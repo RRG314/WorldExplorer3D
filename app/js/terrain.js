@@ -399,6 +399,7 @@ const {
   refreshFarTerrainBoundaryHeights,
   resetFarTerrainClipmap,
   sampleFarTerrainWorldYAt,
+  getFarTerrainSurfaceSnapshot,
   scheduleFarTerrainSurfaceRefresh,
   updateFarTerrainClipmap,
   waitForFarTerrainClipmap
@@ -636,6 +637,7 @@ Object.assign(appCtx, {
   resetEarthStreaming,
   resetLocationTerrainPublication,
   sampleFarTerrainWorldYAt,
+  getFarTerrainSurfaceSnapshot,
   sampleAcceptedGroundAtLatLon,
   sampleAcceptedGroundAtWorldXZ,
   scheduleFarTerrainSurfaceRefresh,

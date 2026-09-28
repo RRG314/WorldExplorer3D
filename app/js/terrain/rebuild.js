@@ -1,3 +1,6 @@
+import {prepareTransportDetail} from './transport-detail-runtime.js';
+import {createRegionalRoadContact} from './regional-road-contact.js';
+import {transportRegionKey} from './transport-detail-plan.js';
 import { STREET_POLYGON_GRID_WORLD } from '../world/compiler/street-polygon-kernel.js';
 import { measurePublishedRoadTriangles, roadSourceCoordinateTolerance } from './published-road-integrity.js';
 import {emitLocalLoadTrace} from '../world/load-trace.js';
@@ -387,6 +390,8 @@ export async function publishCompiledTransportMeshes(deps = {}) {
   } = deps;
 
   if (!appCtx.terrainEnabled || appCtx.roads.length === 0 || appCtx.onMoon) return;
+  appCtx.transportDetail?.dispose();
+  appCtx.transportDetail=null;
   const sequence = appCtx._worldLoadSequence;
   const generation = appCtx._roadMeshGeneration = (appCtx._roadMeshGeneration || 0) + 1;
   const isCurrent = () => sequence === appCtx._worldLoadSequence && generation === appCtx._roadMeshGeneration && !appCtx.onMoon;
@@ -505,6 +510,8 @@ export async function publishCompiledTransportMeshes(deps = {}) {
   const skirtMat = sharedRoadMaterials.skirtMat;
   const markMat = sharedRoadMaterials.markMat;
   const atGradeRoads=[];
+  let detail=null;
+  const initialRegionKeys=new Set();
   await measureAsync('buildStructureRibbons', async () => {
     let sliceStartedAt = now();
     const publishedSharedSurfaces = new Set();
@@ -608,6 +615,18 @@ export async function publishCompiledTransportMeshes(deps = {}) {
 
   if(!isCurrent())return;
   await measureAsync('buildCarriagewayRegions',async()=>{
+    if(typeof Worker==='function') {
+      detail=await prepareTransportDetail(appCtx,atGradeRoads.map(entry=>entry.road),{isCurrent});
+      appCtx.transportDetail=detail;
+      for(const region of detail.initial.regions){
+        initialRegionKeys.add(region.key);
+        for(const batch of region.batches)appendRoadMainGeometry(batch.positions,batch.indices,'at_grade');
+        roadSurfaceIntegrity.carriagewayRegions+=region.keys.length;
+      }
+      detail.initial=null;
+      roadBatchBuilder.finish();
+      return;
+    }
     const partition=await createPavementTerrainPartitionCooperatively(appCtx.terrainGroup?.children || [],{includeFarTerrain:true,current:isCurrent,yieldWork:yieldToMainThread});
     try {
       trace('indexCarriageways:start',{roads:atGradeRoads.length});
@@ -718,7 +737,7 @@ export async function publishCompiledTransportMeshes(deps = {}) {
       if (!isCurrent()) return;
     }
     for (const intersection of intersections) {
-      if (intersection.hasGradeSeparatedRoad) continue;
+      if (intersection.hasGradeSeparatedRoad || (detail&&!initialRegionKeys.has(transportRegionKey(intersection.x,intersection.z)))) continue;
       roadSurfaceIntegrity.junctionSamples++;
       const height = stagedRoadContact.sampleAt(intersection.x, intersection.z, NaN, 'at_grade');
       if (!Number.isFinite(height)) {
@@ -759,7 +778,7 @@ export async function publishCompiledTransportMeshes(deps = {}) {
   for (const mesh of stagedRoadMeshes) appCtx.addEarthWorldObject(mesh);
   appCtx.replaceWorldCollection('roadMeshes', stagedRoadMeshes);
   const previousRoadContact = appCtx.roadContactIndex;
-  appCtx.roadContactIndex = stagedRoadContact;
+  appCtx.roadContactIndex = detail ? createRegionalRoadContact(stagedRoadContact) : stagedRoadContact;
   previousRoadContact?.dispose?.();
   for (const mesh of previousRoadMeshes) {
     mesh.parent?.remove(mesh);
@@ -789,6 +808,8 @@ export async function publishCompiledTransportMeshes(deps = {}) {
     authority: "compiled_transport_surface",
     transportGraphId: appCtx.transportNetworkModel?.id || null,
     roadCount: baseRoads.length,
+    detailScope:detail?'starting-neighborhood':'complete-region',
+    regionalDetailComplete:!detail,
     meshCount: appCtx.roadMeshes.length,
     intersectionCount: intersections.filter(i=>!i.hasGradeSeparatedRoad).length,
     topologyIntersectionCount: intersections.filter((intersection) =>
@@ -806,5 +827,78 @@ export async function publishCompiledTransportMeshes(deps = {}) {
     }),
     worldLoadSequence: appCtx._worldLoadSequence || 0
   });
+  if(detail){
+    const regionalContact=appCtx.roadContactIndex;
+    const junctionsByRegion=new Map();
+    for(const intersection of intersections){
+      if(intersection.hasGradeSeparatedRoad)continue;
+      const key=transportRegionKey(intersection.x,intersection.z);
+      if(!junctionsByRegion.has(key))junctionsByRegion.set(key,[]);
+      junctionsByRegion.get(key).push(intersection);
+    }
+    const updateSummary=complete=>{
+      const previous=appCtx.transportSurfacePublication;
+      if(!previous||!isCurrent())return;
+      appCtx.transportSurfacePublication=Object.freeze({...previous,
+        detailScope:complete?'complete-region':'starting-neighborhood-and-committed-regions',regionalDetailComplete:complete,
+        meshCount:appCtx.roadMeshes.length,
+        vertices:appCtx.roadMeshes.reduce((sum,mesh)=>sum+(mesh.geometry.attributes.position?.count||0),0),
+        triangles:appCtx.roadMeshes.reduce((sum,mesh)=>sum+(mesh.geometry.getIndex()?.count||0)/3,0),
+        roadSurfaceIntegrity:Object.freeze({...roadSurfaceIntegrity})});
+    };
+    detail.attach(async packet=>{
+      if(!isCurrent())throw new DOMException('Transport region superseded','AbortError');
+      const group=new THREE.Group(),meshes=[];
+      let contact=null,committed=false;
+      const schedule={current:isCurrent,yieldWork:yieldToMainThread,budgetMs:2};
+      try {
+        for(const batch of packet.batches)buildIndexedBatchMesh({scene:group,targetList:meshes,
+          verts:batch.positions,indices:batch.indices,material:roadMat,renderOrder:2,frustumCulled:true,
+          userData:{isRoadBatch:true,terrainMode:'at_grade',roadSpatialKey:packet.key,sharedRoadMaterial:true,worldLoadSequence:sequence}});
+        contact=await createRoadContactIndexCooperatively(meshes,16,schedule);
+        // Clip dashes to this region's exact road tops. Neighboring regions own
+        // the other pieces; no marking changes physical collision coverage.
+        const marks=createSpatialRoadBatches();
+        let sliceStartedAt=now();
+        for(const index of packet.roadIndices){
+          const entry=atGradeRoads[index];if(!entry||!shouldRenderRoadCenterMarkings(entry.road))continue;
+          const verts=[],indices=[];
+          appendRoadCenterMarkings(entry.road,entry.points,verts,indices,entry.widths,
+            (x,z)=>cachedTerrainHeight(x,z)+ROAD_SURFACE_BIAS,contact);
+          marks.append(verts,indices,'at_grade');
+          if(now()-sliceStartedAt>=2){await yieldToMainThread();sliceStartedAt=now();}
+          if(!isCurrent())throw new DOMException('Transport region superseded','AbortError');
+        }
+        marks.finish();
+        for(const batch of marks.batches)buildIndexedBatchMesh({scene:group,targetList:meshes,
+          verts:batch.verts,indices:batch.indices,material:markMat,renderOrder:4,receiveShadow:false,frustumCulled:true,
+          userData:{isRoadBatch:true,isRoadMarking:true,roadSpatialKey:packet.key,sharedRoadMaterial:true,worldLoadSequence:sequence}});
+        const measurements={};
+        for(const mesh of meshes){
+          if(mesh.userData.isRoadMarking)continue;
+          const measured=measurePublishedRoadTriangles(mesh.geometry.attributes.position.array,mesh.geometry.getIndex()?.array);
+          for(const [key,value] of Object.entries(measured))measurements[key]=(measurements[key]||0)+value;
+        }
+        for(const junction of junctionsByRegion.get(packet.key)||[]){
+          if(Number.isFinite(contact.sampleAt(junction.x,junction.z,NaN,'at_grade')))continue;
+          const tolerance=roadSourceCoordinateTolerance(junction.x,junction.z,STREET_POLYGON_GRID_WORLD);
+          if(!contact.nearestSurfaceAt(junction.x,junction.z,tolerance,'at_grade'))throw new Error(`Missing road contact in region ${packet.key}`);
+        }
+        if(!isCurrent())throw new DOMException('Transport region superseded','AbortError');
+        // No await between render/contact publication and retirement of the
+        // terrain coverage mask in the controller that owns this callback.
+        regionalContact.add(packet.key,contact);
+        for(const mesh of meshes)appCtx.addEarthWorldObject(mesh);
+        appCtx.replaceWorldCollection('roadMeshes',[...appCtx.roadMeshes,...meshes]);
+        committed=true;
+        roadSurfaceIntegrity.carriagewayRegions+=packet.keys.length;
+        roadSurfaceIntegrity.junctionSamples+=(junctionsByRegion.get(packet.key)||[]).length;
+        for(const [key,value] of Object.entries(measurements))roadSurfaceIntegrity[key]+=value;
+        updateSummary(false);
+      } finally {
+        if(!committed){contact?.dispose();for(const mesh of meshes){mesh.parent?.remove(mesh);mesh.geometry?.dispose();}}
+      }
+    },()=>updateSummary(true));
+  }
   return appCtx.transportSurfacePublication;
 }

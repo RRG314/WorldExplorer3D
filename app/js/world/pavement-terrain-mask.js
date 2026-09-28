@@ -1,6 +1,8 @@
 import {pavementMaskLayout} from './compiler/pavement-mask.js';
 
-export function createPavementTerrainMask(appCtx,keys){
+export function createPavementTerrainMask(appCtx,keys,{kind="pavement",cellSize=64,color=[0.5029,0.4851,0.4564],deferUpload=false}={}){
+  if(!["pavement","road"].includes(kind)||!Number.isFinite(cellSize)||cellSize<=0||color.length!==3||!color.every(Number.isFinite))throw new TypeError("Invalid terrain coverage layer");
+  const names=text=>kind==="road"?text.replaceAll("pavement","roadCoverage").replaceAll("Pavement","RoadCoverage"):text;
   const limit=Math.min(4096,appCtx.renderer?.capabilities?.maxTextureSize||4096),layout=pavementMaskLayout(keys,limit);
   const bytes=new Uint8Array(layout.width*layout.height),addresses=new Uint8Array(layout.lookupWidth*layout.lookupHeight*4);
   const slots=new Map(keys.map((key,index)=>[key,index])),hooks=new Map();
@@ -14,7 +16,7 @@ export function createPavementTerrainMask(appCtx,keys){
   const addressUpload=new THREE.DataTexture(new Uint8Array(4),1,1,THREE.RGBAFormat);
   const uploadPosition=new THREE.Vector2();
   const uploadStats={cells:0,incrementalBytes:0,maxUploadMs:0};
-  const uniforms={pavementMaskAtlas:{value:texture},pavementMaskLookup:{value:lookup},pavementMaskEnabled:{value:1},
+  const uniforms={pavementMaskAtlas:{value:texture},pavementMaskLookup:{value:lookup},pavementMaskEnabled:{value:1},pavementCellSize:{value:cellSize},
     pavementMaskGrid:{value:new THREE.Vector4(layout.minX,layout.minZ,layout.lookupWidth,layout.lookupHeight)},
     pavementMaskLayout:{value:new THREE.Vector4(layout.columns,layout.resolution,layout.width,layout.height)},
     nearPavementBounds:{value:new THREE.Vector4(1,1,-1,-1)}};
@@ -22,19 +24,20 @@ export function createPavementTerrainMask(appCtx,keys){
   uniform sampler2D pavementMaskAtlas;
   uniform sampler2D pavementMaskLookup;
   uniform float pavementMaskEnabled;
+  uniform float pavementCellSize;
   uniform vec4 pavementMaskGrid;
   uniform vec4 pavementMaskLayout;
   uniform vec4 nearPavementBounds;
   float pavementCoverage(){
     if(pavementMaskEnabled<0.5)return 0.0;
     if(all(greaterThanEqual(pavementWorldXZ,nearPavementBounds.xy))&&all(lessThanEqual(pavementWorldXZ,nearPavementBounds.zw)))return 0.0;
-    vec2 cell=floor(pavementWorldXZ/64.0)-pavementMaskGrid.xy;
+    vec2 cell=floor(pavementWorldXZ/pavementCellSize)-pavementMaskGrid.xy;
     if(any(lessThan(cell,vec2(0.0)))||any(greaterThanEqual(cell,pavementMaskGrid.zw)))return 0.0;
     vec4 address=texture2D(pavementMaskLookup,(cell+0.5)/pavementMaskGrid.zw);
     float slot=floor(address.r*255.0+0.5)+floor(address.g*255.0+0.5)*256.0-1.0;
     if(slot<0.0)return 0.0;
     vec2 tile=vec2(mod(slot,pavementMaskLayout.x),floor(slot/pavementMaskLayout.x));
-    vec2 local=clamp(fract(pavementWorldXZ/64.0)*pavementMaskLayout.y,vec2(0.5),vec2(pavementMaskLayout.y-0.5));
+    vec2 local=clamp(fract(pavementWorldXZ/pavementCellSize)*pavementMaskLayout.y,vec2(0.5),vec2(pavementMaskLayout.y-0.5));
     return texture2D(pavementMaskAtlas,(tile*pavementMaskLayout.y+local)/pavementMaskLayout.zw).r;
   }`;
   function restore(material,entry){
@@ -50,11 +53,11 @@ export function createPavementTerrainMask(appCtx,keys){
     for(const material of materials)if(!hooks.has(material)){
       const previousCompile=material.onBeforeCompile,previousKey=material.customProgramCacheKey;
       const compile=(shader,renderer)=>{
-        previousCompile?.call(material,shader,renderer);Object.assign(shader.uniforms,uniforms);
-        shader.vertexShader='varying vec2 pavementWorldXZ;\n'+shader.vertexShader.replace('#include <begin_vertex>','#include <begin_vertex>\npavementWorldXZ=(modelMatrix*vec4(transformed,1.0)).xz;');
-        shader.fragmentShader=prelude+'\n'+shader.fragmentShader.replace('#include <color_fragment>','#include <color_fragment>\ndiffuseColor.rgb=mix(diffuseColor.rgb,vec3(0.5029,0.4851,0.4564),pavementCoverage());');
+        previousCompile?.call(material,shader,renderer);Object.assign(shader.uniforms,Object.fromEntries(Object.entries(uniforms).map(([key,value])=>[names(key),value])));
+        shader.vertexShader=names('varying vec2 pavementWorldXZ;\n')+shader.vertexShader.replace('#include <begin_vertex>',names('#include <begin_vertex>\npavementWorldXZ=(modelMatrix*vec4(transformed,1.0)).xz;'));
+        shader.fragmentShader=names(prelude)+'\n'+shader.fragmentShader.replace('#include <color_fragment>',names(`#include <color_fragment>\ndiffuseColor.rgb=mix(diffuseColor.rgb,vec3(${color.map(n=>n.toFixed(6)).join(',')}),pavementCoverage());`));
       };
-      const key=()=>`${previousKey?.call(material)||''}:pavement-terrain-mask-v1`;
+      const key=()=>`${previousKey?.call(material)||''}:${kind}-terrain-mask-v2`;
       hooks.set(material,{previousCompile,previousKey,compile,key});material.onBeforeCompile=compile;material.customProgramCacheKey=key;material.needsUpdate=true;
     }
     return materials.size;
@@ -67,6 +70,7 @@ export function createPavementTerrainMask(appCtx,keys){
       for(let row=0;row<layout.resolution;row++)bytes.set(mask.subarray(row*layout.resolution,(row+1)*layout.resolution),(y+row)*layout.width+x);
       const [ix,iz]=key.split(':').map(Number),index=((iz-layout.minZ)*layout.lookupWidth+ix-layout.minX)*4;
       addresses[index]=(slot+1)%256;addresses[index+1]=Math.floor((slot+1)/256);
+      if(deferUpload){texture.needsUpdate=true;lookup.needsUpdate=true;return;}
       const started=performance.now();
       cellUpload.image.data=mask;
       addressUpload.image.data.set(addresses.subarray(index,index+4));
@@ -76,6 +80,15 @@ export function createPavementTerrainMask(appCtx,keys){
       uploadStats.maxUploadMs=Math.max(uploadStats.maxUploadMs,performance.now()-started);
       cellUpload.image.data=null;
     },
+    retire(key){
+      if(!slots.has(key))return;
+      const [ix,iz]=key.split(':').map(Number),index=((iz-layout.minZ)*layout.lookupWidth+ix-layout.minX)*4;
+      addresses.fill(0,index,index+4);
+      if(deferUpload){lookup.needsUpdate=true;return;}
+      addressUpload.image.data.fill(0);
+      appCtx.renderer.copyTextureToTexture(uploadPosition.set(ix-layout.minX,iz-layout.minZ),addressUpload,lookup);
+    },
+    finishBulkUpload(){deferUpload=false;},
     dispose(){uniforms.pavementMaskEnabled.value=0;for(const [material,entry] of hooks)restore(material,entry);hooks.clear();texture.dispose();lookup.dispose();cellUpload.dispose();addressUpload.dispose();slots.clear();}
   };
 }

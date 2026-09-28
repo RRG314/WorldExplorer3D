@@ -977,6 +977,7 @@ function createFarFieldTerrainApi(deps = {}) {
     refreshFarTerrainBoundaryHeights,
     resetFarTerrainClipmap,
     sampleFarTerrainWorldYAt,
+    getFarTerrainSurfaceSnapshot: () => farFieldSurfaceState ? {grid:farFieldSurfaceState.surfaceGrid,portals:farFieldMesh?.userData?.structureTerrainPortalDescriptors || []} : null,
     scheduleFarTerrainSurfaceRefresh,
     updateFarTerrainClipmap,
     waitForFarTerrainClipmap

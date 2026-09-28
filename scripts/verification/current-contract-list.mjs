@@ -170,6 +170,7 @@ export const currentContractTests = [
   'tests/terrain-publication-order-current.test.mjs',
   'tests/held-equipment-pose-current.test.mjs',
   'tests/roadside-placement-current.test.mjs',
+  'tests/transport-detail-current.test.mjs',
   'tests/location-quality-current.test.mjs',
   'tests/polar-elevation-current.test.mjs',
   'tests/regional-imagery-current.test.mjs',

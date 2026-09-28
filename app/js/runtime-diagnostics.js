@@ -1207,6 +1207,7 @@ function getWorldExplorerRuntimeDiagnostics() {
     buildingExteriors: appCtx.buildingExteriorDetailPublication || null,
     buildingExteriorMaterials: buildingExteriorMaterialPoolSnapshot(),
     farTerrainClipmap: appCtx.farTerrainClipmapState || null,
+    transportDetail: appCtx.transportDetail?.stats || null,
     quality: appCtx.renderQualityLevel || null,
     earthOrigin: {
       lat: numberOrNull(appCtx.LOC?.lat),

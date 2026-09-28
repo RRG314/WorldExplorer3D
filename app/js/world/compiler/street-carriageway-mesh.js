@@ -5,7 +5,7 @@ import {indexPavementPositions} from '../pavement-indexed-mesh.js';
 // One nonoverlapping top per cell. The terrain-plane partition is temporary
 // height integration while the regional grade solver is being migrated; it is
 // explicit here and must not be reported as independent road-profile authority.
-export function meshCarriagewayTile(tile, sampleTop, partitionSurface) {
+export function meshCarriagewayTile(tile, sampleTop, partitionSurface, {polygons:preparedPolygons} = {}) {
   // A tile repeats boundary vertices in adjacent triangles and terrain cells.
   // Reuse exact numeric coordinates for this synchronous build only. The
   // shared world-height cache remains authoritative across terrain revisions.
@@ -20,7 +20,7 @@ export function meshCarriagewayTile(tile, sampleTop, partitionSurface) {
     }
     return height;
   };
-  const polygons=unionCarriageway(tile);
+  const polygons=preparedPolygons || unionCarriageway(tile);
   if(!polygons.length)return {positions:new Float32Array(),indices:new Uint16Array(),polygons};
   // Terrain partitioning below supplies every actual surface crease. An
   // additional fixed 32-unit grid only creates redundant interior triangles.

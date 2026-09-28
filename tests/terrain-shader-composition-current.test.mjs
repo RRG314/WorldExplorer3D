@@ -35,7 +35,7 @@ test('portal refresh, clear and re-add preserve the subsequently installed pavem
     assert.equal(material.onBeforeCompile, composedHook, 'refresh must not replace a later effect');
     assert.match(shader.fragmentShader, /pavementCoverage\(\)/);
     assert.equal(shader.fragmentShader.includes('structurePortalIndex'), masks.length > 0);
-    assert.match(material.customProgramCacheKey(), /pavement-terrain-mask-v1$/);
+    assert.match(material.customProgramCacheKey(), /pavement-terrain-mask-v2$/);
   }
 });
 
@@ -60,4 +60,22 @@ test('cached portal programs retain the current uniform and release replaced tex
   uniform.value.addEventListener('dispose', () => disposed++);
   assert.equal(compile().uniforms.structurePortalMasks, uniform);
   material.dispose(); assert.equal(uniform.value, null); assert.equal(disposed, 3);
+});
+
+
+test('road overview and pavement retain separate shader uniforms and retirement coverage',t=>{
+ const {ctx,compile}=fixture(t);
+ const road=createPavementTerrainMask(ctx,['0:0'],{kind:'road',cellSize:128,deferUpload:true});
+ const pavement=createPavementTerrainMask(ctx,['0:0'],{deferUpload:true});
+ road.publish('0:0',new Uint8Array(road.layout.resolution**2).fill(255));road.syncMaterials();pavement.syncMaterials();
+ const shader=compile();
+ assert.equal(shader.uniforms.roadCoverageCellSize.value,128);
+ assert.equal(shader.uniforms.pavementCellSize.value,64);
+ assert.notEqual(shader.uniforms.roadCoverageMaskAtlas,shader.uniforms.pavementMaskAtlas);
+ assert.match(shader.fragmentShader,/roadCoverageCoverage\(\)/);
+ assert.match(shader.fragmentShader,/pavementCoverage\(\)/);
+ assert.ok(shader.uniforms.roadCoverageMaskLookup.value.image.data[0]>0);
+ road.retire('0:0');assert.equal(shader.uniforms.roadCoverageMaskLookup.value.image.data[0],0);
+ road.dispose();assert.equal(shader.uniforms.roadCoverageMaskEnabled.value,0);
+ pavement.dispose();
 });

@@ -76,6 +76,11 @@ export function resetWorldForReload(options = {}) {
   const clearBuildingSpatialIndex = typeof options.clearBuildingSpatialIndex === 'function' ? options.clearBuildingSpatialIndex : () => {};
   const resetWorldFurnitureCaches = typeof options.resetWorldFurnitureCaches === 'function' ? options.resetWorldFurnitureCaches : () => {};
 
+  appCtx._roadMeshGeneration=(appCtx._roadMeshGeneration||0)+1;
+  appCtx._cancelTransportPreparation?.();
+  appCtx._cancelTransportPreparation=null;
+  appCtx.transportDetail?.dispose();
+  appCtx.transportDetail=null;
   appCtx.disposeLivingWorldRuntime?.('world_reload');
   appCtx.clearCommunityRealityCapturePresentation?.();
   appCtx.buildingEntranceCatalog = null;
@@ -122,6 +127,8 @@ export function resetWorldForReload(options = {}) {
     appCtx.clearActiveInterior({ restorePlayer: false, preserveCache: true });
   }
 
+  appCtx.transportDetail?.dispose();
+  appCtx.transportDetail=null;
   disposeSceneMeshes(appCtx.roadMeshes);
   appCtx.clearWorldCollections(['roadMeshes', 'roads']);
   // A publication belongs to exactly one world-load sequence. Clearing it here
