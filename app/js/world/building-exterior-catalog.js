@@ -1,3 +1,4 @@
+import { resolveRegionalBuildingStyle } from './regional-building-style.js';
 import { isRuinedBuilding } from './historic-building-semantics.js';
 const BUILDING_EXTERIOR_GENERATOR_VERSION = 'building-exterior-v2';
 
@@ -19,8 +20,10 @@ const MATERIAL_VARIANTS = Object.freeze({
   stucco_cream: Object.freeze({ texture: 'plastered_wall_02', color: 0xd0bd9e, roughness: 0.91, metalness: 0 }),
   stucco_white: Object.freeze({ texture: 'plastered_wall_02', color: 0xd3d1c8, roughness: 0.9, metalness: 0 }),
   stucco_earth: Object.freeze({ texture: 'plastered_wall_02', color: 0xad8e72, roughness: 0.93, metalness: 0 }),
-  siding_light: Object.freeze({ texture: 'plastered_wall_02', color: 0xc4c7c1, roughness: 0.86, metalness: 0, surfacePattern: 'horizontal_siding' }),
-  siding_dark: Object.freeze({ texture: 'plastered_wall_02', color: 0x667476, roughness: 0.88, metalness: 0, surfacePattern: 'horizontal_siding' }),
+  siding_light: Object.freeze({ texture: 'painted_planks', color: 0xc4c7c1, roughness: 0.86, metalness: 0, surfacePattern: 'horizontal_siding' }),
+  siding_dark: Object.freeze({ texture: 'painted_planks', color: 0x667476, roughness: 0.88, metalness: 0, surfacePattern: 'horizontal_siding' }),
+  timber_brown: Object.freeze({ texture: 'timber_planks', color: 0x8d6845, roughness: 0.9, metalness: 0 }),
+  timber_dark: Object.freeze({ texture: 'timber_planks', color: 0x594433, roughness: 0.91, metalness: 0 }),
   metal_silver: Object.freeze({ texture: 'corrugated_iron', color: 0x9ca7aa, roughness: 0.66, metalness: 0.38 }),
   metal_dark: Object.freeze({ texture: 'corrugated_iron', color: 0x4f5a5f, roughness: 0.68, metalness: 0.44 }),
   industrial_panel: Object.freeze({ texture: 'facade_tiles', color: 0x7f898c, roughness: 0.78, metalness: 0.18 }),
@@ -162,7 +165,7 @@ function inferFamilyId(context, seed) {
   if (/hotel|motel|hostel|guest_house/.test(usage)) return 'hotel';
   if (/train_station|transportation|terminal|station/.test(usage)) return 'transit_transport';
   if (/parking|parking_garage/.test(usage)) return 'parking_structure';
-  if (/barn|farm|agricultural|stable|cowshed|farm_auxiliary/.test(usage)) return 'agricultural_farm';
+  if (/(?:^| )(?:barn|farm|agricultural|stable|cowshed|farm_auxiliary)(?: |$)/.test(usage)) return 'agricultural_farm';
   if (/garage|garages|service/.test(type) || /car_repair|vehicle/.test(usage)) return 'garage_service';
   if (/warehouse/.test(usage)) return area >= 900 ? 'distribution_loading' : (seed & 1) ? 'metal_warehouse' : 'brick_warehouse';
   if (/industrial|factory|manufacture|plant/.test(usage)) return area >= 1200 ? 'distribution_loading' : 'industrial_factory';
@@ -183,11 +186,12 @@ function inferFamilyId(context, seed) {
     if (height >= 17 || levels >= 5) return seed % 3 === 0 ? 'apartment_masonry' : 'apartment_midrise';
     return seed % 3 === 0 ? 'apartment_walkup' : 'small_multifamily';
   }
-  if (/terrace|townhouse|semidetached/.test(usage)) {
+  if (type === 'semi' || /terrace|townhouse|semidetached/.test(usage)) {
     if (width <= 8.5 || Math.min(width, depth) <= 7.5) return 'narrow_urban_rowhouse';
     return (seed & 1) ? 'wide_urban_townhouse' : 'attached_brick_residential';
   }
-  if (/house|detached|bungalow|residential/.test(usage)) {
+  if (['detached', 'bungalow', 'cabin', 'farmhouse'].includes(type)) return 'detached_suburban_house';
+  if (/house|detached|bungalow|residential|cabin/.test(usage)) {
     if (denseUrban && Math.min(width, depth) <= 8.2) return 'narrow_urban_rowhouse';
     if (levels >= 3 || height >= 11.5) return 'small_multifamily';
     return 'detached_suburban_house';
@@ -241,8 +245,10 @@ function selectBuildingExteriorProfile(options = {}) {
   const historicMasonry = ruined || options.tags?._landmarkRole === 'fortification_tower' || options.tags?.historic === 'citywalls';
   const familyId = historicMasonry ? 'historic_ruin' : inferFamilyId(context, buildingSeed ^ districtSeed);
   const definition = BUILDING_EXTERIOR_FAMILIES[familyId] || BUILDING_EXTERIOR_FAMILIES.generic_unknown;
-  const regional = compatibleRegionalMaterials(definition, options.location || {});
-  const materials = regional.length > 0 && ((buildingSeed >>> 3) % 4 !== 0)
+  const regionalStyle = historicMasonry ? null : resolveRegionalBuildingStyle(options);
+  const namedArchitecture = options.tags?.['building:architecture'] || options.tags?.architecture || options.tags?.architectural_style;
+  const regional = regionalStyle?.materials || (namedArchitecture ? [] : compatibleRegionalMaterials(definition, options.location || {}));
+  const materials = regionalStyle ? regional : regional.length > 0 && ((buildingSeed >>> 3) % 4 !== 0)
     ? [...regional, ...definition.materials]
     : definition.materials;
   const materialId = choose(materials, buildingSeed ^ (districtSeed >>> 2));
@@ -258,6 +264,7 @@ function selectBuildingExteriorProfile(options = {}) {
   return Object.freeze({
     generatorVersion: BUILDING_EXTERIOR_GENERATOR_VERSION,
     familyId,
+    regionalStyle,
     openings: !historicMasonry,
     category: definition.category,
     materialId,

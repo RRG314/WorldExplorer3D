@@ -307,3 +307,10 @@ baseline and conversion pilot establish the actual work.
 - [Sketchfab developer tools](https://sketchfab.com/developers) and
   [download terms](https://sketchfab.com/terms): authenticated downloads and
   per-asset license obligations. No blanket reuse permission is inferred.
+
+## Regional building implementation
+
+The regional-building extension follows [REGIONAL_BUILDINGS.md](REGIONAL_BUILDINGS.md).
+It includes observation precedence, roof topology, regional evidence, licensed
+asset intake and acceptance across regions. Initial rule and roof changes are
+implemented; broad authored-art coverage and release acceptance remain open.

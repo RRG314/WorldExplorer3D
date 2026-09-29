@@ -51,7 +51,8 @@ function featureTags(layerName, properties = {}, tileIdentity = '') {
   const isPart = layerName === 'building_part';
   const stableId = firstValue(properties, ['id', '@id']);
   const parentId = firstValue(properties, ['building_id', 'buildingId']);
-  const buildingType = firstValue(properties, ['subtype', 'class']) || 'yes';
+  // Overture class is the specific use; subtype is only the broad category.
+  const buildingType = firstValue(properties, ['class', 'subtype']) || 'yes';
   const tags = isPart ? { 'building:part': buildingType } : { building: buildingType };
   const mappings = [
     ['height', ['height']],
@@ -78,6 +79,8 @@ function featureTags(layerName, properties = {}, tileIdentity = '') {
   tags._heightSource = firstValue(properties, ['height_source']) || '';
   tags._overtureBuildingId = isPart ? parentId : stableId;
   tags._overtureFeatureId = stableId;
+  tags._overtureSubtype = firstValue(properties, ['subtype']);
+  tags._overtureClass = firstValue(properties, ['class']);
   tags._overtureParentBuildingId = parentId;
   tags._overtureHasParts = properties.has_parts === true || properties.has_parts === 'true' ? 'yes' : '';
   tags._buildingMetadataSourceId = tags._sourceFeatureId;

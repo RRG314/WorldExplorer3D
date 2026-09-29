@@ -289,5 +289,9 @@ export const currentContractTests = [
   'tests/spacecraft-authority-current.test.mjs',
   'tests/vehicle-handling-current.test.mjs',
   'tests/walking-encounter-director.test.mjs',
+  'tests/building-observation-precedence-current.test.mjs',
+  'tests/roof-plane-geometry-current.test.mjs',
+  'tests/roof-orientation-current.test.mjs',
+  'tests/regional-building-style-current.test.mjs',
   'tests/weapon-reticle-current.test.mjs'
 ];

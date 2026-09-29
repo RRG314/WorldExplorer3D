@@ -110,3 +110,33 @@ not a whole-world frame-rate or memory result. No graphics errors were reported.
 
 The broad regional-art plan and failed full-game performance acceptance are
 still open. The existing local preview artifact predates these source changes.
+
+## Regional building foundation
+
+The regional-building extension passed 33 targeted checks covering source-class
+precedence, mapped/inferred roof authority, distinct roof forms, runoff direction,
+closed single-slope perimeters, regional country lookup, residential classification,
+and facade/part integration. The source gate and whitespace check passed.
+
+Roof and regional-material fixtures were rendered and their screenshots inspected.
+The final regional fixture reported 12 draw calls, six textures and no GL error;
+the roof-direction fixture reported 13 draw calls and no GL error. These are
+small component scenes, not full-world performance measurements.
+
+The Tokyo world check completed loading and walking without browser or local
+asset errors. First playable was 116 seconds in that sample; it was not a matched
+comparison and preceded the coordinate-only country fallback. It is not accepted
+as a loading-performance result.
+
+Four Sketchfab candidates were downloaded and visually inspected. None is
+registered as a runtime building asset: the Japanese diorama is excessively
+fragmented, the Mediterranean model has coarse textures, and the cabin and arched
+window need narrower style eligibility and in-world review. Roof and timber
+surfaces from Poly Haven are integrated with shared texture ownership and
+source/conversion records.
+
+Regional facades remain too similar to meet the intended architectural quality.
+Authored component integration, district and tropical coverage, a current frozen
+world/traversal/space/multiplayer regression run and matched performance acceptance
+remain release requirements. Production and the existing packaged preview have
+not been updated by this work.

@@ -20,6 +20,7 @@ const gltf=await registerMaterialCompatibility(new THREE.GLTFLoader()).loadAsync
 scene.add(root);root.updateMatrixWorld(true);
 const bounds=new THREE.Box3().setFromObject(root),size=bounds.getSize(new THREE.Vector3()),center=bounds.getCenter(new THREE.Vector3());
 root.position.sub(center);const span=Math.max(size.x,size.y,size.z);
+camera.near=Math.max(.001,span/10000);camera.far=Math.max(100,span*20);camera.updateProjectionMatrix();
 camera.position.set(span*.9,span*.55,span*1.7);camera.lookAt(0,0,0);
 const floor=new THREE.Mesh(new THREE.PlaneGeometry(span*8,span*8),new THREE.MeshStandardMaterial({color:0x69727a,roughness:.85}));
 floor.rotation.x=-Math.PI/2;floor.position.y=-size.y/2-.002;scene.add(floor);

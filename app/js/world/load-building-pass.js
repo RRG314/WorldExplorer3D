@@ -30,7 +30,7 @@ import { yieldToMainThread as defaultYieldToMainThread } from './cooperative-sch
 import { isImplausibleTallBuildingFootprint } from './building-geometry-quality.js?v=1';
 import { publishBuildingFacadeEntrances } from './building-facade-entrances.js?v=4';
 import { publishBuildingExteriorDetails } from './building-exterior-details.js?v=2';
-import { resolveBuildingExteriorPresentation } from '../engine/building-facade-materials.js?v=19';
+import { buildingRoofSurface, resolveBuildingExteriorPresentation } from '../engine/building-facade-materials.js?v=19';
 import { mappedBuildingAddress } from '../real-estate/public-address.js?v=1';
 
 export function requiresLoadedRoadCoverageForBuilding(tags = {}) {
@@ -487,6 +487,7 @@ export async function buildBuildingGeometryPass(options = {}) {
         buildingType: bt,
         denseUrban: denseUrbanContext,
         footprintArea,
+        location: appCtx.LOC,
         levels: resolvedLevels
       }
     ));
@@ -680,7 +681,11 @@ export async function buildBuildingGeometryPass(options = {}) {
       baseElevation,
       (mappedRoof?.wallHeight || 0) + terrainFoundationRise,
       mappedRoof,
-      way.tags
+      way.tags,
+      mappedRoof ? (() => {
+        const surface=buildingRoofSurface(appCtx, way.tags['roof:material'] || mappedRoof.material || '');
+        return surface ? {...surface,gableColor:resolvedExteriorPresentation?.tintHex ?? mesh.userData.exteriorPresentation?.wallColor ?? baseColor} : null;
+      })() : null
     );
     if (mappedRoofMesh) {
       mappedRoofMesh.userData.sourceBuildingId = sourceBuildingId;

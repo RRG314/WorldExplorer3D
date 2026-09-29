@@ -11,6 +11,10 @@ const facadeTexturePool = new Map();
 let entranceAtlasTexture = null;
 
 const FACADE_TEXTURES = Object.freeze({
+  painted_planks: '/app/assets/textures/facades/white_planks_clean-diffuse-1k.webp',
+  timber_planks: '/app/assets/textures/facades/japanese_cedar_planks-diffuse-1k.webp',
+  roof_terracotta: '/app/assets/textures/roofs/roof_tiles-diffuse-1k.webp',
+  roof_slate: '/app/assets/textures/roofs/roof_slates_03-diffuse-1k.webp',
   historic_stone: '/app/assets/textures/facades/polyhaven-stone-brick-wall-001-diff-1k.jpg',
   brick_wall_001: '/app/assets/textures/earth/brick_wall_001_diffuse.jpg',
   brick_wall_07: '/app/assets/textures/facades/polyhaven-brick-wall-07-diff-1k.jpg',
@@ -256,6 +260,8 @@ function facadeTextureRepeat(facadeStyle) {
 
 function surfaceTextureRepeat(textureId, facadeStyle, lodTier) {
   // Architectural layout is independent of LOD; surface grain retains metre scale.
+  if (textureId === 'painted_planks') return { x: 1 / 1.8, y: 1 / 1.8 };
+  if (textureId === 'timber_planks') return { x: 1 / 1.13, y: 1 / 1.13 };
   if (textureId === 'historic_stone') return { x: 0.4, y: 0.4 };
   if (textureId === 'glass_curtain') return { x: 0.18, y: 0.18 };
   if (textureId === 'stone_civic') return { x: 0.13, y: 0.13 };
@@ -460,6 +466,15 @@ function applyWallOnlyFacadeMap(material, roof, entranceAtlas, exteriorProfile) 
   material.customProgramCacheKey = () => 'building-facade-local-layout-v11-filtered-openings';
 }
 
+export function buildingRoofSurface(appCtx, materialName = '') {
+  const material = String(materialName).trim().toLowerCase();
+  if (['roof_tiles','tiles','tile','clay','terracotta'].includes(material)) {
+    return {id:'roof_terracotta',map:facadeTexture(appCtx,'roof_terracotta'),physicalWidthMeters:2};
+  }
+  if (material === 'slate') return {id:'roof_slate',map:facadeTexture(appCtx,'roof_slate'),physicalWidthMeters:3};
+  return null;
+}
+
 export function resolveBuildingExteriorPresentation(engineContext, buildingType, buildingSeed, baseColorHex, options = {}) {
   const appCtx = engineContext?.appCtx || engineContext;
   const mappedFamily = normalizeMappedMaterial(options.facadeMaterial);
@@ -480,7 +495,7 @@ export function resolveBuildingExteriorPresentation(engineContext, buildingType,
     stone: ['light_stone', 'dark_stone'],
     concrete: ['concrete_light', 'concrete_dark', 'concrete_panel'],
     stucco: ['stucco_cream', 'stucco_white', 'stucco_earth'],
-    wood: ['siding_light', 'siding_dark'],
+    wood: ['timber_brown', 'timber_dark'],
     glass: ['glass_blue', 'glass_neutral', 'glass_dark'],
     metal: ['metal_silver', 'metal_dark', 'industrial_panel']
   };

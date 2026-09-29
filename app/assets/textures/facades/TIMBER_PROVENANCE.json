@@ -1,0 +1,33 @@
+[
+  {
+    "id": "white_planks_clean",
+    "authors": [
+      "Rob Tuytel"
+    ],
+    "license": "CC0-1.0",
+    "page": "https://polyhaven.com/a/white_planks_clean",
+    "physicalWidthMeters": 1.8,
+    "rotationDegrees": 90,
+    "sourceUrl": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/white_planks_clean/white_planks_clean_diff_1k.jpg",
+    "sourceMd5": "50b7addfff3f66b46c0182d23faf2882",
+    "file": "white_planks_clean-diffuse-1k.webp",
+    "bytes": 67552,
+    "sha256": "1f07d68c79fc93493492e9f9f8c5662ad971ec72444b735bbf69ae42a0a7c9e2"
+  },
+  {
+    "id": "japanese_cedar_planks",
+    "authors": [
+      "Charlotte Baglioni",
+      "Rico Cilliers"
+    ],
+    "license": "CC0-1.0",
+    "page": "https://polyhaven.com/a/japanese_cedar_planks",
+    "physicalWidthMeters": 1.13,
+    "rotationDegrees": 0,
+    "sourceUrl": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/japanese_cedar_planks/japanese_cedar_planks_diff_1k.jpg",
+    "sourceMd5": "a88e63ae003679e2d356807c57363eaf",
+    "file": "japanese_cedar_planks-diffuse-1k.webp",
+    "bytes": 181504,
+    "sha256": "9540db1fe381b39133fe8f41e055a22cdb687db93d89683e1ddb90bd81644edb"
+  }
+]

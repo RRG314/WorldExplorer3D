@@ -1,3 +1,5 @@
+import { resolveRegionalBuildingStyle } from './regional-building-style.js';
+import { roofPlaneTriangles } from './roof-plane-geometry.js';
 const NON_FLAT_ROOF_SHAPES = new Set([
   'dome',
   'gabled',
@@ -16,7 +18,7 @@ const GENERIC_ROOF_MAX_HEIGHT_METERS = 24;
 const GENERIC_ROOF_MAX_LEVELS = 6;
 const GENERIC_ROOF_MAX_TOP_METERS = 32;
 const CONTEXTUAL_PITCHED_BUILDING_TYPES = new Set([
-  'house', 'detached', 'semidetached_house', 'bungalow', 'farmhouse'
+  'house', 'dwelling_house', 'detached', 'semi', 'semidetached_house', 'bungalow', 'farmhouse', 'cabin'
 ]);
 
 function numericValue(value, fallback = NaN) {
@@ -107,12 +109,28 @@ function longestEdgeAxis(pts) {
   return best;
 }
 
-function roofAxis(pts, directionDegrees) {
-  if (Number.isFinite(directionDegrees)) {
-    const radians = directionDegrees * Math.PI / 180;
-    return { x: Math.sin(radians), z: -Math.cos(radians) };
+// OSM roof:direction describes runoff, not the ridge. Local +X is east
+// and +Z is south. Preserve numeric and 16-point compass observations.
+function roofDirection(value) {
+  const text = String(value ?? '').trim().toUpperCase();
+  const compass = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE',
+    'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
+  const index = compass.indexOf(text);
+  if (index >= 0) return index * 22.5;
+  if (!text) return NaN;
+  const degrees = Number(text);
+  return Number.isFinite(degrees) && degrees >= 0 && degrees <= 360 ? degrees : NaN;
+}
+
+function roofAxis(pts, tags) {
+  const direction = roofDirection(tags['roof:direction']);
+  if (Number.isFinite(direction)) {
+    const radians = direction * Math.PI / 180;
+    return { x: Math.cos(radians), z: Math.sin(radians) };
   }
-  return longestEdgeAxis(pts);
+  const axis = longestEdgeAxis(pts);
+  return String(tags['roof:orientation'] || '').trim().toLowerCase() === 'across'
+    ? { x: -axis.z, z: axis.x } : axis;
 }
 
 function pushTriangle(positions, a, b, c) {
@@ -150,46 +168,9 @@ function apexRoofGeometry(pts, roofHeight) {
   return geometryFromTriangles(positions);
 }
 
-function ridgeRoofGeometry(pts, roofHeight, directionDegrees) {
+function skillionRoofGeometry(pts, roofHeight, tags) {
   const metrics = footprintMetrics(pts);
-  const axis = roofAxis(pts, directionDegrees);
-  const center = { x: metrics.centerX, z: metrics.centerZ };
-  const projected = pts.map((point) =>
-    (point.x - center.x) * axis.x + (point.z - center.z) * axis.z
-  );
-  const minAlong = Math.min(...projected);
-  const maxAlong = Math.max(...projected);
-  const ridgePoint = (along) => ({
-    x: center.x + axis.x * along,
-    y: roofHeight,
-    z: center.z + axis.z * along
-  });
-  const positions = [];
-  for (let index = 0; index < pts.length; index++) {
-    const nextIndex = (index + 1) % pts.length;
-    const current = pts[index];
-    const next = pts[nextIndex];
-    const edgeLength = Math.hypot(next.x - current.x, next.z - current.z) || 1;
-    const edgeAxis = { x: (next.x - current.x) / edgeLength, z: (next.z - current.z) / edgeLength };
-    const parallel = Math.abs(edgeAxis.x * axis.x + edgeAxis.z * axis.z) >= 0.7;
-    const p0 = { x: current.x, y: 0, z: current.z };
-    const p1 = { x: next.x, y: 0, z: next.z };
-    if (parallel) {
-      const r0 = ridgePoint(Math.max(minAlong, Math.min(maxAlong, projected[index])));
-      const r1 = ridgePoint(Math.max(minAlong, Math.min(maxAlong, projected[nextIndex])));
-      pushTriangle(positions, p0, p1, r1);
-      pushTriangle(positions, p0, r1, r0);
-    } else {
-      const ridge = ridgePoint((projected[index] + projected[nextIndex]) * 0.5);
-      pushTriangle(positions, p0, p1, ridge);
-    }
-  }
-  return geometryFromTriangles(positions);
-}
-
-function skillionRoofGeometry(pts, roofHeight, directionDegrees) {
-  const metrics = footprintMetrics(pts);
-  const axis = roofAxis(pts, directionDegrees);
+  const axis = roofAxis(pts, tags);
   const across = { x: -axis.z, z: axis.x };
   const projections = pts.map((point) =>
     (point.x - metrics.centerX) * across.x + (point.z - metrics.centerZ) * across.z
@@ -206,6 +187,13 @@ function skillionRoofGeometry(pts, roofHeight, directionDegrees) {
     z: pts[index].z
   });
   for (const face of faces) pushTriangle(positions, vertex(face[0]), vertex(face[1]), vertex(face[2]));
+  // The body stops at the low eave. Close the three raised perimeter walls
+  // explicitly so approaching a single-slope building cannot expose its inside.
+  for (let i = 0; i < pts.length; i++) {
+    const a = vertex(i), b = vertex((i + 1) % pts.length);
+    if (a.y > 1e-8) pushTriangle(positions, {...a, y: 0}, a, {...b, y: 0});
+    if (b.y > 1e-8) pushTriangle(positions, a, b, {...b, y: 0});
+  }
   return geometryFromTriangles(positions);
 }
 
@@ -237,9 +225,12 @@ export function resolveMappedRoof(tags = {}, heightMeters = 0, buildingSemantics
     baseOffset + resolvedHeight > GENERIC_ROOF_MAX_TOP_METERS ||
     (Number.isFinite(mappedLevels) && mappedLevels > GENERIC_ROOF_MAX_LEVELS)
   ) return null;
-  const mappedShape = String(tags['roof:shape'] || '').trim().toLowerCase();
+  const mappedShape = String(tags['roof:shape'] || '').trim().toLowerCase().replaceAll('_', '-');
   const shape = NON_FLAT_ROOF_SHAPES.has(mappedShape) ? mappedShape : '';
   if (!NON_FLAT_ROOF_SHAPES.has(shape)) {
+    // Missing data can be inferred. Explicit flat or unsupported mapped shapes
+    // must not silently turn into an invented residential gable.
+    if (mappedShape) return null;
     const buildingType = String(tags.building || context.buildingType || '').trim().toLowerCase();
     const metrics = Array.isArray(pts) && pts.length >= 3 ? footprintMetrics(pts) : null;
     const levels = numericValue(tags['building:levels'], Number(context.levels));
@@ -250,11 +241,19 @@ export function resolveMappedRoof(tags = {}, heightMeters = 0, buildingSemantics
       metrics && metrics.area >= 28 && metrics.area <= 280 &&
       stableRoofFootprint('gabled', pts);
     if (!contextualCandidate) return null;
-    const roofHeight = Math.max(.8, Math.min(3.2, Math.min(metrics.width, metrics.depth) * .24, resolvedHeight * .3));
+    const regionalStyle = resolveRegionalBuildingStyle({...context,tags,heightMeters:resolvedHeight});
+    const recommendation = regionalStyle?.roof;
+    const observedHeight = numericValue(tags['roof:height']);
+    const hasObservedHeight = Number.isFinite(observedHeight) && observedHeight > 0;
+    const roofHeight = hasObservedHeight ? Math.min(observedHeight, resolvedHeight) :
+      Math.max(.8, Math.min(3.2, Math.min(metrics.width, metrics.depth) * (recommendation?.pitchRatio || .24), resolvedHeight * .3));
     return {
-      shape: 'gabled',
+      shape: recommendation?.shape || 'gabled',
+      color: recommendation?.color,
+      material: recommendation?.material,
+      regionalStyleId: recommendation ? regionalStyle.id : null,
       roofHeight,
-      roofHeightSource: 'context_modeled_from_footprint_span',
+      roofHeightSource: hasObservedHeight ? 'mapped' : 'context_modeled_from_footprint_span',
       roofShapeSource: 'context_inferred_explicit_lowrise_residential',
       wallHeight: Math.max(0, resolvedHeight - roofHeight),
       fullPartRoof: false
@@ -279,31 +278,57 @@ export function resolveMappedRoof(tags = {}, heightMeters = 0, buildingSemantics
   };
 }
 
-export function createMappedRoofMesh(pts, baseElevation, wallHeight, roofSpec, tags = {}) {
+export function createMappedRoofMesh(pts, baseElevation, wallHeight, roofSpec, tags = {}, surface = null) {
   if (!roofSpec) return null;
-  const direction = numericValue(tags['roof:direction']);
   let geometry = null;
   if (roofSpec.shape === 'skillion') {
-    geometry = skillionRoofGeometry(pts, roofSpec.roofHeight, direction);
+    geometry = skillionRoofGeometry(pts, roofSpec.roofHeight, tags);
   } else if (['dome', 'onion', 'round'].includes(roofSpec.shape)) {
     geometry = domeRoofGeometry(pts, roofSpec.roofHeight);
-  } else if (['gabled', 'gambrel', 'half-hipped', 'mansard'].includes(roofSpec.shape)) {
-    geometry = ridgeRoofGeometry(pts, roofSpec.roofHeight, direction);
+  } else if (['gabled', 'gambrel', 'half-hipped', 'hipped', 'mansard'].includes(roofSpec.shape)) {
+    geometry = geometryFromTriangles(roofPlaneTriangles(pts, roofSpec.shape, roofSpec.roofHeight, roofAxis(pts, tags)));
   } else {
     geometry = apexRoofGeometry(pts, roofSpec.roofHeight);
   }
   if (!geometry) return null;
   const mappedColor = String(tags['roof:colour'] || tags['roof:color'] || '').trim();
-  const color = /^#[0-9a-f]{3}([0-9a-f]{3})?$/i.test(mappedColor) ? mappedColor : '#686d72';
+  const validMappedColor = /^#[0-9a-f]{3}([0-9a-f]{3})?$/i.test(mappedColor) ||
+    Object.hasOwn(THREE.Color.NAMES, mappedColor.toLowerCase());
+  const color = validMappedColor ? mappedColor.toLowerCase() : roofSpec.color || '#686d72';
+  if (surface?.map) {
+    if(geometry.index){const indexed=geometry;geometry=indexed.toNonIndexed();indexed.dispose();}
+    const position=geometry.getAttribute('position'), normal=geometry.getAttribute('normal'), uvs=[];
+    const scale=1/Math.max(.1,Number(surface.physicalWidthMeters)||2);
+    for(let i=0;i<position.count;i+=3){
+      const n=new THREE.Vector3().fromBufferAttribute(normal,i);
+      const u=new THREE.Vector3(n.z,0,-n.x);
+      if(u.lengthSq()<1e-8)u.set(1,0,0);else u.normalize();
+      const v=new THREE.Vector3().crossVectors(n,u).normalize();
+      for(let j=0;j<3;j++){const p=new THREE.Vector3().fromBufferAttribute(position,i+j);uvs.push(p.dot(u)*scale,p.dot(v)*scale);}
+    }
+    geometry.setAttribute('uv',new THREE.Float32BufferAttribute(uvs,2));
+  }
   const material = new THREE.MeshStandardMaterial({
-    color,
+    map: surface?.map || null,
+    color: surface?.map && !validMappedColor ? 0xffffff : color,
     roughness: /metal/.test(String(tags['roof:material'] || '').toLowerCase()) ? 0.62 : 0.9,
     metalness: /metal/.test(String(tags['roof:material'] || '').toLowerCase()) ? 0.22 : 0.03,
     side: THREE.DoubleSide
   });
+  if(surface?.map){
+    const gableColor=new THREE.Color(surface.gableColor ?? '#c4bcae');
+    material.onBeforeCompile=shader=>{
+      shader.uniforms.roofGableColor={value:gableColor};
+      shader.vertexShader='varying float roofSlopeMask;\n'+shader.vertexShader;
+      shader.vertexShader=shader.vertexShader.replace('#include <beginnormal_vertex>','#include <beginnormal_vertex>\nroofSlopeMask=step(0.01,abs(objectNormal.y));');
+      shader.fragmentShader='varying float roofSlopeMask; uniform vec3 roofGableColor;\n'+shader.fragmentShader;
+      shader.fragmentShader=shader.fragmentShader.replace('#include <map_fragment>','#include <map_fragment>\ndiffuseColor.rgb=mix(roofGableColor,diffuseColor.rgb,roofSlopeMask);');
+    };
+    material.customProgramCacheKey=()=> 'mapped-roof-surface-v1';
+  }
   material.userData = {
     ...(material.userData || {}),
-    buildingBatchKey: `building-roof:${roofSpec.roofShapeSource}:${roofSpec.shape}:${new THREE.Color(color).getHexString()}:${/metal/.test(String(tags['roof:material'] || '').toLowerCase()) ? 'metal' : 'solid'}`
+    buildingBatchKey: `building-roof:${surface?.id || 'plain'}:${surface?.gableColor ?? 'default'}:${roofSpec.roofShapeSource}:${roofSpec.shape}:${new THREE.Color(color).getHexString()}:${/metal/.test(String(tags['roof:material'] || '').toLowerCase()) ? 'metal' : 'solid'}`
   };
   const mesh = new THREE.Mesh(geometry, material);
   mesh.position.y = baseElevation + Math.max(0, wallHeight);

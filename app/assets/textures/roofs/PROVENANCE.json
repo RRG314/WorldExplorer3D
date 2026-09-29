@@ -1,0 +1,26 @@
+[
+  {
+    "id": "roof_tiles",
+    "author": "Stephan Seeliger",
+    "license": "CC0-1.0",
+    "page": "https://polyhaven.com/a/roof_tiles",
+    "physicalWidthMeters": 2,
+    "sourceUrl": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/roof_tiles/roof_tiles_diff_1k.jpg",
+    "sourceMd5": "525e8cac13027e36f47844f3240fdde8",
+    "file": "roof_tiles-diffuse-1k.webp",
+    "bytes": 415672,
+    "sha256": "d628e8511f7398f8b8f0b022c5ea6cb4c829223cd92a41645a29bc785da4d8c9"
+  },
+  {
+    "id": "roof_slates_03",
+    "author": "Rob Tuytel",
+    "license": "CC0-1.0",
+    "page": "https://polyhaven.com/a/roof_slates_03",
+    "physicalWidthMeters": 3,
+    "sourceUrl": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/roof_slates_03/roof_slates_03_diff_1k.jpg",
+    "sourceMd5": "b416c53d9720ff8b057631ccc6331bf3",
+    "file": "roof_slates_03-diffuse-1k.webp",
+    "bytes": 201840,
+    "sha256": "3370fad48b1b01d961bf6cbebe14edd34702a1fc3ba3eee7218cdf7753ddd07c"
+  }
+]

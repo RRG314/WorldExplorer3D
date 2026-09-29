@@ -83,3 +83,24 @@ license in `functions/vendor/earcut/`.
 ### Historic masonry
 
 [Stone Brick Wall 001](https://polyhaven.com/a/stone_brick_wall_001), photographed by Dimitrios Savva and processed by Rico Cilliers, CC0. The 1K diffuse map supplies representative historic masonry; it is not a scan of a particular monument. See [asset notice](app/assets/textures/facades/HISTORIC_STONE_LICENSE.md).
+
+### Building roof surfaces
+
+- [Roof Tiles](https://polyhaven.com/a/roof_tiles) by Stephan Seeliger — CC0.
+- [Roof Slates 03](https://polyhaven.com/a/roof_slates_03) by Rob Tuytel — CC0.
+
+Converted to 1K WebP for shared building materials. Source checksums, output
+checksums and physical texture dimensions are recorded in
+`app/assets/textures/roofs/PROVENANCE.json`.
+
+Regional building fallback uses an subset of [Natural Earth 1:10m
+country polygons](https://www.naturalearthdata.com/downloads/10m-cultural-vectors/10m-admin-0-countries/), public domain.
+This is approximate visual-region context, not a property boundary or legal map.
+
+## Timber facade surfaces
+
+- [White Planks Clean](https://polyhaven.com/a/white_planks_clean), Rob Tuytel — CC0. Rotated for horizontal painted siding.
+- [Japanese Cedar Planks](https://polyhaven.com/a/japanese_cedar_planks), Charlotte Baglioni (scanning) and Rico Cilliers (processing) — CC0. Representative timber grain, not evidence of a particular building's timber species.
+
+The shared 1K maps retain physical scale. Conversion details and hashes are in
+`app/assets/textures/facades/TIMBER_PROVENANCE.json`.
