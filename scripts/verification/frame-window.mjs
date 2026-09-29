@@ -32,6 +32,7 @@ export async function sampleFrameWindow(durationMs) {
         const diagnostics = globalThis.getWorldExplorerRuntimeDiagnostics?.() || {};
         resolve({
           deltas,
+          firstFrameDelayMs: startedAt-requestedAt,
           elapsedMs: now-startedAt,
           routeComplete: Boolean(routeComplete),
           startPosition,

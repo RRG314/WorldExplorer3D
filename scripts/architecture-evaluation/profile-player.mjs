@@ -23,6 +23,14 @@ let deadline;try{
  const context=await browser.newContext({viewport:report.viewport,deviceScaleFactor:1});const page=await context.newPage();
  await configureStagingAppCheck(page,`http://127.0.0.1:${server.port}`);
  await page.addInitScript(()=>{globalThis.__architectureLongTasks=[];globalThis.__architectureLongTasksDropped=0;try{new PerformanceObserver(list=>{for(const e of list.getEntries()){if(globalThis.__architectureLongTasks.length<10000)globalThis.__architectureLongTasks.push({startTime:e.startTime,duration:e.duration});else globalThis.__architectureLongTasksDropped++;}}).observe({type:'longtask',buffered:true});}catch{}localStorage.setItem('worldExplorerRenderQualityLevel','med');localStorage.setItem('worldExplorerPerfAutoQuality','0');});
+ if(process.env.WE3D_PROFILE_SHADER_STALLS==='1')await page.addInitScript(()=>{
+  globalThis.__shaderStalls=[];
+  for(const Type of [globalThis.WebGLRenderingContext,globalThis.WebGL2RenderingContext]){
+   if(!Type)continue;const original=Type.prototype.getProgramInfoLog;
+   Type.prototype.getProgramInfoLog=function(program){const started=performance.now();const result=original.call(this,program);const elapsed=performance.now()-started;
+    if(elapsed>10&&globalThis.__shaderStalls.length<100)globalThis.__shaderStalls.push({started,elapsed,defines:this.getAttachedShaders(program).map(shader=>(this.getShaderSource(shader)||'').split('\n').filter(line=>line.startsWith('#define')).slice(0,100))});return result;};
+  }
+ });
  page.on('pageerror',e=>report.errors.push(String(e.message).replace(/[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}/gi,'[id]')));
  const cdp=await context.newCDPSession(page);await cdp.send('Performance.enable');
  const metrics=async()=>Object.fromEntries((await cdp.send('Performance.getMetrics')).metrics.map(x=>[x.name,x.value]));
@@ -97,7 +105,8 @@ let deadline;try{
   try{await page.waitForTimeout(10000);}finally{await page.keyboard.up(key);const {profile}=await cdp.send('Profiler.stop');await writeFile(`${out}/${id}.cpuprofile`,JSON.stringify(profile));}
  }
  if(process.env.WE3D_PROFILE_CONTROLLED_TRAVEL==='1'){
-  report.routeScope='Repeatable scenario setup; normal physics and keyboard input thereafter. Driving 100 m, flight 1500 m above the same city; no climb-key loops.';
+  const timedTravelSeconds=Number(process.env.WE3D_PROFILE_TRAVEL_SECONDS)||0;
+  report.routeScope=timedTravelSeconds ? `Diagnostic ${timedTravelSeconds}s input windows; no route completion claim.` : 'Repeatable scenario setup; normal physics and keyboard input thereafter. Driving 100 m, flight 1500 m above the same city; no climb-key loops.';
   async function populationPresentation(){return page.evaluate(async()=>{
    const {ctx}=await import('/app/js/shared-context.js?v=55');let nodes=0,bones=0;
    ctx.earthSceneRoot?.traverse(o=>{nodes++;bones+=o.isBone?1:0;});
@@ -117,12 +126,16 @@ let deadline;try{
      else Object.assign(actor,{y:300,speed:80,horizontalSpeed:80,vx:0,vy:0,vz:80,throttle:1,airborne:true,stalled:false});
      globalThis.__TRAVEL_PROFILE_ACTOR__=actor;
     },mode);
+    const captureCpu=process.env.WE3D_PROFILE_CONTROLLED_CPU==='1';
+    if(captureCpu){await cdp.send('Profiler.enable');await cdp.send('Profiler.start');}
     const key=mode==='drive'?'w':'Space';await page.keyboard.down(key);let raw;
-    try{raw=await page.evaluate(sampleFrameWindow,{durationMs:30000,targetDistance:mode==='drive'?100:1500,actorKey:'__TRAVEL_PROFILE_ACTOR__'});}finally{await page.keyboard.up(key);}
+    try{raw=await page.evaluate(sampleFrameWindow,{durationMs:timedTravelSeconds ? timedTravelSeconds*1000 : 30000,targetDistance:timedTravelSeconds ? 0 : mode==='drive'?100:1500,actorKey:'__TRAVEL_PROFILE_ACTOR__'});}finally{await page.keyboard.up(key);}
+    if(captureCpu){const {profile}=await cdp.send('Profiler.stop');await writeFile(`${out}/controlled-${mode}-${repeat}.cpuprofile`,JSON.stringify(profile));}
+    await writeFile(`${out}/controlled-${mode}-${repeat}-frames.json`,JSON.stringify(raw.deltas));
     const sorted=[...raw.deltas].sort((a,b)=>a-b);
-    report.samples.push({id:`controlled-${mode}-${repeat}`,routeComplete:raw.routeComplete,elapsedMs:raw.elapsedMs,fps:sorted.length*1000/raw.elapsedMs,p95Ms:sorted[Math.ceil(sorted.length*.95)-1],p99Ms:sorted[Math.ceil(sorted.length*.99)-1],maxMs:sorted.at(-1),start:raw.startPosition,end:raw.endPosition,renderer:raw.diagnostics.renderer,worldCounts:raw.diagnostics.worldCounts});await save();
+    report.samples.push({id:`controlled-${mode}-${repeat}`,routeComplete:raw.routeComplete,elapsedMs:raw.elapsedMs,fps:sorted.length*1000/raw.elapsedMs,firstFrameDelayMs:raw.firstFrameDelayMs,p95Ms:sorted[Math.ceil(sorted.length*.95)-1],p99Ms:sorted[Math.ceil(sorted.length*.99)-1],maxMs:sorted.at(-1),start:raw.startPosition,end:raw.endPosition,renderer:raw.diagnostics.renderer,worldCounts:raw.diagnostics.worldCounts,runtimeKernel:await page.evaluate(()=>getWorldExplorerRuntimeDiagnostics().runtimeKernel)});await save();
     await page.screenshot({path:`${out}/controlled-${mode}-${repeat}.png`});
-    if(!raw.routeComplete)throw Error(`${mode} failed to complete controlled route`);
+    if(!timedTravelSeconds&&!raw.routeComplete)throw Error(`${mode} failed to complete controlled route`);
    }
    report.populationPresentation[mode]=await populationPresentation();await save();
   }
@@ -167,6 +180,16 @@ let deadline;try{
   await page.waitForFunction(()=>JSON.parse(globalThis.render_game_to_text?.()||'{}').modes?.space===true,null,{timeout:120000});
   report.noticeSpaceTransitionPassed=true;await page.waitForTimeout(3000);await page.screenshot({path:`${out}/space-after-menu.png`});await save();
  }
+ if(process.env.WE3D_PROFILE_SKY_CYCLE==='1'){
+  report.skyCycle=[];
+  for(const mode of ['night','day']){
+   for(let i=0;i<7&&await page.locator('#quickTimeOfDay').getAttribute('data-mode')!==mode;i++)await page.locator('#quickTimeOfDay').click();
+   await page.waitForTimeout(1200);
+   report.skyCycle.push(await page.evaluate(async()=>{const {ctx}=await import('/app/js/shared-context.js?v=55');return {mode:document.querySelector('#quickTimeOfDay').dataset.mode,visible:ctx.starField.visible,matrixFinite:ctx.starField.children.every(node=>node.matrixWorld.elements.every(Number.isFinite))};}));
+   await page.screenshot({path:`${out}/sky-${mode}.png`});
+  }
+  if(!report.skyCycle[0].visible||report.skyCycle[1].visible||report.skyCycle.some(entry=>!entry.matrixFinite))throw Error('Sky cycle failed');
+ }
  if(process.env.WE3D_PROFILE_ENVIRONMENTS==='1'){
   for(const [id,action,ready] of [
    ['ocean','fOceanMode',()=>JSON.parse(globalThis.render_game_to_text?.()||'{}').modes?.ocean===true],
@@ -205,6 +228,7 @@ let deadline;try{
   }
  }
  report.longTasks=await page.evaluate(()=>({entries:globalThis.__architectureLongTasks||[],dropped:globalThis.__architectureLongTasksDropped||0,scope:'Observer long tasks above 50 ms; renderer/GPU and asynchronous waits are not measured as blocking.'}));
+ report.shaderStalls=await page.evaluate(()=>globalThis.__shaderStalls||[]);
  report.complete=true;console.log('profile: complete');
 }catch(e){report.failure=String(e.message);console.log('profile: failed',report.failure);}finally{clearTimeout(deadline);await save();await browser?.close().catch(()=>{});await server.close();}
 if(!report.complete)process.exitCode=1;

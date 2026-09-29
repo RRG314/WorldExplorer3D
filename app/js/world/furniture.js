@@ -1,3 +1,4 @@
+import {yieldToWorldFrame} from './cooperative-scheduling.js?v=1';
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import {disposeVegetationBatch,renderVegetationModelsCooperatively} from './vegetation-models.js';
 import {publishVegetationCooperatively} from './vegetation-publication.js';
@@ -679,6 +680,7 @@ async function refreshVegetationInBackground(revision,loadSequence) {
     const count=await publishVegetationCooperatively(appCtx,{
       collect:collectWorldVegetationPlacementsCooperatively,
       render:renderVegetationModelsCooperatively,dispose:disposeVegetationBatch,current,
+      yieldWork:yieldToWorldFrame,budgetMs:2,
       onSlice:ms=>{maxSliceMs=Math.max(maxSliceMs,ms);}
     });
     if(current() && count!==null){

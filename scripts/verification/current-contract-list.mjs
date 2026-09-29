@@ -1,5 +1,9 @@
 // Component and source-contract checks; browser and emulator journeys run separately.
 export const currentContractTests = [
+  'tests/street-source-scheduling-current.test.mjs',
+  'tests/world-frame-yield-current.test.mjs',
+  'tests/sky-matrix-updates-current.test.mjs',
+  'tests/world-suppression-query-current.test.mjs',
   'tests/terrain-scalar-storage-current.test.mjs',
   'tests/loading-memory-current.test.mjs',
   'tests/planetary-star-selection-current.test.mjs',

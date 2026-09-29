@@ -30,6 +30,7 @@ function harness(t){
    if(data.type==='next')assert.deepEqual(Object.keys(data.focus).sort(),['x','z'],'worker messages must exclude live scene objects');
    structuredClone(data);calls++;queueMicrotask(()=>{
     if(this.terminated)return;
+    if(data.type==='source-begin'||data.type==='source-chunk'){this.onmessage({data:{type:'source-ready'}});return;}
     if(data.type==='prepare'){this.cursor=0;this.onmessage({data:{type:'prepared',tiles:2,keys:['0:0','16:0'],sourceCells:2,excludedCells:0}});return;}
     const x=this.cursor++*1024;
     this.onmessage({data:x>1024?{type:'complete'}:{type:'tile',key:`${x/64}:0`,mask:new Uint8Array(data.resolution**2).fill(255),coveredSquareWorldUnits:4096,remaining:this.cursor<2?1:0}});
@@ -85,6 +86,10 @@ test('actual overview worker covers a multi-kilometre network beyond the old 144
  const request=data=>new Promise((resolve,reject)=>{worker.once('message',resolve);worker.once('error',reject);worker.postMessage(data);}).finally(()=>worker.removeAllListeners('error'));
  const roads=[-640,0,640].map(z=>({type:'residential',width:8,pts:[{x:-1600,z},{x:1600,z}],transportRecord:{sourceTags:{highway:'residential',sidewalk:'both'}}}));
  const plan=await request({type:'prepare',input:{roads,metersPerWorldUnit:1}});
+ await request({type:'source-begin',metersPerWorldUnit:1});
+ for(const road of roads)await request({type:'source-chunk',field:'roads',items:[road]});
+ const stagedPlan=await request({type:'prepare'});
+ assert.deepEqual(stagedPlan,plan,'staged worker transfer must preserve complete coverage');
  assert.ok(plan.tiles>144);
  let count=0,near=0,far=0;
  for(;;){const packet=await request({type:'next',focus:{x:0,z:0}});if(packet.type==='complete')break;assert.equal(packet.type,'tile');count++;
@@ -112,7 +117,7 @@ test('active flight advances at most one overview cell per presentation tick',as
  const h=harness(t),overview=createStreetOverview(h.ctx);
  Object.assign(h.ctx,{streetOverview:overview,gameStarted:true,car:{x:0,z:0}});
  updateStreetOverviewFrame(h.ctx);updateStreetOverviewFrame(h.ctx);
- assert.equal(h.calls,1,'only one prepare may be in flight');
+ assert.ok(h.calls<=1,'only one source preparation may be in flight');
  await overview.pause();assert.equal(overview.stats.completedCells,1);
  for(const flag of ['worldLoading','onMoon','_streetPavementUpdating','_cancelStreetPavementBuild']){
   h.ctx[flag]=true;updateStreetOverviewFrame(h.ctx);await overview.pause();

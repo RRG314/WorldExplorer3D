@@ -59,7 +59,10 @@ function requestModel(ctx, kind) {
             else if(material[slot] && sharedMaps.has(key))material[slot]=sharedMaps.get(key);
           }
           if(material.alphaTest>0)material.alphaToCoverage=true;
-          // Templates own geometry and textures across reloads; cells own materials and instance buffers.
+          // The bounded family cache owns materials, geometry and textures.
+          // Cells own only instance buffers. Disposing/recloning identical
+          // materials on every focus refresh discards their compiled programs.
+          material.userData.sharedRuntimeMaterial=true;
           geometry.userData.sharedRuntimeGeometry=true;
           for(const value of Object.values(material)) if(value?.isTexture) {
             value.userData=value.userData || {};
@@ -110,7 +113,7 @@ function* vegetationModelSteps(ctx, placements) {
       const root=new THREE.Group();
       lod.addLevel(root,level===0 ? 0 : 300);
       for(const part of group.model.parts[level]) {
-        const geometry=part.geometry, material=part.material.clone();
+        const geometry=part.geometry, material=part.material;
         const mesh=new THREE.InstancedMesh(geometry,material,group.placements.length);
         root.add(mesh);
         const bound=new THREE.Box3(), localBox=new THREE.Box3().setFromBufferAttribute(geometry.attributes.position);
@@ -155,6 +158,6 @@ export function disposeVegetationBatch(root) {
     if (!object.geometry?.userData?.sharedRuntimeGeometry) object.geometry?.dispose?.();
     if (object.isInstancedMesh) object.dispose?.();
     const materials=Array.isArray(object.material) ? object.material : [object.material];
-    materials.forEach(material=>material?.dispose?.());
+    materials.forEach(material=>{if(!material?.userData?.sharedRuntimeMaterial)material?.dispose?.();});
   });
 }

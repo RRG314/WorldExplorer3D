@@ -33,10 +33,12 @@ function disposeSceneMeshes(meshes, options = {}) {
       if (skipSharedUrbanSurfaceMaterial && object.userData?.sharedUrbanSurfaceMaterial) return;
       if (Array.isArray(object.material)) {
         object.material.forEach((material) => {
+          if (material?.userData?.sharedRuntimeMaterial) return;
           disposeOwnedMaterialTextures(material);
           material?.dispose?.();
         });
       } else {
+        if (object.material.userData?.sharedRuntimeMaterial) return;
         disposeOwnedMaterialTextures(object.material);
         object.material.dispose?.();
       }

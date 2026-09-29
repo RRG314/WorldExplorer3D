@@ -219,3 +219,21 @@ loaded furnishings, camera modes, exit and two reboarding cycles. Released
 resources returned to 30 geometries / 33 textures in both cycles. Science and
 Baltimore recovery screenshots were inspected. This validates the changed
 ownership paths, not the outstanding overall visual-quality plan.
+
+
+## September 29 travel-stall investigation
+
+Changes under verification:
+
+- Background road and vegetation preparation yields past a rendering opportunity between 2 ms slices; initial loading retains its existing scheduling.
+- The invisible astronomical sky defers descendant matrix updates and refreshes before it becomes visible. Explicit world-space queries retain normal behavior.
+- Collision checks query normalized saved-building suppression state directly instead of repeatedly copying the full world-edit snapshot.
+- Vegetation cells share the bounded family cache's materials. Replacing a cell releases its instance buffers without discarding identical compiled programs.
+- Vegetation contact indexes are prepared cooperatively and published with the corresponding visual placements, rather than rebuilt by the next movement query.
+- Distant pavement source scanning and worker messages are split into chunks. Worker tests retain identical multi-kilometre coverage.
+
+The real vegetation browser fixture retained programs 0, 1 and 2 over three replacements, with 8 geometries, 7 textures and no graphics errors. Its final image was inspected. A real Baltimore night/day cycle restored and hid the sky correctly. Targeted store persistence, collision, cancellation, source-transfer and actual-worker checks passed. These are not whole-game acceptance.
+
+The initial distance-based diagnostic did not complete its driving route and is recorded as failed. Subsequent windows are explicitly 15-second diagnostic input windows, not matched route comparisons with 5.2. The frame report now includes the delay before its first eligible RAF, previously outside the measured interval.
+
+The contact-publication source run completed driving, flight, underwater, Earth return and space without page errors. Driving p99 was 48.2/51.3 ms, flight p99 34.6/35.2 ms; a 349.6 ms Earth-return frame and other isolated spikes remained. The later chunked pavement source change still requires frozen-build verification. No universal smoothness, memory or production-readiness claim follows from these results. Regional art and the broader visual plan remain open.

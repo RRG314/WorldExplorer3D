@@ -161,7 +161,7 @@ export function isLocalBuildingSuppressed(appCtx, sourceFeatureId) {
   if (sharedState.enabled) {
     return sharedState.rows.some((entry) => entry.kind === 'suppression' && entry.active === true && entry.sourceFeatureId === id);
   }
-  return getLocalWorldModificationSnapshot(appCtx).suppressions.some((entry) => entry.sourceFeatureId === id);
+  return store?.isBuildingSuppressed(currentWorldId(appCtx), id) === true;
 }
 
 export function getSuppressedEditableBuildingIds(appCtx) {

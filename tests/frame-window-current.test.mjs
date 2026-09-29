@@ -21,6 +21,7 @@ test('stale first RAF cannot add pre-window time or shorten the measurement', as
   const result = await sample([10, 90, 110, 130, 150, 170], 60);
   assert.deepEqual(Array.from(result.deltas), [20, 20, 20]);
   assert.equal(result.elapsedMs, 60);
+  assert.equal(result.firstFrameDelayMs, 10);
   assert.equal(result.deltas.reduce((sum, delta) => sum + delta, 0), result.elapsedMs);
 });
 

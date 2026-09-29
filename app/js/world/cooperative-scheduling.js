@@ -31,3 +31,29 @@ export async function drainCooperatively(steps, {current=()=>true, now=()=>perfo
     }
   } finally {steps.return();}
 }
+
+// Background world refinement must leave a paint opportunity between slices.
+// A scheduler.yield continuation can run again before the next rendering turn.
+// The timer after RAF keeps the next slice out of RAF's pre-paint microtasks;
+// the deadline also lets cleanup complete when a tab stops receiving frames.
+export function yieldToWorldFrame(host = globalThis) {
+  if (typeof host.requestAnimationFrame !== 'function' || host.document?.hidden) {
+    return new Promise(resolve => host.setTimeout(resolve, 16));
+  }
+  return new Promise(resolve => {
+    let settled = false, frame = null, afterPaint = null;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      host.clearTimeout(deadline);
+      if (frame !== null) host.cancelAnimationFrame?.(frame);
+      if (afterPaint !== null) host.clearTimeout(afterPaint);
+      resolve();
+    };
+    const deadline = host.setTimeout(finish, 100);
+    frame = host.requestAnimationFrame(() => {
+      frame = null;
+      afterPaint = host.setTimeout(finish, 0);
+    });
+  });
+}

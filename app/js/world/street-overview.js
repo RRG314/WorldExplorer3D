@@ -1,4 +1,5 @@
-import {streetSourceInput} from './street-source-input.js';
+import {yieldToWorldFrame} from './cooperative-scheduling.js?v=1';
+import {streetSourceInputCooperatively,sendStreetSourceInChunks} from './street-source-input.js';
 import {createPavementTerrainMask} from './pavement-terrain-mask.js';
 
 // Complete source coverage lives in the terrain material. Raised geometry and
@@ -29,7 +30,12 @@ export function createStreetOverview(appCtx,{onComplete=()=>{}}={}){
    }
    if(!prepared||!sourcesMatch()){
      sources=sourceLists().map(list=>({list,length:list?.length||0}));
-     const plan=await request({type:'prepare',input:streetSourceInput(appCtx)});if(!valid())return;
+     const current=()=>valid()&&sourcesMatch();
+     const schedule={current,yieldWork:yieldToWorldFrame,budgetMs:2};
+     const input=await streetSourceInputCooperatively(appCtx,()=>true,schedule);
+     await sendStreetSourceInChunks(input,request,schedule);
+     if(!current())return;
+     const plan=await request({type:'prepare'});if(!current())return;
      stagedMask?.dispose();stagedMask=createPavementTerrainMask(appCtx,plan.keys);
      if(!mask){mask=stagedMask;stagedMask=null;}
      setDetailBounds(appCtx.streetPavement?.coverageBounds);

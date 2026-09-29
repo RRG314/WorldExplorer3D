@@ -19,7 +19,7 @@ import {
   sampleFeatureSurfaceY,
   shouldRenderRoadSkirts
 } from "../structure-semantics.js?v=63";
-import { yieldToMainThread } from "../world/cooperative-scheduling.js?v=1";
+import { yieldToMainThread, yieldToWorldFrame } from "../world/cooperative-scheduling.js?v=1";
 
 import { roadWidthAtSegment } from "../world/road-cross-section-profile.js?v=1";
 import { createRoadContactIndex, createRoadContactIndexCooperatively } from './road-contact-index.js?v=1';
@@ -870,7 +870,7 @@ export async function publishCompiledTransportMeshes(deps = {}) {
       if(!isCurrent())throw new DOMException('Transport region superseded','AbortError');
       const group=new THREE.Group(),meshes=[];
       let contact=null,committed=false;
-      const schedule={current:isCurrent,yieldWork:yieldToMainThread,budgetMs:2};
+      const schedule={current:isCurrent,yieldWork:yieldToWorldFrame,budgetMs:2};
       try {
         for(const batch of packet.batches)buildIndexedBatchMesh({scene:group,targetList:meshes,
           verts:batch.positions,indices:batch.indices,material:roadMat,renderOrder:2,frustumCulled:true,
@@ -886,7 +886,7 @@ export async function publishCompiledTransportMeshes(deps = {}) {
           appendRoadCenterMarkings(entry.road,entry.points,verts,indices,entry.widths,
             (x,z)=>cachedTerrainHeight(x,z)+ROAD_SURFACE_BIAS,contact);
           marks.append(verts,indices,'at_grade');
-          if(now()-sliceStartedAt>=2){await yieldToMainThread();sliceStartedAt=now();}
+          if(now()-sliceStartedAt>=2){await yieldToWorldFrame();sliceStartedAt=now();}
           if(!isCurrent())throw new DOMException('Transport region superseded','AbortError');
         }
         marks.finish();
