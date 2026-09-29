@@ -50,6 +50,7 @@ import {
   FAR_WATER_TERRAIN_MASK_SIZE,
   applyMappedWaterTerrainOwnership,
   buildFarWaterGeometry,
+  publishedWaterDetailAreas,
   buildMappedWaterTerrainOwnershipMask,
   createFarWaterMesh
 } from './far-field-water.js?v=7';
@@ -88,6 +89,7 @@ function createFarFieldTerrainApi(deps = {}) {
   let farFieldMesh = null;
   let farContextMesh = null;
   let farWaterMesh = null;
+  let pendingFarWaterContext = null;
   let pendingBuildPromise = null;
   let elevationAbortController = null;
   let farFieldSurfaceState = null;
@@ -157,6 +159,7 @@ function createFarFieldTerrainApi(deps = {}) {
     removeCurrentMesh();
     pendingBuildPromise = null;
     appCtx.fixedLocationMappedSurfaceContext = null;
+    pendingFarWaterContext = null;
     appCtx.farTerrainClipmapState = null;
     return waitForGenerationDrain(retiringBuildPromise);
   }
@@ -567,7 +570,10 @@ function createFarFieldTerrainApi(deps = {}) {
     const builtBuildings = await buildFarBuildingGeometry(spec, loadedTiles, offsetMeters, mappedContext);
     const buildingGeometryBuildMs = performance.now() - buildingBuildStartedAt;
     const waterBuildStartedAt = performance.now();
-    const builtWater = buildFarWaterGeometry(appCtx, mappedContext, spec.inner);
+    const waterDetailReady=appCtx.detailedWaterPublicationSequence===appCtx._worldLoadSequence;
+    const builtWater = buildFarWaterGeometry(appCtx, mappedContext, null, {
+      detailedAreas:waterDetailReady ? publishedWaterDetailAreas(appCtx) : []
+    });
     const publishedWaterAreaIdentities = builtWater?.publishedAreaIdentities || new Set();
     const fixedRegionalStructureWaterAreas = (mappedContext?.waterAreas || [])
       .filter((area) =>
@@ -740,10 +746,14 @@ function createFarFieldTerrainApi(deps = {}) {
       farContextMesh = buildingContext;
       appCtx.terrainGroup.add(farContextMesh);
     }
+    pendingFarWaterContext=waterDetailReady ? null : {waterAreas:mappedContext.waterAreas};
     farWaterMesh = createFarWaterMesh(builtWater, FAR_CONTEXT_HALF_EXTENT_METERS);
     if (farWaterMesh) {
       appCtx.terrainGroup.add(farWaterMesh);
-    }
+      // The detailed pass may have finished while the regional masks awaited
+      // their bounded canvas conversion. Recheck before publishing this owner.
+      if(appCtx.detailedWaterPublicationSequence===appCtx._worldLoadSequence)refreshFarWaterDetailCoverage();
+    } else pendingFarWaterContext=null;
     setState({
       status: 'ready',
       dependencyDurationsMs,
@@ -831,6 +841,20 @@ function createFarFieldTerrainApi(deps = {}) {
       landAreaSpatialByTile: mappedContext.landAreaSpatialByTile,
       surfaceFallbackByTile: mappedContext.surfaceFallbackByTile
     });
+  }
+
+  function refreshFarWaterDetailCoverage() {
+    if(!pendingFarWaterContext || !farWaterMesh)return false;
+    const built=buildFarWaterGeometry(appCtx,pendingFarWaterContext,null,{detailedAreas:publishedWaterDetailAreas(appCtx)});
+    const previous=farWaterMesh.geometry;
+    if(built){farWaterMesh.geometry=built.geometry;farWaterMesh.userData.detailedWaterAreaCount=built.detailedAreaCount;}
+    else {
+      farWaterMesh.parent?.remove(farWaterMesh);
+      appCtx.replaceWorldCollection('waterWaveVisuals',(appCtx.waterWaveVisuals||[]).filter(m=>m!==farWaterMesh.material));
+      farWaterMesh.material.dispose();farWaterMesh=null;
+    }
+    previous.dispose();pendingFarWaterContext=null;
+    return true;
   }
 
   function refreshFarTerrainSurfaceColors() {
@@ -975,6 +999,7 @@ function createFarFieldTerrainApi(deps = {}) {
   }
 
   return {
+    refreshFarWaterDetailCoverage,
     refreshFarTerrainSurfaceColors,
     refreshFarTerrainBoundaryHeights,
     resetFarTerrainClipmap,

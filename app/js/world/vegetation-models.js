@@ -134,6 +134,9 @@ function* vegetationModelSteps(ctx, placements) {
       }
     }
     lod.addLevel(new THREE.Group(),['fern','grass'].includes(group.kind) ? 240 : 1600);
+    // Published cell poses are immutable; LOD changes visibility, not transforms.
+    // Avoid recomposing every hidden and visible instance hierarchy each frame.
+    lod.traverse(object=>{object.updateMatrix();object.matrixAutoUpdate=false;});
     lod.userData.isVegetationBatch=true;
     lod.userData.vegetationAuthority='curated-model-cell-lod';
     ctx.addEarthWorldObject(lod);

@@ -36,7 +36,7 @@ export async function drainCooperatively(steps, {current=()=>true, now=()=>perfo
 // A scheduler.yield continuation can run again before the next rendering turn.
 // The timer after RAF keeps the next slice out of RAF's pre-paint microtasks;
 // the deadline also lets cleanup complete when a tab stops receiving frames.
-export function yieldToWorldFrame(host = globalThis) {
+function waitForWorldFrame(host) {
   if (typeof host.requestAnimationFrame !== 'function' || host.document?.hidden) {
     return new Promise(resolve => host.setTimeout(resolve, 16));
   }
@@ -55,5 +55,25 @@ export function yieldToWorldFrame(host = globalThis) {
       frame = null;
       afterPaint = host.setTimeout(finish, 0);
     });
+  });
+}
+
+// All background producers share the rendering opportunity. Independent RAF
+// timers otherwise resume road, vegetation and source work together, multiplying
+// their individual slice budgets in the same frame.
+const worldFrameQueues=new WeakMap();
+export function yieldToWorldFrame(host=globalThis) {
+  return new Promise(resolve=>{
+    let queue=worldFrameQueues.get(host);
+    if(queue){queue.push(resolve);return;}
+    queue=[resolve];worldFrameQueues.set(host,queue);
+    function advance(){
+      waitForWorldFrame(host).then(()=>{
+        const next=queue.shift();
+        if(queue.length)advance();else worldFrameQueues.delete(host);
+        next();
+      });
+    }
+    advance();
   });
 }

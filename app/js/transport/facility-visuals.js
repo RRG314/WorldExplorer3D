@@ -1,3 +1,4 @@
+import {batchOwnedStaticStructure} from '../world/static-structure-batching.js';
 import { compileAirportOperationalLayout, recordPoints } from './airport-layout.js?v=6';
 
 const FACILITY_COLORS = Object.freeze({
@@ -459,6 +460,32 @@ function createTransportFacilityVisuals(THREE, graph, options = {}) {
   addStandPresentation(THREE, group, airportLayout, track, options.sampleGround, options.mobile === true);
   addControlTower(THREE, group, airportLayout, track, options.sampleGround, options.mobile === true);
   addGeneratedTerminal(THREE, group, airportLayout, track, options.sampleGround, options.mobile === true);
+  // Maritime surface records remain the graph's interaction/physics authority.
+  // Combine only opaque, static surfaces within a small culling cell; ferry
+  // routes and airport operational geometry retain their separate ownership.
+  const surfaceCells=new Map();
+  for(const mesh of [...group.children]) {
+    if(!['pier','quay','dock'].includes(mesh.userData.transportFacilityType)||mesh.material?.transparent)continue;
+    mesh.geometry.computeBoundingBox();
+    const center=mesh.geometry.boundingBox.getCenter(new THREE.Vector3()).add(mesh.position);
+    const key=`${mesh.userData.transportFacilityType}:${Math.floor(center.x/256)}:${Math.floor(center.z/256)}`;
+    if(!surfaceCells.has(key))surfaceCells.set(key,[]);
+    surfaceCells.get(key).push(mesh);
+  }
+  for(const [key,meshes] of surfaceCells){
+    if(meshes.length<2)continue;
+    const cell=new THREE.Group();cell.name=`Mapped maritime surface cell ${key}`;
+    cell.userData.transportFacilityIds=meshes.map(mesh=>mesh.userData.transportFacilityId);
+    for(const mesh of meshes)cell.add(mesh);
+    batchOwnedStaticStructure(THREE,cell);
+    cell.traverse(object=>{object.updateMatrix();object.matrixAutoUpdate=false;});
+    group.add(cell);
+  }
+  // Retire source buffers released by batching, and track replacement buffers.
+  // The owner must not retain disposed geometry arrays until the world unloads.
+  const liveGeometry=new Set(),liveMaterials=new Set();
+  group.traverse(object=>{if(object.geometry)liveGeometry.add(object.geometry);for(const material of Array.isArray(object.material)?object.material:[object.material])if(material)liveMaterials.add(material);});
+  resources.geometries=[...liveGeometry];resources.materials=[...liveMaterials];
   group.userData.airportLayoutAuthority = airportLayout?.authority || '';
   group.userData.generatedAirportFallback = airportLayout?.generatedFallback === true;
   return Object.freeze({

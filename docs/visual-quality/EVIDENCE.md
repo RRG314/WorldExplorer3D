@@ -270,3 +270,58 @@ Artifacts: `output/architecture-evaluation/travel-frozen-2b614f09/`,
 `travel-frozen-gpu-upload/`, `travel-mapped-graphics/`,
 `travel-stable-pavement-programs/`, and
 `output/visual-quality/pavement-program-retention/`.
+
+### September 29: spatial tunnel shading and travel follow-up
+
+The frozen `dcc0ec91` build remained below the corrected 5.2 comparison in
+average travel FPS. It was not promoted. Subsequent source work keeps all tunnel
+openings but indexes them by location: the Baltimore distant terrain previously
+scanned 100 openings per fragment; its largest cell now contains 16 candidates.
+The descriptor, cell and reference data share one texture sampler. Rotated,
+sloped, overlapping and wide-area aperture parity tests passed. A real WebGL
+fixture preserved pavement while openings moved, cleared and returned.
+
+In the source comparison, median whole-composer GPU time during flight changed
+from 32.5 to 24.9 ms. This is diagnostic evidence, not a universal FPS guarantee.
+A later run without GPU/CPU timing instrumentation completed both driving routes
+at 46.6/45.7 FPS and both flight routes at 52.9/52.3 FPS. Worst frames were
+49.9/50.0 ms driving and 85.2/35.3 ms flying. The initial corrected 5.2 sample was
+51.2/52.0 FPS driving and 48.5/51.6 FPS flying; a later instrumented 5.2 run varied
+substantially. Driving parity and final frozen acceptance remain open.
+
+The same source journey completed ocean entry, Earth return, restoration of
+nearby NPC detail, space entry and Main Menu cleanup without browser errors.
+These are single-client journeys, not new multiplayer or physical-phone proof.
+
+Additional repairs retain static vegetation transforms, batch compatible opaque
+maritime facilities by spatial cell, preserve shared vegetation materials during
+world teardown, share background rendering opportunities between producers, and
+avoid temporary filtered arrays in wheel-contact calculations. Water and boat
+wake program variants now share their live uniforms; a lighting-switch fixture
+retained state across three switches with zero GL errors. The water-state repair did not remove the harbor band. Its separate coverage
+repair is described below.
+
+The gas-giant cloud lattice was traced to large-coordinate noise evaluation.
+Bounded hash arithmetic and decorrelated cloud scales removed the repeated grid
+in the inspected gallery. All twelve views (four bodies, three altitudes) passed
+without graphics errors. These are modeled local clouds over the existing
+catalog imagery, not measured weather. Nebula rendering was unchanged. The
+full frozen `dcc0ec91` space/ship gallery previously passed 97 functional checks;
+its images still show basic utility furnishings and some simple moon/satellite
+surfaces. Those art limitations are not closed by the cloud repair.
+
+Artifacts: `output/architecture-evaluation/travel-shared-budget/`,
+`travel-52-gpu-time/`, `travel-current-cpu/`, `travel-surface-matrix/`,
+`travel-spatial-portals/`, `travel-water-state/`, and
+`output/verification/{portal-spatial-grid,water-program-state,atmosphere-gallery}/`.
+
+
+The harbor gap came from excluding distant water over the entire detailed
+terrain rectangle, even where no detailed water had been published. Regional
+water now subtracts the actual detailed polygons and river triangles, including
+explicit island exclusions. Publication handles either completion order and
+releases the temporary source rings after the handoff. The full Baltimore image
+shows continuous harbor water again. Geometry tests preserve dry islands and
+exclude a second surface over a descending river. The post-repair source routes
+completed without browser errors, but driving FPS varied to 45.5/30.6 and flight
+to 49.5/50.4; this remains unsuitable as a final performance acceptance result.

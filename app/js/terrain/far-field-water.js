@@ -1,3 +1,4 @@
+import {streetPolygonKernel} from '../world/compiler/street-polygon-kernel.js';
 import { resolveWaterSurfaceVisualProfile } from '../world/load-geometry.js?v=28';
 import { registerWaterWaveMaterial } from '../world/water-materials.js?v=5';
 import { yieldToMainThread } from '../world/cooperative-scheduling.js?v=1';
@@ -50,7 +51,25 @@ export function waterPolygonOutsideDetailedBounds(points, bounds) {
   return outside;
 }
 
-function buildFarWaterGeometry(appCtx, mappedContext, detailedBounds = null) {
+export function publishedWaterDetailAreas(appCtx) {
+  const areas=[...(appCtx.waterAreas||[])];
+  // A sloping river ribbon is also a published owner. Subtract its actual
+  // triangles, not a bounding box that could erase unrelated nearby water.
+  for(const mesh of appCtx.landuseMeshes||[]){
+    const waterway=mesh.userData?.waterwayRef;
+    if(!waterway||waterway.structureSemantics?.terrainMode==='elevated')continue;
+    const p=mesh.geometry?.attributes?.position,index=mesh.geometry?.index;
+    if(!p)continue;
+    mesh.updateWorldMatrix(true,false);
+    for(let i=0;i<(index?.count||p.count);i+=3){
+      const pts=[0,1,2].map(offset=>new THREE.Vector3().fromBufferAttribute(p,index?index.getX(i+offset):i+offset).applyMatrix4(mesh.matrixWorld));
+      areas.push({pts,bounds:{minX:Math.min(...pts.map(p=>p.x)),maxX:Math.max(...pts.map(p=>p.x)),minZ:Math.min(...pts.map(p=>p.z)),maxZ:Math.max(...pts.map(p=>p.z))}});
+    }
+  }
+  return areas;
+}
+
+function buildFarWaterGeometry(appCtx, mappedContext, detailedBounds = null, {detailedAreas=[]} = {}) {
   const positions = [];
   const indices = [];
   const unitsPerMeter = Number(appCtx.WORLD_UNITS_PER_METER || 1);
@@ -67,21 +86,31 @@ function buildFarWaterGeometry(appCtx, mappedContext, detailedBounds = null) {
     const contour = worldRing(appCtx, area.outer);
     const holes = (area.holes || []).map((ring) => worldRing(appCtx, ring)).filter((ring) => ring.length >= 3);
     if (contour.length < 3) continue;
-    const triangles = THREE.ShapeUtils.triangulateShape(contour, holes);
-    if (!triangles.length) continue;
-    const points = [contour, ...holes].flat();
+    const sourcePolygon=[contour,...holes].map(ring=>ring.map(p=>[p.x,p.y]));
+    const minX=Math.min(...contour.map(p=>p.x)),maxX=Math.max(...contour.map(p=>p.x));
+    const minZ=Math.min(...contour.map(p=>p.y)),maxZ=Math.max(...contour.map(p=>p.y));
+    const cutters=detailedAreas.filter(a=>a.pts?.length>=3 && a.bounds &&
+      a.bounds.minX<=maxX&&a.bounds.maxX>=minX&&a.bounds.minZ<=maxZ&&a.bounds.maxZ>=minZ)
+      // A detailed island is negative water evidence: regional water must
+      // not refill that hole when the coarser source omits the island.
+      .map(a=>[a.pts.map(p=>[p.x,p.z])]);
+    const parts=cutters.length?streetPolygonKernel.difference(sourcePolygon,cutters):[sourcePolygon];
     const y = area.surfaceMeters * unitsPerMeter * yExaggeration + FAR_WATER_SURFACE_CLEARANCE_WORLD;
     const firstIndex = indices.length;
-    for (const triangle of triangles) {
-      for (const polygon of waterPolygonOutsideDetailedBounds(triangle.map(index => points[index]), detailedBounds)) {
-        for (let i = 1; i + 1 < polygon.length; i++) {
-          // XY-to-XZ reverses handedness; retain upward-facing water normals.
-          const corners = [polygon[0], polygon[i + 1], polygon[i]];
-          const [a, b, c] = corners;
-          if (Math.abs((b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x)) < 1e-8) continue;
-          const baseIndex = positions.length / 3;
-          for (const point of corners) positions.push(point.x, y, point.y);
-          indices.push(baseIndex, baseIndex + 1, baseIndex + 2);
+    for(const part of parts){
+      const rings=part.map(ring=>ring.map(([x,z])=>new THREE.Vector2(x,z)));
+      const triangles=THREE.ShapeUtils.triangulateShape(rings[0],rings.slice(1));
+      const points=rings.flat();
+      for (const triangle of triangles) {
+        for (const polygon of waterPolygonOutsideDetailedBounds(triangle.map(index => points[index]), detailedBounds)) {
+          for (let i = 1; i + 1 < polygon.length; i++) {
+            const corners = [polygon[0], polygon[i + 1], polygon[i]];
+            const [a, b, c] = corners;
+            if (Math.abs((b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x)) < 1e-8) continue;
+            const baseIndex = positions.length / 3;
+            for (const point of corners) positions.push(point.x, y, point.y);
+            indices.push(baseIndex, baseIndex + 1, baseIndex + 2);
+          }
         }
       }
     }
@@ -96,7 +125,7 @@ function buildFarWaterGeometry(appCtx, mappedContext, detailedBounds = null) {
   geometry.setIndex(indices);
   geometry.computeVertexNormals();
   geometry.computeBoundingSphere();
-  return { geometry, polygons, triangles: indices.length / 3, publishedAreaIdentities, detailedBounds };
+  return { geometry, polygons, triangles: indices.length / 3, publishedAreaIdentities, detailedBounds, detailedAreaCount:detailedAreas.length };
 }
 
 async function buildMappedWaterTerrainOwnershipMask(appCtx, mappedContext, spec, publishedAreaIdentities = null) {
@@ -251,7 +280,7 @@ function createFarWaterMesh(builtWater, contextHalfExtentMeters) {
   mesh.receiveShadow = false;
   mesh.userData.isFarMappedWaterContext = true;
   mesh.userData.visualOwnership = 'shared-mapped-water-profile';
-  mesh.userData.coverageOwnership = 'regional-water-outside-detailed-world';
+  mesh.userData.coverageOwnership = 'regional-water-outside-published-detail';
   mesh.userData.detailedWaterExclusion = builtWater.detailedBounds || null;
   mesh.userData.renderProvenance = {
     version: 1,

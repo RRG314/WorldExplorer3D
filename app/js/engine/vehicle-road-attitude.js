@@ -67,11 +67,15 @@ function resolveVehicleRoadContactPose(options = {}) {
   const previousMaximumWheelPenetration = Math.max(0, ...contacts.map(contact =>
     contact.y - (y + poseDelta(fallbackPitch, fallbackRoll, contact))));
   for (let iteration = 0; iteration < 3; iteration += 1) {
-    const average = (axis, sign) => contacts.filter(contact => contact[axis] === sign)
-      .reduce((sum, contact) => sum + contact.y, 0) * .5;
-    const forwardSlope = (average('front', 1) - average('front', -1)) /
+    // footprint order is rear-left, rear-right, front-left, front-right.
+    // Avoid allocating four filtered arrays for every contact iteration.
+    const rearHeight = (contacts[0].y + contacts[1].y) * .5;
+    const frontHeight = (contacts[2].y + contacts[3].y) * .5;
+    const leftHeight = (contacts[0].y + contacts[2].y) * .5;
+    const rightHeight = (contacts[1].y + contacts[3].y) * .5;
+    const forwardSlope = (frontHeight - rearHeight) /
       (2 * layout.halfWheelbase * Math.cos(pitch));
-    const rightSlope = ((average('side', 1) - average('side', -1)) / (2 * layout.halfTrack) -
+    const rightSlope = ((rightHeight - leftHeight) / (2 * layout.halfTrack) -
       forwardSlope * Math.sin(pitch) * Math.sin(roll)) / Math.cos(roll);
     const nextPitch = clamp(-Math.atan(forwardSlope), -.55, .55);
     const nextRoll = clamp(Math.atan(rightSlope * Math.cos(nextPitch)), -.55, .55);

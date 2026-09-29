@@ -390,6 +390,7 @@ const transportPublicationDeps = {
 
 const {
   refreshFarTerrainSurfaceColors,
+  refreshFarWaterDetailCoverage,
   refreshFarTerrainBoundaryHeights,
   resetFarTerrainClipmap,
   sampleFarTerrainWorldYAt,
@@ -629,6 +630,7 @@ Object.assign(appCtx, {
   refreshTerrainSurfaceProfiles,
   refreshTerrainSurfaceProfilesCooperatively,
   refreshFarTerrainSurfaceColors,
+  refreshFarWaterDetailCoverage,
   resetFarTerrainClipmap,
   resetEarthStreaming,
   resetLocationTerrainPublication,

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
-import { buildFarWaterGeometry } from '../app/js/terrain/far-field-water.js';
+import { buildFarWaterGeometry, publishedWaterDetailAreas } from '../app/js/terrain/far-field-water.js';
 
 globalThis.THREE = THREE;
 const context = { geoToWorld: (lat, lon) => ({ x: lon, z: lat }), WORLD_UNITS_PER_METER: 1 };
@@ -54,4 +54,31 @@ test('fully detailed polygons are not published; absent detail retains regional 
   assert.equal(surfaceArea(geometry),400);
   assert.deepEqual([...publishedAreaIdentities],['river']);
   geometry.dispose();
+});
+
+test('distant water fills unowned parts of the terrain rectangle without overlapping published water',()=>{
+ const near={pts:[{x:-20,z:-20},{x:0,z:-20},{x:0,z:20},{x:-20,z:20}],holes:[],bounds:{minX:-20,maxX:0,minZ:-20,maxZ:20}};
+ const {geometry}=buildFarWaterGeometry(context,{waterAreas:[{identity:'river',outer:square(100),surfaceMeters:1100}]},null,{detailedAreas:[near]});
+ assert.equal(waterAt(geometry,-10,0),false,'actual detailed water remains the only surface');
+ assert.equal(waterAt(geometry,10,0),true,'terrain coverage is not evidence that detailed water exists');
+ assert.equal(surfaceArea(geometry),40000-800);
+ geometry.dispose();
+});
+test('detailed islands are not refilled by a coarser regional water polygon',()=>{
+ const near={pts:square(20).map(([x,z])=>({x,z})),holes:[square(5).map(([x,z])=>({x,z}))],bounds};
+ const {geometry}=buildFarWaterGeometry(context,{waterAreas:[{identity:'river',outer:square(100),surfaceMeters:1100}]},null,{detailedAreas:[near]});
+ assert.equal(waterAt(geometry,10,0),false);assert.equal(waterAt(geometry,0,0),false);
+ assert.equal(surfaceArea(geometry),40000-1600);geometry.dispose();
+});
+
+test('a published sloping river ribbon excludes a coarse water ceiling over its exact triangles',()=>{
+ const geometry=new THREE.BufferGeometry();
+ geometry.setAttribute('position',new THREE.Float32BufferAttribute([-4,20,-90,4,20,-90,-4,8,90,4,8,90],3));
+ geometry.setIndex([0,1,2,1,3,2]);
+ const mesh=new THREE.Mesh(geometry,new THREE.MeshBasicMaterial());mesh.userData.waterwayRef={structureSemantics:{terrainMode:'at_grade'}};
+ const detailedAreas=publishedWaterDetailAreas({waterAreas:[],landuseMeshes:[mesh]});assert.equal(detailedAreas.length,2);
+ const built=buildFarWaterGeometry(context,{waterAreas:[{identity:'river',outer:square(100),surfaceMeters:1100}]},null,{detailedAreas});
+ for(const z of [-80,0,80]){assert.equal(waterAt(built.geometry,0,z),false);assert.equal(waterAt(built.geometry,6,z),true);}
+ for(let i=0;i<built.geometry.attributes.normal.count;i++)assert.equal(built.geometry.attributes.normal.getY(i),1);
+ built.geometry.dispose();geometry.dispose();mesh.material.dispose();
 });

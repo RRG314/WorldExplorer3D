@@ -29,8 +29,8 @@ function disposeDetachedWorldObject(object) {
       child.userData?.sharedUrbanSurfaceMaterial
     );
     if (sharedMaterial) return;
-    if (Array.isArray(child.material)) child.material.forEach((material) => material?.dispose?.());
-    else child.material.dispose?.();
+    if (Array.isArray(child.material)) child.material.forEach((material) => {if(!material?.userData?.sharedRuntimeMaterial)material?.dispose?.();});
+    else if(!child.material.userData?.sharedRuntimeMaterial)child.material.dispose?.();
   });
 }
 

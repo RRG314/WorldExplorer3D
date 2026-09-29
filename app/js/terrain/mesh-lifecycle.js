@@ -5,6 +5,7 @@ function ensureTerrainGroup() {
   if (!appCtx.terrainGroup) {
     appCtx.terrainGroup = new THREE.Group();
     appCtx.terrainGroup.name = 'TerrainGroup';
+    appCtx.terrainGroup.matrixAutoUpdate = false;
     appCtx.addEarthWorldObject(appCtx.terrainGroup);
   }
 }

@@ -37,3 +37,17 @@ test('hidden tabs use a bounded timer without requesting a frame', async () => {
   const timer = [...host.timers.values()][0]; assert.equal(timer.delay, 16);
   timer.fn(); await pending;
 });
+
+test('concurrent producers resume fairly across separate rendered frames',async()=>{
+ const host=clock(),completed=[];
+ const pending=['roads','vegetation','overview'].map(name=>yieldToWorldFrame(host).then(()=>completed.push(name)));
+ for(const name of ['roads','vegetation','overview']){
+  assert.equal(host.frames.size,1);
+  const [id,callback]=host.frames.entries().next().value;host.frames.delete(id);callback();
+  [...host.timers.values()].find(timer=>timer.delay===0).fn();
+  await Promise.resolve();await Promise.resolve();
+  assert.equal(completed.at(-1),name);
+ }
+ await Promise.all(pending);assert.deepEqual(completed,['roads','vegetation','overview']);
+ assert.equal(host.frames.size,0);assert.equal(host.timers.size,0);
+});

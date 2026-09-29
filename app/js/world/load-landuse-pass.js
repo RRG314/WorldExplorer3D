@@ -676,6 +676,8 @@ export function createWorldLandusePass(options = {}) {
       injectFallback: appCtx.oceanMode?.active === true
     });
 
+    appCtx.detailedWaterPublicationSequence=appCtx._worldLoadSequence;
+    appCtx.refreshFarWaterDetailCoverage?.();
     runtime.endLoadPhase('buildLanduseGeometry');
     runtime.startLoadPhase('batchLanduseGeometry');
     const batchedLanduseCount = batchLanduseMeshes();
