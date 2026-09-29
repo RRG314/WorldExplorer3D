@@ -98,6 +98,12 @@ let deadline;try{
  }
  if(process.env.WE3D_PROFILE_CONTROLLED_TRAVEL==='1'){
   report.routeScope='Repeatable scenario setup; normal physics and keyboard input thereafter. Driving 100 m, flight 1500 m above the same city; no climb-key loops.';
+  async function populationPresentation(){return page.evaluate(async()=>{
+   const {ctx}=await import('/app/js/shared-context.js?v=55');let nodes=0,bones=0;
+   ctx.earthSceneRoot?.traverse(o=>{nodes++;bones+=o.isBone?1:0;});
+   return {nodes,bones,detailedNpcs:ctx.urbanSandboxRuntime?.npcs?.length,actor:ctx.activeEarthActorPosition?.()};
+  });}
+  report.populationPresentation={before:await populationPresentation()};
   for(const mode of ['drive','plane']){
    await page.locator('#travelBtn').click();await page.locator(mode==='drive'?'#fDriving':'#fPlane').click();
    await page.mouse.click(640,400);await page.waitForTimeout(1500);
@@ -118,6 +124,20 @@ let deadline;try{
     await page.screenshot({path:`${out}/controlled-${mode}-${repeat}.png`});
     if(!raw.routeComplete)throw Error(`${mode} failed to complete controlled route`);
    }
+   report.populationPresentation[mode]=await populationPresentation();await save();
+  }
+  if(process.env.WE3D_PROFILE_RETURN_GROUND==='1'){
+   await page.locator('#travelBtn').click();await page.locator('#fDriving').click();
+   // Return to the original scenario origin to test detail restoration, rather
+   // than assuming the end of an aerial route contains pedestrian activity.
+   await page.evaluate(async()=>{
+    const {ctx}=await import('/app/js/shared-context.js?v=55');const x=4.854101966249685,z=3.526711513754839;
+    Object.assign(ctx.car,{x,z,y:ctx.GroundHeight.carCenterY(x,z),speed:0,vFwd:0,vLat:0,vx:0,vy:0,vz:0});
+   });
+   await page.waitForFunction(async()=> (await import('/app/js/shared-context.js?v=55')).ctx.urbanSandboxRuntime?.npcs?.length>0,null,{timeout:15000,polling:500});
+   await page.waitForTimeout(1500);
+   report.populationPresentation.returnGround=await populationPresentation();
+   await page.screenshot({path:`${out}/return-ground.png`});await save();
   }
  }
  if(process.env.WE3D_PROFILE_SKIP_EARTH_WINDOWS!=='1' && process.env.WE3D_PROFILE_CONTROLLED_TRAVEL!=='1'){

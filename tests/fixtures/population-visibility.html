@@ -1,0 +1,14 @@
+<!doctype html><meta charset="utf-8"><link rel="icon" href="data:,"><style>body{margin:0;background:#bacbd6}</style>
+<script src="/node_modules/three/build/three.min.js"></script><script src="/node_modules/three/examples/js/loaders/GLTFLoader.js"></script><script type="module">
+import {attachCuratedExplorerCharacter,updateCuratedCharacterAnimation} from '/app/js/walking/curated-explorer-character.js';
+import {setPopulationHostVisible} from '/app/js/living-world/presentation-attachment.js';
+const scene=new THREE.Scene(),group=new THREE.Group(),host=new THREE.Group();scene.background=new THREE.Color('#bacbd6');scene.add(group);group.add(host);
+const renderer=new THREE.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});renderer.setSize(800,650);renderer.outputEncoding=THREE.sRGBEncoding;document.body.append(renderer.domElement);
+scene.add(new THREE.HemisphereLight(0xffffff,0x657050,1));const light=new THREE.DirectionalLight(0xffffff,1);light.position.set(3,5,4);scene.add(light);
+const camera=new THREE.PerspectiveCamera(40,800/650,.1,100);camera.position.set(3,2.4,5);camera.lookAt(0,1,0);
+if(!await attachCuratedExplorerCharacter(THREE,host,{role:'nearby-npc-character',failClosed:true}))throw Error('Character failed to load');
+let cycles=0;document.addEventListener('keydown',event=>{if(event.key==='ArrowLeft')setPopulationHostVisible(host,group,false);if(event.key==='ArrowRight'){host.position.x=.25;setPopulationHostVisible(host,group,true);cycles++;}});
+function draw(){updateCuratedCharacterAnimation(host,true,1/60);renderer.render(scene,camera);}
+window.advanceTime=ms=>{for(let i=0;i<Math.ceil(ms/16.67);i++)draw();};
+window.render_game_to_text=()=>JSON.stringify({ready:true,cycles,attached:host.parent===group,asset:host.userData.curatedCharacterAssetId,geometry:renderer.info.memory.geometries,textures:renderer.info.memory.textures,glError:renderer.getContext().getError()});draw();
+</script>

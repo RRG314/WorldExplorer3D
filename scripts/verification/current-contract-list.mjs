@@ -197,6 +197,8 @@ export const currentContractTests = [
   'tests/model-template-cache-current.test.mjs',
   'tests/static-batch-transform-current.test.mjs',
   'tests/nearest-road-pruning-current.test.mjs',
+  'tests/urban-presentation-focus-current.test.mjs',
+  'tests/population-presentation-attachment-current.test.mjs',
   'tests/frame-window-current.test.mjs',
   'tests/far-building-instance-batches-current.test.mjs',
   'tests/firebase-emulator-attestation-current.test.mjs',

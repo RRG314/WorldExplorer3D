@@ -182,3 +182,18 @@ harness no longer caps the JavaScript heap and now requires the hardware rendere
 The packaged candidate still requires validation before performance acceptance or
 production promotion. Evidence: local `baltimore-fixed-route-*` reports under
 `output/architecture-evaluation/`; raw profiles and captures are not shipped.
+
+
+The packaged inspection also found obsolete presentation work: invisible or
+promoted ambient character rigs remained in the scene graph, and urban detail
+selection followed a parked vehicle/walker during flight. Hidden population hosts
+now detach without disposing their agent-owned resources. Visibility restores
+the same host and its current pose. Population/detail focus follows the active
+Earth actor; airborne detail selection includes altitude. Civic simulation keeps
+its existing authority.
+
+Three real-character hide/restore cycles passed with ten geometries, one texture,
+and no graphics error; the final walking pose was inspected. Population demand,
+distribution, attachment and focus component checks passed. The preceding source
+flight reduced attached bones from 2,503 to 147 and restored 2,503 at the ground
+origin. Final direct-driving focus and frozen-build checks remain pending below.

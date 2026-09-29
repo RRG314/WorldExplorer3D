@@ -1,3 +1,4 @@
+import {urbanPresentationFocus, urbanPresentationDistance} from './presentation-focus.js';
 import { setDomText, setDomAttribute, setDomHidden, setDomClass } from '../ui/dom-state.js?v=1';
 import { ctx as appCtx } from '../shared-context.js?v=55';
 import { carSpeedToMph, mphToCarSpeed } from '../physics/vehicle-speed-units.js?v=2';
@@ -1197,7 +1198,7 @@ function promotePedestrian(state, source) {
 
 function maintainNearbyNpcDetails(state) {
   if (!activeWorldMatches(state) || state.transition) return;
-  const actor = civicActorPosition(state);
+  const actor = urbanPresentationFocus(appCtx.activeEarthActorPosition?.(), civicActorPosition(state));
   if (!actor) return;
   const driving = state.activeVehicle && appCtx.Walk?.state?.mode !== 'walk';
   const preloadDistance = driving ? NPC_DRIVING_PRELOAD_DISTANCE : NPC_DETAIL_PRELOAD_DISTANCE;
@@ -1205,15 +1206,16 @@ function maintainNearbyNpcDetails(state) {
   const nearby = (state.population?.nearbyPedestrians?.(actor, preloadDistance) || [])
     .map((pedestrian) => ({
       pedestrian,
-      distance: Math.hypot(pedestrian.x - actor.x, pedestrian.z - actor.z)
+      distance: urbanPresentationDistance(actor, pedestrian)
     }))
+    .filter(entry => entry.distance <= preloadDistance)
     .sort((a, b) => a.distance - b.distance);
   // Promoted agents are intentionally hidden from the instanced population's
   // nearby query, so include their current poses when selecting the nearest
   // stable detail set. Otherwise actors would alternate LOD every update.
   const detailCandidates = state.npcs.map((npc) => {
     const pose = npcPose(npc);
-    return { id: npc.sourceAgentId, distance: Math.hypot(pose.x - actor.x, pose.z - actor.z) };
+    return { id: npc.sourceAgentId, distance: urbanPresentationDistance(actor, pose) };
   }).filter((entry) => entry.distance <= releaseDistance);
   const desiredIds = new Set([
     ...detailCandidates,
@@ -1222,7 +1224,7 @@ function maintainNearbyNpcDetails(state) {
   state.npcs.slice().forEach((npc) => {
     if (npc.reaction || npc.reactionUntil === Infinity) return;
     const pose = npcPose(npc);
-    const distance = Math.hypot(pose.x - actor.x, pose.z - actor.z);
+    const distance = urbanPresentationDistance(actor, pose);
     if (distance > releaseDistance || !desiredIds.has(npc.sourceAgentId)) {
       releasePromotedNpc(state, npc);
     }
@@ -1410,7 +1412,7 @@ function promoteTrafficVehicleDetail(state, trafficAgentId) {
 
 function maintainNearbyVehicleDetails(state) {
   if (!activeWorldMatches(state) || state.transition) return;
-  const actor = civicActorPosition(state);
+  const actor = urbanPresentationFocus(appCtx.activeEarthActorPosition?.(), civicActorPosition(state));
   if (!actor) return;
   const snapshots = state.population?.vehicleSnapshots?.() || [];
   const byId = new Map(snapshots.map((snapshot) => [snapshot.id, snapshot]));
@@ -1437,7 +1439,7 @@ function maintainNearbyVehicleDetails(state) {
     .filter((snapshot) => snapshot.visible && (!snapshot.promoted || snapshot.detailPromoted))
     .map((snapshot) => ({
       snapshot,
-      distance: Math.hypot(snapshot.x - actor.x, snapshot.z - actor.z)
+      distance: urbanPresentationDistance(actor, snapshot)
     }))
     .filter((entry) => entry.distance <= VEHICLE_DETAIL_RELEASE_DISTANCE)
     .sort((left, right) => left.distance - right.distance);
@@ -1445,7 +1447,7 @@ function maintainNearbyVehicleDetails(state) {
   for (const vehicle of state.vehicles.slice()) {
     if (!vehicle.ambientTraffic) continue;
     const snapshot = byId.get(vehicle.trafficAgentId);
-    const distance = snapshot ? Math.hypot(snapshot.x - actor.x, snapshot.z - actor.z) : Infinity;
+    const distance = snapshot ? urbanPresentationDistance(actor, snapshot) : Infinity;
     if (distance > VEHICLE_DETAIL_RELEASE_DISTANCE || !desiredIds.has(vehicle.trafficAgentId)) {
       releaseDetailedTrafficVehicle(state, vehicle);
     }
