@@ -10,6 +10,15 @@ Visual-quality implementation is in progress locally. See
 `docs/visual-quality/PLAN.md` and `docs/visual-quality/EVIDENCE.md`.
 The local rendering and asset changes are not the deployed build.
 
+The current local preview is
+`5.3.0+a09cf0d9f270.d38a22c92653b16b.staging` on port 4193. Road-query pruning,
+static transforms, bounded idle model resources and active-actor population
+presentation have targeted and browser evidence. Matched short Baltimore routes
+averaged above the sampled 5.2 build; occasional frame spikes and broader
+performance/visual acceptance remain open. See the frozen-candidate section in
+`docs/visual-quality/EVIDENCE.md`. Production has not changed.
+
+
 The owner authorized production deployment and GitHub updates on September 28,
 superseding earlier local-only instructions. Keep ordinary Chrome open. Run
 heavy local work sequentially and preserve source, history and private data.

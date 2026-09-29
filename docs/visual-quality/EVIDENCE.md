@@ -197,3 +197,25 @@ and no graphics error; the final walking pose was inspected. Population demand,
 distribution, attachment and focus component checks passed. The preceding source
 flight reduced attached bones from 2,503 to 147 and restored 2,503 at the ground
 origin. Final direct-driving focus and frozen-build checks remain pending below.
+
+
+### Frozen candidate a09cf0d9
+
+`5.3.0+a09cf0d9f270.d38a22c92653b16b.staging` completed the same two driving
+and two flight routes, then returned to the original ground scenario. No page
+errors occurred. Driving measured 43.3 / 54.2 FPS and flight 43.1 / 40.6 FPS.
+Compared with the sampled 5.2 routes, averages were approximately 11–13% higher.
+First-flight p99 remains worse (66.7 ms versus 35.4 ms); occasional hitches remain.
+These are limited same-location measurements, not universal performance claims.
+
+Nearby detail restored all 20 NPCs after return. Attached Earth bones changed
+from 2,503 on the ground to 147 during flight and back to 2,503. Main Menu
+released the mapped building/road/terrain collections. The uncollected heap was
+still about 1,018 MiB after five seconds; this is not a total-process memory
+measurement or proof of the earlier 3.8 GiB concern being resolved.
+
+The frozen ship check passed nine checks covering all-room renders, seven crew,
+loaded furnishings, camera modes, exit and two reboarding cycles. Released
+resources returned to 30 geometries / 33 textures in both cycles. Science and
+Baltimore recovery screenshots were inspected. This validates the changed
+ownership paths, not the outstanding overall visual-quality plan.
