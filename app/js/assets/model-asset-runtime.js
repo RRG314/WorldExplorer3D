@@ -1,5 +1,6 @@
 import {createModelTemplateCache} from './model-template-cache.js';
 import {modelAssetRequestUrl} from './model-asset-url.js';
+import {batchSkinnedModelTemplate} from './skinned-model-batching.js';
 import {batchStaticModelTemplate} from './static-model-batching.js?v=1';
 import { getModelAsset } from './model-asset-catalog.js?v=16';
 import { registerMaterialCompatibility } from './gltf-material-compatibility.js';
@@ -28,6 +29,9 @@ function loadTemplate(THREE, record) {
         try {
           if (record.roles.includes('road-vehicle-presentation')) {
             root.userData.staticModelBatching = batchStaticModelTemplate(THREE, root, gltf?.animations || []);
+          }
+          if (record.roles.some(role => /character$/.test(role))) {
+            root.userData.skinnedModelBatching = batchSkinnedModelTemplate(THREE, root, gltf?.animations || []);
           }
           resolve(Object.freeze({ root, animations: Object.freeze([...(gltf?.animations || [])]) }));
         } catch (error) { reject(error); }

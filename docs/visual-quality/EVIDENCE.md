@@ -442,6 +442,39 @@ remain pending. Production and the existing user preview are unchanged.
 
 ## September 29: packaged performance and allocation follow-up
 
-Candidate `5.4.0+e84c1d84d329.a3cb1270c770c62b.staging` failed desktop mode budgets: stationary driving averaged40.93FPS and sampled gameplay heap reached1.55GB. Flight included an816.6ms frame. Retention, resource cleanup, moving-world coverage and mobile checks passed; this is not release acceptance.
+Candidate `5.4.0+e84c1d84d329.a3cb1270c770c62b.staging` failed desktop
+mode budgets: stationary driving averaged 40.93 FPS and sampled gameplay heap
+reached 1.55 GB. Flight included an 816.6 ms frame. Retention, resource cleanup,
+moving-world coverage and mobile checks passed.
 
-The follow-up preserves polygon membership and material weights while indexing coastline edges and water bounds, reusing blend scratch storage and avoiding projection-query closures. Local-light cutoff pruning has rendered parity within one channel value out of255, including legacy zero-decay behavior. Stable street-light slots prevent quality changes from altering shader light counts. All1516current contracts and the source audit pass. Instrumented loading improved from55to45seconds before the final coastline change; uninstrumented packaged measurements remain required.
+The follow-up preserves polygon membership and material weights while indexing
+coastline edges and water bounds, reusing blend scratch storage and avoiding
+projection-query closures. Local-light cutoff pruning has rendered parity within
+one channel value out of 255, including legacy zero-decay behavior. Stable
+street-light slots prevent quality changes from altering shader light counts.
+All 1,516 current contracts and the source audit passed.
+
+The subsequent packaged d0a507d6 run reduced ground-play JavaScript heap to
+552–607 MiB, with no forced collection during gameplay. The largest flight frame
+was 133.4 ms, down from 816.6 ms. Loading took 50 seconds. Ground modes averaged
+40–43 FPS and driving activation took 1,996 ms, so release acceptance still
+failed. Mobile, retention, coverage and browser-error checks passed. These are
+JavaScript heap measurements, not total browser or GPU memory.
+
+## Character draw consolidation
+
+Compatible solid-colour skinned parts now share geometry and vertex colours.
+The authored triangles, weights, bones and animation clips are retained.
+Weapons, independently animated parts, textures and recolourable uniforms stay
+separate. Template geometry remains shared while instances own their materials
+and skeletons.
+
+The eight actual character assets were compared over idle, walk, run and wave
+animations at two times each. Draw counts fell from 9–17 to 1–4 for seven assets;
+the recolourable ship uniform remained unchanged. Six assets had zero or single
+channel-value differences; the casual man's comparison changed six channel
+samples across all frames, with a maximum difference of 20/255. This is near
+pixel parity, not bit-identical rendering. Screenshots were inspected.
+The remote-character fixture completed six vehicle/return and leave/rejoin
+cycles with animation present, four geometries, two textures and no GL errors.
+Full-world performance after this change remains to be measured.
