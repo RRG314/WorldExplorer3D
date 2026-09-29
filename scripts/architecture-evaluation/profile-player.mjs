@@ -10,6 +10,8 @@ const root=process.env.WE3D_PROFILE_ROOT||process.cwd();
 const label=process.env.WE3D_PROFILE_LABEL||'baseline-pilot';
 const location={lat:Number(process.env.WE3D_PROFILE_LAT??39.2904),lon:Number(process.env.WE3D_PROFILE_LON??-76.6122),name:process.env.WE3D_PROFILE_LOCATION||'Baltimore'};
 if(!Number.isFinite(location.lat)||!Number.isFinite(location.lon)||Math.abs(location.lat)>90||Math.abs(location.lon)>180)throw Error('Invalid profile location');
+const drivePose=process.env.WE3D_PROFILE_DRIVE_POSE?JSON.parse(process.env.WE3D_PROFILE_DRIVE_POSE):null;
+if(drivePose&&!['x','z','angle'].every(key=>Number.isFinite(drivePose[key])))throw Error('Invalid driving profile pose');
 const retentionCycles=Math.min(3,Math.max(0,Number(process.env.WE3D_RETENTION_CYCLES)||0));
 const out=`output/architecture-evaluation/${label}`;await mkdir(out,{recursive:true});
 const report={label,source:execFileSync('git',['rev-parse','HEAD'],{cwd:root,encoding:'utf8'}).trim(),host:requirePerformanceHost(),quality:'med fixed; auto-quality disabled',viewport:{width:1280,height:800},clock:'normal RAF; no advanceTime',location,samples:[],errors:[],complete:false};
@@ -35,7 +37,7 @@ let deadline;try{
  const cdp=await context.newCDPSession(page);await cdp.send('Performance.enable');
  const metrics=async()=>Object.fromEntries((await cdp.send('Performance.getMetrics')).metrics.map(x=>[x.name,x.value]));
  const start=Date.now();console.log('profile: title');
- await page.goto(`http://127.0.0.1:${server.port}/app/?loc=custom&lat=${location.lat}&lon=${location.lon}&lname=${encodeURIComponent(location.name)}&launch=earth&gm=free&mode=walk`,{waitUntil:'domcontentloaded',timeout:90000});
+ await page.goto(`http://127.0.0.1:${server.port}/app/?graphicsDiagnostics=${process.env.WE3D_PROFILE_GRAPHICS==='1'?'1':'0'}&loc=custom&lat=${location.lat}&lon=${location.lon}&lname=${encodeURIComponent(location.name)}&launch=earth&gm=free&mode=walk`,{waitUntil:'domcontentloaded',timeout:90000});
  await page.waitForFunction(()=>globalThis.__WE3D_RUNTIME_READY__===true,null,{timeout:120000});
  report.titleReadyMs=Date.now()-start;report.titleMetrics=await metrics();
  report.graphics=await page.evaluate(()=>{const c=document.createElement('canvas'),gl=c.getContext('webgl2')||c.getContext('webgl');const e=gl.getExtension('WEBGL_debug_renderer_info');const renderer=e?gl.getParameter(e.UNMASKED_RENDERER_WEBGL):gl.getParameter(gl.RENDERER);gl.getExtension('WEBGL_lose_context')?.loseContext();return renderer;});requireHardwareGraphics(report.graphics);await save();
@@ -52,6 +54,16 @@ let deadline;try{
  if(process.env.WE3D_PROFILE_DAY==='1'){for(let i=0;i<6&&await page.locator('#quickTimeOfDay').getAttribute('data-mode')!=='day';i++)await page.locator('#quickTimeOfDay').click();report.manualSkyMode=await page.locator('#quickTimeOfDay').getAttribute('data-mode');if(report.manualSkyMode!=='day')throw Error('Day preset did not activate');}
  if(process.env.WE3D_PROFILE_COMPILER==='1'){const {profile}=await cdp.send('Profiler.stop');await writeFile(`${out}/compilation.cpuprofile`,JSON.stringify(profile));report.firstPlayableTimingScope='sampled profiler enabled; do not compare as uninstrumented load latency';}
  await page.waitForTimeout(2500);
+ if(process.env.WE3D_PROFILE_GPU_UPLOADS==='1')await page.evaluate(async()=>{
+  const {ctx}=await import('/app/js/shared-context.js?v=55');const owners=new WeakMap();globalThis.__gpuUploadStalls=[];
+  const register=root=>root?.traverse?.(object=>{
+   const attributes={...object.geometry?.attributes,index:object.geometry?.index,instanceMatrix:object.instanceMatrix,instanceColor:object.instanceColor};
+   for(const [attribute,value] of Object.entries(attributes))if(value?.array?.buffer)owners.set(value.array.buffer,{name:object.name,type:object.type,attribute,bytes:value.array.byteLength,road:!!object.userData?.isRoadBatch,vegetation:!!root.userData?.isVegetationBatch,building:!!object.userData?.isBuildingBatch});
+  });
+  register(ctx.scene);const add=ctx.addEarthWorldObject;ctx.addEarthWorldObject=function(object){register(object);return add(object);};
+  const gl=ctx.renderer.getContext(),original=gl.bufferData;
+  gl.bufferData=function(...args){const started=performance.now();try{return original.apply(this,args);}finally{const elapsed=performance.now()-started;if(elapsed>8&&globalThis.__gpuUploadStalls.length<100)globalThis.__gpuUploadStalls.push({started,elapsed,owner:owners.get(args[1]?.buffer)||null,bytes:args[1]?.byteLength||0});}};
+ });
  report.initial=await page.evaluate(()=>{const d=getWorldExplorerRuntimeDiagnostics();return {worldCounts:d.worldCounts,worldLoad:d.worldLoad,renderer:d.renderer,rendererOwners:d.rendererOwners,runtimeKernel:d.runtimeKernel,transportCompilation:d.transportCompilation};});await save();
  if(process.env.WE3D_PROFILE_SCENE_GRAPH==='1'){
   report.sceneGraph=await page.evaluate(async()=>{
@@ -106,7 +118,7 @@ let deadline;try{
  }
  if(process.env.WE3D_PROFILE_CONTROLLED_TRAVEL==='1'){
   const timedTravelSeconds=Number(process.env.WE3D_PROFILE_TRAVEL_SECONDS)||0;
-  report.routeScope=timedTravelSeconds ? `Diagnostic ${timedTravelSeconds}s input windows; no route completion claim.` : 'Repeatable scenario setup; normal physics and keyboard input thereafter. Driving 100 m, flight 1500 m above the same city; no climb-key loops.';
+  report.drivePose=drivePose;report.routeScope=timedTravelSeconds ? `Diagnostic ${timedTravelSeconds}s input windows; no route completion claim.` : 'Repeatable scenario setup; normal physics and keyboard input thereafter. Driving 100 m, flight 1500 m above the same city; no climb-key loops.';
   async function populationPresentation(){return page.evaluate(async()=>{
    const {ctx}=await import('/app/js/shared-context.js?v=55');let nodes=0,bones=0;
    ctx.earthSceneRoot?.traverse(o=>{nodes++;bones+=o.isBone?1:0;});
@@ -117,15 +129,15 @@ let deadline;try{
    await page.locator('#travelBtn').click();await page.locator(mode==='drive'?'#fDriving':'#fPlane').click();
    await page.mouse.click(640,400);await page.waitForTimeout(1500);
    for(let repeat=0;repeat<2;repeat++){
-    await page.evaluate(async mode=>{
+    await page.evaluate(async({mode,drivePose})=>{
      const {ctx}=await import('/app/js/shared-context.js?v=55');
      const actor=mode==='drive'?ctx.car:ctx.planeMode;
-     const x=4.854101966249685,z=3.526711513754839;
+     const x=mode==='drive'&&drivePose?drivePose.x:4.854101966249685,z=mode==='drive'&&drivePose?drivePose.z:3.526711513754839;
      Object.assign(actor,{x,z,angle:0,yaw:0,pitch:0,roll:0,pitchRate:0,rollRate:0,yawRate:0,lookYawOffset:0,cameraYaw:0,cameraPitch:0,cameraLookTimer:0,barrelRollActive:false,flightPathAngle:0,climbRate:0,turnRate:0,angleOfAttack:0});
-     if(mode==='drive')Object.assign(actor,{y:ctx.GroundHeight.carCenterY(x,z),speed:0,vFwd:0,vLat:0,vx:0,vy:0,vz:0,onGround:true,isAirborne:false});
+     if(mode==='drive')Object.assign(actor,{angle:drivePose?.angle||0,y:ctx.GroundHeight.carCenterY(x,z),speed:0,vFwd:0,vLat:0,vx:0,vy:0,vz:0,onGround:true,isAirborne:false});
      else Object.assign(actor,{y:300,speed:80,horizontalSpeed:80,vx:0,vy:0,vz:80,throttle:1,airborne:true,stalled:false});
      globalThis.__TRAVEL_PROFILE_ACTOR__=actor;
-    },mode);
+    },{mode,drivePose});
     const captureCpu=process.env.WE3D_PROFILE_CONTROLLED_CPU==='1';
     if(captureCpu){await cdp.send('Profiler.enable');await cdp.send('Profiler.start');}
     const key=mode==='drive'?'w':'Space';await page.keyboard.down(key);let raw;
@@ -228,6 +240,8 @@ let deadline;try{
   }
  }
  report.longTasks=await page.evaluate(()=>({entries:globalThis.__architectureLongTasks||[],dropped:globalThis.__architectureLongTasksDropped||0,scope:'Observer long tasks above 50 ms; renderer/GPU and asynchronous waits are not measured as blocking.'}));
+ report.graphicsCalls=await page.evaluate(async()=>{const {ctx}=await import('/app/js/shared-context.js?v=55');return ctx.graphicsCallEvidence?.snapshot()||[];});
+ report.gpuUploadStalls=await page.evaluate(()=>globalThis.__gpuUploadStalls||[]);
  report.shaderStalls=await page.evaluate(()=>globalThis.__shaderStalls||[]);
  report.complete=true;console.log('profile: complete');
 }catch(e){report.failure=String(e.message);console.log('profile: failed',report.failure);}finally{clearTimeout(deadline);await save();await browser?.close().catch(()=>{});await server.close();}

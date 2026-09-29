@@ -40,3 +40,28 @@ test('publishing one mask cell uploads only that rectangle and its lookup pixel'
  assert.equal(mask.uploadStats.incrementalBytes,2*(data.byteLength+4));assert.ok(mask.uploadStats.incrementalBytes<mask.bytes);
  mask.dispose();assert.ok(textures.every(texture=>texture.disposed));
 });
+
+test('late pavement atlases replace uniforms without changing or recompiling terrain shaders',async t=>{
+ const previous=globalThis.THREE;t.after(()=>{globalThis.THREE=previous;});
+ const THREE=await import('three');globalThis.THREE=THREE;
+ const {createPavementTerrainMask,createPavementMaterialBinding}=await import('../app/js/world/pavement-terrain-mask.js');
+ const material=new THREE.MeshStandardMaterial();const original=material.onBeforeCompile;
+ const ctx={renderer:{capabilities:{maxTextureSize:4096}},terrainGroup:{children:[{material,userData:{isTerrainMesh:true}}]}};
+ const binding=createPavementMaterialBinding(ctx);
+ const empty=createPavementTerrainMask(ctx,[],{materialBinding:binding});empty.activate();empty.syncMaterials();
+ const shader={uniforms:{},vertexShader:'#include <begin_vertex>',fragmentShader:'#include <color_fragment>'};
+ material.onBeforeCompile(shader);const hook=material.onBeforeCompile,key=material.customProgramCacheKey(),version=material.version;
+ const uniform=shader.uniforms.pavementMaskAtlas,oldTexture=uniform.value;
+ let released=false;oldTexture.addEventListener('dispose',()=>{released=true;});
+ const replacement=createPavementTerrainMask(ctx,['1:0'],{materialBinding:binding});
+ replacement.setDetailBounds({minX:10,minZ:20,maxX:30,maxZ:40});
+ assert.equal(uniform.value,oldTexture,'staged data must not replace accepted coverage');
+ replacement.activate();empty.dispose();replacement.syncMaterials();
+ assert.equal(released,true);assert.notEqual(uniform.value,oldTexture);
+ assert.equal(shader.uniforms.pavementMaskAtlas,uniform,'compiled uniforms retain their identity');
+ assert.deepEqual(shader.uniforms.nearPavementBounds.value.toArray(),[10,20,30,40]);
+ assert.equal(material.onBeforeCompile,hook);assert.equal(material.customProgramCacheKey(),key);assert.equal(material.version,version);
+ replacement.setEnabled(false);assert.equal(shader.uniforms.pavementMaskEnabled.value,0);
+ replacement.dispose();binding.dispose();assert.equal(material.onBeforeCompile,original);
+ material.dispose();
+});

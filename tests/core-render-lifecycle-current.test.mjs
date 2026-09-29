@@ -92,6 +92,19 @@ for(const composer of [false,true])test(`first-frame preparation uses normal ren
  system.update();assert.equal(events.length,3);
 });
 
+for(const composer of [false,true])test(`resident shader preparation matches the actual render target (${composer})`,()=>{
+ const screen={id:'previous'},buffer={id:'composer'};let target=screen;
+ const events=[];
+ const renderer={info:{programs:[]},getRenderTarget:()=>target,setRenderTarget:value=>{target=value;},
+   compile(){assert.equal(target,composer?buffer:null);events.push('compile');},render(){events.push('draw');}};
+ const app={gameStarted:true,renderer,scene:{},camera:{},composer:{readBuffer:buffer,render(){events.push('draw');}}};
+ createCoreRenderSystem(app,()=>composer);
+ app.prepareFirstWorldRender();assert.deepEqual(events,['compile','draw']);assert.equal(target,screen);
+ renderer.compile=()=>{throw Error('compile failed');};
+ assert.throws(()=>app.prepareFirstWorldRender(),/compile failed/);assert.equal(target,screen);
+ assert.deepEqual(events,['compile','draw'],'failed preparation must not publish a ready frame');
+});
+
 test('overview advances between LOD ticks without adding a timer or background loop',()=>{
  let advances=0;
  const app={gameStarted:true,car:{x:0,z:0},streetOverview:{step:()=>advances++},updateHUD(){},drawMinimap(){}};

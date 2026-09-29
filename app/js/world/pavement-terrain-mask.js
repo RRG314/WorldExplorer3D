@@ -1,25 +1,8 @@
 import {pavementMaskLayout} from './compiler/pavement-mask.js';
 
-export function createPavementTerrainMask(appCtx,keys,{kind="pavement",cellSize=64,color=[0.5029,0.4851,0.4564],deferUpload=false}={}){
-  if(!["pavement","road"].includes(kind)||!Number.isFinite(cellSize)||cellSize<=0||color.length!==3||!color.every(Number.isFinite))throw new TypeError("Invalid terrain coverage layer");
+export function createPavementMaterialBinding(appCtx,{kind="pavement",color=[0.5029,0.4851,0.4564]}={}) {
+  const hooks=new Map(),uniforms={};
   const names=text=>kind==="road"?text.replaceAll("pavement","roadCoverage").replaceAll("Pavement","RoadCoverage"):text;
-  const limit=Math.min(4096,appCtx.renderer?.capabilities?.maxTextureSize||4096),layout=pavementMaskLayout(keys,limit);
-  const bytes=new Uint8Array(layout.width*layout.height),addresses=new Uint8Array(layout.lookupWidth*layout.lookupHeight*4);
-  const slots=new Map(keys.map((key,index)=>[key,index])),hooks=new Map();
-  const texture=new THREE.DataTexture(bytes,layout.width,layout.height,appCtx.renderer?.capabilities?.isWebGL2===false?THREE.LuminanceFormat:THREE.RedFormat);
-  texture.minFilter=texture.magFilter=THREE.LinearFilter;texture.unpackAlignment=1;texture.generateMipmaps=false;texture.needsUpdate=true;
-  const lookup=new THREE.DataTexture(addresses,layout.lookupWidth,layout.lookupHeight,THREE.RGBAFormat);
-  lookup.minFilter=lookup.magFilter=THREE.NearestFilter;lookup.generateMipmaps=false;lookup.needsUpdate=true;
-  // Three r128 copyTextureToTexture uses texSubImage2D for DataTexture input.
-  // Updating one cell must not invalidate and re-upload the complete atlas.
-  const cellUpload=new THREE.DataTexture(new Uint8Array(layout.resolution**2),layout.resolution,layout.resolution,texture.format);
-  const addressUpload=new THREE.DataTexture(new Uint8Array(4),1,1,THREE.RGBAFormat);
-  const uploadPosition=new THREE.Vector2();
-  const uploadStats={cells:0,incrementalBytes:0,maxUploadMs:0};
-  const uniforms={pavementMaskAtlas:{value:texture},pavementMaskLookup:{value:lookup},pavementMaskEnabled:{value:1},pavementCellSize:{value:cellSize},
-    pavementMaskGrid:{value:new THREE.Vector4(layout.minX,layout.minZ,layout.lookupWidth,layout.lookupHeight)},
-    pavementMaskLayout:{value:new THREE.Vector4(layout.columns,layout.resolution,layout.width,layout.height)},
-    nearPavementBounds:{value:new THREE.Vector4(1,1,-1,-1)}};
   const prelude=`varying vec2 pavementWorldXZ;
   uniform sampler2D pavementMaskAtlas;
   uniform sampler2D pavementMaskLookup;
@@ -62,8 +45,40 @@ export function createPavementTerrainMask(appCtx,keys,{kind="pavement",cellSize=
     }
     return materials.size;
   }
-  return {layout,uploadStats,bytes:bytes.byteLength+addresses.byteLength,syncMaterials,
-    setEnabled(enabled){uniforms.pavementMaskEnabled.value=enabled?1:0;},
+  return {syncMaterials,
+    setUniforms(next){for(const [key,uniform] of Object.entries(next)){
+      if(uniforms[key])uniforms[key].value=uniform.value;else uniforms[key]={value:uniform.value};
+    }},
+    dispose(){if(uniforms.pavementMaskEnabled)uniforms.pavementMaskEnabled.value=0;for(const [material,entry] of hooks)restore(material,entry);hooks.clear();}
+  };
+}
+
+
+export function createPavementTerrainMask(appCtx,keys,{kind="pavement",cellSize=64,color=[0.5029,0.4851,0.4564],deferUpload=false,materialBinding=null}={}){
+  if(!["pavement","road"].includes(kind)||!Number.isFinite(cellSize)||cellSize<=0||color.length!==3||!color.every(Number.isFinite))throw new TypeError("Invalid terrain coverage layer");
+  const limit=Math.min(4096,appCtx.renderer?.capabilities?.maxTextureSize||4096),layout=pavementMaskLayout(keys,limit);
+  const bytes=new Uint8Array(layout.width*layout.height),addresses=new Uint8Array(layout.lookupWidth*layout.lookupHeight*4);
+  const slots=new Map(keys.map((key,index)=>[key,index]));
+  const texture=new THREE.DataTexture(bytes,layout.width,layout.height,appCtx.renderer?.capabilities?.isWebGL2===false?THREE.LuminanceFormat:THREE.RedFormat);
+  texture.minFilter=texture.magFilter=THREE.LinearFilter;texture.unpackAlignment=1;texture.generateMipmaps=false;texture.needsUpdate=true;
+  const lookup=new THREE.DataTexture(addresses,layout.lookupWidth,layout.lookupHeight,THREE.RGBAFormat);
+  lookup.minFilter=lookup.magFilter=THREE.NearestFilter;lookup.generateMipmaps=false;lookup.needsUpdate=true;
+  // Three r128 copyTextureToTexture uses texSubImage2D for DataTexture input.
+  // Updating one cell must not invalidate and re-upload the complete atlas.
+  const cellUpload=new THREE.DataTexture(new Uint8Array(layout.resolution**2),layout.resolution,layout.resolution,texture.format);
+  const addressUpload=new THREE.DataTexture(new Uint8Array(4),1,1,THREE.RGBAFormat);
+  const uploadPosition=new THREE.Vector2();
+  const uploadStats={cells:0,incrementalBytes:0,maxUploadMs:0};
+  const uniforms={pavementMaskAtlas:{value:texture},pavementMaskLookup:{value:lookup},pavementMaskEnabled:{value:1},pavementCellSize:{value:cellSize},
+    pavementMaskGrid:{value:new THREE.Vector4(layout.minX,layout.minZ,layout.lookupWidth,layout.lookupHeight)},
+    pavementMaskLayout:{value:new THREE.Vector4(layout.columns,layout.resolution,layout.width,layout.height)},
+    nearPavementBounds:{value:new THREE.Vector4(1,1,-1,-1)}};
+  const ownsBinding=!materialBinding;
+  const binding=materialBinding||createPavementMaterialBinding(appCtx,{kind,color});
+  const activate=()=>binding.setUniforms(uniforms);
+  if(ownsBinding)activate();
+  return {layout,uploadStats,bytes:bytes.byteLength+addresses.byteLength,syncMaterials:binding.syncMaterials,activate,
+    setEnabled(enabled){uniforms.pavementMaskEnabled.value=enabled?1:0;binding.setUniforms({pavementMaskEnabled:uniforms.pavementMaskEnabled});},
     setDetailBounds(b){uniforms.nearPavementBounds.value.set(...(b?[b.minX,b.minZ,b.maxX,b.maxZ]:[1,1,-1,-1]));},
     publish(key,mask){
       const slot=slots.get(key);if(slot===undefined||mask.length!==layout.resolution**2)throw new Error('Invalid pavement mask cell');
@@ -90,6 +105,6 @@ export function createPavementTerrainMask(appCtx,keys,{kind="pavement",cellSize=
       appCtx.renderer.copyTextureToTexture(uploadPosition.set(ix-layout.minX,iz-layout.minZ),addressUpload,lookup);
     },
     finishBulkUpload(){deferUpload=false;},
-    dispose(){uniforms.pavementMaskEnabled.value=0;for(const [material,entry] of hooks)restore(material,entry);hooks.clear();texture.dispose();lookup.dispose();cellUpload.dispose();addressUpload.dispose();slots.clear();}
+    dispose(){if(ownsBinding)binding.dispose();texture.dispose();lookup.dispose();cellUpload.dispose();addressUpload.dispose();slots.clear();}
   };
 }

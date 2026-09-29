@@ -428,3 +428,11 @@ export function updateStreetOverviewFrame(appCtx) {
   const point=focusActor(appCtx);
   if(point)appCtx.streetOverview?.step(point);
 }
+
+// Set up the distant coverage material while the loading cover is still shown.
+// Source compilation stays deferred; no location data are awaited here.
+export function prepareStreetOverviewMaterials(appCtx) {
+  if(!appCtx.streetPavement||appCtx.onMoon||appCtx.onMars||appCtx.activePlanetaryBodyId||appCtx.activeShipInterior)return;
+  if(appCtx.isEnv&&appCtx.ENV&&!appCtx.isEnv(appCtx.ENV.EARTH))return;
+  appCtx.streetOverview ||= createStreetOverview(appCtx,{onComplete:bounds=>refreshMappedPaths(appCtx,bounds)});
+}

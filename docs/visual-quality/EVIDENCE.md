@@ -237,3 +237,36 @@ The real vegetation browser fixture retained programs 0, 1 and 2 over three repl
 The initial distance-based diagnostic did not complete its driving route and is recorded as failed. Subsequent windows are explicitly 15-second diagnostic input windows, not matched route comparisons with 5.2. The frame report now includes the delay before its first eligible RAF, previously outside the measured interval.
 
 The contact-publication source run completed driving, flight, underwater, Earth return and space without page errors. Driving p99 was 48.2/51.3 ms, flight p99 34.6/35.2 ms; a 349.6 ms Earth-return frame and other isolated spikes remained. The later chunked pavement source change still requires frozen-build verification. No universal smoothness, memory or production-readiness claim follows from these results. Regional art and the broader visual plan remain open.
+
+### Follow-up: packaged stalls and delayed terrain shaders
+
+The `2b614f09` packaged run did not pass performance acceptance: isolated frames
+reached 417 ms driving and 849 ms flying. CPU and WebGL-boundary traces separated
+shader linking from first-use geometry/texture uploads. A subsequent upload
+probe did not reproduce an individual buffer upload over 8 ms; it does not rule
+out a costly batch of smaller uploads.
+
+The original fixed driving heading ran into a building. Those stationary/timed
+windows are diagnostic evidence only. The corrected Baltimore comparison starts
+on mapped East Baltimore Street at x=-128, z=82.347, heading 1.625248 radians and
+requires 100 world units of actual driving; flight requires 1,500 world units.
+
+Distant pavement previously attached terrain shader hooks after interactive
+entry. A trace measured a 224 ms render with eight new programs. The replacement
+installs a stable material binding before the first playable render, then swaps
+atlas uniforms as cells arrive. Resident programs are prepared with the actual
+composer render target. No coverage, texture resolution or geometry was removed.
+
+Targeted tests cover atlas replacement, unchanged program keys/material versions,
+compiled-uniform identity, old-texture disposal and correct renderer-target
+restoration. A real WebGL fixture replaced the atlas three times: one retained
+program, two resident textures, zero GL errors; the pavement image was inspected.
+The source journey completed both driving and flight routes without page errors.
+Driving worst frames were 51.9/66.6 ms; flight 133.4/35.3 ms. The terrain-program
+burst no longer appeared. These are source observations, not frozen release
+acceptance or a claim that every travel mode is smooth.
+
+Artifacts: `output/architecture-evaluation/travel-frozen-2b614f09/`,
+`travel-frozen-gpu-upload/`, `travel-mapped-graphics/`,
+`travel-stable-pavement-programs/`, and
+`output/visual-quality/pavement-program-retention/`.
