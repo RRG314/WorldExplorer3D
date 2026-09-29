@@ -1,0 +1,13 @@
+<!doctype html><meta charset="utf-8"><base href="/app/"><link rel="icon" href="data:,"><style>body{margin:0;background:black}canvas{display:block}</style>
+<script src="/node_modules/three/build/three.min.js"></script><script type="module">
+import {createNebulaVolume} from '/app/js/universe/nebula-volume.js';import {createGalacticVolume} from '/app/js/universe/galactic-volume.js';import {getUniverseDestinations} from '/app/js/universe/catalog.js';
+const renderer=new THREE.WebGLRenderer({preserveDrawingBuffer:true});renderer.setSize(800,600);document.body.append(renderer.domElement);renderer.outputEncoding=THREE.sRGBEncoding;
+const scene=new THREE.Scene(),camera=new THREE.PerspectiveCamera(60,4/3,.1,50000);let phase=-1,mesh,result={};
+async function next(){phase++;if(mesh){scene.remove(mesh);mesh.geometry.dispose();mesh.material.map?.dispose();mesh.material.dispose();}
+const nebula=phase%3===0,region=phase%3===2;const entity=getUniverseDestinations().find(e=>e.id===(nebula?'orion-nebula':'milky-way'));mesh=nebula?createNebulaVolume(THREE,entity):createGalacticVolume(THREE,entity,{region});scene.add(mesh);
+if(mesh.material.map){for(let i=0;i<100&&!mesh.material.map.image?.width;i++)await new Promise(r=>setTimeout(r,50));if(!mesh.material.map.image?.width)throw Error('Volume observation image did not load');}
+camera.position.set(0,0,nebula?1000:region?400:1400);camera.lookAt(0,0,0);const optimized=mesh.material.fragmentShader;
+mesh.material.fragmentShader=optimized.replace('if(envelope<=0.0)continue;','').replace('if(envelope+bulge*.6<.00001)continue;','');mesh.material.needsUpdate=true;renderer.render(scene,camera);const gl=renderer.getContext(),before=new Uint8Array(800*600*4),after=new Uint8Array(before.length);gl.readPixels(0,0,800,600,gl.RGBA,gl.UNSIGNED_BYTE,before);
+mesh.material.fragmentShader=optimized;mesh.material.needsUpdate=true;renderer.render(scene,camera);gl.readPixels(0,0,800,600,gl.RGBA,gl.UNSIGNED_BYTE,after);let max=0,sum=0,changed=0;for(let i=0;i<before.length;i++){const d=Math.abs(before[i]-after[i]);max=Math.max(max,d);sum+=d;changed+=d>0?1:0;}result={phase,nebula,region,maxByteDifference:max,meanByteDifference:sum/before.length,changedChannels:changed,glError:gl.getError()};}
+addEventListener('keydown',e=>{if(e.code==='ArrowRight')void next();});window.advanceTime=()=>renderer.render(scene,camera);window.render_game_to_text=()=>JSON.stringify(result);await next();
+</script>

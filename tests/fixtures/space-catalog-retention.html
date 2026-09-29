@@ -1,0 +1,7 @@
+<!doctype html><meta charset="utf-8"><link rel="icon" href="data:,"><style>body{margin:0}canvas{display:block}</style>
+<script src="/node_modules/three/build/three.min.js"></script><script type="module">
+import {ctx} from '/app/js/shared-context.js?v=55';import {createSpaceCelestialCatalog} from '/app/js/space/celestial-catalog.js';
+ctx.spaceFlight={};ctx.constellationsVisible=false;const renderer=new THREE.WebGLRenderer({preserveDrawingBuffer:true});renderer.setSize(900,600);document.body.append(renderer.domElement);const scene=new THREE.Scene(),camera=new THREE.PerspectiveCamera(65,1.5,1,500000);camera.lookAt(0,0,-1);const catalog=createSpaceCelestialCatalog(scene);let phase=0;const versions=()=>catalog.constellationEntries.reduce((sum,e)=>sum+e.line.geometry.attributes.position.version,0);
+const before=versions();for(let i=0;i<12;i++)ctx.updateSpaceCatalogObserver({x:i*.1,y:0,z:0});const hiddenVersion=versions();
+function draw(){renderer.render(scene,camera);}addEventListener('keydown',e=>{if(e.code==='ArrowRight'){phase++;ctx.setSpaceConstellationsVisible(phase%2===1);draw();}});window.advanceTime=draw;window.render_game_to_text=()=>JSON.stringify({phase,before,hiddenVersion,currentVersion:versions(),dirty:catalog.constellationsDirty,visible:catalog.constellationEntries.filter(e=>e.line.visible).length,glError:renderer.getContext().getError()});draw();
+</script>

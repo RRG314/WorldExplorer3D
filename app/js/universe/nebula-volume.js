@@ -39,6 +39,8 @@ export function createNebulaVolume(THREE, entity, mobile = false) {
           vec3 p=observer+direction*(enter+(float(i)+0.5)*stepSize);
           float radial=length(p*vec3(1.0,1.45,1.0));
           float envelope=1.0-smoothstep(0.60,1.0,radial);
+          // Outside the density support every later contribution is exactly zero.
+          if(envelope<=0.0)continue;
           // A photograph is a 2D projection, not a density slice. Extruding its
           // brightness along z creates long luminous columns when flown through.
           // Reconstruct bounded 3D filaments; use the image only for broad color.

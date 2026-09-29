@@ -1,0 +1,14 @@
+<!doctype html><meta charset="utf-8"><link rel="icon" href="data:,"><style>body{margin:0}canvas{display:block}</style>
+<script src="/node_modules/three/build/three.min.js"></script><script type="module">
+import {ctx} from '/app/js/shared-context.js?v=55';
+import {ensureLunarEarthSphere,setLunarEarthVisible,updateLunarEarthPosition} from '/app/js/planetary/moon-sky.js';
+import {addSurfaceMaterialDetail} from '/app/js/planetary/surface-material-detail.js';
+ctx.renderer=new THREE.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});ctx.renderer.setSize(900,600);ctx.renderer.outputEncoding=THREE.sRGBEncoding;document.body.append(ctx.renderer.domElement);
+ctx.scene=new THREE.Scene();ctx.camera=new THREE.PerspectiveCamera(55,1.5,.1,20000);
+ctx.scene.add(new THREE.HemisphereLight(0xffffff,0x444444,.7));const sun=new THREE.DirectionalLight(0xffffff,2);sun.position.set(-20,40,30);ctx.scene.add(sun);
+const ground=new THREE.Mesh(new THREE.PlaneGeometry(20000,20000).rotateX(-Math.PI/2),addSurfaceMaterialDetail(new THREE.MeshStandardMaterial({color:0x86827d,roughness:1})));ctx.scene.add(ground);
+setLunarEarthVisible(true);let phase=0;const earth=ensureLunarEarthSphere();
+function draw(){ctx.camera.position.set(phase*1800,2,phase*600);updateLunarEarthPosition(...ctx.camera.position.toArray());const d=earth.position.clone().sub(ctx.camera.position).normalize();ctx.camera.lookAt(ctx.camera.position.clone().add(d));ctx.renderer.render(ctx.scene,ctx.camera);}
+addEventListener('keydown',e=>{if(e.code==='ArrowRight'){phase++;draw();}});
+window.advanceTime=draw;window.render_game_to_text=()=>JSON.stringify({phase,direction:earth.position.clone().sub(ctx.camera.position).normalize().toArray(),diameter:earth.userData.parentSkyPlacement.angularDiameterDeg,textureReady:!!earth.material.map.image?.width,glError:ctx.renderer.getContext().getError()});draw();
+</script>

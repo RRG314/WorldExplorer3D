@@ -61,10 +61,16 @@ function updateSpaceCatalogObserver(observer = { x: 0, y: 0, z: 0 }, position = 
     colors.setXYZ(index, brightness, brightness, brightness);
   });
   positions.needsUpdate = colors.needsUpdate = true;
+  catalog.constellationsDirty=true;
+  if(appCtx.constellationsVisible===true)refreshConstellationProjection(catalog);
+}
+
+function refreshConstellationProjection(catalog){
+  if(!catalog?.constellationsDirty)return;
   catalog.constellationEntries.forEach((entry) => {
     const attribute = entry.line.geometry.attributes.position;
     entry.segments.forEach((pair, i) => {
-      const points = pair.map((star) => projectCatalogStar(star, observer, CATALOG_RADIUS - 1200));
+      const points = pair.map((star) => projectCatalogStar(star, catalog.observer, CATALOG_RADIUS - 1200));
       const arc=skyArcPoints(points[0],points[1],CATALOG_RADIUS-1200);
       for(let step=0;step<12;step++)for(let end=0;end<2;end++){
         const point=arc[step+end];attribute.setXYZ(i*24+step*2+end,point.x,point.y,point.z);
@@ -72,9 +78,11 @@ function updateSpaceCatalogObserver(observer = { x: 0, y: 0, z: 0 }, position = 
     });
     attribute.needsUpdate = true;
   });
+  catalog.constellationsDirty=false;
 }
 
 function highlightSpaceConstellation(name = '') {
+  if(appCtx.constellationsVisible===true)refreshConstellationProjection(appCtx.spaceFlight?.celestialCatalog);
   const entries = appCtx.spaceFlight?.celestialCatalog?.constellationEntries || [];
   entries.forEach((entry) => {
     const selected = entry.name === name;

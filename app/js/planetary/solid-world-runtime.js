@@ -1,3 +1,5 @@
+import { surfaceLightingGain } from './surface-lighting.js';
+import { parentSkyPlacement } from './parent-sky-placement.js';
 import { addSurfaceMaterialDetail } from './surface-material-detail.js';
 import { regionalMapUv } from './regional-map-uv.js';
 import { getAstronomicalBody, normalizeAstronomicalBodyId } from '../astronomy/body-catalog.js?v=3';
@@ -401,10 +403,16 @@ async function addParentBodyView(pack, world) {
   const parent = getAstronomicalBody(pack.parentBodyId);
   if (!parent?.presentation?.globalTexturePath) return;
   const texture = await loadColorTexture(parent.presentation.globalTexturePath);
-  const radius = pack.parentVisualDiameter / 2;
+  const body=getAstronomicalBody(pack.bodyId),address=pack.manifest.address;
+  const placement=parentSkyPlacement({latitudeDeg:address.latitudeDeg,longitudeDeg:address.longitudeDegPositiveEast,
+    bodyRadiusM:body.physical.meanRadiusM,parentRadiusM:parent.physical.meanRadiusM,
+    parentMassKg:parent.physical.massKg,bodyMassKg:body.physical.massKg,orbitalPeriodS:body.physical.orbitalPeriodS});
+  if(!placement){texture.dispose();return;}
+  const radius=placement.renderRadius;
   const group = new THREE.Group();
   group.name = `${parent.name} body-fixed sky context`;
-  group.position.set(-2_900, 1_850, -4_900);
+  group.position.set(placement.direction.x,placement.direction.y,placement.direction.z).multiplyScalar(placement.renderDistance);
+  group.userData.parentSkyPlacement=placement;
   const globe = new THREE.Mesh(
     new THREE.SphereGeometry(radius, 48, 32),
     new THREE.MeshBasicMaterial({ map: texture, color: 0xffffff })
@@ -420,9 +428,9 @@ async function addParentBodyView(pack, world) {
     ring.rotation.z = -0.18;
     group.add(ring);
   }
-  group.userData.truthClass = 'visual_scale_adjustment';
+  group.userData.truthClass = 'modeled_physics';
   group.userData.parentBodyId = parent.id;
-  group.userData.description = 'Body-fixed parent-planet sky context; apparent size is adjusted for gameplay readability.';
+  group.userData.description = 'Mean synchronous-orbit parent direction and angular size; no libration or time-dependent ephemeris.';
   world.objects.push(group);
   appCtx.scene.add(group);
 }
@@ -1029,6 +1037,7 @@ function hideActiveWorld() {
   clearActivePlanetaryObstacles();
   activeReturnPod = null;
   appCtx.activeSolidWorldSurface = null;
+  appCtx.activeParentSkyViews=null;
   appCtx.activePlanetaryEnvironment = null;
   appCtx.planetaryTravelCapabilities = null;
   setSolidWorldInterfaceActive(false);
@@ -1097,6 +1106,7 @@ async function arriveAtSolidWorld(bodyInput) {
   ensureReturnPodInteraction();
   appCtx.activePlanetaryBodyId = bodyId;
   appCtx.activeSolidWorldSurface = world.surface;
+  appCtx.activeParentSkyViews=world.objects.filter(object=>object.userData.parentSkyPlacement);
   const environment = pack.environment || samplePhysicalEnvironment(bodyId, { heightM: 0, timestampS: Date.now() / 1000 });
   appCtx.activePlanetaryEnvironment = environment;
   appCtx.planetaryTravelCapabilities = pack.capabilities;
@@ -1126,17 +1136,19 @@ async function arriveAtSolidWorld(bodyInput) {
     appCtx.camera.far = Math.max(30_000, appCtx.camera.far);
     appCtx.camera.updateProjectionMatrix?.();
   }
+  const lightingGain=surfaceLightingGain(pack);
+  world.surface.userData.visualLightingGain=lightingGain;
   if (appCtx.sun) {
     appCtx.sun.color?.setHex?.(pack.sunColor);
-    appCtx.sun.intensity = pack.sunIntensity;
+    appCtx.sun.intensity = pack.sunIntensity*lightingGain;
     appCtx.sun.position.set(-160, 220, 70);
   }
   // Earth's blue hemisphere is not illumination for an airless world.
   if (appCtx.hemiLight) appCtx.hemiLight.visible = false;
   appCtx.fillLight?.color?.setHex(0xffffff);
   appCtx.ambientLight?.color?.setHex(0xffffff);
-  if (appCtx.ambientLight) appCtx.ambientLight.intensity = pack.ambientIntensity;
-  if (appCtx.fillLight) appCtx.fillLight.intensity = pack.fillIntensity;
+  if (appCtx.ambientLight) appCtx.ambientLight.intensity = pack.ambientIntensity*lightingGain;
+  if (appCtx.fillLight) appCtx.fillLight.intensity = pack.fillIntensity*lightingGain;
   appCtx.setTravelMode?.(pack.arrivalMode || 'drive', { source: `${bodyId}_arrival`, emitTutorial: false });
   positionPlayer(pack);
   await appCtx.setPlanetaryVehicle?.(pack.vehicleBodyId || bodyId);
@@ -1157,6 +1169,8 @@ async function arriveAtSolidWorld(bodyInput) {
   appCtx.markExpeditionPodLanded?.(bodyId);
   appCtx.syncTravelModeButtons?.();
   appCtx.updateControlsModeUI?.();
+  // Compile and upload the arrived world while the transition cover is still visible.
+  appCtx.prepareFirstWorldRender?.();
   return true;
   } finally {
     if (requestId === transitionId) {

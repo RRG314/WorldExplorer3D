@@ -355,3 +355,56 @@ Production and the existing port-4193 preview have not been promoted. Remaining
 release work includes resolving ground frame pacing and completing the broader
 regional/ship art acceptance already listed above. No new live multiplayer or
 physical-phone verification is claimed by these runs.
+
+
+### Space surfaces and frame pacing — September 29
+
+Parent-planet sky placement now uses a mean synchronous-orbit model: body-fixed
+landing latitude/longitude, catalog radii, masses and orbital period determine
+direction and apparent diameter. Local sky objects follow camera translation
+without following camera rotation. Apollo 11 Earth is about 1.905 degrees wide;
+Europa's sub-Jupiter view is about 12 degrees. This is not a time-dependent
+orbital ephemeris or libration model. Reference context:
+https://science.nasa.gov/moon/tidal-locking/ and
+https://science.nasa.gov/jupiter/jupiter-moons/europa/europa-facts/.
+
+A repeated whole-scene name lookup was removed from planetary frames. Hidden
+constellation figures no longer rebuild their line buffers after observer
+movement; the current projection is generated when the overlay becomes visible.
+The browser fixture confirmed 12 observer changes with zero hidden buffer
+updates, followed by 88 refreshed figures on show. Star projection stays active.
+
+Surface material noise now avoids large sine-hash arguments and filters detail
+below the pixel footprint. Outer-world render lights receive display compensation
+without changing physical environment values. Ten solid-world screenshots were
+inspected; Europa's former near-black ground is readable. These are still coarse
+regional surfaces with repetitive detail and simple rover/rock artwork. They do
+not meet the requested premium-game art quality yet.
+
+Moon and Europa landing-button/return-launch journeys passed without browser
+errors. The initial Moon verifier timed out because it did not open the Travel
+menu containing the return action; the corrected real menu journey passed.
+A headed Chrome sweep exercised ten solid surfaces with three seconds of forward
+movement each. Preparing the first render under the arrival cover removed an
+initial Mercury hitch in the follow-up run; all ten follow-up samples were near
+60 FPS, maximum frame intervals about 19 ms. These short samples do not prove
+sustained travel performance. Results: `output/verification/space-surface-warmup`.
+
+A 61-public-destination headed Chrome sweep completed without browser errors.
+Arrival screenshots were reviewed in four contact sheets. Ordinary stellar
+systems sampled near 60 FPS; nebulae about 37 FPS and galaxies about 29 FPS.
+Most samples issued zero network requests; only three issued one each. The
+filtered follow-up reused the initial report filename, so the initial full JSON
+was overwritten; its console results and 61 screenshots remain, and the runner
+now accepts a separate output directory. Do not claim a preserved complete raw
+baseline report or statistical significance from this run.
+
+Empty-density volume samples now bypass noise evaluation without changing ray
+step counts, resolution or density functions. Follow-up samples: Milky Way
+52 FPS, Andromeda 58, Triangulum 59, nebulae 47–48, inner-galaxy regions 33.
+A fixed-camera WebGL before/after comparison found identical nebula pixels;
+galaxy variants differed in 60 and 2 color channels respectively, by at most
+1/255. The galaxy skipped-density bound is below .00028 integrated opacity.
+Fixtures and sampled results: `output/verification/space-volume-parity` and
+`output/verification/space-destination-travel`. No sustained 60 FPS claim for
+dense volumes, mobile acceptance, or production promotion is made.
