@@ -95,3 +95,18 @@ test('indexed pavement agrees with exhaustive road blending across cell boundari
   assert.ok(Math.abs(sample(x,z)-(ground(x,z)+Math.max(.018,weights?total/weights:0)))<1e-11,`height at ${x}, ${z}`);
  }
 });
+
+test('numeric vertex index preserves insertion order, signed zero and exact Float32 identity',()=>{
+ const input=[];
+ for(let i=0;i<5000;i++){
+  const x=Math.fround(Math.sin(i)*1000),z=Math.fround(Math.cos(i)*1000);
+  input.push(x,0,z,x+1,.125,z,x,-0,z+1);
+  if(i%3===0)input.push(x,0,z,x+1,.125,z,x,-0,z+1);
+ }
+ const source=new Float32Array(input),vertices=new Map(),positions=[],indices=[];
+ for(let i=0;i<source.length;i+=3){const key=`${source[i]}:${source[i+1]}:${source[i+2]}`;let id=vertices.get(key);
+  if(id===undefined){id=positions.length/3;vertices.set(key,id);positions.push(source[i],source[i+1],source[i+2]);}indices.push(id);
+ }
+ const actual=indexPavementPositions(source);
+ assert.deepEqual(actual.positions,new Float32Array(positions));assert.deepEqual(Array.from(actual.indices),indices);
+});

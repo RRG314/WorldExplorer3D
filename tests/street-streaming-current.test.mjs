@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {Worker as NodeWorker} from 'node:worker_threads';
 import {StreetPacketCache} from '../app/js/world/street-packet-cache.js';
-import {updateStreetOverviewFrame} from '../app/js/world/street-pavement-runtime.js';
+import {updateStreetOverviewFrame,updateStreetPavementFocus} from '../app/js/world/street-pavement-runtime.js';
 import {createStreetOverview} from '../app/js/world/street-overview.js';
 
 test('packet cache is bounded, rejects changed inputs and never returns mutable retained arrays',()=>{
@@ -126,4 +126,16 @@ test('active flight advances at most one overview cell per presentation tick',as
  updateStreetOverviewFrame(h.ctx);await overview.pause();
  assert.equal(overview.stats.completedCells,2,'next frame need not wait for a 200 ms LOD tick');
  overview.dispose();
+});
+
+
+test('high flight outside the near terrain retains accepted pavement without starting a detail worker',t=>{
+ const previousDocument=globalThis.document;globalThis.document={getElementById:()=>null};t.after(()=>{globalThis.document=previousDocument;});
+ let overviewSteps=0;
+ const accepted={coverageBounds:{minX:-384,maxX:384,minZ:-384,maxZ:384},stats:{triangles:500}};
+ const ctx={gameStarted:true,planeMode:{active:true,airborne:true,x:4000,y:300,z:6000},streetPavement:accepted,
+  terrainMeshHeightAt:()=>null,elevationWorldYAtWorldXZ:()=>20,streetOverview:{stats:{},step:()=>{overviewSteps++;}}};
+ updateStreetPavementFocus(ctx);assert.equal(ctx.streetPavement,accepted);assert.equal(ctx._streetPavementUpdating,undefined);assert.equal(overviewSteps,1);
+ ctx.elevationWorldYAtWorldXZ=()=>NaN;updateStreetPavementFocus(ctx);
+ assert.equal(ctx.streetPavement,accepted);assert.equal(ctx._streetPavementUpdating,undefined);assert.equal(overviewSteps,2);
 });

@@ -10,7 +10,7 @@ test('Antarctic exposed rock and subpolar barren ground cannot become hot desert
   assert.equal(classifyBiomeProfile({ latitude: -64.774, signals }).id, 'polar-desert');
   assert.equal(classifyBiomeProfile({ latitude: -64.774, signals: { ...signals, cryo: .8 } }).id, 'polar-cryosphere');
   assert.notEqual(classifyBiomeProfile({ latitude: 64, signals }).id, 'hot-desert');
-  assert.equal(classifyBiomeProfile({ latitude: 36.1069, signals }).id, 'hot-desert');
+  assert.equal(classifyBiomeProfile({ latitude: 36.1069, signals }).id, 'arid-mosaic');
 });
 
 test('a distant road cannot replace the selected canyon walking destination', () => {

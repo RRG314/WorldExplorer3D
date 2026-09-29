@@ -60,3 +60,13 @@ test('a blocked route times out without claiming movement', async () => {
   const result=await vm.runInContext(`(${sampleFrameWindow.toString()})({durationMs:100,targetDistance:20,actorKey:'actor'})`,context);
   assert.equal(result.routeComplete,false);assert.equal(result.elapsedMs,100);assert.equal(result.endPosition.x,0);
 });
+
+test('lightweight travel windows never allocate the full diagnostic snapshot',async()=>{
+ let timestamp=100;const actor={x:0,z:0};
+ const context=vm.createContext({actor,performance:{now:()=>100},
+  requestAnimationFrame(callback){queueMicrotask(()=>{actor.x+=5;callback(timestamp+=20);});},
+  getWorldExplorerRuntimeDiagnostics(){throw Error('Heavy diagnostic called inside movement window');}
+ });
+ const result=await vm.runInContext(`(${sampleFrameWindow.toString()})({durationMs:100,targetDistance:20,actorKey:'actor',collectDiagnostics:false})`,context);
+ assert.equal(result.routeComplete,true);assert.equal(result.startPosition.x,0);assert.equal(result.endPosition.x,20);
+});

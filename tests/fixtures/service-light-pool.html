@@ -1,0 +1,18 @@
+<!doctype html><meta charset="utf-8"><link rel="icon" href="data:,"><style>body{margin:0}</style>
+<script src="/node_modules/three/build/three.min.js"></script><script type="module">
+import '/app/js/engine/night-lighting.js';
+import {createServiceLightPool} from '/app/js/urban-sandbox/service-light-pool.js';
+const renderer=new THREE.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});renderer.setSize(900,600);renderer.physicallyCorrectLights=true;document.body.append(renderer.domElement);
+const scene=new THREE.Scene(),camera=new THREE.PerspectiveCamera(50,1.5,.1,100);scene.background=new THREE.Color(0x152238);camera.position.set(0,5,10);camera.lookAt(0,0,0);
+scene.add(new THREE.HemisphereLight(0xffffff,0x333333,.4));
+const floor=new THREE.Mesh(new THREE.PlaneGeometry(30,30),new THREE.MeshStandardMaterial({color:0x888888}));floor.rotation.x=-Math.PI/2;floor.position.y=-1;scene.add(floor);
+for(let i=0;i<3;i++){const mesh=new THREE.Mesh(new THREE.SphereGeometry(.85,32,24),new THREE.MeshStandardMaterial({color:0xaaaabb,roughness:.45}));mesh.position.x=(i-1)*2;scene.add(mesh);}
+const pool=createServiceLightPool(THREE,scene,4);let phase=0,emitters=[];
+function draw(){pool.update(camera.position);renderer.render(scene,camera);}
+draw();const initialPrograms=renderer.info.programs.length;
+function step(){phase++;for(const e of emitters){pool.release(e);scene.remove(e);}emitters=[];
+ if(phase%3)for(let i=0;i<phase%3+1;i++){const e=pool.createEmitter(i%2?0x2266ff:0xff2233);e.position.set((i-1)*2,1,1.5);e.intensity=5;scene.add(e);emitters.push(e);}draw();
+ if(renderer.info.programs.length!==initialPrograms)throw Error('Service spawn compiled new programs');}
+addEventListener('keydown',e=>{if(e.code==='ArrowRight')step();});
+window.advanceTime=draw;window.render_game_to_text=()=>JSON.stringify({phase,emitters:emitters.length,programs:renderer.info.programs.length,initialPrograms,lights:scene.children.filter(o=>o.isPointLight).length,glError:renderer.getContext().getError()});
+</script>

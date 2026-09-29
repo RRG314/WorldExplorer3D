@@ -20,8 +20,8 @@ release. An intended migration must be tested before compatibility is claimed.
 
 Production currently runs **5.3.0**. The visual-quality work is targeting
 **5.4.0**, provided existing saves, room commands and links remain compatible.
-Use `5.4.0-rc.1` for the first packaged release candidate after the remaining
-acceptance work. A 6.0 release is not justified by refactoring alone.
+The packaged 5.4.0 artifact remains a candidate until release acceptance and
+production promotion complete. A 6.0 release is not justified by refactoring alone.
 
 The GitHub 5.3 release remains a draft; this does not make deployed 5.3 code
 unreleased. Do not overwrite its version with new runtime changes. The final

@@ -1,4 +1,5 @@
-import {urbanPresentationFocus, urbanPresentationDistance} from './presentation-focus.js';
+import {createServiceLightPool} from './service-light-pool.js';
+import {urbanPresentationFocus, urbanPresentationDistance, setRetainedNpcPresentation} from './presentation-focus.js';
 import { setDomText, setDomAttribute, setDomHidden, setDomClass } from '../ui/dom-state.js?v=1';
 import { ctx as appCtx } from '../shared-context.js?v=55';
 import { carSpeedToMph, mphToCarSpeed } from '../physics/vehicle-speed-units.js?v=2';
@@ -1401,7 +1402,7 @@ function promoteTrafficVehicleDetail(state, trafficAgentId) {
     wheelContact: promoted.wheelContact,
     driverSide: state.driveOnLeft ? 1 : -1
   };
-  const visual = createUrbanVehicleVisual(THREE, definition);
+  const visual = createUrbanVehicleVisual(THREE, definition, state.serviceLighting);
   const vehicle = { ...definition, visual, attachedToPlayer: false, occupied: false, driver: 'ambient' };
   syncVehiclePose(vehicle, definition);
   state.group.add(visual.root);
@@ -2226,7 +2227,7 @@ function promoteTrafficVehicle(state, trafficAgentId, vehicleId = '') {
     wheelContact: promoted.wheelContact,
     driverSide: state.driveOnLeft ? 1 : -1
   };
-  const visual = createUrbanVehicleVisual(THREE, definition);
+  const visual = createUrbanVehicleVisual(THREE, definition, state.serviceLighting);
   const vehicle = { ...definition, visual, attachedToPlayer: false, occupied: false, driver: '' };
   syncVehiclePose(vehicle, definition);
   state.group.add(visual.root);
@@ -2780,6 +2781,7 @@ function disposeRuntime(state, reason = 'disposed') {
   state.equipmentVisual?.dispose?.();
   state.equipmentRuntime?.dispose?.();
   state.responders?.dispose?.();
+  state.serviceLighting?.dispose();
   state.group.removeFromParent?.();
   state.vehicles.length = 0;
   state.npcs.length = 0;
@@ -2833,8 +2835,9 @@ function startUrbanSandboxRuntime(options = {}) {
   });
   const group = new THREE.Group();
   group.name = 'Urban Sandbox Interactive Vehicles';
+  const serviceLighting = createServiceLightPool(THREE, group, mobile ? 2 : 4);
   const vehicles = anchors.map((anchor) => {
-    const visual = createUrbanVehicleVisual(THREE, anchor);
+    const visual = createUrbanVehicleVisual(THREE, anchor, serviceLighting);
     const vehicle = {
       ...anchor,
       durabilityPolicy: anchor.durabilityPolicy || anchor.variant?.durabilityPolicy,
@@ -2935,13 +2938,14 @@ function startUrbanSandboxRuntime(options = {}) {
     meter: document.getElementById('urbanCivicStatusMeter')
   };
   const owner = `urban-sandbox:${publication.sequence}`;
-  const flashlight = new THREE.SpotLight(0xe8f2ff, 38, 28, Math.PI * .16, .45, 1.3);
+  const flashlight = new THREE.SpotLight(0xe8f2ff, 0, 28, Math.PI * .16, .45, 1.3);
   flashlight.name = 'Urban equipment field light';
-  flashlight.visible = false;
+  flashlight.visible = true;
   flashlight.castShadow = false;
   group.add(flashlight, flashlight.target);
   const state = {
     owner,
+    serviceLighting,
     requestId: publication.requestId,
     sequence: publication.sequence,
     group,
@@ -3055,6 +3059,7 @@ function startUrbanSandboxRuntime(options = {}) {
   });
   state.responders = createUrbanResponderRuntime({
     THREE,
+    serviceLighting,
     group,
     mobile,
     worldIdentity,
@@ -3162,7 +3167,7 @@ function startUrbanSandboxRuntime(options = {}) {
       },
       releaseTrafficAgent: agentId => state.population?.restoreRoomVehicle?.(agentId),
       createVehicle: (definition) => {
-        const visual = createUrbanVehicleVisual(THREE, definition);
+        const visual = createUrbanVehicleVisual(THREE, definition, state.serviceLighting);
         const vehicle = { ...definition, visual, attachedToPlayer: false, occupied: false, driver: '' };
         syncVehiclePose(vehicle, definition);
         state.group.add(visual.root);
@@ -3283,13 +3288,15 @@ function startUrbanSandboxRuntime(options = {}) {
       updateServiceEquipment(state, frame.dt);
       updateCivicResponse(state, frame.dt);
       updateEquipmentEffects(state, frame.dt);
+      state.serviceLighting.update(appCtx.camera?.position);
       updateLootPickups(state, frame.dt);
       updateCrashBodies(state, frame.dt);
-      state.npcs.forEach((npc) => npc.visual.updateAnimation(
-        frame.dt,
-        npc.reaction === 'fleeing' || !!npc.crashMotion,
-        npc.reaction === 'fleeing'
-      ));
+      const presentationActor = urbanPresentationFocus(appCtx.activeEarthActorPosition?.(), civicActorPosition(state));
+      state.npcs.forEach((npc) => {
+        if (setRetainedNpcPresentation(npc.visual.root, presentationActor, NPC_DRIVING_RELEASE_DISTANCE)) {
+          npc.visual.updateAnimation(frame.dt, npc.reaction === 'fleeing' || !!npc.crashMotion, npc.reaction === 'fleeing');
+        }
+      });
       updateEntityLifecycle(state);
       state.npcPromotionElapsed += frame.dt;
       if (state.npcPromotionElapsed >= .25) {

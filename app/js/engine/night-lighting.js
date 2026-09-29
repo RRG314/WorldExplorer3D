@@ -30,6 +30,22 @@ export function installInactiveSpotLightShortcut(three) {
   return true;
 }
 
+export function installInactivePointLightShortcut(three) {
+  const chunk = three?.ShaderChunk?.lights_fragment_begin;
+  const marker = '// WE3D inactive point-light slot';
+  if (typeof chunk !== 'string' || chunk.includes(marker)) return false;
+  const assignment = 'pointLight = pointLights[ i ];';
+  const direct = 'RE_Direct( directLight, geometry, material, reflectedLight );';
+  const start = chunk.indexOf(assignment), end = chunk.indexOf(direct, start);
+  if (start < 0 || end < start) return false;
+  const tail = end + direct.length;
+  three.ShaderChunk.lights_fragment_begin = chunk.slice(0, start) + assignment +
+    `\n${marker}\nif (any(notEqual(pointLight.color, vec3(0.0)))) {\n` +
+    chunk.slice(start + assignment.length, tail) + '\n}' + chunk.slice(tail);
+  return true;
+}
+
+installInactivePointLightShortcut(THREE);
 installInactiveSpotLightShortcut(THREE);
 
 function nightFactor() {

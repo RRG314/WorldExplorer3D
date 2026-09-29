@@ -408,3 +408,34 @@ galaxy variants differed in 60 and 2 color channels respectively, by at most
 Fixtures and sampled results: `output/verification/space-volume-parity` and
 `output/verification/space-destination-travel`. No sustained 60 FPS claim for
 dense volumes, mobile acceptance, or production promotion is made.
+
+## Sustained travel and lifecycle checks — September 29
+
+Longer driving exposed a 1.77-second shader-compilation pause when responders
+added point lights. Responders now use fixed light slots; field-light toggles
+change intensity without changing shader variants. The browser fixture retained
+one program across spawn, movement and removal, with red/blue illumination
+visually inspected. Distant reacting NPCs retain simulation but stop updating
+invisible skeletons; ground return restores presentation.
+
+Pavement publication uses bounded frame scheduling, exact numeric vertex and
+contact indexes, transferable worker buffers and bounded exact-height caching.
+High flight retains accepted nearby paving while the terrain coverage layer
+continues; missing near-mesh support uses the accepted elevation field.
+
+A sustained source capture measured 55.75 FPS driving for 20 seconds and
+57.58 FPS flying for 45 seconds, with maximum intervals of 83.4 and 150 ms.
+That capture included CPU profiling and is diagnostic, not final artifact
+acceptance. The matched 5.2 capture measured 45.10/48.35 FPS driving and
+37.23/39.27 FPS flying; host variability prevents treating a single run as a
+universal speedup. Earlier GPU-instrumented captures are retained separately
+and are not substituted for ordinary frame timing. Driving and flight images
+were inspected. The car reaches a building at the end of the straight route;
+its moving fraction is recorded rather than claiming continuous clear-road travel.
+
+All 1,512 current component/source checks passed after repairing six stale
+fixtures: revised biome classification, cached planetary-atmosphere setup,
+asset-loader registration, content-versioned URLs and asynchronous acquisition,
+and dated attribution assertions. These are component results, not multiplayer
+or whole-game visual certification. Packaged performance and gameplay checks
+remain pending. Production and the existing user preview are unchanged.
