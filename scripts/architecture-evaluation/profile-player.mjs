@@ -72,13 +72,13 @@ let deadline, page;try{
   const pending=[];let frame=0,active=false;const target=ctx.composer||renderer,original=target.render;
   target.render=function(...args){
    for(let i=pending.length-1;i>=0;i--){const p=pending[i];if(!gl.getQueryParameter(p.query,gl.QUERY_RESULT_AVAILABLE))continue;
-    if(!gl.getParameter(ext.GPU_DISJOINT_EXT)&&globalThis.__gpuTimings.records.length<300)globalThis.__gpuTimings.records.push({mode:p.mode,cpuMs:p.cpuMs,gpuMs:gl.getQueryParameter(p.query,gl.QUERY_RESULT)/1e6});
+    if(!gl.getParameter(ext.GPU_DISJOINT_EXT)&&globalThis.__gpuTimings.records.length<300)globalThis.__gpuTimings.records.push({mode:p.mode,stage:p.stage,cpuMs:p.cpuMs,gpuMs:gl.getQueryParameter(p.query,gl.QUERY_RESULT)/1e6});
     gl.deleteQuery(p.query);pending.splice(i,1);
    }
    const measure=!active&&++frame%20===0&&pending.length<12;
    if(!measure)return original.apply(this,args);
    const query=gl.createQuery(),started=performance.now();active=true;gl.beginQuery(ext.TIME_ELAPSED_EXT,query);
-   try{return original.apply(this,args);}finally{gl.endQuery(ext.TIME_ELAPSED_EXT);active=false;pending.push({query,cpuMs:performance.now()-started,mode:ctx.planeMode?.active?'plane':ctx.Walk?.state?.mode==='walk'?'walk':'drive'});}
+   try{return original.apply(this,args);}finally{gl.endQuery(ext.TIME_ELAPSED_EXT);active=false;pending.push({query,stage:globalThis.__renderCostStage||null,cpuMs:performance.now()-started,mode:ctx.planeMode?.active?'plane':ctx.Walk?.state?.mode==='walk'?'walk':'drive'});}
   };
  });
  if(process.env.WE3D_PROFILE_GPU_UPLOADS==='1')await page.evaluate(async()=>{
@@ -92,6 +92,35 @@ let deadline, page;try{
   gl.bufferData=function(...args){const started=performance.now();try{return original.apply(this,args);}finally{const elapsed=performance.now()-started;if(elapsed>8&&globalThis.__gpuUploadStalls.length<100)globalThis.__gpuUploadStalls.push({started,elapsed,owner:owners.get(args[1]?.buffer)||null,bytes:args[1]?.byteLength||0});}};
  });
  report.initial=await page.evaluate(()=>{const d=getWorldExplorerRuntimeDiagnostics();return {worldCounts:d.worldCounts,worldLoad:d.worldLoad,renderer:d.renderer,rendererOwners:d.rendererOwners,runtimeKernel:d.runtimeKernel,transportCompilation:d.transportCompilation};});await save();
+ if(process.env.WE3D_PROFILE_RENDER_COST==='1'){
+  await page.mouse.click(720,400);await page.keyboard.down('w');await page.waitForTimeout(5000);await page.keyboard.up('w');
+  await page.locator('#travelBtn').click();await page.locator('#fDriving').click();await page.waitForTimeout(1500);
+  report.renderCost=[];
+  for(const stage of (process.env.WE3D_PROFILE_DEPTH_SORT==='1'?['baseline','front-to-back','baseline','front-to-back']:['baseline','bloom-off','smaa-off','shadows-held','local-lights-off','baseline-restored'])){
+   await page.evaluate(async stage=>{
+    const {ctx}=await import('/app/js/shared-context.js?v=55');
+    globalThis.__renderCostRestore?.();globalThis.__renderCostRestore=null;globalThis.__renderCostStage=stage;
+    globalThis.__TRAVEL_PROFILE_ACTOR__=ctx.car;
+    if(stage==='front-to-back'){
+     ctx.renderer.setOpaqueSort((a,b)=>a.groupOrder-b.groupOrder||a.renderOrder-b.renderOrder||a.z-b.z||a.material.id-b.material.id||a.id-b.id);
+     globalThis.__renderCostRestore=()=>ctx.renderer.setOpaqueSort(null);
+    }else if(stage==='bloom-off'||stage==='smaa-off'){
+     const pass=stage==='bloom-off'?ctx.bloomPass:ctx.smaaPass;if(pass){const enabled=pass.enabled;pass.enabled=false;globalThis.__renderCostRestore=()=>pass.enabled=enabled;}
+    }else if(stage==='shadows-held'){
+     const shadow=ctx.renderer.shadowMap,descriptor=Object.getOwnPropertyDescriptor(shadow,'needsUpdate');
+     Object.defineProperty(shadow,'needsUpdate',{configurable:true,get:()=>false,set:()=>{}});
+     globalThis.__renderCostRestore=()=>{Object.defineProperty(shadow,'needsUpdate',descriptor);shadow.needsUpdate=true;};
+    }else if(stage==='local-lights-off'){
+     const saved=[];ctx.scene.traverse(o=>{if(o.isPointLight||o.isSpotLight){const intensity=o.intensity,descriptor=Object.getOwnPropertyDescriptor(o,'intensity');saved.push(()=>{Object.defineProperty(o,'intensity',descriptor);o.intensity=intensity;});Object.defineProperty(o,'intensity',{configurable:true,get:()=>0,set:()=>{}});}});
+     globalThis.__renderCostRestore=()=>saved.forEach(restore=>restore());
+    }
+   },stage);
+   await page.waitForTimeout(1000);
+   const raw=await page.evaluate(sampleFrameWindow,{durationMs:5000,actorKey:'__TRAVEL_PROFILE_ACTOR__',collectDiagnostics:false});
+   report.renderCost.push({stage,fps:raw.deltas.length*1000/raw.elapsedMs,maxMs:Math.max(...raw.deltas)});await save();
+  }
+  await page.evaluate(()=>{globalThis.__renderCostRestore?.();globalThis.__renderCostStage=null;});
+ }
  if(process.env.WE3D_PROFILE_DRAW_INVENTORY==='1'){
   report.drawInventory=await page.evaluate(async()=>{
    const {ctx}=await import('/app/js/shared-context.js?v=55');const restored=[],counts={},inventory={};

@@ -2,6 +2,7 @@ import { setupEngineInputHandlers } from "./input-handlers.js?v=16";
 import { createVehicleHeadlightRig } from "./night-lighting.js?v=8";
 import { attachCuratedPlayerCar } from './curated-player-car.js?v=7';
 import { applyDirectionalShadowPolicy } from "./shadow-policy.js?v=2";
+import { opaqueFrontToBack } from './opaque-order.js';
 import {
   buildEarthAtmosphereProfile,
   createEarthAtmosphereVisual
@@ -426,6 +427,7 @@ export function initEngineRuntime(ctx) {
   appCtx.camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.5, 12000);
 
   appCtx.renderer = createRendererWithFallback();
+  appCtx.renderer.setOpaqueSort(opaqueFrontToBack);
   if (!appCtx.renderer) {
     appCtx.engineInitFailed = true;
     showInitFailure(

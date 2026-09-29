@@ -501,3 +501,25 @@ snapshot. The subsequent run recorded live Overpass timeouts and completed
 using fallback data. Failure UI and console capture have been added to the
 profiling harness. Local source-host AppCheck warnings do not certify live
 service access; multiplayer verification remains a separate check.
+
+### Opaque draw order — September 29
+
+The latest frozen build still missed the ground frame-rate budget. Its lightweight
+measurement used live actor coordinates and renderer counters, avoiding repeated
+full-world diagnostic snapshots between timed modes. It measured 41.1 FPS standing,
+41.7 FPS driving and 57.4 FPS in sustained flight; flight still had a 200 ms maximum
+frame. World coverage, teardown, retention and resource checks passed. This is a
+failed performance acceptance result, not a deployment approval.
+
+A same-session draw-order comparison on the physical M1 at 1440 × 900 measured
+43.4/44.2 FPS with material-first opaque ordering and 46.4/45.6 FPS with
+front-to-back ordering. Median instrumented GPU time fell from 29.11 to 25.86 ms.
+Explicit group and render layers remain authoritative; transparent sorting is
+unchanged. The render fixture matched all pixels at four camera positions with
+separated surfaces. An initial coincident floor/block boundary changed one pixel,
+consistent with competing equal-depth fragments. This does not establish visual
+parity for every possible scene; packaged gameplay checks remain required.
+
+A paired Gaussian bloom experiment retained image quality but did not demonstrate
+a useful whole-scene improvement. It was not integrated. Bloom resolution,
+strength, antialiasing and shadows are unchanged.
