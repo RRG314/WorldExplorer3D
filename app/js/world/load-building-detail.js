@@ -1,3 +1,5 @@
+import { applyHistoricWallBuildingRoles } from './historic-wall-building-role.js';
+import { fetchBundledLandmarkData, landmarkBuildingMetadata } from './landmark-source.js?v=3';
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { mergeBuildingMetadata } from "./building-metadata.js?v=2";
 import { supplementSparseBuildingData } from "./inferred-building-footprints.js?v=2";
@@ -253,6 +255,24 @@ export async function loadBuildingDetailForPublication(options = {}) {
           options.cacheMeta
         );
       }
+      // The landmark renderer owns these exact documented pyramids and fortified walls. Do not
+      // also construct a modern facade inside the same mapped footprint.
+      const landmarkData = await fetchBundledLandmarkData({
+        lat: options.location?.lat, lon: options.location?.lon
+      }).catch(() => null);
+      if (landmarkData) mergeBuildingMetadata(data, landmarkBuildingMetadata(landmarkData), {
+        lat: options.location?.lat, lon: options.location?.lon
+      });
+      const landmarkIds = new Set((landmarkData?.elements || [])
+        .filter(e => e.type === 'way' && (e.tags?.tomb === 'pyramid' || e.tags?.historic === 'pyramid' || e.tags?.historic === 'citywalls' || e.tags?._landmarkRole === 'fortification_tower'))
+        .map(e => `osm:way:${e.id}`));
+      for (const element of data.elements || []) {
+        if (landmarkIds.has(element.tags?._buildingMetadataSourceId) ||
+            landmarkIds.has(element.tags?._sourceFeatureId)) {
+          element.tags._dedicatedLandmarkOwner = 'bundled-historic';
+        }
+      }
+      applyHistoricWallBuildingRoles(data, landmarkData);
       if (!isActiveLoadContext()) return;
       const publicationSource = String(data._overpassSource || 'unknown-building-source');
       appCtx.worldLoadRuntimeState ||= {};

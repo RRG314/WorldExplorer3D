@@ -1,6 +1,8 @@
+import { isRuinedBuilding } from './historic-building-semantics.js';
 const BUILDING_EXTERIOR_GENERATOR_VERSION = 'building-exterior-v2';
 
 const MATERIAL_VARIANTS = Object.freeze({
+  weathered_stone: Object.freeze({ texture: 'historic_stone', color: 0xb8ae98, roughness: 0.98, metalness: 0 }),
   red_brick: Object.freeze({ texture: 'brick_wall_001', color: 0x9b5f4d, roughness: 0.91, metalness: 0 }),
   warm_red_brick: Object.freeze({ texture: 'brick_wall_07', color: 0xa96850, roughness: 0.93, metalness: 0 }),
   brown_brick: Object.freeze({ texture: 'brick_wall_12', color: 0x8d6d58, roughness: 0.92, metalness: 0 }),
@@ -90,6 +92,7 @@ function family(definition) {
 }
 
 const BUILDING_EXTERIOR_FAMILIES = Object.freeze({
+  historic_ruin: family({ category: 'historic', materials: ['weathered_stone'], windows: [], doors: [], details: [] }),
   narrow_urban_rowhouse: family({ category: 'residential', materials: ['red_brick', 'warm_red_brick', 'brown_brick', 'painted_brick_light', 'painted_brick_dark', 'stucco_white', 'concrete_light'], windows: ['townhouse_narrow', 'sash_single', 'bay_window'], doors: ['townhouse_panel', 'residential_glass'], details: ['entry_step', 'townhouse_stoop', 'stoop_railing', 'masonry_cornice'] }),
   wide_urban_townhouse: family({ category: 'residential', materials: ['red_brick', 'brown_brick', 'tan_brick', 'limestone', 'stucco_cream', 'stucco_white', 'concrete_light'], windows: ['sash_double', 'historic_tall', 'bay_window'], doors: ['townhouse_panel', 'residential_double'], details: ['townhouse_stoop', 'stoop_railing', 'small_porch', 'masonry_cornice'] }),
   attached_brick_residential: family({ category: 'residential', materials: ['red_brick', 'warm_red_brick', 'dark_brick', 'painted_brick_light', 'stucco_white', 'concrete_light'], windows: ['sash_single', 'sash_double', 'townhouse_narrow'], doors: ['townhouse_panel', 'residential_glass'], details: ['entry_step', 'townhouse_stoop', 'masonry_cornice'] }),
@@ -234,7 +237,9 @@ function selectBuildingExteriorProfile(options = {}) {
     ? `${Math.floor(geo.lat * 1000)}:${Math.floor(geo.lon * 1000)}`
     : stableIdentity;
   const districtSeed = stableStringHash(districtKey);
-  const familyId = inferFamilyId(context, buildingSeed ^ districtSeed);
+  const ruined = isRuinedBuilding({...options.tags, building: options.buildingType || options.tags?.building});
+  const historicMasonry = ruined || options.tags?._landmarkRole === 'fortification_tower' || options.tags?.historic === 'citywalls';
+  const familyId = historicMasonry ? 'historic_ruin' : inferFamilyId(context, buildingSeed ^ districtSeed);
   const definition = BUILDING_EXTERIOR_FAMILIES[familyId] || BUILDING_EXTERIOR_FAMILIES.generic_unknown;
   const regional = compatibleRegionalMaterials(definition, options.location || {});
   const materials = regional.length > 0 && ((buildingSeed >>> 3) % 4 !== 0)
@@ -253,6 +258,7 @@ function selectBuildingExteriorProfile(options = {}) {
   return Object.freeze({
     generatorVersion: BUILDING_EXTERIOR_GENERATOR_VERSION,
     familyId,
+    openings: !historicMasonry,
     category: definition.category,
     materialId,
     material: MATERIAL_VARIANTS[materialId],

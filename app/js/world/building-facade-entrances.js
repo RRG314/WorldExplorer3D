@@ -130,6 +130,7 @@ export function attachEntranceAttribute(mesh, entrance) {
 export function publishBuildingFacadeEntrances(appCtx, options = {}) {
   const tier = String(options.tier || tierForContext(appCtx));
   const nearFacadeMeshes = (Array.isArray(appCtx?.buildingMeshes) ? appCtx.buildingMeshes : []).filter((mesh) =>
+    !mesh?.userData?.buildingSemantics?.historicMasonry &&
     mesh?.userData?.lodTier === 'near' &&
     !mesh?.userData?.isRoofDetail &&
     mesh?.material?.userData?.buildingExterior === true

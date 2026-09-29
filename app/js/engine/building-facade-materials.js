@@ -1,3 +1,4 @@
+import { createHistoricWallMaterial } from '../world/historic-wall-material.js';
 import { FACADE_OPENINGS_GLSL } from '../world/building-facade-layout.js?v=3';
 import {
   MATERIAL_VARIANTS,
@@ -10,6 +11,7 @@ const facadeTexturePool = new Map();
 let entranceAtlasTexture = null;
 
 const FACADE_TEXTURES = Object.freeze({
+  historic_stone: '/app/assets/textures/facades/polyhaven-stone-brick-wall-001-diff-1k.jpg',
   brick_wall_001: '/app/assets/textures/earth/brick_wall_001_diffuse.jpg',
   brick_wall_07: '/app/assets/textures/facades/polyhaven-brick-wall-07-diff-1k.jpg',
   brick_wall_10: '/app/assets/textures/facades/polyhaven-brick-wall-10-diff-1k.jpg',
@@ -254,6 +256,7 @@ function facadeTextureRepeat(facadeStyle) {
 
 function surfaceTextureRepeat(textureId, facadeStyle, lodTier) {
   // Architectural layout is independent of LOD; surface grain retains metre scale.
+  if (textureId === 'historic_stone') return { x: 0.4, y: 0.4 };
   if (textureId === 'glass_curtain') return { x: 0.18, y: 0.18 };
   if (textureId === 'stone_civic') return { x: 0.13, y: 0.13 };
   if (textureId === 'brick_wall_001') return { x: 0.34, y: 0.34 };
@@ -527,6 +530,17 @@ export function resolveBuildingExteriorPresentation(engineContext, buildingType,
 
 export function getBuildingMaterial(engineContext, buildingType, buildingSeed, baseColorHex, options = {}) {
   const appCtx = engineContext?.appCtx || engineContext;
+  if (options.tags?._landmarkRole === 'fortification_tower' || options.tags?.historic === 'citywalls') {
+    const key = 'historic-fortification-stone';
+    let material = exteriorMaterialPool.get(key);
+    if (!material) {
+      material = createHistoricWallMaterial(THREE, facadeTexture(appCtx, 'historic_stone'));
+      material.name = key;
+      material.userData = {sharedRuntimeMaterial:true, buildingBatchKey:key};
+      exteriorMaterialPool.set(key, material);
+    }
+    return material;
+  }
   const resolved = options.resolvedPresentation || resolveBuildingExteriorPresentation(
     engineContext,
     buildingType,

@@ -201,7 +201,8 @@ function geoFromWorldXZ(worldX, worldZ) {
 }
 
 function headingDegreesFromYaw(yawRad) {
-  let hdg = (-yawRad * RAD_TO_DEG + 90) % 360;
+  // Local +Z points south; yaw pi/2 points east.
+  let hdg = (180 - yawRad * RAD_TO_DEG) % 360;
   if (hdg < 0) hdg += 360;
   return hdg;
 }

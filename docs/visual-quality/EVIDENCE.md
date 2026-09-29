@@ -78,3 +78,35 @@ review, compressed-texture pilot and matched whole-game performance measurements
 remain open. No claim of improved whole-game FPS, peak memory, startup time or
 production readiness follows from these checks. The previously failed release
 performance thresholds remain unchanged. Physical phone verification is pending.
+
+## Historic sites and release review
+
+The September 28 follow-up added documented Giza ruin metadata, terrain-sampled
+historic walls and matching collision, bounded fortification presentation rules,
+and Elizabeth Tower facade detail. Old generic landmark models are disposed
+only when their identity and footprint match a replacement. Foundations keep
+the existing robust terrain envelope but remove the 12 m support cap.
+
+Targeted tests cover steep relief, invalid ground, wall collision extents,
+landmark cancellation/disposal and metadata matching without changing neighboring
+buildings. Real-browser historic-material and tower fixtures were rendered and
+inspected. Full-world Giza, Mutianyu, Westminster and San Francisco checks loaded
+and walked, but functional passes did expose further visual issues. Repeated
+captures after those repairs are distinct from final acceptance.
+
+The public documentation review removed personal checkout paths and obsolete
+release-state claims. Production is 5.3, not 5.2. The next compatible release is
+5.4; internal refactoring alone does not require 6.0. No deployment or GitHub
+publication is established by these local checks.
+
+Final targeted run: 27 facade/foundation/historic component checks passed, plus
+one static-structure ownership/bounds check. The source gate and whitespace
+checks passed. The latest Mutianyu load/walk capture has matching wall/building
+stone and no residential facade on the wall-adjacent footprint; its tower detail
+and scene lighting still need visual refinement. The final Elizabeth Tower
+fixture retained its visible detail with 12 draw calls instead of 95; 127 of
+2,457,600 image channels differed after batching. This is a fixture comparison,
+not a whole-world frame-rate or memory result. No graphics errors were reported.
+
+The broad regional-art plan and failed full-game performance acceptance are
+still open. The existing local preview artifact predates these source changes.

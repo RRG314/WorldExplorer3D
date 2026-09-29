@@ -2,6 +2,30 @@
 
 Notable user-facing changes are recorded here. Git history and GitHub releases contain the complete change record.
 
+## [Unreleased — targeting 5.4.0]
+
+### Changed
+
+- Preserve lighting exposure across quality settings and retain imported ship
+  equipment materials, mounts and physical scale.
+- Use licensed vegetation with shared texture allocations and stable tree bases.
+- Filter distant facade windows and retain licensed walking avatars for remote
+  players.
+- Treat documented ruins as historic masonry without residential windows or
+  rooftop equipment. Sample historic walls along terrain rather than tilting
+  long blocks between endpoints.
+
+### Fixed
+
+- Repeated terrain blending no longer changes material weights.
+- Downhill building foundations extend across accepted steep terrain relief.
+- Cancelled landmark loads release their resources; replaced historic models
+  are removed rather than left hidden in the scene.
+- Ground compass headings now agree with the movement coordinate system.
+
+These changes are under verification. Regional coverage and final performance
+acceptance remain open; this section is not a release announcement.
+
 ## [5.3.0] - 2026-09-28
 
 ### Added

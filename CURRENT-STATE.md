@@ -4,7 +4,6 @@ Updated September 28, 2026.
 
 ## Workspace and authority
 
-Worktree: `/Users/stevenreid/.codex/worktrees/architecture-evaluation/WorldExplorer3D-live-deployed-20260320`.
 Branch: `steven/visual-quality`.
 
 Visual-quality implementation is in progress locally. See

@@ -1,3 +1,4 @@
+import { isRuinedBuilding, isHistoricMasonry } from './world/historic-building-semantics.js';
 function normalizedTagValue(value = '') {
   return String(value || '').trim().toLowerCase();
 }
@@ -215,6 +216,8 @@ function computeBuildingHeight(tags = {}, options = {}) {
       buildingLevels;
     return Math.max(0.2, effectiveLevels * levelHeight);
   }
+  // Unmeasured ruins are low remains, not occupied multi-storey buildings.
+  if (isRuinedBuilding(tags)) return 1.6;
   if (partKind === 'roof') return 0.35;
   if (partKind === 'balcony') return 0.32;
   if (partKind === 'canopy') return 0.45;
@@ -344,8 +347,10 @@ function interpretBuildingSemantics(tags = {}, options = {}) {
     elevatedPart,
     thinPart: roofLike,
     allowsPassageBelow: roofLike || baseOffsetMeters >= 2.8,
-    shouldCreateGroundPatch: !roofLike && baseOffsetMeters < 0.35,
-    shouldCreateRoofDetail: !roofLike,
+    shouldCreateGroundPatch: !roofLike && !isHistoricMasonry(tags) && baseOffsetMeters < 0.35,
+    shouldCreateRoofDetail: !roofLike && !isHistoricMasonry(tags),
+    ruined: isRuinedBuilding(tags),
+    historicMasonry: isHistoricMasonry(tags),
     collisionKind: roofLike ? 'thin_part' : elevatedPart ? 'elevated_part' : 'solid'
   };
 }

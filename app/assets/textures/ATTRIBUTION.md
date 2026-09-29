@@ -107,3 +107,7 @@ Venus orbital clouds: NASA VTAD base-color texture from https://science.nasa.gov
 ## Solis Reach interior surfaces
 
 `ship/`: bulkhead and carpet maps extracted from [Sci-Fi Computer Room](https://sketchfab.com/3d-models/sci-fi-computer-room-a149d5bfcef6496c9a0606b5ce5ebf27) by **Michael V (@bossdeff)**, [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Color, normal and packed roughness/metalness maps resized to 512–1024px and applied to the original ship geometry. See `ship/LICENSE.txt` and `docs/visual-quality/assets/ship-surfaces.json`.
+
+### Historic masonry
+
+[Stone Brick Wall 001](https://polyhaven.com/a/stone_brick_wall_001), photographed by Dimitrios Savva and processed by Rico Cilliers, CC0. The 1K diffuse map supplies representative historic masonry; it is not a scan of a particular monument. See [asset notice](facades/HISTORIC_STONE_LICENSE.md).

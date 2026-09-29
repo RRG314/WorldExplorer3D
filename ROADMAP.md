@@ -8,6 +8,16 @@ persistent life in the game. New systems must deepen that shared world instead
 of adding another disconnected menu or duplicate version of an existing
 feature.
 
+## Next release: 5.4 visual quality
+
+The local update aligns lighting, facade filtering, licensed vegetation, ship
+materials and remote walking characters. Historic-site metadata, terrain-following
+walls and steep-ground foundations are being verified against in-game views.
+Remaining acceptance covers landmark overlap, regional vegetation and materials,
+whole-game memory and loading, and physical-phone behavior. These are release
+checks, not completed milestones. See [verification](docs/visual-quality/EVIDENCE.md)
+and [versioning](docs/VERSIONING.md).
+
 ## Product direction
 
 ### Improve real places with photos

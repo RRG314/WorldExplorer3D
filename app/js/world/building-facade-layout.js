@@ -22,6 +22,7 @@ export function attachBuildingFacadeLayout(geometry, options = {}) {
   let minimumY = Infinity, maximumY = -Infinity;
   for (let i=0;i<p.count;i++) { minimumY=Math.min(minimumY,p.getY(i)); maximumY=Math.max(maximumY,p.getY(i)); }
   const plan = facadeFloorPlan(maximumY-minimumY, options);
+  if (options.openings === false) plan.floors = 0;
   const style=options.window || {};
   const glass=options.material?.surfacePattern==='glass';
   const targetBay=glass ? 2.35 : Math.max(1.8,Number(style.bayWidth)||3.4);
