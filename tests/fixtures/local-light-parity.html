@@ -1,0 +1,25 @@
+<!doctype html><meta charset="utf-8"><link rel="icon" href="data:,"><style>body{margin:0;background:#152238}canvas{display:block}</style>
+<script src="/node_modules/three/build/three.min.js"></script><script type="module">
+const original=THREE.ShaderChunk.lights_fragment_begin;
+await import('/app/js/engine/night-lighting.js');
+const optimized=THREE.ShaderChunk.lights_fragment_begin;
+const renderer=new THREE.WebGLRenderer({antialias:false,preserveDrawingBuffer:true});renderer.setSize(800,600);document.body.append(renderer.domElement);
+const scene=new THREE.Scene(),camera=new THREE.PerspectiveCamera(50,4/3,.1,100);scene.background=new THREE.Color(0x152238);camera.position.set(0,6,12);camera.lookAt(0,0,0);
+scene.add(new THREE.HemisphereLight(0xffffff,0x333333,.2));
+const material=new THREE.MeshStandardMaterial({color:0xaaaaaa,roughness:.4});
+const floor=new THREE.Mesh(new THREE.PlaneGeometry(24,24),material);floor.rotation.x=-Math.PI/2;floor.position.y=-1;scene.add(floor);
+for(let i=-1;i<=1;i++){const mesh=new THREE.Mesh(new THREE.SphereGeometry(.9,32,24),material);mesh.position.x=i*2.5;scene.add(mesh);}
+const point=new THREE.PointLight(0xff3344,18,4,2);point.position.set(-2.5,1,1);scene.add(point);
+const spot=new THREE.SpotLight(0x3366ff,24,7,.7,.35,2);spot.position.set(2.5,4,2);spot.target.position.set(2.5,0,0);scene.add(spot,spot.target);
+const far=new THREE.PointLight(0x44ff88,20,2,2);far.position.set(30,4,0);scene.add(far);
+let phase=0,sequence=0,results=[];
+function pixels(chunk){THREE.ShaderChunk.lights_fragment_begin=chunk;material.customProgramCacheKey=()=>String(sequence);sequence++;material.needsUpdate=true;renderer.render(scene,camera);const gl=renderer.getContext(),data=new Uint8Array(800*600*4);gl.readPixels(0,0,800,600,gl.RGBA,gl.UNSIGNED_BYTE,data);if(gl.getError())throw Error('WebGL error');return data;}
+function check(){
+ const cases=[{physical:true,decay:2,distance:4},{physical:false,decay:2,distance:4},{physical:false,decay:0,distance:4},{physical:true,decay:2,distance:0}];
+ const config=cases[phase%cases.length];renderer.physicallyCorrectLights=config.physical;point.decay=spot.decay=far.decay=config.decay;point.distance=config.distance;
+ const before=pixels(original),after=pixels(optimized);let max=0,different=0;for(let i=0;i<before.length;i++){const d=Math.abs(before[i]-after[i]);max=Math.max(max,d);if(d)different++;}
+ results.push({...config,maxChannelDifference:max,differentChannels:different});if(max>1)throw Error('Local lighting changed pixels: '+max);
+}
+check();addEventListener('keydown',e=>{if(e.code==='ArrowRight'){phase++;check();}});
+window.advanceTime=()=>renderer.render(scene,camera);window.render_game_to_text=()=>JSON.stringify({phase,results,glError:renderer.getContext().getError()});
+</script>

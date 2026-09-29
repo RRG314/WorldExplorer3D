@@ -3,7 +3,7 @@
 <p>Terrain materials: bare mineral, sand, forest, snow. Right toggles dark satellite imagery.</p>
 <script src="/node_modules/three/build/three.min.js"></script>
 <script type="module">
-import {configureTerrainSurfaceMaterialBlend,applyTerrainProfileSurfaceMaterialMix} from '/app/js/terrain/surface-material-blend.js';
+import {configureTerrainSurfaceMaterialBlend,applyTerrainProfileSurfaceMaterialMix,applyWorldCoverSurfaceMaterialMix} from '/app/js/terrain/surface-material-blend.js';
 const renderer=new THREE.WebGLRenderer({preserveDrawingBuffer:true,antialias:false});renderer.setSize(800,400);renderer.outputEncoding=THREE.sRGBEncoding;document.body.append(renderer.domElement);
 const scene=new THREE.Scene();scene.background=new THREE.Color('#263039');scene.add(new THREE.AmbientLight(0xffffff,1));
 const camera=new THREE.OrthographicCamera(-8,8,4,-4,.1,100);camera.position.set(0,0,10);camera.lookAt(0,0,0);
@@ -15,6 +15,7 @@ const meshes=['rock','sand','forest','snow'].map((mode,i)=>{
  geometry.setAttribute('color',new THREE.Float32BufferAttribute(Array.from({length:geometry.attributes.position.count},()=>[.5,1,.5]).flat(),3));
  const material=new THREE.MeshStandardMaterial({map:maps.rock.map,roughness:1,vertexColors:true});material.defines={WE3D_TERRAIN_REGIONAL_IMAGE:1};
  const mesh=new THREE.Mesh(geometry,material);mesh.position.x=-6+i*4;scene.add(mesh);configureTerrainSurfaceMaterialBlend(mesh,maps);applyTerrainProfileSurfaceMaterialMix(mesh,mode);
+ applyWorldCoverSurfaceMaterialMix(mesh,{surfaceMaterialClasses:new Uint8Array(4).fill([5,2,3,6][i]),surfaceMaterialClassSize:2});
  const uniforms=material.userData.terrainSurfaceMaterialBlend.uniforms;uniforms.terrainRegionalMap.value=dark;return mesh;
 });
 function draw(){for(const mesh of meshes)mesh.material.userData.terrainSurfaceMaterialBlend.uniforms.terrainRegionalReady.value=imagery?1:0;renderer.render(scene,camera);}

@@ -104,7 +104,9 @@ export function ensureTerrainSurfaceMixAttributes(geometry) {
   return { mixA, mixB };
 }
 
-function weightedMixForWorldCover(result, u, v) {
+const worldCoverMixes=Array.from({length:10},(_,i)=>terrainSurfaceMixForClass(i));
+
+function weightedMixForWorldCover(result, u, v, output) {
   const classes = result?.surfaceMaterialClasses;
   const size = Number(result?.surfaceMaterialClassSize || 0);
   if (!classes || size < 2) return null;
@@ -116,21 +118,17 @@ function weightedMixForWorldCover(result, u, v) {
   const y1 = Math.min(size - 1, y0 + 1);
   const tx = sourceX - x0;
   const ty = sourceY - y0;
-  const samples = [
-    [x0, y0, (1 - tx) * (1 - ty)],
-    [x1, y0, tx * (1 - ty)],
-    [x0, y1, (1 - tx) * ty],
-    [x1, y1, tx * ty]
-  ];
-  const mixA = [0, 0, 0, 0];
-  const mixB = [0, 0];
-  for (const [x, y, weight] of samples) {
-    if (weight <= 0) continue;
-    const mix = terrainSurfaceMixForClass(classes[y * size + x]);
-    for (let channel = 0; channel < 4; channel += 1) mixA[channel] += mix.mixA[channel] * weight;
-    for (let channel = 0; channel < 2; channel += 1) mixB[channel] += mix.mixB[channel] * weight;
+  const {mixA,mixB}=output;mixA.fill(0);mixB.fill(0);
+  for(let sample=0;sample<4;sample++){
+    const right=(sample&1)!==0,bottom=sample>=2;
+    const x=right?x1:x0,y=bottom?y1:y0;
+    const weight=(right?tx:1-tx)*(bottom?ty:1-ty);
+    if(weight<=0)continue;
+    const mix=worldCoverMixes[classes[y*size+x]]||worldCoverMixes[0];
+    for(let channel=0;channel<4;channel++)mixA[channel]+=mix.mixA[channel]*weight;
+    for(let channel=0;channel<2;channel++)mixB[channel]+=mix.mixB[channel]*weight;
   }
-  return { mixA, mixB };
+  return output;
 }
 
 export function applyWorldCoverSurfaceMaterialMix(mesh, result) {
@@ -138,8 +136,9 @@ export function applyWorldCoverSurfaceMaterialMix(mesh, result) {
   const uvs = geometry?.attributes?.uv;
   const attributes = ensureTerrainSurfaceMixAttributes(geometry);
   if (!uvs || !attributes || !result?.surfaceMaterialClasses) return false;
+  const output={mixA:[0,0,0,0],mixB:[0,0]};
   for (let index = 0; index < uvs.count; index += 1) {
-    const mix = weightedMixForWorldCover(result, uvs.getX(index), uvs.getY(index));
+    const mix = weightedMixForWorldCover(result, uvs.getX(index), uvs.getY(index),output);
     if (!mix) return false;
     setNormalizedTerrainAttribute(attributes.mixA, index, mix.mixA);
     setNormalizedTerrainAttribute(attributes.mixB, index, mix.mixB);

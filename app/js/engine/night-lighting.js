@@ -12,37 +12,37 @@ const headlightLocalTarget = new THREE.Vector3();
 
 let lastStreetUpdateAt = 0;
 
-// A fixed pool avoids compiling every material again as nearby lamps enter or
-// leave range. Zero-intensity slots must also skip their fragment-light work.
-export function installInactiveSpotLightShortcut(three) {
+// Fixed pools keep shader variants stable. Lights outside their exact cutoff
+// contribute zero; skip their BRDF work without changing range or intensity.
+function installLocalLightShortcut(three, variable, collection, label) {
   const chunk = three?.ShaderChunk?.lights_fragment_begin;
-  const marker = '// WE3D inactive spotlight slot';
+  const marker = `// WE3D inactive ${label} slot`;
   if (typeof chunk !== 'string' || chunk.includes(marker)) return false;
-  const assignment = 'spotLight = spotLights[ i ];';
-  const direct = 'RE_Direct( directLight, geometry, material, reflectedLight );';
-  const start = chunk.indexOf(assignment);
-  const end = chunk.indexOf(direct, start);
-  if (start < 0 || end < start) return false;
-  const tail = end + direct.length;
-  three.ShaderChunk.lights_fragment_begin = chunk.slice(0, start) + assignment +
-    `\n${marker}\nif (any(notEqual(spotLight.color, vec3(0.0)))) {\n` +
-    chunk.slice(start + assignment.length, tail) + '\n}' + chunk.slice(tail);
-  return true;
-}
-
-export function installInactivePointLightShortcut(three) {
-  const chunk = three?.ShaderChunk?.lights_fragment_begin;
-  const marker = '// WE3D inactive point-light slot';
-  if (typeof chunk !== 'string' || chunk.includes(marker)) return false;
-  const assignment = 'pointLight = pointLights[ i ];';
+  const assignment = `${variable} = ${collection}[ i ];`;
   const direct = 'RE_Direct( directLight, geometry, material, reflectedLight );';
   const start = chunk.indexOf(assignment), end = chunk.indexOf(direct, start);
   if (start < 0 || end < start) return false;
   const tail = end + direct.length;
+  // Legacy lights with decay zero have no cutoff, even when distance is set.
+  const inRange = `(${variable}.distance <= 0.0 ||
+#ifndef PHYSICALLY_CORRECT_LIGHTS
+    ${variable}.decay <= 0.0 ||
+#endif
+    dot(${variable}.position - geometry.position, ${variable}.position - geometry.position) <= ${variable}.distance * ${variable}.distance)`;
+  const body = chunk.slice(start + assignment.length, tail)
+    .replace(direct, `if (directLight.visible) { ${direct} }`);
   three.ShaderChunk.lights_fragment_begin = chunk.slice(0, start) + assignment +
-    `\n${marker}\nif (any(notEqual(pointLight.color, vec3(0.0)))) {\n` +
-    chunk.slice(start + assignment.length, tail) + '\n}' + chunk.slice(tail);
+    `\n${marker}\nif (any(notEqual(${variable}.color, vec3(0.0))) && ${inRange}) {\n` +
+    body + '\n}' + chunk.slice(tail);
   return true;
+}
+
+export function installInactiveSpotLightShortcut(three) {
+  return installLocalLightShortcut(three, 'spotLight', 'spotLights', 'spotlight');
+}
+
+export function installInactivePointLightShortcut(three) {
+  return installLocalLightShortcut(three, 'pointLight', 'pointLights', 'point-light');
 }
 
 installInactivePointLightShortcut(THREE);
@@ -63,7 +63,9 @@ function streetLightBudget() {
 }
 
 function ensureStreetLightPool() {
-  const desired = streetLightBudget();
+  // Allocate the maximum once, before the first world render. Quality
+  // changes choose active fixtures; they must not grow the shader light array.
+  const desired = 12;
   if (!Array.isArray(appCtx.streetLightPool)) appCtx.streetLightPool = [];
   while (appCtx.streetLightPool.length < desired) {
     const target = new THREE.Object3D();

@@ -44,3 +44,9 @@ test('inactive spotlight shader shortcut is idempotent and rejects an unknown ch
  assert.equal(h.c.installInactiveSpotLightShortcut(other),false);
  assert.equal(other.ShaderChunk.lights_fragment_begin,'different shader');
 });
+
+test('raising automatic quality activates existing slots without changing scene light count',()=>{
+ const h=harness();h.tier('performance');h.tick();const pool=[...h.appCtx.streetLightPool];
+ assert.equal(h.active(),5);assert.equal(pool.length,12);
+ h.tier('quality');h.tick();assert.equal(h.active(),12);assert.equal(h.appCtx.streetLightPool.length,pool.length);pool.forEach((entry,i)=>assert.equal(h.appCtx.streetLightPool[i],entry));
+});

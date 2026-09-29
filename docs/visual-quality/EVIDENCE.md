@@ -439,3 +439,9 @@ asset-loader registration, content-versioned URLs and asynchronous acquisition,
 and dated attribution assertions. These are component results, not multiplayer
 or whole-game visual certification. Packaged performance and gameplay checks
 remain pending. Production and the existing user preview are unchanged.
+
+## September 29: packaged performance and allocation follow-up
+
+Candidate `5.4.0+e84c1d84d329.a3cb1270c770c62b.staging` failed desktop mode budgets: stationary driving averaged40.93FPS and sampled gameplay heap reached1.55GB. Flight included an816.6ms frame. Retention, resource cleanup, moving-world coverage and mobile checks passed; this is not release acceptance.
+
+The follow-up preserves polygon membership and material weights while indexing coastline edges and water bounds, reusing blend scratch storage and avoiding projection-query closures. Local-light cutoff pruning has rendered parity within one channel value out of255, including legacy zero-decay behavior. Stable street-light slots prevent quality changes from altering shader light counts. All1516current contracts and the source audit pass. Instrumented loading improved from55to45seconds before the final coastline change; uninstrumented packaged measurements remain required.
