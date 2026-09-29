@@ -1,4 +1,5 @@
 import {
+  applyEarthAtmosphereProfile,
   buildEarthAtmosphereProfile,
   createAtmosphereMaterial
 } from '../sky/earth-atmosphere.js?v=1';
@@ -13,24 +14,30 @@ function publishEarthEnvironment(ctx, texture) {
 function buildProceduralEnvironmentTarget(ctx, profile) {
   const pmremGenerator = ctx.appCtx.pmremGenerator;
   if (!pmremGenerator || typeof THREE === 'undefined') return null;
-  const envScene = new THREE.Scene();
-  const envGeo = new THREE.BoxGeometry(20, 20, 20);
-  const envMat = createAtmosphereMaterial(profile, { name: 'WorldExplorerEarthEnvironment' });
-  if (!envMat) {
-    envGeo.dispose?.();
-    return null;
+  let capture = ctx.state.fallbackEnvCapture;
+  if (capture?.generator !== pmremGenerator) {
+    capture?.mesh.geometry.dispose();
+    capture?.mesh.material.dispose();
+    capture = null;
+    ctx.state.fallbackEnvCapture = null;
   }
-  const envMesh = new THREE.Mesh(envGeo, envMat);
-  envScene.add(envMesh);
+  if (!capture) {
+    const material = createAtmosphereMaterial(profile, { name: 'WorldExplorerEarthEnvironment' });
+    if (!material) return null;
+    const scene = new THREE.Scene();
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(20, 20, 20), material);
+    scene.add(mesh);
+    capture = { generator: pmremGenerator, scene, mesh };
+    ctx.state.fallbackEnvCapture = capture;
+  }
+  // Keep the capture shader alive across sky changes. Disposing it after each
+  // update forced a synchronous program link during normal driving and flight.
+  applyEarthAtmosphereProfile(capture.mesh, profile);
   try {
-    return pmremGenerator.fromScene(envScene, 0.025, 0.1, 100);
+    return pmremGenerator.fromScene(capture.scene, 0.025, 0.1, 100);
   } catch (err) {
     console.warn('Procedural environment map generation failed:', err);
     return null;
-  } finally {
-    envScene.remove(envMesh);
-    envGeo.dispose?.();
-    envMat.dispose?.();
   }
 }
 

@@ -189,6 +189,7 @@ export const currentContractTests = [
   'tests/vessel-batching-current.test.mjs',
   'tests/static-model-batching-current.test.mjs',
   'tests/skinned-model-batching-current.test.mjs',
+  'tests/visual-presentation-current.test.mjs',
   'tests/night-lighting-lifecycle-current.test.mjs',
   'tests/building-facade-layout-current.test.mjs',
   'tests/building-vertex-storage-current.test.mjs',

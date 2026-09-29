@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
-import { applyRenderQuality } from '../app/js/engine/quality.js';
+import { applyRenderQuality, refreshProceduralEnvironment } from '../app/js/engine/quality.js';
 import { applyTerrainReliefMaterialMix, ensureTerrainSurfaceMixAttributes, setNormalizedTerrainAttribute } from '../app/js/terrain/surface-material-blend.js';
 import { registerMaterialCompatibility } from '../app/js/assets/gltf-material-compatibility.js';
 import {attachShipFurnishing} from '../app/js/expedition/ship-furnishings.js';
@@ -31,6 +31,7 @@ test('furnishings resolving after disposal cannot reattach to the closed room',a
   class Loader{register(){return this;}load(url,done){finish=done;}}
   const host=new THREE.Group();
   const pending=attachShipFurnishing({...THREE,GLTFLoader:Loader},host,'solis-crew-lamp');
+  await Promise.resolve(); // Template acquisition starts the loader asynchronously.
   host.userData.disposeShipFurnishing();
   finish({scene:new THREE.Group()});
   assert.equal(await pending,false);assert.equal(host.children.length,0);
@@ -86,4 +87,27 @@ test('r128 adapter preserves authored luminous power, including zero and values 
     const params={};await plugin.extendMaterialParams(0,params);
     assert.equal(params.emissiveIntensity,value);
   }
+});
+
+
+test('sky reflection updates reuse capture resources and release the old generator capture', () => {
+  globalThis.THREE = THREE;
+  try {
+    const captures = [], targets = [];
+    const generator = {fromScene(scene) {
+      captures.push(scene); const target = {texture:{}, disposed:false,dispose(){this.disposed=true;}};
+      targets.push(target); return target;
+    }};
+    const ctx = {appCtx:{scene:new THREE.Scene(),pmremGenerator:generator},state:{},RENDER_QUALITY_LOW:'low'};
+    refreshProceduralEnvironment(ctx,null,{force:true});
+    const first=ctx.state.fallbackEnvCapture;let geometryDisposed=false,materialDisposed=false;
+    first.mesh.geometry.addEventListener('dispose',()=>geometryDisposed=true);
+    first.mesh.material.addEventListener('dispose',()=>materialDisposed=true);
+    refreshProceduralEnvironment(ctx,null,{force:true});
+    assert.equal(captures[0],captures[1]);assert.equal(ctx.state.fallbackEnvCapture,first);
+    assert.equal(targets[0].disposed,true);assert.equal(geometryDisposed,false);assert.equal(materialDisposed,false);
+    ctx.appCtx.pmremGenerator={fromScene:generator.fromScene};
+    refreshProceduralEnvironment(ctx,null,{force:true});
+    assert.notEqual(ctx.state.fallbackEnvCapture,first);assert.equal(geometryDisposed,true);assert.equal(materialDisposed,true);
+  } finally {delete globalThis.THREE;}
 });

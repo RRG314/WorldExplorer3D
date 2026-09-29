@@ -14,18 +14,19 @@ const drivePose=process.env.WE3D_PROFILE_DRIVE_POSE?JSON.parse(process.env.WE3D_
 if(drivePose&&!['x','z','angle'].every(key=>Number.isFinite(drivePose[key])))throw Error('Invalid driving profile pose');
 const retentionCycles=Math.min(3,Math.max(0,Number(process.env.WE3D_RETENTION_CYCLES)||0));
 const out=`output/architecture-evaluation/${label}`;await mkdir(out,{recursive:true});
-const report={label,source:execFileSync('git',['rev-parse','HEAD'],{cwd:root,encoding:'utf8'}).trim(),host:requirePerformanceHost(),quality:'med fixed; auto-quality disabled',viewport:{width:1280,height:800},clock:'normal RAF; no advanceTime',location,samples:[],errors:[],complete:false};
+const defaultQuality=process.env.WE3D_PROFILE_DEFAULT_QUALITY==='1';
+const report={label,source:execFileSync('git',['rev-parse','HEAD'],{cwd:root,encoding:'utf8'}).trim(),host:requirePerformanceHost(),quality:defaultQuality?'application defaults':'med fixed; auto-quality disabled',viewport:{width:Number(process.env.WE3D_PROFILE_WIDTH)||1280,height:Number(process.env.WE3D_PROFILE_HEIGHT)||800},clock:'normal RAF; no advanceTime',location,samples:[],errors:[],complete:false};
 report.runtimeDiffSha256=createHash('sha256').update(execFileSync('git',['diff','HEAD','--','app'],{cwd:root})).digest('hex');
 try {report.artifact=JSON.parse(await readFile(`${root}/build-manifest.json`,'utf8'));} catch {}
 const save=()=>writeFile(`${out}/report.json`,JSON.stringify(report,null,2)+'\n');
 const server=await startStaticServer({rootDir:root,ports:[4491,4492]});let browser;
-let deadline;try{
+let deadline, page;try{
  browser=await chromium.launch({headless:false,channel:'chrome'});
  deadline=setTimeout(()=>browser.close().catch(()=>{}),retentionCycles?1200000:process.env.WE3D_PROFILE_ENVIRONMENTS==='1'?720000:420000);
- const context=await browser.newContext({viewport:report.viewport,deviceScaleFactor:1});const page=await context.newPage();
+ const context=await browser.newContext({viewport:report.viewport,deviceScaleFactor:1});page=await context.newPage();
  report.navigations=[];page.on('framenavigated',frame=>{if(frame===page.mainFrame())report.navigations.push(frame.url());});
  await configureStagingAppCheck(page,`http://127.0.0.1:${server.port}`);
- await page.addInitScript(()=>{globalThis.__architectureLongTasks=[];globalThis.__architectureLongTasksDropped=0;try{new PerformanceObserver(list=>{for(const e of list.getEntries()){if(globalThis.__architectureLongTasks.length<10000)globalThis.__architectureLongTasks.push({startTime:e.startTime,duration:e.duration});else globalThis.__architectureLongTasksDropped++;}}).observe({type:'longtask',buffered:true});}catch{}localStorage.setItem('worldExplorerRenderQualityLevel','med');localStorage.setItem('worldExplorerPerfAutoQuality','0');});
+ await page.addInitScript(({defaultQuality})=>{globalThis.__architectureLongTasks=[];globalThis.__architectureLongTasksDropped=0;try{new PerformanceObserver(list=>{for(const e of list.getEntries()){if(globalThis.__architectureLongTasks.length<10000)globalThis.__architectureLongTasks.push({startTime:e.startTime,duration:e.duration});else globalThis.__architectureLongTasksDropped++;}}).observe({type:'longtask',buffered:true});}catch{}if(!defaultQuality){localStorage.setItem('worldExplorerRenderQualityLevel','med');localStorage.setItem('worldExplorerPerfAutoQuality','0');}},{defaultQuality});
  if(process.env.WE3D_PROFILE_SHADER_STALLS==='1')await page.addInitScript(()=>{
   globalThis.__shaderStalls=[];
   for(const Type of [globalThis.WebGLRenderingContext,globalThis.WebGL2RenderingContext]){
@@ -34,6 +35,7 @@ let deadline;try{
     if(elapsed>10&&globalThis.__shaderStalls.length<100)globalThis.__shaderStalls.push({started,elapsed,defines:this.getAttachedShaders(program).map(shader=>(this.getShaderSource(shader)||'').split('\n').filter(line=>line.startsWith('#define')).slice(0,100))});return result;};
   }
  });
+ report.consoleFailures=[];page.on('console',message=>{if(['error','warning'].includes(message.type()))report.consoleFailures.push(message.text().replace(/https?:\/\/[^\s]+/g,url=>{try{const u=new URL(url);return u.origin+u.pathname;}catch{return '[url]';}}).slice(0,1000));});
  page.on('console',message=>{if(['error','warning'].includes(message.type())&&/StreetPavement|WebGLProgram/.test(message.text()))report.errors.push(message.text().slice(0,500));});
  page.on('pageerror',e=>report.errors.push(String(e.message).replace(/[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}/gi,'[id]')));
  const cdp=await context.newCDPSession(page);await cdp.send('Performance.enable');
@@ -106,7 +108,7 @@ let deadline;try{
  if(process.env.WE3D_PROFILE_SCENE_GRAPH==='1'){
   report.sceneGraph=await page.evaluate(async()=>{
    const {ctx}=await import('/app/js/shared-context.js?v=55');
-   return ctx.scene.children.map(root=>{
+   return [...ctx.scene.children,...(ctx.earthSceneRoot?.children||[])].map(root=>{
     let nodes=0,automaticMatrices=0,meshes=0,bones=0;
     root.traverse(o=>{nodes++;automaticMatrices+=o.matrixAutoUpdate?1:0;meshes+=o.isMesh?1:0;bones+=o.isBone?1:0;});
     return {name:root.name,type:root.type,visible:root.visible,nodes,automaticMatrices,meshes,bones};
@@ -165,8 +167,11 @@ let deadline;try{
   report.populationPresentation={before:await populationPresentation()};
   for(const mode of (process.env.WE3D_PROFILE_MODES || 'drive,plane').split(',')){
    if(!['drive','plane'].includes(mode))throw Error('Invalid profile travel mode');
+   const transitionCpu=process.env.WE3D_PROFILE_TRANSITION_CPU==='1';
+   if(transitionCpu){await cdp.send('Profiler.enable');await cdp.send('Profiler.start');}
    await page.locator('#travelBtn').click();await page.locator(mode==='drive'?'#fDriving':'#fPlane').click();
    await page.locator('#travelBtn').blur();await page.waitForTimeout(1500);
+   if(transitionCpu){const {profile}=await cdp.send('Profiler.stop');await writeFile(`${out}/transition-${mode}.cpuprofile`,JSON.stringify(profile));}
    for(let repeat=0;repeat<(Number(process.env.WE3D_PROFILE_REPEATS)||2);repeat++){
     await page.evaluate(async({mode,drivePose})=>{
      const {ctx}=await import('/app/js/shared-context.js?v=55');
@@ -303,5 +308,7 @@ let deadline;try{
  report.gpuUploadStalls=await page.evaluate(()=>globalThis.__gpuUploadStalls||[]);
  report.shaderStalls=await page.evaluate(()=>globalThis.__shaderStalls||[]);
  report.complete=true;console.log('profile: complete');
-}catch(e){report.failure=String(e.stack||e.message);console.log('profile: failed',report.failure);}finally{clearTimeout(deadline);await save();await browser?.close().catch(()=>{});await server.close();}
+}catch(e){report.failure=String(e.stack||e.message);console.log('profile: failed',report.failure);
+ try{report.failureState=await Promise.race([page.evaluate(()=>({text:document.body.innerText.slice(-5000),gameStarted:globalThis.getWorldExplorerRuntimeDiagnostics?.().gameStarted,worldLoading:globalThis.getWorldExplorerRuntimeDiagnostics?.().worldLoading})),new Promise((_,reject)=>setTimeout(()=>reject(Error('Failure snapshot timed out')),5000))]);await page.screenshot({path:`${out}/failure.png`,timeout:5000});}catch{}
+}finally{clearTimeout(deadline);await save();await Promise.race([browser?.close().catch(()=>{}),new Promise(resolve=>setTimeout(resolve,5000))]);await server.close();}
 if(!report.complete)process.exitCode=1;

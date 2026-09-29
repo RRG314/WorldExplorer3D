@@ -478,3 +478,26 @@ pixel parity, not bit-identical rendering. Screenshots were inspected.
 The remote-character fixture completed six vehicle/return and leave/rejoin
 cycles with animation present, four geometries, two textures and no GL errors.
 Full-world performance after this change remains to be measured.
+
+## Sky reflection capture lifecycle
+
+The 36eb0731 package retained the lower heap footprint (511–560 MiB on the
+ground), passed mode-switch response limits and completed flight at 57.25 FPS.
+Stationary walking/driving still failed the frame-rate budget. It is not an
+accepted release candidate.
+
+A subsequent CPU trace found recurring 42–44 ms shader links from the sky
+reflection capture material. That material was disposed after every capture.
+The engine now retains one capture scene/material per PMREM generator and
+updates its uniforms; replacing the generator disposes the previous capture.
+Six rendered sky updates retained program identities and resource counts. The
+reference comparison differed by at most 1/255 in the first capture and was
+identical thereafter. A fresh source driving window had no recurring capture
+shader link, averaged 48.60 FPS and peaked at 66.6 ms. This source diagnostic
+is not a replacement for packaged acceptance.
+
+One preceding diagnostic failed before gameplay without a sufficient failure
+snapshot. The subsequent run recorded live Overpass timeouts and completed
+using fallback data. Failure UI and console capture have been added to the
+profiling harness. Local source-host AppCheck warnings do not certify live
+service access; multiplayer verification remains a separate check.
