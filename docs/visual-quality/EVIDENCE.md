@@ -140,3 +140,45 @@ Authored component integration, district and tropical coverage, a current frozen
 world/traversal/space/multiplayer regression run and matched performance acceptance
 remain release requirements. Production and the existing packaged preview have
 not been updated by this work.
+
+
+## Baltimore driving and flight investigation
+
+Road searches now reject segments whose best possible score cannot improve the
+current result before sampling their height. Connection rules are evaluated once
+per road rather than per segment. Differential checks preserve selected roads,
+heights and grade-separated transition behavior. Compiled static batches retain
+their transforms; moving actors keep automatic updates.
+
+Decoded model templates now have a 64 MiB estimated idle-resource budget. Active
+instances and derived vegetation retain explicit leases, so eviction cannot
+invalidate their textures. This bounds idle model resources, not total browser
+memory. A real-model fixture completed three vegetation rebuilds with all five
+families visible, seven textures and no graphics error; its image was inspected.
+
+Physical M1 Chrome, fixed medium quality, 1280×800 at device scale 1, same Baltimore
+coordinates. Two repetitions followed a 100 m drive and a 1.5 km flight, with
+identical starting poses and normal physics/input after setup:
+
+| Version | Driving FPS, repetitions | Flight FPS, repetitions |
+| --- | --- | --- |
+| Preserved 5.2 production | 38.7 / 48.4 | 38.3 / 36.7 |
+| Previous 3720 candidate | 35.4 / 46.8 | 41.8 / 41.2 |
+| Patched source | 45.5 / 53.6 | 40.3 / 42.9 |
+
+All fixed routes completed without page errors. Driving improved in this sample;
+flight is essentially unchanged from the previous candidate and above the sampled
+5.2 averages. First-flight p99 was worse than 5.2, although the worst frame was
+shorter. These live-provider samples are not a statistical or all-location
+non-regression certification: 5.2 selected 27,603 buildings, versus 25,587 in both
+newer versions. No threshold has been relaxed.
+
+Earlier sustained-flight samples used a two-second climb input that sometimes
+looped the aircraft and produced different routes. They are diagnostic captures,
+not valid comparative flight benchmarks. The driver now uses bounded pitch input
+for normal takeoff and fixed-distance routes for comparisons. The older replay
+harness no longer caps the JavaScript heap and now requires the hardware renderer.
+
+The packaged candidate still requires validation before performance acceptance or
+production promotion. Evidence: local `baltimore-fixed-route-*` reports under
+`output/architecture-evaluation/`; raw profiles and captures are not shipped.

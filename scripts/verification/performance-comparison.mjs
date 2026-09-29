@@ -1,3 +1,4 @@
+import {requirePerformanceHost, requireHardwareGraphics} from './performance-host.mjs';
 import {publicProviderFixtureRequest} from './provider-fixture-key.mjs';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
@@ -11,6 +12,7 @@ import { sampleFrameWindow } from './frame-window.mjs';
 // Replays public provider bytes, never credentials or authenticated service data.
 // Playwright routing disables HTTP cache: "warm" means persisted world-data cache,
 // not an HTTP/CDN warm load. Hosted transfer latency is a separate acceptance test.
+const hostAuthority = requirePerformanceHost();
 const record = process.env.WE3D_COMPARISON_MODE === 'record';
 const output = path.resolve(process.env.WE3D_COMPARISON_OUTPUT || 'output/verification/performance-comparison');
 const cacheRoot = path.join(output, 'public-provider-cache');
@@ -41,7 +43,7 @@ for (const [label, root] of Object.entries(roots)) {
   assert.equal(manifest.sourceDirty, false);
   manifests[label] = { buildId: manifest.buildId, contentHash: manifest.contentHash, root };
 }
-const report = { mode: record ? 'record-public-fixtures' : 'controlled-replay', startedAt: new Date().toISOString(), manifests,
+const report = { hostAuthority, mode: record ? 'record-public-fixtures' : 'controlled-replay', startedAt: new Date().toISOString(), manifests,
   scope: { hardware: 'current physical desktop', viewport: '1440x900 at DPR 1', renderQuality: 'med', dynamicQuality: 'locked balanced',
     daylight: 'day', controls: 'real W key along fixed starts/headings for 12 m walk and 75 m drive; 20 second timeout', cache: 'cold context followed by same-context persisted-data reload; HTTP cache disabled by routing',
     network: 'public providers replayed locally; Overpass mirrors/timeouts share one complete response per identical data query; authenticated staging attestation remains live',
@@ -77,7 +79,7 @@ async function measure(page, mode) {
 async function trial(label, round) {
   const server = await startStaticServer({ rootDir: roots[label], ports: [4488] });
   const baseUrl = `http://127.0.0.1:${server.port}`;
-  const browser = await chromium.launch({ headless:true, channel:'chrome', args:['--js-flags=--max-old-space-size=1280'] });
+  const browser = await chromium.launch({ headless:true, channel:'chrome', args:[] });
   const context = await browser.newContext({ viewport:{width:1440,height:900}, deviceScaleFactor:1 });
   const misses = [], providerErrors = [], browserErrors = [], pending = new Set();
   await context.route('https://**/*', async route => {
@@ -142,6 +144,14 @@ async function trial(label, round) {
       const started = Date.now();
       const errorsBefore = browserErrors.length, missesBefore = misses.length;
       await page.goto(`${baseUrl}/app/?loc=custom&lat=39.2904&lon=-76.6122&lname=Baltimore&launch=earth&gm=free&mode=walk`,{waitUntil:'domcontentloaded',timeout:120000});
+      const graphics = await page.evaluate(() => {
+        const canvas=document.createElement('canvas'),gl=canvas.getContext('webgl2');
+        if(!gl)return 'unavailable';
+        const ext=gl.getExtension('WEBGL_debug_renderer_info');
+        const renderer=ext?gl.getParameter(ext.UNMASKED_RENDERER_WEBGL):gl.getParameter(gl.RENDERER);
+        gl.getExtension('WEBGL_lose_context')?.loseContext();return renderer;
+      });
+      requireHardwareGraphics(graphics);
       await page.waitForFunction(()=>globalThis.__WE3D_RUNTIME_READY__===true,null,{timeout:120000,polling:500});
       if(await page.locator('#analyticsConsentDenyBtn').isVisible())await page.locator('#analyticsConsentDenyBtn').click();
       await page.locator('#globeSelectorStartBtn').click();

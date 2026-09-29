@@ -419,6 +419,8 @@ export function initEngineRuntime(ctx) {
   recordStartupDiagnostic("renderer", "initEngineRuntime start");
   appCtx.engineInitFailed = false;
   appCtx.scene = new THREE.Scene();
+  // The world origin is fixed; moving actors retain their own automatic matrices.
+  appCtx.scene.matrixAutoUpdate = false;
   appCtx.scene.background = new THREE.Color(0x87ceeb);
   appCtx.scene.fog = new THREE.FogExp2(0xb8d4e8, 0.00035);
   appCtx.camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.5, 12000);

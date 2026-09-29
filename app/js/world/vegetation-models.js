@@ -42,6 +42,9 @@ function requestModel(ctx, kind) {
       // contract). Reuse near textures so switching LOD does not upload a second
       // identical set of maps to the GPU. Geometry remains independent.
       const sharedMaps = new Map();
+      // These five reusable vegetation families own derived geometry/materials
+      // for the session, including textures borrowed from the decoded templates.
+      state.releaseTemplateResources = instances.map(instance => instance.retainResources());
       state.parts = instances.map((instance,level)=>{
         instance.root.updateMatrixWorld(true);
         const parts=[];
