@@ -32,6 +32,22 @@ function* pavementBaseSamplerSteps({segments=[],ground,roadContactIndex,profileC
     const profile={...segment,a,b,blendDistance:8/scale,steps,left,right};
     prepared.push(profile);profileCache.set(key,profile);
   }
+  // Each road contributes only inside its shoulder blend. Keep source order
+  // within each cell so indexed queries retain the same weighted sum.
+  const cells=new Map(),cellSize=64;
+  for(const s of prepared){
+    const radius=Math.max(s.wa,s.wb)/2+s.blendDistance;
+    const minX=Math.floor((Math.min(s.a.x,s.b.x)-radius)/cellSize);
+    const maxX=Math.floor((Math.max(s.a.x,s.b.x)+radius)/cellSize);
+    const minZ=Math.floor((Math.min(s.a.z,s.b.z)-radius)/cellSize);
+    const maxZ=Math.floor((Math.max(s.a.z,s.b.z)+radius)/cellSize);
+    for(let ix=minX;ix<=maxX;ix++)for(let iz=minZ;iz<=maxZ;iz++){
+      const key=`${ix}:${iz}`;
+      if(!cells.has(key))cells.set(key,[]);
+      cells.get(key).push(s);
+      yield;
+    }
+  }
   const heights=new Map();
   return (x,z)=>{
     const key=`${x}:${z}`;
@@ -39,7 +55,7 @@ function* pavementBaseSamplerSteps({segments=[],ground,roadContactIndex,profileC
     const terrain=ground(x,z);
     if(!Number.isFinite(terrain))throw new Error('Pavement has no accepted terrain height');
     let weightedClearance=0,weightSum=0;
-    for(const s of prepared){
+    for(const s of cells.get(`${Math.floor(x/cellSize)}:${Math.floor(z/cellSize)}`)||[]){
       const dx=s.b.x-s.a.x,dz=s.b.z-s.a.z,lengthSq=dx*dx+dz*dz;
       if(!(lengthSq>0))continue;
       const t=Math.max(0,Math.min(1,((x-s.a.x)*dx+(z-s.a.z)*dz)/lengthSq));

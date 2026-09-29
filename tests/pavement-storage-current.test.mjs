@@ -76,3 +76,22 @@ test('indexing drops render-precision collapse while preserving vertical curbs a
  assert.deepEqual([...mesh.indices].flatMap(i=>[...mesh.positions.slice(i*3,i*3+3)]),[...new Float32Array(input.slice(9))]);
  assert.throws(()=>indexPavementPositions([0,0,0]),/Invalid pavement triangle/);
 });
+
+
+test('indexed pavement agrees with exhaustive road blending across cell boundaries',()=>{
+ const segments=Array.from({length:80},(_,i)=>({a:{x:(i%10)*43-200,z:Math.floor(i/10)*37-120},b:{x:(i%10)*43-170,z:Math.floor(i/10)*37-94},wa:3+i%5,wb:5+i%7,offset:i%3-1,road:{surfaceBias:.08+(i%4)*.07}}));
+ const ground=(x,z)=>x*.013-z*.02;
+ const sample=createPavementBaseSampler({segments,ground});
+ for(let x=-220;x<240;x+=7.9)for(let z=-150;z<190;z+=9.7){
+  let total=0,weights=0;
+  for(const s of segments){
+   const dx=s.b.x-s.a.x,dz=s.b.z-s.a.z,len=Math.hypot(dx,dz);
+   const ax=s.a.x-dz/len*s.offset,az=s.a.z+dx/len*s.offset;
+   const t=Math.max(0,Math.min(1,((x-ax)*dx+(z-az)*dz)/(len*len)));
+   const distance=Math.max(0,Math.hypot(x-ax-dx*t,z-az-dz*t)-(s.wa+(s.wb-s.wa)*t)/2);
+   const blend=Math.max(0,1-distance/8),weight=blend*blend/Math.max(1e-12,distance*distance);
+   total+=s.road.surfaceBias*blend*weight;weights+=weight;
+  }
+  assert.ok(Math.abs(sample(x,z)-(ground(x,z)+Math.max(.018,weights?total/weights:0)))<1e-11,`height at ${x}, ${z}`);
+ }
+});

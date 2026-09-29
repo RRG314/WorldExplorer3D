@@ -325,3 +325,33 @@ shows continuous harbor water again. Geometry tests preserve dry islands and
 exclude a second surface over a descending river. The post-repair source routes
 completed without browser errors, but driving FPS varied to 45.5/30.6 and flight
 to 49.5/50.4; this remains unsuitable as a final performance acceptance result.
+
+
+### Packaged travel verification — September 29
+
+Candidate `5.3.0+428c287139a9.990f5fc84dc62511.staging` completed both
+Baltimore driving and flight routes, ground-detail restoration, ocean, Earth
+return and space transitions with no reported runtime errors. First playable
+was 47.9 seconds. Driving averaged 40.4/44.7 FPS, flight 51.7/51.8 FPS.
+Maximum route frame intervals were 167/48 ms driving and 133/50 ms flying.
+Driving does not meet the sampled 5.2 baseline; this is not release acceptance.
+The driving and harbor-flight screenshots were inspected. Harbor coverage is
+continuous, but these views do not establish worldwide art completeness.
+
+The next source change indexes pavement shoulder contributions by spatial cell,
+retaining source order and exact weighted heights. An exhaustive comparison
+across more than 2,000 positions and 80 differently sized/offset roads passed,
+as did the existing height, continuity and cooperative-publication checks.
+The source browser run completed all four routes without errors: driving
+48.7/43.4 FPS, flight 50.2/50.4 FPS. A 135 ms driving interval remains.
+The subsequent diagnostic run found no buffer uploads longer than 8 ms;
+pavement sampling and road-contact construction still consume background CPU,
+and renderer submission remains substantial. Instrumented results are not
+substitutes for uninstrumented acceptance. Local evidence is in
+`output/architecture-evaluation/travel-frozen-428c2871`,
+`travel-indexed-pavement`, and `travel-remaining-stalls`.
+
+Production and the existing port-4193 preview have not been promoted. Remaining
+release work includes resolving ground frame pacing and completing the broader
+regional/ship art acceptance already listed above. No new live multiplayer or
+physical-phone verification is claimed by these runs.
