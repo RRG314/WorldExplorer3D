@@ -20,8 +20,9 @@ Driving and aircraft chase cameras now account for movement throughout each
 frame, reducing the repeated pull-back and catch-up visible at uneven frame
 intervals. Road queries, geometry buffers and repeated lighting updates create
 less temporary work without reducing world detail. Discarded private building
-buffers are released after batching to reduce delayed cleanup freezes. Sustained packaged gameplay
-and release checks remain in progress; occasional pauses are not yet eliminated.
+buffers are released after batching to reduce delayed cleanup freezes. Packaged driving, low flight, camera changes and return to ground have been
+checked. The configured performance and space gates pass on the runtime revision;
+remaining release checks are in progress. Occasional GC pauses remain.
 
 ## Respect the place
 

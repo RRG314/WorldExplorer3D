@@ -1,6 +1,6 @@
 # Current release state
 
-Updated September 29, 2026.
+Updated September 30, 2026.
 
 ## Workspace and authority
 
@@ -10,18 +10,19 @@ Visual-quality implementation is in progress locally. See
 `docs/visual-quality/PLAN.md` and `docs/visual-quality/EVIDENCE.md`.
 The local rendering and asset changes are not the deployed build.
 
-The movement repair source is undergoing final packaged verification. It fixes
-frame-duration-dependent chase-camera lag and reduces measured temporary road,
-geometry and numeric light-uniform work without lowering quality. Source checks,
-1,547 contracts and prescribed source action smoke passed at8357. Low flight then
-exposed a1.35second freeze from deferred native buffer cleanup. A targeted private
-building-buffer retirement repair reduced the measured sweep from786ms to16ms;
-two150second isolated repeats had233/283ms worst pauses. Integration tests pass;
-final packaged confirmation remains open. All-stall elimination is not claimed.
-Average FPS is acceptable to the owner. Packaged travel, multiplayer,
-transitions and release safeguards remain open. See the authoritative
-`docs/visual-quality/MOVEMENT-EVIDENCE.md` ledger. Original8940staging is preserved
-in `.local-candidates`; production has not changed.
+The movement runtime is frozen at f7a0865a2c9b. It repairs frame-duration-dependent
+chase-camera lag and reduces measured temporary road, geometry and lighting work.
+Source validation, 1,550 contracts and source action smoke passed. Matched packaged
+driving reduced the worst pause from 1,333 to 317 ms; an earlier integrated run
+still had a 967 ms pause. Low flight, camera changes and dry-ground return passed
+with inspected visuals. No all-stall elimination claim is made. Average FPS is
+acceptable to the owner.
+
+Formal f7 performance/retention, space and integrity gates passed. The full matrix
+stopped on stale 5.3 release metadata; the metadata is now aligned to package 5.4
+without changing budgets or safeguards. Full current-HEAD candidate/backend and
+weekly-room verification remain open. See `docs/visual-quality/MOVEMENT-EVIDENCE.md`.
+Production has not changed. Original 8940 and comparison 8357 artifacts are saved.
 
 
 The owner authorized production deployment and GitHub updates on September 28,
@@ -44,21 +45,14 @@ public-room browsing and the Chicago weekly-city label were verified.
 
 ## Evidence and limits
 
-The runtime candidate passed 56 functional/source/package/browser gates and
-all 13 isolated backend stages. A fresh two-client weekly-room check loaded both
-worlds, verified shared membership and visible presence, and had its screenshots
-inspected. It was an isolated-service test, not a signed-in production session.
+Earlier 5.3 functional/backend/weekly-room evidence is historical. The current 5.4
+runtime has passed the configured performance gate, including world-exit retention,
+and space transition/lifecycle checks. Remaining occasional GC pauses are recorded
+in the movement ledger. Physical-phone responsiveness remains unverified.
 
-The formal performance gate remains failed: dense-city ground FPS, transient
-heap and aircraft activation exceeded their limits. Repeated-session renderer
-footprints remain high. No thresholds or failed receipts were changed. Physical
-phone responsiveness remains unverified. See
-[release status](docs/RELEASE_INTEGRATION_STATUS.md) for current results.
-
-The ignored `output/release-deploy-20260928/` directory contains deployment
-receipts, a fresh weekly-room test and live integrity checks. Earlier gate
-receipts belong to the exact runtime commit, not subsequent documentation
-commits. Do not rerun passed checks without changed code or a new concern.
+`output/release-deploy-20260928/` contains historical deployment evidence. Current
+release receipts are under `output/release-evidence/current/` and are valid only for
+the exact source/build identity they record. Do not promote using older receipts.
 
 ## Architecture scope
 

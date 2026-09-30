@@ -1,6 +1,6 @@
 # Movement regression evidence — September 29, 2026
 
-Authoritative frozen candidate: dist, 5.4.0+8940b944b163.bbaade0123e1a4f1.staging, source 8940b944b1634e59747314aaf73db3c063876d8a. Existing uncommitted performance-retention CPU profiling change preserved.
+Initial frozen candidate (historical): 5.4.0+8940b944b163.bbaade0123e1a4f1.staging, source 8940b944b1634e59747314aaf73db3c063876d8a. Existing performance-retention CPU profiling change preserved and subsequently committed.
 Baseline: /Users/stevenreid/Developer/WorldExplorer3D-audit-1ec2f70/.local-candidates/5.2.0+db62593ba377.6342cddaba06fc68.production; manifest source db62593ba377e276e5079c78238fa3a83e501c93. No substitute tag.
 Hosted manifest freshly checked: 5.3.0+2839df5d6bbe.114f3c83341f2200.production. No deployment performed.
 
@@ -203,3 +203,45 @@ Integrated a WeakSet ownership marker at the two private extrusion constructors.
 Rejected pavement-source cooperative scan isolation: two250ms driving pauses, no improvement. It remains verification-only, along with previously rejected rendering experiments. Continue targeting jitter/stalls; average FPS is acceptable to the owner.
 
 Integrated retirement source smoke `movement-retired-buffers-source-actions` passed both driving bursts with zero captured errors; both screenshots inspected. Source validation passes and all1,550 current contracts pass (zero failures/skips). Preserved8357dist after SHA-verifying every asset; retired only the verified, unused generated a09staging copy to retain the four-candidate limit. New immutable build and packaged acceptance are next.
+
+
+## Integrated f7 packaged results and release checkpoint — September 30
+
+Runtime source is frozen at f7a0865a2c9b. Immutable staging artifact:
+`5.4.0+f7a0865a2c9b.0a0efe516f4b3921.staging`. Integrity passed with 553 assets.
+The next source commit corrects release metadata and records this evidence; it
+must receive its own current-HEAD release receipts before promotion.
+
+`movement-packaged-f7a0865` completed 150 seconds each of driving and low flight
+with no runtime errors or provider misses. Driving covered 733 m at 58.54 FPS,
+with six >50 ms intervals totaling 2,349.9 ms and a 966.7 ms maximum. Low flight
+covered 11.43 km at 48.53 FPS, with five >50 ms intervals totaling 750 ms and a
+283.2 ms maximum. All six camera views and the actual dry-ground return were
+visually inspected; roads, buildings, car and aircraft remain intact. The long
+driving pause is a remaining limitation, not hidden by the average FPS.
+
+A matched 150-second driving A/B (`movement-building-retirement-ab`) compared
+saved 8357 against f7 under the same recorded world and settings. Worst pause:
+1,333.3 → 316.6 ms; >50 ms count: 10 → 7; their total duration: 3,283.5 → 1,233.2 ms.
+Distance: 757.7 → 796.4 m; FPS: 58.32 → 59.17. Both had zero errors/misses and
+inspected screenshots. The harness label “live” denotes saved 8357, not production.
+These results support retaining the cleanup but do not erase the earlier 966.7 ms
+outlier or establish that every GC pause is eliminated.
+
+`movement-drive-gc-f7a0865` confirms 102,246,600 private source bytes were released.
+Remaining diagnostic main-thread major GC reached 263.187 ms, incremental marking
+start 335.281 ms, and buffer sweep 119.491 ms. Instrumented timing is diagnostic.
+Extra compiler-buffer retirement was rejected after 833.2/966.7 ms repeat maxima;
+transport-profile packing was also not integrated (516.7 ms trial maximum).
+No further speculative runtime optimization is accepted. The owner accepts the
+current average FPS; camera cadence jitter and measured allocation causes were
+repaired without reducing graphics or world coverage.
+
+Formal current-artifact gates passed: performance/retention (desktop and mobile
+emulation), space release, and artifact integrity. Performance flight maximum was
+250.1 ms; world exits released terrain/roads/buildings and stable renderer resources.
+Physical-phone acceptance remains unverified. The full candidate matrix then passed
+weather/location UI and source graph but stopped at release-contract metadata:
+targetVersion still said 5.3.0 while package version is 5.4.0. Release metadata is
+being aligned to 5.4 with unchanged budgets, checkpoints and approval requirements.
+Full candidate/backend/weekly-room verification and deployment remain open.
