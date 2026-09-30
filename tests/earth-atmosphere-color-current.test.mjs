@@ -16,3 +16,15 @@ test('custom atmosphere uniforms are linear on creation and weather updates',()=
   material.dispose();
  } finally {if(previous===undefined)delete globalThis.THREE;else globalThis.THREE=previous;}
 });
+
+test('manual time presets publish the visual profile consumed by weather',async()=>{
+ const previousThree=globalThis.THREE,previousDocument=globalThis.document;globalThis.THREE=THREE;globalThis.document={getElementById:()=>null};
+ const {ctx}=await import('../app/js/shared-context.js?v=55');const old={...ctx};
+ try {
+  Object.assign(ctx,{scene:new THREE.Scene(),sun:new THREE.DirectionalLight(),hemiLight:new THREE.HemisphereLight(),fillLight:new THREE.DirectionalLight(),ambientLight:new THREE.AmbientLight(),renderer:{toneMappingExposure:1}});
+  const {setTimeOfDay}=await import('../app/js/sky/astronomical-state.js');
+  let calls=0;ctx.applyWeatherPresentation=()=>{calls++;assert.equal(ctx.skyState.visual.phase,ctx.skyState.phase);assert.ok(Number.isFinite(ctx.skyState.visual.exposure));};
+  for(const mode of ['night','day','sunset','sunrise','day']){setTimeOfDay(mode);assert.equal(ctx.skyMode,mode);assert.equal(ctx.skyState.source,'manual');}
+  assert.equal(calls,5);
+ }finally{for(const key of Object.keys(ctx))delete ctx[key];Object.assign(ctx,old);globalThis.THREE=previousThree;globalThis.document=previousDocument;}
+});

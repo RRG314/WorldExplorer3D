@@ -1,12 +1,15 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
+import { parentSkyPlacement } from './parent-sky-placement.js';
+import { getAstronomicalBody } from '../astronomy/body-catalog.js?v=3';
 import { PLANETARY_BODIES, configureColorTexture } from './catalog.js?v=1';
 
-// Apollo 11 local east/up/north direction toward the mean sub-Earth point.
-// The Moon is tidally locked, so Earth stays in one region of the lunar sky
-// instead of following the player's camera.
-const LUNAR_EARTH_DIRECTION = new THREE.Vector3(-0.398, 0.917, -0.011).normalize();
-const LUNAR_EARTH_DISTANCE = 9000;
-const LUNAR_EARTH_RADIUS = 150;
+const moon=getAstronomicalBody('moon'),parent=getAstronomicalBody('earth');
+const placement=parentSkyPlacement({latitudeDeg:.67408,longitudeDeg:23.47297,
+  bodyRadiusM:moon.physical.meanRadiusM,parentRadiusM:parent.physical.meanRadiusM,
+  parentMassKg:parent.physical.massKg,bodyMassKg:moon.physical.massKg,orbitalPeriodS:moon.physical.orbitalPeriodS});
+const LUNAR_EARTH_DIRECTION=new THREE.Vector3(placement.direction.x,placement.direction.y,placement.direction.z);
+const LUNAR_EARTH_DISTANCE=placement.renderDistance;
+const LUNAR_EARTH_RADIUS=placement.renderRadius;
 
 function ensureLunarEarthSphere() {
   if (appCtx.lunarEarthSphere) return appCtx.lunarEarthSphere;
@@ -40,22 +43,26 @@ function ensureLunarEarthSphere() {
   atmosphere.renderOrder = 41;
   earth.add(atmosphere);
   earth.position.copy(LUNAR_EARTH_DIRECTION).multiplyScalar(LUNAR_EARTH_DISTANCE);
-  earth.position.y -= 100;
+  earth.userData.parentSkyPlacement=placement;
   appCtx.lunarEarthSphere = earth;
   return earth;
 }
 
 function setLunarEarthVisible(visible) {
-  const earth = ensureLunarEarthSphere();
+  const earth = visible ? ensureLunarEarthSphere() : appCtx.lunarEarthSphere;
+  if (!earth) return;
   earth.visible = !!visible;
   if (visible && earth.parent !== appCtx.scene) appCtx.scene.add(earth);
   if (!visible && earth.parent === appCtx.scene) appCtx.scene.remove(earth);
 }
 
-function updateLunarEarthPosition() {
-  const earth = ensureLunarEarthSphere();
+function updateLunarEarthPosition(x=0,y=0,z=0) {
+  const earth = appCtx.lunarEarthSphere;
+  if (!earth) return;
   if (!earth.visible) return;
-  earth.rotation.y = Date.now() * 0.000002;
+  earth.position.copy(LUNAR_EARTH_DIRECTION).multiplyScalar(LUNAR_EARTH_DISTANCE);
+  earth.position.x+=x;earth.position.y+=y;earth.position.z+=z;
+  earth.rotation.y = (Date.now() % 86164100) / 86164100 * Math.PI * 2;
 }
 
 Object.assign(appCtx, {

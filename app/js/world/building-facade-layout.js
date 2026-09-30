@@ -22,6 +22,7 @@ export function attachBuildingFacadeLayout(geometry, options = {}) {
   let minimumY = Infinity, maximumY = -Infinity;
   for (let i=0;i<p.count;i++) { minimumY=Math.min(minimumY,p.getY(i)); maximumY=Math.max(maximumY,p.getY(i)); }
   const plan = facadeFloorPlan(maximumY-minimumY, options);
+  if (options.openings === false) plan.floors = 0;
   const style=options.window || {};
   const glass=options.material?.surfacePattern==='glass';
   const targetBay=glass ? 2.35 : Math.max(1.8,Number(style.bayWidth)||3.4);
@@ -71,6 +72,9 @@ float facadeBox(vec2 p, vec2 halfSize, float feather) {
   return edge.x*edge.y;
 }
 vec3 facadeOpenings(vec3 wall, vec4 wallLayout, vec4 style) {
+  // Measure the continuous bay coordinate before fract() introduces seams.
+  float pixelWidth=max(fwidth(wallLayout.x),fwidth(wallLayout.y));
+  float edgeWidth=clamp(pixelWidth,0.006,0.25);
   float curtain=1.0-step(-0.5,style.w);
   wall=mix(wall,vec3(0.20,0.26,0.30),curtain);
   if(wallLayout.x<0.0 || wallLayout.y<0.0 || wallLayout.y>=floor(style.z)) return wall;
@@ -78,9 +82,9 @@ vec3 facadeOpenings(vec3 wall, vec4 wallLayout, vec4 style) {
   vec2 point=vec2(fract(wallLayout.x)-0.5,fract(wallLayout.y)-mix(0.55,0.5,curtain));
   vec2 halfSize=mix(vec2(style.x,style.y)*0.5,vec2(0.465,0.455),curtain);
   halfSize=mix(halfSize,vec2(style.w*0.47,0.39),shop);
-  float reveal=facadeBox(point,halfSize+vec2(0.035,0.028),0.008);
-  float outer=facadeBox(point,halfSize,0.006);
-  float inner=facadeBox(point,max(vec2(0.02),halfSize-vec2(mix(fract(style.z),0.016,curtain))),0.006);
+  float reveal=facadeBox(point,halfSize+vec2(0.035,0.028),max(0.008,edgeWidth));
+  float outer=facadeBox(point,halfSize,edgeWidth);
+  float inner=facadeBox(point,max(vec2(0.02),halfSize-vec2(mix(fract(style.z),0.016,curtain))),edgeWidth);
   vec3 frame=mix(wall*0.55,vec3(0.22,0.25,0.26),curtain);
   float reflection=smoothstep(-halfSize.y,halfSize.y,point.y);
   float room=fract(sin(dot(floor(wallLayout.xy),vec2(12.9898,78.233)))*43758.5453);
@@ -88,9 +92,13 @@ vec3 facadeOpenings(vec3 wall, vec4 wallLayout, vec4 style) {
   vec3 result=mix(wall,wall*0.48,reveal);
   result=mix(result,frame,outer);
   result=mix(result,glass,inner);
-  float mullion=(1.0-smoothstep(0.006,0.015,abs(point.x)))*inner;
+  float mullion=(1.0-smoothstep(0.006,0.015+edgeWidth,abs(point.x)))*inner;
   result=mix(result,frame,mullion);
-  float sill=facadeBox(point+vec2(0.0,halfSize.y+0.028),vec2(halfSize.x+0.045,0.018),0.006);
-  return mix(result,wall*1.18,sill*(1.0-curtain));
+  float sill=facadeBox(point+vec2(0.0,halfSize.y+0.028),vec2(halfSize.x+0.045,0.018),edgeWidth);
+  result=mix(result,wall*1.18,sill*(1.0-curtain));
+  // Subpixel windows resolve to coverage, rather than inventing larger bays.
+  float coverage=clamp(4.0*halfSize.x*halfSize.y,0.0,1.0);
+  vec3 average=mix(wall,vec3(0.16,0.23,0.27),coverage);
+  return mix(result,average,smoothstep(0.18,0.75,pixelWidth));
 }
 `;

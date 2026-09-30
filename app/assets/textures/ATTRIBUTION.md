@@ -103,3 +103,11 @@ Nebula `*-nebula-density.jpg` derivatives retain the credits of their correspond
 NASA Visualization Technology Applications and Development (VTAD), base-color images extracted from the NASA glTF downloads: https://science.nasa.gov/resource/uranus-3d-model/, https://science.nasa.gov/resource/neptune-3d-model/, and https://science.nasa.gov/resource/saturn-3d-model/. Uranus/Neptune maps are 1024×512 visualization products, not current weather; Saturn rings preserve the source alpha profile. NASA media usage guidelines apply. Saturn globe atlas is cube-projected; scripts/bake-saturn-atlas.mjs resamples the model’s declared mesh UVs to a 2048×1024 cylindrical runtime map. Only rasterization gaps near poles are filled from neighboring samples.
 
 Venus orbital clouds: NASA VTAD base-color texture from https://science.nasa.gov/resource/venus-3d-model/ (Venus_1_12103.glb). This visualization texture is used only for the cloudy orbital appearance; Magellan radar context is retained for the surface.
+
+## Solis Reach interior surfaces
+
+`ship/`: bulkhead and carpet maps extracted from [Sci-Fi Computer Room](https://sketchfab.com/3d-models/sci-fi-computer-room-a149d5bfcef6496c9a0606b5ce5ebf27) by **Michael V (@bossdeff)**, [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Color, normal and packed roughness/metalness maps resized to 512–1024px and applied to the original ship geometry. See `ship/LICENSE.txt` and `docs/visual-quality/assets/ship-surfaces.json`.
+
+### Historic masonry
+
+[Stone Brick Wall 001](https://polyhaven.com/a/stone_brick_wall_001), photographed by Dimitrios Savva and processed by Rico Cilliers, CC0. The 1K diffuse map supplies representative historic masonry; it is not a scan of a particular monument. See [asset notice](facades/HISTORIC_STONE_LICENSE.md).

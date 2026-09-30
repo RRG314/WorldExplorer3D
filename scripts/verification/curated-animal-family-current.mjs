@@ -201,7 +201,7 @@ async function mobileJourney() {
 
 async function blockedFallbackJourney() {
   const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
-  await context.route('**/app/assets/models/animals/trail-hound-husky-v1.glb', (route) => route.abort('failed'));
+  await context.route('**/app/assets/models/animals/trail-hound-husky-v1.glb*', (route) => route.abort('failed'));
   const page = await context.newPage();
   observe(page, 'blocked-husky', 'trail-hound-husky-v1.glb');
   try {

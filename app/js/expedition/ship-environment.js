@@ -5,8 +5,9 @@ export function createShipEnvironment(THREE, generator) {
   const scene = new THREE.Scene();
   const geometry = new THREE.BoxGeometry(1, 1, 1);
   const materials = [];
-  const panel = (color, size, position, side = THREE.FrontSide) => {
+  const panel = (color, size, position, side = THREE.FrontSide, radiance = 1) => {
     const material = new THREE.MeshBasicMaterial({ color, side });
+    material.color.multiplyScalar(radiance);
     materials.push(material);
     const mesh = new THREE.Mesh(geometry, material);
     mesh.scale.set(...size);
@@ -14,7 +15,7 @@ export function createShipEnvironment(THREE, generator) {
     scene.add(mesh);
   };
   panel(0x777976, [26, 7, 30], [0, 0, 0], THREE.BackSide);
-  panel(0xffffff, [18, 0.1, 7], [0, 3.3, 0]);
+  panel(0xffffff, [18, 0.1, 7], [0, 3.3, 0], THREE.FrontSide, 3);
   panel(0xc1c9cf, [0.1, 3, 22], [-12.5, 0.5, 0]);
   panel(0xcfc7ba, [0.1, 3, 22], [12.5, 0.5, 0]);
   panel(0x333638, [25, 0.1, 29], [0, -3.3, 0]);

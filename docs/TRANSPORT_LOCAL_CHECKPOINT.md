@@ -4,7 +4,7 @@
 
 ## Where this work lives
 
-Continue in `/Users/stevenreid/Developer/WorldExplorer3D-audit-1ec2f70` on the
+Continue in `the historical audit checkout` on the
 same branch. Source preview: <http://127.0.0.1:4195/app/>. The old immutable
 candidate on 4194 does not contain this work. Do not switch the default
 Documents checkout or treat older candidate screenshots as current evidence.

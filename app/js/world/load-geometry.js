@@ -4,6 +4,7 @@ import {
   normalizeLanduseSurfaceType
 } from "../surface-rules.js?v=18";
 import { geometryHasFinitePositions } from "./geometry-batching.js?v=7";
+import { markPrivateBuildingGeometry, releaseRetiredBuildingCpuBuffers } from './retired-building-buffers.js';
 import { resolveBuildingExteriorPresentation } from '../engine/building-facade-materials.js?v=19';
 import {
   fetchShortbreadTile,
@@ -107,12 +108,12 @@ function fallbackMidLodBuildingMesh(pts, height, avgElevation, colorHex = '#7f8c
   shape.lineTo(maxX, -maxZ);
   shape.lineTo(minX, -maxZ);
   shape.closePath();
-  const geo = new THREE.ExtrudeGeometry(shape, {
+  const geo = markPrivateBuildingGeometry(new THREE.ExtrudeGeometry(shape, {
     depth: h,
     bevelEnabled: false,
     curveSegments: 1,
     steps: 1
-  });
+  }));
   geo.rotateX(-Math.PI / 2);
   const facade = midFacadeMaterial(
     options.buildingType || 'yes',
@@ -196,15 +197,16 @@ export function createMidLodBuildingMesh(pts, height, avgElevation, options = {}
     });
     shape.closePath();
 
-    const geo = new THREE.ExtrudeGeometry(shape, {
+    const geo = markPrivateBuildingGeometry(new THREE.ExtrudeGeometry(shape, {
       depth: h,
       bevelEnabled: false,
       curveSegments: 1,
       steps: 1
-    });
+    }));
     geo.rotateX(-Math.PI / 2);
     if (!geometryHasFinitePositions(geo)) {
       geo.dispose();
+      releaseRetiredBuildingCpuBuffers(geo);
       return fallbackMidLodBuildingMesh(pts, h, avgElevation, colorHex, options);
     }
 

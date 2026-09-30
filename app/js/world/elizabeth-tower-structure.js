@@ -1,3 +1,5 @@
+import { batchOwnedStaticStructure } from './static-structure-batching.js';
+
 function standardMaterial(color, options = {}) {
   return new THREE.MeshStandardMaterial({
     color,
@@ -79,6 +81,38 @@ export function createMeasuredElizabethTower() {
     }
   }
 
+  // Repeated masonry piers, recessed lancets and floor mouldings share batches.
+  // This is an architectural reconstruction, not a photogrammetric survey.
+  const piers = [], recesses = [];
+  for (let face = 0; face < 4; face++) {
+    const angle = face * Math.PI / 2;
+    const place = (list, x, y, z, w, h, d) => list.push({
+      x: x*Math.cos(angle)+z*Math.sin(angle), y,
+      z: -x*Math.sin(angle)+z*Math.cos(angle), angle, w,h,d
+    });
+    for (const x of [-5.5,-3.6,0,3.6,5.5]) place(piers,x,26,6.02,.34,43,.38);
+    for (let floor=0; floor<7; floor++) {
+      const y=8+floor*5.5;
+      place(piers,0,y-2.1,6.05,11.7,.22,.42);
+      for (const x of [-2.4,2.4]) {
+        place(recesses,x,y,5.94,.8,2.8,.12);
+        place(piers,x-.53,y,6.03,.16,3.1,.22);
+        place(piers,x+.53,y,6.03,.16,3.1,.22);
+        place(piers,x,y-1.52,6.08,1.3,.2,.3);
+      }
+    }
+  }
+  for (const [items, material, name] of [[piers,stoneDark,'tower-masonry-detail'],[recesses,louver,'tower-recesses']]) {
+    const mesh=new THREE.InstancedMesh(new THREE.BoxGeometry(1,1,1),material,items.length);
+    const matrix=new THREE.Matrix4(),q=new THREE.Quaternion(),axis=new THREE.Vector3(0,1,0);
+    for (let i=0;i<items.length;i++) {
+      const p=items[i];q.setFromAxisAngle(axis,p.angle);
+      matrix.compose(new THREE.Vector3(p.x,p.y,p.z),q,new THREE.Vector3(p.w,p.h,p.d));
+      mesh.setMatrixAt(i,matrix);
+    }
+    mesh.name=name;mesh.castShadow=true;mesh.receiveShadow=true;mesh.frustumCulled=false;root.add(mesh);
+  }
+
   addClockFace(root, [0, 55.5, 6.31], [0, 0, 0]);
   addClockFace(root, [0, 55.5, -6.31], [0, Math.PI, 0]);
   addClockFace(root, [6.31, 55.5, 0], [0, Math.PI / 2, 0]);
@@ -100,5 +134,5 @@ export function createMeasuredElizabethTower() {
   const finial = new THREE.Mesh(new THREE.SphereGeometry(0.58, 10, 8), roof);
   finial.position.y = 97.7;
   root.add(finial);
-  return root;
+  return batchOwnedStaticStructure(THREE, root);
 }

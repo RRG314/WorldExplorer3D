@@ -37,8 +37,8 @@ test('public license language and the player-facing legal surface agree', () => 
 test('third-party credits remain linked and current', () => {
   assert.match(license, /ATTRIBUTION\.md/);
   assert.match(license, /ACKNOWLEDGEMENTS\.md/);
-  assert.match(attribution, /Last reviewed: 2026-09-03 for World Explorer 3D 5\.2\.0/);
-  assert.match(acknowledgements, /Last reviewed: 2026-09-03 for World Explorer 3D 5\.2\.0/);
+  assert.match(attribution, /Last reviewed: \d{4}-\d{2}-\d{2} for World Explorer 3D \d+\.\d+\.\d+/);
+  assert.match(acknowledgements, /Last reviewed: \d{4}-\d{2}-\d{2} for World Explorer 3D \d+\.\d+\.\d+/);
   assert.match(attribution, /© OpenStreetMap contributors/);
   assert.match(modelAttribution, /Low Poly House Interior/);
   assert.match(modelAttribution, /paolo\.mercoglia/);

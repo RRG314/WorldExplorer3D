@@ -1,0 +1,25 @@
+<!doctype html><meta charset="utf-8"><link rel="icon" href="data:,">
+<style>body{margin:0;background:#bacbd6;font:16px system-ui}#caption{position:absolute;bottom:12px;left:12px;background:#fffd;padding:8px}</style>
+<div id="caption">Remote character · right arrow: vehicle and return · left arrow: leave and rejoin</div>
+<script src="/node_modules/three/build/three.min.js"></script>
+<script src="/node_modules/three/examples/js/loaders/GLTFLoader.js"></script>
+<script type="module">
+import {createGhostManager} from '/app/js/multiplayer/ghosts.js';
+const scene=new THREE.Scene();scene.background=new THREE.Color('#bacbd6');
+const renderer=new THREE.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});renderer.setSize(960,720);renderer.outputEncoding=THREE.sRGBEncoding;renderer.toneMapping=THREE.ACESFilmicToneMapping;document.body.append(renderer.domElement);
+scene.add(new THREE.HemisphereLight(0xe4efff,0x807360,1));const light=new THREE.DirectionalLight(0xffead5,2);light.position.set(3,6,4);scene.add(light);
+const floor=new THREE.Mesh(new THREE.PlaneGeometry(30,30),new THREE.MeshStandardMaterial({color:0x7d8979,roughness:1}));floor.rotation.x=-Math.PI/2;scene.add(floor);
+const camera=new THREE.PerspectiveCamera(45,960/720,.1,100);camera.position.set(3,2.6,5);camera.lookAt(0,1,0);
+const manager=createGhostManager(scene,{getSelfUid:()=> 'self',getCamera:()=>camera});
+const player={uid:'remote',displayName:'Room Member',mode:'walk',pose:{x:0,y:1.7,z:0,yaw:0,vx:0,vy:0,vz:0},lastSeenAt:new Date().toISOString()};
+let cycles=0,t=0;
+const root=()=>scene.getObjectByName('multiplayer-ghost-root');const proxy=()=>root().children[0]?.children.find(child=>child.name==='remote-explorer');
+async function join(){manager.updateGhosts([player]);const current=proxy();if(!await current.userData.characterReady)throw Error('Remote character failed to attach');if(!current.userData.characterAnimation)throw Error('Missing animation');}
+await join();
+async function cycle(vehicle){const old=proxy();if(vehicle){manager.updateGhosts([{...player,mode:'drive'}]);}else manager.updateGhosts([]);if(old.userData.curatedCharacterAttachment)throw Error('Previous character leaked');await join();cycles++;draw();}
+let actions=Promise.resolve();
+document.addEventListener('keydown',e=>{if(e.key==='ArrowRight'||e.key==='ArrowLeft')actions=actions.then(()=>cycle(e.key==='ArrowRight'));});
+function draw(){t+=34;manager.tick(t);renderer.render(scene,camera);}
+window.advanceTime=async ms=>{await actions;for(let i=0;i<Math.ceil(ms/34);i++)draw();};
+window.render_game_to_text=()=>JSON.stringify({ready:true,asset:proxy()?.userData.curatedCharacterAssetId,animation:!!proxy()?.userData.characterAnimation,cycles,players:root().children.length,geometry:renderer.info.memory.geometries,textures:renderer.info.memory.textures,glError:renderer.getContext().getError()});draw();
+</script>

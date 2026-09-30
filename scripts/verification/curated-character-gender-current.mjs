@@ -207,7 +207,7 @@ async function normalJourney(viewport, label, verifyPersistence = false) {
 
 async function blockedWomanFallbackJourney() {
   const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
-  await context.route('**/app/assets/models/characters/field-explorer-woman-v1.glb', (route) => route.abort('failed'));
+  await context.route('**/app/assets/models/characters/field-explorer-woman-v1.glb*', (route) => route.abort('failed'));
   const page = await context.newPage();
   observe(page, 'blocked-woman');
   try {

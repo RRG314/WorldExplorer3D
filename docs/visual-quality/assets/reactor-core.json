@@ -1,0 +1,136 @@
+{
+  "schemaVersion": 1,
+  "assetId": "solis-reactor-core",
+  "sourceUrl": "https://sketchfab.com/3d-models/scifi-reactor-core-b3fe00d6b73841a0b6b3a288efc03668",
+  "attribution": "SciFi Reactor Core by iedalton",
+  "license": "CC-BY-4.0",
+  "sourceSha256": "1ac5497df9ee14d5f5060979b07b1ea20a9cfdaa65698517ac1ed3748aa81348",
+  "outputSha256": "73b996bfa3cca084aba6d25b105864f560decfa350e965d3491f71da0017053a",
+  "recipe": {
+    "nodes": null,
+    "textureEdge": 1024,
+    "format": "webp",
+    "quality": 90,
+    "consoleEnvelope": null
+  },
+  "bytes": 4756644,
+  "triangles": 61296,
+  "primitives": 6,
+  "bounds": {
+    "min": [
+      -0.8660899996757507,
+      -0.4762410124945166,
+      -1.0000000202094803
+    ],
+    "max": [
+      0.8660899996757507,
+      0.4762410124945166,
+      1.0000000202094803
+    ]
+  },
+  "textures": [
+    {
+      "name": "",
+      "width": 1024,
+      "height": 1024,
+      "mimeType": "image/webp",
+      "estimatedRgbaMipBytes": 5592406
+    },
+    {
+      "name": "",
+      "width": 1024,
+      "height": 1024,
+      "mimeType": "image/webp",
+      "estimatedRgbaMipBytes": 5592406
+    },
+    {
+      "name": "",
+      "width": 1024,
+      "height": 1024,
+      "mimeType": "image/webp",
+      "estimatedRgbaMipBytes": 5592406
+    },
+    {
+      "name": "",
+      "width": 1024,
+      "height": 1024,
+      "mimeType": "image/webp",
+      "estimatedRgbaMipBytes": 5592406
+    },
+    {
+      "name": "",
+      "width": 1024,
+      "height": 1024,
+      "mimeType": "image/webp",
+      "estimatedRgbaMipBytes": 5592406
+    },
+    {
+      "name": "",
+      "width": 1024,
+      "height": 1024,
+      "mimeType": "image/webp",
+      "estimatedRgbaMipBytes": 5592406
+    },
+    {
+      "name": "",
+      "width": 1024,
+      "height": 1024,
+      "mimeType": "image/webp",
+      "estimatedRgbaMipBytes": 5592406
+    },
+    {
+      "name": "",
+      "width": 1024,
+      "height": 1024,
+      "mimeType": "image/webp",
+      "estimatedRgbaMipBytes": 5592406
+    },
+    {
+      "name": "",
+      "width": 1024,
+      "height": 1024,
+      "mimeType": "image/webp",
+      "estimatedRgbaMipBytes": 5592406
+    },
+    {
+      "name": "",
+      "width": 1024,
+      "height": 1024,
+      "mimeType": "image/webp",
+      "estimatedRgbaMipBytes": 5592406
+    },
+    {
+      "name": "",
+      "width": 1024,
+      "height": 1024,
+      "mimeType": "image/webp",
+      "estimatedRgbaMipBytes": 5592406
+    },
+    {
+      "name": "",
+      "width": 1024,
+      "height": 1024,
+      "mimeType": "image/webp",
+      "estimatedRgbaMipBytes": 5592406
+    },
+    {
+      "name": "",
+      "width": 1024,
+      "height": 1024,
+      "mimeType": "image/webp",
+      "estimatedRgbaMipBytes": 5592406
+    },
+    {
+      "name": "",
+      "width": 1024,
+      "height": 1024,
+      "mimeType": "image/webp",
+      "estimatedRgbaMipBytes": 5592406
+    }
+  ],
+  "extensions": [],
+  "materialCompatibility": {
+    "emissiveStrength": "r128 runtime adapter",
+    "specular": "standard PBR fallback; optional source extension retained"
+  }
+}

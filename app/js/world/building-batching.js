@@ -1,6 +1,7 @@
 import {GeometryBatchStorage, batchStorageView} from './geometry-batch-storage.js';
 import {compactBuildingVertices} from './building-vertex-storage.js';
-import { FACADE_OPENINGS_GLSL } from './building-facade-layout.js?v=2';
+import {releaseRetiredBuildingCpuBuffers} from './retired-building-buffers.js';
+import { FACADE_OPENINGS_GLSL } from './building-facade-layout.js?v=3';
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import {
   boundingSphereCenter,
@@ -48,6 +49,7 @@ export function appendMidFacadeAttributes(batch, material, exteriorPresentation,
 
 export function createMidFacadeBatchMaterial(sourceMaterial, batchKey) {
   const material = sourceMaterial.clone();
+  material.extensions = { ...material.extensions, derivatives: true };
   material.color.setHex(0xffffff);
   material.vertexColors = true;
   material.onBeforeCompile = (shader) => {
@@ -119,7 +121,7 @@ export function createMidFacadeBatchMaterial(sourceMaterial, batchKey) {
       ].join('\n')
     );
   };
-  material.customProgramCacheKey = () => 'building-mid-facade-batch-v6-catalog-albedo';
+  material.customProgramCacheKey = () => 'building-mid-facade-batch-v7-filtered-openings';
   material.userData = {
     ...(material.userData || {}),
     buildingMidFacadeBatch: true,
@@ -229,6 +231,7 @@ async function batchBuildingMeshesByTier(tiers = ['near'], options = {}) {
 
     const batchedMeshes = [];
     let sourceMeshCount = 0;
+    let releasedCpuBytes = 0;
 
     const groupEntries = [...groups.values()];
     for (let groupIndex = 0; groupIndex < groupEntries.length; groupIndex += 1) {
@@ -241,8 +244,8 @@ async function batchBuildingMeshesByTier(tiers = ['near'], options = {}) {
 
       const vertexCapacity = group.meshes.reduce((sum, mesh) => sum + (mesh.geometry?.attributes?.position?.count || 0), 0);
       const indexCapacity = group.meshes.reduce((sum, mesh) => sum + (mesh.geometry?.index?.count ?? mesh.geometry?.attributes?.position?.count ?? 0), 0);
-      const storage = components => new GeometryBatchStorage(vertexCapacity * components);
-      const batch = { positions: storage(3), normals: storage(3), uvs: storage(2), indices: new GeometryBatchStorage(indexCapacity), facadeLayouts: storage(4), facadeOpenings: storage(4) };
+      const storage = (components, ArrayType = Float32Array) => new GeometryBatchStorage(vertexCapacity * components, ArrayType);
+      const batch = { positions: storage(3), normals: storage(3, Float64Array), uvs: storage(2), indices: new GeometryBatchStorage(indexCapacity), facadeLayouts: storage(4), facadeOpenings: storage(4) };
       if (group.lodTier === 'near') batch.facadeEntrances = storage(4);
       if (group.midFacadeBatch) {
         batch.colors = storage(3);
@@ -308,7 +311,7 @@ async function batchBuildingMeshesByTier(tiers = ['near'], options = {}) {
         continue;
       }
 
-      const geometry = buildMergedGeometry(batch);
+      const geometry = buildMergedGeometry(batch, {reuseStorage: true});
       if (!geometry) {
         keep.push(...sourceMeshes);
         continue;
@@ -369,7 +372,11 @@ async function batchBuildingMeshesByTier(tiers = ['near'], options = {}) {
 
       appCtx.addEarthWorldObject(mergedMesh);
       batchedMeshes.push(mergedMesh);
-      for (let i = 0; i < sourceMeshes.length; i++) disposeSceneMesh(sourceMeshes[i]);
+      for (let i = 0; i < sourceMeshes.length; i++) {
+        const geometry = sourceMeshes[i].geometry;
+        disposeSceneMesh(sourceMeshes[i]);
+        releasedCpuBytes += releaseRetiredBuildingCpuBuffers(geometry);
+      }
       sourceMeshCount += sourceMeshes.length;
       } finally {
         if ((groupIndex + 1) % yieldEveryGroups === 0 && groupIndex + 1 < groupEntries.length) {
@@ -386,7 +393,8 @@ async function batchBuildingMeshesByTier(tiers = ['near'], options = {}) {
     appCtx._lastBuildingBatchStats = {
       groupCount: groups.size,
       batchMeshCount: batchedMeshes.length,
-      sourceMeshCount
+      sourceMeshCount,
+      releasedCpuBytes
     };
     return sourceMeshCount;
   } catch (err) {

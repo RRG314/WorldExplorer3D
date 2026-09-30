@@ -1,3 +1,5 @@
+import {createServiceLightPool} from './service-light-pool.js';
+import {urbanPresentationFocus, urbanPresentationDistance, setRetainedNpcPresentation} from './presentation-focus.js';
 import { setDomText, setDomAttribute, setDomHidden, setDomClass } from '../ui/dom-state.js?v=1';
 import { ctx as appCtx } from '../shared-context.js?v=55';
 import { carSpeedToMph, mphToCarSpeed } from '../physics/vehicle-speed-units.js?v=2';
@@ -1197,7 +1199,7 @@ function promotePedestrian(state, source) {
 
 function maintainNearbyNpcDetails(state) {
   if (!activeWorldMatches(state) || state.transition) return;
-  const actor = civicActorPosition(state);
+  const actor = urbanPresentationFocus(appCtx.activeEarthActorPosition?.(), civicActorPosition(state));
   if (!actor) return;
   const driving = state.activeVehicle && appCtx.Walk?.state?.mode !== 'walk';
   const preloadDistance = driving ? NPC_DRIVING_PRELOAD_DISTANCE : NPC_DETAIL_PRELOAD_DISTANCE;
@@ -1205,15 +1207,16 @@ function maintainNearbyNpcDetails(state) {
   const nearby = (state.population?.nearbyPedestrians?.(actor, preloadDistance) || [])
     .map((pedestrian) => ({
       pedestrian,
-      distance: Math.hypot(pedestrian.x - actor.x, pedestrian.z - actor.z)
+      distance: urbanPresentationDistance(actor, pedestrian)
     }))
+    .filter(entry => entry.distance <= preloadDistance)
     .sort((a, b) => a.distance - b.distance);
   // Promoted agents are intentionally hidden from the instanced population's
   // nearby query, so include their current poses when selecting the nearest
   // stable detail set. Otherwise actors would alternate LOD every update.
   const detailCandidates = state.npcs.map((npc) => {
     const pose = npcPose(npc);
-    return { id: npc.sourceAgentId, distance: Math.hypot(pose.x - actor.x, pose.z - actor.z) };
+    return { id: npc.sourceAgentId, distance: urbanPresentationDistance(actor, pose) };
   }).filter((entry) => entry.distance <= releaseDistance);
   const desiredIds = new Set([
     ...detailCandidates,
@@ -1222,7 +1225,7 @@ function maintainNearbyNpcDetails(state) {
   state.npcs.slice().forEach((npc) => {
     if (npc.reaction || npc.reactionUntil === Infinity) return;
     const pose = npcPose(npc);
-    const distance = Math.hypot(pose.x - actor.x, pose.z - actor.z);
+    const distance = urbanPresentationDistance(actor, pose);
     if (distance > releaseDistance || !desiredIds.has(npc.sourceAgentId)) {
       releasePromotedNpc(state, npc);
     }
@@ -1399,7 +1402,7 @@ function promoteTrafficVehicleDetail(state, trafficAgentId) {
     wheelContact: promoted.wheelContact,
     driverSide: state.driveOnLeft ? 1 : -1
   };
-  const visual = createUrbanVehicleVisual(THREE, definition);
+  const visual = createUrbanVehicleVisual(THREE, definition, state.serviceLighting);
   const vehicle = { ...definition, visual, attachedToPlayer: false, occupied: false, driver: 'ambient' };
   syncVehiclePose(vehicle, definition);
   state.group.add(visual.root);
@@ -1410,7 +1413,7 @@ function promoteTrafficVehicleDetail(state, trafficAgentId) {
 
 function maintainNearbyVehicleDetails(state) {
   if (!activeWorldMatches(state) || state.transition) return;
-  const actor = civicActorPosition(state);
+  const actor = urbanPresentationFocus(appCtx.activeEarthActorPosition?.(), civicActorPosition(state));
   if (!actor) return;
   const snapshots = state.population?.vehicleSnapshots?.() || [];
   const byId = new Map(snapshots.map((snapshot) => [snapshot.id, snapshot]));
@@ -1437,7 +1440,7 @@ function maintainNearbyVehicleDetails(state) {
     .filter((snapshot) => snapshot.visible && (!snapshot.promoted || snapshot.detailPromoted))
     .map((snapshot) => ({
       snapshot,
-      distance: Math.hypot(snapshot.x - actor.x, snapshot.z - actor.z)
+      distance: urbanPresentationDistance(actor, snapshot)
     }))
     .filter((entry) => entry.distance <= VEHICLE_DETAIL_RELEASE_DISTANCE)
     .sort((left, right) => left.distance - right.distance);
@@ -1445,7 +1448,7 @@ function maintainNearbyVehicleDetails(state) {
   for (const vehicle of state.vehicles.slice()) {
     if (!vehicle.ambientTraffic) continue;
     const snapshot = byId.get(vehicle.trafficAgentId);
-    const distance = snapshot ? Math.hypot(snapshot.x - actor.x, snapshot.z - actor.z) : Infinity;
+    const distance = snapshot ? urbanPresentationDistance(actor, snapshot) : Infinity;
     if (distance > VEHICLE_DETAIL_RELEASE_DISTANCE || !desiredIds.has(vehicle.trafficAgentId)) {
       releaseDetailedTrafficVehicle(state, vehicle);
     }
@@ -2224,7 +2227,7 @@ function promoteTrafficVehicle(state, trafficAgentId, vehicleId = '') {
     wheelContact: promoted.wheelContact,
     driverSide: state.driveOnLeft ? 1 : -1
   };
-  const visual = createUrbanVehicleVisual(THREE, definition);
+  const visual = createUrbanVehicleVisual(THREE, definition, state.serviceLighting);
   const vehicle = { ...definition, visual, attachedToPlayer: false, occupied: false, driver: '' };
   syncVehiclePose(vehicle, definition);
   state.group.add(visual.root);
@@ -2778,6 +2781,7 @@ function disposeRuntime(state, reason = 'disposed') {
   state.equipmentVisual?.dispose?.();
   state.equipmentRuntime?.dispose?.();
   state.responders?.dispose?.();
+  state.serviceLighting?.dispose();
   state.group.removeFromParent?.();
   state.vehicles.length = 0;
   state.npcs.length = 0;
@@ -2831,8 +2835,9 @@ function startUrbanSandboxRuntime(options = {}) {
   });
   const group = new THREE.Group();
   group.name = 'Urban Sandbox Interactive Vehicles';
+  const serviceLighting = createServiceLightPool(THREE, group, mobile ? 2 : 4);
   const vehicles = anchors.map((anchor) => {
-    const visual = createUrbanVehicleVisual(THREE, anchor);
+    const visual = createUrbanVehicleVisual(THREE, anchor, serviceLighting);
     const vehicle = {
       ...anchor,
       durabilityPolicy: anchor.durabilityPolicy || anchor.variant?.durabilityPolicy,
@@ -2933,13 +2938,14 @@ function startUrbanSandboxRuntime(options = {}) {
     meter: document.getElementById('urbanCivicStatusMeter')
   };
   const owner = `urban-sandbox:${publication.sequence}`;
-  const flashlight = new THREE.SpotLight(0xe8f2ff, 38, 28, Math.PI * .16, .45, 1.3);
+  const flashlight = new THREE.SpotLight(0xe8f2ff, 0, 28, Math.PI * .16, .45, 1.3);
   flashlight.name = 'Urban equipment field light';
-  flashlight.visible = false;
+  flashlight.visible = true;
   flashlight.castShadow = false;
   group.add(flashlight, flashlight.target);
   const state = {
     owner,
+    serviceLighting,
     requestId: publication.requestId,
     sequence: publication.sequence,
     group,
@@ -3053,6 +3059,7 @@ function startUrbanSandboxRuntime(options = {}) {
   });
   state.responders = createUrbanResponderRuntime({
     THREE,
+    serviceLighting,
     group,
     mobile,
     worldIdentity,
@@ -3160,7 +3167,7 @@ function startUrbanSandboxRuntime(options = {}) {
       },
       releaseTrafficAgent: agentId => state.population?.restoreRoomVehicle?.(agentId),
       createVehicle: (definition) => {
-        const visual = createUrbanVehicleVisual(THREE, definition);
+        const visual = createUrbanVehicleVisual(THREE, definition, state.serviceLighting);
         const vehicle = { ...definition, visual, attachedToPlayer: false, occupied: false, driver: '' };
         syncVehiclePose(vehicle, definition);
         state.group.add(visual.root);
@@ -3281,13 +3288,15 @@ function startUrbanSandboxRuntime(options = {}) {
       updateServiceEquipment(state, frame.dt);
       updateCivicResponse(state, frame.dt);
       updateEquipmentEffects(state, frame.dt);
+      state.serviceLighting.update(appCtx.camera?.position);
       updateLootPickups(state, frame.dt);
       updateCrashBodies(state, frame.dt);
-      state.npcs.forEach((npc) => npc.visual.updateAnimation(
-        frame.dt,
-        npc.reaction === 'fleeing' || !!npc.crashMotion,
-        npc.reaction === 'fleeing'
-      ));
+      const presentationActor = urbanPresentationFocus(appCtx.activeEarthActorPosition?.(), civicActorPosition(state));
+      state.npcs.forEach((npc) => {
+        if (setRetainedNpcPresentation(npc.visual.root, presentationActor, NPC_DRIVING_RELEASE_DISTANCE)) {
+          npc.visual.updateAnimation(frame.dt, npc.reaction === 'fleeing' || !!npc.crashMotion, npc.reaction === 'fleeing');
+        }
+      });
       updateEntityLifecycle(state);
       state.npcPromotionElapsed += frame.dt;
       if (state.npcPromotionElapsed >= .25) {

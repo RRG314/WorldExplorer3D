@@ -16,7 +16,6 @@ const MODEL_ASSET_CATALOG = Object.freeze([
     budgets:Object.freeze({bytes,triangles,textureEdgePixels:1024})
   })),
   ...[
-    ['wall-navigation','https://sketchfab.com/3d-models/large-wall-mounted-computer-console-298b7d9b68064618a3819d1a8fae4baf','Large Wall-Mounted Computer Console by Inditrion Dradnon'],
     ['wall-instruments','https://sketchfab.com/3d-models/wall-console-98724ee49fba42a2b0ccbe79a36f246e','Wall Console by LuddePudde']
   ].map(([name,sourceUrl,attribution])=>Object.freeze({
     schemaVersion:MODEL_ASSET_SCHEMA_VERSION,id:`solis-${name}`,label:attribution,
@@ -49,12 +48,12 @@ const MODEL_ASSET_CATALOG = Object.freeze([
   ...['pine', 'broadleaf', 'shrub', 'fern', 'grass'].flatMap((kind) => (['pine','broadleaf'].includes(kind) ? ['', '-lod'] : ['']).map((suffix) => Object.freeze({
     schemaVersion: MODEL_ASSET_SCHEMA_VERSION,
     id: `nature-${kind}${suffix}`,
-    label: `Quaternius ${kind}${suffix ? ' distant model' : ''}`,
+    label: `${kind === 'shrub' ? 'lev26' : 'denoises'} ${kind}${suffix ? ' distant model' : ''}`,
     url: `/app/assets/models/nature/${kind}${suffix}.glb`,
     roles: Object.freeze(['world-vegetation']),
-    license: 'CC0-1.0',
-    sourceUrl: 'https://quaternius.itch.io/stylized-nature-megakit',
-    attribution: 'Stylized Nature MegaKit by Quaternius',
+    license: 'CC-BY-4.0',
+    sourceUrl: kind === 'shrub' ? 'https://sketchfab.com/3d-models/bush-844e6a315757431da97efb5f17383bb5' : 'https://sketchfab.com/3d-models/low-poly-vegetation-for-games-cdac82eb61ab4d83bf162b4c44b44d6d',
+    attribution: kind === 'shrub' ? 'Bush by lev26; base alignment, resized map and alpha-tested leaves.' : 'Low poly vegetation for games by denoises; selected plants, base alignment, resized maps and distant tree simplification.',
     sourceUpAxis: 'y',
     collisionPolicy: 'existing-world-obstacle-trunk-index',
     instancePolicy: Object.freeze({geometry: 'clone', materials: 'clone'}),

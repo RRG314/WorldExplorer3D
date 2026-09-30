@@ -1,0 +1,26 @@
+<!doctype html><meta charset="utf-8"><title>Regional building decisions</title><link rel="icon" href="data:,"><style>body{margin:0;background:#ccd5df;font:16px system-ui}canvas{display:block}</style>
+<script src="/node_modules/three/build/three.min.js"></script><script type="module">
+import {resolveMappedRoof,createMappedRoofMesh} from '/app/js/world/mapped-roof-geometry.js';
+import {getBuildingMaterial,resolveBuildingExteriorPresentation,buildingRoofSurface} from '/app/js/engine/building-facade-materials.js?v=19';
+import {attachBuildingFacadeLayout} from '/app/js/world/building-facade-layout.js?v=3';
+const renderer=new THREE.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});renderer.setSize(1200,720);renderer.outputEncoding=THREE.sRGBEncoding;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=.8;document.body.append(renderer.domElement);
+const scene=new THREE.Scene();scene.background=new THREE.Color(0xccd5df);scene.add(new THREE.HemisphereLight(0xffffff,0x777366,.8));const light=new THREE.DirectionalLight(0xffffff,.8);light.position.set(10,40,30);scene.add(light);
+const records=[],pts=[{x:-5,z:-4},{x:5,z:-4},{x:5,z:4},{x:-5,z:4}];
+const cases=[['Japan contemporary','JP',{}],['Southern Europe','IT',{}],['Mapped Mission Revival','US',{'building:architecture':'mission_revival'}],['Mapped machiya','JP',{'building:architecture':'machiya','roof:material':'slate'}],['Mapped chalet','CH',{'building:architecture':'chalet','roof:material':'slate'}],['Mapped flat overrides style','US',{'building:architecture':'mission_revival','roof:shape':'flat'}]];
+for(const [i,[label,countryCode,extra]] of cases.entries()){
+ const tags={building:'house',...extra},location={countryCode};const spec=resolveMappedRoof(tags,8,null,pts,{location});
+ const wallHeight=spec?.wallHeight??8,group=new THREE.Group();group.position.set((i%3-1)*16,0,Math.floor(i/3)*18-9);
+ const shape=new THREE.Shape();pts.forEach((p,j)=>j?shape.lineTo(p.x,-p.z):shape.moveTo(p.x,-p.z));shape.closePath();
+ const geometry=new THREE.ExtrudeGeometry(shape,{depth:wallHeight,bevelEnabled:false}).rotateX(-Math.PI/2);
+ const options={tags,location,heightMeters:wallHeight,footprintWidth:10,footprintDepth:8,footprintArea:80,levels:2,buildingIdentity:`fixture:${label}`};
+ const presentation=resolveBuildingExteriorPresentation({renderer},'house',123,0xaaaaaa,options);
+ const material=getBuildingMaterial({renderer},'house',123,0xaaaaaa,{...options,resolvedPresentation:presentation});
+ attachBuildingFacadeLayout(geometry,material.userData.exteriorProfile);
+ group.add(new THREE.Mesh(geometry,material));
+ const surface=buildingRoofSurface({renderer},tags['roof:material']||spec?.material||'');
+ const roof=createMappedRoofMesh(pts,0,wallHeight,spec,tags,surface?{...surface,gableColor:presentation.tintHex}:null);if(roof)group.add(roof);
+ scene.add(group);records.push({label,profile:presentation.exteriorProfile.regionalStyle?.id,material:presentation.materialId,roof:spec?.shape||'flat',totalHeight:wallHeight+(spec?.roofHeight||0)});
+}
+const ground=new THREE.Mesh(new THREE.PlaneGeometry(120,100),new THREE.MeshStandardMaterial({color:0x8f9b85}));ground.rotation.x=-Math.PI/2;ground.position.y=-.02;scene.add(ground);
+const camera=new THREE.PerspectiveCamera(45,1200/720,.1,300);camera.position.set(30,33,65);camera.lookAt(0,4,0);const draw=()=>renderer.render(scene,camera);window.advanceTime=draw;window.render_game_to_text=()=>JSON.stringify({records,calls:renderer.info.render.calls,textures:renderer.info.memory.textures,glError:renderer.getContext().getError()});renderer.setAnimationLoop(draw);
+</script>

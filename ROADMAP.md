@@ -1,12 +1,27 @@
 # World Explorer 3D Roadmap
 
-Last updated: 2026-09-28.
+Last updated: 2026-09-30.
 
 World Explorer 3D is growing toward a connected world sandbox: choose a real
 place, build an Explorer, travel by land, water, air, or space, and make a
 persistent life in the game. New systems must deepen that shared world instead
 of adding another disconnected menu or duplicate version of an existing
 feature.
+
+## Released: 5.4 movement and visual quality
+
+Version 5.4 is live. Chase cameras now follow consistently through uneven frames;
+measured temporary road, geometry and lighting work is reduced. Lighting exposure,
+terrain blending, facade filtering, licensed vegetation, ship materials, remote
+walking characters and historic-building presentation have been improved.
+
+All 57 candidate gates, 13 backend stages and the two-client Chicago weekly room
+passed on runtime source 711fe93. Further work includes occasional GC pauses,
+physical-phone responsiveness and the documented limits of regional data and
+landmark reconstructions. Average FPS is acceptable to the owner; these are not
+reasons to pursue speculative rendering changes. See
+[verification](docs/visual-quality/MOVEMENT-EVIDENCE.md) and
+[versioning](docs/VERSIONING.md).
 
 ## Product direction
 

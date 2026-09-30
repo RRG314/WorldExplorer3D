@@ -1,3 +1,5 @@
+import { createHistoricWallMaterial } from './historic-wall-material.js';
+import { sampleHistoricWallSegments, historicWallCollision } from './historic-wall-segments.js';
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { fetchBundledLandmarkData } from "./landmark-source.js?v=3";
 import { renderSuspensionBridgeLandmark } from "./bridge-landmark.js?v=22";
@@ -31,7 +33,7 @@ function isPyramid(tags = {}) {
 function isHistoricWall(tags = {}) {
   const barrier = normalized(tags.barrier);
   const historic = normalized(tags.historic);
-  return historic === 'citywalls' || barrier === 'city_wall' || (barrier === 'wall' && !!historic);
+  return tags._landmarkRole === 'fortification_tower' || historic === 'citywalls' || barrier === 'city_wall' || (barrier === 'wall' && !!historic);
 }
 
 function wayPoints(way, nodes, sanitizer, polygon = false) {
@@ -171,35 +173,23 @@ function reprojectActorOutsideLandmarks(meshes) {
   return true;
 }
 
-function createWallMesh(way, nodes) {
+function createWallMesh(way, nodes, material, registerBuildingCollision) {
   const points = wayPoints(way, nodes, (value) => value, false);
   if (points.length < 2 || typeof THREE === 'undefined') return null;
   const tags = way.tags || {};
   const height = numericMeters(tags.height, DEFAULT_WALL_HEIGHT, 1.2, 30);
   const width = numericMeters(tags.width, DEFAULT_WALL_WIDTH, 0.8, 14);
-  const segments = [];
-  for (let i = 0; i < points.length - 1; i++) {
-    const start = points[i];
-    const end = points[i + 1];
-    const startY = appCtx.elevationWorldYAtWorldXZ(start.x, start.z) + height * 0.5;
-    const endY = appCtx.elevationWorldYAtWorldXZ(end.x, end.z) + height * 0.5;
-    const dx = end.x - start.x;
-    const dy = endY - startY;
-    const dz = end.z - start.z;
-    const length = Math.hypot(dx, dy, dz);
-    if (length < 0.35 || length > 1200) continue;
-    segments.push({ x: (start.x + end.x) * 0.5, y: (startY + endY) * 0.5, z: (start.z + end.z) * 0.5, dx, dy, dz, length });
-  }
+  const segments = sampleHistoricWallSegments(points, appCtx.elevationWorldYAtWorldXZ, height);
   if (segments.length === 0) return null;
 
   const merlons = [];
-  const maxMerlons = 120;
+  const maxMerlons = 2048;
   for (const segment of segments) {
     if (merlons.length >= maxMerlons) break;
     const horizontalLength = Math.hypot(segment.dx, segment.dz) || 1;
     const sideX = -segment.dz / horizontalLength;
     const sideZ = segment.dx / horizontalLength;
-    const positions = Math.min(60, Math.max(1, Math.floor(segment.length / 4.2)));
+    const positions = Math.min(60, Math.max(1, Math.ceil(segment.length / 4.2)));
     for (let index = 0; index < positions && merlons.length < maxMerlons; index++) {
       const t = (index + 0.5) / positions - 0.5;
       for (const side of [-1, 1]) {
@@ -216,7 +206,6 @@ function createWallMesh(way, nodes) {
   }
 
   const geometry = new THREE.BoxGeometry(1, 1, 1);
-  const material = new THREE.MeshStandardMaterial({ color: 0x8f8878, roughness: 0.98, metalness: 0 });
   const mesh = new THREE.InstancedMesh(geometry, material, segments.length + merlons.length);
   const matrix = new THREE.Matrix4();
   const position = new THREE.Vector3();
@@ -227,11 +216,22 @@ function createWallMesh(way, nodes) {
   for (let i = 0; i < segments.length; i++) {
     const segment = segments[i];
     position.set(segment.x, segment.y, segment.z);
-    direction.set(segment.dx, segment.dy, segment.dz).normalize();
-    quaternion.setFromUnitVectors(forward, direction);
-    scale.set(width, height, segment.length);
-    matrix.compose(position, quaternion, scale);
+    // Keep the wall faces vertical while its bottom follows the terrain.
+    const sideX = segment.dz / segment.length;
+    const sideZ = -segment.dx / segment.length;
+    matrix.set(
+      sideX * width, 0, segment.dx, segment.x,
+      0, height, segment.dy, segment.y,
+      sideZ * width, 0, segment.dz, segment.z,
+      0, 0, 0, 1
+    );
     mesh.setMatrixAt(i, matrix);
+    const collision = historicWallCollision(segment, width, height);
+    registerBuildingCollision?.(collision.footprint, collision.height, {
+      baseY: collision.baseY, sourceBuildingId: `osm-way:${way.id}:wall:${i}`,
+      name: tags.name || tags['name:en'] || 'Historic Wall',
+      buildingType: 'historic_wall', geometrySource: 'osm'
+    });
   }
   for (let i = 0; i < merlons.length; i++) {
     const merlon = merlons[i];
@@ -283,14 +283,16 @@ function renderLandmarks(data, options) {
     createdMeshes.push(mesh);
     pyramids += 1;
   }
+  const wallMaterial = wallWays.length ? createHistoricWallMaterial(THREE) : null;
   for (const way of wallWays) {
-    const mesh = createWallMesh(way, nodes);
+    const mesh = createWallMesh(way, nodes, wallMaterial, options.registerBuildingCollision);
     if (!mesh) continue;
     appCtx.addEarthWorldObject(mesh);
     appCtx.historicMarkers.push(mesh);
     createdMeshes.push(mesh);
     walls += 1;
   }
+  if (wallMaterial && !walls) { wallMaterial.map.dispose(); wallMaterial.dispose(); }
   const suspensionBridge = renderSuspensionBridgeLandmark(data);
   if (suspensionBridge?.meshes?.length) createdMeshes.push(...suspensionBridge.meshes);
   return {

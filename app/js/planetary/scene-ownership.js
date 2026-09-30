@@ -1,3 +1,4 @@
+import {freezeWorldBatchTransform} from '../world/static-batch-transform.js';
 import { ctx as appCtx } from '../shared-context.js?v=55';
 
 const EARTH_MESH_LISTS = Object.freeze([
@@ -28,8 +29,8 @@ function disposeDetachedWorldObject(object) {
       child.userData?.sharedUrbanSurfaceMaterial
     );
     if (sharedMaterial) return;
-    if (Array.isArray(child.material)) child.material.forEach((material) => material?.dispose?.());
-    else child.material.dispose?.();
+    if (Array.isArray(child.material)) child.material.forEach((material) => {if(!material?.userData?.sharedRuntimeMaterial)material?.dispose?.();});
+    else if(!child.material.userData?.sharedRuntimeMaterial)child.material.dispose?.();
   });
 }
 
@@ -55,6 +56,7 @@ function ensureEarthSceneRoot() {
   if (!appCtx.scene) return null;
   if (earthSceneRoot?.parent !== appCtx.scene) {
     earthSceneRoot = new THREE.Group();
+    earthSceneRoot.matrixAutoUpdate = false;
     earthSceneRoot.name = 'Earth Runtime Root';
     earthSceneRoot.userData.environmentOwner = appCtx.ENV?.EARTH || 'EARTH';
     earthSceneRoot.visible = stagedWorldLoadSequence === null && appCtx.worldLoading !== true;
@@ -67,6 +69,7 @@ function ensureEarthSceneRoot() {
 function addEarthWorldObject(object) {
   const root = ensureEarthSceneRoot();
   if (!object || !root || object === root) return object || null;
+  freezeWorldBatchTransform(object);
   root.add(object);
   lastOwnershipSignature = '';
   return object;
@@ -123,6 +126,7 @@ function sceneOwnershipSignature() {
 }
 
 function adoptEarthObject(object, root) {
+  freezeWorldBatchTransform(object);
   if (!object || !root || object === root || object.parent === root) return;
   if (!object.parent || object.parent === appCtx.scene) root.add(object);
 }

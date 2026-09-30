@@ -11,7 +11,7 @@ function vehicleMaterials(root) {
   return [...materials];
 }
 
-function createUrbanVehicleVisual(THREE, definition = {}) {
+function createUrbanVehicleVisual(THREE, definition = {}, serviceLighting = null) {
   const variant = definition.variant || {};
   const recipe = roadVehicleVisualRecipe(variant);
   const root = new THREE.Group();
@@ -38,10 +38,10 @@ function createUrbanVehicleVisual(THREE, definition = {}) {
   }
 
   const serviceRed = definition.serviceType === 'responder'
-    ? new THREE.PointLight(0xff2435, 0, 7, 2)
+    ? serviceLighting?.createEmitter(0xff2435) || new THREE.PointLight(0xff2435, 0, 7, 2)
     : null;
   const serviceBlue = definition.serviceType === 'responder'
-    ? new THREE.PointLight(0x247cff, 0, 7, 2)
+    ? serviceLighting?.createEmitter(0x247cff) || new THREE.PointLight(0x247cff, 0, 7, 2)
     : null;
   if (serviceRed && serviceBlue) {
     serviceRed.name = 'Curated responder red light';
@@ -95,6 +95,8 @@ function createUrbanVehicleVisual(THREE, definition = {}) {
     dispose() {
       root.userData.disposeCuratedTrafficVehicle?.();
       root.removeFromParent?.();
+      serviceLighting?.release(serviceRed);
+      serviceLighting?.release(serviceBlue);
       serviceRed?.dispose?.();
       serviceBlue?.dispose?.();
     }

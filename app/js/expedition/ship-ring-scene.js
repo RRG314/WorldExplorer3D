@@ -17,21 +17,32 @@ export function buildRingDeck(THREE,deck,api) {
   const geometry=new THREE.RingGeometry(0,ring.hullRadius,128,16);
   geometry.rotateX(ceiling?Math.PI/2:-Math.PI/2);
   const positions=geometry.attributes.position,uv=geometry.attributes.uv;
-  for(let i=0;i<positions.count;i++)uv.setXY(i,positions.getX(i)/4,positions.getZ(i)/4);
+  const tileSize=material.userData.shipTileSize||4;
+  for(let i=0;i<positions.count;i++)uv.setXY(i,positions.getX(i)/tileSize,positions.getZ(i)/tileSize);
   const mesh=new THREE.Mesh(geometry,material);mesh.name=ceiling?'ring-ceiling':'ring-floor';
   mesh.position.y=y;mesh.receiveShadow=true;architecture.add(mesh);return mesh;
  };
  disc(0,floorMaterial);disc(deckHeight,ceilingMaterial,true);
- function wall(a,b,name,{height=deckHeight,base=0,material=wallMaterial,solid=true,width=.24}={}){
+ function wall(a,b,name,{height=deckHeight,base=0,material=wallMaterial,solid=true,width=.24,uvStart=0,uvLength=null}={}){
   const dx=b.x-a.x,dz=b.z-a.z,length=Math.hypot(dx,dz),nx=dz/length*width/2,nz=-dx/length*width/2;
   const mesh=api.box(name.startsWith('door:')?group:architecture,{x:width,y:height,z:length+.035},{x:(a.x+b.x)/2,y:base+height/2,z:(a.z+b.z)/2},material,name);
   mesh.rotation.y=Math.atan2(dx,dz);
+  // Advance U along the actual curved wall rather than restarting each box
+  // from its unrelated world Z coordinate. V spans one full deck height.
+  if(material.userData.shipSurfaceSource) {
+   const positions=mesh.geometry.attributes.position,normals=mesh.geometry.attributes.normal,uv=mesh.geometry.attributes.uv;
+   for(let i=0;i<positions.count;i++) {
+    const along=Math.abs(normals.getX(i))>.5 ? (positions.getZ(i)/(length+.035)+.5)*(uvLength??length) : positions.getX(i);
+    uv.setXY(i,(uvStart+along)/3.6,(positions.getY(i)+base+height/2)/deckHeight);
+   }
+   uv.needsUpdate=true;
+  }
   if(solid){const pts=[{x:a.x+nx,z:a.z+nz},{x:b.x+nx,z:b.z+nz},{x:b.x-nx,z:b.z-nz},{x:a.x-nx,z:a.z-nz}];colliders.push({...bounds(pts),pts,baseY:base,height,isInteriorCollider:true,sourceBuildingId:name});}
   return mesh;
  }
  function arc(radius,start,end,name,options={}){
   const n=Math.ceil((end-start)/.04);
-  for(let i=0;i<n;i++)wall(polar(radius,start+(end-start)*i/n),polar(radius,start+(end-start)*(i+1)/n),name,options);
+  for(let i=0;i<n;i++)wall(polar(radius,start+(end-start)*i/n),polar(radius,start+(end-start)*(i+1)/n),name,{...options,uvStart:radius*(start+(end-start)*i/n),uvLength:radius*(end-start)/n});
  }
  const full=Math.PI*2;
  const windows=deck.rooms.filter(r=>['bridge','observation-gallery','local-craft-bay'].includes(r.id));
@@ -87,7 +98,10 @@ export function buildRingDeck(THREE,deck,api) {
   const sign=api.label(room.label,api.accent(deck.id));
   const placard=new THREE.Mesh(new THREE.PlaneGeometry(2.5,.45),new THREE.MeshBasicMaterial({map:sign,side:THREE.DoubleSide}));
   placard.position.set(d.x*.987,3.12,d.z*.987);placard.rotation.y=room.angle+Math.PI;group.add(placard);
-  const taskLight=new THREE.PointLight(0xfff5e8,.75,18,2);taskLight.position.set(room.center.x,3.2,room.center.z);group.add(taskLight);
+  // Physically-correct point lights use candela, not the old unitless <1
+  // intensity. Twenty-four cd (~300 lm) makes working surfaces readable with
+  // inverse-square falloff; keep one light per room and the existing range.
+  const taskLight=new THREE.PointLight(0xfff5e8,24,18,2);taskLight.position.set(room.center.x,3.2,room.center.z);group.add(taskLight);
  }
  group.userData.architectureBatching=batchStaticModelTemplate(THREE,architecture);
  // Existing functional room kits are positioned through their room's transform.
@@ -96,12 +110,17 @@ export function buildRingDeck(THREE,deck,api) {
   if(child.name.startsWith('deck-lift:')){group.add(child);continue;}
   const room=deck.rooms.find(r=>child.position.x>=r.template.minX-.5&&child.position.x<=r.template.maxX+.5&&child.position.z>=r.template.minZ-.5&&child.position.z<=r.template.maxZ+.5)
    ||deck.rooms.reduce((a,r)=>Math.hypot(child.position.x-(r.template.minX+r.template.maxX)/2,child.position.z-(r.template.minZ+r.template.maxZ)/2)<Math.hypot(child.position.x-(a.template.minX+a.template.maxX)/2,child.position.z-(a.template.minZ+a.template.maxZ)/2)?r:a);
-  const point=templatePoint(room,child.position);child.position.x=point.x;child.position.z=point.z;child.position.y=(child.isLight||child.name.includes('task-light'))?deckHeight-.35:child.position.y*room.fitScale;child.rotation.y+=room.kitYaw;child.scale.multiplyScalar(room.fitScale);child.userData.shipRoomId=room.id;group.add(child);
+  // Compress the room arrangement, not furniture or human working heights.
+  const point=templatePoint(room,child.position);child.position.x=point.x;child.position.z=point.z;child.position.y=(child.isLight||child.name.includes('task-light'))?deckHeight-.35:child.position.y;child.rotation.y+=room.kitYaw;child.userData.shipRoomId=room.id;group.add(child);
  }
  api.wallEquipment?.(group,deck,colliders);
  const oldColliders=[];api.propColliders(oldColliders,deck.id);
  for(const c of oldColliders){const room=deck.rooms.find(r=>c.centerX>=r.template.minX&&c.centerX<=r.template.maxX&&c.centerZ>=r.template.minZ&&c.centerZ<=r.template.maxZ);if(!room)continue;
-  const pts=[{x:c.minX,z:c.minZ},{x:c.maxX,z:c.minZ},{x:c.maxX,z:c.maxZ},{x:c.minX,z:c.maxZ}].map(p=>templatePoint(room,p));colliders.push({...c,...bounds(pts),pts,height:c.height*room.fitScale,baseY:c.baseY*room.fitScale});
+  const center=templatePoint(room,{x:c.centerX,z:c.centerZ});
+  const pts=[{x:c.minX,z:c.minZ},{x:c.maxX,z:c.minZ},{x:c.maxX,z:c.maxZ},{x:c.minX,z:c.maxZ}].map(p=>{
+   const x=p.x-c.centerX,z=p.z-c.centerZ;
+   return {x:center.x+Math.cos(room.kitYaw)*x+Math.sin(room.kitYaw)*z,z:center.z-Math.sin(room.kitYaw)*x+Math.cos(room.kitYaw)*z};
+  });colliders.push({...c,...bounds(pts),pts,centerX:center.x,centerZ:center.z});
  }
  group.add(new THREE.HemisphereLight(0xfff7ec,0x424d50,.75));
  const alertLight=new THREE.PointLight(0xff6b45,0,80,2);alertLight.position.y=3.2;group.add(alertLight);

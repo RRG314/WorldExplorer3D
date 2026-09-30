@@ -6,8 +6,9 @@ import { chromium } from 'playwright';
 import { startStaticServer } from './static-server.mjs';
 import { collectBrowserGraphicsErrors } from './browser-graphics-errors.mjs';
 import { configureStagingAppCheck } from './staging-app-check.mjs';
+const atmosphereOnly=process.argv.includes('--atmosphere-only');
 const shipOnly=process.argv.includes('--ship-only');
-const out=shipOnly?'output/verification/ship-gallery':'output/verification/space-quality';
+const out=atmosphereOnly?'output/verification/atmosphere-gallery':shipOnly?'output/verification/ship-gallery':'output/verification/space-quality';
 await fs.rm(out,{recursive:true,force:true}); await fs.mkdir(out,{recursive:true});
 await fs.writeFile(`${out}/report.json`,JSON.stringify({ok:false,complete:false}));
 const server=await startStaticServer({rootDir:process.env.WE3D_VERIFY_ROOT||'dist',ports:[4495,4496]});
@@ -23,7 +24,8 @@ try {
  await page.evaluate(()=>{document.getElementById('spaceLaunchToggle')?.click();document.getElementById('startBtn')?.click();});
  await page.waitForFunction(()=>JSON.parse(window.render_game_to_text?.()||'{}').modes?.space===true,null,{timeout:180000});
  await page.evaluate(async()=>{window.__spaceQualityContext=(await import('/app/js/shared-context.js?v=55')).ctx;});
- if(!shipOnly){
+ await page.waitForFunction(()=>window.__spaceQualityContext.spaceFlight?.mode==='flying',null,{timeout:30000});
+ if(!shipOnly&&!atmosphereOnly){
  await page.waitForFunction(()=>window.__spaceQualityContext.spaceFlight?.celestialCatalog?.starEntries?.length>=700);
  await page.locator('#spaceConstellationToggle').click();
  assert.equal(await page.evaluate(()=>window.__spaceQualityContext.spaceFlight.celestialCatalog.constellationEntries.filter(e=>e.line.visible).length),88);
@@ -93,6 +95,7 @@ try {
  }
  checks.push({name:'orbital-artwork-gallery',bodies:orbitalNames,evidenceScope:'scene-camera fixtures for visual review'});
  }
+ if(!atmosphereOnly){
  await page.evaluate(async()=>{
   const {ctx}=await import('/app/js/shared-context.js?v=55');ctx.returnUniverseToSolImmediate();
   const action=document.getElementById('fBoardSolisReach');
@@ -143,8 +146,27 @@ try {
  }
  const exited=await page.evaluate(async()=>{const {ctx}=await import('/app/js/shared-context.js?v=55');ctx.exitExpeditionShipInterior();return {near:ctx.camera.near,active:ctx.spaceFlight.active};});
  assert.equal(exited.near,.5);assert.equal(exited.active,true);checks.push({name:'interior-exit-restores-camera',...exited});
+ const retention=[];
+ for(let cycle=0;cycle<2;cycle++) {
+  await page.evaluate(()=>document.getElementById('fBoardSolisReach').click());
+  await page.waitForFunction(()=>window.__spaceQualityContext.getShipInteriorSnapshot?.()?.crewPresentation?.length===7);
+  const sample=await page.evaluate(async()=>{
+   const ctx=window.__spaceQualityContext,root=ctx.activeInterior.group,pending=[];
+   root.traverse(o=>{if(o.userData.furnishingReady)pending.push(o.userData.furnishingReady);});
+   if(!(await Promise.all(pending)).every(Boolean))throw Error('Reboarding assets failed');
+   ctx.renderer.render(ctx.scene,ctx.camera);
+   const active={...ctx.renderer.info.memory};
+   ctx.exitExpeditionShipInterior();ctx.renderer.render(ctx.scene,ctx.camera);
+   return {active,released:{...ctx.renderer.info.memory},interior:!!ctx.activeInterior,exposure:ctx.renderer.toneMappingExposure};
+  });
+  assert.equal(sample.interior,false);retention.push(sample);
+ }
+ assert.ok(retention[1].released.textures<=retention[0].released.textures+1,'Ship textures accumulate across boarding');
+ assert.ok(retention[1].released.geometries<=retention[0].released.geometries+1,'Ship geometries accumulate across boarding');
+ checks.push({name:'reboarding-resource-retention',cycles:retention});
+ }
  if(!shipOnly){
- for (const nebulaId of ['orion-nebula','carina-nebula','crab-nebula']) {
+ if(!atmosphereOnly)for (const nebulaId of ['orion-nebula','carina-nebula','crab-nebula']) {
   await page.evaluate(async id=>{const ctx=window.__spaceQualityContext;ctx.animateSpaceFlight();ctx.travelToUniverseDestination(id);},nebulaId);
   await page.waitForFunction(id=>{const ctx=window.__spaceQualityContext;return ctx.universeRuntime.current.id===id&&!ctx.universeRuntime.transition;},nebulaId,{timeout:30000});
   for(const [label,x,z] of [['outside',0,13000],['edge',0,6500],['inside',1400,0]]) {
@@ -207,7 +229,7 @@ try {
  // Visit each public destination. Exoplanet cameras isolate the selected body;
  // frame destinations retain the playable arrival view and an interior view.
  await page.evaluate(()=>{const ctx=window.__spaceQualityContext;ctx.clearRenderedSpaceJourney();ctx.animateSpaceFlight();});
- for(const destination of getUniverseDestinations()){
+ if(!atmosphereOnly)for(const destination of getUniverseDestinations()){
   const info={id:destination.id,frame:destination.parentFrameId||destination.id,kind:destination.objectClass};
   if(['exoplanet','planetary_system'].includes(info.kind)){
    await page.evaluate(info=>{const ctx=window.__spaceQualityContext;if(!ctx.restoreUniverseLocalFrame(info.frame,info.kind==='exoplanet'?info.id:''))throw Error(`Cannot restore ${info.id}`);},info);
@@ -236,7 +258,7 @@ try {
  }
  }
  assert.deepEqual(errors,[]);
- await fs.writeFile(`${out}/report.json`,JSON.stringify({ok:true,complete:true,scope:shipOnly?'ship-gallery':'space-quality',evidenceScope:'Desktop software-rendered scene fixtures; not real-device performance or full surface launch acceptance',checks,errors},null,2));
+ await fs.writeFile(`${out}/report.json`,JSON.stringify({ok:true,complete:true,scope:atmosphereOnly?'atmosphere-gallery':shipOnly?'ship-gallery':'space-quality',evidenceScope:'Desktop software-rendered scene fixtures; not real-device performance or full surface launch acceptance',checks,errors},null,2));
 } catch(error) {
  checks.push({name:'failure-state',state:await page.evaluate(()=>({ship:window.__spaceQualityContext?.getShipInteriorSnapshot?.(),interior:!!window.__spaceQualityContext?.activeInterior})).catch(()=>null)});
  await page.screenshot({path:`${out}/failure.png`}).catch(()=>{});

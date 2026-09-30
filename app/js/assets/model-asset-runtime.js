@@ -1,21 +1,25 @@
+import {createModelTemplateCache} from './model-template-cache.js';
+import {modelAssetRequestUrl} from './model-asset-url.js';
+import {batchSkinnedModelTemplate} from './skinned-model-batching.js';
 import {batchStaticModelTemplate} from './static-model-batching.js?v=1';
 import { getModelAsset } from './model-asset-catalog.js?v=16';
+import { registerMaterialCompatibility } from './gltf-material-compatibility.js';
 
-const templateLoads = new Map();
+const templateCache = createModelTemplateCache();
+export const modelAssetCacheSnapshot = () => templateCache.snapshot();
 
 function loaderFor(THREE) {
   if (!THREE?.GLTFLoader) throw new Error('GLTFLoader is unavailable.');
   // Curated runtime assets are stored as self-contained, non-Draco GLBs.
   // Keeping decoding local prevents a vehicle or character from disappearing
   // because a third-party CDN is slow, blocked, or offline.
-  return new THREE.GLTFLoader();
+  return registerMaterialCompatibility(new THREE.GLTFLoader());
 }
 
 function loadTemplate(THREE, record) {
-  if (templateLoads.has(record.id)) return templateLoads.get(record.id);
   const pending = new Promise((resolve, reject) => {
     loaderFor(THREE).load(
-      record.url,
+      modelAssetRequestUrl(record),
       (gltf) => {
         const root = gltf?.scene || gltf?.scenes?.[0];
         if (!root) {
@@ -26,17 +30,16 @@ function loadTemplate(THREE, record) {
           if (record.roles.includes('road-vehicle-presentation')) {
             root.userData.staticModelBatching = batchStaticModelTemplate(THREE, root, gltf?.animations || []);
           }
+          if (record.roles.some(role => /character$/.test(role))) {
+            root.userData.skinnedModelBatching = batchSkinnedModelTemplate(THREE, root, gltf?.animations || []);
+          }
           resolve(Object.freeze({ root, animations: Object.freeze([...(gltf?.animations || [])]) }));
         } catch (error) { reject(error); }
       },
       undefined,
       reject
     );
-  }).catch((error) => {
-    templateLoads.delete(record.id);
-    throw error;
   });
-  templateLoads.set(record.id, pending);
   return pending;
 }
 
@@ -115,10 +118,13 @@ async function loadModelAsset(THREE, assetId, options = {}) {
   const record = getModelAsset(assetId);
   if (!record) throw new Error(`Unknown model asset: ${assetId}`);
   if (options.signal?.aborted) throw abortError(assetId);
-  const template = await loadTemplate(THREE, record);
-  if (options.signal?.aborted) throw abortError(assetId);
+  const lease = await templateCache.acquire(record.id, () => loadTemplate(THREE, record));
+  if (options.signal?.aborted) { lease.release(); throw abortError(assetId); }
+  const template = lease.value;
   const policy = record.instancePolicy || Object.freeze({ geometry: 'clone', materials: 'clone' });
-  const root = cloneModelGraph(template.root, policy);
+  let root;
+  try { root = cloneModelGraph(template.root, policy); }
+  catch (error) { lease.release(); throw error; }
   root.userData.modelAsset = Object.freeze({
     id: record.id,
     label: record.label,
@@ -138,10 +144,12 @@ async function loadModelAsset(THREE, assetId, options = {}) {
     record,
     root,
     animations: template.animations,
+    // Derived geometry may still borrow template textures after this clone is disposed.
+    retainResources() { return lease.retain().release; },
     dispose() {
       if (disposed) return;
       disposed = true;
-      disposeModelInstance(root, policy);
+      try { disposeModelInstance(root, policy); } finally { lease.release(); }
     }
   });
 }

@@ -1,4 +1,4 @@
-import { facadeFloorPlan } from './building-facade-layout.js?v=2';
+import { facadeFloorPlan } from './building-facade-layout.js?v=3';
 import {
   appendGeometryWithTransform,
   buildMergedGeometry

@@ -34,9 +34,10 @@ test('ship bulkheads keep one panel scale across long and short faces',()=>{
 });
 
 const pending = new Map();
-const api = {...THREE, GLTFLoader: class { load(url, resolve) {pending.set(url,resolve);} }};
-const resolveModel = (suffix, texture = null) => {
- const entry=[...pending].find(([url])=>url.endsWith(suffix));assert.ok(entry,suffix);
+const api = {...THREE, GLTFLoader: class { register() {return this;} load(url, resolve) {pending.set(url,resolve);} }};
+const resolveModel = async (suffix, texture = null) => {
+ await Promise.resolve(); // Template acquisition starts its loader in a microtask.
+ const entry=[...pending].find(([url])=>new URL(url,'http://localhost').pathname.endsWith(suffix));assert.ok(entry,suffix);
  const scene=new THREE.Group();scene.add(new THREE.Mesh(new THREE.BoxGeometry(1,2,1),new THREE.MeshStandardMaterial({map:texture})));
  entry[1]({scene,animations:[]});pending.delete(entry[0]);
 };
@@ -48,7 +49,7 @@ test('player host has zero legacy render resources; superseded loads cannot reat
  const second=attachCuratedExplorerCharacter(api,host,{assetId:EXPLORER_WOMAN_ASSET_ID,failClosed:true});
  disposeCuratedCharacter(host);
  const latest=attachCuratedExplorerCharacter(api,host,{assetId:EXPLORER_ASSET_ID,failClosed:true});
- resolveModel('field-explorer-v1.glb');resolveModel('field-explorer-woman-v1.glb');
+ await resolveModel('field-explorer-v1.glb');await resolveModel('field-explorer-woman-v1.glb');
  assert.deepEqual(await Promise.all([first,second,latest]),[false,false,true]);
  assert.equal(host.userData.curatedCharacterAssetId,EXPLORER_ASSET_ID);
  assert.equal(host.children.filter(o=>o.userData.curatedCharacterAssetId).length,1);
@@ -57,7 +58,7 @@ test('player host has zero legacy render resources; superseded loads cannot reat
 
 test('ship furniture teardown releases its instance but preserves cached textures for the next visit',async()=>{
  const host=new THREE.Group(), map=new THREE.Texture();let disposed=0;map.addEventListener('dispose',()=>disposed++);
- const first=attachShipFurnishing(api,host,'solis-crew-bed',{isCurrent:()=>true});resolveModel('crew-bed.glb',map);
+ const first=attachShipFurnishing(api,host,'solis-crew-bed',{isCurrent:()=>true});await resolveModel('crew-bed.glb',map);
  assert.equal(await first,true);host.userData.disposeShipFurnishing();assert.equal(host.children.length,0);assert.equal(disposed,0);
  const second=attachShipFurnishing(api,host,'solis-crew-bed',{isCurrent:()=>true});assert.equal(await second,true);
  assert.equal(disposed,0);host.userData.disposeShipFurnishing();

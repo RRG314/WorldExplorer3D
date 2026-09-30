@@ -2,7 +2,7 @@
 
 Staging candidate: **5.2.0+3f388d31fd21.e67945f48ad80ac5.staging**.
 Project: `we3d-staging-20260712`. Production was not changed.
-Worktree: `/Users/stevenreid/Developer/WorldExplorer3D-audit-1ec2f70`,
+Worktree: `the historical audit checkout`,
 branch `steven/building-exteriors-local`.
 
 ## What is implemented

@@ -1,6 +1,25 @@
 // Exact nearest-segment queries for a single immutable compilation snapshot.
 // The cache is owned and disposed by terrain-corridor publication, never by a
 // process-global map. Equal-distance ties retain original source order.
+function lowerBound(node,x,z){
+  return Math.hypot(Math.max(0,node.minX-x,x-node.maxX),Math.max(0,node.minZ-z,z-node.maxZ));
+}
+function visitProjection(node,x,z,best,stats){
+  if(!node || (best.segIndex>=0 && lowerBound(node,x,z)>best.dist+1e-12))return;
+  if(node.items){
+    for(const s of node.items){
+      if(stats)stats.segments=(stats.segments||0)+1;
+      const t=Math.max(0,Math.min(1,((x-s.ax)*s.dx+(z-s.az)*s.dz)/s.len2));
+      const px=s.ax+s.dx*t,pz=s.az+s.dz*t,dist=Math.hypot(x-px,z-pz);
+      if(best.segIndex<0 || dist<best.dist || (dist===best.dist&&s.i<best.segIndex)){
+        best.x=px;best.z=pz;best.dist=dist;best.segIndex=s.i;best.t=t;
+      }
+    }
+    return;
+  }
+  const first=lowerBound(node.left,x,z)<=lowerBound(node.right,x,z)?node.left:node.right;
+  visitProjection(first,x,z,best,stats);visitProjection(first===node.left?node.right:node.left,x,z,best,stats);
+}
 export function createFeatureProjectionIndex() {
   const features=new Map();
   function compile(points) {
@@ -26,23 +45,9 @@ export function createFeatureProjectionIndex() {
       if(!feature?.pts?.length || !Number.isFinite(x)||!Number.isFinite(z))return null;
       let entry=features.get(feature);
       if(!entry || entry.points!==feature.pts) {entry={points:feature.pts,root:compile(feature.pts)};features.set(feature,entry);}
-      let best=null;
-      const lower=node=>Math.hypot(Math.max(0,node.minX-x,x-node.maxX),Math.max(0,node.minZ-z,z-node.maxZ));
-      function visit(node) {
-        if(!node || (best && lower(node)>best.dist+1e-12))return;
-        if(node.items) {
-          for(const s of node.items) {
-            if(stats)stats.segments=(stats.segments || 0)+1;
-            const t=Math.max(0,Math.min(1,((x-s.ax)*s.dx+(z-s.az)*s.dz)/s.len2));
-            const px=s.ax+s.dx*t,pz=s.az+s.dz*t,dist=Math.hypot(x-px,z-pz);
-            if(!best || dist<best.dist || (dist===best.dist&&s.i<best.segIndex))best={x:px,z:pz,dist,segIndex:s.i,t};
-          }
-          return;
-        }
-        const first=lower(node.left)<=lower(node.right) ? node.left : node.right;
-        visit(first);visit(first===node.left?node.right:node.left);
-      }
-      visit(entry.root);return best;
+      const best={x:0,z:0,dist:Infinity,segIndex:-1,t:0};
+      visitProjection(entry.root,x,z,best,stats);
+      return best.segIndex>=0?best:null;
     },
     dispose(){features.clear();}
   };

@@ -69,6 +69,12 @@ export function createLocalWorldModificationStore(options = {}) {
     return normalizeWorld(database.worlds[worldId], worldId);
   }
 
+  // Database entries are normalized on load and commit. Collision queries need
+  // membership only, not another copy of objects, history and suppressions.
+  function isBuildingSuppressed(worldId, sourceFeatureId) {
+    return database.worlds[worldId]?.suppressions.some(entry => entry.sourceFeatureId === sourceFeatureId) === true;
+  }
+
   function commit(worldId, operation, commitOptions = {}) {
     const current = snapshot(worldId);
     const result = applyWorldModificationOperation(current, operation, {
@@ -97,7 +103,7 @@ export function createLocalWorldModificationStore(options = {}) {
     return Object.freeze({ enabled, recovery, worldCount: Object.keys(database.worlds).length, primaryKey: PRIMARY_KEY, backupKey: BACKUP_KEY });
   }
 
-  return Object.freeze({ commit, exportWorld, initialize, snapshot, status });
+  return Object.freeze({ commit, exportWorld, initialize, snapshot, status, isBuildingSuppressed });
 }
 
 export { BACKUP_KEY, PRIMARY_KEY };

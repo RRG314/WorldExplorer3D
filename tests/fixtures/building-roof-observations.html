@@ -1,0 +1,21 @@
+<!doctype html><meta charset="utf-8"><title>Mapped roof authority</title><link rel="icon" href="data:,"><style>body{margin:0;background:#ccd5df;font:16px system-ui}canvas{display:block}#labels{position:absolute;top:14px;left:18px}</style>
+<div id="labels">Mapped flat · inferred gable · half-hipped · hipped · mansard · gambrel</div>
+<script src="/node_modules/three/build/three.min.js"></script><script type="module">
+import {buildingRoofSurface} from '/app/js/engine/building-facade-materials.js?v=19';
+import {resolveMappedRoof,createMappedRoofMesh} from '/app/js/world/mapped-roof-geometry.js';
+const renderer=new THREE.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});renderer.setSize(1100,650);renderer.outputEncoding=THREE.sRGBEncoding;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=.7;document.body.append(renderer.domElement);
+const scene=new THREE.Scene();scene.background=new THREE.Color(0xccd5df);scene.add(new THREE.HemisphereLight(0xffffff,0x777366,1));const light=new THREE.DirectionalLight(0xffffff,1);light.position.set(10,40,30);scene.add(light);
+const pts=[{x:-5,z:-4},{x:5,z:-4},{x:5,z:4},{x:-5,z:4}],records=[];
+const directionReview = new URLSearchParams(location.search).has('directions');
+if(directionReview)document.querySelector('#labels').textContent='Gable N · gable E · gable across · skillion N · skillion S · skillion E';
+for(const [i,shape] of (directionReview ? ['gabled','gabled','gabled','skillion','skillion','skillion'] : ['flat','', 'half_hipped','hipped','mansard','gambrel']).entries()){
+ const tags={building:'house','roof:shape':shape,'roof:height':'2','roof:material':i%2?'roof_tiles':'slate'};
+ if(directionReview)Object.assign(tags,[{'roof:direction':'N'},{'roof:direction':'E'},{'roof:orientation':'across'},{'roof:direction':'N'},{'roof:direction':'S'},{'roof:direction':'E'}][i]);
+ const spec=resolveMappedRoof(tags,7,null,pts),bodyHeight=spec?.wallHeight??7;
+ const group=new THREE.Group();group.position.x=(i%3-1)*16;group.position.z=Math.floor(i/3)*18-9;
+ const body=new THREE.Mesh(new THREE.BoxGeometry(10,bodyHeight,8),new THREE.MeshStandardMaterial({color:0xcbb99c}));body.position.y=bodyHeight/2;group.add(body);
+ const roof=createMappedRoofMesh(pts,0,bodyHeight,spec,tags,{...buildingRoofSurface({renderer},tags['roof:material']),gableColor:0xcbb99c});if(roof)group.add(roof);scene.add(group);records.push({mapped:shape||null,rendered:spec?.shape||'flat',source:spec?.roofShapeSource||'mapped-flat',top:bodyHeight+(spec?.roofHeight||0)});
+}
+const ground=new THREE.Mesh(new THREE.PlaneGeometry(120,100),new THREE.MeshStandardMaterial({color:0x8f9b85}));ground.rotation.x=-Math.PI/2;ground.position.y=-.02;scene.add(ground);
+const camera=new THREE.PerspectiveCamera(45,1100/650,.1,300);camera.position.set(32,45,70);camera.lookAt(0,3,0);let yaw=0;function draw(){renderer.render(scene,camera);}window.advanceTime=draw;window.render_game_to_text=()=>JSON.stringify({records,calls:renderer.info.render.calls,glError:renderer.getContext().getError()});addEventListener('keydown',e=>{if(e.key==='ArrowRight'){yaw+=.3;camera.position.set(Math.sin(yaw)*60,32,Math.cos(yaw)*60);camera.lookAt(0,3,0);draw();}});draw();
+</script>

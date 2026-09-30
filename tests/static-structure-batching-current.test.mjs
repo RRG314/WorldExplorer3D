@@ -1,0 +1,21 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import * as THREE from 'three';
+import {batchOwnedStaticStructure} from '../app/js/world/static-structure-batching.js';
+test('static structure batching preserves bounds and live instance resources',()=>{
+ const root=new THREE.Group();root.position.set(12,20,-4);
+ const shared=new THREE.MeshStandardMaterial({color:0x777777});
+ const geometry=new THREE.BoxGeometry(2,3,4);
+ const a=new THREE.Mesh(geometry,shared),b=new THREE.Mesh(geometry,shared);b.position.x=6;
+ root.add(a,b);
+ const instances=new THREE.InstancedMesh(geometry,shared,1);
+ instances.setMatrixAt(0,new THREE.Matrix4().makeTranslation(-8,0,0));root.add(instances);
+ root.updateMatrixWorld(true);
+ const bounds=new THREE.Box3().setFromObject(root);
+ let released=0;geometry.addEventListener('dispose',()=>released++);shared.addEventListener('dispose',()=>released++);
+ batchOwnedStaticStructure(THREE,root);root.updateMatrixWorld(true);
+ const after=new THREE.Box3().setFromObject(root);
+ assert.ok(bounds.min.distanceTo(after.min)<1e-6);assert.ok(bounds.max.distanceTo(after.max)<1e-6);
+ assert.equal(a.parent,null);assert.equal(b.parent,null);assert.equal(instances.parent,root);
+ assert.equal(released,0);assert.equal(root.children.filter(x=>x.isMesh).length,2);
+});

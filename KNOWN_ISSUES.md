@@ -1,15 +1,15 @@
 # Known Issues and Limitations
 
-Last reviewed: 2026-09-25 for the World Explorer 3D 5.3 candidate.
-The public game remains on 5.2 until production promotion.
+Last reviewed: 2026-09-28. Production runs 5.3.0; the local visual-quality
+update targets 5.4.0 and has not been released.
 
-## 5.3 candidate acceptance
+## Release acceptance and visual coverage
 
-- Physical-phone responsiveness has not yet been accepted for this candidate.
+- Physical-phone responsiveness has not yet been accepted on the current visual-quality branch.
   Emulated touch layouts and software-rendered browser journeys are functional
   evidence, not hardware frame-rate, battery or thermal measurements.
-- The production research handler and required indexes are updated. Final
-  production-package verification and frontend promotion are still pending.
+- The production research handler and required indexes are deployed. The
+  visual-quality update still requires final package and performance acceptance.
 - Licensed ship furnishings replace major placeholders, but galley appliances,
   hydroponics, thermal/life-support equipment, exercise/EVA fittings and parts
   of fabrication still use simpler custom geometry. Art detail is not uniform.
@@ -18,6 +18,13 @@ The public game remains on 5.2 until production promotion.
   a solid surface to land on. Scientific completeness is not claimed.
 - Research currently offers a limited set of measurements and fabrication
   outcomes; broader experiments and expedition consequences remain planned.
+
+- Current full-game performance evidence still exceeds the existing memory
+  budget and misses some frame-rate and travel-transition targets. Component
+  improvements do not establish a whole-game performance pass.
+- Historic sites and regional vegetation are not uniformly complete. Dedicated
+  landmark geometry, mapped footprints and inferred buildings require visual
+  ownership checks; generic detail must not cover a landmark.
 
 ## Location and map coverage
 

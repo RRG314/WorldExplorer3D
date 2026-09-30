@@ -8,7 +8,7 @@ const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
 const failures = [];
 
 page.on('pageerror', (error) => failures.push(String(error?.stack || error)));
-await page.route('**/assets/models/characters/*.glb', (route) => route.abort('failed'));
+await page.route('**/assets/models/characters/*.glb*', (route) => route.abort('failed'));
 
 try {
   await page.goto(`${baseUrl}/app/?curated-character-fallback=${Date.now()}`, {

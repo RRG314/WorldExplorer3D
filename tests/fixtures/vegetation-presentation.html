@@ -1,0 +1,27 @@
+<!doctype html><meta charset="utf-8"><link rel="icon" href="data:,">
+<style>body{margin:0;background:#c5d5e0;color:#15241e;font:15px system-ui}canvas{display:block}#caption{position:absolute;bottom:12px;left:12px;background:#fffd;padding:8px}</style>
+<div id="caption">Loading vegetation…</div>
+<script src="/node_modules/three/build/three.min.js"></script>
+<script src="/node_modules/three/examples/js/loaders/GLTFLoader.js"></script>
+<script type="module">
+import {modelAssetCacheSnapshot} from '/app/js/assets/model-asset-runtime.js?v=16';
+import {renderVegetationModels,disposeVegetationBatch} from '/app/js/world/vegetation-models.js';
+const renderer=new THREE.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});renderer.setSize(1000,700);
+renderer.outputEncoding=THREE.sRGBEncoding;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=.9;renderer.physicallyCorrectLights=true;document.body.append(renderer.domElement);
+const scene=new THREE.Scene();scene.background=new THREE.Color('#c5d5e0');
+scene.add(new THREE.HemisphereLight(0xcdddeb,0x726b52,1.2));
+const sun=new THREE.DirectionalLight(0xfff1d2,3);sun.position.set(12,22,8);scene.add(sun);
+const ground=new THREE.Mesh(new THREE.PlaneGeometry(150,150),new THREE.MeshStandardMaterial({color:0x7c8870,roughness:1}));ground.rotation.x=-Math.PI/2;ground.position.y=-.02;scene.add(ground);
+const camera=new THREE.PerspectiveCamera(42,1000/700,.1,2000);
+const placements=[{x:-7,z:0,leafType:'needleleaved',scale:1},{x:5,z:0,leafType:'broadleaved',scale:1},{x:-4,z:7,landuseType:'forest_groundcover',scale:1},{x:1,z:7,landuseType:'scrub',scale:1},{x:5,z:7,landuseType:'wetland_groundcover',scale:1}];
+const ctx={LOC:{lat:45},_worldLoadSequence:1,vegetationMeshes:[],worldSurfaceProfile:{biome:{id:'temperate-forest'}},terrainMeshHeightAt:()=>0,addEarthWorldObject:o=>scene.add(o),replaceWorldCollection:(key,v)=>ctx[key]=v};
+renderVegetationModels(ctx,placements);
+const deadline=performance.now()+20000;
+while(performance.now()<deadline){for(const mesh of ctx.vegetationMeshes)disposeVegetationBatch(mesh);ctx.vegetationMeshes=[];renderVegetationModels(ctx,placements);if(Object.values(ctx.vegetationModelStatus).every(v=>v==='ready'))break;await new Promise(r=>setTimeout(r,50));}
+let mode=0,cycles=0;
+const programsBefore = new Set();
+function draw(){camera.position.set(mode===2?14:0,mode===2?3:7,mode===1?330:mode===2?11:26);camera.lookAt(0,mode===2?1:4,0);camera.updateMatrixWorld(true);for(const mesh of ctx.vegetationMeshes){mesh.updateMatrixWorld(true);mesh.update(camera);}renderer.render(scene,camera);if(cycles===0)for(const program of renderer.info.programs)programsBefore.add(program.id);}
+document.addEventListener('keydown',e=>{if(e.key==='ArrowRight'){mode=(mode+1)%3;draw();}if(e.key==='ArrowLeft'){for(const mesh of ctx.vegetationMeshes)disposeVegetationBatch(mesh);ctx.vegetationMeshes=[];renderVegetationModels(ctx,placements);cycles++;draw();}});
+window.advanceTime=draw;window.render_game_to_text=()=>JSON.stringify({ready:window.ready,mode,cycles,automaticMatrices:ctx.vegetationMeshes.reduce((n,root)=>{root.traverse(o=>{if(o.matrixAutoUpdate)n++;});return n;},0),retainedPrograms:renderer.info.programs.every(program=>programsBefore.has(program.id)),programs:renderer.info.programs.map(program=>program.id),cache:modelAssetCacheSnapshot(),models:ctx.vegetationModelStatus,placements:ctx.vegetationFeatures,drawCalls:renderer.info.render.calls,triangles:renderer.info.render.triangles,geometries:renderer.info.memory.geometries,textures:renderer.info.memory.textures,glError:renderer.getContext().getError()});
+window.ready=Object.keys(ctx.vegetationModelStatus).length===5 && Object.values(ctx.vegetationModelStatus).every(status=>status==='ready');if(!window.ready)throw Error('Vegetation fixture assets did not become ready');document.getElementById('caption').textContent='Actual instanced vegetation · conifer / broadleaf / fern / scrub / wetland cover · right arrow changes view';draw();
+</script>

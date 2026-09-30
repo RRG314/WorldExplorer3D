@@ -1,3 +1,4 @@
+import {createGeographicRingIndex} from './geographic-ring-index.js';
 import {
   fetchShortbreadTile,
   vectorTileRangeForBounds
@@ -138,6 +139,8 @@ function farBuildingBoxDescriptor(ring, properties, identity) {
   };
 }
 
+const geographicRingIndexes=new WeakMap();
+
 function retainFarWaterRing(ring) {
   const source = (ring || []).filter((coordinate) => (
     Number.isFinite(Number(coordinate?.[0])) &&
@@ -146,12 +149,15 @@ function retainFarWaterRing(ring) {
   if (source.length < 3) return [];
   const first = source[0];
   const last = source.at(-1);
-  return first[0] === last[0] && first[1] === last[1]
-    ? source.slice()
-    : [...source, first];
+  const closed=first[0]===last[0]&&first[1]===last[1]?source:[...source,first];
+  const retained=Object.freeze(closed.map(point=>Object.freeze([...point])));
+  geographicRingIndexes.set(retained,createGeographicRingIndex(retained));
+  return retained;
 }
 
 function pointInLonLatRing(lon, lat, ring) {
+  const indexed=geographicRingIndexes.get(ring);
+  if(indexed)return indexed(lon,lat);
   let inside = false;
   for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
     const xi = Number(ring[i]?.[0]);

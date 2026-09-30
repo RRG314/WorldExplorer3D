@@ -1,8 +1,8 @@
-// Double precision is required until final Float32 publication: facade masks
-// consume transformed normals before conversion. Capacity is known per group.
+// Normals retain double precision until facade masks have consumed them. Other
+// building attributes can use their final Float32 storage. Capacity is known.
 export class GeometryBatchStorage {
-  constructor(capacity) {
-    this.values = new Float64Array(capacity);
+  constructor(capacity, ArrayType = Float64Array) {
+    this.values = new ArrayType(capacity);
     this.length = 0;
   }
   push(a, b, c, d) {

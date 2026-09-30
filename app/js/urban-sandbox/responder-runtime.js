@@ -181,7 +181,7 @@ function createUrbanResponderRuntime(options = {}) {
       serviceType: 'responder',
       serviceAccent: profile.accent
     };
-    const visual = createUrbanVehicleVisual(THREE, definition);
+    const visual = createUrbanVehicleVisual(THREE, definition, options.serviceLighting);
     const toward = actor || civic.searchCenter || { x: anchor.x, z: anchor.z + 1 };
     const yaw = Math.atan2(finite(toward.x) - anchor.x, finite(toward.z) - anchor.z);
     const contactPose = roadContactPoseAtHeading(anchor.x, anchor.z, anchor.y, yaw, variant, anchor.road);

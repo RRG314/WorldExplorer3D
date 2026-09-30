@@ -1,3 +1,4 @@
+import {disposeLandmarkModel as disposeModel, loadOwnedLandmarkModel, retireReplacedHistoricVisuals} from './landmark-lifetime.js';
 import { ctx as appCtx } from '../shared-context.js?v=55';
 import { curatedLandmarksNear } from './landmark-catalog.js?v=9';
 import { createMeasuredEiffelTower } from './eiffel-structure.js?v=1';
@@ -5,14 +6,6 @@ import { createMeasuredElizabethTower } from './elizabeth-tower-structure.js?v=1
 import { createMeasuredKhufuPyramid } from './giza-pyramid-structure.js?v=3';
 import { createMeasuredTenLightStreet } from './ten-light-street-structure.js?v=1';
 import { createMeasuredCommercePlace } from './commerce-place-structure.js?v=1';
-
-function disposeModel(root) {
-  root?.traverse?.((object) => {
-    object.geometry?.dispose?.();
-    if (Array.isArray(object.material)) object.material.forEach((material) => material?.dispose?.());
-    else object.material?.dispose?.();
-  });
-}
 
 function colorizeModel(root, landmark) {
   const material = new THREE.MeshStandardMaterial({
@@ -67,58 +60,6 @@ function addEiffelAntenna(root, placement, landmark) {
   root.add(mast);
 }
 
-function hideGenericVisuals(landmark, world) {
-  const candidates = [...(appCtx.buildingMeshes || []), ...(appCtx.historicMarkers || [])];
-  for (const mesh of candidates) {
-    if (!mesh || mesh.userData?.curatedLandmarkId) continue;
-    let center = null;
-    const footprint = mesh.userData?.footprint;
-    if (Array.isArray(footprint) && footprint.length) {
-      center = footprint.reduce((sum, point) => ({ x: sum.x + point.x, z: sum.z + point.z }), { x: 0, z: 0 });
-      center.x /= footprint.length;
-      center.z /= footprint.length;
-    } else if (mesh.position) {
-      center = { x: mesh.position.x, z: mesh.position.z };
-    }
-    if (center && Math.hypot(center.x - world.x, center.z - world.z) <= landmark.hideRadiusMeters) mesh.visible = false;
-  }
-}
-
-function loadModel(url, signal = null) {
-  return new Promise((resolve, reject) => {
-    if (!THREE.GLTFLoader) {
-      reject(new Error('GLTFLoader is unavailable'));
-      return;
-    }
-    let settled = false;
-    let request = null;
-    const cleanup = () => signal?.removeEventListener?.('abort', abort);
-    const complete = (callback, value) => {
-      if (settled) return;
-      settled = true;
-      cleanup();
-      callback(value);
-    };
-    const abort = () => {
-      request?.abort?.();
-      complete(reject, signal?.reason instanceof Error
-        ? signal.reason
-        : new DOMException(String(signal?.reason || 'Landmark model load aborted'), 'AbortError'));
-    };
-    if (signal?.aborted) {
-      abort();
-      return;
-    }
-    signal?.addEventListener?.('abort', abort, { once: true });
-    request = new THREE.GLTFLoader().load(
-      url,
-      (gltf) => complete(resolve, gltf.scene),
-      undefined,
-      (error) => complete(reject, error)
-    );
-  });
-}
-
 async function loadCuratedLandmark(landmark, isActiveLoadContext, signal = null) {
   let model;
   if (landmark.builder === 'measured-eiffel-tower') model = createMeasuredEiffelTower();
@@ -126,7 +67,7 @@ async function loadCuratedLandmark(landmark, isActiveLoadContext, signal = null)
   else if (landmark.builder === 'measured-khufu-pyramid') model = createMeasuredKhufuPyramid();
   else if (landmark.builder === 'measured-ten-light-street') model = createMeasuredTenLightStreet();
   else if (landmark.builder === 'measured-commerce-place') model = createMeasuredCommercePlace();
-  else model = await loadModel(landmark.modelUrl, signal);
+  else model = await loadOwnedLandmarkModel(THREE, landmark.modelUrl, signal);
   if (!isActiveLoadContext?.()) {
     disposeModel(model);
     return null;
@@ -146,7 +87,7 @@ async function loadCuratedLandmark(landmark, isActiveLoadContext, signal = null)
   };
   const placement = placeAtRealScale(root, landmark);
   addEiffelAntenna(root, placement, landmark);
-  hideGenericVisuals(landmark, placement.world);
+  retireReplacedHistoricVisuals(appCtx, landmark, placement.world);
   appCtx.addEarthWorldObject(root);
   appCtx.historicMarkers.push(root);
   appCtx.historicSites.push({
@@ -166,7 +107,7 @@ async function loadCuratedLandmark(landmark, isActiveLoadContext, signal = null)
     distanceMeters: Math.round(landmark.distanceMeters),
     meshCount,
     visible: root.visible,
-    attached: root.parent === appCtx.scene,
+    attached: (() => { for (let owner = root.parent; owner; owner = owner.parent) if (owner === appCtx.scene) return true; return false; })(),
     bounds: {
       min: bounds.min.toArray().map((value) => Number(value.toFixed(2))),
       max: bounds.max.toArray().map((value) => Number(value.toFixed(2)))

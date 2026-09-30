@@ -70,7 +70,7 @@ test('a stalled Pathfinder model cannot hang boarding or attach after its deadli
   const THREE=await import('three');
   const {attachCuratedExpeditionPod}=await import('../app/js/space/curated-expedition-pod.js');
   let finish;
-  const api={...THREE,GLTFLoader:class {load(url,success){finish=success;}}};
+  const api={...THREE,GLTFLoader:class {register(){return this;} load(url,success){finish=success;}}};
   const scene=new THREE.Group(),host=new THREE.Group(),fallback=new THREE.Group();
   fallback.userData.defaultPodFallback=true;host.add(fallback);scene.add(host);
   const originalWarn=console.warn;console.warn=()=>{};

@@ -1,0 +1,9 @@
+Low poly vegetation for games by denoises
+https://sketchfab.com/3d-models/low-poly-vegetation-for-games-cdac82eb61ab4d83bf162b4c44b44d6d
+CC-BY-4.0 — https://creativecommons.org/licenses/by/4.0/
+Selected textured plants; source gallery offsets baked around plant bases; 512px PNG maps; alpha-tested foliage; complete leaf-card thinning and simplified distant trunks.
+
+Bush by lev26
+https://sketchfab.com/3d-models/bush-844e6a315757431da97efb5f17383bb5
+CC-BY-4.0 — https://creativecommons.org/licenses/by/4.0/
+Base aligned; resized maps; alpha-tested leaves.

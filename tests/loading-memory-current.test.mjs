@@ -126,3 +126,19 @@ test('persistent urban actions use the active world and safely stop at Main Menu
  context.activeRuntime={id:'second',vehicles:[{id:'car2'}]};appCtx.enterUrbanVehicleByIdForSupport('car2');appCtx.equipUrbanEquipmentSlot(2);appCtx.exitUrbanVehicleForSupport();
  assert.deepEqual(calls,[['enter','first','car1'],['use','first'],['enter','second','car2'],['slot','second',2],['exit','second']]);
 });
+
+
+test('building visibility refresh preserves published traversal graphs and other suppression reasons', async () => {
+ const {refreshEditableBuildingVisibility} = await import('../app/js/editable-world/runtime.js');
+ const graph={walk:{nodes:[{x:0,z:0}]},drive:{nodes:[{x:0,z:0}]}};
+ const mesh={visible:false,userData:{sourceBuildingId:'building-1',buildingSuppressionReasons:new Set(['editable-world'])}};
+ const other={visible:false,userData:{sourceBuildingId:'building-2',buildingSuppressionReasons:new Set(['other-owner'])}};
+ let invalidations=0;
+ const appCtx={LOC:{lat:39.29,lon:-76.61},buildingMeshes:[mesh,other],landuseMeshes:[],traversalNetworks:graph,invalidateTraversalNetworks(){invalidations++;this.traversalNetworks={walk:null,drive:null};}};
+ const result=refreshEditableBuildingVisibility(appCtx);
+ assert.equal(mesh.visible,true);
+ assert.equal(other.visible,false);
+ assert.equal(result.directMeshes,2);
+ assert.equal(invalidations,0);
+ assert.equal(appCtx.traversalNetworks,graph);
+});

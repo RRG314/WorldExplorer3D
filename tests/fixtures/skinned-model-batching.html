@@ -1,0 +1,23 @@
+<!doctype html><meta charset="utf-8"><link rel="icon" href="data:,"><style>body{margin:0;background:#172334}canvas{display:block}</style>
+<script src="/node_modules/three/build/three.min.js"></script><script src="/node_modules/three/examples/js/loaders/GLTFLoader.js"></script><script type="module">
+import {batchSkinnedModelTemplate} from '/app/js/assets/skinned-model-batching.js';
+import {cloneModelGraph,disposeModelInstance} from '/app/js/assets/model-asset-runtime.js';
+const renderer=new THREE.WebGLRenderer({antialias:false,preserveDrawingBuffer:true});renderer.setSize(800,600);document.body.append(renderer.domElement);
+const scene=new THREE.Scene();scene.background=new THREE.Color(0x172334);scene.add(new THREE.HemisphereLight(0xffffff,0x334466,1));const sun=new THREE.DirectionalLight(0xffffff,1);sun.position.set(3,5,4);scene.add(sun);
+const camera=new THREE.PerspectiveCamera(40,4/3,.01,100);let phase=0,results=[],current=null;
+const names=['city-explorer-v1','city-explorer-casual-v1','city-explorer-woman-casual-v1','city-explorer-woman-worker-v1','field-explorer-v1','field-explorer-woman-v1','civic-responder-v1','ship-crew-v1'];
+const loader=new THREE.GLTFLoader(),templates=await Promise.all(names.map(async name=>({name,gltf:await loader.loadAsync('/app/assets/models/characters/'+name+'.glb')})));
+function pixels(root,mixer,time){scene.add(root);mixer.setTime(time);root.updateMatrixWorld(true);renderer.render(scene,camera);const calls=renderer.info.render.calls,gl=renderer.getContext(),data=new Uint8Array(800*600*4);gl.readPixels(0,0,800,600,gl.RGBA,gl.UNSIGNED_BYTE,data);scene.remove(root);return{data,calls};}
+function check(){
+ if(current){scene.remove(current);disposeModelInstance(current,{geometry:'shared',materials:'clone'});}
+ const {name,gltf}=templates[phase%templates.length],raw=cloneModelGraph(gltf.scene,{geometry:'shared',materials:'clone'}),optimized=cloneModelGraph(gltf.scene,{geometry:'shared',materials:'clone'});
+ // Batch independent geometry so retiring this fixture's inputs cannot affect its reference.
+ optimized.traverse(m=>{if(m.isMesh)m.geometry=m.geometry.clone();});
+ const stats=batchSkinnedModelTemplate(THREE,optimized,gltf.animations),bounds=new THREE.Box3().setFromObject(raw),center=bounds.getCenter(new THREE.Vector3()),size=bounds.getSize(new THREE.Vector3());camera.position.copy(center).add(new THREE.Vector3(0,size.y*.06,size.y*2.1));camera.lookAt(center);
+ const a=new THREE.AnimationMixer(raw),b=new THREE.AnimationMixer(optimized),clips=gltf.animations.filter(c=>/^(Idle|Walk|Run|Wave)$/.test(c.name));let max=0,totalDifferences=0,beforeCalls=0,afterCalls=0;
+ for(const clip of clips){a.stopAllAction();b.stopAllAction();a.clipAction(clip).play();b.clipAction(clip).play();for(const t of [.13,.61]){const before=pixels(raw,a,t),after=pixels(optimized,b,t);beforeCalls=before.calls;afterCalls=after.calls;for(let i=0;i<before.data.length;i++){const delta=Math.abs(before.data[i]-after.data[i]);max=Math.max(max,delta);if(delta)totalDifferences++;}}}
+ results.push({name,stats,clips:clips.length,maxChannelDifference:max,totalDifferences,beforeCalls,afterCalls});if(totalDifferences>100)throw Error(name+' excessive changed channels '+totalDifferences);if(!clips.length)throw Error('No animation exercised');
+ a.stopAllAction();b.stopAllAction();a.uncacheRoot(raw);b.uncacheRoot(optimized);disposeModelInstance(raw,{geometry:'shared',materials:'clone'});current=optimized;scene.add(current);renderer.render(scene,camera);
+}
+check();addEventListener('keydown',e=>{if(e.code==='ArrowRight'){phase++;check();}});window.advanceTime=()=>renderer.render(scene,camera);window.render_game_to_text=()=>JSON.stringify({phase,results,glError:renderer.getContext().getError()});
+</script>

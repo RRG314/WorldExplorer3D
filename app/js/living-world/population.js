@@ -1,3 +1,5 @@
+import { nearbyVehicleSnapshots } from './nearby-vehicles.js';
+import {setPopulationHostVisible} from './presentation-attachment.js';
 import { createPedestrianSpacing } from './pedestrian-spacing.js';
 import { selectVehicleVariant, VEHICLE_ROOT_TO_GROUND_METERS } from '../engine/vehicle-catalog.js?v=6';
 import { resolveVehicleRoadContactPose } from '../engine/vehicle-road-attitude.js?v=3';
@@ -665,7 +667,7 @@ export function createLivingWorldPopulation(options = {}) {
       host.position.set(pose.x, pose.y, pose.z);
       host.rotation.set(0, pose.yaw, 0);
       host.scale.setScalar(Math.max(.001, Number(agent.heightScale || 1) * agent.visibility));
-      host.visible = agent.visibility > .01 && agent.promoted !== true;
+      setPopulationHostVisible(host, group, agent.visibility > .01 && agent.promoted !== true);
       host.userData.reaction = String(agent.reaction || '');
       if (host.visible) {
         updateCuratedCharacterAnimation(
@@ -710,7 +712,7 @@ export function createLivingWorldPopulation(options = {}) {
       host.rotation.order = 'YXZ';
       host.rotation.set(Number(pose.pitch || 0), pose.yaw, Number(pose.roll || 0));
       syncCuratedVehicleGroundPivot(host);
-      host.visible = agent.visibility > .01 && agent.promoted !== true;
+      setPopulationHostVisible(host, group, agent.visibility > .01 && agent.promoted !== true);
       host.scale.setScalar(scale);
     });
   };
@@ -752,15 +754,7 @@ export function createLivingWorldPopulation(options = {}) {
       })])).values()])
     }),
     nearbyVehicles(reference, radius = 8) {
-      const origin = reference || referencePosition();
-      if (!origin) return Object.freeze([]);
-      const safeRadius = Math.max(1, Math.min(220, Number(radius) || 8));
-      return Object.freeze(vehicles.map(vehicleSnapshot).filter((vehicle) => (
-        vehicle && !vehicle.promoted && vehicle.visible &&
-        Math.hypot(vehicle.x - origin.x, vehicle.z - origin.z) <= safeRadius
-      )).sort((a, b) => (
-        Math.hypot(a.x - origin.x, a.z - origin.z) - Math.hypot(b.x - origin.x, b.z - origin.z)
-      )));
+      return nearbyVehicleSnapshots(vehicles, trafficGraph, reference || referencePosition(), radius, vehicleSnapshot);
     },
     nearbyPedestrians(reference, radius = 8) {
       const origin = reference || referencePosition();

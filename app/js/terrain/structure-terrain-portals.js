@@ -1,3 +1,4 @@
+import {buildPortalSpatialGrid} from './portal-spatial-grid.js';
 // Texture-backed descriptors avoid the former silent 32-opening truncation.
 const MAX_PORTAL_MASKS_PER_TERRAIN_MESH = Infinity;
 // The aperture must remove terrain at the pavement too. Leaving twelve
@@ -75,7 +76,7 @@ function installPortalMaskShader(material, masks) {
   if (!state) {
     const previousOnBeforeCompile = material.onBeforeCompile;
     const previousProgramCacheKey = material.customProgramCacheKey?.bind(material);
-    state = { count: 0, uniform: { value: null } };
+    state = { count: 0, maxCount: 0, uniform: { value: null }, grid:{value:new THREE.Vector4()}, atlasSize:{value:new THREE.Vector2()}, offsets:{value:new THREE.Vector2()}, cellSize:{value:128} };
     material.userData.structurePortalShaderState = state;
     // Install once: pavement and other later hooks must survive portal refreshes.
     // Keep the uniform object stable because Three reuses programs without
@@ -83,6 +84,10 @@ function installPortalMaskShader(material, masks) {
     material.onBeforeCompile = (shader, renderer) => {
       previousOnBeforeCompile?.call(material, shader, renderer);
       shader.uniforms.structurePortalMasks = state.uniform;
+      shader.uniforms.structurePortalGrid = state.grid;
+      shader.uniforms.structurePortalAtlasSize = state.atlasSize;
+      shader.uniforms.structurePortalOffsets = state.offsets;
+      shader.uniforms.structurePortalCellSize = state.cellSize;
       if (state.count === 0) return;
       shader.vertexShader = shader.vertexShader
         .replace(
@@ -96,21 +101,30 @@ function installPortalMaskShader(material, masks) {
       const fragmentPrelude = [
         '#include <common>',
         'varying vec3 vStructurePortalWorldPosition;',
-        'uniform sampler2D structurePortalMasks;'
+        'uniform sampler2D structurePortalMasks;',
+        'uniform vec4 structurePortalGrid;',
+        'uniform vec2 structurePortalAtlasSize, structurePortalOffsets;',
+        'uniform float structurePortalCellSize;',
+        'vec4 portalTexel(float address) { return texture2D(structurePortalMasks, (vec2(mod(address, structurePortalAtlasSize.x), floor(address / structurePortalAtlasSize.x)) + 0.5) / structurePortalAtlasSize); }'
       ].join('\n');
       const fragmentCut = [
         '#include <clipping_planes_fragment>',
-        `for (int structurePortalIndex = 0; structurePortalIndex < ${state.count}; structurePortalIndex++) {`,
-        `  float portalRow = (float(structurePortalIndex) + 0.5) / ${state.count}.0;`,
-        '  vec4 portalA = texture2D(structurePortalMasks, vec2(0.16666667, portalRow));',
-        '  vec4 portalB = texture2D(structurePortalMasks, vec2(0.5, portalRow));',
-        '  float cutHeight = texture2D(structurePortalMasks, vec2(0.83333333, portalRow)).x;',
+        'vec2 portalCell = floor(vStructurePortalWorldPosition.xz / structurePortalCellSize) - structurePortalGrid.xy;',
+        'if(all(greaterThanEqual(portalCell, vec2(0.0))) && all(lessThan(portalCell, structurePortalGrid.zw))) {',
+        'vec2 portalSpan = portalTexel(structurePortalOffsets.x + portalCell.y * structurePortalGrid.z + portalCell.x).rg;',
+        `for (int portalCandidate = 0; portalCandidate < ${state.maxCount}; portalCandidate++) {`,
+        '  if(float(portalCandidate) >= portalSpan.y) break;',
+        '  float portalAddress = portalSpan.x + float(portalCandidate);',
+        '  float structurePortalIndex = portalTexel(structurePortalOffsets.y + portalAddress).r;',
+        '  vec4 portalA = portalTexel(structurePortalIndex * 3.0);',
+        '  vec4 portalB = portalTexel(structurePortalIndex * 3.0 + 1.0);',
+        '  float cutHeight = portalTexel(structurePortalIndex * 3.0 + 2.0).x;',
         '  vec2 portalDelta = vStructurePortalWorldPosition.xz - portalA.xy;',
         '  float portalAlong = dot(portalDelta, portalA.zw);',
         '  float portalAcross = dot(portalDelta, vec2(-portalA.w, portalA.z));',
         '  float portalRoadY = portalB.x + portalAlong * portalB.y;',
         `  if (abs(portalAcross) <= portalB.z && abs(portalAlong) <= portalB.w && vStructurePortalWorldPosition.y > portalRoadY + ${PORTAL_FLOOR_MARGIN} && vStructurePortalWorldPosition.y < portalRoadY + cutHeight) discard;`,
-        '}'
+        '}}'
       ].join('\n');
       shader.fragmentShader = shader.fragmentShader
         .replace('#include <common>', fragmentPrelude)
@@ -118,7 +132,7 @@ function installPortalMaskShader(material, masks) {
     };
     material.customProgramCacheKey = () => [
       previousProgramCacheKey?.() || '',
-      `structure-terrain-portals-v4:${state.count}`
+      `structure-terrain-portals-v5:${state.count}:${state.maxCount}`
     ].join(':');
     material.addEventListener('dispose', () => {
       state.uniform.value?.dispose();
@@ -126,29 +140,41 @@ function installPortalMaskShader(material, masks) {
       material.userData.structurePortalTexture = null;
     });
   }
-  const previousCount = state.count;
+  const previousCount = state.count, previousMaxCount = state.maxCount;
+  const grid = buildPortalSpatialGrid(masks);
+  state.grid.value.set(grid.minX,grid.minZ,grid.width,grid.height);
+  const lookupOffset=masks.length*3,referenceOffset=lookupOffset+grid.width*grid.height;
+  const texels=referenceOffset+grid.count;
+  const atlasWidth=Math.min(512,Math.max(1,texels)),atlasHeight=Math.max(1,Math.ceil(texels/atlasWidth));
+  state.atlasSize.value.set(atlasWidth,atlasHeight);
+  state.offsets.value.set(lookupOffset,referenceOffset);
+  state.cellSize.value=grid.cellSize;
+  state.maxCount=grid.maxCount;
   let texture = state.uniform.value;
   if (masks.length === 0) {
     texture?.dispose();
     texture = null;
   } else {
-    if (!texture || texture.image.height !== masks.length) {
+    if (!texture || texture.image.width !== atlasWidth || texture.image.height !== atlasHeight) {
       texture?.dispose();
-      texture = new THREE.DataTexture(new Float32Array(masks.length * 12), 3,
-        masks.length, THREE.RGBAFormat, THREE.FloatType);
+      texture = new THREE.DataTexture(new Float32Array(atlasWidth * atlasHeight * 4), atlasWidth,
+        atlasHeight, THREE.RGBAFormat, THREE.FloatType);
     }
     masks.forEach((mask, index) => texture.image.data.set([
       mask.x, mask.z, mask.tangentX, mask.tangentZ,
       mask.roadY, mask.grade || 0, mask.halfWidth, mask.halfDepth,
       Number(mask.cutHeight) || 6, 0, 0, 0
     ], index * 12));
+    texture.image.data.set(grid.lookup,lookupOffset*4);
+    texture.image.data.set(grid.references.subarray(0,grid.count*4),referenceOffset*4);
     texture.needsUpdate = true;
   }
   state.count = masks.length;
   state.uniform.value = texture;
   material.userData.structurePortalTexture = texture;
   material.userData.structurePortalMaskCount = masks.length;
-  if (previousCount !== state.count) material.needsUpdate = true;
+  if (previousCount !== state.count || previousMaxCount !== state.maxCount) material.needsUpdate = true;
+  material.userData.structurePortalMaxCellCandidates = grid.maxCount;
   return masks.length > 0;
 }
 

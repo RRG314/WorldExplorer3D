@@ -144,7 +144,7 @@ export function appendGeometryWithTransform(batch, geometry, matrix) {
   return posAttr.count;
 }
 
-export function buildMergedGeometry(batch) {
+export function buildMergedGeometry(batch, {reuseStorage = false} = {}) {
   const isMergedArray = value => Array.isArray(value) || ArrayBuffer.isView(value);
   // Consume the valid prefix only; failed source meshes may have rolled back.
   batch = Object.fromEntries(Object.entries(batch).map(([key, value]) => [key, batchStorageView(value)]));
@@ -176,27 +176,33 @@ export function buildMergedGeometry(batch) {
     if (!Number.isFinite(idx) || idx < 0 || idx >= vertexCount) return null;
   }
 
+  // The building publisher relinquishes these buffers after this call. Retain
+  // an exact-sized Float32 buffer directly; keep legacy callers' copy semantics
+  // and avoid retaining unused capacity after a failed source-mesh rollback.
+  const attribute = (values, size) => reuseStorage && values instanceof Float32Array
+    ? new THREE.BufferAttribute(values.byteOffset === 0 && values.byteLength === values.buffer.byteLength ? values : values.slice(), size)
+    : new THREE.Float32BufferAttribute(values, size);
   const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute('position', new THREE.Float32BufferAttribute(batch.positions, 3));
-  geometry.setAttribute('normal', new THREE.Float32BufferAttribute(batch.normals, 3));
-  geometry.setAttribute('uv', new THREE.Float32BufferAttribute(batch.uvs, 2));
+  geometry.setAttribute('position', attribute(batch.positions, 3));
+  geometry.setAttribute('normal', attribute(batch.normals, 3));
+  geometry.setAttribute('uv', attribute(batch.uvs, 2));
   for (const [key,name] of [['facadeLayouts','facadeLayout'],['facadeOpenings','facadeOpening']]) {
-    if (isMergedArray(batch[key])) geometry.setAttribute(name,new THREE.Float32BufferAttribute(batch[key],4));
+    if (isMergedArray(batch[key])) geometry.setAttribute(name,attribute(batch[key],4));
   }
   if (isMergedArray(batch.facadeEntrances)) {
-    geometry.setAttribute('facadeEntrance', new THREE.Float32BufferAttribute(batch.facadeEntrances, 4));
+    geometry.setAttribute('facadeEntrance', attribute(batch.facadeEntrances, 4));
   }
   if (isMergedArray(batch.colors)) {
-    geometry.setAttribute('color', new THREE.Float32BufferAttribute(batch.colors, 3));
+    geometry.setAttribute('color', attribute(batch.colors, 3));
   }
   if (isMergedArray(batch.facadeParams)) {
-    geometry.setAttribute('buildingFacadeParams', new THREE.Float32BufferAttribute(batch.facadeParams, 4));
+    geometry.setAttribute('buildingFacadeParams', attribute(batch.facadeParams, 4));
   }
   if (isMergedArray(batch.roofAParams)) {
-    geometry.setAttribute('buildingRoofAParams', new THREE.Float32BufferAttribute(batch.roofAParams, 4));
+    geometry.setAttribute('buildingRoofAParams', attribute(batch.roofAParams, 4));
   }
   if (isMergedArray(batch.roofColorsB)) {
-    geometry.setAttribute('buildingRoofColorB', new THREE.Float32BufferAttribute(batch.roofColorsB, 4));
+    geometry.setAttribute('buildingRoofColorB', attribute(batch.roofColorsB, 4));
   }
 
   const indexArray = vertexCount > 65535 ? new Uint32Array(batch.indices) : new Uint16Array(batch.indices);

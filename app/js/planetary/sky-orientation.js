@@ -6,6 +6,7 @@ import { setPlanetaryStarOcclusion, updatePlanetaryStarHorizon } from './star-oc
 
 const J2000_MS = Date.UTC(2000, 0, 1, 12, 0, 0);
 const DAY_MS = 86400000;
+let activeMarsAtmosphere=null;
 const OBSERVERS = Object.freeze({
   moon: Object.freeze({
     latitudeDeg: 0.67408,
@@ -94,14 +95,15 @@ function setPlanetarySky(body, date = new Date(), options = {}) {
     computedAtIso: date.toISOString(),
     truthClass: 'gameplay_abstraction'
   });
-  const marsAtmosphere = ensurePlanetaryAtmosphere(appCtx.scene, 'mars');
+  const marsAtmosphere = normalizedBody==='mars' ? ensurePlanetaryAtmosphere(appCtx.scene, 'mars') : activeMarsAtmosphere;
+  activeMarsAtmosphere=marsAtmosphere;
   if (marsAtmosphere) marsAtmosphere.visible = normalizedBody === 'mars';
   updatePlanetarySky();
   return orientation;
 }
 
 function clearPlanetarySky() {
-  const marsAtmosphere = appCtx.scene?.getObjectByName('Planetary atmosphere: mars');
+  const marsAtmosphere = activeMarsAtmosphere;
   if (marsAtmosphere) marsAtmosphere.visible = false;
   setPlanetaryStarOcclusion(appCtx.starField, false);
   if (appCtx.renderer && appCtx.starField?.userData && 'earthLocalClippingEnabled' in appCtx.starField.userData) {
@@ -122,9 +124,13 @@ function updatePlanetarySky() {
   // Earth can contain tens of thousands of scene nodes. An inactive Mars
   // atmosphere must not trigger a complete name search on every Earth frame.
   if (env == null || !(env === appCtx.ENV?.MOON || env === appCtx.ENV?.MARS || env === appCtx.ENV?.PLANETARY)) return;
+  for(const object of appCtx.activeParentSkyViews||[]){
+    const placement=object.userData.parentSkyPlacement,d=placement.direction;
+    object.position.set(d.x,d.y,d.z).multiplyScalar(placement.renderDistance).add(appCtx.camera.position);
+  }
   appCtx.starField.position.copy(appCtx.camera.position);
   updatePlanetaryStarHorizon(appCtx.starField, appCtx.camera.position.y);
-  const marsAtmosphere = appCtx.scene?.getObjectByName('Planetary atmosphere: mars');
+  const marsAtmosphere = activeMarsAtmosphere;
   updatePlanetaryAtmosphere(marsAtmosphere, appCtx.camera, appCtx.sun?.position);
 }
 

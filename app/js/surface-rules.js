@@ -228,20 +228,10 @@ function classifyWorldSurfaceProfile({
     ) ||
     norm.barren >= 0.1 && norm.explicitSand >= 0.03;
   const inferredDesert = latitudeDry && sparseVegetation && sparseSurfaceWater && norm.arid >= 0.24;
-  const lowDetailAridFallback = latitudeDry && signals.total < 6 && sparseVegetation && sparseSurfaceWater;
-  const subtropicalDryFallback =
-    absLat >= 18 &&
-    absLat <= ARID_LAT_MAX &&
-    signals.total >= 6 &&
-    norm.vegetated <= 0.02 &&
-    norm.water <= 0.02 &&
-    norm.arid <= 0.01;
-  const aridTerrain = !polar && (
-    explicitDesert ||
-    inferredDesert ||
-    lowDetailAridFallback ||
-    subtropicalDryFallback
-  );
+  // Missing map features are not climate evidence. Bare mapped land can be
+  // mineral ground without being sand; explicit sand still wins.
+  const aridTerrain = !polar && explicitDesert;
+  const rockyTerrain = !polar && !aridTerrain && inferredDesert;
 
   const biome = classifyBiomeProfile({
     latitude: lat,
@@ -250,9 +240,9 @@ function classifyWorldSurfaceProfile({
   return {
     absLat,
     centerLat: lat,
-    terrainModeHint: polar ? 'snow' : lat <= -60 ? (norm.barren >= .1 ? 'rock' : 'snowRock') : aridTerrain ? 'sand' : 'grass',
+    terrainModeHint: polar ? 'snow' : lat <= -60 ? (norm.barren >= .1 ? 'rock' : 'snowRock') : aridTerrain ? 'sand' : rockyTerrain ? 'rock' : 'grass',
     waterModeHint: frozenWater ? 'ice' : 'water',
-    reason: polar ? 'polar_latitude' : lat <= -60 ? 'antarctic_surface' : aridTerrain ? 'arid_surface' : 'temperate',
+    reason: polar ? 'polar_latitude' : lat <= -60 ? 'antarctic_surface' : aridTerrain ? 'arid_surface' : rockyTerrain ? 'rocky_surface' : 'temperate',
     biome,
     signals
   };
@@ -383,17 +373,6 @@ function shouldUseAridFallback(absLat, worldProfile, norm, localSignals) {
   if (!worldArid) return false;
   const worldNorm = worldProfile?.signals?.normalized || {};
   const worldRaw = worldProfile?.signals?.raw || {};
-  const lowDetailAridWorld =
-    worldProfile?.reason === 'arid_surface' &&
-    Number(worldProfile?.signals?.total || 0) < 6;
-  const dryBeltNoMoistureWorld =
-    worldProfile?.reason === 'arid_surface' &&
-    absLat >= 18 &&
-    absLat <= ARID_LAT_MAX &&
-    Number(worldProfile?.signals?.total || 0) >= 6 &&
-    Number(worldNorm.vegetated || 0) <= 0.02 &&
-    Number(worldNorm.water || 0) <= 0.02 &&
-    Number(worldNorm.arid || 0) <= 0.01;
   const explicitAridWorld =
     worldProfile?.reason === 'arid_surface' &&
     Number(worldNorm.water || 0) < 0.08 &&
@@ -408,8 +387,6 @@ function shouldUseAridFallback(absLat, worldProfile, norm, localSignals) {
     Number(worldNorm.arid || 0) >= 0.035;
   const worldSupportsDesertFallback =
     Number(worldNorm.explicitSand || 0) >= 0.35 ||
-    lowDetailAridWorld ||
-    dryBeltNoMoistureWorld ||
     explicitAridWorld ||
     mappedAridRegion ||
     (

@@ -57,3 +57,10 @@ test('indexed water beds preserve exact selection, holes, broad polygons and mut
  areas[0].surfaceMeters=-100;
  assert.equal(indexed(.01,.01,100),mappedWaterBedMetersAt(.01,.01,100,areas,contains));
 });
+
+test('large separated coastal polygons are pruned instead of scanned at every vertex',()=>{
+ const areas=Array.from({length:600},(_,i)=>({bounds:{minLon:-20,maxLon:20,minLat:i/10,maxLat:i/10+.025},surfaceMeters:i%7,kind:'ocean'}));
+ let calls=0;const contains=(x,y,a)=>{calls++;return x>=a.bounds.minLon&&x<=a.bounds.maxLon&&y>=a.bounds.minLat&&y<=a.bounds.maxLat;};
+ const sample=createMappedWaterBedSampler(areas,contains);
+ for(let i=0;i<600;i++){calls=0;const actual=sample(0,i/10+.01,100);assert.ok(calls<=2);assert.equal(actual,mappedWaterBedMetersAt(0,i/10+.01,100,areas,contains));}
+});

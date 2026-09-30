@@ -1,4 +1,5 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
+import { cameraRoadSurfaceHit } from './camera-road-surface.js';
 import { roadWidthAtProjection } from './road-cross-section-profile.js?v=1';
 
 const runtime = {
@@ -296,7 +297,7 @@ function roadContinuityCandidates(preferredRoad) {
   return candidates;
 }
 
-function evaluateNearestRoadCandidate(road, x, z, targetY, maxVerticalDelta, preferredRoad) {
+function evaluateNearestRoadCandidate(road, x, z, targetY, maxVerticalDelta, preferredRoad, bestScore = Infinity) {
   const pts = Array.isArray(road?.pts) ? road.pts : null;
   if (!pts || pts.length < 2) return null;
   const semantics = road?.structureSemantics || null;
@@ -309,6 +310,13 @@ function evaluateNearestRoadCandidate(road, x, z, targetY, maxVerticalDelta, pre
       totalDistance += Math.hypot(pts[i + 1].x - pts[i].x, pts[i + 1].z - pts[i].z);
     }
   }
+  const sameRoad = road === preferredRoad;
+  const connectedRoad = !!preferredRoad && !sameRoad && (
+    Array.isArray(preferredRoad.connectedFeatures?.start) && preferredRoad.connectedFeatures.start.some(entry => entry?.feature === road) ||
+    Array.isArray(preferredRoad.connectedFeatures?.end) && preferredRoad.connectedFeatures.end.some(entry => entry?.feature === road)
+  );
+  const continuityAccess = !!preferredRoad && (sameRoad || runtime.areRoadsConnected(preferredRoad, road));
+  const continuityDiscount = !preferredRoad ? 0 : sameRoad ? 3.4 : connectedRoad ? 2.25 : 0;
   let best = null;
   let cumulativeDistance = 0;
   for (let i = 0; i < pts.length - 1; i++) {
@@ -324,6 +332,13 @@ function evaluateNearestRoadCandidate(road, x, z, targetY, maxVerticalDelta, pre
     const nx = p1.x + t * dx;
     const nz = p1.z + t * dz;
     const d = Math.hypot(x - nx, z - nz);
+    // Height and grade penalties cannot improve this lower bound. Avoid
+    // sampling surfaces for segments that cannot replace the current winner.
+    const endpointDiscount = preferredRoad && (sameRoad || connectedRoad) && (t < 0.08 || t > 0.92) ? 0.55 : 0;
+    if (d - continuityDiscount - endpointDiscount > Math.min(bestScore, best?.weightedDist ?? Infinity) + 1e-9) {
+      cumulativeDistance += segLen;
+      continue;
+    }
     const projected = { x: nx, z: nz, dist: d, segIndex: i, t };
     const roadY = runtime.sampleFeatureSurfaceY(road, x, z, projected);
     const verticalDelta = Number.isFinite(targetY) && Number.isFinite(roadY) ? Math.abs(roadY - targetY) : 0;
@@ -351,11 +366,6 @@ function evaluateNearestRoadCandidate(road, x, z, targetY, maxVerticalDelta, pre
       0.38;
     let weightedDist = d + (Number.isFinite(targetY) && Number.isFinite(roadY) ? verticalDelta * verticalWeight : 0);
     if (preferredRoad) {
-      const sameRoad = road === preferredRoad;
-      const connectedRoad = !sameRoad && (
-        Array.isArray(preferredRoad?.connectedFeatures?.start) && preferredRoad.connectedFeatures.start.some((entry) => entry?.feature === road) ||
-        Array.isArray(preferredRoad?.connectedFeatures?.end) && preferredRoad.connectedFeatures.end.some((entry) => entry?.feature === road)
-      );
       if (sameRoad) {
         weightedDist = d + verticalDelta * 0.12;
       } else if (connectedRoad) {
@@ -365,11 +375,6 @@ function evaluateNearestRoadCandidate(road, x, z, targetY, maxVerticalDelta, pre
       else if (connectedRoad) weightedDist -= 2.25;
       if ((sameRoad || connectedRoad) && (t < 0.08 || t > 0.92)) weightedDist -= 0.55;
     }
-    const continuityAccess =
-      !!preferredRoad && (
-        road === preferredRoad ||
-        runtime.areRoadsConnected(preferredRoad, road)
-      );
     if (semantics?.gradeSeparated && !continuityAccess && Number.isFinite(verticalDelta)) {
       const directLockThreshold = semantics.terrainMode === 'elevated' ? 1.25 : 1.35;
       const transitionLockThreshold = semantics.terrainMode === 'elevated' ? 1.65 : 1.85;
@@ -406,13 +411,10 @@ function evaluateNearestRoadCandidate(road, x, z, targetY, maxVerticalDelta, pre
 export function cameraRoadSurfaceCollision(x, y, z, radius = 0.38) {
   if (![x,y,z,radius].every(Number.isFinite)) return false;
   rebuildRoadSearchIndexIfNeeded();
-  for (const road of indexedRoadCandidates(x,z,32+radius)) {
-    if (runtime.isSuppressedBaseRoad(road)) continue;
-    const hit=evaluateNearestRoadCandidate(road,x,z,NaN,Infinity,null);
-    if (!hit || hit.dist>roadWidthAtProjection(road,hit)*.5+radius) continue;
-    if (Number.isFinite(hit.y) && Math.abs(y-hit.y)<=radius+.12) return true;
-  }
-  return false;
+  return cameraRoadSurfaceHit(
+    indexedRoadCandidates(x,z,32+radius),x,y,z,radius,
+    runtime.sampleFeatureSurfaceY,roadWidthAtProjection,runtime.isSuppressedBaseRoad
+  );
 }
 
 export function findNearestRoad(x, z, options = {}) {
@@ -443,7 +445,8 @@ export function findNearestRoad(x, z, options = {}) {
       z,
       targetY,
       maxVerticalDelta,
-      preferredRoad
+      preferredRoad,
+      bestWeighted
     );
     if (!hit || hit.weightedDist >= bestWeighted) return;
     bestWeighted = hit.weightedDist;

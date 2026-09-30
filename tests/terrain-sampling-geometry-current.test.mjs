@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { pointInMappedWaterArea, pointInMappedLandArea, pointInLonLatRing } from '../app/js/terrain/far-field-mapped-context.js';
+import { pointInMappedWaterArea, pointInMappedLandArea, pointInLonLatRing, retainFarWaterRing } from '../app/js/terrain/far-field-mapped-context.js';
 import { createStreetFrontagePolicy } from '../app/js/world/compiler/street-frontage-policy.js';
 
 test('mapped water and land preserve islands, bounds and malformed-edge handling', () => {
@@ -28,4 +28,14 @@ test('frontage point and segment queries preserve exact distance and crossing ca
     assert.equal(policy.query({x:20,z:0},{x:-20,z:0}).length,2);
     assert.equal(policy.query({x:10,z:10},undefined,0).length,2);
   } finally { policy.dispose(); }
+});
+
+test('compiled geographic rings preserve exact coastal crossings and independent source ownership',()=>{
+ for(const n of [4,65,1000]){
+  const source=Array.from({length:n},(_,i)=>{const a=i/n*Math.PI*2,r=8+Math.sin(i*1.87)*2;return [Math.cos(a)*r,Math.sin(a)*r];});
+  source.push(source[0]);const retained=retainFarWaterRing(source);assert.notEqual(retained,source);assert.ok(Object.isFrozen(retained));
+  for(let i=0;i<4000;i++){const x=((i*7919)%2400)/100-12,y=((i*1543)%2400)/100-12;assert.equal(pointInLonLatRing(x,y,retained),pointInLonLatRing(x,y,source));}
+  for(const [x,y]of source)assert.equal(pointInLonLatRing(x,y,retained),pointInLonLatRing(x,y,source));
+  const before=pointInLonLatRing(0,0,retained);source[0][0]=1000;assert.equal(pointInLonLatRing(0,0,retained),before);
+ }
 });

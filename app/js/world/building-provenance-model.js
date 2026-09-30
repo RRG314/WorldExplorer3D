@@ -10,6 +10,7 @@ const BUILDING_GEOMETRY_AUTHORITY = Object.freeze({
 const PROVENANCE_FIELDS = Object.freeze([
   ['name', ['name']],
   ['buildingType', ['building', 'building:part']],
+  ['architecture', ['building:architecture', 'architecture', 'architectural_style']],
   ['heightMeters', ['height']],
   ['levels', ['building:levels']],
   ['minHeightMeters', ['min_height']],

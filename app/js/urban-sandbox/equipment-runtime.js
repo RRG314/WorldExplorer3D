@@ -964,7 +964,7 @@ function createUrbanEquipmentRuntime(options = {}) {
     const equipment = prepared.definition;
     state.equipmentVisual?.playUse?.(equipment);
     if (prepared.utility === 'flashlight') {
-      state.flashlight.visible = prepared.enabled;
+      state.flashlight.intensity = prepared.enabled ? 38 : 0;
       setStatus(prepared.enabled ? 'Field light on.' : 'Field light off.');
       render();
       return true;
@@ -1029,7 +1029,7 @@ function createUrbanEquipmentRuntime(options = {}) {
     updateProjectiles(dt);
     updateArmedNpcResponse();
     updateReticlePresentation();
-    if (actor && state.flashlight.visible) {
+    if (actor && state.flashlight.intensity > 0) {
       const direction = new THREE.Vector3();
       appCtx.camera?.getWorldDirection?.(direction);
       state.flashlight.position.set(actor.x, actor.y - .25, actor.z);
