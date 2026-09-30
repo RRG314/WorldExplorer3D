@@ -1,15 +1,11 @@
+import {drainCooperatively} from './cooperative-scheduling.js?v=1';
 // Candidate index only. The existing building/obstacle solver owns response.
 const caches = new WeakMap();
 const CELL = 64;
-export function nearbyVegetationObstacles(ctx, x, z, radius = 2) {
-  if (![x, z, radius].every(Number.isFinite) || radius < 0 || radius > 256) return [];
-  if (ctx.isEnv && ctx.ENV && !ctx.isEnv(ctx.ENV.EARTH)) return [];
-  const features = ctx.vegetationFeatures;
-  if (!Array.isArray(features) || !features.length) return [];
-  let cache = caches.get(ctx);
-  if (!cache || cache.features !== features) {
+function* vegetationObstacleIndexSteps(ctx, features) {
     const cells = new Map();
     for (const tree of features) {
+      yield;
       if (tree.trunkRadius === 0) continue;
       if (!Number.isFinite(tree.x) || !Number.isFinite(tree.z)) continue;
       const scale=Math.max(.65,Number(tree.scale)||1), r=Number.isFinite(tree.trunkRadius) ? tree.trunkRadius : .42*scale;
@@ -22,7 +18,27 @@ export function nearbyVegetationObstacles(ctx, x, z, radius = 2) {
         const key=`${ix}:${iz}`;if(!cells.has(key))cells.set(key,[]);cells.get(key).push(collider);
       }
     }
-    cache={features,cells};caches.set(ctx,cache);
+  return {features,cells};
+}
+
+export function prepareVegetationObstacleIndex(ctx,features,schedule) {
+  return drainCooperatively(vegetationObstacleIndexSteps(ctx,features),schedule);
+}
+export function publishVegetationObstacleIndex(ctx,index) {
+  if(index.features!==ctx.vegetationFeatures)throw new Error('Vegetation contact publication must match visual features');
+  caches.set(ctx,index);
+}
+
+export function nearbyVegetationObstacles(ctx, x, z, radius = 2) {
+  if (![x, z, radius].every(Number.isFinite) || radius < 0 || radius > 256) return [];
+  if (ctx.isEnv && ctx.ENV && !ctx.isEnv(ctx.ENV.EARTH)) return [];
+  const features = ctx.vegetationFeatures;
+  if (!Array.isArray(features) || !features.length) return [];
+  let cache = caches.get(ctx);
+  if (!cache || cache.features !== features) {
+    const steps=vegetationObstacleIndexSteps(ctx,features);
+    for (;;) {const result=steps.next();if(result.done){cache=result.value;break;}}
+    caches.set(ctx,cache);
   }
   const result=new Set();
   for(let ix=Math.floor((x-radius)/CELL);ix<=Math.floor((x+radius)/CELL);ix++) for(let iz=Math.floor((z-radius)/CELL);iz<=Math.floor((z+radius)/CELL);iz++) for(const collider of cache.cells.get(`${ix}:${iz}`)||[])result.add(collider);

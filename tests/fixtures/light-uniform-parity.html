@@ -1,0 +1,22 @@
+<!doctype html><meta charset="utf-8"><link rel="icon" href="data:,"><style>body{margin:0;background:#111}canvas{display:block}</style>
+<script src="/node_modules/three/build/three.min.js"></script><script type="module">
+import {installLightUniformExperiment} from '/scripts/verification/light-uniform-experiment.mjs';
+const renderer=new THREE.WebGLRenderer({preserveDrawingBuffer:true,antialias:false});renderer.setSize(640,400);document.body.append(renderer.domElement);
+const scene=new THREE.Scene();scene.background=new THREE.Color(0x223344);
+const camera=new THREE.PerspectiveCamera(55,1.6,.1,100);camera.position.set(7,7,13);camera.lookAt(0,0,0);
+const ground=new THREE.Mesh(new THREE.PlaneGeometry(40,40),new THREE.MeshStandardMaterial({color:0x999999,roughness:.8}));ground.rotation.x=-Math.PI/2;scene.add(ground);
+for(let i=0;i<18;i++){const material=i%2?new THREE.MeshPhongMaterial({color:0xe87733,shininess:50}):new THREE.MeshStandardMaterial({color:0x44aadd,roughness:.5});const mesh=new THREE.Mesh(new THREE.SphereGeometry(.65,16,10),material);mesh.position.set((i%6-2.5)*1.8,.7,(Math.floor(i/6)-1)*2.5);mesh.renderOrder=i;scene.add(mesh);}
+const directional=new THREE.DirectionalLight(0xffddbb,.8);directional.position.set(2,7,2);scene.add(directional);
+const point=new THREE.PointLight(0x33bbff,3,20);point.position.set(-3,3,1);scene.add(point);
+const spot=new THREE.SpotLight(0xffaa44,3,25,.7,.4);spot.position.set(4,6,0);scene.add(spot,spot.target);
+const hemisphere=new THREE.HemisphereLight(0x4466cc,0x554422,.4);scene.add(hemisphere);
+const experiment=installLightUniformExperiment({renderer});
+const capture=cam=>{renderer.render(scene,cam);const gl=renderer.getContext(),out=new Uint8Array(640*400*4);gl.readPixels(0,0,640,400,gl.RGBA,gl.UNSIGNED_BYTE,out);if(gl.getError())throw Error('WebGL error');return out;};
+function compare(name,cam=camera){experiment.setEnabled(false);capture(cam);const before=capture(cam);experiment.setEnabled(true);capture(cam);const after=capture(cam);let changed=0,max=0;const colors=new Set();for(let i=0;i<before.length;i+=4){colors.add((before[i]<<16)|(before[i+1]<<8)|before[i+2]);let diff=false;for(let c=0;c<3;c++){const d=Math.abs(before[i+c]-after[i+c]);max=Math.max(max,d);diff||=d>0;}if(diff)changed++;}if(colors.size<100||changed)throw Error(JSON.stringify({name,changed,max,colors:colors.size}));return {name,changed,max,colors:colors.size};}
+const rows=[];rows.push(compare('multiple programs'));
+point.intensity=0;spot.intensity=0;rows.push(compare('day inactive pools'));
+point.intensity=4;point.position.set(3,2,-2);spot.intensity=6;spot.target.position.set(-3,0,1);directional.color.setHex(0x4455ff);rows.push(compare('night and moved lights'));
+camera.position.set(-9,4,8);camera.lookAt(0,0,0);rows.push(compare('changed camera'));
+const left=camera.clone(),right=camera.clone();left.aspect=right.aspect=.8;left.updateProjectionMatrix();right.updateProjectionMatrix();left.viewport=new THREE.Vector4(0,0,320,400);right.viewport=new THREE.Vector4(320,0,320,400);right.position.x+=3;right.lookAt(0,0,0);const array=new THREE.ArrayCamera([left,right]);rows.push(compare('array camera'));
+window.result={rows,uniforms:experiment.snapshot()};capture(camera);window.ready=true;
+</script>

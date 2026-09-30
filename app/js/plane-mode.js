@@ -1,5 +1,6 @@
+import { cameraFollowHistory, smoothMovingCameraTarget } from './hud/moving-camera-target.js';
 import { ctx as appCtx } from './shared-context.js?v=55';
-import { aircraftBankTurnFactor, aircraftChaseOffset, aircraftForwardVector, cameraSmoothingBlend, integrateAerobaticAttitude } from './controls/traversal-control-policy.js?v=8';
+import { aircraftBankTurnFactor, aircraftChaseOffset, aircraftForwardVector, integrateAerobaticAttitude } from './controls/traversal-control-policy.js?v=8';
 import { aircraftGearSamplePoints } from './plane/roof-contact.js?v=2';
 import { applyAircraftHeadingTurn, classicAircraftBankTurnRate, integrateFixedWingFlight, resolveAircraftFlightTuning } from './plane/flight-dynamics.js?v=4';
 import { sampleSweptContact } from './physics/swept-contact.js?v=1';
@@ -785,10 +786,8 @@ function applyPlaneCamera(dt) {
     const targetX = flightPose.x + chaseOffset.x;
     const targetY = flightPose.y + chaseOffset.y;
     const targetZ = flightPose.z + chaseOffset.z;
-    const blend = cameraSmoothingBlend(12, dt);
-    appCtx.camera.position.x += (targetX - appCtx.camera.position.x) * blend;
-    appCtx.camera.position.y += (targetY - appCtx.camera.position.y) * blend;
-    appCtx.camera.position.z += (targetZ - appCtx.camera.position.z) * blend;
+    smoothMovingCameraTarget(appCtx.camera.position, cameraFollowHistory(appCtx.camera, 'plane-position'),
+      targetX, targetY, targetZ, 12, dt);
     const targetLookX = flightPose.x + forward.x * 3;
     const targetLookY = flightPose.y + 0.4;
     const targetLookZ = flightPose.z + forward.z * 3;
@@ -798,10 +797,8 @@ function applyPlaneCamera(dt) {
       z: targetLookZ
     };
     appCtx.camera.userData.planeLookTarget = lookTarget;
-    const lookBlend = cameraSmoothingBlend(14, dt);
-    lookTarget.x += (targetLookX - lookTarget.x) * lookBlend;
-    lookTarget.y += (targetLookY - lookTarget.y) * lookBlend;
-    lookTarget.z += (targetLookZ - lookTarget.z) * lookBlend;
+    smoothMovingCameraTarget(lookTarget, cameraFollowHistory(appCtx.camera, 'plane-look'),
+      targetLookX, targetLookY, targetLookZ, 14, dt);
     appCtx.camera.lookAt(lookTarget.x, lookTarget.y, lookTarget.z);
   }
   return true;

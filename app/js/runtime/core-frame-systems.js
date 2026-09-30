@@ -1,5 +1,5 @@
 import {createGraphicsCallEvidence} from './graphics-call-evidence.js';
-import { updateStreetPavementFocus, updateStreetOverviewFrame } from '../world/street-pavement-runtime.js';
+import { updateStreetPavementFocus, updateStreetOverviewFrame, prepareStreetOverviewMaterials } from '../world/street-pavement-runtime.js';
 function createCoreFrameSystems(appCtx, hooks = {}) {
   appCtx.presentationPose = null;
   let hudTimer = 0;
@@ -172,6 +172,20 @@ function createCoreRenderSystem(appCtx, shouldUseComposer) {
     if (!appCtx.gameStarted || appCtx.worldLoading) throw new Error('World is not ready for its first render');
     const started=performance.now();
     appCtx.updateCamera?.(0);
+    prepareStreetOverviewMaterials(appCtx);
+    // Prepare resident materials outside the initial camera's frustum too.
+    // Otherwise turning or moving first encounters their synchronous link work.
+    // Match RenderPass's target: compiling for the screen would warm a different
+    // output-encoding variant when postprocessing renders into its read buffer.
+    if (typeof appCtx.renderer.compile === 'function') {
+      const previousTarget = appCtx.renderer.getRenderTarget();
+      try {
+        appCtx.renderer.setRenderTarget(shouldUseComposer() ? appCtx.composer.readBuffer : null);
+        appCtx.renderer.compile(appCtx.scene, appCtx.camera);
+      } finally {
+        appCtx.renderer.setRenderTarget(previousTarget);
+      }
+    }
     draw();
     return {durationMs:performance.now()-started,programs:appCtx.renderer?.info?.programs?.length || 0};
   };

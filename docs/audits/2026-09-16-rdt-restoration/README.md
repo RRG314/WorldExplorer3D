@@ -6,14 +6,7 @@ RDT is restored in the local application as a shared mathematical/identity core 
 
 The game source before removal is preserved in commit `1519f0618e08b4779a9eff976ec7193d11aa819b`. Its `app/js/rdt.js` contains depth, deterministic identity and experimental noise; its world budgets additionally used geographic-hash depth to change feature caps, road sampling and visibility. Reviewing only seed equivalence was insufficient to evaluate all these changes.
 
-The local research review covered:
-
-- `Documents/New project/repos/rdt-spatial-index`: README, implementation, results and license; commit `8d2d9553668606436eb2bde14e8851fced82f29b`. Its JavaScript index uses occupancy-driven recursive grid partitioning. The repository explicitly reports workload-dependent performance and no universal winner.
-- `Documents/ChatGPT/Oeis/rdt_software_research/RDT_SOFTWARE_RESEARCH_REPORT.md`: exact integer/sparse-search work. Its own evaluation reports losses against its strongest equal-memory quantile baseline; that is not evidence to transplant the integer-search method into a frame loop.
-- The Codex task **Run falsification pass**, including its completed comparative study: exact observable-preserving reductions are mathematical results for specified observations. They do not certify visual or collision-preserving reduction of this game.
-- `Documents/rdt-grant-attachments/rdt_repository_ecosystem.md` and the local game RDT-engine README, to distinguish the spatial prototype, game integration and separate entropy/noise work.
-
-These repositories were read only. No research results, repository histories or remote branches were modified.
+The review distinguished the occupancy-driven spatial-index prototype from the separate integer-search, identity and noise experiments. Component results were workload-dependent; mathematical equivalence for a specified query does not establish visual or collision equivalence for the game. The spatial adaptation's license is preserved with this report.
 
 ## Current implementation
 
@@ -43,8 +36,8 @@ Reproduce with `node scripts/verification/rdt-capture-benchmark.mjs`. Run the fo
 
 ## Remaining acceptance
 
-The preceding Baltimore test became unresponsive before useful diagnostics were captured. It cannot be called a passing test or attributed to RDT removal without a matched trace. Browser discovery now reports no remaining tabs, so the former owned test world is no longer discovered. No new whole-world retry was launched during this restoration.
+The preceding Baltimore test became unresponsive before useful diagnostics were captured. It cannot be called a passing test or attributed to RDT removal without a matched trace. No usable whole-world result was obtained during that restoration.
 
-The current source preview is port 4192. The saved packaged artifact predates this restoration. No production deployment or GitHub update was performed. Full loading, memory retention, sustained urban flight and cross-city visual acceptance still require a traced comparison; region-wide road/building construction and first-frame rendering remain open owners. The measured capture improvement is real within its test scope and does not explain every freeze.
+This historical audit did not include a production deployment. Full loading, memory retention, sustained urban flight and cross-city visual acceptance still require a traced comparison; region-wide road/building construction and first-frame rendering remain open owners. The measured capture improvement is real within its test scope and does not explain every freeze.
 
 The spatial adaptation's MIT notice is included in its source and in `RDT-SPATIAL-LICENSE.txt`.

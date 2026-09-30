@@ -2,6 +2,7 @@ import { ctx as appCtx } from "../shared-context.js?v=55";
 import { normalizeAngle, siderealTime, toDays } from "../astro.js?v=1";
 import { createRoundStarMaterial } from "./star-point-material.js?v=4";
 import { createGaiaSkyLayers } from "./gaia-catalog.js?v=4";
+import { deferHiddenSkyMatrixUpdates } from './sky-matrix-updates.js';
 
 const STARFIELD_RADIUS = 5000;
 const _skyMatrix = new THREE.Matrix4();
@@ -58,7 +59,8 @@ function raDecToVector(ra, dec, radius = STARFIELD_RADIUS) {
 }
 
 export function createStarField() {
-  const group = new THREE.Group();
+  const group = deferHiddenSkyMatrixUpdates(new THREE.Group());
+  group.name = 'Astronomical Sky';
   const hitboxGeometry = new THREE.SphereGeometry(1, 6, 4);
   const hitboxMaterial = new THREE.MeshBasicMaterial({ visible: false });
   const brightPositions = [];

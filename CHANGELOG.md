@@ -2,6 +2,36 @@
 
 Notable user-facing changes are recorded here. Git history and GitHub releases contain the complete change record.
 
+## [5.4.0] - 2026-09-30
+
+### Changed
+
+- Preserve lighting exposure across quality settings and retain imported ship
+  equipment materials, mounts and physical scale.
+- Use licensed vegetation with shared texture allocations and stable tree bases.
+- Filter distant facade windows and retain licensed walking avatars for remote
+  players.
+- Treat documented ruins as historic masonry without residential windows or
+  rooftop equipment. Sample historic walls along terrain rather than tilting
+  long blocks between endpoints.
+
+### Fixed
+
+- Driving and aircraft chase cameras no longer alternate their follow lag with
+  short and long frames. Reduce temporary road, geometry and lighting work
+  while preserving rendering and collision behavior.
+  Release discarded private building buffers after batching to reduce deferred
+  native-memory cleanup stalls during travel.
+
+- Repeated terrain blending no longer changes material weights.
+- Downhill building foundations extend across accepted steep terrain relief.
+- Cancelled landmark loads release their resources; replaced historic models
+  are removed rather than left hidden in the scene.
+- Ground compass headings now agree with the movement coordinate system.
+
+All 57 candidate release gates, 13 backend stages and the two-client weekly-room
+journey passed. Occasional GC pauses and physical-phone acceptance remain limits.
+
 ## [5.3.0] - 2026-09-28
 
 ### Added

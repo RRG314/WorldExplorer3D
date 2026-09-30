@@ -1,14 +1,20 @@
 const FEATURED_ARRIVALS = [
   {
+    id: 'elizabeth-tower',
+    match: { lat: 51.5007, lon: -0.1246, radiusMeters: 190 },
+    viewpoint: { lat: 51.5009, lon: -0.1226 },
+    lookAt: { lat: 51.5007, lon: -0.1246 }
+  },
+  {
     id: 'giza-pyramid-complex',
     match: { lat: 29.9792, lon: 31.1342, radiusMeters: 190 },
-    viewpoint: { lat: 29.9792, lon: 31.1238 },
+    viewpoint: { lat: 29.9797, lon: 31.1302 },
     lookAt: { lat: 29.9792345, lon: 31.1342019 }
   },
   {
     id: 'great-wall-mutianyu',
     match: { lat: 40.4319, lon: 116.5704, radiusMeters: 190 },
-    viewpoint: { lat: 40.4334, lon: 116.5736 },
+    viewpoint: { lat: 40.4331, lon: 116.5731 },
     lookAt: { lat: 40.4338583, lon: 116.5743061 }
   }
 ];

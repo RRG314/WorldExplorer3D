@@ -1,4 +1,5 @@
 import {
+  applyEarthAtmosphereProfile,
   buildEarthAtmosphereProfile,
   createAtmosphereMaterial
 } from '../sky/earth-atmosphere.js?v=1';
@@ -13,24 +14,30 @@ function publishEarthEnvironment(ctx, texture) {
 function buildProceduralEnvironmentTarget(ctx, profile) {
   const pmremGenerator = ctx.appCtx.pmremGenerator;
   if (!pmremGenerator || typeof THREE === 'undefined') return null;
-  const envScene = new THREE.Scene();
-  const envGeo = new THREE.BoxGeometry(20, 20, 20);
-  const envMat = createAtmosphereMaterial(profile, { name: 'WorldExplorerEarthEnvironment' });
-  if (!envMat) {
-    envGeo.dispose?.();
-    return null;
+  let capture = ctx.state.fallbackEnvCapture;
+  if (capture?.generator !== pmremGenerator) {
+    capture?.mesh.geometry.dispose();
+    capture?.mesh.material.dispose();
+    capture = null;
+    ctx.state.fallbackEnvCapture = null;
   }
-  const envMesh = new THREE.Mesh(envGeo, envMat);
-  envScene.add(envMesh);
+  if (!capture) {
+    const material = createAtmosphereMaterial(profile, { name: 'WorldExplorerEarthEnvironment' });
+    if (!material) return null;
+    const scene = new THREE.Scene();
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(20, 20, 20), material);
+    scene.add(mesh);
+    capture = { generator: pmremGenerator, scene, mesh };
+    ctx.state.fallbackEnvCapture = capture;
+  }
+  // Keep the capture shader alive across sky changes. Disposing it after each
+  // update forced a synchronous program link during normal driving and flight.
+  applyEarthAtmosphereProfile(capture.mesh, profile);
   try {
-    return pmremGenerator.fromScene(envScene, 0.025, 0.1, 100);
+    return pmremGenerator.fromScene(capture.scene, 0.025, 0.1, 100);
   } catch (err) {
     console.warn('Procedural environment map generation failed:', err);
     return null;
-  } finally {
-    envScene.remove(envMesh);
-    envGeo.dispose?.();
-    envMat.dispose?.();
   }
 }
 
@@ -81,9 +88,8 @@ export function applyRenderQuality(ctx, level, options = {}) {
   ctx.appCtx.renderQualityLevel = normalized;
   if (options.persist !== false) ctx.writeStorage(ctx.RENDER_QUALITY_STORAGE_KEY, normalized);
 
-  if (ctx.appCtx.renderer) {
-    ctx.appCtx.renderer.toneMappingExposure = normalized === ctx.RENDER_QUALITY_HIGH ? 0.95 : normalized === ctx.RENDER_QUALITY_MED ? 0.9 : 0.85;
-  }
+  // Weather and the active world own exposure. A cost/detail change must not
+  // recolour the same place, especially while inside a ship or on another body.
   if (ctx.appCtx.sun) {
     applyDirectionalShadowPolicy(ctx.appCtx, {
       gpuTier: ctx.state.currentGpuTier,
@@ -96,25 +102,6 @@ export function applyRenderQuality(ctx, level, options = {}) {
     publishEarthEnvironment(ctx, ctx.state.hdrEnvMap);
   } else if (ctx.state.fallbackEnvMap) {
     publishEarthEnvironment(ctx, ctx.state.fallbackEnvMap);
-  }
-
-  if (ctx.state.carPaintMaterial) {
-    const high = normalized === ctx.RENDER_QUALITY_HIGH;
-    const utilityMatte = ctx.state.carPaintMaterial.userData?.vehiclePaintFinish === 'utility-matte';
-    ctx.state.carPaintMaterial.envMapIntensity = utilityMatte
-      ? (high ? 0.9 : normalized === ctx.RENDER_QUALITY_MED ? 0.7 : 0.4)
-      : (high ? 1.5 : normalized === ctx.RENDER_QUALITY_MED ? 1.2 : 0.65);
-    ctx.state.carPaintMaterial.roughness = utilityMatte
-      ? (high ? 0.44 : normalized === ctx.RENDER_QUALITY_MED ? 0.52 : 0.6)
-      : (high ? 0.14 : 0.2);
-    ctx.state.carPaintMaterial.metalness = utilityMatte
-      ? (high ? 0.3 : normalized === ctx.RENDER_QUALITY_MED ? 0.24 : 0.18)
-      : (high ? 0.95 : 0.88);
-    if ('clearcoat' in ctx.state.carPaintMaterial) {
-      ctx.state.carPaintMaterial.clearcoat = 0.0;
-      ctx.state.carPaintMaterial.clearcoatRoughness = 1.0;
-    }
-    ctx.state.carPaintMaterial.needsUpdate = true;
   }
 
   if (ctx.appCtx.ssaoPass) ctx.appCtx.ssaoPass.enabled = ctx.state.ssaoEnabled && normalized === ctx.RENDER_QUALITY_HIGH;

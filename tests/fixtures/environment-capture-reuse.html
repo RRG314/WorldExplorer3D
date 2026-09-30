@@ -1,0 +1,20 @@
+<!doctype html><meta charset="utf-8"><link rel="icon" href="data:,"><style>body{margin:0;background:#192533}canvas{display:block}</style>
+<script src="/node_modules/three/build/three.min.js"></script><script type="module">
+import {refreshProceduralEnvironment} from '/app/js/engine/quality.js';
+import {buildEarthAtmosphereProfile,createAtmosphereMaterial} from '/app/js/sky/earth-atmosphere.js?v=1';
+const renderer=new THREE.WebGLRenderer({antialias:false,preserveDrawingBuffer:true});renderer.setSize(800,600);document.body.append(renderer.domElement);
+const scene=new THREE.Scene();scene.background=new THREE.Color(0x192533);const camera=new THREE.PerspectiveCamera(45,4/3,.1,100);camera.position.set(0,1,7);camera.lookAt(0,0,0);
+for(let i=0;i<3;i++){const mesh=new THREE.Mesh(new THREE.SphereGeometry(.8,40,32),new THREE.MeshStandardMaterial({color:0xc5c8cc,metalness:i/2,roughness:.15+i*.3}));mesh.position.x=(i-1)*2;scene.add(mesh);}
+const generator=new THREE.PMREMGenerator(renderer),ctx={appCtx:{scene,pmremGenerator:generator},state:{renderQualityLevel:'med'},RENDER_QUALITY_LOW:'low'};let phase=0,results=[],identity=null;
+function pixels(texture){scene.environment=texture;renderer.render(scene,camera);const gl=renderer.getContext(),data=new Uint8Array(800*600*4);gl.readPixels(0,0,800,600,gl.RGBA,gl.UNSIGNED_BYTE,data);return data;}
+function check(){
+ const profile=buildEarthAtmosphereProfile(null,null,{phase:['day','sunset','night','sunrise'][phase%4],backgroundHex:0x87ceeb});
+ const referenceScene=new THREE.Scene(),referenceMesh=new THREE.Mesh(new THREE.BoxGeometry(20,20,20),createAtmosphereMaterial(profile));referenceScene.add(referenceMesh);
+ const reference=generator.fromScene(referenceScene,.025,.1,100),before=pixels(reference.texture);
+ const texture=refreshProceduralEnvironment(ctx,profile,{force:true}),after=pixels(texture);let max=0;for(let i=0;i<before.length;i++)max=Math.max(max,Math.abs(before[i]-after[i]));
+ reference.dispose();referenceMesh.geometry.dispose();referenceMesh.material.dispose();
+ const capture=ctx.state.fallbackEnvCapture;if(identity&&capture!==identity)throw Error('Capture replaced');identity=capture;
+ results.push({phase,maxChannelDifference:max,geometries:renderer.info.memory.geometries,textures:renderer.info.memory.textures,programs:renderer.info.programs.map(p=>p.id)});if(max>1)throw Error('Environment changed pixels '+max);
+}
+check();addEventListener('keydown',e=>{if(e.code==='ArrowRight'){phase++;check();}});window.advanceTime=()=>renderer.render(scene,camera);window.render_game_to_text=()=>JSON.stringify({phase,results,glError:renderer.getContext().getError()});
+</script>

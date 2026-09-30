@@ -186,9 +186,9 @@ export function startLivingWorldRuntime(appCtx, options = {}) {
     pedestrianGraph: pedestrianCompilation.publication,
     trafficGraph: trafficCompilation.publication,
     random: createWorldRandom(worldIdentity, 0x4c495645),
-    getReferencePosition: () => appCtx.Walk?.state?.mode === 'walk'
+    getReferencePosition: () => appCtx.activeEarthActorPosition?.() || (appCtx.Walk?.state?.mode === 'walk'
       ? appCtx.Walk.state.walker
-      : appCtx.droneMode ? appCtx.drone : appCtx.car,
+      : appCtx.droneMode ? appCtx.drone : appCtx.car),
     getTimePhase: () => appCtx.timeOfDay,
     getTrafficFlow: () => appCtx.currentTrafficFlowProfile || null,
     trafficControls: appCtx.trafficControlPlacements,

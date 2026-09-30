@@ -102,3 +102,18 @@ export async function fetchBundledLandmarkData(options = {}) {
 }
 
 export { BUNDLED_LANDMARK_SCHEMA_VERSION };
+
+// Reuse the reviewed landmark identities when a footprint feed omits historic
+// semantics. This goes through the same unique, bounded metadata join as cities.
+export function landmarkBuildingMetadata(data) {
+  if (!data?._landmarkPackId) return null;
+  const nodes = new Map((data.elements || []).filter(e=>e.type==='node').map(e=>[e.id,e]));
+  const elements = (data.elements || []).filter(e=>e.type==='way' && e.tags?.building).flatMap(way=>{
+    const ids=way.nodes?.slice() || [];
+    if(ids[0]===ids.at(-1))ids.pop();
+    const points=ids.map(id=>nodes.get(id)).filter(Boolean);
+    if(points.length<3)return [];
+    return [{...way,center:{lat:points.reduce((sum,p)=>sum+p.lat,0)/points.length,lon:points.reduce((sum,p)=>sum+p.lon,0)/points.length}}];
+  });
+  return {elements,_overpassSource:'bundled-osm-building-metadata',_buildingMetadataPackId:data._landmarkPackId};
+}

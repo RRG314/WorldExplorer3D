@@ -1,7 +1,9 @@
+import { installRenderLightUniformReuse } from './light-uniform-reuse.js';
 import { setupEngineInputHandlers } from "./input-handlers.js?v=16";
 import { createVehicleHeadlightRig } from "./night-lighting.js?v=8";
 import { attachCuratedPlayerCar } from './curated-player-car.js?v=7';
 import { applyDirectionalShadowPolicy } from "./shadow-policy.js?v=2";
+import { opaqueFrontToBack } from './opaque-order.js';
 import {
   buildEarthAtmosphereProfile,
   createEarthAtmosphereVisual
@@ -419,6 +421,8 @@ export function initEngineRuntime(ctx) {
   recordStartupDiagnostic("renderer", "initEngineRuntime start");
   appCtx.engineInitFailed = false;
   appCtx.scene = new THREE.Scene();
+  // The world origin is fixed; moving actors retain their own automatic matrices.
+  appCtx.scene.matrixAutoUpdate = false;
   appCtx.scene.background = new THREE.Color(0x87ceeb);
   appCtx.scene.fog = new THREE.FogExp2(0xb8d4e8, 0.00035);
   appCtx.camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.5, 12000);
@@ -432,6 +436,9 @@ export function initEngineRuntime(ctx) {
     );
     return false;
   }
+
+  appCtx.renderer.setOpaqueSort(opaqueFrontToBack);
+  installRenderLightUniformReuse(appCtx);
 
   try {
     const gl = appCtx.renderer.getContext?.();

@@ -29,24 +29,44 @@ export function mappedWaterBedMetersAt(
 }
 
 
-// Broad phase only: exact polygon/hole membership and water ownership still
-// decide the bed. Large/unbounded polygons remain candidates for every query.
+// Broad phase only: exact polygon/hole membership and mutable water levels
+// remain authoritative. A hierarchy also prunes large coastal polygons; the
+// former grid put every wide polygon in every query's fallback list.
 export function createMappedWaterBedSampler(areas = [], contains = null) {
-  const buckets = new Map(), broad = [], scale = 64;
-  for (const area of areas) {
-    const b = area?.bounds;
-    if (!b || ![b.minLon,b.maxLon,b.minLat,b.maxLat].every(Number.isFinite)) { broad.push(area); continue; }
-    const x0=Math.floor(b.minLon*scale),x1=Math.floor(b.maxLon*scale),y0=Math.floor(b.minLat*scale),y1=Math.floor(b.maxLat*scale);
-    const count=(x1-x0+1)*(y1-y0+1);
-    if (count>64 || count<=0 || ![x0,x1,y0,y1].every(Number.isSafeInteger)) { broad.push(area); continue; }
-    for(let x=x0;x<=x1;x++)for(let y=y0;y<=y1;y++) {
-      const key=`${x}:${y}`;let list=buckets.get(key);
-      if(!list){list=[];buckets.set(key,list);}list.push(area);
-    }
+  const bounded=[],unbounded=[];
+  for(const area of areas){
+    const b=area?.bounds;
+    if(!b || ![b.minLon,b.maxLon,b.minLat,b.maxLat].every(Number.isFinite) || b.minLon>b.maxLon || b.minLat>b.maxLat)unbounded.push(area);
+    else bounded.push(area);
   }
-  return (lon,lat,terrainMeters,depth=12) => {
-    const local=buckets.get(`${Math.floor(lon*scale)}:${Math.floor(lat*scale)}`);
-    const regional=mappedWaterBedMetersAt(lon,lat,terrainMeters,broad,contains,depth);
-    return local ? mappedWaterBedMetersAt(lon,lat,regional,local,contains,depth) : regional;
+  function build(items){
+    if(!items.length)return null;
+    const node={minLon:Infinity,maxLon:-Infinity,minLat:Infinity,maxLat:-Infinity};
+    for(const area of items){const b=area.bounds;node.minLon=Math.min(node.minLon,b.minLon);node.maxLon=Math.max(node.maxLon,b.maxLon);node.minLat=Math.min(node.minLat,b.minLat);node.maxLat=Math.max(node.maxLat,b.maxLat);}
+    if(items.length<=8){node.areas=items;return node;}
+    const axis=node.maxLon-node.minLon>=node.maxLat-node.minLat?'Lon':'Lat';
+    items.sort((a,b)=>(a.bounds['min'+axis]+a.bounds['max'+axis])-(b.bounds['min'+axis]+b.bounds['max'+axis]));
+    const middle=Math.floor(items.length/2);node.left=build(items.slice(0,middle));node.right=build(items.slice(middle));return node;
+  }
+  const root=build(bounded);
+  function visit(node,lon,lat,meters,depth){
+    if(!node || lon<node.minLon || lon>node.maxLon || lat<node.minLat || lat>node.maxLat)return meters;
+    if(node.areas){
+      for(const area of node.areas){
+        const b=area.bounds;
+        if(lon<b.minLon || lon>b.maxLon || lat<b.minLat || lat>b.maxLat)continue;
+        const surface=Number(area.surfaceMeters);
+        if(!Number.isFinite(surface)||!contains(lon,lat,area))continue;
+        const coastal=area.kind==='ocean'||area._surfaceOwnerKind==='ocean';
+        meters=Math.min(meters,surface-Math.max(coastal?30:2,Number(depth)||12));
+      }
+      return meters;
+    }
+    return visit(node.right,lon,lat,visit(node.left,lon,lat,meters,depth),depth);
+  }
+  return (lon,lat,meters,depth=12)=>{
+    if(!Number.isFinite(meters)||typeof contains!=='function')return meters;
+    const regional=mappedWaterBedMetersAt(lon,lat,meters,unbounded,contains,depth);
+    return visit(root,lon,lat,regional,depth);
   };
 }

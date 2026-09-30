@@ -146,6 +146,7 @@ async function launchWorld(client) {
   milestones.worldRequestedMs = Date.now() - startedAt;
   await waitForPlayable(client.page);
   milestones.playableMs = Date.now() - startedAt;
+  await client.page.evaluate(async()=>{globalThis.__WE3D_PERF_CONTEXT__=(await import('/app/js/shared-context.js?v=55')).ctx;});
   const diagnostics = await client.page.evaluate(() => {
     const state = globalThis.getWorldExplorerRuntimeDiagnostics?.() || {};
     return {
@@ -163,7 +164,7 @@ async function selectMode(page, expected, selector) {
   assert.equal(await page.locator(selector).isVisible(), true, `${selector} is not a visible Travel action.`);
   const startedAt = performance.now();
   await page.locator(selector).click();
-  await page.waitForFunction((mode) => globalThis.getWorldExplorerRuntimeDiagnostics?.().activeActor?.mode === mode, expected, { timeout: 20_000, polling: 500 });
+  await page.waitForFunction((mode) => globalThis.__WE3D_PERF_CONTEXT__?.activeTransportActor?.()?.mode === mode, expected, { timeout: 20_000, polling: 500 });
   const activationMs = Math.round(performance.now() - startedAt);
   await page.waitForTimeout(1_200);
   return activationMs;
@@ -171,13 +172,34 @@ async function selectMode(page, expected, selector) {
 
 async function measureMode(client, id, sampleMs = 5_000, movementKey = null) {
   if (movementKey) {
-    // Focus the world through a real pointer action, then hold the actual control.
-    await client.page.mouse.click(720, 400);
+    // Release menu focus without clicking a building and starting an unrelated
+    // selection/network journey inside the performance sample.
+    await client.page.locator('#travelBtn').blur();
     await client.page.keyboard.down(movementKey);
   }
+  await client.page.evaluate(id=>{
+    const ctx=globalThis.__WE3D_PERF_CONTEXT__;
+    globalThis.__WE3D_PERF_ACTOR__=id.startsWith('walk')?ctx.Walk.state.walker:id==='plane'?ctx.planeMode:ctx.car;
+  },id);
+  const trace = process.env.WE3D_PERF_TRACE_MODE === id;
+  if (trace) { await client.cdp.send('Profiler.enable'); await client.cdp.send('Profiler.start'); }
   let raw;
-  try { raw = await client.page.evaluate(sampleFrameWindow, sampleMs); }
+  try { raw = await client.page.evaluate(sampleFrameWindow, {durationMs:sampleMs,actorKey:'__WE3D_PERF_ACTOR__',collectDiagnostics:false}); }
   finally { if (movementKey) await client.page.keyboard.up(movementKey); }
+  if (trace) {
+    const {profile} = await client.cdp.send('Profiler.stop');
+    await mkdir(`${root}/output/architecture-evaluation/packaged-frame-trace`,{recursive:true});
+    await writeFile(`${root}/output/architecture-evaluation/packaged-frame-trace/${id}.json`,JSON.stringify({profile,raw,scope:'CPU-instrumented diagnostic, not release performance acceptance'}));
+  }
+  // Full diagnostics enumerate the world and actor catalogs. They belong in
+  // functional checks, not between timed windows where their garbage can cause
+  // pauses in the following sample. Read the same authoritative counters here.
+  raw.diagnostics=await client.page.evaluate(()=>{
+    const ctx=globalThis.__WE3D_PERF_CONTEXT__,info=ctx.renderer.info;
+    return {renderer:{...info.render,programs:info.programs.length,geometries:info.memory.geometries,textures:info.memory.textures},
+      worldCounts:{buildings:ctx.buildings.length,roads:ctx.roads.length,terrainTiles:ctx.terrainTileCache.size,
+        buildingMeshes:ctx.buildingMeshes.length,roadMeshes:ctx.roadMeshes.length,landuseMeshes:ctx.landuseMeshes.length}};
+  });
   assert.ok(raw.deltas.length > 0, 'Frame sample must contain intervals');
   assert.ok(raw.elapsedMs >= sampleMs, 'Frame sample must cover the requested duration');
   assert.ok(raw.deltas.every((value) => Number.isFinite(value) && value > 0), 'Frame intervals must be positive');
@@ -196,6 +218,8 @@ async function measureMode(client, id, sampleMs = 5_000, movementKey = null) {
     distanceWorldUnits: raw.startPosition && raw.endPosition
       ? Math.hypot(raw.endPosition.x-raw.startPosition.x,raw.endPosition.z-raw.startPosition.z) : null,
     frames: deltas.length,
+    firstFrameDelayMs: raw.firstFrameDelayMs,
+    measurementScope: 'Live actor coordinates and renderer counters; no full-world snapshots between timed modes',
     averageFps: 1000 / averageFrameMs,
     averageFrameMs,
     p95FrameMs: percentile(deltas, 0.95),

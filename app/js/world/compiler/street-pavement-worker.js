@@ -24,11 +24,13 @@ self.onmessage = async ({ data }) => {
       const mesh = result.polygons.length ? meshPavementTile(tile, result.polygons, () => 0, { curbHeight: 0.12 / plan.metersPerWorldUnit, ramps:result.ramps,includeTriangles:false }) : { vertices: [], curbVertices: [], triangles: [] };
       mesh.markingVertices=result.markingPolygons?.length ? meshPavementTile(tile,result.markingPolygons,()=>0,{curbHeight:0,cellSize:2}).vertices : [];
       delete mesh.triangles; // Contact reuses the final render buffer; do not clone point objects across threads.
+      const transfer=[];
+      for(const name of ['vertices','curbVertices','markingVertices']){mesh[name]=new Float64Array(mesh[name]||[]);transfer.push(mesh[name].buffer);}
       // A single acknowledged chunk is in flight. No unbounded mesh message queue.
       self.postMessage({ type: 'tile', key: tile.key, fingerprint, bounds: tile.bounds,
         segments: tile.segments.map(s => ({ ...s, road: undefined, roadIndex: s.road.auditIndex })),
         inferredFrontages: result.inferredFrontages, ramps:result.ramps, rampCount:result.ramps?.length || 0, mesh, completed: cursor, total: plan.tiles.length,
-        durationMs: Math.round(performance.now() - started) });
+        durationMs: Math.round(performance.now() - started) }, transfer);
     }
   } catch (error) { self.postMessage({ type: 'error', message: String(error?.message || error) }); plan = null; }
 };

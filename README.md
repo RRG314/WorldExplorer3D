@@ -106,7 +106,7 @@ active world.*
 
 ## The released 5.2 foundation
 
-Version 5.2 makes the sandbox feel more alive and more connected. The current
+Version 5.2 established the connected sandbox foundation. The
 Explorer and companion travel together, roads carry denser traffic and
 pedestrians, mapped businesses connect to useful supplies and services, and one
 wallet follows the player through property, fieldwork, vehicle upgrades, and
@@ -114,7 +114,7 @@ space. A shorter optional First Journey, configurable controls, calmer nearby
 prompts, and rebuilt touch and accessibility settings make it easier to start
 playing without covering the screen in instructions.
 
-Beyond Earth, Interstellar Expeditions Alpha now connects shipboard life,
+Beyond Earth, Interstellar Expeditions Alpha connects shipboard life,
 planetary fieldwork, Pathfinder travel, and a surprise pirate interception in
 one continuing voyage. The established Earth, Ocean, vehicle, flight,
 Backpack, Journal, multiplayer, and free-exploration paths remain available.
@@ -179,7 +179,7 @@ environment. Secrets are not included in the repository.
 
 - [Active release repair program](docs/RELEASE_REPAIR_PROGRAM.md)
 
-- [5.3 candidate release notes](RELEASE_NOTES_5.3.0.md)
+- [5.3 release notes](RELEASE_NOTES_5.3.0.md)
 - [Changelog](CHANGELOG.md)
 - [Roadmap](ROADMAP.md)
 - [System inventory](docs/SYSTEM_INVENTORY.md)

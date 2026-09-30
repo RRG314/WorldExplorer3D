@@ -34,18 +34,35 @@ function requestModel(ctx, kind) {
         throw failure.reason;
       }
       const instances=results.map(result=>result.value);
-      state.parts = instances.map(instance=>{
+      instances[0].root.updateMatrixWorld(true);
+      const primaryBounds = new THREE.Box3().setFromObject(instances[0].root);
+      const height = primaryBounds.max.y-primaryBounds.min.y;
+      const normalizedScale = (kind === 'grass' ? 1.2 : kind === 'fern' ? 0.7 : kind === 'shrub' ? 1.8 : 9) / Math.max(height,0.1);
+      // Tree LODs are derived from the same material set (verified by the asset
+      // contract). Reuse near textures so switching LOD does not upload a second
+      // identical set of maps to the GPU. Geometry remains independent.
+      const sharedMaps = new Map();
+      // These five reusable vegetation families own derived geometry/materials
+      // for the session, including textures borrowed from the decoded templates.
+      state.releaseTemplateResources = instances.map(instance => instance.retainResources());
+      state.parts = instances.map((instance,level)=>{
         instance.root.updateMatrixWorld(true);
-        const bounds = new THREE.Box3().setFromObject(instance.root);
-        const height = bounds.max.y-bounds.min.y;
-        const normalizedScale = (kind === 'grass' ? 1.2 : kind === 'fern' ? 0.7 : kind === 'shrub' ? 1.8 : 9) / Math.max(height,0.1);
         const parts=[];
         instance.root.traverse(mesh=>{
           if(!mesh.isMesh) return;
           const geometry=mesh.geometry.clone();geometry.applyMatrix4(mesh.matrixWorld);
-          geometry.translate(0,-bounds.min.y,0);geometry.scale(normalizedScale,normalizedScale,normalizedScale);
-          const material=mesh.material.clone();material.roughness=0.93;
-          // Templates own geometry and textures across reloads; cells own materials and instance buffers.
+          geometry.translate(0,-primaryBounds.min.y,0);geometry.scale(normalizedScale,normalizedScale,normalizedScale);
+          const material=mesh.material.clone();
+          for(const slot of ['map','normalMap','roughnessMap','metalnessMap','aoMap','emissiveMap']) {
+            const key=`${material.name}:${slot}`;
+            if(level===0 && material[slot])sharedMaps.set(key,material[slot]);
+            else if(material[slot] && sharedMaps.has(key))material[slot]=sharedMaps.get(key);
+          }
+          if(material.alphaTest>0)material.alphaToCoverage=true;
+          // The bounded family cache owns materials, geometry and textures.
+          // Cells own only instance buffers. Disposing/recloning identical
+          // materials on every focus refresh discards their compiled programs.
+          material.userData.sharedRuntimeMaterial=true;
           geometry.userData.sharedRuntimeGeometry=true;
           for(const value of Object.values(material)) if(value?.isTexture) {
             value.userData=value.userData || {};
@@ -96,7 +113,7 @@ function* vegetationModelSteps(ctx, placements) {
       const root=new THREE.Group();
       lod.addLevel(root,level===0 ? 0 : 300);
       for(const part of group.model.parts[level]) {
-        const geometry=part.geometry, material=part.material.clone();
+        const geometry=part.geometry, material=part.material;
         const mesh=new THREE.InstancedMesh(geometry,material,group.placements.length);
         root.add(mesh);
         const bound=new THREE.Box3(), localBox=new THREE.Box3().setFromBufferAttribute(geometry.attributes.position);
@@ -117,6 +134,9 @@ function* vegetationModelSteps(ctx, placements) {
       }
     }
     lod.addLevel(new THREE.Group(),['fern','grass'].includes(group.kind) ? 240 : 1600);
+    // Published cell poses are immutable; LOD changes visibility, not transforms.
+    // Avoid recomposing every hidden and visible instance hierarchy each frame.
+    lod.traverse(object=>{object.updateMatrix();object.matrixAutoUpdate=false;});
     lod.userData.isVegetationBatch=true;
     lod.userData.vegetationAuthority='curated-model-cell-lod';
     ctx.addEarthWorldObject(lod);
@@ -141,6 +161,6 @@ export function disposeVegetationBatch(root) {
     if (!object.geometry?.userData?.sharedRuntimeGeometry) object.geometry?.dispose?.();
     if (object.isInstancedMesh) object.dispose?.();
     const materials=Array.isArray(object.material) ? object.material : [object.material];
-    materials.forEach(material=>material?.dispose?.());
+    materials.forEach(material=>{if(!material?.userData?.sharedRuntimeMaterial)material?.dispose?.();});
   });
 }

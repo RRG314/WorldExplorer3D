@@ -1,10 +1,11 @@
+import { disposeCuratedCharacter, updateCuratedCharacterAnimation } from '../walking/curated-explorer-character.js?v=8';
 import {
   createNameTag,
   createProxyByType,
   nameTagHeightForProxy,
   proxyTypeForPlayer,
   yOffsetForProxy
-} from "./ghost-proxies.js?v=1";
+} from "./ghost-proxies.js?v=2";
 
 const FULL_TURN_RAD = Math.PI * 2;
 const VALID_MODES = new Set(['drive', 'walk', 'drone', 'space', 'moon']);
@@ -17,13 +18,6 @@ const MAX_NETWORK_SPEED_EPSILON = 0.001;
 const SERVER_TIME_PAST_WINDOW_MS = 12000;
 const SERVER_TIME_FUTURE_WINDOW_MS = 50;
 const WALK_MOVE_THRESHOLD = 0.35;
-const WALK_MAX_SWING_SPEED = 11;
-const WALK_SWING_BASE_SPEED = 4;
-const WALK_SWING_SPEED_SCALE = 0.75;
-const WALK_LEG_SWING = 0.48;
-const WALK_ARM_SWING = 0.36;
-const WALK_BOB_AMPLITUDE = 0.05;
-const WALK_IDLE_DECAY_RATE = 6;
 const CAR_WHEEL_SPIN_SCALE = 2.1;
 const DRONE_ROTOR_BASE_SPIN = 12;
 const DRONE_ROTOR_SPEED_SCALE = 0.6;
@@ -127,6 +121,7 @@ function disposeMaterial(material) {
 
 function disposeObject3D(rootObject) {
   if (!rootObject || typeof rootObject.traverse !== 'function') return;
+  disposeCuratedCharacter(rootObject);
   rootObject.traverse((node) => {
     if (node && node.isMesh) {
       if (node.geometry && typeof node.geometry.dispose === 'function') node.geometry.dispose();
@@ -212,8 +207,7 @@ function createGhostManager(scene, options = {}) {
       targetYaw: yaw,
       currentYaw: yaw,
       lastPoseAtMs: toMillis(player.lastSeenAt, nowEpochMs),
-      lastReceiveAtMs: nowEpochMs,
-      animTime: 0
+      lastReceiveAtMs: nowEpochMs
     };
   }
 
@@ -298,34 +292,10 @@ function createGhostManager(scene, options = {}) {
     const planarSpeed = Math.hypot(entry.velocity.x, entry.velocity.z);
 
     if (entry.proxyType === 'walker') {
-      const limbs = entry.proxy?.userData?.limbs;
-      if (!limbs) return;
-
       const isMoving =
         planarSpeed > WALK_MOVE_THRESHOLD ||
         Math.hypot(entry.target.x - entry.current.x, entry.target.z - entry.current.z) > WALK_MOVE_THRESHOLD;
-      if (isMoving) {
-        entry.animTime += dtSeconds * Math.min(
-          WALK_MAX_SWING_SPEED,
-          WALK_SWING_BASE_SPEED + planarSpeed * WALK_SWING_SPEED_SCALE
-        );
-        const t = entry.animTime;
-        const legSwing = Math.sin(t) * WALK_LEG_SWING;
-        const armSwing = Math.sin(t) * WALK_ARM_SWING;
-
-        limbs.legLeftPivot.rotation.x = legSwing;
-        limbs.legRightPivot.rotation.x = -legSwing;
-        limbs.armLeftPivot.rotation.x = -armSwing;
-        limbs.armRightPivot.rotation.x = armSwing;
-        limbs.body.position.y = 1.0 * limbs.scale + Math.abs(Math.sin(t * 2)) * WALK_BOB_AMPLITUDE * limbs.scale;
-      } else {
-        const decay = clamp(dtSeconds * WALK_IDLE_DECAY_RATE, 0, 1);
-        limbs.legLeftPivot.rotation.x *= 1 - decay;
-        limbs.legRightPivot.rotation.x *= 1 - decay;
-        limbs.armLeftPivot.rotation.x *= 1 - decay;
-        limbs.armRightPivot.rotation.x *= 1 - decay;
-        limbs.body.position.y = 1.0 * limbs.scale;
-      }
+      updateCuratedCharacterAnimation(entry.proxy, isMoving, dtSeconds, planarSpeed > 4);
       return;
     }
 

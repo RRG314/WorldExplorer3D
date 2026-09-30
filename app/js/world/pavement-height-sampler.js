@@ -32,14 +32,38 @@ function* pavementBaseSamplerSteps({segments=[],ground,roadContactIndex,profileC
     const profile={...segment,a,b,blendDistance:8/scale,steps,left,right};
     prepared.push(profile);profileCache.set(key,profile);
   }
-  const heights=new Map();
+  // Each road contributes only inside its shoulder blend. Keep source order
+  // within each cell so indexed queries retain the same weighted sum.
+  const cells=new Map(),cellSize=64;
+  for(const s of prepared){
+    const radius=Math.max(s.wa,s.wb)/2+s.blendDistance;
+    const minX=Math.floor((Math.min(s.a.x,s.b.x)-radius)/cellSize);
+    const maxX=Math.floor((Math.max(s.a.x,s.b.x)+radius)/cellSize);
+    const minZ=Math.floor((Math.min(s.a.z,s.b.z)-radius)/cellSize);
+    const maxZ=Math.floor((Math.max(s.a.z,s.b.z)+radius)/cellSize);
+    for(let ix=minX;ix<=maxX;ix++)for(let iz=minZ;iz<=maxZ;iz++){
+      if(!cells.has(ix))cells.set(ix,new Map());
+      const column=cells.get(ix);
+      if(!column.has(iz))column.set(iz,[]);
+      column.get(iz).push(s);
+      yield;
+    }
+  }
+  // Exact-coordinate memoization with bounded storage. Stringifying each
+  // tessellated vertex retained a large temporary string/Map graph per tile.
+  // Hash collisions replace an entry; they never approximate a surface height.
+  const capacity=8192,heights=new Float64Array(capacity*3),occupied=new Uint8Array(capacity);
+  const coordinates=new Float64Array(2),bits=new Uint32Array(coordinates.buffer);
   return (x,z)=>{
-    const key=`${x}:${z}`;
-    if(heights.has(key))return heights.get(key);
+    coordinates[0]=x;coordinates[1]=z;
+    let hash=Math.imul(bits[0]^bits[1],73856093)^Math.imul(bits[2]^bits[3],19349663);
+    hash=Math.imul(hash^(hash>>>16),0x85ebca6b);
+    const slot=(hash^(hash>>>13))&(capacity-1),offset=slot*3;
+    if(occupied[slot]&&heights[offset]===x&&heights[offset+1]===z)return heights[offset+2];
     const terrain=ground(x,z);
     if(!Number.isFinite(terrain))throw new Error('Pavement has no accepted terrain height');
     let weightedClearance=0,weightSum=0;
-    for(const s of prepared){
+    for(const s of cells.get(Math.floor(x/cellSize))?.get(Math.floor(z/cellSize))||[]){
       const dx=s.b.x-s.a.x,dz=s.b.z-s.a.z,lengthSq=dx*dx+dz*dz;
       if(!(lengthSq>0))continue;
       const t=Math.max(0,Math.min(1,((x-s.a.x)*dx+(z-s.a.z)*dz)/lengthSq));
@@ -60,7 +84,7 @@ function* pavementBaseSamplerSteps({segments=[],ground,roadContactIndex,profileC
     // sampling that step on a thin clipped triangle produced a steep face.
     const height=terrain+Math.max(.018,weightSum?weightedClearance/weightSum:0);
     if(!Number.isFinite(height))throw new Error('Pavement has no accepted surface height');
-    heights.set(key,height);return height;
+    occupied[slot]=1;heights[offset]=x;heights[offset+1]=z;heights[offset+2]=height;return height;
   };
 }
 

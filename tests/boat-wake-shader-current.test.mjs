@@ -30,3 +30,17 @@ test('missing water shader integration hooks fail explicitly instead of silently
   t.after(() => { globalThis.THREE = previous; });
   assert.throws(() => customizeBoatWaterPatchShader({ uniforms: {}, vertexShader: '', fragmentShader: '' }), /missing its shared hook/);
 });
+
+test('water and wake keep live uniform objects when lighting compiles another variant', t => {
+  const previous=globalThis.THREE,materials=ctx.waterWaveVisuals;globalThis.THREE=THREE;ctx.waterWaveVisuals=[];
+  t.after(()=>{globalThis.THREE=previous;ctx.waterWaveVisuals=materials;});
+  const material=new THREE.MeshStandardMaterial();
+  registerWaterWaveMaterial(material,{shaderHook:customizeBoatWaterPatchShader,shaderKey:'boatPatchWake'});
+  const compile=()=>{const shader={uniforms:{},vertexShader:THREE.ShaderLib.standard.vertexShader,fragmentShader:THREE.ShaderLib.standard.fragmentShader};material.onBeforeCompile(shader);return shader;};
+  const first=compile();first.uniforms.weWaveTime.value=8;first.uniforms.weBoatWakeStrength.value=.6;
+  const second=compile();
+  for(const name of Object.keys(first.uniforms).filter(name=>name.startsWith('we')))assert.equal(first.uniforms[name],second.uniforms[name],name);
+  assert.equal(second.uniforms.weWaveTime.value,8);assert.equal(second.uniforms.weBoatWakeStrength.value,.6);
+  second.uniforms.weWaveTime.value=12;assert.equal(first.uniforms.weWaveTime.value,12);
+  material.dispose();
+});

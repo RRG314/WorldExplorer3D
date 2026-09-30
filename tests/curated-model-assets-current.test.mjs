@@ -338,3 +338,25 @@ test('ship furnishings have local bounded GLBs and attributable sources', () => 
     assert.ok((json.images||[]).every(image=>Number.isInteger(image.bufferView)),`${asset.id} must not fetch external textures`);
   }
 });
+
+test('tree LOD material maps are byte-identical to their primary model', async () => {
+  const {NodeIO} = await import('@gltf-transform/core');
+  const {ALL_EXTENSIONS} = await import('@gltf-transform/extensions');
+  const io = new NodeIO().registerExtensions(ALL_EXTENSIONS);
+  const slots = ['BaseColor','Normal','MetallicRoughness','Occlusion','Emissive'];
+  for (const kind of ['pine','broadleaf']) {
+    const near = await io.read(path.join(root, `app/assets/models/nature/${kind}.glb`));
+    const far = await io.read(path.join(root, `app/assets/models/nature/${kind}-lod.glb`));
+    const materials = new Map(near.getRoot().listMaterials().map(m => [m.getName(), m]));
+    for (const material of far.getRoot().listMaterials()) {
+      const original = materials.get(material.getName());
+      assert.ok(original, `Unknown distant material ${material.getName()}`);
+      for (const slot of slots) {
+        const nearMap = original[`get${slot}Texture`]();
+        const farMap = material[`get${slot}Texture`]();
+        assert.equal(Boolean(farMap), Boolean(nearMap));
+        if (farMap) assert.deepEqual(farMap.getImage(), nearMap.getImage(), `${kind} ${slot}`);
+      }
+    }
+  }
+});

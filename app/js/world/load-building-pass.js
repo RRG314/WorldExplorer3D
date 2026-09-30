@@ -1,4 +1,5 @@
-import { attachBuildingFacadeLayout } from './building-facade-layout.js?v=2';
+import {resolveBuildingFoundation} from './building-foundation.js';
+import { attachBuildingFacadeLayout } from './building-facade-layout.js?v=3';
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { classifyStructureSemantics } from "../structure-semantics.js?v=63";
 import {
@@ -29,7 +30,7 @@ import { yieldToMainThread as defaultYieldToMainThread } from './cooperative-sch
 import { isImplausibleTallBuildingFootprint } from './building-geometry-quality.js?v=1';
 import { publishBuildingFacadeEntrances } from './building-facade-entrances.js?v=4';
 import { publishBuildingExteriorDetails } from './building-exterior-details.js?v=2';
-import { resolveBuildingExteriorPresentation } from '../engine/building-facade-materials.js?v=19';
+import { buildingRoofSurface, resolveBuildingExteriorPresentation } from '../engine/building-facade-materials.js?v=19';
 import { mappedBuildingAddress } from '../real-estate/public-address.js?v=1';
 
 export function requiresLoadedRoadCoverageForBuilding(tags = {}) {
@@ -174,6 +175,10 @@ export async function buildBuildingGeometryPass(options = {}) {
   };
   for (let buildingIndex = 0; buildingIndex < buildingWays.length; buildingIndex += 1) {
     const way = buildingWays[buildingIndex];
+    if (way.tags?._dedicatedLandmarkOwner === 'bundled-historic') {
+      loadMetrics.buildingPublication.dedicatedLandmarks = Number(loadMetrics.buildingPublication.dedicatedLandmarks || 0) + 1;
+      continue;
+    }
     const knownSourceBuildingId = String(way?.tags?._sourceFeatureId || way?.id || '');
     if (knownSourceBuildingId && suppressedBuildingIds.has(knownSourceBuildingId)) {
       loadMetrics.buildingPublication.locallySuppressed = Number(loadMetrics.buildingPublication.locallySuppressed || 0) + 1;
@@ -434,15 +439,9 @@ export async function buildBuildingGeometryPass(options = {}) {
         medianElevation: validSamples > 0 ? sampledElevations[Math.floor((validSamples - 1) * 0.5)] : 0
       };
     });
-    const reliefLimit = Math.min(18, Math.max(4, height * 0.65, Math.min(footprintWidth, footprintDepth) * 0.4));
-    const lowSample = validElevationSamples > 0 ? elevationValues[Math.floor((validElevationSamples - 1) * 0.15)] : medianElevation;
-    const highSample = validElevationSamples > 0 ? elevationValues[Math.ceil((validElevationSamples - 1) * 0.85)] : medianElevation;
-    const minElevation = Math.max(lowSample, medianElevation - reliefLimit);
-    const maxElevation = Math.min(highSample, medianElevation + reliefLimit);
-    const avgElevation = elevationValues.length > 0 ? elevationValues.reduce((sum, value) => sum + value, 0) / elevationValues.length : medianElevation;
-    const slopeRange = Number.isFinite(minElevation) && Number.isFinite(maxElevation) ? maxElevation - minElevation : 0;
-    const terrainFoundationRise = slopeRange >= 0.06 ? Math.min(12, slopeRange) : 0;
-    const baseElevationRaw = terrainFoundationRise > 0 ? maxElevation - terrainFoundationRise + 0.03 : avgElevation;
+    const {minElevation,maxElevation,avgElevation,slopeRange,terrainFoundationRise,baseElevationRaw} = resolveBuildingFoundation({
+      elevationValues,medianElevation,height,footprintWidth,footprintDepth
+    });
     const structureBaseOffset = Number.isFinite(buildingSemantics.baseOffsetMeters) ? buildingSemantics.baseOffsetMeters : 0;
     const buildingProvenance = measureBuildingPhase('provenanceCompilation', () => compileBuildingProvenance(way.tags || {}, {
       fallbackIdentity: way.id,
@@ -488,6 +487,7 @@ export async function buildBuildingGeometryPass(options = {}) {
         buildingType: bt,
         denseUrban: denseUrbanContext,
         footprintArea,
+        location: appCtx.LOC,
         levels: resolvedLevels
       }
     ));
@@ -681,7 +681,11 @@ export async function buildBuildingGeometryPass(options = {}) {
       baseElevation,
       (mappedRoof?.wallHeight || 0) + terrainFoundationRise,
       mappedRoof,
-      way.tags
+      way.tags,
+      mappedRoof ? (() => {
+        const surface=buildingRoofSurface(appCtx, way.tags['roof:material'] || mappedRoof.material || '');
+        return surface ? {...surface,gableColor:resolvedExteriorPresentation?.tintHex ?? mesh.userData.exteriorPresentation?.wallColor ?? baseColor} : null;
+      })() : null
     );
     if (mappedRoofMesh) {
       mappedRoofMesh.userData.sourceBuildingId = sourceBuildingId;

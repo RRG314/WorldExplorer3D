@@ -137,7 +137,9 @@ export function refreshEditableBuildingVisibility(appCtx) {
     mesh.visible = reasons.size === 0;
     directMeshes += 1;
   }
-  appCtx.invalidateTraversalNetworks?.('editable_building_visibility');
+  // Building visibility does not change the road/linear-feature graph. Actual
+  // world edits invalidate it at their mutation boundary; a presentation
+  // refresh must not discard the freshly published navigation networks.
   const result = Object.freeze({
     suppressed: suppressedIds.size,
     directMeshes,
@@ -161,7 +163,7 @@ export function isLocalBuildingSuppressed(appCtx, sourceFeatureId) {
   if (sharedState.enabled) {
     return sharedState.rows.some((entry) => entry.kind === 'suppression' && entry.active === true && entry.sourceFeatureId === id);
   }
-  return getLocalWorldModificationSnapshot(appCtx).suppressions.some((entry) => entry.sourceFeatureId === id);
+  return store?.isBuildingSuppressed(currentWorldId(appCtx), id) === true;
 }
 
 export function getSuppressedEditableBuildingIds(appCtx) {

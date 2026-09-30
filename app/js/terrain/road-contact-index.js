@@ -20,7 +20,10 @@ export function refreshLinearWalkContactIndex(appCtx) {
 // materializes only the small candidate set it actually visits.
 function* roadContactIndexSteps(meshes, cellSize = 16, {bounds} = {}) {
   if(!Number.isFinite(cellSize)||cellSize<=0)throw new RangeError('Contact cell size must be positive');
+  // Numeric columns avoid allocating a string on every contact query and on
+  // both construction passes. Triangle order within each cell is unchanged.
   const cells=new Map(),sources=[],modes=[],modeCodes=new Map();
+  let cellCount=0;
   const descriptors=[];
   let capacity=0;
   for(const mesh of meshes) {
@@ -71,8 +74,11 @@ function* roadContactIndexSteps(meshes, cellSize = 16, {bounds} = {}) {
       denominators[id]=denominator;
       for(let x=Math.floor(Math.min(ax,bx,cx)/cellSize);x<=Math.floor(Math.max(ax,bx,cx)/cellSize);x++) {
         for(let z=Math.floor(Math.min(az,bz,cz)/cellSize);z<=Math.floor(Math.max(az,bz,cz)/cellSize);z++) {
-          const key=`${x}:${z}`;
-          cells.set(key,(cells.get(key)||0)+1);cellReferences++;
+          let column=cells.get(x);
+          if(!column){column=new Map();cells.set(x,column);}
+          const count=column.get(z);
+          if(count===undefined)cellCount++;
+          column.set(z,(count||0)+1);cellReferences++;
           if(cellReferences%512===0)yield;
         }
       }
@@ -80,14 +86,14 @@ function* roadContactIndexSteps(meshes, cellSize = 16, {bounds} = {}) {
   }
   // One contiguous allocation replaces one JS array and one typed array per
   // spatial cell. Count first, assign offsets, then fill in original order.
-  buckets=new Uint32Array(cellReferences+cells.size);
+  buckets=new Uint32Array(cellReferences+cellCount);
   let cursor=0,filledReferences=0;
-  for(const [key,count] of cells){cells.set(key,cursor);cursor+=count+1;yield;}
+  for(const column of cells.values())for(const [z,count] of column){column.set(z,cursor);cursor+=count+1;yield;}
   for(let id=0;id<triangleCount;id++) {
     const offset=id*5,p=sources[records[offset]],a=records[offset+1],b=records[offset+2],c=records[offset+3];
     for(let x=Math.floor(Math.min(p[a],p[b],p[c])/cellSize);x<=Math.floor(Math.max(p[a],p[b],p[c])/cellSize);x++) {
       for(let z=Math.floor(Math.min(p[a+2],p[b+2],p[c+2])/cellSize);z<=Math.floor(Math.max(p[a+2],p[b+2],p[c+2])/cellSize);z++) {
-        const start=cells.get(`${x}:${z}`);
+        const start=cells.get(x)?.get(z);
         buckets[start+1+buckets[start]++]=id;
         if(++filledReferences%512===0)yield;
       }
@@ -102,7 +108,7 @@ function* roadContactIndexSteps(meshes, cellSize = 16, {bounds} = {}) {
       for(let ix=Math.floor(Math.min(...xs)/cellSize);ix<=Math.floor(Math.max(...xs)/cellSize);ix++)
         for(let iz=Math.floor(Math.min(...zs)/cellSize);iz<=Math.floor(Math.max(...zs)/cellSize);iz++)
           {
-            const start=cells.get(`${ix}:${iz}`);
+            const start=cells.get(ix)?.get(iz);
             if(start===undefined)continue;
             for(let i=start+1,end=i+buckets[start];i<end;i++) {
               const id=buckets[i];
@@ -113,8 +119,8 @@ function* roadContactIndexSteps(meshes, cellSize = 16, {bounds} = {}) {
       return projectDecalPolygon(points,supports(),lift);
     }
   return {
-    stats(){return {triangles:triangleCount,cells:cells.size,cellReferences,bucketAllocations:buckets.length ? 1 : 0,recordBytes:records.byteLength+denominators.byteLength,bucketBytes};},
-    dispose(){buckets=new Uint32Array();cells.clear();sources.length=0;modes.length=0;records=new Uint32Array();denominators=new Float64Array();triangleCount=0;cellReferences=0;bucketBytes=0;},
+    stats(){return {triangles:triangleCount,cells:cellCount,cellReferences,bucketAllocations:buckets.length ? 1 : 0,recordBytes:records.byteLength+denominators.byteLength,bucketBytes};},
+    dispose(){buckets=new Uint32Array();cells.clear();cellCount=0;sources.length=0;modes.length=0;records=new Uint32Array();denominators=new Float64Array();triangleCount=0;cellReferences=0;bucketBytes=0;},
     // Diagnostic distance to actual uploaded tops, not an expanded collision
     // surface. Callers supply an explicit bound and retain the measured distance.
     nearestSurfaceAt(x,z,maxDistance,requiredTerrainMode=null) {
@@ -122,7 +128,7 @@ function* roadContactIndexSteps(meshes, cellSize = 16, {bounds} = {}) {
       let best = null;
       for (let ix=Math.floor((x-maxDistance)/cellSize);ix<=Math.floor((x+maxDistance)/cellSize);ix++) {
         for (let iz=Math.floor((z-maxDistance)/cellSize);iz<=Math.floor((z+maxDistance)/cellSize);iz++) {
-          const start=cells.get(`${ix}:${iz}`);
+          const start=cells.get(ix)?.get(iz);
           if(start===undefined)continue;
           for(let i=start+1,end=i+buckets[start];i<end;i++) {
             const id=buckets[i],offset=id*5;
@@ -146,7 +152,7 @@ function* roadContactIndexSteps(meshes, cellSize = 16, {bounds} = {}) {
     projectPolygon,
     projectTriangle: projectPolygon,
     sampleAt(x,z,referenceY=NaN,requiredTerrainMode=null) {
-      const start=cells.get(`${Math.floor(x/cellSize)}:${Math.floor(z/cellSize)}`);
+      const start=cells.get(Math.floor(x/cellSize))?.get(Math.floor(z/cellSize));
       if(start===undefined)return null;
       let best=null;
       for(let i=start+1,end=i+buckets[start];i<end;i++) {

@@ -24,7 +24,11 @@ export function classifyBiomeProfile(options = {}) {
   else if (boundedRatio(signals.wetland)>=0.2 && woody<0.25) id = 'wetland';
   else if (absLatitude <= 24 && woody >= 0.2 && water >= 0.015) id = 'tropical-rainforest';
   else if (absLatitude <= 24 && woody >= 0.28) id = 'tropical-seasonal-forest';
-  else if ((arid >= 0.16 && absLatitude < 60) || (absLatitude >= 12 && absLatitude <= 35 && vegetated < 0.12)) id = 'hot-desert';
+  else if (arid >= 0.16 && vegetated < 0.34) {
+    id = reliefMeters >= 700 ? 'montane-mosaic'
+      : absLatitude < 35 && (!Number.isFinite(elevationMeters) || elevationMeters < 1800) ? 'hot-desert'
+      : 'arid-mosaic';
+  }
   else if (scrub >= 0.12 && vegetated < 0.34) id = 'shrubland';
   else if (woody >= 0.42) id = 'temperate-forest';
   else if (reliefMeters >= 700) id = 'montane-mosaic';
@@ -40,7 +44,7 @@ export function classifyBiomeProfile(options = {}) {
   const surfacePalette =
     id === 'polar-cryosphere' ? 'snow-ice' :
     id === 'polar-desert' || id === 'alpine' ? 'snow-rock' :
-    id === 'hot-desert' ? 'sand-rock' :
+    id === 'hot-desert' || id === 'arid-mosaic' ? 'sand-rock' :
     id === 'tropical-rainforest' || id === 'tropical-seasonal-forest' ? 'forest-soil' :
     id === 'temperate-forest' ? 'forest-grass-soil' :
     id === 'wetland' ? 'wetland-soil-vegetation' :
@@ -52,6 +56,7 @@ export function classifyBiomeProfile(options = {}) {
     vegetationModel,
     surfacePalette,
     hydrologyPolicy: 'mapped-water-only',
+    confidence: Object.keys(signals).length ? 'land-cover-inference' : 'geographic-fallback',
     sourcePolicy: 'mapped-semantics-with-global-land-cover-fallback'
   });
 }

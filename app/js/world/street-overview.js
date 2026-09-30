@@ -1,5 +1,6 @@
-import {streetSourceInput} from './street-source-input.js';
-import {createPavementTerrainMask} from './pavement-terrain-mask.js';
+import {yieldToWorldFrame} from './cooperative-scheduling.js?v=1';
+import {streetSourceInputCooperatively,sendStreetSourceInChunks} from './street-source-input.js';
+import {createPavementTerrainMask,createPavementMaterialBinding} from './pavement-terrain-mask.js';
 
 // Complete source coverage lives in the terrain material. Raised geometry and
 // walking contact are published separately near the player. Terrain movement
@@ -7,6 +8,10 @@ import {createPavementTerrainMask} from './pavement-terrain-mask.js';
 export function createStreetOverview(appCtx,{onComplete=()=>{}}={}){
  const sequence=appCtx._worldLoadSequence,startedAt=performance.now();
  let worker=null,pending=null,active=null,disposed=false,sources=[],prepared=false,mask=null,stagedMask=null,completedBounds=null;
+ const materialBinding=createPavementMaterialBinding(appCtx);
+ // Install one stable shader interface before the first playable render. Cell
+ // data and replacement atlases change uniforms, never the terrain program.
+ mask=createPavementTerrainMask(appCtx,[],{materialBinding});mask.activate();mask.syncMaterials();
  let materialSyncAt=-Infinity;
  const sourceLists=()=>[appCtx.roads,appCtx.buildings,appCtx.landuses,appCtx.linearFeatures];
  const sourcesMatch=()=>sourceLists().every((list,i)=>sources[i]?.list===list&&sources[i]?.length===(list?.length||0));
@@ -29,9 +34,14 @@ export function createStreetOverview(appCtx,{onComplete=()=>{}}={}){
    }
    if(!prepared||!sourcesMatch()){
      sources=sourceLists().map(list=>({list,length:list?.length||0}));
-     const plan=await request({type:'prepare',input:streetSourceInput(appCtx)});if(!valid())return;
-     stagedMask?.dispose();stagedMask=createPavementTerrainMask(appCtx,plan.keys);
-     if(!mask){mask=stagedMask;stagedMask=null;}
+     const current=()=>valid()&&sourcesMatch();
+     const schedule={current,yieldWork:yieldToWorldFrame,budgetMs:2};
+     const input=await streetSourceInputCooperatively(appCtx,()=>true,schedule);
+     await sendStreetSourceInChunks(input,request,schedule);
+     if(!current())return;
+     const plan=await request({type:'prepare'});if(!current())return;
+     stagedMask?.dispose();stagedMask=createPavementTerrainMask(appCtx,plan.keys,{materialBinding});
+     if(stats.totalCells===null){mask.dispose();mask=stagedMask;stagedMask=null;mask.activate();}
      setDetailBounds(appCtx.streetPavement?.coverageBounds);
      Object.assign(stats,{totalCells:plan.tiles,sourceCells:plan.sourceCells,excludedCells:plan.excludedCells,completedCells:0,nonemptyCells:0,coveredSquareWorldUnits:0,
        retainedBytes:(stagedMask||mask).bytes,maskResolution:(stagedMask||mask).layout.resolution,worldUnitsPerTexel:64/(stagedMask||mask).layout.resolution});
@@ -48,7 +58,7 @@ export function createStreetOverview(appCtx,{onComplete=()=>{}}={}){
  }
  async function complete(){
    if(stats.completedCells!==stats.totalCells)throw new Error('Location pavement ended before every planned cell was published');
-   if(stagedMask){mask?.dispose();mask=stagedMask;stagedMask=null;}
+   if(stagedMask){mask?.dispose();mask=stagedMask;stagedMask=null;mask.activate();}
    const l=mask.layout;
    completedBounds=stats.totalCells?{minX:l.minX*64,maxX:(l.minX+l.lookupWidth)*64,minZ:l.minZ*64,maxZ:(l.minZ+l.lookupHeight)*64}:null;
    stats.status='complete';stats.coverageBounds=completedBounds;stats.durationMs=Math.round(performance.now()-startedAt);
@@ -69,6 +79,6 @@ export function createStreetOverview(appCtx,{onComplete=()=>{}}={}){
    // At most one acknowledged cell per rendered frame, never an 80 ms burst.
    active=advance(point).catch(error=>{if(valid()){stats.status='failed';stats.error=String(error.message);worker?.terminate();worker=null;stats.workerActive=false;}}).finally(()=>{active=null;});
  }
- function dispose(){disposed=true;worker?.terminate();pending?.reject(new Error('Overview disposed'));mask?.dispose();stagedMask?.dispose();mask=stagedMask=null;stats.status='disposed';stats.retainedBytes=0;stats.workerActive=false;}
+ function dispose(){disposed=true;worker?.terminate();pending?.reject(new Error('Overview disposed'));mask?.dispose();stagedMask?.dispose();mask=stagedMask=null;materialBinding.dispose();stats.status='disposed';stats.retainedBytes=0;stats.workerActive=false;}
  return {stats,step,setDetailBounds,get completedBounds(){return completedBounds;},pause:()=>active||Promise.resolve(),dispose};
 }

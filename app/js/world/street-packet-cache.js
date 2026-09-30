@@ -18,7 +18,7 @@ export class StreetPacketCache {
   get(key,fingerprint){
     const item=this.entries.get(key);if(!item||item.packet.fingerprint!==fingerprint)return null;
     this.entries.delete(key);this.entries.set(key,item);
-    return {...item.packet,durationMs:0,mesh:Object.fromEntries(Object.entries(item.packet.mesh).map(([name,values])=>[name,Array.from(values)]))};
+    return {...item.packet,durationMs:0,mesh:Object.fromEntries(Object.entries(item.packet.mesh).map(([name,values])=>[name,values.slice()]))};
   }
   clear(){this.entries.clear();this.bytes=0;}
 }

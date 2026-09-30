@@ -1,0 +1,16 @@
+<!doctype html><meta charset="utf-8"><title>Historic material validation</title><style>body{margin:0}canvas{display:block}</style>
+<script src="/node_modules/three/build/three.min.js"></script><script type="module">
+import {createMeasuredElizabethTower} from '/app/js/world/elizabeth-tower-structure.js';
+import {createHistoricWallMaterial} from '/app/js/world/historic-wall-material.js';
+import {getBuildingMaterial} from '/app/js/engine/building-facade-materials.js';
+import {attachBuildingFacadeLayout} from '/app/js/world/building-facade-layout.js';
+const renderer=new THREE.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});renderer.setSize(960,640);renderer.outputEncoding=THREE.sRGBEncoding;document.body.append(renderer.domElement);
+const scene=new THREE.Scene();scene.background=new THREE.Color(0xc4d5e4);scene.add(new THREE.HemisphereLight(0xffffff,0x77736b,1));const sun=new THREE.DirectionalLight(0xfff3df,1);sun.position.set(-10,20,18);scene.add(sun);
+const camera=new THREE.PerspectiveCamera(45,1.5,.1,200);camera.position.set(14,10,22);camera.lookAt(0,2,0);
+const wall=new THREE.InstancedMesh(new THREE.BoxGeometry(1,1,1),createHistoricWallMaterial(THREE),1);wall.setMatrixAt(0,new THREE.Matrix4().makeScale(12,6,1).setPosition(0,3,-5));scene.add(wall);
+const shape=new THREE.Shape();shape.moveTo(-4,-2);shape.lineTo(4,-2);shape.lineTo(4,2);shape.lineTo(-4,2);shape.closePath();const geometry=new THREE.ExtrudeGeometry(shape,{depth:1.6,bevelEnabled:false}).rotateX(-Math.PI/2);
+const material=getBuildingMaterial({renderer},'ruins',123,0xaaaaaa,{tags:{building:'ruins',historic:'ruins'},heightMeters:1.6,footprintWidth:8,footprintDepth:4,footprintArea:32,lodTier:'near'});attachBuildingFacadeLayout(geometry,material.userData.exteriorProfile);scene.add(new THREE.Mesh(geometry,material));
+const ground=new THREE.Mesh(new THREE.PlaneGeometry(70,70),new THREE.MeshStandardMaterial({color:0xc7b393,roughness:1}));ground.rotation.x=-Math.PI/2;ground.position.y=-.03;scene.add(ground);
+if(new URLSearchParams(location.search).has('tower')){scene.clear();scene.add(new THREE.HemisphereLight(0xffffff,0x77736b,1),sun,createMeasuredElizabethTower());camera.far=1000;camera.updateProjectionMatrix();camera.position.set(80,50,130);camera.lookAt(0,45,0);}
+const render=()=>renderer.render(scene,camera);window.advanceTime=async()=>render();window.render_game_to_text=()=>JSON.stringify({ruinOpenings:material.userData.exteriorProfile.openings,wallTexture:!!wall.material.map.image,calls:renderer.info.render.calls,glError:renderer.getContext().getError()});addEventListener('keydown',e=>{if(e.key==='ArrowRight'){camera.position.x-=3;camera.lookAt(0,2,0);render();}});renderer.setAnimationLoop(render);
+</script>

@@ -77,6 +77,7 @@ try {
     if (target === 'moon') return state.environment === 'MOON';
     return state.environment === 'PLANETARY';
   }, bodyId, { timeout: 120_000 });
+  if(bodyId==='moon')await page.locator('#travelBtn').click();
   await page.waitForFunction((selector) => {
     const control = document.querySelector(selector);
     return !!control && getComputedStyle(control).display !== 'none' && control.getBoundingClientRect().width > 0;

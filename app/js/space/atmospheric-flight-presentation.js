@@ -42,7 +42,13 @@ function createAtmosphericSky(body, style) {
       uniform mat3 viewToWorld;
       uniform vec3 radial, skyColor, hazeColor;
       uniform float relativeAltitude, immersion, radiusM;
-      float cloudHash(vec3 p) { return fract(sin(dot(p,vec3(127.1,311.7,74.7)))*43758.5453); }
+      // Keep hash arithmetic bounded even at gas-giant radii. Large sine
+      // arguments quantize nearby lattice corners into visible repeated bands.
+      float cloudHash(vec3 p) {
+        p=fract(p*vec3(.1031,.1030,.0973));
+        p+=dot(p,p.yxz+33.33);
+        return fract((p.x+p.y)*p.z);
+      }
       float cloudNoise(vec3 p) {
         vec3 i=floor(p),f=fract(p);f=f*f*(3.0-2.0*f);
         return mix(mix(mix(cloudHash(i),cloudHash(i+vec3(1,0,0)),f.x),mix(cloudHash(i+vec3(0,1,0)),cloudHash(i+vec3(1,1,0)),f.x),f.y),mix(mix(cloudHash(i+vec3(0,0,1)),cloudHash(i+vec3(1,0,1)),f.x),mix(cloudHash(i+vec3(0,1,1)),cloudHash(i+vec3(1,1,1)),f.x),f.y),f.z);
@@ -82,9 +88,12 @@ function createAtmosphericSky(body, style) {
             vec3 samplePoint=origin+ray*(entry+(float(step)+sampleOffset)*stepLength);
             float height=(length(samplePoint)-1.0)/top;
             vec3 q=samplePoint*(radiusM/11000.0);
+            // Rotate the body-fixed lattice and combine both scales for cloud
+            // height, avoiding rows of equally aligned convection columns.
+            q=mat3(.36,.48,-.8,-.8,.60,0.0,.48,.64,.60)*q;
             float broad=cloudNoise(q);
             float detail=cloudNoise(q*3.1+vec3(broad*2.0));
-            float cloudTop=.25+.75*broad;
+            float cloudTop=.25+.75*(broad*.45+detail*.55);
             float density=smoothstep(.28,.65,broad*.62+detail*.38);
             density*=1.0-smoothstep(cloudTop-.2,cloudTop,height);
             float alpha=1.0-exp(-density*stepLength*radiusM/1800.0);

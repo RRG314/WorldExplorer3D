@@ -1,0 +1,16 @@
+<!doctype html><meta charset="utf-8"><link rel="icon" href="data:,">
+<style>body{margin:0;background:#9bbdd0}canvas{display:block}</style>
+<script src="/node_modules/three/build/three.min.js"></script>
+<script type="module">
+import {createPavementTerrainMask,createPavementMaterialBinding} from '/app/js/world/pavement-terrain-mask.js';
+const renderer=new THREE.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});renderer.setSize(800,600);document.body.append(renderer.domElement);
+const scene=new THREE.Scene();scene.background=new THREE.Color('#9bbdd0');scene.add(new THREE.HemisphereLight(0xffffff,0x686050,1));
+const terrain=new THREE.Mesh(new THREE.PlaneGeometry(64,64),new THREE.MeshStandardMaterial({color:0x487229}));terrain.rotation.x=-Math.PI/2;terrain.position.set(32,0,32);terrain.userData.isTerrainMesh=true;scene.add(terrain);
+const camera=new THREE.PerspectiveCamera(50,4/3,.1,200);camera.position.set(32,66,78);camera.lookAt(32,0,32);
+const ctx={renderer,terrainGroup:{children:[terrain]}},binding=createPavementMaterialBinding(ctx);
+let mask=createPavementTerrainMask(ctx,[],{materialBinding:binding});mask.activate();mask.syncMaterials();renderer.compile(scene,camera);renderer.render(scene,camera);
+const programs=renderer.info.programs.map(p=>p.id);let cycles=0;
+function publish(){const next=createPavementTerrainMask(ctx,['0:0'],{materialBinding:binding});const r=next.layout.resolution,data=new Uint8Array(r*r);for(let z=0;z<r;z++)for(let x=0;x<r;x++)if((x>25&&x<38)||(z>25&&z<38))data[z*r+x]=255;next.publish('0:0',data);next.activate();mask.dispose();mask=next;mask.syncMaterials();cycles++;renderer.render(scene,camera);}
+document.addEventListener('keydown',event=>{if(event.key==='ArrowRight')publish();});
+window.advanceTime=()=>renderer.render(scene,camera);window.render_game_to_text=()=>JSON.stringify({cycles,programs:renderer.info.programs.map(p=>p.id),retainedPrograms:JSON.stringify(programs)===JSON.stringify(renderer.info.programs.map(p=>p.id)),textures:renderer.info.memory.textures,glError:renderer.getContext().getError()});
+</script>

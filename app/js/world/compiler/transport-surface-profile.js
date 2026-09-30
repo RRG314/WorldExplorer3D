@@ -600,15 +600,19 @@ function smoothSignedCutFillProfile(
         Math.min(upperBounds[index], heights[index + 1] + grade * run)
       );
     }
-    const next = new Float64Array(heights);
+    // Preserve the previous pass's left neighbor before overwriting it.
+    // The right neighbor is still untouched: this is the same Jacobi pass
+    // without allocating another backing buffer for every iteration.
+    let previous = heights[0];
     for (let index = 1; index < heights.length - 1; index += 1) {
-      next[index] = clamp(
-        heights[index] * 0.45 + (heights[index - 1] + heights[index + 1]) * 0.275,
+      const current = heights[index];
+      heights[index] = clamp(
+        current * 0.45 + (previous + heights[index + 1]) * 0.275,
         lowerBounds[index],
         upperBounds[index]
       );
+      previous = current;
     }
-    heights.set(next);
   }
   return new Float32Array(heights);
 }

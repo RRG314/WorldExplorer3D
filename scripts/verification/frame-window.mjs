@@ -9,11 +9,14 @@ export async function sampleFrameWindow(durationMs) {
   durationMs = options ? options.durationMs : durationMs;
   return new Promise((resolve) => {
     const deltas = [];
-    const startActor = globalThis.getWorldExplorerRuntimeDiagnostics?.()?.activeActor;
+    const lightSample = options?.collectDiagnostics === false;
+    if (lightSample && !routeActor) throw new Error('A lightweight sample needs a live actor reference.');
+    const startActor = lightSample ? {position:routeActor} : globalThis.getWorldExplorerRuntimeDiagnostics?.()?.activeActor;
     const startPosition = startActor?.position ? {x:startActor.position.x,z:startActor.position.z} : null;
     const requestedAt = performance.now();
     let startedAt = null;
     let previous = null;
+    let priorX = routeActor?.x, priorZ = routeActor?.z, distanceTraveled = 0, movingMs = 0;
     const frame = (now) => {
       // RAF timestamps can predate this request. Never move the clock backward,
       // and measure a complete window between eligible frame timestamps.
@@ -22,16 +25,26 @@ export async function sampleFrameWindow(durationMs) {
         return;
       }
       if (startedAt === null) startedAt = now;
-      else deltas.push(now - previous);
+      else {
+        const delta = now-previous; deltas.push(delta);
+        if (routeActor) {
+          const distance=Math.hypot(routeActor.x-priorX,routeActor.z-priorZ);
+          distanceTraveled+=distance;if(distance>.005)movingMs+=delta;
+        }
+      }
+      if(routeActor){priorX=routeActor.x;priorZ=routeActor.z;}
       previous = now;
       // Read only two coordinates per frame, not the full world diagnostics.
       const routeComplete = targetDistance > 0 && startPosition &&
         Math.hypot(routeActor.x-startPosition.x,routeActor.z-startPosition.z) >= targetDistance;
       if (now - startedAt < durationMs && !routeComplete) requestAnimationFrame(frame);
       else {
-        const diagnostics = globalThis.getWorldExplorerRuntimeDiagnostics?.() || {};
+        const diagnostics = lightSample ? {activeActor:{position:routeActor}} : globalThis.getWorldExplorerRuntimeDiagnostics?.() || {};
         resolve({
           deltas,
+          requestedAt, startedAt, endedAt: now, timeOrigin: performance.timeOrigin ?? null,
+          distanceTraveled, movingMs,
+          firstFrameDelayMs: startedAt-requestedAt,
           elapsedMs: now-startedAt,
           routeComplete: Boolean(routeComplete),
           startPosition,

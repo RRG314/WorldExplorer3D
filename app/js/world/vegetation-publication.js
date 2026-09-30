@@ -1,3 +1,4 @@
+import {prepareVegetationObstacleIndex,publishVegetationObstacleIndex} from './vegetation-obstacle-index.js';
 import {drainCooperatively} from './cooperative-scheduling.js?v=1';
 
 // Keep the accepted scene and collision placements together until replacement
@@ -20,11 +21,14 @@ export async function publishVegetationCooperatively(ctx, {collect,render,dispos
     const placements=await collect(schedule);
     const count=await render(stage,placements,schedule);
     if(!current())return null;
+    const obstacleIndex=await prepareVegetationObstacleIndex(ctx,features,schedule);
+    if(!current())return null;
     const previous=ctx.vegetationMeshes || [];
     for(const mesh of previous)mesh?.parent?.remove(mesh);
     for(const mesh of meshes)ctx.addEarthWorldObject(mesh);
     ctx.replaceWorldCollection('vegetationMeshes',meshes);
     ctx.replaceWorldCollection('vegetationFeatures',features);
+    publishVegetationObstacleIndex(ctx,obstacleIndex);
     ctx.vegetationModelStatus=status;
     committed=true;
     // Retired geometry can be released across turns after atomic publication.

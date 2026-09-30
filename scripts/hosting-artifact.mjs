@@ -2,6 +2,7 @@
 
 import { firebaseProjectScript, firebaseInitJson, generatedFirebaseFiles } from './lib/firebase-artifact-config.mjs';
 import crypto from 'node:crypto';
+import {assertModelAssetRevisions} from './update-model-asset-revisions.mjs';
 import { canonicalBundledModule, rewritePackagedModuleReference } from './lib/runtime-module-identity.mjs';
 import { readReleaseSourceIdentity, assertReleaseSourceIdentity } from './lib/release-source-identity.mjs';
 import { build as buildJavaScript } from 'esbuild';
@@ -327,6 +328,7 @@ async function packageLockSha256() {
 }
 
 async function buildArtifact(environment) {
+  await assertModelAssetRevisions();
   // Check provenance before replacing any generated artifact.
   const sourceIdentity = readReleaseSourceIdentity(ROOT);
   const sourceFiles = await collectSourceFiles();

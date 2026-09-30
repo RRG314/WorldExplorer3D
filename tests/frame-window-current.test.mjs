@@ -21,6 +21,10 @@ test('stale first RAF cannot add pre-window time or shorten the measurement', as
   const result = await sample([10, 90, 110, 130, 150, 170], 60);
   assert.deepEqual(Array.from(result.deltas), [20, 20, 20]);
   assert.equal(result.elapsedMs, 60);
+  assert.equal(result.firstFrameDelayMs, 10);
+  assert.equal(result.requestedAt,100);
+  assert.equal(result.startedAt,110);
+  assert.equal(result.endedAt,170);
   assert.equal(result.deltas.reduce((sum, delta) => sum + delta, 0), result.elapsedMs);
 });
 
@@ -58,4 +62,14 @@ test('a blocked route times out without claiming movement', async () => {
   });
   const result=await vm.runInContext(`(${sampleFrameWindow.toString()})({durationMs:100,targetDistance:20,actorKey:'actor'})`,context);
   assert.equal(result.routeComplete,false);assert.equal(result.elapsedMs,100);assert.equal(result.endPosition.x,0);
+});
+
+test('lightweight travel windows never allocate the full diagnostic snapshot',async()=>{
+ let timestamp=100;const actor={x:0,z:0};
+ const context=vm.createContext({actor,performance:{now:()=>100},
+  requestAnimationFrame(callback){queueMicrotask(()=>{actor.x+=5;callback(timestamp+=20);});},
+  getWorldExplorerRuntimeDiagnostics(){throw Error('Heavy diagnostic called inside movement window');}
+ });
+ const result=await vm.runInContext(`(${sampleFrameWindow.toString()})({durationMs:100,targetDistance:20,actorKey:'actor',collectDiagnostics:false})`,context);
+ assert.equal(result.routeComplete,true);assert.equal(result.startPosition.x,0);assert.equal(result.endPosition.x,20);
 });

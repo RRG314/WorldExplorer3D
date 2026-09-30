@@ -5,6 +5,7 @@ import {ring, polar, templatePoint, pointInRoom, ringRoute} from './ship-ring-pl
 import { configureColorTexture } from '../planetary/catalog.js?v=1';
 import { attachShipFurnishing } from './ship-furnishings.js?v=1';
 import { createShipEnvironment, applyShipSurfaceUV } from './ship-environment.js?v=1';
+import { createShipSurfaceLibrary } from './ship-surface-library.js';
 import { ctx as appCtx } from '../shared-context.js?v=55';
 import { getPrimaryWorldCanvas } from '../engine/webgl-lifecycle.js?v=2';
 import {
@@ -239,8 +240,8 @@ function shipSurfaceMaterial(kind, deckId) {
     map: texture,
     // Albedo panel markings are not a height map. Keep grazing deck/ceiling
     // shading stable instead of differentiating every painted screw and stripe.
-    bumpMap: kind === 'wall' ? texture : null,
-    bumpScale: kind === 'wall' ? 0.012 : 0
+    bumpMap: null,
+    bumpScale: 0
   });
   surface.userData.shipTileSize = kind === 'wall' ? 6.84 : kind === 'ceiling' ? 8 : 4;
   return surface;
@@ -1028,15 +1029,16 @@ function createShipExteriorView() {
 
 function addWallEquipment(group,deck,colliders){
  for(const room of deck.rooms){
-  const inner=room.id==='storm-shelter',radius=inner?17.5:ring.hullRadius-.6;
+  const inner=room.id==='storm-shelter',radius=inner?17.86:ring.hullRadius-.14;
   const offsets=['bridge','observation-gallery','local-craft-bay'].includes(room.id)?[-.24,.24]:[-.12,.12];
   for(const [index,offset] of offsets.entries()){
    const angle=room.angle+offset,p=polar(radius,angle),host=new THREE.Group();
    host.name=`wall-equipment:${room.id}:${index}`;host.position.set(p.x,.7,p.z);host.rotation.y=angle+Math.PI;host.userData.shipRoomId=room.id;group.add(host);
-   const asset=index===0?(deck.id==='habitat'?'crew-display':'wall-navigation'):'wall-instruments';
-   void furnish(host,asset,{sourceYaw:asset==='wall-navigation'?Math.PI:0,fit:{x:index===0?3:2,y:1.8,z:index===0?1.15:.65}});
+   // Reuse the approved instrument module across stations; the previous
+   // navigation shell is distorted in its source mesh, not in the importer.
+   void furnish(host,'wall-instruments',{mount:'wall',fit:{x:2,y:1.8,z:.65}});
    const halfWidth=index===0?1.5:1,halfDepth=index===0?.575:.325;
-   const pts=[[-1,-1],[1,-1],[1,1],[-1,1]].map(([u,v])=>({x:p.x+u*halfWidth*Math.cos(angle)+v*halfDepth*Math.sin(angle),z:p.z-u*halfWidth*Math.sin(angle)+v*halfDepth*Math.cos(angle)}));
+   const pts=[[-1,0],[1,0],[1,-2],[-1,-2]].map(([u,v])=>({x:p.x+u*halfWidth*Math.cos(angle)+v*halfDepth*Math.sin(angle),z:p.z-u*halfWidth*Math.sin(angle)+v*halfDepth*Math.cos(angle)}));
    colliders.push({pts,minX:Math.min(...pts.map(v=>v.x)),maxX:Math.max(...pts.map(v=>v.x)),minZ:Math.min(...pts.map(v=>v.z)),maxZ:Math.max(...pts.map(v=>v.z)),baseY:.7,height:1.8,isInteriorCollider:true,sourceBuildingId:host.name});
    const station=SHIP_STATIONS.find(entry=>entry.roomId===room.id);
    if(station){
@@ -1047,8 +1049,8 @@ function addWallEquipment(group,deck,colliders){
  }
 }
 
-function buildDeckScene(deckDefinition) {
- return buildRingDeck(THREE,deckDefinition,{surface:shipSurfaceMaterial,material,box,accent:deckAccent,label:roomLabelTexture,details:addDeckDetails,propColliders:addDeckPropColliders,spaceView:createShipExteriorView,wallEquipment:addWallEquipment});
+function buildDeckScene(deckDefinition, surfaces) {
+ return buildRingDeck(THREE,deckDefinition,{surface:surfaces.surface,material,box,accent:deckAccent,label:roomLabelTexture,details:addDeckDetails,propColliders:addDeckPropColliders,spaceView:createShipExteriorView,wallEquipment:addWallEquipment});
 }
 
 function buildSolisReachScene(expedition) {
@@ -1058,12 +1060,15 @@ function buildSolisReachScene(expedition) {
   root.add(new THREE.HemisphereLight(0xf3f5f7, 0x343038, 0.65));
   root.add(new THREE.AmbientLight(0xffffff, 0.3));
   const deckStates = new Map();
+  const surfaces = createShipSurfaceLibrary(THREE, appCtx.renderer, shipSurfaceMaterial);
+  root.userData.disposeShipSurfaces = surfaces.dispose;
   SHIP_DECKS.forEach((deckDefinition, index) => {
-    const state = buildDeckScene(deckDefinition);
+    const state = buildDeckScene(deckDefinition, surfaces);
     state.group.visible = index === 0;
     root.add(state.group);
     deckStates.set(deckDefinition.id, state);
   });
+  root.userData.furnishingReady = surfaces.ready();
   const crewLayer = new THREE.Group();
   crewLayer.name = 'solis-reach-crew-layer';
   root.add(crewLayer);
@@ -1496,7 +1501,7 @@ function syncResearchBenches(session){
   if(!group){
    group=new THREE.Group();group.name=`research-cradles:${id}`;
    const room=SHIP_ROOMS.find(r=>r.id===bench.roomId),p=templatePoint(room,bench.template);
-   group.position.set(p.x,(id==='fabrication-bench'?1.07:1.06)*room.fitScale,p.z);group.rotation.y=room.kitYaw+(id==='fabrication-bench'?0:-Math.PI/2);deck.group.add(group);
+   group.position.set(p.x,id==='fabrication-bench'?1.07:1.06,p.z);group.rotation.y=room.kitYaw+(id==='fabrication-bench'?0:-Math.PI/2);deck.group.add(group);
    for(let i=0;i<2;i++){
     const cradle=new THREE.Mesh(new THREE.CylinderGeometry(.32,.35,.08,24),material(0x51646b,{metalness:.65}));cradle.position.x=(i-.5)*1.1;group.add(cradle);
     const specimen=new THREE.Mesh(new THREE.IcosahedronGeometry(.2,1),material(i?0x97826b:0x807566,{roughness:.9}));specimen.name=`specimen:${i}`;specimen.position.set((i-.5)*1.1,.26,0);group.add(specimen);
@@ -2067,6 +2072,7 @@ function exitSolisReachInterior() {
     if (child.userData.disposeShipFurnishing) furnishingHosts.push(child);
   });
   furnishingHosts.forEach((host) => host.userData.disposeShipFurnishing());
+  session.sceneState.root.userData.disposeShipSurfaces?.();
   session.sceneState.root.traverse((child) => {
     child.geometry?.dispose?.();
     if (Array.isArray(child.material)) child.material.forEach((entry) => { entry?.map?.dispose?.(); entry?.dispose?.(); });

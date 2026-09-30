@@ -1,11 +1,19 @@
 import {prepareStreetPavement,compilePavementTile,pavementTileHasWork} from './street-pavement.js';
 import {rasterizePavementMask} from './pavement-mask.js';
-let plan=null;
+let plan=null,stagedInput=null;
 const pending=new Set();
 self.onmessage=({data})=>{
  try{
-  if(data.type==='prepare'){
-   plan=prepareStreetPavement({...data.input,sparseOverview:true});plan.sourceCells=plan.sourceCellCount;
+  if(data.type==='source-begin'){
+   plan=null;pending.clear();stagedInput={roads:[],buildings:[],landuses:[],linearFeatures:[],metersPerWorldUnit:data.metersPerWorldUnit};
+   self.postMessage({type:'source-ready'});
+  }else if(data.type==='source-chunk'){
+   if(!stagedInput||!['roads','buildings','landuses','linearFeatures'].includes(data.field)||!Array.isArray(data.items))throw new Error('Invalid street source chunk');
+   for(const item of data.items)stagedInput[data.field].push(item);
+   self.postMessage({type:'source-accepted'});
+  }else if(data.type==='prepare'){
+   const input=data.input||stagedInput;if(!input)throw new Error('Missing street source');
+   plan=prepareStreetPavement({...input,sparseOverview:true});stagedInput=null;plan.sourceCells=plan.sourceCellCount;
    plan.tiles=plan.tiles.filter(tile=>pavementTileHasWork(tile,false));
    pending.clear();plan.tiles.forEach((_,i)=>pending.add(i));
    self.postMessage({type:'prepared',tiles:plan.tiles.length,keys:plan.tiles.map(tile=>tile.key),sourceCells:plan.sourceCells,excludedCells:plan.sourceCells-plan.tiles.length});

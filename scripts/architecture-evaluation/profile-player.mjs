@@ -1,5 +1,5 @@
 import {chromium} from 'playwright';
-import {mkdir,writeFile} from 'node:fs/promises';
+import {mkdir,writeFile,readFile} from 'node:fs/promises';
 import {execFileSync} from 'node:child_process';
 import {createHash} from 'node:crypto';
 import {startStaticServer} from '../verification/static-server.mjs';
@@ -10,23 +10,38 @@ const root=process.env.WE3D_PROFILE_ROOT||process.cwd();
 const label=process.env.WE3D_PROFILE_LABEL||'baseline-pilot';
 const location={lat:Number(process.env.WE3D_PROFILE_LAT??39.2904),lon:Number(process.env.WE3D_PROFILE_LON??-76.6122),name:process.env.WE3D_PROFILE_LOCATION||'Baltimore'};
 if(!Number.isFinite(location.lat)||!Number.isFinite(location.lon)||Math.abs(location.lat)>90||Math.abs(location.lon)>180)throw Error('Invalid profile location');
+const drivePose=process.env.WE3D_PROFILE_DRIVE_POSE?JSON.parse(process.env.WE3D_PROFILE_DRIVE_POSE):null;
+if(drivePose&&!['x','z','angle'].every(key=>Number.isFinite(drivePose[key])))throw Error('Invalid driving profile pose');
 const retentionCycles=Math.min(3,Math.max(0,Number(process.env.WE3D_RETENTION_CYCLES)||0));
 const out=`output/architecture-evaluation/${label}`;await mkdir(out,{recursive:true});
-const report={label,source:execFileSync('git',['rev-parse','HEAD'],{cwd:root,encoding:'utf8'}).trim(),host:requirePerformanceHost(),quality:'med fixed; auto-quality disabled',viewport:{width:1280,height:800},clock:'normal RAF; no advanceTime',location,samples:[],errors:[],complete:false};
+const defaultQuality=process.env.WE3D_PROFILE_DEFAULT_QUALITY==='1';
+const report={label,source:execFileSync('git',['rev-parse','HEAD'],{cwd:root,encoding:'utf8'}).trim(),host:requirePerformanceHost(),quality:defaultQuality?'application defaults':'med fixed; auto-quality disabled',viewport:{width:Number(process.env.WE3D_PROFILE_WIDTH)||1280,height:Number(process.env.WE3D_PROFILE_HEIGHT)||800},clock:'normal RAF; no advanceTime',location,samples:[],errors:[],complete:false};
 report.runtimeDiffSha256=createHash('sha256').update(execFileSync('git',['diff','HEAD','--','app'],{cwd:root})).digest('hex');
+try {report.artifact=JSON.parse(await readFile(`${root}/build-manifest.json`,'utf8'));} catch {}
 const save=()=>writeFile(`${out}/report.json`,JSON.stringify(report,null,2)+'\n');
 const server=await startStaticServer({rootDir:root,ports:[4491,4492]});let browser;
-let deadline;try{
+let deadline, page;try{
  browser=await chromium.launch({headless:false,channel:'chrome'});
  deadline=setTimeout(()=>browser.close().catch(()=>{}),retentionCycles?1200000:process.env.WE3D_PROFILE_ENVIRONMENTS==='1'?720000:420000);
- const context=await browser.newContext({viewport:report.viewport,deviceScaleFactor:1});const page=await context.newPage();
+ const context=await browser.newContext({viewport:report.viewport,deviceScaleFactor:1});page=await context.newPage();
+ report.navigations=[];page.on('framenavigated',frame=>{if(frame===page.mainFrame())report.navigations.push(frame.url());});
  await configureStagingAppCheck(page,`http://127.0.0.1:${server.port}`);
- await page.addInitScript(()=>{globalThis.__architectureLongTasks=[];globalThis.__architectureLongTasksDropped=0;try{new PerformanceObserver(list=>{for(const e of list.getEntries()){if(globalThis.__architectureLongTasks.length<10000)globalThis.__architectureLongTasks.push({startTime:e.startTime,duration:e.duration});else globalThis.__architectureLongTasksDropped++;}}).observe({type:'longtask',buffered:true});}catch{}localStorage.setItem('worldExplorerRenderQualityLevel','med');localStorage.setItem('worldExplorerPerfAutoQuality','0');});
+ await page.addInitScript(({defaultQuality})=>{globalThis.__architectureLongTasks=[];globalThis.__architectureLongTasksDropped=0;try{new PerformanceObserver(list=>{for(const e of list.getEntries()){if(globalThis.__architectureLongTasks.length<10000)globalThis.__architectureLongTasks.push({startTime:e.startTime,duration:e.duration});else globalThis.__architectureLongTasksDropped++;}}).observe({type:'longtask',buffered:true});}catch{}if(!defaultQuality){localStorage.setItem('worldExplorerRenderQualityLevel','med');localStorage.setItem('worldExplorerPerfAutoQuality','0');}},{defaultQuality});
+ if(process.env.WE3D_PROFILE_SHADER_STALLS==='1')await page.addInitScript(()=>{
+  globalThis.__shaderStalls=[];
+  for(const Type of [globalThis.WebGLRenderingContext,globalThis.WebGL2RenderingContext]){
+   if(!Type)continue;const original=Type.prototype.getProgramInfoLog;
+   Type.prototype.getProgramInfoLog=function(program){const started=performance.now();const result=original.call(this,program);const elapsed=performance.now()-started;
+    if(elapsed>10&&globalThis.__shaderStalls.length<100)globalThis.__shaderStalls.push({started,elapsed,defines:this.getAttachedShaders(program).map(shader=>(this.getShaderSource(shader)||'').split('\n').filter(line=>line.startsWith('#define')).slice(0,100))});return result;};
+  }
+ });
+ report.consoleFailures=[];page.on('console',message=>{if(['error','warning'].includes(message.type()))report.consoleFailures.push(message.text().replace(/https?:\/\/[^\s]+/g,url=>{try{const u=new URL(url);return u.origin+u.pathname;}catch{return '[url]';}}).slice(0,1000));});
+ page.on('console',message=>{if(['error','warning'].includes(message.type())&&/StreetPavement|WebGLProgram/.test(message.text()))report.errors.push(message.text().slice(0,500));});
  page.on('pageerror',e=>report.errors.push(String(e.message).replace(/[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}/gi,'[id]')));
  const cdp=await context.newCDPSession(page);await cdp.send('Performance.enable');
  const metrics=async()=>Object.fromEntries((await cdp.send('Performance.getMetrics')).metrics.map(x=>[x.name,x.value]));
  const start=Date.now();console.log('profile: title');
- await page.goto(`http://127.0.0.1:${server.port}/app/?loc=custom&lat=${location.lat}&lon=${location.lon}&lname=${encodeURIComponent(location.name)}&launch=earth&gm=free&mode=walk`,{waitUntil:'domcontentloaded',timeout:90000});
+ await page.goto(`http://127.0.0.1:${server.port}/app/?graphicsDiagnostics=${process.env.WE3D_PROFILE_GRAPHICS==='1'?'1':'0'}&loc=custom&lat=${location.lat}&lon=${location.lon}&lname=${encodeURIComponent(location.name)}&launch=earth&gm=free&mode=walk`,{waitUntil:'domcontentloaded',timeout:90000});
  await page.waitForFunction(()=>globalThis.__WE3D_RUNTIME_READY__===true,null,{timeout:120000});
  report.titleReadyMs=Date.now()-start;report.titleMetrics=await metrics();
  report.graphics=await page.evaluate(()=>{const c=document.createElement('canvas'),gl=c.getContext('webgl2')||c.getContext('webgl');const e=gl.getExtension('WEBGL_debug_renderer_info');const renderer=e?gl.getParameter(e.UNMASKED_RENDERER_WEBGL):gl.getParameter(gl.RENDERER);gl.getExtension('WEBGL_lose_context')?.loseContext();return renderer;});requireHardwareGraphics(report.graphics);await save();
@@ -43,7 +58,93 @@ let deadline;try{
  if(process.env.WE3D_PROFILE_DAY==='1'){for(let i=0;i<6&&await page.locator('#quickTimeOfDay').getAttribute('data-mode')!=='day';i++)await page.locator('#quickTimeOfDay').click();report.manualSkyMode=await page.locator('#quickTimeOfDay').getAttribute('data-mode');if(report.manualSkyMode!=='day')throw Error('Day preset did not activate');}
  if(process.env.WE3D_PROFILE_COMPILER==='1'){const {profile}=await cdp.send('Profiler.stop');await writeFile(`${out}/compilation.cpuprofile`,JSON.stringify(profile));report.firstPlayableTimingScope='sampled profiler enabled; do not compare as uninstrumented load latency';}
  await page.waitForTimeout(2500);
+ if(process.env.WE3D_PROFILE_MATRIX_TIME==='1')await page.evaluate(async()=>{
+  const {ctx}=await import('/app/js/shared-context.js?v=55');globalThis.__matrixTimings=[];
+  for(const root of ctx.scene.children){
+   const row={name:root.name,type:root.type,nodes:0,automatic:0,calls:0,totalMs:0,maxMs:0};
+   root.traverse(o=>{row.nodes++;row.automatic+=o.matrixAutoUpdate?1:0;});globalThis.__matrixTimings.push(row);
+   const original=root.updateMatrixWorld;root.updateMatrixWorld=function(...args){const start=performance.now();try{return original.apply(this,args);}finally{const elapsed=performance.now()-start;row.calls++;row.totalMs+=elapsed;row.maxMs=Math.max(row.maxMs,elapsed);}};
+  }
+ });
+ if(process.env.WE3D_PROFILE_GPU_TIME==='1')await page.evaluate(async()=>{
+  const {ctx}=await import('/app/js/shared-context.js?v=55'),renderer=ctx.renderer,gl=renderer.getContext();
+  const ext=gl.getExtension('EXT_disjoint_timer_query_webgl2');globalThis.__gpuTimings={available:!!ext,records:[]};if(!ext)return;
+  const pending=[];let frame=0,active=false;const target=ctx.composer||renderer,original=target.render;
+  target.render=function(...args){
+   for(let i=pending.length-1;i>=0;i--){const p=pending[i];if(!gl.getQueryParameter(p.query,gl.QUERY_RESULT_AVAILABLE))continue;
+    if(!gl.getParameter(ext.GPU_DISJOINT_EXT)&&globalThis.__gpuTimings.records.length<300)globalThis.__gpuTimings.records.push({mode:p.mode,stage:p.stage,cpuMs:p.cpuMs,gpuMs:gl.getQueryParameter(p.query,gl.QUERY_RESULT)/1e6});
+    gl.deleteQuery(p.query);pending.splice(i,1);
+   }
+   const measure=!active&&++frame%20===0&&pending.length<12;
+   if(!measure)return original.apply(this,args);
+   const query=gl.createQuery(),started=performance.now();active=true;gl.beginQuery(ext.TIME_ELAPSED_EXT,query);
+   try{return original.apply(this,args);}finally{gl.endQuery(ext.TIME_ELAPSED_EXT);active=false;pending.push({query,stage:globalThis.__renderCostStage||null,cpuMs:performance.now()-started,mode:ctx.planeMode?.active?'plane':ctx.Walk?.state?.mode==='walk'?'walk':'drive'});}
+  };
+ });
+ if(process.env.WE3D_PROFILE_GPU_UPLOADS==='1')await page.evaluate(async()=>{
+  const {ctx}=await import('/app/js/shared-context.js?v=55');const owners=new WeakMap();globalThis.__gpuUploadStalls=[];
+  const register=root=>root?.traverse?.(object=>{
+   const attributes={...object.geometry?.attributes,index:object.geometry?.index,instanceMatrix:object.instanceMatrix,instanceColor:object.instanceColor};
+   for(const [attribute,value] of Object.entries(attributes))if(value?.array?.buffer)owners.set(value.array.buffer,{name:object.name,type:object.type,attribute,bytes:value.array.byteLength,road:!!object.userData?.isRoadBatch,vegetation:!!root.userData?.isVegetationBatch,building:!!object.userData?.isBuildingBatch});
+  });
+  register(ctx.scene);const add=ctx.addEarthWorldObject;ctx.addEarthWorldObject=function(object){register(object);return add(object);};
+  const gl=ctx.renderer.getContext(),original=gl.bufferData;
+  gl.bufferData=function(...args){const started=performance.now();try{return original.apply(this,args);}finally{const elapsed=performance.now()-started;if(elapsed>8&&globalThis.__gpuUploadStalls.length<100)globalThis.__gpuUploadStalls.push({started,elapsed,owner:owners.get(args[1]?.buffer)||null,bytes:args[1]?.byteLength||0});}};
+ });
  report.initial=await page.evaluate(()=>{const d=getWorldExplorerRuntimeDiagnostics();return {worldCounts:d.worldCounts,worldLoad:d.worldLoad,renderer:d.renderer,rendererOwners:d.rendererOwners,runtimeKernel:d.runtimeKernel,transportCompilation:d.transportCompilation};});await save();
+ if(process.env.WE3D_PROFILE_RENDER_COST==='1'){
+  await page.mouse.click(720,400);await page.keyboard.down('w');await page.waitForTimeout(5000);await page.keyboard.up('w');
+  await page.locator('#travelBtn').click();await page.locator('#fDriving').click();await page.waitForTimeout(1500);
+  report.renderCost=[];
+  for(const stage of (process.env.WE3D_PROFILE_DEPTH_SORT==='1'?['baseline','front-to-back','baseline','front-to-back']:['baseline','bloom-off','smaa-off','shadows-held','local-lights-off','baseline-restored'])){
+   await page.evaluate(async stage=>{
+    const {ctx}=await import('/app/js/shared-context.js?v=55');
+    globalThis.__renderCostRestore?.();globalThis.__renderCostRestore=null;globalThis.__renderCostStage=stage;
+    globalThis.__TRAVEL_PROFILE_ACTOR__=ctx.car;
+    if(stage==='front-to-back'){
+     ctx.renderer.setOpaqueSort((a,b)=>a.groupOrder-b.groupOrder||a.renderOrder-b.renderOrder||a.z-b.z||a.material.id-b.material.id||a.id-b.id);
+     globalThis.__renderCostRestore=()=>ctx.renderer.setOpaqueSort(null);
+    }else if(stage==='bloom-off'||stage==='smaa-off'){
+     const pass=stage==='bloom-off'?ctx.bloomPass:ctx.smaaPass;if(pass){const enabled=pass.enabled;pass.enabled=false;globalThis.__renderCostRestore=()=>pass.enabled=enabled;}
+    }else if(stage==='shadows-held'){
+     const shadow=ctx.renderer.shadowMap,descriptor=Object.getOwnPropertyDescriptor(shadow,'needsUpdate');
+     Object.defineProperty(shadow,'needsUpdate',{configurable:true,get:()=>false,set:()=>{}});
+     globalThis.__renderCostRestore=()=>{Object.defineProperty(shadow,'needsUpdate',descriptor);shadow.needsUpdate=true;};
+    }else if(stage==='local-lights-off'){
+     const saved=[];ctx.scene.traverse(o=>{if(o.isPointLight||o.isSpotLight){const intensity=o.intensity,descriptor=Object.getOwnPropertyDescriptor(o,'intensity');saved.push(()=>{Object.defineProperty(o,'intensity',descriptor);o.intensity=intensity;});Object.defineProperty(o,'intensity',{configurable:true,get:()=>0,set:()=>{}});}});
+     globalThis.__renderCostRestore=()=>saved.forEach(restore=>restore());
+    }
+   },stage);
+   await page.waitForTimeout(1000);
+   const raw=await page.evaluate(sampleFrameWindow,{durationMs:5000,actorKey:'__TRAVEL_PROFILE_ACTOR__',collectDiagnostics:false});
+   report.renderCost.push({stage,fps:raw.deltas.length*1000/raw.elapsedMs,maxMs:Math.max(...raw.deltas)});await save();
+  }
+  await page.evaluate(()=>{globalThis.__renderCostRestore?.();globalThis.__renderCostStage=null;});
+ }
+ if(process.env.WE3D_PROFILE_DRAW_INVENTORY==='1'){
+  report.drawInventory=await page.evaluate(async()=>{
+   const {ctx}=await import('/app/js/shared-context.js?v=55');const restored=[],counts={},inventory={};
+   const category=o=>o.userData?.isRoadMarking?'road-mark':o.userData?.isRoadSkirt?'road-skirt':o.userData?.isRoadBatch?'road':o.userData?.isBuildingBatch?'building':o.isSkinnedMesh?'skin':o.isInstancedMesh?'instances':o.userData?.isTerrainMesh?'terrain':(o.name||[o.type,o.parent?.name,o.parent?.parent?.name].filter(Boolean).join('/'));
+   ctx.scene.traverse(o=>{if(!o.geometry)return;const key=category(o),n=o.geometry.attributes.position?.count||0;
+    const bucket=inventory[key]||(inventory[key]={meshes:0,vertices:0,maxVertices:0});bucket.meshes++;bucket.vertices+=n;bucket.maxVertices=Math.max(bucket.maxVertices,n);
+    const original=o.onBeforeRender;const wrapper=function(...args){counts[key]=(counts[key]||0)+1;return original.apply(this,args);};o.onBeforeRender=wrapper;restored.push([o,original,wrapper]);
+   });
+   try{await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));}
+   finally{for(const [o,original,wrapper]of restored)if(o.onBeforeRender===wrapper)o.onBeforeRender=original;}
+   return {inventory,drawsAcrossTwoFrameBoundaries:counts};
+  });await save();
+ }
+ if(process.env.WE3D_PROFILE_SCENE_GRAPH==='1'){
+  report.sceneGraph=await page.evaluate(async()=>{
+   const {ctx}=await import('/app/js/shared-context.js?v=55');
+   return [...ctx.scene.children,...(ctx.earthSceneRoot?.children||[])].map(root=>{
+    let nodes=0,automaticMatrices=0,meshes=0,bones=0;
+    root.traverse(o=>{nodes++;automaticMatrices+=o.matrixAutoUpdate?1:0;meshes+=o.isMesh?1:0;bones+=o.isBone?1:0;});
+    return {name:root.name,type:root.type,visible:root.visible,nodes,automaticMatrices,meshes,bones};
+   }).sort((a,b)=>b.nodes-a.nodes).slice(0,30);
+  });await save();
+ }
+
  if(process.env.WE3D_CAPTURE_WORLD==='1'){
   const projection=await page.evaluate(async()=>{
    const {ctx}=await import('/app/js/shared-context.js?v=55');
@@ -78,21 +179,86 @@ let deadline;try{
   await cdp.send('HeapProfiler.startSampling',{samplingInterval:32768});await page.waitForTimeout(10000);
   const allocation=await cdp.send('HeapProfiler.stopSampling');await writeFile(`${out}/walking-allocations.json`,JSON.stringify(allocation));
  }
- async function sample(id,key=null,duration=15000){console.log(`profile: ${id}`);const before=await metrics();if(key){await page.mouse.click(640,400);await page.keyboard.down(key);}let raw;try{raw=await page.evaluate(sampleFrameWindow,duration);}finally{if(key)await page.keyboard.up(key);}const after=await metrics(),s=[...raw.deltas].sort((a,b)=>a-b);report.samples.push({id,elapsedMs:raw.elapsedMs,frames:s.length,meanMs:raw.elapsedMs/s.length,p95Ms:s[Math.ceil(s.length*.95)-1],p99Ms:s[Math.ceil(s.length*.99)-1],start:raw.startPosition,end:raw.endPosition,distance:raw.startPosition&&raw.endPosition?Math.hypot(raw.endPosition.x-raw.startPosition.x,raw.endPosition.z-raw.startPosition.z):null,renderer:raw.diagnostics.renderer,rendererOwners:await page.evaluate(()=>getWorldExplorerRuntimeDiagnostics().rendererOwners),worldCounts:raw.diagnostics.worldCounts,jsHeapUsedBytes:after.JSHeapUsedSize,scriptSeconds:after.ScriptDuration-before.ScriptDuration,taskSeconds:after.TaskDuration-before.TaskDuration,dom:await cdp.send('Memory.getDOMCounters')});await save();}
- if(process.env.WE3D_PROFILE_SKIP_EARTH_WINDOWS!=='1'){
+ async function sample(id,key=null,duration=15000){console.log(`profile: ${id}`);const before=await metrics();if(key){await page.mouse.click(640,400);await page.keyboard.down(key);}let raw;try{raw=await page.evaluate(sampleFrameWindow,duration);}finally{if(key)await page.keyboard.up(key);}const after=await metrics(),s=[...raw.deltas].sort((a,b)=>a-b);report.samples.push({id,elapsedMs:raw.elapsedMs,frames:s.length,meanMs:raw.elapsedMs/s.length,p95Ms:s[Math.ceil(s.length*.95)-1],p99Ms:s[Math.ceil(s.length*.99)-1],start:raw.startPosition,end:raw.endPosition,distance:raw.startPosition&&raw.endPosition?Math.hypot(raw.endPosition.x-raw.startPosition.x,raw.endPosition.z-raw.startPosition.z):null,maxMs:s.at(-1),fps:s.length*1000/raw.elapsedMs,drawCallBreakdown:raw.diagnostics.drawCallBreakdown,renderer:raw.diagnostics.renderer,rendererOwners:await page.evaluate(()=>getWorldExplorerRuntimeDiagnostics().rendererOwners),worldCounts:raw.diagnostics.worldCounts,jsHeapUsedBytes:after.JSHeapUsedSize,scriptSeconds:after.ScriptDuration-before.ScriptDuration,taskSeconds:after.TaskDuration-before.TaskDuration,dom:await cdp.send('Memory.getDOMCounters')});await save();}
+ async function travelCpu(id,key){
+  console.log(`profile: ${id} CPU (separate window)`);
+  await cdp.send('Profiler.enable');await cdp.send('Profiler.start');await page.keyboard.down(key);
+  try{await page.waitForTimeout(10000);}finally{await page.keyboard.up(key);const {profile}=await cdp.send('Profiler.stop');await writeFile(`${out}/${id}.cpuprofile`,JSON.stringify(profile));}
+ }
+ if(process.env.WE3D_PROFILE_CONTROLLED_TRAVEL==='1'){
+  const timedTravelSeconds=Number(process.env.WE3D_PROFILE_TRAVEL_SECONDS)||0;
+  report.drivePose=drivePose;report.routeScope=timedTravelSeconds ? `Diagnostic ${timedTravelSeconds}s input windows; no route completion claim.` : 'Repeatable scenario setup; normal physics and keyboard input thereafter. Driving 100 m, flight 1500 m above the same city; no climb-key loops.';
+  async function populationPresentation(){return page.evaluate(async()=>{
+   const {ctx}=await import('/app/js/shared-context.js?v=55');let nodes=0,bones=0;
+   ctx.earthSceneRoot?.traverse(o=>{nodes++;bones+=o.isBone?1:0;});
+   return {nodes,bones,detailedNpcs:ctx.urbanSandboxRuntime?.npcs?.length,actor:ctx.activeEarthActorPosition?.()};
+  });}
+  report.populationPresentation={before:await populationPresentation()};
+  for(const mode of (process.env.WE3D_PROFILE_MODES || 'drive,plane').split(',')){
+   if(!['drive','plane'].includes(mode))throw Error('Invalid profile travel mode');
+   const transitionCpu=process.env.WE3D_PROFILE_TRANSITION_CPU==='1';
+   if(transitionCpu){await cdp.send('Profiler.enable');await cdp.send('Profiler.start');}
+   await page.locator('#travelBtn').click();await page.locator(mode==='drive'?'#fDriving':'#fPlane').click();
+   await page.locator('#travelBtn').blur();await page.waitForTimeout(1500);
+   if(transitionCpu){const {profile}=await cdp.send('Profiler.stop');await writeFile(`${out}/transition-${mode}.cpuprofile`,JSON.stringify(profile));}
+   for(let repeat=0;repeat<(Number(process.env.WE3D_PROFILE_REPEATS)||2);repeat++){
+    await page.evaluate(async({mode,drivePose})=>{
+     const {ctx}=await import('/app/js/shared-context.js?v=55');
+     const actor=mode==='drive'?ctx.car:ctx.planeMode;
+     const x=mode==='drive'&&drivePose?drivePose.x:4.854101966249685,z=mode==='drive'&&drivePose?drivePose.z:3.526711513754839;
+     Object.assign(actor,{x,z,angle:0,yaw:0,pitch:0,roll:0,pitchRate:0,rollRate:0,yawRate:0,lookYawOffset:0,cameraYaw:0,cameraPitch:0,cameraLookTimer:0,barrelRollActive:false,flightPathAngle:0,climbRate:0,turnRate:0,angleOfAttack:0});
+     if(mode==='drive')Object.assign(actor,{angle:drivePose?.angle||0,y:ctx.GroundHeight.carCenterY(x,z),speed:0,vFwd:0,vLat:0,vx:0,vy:0,vz:0,onGround:true,isAirborne:false});
+     else Object.assign(actor,{y:300,speed:80,horizontalSpeed:80,vx:0,vy:0,vz:80,throttle:1,airborne:true,stalled:false});
+     globalThis.__TRAVEL_PROFILE_ACTOR__=actor;
+     globalThis.__TRAVEL_PROFILE_RENDERER__=ctx.renderer;
+    },{mode,drivePose});
+    const captureCpu=process.env.WE3D_PROFILE_CONTROLLED_CPU==='1';
+    if(captureCpu){await cdp.send('Profiler.enable');await cdp.send('Profiler.start');}
+    const modeSeconds=mode==='drive'?Number(process.env.WE3D_PROFILE_DRIVE_SECONDS)||timedTravelSeconds:timedTravelSeconds;
+    const windowStartedAt=await page.evaluate(()=>performance.now());
+    const key=mode==='drive'?'w':'Space';await page.keyboard.down(key);let raw;
+    try{raw=await page.evaluate(sampleFrameWindow,{durationMs:modeSeconds ? modeSeconds*1000 : 30000,targetDistance:timedTravelSeconds ? 0 : mode==='drive'?100:1500,actorKey:'__TRAVEL_PROFILE_ACTOR__',collectDiagnostics:false});}finally{await page.keyboard.up(key);}
+    if(captureCpu){const {profile}=await cdp.send('Profiler.stop');await writeFile(`${out}/controlled-${mode}-${repeat}.cpuprofile`,JSON.stringify(profile));}
+    await writeFile(`${out}/controlled-${mode}-${repeat}-frames.json`,JSON.stringify(raw.deltas));
+    const renderer=await page.evaluate(()=>{const r=globalThis.__TRAVEL_PROFILE_RENDERER__,i=r.info;return {calls:i.render.calls,triangles:i.render.triangles,programs:i.programs.length,geometries:i.memory.geometries,textures:i.memory.textures};});
+    const sorted=[...raw.deltas].sort((a,b)=>a-b);
+    report.samples.push({id:`controlled-${mode}-${repeat}`,windowStartedAt,distanceTraveled:raw.distanceTraveled,movingFraction:raw.movingMs/raw.elapsedMs,routeComplete:raw.routeComplete,elapsedMs:raw.elapsedMs,fps:sorted.length*1000/raw.elapsedMs,firstFrameDelayMs:raw.firstFrameDelayMs,p95Ms:sorted[Math.ceil(sorted.length*.95)-1],p99Ms:sorted[Math.ceil(sorted.length*.99)-1],maxMs:sorted.at(-1),start:raw.startPosition,end:raw.endPosition,renderer,diagnosticScope:'Lightweight actor and renderer counters; no world diagnostics inside or between timed windows'});await save();
+    await page.screenshot({path:`${out}/controlled-${mode}-${repeat}.png`});
+    if(!timedTravelSeconds&&!raw.routeComplete)throw Error(`${mode} failed to complete controlled route`);
+   }
+   report.populationPresentation[mode]=await populationPresentation();
+   report.publicationByMode ||= {}; report.publicationByMode[mode]=await page.evaluate(async()=>{const {ctx}=await import('/app/js/shared-context.js?v=55');const p=ctx.planeMode;return {pavement:ctx.streetPavement?.stats,overview:ctx.streetOverview?.stats,pending:!!ctx._streetPavementUpdating,plane:{active:p?.active,airborne:p?.airborne,x:p?.x,y:p?.y,z:p?.z},ground:ctx.terrainMeshHeightAt?.(p.x,p.z),elevation:ctx.elevationWorldYAtWorldXZ?.(p.x,p.z)};});await save();
+  }
+  if(process.env.WE3D_PROFILE_RETURN_GROUND==='1'){
+   await page.locator('#travelBtn').click();await page.locator('#fDriving').click();
+   // Return to the original scenario origin to test detail restoration, rather
+   // than assuming the end of an aerial route contains pedestrian activity.
+   await page.evaluate(async()=>{
+    const {ctx}=await import('/app/js/shared-context.js?v=55');const x=4.854101966249685,z=3.526711513754839;
+    Object.assign(ctx.car,{x,z,y:ctx.GroundHeight.carCenterY(x,z),speed:0,vFwd:0,vLat:0,vx:0,vy:0,vz:0});
+   });
+   await page.waitForFunction(async()=> (await import('/app/js/shared-context.js?v=55')).ctx.urbanSandboxRuntime?.npcs?.length>0,null,{timeout:15000,polling:500});
+   await page.waitForTimeout(1500);
+   report.populationPresentation.returnGround=await populationPresentation();
+   await page.screenshot({path:`${out}/return-ground.png`});await save();
+  }
+ }
+ if(process.env.WE3D_PROFILE_SKIP_EARTH_WINDOWS!=='1' && process.env.WE3D_PROFILE_CONTROLLED_TRAVEL!=='1'){
  await sample('walking-stationary');await sample('walking-moving','w');
  console.log('profile: sampled CPU (separate from frame measurements)');await cdp.send('Profiler.enable');await cdp.send('Profiler.start');await page.waitForTimeout(10000);const {profile}=await cdp.send('Profiler.stop');await writeFile(`${out}/walking.cpuprofile`,JSON.stringify(profile));
  await page.screenshot({path:`${out}/walking.png`});
  await page.locator('#travelBtn').click();await page.locator('#fDriving').click();await page.waitForTimeout(1500);await sample('driving-moving','w');await page.screenshot({path:`${out}/driving.png`});
+ if(process.env.WE3D_PROFILE_TRAVEL_CPU==='1')await travelCpu('driving','w');
  }
  if(process.env.WE3D_PROFILE_FLIGHT==='1'){
   await page.locator('#travelBtn').click();await page.locator('#fPlane').click();await page.mouse.click(640,400);
   const pose=()=>page.evaluate(async()=>(await import('/app/js/shared-context.js?v=55')).ctx.getPlaneSnapshot());
   const before=await pose();await page.keyboard.down('Space');await page.keyboard.down('s');
-  try{await page.waitForTimeout(2000);}finally{await page.keyboard.up('s');await page.keyboard.up('Space');}
+  try{await page.waitForFunction(async()=> (await import('/app/js/shared-context.js?v=55')).ctx.getPlaneSnapshot().pitch>=.12,null,{timeout:5000,polling:'raf'});}finally{await page.keyboard.up('s');await page.keyboard.up('Space');}
   const after=await pose();report.flightPreparation={before,after};
   if(!(after.pitch>.05&&after.y>before.y&&after.throttle>before.throttle))throw Error('Normal flight input did not establish climb');
   await sample('plane-sustained','Space',90000);await page.screenshot({path:`${out}/plane.png`});
+  if(process.env.WE3D_PROFILE_TRAVEL_CPU==='1')await travelCpu('plane','Space');
  }
  if(process.env.WE3D_VERIFY_NOTICE_SPACE==='1'){
   await page.mouse.click(640,400);
@@ -103,6 +269,16 @@ let deadline;try{
   await page.screenshot({path:`${out}/travel-menu.png`});await page.locator('#fSpaceRocket').click();
   await page.waitForFunction(()=>JSON.parse(globalThis.render_game_to_text?.()||'{}').modes?.space===true,null,{timeout:120000});
   report.noticeSpaceTransitionPassed=true;await page.waitForTimeout(3000);await page.screenshot({path:`${out}/space-after-menu.png`});await save();
+ }
+ if(process.env.WE3D_PROFILE_SKY_CYCLE==='1'){
+  report.skyCycle=[];
+  for(const mode of ['night','day']){
+   for(let i=0;i<7&&await page.locator('#quickTimeOfDay').getAttribute('data-mode')!==mode;i++)await page.locator('#quickTimeOfDay').click();
+   await page.waitForTimeout(1200);
+   report.skyCycle.push(await page.evaluate(async()=>{const {ctx}=await import('/app/js/shared-context.js?v=55');return {mode:document.querySelector('#quickTimeOfDay').dataset.mode,visible:ctx.starField.visible,matrixFinite:ctx.starField.children.every(node=>node.matrixWorld.elements.every(Number.isFinite))};}));
+   await page.screenshot({path:`${out}/sky-${mode}.png`});
+  }
+  if(!report.skyCycle[0].visible||report.skyCycle[1].visible||report.skyCycle.some(entry=>!entry.matrixFinite))throw Error('Sky cycle failed');
  }
  if(process.env.WE3D_PROFILE_ENVIRONMENTS==='1'){
   for(const [id,action,ready] of [
@@ -122,6 +298,18 @@ let deadline;try{
    await sample(`${id}-stationary`);await page.screenshot({path:`${out}/${id}.png`});
   }
  }
+ if(process.env.WE3D_PROFILE_SURFACE_PROBES==='1'){
+  report.surfaceProbes=await page.evaluate(async()=>{
+   const {ctx}=await import('/app/js/shared-context.js?v=55'),ray=new THREE.Raycaster();
+   ctx.scene.updateMatrixWorld(true);
+   globalThis.__earthGraph=ctx.earthSceneRoot.children.map(root=>{let nodes=0,automatic=0;root.traverse(o=>{nodes++;automatic+=o.matrixAutoUpdate?1:0;});return {name:root.name,type:root.type,visible:root.visible,nodes,automatic,flags:Object.keys(root.userData)};}).sort((a,b)=>b.nodes-a.nodes).slice(0,20);
+   return [[400,416],[700,416],[640,510],[1000,650]].map(([x,y])=>{
+    ray.setFromCamera(new THREE.Vector2(x/innerWidth*2-1,1-y/innerHeight*2),ctx.camera);
+    return {screen:[x,y],hits:ray.intersectObjects(ctx.scene.children,true).filter(h=>{for(let o=h.object;o;o=o.parent)if(!o.visible)return false;return true;}).slice(0,5).map(h=>({point:h.point,distance:h.distance,faceNormal:h.face?.normal,vertices:h.face?[h.face.a,h.face.b,h.face.c].map(i=>[h.object.geometry.attributes.position.getX(i),h.object.geometry.attributes.position.getY(i),h.object.geometry.attributes.position.getZ(i)]):null,name:h.object.name,type:h.object.type,flags:Object.keys(h.object.userData),material:(Array.isArray(h.object.material)?h.object.material:[h.object.material]).map(m=>({type:m.type,color:m.color?.getHexString(),portalMasks:m.userData?.structurePortalMaskCount,maxPortalCandidates:m.userData?.structurePortalMaxCellCandidates,registeredWater:ctx.waterWaveVisuals?.includes(m),waveTime:m.userData?.weWaterWaveShader?.uniforms.weWaveTime?.value,waveAmplitude:m.userData?.weWaterWaveShader?.uniforms.weWaveAmplitude?.value}))}))};
+   });
+  });await save();
+ }
+ report.earthPublication=await page.evaluate(async()=>{const {ctx}=await import('/app/js/shared-context.js?v=55');return {pavement:ctx.streetPavement?.stats,overview:ctx.streetOverview?.stats,pending:!!ctx._streetPavementUpdating,dirty:!!ctx._streetPavementDirty};});
  await page.locator('#mainMenuBtn').click();await page.waitForTimeout(5000);report.menuMetrics=await metrics();report.menuDiagnostics=await page.evaluate(()=>{const d=getWorldExplorerRuntimeDiagnostics();return {gameStarted:d.gameStarted,worldCounts:d.worldCounts,renderer:d.renderer,rendererOwners:d.rendererOwners,lastEarthWorldRelease:d.lastEarthWorldRelease};});
  if(retentionCycles){
   report.retention=[];
@@ -142,6 +330,14 @@ let deadline;try{
   }
  }
  report.longTasks=await page.evaluate(()=>({entries:globalThis.__architectureLongTasks||[],dropped:globalThis.__architectureLongTasksDropped||0,scope:'Observer long tasks above 50 ms; renderer/GPU and asynchronous waits are not measured as blocking.'}));
+ report.gpuTimings=await page.evaluate(()=>globalThis.__gpuTimings||null);
+ report.matrixTimings=await page.evaluate(()=>globalThis.__matrixTimings||null);
+ report.earthGraph=await page.evaluate(()=>globalThis.__earthGraph||null);
+ report.graphicsCalls=await page.evaluate(async()=>{const {ctx}=await import('/app/js/shared-context.js?v=55');return ctx.graphicsCallEvidence?.snapshot()||[];});
+ report.gpuUploadStalls=await page.evaluate(()=>globalThis.__gpuUploadStalls||[]);
+ report.shaderStalls=await page.evaluate(()=>globalThis.__shaderStalls||[]);
  report.complete=true;console.log('profile: complete');
-}catch(e){report.failure=String(e.message);console.log('profile: failed',report.failure);}finally{clearTimeout(deadline);await save();await browser?.close().catch(()=>{});await server.close();}
+}catch(e){report.failure=String(e.stack||e.message);console.log('profile: failed',report.failure);
+ try{report.failureState=await Promise.race([page.evaluate(()=>({text:document.body.innerText.slice(-5000),gameStarted:globalThis.getWorldExplorerRuntimeDiagnostics?.().gameStarted,worldLoading:globalThis.getWorldExplorerRuntimeDiagnostics?.().worldLoading})),new Promise((_,reject)=>setTimeout(()=>reject(Error('Failure snapshot timed out')),5000))]);await page.screenshot({path:`${out}/failure.png`,timeout:5000});}catch{}
+}finally{clearTimeout(deadline);await save();await Promise.race([browser?.close().catch(()=>{}),new Promise(resolve=>setTimeout(resolve,5000))]);await server.close();}
 if(!report.complete)process.exitCode=1;

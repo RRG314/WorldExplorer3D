@@ -92,31 +92,35 @@ export function registerWaterWaveMaterial(material, options = {}) {
   if (typeof material.envMapIntensity === 'number') {
     material.envMapIntensity = Math.min(0.68, Math.max(material.envMapIntensity, 0.5));
   }
-  material.onBeforeCompile = (shader, renderer) => {
-    if (typeof previousOnBeforeCompile === 'function') previousOnBeforeCompile(shader, renderer);
-    shader.uniforms.weWaveTime = { value: 0 };
-    shader.uniforms.weWaveAmplitude = { value: 0 };
-    shader.uniforms.weWaveSecondaryAmplitude = { value: 0 };
-    shader.uniforms.weWaveSwellAmplitude = { value: 0 };
-    shader.uniforms.weWaveRippleAmplitude = { value: 0 };
-    shader.uniforms.weWaveScale = { value: waveScale };
-    shader.uniforms.weWaveSpeed = { value: 0.52 };
-    shader.uniforms.weWaveVisualStrength = { value: 0.16 * visualBase };
-    shader.uniforms.weWaveFoamStrength = { value: 0.08 * foamBase };
-    shader.uniforms.weWaveEdgeFade = { value: edgeFade };
-    shader.uniforms.weWaveTroughDepth = { value: MAX_SAFE_WATER_TROUGH_DEPTH };
-    shader.uniforms.weWaterNormalStrength = { value: waterOpticsQualityStrength() };
-    shader.uniforms.weWaterZenithColor = { value: new THREE.Color(appCtx.earthAtmosphereProfile?.zenithColor ?? 0x397fc2) };
-    shader.uniforms.weWaterHorizonColor = { value: new THREE.Color(appCtx.earthAtmosphereProfile?.horizonColor ?? 0xd9edf6) };
-    shader.uniforms.weWaterSunColor = { value: new THREE.Color(appCtx.earthAtmosphereProfile?.sunColor ?? 0xfff5e1) };
-    shader.uniforms.weWaterSunDirection = { value: new THREE.Vector3(
+  // All program variants of this material share the same live water state.
+  // A later compile must not leave a cached lighting variant with stale waves.
+  const uniforms = {};
+  uniforms.weWaveTime = { value: 0 };
+  uniforms.weWaveAmplitude = { value: 0 };
+  uniforms.weWaveSecondaryAmplitude = { value: 0 };
+  uniforms.weWaveSwellAmplitude = { value: 0 };
+  uniforms.weWaveRippleAmplitude = { value: 0 };
+  uniforms.weWaveScale = { value: waveScale };
+  uniforms.weWaveSpeed = { value: 0.52 };
+  uniforms.weWaveVisualStrength = { value: 0.16 * visualBase };
+  uniforms.weWaveFoamStrength = { value: 0.08 * foamBase };
+  uniforms.weWaveEdgeFade = { value: edgeFade };
+  uniforms.weWaveTroughDepth = { value: MAX_SAFE_WATER_TROUGH_DEPTH };
+  uniforms.weWaterNormalStrength = { value: waterOpticsQualityStrength() };
+  uniforms.weWaterZenithColor = { value: new THREE.Color(appCtx.earthAtmosphereProfile?.zenithColor ?? 0x397fc2) };
+  uniforms.weWaterHorizonColor = { value: new THREE.Color(appCtx.earthAtmosphereProfile?.horizonColor ?? 0xd9edf6) };
+  uniforms.weWaterSunColor = { value: new THREE.Color(appCtx.earthAtmosphereProfile?.sunColor ?? 0xfff5e1) };
+  uniforms.weWaterSunDirection = { value: new THREE.Vector3(
       appCtx.earthAtmosphereProfile?.sunDirection?.x ?? 0.42,
       appCtx.earthAtmosphereProfile?.sunDirection?.y ?? 0.82,
       appCtx.earthAtmosphereProfile?.sunDirection?.z ?? 0.39
     ) };
-    shader.uniforms.weWaterDaylight = { value: appCtx.earthAtmosphereProfile?.daylight ?? 1 };
-    shader.uniforms.weWaterNight = { value: appCtx.earthAtmosphereProfile?.night ?? 0 };
-    shader.uniforms.weWaterOvercast = { value: appCtx.earthAtmosphereProfile?.overcast ?? 0 };
+  uniforms.weWaterDaylight = { value: appCtx.earthAtmosphereProfile?.daylight ?? 1 };
+  uniforms.weWaterNight = { value: appCtx.earthAtmosphereProfile?.night ?? 0 };
+  uniforms.weWaterOvercast = { value: appCtx.earthAtmosphereProfile?.overcast ?? 0 };
+  material.onBeforeCompile = (shader, renderer) => {
+    if (typeof previousOnBeforeCompile === 'function') previousOnBeforeCompile(shader, renderer);
+    Object.assign(shader.uniforms, uniforms);
     material.userData.weWaterWaveShader = shader;
 
     shader.vertexShader = shader.vertexShader
@@ -185,6 +189,12 @@ totalEmissiveRadiance += vec3(0.018, 0.026, 0.034) * (weFoamBands * 0.22 + weWhi
 // WE_WATER_EMISSIVE_EXTENSION`
       );
     if (shaderHook) shaderHook(shader, { material, waterKind });
+    // Preserve extension state (boat wake, foam) across those variants too.
+    for (const [name, uniform] of Object.entries(shader.uniforms)) {
+      if (!name.startsWith('we')) continue;
+      if (uniforms[name]) shader.uniforms[name] = uniforms[name];
+      else uniforms[name] = uniform;
+    }
   };
 
   if (Array.isArray(appCtx.waterWaveVisuals)) appCtx.waterWaveVisuals.push(material);

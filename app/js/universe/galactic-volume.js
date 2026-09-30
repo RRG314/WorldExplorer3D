@@ -17,10 +17,13 @@ export function createGalacticVolume(THREE,entity,{region=false,mobile=false}={}
     for(int i=0;i<${mobile?40:64};i++){
      vec3 p=observer+dir*(start+(float(i)+.5)*ds);float r=length(p.xz);
      float envelope=(1.-smoothstep(.72,1.,r))*exp(-abs(p.y)*mix(22.,4.,region));
+     float bulge=exp(-dot(p*vec3(1.,2.4,1.),p*vec3(1.,2.4,1.))*45.);
+     // Density is bounded above by envelope + .6*bulge. Across the entire
+     // box, omitted opacity is below .00028, well below the .002 discard.
+     if(envelope+bulge*.6<.00001)continue;
      float phase=atan(p.z,p.x)-r*10.;float arm=pow(.5+.5*cos(phase*arms),8.);
      float broad=noise(p*mix(14.,4.,region)),fine=noise(p*mix(38.,12.,region));
      float clusters=smoothstep(.43,.82,broad*.7+fine*.3);
-     float bulge=exp(-dot(p*vec3(1.,2.4,1.),p*vec3(1.,2.4,1.))*45.);
      float disk=(.1+arm*.9)*envelope*(.3+clusters*.7);
      float regional=envelope*(.08+clusters*.92);
      float density=mix(disk+bulge*.6,regional,region);

@@ -1,0 +1,19 @@
+<!doctype html><meta charset="utf-8"><link rel="icon" href="data:,">
+<style>body{margin:0;background:#a4beca}canvas{display:block}</style>
+<script src="/node_modules/three/build/three.min.js"></script>
+<script type="module">
+import {registerWaterWaveMaterial} from '/app/js/world/water-materials.js';
+import {ctx} from '/app/js/shared-context.js?v=55';
+ctx.waterWaveVisuals=[];
+const renderer=new THREE.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});renderer.setSize(720,480);document.body.append(renderer.domElement);
+renderer.outputEncoding=THREE.sRGBEncoding;
+const scene=new THREE.Scene();scene.background=new THREE.Color('#a4beca');scene.add(new THREE.HemisphereLight(0xffffff,0x455463,1));
+const light=new THREE.DirectionalLight(0xffffff,2);light.position.set(4,12,7);scene.add(light);
+const camera=new THREE.PerspectiveCamera(50,1.5,.1,500);camera.position.set(0,12,35);camera.lookAt(0,0,0);
+const material=new THREE.MeshStandardMaterial({color:0x1b5a76,roughness:.25});registerWaterWaveMaterial(material,{waterKind:'open_ocean'});
+const mesh=new THREE.Mesh(new THREE.PlaneGeometry(100,100,30,30).rotateX(-Math.PI/2),material);scene.add(mesh);
+let phase=0;renderer.render(scene,camera);const originalUniforms=material.userData.weWaterWaveShader.uniforms;
+function draw(){const u=material.userData.weWaterWaveShader.uniforms;u.weWaveTime.value=phase*2;u.weWaveAmplitude.value=.5;u.weWaveSecondaryAmplitude.value=.15;renderer.render(scene,camera);}
+addEventListener('keydown',e=>{if(e.code==='ArrowRight'){phase++;light.visible=phase%2===0;draw();draw();}});
+window.advanceTime=draw;window.render_game_to_text=()=>JSON.stringify({phase,uniformRetained:originalUniforms.weWaveTime===material.userData.weWaterWaveShader.uniforms.weWaveTime,time:originalUniforms.weWaveTime.value,glError:renderer.getContext().getError(),programs:renderer.info.programs.length});window.ready=true;draw();
+</script>

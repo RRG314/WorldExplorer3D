@@ -1,0 +1,42 @@
+{
+  "source": "https://sketchfab.com/3d-models/sci-fi-computer-room-a149d5bfcef6496c9a0606b5ce5ebf27",
+  "license": "CC-BY-4.0",
+  "sourceSha256": "2d418181f7b106f980232b034640116ea4f0713857a15c9d0986f71eb341249e",
+  "textures": [
+    {
+      "filename": "bulkhead-color.png",
+      "channel": "color",
+      "edge": 1024,
+      "sha256": "39be2537e62309a498ff23882ff6727749cc3be7682a74293bd5a753e86a1bbd",
+      "bytes": 874084
+    },
+    {
+      "filename": "bulkhead-normal.png",
+      "channel": "normal",
+      "edge": 512,
+      "sha256": "d5b315747b309a7394ab2fcc49f1ae1fa83eed7e7c87c6b7823bc988e7d3df23",
+      "bytes": 102372
+    },
+    {
+      "filename": "bulkhead-roughness-metalness.png",
+      "channel": "roughness-metalness",
+      "edge": 512,
+      "sha256": "30670de102293a5b0ce1bd7b65c081371b8f7e70df8212e972ed2b1567330616",
+      "bytes": 227685
+    },
+    {
+      "filename": "carpet-color.png",
+      "channel": "color",
+      "edge": 512,
+      "sha256": "0d073c1d8746a2ce966519c891ffcef29c3854f9191d4d588689280349d0e4a1",
+      "bytes": 420999
+    },
+    {
+      "filename": "carpet-roughness-metalness.png",
+      "channel": "roughness-metalness",
+      "edge": 512,
+      "sha256": "60d0ba7ef249472d89f8153fd66615b1d6cbf44c8266bd381c43ca5835afc2eb",
+      "bytes": 112827
+    }
+  ]
+}

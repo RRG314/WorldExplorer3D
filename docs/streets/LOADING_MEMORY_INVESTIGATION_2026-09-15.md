@@ -88,11 +88,9 @@ Terrain still creates per-mesh texture sets keyed by mode, repeat and source ide
 
 Source: `app/js/terrain/surface-profiles.js:60`, `app/js/terrain/surface-profiles.js:258`, `app/js/terrain/mesh-lifecycle.js:23`.
 
-### 5. Tooling adds separate memory pressure
+### 5. Attribute process memory before comparing runs
 
-A read-only process snapshot during this investigation found 19 Chrome processes with approximately 1,200 MiB summed resident memory, 151 Codex tool Node helpers with approximately 393 MiB summed resident memory, and one other Node process at approximately 4 MiB. Summed RSS can count shared pages and is not total memory pressure; compressed or swapped memory is not represented adequately by these figures. Chrome processes were not attributed to particular tabs.
-
-The helper count deserves lifecycle cleanup through the tools that own them. It is not evidence of 151 game workers. No unknown process or user browser was killed. No additional world, test server or test runner was started for this investigation.
+The historical process snapshot included browser and development-tool processes that were not attributed to the game tab. It cannot establish the game's memory footprint. Summed RSS may count shared pages, and does not adequately represent compressed or swapped memory. Future comparisons must identify the game renderer and separate tooling overhead from game allocations.
 
 ## What is running after load
 
