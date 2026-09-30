@@ -19,7 +19,8 @@ use the game's licensed character and animation controller.
 Driving and aircraft chase cameras now account for movement throughout each
 frame, reducing the repeated pull-back and catch-up visible at uneven frame
 intervals. Road queries, geometry buffers and repeated lighting updates create
-less temporary work without reducing world detail. Sustained packaged gameplay
+less temporary work without reducing world detail. Discarded private building
+buffers are released after batching to reduce delayed cleanup freezes. Sustained packaged gameplay
 and release checks remain in progress; occasional pauses are not yet eliminated.
 
 ## Respect the place

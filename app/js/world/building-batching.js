@@ -1,5 +1,6 @@
 import {GeometryBatchStorage, batchStorageView} from './geometry-batch-storage.js';
 import {compactBuildingVertices} from './building-vertex-storage.js';
+import {releaseRetiredBuildingCpuBuffers} from './retired-building-buffers.js';
 import { FACADE_OPENINGS_GLSL } from './building-facade-layout.js?v=3';
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import {
@@ -230,6 +231,7 @@ async function batchBuildingMeshesByTier(tiers = ['near'], options = {}) {
 
     const batchedMeshes = [];
     let sourceMeshCount = 0;
+    let releasedCpuBytes = 0;
 
     const groupEntries = [...groups.values()];
     for (let groupIndex = 0; groupIndex < groupEntries.length; groupIndex += 1) {
@@ -370,7 +372,11 @@ async function batchBuildingMeshesByTier(tiers = ['near'], options = {}) {
 
       appCtx.addEarthWorldObject(mergedMesh);
       batchedMeshes.push(mergedMesh);
-      for (let i = 0; i < sourceMeshes.length; i++) disposeSceneMesh(sourceMeshes[i]);
+      for (let i = 0; i < sourceMeshes.length; i++) {
+        const geometry = sourceMeshes[i].geometry;
+        disposeSceneMesh(sourceMeshes[i]);
+        releasedCpuBytes += releaseRetiredBuildingCpuBuffers(geometry);
+      }
       sourceMeshCount += sourceMeshes.length;
       } finally {
         if ((groupIndex + 1) % yieldEveryGroups === 0 && groupIndex + 1 < groupEntries.length) {
@@ -387,7 +393,8 @@ async function batchBuildingMeshesByTier(tiers = ['near'], options = {}) {
     appCtx._lastBuildingBatchStats = {
       groupCount: groups.size,
       batchMeshCount: batchedMeshes.length,
-      sourceMeshCount
+      sourceMeshCount,
+      releasedCpuBytes
     };
     return sourceMeshCount;
   } catch (err) {

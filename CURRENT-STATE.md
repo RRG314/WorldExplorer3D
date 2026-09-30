@@ -10,12 +10,15 @@ Visual-quality implementation is in progress locally. See
 `docs/visual-quality/PLAN.md` and `docs/visual-quality/EVIDENCE.md`.
 The local rendering and asset changes are not the deployed build.
 
-The movement repair source is ready for an immutable staging build. It fixes
+The movement repair source is undergoing final packaged verification. It fixes
 frame-duration-dependent chase-camera lag and reduces measured temporary road,
 geometry and numeric light-uniform work without lowering quality. Source checks,
-1,547 contracts and prescribed source action smoke pass. The latest isolated
-120-second flight still contained a183ms pause; all-stall elimination is not
-claimed. Average FPS is acceptable to the owner. Packaged travel, multiplayer,
+1,547 contracts and prescribed source action smoke passed at8357. Low flight then
+exposed a1.35second freeze from deferred native buffer cleanup. A targeted private
+building-buffer retirement repair reduced the measured sweep from786ms to16ms;
+two150second isolated repeats had233/283ms worst pauses. Integration tests pass;
+final packaged confirmation remains open. All-stall elimination is not claimed.
+Average FPS is acceptable to the owner. Packaged travel, multiplayer,
 transitions and release safeguards remain open. See the authoritative
 `docs/visual-quality/MOVEMENT-EVIDENCE.md` ledger. Original8940staging is preserved
 in `.local-candidates`; production has not changed.
