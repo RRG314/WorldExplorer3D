@@ -1,3 +1,4 @@
+import { nearbyVehicleSnapshots } from './nearby-vehicles.js';
 import {setPopulationHostVisible} from './presentation-attachment.js';
 import { createPedestrianSpacing } from './pedestrian-spacing.js';
 import { selectVehicleVariant, VEHICLE_ROOT_TO_GROUND_METERS } from '../engine/vehicle-catalog.js?v=6';
@@ -753,15 +754,7 @@ export function createLivingWorldPopulation(options = {}) {
       })])).values()])
     }),
     nearbyVehicles(reference, radius = 8) {
-      const origin = reference || referencePosition();
-      if (!origin) return Object.freeze([]);
-      const safeRadius = Math.max(1, Math.min(220, Number(radius) || 8));
-      return Object.freeze(vehicles.map(vehicleSnapshot).filter((vehicle) => (
-        vehicle && !vehicle.promoted && vehicle.visible &&
-        Math.hypot(vehicle.x - origin.x, vehicle.z - origin.z) <= safeRadius
-      )).sort((a, b) => (
-        Math.hypot(a.x - origin.x, a.z - origin.z) - Math.hypot(b.x - origin.x, b.z - origin.z)
-      )));
+      return nearbyVehicleSnapshots(vehicles, trafficGraph, reference || referencePosition(), radius, vehicleSnapshot);
     },
     nearbyPedestrians(reference, radius = 8) {
       const origin = reference || referencePosition();

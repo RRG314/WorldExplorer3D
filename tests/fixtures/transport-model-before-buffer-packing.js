@@ -1,10 +1,11 @@
-import { sampleSortedProfileAtDistance } from '../../structure-semantics/profile-sampling.js';
-import {fitOrdinaryStreetProfile} from './ordinary-street-profile.js';
-import {roadPlacementOffsetWorld} from '../road-units.js';
+// Frozen storage reference from 8940b944; numeric helpers retain their public contracts.
+import { sampleSortedProfileAtDistance } from '../../app/js/structure-semantics/profile-sampling.js';
+import {fitOrdinaryStreetProfile} from '../../app/js/world/compiler/ordinary-street-profile.js';
+import {roadPlacementOffsetWorld} from '../../app/js/world/road-units.js';
 import {
   polylineDistances,
   sampleProfileAtDistance
-} from '../../structure-semantics/geometry.js?v=2';
+} from '../../app/js/structure-semantics/geometry.js?v=2';
 import {
   DEFAULT_MAX_AT_GRADE_CUT,
   DEFAULT_MAX_AT_GRADE_FILL,
@@ -27,7 +28,7 @@ import {
   smoothGradeLimitedProfile,
   smoothSignedCutFillProfile,
   tangentAtDistance
-} from './transport-surface-profile.js?v=12';
+} from './transport-profile-before-scratch.js';
 
 const TRANSPORT_SURFACE_SCHEMA_VERSION = 1;
 // Weak ownership, not a cache of external/mutable profiles. Compilation creates
@@ -186,21 +187,14 @@ function compileTransportSurfaceModel(feature, sampleTerrainY, options = {}) {
     : halfWidth;
   const corridorCenterOffset = roadPlacementOffsetWorld(feature);
   const anchors = normalizeAnchors(feature, semantics, total);
-  const sampleCount = sampleDistances.length;
-  // These four published profiles share a lifetime, but never overlap. One
-  // backing allocation avoids four native buffers per compiled road.
-  const groundStorage = new Float32Array(sampleCount * 4);
-  const groundHeights = groundStorage.subarray(0, sampleCount);
-  const offsets = groundStorage.subarray(sampleCount, sampleCount * 2);
-  const leftGround = groundStorage.subarray(sampleCount * 2, sampleCount * 3);
-  const rightGround = groundStorage.subarray(sampleCount * 3);
-  // Compiler-only work must not keep storage alive through the published model.
-  // Preserve each field's original Float64/Float32 rounding and zero fill.
-  const scratch = new ArrayBuffer(sampleCount * 28);
-  const centerInitial = new Float64Array(scratch, 0, sampleCount);
-  const centerLowerBounds = new Float64Array(scratch, sampleCount * 8, sampleCount);
-  const centerUpperBounds = new Float64Array(scratch, sampleCount * 16, sampleCount);
-  const terrainEnvelope = new Float32Array(scratch, sampleCount * 24, sampleCount);
+  const groundHeights = new Float32Array(sampleDistances.length);
+  const offsets = new Float32Array(sampleDistances.length);
+  const centerInitial = new Float64Array(sampleDistances.length);
+  const centerLowerBounds = new Float64Array(sampleDistances.length);
+  const centerUpperBounds = new Float64Array(sampleDistances.length);
+  const terrainEnvelope = new Float32Array(sampleDistances.length);
+  const leftGround = new Float32Array(sampleDistances.length);
+  const rightGround = new Float32Array(sampleDistances.length);
   const mode = semantics?.terrainMode || 'at_grade';
   const minimumStructureSurfaceY = Number(feature.minimumStructureSurfaceY);
   const maximumAtGradeCut = Math.max(
@@ -437,11 +431,8 @@ function compileTransportSurfaceModel(feature, sampleTerrainY, options = {}) {
   // Publish the same accepted profile at both edges. All gameplay, markings,
   // sidewalks, and visuals then query one planar deck instead of recreating
   // incompatible lateral terrain folds.
-  const edgeStorage = new Float32Array(centerHeights.length * 2);
-  const leftHeights = edgeStorage.subarray(0, centerHeights.length);
-  const rightHeights = edgeStorage.subarray(centerHeights.length);
-  leftHeights.set(centerHeights);
-  rightHeights.set(centerHeights);
+  const leftHeights = new Float32Array(centerHeights);
+  const rightHeights = new Float32Array(centerHeights);
 
   const stats = profileStats(
     sampleDistances,

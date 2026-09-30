@@ -1,5 +1,6 @@
-import { smoothstep01 } from '../../structure-semantics/geometry.js?v=2';
-import { tunnelMinimumDepth } from './tunnel-envelope.js';
+// Frozen profile reference from 8940b944 for allocation-repair parity.
+import { smoothstep01 } from '../../app/js/structure-semantics/geometry.js?v=2';
+import { tunnelMinimumDepth } from '../../app/js/world/compiler/tunnel-envelope.js';
 
 const TRANSPORT_SURFACE_SCHEMA_VERSION = 1;
 const DEFAULT_SURFACE_BIAS = 0.08;
@@ -600,19 +601,15 @@ function smoothSignedCutFillProfile(
         Math.min(upperBounds[index], heights[index + 1] + grade * run)
       );
     }
-    // Preserve the previous pass's left neighbor before overwriting it.
-    // The right neighbor is still untouched: this is the same Jacobi pass
-    // without allocating another backing buffer for every iteration.
-    let previous = heights[0];
+    const next = new Float64Array(heights);
     for (let index = 1; index < heights.length - 1; index += 1) {
-      const current = heights[index];
-      heights[index] = clamp(
-        current * 0.45 + (previous + heights[index + 1]) * 0.275,
+      next[index] = clamp(
+        heights[index] * 0.45 + (heights[index - 1] + heights[index + 1]) * 0.275,
         lowerBounds[index],
         upperBounds[index]
       );
-      previous = current;
     }
+    heights.set(next);
   }
   return new Float32Array(heights);
 }

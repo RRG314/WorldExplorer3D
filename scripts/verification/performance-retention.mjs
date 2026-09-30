@@ -181,9 +181,16 @@ async function measureMode(client, id, sampleMs = 5_000, movementKey = null) {
     const ctx=globalThis.__WE3D_PERF_CONTEXT__;
     globalThis.__WE3D_PERF_ACTOR__=id.startsWith('walk')?ctx.Walk.state.walker:id==='plane'?ctx.planeMode:ctx.car;
   },id);
+  const trace = process.env.WE3D_PERF_TRACE_MODE === id;
+  if (trace) { await client.cdp.send('Profiler.enable'); await client.cdp.send('Profiler.start'); }
   let raw;
   try { raw = await client.page.evaluate(sampleFrameWindow, {durationMs:sampleMs,actorKey:'__WE3D_PERF_ACTOR__',collectDiagnostics:false}); }
   finally { if (movementKey) await client.page.keyboard.up(movementKey); }
+  if (trace) {
+    const {profile} = await client.cdp.send('Profiler.stop');
+    await mkdir(`${root}/output/architecture-evaluation/packaged-frame-trace`,{recursive:true});
+    await writeFile(`${root}/output/architecture-evaluation/packaged-frame-trace/${id}.json`,JSON.stringify({profile,raw,scope:'CPU-instrumented diagnostic, not release performance acceptance'}));
+  }
   // Full diagnostics enumerate the world and actor catalogs. They belong in
   // functional checks, not between timed windows where their garbage can cause
   // pauses in the following sample. Read the same authoritative counters here.

@@ -17,6 +17,10 @@ Notable user-facing changes are recorded here. Git history and GitHub releases c
 
 ### Fixed
 
+- Driving and aircraft chase cameras no longer alternate their follow lag with
+  short and long frames. Reduce temporary road, geometry and lighting work
+  while preserving rendering and collision behavior.
+
 - Repeated terrain blending no longer changes material weights.
 - Downhill building foundations extend across accepted steep terrain relief.
 - Cancelled landmark loads release their resources; replaced historic models

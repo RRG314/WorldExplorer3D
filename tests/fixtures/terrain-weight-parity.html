@@ -1,0 +1,18 @@
+<!doctype html><meta charset="utf-8"><link rel="icon" href="data:,"><style>body{margin:0}canvas{display:block}</style>
+<script src="/node_modules/three/build/three.min.js"></script><script type="module">
+import {configureTerrainSurfaceMaterialBlend} from '/app/js/terrain/surface-material-blend.js';
+import {installTerrainWeightExperiment} from '/scripts/verification/terrain-weight-experiment.mjs';
+const renderer=new THREE.WebGLRenderer({preserveDrawingBuffer:true,antialias:false});renderer.setSize(640,480);renderer.outputEncoding=THREE.sRGBEncoding;document.body.append(renderer.domElement);
+const scene=new THREE.Scene();scene.background=new THREE.Color('#344453');scene.add(new THREE.AmbientLight(0xffffff,.8));const sun=new THREE.DirectionalLight(0xffffff,.6);sun.position.set(40,80,20);scene.add(sun);
+const camera=new THREE.PerspectiveCamera(60,640/480,.5,2000);
+const texture=seed=>{const bytes=new Uint8Array(128*128*4);for(let y=0;y<128;y++)for(let x=0;x<128;x++){const i=(y*128+x)*4;bytes[i]=(x*17+y*11+seed*37)%256;bytes[i+1]=(x*7+y*19+seed*61)%256;bytes[i+2]=(x*23+y*5+seed*17)%256;bytes[i+3]=255;}const t=new THREE.DataTexture(bytes,128,128,THREE.RGBAFormat);t.wrapS=t.wrapT=THREE.RepeatWrapping;t.minFilter=THREE.LinearMipmapLinearFilter;t.magFilter=THREE.LinearFilter;t.generateMipmaps=true;t.encoding=THREE.sRGBEncoding;t.anisotropy=8;t.needsUpdate=true;return t;};
+const maps=Object.fromEntries(['urban','sand','forest','soil','rock','snow'].map((name,i)=>[name,{map:texture(i+1)}]));maps.snowTextureSupported=true;
+const geo=new THREE.PlaneGeometry(128,128,64,64);geo.rotateX(-Math.PI/2);const p=geo.attributes.position;for(let i=0;i<p.count;i++)p.setY(i,4*Math.sin(p.getX(i)/19)*Math.cos(p.getZ(i)/23));geo.computeVertexNormals();geo.setAttribute('color',new THREE.Float32BufferAttribute(new Float32Array(p.count*3).fill(.8),3));geo.setAttribute('terrainGeographicUv',geo.attributes.uv.clone());
+const material=new THREE.MeshStandardMaterial({map:texture(0),roughness:1,vertexColors:true});material.defines={WE3D_TERRAIN_REGIONAL_IMAGE:1};const mesh=new THREE.Mesh(geo,material);scene.add(mesh);configureTerrainSurfaceMaterialBlend(mesh,maps);
+const a=geo.attributes.terrainSurfaceMixA,b=geo.attributes.terrainSurfaceMixB;for(let i=0;i<p.count;i++){const c=(Math.floor((p.getX(i)+64)/16)+Math.floor((p.getZ(i)+64)/16))%7;if(c>0&&c<5)a.array[i*a.itemSize+c-1]=255;if(c>=5)b.array[i*b.itemSize+c-5]=255;}a.needsUpdate=b.needsUpdate=true;
+const state=material.userData.terrainSurfaceMaterialBlend;state.uniforms.terrainRegionalMap.value=texture(8);state.uniforms.terrainLocalMap.value=texture(9);
+const experiment=installTerrainWeightExperiment({renderer,scene});
+const capture=()=>{renderer.render(scene,camera);const gl=renderer.getContext(),bytes=new Uint8Array(640*480*4);gl.readPixels(0,0,640,480,gl.RGBA,gl.UNSIGNED_BYTE,bytes);if(gl.getError())throw Error('GPU error');return bytes;};
+window.checkCase=({position,imagery,cold})=>{camera.position.set(...position);camera.lookAt(0,0,0);state.uniforms.terrainRegionalReady.value=imagery;state.uniforms.terrainLocalReady.value=imagery;state.uniforms.terrainColdGround.value=cold;experiment.setEnabled(false);capture();const before=capture();experiment.setEnabled(true);capture();const after=capture();let changed=0,max=0,total=0;const colors=new Set();for(let i=0;i<before.length;i+=4){colors.add((before[i]<<16)|(before[i+1]<<8)|before[i+2]);let differs=false;for(let j=0;j<3;j++){let d=Math.abs(before[i+j]-after[i+j]);if(d)differs=true;max=Math.max(max,d);total+=d;}if(differs)changed++;}return {position,imagery,cold,changed,max,total,colors:colors.size};};
+window.ready=true;
+</script>

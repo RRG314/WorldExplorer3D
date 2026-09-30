@@ -42,6 +42,7 @@ export async function sampleFrameWindow(durationMs) {
         const diagnostics = lightSample ? {activeActor:{position:routeActor}} : globalThis.getWorldExplorerRuntimeDiagnostics?.() || {};
         resolve({
           deltas,
+          requestedAt, startedAt, endedAt: now, timeOrigin: performance.timeOrigin ?? null,
           distanceTraveled, movingMs,
           firstFrameDelayMs: startedAt-requestedAt,
           elapsedMs: now-startedAt,

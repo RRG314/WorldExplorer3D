@@ -1,3 +1,4 @@
+import { installRenderLightUniformReuse } from './light-uniform-reuse.js';
 import { setupEngineInputHandlers } from "./input-handlers.js?v=16";
 import { createVehicleHeadlightRig } from "./night-lighting.js?v=8";
 import { attachCuratedPlayerCar } from './curated-player-car.js?v=7';
@@ -427,7 +428,6 @@ export function initEngineRuntime(ctx) {
   appCtx.camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.5, 12000);
 
   appCtx.renderer = createRendererWithFallback();
-  appCtx.renderer.setOpaqueSort(opaqueFrontToBack);
   if (!appCtx.renderer) {
     appCtx.engineInitFailed = true;
     showInitFailure(
@@ -436,6 +436,9 @@ export function initEngineRuntime(ctx) {
     );
     return false;
   }
+
+  appCtx.renderer.setOpaqueSort(opaqueFrontToBack);
+  installRenderLightUniformReuse(appCtx);
 
   try {
     const gl = appCtx.renderer.getContext?.();

@@ -14,6 +14,14 @@ Ship equipment preserves imported materials, housings, cables and mounting
 transforms. Room surfaces use shared licensed materials. Remote walking players
 use the game's licensed character and animation controller.
 
+## More consistent movement
+
+Driving and aircraft chase cameras now account for movement throughout each
+frame, reducing the repeated pull-back and catch-up visible at uneven frame
+intervals. Road queries, geometry buffers and repeated lighting updates create
+less temporary work without reducing world detail. Sustained packaged gameplay
+and release checks remain in progress; occasional pauses are not yet eliminated.
+
 ## Respect the place
 
 Documented ruins use masonry rather than residential windows and roof equipment.

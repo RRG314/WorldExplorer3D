@@ -1,6 +1,6 @@
 # World Explorer 3D Roadmap
 
-Last updated: 2026-09-28.
+Last updated: 2026-09-29.
 
 World Explorer 3D is growing toward a connected world sandbox: choose a real
 place, build an Explorer, travel by land, water, air, or space, and make a
@@ -13,6 +13,9 @@ feature.
 The local update aligns lighting, facade filtering, licensed vegetation, ship
 materials and remote walking characters. Historic-site metadata, terrain-following
 walls and steep-ground foundations are being verified against in-game views.
+Movement work now includes a measured chase-camera jitter repair and reduced
+allocation sources. Packaged sustained travel and release validation remain open;
+the current average frame rate is acceptable to the owner.
 Remaining acceptance covers landmark overlap, regional vegetation and materials,
 whole-game memory and loading, and physical-phone behavior. These are release
 checks, not completed milestones. See [verification](docs/visual-quality/EVIDENCE.md)

@@ -1,5 +1,12 @@
 // Component and source-contract checks; browser and emulator journeys run separately.
 export const currentContractTests = [
+  'tests/moving-camera-target-current.test.mjs',
+  'tests/light-uniform-reuse-current.test.mjs',
+  'tests/profile-scratch-storage-current.test.mjs',
+  'tests/transport-model-buffer-current.test.mjs',
+  'tests/transport-profile-buffer-current.test.mjs',
+  'tests/camera-road-surface-current.test.mjs',
+  'tests/nearby-vehicle-query-current.test.mjs',
   'tests/service-light-pool-current.test.mjs',
   'tests/street-source-scheduling-current.test.mjs',
   'tests/world-frame-yield-current.test.mjs',
@@ -57,7 +64,6 @@ export const currentContractTests = [
   'tests/building-roof-semantics-current.test.mjs',
   'tests/building-selection-completeness-current.test.mjs',
   'tests/building-session-identity-current.test.mjs',
-  'tests/camera-road-surface-current.test.mjs',
   'tests/capture-nearby-refresh-current.test.mjs',
   'tests/capture-room-geometry-current.test.mjs',
   'tests/capture-session-current.test.mjs',

@@ -14,6 +14,7 @@ import { resolveTunnelCameraBoom } from './hud/tunnel-camera-boom.js';
 import { createVehicleCameraBody, selectBodySafeCamera, vehicleCameraProbeRadius } from './hud/vehicle-camera-body.js';
 import { applyDrivingCabinCamera, setCabinNearClip } from './hud/driving-cabin-camera.js';
 import { cameraSmoothingBlend } from "./controls/traversal-control-policy.js?v=8";
+import { beginCameraFollowFrame, cameraFollowHistory, smoothMovingCameraTarget } from "./hud/moving-camera-target.js";
 import { planetarySurfaceYAtRenderXZ } from './planetary/runtime/surface-query.js?v=3';
 // hud.js - HUD updates, camera system, sky positioning
 // ============================================================================
@@ -388,6 +389,7 @@ function updateSkyPositions() {
 }
 
 function updateCamera(dt = 1 / 60) {
+  beginCameraFollowFrame(appCtx.camera);
   if (appCtx.planeMode?.active || appCtx.boatMode?.active || appCtx.droneMode || appCtx.Walk?.state?.mode === 'walk') setCabinNearClip(appCtx.camera, false);
   if (appCtx.planeMode?.active && appCtx.applyPlaneCamera?.(dt)) {
     updateBillboardMarkers();
@@ -547,15 +549,12 @@ function updateCamera(dt = 1 / 60) {
       collisionTarget.collided ||= safe.collided;
     }
 
-    // Smooth both camera position and lookAt target together
-    // Higher factor = camera stays more rigidly fixed to car
-    const smoothFactor = cameraSmoothingBlend(
-      collisionTarget.collided ? 42 : CHASE_CAMERA_SMOOTH_RATE,
-      dt
-    );
-    appCtx.camera.position.x += (targetX - appCtx.camera.position.x) * smoothFactor;
-    appCtx.camera.position.y += (targetY - appCtx.camera.position.y) * smoothFactor;
-    appCtx.camera.position.z += (targetZ - appCtx.camera.position.z) * smoothFactor;
+    // Follow the path through this frame, so 16/33 ms frames do not alternate
+    // the camera's lag. Retraction retains its existing collision response.
+    const followRate = collisionTarget.collided ? 42 : CHASE_CAMERA_SMOOTH_RATE;
+    const continuousFollow = !collisionTarget.collided && !insideTunnel;
+    smoothMovingCameraTarget(appCtx.camera.position, cameraFollowHistory(appCtx.camera, 'drive-position'),
+      targetX, targetY, targetZ, followRate, dt, continuousFollow);
     if (insideTunnel) {
       // Smoothing can cross a curved wall even when both target poses are safe.
       const safe = resolveTunnelCameraBoom(tunnelCameraState.road,
@@ -580,10 +579,8 @@ function updateCamera(dt = 1 / 60) {
       appCtx.camera.userData.lookTarget = { x: lookX, y: lookY, z: lookZ };
     }
 
-    // Smooth the lookAt target
-    appCtx.camera.userData.lookTarget.x += (lookX - appCtx.camera.userData.lookTarget.x) * smoothFactor;
-    appCtx.camera.userData.lookTarget.y += (lookY - appCtx.camera.userData.lookTarget.y) * smoothFactor;
-    appCtx.camera.userData.lookTarget.z += (lookZ - appCtx.camera.userData.lookTarget.z) * smoothFactor;
+    smoothMovingCameraTarget(appCtx.camera.userData.lookTarget, cameraFollowHistory(appCtx.camera, 'drive-look'),
+      lookX, lookY, lookZ, followRate, dt, continuousFollow);
 
     appCtx.camera.lookAt(appCtx.camera.userData.lookTarget.x, appCtx.camera.userData.lookTarget.y, appCtx.camera.userData.lookTarget.z);
     // Collision retraction and smoothing are allowed to shorten the boom, but

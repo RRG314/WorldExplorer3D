@@ -242,8 +242,8 @@ async function batchBuildingMeshesByTier(tiers = ['near'], options = {}) {
 
       const vertexCapacity = group.meshes.reduce((sum, mesh) => sum + (mesh.geometry?.attributes?.position?.count || 0), 0);
       const indexCapacity = group.meshes.reduce((sum, mesh) => sum + (mesh.geometry?.index?.count ?? mesh.geometry?.attributes?.position?.count ?? 0), 0);
-      const storage = components => new GeometryBatchStorage(vertexCapacity * components);
-      const batch = { positions: storage(3), normals: storage(3), uvs: storage(2), indices: new GeometryBatchStorage(indexCapacity), facadeLayouts: storage(4), facadeOpenings: storage(4) };
+      const storage = (components, ArrayType = Float32Array) => new GeometryBatchStorage(vertexCapacity * components, ArrayType);
+      const batch = { positions: storage(3), normals: storage(3, Float64Array), uvs: storage(2), indices: new GeometryBatchStorage(indexCapacity), facadeLayouts: storage(4), facadeOpenings: storage(4) };
       if (group.lodTier === 'near') batch.facadeEntrances = storage(4);
       if (group.midFacadeBatch) {
         batch.colors = storage(3);
@@ -309,7 +309,7 @@ async function batchBuildingMeshesByTier(tiers = ['near'], options = {}) {
         continue;
       }
 
-      const geometry = buildMergedGeometry(batch);
+      const geometry = buildMergedGeometry(batch, {reuseStorage: true});
       if (!geometry) {
         keep.push(...sourceMeshes);
         continue;

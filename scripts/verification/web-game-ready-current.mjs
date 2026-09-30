@@ -1,6 +1,9 @@
 // Use the prescribed action/screenshot client, adding this app's explicit
 // readiness contract. Its generic 500ms menu delay is insufficient here.
 import {readFile} from 'node:fs/promises';
+import {createHash} from 'node:crypto';
+import path from 'node:path';
+import {planRoadRoute} from './travel-road-route.mjs';
 import {spawn} from 'node:child_process';
 const client=process.env.WE3D_GAME_CLIENT || new URL('./vendor/web-game-playwright-client.js', import.meta.url);
 let source=await readFile(client,'utf8');
@@ -10,9 +13,32 @@ const consoleReceipt = 'consoleErrors.ingest({ type: "console.error", text: msg.
 if (!source.includes(consoleReceipt)) throw new Error('Prescribed client console receipt changed; review its adapter.');
 source=source.replace(consoleReceipt, 'consoleErrors.ingest({ type: "console.error", text: msg.text(), location: msg.location() });');
 if (process.env.WE3D_STAGING_APP_CHECK_FILE) {
- const {token} = JSON.parse(await readFile(process.env.WE3D_STAGING_APP_CHECK_FILE, 'utf8'));
- source = source.replace('await page.goto(args.url, { waitUntil: "domcontentloaded" });', `await page.addInitScript(token => { globalThis.FIREBASE_APPCHECK_DEBUG_TOKEN = token; }, ${JSON.stringify(token)});\nawait page.goto(args.url, { waitUntil: "domcontentloaded" });`);
+ const attestationModule = new URL('./staging-app-check.mjs', import.meta.url).href;
+ source = source.replace('await page.goto(args.url, { waitUntil: "domcontentloaded" });', `await (await import(${JSON.stringify(attestationModule)})).configureStagingAppCheck(page, args.url);\nawait page.goto(args.url, { waitUntil: "domcontentloaded" });`);
 }
+// Isolate known public NOAA availability failures from the source action check.
+// Replay only exact recorded URLs, preserving errors for any missing response.
+if(process.env.WE3D_ACTION_NOAA_FIXTURE_DIR){
+ const root=path.resolve(process.env.WE3D_ACTION_NOAA_FIXTURE_DIR);
+ const index=JSON.parse(await readFile(path.join(root,'index.json'),'utf8'));
+ const entries=Object.values(index).filter(e=>new URL(e.url).hostname==='api.tidesandcurrents.noaa.gov'&&e.status===200&&e.sha256);
+ if(!entries.length)throw Error('Recorded NOAA responses unavailable');
+ for(const entry of entries){
+  const body=await readFile(path.join(root,entry.sha256));
+  if(createHash('sha256').update(body).digest('hex')!==entry.sha256)throw Error('NOAA fixture hash mismatch');
+ }
+ const routes=entries.map(entry=>`await page.route(${JSON.stringify(entry.url)},route=>route.fulfill({status:200,headers:${JSON.stringify(entry.headers)},body:fs.readFileSync(${JSON.stringify(path.join(root,entry.sha256))})}));`).join('\n');
+ const receipt={responses:entries.map(({url,sha256})=>({url,sha256})),scope:'Exact recorded NOAA responses; not live NOAA acceptance'};
+ source=source.replace('await page.goto(args.url, { waitUntil: "domcontentloaded" });', `${routes}
+ fs.mkdirSync(args.screenshotDir,{recursive:true});fs.writeFileSync(path.join(args.screenshotDir,'public-fixture.json'),${JSON.stringify(JSON.stringify(receipt))});
+ await page.goto(args.url, { waitUntil: "domcontentloaded" });`);
+}
+if(process.env.WE3D_ACTION_ROAD_START==='1') source=source.replace('await doChoreography(page, canvas, steps);', `if(i===0)await page.evaluate(async()=>{
+ const {ctx}=await import('/app/js/shared-context.js?v=55');
+ const route=(${planRoadRoute.toString()})(ctx.roads),a=route.points[0],b=route.points[1],car=ctx.car;
+ Object.assign(car,{x:a.x,z:a.z,y:ctx.GroundHeight.carCenterY(a.x,a.z),angle:Math.atan2(b.x-a.x,b.z-a.z),speed:0,vFwd:0,vLat:0,vx:0,vy:0,vz:0,onGround:true,isAirborne:false});
+});
+await doChoreography(page, canvas, steps);`);
 source = source.replace('await page.click(args.clickSelector, { timeout: 5000 });', 'if (await page.locator("#analyticsConsentDenyBtn").isVisible()) await page.locator("#analyticsConsentDenyBtn").click(); await page.click(args.clickSelector, { timeout: 5000 });');
 const patches=[
  ['await page.waitForTimeout(500);', `await page.waitForFunction(() => window.__WE3D_RUNTIME_READY__, null, {timeout:45000});`],
@@ -71,6 +97,11 @@ if(i===0){
 if(process.env.WE3D_TEST_DAY==='1') source=source.replace('await doChoreography(page, canvas, steps);', `await page.evaluate(async()=>{const {ctx}=await import('/app/js/shared-context.js?v=55');ctx.setTimeOfDay?.('day');ctx.setWeatherMode?.('clear');});\nawait doChoreography(page, canvas, steps);`);
 if(process.env.WE3D_TEST_MOBILE==='1') source=source.replace('const page = await browser.newPage();','const page = await browser.newPage({viewport:{width:412,height:915},isMobile:true,hasTouch:true,deviceScaleFactor:1,userAgent:"Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Mobile Safari/537.36"});');
 if(process.env.WE3D_REAL_GPU==='1') source=source.replace('args: ["--use-gl=angle", "--use-angle=swiftshader"],','channel:"chrome",');
+if(process.env.WE3D_ACTION_MODE==='plane') source=source.replace('await doChoreography(page, canvas, steps);', `if(i===0){
+ await page.locator('#travelBtn').click();await page.locator('#fPlane').click();await page.locator('#travelBtn').blur();
+ await page.waitForFunction(()=>window.getWorldExplorerRuntimeDiagnostics?.().activeActor?.mode==='plane',null,{timeout:15000});
+} else await page.keyboard.press('KeyC');
+await doChoreography(page, canvas, steps);`);
 if(process.env.WE3D_TEST_BOAT==='1') source=source.replace('await doChoreography(page, canvas, steps);', `if (!await page.evaluate(()=>window.getWorldExplorerRuntimeDiagnostics?.().modes?.boat)) {
  await page.locator('#travelBtn').click(); await page.locator('#fBoat').click();
  await page.waitForFunction(()=>window.getWorldExplorerRuntimeDiagnostics?.().modes?.boat===true,null,{timeout:15000});
@@ -160,6 +191,13 @@ source=source.replace('null, {timeout:90000});', `null, {timeout:90000}).catch(a
  fs.writeFileSync(path.join(args.screenshotDir,'failed-start.json'),JSON.stringify(await page.evaluate(()=>({state:window.getWorldExplorerRuntimeDiagnostics?.(),loading:document.getElementById('loading')?.innerText})),null,2));
  await page.screenshot({path:path.join(args.screenshotDir,'failed-start.png')});throw error;
 });`);
+// Readiness/provider failures must still close this client's own browser.
+const pageCreation=/const page = await browser\.newPage\([^;]*;/;
+if(!pageCreation.test(source))throw Error('Prescribed client page creation changed');
+source=source.replace(pageCreation,match=>'try {\n'+match);
+const closeIndex=source.lastIndexOf('await browser.close();');
+if(closeIndex<0)throw Error('Prescribed client browser cleanup changed');
+source=source.slice(0,closeIndex)+'} finally { await browser.close(); }'+source.slice(closeIndex+'await browser.close();'.length);
 const child=spawn(process.execPath,['--input-type=module','-',...process.argv.slice(2)],{stdio:['pipe','inherit','inherit']});
 const deadline=setTimeout(()=>child.kill('SIGTERM'),150000);
 child.stdin.end(source);
