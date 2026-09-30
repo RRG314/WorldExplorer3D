@@ -4,15 +4,19 @@ import * as THREE from 'three';
 import {createProxyByType} from '../app/js/multiplayer/ghost-proxies.js';
 import {disposeCuratedCharacter} from '../app/js/walking/curated-explorer-character.js?v=8';
 
-test('remote characters share the template but cancel late attachments independently', async()=>{
-  let complete,requests=0;
-  class Loader{register(){return this;}load(url,done){requests++;complete=done;}}
+test('remote characters share the template but cancel late attachments independently', {timeout:5000}, async()=>{
+  let complete,requests=0,loadStarted;
+  const pendingLoad=new Promise(resolve=>{loadStarted=resolve;});
+  class Loader{register(){return this;}load(url,done){requests++;complete=done;loadStarted();}}
   const api={...THREE,GLTFLoader:Loader};
   const scene=new THREE.Group();
   const departed=createProxyByType(api,'walker'),active=createProxyByType(api,'walker');
   scene.add(departed,active);
   scene.remove(departed);disposeCuratedCharacter(departed);
   const source=new THREE.Group();source.add(new THREE.Mesh(new THREE.BoxGeometry(1,2,1),new THREE.MeshStandardMaterial()));
+  // Template acquisition starts its shared load on a microtask. Wait for the
+  // loader itself so cancellation is tested against a real pending attachment.
+  await pendingLoad;
   complete({scene:source,animations:[]});
   assert.equal(await departed.userData.characterReady,false);
   assert.equal(await active.userData.characterReady,true);

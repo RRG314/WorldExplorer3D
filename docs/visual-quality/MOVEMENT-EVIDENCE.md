@@ -245,3 +245,32 @@ weather/location UI and source graph but stopped at release-contract metadata:
 targetVersion still said 5.3.0 while package version is 5.4.0. Release metadata is
 being aligned to 5.4 with unchanged budgets, checkpoints and approval requirements.
 Full candidate/backend/weekly-room verification and deployment remain open.
+
+
+## Production release — September 30
+
+The final metadata revision 711fe93 packaged exactly the same product assets as
+f7 (identical staging asset manifest). All 57 candidate gates, 13 isolated backend
+stages and the two-authenticated-client Chicago weekly room passed. The final
+performance flight maximum was 166.6 ms; the separate longer driving outlier of
+966.7 ms remains part of the evidence and is not superseded by the short gate.
+Complete-world, desktop/mobile performance, regional and weekly-room captures
+were inspected. Physical-phone acceptance remains unverified.
+
+The owner reviewed the presented complete-world capture and explicitly instructed
+updating GitHub and live production. The normal finalization and preview promotion
+path deployed `5.4.0+711fe93aa54e.8d08d47f2ff10556.production`; previous live 5.3
+was preserved in `rollback-53-711fe93`. No gameplay rebuild or new approval was
+substituted. GitHub PR92's independent inventory check identified 14 existing
+component tests absent from its runner. Registering them and updating release
+status is a follow-up to the exact deployed source, not a new runtime deployment.
+
+The newly registered remote-character test had assumed synchronous loader startup;
+the shared template cache schedules loading on a microtask. Its fixture now waits
+for the actual loader-start signal, with a bounded timeout and all original
+cancellation, sharing and disposal assertions retained. No runtime change. Live
+verification matched all 553 assets and rejected unauthenticated protected calls.
+
+The follow-up `verify:pr` passes: 1,574 component tests, no unowned test files,
+source validation and the test-sensitivity check. Runtime/application, assets,
+backend and configuration files are unchanged from the approved deployed source.

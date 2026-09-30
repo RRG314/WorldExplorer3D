@@ -1,7 +1,7 @@
 # A more consistent world
 
-World Explorer 3D 5.4 is in development. This draft describes the local changes
-from deployed 5.3; it is not a production release announcement.
+World Explorer 3D 5.4 was released September 30, 2026. This update improves
+movement consistency and world presentation while preserving existing gameplay.
 
 ## Materials that hold together
 
@@ -21,8 +21,9 @@ frame, reducing the repeated pull-back and catch-up visible at uneven frame
 intervals. Road queries, geometry buffers and repeated lighting updates create
 less temporary work without reducing world detail. Discarded private building
 buffers are released after batching to reduce delayed cleanup freezes. Packaged driving, low flight, camera changes and return to ground have been
-checked. The configured performance and space gates pass on the runtime revision;
-remaining release checks are in progress. Occasional GC pauses remain.
+checked. All 57 candidate gates and 13 isolated backend stages passed, including
+performance, space transitions and two-client multiplayer. The current Chicago
+weekly-room journey also passed. Occasional GC pauses remain.
 
 ## Respect the place
 
@@ -36,13 +37,12 @@ Elizabeth Tower gains repeated masonry and window detail. These structures
 remain reconstructions from available information; they are not surveyed models
 of every historical site.
 
-## Before release
+## Verification and limits
 
-Regional vegetation, landmark presentation and whole-game performance still
-require acceptance. Physical-phone responsiveness remains unverified. See
+Regional data and landmark reconstructions retain their documented limits.
+Physical-phone responsiveness remains unverified. See
 [known limitations](KNOWN_ISSUES.md) and the
 [verification record](docs/visual-quality/EVIDENCE.md).
 
 The update targets 5.4 rather than 6.0 because its intended changes preserve
-existing saves, room interfaces and supported links. Compatibility checks must
-pass before the release is published.
+existing saves, room interfaces and supported links. Compatibility checks passed for the released build.
