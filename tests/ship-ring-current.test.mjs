@@ -5,6 +5,7 @@ import {SHIP_DECKS} from '../app/js/expedition/ship-layout.js';
 import {ring,ringRoute,pointInRoom,polar} from '../app/js/expedition/ship-ring-plan.js';
 import {buildRingDeck} from '../app/js/expedition/ship-ring-scene.js';
 import {createBuildingCollisionQuery} from '../app/js/physics/building-collision.js';
+import {shipDoorwayOccupied} from '../app/js/expedition/ship-navigation.js';
 import {podBayCycle} from '../app/js/expedition/pod-bay-cycle.js';
 
 for(const deck of SHIP_DECKS)test(`${deck.id}: real rendered walls admit room-to-room routes and block closed doors`,()=>{
@@ -29,9 +30,13 @@ for(const deck of SHIP_DECKS)test(`${deck.id}: real rendered walls admit room-to
  for(const door of state.doorStates){
   ctx.dynamicBuildingColliders=[...state.colliders,door.collider];
   assert.equal(blocked(door),true,door.id);
+  assert.equal(shipDoorwayOccupied(door.collider,[door]),true,'Do not close onto an occupant');
+  assert.equal(shipDoorwayOccupied(door.collider,[{x:door.x+Math.sin(door.yaw),z:door.z+Math.cos(door.yaw)}]),false,'A player one metre clear can still reach and close the door');
  }
  ctx.dynamicBuildingColliders=state.colliders;
  assert.equal(blocked(polar(ring.hullRadius,Math.PI/8)),true,'pressure hull');
+ const glass=state.colliders.find(c=>c.sourceBuildingId==='pressure-window');
+ if(glass){const x=(glass.minX+glass.maxX)/2,z=(glass.minZ+glass.maxZ)/2;assert.equal(collision(x,z,.28,{actorBaseY:1.2,actorHeight:.5}).collision,true,'windows retain a pressure boundary above the sill');}
  state.group.traverse(o=>o.geometry?.dispose());surface.dispose();
 });
 test('launch interlock opens the exterior door only after sealing and atmosphere recovery',()=>{

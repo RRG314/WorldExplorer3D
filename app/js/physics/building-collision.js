@@ -15,14 +15,15 @@ function createBuildingCollisionQuery(appCtx) {
     const hasBaseBuildings = Array.isArray(appCtx.buildings) && appCtx.buildings.length > 0;
     const hasDynamicColliders = Array.isArray(appCtx.dynamicBuildingColliders) && appCtx.dynamicBuildingColliders.length > 0;
     const hasTransportColliders = appCtx.transportStructureColliders?.length > 0;
-    const vegetationCandidates = nearbyVegetationObstacles(appCtx, x, z, carRadius + 1);
+    const localShip = appCtx.activeInterior?.environmentKind === 'expedition-ship';
+    const vegetationCandidates = localShip ? [] : nearbyVegetationObstacles(appCtx, x, z, carRadius + 1);
     if (!hasBaseBuildings && !hasDynamicColliders && !hasTransportColliders && !vegetationCandidates.length) return { collision: false };
     const actorBaseY = Number.isFinite(options?.actorBaseY) ? Number(options.actorBaseY) : NaN;
     const actorHeight = Number.isFinite(options?.actorHeight) ? Number(options.actorHeight) : 1.9;
     const acceptCollision = typeof options?.acceptCollision === 'function'
       ? options.acceptCollision
       : null;
-    const indexedCandidates = typeof appCtx.getNearbyBuildings === 'function'
+    const indexedCandidates = localShip ? [] : typeof appCtx.getNearbyBuildings === 'function'
       ? appCtx.getNearbyBuildings(x, z, carRadius + 8)
       : [...(appCtx.buildings || []), ...(appCtx.transportStructureColliders || [])];
     // Authored interiors, Quick Builds and other active-world obstacles are

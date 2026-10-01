@@ -74,7 +74,7 @@ let expeditionRuntimeModulePromise = null;
 let pirateInterceptionRuntime = null;
 
 function prepareSolisReachSurfaceRendezvous(bodyId) {
-  expeditionRuntimeModulePromise ||= import('./expedition/runtime.js?v=51');
+  expeditionRuntimeModulePromise ||= import('./expedition/runtime.js?v=52');
   return expeditionRuntimeModulePromise.then((runtime) => runtime.prepareSolisReachSurfaceRendezvous?.(appCtx, bodyId) === true);
 }
 

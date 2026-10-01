@@ -318,7 +318,7 @@ const { pickFlowerSpawn, placeFlowerMarker, removeFlowerMarker } = flowerMarkerR
 function captureRunEntry(elapsedMs, actor) {
   const player = resolvePlayerName();
   const loc = getRuntimeLocationLabel();
-  const ll = worldToLatLon(actor.x, actor.z);
+  const ll = appCtx.worldToGeo(actor.x, actor.z);
 
   return {
     id: `run_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`,
@@ -342,6 +342,28 @@ async function completeChallenge() {
   challengeState.active = false;
   removeFlowerMarker();
 
+  // Completion feedback must not wait for optional rankings requests.
+  setTitleStatus(
+    `${entry.player} found the red flower in ${(entry.timeMs / 1000).toFixed(2)}s at ${entry.location}.`,
+    'ok'
+  );
+
+  setGameHud(`Flower found by ${entry.player}!`, entry.timeMs);
+  clearTimeout(challengeState.statusTimer);
+  challengeState.statusTimer = setTimeout(() => {
+    if (!challengeState.active) setGameHud('');
+  }, 5000);
+
+  // Keep the local story independent of optional rankings/network availability.
+  void appCtx.recordExplorerEvent?.({
+    eventId: `event:flower-sprint:${entry.id}`,
+    eventType: 'activity-completed', sourceSystem: 'flower-sprint', sourceId: entry.id,
+    pathId: 'activity', activityId: 'flower-sprint', name: 'Flower Sprint completed',
+    detail: `Found the flower in ${(entry.timeMs / 1000).toFixed(2)} seconds at ${entry.location}.`,
+    localPosition: { x: actor.x, y: actor.y || 0, z: actor.z },
+    points: 0, progressReason: 'activity-completion'
+  });
+
   const remoteSaved = await writeRemoteLeaderboard('flower', entry);
   if (!remoteSaved) {
     storeLocalResult('flower', entry);
@@ -354,16 +376,7 @@ async function completeChallenge() {
 
   await refreshFlowerLeaderboard(challengeState.leaderboardView);
 
-  setTitleStatus(
-    `${entry.player} found the red flower in ${(entry.timeMs / 1000).toFixed(2)}s at ${entry.location}.`,
-    'ok'
-  );
 
-  setGameHud(`Flower found by ${entry.player}!`, entry.timeMs);
-  clearTimeout(challengeState.statusTimer);
-  challengeState.statusTimer = setTimeout(() => {
-    if (!challengeState.active) setGameHud('');
-  }, 5000);
 }
 
 function startFlowerChallenge(source = 'manual') {

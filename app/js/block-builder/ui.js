@@ -46,6 +46,14 @@ function syncBlockBuilderUi(snapshot = {}) {
   const rotate = document.getElementById('blockBuilderRotate');
   if (rotate) rotate.title = `Rotate shape (${(Number(snapshot.rotation) || 0) * 90} degrees)`;
 
+  const saved = document.getElementById('blockBuilderSaveState');
+  const persistence = appCtx.getBuildPersistenceStatus?.() || {};
+  if (saved) saved.textContent = snapshot.shared
+    ? persistence.shared?.connected === false ? 'Room offline. Reconnect before saving more blocks.'
+      : persistence.shared?.pendingCount > 0 ? 'Saving to room… Keep your connection until this finishes.'
+        : 'Connected room · accepted blocks are saved to this room. Keep its code to return.'
+    : persistence.enabled === false ? 'Device storage is unavailable. Check the status below before leaving.'
+      : 'Solo blocks save on this device at this location. Return here to keep building.';
   const undo = document.getElementById('blockBuilderUndo');
   if (undo) undo.disabled = !snapshot.canUndo;
   const count = document.getElementById('blockBuilderCount');
@@ -66,7 +74,7 @@ function openBlockBuilder() {
       ? String(persistence.detail || '')
       : '';
     const guidance = snapshot.characterAssistance?.guidanceLabel || 'Basic placement guidance';
-    setStatus(recoveryNotice || `${guidance}. Choose a piece and color, or select a nearby mapped building.`);
+    setStatus(recoveryNotice || `${guidance}. Click or tap the world to place your selected piece.`);
   }
   return enabled;
 }
@@ -115,6 +123,14 @@ function initBlockBuilderUi() {
   panel.addEventListener('pointerdown', stopBuildPointer);
   panel.addEventListener('click', stopBuildPointer);
   document.getElementById('blockBuilderClose')?.addEventListener('click', closeBlockBuilder);
+  document.getElementById('blockBuilderJournal')?.addEventListener('click', () => {
+    closeBlockBuilder();
+    const category = document.getElementById('discoveryJournalCategory');
+    if (category) category.value = 'creation';
+    const region = document.getElementById('discoveryJournalRegion');
+    if (region) region.value = 'all';
+    appCtx.openWorldDiscoverySection?.('journal');
+  });
   panel.querySelectorAll('[data-block-tool]').forEach((button) => {
     button.addEventListener('click', () => appCtx.setBlockBuildTool?.(button.dataset.blockTool));
   });

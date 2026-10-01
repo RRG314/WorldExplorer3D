@@ -76,3 +76,18 @@ test('discovery owns one field prompt for active results and nearby leads', () =
    fieldExpedition:{objectives:[{targetLabel:'Survey stop',distanceMeters:12}]}})),null);
  }
 });
+
+
+test('an unfinished optional outing does not hide a chosen space course', () => {
+  const previous = globalThis.document;
+  const nodes = new Map();
+  globalThis.document = { getElementById(id) { if (!nodes.has(id)) nodes.set(id, { hidden: true, addEventListener() {} }); return nodes.get(id); } };
+  try {
+    const ui = createCurrentJourneyUi({ gameStarted: true, spaceFlight: { active: true } }, {
+      getTutorialSnapshot: () => ({ enabled: true, completed: false, skipped: false, stage: 'explore' })
+    });
+    ui.update(1);
+    assert.equal(nodes.get('currentJourneyCard').hidden, false);
+    assert.equal(nodes.get('currentJourneyEyebrow').textContent, 'SPACE FLIGHT');
+  } finally { globalThis.document = previous; }
+});

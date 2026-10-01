@@ -10,7 +10,7 @@ import {
 } from "./block-builder/catalog.js?v=2";
 import { createBuildCollisionQueries } from "./block-builder/collision.js?v=1";
 import { createBlockLocalStore } from './block-builder/local-store.js?v=3';
-import { createSharedBlockSync } from './block-builder/shared-sync.js?v=3';
+import { createSharedBlockSync } from './block-builder/shared-sync.js?v=4';
 import { getPlanetarySurfaceRegion } from './planetary/runtime/surface-authority.js?v=5';
 import {
   activePlanetaryBodyId,
@@ -112,7 +112,8 @@ function columnKey(gx, gz) {
 const sharedBuildSync = createSharedBlockSync({
   blockKey,
   toVerticalGridCoord,
-  onRefresh: () => refreshBlockBuilderForCurrentLocation()
+  onRefresh: () => refreshBlockBuilderForCurrentLocation(),
+  onSettled: () => syncBlockBuilderUi()
 });
 
 const isSharedBuildSyncActive = () => sharedBuildSync.isActive();
@@ -252,6 +253,8 @@ function rememberBuildAction(action) {
   showBuildTransientMessage('');
   syncBlockBuilderUi();
   const snapshot = getBlockBuilderSnapshot();
+  // Shared receipts are emitted by the commit callback, never optimistic placement.
+  if (snapshot.shared || !canPersistBuildBlocks()) return;
   globalThis.dispatchEvent?.(new CustomEvent('we3d:block-builder-change', { detail: {
     action: action.kind,
     worldId: getCurrentLocationKey() || 'current-world',
@@ -480,11 +483,17 @@ function getSurfaceYAt(x, z) {
 
 function persistPlacedBuildBlock(gx, gy, gz, materialIndex, shape, rotation) {
   if (isSharedBuildSyncActive()) {
+    const worldId = getCurrentLocationKey();
     const entry = sharedBuildSync.upsert({ gx, gy, gz, materialIndex, shape, rotation }, (err, failedEntry) => {
       console.warn('[blocks] Failed to save room block:', err);
       removeBuildBlock(failedEntry.gx, failedEntry.gy, failedEntry.gz, { persist: false });
       discardNewestBuildAction('place', failedEntry);
       showBuildTransientMessage('Could not save block to this room.');
+    }, (_entry, committed) => {
+      if (getCurrentLocationKey() !== worldId) return;
+      globalThis.dispatchEvent?.(new CustomEvent('we3d:block-builder-change', { detail: {
+        action: 'place', worldId, count: committed.count, shared: true, roomId: committed.roomId
+      } }));
     });
     if (!entry) return false;
     return true;

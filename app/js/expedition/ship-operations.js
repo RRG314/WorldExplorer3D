@@ -13,7 +13,7 @@ const STATION_VIEWS = Object.freeze({
   'analysis-review': Object.freeze({ title: 'Analysis & Data', systemId: 'sensors', summary: 'Review collected evidence, provenance, uncertainty, and unresolved observations.', actions: ['approve-processed-sample'] }),
   'briefing-status': Object.freeze({ title: 'Crew Briefing', systemId: 'navigation', summary: 'Review the current watch, resting crew, and the ship’s most urgent system.' }),
   'generation-continuity': Object.freeze({ title: 'Generation Continuity', systemId: 'education', summary: 'Review population, role succession, training coverage, and the knowledge archive.', actions: ['train-successors'] }),
-  'observation-view': Object.freeze({ title: 'Observation Gallery', systemId: 'sensors', summary: 'Observe local space without changing the ship’s course.' }),
+  'observation-view': Object.freeze({ title: 'Observation Gallery', systemId: 'sensors', summary: 'Browse exterior cameras and ship rooms without leaving your location.' }),
   'galley-meal': Object.freeze({ title: 'Galley & Wardroom', systemId: 'food-production', summary: 'Serve a measured crew meal and give the active watch a short recovery period.', actions: ['serve-crew-meal'] }),
   'medical-status': Object.freeze({ title: 'Medical Bay', systemId: 'medical', summary: 'Review crew health, fatigue, and treatment reserves.' }),
   'medical-treatment': Object.freeze({ title: 'Treatment Station', systemId: 'medical', summary: 'Treat the crew member with the greatest current need.', actions: ['treat-crew'] }),

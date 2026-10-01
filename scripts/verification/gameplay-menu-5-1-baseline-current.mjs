@@ -59,7 +59,7 @@ async function verify(viewport, name) {
   await startEarth(page);
 
   const labels = await page.locator('#floatMenuContainer > .floatMenu:not(.contextualMenuControl) > .floatBtn .btnText').allTextContents();
-  assert.deepEqual(labels.map((label) => label.trim()), ['Explore', 'Travel', 'Backpack', 'Community', 'Real Estate']);
+  assert.deepEqual(labels.map((label) => label.trim()), ['Explore', 'Travel', 'Backpack', 'Community', 'Build & Home']);
   assert.equal(await page.locator('#gameBtn, #gameMenu').count(), 0);
   assert.equal(await page.getByText('My Explorer', { exact: true }).count(), 0);
 
@@ -98,11 +98,11 @@ async function verify(viewport, name) {
 
   await openMenu(page, 'communityBtn', 'communityMenu');
   const communityText = (await page.locator('#communityMenu .floatItems').textContent()).replace(/\s+/g, ' ').trim();
-  assert.match(communityText, /Multiplayer.*Community Board.*Memory Marker.*Share This Place/s);
+  assert.match(communityText, /Multiplayer.*Rankings.*Memory Marker.*Share This Place/s);
 
   await openMenu(page, 'realEstateFloatBtn', 'realEstateMenu');
   const realEstateText = (await page.locator('#realEstateMenu .floatItems').textContent()).replace(/\s+/g, ' ').trim();
-  assert.equal(realEstateText, '⌂ Property Hub 🧱 Quick Build');
+  assert.equal(realEstateText, '🧱 Build with Blocks ⌂ Homes & Property');
   await page.locator('#fRealEstate').click();
   await page.locator('#propertyPanel.show').waitFor({ state: 'visible', timeout: 30_000 });
   assert.deepEqual(await page.locator('.propertyHubTabs button').allTextContents(), ['My Properties', 'Find a Property']);

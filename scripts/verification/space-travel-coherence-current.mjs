@@ -114,7 +114,7 @@ async function verifyPathfinderAndInterior(page) {
   const presentation = await page.evaluate(async () => {
     const [{ ctx }, { SHIP_DOORS }] = await Promise.all([
       import('/app/js/shared-context.js?v=55'),
-      import('/app/js/expedition/ship-layout.js?v=5')
+      import('/app/js/expedition/ship-layout.js?v=6')
     ]);
     const actors = ctx.getShipInteriorSnapshot?.()?.crewActors || [];
     const stationaryAtDoor = actors.filter((actor) => {

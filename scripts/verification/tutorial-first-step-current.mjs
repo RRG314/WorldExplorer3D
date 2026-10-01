@@ -14,7 +14,7 @@ try {
     const context=await browser.newContext({viewport,hasTouch:viewport.width<1000,isMobile:viewport.width<1000});
     const page=await context.newPage();
     await page.setContent(`<meta name="viewport" content="width=device-width,initial-scale=1"><style>*{box-sizing:border-box}body{margin:0}.show{display:block}${shellCss}${css}</style>
-      <aside id="tutorialHintCard" class="tutorial-card compact" data-tutorial-stage="move"><div class="tutorial-card-head"><div><span class="tutorial-eyebrow">First Journey · 1 of 3</span><strong class="tutorial-title">ZASD to move · Mouse to look</strong></div><button>Details</button></div></aside>
+      <aside id="tutorialHintCard" class="tutorial-card compact" data-tutorial-stage="move"><div class="tutorial-card-head"><div><span class="tutorial-eyebrow">First Journey · 1 of 4</span><strong class="tutorial-title">ZASD to move · Mouse to look</strong></div><button>Details</button></div></aside>
       ${ids.map(id=>`<div id="${id}" hidden>Observe</div>`).join('')}`);
     for(const id of ids){
       await page.evaluate(({id,ids})=>{

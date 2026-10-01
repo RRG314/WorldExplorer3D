@@ -16,7 +16,7 @@ import { constructOutpost, constructionAvailability, createOutpostSite, serviceO
 import { registerExpeditionDiscovery } from './contact-authority.js?v=4';
 import { createPodJourney, POD_PHASE, POD_ROUTE_KIND, transitionPodJourney } from './pod-journey-authority.js?v=2';
 import { approvedSampleTradeValue, summarizeExpeditionTransfers } from '../resources/material-catalog.js?v=2';
-import { SHIP_STATIONS } from './ship-layout.js?v=5';
+import { SHIP_STATIONS } from './ship-layout.js?v=6';
 import { consumeStagedEarthPod, getStagedEarthPodSnapshot, playSurfacePodLaunch, stageEarthPod } from '../planetary/surface-pod-launch.js?v=11';
 import { SPACE_CRAFT_IDENTITY } from '../space/craft-identity.js?v=1';
 import { SPACE_TRAVEL_LOCATION, SPACE_TRAVEL_PHASE } from '../space/travel-session.js?v=1';
@@ -1328,6 +1328,7 @@ function renderMission() {
 
 function closeShipStationPanel() {
   document.getElementById('shipStationPanel')?.classList.remove('show');
+  document.activeElement?.blur?.();
 }
 
 function crewPortraitPosition(crewId) {
@@ -1798,7 +1799,7 @@ async function enterActiveShip() {
     reason: 'solis-reach-interior-entered'
   });
   ensureStylesheet();
-  const ship = await import('./ship-interior.js?v=27');
+  const ship = await import('./ship-interior.js?v=28');
   closeExpeditionPlanner();
   const entered = ship.enterSolisReachInterior({
     expedition: activeExpedition,

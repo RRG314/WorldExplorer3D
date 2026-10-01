@@ -155,8 +155,8 @@ const TOOL_FIELD_USE = Object.freeze({
 
 const EXPLORER_SECTION_TUTORIALS = Object.freeze({
   workspace: Object.freeze({ id: 'explorer-workspace-v1', title: 'Your Explorer loop', steps: Object.freeze([
-    'Choose an activity in Today. The first option is the best fit for this place; the next two are alternatives.',
-    'Begin, then return to the world so your tool and the nearby clues can guide you.',
+    'Choose Explore, Build, or Together in Today, or roam freely. Your choice can be changed at any time.',
+    'Use the walkthrough to begin. Fieldwork, routes, building and rooms each show their own controls while you play.',
     'Finish the activity to add a memory to your Journal. Identifications also update the Guide, and objects you keep enter your Pack.',
     'Open your Explorer Profile when you want to see your rank, specialties, and companions.'
   ]) }),
@@ -240,6 +240,14 @@ function guideCategoryFor(record = {}) {
   if (/geology|rock|mineral|sediment|gem|ore|metal/.test(family)) return 'geology';
   if (/water-survey|ocean/.test(family)) return 'ocean';
   return 'places';
+}
+
+function publishExplorerResult(event, profileStore) {
+  if (!event?.eventId) return;
+  globalThis.dispatchEvent?.(new CustomEvent('we3d:explorer-result-saved', {
+    detail: { eventId: event.eventId, eventType: event.eventType, name: event.name, shared: event.metadata?.shared === true,
+      storage: profileStore?.type === 'IndexedDbDiscoveryProfileStore' ? 'device' : 'session' }
+  }));
 }
 
 function createDiscoveryUi(state) {
@@ -376,8 +384,11 @@ function createDiscoveryUi(state) {
       (path === 'all' || (event.pathId || 'field') === path) &&
       (regionId === 'all' || event.regionId === regionId)
     );
+    const journey = state.appCtx.getTutorialSnapshot?.();
+    const reviewIndex = journey?.stage === 'review' ? filtered.findIndex(event => event.eventId === journey.result?.eventId) : -1;
+    if (reviewIndex > 0) filtered.unshift(...filtered.splice(reviewIndex, 1));
     const pathLabels = { field: 'Fieldwork', activity: 'Games', creation: 'Making', travel: 'Travel', community: 'Community', companion: 'Companions' };
-    elements.journal.innerHTML = filtered.length ? filtered.slice(0, 16).map((event) => {
+    elements.journal.innerHTML = filtered.length ? filtered.map((event) => {
       const when = new Date(Number(event.occurredAt) || Date.now()).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
       const connections = [
         event.projections?.fieldGuide ? 'also in Field Guide' : '',
@@ -389,6 +400,7 @@ function createDiscoveryUi(state) {
       const eventPath = event.pathId || 'field';
       return `<article class="discoveryItem discoveryJournalEvent"><span class="discoveryJournalTime">${escapeHtml(when)}</span><span class="discoveryJournalPath">${escapeHtml(pathLabels[eventPath] || 'Explorer')}</span><strong>${escapeHtml(event.name || 'Explorer record')}</strong><small>${escapeHtml(`${event.regionLabel || 'Current region'} · ${activity}${connections ? ` · ${connections}` : ''}`)}</small>${event.detail ? `<small>${escapeHtml(event.detail)}</small>` : ''}<span class="discoveryJournalProgress">${event.progress?.points > 0 ? `+${event.progress.points} Explorer points` : 'Saved to your Journal'}</span>${geologyDetails(event.evidencePayload?.geologyEvidence)}${returnButton}</article>`;
     }).join('') : '<div class="discoveryEmpty">No Journal records match these filters.</div>';
+    if (open && activeTab === 'journal') globalThis.dispatchEvent?.(new CustomEvent('we3d:explorer-records-visible', { detail: { eventIds: filtered.map((event) => event.eventId) } }));
   }
 
   async function refreshData() {
@@ -601,6 +613,7 @@ function createDiscoveryUi(state) {
       return false;
     }
     const collection = event.projections?.collection === true;
+    const fieldGuide = event.projections?.fieldGuide === true;
     const points = Number(event.progress?.points) || 0;
     const specialtyAwards = outcome?.characterReward?.specialtyAwards || [];
     const specialtySummary = specialtyAwards.slice(0, 2).map((award) => {
@@ -609,8 +622,12 @@ function createDiscoveryUi(state) {
     }).join(' · ');
     const rewardSummary = [points > 0 ? `Explorer +${points}` : '', specialtySummary].filter(Boolean).join(' · ');
     elements.result.hidden = false;
-    elements.result.innerHTML = `<span class="discoveryResultEyebrow">FIELD RESULT SAVED</span><strong>${escapeHtml(event.name || 'Explorer record')}</strong><p>${escapeHtml(collection ? 'Journal updated · Field Guide updated · Added to Backpack' : 'Journal and Field Guide updated')}</p><div class="discoveryResultProgress">${escapeHtml(rewardSummary || 'Observation saved · already credited here')}</div><div class="discoveryResultActions"><button data-result-tab="guide" type="button">Open Field Guide</button>${collection ? '<button data-open-backpack="true" type="button">Open Backpack</button>' : ''}<button data-result-tab="profile" type="button">Explorer Profile</button></div>`;
+    const storageNote = state.profileStore?.type === 'IndexedDbDiscoveryProfileStore'
+      ? 'Journal saved in this browser on this device. The full Journal is not backed up to your account.'
+      : 'Journal available for this session only. Browser storage is unavailable.';
+    elements.result.innerHTML = `<span class="discoveryResultEyebrow">RESULT SAVED</span><strong>${escapeHtml(event.name || 'Explorer record')}</strong><p>${escapeHtml(collection ? 'Journal updated · Added to Backpack' : fieldGuide ? 'Journal and Field Guide updated' : 'Journal updated')}</p><div class="discoveryResultProgress">${escapeHtml(rewardSummary || 'Your result is saved')}</div><p class="discoveryResultStorage">${escapeHtml(storageNote)}</p><div class="discoveryResultActions"><button data-result-tab="journal" type="button">View in Journal</button>${fieldGuide ? '<button data-result-tab="guide" type="button">Open Field Guide</button>' : ''}${collection ? '<button data-open-backpack="true" type="button">Open Backpack</button>' : ''}<button data-result-continue="true" type="button">Back to exploring</button></div>`;
     document.querySelector('.discoveryPane[data-discovery-pane="today"]')?.scrollTo?.({ top: 0 });
+    publishExplorerResult(event, state.profileStore);
     return true;
   }
 
@@ -739,7 +756,12 @@ function createDiscoveryUi(state) {
       state.appCtx.toggleUrbanEquipment?.(true);
       return;
     }
+    if (event.target?.closest?.('[data-result-continue]')) { setOpen(false); return; }
     const button = event.target?.closest?.('[data-result-tab]');
+    if (button?.dataset.resultTab === 'journal') {
+      if (elements.journalCategory) elements.journalCategory.value = 'all';
+      if (elements.journalRegion) elements.journalRegion.value = 'all';
+    }
     if (button) setTab(button.dataset.resultTab || 'today');
   });
   [elements.fieldGuide, elements.collection].forEach((container) => listen(container, 'click', (event) => {
@@ -1282,6 +1304,8 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
       // The Explorer panel reloads current data whenever it opens. Rebuilding
       // all hidden Journal, Guide, companion, and profile markup here made a
       // background world-visit receipt compete with first-play rendering.
+      const hasResultCard = ['activity-completed', 'creation-saved', 'building-milestone', 'vehicle-route-completed'].includes(result.event?.eventType) && state.ui?.showResult?.(result);
+      if (!hasResultCard) publishExplorerResult(result.event, profileStore);
       if (state.ui?.open) await state.ui.refreshData?.();
     }
     return result || { recorded: false, reason: 'event-store-unavailable' };
@@ -1328,21 +1352,26 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
       progressReason: 'creative-history'
     });
   });
+  const buildOutingReceiptId = Date.now().toString(36);
   listenForExplorerEvent('we3d:block-builder-change', (event) => {
     const detail = event.detail || {};
     const count = Math.max(0, Number(detail.count) || 0);
     const milestone = [1, 10, 25, 50, 100].find((target) => count === target);
-    if (!milestone || detail.action !== 'place') return;
+    if (detail.action !== 'place') return;
+    const journey = state.appCtx.getTutorialSnapshot?.();
+    const needsBuildReceipt = journey?.enabled && journey.stage === 'explore' && (journey.selectedPath === 'build' || (journey.selectedPath === 'together' && detail.shared === true));
+    if (!milestone && !needsBuildReceipt) return;
     void state.recordExplorerEvent({
-      eventId: `event:block-milestone:${detail.worldId}:${milestone}`,
+      eventId: `event:block-milestone:${detail.roomId ? `${detail.roomId}:` : ''}${detail.worldId}:${milestone || `outing-${buildOutingReceiptId}`}`,
       eventType: 'building-milestone',
       sourceSystem: 'blocks',
       sourceId: `${detail.worldId}:${milestone}`,
       pathId: 'creation',
-      name: milestone === 1 ? 'Placed the first block here' : `Built with ${milestone} blocks here`,
-      detail: detail.shared ? 'A shared-world building milestone.' : 'A building milestone saved at this place.',
-      firstCompletion: true,
-      points: milestone === 1 ? 2 : milestone >= 25 ? 3 : 2,
+      name: milestone === 1 ? 'Placed the first block here' : milestone ? `Built with ${milestone} blocks here` : 'Continued building here',
+      detail: detail.shared ? 'Block saved to the shared room. Keep the room code to return; this Journal receipt stays on your device.' : 'Blocks saved on this device at this place. Return here to keep building.',
+      metadata: { shared: detail.shared === true, roomId: detail.roomId || '' },
+      firstCompletion: !!milestone,
+      points: !milestone ? 0 : milestone === 1 ? 2 : milestone >= 25 ? 3 : 2,
       progressReason: 'building-milestone'
     });
   });
@@ -1926,6 +1955,7 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
         recorded.event?.eventId || `wildlife:${state.worldIdentityId}:${actorId}:${catalog.id}`,
         recorded.event?.firstIdentification === true
       );
+      state.ui.showResult(recorded);
       appCtx.showToast?.(`${catalog.names.common} recorded in your Field Guide.`);
       emitDiscoveryTelemetry('discovery_recorded', { activityId: 'photograph', catalogFamily: catalog.family, discipline: 'nature', contextBands: telemetryContextBands(), result: 'recorded-in-world' });
     } else {
