@@ -37,8 +37,8 @@ async function respondToIncidentAboardShip(page, name, capture = false) {
   await page.waitForFunction(() => JSON.parse(globalThis.render_game_to_text?.() || '{}').expeditionShipInterior?.incidentPresentation != null);
   await page.evaluate(async (targetRoomId) => {
     const { ctx } = await import('/app/js/shared-context.js?v=55');
-    const { getShipDeckForRoom, SHIP_STATIONS } = await import('/app/js/expedition/ship-layout.js?v=5');
-    const { handleShipInteriorInteraction, switchSolisReachDeck } = await import('/app/js/expedition/ship-interior.js?v=27');
+    const { getShipDeckForRoom, SHIP_STATIONS } = await import('/app/js/expedition/ship-layout.js?v=6');
+    const { handleShipInteriorInteraction, switchSolisReachDeck } = await import('/app/js/expedition/ship-interior.js?v=28');
     const deckId = getShipDeckForRoom(targetRoomId);
     if (deckId && ctx.getShipInteriorSnapshot?.()?.deckId !== deckId) switchSolisReachDeck(deckId);
     const station = SHIP_STATIONS.find((entry) => entry.roomId === targetRoomId);
@@ -55,7 +55,7 @@ async function respondToIncidentAboardShip(page, name, capture = false) {
   for (let stepIndex = 0; stepIndex < 3; stepIndex += 1) {
     const completed = await page.evaluate(async () => {
       const { ctx } = await import('/app/js/shared-context.js?v=55');
-      const { handleShipInteriorInteraction } = await import('/app/js/expedition/ship-interior.js?v=27');
+      const { handleShipInteriorInteraction } = await import('/app/js/expedition/ship-interior.js?v=28');
       const snapshot = ctx.getShipInteriorSnapshot?.();
       const target = ctx.activeInterior?.interactions?.find((entry) => entry.id === snapshot?.incidentProcedure?.currentInteractionId);
       if (!target) return false;

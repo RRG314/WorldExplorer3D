@@ -194,7 +194,7 @@ function createCurrentJourneyUi(appCtx, options = {}) {
     if (elapsed < 0.25) return;
     elapsed = 0;
     const tutorial = options.getTutorialSnapshot?.() || null;
-    const hiddenForFirstJourney = tutorial?.enabled && !tutorial.completed && !tutorial.skipped;
+    const hiddenForFirstJourney = tutorial?.enabled && !tutorial.completed && !tutorial.skipped && ['move', 'interact'].includes(tutorial.stage);
     if (!worldPresentationReady(appCtx) || hiddenForFirstJourney) {
       if (card) card.hidden = true;
       return;

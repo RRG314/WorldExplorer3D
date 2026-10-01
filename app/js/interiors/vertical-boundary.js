@@ -36,7 +36,9 @@ function resolveInteriorCeiling(input = {}) {
   const storyHeight = Math.max(2.7, Number(activeInterior.floorPlan.storyHeight) || 3.4);
   const activeLevel = Math.max(0, Math.round(Number(activeInterior.activeLevel) || 0));
   const floorBaseY = Number(activeInterior.floorBaseY) || 0;
-  const ceilingY = floorBaseY + activeLevel * storyHeight + storyHeight - 0.12;
+  const ceilingY = activeInterior.environmentKind === 'expedition-ship' && Number.isFinite(activeInterior.ceilingY)
+    ? activeInterior.ceilingY
+    : floorBaseY + activeLevel * storyHeight + storyHeight - 0.12;
   const maximumEyeY = ceilingY - Math.max(0.12, Number(input.headClearance) || 0.18);
   if (eyeY <= maximumEyeY) {
     return Object.freeze({ eyeY, verticalVelocity, collided: false, ceilingY });

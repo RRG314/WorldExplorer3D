@@ -139,3 +139,20 @@ body:has(#urbanVehiclePrompt.show) #discoveryContextPrompt,body:has(#interiorPro
     .discoveryGuideOverview article:last-child{grid-column:1/-1}
   }
 }
+
+/* A completed action is the main decision in this view, including on touch. */
+.discoveryResultCard p,.discoveryResultProgress{font-size:12px;line-height:1.5}
+.discoveryResultActions button{min-height:44px;font-size:9px}
+.discoveryResultActions button[data-result-tab="journal"]{background:#185fc0;border-color:#408bf0;color:#fff}
+.discoveryResultStorage{color:#b7c7d3}
+
+/* Persistent optional walkthrough: readable without racing a timed HUD notice. */
+.sandboxWalkthrough{margin:12px 0;padding:14px;border:1px solid rgba(135,178,201,.25);border-radius:12px;background:rgba(16,35,49,.8);color:#e5eff6}
+.sandboxWalkthrough h3{font-size:15px;margin:0 0 6px}.sandboxWalkthrough p,.sandboxWalkthrough li{font-size:13px;line-height:1.55;color:#bdd0df}.sandboxWalkthrough p{margin:6px 0 12px}.sandboxWalkthrough ol{padding-left:21px}.sandboxWalkthrough li+li{margin-top:8px}
+.sandboxPathChoices,.sandboxPathActions{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0}
+.sandboxPathChoices button,.sandboxPathActions button{min-height:44px;border:1px solid #506c82;background:#1b3448;color:#edf5fa;border-radius:8px;padding:9px 12px;font:inherit;font-size:13px;cursor:pointer}
+.sandboxPathChoices button{flex:1}.sandboxPathChoices button[aria-pressed="true"],#sandboxPathStart{background:#246696;border-color:#72b8ea;color:white}
+.sandboxPathChoices button:focus-visible,.sandboxPathActions button:focus-visible{outline:2px solid #b2dfff;outline-offset:2px}
+#sandboxPathGuide>strong{display:block;margin-top:14px}#urbanEquipment>.sandboxPathActions{padding:0 14px}
+
+.sandboxWalletNote{font-size:12px;line-height:1.5;color:#bdd0df;margin:0;padding:8px 14px}

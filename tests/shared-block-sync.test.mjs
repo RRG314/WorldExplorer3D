@@ -103,3 +103,32 @@ test('a second action for one coordinate waits for the first commit instead of c
   await Promise.resolve();
   assert.deepEqual(sync.getEntries(), []);
 });
+
+test('saved receipts wait for acknowledgement and are cancelled on room switch or disconnect', async () => {
+  for (const cancellation of ['none', 'room', 'offline', 'reject']) {
+    const request = deferred();
+    const receipts = [];
+    const sync = createSync();
+    sync.configure({ enabled: true, roomId: 'ORIGINAL', upsert: () => request.promise });
+    sync.upsert({ gx: 2, gy: 0, gz: 4 }, () => {}, (_entry, receipt) => receipts.push(receipt));
+    assert.deepEqual(receipts, [], 'optimistic placement is not saved');
+    if (cancellation === 'room') sync.configure({ enabled: true, roomId: 'OTHER', upsert: async () => {} });
+    if (cancellation === 'offline') sync.setConnected(false);
+    if (cancellation === 'reject') request.reject(new Error('permission denied'));
+    else request.resolve();
+    await new Promise(resolve => setImmediate(resolve));
+    assert.deepEqual(receipts, cancellation === 'none' ? [{ roomId: 'ORIGINAL', count: 1 }] : []);
+  }
+});
+
+test('save-state observers see the final pending count after placement and Undo', async () => {
+  const settled = [];
+  const sync = createSync({ onSettled: () => settled.push(sync.getStatus().pendingCount) });
+  sync.configure({ enabled: true, roomId: 'SAVING', upsert: async () => {}, remove: async () => {} });
+  const input = { gx: 1, gy: 0, gz: 1 };
+  sync.upsert(input);
+  await new Promise(resolve => setImmediate(resolve));
+  sync.remove(input);
+  await new Promise(resolve => setImmediate(resolve));
+  assert.deepEqual(settled, [0, 0], 'Save status must leave pending after both actions');
+});

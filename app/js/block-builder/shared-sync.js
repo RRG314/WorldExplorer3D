@@ -6,7 +6,7 @@ import {
 } from './catalog.js?v=2';
 
 export function createSharedBlockSync(options = {}) {
-  const { blockKey, onRefresh, toVerticalGridCoord } = options;
+  const { blockKey, onRefresh, onSettled, toVerticalGridCoord } = options;
   let enabled = false;
   let roomId = '';
   let entries = [];
@@ -96,7 +96,7 @@ export function createSharedBlockSync(options = {}) {
     return connected;
   }
 
-  function upsert(raw, onFailure) {
+  function upsert(raw, onFailure, onCommitted) {
     const entry = normalizeEntry(raw);
     if (!entry) return null;
     if (!connected) return null;
@@ -109,8 +109,13 @@ export function createSharedBlockSync(options = {}) {
       const operationId = ++operationSequence;
       const operation = { operationId, key, entry, previous, onFailure };
       pendingOperations.set(key, operation);
-      Promise.resolve(upsertFn(entry)).then(() => {
-        if (pendingOperations.get(key)?.operationId === operationId) pendingOperations.delete(key);
+      let request;
+      try { request = upsertFn(entry); } catch (error) { request = Promise.reject(error); }
+      Promise.resolve(request).then(() => {
+        if (pendingOperations.get(key)?.operationId !== operationId) return;
+        pendingOperations.delete(key);
+        onSettled?.();
+        onCommitted?.(entry, { roomId, count: entries.length - pendingOperations.size });
       }).catch((error) => {
         if (pendingOperations.get(key)?.operationId !== operationId) return;
         pendingOperations.delete(key);
@@ -134,7 +139,9 @@ export function createSharedBlockSync(options = {}) {
       const operation = { operationId, key, entry, previous, onFailure };
       pendingOperations.set(key, operation);
       Promise.resolve(removeFn(entry)).then(() => {
-        if (pendingOperations.get(key)?.operationId === operationId) pendingOperations.delete(key);
+        if (pendingOperations.get(key)?.operationId !== operationId) return;
+        pendingOperations.delete(key);
+        onSettled?.();
       }).catch((error) => {
         if (pendingOperations.get(key)?.operationId !== operationId) return;
         pendingOperations.delete(key);

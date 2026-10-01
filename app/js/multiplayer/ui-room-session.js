@@ -5,7 +5,7 @@ import {
   listenSharedBlocks,
   removeSharedBlock,
   upsertSharedBlock
-} from "./blocks.js?v=69";
+} from "./blocks.js?v=70";
 import { listenChat } from "./chat.js?v=56";
 import { listenPlayers, startPresence } from "./presence.js?v=63";
 import {

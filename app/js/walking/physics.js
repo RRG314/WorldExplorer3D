@@ -7,7 +7,7 @@ import { samplePhysicalEnvironment } from '../planetary/runtime/physical-environ
 import { getPlanetarySurfaceRegion } from '../planetary/runtime/surface-authority.js?v=5';
 import { resolvePlanetarySurfaceBoundary } from '../planetary/runtime/surface-boundary.js?v=1';
 import { queryPlanetaryObstacle } from '../planetary/runtime/obstacle-authority.js?v=1';
-import { resolveInteriorCeiling } from '../interiors/vertical-boundary.js?v=1';
+import { resolveInteriorCeiling } from '../interiors/vertical-boundary.js?v=2';
 import { constrainTunnelActorCeiling, resolveTunnelSpace } from '../world/compiler/tunnel-space-query.js';
 
 function wrapYaw(angle = 0) {
@@ -35,6 +35,7 @@ function isPlanetarySurface() {
 }
 
 function activePlanetaryBodyId() {
+  if (appCtx.activeInterior?.environmentKind === 'expedition-ship') return null;
   return appCtx.activePlanetaryBodyId || (appCtx.onMars ? 'mars' : appCtx.onMoon ? 'moon' : null);
 }
 
@@ -67,6 +68,7 @@ function createWalkingPhysicsHelpers({
   }
 
   function queryBuildings(x, z, radius = 100) {
+    if (appCtx.activeInterior?.environmentKind === 'expedition-ship') return appCtx.dynamicBuildingColliders || [];
     if (typeof getNearbyBuildings === "function") {
       const nearby = getNearbyBuildings(x, z, radius);
       if (Array.isArray(nearby)) {
@@ -203,7 +205,7 @@ function createWalkingPhysicsHelpers({
     let effectiveGroundY = groundY;
     let onBuilding = false;
 
-    if (!isPlanetarySurface()) {
+    if (!isPlanetarySurface() && appCtx.activeInterior?.environmentKind !== 'expedition-ship') {
       const roofInfo = getBuildingRoofHeight(x, z, walkerY);
       if (roofInfo && roofInfo.roofY > groundY) {
         effectiveGroundY = roofInfo.roofY;
@@ -211,7 +213,7 @@ function createWalkingPhysicsHelpers({
       }
     }
 
-    if (typeof appCtx.getBuildTopSurfaceAtWorldXZ === "function") {
+    if (appCtx.activeInterior?.environmentKind !== 'expedition-ship' && typeof appCtx.getBuildTopSurfaceAtWorldXZ === "function") {
       const feetY = finiteOr(walkerY, 0) - CFG.eyeHeight;
       const topY = appCtx.getBuildTopSurfaceAtWorldXZ(x, z, feetY + CFG.blockStepHeight);
       if (Number.isFinite(topY) && topY > effectiveGroundY) {
@@ -513,7 +515,7 @@ function createWalkingPhysicsHelpers({
         ? appCtx.checkBuildingCollision
         : null;
       const checkBuildingsFallback = !isPlanetarySurface() && !sharedBuildingCollision && (getBuildingsArray || getNearbyBuildings);
-      const checkBuildBlocks = typeof appCtx.getBuildCollisionAtWorldXZ === "function";
+      const checkBuildBlocks = appCtx.activeInterior?.environmentKind !== 'expedition-ship' && typeof appCtx.getBuildCollisionAtWorldXZ === "function";
       const checkPlanetaryObstacles = isPlanetarySurface();
       if (sharedBuildingCollision || checkBuildingsFallback || checkBuildBlocks || checkPlanetaryObstacles) {
         const allBuildings = checkBuildingsFallback ? queryBuildings(newX, newZ, 32) || [] : [];
@@ -541,7 +543,7 @@ function createWalkingPhysicsHelpers({
               // query owns a roof beneath the actor's feet. Once the walker
               // has reached that roof, the same solid must not block every
               // horizontal step across it.
-              acceptCollision: (candidate) => candidate?.building?.isTransportCollider || !walkerIsAtOrAboveRoof(
+              acceptCollision: (candidate) => candidate?.building?.isInteriorCollider || candidate?.building?.isTransportCollider || !walkerIsAtOrAboveRoof(
                 candidate?.building,
                 walkerFeetY
               )
@@ -599,7 +601,7 @@ function createWalkingPhysicsHelpers({
           }
         }
       }
-      if (!isPlanetarySurface() && typeof appCtx.resolveUrbanActorCollision === 'function') {
+      if (!isPlanetarySurface() && appCtx.activeInterior?.environmentKind !== 'expedition-ship' && typeof appCtx.resolveUrbanActorCollision === 'function') {
         const urbanCollision = appCtx.resolveUrbanActorCollision(
           { x: state.walker.x, z: state.walker.z },
           { x: newX, z: newZ },

@@ -70,3 +70,28 @@
 .ship-voyage-response button:disabled{opacity:.42}
 .ship-voyage-response small{color:#d4c09b;font-size:10px;line-height:1.35}
 @media(max-width:620px){#shipMiniMap{top:166px;right:8px;width:92px;padding:6px}#shipMiniMap header span{font-size:7px}#shipObjectiveCue{top:166px;right:108px;left:8px;width:auto;padding:8px 9px}#shipObjectiveCue.show{grid-template-columns:1fr}#shipObjectiveCue strong{font-size:10px}#shipObjectiveCue button{grid-column:1;grid-row:auto;min-height:32px}.shipInteriorHud.show,#shipInteriorHud.show{right:8px;left:8px;width:auto;transform:none;flex-direction:column;align-items:stretch;gap:7px}.shipInteriorHud small,#shipInteriorHud small{max-width:none}.shipInteriorHud>div:last-child,#shipInteriorHud>div:last-child{flex-direction:row;gap:4px}.shipInteriorHud button,#shipInteriorHud button{flex:1;min-width:0;padding:6px 5px;font-size:7px}#shipActionCue{top:166px;right:108px;bottom:auto;left:8px;max-width:none;transform:translateY(12px)}#shipActionCue.show{transform:none}#shipMapOverlay,#shipStationPanel{padding:0}#shipMapOverlay>section,.ship-station-card{max-height:100dvh;border-radius:0}.ship-map-deck{width:min(360px,92vw)}.ship-station-metrics,.ship-voyage-response>div{grid-template-columns:1fr}.ship-station-actions{grid-template-columns:1fr}.ship-crew-conversation{grid-template-columns:96px minmax(0,1fr);gap:10px}.ship-crew-conversation figure{width:96px;height:150px}.ship-crew-conversation dl{grid-template-columns:1fr}.ship-crew-conversation h3{font-size:13px}}
+
+#shipObservationPanel { display:none; position:fixed; inset:0; z-index:12050; background:rgba(3,9,15,.88); padding:24px; overflow:auto; color:#e7f4fa; }
+#shipObservationPanel.show { display:grid; place-items:center; }
+.ship-observation-shell { width:min(900px,100%); box-sizing:border-box; padding:24px; background:#101e2a; border:1px solid #3b667c; border-radius:16px; box-shadow:0 20px 80px #0009; font:15px/1.5 system-ui,sans-serif; }
+.ship-observation-shell header,.ship-observation-shell footer { display:flex; justify-content:space-between; align-items:center; gap:16px; }
+.ship-observation-shell h2 { margin:4px 0; font-size:24px; }
+.ship-observation-shell small { color:#a3c9db; }
+.ship-observation-shell p { color:#c0d2dd; }
+.ship-observation-shell label { display:block; margin-bottom:6px; }
+.ship-observation-shell button,.ship-observation-shell select { min-height:44px; background:#19384c; color:#f1f8fc; border:1px solid #5c92ae; border-radius:8px; padding:10px 14px; font:inherit; }
+.ship-observation-shell select { width:100%; }
+.ship-observation-shell :focus-visible { outline:3px solid #8de3ff; outline-offset:3px; }
+.ship-observation-picture { margin:16px 0; background:#000; border:1px solid #3b667c; border-radius:8px; overflow:hidden; }
+.ship-observation-picture canvas { display:block; width:100%; height:auto; aspect-ratio:16/9; }
+.ship-observation-shell footer { margin-bottom:16px; }
+.ship-observation-shell [data-observation-status] { text-align:center; }
+@media(max-width:600px) {
+ #shipObservationPanel { padding:10px; }
+ .ship-observation-shell { padding:14px; }
+ .ship-observation-shell header { align-items:flex-start; gap:8px; }
+ .ship-observation-shell h2 { font-size:21px; }
+ .ship-observation-shell footer { flex-wrap:wrap; gap:8px; }
+ .ship-observation-shell footer [role=status] { order:-1; flex-basis:100%; }
+ .ship-observation-shell footer button { flex:1; }
+}

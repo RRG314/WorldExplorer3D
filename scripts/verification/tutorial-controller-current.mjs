@@ -13,7 +13,7 @@ try {
   await page.goto(`http://127.0.0.1:${server.port}/controller-fixture`);
   const result=await page.evaluate(async mobile=>{
    const {ctx}=await import('/app/js/shared-context.js?v=55');
-   const controller=await import('/app/js/tutorial/tutorial.js?v=13');
+   const controller=await import('/app/js/tutorial/tutorial.js?v=15');
    Object.assign(ctx,{gameStarted:true,worldLoading:true,isLikelyMobileDevice:()=>mobile,Walk:{state:{mode:'walk',walker:{x:0,z:0}}},resolvePrimaryContextInteraction:()=>null});
    controller.initTutorial();controller.tutorialUpdate(.1);
    const duringLoad=controller.getTutorialSnapshot();
@@ -31,9 +31,26 @@ try {
    ctx.Walk.state.walker.x=203;controller.tutorialUpdate(.1);
    ctx.Walk.state.walker.x=207;controller.tutorialUpdate(.1);
    const afterMovement=controller.getTutorialSnapshot();
+   ctx.resolvePrimaryContextInteraction=()=>null;
+   dispatchEvent(new CustomEvent('we3d:context-interaction-completed',{detail:{family:'vehicle'}}));
+   const choosing=controller.getTutorialSnapshot();
+   for(const name of ['opened_explorer','opened_backpack','travel_mode_changed','build_mode_entered','entered_space'])controller.tutorialOnEvent(name);
+   dispatchEvent(new CustomEvent('we3d:discovery-telemetry',{detail:{type:'activity_started'}}));
+   dispatchEvent(new CustomEvent('we3d:explorer-section-opened',{detail:{section:'journal'}}));
+   dispatchEvent(new CustomEvent('we3d:explorer-result-saved',{detail:{eventId:'visit',eventType:'world-visited'}}));
+   const browsing=controller.getTutorialSnapshot();
+   dispatchEvent(new CustomEvent('we3d:explorer-result-saved',{detail:{eventId:'field:1',eventType:'discovery-recorded',name:'Rock pigeon',storage:'device'}}));
+   const recorded=controller.getTutorialSnapshot();
+   const persisted=JSON.parse(localStorage.getItem('worldExplorer3D.tutorialState.v6'));
+   dispatchEvent(new CustomEvent('we3d:explorer-records-visible',{detail:{eventIds:['other']}}));
+   const wrongRecord=controller.getTutorialSnapshot();
+   dispatchEvent(new CustomEvent('we3d:explorer-records-visible',{detail:{eventIds:['field:1']}}));
+   const reviewed=controller.getTutorialSnapshot();
+   dispatchEvent(new CustomEvent('we3d:explorer-result-saved',{detail:{eventId:'field:2',eventType:'specimen-collected',name:'Another result'}}));
+   const duplicate=controller.getTutorialSnapshot();
    ctx.worldLoading=true;controller.tutorialUpdate(.1);
    const reloading=controller.getTutorialSnapshot();
-   return {mobile,duringLoad,afterLoadingPlacement,duringHandoff,firstPlay,requestedGuide,afterMovement,reloading};
+   return {mobile,duringLoad,afterLoadingPlacement,duringHandoff,firstPlay,requestedGuide,afterMovement,choosing,browsing,recorded,persisted,wrongRecord,reviewed,duplicate,reloading};
   },mobile);
   results.push(result);
   await mkdir('output/verification/tutorial-controller',{recursive:true});
@@ -45,9 +62,36 @@ try {
   assert.equal(result.requestedGuide.promptVisible,true,'enabled movement guidance must not be starved by a nearby action');
   assert.equal(result.afterMovement.stage,'interact','actual post-load movement must advance the guide');
   assert.equal(result.afterMovement.promptVisible,false,'nearby actions take priority after the movement step');
+  assert.equal(result.choosing.stage,'explore');
+  assert.equal(result.browsing.completed,false,'menus, travel, activity start and world visits are not a payoff');
+  assert.equal(result.browsing.stage,'explore');
+  assert.equal(result.recorded.stage,'review');
+  assert.equal(result.persisted.result.eventId,'field:1','review target survives reload');
+  assert.equal(result.wrongRecord.completed,false,'an unrelated or filtered Journal record cannot complete review');
+  assert.equal(result.reviewed.completed,true);
+  assert.equal(result.duplicate.result.eventId,'field:1','subsequent results cannot overwrite the completed journey');
   assert.equal(result.reloading.promptVisible,false);
   await context.close();
  }
+ const migrationResults=[];
+ for(const fixture of [
+  {name:'completed-v5',key:'v5',state:{completed:true,stage:'complete'},stage:'complete',completed:true},
+  {name:'pending-v5',key:'v5',state:{completed:false,stage:'explore'},stage:'explore',completed:false},
+  {name:'pending-v4',key:'v4',state:{completed:false,stage:'interact'},stage:'interact',completed:false},
+  {name:'review-reload',key:'v6',state:{stage:'review',result:{eventId:'kept',name:'Kept result',storage:'device'}},stage:'review',completed:false},
+  {name:'session-only-reload',key:'v6',state:{stage:'review',result:{eventId:'temporary',storage:'session'}},stage:'explore',completed:false}
+ ]) {
+  const context=await browser.newContext();const page=await context.newPage();
+  await page.route(`http://127.0.0.1:${server.port}/migration-fixture`,route=>route.fulfill({contentType:'text/html',body:'<!doctype html><body><div id="tab-settings"></div></body>'}));
+  await page.goto(`http://127.0.0.1:${server.port}/migration-fixture`);
+  const snapshot=await page.evaluate(async fixture=>{
+   localStorage.setItem(`worldExplorer3D.tutorialState.${fixture.key}`,JSON.stringify(fixture.state));
+   const controller=await import('/app/js/tutorial/tutorial.js?v=15');controller.initTutorial();return controller.getTutorialSnapshot();
+  },fixture);
+  assert.equal(snapshot.stage,fixture.stage,fixture.name);assert.equal(snapshot.completed,fixture.completed,fixture.name);
+  migrationResults.push({name:fixture.name,stage:snapshot.stage,completed:snapshot.completed});await context.close();
+ }
+ await writeFile('output/verification/tutorial-controller/migration.json',JSON.stringify({ok:true,migrationResults},null,2));
  await writeFile('output/verification/tutorial-controller/report.json',JSON.stringify({ok:true,evidence:'real tutorial controller in isolated browser DOM',results},null,2));
  console.log(JSON.stringify({ok:true,profiles:results.length}));
 }finally{await browser.close();await server.close();}

@@ -27,7 +27,7 @@ function installOnDemandFlowerChallenge(appCtx) {
 
   async function ensureFlowerChallengeReady() {
     if (!modulePromise) {
-      modulePromise = import('../flower-challenge.js?v=56').then((challenge) => {
+      modulePromise = import('../flower-challenge.js?v=57').then((challenge) => {
         removeTitleActivator?.();
         challenge.setupFlowerChallenge?.();
         return challenge;

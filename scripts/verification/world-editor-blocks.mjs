@@ -667,8 +667,8 @@ async function waitForCurrentRoom(page, expectedCode = '') {
 
 async function createRoomThroughVisibleTitleUi(page) {
   await openVisibleMultiplayerTab(page);
-  await page.locator('#mpTitleVisibilitySelect').selectOption('private');
   await page.locator('#mpCreateRoomDetails > summary').click();
+  await page.locator('#mpTitleVisibilitySelect').selectOption('private');
   await page.locator('#mpTitleRoomNameInput').fill(`Blocks acceptance ${runId}`);
   await page.locator('#mpTitleLocationTagInput').fill('Baltimore Inner Harbor');
   await page.locator('#mpTitleCreateBtn').click();
@@ -870,6 +870,14 @@ try {
       waitForBlockCount(roomMember.page, 0, true)
     ]);
 
+    await roomOwner.page.evaluate(async () => {
+      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      globalThis.__sandboxRoomContext = ctx;
+      ctx.restartTutorial();
+      ctx.openWorldDiscoverySection('today');
+    });
+    await roomOwner.page.locator('[data-sandbox-path="together"]').click();
+    await roomOwner.page.locator('#discoveryCloseBtn').click();
     phase('room: owner places through the integrated editor and member converges');
     await openIntegratedBlocks(roomOwner.page);
     await waitForBlockCount(roomOwner.page, 0, true);
@@ -883,6 +891,17 @@ try {
       waitForBlockCount(roomOwner.page, 1, true),
       waitForBlockCount(roomMember.page, 1, true)
     ]);
+    await roomOwner.page.waitForFunction(() => globalThis.__sandboxRoomContext.getTutorialSnapshot().stage === 'review', null, { timeout: 20_000 });
+    const sharedReceipt = await roomOwner.page.evaluate(async () => {
+      const ctx = globalThis.__sandboxRoomContext;
+      const target = ctx.getTutorialSnapshot().result;
+      return (await ctx.discoveryProfileStore.listEvents()).find(event => event.eventId === target.eventId);
+    });
+    assert.equal(sharedReceipt.metadata.shared, true, 'Only an acknowledged room edit earns the shared journey result');
+    await roomOwner.page.locator('#blockBuilderJournal').click();
+    await roomOwner.page.waitForFunction(() => globalThis.__sandboxRoomContext.getTutorialSnapshot().completed);
+    await roomOwner.page.locator('#discoveryCloseBtn').click();
+    await openIntegratedBlocks(roomOwner.page);
     const ownerFirstBlock = (await readRenderedBlocks(roomOwner.page))[0];
     const memberFirstBlock = (await readRenderedBlocks(roomMember.page))[0];
     const memberCollision = await inspectFirstBlockCollision(roomMember.page);
@@ -903,6 +922,7 @@ try {
     await roomMember.page.waitForFunction(() => /connection restored/i.test(document.getElementById('roomPanelStatus')?.textContent || ''), null, { timeout: 15_000 });
     await waitForBlockCount(roomMember.page, 2, true);
     await roomOwner.page.locator('#blockBuilderUndo').click();
+    await roomOwner.page.waitForFunction(() => document.getElementById('blockBuilderSaveState')?.textContent.includes('accepted blocks are saved'), null, { timeout: 20_000 });
     await Promise.all([
       waitForBlockCount(roomOwner.page, 1, true),
       waitForBlockCount(roomMember.page, 1, true)

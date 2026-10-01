@@ -24,12 +24,12 @@ if (location.protocol === 'file:') document.documentElement.classList.add('unsup
 <style>@layer legacy, interface;</style>
 <link rel="stylesheet" href="styles/title-shell.css?v=95">
 <link rel="stylesheet" href="styles/runtime-shell.css?v=127">
-<link rel="stylesheet" href="styles/block-builder.css?v=8">
+<link rel="stylesheet" href="styles/block-builder.css?v=9">
 <link rel="stylesheet" href="styles/universe.css?v=9">
 <link rel="stylesheet" href="styles/fishing-game.css?v=6">
-<link rel="stylesheet" href="styles/interface-v4.css?v=32">
+<link rel="stylesheet" href="styles/interface-v4.css?v=33">
 <link rel="stylesheet" href="styles/start-hub.css?v=20">
-<link rel="stylesheet" href="styles/discovery.css?v=17">
+<link rel="stylesheet" href="styles/discovery.css?v=19">
 <link rel="stylesheet" href="styles/tutorial.css?v=15">
 <link rel="stylesheet" href="styles/ar.css?v=1">
 <link rel="stylesheet" href="styles/mobile-controls.css?v=3">
@@ -91,7 +91,7 @@ if (location.protocol === 'file:') document.documentElement.classList.add('unsup
 <div id="titleScreen">
 <div class="logo">WORLD EXPLORER</div>
 <div class="sub">Explore Any Place on Earth and Beyond</div>
-<button id="flowerChallengeToggleBtn" class="flowerChallengeToggleBtn" type="button" aria-label="Open Community Board" aria-controls="flowerChallengePanel" aria-expanded="false">◉ Community Board</button>
+<button id="flowerChallengeToggleBtn" class="flowerChallengeToggleBtn" type="button" aria-label="Open Rankings" aria-controls="flowerChallengePanel" aria-expanded="false">◉ Rankings</button>
 <div class="title-main-row">
 <div class="menu-container">
 <div class="tab-nav">
@@ -181,7 +181,7 @@ Not case sensitive! Try: "Seattle" • "Tokyo" • "Paris, France" • "Austin, 
 <div class="mode" data-mode="trial"><div class="mode-icon">⏱️</div><div><div class="mode-name">Time Trial</div><div class="mode-desc">Race to the destination as fast as you can</div></div><div class="mode-check">✓</div></div>
 <div class="mode" data-mode="checkpoint"><div class="mode-icon">🏁</div><div><div class="mode-name">Checkpoints</div><div class="mode-desc">Collect all markers scattered across the map</div></div><div class="mode-check">✓</div></div>
 <div class="mode" data-mode="painttown"><div class="mode-icon">🟥</div><div><div class="mode-name">Paint the Town Red</div><div class="mode-desc">Use touch paint or paintball gun to claim buildings. Room rules can enforce roof-only or gun-only rounds.</div></div><div class="mode-check">✓</div></div>
-<div class="mode" data-mode="flower"><div class="mode-icon">🌹</div><div><div class="mode-name">Find the Flower</div><div class="mode-desc">Instantly start the red flower hunt and race for the fastest time.</div></div><div class="mode-check">✓</div></div>
+<div class="mode" data-mode="flower"><div class="mode-icon">🌹</div><div><div class="mode-name">Flower Sprint</div><div class="mode-desc">Instantly start the red flower hunt and race for the fastest time.</div></div><div class="mode-check">✓</div></div>
 <div style="grid-column:1/-1;padding:12px 0;text-align:center;font-size:11px;color:#64748b;border-top:2px solid #e8eef5;margin-top:8px;">💡 Cycle through walking, the BMW, the plane, and the drone with <b>F</b>, or choose a mode directly from Travel</div>
 </div>
 </div>
@@ -421,7 +421,7 @@ How Connected Data Is Used
 </div>
 <aside id="flowerChallengePanel" class="flowerChallengePanel">
 <div class="flowerChallengeHeader">
-<div class="flowerChallengeTitle">Community Board</div>
+<div class="flowerChallengeTitle">Rankings</div>
 <div id="gameLeaderboardBadge" class="flowerChallengeBadge">Flower Sprint</div>
 </div>
 <div class="flowerChallengeBody">
@@ -438,7 +438,7 @@ How Connected Data Is Used
 </div>
 <div class="flowerChallengeRow">
 <input id="flowerPlayerName" class="flowerChallengeName" type="text" maxlength="24" placeholder="Player Name" value="Explorer">
-<button id="titleFindFlowerBtn" class="flowerChallengeBtn" type="button">Find Flower</button>
+<button id="titleFindFlowerBtn" class="flowerChallengeBtn" type="button">Start Flower Sprint</button>
 <button id="titleFlowerRefreshBtn" class="flowerChallengeBtn refresh" type="button">Refresh</button>
 </div>
 <div id="flowerChallengeStatus" class="flowerChallengeStatus" role="status" aria-live="polite"></div>
@@ -702,9 +702,9 @@ How Connected Data Is Used
   <button id="currentJourneyAction" type="button">Open</button>
   <button id="currentJourneyDismiss" type="button" aria-label="Dismiss this notice" title="Dismiss">×</button>
 </aside>
-<aside id="discoveryPanel" aria-label="Explorer fieldwork" aria-hidden="true">
+<aside id="discoveryPanel" aria-label="Explorer" aria-hidden="true">
   <header class="discoveryHead">
-    <div class="discoveryIdentity"><span class="discoveryMark" aria-hidden="true">⌖</span><div><span class="discoveryEyebrow">Explorer Fieldwork</span><strong id="discoveryPanelTitle">Today</strong></div></div>
+    <div class="discoveryIdentity"><span class="discoveryMark" aria-hidden="true">⌖</span><div><span class="discoveryEyebrow">WORLD EXPLORER</span><strong id="discoveryPanelTitle">Today</strong></div></div>
     <div class="discoveryHeadActions"><button id="discoveryProfileBtn" class="discoveryProfileBtn" type="button" aria-label="Open Explorer Profile" aria-pressed="false"><span id="discoveryProfileRank">Trailhead</span><b id="discoveryProfilePoints">0</b></button><button id="discoveryHelpBtn" type="button" aria-label="Show help for this section">?</button><button id="discoveryCloseBtn" type="button" aria-label="Minimize fieldwork" title="Minimize during play">—</button></div>
   </header>
   <div class="discoveryWorkspace">
@@ -717,12 +717,28 @@ How Connected Data Is Used
     <div class="discoveryContent">
       <div id="discoverySectionTutorial" class="discoverySectionTutorial" hidden role="dialog" aria-modal="false" aria-labelledby="discoverySectionTutorialTitle"><strong id="discoverySectionTutorialTitle">Explorer guide</strong><ol id="discoverySectionTutorialSteps"></ol><button id="discoverySectionTutorialDoneBtn" type="button">Understood</button></div>
       <section class="discoveryPane active" data-discovery-pane="today">
-        <div class="discoveryModeNote"><b>YOUR NEXT STEP</b><span>Choose one activity, then return to the world. The active tool and nearby cues will guide you.</span></div>
+        <div class="discoveryModeNote"><b>YOUR NEXT STEP</b><span>Explore, build, or play together. Choose a direction below; your Journal keeps the story of what you do.</span></div>
+        <div id="discoveryResultCard" class="discoveryResultCard" hidden aria-live="polite"></div>
+        <button id="discoveryFirstJourneyBtn" class="discoveryBackpackEntry" type="button"><span>⌖</span><strong id="discoveryFirstJourneyLabel">Try First Journey</strong><small id="discoveryFirstJourneyDetail">Optional · move, do something, keep a record</small></button>
+        <section class="sandboxWalkthrough" aria-labelledby="sandboxWalkthroughHeading">
+          <h3 id="sandboxWalkthroughHeading">What would you like to do?</h3>
+          <p>Pick one direction, or roam freely. You can change your mind at any time.</p>
+          <div class="sandboxPathChoices" role="group" aria-label="Choose your direction">
+            <button data-sandbox-path="explore" type="button" aria-pressed="false">Explore</button>
+            <button data-sandbox-path="build" type="button" aria-pressed="false">Build</button>
+            <button data-sandbox-path="together" type="button" aria-pressed="false">Together</button>
+          </div>
+          <div id="sandboxPathGuide" hidden>
+            <strong id="sandboxPathTitle"></strong>
+            <div class="sandboxPathActions"><button id="sandboxPathStart" type="button">Begin</button><button id="sandboxPathClear" type="button">Roam freely</button></div>
+            <ol id="sandboxPathSteps"></ol><p id="sandboxPathNote"></p>
+          </div>
+          <div class="sandboxPathActions"><button id="sandboxNearbyActivities" type="button">Routes & games nearby</button><button id="sandboxHomes" type="button">Homes & Property</button></div>
+        </section>
         <button id="discoveryOpenBackpackTodayBtn" class="discoveryBackpackEntry" type="button"><span>▣</span><strong>Open Backpack</strong><small>Tools · quick slots · finds</small></button>
         <button id="discoveryEncounterLeadBtn" class="discoveryBackpackEntry discoveryEncounterLead" type="button" hidden><span>⌖</span><strong>Track Lead</strong><small id="discoveryEncounterLeadDetail"></small></button>
         <div id="discoveryFieldSession" class="discoveryFieldSession" hidden aria-live="polite"></div>
-        <div id="discoveryResultCard" class="discoveryResultCard" hidden aria-live="polite"></div>
-        <div class="discoverySectionHead"><span>CHOOSE AN ACTIVITY</span><small>BEST LOCAL FIT FIRST</small></div>
+        <div class="discoverySectionHead"><span>FIELDWORK NEARBY</span><small>BEST LOCAL FIT FIRST</small></div>
         <div id="discoveryActionList" class="discoveryActionList" aria-label="Available activities"></div>
         <div id="discoveryTutorial" class="discoveryTutorial" hidden><strong id="discoveryTutorialTitle">Tool guide</strong><ol id="discoveryTutorialSteps"></ol><button id="discoveryTutorialDoneBtn" type="button">Understood</button></div>
         <div id="discoveryInspection" class="discoveryInspection" hidden></div>
@@ -865,7 +881,9 @@ How Connected Data Is Used
 </div>
 <aside id="urbanEquipment" aria-hidden="true" aria-label="Character Backpack">
   <div class="urbanEquipmentHead"><span>Backpack</span><div><small>I to close · 1–6 quick equip</small><button id="urbanEquipmentCloseBtn" type="button" aria-label="Close Backpack">×</button></div></div>
+  <nav class="sandboxPathActions" aria-label="Explorer records"><button data-pack-record="journal" type="button">Journal</button><button data-pack-record="guide" type="button">Field Guide</button><button data-pack-record="profile" type="button">Skills & companions</button></nav>
   <section class="urbanBackpackWallet" aria-label="Explorer wallet"><span>Explorer wallet</span><strong id="urbanBackpackWallet">$0</strong></section>
+  <p class="sandboxWalletNote">Credits buy in-game goods and property. Exploring and basic building are free.</p>
   <div class="urbanBackpackLabel">Quick access</div>
   <div id="urbanEquipmentSlots" class="urbanEquipmentSlots"></div>
   <div class="urbanBackpackLabel">Pack contents</div>
@@ -1202,7 +1220,7 @@ Explore the area
 <div class="floatItem" id="fLiveGps">📍 Explore with Live GPS</div>
 <div class="floatItemSection" role="separator">ACTIVITIES</div>
 <div class="floatItem" id="fDeFlock">📷 DeFlock Hunt</div>
-<div class="floatItem" id="fFlowerChallenge">🔴 Find Red Flower</div>
+<div class="floatItem" id="fFlowerChallenge">🔴 Flower Sprint</div>
 <div class="floatItem" id="fFishing" style="display:none">🎣 Fishing</div>
 <div class="floatItemSection" role="separator">PLACES</div>
 <div class="floatItem" id="fHistoric">⛩️ Historic Places</div>
@@ -1248,7 +1266,7 @@ Explore the area
 <button class="floatBtn community" id="communityBtn" type="button" aria-label="Open Community" aria-expanded="false" data-mobile-label="Community"><span class="btnIcon">◎</span><span class="btnText">Community</span></button>
 <div class="floatItems" data-menu-title="COMMUNITY">
 <div class="floatItem" id="fMultiplayer">👥 Multiplayer</div>
-<div class="floatItem" id="fCommunityBoard">◎ Community Board</div>
+<div class="floatItem" id="fCommunityBoard">◎ Rankings</div>
 <div class="floatItem" id="fMemoryFlower">🌸 Leave a Memory Marker</div>
 <div class="floatItem" id="fSharePlace">↗ Share This Place</div>
 <!-- Preserved for future product work, intentionally absent from production UI. -->
@@ -1266,10 +1284,10 @@ Explore the area
 </div>
 
 <div class="floatMenu" id="realEstateMenu">
-<button class="floatBtn realEstate" id="realEstateFloatBtn" type="button" aria-label="Open Real Estate" aria-expanded="false" data-mobile-label="Real Estate"><span class="btnIcon">⌂</span><span class="btnText">Real Estate</span></button>
-<div class="floatItems" data-menu-title="REAL ESTATE">
-<div class="floatItem" id="fRealEstate">⌂ Property Hub</div>
-<div class="floatItem" id="fQuickBuild">🧱 Quick Build</div>
+<button class="floatBtn realEstate" id="realEstateFloatBtn" type="button" aria-label="Open Build &amp; Home" aria-expanded="false" data-mobile-label="Build &amp; Home"><span class="btnIcon">⌂</span><span class="btnText">Build &amp; Home</span></button>
+<div class="floatItems" data-menu-title="BUILD &amp; HOME">
+<div class="floatItem" id="fQuickBuild">🧱 Build with Blocks</div>
+<div class="floatItem" id="fRealEstate">⌂ Homes &amp; Property</div>
 </div>
 </div>
 
@@ -1405,7 +1423,7 @@ Explore the area
 <button id="memoryFlowerFloatBtn" title="Place Flower Memory">🌸</button>
 <div id="flowerActionMenu" aria-label="Flower Actions">
 <button id="flowerActionMemoryBtn" class="flowerActionOption" type="button">🌸 Place Memory Flower</button>
-<button id="flowerActionChallengeBtn" class="flowerActionOption danger" type="button">🔴 Find Red Flower</button>
+<button id="flowerActionChallengeBtn" class="flowerActionOption danger" type="button">🔴 Flower Sprint</button>
 <button id="flowerActionCloseBtn" class="flowerActionOption" type="button">Close</button>
 </div>
 <button id="gameShareFloatBtn" title="Share This Experience" aria-label="Share This Experience">
@@ -1426,21 +1444,12 @@ Explore the area
 </div>
 <aside id="blockBuilderPanel" aria-label="Build with Blocks" aria-hidden="true">
   <header class="blockBuilderHeader">
-    <strong>Quick Build</strong>
+    <strong>Build with Blocks</strong>
     <div class="blockBuilderHeaderActions">
-      <button id="blockBuilderClose" type="button" aria-label="Close Quick Build" title="Close Quick Build">×</button>
+      <button id="blockBuilderClose" type="button" aria-label="Close block builder" title="Close block builder">×</button>
     </div>
   </header>
-  <p class="blockBuilderTruthNote">Blocks persist in this virtual location on this device or in the current shared room. They never change OpenStreetMap, Overture, or real-world data.</p>
-  <section class="editableWorldBuildingTools" aria-label="Mapped building tools">
-    <strong>Mapped building</strong>
-    <div class="blockBuilderActions">
-      <button id="editableWorldSelectBuilding" type="button">Select Nearby</button>
-      <button id="editableWorldSuppressBuilding" type="button">Remove Virtually</button>
-      <button id="editableWorldRestoreBuilding" type="button">Restore</button>
-    </div>
-    <div id="editableWorldSelection" aria-live="polite">No mapped building selected.</div>
-  </section>
+  <p class="blockBuilderTruthNote">Choose a piece and color, then click or tap the world to place it. Choose Remove to erase a block, or Undo to correct your last action.</p>
   <div class="blockBuilderTools" role="group" aria-label="Build tool">
     <button type="button" data-block-tool="place">Place</button>
     <button type="button" data-block-tool="remove">Remove</button>
@@ -1455,11 +1464,22 @@ Explore the area
     <button id="blockBuilderClear" type="button">Clear</button>
     <button id="editableWorldReset" type="button">Restore Base World</button>
   </div>
+  <div id="blockBuilderCount"></div>
+  <p id="blockBuilderSaveState" class="blockBuilderTruthNote" aria-live="polite"></p>
+  <button id="blockBuilderJournal" type="button">View building records</button>
+  <section class="editableWorldBuildingTools" aria-label="Mapped building tools">
+    <strong>Mapped building</strong>
+    <div class="blockBuilderActions">
+      <button id="editableWorldSelectBuilding" type="button">Select Nearby</button>
+      <button id="editableWorldSuppressBuilding" type="button">Remove Virtually</button>
+      <button id="editableWorldRestoreBuilding" type="button">Restore</button>
+    </div>
+    <div id="editableWorldSelection" aria-live="polite">No mapped building selected.</div>
+  </section>
   <div class="blockBuilderMapActions">
     <a id="blockBuilderOsmLink" data-osm-location-link href="https://www.openstreetmap.org" target="_blank" rel="noopener noreferrer">Improve map in OSM</a>
     <button id="blockBuilderRefresh" type="button">Refresh map data</button>
   </div>
-  <div id="blockBuilderCount"></div>
   <div id="blockBuilderStatus" role="status" aria-live="polite"></div>
 </aside>
 <div id="controlsTab" aria-hidden="true"><div id="ctrlHeader" aria-expanded="false" aria-controls="ctrlContent">⚙️ Driving Mode ▼</div><div id="ctrlContent" class="hidden" aria-hidden="true">
@@ -1598,7 +1618,7 @@ Explore the area
 </div>
 
 <!-- Real Estate System -->
-<script type="module" src="js/app-shell-fragments.js?v=87"></script>
+<script type="module" src="js/app-shell-fragments.js?v=88"></script>
 <script type="module" src="js/app-auth-shell.js?v=87"></script>
 <script type="module" src="js/bootstrap.js?v=610"></script>
 </body></html>
