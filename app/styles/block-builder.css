@@ -121,6 +121,9 @@
     max-height: min(48vh, 420px);
     overscroll-behavior: contain;
   }
+  #blockBuilderPanel button, #blockBuilderPanel a { min-height: 44px; }
+  .blockBuilderSwatches { grid-template-columns: repeat(4, 44px); }
+  .blockBuilderSwatches button { width: 44px; }
   .blockBuilderShapes { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .editableWorldBuildingTools .blockBuilderActions { grid-template-columns: 1fr; }
 }

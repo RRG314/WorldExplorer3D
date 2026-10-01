@@ -1,15 +1,15 @@
 const APP_SHELL_FRAGMENT_HTML = `
-<button id="realEstateBtn" title="Open Real Estate">🏠</button>
-<div id="propertyPanel" aria-label="Real Estate">
+<button id="realEstateBtn" title="Open Homes & Property">🏠</button>
+<div id="propertyPanel" aria-label="Homes & Property">
   <div class="propertyHubHeader">
     <div>
       <span class="propertyHubEyebrow">YOUR PLACE IN THE WORLD</span>
-      <div class="panel-title">Real Estate</div>
+      <div class="panel-title">Homes & Property</div>
     </div>
-    <button class="panel-close" id="closePropertyPanelBtn" aria-label="Close Real Estate">×</button>
+    <button class="panel-close" id="closePropertyPanelBtn" aria-label="Close Homes & Property">×</button>
   </div>
   <div class="propertyHubBalance"><span>Explorer Wallet</span><strong id="propertyWalletBalance">$0</strong></div>
-  <div class="propertyHubTabs" role="tablist" aria-label="Real Estate sections">
+  <div class="propertyHubTabs" role="tablist" aria-label="Homes & Property sections">
     <button type="button" class="active" data-property-view="home">My Properties</button>
     <button type="button" data-property-view="nearby">Find a Property</button>
   </div>

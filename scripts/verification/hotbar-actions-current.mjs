@@ -119,7 +119,7 @@ async function clickMenuItem(page, buttonId, menuId, itemId) {
 async function verifyEarthActions(page) {
   const rootLabels = (await page.locator('#floatMenuContainer > .floatMenu:not(.contextualMenuControl) > .floatBtn .btnText').allTextContents())
     .map((label) => label.trim());
-  assert.deepEqual(rootLabels, ['Explore', 'Travel', 'Backpack', 'Community', 'Real Estate']);
+  assert.deepEqual(rootLabels, ['Explore', 'Travel', 'Backpack', 'Community', 'Build & Home']);
   mark('Hotbar roots', rootLabels.join(', '));
 
   if (resumeStage <= 0) {

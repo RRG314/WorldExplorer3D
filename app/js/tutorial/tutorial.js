@@ -1,13 +1,14 @@
+import { SANDBOX_PATHS, normalizeSandboxPath, resultMatchesSandboxPath } from './sandbox-paths.js?v=1';
 import { ambientNotices } from '../ui/ambient-notices.js';
 import { ctx as appCtx } from '../shared-context.js?v=55';
-import { createTutorialUi } from './ui.js?v=5';
-import { createCurrentJourneyUi } from './current-journey.js?v=4';
+import { createTutorialUi } from './ui.js?v=6';
+import { createCurrentJourneyUi } from './current-journey.js?v=5';
 import { panelIsVisiblyOpen, worldPresentationReady } from './visibility-contract.js?v=1';
 
-const STORAGE_KEY = 'worldExplorer3D.tutorialState.v5';
-const PREVIOUS_STORAGE_KEY = 'worldExplorer3D.tutorialState.v4';
+const STORAGE_KEY = 'worldExplorer3D.tutorialState.v6';
+const PREVIOUS_STORAGE_KEY = 'worldExplorer3D.tutorialState.v5';
 const LEGACY_STORAGE_KEY = 'worldExplorer3D.tutorialState.v3';
-const TUTORIAL_VERSION = 5;
+const TUTORIAL_VERSION = 6;
 const CORE_JOURNEY_ID = 'first-journey';
 const MOVE_TARGET_METERS = 6;
 
@@ -15,11 +16,12 @@ const STAGES = Object.freeze({
   MOVE: 'move',
   INTERACT: 'interact',
   EXPLORE: 'explore',
+  REVIEW: 'review',
   COMPLETE: 'complete'
 });
-const STAGE_ORDER = [STAGES.MOVE, STAGES.INTERACT, STAGES.EXPLORE, STAGES.COMPLETE];
-const STAGE_NUMBER = Object.freeze({ move: 1, interact: 2, explore: 3, complete: 3 });
-const CORE_STAGE_COUNT = 3;
+const STAGE_ORDER = [STAGES.MOVE, STAGES.INTERACT, STAGES.EXPLORE, STAGES.REVIEW, STAGES.COMPLETE];
+const STAGE_NUMBER = Object.freeze({ move: 1, interact: 2, explore: 3, review: 4, complete: 4 });
+const CORE_STAGE_COUNT = 4;
 
 function safeCall(fn, ...args) {
   if (typeof fn !== 'function') return undefined;
@@ -52,6 +54,8 @@ function defaultState() {
     startedAtMs: 0,
     completedAtMs: 0,
     analyticsBegan: false,
+    result: null,
+    selectedPath: '',
     contextSeen: {}
   };
 }
@@ -106,9 +110,11 @@ function normalizeState(input) {
       : ['explorer', 'activity', 'record', 'review', 'choose'].includes(legacyStage)
         ? STAGES.EXPLORE
         : STAGES.MOVE;
-  const stage = STAGE_ORDER.includes(input?.stage) ? input.stage : migratedStage;
+  const stage = input?.stage === STAGES.REVIEW && (!input?.result?.eventId || input.result.storage === 'session')
+    ? STAGES.EXPLORE : STAGE_ORDER.includes(input?.stage) ? input.stage : migratedStage;
   return {
     ...base,
+    selectedPath: normalizeSandboxPath(input?.selectedPath),
     enabled: input?.enabled !== false,
     mobileHintsConsent: input?.mobileHintsConsent === true,
     completed: input?.completed === true,
@@ -118,6 +124,7 @@ function normalizeState(input) {
     startedAtMs: Math.max(0, Number(input?.startedAtMs) || 0),
     completedAtMs: Math.max(0, Number(input?.completedAtMs) || 0),
     analyticsBegan: input?.analyticsBegan === true,
+    result: input?.result?.eventId && input.result.storage !== 'session' ? { eventId: String(input.result.eventId).slice(0, 260), name: String(input.result.name || 'Your result').slice(0, 120), storage: input.result.storage === 'session' ? 'session' : 'device' } : null,
     contextSeen: input?.contextSeen && typeof input.contextSeen === 'object' ? { ...input.contextSeen } : {}
   };
 }
@@ -126,7 +133,7 @@ function loadState() {
   try {
     const current = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
     if (current && typeof current === 'object') return normalizeState(current);
-    const previous = JSON.parse(localStorage.getItem(PREVIOUS_STORAGE_KEY) || 'null');
+    const previous = JSON.parse(localStorage.getItem(PREVIOUS_STORAGE_KEY) || localStorage.getItem('worldExplorer3D.tutorialState.v4') || 'null');
     if (previous && typeof previous === 'object') {
       return normalizeState(previous);
     }
@@ -144,7 +151,52 @@ function loadState() {
   return defaultState();
 }
 
+function updatePathGuide() {
+  const path = SANDBOX_PATHS[runtime.state.selectedPath];
+  document.querySelectorAll('[data-sandbox-path]').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.sandboxPath === runtime.state.selectedPath)));
+  const guide = document.getElementById('sandboxPathGuide');
+  if (!guide) return;
+  guide.hidden = !path;
+  if (!path) return;
+  document.getElementById('sandboxPathTitle').textContent = path.title;
+  const steps = document.getElementById('sandboxPathSteps');
+  steps.replaceChildren(...path.steps.map(text => { const item = document.createElement('li'); item.textContent = text; return item; }));
+  document.getElementById('sandboxPathNote').textContent = path.note;
+  document.getElementById('sandboxPathStart').textContent = runtime.state.stage === STAGES.REVIEW ? 'Review my result' : path.action;
+}
+
+function startSelectedPath() {
+  if (runtime.state.stage === STAGES.REVIEW && runtime.state.result) { openExplorerJournal(); return; }
+  const selected = runtime.state.selectedPath;
+  if (!runtime.state.completed) {
+    runtime.state.enabled = true;
+    runtime.state.skipped = false;
+    runtime.state.mobileHintsConsent = true;
+    setStage(STAGES.EXPLORE, 'direction_chosen');
+    saveState();
+  }
+  if (selected === 'build' || selected === 'together') {
+    appCtx.toggleWorldDiscoveryJournal?.(false);
+    document.getElementById(selected === 'build' ? 'fQuickBuild' : 'fMultiplayer')?.click();
+  } else {
+    document.getElementById('discoveryActionList')?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }
+}
+
+function updateJourneyEntry() {
+  updatePathGuide();
+  const entry = document.getElementById('discoveryFirstJourneyBtn');
+  if (!entry) return;
+  entry.hidden = runtime.state.completed;
+  const label = document.getElementById('discoveryFirstJourneyLabel');
+  const detail = document.getElementById('discoveryFirstJourneyDetail');
+  if (label) label.textContent = runtime.state.startedAtMs ? 'Continue First Journey' : 'Try First Journey';
+  if (detail) detail.textContent = runtime.state.stage === STAGES.REVIEW
+    ? 'Find your result in the Journal' : 'Optional · move, do something, keep a record';
+}
+
 function saveState() {
+  updateJourneyEntry();
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(runtime.state)); } catch { /* non-fatal */ }
 }
 
@@ -236,6 +288,10 @@ function openExplorer() {
 }
 
 function openExplorerJournal() {
+  for (const id of ['discoveryJournalCategory', 'discoveryJournalRegion']) {
+    const filter = document.getElementById(id);
+    if (filter) filter.value = 'all';
+  }
   if (appCtx.openWorldDiscoverySection?.('journal')) return;
   openExplorer();
   globalThis.requestAnimationFrame?.(() => document.querySelector('[data-discovery-tab="journal"]')?.click());
@@ -257,7 +313,7 @@ function presentCurrentStage() {
       body: touchControls
         ? 'Move a short distance with the left control. Use the right control to look around; action buttons change with what you are doing.'
         : `${moveKeys || 'WASD'} moves your explorer. Drag on the world with either mouse button to look, ${appCtx.getControlBindingLabel?.('modifier_action') || 'Shift'} runs, and ${appCtx.getControlBindingLabel?.('primary_action') || 'Space'} jumps. Arrow keys remain an alternate.`,
-      progress: 33,
+      progress: 25,
       expanded: false
     });
   } else if (runtime.state.stage === STAGES.INTERACT) {
@@ -270,17 +326,26 @@ function presentCurrentStage() {
         setStage(STAGES.EXPLORE, 'interaction_skipped');
         openExplorer();
       },
-      progress: 66,
+      progress: 50,
       expanded: false
     });
   } else if (runtime.state.stage === STAGES.EXPLORE) {
     showPrompt(STAGES.EXPLORE, {
-      title: 'Choose your next adventure',
-      body: 'You are ready. Drive the world, start nearby fieldwork, build, take to the water, or open Travel for aircraft and Space. Explorer keeps the deeper guides available when you want them.',
-      actionLabel: 'Open Explorer',
+      title: SANDBOX_PATHS[runtime.state.selectedPath]?.title || 'Choose your direction',
+      body: SANDBOX_PATHS[runtime.state.selectedPath]?.steps[1] || 'Open Today to explore, build, or play together. Choose one direction, finish an action, then review its result in your Journal. You can change direction or roam freely at any time.',
+      actionLabel: 'Open my walkthrough',
       onAction: openExplorer,
-      progress: 100,
+      progress: 75,
       expanded: false
+    });
+  } else if (runtime.state.stage === STAGES.REVIEW) {
+    showPrompt(STAGES.REVIEW, {
+      title: 'Find your result again',
+      body: `${runtime.state.result?.name || 'Your result'} is in your Journal. ${runtime.state.result?.storage === 'session' ? 'Browser storage is unavailable; this record lasts for this session only.' : 'The Journal stays in this browser on this device; signing in does not back up the full Journal.'}`,
+      actionLabel: 'View my Journal',
+      onAction: openExplorerJournal,
+      progress: 90,
+      expanded: true
     });
   }
 }
@@ -314,8 +379,10 @@ function completeTutorial(reason = 'path_chosen') {
   showPrompt('core_complete', {
     contextual: true,
     eyebrow: 'First Journey complete',
-    title: 'The whole world is open',
-    body: 'Drive, explore, build, fly, or follow an activity. Deeper guidance stays in Explorer and Controls, so play is not interrupted.',
+    title: 'Your first story is in the Journal',
+    body: 'Use a record’s Return to location action when available, try another nearby activity, or make something of your own in Build & Home.',
+    actionLabel: 'Choose another activity',
+    onAction: openExplorer,
     progress: 100,
     expanded: false,
     autoHideMs: 6500
@@ -347,10 +414,8 @@ function tutorialOnEvent(eventName, payload = {}) {
     runtime.movementOrigin = playerPosition();
     runtime.lastPosition = runtime.movementOrigin;
     presentCurrentStage();
-  } else if (['opened_explorer', 'opened_backpack', 'travel_mode_changed'].includes(name) && runtime.state.stage === STAGES.EXPLORE) {
-    completeTutorial('explorer_opened');
+
   } else if (name === 'build_mode_entered') {
-    if (runtime.state.stage === STAGES.EXPLORE) completeTutorial('build_mode_entered');
     showContextTip('building', {
       eyebrow: 'Building tip',
       title: 'Build in this world',
@@ -363,7 +428,6 @@ function tutorialOnEvent(eventName, payload = {}) {
       body: 'Create or join a room when you want company. Room roles decide who can edit or moderate shared work.'
     });
   } else if (name === 'entered_space') {
-    if (runtime.state.stage === STAGES.EXPLORE) completeTutorial('space_entered');
     showContextTip('space', {
       eyebrow: 'Spaceflight tip',
       title: 'Fly your own course',
@@ -373,15 +437,39 @@ function tutorialOnEvent(eventName, payload = {}) {
   if (payload?.forceStage && STAGE_ORDER.includes(payload.forceStage)) setStage(payload.forceStage, 'forced');
 }
 
-function onDiscoveryTelemetry(event) {
-  if (!runtime.initialized || !runtime.state.enabled || runtime.state.completed) return;
-  const type = String(event?.detail?.type || '');
-  if (type === 'activity_started' && runtime.state.stage === STAGES.EXPLORE) completeTutorial('activity_selected');
+const JOURNEY_RESULT_TYPES = new Set([
+  'discovery-recorded', 'specimen-collected', 'activity-completed',
+  'creation-saved', 'building-milestone', 'vehicle-route-completed', 'companion-befriended'
+]);
+
+function onExplorerResultSaved(event) {
+  if (!runtime.initialized || !runtime.state.enabled || runtime.state.completed || runtime.state.skipped) return;
+  const result = event?.detail;
+  if (!JOURNEY_RESULT_TYPES.has(result?.eventType) || !result?.eventId) return;
+  if (!resultMatchesSandboxPath(runtime.state.selectedPath, result)) return;
+  // Record the first earned result, never background world visits or menu opens.
+  if (runtime.state.result) return;
+  runtime.state.result = { eventId: String(result.eventId).slice(0, 260), name: String(result.name || 'Your result').slice(0, 120), storage: result.storage === 'session' ? 'session' : 'device' };
+  setStage(STAGES.REVIEW, 'result_recorded');
 }
 
-function onExplorerSectionOpened(event) {
-  if (!runtime.initialized || !runtime.state.enabled || runtime.state.completed) return;
-  if (runtime.state.stage === STAGES.EXPLORE && event?.detail?.section) completeTutorial('explorer_opened');
+function onExplorerRecordsVisible(event) {
+  if (!runtime.initialized || !runtime.state.enabled || runtime.state.completed || runtime.state.stage !== STAGES.REVIEW) return;
+  if (event?.detail?.eventIds?.includes(runtime.state.result?.eventId)) completeTutorial('record_reviewed');
+}
+
+function resumeFirstJourney() {
+  if (runtime.state.completed) return;
+  runtime.state.enabled = true;
+  runtime.state.skipped = false;
+  runtime.state.mobileHintsConsent = true;
+  runtime.state.startedAtMs ||= Date.now();
+  ambientNotices.reset('tutorial');
+  runtime.sessionPresented.delete(runtime.state.stage);
+  saveState();
+  appCtx.toggleWorldDiscoveryJournal?.(false);
+  if (runtime.state.stage === STAGES.REVIEW) openExplorerJournal();
+  else presentCurrentStage();
 }
 
 function onContextInteractionCompleted(event) {
@@ -511,6 +599,8 @@ function getTutorialSnapshot() {
     stage: runtime.state.stage,
     step: STAGE_NUMBER[runtime.state.stage] || CORE_STAGE_COUNT,
     steps: CORE_STAGE_COUNT,
+    result: runtime.state.result ? { ...runtime.state.result } : null,
+    selectedPath: runtime.state.selectedPath,
     distanceMoved: Number(runtime.state.distanceMoved.toFixed(2)),
     promptVisible: !!runtime.card && !runtime.card.hidden && getComputedStyle(runtime.card).display !== 'none',
     promptExpanded: !!runtime.card && !runtime.card.classList.contains('compact'),
@@ -539,14 +629,22 @@ function initTutorial(appContext = null) {
   };
   runtime.movementOrigin = playerPosition();
   runtime.lastPosition = runtime.movementOrigin;
-  runtime.discoveryListener = onDiscoveryTelemetry;
-  runtime.explorerSectionListener = onExplorerSectionOpened;
+  runtime.discoveryListener = onExplorerResultSaved;
+  runtime.explorerSectionListener = onExplorerRecordsVisible;
   runtime.interactionListener = onContextInteractionCompleted;
   runtime.bindingListener = onKeyboardBindingsChanged;
-  globalThis.addEventListener?.('we3d:discovery-telemetry', runtime.discoveryListener);
-  globalThis.addEventListener?.('we3d:explorer-section-opened', runtime.explorerSectionListener);
+  globalThis.addEventListener?.('we3d:explorer-result-saved', runtime.discoveryListener);
+  globalThis.addEventListener?.('we3d:explorer-records-visible', runtime.explorerSectionListener);
   globalThis.addEventListener?.('we3d:context-interaction-completed', runtime.interactionListener);
   globalThis.addEventListener?.('we3d:keyboard-bindings-changed', runtime.bindingListener);
+  document.getElementById('discoveryFirstJourneyBtn')?.addEventListener('click', resumeFirstJourney);
+  document.querySelectorAll('[data-sandbox-path]').forEach(button => button.addEventListener('click', () => {
+    runtime.state.selectedPath = normalizeSandboxPath(button.dataset.sandboxPath);
+    // Keep an earned receipt until it has been reviewed, even when changing direction.
+    saveState();
+  }));
+  document.getElementById('sandboxPathStart')?.addEventListener('click', startSelectedPath);
+  document.getElementById('sandboxPathClear')?.addEventListener('click', () => { runtime.state.selectedPath = ''; saveState(); hidePrompt(); });
   runtime.initialized = true;
   runtime.currentJourneyUi = createCurrentJourneyUi(appCtx, { getTutorialSnapshot });
 

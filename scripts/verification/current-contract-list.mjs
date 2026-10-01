@@ -1,5 +1,6 @@
 // Component and source-contract checks; browser and emulator journeys run separately.
 export const currentContractTests = [
+  'tests/sandbox-paths-current.test.mjs',
   'tests/building-foundation-current.test.mjs',
   'tests/earth-shared-material-retention-current.test.mjs',
   'tests/historic-building-semantics-current.test.mjs',
@@ -140,6 +141,7 @@ export const currentContractTests = [
   'tests/space-travel-session-current.test.mjs',
   'tests/space-quality-current.test.mjs',
   'tests/ship-ring-current.test.mjs',
+  'tests/ship-traversal-current.test.mjs',
   'tests/research-workbench-current.test.mjs',
   'tests/starter-companion-current.test.mjs',
   'tests/street-captured-overlap-current.test.mjs',

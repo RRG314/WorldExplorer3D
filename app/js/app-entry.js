@@ -34,8 +34,8 @@ import './sky.js?v=89';
 import './weather.js?v=12';
 import './runtime/on-demand-modes.js?v=52';
 import { installOnDemandEarth } from './runtime/on-demand-earth.js?v=193';
-import { installOnDemandBlockBuilder } from './runtime/on-demand-block-builder.js?v=10';
-import { installOnDemandFlowerChallenge } from './runtime/on-demand-flower-challenge.js?v=1';
+import { installOnDemandBlockBuilder } from './runtime/on-demand-block-builder.js?v=11';
+import { installOnDemandFlowerChallenge } from './runtime/on-demand-flower-challenge.js?v=2';
 import { installOnDemandLiveEarth } from './runtime/on-demand-live-earth.js?v=7';
 import { installOnDemandMars } from './runtime/on-demand-mars.js?v=1';
 import './planetary/solid-world-runtime.js?v=22';
@@ -51,7 +51,7 @@ import './hud.js?v=105';
 import './map.js?v=61';
 import { renderLoop } from './main.js?v=77';
 import './memory.js?v=55';
-import { setupUI } from './ui.js?v=172';
+import { setupUI } from './ui.js?v=174';
 import { initAccessibility } from './ui/accessibility.js?v=2';
 
 let _booted = false;
@@ -104,7 +104,7 @@ function registerPlatformServices() {
     platformServices.register({
         id: 'activity-discovery', category: 'discovery',
         load: async () => {
-            const mod = await import('./activity-discovery/session.js?v=8');
+            const mod = await import('./activity-discovery/session.js?v=9');
             mod.initActivityDiscovery?.();
             return mod;
         }
@@ -233,7 +233,7 @@ function scheduleTutorialInit() {
             if (started) return;
             started = true;
             try {
-                const mod = await import('./tutorial/tutorial.js?v=13');
+                const mod = await import('./tutorial/tutorial.js?v=15');
                 if (typeof mod.initTutorial === 'function') mod.initTutorial();
             } catch (error) {
                 console.warn('[boot] Tutorial init deferred import failed.', error);

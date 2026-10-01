@@ -115,7 +115,7 @@ export function createTutorialUi(options = {}) {
     wrap.innerHTML = `
       <span class="tutorial-settings-eyebrow">Learning</span>
       <h3>First Journey</h3>
-      <p>Three optional, learn-by-doing steps cover movement, one nearby interaction, and choosing an adventure. System tips appear once, only when you enter that system.</p>
+      <p>Four optional steps cover movement, a nearby interaction, completing something, and finding its record in your Journal. System tips appear once, only when you enter that system.</p>
       <label><input id="tutorialEnabledToggle" type="checkbox"> <span>Show First Journey and contextual tips</span></label>
       <div class="tutorial-settings-actions"><button id="tutorialRestartBtn" type="button">Replay First Journey</button></div>
       <div id="tutorialSettingsStatus" role="status"></div>

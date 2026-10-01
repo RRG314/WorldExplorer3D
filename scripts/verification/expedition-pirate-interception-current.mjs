@@ -39,7 +39,7 @@ async function prepareEncounter(page) {
       import('/app/js/expedition/model.js?v=12'),
       import('/app/js/expedition/hostile-interception.js?v=1'),
       import('/app/js/expedition/store.js?v=12'),
-      import('/app/js/expedition/runtime.js?v=51'),
+      import('/app/js/expedition/runtime.js?v=52'),
       import('/app/js/shared-context.js?v=55')
     ]);
     const plan = model.createExpeditionPlan({

@@ -44,13 +44,14 @@ export function buildRingDeck(THREE,deck,api) {
   const n=Math.ceil((end-start)/.04);
   for(let i=0;i<n;i++)wall(polar(radius,start+(end-start)*i/n),polar(radius,start+(end-start)*(i+1)/n),name,{...options,uvStart:radius*(start+(end-start)*i/n),uvLength:radius*(end-start)/n});
  }
+ const glass=api.material(0xa3d9eb,{transparent:true,opacity:.08,roughness:.12,depthWrite:false});
  const full=Math.PI*2;
  const windows=deck.rooms.filter(r=>['bridge','observation-gallery','local-craft-bay'].includes(r.id));
  const windowHalf=.16;
  for(let i=0;i<160;i++){
   const a=i*full/160,b=(i+1)*full/160,m=(a+b)/2;
   const window=windows.find(r=>Math.abs(Math.atan2(Math.sin(m-r.angle),Math.cos(m-r.angle)))<windowHalf+.02);
-  if(window){arc(ring.hullRadius,a,b,'window-sill',{height:.65});arc(ring.hullRadius,a,b,'window-header',{base:deckHeight-.4,height:.4});}
+  if(window){arc(ring.hullRadius,a,b,'window-sill',{height:.65});arc(ring.hullRadius,a,b,'pressure-window',{base:.65,height:deckHeight-1.05,material:glass});arc(ring.hullRadius,a,b,'window-header',{base:deckHeight-.4,height:.4});}
   else arc(ring.hullRadius,a,b,'circular-pressure-hull');
  }
  const spaceView=api.spaceView?.();
@@ -94,7 +95,7 @@ export function buildRingDeck(THREE,deck,api) {
   wall(left,right,`header:${room.id}`,{base:2.75,height:deckHeight-2.75});
   
   const panel=wall(left,right,`door:${room.id}`,{height:2.72,width:.14,material:trim});
-  doorStates.push({id:`door:${room.id}`,deckId:deck.id,roomId:room.id,label:`${room.label} pressure door`,...d,orientation:'radial',yaw:room.angle,open:false,panel,collider:colliders.pop(),targetY:1.36});
+  doorStates.push({id:`door:${room.id}`,deckId:deck.id,roomId:room.id,label:`${room.label} pressure door`,...d,orientation:'radial',yaw:room.angle,open:false,passable:false,panel,collider:colliders.pop(),targetY:1.36});
   const sign=api.label(room.label,api.accent(deck.id));
   const placard=new THREE.Mesh(new THREE.PlaneGeometry(2.5,.45),new THREE.MeshBasicMaterial({map:sign,side:THREE.DoubleSide}));
   placard.position.set(d.x*.987,3.12,d.z*.987);placard.rotation.y=room.angle+Math.PI;group.add(placard);

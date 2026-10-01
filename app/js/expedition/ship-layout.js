@@ -29,9 +29,9 @@ const ROOM_KIT_TEMPLATES = Object.freeze([
     { id: 'science-survey', roomId: 'science', label: 'Record stellar survey', x: -5.1, z: 0.5 },
     { id: 'sensor-scan', roomId: 'sensor-control', label: 'Configure sensor scan', x: 5.1, z: 0.5 },
     { id: 'analysis-review', roomId: 'analysis-data', label: 'Review observation evidence', x: -5.1, z: -14.5 },
-    { id: 'briefing-status', roomId: 'briefing', label: 'Review crew priorities', x: 3.7, z: -14.5 },
+    { id: 'briefing-status', roomId: 'briefing', label: 'Review crew priorities', x: 4.6, z: -14.5 },
     { id: 'generation-continuity', roomId: 'briefing', label: 'Review role continuity', x: 10.2, z: -9.2 },
-    { id: 'observation-view', roomId: 'observation-gallery', label: 'Observe local space', x: 0, z: -30 }
+    { id: 'observation-view', roomId: 'observation-gallery', label: 'Use observation screen', x: 0, z: -30 }
   ]),
   deck('habitat', 'Deck 2 · Habitat & Health', 'Habitat', [
     { id: 'galley-wardroom', label: 'Galley & Wardroom', side: 'full', minX: -12.4, maxX: 12.4, minZ: 24, maxZ: 35, systemId: 'food-production' },

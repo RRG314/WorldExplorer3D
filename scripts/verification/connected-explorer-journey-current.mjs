@@ -31,13 +31,14 @@ page.on('response', (response) => {
 });
 
 await context.addInitScript(() => {
+  localStorage.removeItem('worldExplorer3D.tutorialState.v6');
   localStorage.removeItem('worldExplorer3D.tutorialState.v5');
   localStorage.removeItem('worldExplorer3D.tutorialState.v4');
   localStorage.removeItem('worldExplorer3D.keyboardBindings.v1');
 });
 
 function tutorialState() {
-  return page.evaluate(() => JSON.parse(localStorage.getItem('worldExplorer3D.tutorialState.v5') || 'null'));
+  return page.evaluate(() => JSON.parse(localStorage.getItem('worldExplorer3D.tutorialState.v6') || 'null'));
 }
 
 async function hold(code, durationMs, modifiers = []) {
@@ -213,10 +214,10 @@ try {
   await page.screenshot({ path: `${evidenceDir}/03-context-action-priority-desktop.png` });
 
   await page.keyboard.press('KeyE');
-  await page.waitForFunction(() => JSON.parse(localStorage.getItem('worldExplorer3D.tutorialState.v5') || '{}').stage === 'explore', null, { timeout: 20_000 });
+  await page.waitForFunction(() => JSON.parse(localStorage.getItem('worldExplorer3D.tutorialState.v6') || '{}').stage === 'explore', null, { timeout: 20_000 });
   await page.evaluate(() => document.getElementById('fWorldDiscovery')?.click());
   await page.waitForSelector('#discoveryPanel.show', { timeout: 20_000 });
-  await page.waitForFunction(() => JSON.parse(localStorage.getItem('worldExplorer3D.tutorialState.v5') || '{}').completed === true, null, { timeout: 20_000 });
+  assert.equal((await tutorialState()).completed, false, 'Opening a menu cannot finish First Journey; result and Journal review are verified by sandbox-first-session.');
   await page.locator('#discoveryCloseBtn').click();
 
   const statusSemantics = await page.evaluate(() => ({
@@ -253,13 +254,13 @@ try {
     inputTiming: 'runtime-fixed-step; not rendering performance',
     renderQuality: process.env.CI ? 'low (normal Settings UI); functional tutorial only' : 'default',
     ok: browserErrors.length === 0 && failedLocalResources.length === 0,
-    journey: 'optional-first-journey-v5',
+    journey: 'optional-first-journey-v6-controls',
     checks: {
       controlsUiVisibleAndSaved: true,
       remappedKeyMovedLiveActor: true,
       tutorialUsesCurrentBindingLabel: /ZASD/.test(firstStepText || ''),
       tutorialStartsCompact: true,
-      tutorialHasThreeCoreSteps: finalState?.completed === true && finalState?.stage === 'complete',
+      tutorialAwaitsEarnedResult: finalState?.completed === false && finalState?.stage === 'explore',
       nearbyInteractionExplainedOnDemand: true,
       immediateActionHasVisualPriority: Object.values(promptPriority).every(Boolean),
       notificationsUsePoliteStatusSemantics: true,
@@ -286,7 +287,7 @@ try {
     } catch (error) {tutorialRuntime={error:String(error?.stack||error)};}
     return ({
     tutorialRuntime,
-    tutorial: JSON.parse(localStorage.getItem('worldExplorer3D.tutorialState.v5') || 'null'),
+    tutorial: JSON.parse(localStorage.getItem('worldExplorer3D.tutorialState.v6') || 'null'),
     elements: ['tutorialHintCard','urbanVehiclePrompt','interiorPrompt','boatPrompt','discoveryContextPrompt','controlsTab','ctrlContent','worldSelectionNotice','urbanEquipment'].map(id => {
       const element=document.getElementById(id);
       return {id, hidden:element?.hidden, classes:element?.className, display:element?getComputedStyle(element).display:null, text:element?.textContent?.slice(0,1000)};

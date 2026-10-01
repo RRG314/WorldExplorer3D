@@ -276,6 +276,19 @@ function setupUI() {
     appCtx.openWorldDiscoverySection(section);
   });
   document.getElementById('fWorldDiscovery')?.addEventListener('click', () => openExplorerSection('today'));
+  document.querySelectorAll('[data-pack-record]').forEach(button => button.addEventListener('click', () => {
+    appCtx.toggleUrbanEquipment?.(false);
+    openExplorerSection(button.dataset.packRecord);
+  }));
+  document.getElementById('sandboxNearbyActivities')?.addEventListener('click', () => {
+    appCtx.toggleWorldDiscoveryJournal?.(false);
+    appCtx.openActivityBrowser?.();
+  });
+  document.getElementById('sandboxHomes')?.addEventListener('click', () => {
+    appCtx.toggleWorldDiscoveryJournal?.(false);
+    document.getElementById('fRealEstate')?.click();
+  });
+
   document.getElementById('fExplorerJournal')?.addEventListener('click', () => openExplorerSection('journal'));
   document.getElementById('fExplorerGuide')?.addEventListener('click', () => openExplorerSection('guide'));
   document.getElementById('fExplorerProfile')?.addEventListener('click', () => openExplorerSection('profile'));
@@ -309,7 +322,7 @@ function setupUI() {
       if (!panel?.classList.contains('open')) document.getElementById('flowerChallengeToggleBtn')?.click();
     } catch (error) {
       console.error('[community-board] Could not open the board.', error);
-      appCtx.showToast?.('The Community Board is unavailable right now.');
+      appCtx.showToast?.('Rankings are unavailable right now.');
     }
   });
   document.getElementById('fSharePlace')?.addEventListener('click', () => {

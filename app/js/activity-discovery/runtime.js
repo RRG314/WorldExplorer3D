@@ -78,6 +78,7 @@ function markCompleted(activity = {}, durationMs = 0) {
     detail: firstCompletion ? 'First completion saved.' : `Completed again${durationMs > 0 ? ` in ${Math.max(1, Math.round(durationMs / 1000))} seconds` : ''}.`,
     activityId: key,
     localPosition: pose,
+    metadata: { shared: activity.sourceType === 'room_activity' },
     firstCompletion,
     points: firstCompletion ? 2 : 0,
     progressReason: firstCompletion ? 'first-activity-completion' : 'activity-replay'
