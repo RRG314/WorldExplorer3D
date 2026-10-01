@@ -13,6 +13,8 @@ The affected ship source at the start of this repair matched that release.
 - Opening a door previously removed collision before its panel cleared the player. Collision now follows the moving panel's clearance. A door cannot close onto the player or nearby crew.
 - Inspection found Earth building, vegetation, roof, block, and urban-obstacle queries could still participate in ship walking. These are isolated from the ship's local coordinate space. Interior ceilings now use the actual command/habitat/engineering ceiling height, and entering/changing decks clears cached floor support.
 
+- Packaged release verification additionally caught a CSS-loading focus race: the unopened observation dialog could briefly become focusable before its stylesheet arrived. It now uses explicit semantic hidden state on creation/close, and the Earth-boarding regression delays ship CSS to exercise that boundary.
+
 ## Observation gallery
 
 The gallery has a live viewing screen and a Views control. Players can select any of six exterior directions or 25 ship rooms, use Previous/Next, and close with the button or Escape. Interior feeds temporarily render the selected deck and restore scene visibility without moving the player or changing the active deck. Only the selected feed updates, at five frames per second, while the viewer is open or the player is in the gallery. Renderer state and resources are restored/released on close and ship exit. The selector groups rooms by deck and fits a 390 px viewport.
