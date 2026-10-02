@@ -112,19 +112,19 @@ async function ensureStarterCompanion(profileStore, options = {}) {
     });
   }
   if (profileStore.saveProfile && profile) {
-    await profileStore.saveProfile({
-      ...profile,
-      activeCompanionId: active?.instanceId || starter.instanceId,
+    await profileStore.saveProfile((current) => ({
+      ...current,
+      activeCompanionId: current.activeCompanionId || active?.instanceId || starter.instanceId,
       companionOnboarding: {
-        ...marker,
+        ...current.companionOnboarding,
         schemaVersion: 1,
         starterDogGranted: true,
         starterDogInstanceId: starter.instanceId,
         starterDogGrantedAt: Number(marker.starterDogGrantedAt) || starter.adoptedAt || now,
-        starterDogFirstNamedAt: Number(marker.starterDogFirstNamedAt) || 0,
-        primaryHomeId
+        starterDogFirstNamedAt: Number(current.companionOnboarding?.starterDogFirstNamedAt) || 0,
+        primaryHomeId: current.companionOnboarding?.primaryHomeId || primaryHomeId
       }
-    });
+    }));
   }
   return Object.freeze({ starter, created: !stored.some((entry) => entry.instanceId === starter.instanceId), activeInstanceId: active?.instanceId || starter.instanceId, primaryHomeId });
 }
@@ -212,8 +212,7 @@ async function createCompanionRuntime(appCtx, options = {}) {
     if (!result.renamed) return result;
     await profileStore.saveCompanion(result.companion);
     if (result.firstStarterNaming && profileStore.getProfile && profileStore.saveProfile) {
-      const profile = await profileStore.getProfile();
-      await profileStore.saveProfile({
+      await profileStore.saveProfile((profile) => ({
         ...profile,
         companionOnboarding: {
           ...(profile.companionOnboarding || {}),
@@ -221,7 +220,7 @@ async function createCompanionRuntime(appCtx, options = {}) {
           starterDogInstanceId: result.companion.instanceId,
           starterDogFirstNamedAt: result.companion.namedAt
         }
-      });
+      }));
     }
     await refresh();
     options.onRename?.(result.companion, result);
@@ -237,11 +236,10 @@ async function createCompanionRuntime(appCtx, options = {}) {
       .filter(Boolean);
     await Promise.all(updates.map((entry) => profileStore.saveCompanion(entry)));
     if (profileStore.getProfile && profileStore.saveProfile) {
-      const profile = await profileStore.getProfile();
-      await profileStore.saveProfile({
+      await profileStore.saveProfile((profile) => ({
         ...profile,
         companionOnboarding: { ...(profile.companionOnboarding || {}), primaryHomeId }
-      });
+      }));
     }
     await refresh();
     return primaryHomeId;

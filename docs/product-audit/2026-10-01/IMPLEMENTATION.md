@@ -64,3 +64,12 @@ Dismissal and brief-notice timing now follow objective identity rather than chan
 Validation: all **1,613 registered component tests passed**, no failed/skipped/TODO; source verification passed. Actual-source Space launch, Mars/Moon destination changes, dismissal, retained-completion fixture, action opening and Wayfinder course agreement passed with zero page exceptions. Screenshots inspected. Prescribed-client isolated objective fixture passed, screenshot/state inspected and no error artifact. Evidence: `output/verification/product-plan/`. The browser initially exposed a Wayfinder contradiction; it was repaired and the journey rerun successfully.
 
 Limits: no new mission, save authority, landing eligibility or physical-phone certification. P13 retains the deeper travel/landing work. P06 save/reward consistency is next. Production and preserved dist unchanged.
+
+
+## P06 — local profile consistency repaired; account/reconciliation work remains
+
+Replaced stale whole-profile preference writes with synchronous updates inside the latest profile transaction. This protects earned progression during tool, tutorial and companion updates; companion encounters merge against current storage. Memory-store stable-key validation now matches IndexedDB. See [SAVE-CONTRACT.md](SAVE-CONTRACT.md) for actual persistence boundaries and the remaining ordered gates.
+
+Validation: **1,616 component tests passed**, zero failed/skipped/TODO. Final focused save/starter/character and source checks passed after encounter merging. Two real browser IndexedDB tabs verified duplicate claims, concurrent preference updates, reload, backup replay and idempotent legacy migration with a retained backup (20 records, zero page exceptions). Prescribed-client storage fixture passed and screenshots inspected. Actual-source Space regression rerun passed. These are controlled local records, not authenticated account or cross-device certification.
+
+P06 remains open: durable account-scoped retries, paginated hydration, receipt association and cross-store recovery require implementation/verification. P07–P20 have not been started. No production deployment, backend change or player-data migration.

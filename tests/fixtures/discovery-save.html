@@ -1,0 +1,11 @@
+<!doctype html><html><meta charset="utf-8"><title>Discovery save verification</title><style>body{background:#09121e;color:#e5f0fa;font:18px/1.6 system-ui;padding:32px}pre{white-space:pre-wrap}</style>
+<h1>Local Journal save verification</h1><p>Controlled records in a disposable browser profile; no account service.</p><button id="record">Record sample and save preferences</button><pre id="state">Loading browser storage…</pre>
+<script type="module">
+import {createIndexedDbDiscoveryProfileStore} from '/app/js/discovery/profile-store.js';
+window.store=createIndexedDbDiscoveryProfileStore();
+window.sample=id=>({claimId:`claim:${id}`,catalogId:`rock:${id}`,activityId:'geology-inspect',family:'rock',regionId:'test',name:'Test rock'});
+window.refresh=async()=>{window.saved=await store.getProfile();document.querySelector('#state').textContent=JSON.stringify({records:saved.explorerProgress.totalRecords,points:saved.explorerProgress.points,tool:saved.equippedToolId,tutorials:saved.tutorials},null,2)};
+document.querySelector('#record').onclick=async()=>{await Promise.all([store.recordObservation(sample('sample')),store.saveProfile(p=>({...p,equippedToolId:'field-camera'})),store.saveProfile(p=>({...p,tutorials:{...p.tutorials,saveTest:true}}))]);await refresh()};
+window.render_game_to_text=()=>document.querySelector('#state').textContent;
+window.advanceTime=()=>Promise.resolve();await refresh();window.ready=true;
+</script></html>

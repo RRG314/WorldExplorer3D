@@ -104,6 +104,16 @@ function normalizeProfile(profile) {
   };
 }
 
+// Updaters run synchronously inside the read/write transaction against its
+// latest profile. UI preference changes must not overwrite intervening rewards.
+function resolveProfileUpdate(current, update) {
+  const next = typeof update === 'function' ? update(clone(current)) : update;
+  if (!next || typeof next !== 'object' || typeof next.then === 'function') {
+    throw new TypeError('Profile updates must return a synchronous profile object.');
+  }
+  return normalizeProfile({ ...next, characterState: next.characterState || current.characterState });
+}
+
 function requestPromise(request) {
   return new Promise((resolve, reject) => {
     request.onsuccess = () => resolve(request.result);
@@ -252,10 +262,7 @@ function createIndexedDbDiscoveryProfileStore(options = {}) {
       const transaction = db.transaction(['profiles'], 'readwrite');
       const store = transaction.objectStore('profiles');
       const current = normalizeProfile(await requestPromise(store.get(PROFILE_ID)));
-      const profile = normalizeProfile({
-        ...nextProfile,
-        characterState: nextProfile?.characterState || current.characterState
-      });
+      const profile = resolveProfileUpdate(current, nextProfile);
       store.put(profile);
       await transactionPromise(transaction);
       return clone(profile);
@@ -660,6 +667,8 @@ function createMemoryDiscoveryProfileStore(seed = {}) {
   const events = new Map((seed.events || []).map((entry) => [entry.eventId, clone(entry)]));
 
   async function recordDiscovery(record, policy = {}) {
+    if (!record?.claimId || !record?.catalogId) throw new TypeError('Discovery recording requires stable claim and catalog IDs.');
+    if (policy.collection === true && !record?.instanceId) throw new TypeError('Collected discoveries require a stable instance ID.');
     const collection = policy.collection === true;
     if (claims.has(record.claimId)) {
       const claim = claims.get(record.claimId);
@@ -735,7 +744,7 @@ function createMemoryDiscoveryProfileStore(seed = {}) {
     type: 'MemoryDiscoveryProfileStore',
     async getProfile() { return clone(profile); },
     async saveProfile(next) {
-      profile = normalizeProfile({ ...next, characterState: next?.characterState || profile.characterState });
+      profile = resolveProfileUpdate(profile, next);
       return clone(profile);
     },
     async hasClaim(claimId) { return claims.has(String(claimId)); },

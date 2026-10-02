@@ -1324,11 +1324,13 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
       updatedAt: Math.max(0, Number(entry.updatedAt) || Date.now())
     };
     state.companionEncounters.set(normalized.encounterId, normalized);
-    const current = await profileStore.getProfile();
-    const companionEncounters = [...state.companionEncounters.values()]
-      .sort((left, right) => Number(left.updatedAt || 0) - Number(right.updatedAt || 0))
-      .slice(-120);
-    await profileStore.saveProfile({ ...current, companionEncounters });
+    await profileStore.saveProfile((current) => {
+      const encounters = new Map((current.companionEncounters || []).map((record) => [record.encounterId, record]));
+      const previous = encounters.get(normalized.encounterId);
+      if (!previous || Number(previous.updatedAt || 0) <= normalized.updatedAt) encounters.set(normalized.encounterId, normalized);
+      return { ...current, companionEncounters: [...encounters.values()]
+        .sort((left, right) => Number(left.updatedAt || 0) - Number(right.updatedAt || 0)).slice(-120) };
+    });
     return normalized;
   };
   appCtx.recordExplorerEvent = state.recordExplorerEvent;
@@ -1650,8 +1652,7 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
     state.activeTutorialId = '';
     if (!tutorialId || state.tutorials[tutorialId]) return true;
     state.tutorials[tutorialId] = true;
-    const profile = await profileStore.getProfile();
-    await profileStore.saveProfile({ ...profile, tutorials: { ...profile.tutorials, [tutorialId]: true } });
+    await profileStore.saveProfile((profile) => ({ ...profile, tutorials: { ...profile.tutorials, [tutorialId]: true } }));
     return true;
   };
   state.equipTool = async (toolId, options = {}) => {
@@ -1672,7 +1673,8 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
     if (!equippedId || state.entitlements.canUseTool(equippedId).allowed !== true || equippedId === state.equippedToolId) return;
     state.equippedToolId = equippedId;
     state.applyCharacterCapability();
-    void profileStore.getProfile().then((profile) => profileStore.saveProfile({ ...profile, equippedToolId: equippedId }));
+    void profileStore.saveProfile((profile) => ({ ...profile, equippedToolId: equippedId }))
+      .catch((error) => console.warn('[world-discovery] Tool preference was not saved:', error?.message));
     void state.ui?.refreshData?.();
   });
   state.showToolHelp = async (toolId) => {
