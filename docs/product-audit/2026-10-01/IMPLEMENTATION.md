@@ -26,6 +26,20 @@ Both local and global interpolation reject null, nonnumeric and nonfinite contri
 - Extended real-source browser journey: all prior P01 cases plus admitted ocean with subsequent GEBCO outage; unknown depth evidence, procedural collision and submarine movement verified; 6 cases, zero page exceptions. Provider failure is deliberately injected.
 - Outage gameplay screenshot and rerun prescribed-client menu screenshot inspected. Prescribed client still has the known local uncredentialed AppCheck limitation; no authenticated-service claim.
 
+## P03 — sampled seabed map: implemented and focused checks passed
+
+Removed decorative sine-wave contours. The map now samples the collision seabed and draws 10 m gameplay contours with a north-up heading marker, scale bar and working zoom. Geographic missing-data areas are hatched, and modeled depth/datum are separate from simulated player depth. Submarine depth now uses the same world-unit conversion as its speed. The evidence sampler and collision sampler now use the same blend in both readiness states.
+
+Raster generation is cached and bounded to five updates per second while moving, reusing its canvas; marker movement is continuous. Provider/grid/site/zoom changes invalidate it immediately. Pointer zoom returns keyboard control to the game; keyboard activation retains accessibility focus. Clicking the ocean map gives its instructions instead of opening Earth map/teleport actions. A full-screen ocean chart is still a future capability, not an Earth chart presented as ocean navigation.
+
+Evidence:
+- Combined ocean/maritime focused batch: 20 passed.
+- Full registered current-contract suite: **1,600 passed; zero failed/skipped/TODO**. Component/source evidence, not full release certification.
+- Real-source browser journey: 7 cases passed, zero page exceptions; map zoom, actual turn heading, depth labels, collision/evidence agreement, wrong-Earth-map prevention and outage representation added to P01/P02 regression checks. Provider responses remain controlled fixtures.
+- Prescribed develop-web-game client against `tests/fixtures/ocean-navigation-map.html`: real map and seabed modules, partial missing-data grid, movement/turning, screenshot and text state inspected; no client error file. This isolated visual check supplements the actual application journey, not a substitute for it.
+- Source check passed after cache identity updates: 1,226 JS files parsed; no missing or duplicate module identities.
+- Gameplay map, zoom/heading, outage and isolated mixed-coverage screenshots inspected.
+
 ## Next
 
-P03: replace decorative bathymetry with the actual gameplay seabed map and explicit depth/source labels.
+P04: public capability truth inventory, persistence/ownership mapping and correction of unsupported claims. P05–P20 remain pending; the research ship, swimming/diving and asset upgrades have not been implemented by these foundation fixes. No production deployment has been performed.

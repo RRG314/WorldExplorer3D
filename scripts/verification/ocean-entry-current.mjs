@@ -56,6 +56,22 @@ try {
  assert.notEqual(report.after.ocean.position.z, report.before.ocean.position.z);
  assert.ok(report.after.ocean.speed > 0);
  report.cases.push({ id: 'coastal-water-entry-and-controls', passed: true });
+ const mapBefore = report.after.ocean.navigationMap;
+ assert.ok(mapBefore.widthMeters > 0);
+ assert.equal(mapBefore.headingDegrees, 180);
+ await page.locator('#minimapZoomIn').click();
+ await page.keyboard.down('ArrowLeft'); await page.waitForTimeout(700); await page.keyboard.up('ArrowLeft');
+ const turned = await page.evaluate(() => window.getOceanModeDebugState());
+ report.turned = turned;
+ assert.equal(turned.navigationMap.widthMeters, mapBefore.widthMeters / 2);
+ assert.ok(Math.abs(turned.navigationMap.headingDegrees - 180) > 1);
+ assert.ok(Math.abs(turned.navigationMap.gameplaySeabedWorldY - turned.seabed.presentationWorldY) < 1);
+ assert.match(await page.locator('#minimap').getAttribute('aria-label'), /North-up gameplay seabed/);
+ await page.screenshot({ path: `${dir}/seabed-map-zoom-heading.png` });
+ await page.locator('#minimap').click();
+ assert.equal(await page.evaluate(() => window.getWorldExplorerRuntimeDiagnostics().paused), false);
+ assert.equal(await page.locator('#largeMap').evaluate(el => el.classList.contains('show')), false);
+ report.cases.push({ id: 'sampled-map-zoom-heading-depth-labels', passed: true });
  const guard = await page.evaluate(async () => {
    const { ctx } = await import('/app/js/shared-context.js?v=55');
    const before = ctx.oceanMode.launchSite;
@@ -83,6 +99,9 @@ try {
  report.outageAfter = await page.evaluate(() => window.getOceanModeDebugState());
  assert.notEqual(report.outageAfter.position.z, outage.state.position.z);
  assert.ok(Number.isFinite(report.outageAfter.position.y));
+ assert.equal(report.outageAfter.navigationMap.geographicDepthMeters, null);
+ assert.equal(report.outageAfter.navigationMap.coverageFraction, 0);
+ assert.match(await page.locator('#minimap').getAttribute('aria-label'), /Depth data unknown/);
  await page.screenshot({ path: `${dir}/outage-playable.png` });
  report.cases.push({ id: 'provider-outage-preserves-playable-procedural-fallback', passed: true });
  assert.deepEqual(report.errors, []);

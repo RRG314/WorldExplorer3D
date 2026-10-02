@@ -241,6 +241,10 @@ function bindMapControls() {
   adjustLargeMapZoom(0);
 
   const openLargeMap = () => {
+    if (appCtx.oceanMode?.active) {
+      appCtx.showToast?.('Ocean seabed map: use + / − or scroll to zoom. Hatched areas have no geographic depth data.');
+      return false;
+    }
     resetLargeMapBrowsing();
     appCtx.clearControlInputState?.('large-map-open');
     appCtx.showLargeMap = true;
@@ -267,6 +271,7 @@ function bindMapControls() {
     });
     minimapCanvas.addEventListener('contextmenu', (event) => {
       event.preventDefault();
+      if (appCtx.oceanMode?.active) return;
       const point = canvasPointerPoint(minimapCanvas, event);
       const worldPos = appCtx.minimapScreenToWorld(point.x, point.y);
       appCtx.teleportToLocation(worldPos.x, worldPos.z, {
@@ -283,10 +288,12 @@ function bindMapControls() {
   minimapZoomInBtn?.addEventListener('click', (event) => {
     event.stopPropagation();
     adjustMinimapZoom(1);
+    if (event.detail > 0) event.currentTarget?.blur();
   });
   minimapZoomOutBtn?.addEventListener('click', (event) => {
     event.stopPropagation();
     adjustMinimapZoom(-1);
+    if (event.detail > 0) event.currentTarget?.blur();
   });
 
   mapClose?.addEventListener('click', closeLargeMap);

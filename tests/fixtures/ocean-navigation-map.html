@@ -1,0 +1,14 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>Ocean map verification fixture</title>
+<style>body{background:#071723;color:#e6f8fa;font:16px system-ui;padding:24px}canvas{width:450px;height:450px;image-rendering:auto}p{max-width:600px}</style>
+<h1>Ocean map verification fixture</h1><p>This fixture uses the application’s actual seabed and map modules. The northern grid sample is deliberately missing. Arrow keys move and turn the marker.</p><canvas id="minimap" width="150" height="150"></canvas>
+<script type="module">
+import {createOceanBathymetryApi} from '/app/js/ocean/bathymetry.js?v=5';
+import {drawOceanNavigationMap} from '/app/js/ocean/navigation-map.js?v=1';
+const app={SCALE:100000,METERS_PER_WORLD_UNIT:1.11,minimapZoom:15};
+const mode={launchSite:{lat:0,lon:-140},bathymetryReady:true,globalBathymetryGrid:{size:3,extent:900,values:[-80,null,-80,-80,-50,-80,-80,-80,-80]},submarine:{position:{x:0,y:-12,z:0},yaw:0}};
+const api=createOceanBathymetryApi({appCtx:app,oceanMode:mode,constants:{}});
+const keys=new Set();window.addEventListener('keydown',e=>keys.add(e.code));window.addEventListener('keyup',e=>keys.delete(e.code));
+window.advanceTime=async(ms)=>{mode.submarine.yaw+=(keys.has('ArrowLeft')?1:keys.has('ArrowRight')?-1:0)*ms/1000;mode.submarine.position.z+=(keys.has('ArrowUp')?1:0)*ms*.02;drawOceanNavigationMap(app,mode,api.sampleSeabedEvidence)};
+window.render_game_to_text=()=>JSON.stringify({scope:'isolated map presentation fixture',...mode.navigationMapSnapshot,position:mode.submarine.position});
+drawOceanNavigationMap(app,mode,api.sampleSeabedEvidence);
+</script></html>

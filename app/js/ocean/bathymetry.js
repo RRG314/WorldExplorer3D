@@ -328,7 +328,7 @@ export function createOceanBathymetryApi({
     const reefDx = x - 24;
     const reefDz = z - 124;
     const reefWeight = Math.exp(-(reefDx * reefDx + reefDz * reefDz) / 25000);
-    const bathymetryBlend = clamp01(0.52 * (1 - reefWeight * 0.44));
+    const bathymetryBlend = clamp01((oceanMode.bathymetryReady ? 0.52 : 0.3) * (1 - reefWeight * 0.44));
     return Object.freeze({
       bathymetry,
       presentationMode: 'procedural-bathymetry-blend',

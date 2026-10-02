@@ -20,7 +20,7 @@ import {
 import { createOceanFishLifeApi } from "./ocean/fish-life.js?v=2";
 import { createFishPopulationContext } from './fishing/population-authority.js?v=2';
 import { createOceanBathymetryApi } from "./ocean/bathymetry.js?v=5";
-import { updateOceanHud as updateOceanHudView } from "./ocean/hud.js?v=4";
+import { updateOceanHud as updateOceanHudView } from "./ocean/hud.js?v=5";
 import {
   commitEnvironment,
   exitCurrentEnvironmentSync,
@@ -366,7 +366,7 @@ function destroyOceanScene() {
 }
 
 function updateOceanHud(nowSeconds = 0) {
-  updateOceanHudView(appCtx, oceanMode, nowSeconds);
+  updateOceanHudView(appCtx, oceanMode, nowSeconds, sampleSeabedEvidence);
 }
 
 function normalizeOceanLaunchSite(site = null) {
@@ -714,6 +714,7 @@ function getOceanModeDebugState() {
   return {
     active: !!oceanMode.active,
     launchSite: { ...oceanMode.launchSite },
+    navigationMap: oceanMode.navigationMapSnapshot || null,
     seabed: sub.position ? sampleSeabedEvidence(sub.position.x, sub.position.z) : null,
     env: typeof appCtx.getEnv === 'function' ? appCtx.getEnv() : null,
     yaw: Number.isFinite(sub.yaw) ? sub.yaw : null,
