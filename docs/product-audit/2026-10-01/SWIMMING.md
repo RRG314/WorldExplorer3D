@@ -22,4 +22,15 @@ Full registered suite: 1,674 passing, zero failures/skips; source checks pass. L
 
 ## Still required before P08 is complete
 
-A complete ordinary shore-entry/exit journey across multiple body types, playable boat/ladder entry and boarding, on-foot exploration in the standalone Ocean environment, final fitted wetsuit/fins and animation/art review, and physical-touch/device acceptance remain. The research ship, moving deck, sub deployment, high-detail ocean ecology and full expedition progression are later delivery phases, not delivered by this controller. Do not describe P08 or the ocean overhaul as finished, or promote this source as a production release solely from the checks above.
+A complete ordinary shore-entry/exit journey across multiple body types, playable surface-boat/ladder entry and boarding, final fitted wetsuit/fins and animation/art review, and physical-touch/device acceptance remain. The research ship, moving deck, sub deployment, high-detail ocean ecology and full expedition progression are later delivery phases, not delivered by this controller. Do not describe P08 or the ocean overhaul as finished, or promote this source as a production release solely from the checks above.
+
+
+## Standalone Ocean diver continuation
+
+The existing Ocean scene now supports leaving a stopped submarine at 1–16 m simulated depth with at least 2 m of seabed clearance. The same licensed explorer, swimming controller, automatic scuba and resource rules run under the existing Ocean loop. The sub stays parked; the camera, actor contract, observed geographic coordinates, water patch and navigation map follow the diver. A SUB marker identifies the return point. Boarding is available within 8 m; explicit Recover returns aboard. Surface-boat transfers reject an active diver with a useful instruction. Scene teardown cancels/disposes owned avatar and UI resources.
+
+Camera probes keep the view outside the parked hull. Clicked boarding controls release keyboard focus so movement works immediately. Phone boarding, map and dive controls have separate space; boat notices no longer obscure dive buttons. Standalone dives are session-only; they do not use the Earth checkpoint or claim persistent sub/cargo ownership. Full launch/recovery persistence remains P10.
+
+Evidence: four focused admission/actor/location/transfer/camera component cases; the prescribed game client with actual licensed rig and shared controller in a controlled hull scene; eight actual-source Ocean browser cases for pause/air preservation, swim motion, parked sub continuity, blocked surface transfer, phone layout, boarding, Recover, deep-exit rejection and scene cleanup (some grouped in one case). The existing eleven-case Ocean entry/surface/re-dive journey also passes. Screenshots and state inspected; no page exceptions. Reports: `output/verification/ocean-plan/diver-browser.json`, `entry-browser.json` and `output/verification/product-plan/ocean-diver-client/`.
+
+Final continuation validation: **1,678 registered component tests pass**, zero failures/skips/TODO; source verification passes. Full log: `output/verification/product-plan/ocean-diver-full-contracts.log`.

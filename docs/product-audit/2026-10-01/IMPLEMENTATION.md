@@ -117,3 +117,10 @@ Validation: **1,660 component tests pass**, source verification passes, actual e
 Implemented real mapped-water traversal under the existing walking owner, swim/tread rig motion, automatically fitted scuba presentation, air/ascent rules, held touch controls, recovery, bounded local surface resume, mode/environment cleanup and underwater render presentation. The actual mapped-water walkthrough identified the prior 0.6 m bed limitation; broad bodies now use graded simulated gameplay relief while depth evidence remains independent. Terrain refinement and companion behavior respect swimming ownership. Quick Start now honestly describes Swimming as Limited.
 
 Evidence: 1,674 registered component tests pass, source checks pass, prescribed man/woman rig and water shader clients visually inspected, seven-case controller/reload browser, controlled full walking shore-entry/exit browser, and actual Earth mapped-water swimming/dive/mode-exit browser. See SWIMMING.md. Research ship, ladder/boat entry, standalone Ocean human travel and final marine art remain open; no phase-completion or production claim.
+
+
+## October 2 — P08 standalone Ocean diver
+
+Added existing-avatar swim control alongside the parked submarine, safe exit-depth/clearance admission, boarding range, explicit recovery and scene cleanup. Navigation/location/actor authority follows the explorer; the map retains the submarine marker. Surface transfer cannot abandon the diver. Browser/visual checks caught and fixed retained button focus, phone map/notice overlap and near-hull camera squeezing; Ocean pause now preserves motion and air.
+
+Validation: 1,678 registered component tests pass, source checks pass, eight actual Ocean diver cases and eleven existing Ocean entry/surface/re-dive cases pass. Prescribed client screenshots and state inspected. Standalone Ocean dives remain session-only and final suit/fins, surface-boat ladders and device/geographic acceptance remain unfinished. No production changes; P08 is not marked complete.

@@ -85,6 +85,7 @@ async function transferBoatToSubmarine(options = {}) {
 
 async function transferSubmarineToBoat(options = {}) {
   if (!appCtx.oceanMode?.active) return false;
+  if(appCtx.oceanMode.diver?.active){showBoatPrompt('Board the submarine or use Recover before switching to the surface boat.','notice',promptDurationMs);return false;}
   const launchSite = appCtx.oceanMode?.launchSite || {};
   const sub = appCtx.oceanMode?.submarine || {};
   if (!Number.isFinite(sub?.position?.x) || !Number.isFinite(sub?.position?.z) || !Number.isFinite(launchSite.lat) || !Number.isFinite(launchSite.lon)) {

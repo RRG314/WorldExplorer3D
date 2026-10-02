@@ -288,10 +288,12 @@ function syncBoatPromptState(force = false) {
     appCtx.boatMode.available = false;
     appCtx.boatMode.candidate = null;
     updateBoatMenuUi();
-    const promptSignature = 'ocean_surface_transfer';
+    const diving = appCtx.oceanMode.diver?.active === true;
+    const promptSignature = diving ? 'ocean_diver_return' : 'ocean_surface_transfer';
     if (force || _boatPromptSignature !== promptSignature) {
+      if (_boatPromptSignature !== promptSignature) hideBoatPrompt();
       _boatPromptSignature = promptSignature;
-      showBoatHint('Surface boat available in Travel', 'surface');
+      showBoatHint(diving ? 'Board submarine to switch to the surface boat' : 'Surface boat available in Travel', 'surface');
     }
     return null;
   }

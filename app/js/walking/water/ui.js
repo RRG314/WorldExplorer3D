@@ -1,7 +1,8 @@
-export function createSwimmingHud({recover}) {
+export function createSwimmingHud({recover,id='swimmingHud'}) {
   const panel=document.createElement('section');
-  panel.id='swimmingHud';panel.setAttribute('aria-label','Swimming');
+  panel.id=id;panel.setAttribute('aria-label','Swimming');
   Object.assign(panel.style,{position:'fixed',left:'50%',bottom:'calc(100px + env(safe-area-inset-bottom))',transform:'translateX(-50%)',zIndex:'120',maxWidth:'calc(100vw - 24px)',width:'340px',boxSizing:'border-box',padding:'10px 12px',borderRadius:'12px',background:'rgba(5,27,40,.94)',border:'1px solid #5896a9',color:'#f3fbff',font:'13px/1.4 system-ui',pointerEvents:'auto'});
+  const layoutStyle=document.createElement('style');layoutStyle.textContent=`body:has(#${id}:not([hidden])) #boatPrompt{bottom:calc(250px + env(safe-area-inset-bottom))}`;document.head.append(layoutStyle);
   const label=document.createElement('strong'),status=document.createElement('div'),controls=document.createElement('div');
   controls.style.cssText='display:flex;gap:8px;margin-top:8px';
   let held=0;
@@ -13,11 +14,11 @@ export function createSwimmingHud({recover}) {
       button.onpointerup=button.onpointercancel=button.onlostpointercapture=()=>{held=0};
       button.onkeydown=e=>{if(e.key===' '||e.key==='Enter'){e.preventDefault();held=value}};
       button.onkeyup=button.onblur=()=>{held=0};
-    } else button.onclick=recover;
+    } else button.onclick=()=>{button.blur();recover()};
     controls.append(button);
   }
   panel.append(label,status,controls);document.body.append(panel);panel.hidden=true;
-  return {dispose:()=>{held=0;panel.remove()},vertical:()=>held,hide:()=>{panel.hidden=true;held=0},show:state=>{
+  return {dispose:()=>{held=0;panel.remove();layoutStyle.remove()},vertical:()=>held,hide:()=>{panel.hidden=true;held=0},show:state=>{
     panel.hidden=false;
     const heading=state.recovering?(state.submerged?'Low air — returning to surface':'Low air — return to shore'):state.submerged?'Diving':'Swimming';
     if(label.textContent!==heading)label.textContent=heading;

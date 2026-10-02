@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "scope": "Local source capability descriptions; not production or full journey certification",
-  "registrySha256": "406d195617848cf174eb43a39ea136ecb7f5e8488d59f29cbf4a007df10448cc",
+  "registrySha256": "abb328f1911c075d09d99f4f7fe8ae6a0e8c2109766388fe1bdddae6c1c0c4c4",
   "owners": {
     "app/js/live-earth/registry.js": "6c6d3cec9fb3334434304083c2529b97da73eb967cd2edfaef1bc4a0b2cf3ee6",
     "app/js/map.js": "37f3289baf5e52eb6bb48c1fee61f037482226b57023ef71298cbd07955a1a8c",
@@ -14,8 +14,8 @@
     "app/js/physics.js": "c3e42b37830865a47a0e70b20a28ea16134ff0006854451dac4f5e3cf3134ebb",
     "app/js/travel-mode.js": "38dbb7260a048cda3fedaef55eb59d2d36dd81a71887fbbc7437ee9d3410ab24",
     "app/js/plane-mode.js": "594e615f10425a466b33ed0107cc9f03cd87410820756b6948fc07aea191ac19",
-    "app/js/boat-mode.js": "a9f15a4b7a87fedea34685480adf28b5cf838ed2dc6bc66b50b4224cbf621a9a",
-    "app/js/ocean.js": "f2caa132ff560c4e2d28482340fd4e54a2d59824120c97b4654d1350a192e22e",
+    "app/js/boat-mode.js": "baddc3fba8ddd3a3174aed56b4a356761ccd383f4e7ffacf09d3bc7e092b0f00",
+    "app/js/ocean.js": "eaa675356e4876a818195179547ddd201fd2c6363d5df44ae8126c6c04e4857d",
     "app/js/transport/maritime-runtime.js": "d433ff24ad1339353aa56e9e85d3053f4f2d26fb34ecdcc71cffab849aa8a9fe",
     "app/js/planetary/entry.js": "e9bff6f3010e48ca30b66581a44d4e79439b6ebb472d85204b4dd250aecfd78f",
     "app/js/planetary/mars-world.js": "24bfe06faf75e9c9ee87ed9155745fac9ddc1a5cd4aed9a2167eee0734ecfc45",
@@ -176,9 +176,9 @@
       "label": "Swimming & scuba diving",
       "group": "worlds",
       "status": "limited",
-      "summary": "In Earth Walking mode, enter mapped deep water to swim. Space rises; Shift dives. Scuba equips automatically. Touch Rise/Dive controls, low-air ascent and recovery are available. Ship ladders and on-foot exploration in standalone Ocean are still pending.",
+      "summary": "Enter mapped deep water in Earth Walking mode, or stop the Ocean submarine at 1–16 m simulated depth and choose Explore outside submarine. Scuba equips automatically. Space/Shift and Rise/Dive control depth; Recover returns to safety. Swim within 8 m to board the parked sub. Ship ladders are pending.",
       "owner": "app/js/walking.js",
-      "persistence": "A local checkpoint retains air and resumes at the revalidated surface in the same location for up to 24 hours. This is not cloud expedition or vessel persistence.",
+      "persistence": "Earth swimming retains air in a local surface checkpoint for up to 24 hours. Standalone Ocean dives last for the current session; board before leaving. Full expedition and vessel persistence is pending.",
       "acceptance": "Source-reviewed; complete current player-journey acceptance is still pending."
     },
     {

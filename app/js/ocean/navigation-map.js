@@ -59,7 +59,7 @@ export function drawOceanNavigationMap(appCtx, oceanMode, sample) {
   const ctx = canvas?.getContext?.('2d');
   if (!ctx || typeof sample !== 'function') return;
   const width = canvas.width, height = canvas.height;
-  const sub = oceanMode.submarine;
+  const sub = oceanMode.diver?.active?oceanMode.diver.navigationActor():oceanMode.submarine;
   const x = sub.position.x, z = sub.position.z;
   const units = Number(appCtx.METERS_PER_WORLD_UNIT) > 0 ? appCtx.METERS_PER_WORLD_UNIT : 1.11;
   const zoom = Math.max(11, Math.min(19, Number(appCtx.minimapZoom) || 15));
@@ -111,6 +111,11 @@ export function drawOceanNavigationMap(appCtx, oceanMode, sample) {
   ctx.fillStyle = '#fff'; ctx.strokeStyle = '#43dcf0'; ctx.lineWidth = 1.5;
   ctx.beginPath(); ctx.moveTo(0, -7); ctx.lineTo(5, 5); ctx.lineTo(0, 2); ctx.lineTo(-5, 5); ctx.closePath();
   ctx.fill(); ctx.stroke(); ctx.restore();
+  if(oceanMode.diver?.active){
+    const parked=oceanMode.submarine.position;
+    const px=width*(.5+(parked.x-cached.data.centerX)/(halfExtent*2)),py=height*(.5+(parked.z-cached.data.centerZ)/(halfExtent*2));
+    ctx.fillStyle='#ffc76b';ctx.fillRect(px-3,py-3,6,6);ctx.font='9px sans-serif';ctx.fillText('SUB',px+5,py+3);
+  }
   const evidence = sample(x, z);
   const depthKnown = evidence.bathymetry.truthType !== 'unknown';
   const sourceLabel = !depthKnown ? 'Depth data unknown' : evidence.bathymetry.sourceId?.includes('gebco') ? 'GEBCO modeled depth' : 'Terrain-derived depth';

@@ -1,3 +1,4 @@
+import { createOceanDiver } from './ocean/diver.js';
 import { refreshWaterEnvironmentEvidence } from './world/water-environment.js?v=2';
 import { createOceanWaterSurface } from './ocean/water-surface.js?v=1';
 import { hasOceanEntry } from "./ocean/entry-policy.js?v=1";
@@ -300,6 +301,7 @@ function createOceanScene() {
   oceanMode.fillLight = fillLight;
 
   rebuildOceanTerrainLayers(scene, renderer);
+  oceanMode.diver=createOceanDiver(appCtx,oceanMode,{sampleSeabedHeight,worldRadius:OCEAN_CONSTANTS.WORLD_RADIUS});
 
   primeLocalBathymetryGrid().then((ready) => {
     if (!ready || oceanMode.scene !== scene) return;
@@ -350,6 +352,8 @@ function getWorldCanvas() {
 }
 
 function destroyOceanScene() {
+  oceanMode.diver?.dispose();
+  oceanMode.diver=null;
   clearFishLife(oceanMode.scene);
   if (oceanMode.scene) {
     disposeObject3D(oceanMode.scene);
@@ -531,10 +535,10 @@ function animateOceanMode(nowMs = 0) {
   oceanMode.animationId = oceanSessionScope?.animationFrame(animateOceanMode) ?? null;
 
   if (!oceanMode.lastFrameMs) oceanMode.lastFrameMs = nowMs;
-  const dt = Math.min(0.05, Math.max(0.001, (nowMs - oceanMode.lastFrameMs) / 1000));
+  const dt = appCtx.paused ? 0 : Math.min(0.05, Math.max(0.001, (nowMs - oceanMode.lastFrameMs) / 1000));
   oceanMode.lastFrameMs = nowMs;
 
-  updateSubmarine(dt,nowMs*.001);
+  if(!oceanMode.diver?.update(dt,nowMs*.001))updateSubmarine(dt,nowMs*.001);
   oceanMode.waterSurface.update(nowMs*.001);
   if (typeof appCtx.refreshAstronomicalSky === 'function') {
     appCtx.refreshAstronomicalSky(false);
@@ -562,6 +566,7 @@ function startOceanMode(options = {}) {
   if (oceanMode.active) {
     if (options.launchSite && resetOceanLaunchSite(options.launchSite)) {
       oceanMode.waveOffset={x:Number(options.waveOffset?.x)||0,z:Number(options.waveOffset?.z)||0};
+      oceanMode.diver?.board(true);
       resetSubmarineAtLaunch(options.submarinePose || null);
       void refreshWaterEnvironmentEvidence();
       rebuildOceanTerrainLayers(oceanMode.scene, oceanMode.renderer);
@@ -731,6 +736,7 @@ function getOceanModeDebugState() {
     launchSite: { ...oceanMode.launchSite },
     navigationMap: oceanMode.navigationMapSnapshot || null,
     water: oceanMode.waterSample || null,
+    diver:oceanMode.diver?.snapshot() || null,
     seabed: sub.position ? sampleSeabedEvidence(sub.position.x, sub.position.z) : null,
     env: typeof appCtx.getEnv === 'function' ? appCtx.getEnv() : null,
     yaw: Number.isFinite(sub.yaw) ? sub.yaw : null,

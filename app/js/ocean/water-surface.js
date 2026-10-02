@@ -18,7 +18,8 @@ export function createOceanWaterSurface(ctx,mode,sampleSeabedEvidence) {
  }
  function update(time){
    body.waveOffset=mode.waveOffset || {x:0,z:0};
-   mesh.position.set(mode.submarine.position.x,.08,mode.submarine.position.z);
+   const focus=mode.diver?.active?mode.diver.navigationActor().position:mode.submarine.position;
+   mesh.position.set(focus.x,.08,focus.z);
    applyWaveUniformsToMaterial(material,buildBoatWaveProfile(material,undefined,time));
  }
  return {mesh,sample,update};

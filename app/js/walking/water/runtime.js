@@ -11,13 +11,13 @@ function sampleCharacterWater(x,z,candidate,options) {
   return body ? sampleDynamicWaterAt(x,z,body,options) : {coverage:'unresolved',surfaceY:null,volume:null};
 }
 
-export function createWalkingWaterRuntime({ctx,state,CFG,groundAt,moveVector,animate,sample=sampleCharacterWater,hudFactory=createSwimmingHud,resumeStore=createSwimResumeStore()}) {
+export function createWalkingWaterRuntime({ctx,state,CFG,groundAt,moveVector,animate,sample=sampleCharacterWater,hudFactory=createSwimmingHud,resumeStore=createSwimResumeStore(),environment='EARTH',checkpointEnabled=true,onRecover=null}) {
   let active=false, resources=createSwimState(), lastDry=null, hud=null;
   let lastBody=null, bodyPitch=0, resumeChecked=false, saveElapsed=0, checkpointSaved=false, checkpointAttempted=false, regionKey=null;
-  const checkpoint=()=>{if(active){checkpointAttempted=true;checkpointSaved=resumeStore.write(ctx.LOC,state.walker,resources);}};
+  const checkpoint=()=>{if(active&&checkpointEnabled){checkpointAttempted=true;checkpointSaved=resumeStore.write(ctx.LOC,state.walker,resources);}};
   globalThis.addEventListener?.('pagehide',checkpoint);
   function deactivate() {
-    if(active)resumeStore.clear();
+    if(active&&checkpointEnabled)resumeStore.clear();
     active=false;
     state.walker.swimming=null;
     state.walker.waterTraversal='dry';
@@ -30,6 +30,7 @@ export function createWalkingWaterRuntime({ctx,state,CFG,groundAt,moveVector,ani
   }
   function recover() {
     if(!active) return;
+    if(onRecover?.()===true)return;
     const walker=state.walker;
     // Revalidate the remembered bank; loading a different region must never
     // teleport an explorer onto an old, now unsupported coordinate.
@@ -47,11 +48,11 @@ export function createWalkingWaterRuntime({ctx,state,CFG,groundAt,moveVector,ani
     const w=state.walker;
     const nextRegion=Number.isFinite(ctx.LOC?.lat)&&Number.isFinite(ctx.LOC?.lon)?`${ctx.LOC.lat}:${ctx.LOC.lon}`:null;
     if(regionKey!==nextRegion){deactivate();lastDry=null;resources=createSwimState();resumeChecked=false;regionKey=nextRegion;}
-    if((ctx.getEnv && ctx.getEnv()!=='EARTH')||ctx.activeInterior||ctx.activePlanetaryBodyId||ctx.onMoon||ctx.onMars||ctx.boatMode?.active
+    if((ctx.getEnv && ctx.getEnv()!==environment)||ctx.activeInterior||ctx.activePlanetaryBodyId||ctx.onMoon||ctx.onMars||ctx.boatMode?.active
       ||ctx.liveGpsTranslationOwned?.()===true||ctx.urbanSandboxRuntime?.parachute?.skydiving===true) {
       deactivate();lastDry=null;return false;
     }
-    if(!resumeChecked && ctx.initialEarthWorldReady && Number.isFinite(ctx.LOC?.lat) && Number.isFinite(ctx.LOC?.lon)) {
+    if(checkpointEnabled && !resumeChecked && ctx.initialEarthWorldReady && Number.isFinite(ctx.LOC?.lat) && Number.isFinite(ctx.LOC?.lon)) {
       resumeChecked=true;
       const saved=resumeStore.read(ctx.LOC);
       if(saved) {
@@ -122,7 +123,7 @@ export function createWalkingWaterRuntime({ctx,state,CFG,groundAt,moveVector,ani
     saveElapsed+=step;
     if(saveElapsed>=2){checkpoint();saveElapsed=0;}
     w.swimming.checkpointSaved=checkpointSaved;
-    w.swimming.checkpointStatus=checkpointAttempted?(checkpointSaved?'saved':'session-only'):'pending';
+    w.swimming.checkpointStatus=!checkpointEnabled?'disabled':checkpointAttempted?(checkpointSaved?'saved':'session-only'):'pending';
     hud.show(w.swimming);
     return true;
   }

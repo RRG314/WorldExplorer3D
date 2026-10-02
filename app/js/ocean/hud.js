@@ -15,12 +15,14 @@ export function updateOceanHud(appCtx, oceanMode, nowSeconds = 0, sampleSeabedEv
   const indDrift = document.getElementById('indDrift');
   const conditionBar = document.getElementById('conditionBar');
   const conditionFill = document.getElementById('conditionFill');
-  const sub = oceanMode.submarine;
+  const diving=!!oceanMode.diver?.active;
+  const sub = diving?oceanMode.diver.navigationActor():oceanMode.submarine;
 
   const speedKnots = Math.abs(worldUnitsPerSecondToKnots(sub.speed, appCtx.METERS_PER_WORLD_UNIT));
   const metersPerUnit = Number(appCtx.METERS_PER_WORLD_UNIT) > 0 ? appCtx.METERS_PER_WORLD_UNIT : 1.11;
   const depth = Math.max(0, Math.round(((oceanMode.waterSample?.surfaceY ?? .08)-sub.position.y) * metersPerUnit));
-  const condition = Math.max(0, Math.min(1, Number(oceanMode.condition ?? sub.condition ?? 1)));
+  const air=diving?oceanMode.diver.snapshot().swimming?.airSeconds:null;
+  const condition = diving?Math.max(0,Math.min(1,(air??180)/180)):Math.max(0, Math.min(1, Number(oceanMode.condition ?? sub.condition ?? 1)));
   const conditionPct = Math.round(condition * 100);
 
   if (speedUnitLabel) speedUnitLabel.textContent = 'KTS';
@@ -30,7 +32,7 @@ export function updateOceanHud(appCtx, oceanMode, nowSeconds = 0, sampleSeabedEv
     speedEl.classList.remove('fast');
   }
   if (limitEl) limitEl.textContent = `${depth}m`;
-  if (streetEl) streetEl.textContent = 'Ocean Mode';
+  if (streetEl) streetEl.textContent = diving?'Ocean · Scuba explorer':'Ocean Mode';
   if (locationLineEl) {
     locationLineEl.style.display = '';
     locationLineEl.textContent = `${oceanMode.launchSite.name}, ${oceanMode.launchSite.region}`;
@@ -54,9 +56,9 @@ export function updateOceanHud(appCtx, oceanMode, nowSeconds = 0, sampleSeabedEv
     conditionFill.dataset.state = condition <= .25 ? 'critical' : condition <= .6 ? 'injured' : 'healthy';
   }
   if (conditionBar) {
-    conditionBar.setAttribute('aria-label', 'Submarine health');
+    conditionBar.setAttribute('aria-label', diving?'Dive air':'Submarine health');
     conditionBar.setAttribute('aria-valuenow', String(conditionPct));
-    conditionBar.title = `Submarine health · ${conditionPct}%`;
+    conditionBar.title = `${diving?'Dive air':'Submarine health'} · ${conditionPct}%`;
   }
   if (indBrake) {
     indBrake.textContent = 'ASC';
@@ -67,7 +69,7 @@ export function updateOceanHud(appCtx, oceanMode, nowSeconds = 0, sampleSeabedEv
     indBoost.classList.toggle('on', !!(appCtx.keys.ShiftLeft || appCtx.keys.ShiftRight || appCtx.keys.ControlLeft || appCtx.keys.ControlRight));
   }
   if (indDrift) {
-    indDrift.textContent = 'SUB';
+    indDrift.textContent = diving?'SWIM':'SUB';
     indDrift.classList.add('on');
   }
 }
