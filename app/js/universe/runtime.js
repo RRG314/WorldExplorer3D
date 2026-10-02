@@ -919,6 +919,7 @@ function initUniverseRuntime(scene) {
   setupUniverseInput();
   initDestinationMissionRuntime(appCtx);
   createUniverseNavigator({
+    getTravelSession: () => appCtx.getSpaceTravelSession?.(),
     onMission: (destinationId) => appCtx.openDestinationMission?.(destinationId),
     onSelection: setSelectedDestination,
     onTravel: travelToUniverseDestination,

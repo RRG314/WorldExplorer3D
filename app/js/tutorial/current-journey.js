@@ -31,6 +31,9 @@ function safeSnapshot(fn) {
 }
 
 function deriveFieldJourney(appCtx) {
+  const environment = appCtx.getEnv?.();
+  if (appCtx.oceanMode?.active || appCtx.spaceFlight?.active || appCtx.activeShipInterior
+    || appCtx.onMoon || appCtx.onMars || (environment && environment !== 'EARTH')) return null;
   const field = safeSnapshot(appCtx.worldDiscoveryRuntimeSnapshot);
   // Discovery owns its compact activity action and Today panel. Do not publish
   // a second tracking card for the same activity or ambient field lead.
@@ -45,10 +48,12 @@ function deriveFieldJourney(appCtx) {
       ? `${Math.ceil(distance)} m · ${Math.round(bearing)}°`
       : '';
     return {
+      identity: `field:${field.requestId || ''}:${field.activeActivityId || ''}:${phase}`,
+      owner: 'fieldwork',
       eyebrow: ready ? 'RESULT READY' : 'FIELD ACTIVITY',
       title: ready ? `Record ${text(field.interaction?.targetName, activity?.label || 'your finding')}` : text(activity?.label, 'Follow the field lead'),
       detail: ready ? 'Save the result to your Journal and Field Guide.' : text(field.interaction?.message, direction || 'Follow the world cue and continue the activity.'),
-      actionLabel: ready ? 'Record' : 'Resume',
+      actionLabel: ready ? 'Review finding' : 'Resume',
       action: () => appCtx.openWorldDiscoverySection?.('today')
     };
   }
@@ -58,6 +63,8 @@ function deriveFieldJourney(appCtx) {
     const distance = Number(next.distanceMeters);
     const route = Number.isFinite(distance) ? `${Math.ceil(distance)} m away` : 'Ready when you are';
     return {
+      identity: `nearby:${field.requestId || ''}:${next.id || next.targetLabel}`,
+      owner: 'fieldwork',
       eyebrow: 'NEARBY',
       title: text(next.targetLabel, 'Choose a nearby activity'),
       detail: `${route}. Open Today if you want to explore it.`,
@@ -70,13 +77,23 @@ function deriveFieldJourney(appCtx) {
 }
 
 function deriveSpaceJourney(appCtx) {
+  const environment = appCtx.getEnv?.();
+  const onSurface = appCtx.onMoon || appCtx.onMars || ['MOON', 'MARS', 'PLANETARY'].includes(environment);
+  if (appCtx.oceanMode?.active || (!appCtx.activeShipInterior && !appCtx.spaceFlight?.active && !onSurface)) return null;
   const expedition = safeSnapshot(appCtx.getInterstellarExpeditionSnapshot);
   const destinationMission = safeSnapshot(appCtx.getDestinationMissionSnapshot);
   const openExpedition = () => document.getElementById('sfExpeditionBtn')?.click();
   const podPhase = text(expedition?.podJourney?.phase);
-  if (podPhase && POD_PHASE_COPY[podPhase]) {
+  const podContextMatches = podPhase === 'surface' ? onSurface
+    : podPhase === 'recovered' ? !!appCtx.activeShipInterior
+    : podPhase === 'ship_launch' ? !!(appCtx.activeShipInterior || appCtx.spaceFlight?.active)
+    : !!appCtx.spaceFlight?.active;
+  if (podPhase && POD_PHASE_COPY[podPhase] && podContextMatches
+    && !(podPhase === 'recovered' && destinationMission?.phase === 'analysis' && destinationMission?.activeMissionId)
+    && !(podPhase === 'surface' && destinationMission?.atDestination && destinationMission?.activeMissionId)) {
     const [title, detail] = POD_PHASE_COPY[podPhase];
     return {
+      identity: `pod:${expedition?.id || ''}:${podPhase}`, owner: 'pathfinder',
       eyebrow: 'PATHFINDER JOURNEY', title, detail,
       actionLabel: appCtx.activeShipInterior ? 'Ship Map' : 'Wayfinder',
       action: () => appCtx.activeShipInterior ? appCtx.toggleExpeditionShipMap?.(true) : document.getElementById('universeToggle')?.click()
@@ -93,6 +110,14 @@ function deriveSpaceJourney(appCtx) {
         action: () => appCtx.toggleExpeditionShipMap?.(true)
       };
     }
+    if (destinationMission?.phase === 'analysis' && destinationMission?.activeMissionId) {
+      return {
+        identity: `destination:${destinationMission.activeMissionId}:analysis`, owner: 'destination-mission',
+        eyebrow: 'RESEARCH ANALYSIS', title: text(destinationMission.title, 'Analyze the returned fieldwork'),
+        detail: text(destinationMission.currentObjective, 'Review the returned evidence at the analysis station.'),
+        actionLabel: 'Mission', action: () => appCtx.openDestinationMission?.(destinationMission.destinationId)
+      };
+    }
     return {
       eyebrow: 'ABOARD SURVEYOR',
       title: expedition.state === 'completed' ? 'First Light mission complete' : expedition.state === 'planned' ? 'Prepare the Expedition' : `Continue toward ${titleCase(expedition.destinationId, 'the destination')}`,
@@ -101,12 +126,40 @@ function deriveSpaceJourney(appCtx) {
       action: () => appCtx.toggleExpeditionShipMap?.(true)
     };
   }
+  if (onSurface && destinationMission?.atDestination && destinationMission?.activeMissionId) {
+    return {
+      identity: `destination:${destinationMission.activeMissionId}:${destinationMission.phase}`,
+      owner: 'destination-mission', eyebrow: 'DESTINATION FIELDWORK',
+      title: text(destinationMission.title, 'Explore this destination'),
+      detail: text(destinationMission.currentObjective, 'Review the current field objective.'),
+      actionLabel: 'Mission',
+      action: () => appCtx.openDestinationMission?.(destinationMission.destinationId)
+    };
+  }
   if (!appCtx.spaceFlight?.active) return null;
+  const target = safeSnapshot(appCtx.getUniverseHudTarget);
+  const travel = safeSnapshot(appCtx.getSpaceTravelSession);
+  const course = target?.course || (travel?.active && travel.destination ? travel : null);
+  const courseJourney = () => ({
+    identity: `course:${course.destination.id || course.destination.name}`,
+    owner: 'wayfinder',
+    eyebrow: course.guidance === 'assisted' ? 'WAYFINDER ASSIST' : 'ACTIVE COURSE',
+    title: text(course.destination.name, 'Selected destination'),
+    detail: course.guidance === 'assisted'
+      ? 'Guidance is steering toward the selected course. Manual input remains available.'
+      : 'The course marker and flight display show the selected direction.',
+    actionLabel: 'Wayfinder', action: () => document.getElementById('universeToggle')?.click()
+  });
+  // A stored planned/completed voyage is history, not a replacement for the
+  // course the player selected now. Active interstellar travel retains priority.
+  if (course?.destination && !['traveling', 'arrived'].includes(expedition?.state)) return courseJourney();
   if (expedition?.state === 'completed') {
     return {
       eyebrow: 'MISSION SUCCESS',
       title: 'First Light: Proxima complete',
-      detail: `${Number(expedition.campaignResult?.totalPoints || 100)} total points. Review the report or continue in Free Space Flight.`,
+      detail: Number.isFinite(expedition.campaignResult?.totalPoints)
+        ? `${expedition.campaignResult.totalPoints} total points. Review the report or continue in Free Space Flight.`
+        : 'Review the completed mission report or continue in Free Space Flight.',
       actionLabel: 'Expedition',
       action: openExpedition
     };
@@ -149,18 +202,7 @@ function deriveSpaceJourney(appCtx) {
       action: openExpedition
     };
   }
-  const target = safeSnapshot(appCtx.getUniverseHudTarget);
-  const course = target?.course;
-  if (course?.destination) {
-    const assisted = course.guidance === 'assisted';
-    return {
-      eyebrow: assisted ? 'WAYFINDER ASSIST' : 'ACTIVE COURSE',
-      title: text(course.destination.name, 'Selected destination'),
-      detail: assisted ? 'Guidance is steering toward the selected course. Manual input remains available.' : 'The course marker and flight display show the selected direction.',
-      actionLabel: 'Wayfinder',
-      action: () => document.getElementById('universeToggle')?.click()
-    };
-  }
+  if (course?.destination) return courseJourney();
   return {
     eyebrow: 'SPACE FLIGHT',
     title: 'Choose a destination or fly freely',
@@ -168,6 +210,12 @@ function deriveSpaceJourney(appCtx) {
     actionLabel: 'Wayfinder',
     action: () => document.getElementById('universeToggle')?.click()
   };
+}
+
+function deriveCurrentJourney(appCtx) {
+  // Activities own their existing HUD and results. Do not compete with them.
+  if (appCtx.fishingGame?.open || appCtx.getGameplayRegistrySnapshot?.()?.activeId) return null;
+  return deriveSpaceJourney(appCtx) || deriveFieldJourney(appCtx);
 }
 
 function createCurrentJourneyUi(appCtx, options = {}) {
@@ -180,12 +228,15 @@ function createCurrentJourneyUi(appCtx, options = {}) {
   let currentAction = null;
   let elapsed = 1;
   let signature = '';
+  let identity = '';
   let dismissedSignature = '';
+  let snapshot = null;
+  appCtx.getCurrentJourneySnapshot = () => snapshot;
   let shownAt = 0;
 
   action?.addEventListener('click', () => currentAction?.());
   dismiss?.addEventListener('click', () => {
-    dismissedSignature = signature;
+    dismissedSignature = identity;
     if (card) card.hidden = true;
   });
 
@@ -194,22 +245,27 @@ function createCurrentJourneyUi(appCtx, options = {}) {
     if (elapsed < 0.25) return;
     elapsed = 0;
     const tutorial = options.getTutorialSnapshot?.() || null;
-    const hiddenForFirstJourney = tutorial?.enabled && !tutorial.completed && !tutorial.skipped && ['move', 'interact'].includes(tutorial.stage);
+    const teachingEarthMovement = !appCtx.spaceFlight?.active && !appCtx.activeShipInterior && !appCtx.onMoon && !appCtx.onMars
+      && (!appCtx.getEnv?.() || appCtx.getEnv() === 'EARTH');
+    const hiddenForFirstJourney = teachingEarthMovement && tutorial?.enabled && !tutorial.completed && !tutorial.skipped && ['move', 'interact'].includes(tutorial.stage);
     if (!worldPresentationReady(appCtx) || hiddenForFirstJourney) {
       if (card) card.hidden = true;
+      snapshot = null; currentAction = null;
       return;
     }
-    const journey = deriveSpaceJourney(appCtx) || deriveFieldJourney(appCtx);
+    const journey = deriveCurrentJourney(appCtx);
     // Nearby suggestions remain discoverable in Today. On a phone only an
     // activity the player actually started earns an in-game tracking card.
     if (!journey || (journey.transient && appCtx.isLikelyMobileDevice?.())) {
       if (card) card.hidden = true;
+      snapshot = null; currentAction = null;
       return;
     }
+    const nextIdentity = `${appCtx.getEnv?.() || ''}|${journey.identity || [journey.eyebrow, journey.title, journey.actionLabel].join('|')}`;
+    if (nextIdentity !== identity) { identity = nextIdentity; shownAt = Date.now(); }
     const nextSignature = [journey.eyebrow, journey.title, journey.detail, journey.actionLabel].join('|');
     if (nextSignature !== signature) {
       signature = nextSignature;
-      shownAt = Date.now();
       if (eyebrow) eyebrow.textContent = journey.eyebrow;
       if (title) title.textContent = journey.title;
       if (detail) detail.textContent = journey.detail;
@@ -219,7 +275,10 @@ function createCurrentJourneyUi(appCtx, options = {}) {
     const preferredVisibleMs = globalThis.getWorldExplorerAccessibilityNoticeMs?.(AMBIENT_JOURNEY_VISIBLE_MS)
       ?? AMBIENT_JOURNEY_VISIBLE_MS;
     const expired = journey.transient === true && Number.isFinite(preferredVisibleMs) && Date.now() - shownAt >= preferredVisibleMs;
-    if (card) card.hidden = dismissedSignature === signature || expired;
+    if (card) card.hidden = dismissedSignature === identity || expired;
+    snapshot = { identity, owner: journey.owner || 'space-expedition', title: journey.title,
+      detail: journey.detail, actionLabel: journey.actionLabel, transient: journey.transient === true,
+      dismissed: dismissedSignature === identity, expired, visible: card?.hidden === false };
   }
 
   return Object.freeze({ update });
@@ -229,6 +288,7 @@ export {
   AMBIENT_JOURNEY_RADIUS_METERS,
   AMBIENT_JOURNEY_VISIBLE_MS,
   createCurrentJourneyUi,
+  deriveCurrentJourney,
   deriveFieldJourney,
   deriveSpaceJourney
 };

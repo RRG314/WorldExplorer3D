@@ -1,6 +1,9 @@
 import { distanceLightYears, getUniverseDestinations } from './catalog.js?v=11';
 import { getDestinationMission } from './mission-catalog.js?v=3';
 
+let latestNavigatorState = null;
+let readTravelSession = () => null;
+
 const CLASS_LABELS = Object.freeze({
   planetary_system: 'Star Systems',
   nebula: 'Nebulae',
@@ -112,6 +115,7 @@ function syncDestinationSelect(select) {
 }
 
 function createUniverseNavigator(handlers) {
+  readTravelSession = handlers.getTravelSession || (() => null);
   let panel = document.getElementById('universeNavigator');
   if (panel) return panel;
 
@@ -203,6 +207,9 @@ function createUniverseNavigator(handlers) {
     closeUniverseNavigator();
   });
 
+  globalThis.addEventListener?.('we3d:space-travel-session', () => {
+    if (latestNavigatorState) updateUniverseNavigator(latestNavigatorState);
+  });
   ensureUniverseToggle();
   return panel;
 }
@@ -244,6 +251,7 @@ function setUniverseSelection(entity) {
 }
 
 function updateUniverseNavigator(state) {
+  latestNavigatorState = state;
   const panel = document.getElementById('universeNavigator');
   if (!panel || !state?.current) return;
   panel.querySelector('#universeFrameName').textContent = state.current.name;
@@ -253,7 +261,10 @@ function updateUniverseNavigator(state) {
   if (!state.transition && select.value !== state.selected?.id) select.value = state.selected?.id || state.current.id;
   setUniverseSelection(state.selected || state.current);
 
-  const course = state.course;
+  const travelSession = readTravelSession();
+  const localCourse = state.current.id === 'sol' && !state.transition && travelSession?.active && travelSession.destination
+    ? travelSession : null;
+  const course = state.course || localCourse;
   const readout = panel.querySelector('#universeCourseReadout');
   const status = readout.querySelector('.universe-course-status');
   const title = readout.querySelector('strong');
@@ -263,7 +274,9 @@ function updateUniverseNavigator(state) {
     readout.classList.add('has-course');
     status.textContent = isTransit ? 'COURSE ENGAGED' : 'COURSE ACTIVE';
     title.textContent = course.destination.name;
-    detail.textContent = course.destination.objectClass === 'exoplanet'
+    detail.textContent = course === localCourse
+      ? `Solar System course · ${course.guidance === 'assisted' ? 'flight assist engaged' : 'manual flight'} · flight HUD linked`
+      : course.destination.objectClass === 'exoplanet'
       ? `Orbital approach via ${course.frame.name} · marker and flight HUD linked`
       : `${course.frame.address} · flight HUD linked`;
   } else {

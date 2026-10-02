@@ -42,7 +42,7 @@ Evidence:
 
 ## Next
 
-P04: public capability truth inventory, persistence/ownership mapping and correction of unsupported claims. P05–P20 remain pending; the research ship, swimming/diving and asset upgrades have not been implemented by these foundation fixes. No production deployment has been performed.
+P04–P05 are now implemented below. P06–P20 remain pending; the research ship, swimming/diving and asset upgrades have not been implemented by these foundation fixes. No production deployment has been performed.
 
 ## P04 — capability inventory and player guidance: implemented and focused checks passed
 
@@ -53,3 +53,14 @@ Corrected virtual dive tool/activity and Marine Surveyor descriptions, submarine
 Validation: 20 focused capability/discovery/character component tests passed; source check passed; actual Quick Start desktop and 390×844 touch-context search/filter/empty-state/layout checks passed with zero page exceptions. Prescribed-client capability presentation fixture passed without client errors. Desktop, phone and fixture screenshots inspected. Evidence: `output/verification/product-plan/`.
 
 Next: P05, objective/navigation coherence. Production remains `5.4.0+1532bdfbb5c1.319d215f60318297.production`, freshly read October 2. No deployment.
+
+
+## P05 — current objective and navigation coherence: implemented and checked
+
+Current guidance is scoped to the active world, so retained pod/expedition history cannot publish space instructions on Earth or in the ocean. Current Solar System and deep-space courses outrank inactive voyage history; active transit retains priority. Surface fieldwork and returned analysis use the destination mission's actual objective and open that mission. Earth movement onboarding does not suppress space guidance. Activity-owned HUDs keep priority.
+
+Dismissal and brief-notice timing now follow objective identity rather than changing distance text. Reviewing a finding no longer uses a button that implies it saves the finding. Completed reports retain zero scores and never invent a default 100 points. Read-only diagnostics expose the derived objective for verification. Wayfinder now reads the active Solar System travel session rather than contradicting its HUD with “No course set.” Existing Explore/Build/Together and game entry paths remain.
+
+Validation: all **1,613 registered component tests passed**, no failed/skipped/TODO; source verification passed. Actual-source Space launch, Mars/Moon destination changes, dismissal, retained-completion fixture, action opening and Wayfinder course agreement passed with zero page exceptions. Screenshots inspected. Prescribed-client isolated objective fixture passed, screenshot/state inspected and no error artifact. Evidence: `output/verification/product-plan/`. The browser initially exposed a Wayfinder contradiction; it was repaired and the journey rerun successfully.
+
+Limits: no new mission, save authority, landing eligibility or physical-phone certification. P13 retains the deeper travel/landing work. P06 save/reward consistency is next. Production and preserved dist unchanged.
