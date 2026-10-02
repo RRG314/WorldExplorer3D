@@ -10,6 +10,7 @@ function createWalkingRuntimeHelpers({
   carMesh,
   clampPointInsideFootprint,
   createCharacterMesh,
+  deactivateWater,
   finiteOr,
   getSafeDriveY,
   getWalkGroundY,
@@ -84,6 +85,7 @@ function createWalkingRuntimeHelpers({
       return;
     }
 
+    deactivateWater?.();
     const wasWalk = state.mode === "walk";
     state.mode = "drive";
     state.walker._resolvedGroundState = null;
@@ -208,7 +210,8 @@ function createWalkingRuntimeHelpers({
     const pitchBackScale = Math.max(0.46, Math.cos(walker.pitch));
     const camX = walker.x - Math.sin(cameraYaw) * pitchBackScale * back;
     const camZ = walker.z - Math.cos(cameraYaw) * pitchBackScale * back;
-    const camY = baseY + up - Math.sin(walker.pitch) * back * 0.42;
+    const swim = state.walker.swimming;
+    const camY = swim?.submerged ? Math.min(swim.surfaceY-.25,baseY+.65) : baseY + up - Math.sin(walker.pitch) * back * 0.42;
 
     let resolvedCamX = camX;
     let resolvedCamZ = camZ;
@@ -218,7 +221,7 @@ function createWalkingRuntimeHelpers({
       resolvedCamZ = clamped.z;
     }
 
-    const cameraAnchor = { x: walker.x, y: tunnelEnvelope.inside ? baseY : baseY + 1.35, z: walker.z };
+    const cameraAnchor = { x: walker.x, y: tunnelEnvelope.inside || swim?.submerged ? baseY : baseY + 1.35, z: walker.z };
     let collisionSafeCamera = resolveThirdPersonCameraCollision({
       anchor: cameraAnchor,
       target: { x: resolvedCamX, y: camY, z: resolvedCamZ },

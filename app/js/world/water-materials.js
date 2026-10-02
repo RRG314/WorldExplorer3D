@@ -46,6 +46,7 @@ function getWaterOpticsSnapshot() {
 
 export function registerWaterWaveMaterial(material, options = {}) {
   if (!material || material.userData?.weWaterWavePatched || typeof THREE === 'undefined') return material;
+  material.side = THREE.DoubleSide;
   const waveScale = Number.isFinite(options.waveScale) ? options.waveScale : 1;
   const waveBase = Number.isFinite(options.waveBase) ? options.waveBase : 1;
   const visualBase = Number.isFinite(options.visualBase) ? options.visualBase : 1;
@@ -178,6 +179,7 @@ diffuseColor.rgb += vec3(0.045, 0.062, 0.078) * (weFoamBands * 0.4 + weWhitecapB
 diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.88, 0.93, 0.98), clamp(weWhitecapBands * 0.18, 0.0, 0.22));
 // WE_WATER_COLOR_EXTENSION
 diffuseColor.rgb *= mix(1.0, 0.58, clamp(weWaterNight, 0.0, 1.0));
+if (!gl_FrontFacing) diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.025, 0.12, 0.16), 0.75);
 if (weWaveEdgeFade > 0.0) {
   float weEdge = min(min(vWePatchUv.x, 1.0 - vWePatchUv.x), min(vWePatchUv.y, 1.0 - vWePatchUv.y));
   float wePatchMask = smoothstep(0.0, weWaveEdgeFade, weEdge);

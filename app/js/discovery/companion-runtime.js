@@ -356,6 +356,7 @@ async function createCompanionRuntime(appCtx, options = {}) {
 
   function update(actor, dt, mode = 'walk', environment = 'EARTH') {
     if (disposed || !presentation) return;
+    if(mode === 'walk' && appCtx.Walk?.state?.walker?.swimming) mode = 'swim';
     const policy = resolveCompanionTravelPolicy(active, mode, environment);
     travelState = policy.state;
     presentation.group.visible = policy.visible;

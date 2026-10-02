@@ -20,3 +20,13 @@ test('known sea-level and inland lake surfaces retain their datum and never rais
  assert.equal(waterTerrainBedY({surfaceY:1500},0,0,1501,20),1499.4);
  assert.equal(waterTerrainBedY({surfaceY:1500},0,0,1480,20),1480);
 });
+test('mapped broad water has graded gameplay depth without claiming bathymetry',()=>{
+ const ring=[{x:0,z:0},{x:200,z:0},{x:200,z:200},{x:0,z:200}];
+ const lake=normalizeWaterBody({pts:ring,surfaceY:100,kindHint:'lake'});
+ assert.equal(waterTerrainBedY(lake,0,100,100,0),100);
+ const near=waterTerrainBedY(lake,5,100,100,5),deep=waterTerrainBedY(lake,100,100,100,100);
+ assert.ok(near>99);assert.equal(deep,88);assert.equal(lake.depthEvidence.truthType,'unknown');
+ assert.equal(waterTerrainBedY(lake,100,100,70,100),70);
+ const pool=normalizeWaterBody({pts:ring.map(p=>({x:p.x*.05,z:p.z*.05})),surfaceY:100});
+ assert.ok(waterTerrainBedY(pool,5,5,100,5)>99.4);
+});

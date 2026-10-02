@@ -33,3 +33,8 @@ P08–P12 swimming, automatic equipment, moving research-ship deck, persistent s
 - The full Earth backup walkthrough exposed a regression in the preceding shoreline edit: a buffered footprint query referred to an undefined candidate. Corrected it to use the actual area; the mapped-vessel startup path has a dedicated regression and now completes in the actual Earth application.
 
 Evidence: actual Earth backup/reload/Undo and phone layout; actual Ocean eleven-case browser journey, inspected settled-boat and upper-water-boundary screenshots; numerical body-profile/wake/phase/current/immersion tests; prescribed shader client with inspected CPU markers. These qualify the implemented development boundaries. They do not certify a finished underwater art pack, real tides, physical-phone performance, swimming or moving ship decks. P08/P09 still must exercise these samples through actual character and attachment controllers. The remaining higher-level boundary acceptance is tracked in those phases rather than treating a pure sample helper as completed swimming.
+
+
+### Character integration continuation
+
+P08 now exercises the volume and wave sample through actual Earth walking, wading, swimming and diving. The loaded Baltimore check found the shallow terrain-cut limitation. Broad detailed water bodies now receive a graded, capped gameplay bed through the existing terrain-mesh/contact owner; this never changes unknown geographic depth into a measurement. Small pools and varying river datums retain their constraints. The water surface renders from below, and a render-scoped immersion presentation restores the weather state after drawing. See SWIMMING.md for verified behavior and remaining ship/standalone-Ocean boundaries.

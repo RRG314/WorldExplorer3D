@@ -8,6 +8,7 @@ import { createWalkingTerrainHelpers } from "./walking/terrain.js?v=5";
 const DEFAULT_WALKING_SPEEDS = Object.freeze({ walk: 2.8, run: 5.6 });
 
 function createWalkingModule(opts) {
+  appCtx.Walk?.disposeWater?.();
   const {
     THREE,
     scene,
@@ -64,7 +65,7 @@ function createWalkingModule(opts) {
     syncCarFromWalker,
     syncWalkerFromCar
   } = createWalkingTerrainHelpers({ car, state, CFG });
-  const { resolveWalkGroundState, updateWalkPhysics } = createWalkingPhysicsHelpers({
+  const { resolveWalkGroundState, updateWalkPhysics, deactivateWater, disposeWater } = createWalkingPhysicsHelpers({
     CFG,
     animateCharacterWalk,
     getBuildingsArray,
@@ -88,6 +89,7 @@ function createWalkingModule(opts) {
     carMesh,
     clampPointInsideFootprint,
     createCharacterMesh,
+    deactivateWater,
     finiteOr,
     getSafeDriveY,
     getWalkGroundY,
@@ -105,13 +107,16 @@ function createWalkingModule(opts) {
   return {
     state,
     CFG,
+    deactivateWater,
+    disposeWater,
     toggleWalk,
     setModeWalk,
     setModeDrive,
     toggleView,
     update(dt) {
-      if (!state.enabled) return;
+      if (!state.enabled) { deactivateWater(); return; }
       if (state.mode === "walk") updateWalkPhysics(dt, finiteOr);
+      else deactivateWater();
     },
     applyCameraIfWalking() {
       return updateWalkCamera();

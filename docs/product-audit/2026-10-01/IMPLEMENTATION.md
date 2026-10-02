@@ -110,3 +110,10 @@ Actual Earth backup download, malformed/cancelled restore preservation, full rel
 P07 now shares body wave profiles, wake contact displacement, marine origin phase and Ocean surface/depth samples. Near-water tessellation is dense at contact distance without increasing the vertex count. Qualified current/depth/immersion metadata retains unknowns. Marine requests follow active Ocean location; inactive temporary boat water cannot cover Earth; shore fishing no longer requires boat-sized bodies. See WATER-AUTHORITY.md for exact implementation and limits.
 
 Validation: **1,660 component tests pass**, source verification passes, actual eleven-case Ocean journey and actual Earth restore/Undo journey pass, prescribed water client passes. Screenshots/state inspected. No production deployment. Continue with P08 integration; do not describe the new sample contract as an implemented swimmer.
+
+
+## October 2 — P08 Earth swimming continuation
+
+Implemented real mapped-water traversal under the existing walking owner, swim/tread rig motion, automatically fitted scuba presentation, air/ascent rules, held touch controls, recovery, bounded local surface resume, mode/environment cleanup and underwater render presentation. The actual mapped-water walkthrough identified the prior 0.6 m bed limitation; broad bodies now use graded simulated gameplay relief while depth evidence remains independent. Terrain refinement and companion behavior respect swimming ownership. Quick Start now honestly describes Swimming as Limited.
+
+Evidence: 1,674 registered component tests pass, source checks pass, prescribed man/woman rig and water shader clients visually inspected, seven-case controller/reload browser, controlled full walking shore-entry/exit browser, and actual Earth mapped-water swimming/dive/mode-exit browser. See SWIMMING.md. Research ship, ladder/boat entry, standalone Ocean human travel and final marine art remain open; no phase-completion or production claim.

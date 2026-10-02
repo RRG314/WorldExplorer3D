@@ -19,9 +19,9 @@ test('all exposed catalog families retain an owner, persistence boundary and exp
     for (const entry of entries) assert.ok(ids.has(`${prefix}:${entry.id}`));
   }
 });
-test('search reveals missing swimming without advertising a virtual tool as a controller', () => {
+test('search distinguishes limited swimming from a virtual tool as a controller', () => {
   const results = findProductCapabilities({ query: 'swimming' });
-  assert.equal(results.find(entry => entry.id === 'swimming').status, 'planned');
+  assert.equal(results.find(entry => entry.id === 'swimming').status, 'limited');
   assert.match(PRODUCT_CAPABILITIES.find(entry => entry.id === 'tool:virtual-dive-kit').summary, /not a swimming controller/);
   assert.match(PRODUCT_CAPABILITIES.find(entry => entry.id === 'layer:ships').summary, /not live AIS/);
   assert.match(PRODUCT_CAPABILITIES.find(entry => entry.id === 'journal').persistence, /does not copy/);

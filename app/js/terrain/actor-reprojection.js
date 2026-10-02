@@ -21,7 +21,7 @@ function updateCarY(appCtx, surfaceY) {
 
 function updateWalkerY(appCtx, surfaceY) {
   const walker = appCtx.Walk?.state?.walker;
-  if (!walker || !Number.isFinite(surfaceY)) return;
+  if (!walker || walker.swimming || !Number.isFinite(surfaceY)) return;
   const targetY = surfaceY + 1.7;
   const currentY = finite(walker.y, targetY);
   const grossMismatch = Math.abs(targetY - currentY) > 3;

@@ -1,16 +1,18 @@
+import { createSwimmingClips } from './swimming.js';
 // Presentation only. Gameplay, inventory and damage remain with their owners.
 // Split locomotion by bone mask so an upper-body action cannot halve leg motion.
-export function createCharacterAnimationController(THREE, visual, clips, mapping = {}) {
+export function createCharacterAnimationController(THREE, visual, clips, mapping = {}, options = {}) {
+  if (options.swimming === true) clips = [...clips, ...createSwimmingClips(THREE, visual)];
   const mixer = new THREE.AnimationMixer(visual);
   const upperBones = new Set();
   visual.traverse(node => {
     if (node.isBone && /^(Torso|Chest)$/i.test(node.name)) {
-      node.traverse(child => { if (child.isBone) upperBones.add(child.name); });
+      node.traverse(child => { if (child.isBone) { upperBones.add(child.name); upperBones.add(child.uuid); } });
     }
   });
   const upperTrack = track => upperBones.has(THREE.PropertyBinding.parseTrackName(track.name).nodeName);
   const roles = {
-    idle: 'Idle', walk: 'Walk', run: 'Run', backward: 'Run_Back',
+    swim: 'Explorer_Swim', tread: 'Explorer_Tread', idle: 'Idle', walk: 'Walk', run: 'Run', backward: 'Run_Back',
     left: 'Run_Left', right: 'Run_Right', aim: 'Idle_Gun_Pointing',
     fire: 'Gun_Shoot', melee: 'Sword_Slash', punch: 'Punch_Right', interact: 'Interact',
     wave: 'Wave', hit: 'HitRecieve', down: 'Death', ...mapping
@@ -28,7 +30,7 @@ export function createCharacterAnimationController(THREE, visual, clips, mapping
     entries.push({ action, weight: 0, target: 0 });
     return action;
   };
-  for (const role of ['idle', 'walk', 'run', 'backward', 'left', 'right']) {
+  for (const role of ['idle', 'walk', 'run', 'backward', 'left', 'right', 'swim', 'tread']) {
     const clip = clips.find(clip => clip.name === roles[role]);
     if (!clip) continue;
     base[role] = add(`${role}:lower`, clip, track => !upperTrack(track));
@@ -57,13 +59,13 @@ export function createCharacterAnimationController(THREE, visual, clips, mapping
   function update(state = {}, deltaTime = 0) {
     if (disposed) return false;
     const dt = Number.isFinite(deltaTime) ? Math.max(0, Math.min(.1, deltaTime)) : 0;
-    let locomotion = state.moving ? state.running ? 'run' : 'walk' : 'idle';
-    if (state.moving && state.aiming && ['left', 'right', 'backward'].includes(state.direction)) locomotion = state.direction;
+    let locomotion = state.swimming ? state.moving ? 'swim' : 'tread' : state.moving ? state.running ? 'run' : 'walk' : 'idle';
+    if (!state.swimming && state.moving && state.aiming && ['left', 'right', 'backward'].includes(state.direction)) locomotion = state.direction;
     if (!base[locomotion]) locomotion = base.walk && state.moving ? 'walk' : 'idle';
     if (activeAction?.action.time >= activeAction?.action.getClip().duration) activeAction = null;
     if (reaction?.role === 'hit' && reaction.action.time >= reaction.action.getClip().duration) reaction = null;
     if (reaction?.role === 'down' && state.incapacitated === false) reaction = null;
-    const selectedUpper = activeAction?.action || (state.aiming ? actions.aim : null) || upper[locomotion];
+    const selectedUpper = state.swimming ? upper[locomotion] : activeAction?.action || (state.aiming ? actions.aim : null) || upper[locomotion];
     for (const entry of entries) {
       entry.target = reaction ? Number(entry.action === reaction.action)
         : Number(entry.action === base[locomotion] || entry.action === selectedUpper);

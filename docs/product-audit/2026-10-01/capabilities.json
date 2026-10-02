@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "scope": "Local source capability descriptions; not production or full journey certification",
-  "registrySha256": "bbc29ee85c34748476837063795bad4c806b5c57e995f23561c78ebb515ea8a6",
+  "registrySha256": "406d195617848cf174eb43a39ea136ecb7f5e8488d59f29cbf4a007df10448cc",
   "owners": {
     "app/js/live-earth/registry.js": "6c6d3cec9fb3334434304083c2529b97da73eb967cd2edfaef1bc4a0b2cf3ee6",
     "app/js/map.js": "37f3289baf5e52eb6bb48c1fee61f037482226b57023ef71298cbd07955a1a8c",
@@ -10,7 +10,7 @@
     "app/js/ui/accessibility.js": "2ecbd7643ce1b4e4ff7bf8f717630db5bbeebda5217f22d92167b7497327cf88",
     "app/js/perf-settings.js": "7c8d5d3c0c70745c48341753d8646b91b3687612b5cb6b34c3778afee012ef18",
     "app/js/world.js": "381ede5f8f008c9c9f9a601d454197659c2536af55d7066258c6244592f2770e",
-    "app/js/walking.js": "c03394f6a3cc151c2b86837d96dc2e3a95c9ec1f27c1bf72432365067affc7ef",
+    "app/js/walking.js": "f605255163ec452d3b411f41217373d1b2ac5901f79a5da91265e87bda2649ae",
     "app/js/physics.js": "c3e42b37830865a47a0e70b20a28ea16134ff0006854451dac4f5e3cf3134ebb",
     "app/js/travel-mode.js": "38dbb7260a048cda3fedaef55eb59d2d36dd81a71887fbbc7437ee9d3410ab24",
     "app/js/plane-mode.js": "594e615f10425a466b33ed0107cc9f03cd87410820756b6948fc07aea191ac19",
@@ -27,7 +27,7 @@
     "app/js/deflock/runtime.js": "ee0511bd2510f9a59b05d9a74e80268fdd80ead3895c462f8a4e1b53fd55f5a0",
     "app/js/discovery/profile-store.js": "f34b50e4bbb11a5d200963e6e0970f6b45d56b9472614628ac3be42ca6ab3b29",
     "app/js/player/backpack-store.js": "5c50a4fc68ac3497a5900c27b34ee3a3dd3d410a4e3d4108da9b66aa3a872c12",
-    "app/js/discovery/companion-runtime.js": "5f3be561b4bed4c37ac7efb51b6e32e6835dd333f5f5a052d74e229579f54fce",
+    "app/js/discovery/companion-runtime.js": "b31eaf1a240b55965e9b7c194ea252d126047e9848a2013dc7a0c2beb77414e9",
     "app/js/multiplayer/ui-room-events.js": "b6d036c4015291e9fc4b73f88c33c0b7125764b89a2aa4d6ae8cf2dbf876ce9e",
     "app/js/economy/connected-wallet-authority.js": "dd823f6d599a2ad4f0542d3781d2a22b35f49e0b1cbe706016071541bf1473b1",
     "app/js/blocks.js": "7f82d5488e4c77fbb40fbb907795b2a7452b2fe9936a6af4a87b0f7764d8f49f",
@@ -116,7 +116,7 @@
       "label": "Walking & interiors",
       "group": "worlds",
       "status": "playable",
-      "summary": "Walk, interact and enter supported buildings. An ordinary water entry does not start swimming.",
+      "summary": "Walk, interact and enter supported buildings. Mapped shallow water slows walking; deep water starts swimming.",
       "owner": "app/js/walking.js",
       "persistence": "Position and active controls belong to the current session; returning is not a saved voyage.",
       "acceptance": "Source-reviewed; complete current player-journey acceptance is still pending."
@@ -175,10 +175,10 @@
       "id": "swimming",
       "label": "Swimming & scuba diving",
       "group": "worlds",
-      "status": "planned",
-      "summary": "Character swimming, automatic scuba equipment and shore/ladder transitions are not available yet. Virtual dive fieldwork is a separate activity.",
+      "status": "limited",
+      "summary": "In Earth Walking mode, enter mapped deep water to swim. Space rises; Shift dives. Scuba equips automatically. Touch Rise/Dive controls, low-air ascent and recovery are available. Ship ladders and on-foot exploration in standalone Ocean are still pending.",
       "owner": "app/js/walking.js",
-      "persistence": "No swim or scuba session is saved because this controller is not implemented.",
+      "persistence": "A local checkpoint retains air and resumes at the revalidated surface in the same location for up to 24 hours. This is not cloud expedition or vessel persistence.",
       "acceptance": "Source-reviewed; complete current player-journey acceptance is still pending."
     },
     {

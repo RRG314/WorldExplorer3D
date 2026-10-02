@@ -1,3 +1,4 @@
+import {beginSwimmingRender} from '../walking/water/presentation.js';
 import {createGraphicsCallEvidence} from './graphics-call-evidence.js';
 import { updateStreetPavementFocus, updateStreetOverviewFrame, prepareStreetOverviewMaterials } from '../world/street-pavement-runtime.js';
 function createCoreFrameSystems(appCtx, hooks = {}) {
@@ -160,11 +161,12 @@ function createCoreRenderSystem(appCtx, shouldUseComposer) {
   appCtx.graphicsCallEvidence=graphicsEvidence;
   const draw = () => {
     graphicsEvidence?.begin();
+    const restoreWaterPresentation=beginSwimmingRender(appCtx);
     try {
       if (shouldUseComposer()) appCtx.composer.render();
       else appCtx.renderer.render(appCtx.scene, appCtx.camera);
       appCtx.recordPerfRendererInfo?.(appCtx.renderer);
-    } finally {graphicsEvidence?.end();}
+    } finally {restoreWaterPresentation?.();graphicsEvidence?.end();}
   };
   // The completed world must have produced its first frame before the loading
   // cover is dismissed. Use the real render path, including postprocessing.
