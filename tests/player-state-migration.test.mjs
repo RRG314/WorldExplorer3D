@@ -92,7 +92,7 @@ test('signed-in receipt reconciliation upgrades the local claim without duplicat
   const first = await store.collect(local);
   const retry = await store.collect({ ...local, instanceId: 'item:server', collectedAt: 2_000 });
   const upgraded = await store.applyTrustedReceipt(first.item.instanceId, {
-    authority: 'server-receipt', itemId: 'server-item-1', tradeable: false
+    authority: 'server-receipt', itemId: 'server-item-1', tradeable: false, ownerUid: 'test-owner', claimId: local.claimId, catalogId: local.catalogId
   });
 
   assert.equal(first.recorded, true);

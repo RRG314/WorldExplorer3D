@@ -1,3 +1,5 @@
+import { createDiscoveryReceiptSync } from './receipt-outbox.js?v=1';
+import { hydrateDiscoveryReceipts } from './receipt-hydration.js?v=1';
 import { ambientNotices } from '../ui/ambient-notices.js';
 import { BUILTIN_DISCOVERY_CATALOGS, COMPANION_CATALOG, TOOL_CATALOG, validateDiscoveryCatalogs } from './catalog.js?v=4';
 import { createCompanionRuntime } from './companion-runtime.js?v=10';
@@ -995,61 +997,25 @@ function discoveryHaptic(pattern = 18) {
   try { globalThis.navigator?.vibrate?.(pattern); } catch (_) {}
 }
 
-async function syncTrustedReceipt(appCtx, profileStore, item) {
-  if (!item || appCtx.getAccountSnapshot?.().signedIn !== true) return null;
+async function syncTrustedReceipt(appCtx) {
   try {
-    const { claimExplorerDiscovery } = await import('../../../js/discovery-api.js?v=1');
-    const receipt = await claimExplorerDiscovery({
-      claimId: item.claimId,
-      catalogId: item.catalogId,
-      worldIdentity: item.worldIdentity,
-      activityId: item.activityId || 'metal-detect',
-      evidenceClass: item.evidenceClass,
-      name: item.name,
-      family: item.family,
-      rarityBand: item.rarityBand,
-      qualityBand: item.qualityBand,
-      catalogVersion: BUILTIN_DISCOVERY_CATALOGS.version
-    });
-    const updated = await profileStore.applyTrustedReceipt?.(item.instanceId, receipt);
-    const discoveryUi = appCtx.worldDiscoveryRuntime?.ui;
-    if (discoveryUi?.open) void discoveryUi.refreshData?.();
-    return updated;
+    return await appCtx.worldDiscoveryRuntime?.receiptSync?.flush?.();
   } catch (error) {
-    console.warn('[world-discovery] Trusted receipt sync deferred:', error?.message || error);
+    console.warn('[world-discovery] Receipt queue unavailable:', error?.message || error);
     return null;
   }
 }
 
 async function hydrateSignedInReceipts(appCtx, profileStore, claimedIds) {
-  if (appCtx.getAccountSnapshot?.().signedIn !== true) return 0;
+  const ownerUid = appCtx.getAccountUserId?.();
+  const revision = appCtx.getAccountSnapshot?.().revision;
+  if (!ownerUid || appCtx.getAccountSnapshot?.().signedIn !== true) return 0;
   try {
     const { listExplorerDiscoveries } = await import('../../../js/discovery-api.js?v=1');
-    const response = await listExplorerDiscoveries();
-    let imported = 0;
-    for (const receipt of response.items || []) {
-      if (!receipt?.claimId || !receipt?.catalogId) continue;
-      const result = await profileStore.collect({
-        instanceId: `item:${receipt.itemId || receipt.instanceId}`,
-        claimId: receipt.claimId,
-        catalogId: receipt.catalogId,
-        name: receipt.name || receipt.catalogId,
-        family: receipt.family || 'discovery',
-        rarityBand: receipt.rarityBand || 'common',
-        qualityBand: receipt.qualityBand || 'observed',
-        discipline: 'exploration',
-        activityId: receipt.activityId || 'inspect',
-        regionId: receipt.worldIdentity || 'server-region',
-        worldIdentity: receipt.worldIdentity || 'server-region',
-        evidenceClass: receipt.evidenceClass || 'virtual-field-record',
-        collectedAt: Date.now()
-      });
-      const instanceId = result.item?.instanceId;
-      if (instanceId) await profileStore.applyTrustedReceipt?.(instanceId, receipt);
-      claimedIds.add(receipt.claimId);
-      if (result.collected) imported++;
-    }
-    return imported;
+    const result = await hydrateDiscoveryReceipts({ownerUid, profileStore, claimedIds,
+      isCurrentOwner: () => appCtx.getAccountUserId?.() === ownerUid && appCtx.getAccountSnapshot?.().revision === revision,
+      listPage: listExplorerDiscoveries});
+    return result.imported;
   } catch (error) {
     console.warn('[world-discovery] Signed-in receipt hydration deferred:', error?.message || error);
     return 0;
@@ -1077,6 +1043,8 @@ function disposeWorldDiscoveryRuntime(appCtx, reason = 'world-reload') {
   if (!state || state.disposed) return false;
   state.disposed = true;
   state.reason = reason;
+  state.receiptSync?.dispose();
+  if (state.receiptRetryTimer) clearInterval(state.receiptRetryTimer);
   void appCtx.closeArExperience?.(`discovery_${reason}`);
   appCtx.unregisterRuntimeOwner?.(state.owner);
   state.ui?.dispose?.();
@@ -1176,8 +1144,11 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
   const published = appCtx.worldDiscoveryPublicationStore.publish(publication, { requestId: request.id, sequence: snapshot.sequence });
   if (!published.published) return null;
 
-  const profileStore = appCtx.discoveryProfileStore || createIndexedDbDiscoveryProfileStore();
+  const profileStore = appCtx.discoveryProfileStore || createIndexedDbDiscoveryProfileStore({
+    getReceiptOwnerUid: () => appCtx.getAccountUserId?.(), catalogVersion: BUILTIN_DISCOVERY_CATALOGS.version
+  });
   appCtx.discoveryProfileStore = profileStore;
+  profileStore.setReceiptOwnerProvider?.(() => appCtx.getAccountUserId?.(), BUILTIN_DISCOVERY_CATALOGS.version);
   const bootstrap = typeof profileStore.loadRuntimeBootstrap === 'function'
     ? await profileStore.loadRuntimeBootstrap().catch(() => null)
     : null;
@@ -2253,6 +2224,19 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
   state.ui = createDiscoveryUi(state);
   appCtx.worldDiscoveryPublication = publication;
   appCtx.worldDiscoveryRuntime = state;
+  state.receiptSync = createDiscoveryReceiptSync({store:profileStore,
+    getOwnerUid: () => appCtx.getAccountUserId?.(),
+    isAvailable: () => !state.disposed && globalThis.navigator?.onLine !== false,
+    send: async (payload) => {
+      const {claimExplorerDiscovery} = await import('../../../js/discovery-api.js?v=1');
+      return claimExplorerDiscovery(payload);
+    }
+  });
+  const retryReceipts = () => { void syncTrustedReceipt(appCtx); };
+  state.receiptRetryTimer = setInterval(retryReceipts, 30000);
+  globalThis.addEventListener?.('online', retryReceipts);
+  state.unregisterExplorerListeners.push(() => globalThis.removeEventListener?.('online', retryReceipts));
+  retryReceipts();
   appCtx.worldDiscoveryRuntimeSnapshot = () => worldDiscoveryRuntimeSnapshot(appCtx);
   void hydrateSignedInReceipts(appCtx, profileStore, claimedIds).then(() => {
     if (state.ui?.open) return state.ui.refreshData?.();

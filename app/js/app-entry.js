@@ -371,6 +371,10 @@ function registerLazySubsystemEntrypoints() {
         type: 'ArPlatformSnapshot', phase: 'idle', active: false
     };
     appCtx.getPlatformServicesSnapshot = () => platformServices.snapshot();
+    appCtx.getAccountUserId = () => {
+        const user = platformServices.peek('account')?.getUser?.();
+        return user && !user.isAnonymous ? user.uid : null;
+    };
     appCtx.getAccountSnapshot = () => platformServices.peek('account')?.snapshot?.() || {
         started: false,
         signedIn: false,

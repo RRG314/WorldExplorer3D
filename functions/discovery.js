@@ -1,5 +1,5 @@
 const crypto = require('node:crypto');
-const { FieldValue } = require('firebase-admin/firestore');
+const { FieldValue, FieldPath } = require('firebase-admin/firestore');
 
 const TRADEABLE_CATALOG_IDS = new Set([
   'brass-transit-token', 'iron-trade-buckle', 'copper-keepsake',
@@ -67,6 +67,7 @@ function buildDiscoveryExports({ functions, setCors, verifyAuth, db, admin }) {
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed.' });
     const auth = await verifyAuth(req, res);
     if (!auth) return;
+    if (req.body?.expectedOwnerUid && req.body.expectedOwnerUid !== auth.uid) return res.status(409).json({ error: 'Account changed. Retry from the original account.' });
     const claim = normalizeDiscoveryClaim(req.body || {});
     if (!claim) return res.status(400).json({ error: 'Invalid discovery claim.' });
     try {
@@ -94,6 +95,7 @@ function buildDiscoveryExports({ functions, setCors, verifyAuth, db, admin }) {
       const independentlyValidated = auth.admin === true;
       return res.status(200).json({
         ...result,
+        ownerUid: auth.uid,
         claimId: claim.claimId,
         catalogId: claim.catalogId,
         authority: independentlyValidated ? 'trusted-server' : 'server-receipt',
@@ -143,11 +145,19 @@ function buildDiscoveryExports({ functions, setCors, verifyAuth, db, admin }) {
     const auth = await verifyAuth(req, res);
     if (!auth) return;
     try {
-      const snapshot = await db.collection('explorerProfiles').doc(auth.uid).collection('items').limit(250).get();
-      const items = snapshot.docs.map((doc) => {
+      if (req.body?.expectedOwnerUid && req.body.expectedOwnerUid !== auth.uid) return res.status(409).json({ error: 'Account changed. Reload receipts for the current account.' });
+      const cursor = req.body?.cursor;
+      if (cursor != null && (typeof cursor !== 'string' || !/^[a-f0-9]{40}$/.test(cursor))) return res.status(400).json({ error: 'Invalid receipt cursor.' });
+      let query = db.collection('explorerProfiles').doc(auth.uid).collection('items').orderBy(FieldPath.documentId());
+      if (cursor) query = query.startAfter(cursor);
+      const snapshot = await query.limit(251).get();
+      const pageDocs = snapshot.docs.slice(0, 250);
+      const items = pageDocs.map((doc) => {
         const item = doc.data() || {};
         return {
           itemId: doc.id,
+          ownerUid: auth.uid,
+          createdAtMs: item.createdAt?.toMillis?.() || null,
           instanceId: item.instanceId || doc.id,
           claimId: item.claimId,
           catalogId: item.catalogId,
@@ -163,7 +173,7 @@ function buildDiscoveryExports({ functions, setCors, verifyAuth, db, admin }) {
           lockedByTradeId: item.lockedByTradeId || null
         };
       });
-      return res.status(200).json({ items, schemaVersion: 1 });
+      return res.status(200).json({ items, ownerUid: auth.uid, nextCursor: snapshot.docs.length > 250 ? pageDocs.at(-1).id : null, schemaVersion: 2 });
     } catch (error) {
       console.error('[listExplorerDiscoveries] failed:', error);
       return res.status(500).json({ error: 'Could not load discovery receipts.' });

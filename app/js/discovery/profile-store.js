@@ -1,3 +1,4 @@
+import { pendingDiscoveryReceipt } from './receipt-outbox.js?v=1';
 import {
   createExplorerEvent,
   createExplorerStoryEvent,
@@ -11,7 +12,7 @@ import { createDefaultCharacterState, normalizeCharacterState } from '../charact
 import { migrateLegacyCharacterState, projectCharacterProgress } from '../character/progression.js?v=1';
 
 const DISCOVERY_DB_NAME = 'world-explorer-discovery';
-const DISCOVERY_DB_VERSION = 3;
+const DISCOVERY_DB_VERSION = 4;
 const PROFILE_ID = 'local-explorer';
 const CHARACTER_MIGRATION_BACKUP_ID = 'character-v1:local-explorer';
 
@@ -114,6 +115,11 @@ function resolveProfileUpdate(current, update) {
   return normalizeProfile({ ...next, characterState: next.characterState || current.characterState });
 }
 
+function validateReceipt(item, receipt) {
+  if (!receipt?.itemId || !receipt.ownerUid || receipt.claimId !== item.claimId || receipt.catalogId !== item.catalogId
+    || !['trusted-server', 'server-receipt'].includes(receipt.authority)) throw Object.assign(new TypeError('Receipt does not match the local discovery.'), {status:422});
+}
+
 function requestPromise(request) {
   return new Promise((resolve, reject) => {
     request.onsuccess = () => resolve(request.result);
@@ -132,9 +138,15 @@ function transactionPromise(transaction) {
 function openDiscoveryDatabase(indexedDB = globalThis.indexedDB) {
   if (!indexedDB?.open) return Promise.reject(new Error('IndexedDB is unavailable.'));
   return new Promise((resolve, reject) => {
+    let blocked = false;
     const request = indexedDB.open(DISCOVERY_DB_NAME, DISCOVERY_DB_VERSION);
+    request.onblocked = () => { blocked = true; reject(new Error('Close or reload other World Explorer tabs to update Journal storage.')); };
     request.onupgradeneeded = () => {
       const db = request.result;
+      if (!db.objectStoreNames.contains('receiptOutbox')) {
+        const outbox = db.createObjectStore('receiptOutbox', { keyPath: 'id' });
+        outbox.createIndex('ownerUid', 'ownerUid', { unique: false });
+      }
       if (!db.objectStoreNames.contains('profiles')) db.createObjectStore('profiles', { keyPath: 'id' });
       if (!db.objectStoreNames.contains('items')) {
         const items = db.createObjectStore('items', { keyPath: 'instanceId' });
@@ -152,7 +164,12 @@ function openDiscoveryDatabase(indexedDB = globalThis.indexedDB) {
       }
       if (!db.objectStoreNames.contains('migrationBackups')) db.createObjectStore('migrationBackups', { keyPath: 'id' });
     };
-    request.onsuccess = () => resolve(request.result);
+    request.onsuccess = () => {
+      const db = request.result;
+      if (blocked) { db.close(); return; }
+      db.onversionchange = () => db.close();
+      resolve(db);
+    };
     request.onerror = () => reject(request.error || new Error('Could not open discovery database.'));
   });
 }
@@ -202,6 +219,7 @@ async function ensureIndexedDbCharacterMigration(db) {
 }
 
 function createIndexedDbDiscoveryProfileStore(options = {}) {
+  options = { ...options };
   const open = () => openDiscoveryDatabase(options.indexedDB);
   let characterMigrationReady = false;
   let characterMigrationPromise = null;
@@ -285,12 +303,13 @@ function createIndexedDbDiscoveryProfileStore(options = {}) {
 
   async function recordDiscovery(record, policy = {}) {
     if (!record?.claimId || !record?.catalogId) throw new TypeError('Discovery recording requires stable claim and catalog IDs.');
+    const receiptOwnerUid = options.getReceiptOwnerUid?.() || null;
     const collection = policy.collection === true;
     if (collection && !record?.instanceId) throw new TypeError('Collected discoveries require a stable instance ID.');
     const db = await open();
     try {
       await ensureCharacterMigration(db);
-      const transaction = db.transaction(['profiles', 'items', 'claims', 'fieldGuide', 'events'], 'readwrite');
+      const transaction = db.transaction(['profiles', 'items', 'claims', 'fieldGuide', 'events', 'receiptOutbox'], 'readwrite');
       const profiles = transaction.objectStore('profiles');
       const items = transaction.objectStore('items');
       const claims = transaction.objectStore('claims');
@@ -341,7 +360,11 @@ function createIndexedDbDiscoveryProfileStore(options = {}) {
         explorerProgress: projected.progress,
         characterState: characterProjection.character
       });
-      if (item) items.put(item);
+      if (item) {
+        items.put(item);
+        const pending = pendingDiscoveryReceipt(item, receiptOwnerUid, options.catalogVersion);
+        if (pending) transaction.objectStore('receiptOutbox').put(pending);
+      }
       events.put(event);
       claims.put({ claimId: record.claimId, claimedAt: now, item, event });
       fieldGuide.put(projectFieldGuideEntry(existingGuide, record, now, regionId));
@@ -466,8 +489,10 @@ function createIndexedDbDiscoveryProfileStore(options = {}) {
         await transactionPromise(transaction);
         return null;
       }
+      validateReceipt(item, receipt);
       const updated = {
         ...item,
+        receiptOwnerUid: receipt.ownerUid,
         authority: ['trusted-server', 'server-receipt'].includes(receipt.authority) ? receipt.authority : item.authority,
         serverItemId: String(receipt.itemId || item.serverItemId || ''),
         tradeable: receipt.authority === 'trusted-server' && receipt.tradeable === true,
@@ -479,6 +504,46 @@ function createIndexedDbDiscoveryProfileStore(options = {}) {
     } finally {
       db.close();
     }
+  }
+
+  async function listPendingReceipts(ownerUid, now = Date.now()) {
+    const db = await open();
+    try {
+      const tx = db.transaction(['receiptOutbox'], 'readonly');
+      const rows = await requestPromise(tx.objectStore('receiptOutbox').index('ownerUid').getAll(String(ownerUid)));
+      await transactionPromise(tx);
+      return rows.filter(row => row.status === 'pending' && row.nextAttemptAt <= now).slice(0, 25).map(clone);
+    } finally { db.close(); }
+  }
+
+  async function completePendingReceipt(id, receipt) {
+    const db = await open();
+    try {
+      const tx = db.transaction(['receiptOutbox','items'], 'readwrite');
+      const outbox = tx.objectStore('receiptOutbox');
+      const row = await requestPromise(outbox.get(id));
+      if (!row) { await transactionPromise(tx); return false; }
+      const items = tx.objectStore('items');
+      const item = await requestPromise(items.get(row.instanceId));
+      if (!item || receipt.ownerUid !== row.ownerUid) throw Object.assign(new Error('Pending receipt owner/item mismatch.'), {status:422});
+      validateReceipt(item, receipt);
+      items.put({...item, authority:receipt.authority, receiptOwnerUid:receipt.ownerUid,
+        serverItemId:receipt.itemId, tradeable:receipt.authority === 'trusted-server' && receipt.tradeable === true, trustedReceiptAt:Date.now()});
+      outbox.delete(id);
+      await transactionPromise(tx);
+      return true;
+    } finally { db.close(); }
+  }
+
+  async function deferPendingReceipt(id, patch) {
+    const db = await open();
+    try {
+      const tx = db.transaction(['receiptOutbox'], 'readwrite');
+      const outbox = tx.objectStore('receiptOutbox');
+      const row = await requestPromise(outbox.get(id));
+      if (row) outbox.put({...row,...patch});
+      await transactionPromise(tx);
+    } finally { db.close(); }
   }
 
   async function saveCompanion(companion) {
@@ -622,6 +687,8 @@ function createIndexedDbDiscoveryProfileStore(options = {}) {
 
   return Object.freeze({
     type: 'IndexedDbDiscoveryProfileStore',
+    setReceiptOwnerProvider(provider, catalogVersion) { options.getReceiptOwnerUid = provider; options.catalogVersion = catalogVersion; },
+    listPendingReceipts, completePendingReceipt, deferPendingReceipt,
     applyTrustedReceipt,
     collect,
     exportData,
@@ -660,6 +727,7 @@ function createMemoryDiscoveryProfileStore(seed = {}) {
       })
     });
   }
+  const outbox = new Map((seed.receiptOutbox || []).map(row => [row.id, clone(row)]));
   const items = new Map((seed.items || []).map((item) => [item.instanceId, clone(item)]));
   const claims = new Map((seed.claims || []).map((claim) => [claim.claimId, clone(claim)]));
   const guide = new Map((seed.fieldGuide || []).map((entry) => [entry.catalogId, clone(entry)]));
@@ -694,7 +762,11 @@ function createMemoryDiscoveryProfileStore(seed = {}) {
       explorerPointsBefore: profile.explorerProgress.points,
       explorerPointsAfter: projected.progress.points
     });
-    if (item) items.set(item.instanceId, item);
+    if (item) {
+      items.set(item.instanceId, item);
+      const pending = pendingDiscoveryReceipt(item, seed.getReceiptOwnerUid?.(), seed.catalogVersion);
+      if (pending) outbox.set(pending.id, pending);
+    }
     events.set(event.eventId, event);
     claims.set(record.claimId, { claimId: record.claimId, item, event });
     guide.set(record.catalogId, projectFieldGuideEntry(existingGuide, record, record.collectedAt || Date.now(), regionId));
@@ -742,6 +814,16 @@ function createMemoryDiscoveryProfileStore(seed = {}) {
 
   return Object.freeze({
     type: 'MemoryDiscoveryProfileStore',
+    async listPendingReceipts(ownerUid, now = Date.now()) { return [...outbox.values()].filter(row => row.ownerUid === ownerUid && row.status === 'pending' && row.nextAttemptAt <= now).slice(0,25).map(clone); },
+    async deferPendingReceipt(id, patch) { if (outbox.has(id)) outbox.set(id,{...outbox.get(id),...patch}); },
+    async completePendingReceipt(id, receipt) {
+      const row = outbox.get(id); if (!row) return false;
+      const item = items.get(row.instanceId);
+      if (!item || receipt.ownerUid !== row.ownerUid) throw Object.assign(new Error('Pending receipt owner/item mismatch.'),{status:422});
+      validateReceipt(item, receipt);
+      items.set(row.instanceId,{...item,authority:receipt.authority,receiptOwnerUid:receipt.ownerUid,serverItemId:receipt.itemId,tradeable:receipt.authority === 'trusted-server' && receipt.tradeable === true});
+      outbox.delete(id);return true;
+    },
     async getProfile() { return clone(profile); },
     async saveProfile(next) {
       profile = resolveProfileUpdate(profile, next);
@@ -767,7 +849,8 @@ function createMemoryDiscoveryProfileStore(seed = {}) {
     async applyTrustedReceipt(instanceId, receipt = {}) {
       const item = items.get(String(instanceId));
       if (!item) return null;
-      const updated = { ...item, authority: ['trusted-server', 'server-receipt'].includes(receipt.authority) ? receipt.authority : item.authority, serverItemId: String(receipt.itemId || ''), tradeable: receipt.authority === 'trusted-server' && receipt.tradeable === true };
+      validateReceipt(item, receipt);
+      const updated = { ...item, receiptOwnerUid: receipt.ownerUid, authority: ['trusted-server', 'server-receipt'].includes(receipt.authority) ? receipt.authority : item.authority, serverItemId: String(receipt.itemId || ''), tradeable: receipt.authority === 'trusted-server' && receipt.tradeable === true };
       items.set(String(instanceId), updated);
       return clone(updated);
     },

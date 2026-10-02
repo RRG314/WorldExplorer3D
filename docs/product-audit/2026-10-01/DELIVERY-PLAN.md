@@ -149,3 +149,8 @@ Retain distant continuity when reducing near detail. Test slow connection, faile
 For each slice: capture the actual starting experience, specify rules and desired screenshots, implement one complete interaction chain, inspect it in the assembled world, test recovery and save behavior, measure it, and review it with an uncoached player. Promote only the complete slice through the existing release process.
 
 Keep an evidence ledger with source commit, artifact ID, scenario, device, result, screenshot and limitations. A green technical matrix remains necessary; add explicit visual and comprehension acceptance so “all tests pass” can no longer be mistaken for “the game is coherent.”
+
+
+## October 2 scope addition: public Live Earth cameras
+
+The owner requested extensive live/still camera coverage inspired by WorldCam. [LIVE-EARTH-CAMERAS.md](LIVE-EARTH-CAMERAS.md) defines the accepted scope, verified reference research, source ownership, complete player journey and C01–C05 gates. C01 research can proceed now; implementation joins P16 after the existing P06 foundation and ocean/space sequence, with P19 provider and P20 release requirements. This is distinct from mapped ALPR locations and user-device capture. No camera imagery capability or worldwide coverage is claimed yet.

@@ -21,6 +21,9 @@ try {
   await swim.scrollIntoViewIfNeeded(); assert.match(await swim.innerText(),/Planned/);
   assert.match(await swim.innerText(),/not available yet/);
   await page.screenshot({path:`${dir}/capabilities-${mobile?'phone':'desktop'}.png`});
+  await page.getByRole('searchbox',{name:'Search game capabilities'}).fill('Public live');
+  assert.match(await page.locator('[data-capability="public-cameras"]').innerText(),/Planned/);
+  await page.screenshot({path:`${dir}/camera-plan-${mobile?'phone':'desktop'}.png`});
   await page.getByRole('searchbox',{name:'Search game capabilities'}).fill('zz-no-result');
   assert.equal(await page.locator('.capabilityList li').count(),0);
   await page.getByRole('searchbox',{name:'Search game capabilities'}).fill('');

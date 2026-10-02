@@ -4,8 +4,8 @@ export async function claimExplorerDiscovery(input = {}) {
   return postProtectedFunction('/claimExplorerDiscovery', input, { label: 'World Discovery API' });
 }
 
-export async function listExplorerDiscoveries() {
-  return postProtectedFunction('/listExplorerDiscoveries', {}, { label: 'World Discovery API' });
+export async function listExplorerDiscoveries(input = {}) {
+  return postProtectedFunction('/listExplorerDiscoveries', input, { label: 'World Discovery API' });
 }
 
 export async function createDiscoveryTrade(input = {}) {

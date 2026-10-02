@@ -1,0 +1,21 @@
+<!doctype html><html><meta charset="utf-8"><title>Receipt restore verification</title><style>body{background:#09121e;color:#e5f0fa;font:18px/1.6 system-ui;padding:32px}pre{white-space:pre-wrap}</style>
+<h1>Account receipt restoration — controlled test</h1><p>Real browser storage, simulated paginated account responses. No live account service.</p><button id="restore">Restore 501 receipts and retry</button><pre id="state">Ready</pre>
+<script type="module">
+import {createIndexedDbDiscoveryProfileStore} from '/app/js/discovery/profile-store.js';
+import {hydrateDiscoveryReceipts} from '/app/js/discovery/receipt-hydration.js';
+const store=createIndexedDbDiscoveryProfileStore();
+let state={phase:'ready'};
+window.runRestore=async()=>{
+ state={phase:'restoring'};let requests=0;
+ const options={ownerUid:'fixture-a',isCurrentOwner:()=>true,profileStore:store,listPage:async({cursor})=>{
+  requests++;const offset=Number(cursor)||0;return {ownerUid:'fixture-a',items:Array.from({length:Math.min(250,501-offset)},(_,i)=>({itemId:`server-${offset+i}`,claimId:`receipt:${offset+i}`,catalogId:`rock:${offset+i}`,ownerUid:'fixture-a',authority:'server-receipt',worldIdentity:'fixture',activityId:'geology-inspect',family:'rock'})),nextCursor:offset+250<501?String(offset+250):null};
+ }};
+ const first=await hydrateDiscoveryReceipts(options);const before=await store.getProfile();const retry=await hydrateDiscoveryReceipts(options);const after=await store.getProfile();
+ const items=await store.listItems(1000);
+ if(items.length!==501||retry.imported!==0||before.explorerProgress.points!==after.explorerProgress.points)throw new Error('Receipt replay duplicated or lost progress');
+ state={phase:'passed',firstImported:first.imported,retryImported:retry.imported,records:after.explorerProgress.totalRecords,items:items.length,requests};
+ document.querySelector('#state').textContent=JSON.stringify(state,null,2);return state;
+};
+document.querySelector('#restore').onclick=()=>runRestore().catch(error=>{state={phase:'failed',error:error.message};document.querySelector('#state').textContent=JSON.stringify(state);throw error});
+window.render_game_to_text=()=>JSON.stringify(state);window.advanceTime=()=>Promise.resolve();
+</script></html>

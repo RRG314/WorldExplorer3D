@@ -106,3 +106,25 @@ test('repeated claim IDs return the existing receipt without duplicate writes', 
   assert.equal(res.body.itemId, 'existing-item');
   assert.deepEqual(endpoint.writes, []);
 });
+
+function listingEndpoint() {
+  const queries=[];
+  const ids=Array.from({length:501},(_,i)=>i.toString(16).padStart(40,'0'));
+  const db={collection(name){assert.equal(name,'explorerProfiles');return {doc(uid){assert.equal(uid,'explorer-1');return {collection(kind){assert.equal(kind,'items');let after='';return {orderBy(field){assert.ok(field);return this},startAfter(cursor){after=cursor;return this},limit(count){assert.equal(count,251);return this},async get(){queries.push(after);return {docs:ids.filter(id=>!after||id>after).slice(0,251).map(id=>({id,data:()=>({claimId:`claim:${id}`,catalogId:'rock',authority:'server-receipt'})}))}}}}}}}}};
+  const functions={region(){return {runWith(){return this},https:{onRequest:h=>h}}}};
+  return {handler:buildDiscoveryExports({functions,setCors:()=>false,verifyAuth:async()=>({uid:'explorer-1'}),db,admin:{}}).listExplorerDiscoveries,queries};
+}
+test('receipt endpoint pages 501 documents without omissions and binds pages to the authenticated owner',async()=>{
+ const {handler,queries}=listingEndpoint();const seen=[];let cursor=null;
+ do {const res=responseCapture();await handler({method:'POST',body:{cursor,expectedOwnerUid:'explorer-1'}},res);assert.equal(res.statusCode,200);assert.equal(res.body.ownerUid,'explorer-1');seen.push(...res.body.items.map(i=>i.itemId));assert.ok(res.body.items.every(i=>i.ownerUid==='explorer-1'));cursor=res.body.nextCursor;}while(cursor);
+ assert.equal(seen.length,501);assert.equal(new Set(seen).size,501);assert.equal(queries.length,3);
+});
+test('receipt endpoint rejects another owner and malformed cursors before querying',async()=>{
+ const {handler,queries}=listingEndpoint();
+ for(const body of [{expectedOwnerUid:'other'},{cursor:'../other'},{cursor:42}]){const res=responseCapture();await handler({method:'POST',body},res);assert.ok([400,409].includes(res.statusCode));}
+ assert.equal(queries.length,0);
+});
+test('receipt creation rejects account changes before writing',async()=>{
+ const endpoint=createEndpoint();const res=responseCapture();await endpoint.claimExplorerDiscovery({method:'POST',body:{...baseClaim,evidenceClass:'guided-field-lead',expectedOwnerUid:'other'}},res);
+ assert.equal(res.statusCode,409);assert.equal(endpoint.transactionRuns(),0);
+});

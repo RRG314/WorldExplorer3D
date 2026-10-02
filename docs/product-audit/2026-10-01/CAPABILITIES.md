@@ -6,6 +6,7 @@ Catalog families are included individually: authored route templates, field acti
 
 | Capability | Status | Runtime owner | Persistence | Evidence boundary |
 |---|---|---|---|---|
+| Public live & still cameras (public-cameras) | Planned | `app/js/live-earth/registry.js` | Planned camera favourites and Journal references need the save contract; this camera viewer is not available yet. | Planned in LIVE-EARTH-CAMERAS.md; provider research completed, imagery integration and acceptance pending. |
 | Maps, routes & saved places (maps) | Limited | `app/js/map.js` | Saved places and preferences are local to this browser. A shared link opens a destination; it does not transfer a save. | Source-reviewed; complete current player-journey acceptance is still pending. |
 | Share a destination (sharing) | Available | `app/js/ui/share-links.js` | Links carry destination settings, not your Journal, inventory or whole saved world. | Source-reviewed; complete current player-journey acceptance is still pending. |
 | Account & contributions (account) | Limited | `account/account-center.js` | Account records are connected; browser-local game stores remain separate. | Source-reviewed; complete current player-journey acceptance is still pending. |

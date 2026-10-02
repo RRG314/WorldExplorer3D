@@ -73,3 +73,16 @@ Replaced stale whole-profile preference writes with synchronous updates inside t
 Validation: **1,616 component tests passed**, zero failed/skipped/TODO. Final focused save/starter/character and source checks passed after encounter merging. Two real browser IndexedDB tabs verified duplicate claims, concurrent preference updates, reload, backup replay and idempotent legacy migration with a retained backup (20 records, zero page exceptions). Prescribed-client storage fixture passed and screenshots inspected. Actual-source Space regression rerun passed. These are controlled local records, not authenticated account or cross-device certification.
 
 P06 remains open: durable account-scoped retries, paginated hydration, receipt association and cross-store recovery require implementation/verification. P07–P20 have not been started. No production deployment, backend change or player-data migration.
+
+
+## October 2 continuation — P06 receipt recovery and Live Earth camera scope
+
+Implemented atomic account-owned pending receipts for new collected discoveries, durable reload/reconnect retries, bounded backoff, disposal cleanup, expected-owner checks and local receipt identity validation. Added stable paginated account restoration beyond 250 items with repeated-cursor/account-change safeguards. Existing saves upgrade to IndexedDB schema 4; blocked old connections produce a reload instruction. Details and release compatibility requirements are in [SAVE-CONTRACT.md](SAVE-CONTRACT.md).
+
+Validation: **1,628 registered component tests passed**; source checks passed. Real browser IndexedDB verified 501-item restoration/retry/reload; pending queue reload, account switching and recovery; schema 3→4 preservation and blocked upgrade handling. Prior two-tab save/backup checks passed. Prescribed-client receipt/outbox fixtures, actual-source desktop/phone capability UI and Space navigation passed; screenshots inspected, zero page exceptions in scripted browser journeys. Service/account replies were controlled; live authenticated acceptance remains pending.
+
+Added [LIVE-EARTH-CAMERAS.md](LIVE-EARTH-CAMERAS.md) to the delivery plan after directly inspecting WorldCam and its coverage/source catalogue. Defines a distinct public imagery layer, map/camera/explore journey, live versus still freshness, multi-view limits, provider rights/coverage/health and C01–C05 acceptance. Windy and Fintraffic primary documentation informs candidate integrations. Quick Start correctly lists the feature as Planned; there is no public-camera viewer or imagery coverage claim yet. Capability inventory now contains 99 entries.
+
+P06 remains open for live account acceptance, cross-store recovery and save-state presentation. P07–P20 implementation has not been advanced. No deployment or production/player-data changes.
+
+Final store-sharing review: discovery now binds account ownership even when another world created the shared Journal store first. The real outbox/reload/upgrade browser check and prescribed client were rerun through that path; 21 focused receipt/save/migration tests and source verification passed afterward. Production build identity was freshly read as unchanged. Live Functions inventory/authenticated acceptance was not verified: neither gcloud nor the workspace Firebase CLI is available in this execution environment.

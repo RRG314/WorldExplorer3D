@@ -3,6 +3,8 @@ export const currentContractTests = [
   'tests/product-capabilities-current.test.mjs',
   'tests/current-objective-coherence-current.test.mjs',
   'tests/discovery-save-consistency-current.test.mjs',
+  'tests/discovery-receipt-hydration-current.test.mjs',
+  'tests/discovery-receipt-outbox-current.test.mjs',
   'tests/ocean-entry-current.test.mjs',
   'tests/ocean-bathymetry-current.test.mjs',
   'tests/ocean-navigation-map-current.test.mjs',
