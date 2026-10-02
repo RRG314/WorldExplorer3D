@@ -94,3 +94,104 @@ test('direct Ocean boat remains offshore without Earth helpers and respects isla
  assert.equal(pointInsideBoatCandidate(island,14,0,3),true);
  assert.equal(measureBoatShorelineDistance(island,0,0),0);
 });
+
+test('mapped water shader and contact share a body profile regardless of walking or boating',async()=>{
+ const {buildBoatWaveProfile,applyWaveUniformsToMaterial}=await import('../app/js/boat-mode/surface-effects.js');
+ const source=normalizeWaterBody({pts:ring(200),surfaceY:12,kindHint:'lake'});
+ ctx.waterAreas=[source];ctx.waterways=[];ctx.activeWaterOpticsEvidence=null;
+ const material={userData:{weWaterWaveConfig:{waterBody:source,waterKind:'lake',waveBase:.4,waveScale:.55},weWaterWaveShader:{uniforms:Object.fromEntries(['weWaveTime','weWaveSpeed','weWaveScale','weWaveAmplitude','weWaveSecondaryAmplitude','weWaveSwellAmplitude','weWaveRippleAmplitude'].map(k=>[k,{value:0}]))}}};
+ let first;
+ for(const active of [false,true]){
+  ctx.boatMode={active,waveIntensity:.46};
+  const cpu=sampleDynamicWaterAt(12,15,null,{time:8}).profile;
+  const bundle=buildBoatWaveProfile(material,.46,8);applyWaveUniformsToMaterial(material,bundle);
+  assert.deepEqual(bundle.profile,cpu);
+  assert.equal(material.userData.weWaterWaveShader.uniforms.weWaveScale.value,cpu.spatialScale);
+  assert.equal(material.userData.weWaterWaveShader.uniforms.weWaveAmplitude.value,cpu.primaryAmplitude);
+  if(first)assert.deepEqual(cpu,first);first=cpu;
+ }
+});
+
+test('wake contact height agrees with the shader expression at stern, bow and turns',async()=>{
+ const {WAKE_EXPRESSION,sampleBoatWakeHeight}=await import('../app/js/boat-mode/wake-field.js');
+ const expression=new Function('side','stern','bow','spread','strength','bowWave','splash','smoothstep','exp','pow','abs','max',`return (${WAKE_EXPRESSION})`);
+ const smooth=(a,b,v)=>{const t=Math.max(0,Math.min(1,(v-a)/(b-a)));return t*t*(3-2*t)};
+ for(const angle of [0,.6,2.8])for(const x of [-15,0,4,80])for(const z of [-32,-4,0,6,25]){
+  const wake={x:2,z:1,forwardX:Math.sin(angle),forwardZ:Math.cos(angle),spread:.8,strength:1.1,bowWave:.9,splash:.3};
+  const dx=x-wake.x,dz=z-wake.z,side=dx*wake.forwardZ-dz*wake.forwardX,along=dx*wake.forwardX+dz*wake.forwardZ;
+  const gpu=expression(side,Math.max(0,-along),Math.max(0,along),.8,1.1,.9,.3,smooth,Math.exp,Math.pow,Math.abs,Math.max);
+  assert.ok(Math.abs(gpu-sampleBoatWakeHeight(x,z,wake))<1e-12);
+ }
+ const {buildSyntheticBoatCandidate}=await import('../app/js/boat-mode/water-query.js');
+ const body=buildSyntheticBoatCandidate(0,0,{waterKind:'open_ocean',surfaceY:.08});
+ ctx.boat={x:0,z:0,angle:0};ctx.boatMode={active:false,currentWater:body,waveIntensity:.3};
+ const without=sampleDynamicWaterAt(0,4,body,{time:3});
+ ctx.boatMode.active=true;ctx.boatMode.bowWaveStrength=1;
+ const withWake=sampleDynamicWaterAt(0,4,body,{time:3});assert.ok(withWake.surfaceY>without.surfaceY);
+ assert.ok(Math.abs(Math.hypot(...Object.values(withWake.normal))-1)<1e-9);
+});
+
+test('water volume preserves unknown depth/current and has explicit immersion boundaries',async()=>{
+ const {describeWaterVolume,sampleImmersion,waterCurrentSample}=await import('../app/js/world/water-volume-sample.js');
+ const candidate={waterKind:'open_ocean',id:'sea'};
+ const volume=describeWaterVolume({candidate,surfaceY:3,baseY:2,normal:{x:0,y:1,z:0},time:9,metersPerUnit:2});
+ assert.equal(volume.gameplayDepthMeters,null);assert.equal(volume.depthEvidence.depthMeters,null);assert.equal(volume.current.vectorMetersPerSecond,null);
+ assert.equal(sampleImmersion(volume,3,5).state,'dry');assert.equal(sampleImmersion(volume,2,4).fraction,.5);
+ assert.equal(sampleImmersion(volume,0,2).headSubmerged,true);assert.equal(sampleImmersion(null,0,2).state,'unknown');
+ const evidence={truthType:'modeled',sourceId:'fixture',renderUsable:true,validAt:'2026-10-02T12:00:00Z',currentVelocityKph:3.6,currentDirectionDeg:90,currentDirectionConvention:'direction-current-flows-to'};
+ const now=Date.parse(evidence.validAt);
+ assert.equal(waterCurrentSample(evidence,'open_ocean',now).vectorMetersPerSecond.x,1);
+ assert.equal(waterCurrentSample(evidence,'lake',now).truthType,'unknown');
+ assert.equal(waterCurrentSample(evidence,'coastal',now+4*3600000).truthType,'unknown');
+ assert.equal(waterCurrentSample({...evidence,currentVelocityKph:null},'coastal',now).truthType,'unknown');
+});
+
+test('horizon water retains metre-scale contact geometry around the vessel',async()=>{
+ const {waterPatchCoordinate}=await import('../app/js/world/water-patch-geometry.js');
+ const coords=Array.from({length:129},(_,i)=>waterPatchCoordinate(i,128,14000));
+ assert.equal(coords[0],-14000);assert.equal(coords[128],14000);assert.equal(coords[64],0);
+ for(let i=1;i<coords.length;i++)assert.ok(coords[i]>coords[i-1]);
+ for(let i=33;i<=96;i++)assert.ok(coords[i]-coords[i-1]<=1.000001);
+});
+
+
+test('mapped vessel footprint startup uses its water area and buffered island boundary',async()=>{
+ const {isPointInsideWaterAreaFootprint}=await import('../app/js/boat-mode/water-geometry.js');
+ const area=normalizeWaterBody({pts:ring(200),holes:[ring(10)],navigable:true});
+ assert.equal(isPointInsideWaterAreaFootprint(area,40,0,8),true);
+ assert.equal(isPointInsideWaterAreaFootprint(area,12,0,8),false);
+ assert.equal(isPointInsideWaterAreaFootprint(area,198,0,8),false);
+});
+
+test('bounded transition water cannot leak onto land after exiting the boat',async()=>{
+ const {buildSyntheticBoatCandidate}=await import('../app/js/boat-mode/water-query.js');
+ ctx.waterAreas=[];ctx.waterways=[];ctx.boatMode={active:true,currentWater:buildSyntheticBoatCandidate(0,0,{waterKind:'open_ocean'})};
+ assert.equal(resolveWaterSampleCandidate(1000,0),null);
+ assert.ok(resolveWaterSampleCandidate(0,0));ctx.boatMode.active=false;
+ assert.equal(resolveWaterSampleCandidate(0,0),null);
+});
+
+test('water wave phase survives a translated marine origin',async()=>{
+ const {buildSyntheticBoatCandidate}=await import('../app/js/boat-mode/water-query.js');
+ ctx.boatMode={active:false};ctx.activeWaterOpticsEvidence=null;
+ const ocean={source:{waterKind:'open_ocean',surfaceY:.08,waveOffset:{x:17,z:28}}};
+ const before=sampleDynamicWaterAt(36,-14,ocean,{time:42});
+ const boat=buildSyntheticBoatCandidate(0,0,{waterKind:'open_ocean',surfaceY:.08,waveOffset:{x:53,z:14}});
+ const after=sampleDynamicWaterAt(0,0,boat,{time:42});
+ assert.equal(before.surfaceY,after.surfaceY);assert.deepEqual(before.normal,after.normal);
+});
+
+
+test('shore casts resolve mapped non-navigable ponds and island banks without granting boat access',async()=>{
+ const {nearestFishingWater}=await import('../app/js/fishing/water-access.js');
+ const pond=normalizeWaterBody({pts:ring(10),surfaceY:50,kindHint:'lake',navigable:false});
+ const fixture={waterAreas:[pond],waterways:[]};
+ const bank=nearestFishingWater(fixture,15,0,42,{referenceY:50});
+ assert.equal(bank.source,pond);assert.equal(bank.distanceToWater,5);assert.ok(bank.entryPoint.x<10);
+ assert.equal(pond.navigable,false);
+ assert.equal(nearestFishingWater(fixture,15,0,42,{referenceY:100}),null);
+ pond.holes=[ring(2)];const island=nearestFishingWater(fixture,0,0,42,{referenceY:50});
+ assert.equal(island.inside,false);assert.ok(Math.max(Math.abs(island.entryPoint.x),Math.abs(island.entryPoint.z))>2);
+ const buried=normalizeWaterBody({shape:'waterway',pts:[{x:0,z:0},{x:10,z:0}],width:3,structureSemantics:{terrainMode:'subgrade'}});
+ assert.equal(nearestFishingWater({waterAreas:[],waterways:[buried]},1,3,42),null);
+});

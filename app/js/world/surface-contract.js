@@ -186,6 +186,7 @@ function createSurfaceSample(options = {}) {
   const metersPerWorldUnit = Math.max(0.000001, finiteOr(options.metersPerWorldUnit, 1));
   return {
     schemaVersion: SURFACE_SCHEMA_VERSION,
+    ...(options.water ? {water:options.water} : {}),
     profile: Object.values(SOURCE_PROFILE).includes(options.profile) ? options.profile : SOURCE_PROFILE.LOCATION_OSM,
     kind,
     position: {
@@ -218,6 +219,7 @@ function createSurfaceTileDescriptor(options = {}) {
   const y = Math.max(0, Math.min(n - 1, Math.round(finiteOr(options.y, 0))));
   return {
     schemaVersion: SURFACE_SCHEMA_VERSION,
+    ...(options.water ? {water:options.water} : {}),
     key: `${z}/${x}/${y}`,
     profile: Object.values(SOURCE_PROFILE).includes(options.profile) ? options.profile : SOURCE_PROFILE.LOCATION_OSM,
     tile: { z, x, y },
@@ -376,6 +378,7 @@ function createSurfaceQuery(appCtx, GroundHeight) {
       y,
       z,
       kind: SURFACE_KIND.WATER,
+      water: dynamic?.volume,
       normal: dynamic?.normal || (dynamic?.motion ? {x:dynamic.motion.normalX, y:dynamic.motion.normalY, z:dynamic.motion.normalZ} : null),
       traversal: {boat: !!candidate && (candidate.source || candidate).navigable !== false},
       profile: profile(),

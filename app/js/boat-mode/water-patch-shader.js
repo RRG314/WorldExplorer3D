@@ -1,3 +1,4 @@
+import { boatWakeShaderFunction } from './wake-field.js?v=1';
 export function customizeBoatWaterPatchShader(shader) {
   if (!shader?.uniforms || typeof THREE === 'undefined') return;
   for (const marker of ['// WE_WATER_FOAM_EXTENSION', '// WE_WATER_COLOR_EXTENSION', '// WE_WATER_EMISSIVE_EXTENSION']) {
@@ -50,24 +51,12 @@ float weBoatBowFoamMask(vec2 worldXZ) {
   return cone * bowFront;
 }
 
-float weBoatWakeDisplacement(vec2 worldXZ) {
-  vec2 local = weBoatToLocal(worldXZ);
-  float sternDistance = max(0.0, -local.y);
-  float spread = 0.44 + sternDistance * (0.14 + weBoatWakeSpread * 0.1);
-  float wakeWidth = 0.6 + sternDistance * 0.02;
-  float wakeBands = exp(-pow((abs(local.x) - spread) / wakeWidth, 2.0));
-  float sternCore = exp(-pow(local.x / (0.92 + sternDistance * 0.06), 2.0));
-  float wakeTrail = smoothstep(0.0, 1.0, sternDistance) * exp(-sternDistance * 0.045) * (wakeBands * 0.76 - sternCore * 0.22);
-  float bowDistance = max(0.0, local.y);
-  float bowWidth = max(0.9, 0.36 + bowDistance * 0.18);
-  float bowPush = exp(-pow(local.x / bowWidth, 2.0)) * smoothstep(0.0, 2.2, bowDistance) * (1.0 - smoothstep(5.4, 9.2, bowDistance));
-  return wakeTrail * (0.12 + weBoatWakeStrength * 0.42) + bowPush * (0.04 + weBoatBowWave * 0.18 + weBoatBowSplash * 0.08);
-}`
+${boatWakeShaderFunction()}`
     )
     .replace(
-      'transformed.y += weWaveField(weWorldPos.xz);',
+      'transformed.y += weWaveField(weWorldPos.xz + weWaveOrigin);',
       `float weBoatWakeDisplace = weBoatWakeDisplacement(weWorldPos.xz);
-transformed.y += max(weWaveField(weWorldPos.xz) + weBoatWakeDisplace, -weWaveTroughDepth);`
+transformed.y += max(weWaveField(weWorldPos.xz + weWaveOrigin) + weBoatWakeDisplace, -weWaveTroughDepth);`
     );
 
   shader.fragmentShader = shader.fragmentShader

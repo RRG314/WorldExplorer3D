@@ -19,7 +19,7 @@ export function updateOceanHud(appCtx, oceanMode, nowSeconds = 0, sampleSeabedEv
 
   const speedKnots = Math.abs(worldUnitsPerSecondToKnots(sub.speed, appCtx.METERS_PER_WORLD_UNIT));
   const metersPerUnit = Number(appCtx.METERS_PER_WORLD_UNIT) > 0 ? appCtx.METERS_PER_WORLD_UNIT : 1.11;
-  const depth = Math.max(0, Math.round(-sub.position.y * metersPerUnit));
+  const depth = Math.max(0, Math.round(((oceanMode.waterSample?.surfaceY ?? .08)-sub.position.y) * metersPerUnit));
   const condition = Math.max(0, Math.min(1, Number(oceanMode.condition ?? sub.condition ?? 1)));
   const conditionPct = Math.round(condition * 100);
 

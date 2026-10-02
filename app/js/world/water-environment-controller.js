@@ -7,7 +7,7 @@ export function createWaterEnvironmentController({ appCtx, marineService, resolv
   let pending = null;
   const keyFor = location => `${location.lat.toFixed(4)}:${location.lon.toFixed(4)}`;
   function location() {
-    const selected = appCtx.selLoc === 'custom' ? appCtx.customLoc : appCtx.LOC;
+    const selected = appCtx.oceanMode?.active ? appCtx.oceanMode.launchSite : appCtx.selLoc === 'custom' ? appCtx.customLoc : appCtx.LOC;
     if (selected?.lat == null || selected?.lon == null || selected.lat === '' || selected.lon === '') return null;
     const lat = Number(selected.lat), lon = Number(selected.lon);
     return Number.isFinite(lat) && Number.isFinite(lon) && Math.abs(lat) <= 90 && Math.abs(lon) <= 180 ? {lat, lon} : null;

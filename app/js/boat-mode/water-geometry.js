@@ -160,7 +160,7 @@ function isPointInsideWaterAreaFootprint(area, x, z, edgeBuffer = 0) {
   if (!pointInWaterBody(area, x, z)) return false;
   const buffer = Math.max(0, Number(edgeBuffer) || 0);
   if (buffer <= 0) return true;
-  return distanceToWaterBoundary(candidate.source, x, z) >= buffer;
+  return distanceToWaterBoundary(area, x, z) >= buffer;
 }
 
 function isPointInsideWaterwayFootprint(way, x, z, edgeBuffer = 0) {

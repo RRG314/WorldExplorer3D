@@ -105,9 +105,22 @@ try {
  assert.match(await page.locator('#minimap').getAttribute('aria-label'), /Depth data unknown/);
  await page.screenshot({ path: `${dir}/outage-playable.png` });
  report.cases.push({ id: 'provider-outage-preserves-playable-procedural-fallback', passed: true });
+ // Exercise the actual upper-water boundary, not only deep-water travel.
+ await page.evaluate(async()=>{const {ctx}=await import('/app/js/shared-context.js?v=55');ctx.oceanMode.submarine.position.y=-.1;});
+ await page.keyboard.down('Space');await page.waitForTimeout(400);await page.keyboard.up('Space');
+ report.surfaceBoundary=await page.evaluate(()=>{
+   const d=window.getOceanModeDebugState();return {water:d.water,position:d.position,depthText:document.querySelector('#limit').textContent};
+ });
+ assert.ok(report.surfaceBoundary.water.surfaceY-report.surfaceBoundary.position.y>=1.39);
+ assert.equal(report.surfaceBoundary.water.depthEvidence.truthType,'unknown');
+ assert.ok(report.surfaceBoundary.water.gameplayDepthMeters>0);
+ await page.screenshot({path:`${dir}/underwater-wave-boundary.png`});
+ report.cases.push({id:'underwater-wave-boundary-and-qualified-depth',passed:true});
  const surfaced = await page.evaluate(async () => {
    const {ctx}=await import('/app/js/shared-context.js?v=55');
    window.expectedSurfaceOrigin={...ctx.oceanMode.launchSite};
+   const sub=ctx.oceanMode.submarine;
+   window.expectedWaveOffset={x:sub.position.x+(ctx.oceanMode.waveOffset?.x||0),z:sub.position.z+(ctx.oceanMode.waveOffset?.z||0)};
    return ctx.transferSubmarineToBoat({source:'water-authority-verification'});
  });
  report.surfaceTransfer={surfaced,warnings:report.boatWarnings||[],snapshot:await page.evaluate(()=>window.getWorldExplorerRuntimeDiagnostics?.().modes)};
@@ -126,6 +139,8 @@ try {
    return true;
  },null,{timeout:30000});
  report.boatWater=await page.evaluate(()=>window.waterCheckResult);
+ report.waveOffset=await page.evaluate(()=>({actual:waterCheckContext.boatMode.currentWater.source.waveOffset,expected:expectedWaveOffset}));
+ assert.deepEqual(report.waveOffset.actual,report.waveOffset.expected);
  report.surfaceOrigin=await page.evaluate(()=>({actual:waterCheckContext.LOC,expected:expectedSurfaceOrigin}));
  assert.ok(Math.abs(report.surfaceOrigin.actual.lat-report.surfaceOrigin.expected.lat)<.001);
  assert.ok(Math.abs(report.surfaceOrigin.actual.lon-report.surfaceOrigin.expected.lon)<.001);

@@ -156,7 +156,11 @@ function updateFishingScene(state, appCtx, dt) {
     }
   }
   const surfaceY = Number(appCtx.waterSurfaceYAt?.(fishX, fishZ));
-  const waterY = Number.isFinite(surfaceY) ? surfaceY : Number(boat.y) || 0;
+  if (!Number.isFinite(surfaceY)) {
+    visual.fishMesh.visible = false;
+    return;
+  }
+  const waterY = surfaceY;
   const fishY = state.stage === 'landed'
     ? waterY + (shoreActor ? 0.55 : 1.4)
     : waterY - 0.7 - state.currentBurst * 1.1 + Math.sin(visual.phase) * 0.22;

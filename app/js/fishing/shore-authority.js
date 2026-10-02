@@ -1,3 +1,4 @@
+import { nearestFishingWater } from './water-access.js?v=1';
 import { createFishPopulationContext } from './population-authority.js?v=2';
 
 const SHORE_FISHING_POLICY = Object.freeze({
@@ -115,10 +116,10 @@ function evaluateShoreFishing(appCtx, position = {}, options = {}) {
     : position;
   const x = Number(effectivePosition?.x);
   const z = Number(effectivePosition?.z);
-  if (!Number.isFinite(x) || !Number.isFinite(z) || typeof appCtx?.inspectBoatCandidate !== 'function') {
+  if (!Number.isFinite(x) || !Number.isFinite(z) || (!Array.isArray(appCtx?.waterAreas) && typeof appCtx?.inspectBoatCandidate !== 'function')) {
     return Object.freeze({ outcome: 'not_supported', playable: false, rewardEligible: false, message: messageForOutcome('not_supported') });
   }
-  const candidate = appCtx.inspectBoatCandidate(x, z, SHORE_FISHING_POLICY.maximumBankDistanceMeters, {
+  const candidate = nearestFishingWater(appCtx, x, z, SHORE_FISHING_POLICY.maximumBankDistanceMeters, {
     allowSynthetic: false,
     requireContainment: false,
     referenceY: Number(effectivePosition?.y),

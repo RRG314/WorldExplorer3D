@@ -301,6 +301,7 @@ export function createWorldLandusePass(options = {}) {
 
     if (isWater) {
       registerWaterWaveMaterial(material, {
+        waterBody: waterArea,
         waveScale: 1.0,
         waveBase: 1.0,
         area: outerArea,

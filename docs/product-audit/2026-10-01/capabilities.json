@@ -15,7 +15,7 @@
     "app/js/travel-mode.js": "38dbb7260a048cda3fedaef55eb59d2d36dd81a71887fbbc7437ee9d3410ab24",
     "app/js/plane-mode.js": "594e615f10425a466b33ed0107cc9f03cd87410820756b6948fc07aea191ac19",
     "app/js/boat-mode.js": "a9f15a4b7a87fedea34685480adf28b5cf838ed2dc6bc66b50b4224cbf621a9a",
-    "app/js/ocean.js": "b7932d3bbd85fb923626fb5b67a5b06d7bd718a9c23e885eeafca1fcec340709",
+    "app/js/ocean.js": "f2caa132ff560c4e2d28482340fd4e54a2d59824120c97b4654d1350a192e22e",
     "app/js/transport/maritime-runtime.js": "d433ff24ad1339353aa56e9e85d3053f4f2d26fb34ecdcc71cffab849aa8a9fe",
     "app/js/planetary/entry.js": "e9bff6f3010e48ca30b66581a44d4e79439b6ebb472d85204b4dd250aecfd78f",
     "app/js/planetary/mars-world.js": "24bfe06faf75e9c9ee87ed9155745fac9ddc1a5cd4aed9a2167eee0734ecfc45",

@@ -24,3 +24,13 @@ test('same-place calls coalesce and invalid coordinates cancel publication inste
 test('changing selected location without another refresh still invalidates a late result',async()=>{
  const t=setup();const a=t.controller.refresh();await tick();t.appCtx.LOC={lat:3,lon:3};t.requests[0].resolve('A');assert.equal(await a,null);assert.equal(t.stations.length,0);
 });
+
+test('Ocean launch owns marine evidence even when an older Earth selection remains',async()=>{
+ const t=setup();const old=t.controller.refresh();await tick();
+ t.appCtx.oceanMode={active:true,launchSite:{lat:0,lon:-140}};
+ const ocean=t.controller.refresh();await tick();
+ assert.deepEqual(t.requests[1].place,{lat:0,lon:-140});
+ t.requests[0].resolve('old-earth');assert.equal(await old,null);
+ t.requests[1].resolve('ocean');await ocean;assert.equal(t.appCtx.activeWaterOpticsEvidence.wave.truthType,'ocean');
+ t.appCtx.oceanMode.active=false;t.controller.refresh();assert.equal(t.appCtx.activeWaterOpticsEvidence,null);
+});

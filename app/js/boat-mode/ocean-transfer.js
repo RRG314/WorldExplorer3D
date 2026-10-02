@@ -61,7 +61,9 @@ async function transferBoatToSubmarine(options = {}) {
     await appCtx.showTransitionLoad('ocean', 700);
   }
 
+  const waveOffset=appCtx.boatMode.currentWater?.source?.waveOffset || {};
   const started = await appCtx.startOceanMode({
+    waveOffset:{x:appCtx.boat.x+(waveOffset.x||0),z:appCtx.boat.z+(waveOffset.z||0)},
     launchSite: {
       lat: geo.lat,
       lon: geo.lon,
@@ -117,7 +119,8 @@ async function transferSubmarineToBoat(options = {}) {
     // selection alone does not update LOC; keeping the previous origin made
     // the map and the next dive jump to the last terrestrial city.
     commitEarthLocationOrigin(appCtx, {lat, lon, name:customName});
-    const candidate = buildSyntheticBoatCandidate(0, 0, {waterKind:'open_ocean', surfaceY:0.08});
+    void appCtx.refreshWaterEnvironmentEvidence?.();
+    const candidate = buildSyntheticBoatCandidate(0, 0, {waterKind:'open_ocean', surfaceY:0.08, waveOffset:{x:sub.position.x+(appCtx.oceanMode?.waveOffset?.x||0),z:sub.position.z+(appCtx.oceanMode?.waveOffset?.z||0)}});
     if (!candidate) {
       showBoatPrompt('No surface boat spawn was available here', 'notice', promptDurationMs);
       return false;

@@ -1,10 +1,10 @@
+import { createWaterPatchGeometry } from '../world/water-patch-geometry.js?v=1';
 import { registerWaterWaveMaterial } from '../world/water-materials.js?v=5';
 import { ctx as appCtx } from "../shared-context.js?v=55";
-import { getSeaStateConfig, getWaveIntensity, inferWaterRenderContext, resolveWaterMotionProfile, surfaceNormalFromMotion } from "../water-dynamics.js?v=9";
+import { getSeaStateConfig, getWaveIntensity, surfaceNormalFromMotion } from "../water-dynamics.js?v=9";
 import { getWaterPalette } from "../water-palette.js?v=2";
 import {
   getBoatWaveProfile,
-  resolveBoatWaterKind,
   sampleDynamicWaterAt,
   waterSurfaceBaseYAt,
   waterSurfaceYAt
@@ -12,7 +12,7 @@ import {
 import { clamp, stepBoatSpring } from "./dynamics.js?v=1";
 import { resetBoatFoamFx, updateBoatFoamFx } from "./foam-effects.js?v=1";
 import { customizeBoatWaterPatchShader } from "./water-patch-shader.js?v=2";
-import { modeledWaveRenderControls } from '../world/water-optics-evidence.js?v=2';
+import { resolveBodyWaveProfile } from '../world/water-motion-profile.js?v=1';
 
 function registerBoatWaterPatchMaterial(material) {
   if (!material || material.userData?.weWaterWavePatched) return false;
@@ -41,8 +41,7 @@ function ensureBoatWaterPatch() {
     return appCtx.boatMode.waterPatch;
   }
   if (typeof THREE === 'undefined' || !appCtx.scene) return null;
-  const geometry = new THREE.PlaneGeometry(1, 1, 128, 128);
-  geometry.rotateX(-Math.PI / 2);
+  const geometry = createWaterPatchGeometry(THREE,14000);
   const palette = getWaterPalette(appCtx.boatMode?.waterKind);
   const material = new THREE.MeshStandardMaterial({
     color: palette.surface,
@@ -97,7 +96,11 @@ function updateBoatWaterPatch(candidate = null) {
   );
   // The geometry is pre-rotated onto the XZ plane, so scale the footprint on X/Z.
   // Scaling Y here collapses the patch into a moving strip and exaggerates wave height.
-  patch.scale.set(radius * 2.05, 1, radius * 2.05);
+  if (patch.geometry.userData.waterPatchRadius !== radius) {
+    patch.geometry.dispose();
+    patch.geometry=createWaterPatchGeometry(THREE,radius);
+  }
+  patch.scale.set(1,1,1);
   patch.material.opacity = 1;
   if (patch.material.color?.setHex) patch.material.color.setHex(palette.surface);
   if (patch.material.emissive?.setHex) patch.material.emissive.setHex(palette.emissive);
@@ -118,28 +121,9 @@ function buildBoatWaveProfile(material, runtimeIntensity = getWaveIntensity(), t
     profile: getBoatWaveProfile(appCtx.boatMode?.currentWater || null, {intensity:runtimeIntensity}),
     time: Number.isFinite(timeOverride) ? Number(timeOverride) : performance.now() * 0.001
   };
-  const runtimeKind = resolveBoatWaterKind(appCtx.boatMode?.currentWater || null);
-  const runtimeShoreline = Number(appCtx.boatMode?.shorelineDistance || 0);
-  const boatDriven = appCtx.boatMode?.active || config.localPatch === true;
-  const renderKind = config.useRuntimeKind === true ? runtimeKind : inferWaterRenderContext({kindHint:config.waterKind || runtimeKind});
-  const modeledControls = modeledWaveRenderControls(renderKind === 'lake' ? null : appCtx.activeWaterOpticsEvidence?.wave);
-  const effectiveIntensity = modeledControls.usable ? modeledControls.intensity : runtimeIntensity;
-  const profile = resolveWaterMotionProfile({
-    waterKind: renderKind,
-    shorelineDistance: Number.isFinite(config.shorelineDistance) ? config.shorelineDistance : runtimeShoreline,
-    intensity: appCtx.boatMode?.active ? effectiveIntensity : Math.min(effectiveIntensity, 0.24),
-    // Shared mapped water keeps a restrained optical wave field in walk and
-    // flight modes. This is presentation only; CPU sampling and buoyancy stay
-    // on the existing boat-mode water dynamics authority.
-    active: true,
-    energyScale: (Number.isFinite(config.energyBase) ? config.energyBase : 1) * (boatDriven ? 1 : 0.38)
+  const profile = resolveBodyWaveProfile(config.waterBody || {waterKind:config.waterKind}, {
+    intensity:runtimeIntensity, waveEvidence:appCtx.activeWaterOpticsEvidence?.wave
   });
-  if (modeledControls.usable) {
-    profile.speed *= modeledControls.speedScale;
-    profile.waveEvidenceSource = modeledControls.sourceId;
-    profile.modeledWaveHeightM = modeledControls.waveHeightM;
-    profile.modeledWavePeriodS = modeledControls.wavePeriodS;
-  }
   const time = Number.isFinite(timeOverride) ? Number(timeOverride) : performance.now() * 0.001;
   return { config, profile, time };
 }
@@ -149,17 +133,19 @@ function applyWaveUniformsToMaterial(material, profileBundle) {
   if (!shader?.uniforms) return false;
   const { config, profile, time } = profileBundle;
   shader.uniforms.weWaveTime.value = time;
+  const body = config.localPatch ? appCtx.boatMode?.currentWater?.source : config.waterBody;
+  shader.uniforms.weWaveOrigin?.value?.set?.(Number(body?.waveOffset?.x)||0,Number(body?.waveOffset?.z)||0);
   shader.uniforms.weWaveSpeed.value = profile.speed;
-  if (config.localPatch === true && shader.uniforms.weWaveScale) shader.uniforms.weWaveScale.value = profile.spatialScale;
-  shader.uniforms.weWaveAmplitude.value = profile.primaryAmplitude * (Number(config.waveBase) || 1);
+  if (shader.uniforms.weWaveScale) shader.uniforms.weWaveScale.value = profile.spatialScale;
+  shader.uniforms.weWaveAmplitude.value = profile.primaryAmplitude;
   if (shader.uniforms.weWaveSecondaryAmplitude) {
-    shader.uniforms.weWaveSecondaryAmplitude.value = profile.secondaryAmplitude * (Number(config.waveBase) || 1);
+    shader.uniforms.weWaveSecondaryAmplitude.value = profile.secondaryAmplitude;
   }
   if (shader.uniforms.weWaveSwellAmplitude) {
-    shader.uniforms.weWaveSwellAmplitude.value = profile.swellAmplitude * (Number(config.waveBase) || 1);
+    shader.uniforms.weWaveSwellAmplitude.value = profile.swellAmplitude;
   }
   if (shader.uniforms.weWaveRippleAmplitude) {
-    shader.uniforms.weWaveRippleAmplitude.value = profile.rippleAmplitude * (Number(config.waveBase) || 1);
+    shader.uniforms.weWaveRippleAmplitude.value = profile.rippleAmplitude;
   }
   if (shader.uniforms.weWaveVisualStrength) {
     shader.uniforms.weWaveVisualStrength.value = profile.visualStrength * (Number(config.visualBase) || 1);
