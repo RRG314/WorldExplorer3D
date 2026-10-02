@@ -1,3 +1,4 @@
+import { commitEarthLocationOrigin } from '../earth-core/location-origin.js?v=1';
 import {rdtDepth} from '../rdt.js';
 import {emitLocalLoadTrace} from './load-trace.js';
 import { createBuildingProvenanceSnapshot } from './building-provenance-model.js?v=1';
@@ -147,7 +148,7 @@ export function createWorldLoadRuntimeSession(options = {}) {
     finalizePerfLoad(false, { reason: 'invalid_location_selection' });
     return { aborted: true };
   }
-  appCtx.LOC = { ...loadRequest.location };
+  commitEarthLocationOrigin(appCtx, loadRequest.location);
   if (loadRequest.selection.key === 'custom') {
     appCtx.setCustomLocation?.(loadRequest.selection, { syncInputs: false });
   }

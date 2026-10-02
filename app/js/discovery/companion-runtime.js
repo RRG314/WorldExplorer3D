@@ -286,15 +286,16 @@ async function createCompanionRuntime(appCtx, options = {}) {
     progressWrites = progressWrites.then(async () => {
       const current = companions.find((entry) => entry.instanceId === completed.instanceId);
       if (!current) return false;
-      const learned = [...new Set([...(current.training?.learnedCommands || ['follow']), 'recall'])];
-      const records = { ...(current.training?.records || {}), recall: { completed: true, completedAt: Date.now() } };
-      const trained = Object.freeze({ ...current, training: Object.freeze({ ...current.training, learnedCommands: Object.freeze(learned), records: Object.freeze(records) }) });
-      const result = awardCompanionXp(trained, {
-        receiptId: `training:${current.instanceId}:recall:first-clear`,
-        reasonId: 'training-first-clear'
+      let result;
+      const next = await profileStore.saveCompanion(current, latest => {
+        const learned = [...new Set([...(latest.training?.learnedCommands || ['follow']), 'recall'])];
+        const records = { ...(latest.training?.records || {}), recall: { completed: true, completedAt: Date.now() } };
+        const trained = { ...latest, training: { ...latest.training, learnedCommands: learned, records } };
+        result = awardCompanionXp(trained, {
+          receiptId: `training:${latest.instanceId}:recall:first-clear`, reasonId: 'training-first-clear'
+        });
+        return result.companion;
       });
-      const next = result.companion;
-      await profileStore.saveCompanion(next);
       companions = companions.map((entry) => entry.instanceId === next.instanceId ? next : entry);
       active = next;
       if (result.awarded) options.onXpAward?.(next, result);
@@ -329,10 +330,12 @@ async function createCompanionRuntime(appCtx, options = {}) {
     progressWrites = progressWrites.then(async () => {
       const current = companions.find((entry) => entry.instanceId === instanceId);
       if (!current) return false;
-      const result = awardCompanionXp(current, award);
+      let result;
+      const next = await profileStore.saveCompanion(current, latest => {
+        result = awardCompanionXp(latest, award);
+        return result.companion;
+      });
       if (!result.awarded) return false;
-      const next = result.companion;
-      await profileStore.saveCompanion(next);
       companions = companions.map((entry) => entry.instanceId === instanceId ? next : entry);
       if (active?.instanceId === instanceId) active = next;
       options.onXpAward?.(next, result);

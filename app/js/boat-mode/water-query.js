@@ -1,3 +1,4 @@
+import { modeledWaveRenderControls } from '../world/water-optics-evidence.js?v=2';
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import {
   getWaveIntensity,
@@ -39,7 +40,7 @@ import {
   resolveWaterBodySurfaceY,
   waterKindLabel
 } from '../world/water-body-contract.js?v=4';
-import { pointInWaterBody } from '../world/water-surface-registry.js?v=3';
+import { pointInWaterBody, distanceToWaterBoundary } from '../world/water-surface-registry.js?v=3';
 
 let _waterRaycaster = null;
 let _waterRayStart = null;
@@ -68,7 +69,7 @@ function buildSyntheticBoatCandidate(x, z, options = {}) {
       z: z + Math.sin(angle) * radius
     });
   }
-  const surfaceY = waterSurfaceBaseYAt(x, z, { waterKind });
+  const surfaceY = Number.isFinite(options.surfaceY) ? options.surfaceY : waterSurfaceBaseYAt(x, z, { waterKind });
   const source = normalizeWaterBody({
     shape: 'area',
     synthetic: true,
@@ -122,15 +123,24 @@ function resolveBoatWaterKind(candidate = null) {
 }
 
 function getBoatWaveProfile(candidate = null, options = {}) {
-  return resolveWaterMotionProfile({
-    waterKind: resolveBoatWaterKind(candidate),
+  const waterKind = resolveBoatWaterKind(candidate);
+  const modeled = modeledWaveRenderControls(waterKind === 'lake' ? null : appCtx.activeWaterOpticsEvidence?.wave);
+  const profile = resolveWaterMotionProfile({
+    waterKind,
     shorelineDistance: Number.isFinite(options.shorelineDistance) ?
       options.shorelineDistance :
-      Number(candidate?.shorelineDistance || appCtx.boatMode?.shorelineDistance || 0),
-    intensity: options.intensity,
+      Number(candidate?.shorelineDistance ?? appCtx.boatMode?.shorelineDistance ?? 0),
+    intensity: modeled.usable ? modeled.intensity : options.intensity,
     active: options.active !== false,
     energyScale: options.energyScale
   });
+  if (modeled.usable) {
+    profile.speed *= modeled.speedScale;
+    profile.waveEvidenceSource = modeled.sourceId;
+    profile.modeledWaveHeightM = modeled.waveHeightM;
+    profile.modeledWavePeriodS = modeled.wavePeriodS;
+  }
+  return profile;
 }
 
 function waterSurfaceBaseYAt(x, z, candidate = null) {
@@ -140,7 +150,7 @@ function waterSurfaceBaseYAt(x, z, candidate = null) {
       sampleWaterwayProfile: sampleWaterwaySurfaceProfile,
       terrainHeightAt: (sampleX, sampleZ) => typeof appCtx.terrainMeshHeightAt === 'function'
         ? appCtx.terrainMeshHeightAt(sampleX, sampleZ)
-        : appCtx.elevationWorldYAtWorldXZ(sampleX, sampleZ),
+        : appCtx.elevationWorldYAtWorldXZ?.(sampleX, sampleZ),
       waterwayBias: 0.14
     });
   }
@@ -155,21 +165,44 @@ function waterSurfaceBaseYAt(x, z, candidate = null) {
     }
   }
 
-  const terrainY = appCtx.elevationWorldYAtWorldXZ(x, z);
+  const terrainY = appCtx.elevationWorldYAtWorldXZ?.(x, z);
   const waterKind = String(candidate?.waterKind || appCtx.boatMode?.waterKind || '').toLowerCase();
-  if ((waterKind === 'open_ocean' || waterKind === 'coastal') && terrainY < -1) {
+  if ((waterKind === 'open_ocean' || waterKind === 'coastal') && (!Number.isFinite(terrainY) || terrainY < -1)) {
     return 0.08;
   }
-  return terrainY + 0.12;
+  return Number.isFinite(terrainY) ? terrainY + 0.12 : 0;
+}
+
+function resolveWaterSampleCandidate(x, z) {
+  const current = appCtx.boatMode?.currentWater;
+  if (current && isPointInsideBoatCandidate(current, x, z)) return current;
+  // Water queries also serve shore fishing and immersion. Small ponds and
+  // non-navigable water still have a surface; boat eligibility is not coverage.
+  let area = null;
+  for (const body of appCtx.waterAreas || []) {
+    if (pointInWaterBody(body, x, z) && (!area || Number(body.area || Infinity) < Number(area.area || Infinity))) area = body;
+  }
+  if (area) return { source:area, waterKind:area.waterKind, surfaceY:area.surfaceY,
+    shorelineDistance:distanceToWaterBoundary(area, x, z) };
+  const way = (appCtx.waterways || []).find(body => {
+    if (body.structureSemantics?.terrainMode === 'subgrade' || !(Number(body.width) > 0)) return false;
+    const nearest = nearestPointOnPolyline(x, z, body.pts);
+    return nearest && nearest.dist <= Number(body.width) * 0.5;
+  });
+  return way ? {source:way, waterKind:way.waterKind, surfaceY:way.surfaceY, shorelineDistance:0} : null;
 }
 
 function sampleDynamicWaterAt(x, z, candidate = null, options = {}) {
+  candidate ||= resolveWaterSampleCandidate(x, z);
   const profile = options.profile || getBoatWaveProfile(candidate, options);
   const time = Number.isFinite(options.time) ? Number(options.time) : performance.now() * 0.001;
   const motion = sampleWaterSurfaceMotion(x, z, time, { profile });
   const baseY = waterSurfaceBaseYAt(x, z, candidate);
   return {
     baseY,
+    candidate,
+    coverage: candidate ? 'known-water-body' : 'unresolved',
+    normal: {x:motion.normalX, y:motion.normalY, z:motion.normalZ},
     surfaceY: baseY + motion.height,
     motion,
     profile,
@@ -178,7 +211,8 @@ function sampleDynamicWaterAt(x, z, candidate = null, options = {}) {
 }
 
 function waterSurfaceYAt(x, z, candidate = null, options = {}) {
-  return sampleDynamicWaterAt(x, z, candidate, options).surfaceY;
+  const sample = sampleDynamicWaterAt(x, z, candidate, options);
+  return sample.coverage === 'known-water-body' ? sample.surfaceY : NaN;
 }
 
 function syncWaterMeshCache() {
@@ -493,6 +527,7 @@ export {
   resolveBoatWaterKind,
   resolveBoatHeading,
   resolveBoatSpawnPoint,
+  resolveWaterSampleCandidate,
   sampleDynamicWaterAt,
   syncWaterMeshCache,
   waterKindLabel,

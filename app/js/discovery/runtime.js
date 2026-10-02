@@ -1,3 +1,5 @@
+import { projectDiscoveryItemsToBackpack } from './backpack-projection.js?v=1';
+import { discoverySaveMessage } from './save-status.js?v=1';
 import { createDiscoveryReceiptSync } from './receipt-outbox.js?v=1';
 import { hydrateDiscoveryReceipts } from './receipt-hydration.js?v=1';
 import { ambientNotices } from '../ui/ambient-notices.js';
@@ -81,53 +83,6 @@ function fieldToolBackpackDefinition(tool) {
     discipline: tool.discipline,
     sourceRefs: tool.sourceRefs
   });
-}
-
-function discoveryItemBackpackRecord(item) {
-  if (!item?.instanceId || !item?.catalogId) return null;
-  return {
-    instanceId: item.instanceId,
-    catalogId: item.catalogId,
-    quantity: Number(item.quantity) || 1,
-    authority: item.authority || 'anonymous-local',
-    provenance: item.provenance || 'field-discovery',
-    sourceEventId: item.sourceEventId || item.eventId || item.claimId || '',
-    acquiredAt: Number(item.collectedAt) || 0,
-    tradeable: item.tradeable === true,
-    metadata: {
-      label: item.name || item.catalogId,
-      category: 'specimen',
-      icon: 'FIND',
-      verbs: ['inspect'],
-      description: item.description || `${item.name || item.catalogId} was added through ${displayDiscoveryLabel(item.activityId, 'an Explorer activity')}.`,
-      regionLabel: item.regionLabel || '',
-      evidenceClass: item.evidenceClass || ''
-    }
-  };
-}
-
-function projectDiscoveryItemsToBackpack(appCtx, items = []) {
-  const inventory = appCtx.playerBackpackInventory;
-  if (!inventory) return 0;
-  let projected = 0;
-  for (const item of items) {
-    const record = discoveryItemBackpackRecord(item);
-    if (!record) continue;
-    inventory.upsertItem(record, {
-      definition: {
-        id: record.catalogId,
-        label: record.metadata.label,
-        category: record.metadata.category,
-        icon: record.metadata.icon,
-        verbs: record.metadata.verbs,
-        description: record.metadata.description
-      },
-      silent: true
-    });
-    projected += 1;
-  }
-  appCtx.playerBackpackStore?.save?.(inventory.exportState?.());
-  return projected;
 }
 
 const WILDLIFE_COMPANION_CATALOG = Object.freeze({
@@ -255,6 +210,7 @@ function publishExplorerResult(event, profileStore) {
 function createDiscoveryUi(state) {
   const byId = (id) => document.getElementById(id);
   const elements = {
+    saveStatus: byId('discoverySaveStatus'),
     panel: byId('discoveryPanel'), close: byId('discoveryCloseBtn'), help: byId('discoveryHelpBtn'), quick: byId('discoveryQuickToolBtn'), menu: byId('fWorldDiscovery'),
     todayBackpack: byId('discoveryOpenBackpackTodayBtn'),
     encounterLead: byId('discoveryEncounterLeadBtn'), encounterLeadDetail: byId('discoveryEncounterLeadDetail'),
@@ -277,7 +233,7 @@ function createDiscoveryUi(state) {
     sectionTutorialSteps: byId('discoverySectionTutorialSteps'), sectionTutorialDone: byId('discoverySectionTutorialDoneBtn'),
     inspection: byId('discoveryInspection'), arChallenge: byId('discoveryArChallengeBtn'), rank: byId('discoveryRankSummary'), goal: byId('discoveryGoal'),
     fieldSession: byId('discoveryFieldSession'), expedition: byId('discoveryExpeditionList'), expeditionMode: byId('discoveryExpeditionMode'),
-    exportData: byId('discoveryExportBtn'), importData: byId('discoveryImportBtn'), importFile: byId('discoveryImportFile'), backupStatus: byId('discoveryBackupStatus')
+    undoImport: byId('discoveryUndoImportBtn'), exportData: byId('discoveryExportBtn'), importData: byId('discoveryImportBtn'), importFile: byId('discoveryImportFile'), backupStatus: byId('discoveryBackupStatus')
   };
   const listeners = [];
   let activeTab = 'today';
@@ -415,6 +371,14 @@ function createDiscoveryUi(state) {
     guideRecords = guide;
     journalRecords = events;
     projectDiscoveryItemsToBackpack(state.appCtx, items);
+    if (elements.saveStatus) {
+      const ownerUid = state.appCtx.getAccountUserId?.();
+      const receipts = await state.profileStore.getReceiptSyncStatus?.(ownerUid);
+      if (ownerUid === state.appCtx.getAccountUserId?.()) elements.saveStatus.textContent = discoverySaveMessage({
+        durable: state.profileStore.type === 'IndexedDbDiscoveryProfileStore', signedIn: !!ownerUid,
+        receipts, backpackSaved: state.appCtx.discoveryBackpackSaved !== false, online: globalThis.navigator?.onLine !== false
+      });
+    }
     if (elements.journalRegion) {
       const selectedRegion = elements.journalRegion.value || 'all';
       const regions = [...new Map(events.filter((event) => event.regionId).map((event) => [event.regionId, event.regionLabel || 'Saved region'])).entries()];
@@ -627,7 +591,7 @@ function createDiscoveryUi(state) {
     const storageNote = state.profileStore?.type === 'IndexedDbDiscoveryProfileStore'
       ? 'Journal saved in this browser on this device. The full Journal is not backed up to your account.'
       : 'Journal available for this session only. Browser storage is unavailable.';
-    elements.result.innerHTML = `<span class="discoveryResultEyebrow">RESULT SAVED</span><strong>${escapeHtml(event.name || 'Explorer record')}</strong><p>${escapeHtml(collection ? 'Journal updated · Added to Backpack' : fieldGuide ? 'Journal and Field Guide updated' : 'Journal updated')}</p><div class="discoveryResultProgress">${escapeHtml(rewardSummary || 'Your result is saved')}</div><p class="discoveryResultStorage">${escapeHtml(storageNote)}</p><div class="discoveryResultActions"><button data-result-tab="journal" type="button">View in Journal</button>${fieldGuide ? '<button data-result-tab="guide" type="button">Open Field Guide</button>' : ''}${collection ? '<button data-open-backpack="true" type="button">Open Backpack</button>' : ''}<button data-result-continue="true" type="button">Back to exploring</button></div>`;
+    elements.result.innerHTML = `<span class="discoveryResultEyebrow">${state.profileStore?.type === 'IndexedDbDiscoveryProfileStore' ? 'SAVED ON THIS DEVICE' : 'SESSION ONLY'}</span><strong>${escapeHtml(event.name || 'Explorer record')}</strong><p>${escapeHtml(collection ? 'Journal updated · Added to Backpack' : fieldGuide ? 'Journal and Field Guide updated' : 'Journal updated')}</p><div class="discoveryResultProgress">${escapeHtml(rewardSummary || 'Your result is saved')}</div><p class="discoveryResultStorage">${escapeHtml(storageNote)}</p><div class="discoveryResultActions"><button data-result-tab="journal" type="button">View in Journal</button>${fieldGuide ? '<button data-result-tab="guide" type="button">Open Field Guide</button>' : ''}${collection ? '<button data-open-backpack="true" type="button">Open Backpack</button>' : ''}<button data-result-continue="true" type="button">Back to exploring</button></div>`;
     document.querySelector('.discoveryPane[data-discovery-pane="today"]')?.scrollTo?.({ top: 0 });
     publishExplorerResult(event, state.profileStore);
     return true;
@@ -736,16 +700,25 @@ function createDiscoveryUi(state) {
       if (elements.backupStatus) elements.backupStatus.textContent = error?.message || 'The backup could not be created.';
     }
   });
+  listen(elements.undoImport, 'click', async () => {
+    if (!globalThis.confirm?.('Undo the last Journal restore? This returns to the local records saved immediately before that restore and reloads the app.')) return;
+    try {
+      if (await state.profileStore.rollbackLastImport()) globalThis.location?.reload();
+      else if (elements.backupStatus) elements.backupStatus.textContent = 'There is no Journal restore to undo on this device.';
+    } catch (error) {
+      if (elements.backupStatus) elements.backupStatus.textContent = error?.message || 'The previous Journal could not be recovered.';
+    }
+  });
   listen(elements.importData, 'click', () => elements.importFile?.click());
   listen(elements.importFile, 'change', async () => {
     const file = elements.importFile?.files?.[0];
     if (!file) return;
     try {
       const data = JSON.parse(await file.text());
-      if (!globalThis.confirm?.('Restore this Journal backup? Current local Explorer records in this browser will be replaced.')) return;
+      if (!globalThis.confirm?.('Restore this Journal backup? Current local Explorer records in this browser will be replaced and the app will reload. You can undo the last restore in Data and backup.')) return;
       const result = await state.profileStore.importData(data);
-      await refreshData();
-      if (elements.backupStatus) elements.backupStatus.textContent = `Restored ${result.events} Journal memories and ${result.guide} Guide entries.`;
+      if (elements.backupStatus) elements.backupStatus.textContent = `Restored ${result.events} Journal memories and ${result.guide} Guide entries. Reloading…`;
+      globalThis.location?.reload();
     } catch (error) {
       if (elements.backupStatus) elements.backupStatus.textContent = error?.message || 'This backup could not be restored.';
     } finally {
@@ -999,7 +972,10 @@ function discoveryHaptic(pattern = 18) {
 
 async function syncTrustedReceipt(appCtx) {
   try {
-    return await appCtx.worldDiscoveryRuntime?.receiptSync?.flush?.();
+    const runtime = appCtx.worldDiscoveryRuntime;
+    const completed = await runtime?.receiptSync?.flush?.();
+    if (runtime?.ui?.open) await runtime.ui.refreshData();
+    return completed;
   } catch (error) {
     console.warn('[world-discovery] Receipt queue unavailable:', error?.message || error);
     return null;
@@ -1189,7 +1165,7 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
       metadata: { category: 'field-tool' }
     }, { silent: true });
   }
-  projectDiscoveryItemsToBackpack(appCtx, existingItems);
+  projectDiscoveryItemsToBackpack(appCtx, existingItems, {reconcile:true});
   const legacyEquippedToolId = entitlements.canUseTool(discoveryProfile.equippedToolId).allowed
     ? String(discoveryProfile.equippedToolId)
     : 'field-lens';
@@ -1557,15 +1533,8 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
     });
     globalThis.__WE3D_COMPANION_SUPPORT__ = state.companionSupportHook;
   }
-  state.awardActiveCompanionForField = async (receiptBase, firstIdentification = false) => {
-    const stable = String(receiptBase || '').trim();
-    if (!stable || !state.companionRuntime.snapshot().activeInstanceId) return false;
-    const fieldAward = await state.companionRuntime.awardXp({ receiptId: `field:${stable}`, reasonId: 'field-activity' });
-    if (firstIdentification) {
-      await state.companionRuntime.awardXp({ receiptId: `species:${stable}`, reasonId: 'new-species' });
-    }
-    return fieldAward;
-  };
+  // Field credit is committed by the Journal owner; this only refreshes presentation.
+  state.awardActiveCompanionForField = async () => state.companionRuntime.refresh();
   state.wildlifeRuntime = createAmbientWildlifeRuntime(appCtx, wildlife);
   state.refreshToolProgress = async () => {
     const profile = await profileStore.getProfile();

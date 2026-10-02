@@ -70,6 +70,7 @@ test('ocean transfer keeps the selected vessel identity and condition', async ()
   const travelCalls = [];
   const appCtx = {
     SCALE: 1000,
+    LOC: {lat:12,lon:34},
     ENV: { EARTH: 'EARTH' },
     boat: { x: 12, z: 18, angle: .7 },
     boatMode: {
@@ -83,7 +84,6 @@ test('ocean transfer keeps the selected vessel identity and condition', async ()
     },
     customLoc: { name: 'Test Water' },
     oceanMode: { active: false },
-    worldToLatLon: () => ({ lat: 12, lon: 34 }),
     startOceanMode(options) {
       this.oceanMode = {
         active: true,

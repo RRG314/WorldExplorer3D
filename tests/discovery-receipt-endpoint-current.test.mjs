@@ -20,7 +20,7 @@ function collectionRef(path) {
   };
 }
 
-function createEndpoint({ existing = false } = {}) {
+function createEndpoint({ existing = false, isAdmin = false } = {}) {
   const writes = [];
   let transactionRuns = 0;
   const db = {
@@ -28,9 +28,9 @@ function createEndpoint({ existing = false } = {}) {
     async runTransaction(callback) {
       transactionRuns += 1;
       return callback({
-        async get() {
+        async get(ref) {
           return existing
-            ? { exists: true, data: () => ({ itemId: 'existing-item' }) }
+            ? { exists:true, data:()=>ref.path.includes('/items/') ? {catalogId:'taxon-1',ownerUid:'explorer-1',authority:'server-receipt',tradeable:false} : {itemId:ref.id} }
             : { exists: false, data: () => null };
         },
         set(ref, value, options) { writes.push({ operation: 'set', path: ref.path, value, options }); },
@@ -46,7 +46,7 @@ function createEndpoint({ existing = false } = {}) {
   const { claimExplorerDiscovery } = buildDiscoveryExports({
     functions,
     setCors: () => false,
-    verifyAuth: async () => ({ uid: 'explorer-1', admin: false }),
+    verifyAuth: async () => ({ uid: 'explorer-1', admin: isAdmin }),
     db,
     admin: {}
   });
@@ -103,7 +103,7 @@ test('repeated claim IDs return the existing receipt without duplicate writes', 
   await endpoint.claimExplorerDiscovery({ method: 'POST', body: { ...baseClaim, evidenceClass: 'guided-field-lead' } }, res);
   assert.equal(res.statusCode, 200);
   assert.equal(res.body.awarded, false);
-  assert.equal(res.body.itemId, 'existing-item');
+  assert.match(res.body.itemId, /^[a-f0-9]{40}$/);
   assert.deepEqual(endpoint.writes, []);
 });
 
@@ -127,4 +127,10 @@ test('receipt endpoint rejects another owner and malformed cursors before queryi
 test('receipt creation rejects account changes before writing',async()=>{
  const endpoint=createEndpoint();const res=responseCapture();await endpoint.claimExplorerDiscovery({method:'POST',body:{...baseClaim,evidenceClass:'guided-field-lead',expectedOwnerUid:'other'}},res);
  assert.equal(res.statusCode,409);assert.equal(endpoint.transactionRuns(),0);
+});
+
+test('replaying after account privileges change preserves original receipt authority', async () => {
+  const endpoint=createEndpoint({existing:true,isAdmin:true});const res=responseCapture();
+  await endpoint.claimExplorerDiscovery({method:'POST',body:{...baseClaim,evidenceClass:'virtual-field-record'}},res);
+  assert.equal(res.statusCode,200);assert.equal(res.body.authority,'server-receipt');assert.equal(res.body.tradeable,false);
 });

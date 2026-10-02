@@ -1,3 +1,4 @@
+import { registerWaterWaveMaterial } from '../world/water-materials.js?v=5';
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { getSeaStateConfig, getWaveIntensity, inferWaterRenderContext, resolveWaterMotionProfile, surfaceNormalFromMotion } from "../water-dynamics.js?v=9";
 import { getWaterPalette } from "../water-palette.js?v=2";
@@ -14,10 +15,10 @@ import { customizeBoatWaterPatchShader } from "./water-patch-shader.js?v=2";
 import { modeledWaveRenderControls } from '../world/water-optics-evidence.js?v=2';
 
 function registerBoatWaterPatchMaterial(material) {
-  if (!material || material.userData?.weWaterWavePatched || typeof appCtx.registerWaterWaveMaterial !== 'function') return false;
-  appCtx.registerWaterWaveMaterial(material, {
-    waveScale: 1.08,
-    waveBase: 1.28,
+  if (!material || material.userData?.weWaterWavePatched) return false;
+  registerWaterWaveMaterial(material, {
+    waveScale: 1,
+    waveBase: 1,
     visualBase: 0.78,
     foamBase: 1.38,
     edgeFade: 0.46,
@@ -112,13 +113,19 @@ function updateBoatWaterPatch(candidate = null) {
 
 function buildBoatWaveProfile(material, runtimeIntensity = getWaveIntensity(), timeOverride = null) {
   const config = material?.userData?.weWaterWaveConfig || {};
+  if (config.localPatch === true) return {
+    config,
+    profile: getBoatWaveProfile(appCtx.boatMode?.currentWater || null, {intensity:runtimeIntensity}),
+    time: Number.isFinite(timeOverride) ? Number(timeOverride) : performance.now() * 0.001
+  };
   const runtimeKind = resolveBoatWaterKind(appCtx.boatMode?.currentWater || null);
   const runtimeShoreline = Number(appCtx.boatMode?.shorelineDistance || 0);
   const boatDriven = appCtx.boatMode?.active || config.localPatch === true;
-  const modeledControls = modeledWaveRenderControls(appCtx.activeWaterOpticsEvidence?.wave);
+  const renderKind = config.useRuntimeKind === true ? runtimeKind : inferWaterRenderContext({kindHint:config.waterKind || runtimeKind});
+  const modeledControls = modeledWaveRenderControls(renderKind === 'lake' ? null : appCtx.activeWaterOpticsEvidence?.wave);
   const effectiveIntensity = modeledControls.usable ? modeledControls.intensity : runtimeIntensity;
   const profile = resolveWaterMotionProfile({
-    waterKind: config.useRuntimeKind === true ? runtimeKind : inferWaterRenderContext({ kindHint: config.waterKind || runtimeKind }),
+    waterKind: renderKind,
     shorelineDistance: Number.isFinite(config.shorelineDistance) ? config.shorelineDistance : runtimeShoreline,
     intensity: appCtx.boatMode?.active ? effectiveIntensity : Math.min(effectiveIntensity, 0.24),
     // Shared mapped water keeps a restrained optical wave field in walk and
@@ -143,6 +150,7 @@ function applyWaveUniformsToMaterial(material, profileBundle) {
   const { config, profile, time } = profileBundle;
   shader.uniforms.weWaveTime.value = time;
   shader.uniforms.weWaveSpeed.value = profile.speed;
+  if (config.localPatch === true && shader.uniforms.weWaveScale) shader.uniforms.weWaveScale.value = profile.spatialScale;
   shader.uniforms.weWaveAmplitude.value = profile.primaryAmplitude * (Number(config.waveBase) || 1);
   if (shader.uniforms.weWaveSecondaryAmplitude) {
     shader.uniforms.weWaveSecondaryAmplitude.value = profile.secondaryAmplitude * (Number(config.waveBase) || 1);
@@ -528,6 +536,8 @@ function updateWaterWaveVisuals() {
 }
 
 export {
+  buildBoatWaveProfile,
+  applyWaveUniformsToMaterial,
   applyBoatWavePose,
   ensureBoatWaterPatch,
   resetBoatFoamFx,

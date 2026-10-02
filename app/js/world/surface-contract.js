@@ -364,10 +364,10 @@ function createSurfaceQuery(appCtx, GroundHeight) {
   }
 
   function waterAt(x, z, options = {}) {
-    const candidate = options.candidate || null;
-    const dynamic = candidate && typeof appCtx.sampleDynamicWaterAt === 'function'
-      ? appCtx.sampleDynamicWaterAt(x, z, candidate, options)
+    const dynamic = typeof appCtx.sampleDynamicWaterAt === 'function'
+      ? appCtx.sampleDynamicWaterAt(x, z, options.candidate || null, options)
       : null;
+    const candidate = dynamic?.candidate || options.candidate || null;
     const y = Number.isFinite(dynamic?.surfaceY)
       ? dynamic.surfaceY
       : Number.isFinite(candidate?.surfaceY) ? candidate.surfaceY : 0;
@@ -376,6 +376,8 @@ function createSurfaceQuery(appCtx, GroundHeight) {
       y,
       z,
       kind: SURFACE_KIND.WATER,
+      normal: dynamic?.normal || (dynamic?.motion ? {x:dynamic.motion.normalX, y:dynamic.motion.normalY, z:dynamic.motion.normalZ} : null),
+      traversal: {boat: !!candidate && (candidate.source || candidate).navigable !== false},
       profile: profile(),
       metersPerWorldUnit: units(),
       feature: candidate?.source || candidate,

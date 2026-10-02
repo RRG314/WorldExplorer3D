@@ -6,14 +6,24 @@ const server=await startStaticServer({rootDir:process.cwd(),ports:[4396]});
 const browser=await chromium.launch({channel:'chrome',headless:true});
 const dir='output/verification/product-plan';const report={scope:'Real IndexedDB offline queue/reload/account switch with controlled auth and receipt responses; no live service certification',errors:[]};
 try{
- const page=await browser.newPage();page.on('pageerror',e=>report.errors.push(e.message));
+ const page=await browser.newPage({viewport:{width:390,height:844}});page.on('pageerror',e=>report.errors.push(e.message));
  await page.goto(`http://127.0.0.1:${server.port}/tests/fixtures/discovery-outbox.html`);await page.waitForFunction(()=>window.ready);
  report.offline=await page.evaluate(()=>prepare());assert.equal(report.offline.pendingA,1);assert.equal(report.offline.records,1);
+ assert.match(await page.locator('#saveStatus').innerText(),/1 waiting to upload; reconnect/);
+ await page.screenshot({path:`${dir}/receipt-status-pending-phone.png`});
  await page.reload();await page.waitForFunction(()=>window.ready);
  report.reloaded=await page.evaluate(()=>refresh());assert.equal(report.reloaded.pendingA,1);
  report.otherAccount=await page.evaluate(async()=>{owner='fixture-b';return retry()});assert.equal(report.otherAccount.calls,0);assert.equal(report.otherAccount.pendingA,1);
  report.recovered=await page.evaluate(async()=>{owner='fixture-a';return retry()});assert.equal(report.recovered.pendingA,0);assert.equal(report.recovered.records,1);assert.equal(report.recovered.items[0].authority,'server-receipt');
+ assert.match(await page.locator('#saveStatus').innerText(),/1 collected-item receipt acknowledged/);
  await page.screenshot({path:`${dir}/receipt-outbox.png`});
+ await page.evaluate(async()=>{
+   await store.collect({claimId:'blocked:2',instanceId:'blocked:item',catalogId:'rock-2'});
+   const [entry]=await store.listPendingReceipts(owner,Infinity);await store.deferPendingReceipt(entry.id,{status:'blocked'});await refresh();
+ });
+ assert.match(await page.locator('#saveStatus').innerText(),/1 could not be acknowledged/);
+ assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+ await page.screenshot({path:`${dir}/receipt-status-blocked-phone.png`});
  const legacyContext=await browser.newContext();const legacy=await legacyContext.newPage();
  await legacy.goto(`http://127.0.0.1:${server.port}/tests/fixtures/current-objective.html`);
  report.upgrade=await legacy.evaluate(async()=>{

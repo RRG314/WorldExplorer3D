@@ -1,7 +1,7 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
 import { clamp } from './dynamics.js?v=1';
 import { normalizeWaterKind, waterKindLabel } from '../world/water-body-contract.js?v=4';
-import { pointInWaterBody } from '../world/water-surface-registry.js?v=3';
+import { pointInWaterBody, distanceToWaterBoundary } from '../world/water-surface-registry.js?v=3';
 
 const BOAT_ENTRY_OFFSET = 9;
 const BOAT_MAX_CANDIDATE_DISTANCE = 58;
@@ -160,8 +160,7 @@ function isPointInsideWaterAreaFootprint(area, x, z, edgeBuffer = 0) {
   if (!pointInWaterBody(area, x, z)) return false;
   const buffer = Math.max(0, Number(edgeBuffer) || 0);
   if (buffer <= 0) return true;
-  const edge = nearestPointOnPolygon(x, z, pts);
-  return !!edge && edge.dist >= buffer;
+  return distanceToWaterBoundary(candidate.source, x, z) >= buffer;
 }
 
 function isPointInsideWaterwayFootprint(way, x, z, edgeBuffer = 0) {
@@ -243,12 +242,10 @@ function pointInsideBoatCandidate(candidate, x, z, edgeBuffer = 0) {
     const halfWidth = Math.max(3, (Number(candidate.source?.width) || 8) * 0.5);
     return nearest.dist <= Math.max(0.8, halfWidth - buffer);
   }
-  const pts = Array.isArray(candidate.source?.pts) ? candidate.source.pts : [];
   const inside = pointInWaterBody(candidate.source, x, z);
   if (!inside) return false;
   if (buffer <= 0) return true;
-  const edge = nearestPointOnPolygon(x, z, pts);
-  return !!edge && edge.dist >= buffer;
+  return distanceToWaterBoundary(candidate.source, x, z) >= buffer;
 }
 
 function measureBoatShorelineDistance(candidate, x, z) {
@@ -260,10 +257,7 @@ function measureBoatShorelineDistance(candidate, x, z) {
     const halfWidth = Math.max(3, (Number(candidate.source?.width) || 8) * 0.5);
     return Math.max(0, halfWidth - nearest.dist);
   }
-  const pts = Array.isArray(candidate.source?.pts) ? candidate.source.pts : [];
-  if (!(typeof appCtx.pointInPolygon === 'function' && appCtx.pointInPolygon(x, z, pts))) return 0;
-  const nearest = nearestPointOnPolygon(x, z, pts);
-  return Math.max(0, Number(nearest?.dist || 0));
+  return distanceToWaterBoundary(candidate.source, x, z);
 }
 
 function findBestAreaInteriorSpawn(candidate, preferredX, preferredZ, minEdge) {

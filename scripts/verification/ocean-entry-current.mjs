@@ -19,6 +19,7 @@ try {
  });
  const page = await context.newPage();
  page.on('pageerror', error => report.errors.push(error.message));
+ page.on('console', message => {if(message.text().includes('[BoatMode]')) (report.boatWarnings ||= []).push(message.text());});
  await page.goto(`http://127.0.0.1:${server.port}/`, { waitUntil: 'load' });
  await page.locator('#landingPrimaryCta').click();
  await page.waitForFunction(() => window.__WE3D_RUNTIME_READY__ === true, null, { timeout: 90000 });
@@ -104,6 +105,63 @@ try {
  assert.match(await page.locator('#minimap').getAttribute('aria-label'), /Depth data unknown/);
  await page.screenshot({ path: `${dir}/outage-playable.png` });
  report.cases.push({ id: 'provider-outage-preserves-playable-procedural-fallback', passed: true });
+ const surfaced = await page.evaluate(async () => {
+   const {ctx}=await import('/app/js/shared-context.js?v=55');
+   window.expectedSurfaceOrigin={...ctx.oceanMode.launchSite};
+   return ctx.transferSubmarineToBoat({source:'water-authority-verification'});
+ });
+ report.surfaceTransfer={surfaced,warnings:report.boatWarnings||[],snapshot:await page.evaluate(()=>window.getWorldExplorerRuntimeDiagnostics?.().modes)};
+ assert.equal(surfaced,true,JSON.stringify(report.surfaceTransfer));
+ await page.evaluate(async()=>{window.waterCheckContext=(await import('/app/js/shared-context.js?v=55')).ctx;});
+ await page.waitForFunction(()=>{
+   const ctx=window.waterCheckContext;
+   const shader=ctx.boatMode?.waterPatch?.material?.userData?.weWaterWaveShader;
+   if (!shader || !ctx.boatMode.active) return false;
+   const uniforms=shader.uniforms;
+   const sample=ctx.sampleDynamicWaterAt(ctx.boat.x,ctx.boat.z,ctx.boatMode.currentWater,{time:uniforms.weWaveTime.value});
+   window.waterCheckResult={active:ctx.boatMode.active,coverage:sample.coverage,finite:Number.isFinite(sample.surfaceY),
+     amplitudeDelta:Math.abs(uniforms.weWaveAmplitude.value-sample.profile.primaryAmplitude),
+     scaleDelta:Math.abs(uniforms.weWaveScale.value-sample.profile.spatialScale),
+     speedDelta:Math.abs(uniforms.weWaveSpeed.value-sample.profile.speed)};
+   return true;
+ },null,{timeout:30000});
+ report.boatWater=await page.evaluate(()=>window.waterCheckResult);
+ report.surfaceOrigin=await page.evaluate(()=>({actual:waterCheckContext.LOC,expected:expectedSurfaceOrigin}));
+ assert.ok(Math.abs(report.surfaceOrigin.actual.lat-report.surfaceOrigin.expected.lat)<.001);
+ assert.ok(Math.abs(report.surfaceOrigin.actual.lon-report.surfaceOrigin.expected.lon)<.001);
+ assert.deepEqual(report.boatWater,{active:true,coverage:'known-water-body',finite:true,amplitudeDelta:0,scaleDelta:0,speedDelta:0});
+ const mapOrigin=await page.evaluate(async()=>{
+   const {resolveMapView}=await import('/app/js/map/tiles.js?v=5');return resolveMapView(150,150,false).centerLatLon;
+ });
+ assert.ok(Math.abs(mapOrigin.lat-report.surfaceOrigin.actual.lat)<.001);
+ assert.ok(Math.abs(mapOrigin.lon-report.surfaceOrigin.actual.lon)<.001);
+ await page.waitForTimeout(700);
+ report.surfacePresentation=await page.evaluate(()=>{
+   const ctx=window.waterCheckContext, mesh=ctx.boatMode.mesh;
+   return {boat:{...ctx.boat},visible:mesh.visible,parent:mesh.parent?.type,position:mesh.position.toArray(),camera:ctx.camera?.position?.toArray(),projected:mesh.getWorldPosition(new THREE.Vector3()).project(ctx.camera).toArray(),rig:ctx.camera.userData.boatrig,sceneMatch:mesh.parent===ctx.scene,environment:ctx.getEnv?.(),active:ctx.boatMode.active};
+ });
+ await page.screenshot({path:`${dir}/surface-boat-water-authority.png`});
+ await page.waitForTimeout(2500);
+ report.settledPresentation=await page.evaluate(()=>{
+   const ctx=waterCheckContext,mesh=ctx.boatMode.mesh;
+   return {position:mesh.position.toArray(),projected:mesh.getWorldPosition(new THREE.Vector3()).project(ctx.camera).toArray(),rig:ctx.camera.userData.boatrig,visible:mesh.visible,sceneMatch:mesh.parent===ctx.scene};
+ });
+ await page.screenshot({path:`${dir}/surface-boat-settled.png`});
+ assert.ok(report.settledPresentation.projected.every(v=>Number.isFinite(v)&&Math.abs(v)<=1),'stationary boat remains in camera view');
+ const initialBoat=report.surfacePresentation.position,settledBoat=report.settledPresentation.position;
+ assert.ok(Math.hypot(settledBoat[0]-initialBoat[0],settledBoat[2]-initialBoat[2])<2,'stationary boat does not jump to shoreline correction spawns');
+ report.cases.push({id:'surface-boat-stationary-continuity-and-framing',passed:true});
+ report.cases.push({id:'actual-surface-boat-shader-physics-profile-agreement',passed:true});
+ report.roundTrip=await page.evaluate(async()=>{
+   const ctx=window.waterCheckContext;
+   const expected={lat:ctx.LOC.lat-ctx.boat.z/ctx.SCALE,lon:ctx.LOC.lon+ctx.boat.x/(ctx.SCALE*Math.cos(ctx.LOC.lat*Math.PI/180))};
+   const returned=await ctx.transferBoatToSubmarine({source:'water-authority-roundtrip'});
+   return {returned,expected,actual:ctx.oceanMode.launchSite};
+ });
+ assert.equal(report.roundTrip.returned,true);
+ assert.ok(Math.abs(report.roundTrip.actual.lat-report.roundTrip.expected.lat)<.00001);
+ assert.ok(Math.abs(report.roundTrip.actual.lon-report.roundTrip.expected.lon)<.00001);
+ report.cases.push({id:'ocean-surface-dive-retains-geographic-origin',passed:true});
  assert.deepEqual(report.errors, []);
  report.passed = true;
 } finally {

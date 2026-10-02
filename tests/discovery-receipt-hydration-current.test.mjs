@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {hydrateDiscoveryReceipts} from '../app/js/discovery/receipt-hydration.js';
 import {createMemoryDiscoveryProfileStore} from '../app/js/discovery/profile-store.js';
-const item=i=>({claimId:`claim:${i}`,catalogId:`rock:${i}`,itemId:`item-${i}`,ownerUid:'a',authority:'server-receipt',worldIdentity:'test'});
+const item=i=>({claimId:`claim:${i}`,catalogId:`rock:${i}`,itemId:`item-${i}`,ownerUid:'a',authority:'server-receipt',recordKind:'collection',worldIdentity:'test'});
 test('501 account receipts restore across pages and retries do not reward twice',async()=>{
  const store=createMemoryDiscoveryProfileStore();let calls=0;
  const listPage=async({cursor,expectedOwnerUid})=>{calls++;assert.equal(expectedOwnerUid,'a');const start=Number(cursor)||0;return {ownerUid:'a',items:Array.from({length:Math.min(250,501-start)},(_,i)=>item(start+i)),nextCursor:start+250<501?String(start+250):null}};
@@ -26,4 +26,8 @@ test('receipts cannot elevate a different local claim or catalog',async()=>{
  const store=createMemoryDiscoveryProfileStore();await store.collect({...item(1),instanceId:'local'});
  await assert.rejects(store.applyTrustedReceipt('local',{...item(2),authority:'trusted-server',tradeable:true}),/does not match/);
  assert.equal((await store.listItems())[0].authority,'anonymous-local');
+});
+test('legacy receipts restore as observations instead of inventing physical collection items',async()=>{
+ const store=createMemoryDiscoveryProfileStore();await hydrateDiscoveryReceipts({ownerUid:'a',isCurrentOwner:()=>true,profileStore:store,listPage:async()=>({ownerUid:'a',items:[{...item(1),recordKind:'unknown'}]})});
+ assert.equal((await store.listItems()).length,0);assert.equal((await store.listEvents()).length,1);
 });

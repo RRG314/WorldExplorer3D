@@ -1,3 +1,6 @@
+import { validateJournalBackup } from './backup-validation.js?v=1';
+import { summarizeReceiptState } from './save-status.js?v=1';
+import { awardCompanionXp, normalizeCompanionProgression } from './companions.js?v=7';
 import { pendingDiscoveryReceipt } from './receipt-outbox.js?v=1';
 import {
   createExplorerEvent,
@@ -14,6 +17,8 @@ import { migrateLegacyCharacterState, projectCharacterProgress } from '../charac
 const DISCOVERY_DB_NAME = 'world-explorer-discovery';
 const DISCOVERY_DB_VERSION = 4;
 const PROFILE_ID = 'local-explorer';
+const JOURNAL_IMPORT_BACKUP_ID = 'journal-before-import:local-explorer';
+const JOURNAL_STORES = ['profiles', 'items', 'claims', 'fieldGuide', 'companions', 'events', 'migrationBackups', 'receiptOutbox'];
 const CHARACTER_MIGRATION_BACKUP_ID = 'character-v1:local-explorer';
 
 function normalizeCompanionOnboarding(source = {}) {
@@ -113,6 +118,13 @@ function resolveProfileUpdate(current, update) {
     throw new TypeError('Profile updates must return a synchronous profile object.');
   }
   return normalizeProfile({ ...next, characterState: next.characterState || current.characterState });
+}
+
+function fieldCompanionReward(companion, event, firstIdentification) {
+  const first = awardCompanionXp(companion, { receiptId: `field:${event.eventId}`, reasonId: 'field-activity' });
+  return clone(firstIdentification
+    ? awardCompanionXp(first.companion, { receiptId: `species:${event.eventId}`, reasonId: 'new-species' }).companion
+    : first.companion);
 }
 
 function validateReceipt(item, receipt) {
@@ -309,7 +321,7 @@ function createIndexedDbDiscoveryProfileStore(options = {}) {
     const db = await open();
     try {
       await ensureCharacterMigration(db);
-      const transaction = db.transaction(['profiles', 'items', 'claims', 'fieldGuide', 'events', 'receiptOutbox'], 'readwrite');
+      const transaction = db.transaction(['profiles', 'items', 'claims', 'fieldGuide', 'events', 'receiptOutbox', 'companions'], 'readwrite');
       const profiles = transaction.objectStore('profiles');
       const items = transaction.objectStore('items');
       const claims = transaction.objectStore('claims');
@@ -364,6 +376,13 @@ function createIndexedDbDiscoveryProfileStore(options = {}) {
         items.put(item);
         const pending = pendingDiscoveryReceipt(item, receiptOwnerUid, options.catalogVersion);
         if (pending) transaction.objectStore('receiptOutbox').put(pending);
+      }
+      // Companion credit belongs to the same commit as the field record. A
+      // reload after this transaction cannot lose or duplicate its reward.
+      if (current.activeCompanionId && !record.receiptRestore) {
+        const companionStore = transaction.objectStore('companions');
+        const companion = await requestPromise(companionStore.get(current.activeCompanionId));
+        if (companion) companionStore.put(fieldCompanionReward(companion, event, !existingGuide));
       }
       events.put(event);
       claims.put({ claimId: record.claimId, claimedAt: now, item, event });
@@ -506,6 +525,19 @@ function createIndexedDbDiscoveryProfileStore(options = {}) {
     }
   }
 
+  async function getReceiptSyncStatus(ownerUid) {
+    const db = await open();
+    try {
+      const tx = db.transaction(['items', 'receiptOutbox'], 'readonly');
+      const [items, rows] = await Promise.all([
+        requestPromise(tx.objectStore('items').getAll()),
+        requestPromise(tx.objectStore('receiptOutbox').getAll())
+      ]);
+      await transactionPromise(tx);
+      return summarizeReceiptState(items, rows, ownerUid);
+    } finally { db.close(); }
+  }
+
   async function listPendingReceipts(ownerUid, now = Date.now()) {
     const db = await open();
     try {
@@ -546,14 +578,22 @@ function createIndexedDbDiscoveryProfileStore(options = {}) {
     } finally { db.close(); }
   }
 
-  async function saveCompanion(companion) {
+  async function saveCompanion(companion, update) {
     if (!companion?.instanceId || !companion?.catalogId) throw new TypeError('Companion persistence requires stable instance and catalog IDs.');
     const db = await open();
     try {
       const transaction = db.transaction(['companions'], 'readwrite');
-      transaction.objectStore('companions').put(clone(companion));
+      const store = transaction.objectStore('companions');
+      const current = await requestPromise(store.get(companion.instanceId));
+      const next = update ? update(clone(current || companion))
+        : { ...clone(companion), ...(current?.progression ? { progression: normalizeCompanionProgression(current) } : {}) };
+      if (!next || next.then || next.instanceId !== companion.instanceId || next.catalogId !== companion.catalogId) {
+        transaction.abort();
+        throw new TypeError('Companion updates must synchronously preserve identity.');
+      }
+      store.put(clone(next));
       await transactionPromise(transaction);
-      return clone(companion);
+      return clone(next);
     } finally {
       db.close();
     }
@@ -633,19 +673,45 @@ function createIndexedDbDiscoveryProfileStore(options = {}) {
   }
 
   async function exportData() {
-    const [profile, items, fieldGuide, companions, events] = await Promise.all([
-      getProfile(), listItems(10000), listFieldGuide(10000), listCompanions(), listEvents(10000)
-    ]);
-    return { schemaVersion: DISCOVERY_DB_VERSION, exportedAt: Date.now(), profile, items, fieldGuide, companions, events };
+    const db = await open();
+    try {
+      await ensureCharacterMigration(db);
+      const names = ['profiles','items','fieldGuide','companions','events'];
+      const tx = db.transaction(names, 'readonly');
+      const rows = await Promise.all(names.map(name => requestPromise(tx.objectStore(name).getAll())));
+      await transactionPromise(tx);
+      return {schemaVersion:DISCOVERY_DB_VERSION, exportedAt:Date.now(), profile:rows[0].find(p=>p.id===PROFILE_ID), items:rows[1], fieldGuide:rows[2], companions:rows[3], events:rows[4]};
+    } finally { db.close(); }
+  }
+
+  async function rollbackLastImport() {
+    const db = await open();
+    try {
+      const tx = db.transaction(JOURNAL_STORES, 'readwrite');
+      const backup = await requestPromise(tx.objectStore('migrationBackups').get(JOURNAL_IMPORT_BACKUP_ID));
+      if (!backup?.stores) { await transactionPromise(tx); return false; }
+      for (const name of JOURNAL_STORES) {
+        const store = tx.objectStore(name); store.clear();
+        for (const row of backup.stores[name] || []) store.put(clone(row));
+      }
+      await transactionPromise(tx); characterMigrationReady = false;
+      return true;
+    } finally { db.close(); }
   }
 
   async function importData(data = {}) {
-    if (!data || typeof data !== 'object' || !Array.isArray(data.events) || !Array.isArray(data.fieldGuide)) {
-      throw new TypeError('This is not a World Explorer Journal backup.');
-    }
+    data = validateJournalBackup(data);
     const db = await open();
     try {
-      const transaction = db.transaction(['profiles', 'items', 'claims', 'fieldGuide', 'companions', 'events', 'migrationBackups'], 'readwrite');
+      const transaction = db.transaction(JOURNAL_STORES, 'readwrite');
+      const previousRows = await Promise.all(JOURNAL_STORES.map(name => requestPromise(transaction.objectStore(name).getAll())));
+      const previous = Object.fromEntries(JOURNAL_STORES.map((name,index)=>[name,previousRows[index]]));
+      previous.migrationBackups = previous.migrationBackups.filter(row=>row.id!==JOURNAL_IMPORT_BACKUP_ID);
+      transaction.objectStore('migrationBackups').put({id:JOURNAL_IMPORT_BACKUP_ID, backedUpAt:Date.now(), stores:previous});
+      const pendingStore = transaction.objectStore('receiptOutbox');
+      for (const row of previous.receiptOutbox) {
+        if (!data.items.some(item=>item.instanceId===row.instanceId && item.claimId===row.payload.claimId && item.catalogId===row.payload.catalogId)) pendingStore.delete(row.id);
+      }
       const profiles = transaction.objectStore('profiles');
       const itemsStore = transaction.objectStore('items');
       const claims = transaction.objectStore('claims');
@@ -667,7 +733,10 @@ function createIndexedDbDiscoveryProfileStore(options = {}) {
       profiles.put(importedProfile);
       const items = Array.isArray(data.items) ? data.items : [];
       const companions = Array.isArray(data.companions) ? data.companions : [];
-      items.filter((item) => item?.instanceId && item?.catalogId).forEach((item) => itemsStore.put(clone(item)));
+      items.forEach((item) => {
+        itemsStore.put(clone(item));
+        if (item.claimId) claims.put({claimId:item.claimId, item:clone(item), event:null});
+      });
       data.fieldGuide.filter((entry) => entry?.catalogId).forEach((entry) => guideStore.put(clone(entry)));
       companions.filter((entry) => entry?.instanceId && entry?.catalogId).forEach((entry) => companionsStore.put(clone(entry)));
       data.events.filter((event) => event?.eventId).forEach((event) => {
@@ -688,7 +757,7 @@ function createIndexedDbDiscoveryProfileStore(options = {}) {
   return Object.freeze({
     type: 'IndexedDbDiscoveryProfileStore',
     setReceiptOwnerProvider(provider, catalogVersion) { options.getReceiptOwnerUid = provider; options.catalogVersion = catalogVersion; },
-    listPendingReceipts, completePendingReceipt, deferPendingReceipt,
+    getReceiptSyncStatus, listPendingReceipts, completePendingReceipt, deferPendingReceipt,
     applyTrustedReceipt,
     collect,
     exportData,
@@ -705,6 +774,7 @@ function createIndexedDbDiscoveryProfileStore(options = {}) {
     recordExplorerEvent,
     recordObservation,
     rollbackCharacterMigration,
+    rollbackLastImport,
     saveCompanion,
     saveProfile,
     setActiveCompanion
@@ -712,6 +782,7 @@ function createIndexedDbDiscoveryProfileStore(options = {}) {
 }
 
 function createMemoryDiscoveryProfileStore(seed = {}) {
+  let beforeImport = null;
   let legacyProfileBackup = seed.profile && !seed.profile.characterState ? clone(seed.profile) : null;
   let profile = normalizeProfile(seed.profile);
   if (legacyProfileBackup) {
@@ -767,6 +838,10 @@ function createMemoryDiscoveryProfileStore(seed = {}) {
       const pending = pendingDiscoveryReceipt(item, seed.getReceiptOwnerUid?.(), seed.catalogVersion);
       if (pending) outbox.set(pending.id, pending);
     }
+    if (profile.activeCompanionId && !record.receiptRestore) {
+      const companion = companions.get(profile.activeCompanionId);
+      if (companion) companions.set(companion.instanceId, fieldCompanionReward(companion, event, !existingGuide));
+    }
     events.set(event.eventId, event);
     claims.set(record.claimId, { claimId: record.claimId, item, event });
     guide.set(record.catalogId, projectFieldGuideEntry(existingGuide, record, record.collectedAt || Date.now(), regionId));
@@ -814,6 +889,7 @@ function createMemoryDiscoveryProfileStore(seed = {}) {
 
   return Object.freeze({
     type: 'MemoryDiscoveryProfileStore',
+    async getReceiptSyncStatus(ownerUid) { return summarizeReceiptState([...items.values()], [...outbox.values()], ownerUid); },
     async listPendingReceipts(ownerUid, now = Date.now()) { return [...outbox.values()].filter(row => row.ownerUid === ownerUid && row.status === 'pending' && row.nextAttemptAt <= now).slice(0,25).map(clone); },
     async deferPendingReceipt(id, patch) { if (outbox.has(id)) outbox.set(id,{...outbox.get(id),...patch}); },
     async completePendingReceipt(id, receipt) {
@@ -845,7 +921,13 @@ function createMemoryDiscoveryProfileStore(seed = {}) {
     async getCharacterMigrationBackup() {
       return legacyProfileBackup ? { id: CHARACTER_MIGRATION_BACKUP_ID, profile: clone(legacyProfileBackup) } : null;
     },
-    async saveCompanion(companion) { companions.set(companion.instanceId, clone(companion)); return clone(companion); },
+    async saveCompanion(companion, update) {
+      const current = companions.get(companion.instanceId);
+      const next = update ? update(clone(current || companion))
+        : { ...clone(companion), ...(current?.progression ? { progression: normalizeCompanionProgression(current) } : {}) };
+      if (!next || next.then || next.instanceId !== companion.instanceId || next.catalogId !== companion.catalogId) throw new TypeError('Companion updates must synchronously preserve identity.');
+      companions.set(companion.instanceId, clone(next)); return clone(next);
+    },
     async applyTrustedReceipt(instanceId, receipt = {}) {
       const item = items.get(String(instanceId));
       if (!item) return null;
@@ -898,8 +980,18 @@ function createMemoryDiscoveryProfileStore(seed = {}) {
         events: [...events.values()].map(clone)
       };
     },
+    async rollbackLastImport() {
+      if (!beforeImport) return false;
+      profile = clone(beforeImport.profile); legacyProfileBackup = clone(beforeImport.legacyProfileBackup);
+      for (const [name,map] of Object.entries({items,guide,companions,events,claims,outbox})) {
+        map.clear(); for (const [id,row] of beforeImport[name]) map.set(id,clone(row));
+      }
+      beforeImport = null; return true;
+    },
     async importData(data = {}) {
-      if (!data || typeof data !== 'object' || !Array.isArray(data.events) || !Array.isArray(data.fieldGuide)) throw new TypeError('This is not a World Explorer Journal backup.');
+      data = validateJournalBackup(data);
+      beforeImport = clone({profile, legacyProfileBackup, items:[...items], guide:[...guide], companions:[...companions], events:[...events], claims:[...claims], outbox:[...outbox]});
+      for (const [id,row] of outbox) if (!data.items.some(item=>item.instanceId===row.instanceId && item.claimId===row.payload.claimId && item.catalogId===row.payload.catalogId)) outbox.delete(id);
       const hasCharacterState = data.profile?.characterState?.schemaVersion === 1;
       legacyProfileBackup = hasCharacterState ? null : clone(data.profile || {});
       const importedCharacter = hasCharacterState
@@ -914,6 +1006,7 @@ function createMemoryDiscoveryProfileStore(seed = {}) {
       profile = normalizeProfile({ ...data.profile, characterState: importedCharacter });
       items.clear(); guide.clear(); companions.clear(); events.clear(); claims.clear();
       (data.items || []).filter((item) => item?.instanceId && item?.catalogId).forEach((item) => items.set(item.instanceId, clone(item)));
+      for (const item of items.values()) if (item.claimId) claims.set(item.claimId,{claimId:item.claimId,item:clone(item),event:null});
       data.fieldGuide.filter((entry) => entry?.catalogId).forEach((entry) => guide.set(entry.catalogId, clone(entry)));
       (data.companions || []).filter((entry) => entry?.instanceId && entry?.catalogId).forEach((entry) => companions.set(entry.instanceId, clone(entry)));
       data.events.filter((event) => event?.eventId).forEach((event) => {

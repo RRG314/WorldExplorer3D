@@ -8,7 +8,7 @@ let state={phase:'ready'};
 window.runRestore=async()=>{
  state={phase:'restoring'};let requests=0;
  const options={ownerUid:'fixture-a',isCurrentOwner:()=>true,profileStore:store,listPage:async({cursor})=>{
-  requests++;const offset=Number(cursor)||0;return {ownerUid:'fixture-a',items:Array.from({length:Math.min(250,501-offset)},(_,i)=>({itemId:`server-${offset+i}`,claimId:`receipt:${offset+i}`,catalogId:`rock:${offset+i}`,ownerUid:'fixture-a',authority:'server-receipt',worldIdentity:'fixture',activityId:'geology-inspect',family:'rock'})),nextCursor:offset+250<501?String(offset+250):null};
+  requests++;const offset=Number(cursor)||0;return {ownerUid:'fixture-a',items:Array.from({length:Math.min(250,501-offset)},(_,i)=>({itemId:`server-${offset+i}`,claimId:`receipt:${offset+i}`,catalogId:`rock:${offset+i}`,ownerUid:'fixture-a',authority:'server-receipt',recordKind:'collection',worldIdentity:'fixture',activityId:'geology-inspect',family:'rock'})),nextCursor:offset+250<501?String(offset+250):null};
  }};
  const first=await hydrateDiscoveryReceipts(options);const before=await store.getProfile();const retry=await hydrateDiscoveryReceipts(options);const after=await store.getProfile();
  const items=await store.listItems(1000);

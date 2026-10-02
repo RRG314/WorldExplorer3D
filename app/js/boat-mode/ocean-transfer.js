@@ -1,3 +1,4 @@
+import { commitEarthLocationOrigin, earthLocalToGeographic } from '../earth-core/location-origin.js?v=1';
 export function createBoatOceanTransferApi(options = {}) {
   const {
     appCtx,
@@ -38,9 +39,9 @@ function suspendBoatModeForOceanTransfer() {
 async function transferBoatToSubmarine(options = {}) {
   if (!appCtx.boatMode?.active) return false;
   if (!canDiveBoatMode({ showNotice: options.showNotice !== false })) return false;
-  if (typeof appCtx.worldToLatLon !== 'function' || typeof appCtx.startOceanMode !== 'function') return false;
+  if (typeof appCtx.startOceanMode !== 'function') return false;
 
-  const geo = appCtx.worldToLatLon(appCtx.boat.x, appCtx.boat.z);
+  const geo = earthLocalToGeographic(appCtx.LOC, appCtx.SCALE, appCtx.boat.x, appCtx.boat.z);
   if (!Number.isFinite(geo?.lat) || !Number.isFinite(geo?.lon)) {
     showBoatPrompt('Could not resolve water location for underwater entry', 'notice', promptDurationMs);
     return false;
@@ -88,9 +89,8 @@ async function transferSubmarineToBoat(options = {}) {
     showBoatPrompt('Could not resolve submarine position for boat transfer', 'notice', promptDurationMs);
     return false;
   }
-  const lonDenom = appCtx.SCALE * Math.cos(launchSite.lat * Math.PI / 180);
-  const lat = launchSite.lat - sub.position.z / appCtx.SCALE;
-  const lon = launchSite.lon + sub.position.x / (Math.abs(lonDenom) > 0.0001 ? lonDenom : appCtx.SCALE);
+  const {lat,lon} = earthLocalToGeographic(launchSite, appCtx.SCALE, sub.position.x, sub.position.z);
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return false;
   const customName = `${launchSite.name || 'Ocean Site'} Surface`;
   const transferVessel = appCtx.boatMode?.oceanTransferVessel || null;
   const customLatInput = document.getElementById('customLat');
@@ -113,25 +113,11 @@ async function transferSubmarineToBoat(options = {}) {
     // OSM scene. Waiting for a complete road/building/vegetation reload here
     // both delays control and can place land cover over the boat. The explicit
     // synthetic-water handoff below is the authority for this transition.
-    if (typeof appCtx.applyCustomLocationSpawn === 'function') {
-      appCtx.applyCustomLocationSpawn('walk', {
-        source: 'submarine_transfer_spawn',
-        preferBoatIfWater: true,
-        allowSyntheticWater: true,
-        waterKind: 'open_ocean'
-      });
-    }
-    if (appCtx.boatMode?.active) {
-      appCtx.boatMode.oceanTransferVessel = null;
-      if (typeof appCtx.updateControlsModeUI === 'function') appCtx.updateControlsModeUI();
-      return true;
-    }
-    const candidate =
-      findNearestBoatCandidate(0, 0, maxCandidateDistance * 2.2, {
-        allowSynthetic: true,
-        waterKind: 'open_ocean'
-      }) ||
-      buildSyntheticBoatCandidate(0, 0, { waterKind: 'open_ocean' });
+    // The accepted ocean launch site is now the Earth-local origin. Search
+    // selection alone does not update LOC; keeping the previous origin made
+    // the map and the next dive jump to the last terrestrial city.
+    commitEarthLocationOrigin(appCtx, {lat, lon, name:customName});
+    const candidate = buildSyntheticBoatCandidate(0, 0, {waterKind:'open_ocean', surfaceY:0.08});
     if (!candidate) {
       showBoatPrompt('No surface boat spawn was available here', 'notice', promptDurationMs);
       return false;
@@ -166,7 +152,11 @@ async function transferSubmarineToBoat(options = {}) {
         condition: transferVessel?.condition
       });
     const surfaced = resolved === 'boat' || resolved === true;
-    if (surfaced) appCtx.boatMode.oceanTransferVessel = null;
+    if (surfaced) {
+      appCtx.boatMode.oceanTransferVessel = null;
+      appCtx.resetMinimapView?.();
+      appCtx.drawMinimap?.();
+    }
     return surfaced;
   } catch (error) {
     console.warn('[BoatMode] submarine transfer failed', error);

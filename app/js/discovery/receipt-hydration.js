@@ -13,18 +13,18 @@ export async function hydrateDiscoveryReceipts({ownerUid, isCurrentOwner, listPa
     for (const receipt of page.items) {
       if (!isCurrentOwner()) return {imported, complete:false, reason:'account-changed'};
       if (!receipt?.claimId || !receipt.catalogId || !receipt.itemId || receipt.ownerUid !== ownerUid) throw new Error('Invalid discovery receipt identity.');
-      const result = await profileStore.collect({
+      const result = await profileStore.recordDiscovery({
         receiptRestore:true, instanceId:`item:${receipt.itemId}`, claimId:receipt.claimId, catalogId:receipt.catalogId,
         name:receipt.name || receipt.catalogId, family:receipt.family || 'discovery',
         rarityBand:receipt.rarityBand || 'common', qualityBand:receipt.qualityBand || 'observed',
         discipline:'exploration', activityId:receipt.activityId || 'inspect',
         regionId:receipt.worldIdentity || 'server-region', worldIdentity:receipt.worldIdentity || 'server-region',
         evidenceClass:receipt.evidenceClass || 'virtual-field-record', collectedAt:receipt.createdAtMs || Date.now()
-      });
+      }, {collection:receipt.recordKind === 'collection'});
       if (!isCurrentOwner()) return {imported, complete:false, reason:'account-changed'};
       if (result.item?.instanceId) await profileStore.applyTrustedReceipt(result.item.instanceId, receipt);
       claimedIds.add(receipt.claimId);
-      if (result.collected) imported++;
+      if (result.recorded) imported++;
     }
     const next = page.nextCursor ?? null;
     if (next !== null && (typeof next !== 'string' || !next || seen.has(next))) throw new Error('Receipt pagination did not advance.');

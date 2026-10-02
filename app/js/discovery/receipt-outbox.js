@@ -1,6 +1,6 @@
 export function pendingDiscoveryReceipt(record, ownerUid, catalogVersion) {
   if (!ownerUid || record.receiptRestore === true) return null;
-  const payload = {expectedOwnerUid:ownerUid};
+  const payload = {expectedOwnerUid:ownerUid, recordKind:'collection'};
   for (const key of ['claimId','catalogId','worldIdentity','activityId','evidenceClass','name','family','rarityBand','qualityBand']) {
     if (record[key] != null) payload[key] = record[key];
   }

@@ -40,6 +40,7 @@ function normalizeDiscoveryClaim(input = {}) {
   if (!claimId || !catalogId || !worldIdentity || !ACCEPTED_DISCOVERY_EVIDENCE_CLASSES.has(evidenceClass)) return null;
   return Object.freeze({
     claimId, catalogId, worldIdentity, activityId,
+    recordKind: ['collection', 'observation'].includes(input.recordKind) ? input.recordKind : 'unknown',
     name: shortText(input.name || catalogId, 100),
     family: shortText(input.family || 'discovery', 60),
     rarityBand: ['common', 'uncommon', 'rare'].includes(input.rarityBand) ? input.rarityBand : 'common',
@@ -76,7 +77,16 @@ function buildDiscoveryExports({ functions, setCors, verifyAuth, db, admin }) {
       const itemRef = profileRef.collection('items').doc(itemDocumentId(claim.claimId));
       const result = await db.runTransaction(async (transaction) => {
         const existing = await transaction.get(claimRef);
-        if (existing.exists) return { awarded: false, itemId: existing.data().itemId };
+        if (existing.exists) {
+          const stored = await transaction.get(itemRef);
+          if (!stored.exists || stored.data().catalogId !== claim.catalogId || stored.data().ownerUid !== auth.uid) {
+            throw Object.assign(new Error('Existing discovery receipt requires reconciliation.'), {status:409});
+          }
+          const item = stored.data();
+          return { awarded:false, itemId:itemRef.id, authority:item.authority,
+            tradeable:item.authority === 'trusted-server' && item.tradeable === true,
+            recordKind:item.recordKind || 'unknown' };
+        }
         const independentlyValidated = auth.admin === true;
         const item = {
           ...claim,
@@ -90,18 +100,16 @@ function buildDiscoveryExports({ functions, setCors, verifyAuth, db, admin }) {
         transaction.set(profileRef, { uid: auth.uid, schemaVersion: 1, updatedAt: serverTimestamp() }, { merge: true });
         transaction.create(itemRef, item);
         transaction.create(claimRef, { claimId: claim.claimId, itemId: itemRef.id, catalogId: claim.catalogId, createdAt: serverTimestamp() });
-        return { awarded: true, itemId: itemRef.id };
+        return { awarded:true, itemId:itemRef.id, authority:item.authority, tradeable:item.tradeable, recordKind:item.recordKind };
       });
-      const independentlyValidated = auth.admin === true;
       return res.status(200).json({
         ...result,
         ownerUid: auth.uid,
         claimId: claim.claimId,
-        catalogId: claim.catalogId,
-        authority: independentlyValidated ? 'trusted-server' : 'server-receipt',
-        tradeable: independentlyValidated && claim.tradeEligibleCatalog
+        catalogId: claim.catalogId
       });
     } catch (error) {
+      if (error.status === 409) return res.status(409).json({error:error.message});
       console.error('[claimExplorerDiscovery] failed:', error);
       return res.status(500).json({ error: 'Could not issue a trusted discovery receipt.' });
     }
@@ -156,6 +164,7 @@ function buildDiscoveryExports({ functions, setCors, verifyAuth, db, admin }) {
         const item = doc.data() || {};
         return {
           itemId: doc.id,
+          recordKind: item.recordKind || 'unknown',
           ownerUid: auth.uid,
           createdAtMs: item.createdAt?.toMillis?.() || null,
           instanceId: item.instanceId || doc.id,
