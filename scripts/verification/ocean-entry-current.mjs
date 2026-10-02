@@ -64,6 +64,27 @@ try {
  });
  assert.deepEqual(guard, { rejected: true, retained: true });
  report.cases.push({ id: 'runtime-rejects-unchecked-site-preserving-session', passed: true });
+ // P02: a previously admitted site must remain playable when later depth
+ // requests fail. This uses the real runtime and provider request path.
+ elevation = null;
+ const outage = await page.evaluate(async () => {
+   const { ctx } = await import('/app/js/shared-context.js?v=55');
+   const site = { lat: 0, lon: -140, name: 'Provider outage fixture', region: 'Pacific' };
+   const started = await ctx.startOceanMode({ launchSite: site, entry: {
+     ...site, source: 'gebco-elevation-sample', kind: 'modeled-ocean', elevationMeters: -80
+   } });
+   await ctx.oceanMode.bathymetryPromise;
+   return { started, state: window.getOceanModeDebugState() };
+ });
+ assert.equal(outage.started, true);
+ assert.equal(outage.state.seabed.bathymetry.truthType, 'unknown');
+ assert.equal(outage.state.seabed.presentationMode, 'procedural-only');
+ await page.keyboard.down('ArrowUp'); await page.waitForTimeout(700); await page.keyboard.up('ArrowUp');
+ report.outageAfter = await page.evaluate(() => window.getOceanModeDebugState());
+ assert.notEqual(report.outageAfter.position.z, outage.state.position.z);
+ assert.ok(Number.isFinite(report.outageAfter.position.y));
+ await page.screenshot({ path: `${dir}/outage-playable.png` });
+ report.cases.push({ id: 'provider-outage-preserves-playable-procedural-fallback', passed: true });
  assert.deepEqual(report.errors, []);
  report.passed = true;
 } finally {

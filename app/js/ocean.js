@@ -19,7 +19,7 @@ import {
 } from "./ocean/scene-textures.js?v=1";
 import { createOceanFishLifeApi } from "./ocean/fish-life.js?v=2";
 import { createFishPopulationContext } from './fishing/population-authority.js?v=2';
-import { createOceanBathymetryApi } from "./ocean/bathymetry.js?v=4";
+import { createOceanBathymetryApi } from "./ocean/bathymetry.js?v=5";
 import { updateOceanHud as updateOceanHudView } from "./ocean/hud.js?v=4";
 import {
   commitEnvironment,
@@ -121,6 +121,7 @@ const {
   primeBathymetryTiles,
   primeLocalBathymetryGrid,
   sampleSeabedHeight,
+  sampleSeabedEvidence,
   smoothstep,
   valueNoise2D
 } = createOceanBathymetryApi({
@@ -712,6 +713,8 @@ function getOceanModeDebugState() {
   const sub = oceanMode.submarine || {};
   return {
     active: !!oceanMode.active,
+    launchSite: { ...oceanMode.launchSite },
+    seabed: sub.position ? sampleSeabedEvidence(sub.position.x, sub.position.z) : null,
     env: typeof appCtx.getEnv === 'function' ? appCtx.getEnv() : null,
     yaw: Number.isFinite(sub.yaw) ? sub.yaw : null,
     pitch: Number.isFinite(sub.pitch) ? sub.pitch : null,
