@@ -1,3 +1,4 @@
+import { mountCapabilityGuide } from './product/capability-guide.js?v=1';
 import { ctx as appCtx } from "./shared-context.js?v=55"; // ============================================================================
 // ui.js - UI setup, event binding, button handlers
 // ============================================================================
@@ -18,6 +19,7 @@ function emitTutorialEvent(eventName, payload = {}) {
 }
 
 function setupUI() {
+  mountCapabilityGuide();
   const LAST_LOCATION_STORAGE_KEY = 'worldExplorer3D.lastLocation.v1';
   const bindTouchFriendlyPress = (el, handler) => {
     if (!el || typeof handler !== 'function') return;

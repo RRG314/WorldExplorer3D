@@ -602,3 +602,9 @@ input,textarea{-webkit-user-select:text;user-select:text}
   .floatItems{max-height:calc(100dvh - 76px);grid-template-columns:repeat(3,minmax(0,1fr))}
 }
 }
+
+/* Capability descriptions live in Quick Start, not in another gameplay overlay. */
+.capabilityGuide{padding:16px;margin:0 0 20px;border:1px solid #496278;border-radius:8px;background:#0b1a28;color:#e6f1fa;font:14px/1.5 system-ui,sans-serif}
+.capabilityGuide summary{cursor:pointer;font-weight:700;font-size:16px}
+.capabilityFilters{display:flex;gap:10px;flex-wrap:wrap}.capabilityFilters input,.capabilityFilters select{min-width:0;padding:10px;background:#152c3e;color:#fff;border:1px solid #7891a4;border-radius:5px;font:inherit}.capabilityFilters input{flex:1 1 220px}.capabilityFilters select{flex:0 1 200px}
+.capabilityList{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr));gap:12px}.capabilityList li{padding:12px;border:1px solid #385268;border-radius:6px}.capabilityList p{margin:8px 0 0}.capabilityStatus{display:block;color:#8ae5ca;font-size:12px}.capabilityStatus[data-status=planned],.capabilityStatus[data-status=experimental]{color:#ffd28c}.capabilitySave{color:#c0cfdd;font-size:12px}

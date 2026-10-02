@@ -43,3 +43,13 @@ Evidence:
 ## Next
 
 P04: public capability truth inventory, persistence/ownership mapping and correction of unsupported claims. P05–P20 remain pending; the research ship, swimming/diving and asset upgrades have not been implemented by these foundation fixes. No production deployment has been performed.
+
+## P04 — capability inventory and player guidance: implemented and focused checks passed
+
+Quick Start now has a searchable capability guide backed by the same 98-entry registry as [CAPABILITIES.md](CAPABILITIES.md) and [capabilities.json](capabilities.json). It covers main worlds/travel, creation/progress/account surfaces and every current route-template, discovery activity/tool and Live Earth layer. Each entry declares scope/status, runtime owner, persistence boundary and acceptance limits; JSON retains 36 owner-source hashes. This is descriptive ownership metadata, not a replacement permission or save authority.
+
+Corrected virtual dive tool/activity and Marine Surveyor descriptions, submarine entry/help copy, and explicit boundaries for swimming, research ship deployment, local versus connected progress and reference ship tracks. Available status does not claim every device or location is certified; source-only evidence is identified rather than upgraded to a test pass.
+
+Validation: 20 focused capability/discovery/character component tests passed; source check passed; actual Quick Start desktop and 390×844 touch-context search/filter/empty-state/layout checks passed with zero page exceptions. Prescribed-client capability presentation fixture passed without client errors. Desktop, phone and fixture screenshots inspected. Evidence: `output/verification/product-plan/`.
+
+Next: P05, objective/navigation coherence. Production remains `5.4.0+1532bdfbb5c1.319d215f60318297.production`, freshly read October 2. No deployment.

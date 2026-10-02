@@ -1,0 +1,5 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>Capability guide rendering check</title><link rel="stylesheet" href="/app/styles/title-shell.css"><style>body{position:static;overflow:auto;background:#071723;color:#eef9ff;padding:24px}#tab-controls{max-width:980px;margin:auto}</style><main id="tab-controls"></main><script type="module">
+import {mountCapabilityGuide} from '/app/js/product/capability-guide.js?v=1';
+mountCapabilityGuide();document.querySelector('details').open=true;const search=document.querySelector('input');search.value='swimming';search.dispatchEvent(new Event('input'));
+window.advanceTime=async()=>{};window.render_game_to_text=()=>JSON.stringify({scope:'capability presentation fixture',features:[...document.querySelectorAll('[data-capability]')].map(el=>({id:el.dataset.capability,text:el.textContent}))});
+</script></html>

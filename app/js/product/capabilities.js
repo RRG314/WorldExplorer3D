@@ -1,0 +1,68 @@
+import { ACTIVITY_TEMPLATES } from '../activity-discovery/schema-core.js?v=1';
+import { ACTIVITY_CATALOG, TOOL_CATALOG } from '../discovery/catalog.js?v=4';
+import { LIVE_EARTH_LAYERS } from '../live-earth/registry.js?v=11';
+
+// Product descriptions, not permissions. Runtime owners remain responsible for
+// eligibility, persistence and multiplayer authority. Review new catalog entries
+// before promoting their conservative "limited" status.
+export const CAPABILITY_STATUS = Object.freeze({ playable: 'Available', limited: 'Limited', experimental: 'Experimental', planned: 'Planned' });
+export const CAPABILITY_GROUPS = Object.freeze({ worlds: 'Worlds & travel', activities: 'Activities', fieldwork: 'Fieldwork & tools', creation: 'Build & create', progress: 'Progress & together', data: 'Earth data' });
+const localJournal = 'Journal and character progress stay in this browser. Signing in does not copy them to another device.';
+const session = 'Position and active controls belong to the current session; returning is not a saved voyage.';
+function row(id, label, group, status, summary, owner, persistence, acceptance = 'Source-reviewed; complete current player-journey acceptance is still pending.') {
+  return Object.freeze({ id, label, group, status, summary, owner, persistence, acceptance });
+}
+const core = [
+  row('maps', 'Maps, routes & saved places', 'worlds', 'limited', 'Use location search, supported navigation and saved places. Ocean uses its local seabed map; a full-screen ocean chart is not available.', 'app/js/map.js', 'Saved places and preferences are local to this browser. A shared link opens a destination; it does not transfer a save.'),
+  row('sharing', 'Share a destination', 'progress', 'playable', 'Share a link to supported location and launch settings. Recipients start their own session.', 'app/js/ui/share-links.js', 'Links carry destination settings, not your Journal, inventory or whole saved world.'),
+  row('account', 'Account & contributions', 'progress', 'limited', 'Manage supported account, social and contribution features. Signing in is not a universal cloud-save switch for every game system.', 'account/account-center.js', 'Account records are connected; browser-local game stores remain separate.'),
+  row('controls', 'Controls & accessibility', 'progress', 'limited', 'Configure supported keyboard, touch, gamepad and accessibility options. Physical device and assistive-technology coverage still varies.', 'app/js/ui/accessibility.js', 'Control and accessibility preferences are stored on this device.'),
+  row('graphics', 'Graphics & performance settings', 'progress', 'playable', 'Adjust supported rendering and performance options for your browser.', 'app/js/perf-settings.js', 'Rendering preferences are local to this device.'),
+  row('earth', 'Earth exploration', 'worlds', 'limited', 'Explore a bounded area around a selected real location. Buildings and scenery combine map data with generated detail; Earth is not streamed continuously.', 'app/js/world.js', session),
+  row('walk', 'Walking & interiors', 'worlds', 'playable', 'Walk, interact and enter supported buildings. An ordinary water entry does not start swimming.', 'app/js/walking.js', session),
+  row('drive', 'Road vehicles', 'worlds', 'playable', 'Drive supported roads and vehicles, switch cameras and recover to safe ground. Vehicle physics are a game simulation.', 'app/js/physics.js', session),
+  row('drone', 'Drone exploration', 'worlds', 'playable', 'Fly a local drone view with altitude and camera controls.', 'app/js/travel-mode.js', session),
+  row('plane', 'Aircraft', 'worlds', 'limited', 'Fly the personal plane or board supported aircraft at eligible facilities. Airport availability depends on mapped coverage.', 'app/js/plane-mode.js', session),
+  row('boat', 'Surface vessels', 'worlds', 'limited', 'Pilot supported vessel classes on mapped water. Large ship models do not yet provide a walkable research deck or a working sub launch bay.', 'app/js/boat-mode.js', session),
+  row('ocean', 'Submarine exploration', 'worlds', 'limited', 'Pilot a submarine around an eligible ocean site. The seabed combines modeled depth with generated scenery; species and habitats are not a real-time ocean survey.', 'app/js/ocean.js', session, 'P01–P03: source, component and controlled-provider browser checks passed; geographic art accuracy and physical-device acceptance pending.'),
+  row('swimming', 'Swimming & scuba diving', 'worlds', 'planned', 'Character swimming, automatic scuba equipment and shore/ladder transitions are not available yet. Virtual dive fieldwork is a separate activity.', 'app/js/walking.js', 'No swim or scuba session is saved because this controller is not implemented.'),
+  row('research-ship', 'Research ship & sub deployment', 'worlds', 'planned', 'A walkable research vessel, lab and persistent sub deployment/recovery journey are planned. The existing research vessel is a piloted boat class.', 'app/js/transport/maritime-runtime.js', 'Persistent ship/sub/cargo recovery is not implemented.'),
+  row('moon', 'Moon exploration', 'worlds', 'limited', 'Explore the Moon with the supported surface tools and vehicles. Terrain and travel use game scales.', 'app/js/planetary/entry.js', 'Field records and expedition progress use their own stores; surface position is session state.'),
+  row('mars', 'Mars exploration', 'worlds', 'limited', 'Explore Mars with a rover and supported field activities. This is not a full scientific simulation.', 'app/js/planetary/mars-world.js', 'Field records and expedition progress use their own stores; surface position is session state.'),
+  row('space', 'Space flight & planetary destinations', 'worlds', 'experimental', 'Use free flight, Wayfinder and supported destinations. Course, landing and scale differ between travel modes; expedition content is Alpha.', 'app/js/space.js', 'Free-flight pose is session state. Expedition progression uses a separate voyage store.'),
+  row('solis', 'Solis Reach & Pathfinder', 'worlds', 'experimental', 'Explore the ship, switch observation views and use the existing pod and research journeys. This does not provide ocean research-ship gameplay.', 'app/js/expedition/runtime.js', 'Solo expedition state saves in this browser; shared expeditions use room authority. These are separate from the personal Journal.'),
+  row('fishing', 'Fishing', 'activities', 'playable', 'Fish from supported contexts, complete the catch interaction and review catch records. Catalog availability is not a live fish sighting.', 'app/js/fishing-game.js', 'Catch history is saved on this device; connected activity submissions have separate acknowledgement.'),
+  row('flowers', 'Flower Sprint', 'activities', 'playable', 'Collect the marked flowers before time runs out. Review completion in the Journal; rankings are a separate online result.', 'app/js/flower-challenge.js', localJournal),
+  row('paint-town', 'Paint Town', 'activities', 'limited', 'An optional paint activity with its own controls and score. It does not permanently repaint real-world map buildings.', 'app/js/game/paint-town/core.js', 'Active paint effects belong to the activity session; online rankings are separate.'),
+  row('deflock', 'DeFlock activity', 'activities', 'limited', 'Explore mapped camera context and the supported game activity. Missing mapped records do not prove that no cameras exist.', 'app/js/deflock/runtime.js', 'Activity and connected score records have separate online requirements.'),
+  row('journal', 'Journal, Field Guide & character', 'progress', 'playable', 'Record fieldwork, review discoveries and develop character specialties. Skills support implemented actions; they do not unlock missing controllers.', 'app/js/discovery/profile-store.js', localJournal),
+  row('backpack', 'Backpack & equipment', 'progress', 'limited', 'Carry and select supported equipment. Tool names and qualifications do not guarantee a fully simulated physical action.', 'app/js/player/backpack-store.js', 'Personal Backpack inventory saves on this device; connected valuable item actions require their own acknowledged authority.'),
+  row('companions', 'Companions', 'progress', 'limited', 'Care for eligible companions and travel with them in supported environments and vehicles.', 'app/js/discovery/companion-runtime.js', localJournal),
+  row('rooms', 'Multiplayer rooms & chat', 'progress', 'limited', 'Join bounded rooms with presence, chat and supported shared building, vehicles and activities. Not every solo action is shared.', 'app/js/multiplayer/ui-room-events.js', 'Shared changes need a connection and room permission. Personal Journal progress remains separate.'),
+  row('economy', 'Credits, services & upgrades', 'progress', 'limited', 'Use game credits and supported services. In-game property, prices and credits do not represent real-world ownership or money.', 'app/js/economy/connected-wallet-authority.js', 'Connected wallet mutations need server acknowledgement; local exploration records are separate.'),
+  row('blocks', 'Build with Blocks', 'creation', 'playable', 'Place blocks, change shapes/materials and undo work. Room edit permissions apply to shared creations.', 'app/js/blocks.js', 'Solo blocks save by location on this device. Room blocks save through the shared room and require acknowledgement.'),
+  row('property', 'Homes & virtual property', 'creation', 'limited', 'Manage supported game properties and home layouts. A game claim is not legal ownership of a building or parcel.', 'app/js/real-estate.js', 'Connected property changes require an account and server acknowledgement; drafts are separate from published changes.'),
+  row('capture', 'Photo capture & building contributions', 'creation', 'experimental', 'Capture photos, edit supported building representations and submit contributions for review. A saved draft is not a published building.', 'app/js/reality-capture/runtime.js', 'Local drafts, uploaded submissions and approved publications are separate states.'),
+  row('gps', 'Live GPS', 'data', 'limited', 'Follow foreground device location when permission and coverage allow. This is not background world streaming.', 'app/js/live-gps/runtime.js', 'Active tracking is a foreground session, not a persistent worldwide route.'),
+  row('ar', 'AR & camera view', 'data', 'experimental', 'Camera and AR presentation depend on browser capabilities and permission. Persistent real-world anchors are not established.', 'app/js/ar/capabilities.js', 'Camera/AR sessions are temporary; saved captures use the capture workflow.'),
+  row('weather', 'Weather, sky & water simulation', 'data', 'limited', 'Weather and marine data provide context. Rendered waves, tides, underwater movement and live measurements are not yet one complete physical simulation.', 'app/js/water-dynamics.js', 'Provider samples have their own validity times; visual simulation is session state.')
+];
+export const PRODUCT_CAPABILITIES = Object.freeze([
+  ...core,
+  ...ACTIVITY_TEMPLATES.map(entry => row(`route:${entry.id}`, entry.label, 'activities', 'limited',
+    'A route activity using placed anchors and checkpoints. Availability depends on the active environment and a valid route.',
+    'app/js/activity-discovery/session.js', 'Authored activity library saves locally. Active runs and connected results have separate lifecycles.')),
+  ...ACTIVITY_CATALOG.map(entry => row(`field:${entry.id}`, entry.label, 'fieldwork', 'limited',
+    entry.id === 'dive-survey' ? 'A virtual field record using a survey tool; this does not put your character in the water or equip scuba.' : 'A contextual field activity. Eligible locations and tools determine availability; records are game observations, not verified real-world findings.',
+    'app/js/discovery/field-activities.js', localJournal)),
+  ...TOOL_CATALOG.map(entry => row(`tool:${entry.id}`, entry.label, 'fieldwork', 'limited',
+    entry.id === 'virtual-dive-kit' ? 'Used for virtual dive survey records. It is not a swimming controller or wearable scuba system.' : 'Used by supported field activities. Select the tool to see its available actions and instructions.',
+    'app/js/discovery/tools.js', localJournal)),
+  ...Object.values(LIVE_EARTH_LAYERS).map(entry => row(`layer:${entry.id}`, entry.label, 'data', 'limited',
+    entry.summary, 'app/js/live-earth/registry.js', 'Provider observations and reference layers are not persistent gameplay progress. Check each layer’s timestamp and source.'))
+]);
+export function findProductCapabilities({ group = '', query = '' } = {}) {
+  const needle = String(query).trim().toLowerCase();
+  return PRODUCT_CAPABILITIES.filter(entry => (!group || entry.group === group)
+    && (!needle || `${entry.label} ${entry.summary} ${CAPABILITY_STATUS[entry.status]}`.toLowerCase().includes(needle)));
+}
