@@ -8,7 +8,7 @@ import { initMobileControls } from "./ui/mobile-controls.js?v=86";
 import { initShareUi } from "./ui/share-links.js?v=64";
 import { setupSettingsUi } from "./ui/settings.js?v=2";
 import { bindSpaceActions } from "./ui/space-actions.js?v=17";
-import { initTitleScreenUi } from "./ui/title-screen.js?v=119";
+import { initTitleScreenUi } from "./ui/title-screen.js?v=120";
 import { commitEnvironment, exitCurrentEnvironmentSync } from './session-coordinator.js?v=2';
 
 function emitTutorialEvent(eventName, payload = {}) {
@@ -504,7 +504,7 @@ function setupUI() {
       await appCtx.showTransitionLoad('ocean', 900);
     }
     if (typeof appCtx.startOceanMode === 'function') {
-      appCtx.startOceanMode();
+      await appCtx.startOceanMode();
     }
     updateControlsModeUI();
   };

@@ -1,3 +1,4 @@
+import { hasOceanEntry } from "./ocean/entry-policy.js?v=1";
 import { ctx as appCtx } from "./shared-context.js?v=55";
 import {
   createAuxiliaryRenderer,
@@ -543,6 +544,9 @@ function animateOceanMode(nowMs = 0) {
 }
 
 function startOceanMode(options = {}) {
+  // Reject before exiting Earth or replacing an existing ocean session.
+  if (options.launchSite && !hasOceanEntry(options.launchSite, options.entry)) return false;
+  if (!options.launchSite) options = { ...options, launchSite: OCEAN_SITE };
   if (oceanMode.active) {
     if (options.launchSite && resetOceanLaunchSite(options.launchSite)) {
       resetSubmarineAtLaunch(options.submarinePose || null);

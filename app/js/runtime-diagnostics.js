@@ -1339,6 +1339,7 @@ globalThis.render_game_to_text = () => JSON.stringify({
     flightMode: appCtx.spaceFlight?.mode || null,
     nearestBody: appCtx.spaceFlight?._nearestBody?.name || null
   },
+  ocean: appCtx.getOceanModeDebugState?.() || { active: false },
   spaceFlight: spaceFlightSnapshot(),
   pirateInterception: appCtx.getPirateInterceptionSnapshot?.() || { active: false, phase: 'INACTIVE' },
   surfacePodLaunch: appCtx.surfacePodLaunchSnapshot || null,

@@ -1,7 +1,8 @@
+import { oceanEntryDecision } from '../ocean/entry-policy.js?v=1';
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { searchPlaces } from '../places/place-search.js?v=4';
 import { createGlobeSelectorScene } from './globe-selector/scene.js?v=22';
-import { createGlobeSelectorLaunch } from './globe-selector/launch.js?v=2';
+import { createGlobeSelectorLaunch } from './globe-selector/launch.js?v=3';
 import { getGlobeSelectorElements } from './globe-selector/dom.js?v=4';
 import { fetchNearbyCities, nearbyMajorCities } from './globe-selector/catalog.js?v=2';
 import { bindCityListInteractions, renderNearbyCityItems, renderPresetCityItems } from './globe-selector/city-list-view.js?v=4';
@@ -211,9 +212,12 @@ function createGlobeSelector(options = {}) {
       saveFavoriteBtn.title = saved ? 'Remove selected place from favorites' : 'Add selected place to favorites';
       saveFavoriteBtn.setAttribute('aria-label', saveFavoriteBtn.title);
     }
-    if (latInput) latInput.value = selected.lat.toFixed(6);
-    if (lonInput) lonInput.value = selected.lon.toFixed(6);
-    coordinateInputsDirty = false;
+    // A late lookup may rename the selected point, but must not erase a
+    // coordinate edit made while the request was in flight.
+    if (!coordinateInputsDirty) {
+      if (latInput) latInput.value = selected.lat.toFixed(6);
+      if (lonInput) lonInput.value = selected.lon.toFixed(6);
+    }
 
     globeScene.setSelectionMarker(selected);
     nearbyCities = buildNearbyCitiesFromData({
@@ -248,8 +252,7 @@ function createGlobeSelector(options = {}) {
   function setSelection(lat, lon, meta = {}) {
     const clamped = clampLatLon(lat, lon);
     const coordsChanged = !selected ||
-      Math.abs(selected.lat - clamped.lat) > 0.00001 ||
-      Math.abs(selected.lon - clamped.lon) > 0.00001;
+      selected.lat !== clamped.lat || selected.lon !== clamped.lon;
     if (coordsChanged) {
       liveNearbyCity = null;
       mappedNearbyCities = [];
@@ -270,6 +273,7 @@ function createGlobeSelector(options = {}) {
       locationDetails: meta.locationDetails || (coordsChanged ? null : selected?.locationDetails || null),
       surfaceEvidence: meta.surfaceEvidence || (coordsChanged ? null : selected?.surfaceEvidence || null)
     };
+    coordinateInputsDirty = false;
     if (meta.focus) focusOnSelection(selected.lat, selected.lon);
     syncLegacyCustomState(selected);
     renderSelection();
@@ -320,7 +324,7 @@ function createGlobeSelector(options = {}) {
 
   async function reverseLookupPlace(lat, lon) {
     const requestToken = ++reverseLookupToken;
-    const cacheKey = `${Number(lat).toFixed(3)},${Number(lon).toFixed(3)}`;
+    const cacheKey = `${Number(lat)},${Number(lon)}`;
     const cached = reverseLookupCache.get(cacheKey);
     if (cached && selected && Math.abs(selected.lat - lat) <= 0.00001 && Math.abs(selected.lon - lon) <= 0.00001) {
       selected.name = cached.display;
@@ -571,20 +575,22 @@ function createGlobeSelector(options = {}) {
       }
       return Promise.resolve(false);
     }
-    setSelection(selected.lat, selected.lon, {
-      name: selected.name,
-      arrivalMode: 'boat'
-    });
-    if (typeof options.onOceanShortcut === 'function') {
-      recentPlaces = addRecentPlace(selected, recentPlaces);
+    const requestedSelection = selected;
+    const pendingResolution = selectionResolvePromise;
+    return launchCoordinator.startEnvironment(async (isCurrent) => {
+      await pendingResolution;
+      if (!isCurrent() || !openState || selected !== requestedSelection || coordinateInputsDirty) {
+        throw new Error('The selected location changed. Check the current point and press Ocean again.');
+      }
+      const decision = oceanEntryDecision(requestedSelection);
+      if (!decision.allowed) throw new Error(decision.reason);
+      if (typeof options.onOceanShortcut !== 'function') throw new Error('Ocean launch is unavailable.');
+      const launchSelection = { ...requestedSelection, arrivalMode: 'boat', oceanEntry: decision.entry };
+      recentPlaces = addRecentPlace(launchSelection, recentPlaces);
       favoriteRecentList = recentPlaces;
-      syncLegacyCustomState(selected);
-      return launchCoordinator.startEnvironment(
-        () => options.onOceanShortcut({ ...selected }),
-        'Ocean'
-      );
-    }
-    return triggerStartHere();
+      syncLegacyCustomState(launchSelection);
+      return options.onOceanShortcut(launchSelection);
+    }, 'Ocean');
   }
 
   function bindLiveEarthBridge() {

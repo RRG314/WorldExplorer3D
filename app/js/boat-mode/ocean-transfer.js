@@ -60,13 +60,15 @@ async function transferBoatToSubmarine(options = {}) {
     await appCtx.showTransitionLoad('ocean', 700);
   }
 
-  const started = appCtx.startOceanMode({
+  const started = await appCtx.startOceanMode({
     launchSite: {
       lat: geo.lat,
       lon: geo.lon,
       name: appCtx.customLoc?.name || 'Open Water',
       region: 'Underwater'
     },
+    // canDiveBoatMode already checked the mapped area and offshore clearance.
+    entry: { lat: geo.lat, lon: geo.lon, source: 'mapped-boat-water', kind: 'mapped-water-area' },
     submarinePose: {
       x: 0,
       y: -8.5,

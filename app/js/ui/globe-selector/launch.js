@@ -61,7 +61,10 @@ export function createGlobeSelectorLaunch({
     const launchGeneration = ++generation;
     setShortcutButtonsBusy(true);
     setStatus(`Starting ${label}...`, '#334155');
-    const launch = Promise.resolve(callback())
+    const launch = Promise.resolve().then(() => {
+      if (launchGeneration !== generation) return false;
+      return callback(() => launchGeneration === generation);
+    })
       .then((launched) => {
         if (launched === false) throw new Error(`${label} did not accept the launch request.`);
         if (launchGeneration === generation) close();

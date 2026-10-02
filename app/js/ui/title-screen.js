@@ -1,7 +1,9 @@
+import { oceanEntryDecision } from '../ocean/entry-policy.js?v=1';
+import { resolveCoordinateSurfaceEvidence } from './globe-selector/helpers.js?v=9';
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { ENV, getEnv } from "../env.js?v=58";
 import { commitEnvironment } from '../session-coordinator.js?v=2';
-import { createGlobeSelector } from "./globe-selector.js?v=93";
+import { createGlobeSelector } from "./globe-selector.js?v=94";
 import { readSharedExperienceParams } from "./share-links.js?v=64";
 import { prepareTitleEnvironment } from "../planetary/entry.js?v=9";
 import { markFirstPlayReady, scheduleAfterFirstPlay } from '../runtime/workload-policy.js?v=1';
@@ -39,6 +41,7 @@ function initTitleScreenUi({
     ocean: oceanLaunchToggle
   };
   const sharedExperienceParams = readSharedExperienceParams();
+  let pendingOceanSelection = null;
   let titleLaunchMode = 'earth';
   let globeSelector = null;
   let skipGlobeGateOnce = false;
@@ -413,6 +416,7 @@ function initTitleScreenUi({
         arrivalMode: 'boat'
       }, { transient: false });
       if (!appCtx.gameStarted) {
+        pendingOceanSelection = selection;
         setLaunchMode('ocean');
         return appCtx.triggerTitleStart({ bypassCustomGate: true, launchMode: 'ocean' });
       }
@@ -424,7 +428,8 @@ function initTitleScreenUi({
           lon: Number(selection.lon),
           name: String(selection.name || 'Open Ocean'),
           region: 'Selected coordinates'
-        }
+        },
+        entry: selection.oceanEntry
       });
     },
     onMoonShortcut: async () => {
@@ -647,8 +652,16 @@ function initTitleScreenUi({
     if (requestedLaunchMode === 'ocean' && typeof appCtx.startOceanMode === 'function') {
       oceanEntryHadEarthWorld = hasLoadedEarthWorld();
       if (typeof appCtx.setBuildModeEnabled === 'function') appCtx.setBuildModeEnabled(false);
-      const selectedOceanLocation = appCtx.resolveLocationSelection?.() || appCtx.customLoc || null;
-      const oceanStarted = appCtx.startOceanMode({
+      const selectedOceanLocation = pendingOceanSelection || appCtx.resolveLocationSelection?.() || appCtx.customLoc || null;
+      pendingOceanSelection = null;
+      let oceanEntry = selectedOceanLocation?.oceanEntry;
+      if (selectedOceanLocation && !oceanEntry) {
+        const evidence = await resolveCoordinateSurfaceEvidence(Number(selectedOceanLocation.lat), Number(selectedOceanLocation.lon));
+        const decision = oceanEntryDecision({ lat: Number(selectedOceanLocation.lat), lon: Number(selectedOceanLocation.lon) }, evidence);
+        if (!decision.allowed) throw new Error(decision.reason);
+        oceanEntry = decision.entry;
+      }
+      const oceanStarted = await appCtx.startOceanMode({
         launchSite: Number.isFinite(Number(selectedOceanLocation?.lat)) && Number.isFinite(Number(selectedOceanLocation?.lon))
           ? {
               lat: Number(selectedOceanLocation.lat),
@@ -656,7 +669,8 @@ function initTitleScreenUi({
               name: String(selectedOceanLocation.name || 'Open Ocean'),
               region: 'Selected coordinates'
             }
-          : undefined
+          : undefined,
+        entry: oceanEntry
       });
       if (oceanStarted === false) throw new Error('Ocean mode did not accept the selected coordinates.');
       updateControlsModeUI?.();
