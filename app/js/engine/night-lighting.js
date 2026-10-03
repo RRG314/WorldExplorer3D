@@ -139,9 +139,7 @@ function updateHeadlights(factor) {
 }
 
 function nearestFixtures(limit) {
-  const origin = appCtx.carMesh?.visible === false || appCtx.droneMode
-    ? appCtx.camera?.position
-    : appCtx.carMesh?.position;
+  const origin = appCtx.activeEarthActorPosition?.() || appCtx.camera?.position || appCtx.carMesh?.position;
   if (!origin) return [];
   const candidates = [];
   for (const fixture of appCtx.streetLampFixtures || []) {

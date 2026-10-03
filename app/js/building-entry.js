@@ -512,6 +512,7 @@ function listEnterableBuildingSupportsNear(x, z, radius = 220, limit = 8, option
   for (let i = 0; i < nearby.length; i++) {
     const support = resolveBuildingEntrySupport(nearby[i], options);
     if (!support.enterable || !support.key || seen.has(support.key)) continue;
+    if (options.requireExteriorEntrance && !support.exteriorEntrance && !support.capturedExteriorEntry) continue;
     const dist = supportDistanceToActor(x, z, support);
     if (!Number.isFinite(dist) || dist > radius) continue;
     seen.add(support.key);
@@ -522,7 +523,8 @@ function listEnterableBuildingSupportsNear(x, z, radius = 220, limit = 8, option
   }
 
   const activeDestination = resolveActiveDestinationBuildingSupport(options);
-  if (activeDestination?.enterable && !seen.has(activeDestination.key)) {
+  if (activeDestination?.enterable && !seen.has(activeDestination.key) &&
+      (!options.requireExteriorEntrance || activeDestination.exteriorEntrance || activeDestination.capturedExteriorEntry)) {
     const dist = supportDistanceToActor(x, z, activeDestination);
     if (Number.isFinite(dist) && dist <= radius) {
       supports.push({

@@ -1,0 +1,12 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Harbor promenade presentation inspection</title><style>body{margin:0;background:#172730;color:white;font:16px sans-serif}#label{position:absolute;top:20px;left:24px}canvas{display:block}</style></head><body><div id="label">Authored harbor promenade · terrain conformity fixture<br>Arrow keys rotate the inspection camera</div><script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script><script type="module">
+import {publishHarborDistrict} from '/app/js/world/harbor-district.js';
+const scene=new THREE.Scene();scene.background=new THREE.Color(0x94b5c5);const camera=new THREE.PerspectiveCamera(45,innerWidth/innerHeight,.1,1000),renderer=new THREE.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});renderer.setSize(innerWidth,innerHeight);renderer.setPixelRatio(Math.min(devicePixelRatio,1.5));document.body.append(renderer.domElement);
+scene.add(new THREE.HemisphereLight(0xd9e9ee,0x536050,1.2));const sun=new THREE.DirectionalLight(0xfff2dd,1.2);sun.position.set(-35,80,50);scene.add(sun);
+const c={LOC:{lat:39.285,lon:-76.6124},SCALE:100000,_worldLoadSequence:1,terrainMeshHeightAt:(x,z)=>Math.sin(z/30)*.4,streetFurnitureMeshes:[],dynamicBuildingColliders:[],streetLampHeadMaterial:new THREE.MeshStandardMaterial({color:0xeeeee0}),addEarthWorldObject:o=>scene.add(o)};
+publishHarborDistrict(c,{THREE,registerLamp:()=>{}});
+const groundGeometry=new THREE.PlaneGeometry(180,240,90,120);groundGeometry.rotateX(-Math.PI/2);for(let i=0;i<groundGeometry.attributes.position.count;i++){const z=groundGeometry.attributes.position.getZ(i);groundGeometry.attributes.position.setY(i,Math.sin(z/30)*.4)}groundGeometry.computeVertexNormals();scene.add(new THREE.Mesh(groundGeometry,new THREE.MeshStandardMaterial({color:0x64756b,roughness:1})));
+let yaw=.7;const keys=new Set();onkeydown=e=>keys.add(e.key);onkeyup=e=>keys.delete(e.key);
+function render(){camera.position.set(Math.sin(yaw)*70,30,Math.cos(yaw)*70);camera.lookAt(0,0,0);renderer.render(scene,camera);}
+window.advanceTime=async ms=>{yaw+=(keys.has('ArrowRight')?1:keys.has('ArrowLeft')?-1:0)*ms*.0006;render()};
+window.render_game_to_text=()=>JSON.stringify({scene:'authored district fixture; no provider or tree models',coordinates:'world metres: y up',presentation:c.harborDistrictPresentation,colliders:c.dynamicBuildingColliders.length,drawCalls:renderer.info.render.calls,yaw});render();
+</script></body></html>

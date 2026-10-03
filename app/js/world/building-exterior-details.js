@@ -1,3 +1,4 @@
+import {harborDistrictFocus} from './harbor-district.js';
 import { facadeFloorPlan } from './building-facade-layout.js?v=3';
 import {
   appendGeometryWithTransform,
@@ -308,16 +309,17 @@ export function publishBuildingExteriorDetails(appCtx, options = {}) {
   const tier = tierForContext(appCtx, options.tier);
   const limit = DETAIL_LIMITS[tier];
   const radius = DETAIL_RADIUS[tier];
+  const districtFocus=harborDistrictFocus(appCtx);
   const candidates = (Array.isArray(appCtx?.buildingMeshes) ? appCtx.buildingMeshes : [])
     .filter((mesh) =>
-      mesh?.userData?.lodTier === 'near' &&
+      (mesh?.userData?.lodTier === 'near' || districtFocus && mesh?.userData?.lodTier === 'mid') &&
       mesh?.material?.userData?.buildingExterior === true &&
       mesh?.userData?.exteriorProfile &&
       !mesh?.userData?.isRoofDetail
     )
     .map((mesh) => {
       const center = footprintCenter(mesh.userData.buildingFootprint);
-      return { mesh, distance: Math.hypot(center.x, center.z) };
+      return { mesh, distance: Math.min(Math.hypot(center.x, center.z),districtFocus?Math.hypot(center.x-districtFocus.x,center.z-districtFocus.z):Infinity) };
     })
     .filter((candidate) => candidate.distance <= radius)
     .sort((a, b) => a.distance - b.distance || String(a.mesh.userData?.sourceBuildingId || '').localeCompare(String(b.mesh.userData?.sourceBuildingId || '')))

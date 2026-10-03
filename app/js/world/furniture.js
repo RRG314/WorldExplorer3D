@@ -1,3 +1,4 @@
+import {publishHarborDistrict} from './harbor-district.js';
 import {yieldToWorldFrame} from './cooperative-scheduling.js?v=1';
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import {disposeVegetationBatch,renderVegetationModelsCooperatively} from './vegetation-models.js';
@@ -498,7 +499,7 @@ function trafficControlPlacements(mappedFurnitureNodes = [], roads = appCtx.road
 }
 
 export function generateStreetFurniture(options = {}) {
-  try { return publishStreetFurniture(options); }
+  try { const result=publishStreetFurniture(options); publishHarborDistrict(appCtx,{THREE,registerLamp:registerStreetLamp}); return result; }
   finally { roadsideResolver = null; }
 }
 
@@ -731,6 +732,8 @@ export function flushWorldCoverVegetationRefresh() {
 export function resetWorldFurnitureCaches() {
   resetStreetLampFixtures();
   appCtx.trafficControlPlacements = [];
+  appCtx.harborDistrictPresentation = null;
+  appCtx.harborDistrictPlanting = [];
   roadsideResolver = null;
   vegetationRefreshRevision++;
   vegetationFocus = null;

@@ -268,7 +268,7 @@ function refreshActiveFloorFromHeight(active, walker, deps) {
 }
 
 export function listSupportedInteriorsNear(x, z, radius = 220, limit = 8, deps) {
-  const supports = listEnterableBuildingSupportsNear(x, z, radius, limit, { allowSynthetic: true });
+  const supports = listEnterableBuildingSupportsNear(x, z, radius, limit, { allowSynthetic: true, requireExteriorEntrance: true });
   return supports.map((support) => {
     const cached = support?.key ? deps.interiorCache.get(support.key) : null;
     const mappedState = cached?.mode === "mapped" ? "mapped" : cached?.mode === "generated" ? "generated" : "unknown";
@@ -317,7 +317,7 @@ export async function scanNearbyInteriorSupport(options = {}, deps) {
   const radius = Number.isFinite(options.radius) ? Math.max(40, options.radius) : 240;
   const limit = Number.isFinite(options.limit) ? Math.max(1, Math.min(8, options.limit)) : 6;
   const ref = interiorReferencePosition(deps);
-  const supports = listEnterableBuildingSupportsNear(ref.x, ref.z, radius, limit, { allowSynthetic: true });
+  const supports = listEnterableBuildingSupportsNear(ref.x, ref.z, radius, limit, { allowSynthetic: true, requireExteriorEntrance: true });
 
   publishInteriorLegendState({
     loading: supports.length > 0,
@@ -388,6 +388,7 @@ export async function enterInteriorForSupport(support, deps) {
   let sceneState;
   try{sceneState=deps.buildInteriorScene(definition,{curatedHome:!!ownedHome});}
   catch(error){setTransientHint(`Interior not ready: ${error.message}`,deps.INTERIOR_NOTICE_MS,deps);return false;}
+  const outsideColliders = appCtx.dynamicBuildingColliders.slice();
   appCtx.scene.add(sceneState.group);
   appCtx.replaceWorldCollection('dynamicBuildingColliders', sceneState.dynamicColliders.slice());
 
@@ -459,6 +460,8 @@ export async function enterInteriorForSupport(support, deps) {
     partitionCount: sceneState.partitionCount,
     layoutKind: sceneState.layoutKind,
     outsideState,
+    outsideColliders,
+    outsideWorldSequence: appCtx._worldLoadSequence,
     previousView,
     entryPoint: { ...sceneState.entryPoint },
     lastValidPosition: {
@@ -492,7 +495,6 @@ export function clearActiveInterior(options = {}, deps) {
   }
   if (!active) {
     closeElevatorFloorPicker(null);
-    appCtx.replaceWorldCollection('dynamicBuildingColliders');
     if (!options.preservePrompt) clearPrompt();
     return false;
   }
@@ -527,7 +529,10 @@ export function clearActiveInterior(options = {}, deps) {
   }
   restoreExteriorShellState(active.exteriorShellState);
   restoreInteriorWorldSuppression(active.suppressedWorldMeshes);
-  appCtx.replaceWorldCollection('dynamicBuildingColliders');
+  // Restore only the exterior belonging to this world; a world reset owns its
+  // fresh collection and must never inherit old district obstacles.
+  appCtx.replaceWorldCollection('dynamicBuildingColliders',
+    active.outsideWorldSequence === appCtx._worldLoadSequence ? (active.outsideColliders || []) : []);
   deps.disposeCuratedHomeFurnishing?.(active);
   disposeObject3D(active.group);
   appCtx.activeInterior = null;

@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import {readFile} from 'node:fs/promises';
 import * as THREE from 'three';
+import {publishHarborDistrict} from '../app/js/world/harbor-district.js';
 import {packTraversalAdjacency,traversalSourceInterval} from '../app/js/world/traversal-graph-storage.js';
 import {ctx} from '../app/js/shared-context.js?v=55';
 import {initWorldTraversal,buildTraversalNetworks,invalidateTraversalNetworks,findTraversalRoute} from '../app/js/world/traversal.js';
@@ -44,7 +45,7 @@ test('real route search retains one-way restrictions, walking and disconnected l
 test('furniture publication releases its road index on success, failure and reset',async()=>{
  const source=(await readFile(new URL('../app/js/world/furniture.js',import.meta.url),'utf8')).replace(/^import[\s\S]*?from\s+['"][^'"]+['"];?\s*/gm,'').replaceAll('export function','function');
  const appCtx={roads:[],pois:[]};
- const context=vm.createContext({appCtx,THREE,performance,collectWorldVegetationPlacements:()=>[],buildWorldVegetationInstancing:()=>0,disposeVegetationBatch(){},createRoadsidePlacementResolver:roads=>({roads}),resetStreetLampFixtures(){}});
+ const context=vm.createContext({appCtx,THREE,performance,publishHarborDistrict,registerStreetLamp:()=>{},collectWorldVegetationPlacements:()=>[],buildWorldVegetationInstancing:()=>0,disposeVegetationBatch(){},createRoadsidePlacementResolver:roads=>({roads}),resetStreetLampFixtures(){}});
  vm.runInContext(source,context);
  context.generateStreetFurniture();assert.equal(vm.runInContext('roadsideResolver',context),null);
  appCtx.pois={forEach(){throw new Error('publication failed');}};

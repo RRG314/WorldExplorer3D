@@ -193,3 +193,7 @@ Regional public camera stills are implemented and verified: Fintraffic Finland c
 ## P16 waterfront slice — October 3
 
 Fresh Baltimore inspection led to context-qualified generated vessels, corrected berthed waterlines, an original bounded rig on the reviewed Constellation hull, and a three-stop promenade walk in the existing Activities system. The actual browser walks both legs with keyboard controls and records one local completion; the route camera line and unreachable phone details/result were found and fixed. Full 1,741 registered tests and source checks pass; full-world desktop/phone and prescribed rig-client images/state are inspected. See EARTH-DISTRICT.md. This completes the waterfront slice, not all P16: street/promenade art, night readability and interior/transport acceptance remain. P17–P20 and camera C04/C05 remain open. Production unchanged.
+
+## P16 district development closeout — October 3 continuation
+
+The bounded Inner Harbor district acceptance is complete: terrain-following continuous paving, budgeted furniture/vegetation, actor-selected night lights, existing facade and usable-door coverage, honest enterable directory, a labeled fictional orientation lobby, exterior-obstacle restoration, actual keyboard route/entry/exit and walk/drive/walk continuity. All 1,747 registered tests pass; source, actual-world and prescribed presentation-client evidence is recorded in EARTH-DISTRICT.md. This closes the flagship district scope, not a city-wide art or production gate. P17 is next; P18–P20 and camera C04/C05 remain open.

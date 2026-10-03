@@ -234,6 +234,10 @@ function* vegetationPlacementSteps() {
     return true;
   };
 
+  for(const p of appCtx.harborDistrictPlanting || []) {
+    pushPlacement({x:p.x,z:p.z,scale:.85,rotation:p.yaw,leafType:'broadleaved',landuseType:'garden',source:'authored-harbor-district'});
+  }
+
   for (let i = 0; i < treeNodes.length && placements.length < maxTrees; i++) {
     yield;
     const node = treeNodes[i];
