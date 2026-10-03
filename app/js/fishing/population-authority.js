@@ -113,7 +113,7 @@ function createFishPopulationContext(options = {}) {
     evidence: Object.freeze({
       populationTruth: 'gameplay-model-only',
       populationConfidence: 'not-a-population-survey',
-      candidatePoolBasis: 'we3d-game-catalog-water-kind-latitude-access-v2',
+      candidatePoolBasis: String(options.candidatePoolBasis || 'we3d-game-catalog-water-kind-latitude-access-v2').slice(0,120),
       regionalEcologyPackApplied: false,
       regionalExclusionReason: 'regional-catalog-is-not-catch-probability-evidence',
       livePresenceClaim: false,

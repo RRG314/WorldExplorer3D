@@ -1,0 +1,106 @@
+{
+  "retrieved": "2026-10-02",
+  "rightsEvidence": [
+    "https://3d-api.si.edu/api-docs/",
+    "https://www.si.edu/openaccess/faq"
+  ],
+  "modifications": "Converted from Draco to self-contained GLB; scaled to 2 m maximum extent; base aligned with museum mounts cropped and cut embedded into authored rock; simplified near/far meshes. Runtime living-colony colors are authored. These specimens are shape references, not field observations at the game site.",
+  "assets": [
+    {
+      "id": "table-coral",
+      "title": "Madrepora spicifera",
+      "specimen": "USNM 244",
+      "source": "https://3d-api.si.edu/content/document/3d_package:debebbb8-f7ee-4a6d-941c-12ea01dec71a/usnm_244-20k-thumb.glb",
+      "author": "Smithsonian Institution, National Museum of Natural History",
+      "license": "CC0-1.0",
+      "sourceSha256": "7f20516ec7b73a05994117d835958c2a61bc528dc611cf0b5da6fe23293b5214",
+      "sourceBytes": 262668,
+      "near": {
+        "bytes": 327396,
+        "triangles": 6003,
+        "sha256": "ec7cbf73a5a0ccd362bd5537aad1506a12aa3be8ea99cba17de1b45a37d62842"
+      },
+      "far": {
+        "bytes": 134220,
+        "triangles": 1387,
+        "sha256": "281207a92d47578891ec546ba14425e247d18bf9a29faaadb9efe2fc6f5d25f6"
+      },
+      "bounds": {
+        "min": [
+          -0.9714337587356567,
+          0.19642311334609985,
+          -0.7272782921791077
+        ],
+        "max": [
+          0.9857170581817627,
+          1.2111334800720215,
+          0.7386314868927002
+        ]
+      }
+    },
+    {
+      "id": "branch-coral",
+      "title": "Madrepora formosa",
+      "specimen": "USNM 292",
+      "source": "https://3d-api.si.edu/content/document/3d_package:03d6b38a-bf7d-4334-90c9-1f7b4c3041a9/USNM_292-20k-thumb.glb",
+      "author": "Smithsonian Institution, National Museum of Natural History",
+      "license": "CC0-1.0",
+      "sourceSha256": "c22349df7b2f075221817b5f4173857ef5e15735e0246c12cae2ce7101994f55",
+      "sourceBytes": 256440,
+      "near": {
+        "bytes": 367880,
+        "triangles": 6127,
+        "sha256": "2dce1a5624dd73dd50fe207f0bc6d079bc77e23adabac3ec7a1b97cd0d4396be"
+      },
+      "far": {
+        "bytes": 140972,
+        "triangles": 1278,
+        "sha256": "c0bfa48f569b6fd4d97225cf3469c42e4d8f42f51489d368d0f6826597c6011d"
+      },
+      "bounds": {
+        "min": [
+          -0.9572727680206299,
+          0.18165232241153717,
+          -0.9334676265716553
+        ],
+        "max": [
+          0.9656961560249329,
+          1.361895203590393,
+          0.9801013469696045
+        ]
+      }
+    },
+    {
+      "id": "massive-coral",
+      "title": "Porites lobata",
+      "specimen": "USNM 646",
+      "source": "https://3d-api.si.edu/content/document/3d_package:010228bb-75de-4fff-a848-c70584ce1087/USNM_646-20k-thumb.glb",
+      "author": "Smithsonian Institution, National Museum of Natural History",
+      "license": "CC0-1.0",
+      "sourceSha256": "5a16538f9dcc9bce29ef105731368af331209450f83f50a47d1aa3e0fcef5c55",
+      "sourceBytes": 171660,
+      "near": {
+        "bytes": 279652,
+        "triangles": 6150,
+        "sha256": "e598aa3b5fcf6793e5797743bf93d0204a4efc3cdf8debb6fdcc17527d88dfff"
+      },
+      "far": {
+        "bytes": 123364,
+        "triangles": 1471,
+        "sha256": "f852ab1f794baa56e5a4b4eb397af3d71484c17d708ebc8e82e1ad1047703eac"
+      },
+      "bounds": {
+        "min": [
+          -0.7646341323852539,
+          0.1869010478258133,
+          -0.466764360666275
+        ],
+        "max": [
+          0.7767198085784912,
+          1.9920649528503418,
+          0.45382410287857056
+        ]
+      }
+    }
+  ]
+}

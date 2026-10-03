@@ -42,3 +42,7 @@ Research deck/bridge collision, moving-ship character attachment, helm/mooring, 
 ## P10 development closeout
 
 The local ship/sub journey now retains vessel IDs, condition, parent anchor, wave phase and continuation state. The research deck has a submarine cradle and deployment station; the parent remains visible/marked underwater. Explicit recovery, underwater reload, aboard reload and redeployment preserve the same ship/sub. Eight focused contracts, eighteen actual-app Ocean cases and six deck browser cases pass, with inspected desktop/phone screenshots and the prescribed game client. All **1,696 registered tests pass**. See docs/product-audit/2026-10-01/MARINE-VOYAGE.md for local-only scope and failure rules. P11 regional ocean content/art is next; shared expeditions remain P18. Production unchanged.
+
+## P11 development closeout
+
+The first authored Coral Shelf pack replaces generic coral primitives with six bounded Smithsonian CC0 near/far assets, deterministic regional placement, seagrass, named map landmarks, corrected fish shapes, region-qualified fish selection and session-owned optional sound. Habitat collision, failed assets and disposal are verified. All 1,702 registered tests, seven habitat browser cases and eighteen existing Ocean/ship cases pass; source checks and prescribed-client screenshots are inspected. See MARINE-HABITAT.md for measured budgets and provenance. P12 first research outing/earned upgrade is next; P11 does not remain open for worldwide art expansion. Production unchanged.

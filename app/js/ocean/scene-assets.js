@@ -1,12 +1,10 @@
 import {
-  getRockTextureSet,
   getSeabedTextureSet
 } from "./scene-textures.js?v=1";
 
-const _tmpAssetObj = new THREE.Object3D();
-
 export function disposeObject3D(obj) {
   if (!obj) return;
+  const managed=[];obj.traverse(child=>{if(child.userData?.disposeOceanHabitat)managed.push(child.userData.disposeOceanHabitat)});for(const dispose of managed)dispose();
   obj.traverse((child) => {
     if (!child || !child.isMesh) return;
     if (child.geometry && typeof child.geometry.dispose === "function") {
@@ -48,9 +46,9 @@ export function createSeabedMesh(renderer = null, deps = {}) {
     const deepWeight = deps.smoothstep(55, 420, -z + 70);
     const noise = deps.valueNoise2D(x * 0.028 + 20, z * 0.028 - 14, 31);
 
-    const sandR = 0.72 + noise * 0.08;
-    const sandG = 0.80 + noise * 0.08;
-    const sandB = 0.74 + noise * 0.06;
+    const sandR = 0.48 + noise * 0.08;
+    const sandG = 0.49 + noise * 0.08;
+    const sandB = 0.37 + noise * 0.06;
 
     const reefR = 0.58 + noise * 0.1;
     const reefG = 0.69 + noise * 0.1;
@@ -90,165 +88,6 @@ export function createSeabedMesh(renderer = null, deps = {}) {
   mesh.castShadow = false;
   mesh.name = "OceanSeabed";
   return mesh;
-}
-
-export function createReefCluster(renderer = null, deps = {}) {
-  const group = new THREE.Group();
-  group.name = "OceanReefCluster";
-
-  const palette = [0xffa986, 0xff88c1, 0x8be8da, 0xffd6a4, 0xa8f2bc, 0xf8b6de];
-  const branchGeo = new THREE.CylinderGeometry(0.16, 0.44, 2.8, 8);
-  const fanGeo = new THREE.ConeGeometry(0.7, 1.5, 8);
-  const moundGeo = new THREE.IcosahedronGeometry(0.85, 0);
-  const rockGeo = new THREE.IcosahedronGeometry(1.7, 1);
-  const spikeGeo = new THREE.ConeGeometry(0.55, 2.8, 7);
-  const rockTextures = getRockTextureSet(renderer, deps);
-
-  const branchMat = new THREE.MeshStandardMaterial({
-    roughness: 0.64,
-    metalness: 0.04,
-    emissive: 0x11222a,
-    emissiveIntensity: 0.35,
-    vertexColors: true
-  });
-  const fanMat = branchMat.clone();
-  const moundMat = branchMat.clone();
-
-  const rockMat = new THREE.MeshStandardMaterial({
-    color: 0xffffff,
-    map: rockTextures.map,
-    normalMap: rockTextures.normalMap,
-    roughnessMap: rockTextures.roughnessMap,
-    roughness: 0.89,
-    metalness: 0.02
-  });
-  rockMat.normalScale = new THREE.Vector2(0.58, 0.58);
-  const darkRockMat = new THREE.MeshStandardMaterial({
-    color: 0x7f97ad,
-    map: rockTextures.map,
-    normalMap: rockTextures.normalMap,
-    roughnessMap: rockTextures.roughnessMap,
-    roughness: 0.94,
-    metalness: 0.03
-  });
-  darkRockMat.normalScale = new THREE.Vector2(0.66, 0.66);
-
-  const branchMesh = new THREE.InstancedMesh(branchGeo, branchMat, 620);
-  const fanMesh = new THREE.InstancedMesh(fanGeo, fanMat, 360);
-  const moundMesh = new THREE.InstancedMesh(moundGeo, moundMat, 560);
-  const rockMesh = new THREE.InstancedMesh(rockGeo, rockMat, 700);
-  const spikeMesh = new THREE.InstancedMesh(spikeGeo, darkRockMat, 320);
-
-  function randomReefPoint(radiusMin, radiusMax, centerX = 24, centerZ = 124) {
-    const angle = Math.random() * Math.PI * 2;
-    const radius = radiusMin + Math.random() * (radiusMax - radiusMin);
-    const x = centerX + Math.cos(angle) * radius + (Math.random() - 0.5) * 18;
-    const z = centerZ + Math.sin(angle) * radius + (Math.random() - 0.5) * 22;
-    return { x, z, y: deps.sampleSeabedHeight(x, z) };
-  }
-
-  const setInstancedColor = (mesh, index, hex) => {
-    if (!mesh || typeof mesh.setColorAt !== "function") return;
-    mesh.setColorAt(index, new THREE.Color(hex));
-  };
-
-  for (let i = 0; i < branchMesh.count; i++) {
-    const p = randomReefPoint(8, 250);
-    const scale = 0.8 + Math.random() * 1.8;
-    _tmpAssetObj.position.set(p.x, p.y + 0.2, p.z);
-    _tmpAssetObj.rotation.set((Math.random() - 0.5) * 0.28, Math.random() * Math.PI * 2, (Math.random() - 0.5) * 0.28);
-    _tmpAssetObj.scale.set(scale * 0.6, scale, scale * 0.6);
-    _tmpAssetObj.updateMatrix();
-    branchMesh.setMatrixAt(i, _tmpAssetObj.matrix);
-    setInstancedColor(branchMesh, i, palette[(Math.random() * palette.length) | 0]);
-  }
-
-  for (let i = 0; i < fanMesh.count; i++) {
-    const p = randomReefPoint(10, 220);
-    const scale = 0.75 + Math.random() * 1.5;
-    _tmpAssetObj.position.set(p.x, p.y + 0.55, p.z);
-    _tmpAssetObj.rotation.set(Math.random() * 0.22, Math.random() * Math.PI * 2, Math.random() * 0.22);
-    _tmpAssetObj.scale.set(scale, scale * (0.7 + Math.random() * 0.55), scale);
-    _tmpAssetObj.updateMatrix();
-    fanMesh.setMatrixAt(i, _tmpAssetObj.matrix);
-    setInstancedColor(fanMesh, i, palette[(Math.random() * palette.length) | 0]);
-  }
-
-  for (let i = 0; i < moundMesh.count; i++) {
-    const p = randomReefPoint(8, 330);
-    const sx = 0.8 + Math.random() * 2.3;
-    const sy = 0.6 + Math.random() * 1.6;
-    const sz = 0.7 + Math.random() * 2.1;
-    _tmpAssetObj.position.set(p.x, p.y + 0.35, p.z);
-    _tmpAssetObj.rotation.set(Math.random() * 0.35, Math.random() * Math.PI * 2, Math.random() * 0.35);
-    _tmpAssetObj.scale.set(sx, sy, sz);
-    _tmpAssetObj.updateMatrix();
-    moundMesh.setMatrixAt(i, _tmpAssetObj.matrix);
-    setInstancedColor(moundMesh, i, palette[(Math.random() * palette.length) | 0]);
-  }
-
-  for (let i = 0; i < rockMesh.count; i++) {
-    const area = Math.random();
-    const angle = Math.random() * Math.PI * 2;
-    const radius = area < 0.8 ? 24 + Math.random() * 430 : 260 + Math.random() * 520;
-    const x = 6 + Math.cos(angle) * radius + (Math.random() - 0.5) * 22;
-    const z = 84 + Math.sin(angle) * radius + (Math.random() - 0.5) * 28;
-    const y = deps.sampleSeabedHeight(x, z);
-    const sx = 1.1 + Math.random() * 3.4;
-    const sy = 0.6 + Math.random() * 1.8;
-    const sz = 1.0 + Math.random() * 3.0;
-    _tmpAssetObj.position.set(x, y + 0.3, z);
-    _tmpAssetObj.rotation.set(Math.random() * 0.45, Math.random() * Math.PI * 2, Math.random() * 0.45);
-    _tmpAssetObj.scale.set(sx, sy, sz);
-    _tmpAssetObj.updateMatrix();
-    rockMesh.setMatrixAt(i, _tmpAssetObj.matrix);
-  }
-
-  for (let i = 0; i < spikeMesh.count; i++) {
-    const p = randomReefPoint(40, 610, 0, 40);
-    const sy = 0.6 + Math.random() * 2.8;
-    _tmpAssetObj.position.set(p.x, p.y + sy * 0.5, p.z);
-    _tmpAssetObj.rotation.set(0, Math.random() * Math.PI * 2, (Math.random() - 0.5) * 0.12);
-    _tmpAssetObj.scale.set(0.45 + Math.random() * 0.9, sy, 0.45 + Math.random() * 0.9);
-    _tmpAssetObj.updateMatrix();
-    spikeMesh.setMatrixAt(i, _tmpAssetObj.matrix);
-  }
-
-  if (branchMesh.instanceColor) branchMesh.instanceColor.needsUpdate = true;
-  if (fanMesh.instanceColor) fanMesh.instanceColor.needsUpdate = true;
-  if (moundMesh.instanceColor) moundMesh.instanceColor.needsUpdate = true;
-
-  [branchMesh, fanMesh, moundMesh, rockMesh, spikeMesh].forEach((mesh) => {
-    mesh.instanceMatrix.needsUpdate = true;
-    mesh.castShadow = true;
-    mesh.receiveShadow = true;
-    group.add(mesh);
-  });
-
-  const kelpGeo = new THREE.CylinderGeometry(0.05, 0.12, 2.8, 6);
-  const kelpMat = new THREE.MeshStandardMaterial({
-    color: 0x2f7e60,
-    roughness: 0.82,
-    metalness: 0.01,
-    emissive: 0x0c2a21,
-    emissiveIntensity: 0.24
-  });
-  const kelp = new THREE.InstancedMesh(kelpGeo, kelpMat, 520);
-  for (let i = 0; i < kelp.count; i++) {
-    const p = randomReefPoint(10, 280);
-    const sy = 0.7 + Math.random() * 2.6;
-    _tmpAssetObj.position.set(p.x, p.y + sy * 0.5, p.z);
-    _tmpAssetObj.rotation.set((Math.random() - 0.5) * 0.2, Math.random() * Math.PI * 2, (Math.random() - 0.5) * 0.2);
-    _tmpAssetObj.scale.set(0.9, sy, 0.9);
-    _tmpAssetObj.updateMatrix();
-    kelp.setMatrixAt(i, _tmpAssetObj.matrix);
-  }
-  kelp.instanceMatrix.needsUpdate = true;
-  kelp.castShadow = true;
-  kelp.receiveShadow = true;
-  group.add(kelp);
-
-  return group;
 }
 
 export function createMarineParticles() {

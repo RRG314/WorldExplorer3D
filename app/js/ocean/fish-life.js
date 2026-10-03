@@ -5,63 +5,27 @@ export function createOceanFishLifeApi({ oceanMode, disposeObject3D }) {
   const _tmpVecB = new THREE.Vector3();
 
   function createFishTemplate(options = {}) {
-    const group = new THREE.Group();
-
-    const bodyColor = options.bodyColor || 0xffb88f;
-    const finColor = options.finColor || bodyColor;
-    const bodyMat = new THREE.MeshStandardMaterial({
-      color: bodyColor,
-      roughness: 0.48,
-      metalness: 0.03
-    });
-    const finMat = new THREE.MeshStandardMaterial({
-      color: finColor,
-      roughness: 0.52,
-      metalness: 0.02
-    });
-
-    const body = new THREE.Mesh(new THREE.SphereGeometry(0.62, 14, 11), bodyMat);
-    body.scale.set(1.9, 0.86, 0.92);
-    group.add(body);
-
-    const belly = new THREE.Mesh(
-      new THREE.SphereGeometry(0.5, 10, 8),
-      new THREE.MeshStandardMaterial({ color: 0xf5f0e4, roughness: 0.62, metalness: 0.0 })
-    );
-    belly.scale.set(1.3, 0.6, 0.84);
-    belly.position.set(0.08, -0.22, 0.15);
-    group.add(belly);
-
-    const tail = new THREE.Mesh(new THREE.ConeGeometry(0.34, 1.05, 10), finMat);
-    tail.name = "fishTail";
-    tail.rotation.x = -Math.PI / 2;
-    tail.position.z = -1.06;
-    group.add(tail);
-
-    const dorsal = new THREE.Mesh(new THREE.ConeGeometry(0.13, 0.5, 8), finMat);
-    dorsal.rotation.z = Math.PI;
-    dorsal.position.set(-0.06, 0.52, -0.05);
-    group.add(dorsal);
-
-    const pectoralL = new THREE.Mesh(new THREE.ConeGeometry(0.08, 0.32, 6), finMat);
-    pectoralL.rotation.z = Math.PI * 0.52;
-    pectoralL.rotation.x = Math.PI * 0.5;
-    pectoralL.position.set(-0.14, -0.1, 0.34);
-    group.add(pectoralL);
-
-    const pectoralR = pectoralL.clone();
-    pectoralR.rotation.z = -Math.PI * 0.52;
-    pectoralR.position.x = 0.14;
-    group.add(pectoralR);
-
-    const eyeMat = new THREE.MeshStandardMaterial({ color: 0x0f1117, roughness: 0.25, metalness: 0.04 });
-    const eyeL = new THREE.Mesh(new THREE.SphereGeometry(0.055, 8, 8), eyeMat);
-    eyeL.position.set(-0.22, 0.12, 0.68);
-    const eyeR = eyeL.clone();
-    eyeR.position.x = 0.22;
-    group.add(eyeL);
-    group.add(eyeR);
-
+    const group=new THREE.Group();
+    const bodyMaterial=new THREE.MeshStandardMaterial({color:options.bodyColor||0x79888a,roughness:.5,metalness:.12,vertexColors:true});
+    const bodyGeometry=new THREE.SphereGeometry(1,20,12),p=bodyGeometry.attributes.position,colors=[];
+    // Swim axis is +Z, matching lookAt and the eyes/tail. Countershading and
+    // a tapered caudal peduncle replace the old sideways balloon body.
+    for(let i=0;i<p.count;i++){
+      const z=p.getZ(i),y=p.getY(i),taper=.72+.28*(z+1)*.5;
+      p.setXYZ(i,p.getX(i)*.22*taper,y*.34*taper,z*.72);
+      const shade=y>0?.6+(1-y)*.22:.85+Math.abs(y)*.15;colors.push(shade,shade,shade);
+    }
+    bodyGeometry.setAttribute('color',new THREE.Float32BufferAttribute(colors,3));bodyGeometry.computeVertexNormals();
+    group.add(new THREE.Mesh(bodyGeometry,bodyMaterial));
+    const finMaterial=new THREE.MeshStandardMaterial({color:options.finColor||0x4f5d61,roughness:.7,side:THREE.DoubleSide});
+    function fin(points){const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.Float32BufferAttribute(points,3));geo.computeVertexNormals();return new THREE.Mesh(geo,finMaterial)}
+    const tail=new THREE.Group();tail.name='fishTail';tail.position.z=-.62;
+    tail.add(fin([0,0,0, 0,.38,-.42, 0,.07,-.25, 0,0,0, 0,-.07,-.25, 0,-.38,-.42]));group.add(tail);
+    group.add(fin([0,.18,.30, 0,.52,-.1, 0,.17,-.5]));
+    group.add(fin([0,-.17,.1, 0,-.40,-.2, 0,-.14,-.5]));
+    for(const side of [-1,1])group.add(fin([side*.14,0,.18,side*.48,-.08,-.12,side*.10,-.07,-.24]));
+    const eyeMaterial=new THREE.MeshStandardMaterial({color:0x10141a,roughness:.22});const eyeGeometry=new THREE.SphereGeometry(.028,8,6);
+    for(const side of [-1,1]){const eye=new THREE.Mesh(eyeGeometry,eyeMaterial);eye.position.set(side*.125,.085,.53);group.add(eye)}
     return group;
   }
 
@@ -164,8 +128,8 @@ export function createOceanFishLifeApi({ oceanMode, disposeObject3D }) {
       radius: 16 + index * 10,
       speed: Math.max(0.24, 0.6 - index * 0.09),
       verticalAmp: 2 + index * 0.8,
-      scaleMin: 1 + index * 0.3,
-      scaleMax: 1.8 + index * 0.55
+      scaleMin: .48 + index * .06,
+      scaleMax: .8 + index * .08
     }));
     const templates = schoolDefs.map((school) => createFishTemplate({
       bodyColor: school.visual?.body || 0x8cdfff,

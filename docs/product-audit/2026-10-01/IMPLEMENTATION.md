@@ -137,3 +137,7 @@ The bounded P09 journey is implemented and verified; see RESEARCH-DECK.md for sc
 ## P10 local deployment/recovery closeout
 
 Stable ship/sub IDs, geographic parent anchors, local continuation, cradle launch, visible/marked parent vessel, hull clearance, explicit recovery, surface/underwater reload and failed-transfer safeguards are implemented. 1,696 registered tests, eight focused contracts, eighteen actual-app Ocean journey cases and six deck browser cases pass. See MARINE-VOYAGE.md. Regional art P11 and shared ownership P18 are not included; production is unchanged.
+
+## P11 — first regional marine content pack
+
+Completed locally after P10. See MARINE-HABITAT.md for implementation ownership and bounded completion: real CC0 specimen geometry, regional placement, map landmarks, collision, source distinctions, fish correction, optional sound, loading/disposal and browser budgets. 1,702 contracts and existing eighteen-case marine regression pass. No deployment.

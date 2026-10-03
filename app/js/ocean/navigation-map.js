@@ -120,6 +120,12 @@ export function drawOceanNavigationMap(appCtx, oceanMode, sample) {
     const px=Math.max(7,Math.min(width-7,width*(.5-cached.data.centerX/(halfExtent*2)))),py=Math.max(40,Math.min(height-38,height*(.5-cached.data.centerZ/(halfExtent*2))));
     ctx.fillStyle='#ffdc91';ctx.fillRect(px-4,py-4,8,8);ctx.font='9px sans-serif';ctx.fillText('SHIP',Math.min(width-28,px+6),py+3);
   }
+  const landmarks=oceanMode.habitat?.plan.landmarks||[];
+  landmarks.forEach((landmark,index)=>{
+    const px=width*(.5+(landmark.x-cached.data.centerX)/(halfExtent*2)),py=height*(.5+(landmark.z-cached.data.centerZ)/(halfExtent*2));
+    if(px<8||px>width-16||py<40||py>height-38)return;
+    ctx.fillStyle='#9be8bd';ctx.beginPath();ctx.arc(px,py,2.5,0,Math.PI*2);ctx.fill();ctx.font='bold 9px sans-serif';ctx.fillText(String.fromCharCode(65+index),px+5,py+3);
+  });
   const evidence = sample(x, z);
   const depthKnown = evidence.bathymetry.truthType !== 'unknown';
   const sourceLabel = !depthKnown ? 'Depth data unknown' : evidence.bathymetry.sourceId?.includes('gebco') ? 'GEBCO modeled depth' : 'Terrain-derived depth';
@@ -135,7 +141,7 @@ export function drawOceanNavigationMap(appCtx, oceanMode, sample) {
   ctx.moveTo(7, height - 8); ctx.lineTo(7 + width / 4, height - 8); ctx.stroke();
   ctx.fillStyle = '#d3eef1'; ctx.font = '8px sans-serif'; ctx.fillText(scaleText, 7, height - 15);
   ctx.fillText(`${Math.round(heading) % 360}°`, width * .46, height - 15);
-  const detail = `North-up gameplay seabed, 10 m contour interval. Heading ${Math.round(heading) % 360} degrees. ${sourceLabel}: ${modelDepth}. Geographic datum: ${evidence.bathymetry.verticalDatum || 'unknown'}; ≈MSL means assumed mean sea level. Hatched areas lack geographic depth data. Terrain is compressed for gameplay; not a navigation chart.`;
+  const detail = `North-up gameplay seabed, 10 m contour interval. Heading ${Math.round(heading) % 360} degrees. ${sourceLabel}: ${modelDepth}. Geographic datum: ${evidence.bathymetry.verticalDatum || 'unknown'}; ≈MSL means assumed mean sea level. Hatched areas lack geographic depth data. Terrain is compressed for gameplay; not a navigation chart. ${landmarks.map((l,i)=>`${String.fromCharCode(65+i)}: ${l.label} (authored)`).join('; ')}`;
   canvas.title = detail; canvas.setAttribute('aria-label', detail);
   oceanMode.navigationMapSnapshot = { headingDegrees: heading, halfExtentWorldUnits: halfExtent,
     widthMeters: halfExtent * 2 * units, contourIntervalMeters: 10,

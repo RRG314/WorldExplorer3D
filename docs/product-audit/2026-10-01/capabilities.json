@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "scope": "Local source capability descriptions; not production or full journey certification",
-  "registrySha256": "e2361e7c7f20c74f5439f7ef1ba070a3f26cbd8476fe388a8163015a8bfa9947",
+  "registrySha256": "b7d633d97d181b1303b733ada23ec2ae51eb77ebb8050c9c55ce9718076e628b",
   "owners": {
     "app/js/live-earth/registry.js": "6c6d3cec9fb3334434304083c2529b97da73eb967cd2edfaef1bc4a0b2cf3ee6",
     "app/js/map.js": "37f3289baf5e52eb6bb48c1fee61f037482226b57023ef71298cbd07955a1a8c",
@@ -15,7 +15,7 @@
     "app/js/travel-mode.js": "38dbb7260a048cda3fedaef55eb59d2d36dd81a71887fbbc7437ee9d3410ab24",
     "app/js/plane-mode.js": "594e615f10425a466b33ed0107cc9f03cd87410820756b6948fc07aea191ac19",
     "app/js/boat-mode.js": "51791a75d9f2b4645d2481c698a2ea3297f8e603750a339138a36e7a189d94ed",
-    "app/js/ocean.js": "d0d6b91bf14ba1ab6448e5f91aa3838932ac32868dc9ab847b270b677b912bd3",
+    "app/js/ocean.js": "8a9120dc528d17fc14ba804658d4c8a54ac320eb7e2c07a3c8d4ea792048bb14",
     "app/js/boat-mode/research/runtime.js": "4300d253f1e5479fabd734c3cf1587e2586181d77a6fb3ef3be1a08e6db73f2a",
     "app/js/planetary/entry.js": "e9bff6f3010e48ca30b66581a44d4e79439b6ebb472d85204b4dd250aecfd78f",
     "app/js/planetary/mars-world.js": "24bfe06faf75e9c9ee87ed9155745fac9ddc1a5cd4aed9a2167eee0734ecfc45",
@@ -166,10 +166,10 @@
       "label": "Submarine exploration",
       "group": "worlds",
       "status": "limited",
-      "summary": "Pilot a submarine around an eligible ocean site. The seabed combines modeled depth with generated scenery; species and habitats are not a real-time ocean survey.",
+      "summary": "Pilot a submarine around an eligible ocean site. Coral Shelf has an authored reef pack, landmarks and optional sound. Seabed models, species and habitats are not a real-time ocean survey.",
       "owner": "app/js/ocean.js",
       "persistence": "The last voyage retains ship/sub IDs, condition, location and recovery state on this device. Reload resumes aboard the sub. Inventory stays in its existing stores.",
-      "acceptance": "P10: local reload, recovery and redeployment browser checks passed; geographic art and physical-device release acceptance pending."
+      "acceptance": "P10–P11: local voyage and first regional habitat browser checks passed. Broader biomes and physical-device release acceptance remain."
     },
     {
       "id": "swimming",

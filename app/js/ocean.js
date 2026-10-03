@@ -1,3 +1,5 @@
+import {createOceanSoundscape} from './ocean/soundscape.js';
+import {createMarineHabitat} from './ocean/habitat.js';
 import {getMaritimeCatalogEntry} from './transport/maritime-catalog.js?v=1';
 import {createOceanParentVessel,parentHullCollision} from './ocean/parent-vessel.js';
 import {ensureOceanVoyage} from './ocean/voyage.js';
@@ -15,7 +17,6 @@ import {
 import {
   createDeepOceanBackdrop as createDeepOceanBackdropAsset,
   createMarineParticles as createMarineParticlesAsset,
-  createReefCluster as createReefClusterAsset,
   createSeabedMesh as createSeabedMeshAsset,
   createSubmarineMesh as createSubmarineMeshAsset,
   disposeObject3D as disposeOceanObject3D
@@ -163,7 +164,8 @@ function createSeabedMesh(renderer = null) {
 }
 
 function createReefCluster(renderer = null) {
-  return createReefClusterAsset(renderer, oceanSceneAssetDeps);
+  oceanMode.habitat=createMarineHabitat(THREE,{site:oceanMode.launchSite,scale:appCtx.SCALE,sampleSeabedHeight,rockTextures:getRockTextureSet(renderer)});
+  return oceanMode.habitat.group;
 }
 
 function createMarineParticles() {
@@ -188,6 +190,7 @@ function oceanFishPopulationContext() {
   const longitude = Number(site.lon);
   return createFishPopulationContext({
     accessMode: 'underwater',
+    ...(oceanMode.habitat?.plan.featured?{candidateSpeciesIds:['giant_trevally'],candidatePoolBasis:'authored-coral-shelf-visual-pack-v1'}:{}),
     waterbodyId: `ocean-site:${latitude.toFixed(4)}:${longitude.toFixed(4)}`,
     waterKind: 'open_ocean',
     waterClass: 'marine',
@@ -228,7 +231,7 @@ function rebuildOceanTerrainLayers(scene = oceanMode.scene, renderer = oceanMode
 function createOceanScene() {
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x0f496e);
-  scene.fog = new THREE.FogExp2(0x0b3551, 0.0032);
+  scene.fog = new THREE.FogExp2(0x0b3551, .009);
 
   const camera = new THREE.PerspectiveCamera(64, window.innerWidth / window.innerHeight, 0.1, 3600);
   camera.position.set(0, -9, 44);
@@ -252,17 +255,17 @@ function createOceanScene() {
     renderer.outputEncoding = THREE.sRGBEncoding;
   }
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.06;
+  renderer.toneMappingExposure = .92;
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
   getSeabedTextureSet(renderer);
   getRockTextureSet(renderer);
 
-  const ambient = new THREE.AmbientLight(0x84d9ef, 0.8);
+  const ambient = new THREE.AmbientLight(0x84d9ef, .25);
   scene.add(ambient);
 
-  const hemi = new THREE.HemisphereLight(0xa8e9ff, 0x143246, 0.94);
+  const hemi = new THREE.HemisphereLight(0xa8e9ff, 0x143246, .42);
   scene.add(hemi);
 
   const keyLight = new THREE.DirectionalLight(0xb8f1ff, 1.3);
@@ -307,6 +310,8 @@ function createOceanScene() {
   rebuildOceanTerrainLayers(scene, renderer);
   oceanMode.diver=createOceanDiver(appCtx,oceanMode,{sampleSeabedHeight,worldRadius:OCEAN_CONSTANTS.WORLD_RADIUS});
 
+  oceanMode.soundscape=createOceanSoundscape({host:document.getElementById('oceanDiverControls')});
+
   primeLocalBathymetryGrid().then((ready) => {
     if (!ready || oceanMode.scene !== scene) return;
     rebuildOceanTerrainLayers(scene, renderer);
@@ -326,27 +331,27 @@ function applyOceanSkyState(state = null) {
   const nightFactor = 1 - dayFactor;
 
   oceanMode.scene.fog.color.setHex(dayFactor > 0.35 ? 0x0b3551 : twilightFactor > 0.25 ? 0x10253c : 0x06131d);
-  oceanMode.scene.fog.density = 0.0028 + nightFactor * 0.0018;
-  oceanMode.renderer.toneMappingExposure = 0.82 + dayFactor * 0.24 + twilightFactor * 0.08;
+  oceanMode.scene.fog.density = .008 + nightFactor * .003;
+  oceanMode.renderer.toneMappingExposure = .78 + dayFactor * .15 + twilightFactor * .04;
 
   if (oceanMode.ambientLight) {
     oceanMode.ambientLight.color.setHex(dayFactor > 0.4 ? 0x84d9ef : twilightFactor > 0.2 ? 0x537ba2 : 0x1a3149);
-    oceanMode.ambientLight.intensity = 0.3 + dayFactor * 0.55 + twilightFactor * 0.12;
+    oceanMode.ambientLight.intensity = .12 + dayFactor * .22 + twilightFactor * .06;
   }
   if (oceanMode.hemiLight) {
     oceanMode.hemiLight.color.setHex(dayFactor > 0.4 ? 0xa8e9ff : twilightFactor > 0.2 ? 0x7fa9cb : 0x173149);
     oceanMode.hemiLight.groundColor.setHex(dayFactor > 0.4 ? 0x143246 : twilightFactor > 0.2 ? 0x122f42 : 0x081521);
-    oceanMode.hemiLight.intensity = 0.42 + dayFactor * 0.52 + twilightFactor * 0.14;
+    oceanMode.hemiLight.intensity = .20 + dayFactor * .30 + twilightFactor * .07;
   }
   if (oceanMode.keyLight) {
     const sun = state.sun?.direction || { x: 0.45, y: 0.8, z: 0.18 };
     oceanMode.keyLight.color.setHex(dayFactor > 0.35 ? 0xb8f1ff : twilightFactor > 0.2 ? 0xffc48a : 0x5870a2);
-    oceanMode.keyLight.intensity = 0.16 + dayFactor * 1.1 + twilightFactor * 0.26;
+    oceanMode.keyLight.intensity = .14 + dayFactor * .72 + twilightFactor * .18;
     oceanMode.keyLight.position.set(sun.x * 210, Math.max(60, sun.y * 240), sun.z * 210);
   }
   if (oceanMode.fillLight) {
     const sun = state.sun?.direction || { x: 0.45, y: 0.8, z: 0.18 };
-    oceanMode.fillLight.intensity = 0.12 + dayFactor * 0.36 + twilightFactor * 0.1;
+    oceanMode.fillLight.intensity = .06 + dayFactor * .12 + twilightFactor * .05;
     oceanMode.fillLight.position.set(-sun.x * 160, Math.max(40, Math.abs(sun.y) * 110), -sun.z * 160);
   }
 }
@@ -356,6 +361,7 @@ function getWorldCanvas() {
 }
 
 function destroyOceanScene() {
+  oceanMode.soundscape?.dispose();oceanMode.soundscape=null;
   oceanMode.parentVessel?.dispose();oceanMode.parentVessel=null;
   oceanMode.diver?.dispose();
   oceanMode.diver=null;
@@ -370,6 +376,7 @@ function destroyOceanScene() {
   oceanMode.cameraLookTarget = null;
   oceanMode.seabedMesh = null;
   oceanMode.reefGroup = null;
+  oceanMode.habitat = null;
   oceanMode.marineParticles = null;
   oceanMode.deepBackdrop = null;
   oceanMode.ambientLight = null;
@@ -513,7 +520,7 @@ function updateSubmarine(dt,time) {
     if (sub.verticalSpeed > 0) sub.verticalSpeed = 0;
   }
 
-  if(parentHullCollision(appCtx.oceanVoyage?.current?.ship,sub.position,3,oceanMode.waterSurface.sample(0,0,{time}).surfaceY)){sub.position.set(previousPosition.x,previousPosition.y,previousPosition.z);sub.speed=0;sub.verticalSpeed=0;}
+  if(parentHullCollision(appCtx.oceanVoyage?.current?.ship,sub.position,3,oceanMode.waterSurface.sample(0,0,{time}).surfaceY)||oceanMode.habitat?.collision(sub.position,3)){sub.position.set(previousPosition.x,previousPosition.y,previousPosition.z);sub.speed=0;sub.verticalSpeed=0;}
 
   const targetPitch = THREE.MathUtils.clamp(-sub.verticalSpeed * OCEAN_CONSTANTS.PITCH_FROM_VERTICAL, -OCEAN_CONSTANTS.MAX_PITCH, OCEAN_CONSTANTS.MAX_PITCH);
   const targetRoll = THREE.MathUtils.clamp(-sub.turnSpeed * OCEAN_CONSTANTS.ROLL_FROM_TURN, -OCEAN_CONSTANTS.MAX_ROLL, OCEAN_CONSTANTS.MAX_ROLL);
@@ -561,7 +568,9 @@ function animateOceanMode(nowMs = 0) {
 
   if(!oceanMode.diver?.update(dt,nowMs*.001))updateSubmarine(dt,nowMs*.001);
   oceanMode.waterSurface.update(nowMs*.001);
+  oceanMode.soundscape?.update({paused:appCtx.paused,diving:oceanMode.diver?.active,speed:oceanMode.submarine.speed,time:nowMs*.001});
   oceanMode.parentVessel?.update(nowMs*.001);
+  oceanMode.habitat?.update(dt,oceanMode.diver?.active?oceanMode.diver.navigationActor().position:oceanMode.submarine.position,nowMs*.001);
   if (typeof appCtx.refreshAstronomicalSky === 'function') {
     appCtx.refreshAstronomicalSky(false);
   }
@@ -772,6 +781,7 @@ function getOceanModeDebugState() {
     navigationMap: oceanMode.navigationMapSnapshot || null,
     water: oceanMode.waterSample || null,
     diver:oceanMode.diver?.snapshot() || null,
+    habitat:oceanMode.habitat?.group?.userData.habitat || null,
     seabed: sub.position ? sampleSeabedEvidence(sub.position.x, sub.position.z) : null,
     env: typeof appCtx.getEnv === 'function' ? appCtx.getEnv() : null,
     yaw: Number.isFinite(sub.yaw) ? sub.yaw : null,

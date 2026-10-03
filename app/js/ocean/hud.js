@@ -32,7 +32,9 @@ export function updateOceanHud(appCtx, oceanMode, nowSeconds = 0, sampleSeabedEv
     speedEl.classList.remove('fast');
   }
   if (limitEl) limitEl.textContent = `${depth}m`;
-  if (streetEl) streetEl.textContent = diving?'Ocean · Scuba explorer':'Ocean Mode';
+  if (streetEl) streetEl.textContent = diving?'Ocean · Scuba explorer':oceanMode.habitat?.plan.label||'Ocean Mode';
+  if(streetEl&&oceanMode.habitat?.group.userData.habitat.assetState==='unavailable')streetEl.textContent='Coral Shelf · coral assets unavailable';
+  if(streetEl)streetEl.title=oceanMode.habitat?.plan.featured?'Authored reef habitat using Smithsonian coral scans; colony positions and colors are not real observations. Seabed data coverage is shown on the map.':'Habitat coverage is unverified here; sediment and outcrops are authored scenery.';
   if (locationLineEl) {
     locationLineEl.style.display = '';
     locationLineEl.textContent = `${oceanMode.launchSite.name}, ${oceanMode.launchSite.region}`;

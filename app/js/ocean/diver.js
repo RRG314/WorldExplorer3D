@@ -28,7 +28,7 @@ export function createOceanDiver(ctx,mode,{sampleSeabedHeight,worldRadius=1200})
   const box=new THREE.Box3(),cameraTarget=new THREE.Vector3(),lookTarget=new THREE.Vector3();
   const units=Number(ctx.METERS_PER_WORLD_UNIT)>0?ctx.METERS_PER_WORLD_UNIT:1;
   function subCollisionAt(x,z,radius,actor){return {collision:x>box.min.x-radius&&x<box.max.x+radius&&z>box.min.z-radius&&z<box.max.z+radius&&actor.actorBaseY<box.max.y&&actor.actorBaseY+actor.actorHeight>box.min.y};}
-  function allHullCollisionAt(x,z,radius,actor){return {collision:subCollisionAt(x,z,radius,actor).collision||parentHullCollision(ctx.oceanVoyage?.current?.ship,{x,z,y:actor.actorBaseY+actor.actorHeight*.5},radius,mode.waterSurface.sample(0,0).surfaceY)}}
+  function allHullCollisionAt(x,z,radius,actor){return {collision:mode.habitat?.collision({x,z,y:actor.actorBaseY+actor.actorHeight*.5},radius)||subCollisionAt(x,z,radius,actor).collision||parentHullCollision(ctx.oceanVoyage?.current?.ship,{x,z,y:actor.actorBaseY+actor.actorHeight*.5},radius,mode.waterSurface.sample(0,0).surfaceY)}}
   function admission(){const sub=mode.submarine;const water=mode.waterSurface.sample(sub.position.x,sub.position.z);return oceanDiveAdmission({speed:sub.speed,verticalSpeed:sub.verticalSpeed,depthMeters:(water.surfaceY-sub.position.y)*units,bottomClearance:(sub.position.y-sampleSeabedHeight(sub.position.x,sub.position.z))*units})}
   function separation(){return Math.hypot(state.walker.x-mode.submarine.position.x,state.walker.y-mode.submarine.position.y,state.walker.z-mode.submarine.position.z)}
   function board(rescue=false) {
@@ -50,11 +50,11 @@ export function createOceanDiver(ctx,mode,{sampleSeabedHeight,worldRadius=1200})
       const again=admission();if(!again.allowed){status.textContent=again.reason;return false;}
       const sub=mode.submarine;sub.mesh.updateMatrixWorld(true);box.setFromObject(sub.mesh);
       const x=box.max.x+1,z=sub.position.z;
-      if(Math.hypot(x,z)>worldRadius||sampleSeabedHeight(x,z)>sub.position.y-1.65){status.textContent='The exit side is obstructed. Move into clear water.';return false;}
+      if(Math.hypot(x,z)>worldRadius||sampleSeabedHeight(x,z)>sub.position.y-1.65||mode.habitat?.collision({x,z,y:sub.position.y-.8},.6)){status.textContent='The exit side is obstructed. Move into clear water.';return false;}
       Object.assign(state.walker,{x,z,y:sub.position.y,yaw:sub.yaw,angle:sub.yaw,vy:0,pitch:0,lookYawOffset:0});
       const localContext={getEnv:ctx.getEnv,METERS_PER_WORLD_UNIT:units,LOC:mode.launchSite,
         checkBuildingCollision:(px,pz,radius,actor)=>{
-          const inside=allHullCollisionAt(px,pz,radius,actor).collision;
+          const inside=allHullCollisionAt(px,pz,radius,actor).collision||mode.habitat?.collision({x:px,z:pz,y:actor.actorBaseY+actor.actorHeight*.5},radius);
           const water=mode.waterSurface.sample(px,pz);
           return {collision:inside||Math.hypot(px,pz)>worldRadius||water.surfaceY-sampleSeabedHeight(px,pz)<1.5};
         }};

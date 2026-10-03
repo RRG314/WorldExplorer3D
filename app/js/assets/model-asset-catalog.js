@@ -1,6 +1,14 @@
 const MODEL_ASSET_SCHEMA_VERSION = 1;
 
 const MODEL_ASSET_CATALOG = Object.freeze([
+  ...['table-coral','branch-coral','massive-coral'].flatMap(kind=>['','-lod'].map(suffix=>Object.freeze({
+    schemaVersion:MODEL_ASSET_SCHEMA_VERSION,id:`marine-${kind}${suffix}`,label:`Smithsonian ${kind.replaceAll('-',' ')}${suffix?' distant model':''}`,
+    url:`/app/assets/models/marine/${kind}${suffix}.glb`,roles:Object.freeze(['marine-habitat']),license:'CC0-1.0',
+    sourceUrl:'https://3d.si.edu/corals',attribution:'Smithsonian Institution, National Museum of Natural History. Specimen scans simplified and recolored for authored habitat; see marine asset manifest.',
+    sourceUpAxis:'y',collisionPolicy:'authored-marine-habitat-obstacles',instancePolicy:Object.freeze({geometry:'clone',materials:'clone'}),
+    budgets:Object.freeze({bytes:500000,triangles:suffix?2000:6500,textureEdgePixels:512})
+  }))),
+
   ...[
     ['reactor-core','scifi-reactor-core-b3fe00d6b73841a0b6b3a288efc03668','SciFi Reactor Core by iedalton',5000000,62000],
     ['medical-table','sci-fi-laboratory-op-table-ae314a5ea3614a5caf52f0d7e7d61665','Sci-Fi Laboratory Op Table by Michael V',1500000,16500],
