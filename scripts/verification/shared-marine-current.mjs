@@ -42,7 +42,7 @@ try{
  assert.equal((await post(null,command('create'))).status,401);
  await seat(users[0],true);assert.equal((await post(users[0],command('create'))).status,409);assert.equal((await marine.get()).exists,false);await seat(users[0]);report.cases.push('unsigned and expired-seat create rejected without writes');
  renewal=setInterval(()=>{for(const u of users)if(u.renew)void seat(u)},20000);
- server=await startStaticServer({rootDir:process.cwd(),ports:[4396]});browser=await chromium.launch({channel:'chrome',headless:true});
+ server=await startStaticServer({rootDir:process.env.WE3D_VERIFY_ROOT||process.cwd(),ports:[4396]});browser=await chromium.launch({channel:'chrome',headless:true});
  const captain=await openClient(users[0]);await captain.locator('#sharedMarineCreate').click();await waitStage(captain,'aboard');
  const pilot=await openClient(users[1]);await pilot.waitForSelector('#sharedMarineJoin:visible');await pilot.locator('#sharedMarineJoin').click();await waitStage(pilot,'aboard');
  await pilot.locator('#sharedMarinePilot').click();await pilot.waitForFunction(()=>marineCtx.sharedMarine.snapshot().state.seats.pilot);

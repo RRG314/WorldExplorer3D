@@ -3,8 +3,8 @@
   "programId": "world-explorer-5.4-release-2026-09-30",
   "targetVersion": "5.4.0",
   "productionBaseline": {
-    "version": "5.3.0",
-    "releaseCommit": "2839df5d6bbed9f8dfa4b89e379ba2e026cab438"
+    "version": "5.4.0",
+    "releaseCommit": "1532bdfbb5c11e002d278b058d1ebdba88384f60"
   },
   "roadmap": "ROADMAP.md",
   "acceptanceContract": "RELEASE_NOTES_5.4.0.md",

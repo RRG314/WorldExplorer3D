@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import {chromium} from 'playwright';
 import {mkdir,writeFile} from 'node:fs/promises';
 import {startStaticServer} from './static-server.mjs';
-const out='output/verification/product-plan/public-camera-wall';await mkdir(out,{recursive:true});const server=await startStaticServer({rootDir:process.cwd(),ports:[4398]});
+const out='output/verification/product-plan/public-camera-wall';await mkdir(out,{recursive:true});const server=await startStaticServer({rootDir:process.env.WE3D_VERIFY_ROOT||process.cwd(),ports:[4398]});
 const browser=await chromium.launch({channel:'chrome',headless:true}),page=await browser.newPage({viewport:{width:1280,height:850}}),errors=[],requests=[],responses=[];
 page.on('pageerror',e=>errors.push(e.message));page.on('request',r=>{if(/digitraffic.fi|cwwp2.dot.ca.gov/.test(r.url()))requests.push({url:r.url().replace(/\?.*/,''),time:Date.now()});});
 page.on('response',r=>{if(/digitraffic.fi|cwwp2.dot.ca.gov/.test(r.url()))responses.push({kind:/\.jpg/.test(r.url())?'image':'metadata',status:r.status(),declaredBytes:Number(r.headers()['content-length'])||null});});

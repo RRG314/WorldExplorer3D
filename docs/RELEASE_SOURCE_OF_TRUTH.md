@@ -1,5 +1,11 @@
 # Release source identities
 
+## Current observation — October 3, 2026
+
+Fresh hosted manifest: **5.4.0+1532bdfbb5c1.319d215f60318297.production**, source **1532bdfbb5c11e002d278b058d1ebdba88384f60**. Current product-plan work remains on steven/visual-quality and is not deployed. The preserved dist and historical execution receipts are not acceptance of this new source. See [current state](../CURRENT-STATE.md) and [finite release gates](product-audit/2026-10-01/RELEASE-ACCEPTANCE.md).
+
+## Historical September 28 receipt
+
 Verified September 28, 2026 from hosted manifests and deployment results.
 A version label or URL parameter alone does not identify deployed code.
 
