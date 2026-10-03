@@ -229,6 +229,7 @@ function createWalkingRuntimeHelpers({
       probeSpacing: interiorCamera ? 0.24 : 0.45,
       clearance: interiorCamera ? 0.22 : 0.32
     });
+    collisionSafeCamera=appCtx.boatSwimming?.cameraPose(cameraAnchor,collisionSafeCamera)||collisionSafeCamera;
     if (tunnelEnvelope.inside) {
       collisionSafeCamera = { ...collisionSafeCamera,
         ...resolveTunnelCameraBoom(tunnelRoad, cameraAnchor, collisionSafeCamera) };

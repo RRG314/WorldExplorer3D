@@ -65,7 +65,7 @@ function createWalkingModule(opts) {
     syncCarFromWalker,
     syncWalkerFromCar
   } = createWalkingTerrainHelpers({ car, state, CFG });
-  const { resolveWalkGroundState, updateWalkPhysics, deactivateWater, disposeWater } = createWalkingPhysicsHelpers({
+  const { resolveWalkGroundState, updateWalkPhysics, deactivateWater, resupplyWater, disposeWater } = createWalkingPhysicsHelpers({
     CFG,
     animateCharacterWalk,
     getBuildingsArray,
@@ -109,6 +109,7 @@ function createWalkingModule(opts) {
     CFG,
     deactivateWater,
     disposeWater,
+    resupplyWater,
     toggleWalk,
     setModeWalk,
     setModeDrive,

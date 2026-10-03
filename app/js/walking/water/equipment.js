@@ -1,9 +1,11 @@
+import {createDivingOutfit} from './diving-outfit.js';
 // Small owned equipment meshes follow the existing avatar; no inventory grants.
 export function setSwimmingEquipment(THREE,host,equipped) {
   let gear=host.userData.swimmingEquipment;
   if(!gear && equipped && THREE) {
     gear=new THREE.Group();gear.name='Automatic exploration scuba';
     const dark=new THREE.MeshStandardMaterial({color:0x142a35,roughness:.7});
+    gear.userData.divingFinMaterial=dark;
     const tank=new THREE.MeshStandardMaterial({color:0xc3d6d9,metalness:.6,roughness:.32});
     const accent=new THREE.MeshStandardMaterial({color:0xeab23c,roughness:.5});
     const lens=new THREE.MeshStandardMaterial({color:0x2bd0df,transparent:true,opacity:.65,roughness:.18});
@@ -20,12 +22,22 @@ export function setSwimmingEquipment(THREE,host,equipped) {
     add(new THREE.TubeGeometry(hose,18,.016,6,false),dark,0,0,0);
     host.add(gear);host.userData.swimmingEquipment=gear;
   }
-  if(gear)gear.visible=equipped;
+  if(gear){
+    gear.visible=equipped;
+    if(equipped){
+      const rig=host.userData.curatedCharacterAttachment?.visual?.uuid || host.uuid;
+      if(gear.userData.outfit && gear.userData.outfitRig!==rig){gear.userData.outfit.dispose();delete gear.userData.outfit;}
+      gear.userData.outfitRig=rig;
+      if(!gear.userData.outfit)gear.userData.outfit=createDivingOutfit(THREE,host,gear,gear.userData.divingFinMaterial);
+      gear.userData.outfit.update();
+    }else if(gear.userData.outfit){gear.userData.outfit.dispose();delete gear.userData.outfit;}
+  }
 }
 
 export function disposeSwimmingEquipment(host) {
   const gear=host?.userData?.swimmingEquipment;
   if(!gear)return;
+  gear.userData.outfit?.dispose();
   const materials=new Set();
   gear.traverse(node=>{node.geometry?.dispose();if(node.material)materials.add(node.material)});
   materials.forEach(material=>material.dispose());gear.parent?.remove(gear);

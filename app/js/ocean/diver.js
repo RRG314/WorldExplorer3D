@@ -1,6 +1,7 @@
 import {getPlayerCharacterGender} from '../../../js/player-character-preference.js?v=1';
 import {createWalkingWaterRuntime} from '../walking/water/runtime.js';
-import {resolveThirdPersonCameraCollision} from '../walking/camera-collision.js?v=1';
+import {resolveSwimHullCamera} from '../walking/water/hull-camera.js';
+export const resolveOceanDiverCameraPose=options=>resolveSwimHullCamera({...options,vesselPosition:options.submarinePosition});
 import {createSwimmingHud} from '../walking/water/ui.js';
 import {resolveWalkingMoveVector} from '../walking/physics.js?v=32';
 import {createPlayerCharacterHost} from '../walking/player-character-host.js';
@@ -11,15 +12,6 @@ export function oceanDiveAdmission({speed=0,verticalSpeed=0,depthMeters,bottomCl
   if(!Number.isFinite(depthMeters)||depthMeters<1||depthMeters>16)return {allowed:false,reason:'Move the submarine to 1–16 m simulated depth.'};
   if(!Number.isFinite(bottomClearance)||bottomClearance<2)return {allowed:false,reason:'Move away from the seabed before leaving.'};
   return {allowed:true,reason:''};
-}
-
-export function resolveOceanDiverCameraPose({anchor,target,submarinePosition,checkBuildingCollision}) {
-  const clipped=resolveThirdPersonCameraCollision({anchor,target,checkBuildingCollision});
-  if(Math.hypot(clipped.x-anchor.x,clipped.y-anchor.y,clipped.z-anchor.z)>=1.8)return clipped;
-  // A hull behind the explorer must not squeeze the camera into their tank.
-  // The radial direction points out of the parked hull's convex bounds.
-  const dx=anchor.x-submarinePosition.x,dz=anchor.z-submarinePosition.z,length=Math.hypot(dx,dz)||1;
-  return resolveThirdPersonCameraCollision({anchor,target:{x:anchor.x+dx/length*4,y:anchor.y+.6,z:anchor.z+dz/length*4},checkBuildingCollision});
 }
 
 // One diver shares the existing Ocean loop. The parked submarine retains its

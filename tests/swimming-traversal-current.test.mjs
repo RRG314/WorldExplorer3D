@@ -90,3 +90,24 @@ test('a stationary diver keeps the full avatar above the bottom and wave crests 
  assert.ok(result.y-1.6>=-3);
  assert.equal(classifyWaterTraversal({surfaceY:.3,baseY:0,bottomY:-1.2,eyeY:.18,wasSwimming:true}),'wading');
 });
+
+import {setSwimmingEquipment,disposeSwimmingEquipment} from '../app/js/walking/water/equipment.js';
+test('diving outfit follows feet and restores shared skin, clothing and backpack exactly',()=>{
+ const host=new THREE.Group(),skin=new THREE.MeshStandardMaterial({color:0xaa8866});skin.name='Skin';
+ const body=new THREE.Mesh(new THREE.BoxGeometry(),skin);body.name='Adventurer_Body';host.add(body);
+ const head=new THREE.Mesh(new THREE.BoxGeometry(),skin);head.name='Adventurer_Head';host.add(head);
+ const pack=new THREE.Group();pack.name='Backpack';host.add(pack);
+ const foot=new THREE.Bone();foot.name='FootL';foot.position.set(.1,.1,0);host.add(foot);
+ setSwimmingEquipment(THREE,host,true);
+ assert.notEqual(body.material,skin);assert.equal(head.material,skin);assert.equal(pack.visible,false);
+ const fin=host.userData.swimmingEquipment.getObjectByName('Diving fin FootL');assert.ok(fin);
+ foot.position.x=.3;setSwimmingEquipment(THREE,host,true);assert.ok(Math.abs(fin.position.x-.3)<.00001);
+ setSwimmingEquipment(THREE,host,false);assert.equal(body.material,skin);assert.equal(pack.visible,true);assert.equal(host.userData.swimmingEquipment.getObjectByName('Diving fin FootL'),undefined);
+ setSwimmingEquipment(THREE,host,true);disposeSwimmingEquipment(host);assert.equal(body.material,skin);assert.equal(pack.visible,true);assert.equal(host.userData.swimmingEquipment,undefined);
+ body.geometry.dispose();head.geometry.dispose();skin.dispose();
+});
+
+test('vessel resupply clears diving equipment and restores the next dive air budget',()=>{
+ const f=runtimeFixture();for(let i=0;i<30;i++)f.update({vertical:-1});assert.ok(f.controller.snapshot().resources.airSeconds<180);
+ f.controller.resupply();assert.equal(f.state.walker.swimming,null);assert.equal(f.controller.snapshot().resources.airSeconds,180);assert.equal(f.controller.snapshot().resources.equipment,'none');
+});

@@ -1,3 +1,5 @@
+import {vesselWaterSamples,fitVesselWaterPlane} from './water-contact.js';
+import {getMaritimeCatalogEntry} from '../transport/maritime-catalog.js?v=1';
 import { createWaterPatchGeometry } from '../world/water-patch-geometry.js?v=1';
 import { registerWaterWaveMaterial } from '../world/water-materials.js?v=5';
 import { ctx as appCtx } from "../shared-context.js?v=55";
@@ -249,21 +251,9 @@ function applyBoatWavePose(x, z, angle, candidate = null, dt = 0, forceSnap = fa
   );
   const sinA = Math.sin(angle);
   const cosA = Math.cos(angle);
-  const sampleOffsets = [
-    { forward: 0, side: 0, weight: 2.2, zone: 'center' },
-    { forward: 4.9, side: 0, weight: 1.28, zone: 'bow' },
-    { forward: 6.4, side: 0.98, weight: 0.92, zone: 'bow' },
-    { forward: 6.4, side: -0.98, weight: 0.92, zone: 'bow' },
-    { forward: 3.1, side: 1.78, weight: 0.94, zone: 'port' },
-    { forward: 3.1, side: -1.78, weight: 0.94, zone: 'starboard' },
-    { forward: 0.2, side: 1.96, weight: 0.88, zone: 'port' },
-    { forward: 0.2, side: -1.96, weight: 0.88, zone: 'starboard' },
-    { forward: -2.85, side: 1.58, weight: 0.82, zone: 'port' },
-    { forward: -2.85, side: -1.58, weight: 0.82, zone: 'starboard' },
-    { forward: -4.8, side: 0, weight: 1.14, zone: 'stern' },
-    { forward: -3.45, side: 1.08, weight: 0.78, zone: 'stern' },
-    { forward: -3.45, side: -1.08, weight: 0.78, zone: 'stern' }
-  ];
+  const catalog=getMaritimeCatalogEntry(appCtx.boatMode?.transportCatalogId);
+  const sampleOffsets=vesselWaterSamples(catalog.dimensions);
+  const contactSamples=[];
 
   let weightedSurfaceY = 0;
   let totalWeight = 0;
@@ -290,6 +280,7 @@ function applyBoatWavePose(x, z, angle, candidate = null, dt = 0, forceSnap = fa
     const sampleZ = z + cosA * offset.forward - sinA * offset.side;
     const sample = sampleDynamicWaterAt(sampleX, sampleZ, candidate, { time, profile });
 
+    contactSamples.push({...offset,height:sample.surfaceY});
     weightedSurfaceY += sample.surfaceY * offset.weight;
     totalWeight += offset.weight;
     if (sample.surfaceY > maxSurfaceY) maxSurfaceY = sample.surfaceY;
@@ -329,59 +320,12 @@ function applyBoatWavePose(x, z, angle, candidate = null, dt = 0, forceSnap = fa
   };
   const steepness = totalWeight > 0 ? steepnessWeighted / totalWeight : 0;
 
-  const pitchDelta = bowAverage - sternAverage;
-  const rollDelta = portAverage - starboardAverage;
-  const waveDirectionX = Number(centerMotion?.directionX || 0);
-  const waveDirectionZ = Number(centerMotion?.directionZ || 1);
-  const waveAlignment = clamp(sinA * waveDirectionX + cosA * waveDirectionZ, -1, 1);
-  const intoWave = clamp(-waveAlignment, 0, 1);
-  const followingSea = clamp(waveAlignment, 0, 1);
-  const heaveBoost = 1 + profile.breakerStrength * 0.46 + speedNorm * 0.18;
-  const bowDipAssist = clamp(
-    (sternAverage - bowAverage) * (0.078 + intoWave * 0.132 + profile.breakerStrength * 0.034),
-    0,
-    0.28
-  );
-  const planingTrim = clamp(speedNorm * 0.02 + intoWave * 0.038 - followingSea * 0.012, -0.026, 0.072);
-  const crestBias = Math.max(0, (Number.isFinite(maxSurfaceY) ? maxSurfaceY : averageSurfaceY) - averageSurfaceY);
-  const prevHeave = appCtx.boat.heave;
-  let normalPitch = Math.atan2(
-    -((blendedNormal.x * sinA) + (blendedNormal.z * cosA)),
-    Math.max(0.42, blendedNormal.y)
-  );
-  let normalRoll = Math.atan2(
-    -((blendedNormal.x * cosA) - (blendedNormal.z * sinA)),
-    Math.max(0.42, blendedNormal.y)
-  );
-  if (pitchDelta * normalPitch < 0) normalPitch *= -1;
-  if (rollDelta * normalRoll < 0) normalRoll *= -1;
-  const samplePitch = Math.atan2(
-    pitchDelta * profile.pitchScale * (1.22 + speedNorm * 0.34 + profile.breakerStrength * 0.28 + intoWave * 0.56),
-    Math.max(3.4, 4.9 - intoWave * 1.0 - profile.breakerStrength * 0.64)
-  );
-  const sampleRoll = Math.atan2(
-    rollDelta * profile.rollScale * (1.06 + profile.breakerStrength * 0.26 + steepness * 0.08),
-    2.38
-  );
-  const targetPitch = clamp(
-    samplePitch * 0.9 +
-    normalPitch * (0.72 + profile.breakerStrength * 0.14 + speedNorm * 0.1) +
-    bowDipAssist +
-    planingTrim,
-    -0.62,
-    0.68
-  );
-  const targetRoll = clamp(
-    sampleRoll * 0.82 +
-    normalRoll * (0.6 + profile.breakerStrength * 0.12 + steepness * 0.05) -
-    (appCtx.boat.turnRate || 0) * Math.min(0.28, 0.12 + speedNorm * 0.14),
-    -0.58,
-    0.58
-  );
-  const targetHeave =
-    (averageSurfaceY - baseCenterY) * heaveBoost +
-    crestBias * (0.22 + intoWave * 0.14 + profile.breakerStrength * 0.1) +
-    steepness * (0.06 + profile.breakerStrength * 0.024);
+  const plane=fitVesselWaterPlane(contactSamples) || {height:averageSurfaceY,pitch:0,roll:0};
+  const waveDirectionX=Number(centerMotion?.directionX||0),waveDirectionZ=Number(centerMotion?.directionZ||1);
+  const intoWave=clamp(-(sinA*waveDirectionX+cosA*waveDirectionZ),0,1);
+  const prevHeave=appCtx.boat.heave;
+  const targetPitch=clamp(plane.pitch,-.5,.5),targetRoll=clamp(plane.roll,-.5,.5);
+  const targetHeave=plane.height-baseCenterY;
   const sampledMaxSurfaceY = Number.isFinite(maxSurfaceY) ? maxSurfaceY : averageSurfaceY;
   appCtx.boatMode.waveDirectionX = waveDirectionX;
   appCtx.boatMode.waveDirectionZ = waveDirectionZ;
@@ -457,47 +401,10 @@ function applyBoatWavePose(x, z, angle, candidate = null, dt = 0, forceSnap = fa
   appCtx.boat.verticalVelocity = dt > 0 ? (appCtx.boat.heave - prevHeave) / dt : 0;
   updateBoatSurfaceEffects(profile, dt > 0 ? dt : 1 / 60, centerMotion, speedNorm, bowAverage, sternAverage);
 
-  const buoyancyBase = 0.76 + profile.breakerStrength * 0.16;
-  const hullDraft = Math.max(0.36, Number(appCtx.boatMode?.meshDraft || 0.42));
-  const keelClearance = clamp(
-    hullDraft * 0.56 +
-    0.06 +
-    profile.breakerStrength * 0.18 +
-    speedNorm * 0.08 +
-    steepness * 0.03,
-    0.24,
-    0.64
-  );
-  const rotationClearance = Math.abs(appCtx.boat.pitch) * 0.72 + Math.abs(appCtx.boat.roll) * 0.46;
-  const bowClearance = Math.max(0, (Number.isFinite(bowPeakSurface) ? bowPeakSurface : sampledMaxSurfaceY) - sampledMaxSurfaceY) * 0.26;
-  const visualFreeboard = 0.08;
-  const staticWaterFloor = baseCenterY + clamp(0.14 + profile.breakerStrength * 0.08 + speedNorm * 0.04, 0.14, 0.28);
-  const targetBoatY = baseCenterY + buoyancyBase + appCtx.boat.heave;
-  const hullFloorY =
-    Math.max(
-      sampledMaxSurfaceY,
-      Number.isFinite(bowPeakSurface) ? bowPeakSurface : sampledMaxSurfaceY,
-      Number.isFinite(sternPeakSurface) ? sternPeakSurface : sampledMaxSurfaceY,
-      staticWaterFloor
-    ) +
-    keelClearance +
-    rotationClearance +
-    bowClearance +
-    visualFreeboard;
-  const resolvedBoatY = Math.max(targetBoatY, hullFloorY);
-  appCtx.boat.y = resolvedBoatY;
-  appCtx.boatMode.surfaceEnvelope = {
-    baseY: baseCenterY,
-    averageY: averageSurfaceY,
-    maximumY: sampledMaxSurfaceY,
-    targetBoatY,
-    hullFloorY,
-    resolvedBoatY,
-    hullDraft,
-    keelClearance,
-    rotationClearance,
-    sampledAt: time
-  };
+  appCtx.boat.y=baseCenterY+appCtx.boat.heave;
+  appCtx.boatMode.surfaceEnvelope={baseY:baseCenterY,averageY:averageSurfaceY,maximumY:sampledMaxSurfaceY,
+    targetBoatY:plane.height,resolvedBoatY:appCtx.boat.y,hullDraft:catalog.dimensions.draft,
+    waterlinePolicy:'authored-design-waterline',sampledAt:time};
 }
 
 

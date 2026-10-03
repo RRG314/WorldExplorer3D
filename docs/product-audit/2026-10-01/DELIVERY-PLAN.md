@@ -154,3 +154,8 @@ Keep an evidence ledger with source commit, artifact ID, scenario, device, resul
 ## October 2 scope addition: public Live Earth cameras
 
 The owner requested extensive live/still camera coverage inspired by WorldCam. [LIVE-EARTH-CAMERAS.md](LIVE-EARTH-CAMERAS.md) defines the accepted scope, verified reference research, source ownership, complete player journey and C01–C05 gates. C01 research can proceed now; implementation joins P16 after the existing P06 foundation and ocean/space sequence, with P19 provider and P20 release requirements. This is distinct from mapped ALPR locations and user-device capture. No camera imagery capability or worldwide coverage is claimed yet.
+
+
+## Delivery boundaries and current closeout
+
+October 2 owner direction: finish phases without letting them grow indefinitely. P08 is now **development-complete** against its movement/equipment/ladder/recovery/local-resume contract; see SWIMMING.md for measured evidence and eligibility limits. P09 is the next bounded implementation: playable research deck, helm/mooring, chart/lab stations and dive platform. P10 owns persistent parent ship/sub/cargo and reload. P11 owns the regional art/ecology upgrade. P20 owns release-wide physical-device/geographic coverage. A completed development phase is not a production release claim, and later-phase work does not reopen it without a specific regression.

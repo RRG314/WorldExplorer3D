@@ -124,3 +124,8 @@ Evidence: 1,674 registered component tests pass, source checks pass, prescribed 
 Added existing-avatar swim control alongside the parked submarine, safe exit-depth/clearance admission, boarding range, explicit recovery and scene cleanup. Navigation/location/actor authority follows the explorer; the map retains the submarine marker. Surface transfer cannot abandon the diver. Browser/visual checks caught and fixed retained button focus, phone map/notice overlap and near-hull camera squeezing; Ocean pause now preserves motion and air.
 
 Validation: 1,678 registered component tests pass, source checks pass, eight actual Ocean diver cases and eleven existing Ocean entry/surface/re-dive cases pass. Prescribed client screenshots and state inspected. Standalone Ocean dives remain session-only and final suit/fins, surface-boat ladders and device/geographic acceptance remain unfinished. No production changes; P08 is not marked complete.
+
+
+## October 2 — P08 closed, P09 next
+
+Completed the remaining ladder swim/return, same-vessel identity and position, obstruction/depth admission, hull/camera collision, recovery/resupply and rig-following outfit/fins. Actual Earth and component checks pass; corrected the old hull float offset exposed by the ladder camera. 1,684 full component tests and source checks pass; eleven Ocean transition cases and prescribed visual clients inspected. See SWIMMING.md closeout for the bounded definition and evidence. Device/geographic release coverage is P20; no expansion of P08 scope into research deck (P09), persistent sub/cargo (P10) or biome art (P11).

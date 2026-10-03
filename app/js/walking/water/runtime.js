@@ -30,7 +30,7 @@ export function createWalkingWaterRuntime({ctx,state,CFG,groundAt,moveVector,ani
   }
   function recover() {
     if(!active) return;
-    if(onRecover?.()===true)return;
+    if(onRecover?.()===true || ctx.recoverBoatSwimmer?.()===true)return;
     const walker=state.walker;
     // Revalidate the remembered bank; loading a different region must never
     // teleport an explorer onto an old, now unsupported coordinate.
@@ -98,7 +98,8 @@ export function createWalkingWaterRuntime({ctx,state,CFG,groundAt,moveVector,ani
     const supported=nextGround.effectiveGroundY<=result.y+.35;
     const covered=nextWater.coverage==='known-water-body';
     const canExit=!covered&&nextGround.effectiveGroundY>=water.surfaceY-.9;
-    if(!wall?.collision&&!block?.blocked&&supported&&(covered||canExit)) {
+    const vesselBlocked=ctx.checkVesselSwimCollision?.(x,z,.35,{actorBaseY:result.y-.65,actorHeight:.9});
+    if(!wall?.collision&&!vesselBlocked&&!block?.blocked&&supported&&(covered||canExit)) {
       w.x=x;w.z=z;
       if(moving) w.angle=Math.atan2(movement.x,movement.z);
     }
@@ -112,13 +113,13 @@ export function createWalkingWaterRuntime({ctx,state,CFG,groundAt,moveVector,ani
     const mesh=state.characterMesh;
     if(mesh) {
       mesh.userData.swimming=true;
-      setSwimmingEquipment(globalThis.THREE,mesh,resources.equipment==='scuba');
       bodyPitch+=((moving?1.12:.15)-bodyPitch)*(1-Math.exp(-step*8));
       const pitch=bodyPitch;
       mesh.rotation.order='YXZ';mesh.rotation.set(pitch,w.angle,0,'YXZ');
       const bodyLength=CFG.eyeHeight-.12;
       mesh.position.set(w.x-Math.sin(w.angle)*Math.sin(pitch)*bodyLength,w.y-Math.cos(pitch)*bodyLength,w.z-Math.cos(w.angle)*Math.sin(pitch)*bodyLength);
       animate(mesh,moving,step,false);
+      setSwimmingEquipment(globalThis.THREE,mesh,resources.equipment==='scuba');
     }
     saveElapsed+=step;
     if(saveElapsed>=2){checkpoint();saveElapsed=0;}
@@ -127,5 +128,5 @@ export function createWalkingWaterRuntime({ctx,state,CFG,groundAt,moveVector,ani
     hud.show(w.swimming);
     return true;
   }
-  return {update,deactivate,recover,dispose:()=>{deactivate();hud?.dispose?.();hud=null;disposeSwimmingEquipment(state.characterMesh);globalThis.removeEventListener?.('pagehide',checkpoint);},snapshot:()=>({active,resources:{...resources},lastDry})};
+  return {update,deactivate,recover,resupply:()=>{deactivate();resources=createSwimState();},dispose:()=>{deactivate();hud?.dispose?.();hud=null;disposeSwimmingEquipment(state.characterMesh);globalThis.removeEventListener?.('pagehide',checkpoint);},snapshot:()=>({active,resources:{...resources},lastDry})};
 }

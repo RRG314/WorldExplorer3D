@@ -20,6 +20,7 @@ try {
  process.env.WE3D_STAGING_APP_CHECK_FILE=credential;
  const page=await browser.newPage({viewport:{width:1440,height:900}});
  await configureStagingAppCheck(page,`http://127.0.0.1:${server.port}`);
+ page.on('requestfailed',request=>{const u=new URL(request.url());(report.failedRequests ||= []).push({host:u.hostname,path:u.pathname,error:request.failure()?.errorText})});
  page.on('pageerror',e=>report.errors.push(e.message));
  page.on('console',async msg=>{if(msg.text().startsWith('[WorldLoad] Essential Earth gameplay')){report.startupStack=await msg.args()[1]?.evaluate(e=>e?.stack);}});
  async function openEarth(){
@@ -28,7 +29,7 @@ try {
   if(await page.locator('#analyticsConsentDenyBtn').isVisible())await page.locator('#analyticsConsentDenyBtn').click();
   await page.locator('#globeSelectorStartBtn').click();
   await page.evaluate(async()=>{window.swimCtx=(await import('/app/js/shared-context.js?v=55')).ctx;});
-  try {await page.waitForFunction(()=>!!swimCtx.Walk?.state?.characterMesh && swimCtx.initialEarthWorldReady===true || swimCtx.worldLoadRuntimeState?.status==='failed',null,{timeout:45000});}
+  try {await page.waitForFunction(()=>!!swimCtx.Walk?.state?.characterMesh && swimCtx.initialEarthWorldReady===true || swimCtx.worldLoadRuntimeState?.status==='failed',null,{timeout:90000});}
   catch(error){
    report.startup=await page.evaluate(()=>({gameStarted:swimCtx.gameStarted,worldLoading:swimCtx.worldLoading,ready:swimCtx.initialEarthWorldReady,environment:swimCtx.getEnv?.(),publication:!!swimCtx.worldPublication,loadingText:document.getElementById('loading')?.innerText}));
    await page.screenshot({path:`${dir}/swimming-startup-failure.png`});throw error;
@@ -73,6 +74,30 @@ try {
  await page.evaluate(()=>swimCtx.setTravelMode('drive',{source:'swimming-exit-check',force:true}));
  await page.waitForFunction(()=>!swimCtx.Walk.state.walker.swimming);
  assert.equal(await page.locator('#swimmingHud').isVisible(),false);report.modeCleanup=true;
+ // Exercise the actual surface vessel and the same mapped water bed.
+ const boatStarted=await page.evaluate(point=>{
+   const c=swimCtx;c.setTravelMode('walk',{source:'boat-swim-test',force:true});
+   Object.assign(c.Walk.state.walker,{x:point.x,z:point.z,y:.18});
+   const candidate=c.inspectBoatCandidate(point.x,point.z,100,{requireContainment:true});
+   if(!candidate)return false;
+   c.readControlActions=()=>({brake:1});
+   return c.startBoatMode({candidate,spawnX:point.x,spawnZ:point.z,entryMode:'walk'});
+ },deep);
+ assert.equal(boatStarted,true);
+ await page.waitForFunction(()=>document.getElementById('boatSwimmingToggle')?.disabled===false,null,{timeout:20000});
+ const vesselBefore=await page.evaluate(()=>({id:swimCtx.boatMode.transportEntityId,x:swimCtx.boat.x,z:swimCtx.boat.z,mesh:swimCtx.boatMode.mesh.uuid}));
+ await page.locator('#boatSwimmingToggle').click();
+ await page.waitForFunction(()=>swimCtx.boatSwimming.active&&!!swimCtx.Walk.state.walker.swimming);
+ assert.equal(await page.evaluate(()=>swimCtx.boatMode.mesh.visible),true);
+ await page.screenshot({path:`${dir}/swimming-boat-ladder.png`});
+ await page.locator('#boatSwimmingToggle').click();
+ await page.waitForFunction(()=>swimCtx.boatMode.active&&!swimCtx.boatSwimming.active);
+ const vesselAfter=await page.evaluate(()=>({id:swimCtx.boatMode.transportEntityId,x:swimCtx.boat.x,z:swimCtx.boat.z,mesh:swimCtx.boatMode.mesh.uuid}));
+ assert.equal(vesselBefore.id,vesselAfter.id);assert.equal(vesselBefore.mesh,vesselAfter.mesh);assert.ok(Math.hypot(vesselAfter.x-vesselBefore.x,vesselAfter.z-vesselBefore.z)<.5);
+ report.ladderRoundTrip=true;
+ await page.locator('#boatSwimmingToggle').click();await page.waitForFunction(()=>!!swimCtx.Walk.state.walker.swimming);
+ await page.locator('#swimmingHud').getByRole('button',{name:'Recover',exact:true}).click();
+ await page.waitForFunction(()=>swimCtx.boatMode.active&&!swimCtx.boatSwimming.active);report.boatRecovery=true;
  assert.deepEqual(report.errors,[]);report.passed=true;
 }finally{await fs.writeFile(`${dir}/swimming-earth.json`,JSON.stringify(report,null,2));await browser.close();await server.close();await identity?.cleanup();await fs.rm(privateDir,{recursive:true,force:true});}
 console.log(JSON.stringify(report));

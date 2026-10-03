@@ -64,6 +64,7 @@ function createCoreFrameSystems(appCtx, hooks = {}) {
           appCtx.updateExpeditionShipInterior?.(frame.dt);
           return;
         }
+        appCtx.updateBoatSwimming?.(frame.dt);
         appCtx.updatePlanetaryTracks?.();
         appCtx.updatePlanetaryFieldMap?.(frame.dt);
         if (!appCtx.onMars && !appCtx.activePlanetaryBodyId) appCtx.refreshAstronomicalSky?.(false);

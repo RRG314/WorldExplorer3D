@@ -698,6 +698,7 @@ function createWalkingPhysicsHelpers({
     resolveWalkGroundState,
     updateWalkPhysics,
     deactivateWater:waterRuntime.deactivate,
+    resupplyWater:waterRuntime.resupply,
     disposeWater:waterRuntime.dispose
   };
 }

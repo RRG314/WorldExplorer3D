@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "scope": "Local source capability descriptions; not production or full journey certification",
-  "registrySha256": "abb328f1911c075d09d99f4f7fe8ae6a0e8c2109766388fe1bdddae6c1c0c4c4",
+  "registrySha256": "869a754d1992f6a10a99162fa3c977b302c71d6542822588778c1f40141febcd",
   "owners": {
     "app/js/live-earth/registry.js": "6c6d3cec9fb3334434304083c2529b97da73eb967cd2edfaef1bc4a0b2cf3ee6",
     "app/js/map.js": "37f3289baf5e52eb6bb48c1fee61f037482226b57023ef71298cbd07955a1a8c",
@@ -10,11 +10,11 @@
     "app/js/ui/accessibility.js": "2ecbd7643ce1b4e4ff7bf8f717630db5bbeebda5217f22d92167b7497327cf88",
     "app/js/perf-settings.js": "7c8d5d3c0c70745c48341753d8646b91b3687612b5cb6b34c3778afee012ef18",
     "app/js/world.js": "381ede5f8f008c9c9f9a601d454197659c2536af55d7066258c6244592f2770e",
-    "app/js/walking.js": "f605255163ec452d3b411f41217373d1b2ac5901f79a5da91265e87bda2649ae",
+    "app/js/walking.js": "d7cee379aa6a178b6d9d575002789a9bef1242e82c1af828a635d11eda583edc",
     "app/js/physics.js": "c3e42b37830865a47a0e70b20a28ea16134ff0006854451dac4f5e3cf3134ebb",
     "app/js/travel-mode.js": "38dbb7260a048cda3fedaef55eb59d2d36dd81a71887fbbc7437ee9d3410ab24",
     "app/js/plane-mode.js": "594e615f10425a466b33ed0107cc9f03cd87410820756b6948fc07aea191ac19",
-    "app/js/boat-mode.js": "baddc3fba8ddd3a3174aed56b4a356761ccd383f4e7ffacf09d3bc7e092b0f00",
+    "app/js/boat-mode.js": "1938c1bbd5e6e43c413858ba1ee7588cdb8e4e3a7fafb429b649d076a841b419",
     "app/js/ocean.js": "eaa675356e4876a818195179547ddd201fd2c6363d5df44ae8126c6c04e4857d",
     "app/js/transport/maritime-runtime.js": "d433ff24ad1339353aa56e9e85d3053f4f2d26fb34ecdcc71cffab849aa8a9fe",
     "app/js/planetary/entry.js": "e9bff6f3010e48ca30b66581a44d4e79439b6ebb472d85204b4dd250aecfd78f",
@@ -176,9 +176,9 @@
       "label": "Swimming & scuba diving",
       "group": "worlds",
       "status": "limited",
-      "summary": "Enter mapped deep water in Earth Walking mode, or stop the Ocean submarine at 1–16 m simulated depth and choose Explore outside submarine. Scuba equips automatically. Space/Shift and Rise/Dive control depth; Recover returns to safety. Swim within 8 m to board the parked sub. Ship ladders are pending.",
+      "summary": "Enter mapped deep water in Earth Walking mode, or stop the Ocean submarine at 1–16 m simulated depth and choose Explore outside submarine. Scuba equips automatically. Space/Shift and Rise/Dive control depth; Recover returns to safety. Swim within 8 m to board the parked sub. Stopped surface vessels in loaded mapped deep water also offer ladder entry and boarding; the same vessel remains moored.",
       "owner": "app/js/walking.js",
-      "persistence": "Earth swimming retains air in a local surface checkpoint for up to 24 hours. Standalone Ocean dives last for the current session; board before leaving. Full expedition and vessel persistence is pending.",
+      "persistence": "Earth swimming retains air in a local surface checkpoint for up to 24 hours. Standalone Ocean dives last for the current session; board before leaving. Boarding replenishes dive air. Full expedition and vessel persistence is pending.",
       "acceptance": "Source-reviewed; complete current player-journey acceptance is still pending."
     },
     {
