@@ -1,3 +1,4 @@
+import { queryPlanetaryObstacle } from '../planetary/runtime/obstacle-authority.js?v=1';
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { resolveTunnelCameraEnvelope } from '../hud/tunnel-camera-envelope.js?v=6';
 import { resolveTunnelCameraBoom } from '../hud/tunnel-camera-boom.js';
@@ -225,7 +226,10 @@ function createWalkingRuntimeHelpers({
     let collisionSafeCamera = resolveThirdPersonCameraCollision({
       anchor: cameraAnchor,
       target: { x: resolvedCamX, y: camY, z: resolvedCamZ },
-      checkBuildingCollision: appCtx.checkBuildingCollision,
+      checkBuildingCollision: appCtx.onMoon || appCtx.onMars || appCtx.activePlanetaryBodyId
+        ? (x,z,radius,vertical) => queryPlanetaryObstacle(x,z,radius,appCtx.activePlanetaryBodyId || (appCtx.onMoon?'moon':'mars'),
+          {minY:vertical.actorBaseY,maxY:vertical.actorBaseY+vertical.actorHeight})
+        : appCtx.checkBuildingCollision,
       probeSpacing: interiorCamera ? 0.24 : 0.45,
       clearance: interiorCamera ? 0.22 : 0.32
     });

@@ -115,6 +115,7 @@ function createVenusPressureCrawler() {
 }
 
 const PLANETARY_ROVER_STYLES = Object.freeze({
+  expedition: Object.freeze({ name: 'Expedition Sealed Survey Rover', body: 0xd9e2e8, accent: 0x315d78, sealed: true }),
   io: Object.freeze({ name: 'Io Radiation Survey Rover', body: 0xd0a34c, accent: 0x4b4337 }),
   europa: Object.freeze({ name: 'Europa Ice Survey Rover', body: 0xd9e2e8, accent: 0x315d78 }),
   titan: Object.freeze({ name: 'Titan Haze Survey Rover', body: 0xc28443, accent: 0x49372b, sealed: true }),
@@ -290,7 +291,7 @@ function loadMarsRoverModel() {
     if (!THREE.GLTFLoader) return resolve(null);
     new THREE.GLTFLoader().load(
       '/app/assets/models/mars-exploration-rover.glb',
-      (gltf) => resolve(fitLoadedRover(gltf.scene)),
+      (gltf) => { const rover=fitLoadedRover(gltf.scene);rover.userData.cachedPlanetaryModel=true;resolve(rover); },
       undefined,
       (error) => {
         console.warn('[planetary] NASA Mars rover model failed to load; using local fallback.', error);
@@ -301,13 +302,27 @@ function loadMarsRoverModel() {
   return marsModelPromise;
 }
 
-async function setPlanetaryVehicle(kind) {
+function disposeProceduralVehicle(vehicle) {
+  vehicle?.parent?.remove(vehicle);
+  if(!vehicle || vehicle.userData.cachedPlanetaryModel)return;
+  const geometries=new Set(),materials=new Set();
+  vehicle.traverse(object=>{if(object.geometry)geometries.add(object.geometry);for(const material of Array.isArray(object.material)?object.material:[object.material])if(material)materials.add(material);});
+  for(const geometry of geometries)geometry.dispose();for(const material of materials)material.dispose();
+}
+
+export function resolvePlanetaryVehicleKind(bodyId, {solidSurface=false}={}) {
+  if(['moon','mars','mercury','venus',...Object.keys(PLANETARY_ROVER_STYLES)].includes(bodyId))return bodyId;
+  return solidSurface && bodyId!=='earth' ? 'expedition' : null;
+}
+
+async function setPlanetaryVehicle(bodyId, options = {}) {
+  const kind=resolvePlanetaryVehicleKind(bodyId,options);
   const requestId = ++vehicleRequestSequence;
   if (!appCtx.carMesh) return null;
-  if (activeVehicle?.parent) activeVehicle.parent.remove(activeVehicle);
+  disposeProceduralVehicle(activeVehicle);
   activeVehicle = null;
 
-  if (!['moon', 'mars', 'mercury', 'venus', ...Object.keys(PLANETARY_ROVER_STYLES)].includes(kind)) {
+  if (!kind) {
     earthChildVisibility?.forEach((visible, child) => { child.visible = visible; });
     earthChildVisibility = null;
     return null;
@@ -320,6 +335,7 @@ async function setPlanetaryVehicle(kind) {
         kind === 'venus' ? createVenusPressureCrawler() :
           createPlanetarySurveyRover(kind);
   activeVehicle = alignVehicleToSurface(vehicle);
+  activeVehicle.userData.planetaryBodyId=bodyId;
   appCtx.carMesh.add(activeVehicle);
 
   if (kind === 'mars') {
@@ -330,7 +346,7 @@ async function setPlanetaryVehicle(kind) {
       appCtx.onMars &&
       activeVehicle?.userData?.vehicleKind === 'mars'
     ) {
-      appCtx.carMesh.remove(activeVehicle);
+      disposeProceduralVehicle(activeVehicle);
       activeVehicle = alignVehicleToSurface(loaded);
       appCtx.carMesh.add(activeVehicle);
     }

@@ -178,3 +178,8 @@ HUD and landing actions now share selected-target resolution, physical eligibili
 ## P14 development closeout — October 3
 
 The existing Proxima b field mission now closes through partial recovery/redeployment, three saved instrument procedures, actual ship-lab analysis, a readable completed report and Field Link II used at 24 m on the next fictional world. Failed saves remain retryable; duplicate submission cannot duplicate the completion reward. All 1,719 registered tests and source checks pass. The assembled-app browser verifies the journey, an injected field-save failure, desktop/phone report, next-world use and real reload. Prescribed-client state and images are inspected. See PLANETARY-RESEARCH.md for fixture and local-save boundaries. P15 planetary visuals is next. Production unchanged.
+
+
+## P15 development closeout — October 3
+
+Three-site planetary presentation is complete for Moon, Mars and Copper Dawn: local geology, terrain-map raster, readable owned lighting, spacesuit/rover selection, collision and phone return control. Existing measured terrain and real/modeled/fictional labels remain authoritative. All 1,729 registered tests, source checks, actual three-site browser collision/exit checks and inspected prescribed-client visuals pass. See PLANETARY-ART.md for scope, short rendering samples and limitations. P16 Earth district/cameras is next; production unchanged.
