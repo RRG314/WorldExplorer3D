@@ -1,3 +1,4 @@
+import {ensureOceanVoyage} from './ocean/voyage.js';
 import {createResearchDeck} from './boat-mode/research/runtime.js';
 import {addBoatSwimLadder,createBoatSwimming} from './boat-mode/swimming.js';
 import { ctx as appCtx } from "./shared-context.js?v=55";
@@ -450,6 +451,7 @@ function startBoatMode(options = {}) {
   resetBoatFoamFx();
   setBoatActorPose(spawnPoint.x, spawnPoint.z, startAngle, activeCandidate, { forceSnap: true });
   createBoatMesh(catalog.id);
+  const dockedSub=appCtx.boatMode.mesh?.getObjectByName('Docked research submarine');if(dockedSub)dockedSub.userData.transportEntityId=appCtx.oceanVoyage?.current?.ship.transportEntityId===appCtx.boatMode.transportEntityId?appCtx.oceanVoyage.current.subId:`sub:${appCtx.boatMode.transportEntityId}`;
   updateBoatWaterPatch(activeCandidate);
   syncOpenOceanSurfaceLayers();
   updateBoatMesh();
@@ -716,7 +718,7 @@ const updateBoatDynamics = createBoatRuntimeDynamics({
 const boatDeck=createResearchDeck({ctx:appCtx,resetDynamics:resetBoatDynamics,
   updateVessel(dt){applyBoatWavePose(appCtx.boat.x,appCtx.boat.z,appCtx.boat.angle,appCtx.boatMode.currentWater,dt);updateBoatMesh();}
 });
-function updateBoatMode(dt){if(boatDeck.update(dt))return true;return updateBoatDynamics(dt);}
+function updateBoatMode(dt){appCtx.oceanVoyage?.tickSurface(dt);if(boatDeck.update(dt))return true;return updateBoatDynamics(dt);}
 
 const boatSwimming=createBoatSwimming({
   ctx:appCtx,sample:sampleDynamicWaterAt,
@@ -727,6 +729,7 @@ const boatSwimming=createBoatSwimming({
 });
 
 function initBoatMode() {
+  ensureOceanVoyage(appCtx).mount();
   ensureBoatPromptRefs();
   const waveSlider = getWaveSlider();
   syncWaterMeshCache();

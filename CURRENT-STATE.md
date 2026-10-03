@@ -38,3 +38,7 @@ October 2 continuation finishes stopped surface-vessel ladder entry/boarding/rec
 ## P09 development closeout
 
 Research deck/bridge collision, moving-ship character attachment, helm/mooring, chart, persistent Journal lab review and mapped-water ladder swim are implemented. Six controlled deck browser cases and thirteen actual-app Ocean journey cases pass, including the real map open/close. See docs/product-audit/2026-10-01/RESEARCH-DECK.md. P10 owns persistent parent ship/sub deployment and recovery; P11 owns regional art. Production is unchanged.
+
+## P10 development closeout
+
+The local ship/sub journey now retains vessel IDs, condition, parent anchor, wave phase and continuation state. The research deck has a submarine cradle and deployment station; the parent remains visible/marked underwater. Explicit recovery, underwater reload, aboard reload and redeployment preserve the same ship/sub. Eight focused contracts, eighteen actual-app Ocean cases and six deck browser cases pass, with inspected desktop/phone screenshots and the prescribed game client. All **1,696 registered tests pass**. See docs/product-audit/2026-10-01/MARINE-VOYAGE.md for local-only scope and failure rules. P11 regional ocean content/art is next; shared expeditions remain P18. Production unchanged.

@@ -31,6 +31,9 @@ export function createResearchDeck({ctx,resetDynamics,updateVessel,hudFactory=cr
   if(!active||busy||researchStationDistance(pose,targetId)>2.4)return false;
   if(targetId==='helm')return helm();
   if(targetId==='chart'){ctx.openLargeMap?.();return true;}
+  if(targetId==='sub'){
+   busy=true;try{const started=!!await ctx.transferBoatToSubmarine?.({source:'research-cradle'});if(!started)hud?.message(ctx.boatMode.promptMessage||'Submarine launch is unavailable here. Move to deeper open water and try again.');return started;}finally{busy=false;}
+  }
   if(targetId==='dive'){
    const started=ctx.boatSwimming?.start();
    if(!started)hud?.message('Ladder swimming needs loaded mapped deep water. Use Travel → Submarine for open-ocean exploration.');

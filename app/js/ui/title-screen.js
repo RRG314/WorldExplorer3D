@@ -1,3 +1,4 @@
+import {validateOceanVoyage} from '../ocean/voyage-store.js';
 import { oceanEntryDecision } from '../ocean/entry-policy.js?v=1';
 import { resolveCoordinateSurfaceEvidence } from './globe-selector/helpers.js?v=9';
 import { ctx as appCtx } from "../shared-context.js?v=55";
@@ -42,6 +43,7 @@ function initTitleScreenUi({
   };
   const sharedExperienceParams = readSharedExperienceParams();
   let pendingOceanSelection = null;
+  let pendingOceanResume = null;
   let titleLaunchMode = 'earth';
   let globeSelector = null;
   let skipGlobeGateOnce = false;
@@ -358,6 +360,8 @@ function initTitleScreenUi({
   };
 
   appCtx.triggerTitleStart = (options = {}) => {
+    if(titleStartPromise)return titleStartPromise;
+    pendingOceanResume=options.launchMode==='ocean'?validateOceanVoyage(options.voyageResume):null;
     const forcedLaunchMode = ['earth', 'ocean', 'moon', 'mars', 'space'].includes(options?.launchMode)
       ? options.launchMode
       : '';
@@ -582,6 +586,7 @@ function initTitleScreenUi({
 
   const runTitleStart = async () => {
     if (appCtx.runtimeReady !== true) return false;
+    const voyageResume=pendingOceanResume;pendingOceanResume=null;
     const forcedLaunchMode = pendingForcedLaunchMode;
     pendingForcedLaunchMode = '';
     const requestedLaunchMode = forcedLaunchMode || Object.entries(launchModeButtons)
@@ -652,10 +657,10 @@ function initTitleScreenUi({
     if (requestedLaunchMode === 'ocean' && typeof appCtx.startOceanMode === 'function') {
       oceanEntryHadEarthWorld = hasLoadedEarthWorld();
       if (typeof appCtx.setBuildModeEnabled === 'function') appCtx.setBuildModeEnabled(false);
-      const selectedOceanLocation = pendingOceanSelection || appCtx.resolveLocationSelection?.() || appCtx.customLoc || null;
+      const selectedOceanLocation = voyageResume?.site || pendingOceanSelection || appCtx.resolveLocationSelection?.() || appCtx.customLoc || null;
       pendingOceanSelection = null;
       let oceanEntry = selectedOceanLocation?.oceanEntry;
-      if (selectedOceanLocation && !oceanEntry) {
+      if (selectedOceanLocation && !oceanEntry && !voyageResume) {
         const evidence = await resolveCoordinateSurfaceEvidence(Number(selectedOceanLocation.lat), Number(selectedOceanLocation.lon));
         const decision = oceanEntryDecision({ lat: Number(selectedOceanLocation.lat), lon: Number(selectedOceanLocation.lon) }, evidence);
         if (!decision.allowed) throw new Error(decision.reason);
@@ -670,7 +675,10 @@ function initTitleScreenUi({
               region: 'Selected coordinates'
             }
           : undefined,
-        entry: oceanEntry
+        entry: oceanEntry,
+        voyageResume,
+        submarinePose:voyageResume?.sub,
+        waveOffset:voyageResume?.waveOffset
       });
       if (oceanStarted === false) throw new Error('Ocean mode did not accept the selected coordinates.');
       updateControlsModeUI?.();

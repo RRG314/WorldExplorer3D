@@ -1,3 +1,4 @@
+import {parentHullCollision} from './parent-vessel.js';
 import {getPlayerCharacterGender} from '../../../js/player-character-preference.js?v=1';
 import {createWalkingWaterRuntime} from '../walking/water/runtime.js';
 import {resolveSwimHullCamera} from '../walking/water/hull-camera.js';
@@ -27,6 +28,7 @@ export function createOceanDiver(ctx,mode,{sampleSeabedHeight,worldRadius=1200})
   const box=new THREE.Box3(),cameraTarget=new THREE.Vector3(),lookTarget=new THREE.Vector3();
   const units=Number(ctx.METERS_PER_WORLD_UNIT)>0?ctx.METERS_PER_WORLD_UNIT:1;
   function subCollisionAt(x,z,radius,actor){return {collision:x>box.min.x-radius&&x<box.max.x+radius&&z>box.min.z-radius&&z<box.max.z+radius&&actor.actorBaseY<box.max.y&&actor.actorBaseY+actor.actorHeight>box.min.y};}
+  function allHullCollisionAt(x,z,radius,actor){return {collision:subCollisionAt(x,z,radius,actor).collision||parentHullCollision(ctx.oceanVoyage?.current?.ship,{x,z,y:actor.actorBaseY+actor.actorHeight*.5},radius,mode.waterSurface.sample(0,0).surfaceY)}}
   function admission(){const sub=mode.submarine;const water=mode.waterSurface.sample(sub.position.x,sub.position.z);return oceanDiveAdmission({speed:sub.speed,verticalSpeed:sub.verticalSpeed,depthMeters:(water.surfaceY-sub.position.y)*units,bottomClearance:(sub.position.y-sampleSeabedHeight(sub.position.x,sub.position.z))*units})}
   function separation(){return Math.hypot(state.walker.x-mode.submarine.position.x,state.walker.y-mode.submarine.position.y,state.walker.z-mode.submarine.position.z)}
   function board(rescue=false) {
@@ -52,7 +54,7 @@ export function createOceanDiver(ctx,mode,{sampleSeabedHeight,worldRadius=1200})
       Object.assign(state.walker,{x,z,y:sub.position.y,yaw:sub.yaw,angle:sub.yaw,vy:0,pitch:0,lookYawOffset:0});
       const localContext={getEnv:ctx.getEnv,METERS_PER_WORLD_UNIT:units,LOC:mode.launchSite,
         checkBuildingCollision:(px,pz,radius,actor)=>{
-          const inside=subCollisionAt(px,pz,radius,actor).collision;
+          const inside=allHullCollisionAt(px,pz,radius,actor).collision;
           const water=mode.waterSurface.sample(px,pz);
           return {collision:inside||Math.hypot(px,pz)>worldRadius||water.surfaceY-sampleSeabedHeight(px,pz)<1.5};
         }};
@@ -81,10 +83,10 @@ export function createOceanDiver(ctx,mode,{sampleSeabedHeight,worldRadius=1200})
     cameraTarget.y=Math.min(cameraTarget.y,water.surfaceY-.15);
     cameraTarget.y=Math.max(cameraTarget.y,sampleSeabedHeight(cameraTarget.x,cameraTarget.z)+.35);
     lookTarget.set(w.x,w.y-.4,w.z);
-    const safeTarget=resolveOceanDiverCameraPose({anchor:lookTarget,target:cameraTarget,submarinePosition:mode.submarine.position,checkBuildingCollision:subCollisionAt});
+    const safeTarget=resolveOceanDiverCameraPose({anchor:lookTarget,target:cameraTarget,submarinePosition:mode.submarine.position,checkBuildingCollision:allHullCollisionAt});
     cameraTarget.set(safeTarget.x,safeTarget.y,safeTarget.z);
     mode.camera.position.lerp(cameraTarget,1-Math.exp(-dt*7));
-    const cameraPose=resolveOceanDiverCameraPose({anchor:lookTarget,target:mode.camera.position,submarinePosition:mode.submarine.position,checkBuildingCollision:subCollisionAt});
+    const cameraPose=resolveOceanDiverCameraPose({anchor:lookTarget,target:mode.camera.position,submarinePosition:mode.submarine.position,checkBuildingCollision:allHullCollisionAt});
     mode.camera.position.set(cameraPose.x,cameraPose.y,cameraPose.z);mode.camera.lookAt(lookTarget);
     button.textContent=`Board submarine · ${Math.round(separation()*units)} m`;button.disabled=separation()*units>8;
     return true;

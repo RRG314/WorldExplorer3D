@@ -133,3 +133,7 @@ Completed the remaining ladder swim/return, same-vessel identity and position, o
 ## P09 research deck closeout
 
 The bounded P09 journey is implemented and verified; see RESEARCH-DECK.md for scope, evidence and distinct P10/P11/P20 responsibilities. No deployment.
+
+## P10 local deployment/recovery closeout
+
+Stable ship/sub IDs, geographic parent anchors, local continuation, cradle launch, visible/marked parent vessel, hull clearance, explicit recovery, surface/underwater reload and failed-transfer safeguards are implemented. 1,696 registered tests, eight focused contracts, eighteen actual-app Ocean journey cases and six deck browser cases pass. See MARINE-VOYAGE.md. Regional art P11 and shared ownership P18 are not included; production is unchanged.

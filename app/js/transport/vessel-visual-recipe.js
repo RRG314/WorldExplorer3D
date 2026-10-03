@@ -65,9 +65,9 @@ function hullGeometry(THREE, entry, lower = false) {
       indices.push(a, c, b, b, c, d);
     }
   }
-  indices.push(0, 3, 2, 0, 2, 1);
+  indices.push(0, 2, 3, 0, 1, 2);
   const last = (stations.length - 1) * 4;
-  indices.push(last, last + 1, last + 2, last, last + 2, last + 3);
+  indices.push(last, last + 2, last + 1, last, last + 3, last + 2);
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
   geometry.setIndex(indices);

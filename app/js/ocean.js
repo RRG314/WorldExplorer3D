@@ -1,3 +1,7 @@
+import {getMaritimeCatalogEntry} from './transport/maritime-catalog.js?v=1';
+import {createOceanParentVessel,parentHullCollision} from './ocean/parent-vessel.js';
+import {ensureOceanVoyage} from './ocean/voyage.js';
+import {validateOceanVoyage} from './ocean/voyage-store.js';
 import { createOceanDiver } from './ocean/diver.js';
 import { refreshWaterEnvironmentEvidence } from './world/water-environment.js?v=2';
 import { createOceanWaterSurface } from './ocean/water-surface.js?v=1';
@@ -352,6 +356,7 @@ function getWorldCanvas() {
 }
 
 function destroyOceanScene() {
+  oceanMode.parentVessel?.dispose();oceanMode.parentVessel=null;
   oceanMode.diver?.dispose();
   oceanMode.diver=null;
   clearFishLife(oceanMode.scene);
@@ -412,6 +417,8 @@ function resetSubmarineAtLaunch(spawn = null) {
     Number.isFinite(spawn?.y) ? spawn.y : -10.5,
     Number.isFinite(spawn?.z) ? spawn.z : 62
   );
+  sub.position.x=Math.max(-1100,Math.min(1100,sub.position.x));sub.position.z=Math.max(-1100,Math.min(1100,sub.position.z));
+  sub.position.y=Math.min(-1.6,Math.max(sampleSeabedHeight(sub.position.x,sub.position.z)+OCEAN_CONSTANTS.MIN_CLEARANCE,sub.position.y));
   sub.yaw = Number.isFinite(spawn?.yaw) ? spawn.yaw : 0;
   sub.pitch = Number.isFinite(spawn?.pitch) ? spawn.pitch : 0;
   sub.roll = Number.isFinite(spawn?.roll) ? spawn.roll : 0;
@@ -445,8 +452,18 @@ function resetSubmarineAtLaunch(spawn = null) {
   }
 }
 
+function placeSubmarineClearOfParent() {
+  const ship=appCtx.oceanVoyage?.current?.ship,sub=oceanMode.submarine;
+  if(!ship||!parentHullCollision(ship,sub.position,3,oceanMode.waterSurface.sample(0,0).surfaceY))return;
+  const distance=(getMaritimeCatalogEntry(ship.transportCatalogId).length/2)+12;
+  sub.position.x=-Math.sin(ship.yaw)*distance;sub.position.z=-Math.cos(ship.yaw)*distance;
+  resetSubmarineAtLaunch({x:sub.position.x,y:sub.position.y,z:sub.position.z,yaw:sub.yaw});
+}
+
 function updateSubmarine(dt,time) {
+  placeSubmarineClearOfParent();
   const sub = oceanMode.submarine;
+  const previousPosition={x:sub.position.x,y:sub.position.y,z:sub.position.z};
   const actions = appCtx.readControlActions?.('ocean') || {};
   const forwardInput = Number(actions.move) || 0;
   const yawInput = Number(actions.turn) || 0;
@@ -496,6 +513,8 @@ function updateSubmarine(dt,time) {
     if (sub.verticalSpeed > 0) sub.verticalSpeed = 0;
   }
 
+  if(parentHullCollision(appCtx.oceanVoyage?.current?.ship,sub.position,3,oceanMode.waterSurface.sample(0,0,{time}).surfaceY)){sub.position.set(previousPosition.x,previousPosition.y,previousPosition.z);sub.speed=0;sub.verticalSpeed=0;}
+
   const targetPitch = THREE.MathUtils.clamp(-sub.verticalSpeed * OCEAN_CONSTANTS.PITCH_FROM_VERTICAL, -OCEAN_CONSTANTS.MAX_PITCH, OCEAN_CONSTANTS.MAX_PITCH);
   const targetRoll = THREE.MathUtils.clamp(-sub.turnSpeed * OCEAN_CONSTANTS.ROLL_FROM_TURN, -OCEAN_CONSTANTS.MAX_ROLL, OCEAN_CONSTANTS.MAX_ROLL);
   sub.pitch += (targetPitch - sub.pitch) * expApproachFactor(5.6, dt);
@@ -527,6 +546,8 @@ function updateSubmarine(dt,time) {
   oceanMode.cameraLookTarget.lerp(_tmpVecC, expApproachFactor(OCEAN_CONSTANTS.LOOK_LERP, dt));
   const cameraWater=oceanMode.waterSurface.sample(oceanMode.camera.position.x,oceanMode.camera.position.z,{time});
   oceanMode.camera.position.y=Math.min(oceanMode.camera.position.y,cameraWater.surfaceY-.2);
+  const parentShip=appCtx.oceanVoyage?.current?.ship;
+  if(parentHullCollision(parentShip,oceanMode.camera.position,.4,oceanMode.waterSurface.sample(0,0,{time}).surfaceY))oceanMode.camera.position.y=oceanMode.waterSurface.sample(0,0,{time}).surfaceY-getMaritimeCatalogEntry(parentShip.transportCatalogId).draft-.5;
   oceanMode.camera.lookAt(oceanMode.cameraLookTarget);
 }
 
@@ -540,6 +561,7 @@ function animateOceanMode(nowMs = 0) {
 
   if(!oceanMode.diver?.update(dt,nowMs*.001))updateSubmarine(dt,nowMs*.001);
   oceanMode.waterSurface.update(nowMs*.001);
+  oceanMode.parentVessel?.update(nowMs*.001);
   if (typeof appCtx.refreshAstronomicalSky === 'function') {
     appCtx.refreshAstronomicalSky(false);
   }
@@ -555,15 +577,20 @@ function animateOceanMode(nowMs = 0) {
     oceanMode.marineParticles.position.y = -10 + Math.sin(nowMs * 0.00025) * 1.2;
   }
 
+  appCtx.oceanVoyage?.tick(dt);
   updateOceanHud(nowMs * 0.001);
   oceanMode.renderer.render(oceanMode.scene, oceanMode.camera);
 }
 
 function startOceanMode(options = {}) {
+  if(options.isTransferCurrent?.()===false)return false;
+  const resume=validateOceanVoyage(options.voyageResume);
+  const savedEntry=resume&&resume.site.lat===options.launchSite?.lat&&resume.site.lon===options.launchSite?.lon;
   // Reject before exiting Earth or replacing an existing ocean session.
-  if (options.launchSite && !hasOceanEntry(options.launchSite, options.entry)) return false;
+  if (options.launchSite && !savedEntry && !hasOceanEntry(options.launchSite, options.entry)) return false;
   if (!options.launchSite) options = { ...options, launchSite: OCEAN_SITE };
   if (oceanMode.active) {
+    if (options.launchSite) appCtx.oceanVoyage?.checkpoint();
     if (options.launchSite && resetOceanLaunchSite(options.launchSite)) {
       oceanMode.waveOffset={x:Number(options.waveOffset?.x)||0,z:Number(options.waveOffset?.z)||0};
       oceanMode.diver?.board(true);
@@ -575,6 +602,9 @@ function startOceanMode(options = {}) {
           rebuildOceanTerrainLayers(oceanMode.scene, oceanMode.renderer);
         }
       });
+      ensureOceanVoyage(appCtx).begin(options,oceanMode);
+    placeSubmarineClearOfParent();
+    oceanMode.parentVessel?.dispose();oceanMode.parentVessel=createOceanParentVessel(THREE,oceanMode,appCtx.oceanVoyage);
       updateOceanHud(performance.now() * 0.001);
     }
     return true;
@@ -600,6 +630,9 @@ function startOceanMode(options = {}) {
     if (oceanMode.canvas) oceanMode.canvas.style.display = 'block';
 
     oceanMode.active = true;
+    ensureOceanVoyage(appCtx).begin(options,oceanMode);
+    placeSubmarineClearOfParent();
+    oceanMode.parentVessel?.dispose();oceanMode.parentVessel=createOceanParentVessel(THREE,oceanMode,appCtx.oceanVoyage);
     void refreshWaterEnvironmentEvidence();
     appCtx.updateInteriorInteraction?.();
     oceanMode.lastFrameMs = 0;
@@ -647,7 +680,9 @@ function startOceanMode(options = {}) {
 
 function stopOceanMode(options = {}) {
   const wasActive = !!oceanMode.active;
+  if(wasActive)appCtx.oceanVoyage?.checkpoint();
   oceanMode.active = false;
+  appCtx.oceanVoyage?.refresh();
   oceanSessionScope?.dispose('ocean-exit');
   oceanSessionScope = null;
   if (oceanMode.animationId) {

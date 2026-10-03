@@ -98,7 +98,7 @@ test('ocean transfer keeps the selected vessel identity and condition', async ()
       return mode;
     },
     setCustomLocation() {},
-    exitCurrentEnvironmentSync() {},
+    exitCurrentEnvironmentSync() {this.oceanMode.active=false;},
     commitEnvironment() {}
   };
   const originalDocument = globalThis.document;

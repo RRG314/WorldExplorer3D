@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "scope": "Local source capability descriptions; not production or full journey certification",
-  "registrySha256": "132b0ef2c49660e8d68dde365dd04cd62b1539f3f13d20c899e2673cbbe52968",
+  "registrySha256": "e2361e7c7f20c74f5439f7ef1ba070a3f26cbd8476fe388a8163015a8bfa9947",
   "owners": {
     "app/js/live-earth/registry.js": "6c6d3cec9fb3334434304083c2529b97da73eb967cd2edfaef1bc4a0b2cf3ee6",
     "app/js/map.js": "37f3289baf5e52eb6bb48c1fee61f037482226b57023ef71298cbd07955a1a8c",
@@ -14,9 +14,9 @@
     "app/js/physics.js": "c3e42b37830865a47a0e70b20a28ea16134ff0006854451dac4f5e3cf3134ebb",
     "app/js/travel-mode.js": "38dbb7260a048cda3fedaef55eb59d2d36dd81a71887fbbc7437ee9d3410ab24",
     "app/js/plane-mode.js": "594e615f10425a466b33ed0107cc9f03cd87410820756b6948fc07aea191ac19",
-    "app/js/boat-mode.js": "df30598d7cd611d661551c08544e6f2c56a1db12dc065b2f01efe4d88511391e",
-    "app/js/ocean.js": "eaa675356e4876a818195179547ddd201fd2c6363d5df44ae8126c6c04e4857d",
-    "app/js/boat-mode/research/runtime.js": "4818390c9c793317eaf6603f146578c78a4bb02ed928cc856fc135918c239af3",
+    "app/js/boat-mode.js": "51791a75d9f2b4645d2481c698a2ea3297f8e603750a339138a36e7a189d94ed",
+    "app/js/ocean.js": "d0d6b91bf14ba1ab6448e5f91aa3838932ac32868dc9ab847b270b677b912bd3",
+    "app/js/boat-mode/research/runtime.js": "4300d253f1e5479fabd734c3cf1587e2586181d77a6fb3ef3be1a08e6db73f2a",
     "app/js/planetary/entry.js": "e9bff6f3010e48ca30b66581a44d4e79439b6ebb472d85204b4dd250aecfd78f",
     "app/js/planetary/mars-world.js": "24bfe06faf75e9c9ee87ed9155745fac9ddc1a5cd4aed9a2167eee0734ecfc45",
     "app/js/space.js": "231b99e312d08faa0c157ef19e25a274e71c1ed7e1091fe9d836940d1892cce6",
@@ -156,9 +156,9 @@
       "label": "Surface vessels",
       "group": "worlds",
       "status": "limited",
-      "summary": "Pilot supported vessel classes on mapped water. The research vessel has a walkable deck and working stations; persistent sub deployment is still being developed.",
+      "summary": "Pilot supported vessel classes on mapped water. The research vessel has a walkable deck and working stations; the last ship/sub voyage can be resumed on this device.",
       "owner": "app/js/boat-mode.js",
-      "persistence": "Position and active controls belong to the current session; returning is not a saved voyage.",
+      "persistence": "The active ocean voyage retains its parent vessel on this device. Other standalone vessel sessions are not voyage saves.",
       "acceptance": "Source-reviewed; complete current player-journey acceptance is still pending."
     },
     {
@@ -168,8 +168,8 @@
       "status": "limited",
       "summary": "Pilot a submarine around an eligible ocean site. The seabed combines modeled depth with generated scenery; species and habitats are not a real-time ocean survey.",
       "owner": "app/js/ocean.js",
-      "persistence": "Position and active controls belong to the current session; returning is not a saved voyage.",
-      "acceptance": "P01–P03: source, component and controlled-provider browser checks passed; geographic art accuracy and physical-device acceptance pending."
+      "persistence": "The last voyage retains ship/sub IDs, condition, location and recovery state on this device. Reload resumes aboard the sub. Inventory stays in its existing stores.",
+      "acceptance": "P10: local reload, recovery and redeployment browser checks passed; geographic art and physical-device release acceptance pending."
     },
     {
       "id": "swimming",
@@ -178,7 +178,7 @@
       "status": "limited",
       "summary": "Enter mapped deep water in Earth Walking mode, or stop the Ocean submarine at 1–16 m simulated depth and choose Explore outside submarine. Scuba equips automatically. Space/Shift and Rise/Dive control depth; Recover returns to safety. Swim within 8 m to board the parked sub. Stopped surface vessels in loaded mapped deep water also offer ladder entry and boarding; the same vessel remains moored.",
       "owner": "app/js/walking.js",
-      "persistence": "Earth swimming retains air in a local surface checkpoint for up to 24 hours. Standalone Ocean dives last for the current session; board before leaving. Boarding replenishes dive air. Full expedition and vessel persistence is pending.",
+      "persistence": "Earth swimming retains air in a local surface checkpoint for up to 24 hours. Standalone Ocean dives last for the current session; board before leaving. Boarding replenishes dive air. The parent ship/sub voyage saves locally; an active diver resumes aboard the submarine after reload.",
       "acceptance": "Source-reviewed; complete current player-journey acceptance is still pending."
     },
     {
@@ -186,9 +186,9 @@
       "label": "Research ship & sub deployment",
       "group": "worlds",
       "status": "limited",
-      "summary": "Walk the research deck, use the bridge chart, record modeled water conditions in the Journal, moor and swim from the ladder in loaded deep water.",
+      "summary": "Walk the research deck, use the bridge chart, record modeled water conditions in the Journal, moor, swim from the ladder in loaded deep water, and deploy/recover the submarine from its cradle.",
       "owner": "app/js/boat-mode/research/runtime.js",
-      "persistence": "Lab reviews save in this browser. Persistent ship/sub/cargo recovery remains P10.",
+      "persistence": "Lab reviews and the last marine voyage save in this browser. Recovery retains the same ship and sub; Backpack/Journal remain their own authorities. Shared marine expeditions remain P18.",
       "acceptance": "Source-reviewed; complete current player-journey acceptance is still pending."
     },
     {

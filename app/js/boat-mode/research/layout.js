@@ -5,6 +5,7 @@ export const RESEARCH_STATIONS=Object.freeze([
  {id:'helm',label:'Bridge / helm',x:0,z:15,action:'Take helm'},
  {id:'chart',label:'Chart table',x:-3.5,z:10,action:'Open navigation chart'},
  {id:'lab',label:'Wet lab',x:-3.5,z:-10,action:'Record water conditions'},
+ {id:'sub',label:'Submarine cradle',x:0,z:-26,action:'Deploy submarine'},
  {id:'dive',label:'Dive platform',x:6.1,z:-23.4,action:'Enter water at ladder'}
 ].map(Object.freeze));
 export const RESEARCH_SOLIDS=Object.freeze([
@@ -20,6 +21,7 @@ export const RESEARCH_SOLIDS=Object.freeze([
  {id:'lab-starboard-wall',x:-1.5,z:-12.4,w:.2,l:2.4,h:3.1},
  {id:'lab-bench',x:-3.5,z:-12,w:3.2,l:1.2,h:1.0},
  {id:'sample-locker',x:-5.4,z:-18,w:1.2,l:2.6,h:1.4},
+ {id:'submarine-cradle',x:-3.3,z:-25,w:4.2,l:11.4,h:3.6},
  {id:'crane-base',x:3.68,z:-19.5,w:.65,l:.65,h:3.2}
 ].map(Object.freeze));
 export function researchDeckCollision(x,z,radius=.32,baseY=RESEARCH_DECK.y,height=1.7) {

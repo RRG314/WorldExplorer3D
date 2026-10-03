@@ -116,6 +116,10 @@ export function drawOceanNavigationMap(appCtx, oceanMode, sample) {
     const px=width*(.5+(parked.x-cached.data.centerX)/(halfExtent*2)),py=height*(.5+(parked.z-cached.data.centerZ)/(halfExtent*2));
     ctx.fillStyle='#ffc76b';ctx.fillRect(px-3,py-3,6,6);ctx.font='9px sans-serif';ctx.fillText('SUB',px+5,py+3);
   }
+  if(appCtx.oceanVoyage?.current){
+    const px=Math.max(7,Math.min(width-7,width*(.5-cached.data.centerX/(halfExtent*2)))),py=Math.max(40,Math.min(height-38,height*(.5-cached.data.centerZ/(halfExtent*2))));
+    ctx.fillStyle='#ffdc91';ctx.fillRect(px-4,py-4,8,8);ctx.font='9px sans-serif';ctx.fillText('SHIP',Math.min(width-28,px+6),py+3);
+  }
   const evidence = sample(x, z);
   const depthKnown = evidence.bathymetry.truthType !== 'unknown';
   const sourceLabel = !depthKnown ? 'Depth data unknown' : evidence.bathymetry.sourceId?.includes('gebco') ? 'GEBCO modeled depth' : 'Terrain-derived depth';

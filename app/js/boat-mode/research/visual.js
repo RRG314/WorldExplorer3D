@@ -1,3 +1,4 @@
+import {createSubmarineMesh} from '../../ocean/submarine-visual.js';
 import {RESEARCH_DECK as deck,RESEARCH_SOLIDS,RESEARCH_STATIONS} from './layout.js';
 export function addResearchDeckVisual(THREE,root,materials,{detailed=false}={}) {
  const add=(geometry,material,x,y,z,name)=>{const m=new THREE.Mesh(geometry,material);m.position.set(x,y,z);m.name=name||'Research deck';root.add(m);return m};
@@ -7,7 +8,7 @@ export function addResearchDeckVisual(THREE,root,materials,{detailed=false}={}) 
  const glass=new THREE.MeshStandardMaterial({color:0x8cc3cf,transparent:detailed,opacity:detailed?.22:1,roughness:.18,depthWrite:!detailed});
  add(new THREE.BoxGeometry(14,.18,55),floor,0,deck.y-.09,-4.5,'Walkable research deck');
  for(const s of RESEARCH_SOLIDS){
-  if(s.id==='crane-base')continue;
+  if(s.id==='crane-base'||s.id==='submarine-cradle')continue;
   const wall=/wall|front|door-/.test(s.id);
   if(wall){
    add(new THREE.BoxGeometry(s.w,.9,s.l),materials.deck,s.x,deck.y+.45,s.z,s.id);
@@ -31,6 +32,8 @@ export function addResearchDeckVisual(THREE,root,materials,{detailed=false}={}) 
  const lane=new THREE.MeshBasicMaterial({color:0xd9b45e});
  add(new THREE.BoxGeometry(.12,.012,46),lane,0,deck.y+.012,-6,'Center deck lane');
  if(detailed){
+  const sub=createSubmarineMesh({OCEAN_CONSTANTS:{SUB_SCALE:.86}});sub.name='Docked research submarine';sub.position.set(-3.3,deck.y+1.65,-25);sub.traverse(o=>{if(o.isLight)o.intensity=0;});root.add(sub);
+  for(const z of [-28,-22])add(new THREE.BoxGeometry(3.8,.5,.3),consoleMaterial,-3.3,deck.y+.25,z,'Submarine cradle');
   const dark=new THREE.MeshStandardMaterial({color:0x162c35,roughness:.7});
   function display(x,y,z,title,subtitle){
    const canvas=document.createElement('canvas');canvas.width=512;canvas.height=256;
