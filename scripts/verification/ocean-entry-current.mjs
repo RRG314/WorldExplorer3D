@@ -167,6 +167,30 @@ try {
  assert.ok(Math.hypot(settledBoat[0]-initialBoat[0],settledBoat[2]-initialBoat[2])<2,'stationary boat does not jump to shoreline correction spawns');
  report.cases.push({id:'surface-boat-stationary-continuity-and-framing',passed:true});
  report.cases.push({id:'actual-surface-boat-shader-physics-profile-agreement',passed:true});
+ assert.equal(await page.evaluate(()=>waterCheckContext.boatMode.transportCatalogId),'ocean-research-vessel');
+ await page.waitForFunction(()=>document.getElementById('researchDeckEnter')?.disabled===false,null,{timeout:30000});
+ await page.locator('#researchDeckEnter').click();await page.waitForFunction(()=>waterCheckContext.boatDeck.active);
+ const deckStart=await page.evaluate(()=>waterCheckContext.boatDeck.snapshot());
+ await page.keyboard.down('w');try{await page.waitForFunction(z=>waterCheckContext.boatDeck.snapshot().pose.z>z+.4,deckStart.pose.z,{timeout:8000})}finally{await page.keyboard.up('w')}
+ await page.screenshot({path:`${dir}/actual-research-deck.png`});
+ assert.equal(await page.evaluate(()=>waterCheckContext.Walk.state.characterMesh.parent===waterCheckContext.boatMode.mesh),true);
+ const chartReached=await page.evaluate(()=>{
+  const ctx=waterCheckContext,read=ctx.readControlActions;
+  try{for(const target of [{x:0,z:-20},{x:0,z:10},{x:-3.5,z:10}]){
+   let reached=false;for(let i=0;i<1000;i++){const p=ctx.boatDeck.snapshot().pose,dx=target.x-p.x,dz=target.z-p.z;
+    if(Math.hypot(dx,dz)<.28){reached=true;break;}
+    ctx.readControlActions=()=>Math.abs(dx)>.17?{strafe:-Math.sign(dx)}:{move:Math.sign(dz)};ctx.boatDeck.update(.05);
+   }if(!reached)return false;
+  }return true;}finally{ctx.readControlActions=read;}
+ });assert.equal(chartReached,true);
+ await page.getByLabel('Deck destination').selectOption('chart');await page.locator('#researchDeckAction').click();
+ await page.waitForFunction(()=>waterCheckContext.showLargeMap===true);
+ await page.screenshot({path:`${dir}/actual-research-chart.png`});
+ await page.keyboard.press('Escape');await page.waitForFunction(()=>!waterCheckContext.showLargeMap);
+ report.cases.push({id:'actual-research-bridge-chart-opens-and-closes',passed:true});
+ await page.locator('#researchDeckHelm').click();assert.equal(await page.evaluate(()=>waterCheckContext.boatDeck.active),false);
+ report.cases.push({id:'actual-ocean-surface-research-ship-deck-and-helm',passed:true});
+
  report.roundTrip=await page.evaluate(async()=>{
    const ctx=window.waterCheckContext;
    const expected={lat:ctx.LOC.lat-ctx.boat.z/ctx.SCALE,lon:ctx.LOC.lon+ctx.boat.x/(ctx.SCALE*Math.cos(ctx.LOC.lat*Math.PI/180))};

@@ -81,6 +81,9 @@ function activeTransportActor() {
       contactKind: 'space'
     });
   }
+  if (mode === 'boat' && appCtx.boatDeck?.active) {
+    return actorRecord(mode,appCtx.boatDeck.navigationActor(),{domain:'person',catalogId:'research-deck-explorer',bounds:{radius:.35,height:1.7},grounded:true,contactKind:'vessel_deck',enterable:false,companionAboard:false});
+  }
   if (mode === 'boat') {
     const catalog = getMaritimeCatalogEntry(appCtx.boatMode?.transportCatalogId);
     return actorRecord(mode, appCtx.boat, {

@@ -20,6 +20,7 @@ export function createBoatOceanTransferApi(options = {}) {
   } = options;
 
 function suspendBoatModeForOceanTransfer() {
+  appCtx.boatDeck?.release();
   appCtx.boatMode.active = false;
   restoreEarthSurfaceLayers?.();
   appCtx.boatMode.available = false;
@@ -139,7 +140,7 @@ async function transferSubmarineToBoat(options = {}) {
         waterKind: candidate.waterKind || 'open_ocean',
         entryMode: 'walk',
         transportEntityId: transferVessel?.transportEntityId,
-        transportCatalogId: transferVessel?.transportCatalogId,
+        transportCatalogId: transferVessel?.transportCatalogId || 'ocean-research-vessel',
         condition: transferVessel?.condition
       }) :
       startBoatMode({
@@ -152,7 +153,7 @@ async function transferSubmarineToBoat(options = {}) {
         waterKind: candidate.waterKind || 'open_ocean',
         entryMode: 'walk',
         transportEntityId: transferVessel?.transportEntityId,
-        transportCatalogId: transferVessel?.transportCatalogId,
+        transportCatalogId: transferVessel?.transportCatalogId || 'ocean-research-vessel',
         condition: transferVessel?.condition
       });
     const surfaced = resolved === 'boat' || resolved === true;

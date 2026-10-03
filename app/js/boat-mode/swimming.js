@@ -41,6 +41,7 @@ export function createBoatSwimming({ctx,sample,groundY,park,resume,updateParked,
     return sample(p.x,p.z,null,{bottomY:bottom});
   }
   function admission() {
+    if(ctx.boatDeck?.active&&!ctx.boatDeck.atDivePlatform())return {allowed:false,reason:"Walk to the dive platform first."};
     const point=ladderPoint(1),water=waterAt(point),units=ctx.METERS_PER_WORLD_UNIT||1;
     const result=boatSwimAdmission({speed:Math.hypot(ctx.boat.vx||0,ctx.boat.vz||0,ctx.boat.speed||0)*units,
       coverage:water.coverage,depth:(water.surfaceY-groundY(point.x,point.z))*units,
@@ -91,6 +92,7 @@ export function createBoatSwimming({ctx,sample,groundY,park,resume,updateParked,
     const earth=!ctx.getEnv||ctx.getEnv()==='EARTH';
     if(session&&(!earth||origin()!==session.origin||ctx.Walk?.state?.mode!=='walk'||ctx.planeMode?.active||ctx.droneMode))cancel();
     if(!earth||(!session&&!ctx.boatMode?.active)){hud?.hide();return;}
+    if(!session&&ctx.boatMode.transportCatalogId==='ocean-research-vessel'){hud?.hide();return;}
     hud ||= hudFactory({start,board});
     if(session){updateParked(ctx.paused?0:dt);hud.show({swimming:true,...boarding()});}
     else hud.show({swimming:false,...admission()});

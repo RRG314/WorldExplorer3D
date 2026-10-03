@@ -34,3 +34,7 @@ Keep ordinary Chrome open. Run heavy checks sequentially, own/close test browser
 ## P08 closed for development
 
 October 2 continuation finishes stopped surface-vessel ladder entry/boarding/recovery, reversible suit/fins on both explorer rigs and vessel air resupply. The actual-world ladder test also fixed the obsolete positive hull-clearance offset: vessel-sized water-plane fitting now keeps the authored waterline at the water surface. Full 1,684-test suite, source checks, actual Baltimore ladder/swim journey, eleven Ocean transition cases and inspected rig clients pass. See SWIMMING.md closeout. P08 is development-complete within mapped-water eligibility; physical-device and broader geographic release acceptance stay in P20. P09 research deck/stations is the next active implementation phase. Vessel/sub persistence remains P10; marine art/content remains P11. No production change.
+
+## P09 development closeout
+
+Research deck/bridge collision, moving-ship character attachment, helm/mooring, chart, persistent Journal lab review and mapped-water ladder swim are implemented. Six controlled deck browser cases and thirteen actual-app Ocean journey cases pass, including the real map open/close. See docs/product-audit/2026-10-01/RESEARCH-DECK.md. P10 owns persistent parent ship/sub deployment and recovery; P11 owns regional art. Production is unchanged.

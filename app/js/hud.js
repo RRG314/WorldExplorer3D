@@ -397,7 +397,7 @@ function updateCamera(dt = 1 / 60) {
     return;
   }
   if (appCtx.boatMode?.active) {
-    updateBoatCamera();
+    if(!appCtx.boatDeck?.camera())updateBoatCamera();
     updateBillboardMarkers();
     updateCameraLinkedEffects();
     return;
@@ -633,7 +633,7 @@ function updateHUD() {
       appCtx.boat.forwardSpeed ?? appCtx.boat.speed,
       appCtx.METERS_PER_WORLD_UNIT
     ))));
-    const seaLabel = typeof appCtx.boatHudLabel === 'function' ? appCtx.boatHudLabel() : 'Boat Travel';
+    const seaLabel = appCtx.boatDeck?.active ? 'Research ship · On deck' : typeof appCtx.boatHudLabel === 'function' ? appCtx.boatHudLabel() : 'Boat Travel';
     const shorelineKnown = appCtx.boatMode.currentWater?.shorelineDistanceKnown !== false;
     const shoreline = shorelineKnown && Number.isFinite(appCtx.boatMode.shorelineDistance) ?
       Math.round(appCtx.boatMode.shorelineDistance) : null;

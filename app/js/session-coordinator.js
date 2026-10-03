@@ -80,6 +80,7 @@ function commitEnvironment(target, options = {}) {
     clearEarthInteractionPresentation();
     appCtx.Walk?.deactivateWater?.();
     appCtx.boatSwimming?.cancel();
+    appCtx.boatDeck?.release();
   }
   token.committedAt = performance.now();
   if (options.finish !== false) finishEnvironmentTransition(token);

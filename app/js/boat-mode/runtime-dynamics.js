@@ -34,7 +34,7 @@ export function createBoatRuntimeDynamics(deps = {}) {
     const catalog = getMaritimeCatalogEntry(appCtx.boatMode?.transportCatalogId);
     const handling = resolveVesselHandling(catalog);
     const profile = getBoatWaveProfile(appCtx.boatMode.currentWater || null);
-    const fishingLocked = !!appCtx.fishingGame?.active;
+    const fishingLocked = !!appCtx.fishingGame?.active || appCtx.boatMode.moored === true;
     const actions = appCtx.readControlActions?.('boat') || {};
     const steerInput = fishingLocked ? 0 : Number(actions.steer) || 0;
     const throttleInput = fishingLocked ? 0 : Math.max(0, Number(actions.throttle) || 0);
@@ -114,7 +114,7 @@ export function createBoatRuntimeDynamics(deps = {}) {
     const forwardZ = Math.cos(appCtx.boat.angle);
     const rightX = Math.cos(appCtx.boat.angle);
     const rightZ = -Math.sin(appCtx.boat.angle);
-    const driftStrength = profile.driftSpeed * (0.28 + profile.intensity * 0.78) * (0.7 + followingSea * 0.22);
+    const driftStrength = (appCtx.boatMode.moored?0:1) * profile.driftSpeed * (0.28 + profile.intensity * 0.78) * (0.7 + followingSea * 0.22);
     const desiredVX = forwardX * appCtx.boat.forwardSpeed + rightX * appCtx.boat.lateralSpeed + waveDirX * driftStrength;
     const desiredVZ = forwardZ * appCtx.boat.forwardSpeed + rightZ * appCtx.boat.lateralSpeed + waveDirZ * driftStrength;
     const velocityBlend =
