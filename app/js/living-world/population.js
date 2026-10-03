@@ -308,6 +308,26 @@ function relocateAgent(agent, graph, random, kind, reference) {
   agent.relocationCooldown = POPULATION_VISIBILITY_POLICY.relocationHideSeconds;
 }
 
+// Reuse at most one distant, off-camera pedestrian per second. Never move a
+// selected actor or introduce someone in the camera's visible street corridor.
+export function rebalanceHiddenPedestrian(agents, graph, reference, random, {exitRadius=260, canAppearAt=()=>false}={}) {
+  if(!reference || !graph?.edges?.length)return false;
+  const agent=agents.find(a=>!a.promoted && !a.bridge && a.relocationCooldown<=0 && (()=>{const p=agentPose(a,graph);return p && Math.hypot(p.x-reference.x,p.z-reference.z)>exitRadius && (a.visibility<=0 || canAppearAt(p));})());
+  if(!agent)return false;
+  const start=Math.floor(random()*graph.edges.length);
+  for(let n=0;n<Math.min(80,graph.edges.length);n++) {
+    const index=(start+n)%graph.edges.length,edge=graph.edges[index];
+    if(edge.role==='crossing' || edge.role==='entrance')continue;
+    const progress=edge.length*.5,pathOffset=pedestrianPathOffset(edge,random),p={...edgePoint(edge,progress,pathOffset),y:(Number(edge.p1.y||0)+Number(edge.p2.y||0))*.5};
+    const distance=Math.hypot(p.x-reference.x,p.z-reference.z);
+    if(distance<45 || distance>180 || !canAppearAt(p))continue;
+    if(agents.some(other=>other!==agent && (()=>{const q=agentPose(other,graph);return q && Math.hypot(p.x-q.x,p.z-q.z)<7.5;})()))continue;
+    Object.assign(agent,{edgeIndex:index,progress,pathOffset,visibility:0,visibleTarget:false,relocationCooldown:POPULATION_VISIBILITY_POLICY.relocationHideSeconds,waiting:false,currentSpeed:0,reaction:'',reactionRemaining:0});
+    return true;
+  }
+  return false;
+}
+
 export function yieldToOpposingPedestrian(agent, agents, graph) {
   const edge = graph.edges[agent.edgeIndex];
   if (!edge || agent.bridge) return false;
@@ -587,6 +607,8 @@ export function createLivingWorldPopulation(options = {}) {
   let accumulator = 0;
   let tick = 0;
   let elapsedSeconds = 0;
+  let nextPopulationRebalance = 1;
+  let pedestrianRebalances = 0;
   const referencePosition = () => options.getReferencePosition?.() || null;
   const currentDemand = () => resolveLivingWorldDemand({
     latitude: options.latitude,
@@ -910,6 +932,10 @@ export function createLivingWorldPopulation(options = {}) {
         elapsedSeconds += POPULATION_STEP_SECONDS;
         const reference = referencePosition();
         const demand = currentDemand();
+        if(elapsedSeconds>=nextPopulationRebalance){
+          nextPopulationRebalance=elapsedSeconds+1;
+          if(rebalanceHiddenPedestrian(pedestrians,pedestrianGraph,reference,random,{exitRadius:Math.min(260,demand.pedestrianExitRadius),canAppearAt:options.canPedestrianAppearAt}))pedestrianRebalances++;
+        }
         advanceAgents(vehicles, trafficGraph, trafficOutgoing, random, POPULATION_STEP_SECONDS, 'vehicle', {
           reference,
           tick,
@@ -943,6 +969,7 @@ export function createLivingWorldPopulation(options = {}) {
       }).length;
       const contactSamples = vehicles.map((agent) => agent.wheelContact).filter((contact) => contact?.sampledWheelContacts === 4);
       return Object.freeze({
+        pedestrianRebalances,
         pedestrians: pedestrians.filter((agent) => !agent.promoted && agent.visibility > .08).length,
         vehicles: vehicles.filter((agent) => !agent.promoted && agent.visibility > .08).length,
         promotedPedestrians: pedestrians.filter((agent) => agent.promoted).length,

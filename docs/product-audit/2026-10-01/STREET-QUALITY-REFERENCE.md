@@ -33,3 +33,13 @@ Focused behavioral tests cover fitted elevation/entrance reservation, nonretail 
 - Complete P18 shared marine authority; retain P19 rights/provider/asset budgets and P20 physical-device/comprehension/release gates. Camera C04/C05 remain open. Do not treat this first art pass as production approval or reference-quality completion.
 
 The existing district door/exit and walk→drive→walk journey also passes after these changes, with the same exterior collider set restored (`street-reference-interior/report.json`). All 1,764 registered tests and source checks passed at visual closeout; subsequent backend checks add separate coverage.
+
+## Street continuation verified — October 3
+
+The bounded street continuation now includes one generated atlas for supplied map building names (24 labels, 1024×512 pixels, one extra draw call), warmer shop-window display detail, mapped multi-lane secondary/tertiary center markings, and furniture budgets prioritized around playable neighborhoods. Labels describe mapped buildings; they do not invent tenants or promise enterable shops. Footpaths and unknown lane counts remain unpainted. Atlas resources are disposed with the detail publication.
+
+Fresh inspection found that the finite pedestrian graph was consumed near the origin. The existing graph budget now includes the authored harbor neighborhood, and at most one distant off-camera pedestrian per second can be redistributed to an unoccupied eligible sidewalk outside the view. Selected actors, crossings and entrances are excluded from that redistribution. The population budget is unchanged.
+
+Actual Baltimore acceptance: `street-completion-final/report.json` has no browser errors. Nearby furniture within 120 m is 11/7/9 at origin/Light Street/harbor (baseline 2/3/7); 8 pedestrians are within 180 m of the harbor after arrival, versus zero in the baseline. These are sampled scenes, not guaranteed counts. Mapped signs, close storefronts, day/night and phone screenshots were inspected. The separate `street-completion-interior/report.json` passes real E entry/exit, exact exterior collider restoration and walk/drive/walk continuity. The prescribed game client images and states were inspected after correcting text proportions. All 1,771 registered tests and source checks passed at street closeout; the one initial failure was a missing newly imported dependency in a VM test harness, corrected before rerunning.
+
+This completes these finite street changes. The supplied reference remains an art direction target, not a claim of matched scene quality or worldwide authored storefront coverage. Production is unchanged. Shared marine P18 continues next.

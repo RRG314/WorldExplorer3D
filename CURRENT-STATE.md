@@ -74,3 +74,7 @@ Regional public camera stills are implemented and verified: Fintraffic Finland c
 ## P16 waterfront slice — October 3
 
 Fresh Baltimore inspection led to context-qualified generated vessels, corrected berthed waterlines, an original bounded rig on the reviewed Constellation hull, and a three-stop promenade walk in the existing Activities system. The actual browser walks both legs with keyboard controls and records one local completion; the route camera line and unreachable phone details/result were found and fixed. Full 1,741 registered tests and source checks pass; full-world desktop/phone and prescribed rig-client images/state are inspected. See EARTH-DISTRICT.md. This completes the waterfront slice, not all P16: street/promenade art, night readability and interior/transport acceptance remain. P17–P20 and camera C04/C05 remain open. Production unchanged.
+
+## Street continuation verified — October 3
+
+The finite follow-up adds map-name signs, storefront display cues, qualified urban lane paint, local furniture priority and bounded off-camera pedestrian redistribution. The harbor graph now receives coverage inside the unchanged edge budget. Actual street/day/night/phone, interior/collider and transport checks pass; all 1,771 registered contracts and source checks pass. See STREET-QUALITY-REFERENCE.md. This is not a worldwide reference-quality claim. Shared marine P18 is actively being implemented and has not yet passed its two-client acceptance; no deployment.

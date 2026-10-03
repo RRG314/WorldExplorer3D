@@ -89,6 +89,13 @@ vec3 facadeOpenings(vec3 wall, vec4 wallLayout, vec4 style) {
   float reflection=smoothstep(-halfSize.y,halfSize.y,point.y);
   float room=fract(sin(dot(floor(wallLayout.xy),vec2(12.9898,78.233)))*43758.5453);
   vec3 glass=mix(vec3(0.075,0.115,0.14),vec3(0.32,0.43,0.48),reflection*0.6+room*0.12);
+  // Shallow authored display-room cue, bounded to catalog retail glazing.
+  // No additional transparent geometry or fake interactive inventory.
+  float backWall=facadeBox(point-vec2(0.0,0.015),halfSize*vec2(.70,.62),edgeWidth);
+  float shelf=(1.0-smoothstep(.014,.027+edgeWidth,abs(point.y+.12)))*backWall;
+  vec3 display=mix(vec3(.13,.12,.105),vec3(.36,.29,.20),backWall*.6);
+  display=mix(display,vec3(.095,.09,.08),shelf*.6);
+  glass=mix(glass,display,shop*.50);
   vec3 result=mix(wall,wall*0.48,reveal);
   result=mix(result,frame,outer);
   result=mix(result,glass,inner);

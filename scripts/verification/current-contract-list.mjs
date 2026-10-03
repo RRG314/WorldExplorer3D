@@ -1,5 +1,6 @@
 // Component and source-contract checks; browser and emulator journeys run separately.
 export const currentContractTests = [
+  'tests/street-completion-current.test.mjs',
   'tests/activity-completion-current.test.mjs',
   'tests/activity-lifecycle-current.test.mjs',
   'tests/game-result-current.test.mjs',

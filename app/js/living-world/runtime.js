@@ -1,3 +1,4 @@
+import {harborDistrictFocus} from '../world/harbor-district.js';
 import {
   createLivingWorldPublication,
   createLivingWorldPublicationStore,
@@ -161,6 +162,7 @@ export function startLivingWorldRuntime(appCtx, options = {}) {
   const activityAnchors = livingWorldActivityAnchors(appCtx);
   const pedestrianCompilation = compilePedestrianGraph({
     traversal: traversal.walk,
+    neighborhoodFocuses: [harborDistrictFocus(appCtx)].filter(Boolean),
     entrances: catalog.entrances,
     metersPerWorldUnit: appCtx.METERS_PER_WORLD_UNIT || 1.11,
     isPedestrianSurface: (x,z) => {
@@ -189,6 +191,12 @@ export function startLivingWorldRuntime(appCtx, options = {}) {
     getReferencePosition: () => appCtx.activeEarthActorPosition?.() || (appCtx.Walk?.state?.mode === 'walk'
       ? appCtx.Walk.state.walker
       : appCtx.droneMode ? appCtx.drone : appCtx.car),
+    canPedestrianAppearAt(point) {
+      const camera=appCtx.camera;
+      if(!camera?.isCamera)return false;
+      const projected=new THREE.Vector3(point.x,Number(point.y||0)+1,point.z).project(camera);
+      return projected.z < -1 || projected.z > 1 || Math.abs(projected.x)>1.3 || Math.abs(projected.y)>1.3;
+    },
     getTimePhase: () => appCtx.timeOfDay,
     getTrafficFlow: () => appCtx.currentTrafficFlowProfile || null,
     trafficControls: appCtx.trafficControlPlacements,

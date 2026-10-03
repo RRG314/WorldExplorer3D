@@ -1,3 +1,4 @@
+import {createFrontageSigns,mappedFrontageLabel} from './storefront-signs.js';
 import {storefrontLayout} from './storefront-layout.js';
 import {harborDistrictFocus} from './harbor-district.js';
 import { facadeFloorPlan } from './building-facade-layout.js?v=3';
@@ -353,6 +354,7 @@ function* buildDetails(appCtx, options = {}) {
   const storefronts = new Map();
   const combinations = new Set();
   const frontageExamples=[];
+  const signs=[];
 
   for (const { mesh, distance } of candidates) {
     const profile = mesh.userData.exteriorProfile;
@@ -384,6 +386,7 @@ function* buildDetails(appCtx, options = {}) {
     addFireEscape(addBox, edge, baseY+fittedFloors.foundation, topY, alignedProfile, seed, counters);
     addServiceFront(addBox, edge, baseY, profile, counters);
     addChimney(addBox, mesh, profile, seed, counters);
+    if(signs.length<24 && mappedFrontageLabel(mesh.userData.buildingName) && distance<90 && ['commercial','office','institutional'].includes(profile.category))signs.push({name:mesh.userData.buildingName,sourceBuildingId,length:edge.length,x:edge.x,z:edge.z,normalX:edge.normalX,normalZ:edge.normalZ,y:baseY+fittedFloors.foundation+Math.min(fittedFloors.floorHeight-.42,3.3)});
     yield 'building';
   }
 
@@ -411,6 +414,7 @@ function* buildDetails(appCtx, options = {}) {
     if (!batches.get(key)?.positions.length) material.dispose();
   }
 
+  const signMesh=createFrontageSigns(signs);if(signMesh){meshes.push(signMesh);triangles+=signMesh.geometry.index.count/3;}
   const diagnostics = Object.freeze({
     type: 'BuildingExteriorDetailPublication',
     schemaVersion: 1,
@@ -420,6 +424,7 @@ function* buildDetails(appCtx, options = {}) {
     candidateLimit: limit,
     sourceBuildings: candidates.length,
     detailBatches: meshes.length,
+    mappedSigns: signMesh?.userData.labels||[],
     addedDrawCalls: meshes.length,
     boxes: counters.boxes,
     vertices: counters.vertices,
@@ -445,7 +450,7 @@ function* buildDetails(appCtx, options = {}) {
   return diagnostics;
   } finally {
     unitBox.dispose();
-    if(!published){for(const mesh of meshes)mesh.geometry.dispose();for(const material of materials.values())material.dispose();}
+    if(!published){for(const mesh of meshes){mesh.geometry.dispose();if(mesh.material.userData?.ownsFrontageAtlas){mesh.material.map.dispose();mesh.material.dispose();}}for(const material of materials.values())material.dispose();}
   }
 }
 
@@ -459,6 +464,7 @@ function clearDetailMeshes(appCtx) {
     mesh?.geometry?.dispose?.();
     if (mesh?.material && !disposedMaterials.has(mesh.material)) {
       disposedMaterials.add(mesh.material);
+      if(mesh.material.userData?.ownsFrontageAtlas)mesh.material.map?.dispose?.();
       mesh.material.dispose?.();
     }
   }
@@ -471,7 +477,7 @@ export function publishBuildingExteriorDetails(appCtx,options={}){
   clearBuildingExteriorDetails(appCtx);
   // Keep lightweight records before the base buildings are merged. No mesh,
   // geometry or material is retained by the travelling detail cache.
-  const sources=(appCtx.buildingMeshes||[]).filter(m=>['near','mid'].includes(m.userData?.lodTier)&&m.material?.userData?.buildingExterior&&m.userData.exteriorProfile&&!m.userData.isRoofDetail).map(m=>({position:{y:m.position.y},detailCenter:footprintCenter(m.userData.buildingFootprint),userData:Object.fromEntries(['buildingFootprint','exteriorProfile','sourceBuildingId','bodyHeightMeters','heightMeters','buildingSeed','levels','buildingSemantics','terrainFoundationRise'].map(k=>[k,m.userData[k]]))}));
+  const sources=(appCtx.buildingMeshes||[]).filter(m=>['near','mid'].includes(m.userData?.lodTier)&&m.material?.userData?.buildingExterior&&m.userData.exteriorProfile&&!m.userData.isRoofDetail).map(m=>({position:{y:m.position.y},detailCenter:footprintCenter(m.userData.buildingFootprint),userData:Object.fromEntries(['buildingName','buildingFootprint','exteriorProfile','sourceBuildingId','bodyHeightMeters','heightMeters','buildingSeed','levels','buildingSemantics','terrainFoundationRise'].map(k=>[k,m.userData[k]]))}));
   const state={sources,focus:{x:0,z:0},sequence:appCtx._worldLoadSequence,pending:null};detailStates.set(appCtx,state);
   const job=buildDetails(appCtx,{...options,sources});let result;do{result=job.next();}while(!result.done);return result.value;
 }

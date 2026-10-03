@@ -46,7 +46,9 @@ function appendIndexedGeometry(targetVerts, targetIndices, verts, indices) {
 }
 
 export function shouldRenderRoadCenterMarkings(road) {
-  if (!/(motorway|trunk|primary)/.test(String(road?.type || ""))) return false;
+  const type=String(road?.type||'');
+  if(!/^(motorway|trunk|primary|secondary|tertiary)(_link)?$/.test(type))return false;
+  if(/^(secondary|tertiary)/.test(type) && !(Number(road?.transportRecord?.crossSection?.lanes)>=2))return false;
   // Elevated ribbons and their engineered bodies are compiled by separate
   // owners. Until those meshes share one published top surface, lane quads can
   // remain visible when the body is occluded. Preserve ordinary ground-road
