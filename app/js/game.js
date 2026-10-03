@@ -1,3 +1,4 @@
+import {createGameResultController} from './gameplay/result-controller.js';
 import { ctx as appCtx } from "./shared-context.js?v=55";
 import { clearPolice, spawnPolice, updatePolice } from "./game/police.js?v=2";
 import {
@@ -212,16 +213,12 @@ function fmtTime(seconds) {
   return String(Math.floor(whole / 60)).padStart(2, '0') + ':' + String(whole % 60).padStart(2, '0');
 }
 
-function showResult(title, stats) {
-  document.getElementById('resultTitle').textContent = title;
-  document.getElementById('resultStats').textContent = stats;
-  document.getElementById('resultScreen').classList.add('show');
-  appCtx.setPauseReason?.('game_result', true);
-}
-
-function hideResult() {
-  document.getElementById('resultScreen').classList.remove('show');
-}
+const resultController=createGameResultController(appCtx);
+function showResult(title,stats,options){return resultController.show(title,stats,options);}
+function hideResult(){resultController.hide();}
+appCtx.replayGameResult=()=>resultController.replay();
+appCtx.retryGameResult=()=>resultController.retry();
+appCtx.getGameResultSnapshot=()=>resultController.snapshot();
 
 Object.assign(appCtx, {
   applyPaintTownRemoteClaimsFromSync,

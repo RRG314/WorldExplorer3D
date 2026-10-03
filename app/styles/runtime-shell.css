@@ -592,3 +592,12 @@ body.space-destination-details-open #spaceFlightHUD{visibility:hidden}
 .publicCameraPanel .globe-selector-live-detail-actions { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px; }
 .publicCameraPanel .globe-selector-live-list-item { text-align: left; border: 1px solid #324857; padding: 10px; }
 .publicCameraPanel [data-camera-health] { border-left: 3px solid #58baa9; padding-left: 9px; }
+
+#activityDiscoveryRetrySave{min-height:44px;margin-top:8px}
+#resultJournalRetry[hidden]{display:none}
+#resultScreen button:disabled{opacity:.5;cursor:wait}
+#resultJournalStatus{color:#475569;font-size:14px;line-height:1.5;margin:18px 0}
+#resultJournalRetry{min-height:44px;color:#1e293b}
+
+#resultScreen .resultBox{box-sizing:border-box;max-width:calc(100vw - 24px);max-height:calc(100dvh - 32px);overflow-y:auto}
+@media(max-width:600px){#resultScreen .resultBox{width:calc(100vw - 24px);padding:24px}#resultScreen .pauseBtn{min-height:44px}}

@@ -10,7 +10,7 @@ The preserved `dist` and production release are not being replaced by current pl
 
 ## Latest phase status
 
-P08–P16 are development-complete within their documented boundaries. P16 now covers the bounded Inner Harbor district: continuous promenade paving, existing vegetation/furniture/night-light systems, usable facade doors, a fictional orientation lobby, exterior collision restoration, keyboard route/entry/exit and walk/drive/walk continuity. All 1,747 registered tests pass; see EARTH-DISTRICT.md for actual-world/client evidence and limitations. Public camera C01–C03 Finland still imagery is complete; C04 breadth/multi-view and C05 release remain open. P17 mini-game lifecycle is next, followed by P18–P20. Production is unchanged. Older chronological entries below are historical, not current phase status.
+P08–P17 are development-complete within their documented boundaries. P17 closes truthful Journal completion/retry, selected replay, common phone results, pause ownership, road target eligibility and delayed/failed game starts. All 1,761 registered tests and source checks pass; actual Baltimore route/game journeys and prescribed-client images are recorded in GAME-LIFECYCLE.md. P16 district evidence remains in EARTH-DISTRICT.md. Public camera C01–C03 Finland still imagery is complete; C04 breadth/multi-view and C05 release remain open. P18 shared marine expeditions is next, followed by P19–P20. Production is unchanged. Older chronological entries below are historical, not current phase status.
 
 ## Active work
 

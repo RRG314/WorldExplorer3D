@@ -98,6 +98,8 @@ export function startPaintTownMode() {
   }
 
   updatePaintTownHud();
+  if (!state.active) appCtx.showToast?.(state.lastHint);
+  return state.active;
 }
 
 export function stopPaintTownMode({ showSummary = false } = {}) {

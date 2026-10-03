@@ -1,3 +1,4 @@
+import {activityCompletions} from './activity-discovery/completion.js';
 import { ctx as appCtx } from "./shared-context.js?v=55";
 import { createFlowerChallengeLeaderboardApi } from "./flower-challenge/leaderboard.js?v=3";
 import { createFlowerLeaderboardView } from "./flower-challenge/leaderboard-view.js?v=2";
@@ -336,7 +337,7 @@ async function completeChallenge() {
   if (!challengeState.active) return;
 
   const actor = getActiveActorPosition() || { x: appCtx.car?.x || 0, z: appCtx.car?.z || 0, y: appCtx.car?.y || 0 };
-  const elapsedMs = Math.max(0, performance.now() - challengeState.startedAtMs);
+  const elapsedMs = Math.max(0, (appCtx.getGameplayClock?.() ?? performance.now()) - challengeState.startedAtMs);
   const entry = captureRunEntry(elapsedMs, actor);
 
   challengeState.active = false;
@@ -354,15 +355,8 @@ async function completeChallenge() {
     if (!challengeState.active) setGameHud('');
   }, 5000);
 
-  // Keep the local story independent of optional rankings/network availability.
-  void appCtx.recordExplorerEvent?.({
-    eventId: `event:flower-sprint:${entry.id}`,
-    eventType: 'activity-completed', sourceSystem: 'flower-sprint', sourceId: entry.id,
-    pathId: 'activity', activityId: 'flower-sprint', name: 'Flower Sprint completed',
-    detail: `Found the flower in ${(entry.timeMs / 1000).toFixed(2)} seconds at ${entry.location}.`,
-    localPosition: { x: actor.x, y: actor.y || 0, z: actor.z },
-    points: 0, progressReason: 'activity-completion'
-  });
+  // Use the common result/retry owner; optional rankings stay independent.
+  appCtx.showResult?.('Flower found!', `Found the flower in ${(entry.timeMs / 1000).toFixed(2)} seconds at ${entry.location}.`, {activityId:'flower-sprint',durationMs:entry.timeMs,replay:()=>startFlowerChallenge('replay')});
 
   const remoteSaved = await writeRemoteLeaderboard('flower', entry);
   if (!remoteSaved) {
@@ -380,6 +374,10 @@ async function completeChallenge() {
 }
 
 function startFlowerChallenge(source = 'manual') {
+  if(!activityCompletions.canStart('game-flower-sprint-completion')){
+    appCtx.showResult?.('Previous flower result needs saving','Retry the Journal save before another flower run.',{activityId:'flower-sprint',replay:()=>startFlowerChallenge('replay')});return false;
+  }
+
   closeFlowerActionMenu();
 
   if (!appCtx.gameStarted) {
@@ -411,7 +409,7 @@ function startFlowerChallenge(source = 'manual') {
   }
 
   challengeState.active = true;
-  challengeState.startedAtMs = performance.now();
+  challengeState.startedAtMs = appCtx.getGameplayClock?.() ?? performance.now();
   challengeState.locationLabel = getRuntimeLocationLabel();
   challengeState.startSource = source;
   challengeState.lastHudRenderMs = 0;
@@ -468,6 +466,7 @@ function updateChallengeHud(nowMs) {
 }
 
 function updateFlowerChallenge(dt) {
+  if(appCtx.paused || appCtx.worldLoading)return;
   if (!challengeState.marker && !challengeState.active) return;
 
   if (!appCtx.gameStarted || !appCtx.isEnv?.(appCtx.ENV.EARTH)) {
@@ -504,7 +503,7 @@ function updateFlowerChallenge(dt) {
   const now = performance.now();
   if (now - challengeState.lastHudRenderMs > 70) {
     challengeState.lastHudRenderMs = now;
-    updateChallengeHud(now);
+    updateChallengeHud(appCtx.getGameplayClock?.() ?? now);
   }
 
   if (horizontalDist <= reachRadius && Math.abs(dy) <= verticalAllowance) {

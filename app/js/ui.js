@@ -678,7 +678,7 @@ function setupUI() {
     if (appCtx.handleUrbanCustodyContinue?.() === true) return;
     appCtx.spawnOnRoad();
   });
-  document.getElementById('againBtn').addEventListener('click', () => {appCtx.hideResult();appCtx.setPauseReason?.('game_result', false);appCtx.startMode();});
+  document.getElementById('againBtn').addEventListener('click', () => {appCtx.replayGameResult?.();});
   document.getElementById('freeBtn').addEventListener('click', () => {
     appCtx.hideResult();
     appCtx.setPauseReason?.('game_result', false);

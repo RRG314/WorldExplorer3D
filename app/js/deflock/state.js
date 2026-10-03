@@ -61,7 +61,8 @@ function createDeFlockState(features = [], options = {}) {
     discovered: new Set(sanitizeIdList(persisted?.discovered, allowedIds)),
     disabled: new Set(sanitizeIdList(persisted?.disabled, allowedIds)),
     disabledBy: new Map(),
-    startedAt: finite(options.startedAt, Date.now()),
+    clock: options.clock || Date.now,
+    startedAt: finite(options.startedAt, (options.clock || Date.now)()),
     elapsedMs: Math.max(0, finite(persisted?.elapsedMs, 0)),
     distance: 0,
     detections: 0,
@@ -76,7 +77,7 @@ function createDeFlockState(features = [], options = {}) {
   };
   if (state.features.length > 0 && state.disabled.size >= state.features.length) {
     state.status = "complete";
-    state.completedAt = state.startedAt + state.elapsedMs;
+    state.completedAt = state.startedAt;
   }
   return state;
 }
@@ -99,7 +100,7 @@ function markVirtuallyDisabled(state, sourceId, metadata = {}) {
     at: finite(metadata.at, Date.now())
   });
   if (state.disabled.size >= state.features.length && state.features.length > 0 && !state.completedAt) {
-    state.completedAt = Date.now();
+    state.completedAt = (state.clock || Date.now)();
     state.status = "complete";
     const elapsed = getElapsedMs(state);
     if (!state.bestTimeMs || elapsed < state.bestTimeMs) state.bestTimeMs = elapsed;
@@ -116,9 +117,9 @@ function applySharedDisabled(state, entries = []) {
   return changed;
 }
 
-function getElapsedMs(state, now = Date.now()) {
+function getElapsedMs(state, now = (state?.clock || Date.now)()) {
   if (!state) return 0;
-  const activeDuration = state.completedAt ? state.completedAt - state.startedAt : now - state.startedAt;
+  const activeDuration = state.completedAt != null ? state.completedAt - state.startedAt : now - state.startedAt;
   return Math.max(0, finite(state.elapsedMs) + Math.max(0, activeDuration));
 }
 

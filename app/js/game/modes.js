@@ -1,3 +1,4 @@
+import {activityCompletions} from '../activity-discovery/completion.js';
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { createGameplayPluginRegistry } from "../gameplay/plugin-registry.js?v=1";
 import { clearPolice } from "./police.js?v=2";
@@ -24,9 +25,9 @@ function fmtTime(seconds) {
   return String(Math.floor(value / 60)).padStart(2, "0") + ":" + String(value % 60).padStart(2, "0");
 }
 
-function showModeResult(title, stats) {
+function showModeResult(title, stats, options) {
   if (typeof appCtx.showResult === "function") {
-    appCtx.showResult(title, stats);
+    appCtx.showResult(title, stats, options);
     return;
   }
   const titleEl = document.getElementById("resultTitle");
@@ -39,9 +40,20 @@ function showModeResult(title, stats) {
 }
 
 export function pickRoadPt() {
-  if (appCtx.roads.length === 0) return null;
-  const road = appCtx.roads[Math.floor(Math.random() * appCtx.roads.length)];
-  return road.pts[Math.floor(Math.random() * road.pts.length)];
+  for(let attempt=0;attempt<32 && appCtx.roads?.length;attempt++){
+    const road=appCtx.roads[Math.floor(Math.random()*appCtx.roads.length)];
+    if(!road?.pts?.length || appCtx.isVehicleRoad?.(road)===false)continue;
+    const point=road.pts[Math.floor(Math.random()*road.pts.length)];
+    const y=appCtx.SurfaceQuery?.driveAt?.(point.x,point.z,{preferRoad:true})?.position?.y;
+    if(Number.isFinite(y))return {...point,y};
+  }
+  return null;
+}
+let roadModeWarning=false;
+function roadGameCanAdvance(){
+  const eligible=!appCtx.getCurrentTravelMode || appCtx.getCurrentTravelMode()==='drive';
+  if(!eligible&&!roadModeWarning)appCtx.showToast?.('Return to driving to continue this road challenge.');
+  roadModeWarning=!eligible;return eligible;
 }
 
 export function clearObjectives() {
@@ -87,9 +99,9 @@ export function spawnDest() {
     }
     if (!best || dist > Math.hypot(best.x - appCtx.car.x, best.z - appCtx.car.z)) best = point;
   }
-  if (!best) return;
+  if (!best) return false;
 
-  appCtx.destination = { x: best.x, z: best.z };
+  appCtx.destination = { x: best.x, y: best.y, z: best.z };
   const group = new THREE.Group();
   const ring = new THREE.Mesh(new THREE.TorusGeometry(12, 1, 8, 24), new THREE.MeshBasicMaterial({ color: 0xffcc00 }));
   ring.rotation.x = Math.PI / 2;
@@ -103,9 +115,10 @@ export function spawnDest() {
   beam.position.y = 20;
   group.add(beam);
 
-  group.position.set(best.x, 0, best.z);
+  group.position.set(best.x, best.y+.12, best.z);
   appCtx.scene.add(group);
   appCtx.destMesh = group;
+  return true;
 }
 
 export function spawnCheckpoints() {
@@ -124,16 +137,17 @@ export function spawnCheckpoints() {
     if (!point) point = pickRoadPt();
     if (!point) continue;
 
-    appCtx.checkpoints.push({ x: point.x, z: point.z, collected: false, idx: i + 1 });
+    appCtx.checkpoints.push({ x: point.x, y: point.y, z: point.z, collected: false, idx: i + 1 });
     const group = new THREE.Group();
     const ring = new THREE.Mesh(new THREE.TorusGeometry(10, 0.8, 8, 20), new THREE.MeshBasicMaterial({ color: 0xff3366 }));
     ring.rotation.x = Math.PI / 2;
     ring.position.y = 0.5;
     group.add(ring);
-    group.position.set(point.x, 0, point.z);
+    group.position.set(point.x, point.y+.12, point.z);
     appCtx.scene.add(group);
     appCtx.cpMeshes.push(group);
   }
+  return appCtx.checkpoints.length>0;
 }
 
 function clearLegacyPoliceMode() {
@@ -144,23 +158,25 @@ function clearLegacyPoliceMode() {
 }
 
 function updateTrialMode(dt) {
+  if(!roadGameCanAdvance())return;
   appCtx.gameTimer += dt;
   if (!appCtx.destination || appCtx.trialDone) return;
   const dist = Math.hypot(appCtx.destination.x - appCtx.car.x, appCtx.destination.z - appCtx.car.z);
-  if (dist < appCtx.CFG.cpRadius) {
+  if (dist < appCtx.CFG.cpRadius && Math.abs(appCtx.car.y-(appCtx.destination.y+1.2))<5) {
     appCtx.trialDone = true;
     showModeResult("Destination Reached!", "Time: " + fmtTime(appCtx.gameTimer));
   } else if (appCtx.gameTimer > appCtx.CFG.trialTime) {
     appCtx.trialDone = true;
-    showModeResult("Time's Up!", "Result: Failed");
+    showModeResult("Time's Up!", "Result: Failed", {outcome:"failed"});
   }
 }
 
 function updateCheckpointMode(dt) {
+  if(!roadGameCanAdvance())return;
   appCtx.gameTimer += dt;
   for (let i = 0; i < appCtx.checkpoints.length; i++) {
     const checkpoint = appCtx.checkpoints[i];
-    if (checkpoint.collected) continue;
+    if (checkpoint.collected || Math.abs(appCtx.car.y-(checkpoint.y+1.2))>=5) continue;
     if (Math.hypot(checkpoint.x - appCtx.car.x, checkpoint.z - appCtx.car.z) >= appCtx.CFG.cpRadius) continue;
     checkpoint.collected = true;
     appCtx.cpCollected++;
@@ -243,6 +259,7 @@ export function getActiveGameplayLeaderboard() {
 }
 
 function prepareGameplayTransition(reason, context = {}) {
+  appCtx.hideResult?.();
   appCtx.gameTimer = 0;
   gameplayRegistry.stop(reason, { appCtx, ...context });
   clearObjectives();
@@ -254,10 +271,24 @@ export function startGameplayPlugin(id, context = {}) {
   const pluginId = String(id || "free");
   if (!gameplayRegistry.has(pluginId)) throw new Error(`Unknown gameplay plugin: ${pluginId}`);
   prepareGameplayTransition("replaced", context);
-  if (!["trial", "checkpoint", "painttown", "flower", "deflock", "livegps"].includes(pluginId)) {
-    appCtx.gameMode = "free";
+  appCtx.gameMode = ["trial", "checkpoint", "painttown", "flower", "deflock", "livegps"].includes(pluginId) ? pluginId : "free";
+  const resultId=pluginId==='flower'?'flower-sprint':pluginId;
+  for(const outcome of ['completion','attempt']){
+    const id=`game-${resultId}-${outcome}`;
+    if(['saving','retry','cache-retry'].includes(activityCompletions.status(id).status)){
+      appCtx.showResult?.('Previous result needs saving','Retry the previous Journal save before starting another run.',{activityId:resultId,outcome:outcome==='attempt'?'failed':'completed',replay:()=>startGameplayPlugin(pluginId,context)});
+      return false;
+    }
   }
-  return gameplayRegistry.start(pluginId, { appCtx, ...context });
+  if(['trial','checkpoint'].includes(pluginId)){
+    appCtx.setTravelMode?.('drive',{source:'road_game_start'});
+    if(appCtx.getCurrentTravelMode && appCtx.getCurrentTravelMode()!=='drive'){
+      appCtx.gameMode='free';gameplayRegistry.start('free',{appCtx});appCtx.showToast?.('A road vehicle is needed for this challenge.');return false;
+    }
+  }
+  const result=gameplayRegistry.start(pluginId, { appCtx, ...context });
+  const finish=value=>{if(value===false && !gameplayRegistry.getActiveId()){appCtx.gameMode='free';gameplayRegistry.start('free',{appCtx});}return value;};
+  return result&&typeof result.then==='function'?result.then(finish):finish(result);
 }
 
 export function stopGameplayPlugin(reason = "stopped", context = {}) {

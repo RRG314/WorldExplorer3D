@@ -197,3 +197,8 @@ Fresh Baltimore inspection led to context-qualified generated vessels, corrected
 ## P16 district development closeout — October 3 continuation
 
 The bounded Inner Harbor district acceptance is complete: terrain-following continuous paving, budgeted furniture/vegetation, actor-selected night lights, existing facade and usable-door coverage, honest enterable directory, a labeled fictional orientation lobby, exterior-obstacle restoration, actual keyboard route/entry/exit and walk/drive/walk continuity. All 1,747 registered tests pass; source, actual-world and prescribed presentation-client evidence is recorded in EARTH-DISTRICT.md. This closes the flagship district scope, not a city-wide art or production gate. P17 is next; P18–P20 and camera C04/C05 remain open.
+
+
+## P17 development closeout — October 3 continuation
+
+Existing route and standard-game lifecycle is complete within GAME-LIFECYCLE.md: explicit travel rules, correct selected replay, truthful idempotent Journal save/retry, common phone result/pause ownership, active-time clocks, road-height targets and safe delayed/failed starts. All 1,761 registered tests and source checks pass; actual Baltimore keyboard and controlled game-boundary journeys plus prescribed-client screenshots are inspected. Fishing/field specialized authorities remain intact. P18 shared marine expeditions is next. P19–P20 and camera C04/C05 remain open. Production unchanged.

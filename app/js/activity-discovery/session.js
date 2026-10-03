@@ -1,3 +1,4 @@
+import {activityCompletionMessage,activityCompletions} from './completion.js';
 import { ambientNotices } from '../ui/ambient-notices.js';
 import { ctx as appCtx } from '../shared-context.js?v=55';
 import { buildActivityCatalog, currentReferencePose } from './catalog.js?v=5';
@@ -6,6 +7,8 @@ import { bindMarkerClicks, refreshWorldMarkers } from './markers.js?v=3';
 import {
   distanceToStart,
   getCompletionState,
+  getCompletionStatus,
+  retryActivityCompletion,
   getRuntimeSnapshot,
   navigateToActivityStart,
   registerActivityGameplayPlugin,
@@ -208,6 +211,7 @@ function renderDetail() {
       <div class="activityDiscoveryDetailMeta">${escapeHtml(activity.locationLabel)} • ${escapeHtml(activity.traversalMode)} • ${escapeHtml(discoveryVisibilityLabel(activity))}</div>
     </div>
     <div class="activityDiscoveryDetailText">${escapeHtml(activity.description)}</div>
+    <div class="activityDiscoveryDetailText">Follow the route in ${escapeHtml(activity.traversalMode)} mode. Reach each marker in order. Pause stops the timer; Stop ends the run without a reward.</div>
     <div class="activityDiscoveryStatGrid">
       <div><span>Presented by</span><strong>${escapeHtml(activity.creatorAvatar || '🌍')} ${escapeHtml(activity.creatorName)}</strong></div>
       <div><span>Difficulty</span><strong>${escapeHtml(activity.difficulty)}</strong></div>
@@ -226,7 +230,8 @@ function renderDetail() {
     </div>
     <div class="activityDiscoveryDetailSection">
       <div class="activityDiscoveryDetailSectionTitle">Completion</div>
-      <div class="activityDiscoveryCompletionText">${completion?.count ? `Completed ${completion.count} time${completion.count === 1 ? '' : 's'}${completion.bestTimeMs ? ` • best ${(completion.bestTimeMs / 1000).toFixed(1)}s` : ''} • saved in your Journal` : 'First completion adds this activity to your Journal and Games path.'}</div>
+      <div class="activityDiscoveryCompletionText" role="status">${escapeHtml(activityCompletionMessage(completion,getCompletionStatus(activity.id)))}</div>
+      ${['retry','cache-retry'].includes(getCompletionStatus(activity.id).status)?'<div class="activityDiscoveryDetailActions"><button type="button" class="secondary" id="activityDiscoveryRetrySave">Retry Journal save</button></div>':''}
     </div>
   `;
 }
@@ -334,6 +339,7 @@ function inspectActivity(activityId = '', options = {}) {
   const id = sanitizeText(activityId, 120).toLowerCase();
   if (!id) return false;
   state.selectedId = id;
+  void activityCompletions.verify(id).then(()=>{if(state.selectedId===id)renderDetail()});
   if (options.open !== false) state.active = true;
   updateExternalState();
   renderUi();
@@ -343,6 +349,7 @@ function inspectActivity(activityId = '', options = {}) {
 function openActivityBrowser(options = {}) {
   state.active = true;
   if (options.activityId) state.selectedId = sanitizeText(options.activityId, 120).toLowerCase();
+  const selected=state.selectedId;void activityCompletions.verify(selected).then(()=>{if(state.selectedId===selected)renderDetail()});
   if (options.scope) state.scope = sanitizeText(options.scope, 24).toLowerCase();
   if (options.categoryId) state.categoryId = sanitizeText(options.categoryId, 32).toLowerCase();
   refreshCatalog(true);
@@ -427,11 +434,12 @@ function bindEvents() {
       renderUi();
       return;
     }
+    if(target.id==='activityDiscoveryRetrySave'){const activity=selectedActivity();if(!activity)return;const pending=retryActivityCompletion(activity.id);renderDetail();await pending;renderDetail();return;}
     if (target.id === 'activityDiscoveryReplayAction') {
       const activity = selectedActivity();
       if (!activity) return;
       if (getCompletionState(activity.id) || getRuntimeSnapshot().activityId === activity.id) {
-        const ok = await replayLastActivity();
+        const ok = await replayLastActivity(activity);
         state.status = ok ? `Replaying ${activity.title}.` : `Could not replay ${activity.title}.`;
         if (ok) closeActivityBrowser();
       } else {

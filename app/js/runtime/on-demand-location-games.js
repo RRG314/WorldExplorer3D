@@ -45,6 +45,9 @@ function startDeFlockMode() {
     state.loading = false;
   }).catch((error) => {
     state.loading = false;
+    if (generation !== deFlockGeneration || appCtx.gameMode !== 'deflock') return;
+    appCtx.stopGameplayPlugin?.('start-failed');
+    appCtx.showToast?.('DeFlock Hunt could not load. You can try again from Activities.');
     console.error('[gameplay] DeFlock Hunt could not start.', error);
   });
   return state;
@@ -76,6 +79,9 @@ function startLiveGpsMode() {
     state.loading = false;
   }).catch((error) => {
     state.loading = false;
+    if (generation !== liveGpsGeneration || appCtx.gameMode !== 'livegps') return;
+    appCtx.stopGameplayPlugin?.('start-failed');
+    appCtx.showToast?.('Live GPS Explore could not load. You can try again from Activities.');
     console.error('[gameplay] Live GPS Explore could not start.', error);
   });
   return state;

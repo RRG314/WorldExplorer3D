@@ -613,7 +613,8 @@ function completeIfNeeded(session) {
   }
   appCtx.showResult?.(
     "Area DeFlocked",
-    `${snapshot.disabled} virtual cameras • ${formatTime(snapshot.elapsedMs)} • ${snapshot.score} points • ${Math.round(snapshot.distance)}m traveled`
+    `${snapshot.disabled} virtual cameras • ${formatTime(snapshot.elapsedMs)} • ${snapshot.score} points • ${Math.round(snapshot.distance)}m traveled`,
+    {durationMs:snapshot.elapsedMs}
   );
 }
 
@@ -710,7 +711,7 @@ async function initializeSession(session) {
     renderHud(session);
   } catch (error) {
     if (session.abortController.signal.aborted || activeSession !== session) return;
-    session.state = createDeFlockState([], { sourceVersion: DEFLOCK_SOURCE_VERSION, location: session.location });
+    session.state = createDeFlockState([], { clock:()=>appCtx.getGameplayClock?.() ?? performance.now(), sourceVersion: DEFLOCK_SOURCE_VERSION, location: session.location });
     session.state.status = "error";
     session.state.error = String(error?.message || error);
     setStatus(session, "Camera data could not be loaded. The Earth location remains available for normal exploration.", "alert");
@@ -725,7 +726,7 @@ function startDeFlockMode() {
     generation,
     location: locationSnapshot(),
     abortController: new AbortController(),
-    state: createDeFlockState([], { sourceVersion: DEFLOCK_SOURCE_VERSION, location: locationSnapshot() }),
+    state: createDeFlockState([], { clock:()=>appCtx.getGameplayClock?.() ?? performance.now(), sourceVersion: DEFLOCK_SOURCE_VERSION, location: locationSnapshot() }),
     source: null,
     render: null,
     nearby: null,

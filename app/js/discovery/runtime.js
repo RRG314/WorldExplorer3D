@@ -1042,6 +1042,7 @@ function disposeWorldDiscoveryRuntime(appCtx, reason = 'world-reload') {
   appCtx.handleWorldDiscoveryToolUse = null;
   if (appCtx.recordFishingExplorerCatch === state.recordFishingExplorerCatch) appCtx.recordFishingExplorerCatch = null;
   if (appCtx.recordExplorerEvent === state.recordExplorerEvent) appCtx.recordExplorerEvent = null;
+  if (appCtx.getExplorerEventsById === state.getExplorerEventsById) appCtx.getExplorerEventsById = null;
   if (appCtx.assignCompanionPrimaryHome === state.assignCompanionPrimaryHome) appCtx.assignCompanionPrimaryHome = null;
   if (appCtx.resolveCharacterCapability === state.resolveCharacterCapability) appCtx.resolveCharacterCapability = null;
   return true;
@@ -1251,8 +1252,10 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
       // The Explorer panel reloads current data whenever it opens. Rebuilding
       // all hidden Journal, Guide, companion, and profile markup here made a
       // background world-visit receipt compete with first-play rendering.
+      if(record.metadata?.resultOwner!=='game-result'){
       const hasResultCard = ['activity-completed', 'creation-saved', 'building-milestone', 'vehicle-route-completed'].includes(result.event?.eventType) && state.ui?.showResult?.(result);
       if (!hasResultCard) publishExplorerResult(result.event, profileStore);
+      }
       if (state.ui?.open) await state.ui.refreshData?.();
     }
     return result || { recorded: false, reason: 'event-store-unavailable' };
@@ -1281,6 +1284,8 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
     return normalized;
   };
   appCtx.recordExplorerEvent = state.recordExplorerEvent;
+  state.getExplorerEventsById=ids=>profileStore.getEventsById(ids);
+  appCtx.getExplorerEventsById=state.getExplorerEventsById;
   state.unregisterExplorerListeners = [];
   const listenForExplorerEvent = (type, handler) => {
     globalThis.addEventListener?.(type, handler);
