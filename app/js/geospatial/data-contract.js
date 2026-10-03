@@ -10,6 +10,7 @@ const TRUTH_TYPES = Object.freeze([
 ]);
 
 const DATA_SOURCES = Object.freeze({
+  'digitraffic-cameras': Object.freeze({id:'digitraffic-cameras',label:'Fintraffic / digitraffic.fi',operator:'Fintraffic',truthType:'observed',licenseId:'CC-BY-4.0',licenseUrl:'https://creativecommons.org/licenses/by/4.0/',homepage:'https://www.digitraffic.fi/en/road-traffic/',description:'Timestamped road-weather still images in Finland. Catalogue counts are not online-image guarantees.'}),
   'usgs-cngm-surface': Object.freeze({
     id:'usgs-cngm-surface',label:'USGS Cooperative National Geologic Map · surface units',
     operator:'USGS and contributing geological surveys',truthType:'reference',

@@ -1,6 +1,6 @@
 # Live Earth cameras — accepted product expansion
 
-October 2, 2026. The owner requested extensive live and still camera viewing inspired by WorldCam, integrated into World Explorer. This is a planned feature, not a working camera catalogue or coverage claim. Keep the current sequential foundation/ocean/space work; add the camera slice to the Earth track and its provider acceptance to P19/P20.
+October 2, 2026. The owner requested extensive live and still camera viewing inspired by WorldCam, integrated into World Explorer. The October 3 continuation implements the first regional still-image slice described below; broader coverage and live video remain planned. Keep the current sequential foundation/ocean/space work; add the camera slice to the Earth track and its provider acceptance to P19/P20.
 
 ## Reference and current gap
 
@@ -48,3 +48,22 @@ Map queries use viewport bounds, antimeridian handling, clustering and paginatio
 | C05 · release | Physical-phone and desktop playback, slow/offline/expired-token tests, repeated open/close memory/network checks, camera-source removal workflow and measured API/media operating cost. |
 
 Schedule C01 as research alongside current work; implement C02–C05 after P06 and alongside P16's Earth slice. Do not interrupt P07–P15's agreed ocean/space dependencies. P19 owns provider operations; P20 owns release acceptance. This feature must reach a complete actual-imagery slice before its public capability status changes from Planned.
+
+
+## October 3 — C01–C03 regional implementation
+
+The first usable source is **Fintraffic Digitraffic, Finland**. Fresh direct reads verified its [CC BY 4.0 terms](https://www.digitraffic.fi/en/terms-of-service/), [camera endpoints and update cadence](https://www.digitraffic.fi/en/road-traffic/), and [API instructions](https://www.digitraffic.fi/en/support/instructions/). The metadata API allows browser CORS and needs no paid subscription or credential. The source is regional still imagery, not live video. WorldCam data is not scraped or reused.
+
+Read-only inventory on October 3 returned 810 station entries; the app admitted 809 collecting, coordinate-valid sites. Those counts are a dated observation, not a permanent promise. Example station C01503 supplied per-view capture timestamps; the publisher image endpoint returned JPEG HTTP 200. The actual browser later displayed images successfully. Catalogue metadata, last check and image capture have separate meanings.
+
+Implementation uses `public-camera-service.js` as the versioned regional catalogue/detail adapter. IDs and image hosts are validated; inactive presets and malformed coordinates are excluded. Catalogue and detail caches, a 12-second deadline, request pacing, 3 MB response cap and bounded detail cache keep requests controlled. There is no arbitrary media proxy, secret, cloud Function, image archive or new progress store. Compression is browser-managed; the non-personal Digitraffic-User header identifies the app.
+
+The existing Live Earth interface has a Public Cameras category, clustered map markers, place/ID search, bounded pages, actual camera images, capture/availability wording, previous/next view, next camera, source/license links, full-size publisher image link, map focus and Explore here. Single-view sites disable redundant controls. Finland coverage is explicit. Selecting a camera focuses its own coordinates. Watching remotely grants no gameplay visit or reward. Closing, leaving the layer or hiding the page cancels metadata work, clears the image and stops the refresh timer. Late responses cannot replace a newer selection. Still refresh is ten minutes while visible; unknown and stale capture times are explicit. A failed image is hidden and labeled unavailable; retry recovers.
+
+### Verification status
+
+Seven registered adapter/lifecycle tests pass. Actual-browser acceptance has already covered real provider catalogue/images, multiple views, a deliberately failed image and retry, phone inspection, source attribution and teardown. The prescribed game client screenshot/state is inspected; unsigned local App Check console warnings remain a harness limitation. Final acceptance clicked an actual map cluster (9 sites from 290 displayed clusters), recovered a deliberately failed image, and verified stopped timers/requests/image source on close. All 1,736 registered tests and source checks pass. C01–C03 are development-complete for this regional still-image source.
+
+The Explore here test verifies coordinates handed to the **existing** startHere path with that callback captured; it does not claim an actual Finland world load. P16's Earth journey acceptance owns the complete loaded-world path. The separately inspected full-size image remains on the publisher's site; the app does not record or re-host imagery.
+
+C04 (additional independently verified sources, favourites/Journal and camera wall) and C05/P20 physical-device/release acceptance remain open. The surrounding Earth district in P16 remains open. This concrete regional camera slice should not expand indefinitely into worldwide parity before it can be accepted.

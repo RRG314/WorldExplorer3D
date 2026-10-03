@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
   "scope": "Local source capability descriptions; not production or full journey certification",
-  "registrySha256": "12f89cff30d11cfd943300bac52122f504b721e3a385d92de066bffa949258f7",
+  "registrySha256": "d7aca0f9e75f080b1bc389c5686d480d5da6fbc07f6f462ccebb597578720ea7",
   "owners": {
-    "app/js/live-earth/registry.js": "6c6d3cec9fb3334434304083c2529b97da73eb967cd2edfaef1bc4a0b2cf3ee6",
+    "app/js/live-earth/public-camera-ui.js": "82aa09ad50910739d1fa1b9e0da95819e6dc68df097e67e589860a78e741547f",
     "app/js/map.js": "37f3289baf5e52eb6bb48c1fee61f037482226b57023ef71298cbd07955a1a8c",
     "app/js/ui/share-links.js": "dc7f611f894818de108ef86db54644aabbdea6d3e202e3cb2c876b6f15571260",
     "account/account-center.js": "bacd77901ec8719b318893c7ff53d43f46c62cd5b809deecfb94ff8f54132690",
@@ -38,18 +38,19 @@
     "app/js/water-dynamics.js": "7b8aac751446d4aee8e93b98b8eb4247a8ae024c8171e1acf5359ecc98344e6a",
     "app/js/activity-discovery/session.js": "a00c472815a22832b34d1d587b7a443ad9163b7f1a7778a0f03803f82667b081",
     "app/js/discovery/field-activities.js": "8dde9c2ec5cd02424971b2ae8946c438afbcd5f906e629d6e674734196aeddfa",
-    "app/js/discovery/tools.js": "5b11668402d7bd7e0c5b57a8fb2f7055b04e0c976b3f316542a7faa18efc0780"
+    "app/js/discovery/tools.js": "5b11668402d7bd7e0c5b57a8fb2f7055b04e0c976b3f316542a7faa18efc0780",
+    "app/js/live-earth/registry.js": "1889bf51a76148704048c4abd3ed29331157f94adaf8048d5efd33c38fcd7b19"
   },
   "capabilities": [
     {
       "id": "public-cameras",
-      "label": "Public live & still cameras",
+      "label": "Public camera stills",
       "group": "data",
-      "status": "planned",
-      "summary": "Planned: browse public place, weather and nature cameras on the Earth map, with source attribution and image timestamps. Existing mapped camera locations do not provide video.",
-      "owner": "app/js/live-earth/registry.js",
-      "persistence": "Planned camera favourites and Journal references need the save contract; this camera viewer is not available yet.",
-      "acceptance": "Planned in LIVE-EARTH-CAMERAS.md; provider research completed, imagery integration and acceptance pending."
+      "status": "limited",
+      "summary": "Browse Finland road-weather cameras in Live Earth, with capture times, source credit, map selection and Explore here. These are still images; other countries and live video are not available yet.",
+      "owner": "app/js/live-earth/public-camera-ui.js",
+      "persistence": "Viewing a remote camera does not award a physical visit or field record. Camera favourites and Journal references are not implemented.",
+      "acceptance": "Actual Fintraffic imagery, view switching, failed-image retry and phone layout verified locally; see LIVE-EARTH-CAMERAS.md."
     },
     {
       "id": "maps",
@@ -929,6 +930,16 @@
       "summary": "Used by supported field activities. Select the tool to see its available actions and instructions.",
       "owner": "app/js/discovery/tools.js",
       "persistence": "Journal and character progress stay in this browser. Signing in does not copy them to another device.",
+      "acceptance": "Source-reviewed; complete current player-journey acceptance is still pending."
+    },
+    {
+      "id": "layer:public-cameras",
+      "label": "Public Camera Views",
+      "group": "data",
+      "status": "limited",
+      "summary": "Finland road-weather stills from Fintraffic; regional coverage, not live video.",
+      "owner": "app/js/live-earth/registry.js",
+      "persistence": "Provider observations and reference layers are not persistent gameplay progress. Check each layer’s timestamp and source.",
       "acceptance": "Source-reviewed; complete current player-journey acceptance is still pending."
     },
     {

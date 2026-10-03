@@ -1,3 +1,4 @@
+import { cameraMapClusters } from './public-camera-service.js';
 const DEFLOCK_POINT_RADIUS = 1.000025;
 const DEFLOCK_SELECTION_RADIUS = 1.00004;
 const DEFLOCK_COVERAGE_RADIUS = 1.000045;
@@ -13,6 +14,7 @@ function ensureSelectorGroups(state) {
   selector.satelliteGroup = new THREE.Group();
   selector.earthquakeGroup = new THREE.Group();
   selector.weatherGroup = new THREE.Group();
+  selector.publicCameraGroup = new THREE.Group();
   selector.deFlockGroup = new THREE.Group();
   selector.deFlockPointGroup = new THREE.Group();
   selector.deFlockSelectionGroup = new THREE.Group();
@@ -21,6 +23,7 @@ function ensureSelectorGroups(state) {
   selector.group.add(selector.satelliteGroup);
   selector.group.add(selector.earthquakeGroup);
   selector.group.add(selector.weatherGroup);
+  selector.group.add(selector.publicCameraGroup);
   selector.group.add(selector.deFlockGroup);
   selector.deFlockGroup.add(selector.deFlockPointGroup);
   selector.deFlockGroup.add(selector.deFlockSelectionGroup);
@@ -443,7 +446,22 @@ export function renderTransportGlobe(ctx, state) {
   }));
 }
 
+function renderPublicCameraGlobe(state) {
+  ensureSelectorGroups(state);const selector=state.selector,group=selector.publicCameraGroup;if(!group)return;
+  group.visible=state.panelMode==='live-earth'&&state.activeLayerId==='public-cameras';
+  selector.markerRecords=selector.markerRecords.filter(v=>v.type!=='public-camera');
+  removeChildren(group);if(!group.visible)return;
+  const clusters=cameraMapClusters(state.publicCamera.items);state.publicCamera.clusters=clusters;
+  const positions=new Float32Array(clusters.length*3);
+  clusters.forEach((item,i)=>{const point=selector.api.latLonToLocalPoint(item.lat,item.lon,1.00005);positions.set([point.x,point.y,point.z],i*3);});
+  const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.BufferAttribute(positions,3));
+  const points=new THREE.Points(geometry,new THREE.PointsMaterial({color:0x5eead4,size:7,sizeAttenuation:false,depthWrite:false}));
+  points.userData.liveEarth={type:'public-camera'};points.renderOrder=6;group.add(points);
+  selector.markerRecords.push({type:'public-camera',id:'public-camera-clusters',mesh:points});
+}
+
 export function renderGlobeLayers(ctx, state) {
+  renderPublicCameraGlobe(state);
   renderSatelliteGlobe(ctx, state);
   renderEarthquakeGlobe(ctx, state);
   renderWeatherGlobe(ctx, state);

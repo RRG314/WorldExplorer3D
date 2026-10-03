@@ -10,7 +10,7 @@ The preserved `dist` and production release are not being replaced by current pl
 
 ## Latest phase status
 
-P08–P15 are development-complete within their documented boundaries. Marine swimming/deck/voyage/regional habitat/research and space navigation/planetary mission progression are implemented and verified. P14 adds partial survey recovery, save-safe lab completion, a persistent useful equipment improvement and a readable report. P15 now improves Moon/Mars/Copper Dawn presentation, equipment and obstacle ownership. All 1,729 registered tests, source checks and the actual mission and three-site art/collision browser journeys pass; desktop/phone and prescribed-client images are inspected. P16 Earth district and Live Earth cameras is next. Production is unchanged. Older chronological entries below are historical, not current phase status.
+P08–P15 are development-complete within their documented boundaries. Marine swimming/deck/voyage/regional habitat/research and space navigation/planetary mission progression are implemented and verified. P14 adds partial survey recovery, save-safe lab completion, a persistent useful equipment improvement and a readable report. P15 now improves Moon/Mars/Copper Dawn presentation, equipment and obstacle ownership. All 1,729 registered tests, source checks and the actual mission and three-site art/collision browser journeys pass; desktop/phone and prescribed-client images are inspected. P16 is active: public camera C01–C03 regional still imagery is implemented and tested (1,736 tests); Earth district work is next. Production is unchanged. Older chronological entries below are historical, not current phase status.
 
 ## Active work
 
@@ -60,3 +60,8 @@ The existing Proxima b field mission now closes through partial recovery/redeplo
 ## P15 development closeout — October 3
 
 Three-site planetary presentation is complete for Moon, Mars and Copper Dawn: local geology, terrain-map raster, readable owned lighting, spacesuit/rover selection, collision and phone return control. Existing measured terrain and real/modeled/fictional labels remain authoritative. All 1,729 registered tests, source checks, actual three-site browser collision/exit checks and inspected prescribed-client visuals pass. See PLANETARY-ART.md for scope, short rendering samples and limitations. P16 Earth district/cameras is next; production unchanged.
+
+
+## P16 camera C01–C03 closeout — October 3
+
+Regional public camera stills are implemented and verified: Fintraffic Finland catalogue (809 admitted sites at test time), clustered map/search/pages, real timestamped images, view/camera switching, source attribution, failure/retry, phone layout and Explore here coordinate handoff. Closing/hiding cancels work. All 1,736 registered tests, source checks, actual-provider browser and inspected prescribed-client evidence pass. See LIVE-EARTH-CAMERAS.md for boundaries: no global/live-video parity, no remote visit reward, no Finland world-load claim. P16 Earth district remains active; C04 breadth/multi-view and C05 release remain open. Production unchanged.

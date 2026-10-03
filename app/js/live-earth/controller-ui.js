@@ -1,3 +1,4 @@
+import { renderPublicCameraDetails, publicCameraAction, stopPublicCamera } from './public-camera-ui.js';
 import { LIVE_EARTH_CATEGORIES, getLayersForCategory, getLiveEarthLayer } from "./registry.js?v=11";
 import { CURATED_SATELLITES } from "./satellites.js?v=6";
 import { nearestRouteContext } from "./transport.js?v=3";
@@ -14,7 +15,8 @@ import {
 } from "./render-globe.js?v=11";
 
 function selectedLayerCount(ctx, state, layerId) {
-  if (layerId === 'overview') return 7;
+  if (layerId === 'overview') return 8;
+  if (layerId === 'public-cameras') return state.publicCamera.items.length;
   if (layerId === 'satellites') return ctx.filteredSatelliteItems(state).length;
   if (layerId === 'earthquakes') return state.earthquakeItems.length;
   if (layerId === 'weather') return state.weatherSamples.length;
@@ -33,6 +35,7 @@ function selectedLayerCount(ctx, state, layerId) {
 function layerCountLabel(ctx, state, layer) {
   const count = selectedLayerCount(ctx, state, layer.id);
   if (layer.id === 'overview') return `${count} systems`;
+  if (layer.id === 'public-cameras') return state.publicCamera.loading?'loading':`${count} indexed sites`;
   if (layer.id === 'aircraft') return `${count} ${state.aircraftSourceMode === 'observed' ? 'observed' : 'reference'}`;
   if (layer.id === 'ships') return `${count} reference`;
   if (layer.id === 'ocean-state') return state.marineLoading ? 'loading' : `${count} ${count === 1 ? 'source' : 'sources'}`;
@@ -126,6 +129,7 @@ function renderOverviewDetails(ctx, state) {
     { id: 'satellites', label: 'Satellites', value: `${observedSatellites}/${state.satelliteItems.length} observed`, source: 'CelesTrak GP orbital elements', health: health.satellites.label },
     { id: 'earthquakes', label: 'Earthquakes', value: `${state.earthquakeItems.length} observed`, source: 'USGS GeoJSON feed', health: health.earthquakes.label },
     { id: 'weather', label: 'Weather', value: `${state.weatherSamples.length} current`, source: 'Open-Meteo current conditions', health: health.weather.label },
+    { id: 'public-cameras',label:'Public camera views',value:`${state.publicCamera.items.length} indexed sites`,source:'Fintraffic · Finland · timestamped stills',health:'Open to browse regional imagery; not live video' },
     { id: 'street-imagery', label: 'Street imagery', value: 'selected location', source: 'Panoramax and KartaView community observations', health: health.streetImagery.label },
     { id: 'deflock-cameras', label: 'DeFlock cameras', value: `${(state.deFlockIndex?.count || 0).toLocaleString()} indexed`, source: 'Hourly OpenStreetMap ALPR position index', health: state.deFlockError || state.deFlockIndexWarning || (state.deFlockIndex ? 'Index ready · exact detail resolved on selection' : 'Open layer to load') },
     { id: 'aircraft', label: 'Aircraft', value: `${state.aircraftItems.length} ${state.aircraftSourceMode === 'observed' ? 'observed' : 'reference'}`, source: state.aircraftSourceMode === 'observed' ? 'Current live ADS-B state vectors' : 'Modeled route fallback', health: state.aircraftSourceMode === 'observed' ? health.aircraft.label : 'Fallback active · Live ADS-B unavailable' },
@@ -161,6 +165,8 @@ export function renderLiveEarthDetails(ctx, state) {
     renderOverviewDetails(ctx, state);
     return;
   }
+
+  if (layer.id === 'public-cameras') {renderPublicCameraDetails(ctx,state);return;}
 
   if (layer.id === 'street-imagery') {
     renderStreetImageryDetails(ctx, state);
@@ -353,6 +359,7 @@ export function renderLiveEarthStatus(ctx, state) {
     layer?.id === 'earthquakes' ? state.earthquakesLoadedAt :
     layer?.id === 'ships' ? state.shipsLoadedAt :
     layer?.id === 'aircraft' ? state.aircraftLoadedAt :
+    layer?.id === 'public-cameras' ? state.publicCamera.indexedAt :
     layer?.id === 'street-imagery' ? state.streetImageryLoadedAt :
     layer?.id === 'deflock-cameras' ? state.deFlockLoadedAt :
     layer?.id === 'ocean-state' ? Math.max(state.weatherSamplesLoadedAt, state.marineLoadedAt) :
@@ -408,6 +415,7 @@ export function renderLiveEarthUi(ctx, state) {
 }
 
 export function setPanelMode(state, mode = 'explore') {
+  if(mode!=='live-earth')stopPublicCamera(state);
   state.panelMode = mode === 'live-earth' ? 'live-earth' : 'explore';
   const ui = state.selector.ui;
   if (ui?.exploreModeBtn) ui.exploreModeBtn.classList.toggle('active', state.panelMode === 'explore');
@@ -427,6 +435,7 @@ export function setPanelMode(state, mode = 'explore') {
 }
 
 export async function refreshActiveLayer(ctx, state, force = false) {
+  const requestedLayer=state.activeLayerId;
   try {
     const layerId = state.activeLayerId;
     if (layerId === 'overview') {
@@ -441,6 +450,8 @@ export async function refreshActiveLayer(ctx, state, force = false) {
       await ctx.ensureShipTrafficData(state, force);
     } else if (layerId === 'aircraft') {
       await ctx.ensureAircraftTrafficData(state, force);
+    } else if (layerId === 'public-cameras') {
+      await ctx.ensurePublicCameras(ctx,state,force);
     } else if (layerId === 'street-imagery') {
       const pending = ctx.ensureStreetImagery(state, force);
       renderLiveEarthUi(ctx, state);
@@ -460,6 +471,7 @@ export async function refreshActiveLayer(ctx, state, force = false) {
     console.warn('[live-earth] refresh failed:', error?.message || error);
     state.lastErrorMessage = `Live feed refresh failed: ${error?.message || error}`;
   }
+  if(requestedLayer==='public-cameras'&&(!state.selector.api?.isOpen?.()||state.activeLayerId!==requestedLayer))return;
   renderGlobeLayers(ctx, state);
   renderLiveEarthUi(ctx, state);
 }
@@ -467,6 +479,7 @@ export async function refreshActiveLayer(ctx, state, force = false) {
 export async function setActiveLayer(ctx, state, layerId, force = false) {
   const layer = getLiveEarthLayer(layerId);
   if (!layer) return;
+  if(layer.id!==state.activeLayerId)stopPublicCamera(state);
   state.activeCategoryId = layer.categoryId;
   state.activeLayerId = layer.id;
   if (layer.id === 'satellites' && !state.selectedSatelliteId && CURATED_SATELLITES[0]) {
@@ -484,6 +497,7 @@ export async function setActiveLayer(ctx, state, layerId, force = false) {
 }
 
 export async function handleUiAction(ctx, state, action, value) {
+  if(publicCameraAction(ctx,state,action,value))return;
   if (action === 'category') {
     state.activeCategoryId = value;
     const nextLayer = getLayersForCategory(value)[0];
@@ -680,14 +694,17 @@ export function bindSelectorUi(ctx, state) {
 
 export function handleGlobePick(ctx, state, raycaster) {
   if (state.panelMode !== 'live-earth') return false;
-  const meshes = state.selector.markerRecords.map((entry) => entry.mesh).filter(Boolean);
+  const meshes = state.selector.markerRecords.filter(entry=>state.activeLayerId!=='public-cameras'||entry.type==='public-camera').map((entry) => entry.mesh).filter(Boolean);
   if (!meshes.length && state.activeLayerId !== 'deflock-cameras') return false;
-  if (state.activeLayerId === 'deflock-cameras' && raycaster.params?.Points) {
+  if (['deflock-cameras','public-cameras'].includes(state.activeLayerId) && raycaster.params?.Points) {
     raycaster.params.Points.threshold = state.selector.api?.getPointHitThresholdWorld?.(7, 1.000025) || 0.006;
   }
   const hits = raycaster.intersectObjects(meshes, false);
   const hit = hits && hits.length ? hits[0] : null;
   const meta = hit?.object?.userData?.liveEarth || null;
+  if (meta?.type === 'public-camera' && Number.isInteger(hit.index)) {
+    const cluster=state.publicCamera.clusters?.[hit.index];if(cluster){state.publicCamera.clusterIds=cluster.ids;state.publicCamera.selectedId='';state.publicCamera.detail=null;state.publicCamera.query='';state.publicCamera.page=0;stopPublicCamera(state);state.selector.api?.setSelection?.(cluster.lat,cluster.lon,{name:'Public cameras · Finland',focus:true});renderLiveEarthUi(ctx,state);}return true;
+  }
   if (meta?.type === 'deflock' && Number.isInteger(hit.index)) {
     void handleUiAction(ctx, state, 'select-deflock', String(hit.index));
     return true;

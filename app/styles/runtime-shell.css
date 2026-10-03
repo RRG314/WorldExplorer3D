@@ -581,3 +581,14 @@ body.space-destination-details-open #spaceFlightHUD{visibility:hidden}
   #boatPrompt{left:auto;right:max(10px,env(safe-area-inset-right));transform:none;border-radius:3px}
 }
 }
+
+/* Public imagery remains in the existing Live Earth inspector. */
+.publicCameraPanel h3 { margin: 12px 0 8px; font-size: 17px; }
+.publicCameraPanel p { font-size: 13px; line-height: 1.5; margin: 8px 0; }
+.publicCameraPanel a { color: #9cdded; }
+.publicCameraPanel form { display: grid; gap: 8px; margin: 12px 0; }
+.publicCameraPanel input { min-height: 44px; border: 1px solid #426071; border-radius: 5px; padding: 9px; background: #091521; color: white; font-size: 16px; }
+.publicCameraPanel button, .publicCameraPanel .globe-selector-live-action-btn { min-height: 44px; }
+.publicCameraPanel .globe-selector-live-detail-actions { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px; }
+.publicCameraPanel .globe-selector-live-list-item { text-align: left; border: 1px solid #324857; padding: 10px; }
+.publicCameraPanel [data-camera-health] { border-left: 3px solid #58baa9; padding-left: 9px; }

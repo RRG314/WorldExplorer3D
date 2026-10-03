@@ -1,4 +1,5 @@
 const LIVE_EARTH_CATEGORIES = [
+  { id:'cameras',label:'Public Cameras',summary:'Timestamped public camera still images, with source and coverage.',layers:['public-cameras'] },
   {
     id: 'overview',
     label: 'Overview',
@@ -44,6 +45,7 @@ const LIVE_EARTH_CATEGORIES = [
 ];
 
 const LIVE_EARTH_LAYERS = {
+  'public-cameras': {id:'public-cameras',categoryId:'cameras',label:'Public Camera Views',shortLabel:'Cameras',status:'observed',globeMode:'markers',summary:'Finland road-weather stills from Fintraffic; regional coverage, not live video.',localSummary:'Choose a camera, inspect its capture time, then explore that location.',sourceIds:['digitraffic-cameras']},
   overview: {
     id: 'overview',
     categoryId: 'overview',

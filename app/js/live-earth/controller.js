@@ -1,3 +1,4 @@
+import { createPublicCameraState, loadPublicCameras, stopPublicCamera } from './public-camera-ui.js';
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { resolveObservedEarthLocation, haversineKm } from "../earth-location.js?v=2";
 import { getWeatherSnapshotForLocation } from "../weather.js?v=12";
@@ -88,7 +89,8 @@ function buildLiveEarthState() {
   return {
     ready: true,
     panelMode: 'explore',
-    activeCategoryId: LIVE_EARTH_CATEGORIES[0].id,
+    activeCategoryId: 'overview',
+    publicCamera: createPublicCameraState(),
     activeLayerId: 'overview',
     satelliteFilter: 'all',
     selectedSatelliteId: '',
@@ -190,6 +192,7 @@ function buildLiveEarthModuleContext() {
     ensureSatellitePositions,
     ensureShipTrafficData,
     ensureStreetImagery,
+    ensurePublicCameras: loadPublicCameras,
     ensureWeatherSamples,
     filteredSatelliteItems,
     getLiveEarthLayer,
@@ -702,6 +705,7 @@ function resetSelectorVisuals(state) {
     satelliteGroup: null,
     earthquakeGroup: null,
     weatherGroup: null,
+    publicCameraGroup: null,
     deFlockGroup: null,
     deFlockPointGroup: null,
     deFlockSelectionGroup: null,
@@ -716,6 +720,7 @@ function resetSelectorVisuals(state) {
 function initLiveEarth() {
   if (appCtx.liveEarth?.ready) return appCtx.liveEarth;
   const state = buildLiveEarthState();
+  document.addEventListener('visibilitychange',()=>{if(document.hidden)stopPublicCamera(state);else if(state.selector.api?.isOpen?.()&&state.activeLayerId==='public-cameras'&&state.panelMode==='live-earth')void loadPublicCameras(buildLiveEarthModuleContext(),state);});
 
   const liveEarth = {
     ready: true,
@@ -732,6 +737,7 @@ function initLiveEarth() {
       refreshForOpenSelector(buildLiveEarthModuleContext(), state);
     },
     onSelectorClose() {
+      stopPublicCamera(state);
       state.deFlockResolveToken += 1;
       resetSelectorVisuals(state);
     },
@@ -777,6 +783,7 @@ function initLiveEarth() {
         aircraft: state.aircraftItems.length,
         aircraftSourceMode: state.aircraftSourceMode,
         streetImagery: state.streetImageryItems.length,
+        publicCameras: {indexed:state.publicCamera.items.length,selectedId:state.publicCamera.selectedId,verifiedImages:state.publicCamera.verified.size,loading:state.publicCamera.loading,error:state.publicCamera.error,mode:'still',coverage:'Finland'},
         deFlockCameras: state.deFlockIndex?.count || 0,
         localEventId: state.localEvent?.id || '',
         selectedSatelliteId: state.selectedSatelliteId || '',

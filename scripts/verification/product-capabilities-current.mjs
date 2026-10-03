@@ -18,11 +18,11 @@ try {
   await page.locator('#capabilityGuide summary').click();
   await page.getByRole('searchbox',{name:'Search game capabilities'}).fill('swimming');
   const swim=page.locator('[data-capability="swimming"]');
-  await swim.scrollIntoViewIfNeeded(); assert.match(await swim.innerText(),/Planned/);
-  assert.match(await swim.innerText(),/not available yet/);
+  await swim.scrollIntoViewIfNeeded(); assert.match(await swim.innerText(),/Limited/);
+  assert.match(await swim.innerText(),/swim/i);
   await page.screenshot({path:`${dir}/capabilities-${mobile?'phone':'desktop'}.png`});
-  await page.getByRole('searchbox',{name:'Search game capabilities'}).fill('Public live');
-  assert.match(await page.locator('[data-capability="public-cameras"]').innerText(),/Planned/);
+  await page.getByRole('searchbox',{name:'Search game capabilities'}).fill('Public camera');
+  assert.match(await page.locator('[data-capability="public-cameras"]').innerText(),/Limited/);
   await page.screenshot({path:`${dir}/camera-plan-${mobile?'phone':'desktop'}.png`});
   await page.getByRole('searchbox',{name:'Search game capabilities'}).fill('zz-no-result');
   assert.equal(await page.locator('.capabilityList li').count(),0);
