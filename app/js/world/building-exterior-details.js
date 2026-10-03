@@ -1,3 +1,4 @@
+import {storefrontLayout} from './storefront-layout.js';
 import {harborDistrictFocus} from './harbor-district.js';
 import { facadeFloorPlan } from './building-facade-layout.js?v=3';
 import {
@@ -41,7 +42,7 @@ function pointSegmentDistance(point, start, end) {
   return { x, z, t, distance: Math.hypot(point.x - x, point.z - z) };
 }
 
-function facadeEdgeForMesh(appCtx, mesh, entrance) {
+function* facadeEdgeSteps(appCtx, mesh, entrance) {
   const points = Array.isArray(mesh?.userData?.buildingFootprint) ? mesh.userData.buildingFootprint : [];
   if (points.length < 3) return null;
   const center = footprintCenter(points);
@@ -87,8 +88,13 @@ function facadeEdgeForMesh(appCtx, mesh, entrance) {
         yaw: Math.atan2(-dz, dx)
       };
     }
+    yield 'edge';
   }
   return best;
+}
+
+function facadeEdgeForMesh(appCtx,mesh,entrance){
+  const job=facadeEdgeSteps(appCtx,mesh,entrance);let result;do{result=job.next();}while(!result.done);return result.value;
 }
 
 function createDetailMaterials() {
@@ -211,13 +217,29 @@ function addCornice(addBox, edge, topY, profile, counters) {
   counters.modules[type] = (counters.modules[type] || 0) + 1;
 }
 
-function addStorefrontAwning(addBox, edge, baseY, profile, seed, counters) {
-  if (!profile.details.includes('storefront_awning') || profile.storefrontStyle === 'none' || edge.length < 3.2) return;
-  const width = Math.min(8.5, Math.max(2.6, edge.length - 0.8));
-  const material = ['awning-red', 'awning-blue', 'awning-ochre'][(seed >>> 5) % 3];
-  addFacadeBeam(addBox, material, edge, width, 0.16, 0.95, baseY + 2.82, 0, 0.48);
-  addFacadeBeam(addBox, 'dark-metal', edge, width + 0.08, 0.07, 0.07, baseY + 2.92, 0, 0.06);
-  counters.modules.storefront_awning = (counters.modules.storefront_awning || 0) + 1;
+function addStorefrontAwning(addBox, edge, baseY, profile, seed, counters, mesh, entrance) {
+  const doorAlong=entrance?(entrance.x-edge.x)*edge.tangentX+(entrance.z-edge.z)*edge.tangentZ:Infinity;
+  const layout=storefrontLayout({length:edge.length,height:finite(mesh.userData.bodyHeightMeters),levels:Math.max(1,finite(mesh.userData.levels)-finite(mesh.userData.buildingSemantics?.buildingMinLevel)),foundation:finite(mesh.userData.terrainFoundationRise),profile,doorAlong,doorWidth:finite(profile.door?.width,1.8)});
+  if(!layout)return;
+  const material=['awning-red','awning-blue','awning-ochre'][(seed>>>5)%3];
+  for(const bay of layout.bays){
+    if((counters.modules.shopfront_bay||0)>=192)break;
+    const y=baseY+(bay.bottom+bay.top)/2,h=bay.top-bay.bottom;
+    // Side posts, lower stall riser and transom fit the exact shader opening.
+    for(const side of [-1,1])addFacadeBeam(addBox,'dark-metal',edge,.085,h,.12,y,bay.along+side*bay.width/2,.065);
+    addFacadeBeam(addBox,'dark-metal',edge,bay.width,.065,.12,baseY+bay.top-h*.22,bay.along,.065);
+    addFacadeBeam(addBox,'trim',edge,bay.width+.14,.14,.18,baseY+bay.bottom-.07,bay.along,.08);
+    addFacadeBeam(addBox,material,edge,bay.width+.18,.16,.15,baseY+layout.fasciaY,bay.along,.08);
+    if(profile.details.includes('storefront_awning')){
+      // Segmented canopies leave gaps at real doors and never span a whole block.
+      const width=Math.min(4.8,bay.width+.16);
+      addFacadeBeam(addBox,material,edge,width,.10,.82,baseY+layout.awningY,bay.along,.42);
+      addFacadeBeam(addBox,material,edge,width,.19,.06,baseY+layout.awningY-.075,bay.along,.81);
+      addFacadeBeam(addBox,'trim',edge,width,.045,.07,baseY+layout.awningY-.16,bay.along,.82);
+      counters.modules.storefront_awning=(counters.modules.storefront_awning||0)+1;
+    }
+    counters.modules.shopfront_bay=(counters.modules.shopfront_bay||0)+1;
+  }
 }
 
 function addBalconies(addBox, edge, baseY, topY, profile, seed, counters) {
@@ -276,9 +298,9 @@ function addChimney(addBox, mesh, profile, seed, counters) {
 }
 
 
-function addFittedWindowTrim(addBox, edge, mesh, profile, entrance, counters) {
+function addFittedWindowTrim(addBox, edge, mesh, profile, entrance, counters, distance) {
   // Bounded close detail. All other windows keep the identical shader layout.
-  if (Math.hypot(edge.x, edge.z) > 90 || profile.material?.surfacePattern === 'glass' || edge.length < 1.4) return;
+  if (distance > 90 || profile.material?.surfacePattern === 'glass' || edge.length < 1.4) return;
   const plan=facadeFloorPlan(finite(mesh.userData.bodyHeightMeters), {
     ...profile, levels: Math.max(1, finite(mesh.userData.levels)-finite(mesh.userData.buildingSemantics?.buildingMinLevel)),
     foundation: finite(mesh.userData.terrainFoundationRise)
@@ -288,8 +310,9 @@ function addFittedWindowTrim(addBox, edge, mesh, profile, entrance, counters) {
   for(let floor=0;floor<Math.min(2,plan.floors);floor++)for(let bay=0;bay<bays;bay++){
     if((counters.modules.fitted_window_frame||0)>=192)return;
     const shop=floor===0 && finite(profile.storefront?.glazing)>0;
-    const w=bayWidth*(shop?profile.storefront.glazing*.94:finite(profile.window?.width,.55));
-    const h=plan.floorHeight*(shop?.78:finite(profile.window?.height,.56));
+    if(shop)continue; // storefront layout supplies the aligned close trim
+    const w=bayWidth*finite(profile.window?.width,.55);
+    const h=plan.floorHeight*finite(profile.window?.height,.56);
     const along=-edge.length/2+(bay+.5)*bayWidth;
     const y=finite(mesh.position.y)+plan.foundation+(floor+.55)*plan.floorHeight;
     const entranceAlong=entrance?(entrance.x-edge.x)*edge.tangentX+(entrance.z-edge.z)*edge.tangentZ:Infinity;
@@ -305,29 +328,22 @@ function distribution(values) {
   return Object.freeze(Object.fromEntries([...values.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))));
 }
 
-export function publishBuildingExteriorDetails(appCtx, options = {}) {
+function* buildDetails(appCtx, options = {}) {
   const tier = tierForContext(appCtx, options.tier);
   const limit = DETAIL_LIMITS[tier];
   const radius = DETAIL_RADIUS[tier];
   const districtFocus=harborDistrictFocus(appCtx);
-  const candidates = (Array.isArray(appCtx?.buildingMeshes) ? appCtx.buildingMeshes : [])
-    .filter((mesh) =>
-      (mesh?.userData?.lodTier === 'near' || districtFocus && mesh?.userData?.lodTier === 'mid') &&
-      mesh?.material?.userData?.buildingExterior === true &&
-      mesh?.userData?.exteriorProfile &&
-      !mesh?.userData?.isRoofDetail
-    )
-    .map((mesh) => {
-      const center = footprintCenter(mesh.userData.buildingFootprint);
-      return { mesh, distance: Math.min(Math.hypot(center.x, center.z),districtFocus?Math.hypot(center.x-districtFocus.x,center.z-districtFocus.z):Infinity) };
-    })
-    .filter((candidate) => candidate.distance <= radius)
-    .sort((a, b) => a.distance - b.distance || String(a.mesh.userData?.sourceBuildingId || '').localeCompare(String(b.mesh.userData?.sourceBuildingId || '')))
-    .slice(0, limit);
+  const focus=options.focus||{x:0,z:0};
+  const candidates = (options.sources || []).map(mesh=>{
+    const center=mesh.detailCenter||footprintCenter(mesh.userData.buildingFootprint);
+    return {mesh,distance:Math.min(Math.hypot(center.x-focus.x,center.z-focus.z),!options.focus&&districtFocus?Math.hypot(center.x-districtFocus.x,center.z-districtFocus.z):Infinity)};
+  }).filter(c=>c.distance<=radius).sort((a,b)=>a.distance-b.distance||String(a.mesh.userData.sourceBuildingId).localeCompare(String(b.mesh.userData.sourceBuildingId))).slice(0,limit);
 
   const materials = createDetailMaterials();
   const batches = createBatchMap(materials);
   const unitBox = new THREE.BoxGeometry(1, 1, 1);
+  const meshes=[];let published=false;
+  try {
   const counters = { boxes: 0, vertices: 0, modules: {} };
   const addBox = boxAppender(unitBox, batches, counters);
   const families = new Map();
@@ -336,12 +352,14 @@ export function publishBuildingExteriorDetails(appCtx, options = {}) {
   const doors = new Map();
   const storefronts = new Map();
   const combinations = new Set();
+  const frontageExamples=[];
 
-  for (const { mesh } of candidates) {
+  for (const { mesh, distance } of candidates) {
     const profile = mesh.userData.exteriorProfile;
     const sourceBuildingId = String(mesh.userData?.sourceBuildingId || '');
     const entrance = appCtx?.buildingEntranceByBuilding?.get?.(sourceBuildingId) || null;
-    const edge = facadeEdgeForMesh(appCtx, mesh, entrance);
+    const edge = mesh.detailEdge || (yield* facadeEdgeSteps(appCtx, mesh, entrance));
+    mesh.detailEdge=edge;
     if (!edge) continue;
     const baseY = finite(mesh.position?.y);
     const topY = baseY + finite(mesh.userData?.bodyHeightMeters, mesh.userData?.heightMeters);
@@ -353,9 +371,11 @@ export function publishBuildingExteriorDetails(appCtx, options = {}) {
     storefronts.set(profile.storefrontStyle, (storefronts.get(profile.storefrontStyle) || 0) + 1);
     combinations.add([profile.familyId, profile.materialId, profile.windowStyle, profile.doorStyle, profile.storefrontStyle].join('|'));
 
-    addFittedWindowTrim(addBox, edge, mesh, profile, entrance, counters);
+    addFittedWindowTrim(addBox, edge, mesh, profile, entrance, counters, distance);
     addCornice(addBox, edge, topY, profile, counters);
-    addStorefrontAwning(addBox, edge, baseY, profile, seed, counters);
+    const shopsBefore=counters.modules.shopfront_bay||0;
+    addStorefrontAwning(addBox, edge, baseY, profile, seed, counters, mesh, entrance);
+    if(frontageExamples.length<12 && (counters.modules.shopfront_bay||0)>shopsBefore)frontageExamples.push(Object.freeze({sourceBuildingId,x:edge.x,z:edge.z,baseY,normalX:edge.normalX,normalZ:edge.normalZ}));
     addEntryStep(addBox, edge, entrance, profile, mesh, counters);
     addPorch(addBox, edge, entrance, profile, counters);
     const fittedFloors = facadeFloorPlan(topY-baseY,{...profile,levels:Math.max(1,finite(mesh.userData.levels)-finite(mesh.userData.buildingSemantics?.buildingMinLevel)),foundation:finite(mesh.userData.terrainFoundationRise)});
@@ -364,10 +384,9 @@ export function publishBuildingExteriorDetails(appCtx, options = {}) {
     addFireEscape(addBox, edge, baseY+fittedFloors.foundation, topY, alignedProfile, seed, counters);
     addServiceFront(addBox, edge, baseY, profile, counters);
     addChimney(addBox, mesh, profile, seed, counters);
+    yield 'building';
   }
-  unitBox.dispose();
 
-  const meshes = [];
   let triangles = 0;
   for (const [materialKey, batch] of batches) {
     const geometry = buildMergedGeometry(batch);
@@ -385,10 +404,8 @@ export function publishBuildingExteriorDetails(appCtx, options = {}) {
       sourceClaim: 'generated-visual-representation'
     };
     triangles += Math.floor(Number(geometry.index?.count || 0) / 3);
-    appCtx.addEarthWorldObject(mesh);
-    appCtx.buildingExteriorDetailMeshes ||= [];
-    appCtx.buildingExteriorDetailMeshes.push(mesh);
     meshes.push(mesh);
+    yield 'batch';
   }
   for (const [key, material] of materials) {
     if (!batches.get(key)?.positions.length) material.dispose();
@@ -397,6 +414,7 @@ export function publishBuildingExteriorDetails(appCtx, options = {}) {
   const diagnostics = Object.freeze({
     type: 'BuildingExteriorDetailPublication',
     schemaVersion: 1,
+    focus: Object.freeze({...focus}),
     tier,
     radius,
     candidateLimit: limit,
@@ -407,6 +425,7 @@ export function publishBuildingExteriorDetails(appCtx, options = {}) {
     vertices: counters.vertices,
     triangles,
     combinations: combinations.size,
+    frontageExamples:Object.freeze(frontageExamples),
     modules: Object.freeze({ ...counters.modules }),
     families: distribution(families),
     materials: distribution(materialVariants),
@@ -418,11 +437,19 @@ export function publishBuildingExteriorDetails(appCtx, options = {}) {
     entranceAuthority: 'building-facade-entrances',
     collisionAuthority: 'existing-building-collider-unchanged'
   });
+  clearDetailMeshes(appCtx);
+  for(const mesh of meshes)appCtx.addEarthWorldObject(mesh);
+  appCtx.buildingExteriorDetailMeshes=meshes;
   appCtx.buildingExteriorDetailPublication = diagnostics;
+  published=true;
   return diagnostics;
+  } finally {
+    unitBox.dispose();
+    if(!published){for(const mesh of meshes)mesh.geometry.dispose();for(const material of materials.values())material.dispose();}
+  }
 }
 
-export function clearBuildingExteriorDetails(appCtx) {
+function clearDetailMeshes(appCtx) {
   const meshes = Array.isArray(appCtx?.buildingExteriorDetailMeshes)
     ? appCtx.buildingExteriorDetailMeshes
     : [];
@@ -437,6 +464,38 @@ export function clearBuildingExteriorDetails(appCtx) {
   }
   appCtx.buildingExteriorDetailMeshes = [];
   appCtx.buildingExteriorDetailPublication = null;
+}
+
+const detailStates=new WeakMap();
+export function publishBuildingExteriorDetails(appCtx,options={}){
+  clearBuildingExteriorDetails(appCtx);
+  // Keep lightweight records before the base buildings are merged. No mesh,
+  // geometry or material is retained by the travelling detail cache.
+  const sources=(appCtx.buildingMeshes||[]).filter(m=>['near','mid'].includes(m.userData?.lodTier)&&m.material?.userData?.buildingExterior&&m.userData.exteriorProfile&&!m.userData.isRoofDetail).map(m=>({position:{y:m.position.y},detailCenter:footprintCenter(m.userData.buildingFootprint),userData:Object.fromEntries(['buildingFootprint','exteriorProfile','sourceBuildingId','bodyHeightMeters','heightMeters','buildingSeed','levels','buildingSemantics','terrainFoundationRise'].map(k=>[k,m.userData[k]]))}));
+  const state={sources,focus:{x:0,z:0},sequence:appCtx._worldLoadSequence,pending:null};detailStates.set(appCtx,state);
+  const job=buildDetails(appCtx,{...options,sources});let result;do{result=job.next();}while(!result.done);return result.value;
+}
+export function updateBuildingExteriorFocus(appCtx){
+  const state=detailStates.get(appCtx),point=appCtx.activeEarthActorPosition?.();
+  if(!state || state.pending || appCtx.worldLoading || appCtx.paused || !point || !Number.isFinite(point.x)||!Number.isFinite(point.z) || Math.hypot(point.x-state.focus.x,point.z-state.focus.z)<65)return;
+  if(appCtx.getEnv?.() && appCtx.getEnv()!=='EARTH')return;
+  const focus={x:point.x,z:point.z},started=performance.now();
+  const job=buildDetails(appCtx,{sources:state.sources,focus});
+  state.pending={job,focus};let maxSliceMs=0;const workByStage={};
+  const step=()=>{
+    if(detailStates.get(appCtx)!==state || state.sequence!==appCtx._worldLoadSequence || appCtx.worldLoading || (appCtx.getEnv?.() && appCtx.getEnv()!=='EARTH')){job.return();state.pending=null;return;}
+    const start=performance.now();let result;
+    try {do{const unitStart=performance.now();result=job.next();const stage=result.done?'publish':result.value||'prepare';workByStage[stage]=Math.max(workByStage[stage]||0,performance.now()-unitStart);}while(!result.done && performance.now()-start<2);}
+    catch(error){state.pending=null;state.focus=focus;console.warn('[Building details] replacement failed; previous details retained',error);return;}
+    maxSliceMs=Math.max(maxSliceMs,performance.now()-start);
+    if(result.done){state.focus=focus;state.pending=null;appCtx.buildingExteriorDetailTiming={maxSliceMs,totalMs:performance.now()-started,workByStage};}
+    else state.frame=requestAnimationFrame(step);
+  };
+  state.frame=requestAnimationFrame(step);
+}
+export function clearBuildingExteriorDetails(appCtx){
+  const state=detailStates.get(appCtx);if(state){globalThis.cancelAnimationFrame?.(state.frame);state.pending?.job.return();detailStates.delete(appCtx);}
+  clearDetailMeshes(appCtx);
 }
 
 export { DETAIL_LIMITS, DETAIL_RADIUS, facadeEdgeForMesh };

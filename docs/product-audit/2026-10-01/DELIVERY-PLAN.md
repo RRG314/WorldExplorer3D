@@ -202,3 +202,11 @@ The bounded Inner Harbor district acceptance is complete: terrain-following cont
 ## P17 development closeout — October 3 continuation
 
 Existing route and standard-game lifecycle is complete within GAME-LIFECYCLE.md: explicit travel rules, correct selected replay, truthful idempotent Journal save/retry, common phone result/pause ownership, active-time clocks, road-height targets and safe delayed/failed starts. All 1,761 registered tests and source checks pass; actual Baltimore keyboard and controlled game-boundary journeys plus prescribed-client screenshots are inspected. Fishing/field specialized authorities remain intact. P18 shared marine expeditions is next. P19–P20 and camera C04/C05 remain open. Production unchanged.
+
+## Owner street-quality reference — October 3
+
+The supplied city-render screenshot adds the visual target recorded in STREET-QUALITY-REFERENCE.md. The first implemented pass adds fitted retail frontage, actor-following bounded façade detail and correct asphalt albedo. Actual Baltimore and prescribed-client evidence is recorded there. Streets/NPC composition and lighting remain explicitly unaccepted against the broader reference; this does not silently reclassify the previous bounded P16 closeout as full city-art completion. P18–P20 and camera C04/C05 retain their existing open scope.
+
+## P18 prerequisite repair — October 3 continuation
+
+SHARED-MARINE.md records fresh gaps and the finite first Coral Shelf multiplayer acceptance. The existing expedition endpoint now checks membership/seat expiry and crew quorum within the mutation transaction. Its focused contracts and authenticated emulator evidence are separate from the still-unimplemented shared marine player journey. P18 remains open; no deployment.

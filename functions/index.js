@@ -1,3 +1,4 @@
+const { activeExpeditionPresence, requireExpeditionMembership } = require('./expedition-room-access');
 const { admitRoomPlayer } = require('./room-admission');
 const functions = require('firebase-functions/v1');
 // Browser HTTP routes use Firebase ID tokens inside verifyAuth/requireModerator.
@@ -2285,38 +2286,14 @@ exports.resolveUrbanCivicOutcome = functions.region('us-central1').runWith({ inv
   }
 });
 
-async function requireExpeditionRoomContext(req, res, auth) {
+function requireExpeditionRoomContext(req, res) {
   const roomCode = sanitizeText(req.body && req.body.roomCode, 12).toUpperCase().replace(/[^A-Z0-9]/g, '');
   if (!roomCode) {
     res.status(400).json({ error: 'A valid multiplayer room is required.' });
     return null;
   }
   const roomRef = db.collection('rooms').doc(roomCode);
-  const [roomSnap, memberSnap] = await Promise.all([
-    roomRef.get(),
-    roomRef.collection('players').doc(auth.uid).get()
-  ]);
-  if (!roomSnap.exists) {
-    res.status(404).json({ error: 'Room not found.' });
-    return null;
-  }
-  const room = roomSnap.data() || {};
-  if (room.ownerUid !== auth.uid && !memberSnap.exists) {
-    res.status(403).json({ error: 'Join this room before using its Expedition.' });
-    return null;
-  }
-  const playerSnap = memberSnap.exists ? memberSnap : await roomRef.collection('players').doc(auth.uid).get();
-  if (!playerSnap.exists) {
-    res.status(409).json({ error: 'Active room presence is required.' });
-    return null;
-  }
-  const player = playerSnap.data() || {};
-  const lastSeenMs = timestampToMillis(player.lastSeenAt);
-  if (!Number.isFinite(lastSeenMs) || Date.now() - lastSeenMs > 120_000) {
-    res.status(409).json({ error: 'Room presence is stale. Rejoin the room and try again.' });
-    return null;
-  }
-  return { roomCode, roomRef, room, player };
+  return { roomCode, roomRef };
 }
 
 exports.mutateSharedExpedition = functions.region('us-central1').runWith({ invoker: 'public' }).https.onRequest(async (req, res) => {
@@ -2325,27 +2302,26 @@ exports.mutateSharedExpedition = functions.region('us-central1').runWith({ invok
   const auth = await verifyAuth(req, res);
   if (!auth) return;
   try {
-    const context = await requireExpeditionRoomContext(req, res, auth);
+    const context = requireExpeditionRoomContext(req, res);
     if (!context) return;
     const action = sanitizeText(req.body && req.body.action, 32).toLowerCase();
-    const nowMs = Date.now();
     const authUser = await admin.auth().getUser(auth.uid);
     const actor = {
       uid: auth.uid,
-      displayName: sanitizeText(authUser.displayName || authUser.email || context.player.displayName || 'Explorer', 60),
+      displayName: sanitizeText(authUser.displayName || authUser.email || 'Explorer', 60),
       role: sanitizeText(req.body && req.body.role, 32)
     };
     const expeditionRef = context.roomRef.collection('expeditions').doc('active');
-    const playersSnap = await context.roomRef.collection('players').get();
-    const activeUids = playersSnap.docs.filter((entry) => {
-      const data = entry.data() || {};
-      const lastSeen = timestampToMillis(data.lastSeenAt);
-      const expiresAt = timestampToMillis(data.expiresAt);
-      return Number.isFinite(lastSeen) && nowMs - lastSeen <= 120_000 &&
-        (!Number.isFinite(expiresAt) || expiresAt >= nowMs - 2_000);
-    }).map((entry) => entry.id);
-
     const state = await db.runTransaction(async (transaction) => {
+      const roomSnapshot = await transaction.get(context.roomRef);
+      const playersSnap = await transaction.get(context.roomRef.collection('players'));
+      const nowMs = Date.now();
+      const actorPresence = playersSnap.docs.find(entry => entry.id === auth.uid);
+      requireExpeditionMembership(roomSnapshot.exists ? roomSnapshot.data() : null,
+        actorPresence?.data() || null, auth.uid, nowMs);
+      const activeUids = playersSnap.docs.filter(entry =>
+        activeExpeditionPresence(entry.data(), entry.id, nowMs)
+      ).map(entry => entry.id);
       const snapshot = await transaction.get(expeditionRef);
       const current = snapshot.exists ? snapshot.data() || null : null;
       let next;
@@ -2378,6 +2354,7 @@ exports.mutateSharedExpedition = functions.region('us-central1').runWith({ invok
     });
     res.status(200).json({ accepted: true, state });
   } catch (error) {
+    if ([403, 404, 409].includes(error?.status)) return res.status(error.status).json({ error: error.message });
     const code = String(error && error.message || '');
     const conflicts = new Set([
       'shared_expedition_already_active', 'shared_expedition_not_found',

@@ -1,0 +1,19 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Street architecture inspection</title><style>body{margin:0;background:#97afbb;font:14px system-ui}canvas{display:block}#caption{position:absolute;bottom:12px;left:16px;background:#ffffffed;padding:10px;color:#172d34}</style></head><body><div id="caption">Original generated shopfronts · mapped footprints unchanged · arrows move the inspection camera</div><script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script><script type="module">
+import {createAsphaltTexture} from '/app/js/engine/procedural-textures.js';
+import {attachBuildingFacadeLayout} from '/app/js/world/building-facade-layout.js?v=3';
+import {getBuildingMaterial,resolveBuildingExteriorPresentation} from '/app/js/engine/building-facade-materials.js';
+import {publishBuildingExteriorDetails} from '/app/js/world/building-exterior-details.js?v=2';
+const scene=new THREE.Scene();scene.background=new THREE.Color(0xa7c1ce);const camera=new THREE.PerspectiveCamera(50,innerWidth/innerHeight,.1,500),renderer=new THREE.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});renderer.setSize(innerWidth,innerHeight);renderer.outputEncoding=THREE.sRGBEncoding;renderer.setPixelRatio(1);document.body.append(renderer.domElement);
+scene.add(new THREE.HemisphereLight(0xe4f0ff,0x767365,1));const sun=new THREE.DirectionalLight(0xffedda,1.25);sun.position.set(-30,45,25);scene.add(sun);
+const ctx={findNearestRoad:(x,z)=>({dist:Math.abs(z-12)}),buildingMeshes:[],buildingEntranceByBuilding:new Map(),addEarthWorldObject:o=>scene.add(o),_worldLoadSequence:1};
+let x=-20;for(let i=0;i<4;i++){
+ const width=[9,12,8,10][i],height=[13,18,10,15][i],levels=[4,5,3,4][i],shape=new THREE.Shape();shape.moveTo(0,0);shape.lineTo(width,0);shape.lineTo(width,9);shape.lineTo(0,9);shape.closePath();
+ const options={facadeMaterial:['brick','stucco','brick','stone'][i],heightMeters:height,footprintWidth:width,footprintDepth:9,footprintArea:width*9,levels,lodTier:'near'};
+ const resolved=resolveBuildingExteriorPresentation({renderer},'retail',100+i*17,0xaaaaaa,options),material=getBuildingMaterial({renderer},'retail',100+i*17,0xaaaaaa,{...options,resolvedPresentation:resolved});
+ const g=new THREE.ExtrudeGeometry(shape,{depth:height,bevelEnabled:false}).rotateX(-Math.PI/2);attachBuildingFacadeLayout(g,{...material.userData.exteriorProfile,levels});g.setAttribute('facadeEntrance',new THREE.BufferAttribute(new Float32Array(g.attributes.position.count*4),4));const m=new THREE.Mesh(g,material);m.position.x=x;m.userData={sourceBuildingId:`fixture${i}`,buildingFootprint:[{x,z:0},{x:x+width,z:0},{x:x+width,z:-9},{x,z:-9}],exteriorProfile:material.userData.exteriorProfile,lodTier:'near',bodyHeightMeters:height,heightMeters:height,levels,buildingSeed:100+i*17};scene.add(m);ctx.buildingMeshes.push(m);x+=width+.15;
+}
+publishBuildingExteriorDetails(ctx);
+const ground=new THREE.Mesh(new THREE.PlaneGeometry(120,80),new THREE.MeshStandardMaterial({color:0xffffff,map:createAsphaltTexture(),roughness:1}));ground.rotation.x=-Math.PI/2;ground.position.y=-.05;scene.add(ground);
+const sidewalk=new THREE.Mesh(new THREE.BoxGeometry(65,.14,3.6),new THREE.MeshStandardMaterial({color:0xb9b7ae,roughness:1}));sidewalk.position.set(0,.01,1.8);scene.add(sidewalk);
+let offset=0;const keys=new Set();onkeydown=e=>keys.add(e.key);onkeyup=e=>keys.delete(e.key);function render(){camera.position.set(-14+offset,2.6,22);camera.lookAt(offset,5,0);renderer.render(scene,camera)}window.advanceTime=async ms=>{offset+=(keys.has('ArrowRight')?1:keys.has('ArrowLeft')?-1:0)*ms*.004;render()};window.render_game_to_text=()=>JSON.stringify({coordinates:'metres; y up',fixture:'original street architecture; no mapped businesses or NPC claim',offset,details:ctx.buildingExteriorDetailPublication,drawCalls:renderer.info.render.calls,triangles:renderer.info.render.triangles});render();setTimeout(render,1800);
+</script></body></html>

@@ -12,6 +12,10 @@ The preserved `dist` and production release are not being replaced by current pl
 
 P08–P17 are development-complete within their documented boundaries. P17 closes truthful Journal completion/retry, selected replay, common phone results, pause ownership, road target eligibility and delayed/failed game starts. All 1,761 registered tests and source checks pass; actual Baltimore route/game journeys and prescribed-client images are recorded in GAME-LIFECYCLE.md. P16 district evidence remains in EARTH-DISTRICT.md. Public camera C01–C03 Finland still imagery is complete; C04 breadth/multi-view and C05 release remain open. P18 shared marine expeditions is next, followed by P19–P20. Production is unchanged. Older chronological entries below are historical, not current phase status.
 
+## Street-quality reference continuation
+
+The owner’s supplied city-render image now guides STREET-QUALITY-REFERENCE.md. Fitted shopfronts, actor-following bounded facade detail and asphalt albedo are implemented. Actual Baltimore street/movement/phone and interior/transport regression checks pass; all 1,766 current tests and final source checks pass (including the expedition access repair). Short detail-refresh slices measured 4.3 ms and 2.4 ms after fixing the initial 37 ms spike. This is a first visual pass, not full reference-quality streets/NPCs. P18 shared marine remains open; the existing server expedition membership/expiry check is now transactional and passes nine authenticated emulator cases. See SHARED-MARINE.md for the remaining vessel/role/frame/cargo journey. No deployment.
+
 ## Active work
 
 Use `/Users/stevenreid/.codex/worktrees/architecture-evaluation/WorldExplorer3D-live-deployed-20260320`, branch `steven/visual-quality`. Do not edit the older Documents checkout. The owner authorized implementing the product plan sequentially, verifying each item before the next.

@@ -1,3 +1,4 @@
+import {updateBuildingExteriorFocus} from '../world/building-exterior-details.js?v=2';
 import {beginSwimmingRender} from '../walking/water/presentation.js';
 import {createGraphicsCallEvidence} from './graphics-call-evidence.js';
 import { updateStreetPavementFocus, updateStreetOverviewFrame, prepareStreetOverviewMaterials } from '../world/street-pavement-runtime.js';
@@ -147,6 +148,7 @@ function createCoreFrameSystems(appCtx, hooks = {}) {
           lodTimer = 0;
           appCtx.updateStreetFurnitureVisibility?.();
           appCtx.updateVegetationFocus?.();
+          updateBuildingExteriorFocus(appCtx);
           updateStreetPavementFocus(appCtx);
           appCtx.updateStructureVisualVisibility?.();
           appCtx.enforceEnvironmentSceneOwnership?.();
