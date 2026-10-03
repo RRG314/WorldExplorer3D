@@ -21,6 +21,7 @@ async function harness(kind) {
     refreshLivePlace: async () => null, getActiveWeatherLocationLabel: () => 'Selected place'
   });
   const modules = {
+    'place-lookup-fetch.js': {fetchPlaceLookup:(...args)=>context.fetch(...args)},
     'shared-context.js': { ctx: appCtx },
     'state-service.js': { weatherStateService: service },
     'earth-location.js': { resolveObservedEarthLocation: () => ({ ...appCtx.testLocation }), haversineKm: (a,b,c,d) => Math.hypot(a-c,b-d)*100 },

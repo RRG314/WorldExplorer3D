@@ -1,3 +1,4 @@
+import {readBoundedJson} from '../geospatial/bounded-response.js';
 // Only Caltrans-owned current stills from the explicitly reviewed districts.
 export const CALTRANS_PROVIDER=Object.freeze({id:'caltrans',name:'Caltrans',country:'California, USA',homepage:'https://cwwp2.dot.ca.gov/',terms:'https://dot.ca.gov/conditions-of-use',license:'Caltrans public information',licenseUrl:'https://dot.ca.gov/conditions-of-use',mode:'still',refreshMs:600000,coverage:'California districts 3 and 4',center:{lat:38,lon:-121.5}});
 const DISTRICTS=[3,4];
@@ -23,9 +24,7 @@ export function createCaltransCameraService({fetchImpl=globalThis.fetch,now=Date
   try{
    const response=await fetchImpl(`https://cwwp2.dot.ca.gov/data/d${district}/cctv/cctvStatusD0${district}.json`,{signal:controller.signal,credentials:'omit',redirect:'error'});
    if(!response.ok)throw Error('California camera source is temporarily unavailable.');
-   if(Number(response.headers?.get('content-length'))>3000000)throw Error('Camera source response exceeds the catalogue limit.');
-   const text=await response.text();if(text.length>3000000)throw Error('Camera source response exceeds the catalogue limit.');
-   return normalizeCaltransCatalogue(JSON.parse(text),district,now());
+   return normalizeCaltransCatalogue(await readBoundedJson(response,3000000),district,now());
   }finally{clearTimeout(timer);signal?.removeEventListener('abort',cancel);}
  }
  return {

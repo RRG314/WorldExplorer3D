@@ -1,3 +1,4 @@
+import {readBoundedJson,readBoundedText} from './bounded-response.js';
 import { createProviderRegistry } from './provider-registry.js?v=2';
 
 const CELESTRAK_BASE = 'https://celestrak.org/NORAD/elements/gp.php';
@@ -32,7 +33,7 @@ function normalizeWeatherRequest(input = {}) {
 
 async function readJson(response, providerId) {
   if (!response.ok) throw new Error(`${providerId}_http_${response.status}`);
-  return response.json();
+  return readBoundedJson(response,5000000);
 }
 
 function createOperationalFeedService(options = {}) {
@@ -53,7 +54,7 @@ function createOperationalFeedService(options = {}) {
         url.searchParams.set('FORMAT', 'tle');
         const response = await fetchImpl(url.href, { signal: context.signal, cache: 'no-store' });
         if (!response.ok) throw new Error(`celestrak_${source}_${response.status}`);
-        return { source, text: await response.text() };
+        return { source, text: await readBoundedText(response,3000000) };
       }));
       const items = settled.filter((result) => result.status === 'fulfilled').map((result) => result.value);
       const warnings = settled.filter((result) => result.status === 'rejected').map((result) => String(result.reason?.message || result.reason));

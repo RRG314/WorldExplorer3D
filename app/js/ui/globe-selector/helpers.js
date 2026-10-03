@@ -1,3 +1,4 @@
+import {fetchPlaceLookup} from '../../places/place-lookup-fetch.js';
 import { isPolarCryosphereLocation } from '../../earth-core/world-surface-domain.js?v=3';
 import { fetchGebcoDepthEvidence } from '../../geospatial/bathymetry-evidence.js?v=1';
 
@@ -339,7 +340,7 @@ async function fetchJsonWithTimeout(url, timeoutMs = 6000) {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const response = await fetch(url, { signal: controller.signal });
+    const response = await (url.startsWith('/api/geospatial/')?fetchPlaceLookup:fetch)(url, { signal: controller.signal });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     return await response.json();
   } finally {
@@ -396,13 +397,8 @@ export async function resolveCoordinateWaterKind(lat, lon, reversePayload = null
 }
 
 export async function fetchReversePayload(lat, lon) {
-  const nominatimUrl = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=10&addressdetails=1&lat=${encodeURIComponent(lat.toFixed(6))}&lon=${encodeURIComponent(lon.toFixed(6))}`;
-  try {
-    return await fetchJsonWithTimeout(nominatimUrl, 6000);
-  } catch {
-    const bdcUrl = `https://api-bdc.io/data/reverse-geocode-client?latitude=${encodeURIComponent(lat.toFixed(6))}&longitude=${encodeURIComponent(lon.toFixed(6))}&localityLanguage=en`;
-    return await fetchJsonWithTimeout(bdcUrl, 7000);
-  }
+  const lookupUrl = `/api/geospatial/reverse?kind=reverse&format=jsonv2&zoom=10&addressdetails=1&lat=${encodeURIComponent(lat.toFixed(6))}&lon=${encodeURIComponent(lon.toFixed(6))}`;
+  return fetchJsonWithTimeout(lookupUrl, 10000);
 }
 
 export function addSelectionToSavedFavorites(selection, savedFavorites = []) {

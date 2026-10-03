@@ -1,3 +1,4 @@
+import {servePlaceLookupPreview} from './place-lookup-preview.mjs';
 import fs from 'node:fs/promises';
 import http from 'node:http';
 import path from 'node:path';
@@ -56,6 +57,7 @@ async function exists(filePath) {
 const server = http.createServer(async (req, res) => {
   try {
     const reqUrl = new URL(req.url || '/', `http://${host}:${port}`);
+    if(await servePlaceLookupPreview(req,res,reqUrl))return;
     if(reqUrl.pathname==='/__preview/load-trace' && req.method==='POST' && !candidateId) {
       if(req.headers.origin!==`http://${host}:${port}` && req.headers.origin!==`http://localhost:${port}`) {res.writeHead(403);res.end();return;}
       let body='';

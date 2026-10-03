@@ -1,3 +1,4 @@
+import {readBoundedJson} from '../geospatial/bounded-response.js';
 // Public, credential-free regional provider. Media is displayed from its publisher,
 // never proxied through an arbitrary URL endpoint or represented as live video.
 export const CAMERA_PROVIDER = Object.freeze({
@@ -75,8 +76,7 @@ export function createPublicCameraService({fetchImpl=globalThis.fetch,now=Date.n
     try {
       const response=await fetchImpl(url,{signal:controller.signal,headers:{'Digitraffic-User':'WorldExplorer3D'},credentials:'omit',redirect:'error'});
       if(!response.ok)throw Error(response.status===429?'Camera source is busy. Retry in a minute.':'Camera source is temporarily unavailable.');
-      if(Number(response.headers?.get('content-length'))>3000000)throw Error('Camera source response exceeds the catalogue limit.');
-      const text=await response.text();if(text.length>3000000)throw Error('Camera source response exceeds the catalogue limit.');return JSON.parse(text);
+      return await readBoundedJson(response,3000000);
     }finally{clearTimeout(timer);signal?.removeEventListener('abort',cancel);}
   }
   return {

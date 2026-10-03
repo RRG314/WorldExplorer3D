@@ -3,7 +3,7 @@ import test from 'node:test';
 
 const settle = () => new Promise(resolve => setImmediate(resolve));
 let sequence = 0;
-const freshSearch = () => import(`../app/js/places/place-search.js?lifecycle-test=${++sequence}`);
+const freshSearch = async () => { const module=await import(`../app/js/places/place-search.js?lifecycle-test=${++sequence}`);return {...module,searchPlaces:(query,options={})=>module.searchPlaces(query,{...options,fetchImpl:globalThis.fetch})}; };
 
 function installProvider(t) {
   const requests = [];

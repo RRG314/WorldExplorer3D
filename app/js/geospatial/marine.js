@@ -1,3 +1,4 @@
+import {readBoundedJson} from './bounded-response.js';
 import { createProvenance } from './data-contract.js?v=3';
 import { createProviderRegistry } from './provider-registry.js?v=2';
 
@@ -125,7 +126,7 @@ function normalizeNoaaPredictions(payload = {}, station = {}, fetchedAt = new Da
 }
 
 async function jsonResponse(response, provider) {
-  const payload = await response.json().catch(() => ({}));
+  const payload = await readBoundedJson(response,5000000);
   if (!response.ok || payload?.error) throw new Error(payload?.error?.message || `${provider}_http_${response.status}`);
   return payload;
 }

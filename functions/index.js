@@ -21,6 +21,7 @@ const {
 } = require('./creator-profile');
 const { buildOverlayExports } = require('./overlay');
 const { buildGeospatialExports } = require('./geospatial');
+const { buildPlaceLookupExport } = require('./place-lookup');
 const { buildDiscoveryExports } = require('./discovery');
 const { buildCommunityRealityCaptureExports } = require('./community-reality-capture');
 const {
@@ -2728,6 +2729,8 @@ Object.assign(exports, buildAdminDashboardExports({
   contributionNotificationEnabled,
   logAdminActivity
 }));
+
+exports.getPlaceLookup = buildPlaceLookupExport({functions,db,setCors,verifyAppCheck});
 
 Object.assign(exports, buildGeospatialExports({
   functions,

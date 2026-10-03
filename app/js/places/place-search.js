@@ -1,4 +1,5 @@
-const SEARCH_ENDPOINT = 'https://nominatim.openstreetmap.org/search';
+import {fetchPlaceLookup} from './place-lookup-fetch.js';
+const SEARCH_ENDPOINT = '/api/geospatial/search';
 const CACHE_KEY = 'world-explorer-place-search-v1';
 const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const CACHE_LIMIT = 40;
@@ -131,7 +132,7 @@ function normalizeProviderResult(result, index) {
   };
 }
 
-function queueProviderRequest(url, signal) {
+function queueProviderRequest(url, signal, fetchImpl = fetchPlaceLookup) {
   const request = networkQueue.then(async () => {
     const waitMs = Math.max(0, MIN_REQUEST_INTERVAL_MS - (Date.now() - lastRequestAt));
     if (waitMs) await new Promise((resolve) => setTimeout(resolve, waitMs));
@@ -142,7 +143,7 @@ function queueProviderRequest(url, signal) {
     signal?.addEventListener('abort', cancel, { once: true });
     const timer = setTimeout(() => controller.abort(new Error('Place search timed out. Try again or enter coordinates.')), REQUEST_TIMEOUT_MS);
     try {
-      const response = await fetch(url, {
+      const response = await fetchImpl(url, {
         signal: controller.signal,
         headers: { Accept: 'application/json' }
       });
@@ -173,6 +174,7 @@ async function searchPlaces(query, options = {}) {
   if (!options.signal && inFlight.has(key)) return inFlight.get(key);
 
   const params = new URLSearchParams({
+    kind: 'search',
     q: providerQuery(clean),
     format: 'jsonv2',
     addressdetails: '1',
@@ -181,7 +183,7 @@ async function searchPlaces(query, options = {}) {
     limit: String(Math.max(1, Math.min(8, Number(options.limit) || 8))),
     'accept-language': String(options.language || navigator.language || 'en')
   });
-  const promise = queueProviderRequest(`${SEARCH_ENDPOINT}?${params}`, options.signal)
+  const promise = queueProviderRequest(`${SEARCH_ENDPOINT}?${params}`, options.signal, options.fetchImpl)
     .then((payload) => (Array.isArray(payload) ? payload : [])
       .map(normalizeProviderResult)
       .filter(Boolean))

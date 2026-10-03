@@ -220,3 +220,8 @@ The finite anchored Coral Shelf crew voyage is complete in development: server-o
 ## C04 development closeout — October 3
 
 LIVE-EARTH-CAMERAS.md closes the bounded two-region camera increment: verified Caltrans district 3/4 stills alongside Finland, a four-view wall, existing-profile favorites and no-reward Journal references. Actual-provider browser/IndexedDB/failure/teardown checks, inspected desktop/phone and prescribed-client images, all 1,784 registered tests and source checks pass. C05/P20 physical-device and coordinated release remain open. P19 operations is next; current service review has identified free Open-Meteo commercial-use eligibility and application-wide Nominatim capacity as unresolved production gates.
+
+
+## P19 engineering closeout — October 3
+
+OPERATIONS.md records verified provider ownership/terms, request/body/cancellation bounds, actual asset hashes, workload units and source-removal/rollback dependencies. The shared App-Check-protected geocoder replaces per-browser public requests, enforces one application-wide lease/cooldown and a 5,000/day upstream budget, caches for seven days with declared TTL, and preserves coordinate/saved-place fallback. Seven real Firestore/HTTP/source-browser cases pass. Overture is reviewed/pinned to patched September data after discovering the near-expiry August pin and hard-coded verification date; current two-city tiles decode and convert. Actual forecast/marine/earthquake reads, all six marine asset hashes, all 1,792 registered contracts and source checks pass. The code work is closed; production account entitlement, real hosted App Check/index/TTL rollout and billing review remain explicit launch gates. P20/C05 is active next. No deployment.
