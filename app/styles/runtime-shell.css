@@ -540,7 +540,7 @@ body.creator-profile-open #tutorialHintCard{
   }
 }
 
-.spaceFlightHud{position:fixed;top:max(70px,calc(env(safe-area-inset-top) + 58px));right:max(14px,env(safe-area-inset-right));z-index:10001;display:none;width:min(244px,calc(100vw - 28px));box-sizing:border-box;padding:12px;background:rgba(5,12,18,.94);border:1px solid rgba(157,174,186,.38);border-radius:3px;color:#f4f7f9;font-family:Inter,system-ui,sans-serif;font-size:11px;box-shadow:0 14px 38px rgba(0,0,0,.4);backdrop-filter:blur(10px)}
+.spaceFlightHud{position:fixed;top:max(70px,calc(env(safe-area-inset-top) + 58px));right:max(14px,env(safe-area-inset-right));z-index:10002;display:none;width:min(244px,calc(100vw - 28px));box-sizing:border-box;padding:12px;background:rgba(5,12,18,.94);border:1px solid rgba(157,174,186,.38);border-radius:3px;color:#f4f7f9;font-family:Inter,system-ui,sans-serif;font-size:11px;box-shadow:0 14px 38px rgba(0,0,0,.4);backdrop-filter:blur(10px)}
 .spaceFlightHudHead{display:flex;align-items:center;gap:7px;color:#9db9ff;letter-spacing:.06em;font-size:12px}
 .spaceFlightHudHead strong{flex:1}
 .spaceFlightHudHead button{width:28px;height:28px;padding:0;border:1px solid rgba(157,174,186,.38);border-radius:2px;background:#101921;color:#fff;font:700 16px/1 system-ui;cursor:pointer}

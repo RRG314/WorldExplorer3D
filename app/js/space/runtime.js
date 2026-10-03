@@ -9,6 +9,8 @@ import { spacecraftOperationTuning } from '../character/spacecraft-assistance.js
 import { resolveCelestialSceneCollision } from './celestial-collision.js?v=2';
 import { releaseAtmosphericFlightPresentation, updateAtmosphericFlightPresentation } from './atmospheric-flight-presentation.js?v=1';
 
+import { resolveFlightTarget, flightLandingReadout } from './navigation-presentation.js?v=1';
+
 let injectedThree = null;
 let math = null;
 
@@ -181,7 +183,7 @@ export function forceSpaceFlightLanding(target, deps = {}) {
   if (!appCtx.spaceFlight.active || !appCtx.spaceFlight.rocket || appCtx.spaceFlight.mode === 'landing') return false;
   const normalized = normalizeLandingTargetName(target);
   if (!normalized) return false;
-  if (appCtx.spacecraftState && typeof appCtx.requestRenderedJourneyLanding === 'function') {
+  if (appCtx.spaceFlight.presentationAuthority === 'si' && appCtx.spacecraftState && typeof appCtx.requestRenderedJourneyLanding === 'function') {
     const result = appCtx.requestRenderedJourneyLanding(normalized);
     deps.showFlightMessage?.(
       result.accepted ? 'DESCENT GUIDANCE ENGAGED' : String(result.reason || 'LANDING NOT AVAILABLE').replaceAll('-', ' ').toUpperCase(),
@@ -793,6 +795,8 @@ export function animateSpaceFlight(deps = {}) {
 }
 
 export function attemptLanding(deps = {}) {
+  const resolvedTarget = resolveFlightTarget(appCtx, findLandableBodyByName);
+  const readout = flightLandingReadout(appCtx, resolvedTarget);
   const expeditionDock = appCtx.getExpeditionPodDockingTarget?.();
   const pathfinderDock = expeditionDock?.position ? expeditionDock : appCtx.getSolisReachDockTarget?.();
   if (pathfinderDock?.position) {
@@ -806,11 +810,9 @@ export function attemptLanding(deps = {}) {
     );
     return accepted;
   }
-  const universeTarget = appCtx.getUniverseHudTarget?.();
+  const universeTarget = resolvedTarget.kind === 'universe' ? resolvedTarget.body : null;
   if (universeTarget?.targetKind === 'exoplanet' && universeTarget.landable === true && universeTarget.position) {
-    const distance = appCtx.spaceFlight.rocket.position.distanceTo(universeTarget.position);
-    const descentDistance = Math.max(18, universeTarget.radius * 3);
-    if (distance >= descentDistance + universeTarget.radius) {
+    if (!readout.eligible) {
       deps.showFlightMessage?.('MOVE CLOSER TO BEGIN SURVEY DESCENT', '#f59e0b');
       return false;
     }
@@ -826,7 +828,9 @@ export function attemptLanding(deps = {}) {
       2200
     );
   }
+  if (universeTarget) return false;
   if (
+    appCtx.spaceFlight.presentationAuthority === 'si' &&
     appCtx.spaceJourney?.phase === 'atmospheric_exploration' &&
     typeof appCtx.requestRenderedAtmosphericDeparture === 'function'
   ) {
@@ -837,21 +841,19 @@ export function attemptLanding(deps = {}) {
     );
     return result.accepted;
   }
-  if (appCtx.spacecraftState && typeof appCtx.requestRenderedJourneyLanding === 'function') {
+  if (readout.si && appCtx.spacecraftState && typeof appCtx.requestRenderedJourneyLanding === 'function') {
     const targetName = normalizeLandingTargetName(
-      appCtx.spaceFlight._manualLandingTarget || appCtx.spaceFlight.destination
+      resolvedTarget.body?.name
     );
     if (!targetName) return false;
     const targetBody = getAstronomicalBody(targetName);
-    if (appCtx.getActiveSpaceCraftId?.() === 'solis-reach') {
-      appCtx.setExpeditionPodFlightPresentation?.(true);
-    }
     if (
       targetBody?.exploration?.landingMode === LANDING_MODE.ATMOSPHERIC_DESCENT &&
       typeof appCtx.requestRenderedAtmosphericEntry === 'function'
     ) {
       const result = appCtx.requestRenderedAtmosphericEntry(targetName);
       if (result.accepted) {
+        if (appCtx.getActiveSpaceCraftId?.() === 'solis-reach') appCtx.setExpeditionPodFlightPresentation?.(true);
         const atmosphereBody = findLandableBodyByName(targetName);
         appCtx.orientActiveCraftForAtmosphere?.(atmosphereBody?.position);
         deps.collapseFlightHud?.();
@@ -862,53 +864,22 @@ export function attemptLanding(deps = {}) {
       );
       return result.accepted;
     }
+    if (!readout.eligible) {
+      deps.showFlightMessage?.(readout.reason || 'LANDING NOT YET AVAILABLE', '#f59e0b');
+      return false;
+    }
     const result = appCtx.requestRenderedJourneyLanding(targetName);
+    if (result.accepted && appCtx.getActiveSpaceCraftId?.() === 'solis-reach') appCtx.setExpeditionPodFlightPresentation?.(true);
     deps.showFlightMessage?.(
       result.accepted ? 'DESCENT GUIDANCE ENGAGED' : String(result.reason || 'LANDING NOT AVAILABLE').replaceAll('-', ' ').toUpperCase(),
       result.accepted ? '#10b981' : '#f59e0b'
     );
     return result.accepted;
   }
-  let target = null;
-  let targetRadius = 0;
-  let targetName = '';
-  const forcedTarget = normalizeLandingTargetName(appCtx.spaceFlight._manualLandingTarget);
-
-  if (forcedTarget) {
-    const forcedBody = findLandableBodyByName(forcedTarget);
-    if (forcedBody?.landable && forcedBody.mesh && forcedBody.position) {
-      target = forcedBody.mesh;
-      targetRadius = forcedBody.radius;
-      targetName = forcedBody.name;
-      const forcedDist = appCtx.spaceFlight.rocket.position.distanceTo(forcedBody.position);
-      if (forcedDist >= SPACE_CONSTANTS.LANDING_DISTANCE + targetRadius) return;
-    }
+  if (readout.si || !readout.eligible || !resolvedTarget.body?.mesh) {
+    deps.showFlightMessage?.(readout.reason || 'APPROACH THE SELECTED DESTINATION', '#f59e0b');
+    return false;
   }
-
-  if (!target) {
-    if (typeof appCtx.getAllSpaceBodies === 'function') {
-      const bodies = appCtx.getAllSpaceBodies();
-      let nearestDist = Infinity;
-      bodies.forEach((body) => {
-        if (!body.landable) return;
-        const dist = appCtx.spaceFlight.rocket.position.distanceTo(body.position);
-        if (dist < nearestDist) {
-          nearestDist = dist;
-          target = body.mesh;
-          targetRadius = body.radius;
-          targetName = body.name;
-        }
-      });
-
-      if (!target || nearestDist >= SPACE_CONSTANTS.LANDING_DISTANCE + targetRadius) return;
-    } else {
-      target = appCtx.spaceFlight.destination === 'moon' ? appCtx.spaceFlight.moon : appCtx.spaceFlight.earth;
-      targetRadius = appCtx.spaceFlight.destination === 'moon' ? SPACE_CONSTANTS.MOON_SIZE : SPACE_CONSTANTS.EARTH_SIZE;
-      targetName = appCtx.spaceFlight.destination === 'moon' ? 'Moon' : 'Earth';
-      const dist = appCtx.spaceFlight.rocket.position.distanceTo(target.position);
-      if (dist >= SPACE_CONSTANTS.LANDING_DISTANCE + targetRadius) return;
-    }
-  }
-
-  return startLandingSequence(target, targetRadius, targetName, deps, 2000);
+  const body = resolvedTarget.body;
+  return startLandingSequence(body.mesh, body.radius, body.name, deps, 2000);
 }

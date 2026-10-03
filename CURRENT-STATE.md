@@ -10,7 +10,7 @@ The preserved `dist` and production release are not being replaced by current pl
 
 ## Latest phase status
 
-P08–P12 are development-complete within their documented boundaries. P12 closes the first local marine outing: briefing, three saved surveys, recovery/reload, lab report and a usable 18 m → 35 m scanner upgrade. All 1,708 registered tests, eight actual-app research cases and eighteen marine regression cases pass. Desktop/phone and prescribed-client images are inspected. P13 space navigation consistency is next. Production is unchanged. Older chronological entries below are historical, not current phase status.
+P08–P13 are development-complete within their documented boundaries. P12 closes the first local marine outing: briefing, three saved surveys, recovery/reload, lab report and a usable 18 m → 35 m scanner upgrade. All 1,708 registered tests, eight actual-app research cases and eighteen marine regression cases pass. Desktop/phone and prescribed-client images are inspected. P13 now aligns destination/landing actions and labels compressed versus physical flight; 1,713 registered tests and actual course/boundary browser checks pass. P14 planetary field-mission completion is next. Production is unchanged. Older chronological entries below are historical, not current phase status.
 
 ## Active work
 

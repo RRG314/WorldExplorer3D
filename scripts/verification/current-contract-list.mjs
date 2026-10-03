@@ -338,6 +338,7 @@ export const currentContractTests = [
   'tests/space-atmospheric-exploration-current.test.mjs',
   'tests/space-destination-completeness-current.test.mjs',
   'tests/space-journey-authority-current.test.mjs',
+  'tests/space-navigation-presentation-current.test.mjs',
   'tests/space-landing-target-current.test.mjs',
   'tests/spacecraft-authority-current.test.mjs',
   'tests/vehicle-handling-current.test.mjs',

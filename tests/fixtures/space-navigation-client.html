@@ -1,0 +1,9 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Space navigation client</title><style>html,body,iframe{margin:0;width:100%;height:100%;border:0;overflow:hidden}#launch{position:fixed;z-index:3;top:8px;left:8px;padding:12px}</style></head><body><button id="launch">Start flight verification</button><iframe id="game" src="/app/?launch=space"></iframe><script>
+// The prescribed client has a five-second click limit, shorter than full-app
+// initialization. This test-only wrapper queues a normal title-screen launch.
+const frame=document.getElementById('game');let pending=false,started=false;
+document.getElementById('launch').onclick=()=>{pending=true;};
+const timer=setInterval(()=>{const doc=frame.contentDocument;if(pending&&!started&&doc?.getElementById('startBtn')?.disabled===false){started=true;doc.getElementById('spaceLaunchToggle').click();doc.getElementById('startBtn').click();document.getElementById('launch').hidden=true;frame.contentWindow.focus();clearInterval(timer);}},100);
+window.render_game_to_text=()=>frame.contentWindow.render_game_to_text?.()||JSON.stringify({loading:true});
+window.advanceTime=async()=>new Promise(resolve=>setTimeout(resolve,50));
+</script></body></html>
