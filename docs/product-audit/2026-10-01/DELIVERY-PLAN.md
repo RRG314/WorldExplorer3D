@@ -163,3 +163,8 @@ October 2 owner direction: finish phases without letting them grow indefinitely.
 P10 is development-complete for the local marine deployment/recovery contract described in MARINE-VOYAGE.md. The last voyage preserves ship/sub state; Backpack and Journal remain the cargo/reward authorities. P12 adds the research-outing content and P18 shared marine ownership. P11 is the next unfinished phase; do not reopen P08–P10 for unrelated regional-art expansion.
 
 P11 is **development-complete for the first Coral Shelf content pack**; see MARINE-HABITAT.md for assets, rights, coordinate/habitat limits, collision, sound, rendering budgets and actual-browser evidence. Unknown ocean coordinates remain honestly unverified. The remaining first-ocean-product phase is P12: one complete research outing with a persistent useful upgrade.
+
+
+## P12 development closeout — October 3
+
+The first Coral Shelf outing is complete: normal location-entry gate, wet-lab briefing, three stationary scans, partial recovery/reload, saved report and Scanner II used on a subsequent dive. Progress derives from stable existing Journal events, with no new currency or independent upgrade authority. All 1,708 registered tests, eight actual-app research cases, eighteen existing marine cases and source checks pass; desktop/phone and prescribed-client images are inspected. See MARINE-RESEARCH.md for scope and evidence. P13 space navigation consistency is next. No production deployment.

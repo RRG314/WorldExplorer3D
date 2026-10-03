@@ -24,12 +24,13 @@ const sample=()=>({coverage:'known-water-body',surfaceY:0,baseY:0,volume:{volume
 const waterRuntime=createWalkingWaterRuntime({ctx,state,CFG:{eyeHeight:1.7},groundAt:()=>({effectiveGroundY:-30}),sample,moveVector:resolveWalkingMoveVector,animate:updateCuratedCharacterAnimation});
 ctx.Walk={state,deactivateWater:waterRuntime.deactivate,resupplyWater:waterRuntime.resupply,setModeWalk(){state.mode='walk';host.visible=true},setModeDrive(){state.mode='drive';waterRuntime.deactivate();host.visible=false}};
 function updateVessel(){ctx.boat.y=Math.sin(time)*.14;mesh.position.set(ctx.boat.x,ctx.boat.y,ctx.boat.z);mesh.rotation.set(Math.sin(time*.8)*.012,ctx.boat.angle,Math.sin(time*.6)*.015);mesh.updateMatrixWorld(true);}
+if(new URLSearchParams(location.search).has('survey')){ctx.LOC={lat:-18.2861,lon:147.7};ctx.oceanVoyage={current:{site:{...ctx.LOC},ship:{transportEntityId:'fixture-research'}}};}
 ctx.boatDeck=createResearchDeck({ctx,resetDynamics(){ctx.boat.speed=ctx.boat.vx=ctx.boat.vz=0},updateVessel});
 ctx.boatSwimming=createBoatSwimming({ctx,sample,groundY:()=>-30,park(){ctx.boatDeck.release();ctx.boatMode.active=false},resume(){ctx.boatMode.active=true;ctx.boatDeck.enter(true)},updateParked:updateVessel});
 ctx.recoverBoatSwimmer=()=>ctx.boatSwimming.board(true);ctx.checkVesselSwimCollision=(...args)=>ctx.boatSwimming.collision(...args);
 function step(dt){time+=dt;updateVessel();ctx.boatDeck.update(dt);ctx.boatSwimming.update(dt);if(state.mode==='walk'){const a=actions();waterRuntime.update(dt,{actions:a,forward:a.move||0,strafe:-(a.strafe||0),groundState:{effectiveGroundY:-30}});const w=state.walker;camera.position.set(w.x+4,w.y+2,w.z-4);camera.lookAt(w.x,w.y-.4,w.z);}else ctx.boatDeck.camera();}
 window.advanceTime=async ms=>{for(let i=0;i<Math.ceil(ms/16.667);i++)step(1/60);renderer.render(scene,camera)};
-window.render_game_to_text=()=>JSON.stringify({coordinateSystem:'ship local: x port, y up, z bow; deck y=4.3',deck:ctx.boatDeck.snapshot(),swimming:ctx.boatSwimming.snapshot(),walker:state.walker,chartOpened});
+window.render_game_to_text=()=>JSON.stringify({coordinateSystem:'ship local: x port, y up, z bow; deck y=4.3',deck:ctx.boatDeck.snapshot(),swimming:ctx.boatSwimming.snapshot(),walker:state.walker,chartOpened,research:ctx.marineResearch?.snapshot()});
 window.researchTest={ctx,setActions:value=>override=value,get chartOpened(){return chartOpened}};
 let last=performance.now();function frame(now){step(Math.min(.05,(now-last)/1000));last=now;renderer.render(scene,camera);requestAnimationFrame(frame)}requestAnimationFrame(frame);window.ready=true;
 onresize=()=>{renderer.setSize(innerWidth,innerHeight);camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix()};

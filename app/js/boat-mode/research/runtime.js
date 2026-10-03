@@ -1,3 +1,4 @@
+import {ensureMarineResearch} from '../../ocean/research-outing.js';
 import {RESEARCH_DECK as deck,RESEARCH_STATIONS,moveOnResearchDeck,researchDeckCollision,researchStationDistance} from './layout.js';
 import {createResearchDeckHud} from './ui.js';
 import {researchLabRecord} from './lab.js';
@@ -6,6 +7,7 @@ import {updateCuratedCharacterAnimation} from '../../walking/curated-explorer-ch
 import {createIndexedDbDiscoveryProfileStore} from '../../discovery/profile-store.js?v=5';
 
 export function createResearchDeck({ctx,resetDynamics,updateVessel,hudFactory=createResearchDeckHud}) {
+ const research=ensureMarineResearch(ctx);
  let active=false,host=null,parent=null,hud=null,targetId='lab',busy=false,epoch=0;
  let pose={x:2.4,z:-24,yaw:0},world={x:0,y:0,z:0},origin='';
  const supported=()=>ctx.boatMode?.active&&ctx.boatMode.transportCatalogId==='ocean-research-vessel';
@@ -54,7 +56,7 @@ export function createResearchDeck({ctx,resetDynamics,updateVessel,hudFactory=cr
  function update(dt){
   if(active&&(!supported()||origin!==`${ctx.LOC?.lat}:${ctx.LOC?.lon}`||ctx.getEnv?.()&&ctx.getEnv()!=='EARTH'))release();
   if(!supported()){hud?.hide();return false;}
-  hud ||= hudFactory({enter:()=>enter(),helm,moor,act:()=>void act(),select});
+  hud ||= hudFactory({enter:()=>enter(),helm,moor,act:()=>void act(),select,researchAct:()=>void research.labAction()});
   if(active){
    updateVessel(ctx.paused?0:dt);
    const actions=ctx.paused||ctx.showLargeMap?{}:ctx.readControlActions?.('walk')||{};
@@ -68,7 +70,7 @@ export function createResearchDeck({ctx,resetDynamics,updateVessel,hudFactory=cr
   const target=RESEARCH_STATIONS.find(s=>s.id===targetId),distance=researchStationDistance(pose,targetId);
   const bearing=Math.atan2(target.x-pose.x,target.z-pose.z)-pose.yaw;
   const turn=Math.atan2(Math.sin(bearing),Math.cos(bearing));const direction=Math.abs(turn)<.6?'ahead':Math.abs(turn)>2.5?'behind':turn>0?'to port':'to starboard';
-  hud.show({active,canEnter:stopped()&&!!ctx.Walk?.state?.characterMesh,reason:stopped()?'Explorer is loading.':'Stop the vessel before walking the deck.',moored:!!ctx.boatMode.moored,target,distance,direction,busy});
+  hud.show({active,canEnter:stopped()&&!!ctx.Walk?.state?.characterMesh,reason:stopped()?'Explorer is loading.':'Stop the vessel before walking the deck.',moored:!!ctx.boatMode.moored,target,distance,direction,busy,research:research.snapshot()});
   return active;
  }
  function camera(){

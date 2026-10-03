@@ -471,6 +471,15 @@ function createIndexedDbDiscoveryProfileStore(options = {}) {
     }
   }
 
+  async function getEventsById(ids = []) {
+    if(!Array.isArray(ids)||ids.length>32||ids.some(id=>typeof id!=='string'||id.length>260))throw new TypeError('Expected at most 32 stable event IDs');
+    const db=await open();try{
+      const transaction=db.transaction(['events'],'readonly'),events=transaction.objectStore('events');
+      const records=await Promise.all(ids.map(id=>requestPromise(events.get(id))));await transactionPromise(transaction);
+      return records.filter(Boolean).map(clone);
+    }finally{db.close();}
+  }
+
   async function listEvents(limit = 500) {
     const db = await open();
     try {
@@ -766,6 +775,7 @@ function createIndexedDbDiscoveryProfileStore(options = {}) {
     hasClaim,
     listCompanions,
     listEvents,
+    getEventsById,
     listFieldGuide,
     listItems,
     loadRuntimeBootstrap,
@@ -908,6 +918,7 @@ function createMemoryDiscoveryProfileStore(seed = {}) {
     async hasClaim(claimId) { return claims.has(String(claimId)); },
     async listItems(limit = 200) { return [...items.values()].slice(0, limit).map(clone); },
     async listFieldGuide(limit = 500) { return [...guide.values()].slice(0, limit).map(clone); },
+    async getEventsById(ids=[]) {if(!Array.isArray(ids)||ids.length>32||ids.some(id=>typeof id!=='string'||id.length>260))throw new TypeError('Expected at most 32 stable event IDs');return ids.map(id=>events.get(id)).filter(Boolean).map(clone);},
     async listEvents(limit = 500) { return [...events.values()].sort((a, b) => Number(b.occurredAt) - Number(a.occurredAt)).slice(0, limit).map(clone); },
     async loadRuntimeBootstrap() {
       return {

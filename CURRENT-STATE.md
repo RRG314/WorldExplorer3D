@@ -1,12 +1,16 @@
 # Current development and release state
 
-Updated October 2, 2026.
+Updated October 3, 2026.
 
 ## Production
 
 Freshly read from https://worldexplorer3d.io/build-manifest.json:
 `5.4.0+1532bdfbb5c1.319d215f60318297.production`.
 The preserved `dist` and production release are not being replaced by current plan work. No backend changes have been deployed; pending receipt-handler source changes require a coordinated release. Older 711fe93 status and unpromoted ship notes in this file's Git history are superseded by the deployed identity above.
+
+## Latest phase status
+
+P08–P12 are development-complete within their documented boundaries. P12 closes the first local marine outing: briefing, three saved surveys, recovery/reload, lab report and a usable 18 m → 35 m scanner upgrade. All 1,708 registered tests, eight actual-app research cases and eighteen marine regression cases pass. Desktop/phone and prescribed-client images are inspected. P13 space navigation consistency is next. Production is unchanged. Older chronological entries below are historical, not current phase status.
 
 ## Active work
 

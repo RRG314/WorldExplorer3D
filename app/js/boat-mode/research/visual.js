@@ -14,6 +14,11 @@ export function addResearchDeckVisual(THREE,root,materials,{detailed=false}={}) 
    add(new THREE.BoxGeometry(s.w,.9,s.l),materials.deck,s.x,deck.y+.45,s.z,s.id);
    add(new THREE.BoxGeometry(s.w,1.7,s.l),glass,s.x,deck.y+1.75,s.z,`${s.id} windows`);
    add(new THREE.BoxGeometry(s.w,.5,s.l),materials.deck,s.x,deck.y+2.85,s.z,`${s.id} header`);
+   if(detailed){
+    const alongZ=s.l>s.w,length=alongZ?s.l:s.w,segments=Math.max(1,Math.ceil(length/2.6));
+    for(let i=0;i<=segments;i++){const offset=-length*.5+i*length/segments;add(new THREE.BoxGeometry(.09,1.7,.09),materials.deck,s.x+(alongZ?0:offset),deck.y+1.75,s.z+(alongZ?offset:0),`${s.id} window frame`);}
+   }
+
   }else{
    add(new THREE.BoxGeometry(s.w,s.h,s.l),consoleMaterial,s.x,deck.y+s.h*.5,s.z,s.id);
    add(new THREE.BoxGeometry(s.w*.86,.035,s.l*.82),screen,s.x,deck.y+s.h+.018,s.z,`${s.id} work surface`);

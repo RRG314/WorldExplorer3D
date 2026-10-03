@@ -214,7 +214,7 @@ function deriveSpaceJourney(appCtx) {
 
 function deriveCurrentJourney(appCtx) {
   // Activities own their existing HUD and results. Do not compete with them.
-  if (appCtx.fishingGame?.open || appCtx.getGameplayRegistrySnapshot?.()?.activeId) return null;
+  if (appCtx.fishingGame?.open || appCtx.getGameplayRegistrySnapshot?.()?.activeId || appCtx.boatMode?.active&&appCtx.marineResearch?.snapshot?.()?.visible) return null;
   return deriveSpaceJourney(appCtx) || deriveFieldJourney(appCtx);
 }
 

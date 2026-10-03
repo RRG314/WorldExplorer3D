@@ -141,3 +141,8 @@ Stable ship/sub IDs, geographic parent anchors, local continuation, cradle launc
 ## P11 — first regional marine content pack
 
 Completed locally after P10. See MARINE-HABITAT.md for implementation ownership and bounded completion: real CC0 specimen geometry, regional placement, map landmarks, collision, source distinctions, fish correction, optional sound, loading/disposal and browser budgets. 1,702 contracts and existing eighteen-case marine regression pass. No deployment.
+
+
+## P12 development closeout — October 3
+
+The first Coral Shelf outing is complete: normal location-entry gate, wet-lab briefing, three stationary scans, partial recovery/reload, saved report and Scanner II used on a subsequent dive. Progress derives from stable existing Journal events, with no new currency or independent upgrade authority. All 1,708 registered tests, eight actual-app research cases, eighteen existing marine cases and source checks pass; desktop/phone and prescribed-client images are inspected. See MARINE-RESEARCH.md for scope and evidence. P13 space navigation consistency is next. No production deployment.

@@ -1,3 +1,4 @@
+import {CORAL_SHELF_SITE} from '../ocean/habitat-plan.js';
 import { oceanEntryDecision } from '../ocean/entry-policy.js?v=1';
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { searchPlaces } from '../places/place-search.js?v=4';
@@ -549,6 +550,7 @@ function createGlobeSelector(options = {}) {
       if (moonBtn) moonBtn.disabled = isBusy;
       if (spaceBtn) spaceBtn.disabled = isBusy;
       if (oceanBtn) oceanBtn.disabled = isBusy;
+      const researchButton=document.getElementById('coralResearchStart');if(researchButton)researchButton.disabled=isBusy;
     },
     setStartButtonBusy,
     setStatus(message, color) {
@@ -729,6 +731,18 @@ function createGlobeSelector(options = {}) {
   moonBtn?.addEventListener('click', () => void launchCoordinator.startEnvironment(options.onMoonShortcut, 'Moon'));
   spaceBtn?.addEventListener('click', () => void launchCoordinator.startEnvironment(options.onSpaceShortcut, 'Space'));
   oceanBtn?.addEventListener('click', () => void startSelectedOcean());
+  if(startBtn&&!document.getElementById('coralResearchStart')){
+    const researchButton=document.createElement('button');researchButton.id='coralResearchStart';researchButton.type='button';researchButton.textContent='Coral Shelf · first research outing';researchButton.style.cssText='margin-top:8px;width:100%;min-height:44px;font:600 12px system-ui;background:#112b3a;color:#e8f6ff;border:1px solid #5689a3;border-radius:4px;padding:10px';startBtn.after(researchButton);
+    researchButton.onclick=async()=>{
+      if(researchButton.disabled)return;researchButton.disabled=true;
+      try{setSelection(CORAL_SHELF_SITE.lat,CORAL_SHELF_SITE.lon,{name:'Coral Shelf research outing',focus:true});
+        beginReverseLookup(CORAL_SHELF_SITE.lat,CORAL_SHELF_SITE.lon);
+        if(await startSelectedOcean()&&appCtx.oceanMode?.active){if(await appCtx.transferSubmarineToBoat?.({source:'research-outing'})){appCtx.boatDeck?.enter();appCtx.boatDeck?.select('lab');}}
+      }catch{if(searchStatus)searchStatus.textContent='The research outing could not start. Your saved voyage is retained; try again.';}
+      finally{researchButton.disabled=false;}
+    };
+  }
+
   for (const coordinateInput of [latInput, lonInput]) {
     coordinateInput?.addEventListener('input', () => {
       coordinateInputsDirty = true;

@@ -520,7 +520,7 @@ function updateSubmarine(dt,time) {
     if (sub.verticalSpeed > 0) sub.verticalSpeed = 0;
   }
 
-  if(parentHullCollision(appCtx.oceanVoyage?.current?.ship,sub.position,3,oceanMode.waterSurface.sample(0,0,{time}).surfaceY)||oceanMode.habitat?.collision(sub.position,3)){sub.position.set(previousPosition.x,previousPosition.y,previousPosition.z);sub.speed=0;sub.verticalSpeed=0;}
+  if(parentHullCollision(appCtx.oceanVoyage?.current?.ship,sub.position,3,oceanMode.waterSurface.sample(0,0,{time}).surfaceY)||oceanMode.habitat?.collision(sub.position,3)){sub.position.set(previousPosition.x,previousPosition.y,previousPosition.z);sub.speed=0;sub.verticalSpeed=0;oceanMode.contactUntil=time+1.2;}
 
   const targetPitch = THREE.MathUtils.clamp(-sub.verticalSpeed * OCEAN_CONSTANTS.PITCH_FROM_VERTICAL, -OCEAN_CONSTANTS.MAX_PITCH, OCEAN_CONSTANTS.MAX_PITCH);
   const targetRoll = THREE.MathUtils.clamp(-sub.turnSpeed * OCEAN_CONSTANTS.ROLL_FROM_TURN, -OCEAN_CONSTANTS.MAX_ROLL, OCEAN_CONSTANTS.MAX_ROLL);
