@@ -14,9 +14,13 @@ Freshly read October 3 from https://worldexplorer3d.io/build-manifest.json:
 `5.4.0+1532bdfbb5c1.319d215f60318297.production`.
 Source `1532bdfbb5c11e002d278b058d1ebdba88384f60`.
 
-No new frontend, backend, rules or index deployment occurred in this continuation. Local Functions/Auth/Firestore emulators and disposable staging App Check identities were used for verification. Source checks and emulator success are not production receipts.
+No production deployment occurred. During full release revalidation, getPlaceLookup and mutateSharedExpedition plus Firestore rules/indexes were deployed explicitly to staging (we3d-staging-20260712), with existing hosted parameter values preserved. Hosted verification is pending. Local emulators and disposable staging App Check identities are also used; their success is not a production receipt.
 
-## Development closeout
+## Full release revalidation — owner follow-up
+
+The owner now explicitly requires phase 0 onward and all added work checked for production readiness. The earlier development closeout below is not final release acceptance. A fresh staging artifact was built; the previous production dist was moved intact (not copied or deleted) to `output/preserved-artifacts/5.4.0+1532bdfbb5c1.319d215f60318297.production`. All four saved candidates remain intact. New work fixes packaged-check imports, adds missing phase journeys to the release matrix, uses actual SDK shared-voyage transport, and repairs ocean entry when place-name lookup fails. The complete new matrix is pending; do not claim readiness from old receipts.
+
+## Earlier development closeout
 
 The finite implementation sequence P01–P19 is closed within the boundaries in [DELIVERY-PLAN.md](docs/product-audit/2026-10-01/DELIVERY-PLAN.md). P20 automated development acceptance passes; P20/C05 release acceptance remains explicitly pending. Do not reopen completed phases for unrelated worldwide visual/content expansion.
 

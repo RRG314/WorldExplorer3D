@@ -6,7 +6,7 @@ const server = await startStaticServer({ rootDir: process.env.WE3D_VERIFY_ROOT |
 const browser = await chromium.launch({ channel: 'chrome', headless: true });
 const dir = 'output/verification/ocean-plan';
 await fs.mkdir(dir, { recursive: true });
-const report = { scope: 'Mutable source, real UI and ocean renderer; controlled provider responses for entry boundary cases', cases: [], errors: [] };
+const report = { scope: 'Selected artifact/source, real UI and ocean renderer; controlled provider responses for entry boundary cases', cases: [], errors: [] };
 try {
  const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
  let elevation = 50, delay = 0;
@@ -46,6 +46,7 @@ try {
  await select(39.29, -76.61);
  await rejected('stale-selection-blocked', 'location changed');
  delay = 0; elevation = -30;
+ await context.route('**/api/geospatial/reverse?**',route=>route.fulfill({status:503,json:{error:'Controlled naming outage'}}));
  await select(-18.2862, 147.7001); await click();
  await page.waitForFunction(() => window.getWorldExplorerRuntimeDiagnostics?.().modes?.ocean === true, null, { timeout: 90000 });
  await page.waitForTimeout(2000);
@@ -56,7 +57,7 @@ try {
  await page.screenshot({ path: `${dir}/coastal-water-moved.png` });
  assert.notEqual(report.after.ocean.position.z, report.before.ocean.position.z);
  assert.ok(report.after.ocean.speed > 0);
- report.cases.push({ id: 'coastal-water-entry-and-controls', passed: true });
+ report.cases.push({ id: 'coastal-water-entry-and-controls-despite-naming-outage', passed: true });
  const mapBefore = report.after.ocean.navigationMap;
  assert.ok(mapBefore.widthMeters > 0);
  assert.equal(mapBefore.headingDegrees, 180);
@@ -146,7 +147,7 @@ try {
  assert.ok(Math.abs(report.surfaceOrigin.actual.lon-report.surfaceOrigin.expected.lon)<.001);
  assert.deepEqual(report.boatWater,{active:true,coverage:'known-water-body',finite:true,amplitudeDelta:0,scaleDelta:0,speedDelta:0});
  const mapOrigin=await page.evaluate(async()=>{
-   const {resolveMapView}=await import('/app/js/map/tiles.js?v=5');return resolveMapView(150,150,false).centerLatLon;
+   waterCheckContext.drawMinimap();return waterCheckContext.getMinimapViewSnapshot().centerLatLon;
  });
  assert.ok(Math.abs(mapOrigin.lat-report.surfaceOrigin.actual.lat)<.001);
  assert.ok(Math.abs(mapOrigin.lon-report.surfaceOrigin.actual.lon)<.001);

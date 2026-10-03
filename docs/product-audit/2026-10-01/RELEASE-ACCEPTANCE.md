@@ -1,4 +1,6 @@
-# P20 / C05 acceptance — development checks complete, release not approved
+# P20 / C05 acceptance — full release revalidation in progress
+
+October 3 owner follow-up: revalidate phase 0 onward and all additional work for production. Earlier development receipts below are historical evidence, not a pass for the next immutable candidate. The candidate matrix now registers the previously omitted save, swimming, deck, marine art/research, planetary research, navigation, geology, district, mini-game and street-reference journeys. Source fixtures are explicitly separate from packaged journeys. The shared marine journey now uses browser authentication, actual room admission and Firestore SDK subscriptions. A reproduced naming-outage/ocean-entry regression is being repaired and retested.
 
 October 3, 2026. The implementation sequence through P19 and its automated P20 accessibility work is closed. Do not keep adding unrelated features to those phases. The remaining items below are a finite release decision, not permission to claim production acceptance or reopen worldwide art expansion.
 

@@ -345,11 +345,14 @@ function createGlobeSelector(options = {}) {
       return;
     }
     try {
-      const payload = await fetchReversePayload(lat, lon);
+      // Place naming is optional. Its outage must not suppress independent
+      // bathymetry evidence or block a verified offshore launch.
+      const payload = await fetchReversePayload(lat, lon).catch(() => null);
       if (!openState || requestToken !== reverseLookupToken || !selected) return;
       if (Math.abs(selected.lat - lat) > 0.00001 || Math.abs(selected.lon - lon) > 0.00001) return;
 
-      const parsed = parseReverseAddress(payload);
+      const parsed = parseReverseAddress(payload || {});
+      parsed.display ||= selected.name || `Remote Region ${lat.toFixed(2)}, ${lon.toFixed(2)}`;
       parsed.surfaceEvidence = await resolveCoordinateSurfaceEvidence(lat, lon, payload);
       parsed.waterKind = parsed.surfaceEvidence?.kind === 'open_ocean' ? 'open_ocean' : null;
       if (parsed.waterKind) {

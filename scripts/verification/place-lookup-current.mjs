@@ -20,6 +20,9 @@ try{
  await page.goto(`http://127.0.0.1:${server.port}/app/`);await page.waitForFunction(()=>document.querySelector('#startBtn')?.disabled===false,null,{timeout:90000});
  // Use the visible global location form; it must reach the same cached authority.
  const input=page.locator('#globeLocationSearch');await input.fill('Baltimore');await input.press('Enter');await page.waitForFunction(()=>document.querySelector('#globeLocationSearchStatus')?.textContent.match(/found|select|result/i),null,{timeout:20000});await page.screenshot({path:`${out}/search-results.png`});
- const browserResult=await page.evaluate(async()=>{const {searchPlaces}=await import('/app/js/places/place-search.js');const first=await searchPlaces('Baltimore');const coordinate=await searchPlaces('39.2904, -76.6122');return {first,coordinate};});assert.ok(browserResult.first.length);assert.equal(browserResult.coordinate[0].lat,39.2904);report.cases.push('actual source search UI and coordinate fallback use the same backend/cache without sign-in');
+ await input.fill('39.2904, -76.6122');await input.press('Enter');
+ await page.waitForFunction(()=>Math.abs(Number(document.querySelector('#globeCustomLat').value)-39.2904)<.00001&&Math.abs(Number(document.querySelector('#globeCustomLon').value)+76.6122)<.00001,null,{timeout:20000});
+ report.cases.push('packaged/source visible search UI and coordinate fallback use the same backend/cache without sign-in');
+
  report.passed=report.errors.length===0;await writeFile(`${out}/report.json`,JSON.stringify(report,null,2));assert.equal(report.errors.length,0);console.log(JSON.stringify(report));
 }catch(error){if(browser){const pages=browser.contexts().flatMap(c=>c.pages());await pages[0]?.screenshot({path:`${out}/failure.png`});}await writeFile(`${out}/failure.json`,JSON.stringify({error:String(error),report},null,2));throw error;}finally{await browser?.close();await server?.close();await db.terminate();}

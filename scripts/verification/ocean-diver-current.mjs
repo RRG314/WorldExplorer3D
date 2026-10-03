@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import { chromium } from 'playwright';
 import { startStaticServer } from './static-server.mjs';
-const server = await startStaticServer({ rootDir: process.cwd(), ports: [4396] });
+const server = await startStaticServer({ rootDir: process.env.WE3D_VERIFY_ROOT || process.cwd(), ports: [4396] });
 const browser = await chromium.launch({ channel: 'chrome', headless: true });
 const dir = 'output/verification/ocean-plan';
 await fs.mkdir(dir, { recursive: true });

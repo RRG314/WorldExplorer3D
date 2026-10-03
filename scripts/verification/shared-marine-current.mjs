@@ -10,30 +10,40 @@ const require=createRequire(new URL('../../functions/package.json',import.meta.u
 const {initializeApp}=require('firebase-admin/app'),{getFirestore,Timestamp}=require('firebase-admin/firestore');
 initializeApp({projectId});const db=getFirestore(),roomCode=`M${Date.now().toString(36).slice(-5)}`.toUpperCase(),room=db.collection('rooms').doc(roomCode),marine=room.collection('expeditions').doc('marine');
 const dir='output/verification/product-plan/shared-marine';await mkdir(dir,{recursive:true});
-const report={scope:'Two actual source-app Ocean clients and actual authenticated Functions/Firestore/Auth emulators; room membership is provisioned, subscription delivery uses an admin listener adapter, and entry-depth provider is controlled. Not production, room-admission UI or physical-device acceptance.',cases:[],errors:[]};
-const users=[];let browser,server,renewal;const subscriptions=[];
-for(const name of ['captain','pilot']){const r=await fetch(`http://${process.env.FIREBASE_AUTH_EMULATOR_HOST}/identitytoolkit.googleapis.com/v1/accounts:signUp?key=emulator-key`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({email:`${name}-${Date.now()}@example.test`,password:'Local-test-only-934!',returnSecureToken:true})});assert.equal(r.ok,true);const v=await r.json();users.push({uid:v.localId,token:v.idToken,name,renew:true});}
-const seat=async(user,expired=false)=>{const now=Date.now();await room.collection('players').doc(user.uid).set({uid:user.uid,displayName:user.name,lastSeenAt:Timestamp.fromMillis(now),expiresAt:Timestamp.fromMillis(expired?now-1:now+90000)});};
+const report={scope:'Two actual selected-build Ocean clients and actual authenticated Functions/Firestore/Auth emulators; room fixture is provisioned and clients use actual room admission, subscription delivery uses the actual authenticated browser SDK, and entry-depth provider is controlled. Not production, room-admission UI or physical-device acceptance.',cases:[],errors:[]};
+const users=[];let browser,server,renewal;
+for(const name of ['captain','pilot']){const r=await fetch(`http://${process.env.FIREBASE_AUTH_EMULATOR_HOST}/identitytoolkit.googleapis.com/v1/accounts:signUp?key=emulator-key`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({email:`${name}-${Date.now()}@example.test`,password:'Local-test-only-934!',returnSecureToken:true})});assert.equal(r.ok,true);const v=await r.json();users.push({uid:v.localId,token:v.idToken,name,email:v.email,renew:true});}
+const seat=async(user,expired=false)=>{const now=Date.now();await room.collection('players').doc(user.uid).set({uid:user.uid,displayName:user.name,lastSeenAt:Timestamp.fromMillis(now),expiresAt:Timestamp.fromMillis(expired?now-1:now+90000)},{merge:true});};
 const post=async(user,command)=>{const r=await fetch(`http://127.0.0.1:5001/${projectId}/us-central1/mutateSharedExpedition`,{method:'POST',headers:{'content-type':'application/json',...(user?{authorization:`Bearer ${user.token}`}:{})},body:JSON.stringify({roomCode,domain:'marine',command})});const body=await r.json();return {status:r.status,...body};};
 const command=(type,revision=0,extra={})=>({type,revision,requestId:crypto.randomUUID(),...extra});
 async function openClient(user){
  const context=await browser.newContext({viewport:{width:1280,height:800}});user.context=context;
+ await context.addInitScript(({projectId})=>{globalThis.WORLD_EXPLORER_FIREBASE_EMULATORS={enabled:true,host:'127.0.0.1',authPort:9099,firestorePort:8080,storagePort:9199};globalThis.WORLD_EXPLORER_FUNCTIONS_ORIGIN=`http://127.0.0.1:5001/${projectId}/us-central1`;},{projectId});
+ await context.route('**/api/geospatial/reverse?**',r=>r.fulfill({status:503,json:{error:'Controlled naming outage'}}));
  await context.route('https://wms.gebco.net/**',r=>r.fulfill({status:200,contentType:'text/plain',body:"value_list = '-30'"}));
  const page=await context.newPage();user.page=page;
  page.on('pageerror',e=>report.errors.push({client:user.name,message:e.message}));
- await page.exposeFunction('sendMarine',async cmd=>{const r=await post(user,cmd);if(r.status!==200)throw Error(r.error);return {state:r.state};});
- await page.goto(`http://127.0.0.1:${server.port}/`,{waitUntil:'load'});
+ await page.goto(`http://127.0.0.1:${server.port}/app/?diagnostics=1`,{waitUntil:'domcontentloaded'});
  if(await page.locator('#landingPrimaryCta').isVisible())await page.locator('#landingPrimaryCta').click();
  await page.waitForFunction(()=>window.__WE3D_RUNTIME_READY__===true,null,{timeout:90000});
  if(await page.locator('#analyticsConsentDenyBtn').isVisible())await page.locator('#analyticsConsentDenyBtn').click();
  await page.evaluate(async()=>{window.marineCtx=(await import('/app/js/shared-context.js?v=55')).ctx});
- await page.locator('#coralResearchStart').click();await page.waitForFunction(()=>marineCtx.boatDeck?.active,null,{timeout:90000});
+ await page.locator('#coralResearchStart').click();try{await page.waitForFunction(()=>marineCtx.boatDeck?.active,null,{timeout:45000});}catch(error){await page.screenshot({path:`${dir}/${user.name}-entry-failure.png`});report.entryFailure=await page.evaluate(()=>({status:document.querySelector('#globeLocationSearchStatus')?.textContent,boat:marineCtx.boatMode?.active,ocean:marineCtx.oceanMode?.active,deck:marineCtx.boatDeck?.snapshot(),environment:marineCtx.getEnv?.(),text:document.body.innerText.slice(-5000)}));throw error;}
  user.personal=await page.evaluate(()=>localStorage.getItem('we3d.ocean.voyage.v1'));
- await page.evaluate(async({uid,roomCode})=>{
-  const module=await import('/app/js/ocean/shared-marine-runtime.js');
-  await module.openSharedMarine(marineCtx,{transport:{uid,roomCode,isCurrent:()=>true,send:command=>window.sendMarine(command),subscribe:(next,error)=>{window.marineReceive=next;window.marineConnectionError=error;return()=>{window.marineReceive=null}}}});
- },{uid:user.uid,roomCode});
- const unsub=marine.onSnapshot(snapshot=>{void page.evaluate(state=>window.marineReceive?.(state),snapshot.exists?snapshot.data():null).catch(()=>{})});subscriptions.push(unsub);
+ await page.evaluate(async({email,roomCode})=>{
+  const {signInWithEmailAndPassword}=await import('https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js');
+  const services=globalThis.WorldExplorerFirebase.initFirebase();
+  const credential=await signInWithEmailAndPassword(services.auth,email,'Local-test-only-934!');
+  const {getCurrentUser}=await import('/js/auth-ui.js?v=56');
+  const until=Date.now()+15000;while(getCurrentUser()?.uid!==credential.user.uid&&Date.now()<until)await new Promise(r=>setTimeout(r,50));
+  if(getCurrentUser()?.uid!==credential.user.uid)throw Error('Application sign-in did not settle');
+  const manifest=await fetch('/build-manifest.json').then(r=>r.json());
+  await import(manifest.runtimePackaging?.entries?.['multiplayer-rooms']?'/app/'+manifest.runtimePackaging.entries['multiplayer-rooms']:'/app/js/multiplayer/rooms.js?v=67');
+  await globalThis.__WE3D_ROOM_SUPPORT__.join(roomCode);
+ },{email:user.email,roomCode});
+ await page.locator('#researchSharedCrew').click();
+ await page.waitForSelector('#sharedMarineControls');
+
  return page;
 }
 const waitStage=async(page,stage)=>page.waitForFunction(stage=>marineCtx.sharedMarine?.snapshot().state?.stage===stage&&!marineCtx.sharedMarine.snapshot().transition&&(stage==='underwater'?marineCtx.oceanMode?.active:marineCtx.boatMode?.active&&!marineCtx.oceanMode?.active),stage,{timeout:90000});
@@ -85,7 +95,7 @@ try{
  await reconnect.locator('#sharedMarineLeave').click();await reconnect.waitForFunction(()=>!marineCtx.sharedMarine&&marineCtx.boatMode.active&&!marineCtx.oceanMode.active,null,{timeout:45000});assert.equal(await reconnect.evaluate(()=>marineCtx.boatMode.transportEntityId),JSON.parse(users[0].personal).ship.transportEntityId);report.cases.push('leaving restores the original personal vessel and clears shared controls');
  assert.deepEqual(report.errors,[]);report.passed=true;
 }catch(e){report.failure=e.stack;report.clients=await Promise.all(users.filter(u=>u.page&&!u.page.isClosed()).map(u=>u.page.evaluate(()=>({error:marineCtx.sharedMarine?.snapshot().error,state:marineCtx.sharedMarine?.snapshot().state?.stage,revision:marineCtx.sharedMarine?.snapshot().state?.revision,controlRevision:marineCtx.sharedMarine?.snapshot().state?.controlRevision})).catch(()=>null)));throw e;}finally{
- if(renewal)clearInterval(renewal);subscriptions.forEach(f=>f());await writeFile(`${dir}/report.json`,JSON.stringify(report,null,2));await browser?.close();await server?.close();await db.recursiveDelete(room);
+ if(renewal)clearInterval(renewal);await writeFile(`${dir}/report.json`,JSON.stringify(report,null,2));await browser?.close();await server?.close();await db.recursiveDelete(room);
 }
 await import('./shared-marine-rules.mjs');
 console.log(JSON.stringify({passed:report.passed,cases:report.cases.length,errors:report.errors}));
