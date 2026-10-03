@@ -1,3 +1,4 @@
+import {addMuseumSailingRig} from './museum-sailing-rig.js';
 import { pointInWaterBody } from './water-surface-registry.js?v=3';
 
 const VESSEL_BUILDING_TYPES = new Set(['ship', 'houseboat']);
@@ -303,7 +304,8 @@ function createMappedVesselMesh(points, waterSurfaceY, tags = {}, options = {}) 
   const spanZ = Math.max(2, maxZ - minZ);
   const longAxisX = spanX >= spanZ;
   const majorSpan = Math.max(spanX, spanZ);
-  const mastCount = historic && majorSpan >= 18 ? 3 : majorSpan >= 12 ? 1 : 0;
+  const museumRig = identity.typeId === 'sloop-of-war';
+  const mastCount = museumRig ? 0 : historic && majorSpan >= 18 ? 3 : majorSpan >= 12 ? 1 : 0;
   for (let index = 0; index < mastCount; index += 1) {
     const along = mastCount === 1 ? 0 : (index / (mastCount - 1) - 0.5) * majorSpan * 0.42;
     const mastHeight = Math.max(4, Math.min(15, majorSpan * (historic ? 0.22 : 0.12)));
@@ -330,6 +332,7 @@ function createMappedVesselMesh(points, waterSurfaceY, tags = {}, options = {}) 
   cabin.position.set(centerX, waterSurfaceY + hullHeight - 0.2 + cabinHeight * 0.5, centerZ);
   cabin.castShadow = true;
   vessel.add(cabin);
+  if(museumRig) addMuseumSailingRig(THREE,vessel,{points,centerX,centerZ,deckY:deck.position.y+.28});
 
   vessel.userData.isMappedVessel = true;
   vessel.userData.vesselName = identity.name;

@@ -166,3 +166,8 @@ Three-site planetary presentation is complete for Moon, Mars and Copper Dawn: lo
 ## P16 camera C01–C03 closeout — October 3
 
 Regional public camera stills are implemented and verified: Fintraffic Finland catalogue (809 admitted sites at test time), clustered map/search/pages, real timestamped images, view/camera switching, source attribution, failure/retry, phone layout and Explore here coordinate handoff. Closing/hiding cancels work. All 1,736 registered tests, source checks, actual-provider browser and inspected prescribed-client evidence pass. See LIVE-EARTH-CAMERAS.md for boundaries: no global/live-video parity, no remote visit reward, no Finland world-load claim. P16 Earth district remains active; C04 breadth/multi-view and C05 release remain open. Production unchanged.
+
+
+## P16 waterfront slice — October 3
+
+Fresh Baltimore inspection led to context-qualified generated vessels, corrected berthed waterlines, an original bounded rig on the reviewed Constellation hull, and a three-stop promenade walk in the existing Activities system. The actual browser walks both legs with keyboard controls and records one local completion; the route camera line and unreachable phone details/result were found and fixed. Full 1,741 registered tests and source checks pass; full-world desktop/phone and prescribed rig-client images/state are inspected. See EARTH-DISTRICT.md. This completes the waterfront slice, not all P16: street/promenade art, night readability and interior/transport acceptance remain. P17–P20 and camera C04/C05 remain open. Production unchanged.

@@ -371,6 +371,9 @@ function bindEvents() {
     const selectBtn = target.closest('[data-activity-select]');
     if (selectBtn) {
       inspectActivity(selectBtn.getAttribute('data-activity-select') || '', { open: true });
+      if (window.matchMedia('(max-width:860px)').matches) {
+        document.querySelector('.activityDiscoveryDetailCol')?.scrollIntoView({block:'start'});
+      }
       return;
     }
     const scopeBtn = target.closest('[data-activity-scope]');

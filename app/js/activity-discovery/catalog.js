@@ -1,3 +1,4 @@
+import {buildHarborWalk} from './harbor-walk.js';
 import { ctx as appCtx } from '../shared-context.js?v=55';
 import {
   createDefaultAnchorDraft,
@@ -514,7 +515,9 @@ function buildCreatorActivities(ref) {
 
 function buildActivityCatalog() {
   const ref = currentReferencePose();
+  const harborWalk = buildHarborWalk(appCtx);
   const items = [
+    ...(harborWalk ? [buildActivityRecord(harborWalk, ref)] : []),
     ...buildGeneratedActivities(ref),
     ...buildRoomActivities(ref)
   ];

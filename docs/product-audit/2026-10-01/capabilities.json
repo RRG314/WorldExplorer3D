@@ -36,7 +36,7 @@
     "app/js/live-gps/runtime.js": "8f729333677c29a94259f006b4d284c1cb9b4f159a8c8f435fe85e5ecd9a87e5",
     "app/js/ar/capabilities.js": "e1b3a58947c5a65579b455c1a0d166f2acb84e119f731cd329ce0e08903c7baf",
     "app/js/water-dynamics.js": "7b8aac751446d4aee8e93b98b8eb4247a8ae024c8171e1acf5359ecc98344e6a",
-    "app/js/activity-discovery/session.js": "a00c472815a22832b34d1d587b7a443ad9163b7f1a7778a0f03803f82667b081",
+    "app/js/activity-discovery/session.js": "d6388b6f4c5bc2e59aa7c4199cc4f057c19ad65915007bb1c3d03cc20aff0f2f",
     "app/js/discovery/field-activities.js": "8dde9c2ec5cd02424971b2ae8946c438afbcd5f906e629d6e674734196aeddfa",
     "app/js/discovery/tools.js": "5b11668402d7bd7e0c5b57a8fb2f7055b04e0c976b3f316542a7faa18efc0780",
     "app/js/live-earth/registry.js": "1889bf51a76148704048c4abd3ed29331157f94adaf8048d5efd33c38fcd7b19"

@@ -387,12 +387,12 @@ body.creator-profile-open #tutorialHintCard{
   .activityDiscoveryBrowseCol{width:min(360px,calc(100vw - 36px))}
 }
 @media (max-width:860px){
-  #activityDiscoveryPanel{padding:12px}
-  .activityDiscoveryTopBar{top:12px;left:12px;right:12px;flex-direction:column;align-items:flex-start}
-  #activityDiscoveryStatus{top:128px;left:12px;right:12px;max-width:none}
+  #activityDiscoveryPanel{padding:12px;overflow-y:auto;overscroll-behavior:contain;pointer-events:auto;background:rgba(5,12,22,.94);box-sizing:border-box}
+  .activityDiscoveryTopBar{position:sticky;top:0;left:auto;right:auto;flex-direction:row;align-items:flex-start;z-index:2;background:#08111d}
+  #activityDiscoveryStatus{position:relative;top:auto;left:auto;right:auto;max-width:none;margin:10px 0}
   .activityDiscoveryPanelCol{position:relative;top:auto;left:auto;right:auto;bottom:auto;width:auto}
-  .activityDiscoveryBrowseCol{margin-top:148px;min-height:40vh}
-  .activityDiscoveryDetailCol{margin-top:12px;margin-bottom:92px}
+  .activityDiscoveryBrowseCol{margin-top:0;min-height:40vh}
+  .activityDiscoveryDetailCol{margin-top:12px;margin-bottom:24px;scroll-margin-top:120px}
   .activityDiscoveryPrompt{left:12px;right:12px;bottom:12px;transform:none;min-width:0;max-width:none;flex-direction:column;align-items:flex-start}
   .activityDiscoveryPromptActions{margin-left:0}
   .activityRunHud{left:12px;right:12px;bottom:128px;min-width:0;max-width:none}

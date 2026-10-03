@@ -350,5 +350,6 @@ export const currentContractTests = [
   'tests/roof-plane-geometry-current.test.mjs',
   'tests/roof-orientation-current.test.mjs',
   'tests/regional-building-style-current.test.mjs',
+  'tests/earth-district-current.test.mjs',
   'tests/weapon-reticle-current.test.mjs'
 ];
