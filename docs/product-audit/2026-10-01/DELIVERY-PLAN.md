@@ -215,3 +215,8 @@ SHARED-MARINE.md records fresh gaps and the finite first Coral Shelf multiplayer
 ## P18 development closeout — October 3
 
 The finite anchored Coral Shelf crew voyage is complete in development: server-owned vessels, exclusive helm/pilot leases, validated shared motion, three observations, reconnect/takeover/rescue/report and personal-voyage restoration. Nine actual two-client cases, three authenticated rule/subscription cases, eighteen local marine regression cases, all 1,780 registered tests and source checks pass. Desktop/phone viewport and prescribed-client images are inspected. SHARED-MARINE.md states the controlled-provider, subscription-adapter and production/device boundaries. C04 camera breadth/multi-view is active next, then P19/P20. Production unchanged.
+
+
+## C04 development closeout — October 3
+
+LIVE-EARTH-CAMERAS.md closes the bounded two-region camera increment: verified Caltrans district 3/4 stills alongside Finland, a four-view wall, existing-profile favorites and no-reward Journal references. Actual-provider browser/IndexedDB/failure/teardown checks, inspected desktop/phone and prescribed-client images, all 1,784 registered tests and source checks pass. C05/P20 physical-device and coordinated release remain open. P19 operations is next; current service review has identified free Open-Meteo commercial-use eligibility and application-wide Nominatim capacity as unresolved production gates.

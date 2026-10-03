@@ -45,7 +45,7 @@ const LIVE_EARTH_CATEGORIES = [
 ];
 
 const LIVE_EARTH_LAYERS = {
-  'public-cameras': {id:'public-cameras',categoryId:'cameras',label:'Public Camera Views',shortLabel:'Cameras',status:'observed',globeMode:'markers',summary:'Finland road-weather stills from Fintraffic; regional coverage, not live video.',localSummary:'Choose a camera, inspect its capture time, then explore that location.',sourceIds:['digitraffic-cameras']},
+  'public-cameras': {id:'public-cameras',categoryId:'cameras',label:'Public Camera Views',shortLabel:'Cameras',status:'observed',globeMode:'markers',summary:'Finland and California district 3/4 road-camera stills; regional coverage, not live video.',localSummary:'Choose a camera, inspect its capture time, then explore that location.',sourceIds:['digitraffic-cameras','caltrans-cameras']},
   overview: {
     id: 'overview',
     categoryId: 'overview',

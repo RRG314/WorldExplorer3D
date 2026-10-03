@@ -43,3 +43,32 @@ test('an older camera request cannot replace the next selection, and close cance
  state.publicCamera.timer=setTimeout(()=>{},1000);stopPublicCamera(state);assert.equal(state.publicCamera.timer,null);assert.equal(state.publicCamera.controller,null);assert.ok(aborts>=1);assert.ok(removed>=1);
  }finally{globalThis.document=previous;}
 });
+
+const {normalizeCaltransCatalogue,createCaltransCameraService}=await import('../app/js/live-earth/caltrans-camera-service.js');
+const {normalizeCameraFavorites,cameraJournalReference}=await import('../app/js/live-earth/public-camera-directory.js');
+const {createMemoryDiscoveryProfileStore}=await import('../app/js/discovery/profile-store.js');
+const cal=(district=3)=>({data:[{cctv:{inService:'true',location:{district:String(district),latitude:'38.481128',longitude:'-121.510528',locationName:'Hwy 5 at Pocket'},recordTimestamp:{recordEpoch:'1789771342'},imageData:{static:{currentImageURL:`https://cwwp2.dot.ca.gov/data/d${district}/cctv/image/pocket/pocket.jpg`}}}}]});
+test('Caltrans identifiers derive from approved stills, never reorderable ordinal indices or arbitrary media',()=>{
+ const source=cal(),item=normalizeCaltransCatalogue(source,3).items[0];assert.equal(item.id,'caltrans:3:pocket:pocket');
+ for(const url of ['https://example.com/private.jpg','https://cwwp2.dot.ca.gov/data/d4/cctv/image/pocket/pocket.jpg','https://cwwp2.dot.ca.gov/data/d3/cctv/image/../pocket.jpg','https://cwwp2.dot.ca.gov/data/d3/cctv/image/pocket/pocket.jpg?token=secret']){const bad=cal();bad.data[0].cctv.imageData.static.currentImageURL=url;assert.equal(normalizeCaltransCatalogue(bad,3).items.length,0);}
+ source.data[0].cctv.inService='false';assert.equal(normalizeCaltransCatalogue(source,3).items.length,0);assert.throws(()=>normalizeCaltransCatalogue({error:true},3));
+});
+test('Caltrans regional catalogue caches atomically and metadata timestamps never become image capture times',async()=>{
+ let time=100000,calls=0,fail=false;const service=createCaltransCameraService({now:()=>time,fetchImpl:async url=>{calls++;const d=url.includes('/d3/')?3:4;return {ok:!(fail&&d===4),headers:new Headers(),text:async()=>JSON.stringify(cal(d))}}});
+ const initial=await service.catalogue();assert.equal(initial.items.length,2);await service.catalogue({force:true});assert.equal(calls,2);
+ const detail=await service.detail(initial.items[0].id);assert.equal(detail.presets[0].capturedAt,null);assert.equal(calls,2);
+ time+=3600001;fail=true;await assert.rejects(()=>service.catalogue(),/unavailable/);assert.equal(initial.items.length,2);
+ await assert.rejects(()=>service.detail('https://evil.test'),/Unknown/);
+});
+test('camera favorites are bounded, survive local export, and remote references cannot award a visit',async()=>{
+ assert.deepEqual(normalizeCameraFavorites(['C01503','C01503','https://evil','caltrans:3:pocket:pocket']),['C01503','caltrans:3:pocket:pocket']);
+ assert.equal(normalizeCameraFavorites(Array.from({length:150},(_,i)=>'C'+String(i).padStart(5,'0'))).length,100);
+ const store=createMemoryDiscoveryProfileStore(),before=await store.getProfile();await store.saveProfile(current=>({...current,publicCameraFavorites:['C01503']}));
+ const item=normalizeCaltransCatalogue(cal(),3).items[0],reference=cameraJournalReference(item,{id:item.id,capturedAt:null},100000);assert.equal(reference.projections.profile,false);assert.equal(reference.projections.place,false);assert.equal(reference.progress.points,0);
+ await store.recordExplorerEvent(reference);assert.equal((await store.recordExplorerEvent(reference)).reason,'already-recorded');
+ const after=await store.getProfile();assert.deepEqual(after.explorerProgress,before.explorerProgress);assert.deepEqual(after.characterState,before.characterState);assert.deepEqual((await store.exportData()).profile.publicCameraFavorites,['C01503']);
+});
+test('closing a camera wall clears every image, timer, and in-flight metadata request',()=>{
+ let removed=0,aborted=0;const controller={abort:()=>aborted++};const camera=createPublicCameraState();camera.controller=controller;camera.timer=setTimeout(()=>{},5000);
+ stopPublicCamera({publicCamera:camera,selector:{ui:{details:{querySelectorAll:()=>Array.from({length:4},()=>({removeAttribute:()=>removed++}))}}}});assert.equal(removed,4);assert.equal(aborted,1);assert.equal(camera.timer,null);
+});

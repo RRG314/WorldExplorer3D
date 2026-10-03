@@ -608,3 +608,17 @@ input,textarea{-webkit-user-select:text;user-select:text}
 .capabilityGuide summary{cursor:pointer;font-weight:700;font-size:16px}
 .capabilityFilters{display:flex;gap:10px;flex-wrap:wrap}.capabilityFilters input,.capabilityFilters select{min-width:0;padding:10px;background:#152c3e;color:#fff;border:1px solid #7891a4;border-radius:5px;font:inherit}.capabilityFilters input{flex:1 1 220px}.capabilityFilters select{flex:0 1 200px}
 .capabilityList{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr));gap:12px}.capabilityList li{padding:12px;border:1px solid #385268;border-radius:6px}.capabilityList p{margin:8px 0 0}.capabilityStatus{display:block;color:#8ae5ca;font-size:12px}.capabilityStatus[data-status=planned],.capabilityStatus[data-status=experimental]{color:#ffd28c}.capabilitySave{color:#c0cfdd;font-size:12px}
+
+/* A bounded multi-view workspace; teardown removes the owning class. */
+.globe-selector-live-details.public-camera-wall{position:fixed;inset:90px 16px 18px 176px;z-index:40;overflow:auto;background:#09151f;border:1px solid #526d7d;box-shadow:0 16px 50px #0008}
+.public-camera-wall [data-camera-wall]{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.public-camera-wall [data-camera-wall]>section{min-width:0;border:1px solid #36515f;padding:10px;border-radius:6px;background:#0d202c}
+.public-camera-wall [data-camera-wall] h4{margin:0 0 6px;font-size:14px}
+.public-camera-wall [data-camera-wall] img{max-height:170px}
+.public-camera-wall [data-camera-wall] p{font-size:12px;line-height:1.4;margin:6px 0}
+.public-camera-wall [data-camera-wall] summary{cursor:pointer;min-height:36px;display:flex;align-items:center;font-size:12px}
+.publicCameraPanel button:focus-visible,.publicCameraPanel a:focus-visible,.publicCameraPanel summary:focus-visible{outline:2px solid #88e7ff;outline-offset:2px}
+@media(max-width:760px){.globe-selector-live-details.public-camera-wall{inset:80px 8px 76px;z-index:40}.public-camera-wall [data-camera-wall]{grid-template-columns:minmax(0,1fr)}.public-camera-wall [data-camera-wall] img{max-height:none}}
+.publicCameraPanel>.globe-selector-live-detail-actions{display:flex;flex-wrap:wrap;gap:8px}
+.public-camera-wall .publicCameraPanel>h3{margin:12px 0 6px}.public-camera-wall .publicCameraPanel>p{margin:6px 0 12px;font-size:13px}
+.public-camera-wall .publicCameraPanel>.globe-selector-live-detail-actions{display:flex;justify-content:flex-start}.public-camera-wall .publicCameraPanel>.globe-selector-live-detail-actions>button{flex:0 1 auto}

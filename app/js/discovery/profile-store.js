@@ -1,3 +1,4 @@
+import { normalizeCameraFavorites } from '../live-earth/public-camera-directory.js';
 import { validateJournalBackup } from './backup-validation.js?v=1';
 import { summarizeReceiptState } from './save-status.js?v=1';
 import { awardCompanionXp, normalizeCompanionProgression } from './companions.js?v=7';
@@ -75,6 +76,7 @@ function createDefaultProfile() {
     updatedAt: Date.now(),
     equippedToolId: 'metal-detector',
     favoriteToolIds: ['metal-detector', 'field-lens', 'field-camera'],
+    publicCameraFavorites: [],
     activeCompanionId: null,
     companionOnboarding: normalizeCompanionOnboarding(),
     tutorials: {},
@@ -99,6 +101,7 @@ function normalizeProfile(profile) {
     ...base,
     ...(profile || {}),
     favoriteToolIds: Array.isArray(profile?.favoriteToolIds) ? profile.favoriteToolIds.slice(0, 6) : base.favoriteToolIds,
+    publicCameraFavorites: normalizeCameraFavorites(profile?.publicCameraFavorites),
     tutorials: { ...base.tutorials, ...(profile?.tutorials || {}) },
     disciplineProgress: { ...base.disciplineProgress, ...(profile?.disciplineProgress || {}) },
     toolMastery: { ...(profile?.toolMastery || {}) },

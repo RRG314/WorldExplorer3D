@@ -10,6 +10,7 @@ const TRUTH_TYPES = Object.freeze([
 ]);
 
 const DATA_SOURCES = Object.freeze({
+  'caltrans-cameras': Object.freeze({id:'caltrans-cameras',label:'Caltrans CWWP',operator:'California Department of Transportation',truthType:'observed',licenseId:'caltrans-conditions',licenseUrl:'https://dot.ca.gov/conditions-of-use',homepage:'https://cwwp2.dot.ca.gov/',description:'Caltrans-owned regional road-camera stills from districts 3 and 4. Capture timestamps unavailable; metadata timestamps are not image age.'}),
   'digitraffic-cameras': Object.freeze({id:'digitraffic-cameras',label:'Fintraffic / digitraffic.fi',operator:'Fintraffic',truthType:'observed',licenseId:'CC-BY-4.0',licenseUrl:'https://creativecommons.org/licenses/by/4.0/',homepage:'https://www.digitraffic.fi/en/road-traffic/',description:'Timestamped road-weather still images in Finland. Catalogue counts are not online-image guarantees.'}),
   'usgs-cngm-surface': Object.freeze({
     id:'usgs-cngm-surface',label:'USGS Cooperative National Geologic Map · surface units',

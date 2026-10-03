@@ -783,7 +783,7 @@ function initLiveEarth() {
         aircraft: state.aircraftItems.length,
         aircraftSourceMode: state.aircraftSourceMode,
         streetImagery: state.streetImageryItems.length,
-        publicCameras: {indexed:state.publicCamera.items.length,selectedId:state.publicCamera.selectedId,verifiedImages:state.publicCamera.verified.size,loading:state.publicCamera.loading,error:state.publicCamera.error,mode:'still',coverage:'Finland'},
+        publicCameras: {indexed:state.publicCamera.items.length,selectedId:state.publicCamera.selectedId,verifiedImages:state.publicCamera.verified.size,loading:state.publicCamera.loading,error:state.publicCamera.error,mode:'still',coverage:state.publicCamera.providerId==='caltrans'?'California districts 3 and 4':'Finland',wallViews:state.publicCamera.wall.length,wallOpen:state.publicCamera.wallOpen,favorites:state.publicCamera.favorites.length},
         deFlockCameras: state.deFlockIndex?.count || 0,
         localEventId: state.localEvent?.id || '',
         selectedSatelliteId: state.selectedSatelliteId || '',

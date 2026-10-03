@@ -129,7 +129,7 @@ function renderOverviewDetails(ctx, state) {
     { id: 'satellites', label: 'Satellites', value: `${observedSatellites}/${state.satelliteItems.length} observed`, source: 'CelesTrak GP orbital elements', health: health.satellites.label },
     { id: 'earthquakes', label: 'Earthquakes', value: `${state.earthquakeItems.length} observed`, source: 'USGS GeoJSON feed', health: health.earthquakes.label },
     { id: 'weather', label: 'Weather', value: `${state.weatherSamples.length} current`, source: 'Open-Meteo current conditions', health: health.weather.label },
-    { id: 'public-cameras',label:'Public camera views',value:`${state.publicCamera.items.length} indexed sites`,source:'Fintraffic · Finland · timestamped stills',health:'Open to browse regional imagery; not live video' },
+    { id: 'public-cameras',label:'Public camera views',value:`${state.publicCamera.items.length} indexed sites`,source:'Fintraffic / Caltrans · regional stills',health:'Open to browse regional imagery; not live video' },
     { id: 'street-imagery', label: 'Street imagery', value: 'selected location', source: 'Panoramax and KartaView community observations', health: health.streetImagery.label },
     { id: 'deflock-cameras', label: 'DeFlock cameras', value: `${(state.deFlockIndex?.count || 0).toLocaleString()} indexed`, source: 'Hourly OpenStreetMap ALPR position index', health: state.deFlockError || state.deFlockIndexWarning || (state.deFlockIndex ? 'Index ready · exact detail resolved on selection' : 'Open layer to load') },
     { id: 'aircraft', label: 'Aircraft', value: `${state.aircraftItems.length} ${state.aircraftSourceMode === 'observed' ? 'observed' : 'reference'}`, source: state.aircraftSourceMode === 'observed' ? 'Current live ADS-B state vectors' : 'Modeled route fallback', health: state.aircraftSourceMode === 'observed' ? health.aircraft.label : 'Fallback active · Live ADS-B unavailable' },
@@ -703,7 +703,7 @@ export function handleGlobePick(ctx, state, raycaster) {
   const hit = hits && hits.length ? hits[0] : null;
   const meta = hit?.object?.userData?.liveEarth || null;
   if (meta?.type === 'public-camera' && Number.isInteger(hit.index)) {
-    const cluster=state.publicCamera.clusters?.[hit.index];if(cluster){state.publicCamera.clusterIds=cluster.ids;state.publicCamera.selectedId='';state.publicCamera.detail=null;state.publicCamera.query='';state.publicCamera.page=0;stopPublicCamera(state);state.selector.api?.setSelection?.(cluster.lat,cluster.lon,{name:'Public cameras · Finland',focus:true});renderLiveEarthUi(ctx,state);}return true;
+    const cluster=state.publicCamera.clusters?.[hit.index];if(cluster){state.publicCamera.clusterIds=cluster.ids;state.publicCamera.selectedId='';state.publicCamera.wallOpen=false;state.publicCamera.detail=null;state.publicCamera.query='';state.publicCamera.page=0;stopPublicCamera(state);state.selector.api?.setSelection?.(cluster.lat,cluster.lon,{name:'Public camera cluster',focus:true});renderLiveEarthUi(ctx,state);}return true;
   }
   if (meta?.type === 'deflock' && Number.isInteger(hit.index)) {
     void handleUiAction(ctx, state, 'select-deflock', String(hit.index));

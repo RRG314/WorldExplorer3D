@@ -10,7 +10,7 @@ The preserved `dist` and production release are not being replaced by current pl
 
 ## Latest phase status
 
-P08–P18 are development-complete within their documented boundaries. P18 passes the real two-client shared voyage, authenticated endpoint/rules checks, all eighteen local marine regression cases, all 1,780 registered tests and source checks. See SHARED-MARINE.md. Street reference follow-up is committed as bbec456d; it is not worldwide reference-quality parity. Public camera C01–C03 is complete; C04 breadth/multi-view is actively being implemented, followed by P19 operations and P20/C05 release gates. Production is unchanged. Older chronological entries below are historical, not current phase status.
+P08–P18 are development-complete within their documented boundaries. P18 passes the real two-client shared voyage, authenticated endpoint/rules checks, all eighteen local marine regression cases, all 1,780 registered tests and source checks. See SHARED-MARINE.md. Street reference follow-up is committed as bbec456d; it is not worldwide reference-quality parity. Public camera C01–C03 is complete; C04 breadth/multi-view is development-complete for Finland and Caltrans districts 3/4: four-view wall, local favorites and no-reward Journal references. All 1,784 tests/source checks and actual two-provider browser checks pass. P19 operations and P20/C05 release gates are next. Production is unchanged. Older chronological entries below are historical, not current phase status.
 
 ## Street-quality reference continuation
 

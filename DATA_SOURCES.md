@@ -215,3 +215,8 @@ is no longer selected by the Earth material registry. Rebuild with
 `node scripts/build-snow-assets.mjs`; source checksums and resulting SHA-256
 hashes are recorded in `app/assets/textures/earth/snow_02.provenance.json`.
 This is representative surface detail, not measured Antarctic topography.
+
+
+### Public road-camera stills — October 2026
+
+Live Earth displays Fintraffic Digitraffic Finland imagery under CC BY 4.0 with provider capture times, and Caltrans-owned CWWP current stills from California districts 3/4 under Caltrans Conditions of Use. Caltrans catalogue timestamps are not capture timestamps. Each view links to its publisher and terms; images are not archived or rehosted. Four-view wall/favorites/remote Journal references do not award location visits. See docs/product-audit/2026-10-01/LIVE-EARTH-CAMERAS.md for verified coverage, adapter bounds and evidence.

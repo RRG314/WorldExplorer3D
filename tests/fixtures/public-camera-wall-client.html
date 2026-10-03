@@ -1,0 +1,15 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Camera wall presentation check</title><style>html,body,iframe{margin:0;width:100%;height:100%;border:0;overflow:hidden}#launch{position:fixed;z-index:60;top:8px;left:8px;padding:12px}</style></head><body><button id="launch">Open four-camera wall</button><iframe id="game" src="/app/"></iframe><script type="module">
+const frame=document.getElementById('game'),button=document.getElementById('launch');
+const wait=async predicate=>{const until=Date.now()+60000;while(!predicate()){if(Date.now()>until)throw Error('Camera fixture preparation timeout');await new Promise(r=>setTimeout(r,100));}};
+const ready=(async()=>{
+await wait(()=>frame.contentDocument?.getElementById('startBtn')?.disabled===false);
+const w=frame.contentWindow;
+await w.eval(`(async()=>{window.c=(await import('/app/js/shared-context.js?v=55')).ctx;await c.ensureLiveEarthReady();await c.openLiveEarthSelector('public-cameras');})()`);
+await wait(()=>w.c?.liveEarth?.state?.publicCamera?.items?.length>0);
+const click=(action)=>frame.contentDocument.querySelector('[data-live-earth-action="camera-'+action+'"]').click();
+for(let i=0;i<4;i++){Array.from(frame.contentDocument.querySelectorAll('[data-live-earth-action="camera-select"]')).find(el=>!w.c.liveEarth.state.publicCamera.wall.some(v=>v.item.id===el.dataset.id)).click();await wait(()=>!!frame.contentDocument.querySelector('[data-live-earth-action="camera-wall-add"]'));click('wall-add');click('back');}
+return click;})();
+button.onclick=()=>{button.hidden=true;};
+window.render_game_to_text=()=>JSON.stringify({publicCameras:frame.contentWindow.c?.getLiveEarthSummary?.().publicCameras,visibleImages:Array.from(frame.contentDocument.querySelectorAll('[data-public-camera-image]')).map(v=>({id:v.dataset.publicCameraImage,loaded:v.complete&&v.naturalWidth>0&&!v.hidden}))});
+let opened=false;window.advanceTime=async()=>{const click=await ready;if(!opened){opened=true;click('wall');}await wait(()=>!frame.contentWindow.c.liveEarth.state.publicCamera.loading);await new Promise(r=>setTimeout(r,100));};
+</script></body></html>
