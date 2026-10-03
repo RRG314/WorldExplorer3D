@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "scope": "Local source capability descriptions; not production or full journey certification",
-  "registrySha256": "cf3183f293793b3e2b64cc571c1f685f13664cc7ca53250c0374e31e7a132aab",
+  "registrySha256": "12f89cff30d11cfd943300bac52122f504b721e3a385d92de066bffa949258f7",
   "owners": {
     "app/js/live-earth/registry.js": "6c6d3cec9fb3334434304083c2529b97da73eb967cd2edfaef1bc4a0b2cf3ee6",
     "app/js/map.js": "37f3289baf5e52eb6bb48c1fee61f037482226b57023ef71298cbd07955a1a8c",
@@ -20,7 +20,7 @@
     "app/js/planetary/entry.js": "e9bff6f3010e48ca30b66581a44d4e79439b6ebb472d85204b4dd250aecfd78f",
     "app/js/planetary/mars-world.js": "24bfe06faf75e9c9ee87ed9155745fac9ddc1a5cd4aed9a2167eee0734ecfc45",
     "app/js/space.js": "231b99e312d08faa0c157ef19e25a274e71c1ed7e1091fe9d836940d1892cce6",
-    "app/js/expedition/runtime.js": "d922fc50330b7ccc30527456c1868fb23bfec992065c6f0fd4f4b08f701f0dfa",
+    "app/js/expedition/runtime.js": "9f54e4e82cef7bdc94dac73614a58924a869479ccca16b3e3a2e76a0d72d25c0",
     "app/js/fishing-game.js": "a1c951fe7471365da5478ecfb2f18731118ddf4ff013f695c4d0478f17eebdac",
     "app/js/flower-challenge.js": "77c7c51a178f2952d7c1b0b3ecbd4b44f6fff658f3522fed0d7bebe26b95e231",
     "app/js/game/paint-town/core.js": "f872282dfc9a3f42b1693e26464d961b43725221aa8632ae018cfdef432b9f63",
@@ -216,7 +216,7 @@
       "label": "Space flight & planetary destinations",
       "group": "worlds",
       "status": "experimental",
-      "summary": "Use free flight, Wayfinder and supported destinations. Course, landing and scale differ between travel modes; expedition content is Alpha.",
+      "summary": "Use free flight, Wayfinder and supported destinations. The course and landing HUD share a target; physical flight and compressed approaches show different units. Expedition content remains Alpha.",
       "owner": "app/js/space.js",
       "persistence": "Free-flight pose is session state. Expedition progression uses a separate voyage store.",
       "acceptance": "Source-reviewed; complete current player-journey acceptance is still pending."
@@ -226,7 +226,7 @@
       "label": "Solis Reach & Pathfinder",
       "group": "worlds",
       "status": "experimental",
-      "summary": "Explore the ship, switch observation views and use the existing pod and research journeys. This does not provide ocean research-ship gameplay.",
+      "summary": "Explore the ship and observation views. The first planetary survey connects briefing, pod landing, three field records, partial recovery, lab analysis and Field Link II for longer-range remote stations on later worlds.",
       "owner": "app/js/expedition/runtime.js",
       "persistence": "Solo expedition state saves in this browser; shared expeditions use room authority. These are separate from the personal Journal.",
       "acceptance": "Source-reviewed; complete current player-journey acceptance is still pending."

@@ -89,7 +89,7 @@ function deriveSpaceJourney(appCtx) {
     : podPhase === 'ship_launch' ? !!(appCtx.activeShipInterior || appCtx.spaceFlight?.active)
     : !!appCtx.spaceFlight?.active;
   if (podPhase && POD_PHASE_COPY[podPhase] && podContextMatches
-    && !(podPhase === 'recovered' && destinationMission?.phase === 'analysis' && destinationMission?.activeMissionId)
+    && !(podPhase === 'recovered' && ['analysis','fieldwork','complete'].includes(destinationMission?.phase) && destinationMission?.activeMissionId)
     && !(podPhase === 'surface' && destinationMission?.atDestination && destinationMission?.activeMissionId)) {
     const [title, detail] = POD_PHASE_COPY[podPhase];
     return {
@@ -108,6 +108,14 @@ function deriveSpaceJourney(appCtx) {
         detail: `Go to ${room}. The ship map marks the route and the working station.`,
         actionLabel: 'Ship Map',
         action: () => appCtx.toggleExpeditionShipMap?.(true)
+      };
+    }
+    if (destinationMission?.phase === 'fieldwork' && destinationMission?.surfaceRequired && destinationMission?.activeMissionId) {
+      return {
+        identity: `destination:${destinationMission.activeMissionId}:resume`, owner: 'destination-mission',
+        eyebrow: 'SURVEY PAUSED', title: text(destinationMission.title, 'Continue the surface survey'),
+        detail: 'Your field records are saved. Go to the Pod Bay to return to the survey site.',
+        actionLabel: 'Ship Map', action: () => appCtx.toggleExpeditionShipMap?.(true)
       };
     }
     if (destinationMission?.phase === 'analysis' && destinationMission?.activeMissionId) {

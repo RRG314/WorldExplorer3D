@@ -173,3 +173,8 @@ The first Coral Shelf outing is complete: normal location-entry gate, wet-lab br
 ## P13 development closeout — October 3
 
 HUD and landing actions now share selected-target resolution, physical eligibility and explicit compressed-distance presentation. Unknown/mismatched physical targets fail closed; unsupported universe targets cannot land on another world. Local proximity remains independent of course selection. 1,713 registered tests and actual course/manual-takeover/Wayfinder/phone/disposal and six boundary browser checks pass. See SPACE-NAVIGATION.md. P14 field mission/progression is next; planetary art remains P15. Production unchanged.
+
+
+## P14 development closeout — October 3
+
+The existing Proxima b field mission now closes through partial recovery/redeployment, three saved instrument procedures, actual ship-lab analysis, a readable completed report and Field Link II used at 24 m on the next fictional world. Failed saves remain retryable; duplicate submission cannot duplicate the completion reward. All 1,719 registered tests and source checks pass. The assembled-app browser verifies the journey, an injected field-save failure, desktop/phone report, next-world use and real reload. Prescribed-client state and images are inspected. See PLANETARY-RESEARCH.md for fixture and local-save boundaries. P15 planetary visuals is next. Production unchanged.

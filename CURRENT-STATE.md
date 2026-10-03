@@ -10,7 +10,7 @@ The preserved `dist` and production release are not being replaced by current pl
 
 ## Latest phase status
 
-P08–P13 are development-complete within their documented boundaries. P12 closes the first local marine outing: briefing, three saved surveys, recovery/reload, lab report and a usable 18 m → 35 m scanner upgrade. All 1,708 registered tests, eight actual-app research cases and eighteen marine regression cases pass. Desktop/phone and prescribed-client images are inspected. P13 now aligns destination/landing actions and labels compressed versus physical flight; 1,713 registered tests and actual course/boundary browser checks pass. P14 planetary field-mission completion is next. Production is unchanged. Older chronological entries below are historical, not current phase status.
+P08–P14 are development-complete within their documented boundaries. Marine swimming/deck/voyage/regional habitat/research and space navigation/planetary mission progression are implemented and verified. P14 adds partial survey recovery, save-safe lab completion, a persistent useful equipment improvement and a readable report. All 1,719 registered tests, source checks and the actual mission/recovery/reload browser journey pass; desktop/phone and prescribed-client images are inspected. P15 Moon/Mars and fictional-world visuals is next. Production is unchanged. Older chronological entries below are historical, not current phase status.
 
 ## Active work
 
@@ -50,3 +50,8 @@ The local ship/sub journey now retains vessel IDs, condition, parent anchor, wav
 ## P11 development closeout
 
 The first authored Coral Shelf pack replaces generic coral primitives with six bounded Smithsonian CC0 near/far assets, deterministic regional placement, seagrass, named map landmarks, corrected fish shapes, region-qualified fish selection and session-owned optional sound. Habitat collision, failed assets and disposal are verified. All 1,702 registered tests, seven habitat browser cases and eighteen existing Ocean/ship cases pass; source checks and prescribed-client screenshots are inspected. See MARINE-HABITAT.md for measured budgets and provenance. P12 first research outing/earned upgrade is next; P11 does not remain open for worldwide art expansion. Production unchanged.
+
+
+## P14 development closeout — October 3
+
+The existing Proxima b field mission now closes through partial recovery/redeployment, three saved instrument procedures, actual ship-lab analysis, a readable completed report and Field Link II used at 24 m on the next fictional world. Failed saves remain retryable; duplicate submission cannot duplicate the completion reward. All 1,719 registered tests and source checks pass. The assembled-app browser verifies the journey, an injected field-save failure, desktop/phone report, next-world use and real reload. Prescribed-client state and images are inspected. See PLANETARY-RESEARCH.md for fixture and local-save boundaries. P15 planetary visuals is next. Production unchanged.

@@ -105,6 +105,7 @@ export const currentContractTests = [
   'tests/curated-equipment-current.test.mjs',
   'tests/curated-home-interior-current.test.mjs',
   'tests/curated-model-assets-current.test.mjs',
+  'tests/planetary-mission-completion-current.test.mjs',
   'tests/destination-missions-current.test.mjs',
   'tests/detail-boundary-current.test.mjs',
   'tests/discovery-receipt-endpoint-current.test.mjs',

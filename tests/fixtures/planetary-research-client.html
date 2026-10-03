@@ -1,0 +1,29 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Planetary research equipment fixture</title><style>html,body,iframe{margin:0;width:100%;height:100%;border:0;overflow:hidden}#launch{position:fixed;z-index:3;top:8px;left:8px;padding:12px}</style></head><body><button id="launch">Load earned-equipment fixture</button><iframe id="game" src="/app/?launch=space"></iframe><script type="module">
+const frame=document.getElementById('game');let busy=false;
+document.getElementById('launch').onclick=async()=>{
+ if(busy)return;busy=true;
+ while(frame.contentDocument?.getElementById('startBtn')?.disabled!==false)await new Promise(resolve=>setTimeout(resolve,100));
+ const w=frame.contentWindow;
+ // Controlled equipment fixture, not a claimed completed player journey.
+ await w.eval(`(async()=>{
+  const {createDestinationMissionStore}=await import('/app/js/universe/mission-authority.js?v=3');
+  const {getDestinationMission}=await import('/app/js/universe/mission-catalog.js?v=3');
+  const store=createDestinationMissionStore(),mission=getDestinationMission('proxima-centauri-b');
+  store.activate(mission);store.advance(mission,'review_briefing');store.advance(mission,'arrive');
+  for(const id of ['photograph','geology-inspect','habitat-survey'])store.recordEvidence(mission,id);
+  store.advance(mission,'complete_fieldwork');store.advance(mission,'complete_analysis');
+ })()`);
+ frame.contentDocument.getElementById('spaceLaunchToggle').click();frame.contentDocument.getElementById('startBtn').click();
+ while(!JSON.parse(w.render_game_to_text?.()||'{}').modes?.space)await new Promise(resolve=>setTimeout(resolve,100));
+ await w.eval(`(async()=>{
+  const {ctx}=await import('/app/js/shared-context.js?v=55');
+  const {arriveAtSolidWorld}=await import('/app/js/planetary/solid-world-runtime.js?v=14');
+  ctx.prepareDestinationMissionSurface('andromeda-explorer-a-b');await arriveAtSolidWorld('andromeda-explorer-a-b');
+  const photo=ctx.planetaryFieldActivitySnapshot().activities.find(entry=>entry.activityId==='photograph');
+  Object.assign(ctx.Walk.state.walker,{x:photo.x+24,z:photo.z,y:photo.y+1.7,yaw:Math.PI/2,angle:Math.PI/2,vy:0,onGround:true});
+ })()`);
+ document.getElementById('launch').hidden=true;w.focus();
+};
+window.render_game_to_text=()=>frame.contentWindow.render_game_to_text?.()||JSON.stringify({loading:true});
+window.advanceTime=async()=>new Promise(resolve=>setTimeout(resolve,50));
+</script></body></html>
