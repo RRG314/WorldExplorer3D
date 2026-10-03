@@ -27,7 +27,7 @@ export function createResearchDeck({ctx,resetDynamics,updateVessel,hudFactory=cr
   host=null;parent=null;ctx.clearControlInputState?.('research-deck-exit');ctx.updateControlsModeUI?.();
  }
  function helm(){release();return true;}
- function moor(){if(!supported())return false;ctx.boatMode.moored=!ctx.boatMode.moored;if(ctx.boatMode.moored)resetDynamics();return true;}
+ function moor(){if(ctx.sharedMarine?.active)return false;if(!supported())return false;ctx.boatMode.moored=!ctx.boatMode.moored;if(ctx.boatMode.moored)resetDynamics();return true;}
  const select=id=>{if(RESEARCH_STATIONS.some(s=>s.id===id))targetId=id};
  async function act(){
   if(!active||busy||researchStationDistance(pose,targetId)>2.4)return false;
@@ -56,7 +56,7 @@ export function createResearchDeck({ctx,resetDynamics,updateVessel,hudFactory=cr
  function update(dt){
   if(active&&(!supported()||origin!==`${ctx.LOC?.lat}:${ctx.LOC?.lon}`||ctx.getEnv?.()&&ctx.getEnv()!=='EARTH'))release();
   if(!supported()){hud?.hide();return false;}
-  hud ||= hudFactory({enter:()=>enter(),helm,moor,act:()=>void act(),select,researchAct:()=>void research.labAction()});
+  hud ||= hudFactory({enter:()=>enter(),helm,moor,act:()=>void act(),select,researchAct:()=>void research.labAction(),sharedAct:()=>void import('../../ocean/shared-marine-runtime.js').then(m=>m.openSharedMarine(ctx)).catch(e=>hud?.message(e.message))});
   if(active){
    updateVessel(ctx.paused?0:dt);
    const actions=ctx.paused||ctx.showLargeMap?{}:ctx.readControlActions?.('walk')||{};

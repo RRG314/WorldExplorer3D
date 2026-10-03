@@ -41,6 +41,7 @@ function suspendBoatModeForOceanTransfer() {
 }
 
 async function transferBoatToSubmarine(options = {}) {
+  if(appCtx.sharedMarine?.active)return false; // Shared deployment is server-owned.
   if (transferPending) return false;
   if (!appCtx.boatMode?.active) return false;
   if (!canDiveBoatMode({ showNotice: options.showNotice !== false })) return false;
@@ -107,6 +108,7 @@ async function transferBoatToSubmarine(options = {}) {
 }
 
 async function transferSubmarineToBoat(options = {}) {
+  if(appCtx.sharedMarine?.active && options.source!=='shared-marine-authority')return false;
   if (transferPending) return false;
   if (!appCtx.oceanMode?.active) return false;
   if(appCtx.oceanMode.diver?.active){showBoatPrompt('Board the submarine or use Recover before switching to the surface boat.','notice',promptDurationMs);return false;}

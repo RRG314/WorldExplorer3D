@@ -471,32 +471,33 @@ function updateSubmarine(dt,time) {
   placeSubmarineClearOfParent();
   const sub = oceanMode.submarine;
   const previousPosition={x:sub.position.x,y:sub.position.y,z:sub.position.z};
-  const actions = appCtx.readControlActions?.('ocean') || {};
+  const motionDt=appCtx.sharedMarine?.active&&!appCtx.sharedMarine.canPilot?0:dt;
+  const actions = motionDt>0 ? appCtx.readControlActions?.('ocean') || {} : {};
   const forwardInput = Number(actions.move) || 0;
   const yawInput = Number(actions.turn) || 0;
   const verticalInput = Number(actions.vertical) || 0;
 
   const targetSpeed = forwardInput * OCEAN_CONSTANTS.MAX_SPEED;
-  const speedFactor = expApproachFactor(OCEAN_CONSTANTS.SPEED_RESPONSE, dt);
+  const speedFactor = expApproachFactor(OCEAN_CONSTANTS.SPEED_RESPONSE, motionDt);
   sub.speed += (targetSpeed - sub.speed) * speedFactor;
-  sub.speed *= Math.pow(OCEAN_CONSTANTS.DRAG, dt * 60);
+  sub.speed *= Math.pow(OCEAN_CONSTANTS.DRAG, motionDt * 60);
 
   const targetTurnSpeed = yawInput * OCEAN_CONSTANTS.MAX_TURN_SPEED;
-  const turnFactor = expApproachFactor(OCEAN_CONSTANTS.TURN_RESPONSE, dt);
+  const turnFactor = expApproachFactor(OCEAN_CONSTANTS.TURN_RESPONSE, motionDt);
   sub.turnSpeed += (targetTurnSpeed - sub.turnSpeed) * turnFactor;
-  sub.turnSpeed *= Math.pow(0.9, dt * 60);
-  sub.yaw += sub.turnSpeed * dt;
+  sub.turnSpeed *= Math.pow(0.9, motionDt * 60);
+  sub.yaw += sub.turnSpeed * motionDt;
 
   const targetVertical = verticalInput * OCEAN_CONSTANTS.MAX_VERTICAL_SPEED;
-  const verticalFactor = expApproachFactor(OCEAN_CONSTANTS.VERTICAL_RESPONSE, dt);
+  const verticalFactor = expApproachFactor(OCEAN_CONSTANTS.VERTICAL_RESPONSE, motionDt);
   sub.verticalSpeed += (targetVertical - sub.verticalSpeed) * verticalFactor;
-  sub.verticalSpeed *= Math.pow(0.9, dt * 60);
+  sub.verticalSpeed *= Math.pow(0.9, motionDt * 60);
 
   const sinYaw = Math.sin(sub.yaw);
   const cosYaw = Math.cos(sub.yaw);
-  sub.position.x += sinYaw * sub.speed * dt;
-  sub.position.z += cosYaw * sub.speed * dt;
-  sub.position.y += sub.verticalSpeed * dt;
+  sub.position.x += sinYaw * sub.speed * motionDt;
+  sub.position.z += cosYaw * sub.speed * motionDt;
+  sub.position.y += sub.verticalSpeed * motionDt;
 
   _tmpVecA.set(sub.position.x, 0, sub.position.z);
   if (_tmpVecA.length() > OCEAN_CONSTANTS.WORLD_RADIUS) {
@@ -566,6 +567,7 @@ function animateOceanMode(nowMs = 0) {
   const dt = appCtx.paused ? 0 : Math.min(0.05, Math.max(0.001, (nowMs - oceanMode.lastFrameMs) / 1000));
   oceanMode.lastFrameMs = nowMs;
 
+  appCtx.sharedMarine?.tick(dt);
   if(!oceanMode.diver?.update(dt,nowMs*.001))updateSubmarine(dt,nowMs*.001);
   oceanMode.waterSurface.update(nowMs*.001);
   oceanMode.soundscape?.update({paused:appCtx.paused,diving:oceanMode.diver?.active,speed:oceanMode.submarine.speed,time:nowMs*.001});
@@ -775,7 +777,9 @@ function initOceanModeUI() {
 
 function getOceanModeDebugState() {
   const sub = oceanMode.submarine || {};
+  const marine=appCtx.sharedMarine?.snapshot();
   return {
+    sharedVoyage:marine?.active?{stage:marine.state?.stage,revision:marine.state?.revision,observations:marine.state?.manifest.length,canPilot:appCtx.sharedMarine.canPilot,transition:marine.transition,error:marine.error}:null,
     active: !!oceanMode.active,
     launchSite: { ...oceanMode.launchSite },
     navigationMap: oceanMode.navigationMapSnapshot || null,

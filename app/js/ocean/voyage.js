@@ -6,9 +6,10 @@ export function ensureOceanVoyage(ctx,{store=createOceanVoyageStore()}={}){
  if(ctx.oceanVoyage)return ctx.oceanVoyage;
  const setText=(element,text)=>{if(element.textContent!==text)element.textContent=text;};
  const research=ensureMarineResearch(ctx);
- let saved=store.read(),current=null,elapsed=0,status='Not saved yet',ui=null;
- const commit=()=>{if(!current)return false;const result=store.write(current);if(result.saved){current=result.value;saved=result.value;status='Voyage saved on this device';}else status=result.reason==='conflict'?'Another tab changed this voyage. This session is not saved.':result.reason==='invalid-existing'?'The existing voyage record cannot be read and has been retained. This session is not saved.':'Voyage not saved: browser storage unavailable';refresh();return result.saved;};
+ let saved=store.read(),current=null,personalBeforeShared=null,elapsed=0,status='Not saved yet',ui=null;
+ const commit=()=>{if(!current||ctx.sharedMarine?.active)return false;const result=store.write(current);if(result.saved){current=result.value;saved=result.value;status='Voyage saved on this device';}else status=result.reason==='conflict'?'Another tab changed this voyage. This session is not saved.':result.reason==='invalid-existing'?'The existing voyage record cannot be read and has been retained. This session is not saved.':'Voyage not saved: browser storage unavailable';refresh();return result.saved;};
  function begin(options,ocean){
+  if(options.sharedVoyage && !personalBeforeShared)personalBeforeShared={current};
   const resume=validateOceanVoyage(options.voyageResume);
   if(resume){current=resume;current.stage='underwater';}
   else{
@@ -38,7 +39,7 @@ export function ensureOceanVoyage(ctx,{store=createOceanVoyageStore()}={}){
   const offset=ctx.boatMode.currentWater?.source?.waveOffset||{};
   current={...current,site:{...current.site,...anchor},ship:{...current.ship,anchor,yaw:ctx.boat.angle,condition:ctx.boatMode.condition??1},waveOffset:{x:ctx.boat.x+(offset.x||0),z:ctx.boat.z+(offset.z||0)}};return commit();
  }
- function tickSurface(dt){elapsed+=dt;if(elapsed>=5){elapsed=0;surfaceCheckpoint();}refresh();}
+ function tickSurface(dt){ctx.sharedMarine?.tick(dt);elapsed+=dt;if(elapsed>=5){elapsed=0;surfaceCheckpoint();}refresh();}
  function tick(dt){elapsed+=dt;if(elapsed>=5){elapsed=0;checkpoint();}refresh();}
  function refresh(){
   if(!ui)return;
@@ -56,13 +57,15 @@ export function ensureOceanVoyage(ctx,{store=createOceanVoyageStore()}={}){
   else if(current&&sub){const metres=Math.hypot(sub.position.x,sub.position.z)*(ctx.METERS_PER_WORLD_UNIT||1);setText(ui.distance,`Parent vessel · ${Math.round(metres)} m from launch point. Recovery returns you and this submarine aboard.`);}
   ui.recover.disabled=!!ctx.oceanMode?.diver?.active;
  }
- async function resume(){
-  if(!saved||ui?.resume.disabled)return false;
-  const restore=store.read();if(!restore)return false;saved=restore;
+ async function resume(sessionRecord=null){
+  const session=validateOceanVoyage(sessionRecord);
+  if((!saved&&!session)||ui?.resume.disabled)return false;
+  const restore=session||store.read();if(!restore)return false;saved=restore;
   if(ui)ui.resume.disabled=true;
   try{
    // Saved traversal is not a new geographic claim. The current seabed clamps
    // the resumed craft, and inventories remain in their existing authorities.
+   if(ctx.boatMode?.active)ctx.suspendBoatModeForOceanTransfer?.();
    const started=ctx.gameStarted?await ctx.startOceanMode({launchSite:restore.site,waveOffset:restore.waveOffset,submarinePose:restore.sub,voyageResume:restore}):await ctx.triggerTitleStart({bypassCustomGate:true,launchMode:'ocean',voyageResume:restore});
    if(!started)return false;
    ctx.closeGlobeSelector?.();ctx.setPaused?.(false);ctx.paused=false;
@@ -78,12 +81,13 @@ export function ensureOceanVoyage(ctx,{store=createOceanVoyageStore()}={}){
   const style=document.createElement('style');style.textContent='@media(max-width:600px){#oceanVoyageControls{top:auto!important;bottom:146px;max-height:calc(100dvh - 588px);overflow:auto}}';document.head.append(style);
   const title=document.createElement('strong');title.textContent='Research voyage';const distance=document.createElement('div'),statusElement=document.createElement('div');statusElement.setAttribute('role','status');
   const recover=document.createElement('button');recover.id='oceanVoyageRecover';recover.textContent='Recover to parent vessel';recover.style.cssText='width:100%;min-height:42px;margin-top:6px;background:#175069;color:white;border:1px solid #91c2d0;border-radius:7px';recover.onclick=()=>{recover.blur();void ctx.transferSubmarineToBoat({source:'voyage-recovery'})};
+  const shared=document.createElement('button');shared.id='oceanSharedCrew';shared.textContent='Shared crew';shared.style.cssText=recover.style.cssText;shared.onclick=()=>void import('./shared-marine-runtime.js').then(m=>m.openSharedMarine(ctx)).catch(e=>{status=e.message;refresh()});
   const scan=document.createElement('button');scan.id='marineResearchScan';scan.type='button';scan.style.cssText=recover.style.cssText;scan.onclick=()=>{scan.blur();void research.scan().then(refresh)};
   const site=document.createElement('select');site.id='marineResearchSite';site.setAttribute('aria-label','Follow-up study site');site.style.cssText='width:100%;min-height:38px;margin-top:5px;background:#173d4c;color:white';
   REEF_SURVEY.sites.forEach((id,index)=>{const option=document.createElement('option');option.value=id;option.textContent=REEF_SURVEY.labels[index];site.append(option)});site.onchange=()=>{research.select(site.value);site.blur();refresh()};
-  panel.append(title,distance,statusElement,site,scan,recover);document.body.append(panel);ui={resume:resumeButton,panel,title,status:statusElement,distance,recover,scan,site};refresh();
+  panel.append(title,distance,statusElement,site,scan,recover,shared);document.body.append(panel);ui={resume:resumeButton,panel,title,status:statusElement,distance,recover,scan,site};refresh();
  }
- const api={begin,checkpoint,surfaceCheckpoint,surfaced,tick,tickSurface,mount,resume,refresh,get current(){return current},get saved(){return saved},get status(){return status}};
+ const api={restorePersonal(){if(personalBeforeShared){current=personalBeforeShared.current;personalBeforeShared=null;}return current;},begin,checkpoint,surfaceCheckpoint,surfaced,tick,tickSurface,mount,resume,refresh,get current(){return current},get saved(){return saved},get status(){return status}};
  ctx.oceanVoyage=api;
  if(typeof window!=='undefined')window.addEventListener('pagehide',()=>ctx.oceanMode?.active?checkpoint():surfaceCheckpoint());
  return api;

@@ -10,7 +10,7 @@ The preserved `dist` and production release are not being replaced by current pl
 
 ## Latest phase status
 
-P08–P17 are development-complete within their documented boundaries. P17 closes truthful Journal completion/retry, selected replay, common phone results, pause ownership, road target eligibility and delayed/failed game starts. All 1,761 registered tests and source checks pass; actual Baltimore route/game journeys and prescribed-client images are recorded in GAME-LIFECYCLE.md. P16 district evidence remains in EARTH-DISTRICT.md. Public camera C01–C03 Finland still imagery is complete; C04 breadth/multi-view and C05 release remain open. P18 shared marine expeditions is next, followed by P19–P20. Production is unchanged. Older chronological entries below are historical, not current phase status.
+P08–P18 are development-complete within their documented boundaries. P18 passes the real two-client shared voyage, authenticated endpoint/rules checks, all eighteen local marine regression cases, all 1,780 registered tests and source checks. See SHARED-MARINE.md. Street reference follow-up is committed as bbec456d; it is not worldwide reference-quality parity. Public camera C01–C03 is complete; C04 breadth/multi-view is actively being implemented, followed by P19 operations and P20/C05 release gates. Production is unchanged. Older chronological entries below are historical, not current phase status.
 
 ## Street-quality reference continuation
 

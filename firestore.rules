@@ -606,7 +606,7 @@ service cloud.firestore {
           'interiorFloorId',
           'interiorFloorLevel'
         ]) &&
-        frame.kind in ['earth', 'moon', 'space'] &&
+        frame.kind in ['earth', 'moon', 'space', 'ocean'] &&
         frame.locLat is number &&
         frame.locLon is number &&
         (!('interiorKey' in frame) ||
@@ -640,7 +640,7 @@ service cloud.firestore {
         request.resource.data.lastSeenAt is timestamp &&
         request.resource.data.expiresAt is timestamp &&
         request.resource.data.role in ['owner', 'mod', 'member'] &&
-        request.resource.data.mode in ['drive', 'walk', 'drone', 'space', 'moon'] &&
+        request.resource.data.mode in ['drive', 'walk', 'drone', 'space', 'moon', 'ocean'] &&
         validFrameData(request.resource.data.frame) &&
         validPoseData(request.resource.data.pose) &&
         (!('joinCode' in request.resource.data) ||

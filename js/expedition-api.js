@@ -9,6 +9,7 @@ function roomCode(value) {
 async function mutateSharedExpedition(input = {}) {
   const payload = {
     roomCode: roomCode(input.roomCode),
+    ...(input.domain === 'marine' ? {domain:'marine'} : {}),
     action: String(input.action || '').slice(0, 32),
     role: String(input.role || '').slice(0, 32),
     ready: input.ready !== false,

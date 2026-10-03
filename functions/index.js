@@ -1,3 +1,4 @@
+const { mutateMarineExpedition } = require('./marine-expedition-authority');
 const { activeExpeditionPresence, requireExpeditionMembership } = require('./expedition-room-access');
 const { admitRoomPlayer } = require('./room-admission');
 const functions = require('firebase-functions/v1');
@@ -2311,7 +2312,8 @@ exports.mutateSharedExpedition = functions.region('us-central1').runWith({ invok
       displayName: sanitizeText(authUser.displayName || authUser.email || 'Explorer', 60),
       role: sanitizeText(req.body && req.body.role, 32)
     };
-    const expeditionRef = context.roomRef.collection('expeditions').doc('active');
+    const marine = req.body?.domain === 'marine';
+    const expeditionRef = context.roomRef.collection('expeditions').doc(marine ? 'marine' : 'active');
     const state = await db.runTransaction(async (transaction) => {
       const roomSnapshot = await transaction.get(context.roomRef);
       const playersSnap = await transaction.get(context.roomRef.collection('players'));
@@ -2325,7 +2327,9 @@ exports.mutateSharedExpedition = functions.region('us-central1').runWith({ invok
       const snapshot = await transaction.get(expeditionRef);
       const current = snapshot.exists ? snapshot.data() || null : null;
       let next;
-      if (action === 'create') {
+      if (marine) {
+        next = mutateMarineExpedition(current, {roomCode:context.roomCode,uid:auth.uid,displayName:sanitizeText(authUser.displayName || 'Explorer',48),command:req.body?.command,activeUids,nowMs,newId:crypto.randomUUID()});
+      } else if (action === 'create') {
         if (current && current.expedition?.state !== 'failed' && current.expedition?.state !== 'arrived') {
           throw new Error('shared_expedition_already_active');
         }
@@ -2354,7 +2358,7 @@ exports.mutateSharedExpedition = functions.region('us-central1').runWith({ invok
     });
     res.status(200).json({ accepted: true, state });
   } catch (error) {
-    if ([403, 404, 409].includes(error?.status)) return res.status(error.status).json({ error: error.message });
+    if ([403, 404, 409, 422].includes(error?.status)) return res.status(error.status).json({ error: error.message });
     const code = String(error && error.message || '');
     const conflicts = new Set([
       'shared_expedition_already_active', 'shared_expedition_not_found',

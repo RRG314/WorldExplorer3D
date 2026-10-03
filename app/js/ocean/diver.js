@@ -41,6 +41,7 @@ export function createOceanDiver(ctx,mode,{sampleSeabedHeight,worldRadius=1200})
     return true;
   }
   async function start(){
+    if(ctx.sharedMarine?.active){status.textContent='Stay aboard during this shared submarine survey. Leave Shared crew for personal scuba exploration.';return false;}
     if(active||pending||disposed||!mode.active)return false;
     const gate=admission();if(!gate.allowed){status.textContent=gate.reason;return false;}
     pending=true;button.disabled=true;status.textContent='Preparing your explorer…';

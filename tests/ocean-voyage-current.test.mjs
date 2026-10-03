@@ -63,3 +63,17 @@ test('surface checkpoints retain a moved ship anchor and air/gear stay outside t
  const voyage=ensureOceanVoyage(ctx,{store:createOceanVoyageStore({storage})});voyage.begin({},ctx.oceanMode);const subId=voyage.current.subId;voyage.surfaced();ctx.oceanMode.active=false;Object.assign(ctx.boatMode,{active:true,transportEntityId:voyage.current.ship.transportEntityId,condition:.75,currentWater:{source:{waveOffset:{x:7,z:9}}}});assert.equal(voyage.surfaceCheckpoint(),true);
  assert.equal(voyage.saved.subId,subId);assert.equal(voyage.saved.ship.condition,.75);assert.equal(voyage.saved.site.lat,9.998);assert.deepEqual(voyage.saved.waveOffset,{x:107,z:209});assert.deepEqual(voyage.saved.ship.anchor,{lat:voyage.saved.site.lat,lon:voyage.saved.site.lon});
 });
+
+test('shared voyage traversal cannot overwrite the personal save and restores its local owner',()=>{
+ const storage=memory(),store=createOceanVoyageStore({storage}),ctx={boatMode:{},oceanMode:{active:true,launchSite:{lat:10,lon:20},waveOffset:{x:0,z:0},submarine:{position:{x:0,y:-12,z:-65},yaw:0}}};
+ const voyage=ensureOceanVoyage(ctx,{store});voyage.begin({},ctx.oceanMode);const personal=voyage.current,before=storage.getItem(OCEAN_VOYAGE_KEY);
+ ctx.sharedMarine={active:true};voyage.begin({sharedVoyage:true,voyageResume:{...record(),id:'shared-room-voyage'}},ctx.oceanMode);voyage.checkpoint();voyage.surfaced();assert.equal(storage.getItem(OCEAN_VOYAGE_KEY),before);
+ voyage.restorePersonal();assert.equal(voyage.current,personal);assert.equal(storage.getItem(OCEAN_VOYAGE_KEY),before);
+});
+
+test('leaving a shared session can resume retained personal traversal even when browser saving is unavailable',async()=>{
+ let restored=null,suspended=false;
+ const ctx={gameStarted:true,boatMode:{active:true},suspendBoatModeForOceanTransfer(){suspended=true;ctx.boatMode.active=false;},startOceanMode:async options=>{restored=options.voyageResume;return true},oceanMode:{active:false}};
+ const voyage=ensureOceanVoyage(ctx,{store:{read:()=>null,write:()=>({saved:false,reason:'unavailable'})}});
+ assert.equal(await voyage.resume(record()),true);assert.equal(suspended,true);assert.equal(restored.id,'voyage-1');assert.equal(restored.ship.transportEntityId,'ship-1');
+});

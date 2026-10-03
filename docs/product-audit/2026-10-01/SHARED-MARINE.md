@@ -1,6 +1,6 @@
-# P18 shared marine — active, not complete
+# P18 shared marine — development-complete
 
-October 3, 2026. Fresh code inspection confirms the local P10 voyage is not a room-owned vessel. `ui-room-pose.js` and room admission currently describe Earth/Moon/Space; an Ocean explorer cannot be made multiplayer merely by uploading the local voyage record. Existing interstellar expedition roles are participant labels, not exclusive marine helm/submarine seat leases. Do not use historical notes as evidence that these requirements already work.
+Historical starting diagnosis, October 3, 2026. Fresh code inspection confirms the local P10 voyage is not a room-owned vessel. `ui-room-pose.js` and room admission currently describe Earth/Moon/Space; an Ocean explorer cannot be made multiplayer merely by uploading the local voyage record. Existing interstellar expedition roles are participant labels, not exclusive marine helm/submarine seat leases. Do not use historical notes as evidence that these requirements already work.
 
 ## First completed prerequisite
 
@@ -23,3 +23,19 @@ One supported shared Coral Shelf expedition is the first contract; do not expand
 Keep P18 open until those interactions and their server rejection cases pass. P19 operations, camera C04/C05 and P20 release also remain open. This prerequisite is a completed repair to the existing endpoint, not a scaffold presented as a finished shared marine game.
 
 Final combined closeout: all 1,766 registered tests and source checks pass (`street-and-expedition-contracts.log`, `street-and-expedition-source.log`). Production remains unchanged; P18 remains active and incomplete.
+
+
+## Development closeout — October 3
+
+The finite first shared Coral Shelf expedition is implemented and accepted in development. An admitted Earth-room crew can open Shared crew from the research vessel/Ocean controls, create or join the same anchored ship and submarine, claim exclusive helm/pilot leases, deploy, navigate to three authored habitats, record a shared manifest, recover and submit a crew report. Completing or leaving the shared voyage preserves the original personal voyage, Backpack and Journal. This is one anchored site, not shared free-roaming surface navigation or a global Ocean room directory.
+
+The existing protected endpoint owns ship/sub IDs, stage, structural control revision, deployment identity, leases, pose validation, observations and bounded recovery/receipt history. Presence advertises an Ocean frame only after entry; Earth ghosts exclude it. The Ocean craft and crew control panel represent the shared expedition. Helm and pilot seats are exclusive by UID. Pose/heartbeat publications do not invalidate structural commands; deployment identity rejects old-trip pose packets. The pilot publishes every 2.5 seconds; observers interpolate buffered samples without extrapolating past the latest authorized pose. Lost control freezes input and exposes recovery. A disconnected pilot can be replaced after its 15-second lease expires; an active crew member can rescue when no pilot is available.
+
+Verified evidence:
+- All **1,780 registered tests** and source checks pass: `marine-final-contracts.log`, `marine-final-source.log`.
+- `shared-marine/report.json`: nine actual-source, two-browser cases using the real authenticated emulator HTTP endpoint and Firestore transactions. Actual keyboard piloting reaches all three observations. Includes exclusive roles/stale commands, host departure/takeover, underwater rejoin, pilot loss/rescue/report, preserved local save and restored original personal boat. No server-seeded manifest or teleport completion.
+- `shared-marine/rules.json`: admitted Ocean presence, member-only reads/client-write rejection, and an authenticated SDK subscription receiving a server revision. The two-browser main journey uses an admin read-only subscription adapter; SDK delivery is separately tested, not represented as production transport acceptance.
+- `marine-ocean-regression.log`: all eighteen existing actual-source local Ocean/ship/reload/deck/redeployment checks pass with controlled entry-depth responses; no page errors.
+- Actual desktop/phone-view report images and prescribed `shared-marine-client` screenshots/text inspected. Phone viewport is not a physical-phone certificate.
+
+The first race diagnostics are retained separately; only the final nine-case result is the closeout. No backend/rules/frontend deployment. Production Firebase/App Check transport and physical-device/user comprehension remain coordinated P20 release gates. P19 operations and camera C04/C05 follow; do not reopen this finite voyage for unrelated global expansion.

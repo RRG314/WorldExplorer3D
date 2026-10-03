@@ -210,3 +210,8 @@ The supplied city-render screenshot adds the visual target recorded in STREET-QU
 ## P18 prerequisite repair — October 3 continuation
 
 SHARED-MARINE.md records fresh gaps and the finite first Coral Shelf multiplayer acceptance. The existing expedition endpoint now checks membership/seat expiry and crew quorum within the mutation transaction. Its focused contracts and authenticated emulator evidence are separate from the still-unimplemented shared marine player journey. P18 remains open; no deployment.
+
+
+## P18 development closeout — October 3
+
+The finite anchored Coral Shelf crew voyage is complete in development: server-owned vessels, exclusive helm/pilot leases, validated shared motion, three observations, reconnect/takeover/rescue/report and personal-voyage restoration. Nine actual two-client cases, three authenticated rule/subscription cases, eighteen local marine regression cases, all 1,780 registered tests and source checks pass. Desktop/phone viewport and prescribed-client images are inspected. SHARED-MARINE.md states the controlled-provider, subscription-adapter and production/device boundaries. C04 camera breadth/multi-view is active next, then P19/P20. Production unchanged.

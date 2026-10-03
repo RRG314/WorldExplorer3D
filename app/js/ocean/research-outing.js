@@ -39,6 +39,7 @@ export function ensureMarineResearch(ctx,{store:providedStore,now=()=>Date.now()
  function record(part,name,detail,extra={}){const underwater=!!ctx.oceanMode?.active,actor=underwater?(ctx.oceanMode.diver?.active?ctx.oceanMode.diver.navigationActor().position:ctx.oceanMode.submarine.position):ctx.boat;const geo=earthLocalToGeographic(underwater?ctx.oceanMode.launchSite||CORAL_SHELF_SITE:ctx.LOC,ctx.SCALE,actor?.x||0,actor?.z||0)||CORAL_SHELF_SITE;return {eventId:eventId(part),eventType:'marine-research-recorded',sourceSystem:'marine-research',sourceId:eventId(part),activityId:REEF_SURVEY.id,pathId:'field',name,detail,occurredAt:now(),regionLabel:'Coral Shelf authored study',environment:ctx.oceanMode?.active?'OCEAN':'EARTH',locationSnapshot:{...geo,name:'Coral Shelf authored habitat'},localPosition:{x:actor?.x,y:actor?.y,z:actor?.z},projections:{journal:true,profile:false,place:false,missionProgress:false},progress:{points:0,reason:'local-marine-research'},metadata:{truthType:'authored',...extra}};}
  async function save(value){const result=await store().recordExplorerEvent(value);if(!result.recorded&&result.reason!=='already-recorded')throw Error('Journal rejected record');if(result.event?.sourceSystem!=='marine-research'||result.event?.activityId!==REEF_SURVEY.id||result.event?.metadata?.truthType!=='authored')throw Error('Journal ID belongs to another record');await refresh();if(!ready)throw Error('Journal confirmation unavailable');return result;}
  async function labAction(){
+  if(ctx.sharedMarine?.active)return false;
   if(busy)return false;busy=true;
   try{if(!await refresh()||!atLab()||ctx.paused)return false;const s=state();
    if(!s.started){await save(record('brief','Reef survey briefing','Survey A: Table Garden, B: Branch Ridge and C: Seagrass Edge. Stop within 18 m to scan. Return to the wet lab for Scanner II (35 m).'));
@@ -49,6 +50,7 @@ export function ensureMarineResearch(ctx,{store:providedStore,now=()=>Date.now()
   }catch{message='Could not confirm the Journal save. Retry; completed records will not be duplicated.';return false;}finally{busy=false;}
  }
  async function scan(){
+  if(ctx.sharedMarine?.active)return false;
   if(busy)return false;busy=true;
   try{if(!await refresh())return false;const s=state(),gate=admission(),t=target();if(!s.started||!gate.allowed||!t){message=gate.reason||'Get the wet-lab briefing first.';return false;}
    const part=s.completed?`followup:${t.id}:${Math.floor(now()/3600000)}`:t.id;
