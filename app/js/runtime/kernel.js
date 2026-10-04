@@ -1,3 +1,4 @@
+import {acceptedSimulationDelta} from './simulation-clock.js';
 const RUNTIME_PHASES = Object.freeze([
   'input',
   'simulation',
@@ -42,6 +43,7 @@ function createRuntimeKernel(options = {}) {
   const now = options.now || (() => globalThis.performance?.now?.() ?? Date.now());
   const getContext = typeof options.getContext === 'function' ? options.getContext : () => ({});
   const isSuspended = typeof options.isSuspended === 'function' ? options.isSuspended : () => false;
+  const isSimulationPaused = typeof options.isSimulationPaused === 'function' ? options.isSimulationPaused : () => false;
   const onSuspendedFrame = typeof options.onSuspendedFrame === 'function' ? options.onSuspendedFrame : null;
   const onSystemError = typeof options.onSystemError === 'function' ? options.onSystemError : null;
 
@@ -173,8 +175,9 @@ function createRuntimeKernel(options = {}) {
       return false;
     }
 
-    const dt = Math.min(rawDelta, maxDelta);
-    accumulator = Math.min(accumulator + dt, fixedDelta * maxFixedSteps);
+    const simulationPaused=isSimulationPaused(sharedContext);
+    if(simulationPaused)accumulator=0;
+    const dt = simulationPaused?0:acceptedSimulationDelta(rawDelta,Math.min(maxDelta,fixedDelta*maxFixedSteps),accumulator);
     frameNumber++;
     const frame = {
       ...sharedContext,
@@ -187,16 +190,22 @@ function createRuntimeKernel(options = {}) {
       interpolation: 0
     };
 
+    // Input/readiness decisions belong before both player and population work.
+    frame.phase='input';
+    for(const record of orderedSystems)if(record.phase==='input')invokeSystem(record,'update',frame);
+    if(frame.flags.simulationBlocked){frame.dt=0;accumulator=0;}
+    accumulator+=frame.dt;
     let fixedStep = 0;
-    while (accumulator >= fixedDelta && fixedStep < maxFixedSteps) {
+    while (accumulator + 1e-10 >= fixedDelta && fixedStep < maxFixedSteps) {
       fixedStep++;
       const fixedFrame = { ...frame, dt: fixedDelta, fixedStep };
       for (const record of orderedSystems) invokeSystem(record, 'fixedUpdate', fixedFrame);
-      accumulator -= fixedDelta;
+      accumulator = Math.max(0,accumulator-fixedDelta);
     }
     frame.interpolation = fixedDelta > 0 ? accumulator / fixedDelta : 0;
 
     for (const phase of RUNTIME_PHASES) {
+      if(phase==='input')continue;
       frame.phase = phase;
       for (const record of orderedSystems) {
         if (record.phase === phase) invokeSystem(record, 'update', frame);

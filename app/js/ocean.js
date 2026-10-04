@@ -35,6 +35,7 @@ import {
   registerEnvironmentLifecycle
 } from './session-coordinator.js?v=2';
 import { createLifecycleScope } from './runtime/lifecycle-scope.js?v=2';
+import {acceptedSimulationDelta} from './runtime/simulation-clock.js';
 
 const OCEAN_SITE = Object.freeze({
   name: 'Coral Shelf Reserve',
@@ -565,7 +566,7 @@ function animateOceanMode(nowMs = 0) {
   oceanMode.animationId = oceanSessionScope?.animationFrame(animateOceanMode) ?? null;
 
   if (!oceanMode.lastFrameMs) oceanMode.lastFrameMs = nowMs;
-  const dt = appCtx.paused ? 0 : Math.min(0.05, Math.max(0.001, (nowMs - oceanMode.lastFrameMs) / 1000));
+  const dt = appCtx.paused || globalThis.document?.hidden ? 0 : acceptedSimulationDelta((nowMs-oceanMode.lastFrameMs)/1000);
   oceanMode.lastFrameMs = nowMs;
 
   appCtx.sharedMarine?.tick(dt);

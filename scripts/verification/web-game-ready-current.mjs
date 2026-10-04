@@ -69,6 +69,22 @@ source=source.replace('console.warn("Failed to click selector", args.clickSelect
 // The generic client captures console errors but exits successfully. A release
 // check must retain that evidence and fail after closing its owned browser.
 source=source.replace('if (freshErrors.length) {', 'if (freshErrors.length) { process.exitCode = 1;');
+// The loopback preview deliberately returns 503 when its optional naming
+// emulator is absent. Preserve that result as degraded provider evidence;
+// this explicitly opted-in local movement check does not certify search.
+if(process.env.WE3D_ACTION_LOCAL_PLACE_UNAVAILABLE==='1') source=source.replace('const freshErrors = consoleErrors.drain();', `
+const observedErrors=consoleErrors.drain();
+const expectedLocalNamingFailure=error=>{
+ try{const url=new URL(error.location?.url),base=new URL(args.url);
+ return ['127.0.0.1','localhost'].includes(base.hostname)&&url.origin===base.origin&&
+ ['/api/geospatial/search','/api/geospatial/reverse'].includes(url.pathname)&&
+ error.text==='Failed to load resource: the server responded with a status of 503 (Service Unavailable)';
+ }catch{return false;}
+};
+const providerDegradations=observedErrors.filter(expectedLocalNamingFailure);
+if(providerDegradations.length)fs.writeFileSync(path.join(args.screenshotDir,'provider-degradations-'+i+'.json'),JSON.stringify({
+ scope:'Local movement only; optional place-name emulator unavailable; no search/provider acceptance',errors:providerDegradations},null,2));
+const freshErrors=observedErrors.filter(error=>!expectedLocalNamingFailure(error));`);
 // WebGL's default non-preserved drawing buffer may be cleared before toDataURL.
 // Capture the composited page instead, including the real player-facing HUD.
 source=source.replace('await captureScreenshot(page, canvas, shotPath);', 'await page.screenshot({path:shotPath, type:"png"});\nfs.writeFileSync(path.join(args.screenshotDir,"runtime.json"),JSON.stringify(await page.evaluate(()=>window.getWorldExplorerRuntimeDiagnostics?.()),null,2));');

@@ -11,6 +11,7 @@
     "skipLibCheck": true
   },
   "files": [
+    "app/js/runtime/simulation-clock.js",
     "types/world-boundaries.ts",
     "tests/world-boundaries.type-test.ts"
   ]

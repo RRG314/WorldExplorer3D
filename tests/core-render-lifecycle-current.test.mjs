@@ -77,7 +77,7 @@ test('flight telemetry records full stalls while simulation catch-up stays bound
  kernel.registerSystem({id:'test.simulation',phase:'simulation',update:frame=>steps.push(frame.dt)});
  for(const timestamp of [0,16,2016,2032])kernel.runFrame(timestamp);
  assert.deepEqual(observed,[0,.016,2,.016]);
- assert.deepEqual(steps,[0,.016,.1,.016]);
+ assert.equal(steps[0],0);assert.equal(steps[1],.016);assert.ok(Math.abs(steps[2]-(5/60-.016))<1e-9);assert.equal(steps[3],.016);
  kernel.dispose();
 });
 

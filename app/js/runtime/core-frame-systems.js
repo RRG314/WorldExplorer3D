@@ -35,9 +35,10 @@ function createCoreFrameSystems(appCtx, hooks = {}) {
       }
     },
     {
-      id: 'core.simulation',
+      id: 'core.readiness',
       owner: 'engine',
-      phase: 'simulation',
+      phase: 'input',
+      priority: 10,
       enabled: () => !!appCtx.gameStarted && !appCtx.worldLoading && !appCtx.titleLaunchPending,
       update(frame) {
         const earthActive=!appCtx.onMoon&&!appCtx.onMars&&!appCtx.activePlanetaryBodyId&&
@@ -47,8 +48,15 @@ function createCoreFrameSystems(appCtx, hooks = {}) {
           const point=appCtx.activeEarthActorPosition?.()||{x:0,z:0};
           detail.step(point);
           const terrainY=['plane','drone'].includes(point.source)?appCtx.terrainMeshHeightAt?.(point.x,point.z):NaN;
-          if(!detail.readyForActor(point,terrainY))return;
+          if(!detail.readyForActor(point,terrainY))frame.flags.simulationBlocked=true;
         }
+      }
+    },
+    {
+      id:'core.simulation',owner:'engine',phase:'simulation',
+      enabled:()=>!!appCtx.gameStarted&&!appCtx.worldLoading&&!appCtx.titleLaunchPending,
+      update(frame){
+        if(frame.flags?.simulationBlocked)return;
         appCtx.update(frame.dt);
       }
     },

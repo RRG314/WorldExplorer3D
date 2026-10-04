@@ -5,9 +5,9 @@ import {TRANSPORT_REGION_SIZE,actorNeedsRoadDetail} from './transport-detail-pla
 export async function prepareTransportDetail(appCtx,roads,{isCurrent,focus={x:0,z:0},terrainReady=null}) {
   const url=globalThis.__WORLD_EXPLORER_PRODUCTION__?.transportDetailWorkerUrl||new URL('./transport-detail-worker.js',import.meta.url);
   const worker=new Worker(url,{type:'module'});
-  let pending=null,disposed=false,active=null,publish=null,complete=null,mask=null,notice=null,lastSync=0;
+  let pending=null,disposed=false,active=null,publish=null,complete=null,mask=null,notice=null,noticeText=null,retryButton=null,lastSync=0;
   const remaining=new Map();
-  const stats={status:'preparing',sourceRoads:roads.length,completedRegions:0,pendingRegions:0,blocked:false,error:null};
+  const stats={status:'preparing',sourceRoads:roads.length,completedRegions:0,pendingRegions:0,blocked:false,blockedAtMs:null,blockedTotalMs:0,blockedCount:0,error:null};
   const request=data=>new Promise((resolve,reject)=>{
     const timeout=setTimeout(()=>{pending=null;reject(new Error('Transport detail worker exceeded its deadline'));},60000);
     pending={resolve:value=>{clearTimeout(timeout);pending=null;resolve(value);},reject:error=>{clearTimeout(timeout);pending=null;reject(error);}};
@@ -22,14 +22,24 @@ export async function prepareTransportDetail(appCtx,roads,{isCurrent,focus={x:0,
     stats.status='disposed';stats.pendingRegions=0;stats.blocked=false;
   }
   function updateNotice(blocked){
+    if(blocked&&!stats.blocked){stats.blockedAtMs=performance.now();stats.blockedCount++;}
+    if(!blocked&&stats.blocked){stats.blockedTotalMs+=Math.max(0,performance.now()-stats.blockedAtMs);stats.blockedAtMs=null;}
     stats.blocked=blocked;
-    if(!blocked){notice?.remove();notice=null;return;}
+    if(!blocked){notice?.remove();notice=noticeText=retryButton=null;return;}
     if(!notice&&typeof document!=='undefined'){
       notice=document.createElement('div');notice.setAttribute('role','status');notice.dataset.transportReadiness='true';
-      notice.style.cssText='position:fixed;bottom:100px;left:50%;transform:translateX(-50%);z-index:2000;padding:8px 14px;background:#10202ee8;color:white;border-radius:8px;pointer-events:none;font:14px sans-serif';
+      notice.style.cssText='position:fixed;bottom:100px;left:50%;transform:translateX(-50%);z-index:2000;padding:8px 14px;background:#10202ee8;color:white;border-radius:8px;font:14px sans-serif';
+      noticeText=document.createElement('span');notice.append(noticeText);
+      if(typeof appCtx.reloadEarthWorldSession==='function'){
+        retryButton=document.createElement('button');retryButton.textContent='Retry roads';retryButton.style.cssText='margin-left:10px;min-height:44px';
+        retryButton.onclick=async()=>{if(disposed||!isCurrent())return;retryButton.disabled=true;appCtx.captureEarthWorldSession?.();try{await appCtx.reloadEarthWorldSession({transitionDurationMs:0});}catch{/* Keep the failed readiness notice available for another attempt. */}finally{if(retryButton&&!disposed)retryButton.disabled=false;}};
+        notice.append(retryButton);
+      }
       document.body.appendChild(notice);
     }
-    if(notice)notice.textContent=stats.error?'Nearby road detail could not load. Return to Main Menu to retry.':'Preparing nearby road detail…';
+    const message=stats.error?'Nearby road detail could not load. Retry here or from Main Menu.':'Preparing nearby road detail…';
+    if(noticeText&&noticeText.textContent!==message)noticeText.textContent=message;
+    if(retryButton)retryButton.hidden=!stats.error;
   }
   appCtx._cancelTransportPreparation?.();
   appCtx._cancelTransportPreparation=dispose;

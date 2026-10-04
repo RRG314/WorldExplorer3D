@@ -118,6 +118,34 @@ test('ground readiness protects landing and driving without pausing water or hig
  assert.equal(actorNeedsRoadDetail({source:'drive',y:300},0),true);
 });
 
+test('failed road readiness retains collision protection and an owned retry with wait accounting',async t=>{
+ const prior={Worker:globalThis.Worker,THREE:globalThis.THREE,document:globalThis.document};
+ globalThis.THREE=await import('three');
+ const elements=[];
+ globalThis.document={createElement(tag){const element={tag,style:{},dataset:{},children:[],setAttribute(){},append(child){this.children.push(child);},remove(){this.removed=true;}};elements.push(element);return element;},body:{appendChild(){}}};
+ globalThis.Worker=class {
+  postMessage(message){queueMicrotask(()=>this.onmessage?.({data:message.type==='prepare'?
+   {type:'prepared',keys:[],layout:{resolution:64},masks:new Uint8Array(),regions:[],pending:[{key:'2:0',bounds:{}}]}:
+   {type:'error',message:'Controlled worker failure'}}));}
+  terminate(){}
+ };
+ t.after(()=>Object.assign(globalThis,prior));
+ const {prepareTransportDetail}=await import('../app/js/terrain/transport-detail-runtime.js');
+ let captures=0,reloads=0,current=true;
+ const ctx={terrainGroup:{children:[]},renderer:{capabilities:{maxTextureSize:4096}},terrainMeshHeightAt:()=>0,
+  captureEarthWorldSession(){captures++;},async reloadEarthWorldSession(){reloads++;throw Error('Controlled retry failure');}};
+ const detail=await prepareTransportDetail(ctx,[],{isCurrent:()=>current});t.after(()=>detail.dispose());
+ detail.attach(()=>{});assert.equal(detail.readyAt({x:2500,z:300},0),false);
+ const button=elements.find(e=>e.tag==='button');assert.equal(button.hidden,true);
+ detail.step({x:2500,z:300});await new Promise(r=>setTimeout(r,5));
+ assert.equal(detail.readyAt({x:2500,z:300},0),false);assert.equal(button.hidden,false);
+ assert.equal(detail.stats.blockedCount,1);assert.equal(detail.stats.status,'failed');
+ await button.onclick();assert.equal(captures,1);assert.equal(reloads,1);assert.equal(button.disabled,false);
+ assert.equal(detail.readyAt({x:0,z:0},0),true);assert.ok(detail.stats.blockedTotalMs>0);assert.equal(detail.stats.blockedAtMs,null);
+ current=false;await button.onclick();assert.equal(reloads,1);detail.dispose();
+ assert.equal(elements.find(e=>e.tag==='div').removed,true);
+});
+
 
 test('plan-ahead transport produces byte-identical masks and complete geometry from the final terrain',()=>{
  const serial=createTransportDetailCompiler({roads,terrain:terrain(),radius:1024});

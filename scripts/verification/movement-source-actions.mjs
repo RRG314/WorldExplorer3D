@@ -20,7 +20,8 @@ try {
     '--iterations',plane?'4':'2','--screenshot-dir',process.env.WE3D_ACTION_OUTPUT || 'output/architecture-evaluation/movement-source-actions-recorded-noaa'],
     {stdio:'inherit',env:{...process.env,WE3D_STAGING_APP_CHECK_FILE:credential,
       WE3D_GAME_CLIENT:process.env.WE3D_GAME_CLIENT || path.join(process.env.HOME,'.codex/skills/develop-web-game/scripts/web_game_playwright_client.js'),
-      WE3D_REAL_GPU:'1',WE3D_TEST_DAY:'1',WE3D_ACTION_ROAD_START:plane?'0':'1'}});
+      WE3D_REAL_GPU:'1',WE3D_TEST_DAY:'1',WE3D_ACTION_ROAD_START:plane?'0':'1',
+      WE3D_ACTION_LOCAL_PLACE_UNAVAILABLE:process.env.WE3D_PLACE_LOOKUP_EMULATOR_ORIGIN?'0':'1'}});
   process.exitCode=await new Promise((resolve,reject)=>{child.on('error',reject);child.on('exit',code=>resolve(code??1));});
 } finally {
   await server?.close();

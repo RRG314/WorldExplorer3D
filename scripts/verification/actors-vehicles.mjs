@@ -576,10 +576,13 @@ try {
     const browserErrors = [];
     collectBrowserGraphicsErrors(page, browserErrors);
     const localFailures = [];
+    const providerDegradations = [];
     page.on('pageerror', (error) => browserErrors.push(String(error?.stack || error)));
     page.on('response', (response) => {
       if (response.url().startsWith(baseUrl) && response.status() >= 400) {
-        localFailures.push({ status: response.status(), url: response.url() });
+        const endpoint=new URL(response.url()).pathname;
+        if(['/api/geospatial/search','/api/geospatial/reverse'].includes(endpoint)&&[429,502,503,504].includes(response.status()))providerDegradations.push({endpoint,status:response.status()});
+        else localFailures.push({ status: response.status(), url: response.url() });
       }
     });
     page.on('requestfailed', (request) => {
@@ -791,10 +794,10 @@ try {
         envelopes,
         runtimeErrors: second?.runtimeErrors || [],
         browserErrors,
-        localFailures
+        localFailures,providerDegradations
       });
     } catch (error) {
-      results.push({ id: location.id, ok: false, error: String(error?.stack || error), browserErrors, localFailures });
+      results.push({ id: location.id, ok: false, error: String(error?.stack || error), browserErrors, localFailures,providerDegradations });
       await page.screenshot({ path: path.join(evidenceDir, `${location.id}-error.png`), timeout: 5000 }).catch(() => {});
     } finally {
       if (cpuProfiler) {

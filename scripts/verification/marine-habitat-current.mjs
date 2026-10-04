@@ -43,7 +43,7 @@ try {
  report.cases.push({id:'actual-app-regional-assets-loaded',passed:true});
  // A controlled camera close-up inspects authored mesh contact and near LOD;
  // ordinary sub movement and HUD are captured separately at arrival.
- await page.evaluate(()=>{const o=marineCtx.oceanMode,r=o.habitat.plan.rocks[0];marineCtx.paused=true;o.submarine.position.set(r.x,r.y+8,r.z-15);o.habitat.update(1,o.submarine.position,0);o.camera.position.set(r.x+12,r.y+6,r.z-13);o.cameraLookTarget.set(r.x,r.y+2,r.z);o.camera.lookAt(o.cameraLookTarget);});
+ await page.evaluate(()=>{const o=marineCtx.oceanMode,r=o.habitat.plan.rocks[0];marineCtx.setPauseReason('verification_pause',true);o.submarine.position.set(r.x,r.y+8,r.z-15);o.habitat.update(1,o.submarine.position,0);o.camera.position.set(r.x+12,r.y+6,r.z-13);o.cameraLookTarget.set(r.x,r.y+2,r.z);o.camera.lookAt(o.cameraLookTarget);});
  await page.waitForTimeout(300);await page.screenshot({path:`${dir}/reef-close.png`});
  report.contact=await page.evaluate(()=>{const o=marineCtx.oceanMode,r=o.habitat.plan.rocks[0];o.scene.updateMatrixWorld(true);const hits=new THREE.Raycaster(new THREE.Vector3(r.x,100,r.z),new THREE.Vector3(0,-1,0)).intersectObject(o.seabedMesh);return {rock:r,ground:hits[0]?.point}});
  report.close=await page.evaluate(()=>({habitat:marineCtx.oceanMode.habitat.group.userData.habitat,render:marineCtx.oceanMode.renderer.info.render,memory:marineCtx.oceanMode.renderer.info.memory}));
@@ -52,7 +52,7 @@ try {
  await page.evaluate(()=>{window.savedSkyRefresh=marineCtx.refreshAstronomicalSky;marineCtx.refreshAstronomicalSky=()=>{};marineCtx.applyOceanSkyState({sun:{daylightFactor:0,twilightFactor:0,direction:{x:0,y:-1,z:0}}});});
  await page.waitForTimeout(200);await page.screenshot({path:`${dir}/night.png`});
  await page.evaluate(()=>{marineCtx.refreshAstronomicalSky=window.savedSkyRefresh;marineCtx.refreshAstronomicalSky(true);});
- const obstacle=await page.evaluate(()=>{const o=marineCtx.oceanMode,r=o.habitat.plan.rocks[0];o.submarine.position.set(r.x,r.y+1.8,r.z-r.rz-12);o.submarine.yaw=0;o.submarine.speed=0;marineCtx.paused=false;return {z:r.z,x:r.x};});
+ const obstacle=await page.evaluate(()=>{const o=marineCtx.oceanMode,r=o.habitat.plan.rocks[0];o.submarine.position.set(r.x,r.y+1.8,r.z-r.rz-12);o.submarine.yaw=0;o.submarine.speed=0;marineCtx.setPauseReason('verification_pause',false);return {z:r.z,x:r.x};});
  await page.keyboard.down('ArrowUp');await page.waitForTimeout(3000);await page.keyboard.up('ArrowUp');
  const stopped=await page.evaluate(()=>({position:{...marineCtx.oceanMode.submarine.position},speed:marineCtx.oceanMode.submarine.speed}));
  assert.ok(stopped.position.z<obstacle.z);assert.ok(Math.abs(stopped.speed)<.5,'sub stops at the reef');
@@ -64,7 +64,7 @@ try {
  await page.locator('#oceanSoundToggle').click();assert.equal(await page.evaluate(()=>marineCtx.oceanMode.soundscape.snapshot().enabled),true);
  await page.locator('#oceanSoundToggle').click();assert.equal(await page.evaluate(()=>marineCtx.oceanMode.soundscape.snapshot().enabled),false);
  report.cases.push({id:'actual-sound-opt-in-and-mute',passed:true});
- await page.evaluate(()=>{marineCtx.paused=false;});
+ await page.evaluate(()=>{marineCtx.setPauseReason('verification_pause',false);});
  report.frameTiming=await page.evaluate(async()=>{const samples=[];let last=performance.now();for(let i=0;i<180;i++){await new Promise(requestAnimationFrame);const now=performance.now();samples.push(now-last);last=now;}samples.sort((a,b)=>a-b);return {frames:samples.length,p50:samples[90],p95:samples[171],p99:samples[178],max:samples.at(-1),over100ms:samples.filter(n=>n>100).length};});
  assert.ok(report.close.render.calls<120);assert.ok(report.close.render.triangles<900000);
  await page.setViewportSize({width:390,height:844});await page.waitForTimeout(200);await page.screenshot({path:`${dir}/phone.png`});

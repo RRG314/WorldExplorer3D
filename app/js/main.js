@@ -102,6 +102,7 @@ const runtimeKernel = createRuntimeKernel({
     gameStarted: !!appCtx.gameStarted
   }),
   isSuspended: dedicatedRendererActive,
+  isSimulationPaused: () => appCtx.paused || globalThis.document?.hidden === true,
   onSuspendedFrame: ({ timestamp }) => {
     appCtx.lastTime = timestamp;
   },

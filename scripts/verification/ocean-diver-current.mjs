@@ -37,9 +37,9 @@ try {
  await page.locator('#oceanDiverToggle').waitFor({state:'visible'});
  await page.locator('#oceanDiverToggle').click();
  await page.waitForFunction(()=>window.getOceanModeDebugState?.().diver?.swimming?.equipment==='scuba',null,{timeout:30000});
- const paused=await page.evaluate(async()=>{const {ctx}=await import('/app/js/shared-context.js?v=55');ctx.paused=true;return getOceanModeDebugState().diver});
+ const paused=await page.evaluate(async()=>{const {ctx}=await import('/app/js/shared-context.js?v=55');ctx.setPauseReason('verification_pause',true);return getOceanModeDebugState().diver});
  await page.waitForTimeout(500);const stillPaused=await page.evaluate(()=>getOceanModeDebugState().diver);assert.deepEqual(stillPaused.position,paused.position);assert.equal(stillPaused.swimming.airSeconds,paused.swimming.airSeconds);
- await page.evaluate(async()=>{const {ctx}=await import('/app/js/shared-context.js?v=55');ctx.paused=false});report.cases.push({id:'pause-preserves-diver-position-and-air',passed:true});
+ await page.evaluate(async()=>{const {ctx}=await import('/app/js/shared-context.js?v=55');ctx.setPauseReason('verification_pause',false)});report.cases.push({id:'pause-preserves-diver-position-and-air',passed:true});
  const initial=await page.evaluate(()=>getOceanModeDebugState());
  assert.equal(initial.diver.ready,true);assert.equal(initial.diver.swimming.equipment,'scuba');
  await page.keyboard.down('w');

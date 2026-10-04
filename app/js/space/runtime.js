@@ -1,4 +1,5 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
+import {acceptedSimulationDelta,frameDamping} from '../runtime/simulation-clock.js';
 import {
   getAstronomicalBody,
   LANDING_MODE,
@@ -689,7 +690,7 @@ export function updateSpaceFlightPhysics() {
   }
 }
 
-export function updateSpaceFlightCamera() {
+export function updateSpaceFlightCamera(dt = (appCtx.spaceFlight._frameScale ?? 1) / 60) {
   const {
     cameraLookMatrix,
     cameraQuaternion,
@@ -702,12 +703,12 @@ export function updateSpaceFlightCamera() {
   if (appCtx.spaceFlight.overviewMode) {
     if (appCtx.spaceFlight.overviewMode === 'inner') _sfTargetPos.set(0, 5600, 7200);
     else _sfTargetPos.set(0, 52000, 68000);
-    appCtx.spaceFlight.camera.position.lerp(_sfTargetPos, 0.08);
+    appCtx.spaceFlight.camera.position.lerp(_sfTargetPos, frameDamping(0.08,dt));
     appCtx.spaceFlight.camera.up.set(0, 1, 0);
     _sfTempVec.set(0, 0, 0);
     cameraLookMatrix.lookAt(appCtx.spaceFlight.camera.position, _sfTempVec, appCtx.spaceFlight.camera.up);
     cameraQuaternion.setFromRotationMatrix(cameraLookMatrix);
-    appCtx.spaceFlight.camera.quaternion.slerp(cameraQuaternion, 0.045).normalize();
+    appCtx.spaceFlight.camera.quaternion.slerp(cameraQuaternion, frameDamping(0.045,dt)).normalize();
     return;
   }
   _sfForward.set(0, 1, 0).applyQuaternion(rocket.quaternion);
@@ -730,7 +731,7 @@ export function updateSpaceFlightCamera() {
   const snapCamera = appCtx.spaceFlight._snapCameraToCraft === true;
   const atmosphericChase = appCtx.spaceJourney?.phase === 'atmospheric_exploration';
   if (snapCamera) appCtx.spaceFlight.camera.position.copy(_sfTargetPos);
-  else appCtx.spaceFlight.camera.position.lerp(_sfTargetPos, atmosphericChase ? 0.18 : 0.1);
+  else appCtx.spaceFlight.camera.position.lerp(_sfTargetPos, frameDamping(atmosphericChase ? 0.18 : 0.1,dt));
   // Follow the spacecraft's transported up vector rather than a fixed world-up
   // pole. Physics reads the resulting camera axes, so arrows retain the same
   // visible direction through every world-axis crossing.
@@ -738,7 +739,7 @@ export function updateSpaceFlightCamera() {
   cameraLookMatrix.lookAt(appCtx.spaceFlight.camera.position, rocket.position, _sfTempVec);
   cameraQuaternion.setFromRotationMatrix(cameraLookMatrix);
   if (snapCamera) appCtx.spaceFlight.camera.quaternion.copy(cameraQuaternion).normalize();
-  else appCtx.spaceFlight.camera.quaternion.slerp(cameraQuaternion, atmosphericChase ? 0.12 : 0.045).normalize();
+  else appCtx.spaceFlight.camera.quaternion.slerp(cameraQuaternion, frameDamping(atmosphericChase ? 0.12 : 0.045,dt)).normalize();
   appCtx.spaceFlight._snapCameraToCraft = false;
 }
 
@@ -750,8 +751,9 @@ export function animateSpaceFlight(deps = {}) {
 
   const frameNow = performance.now();
   const previousFrame = appCtx.spaceFlight._lastFrameMs || frameNow - (1000 / 60);
-  appCtx.spaceFlight._frameScale = Math.min(2.5, Math.max(0.25, (frameNow - previousFrame) / (1000 / 60)));
+  appCtx.spaceFlight._frameScale = acceptedSimulationDelta((frameNow-previousFrame)/1000)*60;
   appCtx.spaceFlight._lastFrameMs = frameNow;
+  if(appCtx.paused||globalThis.document?.hidden)return;
 
   if (appCtx.spaceFlight.earth) appCtx.spaceFlight.earth.rotation.y += 0.0005 * appCtx.spaceFlight._frameScale;
   if (appCtx.spaceFlight.moon) appCtx.spaceFlight.moon.rotation.y += 0.0002 * appCtx.spaceFlight._frameScale;

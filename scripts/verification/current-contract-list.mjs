@@ -1,5 +1,6 @@
 // Component and source-contract checks; browser and emulator journeys run separately.
 export const currentContractTests = [
+  'tests/simulation-clock-current.test.mjs',
   'tests/context-ownership-current.test.mjs',
   'tests/session-ownership-current.test.mjs',
   'tests/condition-sync-current.test.mjs',
