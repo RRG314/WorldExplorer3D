@@ -484,7 +484,7 @@ const requestedRoot = String(process.env.WE3D_VERIFY_ROOT || '').trim();
 const servedRoot = requestedRoot ? path.resolve(root, requestedRoot) : root;
 const server = await startStaticServer({ rootDir: servedRoot, ports: [4398, 4399, 4400, 4401] });
 const baseUrl = `http://127.0.0.1:${server.port}`;
-const evidenceDir = path.join(root, 'output', 'verification', 'actors-vehicles');
+const evidenceDir = process.env.WE3D_ACTORS_OUTPUT || path.join(root, 'output', 'verification', 'actors-vehicles');
 const captureDir = path.join(root, 'output', 'release-evidence', 'current', 'actors-vehicles');
 const capture = process.env.WE3D_CAPTURE_RELEASE_EVIDENCE === '1';
 await fs.mkdir(evidenceDir, { recursive: true });

@@ -9,6 +9,9 @@ export async function sampleFrameWindow(durationMs) {
   durationMs = options ? options.durationMs : durationMs;
   return new Promise((resolve) => {
     const deltas = [];
+    const background = [];
+    const backgroundContext = options?.backgroundContextKey ? globalThis[options.backgroundContextKey] : null;
+    let backgroundAt = -Infinity;
     const lightSample = options?.collectDiagnostics === false;
     if (lightSample && !routeActor) throw new Error('A lightweight sample needs a live actor reference.');
     const startActor = lightSample ? {position:routeActor} : globalThis.getWorldExplorerRuntimeDiagnostics?.()?.activeActor;
@@ -34,6 +37,16 @@ export async function sampleFrameWindow(durationMs) {
       }
       if(routeActor){priorX=routeActor.x;priorZ=routeActor.z;}
       previous = now;
+      // Scalar counters only, at most once per second. Do not traverse the
+      // scene or build the public diagnostics snapshot inside a timed window.
+      if (backgroundContext && now - backgroundAt >= 1000) {
+        backgroundAt = now;
+        const overview = backgroundContext.streetOverview?.stats;
+        const transport = backgroundContext.transportDetail?.stats;
+        background.push({elapsedMs:now-startedAt,
+          overview:overview ? {status:overview.status,completedCells:overview.completedCells,totalCells:overview.totalCells,workerActive:overview.workerActive} : null,
+          transport:transport ? {status:transport.status,completedRegions:transport.completedRegions,pendingRegions:transport.pendingRegions,blocked:transport.blocked} : null});
+      }
       // Read only two coordinates per frame, not the full world diagnostics.
       const routeComplete = targetDistance > 0 && startPosition &&
         Math.hypot(routeActor.x-startPosition.x,routeActor.z-startPosition.z) >= targetDistance;
@@ -42,6 +55,7 @@ export async function sampleFrameWindow(durationMs) {
         const diagnostics = lightSample ? {activeActor:{position:routeActor}} : globalThis.getWorldExplorerRuntimeDiagnostics?.() || {};
         resolve({
           deltas,
+          background,
           requestedAt, startedAt, endedAt: now, timeOrigin: performance.timeOrigin ?? null,
           distanceTraveled, movingMs,
           firstFrameDelayMs: startedAt-requestedAt,

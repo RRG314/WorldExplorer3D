@@ -31,12 +31,12 @@ if(context<0)throw Error('Expected explicitly tagged application context');
 const excluded=new Set(['__proto__','prototype','constructor','parent','ownerDocument','native_context','context']);
 const marks=new Uint32Array(n);let generation=0;
 function dataReachable(root){
-  generation++;const stack=[root];let bytes=0,count=0;
+  generation++;const stack=[root];let bytes=0,count=0;const byType={};
   while(stack.length){
     const id=stack.pop();if(marks[id]===generation)continue;marks[id]=generation;
     const type=types[heap.nodes[id*width+nt]];
     if(['closure','code','synthetic'].includes(type))continue;
-    bytes+=heap.nodes[id*width+ns];count++;
+    bytes+=heap.nodes[id*width+ns];count++;const group=byType[type]||={count:0,bytes:0};group.count++;group.bytes+=heap.nodes[id*width+ns];
     for(let p=offsets[id];p<offsets[id+1];p+=ew){
       const kind=edgeTypes[heap.edges[p+et]];
       if(kind==='weak'||kind==='shortcut')continue;
@@ -48,7 +48,7 @@ function dataReachable(root){
       stack.push(heap.edges[p+to]/width);
     }
   }
-  return {count,bytes};
+  return {count,bytes,byType};
 }
 const roots=[];
 const reviewedOwners=new Set(['scene','roads','buildings','landuses','linearFeatures','pois','roadMeshes','buildingMeshes',
@@ -57,6 +57,10 @@ const reviewedOwners=new Set(['scene','roads','buildings','landuses','linearFeat
   'waterAreas','waterways','waterSurfaceRegistrySnapshot','buildingProvenanceRecords','buildingProvenanceModel',
   'livingWorldRuntime','worldPublication','streetPavement','streetFrontageGrading','roadContactIndex','linearWalkContactIndex',
   'vegetationFeatures','streetFurnitureMeshes','functionalPoiRecords','transportFacilityGraph','_worldLoadNodes']);
+if(process.env.WE3D_HEAP_ALL_CONTEXT==='1'){
+  const inventory=JSON.parse(await readFile(new URL('../../docs/system-review/2026-10-04/inventory.json',import.meta.url),'utf8'));
+  for(const row of inventory.contextRoots)reviewedOwners.add(row.root);
+}
 for(let p=offsets[context];p<offsets[context+1];p+=ew){
   if(edgeTypes[heap.edges[p+et]]!=='property')continue;
   const name=strings[heap.edges[p+en]],id=heap.edges[p+to]/width,type=types[heap.nodes[id*width+nt]];
@@ -81,7 +85,10 @@ for(let p=offsets[context];p<offsets[context+1];p+=ew){
     }
   }
 }
-const result={scope:'Aggregate shallow bytes and overlapping structural data reachability; not dominator sizes. Excludes function contexts, prototype and scene-parent backedges. No heap values emitted.',
+const constructors={};
+const reviewedConstructors=new Set(['ArrayBuffer','SharedArrayBuffer','Float32Array','Float64Array','Uint32Array','Uint16Array','Uint8Array','Uint8ClampedArray','Int32Array','DataView']);
+for(let i=0;i<n;i++){const name=strings[heap.nodes[i*width+nn]];if(reviewedConstructors.has(name)&&types[heap.nodes[i*width+nt]]==='object')constructors[name]=(constructors[name]||0)+1;}
+const result={constructors,scope:'Aggregate shallow bytes and overlapping structural data reachability; not dominator sizes. Excludes function contexts, prototype and scene-parent backedges. No heap values emitted.',
   captures,nodes:n,edges:heap.edges.length/ew,byType:[...totals.values()].sort((a,b)=>b.bytes-a.bytes),contextData:roots.sort((a,b)=>b.bytes-a.bytes)};
 await writeFile(output,JSON.stringify(result,null,2));
 console.log(JSON.stringify({nodes:n,top:result.contextData.slice(0,20)},null,2));

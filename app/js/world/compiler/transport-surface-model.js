@@ -139,7 +139,7 @@ function compileTransportSurfaceModel(feature, sampleTerrainY, options = {}) {
 
   const points = feature.pts;
   const semantics = feature.structureSemantics || { terrainMode: 'at_grade' };
-  const { distances: pathDistances, total } = polylineDistances(points);
+  const { distances: sourcePathDistances, total } = polylineDistances(points);
   const exactGraphNodeDistances = (Array.isArray(feature?.structureTransitionAnchors)
     ? feature.structureTransitionAnchors
     : [])
@@ -150,11 +150,26 @@ function compileTransportSurfaceModel(feature, sampleTerrainY, options = {}) {
   // Interior freeway/ramp merges are real mapped stations, not visual hints.
   // Make them samples in the authoritative profile so the shared elevation is
   // represented exactly rather than rounded to the nearest regular interval.
-  const sampleDistances = createSampleDistances(
+  const sourceSampleDistances = createSampleDistances(
     total,
     options.sampleStep,
     exactGraphNodeDistances.concat((feature.ordinaryStreetAnchors||[]).map(a=>a.distance))
   );
+  // All nine published numeric fields have the model's lifetime. Use one
+  // backing store with disjoint views rather than five native buffers per
+  // road. Preserve Float64 station coordinates and every Float32 field.
+  const sampleCount = sourceSampleDistances.length;
+  const stationBytes = sampleCount * 8;
+  const pathBytes = sourcePathDistances.byteLength;
+  const publishedStorage = new ArrayBuffer(stationBytes + pathBytes + sampleCount * 7 * 4);
+  const sampleDistances = new Float64Array(publishedStorage, 0, sampleCount);
+  const pathDistances = new Float32Array(publishedStorage, stationBytes, sourcePathDistances.length);
+  sampleDistances.set(sourceSampleDistances);
+  pathDistances.set(sourcePathDistances);
+  // Both sources were allocated exclusively by this call, before publication.
+  // Older browsers simply retain their normal GC behavior.
+  sourceSampleDistances.buffer.transfer?.(0);
+  sourcePathDistances.buffer.transfer?.(0);
   const surfaceBias = Number.isFinite(options.surfaceBias)
     ? Number(options.surfaceBias)
     : Number.isFinite(feature.surfaceBias)
@@ -186,10 +201,9 @@ function compileTransportSurfaceModel(feature, sampleTerrainY, options = {}) {
     : halfWidth;
   const corridorCenterOffset = roadPlacementOffsetWorld(feature);
   const anchors = normalizeAnchors(feature, semantics, total);
-  const sampleCount = sampleDistances.length;
   // These four published profiles share a lifetime, but never overlap. One
   // backing allocation avoids four native buffers per compiled road.
-  const groundStorage = new Float32Array(sampleCount * 4);
+  const groundStorage = new Float32Array(publishedStorage, stationBytes + pathBytes, sampleCount * 4);
   const groundHeights = groundStorage.subarray(0, sampleCount);
   const offsets = groundStorage.subarray(sampleCount, sampleCount * 2);
   const leftGround = groundStorage.subarray(sampleCount * 2, sampleCount * 3);
@@ -437,7 +451,12 @@ function compileTransportSurfaceModel(feature, sampleTerrainY, options = {}) {
   // Publish the same accepted profile at both edges. All gameplay, markings,
   // sidewalks, and visuals then query one planar deck instead of recreating
   // incompatible lateral terrain folds.
-  const edgeStorage = new Float32Array(centerHeights.length * 2);
+  const solvedHeights = centerHeights;
+  centerHeights = new Float32Array(publishedStorage, stationBytes + pathBytes + sampleCount * 4 * 4, sampleCount);
+  centerHeights.set(solvedHeights);
+  solvedHeights.buffer.transfer?.(0);
+  scratch.transfer?.(0);
+  const edgeStorage = new Float32Array(publishedStorage, stationBytes + pathBytes + sampleCount * 5 * 4, sampleCount * 2);
   const leftHeights = edgeStorage.subarray(0, centerHeights.length);
   const rightHeights = edgeStorage.subarray(centerHeights.length);
   leftHeights.set(centerHeights);

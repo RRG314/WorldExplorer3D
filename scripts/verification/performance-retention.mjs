@@ -213,13 +213,13 @@ async function measureMode(client, id, sampleMs = 5_000, movementKey = null) {
     traceClock=await client.cdp.send('Performance.getMetrics');
     if(gcTrace){
       client.cdp.on('Tracing.dataCollected',collectGc);
-      await client.cdp.send('Tracing.start',{categories:'v8,disabled-by-default-v8.gc,disabled-by-default-v8.gc_stats',transferMode:'ReportEvents'});
+      await client.cdp.send('Tracing.start',{categories:'v8,disabled-by-default-v8.gc',transferMode:'ReportEvents'});
     }
     await client.cdp.send('Profiler.enable'); await client.cdp.send('Profiler.start');
     if(process.env.WE3D_PERF_ALLOCATIONS==='1')await client.cdp.send('HeapProfiler.startSampling',{samplingInterval:65536,includeObjectsCollectedByMajorGC:true,includeObjectsCollectedByMinorGC:true});
   }
   let raw;
-  try { raw = await client.page.evaluate(sampleFrameWindow, {durationMs:sampleMs,actorKey:'__WE3D_PERF_ACTOR__',collectDiagnostics:false}); }
+  try { raw = await client.page.evaluate(sampleFrameWindow, {durationMs:sampleMs,actorKey:'__WE3D_PERF_ACTOR__',backgroundContextKey:'__WE3D_PERF_CONTEXT__',collectDiagnostics:false}); }
   finally { if (movementKey) await client.page.keyboard.up(movementKey); }
   if (trace) {
     if(gcTrace){
@@ -249,7 +249,7 @@ async function measureMode(client, id, sampleMs = 5_000, movementKey = null) {
   const deltas = raw.deltas.filter((value) => Number.isFinite(value) && value > 0);
   const averageFrameMs = deltas.reduce((sum, value) => sum + value, 0) / Math.max(1, deltas.length);
   const hitches=frameHitches(deltas,budgets.desktopTier.hitches);
-  await writeFile(`${evidenceDirectory}/${id}-frames.json`,JSON.stringify({deltas,elapsedMs:raw.elapsedMs,firstFrameDelayMs:raw.firstFrameDelayMs,startPosition:raw.startPosition,endPosition:raw.endPosition,distanceTraveled:raw.distanceTraveled,movingMs:raw.movingMs,hitches}));
+  await writeFile(`${evidenceDirectory}/${id}-frames.json`,JSON.stringify({deltas,background:raw.background,elapsedMs:raw.elapsedMs,firstFrameDelayMs:raw.firstFrameDelayMs,startPosition:raw.startPosition,endPosition:raw.endPosition,distanceTraveled:raw.distanceTraveled,movingMs:raw.movingMs,hitches}));
   const rawJsHeapUsedBytes = await heapUsedBytes(client.cdp);
   const jsHeapUsedBytes = rawJsHeapUsedBytes;
   return {
