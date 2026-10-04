@@ -4,7 +4,7 @@ import { chromium } from 'playwright';
 import { startStaticServer } from './static-server.mjs';
 const server = await startStaticServer({ rootDir: process.env.WE3D_VERIFY_ROOT || process.cwd(), ports: [4396] });
 const browser = await chromium.launch({ channel: 'chrome', headless: true });
-const dir = 'output/verification/ocean-plan';
+const dir = process.env.WE3D_OCEAN_ENTRY_OUTPUT || 'output/verification/ocean-plan';
 await fs.mkdir(dir, { recursive: true });
 const report = { scope: 'Selected artifact/source, real UI and ocean renderer; controlled provider responses for entry boundary cases', cases: [], errors: [] };
 try {

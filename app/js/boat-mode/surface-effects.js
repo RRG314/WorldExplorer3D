@@ -130,48 +130,53 @@ function buildBoatWaveProfile(material, runtimeIntensity = getWaveIntensity(), t
   return { config, profile, time };
 }
 
+// Uniforms are owned by this water presentation. Avoid rewriting unchanged
+// boxed values each frame. Compare the actual destination too, so shader
+// replacement and external edits cannot leave a stale cached value behind.
+const appliedWaterColors = new WeakMap();
+function setWaterScalar(uniform, value) {
+  if (uniform && uniform.value !== value) uniform.value = value;
+}
+function setWaterColor(color, hex) {
+  if (typeof color?.setHex !== 'function') return;
+  const prior = appliedWaterColors.get(color);
+  if (prior && prior.hex === hex && prior.r === color.r && prior.g === color.g && prior.b === color.b) return;
+  color.setHex(hex);
+  if (prior) { prior.hex = hex; prior.r = color.r; prior.g = color.g; prior.b = color.b; }
+  else appliedWaterColors.set(color, { hex, r: color.r, g: color.g, b: color.b });
+}
+
 function applyWaveUniformsToMaterial(material, profileBundle) {
   const shader = material?.userData?.weWaterWaveShader;
   if (!shader?.uniforms) return false;
   const { config, profile, time } = profileBundle;
-  shader.uniforms.weWaveTime.value = time;
+  if (shader.uniforms.weWaveTime.value !== time) shader.uniforms.weWaveTime.value = time;
   const body = config.localPatch ? appCtx.boatMode?.currentWater?.source : config.waterBody;
-  shader.uniforms.weWaveOrigin?.value?.set?.(Number(body?.waveOffset?.x)||0,Number(body?.waveOffset?.z)||0);
-  shader.uniforms.weWaveSpeed.value = profile.speed;
-  if (shader.uniforms.weWaveScale) shader.uniforms.weWaveScale.value = profile.spatialScale;
-  shader.uniforms.weWaveAmplitude.value = profile.primaryAmplitude;
-  if (shader.uniforms.weWaveSecondaryAmplitude) {
-    shader.uniforms.weWaveSecondaryAmplitude.value = profile.secondaryAmplitude;
-  }
-  if (shader.uniforms.weWaveSwellAmplitude) {
-    shader.uniforms.weWaveSwellAmplitude.value = profile.swellAmplitude;
-  }
-  if (shader.uniforms.weWaveRippleAmplitude) {
-    shader.uniforms.weWaveRippleAmplitude.value = profile.rippleAmplitude;
-  }
-  if (shader.uniforms.weWaveVisualStrength) {
-    shader.uniforms.weWaveVisualStrength.value = profile.visualStrength * (Number(config.visualBase) || 1);
-  }
-  if (shader.uniforms.weWaveFoamStrength) {
-    shader.uniforms.weWaveFoamStrength.value = (profile.foamStrength + profile.whitecapStrength * 0.4) * (Number(config.foamBase) || 1);
-  }
+  const origin = shader.uniforms.weWaveOrigin?.value;
+  const originX = Number(body?.waveOffset?.x) || 0, originZ = Number(body?.waveOffset?.z) || 0;
+  if (origin && (origin.x !== originX || origin.y !== originZ)) origin.set?.(originX, originZ);
+  if (shader.uniforms.weWaveSpeed.value !== profile.speed) shader.uniforms.weWaveSpeed.value = profile.speed;
+  setWaterScalar(shader.uniforms.weWaveScale, profile.spatialScale);
+  if (shader.uniforms.weWaveAmplitude.value !== profile.primaryAmplitude) shader.uniforms.weWaveAmplitude.value = profile.primaryAmplitude;
+  setWaterScalar(shader.uniforms.weWaveSecondaryAmplitude, profile.secondaryAmplitude);
+  setWaterScalar(shader.uniforms.weWaveSwellAmplitude, profile.swellAmplitude);
+  setWaterScalar(shader.uniforms.weWaveRippleAmplitude, profile.rippleAmplitude);
+  setWaterScalar(shader.uniforms.weWaveVisualStrength, profile.visualStrength * (Number(config.visualBase) || 1));
+  setWaterScalar(shader.uniforms.weWaveFoamStrength, (profile.foamStrength + profile.whitecapStrength * 0.4) * (Number(config.foamBase) || 1));
   const atmosphere = appCtx.earthAtmosphereProfile;
   if (atmosphere) {
-    shader.uniforms.weWaterZenithColor?.value?.setHex?.(atmosphere.zenithColor);
-    shader.uniforms.weWaterHorizonColor?.value?.setHex?.(atmosphere.horizonColor);
-    shader.uniforms.weWaterSunColor?.value?.setHex?.(atmosphere.sunColor);
-    shader.uniforms.weWaterSunDirection?.value?.set?.(
-      atmosphere.sunDirection.x,
-      atmosphere.sunDirection.y,
-      atmosphere.sunDirection.z
-    );
-    if (shader.uniforms.weWaterDaylight) shader.uniforms.weWaterDaylight.value = atmosphere.daylight;
-    if (shader.uniforms.weWaterNight) shader.uniforms.weWaterNight.value = atmosphere.night;
-    if (shader.uniforms.weWaterOvercast) shader.uniforms.weWaterOvercast.value = atmosphere.overcast;
+    setWaterColor(shader.uniforms.weWaterZenithColor?.value, atmosphere.zenithColor);
+    setWaterColor(shader.uniforms.weWaterHorizonColor?.value, atmosphere.horizonColor);
+    setWaterColor(shader.uniforms.weWaterSunColor?.value, atmosphere.sunColor);
+    const direction = shader.uniforms.weWaterSunDirection?.value, sun = atmosphere.sunDirection;
+    if (direction && (direction.x !== sun.x || direction.y !== sun.y || direction.z !== sun.z)) direction.set?.(sun.x, sun.y, sun.z);
+    setWaterScalar(shader.uniforms.weWaterDaylight, atmosphere.daylight);
+    setWaterScalar(shader.uniforms.weWaterNight, atmosphere.night);
+    setWaterScalar(shader.uniforms.weWaterOvercast, atmosphere.overcast);
   }
   if (shader.uniforms.weWaterNormalStrength) {
     const quality = String(appCtx.renderQualityLevel || 'medium').toLowerCase();
-    shader.uniforms.weWaterNormalStrength.value = quality === 'low' ? 0.42 : quality === 'high' ? 1 : 0.72;
+    setWaterScalar(shader.uniforms.weWaterNormalStrength, quality === 'low' ? 0.42 : quality === 'high' ? 1 : 0.72);
   }
   return true;
 }
