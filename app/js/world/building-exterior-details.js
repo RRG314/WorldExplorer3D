@@ -2,10 +2,7 @@ import {createFrontageSigns,mappedFrontageLabel} from './storefront-signs.js';
 import {storefrontLayout} from './storefront-layout.js';
 import {harborDistrictFocus} from './harbor-district.js';
 import { facadeFloorPlan } from './building-facade-layout.js?v=3';
-import {
-  appendGeometryWithTransform,
-  buildMergedGeometry
-} from './geometry-batching.js?v=7';
+import {createBoxInstanceBatch} from './box-instance-batch.js';
 import { buildingExteriorCatalogSnapshot } from './building-exterior-catalog.js?v=1';
 
 const DETAIL_LIMITS = Object.freeze({ low: 0, performance: 72, balanced: 150, quality: 240 });
@@ -120,7 +117,7 @@ function createDetailMaterials() {
 }
 
 function createBatchMap(materials) {
-  return new Map([...materials.keys()].map((key) => [key, { positions: [], normals: [], uvs: [], indices: [] }]));
+  return new Map([...materials.keys()].map((key) => [key, createBoxInstanceBatch()]));
 }
 
 function boxAppender(unitBox, batches, counters) {
@@ -137,10 +134,9 @@ function boxAppender(unitBox, batches, counters) {
     scale.set(width, height, depth);
     quaternion.setFromAxisAngle(axis, yaw);
     matrix.compose(position, quaternion, scale);
-    const appended = appendGeometryWithTransform(batch, unitBox, matrix);
-    if (appended <= 0) return false;
+    if (!batch.append(matrix)) return false;
     counters.boxes += 1;
-    counters.vertices += appended;
+    counters.vertices += unitBox.attributes.position.count;
     return true;
   };
 }
@@ -332,7 +328,8 @@ function distribution(values) {
 export function selectExteriorDetailSources(sources, {focus, districtFocus, radius, limit}) {
   const candidates = [];
   if (limit <= 0) return candidates;
-  for (const mesh of sources) {
+  for (let sourceIndex=0;sourceIndex<sources.length;sourceIndex++) {
+    const mesh=sources[sourceIndex];
     const center = mesh.detailCenter || footprintCenter(mesh.userData.buildingFootprint);
     const dx = center.x - focus.x, dz = center.z - focus.z;
     const districtX = districtFocus ? center.x - districtFocus.x : Infinity;
@@ -415,26 +412,24 @@ function* buildDetails(appCtx, options = {}) {
 
   let triangles = 0;
   for (const [materialKey, batch] of batches) {
-    const geometry = buildMergedGeometry(batch);
-    if (!geometry) continue;
+    if (!batch.count) continue;
     const material = materials.get(materialKey);
-    const mesh = new THREE.Mesh(geometry, material);
+    const mesh = batch.build(unitBox, material);
     mesh.name = `building-exterior-details:${materialKey}`;
     mesh.castShadow = tier === 'quality' && materialKey !== 'glass';
     mesh.receiveShadow = true;
-    mesh.frustumCulled = true;
     mesh.userData = {
       buildingExteriorDetailBatch: true,
       materialKey,
       detailTier: tier,
       sourceClaim: 'generated-visual-representation'
     };
-    triangles += Math.floor(Number(geometry.index?.count || 0) / 3);
+    triangles += batch.count * unitBox.index.count / 3;
     meshes.push(mesh);
     yield 'batch';
   }
   for (const [key, material] of materials) {
-    if (!batches.get(key)?.positions.length) material.dispose();
+    if (!batches.get(key)?.count) { material.dispose(); materials.delete(key); }
   }
 
   const signMesh=createFrontageSigns(signs);if(signMesh){meshes.push(signMesh);triangles+=signMesh.geometry.index.count/3;}
@@ -484,8 +479,8 @@ function* buildDetails(appCtx, options = {}) {
   published=true;
   return diagnostics;
   } finally {
-    unitBox.dispose();
-    if(!published){for(const mesh of meshes){mesh.geometry.dispose();if(mesh.material.userData?.ownsFrontageAtlas){mesh.material.map.dispose();mesh.material.dispose();}}for(const material of materials.values())material.dispose();}
+    if (!published || !meshes.some(mesh=>mesh.geometry===unitBox)) unitBox.dispose();
+    if(!published){for(const mesh of meshes){if(mesh.isInstancedMesh)mesh.dispose();if(mesh.geometry!==unitBox)mesh.geometry.dispose();if(mesh.material.userData?.ownsFrontageAtlas){mesh.material.map.dispose();mesh.material.dispose();}}for(const material of materials.values())material.dispose();}
   }
 }
 
@@ -494,9 +489,13 @@ function clearDetailMeshes(appCtx, retainedMaterial = null) {
     ? appCtx.buildingExteriorDetailMeshes
     : [];
   const disposedMaterials = new Set();
+  const disposedGeometries = new Set();
   for (const mesh of meshes) {
     mesh?.parent?.remove?.(mesh);
-    mesh?.geometry?.dispose?.();
+    if(mesh?.isInstancedMesh)mesh.dispose();
+    if(mesh?.geometry && !disposedGeometries.has(mesh.geometry)){
+      disposedGeometries.add(mesh.geometry);mesh.geometry.dispose?.();
+    }
     if (mesh?.material && mesh.material !== retainedMaterial && !disposedMaterials.has(mesh.material)) {
       disposedMaterials.add(mesh.material);
       if(mesh.material.userData?.ownsFrontageAtlas)mesh.material.map?.dispose?.();

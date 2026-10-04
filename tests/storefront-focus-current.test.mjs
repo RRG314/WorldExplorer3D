@@ -20,6 +20,17 @@ test('low tier stays empty and world reset cancels an unfinished replacement',()
  publishBuildingExteriorDetails(c);const old=[...scene.children];move({x:400,z:0});updateBuildingExteriorFocus(c);c._worldLoadSequence++;while(frames.length)frames.shift()();assert.deepEqual(scene.children,old);clearBuildingExteriorDetails(c);
 });
 
+test('facade instances share one live unit geometry and release instance buffers and geometry once',()=>{
+ const {c,scene}=world();publishBuildingExteriorDetails(c);
+ const meshes=[...scene.children];assert.ok(meshes.every(mesh=>mesh.isInstancedMesh));
+ const geometry=meshes[0].geometry;assert.ok(meshes.every(mesh=>mesh.geometry===geometry));
+ let geometryDisposals=0;const meshDisposals=meshes.map(()=>0);
+ geometry.addEventListener('dispose',()=>geometryDisposals++);
+ meshes.forEach((mesh,i)=>mesh.addEventListener('dispose',()=>meshDisposals[i]++));
+ assert.equal(geometryDisposals,0);clearBuildingExteriorDetails(c);clearBuildingExteriorDetails(c);
+ assert.equal(geometryDisposals,1);assert.deepEqual(meshDisposals,meshes.map(()=>1));assert.equal(scene.children.length,0);
+});
+
 // Exercise two atlas replacements and a label-free region, not just source text.
 test('travelling mapped signs retain the compiled material and dispose atlases and final owner exactly once',()=>{
  const {c,scene,move}=world(),frames=[];
