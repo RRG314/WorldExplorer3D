@@ -44,7 +44,12 @@ function distanceToRing(x, z, ring = []) {
     const t = lengthSquared > 1e-9
       ? Math.max(0, Math.min(1, ((x - a.x) * dx + (z - a.z) * dz) / lengthSquared))
       : 0;
-    best = Math.min(best, Math.hypot(x - (a.x + dx * t), z - (a.z + dz * t)));
+    const distanceX=x-(a.x+dx*t),distanceZ=z-(a.z+dz*t);
+    // Either axis is a lower bound on Euclidean distance. Most segments of a
+    // mapped coastline cannot beat the nearest segment already found. Keep
+    // the exact hypot calculation for every segment that can affect clearance.
+    if(Math.abs(distanceX)>=best||Math.abs(distanceZ)>=best)continue;
+    best = Math.min(best, Math.hypot(distanceX,distanceZ));
   }
   return best;
 }

@@ -1,4 +1,5 @@
 import {drainCooperatively} from './cooperative-scheduling.js?v=1';
+import {appendCollisionCandidate} from '../physics/collision-candidates.js';
 // Candidate index only. The existing building/obstacle solver owns response.
 const caches = new WeakMap();
 const CELL = 64;
@@ -29,18 +30,26 @@ export function publishVegetationObstacleIndex(ctx,index) {
   caches.set(ctx,index);
 }
 
-export function nearbyVegetationObstacles(ctx, x, z, radius = 2) {
-  if (![x, z, radius].every(Number.isFinite) || radius < 0 || radius > 256) return [];
-  if (ctx.isEnv && ctx.ENV && !ctx.isEnv(ctx.ENV.EARTH)) return [];
+export function nearbyVegetationObstacles(ctx, x, z, radius = 2, candidates = null) {
+  if (!Number.isFinite(x)||!Number.isFinite(z)||!Number.isFinite(radius)||radius < 0 || radius > 256) return candidates || [];
+  if (ctx.isEnv && ctx.ENV && !ctx.isEnv(ctx.ENV.EARTH)) return candidates || [];
   const features = ctx.vegetationFeatures;
-  if (!Array.isArray(features) || !features.length) return [];
+  if (!Array.isArray(features) || !features.length) return candidates || [];
   let cache = caches.get(ctx);
   if (!cache || cache.features !== features) {
     const steps=vegetationObstacleIndexSteps(ctx,features);
     for (;;) {const result=steps.next();if(result.done){cache=result.value;break;}}
     caches.set(ctx,cache);
   }
-  const result=new Set();
-  for(let ix=Math.floor((x-radius)/CELL);ix<=Math.floor((x+radius)/CELL);ix++) for(let iz=Math.floor((z-radius)/CELL);iz<=Math.floor((z+radius)/CELL);iz++) for(const collider of cache.cells.get(`${ix}:${iz}`)||[])result.add(collider);
-  return [...result];
+  const result=candidates?null:new Set();
+  for(let ix=Math.floor((x-radius)/CELL);ix<=Math.floor((x+radius)/CELL);ix++) {
+    for(let iz=Math.floor((z-radius)/CELL);iz<=Math.floor((z+radius)/CELL);iz++) {
+      const bucket=cache.cells.get(`${ix}:${iz}`);if(!bucket)continue;
+      for(let i=0;i<bucket.length;i++) {
+        if(candidates)appendCollisionCandidate(candidates,bucket[i]);
+        else result.add(bucket[i]);
+      }
+    }
+  }
+  return candidates || [...result];
 }

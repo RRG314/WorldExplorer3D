@@ -30,7 +30,7 @@ export function planRoadRoute(roads) {
   return best;
 }
 
-export async function followRoadRoute(page,route,signal) {
+export async function followRoadRoute(page,route,signal,{mode='drive'}={}) {
   const points=route.points,held=new Set(),samples=[];let segment=0,progress=0,completedLength=0;
   const setKey=async(key,down)=>{if(down===held.has(key))return;if(down){await page.keyboard.down(key);held.add(key);}else{await page.keyboard.up(key);held.delete(key);}};
   try{
@@ -48,11 +48,11 @@ export async function followRoadRoute(page,route,signal) {
       const error=Math.atan2(Math.sin(targetAngle-pose.angle),Math.cos(targetAngle-pose.angle));
       const correction=error-(pose.yawRate||0)*.18;
       const complete=segment===points.length-2&&Math.hypot(pose.x-b.x,pose.z-b.z)<5;
-      const targetSpeed=Math.abs(error)>.4?12:24;
-      await setKey('w',!complete&&pose.speed<targetSpeed);
-      await setKey('s',!complete&&pose.speed>targetSpeed+8);
-      await setKey('a',!complete&&correction>.055);
-      await setKey('d',!complete&&correction<-.055);
+      const walking=mode==='walk',targetSpeed=Math.abs(error)>.4?12:24;
+      await setKey('w',!complete&&(walking?Math.abs(error)<1:pose.speed<targetSpeed));
+      await setKey('s',!walking&&!complete&&pose.speed>targetSpeed+8);
+      await setKey(walking?'ArrowLeft':'a',!complete&&correction>.055);
+      await setKey(walking?'ArrowRight':'d',!complete&&correction<-.055);
       samples.push({...pose,segment,progress,error,complete});
       if(complete){signal.completed=true;break;}
       await new Promise(resolve=>setTimeout(resolve,100));

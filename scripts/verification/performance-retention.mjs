@@ -1,6 +1,9 @@
 import { configureStagingAppCheck } from './staging-app-check.mjs';
 import assert from 'node:assert/strict';
 import { sampleFrameWindow } from './frame-window.mjs';
+import { frameHitches } from './frame-hitches.mjs';
+import {planRoadRoute,followRoadRoute} from './travel-road-route.mjs';
+import {followFlightOrbit} from './travel-flight-orbit.mjs';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { chromium, devices } from 'playwright';
 import { startStaticServer } from './static-server.mjs';
@@ -10,6 +13,7 @@ import { collectBrowserGraphicsErrors } from './browser-graphics-errors.mjs';
 // Reject cloud/other hardware before opening a browser or loading a world.
 const hostAuthority = requirePerformanceHost();
 const root = process.cwd();
+const evidenceDirectory=process.env.WE3D_PERF_OUTPUT || 'output/verification/performance-retention';
 const verifyRoot = process.env.WE3D_VERIFY_ROOT || root;
 const budgets = JSON.parse(await readFile(`${root}/config/performance-budgets.json`, 'utf8'));
 const server = await startStaticServer({ rootDir: verifyRoot, ports: [4421, 4422, 4423] });
@@ -21,6 +25,7 @@ let browser = await chromium.launch(browserOptions);
 let graphicsAuthority = null;
 const requestedProfile = String(process.env.WE3D_VERIFY_PROFILE || 'all').trim().toLowerCase();
 const auditOnly = process.env.WE3D_VERIFY_AUDIT_ONLY === '1';
+const sustained=process.env.WE3D_PERF_SUSTAINED==='1';
 assert.ok(['all', 'desktop', 'mobile'].includes(requestedProfile), `Unsupported WE3D_VERIFY_PROFILE: ${requestedProfile}`);
 
 const percentile = (values, portion) => {
@@ -43,16 +48,20 @@ async function createMeasuredClient(contextOptions) {
   const transfers = new Map();
   const browserErrors = [];
   const localFailures = [];
+  const providerDegradations=[];
   collectBrowserGraphicsErrors(page, browserErrors);
   page.on('pageerror', (error) => browserErrors.push(String(error?.stack || error)));
   page.on('response', (response) => {
     if (response.url().startsWith(baseUrl) && response.status() >= 400) {
-      localFailures.push({ url: response.url(), status: response.status() });
+      const pathname=new URL(response.url()).pathname;
+      const localNamingUnavailable=!process.env.WE3D_PLACE_LOOKUP_EMULATOR_ORIGIN&&response.status()===503&&
+        ['/api/geospatial/search','/api/geospatial/reverse'].includes(pathname);
+      (localNamingUnavailable?providerDegradations:localFailures).push({ url: response.url(), status: response.status() });
     }
   });
   cdp.on('Network.requestWillBeSent', (event) => requests.set(event.requestId, event.request.url));
   cdp.on('Network.loadingFinished', (event) => transfers.set(event.requestId, Number(event.encodedDataLength || 0)));
-  return { context, page, cdp, requests, transfers, browserErrors, localFailures };
+  return { context, page, cdp, requests, transfers, browserErrors, localFailures, providerDegradations };
 }
 
 async function heapUsedBytes(cdp, collect = false) {
@@ -179,17 +188,22 @@ async function measureMode(client, id, sampleMs = 5_000, movementKey = null) {
   }
   await client.page.evaluate(id=>{
     const ctx=globalThis.__WE3D_PERF_CONTEXT__;
-    globalThis.__WE3D_PERF_ACTOR__=id.startsWith('walk')?ctx.Walk.state.walker:id==='plane'?ctx.planeMode:ctx.car;
+    globalThis.__WE3D_PERF_ACTOR__=id.startsWith('walk')?ctx.Walk.state.walker:id.startsWith('plane')?ctx.planeMode:ctx.car;
   },id);
   const trace = process.env.WE3D_PERF_TRACE_MODE === id;
-  if (trace) { await client.cdp.send('Profiler.enable'); await client.cdp.send('Profiler.start'); }
+  let traceClock;
+  if (trace) {
+    traceClock=await client.cdp.send('Performance.getMetrics');
+    await client.cdp.send('Profiler.enable'); await client.cdp.send('Profiler.start');
+    if(process.env.WE3D_PERF_ALLOCATIONS==='1')await client.cdp.send('HeapProfiler.startSampling',{samplingInterval:65536,includeObjectsCollectedByMajorGC:true,includeObjectsCollectedByMinorGC:true});
+  }
   let raw;
   try { raw = await client.page.evaluate(sampleFrameWindow, {durationMs:sampleMs,actorKey:'__WE3D_PERF_ACTOR__',collectDiagnostics:false}); }
   finally { if (movementKey) await client.page.keyboard.up(movementKey); }
   if (trace) {
     const {profile} = await client.cdp.send('Profiler.stop');
-    await mkdir(`${root}/output/architecture-evaluation/packaged-frame-trace`,{recursive:true});
-    await writeFile(`${root}/output/architecture-evaluation/packaged-frame-trace/${id}.json`,JSON.stringify({profile,raw,scope:'CPU-instrumented diagnostic, not release performance acceptance'}));
+    await writeFile(`${evidenceDirectory}/${id}-cpu.json`,JSON.stringify({profile,raw,clock:traceClock,scope:'Instrumented diagnostic, not release performance acceptance'}));
+    if(process.env.WE3D_PERF_ALLOCATIONS==='1')await writeFile(`${evidenceDirectory}/${id}-allocation.json`,JSON.stringify(await client.cdp.send('HeapProfiler.stopSampling')));
   }
   // Full diagnostics enumerate the world and actor catalogs. They belong in
   // functional checks, not between timed windows where their garbage can cause
@@ -207,6 +221,8 @@ async function measureMode(client, id, sampleMs = 5_000, movementKey = null) {
     'Frame intervals must sum to the measured window');
   const deltas = raw.deltas.filter((value) => Number.isFinite(value) && value > 0);
   const averageFrameMs = deltas.reduce((sum, value) => sum + value, 0) / Math.max(1, deltas.length);
+  const hitches=frameHitches(deltas,budgets.desktopTier.hitches);
+  await writeFile(`${evidenceDirectory}/${id}-frames.json`,JSON.stringify({deltas,elapsedMs:raw.elapsedMs,firstFrameDelayMs:raw.firstFrameDelayMs,startPosition:raw.startPosition,endPosition:raw.endPosition,distanceTraveled:raw.distanceTraveled,movingMs:raw.movingMs,hitches}));
   const rawJsHeapUsedBytes = await heapUsedBytes(client.cdp);
   const jsHeapUsedBytes = rawJsHeapUsedBytes;
   return {
@@ -215,6 +231,8 @@ async function measureMode(client, id, sampleMs = 5_000, movementKey = null) {
     inputDuringSample: movementKey ? { key: movementKey, heldForMs: sampleMs } : 'none',
     sampleMs,
     elapsedMs: raw.elapsedMs,
+    distanceTraveled:raw.distanceTraveled,
+    movingMs:raw.movingMs,
     distanceWorldUnits: raw.startPosition && raw.endPosition
       ? Math.hypot(raw.endPosition.x-raw.startPosition.x,raw.endPosition.z-raw.startPosition.z) : null,
     frames: deltas.length,
@@ -225,6 +243,7 @@ async function measureMode(client, id, sampleMs = 5_000, movementKey = null) {
     p95FrameMs: percentile(deltas, 0.95),
     p99FrameMs: percentile(deltas, 0.99),
     worstFrameMs: Math.max(...deltas),
+    hitches,
     calls: Number(raw.diagnostics.renderer?.calls || 0),
     triangles: Number(raw.diagnostics.renderer?.triangles || 0),
     programs: Number(raw.diagnostics.renderer?.programs || 0),
@@ -265,6 +284,40 @@ function transferWithinBudget(transfer, limit) {
     transfer.externalTransferBytes <= limit.maximumExternalTransferBytes;
 }
 
+async function sustainedTravel(client){
+  const page=client.page;
+  const route=await page.evaluate(`(${planRoadRoute.toString()})(globalThis.__WE3D_PERF_CONTEXT__.roads)`);
+  await writeFile(`${evidenceDirectory}/sustained-road-route.json`,JSON.stringify(route));
+  const samples=[];
+  // 630 seconds of active traversal. Initial placement is explicit test setup;
+  // after that each driver only observes actors and sends real keyboard input.
+  for(const [index,mode] of ['walk','drive','plane','walk','drive','plane','plane'].entries()){
+    await selectMode(page,mode,{walk:'#fWalk',drive:'#fDriving',plane:'#fPlane'}[mode]);
+    await page.locator('#travelBtn').blur();
+    await page.evaluate(({mode,route})=>{
+      const c=globalThis.__WE3D_PERF_CONTEXT__,actor=mode==='walk'?c.Walk.state.walker:mode==='drive'?c.car:c.planeMode;
+      const p=mode==='plane'?{x:750,z:0}:route.points[0],next=route.points[1];
+      const yaw=mode==='plane'?0:Math.atan2(next.x-p.x,next.z-p.z);
+      Object.assign(actor,{x:p.x,z:p.z,yaw,angle:yaw,pitch:0,roll:0,pitchRate:0,rollRate:0,yawRate:0,lookYawOffset:0,cameraYaw:0,cameraPitch:0,cameraLookTimer:0});
+      if(mode==='plane')Object.assign(actor,{y:220,speed:80,horizontalSpeed:80,vx:0,vy:0,vz:80,throttle:1,airborne:true,stalled:false,flightPathAngle:0,climbRate:0,turnRate:0,angleOfAttack:0,barrelRollActive:false});
+      else Object.assign(actor,{y:mode==='walk'?c.GroundHeight.walkSurfaceY(p.x,p.z)+1.7:c.GroundHeight.carCenterY(p.x,p.z),speed:0,vFwd:0,vLat:0,vx:0,vy:0,vz:0,onGround:true,isAirborne:false});
+      globalThis.__WE3D_TRAVEL_ACTOR__=actor;
+    },{mode,route});
+    await page.waitForTimeout(1200);
+    const signal={stopped:false};let driverFailure=null;
+    const driver=(mode==='plane'?followFlightOrbit(page,signal):followRoadRoute(page,route,signal,{mode})).catch(error=>{driverFailure=error;return {failure:error.message};});
+    let sample,progress;
+    try{sample=await measureMode(client,`${mode}-sustained-${index}`,90000);}
+    finally{signal.stopped=true;progress=await driver;await writeFile(`${evidenceDirectory}/${mode}-sustained-${index}-input.json`,JSON.stringify(progress));}
+    if(driverFailure)throw driverFailure;
+    assert.ok(sample.distanceTraveled>=(mode==='walk'?100:mode==='drive'?300:1000),`${mode} sustained sample did not traverse the world`);
+    assert.ok(sample.movingMs>=60000,`${mode} sustained sample spent too long stationary`);
+    sample.scenario='sustained-keyboard-route';sample.initialPlacement='Test setup only; no physics/pose writes during the window';
+    samples.push(sample);console.log('[performance-retention] sustained',JSON.stringify({id:sample.id,fps:sample.averageFps,p99:sample.p99FrameMs,hitches:sample.hitches,distance:sample.distanceTraveled}));
+  }
+  return samples;
+}
+
 async function runDesktop() {
   const client = await createMeasuredClient({ viewport: { width: 1440, height: 900 } });
   try {
@@ -290,18 +343,21 @@ async function runDesktop() {
     const flightAfter = await client.page.evaluate(async () => (await import('/app/js/shared-context.js?v=55')).ctx.getPlaneSnapshot());
     assert.ok(flightAfter.pitch > .05 && flightAfter.y > flightBefore.y && flightAfter.throttle > flightBefore.throttle,
       'Real pitch/throttle input must establish a climb before sustained flight');
-    const plane = { ...(await measureMode(client, 'plane', auditOnly ? 1_500 : 90_000, 'Space')), activationMs: planeActivationMs,
+    const plane = { ...(await measureMode(client, 'plane', auditOnly && !process.env.WE3D_PERF_TRACE_MODE ? 1_500 : 90_000, 'Space')), activationMs: planeActivationMs,
       preparation: { keys: ['s', 'Space'], heldForMs: 2_000, before: flightBefore, after: flightAfter } };
     console.log('[performance-retention] desktop plane', JSON.stringify({ fps: plane.averageFps, withinBudgets: modesWithinBudgets([plane], budgets.desktopTier) }));
-    const modes = [walk, walkMoving, drive, driveMoving, plane];
+    const sustainedModes=sustained?await sustainedTravel(client):[];
+    const modes = [walk, walkMoving, drive, driveMoving, plane,...sustainedModes];
     const baselineCounts = walk.worldCounts;
     const releases = [];
     const reloadCounts = [];
+    const reloadTransfers=[];
+    let shortRunTransfer=null,previousTransfer=transferSnapshot(client);
     const requestedRetentionCycles = Number(process.env.WE3D_VERIFY_RETENTION_CYCLES);
     const environmentCycles = auditOnly
       ? 0
       : Math.max(
-          budgets.retention.minimumEnvironmentCycles,
+          sustained?12:budgets.retention.minimumEnvironmentCycles,
           Number.isFinite(requestedRetentionCycles) ? Math.floor(requestedRetentionCycles) : 0
         );
     for (let cycle = 0; cycle < environmentCycles; cycle += 1) {
@@ -314,14 +370,31 @@ async function runDesktop() {
       // Record natural behavior before collecting solely to diagnose retained
       // ownership. Never use the collected value as an active-play budget.
       release.naturalJsHeapUsedBytes = await heapUsedBytes(client.cdp);
+      release.immediateJsHeapUsedBytes = await heapUsedBytes(client.cdp, true);
+      // Disposal cancels async producers; their rejection/finally jobs can
+      // still hold staging data until subsequent event-loop turns. Preserve
+      // the immediate reading and independently measure the settled owner.
+      await client.page.waitForTimeout(2000);
+      release.settledOwnerCounts=await client.page.evaluate(()=>{
+        const c=globalThis.__WE3D_PERF_CONTEXT__;
+        return {roads:c.roads.length,buildings:c.buildings.length,terrainTiles:c.terrainTileCache.size,
+          worldLoading:c.worldLoading,providerRelease:c.worldProviderStagingRelease,
+          lifecycle:c.getLifecycleRegistrySnapshot?.()};
+      });
       release.jsHeapUsedBytes = await heapUsedBytes(client.cdp, true);
-      release.heapEvidenceScope = 'post-GC retained objects; not process memory';
+      release.settledAfterMs=2000;
+      release.heapEvidenceScope = 'Immediate and settled post-GC retained objects; not process memory or active-play budget';
       releases.push(release);
       await client.page.locator('#globeSelectorStartBtn').click();
       await waitForPlayable(client.page);
       reloadCounts.push(await client.page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().worldCounts || null));
+      const currentTransfer=transferSnapshot(client);
+      reloadTransfers.push(Object.fromEntries(['localTransferBytes','externalTransferBytes','externalRequests'].map(key=>[key,currentTransfer[key]-previousTransfer[key]])));
+      previousTransfer=currentTransfer;
+      if(cycle+1===budgets.retention.minimumEnvironmentCycles)shortRunTransfer=currentTransfer;
+      console.log('[performance-retention] world cycle',JSON.stringify({cycle:cycle+1,immediateMiB:release.immediateJsHeapUsedBytes/1048576,settledMiB:release.jsHeapUsedBytes/1048576}));
     }
-    await client.page.screenshot({ path: 'output/release-evidence/current/performance-desktop.png', fullPage: false });
+    await client.page.screenshot({ path: `${evidenceDirectory}/performance-desktop.png`, fullPage: false });
     const storage = await storageSnapshot(client.page);
     const transfer = transferSnapshot(client);
     const limit = budgets.desktopTier.budgets;
@@ -332,6 +405,13 @@ async function runDesktop() {
       modeActivationResponsive: modes.filter((mode) => mode.activationMs !== undefined).every((mode) => mode.activationMs <= limit.maximumModeActivationMs),
       completeWorld: modes.every((mode) => Number(mode.worldCounts?.buildings) > 0 && Number(mode.worldCounts?.roads) > 0 && Number(mode.worldCounts?.terrainTiles) > 0),
       modesWithinBudgets: modesWithinBudgets(modes, budgets.desktopTier),
+      activePlayHitchesWithinBudget:modes.every(mode=>mode.hitches.passed),
+      sustainedMixedTraversal:!sustained||sustainedModes.reduce((sum,mode)=>sum+mode.elapsedMs,0)>=600000,
+      settledRetentionPlateau:!sustained||releases.length>=12&&releases.slice(2).every(entry=>{
+        const baseline=releases[2];return Math.abs(entry.after.rendererGeometries-baseline.after.rendererGeometries)<=16&&
+          Math.abs(entry.after.rendererTextures-baseline.after.rendererTextures)<=8&&entry.jsHeapUsedBytes-baseline.jsHeapUsedBytes<=50*1024*1024&&
+          entry.settledOwnerCounts.roads===0&&entry.settledOwnerCounts.buildings===0&&entry.settledOwnerCounts.terrainTiles===0&&!entry.settledOwnerCounts.worldLoading;
+      }),
       movingGroundRoutesObserved: walkMoving.distanceWorldUnits >= 2 && driveMoving.distanceWorldUnits >= 5,
       sustainedFlightObserved: !auditOnly && plane.elapsedMs >= 90_000 && plane.distanceWorldUnits >= 1_000,
       teardownClearsWorldOwners: releases.every((entry) =>
@@ -342,12 +422,17 @@ async function runDesktop() {
         Math.max(...releaseTextures) - Math.min(...releaseTextures) <= budgets.retention.maximumTextureGrowthPerCycle,
       heapRetentionBounded: releases.every((entry) => Number(entry.jsHeapUsedBytes || 0) <= launch.titleHeapBytes + budgets.retention.maximumHeapGrowthBytes),
       worldCoveragePreserved: reloadCounts.every((counts) => reloadPreservesCoverage(counts, baselineCounts, budgets.retention)),
-      transferWithinBudget: transferWithinBudget(transfer, limit),
+      // Preserve the existing short-run total limit. Additional reloads have
+      // separate receipts instead of being charged to a two-cycle total.
+      transferWithinBudget: transferWithinBudget(shortRunTransfer || transfer, limit),
+      extendedReloadTransfersWithinBudget:reloadTransfers.slice(budgets.retention.minimumEnvironmentCycles).every(sample=>transferWithinBudget(sample,limit)),
       storageWithinBudget: storage.usageBytes <= limit.maximumPersistentStorageBytes,
       noBrowserErrors: client.browserErrors.length === 0,
       noFailedLocalResources: client.localFailures.length === 0
     };
-    return { ok: Object.values(checks).every(Boolean), tier: budgets.desktopTier, launch, modes, releases, reloadCounts, transfer, storage, checks, browserErrors: client.browserErrors, localFailures: client.localFailures };
+    return { ok: Object.values(checks).every(Boolean), tier: budgets.desktopTier, launch, modes, releases, reloadCounts,
+      transfer,shortRunTransfer,reloadTransfers,transferScope:'Original total budget through two reloads; same limits checked separately on every additional reload; cumulative transfers retained.',
+      storage, checks, browserErrors: client.browserErrors, localFailures: client.localFailures, providerDegradations:client.providerDegradations };
   } finally {
     await client.context.close();
   }
@@ -382,7 +467,7 @@ async function runMobileRegression() {
 }
 
 try {
-  await mkdir('output/verification/performance-retention', { recursive: true });
+  await mkdir(evidenceDirectory, { recursive: true });
   const graphicsPage = await browser.newPage();
   try {
     graphicsAuthority = await graphicsPage.evaluate(() => {
@@ -400,7 +485,7 @@ try {
   if (requestedProfile !== 'mobile') {
     console.log('[performance-retention] starting desktop');
     desktop = await runDesktop();
-    await writeFile('output/verification/performance-retention/report-desktop.json', `${JSON.stringify(desktop, null, 2)}\n`);
+    await writeFile(`${evidenceDirectory}/report-desktop.json`, `${JSON.stringify(desktop, null, 2)}\n`);
     console.log('[performance-retention] desktop complete');
   }
   if (requestedProfile !== 'desktop') {
@@ -413,18 +498,18 @@ try {
     }
     console.log('[performance-retention] starting mobile');
     mobileRegression = await runMobileRegression();
-    await writeFile('output/verification/performance-retention/report-mobile.json', `${JSON.stringify(mobileRegression, null, 2)}\n`);
+    await writeFile(`${evidenceDirectory}/report-mobile.json`, `${JSON.stringify(mobileRegression, null, 2)}\n`);
     console.log('[performance-retention] mobile complete');
   }
   const selectedReports = [desktop, mobileRegression].filter(Boolean);
   const report = {
-    ok: selectedReports.every((entry) => entry.ok),
+    ok: !auditOnly&&!process.env.WE3D_PERF_TRACE_MODE&&selectedReports.every((entry) => entry.ok),
     contract: 'world-explorer-minimum-5-performance-retention-v1',
     generatedAt: new Date().toISOString(),
     baseUrl,
     writesProduction: false,
     evidenceScope: {
-      kind: 'single-artifact-budget-and-retention',
+      kind: auditOnly||process.env.WE3D_PERF_TRACE_MODE?'instrumented-or-short-diagnostic':'single-artifact-budget-and-retention',
       comparativeImprovementEstablished: false,
       movingWalkAndDriveMeasured: desktop?.checks?.movingGroundRoutesObserved === true,
       reason: 'Stationary and controlled moving samples are separate. A live-versus-candidate comparison with matched data, routes, quality, hardware, and repeated cold/warm trials is required to establish improvement.'
@@ -443,10 +528,14 @@ try {
       reason: 'No physical phone is connected; touch emulation is not presented as device evidence.'
     }
   };
-  await writeFile('output/verification/performance-retention/report.json', `${JSON.stringify(report, null, 2)}\n`);
+  await writeFile(`${evidenceDirectory}/report.json`, `${JSON.stringify(report, null, 2)}\n`);
   console.log(JSON.stringify(report, null, 2));
-  assert.equal(report.ok, true, 'Minimum-5 desktop/mobile-regression performance or retention budget failed.');
+  if(!auditOnly)assert.equal(report.ok, true, 'Desktop/mobile-regression performance or retention budget failed.');
 } finally {
-  await browser.close();
+  // Always close the loopback listener even if a profiled browser's transport
+  // fails to finish its close handshake after the Chrome process has exited.
   await server.close();
+  let closeTimer;
+  try{await Promise.race([browser.close(),new Promise((_,reject)=>{closeTimer=setTimeout(()=>reject(Error('Owned browser cleanup exceeded 20 seconds')),20000);})]);}
+  finally{clearTimeout(closeTimer);}
 }

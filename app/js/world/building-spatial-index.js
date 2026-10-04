@@ -1,4 +1,5 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
+import {appendCollisionCandidate,hasCollisionCandidate} from '../physics/collision-candidates.js';
 
 const BUILDING_INDEX_CELL_SIZE = 120;
 let buildingSpatialIndex = new Map();
@@ -68,7 +69,9 @@ export function removeBuildingsFromSpatialIndex(buildings) {
   });
 }
 
-export function getNearbyBuildings(x, z, radius = 80) {
+// A collision query can append to its leased buffer. Ordinary callers still
+// receive their own array; they cannot observe later queries overwriting it.
+export function getNearbyBuildings(x, z, radius = 80, candidates = null) {
   const baseBuildings = appCtx.buildings || [];
   const dynamicColliders = Array.isArray(appCtx.dynamicBuildingColliders) ? appCtx.dynamicBuildingColliders : [];
 
@@ -76,9 +79,19 @@ export function getNearbyBuildings(x, z, radius = 80) {
   // it is not physically co-located with the cached Earth city at local 0,0.
   // Only the published ship colliders may participate while this nested Space
   // activity is active.
-  if (appCtx.activeShipInterior === true) return dynamicColliders;
+  if (appCtx.activeShipInterior === true) {
+    if(!candidates)return dynamicColliders;
+    for(const collider of dynamicColliders)appendCollisionCandidate(candidates,collider);
+    return candidates;
+  }
 
   if (!Number.isFinite(x) || !Number.isFinite(z) || !buildingSpatialIndex || buildingSpatialIndex.size === 0) {
+    if(candidates){
+      for(const building of baseBuildings)if(!isSuppressedBaseBuilding(building))appendCollisionCandidate(candidates,building);
+      for(const building of dynamicColliders)appendCollisionCandidate(candidates,building);
+      for(const building of appCtx.transportStructureColliders || [])appendCollisionCandidate(candidates,building);
+      return candidates;
+    }
     return baseBuildings.filter((building) => !isSuppressedBaseBuilding(building))
       .concat(dynamicColliders, appCtx.transportStructureColliders || []);
   }
@@ -88,8 +101,8 @@ export function getNearbyBuildings(x, z, radius = 80) {
   const maxCellX = Math.floor((x + queryRadius) / BUILDING_INDEX_CELL_SIZE);
   const minCellZ = Math.floor((z - queryRadius) / BUILDING_INDEX_CELL_SIZE);
   const maxCellZ = Math.floor((z + queryRadius) / BUILDING_INDEX_CELL_SIZE);
-  const out = [];
-  const seen = new Set();
+  const out = candidates ? null : [];
+  const seen = candidates ? null : new Set();
 
   for (let cx = minCellX; cx <= maxCellX; cx++) {
     for (let cz = minCellZ; cz <= maxCellZ; cz++) {
@@ -97,17 +110,16 @@ export function getNearbyBuildings(x, z, radius = 80) {
       if (!bucket) continue;
       for (let i = 0; i < bucket.length; i++) {
         const building = bucket[i];
-        if (!building || seen.has(building) || isSuppressedBaseBuilding(building)) continue;
-        seen.add(building);
-        out.push(building);
+        if (!building || (candidates ? hasCollisionCandidate(candidates,building) : seen.has(building)) || isSuppressedBaseBuilding(building)) continue;
+        if(candidates)appendCollisionCandidate(candidates,building);
+        else {seen.add(building);out.push(building);}
       }
     }
   }
 
-  const mergeByBounds = (buildings) => {
-    for (let i = 0; i < buildings.length; i++) {
-      const building = buildings[i];
-      if (!building || seen.has(building)) continue;
+    for (let i = 0; i < dynamicColliders.length; i++) {
+      const building = dynamicColliders[i];
+      if (!building || (candidates ? hasCollisionCandidate(candidates,building) : seen.has(building))) continue;
       if (
         x < building.minX - queryRadius ||
         x > building.maxX + queryRadius ||
@@ -116,11 +128,8 @@ export function getNearbyBuildings(x, z, radius = 80) {
       ) {
         continue;
       }
-      seen.add(building);
-      out.push(building);
+      if(candidates)appendCollisionCandidate(candidates,building);
+      else {seen.add(building);out.push(building);}
     }
-  };
-
-  mergeByBounds(dynamicColliders);
-  return out;
+  return candidates || out;
 }

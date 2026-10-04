@@ -1,5 +1,6 @@
 import {pointInPolygonXZ} from '../structure-semantics/geometry.js?v=2';
 import { nearbyVegetationObstacles } from '../world/vegetation-obstacle-index.js';
+import {createCollisionCandidates,appendCollisionCandidate,releaseCollisionCandidates} from './collision-candidates.js';
 
 function buildingVerticalRangeOverlap(building, actorBaseY, actorHeight, tolerance = 0.45) {
   if (!Number.isFinite(actorBaseY)) return true;
@@ -11,41 +12,42 @@ function buildingVerticalRangeOverlap(building, actorBaseY, actorHeight, toleran
 }
 
 function createBuildingCollisionQuery(appCtx) {
+  const available=[];
   return function checkBuildingCollision(x, z, carRadius = 2, options = {}) {
-    const hasBaseBuildings = Array.isArray(appCtx.buildings) && appCtx.buildings.length > 0;
-    const hasDynamicColliders = Array.isArray(appCtx.dynamicBuildingColliders) && appCtx.dynamicBuildingColliders.length > 0;
-    const hasTransportColliders = appCtx.transportStructureColliders?.length > 0;
+    // A nested acceptCollision callback leases another buffer. Nothing from
+    // the outer query is overwritten, including when that callback throws.
+    const buffer=available.pop() || createCollisionCandidates();
+    try {
     const localShip = appCtx.activeInterior?.environmentKind === 'expedition-ship';
-    const vegetationCandidates = localShip ? [] : nearbyVegetationObstacles(appCtx, x, z, carRadius + 1);
-    if (!hasBaseBuildings && !hasDynamicColliders && !hasTransportColliders && !vegetationCandidates.length) return { collision: false };
+    if(!localShip)nearbyVegetationObstacles(appCtx, x, z, carRadius + 1,buffer);
+    if(!(Array.isArray(appCtx.buildings)&&appCtx.buildings.length) &&
+      !(Array.isArray(appCtx.dynamicBuildingColliders)&&appCtx.dynamicBuildingColliders.length) &&
+      !appCtx.transportStructureColliders?.length && !buffer.count)return {collision:false};
     const actorBaseY = Number.isFinite(options?.actorBaseY) ? Number(options.actorBaseY) : NaN;
     const actorHeight = Number.isFinite(options?.actorHeight) ? Number(options.actorHeight) : 1.9;
     const acceptCollision = typeof options?.acceptCollision === 'function'
       ? options.acceptCollision
       : null;
-    const indexedCandidates = localShip ? [] : typeof appCtx.getNearbyBuildings === 'function'
-      ? appCtx.getNearbyBuildings(x, z, carRadius + 8)
-      : [...(appCtx.buildings || []), ...(appCtx.transportStructureColliders || [])];
+    if(!localShip){
+      if(typeof appCtx.getNearbyBuildings === 'function'){
+        const indexed=appCtx.getNearbyBuildings(x,z,carRadius+8,buffer);
+        // Compatibility with injected or legacy queries returning arrays.
+        if(Array.isArray(indexed))for(const candidate of indexed)appendCollisionCandidate(buffer,candidate);
+      }else{
+        for(const candidate of appCtx.buildings || [])appendCollisionCandidate(buffer,candidate);
+        for(const candidate of appCtx.transportStructureColliders || [])appendCollisionCandidate(buffer,candidate);
+      }
+    }
     // Authored interiors, Quick Builds and other active-world obstacles are
     // intentionally kept out of the cached Earth building index. They still
     // belong to this one collision authority. In particular, a ship interior
     // can be entered before getNearbyBuildings is published on the shared
     // context; falling back to only appCtx.buildings made every ship wall and
     // closed pressure door non-solid even though their colliders existed.
-    const candidates = [];
-    const seenCandidates = new Set();
-    [
-      ...vegetationCandidates,
-      ...(Array.isArray(indexedCandidates) ? indexedCandidates : []),
-      ...(Array.isArray(appCtx.dynamicBuildingColliders) ? appCtx.dynamicBuildingColliders : [])
-    ].forEach((candidate) => {
-      if (!candidate || seenCandidates.has(candidate)) return;
-      seenCandidates.add(candidate);
-      candidates.push(candidate);
-    });
-    if (!candidates?.length) return { collision: false };
+    if(Array.isArray(appCtx.dynamicBuildingColliders))for(const candidate of appCtx.dynamicBuildingColliders)appendCollisionCandidate(buffer,candidate);
+    const candidates=buffer.items;
 
-    for (let i = 0; i < candidates.length; i += 1) {
+    for (let i = 0; i < buffer.count; i += 1) {
       const building = candidates[i];
       if (!building || building.collisionDisabled) continue;
       if (!buildingVerticalRangeOverlap(building, actorBaseY, actorHeight)) continue;
@@ -128,6 +130,12 @@ function createBuildingCollisionQuery(appCtx) {
       }
     }
     return { collision: false };
+    } finally {
+      releaseCollisionCandidates(buffer);
+      // A fallback query against a whole unindexed world must not leave a
+      // large backing array permanently attached to the movement authority.
+      if(available.length<4 && buffer.items.length<=4096)available.push(buffer);
+    }
   };
 }
 

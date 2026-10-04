@@ -22,11 +22,19 @@
       "maximumExternalRequests": 3000,
       "maximumExternalTransferBytes": 67108864,
       "maximumPersistentStorageBytes": 157286400
+    },
+    "hitches": {
+      "maximumFrameMs": 250,
+      "maximumOver100PerMinute": 1,
+      "minimumHitchGapMs": 10000
     }
   },
   "mobileRegressionTier": {
     "id": "390x844-touch-emulation-on-apple-m1",
-    "viewport": { "width": 390, "height": 844 },
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
     "browser": "Installed Google Chrome with touch/mobile emulation",
     "measurementAuthority": "software regression proxy; not physical-phone battery or thermal evidence",
     "budgets": {
