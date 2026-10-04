@@ -1,6 +1,6 @@
 # Current development and release state
 
-Updated October 3, 2026. This summary supersedes the chronological status notes retained in Git history.
+Updated October 4, 2026. This summary supersedes the chronological status notes retained in Git history.
 
 ## Workspace and authorization
 
@@ -14,11 +14,17 @@ Freshly read October 3 from https://worldexplorer3d.io/build-manifest.json:
 `5.4.0+1532bdfbb5c1.319d215f60318297.production`.
 Source `1532bdfbb5c11e002d278b058d1ebdba88384f60`.
 
-No production deployment occurred. During full release revalidation, getPlaceLookup and mutateSharedExpedition plus Firestore rules/indexes were deployed explicitly to staging (we3d-staging-20260712), with existing hosted parameter values preserved. Hosted App Check lookup and rejection without a token passed in the first immutable matrix. Hosted shared-voyage HTTP authority/security-rules checks also pass with three disposable accounts and successful fixture cleanup. The updated dependency lock still requires staging deployment. Local emulators and disposable staging App Check identities are also used; their success is not a production receipt.
+No production deployment occurred. During full release revalidation, getPlaceLookup and mutateSharedExpedition plus Firestore rules/indexes were deployed explicitly to staging (we3d-staging-20260712), with existing hosted parameter values preserved. Hosted App Check lookup and rejection without a token passed in the first immutable matrix. Hosted shared-voyage HTTP authority/security-rules checks also pass with three disposable accounts and successful fixture cleanup. All staging Functions were redeployed from clean 87011a84 with the patched dependency lock and all 11 existing parameters preserved. Local emulators and disposable staging App Check identities are also used; their success is not a production receipt.
 
 ## Full release revalidation — owner follow-up
 
-The owner now explicitly requires phase 0 onward and all added work checked for production readiness. The earlier development closeout below is not final release acceptance. A fresh staging artifact was built; the previous production dist was moved intact (not copied or deleted) to `output/preserved-artifacts/5.4.0+1532bdfbb5c1.319d215f60318297.production`. All four saved candidates remain intact. New work fixes packaged-check imports, adds missing phase journeys to the release matrix, uses actual SDK shared-voyage transport, and repairs ocean entry when place-name lookup fails. The complete first matrix ran all 81 candidate gates against d643c222: 66 passed and 15 failed. The failures are being repaired, with a second clean immutable build and full candidate/backend matrix still required. The original report is retained at output/verification/product-plan/first-candidate-d643c222.json; do not claim readiness from partial reruns.
+The owner now explicitly requires phase 0 onward and all added work checked for production readiness. The earlier development closeout below is not final release acceptance. A fresh staging artifact was built; the previous production dist was moved intact (not copied or deleted) to `output/preserved-artifacts/5.4.0+1532bdfbb5c1.319d215f60318297.production`. All four saved candidates remain intact. New work fixes packaged-check imports, adds missing phase journeys to the release matrix, uses actual SDK shared-voyage transport, and repairs ocean entry when place-name lookup fails. The complete first matrix ran all 81 candidate gates against d643c222: 66 passed and 15 failed. The failures are being repaired, with a final matching candidate/backend acceptance still required. The original report is retained at output/verification/product-plan/first-candidate-d643c222.json; do not claim readiness from partial reruns.
+
+## October 4 full-run checkpoint
+
+Clean staging candidate `5.4.0+87011a841a71.a6a388d7e2c2b056.staging` completed all 82 candidate gates: **79 passed, three failed**. Hardware performance/retention passed without budget changes: desktop moving drive 45.45 FPS, p99/worst 33.4 ms; flight 57.87 FPS, p99 33.4 ms, worst 83.3 ms. All loading, activation, world coverage, resource/heap retention, storage, transfers and error checks passed, as did the phone-viewport regression proxy. This is not physical-phone evidence. Exact reports: `output/verification/product-plan/candidate-87011a84.json` and `performance-87011a84.json`.
+
+The two Ocean-related failures are test mismatches: the current HUD truthfully says SIM DEPTH and optional protected place-naming 502/429 responses were classified as missing packaged assets. Gameplay/renderer ownership passed. Narrow harness corrections retain provider degradation in reports and continue failing auth, asset, runtime and movement errors. A third gate recorded 14-second live parcel-provider timeouts in Howard and St. Mary's counties (22/24 passed); no timeout or coverage waiver is being applied. Focused packaged player-blocker and environment reruns pass. The newly reached fish check also exposed a stale Explore-menu selector; it now uses the visible Travel control and passes actual fish motion (24 moving fish), Earth return and teardown. The bounded parcel rerun passed all 24 jurisdictions with unchanged provider timeouts and no source changes; original transient failures are retained. Final matching candidate/backend evidence remains required. All source/runtime changes in this checkpoint passed 1,795 contracts. No production deployment.
 
 ## Current release repairs — October 3 evening
 

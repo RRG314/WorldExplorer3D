@@ -16,9 +16,15 @@ const context = await browser.newContext({ viewport: { width: 390, height: 844 }
 const page = await context.newPage();
 const browserErrors = [];
 const localFailures = [];
+const providerDegradations = [];
 page.on('pageerror', (error) => browserErrors.push(String(error?.stack || error)));
 page.on('response', (response) => {
-  if (response.url().startsWith(baseUrl) && response.status() >= 400) localFailures.push({ url: response.url(), status: response.status() });
+  if (response.url().startsWith(baseUrl) && response.status() >= 400) {
+    const endpoint = new URL(response.url()).pathname;
+    if (['/api/geospatial/search', '/api/geospatial/reverse'].includes(endpoint) && [429, 502, 503, 504].includes(response.status())) {
+      providerDegradations.push({endpoint, status: response.status()});
+    } else localFailures.push({url: response.url(), status: response.status()});
+  }
 });
 
 try {
@@ -56,8 +62,8 @@ try {
   await mkdir('output/release-evidence/current', { recursive: true });
   await page.screenshot({ path: 'output/release-evidence/current/underwater-authority-mobile.png', fullPage: true });
 
-  await page.locator('#exploreBtn').click();
-  await page.waitForSelector('#exploreMenu.open #fEarthMode', { timeout: 10_000 });
+  await page.locator('#travelBtn').click();
+  await page.waitForSelector('#travelMenu.open #fEarthMode', { timeout: 10_000 });
   await page.locator('#fEarthMode').click();
   await page.waitForFunction(() => {
     const diagnostics = globalThis.getWorldExplorerRuntimeDiagnostics?.() || {};
@@ -88,7 +94,7 @@ try {
     noBrowserErrors: browserErrors.length === 0,
     noFailedLocalResources: localFailures.length === 0
   };
-  const report = { ok: Object.values(checks).every(Boolean), contract: 'underwater-water-fish-authority-v2', checks, animatedFish, underwater, recovered, browserErrors, localFailures };
+  const report = { ok: Object.values(checks).every(Boolean), contract: 'underwater-water-fish-authority-v2', checks, animatedFish, underwater, recovered, browserErrors, localFailures, providerDegradations };
   console.log(JSON.stringify(report, null, 2));
   assert.equal(report.ok, true, 'Underwater fish authority journey failed.');
 } finally {

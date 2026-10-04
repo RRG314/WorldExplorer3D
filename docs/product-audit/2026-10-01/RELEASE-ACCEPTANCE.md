@@ -6,7 +6,7 @@ October 3, 2026. The implementation sequence through P19 and its automated P20 a
 
 ## What actually passed
 
-- All 1,792 registered contracts and source checks for the current implementation.
+- All 1,795 registered contracts and source checks after the runtime repairs.
 - Actual street/day/night/phone, usable-door/collision and walk/drive/walk checks documented in STREET-QUALITY-REFERENCE.md. The supplied city image remains a design target; no full visual parity is claimed.
 - Shared marine: nine two-client cases, three authenticated rules/subscription cases and eighteen local Ocean/ship regression cases. One anchored authored site; no global multiplayer Ocean directory.
 - Cameras: actual Finland and California images, expanded four-view desktop wall, phone viewport, IndexedDB favorites/reload, idempotent no-reward Journal reference, source failure/retry and teardown. Eleven camera contracts. No live-video/global coverage claim.
@@ -16,12 +16,14 @@ October 3, 2026. The implementation sequence through P19 and its automated P20 a
 
 The runner `product-accessibility-emulators.mjs` owns its emulators, browser and disposable staging attestation and closes them. Ordinary Chrome, dist, saved candidates and player data are preserved. Gate registration now includes 17 systems, 82 candidate gates and three backend gates. New local marine, shared marine, camera wall, provider and geocoder checks are mandatory in the existing release matrix and now honor WE3D_VERIFY_ROOT. Emulator wrappers reuse an already attached local emulator instead of starting conflicting instances.
 
+The second complete candidate run, clean 87011a84, passed 79/82 gates, including the full physical-M1 performance/retention gate without changed budgets. Remaining findings: stale SIM DEPTH assertion and optional naming errors misclassified as missing files in two Ocean checks; two live Maryland parcel-provider timeouts. Narrow harness corrections and a bounded provider rerun are in progress. This is not yet a complete green release matrix. Full report: output/verification/product-plan/candidate-87011a84.json.
+
 ## Finite remaining release gates
 
 | Gate | Current evidence / required result | Who or what supplies it |
 |---|---|---|
 | Weather service entitlement | Paid Open-Meteo account is unverified; current free endpoints cannot be certified for a commercial app. Confirm the existing plan, then configure/test an eligible server-side customer endpoint without exposing a key in the browser | Owner account information plus implementation/configuration check; no purchase or secret collection in chat |
-| Hosted backend and TTL | Staging getPlaceLookup, mutateSharedExpedition, rules/indexes and active cache TTL were verified/deployed. Actual hosted App Check search and rejection without a token passed. Hosted shared access/forged-write denial, idempotence and Ocean presence also pass with disposable identities; deploy the patched dependency lock and retain final identity-matched receipts. Production is unchanged | Coordinated staging release |
+| Hosted backend and TTL | Staging getPlaceLookup, mutateSharedExpedition, rules/indexes and active cache TTL were verified/deployed. Actual hosted App Check search and rejection without a token passed. Hosted shared access/forged-write denial, idempotence and Ocean presence also pass with disposable identities; all staging Functions now include the patched lock with 11 existing parameters preserved; retain final identity-matched receipts. Production is unchanged | Coordinated staging release |
 | Matching immutable artifact | Existing candidate/backend release receipts are for older HEAD/workspace/artifacts. `product-release-readiness.log` correctly rejects reuse. A source pass cannot approve preserved dist | Build once after configuration is settled; run the registered candidate/backend matrix against that exact artifact; retain its manifest and results |
 | Physical phone | iOS Safari and Android Chrome: load flagship location, move/turn, open map/Journal, use boat/ladder/sub recovery and camera wall, background/resume, rotate and return without stuck input or hidden controls | Actual devices; emulated viewport does not substitute |
 | Uncoached player comprehension | A fresh player completes the five tasks below and can explain save/remote-data boundaries without developer prompts | Human play review |

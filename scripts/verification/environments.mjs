@@ -32,10 +32,14 @@ async function verifyDestination(destination) {
   const browserErrors = [];
   collectBrowserGraphicsErrors(page, browserErrors);
   const localFailures = [];
+  const providerDegradations = [];
   page.on('pageerror', (error) => browserErrors.push(String(error?.stack || error)));
   page.on('response', (response) => {
     if (response.url().startsWith(baseUrl) && response.status() >= 400) {
-      localFailures.push({ kind: 'response', url: response.url(), status: response.status() });
+      const endpoint = new URL(response.url()).pathname;
+      if (['/api/geospatial/search', '/api/geospatial/reverse'].includes(endpoint) && [429, 502, 503, 504].includes(response.status())) {
+        providerDegradations.push({endpoint, status: response.status()});
+      } else localFailures.push({ kind: 'response', url: response.url(), status: response.status() });
     }
   });
   page.on('requestfailed', (request) => {
@@ -99,9 +103,9 @@ async function verifyDestination(destination) {
       noFailedLocalResources: localFailures.length === 0
     };
     await fs.mkdir(path.dirname(reportPath), { recursive: true });
-    await fs.writeFile(path.join(path.dirname(reportPath), `${destination.id}.json`), JSON.stringify({ id: destination.id, checks, snapshot, browserErrors, localFailures }, null, 2));
+    await fs.writeFile(path.join(path.dirname(reportPath), `${destination.id}.json`), JSON.stringify({ id: destination.id, checks, snapshot, browserErrors, localFailures, providerDegradations }, null, 2));
     assert.ok(Object.values(checks).every(Boolean), `${destination.id} destination verification failed`);
-    return { id: destination.id, ok: true, checks, snapshot, browserErrors, localFailures };
+    return { id: destination.id, ok: true, checks, snapshot, browserErrors, localFailures, providerDegradations };
   } finally {
     await context.close();
   }
