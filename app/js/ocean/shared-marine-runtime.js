@@ -6,7 +6,8 @@ export function marineVoyageRecord(s){return {version:1,id:s.id,subId:s.submarin
 export async function openSharedMarine(ctx,{transport:provided,now=()=>performance.now()}={}){
  if(ctx.sharedMarine){ctx.sharedMarine.open();return ctx.sharedMarine;}
  const transport=provided||(await import('./shared-marine-authority.js')).createMarineTransport();
- let latest=null,active=false,disposed=false,busy=false,error='',transition='',applied='',controlFault=false,generation=0;
+ let latest=null,active=false,disposed=false,busy=false,error='',transition='',applied='',controlFault=false,generation=0,leaving=false;
+ let transitionDone=Promise.resolve();
  const link=createMarineLink({transport,state:()=>latest,now,onState:accept,onFault:message=>{error=message;controlFault=!!message;refresh();},reconcile(state){
   if(state?.id!==latest?.id||state?.deployment!==latest?.deployment||state?.stage!=='underwater')return;
   const sub=ctx.oceanMode?.submarine,p=latest.submarine.pose;if(!sub)return;
@@ -23,13 +24,14 @@ export async function openSharedMarine(ctx,{transport:provided,now=()=>performan
  latest=state;if(!state&&active){error='The shared voyage is unavailable. Controls are stopped.';}refresh();if(active)void applyStage();}
  const send=link.send;
  async function act(type,extra={}){if(busy)return false;busy=true;error='';refresh();try{await send(type,extra);return true;}catch(e){error=e.message||'The command was not confirmed. Retry.';return false;}finally{busy=false;refresh();}}
- async function join(create=false){if(busy)return;busy=true;error='';try{await send(create?'create':'join');active=true;applied='';document.body.dataset.sharedMarine='true';await applyStage();}catch(e){error=e.message;}finally{busy=false;refresh();}}
+ async function join(create=false){if(busy||leaving||disposed)return;const ownGeneration=generation;busy=true;error='';try{await send(create?'create':'join');if(disposed||leaving||generation!==ownGeneration)return;active=true;applied='';document.body.dataset.sharedMarine='true';await applyStage();}catch(e){if(!disposed&&!leaving)error=e.message;}finally{busy=false;refresh();}}
  async function applyStage(){
   if(disposed||!active||!latest||transition)return;
   const stageKey=()=>`${latest?.id}:${latest?.deployment}:${latest?.stage}`;
   const key=stageKey();if(applied===key)return;
   const ownGeneration=generation,isCurrent=()=>!disposed&&active&&generation===ownGeneration&&transport.isCurrent()&&stageKey()===key;
   transition=key;refresh();
+  let finishTransition;transitionDone=new Promise(resolve=>{finishTransition=resolve;});
   try{
    const record=marineVoyageRecord(latest);
    if(record.stage==='aboard'&&!ctx.oceanMode?.active&&ctx.boatMode?.active&&ctx.boatMode.transportEntityId===record.ship.transportEntityId){ctx.boatMode.moored=true;applied=key;return;}
@@ -37,7 +39,7 @@ export async function openSharedMarine(ctx,{transport:provided,now=()=>performan
    const started=await ctx.startOceanMode({launchSite:record.site,submarinePose:record.sub,voyageResume:record,sharedVoyage:true,isTransferCurrent:isCurrent});
    if(!isCurrent())return;
    if(!started)throw Error('Could not enter the shared study site. Retry joining.');
-   ctx.setPaused?.(false);
+   ctx.setPauseReason?.('manual_pause',false);
    if(record.stage==='aboard'){
     const recovered=await ctx.transferSubmarineToBoat({source:'shared-marine-authority',isTransferCurrent:isCurrent});
     if(!isCurrent())return;
@@ -45,7 +47,7 @@ export async function openSharedMarine(ctx,{transport:provided,now=()=>performan
     ctx.boatMode.moored=true;
    }
    applied=key;error='';
-  }catch(e){if(isCurrent())error=e.message;}finally{transition='';refresh();if(!disposed&&active&&stageKey()!==key)void applyStage();}
+  }catch(e){if(isCurrent())error=e.message;}finally{transition='';finishTransition();refresh();if(!disposed&&active&&stageKey()!==key)void applyStage();}
  }
  function refresh(){if(disposed)return;
   const seats=latest?.seats||{},seatName=k=>seats[k]?.untilMs>clock()?(latest.crew[seats[k].uid]?.name||'Crew'):'Available';
@@ -58,6 +60,7 @@ export async function openSharedMarine(ctx,{transport:provided,now=()=>performan
   reportView.hidden=!active||!latest?.manifest.length;reportView.open=latest?.stage==='complete';
   const signature=JSON.stringify([latest?.manifest,latest?.rescues.length]);if(reportBody.dataset.signature!==signature){reportBody.dataset.signature=signature;reportBody.replaceChildren();for(const item of latest?.manifest||[]){const row=document.createElement('p');row.textContent=`${{'table-garden':'Table Garden','branch-ridge':'Branch Ridge','seagrass-edge':'Seagrass Edge'}[item.id]||item.id} · authored habitat observation · ${new Date(item.atMs).toLocaleString()}`;reportBody.append(row);}if(latest?.rescues.length){const row=document.createElement('p');row.textContent=`${latest.rescues.length} crew recovery recorded; findings retained.`;reportBody.append(row);}}
   for(const b of Object.values(buttons))b.disabled=busy||!!transition;
+  buttons.Leave.disabled=leaving;
   buttons.Create.hidden=!!latest;buttons.Join.hidden=!latest||active&&!error;
   for(const id of ['Helm','Pilot','ReleaseHelm','ReleasePilot','Deploy','Scan','Recover','Report'])buttons[id].hidden=!active;
   buttons.Helm.hidden=!active||latest?.stage==='complete'||!!seats.helm&&seats.helm.untilMs>clock();buttons.Pilot.hidden=!active||latest?.stage==='complete'||!!seats.pilot&&seats.pilot.untilMs>clock();
@@ -74,16 +77,18 @@ export async function openSharedMarine(ctx,{transport:provided,now=()=>performan
  button('Deploy','Deploy shared submarine',()=>act('deploy'));button('Scan','Record observation',()=>act('scan',{target:['table-garden','branch-ridge','seagrass-edge'].find(id=>!latest.manifest.some(r=>r.id===id))}));
  button('Recover','Recover crew and submarine',()=>act('recover'));button('Report','Submit shared survey report',()=>act('report'));button('Leave','Close',()=>leave());
  async function leave({restore=true}={}){
-  if(busy||transition)return;
-  busy=true;controlFault=true;
+  if(leaving||disposed)return;
+  leaving=true;busy=true;controlFault=true;
   generation++;
   const wasActive=active;
-  if(active){for(const seat of ['helm','pilot'])if(latest?.seats?.[seat]?.uid===transport.uid)try{await send('release',{seat});}catch{}}
+  active=false;refresh();
+  await transitionDone;
+  if(wasActive){for(const seat of ['helm','pilot'])if(latest?.seats?.[seat]?.uid===transport.uid)try{await send('release',{seat});}catch{}}
   active=false;disposed=true;link.dispose();unsubscribe();clearInterval(timer);panel.remove();style.remove();delete document.body.dataset.sharedMarine;const personal=ctx.oceanVoyage?.restorePersonal?.();ctx.sharedMarine=null;
   // Return to the retained personal journey when one exists; otherwise stop
   // shared movement at the title instead of saving a duplicate local vessel.
   if(!wasActive||!restore)return;
-  if(personal||ctx.oceanVoyage?.saved)await ctx.oceanVoyage.resume(personal);else {if(ctx.boatMode?.active)ctx.suspendBoatModeForOceanTransfer?.();ctx.stopOceanMode?.();ctx.setPaused?.(true);ctx.openGlobeSelector?.();}
+  if(personal||ctx.oceanVoyage?.saved)await ctx.oceanVoyage.resume(personal);else {if(ctx.boatMode?.active)ctx.suspendBoatModeForOceanTransfer?.();ctx.stopOceanMode?.();ctx.setPauseReason?.('manual_pause',true);ctx.openGlobeSelector?.();}
  }
  const api={get active(){return active},get canPilot(){return owns('pilot')&&latest?.stage==='underwater'},snapshot:()=>({active,state:latest,error,transition,connection:link.snapshot()}),open(){panel.hidden=false},leave,
   tick(dt){

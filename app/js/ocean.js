@@ -116,6 +116,7 @@ Object.assign(oceanMode, {
 appCtx.oceanMode = oceanMode;
 const oceanModuleScope = createLifecycleScope('ocean-module');
 let oceanSessionScope = null;
+let oceanSiteGeneration = 0;
 
 const _tmpVecA = new THREE.Vector3();
 const _tmpVecB = new THREE.Vector3();
@@ -600,6 +601,8 @@ function startOceanMode(options = {}) {
   // Reject before exiting Earth or replacing an existing ocean session.
   if (options.launchSite && !savedEntry && !hasOceanEntry(options.launchSite, options.entry)) return false;
   if (!options.launchSite) options = { ...options, launchSite: OCEAN_SITE };
+  const siteGeneration=++oceanSiteGeneration;
+  const currentSite=()=>siteGeneration===oceanSiteGeneration&&oceanMode.active&&!!oceanMode.scene;
   if (oceanMode.active) {
     if (options.launchSite) appCtx.oceanVoyage?.checkpoint();
     if (options.launchSite && resetOceanLaunchSite(options.launchSite)) {
@@ -609,7 +612,7 @@ function startOceanMode(options = {}) {
       void refreshWaterEnvironmentEvidence();
       rebuildOceanTerrainLayers(oceanMode.scene, oceanMode.renderer);
       void primeBathymetryTiles().then((ready) => {
-        if (ready && oceanMode.active && oceanMode.scene) {
+        if (ready && currentSite()) {
           rebuildOceanTerrainLayers(oceanMode.scene, oceanMode.renderer);
         }
       });
@@ -661,12 +664,12 @@ function startOceanMode(options = {}) {
     updateOceanHud(performance.now() * 0.001);
 
     primeLocalBathymetryGrid().then(oceanSessionScope.guard((ready) => {
-      if (!ready || !oceanMode.scene) return;
+      if (!ready || !currentSite()) return;
       rebuildOceanTerrainLayers(oceanMode.scene, oceanMode.renderer);
     }));
 
     primeBathymetryTiles().then(oceanSessionScope.guard((ready) => {
-      if (!ready || !oceanMode.scene) return;
+      if (!ready || !currentSite()) return;
       rebuildOceanTerrainLayers(oceanMode.scene, oceanMode.renderer);
     }));
 

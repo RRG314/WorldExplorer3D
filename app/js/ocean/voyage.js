@@ -68,7 +68,7 @@ export function ensureOceanVoyage(ctx,{store=createOceanVoyageStore()}={}){
    if(ctx.boatMode?.active)ctx.suspendBoatModeForOceanTransfer?.();
    const started=ctx.gameStarted?await ctx.startOceanMode({launchSite:restore.site,waveOffset:restore.waveOffset,submarinePose:restore.sub,voyageResume:restore}):await ctx.triggerTitleStart({bypassCustomGate:true,launchMode:'ocean',voyageResume:restore});
    if(!started)return false;
-   ctx.closeGlobeSelector?.();ctx.setPaused?.(false);ctx.paused=false;
+   ctx.closeGlobeSelector?.();ctx.setPauseReason?.('manual_pause',false);
    if(restore.stage==='aboard')return !!await ctx.transferSubmarineToBoat({source:'saved-voyage-recovery'});
    return true;
   }catch{status='Could not resume this voyage. The saved record is retained.';return false;}finally{if(ui)ui.resume.disabled=false;refresh();}

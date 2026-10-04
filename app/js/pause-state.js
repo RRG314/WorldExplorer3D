@@ -4,9 +4,9 @@ import { ctx as appCtx } from './shared-context.js?v=55';
 const pauseReasons = new Set();
 const gameplayClock=createActivePlayClock();
 appCtx.getGameplayClock=()=>gameplayClock.now();
+Object.defineProperty(appCtx,'paused',{enumerable:true,configurable:false,get:()=>pauseReasons.size>0});
 
 function syncPausedState() {
-  appCtx.paused = pauseReasons.size > 0;
   gameplayClock.setPaused(appCtx.paused);
   return appCtx.paused;
 }

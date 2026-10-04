@@ -6,6 +6,16 @@ import { createLifecycleScope, getLifecycleRegistrySnapshot } from './runtime/li
 const environmentAdapters = new Map();
 let transitionSequence = 0;
 let activeTransition = null;
+let sessionAbort = new AbortController();
+
+// Capture this before awaiting work owned by the current environment. World
+// loaders retain their own request generation; consumers may also opt into it.
+export function captureEnvironmentSession({includeWorld = true} = {}) {
+  const generation=transitionSequence,environment=getEnv(),world=appCtx._worldLoadSequence||0;
+  const signal=sessionAbort.signal;
+  return Object.freeze({generation,environment,world,signal,
+    isCurrent:()=>!signal.aborted&&generation===transitionSequence&&environment===getEnv()&&(!includeWorld||world===(appCtx._worldLoadSequence||0))});
+}
 
 function validEnvironment(environment) {
   return Object.values(ENV).includes(environment);
@@ -30,13 +40,19 @@ function cancelEnvironmentTransition(token = activeTransition, reason = 'superse
   token.cancelReason = reason;
   token.abortController.abort(reason);
   token.scope.dispose(reason);
-  if (activeTransition === token) activeTransition = null;
+  if (activeTransition === token) {
+    activeTransition = null;
+    sessionAbort.abort(reason);
+    sessionAbort = new AbortController();
+  }
   return true;
 }
 
 function beginEnvironmentTransition(target, options = {}) {
   if (!validEnvironment(target)) throw new Error(`Unknown environment: ${target}`);
   if (activeTransition) cancelEnvironmentTransition(activeTransition, 'superseded');
+  sessionAbort.abort('environment-requested');
+  sessionAbort = new AbortController();
   const id = ++transitionSequence;
   const source = String(options.source || 'runtime');
   const scope = createLifecycleScope(`environment-transition:${id}:${source}`);
@@ -148,6 +164,7 @@ function getSessionCoordinatorDebugState() {
     }
   });
   return {
+    generation: transitionSequence,
     environment: getEnv(),
     registeredEnvironments: [...environmentAdapters.keys()],
     environments,

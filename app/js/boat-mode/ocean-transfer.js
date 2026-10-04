@@ -108,6 +108,7 @@ async function transferBoatToSubmarine(options = {}) {
 }
 
 async function transferSubmarineToBoat(options = {}) {
+  if(options.isTransferCurrent?.()===false)return false;
   if(appCtx.sharedMarine?.active && options.source!=='shared-marine-authority')return false;
   if (transferPending) return false;
   if (!appCtx.oceanMode?.active) return false;
@@ -132,7 +133,7 @@ async function transferSubmarineToBoat(options = {}) {
   const priorPose={x:sub.position.x,y:sub.position.y,z:sub.position.z,yaw:sub.yaw};
   const priorWave={...appCtx.oceanMode.waveOffset};
   let surfaced=false,originCommitted=false;
-  const stillHere=()=>!appCtx.boatMode.active&&!appCtx.oceanMode.active&&(!appCtx.getEnv||appCtx.getEnv()===(appCtx.ENV?.EARTH||'EARTH'))&&(originCommitted?appCtx.LOC?.lat===lat&&appCtx.LOC?.lon===lon:appCtx.LOC?.lat===priorOrigin.lat&&appCtx.LOC?.lon===priorOrigin.lon);
+  const stillHere=()=>options.isTransferCurrent?.()!==false&&!appCtx.boatMode.active&&!appCtx.oceanMode.active&&(!appCtx.getEnv||appCtx.getEnv()===(appCtx.ENV?.EARTH||'EARTH'))&&(originCommitted?appCtx.LOC?.lat===lat&&appCtx.LOC?.lon===lon:appCtx.LOC?.lat===priorOrigin.lat&&appCtx.LOC?.lon===priorOrigin.lon);
   const customLatInput = document.getElementById('customLat');
   const customLonInput = document.getElementById('customLon');
   if (customLatInput) customLatInput.value = lat.toFixed(6);

@@ -40,3 +40,17 @@ test('uncertain response stops prediction; rejoin adopts authoritative state and
  fail=false;now=2500;await link.send('join');assert.equal(link.blocked(),false);assert.equal(reconciled,1);
  current=false;await assert.rejects(link.send('pose'),/Room connection changed/);assert.equal(reconciled,1);link.dispose();
 });
+test('stage publications converge during entry and leaving cancels a pending entry',async t=>{
+ const elements=[],pending=[];let subscription,recovered=0;
+ const element=()=>{const e={dataset:{},style:{},append(){},setAttribute(){},replaceChildren(){},remove(){},blur(){}};elements.push(e);return e;};
+ const previous=globalThis.document;globalThis.document={createElement:element,head:element(),body:element()};t.after(()=>{if(previous===undefined)delete globalThis.document;else globalThis.document=previous;});
+ t.mock.method(globalThis,'setInterval',()=>1);t.mock.method(globalThis,'clearInterval',()=>{});
+ let state={id:'lifecycle',revision:1,deployment:0,stage:'aboard',updatedAtMs:1000,site:{},ship:{id:'ship',anchor:{}},submarine:{id:'sub',pose:{x:0,y:-12,z:-65,yaw:0},poseAtMs:1000},crew:{},seats:{},manifest:[],rescues:[]};
+ const ctx={oceanMode:{active:false},boatMode:{active:false},startOceanMode:options=>new Promise(resolve=>pending.push({options,resolve})),transferSubmarineToBoat:async()=>{recovered++;return true;}};
+ const transport={uid:'pilot',roomCode:'TEST',isCurrent:()=>true,subscribe:fn=>{subscription=fn;fn(state);return()=>{};},send:async()=>({state,serverNowMs:1000})};
+ const api=await openSharedMarine(ctx,{transport,now:()=>0});elements.find(e=>e.id==='sharedMarineJoin').onclick();await settle();assert.equal(pending.length,1);
+ state={...state,revision:2,deployment:1,stage:'underwater'};subscription(state);assert.equal(pending[0].options.isTransferCurrent(),false);
+ pending[0].resolve(true);await settle();assert.equal(pending.length,2,'latest stage is applied without another server publication');assert.equal(recovered,0);
+ const leaving=api.leave({restore:false});assert.equal(api.active,false);assert.equal(pending[1].options.isTransferCurrent(),false);
+ pending[1].resolve(false);await leaving;assert.equal(ctx.sharedMarine,null);assert.equal(recovered,0);
+});

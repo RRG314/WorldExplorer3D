@@ -1,6 +1,7 @@
 import {updateBuildingExteriorFocus} from '../world/building-exterior-details.js?v=2';
 import {beginSwimmingRender} from '../walking/water/presentation.js';
 import {createGraphicsCallEvidence} from './graphics-call-evidence.js';
+import {activePresentationOwner} from './renderer-owners.js';
 import { updateStreetPavementFocus, updateStreetOverviewFrame, prepareStreetOverviewMaterials } from '../world/street-pavement-runtime.js';
 function createCoreFrameSystems(appCtx, hooks = {}) {
   appCtx.presentationPose = null;
@@ -206,7 +207,7 @@ function createCoreRenderSystem(appCtx, shouldUseComposer) {
     // partial city batches competes with compilation and uploads them early.
     // Manual pause retains the last frame beneath its dimmed dialog. Network
     // listeners and lease heartbeats remain alive without redrawing the city.
-    enabled: (frame) => frame?.manualRender !== false && !!appCtx.gameStarted && !appCtx.worldLoading && !appCtx.titleLaunchPending && !appCtx.hasPauseReason?.('manual_pause'),
+    enabled: (frame) => frame?.manualRender !== false && activePresentationOwner(appCtx)==='main' && !appCtx.worldLoading && !appCtx.titleLaunchPending && !appCtx.hasPauseReason?.('manual_pause'),
     update() {
       draw();
     }
