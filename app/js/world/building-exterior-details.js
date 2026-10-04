@@ -335,10 +335,16 @@ function* buildDetails(appCtx, options = {}) {
   const radius = DETAIL_RADIUS[tier];
   const districtFocus=harborDistrictFocus(appCtx);
   const focus=options.focus||{x:0,z:0};
-  const candidates = (options.sources || []).map(mesh=>{
+  // A moving aircraft refreshes focus frequently. Only nearby candidates need
+  // records; allocating one for every city building creates avoidable GC work.
+  const candidates = [];
+  for (const mesh of options.sources || []) {
     const center=mesh.detailCenter||footprintCenter(mesh.userData.buildingFootprint);
-    return {mesh,distance:Math.min(Math.hypot(center.x-focus.x,center.z-focus.z),!options.focus&&districtFocus?Math.hypot(center.x-districtFocus.x,center.z-districtFocus.z):Infinity)};
-  }).filter(c=>c.distance<=radius).sort((a,b)=>a.distance-b.distance||String(a.mesh.userData.sourceBuildingId).localeCompare(String(b.mesh.userData.sourceBuildingId))).slice(0,limit);
+    const distance=Math.min(Math.hypot(center.x-focus.x,center.z-focus.z),!options.focus&&districtFocus?Math.hypot(center.x-districtFocus.x,center.z-districtFocus.z):Infinity);
+    if(distance<=radius)candidates.push({mesh,distance});
+  }
+  candidates.sort((a,b)=>a.distance-b.distance||String(a.mesh.userData.sourceBuildingId).localeCompare(String(b.mesh.userData.sourceBuildingId)));
+  if(candidates.length>limit)candidates.length=limit;
 
   const materials = createDetailMaterials();
   const batches = createBatchMap(materials);

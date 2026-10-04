@@ -369,7 +369,7 @@ function advanceAgents(agents, graph, outgoing, random, dt, kind, behavior = {})
     }
     agent.relocationCooldown = Math.max(0, agent.relocationCooldown - dt);
     if (kind === 'vehicle' && agent.routeEndHold > 0) {
-      const heldPose = agentPose(agent, graph, behavior.sampleVehicleSurface);
+      const heldPose = agentPose(agent, graph);
       const heldDistance = heldPose && behavior.reference
         ? Math.hypot(heldPose.x - behavior.reference.x, heldPose.z - behavior.reference.z)
         : 0;
@@ -403,7 +403,9 @@ function advanceAgents(agents, graph, outgoing, random, dt, kind, behavior = {})
     }
     const edge = graph.edges[agent.edgeIndex];
     if (!edge) continue;
-    const pose = agentPose(agent, graph, kind === 'vehicle' ? behavior.sampleVehicleSurface : null);
+    // Distance and following decisions use X/Z only; visual wheel support is
+    // resolved once when publishing the vehicle host below.
+    const pose = agentPose(agent, graph);
     const reference = behavior.reference;
     const distance = pose && reference ? Math.hypot(pose.x - reference.x, pose.z - reference.z) : 0;
     const stride = kind === 'vehicle' ? 1 : distance > 900 ? 8 : distance > 480 ? 4 : distance > 220 ? 2 : 1;
@@ -943,7 +945,7 @@ export function createLivingWorldPopulation(options = {}) {
           speedScale: demand.vehicleSpeedScale,
           signalDirective: (edgeIndex, progress, speed) => trafficControls.directive(edgeIndex, progress, speed, elapsedSeconds)
         });
-        const vehiclePoses = vehicles.map((agent) => agentPose(agent, trafficGraph, sampleVehicleSurface)).filter(Boolean);
+        const vehiclePoses = vehicles.map((agent) => agentPose(agent, trafficGraph)).filter(Boolean);
         advanceAgents(pedestrians, pedestrianGraph, pedestrianOutgoing, random, POPULATION_STEP_SECONDS, 'pedestrian', {
           reference,
           tick,

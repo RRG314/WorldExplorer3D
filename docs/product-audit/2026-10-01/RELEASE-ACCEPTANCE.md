@@ -18,6 +18,12 @@ The runner `product-accessibility-emulators.mjs` owns its emulators, browser and
 
 The second complete candidate run, clean 87011a84, passed 79/82 gates, including the full physical-M1 performance/retention gate without changed budgets. Remaining findings: stale SIM DEPTH assertion and optional naming errors misclassified as missing files in two Ocean checks; two live Maryland parcel-provider timeouts. Narrow harness corrections and a bounded provider rerun are in progress. This is not yet a complete green release matrix. Full report: output/verification/product-plan/candidate-87011a84.json.
 
+## October 4 matching acceptance and bounded follow-up
+
+Clean 01d181c9 completed **82/82 candidate gates and 3/3 backend groups**, including hosted App Check, shared marine authority, full multiplayer, all phase journeys and unchanged performance/retention budgets. Preserved matching receipts: `output/verification/product-plan/final-candidate-01d181c9.json` and `final-backend-01d181c9.json`. The stale Ocean assertions and transient parcel failures described above are resolved; all 24 parcel jurisdictions passed.
+
+The flight sample nevertheless contained a 600 ms outlier. CPU/heap diagnostics identified collection pauses and avoidable traffic/contact/frontage allocations. A bounded runtime follow-up preserves exact wheel-contact results (12,000 old/new comparisons), X/Z traffic decisions and storefront selection while reducing sampled cumulative temporary allocation by about 24% in the diagnostic comparison. Actual four-city traffic, streets and prescribed movement-client checks, inspected images, source checks and all 1,796 contracts pass. A final clean build and matching full acceptance must cover this follow-up; the prior green artifact cannot approve changed source. Physical-phone and human-comprehension gates remain separate.
+
 ## Finite remaining release gates
 
 | Gate | Current evidence / required result | Who or what supplies it |
