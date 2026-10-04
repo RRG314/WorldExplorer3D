@@ -1,10 +1,18 @@
-// Owns asynchronous evidence for the selected place. Old requests may finish,
-// but only the current place/request may publish or update cache identity.
+// Owns and cancels asynchronous evidence for the selected place. Generation
+// guards still reject late results from providers that ignore cancellation.
 export function createWaterEnvironmentController({ appCtx, marineService, resolveEvidence, now = Date.now }) {
   let sequence = 0;
   let lastKey = '';
   let refreshedAt = 0;
   let pending = null;
+  let requestController = null;
+  function cancel(clear = false) {
+    sequence++;
+    requestController?.abort();
+    requestController = null;
+    pending = null;
+    if (clear) { lastKey = ''; clearEvidence(); }
+  }
   const keyFor = location => `${location.lat.toFixed(4)}:${location.lon.toFixed(4)}`;
   function location() {
     const selected = appCtx.oceanMode?.active ? appCtx.oceanMode.launchSite : appCtx.selLoc === 'custom' ? appCtx.customLoc : appCtx.LOC;
@@ -40,23 +48,26 @@ export function createWaterEnvironmentController({ appCtx, marineService, resolv
   function refresh(force = false) {
     const place = location();
     if (!place) {
-      sequence++; pending = null; lastKey = ''; clearEvidence();
+      cancel(true);
       appCtx.waterEnvironmentStatus = Object.freeze({state:'unavailable', reason:'invalid-location'});
       return Promise.resolve(null);
     }
     const key = keyFor(place);
     // A pending request for another place must not defeat returning to a cached
     // place. Invalidate it before considering that cache reusable.
-    if (pending && pending.key !== key) { sequence++; pending = null; }
+    if (pending && pending.key !== key) cancel();
     if (!force && key === lastKey && now() - refreshedAt < 15 * 60 * 1000 && appCtx.activeWaterOpticsEvidence) return Promise.resolve(appCtx.activeWaterOpticsEvidence);
     if (!force && pending?.key === key) return pending.promise;
-    const id = ++sequence;
+    cancel();
+    const id = sequence;
+    const controller = requestController = new AbortController();
+    const signal = controller.signal;
     if (key !== lastKey) clearEvidence();
     appCtx.waterEnvironmentStatus = Object.freeze({state:'loading', location:place, requestedAt:now()});
-    const promise = Promise.resolve().then(() => marineService.modelAt(place, {force})).then(model => {
+    const promise = Promise.resolve().then(() => marineService.modelAt(place, {force, signal})).then(model => {
       if (!isCurrent(id, key)) return null;
       const evidence = publish(place, {model, station:null, observation:null, predictions:[], warnings:[]}, id, 'ready-wave-model');
-      void Promise.resolve().then(() => marineService.selected(place, {force:false})).then(marine => publish(place, marine, id, 'ready')).catch(() => {});
+      void Promise.resolve().then(() => marineService.selected(place, {force:false, signal})).then(marine => publish(place, marine, id, 'ready')).catch(() => {});
       return evidence;
     }).catch(error => {
       if (isCurrent(id, key)) {
@@ -68,5 +79,5 @@ export function createWaterEnvironmentController({ appCtx, marineService, resolv
     pending = {id, key, promise};
     return promise;
   }
-  return Object.freeze({refresh});
+  return Object.freeze({refresh, cancel});
 }

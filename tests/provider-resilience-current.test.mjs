@@ -27,3 +27,53 @@ test('missing or compressed length cannot allow an oversized decoded response; s
  assert.equal(await readBoundedText(new Response('harbor'),20),'harbor');
  await assert.rejects(readBoundedText({text:async()=>'🌊🌊',headers:new Headers()},7),/size limit/);
 });
+
+const {providerResponseError}=await import('../app/js/geospatial/provider-error.js');
+test('rate limits span locations, retain valid dated cache, and admit just one recovery probe',async()=>{
+ let now=100000,calls=0,stage='ready',release;
+ const registry=createProviderRegistry({now:()=>now});
+ registry.register({id:'weather',cacheTtlMs:600000,query:async()=>{
+  calls++;
+  if(stage==='limited')throw providerResponseError(new Response('private provider body',{status:429,headers:{'retry-after':'120'}}),now);
+  if(stage==='probe')await new Promise(r=>release=r);
+  return {items:[1]};
+ }});
+ const cached=await registry.query('weather',{lat:1});stage='limited';
+ await assert.rejects(registry.query('weather',{lat:2}),{status:429});
+ for(let lat=3;lat<13;lat++)await assert.rejects(registry.query('weather',{lat},{force:true}),{code:'PROVIDER_COOLDOWN'});
+ assert.equal(calls,2);assert.equal((await registry.query('weather',{lat:1})).fetchedAt,cached.fetchedAt);
+ now+=120001;stage='probe';const probe=registry.query('weather',{lat:3});await tick();
+ await assert.rejects(registry.query('weather',{lat:4}),{code:'PROVIDER_COOLDOWN'});
+ release();await probe;stage='ready';await registry.query('weather',{lat:4});
+ assert.equal(calls,4);assert.equal(registry.snapshot().providers[0].retryAt,0);
+ assert.doesNotMatch(JSON.stringify(registry.snapshot()),/private provider body/);
+});
+test('outage circuit and a failed recovery probe bound retries across changing queries',async()=>{
+ let now=100000,calls=0;
+ const registry=createProviderRegistry({now:()=>now});registry.register({id:'feed',query:()=>{calls++;throw new TypeError('Failed to fetch private-coordinate');}});
+ for(let key=0;key<3;key++)await assert.rejects(registry.query('feed',{key}));
+ await assert.rejects(registry.query('feed',{key:4}),{code:'PROVIDER_COOLDOWN'});assert.equal(calls,3);
+ now+=30001;await assert.rejects(registry.query('feed',{key:5}));
+ await assert.rejects(registry.query('feed',{key:6}),{code:'PROVIDER_COOLDOWN'});assert.equal(calls,4);
+ assert.doesNotMatch(JSON.stringify(registry.snapshot()),/private-coordinate/);
+});
+test('a success started before a 429 cannot erase its cooldown and canceling a probe allows a new probe',async()=>{
+ let now=100000,release,signal;
+ const registry=createProviderRegistry({now:()=>now});registry.register({id:'feed',query:async(input,context)=>{
+  if(input.key===2)throw providerResponseError(new Response('',{status:429}),now);
+  signal=context.signal;await new Promise(r=>release=r);return {items:[1]};
+ }});
+ const old=registry.query('feed',{key:1});await tick();await assert.rejects(registry.query('feed',{key:2}));release();await old;
+ await assert.rejects(registry.query('feed',{key:3}),{code:'PROVIDER_COOLDOWN'});
+ now+=60001;const controller=new AbortController(),probe=registry.query('feed',{key:3},{signal:controller.signal});await tick();controller.abort();await assert.rejects(probe,{name:'AbortError'});assert.equal(signal.aborted,true);release();await tick();
+ const recovered=registry.query('feed',{key:4});await tick();release();await recovered;
+ assert.equal(registry.snapshot().providers[0].retryAt,0);
+});
+test('Retry-After dates, delays and malformed values are handled without retaining error bodies',()=>{
+ const now=Date.parse('2026-10-04T00:00:00Z');
+ const response=value=>new Response('private details',{status:503,headers:{'retry-after':value}});
+ assert.equal(providerResponseError(response('90'),now).retryAfterMs,90000);
+ assert.equal(providerResponseError(response('Sun, 04 Oct 2026 00:02:00 GMT'),now).retryAfterMs,120000);
+ assert.equal(providerResponseError(response('invalid'),now).retryAfterMs,null);
+ assert.equal(providerResponseError(response('999999999'),now).retryAfterMs,86400000);
+});

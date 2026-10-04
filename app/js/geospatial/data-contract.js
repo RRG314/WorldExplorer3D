@@ -163,6 +163,7 @@ function getDataSource(sourceId) {
 }
 
 function finiteCoordinate(value, min, max, label) {
+  if (!['number', 'string'].includes(typeof value) || (typeof value === 'string' && !value.trim())) throw new RangeError(`${label} is invalid.`);
   const number = Number(value);
   if (!Number.isFinite(number) || number < min || number > max) {
     throw new RangeError(`${label} must be between ${min} and ${max}.`);

@@ -8,7 +8,7 @@ import { marineService } from "../geospatial/marine.js?v=2";
 import { streetImageryService } from "../geospatial/street-imagery.js?v=1";
 import { cameraAt, loadDeFlockGlobeIndex, nearestCamera } from "../deflock/globe-index.js?v=1";
 import { loadSurveillanceFeatures } from "../deflock/source.js?v=7";
-import { createMarineState, ensureSelectedMarineData } from "./marine-state.js?v=1";
+import { createMarineState, ensureSelectedMarineData, cancelSelectedMarineData } from "./marine-state.js?v=1";
 import { LIVE_EARTH_CATEGORIES, LIVE_EARTH_LAYERS, getLiveEarthLayer } from "./registry.js?v=11";
 import { getSatelliteLookAngles, getSatelliteSnapshot, getSatelliteTrack, refreshSatelliteCatalog } from "./satellites.js?v=6";
 import { buildEarthquakeReplayProfile, refreshEarthquakes } from "./earthquakes.js?v=2";
@@ -720,7 +720,7 @@ function resetSelectorVisuals(state) {
 function initLiveEarth() {
   if (appCtx.liveEarth?.ready) return appCtx.liveEarth;
   const state = buildLiveEarthState();
-  document.addEventListener('visibilitychange',()=>{if(document.hidden)stopPublicCamera(state);else if(state.selector.api?.isOpen?.()&&state.activeLayerId==='public-cameras'&&state.panelMode==='live-earth')void loadPublicCameras(buildLiveEarthModuleContext(),state);});
+  document.addEventListener('visibilitychange',()=>{if(document.hidden){stopPublicCamera(state);cancelSelectedMarineData(state);}else if(state.selector.api?.isOpen?.()&&state.activeLayerId==='public-cameras'&&state.panelMode==='live-earth')void loadPublicCameras(buildLiveEarthModuleContext(),state);});
 
   const liveEarth = {
     ready: true,
@@ -738,6 +738,7 @@ function initLiveEarth() {
     },
     onSelectorClose() {
       stopPublicCamera(state);
+      cancelSelectedMarineData(state);
       state.deFlockResolveToken += 1;
       resetSelectorVisuals(state);
     },

@@ -1,3 +1,4 @@
+import { providerFailureCategory, providerCooldownError } from './provider-error.js';
 function stableValue(value) {
   if (Array.isArray(value)) return value.map(stableValue);
   if (!value || typeof value !== 'object') return value;
@@ -7,21 +8,17 @@ function stableValue(value) {
   }, {});
 }
 
-function safeError(error) {
-  if (error?.name === 'AbortError') return 'Request timed out or was cancelled.';
-  return error instanceof Error ? error.message : String(error || 'Unknown provider error');
-}
-
 function createProviderRegistry(options = {}) {
   const providers = new Map();
   const cache = new Map();
   const inFlight = new Map();
   const health = new Map();
   const failures = new Map();
+  const circuits = new Map();
   const maxActiveQueries = Math.max(1, Math.min(16, Number(options.maxActiveQueries) || 8));
   const events = [];
   const now = options.now || (() => Date.now());
-  const maxCacheEntries = Math.max(8, Number(options.maxCacheEntries) || 64);
+  const maxCacheEntries = Math.max(8, Math.min(512, Number(options.maxCacheEntries) || 64));
 
   function rememberEvent(type, providerId, detail = '') {
     events.push({ type, providerId, detail: String(detail || ''), at: now() });
@@ -41,6 +38,7 @@ function createProviderRegistry(options = {}) {
       normalizeRequest: definition.normalizeRequest || ((request) => request),
       query: definition.query
     }));
+    circuits.set(id, { failures:0, retryAt:0, probe:null });
     health.set(id, {
       status: 'idle',
       lastSuccessAt: 0,
@@ -54,6 +52,8 @@ function createProviderRegistry(options = {}) {
     rememberEvent('registered', id);
     return () => {
       health.delete(id);
+      circuits.delete(id);
+      for (const key of failures.keys()) if (key.startsWith(`${id}:`)) failures.delete(key);
       invalidate(id);
       for (const [key, task] of inFlight) if (key.startsWith(`${id}:`)) task.controller.abort();
       return providers.delete(id);
@@ -108,10 +108,13 @@ function createProviderRegistry(options = {}) {
     const existing = inFlight.get(key);
     if (existing && !existing.controller.signal.aborted) return consume(existing, queryOptions.signal);
     if (inFlight.size >= maxActiveQueries) throw new Error('Data requests are busy. Retry after the current requests finish.');
-    if ((failures.get(key) || 0) > now()) throw new Error('Data source is temporarily unavailable. Retry in a moment.');
+    const circuit = circuits.get(provider.id);
+    if (circuit.retryAt > now() || circuit.probe) throw providerCooldownError(circuit.retryAt);
+    if ((failures.get(key) || 0) > now()) throw providerCooldownError(failures.get(key));
     const controller = new AbortController();
     const task = { controller, consumers: 0, settled: false, promise: null };
     inFlight.set(key, task);
+    if (circuit.retryAt) circuit.probe = task;
     task.promise = (async () => {
       const startedAt = now(), providerHealth = health.get(provider.id);
       let timedOut = false;
@@ -136,6 +139,10 @@ function createProviderRegistry(options = {}) {
           durationMs: Math.max(0, now() - startedAt), fromCache: false
         });
         cache.set(key, { value, expiresAt: now() + provider.cacheTtlMs }); trimCache(); failures.delete(key);
+        circuit.failures = 0;
+        // A response already in flight when a rate limit arrived cannot end
+        // that provider's cooldown. Only its admitted recovery probe can.
+        if (circuit.probe === task) circuit.retryAt = 0;
         if (providerHealth) Object.assign(providerHealth, { status: value.warnings.length ? 'degraded' : 'ready', lastSuccessAt: now(), lastError: value.warnings[0] || '', lastItemCount: value.items.length, warningCount: value.warnings.length, durationMs: value.durationMs });
         rememberEvent('ready', provider.id, value.items.length);
         return value;
@@ -143,13 +150,20 @@ function createProviderRegistry(options = {}) {
         const aborted = controller.signal.aborted && !timedOut;
         if (!aborted) {
           failures.set(key, now() + 1500);
+          const category = providerFailureCategory(error, timedOut);
+          circuit.failures++;
+          if (category === 'rate-limited' || category === 'permission' || circuit.probe === task || circuit.failures >= 3 || error?.retryAfterMs > 0) {
+            const delay = Math.max(category === 'rate-limited' || category === 'permission' ? 60000 : 30000, Number(error?.retryAfterMs) || 0);
+            circuit.retryAt = Math.max(circuit.retryAt, now() + delay);
+          }
           while (failures.size > maxCacheEntries) failures.delete(failures.keys().next().value);
-          if (providerHealth) Object.assign(providerHealth, { status: [...cache.keys()].some(entry => entry.startsWith(`${provider.id}:`)) ? 'degraded' : 'failed', lastFailureAt: now(), lastError: safeError(error) });
-          rememberEvent('failed', provider.id, safeError(error));
+          if (providerHealth) Object.assign(providerHealth, { status: [...cache.keys()].some(entry => entry.startsWith(`${provider.id}:`)) ? 'degraded' : 'failed', lastFailureAt: now(), lastError: category });
+          rememberEvent('failed', provider.id, category);
         } else if (providerHealth) providerHealth.status = providerHealth.lastSuccessAt ? 'ready' : 'idle';
         throw error;
       } finally {
         task.settled = true;
+        if (circuit.probe === task) circuit.probe = null;
         clearTimeout(timeoutId);
         if (inFlight.get(key) === task) inFlight.delete(key);
       }
@@ -176,6 +190,8 @@ function createProviderRegistry(options = {}) {
         return {
           id, sourceId, cacheTtlMs, timeoutMs,
           ...providerHealth,
+          retryAt: circuits.get(id)?.retryAt || 0,
+          consecutiveFailures: circuits.get(id)?.failures || 0,
           cachedQueries: [...cache.keys()].filter((key) => key.startsWith(prefix)).length,
           activeQueries: [...inFlight.keys()].filter((key) => key.startsWith(prefix)).length
         };

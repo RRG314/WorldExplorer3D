@@ -52,6 +52,7 @@ function beginEnvironmentTransition(target, options = {}) {
   if (!validEnvironment(target)) throw new Error(`Unknown environment: ${target}`);
   if (activeTransition) cancelEnvironmentTransition(activeTransition, 'superseded');
   sessionAbort.abort('environment-requested');
+  appCtx.cancelWaterEnvironmentEvidence?.();
   sessionAbort = new AbortController();
   const id = ++transitionSequence;
   const source = String(options.source || 'runtime');

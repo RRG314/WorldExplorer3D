@@ -151,6 +151,7 @@
     "verify:interstellar-persistence": "node scripts/verification/interstellar-persistence.mjs",
     "verify:artifact-runtime": "WE3D_VERIFY_ROOT=dist node scripts/verification/world.mjs",
     "test": "npm run verify:pr && npm run verify:world",
+    "verify:provider-outages": "node scripts/verification/provider-outage-browser.mjs",
     "verify:dependencies": "node scripts/verification/runtime-dependencies.mjs",
     "vendor:three": "node scripts/vendor-three.mjs",
     "verify:pr": "npm run verify:dependencies && npm run verify:source && npm run verify:ownership && npm run verify:boundary-types && npm run verify:current-contracts && npm run audit:tests && npm run verify:test-sensitivity",

@@ -2165,6 +2165,7 @@
       "waterEnvironmentStatus"
     ],
     "app/js/world/water-environment.js": [
+      "cancelWaterEnvironmentEvidence",
       "refreshWaterEnvironmentEvidence"
     ],
     "app/js/world/water-materials.js": [

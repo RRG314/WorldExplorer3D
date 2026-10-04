@@ -1,3 +1,4 @@
+import {providerResponseError} from './provider-error.js';
 import {readBoundedJson} from './bounded-response.js';
 import { createProvenance } from './data-contract.js?v=3';
 import { createProviderRegistry } from './provider-registry.js?v=2';
@@ -9,6 +10,7 @@ const MARINE_FIELDS = 'wave_height,wave_direction,wave_period,wind_wave_height,s
 const NOAA_COVERAGE_KM = 250;
 
 function normalizeMarineLocation(input = {}) {
+  if ([input.lat, input.lon].some(value => !['number', 'string'].includes(typeof value) || (typeof value === 'string' && !value.trim()))) throw new RangeError('Marine coordinates are invalid.');
   const lat = Number(input.lat);
   const lon = Number(input.lon);
   if (!Number.isFinite(lat) || lat < -90 || lat > 90) throw new RangeError('Marine latitude is invalid.');
@@ -126,8 +128,9 @@ function normalizeNoaaPredictions(payload = {}, station = {}, fetchedAt = new Da
 }
 
 async function jsonResponse(response, provider) {
+  if (!response.ok) throw providerResponseError(response);
   const payload = await readBoundedJson(response,5000000);
-  if (!response.ok || payload?.error) throw new Error(payload?.error?.message || `${provider}_http_${response.status}`);
+  if (payload?.error) throw new Error('Marine data is unavailable for this request.');
   return payload;
 }
 
@@ -181,17 +184,18 @@ function createMarineService(options = {}) {
 
   async function modelAt(location, queryOptions = {}) {
     const requested = normalizeMarineLocation(location);
-    const result = await registry.query('open-meteo-marine', requested, { force: queryOptions.force === true });
+    const result = await registry.query('open-meteo-marine', requested, { force: queryOptions.force === true, signal: queryOptions.signal });
     return normalizeMarineModel(result.items[0], requested, result.fetchedAt);
   }
 
   async function selected(location, queryOptions = {}) {
     const requested = normalizeMarineLocation(location);
-    const force = queryOptions.force === true;
+    const force = queryOptions.force === true, signal = queryOptions.signal;
     const [modelResult, stationsResult] = await Promise.allSettled([
-      registry.query('open-meteo-marine', requested, { force }),
-      registry.query('noaa-water-level-stations', {}, { force: false })
+      registry.query('open-meteo-marine', requested, { force, signal }),
+      registry.query('noaa-water-level-stations', {}, { force: false, signal })
     ]);
+    if (signal?.aborted) throw new DOMException('Marine request cancelled.', 'AbortError');
     const warnings = [];
     const model = modelResult.status === 'fulfilled'
       ? normalizeMarineModel(modelResult.value.items[0], requested, modelResult.value.fetchedAt)
@@ -205,14 +209,15 @@ function createMarineService(options = {}) {
     if (station) {
       const stationRequestValue = { stationId: station.id, greatLakes: station.greatLakes };
       const [observedResult, predictedResult] = await Promise.allSettled([
-        registry.query('noaa-water-level', stationRequestValue, { force }),
-        station.tidal ? registry.query('noaa-tide-predictions', stationRequestValue, { force }) : Promise.resolve(null)
+        registry.query('noaa-water-level', stationRequestValue, { force, signal }),
+        station.tidal ? registry.query('noaa-tide-predictions', stationRequestValue, { force, signal }) : Promise.resolve(null)
       ]);
       if (observedResult.status === 'fulfilled') observation = normalizeNoaaObservation(observedResult.value.items[0], station, observedResult.value.fetchedAt);
       else warnings.push(String(observedResult.reason?.message || observedResult.reason));
       if (predictedResult.status === 'fulfilled' && predictedResult.value) predictions = normalizeNoaaPredictions(predictedResult.value.items[0], station, predictedResult.value.fetchedAt);
       else if (predictedResult.status === 'rejected') warnings.push(String(predictedResult.reason?.message || predictedResult.reason));
     }
+    if (signal?.aborted) throw new DOMException('Marine request cancelled.', 'AbortError');
     return Object.freeze({ requested, model, station, observation, predictions, warnings, noaaCoverageKm: NOAA_COVERAGE_KM });
   }
 

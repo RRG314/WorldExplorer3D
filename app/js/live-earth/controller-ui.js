@@ -1,3 +1,4 @@
+import {cancelSelectedMarineData} from './marine-state.js?v=1';
 import { renderPublicCameraDetails, publicCameraAction, stopPublicCamera } from './public-camera-ui.js';
 import { LIVE_EARTH_CATEGORIES, getLayersForCategory, getLiveEarthLayer } from "./registry.js?v=11";
 import { CURATED_SATELLITES } from "./satellites.js?v=6";
@@ -415,7 +416,7 @@ export function renderLiveEarthUi(ctx, state) {
 }
 
 export function setPanelMode(state, mode = 'explore') {
-  if(mode!=='live-earth')stopPublicCamera(state);
+  if(mode!=='live-earth'){stopPublicCamera(state);cancelSelectedMarineData(state);}
   state.panelMode = mode === 'live-earth' ? 'live-earth' : 'explore';
   const ui = state.selector.ui;
   if (ui?.exploreModeBtn) ui.exploreModeBtn.classList.toggle('active', state.panelMode === 'explore');
@@ -479,7 +480,7 @@ export async function refreshActiveLayer(ctx, state, force = false) {
 export async function setActiveLayer(ctx, state, layerId, force = false) {
   const layer = getLiveEarthLayer(layerId);
   if (!layer) return;
-  if(layer.id!==state.activeLayerId)stopPublicCamera(state);
+  if(layer.id!==state.activeLayerId){stopPublicCamera(state);cancelSelectedMarineData(state);}
   state.activeCategoryId = layer.categoryId;
   state.activeLayerId = layer.id;
   if (layer.id === 'satellites' && !state.selectedSatelliteId && CURATED_SATELLITES[0]) {

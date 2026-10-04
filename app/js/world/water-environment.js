@@ -5,5 +5,6 @@ import { createWaterEnvironmentController } from './water-environment-controller
 
 const controller = createWaterEnvironmentController({appCtx, marineService, resolveEvidence:resolveWaterOpticsEvidence});
 const refreshWaterEnvironmentEvidence = controller.refresh;
-Object.assign(appCtx, { refreshWaterEnvironmentEvidence });
+const cancelWaterEnvironmentEvidence = controller.cancel;
+Object.assign(appCtx, { refreshWaterEnvironmentEvidence, cancelWaterEnvironmentEvidence });
 export { refreshWaterEnvironmentEvidence };

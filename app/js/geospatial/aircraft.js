@@ -1,9 +1,12 @@
+import {readBoundedJson} from './bounded-response.js';
+import {providerResponseError} from './provider-error.js';
 import { createProvenance } from './data-contract.js?v=3';
 import { createProviderRegistry } from './provider-registry.js?v=2';
 
 const DEFAULT_ENDPOINT = '/api/geospatial/aircraft';
 
 function normalizeAircraftRequest(input = {}) {
+  if ([input.lat, input.lon].some(value => !['number', 'string'].includes(typeof value) || (typeof value === 'string' && !value.trim()))) throw new RangeError('Aircraft coordinates are invalid.');
   const lat = Number(input.lat);
   const lon = Number(input.lon);
   if (!Number.isFinite(lat) || lat < -90 || lat > 90) throw new RangeError('Aircraft latitude is invalid.');
@@ -34,7 +37,7 @@ function normalizeAircraftItem(item, fetchedAt, providerId = 'opensky') {
 function createAircraftService(options = {}) {
   const endpoint = options.endpoint || DEFAULT_ENDPOINT;
   const fetchImpl = options.fetchImpl || globalThis.fetch?.bind(globalThis);
-  const registry = createProviderRegistry({ maxCacheEntries: 24 });
+  const registry = createProviderRegistry({ now: options.now, maxCacheEntries: 24 });
   if (typeof fetchImpl !== 'function') throw new Error('Aircraft service requires fetch().');
 
   registry.register({
@@ -49,8 +52,8 @@ function createAircraftService(options = {}) {
         headers: { Accept: 'application/json' },
         signal: context.signal
       });
-      const payload = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(payload.error || `Aircraft provider failed (${response.status}).`);
+      if (!response.ok) throw providerResponseError(response);
+      const payload = await readBoundedJson(response, 5000000);
       return {
         fetchedAt: payload.fetchedAt,
         items: (payload.items || []).map((item) => normalizeAircraftItem(item, payload.fetchedAt, payload.provider || 'opensky')),

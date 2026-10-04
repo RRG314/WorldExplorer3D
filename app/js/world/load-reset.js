@@ -104,6 +104,7 @@ export function resetWorldForReload(options = {}) {
   appCtx.transportFacilityGraph = null;
   releaseLocationModels(appCtx);
   clearWaterMeshCache();
+  appCtx.cancelWaterEnvironmentEvidence?.(true);
 
   if (typeof appCtx.resetEarthStreaming !== 'function') {
     throw new Error('Earth streaming lifecycle owner is unavailable during world reset.');

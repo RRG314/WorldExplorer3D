@@ -1,3 +1,5 @@
+import {readBoundedJson} from './bounded-response.js';
+import {providerResponseError} from './provider-error.js';
 import { createProvenance, getDataSource, normalizeGeoQuery } from './data-contract.js?v=3';
 import { createProviderRegistry } from './provider-registry.js?v=2';
 
@@ -67,8 +69,8 @@ function createStreetImageryService(options = {}) {
           signal: context.signal,
           credentials: 'same-origin'
         });
-        const payload = await response.json().catch(() => ({}));
-        if (!response.ok) throw new Error(payload?.error || `${providerId} imagery request failed (${response.status}).`);
+        if (!response.ok) throw providerResponseError(response);
+        const payload = await readBoundedJson(response, 5000000);
         const fetchedAt = String(payload.fetchedAt || new Date().toISOString());
         return {
           fetchedAt,

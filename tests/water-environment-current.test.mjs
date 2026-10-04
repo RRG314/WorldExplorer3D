@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {createWaterEnvironmentController} from '../app/js/world/water-environment-controller.js';
 const deferred=()=>{let resolve,reject;const promise=new Promise((a,b)=>{resolve=a;reject=b});return {promise,resolve,reject}};
 const tick=()=>new Promise(r=>setImmediate(r));
-function setup(){const requests=[],stations=[];const appCtx={LOC:{lat:1,lon:1}};const controller=createWaterEnvironmentController({appCtx,marineService:{modelAt(place){const d=deferred();requests.push({...d,place});return d.promise},selected(place){const d=deferred();stations.push({...d,place});return d.promise}},resolveEvidence:({marine})=>({wave:{truthType:marine.model,renderUsable:true}})});return {appCtx,controller,requests,stations};}
+function setup(){const requests=[],stations=[];const appCtx={LOC:{lat:1,lon:1}};const controller=createWaterEnvironmentController({appCtx,marineService:{modelAt(place,{signal}){const d=deferred();requests.push({...d,place,signal});return d.promise},selected(place,{signal}){const d=deferred();stations.push({...d,place,signal});return d.promise}},resolveEvidence:({marine})=>({wave:{truthType:marine.model,renderUsable:true}})});return {appCtx,controller,requests,stations};}
 test('out-of-order model responses cannot publish, relabel cache or start obsolete station requests',async()=>{
  const t=setup();const a=t.controller.refresh();await tick();t.appCtx.LOC={lat:2,lon:2};const b=t.controller.refresh();await tick();
  t.requests[1].resolve('B');await b;t.requests[0].resolve('A');assert.equal(await a,null);await tick();
@@ -33,4 +33,8 @@ test('Ocean launch owns marine evidence even when an older Earth selection remai
  t.requests[0].resolve('old-earth');assert.equal(await old,null);
  t.requests[1].resolve('ocean');await ocean;assert.equal(t.appCtx.activeWaterOpticsEvidence.wave.truthType,'ocean');
  t.appCtx.oceanMode.active=false;t.controller.refresh();assert.equal(t.appCtx.activeWaterOpticsEvidence,null);
+});
+
+test('world replacement and explicit owner cancellation release both marine phases',async()=>{
+ const t=setup();const old=t.controller.refresh();await tick();t.appCtx.LOC={lat:2,lon:2};const next=t.controller.refresh();assert.equal(t.requests[0].signal.aborted,true);await tick();t.requests[1].resolve('current');await next;await tick();t.controller.cancel(true);assert.equal(t.stations[0].signal.aborted,true);assert.equal(t.appCtx.activeMarineSnapshot,null);t.requests[0].resolve('old');assert.equal(await old,null);t.stations[0].resolve({model:'late'});await tick();assert.equal(t.appCtx.activeMarineSnapshot,null);
 });

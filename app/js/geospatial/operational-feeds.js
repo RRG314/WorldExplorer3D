@@ -1,3 +1,4 @@
+import {providerResponseError, providerCooldownError} from './provider-error.js';
 import {readBoundedJson,readBoundedText} from './bounded-response.js';
 import { createProviderRegistry } from './provider-registry.js?v=2';
 
@@ -8,6 +9,7 @@ const WEATHER_FIELDS = 'temperature_2m,relative_humidity_2m,apparent_temperature
 const CELESTRAK_GROUPS = new Set(['stations', 'weather', 'resource', 'science']);
 
 function finiteCoordinate(value, min, max, label) {
+  if (!['number', 'string'].includes(typeof value) || (typeof value === 'string' && !value.trim())) throw new RangeError(`${label} is invalid.`);
   const number = Number(value);
   if (!Number.isFinite(number) || number < min || number > max) throw new RangeError(`${label} is invalid.`);
   return number;
@@ -32,7 +34,7 @@ function normalizeWeatherRequest(input = {}) {
 }
 
 async function readJson(response, providerId) {
-  if (!response.ok) throw new Error(`${providerId}_http_${response.status}`);
+  if (!response.ok) throw providerResponseError(response);
   return readBoundedJson(response,5000000);
 }
 
@@ -40,6 +42,7 @@ function createOperationalFeedService(options = {}) {
   const fetchImpl = options.fetchImpl || globalThis.fetch?.bind(globalThis);
   if (typeof fetchImpl !== 'function') throw new Error('Operational feeds require fetch support.');
   const registry = createProviderRegistry({ now: options.now, maxCacheEntries: 40 });
+  const clock = options.now || Date.now, groupCooldowns = new Map();
 
   registry.register({
     id: 'celestrak-gp',
@@ -49,16 +52,21 @@ function createOperationalFeedService(options = {}) {
     normalizeRequest: normalizeCelestrakRequest,
     async query(request, context) {
       const settled = await Promise.allSettled(request.sources.map(async (source) => {
+        if ((groupCooldowns.get(source) || 0) > clock()) throw providerCooldownError(groupCooldowns.get(source));
         const url = new URL(CELESTRAK_BASE);
         url.searchParams.set('GROUP', source);
         url.searchParams.set('FORMAT', 'tle');
         const response = await fetchImpl(url.href, { signal: context.signal, cache: 'no-store' });
-        if (!response.ok) throw new Error(`celestrak_${source}_${response.status}`);
+        if (!response.ok) {
+          const error = providerResponseError(response, clock());
+          if (error.status === 429 || error.retryAfterMs > 0) groupCooldowns.set(source, clock() + Math.max(60000, error.retryAfterMs || 0));
+          throw error;
+        }
         return { source, text: await readBoundedText(response,3000000) };
       }));
       const items = settled.filter((result) => result.status === 'fulfilled').map((result) => result.value);
       const warnings = settled.filter((result) => result.status === 'rejected').map((result) => String(result.reason?.message || result.reason));
-      if (!items.length) throw new Error(warnings[0] || 'CelesTrak feeds unavailable.');
+      if (!items.length) throw settled.find(result => result.status === 'rejected')?.reason || new Error('CelesTrak feeds unavailable.');
       return { items, warnings };
     }
   });
@@ -104,7 +112,7 @@ function createOperationalFeedService(options = {}) {
       return registry.query('usgs-earthquakes-day', {}, queryOptions);
     },
     weather(locations, options = {}) {
-      return registry.query('open-meteo-current', { locations, ocean: options.ocean === true }, { force: options.force === true });
+      return registry.query('open-meteo-current', { locations, ocean: options.ocean === true }, { force: options.force === true, signal: options.signal });
     },
     diagnostics() {
       return registry.snapshot();
