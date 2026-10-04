@@ -6,7 +6,7 @@ import { applyCaptureAlignment } from './alignment.js?v=1';
 export async function createCaptureViewer(host, bytes, signal, options = {}) {
   if (!globalThis.THREE) await loadClassicScript(vendorScriptsCritical[0]);
   if (!options.model && !globalThis.THREE.GLTFLoader) await loadClassicScript(vendorScriptsCritical[3]);
-  if (!globalThis.THREE.OrbitControls) await loadClassicScript('https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js');
+  if (!globalThis.THREE.OrbitControls) await loadClassicScript('/app/vendor/three/examples/js/controls/OrbitControls.js');
   if (signal.aborted) return null;
   const T = globalThis.THREE;
   let model = options.model || (await new Promise((resolve, reject) => new T.GLTFLoader().parse(bytes, '', resolve, reject))).scene;

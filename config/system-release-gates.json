@@ -6,6 +6,8 @@
     "docs/ARCHITECTURE_MAP.md": ["Application overview", "Earth world flow", "Player movement and cameras", "Character, companions, and urban play", "Field exploration and progression", "Planetary and space environments", "Quick Build and persistent Blocks", "Multiplayer and backend", "Data classification", "Release shape"]
   },
   "gates": {
+    "runtime-dependencies": {"scope":"candidate","command":["node","scripts/verification/runtime-dependencies.mjs"],"artifactRequired":false,"timeoutMs":60000},
+    "runtime-vendor": {"scope":"candidate","command":["node","scripts/verification/runtime-vendor-browser.mjs"],"artifactRequired":false,"timeoutMs":90000},
     "product-marine-hosted": {"scope":"candidate","command":["node","scripts/verification/shared-marine-hosted-current.mjs"],"artifactRequired":false,"timeoutMs":180000},
     "product-place-hosted": {"scope":"candidate","command":["node","scripts/verification/place-lookup-staging-current.mjs"],"artifactRequired":true,"timeoutMs":180000},
     "product-save": {"scope":"candidate","command":["node","scripts/verification/product-foundations.mjs","save"],"artifactRequired":false,"timeoutMs":1000000},

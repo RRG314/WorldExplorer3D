@@ -78,3 +78,9 @@ Transactional condition repair complete as a local checkpoint: nine focused cond
 
 
 P5 persistence/inventory local checkpoint: all1,844PRcontracts/source/ownership/types/inventory/mutations pass. Assembledjournal-first-session-rerun9631 passes all10checks: Backpack UIequipactions, actualfieldresult+Journal, mobilelayout, buildplace/undo/save/reload, room/propertyentry andsingleFlowerreceipt. Three representativeimagesinspected. Onlyexplicitoptionalpreviewreverse503 reportedasproviderdegradation, notsearchacceptance. Prescribedjournal-backpack-actions45600 passed, shot1inspected. All four new sourcebrowsergates(condition-tabs,journal-history,journal-transactions,backpack-presentation) nowregistered incandidateconfig/package scripts, artifactRequiredfalse correctlyreflectssourcecomponent scope. Newfullartifact86gate+backendacceptanceremainsrequired; past82gaterunsnotcurrentapproval. No push/deploy.
+
+## Renderer dependencies checkpoint
+
+The renderer and seventeen runtime scripts now load from reviewed same-origin Three.js 0.128.0 files, with upstream license preserved; no version upgrade. Canonical script URL identity prevents duplicate local/absolute loads. `config/runtime-dependencies.json` and the PR/candidate verifier cover external executable URLs, local vendor integrity, both locks and reproducible shared Expedition generation. See DEPENDENCIES.md for remaining CDN and SDK boundaries.
+
+`vendor-cold/` passes actual cold renderer/capture loading with renderer CDNs blocked, single THREE identity, and a missing-file/retry case. Capture image inspected. `vendor-actions/` passes the prescribed assembled driving client, final image inspected. `vendor-pr.log` passes all 1,847 contracts and the complete PR chain. Both new gates are registered, bringing the candidate matrix to 88; no old artifact result is transferred to these changes. No push or deployment.
