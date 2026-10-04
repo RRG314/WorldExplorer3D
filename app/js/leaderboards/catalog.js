@@ -3,7 +3,8 @@ const LEADERBOARD_CATALOG = Object.freeze({
     id: 'flower',
     icon: '🌹',
     label: 'Flower Sprint',
-    scope: 'Global • All time',
+    scope: 'Global • All time • Casual',
+    resultDisclosure: 'Player-reported results.',
     objective: 'Fastest finish time ranks first.',
     empty: 'No flower runs yet. Finish a Flower Sprint to set the first time.'
   }),
@@ -11,7 +12,8 @@ const LEADERBOARD_CATALOG = Object.freeze({
     id: 'painttown',
     icon: '🟥',
     label: 'Paint Town',
-    scope: 'Global • All time',
+    scope: 'Global • All time • Casual',
+    resultDisclosure: 'Player-reported results.',
     objective: 'Paint the most buildings during the two-minute round.',
     empty: 'No Paint Town results yet. Finish a two-minute rooftop round to post a score.'
   }),
@@ -19,7 +21,8 @@ const LEADERBOARD_CATALOG = Object.freeze({
     id: 'fishing',
     icon: '🎣',
     label: 'Fishing',
-    scope: 'Global • All time',
+    scope: 'Global • All time • Casual',
+    resultDisclosure: 'Player-reported results.',
     objective: 'Earn points from species rarity, size, strength, and line control.',
     empty: 'No catches yet. Land a fish from a boat or mapped shore to post a score.'
   }),
@@ -28,6 +31,7 @@ const LEADERBOARD_CATALOG = Object.freeze({
     icon: '◎',
     label: 'Community',
     scope: 'Global • All time',
+    resultDisclosure: 'Community-reported activity.',
     objective: 'Join rooms, share finds, and make explorer connections.',
     empty: 'No shared community activity yet. Join a room or share a find to begin.'
   }),
@@ -43,7 +47,8 @@ const LEADERBOARD_CATALOG = Object.freeze({
     id: 'deflock',
     icon: '📷',
     label: 'DeFlock Hunt',
-    scope: 'Global • All time',
+    scope: 'Global • All time • Casual',
+    resultDisclosure: 'Player-reported results.',
     objective: 'Complete mapped virtual-camera hunts with the highest score and fastest time.',
     empty: 'No completed DeFlock hunts yet. Finish every mapped objective to post a score.'
   })

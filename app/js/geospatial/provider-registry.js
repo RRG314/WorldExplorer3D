@@ -1,3 +1,4 @@
+import {supportRecorder} from '../runtime/support-receipt.js';
 import { providerFailureCategory, providerCooldownError } from './provider-error.js';
 function stableValue(value) {
   if (Array.isArray(value)) return value.map(stableValue);
@@ -152,6 +153,7 @@ function createProviderRegistry(options = {}) {
           failures.set(key, now() + 1500);
           const category = providerFailureCategory(error, timedOut);
           circuit.failures++;
+          supportRecorder.record({operation:'provider-query',provider:provider.id,category});
           if (category === 'rate-limited' || category === 'permission' || circuit.probe === task || circuit.failures >= 3 || error?.retryAfterMs > 0) {
             const delay = Math.max(category === 'rate-limited' || category === 'permission' ? 60000 : 30000, Number(error?.retryAfterMs) || 0);
             circuit.retryAt = Math.max(circuit.retryAt, now() + delay);

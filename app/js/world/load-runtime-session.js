@@ -1,3 +1,4 @@
+import {supportRecorder} from '../runtime/support-receipt.js';
 import { commitEarthLocationOrigin } from '../earth-core/location-origin.js?v=1';
 import {rdtDepth} from '../rdt.js';
 import {emitLocalLoadTrace} from './load-trace.js';
@@ -85,6 +86,7 @@ export function createWorldLoadRuntimeSession(options = {}) {
     if (perfLoadFinalized) return;
     perfLoadFinalized = true;
     loadMetrics.success = !!success;
+    if(!success) supportRecorder.record({operation:'world-load',category:'request-failed'});
     const payload = { ...loadMetrics, ...extra };
     if (typeof appCtx.finishPerfLoad === 'function') appCtx.finishPerfLoad(payload);
   };

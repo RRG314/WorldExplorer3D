@@ -22,7 +22,7 @@ This contract describes the current implementation. “Saved by the server” do
 | Fish, wildlife encounters, scuba capability, authored marine scene | Game ecology/capability rules and water simulation; labeled evidence where applicable | Virtual gameplay and authored habitat. Not a claim that a specimen or safe dive exists at those real coordinates |
 | Capture uploads, reconstruction, placement | Capture ownership/storage rules and reviewed reconstruction/placement authority | User media is private according to existing access rules. Reconstruction appearance is not survey-grade geometry or authoritative property ownership |
 
-The public gameplay boards are to be labeled as casual/player-reported in the existing UI; account portfolio totals retain their different authority. No score values, saved records, reward rules, leaderboard ordering or access rules need changing for that disclosure.
+The four public gameplay boards now show Casual and Player-reported results in the existing UI; account portfolio totals retain their different authority. No score values, saved records, reward rules, leaderboard ordering or access rules need changing for that disclosure.
 
 ## Local save compatibility
 

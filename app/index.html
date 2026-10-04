@@ -276,6 +276,13 @@ Not case sensitive! Try: "Seattle" • "Tokyo" • "Paris, France" • "Austin, 
 </div>
 </div>
 <div class="tab-content" id="tab-settings">
+<section class="support-receipt-card" aria-labelledby="supportReceiptTitle">
+<h3 id="supportReceiptTitle">Help with a problem</h3>
+<p>Copy a report of the game version and recent errors to share with support. Coordinates, account details and personal media are excluded.</p>
+<button id="copySupportReceiptBtn" type="button">Copy support report</button>
+<p id="supportReceiptStatus" role="status" aria-live="polite"></p>
+<textarea id="supportReceiptPreview" readonly hidden aria-label="Support report for copying" spellcheck="false"></textarea>
+</section>
 <div style="padding:8px 0">
 <div style="margin-bottom:24px">
 <div style="font-family:'Poppins',sans-serif;font-size:15px;font-weight:600;color:#667eea;margin-bottom:12px;display:flex;align-items:center;gap:8px">
@@ -425,8 +432,8 @@ How Connected Data Is Used
 <div id="gameLeaderboardBadge" class="flowerChallengeBadge">Flower Sprint</div>
 </div>
 <div class="flowerChallengeBody">
-<div id="gameLeaderboardHint" class="flowerChallengeHint">Fastest red-flower runs. Signed-in scores publish to the shared board.</div>
-<div id="gameLeaderboardScope" class="flowerLeaderboardScope">Global • All time</div>
+<div id="gameLeaderboardHint" class="flowerChallengeHint">Fastest Flower Sprint finishes. Player-reported results.</div>
+<div id="gameLeaderboardScope" class="flowerLeaderboardScope">Global • All time • Casual</div>
 <div class="flowerChallengeLocation">Location: <b id="flowerChallengeLocation">Baltimore</b></div>
 <div class="flowerLeaderboardTabs">
 <button id="leaderboardTabFlower" class="flowerLeaderboardTab active" type="button">🌹 Flower</button>

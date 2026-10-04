@@ -1,3 +1,4 @@
+import {supportRecorder} from '../runtime/support-receipt.js';
 // IndexedDB transactions, rather than per-tab snapshots, own pending intent.
 const DATABASE = 'world-explorer-condition';
 const STORE = 'accounts';
@@ -94,6 +95,7 @@ export function createConditionOutbox({ uid, indexedDB = globalThis.indexedDB, s
     } catch (error) {
       if (mutationError) throw error;
       durable = false;
+      supportRecorder.record({operation:'condition-save',error});
       // A quota failure after reading another tab's row preserves that latest
       // attempted state in memory. It is explicitly not a durable save.
       if (attempted) fallback = structuredClone(attempted);

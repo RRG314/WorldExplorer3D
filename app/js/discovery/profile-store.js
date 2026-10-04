@@ -1,3 +1,4 @@
+import {supportRecorder} from '../runtime/support-receipt.js';
 import { normalizeCameraFavorites } from '../live-earth/public-camera-directory.js';
 import { validateJournalBackup } from './backup-validation.js?v=1';
 import { summarizeReceiptState } from './save-status.js?v=1';
@@ -415,6 +416,7 @@ function createIndexedDbDiscoveryProfileStore(options = {}) {
         characterReward: clone(characterProjection.reward)
       };
     } catch (error) {
+      supportRecorder.record({operation:'journal-save',error});
       try { transactionToAbort?.abort(); } catch { /* Already committed or aborted. */ }
       throw error;
     } finally {
@@ -456,6 +458,7 @@ function createIndexedDbDiscoveryProfileStore(options = {}) {
       await transactionPromise(transaction);
       return { recorded: true, event: clone(event), profile: clone(profile), characterReward: clone(characterProjection.reward) };
     } catch (error) {
+      supportRecorder.record({operation:'journal-save',error});
       try { transactionToAbort?.abort(); } catch { /* Already committed or aborted. */ }
       throw error;
     } finally {
@@ -553,6 +556,7 @@ function createIndexedDbDiscoveryProfileStore(options = {}) {
       await transactionPromise(transaction);
       return clone(updated);
     } catch (error) {
+      supportRecorder.record({operation:'journal-save',error});
       try { transactionToAbort?.abort(); } catch { /* Already committed or aborted. */ }
       throw error;
     } finally {
@@ -607,6 +611,7 @@ function createIndexedDbDiscoveryProfileStore(options = {}) {
       await transactionPromise(tx);
       return true;
     } catch (error) {
+      supportRecorder.record({operation:'journal-save',error});
       try { transactionToAbort?.abort(); } catch { /* Already committed or aborted. */ }
       throw error;
     } finally { db.close(); }
@@ -626,6 +631,7 @@ function createIndexedDbDiscoveryProfileStore(options = {}) {
       }
       await transactionPromise(tx);
     } catch (error) {
+      supportRecorder.record({operation:'journal-save',error});
       try { transactionToAbort?.abort(); } catch { /* Already committed or aborted. */ }
       throw error;
     } finally { db.close(); }
@@ -752,6 +758,7 @@ function createIndexedDbDiscoveryProfileStore(options = {}) {
       await transactionPromise(tx); characterMigrationReady = false;
       return true;
     } catch (error) {
+      supportRecorder.record({operation:'journal-save',error});
       try { transactionToAbort?.abort(); } catch { /* Already committed or aborted. */ }
       throw error;
     } finally { db.close(); }
@@ -815,6 +822,7 @@ function createIndexedDbDiscoveryProfileStore(options = {}) {
       characterMigrationReady = hasCharacterState;
       return { imported: true, events: data.events.length, guide: data.fieldGuide.length, items: items.length, companions: companions.length };
     } catch (error) {
+      supportRecorder.record({operation:'journal-save',error});
       try { transactionToAbort?.abort(); } catch { /* Already committed or aborted. */ }
       throw error;
     } finally {

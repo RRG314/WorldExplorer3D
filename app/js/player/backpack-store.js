@@ -1,3 +1,4 @@
+import {supportRecorder} from '../runtime/support-receipt.js';
 const BACKPACK_STORAGE_SCHEMA_VERSION = 2;
 const BACKPACK_STORAGE_KEY = 'world-explorer:character-backpack:v2';
 const BACKPACK_CONTROLS_KEY = 'world-explorer:backpack-controls:v1';
@@ -120,7 +121,8 @@ function createLocalBackpackStore(storage = globalThis.localStorage) {
       lastMigration = normalized.migration;
       lastControls = controls(normalized);
       return true;
-    } catch (_) {
+    } catch (error) {
+      supportRecorder.record({operation:'inventory-save',error});
       return false;
     }
   }
@@ -178,7 +180,8 @@ function createLocalBackpackStore(storage = globalThis.localStorage) {
       lastMigration = null;
       lastControls = null;
       return true;
-    } catch (_) {
+    } catch (error) {
+      supportRecorder.record({operation:'inventory-save',error});
       return false;
     }
   }
@@ -200,7 +203,7 @@ function createLocalBackpackStore(storage = globalThis.localStorage) {
         lastControls = {...lastControls,...latest};
         storage.setItem(BACKPACK_CONTROLS_KEY, JSON.stringify({schemaVersion:1,saveGeneration:lastMigration.saveGeneration,...lastControls}));
         return true;
-      } catch { return false; }
+      } catch (error) { supportRecorder.record({operation:'inventory-save',error}); return false; }
     }
   });
 }

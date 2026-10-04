@@ -1,3 +1,7 @@
+import {supportRecorder} from './runtime/support-receipt.js';
+import {sceneResourceSnapshot,measureSceneAnimation} from './runtime/scene-resources.js';
+import {capturePresentation} from './runtime/renderer-owners.js';
+import {getSessionStatus,captureEnvironmentSession} from './session-coordinator.js?v=2';
 import { rendererOwnershipSnapshot } from './runtime/renderer-owners.js';
 import { ctx as appCtx } from "./shared-context.js?v=55";
 import { buildingExteriorMaterialPoolSnapshot } from './engine/building-facade-materials.js?v=19';
@@ -9,8 +13,26 @@ const diagnosticsParams = new URLSearchParams(globalThis.location?.search || '')
 const developerDiagnosticsEnabled = diagnosticsParams.get('diagnostics') === '1';
 appCtx.developerDiagnosticsEnabled = developerDiagnosticsEnabled;
 
+supportRecorder.bindContext(() => {
+  const session = getSessionStatus();
+  return {buildId:globalThis.__WORLD_EXPLORER_BUILD__?.buildId,sessionGeneration:session.generation,worldGeneration:appCtx._worldLoadSequence,environment:session.environment,mode:!appCtx.gameStarted ? 'title' : appCtx.oceanMode?.active ? (appCtx.oceanMode.diver?.active ? 'diver' : 'submarine') : appCtx.spaceFlight?.active ? 'space' : appCtx.activeInterior ? 'interior' : appCtx.activeTransportActor?.()?.mode || (appCtx.gameStarted ? null : 'title'),transition:session.transition};
+});
+globalThis.getWorldExplorerSupportReceipt = () => supportRecorder.snapshot();
+globalThis.getWorldExplorerSceneResources = () => {
+  const current=capturePresentation(appCtx);
+  return {owner:current.owner,worldGeneration:Number(appCtx._worldLoadSequence)||0,loading:appCtx.worldLoading===true,lastEarthLoadMs:Number(appCtx.perfStats?.lastLoad?.loadMs)||null,resources:sceneResourceSnapshot({...current,colliders:current.owner==='main'?{mappedBuildings:appCtx.buildings?.length,transportStructures:appCtx.transportStructureColliders?.length,dynamic:appCtx.dynamicBuildingColliders?.length}:null})};
+};
+globalThis.measureWorldExplorerSceneAnimation = async (durationMs=2000) => {
+  if(!developerDiagnosticsEnabled)throw new Error('Animation instrumentation requires an explicit diagnostics session.');
+  const current=capturePresentation(appCtx),session=captureEnvironmentSession();
+  const result=await measureSceneAnimation(globalThis.THREE,current.scene,{durationMs,signal:session.signal});
+  if(!current.isCurrent()||!session.isCurrent())throw new Error('Scene changed during animation measurement.');
+  return result;
+};
+
 const runtimeErrors = [];
 function recordRuntimeError(kind, value) {
+  supportRecorder.record({operation:'runtime',error:value});
   const message = value instanceof Error
     ? `${value.name}: ${value.message}`
     : String(value?.message || value || "Unknown runtime error");
@@ -19,6 +41,7 @@ function recordRuntimeError(kind, value) {
   runtimeErrors.push(entry);
   if (runtimeErrors.length > 12) runtimeErrors.shift();
 }
+globalThis.addEventListener?.('we3d:runtime-system-error', event => supportRecorder.record({operation:'runtime',error:event.detail?.error,category:'runtime-error'}));
 globalThis.addEventListener?.("error", (event) => recordRuntimeError("error", event.error || event.message));
 globalThis.addEventListener?.("unhandledrejection", (event) => recordRuntimeError("unhandledrejection", event.reason));
 

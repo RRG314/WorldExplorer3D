@@ -6,6 +6,7 @@ import { createLifecycleScope, getLifecycleRegistrySnapshot } from './runtime/li
 const environmentAdapters = new Map();
 let transitionSequence = 0;
 let activeTransition = null;
+let lastTransition = null;
 let sessionAbort = new AbortController();
 
 // Capture this before awaiting work owned by the current environment. World
@@ -29,6 +30,7 @@ function finishEnvironmentTransition(token, reason = 'completed') {
   if (!isEnvironmentTransitionCurrent(token)) return false;
   token.finishedAt = performance.now();
   token.finishReason = reason;
+  lastTransition = {generation:token.id,from:token.from,to:token.target,phase:'completed'};
   token.scope.dispose(reason);
   activeTransition = null;
   return true;
@@ -38,6 +40,7 @@ function cancelEnvironmentTransition(token = activeTransition, reason = 'superse
   if (!token || !token.scope.isActive()) return false;
   token.cancelledAt = performance.now();
   token.cancelReason = reason;
+  lastTransition = {generation:token.id,from:token.from,to:token.target,phase:reason === 'failed' ? 'failed' : 'cancelled'};
   token.abortController.abort(reason);
   token.scope.dispose(reason);
   if (activeTransition === token) {
@@ -148,6 +151,12 @@ async function transitionEnvironment(target, options = {}) {
     cancelEnvironmentTransition(token, 'failed');
     throw error;
   }
+}
+
+// Small status contract; does not invoke environment adapters or copy their
+// player positions, destination labels or room snapshots.
+export function getSessionStatus() {
+  return {generation:transitionSequence,environment:getEnv(),transition:activeTransition?{generation:activeTransition.id,from:activeTransition.from,to:activeTransition.target,phase:Number.isFinite(activeTransition.committedAt)?'committed':'requested'}:lastTransition?{...lastTransition}:null};
 }
 
 function getSessionCoordinatorDebugState() {
