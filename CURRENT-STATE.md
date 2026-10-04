@@ -6,7 +6,7 @@ Updated October 3, 2026. This summary supersedes the chronological status notes 
 
 Use `/Users/stevenreid/.codex/worktrees/architecture-evaluation/WorldExplorer3D-live-deployed-20260320`, branch `steven/visual-quality`. Do not edit the older Documents or Developer checkouts named in historical notes. The owner authorized finishing the product-plan phases sequentially with actual verification, preserving existing gameplay and work. The original investigation explicitly excludes production deployment.
 
-Observed host: physical Apple M1 Mac mini, 8 GiB RAM; approximately 18 GiB disk free at the final check. Run heavy workloads sequentially, close only owned test processes, keep ordinary Chrome open, preserve dist, all four saved candidates and player data. Never print credentials. Current observation overrides stale hardware assumptions.
+Observed host: physical Apple M1 Mac mini, 8 GiB RAM; approximately 15 GiB disk free at the latest check. Run heavy workloads sequentially, close only owned test processes, keep ordinary Chrome open, preserve dist, all four saved candidates and player data. Never print credentials. Current observation overrides stale hardware assumptions.
 
 ## Production — unchanged
 
@@ -14,7 +14,7 @@ Freshly read October 3 from https://worldexplorer3d.io/build-manifest.json:
 `5.4.0+1532bdfbb5c1.319d215f60318297.production`.
 Source `1532bdfbb5c11e002d278b058d1ebdba88384f60`.
 
-No production deployment occurred. During full release revalidation, getPlaceLookup and mutateSharedExpedition plus Firestore rules/indexes were deployed explicitly to staging (we3d-staging-20260712), with existing hosted parameter values preserved. Hosted App Check lookup and rejection without a token passed in the first immutable matrix. Shared hosted authority and the updated dependency lock still require staging validation/deployment. Local emulators and disposable staging App Check identities are also used; their success is not a production receipt.
+No production deployment occurred. During full release revalidation, getPlaceLookup and mutateSharedExpedition plus Firestore rules/indexes were deployed explicitly to staging (we3d-staging-20260712), with existing hosted parameter values preserved. Hosted App Check lookup and rejection without a token passed in the first immutable matrix. Hosted shared-voyage HTTP authority/security-rules checks also pass with three disposable accounts and successful fixture cleanup. The updated dependency lock still requires staging deployment. Local emulators and disposable staging App Check identities are also used; their success is not a production receipt.
 
 ## Full release revalidation — owner follow-up
 
@@ -26,7 +26,9 @@ Actual runtime repairs preserve activity-browser controls/focus across catalog r
 
 Harness repairs distinguish packaged gameplay from isolated source fixtures, exercise Ocean entry at valid water coordinates while retaining land-rejection gates, and verify exact exterior obstacle restoration on interior exit. The packaged planetary mission, marine habitat, weather fixture and captured-home entry fixture pass focused reruns against the first artifact where applicable. These are diagnostic reruns, not acceptance of changed runtime files in the old artifact.
 
-A CPU trace identified repeated road-publication geometry scans during streaming; incremental counts replace those scans and require an independent actual-geometry comparison. A proposed static-transform cache was benchmarked, found slower and removed. The original supported-hardware performance failure remains open until the new artifact passes; budgets have not been relaxed.
+A CPU trace identified repeated road-publication geometry scans during streaming; incremental counts replace those scans and require an independent actual-geometry comparison. A proposed static-transform cache was benchmarked, found slower and removed. The first repaired clean artifact (5ecf2076) passed moving-drive p99 at 33.4 ms and about 45 FPS, flight and all retention/coverage checks. Stationary ground FPS remains below the existing threshold. A further trace found storefront sign shaders recompiling during movement; material retention now passes the actual source street journey, lifecycle contracts and prescribed movement client; an instrumented trace records zero shader links during moving drive. Mars metallic equipment now receives an owned local reflection map; actual three-world travel verifies restoration and one-time disposal. Budgets have not been relaxed.
+
+The first backend matrix passed the actual two-client marine journey (nine cases plus three rules checks), geocoder authority and all broader backend stages except the multiplayer fixture assertion. The mobile client correctly used primary Shortbread during optional Overpass cooldown; the harness now verifies that explicit fallback while retaining all synchronization/vehicle authority checks. A diagnostic rerun completed all gameplay assertions, but failed an obsolete final summary predicate; that predicate is corrected and the final clean backend matrix remains required. A separate hosted marine gate is now registered, bringing the candidate matrix to 82 gates.
 
 ## Earlier development closeout
 

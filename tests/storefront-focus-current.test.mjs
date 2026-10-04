@@ -19,3 +19,24 @@ test('low tier stays empty and world reset cancels an unfinished replacement',()
  assert.equal(publishBuildingExteriorDetails(c,{tier:'low'}).addedDrawCalls,0);assert.equal(scene.children.length,0);
  publishBuildingExteriorDetails(c);const old=[...scene.children];move({x:400,z:0});updateBuildingExteriorFocus(c);c._worldLoadSequence++;while(frames.length)frames.shift()();assert.deepEqual(scene.children,old);clearBuildingExteriorDetails(c);
 });
+
+// Exercise two atlas replacements and a label-free region, not just source text.
+test('travelling mapped signs retain the compiled material and dispose atlases and final owner exactly once',()=>{
+ const {c,scene,move}=world(),frames=[];
+ for(const [i,m] of c.buildingMeshes.entries()){m.userData.buildingName=`Mapped shop ${i}`;m.userData.exteriorProfile={...profile,category:'commercial'};}
+ const previousDocument=globalThis.document;
+ globalThis.document={createElement:()=>({getContext:()=>({fillRect(){},strokeRect(){},fillText(){},measureText:()=>({width:100})})})};
+ globalThis.requestAnimationFrame=f=>{frames.push(f);return frames.length};globalThis.cancelAnimationFrame=()=>{};
+ try {
+  publishBuildingExteriorDetails(c);
+  const sign=()=>c.buildingExteriorDetailMeshes.find(m=>m.material.userData.ownsFrontageAtlas);
+  const material=sign().material,version=material.version,firstTexture=material.map;let disposedMaterial=0,firstDisposed=0,lastDisposed=0;
+  material.addEventListener('dispose',()=>disposedMaterial++);firstTexture.addEventListener('dispose',()=>firstDisposed++);
+  move({x:400,z:0});updateBuildingExteriorFocus(c);assert.equal(material.map,firstTexture,'Old atlas remains until the replacement is complete');
+  while(frames.length)frames.shift()();assert.equal(sign().material,material);assert.notEqual(material.map,firstTexture);assert.equal(material.map,material.emissiveMap);assert.equal(material.version,version,'Atlas replacement must not request shader recompile');assert.equal(firstDisposed,1);assert.equal(disposedMaterial,0);
+  const finalTexture=material.map;finalTexture.addEventListener('dispose',()=>lastDisposed++);
+  move({x:800,z:0});updateBuildingExteriorFocus(c);while(frames.length)frames.shift()();assert.equal(sign(),undefined);assert.equal(disposedMaterial,0);
+  clearBuildingExteriorDetails(c);assert.equal(disposedMaterial,1);assert.equal(lastDisposed,1);assert.equal(scene.children.length,0);
+  clearBuildingExteriorDetails(c);assert.equal(disposedMaterial,1);assert.equal(lastDisposed,1);
+ } finally {clearBuildingExteriorDetails(c);globalThis.document=previousDocument;}
+});

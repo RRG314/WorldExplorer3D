@@ -1,4 +1,4 @@
-import { captureSurfaceLightPresentation } from './surface-lighting.js';
+import { captureSurfaceLightPresentation, createSurfaceReflectionEnvironment } from './surface-lighting.js';
 let restoreSurfaceLights = null;
 import { createSurfaceDressing } from './surface-dressing.js';
 import { addSurfaceMaterialDetail } from './surface-material-detail.js';
@@ -350,8 +350,9 @@ async function arriveAtMars(expectedSessionId = null) {
   if (!isCurrentMarsTransition(sessionId)) return false;
   if (!retainMarsTransitionOwnership(sessionId)) return false;
   appCtx.setPauseReason?.('planetary_transition', true);
-  restoreSurfaceLights ||= captureSurfaceLightPresentation(appCtx);
-  appCtx.scene.environment=null;
+  restoreSurfaceLights ||= captureSurfaceLightPresentation(appCtx, {
+    surfaceEnvironment:createSurfaceReflectionEnvironment(THREE)
+  });
   appCtx.scene.background = new THREE.Color(0x6f3628);
   appCtx.scene.fog = new THREE.FogExp2(0x8a4a36, 0.000075);
   if (appCtx.renderer) appCtx.renderer.toneMappingExposure = 1.35;

@@ -442,7 +442,19 @@ function* buildDetails(appCtx, options = {}) {
     entranceAuthority: 'building-facade-entrances',
     collisionAuthority: 'existing-building-collider-unchanged'
   });
-  clearDetailMeshes(appCtx);
+  // Retain the one compiled sign material across moving-focus publications.
+  // Disposing its last user before the replacement renders forces synchronous
+  // shader linking on the next driving frame, even for an identical shader.
+  const state=detailStates.get(appCtx);
+  if(signMesh && state){
+    const incoming=signMesh.material;
+    if(state.frontageMaterial){
+      const retained=state.frontageMaterial,oldTexture=retained.map;
+      retained.map=incoming.map;retained.emissiveMap=incoming.emissiveMap;
+      signMesh.material=retained;incoming.dispose();oldTexture?.dispose();
+    } else state.frontageMaterial=incoming;
+  }
+  clearDetailMeshes(appCtx,state?.frontageMaterial);
   for(const mesh of meshes)appCtx.addEarthWorldObject(mesh);
   appCtx.buildingExteriorDetailMeshes=meshes;
   appCtx.buildingExteriorDetailPublication = diagnostics;
@@ -454,7 +466,7 @@ function* buildDetails(appCtx, options = {}) {
   }
 }
 
-function clearDetailMeshes(appCtx) {
+function clearDetailMeshes(appCtx, retainedMaterial = null) {
   const meshes = Array.isArray(appCtx?.buildingExteriorDetailMeshes)
     ? appCtx.buildingExteriorDetailMeshes
     : [];
@@ -462,7 +474,7 @@ function clearDetailMeshes(appCtx) {
   for (const mesh of meshes) {
     mesh?.parent?.remove?.(mesh);
     mesh?.geometry?.dispose?.();
-    if (mesh?.material && !disposedMaterials.has(mesh.material)) {
+    if (mesh?.material && mesh.material !== retainedMaterial && !disposedMaterials.has(mesh.material)) {
       disposedMaterials.add(mesh.material);
       if(mesh.material.userData?.ownsFrontageAtlas)mesh.material.map?.dispose?.();
       mesh.material.dispose?.();
@@ -501,7 +513,10 @@ export function updateBuildingExteriorFocus(appCtx){
 }
 export function clearBuildingExteriorDetails(appCtx){
   const state=detailStates.get(appCtx);if(state){globalThis.cancelAnimationFrame?.(state.frame);state.pending?.job.return();detailStates.delete(appCtx);}
-  clearDetailMeshes(appCtx);
+  clearDetailMeshes(appCtx,state?.frontageMaterial);
+  // A focus with no mapped labels may leave this single cached material
+  // detached. Its world owner still releases both the atlas and program.
+  state?.frontageMaterial?.map?.dispose();state?.frontageMaterial?.dispose();
 }
 
 export { DETAIL_LIMITS, DETAIL_RADIUS, facadeEdgeForMesh };

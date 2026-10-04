@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import {surfaceDressingLayout,createSurfaceDressing} from '../app/js/planetary/surface-dressing.js';
-import {captureSurfaceLightPresentation} from '../app/js/planetary/surface-lighting.js';
+import {captureSurfaceLightPresentation,createSurfaceReflectionEnvironment} from '../app/js/planetary/surface-lighting.js';
 import {setActivePlanetaryObstacles,queryPlanetaryObstacle,clearActivePlanetaryObstacles} from '../app/js/planetary/runtime/obstacle-authority.js?v=1';
 import {resolvePlanetaryVehicleObstacle} from '../app/js/physics/planetary-obstacle-response.js';
 import {disposeOwnedPlanetaryWorld} from '../app/js/planetary/owned-world-cache.js';
@@ -34,6 +34,18 @@ test('surface light ownership restores the incoming Earth environment and colors
  const environment=new THREE.Texture();context.scene.environment=environment;
  const restore=captureSurfaceLightPresentation(context);context.scene.environment=null;context.hemiLight.visible=false;context.sun.color.setHex(0xffffff);context.renderer.toneMappingExposure=1;
  restore();assert.equal(context.scene.environment,environment);assert.equal(context.hemiLight.visible,true);assert.equal(context.sun.color.getHex(),0xaaccff);assert.equal(context.renderer.toneMappingExposure,1.6);
+});
+
+test('metallic surface equipment gets bounded local reflections and releases them once on exit',()=>{
+ const earth=new THREE.Texture(),scene=new THREE.Scene();scene.environment=earth;
+ const surface=createSurfaceReflectionEnvironment(THREE);let disposed=0,earthDisposed=0;
+ surface.addEventListener('dispose',()=>disposed++);earth.addEventListener('dispose',()=>earthDisposed++);
+ assert.equal(surface.image.data.byteLength,128*64*4);
+ assert.equal(surface.mapping,THREE.EquirectangularReflectionMapping);
+ assert.notDeepEqual(Array.from(surface.image.data.slice(0,3)),Array.from(surface.image.data.slice(-4,-1)));
+ const restore=captureSurfaceLightPresentation({scene},{surfaceEnvironment:surface});
+ assert.equal(scene.environment,surface);restore();restore();
+ assert.equal(scene.environment,earth);assert.equal(disposed,1);assert.equal(earthDisposed,0);
 });
 
 

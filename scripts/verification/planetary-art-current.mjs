@@ -9,10 +9,21 @@ try{
  await page.waitForFunction(()=>document.querySelector('#startBtn')?.disabled===false,null,{timeout:90000});
  await page.evaluate(()=>{document.querySelector('#spaceLaunchToggle').click();document.querySelector('#startBtn').click()});
  await page.waitForFunction(()=>JSON.parse(render_game_to_text()).modes?.space,null,{timeout:90000});
- await page.evaluate(async()=>{window.c=(await import('/app/js/shared-context.js?v=55')).ctx;});
+ await page.evaluate(async()=>{window.c=(await import('/app/js/shared-context.js?v=55')).ctx;window.__beforeSurfaceEnvironment=c.scene.environment;});
  for(const body of ['moon','mars','andromeda-explorer-a-b']){
   await page.evaluate(async id=>{if(id==='moon')c.arriveAtMoon();else if(id==='mars'){await import('/app/js/planetary/mars-world.js');await c.arriveAtMars();}else{c.prepareDestinationMissionSurface(id);await c.arriveAtSolidWorld(id);}},body);
   await page.waitForFunction(id=>id==='moon'?c.moonSurface?.userData?.ready:id==='mars'?c.onMars:c.activePlanetaryBodyId===id,body,{timeout:90000});
+  if(body==='mars')await page.evaluate(()=>{
+    const texture=c.scene.environment;
+    if(texture?.name!=='Surface sky and ground reflections')throw Error('Mars metallic equipment has no local reflection field');
+    window.__marsReflectionReceipt={disposed:0,restoredBeforeDisposal:false};
+    texture.addEventListener('dispose',()=>{__marsReflectionReceipt.disposed++;__marsReflectionReceipt.restoredBeforeDisposal=c.scene.environment===__beforeSurfaceEnvironment;});
+  });
+  if(body==='andromeda-explorer-a-b'){
+    const receipt=await page.evaluate(()=>__marsReflectionReceipt);
+    assert.equal(receipt.disposed,1,'Mars reflection texture is released when another surface takes ownership');
+    assert.equal(receipt.restoredBeforeDisposal,true,'Incoming environment is restored before owned reflections are released');
+  }
   await page.waitForTimeout(1500);
   await page.evaluate(()=>c.setTravelMode('walk'));
   await page.waitForTimeout(2500);
@@ -38,6 +49,6 @@ try{
  await page.setViewportSize({width:390,height:844});await page.waitForTimeout(300);await page.screenshot({path:`${out}/copper-phone.png`});
  const cleanup=await page.evaluate(async()=>{const {snapshotPlanetaryObstacles}=await import('/app/js/planetary/runtime/obstacle-authority.js?v=1');c.prepareTitleEnvironment();return {obstacles:snapshotPlanetaryObstacles().obstacles.length,attachedGeology:c.scene.children.filter(o=>o.name.endsWith(' local geology')&&o.visible).length};});
  assert.equal(cleanup.obstacles,0);assert.equal(cleanup.attachedGeology,0);
- await writeFile(`${out}/report.json`,JSON.stringify({results,cleanup,errors},null,2));console.log(JSON.stringify({results,cleanup,errors}));
+ await writeFile(`${out}/report.json`,JSON.stringify({results,cleanup,errors,marsReflection:await page.evaluate(()=>__marsReflectionReceipt)},null,2));console.log(JSON.stringify({results,cleanup,errors,marsReflection:await page.evaluate(()=>__marsReflectionReceipt)}));
  if(errors.length)process.exitCode=1;
 }finally{await browser.close()}
