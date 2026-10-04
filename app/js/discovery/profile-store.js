@@ -3,6 +3,8 @@ import { validateJournalBackup } from './backup-validation.js?v=1';
 import { summarizeReceiptState } from './save-status.js?v=1';
 import { awardCompanionXp, normalizeCompanionProgression } from './companions.js?v=7';
 import { pendingDiscoveryReceipt } from './receipt-outbox.js?v=1';
+import { JOURNAL_ORDER_STORE, installJournalOrder, rebuildJournalOrder, putJournalOrder,
+  recentJournalRows, readyJournalReceipts, compareJournalRows, journalPageSize } from './journal-index.js';
 import {
   createExplorerEvent,
   createExplorerStoryEvent,
@@ -16,10 +18,11 @@ import { createDefaultCharacterState, normalizeCharacterState } from '../charact
 import { migrateLegacyCharacterState, projectCharacterProgress } from '../character/progression.js?v=1';
 
 const DISCOVERY_DB_NAME = 'world-explorer-discovery';
-const DISCOVERY_DB_VERSION = 4;
+const DISCOVERY_DB_VERSION = 5;
 const PROFILE_ID = 'local-explorer';
 const JOURNAL_IMPORT_BACKUP_ID = 'journal-before-import:local-explorer';
 const JOURNAL_STORES = ['profiles', 'items', 'claims', 'fieldGuide', 'companions', 'events', 'migrationBackups', 'receiptOutbox'];
+const JOURNAL_TRANSACTION_STORES = [...JOURNAL_STORES, JOURNAL_ORDER_STORE];
 const CHARACTER_MIGRATION_BACKUP_ID = 'character-v1:local-explorer';
 
 function normalizeCompanionOnboarding(source = {}) {
@@ -178,6 +181,7 @@ function openDiscoveryDatabase(indexedDB = globalThis.indexedDB) {
         events.createIndex('eventType', 'eventType', { unique: false });
       }
       if (!db.objectStoreNames.contains('migrationBackups')) db.createObjectStore('migrationBackups', { keyPath: 'id' });
+      installJournalOrder(db, request.transaction);
     };
     request.onsuccess = () => {
       const db = request.result;
@@ -193,13 +197,7 @@ async function ensureIndexedDbCharacterMigration(db) {
   const transaction = db.transaction(['profiles', 'events', 'fieldGuide', 'companions', 'migrationBackups'], 'readwrite');
   const profiles = transaction.objectStore('profiles');
   const backups = transaction.objectStore('migrationBackups');
-  const [storedProfile, events, fieldGuide, companions, existingBackup] = await Promise.all([
-    requestPromise(profiles.get(PROFILE_ID)),
-    requestPromise(transaction.objectStore('events').getAll()),
-    requestPromise(transaction.objectStore('fieldGuide').getAll()),
-    requestPromise(transaction.objectStore('companions').getAll()),
-    requestPromise(backups.get(CHARACTER_MIGRATION_BACKUP_ID))
-  ]);
+  const storedProfile = await requestPromise(profiles.get(PROFILE_ID));
   if (!storedProfile) {
     const profile = createDefaultProfile();
     profiles.put(profile);
@@ -210,6 +208,12 @@ async function ensureIndexedDbCharacterMigration(db) {
     await transactionPromise(transaction);
     return normalizeProfile(storedProfile);
   }
+  const [events, fieldGuide, companions, existingBackup] = await Promise.all([
+    requestPromise(transaction.objectStore('events').getAll()),
+    requestPromise(transaction.objectStore('fieldGuide').getAll()),
+    requestPromise(transaction.objectStore('companions').getAll()),
+    requestPromise(backups.get(CHARACTER_MIGRATION_BACKUP_ID))
+  ]);
   const backedUpAt = Number(existingBackup?.backedUpAt) || Date.now();
   if (!existingBackup) {
     backups.put({
@@ -256,19 +260,19 @@ function createIndexedDbDiscoveryProfileStore(options = {}) {
     const db = await open();
     try {
       await ensureCharacterMigration(db);
-      const transaction = db.transaction(['profiles', 'items', 'fieldGuide', 'events'], 'readonly');
-      const [profile, items, fieldGuide, events] = await Promise.all([
+      const transaction = db.transaction(['profiles', 'items', 'fieldGuide', 'claims'], 'readonly');
+      const [profile, items, observedCatalogIds, claimedIds] = await Promise.all([
         requestPromise(transaction.objectStore('profiles').get(PROFILE_ID)),
         requestPromise(transaction.objectStore('items').getAll()),
-        requestPromise(transaction.objectStore('fieldGuide').getAll()),
-        requestPromise(transaction.objectStore('events').getAll())
+        requestPromise(transaction.objectStore('fieldGuide').getAllKeys()),
+        requestPromise(transaction.objectStore('claims').getAllKeys())
       ]);
       await transactionPromise(transaction);
       return {
         profile: normalizeProfile(profile),
-        items: items.sort((a, b) => Number(b.collectedAt) - Number(a.collectedAt)).map(clone),
-        fieldGuide: fieldGuide.sort((a, b) => Number(b.lastObservedAt) - Number(a.lastObservedAt)).map(clone),
-        events: events.sort((a, b) => Number(b.occurredAt) - Number(a.occurredAt)).map(clone)
+        items: items.sort((a, b) => compareJournalRows('items', a, b)),
+        claimedIds,
+        observedCatalogIds
       };
     } finally {
       db.close();
@@ -322,9 +326,10 @@ function createIndexedDbDiscoveryProfileStore(options = {}) {
     const collection = policy.collection === true;
     if (collection && !record?.instanceId) throw new TypeError('Collected discoveries require a stable instance ID.');
     const db = await open();
+    let transactionToAbort;
     try {
       await ensureCharacterMigration(db);
-      const transaction = db.transaction(['profiles', 'items', 'claims', 'fieldGuide', 'events', 'receiptOutbox', 'companions'], 'readwrite');
+      const transaction = transactionToAbort = db.transaction(['profiles', 'items', 'claims', 'fieldGuide', 'events', 'receiptOutbox', 'companions', JOURNAL_ORDER_STORE], 'readwrite');
       const profiles = transaction.objectStore('profiles');
       const items = transaction.objectStore('items');
       const claims = transaction.objectStore('claims');
@@ -378,7 +383,12 @@ function createIndexedDbDiscoveryProfileStore(options = {}) {
       if (item) {
         items.put(item);
         const pending = pendingDiscoveryReceipt(item, receiptOwnerUid, options.catalogVersion);
-        if (pending) transaction.objectStore('receiptOutbox').put(pending);
+        if (pending) {
+          transaction.objectStore('receiptOutbox').put(pending);
+          putJournalOrder(transaction, 'receiptOutbox', pending);
+        }
+        const queued = await requestPromise(transaction.objectStore(JOURNAL_ORDER_STORE).index('receiptInstance').count(['receiptOutbox', item.instanceId]));
+        putJournalOrder(transaction, 'items', item, queued > 0);
       }
       // Companion credit belongs to the same commit as the field record. A
       // reload after this transaction cannot lose or duplicate its reward.
@@ -388,8 +398,11 @@ function createIndexedDbDiscoveryProfileStore(options = {}) {
         if (companion) companionStore.put(fieldCompanionReward(companion, event, !existingGuide));
       }
       events.put(event);
+      putJournalOrder(transaction, 'events', event);
       claims.put({ claimId: record.claimId, claimedAt: now, item, event });
-      fieldGuide.put(projectFieldGuideEntry(existingGuide, record, now, regionId));
+      const guideEntry = projectFieldGuideEntry(existingGuide, record, now, regionId);
+      fieldGuide.put(guideEntry);
+      putJournalOrder(transaction, 'fieldGuide', guideEntry);
       profiles.put(profile);
       await transactionPromise(transaction);
       return {
@@ -401,6 +414,9 @@ function createIndexedDbDiscoveryProfileStore(options = {}) {
         progress: { points: projected.points, reason: projected.reason, specialtyId: projected.specialtyId },
         characterReward: clone(characterProjection.reward)
       };
+    } catch (error) {
+      try { transactionToAbort?.abort(); } catch { /* Already committed or aborted. */ }
+      throw error;
     } finally {
       db.close();
     }
@@ -409,9 +425,10 @@ function createIndexedDbDiscoveryProfileStore(options = {}) {
   async function recordExplorerEvent(record) {
     const event = createExplorerStoryEvent(record);
     const db = await open();
+    let transactionToAbort;
     try {
       await ensureCharacterMigration(db);
-      const transaction = db.transaction(['profiles', 'events'], 'readwrite');
+      const transaction = transactionToAbort = db.transaction(['profiles', 'events', JOURNAL_ORDER_STORE], 'readwrite');
       const profiles = transaction.objectStore('profiles');
       const events = transaction.objectStore('events');
       const existing = await requestPromise(events.get(event.eventId));
@@ -434,9 +451,13 @@ function createIndexedDbDiscoveryProfileStore(options = {}) {
         ? normalizeProfile({ ...current, explorerProgress: nextExplorerProgress, characterState: characterProjection.character })
         : current;
       events.put(event);
+      putJournalOrder(transaction, 'events', event);
       profiles.put(profile);
       await transactionPromise(transaction);
       return { recorded: true, event: clone(event), profile: clone(profile), characterReward: clone(characterProjection.reward) };
+    } catch (error) {
+      try { transactionToAbort?.abort(); } catch { /* Already committed or aborted. */ }
+      throw error;
     } finally {
       db.close();
     }
@@ -453,10 +474,10 @@ function createIndexedDbDiscoveryProfileStore(options = {}) {
   async function listItems(limit = 200) {
     const db = await open();
     try {
-      const transaction = db.transaction(['items'], 'readonly');
-      const records = await requestPromise(transaction.objectStore('items').getAll());
+      const transaction = db.transaction(['items', JOURNAL_ORDER_STORE], 'readonly');
+      const records = await recentJournalRows(transaction, 'items', limit);
       await transactionPromise(transaction);
-      return records.sort((a, b) => Number(b.collectedAt) - Number(a.collectedAt)).slice(0, Math.max(1, limit)).map(clone);
+      return records;
     } finally {
       db.close();
     }
@@ -465,10 +486,10 @@ function createIndexedDbDiscoveryProfileStore(options = {}) {
   async function listFieldGuide(limit = 500) {
     const db = await open();
     try {
-      const transaction = db.transaction(['fieldGuide'], 'readonly');
-      const records = await requestPromise(transaction.objectStore('fieldGuide').getAll());
+      const transaction = db.transaction(['fieldGuide', JOURNAL_ORDER_STORE], 'readonly');
+      const records = await recentJournalRows(transaction, 'fieldGuide', limit);
       await transactionPromise(transaction);
-      return records.sort((a, b) => Number(b.lastObservedAt) - Number(a.lastObservedAt)).slice(0, Math.max(1, limit)).map(clone);
+      return records;
     } finally {
       db.close();
     }
@@ -486,13 +507,10 @@ function createIndexedDbDiscoveryProfileStore(options = {}) {
   async function listEvents(limit = 500) {
     const db = await open();
     try {
-      const transaction = db.transaction(['events'], 'readonly');
-      const records = await requestPromise(transaction.objectStore('events').getAll());
+      const transaction = db.transaction(['events', JOURNAL_ORDER_STORE], 'readonly');
+      const records = await recentJournalRows(transaction, 'events', limit);
       await transactionPromise(transaction);
-      return records
-        .sort((a, b) => Number(b.occurredAt) - Number(a.occurredAt))
-        .slice(0, Math.max(1, limit))
-        .map(clone);
+      return records;
     } finally {
       db.close();
     }
@@ -512,8 +530,9 @@ function createIndexedDbDiscoveryProfileStore(options = {}) {
 
   async function applyTrustedReceipt(instanceId, receipt = {}) {
     const db = await open();
+    let transactionToAbort;
     try {
-      const transaction = db.transaction(['items'], 'readwrite');
+      const transaction = transactionToAbort = db.transaction(['items', JOURNAL_ORDER_STORE], 'readwrite');
       const store = transaction.objectStore('items');
       const item = await requestPromise(store.get(String(instanceId)));
       if (!item) {
@@ -530,8 +549,12 @@ function createIndexedDbDiscoveryProfileStore(options = {}) {
         trustedReceiptAt: Date.now()
       };
       store.put(updated);
+      putJournalOrder(transaction, 'items', updated);
       await transactionPromise(transaction);
       return clone(updated);
+    } catch (error) {
+      try { transactionToAbort?.abort(); } catch { /* Already committed or aborted. */ }
+      throw error;
     } finally {
       db.close();
     }
@@ -540,30 +563,34 @@ function createIndexedDbDiscoveryProfileStore(options = {}) {
   async function getReceiptSyncStatus(ownerUid) {
     const db = await open();
     try {
-      const tx = db.transaction(['items', 'receiptOutbox'], 'readonly');
-      const [items, rows] = await Promise.all([
-        requestPromise(tx.objectStore('items').getAll()),
-        requestPromise(tx.objectStore('receiptOutbox').getAll())
+      const tx = db.transaction([JOURNAL_ORDER_STORE], 'readonly');
+      const metadata = tx.objectStore(JOURNAL_ORDER_STORE);
+      const [pending, blocked, acknowledged, deviceOnly] = await Promise.all([
+        ownerUid ? requestPromise(metadata.index('receiptStatus').count(['receiptOutbox', ownerUid, 'pending'])) : 0,
+        ownerUid ? requestPromise(metadata.index('receiptStatus').count(['receiptOutbox', ownerUid, 'blocked'])) : 0,
+        ownerUid ? requestPromise(metadata.index('ownedDisposition').count(['items', ownerUid, 'acknowledged'])) : 0,
+        requestPromise(metadata.index('disposition').count(['items', 'device']))
       ]);
       await transactionPromise(tx);
-      return summarizeReceiptState(items, rows, ownerUid);
+      return Object.freeze({pending, blocked, acknowledged, deviceOnly});
     } finally { db.close(); }
   }
 
   async function listPendingReceipts(ownerUid, now = Date.now()) {
     const db = await open();
     try {
-      const tx = db.transaction(['receiptOutbox'], 'readonly');
-      const rows = await requestPromise(tx.objectStore('receiptOutbox').index('ownerUid').getAll(String(ownerUid)));
+      const tx = db.transaction(['receiptOutbox', JOURNAL_ORDER_STORE], 'readonly');
+      const rows = await readyJournalReceipts(tx, String(ownerUid), now);
       await transactionPromise(tx);
-      return rows.filter(row => row.status === 'pending' && row.nextAttemptAt <= now).slice(0, 25).map(clone);
+      return rows;
     } finally { db.close(); }
   }
 
   async function completePendingReceipt(id, receipt) {
     const db = await open();
+    let transactionToAbort;
     try {
-      const tx = db.transaction(['receiptOutbox','items'], 'readwrite');
+      const tx = transactionToAbort = db.transaction(['receiptOutbox','items', JOURNAL_ORDER_STORE], 'readwrite');
       const outbox = tx.objectStore('receiptOutbox');
       const row = await requestPromise(outbox.get(id));
       if (!row) { await transactionPromise(tx); return false; }
@@ -571,22 +598,36 @@ function createIndexedDbDiscoveryProfileStore(options = {}) {
       const item = await requestPromise(items.get(row.instanceId));
       if (!item || receipt.ownerUid !== row.ownerUid) throw Object.assign(new Error('Pending receipt owner/item mismatch.'), {status:422});
       validateReceipt(item, receipt);
-      items.put({...item, authority:receipt.authority, receiptOwnerUid:receipt.ownerUid,
-        serverItemId:receipt.itemId, tradeable:receipt.authority === 'trusted-server' && receipt.tradeable === true, trustedReceiptAt:Date.now()});
+      const updated = {...item, authority:receipt.authority, receiptOwnerUid:receipt.ownerUid,
+        serverItemId:receipt.itemId, tradeable:receipt.authority === 'trusted-server' && receipt.tradeable === true, trustedReceiptAt:Date.now()};
+      items.put(updated);
+      putJournalOrder(tx, 'items', updated);
       outbox.delete(id);
+      tx.objectStore(JOURNAL_ORDER_STORE).delete(['receiptOutbox', id]);
       await transactionPromise(tx);
       return true;
+    } catch (error) {
+      try { transactionToAbort?.abort(); } catch { /* Already committed or aborted. */ }
+      throw error;
     } finally { db.close(); }
   }
 
   async function deferPendingReceipt(id, patch) {
     const db = await open();
+    let transactionToAbort;
     try {
-      const tx = db.transaction(['receiptOutbox'], 'readwrite');
+      const tx = transactionToAbort = db.transaction(['receiptOutbox', JOURNAL_ORDER_STORE], 'readwrite');
       const outbox = tx.objectStore('receiptOutbox');
       const row = await requestPromise(outbox.get(id));
-      if (row) outbox.put({...row,...patch});
+      if (row) {
+        const updated = {...row,...patch, id:row.id, instanceId:row.instanceId, ownerUid:row.ownerUid};
+        outbox.put(updated);
+        putJournalOrder(tx, 'receiptOutbox', updated);
+      }
       await transactionPromise(tx);
+    } catch (error) {
+      try { transactionToAbort?.abort(); } catch { /* Already committed or aborted. */ }
+      throw error;
     } finally { db.close(); }
   }
 
@@ -698,31 +739,42 @@ function createIndexedDbDiscoveryProfileStore(options = {}) {
 
   async function rollbackLastImport() {
     const db = await open();
+    let transactionToAbort;
     try {
-      const tx = db.transaction(JOURNAL_STORES, 'readwrite');
+      const tx = transactionToAbort = db.transaction(JOURNAL_TRANSACTION_STORES, 'readwrite');
       const backup = await requestPromise(tx.objectStore('migrationBackups').get(JOURNAL_IMPORT_BACKUP_ID));
       if (!backup?.stores) { await transactionPromise(tx); return false; }
       for (const name of JOURNAL_STORES) {
         const store = tx.objectStore(name); store.clear();
         for (const row of backup.stores[name] || []) store.put(clone(row));
       }
+      rebuildJournalOrder(tx, backup.stores);
       await transactionPromise(tx); characterMigrationReady = false;
       return true;
+    } catch (error) {
+      try { transactionToAbort?.abort(); } catch { /* Already committed or aborted. */ }
+      throw error;
     } finally { db.close(); }
   }
 
   async function importData(data = {}) {
     data = validateJournalBackup(data);
     const db = await open();
+    let transactionToAbort;
     try {
-      const transaction = db.transaction(JOURNAL_STORES, 'readwrite');
+      const transaction = transactionToAbort = db.transaction(JOURNAL_TRANSACTION_STORES, 'readwrite');
       const previousRows = await Promise.all(JOURNAL_STORES.map(name => requestPromise(transaction.objectStore(name).getAll())));
       const previous = Object.fromEntries(JOURNAL_STORES.map((name,index)=>[name,previousRows[index]]));
       previous.migrationBackups = previous.migrationBackups.filter(row=>row.id!==JOURNAL_IMPORT_BACKUP_ID);
       transaction.objectStore('migrationBackups').put({id:JOURNAL_IMPORT_BACKUP_ID, backedUpAt:Date.now(), stores:previous});
       const pendingStore = transaction.objectStore('receiptOutbox');
+      const importedByInstance = new Map(data.items.map(item=>[item.instanceId,item]));
+      const importedByClaim = new Map(data.items.filter(item=>item.claimId).map(item=>[item.claimId,item]));
+      const retainedReceipts = [];
       for (const row of previous.receiptOutbox) {
-        if (!data.items.some(item=>item.instanceId===row.instanceId && item.claimId===row.payload.claimId && item.catalogId===row.payload.catalogId)) pendingStore.delete(row.id);
+        const item = importedByInstance.get(row.instanceId);
+        if (!item || item.claimId!==row.payload?.claimId || item.catalogId!==row.payload?.catalogId) pendingStore.delete(row.id);
+        else retainedReceipts.push(row);
       }
       const profiles = transaction.objectStore('profiles');
       const itemsStore = transaction.objectStore('items');
@@ -754,13 +806,17 @@ function createIndexedDbDiscoveryProfileStore(options = {}) {
       data.events.filter((event) => event?.eventId).forEach((event) => {
         eventsStore.put(clone(event));
         if (event.claimId) {
-          const item = items.find((candidate) => candidate.claimId === event.claimId) || null;
+          const item = importedByClaim.get(event.claimId) || null;
           claims.put({ claimId: event.claimId, claimedAt: event.occurredAt || Date.now(), item, event });
         }
       });
+      rebuildJournalOrder(transaction, {...data, receiptOutbox:retainedReceipts});
       await transactionPromise(transaction);
       characterMigrationReady = hasCharacterState;
       return { imported: true, events: data.events.length, guide: data.fieldGuide.length, items: items.length, companions: companions.length };
+    } catch (error) {
+      try { transactionToAbort?.abort(); } catch { /* Already committed or aborted. */ }
+      throw error;
     } finally {
       db.close();
     }
@@ -903,8 +959,9 @@ function createMemoryDiscoveryProfileStore(seed = {}) {
   return Object.freeze({
     type: 'MemoryDiscoveryProfileStore',
     async getReceiptSyncStatus(ownerUid) { return summarizeReceiptState([...items.values()], [...outbox.values()], ownerUid); },
-    async listPendingReceipts(ownerUid, now = Date.now()) { return [...outbox.values()].filter(row => row.ownerUid === ownerUid && row.status === 'pending' && row.nextAttemptAt <= now).slice(0,25).map(clone); },
-    async deferPendingReceipt(id, patch) { if (outbox.has(id)) outbox.set(id,{...outbox.get(id),...patch}); },
+    async listPendingReceipts(ownerUid, now = Date.now()) { return [...outbox.values()].filter(row => row.ownerUid === ownerUid && row.status === 'pending' && row.nextAttemptAt <= now)
+      .sort((a,b)=>Number(a.nextAttemptAt)-Number(b.nextAttemptAt)||(a.id<b.id?-1:a.id>b.id?1:0)).slice(0,25).map(clone); },
+    async deferPendingReceipt(id, patch) { const row=outbox.get(id);if(row)outbox.set(id,{...row,...patch,id:row.id,instanceId:row.instanceId,ownerUid:row.ownerUid}); },
     async completePendingReceipt(id, receipt) {
       const row = outbox.get(id); if (!row) return false;
       const item = items.get(row.instanceId);
@@ -919,16 +976,16 @@ function createMemoryDiscoveryProfileStore(seed = {}) {
       return clone(profile);
     },
     async hasClaim(claimId) { return claims.has(String(claimId)); },
-    async listItems(limit = 200) { return [...items.values()].slice(0, limit).map(clone); },
-    async listFieldGuide(limit = 500) { return [...guide.values()].slice(0, limit).map(clone); },
+    async listItems(limit = 200) { return [...items.values()].sort((a,b)=>compareJournalRows('items',a,b)).slice(0, journalPageSize(limit)).map(clone); },
+    async listFieldGuide(limit = 500) { return [...guide.values()].sort((a,b)=>compareJournalRows('fieldGuide',a,b)).slice(0, journalPageSize(limit)).map(clone); },
     async getEventsById(ids=[]) {if(!Array.isArray(ids)||ids.length>32||ids.some(id=>typeof id!=='string'||id.length>260))throw new TypeError('Expected at most 32 stable event IDs');return ids.map(id=>events.get(id)).filter(Boolean).map(clone);},
-    async listEvents(limit = 500) { return [...events.values()].sort((a, b) => Number(b.occurredAt) - Number(a.occurredAt)).slice(0, limit).map(clone); },
+    async listEvents(limit = 500) { return [...events.values()].sort((a,b)=>compareJournalRows('events',a,b)).slice(0, journalPageSize(limit)).map(clone); },
     async loadRuntimeBootstrap() {
       return {
         profile: clone(profile),
-        items: [...items.values()].map(clone),
-        fieldGuide: [...guide.values()].map(clone),
-        events: [...events.values()].sort((a, b) => Number(b.occurredAt) - Number(a.occurredAt)).map(clone)
+        items: [...items.values()].sort((a,b)=>compareJournalRows('items',a,b)).map(clone),
+        claimedIds: [...new Set([...claims.keys(), ...[...items.values(),...events.values()].map(row=>row.claimId).filter(Boolean)])],
+        observedCatalogIds: [...guide.keys()]
       };
     },
     async listCompanions() { return [...companions.values()].map(clone); },
@@ -1005,7 +1062,12 @@ function createMemoryDiscoveryProfileStore(seed = {}) {
     async importData(data = {}) {
       data = validateJournalBackup(data);
       beforeImport = clone({profile, legacyProfileBackup, items:[...items], guide:[...guide], companions:[...companions], events:[...events], claims:[...claims], outbox:[...outbox]});
-      for (const [id,row] of outbox) if (!data.items.some(item=>item.instanceId===row.instanceId && item.claimId===row.payload.claimId && item.catalogId===row.payload.catalogId)) outbox.delete(id);
+      const importedByInstance = new Map(data.items.map(item=>[item.instanceId,item]));
+      const importedByClaim = new Map(data.items.filter(item=>item.claimId).map(item=>[item.claimId,item]));
+      for (const [id,row] of outbox) {
+        const item=importedByInstance.get(row.instanceId);
+        if (!item || item.claimId!==row.payload?.claimId || item.catalogId!==row.payload?.catalogId) outbox.delete(id);
+      }
       const hasCharacterState = data.profile?.characterState?.schemaVersion === 1;
       legacyProfileBackup = hasCharacterState ? null : clone(data.profile || {});
       const importedCharacter = hasCharacterState
@@ -1025,7 +1087,7 @@ function createMemoryDiscoveryProfileStore(seed = {}) {
       (data.companions || []).filter((entry) => entry?.instanceId && entry?.catalogId).forEach((entry) => companions.set(entry.instanceId, clone(entry)));
       data.events.filter((event) => event?.eventId).forEach((event) => {
         events.set(event.eventId, clone(event));
-        if (event.claimId) claims.set(event.claimId, { claimId: event.claimId, event: clone(event), item: [...items.values()].find((item) => item.claimId === event.claimId) || null });
+        if (event.claimId) claims.set(event.claimId, { claimId: event.claimId, event: clone(event), item: importedByClaim.get(event.claimId) || null });
       });
       return { imported: true, events: events.size, guide: guide.size, items: items.size, companions: companions.size };
     }

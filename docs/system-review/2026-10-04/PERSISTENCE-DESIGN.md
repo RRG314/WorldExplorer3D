@@ -1,6 +1,6 @@
 # Planned persistence repair boundary
 
-Package 5 is in progress locally. The transactional account-condition outbox is implemented and its eight real-browser regression cases pass. Journal version 5 and inventory scaling below remain planned, not implemented. Nothing in this document is a production receipt.
+Package 5 is in progress locally. The transactional account-condition outbox is implemented and its eight real-browser regression cases pass. Journal version 5 and inventory scaling are now implemented locally, with source/component and disposable-browser evidence below; the assembled-world Journal/Backpack/reload journey and prescribed driving client also pass. Nothing in this document is a production receipt.
 
 ## Journal query authority
 
@@ -56,3 +56,16 @@ Version 5 creates a release compatibility requirement: the current production co
 Legacy pending/uncertain work imports once before its unchanged old key is removed. A later restored old key cannot replace a migrated row. Denied/quota storage retains work in memory and emits a visible storage warning; it is explicitly non-durable. An actual eight-case browser run (`condition-tabs-transaction-expanded/`) passes older-tab disposal, lost acknowledgments, dispatch-time tab closure, account switching, legacy recovery, no-Web-Locks concurrent idempotency, quota failure and denied storage, with zero page errors. Transport in this fixture executes the actual server mutation function but is controlled; it is not an SDK/emulator or hosted receipt.
 
 Both the condition migration and planned Journal upgrade require a migration-compatible rollback strategy before production. An old frontend does not understand the new outbox. A local source checkpoint is not authorization to promote storage changes to production.
+
+
+## Journal and established inventory implementation
+
+Version 5 stores separate `journalOrder` metadata and preserves original records, including unknown fields. Recent lists visit only requested originals. Receipt status uses index counts; dispatch chooses the earliest eligible `nextAttemptAt`, then stable ID, up to 25 rows. This deliberate ready-order change prevents newer eligible rows being hidden behind arbitrary primary-key order; numeric eligibility is unchanged. Retry patches cannot alter owner or item identity. Every indexed writer, import and rollback aborts on synchronous write failures, so originals and indexes cannot commit separately.
+
+Bootstrap retains all items and reads claim/guide identities without copying full event or guide payloads. Stable indexed Backpack membership preserves original insertion precedence, same-instance priority and event aliases. The equipment view reads compact summaries while closed, shows pages of 48 while open and retains keyboard focus across updates. All inventory rows remain available.
+
+Frequent equipment updates write a small controls record tied to the current complete Backpack save generation. Replaced inventories reject older supplements. Full Journal projections preserve ammunition from the latest equipment state. Failed writes return failure and the active game reports unsaved Backpack changes. A full inventory remains intact; this is not a truncated save or cloud backup. Rollback compatibility must include the new controls supplement as well as the condition outbox and Journal database version.
+
+Real IndexedDB `journal-history-indexed/` passes at 0, 1k, 10k and 50k records, retaining exact originals through upgrade/import/rollback. At 50k, three seven-row lists loaded exactly 21 originals (22.5 ms), bootstrap took 262 ms, and two actual Backpack projections took 244 ms. Migration took 5.88 seconds. `journal-transactions-indexed/` passes twelve cases, including receipt owner/duplicate/orphan counts, bounded dispatch, eight injected write failures with exact transaction rollback and simultaneous profile preference edits preserving rewards. These are disposable local profiles, not modifications to user data.
+
+The real equipment component with 50,008 items passes paging, category, keyboard focus and phone-viewport checks. The expanded controls run persists 541 bytes per equipment update and proves ammunition survives reload without replacing the full inventory. The full PR chain passes 1,844 contracts. Actual assembled-world and prescribed movement checks are tracked separately in IMPLEMENTATION.md; these measurements do not close remaining P4 hitch or release gates.

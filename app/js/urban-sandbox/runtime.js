@@ -3231,6 +3231,11 @@ function startUrbanSandboxRuntime(options = {}) {
     return true;
   };
   state.onEquipmentSlotClick = (event) => {
+    const pageButton = event.target?.closest?.('[data-backpack-page]');
+    if (pageButton && state.equipmentUi.contents?.contains(pageButton)) {
+      state.equipmentRuntime?.changePage?.(pageButton.dataset.backpackPage);
+      return;
+    }
     const button = event.target?.closest?.('[data-equipment-id]');
     if (!button || !state.equipmentUi.root.contains(button)) return;
     state.equipmentRuntime?.inspectItem?.(button.dataset.equipmentId);
@@ -3269,8 +3274,13 @@ function startUrbanSandboxRuntime(options = {}) {
   storeUi.close?.addEventListener('click', state.onStoreClose);
   storeUi.root?.addEventListener('click', state.onStoreAction);
   document.addEventListener('keydown', state.onStoreKeyDown);
-  state.unsubscribeBackpack = state.equipment.subscribe(() => {
-    backpackStore.save(state.equipment.exportState());
+  const controlsOnlyReasons = new Set(['ammunition-reloaded','ammunition-added','quantity-added','equipment-consumed','equipped-changed','hotbar-changed']);
+  state.unsubscribeBackpack = state.equipment.subscribe(change => {
+    const saved = controlsOnlyReasons.has(change.reason)
+      ? backpackStore.saveControls(state.equipment.exportControls())
+      : backpackStore.save(state.equipment.exportState());
+    if (!saved && !state.backpackSaveFailed) setStatus(state, 'Backpack changes could not be saved. Keep this tab open until browser storage is available.', 8000);
+    state.backpackSaveFailed = !saved;
     if (activeWorldMatches(state)) renderEquipment(state);
   });
   backpackStore.save(state.equipment.exportState());
@@ -3335,7 +3345,7 @@ function startUrbanSandboxRuntime(options = {}) {
     state.parachute.automaticEquip = options.autoEquip === true;
     if (options.autoEquip === true && state.equipment.has?.('parachute')) {
       state.equipment.equip?.('parachute');
-      state.backpackStore.save(state.equipment.exportState());
+      state.backpackStore.saveControls(state.equipment.exportControls());
       state.equipmentRuntime?.render?.();
       setStatus(state, 'Parachute ready · press Space while descending to deploy.', 2600);
     } else {

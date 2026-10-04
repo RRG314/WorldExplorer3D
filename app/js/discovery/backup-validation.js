@@ -3,7 +3,7 @@
 export function validateJournalBackup(input) {
   const fail = () => { throw new TypeError('This Journal backup is incomplete, damaged, or from an unsupported version. Existing records have not been changed.'); };
   if (!input || typeof input !== 'object' || !input.profile || typeof input.profile !== 'object' || Array.isArray(input.profile)) fail();
-  if (input.schemaVersion != null && (!Number.isInteger(input.schemaVersion) || input.schemaVersion < 1 || input.schemaVersion > 4)) fail();
+  if (input.schemaVersion != null && (!Number.isInteger(input.schemaVersion) || input.schemaVersion < 1 || input.schemaVersion > 5)) fail();
   if (input.profile.id != null && input.profile.id !== 'local-explorer') fail();
   const data = JSON.parse(JSON.stringify(input));
   for (const [name, key, required, catalog] of [['events','eventId',true,false],['fieldGuide','catalogId',true,false],['items','instanceId',false,true],['companions','instanceId',false,true]]) {

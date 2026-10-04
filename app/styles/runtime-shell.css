@@ -605,3 +605,5 @@ body.space-destination-details-open #spaceFlightHUD{visibility:hidden}
 
 /* Activities share the same minimum touch target as other game controls. */
 .activityDiscoveryHeaderActions button,.activityDiscoveryDetailActions button,.activityDiscoveryPromptActions button,.activityRunHud button,.activityDiscoveryChipRow button{min-height:44px;min-width:44px;box-sizing:border-box}
+
+.urbanBackpackPages{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:12px;color:#c7d7e3;font:600 12px Inter,sans-serif}.urbanBackpackPages button{min-width:72px;min-height:44px;padding:8px 12px;color:#edf3f7;background:#142b3e;border:1px solid #537594;border-radius:4px;cursor:pointer}.urbanBackpackPages button:disabled{opacity:.45;cursor:default}

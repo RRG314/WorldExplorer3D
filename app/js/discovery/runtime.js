@@ -1130,15 +1130,15 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
     ? await profileStore.loadRuntimeBootstrap().catch(() => null)
     : null;
   const [existingItems, existingEvents, existingGuide, discoveryProfile] = bootstrap
-    ? [bootstrap.items, bootstrap.events, bootstrap.fieldGuide, bootstrap.profile]
+    ? [bootstrap.items, bootstrap.events || [], bootstrap.fieldGuide || [], bootstrap.profile]
     : await Promise.all([
         profileStore.listItems(10000).catch(() => []),
         profileStore.listEvents?.(10000).catch(() => []) || [],
         profileStore.listFieldGuide?.(10000).catch(() => []) || [],
         profileStore.getProfile().catch(() => ({ tutorials: {} }))
       ]);
-  const claimedIds = new Set([...existingItems, ...existingEvents].map((entry) => entry.claimId).filter(Boolean));
-  const observedCatalogIds = new Set([...existingItems, ...existingGuide].map((entry) => entry.catalogId).filter(Boolean));
+  const claimedIds = new Set([...(bootstrap?.claimedIds || []), ...[...existingItems, ...existingEvents].map((entry) => entry.claimId).filter(Boolean)]);
+  const observedCatalogIds = new Set([...(bootstrap?.observedCatalogIds || []), ...[...existingItems, ...existingGuide].map((entry) => entry.catalogId).filter(Boolean)]);
   const progress = fieldProgress(discoveryProfile);
   const initialToolProgress = explorerToolProgress(discoveryProfile);
   const entitlements = createExplorationEntitlementService({

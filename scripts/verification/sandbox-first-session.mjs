@@ -9,12 +9,12 @@ import {closeOwnedBrowser} from './owned-browser.mjs';
 import {startStaticServer} from './static-server.mjs';
 import {stagingCaptureAttestation} from './staging-capture-attestation.mjs';
 import {configureStagingAppCheck} from './staging-app-check.mjs';
-const out=process.env.WE3D_SANDBOX_FLOWER_ONLY === '1' ? 'output/verification/sandbox-flower-result' : 'output/verification/sandbox-first-session';
+const out=process.env.WE3D_SANDBOX_OUTPUT || (process.env.WE3D_SANDBOX_FLOWER_ONLY === '1' ? 'output/verification/sandbox-flower-result' : 'output/verification/sandbox-first-session');
 await mkdir(out,{recursive:true});
 const privateDir=await mkdtemp(path.join(tmpdir(),'we3d-sandbox-'));
 let identity,server,browser,browserServer,page;
 const errors=[];const failedLocal=[];
-const report={ok:false,evidence:'Earth runtime; real field procedure and DOM actions; target placement is test setup',runtimeRoot:process.env.WE3D_VERIFY_ROOT||'.',checks:{}};
+const report={ok:false,evidence:'Earth runtime; real field procedure and DOM actions; target placement is test setup',runtimeRoot:process.env.WE3D_VERIFY_ROOT||'.',checks:{},providerDegradations:[]};
 try {
  identity=await stagingCaptureAttestation();
  const credential=path.join(privateDir,'credential.json');
@@ -27,7 +27,13 @@ try {
  const context=await browser.newContext({viewport:{width:1440,height:900}});
  page=await context.newPage();
  page.on('pageerror',e=>errors.push(String(e)));
- page.on('response',r=>{if(r.url().startsWith(base)&&r.status()>=400)failedLocal.push({url:r.url(),status:r.status()});});
+ page.on('response',r=>{
+  const url=new URL(r.url());
+  if(url.origin!==base||r.status()<400)return;
+  if(process.env.WE3D_SANDBOX_LOCAL_PLACE_UNAVAILABLE==='1'&&r.status()===503&&['/api/geospatial/search','/api/geospatial/reverse'].includes(url.pathname)) {
+   report.providerDegradations.push({path:url.pathname,status:r.status(),scope:'Optional loopback naming emulator unavailable; no location-search acceptance'});
+  } else failedLocal.push({url:r.url(),status:r.status()});
+ });
  await configureStagingAppCheck(page,base);
  const url=`${base}/app/?loc=custom&lat=39.2904&lon=-76.6122&lname=Baltimore&launch=earth&gm=free&mode=walking`;
  const ready=async()=>{
@@ -40,6 +46,17 @@ try {
  await page.goto(url,{waitUntil:'domcontentloaded'});await ready();
  await page.evaluate(async()=>{const{ctx}=await import('/app/js/shared-context.js?v=55');ctx.setTimeOfDay?.('day');ctx.setWeatherMode?.('clear');});
  if(process.env.WE3D_SANDBOX_FLOWER_ONLY !== '1') {
+ await page.locator('#backpackBtn').click();
+ await page.locator('#fBackpack').click();
+ await page.locator('#urbanEquipment.show').waitFor({state:'visible'});
+ await page.locator('#urbanEquipmentSlots [data-equipment-id]').nth(1).click();
+ await page.locator('#urbanBackpackDetail [data-backpack-action="equip"]').click();
+ assert.equal(await page.evaluate(()=>globalThis.__sandboxTestContext.urbanSandboxRuntime.equipment.summary().equipped.catalogId),'flashlight');
+ await page.locator('#urbanEquipmentSlots [data-equipment-id]').first().click();
+ await page.locator('#urbanBackpackDetail [data-backpack-action="equip"]').click();
+ await page.screenshot({path:`${out}/desktop-backpack.png`});
+ await page.locator('#urbanEquipmentCloseBtn').click();
+ report.checks.backpackEquipmentActions=true;
  await page.locator('#exploreBtn').click();await page.locator('#fWorldDiscovery').click();
  await page.locator('[data-sandbox-path="explore"]').click();
  assert.match(await page.locator('#sandboxPathSteps').innerText(), /record the finding/);

@@ -48,7 +48,7 @@ function createEquipmentInventory(options = {}) {
   backpack.registerDefinitions(EQUIPMENT_DEFINITIONS);
   for (const definition of EQUIPMENT_DEFINITIONS.filter((entry) => acquired.has(entry.id))) {
     if (!backpack.has(definition.id)) backpack.upsertItem(starterItem(definition), { silent: true });
-    if (Number.isInteger(definition.slot) && !backpack.snapshot().hotbar[definition.slot - 1]) {
+    if (Number.isInteger(definition.slot) && !backpack.summary().hotbar[definition.slot - 1]) {
       backpack.assignHotbar(definition.slot, definition.id, { silent: true });
     }
   }
@@ -67,6 +67,12 @@ function createEquipmentInventory(options = {}) {
   });
   const lastUseAtByEquipment = new Map();
   let flashlightEnabled = false;
+  function present(item) {
+    if (!item) return null;
+    const rounds=ammo.get(item.catalogId);
+    return Object.freeze({...item,slot:item.hotbarSlot,magazine:rounds?.magazine??null,
+      reserve:rounds?.reserve??null,quantity:quantities.get(item.catalogId)??item.quantity??null});
+  }
 
   const snapshot = () => {
     const base = backpack.snapshot();
@@ -74,16 +80,7 @@ function createEquipmentInventory(options = {}) {
       ...base,
       equippedId: base.equippedCatalogId,
       flashlightEnabled,
-      items: Object.freeze(base.items.map((item) => {
-        const rounds = ammo.get(item.catalogId);
-        return Object.freeze({
-          ...item,
-          slot: item.hotbarSlot,
-          magazine: rounds?.magazine ?? null,
-          reserve: rounds?.reserve ?? null,
-          quantity: quantities.get(item.catalogId) ?? item.quantity ?? null
-        });
-      }))
+      items: Object.freeze(base.items.map(present))
     });
   };
 
@@ -97,6 +94,14 @@ function createEquipmentInventory(options = {}) {
     type: 'CharacterBackpackEquipmentAdapter',
     backpack,
     snapshot,
+    summary() { const base=backpack.summary();return Object.freeze({...base,equipped:present(base.equipped),hotbar:Object.freeze(base.hotbar.map(present))}); },
+    page(options) { const base=backpack.page(options);return Object.freeze({...base,items:Object.freeze(base.items.map(present))}); },
+    item(identity) { return present(backpack.present(identity)); },
+    exportControls() {
+      const summary=backpack.summary();
+      return {revision:summary.revision,equippedInstanceId:summary.equippedInstanceId,hotbar:summary.hotbar.map(item=>item?.instanceId||null),
+        ammo:Object.fromEntries([...ammo.entries()].map(([id,rounds])=>[id,{...rounds}])),quantities:Object.fromEntries(quantities)};
+    },
     exportState: () => ({
       ...backpack.exportState(),
       ammo: Object.fromEntries([...ammo.entries()].map(([id, rounds]) => [id, { ...rounds }])),
@@ -115,8 +120,8 @@ function createEquipmentInventory(options = {}) {
     assignHotbar(slot, id) { return backpack.assignHotbar(slot, id); },
     consumeItem(id, quantity = 1) { return backpack.consume(id, quantity); },
     cycle(direction = 1) {
-      const state = backpack.snapshot();
-      const available = state.hotbar.filter(Boolean);
+      const state = backpack.summary();
+      const available = state.hotbar.filter(Boolean).map(item=>item.instanceId);
       if (!available.length) return equippedDefinition();
       const current = Math.max(0, available.indexOf(state.equippedInstanceId));
       const next = available[(current + (direction < 0 ? -1 : 1) + available.length) % available.length];
