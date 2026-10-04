@@ -54,19 +54,20 @@ const geoToWorld = (lat, lon) => {
     z: -local.northMeters * WORLD_UNITS_PER_METER
   };
 };
-const worldToGeo = (x, z) => {
+const worldToGeo = (x, z, result = {}) => {
   if (!usesPolarLocalProjection()) {
-    return {
-      lat: LOC.lat - z / SCALE,
-      lon: LOC.lon + x / (SCALE * Math.cos(LOC.lat * Math.PI / 180))
-    };
+    result.lat = LOC.lat - z / SCALE;
+    result.lon = LOC.lon + x / (SCALE * Math.cos(LOC.lat * Math.PI / 180));
+    return result;
   }
   const geographic = localEnuToGeographic(localProjectionFrame(), {
     eastMeters: Number(x) / WORLD_UNITS_PER_METER,
     northMeters: -Number(z) / WORLD_UNITS_PER_METER,
     upMeters: 0
   });
-  return { lat: geographic.latitude, lon: geographic.longitude };
+  result.lat = geographic.latitude;
+  result.lon = geographic.longitude;
+  return result;
 };
 
 // =====================
