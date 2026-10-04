@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { selectBodySafeCamera, vehicleCameraProbeRadius } from '../app/js/hud/vehicle-camera-body.js';
+import { selectBodySafeCamera, vehicleCameraProbeRadius, vehicleRoofOrbitPoint } from '../app/js/hud/vehicle-camera-body.js';
 import {setCabinNearClip} from '../app/js/hud/driving-cabin-camera.js';
 
 test('cabin near plane is scoped and restored without per-frame projection churn',()=>{
@@ -34,4 +34,14 @@ test('a low roof cannot push the exterior camera back into the vehicle', () => {
 test('a normal rear view is preserved and resumes after the obstruction', () => {
   const desired = { x: 0, y: 2, z: -6 };
   assert.deepEqual(selectBodySafeCamera(desired, [], body, () => false), { point: desired, mode: 'chase' });
+});
+
+test('roof clearance preserves requested orbit heading and avoids a vertical chase view', () => {
+  const roof={x:12,y:3,z:-4};
+  for(const angle of [-2.4,-1.2,0,1.2,2.4]) {
+    const point=vehicleRoofOrbitPoint(roof,angle);
+    assert.ok(Math.abs(Math.hypot(point.x-roof.x,point.z-roof.z)-2)<1e-9);
+    assert.ok(Math.abs(Math.atan2(roof.x-point.x,roof.z-point.z)-angle)<1e-9);
+    assert.equal(point.y,roof.y);
+  }
 });

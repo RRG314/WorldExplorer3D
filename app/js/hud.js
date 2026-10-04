@@ -11,7 +11,7 @@ import {
 import { resolveChaseCameraTerrainCollision } from "./hud/chase-camera-terrain.js?v=1";
 import { resolveTunnelCameraState } from "./hud/tunnel-camera-controller.js?v=6";
 import { resolveTunnelCameraBoom } from './hud/tunnel-camera-boom.js';
-import { createVehicleCameraBody, selectBodySafeCamera, vehicleCameraProbeRadius } from './hud/vehicle-camera-body.js';
+import { createVehicleCameraBody, selectBodySafeCamera, vehicleCameraProbeRadius, vehicleRoofOrbitPoint } from './hud/vehicle-camera-body.js';
 import { applyDrivingCabinCamera, setCabinNearClip } from './hud/driving-cabin-camera.js';
 import { cameraSmoothingBlend } from "./controls/traversal-control-policy.js?v=8";
 import { beginCameraFollowFrame, cameraFollowHistory, smoothMovingCameraTarget } from "./hud/moving-camera-target.js";
@@ -549,6 +549,33 @@ function updateCamera(dt = 1 / 60) {
       collisionTarget.collided ||= safe.collided;
     }
 
+    const body = createVehicleCameraBody(typeof THREE === 'undefined' ? null : THREE, appCtx.carMesh, cameraRadius);
+    const anchor = { x: lookX, y: lookY, z: lookZ };
+    const isClear = point => {
+      if (insideTunnel) {
+        const probe = resolveTunnelCameraBoom(tunnelCameraState.road, anchor, point, cameraRadius, sampleOutsideTunnelTerrain);
+        if (probe.collided) return false;
+      } else {
+        const terrain = planetaryChase
+          ? planetarySurfaceYAtRenderXZ(appCtx, point.x, point.z)
+          : appCtx.SurfaceQuery?.terrainAt?.(point.x, point.z)?.position?.y;
+        if (Number.isFinite(terrain) && point.y < terrain + cameraRadius) return false;
+      }
+      if (!planetaryChase && appCtx.cameraRoadSurfaceCollision?.(point.x,point.y,point.z,cameraRadius)) return false;
+      return appCtx.checkBuildingCollision?.(point.x, point.z, cameraRadius,
+        { actorBaseY: point.y - cameraRadius, actorHeight: cameraRadius * 2 })?.collision !== true;
+    };
+    // Resolve a retracted target before smoothing. Otherwise smoothing toward
+    // the body and snapping onto its roof repeats every few frames.
+    let roof = null;
+    const retractedTarget = {x:targetX,y:targetY,z:targetZ};
+    if (body?.contains(retractedTarget)) roof = vehicleRoofOrbitPoint(body.roofPoint(), viewAngle);
+    const targetChoice = selectBodySafeCamera(retractedTarget, roof ? [roof] : [], body, isClear);
+    if (targetChoice.mode === 'clearance-chase') {
+      targetX = targetChoice.point.x; targetY = targetChoice.point.y; targetZ = targetChoice.point.z;
+      collisionTarget.collided = true;
+    }
+
     // Follow the path through this frame, so 16/33 ms frames do not alternate
     // the camera's lag. Retraction retains its existing collision response.
     const followRate = collisionTarget.collided ? 42 : CHASE_CAMERA_SMOOTH_RATE;
@@ -587,25 +614,10 @@ function updateCamera(dt = 1 / 60) {
     // not to put the camera inside the actual attached vehicle. Prefer an
     // outside-body roof view; a genuinely confined space uses first person
     // temporarily without changing the player's selected camera mode.
-    const body = createVehicleCameraBody(typeof THREE === 'undefined' ? null : THREE, appCtx.carMesh, cameraRadius);
-    const anchor = { x: lookX, y: lookY, z: lookZ };
-    const isClear = point => {
-      if (insideTunnel) {
-        const probe = resolveTunnelCameraBoom(tunnelCameraState.road, anchor, point, cameraRadius, sampleOutsideTunnelTerrain);
-        if (probe.collided) return false;
-      } else {
-        const terrain = planetaryChase
-          ? planetarySurfaceYAtRenderXZ(appCtx, point.x, point.z)
-          : appCtx.SurfaceQuery?.terrainAt?.(point.x, point.z)?.position?.y;
-        if (Number.isFinite(terrain) && point.y < terrain + cameraRadius) return false;
-      }
-      if (!planetaryChase && appCtx.cameraRoadSurfaceCollision?.(point.x,point.y,point.z,cameraRadius)) return false;
-      return appCtx.checkBuildingCollision?.(point.x, point.z, cameraRadius,
-        { actorBaseY: point.y - cameraRadius, actorHeight: cameraRadius * 2 })?.collision !== true;
-    };
-    const roof = body?.contains(appCtx.camera.position) ? body.roofPoint() : null;
-    const choice = selectBodySafeCamera(appCtx.camera.position, [{x:targetX,y:targetY,z:targetZ}, ...(roof ? [roof] : [])], body, isClear);
-    appCtx.camera.userData.vehicleClearanceMode = choice.mode;
+    if (!roof && body?.contains(appCtx.camera.position)) roof = vehicleRoofOrbitPoint(body.roofPoint(), viewAngle);
+    const choice = targetChoice.mode === 'clearance-first-person' ? targetChoice
+      : selectBodySafeCamera(appCtx.camera.position, [{x:targetX,y:targetY,z:targetZ}, ...(roof ? [roof] : [])], body, isClear);
+    appCtx.camera.userData.vehicleClearanceMode = choice.mode === 'chase' ? targetChoice.mode : choice.mode;
     if (choice.mode === 'clearance-chase') {
       appCtx.camera.position.copy(choice.point);
       appCtx.camera.lookAt(lookX, lookY, lookZ);

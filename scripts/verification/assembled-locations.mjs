@@ -153,10 +153,17 @@ try {
       }, null, { timeout: 360000, polling: 500 });
       await page.waitForTimeout(3000);
 
-      const snapshot = await page.evaluate(() => {
+      const snapshot = await page.evaluate(async () => {
+        const {ctx}=await import('/app/js/shared-context.js?v=55');
+        const roadPublication=ctx.transportSurfacePublication;
+        const roadCounts={
+          published:{meshes:roadPublication?.meshCount,vertices:roadPublication?.vertices,triangles:roadPublication?.triangles},
+          actual:(ctx.roadMeshes||[]).reduce((total,mesh)=>({meshes:total.meshes+1,vertices:total.vertices+(mesh.geometry.attributes.position?.count||0),triangles:total.triangles+(mesh.geometry.getIndex()?.count||0)/3}),{meshes:0,vertices:0,triangles:0})
+        };
         const diagnostics = globalThis.getWorldExplorerRuntimeDiagnostics?.() || {};
         return {
           environment: diagnostics.environment,
+          roadCounts,
           worldCounts: diagnostics.worldCounts || {},
           transportContinuity: diagnostics.transportStructures?.junctionContinuity || null,
           transportNetwork: diagnostics.transportStructures?.transportNetwork || null,
@@ -207,6 +214,7 @@ try {
         directAtGradeContactAligned;
       const checks = {
         earthOwnsRuntime: snapshot.environment === 'EARTH',
+        streamedRoadCountsMatchGeometry: ['meshes','vertices','triangles'].every(key=>snapshot.roadCounts.published[key]===snapshot.roadCounts.actual[key]),
         terrainAndRoadsPublished:
           snapshot.surfaceChain?.surfaces?.terrain?.kind === 'terrain' &&
           Number.isFinite(Number(snapshot.surfaceChain?.surfaces?.terrain?.y)) &&

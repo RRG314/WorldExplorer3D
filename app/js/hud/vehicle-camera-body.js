@@ -56,3 +56,10 @@ export function selectBodySafeCamera(desired, candidates, body, isClear) {
   // outside-body pose fits. Never publish a third-person pose inside the mesh.
   return { point: null, mode: 'clearance-first-person' };
 }
+
+// Keep a roof fallback behind the requested viewing direction. A centered
+// roof pose makes lookAt nearly vertical, so touch yaw disappears and tiny
+// suspension changes can flip the camera heading.
+export function vehicleRoofOrbitPoint(roof, viewAngle, distance = 2) {
+  return { x: roof.x - Math.sin(viewAngle) * distance, y: roof.y, z: roof.z - Math.cos(viewAngle) * distance };
+}

@@ -3,6 +3,7 @@ import { mkdir } from 'node:fs/promises';
 import path from 'node:path';
 import { chromium, devices } from 'playwright';
 import { startStaticServer } from './static-server.mjs';
+import {configureStagingAppCheck} from './staging-app-check.mjs';
 
 const root = process.cwd();
 const requestedRoot = String(process.env.WE3D_VERIFY_ROOT || '').trim();
@@ -21,12 +22,16 @@ page.on('response', (response) => {
 });
 
 try {
+  await configureStagingAppCheck(page,baseUrl);
   await page.goto(`${baseUrl}/`, { waitUntil: 'load', timeout: 120_000 });
   await page.locator('#landingPrimaryCta').click();
   await page.waitForFunction(() => globalThis.__WE3D_RUNTIME_READY__ === true, null, { timeout: 120_000 });
   await page.waitForSelector('#globeSelectorScreen.show', { timeout: 60_000 });
   const analytics = page.locator('#analyticsConsentDenyBtn');
   if (await analytics.isVisible()) await analytics.click();
+  await page.locator('#globeCustomLat').fill('-18.2861');
+  await page.locator('#globeCustomLon').fill('147.7');
+  await page.locator('#globeCustomLon').press('Tab');
   await page.locator('#globeSelectorOceanBtn').click();
   await page.waitForFunction(() => {
     const diagnostics = globalThis.getWorldExplorerRuntimeDiagnostics?.() || {};
@@ -34,7 +39,11 @@ try {
     return diagnostics.environment === 'OCEAN' && diagnostics.modes?.ocean === true &&
       ocean.active === true && ocean.underwaterSchoolCount > 0 && ocean.underwaterFishCount > 0;
   }, null, { timeout: 180_000 });
+  const fishPose=()=>page.evaluate(async()=>{const {ctx}=await import('/app/js/shared-context.js?v=55');return ctx.oceanMode.fishEntities.map(f=>({id:f.mesh.uuid,x:f.mesh.position.x,y:f.mesh.position.y,z:f.mesh.position.z,tail:f.tail?.rotation.y??null}));});
+  const fishBefore=await fishPose();
   await page.waitForTimeout(2_000);
+  const fishAfter=await fishPose();
+  const animatedFish=fishAfter.filter((f,i)=>f.id===fishBefore[i]?.id&&Math.hypot(f.x-fishBefore[i].x,f.y-fishBefore[i].y,f.z-fishBefore[i].z)>.05).length;
   const underwater = await page.evaluate(() => ({
     diagnostics: globalThis.getWorldExplorerRuntimeDiagnostics?.() || {},
     ocean: globalThis.getOceanModeDebugState?.() || {},
@@ -68,6 +77,7 @@ try {
       underwater.ocean.underwaterSchoolCount <= 5 &&
       underwater.ocean.underwaterSpeciesIds.length === underwater.ocean.underwaterSchoolCount &&
       new Set(underwater.ocean.underwaterSpeciesIds).size === underwater.ocean.underwaterSpeciesIds.length,
+    fishActuallySwim: animatedFish>0,
     visibleFishUseSchoolPlan: underwater.ocean.underwaterFishCount > underwater.ocean.underwaterSchoolCount,
     honestPopulationTruth: underwater.ocean.fishPopulationEvidence === 'gameplay-model-only' &&
       underwater.ocean.fishLivePresenceClaim === false,
@@ -78,7 +88,7 @@ try {
     noBrowserErrors: browserErrors.length === 0,
     noFailedLocalResources: localFailures.length === 0
   };
-  const report = { ok: Object.values(checks).every(Boolean), contract: 'underwater-water-fish-authority-v2', checks, underwater, recovered, browserErrors, localFailures };
+  const report = { ok: Object.values(checks).every(Boolean), contract: 'underwater-water-fish-authority-v2', checks, animatedFish, underwater, recovered, browserErrors, localFailures };
   console.log(JSON.stringify(report, null, 2));
   assert.equal(report.ok, true, 'Underwater fish authority journey failed.');
 } finally {

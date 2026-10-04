@@ -5,13 +5,14 @@ import {mkdtemp, mkdir, writeFile, rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import path from 'node:path';
 import {chromium} from 'playwright';
+import {closeOwnedBrowser} from './owned-browser.mjs';
 import {startStaticServer} from './static-server.mjs';
 import {stagingCaptureAttestation} from './staging-capture-attestation.mjs';
 import {configureStagingAppCheck} from './staging-app-check.mjs';
 const out=process.env.WE3D_SANDBOX_FLOWER_ONLY === '1' ? 'output/verification/sandbox-flower-result' : 'output/verification/sandbox-first-session';
 await mkdir(out,{recursive:true});
 const privateDir=await mkdtemp(path.join(tmpdir(),'we3d-sandbox-'));
-let identity,server,browser,page;
+let identity,server,browser,browserServer,page;
 const errors=[];const failedLocal=[];
 const report={ok:false,evidence:'Earth runtime; real field procedure and DOM actions; target placement is test setup',runtimeRoot:process.env.WE3D_VERIFY_ROOT||'.',checks:{}};
 try {
@@ -21,7 +22,8 @@ try {
  process.env.WE3D_STAGING_APP_CHECK_FILE=credential;
  server=await startStaticServer({rootDir:process.env.WE3D_VERIFY_ROOT||process.cwd(),ports:[4476]});
  const base=`http://127.0.0.1:${server.port}`;
- browser=await chromium.launch({headless:true,channel:'chrome'});
+ browserServer=await chromium.launchServer({headless:true,channel:'chrome'});
+ browser=await chromium.connect(browserServer.wsEndpoint());
  const context=await browser.newContext({viewport:{width:1440,height:900}});
  page=await context.newPage();
  page.on('pageerror',e=>errors.push(String(e)));
@@ -158,15 +160,23 @@ try {
   Object.assign(ctx.Walk.state.walker,{x:marker.position.x,y:marker.position.y,z:marker.position.z});
   return {mode:ctx.Walk.state.mode,droneMode:ctx.droneMode,walker:{x:ctx.Walk.state.walker.x,y:ctx.Walk.state.walker.y,z:ctx.Walk.state.walker.z},marker:{x:marker.position.x,y:marker.position.y,z:marker.position.z}};
  });
- await page.waitForFunction(()=>globalThis.__sandboxSavedResults.some(result=>result.name==='Flower Sprint completed'),null,{timeout:20000});
- await page.evaluate(()=>globalThis.__sandboxTestContext.openWorldDiscoverySection('today'));
- assert.match(await page.locator('#discoveryResultCard').innerText(),/Flower Sprint completed/i);
+ await page.waitForFunction(()=>globalThis.__sandboxSavedResults.some(result=>result.name==='Flower found!'),null,{timeout:20000});
+ await page.waitForFunction(()=>globalThis.__sandboxTestContext.getGameResultSnapshot()?.status==='saved');
+ assert.match(await page.locator('#resultTitle').innerText(),/Flower found!/i);
+ const flowerRecords=await page.evaluate(async()=> (await globalThis.__sandboxTestContext.discoveryProfileStore.listEvents()).filter(event=>event.activityId==='game-flower-sprint-completion'));
+ assert.equal(flowerRecords.length,1,'The actual Journal holds exactly one flower completion');
+ assert.equal(flowerRecords[0].name,'Flower found!');
+ report.flowerJournal=flowerRecords[0].eventId;
  await page.screenshot({path:`${out}/flower-result.png`});
- assert.equal(await page.evaluate(()=>globalThis.__sandboxSavedResults.filter(result=>result.name==='Flower Sprint completed').length),1,'One completion publishes one receipt');
- assert.match(await page.evaluate(()=>globalThis.__sandboxSavedResults.find(result=>result.name==='Flower Sprint completed').hudAtReceipt),/Flower found/,'The HUD must acknowledge completion before the Journal receipt');
+ assert.equal(await page.evaluate(()=>globalThis.__sandboxSavedResults.filter(result=>result.name==='Flower found!').length),1,'One completion publishes one receipt');
+ assert.match(await page.evaluate(()=>globalThis.__sandboxSavedResults.find(result=>result.name==='Flower found!').hudAtReceipt),/Flower found/,'The HUD must acknowledge completion before the Journal receipt');
  report.checks.flowerSprintReceipt=true;
  report.errors=errors;report.failedLocal=failedLocal;assert.deepEqual(errors,[]);assert.deepEqual(failedLocal,[]);
  report.ok=true;
 } catch(error){report.errors=errors;report.failedLocal=failedLocal;report.error=String(error.stack||error);if(page){await page.screenshot({path:`${out}/failure.png`}).catch(()=>{});report.state=await page.evaluate(()=>{const d=globalThis.getWorldExplorerRuntimeDiagnostics?.();return {worldLoading:d?.worldLoading,environment:d?.environment,interaction:d?.worldDiscovery?.interaction,loading:document.getElementById('loading')?.textContent,flower:{mode:globalThis.__sandboxTestContext?.Walk?.state?.mode,walker:{x:globalThis.__sandboxTestContext?.Walk?.state?.walker?.x,y:globalThis.__sandboxTestContext?.Walk?.state?.walker?.y,z:globalThis.__sandboxTestContext?.Walk?.state?.walker?.z},marker:globalThis.__sandboxTestContext?.scene?.getObjectByName('redFlowerChallenge')?.position,backend:globalThis.__sandboxTestContext?.getFlowerChallengeBackendStatus?.(),receipts:globalThis.__sandboxSavedResults}};}).catch(()=>null);}throw error;}
-finally{await writeFile(`${out}/report.json`,JSON.stringify(report,null,2));await browser?.close();await server?.close();try{await identity?.cleanup();}finally{await rm(privateDir,{recursive:true,force:true});}}
+finally{
+ await writeFile(`${out}/report.json`,JSON.stringify(report,null,2));
+ try {if(browserServer)await closeOwnedBrowser(browserServer);}
+ finally {try{await server?.close();}finally{try{await identity?.cleanup();}finally{await rm(privateDir,{recursive:true,force:true});}}}
+}
 console.log(JSON.stringify(report,null,2));

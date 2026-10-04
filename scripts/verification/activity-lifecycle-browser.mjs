@@ -22,6 +22,17 @@ export async function verifyActivities(page,dir){
  await page.evaluate(()=>window.activityReject=false);await page.locator('#activityDiscoveryRetrySave').click();await page.waitForFunction(id=>activityRuntime.getCompletionStatus(id).status==='saved',route.id);
  report.completion=await page.evaluate(id=>activityRuntime.getCompletionState(id),route.id);assert.equal(report.completion.count,1);report.cases.push('actual completion remains unsaved until retry accepted');
  report.journal=await page.evaluate(async id=>{const db=await new Promise((resolve,reject)=>{const r=indexedDB.open('world-explorer-discovery');r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error)});try{return await new Promise((resolve,reject)=>{const r=db.transaction('events').objectStore('events').get(`event:activity-completed:${id}:1`);r.onsuccess=()=>resolve(r.result?{eventId:r.result.eventId,points:r.result.progress?.points}:null);r.onerror=()=>reject(r.error)})}finally{db.close()}},route.id);assert.ok(report.journal);assert.equal(report.journal.points,2);
+ // Hold a focused action through two automatic catalog refreshes. Replacing
+ // identical HTML used to detach the player's target and lose keyboard focus.
+ const replay=page.locator('#activityDiscoveryReplayAction');
+ await replay.scrollIntoViewIfNeeded();await replay.focus();
+ await page.evaluate(()=>window.activityStableReplay=document.getElementById('activityDiscoveryReplayAction'));
+ await page.waitForTimeout(4800);
+ assert.equal(await page.evaluate(()=>activityStableReplay===document.getElementById('activityDiscoveryReplayAction')&&document.activeElement===activityStableReplay),true,'Unchanged activity actions retain DOM identity and focus across refresh');
+ for(const selector of ['#activityDiscoveryReplayAction','#activityDiscoveryPrimaryAction']){
+  const bounds=await page.locator(selector).boundingBox();assert.ok(bounds&&bounds.height>=44&&bounds.width>=44,selector+' must have a 44px touch target');
+ }
+ report.cases.push('phone actions stay focused and attached across refresh and meet 44px touch size');
  await page.screenshot({path:`${dir}/activity-phone-saved.png`});
  await page.setViewportSize({width:1440,height:900});await page.evaluate(()=>swimCtx.closeActivityBrowser());await stageStart();
  await page.evaluate(r=>{activityRuntime.startActivity({...r,id:'acceptance-other-route'});activityRuntime.stopActivity();swimCtx.openActivityBrowser({activityId:r.id})},route);await page.locator('#activityDiscoveryReplayAction').click();

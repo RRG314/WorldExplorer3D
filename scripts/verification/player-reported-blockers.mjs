@@ -282,7 +282,10 @@ try {
   observe(oceanMobile);
   await oceanMobile.goto(`${baseUrl}/app/`, { waitUntil: 'load', timeout: 120_000 });
   await waitForRuntime(oceanMobile);
-  await selectBaltimore(oceanMobile);
+  // Ocean entry now requires water/depth authority; city-center land must be rejected.
+  await oceanMobile.locator('#globeCustomLat').fill('-18.2861');
+  await oceanMobile.locator('#globeCustomLon').fill('147.7');
+  await oceanMobile.locator('#globeCustomLon').press('Tab');
   if (softwareCi) await selectLowRenderQuality(oceanMobile);
   await oceanMobile.locator('#globeSelectorOceanBtn').click();
   await oceanMobile.waitForFunction(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().activeActor?.mode === 'ocean', null, { timeout: 120_000 });

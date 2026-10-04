@@ -6,8 +6,8 @@ const server = await startStaticServer({ rootDir: process.env.WE3D_VERIFY_ROOT |
 const browser = await chromium.launch({ channel: 'chrome', headless: true });
 const dir = 'output/verification/product-plan/habitat';
 await fs.mkdir(dir, { recursive: true });
-const report = { scope: 'Mutable source, real UI and ocean renderer; controlled provider responses for entry boundary cases', cases: [], errors: [] };
-let page;
+const report = { scope: 'Actual app UI and ocean renderer from selected runtime root; controlled providers. Separate source fixture for resource lifetime and asset outage.', runtimeRoot: process.env.WE3D_VERIFY_ROOT || '.', fixtureScope: 'source component only', cases: [], errors: [] };
+let page, fixtureServer;
 try {
  const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
  let elevation = -30, delay = 0;
@@ -70,7 +70,8 @@ try {
  await page.setViewportSize({width:390,height:844});await page.waitForTimeout(200);await page.screenshot({path:`${dir}/phone.png`});
  const panel=await page.locator('#oceanDiverControls').boundingBox();assert.ok(panel.x>=0&&panel.x+panel.width<=391&&panel.y+panel.height<650);
  report.cases.push({id:'phone-controls-fit-and-bounded-rendering',passed:true});
- await page.goto(`http://127.0.0.1:${server.port}/tests/fixtures/marine-habitat.html`);await page.waitForFunction(()=>window.ready===true);
+ fixtureServer=await startStaticServer({rootDir:process.cwd(),ports:[4397]});
+ await page.goto(`http://127.0.0.1:${fixtureServer.port}/tests/fixtures/marine-habitat.html`);await page.waitForFunction(()=>window.ready===true);
  report.cycles=[];for(let i=0;i<3;i++){await page.evaluate(()=>habitatTest.rebuild());report.cycles.push(await page.evaluate(()=>({memory:{...habitatTest.renderer.info.memory},cache:habitatTest.cache()})));}
  assert.deepEqual(report.cycles[0].memory,report.cycles[2].memory);
  assert.ok(report.cycles.every(c=>c.cache.entries.filter(a=>a.id.startsWith('marine-')).every(a=>a.leases===1)));
@@ -82,5 +83,5 @@ try {
  assert.equal(await page.evaluate(()=>habitatTest.habitat.group.children.filter(c=>c.name.includes('coral')).length),0);
  report.cases.push({id:'asset-outage-preserves-seabed-and-releases-partial-assets',passed:true});
  assert.deepEqual(report.errors,[]);report.passed=true;
-}catch(error){report.failure=error.message;report.ui=await page?.locator('body').innerText();await page?.screenshot({path:`${dir}/failure.png`});throw error;}finally{await fs.writeFile(`${dir}/browser.json`,JSON.stringify(report,null,2));await browser.close();await server.close();}
+}catch(error){report.failure=error.message;report.ui=await page?.locator('body').innerText();await page?.screenshot({path:`${dir}/failure.png`});throw error;}finally{await fs.writeFile(`${dir}/browser.json`,JSON.stringify(report,null,2));await browser.close();await server.close();await fixtureServer?.close();}
 console.log(JSON.stringify(report));

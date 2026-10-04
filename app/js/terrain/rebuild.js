@@ -858,14 +858,18 @@ export async function publishCompiledTransportMeshes(deps = {}) {
       if(!junctionsByRegion.has(key))junctionsByRegion.set(key,[]);
       junctionsByRegion.get(key).push(intersection);
     }
+    // Only this generation appends committed road batches. Keep exact counts
+    // incrementally instead of rescanning the growing world after each packet.
+    let detailVertices=appCtx.transportSurfacePublication.vertices;
+    let detailTriangles=appCtx.transportSurfacePublication.triangles;
     const updateSummary=complete=>{
       const previous=appCtx.transportSurfacePublication;
       if(!previous||!isCurrent())return;
       appCtx.transportSurfacePublication=Object.freeze({...previous,
         detailScope:complete?'complete-region':'starting-neighborhood-and-committed-regions',regionalDetailComplete:complete,
         meshCount:appCtx.roadMeshes.length,
-        vertices:appCtx.roadMeshes.reduce((sum,mesh)=>sum+(mesh.geometry.attributes.position?.count||0),0),
-        triangles:appCtx.roadMeshes.reduce((sum,mesh)=>sum+(mesh.geometry.getIndex()?.count||0)/3,0),
+        vertices:detailVertices,
+        triangles:detailTriangles,
         roadSurfaceIntegrity:Object.freeze({...roadSurfaceIntegrity})});
     };
     detail.attach(async packet=>{
@@ -920,6 +924,10 @@ export async function publishCompiledTransportMeshes(deps = {}) {
         regionalContact.add(packet.key,contact);
         for(const mesh of meshes)appCtx.addEarthWorldObject(mesh);
         appCtx.replaceWorldCollection('roadMeshes',[...appCtx.roadMeshes,...meshes]);
+        for(const mesh of meshes){
+          detailVertices+=mesh.geometry.attributes.position?.count||0;
+          detailTriangles+=(mesh.geometry.getIndex()?.count||0)/3;
+        }
         committed=true;
         roadSurfaceIntegrity.carriagewayRegions+=packet.keys.length;
         for(const [key,value] of Object.entries(junctionStats))roadSurfaceIntegrity[key]=key.startsWith('maximum')

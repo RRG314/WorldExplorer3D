@@ -3,6 +3,12 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { chromium } from 'playwright';
+import {startStaticServer} from './static-server.mjs';
+import {configureStagingAppCheck} from './staging-app-check.mjs';
+import {DEFAULT_CREW} from '../../app/js/expedition/catalog.js';
+import {createExpeditionPlan,withExpeditionChanges} from '../../app/js/expedition/model.js';
+import {startExpedition} from '../../app/js/expedition/simulation.js';
+import {SHIP_STATIONS} from '../../app/js/expedition/ship-layout.js';
 
 const baseUrl = String(process.env.WE3D_VERIFY_BASE_URL || 'http://127.0.0.1:4192').replace(/\/$/, '');
 const outputDir = path.resolve('output/verification/destination-mission-proxima-surface');
@@ -27,18 +33,10 @@ async function openSpace(page) {
 }
 
 async function beginProximaBMission(page) {
-  await page.evaluate(async () => {
-    const [{ DEFAULT_CREW }, { createExpeditionPlan, withExpeditionChanges }, { startExpedition }, { createExpeditionStore }] = await Promise.all([
-      import('/app/js/expedition/catalog.js?v=2'),
-      import('/app/js/expedition/model.js?v=11'),
-      import('/app/js/expedition/simulation.js?v=8'),
-      import('/app/js/expedition/store.js?v=11')
-    ]);
-    const planned = createExpeditionPlan({ destinationId: 'proxima-centauri', crew: DEFAULT_CREW, id: 'first-light-surface-verification', createdAtMs: 91_000 });
-    createExpeditionStore().save(withExpeditionChanges(startExpedition(planned, 91_100), {
-      state: 'arrived', progress: 1, voyagePhase: 'arrival', arrivalTransferState: 'pending'
-    }));
-  });
+  // Seed a normal saved voyage as setup; all mission actions run in the selected artifact.
+  const planned=createExpeditionPlan({destinationId:'proxima-centauri',crew:DEFAULT_CREW,id:'first-light-surface-verification',createdAtMs:91_000});
+  const arrived=withExpeditionChanges(startExpedition(planned,91_100),{state:'arrived',progress:1,voyagePhase:'arrival',arrivalTransferState:'pending'});
+  await page.evaluate(record=>localStorage.setItem('world-explorer:interstellar-expedition:v1',JSON.stringify(record)),arrived);
   await page.locator('#sfExpeditionBtn').click();
   await page.locator('#expeditionOverlay').waitFor({ state: 'visible' });
   await page.locator('#expeditionArrive').click();
@@ -82,13 +80,11 @@ async function enterPodBay(page) {
   await page.locator('#expeditionEnterShip').click();
   await page.waitForFunction(() => JSON.parse(globalThis.render_game_to_text?.() || '{}').expeditionShipInterior?.active === true);
   }
-  await page.evaluate(async () => {
+  await page.evaluate(async station => {
     const { ctx } = await import('/app/js/shared-context.js?v=55');
-    const { SHIP_STATIONS } = await import('/app/js/expedition/ship-layout.js');
-    const station = SHIP_STATIONS.find(entry => entry.id === 'craft-bay-status');
     ctx.switchSolisReachDeck(station.deckId);
     Object.assign(ctx.Walk.state.walker, { x: station.x, z: station.z, y:1.74, angle: 0, yaw: 0, lookYawOffset: 0, pitch: 0, vy: 0, onGround: true });
-  });
+  },SHIP_STATIONS.find(entry=>entry.id==='craft-bay-status'));
   await page.waitForTimeout(220);
   await page.keyboard.press('KeyE');
   await page.locator('[data-pod-mission]').waitFor({ state: 'visible', timeout:10000 }).catch(async error => {
@@ -98,11 +94,17 @@ async function enterPodBay(page) {
 }
 
 async function recordSurfaceActivity(page, activityId, failFirstSave = false) {
-  if(failFirstSave) await page.evaluate(async()=>{
-    const {ctx}=await import('/app/js/shared-context.js?v=55');
-    const {createIndexedDbDiscoveryProfileStore}=await import('/app/js/discovery/profile-store.js?v=5');
-    const original=ctx.discoveryProfileStore || createIndexedDbDiscoveryProfileStore();let fail=true;
-    ctx.discoveryProfileStore={...original,recordObservation:async(...args)=>{if(fail){fail=false;throw Error('injected field save failure');}return original.recordObservation(...args);}};
+  if(failFirstSave) await page.evaluate(()=>{
+    // Fail the real observation transaction once, without importing or replacing
+    // production stores. This exercises the packaged storage-error path.
+    const transaction=IDBDatabase.prototype.transaction;
+    IDBDatabase.prototype.transaction=function(stores,mode,...rest){
+      if(this.name==='world-explorer-discovery'&&mode==='readwrite'&&Array.from(stores).includes('claims')){
+        IDBDatabase.prototype.transaction=transaction;
+        throw new DOMException('Injected field save quota failure','QuotaExceededError');
+      }
+      return transaction.call(this,stores,mode,...rest);
+    };
   });
   await page.evaluate(async (id) => {
     const { ctx } = await import('/app/js/shared-context.js?v=55');
@@ -217,18 +219,13 @@ async function deployPodAndLand(page) {
     }, null, { timeout: 35_000 });
 }
 
-async function run() {
-  const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
-  const page = await context.newPage();
-  page.on('pageerror', (error) => failures.push(`pageerror: ${error.stack || error}`));
-  page.on('requestfailed', (request) => {
-    if (!request.url().startsWith(baseUrl)) return;
-    if (request.failure()?.errorText === 'net::ERR_ABORTED') cancelledResources.push(request.url());
-    else failures.push(`request failed: ${request.url()} ${request.failure()?.errorText}`);
-  });
-  page.on('response', (response) => { if (response.url().startsWith(baseUrl) && response.status() >= 400) failures.push(`${response.status()} ${response.url()}`); });
+async function verifySourceCatalog() {
+  const sourceServer=await startStaticServer({rootDir:process.cwd(),ports:[4397]});
+  const context=await browser.newContext();const page=await context.newPage();
+  page.on('pageerror',error=>failures.push(`source catalog: ${error.message}`));
   try {
-    await openSpace(page);
+    await page.goto(`http://127.0.0.1:${sourceServer.port}/app/`,{waitUntil:'domcontentloaded'});
+    await page.waitForFunction(()=>document.getElementById('startBtn')?.disabled===false,null,{timeout:120000});
     const surfaceCatalogProfiles = await page.evaluate(async () => {
       const { listDestinationMissions } = await import('/app/js/universe/mission-catalog.js?v=2');
       const { resolveUniverseAddress } = await import('/app/js/universe/catalog.js?v=11');
@@ -296,6 +293,24 @@ async function run() {
     const originalWorlds = surfaceCatalogProfiles.filter((profile) => profile.truthClass === 'fictional-game-world');
     assert.ok(originalWorlds.length >= 2, JSON.stringify(surfaceCatalogProfiles));
     assert.equal(originalWorlds.every((profile) => profile.atmosphereEvidence === 'fictional-game-world' && profile.weatherModelId !== 'none' && profile.pressurePa > 0), true, JSON.stringify(originalWorlds));
+    return {scope:'source catalog diversity component; not packaged gameplay',profiles:surfaceCatalogProfiles};
+  } finally {await context.close();await sourceServer.close();}
+}
+
+async function run() {
+  const surfaceCatalogProfiles=await verifySourceCatalog();
+  const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const page = await context.newPage();
+  await configureStagingAppCheck(page,baseUrl);
+  page.on('pageerror', (error) => failures.push(`pageerror: ${error.stack || error}`));
+  page.on('requestfailed', (request) => {
+    if (!request.url().startsWith(baseUrl)) return;
+    if (request.failure()?.errorText === 'net::ERR_ABORTED') cancelledResources.push(request.url());
+    else failures.push(`request failed: ${request.url()} ${request.failure()?.errorText}`);
+  });
+  page.on('response', (response) => { if (response.url().startsWith(baseUrl) && response.status() >= 400) failures.push(`${response.status()} ${response.url()}`); });
+  try {
+    await openSpace(page);
     await beginProximaBMission(page);
     assert.ok(await page.evaluate(() => localStorage.getItem('world-explorer:interstellar-expedition:v1')));
     await enterPodBay(page);
@@ -366,13 +381,11 @@ async function run() {
     });
     await page.screenshot({ path: path.join(outputDir, 'desktop-proxima-b-surface-complete.png'), fullPage: true });
     await returnSurfaceToShip(page);
-    await page.evaluate(async () => {
+    await page.evaluate(async station => {
       const { ctx } = await import('/app/js/shared-context.js?v=55');
-      const { SHIP_STATIONS } = await import('/app/js/expedition/ship-layout.js');
-      const station = SHIP_STATIONS.find(entry => entry.id === 'analysis-review');
       ctx.switchSolisReachDeck(station.deckId);
       Object.assign(ctx.Walk.state.walker, { x: station.x, z: station.z, y:1.74, angle: 0, yaw: 0, lookYawOffset: 0, pitch: 0, vy: 0, onGround: true });
-    });
+    },SHIP_STATIONS.find(entry=>entry.id==='analysis-review'));
     await page.waitForTimeout(220);
     await page.keyboard.press('KeyE');
     await page.locator('[data-complete-destination-analysis="cautious-baseline"]').waitFor({ state: 'visible' });
@@ -404,29 +417,9 @@ async function run() {
     await page.locator('#expeditionClose').click();
     const fictionalWorldProfile = await page.evaluate(async () => {
       const { ctx } = await import('/app/js/shared-context.js?v=55');
-      const { resolveUniverseAddress } = await import('/app/js/universe/catalog.js?v=11');
-      const { arriveAtSolidWorld, registerExpeditionSolidWorld } = await import('/app/js/planetary/solid-world-runtime.js?v=14');
-      const destination = resolveUniverseAddress('andromeda-explorer-a-b');
-      const system = resolveUniverseAddress(destination.parentFrameId);
-      let seed = 2166136261;
-      for (const character of destination.id) {
-        seed ^= character.charCodeAt(0);
-        seed = Math.imul(seed, 16777619);
-      }
-      registerExpeditionSolidWorld({
-        id: destination.id,
-        name: destination.name,
-        seed: seed >>> 0,
-        parentSystemId: system.id,
-        radiusEarth: destination.radiusEarth,
-        massEarth: destination.massEarth,
-        starMassSolar: system.physical?.hostMassSolar,
-        semiMajorAxisAu: destination.semiMajorAxisAu,
-        originalGameWorld: true,
-        context: 'Copper Dawn · original game-world field survey',
-        representation: 'Original World Explorer terrain, atmosphere, and weather model'
-      });
-      const arrived = await arriveAtSolidWorld(destination.id);
+      const destinationId='andromeda-explorer-a-b';
+      if(!ctx.prepareDestinationMissionSurface(destinationId))throw Error('Mission surface could not be prepared');
+      const arrived=await ctx.arriveAtSolidWorld(destinationId);
       const positions = ctx.activeSolidWorldSurface.geometry.attributes.position;
       let minElevation = Infinity;
       let maxElevation = -Infinity;
@@ -450,9 +443,7 @@ async function run() {
     assert.ok(fictionalWorldProfile.pressurePa > 0, JSON.stringify(fictionalWorldProfile));
     const nextWorldEquipment = await page.evaluate(async () => {
       const { ctx } = await import('/app/js/shared-context.js?v=55');
-      const { createDestinationMissionStore } = await import('/app/js/universe/mission-authority.js?v=3');
-      const { planetarySurveyEquipment } = await import('/app/js/universe/mission-progression.js?v=1');
-      const restored = planetarySurveyEquipment(createDestinationMissionStore().load());
+      const restored = ctx.getPlanetarySurveyEquipment();
       const photo = ctx.planetaryFieldActivitySnapshot().activities.find(entry => entry.activityId === 'photograph');
       Object.assign(ctx.Walk.state.walker, { x:photo.x+24, z:photo.z, y:photo.y+1.7, vy:0, onGround:true });
       const state=ctx.planetaryFieldActivitySnapshot();
@@ -471,8 +462,8 @@ async function run() {
     await openSpace(page);
     const restoredMission=await page.evaluate(async()=>{
       const {ctx}=await import('/app/js/shared-context.js?v=55');
-      const {createIndexedDbDiscoveryProfileStore}=await import('/app/js/discovery/profile-store.js?v=5');
-      const events=await createIndexedDbDiscoveryProfileStore().getEventsById(['event:destination-mission:proxima-centauri-b']);
+      const event=await new Promise((resolve,reject)=>{const request=indexedDB.open('world-explorer-discovery');request.onerror=()=>reject(request.error);request.onsuccess=()=>{const db=request.result;const tx=db.transaction('events','readonly');const read=tx.objectStore('events').get('event:destination-mission:proxima-centauri-b');read.onsuccess=()=>resolve(read.result);read.onerror=()=>reject(read.error);tx.oncomplete=()=>db.close();};});
+      const events=event?[event]:[];
       return {phase:ctx.getDestinationMissionSnapshot()?.phase,equipment:ctx.getPlanetarySurveyEquipment?.(),reportCount:events.length};
     });
     assert.equal(restoredMission.phase,'complete');assert.equal(restoredMission.equipment.remoteRangeM,30);assert.equal(restoredMission.reportCount,1);

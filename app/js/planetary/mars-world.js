@@ -131,23 +131,6 @@ function loadMarsColorTexture() {
   });
 }
 
-function loadMarsReliefTexture() {
-  const asset = OLYMPUS_MONS_SURFACE_REGION.assets.find((entry) => entry.role === 'height');
-  return new Promise((resolve, reject) => {
-    new THREE.TextureLoader().load(
-      asset.url,
-      (texture) => {
-        texture.colorSpace = THREE.NoColorSpace;
-        texture.anisotropy = Math.min(4, appCtx.renderer?.capabilities?.getMaxAnisotropy?.() || 1);
-        texture.needsUpdate = true;
-        resolve(texture);
-      },
-      undefined,
-      () => reject(new Error(`Unable to load Mars relief asset: ${asset.url}`))
-    );
-  });
-}
-
 async function createMarsSurface() {
   const surfaceAuthority = ensurePlanetarySurfaceAuthority(appCtx);
   if (appCtx.marsSurface) {
@@ -161,10 +144,9 @@ async function createMarsSurface() {
   const publication = await surfaceAuthority.prepare(
     OLYMPUS_MONS_SURFACE_REGION.regionId,
     async () => {
-      const [dem, texture, reliefTexture] = await Promise.all([
+      const [dem, texture] = await Promise.all([
         loadMarsDemSample(),
-        loadMarsColorTexture(),
-        loadMarsReliefTexture()
+        loadMarsColorTexture()
       ]);
       if (!dem) throw new Error('Mars measured elevation asset is unavailable.');
       const geometry = new THREE.PlaneGeometry(MARS_SIZE, MARS_SIZE, MARS_SEGMENTS, MARS_SEGMENTS);
@@ -176,10 +158,11 @@ async function createMarsSurface() {
       positions.needsUpdate = true;
       geometry.computeVertexNormals();
 
+      // The measured DEM already supplies macro relief and its normals. Applying
+      // its quantized height image again as a bump map creates false contour
+      // lines at walking distance. Local regolith detail remains below.
       const material = new THREE.MeshStandardMaterial({
         map: texture,
-        bumpMap: reliefTexture,
-        bumpScale: 18,
         color: 0xffffff,
         roughness: 0.92,
         metalness: 0,

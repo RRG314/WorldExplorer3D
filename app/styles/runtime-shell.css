@@ -601,3 +601,7 @@ body.space-destination-details-open #spaceFlightHUD{visibility:hidden}
 
 #resultScreen .resultBox{box-sizing:border-box;max-width:calc(100vw - 24px);max-height:calc(100dvh - 32px);overflow-y:auto}
 @media(max-width:600px){#resultScreen .resultBox{width:calc(100vw - 24px);padding:24px}#resultScreen .pauseBtn{min-height:44px}}
+
+
+/* Activities share the same minimum touch target as other game controls. */
+.activityDiscoveryHeaderActions button,.activityDiscoveryDetailActions button,.activityDiscoveryPromptActions button,.activityRunHud button,.activityDiscoveryChipRow button{min-height:44px;min-width:44px;box-sizing:border-box}

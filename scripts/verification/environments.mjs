@@ -51,6 +51,11 @@ async function verifyDestination(destination) {
     await page.waitForSelector('#globeSelectorScreen.show', { timeout: 60000 });
     const consent = page.locator('#analyticsConsentDenyBtn');
     if (await consent.isVisible()) await consent.click();
+    if(destination.id==='ocean'){
+      await page.locator('#globeCustomLat').fill('-18.2861');
+      await page.locator('#globeCustomLon').fill('147.7');
+      await page.locator('#globeCustomLon').press('Tab');
+    }
     await page.locator(destination.selector).click();
     await page.waitForFunction((expected) => {
       const diagnostics = globalThis.getWorldExplorerRuntimeDiagnostics?.() || {};

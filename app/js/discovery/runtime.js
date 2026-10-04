@@ -877,8 +877,8 @@ function createDiscoveryUi(state) {
     };
     const controls = (isDetector ? detectorControls : fieldControls)[snapshot.phase] || ['Begin', 'Close'];
     if (elements.primary) {
-      elements.primary.textContent = controls[0];
-      elements.primary.disabled = snapshot.phase === 'excavating' || snapshot.phase === 'observing' || snapshot.phase === 'seeking';
+      elements.primary.textContent = state.activitySelectionPending ? 'Preparing tool…' : controls[0];
+      elements.primary.disabled = state.activitySelectionPending === true || snapshot.phase === 'excavating' || snapshot.phase === 'observing' || snapshot.phase === 'seeking';
     }
     if (elements.secondary) elements.secondary.textContent = controls[1];
   }
@@ -1255,6 +1255,10 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
       if(record.metadata?.resultOwner!=='game-result'){
       const hasResultCard = ['activity-completed', 'creation-saved', 'building-milestone', 'vehicle-route-completed'].includes(result.event?.eventType) && state.ui?.showResult?.(result);
       if (!hasResultCard) publishExplorerResult(result.event, profileStore);
+      } else {
+        // The game owns its result card, but tutorial and Journal observers
+        // still need the committed receipt. Do not create a second result UI.
+        publishExplorerResult(result.event, profileStore);
       }
       if (state.ui?.open) await state.ui.refreshData?.();
     }
@@ -1927,6 +1931,8 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
     await state.ui?.refreshData?.();
     return true;
   };
+  let activitySelectionGeneration = 0;
+  let committedActivityId = state.activeActivityId;
   state.selectActivity = async (activityId, options = {}) => {
     const id = String(activityId || 'inspect');
     const selectedAction = state.actions.find((action) => action.id === id);
@@ -1935,12 +1941,15 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
       appCtx.showToast?.(`${displayDiscoveryLabel(activityToolId)} unlocks at a later Explorer rank.`);
       return false;
     }
-    emitDiscoveryTelemetry('activity_started', {
+    if (options.telemetry !== false) emitDiscoveryTelemetry('activity_started', {
       activityId: id,
       discipline: selectedAction?.discipline,
       contextBands: telemetryContextBands(),
       liveGps: appCtx.liveGpsActive === true
     });
+    if (!state.activitySelectionPending) committedActivityId = state.activeActivityId;
+    const selectionGeneration = ++activitySelectionGeneration;
+    state.activitySelectionPending = id !== 'fish';
     if (id === 'fish') {
       await appCtx.openFishingGame?.();
       return true;
@@ -1948,11 +1957,25 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
     // Commit the visible selection before any IndexedDB/profile refresh. The
     // previous ordering left the old activity highlighted during the await,
     // so a single click could visibly bounce old → new several times.
-    const previousActivityId = state.activeActivityId;
+    const previousActivityId = committedActivityId;
     state.activeActivityId = id;
     state.applyCharacterCapability(id);
     state.ui.render(state.actions, state.lastSnapshot, state.activeActivityId);
-    if (activityToolId && await state.equipTool(activityToolId, { silent: true }) !== true) {
+    // A fast Begin click must not start a session that this async selection
+    // resets afterward; late selections must not replace the newest choice.
+    let equipped = true;
+    try { if (activityToolId) equipped = await state.equipTool(activityToolId, { silent: true }); }
+    catch {
+      // Equipment is applied synchronously; a later Journal refresh failure
+      // must not make the selected activity disagree with the actual tool.
+      equipped = state.equippedToolId === activityToolId;
+      if (!state.disposed && selectionGeneration === activitySelectionGeneration) {
+        appCtx.showToast?.(equipped ? 'Tool ready. Journal data could not refresh; reopen it to retry.' : 'The tool could not be prepared. Please try again.');
+      }
+    }
+    if (state.disposed || selectionGeneration !== activitySelectionGeneration) return false;
+    state.activitySelectionPending = false;
+    if (equipped !== true) {
       state.activeActivityId = previousActivityId;
       state.applyCharacterCapability(previousActivityId);
       state.ui.render(state.actions, state.lastSnapshot, state.activeActivityId);
@@ -1967,6 +1990,7 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
       state.fieldSession.reset();
       state.lastSnapshot = state.fieldSession.snapshot(playerPosition(appCtx));
     }
+    committedActivityId = id;
     state.presentation.setRevealed(null, false);
     state.presentation.setExcavation(null, 'idle');
     state.ui.showResult(null);
@@ -1995,8 +2019,7 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
       appCtx.showToast?.(`${displayDiscoveryLabel(toolId)} unlocks at a later Explorer rank.`);
       return false;
     }
-    if (toolId) await state.equipTool(toolId, { silent: true });
-    state.activeActivityId = activityId;
+    if (!await state.selectActivity(activityId, { openPanel: true, tutorial: false, telemetry: false })) return false;
     const characterCapability = state.applyCharacterCapability(activityId);
     state.session.reset();
     state.detectorSnapshot = state.session.snapshot(playerPosition(appCtx));
@@ -2032,8 +2055,7 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
       appCtx.showToast?.(`${displayDiscoveryLabel(toolId)} unlocks at a later Explorer rank.`);
       return false;
     }
-    if (toolId) await state.equipTool(toolId, { silent: true });
-    state.activeActivityId = lead.activityId;
+    if (!await state.selectActivity(lead.activityId, { openPanel: false, tutorial: false, telemetry: false })) return false;
     const characterCapability = state.applyCharacterCapability(lead.activityId);
     state.session.reset();
     state.detectorSnapshot = state.session.snapshot(position);
@@ -2069,6 +2091,7 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
     return true;
   };
   state.handlePrimary = async () => {
+    if (state.activitySelectionPending || state.disposed) return false;
     resumeDiscoveryAudio(state);
     const position = playerPosition(appCtx);
     if (state.activeActivityId !== 'metal-detect') {

@@ -166,6 +166,22 @@ function updateExternalState() {
   );
 }
 
+// Background catalog refreshes must not replace unchanged controls or live regions.
+const activityMarkup = new WeakMap();
+function publishActivityMarkup(host, markup) {
+  if (activityMarkup.get(host) === markup) return;
+  const focused = host.contains(document.activeElement) ? document.activeElement : null;
+  const id = focused?.id;
+  const attributes = ['data-activity-scope', 'data-activity-category', 'data-activity-select'];
+  const key = focused && attributes.find(name => focused.hasAttribute(name));
+  const value = key ? focused.getAttribute(key) : null;
+  host.innerHTML = markup;
+  activityMarkup.set(host, markup);
+  const replacement = id ? document.getElementById(id) : key
+    ? Array.from(host.querySelectorAll(`[${key}]`)).find(node => node.getAttribute(key) === value) : null;
+  if (replacement && host.contains(replacement) && !replacement.disabled) replacement.focus({preventScroll:true});
+}
+
 function cardHtml(activity = {}) {
   const distance = finiteNumber(activity.distanceMeters, 0);
   const completion = getCompletionState(activity.id);
@@ -188,12 +204,12 @@ function renderDetail() {
   if (!refsNow.detail) return;
   const activity = selectedActivity();
   if (!activity) {
-    refsNow.detail.innerHTML = `
+    publishActivityMarkup(refsNow.detail, `
       <div class="activityDiscoveryEmptyDetail">
         <div class="activityDiscoveryDetailTitle">Select an activity</div>
         <div class="activityDiscoveryDetailText">Choose a ready-to-play world activity or multiplayer room to inspect it and start.</div>
       </div>
-    `;
+    `);
     return;
   }
   const completion = getCompletionState(activity.id);
@@ -204,7 +220,7 @@ function renderDetail() {
   const roomActivityRunning = activity.sourceType === 'room_activity'
     && sanitizeText(appCtx.getCurrentMultiplayerRoomActivity?.()?.activityId || '', 120).toLowerCase() === sanitizeText(activity.id || '', 120).toLowerCase();
   const route = Array.isArray(activity.previewRoute) ? activity.previewRoute : [];
-  refsNow.detail.innerHTML = `
+  publishActivityMarkup(refsNow.detail, `
     <div class="activityDiscoveryDetailHead">
       <div class="activityDiscoveryDetailBadge" style="border-color:${escapeHtml(activity.color)};color:${escapeHtml(activity.color)}">${escapeHtml(activity.badge)}</div>
       <div class="activityDiscoveryDetailTitle">${escapeHtml(activity.title)}</div>
@@ -233,7 +249,7 @@ function renderDetail() {
       <div class="activityDiscoveryCompletionText" role="status">${escapeHtml(activityCompletionMessage(completion,getCompletionStatus(activity.id)))}</div>
       ${['retry','cache-retry'].includes(getCompletionStatus(activity.id).status)?'<div class="activityDiscoveryDetailActions"><button type="button" class="secondary" id="activityDiscoveryRetrySave">Retry Journal save</button></div>':''}
     </div>
-  `;
+  `);
 }
 
 function renderPrompt() {
@@ -276,22 +292,22 @@ function renderUi() {
   if (refsNow.search && refsNow.search.value !== state.search) refsNow.search.value = state.search;
   if (refsNow.sort && refsNow.sort.value !== state.sort) refsNow.sort.value = state.sort;
   if (refsNow.scope) {
-    refsNow.scope.innerHTML = [
+    publishActivityMarkup(refsNow.scope, [
       ['all', 'All'],
       ['nearby', 'Nearby'],
       ['featured', 'Featured'],
       ['rooms', 'Multiplayer']
-    ].map(([id, label]) => `<button type="button" class="${state.scope === id ? 'active' : ''}" data-activity-scope="${escapeHtml(id)}">${escapeHtml(label)}</button>`).join('');
+    ].map(([id, label]) => `<button type="button" class="${state.scope === id ? 'active' : ''}" data-activity-scope="${escapeHtml(id)}">${escapeHtml(label)}</button>`).join(''));
   }
   if (refsNow.categories) {
-    refsNow.categories.innerHTML = listDiscoveryCategories()
+    publishActivityMarkup(refsNow.categories, listDiscoveryCategories()
       .filter((entry) => entry.id !== 'nearby' && entry.id !== 'featured' && entry.id !== 'creator' && entry.id !== 'room')
       .map((entry) => `<button type="button" class="${state.categoryId === entry.id ? 'active' : ''}" data-activity-category="${escapeHtml(entry.id)}">${escapeHtml(entry.icon)} ${escapeHtml(entry.label)}</button>`)
-      .join('');
+      .join(''));
   }
   if (refsNow.featured) {
     const featured = featuredActivities();
-    refsNow.featured.innerHTML = featured.length > 0
+    publishActivityMarkup(refsNow.featured, featured.length > 0
       ? featured.map((activity) => `
           <button type="button" class="activityDiscoveryFeaturedCard" data-activity-select="${escapeHtml(activity.id)}">
             <span>${escapeHtml(activity.icon)}</span>
@@ -299,13 +315,13 @@ function renderUi() {
             <em>${escapeHtml(activity.locationLabel)}</em>
           </button>
         `).join('')
-      : '<div class="activityDiscoveryEmptyState">No featured activities are available in this area yet.</div>';
+      : '<div class="activityDiscoveryEmptyState">No featured activities are available in this area yet.</div>');
   }
   if (refsNow.list) {
     const items = filteredCatalog();
-    refsNow.list.innerHTML = items.length > 0
+    publishActivityMarkup(refsNow.list, items.length > 0
       ? items.map(cardHtml).join('')
-      : '<div class="activityDiscoveryEmptyState">No activities match the current filters here yet.</div>';
+      : '<div class="activityDiscoveryEmptyState">No activities match the current filters here yet.</div>');
   }
   renderDetail();
   renderPrompt();

@@ -16,7 +16,11 @@ try {
   page.on('pageerror', error => report.errors.push(String(error)));
   const requests = [];
   await page.route('https://api.open-meteo.com/**', route => { requests.push(route); });
-  await page.route('https://nominatim.openstreetmap.org/**', route => {
+  // This isolated component fixture supplies a deterministic attestation module.
+  // Hosted token validation is covered separately by product-place-hosted.
+  await page.route('**/js/firebase-init.js*', route => route.fulfill({contentType:'text/javascript',body:"export async function getFirebaseAppCheckToken(){return 'weather-component-fixture';}"}));
+  await page.route('**/api/geospatial/reverse?**', route => {
+    assert.equal(route.request().headers()['x-firebase-appcheck'],'weather-component-fixture');
     const polar = Number(new URL(route.request().url()).searchParams.get('lat')) < 0;
     return route.fulfill({ json: { address: { city: polar ? 'McMurdo Station' : 'Baltimore', country: polar ? 'Antarctica' : 'United States' } } });
   });
