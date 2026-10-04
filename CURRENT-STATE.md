@@ -8,6 +8,12 @@ Use `/Users/stevenreid/.codex/worktrees/architecture-evaluation/WorldExplorer3D-
 
 Observed host: physical Apple M1 Mac mini, 8 GiB RAM; approximately 15 GiB disk free at the latest check. Run heavy workloads sequentially, close only owned test processes, keep ordinary Chrome open, preserve dist, all four saved candidates and player data. Never print credentials. Current observation overrides stale hardware assumptions.
 
+## Local architecture polish — current owner request
+
+The owner now requests fixes and verification locally, preserving progress; no GitHub push or deployment. The fresh review and repair ledger is [IMPLEMENTATION.md](docs/system-review/2026-10-04/IMPLEMENTATION.md), with [ACCEPTANCE.md](docs/system-review/2026-10-04/ACCEPTANCE.md) defining evidence. Earlier phase/deployment summaries below are historical and do not approve this changed source.
+
+Synchronization, state ownership, clocks, persistence/history, provider handling, dependency provenance and support/resource diagnostics have verified local checkpoints. Retired world references have been repaired. Later façade/map allocation changes preserve behavior, but P4 remains open: the latest normal flight has clustered stalls, and loading still exceeds the proposed product target. P6 now has separate source/test/config/prose fingerprints, actual artifact-byte checks and explicit external acceptance classes; its fresh immutable matrix and compatible rollback remain pending. Raw heap captures stay private. Preserve the four saved candidates, current dist, production artifact and player data.
+
 ## Production — unchanged
 
 Freshly read October 3 from https://worldexplorer3d.io/build-manifest.json:

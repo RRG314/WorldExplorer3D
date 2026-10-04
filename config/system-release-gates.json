@@ -95,7 +95,7 @@
     "environments": { "scope": "candidate", "command": ["npm", "run", "verify:environments"], "artifactRequired": true },
     "painttown": { "scope": "candidate", "command": ["npm", "run", "verify:painttown"], "artifactRequired": true },
     "accessibility": { "scope": "candidate", "command": ["npm", "run", "verify:accessibility-release"], "artifactRequired": true },
-    "performance": { "scope": "candidate", "command": ["npm", "run", "verify:performance-retention"], "artifactRequired": true },
+    "performance": { "scope": "candidate", "command": ["env", "WE3D_PERF_SUSTAINED=1", "npm", "run", "verify:performance-retention"], "artifactRequired": true, "timeoutMs": 2400000 },
     "space-memory": { "scope": "component", "command": ["npm", "run", "verify:space-memory-lifecycle"], "artifactRequired": true },
     "space-journey": { "scope": "component", "command": ["npm", "run", "verify:current-space-journey"], "artifactRequired": true },
     "space-release": { "scope": "candidate", "command": ["npm", "run", "verify:space-release"], "artifactRequired": true },

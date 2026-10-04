@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
-import { currentArtifactIdentity, currentBaseline, sameArtifactIdentity } from './execution-evidence.mjs';
+import { currentArtifactIdentity, currentBaseline, sameArtifactIdentity, sameAcceptanceSource } from './execution-evidence.mjs';
 
 export const PROMOTION_RECEIPT = 'output/release-evidence/current/production-promotion.json';
 export const ENVIRONMENT_ASSETS = Object.freeze([
@@ -17,8 +17,12 @@ export function validatePromotion({ receipt, baseline, productionIdentity, produ
   productionAssets, stagingConfig, productionConfig }) {
   assert.equal(receipt?.contract, 'world-explorer-production-promotion-v1');
   assert.equal(baseline.dirty, false, 'Promotion requires clean source');
-  assert.equal(receipt.baseline?.headCommit, baseline.headCommit, 'Promotion source commit changed');
-  assert.equal(receipt.baseline?.workspaceFingerprint, baseline.workspaceFingerprint, 'Promotion source changed');
+  if (receipt.baseline?.contract === 'world-explorer-source-fingerprint-v2') {
+    assert.ok(sameAcceptanceSource(receipt.baseline, baseline), 'Promotion source changed');
+  } else {
+    assert.equal(receipt.baseline?.headCommit, baseline.headCommit, 'Promotion source commit changed');
+    assert.equal(receipt.baseline?.workspaceFingerprint, baseline.workspaceFingerprint, 'Promotion source changed');
+  }
   assert.ok(sameArtifactIdentity(receipt.productionIdentity, productionIdentity), 'Production artifact changed');
   assert.equal(hash(receipt.stagingBuildJson), receipt.stagingIdentity?.buildManifestSha256, 'Staging build receipt changed');
   assert.equal(hash(receipt.stagingAssetsJson), receipt.stagingIdentity?.assetManifestSha256, 'Staging asset receipt changed');
@@ -31,8 +35,14 @@ export function validatePromotion({ receipt, baseline, productionIdentity, produ
   assert.notEqual(stagingConfig.projectId, productionConfig.projectId);
   assert.equal(stagingBuild.sourceDirty, false);
   assert.equal(productionBuild.sourceDirty, false);
-  assert.equal(stagingBuild.commit, baseline.headCommit);
-  assert.equal(productionBuild.commit, baseline.headCommit);
+  if (stagingBuild.sourceInputFingerprint || productionBuild.sourceInputFingerprint) {
+    assert.match(baseline.acceptanceFingerprint || '', /^[a-f0-9]{64}$/);
+    assert.equal(stagingBuild.sourceInputFingerprint, baseline.acceptanceFingerprint);
+    assert.equal(productionBuild.sourceInputFingerprint, baseline.acceptanceFingerprint);
+  } else {
+    assert.equal(stagingBuild.commit, baseline.headCommit);
+    assert.equal(productionBuild.commit, baseline.headCommit);
+  }
   for (const key of ['version', 'sourceReleaseManifestSha256', 'dependencyLockSha256']) {
     assert.ok(stagingBuild[key], `Missing ${key}`);
     assert.equal(productionBuild[key], stagingBuild[key], `${key} changed during promotion`);

@@ -4,7 +4,8 @@ import { firebaseProjectScript, firebaseInitJson, generatedFirebaseFiles } from 
 import crypto from 'node:crypto';
 import {assertModelAssetRevisions} from './update-model-asset-revisions.mjs';
 import { canonicalBundledModule, rewritePackagedModuleReference } from './lib/runtime-module-identity.mjs';
-import { readReleaseSourceIdentity, assertReleaseSourceIdentity } from './lib/release-source-identity.mjs';
+import { readReleaseSourceIdentity, assertCompatibleReleaseSourceIdentity } from './lib/release-source-identity.mjs';
+import { sourceFingerprint as inputFingerprint, SHIPPED_SOURCE_ENTRIES } from './verification/source-fingerprint.mjs';
 import { build as buildJavaScript } from 'esbuild';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -13,18 +14,7 @@ const ROOT = process.cwd();
 const OUTPUT_DIR = path.join(ROOT, 'dist');
 const ASSET_MANIFEST = 'asset-manifest.json';
 const BUILD_MANIFEST = 'build-manifest.json';
-const SOURCE_ENTRIES = [
-  'about.html',
-  'favicon.svg',
-  'index.html',
-  'about',
-  'account',
-  'app',
-  'assets',
-  'js',
-  'legal',
-  'styles'
-];
+const SOURCE_ENTRIES = SHIPPED_SOURCE_ENTRIES;
 const GENERATED_PATHS = new Set([
   'js/firebase-project-config.js',
   '__/firebase/init.json',
@@ -331,6 +321,8 @@ async function buildArtifact(environment) {
   await assertModelAssetRevisions();
   // Check provenance before replacing any generated artifact.
   const sourceIdentity = readReleaseSourceIdentity(ROOT);
+  const inputBefore = inputFingerprint(ROOT);
+  if (sourceIdentity.sourceDirty || inputBefore.dirty) throw new Error('Commit all shipped source inputs before replacing a release artifact.');
   const sourceFiles = await collectSourceFiles();
   const config = JSON.parse(await fs.readFile(firebaseConfigPath(environment), 'utf8'));
   const sourceReleases = await sourceReleaseFingerprint(sourceFiles);
@@ -358,6 +350,10 @@ async function buildArtifact(environment) {
   const buildId = `${packageJson.version}+${shortCommit}.${contentHash.slice(0, 16)}.${environment}`;
   const assetManifest = { schemaVersion: 1, files };
   const assetManifestSha256 = sha256(canonicalJson(assetManifest));
+  const inputAfter = inputFingerprint(ROOT);
+  if (inputBefore.acceptanceFingerprint !== inputAfter.acceptanceFingerprint || inputAfter.dirty) {
+    throw new Error('Release inputs changed during the build; the artifact cannot be accepted.');
+  }
 
   await fs.writeFile(path.join(OUTPUT_DIR, ASSET_MANIFEST), canonicalJson(assetManifest));
   await fs.writeFile(path.join(OUTPUT_DIR, BUILD_MANIFEST), canonicalJson({
@@ -370,6 +366,7 @@ async function buildArtifact(environment) {
     commitTime,
     buildTimestamp: commitTime,
     sourceDirty: dirty,
+    sourceInputFingerprint: inputBefore.acceptanceFingerprint,
     sourceFingerprint: fingerprint,
     sourceReleaseManifestSha256: sourceReleases.sha256,
     sourceReleaseManifestCount: sourceReleases.manifestCount,
@@ -495,9 +492,8 @@ async function verifyArtifact() {
   const contentHash = sha256(canonicalJson(expectedFiles));
   const fingerprint = await sourceFingerprint(sourceFiles, environment, config);
   const dependencyLockSha256 = await packageLockSha256();
-  const sourceIdentity = readReleaseSourceIdentity(ROOT);
-  assertReleaseSourceIdentity(buildManifest, sourceIdentity);
-  const { commit } = sourceIdentity;
+  assertCompatibleReleaseSourceIdentity(buildManifest, ROOT);
+  const { commit } = buildManifest;
   const buildId = `${packageJson.version}+${commit.slice(0, 12)}.${contentHash.slice(0, 16)}.${environment}`;
   const assetManifestSha256 = sha256(canonicalJson(assetManifest));
   if (

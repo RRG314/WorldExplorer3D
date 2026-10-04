@@ -3,14 +3,15 @@
 // scenario (for example the separate provider-outage gate).
 export function completeReleaseEnvironment(environment) {
   const result = { ...environment };
-  for (const name of [
-    'WE3D_VERIFY_LOCATIONS', 'WE3D_ACTOR_VEHICLE_LOCATIONS',
-    'WE3D_BACKEND_FROM', 'WE3D_HOTBAR_RESUME_STAGE', 'WE3D_HOTBAR_ONLY_ACTION',
-    'WE3D_VERIFY_PROFILE', 'WE3D_VERIFY_AUDIT_ONLY',
-    'WE3D_VERIFY_INITIAL_ONLY', 'WE3D_VERIFY_SLICE_ONLY',
-    'WE3D_FORCE_TRANSPORT_FALLBACK',
-    'WE3D_URBAN_SCOPE', 'WE3D_VERIFY_JOURNEY', 'WE3D_VIEWPORT_SCOPE',
-    'WE3D_BLOCKS_SCOPE', 'WE3D_ROAD_TERRAIN_JOURNEY', 'WE3D_TRANSPORT_FACILITY_JOURNEY'
-  ]) delete result[name];
+  const allowed = new Set([
+    'WE3D_VERIFY_ROOT', 'WE3D_VERIFY_BASE_URL', 'WE3D_VERIFY_ENGINE',
+    'WE3D_VERIFY_HOSTED_PLACE_LOOKUP', 'WE3D_STAGING_APP_CHECK_FILE',
+    'WE3D_PLACE_LOOKUP_EMULATOR_ORIGIN', 'WE3D_CAPTURE_AUTOMATION_ATTESTATION',
+    'WE3D_CAPTURE_RELEASE_EVIDENCE', 'WE3D_REAL_GPU', 'WE3D_REQUIRE_IMMUTABLE',
+    'WE3D_EXPECT_BUILD_ID', 'WE3D_EXPECT_ENVIRONMENT', 'WE3D_EXPECT_TAG'
+  ]);
+  // Release commands explicitly set their own scenario flags. Unknown parent
+  // WE3D_* options must not silently turn a full gate into a diagnostic subset.
+  for (const name of Object.keys(result)) if (name.startsWith('WE3D_') && !allowed.has(name)) delete result[name];
   return result;
 }

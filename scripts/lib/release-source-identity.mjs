@@ -1,5 +1,6 @@
 import { execFileSync } from 'node:child_process';
 import { realpathSync } from 'node:fs';
+import { sourceFingerprint } from '../verification/source-fingerprint.mjs';
 
 // A missing repository or failed status command must never imply clean source.
 export function readReleaseSourceIdentity(root = process.cwd()) {
@@ -28,4 +29,23 @@ export function assertReleaseSourceIdentity(manifest, source) {
       manifest.buildTimestamp !== source.commitTime || manifest.sourceDirty !== source.sourceDirty) {
     throw new Error('Hosting artifact source identity does not match the current Git worktree.');
   }
+}
+
+// New artifacts bind all runtime/test/environment inputs independently of
+// prose. Existing artifacts keep the original strict commit/dirty contract.
+export function assertCompatibleReleaseSourceIdentity(manifest, root = process.cwd()) {
+  const source = readReleaseSourceIdentity(root);
+  if (!manifest.sourceInputFingerprint) { assertReleaseSourceIdentity(manifest, source); return source; }
+  const current = sourceFingerprint(root);
+  let recordedTime;
+  try {
+    if (!/^[a-f0-9]{40,64}$/.test(manifest.commit || '')) throw new Error('Invalid commit');
+    recordedTime = execFileSync('git', ['show', '-s', '--format=%cI', `${manifest.commit}^{commit}`],
+      { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+  } catch { throw new Error('Hosting artifact source identity does not match a recorded Git commit.'); }
+  if (manifest.sourceInputFingerprint !== current.acceptanceFingerprint || manifest.sourceDirty !== false ||
+      manifest.commitTime !== recordedTime || manifest.buildTimestamp !== recordedTime) {
+    throw new Error('Hosting artifact source identity does not match runtime, test and environment inputs.');
+  }
+  return source;
 }

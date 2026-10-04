@@ -4,7 +4,8 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { readReleaseSourceIdentity, assertReleaseSourceIdentity } from '../scripts/lib/release-source-identity.mjs';
+import { readReleaseSourceIdentity, assertReleaseSourceIdentity, assertCompatibleReleaseSourceIdentity } from '../scripts/lib/release-source-identity.mjs';
+import { sourceFingerprint } from '../scripts/verification/source-fingerprint.mjs';
 
 function fixture(t, { committed = true } = {}) {
   const root = mkdtempSync(path.join(tmpdir(), 'we3d-source-identity-'));
@@ -67,4 +68,19 @@ test('verification rejects falsely clean, missing or altered source identity', (
   ]) assert.throws(() => assertReleaseSourceIdentity(invalid, source), /does not match/);
   writeFileSync(path.join(root, 'source.txt'), 'dirty\n');
   assert.throws(() => assertReleaseSourceIdentity(manifest, readReleaseSourceIdentity(root)), /does not match/);
+});
+
+test('new artifacts survive documentation-only commits while retaining their actual build commit and rejecting changed inputs', t => {
+  const { root, git } = fixture(t), source = readReleaseSourceIdentity(root);
+  const manifest = { ...source, buildTimestamp: source.commitTime, sourceInputFingerprint: sourceFingerprint(root).acceptanceFingerprint };
+  writeFileSync(path.join(root, 'README.md'), 'verification notes');
+  assert.doesNotThrow(() => assertCompatibleReleaseSourceIdentity(manifest, root));
+  git('add', 'README.md'); git('-c', 'commit.gpgsign=false', 'commit', '-m', 'documentation');
+  assert.notEqual(readReleaseSourceIdentity(root).commit, manifest.commit);
+  assert.doesNotThrow(() => assertCompatibleReleaseSourceIdentity(manifest, root));
+  assert.throws(() => assertCompatibleReleaseSourceIdentity({ ...manifest, sourceInputFingerprint: undefined }, root));
+  assert.throws(() => assertCompatibleReleaseSourceIdentity({ ...manifest, commit: 'a'.repeat(40) }, root));
+  assert.throws(() => assertCompatibleReleaseSourceIdentity({ ...manifest, buildTimestamp: '2020-01-01' }, root));
+  writeFileSync(path.join(root, 'source.txt'), 'changed runtime');
+  assert.throws(() => assertCompatibleReleaseSourceIdentity(manifest, root), /does not match/);
 });

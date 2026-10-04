@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
 import { runLoggedStep } from './run-logged-step.mjs';
-import { currentBaseline, evidencePath, currentArtifactIdentity, sameArtifactIdentity } from './execution-evidence.mjs';
+import { currentBaseline, evidencePath, currentArtifactIdentity, sameArtifactIdentity, sameAcceptanceSource } from './execution-evidence.mjs';
 import { startStaticServer } from './static-server.mjs';
 import { completeReleaseEnvironment } from './release-environment.mjs';
 
@@ -105,14 +105,14 @@ function gateEvidencePath(id) {
 function reusableGateEvidence(id, gate) {
   // Files can change without updating their manifests. Always re-hash the
   // delivered artifact instead of trusting a cached integrity receipt.
-  if (freshExecution || id === 'artifact-integrity') return null;
+  if (freshExecution || ['artifact-integrity', 'release-contracts', 'public-claims'].includes(id)) return null;
   const target = gateEvidencePath(id);
   if (!existsSync(target)) return null;
   try {
     const prior = JSON.parse(readFileSync(target, 'utf8'));
-    if (prior.contract !== 'world-explorer-gate-evidence-v1' || prior.ok !== true) return null;
-    if (prior.baseline?.headCommit !== baseline.headCommit ||
-      prior.baseline?.workspaceFingerprint !== baseline.workspaceFingerprint) return null;
+    if (prior.contract !== 'world-explorer-gate-evidence-v2' || prior.ok !== true) return null;
+    if (!sameAcceptanceSource(prior.baseline, baseline) ||
+      prior.baseline.executionEnvironmentFingerprint !== baseline.executionEnvironmentFingerprint) return null;
     if (JSON.stringify(prior.command) !== JSON.stringify(gate.command)) return null;
     if (gate.artifactRequired && !sameArtifactIdentity(prior.artifactIdentity, artifactIdentity)) return null;
     return prior;
@@ -125,8 +125,8 @@ function writeGateEvidence(id, gate, record) {
   const target = gateEvidencePath(id);
   mkdirSync(path.dirname(target), { recursive: true });
   writeFileSync(target, `${JSON.stringify({
-    schemaVersion: 1,
-    contract: 'world-explorer-gate-evidence-v1',
+    schemaVersion: 2,
+    contract: 'world-explorer-gate-evidence-v2',
     targetVersion: config.targetVersion,
     scope: requestedScope,
     id,
@@ -152,7 +152,7 @@ function markGateStarted(id, gate) {
   const target = evidencePath(root, requestedScope);
   mkdirSync(path.dirname(target), { recursive: true });
   writeFileSync(target, `${JSON.stringify({
-    schemaVersion: 1, contract: 'world-explorer-execution-evidence-v1',
+    schemaVersion: 2, contract: 'world-explorer-execution-evidence-v2',
     targetVersion: config.targetVersion, scope: requestedScope,
     ok: false, state: 'running', baseline, artifactIdentity, artifactRoot,
     startedAt, completedAt: null, outputDir, results: [],
@@ -224,12 +224,12 @@ const report = {
 const isCompleteScope = requestedGates.size === 0;
 if (isCompleteScope) {
   const completedBaseline = currentBaseline(root);
-  const stableBaseline = completedBaseline.headCommit === baseline.headCommit &&
-    completedBaseline.workspaceFingerprint === baseline.workspaceFingerprint;
+  const stableBaseline = sameAcceptanceSource(completedBaseline, baseline) &&
+    completedBaseline.executionEnvironmentFingerprint === baseline.executionEnvironmentFingerprint;
   const stableArtifact = sameArtifactIdentity(artifactIdentity, currentArtifactIdentity(root, artifactRoot));
   const executionEvidence = {
-    schemaVersion: 1,
-    contract: 'world-explorer-execution-evidence-v1',
+    schemaVersion: 2,
+    contract: 'world-explorer-execution-evidence-v2',
     targetVersion: config.targetVersion,
     scope: requestedScope,
     state: 'completed',

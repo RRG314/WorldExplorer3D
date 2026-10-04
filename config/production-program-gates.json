@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 4,
+  "schemaVersion": 5,
   "programId": "world-explorer-5.4-release-2026-09-30",
   "targetVersion": "5.4.0",
   "productionBaseline": {
@@ -11,6 +11,7 @@
   "deploymentRequiresExplicitUserApproval": true,
   "statusAuthority": "current-execution-evidence",
   "requiredExecutionScopes": ["candidate", "backend"],
+  "requiredAcceptanceClasses": ["ordinary-hosted", "physical-ios", "physical-android", "fresh-player", "weather-entitlement", "migration-rollback"],
   "executionGateRequirements": {
     "CP0": ["source-graph", "artifact-world", "explorer-browser"],
     "CP1": ["assembled-worlds", "assembled-fallback", "provider-release"],

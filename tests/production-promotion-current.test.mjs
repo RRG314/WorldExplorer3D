@@ -36,13 +36,25 @@ function fixture() {
     ...Object.fromEntries(Object.entries(generatedFirebaseFiles(environment, config(environment))).map(([file, bytes]) => [file, hash(bytes)])) } });
   const stagingBuildJson = JSON.stringify(build('staging')), stagingAssetsJson = JSON.stringify(assets('staging'));
   const productionBuild = build('production'), productionAssets = assets('production');
-  const productionIdentity = { buildManifestSha256: hash(JSON.stringify(productionBuild)), assetManifestSha256: hash(JSON.stringify(productionAssets)) };
+  const contentIdentity = assets => hash(JSON.stringify(Object.entries(assets.files).sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0)));
+  const productionIdentity = { verifiedContentSha256: contentIdentity(productionAssets), buildManifestSha256: hash(JSON.stringify(productionBuild)), assetManifestSha256: hash(JSON.stringify(productionAssets)) };
   return { baseline, productionBuild, productionAssets, productionIdentity, stagingConfig: config('staging'), productionConfig: config('production'),
     receipt: { contract: 'world-explorer-production-promotion-v1', baseline: { ...baseline }, stagingBuildJson, stagingAssetsJson,
-      stagingIdentity: { buildManifestSha256: hash(stagingBuildJson), assetManifestSha256: hash(stagingAssetsJson) }, productionIdentity: { ...productionIdentity } } };
+      stagingIdentity: { verifiedContentSha256: contentIdentity(JSON.parse(stagingAssetsJson)), buildManifestSha256: hash(stagingBuildJson), assetManifestSha256: hash(stagingAssetsJson) }, productionIdentity: { ...productionIdentity } } };
 }
 test('configuration-only promotion preserves the original staging evidence identity', () => {
   const f = fixture(); assert.deepEqual(validatePromotion(f), f.receipt.stagingIdentity);
+});
+test('new promotion receipts preserve build provenance across documentation-only commits and still reject changed inputs', () => {
+  const f = fixture(), fingerprint = hash('accepted-inputs');
+  Object.assign(f.baseline, { contract: 'world-explorer-source-fingerprint-v2', acceptanceFingerprint: fingerprint, headCommit: 'new-doc-commit' });
+  f.receipt.baseline = { ...f.baseline, headCommit: 'earlier-doc-commit', workspaceFingerprint: 'old-prose' };
+  const stagingBuild = JSON.parse(f.receipt.stagingBuildJson); stagingBuild.sourceInputFingerprint = fingerprint;
+  f.receipt.stagingBuildJson = JSON.stringify(stagingBuild); f.receipt.stagingIdentity.buildManifestSha256 = hash(f.receipt.stagingBuildJson);
+  f.productionBuild.sourceInputFingerprint = fingerprint;
+  assert.deepEqual(validatePromotion(f), f.receipt.stagingIdentity);
+  f.productionBuild.sourceInputFingerprint = hash('changed-inputs');
+  assert.throws(() => validatePromotion(f));
 });
 test('promotion rejects altered code, backend scripts, assets, source and artifact identities', () => {
   const mutations = [

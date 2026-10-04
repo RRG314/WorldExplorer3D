@@ -17,6 +17,14 @@ test('a developer diagnostic session cannot narrow release coverage', () => {
   assert.equal(diagnosticSession.WE3D_VERIFY_PROFILE, 'mobile');
 });
 
+test('unknown diagnostic flags, trace modes, reduced retention and provider waivers cannot leak into a release', () => {
+  assert.deepEqual(completeReleaseEnvironment({
+    WE3D_PERF_TRACE_MODE: 'plane', WE3D_PERF_ALLOCATIONS: '1', WE3D_PERF_PRIVATE_HEAP: '1',
+    WE3D_VERIFY_RETENTION_CYCLES: '1', WE3D_NEW_SKIP_CHECKS: '1', WE3D_SANDBOX_FLOWER_ONLY: '1',
+    WE3D_SANDBOX_LOCAL_PLACE_UNAVAILABLE: '1', WE3D_SHIP_SCOPE: 'controls'
+  }), {});
+});
+
 test('release isolation preserves emulator routing and artifact/resource configuration', () => {
   const required = {
     FIRESTORE_EMULATOR_HOST: '127.0.0.1:8080',
