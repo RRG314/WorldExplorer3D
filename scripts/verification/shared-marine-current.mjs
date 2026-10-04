@@ -9,7 +9,7 @@ assert.match(process.env.FIREBASE_AUTH_EMULATOR_HOST||'',/^(127\.0\.0\.1|localho
 const require=createRequire(new URL('../../functions/package.json',import.meta.url));
 const {initializeApp}=require('firebase-admin/app'),{getFirestore,Timestamp}=require('firebase-admin/firestore');
 initializeApp({projectId});const db=getFirestore(),roomCode=`M${Date.now().toString(36).slice(-5)}`.toUpperCase(),room=db.collection('rooms').doc(roomCode),marine=room.collection('expeditions').doc('marine');
-const dir='output/verification/product-plan/shared-marine';await mkdir(dir,{recursive:true});
+const dir=process.env.WE3D_MARINE_REPORT_DIR||'output/verification/product-plan/shared-marine';await mkdir(dir,{recursive:true});
 const report={scope:'Two actual selected-build Ocean clients and actual authenticated Functions/Firestore/Auth emulators; room fixture is provisioned and clients use actual room admission, subscription delivery uses the actual authenticated browser SDK, and entry-depth provider is controlled. Not production, room-admission UI or physical-device acceptance.',cases:[],errors:[]};
 const users=[];let browser,server,renewal;
 for(const name of ['captain','pilot']){const r=await fetch(`http://${process.env.FIREBASE_AUTH_EMULATOR_HOST}/identitytoolkit.googleapis.com/v1/accounts:signUp?key=emulator-key`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({email:`${name}-${Date.now()}@example.test`,password:'Local-test-only-934!',returnSecureToken:true})});assert.equal(r.ok,true);const v=await r.json();users.push({uid:v.localId,token:v.idToken,name,email:v.email,renew:true});}
@@ -48,6 +48,15 @@ async function openClient(user){
 }
 const waitStage=async(page,stage)=>page.waitForFunction(stage=>marineCtx.sharedMarine?.snapshot().state?.stage===stage&&!marineCtx.sharedMarine.snapshot().transition&&(stage==='underwater'?marineCtx.oceanMode?.active:marineCtx.boatMode?.active&&!marineCtx.oceanMode?.active),stage,{timeout:90000});
 try{
+ const save=async(user,body)=>{const response=await fetch(`http://127.0.0.1:5001/${projectId}/us-central1/saveExplorerPlayerCondition`,{method:'POST',headers:{'content-type':'application/json',...(user?{authorization:`Bearer ${user.token}`}:{})},body:JSON.stringify(body)});return {status:response.status,body:await response.json()};};
+ const health={condition:.9,reason:'controlled-retry',mutationId:crypto.randomUUID(),expectedRevision:0};
+ assert.equal((await save(null,health)).status,401);
+ const first=await save(users[0],health);assert.equal(first.status,200);assert.equal(first.body.revision,1);
+ const newer=await save(users[0],{...health,condition:.4,mutationId:crypto.randomUUID(),expectedRevision:1});assert.equal(newer.status,200);assert.equal(newer.body.revision,2);
+ const replay=await save(users[0],health);assert.equal(replay.status,200);assert.equal(replay.body.condition,.4);assert.equal(replay.body.revision,2);
+ const stale=await save(users[0],{...health,mutationId:crypto.randomUUID()});assert.equal(stale.status,409);assert.equal(stale.body.state.revision,2);
+ const separate=await save(users[1],health);assert.equal(separate.status,200);assert.equal(separate.body.revision,1);
+ report.cases.push('authenticated condition transaction is revision-checked, retry-safe and account-isolated');
  await room.set({ownerUid:users[0].uid,world:{kind:'earth',lat:-18.2861,lon:147.7},maxPlayers:6});await Promise.all(users.map(u=>seat(u)));
  assert.equal((await post(null,command('create'))).status,401);
  await seat(users[0],true);assert.equal((await post(users[0],command('create'))).status,409);assert.equal((await marine.get()).exists,false);await seat(users[0]);report.cases.push('unsigned and expired-seat create rejected without writes');
@@ -65,6 +74,33 @@ try{
  const positions=await Promise.all([captain,pilot].map(p=>p.evaluate(()=>({...marineCtx.oceanMode.submarine.position}))));report.motion={before,positions,clients:await Promise.all([captain,pilot].map(p=>p.evaluate(()=>({error:marineCtx.sharedMarine.snapshot().error,canPilot:marineCtx.sharedMarine.canPilot,revision:marineCtx.sharedMarine.snapshot().state.revision}))))};assert.ok(Math.hypot(positions[1].x-before.x,positions[1].z-before.z)>1);assert.ok(Math.hypot(positions[0].x-positions[1].x,positions[0].z-positions[1].z)<10,JSON.stringify(positions));
  assert.equal(await captain.evaluate(()=>marineCtx.sharedMarine.canPilot),false);assert.equal(await pilot.evaluate(()=>marineCtx.oceanMode.diver.start()),false);assert.equal(await pilot.evaluate(()=>marineCtx.transferSubmarineToBoat({source:'voyage-recovery'})),false);
  report.cases.push('keyboard pilot movement reaches crew camera; passenger, solo recovery and scuba cannot bypass shared control');
+ // Exercise a lost/delayed response through the real SDK/HTTP transport. The
+ // Function commits normally; only acknowledgment delivery is fault-injected.
+ let delayed=false;
+ const endpoint='**/us-central1/mutateSharedExpedition';
+ await pilot.route(endpoint,async route=>{
+  if(!delayed&&route.request().postDataJSON()?.command?.type==='pose'){
+   delayed=true;const response=await route.fetch();await new Promise(resolve=>setTimeout(resolve,3500));await route.fulfill({response});
+  }else await route.continue();
+ });
+ await pilot.keyboard.down('w');
+ await pilot.waitForFunction(()=>marineCtx.sharedMarine.snapshot().connection?.blocked,null,{timeout:12000});
+ assert.equal(await pilot.evaluate(()=>marineCtx.sharedMarine.canPilot),false);
+ assert.equal(await pilot.evaluate(()=>marineCtx.sharedMarine.snapshot().connection.pending),1);
+ await pilot.keyboard.up('w');
+ await pilot.waitForFunction(()=>marineCtx.sharedMarine.canPilot&&!marineCtx.sharedMarine.snapshot().connection.pending,null,{timeout:15000});
+ await pilot.unroute(endpoint);
+ assert.equal(delayed,true);assert.equal(await pilot.evaluate(()=>marineCtx.sharedMarine.snapshot().error),'');
+ report.cases.push('delayed committed pose pauses prediction, bounds pending work and reconciles without travel-envelope failure');
+ let lost=false;
+ await pilot.route(endpoint,async route=>{
+  if(!lost&&route.request().postDataJSON()?.command?.type==='pose'){lost=true;await route.fetch();await route.abort('failed');}
+  else await route.continue();
+ });
+ await pilot.waitForFunction(()=>marineCtx.sharedMarine.snapshot().connection?.recovering,null,{timeout:15000});
+ await pilot.waitForFunction(()=>marineCtx.sharedMarine.canPilot&&!marineCtx.sharedMarine.snapshot().connection.recovering,null,{timeout:15000});
+ await pilot.unroute(endpoint);assert.equal(lost,true);
+ report.cases.push('lost acknowledgment reconnects automatically to the committed submarine pose');
  // Drive the actual submarine controller between study markers. Never seed a
  // server pose or manifest; the authority checks every normal 2.5 s update.
  for(const targetId of ['table-garden','branch-ridge','seagrass-edge']){

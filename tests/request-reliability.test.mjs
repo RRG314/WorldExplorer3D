@@ -3,8 +3,13 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 const source = (await readFile(new URL('../js/function-api.js', import.meta.url), 'utf8'))
   .replace(/^import .*;$/gm, '')
-  .replace("const DEFAULT_FUNCTIONS_REGION", "const getCurrentUserToken = async () => 'test-token'; const getFirebaseAppCheckToken = async () => 'test-check'; const readFirebaseConfig = () => ({projectId: 'test-project'}); const assertFunctionsOrigin = x => x;\nconst DEFAULT_FUNCTIONS_REGION");
+  .replace("const DEFAULT_FUNCTIONS_REGION", "const getCurrentUser = () => ({uid:'current-user'}); const getCurrentUserToken = async () => 'test-token'; const getFirebaseAppCheckToken = async () => 'test-check'; const readFirebaseConfig = () => ({projectId: 'test-project'}); const assertFunctionsOrigin = x => x;\nconst DEFAULT_FUNCTIONS_REGION");
 const api = await import('data:text/javascript;base64,' + Buffer.from(source).toString('base64'));
+test('account-bound mutation is not dispatched after an identity change',async t=>{
+ let calls=0;t.mock.method(globalThis,'fetch',async()=>{calls++;return Response.json({});});
+ await assert.rejects(api.postProtectedFunction('/write',{}, {expectedUserId:'previous-user'}),e=>e.code==='account-changed');
+ assert.equal(calls,0);
+});
 for (const method of ['postProtectedFunction', 'postAppCheckedFunction']) {
   test(`${method}: lost response after commit is not replayed`, async t => {
     let writes = 0;

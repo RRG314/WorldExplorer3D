@@ -8,5 +8,5 @@ export function createMarineTransport(){
  if(!user?.uid||!room?.code||!db)throw Error('Open Community and join a room, then return to Shared crew.');
  return {uid:user.uid,roomCode:room.code,isCurrent:()=>getCurrentRoom()?.code===room.code&&getCurrentUser()?.uid===user.uid,
   subscribe:(next,error)=>onSnapshot(doc(db,'rooms',room.code,'expeditions','marine'),s=>next(s.exists()?s.data():null),error),
-  send:command=>mutateSharedExpedition({roomCode:room.code,domain:'marine',command,forceRefreshToken:false})};
+  send:command=>mutateSharedExpedition({roomCode:room.code,domain:'marine',command,forceRefreshToken:false,expectedUserId:user.uid,timeoutMs:8000})};
 }

@@ -56,7 +56,7 @@ const {
   validatePropertyProximity
 } = require('./property-authority');
 const { settleCommerceOutcome, settleCommerceTransaction } = require('./economy-authority');
-const { normalizePlayerConditionInput } = require('./player-state-authority');
+const { applyPlayerConditionMutation } = require('./player-state-authority');
 
 if (!admin.apps.length) {
   admin.initializeApp();
@@ -2162,13 +2162,16 @@ exports.saveExplorerPlayerCondition = functions.region('us-central1').runWith({ 
   const auth = await verifyAuth(req, res);
   if (!auth) return;
   try {
-    const state = normalizePlayerConditionInput(req.body || {});
-    await db.collection('users').doc(auth.uid).collection('gameplay').doc('condition').set({
-      ...state,
-      updatedAt: AdminTimestamp.now()
-    }, { merge: false });
+    const ref=db.collection('users').doc(auth.uid).collection('gameplay').doc('condition');
+    const state=await db.runTransaction(async tx=>{
+      const previous=await tx.get(ref),current=previous.exists?previous.data():null;
+      const next=applyPlayerConditionMutation(current,req.body||{});
+      if(next!==current)tx.set(ref,{...next,updatedAt:AdminTimestamp.now()});
+      return {authority:next.authority,schemaVersion:next.schemaVersion,condition:next.condition,reason:next.reason,revision:next.revision};
+    });
     res.status(200).json(state);
   } catch (error) {
+    if([400,409].includes(error?.status))return res.status(error.status).json({error:error.message,...(error.state?{state:error.state}:{})});
     if (String(error?.message || '') === 'invalid_player_condition') {
       return res.status(400).json({ error: 'Player condition must be between 0 and 1.' });
     }
@@ -2357,7 +2360,7 @@ exports.mutateSharedExpedition = functions.region('us-central1').runWith({ invok
       transaction.set(expeditionRef, { ...next, updatedAt: FieldValue.serverTimestamp() });
       return next;
     });
-    res.status(200).json({ accepted: true, state });
+    res.status(200).json({ accepted: true, state, serverNowMs: Date.now() });
   } catch (error) {
     if ([403, 404, 409, 422].includes(error?.status)) return res.status(error.status).json({ error: error.message });
     const code = String(error && error.message || '');

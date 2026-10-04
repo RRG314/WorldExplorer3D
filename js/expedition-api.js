@@ -21,6 +21,8 @@ async function mutateSharedExpedition(input = {}) {
   if (input.configuration && typeof input.configuration === 'object') payload.configuration = input.configuration;
   return postProtectedFunction('/mutateSharedExpedition', payload, {
     label: 'Shared Expedition authority',
+    expectedUserId: input.expectedUserId,
+    timeoutMs: input.timeoutMs,
     forceRefreshToken: input.forceRefreshToken !== false
   });
 }
