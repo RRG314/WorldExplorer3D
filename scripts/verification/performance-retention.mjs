@@ -4,7 +4,11 @@ import { sampleFrameWindow } from './frame-window.mjs';
 import { frameHitches } from './frame-hitches.mjs';
 import {planRoadRoute,followRoadRoute} from './travel-road-route.mjs';
 import {followFlightOrbit} from './travel-flight-orbit.mjs';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile, mkdtemp } from 'node:fs/promises';
+import {createWriteStream} from 'node:fs';
+import {finished} from 'node:stream/promises';
+import {tmpdir} from 'node:os';
+import path from 'node:path';
 import { chromium, devices } from 'playwright';
 import { startStaticServer } from './static-server.mjs';
 import { requirePerformanceHost, requireHardwareGraphics } from './performance-host.mjs';
@@ -192,8 +196,25 @@ async function measureMode(client, id, sampleMs = 5_000, movementKey = null) {
   },id);
   const trace = process.env.WE3D_PERF_TRACE_MODE === id;
   let traceClock;
+  const gcEvents=[];
+  const gcTrace=trace&&process.env.WE3D_PERF_GC_TRACE==='1';
+  let gcTruncated=false;
+  const collectGc=({value})=>{
+    for(const event of value){
+      if(!/GC|Scavenge|MarkCompact|Major|Minor|Sweeper/i.test(event.name))continue;
+      if(gcEvents.length>=100000){gcTruncated=true;continue;}
+      // Trace arguments may include runtime strings. Retain numeric collector
+      // counters only; no account, location, URL or source values.
+      gcEvents.push({name:event.name,cat:event.cat,ph:event.ph,ts:event.ts,dur:event.dur,pid:event.pid,tid:event.tid,
+        args:Object.fromEntries(Object.entries(event.args||{}).filter(([key,value])=>/^[a-zA-Z0-9_ .-]{1,80}$/.test(key)&&typeof value==='number'))});
+    }
+  };
   if (trace) {
     traceClock=await client.cdp.send('Performance.getMetrics');
+    if(gcTrace){
+      client.cdp.on('Tracing.dataCollected',collectGc);
+      await client.cdp.send('Tracing.start',{categories:'v8,disabled-by-default-v8.gc,disabled-by-default-v8.gc_stats',transferMode:'ReportEvents'});
+    }
     await client.cdp.send('Profiler.enable'); await client.cdp.send('Profiler.start');
     if(process.env.WE3D_PERF_ALLOCATIONS==='1')await client.cdp.send('HeapProfiler.startSampling',{samplingInterval:65536,includeObjectsCollectedByMajorGC:true,includeObjectsCollectedByMinorGC:true});
   }
@@ -201,6 +222,12 @@ async function measureMode(client, id, sampleMs = 5_000, movementKey = null) {
   try { raw = await client.page.evaluate(sampleFrameWindow, {durationMs:sampleMs,actorKey:'__WE3D_PERF_ACTOR__',collectDiagnostics:false}); }
   finally { if (movementKey) await client.page.keyboard.up(movementKey); }
   if (trace) {
+    if(gcTrace){
+      const completed=new Promise(resolve=>client.cdp.once('Tracing.tracingComplete',resolve));
+      await client.cdp.send('Tracing.end');await completed;
+      client.cdp.off('Tracing.dataCollected',collectGc);
+      await writeFile(`${evidenceDirectory}/${id}-gc.json`,JSON.stringify({scope:'Instrumented collector events with numeric arguments only; not acceptance',truncated:gcTruncated,clock:traceClock,raw,events:gcEvents}));
+    }
     const {profile} = await client.cdp.send('Profiler.stop');
     await writeFile(`${evidenceDirectory}/${id}-cpu.json`,JSON.stringify({profile,raw,clock:traceClock,scope:'Instrumented diagnostic, not release performance acceptance'}));
     if(process.env.WE3D_PERF_ALLOCATIONS==='1')await writeFile(`${evidenceDirectory}/${id}-allocation.json`,JSON.stringify(await client.cdp.send('HeapProfiler.stopSampling')));
@@ -322,6 +349,43 @@ async function runDesktop() {
   const client = await createMeasuredClient({ viewport: { width: 1440, height: 900 } });
   try {
     const launch = await launchWorld(client);
+    if(process.env.WE3D_PERF_PRIVATE_HEAP==='1'){
+      assert.ok(auditOnly,'Heap snapshots are private diagnostics, never frame-time acceptance');
+      // Snapshots can contain disposable auth material. Keep raw bytes outside
+      // the repository/evidence tree with owner-only permissions.
+      const directory=await mkdtemp(path.join(tmpdir(),'we3d-private-heap-'));
+      const target=path.join(directory,'active-world.heapsnapshot');
+      const output=createWriteStream(target,{mode:0o600});let bytes=0;
+      const chunk=event=>{bytes+=Buffer.byteLength(event.chunk);output.write(event.chunk);};
+      await client.page.evaluate(()=>{globalThis.__WE3D_HEAP_CONTEXT__=globalThis.__WE3D_PERF_CONTEXT__;});
+      client.cdp.on('HeapProfiler.addHeapSnapshotChunk',chunk);
+      try {await client.cdp.send('HeapProfiler.takeHeapSnapshot');}
+      finally {client.cdp.off('HeapProfiler.addHeapSnapshotChunk',chunk);output.end();await finished(output);}
+      launch.privateHeap={path:target,bytes,scope:'Private raw heap; publish only aggregate counts or reviewed code property names'};
+      console.log('[performance-retention] private heap saved',JSON.stringify(launch.privateHeap));
+    }
+    if(process.env.WE3D_PERF_TREE_NODE_DIAGNOSTIC==='1'){
+      assert.ok(auditOnly,'Tree-node lifetime experiment is diagnostic only');
+      const counts=await client.page.evaluate(()=>{
+        const c=globalThis.__WE3D_PERF_CONTEXT__;
+        return {nodes:Object.keys(c._worldLoadNodes||{}).length,rows:c.osmTreeRows.length,
+          trees:c.vegetationFeatures.length,roads:c.roads.length,buildings:c.buildings.length};
+      });
+      const beforeHeap=await heapUsedBytes(client.cdp,true);
+      const selected=await client.page.evaluate(()=>{
+        const c=globalThis.__WE3D_PERF_CONTEXT__,nodes=c._worldLoadNodes,keep=Object.create(null);
+        globalThis.__WE3D_OLD_NODE_INDEX__=new WeakRef(nodes);
+        for(const row of c.osmTreeRows)for(const id of row.nodes||[])if(nodes[id])keep[id]=nodes[id];
+        const sameRows=c.osmTreeRows.every(row=>(row.nodes||[]).every(id=>nodes[id]===keep[id]));
+        c._worldLoadNodes=keep;return {nodes:Object.keys(keep).length,sameRows};
+      });
+      await client.page.waitForTimeout(1000);
+      const afterHeap=await heapUsedBytes(client.cdp,true);
+      const oldIndexCollected=await client.page.evaluate(()=>!globalThis.__WE3D_OLD_NODE_INDEX__.deref());
+      launch.treeNodeExperiment={counts,selected,beforeHeap,afterHeap,oldIndexCollected,
+        scope:'Controlled source mutation plus GC for retained-owner diagnosis; not performance acceptance'};
+      console.log('[performance-retention] tree-node experiment',JSON.stringify(launch.treeNodeExperiment));
+    }
     const walkActivationMs = await selectMode(client.page, 'walk', '#fWalk');
     const walk = { ...(await measureMode(client, 'walk', auditOnly ? 1_500 : 5_000)), activationMs: walkActivationMs };
     console.log('[performance-retention] desktop walk', JSON.stringify({ fps: walk.averageFps, withinBudgets: modesWithinBudgets([walk], budgets.desktopTier) }));

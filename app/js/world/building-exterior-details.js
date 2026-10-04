@@ -329,6 +329,28 @@ function distribution(values) {
   return Object.freeze(Object.fromEntries([...values.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))));
 }
 
+export function selectExteriorDetailSources(sources, {focus, districtFocus, radius, limit}) {
+  const candidates = [];
+  if (limit <= 0) return candidates;
+  for (const mesh of sources) {
+    const center = mesh.detailCenter || footprintCenter(mesh.userData.buildingFootprint);
+    const dx = center.x - focus.x, dz = center.z - focus.z;
+    const districtX = districtFocus ? center.x - districtFocus.x : Infinity;
+    const districtZ = districtFocus ? center.z - districtFocus.z : Infinity;
+    // An axis outside the radius cannot win the circular distance test. Keep
+    // exact hypot distances for every possible candidate, including ties and
+    // the district's second focus during initial publication.
+    const distance = Math.min(
+      Math.abs(dx) <= radius && Math.abs(dz) <= radius ? Math.hypot(dx, dz) : Infinity,
+      Math.abs(districtX) <= radius && Math.abs(districtZ) <= radius ? Math.hypot(districtX, districtZ) : Infinity
+    );
+    if (distance <= radius) candidates.push({mesh, distance});
+  }
+  candidates.sort((a,b)=>a.distance-b.distance||String(a.mesh.userData.sourceBuildingId).localeCompare(String(b.mesh.userData.sourceBuildingId)));
+  if (candidates.length > limit) candidates.length = limit;
+  return candidates;
+}
+
 function* buildDetails(appCtx, options = {}) {
   const tier = tierForContext(appCtx, options.tier);
   const limit = DETAIL_LIMITS[tier];
@@ -337,14 +359,9 @@ function* buildDetails(appCtx, options = {}) {
   const focus=options.focus||{x:0,z:0};
   // A moving aircraft refreshes focus frequently. Only nearby candidates need
   // records; allocating one for every city building creates avoidable GC work.
-  const candidates = [];
-  for (const mesh of options.sources || []) {
-    const center=mesh.detailCenter||footprintCenter(mesh.userData.buildingFootprint);
-    const distance=Math.min(Math.hypot(center.x-focus.x,center.z-focus.z),!options.focus&&districtFocus?Math.hypot(center.x-districtFocus.x,center.z-districtFocus.z):Infinity);
-    if(distance<=radius)candidates.push({mesh,distance});
-  }
-  candidates.sort((a,b)=>a.distance-b.distance||String(a.mesh.userData.sourceBuildingId).localeCompare(String(b.mesh.userData.sourceBuildingId)));
-  if(candidates.length>limit)candidates.length=limit;
+  const candidates = selectExteriorDetailSources(options.sources || [], {
+    focus, districtFocus: !options.focus ? districtFocus : null, radius, limit
+  });
 
   const materials = createDetailMaterials();
   const batches = createBatchMap(materials);

@@ -1,4 +1,5 @@
 import {emitLocalLoadTrace} from './load-trace.js';
+import {retainTreeRowNodes} from './vegetation-source-nodes.js';
 import {isSurfacePublicationError,finishFailedSurfaceLoad} from './surface-publication-error.js';
 import { createLinearFeatureRuntime } from "./load-linear-runtime.js?v=11";
 import { createWorldLandusePass } from "./load-landuse-pass.js?v=40";
@@ -819,7 +820,7 @@ export function createWorldRoadLoader(deps = {}) {
               })
             ).then(data => ({ data }), error => ({ error }))
           : null;
-        appCtx._worldLoadNodes = normalizedSelection.nodes;
+        appCtx._worldLoadNodes = retainTreeRowNodes(normalizedSelection.nodes,appCtx.osmTreeRows);
         if (runtimeState) {
           Object.assign(runtimeState, normalized.diagnostics);
           const summarizeReviewedStructures = (ways = []) => ways
