@@ -1,6 +1,6 @@
 # Planned persistence repair boundary
 
-This is implementation preparation for package 5. No storage migration or condition-outbox redesign described here has shipped or been implemented by this document.
+Package 5 is in progress locally. The transactional account-condition outbox is implemented and its eight real-browser regression cases pass. Journal version 5 and inventory scaling below remain planned, not implemented. Nothing in this document is a production receipt.
 
 ## Journal query authority
 
@@ -31,3 +31,28 @@ This design is not final until fixtures prove queue/dispatch/disposal races, los
 - Two actual browser tabs sharing storage, asynchronous condition mutations, uncertain dispatch during closure and recovery with no erased newer intent.
 
 No source-only assertion or empty-profile benchmark closes this package.
+
+## Browser regression drafts
+
+`journal-history.mjs` and `condition-tabs.mjs` have run against the current baseline and fail as expected. Journal storage is still version 4. The real two-tab test proves that disposing the older .9 tab overwrites a newer .4 durable intent. Their retained reports are `journal-history-before/` and `condition-tabs-before/` under `output/verification/architecture-polish/`. These failures are evidence of remaining work, not implementation completion. The first creates version-4 storage in a disposable profile before importing the current store. The second uses actual same-origin tabs/storage and controlled transport through the actual pure server mutation authority; it is a separate class from SDK/emulator acceptance.
+
+The outbox owner should expose initialization and local-durability completion promises (`whenInitialized`, `whenDurable`) without making queue acceptance depend on a network reply. `dispose` must stop subscriptions/timers/adoption without rewriting or erasing the shared durable row. Already accepted local work continues to its storage commit. A successful idempotent replay must deliver `onConfirmed` when there is no newer pending intent. `connected-player-state` must guard success and error callbacks by current account and reconcile recovered condition state.
+
+Keep all Journal rows intact in the v5 migration. Order metadata uses separate records, and transactions must include the derived store wherever items/events/guide entries or their receipt disposition change. Imported and rolled-back outbox rows need to rebuild disposition atomically. Use maps for import claim/instance matching and stable insertion-order indexes in the Backpack projection; preserve same-instance precedence even when multiple entries already share an event.
+
+A related established-inventory risk needs bounded handling: the equipment UI currently rebuilds the full snapshot and all carried-item DOM even when its panel is closed. The direct equipped-definition hot-path repair is verified separately in package 4. During persistence integration, keep closed-panel updates limited to equipped state and use bounded presentation for open inventory contents. Do not truncate stored items.
+
+## Transaction and rollback details to preserve
+
+Keep `JOURNAL_STORES` as the original authoritative backup collections. Import and rollback transactions additionally include `journalOrder`, but backup/export payloads do not copy derived rows. Rebuild derived rows from the restored originals and preserved outbox rows atomically. Receipt disposition must preserve duplicate/orphan outbox semantics; item acknowledgment takes precedence over device-only classification. Indexed flags must use valid IndexedDB keys (strings/numbers, not booleans).
+
+Version 5 creates a release compatibility requirement: the current production code explicitly opens version 4 and cannot open an upgraded database. Merely restoring old Hosting bytes would not restore save access. Before any migration reaches production, provide and verify a compatible rollback build or staged compatibility rollout. Preserve the current production artifact; do not silently relabel it migration-compatible. All development migration tests use disposable browser profiles and cannot modify existing player data. This remains part of package 6's release decision.
+
+
+## Transactional condition checkpoint
+
+`condition-outbox.js` owns one row per account in a separate IndexedDB database. Read/write transactions always start from the current shared row, preserve uncertain operations and only acknowledge a matching command. Dispatch uses a Web Lock where available; backend revision/idempotency still protects the no-lock fallback. Disposal never writes a snapshot. Accepted storage work finishes without adopting results into a switched account. The connected feed waits for storage initialization and guards success, errors and recovered confirmations by account identity.
+
+Legacy pending/uncertain work imports once before its unchanged old key is removed. A later restored old key cannot replace a migrated row. Denied/quota storage retains work in memory and emits a visible storage warning; it is explicitly non-durable. An actual eight-case browser run (`condition-tabs-transaction-expanded/`) passes older-tab disposal, lost acknowledgments, dispatch-time tab closure, account switching, legacy recovery, no-Web-Locks concurrent idempotency, quota failure and denied storage, with zero page errors. Transport in this fixture executes the actual server mutation function but is controlled; it is not an SDK/emulator or hosted receipt.
+
+Both the condition migration and planned Journal upgrade require a migration-compatible rollback strategy before production. An old frontend does not understand the new outbox. A local source checkpoint is not authorization to promote storage changes to production.

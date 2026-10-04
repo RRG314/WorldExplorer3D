@@ -18,6 +18,11 @@ function createConnectedPlayerState(options = {}) {
   const isCurrent=()=>!disposed&&getCurrentUser()?.uid===user.uid;
   const sync=createConditionSync({uid:user.uid,isCurrent,
     send:command=>saveExplorerPlayerCondition({...command,expectedUserId:user.uid}),
+    onConfirmed:state=>{
+      if (!isCurrent()) return;
+      conditionAuthority.hydrate(state.condition, 'confirmed-account-save');
+      options.onChange?.(api.snapshot());
+    },
     onState:()=>options.onChange?.(api.snapshot()),onError:options.onError});
   const stopConditionChanges = conditionAuthority.subscribe(sync.queue);
   const api = Object.freeze({
@@ -42,7 +47,8 @@ function createConnectedPlayerState(options = {}) {
     }
   });
 
-  stopCondition = onSnapshot(doc(services.db, 'users', user.uid, 'gameplay', 'condition'), (snapshot) => {
+  stopCondition = onSnapshot(doc(services.db, 'users', user.uid, 'gameplay', 'condition'), async (snapshot) => {
+    await sync.whenInitialized();
     if (!isCurrent()) return;
     const data = snapshot.exists() ? snapshot.data() : null;
     conditionLoaded = true;
@@ -56,7 +62,7 @@ function createConnectedPlayerState(options = {}) {
       sync.queue({ after: conditionAuthority.snapshot().condition, reason: 'signed-in-initialization' });
     }
     options.onChange?.(api.snapshot());
-  }, (error) => options.onError?.(error));
+  }, (error) => { if (isCurrent()) options.onError?.(error); });
 
   stopUpgrades = onSnapshot(doc(services.db, 'users', user.uid, 'gameplay', 'vehicleUpgrades'), (snapshot) => {
     if (!isCurrent()) return;
@@ -64,7 +70,7 @@ function createConnectedPlayerState(options = {}) {
     upgradesLoaded = true;
     if (data?.vehicles && typeof data.vehicles === 'object') vehicleUpgradeStore.hydrate(data.vehicles);
     options.onChange?.(api.snapshot());
-  }, (error) => options.onError?.(error));
+  }, (error) => { if (isCurrent()) options.onError?.(error); });
 
   return api;
 }

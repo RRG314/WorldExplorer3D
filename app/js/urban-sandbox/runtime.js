@@ -3389,8 +3389,10 @@ function startUrbanSandboxRuntime(options = {}) {
 function handleWalletReconnect() {
   if (activeRuntime) setStatus(activeRuntime, 'Explorer Wallet is reconnecting.', 2200);
 }
-function handlePlayerStateReconnect() {
-  if (activeRuntime) setStatus(activeRuntime, 'Explorer health and upgrades are reconnecting.', 2200);
+function handlePlayerStateReconnect(error) {
+  if (activeRuntime) setStatus(activeRuntime,
+    error?.code === 'condition-storage-unavailable' ? error.message : 'Explorer health and upgrades are reconnecting.',
+    error?.code === 'condition-storage-unavailable' ? 8000 : 2200);
 }
 function refreshActiveEquipment() { if (activeRuntime) renderEquipment(activeRuntime); }
 
