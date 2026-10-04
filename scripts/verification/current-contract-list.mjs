@@ -55,6 +55,7 @@ export const currentContractTests = [
   'tests/model-asset-revisions-current.test.mjs',
   'tests/parent-sky-placement-current.test.mjs',
   'tests/population-distance-pose-current.test.mjs',
+  'tests/vehicle-presentation-pose-current.test.mjs',
   'tests/portal-spatial-grid-current.test.mjs',
   'tests/provisional-transport-profile-current.test.mjs',
   'tests/remote-character-current.test.mjs',

@@ -619,8 +619,7 @@ export function createLivingWorldPopulation(options = {}) {
     liveFlow: options.getTrafficFlow?.()
   });
 
-  const vehicleSnapshot = (agent) => {
-    const pose = agentPose(agent, trafficGraph, sampleVehicleSurface);
+  const vehicleSnapshotFromPose = (agent, pose) => {
     if (!pose) return null;
     return Object.freeze({
       id: agent.id,
@@ -646,6 +645,10 @@ export function createLivingWorldPopulation(options = {}) {
       signalAspect: agent.signalAspect || 'none'
     });
   };
+  // Gameplay queries can request current support independently. Presentation
+  // reads the pose already published by the fixed simulation, so both visual
+  // detail levels use the same contact solution without solving it per draw.
+  const vehicleSnapshot = agent => vehicleSnapshotFromPose(agent, agentPose(agent, trafficGraph, sampleVehicleSurface));
 
   const pedestrianSnapshot = (agent) => {
     const pose = agentPose(agent, pedestrianGraph);
@@ -711,6 +714,7 @@ export function createLivingWorldPopulation(options = {}) {
     const visibilityPolicy = { enterDistance: demand.vehicleRadius, exitDistance: demand.vehicleExitRadius };
     vehicles.forEach((agent) => {
       const pose = agentPose(agent, trafficGraph, sampleVehicleSurface);
+      agent.presentationPose = pose;
       const host = agent.visualHost;
       if (!pose || !host) return;
       const distance = reference ? Math.hypot(pose.x - reference.x, pose.z - reference.z) : 0;
@@ -793,6 +797,9 @@ export function createLivingWorldPopulation(options = {}) {
     },
     vehicleSnapshots() {
       return Object.freeze(vehicles.map(vehicleSnapshot).filter(Boolean));
+    },
+    vehiclePresentationSnapshots() {
+      return Object.freeze(vehicles.map(agent => vehicleSnapshotFromPose(agent, agent.presentationPose)).filter(Boolean));
     },
     pedestrianSnapshots() {
       return Object.freeze(pedestrians.map(pedestrianSnapshot).filter(Boolean));
@@ -1001,6 +1008,7 @@ export function createLivingWorldPopulation(options = {}) {
       vehicles.forEach((agent) => {
         disposeCuratedTrafficVehicle(agent.visualHost);
         agent.visualHost = null;
+        agent.presentationPose = null;
       });
       pedestrians.forEach((agent) => {
         disposeCuratedCharacter(agent.visualHost);

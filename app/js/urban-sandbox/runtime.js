@@ -1416,7 +1416,7 @@ function maintainNearbyVehicleDetails(state) {
   if (!activeWorldMatches(state) || state.transition) return;
   const actor = urbanPresentationFocus(appCtx.activeEarthActorPosition?.(), civicActorPosition(state));
   if (!actor) return;
-  const snapshots = state.population?.vehicleSnapshots?.() || [];
+  const snapshots = state.population?.vehiclePresentationSnapshots?.() || [];
   const byId = new Map(snapshots.map((snapshot) => [snapshot.id, snapshot]));
   const existingDetails = state.vehicles.filter((vehicle) => vehicle.ambientTraffic === true);
   for (const vehicle of existingDetails) {
