@@ -543,7 +543,7 @@ export function createLivingWorldPopulation(options = {}) {
   const pedestrianGraph = options.pedestrianGraph;
   const trafficGraph = options.trafficGraph;
   const random = typeof options.random === 'function' ? options.random : Math.random;
-  const sampleVehicleSurface = typeof options.sampleVehicleSurface === 'function' ? options.sampleVehicleSurface : null;
+  let sampleVehicleSurface = typeof options.sampleVehicleSurface === 'function' ? options.sampleVehicleSurface : null;
   const initialReference = options.getReferencePosition?.() || null;
   const pedestrians = createAgents(budget.pedestrians, pedestrianGraph, random, 'pedestrian', initialReference);
   const vehicles = createAgents(budget.vehicles, trafficGraph, random, 'vehicle', initialReference);
@@ -925,6 +925,7 @@ export function createLivingWorldPopulation(options = {}) {
       return true;
     },
     fixedUpdate(dt) {
+      if (disposed) return;
       accumulator += dt;
       if (accumulator < POPULATION_STEP_SECONDS) return;
       const stepCount = Math.min(4, Math.floor(accumulator / POPULATION_STEP_SECONDS));
@@ -994,6 +995,7 @@ export function createLivingWorldPopulation(options = {}) {
       });
     },
     dispose() {
+      if (disposed) return;
       disposed = true;
       group.removeFromParent?.();
       vehicles.forEach((agent) => {
@@ -1004,6 +1006,15 @@ export function createLivingWorldPopulation(options = {}) {
         disposeCuratedCharacter(agent.visualHost);
         agent.visualHost = null;
       });
+      pedestrians.length = 0;
+      vehicles.length = 0;
+      pedestrianHosts.length = 0;
+      vehicleHosts.length = 0;
+      pedestrianOutgoing.clear();
+      trafficOutgoing.clear();
+      group.clear();
+      sampleVehicleSurface = null;
+      options = {};
     }
   });
 }

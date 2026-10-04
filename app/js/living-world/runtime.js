@@ -81,7 +81,8 @@ function sourceSegmentProjection(feature, edge, x, z) {
 }
 
 export function createTrafficVehicleSurfaceSampler(appCtx, trafficCompilation) {
-  return (edge, x, z) => {
+  const sample = (edge, x, z) => {
+    if (!trafficCompilation) return NaN;
     const feature = trafficCompilation?.runtimeFeatureByEdge?.get(edge?.id);
     const projection = feature ? sourceSegmentProjection(feature, edge, x, z) : null;
     const surfaceY = Number(appCtx?.sampleFeatureSurfaceY?.(feature, x, z, projection));
@@ -91,6 +92,8 @@ export function createTrafficVehicleSurfaceSampler(appCtx, trafficCompilation) {
     if (!Number.isFinite(surfaceY)) return sampleEdgeTransitionPlane(edge, x, z);
     return surfaceY + 0.08;
   };
+  sample.dispose = () => { trafficCompilation = null; };
+  return sample;
 }
 
 function disposeRuntimeState(appCtx, state, reason = 'disposed') {
@@ -99,6 +102,11 @@ function disposeRuntimeState(appCtx, state, reason = 'disposed') {
   state.reason = String(reason || 'disposed');
   appCtx?.unregisterRuntimeOwner?.(state.owner);
   state.population?.dispose?.();
+  state.sampleVehicleSurface?.dispose?.();
+  // Retired callbacks and engine feedback can outlive a world. Drop the
+  // owned feature maps explicitly so they cannot keep that city's roads alive.
+  state.trafficCompilation?.runtimeFeatureByEdge?.clear();
+  state.pedestrianCompilation?.runtimeFeatureByEdge?.clear();
   if (appCtx?.handleLivingWorldSelection === state.handleWorldSelection) delete appCtx.handleLivingWorldSelection;
   if (appCtx?.livingWorldRuntime === state) appCtx.livingWorldRuntime = null;
   return true;
@@ -276,6 +284,7 @@ export function startLivingWorldRuntime(appCtx, options = {}) {
     reason: null
   };
   state.handleWorldSelection = (target) => {
+    if (state.disposed) return false;
     const activeActor = appCtx.activeTransportActor?.();
     const reference = activeActor?.position || (appCtx.Walk?.state?.mode === 'walk'
       ? appCtx.Walk?.state?.walker

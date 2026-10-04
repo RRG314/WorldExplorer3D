@@ -1,3 +1,4 @@
+import { bindPlayerConditionAuthority } from './player-condition-binding.js';
 import {createServiceLightPool} from './service-light-pool.js';
 import {urbanPresentationFocus, urbanPresentationDistance, setRetainedNpcPresentation} from './presentation-focus.js';
 import { setDomText, setDomAttribute, setDomHidden, setDomClass } from '../ui/dom-state.js?v=1';
@@ -2787,6 +2788,9 @@ function disposeRuntime(state, reason = 'disposed') {
   state.npcs.length = 0;
   state.curatedNpcAssetOwners.clear();
   state.pickups.length = 0;
+  // Borrowed population is valid only during this world. Retired visual
+  // callbacks must not retain the traffic sampler and all source geometry.
+  state.population = null;
   state.activeVehicle = null;
   state.civic?.clear?.();
   if (appCtx.isUrbanParachuteDeployed === state.isParachuteDeployed) delete appCtx.isUrbanParachuteDeployed;
@@ -3042,12 +3046,7 @@ function startUrbanSandboxRuntime(options = {}) {
     remoteEntities: new Map(),
     roomAuthorityRuntime: null
   };
-  Object.defineProperty(state, 'playerCondition', {
-    configurable: true,
-    enumerable: true,
-    get: () => state.playerConditionAuthority.snapshot().condition,
-    set: (value) => { state.playerConditionAuthority.set(value, 'urban-runtime'); }
-  });
+  bindPlayerConditionAuthority(state);
   void state.commerce.recoverPending?.((service, receiptId) => applyPoiService(state, service, receiptId)).then((result) => {
     if (result?.recovered > 0 && activeWorldMatches(state)) {
       setStatus(state, `${result.recovered} Explorer Wallet service ${result.recovered === 1 ? 'receipt' : 'receipts'} recovered.`, 2600);

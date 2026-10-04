@@ -61,12 +61,14 @@ test('world reset releases derived transport models as well as scene objects',as
  const keys=['transportNetworkModel','transportStructureModel','transportStructureAssembly','transportJunctionProfile','sharedTransportSurfacePresentation','tunnelSolidCompilation','structureProfileCompilation'];
  const appCtx={resetEarthStreaming(){},replaceWorldCollection(k){this[k]=[];},clearWorldCollections(keys){for(const k of keys)this[k]=[];}};
  appCtx.Walk={state:{walker:{_walkSupportFeature:{transportConnections:[{}]}}}};
+ let waterCacheResets=0;
  let groundInvalidations=0;appCtx.GroundHeight={invalidate(){groundInvalidations++;}};
  for(const key of keys)appCtx[key]={oldWorldFeature:{}};
- const context=vm.createContext({appCtx,resetRoadMapIndex(){},resetRoadSearchIndex(){},releaseLocationModels(){},clearBuildingExteriorMaterialPool(){},clearBuildingExteriorDetails(){}});
+ const context=vm.createContext({appCtx,clearWaterMeshCache(){waterCacheResets++;},resetRoadMapIndex(){},resetRoadSearchIndex(){},releaseLocationModels(){},clearBuildingExteriorMaterialPool(){},clearBuildingExteriorDetails(){}});
  vm.runInContext(source,context);context.resetWorldForReload({showLoading:false});
  for(const key of keys)assert.equal(appCtx[key],null,key);
  assert.equal(groundInvalidations,1);
+ assert.equal(waterCacheResets,1);
  assert.equal(appCtx.Walk.state.walker._walkSupportFeature,null);
 });
 

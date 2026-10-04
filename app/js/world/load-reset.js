@@ -1,3 +1,4 @@
+import { clearWaterMeshCache } from '../boat-mode/water-query.js?v=21';
 import { resetRoadMapIndex } from '../map/earth-base.js?v=4';
 import { resetRoadSearchIndex } from './navigation.js?v=6';
 import { releaseLocationModels } from './release-location-models.js';
@@ -102,6 +103,7 @@ export function resetWorldForReload(options = {}) {
   appCtx.transportFacilityVisual = null;
   appCtx.transportFacilityGraph = null;
   releaseLocationModels(appCtx);
+  clearWaterMeshCache();
 
   if (typeof appCtx.resetEarthStreaming !== 'function') {
     throw new Error('Earth streaming lifecycle owner is unavailable during world reset.');

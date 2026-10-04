@@ -322,6 +322,7 @@ export const currentContractTests = [
   'tests/celestial-collision-current.test.mjs',
   'tests/character-progression-current.test.mjs',
   'tests/combat-backpack-current.test.mjs',
+  'tests/backpack-history-current.test.mjs',
   'tests/companion-progression-current.test.mjs',
   'tests/world-economy-current.test.mjs',
   'tests/crash-physics-current.test.mjs',

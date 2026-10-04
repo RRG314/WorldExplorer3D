@@ -30,6 +30,7 @@ let graphicsAuthority = null;
 const requestedProfile = String(process.env.WE3D_VERIFY_PROFILE || 'all').trim().toLowerCase();
 const auditOnly = process.env.WE3D_VERIFY_AUDIT_ONLY === '1';
 const sustained=process.env.WE3D_PERF_SUSTAINED==='1';
+const retainedHeapCycles=new Set(String(process.env.WE3D_PERF_RETAINED_HEAPS||'').split(',').filter(Boolean).map(Number));
 assert.ok(['all', 'desktop', 'mobile'].includes(requestedProfile), `Unsupported WE3D_VERIFY_PROFILE: ${requestedProfile}`);
 
 const percentile = (values, portion) => {
@@ -72,6 +73,22 @@ async function heapUsedBytes(cdp, collect = false) {
   if (collect) await cdp.send('HeapProfiler.collectGarbage').catch(() => {});
   const result = await cdp.send('Performance.getMetrics');
   return metricValue(result.metrics || [], 'JSHeapUsedSize');
+}
+
+async function privateHeapSnapshot(client,label){
+  assert.ok(auditOnly,'Raw heap capture is diagnostic only');
+  const directory=await mkdtemp(path.join(tmpdir(),'we3d-private-heap-'));
+  const target=path.join(directory,`${label}.heapsnapshot`);
+  const output=createWriteStream(target,{mode:0o600});let bytes=0;
+  const streamed=finished(output);streamed.catch(()=>{});
+  const chunk=event=>{bytes+=Buffer.byteLength(event.chunk);output.write(event.chunk);};
+  await client.page.evaluate(()=>{globalThis.__WE3D_HEAP_CONTEXT__=globalThis.__WE3D_PERF_CONTEXT__;});
+  client.cdp.on('HeapProfiler.addHeapSnapshotChunk',chunk);
+  try {await client.cdp.send('HeapProfiler.takeHeapSnapshot');}
+  finally {client.cdp.off('HeapProfiler.addHeapSnapshotChunk',chunk);output.end();await streamed;}
+  const result={path:target,bytes,scope:'Private raw heap; publish only aggregate counts or reviewed code property names'};
+  console.log('[performance-retention] private heap saved',JSON.stringify(result));
+  return result;
 }
 
 async function storageSnapshot(page) {
@@ -348,21 +365,16 @@ async function sustainedTravel(client){
 async function runDesktop() {
   const client = await createMeasuredClient({ viewport: { width: 1440, height: 900 } });
   try {
+    if(retainedHeapCycles.size){
+      assert.ok(auditOnly&&path.resolve(verifyRoot)===root,'Retained heap investigation requires diagnostic source mode');
+      assert.ok([...retainedHeapCycles].every(cycle=>Number.isInteger(cycle)&&cycle>=1&&cycle<=24),'Retained heap cycles must be integers 1–24');
+    }
     const launch = await launchWorld(client);
     if(process.env.WE3D_PERF_PRIVATE_HEAP==='1'){
       assert.ok(auditOnly,'Heap snapshots are private diagnostics, never frame-time acceptance');
       // Snapshots can contain disposable auth material. Keep raw bytes outside
       // the repository/evidence tree with owner-only permissions.
-      const directory=await mkdtemp(path.join(tmpdir(),'we3d-private-heap-'));
-      const target=path.join(directory,'active-world.heapsnapshot');
-      const output=createWriteStream(target,{mode:0o600});let bytes=0;
-      const chunk=event=>{bytes+=Buffer.byteLength(event.chunk);output.write(event.chunk);};
-      await client.page.evaluate(()=>{globalThis.__WE3D_HEAP_CONTEXT__=globalThis.__WE3D_PERF_CONTEXT__;});
-      client.cdp.on('HeapProfiler.addHeapSnapshotChunk',chunk);
-      try {await client.cdp.send('HeapProfiler.takeHeapSnapshot');}
-      finally {client.cdp.off('HeapProfiler.addHeapSnapshotChunk',chunk);output.end();await finished(output);}
-      launch.privateHeap={path:target,bytes,scope:'Private raw heap; publish only aggregate counts or reviewed code property names'};
-      console.log('[performance-retention] private heap saved',JSON.stringify(launch.privateHeap));
+      launch.privateHeap=await privateHeapSnapshot(client,'active-world');
     }
     if(process.env.WE3D_PERF_TREE_NODE_DIAGNOSTIC==='1'){
       assert.ok(auditOnly,'Tree-node lifetime experiment is diagnostic only');
@@ -418,13 +430,21 @@ async function runDesktop() {
     const reloadTransfers=[];
     let shortRunTransfer=null,previousTransfer=transferSnapshot(client);
     const requestedRetentionCycles = Number(process.env.WE3D_VERIFY_RETENTION_CYCLES);
-    const environmentCycles = auditOnly
+    const environmentCycles = auditOnly&&!retainedHeapCycles.size
       ? 0
       : Math.max(
           sustained?12:budgets.retention.minimumEnvironmentCycles,
+          ...retainedHeapCycles,
           Number.isFinite(requestedRetentionCycles) ? Math.floor(requestedRetentionCycles) : 0
         );
     for (let cycle = 0; cycle < environmentCycles; cycle += 1) {
+      await client.page.evaluate(()=>{
+        const c=globalThis.__WE3D_PERF_CONTEXT__;
+        globalThis.__WE3D_RETIRED_RUNTIME_REFS__={
+          living:c.livingWorldRuntime?new WeakRef(c.livingWorldRuntime):null,
+          urban:c.urbanSandboxRuntime?new WeakRef(c.urbanSandboxRuntime):null
+        };
+      });
       await client.page.locator('#mainMenuBtn').click();
       await client.page.waitForFunction(() => {
         const state = globalThis.getWorldExplorerRuntimeDiagnostics?.() || {};
@@ -446,6 +466,23 @@ async function runDesktop() {
           lifecycle:c.getLifecycleRegistrySnapshot?.()};
       });
       release.jsHeapUsedBytes = await heapUsedBytes(client.cdp, true);
+      release.retiredPopulationOwnership=await client.page.evaluate(()=>{
+        const refs=globalThis.__WE3D_RETIRED_RUNTIME_REFS__,living=refs?.living?.deref(),urban=refs?.urban?.deref();
+        return {livingRetained:!!living,urbanRetained:!!urban,
+          trafficFeatureRefs:living?.trafficCompilation?.runtimeFeatureByEdge?.size||0,
+          pedestrianFeatureRefs:living?.pedestrianCompilation?.runtimeFeatureByEdge?.size||0,
+          urbanPopulationRetained:!!urban?.population};
+      });
+      if(retainedHeapCycles.size){
+        // This is the exact module identity used by source model consumers.
+        // Never create a second empty cache or import source into an artifact.
+        release.modelCache=await client.page.evaluate(async()=>
+          (await import('/app/js/assets/model-asset-runtime.js?v=16')).modelAssetCacheSnapshot());
+        if(retainedHeapCycles.has(cycle+1)){
+          release.privateHeap=await privateHeapSnapshot(client,`released-world-${cycle+1}`);
+          release.afterSnapshotHeapBytes=await heapUsedBytes(client.cdp);
+        }
+      }
       release.settledAfterMs=2000;
       release.heapEvidenceScope = 'Immediate and settled post-GC retained objects; not process memory or active-play budget';
       releases.push(release);
@@ -478,6 +515,8 @@ async function runDesktop() {
       }),
       movingGroundRoutesObserved: walkMoving.distanceWorldUnits >= 2 && driveMoving.distanceWorldUnits >= 5,
       sustainedFlightObserved: !auditOnly && plane.elapsedMs >= 90_000 && plane.distanceWorldUnits >= 1_000,
+      retiredPopulationReleasesFeatures:releases.every(entry=>entry.retiredPopulationOwnership?.trafficFeatureRefs===0&&
+        entry.retiredPopulationOwnership?.pedestrianFeatureRefs===0&&!entry.retiredPopulationOwnership?.urbanPopulationRetained),
       teardownClearsWorldOwners: releases.every((entry) =>
         Number(entry?.after?.roads || 0) <= budgets.retention.maximumRetainedRoads &&
         Number(entry?.after?.buildings || 0) <= budgets.retention.maximumRetainedBuildings &&

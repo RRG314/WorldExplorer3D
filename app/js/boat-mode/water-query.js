@@ -226,6 +226,10 @@ function waterSurfaceYAt(x, z, candidate = null, options = {}) {
   return sample.coverage === 'known-water-body' ? sample.surfaceY : NaN;
 }
 
+function clearWaterMeshCache() {
+  _cachedWaterMeshes = [];
+}
+
 function syncWaterMeshCache() {
   _cachedWaterMeshes = (Array.isArray(appCtx.landuseMeshes) ? appCtx.landuseMeshes : []).filter((mesh) => {
     if (!mesh) return false;
@@ -540,6 +544,7 @@ export {
   resolveWaterSampleCandidate,
   sampleDynamicWaterAt,
   syncWaterMeshCache,
+  clearWaterMeshCache,
   waterKindLabel,
   waterSurfaceBaseYAt,
   waterSurfaceYAt

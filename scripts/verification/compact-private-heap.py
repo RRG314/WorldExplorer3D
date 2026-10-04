@@ -55,7 +55,7 @@ with open(source, 'rb') as file:
             end += 1
         if end - position < 300:
             name = json.loads(data[position:end + 1])
-            if re.fullmatch(r'[A-Za-z_$][A-Za-z0-9_$]{0,70}', name):
+            if re.fullmatch(r'[A-Za-z_$][A-Za-z0-9_$]{0,70}', name) or name in {'(GC roots)', '(Strong roots)', '(Global handles)', '(Internalized strings)', '(External strings)', '(StringTable)', '(object elements)', '(object properties)', 'system / NativeContext', 'system / Context'}:
                 names[index] = name
         index += 1
         position = end + 1
