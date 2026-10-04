@@ -88,7 +88,9 @@ function createEquipmentInventory(options = {}) {
   };
 
   function equippedDefinition() {
-    return definitionFor(backpack.snapshot().equippedCatalogId, backpack);
+    // Frame-time equipment decisions need one catalog entry, not a sorted
+    // copy of every collected item in an established player's Backpack.
+    return definitionFor(backpack.equipped()?.catalogId, backpack);
   }
 
   return Object.freeze({

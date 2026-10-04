@@ -110,3 +110,18 @@ test('defensive fire respects range, reaction delay, walking mode, and room auth
   assert.equal(npcFireDecision(npc, actor, 1600, { walking: false }), null);
   assert.equal(npcFireDecision(npc, actor, 1600, { walking: true, multiplayer: true }), null);
 });
+test('equipment reads and use do not enumerate the Backpack', () => {
+  const inventory = createEquipmentInventory();
+  const backpack = inventory.backpack;
+  let reads = 0;
+  const observed = createEquipmentInventory({backpack:{...backpack,snapshot(){reads++;return backpack.snapshot();}}});
+  const startupReads = reads;
+  assert.equal(observed.equip('pulse-sidearm'),true);
+  for(let i=0;i<6000;i++)assert.equal(observed.equipped().id,'pulse-sidearm');
+  assert.equal(observed.prepareUse(1000).ok,true);
+  assert.equal(observed.equip('flashlight'),true);
+  assert.equal(observed.equipped().id,'flashlight');
+  assert.equal(reads,startupReads,'Hot-path reads must not scale with inventory size');
+  assert.equal(observed.snapshot().equippedCatalogId,'flashlight');
+  assert.equal(reads,startupReads+1,'Explicit UI snapshots still enumerate current records');
+});

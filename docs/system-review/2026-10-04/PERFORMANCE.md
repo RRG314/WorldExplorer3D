@@ -49,3 +49,11 @@ The corrected snapshot contained 159,498 ArrayBuffer objects and 196,819 Float32
 Run the repaired normal routes and sustained mixed traversal with at least two 90-second samples for each affected movement mode. Complete twelve reloads with immediate and settled post-GC ownership measurements (two warmups followed by ten plateau samples). Keep transfer budgets scoped to the original two-load total and separate additional-load receipts; retain cumulative totals as well.
 
 The 25-second desktop loading target remains proposed and missed (approximately 46–51 seconds in the recent source runs). The existing 120-second safety ceiling is not evidence that this product target is achieved. The final retained-heap jump, intermittent ground FPS failure and flight hitch clusters must remain visible until resolved. No old green artifact certifies these newer runtime changes.
+
+## Latest equipment and sustained-run checkpoint
+
+The equipped-tool hot path now reads the existing direct Backpack lookup instead of rebuilding and sorting the full inventory every frame. A 6,000-read regression proves no full snapshot is requested; the full PR chain passes 1,831 tests, and the prescribed driving client passes with its final image inspected.
+
+`performance-equipment-direct-sustained/` completed all moving routes and twelve reloads, exiting 1. All average-FPS, p99, coverage, transfer, storage and runtime/local-resource checks pass. Straight flight still has 266.7/316.7 ms frames 649.9 ms apart. One of seven 90-second mixed-route segments has 166.7/100.1 ms frames 233.4 ms apart; the other six satisfy the hitch gate. First playable is 47.0 seconds. These are unresolved failures, not a stutter-fix claim.
+
+Settled retained heap is 115.6–121.7 MiB through reload 11, then 185.7 MiB at reload 12. The two-second wait does not remove the jump. Renderer release counts remain 135 geometries/41 textures, world collections are empty, and lifecycle/provider counts are stable. This repeats the earlier late jump and requires private retained-heap investigation. No release acceptance or production change follows from this checkpoint.
