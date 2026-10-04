@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "evidenceScope": "Static inventory signals, not exclusive test classifications or coverage percentages",
+  "selectedFiles": 364,
+  "uniqueFiles": 364,
+  "filesReadingSourceOrFixtures": 51,
+  "filesWithMatchingAssertions": 67,
+  "filesUsingVm": 18,
+  "filesImportingBrowser": 0,
+  "unownedFiles": [],
+  "separateGateSyntaxChecks": [
+    {
+      "file": "tests/firestore.rules.security.test.mjs",
+      "ok": true
+    },
+    {
+      "file": "tests/painttown.integration.test.mjs",
+      "ok": true
+    },
+    {
+      "file": "tests/room-admission-emulator.test.mjs",
+      "ok": true
+    },
+    {
+      "file": "tests/room-admission-http-emulator.test.mjs",
+      "ok": true
+    },
+    {
+      "file": "tests/room-profile-emulator.test.mjs",
+      "ok": true
+    },
+    {
+      "file": "tests/storage.rules.reality-capture.test.mjs",
+      "ok": true
+    }
+  ]
+}

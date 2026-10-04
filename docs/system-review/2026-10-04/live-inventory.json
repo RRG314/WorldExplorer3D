@@ -1,0 +1,497 @@
+{
+  "at": "2026-10-04T13:54:57.637Z",
+  "scope": "Read-only public manifests and production function names/runtime inventory; no deployment, endpoint behavior or private configuration inspection.",
+  "manifests": [
+    {
+      "label": "production",
+      "status": 200,
+      "buildId": "5.4.0+1532bdfbb5c1.319d215f60318297.production",
+      "commit": "1532bdfbb5c11e002d278b058d1ebdba88384f60",
+      "contentHash": "319d215f603182977a27082b652245b9339ca401292bca8a2d1ccc99de00a6ca",
+      "environment": "production"
+    },
+    {
+      "label": "staging-preview",
+      "status": 200,
+      "buildId": "5.4.0+919888ec3198.22910078a1af7019.staging",
+      "commit": "919888ec31984b59f4da16c3a93936e5ded86e1f",
+      "contentHash": "22910078a1af7019e83125884de655fcd26a94386bf5b25b613aeb4b7c879a2b",
+      "environment": "staging"
+    }
+  ],
+  "cloud": {
+    "ok": true,
+    "status": "success",
+    "count": 78,
+    "functions": [
+      {
+        "id": "acceptDiscoveryTrade",
+        "region": "us-central1",
+        "runtime": "nodejs22",
+        "platform": "gcfv1"
+      },
+      {
+        "id": "cancelDiscoveryTrade",
+        "region": "us-central1",
+        "runtime": "nodejs22",
+        "platform": "gcfv1"
+      },
+      {
+        "id": "claimDeFlockVirtualDisable",
+        "region": "us-central1",
+        "runtime": "nodejs22",
+        "platform": "gcfv1"
+      },
+      {
+        "id": "claimExplorerDiscovery",
+        "region": "us-central1",
+        "runtime": "nodejs22",
+        "platform": "gcfv1"
+      },
+      {
+        "id": "claimUrbanVehicle",
+        "region": "us-central1",
+        "runtime": "nodejs22",
+        "platform": "gcfv1"
+      },
+      {
+        "id": "commitExplorerCommerceAction",
+        "region": "us-central1",
+        "runtime": "nodejs22",
+        "platform": "gcfv1"
+      },
+      {
+        "id": "commitUrbanCivicEvent",
+        "region": "us-central1",
+        "runtime": "nodejs22",
+        "platform": "gcfv1"
+      },
+      {
+        "id": "commitUrbanImpacts",
+        "region": "us-central1",
+        "runtime": "nodejs22",
+        "platform": "gcfv1"
+      },
+      {
+        "id": "commitWorldPropertyAction",
+        "region": "us-central1",
+        "runtime": "nodejs22",
+        "platform": "gcfv1"
+      },
+      {
+        "id": "createCheckoutSession",
+        "region": "us-central1",
+        "runtime": "nodejs22",
+        "platform": "gcfv1"
+      },
+      {
+        "id": "createDiscoveryTrade",
+        "region": "us-central1",
+        "runtime": "nodejs22",
+        "platform": "gcfv1"
+      },
+      {
+        "id": "createPortalSession",
+        "region": "us-central1",
+        "runtime": "nodejs22",
+        "platform": "gcfv1"
+      },
+      {
+        "id": "createRealityCaptureDraft",
+        "region": "us-central1",
+        "runtime": "nodejs22",
+        "platform": "gcfv1"
+      },
+      {
+        "id": "createRealityCaptureUploadUrl",
+        "region": "us-central1",
+        "runtime": "nodejs22",
+        "platform": "gcfv1"
+      },
+      {
+        "id": "decidePrivateSpaceAccessRequest",
+        "region": "us-central1",
+        "runtime": "nodejs22",
+        "platform": "gcfv1"
+      },
+      {
+        "id": "deleteAccount",
+        "region": "us-central1",
+        "runtime": "nodejs22",
+        "platform": "gcfv1"
+      },
+      {
+        "id": "deleteOverlayFeatureDraft",
+        "region": "us-central1",
+        "runtime": "nodejs22",
+        "platform": "gcfv1"
+      },
+      {
+        "id": "deleteRealityCapture",
+        "region": "us-central1",
+        "runtime": "nodejs22",
+        "platform": "gcfv1"
+      },
+      {
+        "id": "dispatchRealityCapture",
+        "region": "us-central1",
+        "runtime": "nodejs22",
+        "platform": "gcfv1"
+      },
+      {
+        "id": "enableAdminTester",
+        "region": "us-central1",
+        "runtime": "nodejs22",
+        "platform": "gcfv1"
+      },
+      {
+        "id": "finalizeRealityCaptureUpload",
+        "region": "us-central1",
+        "runtime": "nodejs22",
+        "platform": "gcfv1"
+      },
+      {
+        "id": "getAccountOverview",
+        "region": "us-central1",
+        "runtime": "nodejs22",
+        "platform": "gcfv1"
+      },
+      {
+        "id": "getAdminDashboardOverview",
+        "region": "us-central1",
+        "runtime": "nodejs22",
+        "platform": "gcfv1"
+      },
+      {
+        "id": "getAdminOperationsSnapshot",
+        "region": "us-central1",
+        "runtime": "nodejs22",
+        "platform": "gcfv1"
+      },
+      {
+        "id": "getAdminOverlayFeatureDetail",
+        "region": "us-central1",
+        "runtime": "nodejs22",
+        "platform": "gcfv1"
+      },
+      {
+        "id": "getAdminSiteContent",
+        "region": "us-central1",
+        "runtime": "nodejs22",
+        "platform": "gcfv1"
+      },
+      {
+        "id": "getAdminUserDetail",
+        "region": "us-central1",
+        "runtime": "nodejs22",
+        "platform": "gcfv1"
+      },
+      {
+        "id": "getAircraftStates",
+        "region": "us-central1",
+        "runtime": "nodejs22",
+        "platform": "gcfv1"
+      },
+      {
+        "id": "getContributionModerationOverview",
+        "region": "us-central1",
+        "runtime": "nodejs22",
+        "platform": "gcfv1"
+      },
+      {
+        "id": "getDeFlockCameras",
+        "region": "us-central1",
+        "runtime": "nodejs22",
+        "platform": "gcfv1"
+      },
+      {
+        "id": "getMyRealityCapture",
+        "region": "us-central1",
+        "runtime": "nodejs22",
+        "platform": "gcfv1"
+      },
+      {
+        "id": "getPublicSiteStats",
+        "region": "us-central1",
+        "runtime": "nodejs22",
+        "platform": "gcfv1"
+      },
+      {
+        "id": "getRealityCaptureAssetAccess",
+        "region": "us-central1",
+        "runtime": "nodejs22",
+        "platform": "gcfv1"
+      },
+      {
+        "id": "getRealityCaptureModerationDetail",
+        "region": "us-central1",
+        "runtime": "nodejs22",
+        "platform": "gcfv1"
+      },
+      {
+        "id": "getStreetImagery",
+        "region": "us-central1",
+        "runtime": "nodejs22",
+        "platform": "gcfv1"
+      },
+      {
+        "id": "joinRoom",
+        "region": "us-central1",
+        "runtime": "nodejs22",
+        "platform": "gcfv1"
+      },
+      {
+        "id": "listAdminActivity",
+        "region": "us-central1",
+        "runtime": "nodejs22",
+        "platform": "gcfv1"
+      },
+      {
+        "id": "listAdminOverlayFeatures",
+        "region": "us-central1",
+        "runtime": "nodejs22",
+        "platform": "gcfv1"
+      },
+      {
+        "id": "listAdminRooms",
+        "region": "us-central1",
+        "runtime": "nodejs22",
+        "platform": "gcfv1"
+      },
+      {
+        "id": "listAdminUsers",
+        "region": "us-central1",
+        "runtime": "nodejs22",
+        "platform": "gcfv1"
+      },
+      {
+        "id": "listApprovedExteriorRepresentations",
+        "region": "us-central1",
+        "runtime": "nodejs22",
+        "platform": "gcfv1"
+      },
+      {
+        "id": "listBillingReceipts",
+        "region": "us-central1",
+        "runtime": "nodejs22",
+        "platform": "gcfv1"
+      },
+      {
+        "id": "listContributionSubmissions",
+        "region": "us-central1",
+        "runtime": "nodejs22",
+        "platform": "gcfv1"
+      },
+      {
+        "id": "listExplorerDiscoveries",
+        "region": "us-central1",
+        "runtime": "nodejs22",
+        "platform": "gcfv1"
+      },
+      {
+        "id": "listMyRealityCaptures",
+        "region": "us-central1",
+        "runtime": "nodejs22",
+        "platform": "gcfv1"
+      },
+      {
+        "id": "listRealityCaptureModeration",
+        "region": "us-central1",
+        "runtime": "nodejs22",
+        "platform": "gcfv1"
+      },
+      {
+        "id": "moderateContributionSubmission",
+        "region": "us-central1",
+        "runtime": "nodejs22",
+        "platform": "gcfv1"
+      },
+      {
+        "id": "moderateOverlayFeature",
+        "region": "us-central1",
+        "runtime": "nodejs22",
+        "platform": "gcfv1"
+      },
+      {
+        "id": "moderateRealityCapture",
+        "region": "us-central1",
+        "runtime": "nodejs22",
+        "platform": "gcfv1"
+      },
+      {
+        "id": "mutateSharedExpedition",
+        "region": "us-central1",
+        "runtime": "nodejs22",
+        "platform": "gcfv1"
+      },
+      {
+        "id": "notifyCaptureReview",
+        "region": "us-central1",
+        "runtime": "nodejs22",
+        "platform": "gcfv1"
+      },
+      {
+        "id": "publishAdminSiteContent",
+        "region": "us-central1",
+        "runtime": "nodejs22",
+        "platform": "gcfv1"
+      },
+      {
+        "id": "realityCaptureWorker",
+        "region": "us-central1",
+        "runtime": "nodejs22",
+        "platform": "gcfv1"
+      },
+      {
+        "id": "recoverRealityCaptureQueue",
+        "region": "us-central1",
+        "runtime": "nodejs22",
+        "platform": "gcfv1"
+      },
+      {
+        "id": "releaseUrbanVehicle",
+        "region": "us-central1",
+        "runtime": "nodejs22",
+        "platform": "gcfv1"
+      },
+      {
+        "id": "requestPrivateSpaceAccess",
+        "region": "us-central1",
+        "runtime": "nodejs22",
+        "platform": "gcfv1"
+      },
+      {
+        "id": "reserveRealityCapturePhoto",
+        "region": "us-central1",
+        "runtime": "nodejs22",
+        "platform": "gcfv1"
+      },
+      {
+        "id": "resolveBuildingExteriorRepresentation",
+        "region": "us-central1",
+        "runtime": "nodejs22",
+        "platform": "gcfv1"
+      },
+      {
+        "id": "resolveBuildingInteriorRepresentation",
+        "region": "us-central1",
+        "runtime": "nodejs22",
+        "platform": "gcfv1"
+      },
+      {
+        "id": "resolvePrivateSpaceEntry",
+        "region": "us-central1",
+        "runtime": "nodejs22",
+        "platform": "gcfv1"
+      },
+      {
+        "id": "resolveUrbanCivicOutcome",
+        "region": "us-central1",
+        "runtime": "nodejs22",
+        "platform": "gcfv1"
+      },
+      {
+        "id": "retryRealityCapture",
+        "region": "us-central1",
+        "runtime": "nodejs22",
+        "platform": "gcfv1"
+      },
+      {
+        "id": "retryRealityCaptureReviewEmail",
+        "region": "us-central1",
+        "runtime": "nodejs22",
+        "platform": "gcfv1"
+      },
+      {
+        "id": "saveAdminSiteContentDraft",
+        "region": "us-central1",
+        "runtime": "nodejs22",
+        "platform": "gcfv1"
+      },
+      {
+        "id": "saveExplorerPlayerCondition",
+        "region": "us-central1",
+        "runtime": "nodejs22",
+        "platform": "gcfv1"
+      },
+      {
+        "id": "saveOverlayFeatureDraft",
+        "region": "us-central1",
+        "runtime": "nodejs22",
+        "platform": "gcfv1"
+      },
+      {
+        "id": "saveRealityCaptureHybridPreview",
+        "region": "us-central1",
+        "runtime": "nodejs22",
+        "platform": "gcfv1"
+      },
+      {
+        "id": "sealRealityCaptureOriginal",
+        "region": "us-central1",
+        "runtime": "nodejs22",
+        "platform": "gcfv1"
+      },
+      {
+        "id": "settleExplorerCommerceOutcome",
+        "region": "us-central1",
+        "runtime": "nodejs22",
+        "platform": "gcfv1"
+      },
+      {
+        "id": "startTrial",
+        "region": "us-central1",
+        "runtime": "nodejs22",
+        "platform": "gcfv1"
+      },
+      {
+        "id": "stripeWebhook",
+        "region": "us-central1",
+        "runtime": "nodejs22",
+        "platform": "gcfv1"
+      },
+      {
+        "id": "submitContribution",
+        "region": "us-central1",
+        "runtime": "nodejs22",
+        "platform": "gcfv1"
+      },
+      {
+        "id": "submitOverlayFeature",
+        "region": "us-central1",
+        "runtime": "nodejs22",
+        "platform": "gcfv1"
+      },
+      {
+        "id": "submitRealityCaptureHybrid",
+        "region": "us-central1",
+        "runtime": "nodejs22",
+        "platform": "gcfv1"
+      },
+      {
+        "id": "updateAccountProfile",
+        "region": "us-central1",
+        "runtime": "nodejs22",
+        "platform": "gcfv1"
+      },
+      {
+        "id": "updateAdminRoomFlags",
+        "region": "us-central1",
+        "runtime": "nodejs22",
+        "platform": "gcfv1"
+      },
+      {
+        "id": "updatePrivateSpaceAccess",
+        "region": "us-central1",
+        "runtime": "nodejs22",
+        "platform": "gcfv1"
+      },
+      {
+        "id": "updateUrbanVehicle",
+        "region": "us-central1",
+        "runtime": "nodejs22",
+        "platform": "gcfv1"
+      }
+    ]
+  }
+}
