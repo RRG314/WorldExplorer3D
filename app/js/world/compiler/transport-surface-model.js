@@ -33,6 +33,65 @@ const TRANSPORT_SURFACE_SCHEMA_VERSION = 1;
 // Weak ownership, not a cache of external/mutable profiles. Compilation creates
 // sorted station distances; later reconciliation updates heights, not stations.
 const compiledModels = new WeakSet();
+const packedModels = new WeakSet();
+const PROFILE_CHUNK_BYTES = 256 * 1024;
+const PROFILE_FIELDS = ['distances', 'pathDistances', 'groundHeights', 'offsets',
+  'leftGround', 'rightGround', 'centerHeights', 'leftHeights', 'rightHeights'];
+
+// Final profiles share the compilation lifetime. Bound each backing store so
+// retaining one road cannot keep a whole city's numeric storage alive. Do this
+// after reconciliation, before tunnel/collision consumers capture any views.
+// Never detach old profiles: diagnostics and prior publications may hold them.
+function packCompiledTransportSurfaces(features) {
+  const pending = new Map();
+  const chunks = [];
+  let chunk = null;
+  let sourceBytes = 0;
+  for (const feature of features) {
+    const model = feature?.transportSurfaceModel;
+    if (!compiledModels.has(model) || packedModels.has(model) || pending.has(model)) continue;
+    const bytes = PROFILE_FIELDS.reduce((sum, field) => sum + model[field].byteLength, 0);
+    const offset = chunk ? Math.ceil(chunk.bytes / 8) * 8 : 0;
+    if (!chunk || offset + bytes > PROFILE_CHUNK_BYTES) {
+      chunk = { bytes: 0, entries: [] };
+      chunks.push(chunk);
+    }
+    const entry = { model, offset: Math.ceil(chunk.bytes / 8) * 8, bytes };
+    chunk.entries.push(entry);
+    chunk.bytes = entry.offset + bytes;
+    pending.set(model, null);
+    sourceBytes += bytes;
+  }
+  let storageBytes = 0;
+  for (const group of chunks) {
+    const storage = new ArrayBuffer(group.bytes);
+    storageBytes += storage.byteLength;
+    for (const { model, offset } of group.entries) {
+      const next = { ...model };
+      let cursor = offset;
+      for (const field of PROFILE_FIELDS) {
+        const source = model[field];
+        const view = new source.constructor(storage, cursor, source.length);
+        // Copy bytes, preserving every Float32/Float64 bit, including -0.
+        new Uint8Array(storage, cursor, source.byteLength).set(
+          new Uint8Array(source.buffer, source.byteOffset, source.byteLength));
+        next[field] = view;
+        cursor += source.byteLength;
+      }
+      Object.freeze(next);
+      compiledModels.add(next);
+      packedModels.add(next);
+      pending.set(model, next);
+    }
+  }
+  // Allocate/copy all replacements before publishing any of them. Duplicate
+  // feature/model identities retain their aliases; unrelated models stay put.
+  for (const feature of features) {
+    const next = pending.get(feature?.transportSurfaceModel);
+    if (next) attachCompiledTransportSurface(feature, next);
+  }
+  return Object.freeze({ profiles: pending.size, buffers: chunks.length, sourceBytes, storageBytes });
+}
 
 function featureRoadType(feature) {
   return String(
@@ -572,6 +631,7 @@ export {
   TRANSPORT_SURFACE_SCHEMA_VERSION,
   attachCompiledTransportSurface,
   compileTransportSurfaceModel,
+  packCompiledTransportSurfaces,
   roadSkirtDepth,
   sampleTransportSurfaceAtDistance
 };

@@ -1,5 +1,6 @@
 // Component and source-contract checks; browser and emulator journeys run separately.
 export const currentContractTests = [
+  'tests/rollback-runtime-contract-current.test.mjs',
   'tests/immutable-world-facts-current.test.mjs',
   'tests/water-uniform-storage-current.test.mjs',
   'tests/source-fingerprint-current.test.mjs',

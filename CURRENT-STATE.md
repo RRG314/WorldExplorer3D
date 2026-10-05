@@ -1,6 +1,6 @@
 # Current development and release state
 
-Updated October 4, 2026. This summary supersedes the chronological status notes retained in Git history.
+Updated October 5, 2026. This summary supersedes the chronological status notes retained in Git history.
 
 ## Workspace and authorization
 
@@ -12,7 +12,7 @@ Observed host: physical Apple M1 Mac mini, 8 GiB RAM; approximately 8 GiB disk f
 
 The owner now requests fixes and verification locally, preserving progress; no GitHub push or deployment. The fresh review and repair ledger is [IMPLEMENTATION.md](docs/system-review/2026-10-04/IMPLEMENTATION.md), with [ACCEPTANCE.md](docs/system-review/2026-10-04/ACCEPTANCE.md) defining evidence. Earlier phase/deployment summaries below are historical and do not approve this changed source.
 
-Synchronization, state ownership, clocks, persistence/history, provider handling, dependency provenance and support/resource diagnostics have verified local checkpoints. The a6cbf53f immutable matrix completed 84/90 candidate gates; six failed and backend groups remain pending. A compatible packaged save round trip passed for that artifact only. Backpack focused-button Escape and space launch retarget pause defects have source repairs with focused behavior/browser evidence; their full acceptance remains pending. Swimming/support-report/equipment fixtures are being corrected without weakening their assertions. P4 remains open: the sustained run records active-play stalls up to 1,133 ms and some average-FPS failures, while twelve-cycle retention and ownership checks pass. Preserve all failure evidence, four saved candidates, current dist, production artifact and player data. No GitHub push or production deployment.
+Synchronization, state ownership, clocks, persistence/history, provider handling, dependency provenance and support/resource diagnostics have verified local checkpoints. The a6cbf53f immutable matrix completed 84/90 candidate gates; six failed and backend groups remain pending. Its packaged save round trip passed for that artifact only. Backpack focused-button Escape and space launch retarget pause repairs now pass focused behavior/browser checks and the full PR chain. Corrected swimming/support/equipment fixtures pass without weakening gameplay assertions. Exact captured-building nearest search passes parity and browser checks. P4 remains open: the latest normal run records active-play stalls up to 1,333 ms and one driving FPS failure. Bounded final road profile storage now reduces 18,760 buffers to 78 with four-city behavior, prescribed driving and all 1,905 PR contracts verified; matching timing and immutable acceptance remain pending. The final rollback check requires exact reviewed runtime bytes plus a new actual packaged round trip. Preserve all failure evidence, four saved candidates, current dist, production artifact and player data. No GitHub push or production deployment.
 
 ## Production — unchanged
 

@@ -2,7 +2,6 @@
 // Owner APIs perform writes; this is save/protocol compatibility, not player UX.
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { execFileSync } from 'node:child_process';
 import { mkdir, readFile, writeFile, realpath } from 'node:fs/promises';
 import path from 'node:path';
 import { chromium } from 'playwright';
@@ -11,6 +10,7 @@ import { sourceFingerprint, sameAcceptanceSource } from './source-fingerprint.mj
 import { startStaticServer } from './static-server.mjs';
 import { configureStagingAppCheck } from './staging-app-check.mjs';
 import { closeOwnedBrowser } from './owned-browser.mjs';
+import { assertReviewedRollbackRuntime } from './rollback-runtime-contract.mjs';
 
 const root = process.cwd(), candidateRoot = process.env.WE3D_VERIFY_ROOT || 'dist';
 const fallbackRoot = process.argv.find(arg => arg.startsWith('--fallback='))?.slice(11);
@@ -26,16 +26,13 @@ assert.equal(manifests[0].sourceInputFingerprint, baseline.acceptanceFingerprint
 assert.equal(manifests[0].firebaseProjectId, manifests[1].firebaseProjectId);
 assert.equal(manifests[0].firebaseProjectId, 'we3d-staging-20260712', 'This test cannot target production');
 
-// This fallback intentionally differs only in immutable world metadata storage.
-// Any later save, protocol, configuration or other runtime change needs a new
-// compatibility contract; it cannot borrow this proof of identical protocols.
-const runtimeRoots = ['app', 'js', 'functions', 'account', 'assets', 'styles', 'legal', 'about', 'index.html', 'about.html',
-  'firebase.json', 'firestore.rules', 'firestore.indexes.json', 'storage.rules', 'package.json', 'package-lock.json'];
-const changed = execFileSync('git', ['diff', '--name-only', manifests[1].commit, manifests[0].commit, '--', ...runtimeRoots], { encoding: 'utf8' }).trim().split('\n').filter(Boolean).sort();
-assert.deepEqual(changed, ['app/js/world/building-provenance-model.js', 'app/js/world/compiler/transport-source-normalizer.js', 'app/js/world/load-road-pass.js']);
+// Pin every changed runtime file to the reviewed before/after bytes. A later
+// edit to even an already-listed path requires another compatibility review.
+const compatibility = JSON.parse(await readFile(path.join(root, 'scripts/verification/rollback-runtime-review.json'), 'utf8'));
+const changed = assertReviewedRollbackRuntime(root, manifests[1].commit, manifests[0].commit, compatibility);
 const report = { passed: false, scope: 'Packaged IndexedDB v4→v5 upgrade, fallback owner reads/writes, candidate return, Backpack controls and unchanged pending account data; identical remaining client/backend protocol bytes. SDK authority tests remain separate.',
   baseline, artifactIdentity: candidate, fallbackArtifactIdentity: fallback, fallbackArtifactRoot: fallbackRoot,
-  compatibilityContract: 'journal-v5-backpack-v2-controls-v1-condition-outbox-v1-world-metadata-only',
+  compatibilityContract: compatibility.id,
   runtimeDifferences: changed, stages: [], errors: [], localFailures: [], providerDegradations: [] };
 let server, browserServer, browser, page, stage = 'seed';
 try {
