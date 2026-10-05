@@ -1,3 +1,4 @@
+import {publishReferenceBlockDressing} from './reference-block-dressing.js';
 import {createPavementTerrainPartitionCooperatively} from './pavement-terrain-partition.js';
 import { captureStreetSurfaceGeometry,serializeStreetSurfaceCapture } from './street-surface-capture.js';
 import { createRoadMarkingMaterial } from '../road-render.js?v=4';
@@ -19,21 +20,21 @@ import { buildFeatureRibbonEdges } from '../structure-semantics.js?v=63';
 import { yieldToMainThread, yieldToWorldFrame } from './cooperative-scheduling.js?v=1';
 
 function concreteTexture(THREE) {
-  const canvas = document.createElement('canvas'); canvas.width = canvas.height = 128;
-  const ctx = canvas.getContext('2d');
-  const pixels = ctx.createImageData(128, 128);
-  let seed = 7231;
-  for (let i = 0; i < pixels.data.length; i += 4) {
-    seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
-    const value = 183 + (seed % 13);
-    pixels.data.set([value, value - 3, value - 8, 255], i);
+  const canvas=document.createElement('canvas');canvas.width=canvas.height=256;
+  const paint=canvas.getContext('2d'),pixels=paint.createImageData(256,256);
+  let seed=7231;
+  for(let y=0;y<256;y++)for(let x=0;x<256;x++){
+    seed=(Math.imul(seed,1664525)+1013904223)>>>0;
+    const edge=Math.min(x,y,255-x,255-y),grain=(seed%17)-8;
+    const bevel=edge<2?-34:edge<5?8:0;
+    const mottling=4*Math.sin(x*.043)*Math.sin(y*.051);
+    const v=184+grain+bevel+mottling,i=(y*256+x)*4;
+    pixels.data.set([v+4,v+2,v-2,255],i);
   }
-  ctx.putImageData(pixels, 0, 0);
-  ctx.strokeStyle = '#8c8982'; ctx.lineWidth = 1;
-  ctx.strokeRect(0.5, 0.5, 127, 127);
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
-  texture.encoding = THREE.sRGBEncoding;
+  paint.putImageData(pixels,0,0);
+  const texture=new THREE.CanvasTexture(canvas);
+  texture.wrapS=texture.wrapT=THREE.RepeatWrapping;
+  texture.encoding=THREE.sRGBEncoding;texture.anisotropy=4;
   return texture;
 }
 
@@ -388,6 +389,12 @@ export async function publishStreetPavement(appCtx, options = {}) {
     const diagnostics = document.querySelector('#streetSurfaceDiagnostics pre');
     if (diagnostics) diagnostics.textContent = JSON.stringify(stats,null,2);
     trace('published',stats);
+    // Dressing requires the world origin and the furniture owner's materials.
+    if(appCtx.streetLampHeadMaterial && Number.isFinite(appCtx.LOC?.lat) &&
+      !appCtx.streetFurnitureMeshes?.some(root=>root.userData?.referenceBlock)){
+      const {registerStreetLamp}=await import('../engine/night-lighting.js?v=8');
+      if(current())publishReferenceBlockDressing(appCtx,{registerLamp:registerStreetLamp});
+    }
     appCtx.scheduleWorldCoverVegetationRefresh?.();
     return stats;
   } catch (error) {

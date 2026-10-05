@@ -28,6 +28,7 @@ export const currentContractTests = [
   'tests/activity-lifecycle-current.test.mjs',
   'tests/game-result-current.test.mjs',
   'tests/harbor-district-presentation.test.mjs',
+  'tests/reference-block-current.test.mjs',
   'tests/interior-exterior-colliders-current.test.mjs',
   'tests/marine-research-current.test.mjs',
   'tests/marine-habitat-current.test.mjs',

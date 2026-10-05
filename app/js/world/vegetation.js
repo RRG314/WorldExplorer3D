@@ -159,7 +159,7 @@ function isInsideWaterArea(x, z) {
 }
 
 function isVegetationPlacementBlocked(x, z, options = {}) {
-  if (Number.isFinite(appCtx.streetPavement?.sampleAt(x,z))) return true;
+  if (!options.authoredPlanter && Number.isFinite(appCtx.streetPavement?.sampleAt(x,z))) return true;
   if (Math.hypot(x, z) < 18) return true;
   const roadPadding = Number.isFinite(options.roadPadding) ? options.roadPadding : 4.5;
   const buildingPadding = Number.isFinite(options.buildingPadding) ? options.buildingPadding : 1.8;
@@ -184,6 +184,8 @@ function isVegetationPlacementBlocked(x, z, options = {}) {
   for (let i = 0; i < nearbyBuildings.length; i++) {
     const building = nearbyBuildings[i];
     if (!building || building.collisionDisabled) continue;
+    // The planter is the intended support, not an obstruction to its own tree.
+    if (options.authoredPlanter && building.sourceBuildingId === 'authored-calvert-street-fixture') continue;
     if (
       x < building.minX - buildingPadding ||
       x > building.maxX + buildingPadding ||
@@ -233,6 +235,10 @@ function* vegetationPlacementSteps() {
     placements.push(placement);
     return true;
   };
+
+  for(const root of appCtx.streetFurnitureMeshes || [])if(root.userData?.referenceBlock){
+    for(const p of root.userData.plan || [])if(p.kind==='planter')pushPlacement({x:p.x,z:p.z,scale:.65,rotation:p.yaw,leafType:'broadleaved',landuseType:'garden',source:'authored-reference-block',options:{authoredPlanter:true,roadPadding:1,buildingPadding:.4}});
+  }
 
   for(const p of appCtx.harborDistrictPlanting || []) {
     pushPlacement({x:p.x,z:p.z,scale:.85,rotation:p.yaw,leafType:'broadleaved',landuseType:'garden',source:'authored-harbor-district'});

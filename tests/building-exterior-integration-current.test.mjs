@@ -101,7 +101,7 @@ test('facade material selection preserves mapped tags and uses bounded shared te
   assert.match(material, /materialClaim: mappedFamily \? 'mapped'/);
   assert.match(material, /colorClaim: mappedColor \? 'mapped'/);
   assert.match(material, /sharedRuntimeTexture: true/);
-  assert.match(material, /building-facade-local-layout-v11-filtered-openings/);
+  assert.match(material, /building-facade-local-layout-v12-room-depth/);
   assert.doesNotMatch(material, /new THREE\.TextureLoader\(\).*forEach/);
 });
 

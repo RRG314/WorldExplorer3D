@@ -1,6 +1,6 @@
 # Current development and release state
 
-Updated October 5, 2026. This file supersedes historical status paragraphs. The verified closeout is [LOCAL-RESULT.md](docs/system-review/2026-10-04/LOCAL-RESULT.md); detailed failed and successful checkpoints remain in [IMPLEMENTATION.md](docs/system-review/2026-10-04/IMPLEMENTATION.md) and Git history.
+Updated October 5, 2026. This file supersedes historical status paragraphs. The latest local visual work is [REFERENCE-BLOCK.md](docs/visual-quality/REFERENCE-BLOCK.md). The earlier architecture closeout is [LOCAL-RESULT.md](docs/system-review/2026-10-04/LOCAL-RESULT.md); detailed failed and successful checkpoints remain in [IMPLEMENTATION.md](docs/system-review/2026-10-04/IMPLEMENTATION.md) and Git history.
 
 ## Workspace and authorization
 
@@ -8,7 +8,15 @@ Use `/Users/stevenreid/.codex/worktrees/architecture-evaluation/WorldExplorer3D-
 
 Observed host: physical Apple M1 Mac mini, 8 GiB RAM. Run heavy work sequentially. Keep ordinary Chrome open, close only owned verification processes, and preserve `dist`, all four saved candidates, previous build artifacts and player data. Current observations supersede stale hardware notes. Private diagnostic captures remain outside the repository; never print credentials.
 
-## Local architecture work — automated acceptance complete
+## Local visual source — reference street block
+
+The shared facade renderer, near-building trim/storefronts, asphalt/paving materials and an authored Calvert Street seating/planting block are implemented. Night windows reuse the existing lighting owner; furniture, trees and three seating lamps reuse existing lifecycle, collision and light-budget owners. A profiled excessive commerce lookup now uses the existing batch spatial index, with exact-association and stale-publication regression coverage.
+
+Local source checks pass all **1,913 PR contracts**, plus the source/dependency/ownership/type checks, actual near/mid shader rendering and the prescribed storefront browser client. The final actual Baltimore journey passes furniture clearance, building entry/exit, day/night/weather and phone-viewport inspection. Its 30-second walking and driving samples measure 46.24 / 43.72 FPS, p99 33.4 ms and worst frame 33.5 ms, with no frames over 100 ms; all 263 driving positions remain on the mapped carriageway. These are bounded checks on this Mac, not a repeat of the entire release/device matrix.
+
+The new source is different from the preserved architecture artifact below. Its previous 90 candidate gates, backend receipts, reload matrix and `automatedReady` status certify that older artifact only. They do not certify the visual source for production. `dist`, saved candidates and player data remain unchanged; no push or deployment occurred. See the visual ledger for images, evidence locations and remaining art scope.
+
+## Preserved architecture artifact — automated acceptance complete
 
 Packages 1–5 are implemented and verified locally: synchronization, state/lifecycle ownership, coherent clocks, measured stall/retention repairs, and persistence/service/dependency boundaries. Package 6's evidence infrastructure and automated acceptance are complete; its genuinely external release observations remain pending.
 

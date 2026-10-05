@@ -98,6 +98,7 @@ function facadeEdgeForMesh(appCtx,mesh,entrance){
 function createDetailMaterials() {
   const make = (key, color, roughness, metalness = 0) => {
     const material = new THREE.MeshStandardMaterial({ color, roughness, metalness });
+    material.color.convertSRGBToLinear();
     material.name = `building-exterior-detail:${key}`;
     material.userData = {
       buildingExteriorDetail: true,
@@ -107,7 +108,7 @@ function createDetailMaterials() {
     return material;
   };
   return new Map([
-    ['trim', make('trim', 0xaaa69c, 0.86)],
+    ['trim', make('trim', 0xb9b1a0, 0.86)],
     ['dark-metal', make('dark-metal', 0x343c40, 0.62, 0.34)],
     ['glass', make('glass', 0x405765, 0.32, 0.16)],
     ['awning-red', make('awning-red', 0x8e3d37, 0.82)],
@@ -125,14 +126,14 @@ function boxAppender(unitBox, batches, counters) {
   const scale = new THREE.Vector3();
   const quaternion = new THREE.Quaternion();
   const matrix = new THREE.Matrix4();
-  const axis = new THREE.Vector3(0, 1, 0);
-  return (materialKey, width, height, depth, x, y, z, yaw = 0) => {
+  const rotation = new THREE.Euler(0, 0, 0, 'YXZ');
+  return (materialKey, width, height, depth, x, y, z, yaw = 0, pitch = 0) => {
     if (!(width > 0.025 && height > 0.025 && depth > 0.025)) return false;
     const batch = batches.get(materialKey);
     if (!batch) return false;
     position.set(x, y, z);
     scale.set(width, height, depth);
-    quaternion.setFromAxisAngle(axis, yaw);
+    quaternion.setFromEuler(rotation.set(pitch, yaw, 0));
     matrix.compose(position, quaternion, scale);
     if (!batch.append(matrix)) return false;
     counters.boxes += 1;
@@ -148,9 +149,9 @@ function facadePoint(edge, tangentOffset, outwardOffset) {
   };
 }
 
-function addFacadeBeam(addBox, material, edge, width, height, depth, y, tangentOffset = 0, outwardOffset = 0.08) {
+function addFacadeBeam(addBox, material, edge, width, height, depth, y, tangentOffset = 0, outwardOffset = 0.08, pitch = 0) {
   const point = facadePoint(edge, tangentOffset, outwardOffset);
-  return addBox(material, width, height, depth, point.x, y, point.z, edge.yaw);
+  return addBox(material, width, height, depth, point.x, y, point.z, edge.yaw, pitch * Math.sign(edge.normalX*Math.sin(edge.yaw)+edge.normalZ*Math.cos(edge.yaw)));
 }
 
 function addRailings(addBox, edge, center, width, baseY, height = 0.78) {
@@ -222,21 +223,52 @@ function addStorefrontAwning(addBox, edge, baseY, profile, seed, counters, mesh,
   for(const bay of layout.bays){
     if((counters.modules.shopfront_bay||0)>=192)break;
     const y=baseY+(bay.bottom+bay.top)/2,h=bay.top-bay.bottom;
-    // Side posts, lower stall riser and transom fit the exact shader opening.
-    for(const side of [-1,1])addFacadeBeam(addBox,'dark-metal',edge,.085,h,.12,y,bay.along+side*bay.width/2,.065);
-    addFacadeBeam(addBox,'dark-metal',edge,bay.width,.065,.12,baseY+bay.top-h*.22,bay.along,.065);
-    addFacadeBeam(addBox,'trim',edge,bay.width+.14,.14,.18,baseY+bay.bottom-.07,bay.along,.08);
-    addFacadeBeam(addBox,material,edge,bay.width+.18,.16,.15,baseY+layout.fasciaY,bay.along,.08);
+    // Layered piers, stall riser, sill and transom have real projection. Their
+    // openings still match the facade shader and reserve the existing door.
+    for(const side of [-1,1]){
+      addFacadeBeam(addBox,'trim',edge,.18,h+.26,.27,y,bay.along+side*(bay.width/2+.10),.10);
+      addFacadeBeam(addBox,'dark-metal',edge,.065,h,.13,y,bay.along+side*bay.width/2,.085);
+    }
+    addFacadeBeam(addBox,'dark-metal',edge,bay.width,.065,.13,baseY+bay.top-h*.22,bay.along,.085);
+    addFacadeBeam(addBox,'dark-metal',edge,bay.width,.07,.16,baseY+bay.bottom,bay.along,.09);
+    addFacadeBeam(addBox,'trim',edge,bay.width+.32,.12,.32,baseY+bay.bottom-.07,bay.along,.12);
+    addFacadeBeam(addBox,material,edge,bay.width+.32,.58,.22,baseY+layout.fasciaY,bay.along,.12);
+    addFacadeBeam(addBox,'trim',edge,bay.width+.40,.09,.34,baseY+layout.fasciaY+.33,bay.along,.14);
     if(profile.details.includes('storefront_awning')){
-      // Segmented canopies leave gaps at real doors and never span a whole block.
-      const width=Math.min(4.8,bay.width+.16);
-      addFacadeBeam(addBox,material,edge,width,.10,.82,baseY+layout.awningY,bay.along,.42);
-      addFacadeBeam(addBox,material,edge,width,.19,.06,baseY+layout.awningY-.075,bay.along,.81);
-      addFacadeBeam(addBox,'trim',edge,width,.045,.07,baseY+layout.awningY-.16,bay.along,.82);
+      const width=Math.min(4.8,bay.width+.16),canopyY=baseY+layout.awningY-.10;
+      addFacadeBeam(addBox,material,edge,width,.075,1.12,canopyY,bay.along,.58,.22);
+      addFacadeBeam(addBox,material,edge,width,.22,.065,canopyY-.20,bay.along,1.12);
+      addFacadeBeam(addBox,'trim',edge,width,.035,.07,canopyY-.31,bay.along,1.13);
+      for(const side of [-1,1])addFacadeBeam(addBox,'dark-metal',edge,.035,.045,.94,canopyY-.075,bay.along+side*(width/2-.08),.50,.22);
       counters.modules.storefront_awning=(counters.modules.storefront_awning||0)+1;
     }
     counters.modules.shopfront_bay=(counters.modules.shopfront_bay||0)+1;
   }
+}
+
+function addFrontageStructure(addBox,edge,mesh,profile,entrance,counters,distance){
+  if(distance>90 || edge.length<3 || profile.material?.surfacePattern==='glass')return;
+  const base=finite(mesh.position.y),plan=facadeFloorPlan(finite(mesh.userData.bodyHeightMeters),{
+    ...profile,levels:Math.max(1,finite(mesh.userData.levels)-finite(mesh.userData.buildingSemantics?.buildingMinLevel)),foundation:finite(mesh.userData.terrainFoundationRise)
+  });
+  if(!plan.floors)return;
+  const ground=base+plan.foundation,groundFloor=ground+plan.floorHeight;
+  // A stone base course stops either side of the authoritative doorway.
+  const doorAlong=entrance?(entrance.x-edge.x)*edge.tangentX+(entrance.z-edge.z)*edge.tangentZ:Infinity;
+  const width=finite(profile.door?.width,1.8)+.5;
+  const spans=entrance?[[-edge.length/2,Math.max(-edge.length/2,doorAlong-width/2)],[Math.min(edge.length/2,doorAlong+width/2),edge.length/2]]:[[-edge.length/2,edge.length/2]];
+  for(const [a,b] of spans)if(b-a>.3)addFacadeBeam(addBox,'trim',edge,b-a,.30,.14,ground+.15,(a+b)/2,.055);
+  if(plan.floors>1){
+    addFacadeBeam(addBox,'trim',edge,edge.length,.15,.25,groundFloor+.04,0,.10);
+    addFacadeBeam(addBox,'trim',edge,edge.length,.06,.32,groundFloor+.14,0,.13);
+  }
+  if(entrance){
+    const doorHeight=2.78,entryBase=finite(entrance.facadeBaseY,ground);
+    for(const side of [-1,1])addFacadeBeam(addBox,'trim',edge,.15,doorHeight,.22,entryBase+doorHeight/2,doorAlong+side*width/2,.08);
+    addFacadeBeam(addBox,'trim',edge,width+.15,.16,.28,entryBase+doorHeight,doorAlong,.11);
+    counters.modules.entry_surround=(counters.modules.entry_surround||0)+1;
+  }
+  counters.modules.frontage_base=(counters.modules.frontage_base||0)+1;
 }
 
 function addBalconies(addBox, edge, baseY, topY, profile, seed, counters) {
@@ -304,8 +336,8 @@ function addFittedWindowTrim(addBox, edge, mesh, profile, entrance, counters, di
   });
   const bays=Math.max(1,Math.round(edge.length/Math.max(1.8,finite(profile.window?.bayWidth,3.4))));
   const bayWidth=edge.length/bays;
-  for(let floor=0;floor<Math.min(2,plan.floors);floor++)for(let bay=0;bay<bays;bay++){
-    if((counters.modules.fitted_window_frame||0)>=192)return;
+  for(let floor=0;floor<Math.min(4,plan.floors);floor++)for(let bay=0;bay<bays;bay++){
+    if((counters.modules.fitted_window_frame||0)>=320)return;
     const shop=floor===0 && finite(profile.storefront?.glazing)>0;
     if(shop)continue; // storefront layout supplies the aligned close trim
     const w=bayWidth*finite(profile.window?.width,.55);
@@ -314,9 +346,9 @@ function addFittedWindowTrim(addBox, edge, mesh, profile, entrance, counters, di
     const y=finite(mesh.position.y)+plan.foundation+(floor+.55)*plan.floorHeight;
     const entranceAlong=entrance?(entrance.x-edge.x)*edge.tangentX+(entrance.z-edge.z)*edge.tangentZ:Infinity;
     if(floor===0 && Math.abs(along-entranceAlong)<bayWidth*finite(profile.window?.width,.55)/2+1.2)continue;
-    addFacadeBeam(addBox,'trim',edge,w+.16,.09,.16,y-h/2-.04,along,.075);
-    addFacadeBeam(addBox,'trim',edge,w+.12,.075,.10,y+h/2+.025,along,.045);
-    for(const side of [-1,1])addFacadeBeam(addBox,'dark-metal',edge,.055,h,.06,y,along+side*w/2,.025);
+    addFacadeBeam(addBox,'trim',edge,w+.22,.12,.24,y-h/2-.04,along,.105);
+    addFacadeBeam(addBox,'trim',edge,w+.18,.11,.16,y+h/2+.035,along,.07);
+    for(const side of [-1,1])addFacadeBeam(addBox,'dark-metal',edge,.06,h,.13,y,along+side*w/2,.055);
     counters.modules.fitted_window_frame=(counters.modules.fitted_window_frame||0)+1;
   }
 }
@@ -393,6 +425,7 @@ function* buildDetails(appCtx, options = {}) {
     storefronts.set(profile.storefrontStyle, (storefronts.get(profile.storefrontStyle) || 0) + 1);
     combinations.add([profile.familyId, profile.materialId, profile.windowStyle, profile.doorStyle, profile.storefrontStyle].join('|'));
 
+    addFrontageStructure(addBox, edge, mesh, profile, entrance, counters, distance);
     addFittedWindowTrim(addBox, edge, mesh, profile, entrance, counters, distance);
     addCornice(addBox, edge, topY, profile, counters);
     const shopsBefore=counters.modules.shopfront_bay||0;
@@ -406,7 +439,7 @@ function* buildDetails(appCtx, options = {}) {
     addFireEscape(addBox, edge, baseY+fittedFloors.foundation, topY, alignedProfile, seed, counters);
     addServiceFront(addBox, edge, baseY, profile, counters);
     addChimney(addBox, mesh, profile, seed, counters);
-    if(signs.length<24 && mappedFrontageLabel(mesh.userData.buildingName) && distance<90 && ['commercial','office','institutional'].includes(profile.category))signs.push({name:mesh.userData.buildingName,sourceBuildingId,length:edge.length,x:edge.x,z:edge.z,normalX:edge.normalX,normalZ:edge.normalZ,y:baseY+fittedFloors.foundation+Math.min(fittedFloors.floorHeight-.42,3.3)});
+    if(signs.length<24 && mappedFrontageLabel(mesh.userData.buildingName) && distance<90 && ['commercial','office','institutional'].includes(profile.category))signs.push({name:mesh.userData.buildingName,sourceBuildingId,length:edge.length,x:edge.x,z:edge.z,normalX:edge.normalX,normalZ:edge.normalZ,y:baseY+fittedFloors.foundation+fittedFloors.floorHeight+.18});
     yield 'building';
   }
 

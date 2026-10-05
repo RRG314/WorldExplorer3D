@@ -15,7 +15,7 @@ export function createFrontageSigns(records,{THREE=globalThis.THREE,document=glo
   paint.fillStyle='#152b34';paint.fillRect(x,y,256,64);paint.strokeStyle='#baa887';paint.lineWidth=3;paint.strokeRect(x+8,y+6,240,52);
   let size=28;paint.font=`600 ${size}px sans-serif`;while(paint.measureText(label).width>226 && size>12){size--;paint.font=`600 ${size}px sans-serif`;}
   paint.fillStyle='#f6e9cc';paint.textAlign='center';paint.textBaseline='middle';paint.fillText(label,x+128,y+32,226);
-  const width=Math.min(5.2,r.length-.6),height=.72,cx=r.x+r.normalX*.19,cz=r.z+r.normalZ*.19;
+  const width=Math.min(5.2,r.length-.6),height=.46,cx=r.x+r.normalX*.335,cz=r.z+r.normalZ*.335;
   const rightX=r.normalZ,rightZ=-r.normalX,base=positions.length/3;
   for(const [sx,sy] of [[-1,-1],[1,-1],[1,1],[-1,1]]){positions.push(cx+rightX*sx*width/2,r.y+sy*height/2,cz+rightZ*sx*width/2);normals.push(r.normalX,0,r.normalZ);}
   const u0=(x+1)/1024,u1=(x+255)/1024,v0=1-(y+63)/512,v1=1-(y+1)/512;uvs.push(u0,v0,u1,v0,u1,v1,u0,v1);indices.push(base,base+1,base+2,base,base+2,base+3);

@@ -16,5 +16,5 @@ export function storefrontLayout({length,height,levels,foundation=0,profile,door
   if(Math.abs(along-doorAlong)<doorwayClearance)continue;
   bays.push({along,width:windowWidth,bottom,top});
  }
- return {bays,bayWidth,foundation,floorHeight:floor.floorHeight,fasciaY:foundation+floor.floorHeight*.975,awningY:Math.max(foundation+2.35,top+.12)};
+ return {bays,bayWidth,foundation,floorHeight:floor.floorHeight,fasciaY:foundation+floor.floorHeight+.18,awningY:Math.max(foundation+2.35,top+.12)};
 }

@@ -23,7 +23,21 @@ try {
       await page.evaluate(() => window.advanceTime(16));
       const state = await page.evaluate(() => JSON.parse(window.render_game_to_text()));
       await page.screenshot({ path: `${output}/${tier}.png` });
-      results.push({ tier, state, errors });
+      const night=await page.evaluate(async()=>{
+        const {facadeNightUniform}=await import('/app/js/world/facade-lighting.js');
+        facadeNightUniform.value=1;await window.advanceTime(16);
+        return JSON.parse(window.render_game_to_text());
+      });
+      await page.screenshot({path:`${output}/${tier}-night.png`});
+      const dayReturn=await page.evaluate(async()=>{
+        const {facadeNightUniform}=await import('/app/js/world/facade-lighting.js');
+        facadeNightUniform.value=0;await window.advanceTime(16);
+        return JSON.parse(window.render_game_to_text());
+      });
+      results.push({ tier, state, night, errors });
+      assert.equal(night.renderer.calls,state.renderer.calls,'Window lighting adds no draw calls');
+      assert.deepEqual(dayReturn.windowSamples,state.windowSamples,'Daylight restores without rebuilding materials');
+      assert.ok(night.windowSamples.some((sample,i)=>sample.rgba.some((c,k)=>k<3 && c>state.windowSamples[i].rgba[k]+5)),'No illuminated room was rendered');
       assert.deepEqual(errors, [], `${tier} shader or asset failure`);
       assert.equal(state.cases.length, 4);
       assert.ok(state.renderer.calls > 0);
@@ -37,6 +51,8 @@ try {
     const near=results[0].state.windowSamples[i].rgba;
     const mid=results[1].state.windowSamples[i].rgba;
     assert.ok(near.slice(0,3).every((channel,k)=>Math.abs(channel-mid[k])<=12), `Window glass changes color across LOD: ${near} vs ${mid}`);
+    const nightNear=results[0].night.windowSamples[i].rgba,nightMid=results[1].night.windowSamples[i].rgba;
+    assert.ok(nightNear.slice(0,3).every((channel,k)=>Math.abs(channel-nightMid[k])<=12),`Night window changes across LOD: ${nightNear} vs ${nightMid}`);
   }
 } finally {
   await writeFile(`${output}/report.json`, JSON.stringify({ evidenceScope: 'source-fixture-shader-compilation', results }, null, 2));

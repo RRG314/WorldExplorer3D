@@ -13,7 +13,7 @@ function harness(t, mode='success') {
   class Attribute {constructor(values){this.array=new Float32Array(values);}}
   class Mesh {constructor(geometry,material){this.geometry=geometry;this.material=material;this.userData={};}}
   install('THREE',{value:{CanvasTexture:Resource,MeshStandardMaterial:Resource,BufferGeometry:Geometry,Float32BufferAttribute:Attribute,BufferAttribute:class{constructor(array){this.array=array;}},Mesh,RepeatWrapping:1,SRGBColorSpace:1,DoubleSide:2},configurable:true});
-  install('document',{value:{createElement(){return {getContext(){return {createImageData(){return {data:new Uint8ClampedArray(128*128*4)};},putImageData(){},strokeRect(){}};}};},querySelector(){return null;}},configurable:true});
+  install('document',{value:{createElement(){return {getContext(){return {createImageData(width,height){return {data:new Uint8ClampedArray(width*height*4)};},putImageData(){},strokeRect(){}};}};},querySelector(){return null;}},configurable:true});
   install('location',{value:{search:''},configurable:true});
   let worker;
   const ctx={_worldLoadSequence:1,terrainEnabled:true,scene:{},roads:[{pts:[{x:0,z:0},{x:10,z:0}],width:4}],roadMeshes:[],buildings:[],landuses:[],linearFeatures:[],linearFeatureMeshes:[],urbanSurfaceMeshes:[],car:{x:0,z:0},

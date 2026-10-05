@@ -1,3 +1,4 @@
+import { facadeNightUniform, FACADE_EMISSION_GLSL } from './facade-lighting.js';
 import {GeometryBatchStorage, batchStorageView} from './geometry-batch-storage.js';
 import {compactBuildingVertices} from './building-vertex-storage.js';
 import {releaseRetiredBuildingCpuBuffers} from './retired-building-buffers.js';
@@ -31,6 +32,8 @@ export function appendMidFacadeAttributes(batch, material, exteriorPresentation,
     : new THREE.Color(0x8d9292);
   const roofColorA = new THREE.Color(exteriorPresentation?.roofColorA ?? material?.userData?.roofSurfaceColorA ?? wallColor.getHex());
   const roofColorB = new THREE.Color(exteriorPresentation?.roofColorB ?? material?.userData?.roofSurfaceColorB ?? wallColor.getHex());
+  if (Number.isFinite(Number(exteriorPresentation?.wallColor))) wallColor.convertSRGBToLinear();
+  roofColorA.convertSRGBToLinear(); roofColorB.convertSRGBToLinear();
   const roofGrainScale = Number(exteriorPresentation?.roofGrainScale || material?.userData?.roofSurfaceGrainScale || 0.6);
   const [repeatX,repeatY,offsetX,offsetY]=material.userData.facadeProjection || [
     Number(material?.map?.repeat?.x || 0.08),Number(material?.map?.repeat?.y || (1/16)),
@@ -53,6 +56,7 @@ export function createMidFacadeBatchMaterial(sourceMaterial, batchKey) {
   material.color.setHex(0xffffff);
   material.vertexColors = true;
   material.onBeforeCompile = (shader) => {
+    shader.uniforms.facadeNight = facadeNightUniform;
     // Facades use wall-local coordinates; remove the unused standard map UV
     // varying so merged buildings stay within eight vertex attribute slots.
     shader.vertexShader = shader.vertexShader.replace('#include <uv_vertex>', '');
@@ -85,6 +89,7 @@ export function createMidFacadeBatchMaterial(sourceMaterial, batchKey) {
     shader.fragmentShader = [
       'varying vec4 vFacadeLayout; varying vec4 vFacadeOpening;',
       FACADE_OPENINGS_GLSL,
+      'uniform float facadeNight;',
       'varying vec4 vBuildingFacadeParams;',
       'varying vec4 vBuildingRoofAParams;',
       'varying vec4 vBuildingRoofColorB;',
@@ -115,13 +120,20 @@ export function createMidFacadeBatchMaterial(sourceMaterial, batchKey) {
         '  float buildingRoofGrain = buildingMidRoofNoise(vBuildingRoofPosition * vBuildingRoofAParams.w);',
         '  vec3 buildingRoofSurface = mix(vBuildingRoofAParams.rgb, vBuildingRoofColorB.rgb, 0.18 + buildingRoofGrain * 0.64);',
         '  diffuseColor.rgb = mix(buildingRoofSurface, facadeWallSurface(diffuseColor.rgb * vColor.rgb, buildingFacadeTexel.rgb), vBuildingWallMask);',
-        '  if (vBuildingWallMask > 0.5) diffuseColor.rgb = facadeOpenings(diffuseColor.rgb, vFacadeLayout, vFacadeOpening);',
+        '  float facadeBuildingSeed=dot(floor(vColor.rgb*16.0+.001),vec3(17.0,3.0,7.0));',
+        '  vec4 facadeSurface=vec4(diffuseColor.rgb,0.0);',
+        '  if (vBuildingWallMask > 0.5) facadeSurface=facadeOpenings(diffuseColor.rgb, vFacadeLayout, vFacadeOpening, facadeViewRay(vViewPosition,vFacadeLayout.zw),facadeBuildingSeed);',
+        '  diffuseColor.rgb=facadeSurface.rgb;',
         '  diffuseColor.a *= mix(1.0, buildingFacadeTexel.a, vBuildingWallMask);',
         '#endif'
       ].join('\n')
     );
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n' + FACADE_EMISSION_GLSL)
+      .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\nroughnessFactor=mix(roughnessFactor,.22,facadeSurface.a);')
+      .replace('#include <normal_fragment_maps>', '#include <normal_fragment_maps>\nnormal=facadeGrainNormal(normal,vViewPosition,dot(buildingFacadeTexel.rgb,vec3(.2126,.7152,.0722)),.018*vBuildingWallMask*(1.0-facadeSurface.a));');
   };
-  material.customProgramCacheKey = () => 'building-mid-facade-batch-v7-filtered-openings';
+  material.customProgramCacheKey = () => 'building-mid-facade-batch-v8-room-depth';
   material.userData = {
     ...(material.userData || {}),
     buildingMidFacadeBatch: true,
