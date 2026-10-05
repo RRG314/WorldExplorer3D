@@ -117,7 +117,15 @@ try {
       const saved = await store.recordExplorerEvent(record);
       check(saved.recorded === true, 'New Journal write did not commit');
       check((await store.recordExplorerEvent(record)).recorded === false, 'Duplicate Journal write was credited twice');
-      check(backpack.saveControls({ ammo: { 'pulse-sidearm': { magazine: writeMagazine, reserve: 12 } } }), 'Backpack control write failed');
+      // Exercise the live equipment owner and its persistence subscription.
+      // Writing storage behind that owner's back is not a gameplay mutation.
+      const equipment = ctx.urbanSandboxRuntime?.equipment;
+      check(equipment, 'Packaged equipment owner unavailable');
+      equipment.equip('pulse-sidearm');
+      check(equipment.equipped()?.id === 'pulse-sidearm', 'Sidearm selection failed');
+      check(equipment.prepareUse(Date.now()).ok, 'Equipment consumption failed');
+      equipment.equip('hands');
+      check(equipment.exportControls().ammo['pulse-sidearm'].magazine === writeMagazine, 'Equipment owner consumption differs');
       check(backpack.load().ammo['pulse-sidearm'].magazine === writeMagazine, 'Backpack control write did not persist');
       ctx.setTimeOfDay?.('day'); ctx.openWorldDiscoverySection?.('journal');
       return { label, schemaVersion: before.schemaVersion, retainedItems: seed.items.length, retainedEvents: seed.events.length + previous.length, event: saved.event, magazine: writeMagazine };
