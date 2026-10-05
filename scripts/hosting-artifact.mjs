@@ -190,8 +190,8 @@ async function buildGameRuntime() {
     write: true,
     logLevel: 'warning'
   });
-  const outputFiles = Object.entries(result.metafile.outputs)
-    .filter(([, details]) => Number(details.bytes || 0) > 0);
+  // Empty chunks are still emitted files and must be counted in the artifact.
+  const outputFiles = Object.entries(result.metafile.outputs);
   const entries = Object.fromEntries(
     Object.entries(GAME_RUNTIME_ENTRYPOINTS).map(([name, source]) => [
       name,
