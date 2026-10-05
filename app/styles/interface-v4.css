@@ -377,6 +377,9 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .hud-box::after { content: attr(data-build-label); position: absolute; top: 39px; left: 16px; max-width: 190px; overflow: hidden; color: var(--wx-blue); font: 600 9px/1 Orbitron, sans-serif; text-overflow: ellipsis; white-space: nowrap; }
 .hud-box:not([data-build-label])::after { content: 'SOURCE PREVIEW'; }
 #hudToggleBtn { color: var(--wx-text); background: transparent; border: 1px solid var(--wx-line); border-radius: 50%; }
+#hudHeader { gap: 12px; padding-right: 0; }
+#hudSpeedBlock { flex: 0 0 92px; min-width: 0; }
+#weatherLine, #weatherMetaLine { overflow-wrap: anywhere; }
 #speed { color: var(--wx-text); font-family: Orbitron, sans-serif; }
 .hud-label, #weatherMetaLine, #locationLine, .indicators { color: var(--wx-muted); }
 #weatherLine, #street, #hudClockDisplay { color: var(--wx-text); }

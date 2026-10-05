@@ -66,4 +66,7 @@ finally { await browser.close(); await server.close(); await fs.writeFile(`${out
 console.log(JSON.stringify(report));
 if (!report.ok) process.exitCode = 1;
 
-if (report.ok) { const {verifyEnvironmentPanelClient} = await import('./environment-panel-client.mjs'); await verifyEnvironmentPanelClient(); }
+if (report.ok) {
+ const {verifyHudWeatherLayout} = await import('./hud-weather-layout.mjs'); await verifyHudWeatherLayout();
+ const {verifyEnvironmentPanelClient} = await import('./environment-panel-client.mjs'); await verifyEnvironmentPanelClient();
+}
