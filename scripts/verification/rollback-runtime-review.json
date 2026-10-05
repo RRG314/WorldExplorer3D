@@ -1,85 +1,92 @@
 {
   "schema": "we3d-reviewed-rollback-runtime-v1",
-  "id": "journal-v5-backpack-v2-controls-v1-condition-outbox-v1-reviewed-local-polish-20261005",
-  "fallbackCommit": "5d772a9c758cf70375acdd2c08a6ed34c821d546",
-  "scope": "All remaining shipped client/backend/configuration bytes must match the fallback. Reviewed differences below affect transient input/focus, launch, spatial queries and in-memory world representation. Save, equipment model/storage, migration, account synchronization and backend protocol owners are unchanged. Actual packaged upgrade/fallback/write/return verification is still required.",
+  "id": "journal-v5-backpack-v2-free-data-gateway-v1-visual-fallback-20261005",
+  "fallbackCommit": "0e4c8d429c8a62d7b2cd58158117833ac3da770e",
+  "scope": "Identical public environmental data, backend, configuration, save/migration, equipment and account synchronization owners. The only runtime differences are the twelve reviewed transient visual/scene files. Actual packaged upgrade/fallback/write/return is required.",
   "files": {
-    "app/js/engine/input-handlers.js": {
-      "before": "7f1334b697f5b654287cd3df7d435af0ff052f859ca62dbe5ea0ac874ffe46f2",
-      "after": "71ae421c251586cc092f0d82b63ffb8d09373fa410e9375c807111872e71a932",
-      "review": "Focused Backpack Escape routing only; equipment/storage owners and durable formats unchanged.",
+    "app/js/engine/building-facade-materials.js": {
+      "before": "cb740f60cfaff53fcce15bb53313243660014614c50f0f19137984a7c612d04d",
       "beforeMode": "100644",
-      "afterMode": "100644"
+      "after": "fff635e03e21230dbe63e6077e60f0fb8843556ebcb2369eeb16a7d18a3c0a5e",
+      "afterMode": "100644",
+      "review": "Facade shading and parallax uniforms only; no persistent world or player state."
     },
-    "app/js/reality-capture/nearby-buildings.js": {
-      "before": "b27b5f0f28dda7fe1657bac0322313732800c0463e2e76701cb993fb904043f3",
-      "after": "39e7db9b1a764331a708174de7625cd50316a4008361c075d8e5a6b155cf0bab",
-      "review": "Exact nearest-ID selection with bounded retained candidates; no session persistence or protocol changes.",
+    "app/js/engine/night-lighting.js": {
+      "before": "37f9d64048ea99e9712e5651ded4b0ccc526b16528b3a5df1019d6964c91fa39",
       "beforeMode": "100644",
-      "afterMode": "100644"
+      "after": "d7a70e2a6a13664ed953a715d5f8a5eeec50138d6a0b860cbc5d97fa371ec098",
+      "afterMode": "100644",
+      "review": "Transient window emission and bounded light intensity under existing lighting owner; no saved settings format changes."
     },
-    "app/js/reality-capture/rdt-building-index.js": {
-      "before": "2cd1f12f83d27b21855990bcdd8218383fc95c94ca350b56b8b9157d860fe97b",
-      "after": "52688047fb24374219649f9ef799b23449c7b3e87c9706817c2e97c4b83d8b53",
-      "review": "Nearest-bound traversal with stable result identities; no durable capture format changes.",
+    "app/js/engine/procedural-textures.js": {
+      "before": "3980f393f7104ed25886ab0096036689d31f6a6514995bb8646a828e034f6d33",
       "beforeMode": "100644",
-      "afterMode": "100644"
+      "after": "35dacd8aad9a88a2080eb630d03eb7b7a28bdbc781be1f5424aa0389dfb1ed01",
+      "afterMode": "100644",
+      "review": "Generated pavement/asphalt material texture bytes only; no persistence or network protocol."
     },
-    "app/js/space.js": {
-      "before": "231b99e312d08faa0c157ef19e25a274e71c1ed7e1091fe9d836940d1892cce6",
-      "after": "4347b5fd1e3aba436102df5b72abac01370db93b02ab7fe098a18b7c09117130",
-      "review": "Session-scoped launch readiness replaces destination-specific pause timeout; save and journey schema owners unchanged.",
+    "app/js/world/building-batching.js": {
+      "before": "9b0fc9cfdb7ea37881cdcf8395a97a750a91c4b741c93dd447abd2e3bcbdff33",
       "beforeMode": "100644",
-      "afterMode": "100644"
+      "after": "2bf748c2ae9403c8510c556a98d9a16f2ebbd0eaca4a1a59f96f2ff7061c200e",
+      "afterMode": "100644",
+      "review": "Per-instance facade attributes and rendering only; unchanged source building identity."
     },
-    "app/js/space/launch-readiness.js": {
+    "app/js/world/building-exterior-details.js": {
+      "before": "5b11eacffdb8e1188627a6180e85fcc32ff6388aba82222a83342b2107bc557c",
+      "beforeMode": "100644",
+      "after": "2f5562cae409d45a889e10dfb561b9ad6eeaa39220e184cbd268db9a33c2ba09",
+      "afterMode": "100644",
+      "review": "Transient facade trim and awning geometry under existing disposal owner; no durable records."
+    },
+    "app/js/world/building-facade-layout.js": {
+      "before": "e79b7e4a9e33315202c12608f8df1c432fb16c8954d88466e7d09d130f7e5929",
+      "beforeMode": "100644",
+      "after": "d83926ed6d0b383ef9ec3ff284c35a0d3008f363ca2cb8f1e41824941f8e69cf",
+      "afterMode": "100644",
+      "review": "Pure facade layout and near/mid rendering profile; no save or provider format changes."
+    },
+    "app/js/world/facade-lighting.js": {
       "before": null,
-      "after": "228d8ce64365bff4842fa93088123920eb5d1e8e1799cc42004bf5bca8c4f510",
-      "review": "New transient lifecycle/session pause helper; reads journey ID/phase but writes no durable data.",
       "beforeMode": null,
-      "afterMode": "100644"
+      "after": "ef84dff2091aab5772065992157a158b0c79f413a5b4af0a0fe91ea46c0f68cc",
+      "afterMode": "100644",
+      "review": "New shared transient shader uniform; no persistent or protocol owner."
     },
-    "app/js/urban-sandbox/equipment-runtime.js": {
-      "before": "845a4ab490ec93ff3c277857fb8e365c6fd9d8fa4c99e74ea86d697e0737b74c",
-      "after": "bad48bc614c9d7f5f53ef11e90e5cb3180eff986b61e4e80505f72077500854e",
-      "review": "Synchronously release only Backpack-owned DOM focus on hiding or disposal; equipment model, control persistence, save formats and network protocols unchanged.",
-      "beforeMode": "100644",
-      "afterMode": "100644"
+    "app/js/world/reference-block-dressing.js": {
+      "before": null,
+      "beforeMode": null,
+      "after": "d91eb8e3337cc2e40c986100325d1464166d7472195198c83a14629c6154de55",
+      "afterMode": "100644",
+      "review": "Authored ephemeral street furniture placement, collision and lamp registration; never writes player/world saves."
     },
-    "app/js/world/building-provenance-model.js": {
-      "before": "b673f7252eb09a4e88def1b5849ae525ab6f9f321c337d96e4ff339821ff9bb8",
-      "after": "28bea8e19c6da11d07c72b183b3bde9b3ffe67dce4cc5c75e434b28f1848ddfa",
-      "review": "Equivalent frozen world metadata representation; original source identity and values retained.",
+    "app/js/world/storefront-layout.js": {
+      "before": "4c0dc37055d9822b92c4c0fc678514f9f617cf01b3d87b841fc7d9b71ef9a1ee",
       "beforeMode": "100644",
-      "afterMode": "100644"
+      "after": "a4f382eb5e3c1e046e7b4f7d5a2c66141d186caf69469aca0560e8b8b650da0f",
+      "afterMode": "100644",
+      "review": "Storefront sign height in transient facade geometry only; shop and equipment models unchanged."
     },
-    "app/js/world/compiler/transport-source-normalizer.js": {
-      "before": "6edd8a419951584b01b95f3c91bbf0047e72e06c41f571eaf75f678422d09ead",
-      "after": "7807fc7c5f4340c9e8bae18f61d7a85cf08db2779e3c10d38acd1ae0665b78ff",
-      "review": "Bounded compilation-local interning of equivalent immutable transport facts; no save or network shape changes.",
+    "app/js/world/storefront-signs.js": {
+      "before": "44f6778a53dfd4dc62680229c0d3532e8193d6b8af049d56c7b270f34a914100",
       "beforeMode": "100644",
-      "afterMode": "100644"
+      "after": "ac6ae4074fff54659e8fa2d22ce6d7f2c85325d9b5507aa530e9095db3201f62",
+      "afterMode": "100644",
+      "review": "Sign mesh placement only; no business identity or persistent changes."
     },
-    "app/js/world/compiler/transport-surface-model.js": {
-      "before": "fe8b36fb3712dccdb69bb190c3eb767f589f0ea856a618192eb8fc5febfacabf",
-      "after": "e4e3d0832c7e22e0a4db6716e5c280b93650456bc4d6e471b3e3574ecf240930",
-      "review": "Exact numeric road profile storage in bounded backing buffers; all view values preserved, no worker/save payload changes.",
+    "app/js/world/street-pavement-runtime.js": {
+      "before": "e58e6722d03337009a5477ba26c5d17eaff12356fefa766990d2736457d8b25c",
       "beforeMode": "100644",
-      "afterMode": "100644"
+      "after": "cd160bb256d579263c32ac56c5e76cd69b6c338c02f5b422239dafea5bad8cdf",
+      "afterMode": "100644",
+      "review": "Pavement material detail and lifecycle-managed authored furniture; terrain/save/protocol owners unchanged."
     },
-    "app/js/world/load-road-pass.js": {
-      "before": "03c8505dc5c0717413905cb3ae354e09552633f13d8b47c34641d20c8a0ec195",
-      "after": "f546dbd40226a800f8fabe27148531c53c4408f5147daedbcddbcda6f0de863e",
-      "review": "Compilation-local immutable transport fact owner; no persistent record or protocol change.",
+    "app/js/world/vegetation.js": {
+      "before": "6cadc778abba8a909bb5e6d7df8dd6bb51213a4ba5d303a109b36f8f0c1f20f4",
       "beforeMode": "100644",
-      "afterMode": "100644"
-    },
-    "app/js/world/structure-aware.js": {
-      "before": "b90b4c46285c9cd00ab81cfd789ad2863e60bfa932446a202ec65846b4b8acd4",
-      "after": "def099cc97990cfd74cd1a3a2fd6110a9fac28fbe2c85459ddf477e65f30b92e",
-      "review": "Pack final reconciled transient profiles before tunnel/collision publication; no persistence change.",
-      "beforeMode": "100644",
-      "afterMode": "100644"
+      "after": "efb4d02c710c3f93c981f7d4082ae686f97b5164ec23f5d1e7e22c4fd39092d1",
+      "afterMode": "100644",
+      "review": "Existing placement pipeline accepts authored planter trees; transient placement and collision clearance only."
     }
   }
 }
