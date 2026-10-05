@@ -21,7 +21,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
-import {buildingCenter,nearestCaptureBuildingIds} from './nearby-buildings.js';
+import {buildingCenter,nearestCaptureBuildingIds,createNearestCaptureSelection} from './nearby-buildings.js';
 
 // Browser adaptation of RRG314/rdt-spatial-index's occupancy-driven grid
 // partition (packages/rdt-spatial-index/src/index.cjs, MIT). See the provenance
@@ -73,31 +73,40 @@ export class RdtBuildingIndex {
       this.lastCandidates=this.length;
       return nearestCaptureBuildingIds(this.buildings,actor,limit);
     }
-    let radius=64,ids=[];
-    // At most 16 regional probes. Remote arrivals and degenerate distributions
-    // use one complete exact query rather than an unbounded expansion loop.
-    for(let attempt=0;attempt<17;attempt++,radius*=2){
-      ids=[];const unique=new Set(),stack=[this.root];
-      while(stack.length){const node=stack.pop();
-        const dx=Math.max(node.minX-actor.x,0,actor.x-node.maxX),dz=Math.max(node.minZ-actor.z,0,actor.z-node.maxZ);
-        if(attempt<16&&Math.hypot(dx,dz)>radius)continue;
-        if(node.children){stack.push(...node.children);continue;}
-        for(const id of node.ids){const p=this.points[id];
-          if(attempt===16||Math.hypot(p.x-actor.x,p.z-actor.z)<=radius){ids.push(id);unique.add(String(this.buildings[id].sourceBuildingId));}
+    const selection=createNearestCaptureSelection(limit),frontier=[];
+    const enqueue=node=>{
+      const dx=Math.max(node.minX-actor.x,0,actor.x-node.maxX),dz=Math.max(node.minZ-actor.z,0,actor.z-node.maxZ);
+      const distance=Math.hypot(dx,dz);
+      if(distance>selection.maximumDistance())return;
+      const entry={node,distance};let i=frontier.length;frontier.push(entry);
+      while(i>0){const parent=(i-1)>>1;if(frontier[parent].distance<=distance)break;frontier[i]=frontier[parent];i=parent;}
+      frontier[i]=entry;
+    };
+    const takeNearest=()=>{
+      const first=frontier[0],last=frontier.pop();
+      if(frontier.length){let i=0;
+        for(;;){const left=i*2+1,right=left+1;if(left>=frontier.length)break;
+          const child=right<frontier.length&&frontier[right].distance<frontier[left].distance?right:left;
+          if(frontier[child].distance>=last.distance)break;
+          frontier[i]=frontier[child];i=child;
         }
+        frontier[i]=last;
       }
-      if(unique.size>=limit||attempt===16)break;
-      // A circle containing every corner already contains every source point.
-      const r=this.root;
-      if(Math.hypot(Math.max(Math.abs(actor.x-r.minX),Math.abs(actor.x-r.maxX)),Math.max(Math.abs(actor.z-r.minZ),Math.abs(actor.z-r.maxZ)))<=radius)break;
+      return first;
+    };
+    // Visit nearest bounds once. A distant flight used to repeatedly expand
+    // a radius over the same nodes, then scan the whole city a second time.
+    // Equal bounds remain eligible to preserve source-order distance ties.
+    this.lastCandidates=0;enqueue(this.root);
+    while(frontier.length){
+      const {node,distance}=takeNearest();
+      if(distance>selection.maximumDistance())break;
+      if(node.children){for(const child of node.children)enqueue(child);continue;}
+      for(const id of node.ids){const point=this.points[id];this.lastCandidates++;
+        selection.consider(String(this.identities[id]),Math.hypot(point.x-actor.x,point.z-actor.z),id);
+      }
     }
-    this.lastCandidates=ids.length;
-    // A dense or degenerate query offers no useful spatial pruning. Avoid
-    // sorting/copying most of the world; the bounded exact scan is cheaper.
-    if(ids.length>=this.length/2)return nearestCaptureBuildingIds(this.buildings,actor,limit);
-    // Restore source order so equal-distance and duplicate-ID semantics match.
-    ids.sort((a,b)=>a-b);
-    return nearestCaptureBuildingIds(ids.map(id=>this.buildings[id]),actor,limit);
+    return selection.ids();
   }
   dispose(){this.buildings=null;this.points=null;this.identities=null;this.root=null;this.length=0;this.nodes=0;}
 }

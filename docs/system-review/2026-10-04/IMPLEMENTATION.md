@@ -173,3 +173,15 @@ The source repair journeys are now complete: urban sandbox passes all 15 vehicle
 
 
 The final launch/input PR chain passes all 1,898 registered contracts, dependencies, source/syntax, ownership, boundary types, test inventory and mutation sensitivity (`launch-input-pr-rerun.log`). The first PR failure was a source-text assertion requiring the removed shared pause release. Its replacement executes the actual Space/Moon entry functions with real lifecycle/readiness/travel-session owners and verifies visible controls, manual/assisted selection and pause release. The original failed log remains retained. These repairs are a local checkpoint; performance diagnosis, new packaged matrix/backend acceptance and updated save-compatibility evidence remain open.
+
+
+## Fresh stall trace and captured-building search
+
+`flight-gc-after-metadata/` is instrumented diagnosis, not acceptance. It records 1,883/633 ms flight frames coinciding with a 1,836 ms incremental-marking start and 605 ms major collection. A separate 383 ms frame includes over 200 sampled ms in the captured-building selector/index. The first 2,350 ms frame is mostly profiler idle/program time and is not attributed to game code. Host counters show about 15,112 MiB swapped in and 17,072 MiB out across a 219-second observation spanning setup/run/analysis, with about 3,662 MiB compressed; those global counters are not per-frame attribution. Raw events and numeric aligned findings are retained in `stalls-summary.json`.
+
+The captured-building index used repeated expanding-radius probes, then another whole-city exact scan for far-flight queries. Its replacement visits nearest spatial bounds once, retaining only the nearest unique IDs and preserving original-order ties. The occupancy partition, buildings, editing invalidation, collision and rendering are unchanged. Eight focused tests pass, including independent full-sort parity, duplicate identities across cells, degenerate/distant inputs, in-place edits and nonmutating selection snapshots.
+
+The actual loaded Baltimore publication contains 25,529 buildings. All 48 old/new complete-selector queries return identical IDs/order; median time is 7.0 ms before versus 1.2 ms after. Distant queries consider 120–128 points instead of including all 25,529 in the old final selection. This is an instrumented function comparison, not a frame-time pass. The previous implementation is captured directly from 88174fe5 under the ignored comparison output. The actual world and prescribed movement images were inspected. Full PR and normal performance checks remain pending.
+
+
+The search repair passes the full PR chain: 1,901 contracts plus dependency/source/ownership/type/inventory/mutation checks (`capture-index-pr.log`). The prescribed driving client passes with its final image inspected. Normal frame-time and final immutable acceptance remain required.
