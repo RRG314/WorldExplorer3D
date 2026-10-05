@@ -1,8 +1,8 @@
 {
   "schema": "we3d-reviewed-rollback-runtime-v1",
-  "id": "journal-v5-backpack-v2-free-data-gateway-v1-visual-fallback-20261005",
-  "fallbackCommit": "0e4c8d429c8a62d7b2cd58158117833ac3da770e",
-  "scope": "Identical public environmental data, backend, configuration, save/migration, equipment and account synchronization owners. The only runtime differences are the thirteen reviewed transient visual/scene/layout files. Actual packaged upgrade/fallback/write/return is required.",
+  "id": "journal-v5-backpack-v2-public-data-v1-visual-fallback-20261005",
+  "fallbackCommit": "37a12d117111446a128888384df67ac52445d972",
+  "scope": "Identical public weather, ocean and aircraft providers, HUD layout, backend, configuration, save/migration, equipment and account synchronization owners. The only runtime differences are the twelve reviewed transient visual/scene files. Actual packaged upgrade/fallback/write/return is required.",
   "files": {
     "app/js/engine/building-facade-materials.js": {
       "before": "cb740f60cfaff53fcce15bb53313243660014614c50f0f19137984a7c612d04d",
@@ -87,13 +87,6 @@
       "after": "efb4d02c710c3f93c981f7d4082ae686f97b5164ec23f5d1e7e22c4fd39092d1",
       "afterMode": "100644",
       "review": "Existing placement pipeline accepts authored planter trees; transient placement and collision clearance only."
-    },
-    "app/styles/interface-v4.css": {
-      "before": "54b4259139bd3dfac17c4b5dc076050f883b405fb279462b7c959b43fb2742f1",
-      "after": "8f91986b6dd84adb0e89b7ccb6fe4de2e538aaca0ab88c60287a5f69dcc1ccce",
-      "beforeMode": "100644",
-      "afterMode": "100644",
-      "review": "Desktop HUD column sizing and weather word wrapping only; phone presentation, game state, data gateway and save/protocol owners unchanged."
     }
   }
 }
