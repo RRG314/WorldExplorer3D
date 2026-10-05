@@ -115,11 +115,19 @@ function createUrbanEquipmentRuntime(options = {}) {
     replaceMarkup(ui.detail, `<strong>${escapeHtml(item.label)}</strong><small>${escapeHtml(description)}</small>${capabilities}${item.metadata?.regionLabel ? `<small>${escapeHtml(item.metadata.regionLabel)}</small>` : ''}<div class="urbanBackpackDetailActions">${actions.join('')}${slots}</div>`);
   }
 
+  function releasePanelFocus() {
+    const root = state.equipmentUi?.root;
+    const focused = root?.ownerDocument?.activeElement;
+    // Hiding a focused control does not synchronously return keyboard input to gameplay.
+    if (focused && root.contains(focused)) focused.blur();
+  }
+
   function render() {
     const ui = state.equipmentUi;
     if (!ui?.root) return;
     const inventory = state.equipment.summary();
     const visible = state.equipmentOpen && isActive();
+    if (!visible) releasePanelFocus();
     ui.root.classList.toggle('show', visible);
     ui.root.setAttribute('aria-hidden', visible ? 'false' : 'true');
     ui.toggle.hidden = !state.mobile;
@@ -1072,6 +1080,7 @@ function createUrbanEquipmentRuntime(options = {}) {
   }
 
   function dispose() {
+    releasePanelFocus();
     state.equipmentUi?.reticle?.classList.remove('show');
     projectiles.slice().forEach(disposeProjectile);
     projectiles.length = 0;

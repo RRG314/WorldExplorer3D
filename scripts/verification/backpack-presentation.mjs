@@ -33,7 +33,8 @@ try {
     window.state={equipment:{...inventory,snapshot(){throw Error('Presentation requested a full inventory snapshot');}},equipmentOpen:false,mobile:false,backpackFilter:'all',backpackSelectedId:'',npcs:[],
       equipmentUi:{root:id('urbanEquipment'),toggle:id('toggle'),slots:id('urbanEquipmentSlots'),contents:id('urbanBackpackContents'),filters:id('urbanBackpackFilters'),detail:id('urbanBackpackDetail'),status:id('urbanEquipmentStatus'),reticle:id('reticle')}};
     ctx.Walk={state:{mode:'walk',walker:{speedMph:0}}};
-    window.runtime=createUrbanEquipmentRuntime({state,isActive:()=>true,setStatus:()=>{}});
+    window.equipmentActive=true;
+    window.runtime=createUrbanEquipmentRuntime({state,isActive:()=>window.equipmentActive,setStatus:()=>{}});
     const started=performance.now();for(let i=0;i<1000;i++)runtime.render();const closedRenderMs=performance.now()-started;
     if(state.equipmentUi.contents.childElementCount||state.equipmentUi.slots.childElementCount)throw Error('Closed Backpack built hidden item DOM');
     const opened=performance.now();runtime.toggle(true);const openMs=performance.now()-opened;
@@ -56,6 +57,33 @@ try {
   await page.evaluate(()=>{state.mobile=true;runtime.render();});
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
   await page.screenshot({path:`${directory}/phone-viewport.png`});
+  report.focusOwnership=await page.evaluate(()=>{
+    const root=state.equipmentUi.root;
+    runtime.inspectItem('hands');
+    const focusEquip=()=>{
+      const button=root.querySelector('[data-backpack-action="equip"]');
+      if(!button)throw Error('Actual Equip control is missing');
+      button.focus();
+      if(document.activeElement!==button)throw Error('Equip control did not receive focus');
+    };
+    focusEquip();
+    runtime.toggle(false);
+    const closeReleasesImmediately=!root.contains(document.activeElement);
+    runtime.toggle(true);focusEquip();
+    equipmentActive=false;runtime.render();
+    const inactiveRenderReleasesImmediately=!root.contains(document.activeElement);
+    equipmentActive=true;runtime.toggle(true);focusEquip();
+    runtime.dispose();
+    const disposalReleasesImmediately=!root.contains(document.activeElement);
+    const external=document.getElementById('toggle');external.focus();
+    runtime.toggle(false);runtime.render();runtime.dispose();
+    const unrelatedFocusPreserved=document.activeElement===external;
+    return {closeReleasesImmediately,inactiveRenderReleasesImmediately,disposalReleasesImmediately,unrelatedFocusPreserved};
+  });
+  assert.deepEqual(report.focusOwnership,{
+    closeReleasesImmediately:true,inactiveRenderReleasesImmediately:true,
+    disposalReleasesImmediately:true,unrelatedFocusPreserved:true
+  });
   assert.deepEqual(report.errors,[]);report.passed=true;
 }catch(error){report.error=error.stack;throw error;}
 finally{await writeFile(`${directory}/report.json`,JSON.stringify(report,null,2));await browser?.close();await server.close();}

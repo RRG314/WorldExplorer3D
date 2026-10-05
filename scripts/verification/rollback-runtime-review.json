@@ -2,7 +2,7 @@
   "schema": "we3d-reviewed-rollback-runtime-v1",
   "id": "journal-v5-backpack-v2-controls-v1-condition-outbox-v1-reviewed-local-polish-20261005",
   "fallbackCommit": "5d772a9c758cf70375acdd2c08a6ed34c821d546",
-  "scope": "All remaining shipped client/backend/configuration bytes must match the fallback. Reviewed differences below affect transient input, launch, spatial queries and in-memory world representation. Save, equipment, migration, account synchronization and backend protocol owners are unchanged. Actual packaged upgrade/fallback/write/return verification is still required.",
+  "scope": "All remaining shipped client/backend/configuration bytes must match the fallback. Reviewed differences below affect transient input/focus, launch, spatial queries and in-memory world representation. Save, equipment model/storage, migration, account synchronization and backend protocol owners are unchanged. Actual packaged upgrade/fallback/write/return verification is still required.",
   "files": {
     "app/js/engine/input-handlers.js": {
       "before": "7f1334b697f5b654287cd3df7d435af0ff052f859ca62dbe5ea0ac874ffe46f2",
@@ -37,6 +37,13 @@
       "after": "228d8ce64365bff4842fa93088123920eb5d1e8e1799cc42004bf5bca8c4f510",
       "review": "New transient lifecycle/session pause helper; reads journey ID/phase but writes no durable data.",
       "beforeMode": null,
+      "afterMode": "100644"
+    },
+    "app/js/urban-sandbox/equipment-runtime.js": {
+      "before": "845a4ab490ec93ff3c277857fb8e365c6fd9d8fa4c99e74ea86d697e0737b74c",
+      "after": "bad48bc614c9d7f5f53ef11e90e5cb3180eff986b61e4e80505f72077500854e",
+      "review": "Synchronously release only Backpack-owned DOM focus on hiding or disposal; equipment model, control persistence, save formats and network protocols unchanged.",
+      "beforeMode": "100644",
       "afterMode": "100644"
     },
     "app/js/world/building-provenance-model.js": {
