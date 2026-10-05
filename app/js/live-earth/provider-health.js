@@ -42,7 +42,7 @@ function collectLiveEarthProviderHealth(state, now = Date.now()) {
     earthquakes: describeProviderHealth(operational, 'usgs-earthquakes-day', now),
     weather: describeProviderHealth(operational, 'met-norway-current', now),
     streetImagery: describeProviderHealth(street, streetProvider, now),
-    aircraft: describeProviderHealth(aircraft, 'opensky', now),
+    aircraft: describeProviderHealth(aircraft, 'adsb-lol', now),
     marineModel: describeProviderHealth(marine, 'public-marine', now),
     marineObservation: describeProviderHealth(marine, 'noaa-water-level', now)
   });

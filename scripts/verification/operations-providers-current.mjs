@@ -9,9 +9,10 @@ try{const page=await browser.newPage();await configureStagingAppCheck(page,`http
 report.providers=await page.evaluate(async()=>{
  const {operationalFeedService}=await import('/app/js/geospatial/operational-feeds.js');
  const {marineService}=await import('/app/js/geospatial/marine.js');
+ const {aircraftService}=await import('/app/js/geospatial/aircraft.js');
  const results=[];
- for(const [id,read] of [['weather',()=>operationalFeedService.weather([{lat:39.29,lon:-76.61}])],['marine',()=>marineService.modelAt({lat:-18.5,lon:147.5})],['earthquakes',()=>operationalFeedService.earthquakes()]]){
-  try{const result=await read();const usable=id==='weather'?Number.isFinite(result.items?.[0]?.current?.temperature_2m):id==='marine'?Number.isFinite(result.waveHeightM)&&Number.isFinite(result.currentVelocityKph)&&Number.isFinite(result.seaSurfaceTemperatureC):result.items?.length>0;
+ for(const [id,read] of [['weather',()=>operationalFeedService.weather([{lat:39.29,lon:-76.61}])],['marine',()=>marineService.modelAt({lat:-18.5,lon:147.5})],['aircraft',()=>aircraftService.search({lat:39.29,lon:-76.61,radiusKm:160,limit:80},{force:true})],['earthquakes',()=>operationalFeedService.earthquakes()]]){
+  try{const result=await read();const usable=id==='weather'?Number.isFinite(result.items?.[0]?.current?.temperature_2m):id==='marine'?Number.isFinite(result.waveHeightM)&&Number.isFinite(result.currentVelocityKph)&&Number.isFinite(result.seaSurfaceTemperatureC):id==='aircraft'?result.items?.length>0&&result.items.every(item=>item.provenance.sourceId==='adsb-lol'&&Number.isFinite(item.lat)&&Number.isFinite(item.lon))&&!result.warnings?.length:result.items?.length>0;
    results.push({id,ok:usable,items:result.items?.length??1,sources:result.sources?.map(s=>s.sourceId)||[result.sourceId]});
   }catch(error){results.push({id,ok:false,error:error.message});}
  }
@@ -26,3 +27,4 @@ report.providers=await page.evaluate(async()=>{
 });assert.equal(report.overture.release,'2026-09-23.1');assert.ok(report.overture.tiles.every(v=>Object.values(v.layers).some(n=>n>0)));assert.ok(report.overture.tiles.filter(v=>v.theme==='buildings').every(v=>v.convertedWays>0));report.assetBytes=report.assets.reduce((n,v)=>n+v.bytes,0);report.passed=report.providers.every(v=>v.ok);await writeFile(`${out}/report.json`,JSON.stringify(report,null,2));console.log(JSON.stringify(report));assert.equal(report.passed,true);}finally{await browser.close();await server.close();}
 
 await import('./environment-data-staging-current.mjs');
+await import('./aircraft-panel-client.mjs');

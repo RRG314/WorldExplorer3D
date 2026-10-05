@@ -16,14 +16,14 @@ function normalizeAircraftRequest(input = {}) {
   return Object.freeze({ lat, lon, radiusKm, limit });
 }
 
-function normalizeAircraftItem(item, fetchedAt, providerId = 'opensky') {
+function normalizeAircraftItem(item, fetchedAt, providerId = 'adsb-lol') {
   return Object.freeze({
     ...item,
     id: String(item.id || item.icao24 || ''),
     label: String(item.callsign || item.icao24 || 'Aircraft').trim(),
     lat: Number(item.lat),
     lon: Number(item.lon),
-    headingDeg: Number.isFinite(Number(item.headingDeg)) ? Number(item.headingDeg) : 0,
+    headingDeg: item.headingDeg == null ? null : Number.isFinite(Number(item.headingDeg)) ? Number(item.headingDeg) : null,
     altitude: 1.024 + Math.min(0.04, Math.max(0.004, (Number(item.altitudeM) || 0) / 400000)),
     dataSource: providerId,
     provenance: createProvenance({
@@ -41,8 +41,8 @@ function createAircraftService(options = {}) {
   if (typeof fetchImpl !== 'function') throw new Error('Aircraft service requires fetch().');
 
   registry.register({
-    id: 'opensky',
-    sourceId: 'opensky',
+    id: 'adsb-lol',
+    sourceId: 'adsb-lol',
     cacheTtlMs: 60 * 1000,
     timeoutMs: 10000,
     normalizeRequest: normalizeAircraftRequest,
@@ -54,9 +54,10 @@ function createAircraftService(options = {}) {
       });
       if (!response.ok) throw providerResponseError(response);
       const payload = await readBoundedJson(response, 5000000);
+      if (payload.provider !== 'adsb-lol' || !Array.isArray(payload.items)) throw new Error('Aircraft feed source is unavailable.');
       return {
         fetchedAt: payload.fetchedAt,
-        items: (payload.items || []).map((item) => normalizeAircraftItem(item, payload.fetchedAt, payload.provider || 'opensky')),
+        items: (payload.items || []).map((item) => normalizeAircraftItem(item, payload.fetchedAt, payload.provider || 'adsb-lol')),
         warnings: payload.warnings || []
       };
     }
@@ -64,7 +65,7 @@ function createAircraftService(options = {}) {
 
   return Object.freeze({
     search(request, queryOptions = {}) {
-      return registry.query('opensky', request, queryOptions);
+      return registry.query('adsb-lol', request, queryOptions);
     },
     inspect() {
       return registry.snapshot();

@@ -7,7 +7,7 @@ const modes=new Set(['walk','walking','driving','car','boat','plane','drone','sp
 const providers=new Map([
  ['met-norway-current','weather-model'],['public-marine','marine-model'],
  ['noaa-water-level-stations','noaa-stations'],['noaa-water-level','noaa-observation'],['noaa-tide-predictions','noaa-prediction'],
- ['celestrak-gp','orbit-elements'],['usgs-earthquakes-day','earthquakes'],['opensky','aircraft'],
+ ['celestrak-gp','orbit-elements'],['usgs-earthquakes-day','earthquakes'],['adsb-lol','aircraft'],
  ['panoramax','street-imagery'],['kartaview','street-imagery'],['geology-point','mapped-geology']
 ]);
 const count=value=>Number.isFinite(value)&&value>=0?Math.min(Number.MAX_SAFE_INTEGER,Math.floor(value)):0;

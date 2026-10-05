@@ -91,7 +91,7 @@ function renderTransportDetails(ctx, state, layerId) {
   const list = items.map((item) => {
     const active = item.id === selected?.id ? ' active' : '';
     const detail = !isShipLayer && item.dataSource !== 'reference'
-      ? `${item.meta || ''} • observed ${item.observedAt ? new Date(item.observedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : 'recently'}`
+      ? `${item.meta || ''} • ${item.observedAt ? `observed ${new Date(item.observedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}` : 'observation time unavailable'}`
       : `${item.meta || ''} • ${item.progressPct}% along route`;
     return `<button class="globe-selector-live-list-item${active}" type="button" data-live-earth-action="${isShipLayer ? 'select-ship' : 'select-aircraft'}" data-id="${ctx.escapeHtml(item.id)}">
       <span>${ctx.escapeHtml(item.label)} • ${ctx.escapeHtml(item.routeLabel)}</span>
@@ -111,9 +111,9 @@ function renderTransportDetails(ctx, state, layerId) {
       <div class="globe-selector-live-detail-copy">${ctx.escapeHtml(selected?.routeSummary || getLiveEarthLayer(layerId)?.summary || '')}</div>
       <div class="globe-selector-live-detail-meta">${ctx.escapeHtml(sourceSummary)}</div>
       <div class="globe-selector-live-detail-meta">${ctx.escapeHtml(sourceCaveat)}</div>
-      ${selected ? `<div class="globe-selector-live-detail-meta">${ctx.escapeHtml(`${selected.operator || ''} • ${selected.speedKt} kt • heading ${Math.round(selected.headingDeg || 0)}°`)}</div>` : ''}
+      ${selected ? `<div class="globe-selector-live-detail-meta">${ctx.escapeHtml([selected.operator, selected.speedKt == null ? 'Speed unavailable' : `${selected.speedKt} kt`, selected.headingDeg == null ? 'Heading unavailable' : `heading ${Math.round(selected.headingDeg)}°`].filter(Boolean).join(' • '))}</div>` : ''}
       ${selected ? `<div class="globe-selector-live-detail-meta">${ctx.escapeHtml(`${selected.routeLabel} • ${selected.region}`)}</div>` : ''}
-      ${selected && !isShipLayer ? `<div class="globe-selector-live-detail-meta">${ctx.escapeHtml(`${Number(selected.lat).toFixed(4)}°, ${Number(selected.lon).toFixed(4)}° • reported aircraft position`)}</div>` : ''}
+      ${selected && !isShipLayer ? `<div class="globe-selector-live-detail-meta">${ctx.escapeHtml(`${Number(selected.lat).toFixed(4)}°, ${Number(selected.lon).toFixed(4)}° • ${observedAircraft ? 'reported aircraft position' : 'modeled reference position'}`)}</div>` : ''}
       ${localContext ? `<div class="globe-selector-live-detail-meta">${ctx.escapeHtml(`Closest selected-world corridor: ${localContext.routeLabel} • ${Math.round(localContext.distanceKm)} km away`)}</div>` : ''}
       <div class="globe-selector-live-detail-actions">
         <button class="globe-selector-live-action-btn" type="button" data-live-earth-action="focus-transport"${selected ? '' : ' disabled'}>Focus Marker</button>

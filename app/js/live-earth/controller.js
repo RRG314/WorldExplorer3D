@@ -539,7 +539,7 @@ async function ensureAircraftTrafficData(state, force = false) {
     try {
       const result = await aircraftService.search({ lat, lon, radiusKm: 160, limit: 80 }, { force });
       if (result.items.length) {
-        const providerLabel = result.items[0]?.dataSource === 'adsb-lol' ? 'ADSB.lol' : 'OpenSky';
+        const providerLabel = 'ADSB.lol';
         state.aircraftRoutes = [];
         state.aircraftItems = result.items.map((item) => ({
           ...item,
@@ -549,9 +549,9 @@ async function ensureAircraftTrafficData(state, force = false) {
           routeLabel: `${providerLabel} observation`,
           routeSummary: `Current aircraft state vector observed by ${providerLabel}.`,
           region: `${item.distanceKm} km from selected point`,
-          speedKt: item.velocityKt || 0,
+          speedKt: item.velocityKt,
           progressPct: null,
-          meta: `${item.onGround ? 'On ground' : `${Math.round(item.altitudeM || 0).toLocaleString()} m`} • ${item.velocityKt ?? '--'} kt`
+          meta: `${item.onGround ? 'On ground' : item.altitudeM == null ? 'Altitude unavailable' : `${Math.round(item.altitudeM).toLocaleString()} m`} • ${item.velocityKt ?? '--'} kt`
         }));
         state.aircraftLoadedAt = now;
         state.aircraftQueryKey = queryKey;

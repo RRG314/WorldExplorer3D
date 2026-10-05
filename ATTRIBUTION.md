@@ -29,7 +29,6 @@ This is the concise public attribution index. Asset-level details are in `app/as
 
 - CelesTrak GP orbital elements. <https://celestrak.org/>
 - USGS Earthquake Hazards Program feeds. <https://earthquake.usgs.gov/earthquakes/feed/>
-- OpenSky Network aircraft state vectors, subject to OpenSky terms of use. <https://opensky-network.org/about/terms-of-use>
 - ADSB.lol community aircraft observations, available under ODbL 1.0. <https://www.adsb.lol/>
 - Weather: [MET Norway Locationforecast](https://api.met.no/) under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Coordinates rounded, wind converted from m/s to km/h, and symbols mapped to WMO categories. Unprovided fields are not estimated.
 - Waves/swell: [PacIOOS global WAVEWATCH III](https://www.pacioos.hawaii.edu/waves/model-global/), [free use and redistribution](https://pae-paha.pacioos.hawaii.edu/erddap/info/ww3_global/index.html).
