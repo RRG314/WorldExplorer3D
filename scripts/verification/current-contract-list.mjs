@@ -193,6 +193,7 @@ export const currentContractTests = [
   'tests/runtime-publication-tutorial-visibility-current.test.mjs',
   'tests/shadow-policy-current.test.mjs',
   'tests/space-travel-session-current.test.mjs',
+  'tests/space-launch-readiness-current.test.mjs',
   'tests/space-quality-current.test.mjs',
   'tests/ship-ring-current.test.mjs',
   'tests/ship-traversal-current.test.mjs',

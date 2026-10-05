@@ -1,3 +1,4 @@
+import { createSpaceLaunchReadiness } from './space/launch-readiness.js';
 import { releaseAtmosphericFlightPresentation } from './space/atmospheric-flight-presentation.js?v=1';
 import { ctx as appCtx } from "./shared-context.js?v=55";
 import { getPrimaryWorldCanvas } from "./engine/webgl-lifecycle.js?v=2";
@@ -69,6 +70,7 @@ installSpaceTravelSession(appCtx);
 installSpaceJourneyRuntime(appCtx);
 
 let spaceSessionScope = null;
+let spaceLaunchReadiness = null;
 const spaceModuleScope = createLifecycleScope('space-module');
 let expeditionRuntimeModulePromise = null;
 let pirateInterceptionRuntime = null;
@@ -82,6 +84,7 @@ function beginSpaceFlightSession(options = {}) {
   spaceSessionScope?.dispose('space-session-replaced');
   spaceSessionScope = createLifecycleScope('space-flight-session');
   appCtx.spaceFlight._sessionId = Number(appCtx.spaceFlight._sessionId || 0) + 1;
+  spaceLaunchReadiness = createSpaceLaunchReadiness(appCtx, spaceSessionScope, appCtx.spaceFlight._sessionId);
   appCtx.spaceFlight.overviewMode = false;
   appCtx.spaceFlight._landingTarget = null;
   appCtx.spaceFlight._runtimeLandingTarget = null;
@@ -217,7 +220,6 @@ function startSpaceFlightToMoon(options = {}) {
   const transition = beginEnvironmentTransition(appCtx.ENV.SPACE_FLIGHT, { source: 'space_to_moon' });
 
   appCtx.setEnvironmentTransitionActive(true);
-  appCtx.setPauseReason?.('planetary_transition', true);
   appCtx.earthPosition = { x: appCtx.car.x, z: appCtx.car.z, angle: appCtx.car.angle };
   captureEarthWorldSession();
   suspendEarthModesForPlanetaryEntry(appCtx.ENV.SPACE_FLIGHT);
@@ -267,17 +269,14 @@ function startSpaceFlightToMoon(options = {}) {
   if (typeof appCtx.showSolarSystemUI === 'function') appCtx.showSolarSystemUI();
   appCtx.showUniverseUI?.();
 
-  spaceSessionScope.timeout(() => {
-    if (!isCurrentSpaceFlightSession(sessionId, 'moon')) return;
-    appCtx.spaceFlight.mode = 'flying';
+  spaceLaunchReadiness.schedule({ delayMs: 1000, onReady: () => {
     appCtx.spaceFlight.speed = 0;
     appCtx.updateSpaceTravelSession?.({
       phase: freeFlight ? SPACE_TRAVEL_PHASE.FREE_FLIGHT : SPACE_TRAVEL_PHASE.ASCENT,
       reason: freeFlight ? 'free-flight-ready' : 'earth-ascent-ready'
     });
-    appCtx.setPauseReason?.('planetary_transition', false);
     showFlightMessage(freeFlight ? 'FREE SPACE FLIGHT READY · OPEN WAYFINDER TO SET A COURSE' : 'SPACE FLIGHT READY', '#10b981');
-  }, 1000);
+  } });
   return true;
 }
 
@@ -329,7 +328,6 @@ async function startSpaceFlightToSolisReach(options = {}) {
   });
 
   appCtx.setEnvironmentTransitionActive(true);
-  appCtx.setPauseReason?.('planetary_transition', true);
   appCtx.earthPosition = { x: appCtx.car.x, z: appCtx.car.z, angle: appCtx.car.angle };
   captureEarthWorldSession();
   suspendEarthModesForPlanetaryEntry(appCtx.ENV.SPACE_FLIGHT);
@@ -374,18 +372,15 @@ async function startSpaceFlightToSolisReach(options = {}) {
   appCtx.spaceFlight.canvas.style.display = 'block';
   appCtx.showSolarSystemUI?.();
   appCtx.showUniverseUI?.();
-  spaceSessionScope.timeout(() => {
-    if (!isCurrentSpaceFlightSession(sessionId, SPACE_CRAFT_IDENTITY.starship.id)) return;
-    appCtx.spaceFlight.mode = 'flying';
+  spaceLaunchReadiness.schedule({ delayMs: 1000, onReady: () => {
     appCtx.spaceFlight.speed = 0;
     appCtx.updateSpaceTravelSession?.({
       phase: usePathfinder ? SPACE_TRAVEL_PHASE.RENDEZVOUS : SPACE_TRAVEL_PHASE.DOCKED,
       reason: usePathfinder ? 'pathfinder-rendezvous-ready' : 'starship-boarding-ready'
     });
-    appCtx.setPauseReason?.('planetary_transition', false);
     showFlightMessage(usePathfinder ? `${SPACE_CRAFT_IDENTITY.starship.name.toUpperCase()} ACQUIRED · MANUAL DOCKING APPROACH` : `${SPACE_CRAFT_IDENTITY.starship.name.toUpperCase()} TRANSFER COMPLETE`, '#6fe8ff');
     options.onReady?.();
-  }, 1000);
+  } });
   return true;
 }
 
@@ -411,7 +406,6 @@ function startSpaceFlightToEarth(options = {}) {
   const transition = beginEnvironmentTransition(appCtx.ENV.SPACE_FLIGHT, { source: 'surface_to_pathfinder_pod' });
 
   appCtx.setEnvironmentTransitionActive(true);
-  appCtx.setPauseReason?.('planetary_transition', true);
   if (typeof appCtx.hideReturnToEarthButton === 'function') appCtx.hideReturnToEarthButton();
   const marsReturnButton = document.getElementById('marsReturnEarthBtn');
   if (marsReturnButton) marsReturnButton.style.display = 'none';
@@ -467,14 +461,11 @@ function startSpaceFlightToEarth(options = {}) {
     appCtx.showUniverseUI?.();
   }
 
-  spaceSessionScope.timeout(() => {
-    if (!isCurrentSpaceFlightSession(sessionId, SPACE_CRAFT_IDENTITY.starship.id)) return;
-    appCtx.spaceFlight.mode = 'flying';
+  spaceLaunchReadiness.schedule({ delayMs: 1000, onReady: () => {
     appCtx.spaceFlight.speed = 0;
     appCtx.updateSpaceTravelSession?.({ phase: SPACE_TRAVEL_PHASE.RENDEZVOUS, reason: 'surface-rendezvous-ready' });
-    appCtx.setPauseReason?.('planetary_transition', false);
     showFlightMessage(`${SPACE_CRAFT_IDENTITY.starship.name.toUpperCase()} ACQUIRED · MANUAL DOCKING APPROACH`, '#6fe8ff');
-  }, 1000);
+  } });
   return true;
 }
 
@@ -493,7 +484,6 @@ function startSpaceFlightToMars() {
   });
   const transition = beginEnvironmentTransition(appCtx.ENV.SPACE_FLIGHT, { source: 'space_to_mars' });
   appCtx.setEnvironmentTransitionActive(true);
-  appCtx.setPauseReason?.('planetary_transition', true);
   appCtx.earthPosition = { x: appCtx.car.x, z: appCtx.car.z, angle: appCtx.car.angle };
   appCtx.prepareEarthDepartureForMars?.();
   suspendEarthModesForPlanetaryEntry(appCtx.ENV.SPACE_FLIGHT);
@@ -531,13 +521,11 @@ function startSpaceFlightToMars() {
   animateSpaceFlight();
   appCtx.showSolarSystemUI?.();
   appCtx.showUniverseUI?.();
-  spaceSessionScope.timeout(() => {
-    if (!isCurrentSpaceFlightSession(sessionId, 'mars')) return;
-    appCtx.spaceFlight.mode = 'flying';
+  spaceLaunchReadiness.schedule({ delayMs: 1000, onReady: () => {
     appCtx.spaceFlight.speed = 0;
     appCtx.updateSpaceTravelSession?.({ phase: SPACE_TRAVEL_PHASE.ASCENT, reason: 'mars-flight-ready' });
     showFlightMessage('MARS FLIGHT READY', '#e26f45');
-  }, 1000);
+  } });
   return true;
 }
 
@@ -556,7 +544,6 @@ function startSpaceFlightFromExpeditionSurface(options = {}) {
   });
   const transition = beginEnvironmentTransition(appCtx.ENV.SPACE_FLIGHT, { source: 'expedition_surface_return' });
   appCtx.setEnvironmentTransitionActive(true);
-  appCtx.setPauseReason?.('planetary_transition', true);
   suspendEarthModesForPlanetaryEntry(appCtx.ENV.SPACE_FLIGHT);
   appCtx.spaceFlight.destination = SPACE_CRAFT_IDENTITY.starship.id;
   appCtx.spaceFlight.mode = 'launching';
@@ -600,15 +587,12 @@ function startSpaceFlightFromExpeditionSurface(options = {}) {
   appCtx.stopRuntimeKernel?.('space-flight-active');
   animateSpaceFlight();
   appCtx.showUniverseUI?.();
-  spaceSessionScope.timeout(() => {
-    if (!isCurrentSpaceFlightSession(sessionId, SPACE_CRAFT_IDENTITY.starship.id)) return;
-    appCtx.spaceFlight.mode = 'flying';
+  spaceLaunchReadiness.schedule({ delayMs: 800, onReady: () => {
     appCtx.spaceFlight.speed = 0;
     appCtx.updateSpaceTravelSession?.({ phase: SPACE_TRAVEL_PHASE.RENDEZVOUS, reason: 'pathfinder-return-ready' });
-    appCtx.setPauseReason?.('planetary_transition', false);
     showFlightMessage('SURVEY TEAM ABOARD · SAMPLE TRANSFER COMPLETE', '#83e6a6');
     options.onReady?.();
-  }, 800);
+  } });
   return true;
 }
 

@@ -10,7 +10,7 @@ const privateDir=await fs.mkdtemp(path.join(tmpdir(),'we3d-swimming-ui-'));
 let identity;
 const server=await startStaticServer({rootDir:process.cwd(),ports:[4396]});
 const browser=await chromium.launch({channel:'chrome',headless:true});
-const dir='output/verification/product-plan';
+const dir=process.env.WE3D_SWIMMING_OUTPUT||'output/verification/product-plan';
 await fs.mkdir(dir,{recursive:true});
 const report={scope:'Actual Earth mapped-water terrain, swimming, equipment, camera and travel-mode cleanup; controlled pose/input at a loaded Baltimore water body, not a complete shore walk or real bathymetry certificate',errors:[]};
 try {
@@ -29,7 +29,7 @@ try {
   if(await page.locator('#analyticsConsentDenyBtn').isVisible())await page.locator('#analyticsConsentDenyBtn').click();
   await page.locator('#globeSelectorStartBtn').click();
   await page.evaluate(async()=>{window.swimCtx=(await import('/app/js/shared-context.js?v=55')).ctx;});
-  try {await page.waitForFunction(()=>!!swimCtx.Walk?.state?.characterMesh && swimCtx.initialEarthWorldReady===true || swimCtx.worldLoadRuntimeState?.status==='failed',null,{timeout:90000});}
+  try {await page.waitForFunction(()=> (swimCtx.gameStarted===true && swimCtx.worldLoading===false && !!swimCtx.Walk?.state?.characterMesh && swimCtx.initialEarthWorldReady===true && swimCtx.worldLoadRuntimeState?.gameplayRuntimesReady===true) || swimCtx.worldLoadRuntimeState?.status==='failed',null,{timeout:90000});}
   catch(error){
    report.startup=await page.evaluate(()=>({gameStarted:swimCtx.gameStarted,worldLoading:swimCtx.worldLoading,ready:swimCtx.initialEarthWorldReady,environment:swimCtx.getEnv?.(),publication:!!swimCtx.worldPublication,loadingText:document.getElementById('loading')?.innerText}));
    await page.screenshot({path:`${dir}/swimming-startup-failure.png`});throw error;
@@ -62,7 +62,17 @@ try {
    Object.assign(c.Walk.state.walker,{x:point.x,z:point.z,y:sample.surfaceY+.18,vy:0,_resolvedGroundState:null});
    window.originalSwimActions=c.readControlActions;c.readControlActions=()=>({move:0,strafe:0,vertical:0});
  },deep);
- await page.waitForFunction(()=>swimCtx.Walk.state.walker.swimming?.equipment==='none');
+ try {await page.waitForFunction(()=>swimCtx.Walk.state.walker.swimming?.equipment==='none');}
+ catch(error){
+  report.surfaceEntryFailure=await page.evaluate(()=>({
+   worldLoading:swimCtx.worldLoading,runtimeStatus:swimCtx.worldLoadRuntimeState?.status,
+   gameplayReady:swimCtx.worldLoadRuntimeState?.gameplayRuntimesReady,
+   paused:swimCtx.paused,mode:swimCtx.getTravelMode?.(),
+   position:{x:swimCtx.Walk.state.walker.x,y:swimCtx.Walk.state.walker.y,z:swimCtx.Walk.state.walker.z},
+   swimming:swimCtx.Walk.state.walker.swimming
+  }));
+  await page.screenshot({path:`${dir}/swimming-surface-entry-failure.png`});throw error;
+ }
  report.surfaceEntry=true;
  await page.evaluate(()=>{swimCtx.readControlActions=()=>({move:0,strafe:0,vertical:-1})});
  await page.waitForFunction(()=>swimCtx.Walk.state.walker.swimming?.submerged===true,null,{timeout:10000});

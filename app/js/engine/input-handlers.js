@@ -28,10 +28,14 @@ export function setupEngineInputHandlers(appCtx) {
   });
 
   inputScope.listen(globalThis, 'keydown', (e) => {
-    // The pause dialog intentionally focuses Resume for accessibility. Escape
-    // must still resume from that button; ordinary form typing stays isolated.
-    const pauseEscape = e.code === 'Escape' && appCtx.hasPauseReason?.('manual_pause');
-    if (isFormControl(e.target) && !pauseEscape) return;
+    // Panels retain button focus for accessibility. Their Escape command must
+    // still reach the owner; ordinary form typing and gameplay stay isolated.
+    const equipment = appCtx.urbanSandboxRuntime;
+    const ownerEscape = e.code === 'Escape' && (
+      appCtx.hasPauseReason?.('manual_pause') ||
+      (equipment?.equipmentOpen && equipment.equipmentUi?.root?.contains(e.target))
+    );
+    if (isFormControl(e.target) && !ownerEscape) return;
     if (appCtx.hasPauseReason?.('reality_capture')) return;
     if (appCtx.showLargeMap && gameplayKeys.has(e.code)) {
       e.preventDefault();

@@ -160,15 +160,14 @@ try {
   }, null, { timeout: equipmentTimeout, polling: 100 });
   await page.waitForTimeout(4000);
   const laserEquipped = await snapshot();
+  // Return focus to gameplay through the panel's real close command before use.
+  await page.keyboard.press('Escape');
+  await page.waitForFunction(() => document.querySelector('#urbanEquipment')?.classList.contains('show') !== true);
   if (captureRequested) {
     await fs.mkdir(evidenceDir, { recursive: true });
-    await page.keyboard.press('Escape');
-    await page.waitForFunction(() => document.querySelector('#urbanEquipment')?.classList.contains('show') !== true);
     const laserImage = path.join(evidenceDir, 'urban-equipment-laser-pose.png');
     await page.screenshot({ path: laserImage, fullPage: false, timeout: 120000 });
     visualEvidence.push(path.relative(root, laserImage));
-    await page.keyboard.press('KeyI');
-    await page.waitForSelector('#urbanEquipment.show', { timeout: equipmentTimeout });
   }
   const laserMagazineBefore = Number(item(laserEquipped, 'laser-gun')?.magazine);
 
@@ -191,6 +190,8 @@ try {
   }, null, { timeout: equipmentTimeout, polling: 100 });
   const flashlightUsed = await snapshot();
 
+  await page.keyboard.press('KeyI');
+  await page.waitForSelector('#urbanEquipment.show', { timeout: equipmentTimeout });
   await page.keyboard.press('Escape');
   await page.waitForFunction(() => document.querySelector('#urbanEquipment')?.classList.contains('show') !== true, null, { timeout: equipmentTimeout, polling: 100 });
   const closed = await snapshot();

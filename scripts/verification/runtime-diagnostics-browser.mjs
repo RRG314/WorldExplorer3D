@@ -24,7 +24,9 @@ async function fresh(url){
   const url=new URL(response.url());
   if(url.origin!==base||response.status()<400)return;
   const item={path:url.pathname,status:response.status()};
-  if(response.status()===503&&['/api/geospatial/search','/api/geospatial/reverse'].includes(url.pathname))report.providerDegradations.push(item);
+  // Automatic location labels are optional here; provider availability has
+  // separate gates. Search, auth rejection and packaged assets still fail.
+  if(url.pathname==='/api/geospatial/reverse'&&[429,502,503,504].includes(response.status()))report.providerDegradations.push(item);
   else report.failedLocal.push(item);
  });
  await configureStagingAppCheck(page,base);
@@ -50,15 +52,17 @@ async function measure(id,owner){
 try{
  await fresh('loc=custom&lat=39.2904&lon=-76.6122&lname=Baltimore&launch=earth&gm=free&mode=walking');
  await page.locator('[data-globe-destination="settings"]').click();
- await page.evaluate(async()=>{
-  const {supportRecorder}=await import('/app/js/runtime/support-receipt.js');
-  supportRecorder.record({operation:'journal-save',error:new DOMException('PRIVATE_ACCOUNT_1234 secret coordinates media payload','QuotaExceededError'),request:{coordinates:[123,45],secret:'PRIVATE_ACCOUNT_1234'}});
+ // Exercise the registered runtime listener in source and bundled builds.
+ await page.evaluate(()=>{
+  globalThis.dispatchEvent(new ErrorEvent('error',{
+   error:new DOMException('PRIVATE_ACCOUNT_1234 secret coordinates media payload','QuotaExceededError')
+  }));
  });
  await page.locator('#copySupportReceiptBtn').click();
  await page.waitForFunction(()=>document.getElementById('supportReceiptStatus').textContent.startsWith('Report copied'));
  const copied=await page.evaluate(()=>navigator.clipboard.readText());
  assert.doesNotMatch(copied,/PRIVATE_ACCOUNT|secret|payload|coordinates/i);
- const receipt=JSON.parse(copied);assert.equal(receipt.type,'WorldExplorerSupportReceipt');assert.ok(receipt.events.some(e=>e.operation==='journal-save'&&e.category==='storage-full'));
+ const receipt=JSON.parse(copied);assert.equal(receipt.type,'WorldExplorerSupportReceipt');assert.ok(receipt.events.some(e=>e.operation==='runtime'&&e.category==='storage-full'));
  assert.equal(await page.locator('#supportReceiptPreview').inputValue(),copied);
  await page.screenshot({path:`${output}/support-desktop.png`});
  report.checks.push('actual-settings-copy-and-private-field-exclusion');
