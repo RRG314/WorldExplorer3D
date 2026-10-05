@@ -1,0 +1,17 @@
+<!doctype html><meta charset="utf-8"><title>Marine source and outage verification</title>
+<style>body{margin:32px;background:#0b1722;color:#e4f3fc;font:16px/1.55 system-ui;max-width:920px}h1{font-size:24px}button{font:inherit;padding:10px 18px;margin-bottom:16px;background:#214b66;color:white;border:1px solid #739bb2;border-radius:6px}.globe-selector-live-detail-card{padding:22px;border:1px solid #42647b;border-radius:14px;background:#142838}.globe-selector-live-detail-heading{font-size:20px;margin:14px 0 6px}.globe-selector-live-detail-copy{font-size:18px}.globe-selector-live-detail-meta{color:#b2ccdc;margin:8px 0}a{color:#8ed8ff}</style>
+<h1>Marine conditions — source component check</h1><p>Controlled model responses. Arrow Right changes coverage; the card uses the actual game renderer.</p><button id="next">Change coverage →</button><div id="details"></div>
+<script type="module">
+import {normalizeMarineModel} from '/app/js/geospatial/marine.js';
+import {renderMarineDetails} from '/app/js/live-earth/marine-ui.js';
+const point={lat:-18.5,lon:147.5};let phase=0;
+const payload={latitude:-18.5,longitude:147.5,current:{time:'2026-10-05T21:00:00Z',wave_height:1.09,wave_direction:81.21,wave_period:8.9,wind_wave_height:1.09,ocean_current_velocity:.27,ocean_current_direction:6,sea_surface_temperature:24.2},sources:[
+ {sourceId:'noaa-ww3',latitude:-18.5,longitude:147.5,validAt:'2026-10-05T21:00:00Z',fields:['wave_height','wave_direction','wave_period','wind_wave_height']},
+ {sourceId:'hycom-espc',latitude:-18.48,longitude:147.52,validAt:'2026-10-05T20:00:00Z',fields:['ocean_current_velocity','ocean_current_direction','sea_surface_temperature']}]};
+const ctx={appCtx:{},oceanSamples:()=>[],selectorSelection:()=>({name:'Coral Sea'}),stateWaveIntensity:()=>.4,
+ escapeHtml:value=>String(value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])),setDetailsHtml:(_state,html)=>document.getElementById('details').innerHTML=html};
+let state;
+function draw(){const data=structuredClone(payload);if(phase===1){data.current={time:payload.current.time,wave_height:1.09,wave_direction:81.21,wave_period:8.9};data.sources=data.sources.slice(0,1);}if(phase===2){data.current={};data.sources=[];}state={marineSnapshot:{model:normalizeMarineModel(data,point),station:null},marineError:phase===1?'Current and temperature guidance is temporarily unavailable.':''};renderMarineDetails(ctx,state);}
+function next(){phase=(phase+1)%3;draw();}document.getElementById('next').onclick=next;window.addEventListener('keydown',e=>{if(e.code==='ArrowRight'){e.preventDefault();next();}});
+window.render_game_to_text=()=>JSON.stringify({evidenceScope:'Controlled source panel; not live provider or physical-device evidence',phase,model:state.marineSnapshot.model,text:document.getElementById('details').textContent});window.advanceTime=async()=>{};draw();
+</script>

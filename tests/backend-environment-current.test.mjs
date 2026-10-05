@@ -17,7 +17,8 @@ test('standalone backend verification creates the explicit staging emulator life
 });
 test('isolated backend groups cover every assertion stage exactly once and preserve multiplayer stages',()=>{
  assert.deepEqual(backendGroups.flat(),backendSteps);
- assert.equal(new Set(backendGroups.flat().map(step=>step.id)).size,13);
+ assert.ok(backendGroups[0].some(step=>step.id==='environment-data'),'public environmental HTTP/cache/rules checks run in the backend release');
+ assert.equal(new Set(backendGroups.flat().map(step=>step.id)).size,14);
  assert.deepEqual(backendGroups.slice(1).map(group=>group.map(step=>step.id)),
    [['shared-expedition'],['connected-property-multiplayer'],['room-chat-gameplay'],['multiplayer'],['account-backend']]);
 });

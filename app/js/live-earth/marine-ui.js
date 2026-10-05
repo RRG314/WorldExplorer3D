@@ -22,7 +22,6 @@ function renderMarineDetails(ctx, state) {
   const hasModelGuidance = model?.hasGuidance === true;
   const station = marine?.station || null;
   const observation = marine?.observation || null;
-  const samples = ctx.oceanSamples(state);
   const selectedLocation = ctx.selectorSelection(state);
   const localWorld = typeof ctx.appCtx.getWeatherSnapshot === 'function' ? ctx.appCtx.getWeatherSnapshot() : null;
   const localSeaState = String(ctx.appCtx.boatMode?.seaState || 'moderate').replace(/_/g, ' ');
@@ -30,6 +29,7 @@ function renderMarineDetails(ctx, state) {
   const waveLine = model?.waveHeightM != null
     ? `Wave ${formatNumber(model.waveHeightM)} m · from ${formatNumber(model.waveDirectionDeg, 0)}° · ${formatNumber(model.wavePeriodS)} s period`
     : 'Wave guidance is unavailable at this model grid.';
+  const sourceLines = (model?.sources || []).map(source => `${source.sourceId === 'pacioos-ww3' ? 'PacIOOS WAVEWATCH III' : source.sourceId === 'noaa-ww3' ? 'NOAA WAVEWATCH III via NSF Unidata' : 'HYCOM / FNMOC ESPC'} · valid ${new Date(source.validAt).toLocaleString([], {timeZone:'UTC',month:'short',day:'numeric',hour:'2-digit',minute:'2-digit',hour12:false})} UTC · grid ${formatNumber(source.gridDistanceKm, 1)} km away`).join(' · ');
   const modelDetails = [
     model?.seaSurfaceTemperatureC != null ? `surface ${formatNumber(model.seaSurfaceTemperatureC)}°C` : '',
     model?.currentVelocityKph != null ? `current ${formatNumber(model.currentVelocityKph)} km/h toward ${formatNumber(model.currentDirectionDeg, 0)}°` : '',
@@ -56,13 +56,13 @@ function renderMarineDetails(ctx, state) {
       ${state.marineError ? `<div class="globe-selector-live-detail-meta">${ctx.escapeHtml(state.marineError)}</div>` : ''}
       ${hasModelGuidance ? `<div class="globe-selector-live-detail-copy">${ctx.escapeHtml(waveLine)}</div>
         ${modelDetails ? `<div class="globe-selector-live-detail-meta">${ctx.escapeHtml(modelDetails)}</div>` : ''}
-        <div class="globe-selector-live-detail-meta">${ctx.escapeHtml(`Open-Meteo Marine model · grid ${formatNumber(model.gridDistanceKm, 1)} km from selection · modeled guidance, not for navigation`)}</div>` : ''}
-      ${model && !hasModelGuidance ? '<div class="globe-selector-live-detail-copy">No Open-Meteo marine guidance is available for this inland model cell.</div>' : ''}
+        <div class="globe-selector-live-detail-meta">${ctx.escapeHtml(`${sourceLines || 'Public ocean models'} · modeled guidance, not for navigation`)}</div>` : ''}
+      ${model && !hasModelGuidance ? '<div class="globe-selector-live-detail-copy">No marine guidance is available at this model cell.</div>' : ''}
       ${stationDetails}
       <div class="globe-selector-live-detail-heading">World simulation</div>
       <div class="globe-selector-live-detail-meta">${ctx.escapeHtml(`Current 3D world sea state: ${localSeaState} · wave intensity ${localIntensity}%`)}</div>
-      ${localWorld ? `<div class="globe-selector-live-detail-meta">${ctx.escapeHtml(`Local wind ${Math.round(localWorld.windMph || 0)} mph · ${localWorld.conditionLabel || 'Weather'}`)}</div>` : ''}
-      <div class="globe-selector-live-detail-meta">${ctx.escapeHtml(`${samples.length} regional weather samples support the globe view. Runtime wave physics remain a separate simulation owner.`)}</div>
+      ${localWorld ? `<div class="globe-selector-live-detail-meta">${ctx.escapeHtml(`Local wind ${formatNumber(localWorld.windMph, 0)} mph · ${localWorld.conditionLabel || 'Weather'}`)}</div>` : ''}
+      <div class="globe-selector-live-detail-meta">Ocean motion in the world is simulated. Forecasts guide it where local coverage is available.</div>
     </div>
   `);
 }

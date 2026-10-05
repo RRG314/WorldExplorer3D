@@ -15,7 +15,7 @@ try {
   const page = await browser.newPage({ viewport: { width: 600, height: 350 } });
   page.on('pageerror', error => report.errors.push(String(error)));
   const requests = [];
-  await page.route('https://api.open-meteo.com/**', route => { requests.push(route); });
+  await page.route('**/api/geospatial/weather?**', route => { requests.push(route); });
   // This isolated component fixture supplies a deterministic attestation module.
   // Hosted token validation is covered separately by product-place-hosted.
   await page.route('**/js/firebase-init.js*', route => route.fulfill({contentType:'text/javascript',body:"export async function getFirebaseAppCheckToken(){return 'weather-component-fixture';}"}));
@@ -65,3 +65,5 @@ try {
 finally { await browser.close(); await server.close(); await fs.writeFile(`${out}/report.json`, JSON.stringify(report, null, 2)); }
 console.log(JSON.stringify(report));
 if (!report.ok) process.exitCode = 1;
+
+if (report.ok) { const {verifyEnvironmentPanelClient} = await import('./environment-panel-client.mjs'); await verifyEnvironmentPanelClient(); }

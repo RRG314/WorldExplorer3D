@@ -1,10 +1,10 @@
 # Current development and release state
 
-Updated October 5, 2026. This file supersedes historical status paragraphs. The latest local visual work is [REFERENCE-BLOCK.md](docs/visual-quality/REFERENCE-BLOCK.md). The earlier architecture closeout is [LOCAL-RESULT.md](docs/system-review/2026-10-04/LOCAL-RESULT.md); detailed failed and successful checkpoints remain in [IMPLEMENTATION.md](docs/system-review/2026-10-04/IMPLEMENTATION.md) and Git history.
+Updated October 5, 2026. Active continuation: [free environmental data and release review](docs/release-review/2026-10-05/FREE-ENVIRONMENT-DATA.md). The owner rejects paid data subscriptions; do not ask them to buy Open-Meteo. The public data replacement is implemented and staged, with final candidate verification in progress. This file supersedes historical status paragraphs. The latest local visual work is [REFERENCE-BLOCK.md](docs/visual-quality/REFERENCE-BLOCK.md). The earlier architecture closeout is [LOCAL-RESULT.md](docs/system-review/2026-10-04/LOCAL-RESULT.md); detailed failed and successful checkpoints remain in [IMPLEMENTATION.md](docs/system-review/2026-10-04/IMPLEMENTATION.md) and Git history.
 
 ## Workspace and authorization
 
-Use `/Users/stevenreid/.codex/worktrees/architecture-evaluation/WorldExplorer3D-live-deployed-20260320`, branch `steven/visual-quality`. Do not edit the older Documents or Developer checkouts named in historical instructions. The owner authorized completing repairs and verification locally, with local commits and preservation of progress. No GitHub push or production deployment is part of this request.
+Use `/Users/stevenreid/.codex/worktrees/architecture-evaluation/WorldExplorer3D-live-deployed-20260320`, branch `steven/visual-quality`. Do not edit the older Documents or Developer checkouts named in historical instructions. The owner authorized completing repairs and verification locally, with local commits and preservation of progress. No GitHub push or production deployment is part of this request. A test build is explicitly requested: staging Hosting preview and supporting staging Functions/indexes are authorized and have been used.
 
 Observed host: physical Apple M1 Mac mini, 8 GiB RAM. Run heavy work sequentially. Keep ordinary Chrome open, close only owned verification processes, and preserve `dist`, all four saved candidates, previous build artifacts and player data. Current observations supersede stale hardware notes. Private diagnostic captures remain outside the repository; never print credentials.
 
@@ -37,7 +37,7 @@ Certified local save-compatible fallback: `output/preserved-artifacts/5.4.0+5d77
 1. Ordinary hosted journeys on the exact artifact with normal attestation and live providers. Staging/debug-attested and emulator results are separate evidence.
 2. Physical iOS and physical Android acceptance on named devices.
 3. Uncoached fresh-player navigation, exploration and return/resume.
-4. Commercial weather-service entitlement and endpoint/attribution confirmation; never request keys in chat or purchase a plan without authorization.
+4. Public weather/ocean model usage rights, deployed gateway and attribution confirmation. No paid data subscription is used; the historical weather-entitlement receipt key now covers public-use rights.
 
 These observations remain pending; the migration/rollback class now passes. No frontend, Functions, rules or indexes were deployed during this local repair closeout. Production promotion is a separate action after the required evidence exists.
 

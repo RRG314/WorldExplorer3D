@@ -2,7 +2,7 @@ import { createPublicCameraState, loadPublicCameras, stopPublicCamera } from './
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { resolveObservedEarthLocation, haversineKm } from "../earth-location.js?v=2";
 import { getWeatherSnapshotForLocation } from "../weather.js?v=12";
-import { getWeatherSampleSnapshots } from "./weather-samples.js?v=2";
+import { getWeatherSampleSnapshots, ensureSelectedWeather } from "./weather-samples.js?v=2";
 import { aircraftService } from "../geospatial/aircraft.js?v=1";
 import { marineService } from "../geospatial/marine.js?v=2";
 import { streetImageryService } from "../geospatial/street-imagery.js?v=1";
@@ -405,22 +405,8 @@ async function ensureWeatherSamples(state, force = false) {
   return samples;
 }
 
-async function ensureSelectionWeather(state, force = false) {
-  const selected = selectorSelection(state);
-  if (!Number.isFinite(selected?.lat) || !Number.isFinite(selected?.lon)) {
-    state.selectionWeather = null;
-    return null;
-  }
-  const current = state.selectionWeather;
-  if (!force && current && Math.abs(current.lat - selected.lat) < 0.01 && Math.abs(current.lon - selected.lon) < 0.01) {
-    return current;
-  }
-  try {
-    state.selectionWeather = await getWeatherSnapshotForLocation(selected.lat, selected.lon, { force });
-  } catch {
-    state.selectionWeather = null;
-  }
-  return state.selectionWeather;
+function ensureSelectionWeather(state, force = false) {
+  return ensureSelectedWeather({selectorSelection,getWeatherSnapshotForLocation},state,force);
 }
 
 async function ensureMarineData(state, force = false) {
@@ -822,8 +808,8 @@ function initLiveEarth() {
         } : null,
         selectionWeather: state.selectionWeather ? {
           conditionLabel: state.selectionWeather.conditionLabel || '',
-          temperatureF: Number(state.selectionWeather.temperatureF || 0),
-          cloudCover: Number(state.selectionWeather.cloudCover || 0)
+          temperatureF: state.selectionWeather.temperatureF ?? null,
+          cloudCover: state.selectionWeather.cloudCover ?? null
         } : null
       };
     }

@@ -1,14 +1,15 @@
 import { normalizeDepthEvidence } from '../geospatial/bathymetry-evidence.js?v=1';
 
 export function waterCurrentSample(evidence, waterKind, nowMs=Date.now()) {
+  evidence = evidence?.currentEvidence || evidence;
   const speed=evidence?.currentVelocityKph,heading=evidence?.currentDirectionDeg;
   const validAt=Date.parse(evidence?.validAt || '');
   if (!['coastal','open_ocean'].includes(waterKind) || evidence?.truthType !== 'modeled' || evidence?.renderUsable !== true
-    || !Number.isFinite(speed) || speed<0 || !Number.isFinite(heading) || !Number.isFinite(validAt)
+    || !Number.isFinite(speed) || speed<0 || (speed>0 && !Number.isFinite(heading)) || !Number.isFinite(validAt)
     || Math.abs(nowMs-validAt)>3*3600000 || evidence.currentDirectionConvention !== 'direction-current-flows-to') {
     return {truthType:'unknown',vectorMetersPerSecond:null,sourceId:'none'};
   }
-  const radians=heading*Math.PI/180,metersPerSecond=speed/3.6;
+  const radians=(heading||0)*Math.PI/180,metersPerSecond=speed/3.6;
   return {truthType:'modeled',sourceId:evidence.sourceId,validAt:evidence.validAt,
     convention:'east-positive-x-south-positive-z',vectorMetersPerSecond:{x:Math.sin(radians)*metersPerSecond,y:0,z:-Math.cos(radians)*metersPerSecond}};
 }

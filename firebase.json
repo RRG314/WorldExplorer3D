@@ -102,6 +102,8 @@
       }
     ],
     "rewrites": [
+      {"source":"/api/geospatial/weather","function":"getEnvironmentalData"},
+      {"source":"/api/geospatial/marine","function":"getEnvironmentalData"},
       {"source":"/api/geospatial/search","function":"getPlaceLookup"},
       {"source":"/api/geospatial/reverse","function":"getPlaceLookup"},
       {

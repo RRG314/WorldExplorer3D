@@ -407,6 +407,8 @@ function applyWeatherPresentation() {
   updateWeatherUi();
 }
 
+function weatherNumber(value) { return value == null || value === '' ? NaN : Number(value); }
+
 function buildLiveWeatherState(location, payload) {
   const current = payload?.current || {};
   const place = appCtx.livePlaceState;
@@ -423,25 +425,27 @@ function buildLiveWeatherState(location, payload) {
     localTimeIso: String(current.time || payload?.current?.time || '').trim(),
     timezone: String(payload?.timezone || '').trim(),
     timezoneAbbr: String(payload?.timezone_abbreviation || '').trim(),
-    conditionCode: Number(current.weather_code),
+    conditionCode: weatherNumber(current.weather_code),
     conditionLabel: descriptor.label,
     category: descriptor.category,
     icon: descriptor.icon,
-    temperatureC: roundTo(Number(current.temperature_2m), 1),
-    temperatureF: roundTo(cToF(Number(current.temperature_2m)), 1),
-    apparentC: roundTo(Number(current.apparent_temperature), 1),
-    apparentF: roundTo(cToF(Number(current.apparent_temperature)), 1),
-    humidityPct: roundTo(Number(current.relative_humidity_2m), 0),
-    cloudCover: roundTo(Number(current.cloud_cover), 0),
-    windKph: roundTo(Number(current.wind_speed_10m), 1),
-    windMph: roundTo(kphToMph(Number(current.wind_speed_10m)), 1),
-    windDirectionDeg: roundTo(Number(current.wind_direction_10m), 0),
-    precipitationMm: roundTo(Number(current.precipitation), 1),
-    rainMm: roundTo(Number(current.rain), 1),
-    showersMm: roundTo(Number(current.showers), 1),
-    snowfallCm: roundTo(Number(current.snowfall), 1),
-    visibilityM: roundTo(Number(current.visibility), 0),
-    isDay: Number(current.is_day) === 1,
+    temperatureC: roundTo(weatherNumber(current.temperature_2m), 1),
+    temperatureF: roundTo(cToF(weatherNumber(current.temperature_2m)), 1),
+    apparentC: roundTo(weatherNumber(current.apparent_temperature), 1),
+    apparentF: roundTo(cToF(weatherNumber(current.apparent_temperature)), 1),
+    humidityPct: roundTo(weatherNumber(current.relative_humidity_2m), 0),
+    cloudCover: roundTo(weatherNumber(current.cloud_cover), 0),
+    windKph: roundTo(weatherNumber(current.wind_speed_10m), 1),
+    windMph: roundTo(kphToMph(weatherNumber(current.wind_speed_10m)), 1),
+    windDirectionDeg: roundTo(weatherNumber(current.wind_direction_10m), 0),
+    precipitationMm: roundTo(weatherNumber(current.precipitation), 1),
+    rainMm: roundTo(weatherNumber(current.rain), 1),
+    showersMm: roundTo(weatherNumber(current.showers), 1),
+    snowfallCm: roundTo(weatherNumber(current.snowfall), 1),
+    visibilityM: roundTo(weatherNumber(current.visibility), 0),
+    isDay: current.is_day == null ? null : Number(current.is_day) === 1,
+    sourceId: payload?.sourceId || '',
+    issuedAt: payload?.issuedAt || '',
     locationDisplay: String(matchingPlace?.display || '').trim(),
     locationShortLabel: String(matchingPlace?.shortLabel || '').trim()
   };

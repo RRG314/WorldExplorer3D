@@ -109,7 +109,7 @@ const LIVE_EARTH_LAYERS = {
     globeMode: 'markers',
     summary: 'Current weather-model conditions tied to selected globe and local-world locations.',
     localSummary: 'Uses the same real local weather system already active in the 3D world.',
-    sourceIds: ['open-meteo']
+    sourceIds: ['met-norway']
   },
   storms: {
     id: 'storms',
@@ -120,7 +120,7 @@ const LIVE_EARTH_LAYERS = {
     globeMode: 'markers',
     summary: 'Live severe-weather watchpoints derived from regional weather samples.',
     localSummary: 'Uses live weather snapshots to surface the strongest nearby storm-like conditions.',
-    sourceIds: ['open-meteo']
+    sourceIds: ['met-norway']
   },
   'ocean-state': {
     id: 'ocean-state',
@@ -131,7 +131,7 @@ const LIVE_EARTH_LAYERS = {
     globeMode: 'markers',
     summary: 'Global modeled marine conditions plus NOAA water-level observations and tide predictions where covered.',
     localSummary: 'Separates modeled guidance, observed gauges, predicted tides, and the runtime water simulation.',
-    sourceIds: ['open-meteo-marine', 'noaa-coops-observations', 'noaa-coops-predictions']
+    sourceIds: ['pacioos-ww3', 'noaa-ww3', 'hycom-espc', 'noaa-coops-observations', 'noaa-coops-predictions']
   },
   ships: {
     id: 'ships',

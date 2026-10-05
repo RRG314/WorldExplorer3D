@@ -15,6 +15,8 @@ const WMO_CODE_MAP = new Map([
   [65, { label: 'Heavy Rain', category: 'rain', icon: '🌧️' }],
   [66, { label: 'Freezing Rain', category: 'snow', icon: '🌨️' }],
   [67, { label: 'Heavy Freezing Rain', category: 'snow', icon: '🌨️' }],
+  [68, { label: 'Sleet', category: 'snow', icon: '🌨️' }],
+  [69, { label: 'Heavy Sleet', category: 'snow', icon: '🌨️' }],
   [71, { label: 'Light Snow', category: 'snow', icon: '🌨️' }],
   [73, { label: 'Snow', category: 'snow', icon: '❄️' }],
   [75, { label: 'Heavy Snow', category: 'snow', icon: '❄️' }],
@@ -30,7 +32,7 @@ const WMO_CODE_MAP = new Map([
 ]);
 
 function weatherCodeDescriptor(code) {
-  return WMO_CODE_MAP.get(Number(code)) || { label: 'Weather', category: 'cloudy', icon: '🌦️' };
+  return WMO_CODE_MAP.get(code == null || code === '' ? NaN : Number(code)) || { label: 'Weather', category: 'cloudy', icon: '🌦️' };
 }
 
 

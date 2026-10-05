@@ -5,6 +5,8 @@ import { artifactIdentity, sameArtifactIdentity } from './artifact-identity.mjs'
 
 // Automated candidate/backend execution is checked separately. These classes
 // cannot be satisfied by viewport emulation or a disposable App Check token.
+// The historical weather-entitlement key accepts documented public-use rights;
+// it does not require a subscription. Check the deployed gateway and attribution.
 export const REQUIRED_ACCEPTANCE = Object.freeze({
   'ordinary-hosted': { checks: ['coldStart', 'warmStart', 'locationSearch', 'signIn', 'sharedVoyage', 'saveRecovery'], maxAgeDays: 7 },
   'physical-ios': { checks: ['journey', 'touchControls', 'memory', 'thermal', 'resume'], maxAgeDays: 30 },

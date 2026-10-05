@@ -2786,3 +2786,6 @@ exports.sealRealityCaptureOriginal=functions.storage.object().onFinalize(async o
   if(tombstone.exists||!capture.exists||capture.data().ownerUid!==uid||capture.data().status==='deleting'){await file.delete({ignoreNotFound:true});return;}
   const [metadata]=await file.getMetadata();await require('./reality-capture-storage-privacy').sealCapturePhoto(file,metadata);
 });
+
+// Free public weather and ocean models share bounded, authenticated cache authority.
+exports.getEnvironmentalData = require('./environment-data').buildEnvironmentDataExport({functions, db, setCors, verifyAppCheck});

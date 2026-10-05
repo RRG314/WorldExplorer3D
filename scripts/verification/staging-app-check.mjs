@@ -32,11 +32,12 @@ export async function configureStagingAppCheck(page, baseUrl) {
   // Local immutable-artifact verification mirrors the Hosting rewrite against
   // the explicit staging authority. No production endpoint or free-provider bypass.
   if (process.env.WE3D_VERIFY_HOSTED_PLACE_LOOKUP === '1') {
-    await page.route(candidate => candidate.origin === url.origin && ['/api/geospatial/search', '/api/geospatial/reverse'].includes(candidate.pathname), async route => {
+    await page.route(candidate => candidate.origin === url.origin && ['/api/geospatial/search', '/api/geospatial/reverse', '/api/geospatial/weather', '/api/geospatial/marine'].includes(candidate.pathname), async route => {
       const request = new URL(route.request().url());
-      const target = new URL('https://us-central1-we3d-staging-20260712.cloudfunctions.net/getPlaceLookup');
+      const environmental = ['/api/geospatial/weather','/api/geospatial/marine'].includes(request.pathname);
+      const target = new URL('https://us-central1-we3d-staging-20260712.cloudfunctions.net/'+(environmental?'getEnvironmentalData':'getPlaceLookup'));
       target.search = request.search;
-      try { const response = await route.fetch({url: target.href, timeout: 15000}); await route.fulfill({response}); }
+      try { const response = await route.fetch({url: target.href, timeout: 55000}); await route.fulfill({response}); }
       catch { await route.fulfill({status: 502, contentType: 'application/json', body: JSON.stringify({error: 'Staging place lookup unavailable.'})}); }
     });
   }

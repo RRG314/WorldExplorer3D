@@ -27,7 +27,7 @@ try{
   let status,cooldowns=0;
   try{await feeds.weather([{lat:1,lon:2}]);}catch(error){status=error.status;}
   for(let lat=2;lat<12;lat++)try{await feeds.weather([{lat,lon:2}],{force:true});}catch(error){if(error.code==='PROVIDER_COOLDOWN')cooldowns++;}
-  return {status,cooldowns,health:feeds.diagnostics().providers.find(row=>row.id==='open-meteo-current')};
+  return {status,cooldowns,health:feeds.diagnostics().providers.find(row=>row.id==='met-norway-current')};
  });
  assert.equal(rate.status,429);assert.equal(rate.cooldowns,10);assert.equal(requests.filter(p=>p.endsWith('/weather')).length,1);
  limited=false;

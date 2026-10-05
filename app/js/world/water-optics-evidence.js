@@ -9,13 +9,23 @@ function numberOrNull(value) {
 
 function modeledWaveEvidence(model = null) {
   if (!model || model.hasGuidance !== true) return Object.freeze({ truthType: 'unknown', sourceId: 'none' });
-  const gridDistanceKm = numberOrNull(model.gridDistanceKm);
+  const waveSource = model.sources?.find(source => source.fields?.includes('wave_height'));
+  const currentSource = model.sources?.find(source => source.fields?.includes('ocean_current_velocity'));
+  const gridDistanceKm = numberOrNull(waveSource ? waveSource.gridDistanceKm : model.gridDistanceKm);
+  const currentEvidence = Array.isArray(model.sources) ? Object.freeze({
+    truthType: currentSource ? 'modeled' : 'unknown', sourceId: currentSource?.sourceId || 'none',
+    validAt: currentSource?.validAt || null, gridDistanceKm: currentSource?.gridDistanceKm ?? null,
+    renderUsable: Number.isFinite(currentSource?.gridDistanceKm) && currentSource.gridDistanceKm <= 35,
+    currentVelocityKph: numberOrNull(model.currentVelocityKph), currentDirectionDeg: numberOrNull(model.currentDirectionDeg),
+    currentDirectionConvention: 'direction-current-flows-to'
+  }) : null;
   return Object.freeze({
     truthType: 'modeled',
-    sourceId: String(model.sourceId || model.provenance?.sourceId || 'open-meteo-marine'),
-    validAt: String(model.validAt || model.provenance?.validAt || '') || null,
+    sourceId: String(waveSource?.sourceId || model.sourceId || model.provenance?.sourceId || 'public-marine'),
+    validAt: String(waveSource?.validAt || model.validAt || model.provenance?.validAt || '') || null,
     fetchedAt: String(model.provenance?.fetchedAt || '') || null,
     gridDistanceKm,
+    currentEvidence,
     renderUsable: gridDistanceKm !== null && gridDistanceKm <= 35,
     waveHeightM: numberOrNull(model.waveHeightM),
     wavePeriodS: numberOrNull(model.wavePeriodS),
@@ -40,7 +50,7 @@ function modeledWaveRenderControls(wave = null) {
   // The source height and period remain unchanged in the evidence object.
   return Object.freeze({
     usable: true,
-    sourceId: String(wave.sourceId || 'open-meteo-marine'),
+    sourceId: String(wave.sourceId || 'public-marine'),
     intensity: Math.max(0.06, Math.min(1, Math.sqrt(Math.max(0, waveHeightM) / 4))),
     speedScale: wavePeriodS !== null && wavePeriodS > 0
       ? Math.max(0.6, Math.min(1.45, 6 / wavePeriodS))
@@ -87,7 +97,7 @@ function waterLevelEvidence(marine = null) {
   if (modeledLevel !== null) {
     return Object.freeze({
       truthType: 'modeled',
-      sourceId: String(marine.model.sourceId || 'open-meteo-marine'),
+      sourceId: String(marine.model.sourceId || 'public-marine'),
       valueM: modeledLevel,
       datum: 'model-mean-sea-level',
       validAt: String(marine.model.validAt || '') || null,

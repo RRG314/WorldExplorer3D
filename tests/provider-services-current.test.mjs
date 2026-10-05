@@ -76,3 +76,30 @@ test('partial orbital groups retain successful data without re-requesting a rate
  assert.equal(first.items.length,1);assert.equal(second.items.length,1);assert.equal(second.warnings.length,1);
  assert.equal(calls.filter(group=>group==='weather').length,1);assert.equal(calls.filter(group=>group==='stations').length,2);
 });
+
+
+test('marine current physics use their own source time and distance instead of the wave grid', async()=>{
+ const {normalizeMarineModel}=await import('../app/js/geospatial/marine.js');
+ const {modeledWaveEvidence}=await import('../app/js/world/water-optics-evidence.js');
+ const {waterCurrentSample}=await import('../app/js/world/water-volume-sample.js');
+ const now=Date.parse('2026-10-05T20:30:00Z');
+ const payload={latitude:1,longitude:1,current:{time:'2026-10-05T20:00:00Z',wave_height:1,ocean_current_velocity:3.6,ocean_current_direction:90},sources:[
+   {sourceId:'pacioos-ww3',latitude:1,longitude:1,validAt:'2026-10-05T20:00:00Z',fields:['wave_height']},
+   {sourceId:'hycom-espc',latitude:0,longitude:0,validAt:'2026-10-05T19:00:00Z',fields:['ocean_current_velocity','ocean_current_direction']} ]};
+ const evidence=modeledWaveEvidence(normalizeMarineModel(payload,{lat:0,lon:0}));
+ assert.equal(evidence.renderUsable,false);const sample=waterCurrentSample(evidence,'open_ocean',now);assert.equal(sample.sourceId,'hycom-espc');assert.equal(sample.validAt,'2026-10-05T19:00:00Z');assert.equal(sample.vectorMetersPerSecond.x,1);
+ payload.sources[1].validAt='2026-10-01T20:00:00Z';assert.equal(waterCurrentSample(modeledWaveEvidence(normalizeMarineModel(payload,{lat:0,lon:0})),'open_ocean',now).truthType,'unknown');
+});
+
+
+test('Live Earth weather ignores out-of-order selections and exposes failure instead of permanent loading',async()=>{
+ const {ensureSelectedWeather}=await import('../app/js/live-earth/weather-samples.js');
+ let selected={lat:39,lon:-76};const requests=[],state={};
+ const ctx={selectorSelection:()=>selected,getWeatherSnapshotForLocation:(lat,lon)=>new Promise((resolve,reject)=>requests.push({lat,lon,resolve,reject}))};
+ const a=ensureSelectedWeather(ctx,state);selected={lat:-77,lon:166};const b=ensureSelectedWeather(ctx,state);
+ assert.equal(state.selectionWeather,null);assert.equal(state.selectionWeatherLoading,true);
+ requests[1].resolve({lat:-77,lon:166,temperatureF:-4,fetchedAtMs:Date.now()});await b;requests[0].resolve({lat:39,lon:-76,temperatureF:80});await a;
+ assert.equal(state.selectionWeather.temperatureF,-4);assert.equal(state.selectionWeatherLoading,false);
+ selected={lat:1,lon:2};const c=ensureSelectedWeather(ctx,state);requests[2].reject(Error('offline'));await c;assert.equal(state.selectionWeather,null);assert.equal(state.selectionWeatherLoading,false);
+ const d=ensureSelectedWeather(ctx,state);selected={lat:3,lon:4};requests[3].resolve({lat:1,lon:2,temperatureF:90});await d;assert.equal(state.selectionWeather,null);
+});

@@ -5,7 +5,7 @@ const categories=new Set(['cancelled','timeout','rate-limited','permission','una
 const environments=new Set(['EARTH','SPACE_FLIGHT','MOON','MARS','PLANETARY','OCEAN']);
 const modes=new Set(['walk','walking','driving','car','boat','plane','drone','space','submarine','diver','interior','title']);
 const providers=new Map([
- ['open-meteo-current','weather-model'],['open-meteo-marine','marine-model'],
+ ['met-norway-current','weather-model'],['public-marine','marine-model'],
  ['noaa-water-level-stations','noaa-stations'],['noaa-water-level','noaa-observation'],['noaa-tide-predictions','noaa-prediction'],
  ['celestrak-gp','orbit-elements'],['usgs-earthquakes-day','earthquakes'],['opensky','aircraft'],
  ['panoramax','street-imagery'],['kartaview','street-imagery'],['geology-point','mapped-geology']

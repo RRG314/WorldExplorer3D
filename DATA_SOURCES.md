@@ -166,8 +166,9 @@ with DeFlock and uses no DeFlock application code or DeFlock-owned data feed.
 | USGS GeoJSON earthquake feed | Recent earthquake locations and magnitudes | Observed events | Five-minute shared cache |
 | OpenSky Network | Aircraft state vectors near the selected location | Observed state vectors | Same-origin server adapter; hosting egress and provider terms apply |
 | ADSB.lol | Fallback aircraft observations when OpenSky is unavailable | Observed ADS-B state vectors | Same-origin server adapter; ODbL 1.0; provider availability and rate limits apply |
-| Open-Meteo Forecast API | Current weather samples | Modeled current conditions | Ten-minute shared cache |
-| Open-Meteo Marine API | Wave, current, temperature, and sea-level guidance | Modeled marine guidance | Fifteen-minute shared cache |
+| MET Norway Locationforecast | Hourly weather samples | Modeled, CC BY 4.0; converted units/categories | Shared backend cache honors Expires and Last-Modified |
+| PacIOOS global WAVEWATCH III | Wave and swell guidance | Free-use model; half-degree grid, per-source valid time | Fifteen-minute shared backend cache |
+| HYCOM / FNMOC ESPC | Surface currents and temperature | Freely available model; explicit grid and valid time | Fifteen-minute shared backend cache |
 | NOAA CO-OPS | Water-level station metadata and observations | Observed station data | Coverage is station-dependent; datum and quality are retained |
 | NOAA CO-OPS | High/low tide times and levels | Predicted tides | Kept separate from observations |
 | Panoramax | Nearby community street imagery and official viewer links | Community observations | CC BY-SA 4.0; coverage varies |
@@ -220,3 +221,13 @@ This is representative surface detail, not measured Antarctic topography.
 ### Public road-camera stills — October 2026
 
 Live Earth displays Fintraffic Digitraffic Finland imagery under CC BY 4.0 with provider capture times, and Caltrans-owned CWWP current stills from California districts 3/4 under Caltrans Conditions of Use. Caltrans catalogue timestamps are not capture timestamps. Each view links to its publisher and terms; images are not archived or rehosted. Four-view wall/favorites/remote Journal references do not award location visits. See docs/product-audit/2026-10-01/LIVE-EARTH-CAMERAS.md for verified coverage, adapter bounds and evidence.
+
+### Public environmental gateway (October 5, 2026)
+
+`getEnvironmentalData` owns the allowlisted upstream requests for `/api/geospatial/weather` and `/api/geospatial/marine`. App Check precedes provider access. Firestore caches and per-provider application-wide scheduling prevent per-player upstream fan-out. Maximum batch: 16 weather points or one marine point; bounded 350 kB responses and 15-second upstream timeouts. MET Norway Expires/Last-Modified and upstream 429 cooldowns are respected. No subscription, key, or Open-Meteo fallback is used. Ordinary Firebase infrastructure usage still applies.
+
+Weather coordinates are rounded to two decimals. Ocean requests select explicit grid points at the current UTC hour. Missing land/polar cells, absent units/fields, stale responses, or outages remain unavailable; they are never converted to a calm ocean or zero temperature. Wave directions are from-bearings; current directions are toward-bearings. NOAA station observations/tide predictions remain distinct. HYCOM surface elevation is deliberately not relabeled as MSL because that datum has not been established.
+
+Terms reviewed: https://api.met.no/doc/TermsOfService ; https://docs.api.met.no/doc/License.html ; https://pae-paha.pacioos.hawaii.edu/erddap/info/ww3_global/index.html ; https://tds.hycom.org/thredds/catalogs/GLBy0.08/latest.html?dataset=GLBy0.08-latest .
+
+PacIOOS returned an actual intermittent “unknown dataset” outage during validation. The same bounded cache authority now falls back to NOAA / NCEP WAVEWATCH III via NSF Unidata THREDDS, using that source's own three-hour valid time and half-degree grid. Combined waves, primary direction/period and wind-wave height remain available; swell partitions are explicitly absent on this fallback. No blended or invented observations.

@@ -20,7 +20,7 @@ maintain them.
 - [OpenStreetMap contributors](https://www.openstreetmap.org/copyright) provide
   the primary community-mapped geographic context under ODbL 1.0.
 - Overture Maps Foundation, ESA WorldCover, USGS, Copernicus, GEBCO, NOAA,
-  Open-Meteo, CelesTrak, OpenSky Network, ADSB.lol, Panoramax, and KartaView
+  MET Norway, PacIOOS, HYCOM/FNMOC, CelesTrak, OpenSky Network, ADSB.lol, Panoramax, and KartaView
   contribute mapped, modeled, reference, or observed context where available.
 - The independent [DeFlock project](https://deflock.org/) inspired DeFlock
   Hunt. World Explorer 3D is unaffiliated with DeFlock and uses publicly mapped

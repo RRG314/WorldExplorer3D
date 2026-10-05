@@ -145,3 +145,11 @@ test('weather labels cannot be overwritten with a different location', () => {
   service.updatePlaceLabels();
   assert.equal(context.liveWeatherState.locationDisplay, 'London, United Kingdom');
 });
+
+
+test('absent weather fields never appear as zero measurements',async()=>{
+ const h=await harness('weather');const request=h.api.refreshLiveWeather(true);
+ h.pending[0].resolve({temperature_2m:20,apparent_temperature:null,visibility:null,relative_humidity_2m:null,weather_code:null});await request;
+ for(const key of ['apparentC','apparentF','visibilityM','humidityPct','windKph','windMph','precipitationMm','snowfallCm'])assert.equal(h.appCtx.liveWeatherState[key],null,key);
+ assert.equal(h.appCtx.liveWeatherState.isDay,null);
+});

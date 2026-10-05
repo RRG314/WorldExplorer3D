@@ -31,7 +31,9 @@ This is the concise public attribution index. Asset-level details are in `app/as
 - USGS Earthquake Hazards Program feeds. <https://earthquake.usgs.gov/earthquakes/feed/>
 - OpenSky Network aircraft state vectors, subject to OpenSky terms of use. <https://opensky-network.org/about/terms-of-use>
 - ADSB.lol community aircraft observations, available under ODbL 1.0. <https://www.adsb.lol/>
-- Open-Meteo weather and marine APIs, subject to provider terms. <https://open-meteo.com/>
+- Weather: [MET Norway Locationforecast](https://api.met.no/) under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Coordinates rounded, wind converted from m/s to km/h, and symbols mapped to WMO categories. Unprovided fields are not estimated.
+- Waves/swell: [PacIOOS global WAVEWATCH III](https://www.pacioos.hawaii.edu/waves/model-global/), [free use and redistribution](https://pae-paha.pacioos.hawaii.edu/erddap/info/ww3_global/index.html).
+- Surface currents and temperature: [HYCOM / FNMOC ESPC latest model](https://tds.hycom.org/thredds/catalogs/GLBy0.08/latest.html?dataset=GLBy0.08-latest), freely available. Vector components are converted to speed and toward-bearing; no unverified sea-level datum is presented.
 - NOAA Center for Operational Oceanographic Products and Services water-level observations and tide predictions. <https://tidesandcurrents.noaa.gov/>
 - Panoramax and KartaView community street imagery, CC BY-SA 4.0. <https://panoramax.openstreetmap.fr/> and <https://kartaview.org/>
 
@@ -104,3 +106,5 @@ This is approximate visual-region context, not a property boundary or legal map.
 
 The shared 1K maps retain physical scale. Conversion details and hashes are in
 `app/assets/textures/facades/TIMBER_PROVENANCE.json`.
+
+- Wave fallback: NOAA / NCEP WAVEWATCH III via [NSF Unidata THREDDS](https://tds.scigw.unidata.ucar.edu/thredds/catalog/grib/NCEP/WW3/Global/catalog.html). [NOAA public-domain data](https://www.weather.gov/disclaimer), not an official NOAA product or endorsement. Separate swell partitions remain unavailable on this fallback.

@@ -20,11 +20,11 @@ function selectedLayerCount(ctx, state, layerId) {
   if (layerId === 'public-cameras') return state.publicCamera.items.length;
   if (layerId === 'satellites') return ctx.filteredSatelliteItems(state).length;
   if (layerId === 'earthquakes') return state.earthquakeItems.length;
-  if (layerId === 'weather') return state.weatherSamples.length;
+  if (layerId === 'weather') return state.weatherSamples.filter(sample => sample.snapshot).length;
   if (layerId === 'storms') return ctx.stormSamples(state).length;
   if (layerId === 'ocean-state') {
     const snapshot = state.marineSnapshot;
-    return Number(snapshot?.model?.hasGuidance === true) + Number(Boolean(snapshot?.observation)) + Number(Boolean(snapshot?.predictions?.length));
+    return (snapshot?.model?.hasGuidance ? (snapshot.model.sources?.length || 1) : 0) + Number(Boolean(snapshot?.observation)) + Number(Boolean(snapshot?.predictions?.length));
   }
   if (layerId === 'ships') return state.shipItems.length;
   if (layerId === 'aircraft') return state.aircraftItems.length;
@@ -42,6 +42,7 @@ function layerCountLabel(ctx, state, layer) {
   if (layer.id === 'ocean-state') return state.marineLoading ? 'loading' : `${count} ${count === 1 ? 'source' : 'sources'}`;
   if (layer.id === 'deflock-cameras') return state.deFlockLoading ? 'loading' : `${count.toLocaleString()} mapped`;
   if (layer.id === 'storms') return `${count} derived`;
+  if (layer.id === 'weather') return `${count} forecasts`;
   if (layer.id === 'satellites') {
     const observed = state.satelliteItems.filter((entry) => entry.dataSource === 'live').length;
     return observed === count ? `${count} observed` : `${observed}/${count} observed`;
@@ -51,7 +52,7 @@ function layerCountLabel(ctx, state, layer) {
 }
 
 function formatWeatherLine(snapshot) {
-  if (!snapshot) return 'Loading weather…';
+  if (!snapshot) return 'Weather unavailable';
   const temp = Number.isFinite(snapshot.temperatureF) ? `${Math.round(snapshot.temperatureF)}°F` : '--';
   return `${snapshot.icon || '🌦️'} ${snapshot.conditionLabel || 'Weather'} • ${temp}`;
 }
@@ -129,7 +130,7 @@ function renderOverviewDetails(ctx, state) {
   const sourceRows = [
     { id: 'satellites', label: 'Satellites', value: `${observedSatellites}/${state.satelliteItems.length} observed`, source: 'CelesTrak GP orbital elements', health: health.satellites.label },
     { id: 'earthquakes', label: 'Earthquakes', value: `${state.earthquakeItems.length} observed`, source: 'USGS GeoJSON feed', health: health.earthquakes.label },
-    { id: 'weather', label: 'Weather', value: `${state.weatherSamples.length} current`, source: 'Open-Meteo current conditions', health: health.weather.label },
+    { id: 'weather', label: 'Weather', value: `${state.weatherSamples.filter(sample => sample.snapshot).length}/${state.weatherSamples.length} available`, source: 'MET Norway hourly model', health: health.weather.label },
     { id: 'public-cameras',label:'Public camera views',value:`${state.publicCamera.items.length} indexed sites`,source:'Fintraffic / Caltrans · regional stills',health:'Open to browse regional imagery; not live video' },
     { id: 'street-imagery', label: 'Street imagery', value: 'selected location', source: 'Panoramax and KartaView community observations', health: health.streetImagery.label },
     { id: 'deflock-cameras', label: 'DeFlock cameras', value: `${(state.deFlockIndex?.count || 0).toLocaleString()} indexed`, source: 'Hourly OpenStreetMap ALPR position index', health: state.deFlockError || state.deFlockIndexWarning || (state.deFlockIndex ? 'Index ready · exact detail resolved on selection' : 'Open layer to load') },
@@ -290,16 +291,16 @@ export function renderLiveEarthDetails(ctx, state) {
       const active = sample.id === state.selectedWeatherSampleId ? ' active' : '';
       return `<button class="globe-selector-live-list-item${active}" type="button" data-live-earth-action="select-weather" data-id="${sample.id}">
         <span>${ctx.escapeHtml(sample.label)}${sample.snapshot ? ` • ${ctx.escapeHtml(sample.snapshot.conditionLabel || '')}` : ''}</span>
-        <small>${ctx.escapeHtml(sample.snapshot ? `${Math.round(sample.snapshot.temperatureF || 0)}°F` : 'Loading…')}</small>
+        <small>${ctx.escapeHtml(Number.isFinite(sample.snapshot?.temperatureF) ? `${Math.round(sample.snapshot.temperatureF)}°F` : state.weatherSamplesLoadedAt ? 'Unavailable' : 'Loading…')}</small>
       </button>`;
     }).join('');
     const localWorld = typeof ctx.appCtx.getWeatherSnapshot === 'function' ? ctx.appCtx.getWeatherSnapshot() : null;
     ctx.setDetailsHtml(state, `
       <div class="globe-selector-live-detail-card">
         <div class="globe-selector-live-detail-heading">${ctx.escapeHtml(selected?.locationDisplay || ctx.selectorSelection(state)?.name || 'Selected globe weather')}</div>
-        <div class="globe-selector-live-detail-copy">${ctx.escapeHtml(formatWeatherLine(selected))}</div>
-        ${selected ? `<div class="globe-selector-live-detail-meta">${ctx.escapeHtml(`Feels like ${Math.round(selected.apparentF || 0)}°F • ${Math.round(selected.humidityPct || 0)}% humidity • ${Math.round(selected.cloudCover || 0)}% clouds`)}</div>` : ''}
-        ${localWorld ? `<div class="globe-selector-live-detail-meta">${ctx.escapeHtml(`Current 3D world: ${localWorld.conditionLabel || 'Weather'} • ${Math.round(localWorld.temperatureF || 0)}°F`)}</div>` : ''}
+        <div class="globe-selector-live-detail-copy">${ctx.escapeHtml(state.selectionWeatherLoading ? 'Loading weather…' : formatWeatherLine(selected))}</div>
+        ${selected ? `<div class="globe-selector-live-detail-meta">${ctx.escapeHtml([Number.isFinite(selected.apparentF) ? `Feels like ${Math.round(selected.apparentF)}°F` : '', Number.isFinite(selected.humidityPct) ? `${Math.round(selected.humidityPct)}% humidity` : '', Number.isFinite(selected.cloudCover) ? `${Math.round(selected.cloudCover)}% clouds` : ''].filter(Boolean).join(' • '))}</div><div class="globe-selector-live-detail-meta">${ctx.escapeHtml(`MET Norway hourly forecast · valid ${selected.localTimeIso || 'time unavailable'}`)}</div>` : ''}
+        ${localWorld ? `<div class="globe-selector-live-detail-meta">${ctx.escapeHtml(`Current 3D world: ${localWorld.conditionLabel || 'Weather'} • ${Number.isFinite(localWorld.temperatureF) ? Math.round(localWorld.temperatureF) : '--'}°F`)}</div>` : ''}
         <div class="globe-selector-live-list">${sampleList}</div>
       </div>
     `);
@@ -313,8 +314,8 @@ export function renderLiveEarthDetails(ctx, state) {
       ctx.setDetailsHtml(state, `
         <div class="globe-selector-live-detail-card">
           <div class="globe-selector-live-detail-heading">Storm Watch</div>
-          <div class="globe-selector-live-detail-copy">No major storm-like conditions are showing in the current regional sample set.</div>
-          <div class="globe-selector-live-detail-meta">The feed is still live. Open Weather for the broader condition map.</div>
+          <div class="globe-selector-live-detail-copy">${state.weatherSamples.some(sample => sample.snapshot) ? 'No storm-like conditions are showing in the available regional samples.' : 'Storm conditions are unknown while forecasts are unavailable.'}</div>
+          <div class="globe-selector-live-detail-meta">${state.weatherSamples.some(sample => sample.snapshot) ? 'Based on available regional forecasts; coverage is not a worldwide alert service.' : 'Regional forecasts are unavailable. Open Weather and refresh to try again.'}</div>
         </div>
       `);
       return;
@@ -323,14 +324,14 @@ export function renderLiveEarthDetails(ctx, state) {
       const active = sample.id === selected?.id ? ' active' : '';
       return `<button class="globe-selector-live-list-item${active}" type="button" data-live-earth-action="select-weather" data-id="${sample.id}">
         <span>${ctx.escapeHtml(sample.label)} • ${ctx.escapeHtml(sample.snapshot?.conditionLabel || 'Storm Watch')}</span>
-        <small>${ctx.escapeHtml(`Wind ${Math.round(sample.snapshot?.windMph || 0)} mph • ${Math.round(sample.snapshot?.cloudCover || 0)}% clouds`)}</small>
+        <small>${ctx.escapeHtml(`Wind ${Number.isFinite(sample.snapshot?.windMph) ? Math.round(sample.snapshot.windMph) : '--'} mph • ${Number.isFinite(sample.snapshot?.cloudCover) ? Math.round(sample.snapshot.cloudCover) : '--'}% clouds`)}</small>
       </button>`;
     }).join('');
     ctx.setDetailsHtml(state, `
       <div class="globe-selector-live-detail-card">
         <div class="globe-selector-live-detail-heading">${ctx.escapeHtml(selected?.label || 'Storm Watch')}</div>
         <div class="globe-selector-live-detail-copy">${ctx.escapeHtml(selected?.snapshot?.conditionLabel || layer.summary)}</div>
-        ${selected ? `<div class="globe-selector-live-detail-meta">${ctx.escapeHtml(`Wind ${Math.round(selected.snapshot?.windMph || 0)} mph • ${Math.round(selected.snapshot?.precipitationMm || 0)} mm precip • ${Math.round(selected.snapshot?.cloudCover || 0)}% clouds`)}</div>` : ''}
+        ${selected ? `<div class="globe-selector-live-detail-meta">${ctx.escapeHtml(`Wind ${Number.isFinite(selected.snapshot?.windMph) ? Math.round(selected.snapshot.windMph) : '--'} mph • ${Number.isFinite(selected.snapshot?.precipitationMm) ? Math.round(selected.snapshot.precipitationMm) : '--'} mm precip • ${Number.isFinite(selected.snapshot?.cloudCover) ? Math.round(selected.snapshot.cloudCover) : '--'}% clouds`)}</div>` : ''}
         <div class="globe-selector-live-list">${sampleList}</div>
       </div>
     `);
@@ -464,8 +465,9 @@ export async function refreshActiveLayer(ctx, state, force = false) {
       renderLiveEarthUi(ctx, state);
       await Promise.all([pending, ctx.ensureWeatherSamples(state, force), ctx.ensureSelectionWeather(state, force)]);
     } else if (layerId === 'weather' || layerId === 'storms') {
-      await ctx.ensureWeatherSamples(state, force);
-      await ctx.ensureSelectionWeather(state, force);
+      const pending = Promise.all([ctx.ensureWeatherSamples(state, force), ctx.ensureSelectionWeather(state, force)]);
+      renderLiveEarthUi(ctx, state);
+      await pending;
     }
     state.lastErrorMessage = '';
   } catch (error) {
@@ -647,7 +649,9 @@ export async function handleUiAction(ctx, state, action, value) {
 
 export function syncSelectionWeather(ctx, state, force = false) {
   if (!['weather', 'storms', 'ocean-state'].includes(state.activeLayerId)) return;
-  void ctx.ensureSelectionWeather(state, force).then(() => {
+  const pending = ctx.ensureSelectionWeather(state, force);
+  renderLiveEarthUi(ctx, state);
+  void pending.then(() => {
     renderWeatherGlobe(ctx, state);
     renderLiveEarthUi(ctx, state);
   });
