@@ -6,7 +6,7 @@ Updated October 4, 2026. This summary supersedes the chronological status notes 
 
 Use `/Users/stevenreid/.codex/worktrees/architecture-evaluation/WorldExplorer3D-live-deployed-20260320`, branch `steven/visual-quality`. Do not edit the older Documents or Developer checkouts named in historical notes. The owner authorized finishing the product-plan phases sequentially with actual verification, preserving existing gameplay and work. The original investigation explicitly excludes production deployment.
 
-Observed host: physical Apple M1 Mac mini, 8 GiB RAM; approximately 15 GiB disk free at the latest check. Run heavy workloads sequentially, close only owned test processes, keep ordinary Chrome open, preserve dist, all four saved candidates and player data. Never print credentials. Current observation overrides stale hardware assumptions.
+Observed host: physical Apple M1 Mac mini, 8 GiB RAM; approximately 8 GiB disk free after verified compression of generated private diagnostics. Run heavy workloads sequentially, close only owned test processes, keep ordinary Chrome open, preserve dist, all four saved candidates and player data. Never print credentials. Current observation overrides stale hardware assumptions.
 
 ## Local architecture polish — current owner request
 

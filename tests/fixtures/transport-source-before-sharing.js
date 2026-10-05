@@ -1,3 +1,4 @@
+// Independent baseline from local commit 5d772a9c; do not update to mirror the implementation.
 // Pure transport-source normalization. This module deliberately keeps the
 // original strings beside parsed values so later compilers never need to
 // reconstruct source meaning from renderer-friendly booleans.
@@ -296,40 +297,6 @@ export function normalizeTransportSource(source = {}, tags = {}) {
       semantics: sourceCompleteness === 'lossless' ? 'source-tags' : 'generalized-schema'
     })
   });
-}
-
-const SHARED_TRANSPORT_FIELDS = ['rawTags', 'access', 'crossSection', 'capabilities', 'provenance'];
-const SHARED_TRANSPORT_LIMIT = 256;
-
-function sameFrozenValue(a, b) {
-  if (Object.is(a, b)) return true;
-  if (!a || !b || typeof a !== 'object' || typeof b !== 'object') return false;
-  const keys = Object.keys(a), otherKeys = Object.keys(b);
-  return keys.length === otherKeys.length && keys.every((key, i) =>
-    key === otherKeys[i] && sameFrozenValue(a[key], b[key]));
-}
-
-// One compilation pass owns these bounded tables. They are released with the
-// pass, while its roads retain only the immutable facts they actually use.
-// Source identity and full original tags always remain individual records.
-export function createTransportSourceNormalizer() {
-  const caches = SHARED_TRANSPORT_FIELDS.map(() => new Map());
-  return (source, tags) => {
-    const normalized = normalizeTransportSource(source, tags);
-    const result = { ...normalized };
-    for (let i = 0; i < SHARED_TRANSPORT_FIELDS.length; i++) {
-      const field = SHARED_TRANSPORT_FIELDS[i], value = normalized[field];
-      const key = JSON.stringify(value), cache = caches[i], existing = cache.get(key);
-      // JSON keys are only a lookup aid: preserve -0, non-finite values and
-      // every field exactly even if two values have the same JSON encoding.
-      if (existing && sameFrozenValue(existing, value)) result[field] = existing;
-      else {
-        if (!cache.has(key) && cache.size >= SHARED_TRANSPORT_LIMIT) cache.delete(cache.keys().next().value);
-        cache.set(key, value);
-      }
-    }
-    return Object.freeze(result);
-  };
 }
 
 export {

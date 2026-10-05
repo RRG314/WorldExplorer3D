@@ -1,7 +1,5 @@
+// Independent baseline from local commit 5d772a9c; do not update to mirror the implementation.
 const BUILDING_PROVENANCE_SCHEMA_VERSION = 1;
-const SAME_FEATURE_METADATA = Object.freeze({ sourceFeatureId: null, mapping: 'same_feature', stable: true });
-const NAMED_LANDMARK = Object.freeze({ mapped: true, genericOverrideAllowed: false });
-const GENERIC_LANDMARK = Object.freeze({ mapped: false, genericOverrideAllowed: true });
 
 const BUILDING_GEOMETRY_AUTHORITY = Object.freeze({
   OVERTURE: 'overture',
@@ -95,7 +93,6 @@ function compileBuildingProvenance(tags = {}, computed = {}) {
   const metadataSourceId = normalizedString(tags._buildingMetadataSourceId) || null;
   const stableMetadataMapping = isStableBuildingMetadataMapping(tags);
   const fields = {};
-  let absentField;
 
   for (const [field, tagKeys] of PROVENANCE_FIELDS) {
     const mapped = firstMappedTag(tags, tagKeys);
@@ -116,13 +113,11 @@ function compileBuildingProvenance(tags = {}, computed = {}) {
         sourceFeatureId: featureId
       };
     } else {
-      // This immutable fact is identical across absent fields of ONE feature.
-      // Keep its source identity local; never share it across buildings.
-      fields[field] = absentField ||= Object.freeze({
+      fields[field] = {
         value: null,
         status: 'absent',
         sourceFeatureId: featureId
-      });
+      };
     }
   }
 
@@ -164,14 +159,17 @@ function compileBuildingProvenance(tags = {}, computed = {}) {
         : 0,
       terrainMutation: false
     },
-    metadata: metadataSourceId ? {
+    metadata: {
       sourceFeatureId: metadataSourceId,
       mapping: metadataSourceId
         ? normalizedString(tags._buildingMetadataMapping) || 'ambiguous'
         : 'same_feature',
       stable: stableMetadataMapping
-    } : SAME_FEATURE_METADATA,
-    landmark: landmarkMapped ? NAMED_LANDMARK : GENERIC_LANDMARK,
+    },
+    landmark: {
+      mapped: landmarkMapped,
+      genericOverrideAllowed: !landmarkMapped
+    },
     fields
   });
 }
