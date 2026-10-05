@@ -271,11 +271,26 @@ function agentPose(agent, graph, sampleVehicleSurface = null) {
     pitch: Number.isFinite(Number(edge.surfacePitch)) ? Number(edge.surfacePitch) : 0,
     roll: 0
   };
+  return resolveAgentRoadPose(agent, edge, edgePose, sampleVehicleSurface);
+}
+
+function resolveAgentRoadPose(agent, edge, edgePose, sampleVehicleSurface) {
   if (!agent.variant || typeof sampleVehicleSurface !== 'function') return edgePose;
   return resolveVehicleRoadContactPose({
     ...edgePose,
     variant: agent.variant,
     sampleSurface: (sampleX, sampleZ) => sampleVehicleSurface(edge, sampleX, sampleZ)
+  });
+}
+
+function vehicleContactSnapshot(pose) {
+  return Object.freeze({
+    authority: String(pose.authority || 'edge-plane-fallback'),
+    sampledWheelContacts: Number(pose.sampledWheelContacts || 0),
+    maximumWheelPenetration: Number(pose.maximumWheelPenetration || 0),
+    maximumWheelGap: Number(pose.maximumWheelGap || 0),
+    previousMaximumWheelPenetration: Number(pose.previousMaximumWheelPenetration || 0),
+    contactAnomaly: pose.contactAnomaly || null
   });
 }
 
@@ -619,7 +634,7 @@ export function createLivingWorldPopulation(options = {}) {
     liveFlow: options.getTrafficFlow?.()
   });
 
-  const vehicleSnapshotFromPose = (agent, pose) => {
+  const vehicleSnapshotFromPose = (agent, pose, contact = agent.wheelContact) => {
     if (!pose) return null;
     return Object.freeze({
       id: agent.id,
@@ -632,7 +647,7 @@ export function createLivingWorldPopulation(options = {}) {
       renderedPitch: Number(agent.renderedPitch || 0),
       renderedRoll: Number(agent.renderedRoll || 0),
       renderedGroundY: Number(agent.renderedGroundY || 0),
-      wheelContact: agent.wheelContact || null,
+      wheelContact: contact || null,
       speed: Number(Number.isFinite(agent.currentSpeed) ? agent.currentSpeed : agent.speed || 0),
       visible: agent.detailPromoted === true || agent.visibility > 0.08,
       promoted: agent.promoted === true,
@@ -648,7 +663,10 @@ export function createLivingWorldPopulation(options = {}) {
   // Gameplay queries can request current support independently. Presentation
   // reads the pose already published by the fixed simulation, so both visual
   // detail levels use the same contact solution without solving it per draw.
-  const vehicleSnapshot = agent => vehicleSnapshotFromPose(agent, agentPose(agent, trafficGraph, sampleVehicleSurface));
+  const vehicleSnapshot = agent => {
+    const pose = agentPose(agent, trafficGraph, sampleVehicleSurface);
+    return vehicleSnapshotFromPose(agent, pose, pose ? vehicleContactSnapshot(pose) : null);
+  };
 
   const pedestrianSnapshot = (agent) => {
     const pose = agentPose(agent, pedestrianGraph);
@@ -713,28 +731,30 @@ export function createLivingWorldPopulation(options = {}) {
     const ratio = demand.vehicleActiveRatio;
     const visibilityPolicy = { enterDistance: demand.vehicleRadius, exitDistance: demand.vehicleExitRadius };
     vehicles.forEach((agent) => {
-      const pose = agentPose(agent, trafficGraph, sampleVehicleSurface);
-      agent.presentationPose = pose;
+      const pathPose = agentPose(agent, trafficGraph);
       const host = agent.visualHost;
-      if (!pose || !host) return;
-      const distance = reference ? Math.hypot(pose.x - reference.x, pose.z - reference.z) : 0;
+      if (!pathPose || !host) { agent.presentationPose = null; return; }
+      const distance = reference ? Math.hypot(pathPose.x - reference.x, pathPose.z - reference.z) : 0;
       if (agent.promoted) {
         agent.visibleTarget = false;
         agent.visibility = 0;
       } else {
         updateAgentVisibility(agent, distance, ratio, dt, visibilityPolicy);
       }
+      // Route motion/following continues for hidden agents. Their detached
+      // visual rigs need no wheel solve. Resolve support before either visual
+      // detail level becomes visible, including a promoted detail host.
+      if (agent.visibility <= .01 && !agent.detailPromoted) {
+        agent.presentationPose = null;
+        setPopulationHostVisible(host, group, false);
+        return;
+      }
+      const pose = resolveAgentRoadPose(agent, agent.bridge || trafficGraph.edges[agent.edgeIndex], pathPose, sampleVehicleSurface);
+      agent.presentationPose = pose;
       agent.renderedPitch = Number(pose.pitch || 0);
       agent.renderedRoll = Number(pose.roll || 0);
       agent.renderedGroundY = Number(pose.y || 0);
-      agent.wheelContact = Object.freeze({
-        authority: String(pose.authority || 'edge-plane-fallback'),
-        sampledWheelContacts: Number(pose.sampledWheelContacts || 0),
-        maximumWheelPenetration: Number(pose.maximumWheelPenetration || 0),
-        maximumWheelGap: Number(pose.maximumWheelGap || 0),
-        previousMaximumWheelPenetration: Number(pose.previousMaximumWheelPenetration || 0),
-        contactAnomaly: pose.contactAnomaly || null
-      });
+      agent.wheelContact = vehicleContactSnapshot(pose);
       const scale = Math.max(.001, agent.visibility);
       host.position.set(pose.x, pose.y + VEHICLE_ROOT_TO_GROUND_METERS * scale, pose.z);
       host.rotation.order = 'YXZ';
@@ -969,15 +989,17 @@ export function createLivingWorldPopulation(options = {}) {
       updateCuratedVehicleHosts(stepCount * POPULATION_STEP_SECONDS);
     },
     activeCounts() {
-      const vehicleAttitudeMismatches = vehicles.filter((agent) => {
-        const pose = agentPose(agent, trafficGraph, sampleVehicleSurface);
-        return pose && (
+      // Diagnostic queries still independently solve every agent's current
+      // road support. Only published poses have a rendered attitude to compare.
+      const solutions = vehicles.map(agent => ({agent, pose: agentPose(agent, trafficGraph, sampleVehicleSurface)}));
+      const vehicleAttitudeMismatches = solutions.filter(({agent, pose}) => {
+        return pose && agent.presentationPose && (
           Math.abs(Number(agent.renderedPitch || 0) - Number(pose.pitch || 0)) > 0.001 ||
           Math.abs(Number(agent.renderedRoll || 0) - Number(pose.roll || 0)) > 0.001 ||
           Math.abs(Number(agent.renderedGroundY || 0) - Number(pose.y || 0)) > 0.001
         );
       }).length;
-      const contactSamples = vehicles.map((agent) => agent.wheelContact).filter((contact) => contact?.sampledWheelContacts === 4);
+      const contactSamples = solutions.map(({pose}) => pose).filter((contact) => contact?.sampledWheelContacts === 4);
       return Object.freeze({
         pedestrianRebalances,
         pedestrians: pedestrians.filter((agent) => !agent.promoted && agent.visibility > .08).length,
@@ -985,17 +1007,18 @@ export function createLivingWorldPopulation(options = {}) {
         promotedPedestrians: pedestrians.filter((agent) => agent.promoted).length,
         promotedVehicles: vehicles.filter((agent) => agent.promoted).length,
         detailedMovingVehicles: vehicles.filter((agent) => agent.detailPromoted).length,
-        slopedVehicles: vehicles.filter((agent) => {
-          const pose = agentPose(agent, trafficGraph, sampleVehicleSurface);
+        slopedVehicles: solutions.filter(({pose}) => {
           return pose && (Math.abs(Number(pose.pitch || 0)) > 0.01 || Math.abs(Number(pose.roll || 0)) > 0.01);
         }).length,
         vehicleAttitudeMismatches,
+        vehicleContactQueryScope: 'fresh-all-agents',
+        publishedVehicleContacts: vehicles.filter(agent => agent.presentationPose?.sampledWheelContacts === 4).length,
         fourWheelContactVehicles: contactSamples.length,
         maximumWheelPenetration: Math.max(0, ...contactSamples.map((contact) => Number(contact.maximumWheelPenetration || 0))),
         maximumWheelGap: Math.max(0, ...contactSamples.map((contact) => Number(contact.maximumWheelGap || 0))),
-        contactAnomalies: vehicles.filter(agent => agent.wheelContact?.contactAnomaly).slice(0, 8).map(agent => ({
+        contactAnomalies: solutions.filter(({pose}) => pose?.contactAnomaly).slice(0, 8).map(({agent, pose}) => ({
           id: agent.id, variant: agent.variant?.id, edge: agent.bridge || trafficGraph.edges[agent.edgeIndex],
-          contacts: agent.wheelContact.contactAnomaly
+          contacts: pose.contactAnomaly
         })),
         previousMaximumWheelPenetration: Math.max(0, ...contactSamples.map((contact) => Number(contact.previousMaximumWheelPenetration || 0))),
         entranceVirtualizations: pedestrians.reduce((sum, agent) => sum + Number(agent.virtualizedEntries || 0), 0)
