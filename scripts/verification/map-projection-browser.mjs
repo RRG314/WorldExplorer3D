@@ -21,6 +21,16 @@ try{
  const mini=await page.locator('#minimapZoomLevel').textContent();await page.locator('#minimapZoomIn').click();assert.notEqual(await page.locator('#minimapZoomLevel').textContent(),mini);await page.locator('#minimapZoomOut').click();
  for(const [id,viewport] of [['desktop',{width:1440,height:900}],['phone',{width:390,height:844}]]){
   await page.setViewportSize(viewport);await page.locator('#minimap').click();await page.locator('#largeMap.show').waitFor({state:'visible'});
+  const searchLayout=await page.evaluate(()=>{
+   const input=document.getElementById('mapSearchInput'),button=document.getElementById('mapSearchBtn');
+   const a=input.getBoundingClientRect(),b=button.getBoundingClientRect();
+   const hit=element=>{const r=element.getBoundingClientRect(),target=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);return target===element||element.contains(target);};
+   return {sameRow:Math.abs(a.top-b.top)<1,inputWidth:a.width,withinViewport:a.left>=0&&b.right<=innerWidth,
+    inputHit:hit(input),buttonHit:hit(button),label:input.labels?.[0]?.textContent.trim()};
+  });
+  assert.ok(searchLayout.sameRow&&searchLayout.withinViewport&&searchLayout.inputWidth>=140&&searchLayout.inputHit&&searchLayout.buttonHit,JSON.stringify(searchLayout));
+  assert.equal(searchLayout.label,'Search for a city, place, airport, or coordinates');
+  report.checks.push(`${id}-search-label-and-input-button-layout`);
   const before=await page.evaluate(()=>({x:__mapContext.Walk.state.walker.x,z:__mapContext.Walk.state.walker.z}));
   await page.keyboard.down('w');await page.waitForTimeout(300);await page.keyboard.up('w');
   assert.deepEqual(await page.evaluate(()=>({x:__mapContext.Walk.state.walker.x,z:__mapContext.Walk.state.walker.z})),before);
