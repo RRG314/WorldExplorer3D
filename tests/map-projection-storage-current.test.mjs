@@ -47,3 +47,25 @@ test('water and POI painters use bounded projection destinations without changin
   }
  }finally{ctx.LOC=original;globalThis.Image=image;}
 });
+
+
+test('map POI visibility follows current layer toggles without caching stale player settings',async()=>{
+ const {isPoiMapLayerVisible}=await import('../app/js/game/poi-map-visibility.js');
+ const examples={schools:['amenity=school','amenity=university'],healthcare:['amenity=hospital','amenity=clinic','amenity=pharmacy'],
+  emergency:['amenity=police','amenity=fire_station'],food:['amenity=restaurant','amenity=cafe','amenity=fast_food','amenity=bar','amenity=pub'],
+  shopping:['shop=supermarket','shop=mall','shop=convenience','shop=hardware','shop=doityourself','shop=pawnbroker','shop=second_hand','shop=car_repair','shop=car_parts','shop=outdoor','shop=fishing','shop=boat','shop=aviation'],
+  culture:['tourism=museum','tourism=artwork'],tourism:['tourism=attraction','tourism=viewpoint'],hotels:['tourism=hotel'],
+  historic:['historic=monument','historic=memorial'],parks:['leisure=park','leisure=playground','leisure=sports_centre','leisure=stadium'],
+  parking:['amenity=parking'],fuel:['amenity=fuel','amenity=charging_station'],banks:['amenity=bank'],postal:['amenity=post_office']};
+ const layers=Object.fromEntries(Object.keys(examples).map(k=>[k,true]));
+ for(const [category,types] of Object.entries(examples)){
+  for(const type of types)assert.equal(isPoiMapLayerVisible(type,layers),true,type);
+  layers[category]=false;
+  for(const type of types)assert.equal(isPoiMapLayerVisible(type,layers),false,type);
+  for(const [other,entries] of Object.entries(examples))if(other!==category)assert.equal(isPoiMapLayerVisible(entries[0],layers),true,other);
+  layers[category]=true;
+  for(const type of types)assert.equal(isPoiMapLayerVisible(type,layers),true,type);
+ }
+ assert.equal(isPoiMapLayerVisible('unknown=unmapped',layers),false);
+ assert.equal(isPoiMapLayerVisible('amenity=cafe',{}),undefined);
+});
