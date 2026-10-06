@@ -24,7 +24,7 @@ test('denied, rate-limited, missing and invalid source tiles never trigger recov
  }
 });
 
-test('a provider outage or more than eight gaps cannot double the whole window request set',async()=>{
+test('a provider outage or a tail above the proportional allowance cannot double the request set',async()=>{
  for(const failures of [9,100]){
   let calls=0;const result=await fetchWithConcurrency(coordinates(100),8,async item=>{calls++;if(item.x<failures)throw cancelled();return item;});
   assert.equal(calls,100);assert.equal(result.metrics.recovery,null);assert.equal(result.missingTiles.length,failures);
@@ -75,4 +75,24 @@ test('the actual mapped-context loader publishes recovered building coverage and
  assert.equal(result.sourceCoverageComplete,true);assert.equal(result.loadedTiles,result.requestedTiles);
  assert.equal(result.contextBatchMetrics.recovery.fulfilled,1);assert.equal(result.availableBuildings,result.requestedTiles);
  assert.deepEqual(result.contextMissingTiles,[]);assert.equal(result.coverageStatus,'complete');
+});
+
+
+test('a healthy London-sized window recovers eleven deadline gaps once with no successful-tile refetch', async()=>{
+ const items=coordinates(400),calls=new Map();let active=0,peak=0;
+ const result=await fetchWithConcurrency(items,8,async item=>{
+  const n=(calls.get(item.x)||0)+1;calls.set(item.x,n);
+  if(item.x>=389&&n===1)throw cancelled();
+  if(n===2){active++;peak=Math.max(peak,active);await new Promise(r=>setTimeout(r,1));active--;}
+  return item;
+ });
+ assert.equal(result.metrics.recovery.requested,11);assert.equal(peak,2);
+ assert.deepEqual(result.values,items);assert.deepEqual(result.missingTiles,[]);
+ for(const item of items)assert.equal(calls.get(item.x),item.x>=389?2:1);
+});
+
+test('a large window beyond the maximum recovery allowance stays explicitly incomplete', async()=>{
+ let calls=0;
+ const result=await fetchWithConcurrency(coordinates(800),8,async item=>{calls++;if(item.x<33)throw cancelled();return item;});
+ assert.equal(calls,800);assert.equal(result.metrics.recovery,null);assert.equal(result.missingTiles.length,33);
 });

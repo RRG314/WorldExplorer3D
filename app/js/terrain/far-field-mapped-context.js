@@ -212,10 +212,11 @@ async function fetchWithConcurrency(items, concurrency, worker, signal = null, o
   const failed = [];
   for(let index=0;index<settled.length;index++)if(settled[index].status==='rejected')failed.push(index);
   let recovery=null;
-  // London reproduced 399/400 tiles followed by a permanent hole when the
-  // 30s batch deadline cancelled its last tile. Give only small isolated gaps
-  // one bounded recovery pass. An outage cannot double the entire request set.
-  if(failed.length>0 && failed.length<=8 && metrics.fulfilled>=Math.max(1,Math.floor(items.length*.9))){
+  // Healthy large windows can miss a small tail at the primary deadline.
+  // Recover at most 5% (minimum 8, absolute maximum 32) once, still with two
+  // requests and a 10s deadline. Outages/denials never double the request set.
+  const recoveryLimit = Math.max(8, Math.min(32, Math.ceil(items.length * .05)));
+  if(failed.length>0 && failed.length<=recoveryLimit && metrics.fulfilled>=Math.max(1,Math.floor(items.length*.9))){
     const eligible=failed.filter(index=>retryableTileFailure(settled[index].reason));
     if(eligible.length){
       const retried=await runBoundedProviderBatch(eligible,
