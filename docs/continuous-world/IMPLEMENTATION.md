@@ -42,3 +42,24 @@ Public sources remain the direction; no paid subscription is required by this de
 - [USGS3DEP](https://www.usgs.gov/3d-elevation-program/about-3dep-products-services): elevation products must retain their acquisition resolution/datum; a rendered mesh grid is not the source survey resolution.
 - [USGS PAD-US](https://www.usgs.gov/programs/gap-analysis-project/science/pad-us-data-download): public protected-area inventory supplies purpose/boundary evidence, not a forest map or permission for every real-world activity.
 - [ESA WorldCover](https://esa-worldcover.org/en/data-access):10m categorical cover with published year/version/attribution. Combine with mapped paths, water, verified local GIS and regional ecology; do not turn every park polygon into the same tree field. Existing local tree/groundcover generation follows the actor, but the far field remains largely material-based.
+
+## Coordinate authority correction
+
+The scene/map used one polar projection while interiors used the latitude of the destination in its longitude denominator and marine records used a separate flat formula. These now use `earth-core/coordinate-frame.js`, as do property/activity tools. Existing non-polar district coordinates and units are preserved; geographic longitude wraps at the date line and the two poles use the existing ENU source-contract math. Frame snapshots are immutable, the cache is bounded to16 entries and the active-frame hot path allocates no key string. Ordinary district round trips, both date-line directions, invalid input, output-buffer reuse, both poles and the existing map tests pass. All1942 current PR contracts and supporting gates pass.
+
+This establishes conversion consistency in these consumers. It does **not** establish automatic origin rebasing or remove fixed-world travel limits. Remaining independent formulas in authored event/legacy save adapters require compatibility review before rebasing; persistent records and multiplayer room coordinates must not be silently reinterpreted.
+
+## Required ownership migration (do not replace with periodic location reload)
+
+| Existing owner | Required change for continuous travel | Release test |
+| --- | --- | --- |
+| `config.js` / `earth-core/coordinate-frame.js` | Stable geographic positions; cell-local render frames; atomic actor/camera/velocity conversion when the active frame changes | Round trips at latitude changes/date line/poles; no camera jump or lost speed |
+| `world/load-roads.js`, `load-reset.js`, runtime session | Extract reusable cell compilation/publication from world/session reset | Crossing a cell never resets inventory, activities, character, vehicle or room |
+| `terrain/location-world.js`, far-field owner, accepted-ground runtime | Moving resident window; terrain/physical query coverage handoff; bounded decoding and imagery leases | No ground gap, overlapping height owners, stale publication or unbounded cache |
+| Building compiler, collision index, landmark owner | Geographic IDs and per-cell ownership; complete low-detail coverage; authoritative major-height enrichment; promote details before arrival | Independent denominator ≥90%; all identified majors rendered; cleanup and turnback |
+| Transport network/compiler, street overview/pavement, traversal/contact indices | Complete source network separated from close physical geometry; clipped-cell border nodes retain shared identity | Connected roads/bridges/approaches, no orphan graph nodes after eviction |
+| Land use, water bodies, vegetation/furniture, facilities | Share cell lifetime; regional biome/cover LOD; distinguish land purpose from physical cover | Park/forest/wetland/farm/coast and national-park journeys remain recognizable |
+| Weather/ocean/live Earth services and GIS | Query current geographic window with source TTL, cancellation and honest gaps; optional jurisdiction adapters | Cross-region response races, outages, cache/bandwidth ceilings, no paid provider dependency |
+| Saves/property/Journal/shared rooms/GPS | Persist stable geographic identity; migrate versioned local-frame records without dropping unknown fields | Existing save upgrade/rollback; authenticated room authority and two-client handoff |
+
+A new cell becomes active only after usable terrain and collision/transport are published together. Keep the old overlap while that happens. If source data fails, show the actual loading/unavailable condition and retain valid neighbours; do not invent roads or silently drop90% of a city. Eviction must unregister physics, raycast/contact/spatial indices, NPC/furniture/activity references, callbacks, pending requests/workers, textures and instance buffers. Persistent player changes stay in the existing save owner, not resident scene cells.

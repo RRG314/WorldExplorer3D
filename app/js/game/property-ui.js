@@ -1,3 +1,4 @@
+import {earthCoordinateFrame} from '../earth-core/coordinate-frame.js?v=1';
 import { ctx as appCtx } from '../shared-context.js?v=55';
 import { ensurePlayerBackpackInventory } from '../urban-sandbox/equipment-model.js?v=10';
 import { createLocalCommerceModel } from '../urban-sandbox/commerce-model.js?v=5';
@@ -78,19 +79,11 @@ function runtimeLocation() {
 }
 
 function worldToGeo(x, z) {
-  const baseLat = Number(appCtx.LOC?.lat || 0);
-  const baseLon = Number(appCtx.LOC?.lon || 0);
-  const scale = Number(appCtx.SCALE || 100000);
-  const cosLat = Math.cos(baseLat * Math.PI / 180) || 1;
-  return { lat: baseLat - Number(z || 0) / scale, lon: baseLon + Number(x || 0) / (scale * cosLat) };
+  return earthCoordinateFrame(appCtx.LOC, appCtx.SCALE).toGeographic(x, z);
 }
 
 function geoToWorld(lat, lon) {
-  const baseLat = Number(appCtx.LOC?.lat || 0);
-  const baseLon = Number(appCtx.LOC?.lon || 0);
-  const scale = Number(appCtx.SCALE || 100000);
-  const cosLat = Math.cos(baseLat * Math.PI / 180) || 1;
-  return { x: (Number(lon) - baseLon) * scale * cosLat, z: (baseLat - Number(lat)) * scale };
+  return earthCoordinateFrame(appCtx.LOC, appCtx.SCALE).toWorld(lat, lon);
 }
 
 function surfaceYAt(x, z) {
