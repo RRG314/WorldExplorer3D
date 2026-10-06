@@ -66,3 +66,7 @@ The exact accepted runtime fingerprint is `18e135ddd85176e816031e5a42c5bc598ff67
 This pass improves the shared street-level visual construction and one actual block. It does not replace all Earth buildings with artist-authored meshes, reskin the NPC family, redesign generated interiors, or revise the ocean/space scenes. Broad city composition and reference-grade art still require further location/asset work. Existing street widths, terrain, intersections and crossing evidence remain authoritative; unverified real-world road classifications were not rewritten to make screenshots more attractive.
 
 This is local source verification. The preserved architecture candidate and its receipts remain intact; they do not automatically certify these new visual changes for production. No deployment or player-data migration is part of this pass.
+
+## October 5 packaged release check
+
+The street pass is included in the 078250e5 staging preview with the free public-data replacement. All 89 functional/release gates and three backend groups pass, but the normal performance gate does not. A repeat after closing the owned preview reproduced clustered flight stalls; a bounded trace measured main-thread garbage collection around 130–140 ms. The earlier bounded route results above do not certify the later full candidate. See [current release evidence](../release-review/2026-10-05/FREE-ENVIRONMENT-DATA.md) for identities, the tested compatible fallback and remaining acceptance. No visual/runtime edits or budget relaxations were made to conceal the failed gate.
