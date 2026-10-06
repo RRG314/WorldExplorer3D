@@ -123,6 +123,8 @@ function logStep(message) {
 let report;
 const snapshots = [];
 const originalFavorites = [];
+let failedLoad = null;
+let invalidAdmission = null;
 try {
   await mkdir(outputDir, { recursive: true });
   await page.goto(`${baseUrl}/app/?loc=custom&lat=39.2904&lon=-76.6122&lname=Baltimore&launch=earth&gm=free&mode=walk`, {
@@ -137,11 +139,54 @@ try {
   await page.locator('#globeSaveFavoriteBtn').click();
   originalFavorites.push(...await page.evaluate(() => JSON.parse(localStorage.getItem('worldExplorer3D.globeSelector.savedFavorites') || '[]')));
   assert.ok(originalFavorites.length > 0, 'The current selected place must be saved');
+  logStep('injecting one ground-provider failure before entry, then retrying through the visible menu');
+  await page.evaluate(async () => {
+    const {ctx} = await import('/app/js/shared-context.js?v=55');
+    await ctx.ensureEarthRuntimeReady();
+    const prepare = ctx.prepareAcceptedGroundFromCatalog;
+    if (typeof prepare !== 'function') throw Error('Ground provider boundary unavailable');
+    ctx.prepareAcceptedGroundFromCatalog = async (...args) => {
+      ctx.prepareAcceptedGroundFromCatalog = prepare;
+      throw Error('audit-injected-ground-failure');
+    };
+  });
+  await page.locator('#globeSelectorStartBtn').click();
+  await page.waitForFunction(async () => {
+    const {ctx} = await import('/app/js/shared-context.js?v=55');
+    return ctx.worldLoadRuntimeState?.status === 'failed' && !ctx.worldLoading &&
+      document.getElementById('globeSelectorScreen')?.classList.contains('show');
+  }, null, {timeout: 60000});
+  failedLoad = await page.evaluate(async () => {
+    const {ctx} = await import('/app/js/shared-context.js?v=55');
+    return {started:ctx.gameStarted, ready:ctx.initialEarthWorldReady, publication:!!ctx.worldPublication,
+      loading:ctx.worldLoading, buildings:ctx.buildings.length, roads:ctx.roads.length,
+      providers:ctx.worldLoadRuntimeState.session.outstandingProviderWork,
+      error:ctx.worldLoadRuntimeState.error, loadingCover:document.getElementById('loading').classList.contains('show')};
+  });
+  assert.equal(failedLoad.started, false);assert.equal(failedLoad.ready, false);
+  assert.equal(failedLoad.publication, false);assert.equal(failedLoad.loadingCover, false);
+  assert.equal(failedLoad.buildings, 0);assert.equal(failedLoad.roads, 0);assert.equal(failedLoad.providers, 0);
+  assert.match(failedLoad.error, /audit-injected-ground-failure/);
+  await page.screenshot({path:`${outputDir}/failed-load-recovered-menu.png`});
   await page.locator('#globeSelectorStartBtn').click();
   logStep('waiting for initial Baltimore world');
   await waitForWorld(39.2904, -76.6122);
   const baseline = await runtimeSnapshot('custom-baltimore');
   snapshots.push(baseline);
+  invalidAdmission = await page.evaluate(async () => {
+    const {ctx} = await import('/app/js/shared-context.js?v=55');
+    const snapshot = () => ({sequence:ctx._worldLoadSequence,publication:ctx.worldPublication?.requestId,
+      buildings:ctx.buildings.length,roads:ctx.roads.length,ready:ctx.initialEarthWorldReady,
+      loading:ctx.worldLoading,started:ctx.gameStarted,x:ctx.car.x,z:ctx.car.z});
+    const before=snapshot(),resolve=ctx.resolveLocationSelection;
+    try {
+      ctx.resolveLocationSelection=()=>null;
+      const result=await ctx.loadRoads();
+      return {before,after:snapshot(),aborted:result?.aborted===true};
+    } finally {ctx.resolveLocationSelection=resolve;}
+  });
+  assert.equal(invalidAdmission.aborted,true);
+  assert.deepEqual(invalidAdmission.after,invalidAdmission.before,'Invalid admission must preserve the live world and pose');
 
   let sameAreaReload = null;
   let qualityReload = null;
@@ -218,6 +263,8 @@ try {
   }
   const afterFavorites = await page.evaluate(() => JSON.parse(localStorage.getItem('worldExplorer3D.globeSelector.savedFavorites') || '[]'));
   const checks = {
+    failedLoadRetiredBeforeRetry: failedLoad?.started === false && failedLoad?.providers === 0 && baseline.loadStatus === 'ready',
+    invalidRequestPreservesWorld: invalidAdmission?.aborted === true && JSON.stringify(invalidAdmission.before) === JSON.stringify(invalidAdmission.after),
     lowerQualityPreservesDistrict: initialOnly || (
       qualityReload.presentationLodScale < baseline.presentationLodScale &&
       qualityReload.publicationRadiusWorld === baseline.publicationRadiusWorld &&
@@ -244,6 +291,8 @@ try {
     scope: initialOnly ? 'initial-world-only' : 'in-session-city-switches',
     checks,
     snapshots,
+    failedLoad,
+    invalidAdmission,
     repeatProbe,
     browserErrors,
     localFailures,

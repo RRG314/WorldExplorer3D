@@ -2067,7 +2067,6 @@
       "dynamicBudgetScale",
       "dynamicLodScale",
       "functionalPoiRecords",
-      "gameStarted",
       "initialEarthDetailRadius",
       "initialEarthWorldReady",
       "plannedEarthDetailRadiusWorld",
@@ -2145,11 +2144,6 @@
       "transportStructureColliderPolicy",
       "transportStructureColliders"
     ],
-    "app/js/world/surface-publication-error.js": [
-      "gameStarted",
-      "initialEarthWorldReady",
-      "worldLoading"
-    ],
     "app/js/world/traversal.js": [
       "traversalNetworks"
     ],
@@ -2180,6 +2174,11 @@
     "app/js/world/world-snapshot-adapter.js": [
       "worldPublication",
       "worldSnapshotStore"
+    ],
+    "app/js/world/load-failure.js": [
+      "gameStarted",
+      "initialEarthWorldReady",
+      "worldLoading"
     ]
   }
 }

@@ -26,8 +26,10 @@ function dispatchQueuedWork() {
   activeTask = id;
   runWhenIdle(async () => {
     try {
-      await entry.task(firstPlayDetail);
-      completed.add(id);
+      if (entry.isCurrent()) {
+        await entry.task(firstPlayDetail);
+        if (entry.once && entry.isCurrent()) completed.add(id);
+      }
     } catch (error) {
       console.warn(`[workload] Deferred task ${id} failed:`, error);
     } finally {
@@ -41,6 +43,8 @@ export function scheduleAfterFirstPlay(id, task, options = {}) {
   if (!id || typeof task !== 'function' || completed.has(id) || queued.has(id) || activeTask === id) return false;
   queued.set(id, {
     task,
+    once: options.once !== false,
+    isCurrent: typeof options.isCurrent === 'function' ? options.isCurrent : () => true,
     timeout: Math.max(100, Number(options.timeout) || RUNTIME_WORKLOAD_BUDGETS.backgroundIdleTimeoutMs)
   });
   dispatchQueuedWork();

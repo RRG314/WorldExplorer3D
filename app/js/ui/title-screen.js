@@ -8,6 +8,7 @@ import { createGlobeSelector } from "./globe-selector.js?v=94";
 import { readSharedExperienceParams } from "./share-links.js?v=64";
 import { prepareTitleEnvironment } from "../planetary/entry.js?v=9";
 import { markFirstPlayReady, scheduleAfterFirstPlay } from '../runtime/workload-policy.js?v=1';
+import {isEarthWorldUsable} from '../earth-core/world-readiness.js';
 import { setupGlobeHub } from './title-screen/globe-hub.js?v=5';
 import {
   clampDetectedCoords,
@@ -729,11 +730,13 @@ function initTitleScreenUi({
       explorationMsg.style.display = 'none';
     }
 
-    await appCtx.loadRoads();
-    if(appCtx.worldLoadRuntimeState?.status==='failed') {
+    const earthLoadResult = await appCtx.loadRoads();
+    if (!isEarthWorldUsable(appCtx, earthLoadResult)) {
       appCtx.gameStarted=false;
+      appCtx.hideLoad?.();
+      document.getElementById('titleScreen')?.classList.remove('hidden');
       globeSelector.open();
-      return;
+      return false;
     }
     scheduleAfterFirstPlay('earth-star-catalog', () => appCtx.ensureStarCatalogLoaded?.(), {
       timeout: 1800

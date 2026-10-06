@@ -1,4 +1,7 @@
 function finiteCoordinate(value) {
+  if (value === null || value === undefined || typeof value === 'boolean' ||
+      (typeof value === 'string' && !value.trim())) return null;
+  if (typeof value !== 'number' && typeof value !== 'string') return null;
   const number = Number(value);
   return Number.isFinite(number) ? number : null;
 }

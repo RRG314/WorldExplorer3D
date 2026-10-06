@@ -7,10 +7,10 @@ export function createWorldLoadCoordinator(options = {}) {
   let activeWorldLoad = null;
 
   async function coordinatedLoad(retryPass = 0) {
-    if (retryPass > 0) return loadWorld(retryPass);
-    if (appCtx.boatMode?.active && typeof appCtx.stopBoatMode === 'function') {
-      appCtx.stopBoatMode({ targetMode: 'walk' });
+    if (options.admitRequest?.() === false) {
+      return {aborted: true, reason: 'invalid_location_selection'};
     }
+    if (retryPass > 0) return loadWorld(retryPass);
     const signature = getWorldLoadSignature();
     if (activeWorldLoad) {
       if (activeWorldLoad.signature === signature) return activeWorldLoad.promise;

@@ -1,6 +1,7 @@
 import {emitLocalLoadTrace} from './load-trace.js';
 import {retainTreeRowNodes} from './vegetation-source-nodes.js';
 import {isSurfacePublicationError,finishFailedSurfaceLoad} from './surface-publication-error.js';
+import {finishFailedWorldLoad} from './load-failure.js';
 import { createLinearFeatureRuntime } from "./load-linear-runtime.js?v=11";
 import { createWorldLandusePass } from "./load-landuse-pass.js?v=40";
 import { createWorldRoadLoaderSupport } from "./load-roads-support.js?v=9";
@@ -13,6 +14,7 @@ import {
 import { loadBuildingDetailForPublication } from "./load-building-detail.js?v=27";
 import { activateAcceptedGroundForWorldLoad } from "./accepted-ground-activation.js?v=7";
 import { createWorldLoadPlan } from "../earth-core/world-load-plan.js?v=1";
+import {createWorldLoadRequest} from '../earth-core/world-load-request.js?v=1';
 import { diagnoseDistrictGroundSource, prepareSelectedLocationSource } from "./compiler/selected-location-source-adapter.js?v=16";
 import { shouldLoadDetailedBuildings } from "./settlement-density-policy.js?v=1";
 import {
@@ -220,7 +222,7 @@ export function createWorldRoadLoader(deps = {}) {
       retryPass,
       sameLocation
     });
-    if (session.aborted) return;
+    if (session.aborted) return session;
     try {
     appCtx.showGroundFallbackPlaceholder?.();
     const {
@@ -367,7 +369,9 @@ export function createWorldRoadLoader(deps = {}) {
           : 'Preparing verified open-ocean surface...'
       );
       await markLoaded('primary');
-      return finishWorldLoadRuntimeSession({
+      await session.drainProviderWork('providers-complete');
+      return await finishWorldLoadRuntimeSession({
+        ...session,
         appCtx,
         finalizePerfLoad,
         loadMetrics,
@@ -1124,7 +1128,8 @@ export function createWorldRoadLoader(deps = {}) {
       worldSession.fail('automatic-retry');
       syncWorldSessionState();
       releaseWorldLoadCancellation();
-      return loadRoadsInternal(retryPass + 1);
+      await session.drainProviderWork('automatic-retry');
+      return await loadRoadsInternal(retryPass + 1);
     }
     if (!loaded) {
       console.warn('[WorldLoad] Final load path failed. Entering fallback recovery mode.');
@@ -1141,7 +1146,9 @@ export function createWorldRoadLoader(deps = {}) {
     if (!isActiveLoadContext()) {
       return finishSupersededWorldLoadRuntimeSession(session, 'superseded-before-publication');
     }
-    return finishWorldLoadRuntimeSession({
+    await session.drainProviderWork('providers-complete');
+    return await finishWorldLoadRuntimeSession({
+      ...session,
       appCtx,
       finalizePerfLoad,
       loadMetrics,
@@ -1153,13 +1160,27 @@ export function createWorldRoadLoader(deps = {}) {
       worldSession
     });
     } catch(error) {
+      if (!session.isActiveLoadContext()) {
+        return finishSupersededWorldLoadRuntimeSession(session, 'superseded-after-load-error');
+      }
       if(isSurfacePublicationError(error))return finishFailedSurfaceLoad(session,error);
-      throw error;
+      console.warn('[WorldLoad] World publication failed:', error);
+      return finishFailedWorldLoad(session, error);
+    } finally {
+      // Include asynchronous finalization in this scope. Replacement cannot
+      // reset shared owners while this request still has provider work alive.
+      await session.drainProviderWork('world-load-finished');
+      session.releaseWorldLoadCancellation();
     }
   }
 
   const { loadWorld: loadRoads } = createWorldLoadCoordinator({
     appCtx,
+    admitRequest: () => {
+      const accepted = !!createWorldLoadRequest(appCtx.resolveLocationSelection?.(), Number(appCtx._worldLoadSequence || 0) + 1);
+      if (!accepted) appCtx.showToast?.('Choose a valid location. The current world has been kept.');
+      return accepted;
+    },
     cancelActive: cancellationSlot.cancel,
     getWorldLoadSignature,
     loadWorld: loadRoadsInternal
