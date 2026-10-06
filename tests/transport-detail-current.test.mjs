@@ -2,7 +2,8 @@ import test from 'node:test';
 import {Worker as NodeWorker} from 'node:worker_threads';
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
-import {planTransportRegions,nearestTransportRegion,actorNeedsRoadDetail} from '../app/js/terrain/transport-detail-plan.js';
+import {planTransportRegions,nearestTransportRegion,actorNeedsRoadDetail,actorRequestsRoadDetail,
+ transportRegionBounds,MAX_MOVING_TRANSPORT_REGIONS} from '../app/js/terrain/transport-detail-plan.js';
 import {createTransportDetailCompiler,prepareTransportDetailPlan} from '../app/js/terrain/transport-detail-compiler.js';
 import {restoreTransportTerrain} from '../app/js/terrain/transport-terrain-snapshot.js';
 import {createRegionalRoadContact} from '../app/js/terrain/regional-road-contact.js';
@@ -116,6 +117,9 @@ test('ground readiness protects landing and driving without pausing water or hig
  assert.equal(actorNeedsRoadDetail({source:'plane',y:100},0),true);
  assert.equal(actorNeedsRoadDetail({source:'drone',y:300},NaN),true);
  assert.equal(actorNeedsRoadDetail({source:'drive',y:300},0),true);
+ assert.equal(actorRequestsRoadDetail({source:'plane',y:700},0),false);
+ assert.equal(actorRequestsRoadDetail({source:'plane',y:300},0),true,'landing prefetch precedes contact protection');
+ assert.equal(actorRequestsRoadDetail({source:'boat'},0),false);
 });
 
 test('failed road readiness retains collision protection and an owned retry with wait accounting',async t=>{
@@ -186,6 +190,10 @@ test('actual transport worker accepts an early planar plan and transfers final t
  assert.equal((await request({type:'plan',input:{roads,radius:1024}})).type,'planned');
  const result=await request({type:'prepare',input:{terrain:terrain(),heightProbes:[{x:0,z:0,y:.18}]}});
  assert.equal(result.type,'prepared');assert.equal(result.heightParity.maximumDifference,0);
+ const key=result.pending[0].key;
+ const first=await request({type:'compile',key});
+ const returned=await request({type:'compile',key});
+ assert.equal(triangles(first.batches),triangles(returned.batches),'returning to a region recompiles the same exact geometry after transfer');
  const batches=result.regions.flatMap(r=>r.batches);
  for(;;){const next=await request({type:'next',focus:{x:1000,z:0}});if(next.type==='complete')break;assert.equal(next.type,'region');batches.push(...next.batches);}
  const serial=createTransportDetailCompiler({roads,terrain:terrain(),radius:1024});const expected=serial.initial.regions.flatMap(r=>r.batches);
@@ -203,5 +211,81 @@ test('an existing regional overview avoids duplicate mask allocation without cha
  const regional=prepareTransportDetailPlan({roads,includeOverview:false});
  assert.ok(ordinary.masks.length>0);assert.equal(regional.masks.length,0);
  assert.deepEqual(regional.keys,ordinary.keys);
- assert.deepEqual(regional.tiles.map(t=>t.polygons),ordinary.tiles.map(t=>t.polygons));
+ assert.ok(regional.tiles.every(tile=>tile.polygons===undefined),'unused remote polygon unions are deferred');
+ const eager=createTransportDetailCompiler({terrain:terrain(),preparedPlan:ordinary});
+ const lazy=createTransportDetailCompiler({terrain:terrain(),preparedPlan:regional});
+ assert.equal(triangles(eager.initial.regions.flatMap(r=>r.batches)),triangles(lazy.initial.regions.flatMap(r=>r.batches)));
+ eager.dispose();lazy.dispose();
+});
+
+test('moving road detail evicts render/contact ownership and recompiles on return without thinning the overview',async t=>{
+ const previous=globalThis.Worker,requests=[];let worker;
+ const regions=[];for(let x=-12;x<=12;x++)for(let z=-3;z<=3;z++){
+  const key=`${x}:${z}`;regions.push({key,bounds:transportRegionBounds(key)});
+ }
+ globalThis.Worker=class {
+  constructor(){worker=this;this.terminated=false;}
+  postMessage(message){requests.push(message);queueMicrotask(()=>this.onmessage?.({data:message.type==='prepare'?
+   {type:'prepared',keys:[],masks:new Uint8Array(),regions:[],pending:regions}:
+   {type:'region',key:message.key,keys:[],batches:[]}}));}
+  terminate(){this.terminated=true;}
+ };
+ t.after(()=>globalThis.Worker=previous);
+ const {prepareTransportDetail}=await import('../app/js/terrain/transport-detail-runtime.js');
+ const ctx={farTerrainClipmapState:{regionalRoadCoverage:{status:'ready'}},terrainGroup:{children:[]},renderer:{capabilities:{maxTextureSize:4096}},terrainMeshHeightAt:()=>0};
+ const detail=await prepareTransportDetail(ctx,[],{isCurrent:()=>true});t.after(()=>detail.dispose());
+ const live=new Set(),published=[];
+ detail.attach(packet=>{assert.ok(!live.has(packet.key));live.add(packet.key);published.push(packet.key);},()=>{},key=>{assert.equal(live.delete(key),true);});
+ const settle=async point=>{for(let i=0;i<20;i++){
+  detail.step(point,0);await new Promise(r=>setImmediate(r));
+  assert.ok(live.size<=MAX_MOVING_TRANSPORT_REGIONS);assert.ok(detail.stats.activeJobs<=1);
+  if(detail.stats.status==='window-ready')return;
+ }throw Error('Window did not become ready');};
+ // High flight and water request no contact compilation. Reads have no request authority.
+ for(const source of ['plane','boat'])for(let n=0;n<20;n++){
+  detail.step({x:6000,z:200,y:700,source},0);detail.readyForActor({source,y:700},0);
+ }
+ assert.equal(requests.length,1);
+ await settle({x:250,z:250,source:'drive'});const first=new Set(live);
+ assert.ok(first.size>0);assert.equal(detail.readyAt({x:250,z:250}),true);
+ for(const x of [2300,4500,6700,8900,4500,250]){
+  await settle({x,z:250,source:'drive'});assert.equal(detail.readyAt({x,z:250}),true);
+  assert.equal(detail.stats.completedRegions+detail.stats.pendingRegions,regions.length);
+ }
+ assert.ok(detail.stats.evictedRegions>0);
+ for(const key of first)assert.ok(published.filter(value=>value===key).length>=2,'revisited regions must be rebuilt');
+ const old=published.length;detail.dispose();assert.equal(live.size,0);assert.equal(worker.terminated,true);
+ detail.step({x:5000,z:250});await new Promise(r=>setImmediate(r));assert.equal(published.length,old);
+});
+
+test('a moved observer cannot publish an obsolete worker response or an unfinished contact build',async t=>{
+ const previous=globalThis.Worker;let worker;
+ globalThis.Worker=class {
+  constructor(){worker=this;this.messages=[];}
+  postMessage(message){this.messages.push(message);if(message.type==='prepare')queueMicrotask(()=>this.onmessage({data:{type:'prepared',keys:[],masks:new Uint8Array(),regions:[],pending:[{key:'2:0'}]}}));}
+  terminate(){}
+ };
+ t.after(()=>globalThis.Worker=previous);
+ const {prepareTransportDetail}=await import('../app/js/terrain/transport-detail-runtime.js');
+ const ctx={farTerrainClipmapState:{regionalRoadCoverage:{status:'ready'}},terrainGroup:{children:[]},renderer:{capabilities:{maxTextureSize:4096}},terrainMeshHeightAt:()=>0};
+ const detail=await prepareTransportDetail(ctx,[],{isCurrent:()=>true});t.after(()=>detail.dispose());
+ let calls=0;detail.attach(()=>calls++);
+ detail.step({x:2500,z:250},0);detail.step({x:-8000,z:250},0);
+ worker.onmessage({data:{type:'region',key:'2:0',keys:[],batches:[]}});await new Promise(r=>setImmediate(r));
+ assert.equal(calls,0);assert.equal(detail.readyAt({x:2500,z:250},0),false);
+ let release;
+ detail.attach(async(packet,{isCurrent})=>{await new Promise(r=>release=r);if(!isCurrent())throw new DOMException('Moved','AbortError');calls++;});
+ detail.step({x:2500,z:250},0);worker.onmessage({data:{type:'region',key:'2:0',keys:[],batches:[]}});await new Promise(r=>setImmediate(r));
+ detail.step({x:2500,z:250,y:700,source:'plane'},0);release();await new Promise(r=>setImmediate(r));
+ assert.equal(calls,0);assert.equal(detail.stats.cancelledRegions,2);assert.equal(detail.stats.error,null);
+});
+
+test('regional contact retirement removes only its own deck and permits a clean return',()=>{
+ const batch=(x,y)=>({positions:Float32Array.from([x,y,0,x+10,y,0,x,y,10]),indices:Uint16Array.from([0,2,1])});
+ const index=createRegionalRoadContact(createRoadContactIndex(meshes([batch(0,20)])));
+ const remote=createRoadContactIndex(meshes([batch(2048,0)]));index.add('2:0',remote);
+ assert.equal(index.sampleAt(2049,1),0);assert.equal(index.remove('2:0'),true);
+ assert.equal(remote.stats().triangles,0);assert.equal(index.sampleAt(2049,1),null);assert.equal(index.sampleAt(1,1),20);
+ assert.equal(index.remove('2:0'),false);index.add('2:0',createRoadContactIndex(meshes([batch(2048,3)])));
+ assert.equal(index.sampleAt(2049,1),3);index.dispose();
 });

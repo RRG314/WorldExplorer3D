@@ -12,7 +12,7 @@ export function prepareTransportDetailPlan({roads,focus={x:0,z:0},radius,maxText
   const tiles=prepareCarriagewayTiles(roads);
   const keys=tiles.map(tile=>tile.key),layout=pavementMaskLayout(keys,maxTextureSize);
   const masks=new Uint8Array(includeOverview?keys.length*layout.resolution**2:0);
-  for(let i=0;i<tiles.length;i++){
+  for(let i=0;includeOverview&&i<tiles.length;i++){
     const tile=tiles[i];tile.polygons=unionCarriageway(tile);
     if(includeOverview)masks.set(rasterizePavementMask(tile.polygons,tile.bounds,layout.resolution),i*layout.resolution**2);
   }
@@ -30,6 +30,7 @@ export function createTransportDetailCompiler({roads,terrain,focus={x:0,z:0},rad
   }
   const partition=createPavementTerrainPartition(restored.meshes,{includeFarTerrain:true});
   const {tiles,keys,layout,masks,plan}=preparedPlan || prepareTransportDetailPlan({roads,focus,radius,maxTextureSize,includeOverview});
+  const regions=new Map([...plan.initial,...plan.pending].map(region=>[region.key,region]));
   function compile(region){
     const builder=createSpatialRoadBatches();
     for(const tile of region.tiles){
@@ -45,12 +46,17 @@ export function createTransportDetailCompiler({roads,terrain,focus={x:0,z:0},rad
   const initial=plan.initial.map(compile);
   return {
     initial:{keys,layout,masks,heightParity,regions:initial,pending:plan.pending.map(({key,bounds})=>({key,bounds})),totalCells:tiles.length},
+    compile(key){
+      const region=regions.get(key);
+      if(!region)throw new Error(`Unknown transport region ${key}`);
+      return compile(region);
+    },
     next(focus={x:0,z:0}){
       const index=nearestTransportRegion(plan.pending,focus);
       if(index<0)return null;
       const region=plan.pending.splice(index,1)[0];
       return {...compile(region),remaining:plan.pending.length};
     },
-    dispose(){partition.dispose();restored.dispose();plan.pending.length=0;plan.initial.length=0;tiles.length=0;}
+    dispose(){partition.dispose();restored.dispose();regions.clear();plan.pending.length=0;plan.initial.length=0;tiles.length=0;}
   };
 }

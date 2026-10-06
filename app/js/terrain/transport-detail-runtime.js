@@ -1,14 +1,30 @@
 import { leaseRoadOverview } from './road-overview-owner.js';
 import {captureTransportTerrain} from './transport-terrain-snapshot.js';
 import {createPavementTerrainMask} from '../world/pavement-terrain-mask.js';
-import {TRANSPORT_REGION_SIZE,actorNeedsRoadDetail} from './transport-detail-plan.js';
+import {TRANSPORT_REGION_SIZE,actorNeedsRoadDetail,actorRequestsRoadDetail,
+  transportRegionBounds,transportRegionInWindow,transportRegionDistanceSquared,
+  TRANSPORT_DETAIL_RADIUS,TRANSPORT_RETENTION_RADIUS,MAX_MOVING_TRANSPORT_REGIONS} from './transport-detail-plan.js';
 
 export async function prepareTransportDetail(appCtx,roads,{isCurrent,focus={x:0,z:0},terrainReady=null}) {
   const url=globalThis.__WORLD_EXPLORER_PRODUCTION__?.transportDetailWorkerUrl||new URL('./transport-detail-worker.js',import.meta.url);
   const worker=new Worker(url,{type:'module'});
-  let pending=null,disposed=false,active=null,publish=null,complete=null,mask=null,notice=null,noticeText=null,retryButton=null,lastSync=0;
-  const remaining=new Map();
-  const stats={status:'preparing',sourceRoads:roads.length,completedRegions:0,pendingRegions:0,blocked:false,blockedAtMs:null,blockedTotalMs:0,blockedCount:0,error:null};
+  let pending=null,disposed=false,active=null,publish=null,complete=null,retire=null,mask=null,notice=null,noticeText=null,retryButton=null,lastSync=0;
+  const remaining=new Map(),resident=new Map(),latestFocus={x:focus.x,z:focus.z};
+  let requestsDetail=true;
+  const stats={status:'preparing',sourceRoads:roads.length,completedRegions:0,pendingRegions:0,
+    pinnedRegions:0,residentMovingRegions:0,maxMovingRegions:MAX_MOVING_TRANSPORT_REGIONS,
+    activeJobs:0,evictedRegions:0,cancelledRegions:0,
+    blocked:false,blockedAtMs:null,blockedTotalMs:0,blockedCount:0,error:null};
+  const refreshCounts=()=>{
+    stats.residentMovingRegions=resident.size;
+    stats.completedRegions=stats.pinnedRegions+resident.size;
+    stats.pendingRegions=remaining.size;
+  };
+  function evict(key){
+    const bounds=resident.get(key);if(!bounds)return;
+    if(typeof retire!=='function')throw new Error('Transport residency requires a render/contact eviction owner');
+    retire(key);resident.delete(key);remaining.set(key,bounds);stats.evictedRegions++;refreshCounts();
+  }
   const request=data=>new Promise((resolve,reject)=>{
     const timeout=setTimeout(()=>{pending=null;reject(new Error('Transport detail worker exceeded its deadline'));},60000);
     pending={resolve:value=>{clearTimeout(timeout);pending=null;resolve(value);},reject:error=>{clearTimeout(timeout);pending=null;reject(error);}};
@@ -19,8 +35,9 @@ export async function prepareTransportDetail(appCtx,roads,{isCurrent,focus={x:0,
   function dispose(){
     if(disposed)return;disposed=true;worker.terminate();
     if(appCtx._cancelTransportPreparation===dispose)appCtx._cancelTransportPreparation=null;pending?.reject(new DOMException('Transport detail cancelled','AbortError'));
-    mask?.dispose();mask=null;notice?.remove();notice=null;remaining.clear();publish=null;
-    stats.status='disposed';stats.pendingRegions=0;stats.blocked=false;
+    for(const key of resident.keys())retire?.(key);
+    resident.clear();mask?.dispose();mask=null;notice?.remove();notice=noticeText=retryButton=null;remaining.clear();publish=complete=retire=null;
+    stats.status='disposed';stats.pendingRegions=0;stats.residentMovingRegions=0;stats.activeJobs=0;stats.blocked=false;
   }
   function updateNotice(blocked){
     if(blocked&&!stats.blocked){stats.blockedAtMs=performance.now();stats.blockedCount++;}
@@ -72,16 +89,17 @@ export async function prepareTransportDetail(appCtx,roads,{isCurrent,focus={x:0,
       mask=leaseRoadOverview(appCtx,fallback,10);
       const size=initial.layout.resolution**2;
       initial.keys.forEach((key,i)=>mask.publish(key,initial.masks.subarray(i*size,(i+1)*size)));
-      for(const region of initial.regions)for(const key of region.keys)mask.retire(key);
+      // Keep the complete overview below detailed surfaces. Eviction must not
+      // erase distant roads, including when the regional source is unavailable.
     }
-    for(const region of initial.pending)remaining.set(region.key,region.bounds);
+    for(const region of initial.pending)remaining.set(region.key,transportRegionBounds(region.key));
     mask?.syncMaterials();
-    // Texture data are bulk-uploaded on the first render. Later regional
-    // commits retire only four-byte lookup entries, not the whole atlas.
-    stats.heightParity=initial.heightParity;stats.completedRegions=initial.regions.length;stats.pendingRegions=remaining.size;stats.status='near-ready';
+    // Texture data are bulk-uploaded once. The overview stays available after
+    // contact/render eviction; it never needs to be rebuilt during travel.
+    stats.heightParity=initial.heightParity;stats.pinnedRegions=initial.regions.length;refreshCounts();stats.status='near-ready';
     initial.masks=null;
     const controller={stats,initial,dispose,refreshMaterials:()=>mask?.syncMaterials(),
-      attach(callback,onComplete=()=>{}){publish=callback;complete=onComplete;},
+      attach(callback,onComplete=()=>{},onRetire=null){publish=callback;complete=onComplete;retire=onRetire;},
       readyForActor(point,terrainY){
         if(!actorNeedsRoadDetail(point,terrainY)){updateNotice(false);return true;}
         return controller.readyAt(point);
@@ -94,27 +112,55 @@ export async function prepareTransportDetail(appCtx,roads,{isCurrent,focus={x:0,
             if(remaining.has(`${ix}:${iz}`)){updateNotice(true);return false;}
         updateNotice(false);return true;
       },
-      step(point={x:0,z:0}){
-        if(disposed||!publish||stats.status==='complete')return;
+      step(point={x:0,z:0},terrainY=NaN){
+        latestFocus.x=Number(point.x)||0;latestFocus.z=Number(point.z)||0;
+        requestsDetail=actorRequestsRoadDetail(point,terrainY);
+        if(disposed||!publish)return;
         if(!isCurrent()){dispose();return;}
         const now=performance.now();if(now-lastSync>500){mask?.syncMaterials();lastSync=now;}
-        if(active||stats.error||stats.status==='complete')return;
-        mask?.finishBulkUpload();
-        stats.status='refining';
-        active=(async()=>{
-          const packet=await request({type:'next',focus:{x:Number(point.x)||0,z:Number(point.z)||0}});
-          if(disposed||!isCurrent())return;
-          if(packet.type==='complete'){
-            stats.status='complete';stats.completedAt=performance.now();mask?.dispose();mask=null;worker.terminate();updateNotice(false);complete?.();publish=null;complete=null;return;
+        // Retire only outside the overlap. Resident and staged work have
+        // independent bounds: one packet can be in flight, never an open queue.
+        for(const [key,bounds] of resident)if(!transportRegionInWindow(bounds,latestFocus,TRANSPORT_RETENTION_RADIUS))evict(key);
+        if(active||stats.error)return;
+        if(!requestsDetail){stats.status='dormant';return;}
+        let key=null,best=Infinity;
+        for(const [candidate,bounds] of remaining){
+          if(!transportRegionInWindow(bounds,latestFocus,TRANSPORT_DETAIL_RADIUS))continue;
+          const distance=transportRegionDistanceSquared(bounds,latestFocus);
+          if(distance<best){best=distance;key=candidate;}
+        }
+        if(key===null){
+          if(!remaining.size&&stats.status!=='complete')complete?.();
+          stats.status=remaining.size?'window-ready':'complete';return;
+        }
+        if(resident.size>=MAX_MOVING_TRANSPORT_REGIONS){
+          let victim=null,farthest=-1;
+          for(const [candidate,bounds] of resident){
+            if(transportRegionInWindow(bounds,latestFocus,TRANSPORT_DETAIL_RADIUS))continue;
+            const distance=transportRegionDistanceSquared(bounds,latestFocus);
+            if(distance>farthest){farthest=distance;victim=candidate;}
           }
-          await publish(packet);
+          if(victim===null)throw new Error('Transport detail window exceeds its residency budget');
+          evict(victim);
+        }
+        const bounds=remaining.get(key);
+        const publicationCurrent=()=>!disposed&&isCurrent()&&requestsDetail&&
+          transportRegionInWindow(bounds,latestFocus,TRANSPORT_DETAIL_RADIUS);
+        mask?.finishBulkUpload();
+        stats.status='refining';stats.activeJobs=1;
+        active=(async()=>{
+          const packet=await request({type:'compile',key});
           if(disposed||!isCurrent())return;
-          for(const key of packet.keys)mask?.retire(key);
-          remaining.delete(packet.key);stats.completedRegions++;stats.pendingRegions=remaining.size;
+          if(packet.type!=='region'||packet.key!==key)throw new Error('Transport worker returned an unowned region');
+          if(!publicationCurrent()){stats.cancelledRegions++;return;}
+          await publish(packet,{isCurrent:publicationCurrent});
+          if(disposed||!isCurrent())return;
+          remaining.delete(key);resident.set(key,bounds);refreshCounts();
         })().catch(error=>{
           if(disposed)return;
+          if(error?.name==='AbortError'){stats.cancelledRegions++;return;}
           stats.status='failed';stats.error=String(error.message);worker.terminate();console.error('[TransportDetail]',error);
-        }).finally(()=>{active=null;});
+        }).finally(()=>{active=null;stats.activeJobs=0;});
       }
     };
     if(appCtx._cancelTransportPreparation===dispose)appCtx._cancelTransportPreparation=null;

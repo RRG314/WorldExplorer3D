@@ -862,6 +862,7 @@ export async function publishCompiledTransportMeshes(deps = {}) {
     // incrementally instead of rescanning the growing world after each packet.
     let detailVertices=appCtx.transportSurfacePublication.vertices;
     let detailTriangles=appCtx.transportSurfacePublication.triangles;
+    const residentRegions=new Map();
     const updateSummary=complete=>{
       const previous=appCtx.transportSurfacePublication;
       if(!previous||!isCurrent())return;
@@ -872,11 +873,11 @@ export async function publishCompiledTransportMeshes(deps = {}) {
         triangles:detailTriangles,
         roadSurfaceIntegrity:Object.freeze({...roadSurfaceIntegrity})});
     };
-    detail.attach(async packet=>{
+    detail.attach(async (packet,{isCurrent:publicationCurrent=isCurrent}={})=>{
       if(!isCurrent())throw new DOMException('Transport region superseded','AbortError');
       const group=new THREE.Group(),meshes=[];
       let contact=null,committed=false;
-      const schedule={current:isCurrent,yieldWork:yieldToWorldFrame,budgetMs:2};
+      const schedule={current:publicationCurrent,yieldWork:yieldToWorldFrame,budgetMs:2};
       try {
         for(const batch of packet.batches)buildIndexedBatchMesh({scene:group,targetList:meshes,
           verts:batch.positions,indices:batch.indices,material:roadMat,renderOrder:2,frustumCulled:true,
@@ -893,7 +894,7 @@ export async function publishCompiledTransportMeshes(deps = {}) {
             (x,z)=>cachedTerrainHeight(x,z)+ROAD_SURFACE_BIAS,contact);
           marks.append(verts,indices,'at_grade');
           if(now()-sliceStartedAt>=2){await yieldToWorldFrame();sliceStartedAt=now();}
-          if(!isCurrent())throw new DOMException('Transport region superseded','AbortError');
+          if(!publicationCurrent())throw new DOMException('Transport region superseded','AbortError');
         }
         marks.finish();
         for(const batch of marks.batches)buildIndexedBatchMesh({scene:group,targetList:meshes,
@@ -918,26 +919,46 @@ export async function publishCompiledTransportMeshes(deps = {}) {
           junctionStats.junctionPrecisionContacts++;
           junctionStats.maximumJunctionContactDistance=Math.max(junctionStats.maximumJunctionContactDistance,nearest.distance);
         }
-        if(!isCurrent())throw new DOMException('Transport region superseded','AbortError');
+        if(!publicationCurrent())throw new DOMException('Transport region superseded','AbortError');
         // No await between render/contact publication and retirement of the
         // terrain coverage mask in the controller that owns this callback.
         regionalContact.add(packet.key,contact);
         for(const mesh of meshes)appCtx.addEarthWorldObject(mesh);
         appCtx.replaceWorldCollection('roadMeshes',[...appCtx.roadMeshes,...meshes]);
-        for(const mesh of meshes){
-          detailVertices+=mesh.geometry.attributes.position?.count||0;
-          detailTriangles+=(mesh.geometry.getIndex()?.count||0)/3;
-        }
+        let vertices=0,triangles=0;
+        for(const mesh of meshes){vertices+=mesh.geometry.attributes.position?.count||0;triangles+=(mesh.geometry.getIndex()?.count||0)/3;}
+        detailVertices+=vertices;detailTriangles+=triangles;
+        residentRegions.set(packet.key,{meshes,vertices,triangles,measurements,junctionStats,cells:packet.keys.length});
         committed=true;
         roadSurfaceIntegrity.carriagewayRegions+=packet.keys.length;
         for(const [key,value] of Object.entries(junctionStats))roadSurfaceIntegrity[key]=key.startsWith('maximum')
           ?Math.max(roadSurfaceIntegrity[key],value):roadSurfaceIntegrity[key]+value;
         for(const [key,value] of Object.entries(measurements))roadSurfaceIntegrity[key]+=value;
         updateSummary(false);
+      } catch(error) {
+        if(!publicationCurrent())throw new DOMException('Transport region superseded','AbortError');
+        throw error;
       } finally {
         if(!committed){contact?.dispose();for(const mesh of meshes){mesh.parent?.remove(mesh);mesh.geometry?.dispose();}}
       }
-    },()=>updateSummary(true));
+    },()=>updateSummary(true),key=>{
+      const region=residentRegions.get(key);if(!region)return;
+      residentRegions.delete(key);
+      // A reset can retire the controller after another world became current;
+      // that world's collections must never be edited by this generation.
+      if(!isCurrent())return;
+      regionalContact.remove(key);
+      const retired=new Set(region.meshes);
+      appCtx.replaceWorldCollection('roadMeshes',appCtx.roadMeshes.filter(mesh=>!retired.has(mesh)));
+      for(const mesh of region.meshes){mesh.parent?.remove(mesh);mesh.geometry?.dispose();}
+      detailVertices-=region.vertices;detailTriangles-=region.triangles;
+      roadSurfaceIntegrity.carriagewayRegions-=region.cells;
+      for(const [name,value] of Object.entries(region.measurements))roadSurfaceIntegrity[name]-=value;
+      // Maximum tolerances are lifetime evidence; event/sample counts describe
+      // the currently published contact set.
+      for(const [name,value] of Object.entries(region.junctionStats))if(!name.startsWith('maximum'))roadSurfaceIntegrity[name]-=value;
+      updateSummary(false);
+    });
   }
   return appCtx.transportSurfacePublication;
   } finally {

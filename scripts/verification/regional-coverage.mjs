@@ -10,6 +10,7 @@ import {closeOwnedBrowser} from './owned-browser.mjs';
 import {followFlightOrbit} from './travel-flight-orbit.mjs';
 import {sampleFrameWindow} from './frame-window.mjs';
 import {frameHitches} from './frame-hitches.mjs';
+import {verifyTransportResidency} from './transport-residency-world.mjs';
 const root=path.resolve(process.env.WE3D_VERIFY_ROOT||'.');
 const external=process.env.WE3D_VERIFY_BASE_URL;
 const server=external?null:await startStaticServer({rootDir:root,ports:[4552]});
@@ -42,7 +43,7 @@ try{
  if(report.shaderErrors.length||report.programFailures.length)throw new Error('Terrain/WebGL shader compilation failed; see shaderErrors/programFailures');
  report.terrainCache=await page.evaluate(async()=>{const {ctx}=await import('/app/js/shared-context.js?v=55');return ctx.terrainTileCacheSnapshot();});
  assert.ok(report.terrainCache.entries<=report.terrainCache.limit,'Published terrain sources must return to their steady cache budget');
- report.before=await page.evaluate(()=>{const s=globalThis.getWorldExplorerRuntimeDiagnostics();return {counts:s.worldCounts,far:s.farTerrainClipmap,roads:s.worldLoad?.regionalTransportSelection,buildings:s.worldDetail?.buildings,landmarks:s.mappedTallBuildingVisuals,resources:s.resources};});
+ report.before=await page.evaluate(()=>{const s=globalThis.getWorldExplorerRuntimeDiagnostics();return {counts:s.worldCounts,far:s.farTerrainClipmap,roads:s.worldLoad?.regionalTransportSelection,buildings:s.worldDetail?.buildings,landmarks:s.mappedTallBuildingVisuals,transport:s.transportDetail,resources:s.resources};});
  if(process.env.WE3D_COVERAGE_INSPECT_LANDUSE==='1') {
   report.landcover=await page.evaluate(async()=>{
    const {ctx}=await import('/app/js/shared-context.js?v=55');
@@ -122,7 +123,8 @@ try{
   await page.screenshot({path:`${out}/sustained-flight.png`});
  }
 
- report.after=await page.evaluate(()=>{const s=globalThis.getWorldExplorerRuntimeDiagnostics();return {actor:s.activeActor,counts:s.worldCounts,far:s.farTerrainClipmap,runtimeErrors:s.runtimeErrors};});
+ report.after=await page.evaluate(()=>{const s=globalThis.getWorldExplorerRuntimeDiagnostics();return {actor:s.activeActor,counts:s.worldCounts,far:s.farTerrainClipmap,transport:s.transportDetail,runtimeErrors:s.runtimeErrors};});
+ if(process.env.WE3D_COVERAGE_ROAD_RESIDENCY==='1')report.roadResidency=await verifyTransportResidency(page,out);
  await page.evaluate(()=>{delete globalThis.__WE3D_TRAVEL_ACTOR__;});
  await page.locator('#mainMenuBtn').click();
  await page.waitForFunction(()=>{const s=globalThis.getWorldExplorerRuntimeDiagnostics?.();return s?.gameStarted===false&&s.lastEarthWorldRelease?.released===true;},null,{timeout:30000});

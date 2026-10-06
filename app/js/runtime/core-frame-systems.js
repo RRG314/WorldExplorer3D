@@ -46,8 +46,8 @@ function createCoreFrameSystems(appCtx, hooks = {}) {
         const detail=earthActive?appCtx.transportDetail:null;
         if(detail){
           const point=appCtx.activeEarthActorPosition?.()||{x:0,z:0};
-          detail.step(point);
           const terrainY=['plane','drone'].includes(point.source)?appCtx.terrainMeshHeightAt?.(point.x,point.z):NaN;
+          detail.step(point,terrainY);
           if(!detail.readyForActor(point,terrainY))frame.flags.simulationBlocked=true;
         }
       }

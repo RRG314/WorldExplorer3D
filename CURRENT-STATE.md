@@ -1,6 +1,6 @@
 # Current development and release state
 
-Updated October 6, 2026. Current request: restore at least 90% building coverage and all identified major buildings, roads, recognizable land uses, public GIS and a bounded continuous Earth. Free data only; local implementation. **Regional coverage is restored, but a stronger check found the detailed district retained only53%of available buildings; its correction is now in progress. Continuous geographic streaming and expanded GIS/ecology are not complete. Production is not cleared.**
+Updated October 6, 2026. Current request: restore at least 90% building coverage and all identified major buildings, roads, recognizable land uses, public GIS and a bounded continuous Earth. Free data only; local implementation. **Both nearby and regional building coverage are restored in the latest assembled Baltimore check (98.9% / 95%). Flight stalls still fail. Bounded moving road detail is now implemented and component/WebGL tested, pending assembled verification. Continuous geographic streaming and expanded GIS/ecology are not complete. Production is not cleared.**
 
 Details: [FREE-ENVIRONMENT-DATA.md](docs/release-review/2026-10-05/FREE-ENVIRONMENT-DATA.md). Visual work: [REFERENCE-BLOCK.md](docs/visual-quality/REFERENCE-BLOCK.md). Earlier architecture acceptance: [LOCAL-RESULT.md](docs/system-review/2026-10-04/LOCAL-RESULT.md).
 
@@ -19,7 +19,7 @@ Plan and evidence: [IMPLEMENTATION.md](docs/continuous-world/IMPLEMENTATION.md).
 - Instance GPU buffers now release. Regional and temporary road masks share one presentation owner; independent shader retirement and cached-program uniforms are corrected. The latest source also clears retired CPU atlas references. Twelve real WebGL allocation/render/retirement cycles end at zero coverage textures; cancellation releases staged inputs.
 - One coordinate conversion authority now serves map/scene/interiors/property/activity/marine consumers, including longitude wrapping and existing polar ENU. This is not automatic origin rebasing.
 
-The clean-source local artifact **5.4.0+39dcdff721f0.f9204870cbad707d.staging** passes assembled coverage in two cities:
+Earlier regional-only checkpoint (historical): artifact **5.4.0+39dcdff721f0.f9204870cbad707d.staging** passed regional coverage in two cities. This did not check the detailed-district denominator and is not current flight acceptance:
 
 | Location | Eligible regional buildings rendered | Identified major footprints | Source tiles |
 | --- | --- | --- | --- |
@@ -32,7 +32,7 @@ Evidence: `output/verification/continuous-world/final-baltimore/`, `recovered-lo
 
 These remain regional checks. Shortbread has no mapped regional heights in either sample; the major count cannot establish all real-world landmark identities/heights. Baltimore has 17,754 compiled physical roads, while the road mask renders 76,445 in-window surface fragments using 8.76 MiB; the mask does not certify complete physical routes/bridges. Earlier a804 flight failed with 1.4/1.2-second pauses, and a separate trace captured a 307.8 ms major GC. The latest single-window pass does not prove that long-session or future streaming stalls are eliminated. The rejected 8ad0d224 artifact had duplicate road GLSL/missing terrain; failed artifacts and receipts remain preserved.
 
-Subsequent source correction: land-use vegetation now shares terrain's physical-cover ownership, respects holes/clearings and distinguishes protected-area purpose and wetlands. The e120e05d artifact passed all1,968contracts and controlled vegetation tests. Baltimore retained95%coverage and clean exit but failed the90second stall gate (216.7/316.6mscluster). Druid Hill Park exposed860terrain cache entries and2late entries after exit; that run failed. A subsequent local terrain-source ownership repair is implemented and component/browser tested, pending packaged acceptance. See the implementation ledger. None of these artifacts is cleared for production or complete worldwide streaming.
+Subsequent source correction: land-use vegetation now shares terrain's physical-cover ownership, respects holes/clearings and distinguishes protected-area purpose and wetlands. The e120e05d artifact passed all1,968contracts and controlled vegetation tests. Baltimore retained95%coverage and clean exit but failed the90second stall gate (216.7/316.6mscluster). Druid Hill Park exposed860terrain cache entries and2late entries after exit; that run failed. A subsequent local terrain-source ownership repair is implemented and component/browser tested, now accepted in the 1b35 Druid Hill Park check: 72 terrain sources, zero after exit. A bounded hierarchy also replaces land-cover polygon duplication. The eedcd024 artifact passes nearby Baltimore coverage (48,294 / 48,834), regional coverage and exit cleanup, but fails the 90-second flight gate (1,333 / 950 ms pauses). See the implementation ledger. None of these artifacts is cleared for production or complete worldwide streaming.
 
 ## Existing free-data preview
 
