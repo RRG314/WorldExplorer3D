@@ -21,6 +21,11 @@ await cdp.send('Performance.enable');
 
 const browserErrors = [];
 const localFailures = [];
+const cancelledLocationRequests = [];
+const pendingRequests = new Set();
+const supersededRequests = new WeakSet();
+page.on('request', request => pendingRequests.add(request));
+page.on('requestfinished', request => pendingRequests.delete(request));
 page.on('pageerror', (error) => browserErrors.push(String(error?.stack || error)));
 page.on('response', (response) => {
   if (response.url().startsWith(baseUrl) && response.status() >= 400) {
@@ -28,10 +33,22 @@ page.on('response', (response) => {
   }
 });
 page.on('requestfailed', (request) => {
+  pendingRequests.delete(request);
+  if (supersededRequests.has(request) && request.failure()?.errorText === 'net::ERR_ABORTED') {
+    cancelledLocationRequests.push({ url: request.url(), reason: 'superseded-location' });
+    return;
+  }
   if (request.url().startsWith(baseUrl)) {
     localFailures.push({ url: request.url(), reason: request.failure()?.errorText || 'failed' });
   }
 });
+
+function markSupersededLocationRequests() {
+  for (const request of pendingRequests) {
+    const url = new URL(request.url());
+    if (url.origin === baseUrl && url.pathname === '/api/geospatial/marine') supersededRequests.add(request);
+  }
+}
 
 function metric(metrics, name) {
   return Number(metrics.find((entry) => entry.name === name)?.value || 0);
@@ -130,12 +147,14 @@ try {
   let repeatOriginBefore = null;
   if (!initialOnly) {
     logStep('switching custom Baltimore to preset Baltimore');
+    markSupersededLocationRequests();
     await page.keyboard.press('Shift+KeyN');
     await waitForWorld(39.2904, -76.6122, baseline.loadSequence);
     sameAreaReload = await runtimeSnapshot('preset-baltimore');
     snapshots.push(sameAreaReload);
 
     logStep('switching Baltimore to Hollywood');
+    markSupersededLocationRequests();
     await page.keyboard.press('Shift+KeyN');
     await waitForWorld(34.0928, -118.3287, sameAreaReload.loadSequence);
     hollywood = await runtimeSnapshot('hollywood');
@@ -170,6 +189,7 @@ try {
   });
   if (!initialOnly) {
     logStep('returning to Baltimore through the same location loader as the city control');
+    markSupersededLocationRequests();
     await page.evaluate(async () => {
       const { ctx } = await import('/app/js/shared-context.js?v=55');
       ctx.selectPresetLocation('baltimore');
@@ -203,7 +223,8 @@ try {
     snapshots,
     repeatProbe,
     browserErrors,
-    localFailures
+    localFailures,
+    cancelledLocationRequests
   };
   await writeFile(`${outputDir}/${initialOnly ? 'report-initial.json' : 'report.json'}`, `${JSON.stringify(report, null, 2)}\n`);
   Object.entries(checks).forEach(([name, ok]) => console.log(`${ok ? 'PASS' : 'FAIL'} ${name}`));
@@ -214,7 +235,7 @@ try {
       const d = globalThis.getWorldExplorerRuntimeDiagnostics?.();
       return { origin: d?.earthOrigin, loading: d?.worldLoading, status: d?.worldLoad?.status, sequence: d?.worldLoad?.sequence, phases: d?.worldLoad?.activePhases };
     }).catch(() => null);
-    await writeFile(`${outputDir}/failure.json`, JSON.stringify({ ok: false, error: error.message, snapshots, lastWorld, browserErrors, localFailures }, null, 2));
+    await writeFile(`${outputDir}/failure.json`, JSON.stringify({ ok: false, error: error.message, snapshots, lastWorld, browserErrors, localFailures, cancelledLocationRequests }, null, 2));
   }
   throw error;
 } finally {
