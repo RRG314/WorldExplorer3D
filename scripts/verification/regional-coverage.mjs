@@ -42,7 +42,7 @@ try{
  if(report.shaderErrors.length||report.programFailures.length)throw new Error('Terrain/WebGL shader compilation failed; see shaderErrors/programFailures');
  report.terrainCache=await page.evaluate(async()=>{const {ctx}=await import('/app/js/shared-context.js?v=55');return ctx.terrainTileCacheSnapshot();});
  assert.ok(report.terrainCache.entries<=report.terrainCache.limit,'Published terrain sources must return to their steady cache budget');
- report.before=await page.evaluate(()=>{const s=globalThis.getWorldExplorerRuntimeDiagnostics();return {counts:s.worldCounts,far:s.farTerrainClipmap,roads:s.worldLoad?.regionalTransportSelection,buildings:s.worldLoad?.buildingPublicationDomain,landmarks:s.mappedTallBuildingVisuals,resources:s.resources};});
+ report.before=await page.evaluate(()=>{const s=globalThis.getWorldExplorerRuntimeDiagnostics();return {counts:s.worldCounts,far:s.farTerrainClipmap,roads:s.worldLoad?.regionalTransportSelection,buildings:s.worldDetail?.buildings,landmarks:s.mappedTallBuildingVisuals,resources:s.resources};});
  if(process.env.WE3D_COVERAGE_INSPECT_LANDUSE==='1') {
   report.landcover=await page.evaluate(async()=>{
    const {ctx}=await import('/app/js/shared-context.js?v=55');
@@ -52,8 +52,10 @@ try{
     plantSources:countBy(plants,'source'),models:ctx.vegetationModelStatus||{}};
   });
   assert.ok(report.landcover.plants>0,'The requested vegetated location has no published plants');
+  await page.evaluate(async()=>{const {ctx}=await import('/app/js/shared-context.js?v=55');ctx.setTimeOfDay('day');});
+  await page.waitForTimeout(500);
   const data=await page.evaluate(async()=>{
-   const {ctx}=await import('/app/js/shared-context.js?v=55');ctx.setTimeOfDay('day');
+   const {ctx}=await import('/app/js/shared-context.js?v=55');
    const plants=ctx.vegetationFeatures||[],forest=plants.filter(p=>p.source==='polygon'&&p.landuseType==='forest');
    const point=forest.reduce((best,p)=>!best||Math.hypot(p.x,p.z)<Math.hypot(best.x,best.z)?p:best,null)||plants.find(p=>p.source==='polygon')||plants[0];
    if(!point)return null;
@@ -65,6 +67,8 @@ try{
  }
  console.log(JSON.stringify({stage:'loaded',loadMs:report.loadMs,counts:report.before.counts,far:{available:report.before.far.farBuildingsAvailable,rendered:report.before.far.farBuildings,coverage:report.before.far.farBuildingPublishedCoverage},roads:report.before.roads}));
  for(const time of ['day','night']){
+  await page.evaluate(async time=>{const {ctx}=await import('/app/js/shared-context.js?v=55');ctx.setTimeOfDay(time);},time);
+  await page.waitForTimeout(500);
   const captures=await page.evaluate(async time=>{
    const {ctx}=await import('/app/js/shared-context.js?v=55');
    ctx.setTimeOfDay(time);
@@ -120,6 +124,10 @@ try{
 
  report.after=await page.evaluate(()=>{const s=globalThis.getWorldExplorerRuntimeDiagnostics();return {actor:s.activeActor,counts:s.worldCounts,far:s.farTerrainClipmap,runtimeErrors:s.runtimeErrors};});
  if(tag!=='baseline'){
+  const near=report.before.buildings;
+  assert.equal(near?.status,'ready','Detailed building publication completed');
+  assert.ok(near.requested===0||near.selected/near.requested>=.9,'At least90% of requested detailed buildings are selected');
+  assert.ok(near.requested===0||near.publicationDiagnostics?.renderedFeatures/near.requested>=.9,'At least90% of requested detailed buildings are rendered');
   assert.ok(report.before.far.farBuildingPublishedCoverage>=.9,'At least90% eligible regional buildings render');
   assert.equal(report.before.far.farMajorBuildingsAvailable,report.before.far.farMajorBuildingsSelected,'Every identified major building selected');
   assert.equal(report.before.far.farMajorBuildingsAvailable,report.before.far.farMajorBuildingsRendered,'Every identified major building rendered');
