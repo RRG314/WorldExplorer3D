@@ -321,13 +321,18 @@ async function loadFarMappedContext(bounds, excludedBounds = null, waterBounds =
     loadFarMappedWaterContext(waterBounds, { ...options, fetchTile })
   ]);
   const tiles = contextBatch.values;
-  const roadCoveragePlan = options.roadCoverageFrame ? createRegionalRoadCoveragePlan(options.roadCoverageFrame) : null;
   const useWorker = typeof Worker === 'function' && tiles.every(tile => tile.bytes instanceof Uint8Array) &&
-    (!options.isWithinDetailedBuildingDomain || options.detailedBuildingFrame);
+    (!options.isWithinDetailedBuildingDomain || options.detailedBuildingFrame) &&
+    (!options.roadCoverageFrame || options.detailedBuildingFrame);
   const buildingWorker = useWorker ? await createRegionalBuildingWorker({
     bounds, excludedBounds, tileCount: tiles.length, detailedFrame: options.detailedBuildingFrame,
-    unitsPerMeter: options.roadCoverageFrame?.unitsPerMeter || 1, maxInstances: options.maxInstances
+    unitsPerMeter: options.roadCoverageFrame?.unitsPerMeter || 1, maxInstances: options.maxInstances,
+    roadFrame: options.roadCoverageFrame ? { bounds: options.roadCoverageFrame.bounds,
+      unitsPerMeter: options.roadCoverageFrame.unitsPerMeter, maxTextureSize: options.roadCoverageFrame.maxTextureSize,
+      origin: options.detailedBuildingFrame.origin, scale: options.detailedBuildingFrame.scale } : null
   }, { signal: options.signal }) : null;
+  let roadCoveragePlan = options.roadCoverageFrame && !buildingWorker?.roadWorkerEnabled
+    ? createRegionalRoadCoveragePlan(options.roadCoverageFrame) : null;
   const buildingBuckets = [];
   const landAreasByTile = new Map();
   const landAreaSpatialByTile = new Map();
@@ -452,7 +457,10 @@ async function loadFarMappedContext(bounds, excludedBounds = null, waterBounds =
   }
 
   const selection = buildingWorker ? await buildingWorker.finish() : selectFarBuildingCoverage(buildingBuckets, options);
-  if (buildingWorker) ({ sourceBuildings, invalidBuildings, outsideBuildings, skippedNearBuildings } = selection);
+  if (buildingWorker) {
+    ({ sourceBuildings, invalidBuildings, outsideBuildings, skippedNearBuildings } = selection);
+    roadCoveragePlan = selection.roadCoveragePlan || roadCoveragePlan;
+  }
   const { availableBuildings, selectedBuildingTarget, buildings } = selection;
   if (!buildingWorker) {
   const exactBuildingIds = new Set(selectSpatiallyDistributedBuildings(
@@ -487,6 +495,9 @@ async function loadFarMappedContext(bounds, excludedBounds = null, waterBounds =
     landAreaSpatialByTile,
     surfaceFallbackByTile
   };
+  } catch (error) {
+    roadCoveragePlan?.dispose();
+    throw error;
   } finally { buildingWorker?.dispose(); }
 }
 

@@ -46,6 +46,11 @@ try{
   report.loadedHeap=await loadProfiler.send('Runtime.getHeapUsage');
   await fs.writeFile(`${out}/load-allocation.json`,JSON.stringify({scope:'Instrumented construction allocations still present at ready; not a heap-retention or performance pass',...await loadProfiler.send('HeapProfiler.stopSampling')}));
   await loadProfiler.detach();
+ } else {
+  // Read the ready-state heap without forcing collection or enabling sampling.
+  const heapReader=await page.context().newCDPSession(page);
+  report.loadedHeap=await heapReader.send('Runtime.getHeapUsage');
+  await heapReader.detach();
  }
  report.programFailures=await page.evaluate(async()=>{const {ctx}=await import('/app/js/shared-context.js?v=55');return (ctx.renderer.info.programs||[]).filter(p=>p.diagnostics?.runnable===false).map(p=>({name:p.name,diagnostics:p.diagnostics}));});
  if(report.shaderErrors.length||report.programFailures.length)throw new Error('Terrain/WebGL shader compilation failed; see shaderErrors/programFailures');

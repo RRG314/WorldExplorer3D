@@ -37,3 +37,30 @@ test('cancelling before mask compilation frees the staged cell inputs',async()=>
  const controller=new AbortController();controller.abort();
  await assert.rejects(buildRegionalRoadCoverageMask({},p,{signal:controller.signal}),{name:'AbortError'});assert.equal(p.cells.size,0);
 });
+
+
+// Canvas pixels are compared against the real source path in the browser fixture.
+// These tests exercise the ownership and rejected-output paths without WebGL.
+test('worker raster releases its source cells when canvas creation or its input budget fails', async()=>{
+ const {rasterizeRegionalRoadPlan}=await import('../app/js/terrain/regional-road-raster.js');
+ for(const budget of [false,true]){
+  const p=make({maxSegments:budget?0:100});p.addGeometry(line([[1,1],[10,1]]),{kind:'primary'});
+  assert.throws(()=>rasterizeRegionalRoadPlan(p,4096,()=>({getContext:()=>null})),budget?/budget/:/canvas/);
+  assert.equal(p.cells.size,0);assert.throws(()=>p.addGeometry(line([[1,1],[10,1]]),{kind:'primary'}),/retired/);
+ }
+});
+
+test('road worker packets reject inconsistent bounds and release bytes on cancellation and reported failure',async()=>{
+ const {ownRegionalRoadPacket}=await import('../app/js/terrain/regional-road-raster.js');
+ const packet=()=>({keys:['0:0'],masks:new Uint8Array(64),layout:{resolution:8},stats:{cellSize:256}});
+ for(const change of [p=>p.masks=new Uint8Array(63),p=>p.keys=['x:0'],p=>p.layout.resolution=4,p=>p.keys=['0:0','0:0']]){
+  const p=packet();change(p);assert.throws(()=>ownRegionalRoadPacket(p),/Invalid regional road/);
+ }
+ const controller=new AbortController();controller.abort();
+ const owned=ownRegionalRoadPacket(packet());
+ await assert.rejects(buildRegionalRoadCoverageMask({},owned,{signal:controller.signal}),{name:'AbortError'});
+ assert.equal(owned.packet.masks,null);assert.equal(owned.packet.keys.length,0);owned.dispose();
+ const failed=ownRegionalRoadPacket({keys:[],masks:new Uint8Array(),stats:{budgetExceeded:true},error:'source road budget exceeded'});
+ await assert.rejects(buildRegionalRoadCoverageMask({},failed),/source road budget exceeded/);
+ assert.equal(failed.packet.masks,null);
+});

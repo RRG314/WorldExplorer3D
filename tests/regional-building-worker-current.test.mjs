@@ -104,3 +104,23 @@ test('worker errors, malformed result packets and message failures close the own
     await assert.rejects(runtime.finish());assert.equal(worker.terminated,1);
   }
 });
+
+
+test('browsers without worker canvas keep surface roads on the existing main-thread owner',async()=>{
+ const originalWorker=globalThis.Worker;
+ let worker;
+ globalThis.Worker=function(){worker=fakeWorker((m,w)=>{
+  if(m.type==='start')answer(w,m.id,{roadWorkerEnabled:false});
+  if(m.type==='tile')answer(w,m.id,{tileAvailableBuildings:0});
+  if(m.type==='finish')answer(w,m.id,{data:new Float64Array(),rings:[],availableBuildings:0});
+ });return worker;};
+ try{
+  const result=await loadFarMappedContext(bounds,null,bounds,{
+   detailedBuildingFrame:{origin:{lat:0,lon:0},scale:111000,radius:520},
+   roadCoverageFrame:{bounds:{minX:0,minZ:0,maxX:2500,maxZ:2500},geoToWorld:(lat,lon)=>({x:lon*111000,z:lat*111000}),unitsPerMeter:1},
+   fetchTile:async(z,x,y)=>({z,x,y,bytes:new Uint8Array([1]),tile:{layers:z===14?{streets:{length:1,feature:()=>({toGeoJSON:()=>({properties:{kind:'residential'},geometry:{type:'LineString',coordinates:[[.001,.001],[.01,.001]]}})})}}:{}}})
+  });
+  assert.ok(result.roadCoveragePlan.cells.size>0);assert.ok(result.roadCoveragePlan.stats.surfaceLines>0);
+  assert.equal(worker.terminated,1);result.roadCoveragePlan.dispose();result.buildings.dispose();
+ }finally{if(originalWorker===undefined)delete globalThis.Worker;else globalThis.Worker=originalWorker;}
+});

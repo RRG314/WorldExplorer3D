@@ -471,6 +471,7 @@ function createFarFieldTerrainApi(deps = {}) {
           detailedBuildingFrame: { origin: {lat: appCtx.LOC.lat, lon: appCtx.LOC.lon}, scale: appCtx.SCALE,
             radius: Number(appCtx.worldLoadRuntimeState?.buildingVisibleRadiusWorld) },
           roadCoverageFrame: { bounds: spec.contextOuter, geoToWorld: appCtx.geoToWorld,
+            maxTextureSize: appCtx.renderer?.capabilities?.maxTextureSize || 4096,
             unitsPerMeter: Number(appCtx.WORLD_UNITS_PER_METER || 1) },
           // The provider rectangle is only a coarse exclusion. Detailed
           // publication clips to a circle, including on low-detail clients.
@@ -864,7 +865,7 @@ function createFarFieldTerrainApi(deps = {}) {
       landAreaSpatialByTile: mappedContext.landAreaSpatialByTile,
       surfaceFallbackByTile: mappedContext.surfaceFallbackByTile
     });
-    } finally { mappedContext?.buildings?.dispose?.(); }
+    } finally { mappedContext?.buildings?.dispose?.(); mappedContext?.roadCoveragePlan?.dispose?.(); }
   }
 
   function refreshFarWaterDetailCoverage() {

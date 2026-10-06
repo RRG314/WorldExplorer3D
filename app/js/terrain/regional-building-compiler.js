@@ -4,6 +4,8 @@ import { farBuildingBoxDescriptor, ringBounds, FAR_CONTEXT_MAX_BUILDINGS,
 import { resolveFarBuildingMassing } from './far-building-massing.js?v=2';
 import { DESCRIPTOR_STRIDE, writeBuildingDescriptor } from './regional-building-descriptors.js';
 import { earthCoordinateFrame } from '../earth-core/coordinate-frame.js?v=1';
+import { createRegionalRoadCoveragePlan } from './regional-road-coverage.js';
+import { rasterizeRegionalRoadPlan } from './regional-road-raster.js';
 
 // One sequential tile job, with packed retained buckets. Temporary MVT features,
 // tags and polygon graphs die in this worker before gameplay begins.
@@ -11,6 +13,10 @@ export function createRegionalBuildingCompiler(options) {
   const { bounds, excludedBounds, detailedFrame } = options;
   const frame = detailedFrame ? earthCoordinateFrame(detailedFrame.origin, detailedFrame.scale) : null;
   const point = {};
+  const roadFrame = options.roadFrame;
+  const roadCoordinates = roadFrame ? earthCoordinateFrame(roadFrame.origin, roadFrame.scale) : null;
+  const roadPlan = roadFrame ? createRegionalRoadCoveragePlan({bounds:roadFrame.bounds,
+    unitsPerMeter:roadFrame.unitsPerMeter,geoToWorld:(lat,lon)=>roadCoordinates.toWorld(lat,lon)}) : null;
   const buckets = [], major = [];
   const stats = { sourceBuildings: 0, invalidBuildings: 0, outsideBuildings: 0,
     skippedNearBuildings: 0, availableBuildings: 0 };
@@ -18,6 +24,11 @@ export function createRegionalBuildingCompiler(options) {
   const exactCandidates = Math.max(32, Math.ceil(FAR_CONTEXT_MAX_BUILDINGS / Math.max(1, options.tileCount)) * 2);
   function addTile(record) {
     if (finished || buckets.length >= 512) throw new Error('Regional compiler ownership/budget exceeded');
+    const streets = roadPlan && record.tile.layers.streets;
+    if (streets) for (let i=0;i<streets.length;i++) {
+      const feature = streets.feature(i).toGeoJSON(record.x,record.y,record.z);
+      roadPlan.addGeometry(feature.geometry,feature.properties);
+    }
     const layer = record.tile.layers.buildings;
     const descriptors = [];
     let tileAvailableBuildings = 0;
@@ -96,7 +107,11 @@ export function createRegionalBuildingCompiler(options) {
     const rings = selectSpatiallyDistributedBuildings(candidates, FAR_CONTEXT_MAX_BUILDINGS)
       .map(b => [b.outputIndex, b.ring]);
     buckets.length = 0;
+    let roadPacket = null;
+    if (roadPlan) try { roadPacket = rasterizeRegionalRoadPlan(roadPlan, roadFrame.maxTextureSize); }
+    catch (error) { roadPacket = { keys:[],masks:new Uint8Array(0),stats:{...roadPlan.stats},error:String(error.message) }; }
     return { data, rings, ...stats, selectedBuildingTarget: target,
+      roadPacket,
       majorBuildingsAvailable: major.length, majorBuildingsSelected: Math.min(major.length, target),
       buildingBudgetExceeded: Math.ceil(stats.availableBuildings * FAR_CONTEXT_BUILDING_COVERAGE_TARGET) > limit,
       compiler: { mode: 'worker-packed', tiles: options.tileCount, packedSourceBytes: packedBytes,

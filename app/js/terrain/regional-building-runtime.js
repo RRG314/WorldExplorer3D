@@ -1,4 +1,5 @@
 import { RegionalBuildingDescriptors } from './regional-building-descriptors.js';
+import { ownRegionalRoadPacket } from './regional-road-raster.js';
 
 export async function createRegionalBuildingWorker(options, { signal, workerFactory, deadlineMs = 30000 } = {}) {
   signal?.throwIfAborted();
@@ -28,8 +29,10 @@ export async function createRegionalBuildingWorker(options, { signal, workerFact
   worker.onmessageerror = () => dispose(new Error('Regional building worker packet could not be decoded'));
   signal?.addEventListener('abort', abort, { once: true });
   if (signal?.aborted) abort();
-  try { await request({ type: 'start', options }); } catch (error) { dispose(error); throw error; }
+  let started;
+  try { started = await request({ type: 'start', options }); } catch (error) { dispose(error); throw error; }
   return {
+    roadWorkerEnabled: started.roadWorkerEnabled === true,
     dispose,
     async addTile(tile) {
       // Shared source bytes belong to the cache/road reader. Transfer one owned
@@ -40,8 +43,9 @@ export async function createRegionalBuildingWorker(options, { signal, workerFact
     async finish() {
       try {
         const packet = await request({ type: 'finish' });
-        const { data, rings, ...stats } = packet;
-        return { ...stats, buildings: new RegionalBuildingDescriptors({ data, rings }) };
+        const { data, rings, roadPacket, ...stats } = packet;
+        return { ...stats, buildings: new RegionalBuildingDescriptors({ data, rings }),
+          roadCoveragePlan: roadPacket ? ownRegionalRoadPacket(roadPacket) : null };
       } finally { dispose(); }
     }
   };

@@ -79,13 +79,26 @@ export function createRegionalRoadCoveragePlan({bounds,geoToWorld,unitsPerMeter=
 }
 
 export async function buildRegionalRoadCoverageMask(appCtx,plan,{signal,yieldWork=yieldToMainThread,now=()=>performance.now()}={}) {
-  if(!plan?.cells?.size)return null;
+  if (plan?.packet?.error) { const error = new Error(plan.packet.error); plan.dispose(); throw error; }
+  if(!plan?.cells?.size && !plan?.packet?.keys?.length){plan?.dispose();return null;}
   let mask=null;
   try{
     signal?.throwIfAborted();
     if(plan.stats.budgetExceeded)throw new Error('Regional surface-road coverage exceeded its bounded input budget');
-    mask=createPavementTerrainMask(appCtx,[...plan.cells.keys()],{kind:'road',cellSize:CELL_SIZE,color:[.19,.205,.22],deferUpload:true});
+    mask=createPavementTerrainMask(appCtx,plan.packet?.keys || [...plan.cells.keys()],{kind:'road',cellSize:CELL_SIZE,color:[.19,.205,.22],deferUpload:true});
     const size=mask.layout.resolution;
+    if (plan.packet) {
+      const {keys,masks,layout} = plan.packet;
+      if (layout.resolution !== size || masks.length !== keys.length * size * size) throw new Error('Regional road worker layout mismatch');
+      let slice = now();
+      for (let i=0;i<keys.length;i++) {
+        signal?.throwIfAborted();
+        mask.publish(keys[i],masks.subarray(i*size*size,(i+1)*size*size));
+        if(now()-slice>=8){await yieldWork();signal?.throwIfAborted();slice=now();}
+      }
+      mask.finishBulkUpload();
+      return {mask,stats:{...plan.stats,status:'ready',retainedBytes:mask.bytes,worldUnitsPerTexel:CELL_SIZE/size,compiler:'worker-raster'}};
+    }
     const canvas=typeof OffscreenCanvas==='function'?new OffscreenCanvas(size,size):document.createElement('canvas');
     canvas.width=canvas.height=size;
     const context=canvas.getContext('2d',{willReadFrequently:true});
