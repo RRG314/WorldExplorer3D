@@ -112,4 +112,6 @@ test('regional and temporary road coverage share one shader owner through late a
  fallbackLease.setEnabled(true);regionalLease.dispose();
  assert.equal(compile().uniforms.roadCoverageCellSize.value,128,'retiring regional coverage restores a still-live fallback');
  fallbackLease.dispose();assert.equal(material.onBeforeCompile,original);
+ assert.equal(oldUniform.value,null,'retired shader must not retain the CPU atlas');
+ assert.equal(shader.uniforms.roadCoverageMaskLookup.value,null,'retired lookup must be released too');
 });

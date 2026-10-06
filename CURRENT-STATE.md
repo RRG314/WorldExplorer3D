@@ -1,6 +1,6 @@
 # Current development and release state
 
-Updated October 5, 2026. The owner requests a test build and production-blocker repairs with **free public data, without paid data subscriptions**. The free-data replacement is implemented and deployed to the test preview. **Production is not cleared: performance still fails.**
+Updated October 6, 2026. Current request: restore at least 90% building coverage and all identified major buildings, roads, recognizable land uses, public GIS and a bounded continuous Earth. Free data only; local implementation. **Coverage restoration is implemented; continuous geographic streaming and expanded GIS/ecology are not complete. Production is not cleared.**
 
 Details: [FREE-ENVIRONMENT-DATA.md](docs/release-review/2026-10-05/FREE-ENVIRONMENT-DATA.md). Visual work: [REFERENCE-BLOCK.md](docs/visual-quality/REFERENCE-BLOCK.md). Earlier architecture acceptance: [LOCAL-RESULT.md](docs/system-review/2026-10-04/LOCAL-RESULT.md).
 
@@ -10,7 +10,22 @@ Use `/Users/stevenreid/.codex/worktrees/architecture-evaluation/WorldExplorer3D-
 
 Physical Apple M1 Mac mini, 8 GiB RAM. Heavy checks run sequentially. Preserve ordinary user Chrome, player data, four saved candidates and retained artifacts. Close owned verification browsers; an open 3D preview measurably interferes with performance testing. Private credentials stay outside the repository and reports.
 
-## Implemented and deployed
+## Latest local coverage work
+
+Plan and evidence: [IMPLEMENTATION.md](docs/continuous-world/IMPLEMENTATION.md). The fixed Earth region remains in place until terrain, transport, collisions, player state and cleanup can cross geographic windows safely. Removing the boundary alone is not accepted.
+
+- Regional building selection targets 95% of eligible footprints, prioritizes every source-identified major, and reports source holes and safety ceilings separately. Removed per-tile quotas and empty mobile building zoom; corrected a near/far exclusion corner and degenerate polygon loss.
+- Complete at-grade regional road linework reuses the fetched building tiles and a bounded terrain mask. This restores visual roads without overloading physical road compilation. Engineered structures and route coverage remain limited by their existing physical owner; the mask is not a road physics implementation.
+- Instance GPU buffers now release. Regional and temporary road masks share one presentation owner; independent shader retirement and cached-program uniforms are corrected. The latest source also clears retired CPU atlas references. Twelve real WebGL allocation/render/retirement cycles end at zero coverage textures; cancellation releases staged inputs.
+- One coordinate conversion authority now serves map/scene/interiors/property/activity/marine consumers, including longitude wrapping and existing polar ENU. This is not automatic origin rebasing.
+
+Packaged a804cc52 coverage and cleanup pass in Baltimore: **384,814 / 405,067 eligible regional footprints (95.0001%)**, **1,489 / 1,489 identified major footprints rendered**, 240/240 source tiles, 25,652 near buildings, 17,754 physical roads, 213 land-use meshes and 49 detail terrain tiles. Regional road mask covers 76,445 in-window surface line fragments using 8.76 MiB retained mask/lookup buffers. Day/night near/regional views, driving/flight images inspected; zero shader errors and zero unowned terrain cells. Exit collections are zero; one post-GC exit observation is 42.82 MiB. These are local/regional checks, not global acceptance.
+
+**Flight stall gate fails:** 90-second normal a804 flight has two pauses of 1,416.7 and 1,199.9 ms near 74–77 seconds, despite normal p95/p99 of 33.4 ms. A separate instrumented diagnostic reproduces a 316.6 ms pause, with a 307.8 ms major GC (1.43 GB before / 373 MB after). That diagnostic is not a timing acceptance. No scenery or test thresholds were reduced to hide this. Shortbread has no mapped regional heights in this sample, so the major count cannot establish that every real-world landmark is represented accurately.
+
+Evidence: `output/verification/continuous-world/road-owner-local-build/`, `road-owner-profile/`, `road-owner-release/`. Full current PR chain: **1,954 contracts plus dependency/source/ownership/types/inventory/sensitivity pass** (`/tmp/we3d-coverage-release-pr.log`). The shader-retention source checkpoint is being packaged and London coverage checked next; record those results before treating the next artifact as tested. The prior 8ad0d224 candidate is rejected for duplicate road GLSL/missing terrain; it and its failed screenshots remain preserved.
+
+## Existing free-data preview
 
 - MET Norway weather; PacIOOS waves with NOAA/NCEP fallback through NSF Unidata; HYCOM/FNMOC surface currents and temperature; existing NOAA tides retained.
 - ADSB.lol public ODbL aircraft observations replace OpenSky. Active runtime contains neither Open-Meteo nor OpenSky integration.
@@ -19,13 +34,13 @@ Physical Apple M1 Mac mini, 8 GiB RAM. Heavy checks run sequentially. Preserve o
 
 Test preview: https://we3d-staging-20260712--visual-review-1005-e5075bnu.web.app (expires October 12).
 
-Preview and `dist`: **5.4.0+078250e5e401.c530fbdb9b6a1cb4.staging**, source `078250e5e401c3366c3a6e21b2bb09909bfc3938`, 605 content files. Both hosted manifests byte-match local files. Asset-manifest SHA256: `b448607fa75f78383bf3f9dc0434045117ca73f8f5a3419baafaac75d1aef39a`. Acceptance fingerprint: `922e0d875875ac1766eb72f41a5b715854ab80dfb3288f95d27705a2a0c42347`. Later documentation-only commits do not rebuild this artifact.
+Hosted preview (not current `dist`): **5.4.0+078250e5e401.c530fbdb9b6a1cb4.staging**, source `078250e5e401c3366c3a6e21b2bb09909bfc3938`, 605 content files. At preview publication, both hosted manifests byte-matched that preserved artifact. Asset-manifest SHA256: `b448607fa75f78383bf3f9dc0434045117ca73f8f5a3419baafaac75d1aef39a`. Acceptance fingerprint: `922e0d875875ac1766eb72f41a5b715854ab80dfb3288f95d27705a2a0c42347`. Later documentation-only commits do not rebuild this artifact.
 
 Staging Functions verified ACTIVE: environmental gateway v1, aircraft v5, place lookup v2; environmental cache TTL/index settings deployed. Ordinary Chrome without debug attestation displayed MET weather, 80 ADSB observations, NOAA waves and HYCOM currents/temperature. Source/licence links and model timestamps inspected. Only the exact preview hostname was added to staging reCAPTCHA allowed domains; allow-all remains disabled. These observations cover public-data panels, not the full signed-in hosted journey.
 
-## Verification and remaining blocker
+## Previous free-data candidate verification and remaining release work
 
-**1,931 PR contracts** and dependency/source/ownership/type/inventory/sensitivity checks pass. Frozen candidate ran all 90 gates: **89 pass; performance fails**. All **3 backend groups pass**, including isolated security/multiplayer/economy cases. Packaged save upgrade → fallback read/write → candidate return passes all 3 stages, preserving legacy/new Journal records, equipment/ammo, unknown fields and unrelated pending account data. Images inspected. Current public-data rights and migration receipts match the artifact.
+The preceding free-data release checkpoint passed **1,931 PR contracts** and dependency/source/ownership/type/inventory/sensitivity checks pass. Frozen candidate ran all 90 gates: **89 pass; performance fails**. All **3 backend groups pass**, including isolated security/multiplayer/economy cases. Packaged save upgrade → fallback read/write → candidate return passes all 3 stages, preserving legacy/new Journal records, equipment/ammo, unknown fields and unrelated pending account data. Images inspected. Current public-data rights and migration receipts match the artifact.
 
 The first complete performance run passed loading, coverage, resources, storage and retention, including seven sustained travel windows and twelve reloads. FPS and clustered hitch limits failed. Its open owned preview consumed graphics resources; after closing that preview, the clean repeat still reproduced flight hitches near 71 seconds (200/133/250 ms) and initial driving around 41 FPS. The repeat was deliberately stopped once failure reproduced by terminating only its verified owned Chrome; the matrix unwound, preserving a failed result. Its unfinished retention portion is not a pass.
 

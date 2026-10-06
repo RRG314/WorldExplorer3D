@@ -86,7 +86,14 @@ export function createPavementMaterialBinding(appCtx,{kind="pavement",color=[0.5
   }
   function detachMaterials(){
     for(const material of hooks){
-      stableCoverageUniforms(material,{[names('pavementMaskEnabled')]:{value:0}});
+      // A cached Three program can outlive this lease. Release its CPU atlas
+      // references as well as disabling the shader; GPU disposal alone does
+      // not free the typed arrays retained through those stable uniforms.
+      stableCoverageUniforms(material,{
+        [names('pavementMaskEnabled')]:{value:0},
+        [names('pavementMaskAtlas')]:{value:null},
+        [names('pavementMaskLookup')]:{value:null}
+      });
       unregisterCoverageLayer(material,token);
     }
     hooks.clear();
