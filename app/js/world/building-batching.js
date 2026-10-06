@@ -1,5 +1,5 @@
 import { facadeNightUniform, FACADE_EMISSION_GLSL } from './facade-lighting.js';
-import {GeometryBatchStorage, batchStorageView} from './geometry-batch-storage.js';
+import {GeometryBatchStorage, batchStorageView, releaseGeometryBatchScratch} from './geometry-batch-storage.js';
 import {compactBuildingVertices} from './building-vertex-storage.js';
 import {releaseRetiredBuildingCpuBuffers} from './retired-building-buffers.js';
 import { FACADE_OPENINGS_GLSL } from './building-facade-layout.js?v=3';
@@ -244,6 +244,7 @@ async function batchBuildingMeshesByTier(tiers = ['near'], options = {}) {
     const batchedMeshes = [];
     let sourceMeshCount = 0;
     let releasedCpuBytes = 0;
+    let releasedBatchScratchBytes = 0;
 
     const groupEntries = [...groups.values()];
     for (let groupIndex = 0; groupIndex < groupEntries.length; groupIndex += 1) {
@@ -319,17 +320,20 @@ async function batchBuildingMeshesByTier(tiers = ['near'], options = {}) {
       }
 
       if (sourceMeshes.length < 2) {
+        releasedBatchScratchBytes += releaseGeometryBatchScratch(batch, null);
         keep.push(...sourceMeshes);
         continue;
       }
 
       const geometry = buildMergedGeometry(batch, {reuseStorage: true});
       if (!geometry) {
+        releasedBatchScratchBytes += releaseGeometryBatchScratch(batch, null);
         keep.push(...sourceMeshes);
         continue;
       }
 
-      const vertexStorage = compactBuildingVertices(geometry, vertexOwnershipRanges);
+      const vertexStorage = compactBuildingVertices(geometry, vertexOwnershipRanges, {consumeSource: true});
+      releasedBatchScratchBytes += releaseGeometryBatchScratch(batch, geometry);
 
       const material = group.midFacadeBatch
         ? createMidFacadeBatchMaterial(group.material, group.batchKey)
@@ -406,7 +410,8 @@ async function batchBuildingMeshesByTier(tiers = ['near'], options = {}) {
       groupCount: groups.size,
       batchMeshCount: batchedMeshes.length,
       sourceMeshCount,
-      releasedCpuBytes
+      releasedCpuBytes,
+      releasedBatchScratchBytes
     };
     return sourceMeshCount;
   } catch (err) {

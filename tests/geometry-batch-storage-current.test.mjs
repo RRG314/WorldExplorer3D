@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
-import {GeometryBatchStorage} from '../app/js/world/geometry-batch-storage.js';
+import {GeometryBatchStorage,releaseGeometryBatchScratch,releaseOwnedConstructionBuffers} from '../app/js/world/geometry-batch-storage.js';
 import {appendGeometryWithTransform,buildMergedGeometry} from '../app/js/world/geometry-batching.js';
 import {appendMidFacadeAttributes} from '../app/js/world/building-batching.js';
 globalThis.THREE=THREE;
@@ -50,4 +50,22 @@ test('merged storage copies by default and does not retain rolled-back capacity 
   assert.deepEqual(bytes(copied.attributes.position.array),bytes(owned.attributes.position.array));
   copied.dispose();owned.dispose();
  }
+});
+
+test('construction scratch retires immediately without detaching published or shared storage',()=>{
+ for(const capacity of [3,6]){
+  const b={positions:new GeometryBatchStorage(capacity*3,Float32Array),normals:new GeometryBatchStorage(capacity*3),uvs:new GeometryBatchStorage(capacity*2,Float32Array),indices:new GeometryBatchStorage(3)};
+  for(const p of [[0,0,0],[1,0,0],[0,0,1]]){b.positions.push(...p);b.normals.push(0,1,0);b.uvs.push(0,0);}b.indices.push(0,1,2);
+  const g=buildMergedGeometry(b,{reuseStorage:true}),before=Object.values(g.attributes).map(a=>Array.from(a.array));
+  const shared=new Float32Array([5,6,7]);b.shared=shared;
+  const released=releaseGeometryBatchScratch(b,g);
+  assert.ok(released>0);assert.equal(b.normals.values.byteLength,0);assert.equal(b.indices.values.byteLength,0);
+  assert.equal(b.positions.values.byteLength===0,capacity!==3);
+  assert.deepEqual(Object.values(g.attributes).map(a=>Array.from(a.array)),before);
+  assert.deepEqual(Array.from(shared),[5,6,7]);assert.equal(releaseGeometryBatchScratch(b,g),0);
+  g.dispose();
+ }
+ const buffer=new ArrayBuffer(12);assert.equal(releaseOwnedConstructionBuffers([buffer,buffer]),12);
+ const legacy=new ArrayBuffer(8);Object.defineProperty(legacy,'transfer',{value:undefined});
+ assert.equal(releaseOwnedConstructionBuffers([legacy]),0);assert.equal(legacy.byteLength,8);
 });

@@ -20,3 +20,33 @@ export class GeometryBatchStorage {
 }
 export const isBatchStorage = value => Array.isArray(value) || value instanceof GeometryBatchStorage;
 export const batchStorageView = value => value instanceof GeometryBatchStorage ? value.view() : value;
+
+// The caller must exclusively own every supplied buffer. Keep published
+// attribute buffers alive even when multiple scratch views alias them.
+export function releaseOwnedConstructionBuffers(buffers, retained = new Set()) {
+  let released = 0;
+  for (const buffer of new Set(buffers)) {
+    if (retained.has(buffer) || !buffer?.byteLength || typeof buffer.transfer !== 'function') continue;
+    const bytes = buffer.byteLength;
+    buffer.transfer(0);
+    released += bytes;
+  }
+  return released;
+}
+
+export function geometryAttributeBuffers(geometry) {
+  return new Set([
+    ...Object.values(geometry?.attributes || {}).map(attribute => attribute.array?.buffer),
+    geometry?.index?.array?.buffer
+  ].filter(Boolean));
+}
+
+// A finished building batch no longer needs its double-precision normals,
+// wide construction indices, or capacity abandoned after a source rollback.
+// Float32 storage adopted by the final geometry remains owned by that geometry.
+export function releaseGeometryBatchScratch(batch, geometry) {
+  return releaseOwnedConstructionBuffers(
+    Object.values(batch).filter(value => value instanceof GeometryBatchStorage).map(value => value.values.buffer),
+    geometryAttributeBuffers(geometry)
+  );
+}
