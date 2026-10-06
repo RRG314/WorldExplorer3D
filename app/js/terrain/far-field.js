@@ -735,6 +735,8 @@ function createFarFieldTerrainApi(deps = {}) {
       dependencyDurationsMs,
       contextBatchMetrics:mappedContext.contextBatchMetrics,
       waterBatchMetrics:mappedContext.waterBatchMetrics,
+      contextMissingTiles:mappedContext.contextMissingTiles,
+      waterMissingTiles:mappedContext.waterMissingTiles,
       sourceZoom: spec.sourceZoom,
       preferredSourceZoom: spec.preferredSourceZoom,
       sourceTiles: sourceTiles.length,

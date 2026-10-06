@@ -5,6 +5,7 @@
 import {createRegionalRoadCoveragePlan,buildRegionalRoadCoverageMask} from '/app/js/terrain/regional-road-coverage.js';
 import {leaseRoadOverview} from '/app/js/terrain/road-overview-owner.js';
 import {createPavementTerrainMask} from '/app/js/world/pavement-terrain-mask.js';
+import {fetchWithConcurrency} from '/app/js/terrain/far-field-mapped-context.js';
 const renderer=new THREE.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});renderer.setSize(1000,700);document.body.append(renderer.domElement);
 const scene=new THREE.Scene();scene.background=new THREE.Color(0x8eb9cf);scene.add(new THREE.HemisphereLight(0xffffff,0x777755,1));
 const camera=new THREE.PerspectiveCamera(50,1000/700,.1,10000);camera.position.set(800,850,1050);camera.lookAt(512,0,512);
@@ -12,9 +13,14 @@ const terrainGroup=new THREE.Group();scene.add(terrainGroup);
 const geometry=new THREE.PlaneGeometry(1024,1024);geometry.rotateX(-Math.PI/2);geometry.translate(512,0,512);
 const terrain=new THREE.Mesh(geometry,new THREE.MeshStandardMaterial({color:0x94a573,roughness:1}));terrain.userData.isTerrainMesh=true;terrainGroup.add(terrain);
 const ctx={renderer,terrainGroup},cycles=[];
+const lines=[];
+for(let n=64;n<1024;n+=64){lines.push({points:[[n,0],[n,1024]],width:7});lines.push({points:[[0,n],[1024,n]],width:7});}
+lines.push({points:[[0,0],[1024,1024]],width:14});
+let failed=false;
+const recovered=await fetchWithConcurrency(lines,8,async line=>{if(!failed){failed=true;throw new TypeError('Controlled transient source failure');}return line;});
+if(recovered.missingTiles.length||recovered.values.length!==31||recovered.metrics.recovery?.fulfilled!==1)throw Error('Road fixture failed source recovery');
 function make(){const plan=createRegionalRoadCoveragePlan({bounds:{minX:0,minZ:0,maxX:1024,maxZ:1024},geoToWorld:(lat,lon)=>({x:lon,z:lat})});
- for(let n=64;n<1024;n+=64){plan.addGeometry({type:'LineString',coordinates:[[n,0],[n,1024]]},{kind:'residential',width:7});plan.addGeometry({type:'LineString',coordinates:[[0,n],[1024,n]]},{kind:'residential',width:7});}
- plan.addGeometry({type:'LineString',coordinates:[[0,0],[1024,1024]]},{kind:'primary',width:14});return plan;}
+ for(const line of recovered.values)plan.addGeometry({type:'LineString',coordinates:line.points},{kind:line.width===14?'primary':'residential',width:line.width});return plan;}
 renderer.render(scene,camera);const baseline=renderer.info.memory.textures;
 for(let cycle=0;cycle<12;cycle++){
  const road=await buildRegionalRoadCoverageMask(ctx,make());
@@ -34,7 +40,7 @@ try{await buildRegionalRoadCoverageMask(ctx,plan,{signal:controller.signal,now:(
 if(!aborted||plan.cells.size)throw new Error('Cancelled road compilation retained staged source');
 const demo=await buildRegionalRoadCoverageMask(ctx,make());demo.mask.syncMaterials();
 const draw=()=>renderer.render(scene,camera);window.advanceTime=draw;
-window.render_game_to_text=()=>JSON.stringify({ok:true,cycles,cancelledInputsReleased:aborted,coverage:demo.stats,scope:'Actual WebGL coverage masks; controlled source fixture, not world streaming'});
+window.render_game_to_text=()=>JSON.stringify({ok:true,cycles,cancelledInputsReleased:aborted,sourceRecovery:recovered.metrics.recovery,coverage:demo.stats,scope:'Actual WebGL coverage masks; controlled source fixture, not world streaming'});
 document.querySelector('#status').textContent='31 mapped road lines; physical transport remains separate\n12 render → retirement cycles: no retained coverage textures\nCancellation releases partial inputs and textures';
 window.fixtureReady=true;draw();
 </script>

@@ -379,17 +379,43 @@ function selectSpatiallyDistributedBuildings(buildings, maxCount) {
   return roundRobinSelect(orderedBuckets, maxCount);
 }
 
-async function fetchWithConcurrency(items, concurrency, worker, signal = null) {
+function retryableTileFailure(error) {
+  // Parent/world cancellation is handled by the batch owner. A timeout of an
+  // otherwise healthy visible window is recoverable; denied/missing tiles and
+  // provider cooldowns are not. Never defeat a provider's rate-limit policy.
+  if (/HTTP\s+(403|404|429)\b|cooldown|recovery probe/i.test(String(error?.message))) return false;
+  return ['AbortError','TimeoutError','TypeError'].includes(error?.name) ||
+    /HTTP\s+(408|5\d\d)\b|Provider batch deadline/i.test(String(error?.message));
+}
+
+async function fetchWithConcurrency(items, concurrency, worker, signal = null, options = {}) {
   const { settled, metrics } = await runBoundedProviderBatch(
     items,
     (item, _index, batchSignal) => worker(item, batchSignal),
-    { signal, concurrency, maxElapsedMs:30000, abortMessage: 'Far mapped context aborted' }
+    { signal, concurrency, maxElapsedMs:options.maxElapsedMs ?? 30000, abortMessage: 'Far mapped context aborted' }
   );
+  const failed = [];
+  for(let index=0;index<settled.length;index++)if(settled[index].status==='rejected')failed.push(index);
+  let recovery=null;
+  // London reproduced 399/400 tiles followed by a permanent hole when the
+  // 30s batch deadline cancelled its last tile. Give only small isolated gaps
+  // one bounded recovery pass. An outage cannot double the entire request set.
+  if(failed.length>0 && failed.length<=8 && metrics.fulfilled>=Math.max(1,Math.floor(items.length*.9))){
+    const eligible=failed.filter(index=>retryableTileFailure(settled[index].reason));
+    if(eligible.length){
+      const retried=await runBoundedProviderBatch(eligible,
+        (index,_retryIndex,retrySignal)=>worker(items[index],retrySignal),
+        {signal,concurrency:2,maxElapsedMs:options.recoveryMaxElapsedMs ?? 10000,abortMessage:'Far mapped context recovery aborted'});
+      recovery=retried.metrics;
+      for(let index=0;index<eligible.length;index++)settled[eligible[index]]=retried.settled[index];
+    }
+  }
   return {
     values: settled
       .filter((entry) => entry.status === 'fulfilled' && entry.value)
       .map((entry) => entry.value),
-    metrics
+    metrics:Object.freeze({...metrics,recovery}),
+    missingTiles:items.filter((_item,index)=>settled[index].status==='rejected')
   };
 }
 
@@ -456,6 +482,7 @@ async function loadFarMappedWaterContext(bounds, options = {}) {
     waterTilesRequested: coordinates.length,
     waterMaxInFlight: waterBatch.metrics.maxInFlight,
     waterBatchMetrics:waterBatch.metrics,
+    waterMissingTiles:waterBatch.missingTiles,
     waterZoom
   };
 }
@@ -621,6 +648,7 @@ async function loadFarMappedContext(bounds, excludedBounds = null, waterBounds =
       : selection.buildingBudgetExceeded ? 'incomplete-budget' : 'complete',
     contextMaxInFlight: contextBatch.metrics.maxInFlight,
     contextBatchMetrics:contextBatch.metrics,
+    contextMissingTiles:contextBatch.missingTiles,
     landAreas,
     landAreasByTile,
     landAreaSpatialByTile,
@@ -648,5 +676,6 @@ export {
   retainFarWaterRing,
   roundRobinSelect,
   selectSpatiallyDistributedBuildings,
-  selectContextZoomForTileBudget
+  selectContextZoomForTileBudget,
+  fetchWithConcurrency
 };
