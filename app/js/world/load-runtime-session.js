@@ -279,7 +279,13 @@ export function createWorldLoadRuntimeSession(options = {}) {
     authorityBudgetScale,
     dynamicBudgetState.deviceClass
   );
-  const lodThresholds = getWorldLodThresholds(0, perfModeNow, dynamicBudgetState.lodScale);
+  // These thresholds also define source selection, colliders and the near/far
+  // publication boundary. A slower previous frame must not shrink the next
+  // desktop world's authoritative district. Keep the fixed mobile device cap.
+  const authorityLodScale = dynamicBudgetState.deviceClass === 'mobile'
+    ? dynamicBudgetState.lodScale
+    : 1;
+  const lodThresholds = getWorldLodThresholds(0, perfModeNow, authorityLodScale);
   runtimeState.buildingVisibleRadiusWorld = lodThresholds.farVisible;
   const plannedDetailRadiusDeg = Number(loadProfile.radii?.[0]);
   appCtx.plannedEarthDetailRadiusWorld = Number.isFinite(plannedDetailRadiusDeg)

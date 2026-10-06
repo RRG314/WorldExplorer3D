@@ -92,6 +92,8 @@ async function runtimeSnapshot(label) {
     loadStatus: runtime.worldLoad?.status || null,
     loadSequence: Number(runtime.worldLoad?.sequence || 0),
     locationName: runtime.worldLoad?.location?.name || null,
+    publicationRadiusWorld: runtime.worldLoad?.buildingVisibleRadiusWorld || null,
+    presentationLodScale: runtime.worldLoad?.loadProfile?.dynamicLodScale || null,
     worldCounts: runtime.worldCounts || null,
     renderer: runtime.renderer || null,
     runtimeErrorCount: Array.isArray(runtime.runtimeErrors) ? runtime.runtimeErrors.length : 0,
@@ -142,14 +144,29 @@ try {
   snapshots.push(baseline);
 
   let sameAreaReload = null;
+  let qualityReload = null;
   let hollywood = null;
   let repeatProbe = null;
   let repeatOriginBefore = null;
   if (!initialOnly) {
+    logStep('reopening the same location after lowering automatic presentation quality');
+    markSupersededLocationRequests();
+    await page.locator('#mainMenuBtn').click();
+    await page.waitForSelector('#globeSelectorScreen.show');
+    await page.evaluate(async () => {
+      const {ctx} = await import('/app/js/shared-context.js?v=55');
+      ctx.setPerfAutoQualityEnabled(true, {persist:false});
+      ctx.setPerfAutoQualityTier(ctx.PERF_QUALITY_TIER_PERFORMANCE, {reason:'coverage-regression-check'});
+    });
+    await page.locator('#globeSelectorStartBtn').click();
+    await waitForWorld(39.2904, -76.6122, baseline.loadSequence);
+    qualityReload = await runtimeSnapshot('same-location-lower-quality');
+    snapshots.push(qualityReload);
+
     logStep('switching custom Baltimore to preset Baltimore');
     markSupersededLocationRequests();
     await page.keyboard.press('Shift+KeyN');
-    await waitForWorld(39.2904, -76.6122, baseline.loadSequence);
+    await waitForWorld(39.2904, -76.6122, qualityReload.loadSequence);
     sameAreaReload = await runtimeSnapshot('preset-baltimore');
     snapshots.push(sameAreaReload);
 
@@ -201,6 +218,12 @@ try {
   }
   const afterFavorites = await page.evaluate(() => JSON.parse(localStorage.getItem('worldExplorer3D.globeSelector.savedFavorites') || '[]'));
   const checks = {
+    lowerQualityPreservesDistrict: initialOnly || (
+      qualityReload.presentationLodScale < baseline.presentationLodScale &&
+      qualityReload.publicationRadiusWorld === baseline.publicationRadiusWorld &&
+      qualityReload.worldCounts.buildings >= baseline.worldCounts.buildings * .99 &&
+      qualityReload.worldCounts.roads >= baseline.worldCounts.roads * .99
+    ),
     savedPlacesPreserved: originalFavorites.every(before => afterFavorites.some(after => JSON.stringify(before) === JSON.stringify(after))),
     completeWorldAfterEachSwitch: snapshots.every(entry => !entry.worldLoading && entry.loadStatus === 'ready'),
     liveFramesAfterEachSwitch: snapshots.every((entry) =>

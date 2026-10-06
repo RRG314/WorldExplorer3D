@@ -173,6 +173,7 @@ export const currentContractTests = [
   'tests/maritime-sandbox-current.test.mjs',
   'tests/maryland-parcel-property-current.test.mjs',
   'tests/mobile-world-load-policy-current.test.mjs',
+  'tests/world-load-coverage-current.test.mjs',
   'tests/ordinary-street-profile-current.test.mjs',
   'tests/osm-airport-source-current.test.mjs',
   'tests/pavement-mask-current.test.mjs',

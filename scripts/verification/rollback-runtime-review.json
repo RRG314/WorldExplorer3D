@@ -392,9 +392,9 @@
     "app/js/world/load-runtime-session.js": {
       "before": "561afb54eda9cc0a739312b40d798c13815a542294be84b80eb05f977cbcf26b",
       "beforeMode": "100644",
-      "after": "6b4457f80ccb65e786f3ea5e8e6ba080b7a568478a7ed9baed1cff8d2728b96d",
+      "after": "62611ee4d76e81ae5bdf2da467a712107daf0841aed7c9c506bc45123eb9089f",
       "afterMode": "100644",
-      "review": "Restores coverage and land-purpose/physical-cover classification with bounded source caches. Location presets, source IDs, saved map preferences and schema owners are preserved; current real-city coverage must be tested."
+      "review": "Restores coverage and land-purpose/physical-cover classification with bounded source caches. Location presets, source IDs, saved map preferences and schema owners are preserved; current real-city coverage must be tested. The final October 6 fix keeps the desktop building publication/collision district fixed across automatic quality changes. It retains the existing fixed mobile radius and presentation quality state. No saved location, coordinate origin or persistent record is replaced."
     },
     "app/js/world/pavement-terrain-mask.js": {
       "before": "15327bb63fc26f4f81b6a486d73442b4d2b1cb07107e4d2da1b0ac1f234e171e",
