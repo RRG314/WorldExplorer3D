@@ -337,15 +337,16 @@ function landTags(properties = {}) {
     'farmyard', 'farmland'
   ]);
   if (directLanduse.has(kind)) return { landuse: kind };
+  if (kind === 'national_park' || kind === 'protected_area') return { boundary: kind };
   if (kind === 'grave_yard') return { amenity: 'grave_yard', landuse: 'cemetery' };
   if (kind === 'sand' || kind === 'beach') return { natural: kind };
-  if (['heath', 'scrub', 'grassland', 'bare_rock', 'scree', 'shingle'].includes(kind)) {
+  if (['wood', 'heath', 'scrub', 'grassland', 'bare_rock', 'scree', 'shingle', 'wetland'].includes(kind)) {
     return { natural: kind };
   }
   if (['swamp', 'bog', 'string_bog', 'wet_meadow', 'marsh'].includes(kind)) {
     return { natural: 'wetland', wetland: kind };
   }
-  if (['park', 'garden', 'playground', 'golf_course', 'miniature_golf'].includes(kind)) {
+  if (['park', 'garden', 'nature_reserve', 'playground', 'golf_course', 'miniature_golf'].includes(kind)) {
     return { leisure: kind };
   }
   return null;
@@ -353,6 +354,7 @@ function landTags(properties = {}) {
 
 function siteTags(properties = {}) {
   const kind = String(properties.kind || '').toLowerCase();
+  if (['park', 'garden', 'nature_reserve', 'national_park', 'protected_area'].includes(kind)) return landTags(properties);
   if (kind === 'parking' || kind === 'bicycle_parking') return { amenity: kind };
   if (kind === 'construction') return { landuse: 'construction' };
   if (['sports_centre'].includes(kind)) return { leisure: kind };
@@ -571,6 +573,10 @@ async function convertTilesToElements(tiles, layerNames, bounds = null) {
             if (!partIntersectsBounds(part, bounds)) continue;
           const resolvedTags = {
             ...tags,
+            ...(['land', 'sites'].includes(layerName) ? Object.fromEntries(
+              ['leaf_type', 'leaf_cycle', 'wetland'].filter(key => typeof geojson.properties?.[key] === 'string')
+                .map(key => [key, geojson.properties[key]])
+            ) : {}),
             ...(['land', 'sites', 'street_polygons'].includes(layerName) &&
                 typeof geojson.properties?.surface === 'string'
               ? { surface: geojson.properties.surface } : {}),

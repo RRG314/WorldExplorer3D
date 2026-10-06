@@ -244,6 +244,7 @@ export const currentContractTests = [
   'tests/vegetation-obstacles-current.test.mjs',
   'tests/vegetation-publication-current.test.mjs',
   'tests/vegetation-spatial-current.test.mjs',
+  'tests/vegetation-landcover-authority-current.test.mjs',
   'tests/vehicle-camera-body-current.test.mjs',
   'tests/vehicle-upgrades-current.test.mjs',
   'tests/webgl-lifecycle-current.test.mjs',

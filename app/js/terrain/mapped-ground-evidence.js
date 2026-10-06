@@ -44,6 +44,31 @@ function inside(x, z, ring) {
   return result;
 }
 
+export function mappedAreaContains(feature, x, z) {
+  const b = feature?.bounds;
+  return !!(b && x >= b.minX && x <= b.maxX && z >= b.minZ && z <= b.maxZ &&
+    feature.pts?.length >= 3 && inside(x, z, feature.pts) &&
+    !(feature.holeRings || []).some(hole => inside(x, z, hole)));
+}
+
+// Terrain and vegetation share the same physical-cover winner. The context
+// reset drops the cache as well as the collection, so retired polygons cannot
+// survive through an otherwise idle sampler after leaving Earth.
+const contextIndexes = new WeakMap();
+export function resetMappedGroundIndex(ctx) { contextIndexes.delete(ctx); }
+export function currentMappedGroundIndex(ctx) {
+  const collection = ctx.landuses;
+  const count = collection?.length || 0;
+  const lat = ctx.LOC?.lat, lon = ctx.LOC?.lon, generation = ctx._worldLoadSequence;
+  let state = contextIndexes.get(ctx);
+  if (!state || state.collection !== collection || state.count !== count ||
+      state.lat !== lat || state.lon !== lon || state.generation !== generation) {
+    state = { collection, count, lat, lon, generation, index: indexMappedGround(collection || []) };
+    contextIndexes.set(ctx, state);
+  }
+  return state.index;
+}
+
 // Built once per collection revision, not per frame/terrain vertex. Small
 // polygons win equal-evidence overlaps; identity breaks ties deterministically.
 export function indexMappedGround(features = [], cellSize = 128) {
@@ -67,7 +92,6 @@ export function indexMappedGround(features = [], cellSize = 128) {
     String(a.sourceFeatureId || '').localeCompare(String(b.sourceFeatureId || '')));
   return { sample(x, z) {
     return (cells.get(`${Math.floor(x / cellSize)}/${Math.floor(z / cellSize)}`) || []).find((f) =>
-      x >= f.bounds.minX && x <= f.bounds.maxX && z >= f.bounds.minZ && z <= f.bounds.maxZ &&
-      inside(x, z, f.pts) && !(f.holeRings || []).some((hole) => inside(x, z, hole))) || null;
+      mappedAreaContains(f, x, z)) || null;
   } };
 }

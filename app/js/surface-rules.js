@@ -18,6 +18,7 @@ const COASTAL_SAMPLE_PADDING_WORLD = 65;
 const ROAD_SAMPLE_PADDING_WORLD = 24;
 
 const VEGETATED_SURFACE_TYPES = new Set([
+  'wetland',
   'forest',
   'wood',
   'park',
@@ -97,10 +98,13 @@ function normalizeLanduseSurfaceType(tags = {}) {
   if (tags.natural === 'wood') return 'wood';
   if (tags.natural === 'scrub') return 'scrub';
   if (tags.natural === 'grassland' || tags.natural === 'heath') return 'meadow';
-  if (tags.natural === 'wetland') return 'grass';
+  if (tags.natural === 'wetland') return 'wetland';
   if (tags.leisure === 'park') return 'park';
   if (tags.leisure === 'garden') return 'garden';
-  if (tags.leisure === 'nature_reserve') return 'forest';
+  // Protection is a land purpose, not evidence of trees. Keep the boundary
+  // available to discovery while physical cover remains independently owned.
+  if (tags.leisure === 'nature_reserve') return 'nature_reserve';
+  if (tags.boundary === 'national_park' || tags.boundary === 'protected_area') return tags.boundary;
   return null;
 }
 
