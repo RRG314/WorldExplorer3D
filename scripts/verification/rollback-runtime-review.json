@@ -1,9 +1,51 @@
 {
   "schema": "we3d-reviewed-rollback-runtime-v1",
-  "id": "journal-v5-backpack-v2-public-data-v1-visual-fallback-20261005",
+  "id": "journal-v5-backpack-v2-location-preservation-20261006",
   "fallbackCommit": "37a12d117111446a128888384df67ac52445d972",
-  "scope": "Identical public weather, ocean and aircraft providers, HUD layout, backend, configuration, save/migration, equipment and account synchronization owners. The only runtime differences are the twelve reviewed transient visual/scene files. Actual packaged upgrade/fallback/write/return is required.",
+  "scope": "Fixed-location coverage, scene compilation and memory repairs since the retained free-data fallback. Save/migration, equipment, account, shared-room, backend and Firebase configuration owners remain byte-identical. The coordinate helper consolidates conversions without rebasing the active origin. Exact reviewed runtime bytes are pinned below; actual packaged upgrade/fallback/write/return remains required. This review does not certify worldwide streaming or performance.",
   "files": {
+    "app/index.html": {
+      "before": "94bdb7f627e930e09c6e1946aacd6dbbd447c6b332e4629b9dc1153660659ec2",
+      "beforeMode": "100644",
+      "after": "98984dfc22a07b2a4413a4f00fe97f7866e34f911b71a2b93de376d3fc09744f",
+      "afterMode": "100644",
+      "review": "Map search accessibility and existing layer classification; preference keys and selected layers are unchanged. No persistence or server protocol writes introduced."
+    },
+    "app/js/activity-discovery/catalog.js": {
+      "before": "6763f7ff5f4d5c5f2be9b76b59674cc29f98e7723acb04ec203e0574358d853a",
+      "beforeMode": "100644",
+      "after": "31d818e4ae489a7b136658edff1f7a1151030ee69d3a12826299d329cc9c8410",
+      "afterMode": "100644",
+      "review": "Centralizes existing location-relative conversion and corrects wrapped longitude/polar consumers. No origin rebase, session migration or save-key change. Existing location identity and records remain under unchanged persistence owners; actual return and save roundtrips required."
+    },
+    "app/js/config.js": {
+      "before": "1193b1bcb3b54fa72c8ecb21277186c3614a96c34172db09791fe2b08b699365",
+      "beforeMode": "100644",
+      "after": "126af1c21e595da311ec6f8e357a23d99e446ec8a85b6345d22c7b8eb59648a2",
+      "afterMode": "100644",
+      "review": "Centralizes existing location-relative conversion and corrects wrapped longitude/polar consumers. No origin rebase, session migration or save-key change. Existing location identity and records remain under unchanged persistence owners; actual return and save roundtrips required."
+    },
+    "app/js/earth-core/coordinate-frame.js": {
+      "before": null,
+      "beforeMode": null,
+      "after": "17701713af4c66800eb5e5ff170bb866f7aab6e91421f21af05927aec6b7912a",
+      "afterMode": "100644",
+      "review": "Centralizes existing location-relative conversion and corrects wrapped longitude/polar consumers. No origin rebase, session migration or save-key change. Existing location identity and records remain under unchanged persistence owners; actual return and save roundtrips required."
+    },
+    "app/js/earth-core/location-origin.js": {
+      "before": "f893fb4a3c2fc37580fbfac8b2cb2996e7c452bea89a1240984629694c5c8370",
+      "beforeMode": "100644",
+      "after": "21e83c1286c673abec6a46b571c3455be3919d7bbf6095e911320694238cdf33",
+      "afterMode": "100644",
+      "review": "Centralizes existing location-relative conversion and corrects wrapped longitude/polar consumers. No origin rebase, session migration or save-key change. Existing location identity and records remain under unchanged persistence owners; actual return and save roundtrips required."
+    },
+    "app/js/earth-core/region-build.js": {
+      "before": null,
+      "beforeMode": null,
+      "after": "246695973e20f863c8a796615262b27eeb619c8ce7cf704c0ae873e4bbf098af",
+      "afterMode": "100644",
+      "review": "Fixed-location regional compilation, staged publication and cancellation/resource retirement. Does not initiate movement-based source windows or write a durable world/player record. Existing coverage and lifecycle acceptance required."
+    },
     "app/js/engine/building-facade-materials.js": {
       "before": "cb740f60cfaff53fcce15bb53313243660014614c50f0f19137984a7c612d04d",
       "beforeMode": "100644",
@@ -25,12 +67,257 @@
       "afterMode": "100644",
       "review": "Generated pavement/asphalt material texture bytes only; no persistence or network protocol."
     },
+    "app/js/game.js": {
+      "before": "079f490410b51527c2d8e20fd419f333377b9007da44841e962de091bfe86915",
+      "beforeMode": "100644",
+      "after": "70817a4d70f5590c234dffbdad6eb5d89bd8d2601d98dda000bd18a02551d6bc",
+      "afterMode": "100644",
+      "review": "Map search accessibility and existing layer classification; preference keys and selected layers are unchanged. No persistence or server protocol writes introduced."
+    },
+    "app/js/game/poi-map-visibility.js": {
+      "before": null,
+      "beforeMode": null,
+      "after": "101f0462130c20c9640eccc6e6f8160f1ca14bdd085faff54409c4de7b526a38",
+      "afterMode": "100644",
+      "review": "Map search accessibility and existing layer classification; preference keys and selected layers are unchanged. No persistence or server protocol writes introduced."
+    },
+    "app/js/game/property-ui.js": {
+      "before": "ac4574e435118cf55a4f7c594f6d875b7e22e98edc2b504709c69c69feac415c",
+      "beforeMode": "100644",
+      "after": "ea2fcaa72071aa27f4b88bacca4a3e2293c30480b141b76165a612e863fc9b80",
+      "afterMode": "100644",
+      "review": "Centralizes existing location-relative conversion and corrects wrapped longitude/polar consumers. No origin rebase, session migration or save-key change. Existing location identity and records remain under unchanged persistence owners; actual return and save roundtrips required."
+    },
+    "app/js/interiors/core.js": {
+      "before": "44fbe2e15d0727b5be8eec8dcfc01cf2e141940a13f7f72c9a6f163be0b69a2b",
+      "beforeMode": "100644",
+      "after": "1af43166dc242bbf3e1d9a0921446f943ef88c0f07b6835c5406491647072c8f",
+      "afterMode": "100644",
+      "review": "Centralizes existing location-relative conversion and corrects wrapped longitude/polar consumers. No origin rebase, session migration or save-key change. Existing location identity and records remain under unchanged persistence owners; actual return and save roundtrips required."
+    },
+    "app/js/runtime/core-frame-systems.js": {
+      "before": "dbde26a81cfc7e3737a846cde219ea78334ad0c2030d39b120ed5f91f214f3fe",
+      "beforeMode": "100644",
+      "after": "c75a4d8a6d0e6e461e4989280ea7202f2b7d63b4dd3edc9b008cb4b43b6d2e59",
+      "afterMode": "100644",
+      "review": "Bounded road render/contact residency within the existing fixed source catalog and shared road-mask ownership. Existing retry calls the existing session capture/reload authority. No new save schema, geographic migration, room authority or persistent write protocol."
+    },
+    "app/js/surface-rules.js": {
+      "before": "ea104bd9fdf47651542a6e4832f4946e5181df36a91c94a2b8da18a1900949e7",
+      "beforeMode": "100644",
+      "after": "e03d4f0d6e55ebb55a452e3b99107a86e0f75d72fa84fa6a82beaa8133a7804b",
+      "afterMode": "100644",
+      "review": "Restores coverage and land-purpose/physical-cover classification with bounded source caches. Location presets, source IDs, saved map preferences and schema owners are preserved; current real-city coverage must be tested."
+    },
+    "app/js/terrain.js": {
+      "before": "52ecf77f1c3858a14ed70ffe258ba7bc188b3fd47e831fa8389f18636d23f741",
+      "beforeMode": "100644",
+      "after": "0d37691cd069b59c0f6c9ba517c1ee9043667229f1c6165c4c6a21651aaf3a7e",
+      "afterMode": "100644",
+      "review": "Terrain source cache, sampled surface and land-cover lookup lifetime changes. No durable schema or provider credential changes; memory bounds and location replacement must be verified against the package."
+    },
+    "app/js/terrain/far-building-facade-material.js": {
+      "before": "f6b49f25df2a208b6633982bfcc6ff18654e478a3954d0b14f1e63aa3ef57232",
+      "beforeMode": "100644",
+      "after": "f6421ea55c66caa834fe5139281799eabbd1a3a0af0e7925a93d79f3dc1b1696",
+      "afterMode": "100644",
+      "review": "Regional source selection and worker-owned packed/render data retain source-identified majors and coverage. Cell-relative GPU coordinates do not migrate the gameplay origin. Regional representations are transient; persistent building identity owners unchanged."
+    },
+    "app/js/terrain/far-building-instance-batches.js": {
+      "before": "c63b45ee47327894c5ac82e80cfd72e64399f91fc08af454b5eba23a705793e2",
+      "beforeMode": "100644",
+      "after": "772e8bc4b8a174c5474926987ef3744975d3b521f0265c72758851179f2fa899",
+      "afterMode": "100644",
+      "review": "Regional source selection and worker-owned packed/render data retain source-identified majors and coverage. Cell-relative GPU coordinates do not migrate the gameplay origin. Regional representations are transient; persistent building identity owners unchanged."
+    },
+    "app/js/terrain/far-building-instance-storage.js": {
+      "before": null,
+      "beforeMode": null,
+      "after": "47d835399aae0f3bd07ad0595f4f47656ea5cf3aec9952825d26e59951fc7190",
+      "afterMode": "100644",
+      "review": "Regional source selection and worker-owned packed/render data retain source-identified majors and coverage. Cell-relative GPU coordinates do not migrate the gameplay origin. Regional representations are transient; persistent building identity owners unchanged."
+    },
+    "app/js/terrain/far-building-massing.js": {
+      "before": "d5ceecfc31bd911a99c1478a914985be24ebc55d00d21ac31686ebd04b10b855",
+      "beforeMode": "100644",
+      "after": "65b3e4eb2a53fcad3ac34edac7057259440b4fe2b4f6e586fa3ceccb222e472b",
+      "afterMode": "100644",
+      "review": "Regional source selection and worker-owned packed/render data retain source-identified majors and coverage. Cell-relative GPU coordinates do not migrate the gameplay origin. Regional representations are transient; persistent building identity owners unchanged."
+    },
+    "app/js/terrain/far-building-selection.js": {
+      "before": null,
+      "beforeMode": null,
+      "after": "fbfd13d01e8d96f46c8d8743386d5ae7539a4fec354da36f5587948821f05ec9",
+      "afterMode": "100644",
+      "review": "Regional source selection and worker-owned packed/render data retain source-identified majors and coverage. Cell-relative GPU coordinates do not migrate the gameplay origin. Regional representations are transient; persistent building identity owners unchanged."
+    },
+    "app/js/terrain/far-field-geometry.js": {
+      "before": "0c33119461996a7254a33338a6b40f675ba01e7454316a6b643c2e9daa7402a9",
+      "beforeMode": "100644",
+      "after": "5a00f08971ac9ff9c2a91f08e87ea9084454cc612a1e5ecc0fbd5edfd3874a5b",
+      "afterMode": "100644",
+      "review": "Fixed-location regional compilation, staged publication and cancellation/resource retirement. Does not initiate movement-based source windows or write a durable world/player record. Existing coverage and lifecycle acceptance required."
+    },
+    "app/js/terrain/far-field-mapped-context.js": {
+      "before": "290a29bfb45c893d181da705d189c0597bc30532d7888c7851f363e9e2672d19",
+      "beforeMode": "100644",
+      "after": "141a2cd073af649bddd14e3b06f4d7d631190b120e98fa377bfd8c76d93d5f8f",
+      "afterMode": "100644",
+      "review": "Regional source selection and worker-owned packed/render data retain source-identified majors and coverage. Cell-relative GPU coordinates do not migrate the gameplay origin. Regional representations are transient; persistent building identity owners unchanged."
+    },
+    "app/js/terrain/far-field-water.js": {
+      "before": "18036fd05f118ef2596ce4f9fdc047028a0bc37cff056930c3131a4592c8f891",
+      "beforeMode": "100644",
+      "after": "a06a77eda387ce2ad13a704354295d6ab91158fcae1865cfd843fe04aa4f0bdb",
+      "afterMode": "100644",
+      "review": "Fixed-location regional compilation, staged publication and cancellation/resource retirement. Does not initiate movement-based source windows or write a durable world/player record. Existing coverage and lifecycle acceptance required."
+    },
+    "app/js/terrain/far-field.js": {
+      "before": "27203a342331cb5a0dffe2537969c10bea29d564b5fafb101cfba501f69a9d77",
+      "beforeMode": "100644",
+      "after": "4a57f13e5f0ade9f5898c03e2f8e2805182399a02e08a73d700c122225464fe9",
+      "afterMode": "100644",
+      "review": "Fixed-location regional compilation, staged publication and cancellation/resource retirement. Does not initiate movement-based source windows or write a durable world/player record. Existing coverage and lifecycle acceptance required."
+    },
+    "app/js/terrain/mapped-ground-evidence.js": {
+      "before": "faae13b0082c17fe3d2df1ea5abb28a90c73621c84f21054445252222299cb4e",
+      "beforeMode": "100644",
+      "after": "ae627d912c9a54df1709803f5ae7f14b4e16a7a8a16fed7446cd130bd3429709",
+      "afterMode": "100644",
+      "review": "Terrain source cache, sampled surface and land-cover lookup lifetime changes. No durable schema or provider credential changes; memory bounds and location replacement must be verified against the package."
+    },
+    "app/js/terrain/rebuild.js": {
+      "before": "18c3dcfa8980bf654481eb46e26b93f3b0db56de529782baac08402f51ca6276",
+      "beforeMode": "100644",
+      "after": "298affd91dc1528baa423d7c1164a745345e547449346fd3df78fab39667bf4e",
+      "afterMode": "100644",
+      "review": "Terrain source cache, sampled surface and land-cover lookup lifetime changes. No durable schema or provider credential changes; memory bounds and location replacement must be verified against the package."
+    },
+    "app/js/terrain/regional-building-compiler.js": {
+      "before": null,
+      "beforeMode": null,
+      "after": "4f19e5cf00f2d0bb79ba736d11a95f92750727de4e81978e8cf7fb467bb6e834",
+      "afterMode": "100644",
+      "review": "Regional source selection and worker-owned packed/render data retain source-identified majors and coverage. Cell-relative GPU coordinates do not migrate the gameplay origin. Regional representations are transient; persistent building identity owners unchanged."
+    },
+    "app/js/terrain/regional-building-descriptors.js": {
+      "before": null,
+      "beforeMode": null,
+      "after": "8233322281eeb33aa0dfea6d7bde2572ccdb4b57d19c8cfd06685e9244f46376",
+      "afterMode": "100644",
+      "review": "Regional source selection and worker-owned packed/render data retain source-identified majors and coverage. Cell-relative GPU coordinates do not migrate the gameplay origin. Regional representations are transient; persistent building identity owners unchanged."
+    },
+    "app/js/terrain/regional-building-runtime.js": {
+      "before": null,
+      "beforeMode": null,
+      "after": "efe18772a955b0f5539abd314d7def911c64ebedf24cfb80b9651f57ce70fa78",
+      "afterMode": "100644",
+      "review": "Regional source selection and worker-owned packed/render data retain source-identified majors and coverage. Cell-relative GPU coordinates do not migrate the gameplay origin. Regional representations are transient; persistent building identity owners unchanged."
+    },
+    "app/js/terrain/regional-building-worker.js": {
+      "before": null,
+      "beforeMode": null,
+      "after": "f8395dae3374edb4e41790f10a9590527d8f31e310528cbafe1f2013782ab2be",
+      "afterMode": "100644",
+      "review": "Regional source selection and worker-owned packed/render data retain source-identified majors and coverage. Cell-relative GPU coordinates do not migrate the gameplay origin. Regional representations are transient; persistent building identity owners unchanged."
+    },
+    "app/js/terrain/regional-road-contact.js": {
+      "before": "61afdf13194444add0d85ceab2a2027d8f4aeb130ef33f911cdae5230835742d",
+      "beforeMode": "100644",
+      "after": "62dd62bad765a00d5ac845558dc759ec24a862c3d264040919f4eac791ec4f94",
+      "afterMode": "100644",
+      "review": "Bounded road render/contact residency within the existing fixed source catalog and shared road-mask ownership. Existing retry calls the existing session capture/reload authority. No new save schema, geographic migration, room authority or persistent write protocol."
+    },
+    "app/js/terrain/regional-road-coverage.js": {
+      "before": null,
+      "beforeMode": null,
+      "after": "9149b949125995b9c4d5a3349f681f9e2a87cf1ede42963fc3d06a0ebb6e4549",
+      "afterMode": "100644",
+      "review": "Bounded road render/contact residency within the existing fixed source catalog and shared road-mask ownership. Existing retry calls the existing session capture/reload authority. No new save schema, geographic migration, room authority or persistent write protocol."
+    },
+    "app/js/terrain/regional-road-raster.js": {
+      "before": null,
+      "beforeMode": null,
+      "after": "57a8ec24ccd91c9d5ea17d00f6afd2f5e4fcbdd040ee73d8dbe267c461bddc46",
+      "afterMode": "100644",
+      "review": "Bounded road render/contact residency within the existing fixed source catalog and shared road-mask ownership. Existing retry calls the existing session capture/reload authority. No new save schema, geographic migration, room authority or persistent write protocol."
+    },
+    "app/js/terrain/road-overview-owner.js": {
+      "before": null,
+      "beforeMode": null,
+      "after": "9661464b6116cb99f28d10de0839a79934f942465796e2de6294b9db065294c7",
+      "afterMode": "100644",
+      "review": "Bounded road render/contact residency within the existing fixed source catalog and shared road-mask ownership. Existing retry calls the existing session capture/reload authority. No new save schema, geographic migration, room authority or persistent write protocol."
+    },
+    "app/js/terrain/surface-profiles.js": {
+      "before": "ce4693e0b90eba7a393bdb9ea949aa80e1c3bba5268aa436db32ebfa0f6ad1a8",
+      "beforeMode": "100644",
+      "after": "ea7e9044fe2e867c94729dfdf272ce77dff92bb463946bda070938d6f9ccf94a",
+      "afterMode": "100644",
+      "review": "Terrain source cache, sampled surface and land-cover lookup lifetime changes. No durable schema or provider credential changes; memory bounds and location replacement must be verified against the package."
+    },
+    "app/js/terrain/tile-request-lifecycle.js": {
+      "before": "1477f220ecef5bcb7db5f82e0ed5dc5b4ab2d412aadaedc19a2fb5a807bddad3",
+      "beforeMode": "100644",
+      "after": "ad3da0c0f172eaf34dd56a339911a516602c20c2b6bd23b9db005d30d92493d7",
+      "afterMode": "100644",
+      "review": "Terrain source cache, sampled surface and land-cover lookup lifetime changes. No durable schema or provider credential changes; memory bounds and location replacement must be verified against the package."
+    },
+    "app/js/terrain/tiles.js": {
+      "before": "04fdfd30594b96170ff7bc3d2c64ea83ddd9d9a8b55c98abccdf0735201bd4ab",
+      "beforeMode": "100644",
+      "after": "567d42a9997b1681fad060417b00cfbcc8b066f8365de4607c65830f2405a9f5",
+      "afterMode": "100644",
+      "review": "Terrain source cache, sampled surface and land-cover lookup lifetime changes. No durable schema or provider credential changes; memory bounds and location replacement must be verified against the package."
+    },
+    "app/js/terrain/transport-detail-compiler.js": {
+      "before": "34540c2f26bf0f8a20d21abfe692f94a431f186fb27e55947c7318c4829e23ff",
+      "beforeMode": "100644",
+      "after": "b657cc06922ffb3d98e9b7041218d09a88c29d3e89db3eead1f964df6bbd9684",
+      "afterMode": "100644",
+      "review": "Bounded road render/contact residency within the existing fixed source catalog and shared road-mask ownership. Existing retry calls the existing session capture/reload authority. No new save schema, geographic migration, room authority or persistent write protocol."
+    },
+    "app/js/terrain/transport-detail-plan.js": {
+      "before": "5438b4a2bf90be4f0e4a5b56ad26ffe1f6cc27948b506d768a4621fdce46f39f",
+      "beforeMode": "100644",
+      "after": "9ddc9ed29569f2786e8b8b38f00992579451cbcfce36bb230b289cb7a2ae2500",
+      "afterMode": "100644",
+      "review": "Bounded road render/contact residency within the existing fixed source catalog and shared road-mask ownership. Existing retry calls the existing session capture/reload authority. No new save schema, geographic migration, room authority or persistent write protocol."
+    },
+    "app/js/terrain/transport-detail-runtime.js": {
+      "before": "9b839e6e6348061704fc89cb50592aab56d847f20966fe66461abe68c701a66c",
+      "beforeMode": "100644",
+      "after": "a9e4ba9acc019ff1031f5c2264f47994c6f077f73822a04b29196d7c70f735f5",
+      "afterMode": "100644",
+      "review": "Bounded road render/contact residency within the existing fixed source catalog and shared road-mask ownership. Existing retry calls the existing session capture/reload authority. No new save schema, geographic migration, room authority or persistent write protocol."
+    },
+    "app/js/terrain/transport-detail-worker.js": {
+      "before": "9c25ef70e9cbd2a2d4190dc252c2c312f65acbfea1df903257299dc010854e6e",
+      "beforeMode": "100644",
+      "after": "d04a560efbbbe649cd2cf7a2142c560f5b65490be0910b4efae5cff542c10753",
+      "afterMode": "100644",
+      "review": "Bounded road render/contact residency within the existing fixed source catalog and shared road-mask ownership. Existing retry calls the existing session capture/reload authority. No new save schema, geographic migration, room authority or persistent write protocol."
+    },
+    "app/js/world/budgets.js": {
+      "before": "823757a17a17833c31c012691bc6f202289f0d6fd38532b7feff6244540d2ecb",
+      "beforeMode": "100644",
+      "after": "7c3e72b05b4aa2a9e1a029adb74472f93e7a735cfff512643d8d3a8534ba5ced",
+      "afterMode": "100644",
+      "review": "Restores coverage and land-purpose/physical-cover classification with bounded source caches. Location presets, source IDs, saved map preferences and schema owners are preserved; current real-city coverage must be tested."
+    },
     "app/js/world/building-batching.js": {
       "before": "9b0fc9cfdb7ea37881cdcf8395a97a750a91c4b741c93dd447abd2e3bcbdff33",
       "beforeMode": "100644",
-      "after": "2bf748c2ae9403c8510c556a98d9a16f2ebbd0eaca4a1a59f96f2ff7061c200e",
+      "after": "335c1c33db5418c845ad300d97f21406cd226a846e8b2ec901bbb66327a4d12a",
       "afterMode": "100644",
-      "review": "Per-instance facade attributes and rendering only; unchanged source building identity."
+      "review": "Building geometry and private temporary-buffer lifetime only. Tests require unchanged final triangle attributes, source-building edit boundaries and retained shared buffers. No persistent data writes or identity migration."
+    },
+    "app/js/world/building-body-geometry.js": {
+      "before": null,
+      "beforeMode": null,
+      "after": "c5c6f0c5fb53883c7dbc96f5d4637a8b3397c3172a7993d7bb7cf6c380f44040",
+      "afterMode": "100644",
+      "review": "Building geometry and private temporary-buffer lifetime only. Tests require unchanged final triangle attributes, source-building edit boundaries and retained shared buffers. No persistent data writes or identity migration."
     },
     "app/js/world/building-exterior-details.js": {
       "before": "5b11eacffdb8e1188627a6180e85fcc32ff6388aba82222a83342b2107bc557c",
@@ -46,6 +333,20 @@
       "afterMode": "100644",
       "review": "Pure facade layout and near/mid rendering profile; no save or provider format changes."
     },
+    "app/js/world/building-vertex-storage.js": {
+      "before": "e15df4a7c7ace092ca6106f2a434e1ec94a7c8967fb50c77729e7ac456b98356",
+      "beforeMode": "100644",
+      "after": "0237168a831b657abfdae843e4fe8c24ff4477411bf39ed85b84afc282267fb7",
+      "afterMode": "100644",
+      "review": "Building geometry and private temporary-buffer lifetime only. Tests require unchanged final triangle attributes, source-building edit boundaries and retained shared buffers. No persistent data writes or identity migration."
+    },
+    "app/js/world/compiler/transport-source-normalizer.js": {
+      "before": "7807fc7c5f4340c9e8bae18f61d7a85cf08db2779e3c10d38acd1ae0665b78ff",
+      "beforeMode": "100644",
+      "after": "fdff8b0e119cb0a58212fcb41940961d30720d1d91318f65b6a5e5cfc3ae1e26",
+      "afterMode": "100644",
+      "review": "Bounded road render/contact residency within the existing fixed source catalog and shared road-mask ownership. Existing retry calls the existing session capture/reload authority. No new save schema, geographic migration, room authority or persistent write protocol."
+    },
     "app/js/world/facade-lighting.js": {
       "before": null,
       "beforeMode": null,
@@ -53,12 +354,68 @@
       "afterMode": "100644",
       "review": "New shared transient shader uniform; no persistent or protocol owner."
     },
+    "app/js/world/geometry-batch-storage.js": {
+      "before": "a1855eb90df65309f4077620d8e155dcad62547d84f955029b3201cce9d1d060",
+      "beforeMode": "100644",
+      "after": "a61658f7761af887bbde523e1692b8a9f29b38c9b1639341e2e0334031f81c59",
+      "afterMode": "100644",
+      "review": "Building geometry and private temporary-buffer lifetime only. Tests require unchanged final triangle attributes, source-building edit boundaries and retained shared buffers. No persistent data writes or identity migration."
+    },
+    "app/js/world/load-budgeting.js": {
+      "before": "0d6f54f43dc62c878264b7b9c076b8ff43d5563bfad11a27a7886f7ea6cde5a9",
+      "beforeMode": "100644",
+      "after": "654c4c4584fc6aa70dd77f69cbc51b6233e46703d31c79b0698cb0cbfbe3a715",
+      "afterMode": "100644",
+      "review": "Restores coverage and land-purpose/physical-cover classification with bounded source caches. Location presets, source IDs, saved map preferences and schema owners are preserved; current real-city coverage must be tested."
+    },
+    "app/js/world/load-building-detail.js": {
+      "before": "c648181e768d7462aebe5dac9f58811e1583ff9533a6ffa9958b6dbb7bbd5915",
+      "beforeMode": "100644",
+      "after": "b873640f53b930f963680a4b05ac946176d41ee4d97272c365ee265d4c164f5f",
+      "afterMode": "100644",
+      "review": "Restores coverage and land-purpose/physical-cover classification with bounded source caches. Location presets, source IDs, saved map preferences and schema owners are preserved; current real-city coverage must be tested."
+    },
+    "app/js/world/load-building-pass.js": {
+      "before": "89b97dc69f27c0b0ec54784900ce4be304086e162dc85295adde4c749a7a4735",
+      "beforeMode": "100644",
+      "after": "d89631d7fdd47f578f4704d4e2e484bbb3c1eb20cd8b8afad56f1f871ccf94aa",
+      "afterMode": "100644",
+      "review": "Building geometry and private temporary-buffer lifetime only. Tests require unchanged final triangle attributes, source-building edit boundaries and retained shared buffers. No persistent data writes or identity migration."
+    },
+    "app/js/world/load-geometry.js": {
+      "before": "31f452f553af96784ea0e3d2cc7df939c169d676b9ad9494a7c64d40f3bfb3fa",
+      "beforeMode": "100644",
+      "after": "568c39a1b897602cf07ebce2f4e4b4ed85dca00088f655da848136f8f3805adb",
+      "afterMode": "100644",
+      "review": "Building geometry and private temporary-buffer lifetime only. Tests require unchanged final triangle attributes, source-building edit boundaries and retained shared buffers. No persistent data writes or identity migration."
+    },
+    "app/js/world/load-runtime-session.js": {
+      "before": "561afb54eda9cc0a739312b40d798c13815a542294be84b80eb05f977cbcf26b",
+      "beforeMode": "100644",
+      "after": "6b4457f80ccb65e786f3ea5e8e6ba080b7a568478a7ed9baed1cff8d2728b96d",
+      "afterMode": "100644",
+      "review": "Restores coverage and land-purpose/physical-cover classification with bounded source caches. Location presets, source IDs, saved map preferences and schema owners are preserved; current real-city coverage must be tested."
+    },
+    "app/js/world/pavement-terrain-mask.js": {
+      "before": "15327bb63fc26f4f81b6a486d73442b4d2b1cb07107e4d2da1b0ac1f234e171e",
+      "beforeMode": "100644",
+      "after": "aab2db3e84ef44f5ed1de4a65f350c93977d27c2a68bdcee9a275ebe27ff3a8e",
+      "afterMode": "100644",
+      "review": "Bounded road render/contact residency within the existing fixed source catalog and shared road-mask ownership. Existing retry calls the existing session capture/reload authority. No new save schema, geographic migration, room authority or persistent write protocol."
+    },
     "app/js/world/reference-block-dressing.js": {
       "before": null,
       "beforeMode": null,
       "after": "d91eb8e3337cc2e40c986100325d1464166d7472195198c83a14629c6154de55",
       "afterMode": "100644",
       "review": "Authored ephemeral street furniture placement, collision and lamp registration; never writes player/world saves."
+    },
+    "app/js/world/shortbread-source.js": {
+      "before": "c45eb20adf5e2d4a5262dfc0b7ca67bfc0a29789f8d26d7b4db28da8fe2293f4",
+      "beforeMode": "100644",
+      "after": "cf6e43e22c4a819c79a9eb9e5ee454143af812e9be29c9c30560a3c3fb823083",
+      "afterMode": "100644",
+      "review": "Restores coverage and land-purpose/physical-cover classification with bounded source caches. Location presets, source IDs, saved map preferences and schema owners are preserved; current real-city coverage must be tested."
     },
     "app/js/world/storefront-layout.js": {
       "before": "4c0dc37055d9822b92c4c0fc678514f9f617cf01b3d87b841fc7d9b71ef9a1ee",
@@ -84,9 +441,16 @@
     "app/js/world/vegetation.js": {
       "before": "6cadc778abba8a909bb5e6d7df8dd6bb51213a4ba5d303a109b36f8f0c1f20f4",
       "beforeMode": "100644",
-      "after": "efb4d02c710c3f93c981f7d4082ae686f97b5164ec23f5d1e7e22c4fd39092d1",
+      "after": "c07fa7e8ef9f20c55365bfb5e157ff75dfd5d80108afb4691b77f6c2da3cdec4",
       "afterMode": "100644",
       "review": "Existing placement pipeline accepts authored planter trees; transient placement and collision clearance only."
+    },
+    "scripts/hosting-artifact.mjs": {
+      "before": "1ebfedce6aac9d44fe62d9496c1d48063669a948ee35de4642ee717d9f0fae20",
+      "beforeMode": "100644",
+      "after": "542207767e95581aa47dd23619d9355895da41f6ec0975bdacdb651670662b81",
+      "afterMode": "100644",
+      "review": "Adds the regional worker entry and its bundled URL to the immutable artifact. Environment config, existing save modules and backend bytes unchanged."
     }
   }
 }
