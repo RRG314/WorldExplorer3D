@@ -445,6 +445,13 @@
       "afterMode": "100644",
       "review": "Existing placement pipeline accepts authored planter trees; transient placement and collision clearance only."
     },
+    "config/system-release-gates.json": {
+      "before": "d5184bd18f6b116f90c94820c9b6581750722fdb82217ad44fb0d5a5f752fbae",
+      "beforeMode": "100644",
+      "after": "524378b731e64c12ca3883c14b54800b0a30349f58fe7fae34a264bac3970ebf",
+      "afterMode": "100644",
+      "review": "Adds the actual packaged city-switch preservation gate and its Earth-compilation assertion. Existing release gate commands, limits and approval requirements remain unchanged. This release configuration has no client persistence or backend protocol behavior."
+    },
     "scripts/hosting-artifact.mjs": {
       "before": "1ebfedce6aac9d44fe62d9496c1d48063669a948ee35de4642ee717d9f0fae20",
       "beforeMode": "100644",
