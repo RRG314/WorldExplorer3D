@@ -34,6 +34,35 @@ The real WebGL fixture also exposed a regional facade shader that assumed `world
 
 ## Finite remaining acceptance gates
 
+### Preserve the location-based game and make travel optional
+
+Owner requirement, October 6: continuous travel must be an optional mode, never
+a replacement for the existing location-based game. The current candidate has
+no completed worldwide scheduler and therefore continues to use location-based
+travel. There is no working continuous-world toggle in this candidate.
+
+The four gates below must include these mode-isolation requirements:
+
+- Existing installations and new players start in location-based mode. Presets,
+  custom coordinates, favorites, existing geography, activities and saves remain.
+- A working settings choice may enable continuous travel only after the complete
+  moving-world journey is accepted. Changing graphics quality or opening a saved
+  location must never silently enable it.
+- Changing the choice uses the session authority: preserve the location-based
+  selection and pose, drain the departing mode's work, and publish the destination
+  only when its ground and collision state are ready. Failed transitions leave
+  the prior playable mode and its saved records intact.
+- Continuous geographic anchors use a separate, versioned record. Preserve legacy
+  records and unknown fields; switching off restores the location session without
+  deleting a continuous journey, Journal, inventory, property or authored edits.
+- A shared room declares the supported travel mode. A local preference cannot
+  reinterpret another player's coordinates or alter server-owned progress.
+- Acceptance includes off → on → off, reload in both modes, failed enable,
+  cancellation, fallback-build save roundtrips and repeated switches with bounded
+  memory. A checkbox without those behaviors is not completion.
+
+### Implementation and acceptance
+
 1. **Geographic source windows and cell ownership.** Implement canonical wrapped/polar cell addresses and all source adapters; extract terrain/building/road/collision/land-cover publications into independently owned cells used by the existing initial load. Preserve source feature IDs and overlaps across tiles. Enforce combined resident/staging byte and request budgets, deterministic retirement, retry and source completeness. Accept only after boundary fixtures, real-provider samples and repeated cell replacement/return pass. The region transaction completed here is one prerequisite, not this whole gate.
 2. **Geographic player and persistent authority.** Add versioned geographic anchors; migrate legacy location-relative records without replacing unknown fields; stage physics/render origin changes atomically. Account for actors, cameras, boats/planes, interiors, authored edits, saved activities and shared-room validation. Accept round trips through old/new saves and peers, reversals, large-distance moves and polar/dateline boundaries before using this during gameplay.
 3. **Integrated moving residency.** Connect observer movement to the shared cell scheduler. Keep a complete published local ground/collision set while new cells load; replace only the delta and retain a small bounded overlap. Loading failures must not publish fictitious ground, drop the player through the world or erase their session. Remove the fixed traversal boundary only when this journey is accepted. Require at least 90% of valid received nearby footprints and every source-identified major; report missing source tiles separately. Reduce distant detail or visible extent under pressure rather than silently deleting nearby coverage.
