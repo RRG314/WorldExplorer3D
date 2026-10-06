@@ -10,13 +10,12 @@ import { mappedGroundProfile } from './mapped-ground-evidence.js';
 
 const FAR_CONTEXT_ZOOM = 14;
 const FAR_WATER_CONTEXT_ZOOM = 11;
-// Detailed city buildings remain complete. The fixed regional ring is an
-// aerial continuity LOD: retain a spatially distributed subset and publish
-// most of it as inexpensive oriented instances instead of converting nearly
-// a million source footprints that are not individually resolvable.
+// Coverage and geometric detail have separate budgets. Keep almost all valid
+// mapped footprints; only a bounded subset receives polygon-exact geometry.
+// The safety ceiling bounds instance buffers, never an equal quota per tile.
 const FAR_CONTEXT_MAX_BUILDINGS = 9000;
-const FAR_CONTEXT_BUILDING_COVERAGE_TARGET = 0.45;
-const FAR_CONTEXT_MAX_BUILDING_INSTANCES = 280000;
+const FAR_CONTEXT_BUILDING_COVERAGE_TARGET = 0.95;
+const FAR_CONTEXT_MAX_BUILDING_INSTANCES = 1200000;
 // The building layer is available at z14, not at the lower generalized zooms.
 // A 14 km half-extent needs roughly 400 tiles at London's latitude, so this
 // budget must cover every shipped fixed-location preset before zoom selection
@@ -128,7 +127,7 @@ function farBuildingBoxDescriptor(ring, properties, identity) {
   return {
     ring,
     properties,
-    priority: areaMeters,
+    priority: farBuildingPriority(properties, areaMeters),
     centerLat: centerLat - southOffset / 110540,
     centerLon: centerLon + eastOffset / eastMetersPerDegree,
     widthMeters,
@@ -137,6 +136,41 @@ function farBuildingBoxDescriptor(ring, properties, identity) {
     rotationY: -axisAngle,
     identity
   };
+}
+
+// Important mapped buildings survive a density cap even when they occur last
+// in a vector tile. An inferred height is not evidence of a landmark.
+function farBuildingPriority(properties = {}, areaMeters = 0) {
+  const height = Number.parseFloat(properties.height ?? properties.render_height ?? properties['building:height']);
+  const levels = Number.parseFloat(properties['building:levels'] ?? properties.levels ?? properties.num_floors);
+  const major = height >= 60 || levels >= 18 || areaMeters >= 4000 ||
+    /^(tower|cathedral|stadium|hospital|university|terminal|castle|civic)$/.test(String(properties.building || properties.kind || '')) ||
+    Boolean(properties.wikidata || properties.wikipedia || properties.historic);
+  return (major ? 1000000 : 0) + Math.min(350000, areaMeters) + (Number.isFinite(height) ? height : 0);
+}
+
+function selectFarBuildingCoverage(buckets, options = {}) {
+  const available = buckets.reduce((count, bucket) => count + bucket.length, 0);
+  const limit = Math.max(0, Math.min(FAR_CONTEXT_MAX_BUILDING_INSTANCES,
+    Math.floor(options.maxInstances ?? FAR_CONTEXT_MAX_BUILDING_INSTANCES)));
+  const major = [], ordinary = [];
+  for (const bucket of buckets) {
+    const remaining = [];
+    for (const building of bucket) {
+      if (building.priority >= 1000000) major.push(building);
+      else remaining.push(building);
+    }
+    ordinary.push(remaining);
+  }
+  // Never hide a major feature behind a spatial sampling stride. Exceeding the
+  // resource ceiling is reported as incomplete coverage, not a successful load.
+  major.sort((a,b) => b.priority - a.priority || a.identity.localeCompare(b.identity));
+  const target = Math.min(limit, Math.max(major.length, Math.ceil(available * FAR_CONTEXT_BUILDING_COVERAGE_TARGET)));
+  const buildings = major.slice(0, target);
+  for (const building of roundRobinSelect(ordinary, Math.max(0, target - buildings.length))) buildings.push(building);
+  return { buildings, availableBuildings: available, selectedBuildingTarget: target,
+    majorBuildingsAvailable: major.length, majorBuildingsSelected: Math.min(major.length, target),
+    buildingBudgetExceeded: Math.ceil(available * FAR_CONTEXT_BUILDING_COVERAGE_TARGET) > limit };
 }
 
 const geographicRingIndexes=new WeakMap();
@@ -260,6 +294,19 @@ function contextTileCoordinates(bounds, zoom = FAR_CONTEXT_ZOOM) {
     for (let y = range.yMin; y <= range.yMax; y += 1) coordinates.push({ x, y });
   }
   return coordinates;
+}
+
+function limitContextTiles(coordinates, maxTiles) {
+  if (coordinates.length <= maxTiles) return coordinates;
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  for (const tile of coordinates) {
+    minX = Math.min(minX, tile.x); maxX = Math.max(maxX, tile.x);
+    minY = Math.min(minY, tile.y); maxY = Math.max(maxY, tile.y);
+  }
+  const x = (minX + maxX) * .5, y = (minY + maxY) * .5;
+  return coordinates.sort((a, b) =>
+    Math.hypot(a.x - x, a.y - y) - Math.hypot(b.x - x, b.y - y) || a.x - b.x || a.y - b.y
+  ).slice(0, maxTiles);
 }
 
 function roundRobinSelect(buckets, maxCount) {
@@ -413,14 +460,12 @@ async function loadFarMappedWaterContext(bounds, options = {}) {
 }
 
 async function loadFarMappedContext(bounds, excludedBounds = null, waterBounds = bounds, options = {}) {
-  const contextZoom = Number.isFinite(Number(options.contextZoom))
-    ? Number(options.contextZoom)
-    : selectContextZoomForTileBudget(
-        bounds,
-        FAR_CONTEXT_ZOOM,
-        FAR_CONTEXT_BUILDING_MAX_TILES
-      );
-  const coordinates = contextTileCoordinates(bounds, contextZoom);
+  // Building geometry exists only at z14. Never satisfy a request budget by
+  // switching to an empty building layer. Bound requests explicitly and report
+  // missing tile coverage (not 95% worldwide coverage) if the window is too big.
+  const contextZoom = FAR_CONTEXT_ZOOM;
+  const requestedCoordinates = contextTileCoordinates(bounds, contextZoom);
+  const coordinates = limitContextTiles(requestedCoordinates, FAR_CONTEXT_BUILDING_MAX_TILES);
   const fetchTile = typeof options.fetchTile === 'function' ? options.fetchTile : fetchShortbreadTile;
   const [contextBatch, waterContext] = await Promise.all([
     fetchWithConcurrency(
@@ -438,11 +483,10 @@ async function loadFarMappedContext(bounds, excludedBounds = null, waterBounds =
   const surfaceFallbackByTile = new Map();
   let landAreas = 0;
   let skippedNearBuildings = 0;
-  let availableBuildings = 0;
-  const perTileBuildingBudget = Math.max(
-    1,
-    Math.ceil(FAR_CONTEXT_MAX_BUILDING_INSTANCES / Math.max(1, tiles.length))
-  );
+  let sourceBuildings = 0;
+  let invalidBuildings = 0;
+  let outsideBuildings = 0;
+  let sliceStarted = performance.now();
 
   for (let tileIndex = 0; tileIndex < tiles.length; tileIndex += 1) {
     const tileRecord = tiles[tileIndex];
@@ -489,27 +533,21 @@ async function loadFarMappedContext(bounds, excludedBounds = null, waterBounds =
     }
     const tileBuildings = [];
     let tileAvailableBuildings = 0;
-    let remainingTileBudget = perTileBuildingBudget;
     for (let index = 0; index < buildingLayer.length; index += 1) {
       const feature = buildingLayer.feature(index);
       const geojson = feature?.toGeoJSON?.(tileRecord.x, tileRecord.y, tileRecord.z);
       const rings = polygonRings(geojson?.geometry);
-      availableBuildings += rings.length;
+      sourceBuildings += rings.length;
       tileAvailableBuildings += rings.length;
-      const selectedRingIndices = distributedFeatureIndices(
-        rings.length,
-        Math.min(
-          remainingTileBudget,
-          Math.ceil(rings.length * FAR_CONTEXT_BUILDING_COVERAGE_TARGET)
-        )
-      );
-      remainingTileBudget -= selectedRingIndices.length;
-      for (const ringIndex of selectedRingIndices) {
+      for (let ringIndex = 0; ringIndex < rings.length; ringIndex++) {
         const ring = rings[ringIndex];
-        if (ring.length < 4) continue;
-        const bounds = ringBounds(ring);
-        const centerLat = (bounds.minLat + bounds.maxLat) * 0.5;
-        const centerLon = (bounds.minLon + bounds.maxLon) * 0.5;
+        if (ring.length < 4) { invalidBuildings++; continue; }
+        const footprintBounds = ringBounds(ring);
+        const centerLat = (footprintBounds.minLat + footprintBounds.maxLat) * 0.5;
+        const centerLon = (footprintBounds.minLon + footprintBounds.maxLon) * 0.5;
+        if (centerLat < bounds.latS || centerLat > bounds.latN || centerLon < bounds.lonW || centerLon > bounds.lonE) {
+          outsideBuildings++; continue;
+        }
         if (excludedBounds &&
             centerLat >= excludedBounds.latS && centerLat <= excludedBounds.latN &&
             centerLon >= excludedBounds.lonW && centerLon <= excludedBounds.lonE) {
@@ -519,11 +557,16 @@ async function loadFarMappedContext(bounds, excludedBounds = null, waterBounds =
         const descriptor = farBuildingBoxDescriptor(
           ring,
           geojson.properties || {},
-          `${tileRecord.x}/${tileRecord.y}/${feature.id ?? index}/${tileBuildings.length}`
+          `${tileRecord.x}/${tileRecord.y}/${feature.id ?? index}/${ringIndex}`
         );
         if (descriptor) tileBuildings.push(descriptor);
+        else invalidBuildings++;
+        if (performance.now() - sliceStarted >= 8) {
+          options.signal?.throwIfAborted();
+          await yieldToMainThread();
+          sliceStarted = performance.now();
+        }
       }
-      if (remainingTileBudget <= 0) break;
     }
     if (regionalBuildingTileOwnsUrbanSurface(tileAvailableBuildings)) {
       surfaceFallbackByTile.set(
@@ -531,24 +574,27 @@ async function loadFarMappedContext(bounds, excludedBounds = null, waterBounds =
         FAR_LAND_SURFACE_PROFILES.urban
       );
     }
+    // Retain only a small exact-shape candidate set per source tile. Compact
+    // descriptors retain EVERY eligible building until the global selection;
+    // hundreds of thousands of source polygon arrays need not survive decoding.
+    const exactCandidates = Math.max(32, Math.ceil(FAR_CONTEXT_MAX_BUILDINGS / Math.max(1, tiles.length)) * 2);
+    tileBuildings.sort((a, b) => b.priority - a.priority || a.identity.localeCompare(b.identity));
+    for (let i = exactCandidates; i < tileBuildings.length; i++) tileBuildings[i].ring = null;
     buildingBuckets.push(tileBuildings);
     if ((tileIndex + 1) % 2 === 0) await yieldToMainThread();
   }
 
-  const selectedBuildingTarget = Math.min(
-    FAR_CONTEXT_MAX_BUILDING_INSTANCES,
-    buildingBuckets.reduce((total, bucket) => total + bucket.length, 0)
-  );
-  const selectedBuildings = roundRobinSelect(buildingBuckets, selectedBuildingTarget);
+  const selection = selectFarBuildingCoverage(buildingBuckets, options);
+  const { availableBuildings, selectedBuildingTarget, buildings } = selection;
   const exactBuildingIds = new Set(selectSpatiallyDistributedBuildings(
-    selectedBuildings.slice(),
-    Math.min(FAR_CONTEXT_MAX_BUILDINGS, selectedBuildings.length)
+    buildings.filter(building => building.ring),
+    FAR_CONTEXT_MAX_BUILDINGS
   ).map((building) => building.identity));
-  const buildings = selectedBuildings.map((building) => exactBuildingIds.has(building.identity)
-    ? building
-    : { ...building, ring: null });
+  for (const building of buildings) if (!exactBuildingIds.has(building.identity)) building.ring = null;
 
   return {
+    ...selection,
+    sourceBuildings, invalidBuildings, outsideBuildings,
     buildings,
     availableBuildings,
     selectedBuildingTarget,
@@ -557,7 +603,11 @@ async function loadFarMappedContext(bounds, excludedBounds = null, waterBounds =
     skippedNearBuildings,
     contextZoom,
     loadedTiles: tiles.length,
-    requestedTiles: coordinates.length,
+    requestedTiles: requestedCoordinates.length,
+    scheduledTiles: coordinates.length,
+    sourceCoverageComplete: tiles.length === requestedCoordinates.length,
+    coverageStatus: tiles.length !== requestedCoordinates.length ? 'incomplete-source'
+      : selection.buildingBudgetExceeded ? 'incomplete-budget' : 'complete',
     contextMaxInFlight: contextBatch.metrics.maxInFlight,
     contextBatchMetrics:contextBatch.metrics,
     landAreas,
@@ -576,6 +626,9 @@ export {
   FAR_WATER_CONTEXT_ZOOM,
   FAR_WATER_MIN_SPAN_METERS,
   distributedFeatureIndices,
+  limitContextTiles,
+  farBuildingPriority,
+  selectFarBuildingCoverage,
   loadFarMappedContext,
   loadFarMappedWaterContext,
   pointInLonLatRing,

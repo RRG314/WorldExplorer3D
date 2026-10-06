@@ -24,14 +24,16 @@ function resolveFarBuildingMassing(building, footprint, areaWorld, unitsPerMeter
   const tags = mappedBuildingTags(properties);
   const kind = String(tags.building || '').toLowerCase();
   let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
-  for (const point of footprint) {
+  for (const point of footprint || []) {
     minX = Math.min(minX, point.x);
     maxX = Math.max(maxX, point.x);
     minZ = Math.min(minZ, point.z);
     maxZ = Math.max(maxZ, point.z);
   }
-  const footprintWidth = (maxX - minX) / unitsPerMeter;
-  const footprintDepth = (maxZ - minZ) / unitsPerMeter;
+  // Instances already carry metre dimensions. Reconstructing four temporary
+  // footprint points per house creates millions of objects during a city load.
+  const footprintWidth = footprint ? (maxX - minX) / unitsPerMeter : Number(building?.widthMeters);
+  const footprintDepth = footprint ? (maxZ - minZ) / unitsPerMeter : Number(building?.depthMeters);
   const footprintArea = areaWorld / (unitsPerMeter * unitsPerMeter);
   const seed = buildingSeedFromIdentity(building?.identity);
   const random = (seed >>> 0) / 4294967295;

@@ -165,7 +165,7 @@ function parentTerrainTile(tile, levels = 1) {
 }
 
 function disposeFarFieldMesh(mesh) {
-  if (!mesh) return;
+  if (!mesh || mesh.userData?.farFieldDisposed) return;
   mesh.userData.farFieldDisposed = true;
   mesh.userData?.mappedWaterOwnershipMask?.dispose?.();
   for (const textures of Object.values(mesh.userData?.terrainTextureSetsByMode || {})) {
@@ -176,6 +176,9 @@ function disposeFarFieldMesh(mesh) {
   const geometries = new Set();
   const materials = new Set();
   const collect = (node) => {
+    // r128 owns instanceMatrix/instanceColor outside the geometry attribute
+    // table. Its InstancedMesh dispose event is the only buffer-release path.
+    if (node?.isInstancedMesh) node.dispose?.();
     if (node?.geometry) geometries.add(node.geometry);
     const nodeMaterials = Array.isArray(node?.material) ? node.material : [node?.material];
     nodeMaterials.filter(Boolean).forEach((material) => materials.add(material));

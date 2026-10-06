@@ -75,11 +75,11 @@ test('batch raycasts match the former single draw, preserve source IDs and resto
 });
 
 test('interrupted cooperative building assembly releases its geometry and retains caller-owned material',async()=>{
-  let created=0,disposed=0,materialDisposed=false;
+  let created=0,disposed=0,materialDisposed=false,tick=0;
   class CountedGeometry extends THREE.BoxGeometry{constructor(...args){super(...args);created++;this.addEventListener('dispose',()=>disposed++);}}
   const material=new THREE.MeshBasicMaterial();material.addEventListener('dispose',()=>materialDisposed=true);
   try{
-    await assert.rejects(buildFarBuildingInstanceBatches({...THREE,BoxGeometry:CountedGeometry},Array(12001).fill(buildings[0]),material,{yieldControl:async()=>{throw new Error('cancelled');}}),/cancelled/);
+    await assert.rejects(buildFarBuildingInstanceBatches({...THREE,BoxGeometry:CountedGeometry},Array(12001).fill(buildings[0]),material,{now:()=>tick+=9,yieldControl:async()=>{throw new Error('cancelled');}}),/cancelled/);
     assert.equal(disposed,created);assert.ok(created>0);assert.equal(materialDisposed,false);
   }finally{material.dispose();}
 });

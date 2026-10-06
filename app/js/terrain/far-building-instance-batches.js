@@ -37,7 +37,8 @@ function preserveInstanceRaycasting(mesh, localBox, localSphere, sourceIndices) 
 
 export async function buildFarBuildingInstanceBatches(THREE, buildings, material, {
   cellSize = 2048,
-  yieldControl = async () => {}
+  yieldControl = async () => {},
+  now = () => performance.now()
 } = {}) {
   const buckets = partitionFarBuildingInstances(buildings, cellSize);
   const batches = [];
@@ -49,6 +50,7 @@ export async function buildFarBuildingInstanceBatches(THREE, buildings, material
   const up = new THREE.Vector3(0, 1, 0);
   const transformedBox = new THREE.Box3();
   let completed = 0;
+  let sliceStarted = now();
   try {
     for (const [key, indices] of buckets) {
       const geometry = new THREE.BoxGeometry(1, 1, 1);
@@ -73,7 +75,10 @@ export async function buildFarBuildingInstanceBatches(THREE, buildings, material
         // Bound the Float32 transform actually uploaded, including rotation.
         mesh.getMatrixAt(index, matrix);
         bounds.union(transformedBox.copy(localBox).applyMatrix4(matrix));
-        if (++completed % 12000 === 0) await yieldControl();
+        if ((++completed & 63) === 0 && now() - sliceStarted >= 8) {
+          await yieldControl();
+          sliceStarted = now();
+        }
       }
       geometry.boundingBox = bounds;
       geometry.boundingSphere = bounds.getBoundingSphere(new THREE.Sphere());
@@ -92,7 +97,7 @@ export async function buildFarBuildingInstanceBatches(THREE, buildings, material
     }
     return batches;
   } catch (error) {
-    for (const mesh of batches) mesh.geometry.dispose();
+    for (const mesh of batches) { mesh.dispose(); mesh.geometry.dispose(); }
     throw error;
   }
 }

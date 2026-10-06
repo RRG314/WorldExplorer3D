@@ -324,8 +324,12 @@ function createFarFieldTerrainApi(deps = {}) {
     };
 
     const mappedBuildings = mappedContext?.buildings || [];
+    let buildingSliceStarted = performance.now();
     for (let buildingIndex = 0; buildingIndex < mappedBuildings.length; buildingIndex += 1) {
-      if (buildingIndex > 0 && buildingIndex % 8000 === 0) await yieldToMainThread();
+      if ((buildingIndex & 63) === 0 && performance.now() - buildingSliceStarted >= 8) {
+        await yieldToMainThread();
+        buildingSliceStarted = performance.now();
+      }
       const building = mappedBuildings[buildingIndex];
       if (!Array.isArray(building.ring)) {
         const center = appCtx.geoToWorld(building.centerLat, building.centerLon);
@@ -336,13 +340,7 @@ function createFarFieldTerrainApi(deps = {}) {
         const widthWorld = Number(building.widthMeters) * unitsPerMeter;
         const depthWorld = Number(building.depthMeters) * unitsPerMeter;
         const areaWorld = Number(building.areaMeters) * unitsPerMeter * unitsPerMeter;
-        const footprint = [
-          { x: center.x - widthWorld * 0.5, z: center.z - depthWorld * 0.5 },
-          { x: center.x + widthWorld * 0.5, z: center.z - depthWorld * 0.5 },
-          { x: center.x + widthWorld * 0.5, z: center.z + depthWorld * 0.5 },
-          { x: center.x - widthWorld * 0.5, z: center.z + depthWorld * 0.5 }
-        ];
-        const massing = resolveFarBuildingMassing(building, footprint, areaWorld, unitsPerMeter, {
+        const massing = resolveFarBuildingMassing(building, null, areaWorld, unitsPerMeter, {
           worldSeed: appCtx.worldSeed
         });
         if (!massing) continue;
@@ -495,12 +493,7 @@ function createFarFieldTerrainApi(deps = {}) {
         spec.detailExclusionGeographic,
         spec.geographic,
         {
-          signal,
-          // Mobile renders the exact playable district separately. The aerial
-          // ring only needs generalized land/water context; requesting hundreds
-          // of z14 building tiles before first play duplicates detail that is
-          // not resolvable on a phone screen.
-          contextZoom: appCtx.isLikelyMobileDevice?.() ? 13 : undefined
+          signal
         }
       )),
       measureDependency('worldCover', loadWorldCoverBaseline(spec.geographic, {
@@ -815,6 +808,14 @@ function createFarFieldTerrainApi(deps = {}) {
       waterTerrainMaskBuildMs,
       skippedDuplicateNearBuildings: mappedContext.skippedNearBuildings,
       farBuildingsAvailable: mappedContext.availableBuildings,
+      farBuildingsSource: mappedContext.sourceBuildings,
+      farBuildingsInvalid: mappedContext.invalidBuildings,
+      farBuildingsOutside: mappedContext.outsideBuildings,
+      farMajorBuildingsAvailable: mappedContext.majorBuildingsAvailable,
+      farMajorBuildingsSelected: mappedContext.majorBuildingsSelected,
+      farBuildingBudgetExceeded: mappedContext.buildingBudgetExceeded,
+      farBuildingSourceCoverageComplete: mappedContext.sourceCoverageComplete,
+      farBuildingCoverageStatus: mappedContext.coverageStatus,
       farBuildingSelectionTarget: mappedContext.selectedBuildingTarget,
       farBuildingSelectionCoverage: mappedContext.selectedBuildingCoverage,
       farBuildingPublishedCoverage: mappedContext.availableBuildings > 0
