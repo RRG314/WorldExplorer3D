@@ -189,9 +189,9 @@
     "app/js/terrain/rebuild.js": {
       "before": "18c3dcfa8980bf654481eb46e26b93f3b0db56de529782baac08402f51ca6276",
       "beforeMode": "100644",
-      "after": "298affd91dc1528baa423d7c1164a745345e547449346fd3df78fab39667bf4e",
+      "after": "16176cbfb54566de8c391b99db73369d8ae9f1afb561b7ac2ffa9fda170753a5",
       "afterMode": "100644",
-      "review": "Terrain source cache, sampled surface and land-cover lookup lifetime changes. No durable schema or provider credential changes; memory bounds and location replacement must be verified against the package."
+      "review": "Terrain source cache, sampled surface and land-cover lookup lifetime changes. No durable schema or provider credential changes; memory bounds and location replacement must be verified against the package. The October 6 repair passes an explicit recovery callback from the terrain builder to the existing Earth-session capture/reload exports. It replaces an unregistered context method; retry duplication and stale/disposed callbacks are guarded. No new persistence owner or schema."
     },
     "app/js/terrain/regional-building-compiler.js": {
       "before": null,
@@ -287,9 +287,9 @@
     "app/js/terrain/transport-detail-runtime.js": {
       "before": "9b839e6e6348061704fc89cb50592aab56d847f20966fe66461abe68c701a66c",
       "beforeMode": "100644",
-      "after": "a9e4ba9acc019ff1031f5c2264f47994c6f077f73822a04b29196d7c70f735f5",
+      "after": "a4a4df75ef81de5054bcd932c657c6e53bf0532efee2149e6cd4c98f56f090f1",
       "afterMode": "100644",
-      "review": "Bounded road render/contact residency within the existing fixed source catalog and shared road-mask ownership. Existing retry calls the existing session capture/reload authority. No new save schema, geographic migration, room authority or persistent write protocol."
+      "review": "Bounded road render/contact residency within the existing fixed source catalog and shared road-mask ownership. Existing retry calls the existing session capture/reload authority. No new save schema, geographic migration, room authority or persistent write protocol. The October 6 repair passes an explicit recovery callback from the terrain builder to the existing Earth-session capture/reload exports. It replaces an unregistered context method; retry duplication and stale/disposed callbacks are guarded. No new persistence owner or schema."
     },
     "app/js/terrain/transport-detail-worker.js": {
       "before": "9c25ef70e9cbd2a2d4190dc252c2c312f65acbfea1df903257299dc010854e6e",
