@@ -1,3 +1,4 @@
+import { leaseRoadOverview } from './road-overview-owner.js';
 import {captureTransportTerrain} from './transport-terrain-snapshot.js';
 import {createPavementTerrainMask} from '../world/pavement-terrain-mask.js';
 import {TRANSPORT_REGION_SIZE,actorNeedsRoadDetail} from './transport-detail-plan.js';
@@ -48,7 +49,9 @@ export async function prepareTransportDetail(appCtx,roads,{isCurrent,focus={x:0,
       pts:road.pts,width:road.width,metersPerWorldUnit:road.metersPerWorldUnit,resolvedCrossSection:road.resolvedCrossSection,
       structureSemantics:road.structureSemantics,transportRecord:{crossSection:road.transportRecord?.crossSection}
     }));
-    const planInput={roads:sourceRoads,focus,maxTextureSize:Math.min(4096,appCtx.renderer.capabilities.maxTextureSize)};
+    const includeOverview=appCtx.farTerrainClipmapState?.regionalRoadCoverage?.status!=='ready';
+    stats.overviewOwner=includeOverview?'selected-transport-fallback':'regional-source-coverage';
+    const planInput={roads:sourceRoads,focus,includeOverview,maxTextureSize:Math.min(4096,appCtx.renderer.capabilities.maxTextureSize)};
     if(terrainReady){
       await Promise.all([request({type:'plan',input:planInput}),terrainReady]);
       if(disposed||!isCurrent())throw new DOMException('Transport detail superseded','AbortError');
@@ -64,12 +67,15 @@ export async function prepareTransportDetail(appCtx,roads,{isCurrent,focus={x:0,
       terrain:captureTransportTerrain(appCtx),heightProbes}});
 
     if(!isCurrent())throw new DOMException('Transport detail superseded','AbortError');
-    mask=createPavementTerrainMask(appCtx,initial.keys,{kind:'road',cellSize:128,color:[.075,.078,.082],deferUpload:true});
-    const size=initial.layout.resolution**2;
-    initial.keys.forEach((key,i)=>mask.publish(key,initial.masks.subarray(i*size,(i+1)*size)));
-    for(const region of initial.regions)for(const key of region.keys)mask.retire(key);
+    if(includeOverview){
+      const fallback=createPavementTerrainMask(appCtx,initial.keys,{kind:'road',cellSize:128,color:[.075,.078,.082],deferUpload:true});
+      mask=leaseRoadOverview(appCtx,fallback,10);
+      const size=initial.layout.resolution**2;
+      initial.keys.forEach((key,i)=>mask.publish(key,initial.masks.subarray(i*size,(i+1)*size)));
+      for(const region of initial.regions)for(const key of region.keys)mask.retire(key);
+    }
     for(const region of initial.pending)remaining.set(region.key,region.bounds);
-    mask.syncMaterials();
+    mask?.syncMaterials();
     // Texture data are bulk-uploaded on the first render. Later regional
     // commits retire only four-byte lookup entries, not the whole atlas.
     stats.heightParity=initial.heightParity;stats.completedRegions=initial.regions.length;stats.pendingRegions=remaining.size;stats.status='near-ready';
@@ -99,11 +105,11 @@ export async function prepareTransportDetail(appCtx,roads,{isCurrent,focus={x:0,
           const packet=await request({type:'next',focus:{x:Number(point.x)||0,z:Number(point.z)||0}});
           if(disposed||!isCurrent())return;
           if(packet.type==='complete'){
-            stats.status='complete';stats.completedAt=performance.now();mask?.setEnabled(false);worker.terminate();updateNotice(false);complete?.();publish=null;complete=null;return;
+            stats.status='complete';stats.completedAt=performance.now();mask?.dispose();mask=null;worker.terminate();updateNotice(false);complete?.();publish=null;complete=null;return;
           }
           await publish(packet);
           if(disposed||!isCurrent())return;
-          for(const key of packet.keys)mask.retire(key);
+          for(const key of packet.keys)mask?.retire(key);
           remaining.delete(packet.key);stats.completedRegions++;stats.pendingRegions=remaining.size;
         })().catch(error=>{
           if(disposed)return;

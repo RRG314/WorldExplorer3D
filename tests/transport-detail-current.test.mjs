@@ -196,3 +196,12 @@ test('actual transport worker accepts an early planar plan and transfers final t
  const empty=await request({type:'prepare',input:{terrain:terrain()}});assert.equal(empty.totalCells,0);
  assert.equal((await request({type:'next',focus:{x:0,z:0}})).type,'complete');
 });
+
+test('an existing regional overview avoids duplicate mask allocation without changing physical road footprints',()=>{
+ const roads=[{pts:[{x:0,z:0},{x:600,z:0}],width:7,metersPerWorldUnit:1.11,structureSemantics:{terrainMode:'at_grade'}}];
+ const ordinary=prepareTransportDetailPlan({roads});
+ const regional=prepareTransportDetailPlan({roads,includeOverview:false});
+ assert.ok(ordinary.masks.length>0);assert.equal(regional.masks.length,0);
+ assert.deepEqual(regional.keys,ordinary.keys);
+ assert.deepEqual(regional.tiles.map(t=>t.polygons),ordinary.tiles.map(t=>t.polygons));
+});

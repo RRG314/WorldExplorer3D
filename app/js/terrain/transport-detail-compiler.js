@@ -8,19 +8,19 @@ import {createSpatialRoadBatches} from './spatial-road-batches.js';
 
 // The planar footprint is independent of terrain elevation. It can compile
 // while the main thread publishes the final cut/fill surface.
-export function prepareTransportDetailPlan({roads,focus={x:0,z:0},radius,maxTextureSize=4096}) {
+export function prepareTransportDetailPlan({roads,focus={x:0,z:0},radius,maxTextureSize=4096,includeOverview=true}) {
   const tiles=prepareCarriagewayTiles(roads);
   const keys=tiles.map(tile=>tile.key),layout=pavementMaskLayout(keys,maxTextureSize);
-  const masks=new Uint8Array(keys.length*layout.resolution**2);
+  const masks=new Uint8Array(includeOverview?keys.length*layout.resolution**2:0);
   for(let i=0;i<tiles.length;i++){
     const tile=tiles[i];tile.polygons=unionCarriageway(tile);
-    masks.set(rasterizePavementMask(tile.polygons,tile.bounds,layout.resolution),i*layout.resolution**2);
+    if(includeOverview)masks.set(rasterizePavementMask(tile.polygons,tile.bounds,layout.resolution),i*layout.resolution**2);
   }
   const plan=planTransportRegions(tiles,focus,radius);
   return {tiles,keys,layout,masks,plan};
 }
 
-export function createTransportDetailCompiler({roads,terrain,focus={x:0,z:0},radius,maxTextureSize=4096,heightProbes=[],preparedPlan=null}) {
+export function createTransportDetailCompiler({roads,terrain,focus={x:0,z:0},radius,maxTextureSize=4096,includeOverview=true,heightProbes=[],preparedPlan=null}) {
   const restored=restoreTransportTerrain(terrain);
   const heightParity={samples:heightProbes.length,maximumDifference:0};
   for(const point of heightProbes){
@@ -29,7 +29,7 @@ export function createTransportDetailCompiler({roads,terrain,focus={x:0,z:0},rad
     heightParity.maximumDifference=Math.max(heightParity.maximumDifference,difference);
   }
   const partition=createPavementTerrainPartition(restored.meshes,{includeFarTerrain:true});
-  const {tiles,keys,layout,masks,plan}=preparedPlan || prepareTransportDetailPlan({roads,focus,radius,maxTextureSize});
+  const {tiles,keys,layout,masks,plan}=preparedPlan || prepareTransportDetailPlan({roads,focus,radius,maxTextureSize,includeOverview});
   function compile(region){
     const builder=createSpatialRoadBatches();
     for(const tile of region.tiles){

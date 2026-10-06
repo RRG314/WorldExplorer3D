@@ -94,3 +94,22 @@ for (const order of ['road-first','pavement-first']) test(`coverage layer dispos
  assert.equal('pavementMaskAtlas' in shader.uniforms,order==='road-first');
  second.dispose();assert.equal(material.onBeforeCompile,originalCompile);assert.equal(material.customProgramCacheKey,originalKey);
 });
+
+test('regional and temporary road coverage share one shader owner through late arrival and eviction',async t=>{
+ const {leaseRoadOverview}=await import('../app/js/terrain/road-overview-owner.js');
+ const {material,ctx,compile}=fixture(t),original=material.onBeforeCompile;
+ const fallback=createPavementTerrainMask(ctx,['0:0'],{kind:'road',cellSize:128,deferUpload:true});
+ const fallbackLease=leaseRoadOverview(ctx,fallback,10);
+ const oldUniform=compile().uniforms.roadCoverageMaskAtlas;
+ const regional=createPavementTerrainMask(ctx,['0:0'],{kind:'road',cellSize:256,deferUpload:true});
+ const regionalLease=leaseRoadOverview(ctx,regional,20);
+ const shader=compile();
+ assert.equal(shader.vertexShader.match(/varying vec2 roadCoverageWorldXZ;/g).length,1);
+ assert.equal(shader.uniforms.roadCoverageCellSize.value,256);assert.equal(shader.uniforms.roadCoverageMaskAtlas,oldUniform);
+ assert.match(shader.fragmentShader,/uniform vec3 roadCoverageColor/);
+ fallbackLease.syncMaterials();fallbackLease.setEnabled(false);
+ assert.equal(compile().uniforms.roadCoverageMaskEnabled.value,1,'inactive fallback cannot disable regional coverage');
+ fallbackLease.setEnabled(true);regionalLease.dispose();
+ assert.equal(compile().uniforms.roadCoverageCellSize.value,128,'retiring regional coverage restores a still-live fallback');
+ fallbackLease.dispose();assert.equal(material.onBeforeCompile,original);
+});

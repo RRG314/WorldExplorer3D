@@ -1,3 +1,4 @@
+import { leaseRoadOverview } from './road-overview-owner.js';
 import { buildRegionalRoadCoverageMask } from './regional-road-coverage.js';
 import {
   FAR_CONTEXT_BUILDING_COVERAGE_TARGET,
@@ -659,7 +660,10 @@ function createFarFieldTerrainApi(deps = {}) {
 
     farFieldMesh = mesh;
     appCtx.terrainGroup.add(mesh);
-    regionalRoadCoverage = builtRoadCoverage;
+    regionalRoadCoverage = builtRoadCoverage ? {
+      stats:builtRoadCoverage.stats,
+      mask:leaseRoadOverview(appCtx,builtRoadCoverage.mask,20)
+    } : null;
     regionalRoadCoverage?.mask.syncMaterials();
     if (appCtx.structureTerrainPortalDescriptors?.length) {
       applyTerrainPortalMasksForContext(appCtx, appCtx.structureTerrainPortalDescriptors);

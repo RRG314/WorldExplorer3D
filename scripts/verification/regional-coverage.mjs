@@ -20,11 +20,12 @@ await fs.mkdir(out,{recursive:true});
 const flightSeconds=Math.max(0,Math.min(120,Number(process.env.WE3D_COVERAGE_FLIGHT_SECONDS)||0));
 const owned=await chromium.launchServer({headless:true,channel:'chrome',args:flightSeconds?[]:['--js-flags=--max-old-space-size=1536']});
 const browser=await chromium.connect(owned.wsEndpoint());
-const report={ok:false,scope:'Baltimore regional coverage and controlled day/night cameras; not worldwide streaming acceptance',pageErrors:[]};
+const report={ok:false,scope:'Baltimore regional coverage and controlled day/night cameras; not worldwide streaming acceptance',pageErrors:[],shaderErrors:[]};
 try{
  const page=await browser.newPage({viewport:{width:1440,height:900}});
  await configureStagingAppCheck(page,base);
  page.on('pageerror',e=>report.pageErrors.push(String(e)));
+ page.on('console',message=>{if(message.type()==='error'&&/WebGL|shader|GL_INVALID/i.test(message.text())&&report.shaderErrors.length<20)report.shaderErrors.push(message.text().slice(0,10000));});
  report.build=await fetch(base+'/build-manifest.json').then(r=>r.json()).then(m=>({buildId:m.buildId,commit:m.commit,sourceDirty:m.sourceDirty}));
  const start=Date.now();
  await page.goto(`${base}/app/?launch=earth&gm=free&loc=custom&lat=39.3098&lon=-76.6147&lname=Baltimore&mode=driving&diagnostics=1`,{waitUntil:'load',timeout:90000});
@@ -33,6 +34,8 @@ try{
  await page.getByRole('button',{name:'Explore',exact:true}).click();
  await page.waitForFunction(()=>{const s=globalThis.getWorldExplorerRuntimeDiagnostics?.();return s?.gameStarted&&!s.worldLoading&&s.farTerrainClipmap?.status==='ready'&&!document.getElementById('loading')?.classList.contains('show');},null,{timeout:360000,polling:500});
  report.loadMs=Date.now()-start;
+ report.programFailures=await page.evaluate(async()=>{const {ctx}=await import('/app/js/shared-context.js?v=55');return (ctx.renderer.info.programs||[]).filter(p=>p.diagnostics?.runnable===false).map(p=>({name:p.name,diagnostics:p.diagnostics}));});
+ if(report.shaderErrors.length||report.programFailures.length)throw new Error('Terrain/WebGL shader compilation failed; see shaderErrors/programFailures');
  report.before=await page.evaluate(()=>{const s=globalThis.getWorldExplorerRuntimeDiagnostics();return {counts:s.worldCounts,far:s.farTerrainClipmap,roads:s.worldLoad?.regionalTransportSelection,buildings:s.worldLoad?.buildingPublicationDomain,landmarks:s.mappedTallBuildingVisuals,resources:s.resources};});
  console.log(JSON.stringify({stage:'loaded',loadMs:report.loadMs,counts:report.before.counts,far:{available:report.before.far.farBuildingsAvailable,rendered:report.before.far.farBuildings,coverage:report.before.far.farBuildingPublishedCoverage},roads:report.before.roads}));
  for(const time of ['day','night']){
@@ -80,6 +83,7 @@ try{
   assert.equal(report.before.far.regionalRoadCoverage?.budgetExceeded,false,'Surface-road coverage is not truncated');
  }
  assert.equal(report.pageErrors.length,0);
+ assert.equal(report.shaderErrors.length,0);
  await page.evaluate(()=>{delete globalThis.__WE3D_TRAVEL_ACTOR__;});
  await page.locator('#mainMenuBtn').click();
  await page.waitForFunction(()=>{const s=globalThis.getWorldExplorerRuntimeDiagnostics?.();return s?.gameStarted===false&&s.lastEarthWorldRelease?.released===true;},null,{timeout:30000});

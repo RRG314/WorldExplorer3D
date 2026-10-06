@@ -3,6 +3,7 @@
 <script>window.addEventListener("error",event=>{window.fixtureError=event.message;});</script>
 <script type="module">
 import {createRegionalRoadCoveragePlan,buildRegionalRoadCoverageMask} from '/app/js/terrain/regional-road-coverage.js';
+import {leaseRoadOverview} from '/app/js/terrain/road-overview-owner.js';
 import {createPavementTerrainMask} from '/app/js/world/pavement-terrain-mask.js';
 const renderer=new THREE.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});renderer.setSize(1000,700);document.body.append(renderer.domElement);
 const scene=new THREE.Scene();scene.background=new THREE.Color(0x8eb9cf);scene.add(new THREE.HemisphereLight(0xffffff,0x777755,1));
@@ -16,9 +17,15 @@ function make(){const plan=createRegionalRoadCoveragePlan({bounds:{minX:0,minZ:0
  plan.addGeometry({type:'LineString',coordinates:[[0,0],[1024,1024]]},{kind:'primary',width:14});return plan;}
 renderer.render(scene,camera);const baseline=renderer.info.memory.textures;
 for(let cycle=0;cycle<12;cycle++){
- const road=await buildRegionalRoadCoverageMask(ctx,make());road.mask.syncMaterials();
+ const road=await buildRegionalRoadCoverageMask(ctx,make());
+ const fallbackMask=createPavementTerrainMask(ctx,['0:0'],{kind:'road',deferUpload:true});
+ let regionalLease,fallbackLease;
+ if(cycle%2){regionalLease=leaseRoadOverview(ctx,road.mask,20);fallbackLease=leaseRoadOverview(ctx,fallbackMask,10);}
+ else{fallbackLease=leaseRoadOverview(ctx,fallbackMask,10);regionalLease=leaseRoadOverview(ctx,road.mask,20);}
  const pavement=createPavementTerrainMask(ctx,['0:0'],{deferUpload:true});pavement.syncMaterials();renderer.render(scene,camera);
- if(cycle%2){pavement.dispose();road.mask.dispose();}else{road.mask.dispose();pavement.dispose();}
+ if(renderer.info.programs.some(p=>p.diagnostics?.runnable===false))throw new Error('Combined coverage shader failed');
+ if(cycle%2){pavement.dispose();regionalLease.dispose();renderer.render(scene,camera);fallbackLease.dispose();}
+ else{fallbackLease.dispose();regionalLease.dispose();pavement.dispose();}
  renderer.render(scene,camera);cycles.push({cycle,textures:renderer.info.memory.textures});
 }
 if(cycles.some(c=>c.textures!==baseline))throw new Error('Terrain coverage textures accumulated after retirement '+JSON.stringify({baseline,cycles}));
