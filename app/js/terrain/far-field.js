@@ -13,6 +13,7 @@ import {
   pointInMappedWaterArea
 } from './far-field-mapped-context.js?v=20';
 import { buildFarBuildingInstanceBatches } from './far-building-instance-batches.js?v=1';
+import { FarBuildingInstanceStorage } from './far-building-instance-storage.js';
 import { resolveFarBuildingMassing, farBuildingRenderFootprint } from './far-building-massing.js?v=2';
 import { applyFarBuildingFacadeDetail } from './far-building-facade-material.js?v=4';
 import { loadFarTerrainElevationWithParentFallback } from './far-field-elevation-loader.js?v=2';
@@ -300,11 +301,10 @@ function createFarFieldTerrainApi(deps = {}) {
     return true;
   }
 
-  async function buildFarBuildingGeometry(spec, loadedTiles, offsetMeters, mappedContext) {
+  async function buildFarBuildingGeometry(spec, loadedTiles, offsetMeters, mappedContext, isCurrent=()=>true) {
     const positions = [];
     const colors = [];
     const indices = [];
-    const instances = [];
     const unitsPerMeter = Number(appCtx.WORLD_UNITS_PER_METER || 1);
     const yExaggeration = Number(appCtx.TERRAIN_Y_EXAGGERATION || 1);
     let exactPublished = 0;
@@ -332,13 +332,20 @@ function createFarFieldTerrainApi(deps = {}) {
     };
 
     const mappedBuildings = mappedContext?.buildings || [];
+    const instances=new FarBuildingInstanceStorage(mappedBuildings.length);
     let buildingSliceStarted = performance.now();
+    try {
     for (let buildingIndex = 0; buildingIndex < mappedBuildings.length; buildingIndex += 1) {
+      if ((buildingIndex & 63) === 0 && !isCurrent())throw new DOMException('Regional buildings superseded','AbortError');
       if ((buildingIndex & 63) === 0 && performance.now() - buildingSliceStarted >= 8) {
         await yieldToMainThread();
         buildingSliceStarted = performance.now();
       }
       const building = mappedBuildings[buildingIndex];
+      // The loader hands this compiler exclusive descriptors. Retire each one
+      // as it is consumed instead of promoting an entire second city into the
+      // main-thread old generation while GPU construction is underway.
+      mappedBuildings[buildingIndex]=null;
       // Ground, height and eligibility are shared by both visual LODs. Losing
       // vertices while simplifying a polygon must not delete a valid building.
       const center = appCtx.geoToWorld(building.centerLat, building.centerLon);
@@ -363,11 +370,9 @@ function createFarFieldTerrainApi(deps = {}) {
       if (building.priority >= 1000000) majorBuildings++;
       if (!exact) {
         if (Array.isArray(building.ring)) simplifiedFootprintFallbacks++;
-        instances.push({ x: center.x, z: center.z, baseY,
-          width: Number(building.widthMeters) * unitsPerMeter,
-          depth: Number(building.depthMeters) * unitsPerMeter,
-          height: massing.heightMeters * unitsPerMeter,
-          rotationY: Number(building.rotationY) || 0, color: massing.color });
+        instances.append(center.x,center.z,baseY,
+          Number(building.widthMeters)*unitsPerMeter,Number(building.depthMeters)*unitsPerMeter,
+          massing.heightMeters*unitsPerMeter,Number(building.rotationY)||0,massing.color);
         continue;
       }
       const { heightMeters, color } = massing;
@@ -396,6 +401,7 @@ function createFarFieldTerrainApi(deps = {}) {
       exactPublished += 1;
     }
 
+    mappedBuildings.length=0;
     let geometry = null;
     if (exactPublished > 0) {
       geometry = new THREE.BufferGeometry();
@@ -405,7 +411,7 @@ function createFarFieldTerrainApi(deps = {}) {
       geometry.computeVertexNormals();
       geometry.computeBoundingSphere();
     }
-    if (!geometry && instances.length === 0) return null;
+    if (!geometry && instances.length === 0) {instances.dispose();return null;}
     return {
       geometry,
       instances,
@@ -419,6 +425,7 @@ function createFarFieldTerrainApi(deps = {}) {
       heightAuthority: 'shared-building-semantics',
       buildings: exactPublished + instances.length
     };
+    } catch(error) {mappedBuildings.length=0;instances.dispose();throw error;}
   }
 
   async function buildAndPublish(spec, requestGeneration, signal) {
@@ -532,7 +539,11 @@ function createFarFieldTerrainApi(deps = {}) {
     const built = await buildFarFieldGeometry(spec, loadedTiles, offsetMeters, mappedContext);
     const terrainGeometryBuildMs = performance.now() - geometryBuildStartedAt;
     const buildingBuildStartedAt = performance.now();
-    const builtBuildings = await buildFarBuildingGeometry(spec, loadedTiles, offsetMeters, mappedContext);
+    let builtBuildings;
+    try {
+      builtBuildings = await buildFarBuildingGeometry(spec, loadedTiles, offsetMeters, mappedContext,
+        ()=>requestGeneration===generation&&!signal.aborted);
+    } catch(error) { built?.geometry?.dispose?.();throw error; }
     const buildingGeometryBuildMs = performance.now() - buildingBuildStartedAt;
     const waterBuildStartedAt = performance.now();
     const waterDetailReady=appCtx.detailedWaterPublicationSequence===appCtx._worldLoadSequence;
@@ -576,6 +587,7 @@ function createFarFieldTerrainApi(deps = {}) {
       builtRoadCoverage?.mask.dispose();
       built?.geometry?.dispose?.();
       builtBuildings?.geometry?.dispose?.();
+      builtBuildings?.instances.dispose();
       builtWater?.geometry?.dispose?.();
       waterTerrainMask?.texture?.dispose?.();
       return;
@@ -583,6 +595,7 @@ function createFarFieldTerrainApi(deps = {}) {
     if (!built) {
       builtRoadCoverage?.mask.dispose();
       builtBuildings?.geometry?.dispose?.();
+      builtBuildings?.instances.dispose();
       builtWater?.geometry?.dispose?.();
       waterTerrainMask?.texture?.dispose?.();
       setState({ status: 'unavailable', reason: 'far-field-elevation-sampling-failed' });
@@ -706,15 +719,25 @@ function createFarFieldTerrainApi(deps = {}) {
         }));
         try {
           const batches = await buildFarBuildingInstanceBatches(
-            THREE, builtBuildings.instances, instanceMaterial, { yieldControl: yieldToMainThread }
+            THREE, builtBuildings.instances, instanceMaterial, { yieldControl: async()=>{
+              await yieldToMainThread();
+              if(requestGeneration!==generation||signal.aborted)throw new DOMException('Regional buildings superseded','AbortError');
+            } }
           );
           for (const batch of batches) buildingContext.add(batch);
         } catch (error) {
           disposeFarFieldMesh(buildingContext);
           instanceMaterial.dispose();
+          builtWater?.geometry?.dispose?.();
+          // This generation may already have published terrain while yielding.
+          // Never remove a replacement owned by a subsequent generation.
+          if(requestGeneration===generation)removeCurrentMesh();
           throw error;
+        } finally {
+          builtBuildings.instances.dispose();
         }
       }
+      builtBuildings.instances.dispose();
       if (requestGeneration !== generation) {
         disposeFarFieldMesh(buildingContext);
         builtWater?.geometry?.dispose?.();

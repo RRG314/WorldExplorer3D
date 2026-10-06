@@ -3,6 +3,7 @@
 <script src="/node_modules/three/build/three.min.js"></script>
 <script type="module">
 import {buildFarBuildingInstanceBatches} from '/app/js/terrain/far-building-instance-batches.js';
+import {FarBuildingInstanceStorage} from '/app/js/terrain/far-building-instance-storage.js';
 import {disposeFarFieldMesh} from '/app/js/terrain/far-field-geometry.js';
 const renderer=new THREE.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});renderer.setSize(1000,700);document.body.append(renderer.domElement);
 const gl=renderer.getContext(),live=new Set(),create=gl.createBuffer.bind(gl),remove=gl.deleteBuffer.bind(gl);
@@ -10,18 +11,24 @@ gl.createBuffer=()=>{const b=create();live.add(b);return b;};gl.deleteBuffer=b=>
 const scene=new THREE.Scene();scene.background=new THREE.Color(0x8eb9cf);scene.add(new THREE.HemisphereLight(0xffffff,0x666644,1));
 const camera=new THREE.PerspectiveCamera(50,1000/700,.1,10000);camera.position.set(1400,1400,1900);camera.lookAt(0,0,0);
 const buildings=Array.from({length:1200},(_,i)=>({x:(i%40-20)*45,z:(Math.floor(i/40)-15)*45,baseY:0,width:18,depth:25,height:15+(i%9)*8,rotationY:(i%3)*.15,color:[.42+(i%4)*.1,.35,.26]}));
+const packedBatches=async material=>{
+ const packed=new FarBuildingInstanceStorage(buildings.length);
+ for(const b of buildings)packed.append(b.x,b.z,b.baseY,b.width,b.depth,b.height,b.rotationY,b.color);
+ try{return await buildFarBuildingInstanceBatches(THREE,packed,material,{cellSize:256});}
+ finally{packed.dispose();if(packed.data.byteLength!==0)throw Error('Scratch storage retained');}
+};
 const cycles=[];let peak=0;
 for(let cycle=0;cycle<12;cycle++){
  const group=new THREE.Group(),material=new THREE.MeshStandardMaterial();
- const batches=await buildFarBuildingInstanceBatches(THREE,buildings,material,{cellSize:256});for(const mesh of batches)group.add(mesh);scene.add(group);renderer.render(scene,camera);peak=Math.max(peak,live.size);
+ const batches=await packedBatches(material);for(const mesh of batches)group.add(mesh);scene.add(group);renderer.render(scene,camera);peak=Math.max(peak,live.size);
  scene.remove(group);disposeFarFieldMesh(group);renderer.render(scene,camera);cycles.push({cycle,buffers:live.size,geometries:renderer.info.memory.geometries});
  await new Promise(requestAnimationFrame);
 }
 const ok=cycles.every(c=>c.buffers===0&&c.geometries===0);
 if(!ok)throw Error('Regional GPU buffers accumulated after eviction');
-const demo=new THREE.Group(),material=new THREE.MeshStandardMaterial();for(const m of await buildFarBuildingInstanceBatches(THREE,buildings,material,{cellSize:256}))demo.add(m);scene.add(demo);
+const demo=new THREE.Group(),material=new THREE.MeshStandardMaterial();for(const m of await packedBatches(material))demo.add(m);scene.add(demo);
 const draw=()=>renderer.render(scene,camera);window.advanceTime=draw;
-window.render_game_to_text=()=>JSON.stringify({ok,cycles,peakBuffers:peak,scope:'Real WebGL regional instance allocation/disposal, 12 cycles; not whole-world streaming'});
+window.render_game_to_text=()=>JSON.stringify({ok,cycles,peakBuffers:peak,scratchRetiredBeforeRender:true,scope:'Real WebGL regional instance allocation/disposal, 12 cycles; not whole-world streaming'});
 document.querySelector('#status').textContent=`12 allocation → render → eviction cycles passed\n0 instance/geometry buffers retained after each eviction\n1,200 buildings below are a separate live demonstration`;
 window.fixtureReady=true;draw();
 </script>

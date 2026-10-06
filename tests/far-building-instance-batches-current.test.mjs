@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { buildFarBuildingInstanceBatches, partitionFarBuildingInstances } from '../app/js/terrain/far-building-instance-batches.js';
+import {FarBuildingInstanceStorage} from '../app/js/terrain/far-building-instance-storage.js';
 
 const buildings = [
   {x:-5000.123,z:-4096.75,baseY:-28.2,width:37,height:95,depth:12,rotationY:.83,color:[.2,.4,.6]},
@@ -82,4 +83,37 @@ test('interrupted cooperative building assembly releases its geometry and retain
     await assert.rejects(buildFarBuildingInstanceBatches({...THREE,BoxGeometry:CountedGeometry},Array(12001).fill(buildings[0]),material,{now:()=>tick+=9,yieldControl:async()=>{throw new Error('cancelled');}}),/cancelled/);
     assert.equal(disposed,created);assert.ok(created>0);assert.equal(materialDisposed,false);
   }finally{material.dispose();}
+});
+
+test('packed city construction preserves every uploaded byte, bounds and raycast after its scratch buffer retires',async()=>{
+  const material=new THREE.MeshBasicMaterial(),packed=new FarBuildingInstanceStorage(buildings.length);
+  for(const b of buildings)packed.append(b.x,b.z,b.baseY,b.width,b.depth,b.height,b.rotationY,b.color);
+  assert.equal(packed.data.byteLength,80*buildings.length);
+  const ordinary=await buildFarBuildingInstanceBatches(THREE,buildings,material);
+  const compact=await buildFarBuildingInstanceBatches(THREE,packed,material);
+  try{
+    assert.deepEqual(partitionFarBuildingInstances(packed),partitionFarBuildingInstances(buildings));
+    packed.dispose();assert.equal(packed.data.byteLength,0);assert.equal(packed.length,0);
+    for(let i=0;i<ordinary.length;i++){
+      assert.deepEqual(compact[i].instanceMatrix.array,ordinary[i].instanceMatrix.array);
+      assert.deepEqual(compact[i].instanceColor.array,ordinary[i].instanceColor.array);
+      assert.deepEqual(compact[i].geometry.boundingBox,ordinary[i].geometry.boundingBox);
+      assert.deepEqual(compact[i].geometry.boundingSphere,ordinary[i].geometry.boundingSphere);
+    }
+    const ray=new THREE.Raycaster(new THREE.Vector3(0,2000,0),new THREE.Vector3(0,-1,0));
+    const normalized=meshes=>ray.intersectObjects(meshes).map(hit=>({id:hit.sourceInstanceId,point:hit.point.toArray(),distance:hit.distance}));
+    assert.ok(normalized(compact).length>0);assert.deepEqual(normalized(compact),normalized(ordinary));
+  }finally{for(const m of [...ordinary,...compact])m.dispose();cleanup([...ordinary,...compact],material);packed.dispose();}
+});
+
+test('packed scratch capacity is finite and retired storage cannot be reused',()=>{
+  assert.throws(()=>new FarBuildingInstanceStorage(1200001),RangeError);
+  const packed=new FarBuildingInstanceStorage(1),color=[.1,.2,.3];
+  packed.append(1,2,3,4,5,6,.7,color);color[0]=1;
+  const scratch={color:[0,0,0]};assert.equal(packed.read(0,scratch),scratch);assert.deepEqual(scratch.color,[.1,.2,.3]);
+  assert.throws(()=>packed.append(1,2,3,4,5,6,.7,color),RangeError);
+  assert.throws(()=>packed.read(1,scratch),RangeError);
+  const allocation=packed.data.buffer;packed.dispose();packed.dispose();
+  if(typeof allocation.transfer==='function')assert.equal(allocation.byteLength,0);
+  assert.throws(()=>packed.read(0,scratch),RangeError);assert.throws(()=>packed.append(1,2,3,4,5,6,.7,color),RangeError);
 });

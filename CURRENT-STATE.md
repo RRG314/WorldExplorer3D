@@ -1,6 +1,6 @@
 # Current development and release state
 
-Updated October 6, 2026. Current request: restore at least 90% building coverage and all identified major buildings, roads, recognizable land uses, public GIS and a bounded continuous Earth. Free data only; local implementation. **Both nearby and regional building coverage are restored in the latest assembled Baltimore check (98.9% / 95%). Flight stalls still fail. Bounded moving road detail is now implemented and component/WebGL tested, pending assembled verification. Continuous geographic streaming and expanded GIS/ecology are not complete. Production is not cleared.**
+Updated October 6, 2026. Current request: restore at least 90% building coverage and all identified major buildings, roads, recognizable land uses, public GIS and a bounded continuous Earth. Free data only; local implementation. **Nearby/regional building coverage passes in Baltimore (98.9% / 95%) and London (91.5% / 95%). Bounded moving road detail passes component, WebGL and actual-city eviction/return checks. Baltimore’s 90-second flight passes; London still has roughly one-second stalls. A subsequent packed building-construction memory repair is under verification. Continuous geographic streaming and expanded GIS/ecology are not complete. Production is not cleared.**
 
 Details: [FREE-ENVIRONMENT-DATA.md](docs/release-review/2026-10-05/FREE-ENVIRONMENT-DATA.md). Visual work: [REFERENCE-BLOCK.md](docs/visual-quality/REFERENCE-BLOCK.md). Earlier architecture acceptance: [LOCAL-RESULT.md](docs/system-review/2026-10-04/LOCAL-RESULT.md).
 

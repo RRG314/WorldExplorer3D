@@ -3,8 +3,9 @@
 export function partitionFarBuildingInstances(buildings, cellSize = 2048) {
   if (!(cellSize > 0) || !Number.isFinite(cellSize)) throw new TypeError('Invalid building batch size');
   const buckets = new Map();
+  const scratch={color:[0,0,0]};
   for (let index = 0; index < buildings.length; index++) {
-    const { x, z } = buildings[index];
+    const { x, z } = buildings.read ? buildings.read(index,scratch) : buildings[index];
     if (!Number.isFinite(x) || !Number.isFinite(z)) throw new TypeError('Invalid building position');
     const key = `${Math.floor(x / cellSize)}:${Math.floor(z / cellSize)}`;
     if (!buckets.has(key)) buckets.set(key, []);
@@ -49,6 +50,7 @@ export async function buildFarBuildingInstanceBatches(THREE, buildings, material
   const color = new THREE.Color();
   const up = new THREE.Vector3(0, 1, 0);
   const transformedBox = new THREE.Box3();
+  const scratch={color:[0,0,0]};
   let completed = 0;
   let sliceStarted = now();
   try {
@@ -64,7 +66,7 @@ export async function buildFarBuildingInstanceBatches(THREE, buildings, material
       batches.push(mesh);
       mesh.instanceMatrix.setUsage(THREE.StaticDrawUsage);
       for (let index = 0; index < indices.length; index++) {
-        const building = buildings[indices[index]];
+        const building = buildings.read ? buildings.read(indices[index],scratch) : buildings[indices[index]];
         position.set(building.x, building.baseY, building.z);
         rotation.setFromAxisAngle(up, building.rotationY);
         scale.set(building.width, building.height, building.depth);
