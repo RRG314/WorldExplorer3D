@@ -159,6 +159,7 @@ export const currentContractTests = [
   'tests/economy-authority-current.test.cjs',
   'tests/expedition-pod-journey-current.test.mjs',
   'tests/far-terrain-buffer-lifetime-current.test.mjs',
+  'tests/region-build-current.test.mjs',
   'tests/functional-poi-semantics-current.test.mjs',
   'tests/graphics-call-evidence-current.test.mjs',
   'tests/ground-reconstruction-current.test.mjs',

@@ -251,7 +251,7 @@ function applyMappedWaterTerrainOwnership(mesh, material, ownership) {
   return true;
 }
 
-function createFarWaterMesh(builtWater, contextHalfExtentMeters) {
+function createFarWaterMesh(builtWater, contextHalfExtentMeters, options = {}) {
   if (!builtWater?.geometry) return null;
   const waterStyle = resolveWaterSurfaceVisualProfile();
   const material = new THREE.MeshStandardMaterial({
@@ -271,7 +271,8 @@ function createFarWaterMesh(builtWater, contextHalfExtentMeters) {
     waveBase: 1,
     area: Math.pow(contextHalfExtentMeters * 2, 2),
     span: contextHalfExtentMeters * 2,
-    waterKind: 'open_ocean'
+    waterKind: 'open_ocean',
+    track: options.track !== false
   });
   const mesh = new THREE.Mesh(builtWater.geometry, material);
   mesh.name = 'FarMappedWaterContext';

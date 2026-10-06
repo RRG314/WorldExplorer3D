@@ -33,7 +33,13 @@ function applyFarBuildingFacadeDetail(material) {
       '#include <worldpos_vertex>',
       [
         '#include <worldpos_vertex>',
-        'vFarBuildingWorldPosition = worldPosition.xyz;'
+        // r128 declares worldPosition only for certain lighting/shadow flags.
+        // Regional scenery must also render in an unshadowed scene.
+        'vec4 farFacadeWorldPosition = vec4(transformed, 1.0);',
+        '#ifdef USE_INSTANCING',
+        '  farFacadeWorldPosition = instanceMatrix * farFacadeWorldPosition;',
+        '#endif',
+        'vFarBuildingWorldPosition = (modelMatrix * farFacadeWorldPosition).xyz;'
       ].join('\n')
     );
     shader.fragmentShader = [
@@ -90,7 +96,7 @@ function applyFarBuildingFacadeDetail(material) {
       ].join('\n')
     );
   };
-  material.customProgramCacheKey = () => 'far-building-facade-detail-v4-shared-atlas';
+  material.customProgramCacheKey = () => 'far-building-facade-detail-v5-cell-transform';
   material.userData = {
     ...(material.userData || {}),
     farBuildingFacadeDetail: 'world-space-distance-adaptive-window-grid',

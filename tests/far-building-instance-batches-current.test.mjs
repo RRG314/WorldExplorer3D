@@ -22,7 +22,7 @@ function reference(material) {
 }
 function cleanup(meshes,material){meshes.forEach(m=>m.geometry.dispose());material.dispose();}
 
-test('spatial building batches preserve all uploaded transforms/colors and bound every rotated vertex',async()=>{
+test('spatial building cells preserve coverage/colors and bound every rotated vertex in local coordinates',async()=>{
   assert.equal(THREE.REVISION,'128','Use the same Three revision as the shipped runtime');
   const material=new THREE.MeshBasicMaterial(),baseline=reference(material);
   const batches=await buildFarBuildingInstanceBatches(THREE,buildings,material);
@@ -35,7 +35,10 @@ test('spatial building batches preserve all uploaded transforms/colors and bound
       const ids=byKey.get(batch.userData.spatialBatchKey);
       for(let i=0;i<batch.count;i++){
         batch.getMatrixAt(i,matrix);baseline.getMatrixAt(ids[i],expected);
-        assert.deepEqual(matrix.elements,expected.elements);
+        const source=buildings[ids[i]];
+        assert.ok(Math.abs(matrix.elements[12]+batch.position.x-source.x)<.00013);
+        assert.ok(Math.abs(matrix.elements[14]+batch.position.z-source.z)<.00013);
+        for(let n=0;n<16;n++)if(n!==12&&n!==14)assert.equal(matrix.elements[n],expected.elements[n]);
         assert.deepEqual([...batch.instanceColor.array.slice(i*3,i*3+3)],[...baseline.instanceColor.array.slice(ids[i]*3,ids[i]*3+3)]);
         const positions=batch.geometry.attributes.position;
         for(let j=0;j<positions.count;j++){
@@ -45,6 +48,7 @@ test('spatial building batches preserve all uploaded transforms/colors and bound
         }
       }
     }
+    for(const batch of batches)batch.updateMatrixWorld(true);
     const camera=new THREE.PerspectiveCamera(60,1,.1,1000);camera.position.set(0,100,100);camera.lookAt(0,10,0);camera.updateMatrixWorld(true);
     const frustum=new THREE.Frustum().setFromProjectionMatrix(new THREE.Matrix4().multiplyMatrices(camera.projectionMatrix,camera.matrixWorldInverse));
     assert.equal(frustum.intersectsObject(batches.find(m=>m.userData.spatialBatchKey==='0:0')),true);
@@ -56,7 +60,8 @@ test('batch raycasts match the former single draw, preserve source IDs and resto
   const material=new THREE.MeshBasicMaterial(),baseline=reference(material),batches=await buildFarBuildingInstanceBatches(THREE,buildings,material);
   try{
     for(const translated of [false,true]){
-      for(const mesh of [baseline,...batches]){mesh.position.set(translated?31:0,translated?17:0,translated?-27:0);mesh.updateMatrixWorld(true);}
+      baseline.position.set(translated?31:0,translated?17:0,translated?-27:0);baseline.updateMatrixWorld(true);
+      for(const mesh of batches){const [cx,cz]=mesh.userData.spatialBatchKey.split(':').map(Number);mesh.position.set(cx*2048+(translated?31:0),translated?17:0,cz*2048+(translated?-27:0));mesh.updateMatrixWorld(true);}
       for(const building of buildings){
         const ray=new THREE.Raycaster(new THREE.Vector3(building.x+(translated?31:0),2000,building.z+(translated?-27:0)),new THREE.Vector3(0,-1,0));
         const bounds=batches.map(m=>[m.geometry.boundingBox,m.geometry.boundingSphere]);
@@ -67,7 +72,9 @@ test('batch raycasts match the former single draw, preserve source IDs and resto
         for(const hit of actual){
           const local=new THREE.Matrix4(),source=new THREE.Matrix4();
           hit.object.getMatrixAt(hit.instanceId,local);baseline.getMatrixAt(hit.sourceInstanceId,source);
-          assert.deepEqual(local.elements,source.elements);
+          const world=new THREE.Matrix4().multiplyMatrices(hit.object.matrixWorld,local);
+          const expectedWorld=new THREE.Matrix4().multiplyMatrices(baseline.matrixWorld,source);
+          for(let n=0;n<16;n++)assert.ok(Math.abs(world.elements[n]-expectedWorld.elements[n])<.0003);
         }
         batches.forEach((m,i)=>{assert.equal(m.geometry.boundingBox,bounds[i][0]);assert.equal(m.geometry.boundingSphere,bounds[i][1]);});
       }
@@ -116,4 +123,28 @@ test('packed scratch capacity is finite and retired storage cannot be reused',()
   const allocation=packed.data.buffer;packed.dispose();packed.dispose();
   if(typeof allocation.transfer==='function')assert.equal(allocation.byteLength,0);
   assert.throws(()=>packed.read(0,scratch),RangeError);assert.throws(()=>packed.append(1,2,3,4,5,6,.7,color),RangeError);
+});
+
+
+test('cell transforms retain sub-millimetre placement at worldwide-scale positive and negative offsets',async()=>{
+ const material=new THREE.MeshBasicMaterial();
+ const source=[...buildings.map(b=>({...b,x:b.x+40000000.125,z:b.z-30000000.375})),
+  ...buildings.map(b=>({...b,x:b.x-40000000.125,z:b.z+30000000.375}))];
+ const batches=await buildFarBuildingInstanceBatches(THREE,source,material);
+ try{
+  const ids=partitionFarBuildingInstances(source),matrix=new THREE.Matrix4();
+  for(const batch of batches){
+   batch.updateMatrixWorld(true);
+   const indices=ids.get(batch.userData.spatialBatchKey);
+   for(let i=0;i<batch.count;i++){
+    batch.getMatrixAt(i,matrix);const b=source[indices[i]];
+    assert.ok(matrix.elements[12]>=0&&matrix.elements[12]<=2048);
+    assert.ok(matrix.elements[14]>=0&&matrix.elements[14]<=2048);
+    assert.ok(Math.abs(matrix.elements[12]+batch.position.x-b.x)<.00013);
+    assert.ok(Math.abs(matrix.elements[14]+batch.position.z-b.z)<.00013);
+   }
+  }
+  const ray=new THREE.Raycaster(new THREE.Vector3(source[3].x,2000,source[3].z),new THREE.Vector3(0,-1,0));
+  assert.ok(ray.intersectObjects(batches).some(hit=>hit.sourceInstanceId===3));
+ }finally{for(const batch of batches)batch.dispose();cleanup(batches,material);}
 });

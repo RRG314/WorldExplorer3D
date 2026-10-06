@@ -1,5 +1,6 @@
 // Preserve every regional building while allowing the renderer to reject
-// off-screen groups. Instance transforms remain in the original world frame.
+// off-screen groups. Each cell keeps small GPU transforms; its double-precision
+// Object3D position carries the world offset into the camera-relative matrix.
 export function partitionFarBuildingInstances(buildings, cellSize = 2048) {
   if (!(cellSize > 0) || !Number.isFinite(cellSize)) throw new TypeError('Invalid building batch size');
   const buckets = new Map();
@@ -55,6 +56,8 @@ export async function buildFarBuildingInstanceBatches(THREE, buildings, material
   let sliceStarted = now();
   try {
     for (const [key, indices] of buckets) {
+      const [cellX, cellZ] = key.split(':').map(Number);
+      const originX = cellX * cellSize, originZ = cellZ * cellSize;
       const geometry = new THREE.BoxGeometry(1, 1, 1);
       geometry.translate(0, .5, 0);
       geometry.computeBoundingBox();
@@ -64,10 +67,11 @@ export async function buildFarBuildingInstanceBatches(THREE, buildings, material
       const bounds = new THREE.Box3().makeEmpty();
       const mesh = new THREE.InstancedMesh(geometry, material, indices.length);
       batches.push(mesh);
+      mesh.position.set(originX, 0, originZ);
       mesh.instanceMatrix.setUsage(THREE.StaticDrawUsage);
       for (let index = 0; index < indices.length; index++) {
         const building = buildings.read ? buildings.read(indices[index],scratch) : buildings[indices[index]];
-        position.set(building.x, building.baseY, building.z);
+        position.set(building.x - originX, building.baseY, building.z - originZ);
         rotation.setFromAxisAngle(up, building.rotationY);
         scale.set(building.width, building.height, building.depth);
         matrix.compose(position, rotation, scale);

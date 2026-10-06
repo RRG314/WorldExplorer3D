@@ -1,3 +1,4 @@
+import { createRegionBuild } from '../earth-core/region-build.js';
 import { leaseRoadOverview } from './road-overview-owner.js';
 import { buildRegionalRoadCoverageMask } from './regional-road-coverage.js';
 import {
@@ -85,7 +86,9 @@ function createFarFieldTerrainApi(deps = {}) {
     terrainTileDeps,
     tileXYToLatLonBounds,
     waitForTerrainTileReadyAtZoom,
-    worldToLatLon
+    worldToLatLon,
+    loadMappedContext = loadFarMappedContext,
+    loadWorldCover = loadWorldCoverBaseline
   } = deps;
 
   let generation = 0;
@@ -130,6 +133,11 @@ function createFarFieldTerrainApi(deps = {}) {
     appCtx.farTerrainClipmapState = Object.freeze({ generation, key: activeKey, ...(next || {}) });
   }
 
+  function untrackWaterMesh(mesh) {
+    if (!mesh?.material || !appCtx.waterWaveVisuals?.includes(mesh.material)) return;
+    appCtx.replaceWorldCollection('waterWaveVisuals', appCtx.waterWaveVisuals.filter(material => material !== mesh.material));
+  }
+
   function removeCurrentMesh() {
     regionalRoadCoverage?.mask.dispose();regionalRoadCoverage=null;
     appCtx.fixedRegionalStructureWaterAreas = [];
@@ -144,6 +152,7 @@ function createFarFieldTerrainApi(deps = {}) {
       farContextMesh = null;
     }
     if (farWaterMesh) {
+      untrackWaterMesh(farWaterMesh);
       farWaterMesh.parent?.remove?.(farWaterMesh);
       disposeFarFieldMesh(farWaterMesh);
       farWaterMesh = null;
@@ -163,7 +172,9 @@ function createFarFieldTerrainApi(deps = {}) {
     surfaceRefreshTimer = null;
     activeKey = '';
     removeCurrentMesh();
-    pendingBuildPromise = null;
+    const drain = waitForGenerationDrain(retiringBuildPromise);
+    pendingBuildPromise = drain;
+    void drain.finally(() => { if (pendingBuildPromise === drain) pendingBuildPromise = null; });
     appCtx.fixedLocationMappedSurfaceContext = null;
     pendingFarWaterContext = null;
     appCtx.farTerrainClipmapState = null;
@@ -296,8 +307,8 @@ function createFarFieldTerrainApi(deps = {}) {
       mode: 'semantic-pbr',
       hardscapeOwner: 'exact-mapped-surface-geometry'
     };
-    lastAppliedDetailMode = 'semantic-pbr';
-    lastAppliedFallbackMode = detailMode;
+    mesh.userData.farSurfaceDetailMode = 'semantic-pbr';
+    mesh.userData.farSurfaceFallbackMode = detailMode;
     return true;
   }
 
@@ -433,7 +444,11 @@ function createFarFieldTerrainApi(deps = {}) {
     } catch(error) {retireDescriptors();instances.dispose();throw error;}
   }
 
-  async function buildAndPublish(spec, requestGeneration, signal) {
+  async function buildAndPublish(spec, requestGeneration, parentSignal) {
+    const build = createRegionBuild(parentSignal);
+    const signal = build.signal;
+    const isCurrent = () => requestGeneration === generation && !signal.aborted;
+    try {
     const dependencyStartedAt=performance.now();
     const dependencyDurationsMs={};
     const measureDependency=(name,promise)=>Promise.resolve(promise).finally(()=>{
@@ -445,8 +460,8 @@ function createFarFieldTerrainApi(deps = {}) {
       ? []
       : sourceTileRange(spec.geographic, spec.sourceZoom);
     setState({ status: 'loading-elevation-and-context', sourceZoom: spec.sourceZoom, sourceTiles: sourceTiles.length });
-    const [elevation, mappedContext, worldCoverContext] = await Promise.all([
-      measureDependency('elevation', acceptedRegionalGround
+    const [elevation, mappedContext, worldCoverContext] = await build.loadAll([
+      { load: () => measureDependency('elevation', acceptedRegionalGround
         ? Promise.resolve({
             ready: true,
             missingSourceTiles: [],
@@ -456,13 +471,13 @@ function createFarFieldTerrainApi(deps = {}) {
           })
         : loadFarTerrainElevationWithParentFallback({
             tiles: sourceTiles,
-            isActive: () => requestGeneration === generation,
+            isActive: isCurrent,
             parentTile: parentTerrainTile,
             loadTile: (tile) => waitForTerrainTileReadyAtZoom(
               tile.z, tile.tx, tile.ty, 10000, deps, { signal }
             )
-          })),
-      measureDependency('mappedContext', loadFarMappedContext(
+          })) },
+      { load: () => measureDependency('mappedContext', loadMappedContext(
         spec.contextGeographic,
         spec.detailExclusionGeographic,
         spec.geographic,
@@ -482,28 +497,23 @@ function createFarFieldTerrainApi(deps = {}) {
             return Number.isFinite(radius) && radius > 0 && Math.hypot(point.x, point.z) <= radius;
           }
         }
-      )),
-      measureDependency('worldCover', loadWorldCoverBaseline(spec.geographic, {
+      )), retire: context => {
+        context?.buildings?.dispose?.();
+        context?.roadCoveragePlan?.dispose?.();
+      } },
+      { load: () => measureDependency('worldCover', loadWorldCover(spec.geographic, {
         size: FAR_FIELD_WORLDCOVER_SIZE,
         key: `far-field:${activeKey}`,
         signal,
         priority: -10
-      }).catch(() => null))
+      }).catch(() => null)) }
     ]);
-    try {
-    if (requestGeneration !== generation) return;
+    if (!isCurrent()) return;
     // The detailed mesh queue must settle before the far mesh chooses its
     // holes. Otherwise late near tiles cover a far surface that was compiled
     // through their still-empty slots, leaving two terrain owners.
     await appCtx.waitForLocationTerrainPublication?.();
     if(requestGeneration!==generation || signal.aborted)return;
-    appCtx.fixedLocationMappedSurfaceContext = mappedContext;
-    let detailedMappedSurfaceTintVertices = 0;
-    for (const detailedMesh of appCtx.terrainGroup?.children || []) {
-      if (detailedMesh?.userData?.isTerrainMesh !== true || detailedMesh?.userData?.isFarTerrainClipmap) continue;
-      detailedMappedSurfaceTintVertices += applyMappedSemanticVertexTints(detailedMesh, mappedContext);
-      await yieldToMainThread();
-    }
     const coverageRequest = spec.detailedCoverageRequest || {};
     spec = {
       ...spec,
@@ -546,19 +556,21 @@ function createFarFieldTerrainApi(deps = {}) {
     setState({ status: 'building-geometry', sourceZoom: spec.sourceZoom, sourceTiles: sourceTiles.length, offsetMeters });
     const geometryBuildStartedAt = performance.now();
     const built = await buildFarFieldGeometry(spec, loadedTiles, offsetMeters, mappedContext);
+    build.own(built?.geometry);
+    if (!isCurrent()) return;
     const terrainGeometryBuildMs = performance.now() - geometryBuildStartedAt;
     const buildingBuildStartedAt = performance.now();
-    let builtBuildings;
-    try {
-      builtBuildings = await buildFarBuildingGeometry(spec, loadedTiles, offsetMeters, mappedContext,
-        ()=>requestGeneration===generation&&!signal.aborted);
-    } catch(error) { built?.geometry?.dispose?.();throw error; }
+    const builtBuildings = await buildFarBuildingGeometry(spec, loadedTiles, offsetMeters, mappedContext, isCurrent);
+    build.own(builtBuildings?.geometry);
+    build.own(builtBuildings?.instances);
+    if (!isCurrent()) return;
     const buildingGeometryBuildMs = performance.now() - buildingBuildStartedAt;
     const waterBuildStartedAt = performance.now();
     const waterDetailReady=appCtx.detailedWaterPublicationSequence===appCtx._worldLoadSequence;
     const builtWater = buildFarWaterGeometry(appCtx, mappedContext, null, {
       detailedAreas:waterDetailReady ? publishedWaterDetailAreas(appCtx) : []
     });
+    build.own(builtWater?.geometry);
     const publishedWaterAreaIdentities = builtWater?.publishedAreaIdentities || new Set();
     const fixedRegionalStructureWaterAreas = (mappedContext?.waterAreas || [])
       .filter((area) =>
@@ -587,35 +599,22 @@ function createFarFieldTerrainApi(deps = {}) {
       spec,
       publishedWaterAreaIdentities
     );
+    build.own(waterTerrainMask?.texture);
+    if (!isCurrent()) return;
     const waterTerrainMaskBuildMs = performance.now() - waterMaskBuildStartedAt;
     let builtRoadCoverage = null, roadCoverageError = null;
     try {
       builtRoadCoverage = await buildRegionalRoadCoverageMask(appCtx,mappedContext.roadCoveragePlan,{signal});
+      build.own(builtRoadCoverage?.mask);
     } catch (error) { roadCoverageError = String(error?.message || error); }
-    if (requestGeneration !== generation || signal.aborted) {
-      builtRoadCoverage?.mask.dispose();
-      built?.geometry?.dispose?.();
-      builtBuildings?.geometry?.dispose?.();
-      builtBuildings?.instances.dispose();
-      builtWater?.geometry?.dispose?.();
-      waterTerrainMask?.texture?.dispose?.();
-      return;
-    }
+    if (!isCurrent()) return;
     if (!built) {
-      builtRoadCoverage?.mask.dispose();
-      builtBuildings?.geometry?.dispose?.();
-      builtBuildings?.instances.dispose();
-      builtWater?.geometry?.dispose?.();
-      waterTerrainMask?.texture?.dispose?.();
       setState({ status: 'unavailable', reason: 'far-field-elevation-sampling-failed' });
       return;
     }
 
-    // Retire the prior location LOD before publishing state for its replacement.
-    // Clearing after material setup erased the new surface authority and left the
-    // outer terrain frozen on its initial coarse fallback.
-    removeCurrentMesh();
-    appCtx.fixedRegionalStructureWaterAreas = fixedRegionalStructureWaterAreas;
+    // Prepare all owners off-scene. The previous complete region stays usable
+    // while instance matrices yield, and failures retire only this draft.
     const material = new THREE.MeshStandardMaterial({
       color: 0xffffff,
       vertexColors: true,
@@ -626,7 +625,10 @@ function createFarFieldTerrainApi(deps = {}) {
       // by the weather system and is zero outside an actual fog condition.
       fog: true
     });
-    const mesh = new THREE.Mesh(built.geometry, material);
+    build.own(material);
+    const mesh = build.own(new THREE.Mesh(built.geometry, material), disposeFarFieldMesh);
+    build.transfer(built.geometry);
+    build.transfer(material);
     mesh.name = 'FixedLocationTerrainLod';
     mesh.renderOrder = 0;
     // The geometry planner computes bounds and refreshes them after seam edits.
@@ -637,7 +639,7 @@ function createFarFieldTerrainApi(deps = {}) {
     mesh.userData.isFixedLocationTerrainLod = true;
     mesh.userData.mappedSurfaceTints = built.mappedSurfaceTints;
     mesh.userData.mappedSurfaceModes = built.mappedSurfaceModes;
-    farFieldSurfaceState = {
+    const nextSurfaceState = {
       spec,
       worldCoverResult: worldCoverContext,
       surfaceGrid: built.surfaceGrid,
@@ -645,7 +647,9 @@ function createFarFieldTerrainApi(deps = {}) {
     };
     applyFixedLocationSurfaceMaterial(mesh, worldCoverContext, spec);
     applyMappedSurfaceTintOwnership(mesh);
-    applyMappedWaterTerrainOwnership(mesh, material, waterTerrainMask);
+    if (applyMappedWaterTerrainOwnership(mesh, material, waterTerrainMask)) {
+      build.transfer(waterTerrainMask?.texture);
+    }
     const centerAcceptedGround = sampleAcceptedGroundAtLatLon(
       appCtx.LOC.lat,
       appCtx.LOC.lon
@@ -681,16 +685,7 @@ function createFarFieldTerrainApi(deps = {}) {
       ))
     };
 
-    farFieldMesh = mesh;
-    appCtx.terrainGroup.add(mesh);
-    regionalRoadCoverage = builtRoadCoverage ? {
-      stats:builtRoadCoverage.stats,
-      mask:leaseRoadOverview(appCtx,builtRoadCoverage.mask,20)
-    } : null;
-    regionalRoadCoverage?.mask.syncMaterials();
-    if (appCtx.structureTerrainPortalDescriptors?.length) {
-      applyTerrainPortalMasksForContext(appCtx, appCtx.structureTerrainPortalDescriptors);
-    }
+    let buildingContext = null;
     if (builtBuildings) {
       const buildingMaterial = builtBuildings.geometry ? applyFarBuildingFacadeDetail(new THREE.MeshStandardMaterial({
         color: 0xffffff,
@@ -700,9 +695,12 @@ function createFarFieldTerrainApi(deps = {}) {
         side: THREE.DoubleSide,
         fog: true
       })) : null;
-      const buildingContext = builtBuildings.geometry
+      build.own(buildingMaterial);
+      buildingContext = build.own(builtBuildings.geometry
         ? new THREE.Mesh(builtBuildings.geometry, buildingMaterial)
-        : new THREE.Group();
+        : new THREE.Group(), disposeFarFieldMesh);
+      build.transfer(builtBuildings.geometry);
+      build.transfer(buildingMaterial);
       buildingContext.name = 'FarMappedBuildingContext';
       buildingContext.renderOrder = 1;
       buildingContext.castShadow = false;
@@ -726,43 +724,64 @@ function createFarFieldTerrainApi(deps = {}) {
           side: THREE.FrontSide,
           fog: true
         }));
-        try {
-          const batches = await buildFarBuildingInstanceBatches(
+        build.own(instanceMaterial);
+        const batches = await buildFarBuildingInstanceBatches(
             THREE, builtBuildings.instances, instanceMaterial, { yieldControl: async()=>{
               await yieldToMainThread();
               if(requestGeneration!==generation||signal.aborted)throw new DOMException('Regional buildings superseded','AbortError');
             } }
           );
-          for (const batch of batches) buildingContext.add(batch);
-        } catch (error) {
-          disposeFarFieldMesh(buildingContext);
-          instanceMaterial.dispose();
-          builtWater?.geometry?.dispose?.();
-          // This generation may already have published terrain while yielding.
-          // Never remove a replacement owned by a subsequent generation.
-          if(requestGeneration===generation)removeCurrentMesh();
-          throw error;
-        } finally {
-          builtBuildings.instances.dispose();
-        }
+        for (const batch of batches) buildingContext.add(batch);
+        if (batches.length) build.transfer(instanceMaterial);
       }
       builtBuildings.instances.dispose();
-      if (requestGeneration !== generation) {
-        disposeFarFieldMesh(buildingContext);
-        builtWater?.geometry?.dispose?.();
-        return;
-      }
-      farContextMesh = buildingContext;
-      appCtx.terrainGroup.add(farContextMesh);
+      build.transfer(builtBuildings.instances);
     }
-    pendingFarWaterContext=waterDetailReady ? null : {waterAreas:mappedContext.waterAreas};
-    farWaterMesh = createFarWaterMesh(builtWater, FAR_CONTEXT_HALF_EXTENT_METERS);
+    if (!isCurrent()) return;
+    const waterMesh = build.own(createFarWaterMesh(builtWater, FAR_CONTEXT_HALF_EXTENT_METERS, { track: false }), disposeFarFieldMesh);
+    if (waterMesh) build.transfer(builtWater.geometry);
+
+    // No await is allowed across this handoff. Scene, sampling and water/road
+    // registries must describe the same generation at the next rendered frame.
+    removeCurrentMesh();
+    farFieldMesh = build.transfer(mesh);
+    farContextMesh = build.transfer(buildingContext);
+    farWaterMesh = build.transfer(waterMesh);
+    farFieldSurfaceState = nextSurfaceState;
+    lastAppliedDetailMode = mesh.userData.farSurfaceDetailMode;
+    lastAppliedFallbackMode = mesh.userData.farSurfaceFallbackMode;
+    appCtx.fixedRegionalStructureWaterAreas = fixedRegionalStructureWaterAreas;
+    appCtx.terrainGroup.add(farFieldMesh);
+    if (farContextMesh) appCtx.terrainGroup.add(farContextMesh);
     if (farWaterMesh) {
       appCtx.terrainGroup.add(farWaterMesh);
-      // The detailed pass may have finished while the regional masks awaited
-      // their bounded canvas conversion. Recheck before publishing this owner.
-      if(appCtx.detailedWaterPublicationSequence===appCtx._worldLoadSequence)refreshFarWaterDetailCoverage();
-    } else pendingFarWaterContext=null;
+      appCtx.replaceWorldCollection('waterWaveVisuals', [...(appCtx.waterWaveVisuals || []), farWaterMesh.material]);
+    }
+    regionalRoadCoverage = builtRoadCoverage ? {
+      stats: builtRoadCoverage.stats,
+      mask: leaseRoadOverview(appCtx, build.transfer(builtRoadCoverage.mask), 20)
+    } : null;
+    regionalRoadCoverage?.mask.syncMaterials();
+    if (appCtx.structureTerrainPortalDescriptors?.length) {
+      applyTerrainPortalMasksForContext(appCtx, appCtx.structureTerrainPortalDescriptors);
+    }
+    pendingFarWaterContext = waterDetailReady || !farWaterMesh ? null : { waterAreas: mappedContext.waterAreas };
+    if (appCtx.detailedWaterPublicationSequence === appCtx._worldLoadSequence) refreshFarWaterDetailCoverage();
+    appCtx.fixedLocationMappedSurfaceContext = Object.freeze({
+      contextZoom: mappedContext.contextZoom,
+      landAreas: Number(mappedContext.landAreas || 0),
+      landAreasByTile: mappedContext.landAreasByTile,
+      landAreaSpatialByTile: mappedContext.landAreaSpatialByTile,
+      surfaceFallbackByTile: mappedContext.surfaceFallbackByTile
+    });
+    let detailedMappedSurfaceTintVertices = 0;
+    for (const detailedMesh of appCtx.terrainGroup?.children || []) {
+      if (detailedMesh?.userData?.isTerrainMesh !== true || detailedMesh.userData?.isFarTerrainClipmap) continue;
+      if (!isCurrent()) return;
+      detailedMappedSurfaceTintVertices += applyMappedSemanticVertexTints(detailedMesh, appCtx.fixedLocationMappedSurfaceContext);
+      await yieldToMainThread();
+    }
+    if (!isCurrent()) return;
     setState({
       status: 'ready',
       dependencyDurationsMs,
@@ -854,18 +873,7 @@ function createFarFieldTerrainApi(deps = {}) {
       detailedTerrainTilesExcluded: spec.detailedCoverage?.length || 0,
       outerDistanceMeters: FAR_FIELD_OUTER_DISTANCE_METERS
     });
-    // Building descriptors and mapped-water rings are compilation inputs. The
-    // published GPU geometry and fixedRegionalStructureWaterAreas own their
-    // runtime forms; retain only the land lookup needed by later surface-color
-    // refreshes instead of keeping the complete regional source graph alive.
-    appCtx.fixedLocationMappedSurfaceContext = Object.freeze({
-      contextZoom: mappedContext.contextZoom,
-      landAreas: Number(mappedContext.landAreas || 0),
-      landAreasByTile: mappedContext.landAreasByTile,
-      landAreaSpatialByTile: mappedContext.landAreaSpatialByTile,
-      surfaceFallbackByTile: mappedContext.surfaceFallbackByTile
-    });
-    } finally { mappedContext?.buildings?.dispose?.(); mappedContext?.roadCoveragePlan?.dispose?.(); }
+    } finally { build.dispose(); }
   }
 
   function refreshFarWaterDetailCoverage() {
@@ -893,6 +901,8 @@ function createFarFieldTerrainApi(deps = {}) {
       farFieldSurfaceState.spec
     )) return false;
     applyMappedSurfaceTintOwnership(farFieldMesh);
+    lastAppliedDetailMode = farFieldMesh.userData.farSurfaceDetailMode;
+    lastAppliedFallbackMode = farFieldMesh.userData.farSurfaceFallbackMode;
     setState({
       ...appCtx.farTerrainClipmapState,
       surfaceDetailMode: 'semantic-pbr',
@@ -997,6 +1007,10 @@ function createFarFieldTerrainApi(deps = {}) {
       : Promise.resolve(beginBuild())
     ).catch((error) => {
       if (generationSignal.aborted || requestGeneration !== generation) return;
+      setState({ status: 'failed', reason: String(error?.message || error), previousRegionRetained: !!farFieldMesh });
+      // The same geographic request may recover; its failed key must not be
+      // mistaken for an already completed or still pending publication.
+      activeKey = '';
       throw error;
     }).finally(() => {
       if (requestGeneration === generation) {
