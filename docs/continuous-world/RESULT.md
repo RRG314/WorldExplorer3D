@@ -1,8 +1,16 @@
 # Coverage restoration and continuous-world audit
 
-October 6, 2026. Local work on `steven/visual-quality`. The test preview is updated; production remains unchanged.
+October 6, 2026. Local work on `steven/visual-quality`. New worldwide-readiness repairs are local only; the hosted preview still serves abb8e8a9 and production remains unchanged.
 
 Building coverage was being reduced before rendering: the nearby selection stopped at 26,000 buildings, and regional selection discarded footprints through sampling and per-tile quotas. Those losses are corrected. Device quality can still change rendering detail; it no longer scales down the nearby building-count ceiling or requests a regional zoom without buildings.
+
+## Latest worldwide-readiness work
+
+Local source c2acc7a3 now stages complete regional publications, drains cancelled/failed work, retains the old region on construction failure, allows retry and explicitly retires water registration. Regional buildings use cell-relative GPU transforms while preserving coverage, culling and picking. Full PR passes 2,004 contracts. Actual WebGL replacement/failure/retry/cancellation/reversal/exit checks pass with stable resource counts; packaged driving and Baltimore coverage/cleanup also pass.
+
+Current local artifact: `5.4.0+c2acc7a3c2a2.e6911e31f7a7ab25.staging`, 610 byte-verified files. Latest Baltimore retains 98.9% nearby / 95% regional buildings, all 1,489 identified majors and 240/240 tiles. Exit heap is 43.97 MB with no retained world collections or JS/shader errors. Its 90-second flight **fails** at a 133.4/183.2 ms cluster despite 46.40 FPS. The earlier preview's passing Baltimore window is historical, not current performance acceptance.
+
+**Worldwide travel remains unfinished.** The [readiness plan](WORLDWIDE-READINESS.md) replaces the broader sequence below for the owner's current focus: geographic cell/source ownership, geographic saves and frame transitions, integrated moving residency, then long-route acceptance. These local prerequisites do not enable unrestricted movement or broaden source coverage yet.
 
 ## What is implemented
 
@@ -23,7 +31,7 @@ Regional Shortbread samples in both tested cities contain no mapped heights. Exi
 
 Historical flight failures before the current worker checkpoint: the latest Baltimore run reaches 700 ms, and London has roughly one-second garbage-collection pauses. An instrumented run captured about 1.08 seconds starting collection and 1.11 seconds completing it, including a 0.67-second array-buffer sweep. Heap usage dropped from 1.57 GB to 478 MB. The regional construction storage repair preserves geometry and improves explicit ownership but did not remove this pause. No coverage reduction, forced collection or relaxed stall threshold is used to claim a pass.
 
-## Remaining implementation sequence
+## Earlier broader implementation sequence
 
 1. Move regional decoding and geometry compilation into bounded cell jobs, keeping large temporary construction graphs off the main thread. Preserve source identities and complete visible coverage. Prove dense-city pauses improve with ordinary, uninstrumented flight.
 2. Publish moving terrain, buildings, roads and collision data together. Keep usable overlap until replacements are ready; cancel obsolete jobs and retire every associated resource and index. Do not reuse full-game reset during travel.
@@ -33,9 +41,9 @@ Historical flight failures before the current worker checkpoint: the latest Balt
 
 The implementation and test receipts are recorded in [IMPLEMENTATION.md](IMPLEMENTATION.md). A component test, an actual city journey and complete worldwide acceptance are separate evidence levels.
 
-## Current test checkpoint
+## Published abb8e8a9 test checkpoint (earlier source)
 
-The clean local artifact is `5.4.0+abb8e8a9274a.0218ea3cefb3aa7c.staging` in `dist`: 610 byte-verified files, 186 runtime bundles and 84 accepted-ground files. Full runtime regression at 27924374 passes 1,997 contracts and supporting gates; the final markup-only repair passes source validation and actual desktop/phone-viewport map tests. [Test preview](https://we3d-staging-20260712--visual-review-1005-e5075bnu.web.app) is published after its required packaged smoke passed; hosted manifests match the local bytes. [Testing notes](TEST-BUILD.md) identify what is verified and what remains unfinished. A normal in-app browser (no debug App Check token) loads Baltimore and live weather with no error-console entries. The automated hosted client received 403/401 resource errors and stopped after its first burst; that failed receipt is preserved. Exact Overpass transport timed out in the normal browser and used the existing generalized fallback, so this does not certify exact bridges or routes.
+The hosted artifact is `5.4.0+abb8e8a9274a.0218ea3cefb3aa7c.staging`, preserved locally under `output/preserved-artifacts/`: 610 byte-verified files, 186 runtime bundles and 84 accepted-ground files. Full runtime regression at 27924374 passes 1,997 contracts and supporting gates; the final markup-only repair passes source validation and actual desktop/phone-viewport map tests. [Test preview](https://we3d-staging-20260712--visual-review-1005-e5075bnu.web.app) is published after its required packaged smoke passed; hosted manifests match the local bytes. [Testing notes](TEST-BUILD.md) identify what is verified and what remains unfinished. A normal in-app browser (no debug App Check token) loads Baltimore and live weather with no error-console entries. The automated hosted client received 403/401 resource errors and stopped after its first burst; that failed receipt is preserved. Exact Overpass transport timed out in the normal browser and used the existing generalized fallback, so this does not certify exact bridges or routes.
 
 Regional building and road construction now share one bounded worker. Road pixels match the previous renderer, source bytes remain owned by the cache, cancellation/deadline/error/fallback paths close cleanly, and repeated WebGL retirement returns to baseline. Nearby straight-wall building geometry matches every tested original attribute byte. POI visibility uses one immutable classification table and still follows each current layer toggle. The map search field now uses the existing accessible hidden-label style instead of exposing that label as a grid column.
 

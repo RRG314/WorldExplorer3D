@@ -2,6 +2,8 @@
 
 [Open the test preview](https://we3d-staging-20260712--visual-review-1005-e5075bnu.web.app/app/?launch=earth&gm=free&loc=custom&lat=39.3098&lon=-76.6147&lname=Baltimore&mode=driving). Choose **Explore** to enter. The HUD version ends in **abb8e8a**. The preview expires October 13, 2026; production has not changed.
 
+The subsequent worldwide-readiness artifact c2acc7a3 is **local only** and is not at this link. It passes regional ownership/precision, coverage and driving checks but fails its 90-second flight stall check. See [current readiness and remaining gates](WORLDWIDE-READINESS.md) and [results](RESULT.md).
+
 ## What to check
 
 1. Start in Baltimore, drive several blocks, then switch to aircraft through Travel. Buildings and roads should remain across the surrounding region as you climb. Use the time control to compare daylight and night.
