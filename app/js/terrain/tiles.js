@@ -29,6 +29,12 @@ import {
 } from './tile-request-lifecycle.js?v=1';
 
 const TERRAIN_TILE_CACHE_LIMIT = 72;
+// Detailed sources (including shared edges), regional sources and parent
+// fallbacks may coexist during compilation. Sampling never admits a tile;
+// explicit loading has a separate absolute ceiling, including pending images.
+const TERRAIN_TILE_REQUEST_LIMIT = 192;
+const TERRAIN_BOUNDS_REQUEST_CONCURRENCY = 8;
+let terrainCacheGeneration = 0;
 const TERRAIN_TILE_MAX_ATTEMPTS = 3;
 const TERRAIN_TILE_RETRY_BASE_MS = 300;
 const TERRAIN_TILE_ATTEMPT_TIMEOUT_MS = 2400;
@@ -53,6 +59,12 @@ const INVALID_TERRAIN_TILE = Object.freeze({
   nextRetryAt: Number.POSITIVE_INFINITY,
   lastError: "invalid terrain tile coordinates",
   lastUsedAt: 0
+});
+
+const REQUEST_BUDGET_TERRAIN_TILE = Object.freeze({
+  ...INVALID_TERRAIN_TILE,
+  key: 'request-budget',
+  lastError: 'terrain source working set is full'
 });
 
 function terrainNow() {
@@ -187,6 +199,9 @@ export function getOrLoadTerrainTile(z, x, y, deps = {}) {
     return cached;
   }
 
+  if (appCtx.terrainTileCache.size >= TERRAIN_TILE_REQUEST_LIMIT) {
+    return REQUEST_BUDGET_TERRAIN_TILE;
+  }
   const recentFailure = recentTerrainFailures.get(key);
   const initialAttempts = recentFailure && terrainNow() - recentFailure.failedAt <= TERRAIN_FAILURE_HISTORY_MS
     ? Math.min(TERRAIN_TILE_MAX_ATTEMPTS, Number(recentFailure.attempts) || 0)
@@ -254,6 +269,7 @@ export function terrainTileCacheSnapshot() {
     cachedRecovered,
     elevationBytes,
     limit: TERRAIN_TILE_CACHE_LIMIT,
+    requestLimit: TERRAIN_TILE_REQUEST_LIMIT,
     maxAttempts: TERRAIN_TILE_MAX_ATTEMPTS
   };
 }
@@ -277,6 +293,7 @@ function releaseTerrainTile(tile) {
 }
 
 export function clearTerrainTileCache() {
+  terrainCacheGeneration += 1;
   const before = terrainTileCacheSnapshot();
   appCtx.terrainTileCache.forEach(releaseTerrainTile);
   appCtx.terrainTileCache.clear();
@@ -296,6 +313,15 @@ export function pruneTerrainTileCache(limit = TERRAIN_TILE_CACHE_LIMIT) {
   appCtx.terrainGroup?.children?.forEach?.((mesh) => {
     const key = mesh?.userData?.terrainTileKey;
     if (key) protectedKeys.add(key);
+    const tile = mesh?.userData?.terrainTile;
+    if (tile) {
+      const n = 2 ** tile.z;
+      for (let dx = 0; dx <= 1; dx += 1) {
+        for (let dy = 0; dy <= 1; dy += 1) {
+          if (tile.ty + dy < n) protectedKeys.add(`${tile.z}/${(tile.tx + dx) % n}/${tile.ty + dy}`);
+        }
+      }
+    }
   });
   const candidates = [...appCtx.terrainTileCache.entries()]
     .filter(([key, tile]) => !protectedKeys.has(key) && (tile?.loaded || tile?.failed))
@@ -312,8 +338,10 @@ export function pruneTerrainTileCache(limit = TERRAIN_TILE_CACHE_LIMIT) {
 }
 
 function waitForTerrainTileReady(z, x, y, deadline, deps, options = {}) {
+  const generation = terrainCacheGeneration;
   return waitForTerrainTileRequest({
     z, x, y, deadline, deps, signal: options.signal,
+    isActive: () => generation === terrainCacheGeneration,
     getOrLoadTerrainTile, failTerrainTileAttempt, terrainNow,
     cancelTile: (tileZ, tileX, tileY) => cancelTileRequest(appCtx.terrainTileCache, tileZ, tileX, tileY),
     maxAttempts: TERRAIN_TILE_MAX_ATTEMPTS,
@@ -361,15 +389,23 @@ export async function waitForTerrainReadyBounds(bounds, timeoutMs = 6000, deps =
     for (let x = 0; x <= southEast.x; x += 1) xValues.push(x);
   }
   const deadline = terrainNow() + Math.max(0, Number(timeoutMs) || 0);
-  const waits = [];
-  xValues.forEach((x) => {
-    for (let y = minY; y <= maxY; y += 1) {
-      waits.push(waitForTerrainTileReady(zoom, x, y, deadline, deps));
+  const count = xValues.length * (maxY - minY + 1);
+  // This entry point prepares the detailed district, not a global DEM. Refuse
+  // an oversized window before issuing requests instead of allocating an
+  // unbounded Promise/image set or pretending partial coverage is ready.
+  if (count === 0 || count > TERRAIN_TILE_CACHE_LIMIT) return false;
+  const generation = terrainCacheGeneration;
+  let next = 0;
+  let ready = true;
+  await Promise.all(Array.from({ length: Math.min(TERRAIN_BOUNDS_REQUEST_CONCURRENCY, count) }, async () => {
+    while (next < count && generation === terrainCacheGeneration) {
+      const index = next++;
+      const x = xValues[Math.floor(index / (maxY - minY + 1))];
+      const y = minY + index % (maxY - minY + 1);
+      if (!await waitForTerrainTileReady(zoom, x, y, deadline, deps)) ready = false;
     }
-  });
-  if (waits.length === 0) return false;
-  const results = await Promise.all(waits);
-  return results.every(Boolean);
+  }));
+  return ready && next === count && generation === terrainCacheGeneration;
 }
 
 export function sampleTileElevationMeters(tile, u, v, clampElevationMeters = null) {
@@ -413,37 +449,18 @@ export function worldToLatLon(x, z) {
 
 export function elevationMetersAtLatLon(lat, lon, deps = {}) {
   const t = latLonToTileXY(lat, lon, appCtx.TERRAIN_ZOOM);
-  const tile = getOrLoadTerrainTile(appCtx.TERRAIN_ZOOM, t.x, t.y, deps);
-  if (!tile.loaded) return null;
+  const tile = peekTerrainTile(appCtx.TERRAIN_ZOOM, t.x, t.y);
+  if (!tile?.loaded) return null;
 
   const u = t.xf - t.x;
   const v = t.yf - t.y;
   return sampleTileElevationMeters(tile, u, v, deps.clampElevationMeters);
 }
 
+// Height queries are reads. Only publication/readiness owners request sources;
+// a vegetation/physics/diagnostic query must never start network work.
 export function terrainSourceSampleAtLatLon(lat, lon, deps = {}) {
-  const preflight = adaptTerrariumTileSample({
-    latitude: lat,
-    longitude: lon,
-    zoom: appCtx.TERRAIN_ZOOM,
-    tile: null
-  });
-  if (preflight.status === "outside-coverage") return preflight;
-  const tilePoint = latLonToTileXY(lat, lon, appCtx.TERRAIN_ZOOM);
-  const tile = getOrLoadTerrainTile(
-    appCtx.TERRAIN_ZOOM,
-    tilePoint.x,
-    tilePoint.y,
-    deps
-  );
-  return adaptTerrariumTileSample({
-    latitude: lat,
-    longitude: lon,
-    zoom: appCtx.TERRAIN_ZOOM,
-    tile,
-    sourceFacts: polarSourceAt(tile, tilePoint.xf - tilePoint.x, tilePoint.yf - tilePoint.y) || undefined,
-    clampElevationMeters: deps.clampElevationMeters
-  });
+  return peekTerrainSourceSampleAtLatLon(lat, lon, deps);
 }
 
 export function peekTerrainSourceSampleAtLatLon(lat, lon, deps = {}) {

@@ -75,6 +75,7 @@ function createFarFieldTerrainApi(deps = {}) {
     appCtx,
     clampElevationMeters,
     getOrLoadTerrainTile,
+    pruneTerrainTileCache,
     latLonToTileXY,
     sampleAcceptedGroundAtLatLon,
     sampleAcceptedGroundElevationAtLatLon,
@@ -965,6 +966,9 @@ function createFarFieldTerrainApi(deps = {}) {
       throw error;
     }).finally(() => {
       if (requestGeneration === generation) {
+        // Compilation has finished using its source arrays. The published
+        // regional grid now owns sampling; retain only the detailed working set.
+        pruneTerrainTileCache?.();
         pendingBuildPromise = null;
         elevationAbortController = null;
       }

@@ -40,7 +40,29 @@ try{
  report.loadMs=Date.now()-start;
  report.programFailures=await page.evaluate(async()=>{const {ctx}=await import('/app/js/shared-context.js?v=55');return (ctx.renderer.info.programs||[]).filter(p=>p.diagnostics?.runnable===false).map(p=>({name:p.name,diagnostics:p.diagnostics}));});
  if(report.shaderErrors.length||report.programFailures.length)throw new Error('Terrain/WebGL shader compilation failed; see shaderErrors/programFailures');
+ report.terrainCache=await page.evaluate(async()=>{const {ctx}=await import('/app/js/shared-context.js?v=55');return ctx.terrainTileCacheSnapshot();});
+ assert.ok(report.terrainCache.entries<=report.terrainCache.limit,'Published terrain sources must return to their steady cache budget');
  report.before=await page.evaluate(()=>{const s=globalThis.getWorldExplorerRuntimeDiagnostics();return {counts:s.worldCounts,far:s.farTerrainClipmap,roads:s.worldLoad?.regionalTransportSelection,buildings:s.worldLoad?.buildingPublicationDomain,landmarks:s.mappedTallBuildingVisuals,resources:s.resources};});
+ if(process.env.WE3D_COVERAGE_INSPECT_LANDUSE==='1') {
+  report.landcover=await page.evaluate(async()=>{
+   const {ctx}=await import('/app/js/shared-context.js?v=55');
+   const countBy=(items,key)=>items.reduce((r,p)=>{const k=String(p[key]||'unknown');r[k]=(r[k]||0)+1;return r;},{});
+   const plants=ctx.vegetationFeatures||[],areas=ctx.landuses||[];
+   return {landUses:countBy(areas,'type'),plants:plants.length,plantTypes:countBy(plants,'landuseType'),
+    plantSources:countBy(plants,'source'),models:ctx.vegetationModelStatus||{}};
+  });
+  assert.ok(report.landcover.plants>0,'The requested vegetated location has no published plants');
+  const data=await page.evaluate(async()=>{
+   const {ctx}=await import('/app/js/shared-context.js?v=55');ctx.setTimeOfDay('day');
+   const plants=ctx.vegetationFeatures||[],forest=plants.filter(p=>p.source==='polygon'&&p.landuseType==='forest');
+   const point=forest.reduce((best,p)=>!best||Math.hypot(p.x,p.z)<Math.hypot(best.x,best.z)?p:best,null)||plants.find(p=>p.source==='polygon')||plants[0];
+   if(!point)return null;
+   const y=ctx.terrainMeshHeightAt(point.x,point.z),camera=ctx.camera.clone();
+   camera.position.set(point.x+24,y+12,point.z+30);camera.lookAt(point.x,y+4,point.z);camera.updateMatrixWorld(true);
+   ctx.renderer.render(ctx.scene,camera);const image=ctx.renderer.domElement.toDataURL('image/png');ctx.renderer.render(ctx.scene,ctx.camera);return image;
+  });
+  if(data)await fs.writeFile(`${out}/landuse-detail.png`,Buffer.from(data.split(',')[1],'base64'));
+ }
  console.log(JSON.stringify({stage:'loaded',loadMs:report.loadMs,counts:report.before.counts,far:{available:report.before.far.farBuildingsAvailable,rendered:report.before.far.farBuildings,coverage:report.before.far.farBuildingPublishedCoverage},roads:report.before.roads}));
  for(const time of ['day','night']){
   const captures=await page.evaluate(async time=>{

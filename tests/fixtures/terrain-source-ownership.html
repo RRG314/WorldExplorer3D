@@ -1,0 +1,46 @@
+<!doctype html><meta charset="utf-8"><link rel="icon" href="data:,">
+<style>body{margin:0;background:#182b36;font:18px system-ui;color:#eef6fa}canvas{display:block}</style>
+<canvas id="view" width="1000" height="700"></canvas>
+<script type="module">
+import {ctx} from '/app/js/shared-context.js?v=55';
+import {getOrLoadTerrainTile,clearTerrainTileCache,terrainTileCacheSnapshot,elevationMetersAtLatLon,terrainSourceSampleAtLatLon,latLonToTileXY,waitForTerrainTileReadyAtZoom} from '/app/js/terrain/tiles.js';
+const canvas=document.getElementById('view'),paint=canvas.getContext('2d');
+const source=document.createElement('canvas');source.width=source.height=256;
+const sourcePaint=source.getContext('2d');sourcePaint.fillStyle='rgb(128,123,0)';sourcePaint.fillRect(0,0,256,256);
+const url=source.toDataURL(),origin={lat:39.3187,lon:-76.6465};let requests=0,queries=0,cycles=0,operation=Promise.resolve();
+const history=[];
+Object.assign(ctx,{LOC:origin,terrainTileCache:new Map(),terrainGroup:{children:[]},TERRAIN_ZOOM:15,
+ TERRAIN_TILE_URL:()=>{requests++;return url;},WORLD_UNITS_PER_METER:1,TERRAIN_Y_EXAGGERATION:1});
+const center=latLonToTileXY(origin.lat,origin.lon,15);
+function assert(ok,message){if(!ok)throw Error(message);}
+function queryWide(){const before=requests;for(let i=0;i<10000;i++){terrainSourceSampleAtLatLon(38+i/10000,-78+i/10000);queries++;}assert(before===requests,'Ordinary height queries requested new images');}
+async function load(){
+ const tiles=[];for(let x=-3;x<=3;x++)for(let y=-3;y<=3;y++)tiles.push(getOrLoadTerrainTile(15,center.x+x,center.y+y));
+ await Promise.all(tiles.map(tile=>tile.ready));
+ assert(tiles.every(tile=>tile.loaded),'Real browser image decoding failed');
+ assert(elevationMetersAtLatLon(origin.lat,origin.lon)===123,'Decoded height mismatch');queryWide();
+ history.push({stage:'loaded',entries:terrainTileCacheSnapshot().entries});
+}
+async function retire(){
+ const pending=waitForTerrainTileReadyAtZoom(15,center.x+8,center.y,1000);
+ clearTerrainTileCache();queryWide();assert(await pending===false,'Old readiness request survived its generation');
+ assert(terrainTileCacheSnapshot().entries===0,'Terrain sources reappeared after exit');cycles++;
+ history.push({stage:'retired',entries:terrainTileCacheSnapshot().entries});
+}
+function draw(){
+ paint.fillStyle='#182b36';paint.fillRect(0,0,1000,700);paint.fillStyle='#eef6fa';paint.font='bold 26px system-ui';paint.fillText('Terrain source ownership — controlled image fixture',35,50);
+ paint.font='18px system-ui';paint.fillText('Actual image decoding; 10,000 distant height queries per action',35,86);
+ paint.fillText('Green: loaded 7 × 7 terrain sources    Outline: safely released sources',35,118);
+ const count=terrainTileCacheSnapshot().entries;
+ for(let i=0;i<49;i++){const x=38+i%7*66,y=160+Math.floor(i/7)*66;paint.strokeStyle='#73959f';paint.strokeRect(x,y,54,54);if(count){paint.fillStyle='#61bc98';paint.fillRect(x+2,y+2,50,50);}}
+ paint.fillStyle='#eef6fa';paint.font='22px system-ui';paint.fillText(`Resident sources: ${count}`,560,210);paint.fillText(`Explicit requests: ${requests}`,560,255);paint.fillText(`Read-only queries: ${queries}`,560,300);paint.fillText(`Completed exits: ${cycles}`,560,345);
+ paint.font='18px system-ui';paint.fillText('Left: reload and query',560,430);paint.fillText('Right: cancel, exit and query',560,463);
+ paint.fillText('This is a lifecycle test, not world imagery.',35,660);
+}
+try{
+ await load();draw();window.fixtureReady=true;
+ document.addEventListener('keydown',event=>{if(event.key==='ArrowLeft'||event.key==='ArrowRight')operation=operation.then(()=>event.key==='ArrowLeft'?load():retire()).then(draw).catch(error=>{window.fixtureError=String(error.stack||error);throw error;});});
+ window.advanceTime=async()=>{await operation;draw();};
+ window.render_game_to_text=()=>JSON.stringify({ready:window.fixtureReady,error:window.fixtureError||null,requests,queries,cycles,cache:terrainTileCacheSnapshot(),history});
+}catch(error){window.fixtureError=String(error.stack||error);throw error;}
+</script>
