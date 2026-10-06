@@ -81,3 +81,16 @@ test('road overview and pavement retain separate shader uniforms and retirement 
  road.dispose();assert.equal(shader.uniforms.roadCoverageMaskEnabled.value,0);
  pavement.dispose();
 });
+
+
+for (const order of ['road-first','pavement-first']) test(`coverage layer disposal ${order} never revives a retired shader`,t=>{
+ const {material,ctx,compile}=fixture(t),originalCompile=material.onBeforeCompile,originalKey=material.customProgramCacheKey;
+ const road=createPavementTerrainMask(ctx,['0:0'],{kind:'road',deferUpload:true});
+ const pavement=createPavementTerrainMask(ctx,['0:0'],{deferUpload:true});
+ road.syncMaterials();pavement.syncMaterials();
+ const first=order==='road-first'?road:pavement,second=order==='road-first'?pavement:road;
+ first.dispose();const shader=compile();
+ assert.equal('roadCoverageMaskAtlas' in shader.uniforms,order!=='road-first');
+ assert.equal('pavementMaskAtlas' in shader.uniforms,order==='road-first');
+ second.dispose();assert.equal(material.onBeforeCompile,originalCompile);assert.equal(material.customProgramCacheKey,originalKey);
+});

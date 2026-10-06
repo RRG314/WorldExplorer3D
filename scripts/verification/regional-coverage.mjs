@@ -73,7 +73,11 @@ try{
  if(tag!=='baseline'){
   assert.ok(report.before.far.farBuildingPublishedCoverage>=.9,'At least90% eligible regional buildings render');
   assert.equal(report.before.far.farMajorBuildingsAvailable,report.before.far.farMajorBuildingsSelected,'Every identified major building selected');
+  assert.equal(report.before.far.farMajorBuildingsAvailable,report.before.far.farMajorBuildingsRendered,'Every identified major building rendered');
+  assert.equal(report.before.far.farBuildingSourceCoverageComplete,true,'All requested regional source tiles loaded');
   assert.equal(report.before.far.farBuildingBudgetExceeded,false,'Coverage does not exhaust the safety ceiling');
+  assert.equal(report.before.far.regionalRoadCoverage?.status,'ready','Regional surface-road coverage compiled');
+  assert.equal(report.before.far.regionalRoadCoverage?.budgetExceeded,false,'Surface-road coverage is not truncated');
  }
  assert.equal(report.pageErrors.length,0);
  await page.evaluate(()=>{delete globalThis.__WE3D_TRAVEL_ACTOR__;});
@@ -84,6 +88,11 @@ try{
  report.releasedHeapBytes=(await cdp.send('Runtime.getHeapUsage')).usedSize;
  report.release=await page.evaluate(()=>{const s=globalThis.getWorldExplorerRuntimeDiagnostics();return {counts:s.worldCounts,streaming:s.lastEarthStreamingRelease};});
  assert.equal(report.release.counts.buildings,0);assert.equal(report.release.counts.roads,0);assert.equal(report.release.counts.terrainTiles,0);
+ report.coverageAndCleanupPassed=true;
+ report.flightStallCheckPassed=report.flight?report.flight.hitches.passed:null;
+ // Retain cleanup evidence even when a requested flight check fails. A failed
+ // optional journey must not be hidden behind a successful coverage headline.
+ assert.notEqual(report.flightStallCheckPassed,false,'Sustained flight has clustered stalls');
  report.ok=true;
 } catch(error){report.error=String(error.stack||error);throw error;}
 finally{await fs.writeFile(`${out}/report.json`,JSON.stringify(report,null,2));await browser.close().catch(()=>{});await closeOwnedBrowser(owned);await server?.close();console.log(JSON.stringify({tag,ok:report.ok,report:`${out}/report.json`}));}

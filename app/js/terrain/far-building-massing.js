@@ -70,3 +70,30 @@ function resolveFarBuildingMassing(building, footprint, areaWorld, unitsPerMeter
 }
 
 export { mappedBuildingTags, resolveFarBuildingMassing };
+
+// Geometry detail may simplify a valid source polygon, but may not determine
+// whether the building exists. Return null for a degenerate LOD so the caller
+// uses the already validated compact footprint. Height remains source-based.
+export function farBuildingRenderFootprint(building, geoToWorld, unitsPerMeter) {
+  const ring = building?.ring;
+  if (!Array.isArray(ring) || ring.length < 3) return null;
+  const closed = ring[0]?.[0] === ring.at(-1)?.[0] && ring[0]?.[1] === ring.at(-1)?.[1];
+  const length = ring.length - (closed ? 1 : 0);
+  const stride = Math.max(1, Math.ceil(length / 18));
+  const footprint = [];
+  for (let i = 0; i < length; i += stride) {
+    const [lon, lat] = ring[i] || [];
+    if (!Number.isFinite(lon) || !Number.isFinite(lat)) return null;
+    const point = geoToWorld(lat, lon);
+    if (!Number.isFinite(point?.x) || !Number.isFinite(point?.z)) return null;
+    footprint.push(point);
+  }
+  if (footprint.length < 3) return null;
+  let area = 0;
+  for (let i = 0, j = footprint.length - 1; i < footprint.length; j = i++) {
+    area += footprint[j].x * footprint[i].z - footprint[i].x * footprint[j].z;
+  }
+  const areaMeters = Math.abs(area) / (2 * unitsPerMeter * unitsPerMeter);
+  if (!Number.isFinite(areaMeters) || areaMeters < 14 || areaMeters > 350000) return null;
+  return footprint;
+}

@@ -1,3 +1,4 @@
+import { createRegionalRoadCoveragePlan } from './regional-road-coverage.js';
 import {createGeographicRingIndex} from './geographic-ring-index.js';
 import {
   fetchShortbreadTile,
@@ -477,6 +478,7 @@ async function loadFarMappedContext(bounds, excludedBounds = null, waterBounds =
     loadFarMappedWaterContext(waterBounds, { ...options, fetchTile })
   ]);
   const tiles = contextBatch.values;
+  const roadCoveragePlan = options.roadCoverageFrame ? createRegionalRoadCoveragePlan(options.roadCoverageFrame) : null;
   const buildingBuckets = [];
   const landAreasByTile = new Map();
   const landAreaSpatialByTile = new Map();
@@ -491,6 +493,12 @@ async function loadFarMappedContext(bounds, excludedBounds = null, waterBounds =
   for (let tileIndex = 0; tileIndex < tiles.length; tileIndex += 1) {
     const tileRecord = tiles[tileIndex];
     const landBucket = [];
+    const streetLayer = roadCoveragePlan && tileRecord.tile.layers.streets;
+    if (streetLayer) for (let i=0;i<streetLayer.length;i++) {
+      const feature=streetLayer.feature(i)?.toGeoJSON?.(tileRecord.x,tileRecord.y,tileRecord.z);
+      roadCoveragePlan.addGeometry(feature?.geometry,feature?.properties);
+      if(performance.now()-sliceStarted>=8){options.signal?.throwIfAborted();await yieldToMainThread();sliceStarted=performance.now();}
+    }
     for (const layerName of ['land', 'sites']) {
       const layer = tileRecord.tile.layers[layerName];
       if (!layer) continue;
@@ -550,7 +558,9 @@ async function loadFarMappedContext(bounds, excludedBounds = null, waterBounds =
         }
         if (excludedBounds &&
             centerLat >= excludedBounds.latS && centerLat <= excludedBounds.latN &&
-            centerLon >= excludedBounds.lonW && centerLon <= excludedBounds.lonE) {
+            centerLon >= excludedBounds.lonW && centerLon <= excludedBounds.lonE &&
+            (typeof options.isWithinDetailedBuildingDomain !== 'function' ||
+              options.isWithinDetailedBuildingDomain(centerLat, centerLon))) {
           skippedNearBuildings += 1;
           continue;
         }
@@ -594,6 +604,7 @@ async function loadFarMappedContext(bounds, excludedBounds = null, waterBounds =
 
   return {
     ...selection,
+    roadCoveragePlan,
     sourceBuildings, invalidBuildings, outsideBuildings,
     buildings,
     availableBuildings,

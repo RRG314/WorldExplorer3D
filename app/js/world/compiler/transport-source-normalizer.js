@@ -335,6 +335,7 @@ export function createTransportSourceNormalizer() {
 export {
   TRANSPORT_RAW_TAG_KEYS,
   TRANSPORT_SOURCE_SCHEMA_VERSION,
+  normalizedCrossSection,
   parseLaneCount,
   parseMeters
 };

@@ -62,3 +62,22 @@ test('regional request count is bounded without selecting a building-free zoom',
  await loadFarMappedContext(bounds,null,bounds,{contextZoom:13,fetchTile:async(z,x,y)=>{zooms.push(z);return fetchFixture([])(z,x,y);}});
  assert.ok(zooms.includes(14));assert.equal(zooms.includes(13),false);
 });
+
+
+test('a source rectangle cannot erase corners outside the published detailed building circle',async()=>{
+ const rings=[box(.0001,.0001),box(.0007,.0007)];
+ const result=await loadFarMappedContext(bounds,bounds,bounds,{fetchTile:fetchFixture([feature(1,rings)]),
+  isWithinDetailedBuildingDomain:(lat,lon)=>Math.hypot(lat,lon)<.0006});
+ assert.equal(result.skippedNearBuildings,result.loadedTiles);
+ assert.equal(result.availableBuildings,result.loadedTiles);
+ assert.ok(result.buildings.every(b=>b.centerLat>.0006&&b.centerLon>.0006));
+});
+
+test('polygon detail uses metre area and a degenerate simplification requests compact fallback',async()=>{
+ const {farBuildingRenderFootprint}=await import('../app/js/terrain/far-building-massing.js');
+ const project=(lat,lon)=>({x:lon*.5,z:lat*.5});
+ const small={ring:[[0,0],[4,0],[4,4],[0,4],[0,0]]};
+ assert.equal(farBuildingRenderFootprint(small,project,.5).length,4,'A16m² building remains valid at half-scale');
+ assert.equal(farBuildingRenderFootprint({ring:[[0,0],[1,0],[2,0],[0,0]]},project,.5),null);
+ assert.equal(farBuildingRenderFootprint({ring:null},project,.5),null);
+});

@@ -280,6 +280,7 @@ export function createWorldLoadRuntimeSession(options = {}) {
     dynamicBudgetState.deviceClass
   );
   const lodThresholds = getWorldLodThresholds(0, perfModeNow, dynamicBudgetState.lodScale);
+  runtimeState.buildingVisibleRadiusWorld = lodThresholds.farVisible;
   const plannedDetailRadiusDeg = Number(loadProfile.radii?.[0]);
   appCtx.plannedEarthDetailRadiusWorld = Number.isFinite(plannedDetailRadiusDeg)
     ? Math.max(800, Math.round(plannedDetailRadiusDeg * (appCtx.SCALE || 100000) * 0.92))
