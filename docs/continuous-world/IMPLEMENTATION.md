@@ -2,7 +2,28 @@
 
 Owner request, October 5, 2026: restore at least 90% of available valid building footprints and every identified major building, preserve roads, render recognizable land uses, extend public GIS, and support bounded continuous worldwide travel. Flight quality was acceptable; removing scenery to meet an FPS number is not an acceptable remedy. Local work; no production promotion.
 
-## Current evidence
+## Latest checkpoint: location preservation, October 6
+
+Runtime 86fdc6e3 is published only to the existing staging preview as `5.4.0+86fdc6e3e6a2.febba16c0a5e3daa.staging` (611 files, 187 runtime bundles, 84 accepted-ground files). Hosted manifests byte-match local `dist`; production remains 1532bdfb. See [CURRENT-STATE.md](../../CURRENT-STATE.md) for immutable identities and [TEST-BUILD.md](TEST-BUILD.md) for the review journey. Earlier sections below are chronological evidence, not current release acceptance.
+
+The owner requires preserving location-based play and making continuous travel optional. That requirement is recorded in [WORLDWIDE-READINESS.md](WORLDWIDE-READINESS.md); no worldwide scheduler or functional mode toggle exists yet. Do not reinterpret presets, favorites, saved local positions or shared-room records to simulate global movement.
+
+Repairs implemented and verified:
+
+- Retire exclusively owned building construction/compaction scratch, preserving adopted attribute buffers. Eleven focused storage tests pass. Measured loaded heap varies; a reliable whole-game heap improvement is not established.
+- Pass the existing Earth session retry callback into terrain/transport UI. Repeated pending retry clicks do not duplicate reloads; rejected retries leave the action available. The previous button referenced an unregistered app-context method.
+- Fix the authoritative desktop building radius at 2,700 units independently of adaptive presentation LOD. The long test proved the old coupling dropped downtown coverage from 49,023 to 39,001 buildings after reload. Preserve the existing mobile radius/source policy. New tests use actual runtime sessions and domain selection; source inventory includes them.
+- Add `city-switch-preservation` to candidate release gates. Repair that verifier's outdated city key, wait for new load sequences, and classify only pending requests aborted by its own location switch as owned cancellation. Other request failures remain failures.
+
+Final-artifact acceptance: full PR **2,009 contracts and all supporting gates PASS**; five actual city loads PASS; packaged current/fallback/current save journey PASS; three prescribed driving bursts PASS; packaged-world preflight and artifact verification PASS. The five-load report retains 49,023 buildings/18,758 roads on all four downtown Baltimore visits, including lower quality and return from Hollywood. Saved favorite and renderer/resources remain intact. Save tests preserve 64 legacy Journal items, subsequent entries, inventory/ammo, unknown fields and unrelated pending account data in disposable storage. The 65 exact current/fallback runtime differences are reviewed and hash-pinned; fallback bytes remain retained.
+
+Receipts: `output/verification/city-switch-lifecycle/report.json`, `output/release-evidence/current/migration-rollback/report.json`, `output/verification/continuous-world/fixed-district-game-client/`, `output/verification/continuous-world/preservation-preview-86fdc6e3.json`. Full PR log: `/tmp/we3d-fixed-district-registered-pr.log`. Ordinary hosted browser entered gameplay without debug attestation and captured no console errors; screenshot `output/verification/continuous-world/hosted-preservation-86fdc6e3.png`. This does not certify signed-in/shared sessions or physical devices.
+
+The completed **044dd362** performance gate ran seven sustained windows and twelve reloads. It passed retention/cleanup/transfers/storage/error checks but failed active-play hitch and FPS budgets, with **533.3 ms walking / 649.9 ms driving** pauses. Its coverage failure is repaired by 86fdc6e3 and independently verified above; its performance failure is not repaired or relabeled. A separate clean 90-second flight on 044dd362 passes at 46.06 FPS with a 66.7 ms maximum and zero >100 ms frames, complete sources/majors and clean exit. Ready heap was 1,089,922,104 bytes; exit 44,329,464 bytes. No forced collection during movement or threshold relaxation. Explicit collection in lifecycle snapshots is only for retention evidence.
+
+The phone-viewport regression portion passes on 044dd362; the chained mobile load-time command did not run after the gate failed. The current 91-candidate/3-backend matrix has not passed for the final artifact. Signed-in/shared/save recovery, physical hardware and fresh-player acceptance remain. Continuous-world implementation is still incomplete. Production promotion is not cleared.
+
+## Initial audit (historical)
 
 Source inspected at 6c32df9f. Preview still 078250e5e401; production still 1532bdfbb5c1. Staging environmental/aircraft/place gateways ACTIVE. These observations are not coverage acceptance.
 

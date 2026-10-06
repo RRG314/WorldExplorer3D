@@ -1,30 +1,33 @@
-# October 6 test build
+# October 6 location-preservation test build
 
-[Open the test preview](https://we3d-staging-20260712--visual-review-1005-e5075bnu.web.app/app/?launch=earth&gm=free&loc=custom&lat=39.3098&lon=-76.6147&lname=Baltimore&mode=driving). Choose **Explore** to enter. The HUD version ends in **abb8e8a**. The preview expires October 13, 2026; production has not changed.
+[Open the test preview](https://we3d-staging-20260712--visual-review-1005-e5075bnu.web.app/app/?launch=earth&gm=free&loc=custom&lat=39.3098&lon=-76.6147&lname=Baltimore&mode=driving). Choose **Explore** to enter. The HUD version includes **86fdc6e**. The preview expires October 13, 2026. Production remains unchanged.
 
-The subsequent worldwide-readiness artifact c2acc7a3 is **local only** and is not at this link. It passes regional ownership/precision, coverage and driving checks but fails its 90-second flight stall check. See [current readiness and remaining gates](WORLDWIDE-READINESS.md) and [results](RESULT.md).
+This build keeps the existing location-based game. It fixes buildings disappearing after graphics quality adjusts and connects the road retry action. **Worldwide travel and its on/off control are not implemented yet.** The existing geographic travel boundary remains.
 
 ## What to check
 
-1. Start in Baltimore, drive several blocks, then switch to aircraft through Travel. Buildings and roads should remain across the surrounding region as you climb. Use the time control to compare daylight and night.
-2. Open the map. Pan, zoom and recenter. Under Map layers → Places, turn Restaurants & Cafes off and on; other enabled categories should remain visible. Close the map and continue driving.
-3. Travel within the loaded region, turn back and return to a previously visited road. Nearby road detail should return with the same ground contact. The automated controlled-return check covers this within the existing region.
-4. Return to the main menu and choose another location. London is useful for comparing a denser city. It retains 91.5% nearby and 95% regional source-building coverage, but the latest 90-second test still catches a short late pause.
+1. Start in Baltimore and save it as a favorite. Drive several blocks, open the map, pan/zoom/recenter, then close the map and continue. Check that streets and buildings remain visible in both daylight and night.
+2. Return to the main menu, reopen the same location and check that its buildings remain. Quality adaptation should change presentation detail without shrinking the district. Your favorite should still be available.
+3. Switch to another city, then return to Baltimore. Existing presets and custom coordinates remain available. The automated test covers Baltimore → Hollywood → Baltimore and a reload after lower graphics quality.
+4. Switch to aircraft using Travel, fly within the loaded region and return. Compare ground detail and surrounding building coverage. The existing region is finite; this is not an unrestricted worldwide flight test.
+5. If the app reports that roads failed to load, use **Retry roads**. The action should retry the same location through the session owner and should not start duplicate loads while pending.
 
-## Known boundaries
+## Verified on this artifact
 
-This is a restored-coverage and resource-ownership checkpoint, **not the completed worldwide sandbox**. The existing geographic travel boundary remains. Worldwide terrain/building/road handoff, safe coordinate and saved-position transitions, expanded public GIS and convincing distant forest/national-park scenery are unfinished.
+- **2,009 game contracts** and dependency/source/ownership/type/inventory/sensitivity checks pass.
+- Five actual location loads pass all preservation checks. Four downtown Baltimore visits each retain **49,023 buildings / 18,758 roads**, including after graphics quality decreases. Hollywood retains 34,999 / 18,832. Favorites, live frames, healthy renderer, resource loading and held-key isolation pass.
+- Packaged save → retained fallback build → current build passes all three stages. Original/new Journal records, equipment/ammo changes, unknown fields and unrelated pending account data survive in disposable test storage.
+- Three prescribed drive/turn/idle bursts pass without error files. At this guide's starting coordinate, Baltimore retains **48,294/48,834 nearby buildings (98.9%)** and **95% regional** source-building coverage. This differs from the downtown preservation test's coordinate.
+- Packaged-world readiness and immutable artifact verification pass. Hosted build and asset manifests match local bytes. A normal browser without debug attestation entered gameplay with no captured console errors.
 
-Coverage figures describe valid buildings received from the providers, not an independent survey of every real building. All source-identified major footprints were retained in the two measured cities; correct heights/identities for every real-world landmark are not certified. Regional road linework is visible; this does not certify every bridge or route's physical geometry.
+## Still blocking production
 
-## Verified before publication
+The completed long performance run on immediately preceding source 044dd362 passed cleanup/retention but reproduced **533 ms walking and 650 ms driving pauses**, plus some failed FPS budgets. It also exposed the reload coverage bug now fixed. The final city check verifies that repair; it does not establish that stalls are fixed. A separate clean 90-second flight passed (maximum 66.7 ms, no frames over 100 ms), so short smooth flights alone are insufficient release evidence.
 
-- Full game-logic regression: 1,997 contracts and supporting checks pass.
-- Packaged-world readiness, controls and resources check passes.
-- Nearby/regional coverage: Baltimore 98.9% / 95%; London 91.5% / 95%.
-- Clean Baltimore 90-second flight: 46.35 FPS, maximum frame 66.6 ms, no frames over 100 ms. London remains a performance failure (216.6/400.1 ms cluster).
-- Mapped-road retirement/return, worker failure/cancellation/fallback, source deadlines and resource disposal tested.
-- Desktop and phone-viewport map pan/zoom/recenter/close, input isolation, search-label accessibility and control layout pass. These are not physical-device acceptance.
-- Hosted build and asset manifests byte-match the local immutable artifact. A normal browser loads Baltimore and live weather without debug attestation; no error-console entries. Exact Overpass transport was unavailable and used the existing generalized fallback. The separate automated hosted attempt received authorization errors and is not recorded as passing.
+The complete current 91-gate candidate matrix and 3 backend groups have not passed for this artifact. Ordinary hosted sign-in/shared/save recovery, named physical iOS/Android devices and uncoached fresh-player acceptance remain outstanding. Phone-viewport tests do not substitute for actual mobile hardware.
 
-Build: `5.4.0+abb8e8a9274a.0218ea3cefb3aa7c.staging`. All prior artifacts, source history, four saved candidates and existing player data are preserved.
+Continuous source/terrain/building/road handoff, safe geographic save and frame transitions, broad public GIS expansion and convincing distant ecology remain unfinished. Continuous travel must eventually be optional and must preserve the location session when turned off; this preview contains no working worldwide toggle. See [remaining acceptance gates](WORLDWIDE-READINESS.md).
+
+Coverage percentages describe valid buildings received from providers, not an independent survey of every real building. Source-identified major footprints do not establish correct heights/identities for every landmark. Visible regional road linework does not certify every bridge or physical route.
+
+Build: `5.4.0+86fdc6e3e6a2.febba16c0a5e3daa.staging`. Source history, prior artifacts, four saved candidates and existing player data are preserved. No GitHub push or production promotion was performed.
