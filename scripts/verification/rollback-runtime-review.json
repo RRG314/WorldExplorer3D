@@ -1,8 +1,8 @@
 {
   "schema": "we3d-reviewed-rollback-runtime-v1",
-  "id": "journal-v5-backpack-v2-location-preservation-20261006",
+  "id": "journal-v5-backpack-v2-world-lifecycle-20261006",
   "fallbackCommit": "37a12d117111446a128888384df67ac52445d972",
-  "scope": "Fixed-location coverage, scene compilation and memory repairs since the retained free-data fallback. Save/migration, equipment, account, shared-room, backend and Firebase configuration owners remain byte-identical. The coordinate helper consolidates conversions without rebasing the active origin. Exact reviewed runtime bytes are pinned below; actual packaged upgrade/fallback/write/return remains required. This review does not certify worldwide streaming or performance.",
+  "scope": "Existing fixed-location coverage/resource work plus current request admission, provider ownership, terminal failure, readiness and deferred-work repair. Save/migration, equipment, account, room, backend and Firebase configuration owners are unchanged. Failed loads cannot restore or stamp a world; valid location and player schemas remain. Exact reviewed differences are pinned; actual packaged upgrade/fallback/write/return remains required. Does not certify worldwide streaming or performance.",
   "files": {
     "app/index.html": {
       "before": "94bdb7f627e930e09c6e1946aacd6dbbd447c6b332e4629b9dc1153660659ec2",
@@ -45,6 +45,27 @@
       "after": "246695973e20f863c8a796615262b27eeb619c8ce7cf704c0ae873e4bbf098af",
       "afterMode": "100644",
       "review": "Fixed-location regional compilation, staged publication and cancellation/resource retirement. Does not initiate movement-based source windows or write a durable world/player record. Existing coverage and lifecycle acceptance required."
+    },
+    "app/js/earth-core/world-load-request.js": {
+      "review": "Rejects absent/blank coordinates before admitting a load. No saved location schema, coordinates of valid records or persistence owner changes.",
+      "beforeMode": "100644",
+      "before": "4b71110fc475c2a0b90c860bc1bdbac7c48f271c7937d37a50b89d0f469f281d",
+      "afterMode": "100644",
+      "after": "0e958a2a427bd8b0c166a6314b31a69b2615a9f7ea5910fb7592b2c70baf2077"
+    },
+    "app/js/earth-core/world-readiness.js": {
+      "review": "Pure validation of current in-memory publication/session identity. No state mutation or persistence writes.",
+      "beforeMode": null,
+      "before": null,
+      "afterMode": "100644",
+      "after": "b0d95fc69febae8cc169ed483f763611ea0c0f34cf6bce0f42a7d1a92263602a"
+    },
+    "app/js/earth-session.js": {
+      "review": "Resume and reload reject unsuccessful world publications before restoring pose or stamping the loaded selection; successful pose restoration and existing save owners are retained. Actual failure/retry and packaged save roundtrip required.",
+      "beforeMode": "100644",
+      "before": "3406a7dac638ad2e2d22c2ebbb4127f4cb432d7bdce002ccc2ee88b62b92cf3d",
+      "afterMode": "100644",
+      "after": "4de5a4973066872f5b161dc832268832b5fee5db56959d1d5cf929b04525046e"
     },
     "app/js/engine/building-facade-materials.js": {
       "before": "cb740f60cfaff53fcce15bb53313243660014614c50f0f19137984a7c612d04d",
@@ -101,6 +122,13 @@
       "after": "c75a4d8a6d0e6e461e4989280ea7202f2b7d63b4dd3edc9b008cb4b43b6d2e59",
       "afterMode": "100644",
       "review": "Bounded road render/contact residency within the existing fixed source catalog and shared road-mask ownership. Existing retry calls the existing session capture/reload authority. No new save schema, geographic migration, room authority or persistent write protocol."
+    },
+    "app/js/runtime/workload-policy.js": {
+      "review": "Transient deferred-task freshness and completion retention only; no persisted task format or account state.",
+      "beforeMode": "100644",
+      "before": "906650cb92037aa8437f9dac05c2c0209ccd28dfdd2513e165c8a5ceedf0e003",
+      "afterMode": "100644",
+      "after": "f2a3c6b8529632b34f6cfba629f6cb324e3dbee08726eae9bc1722cec35b6ebd"
     },
     "app/js/surface-rules.js": {
       "before": "ea104bd9fdf47651542a6e4832f4946e5181df36a91c94a2b8da18a1900949e7",
@@ -298,6 +326,13 @@
       "afterMode": "100644",
       "review": "Bounded road render/contact residency within the existing fixed source catalog and shared road-mask ownership. Existing retry calls the existing session capture/reload authority. No new save schema, geographic migration, room authority or persistent write protocol."
     },
+    "app/js/ui/title-screen.js": {
+      "review": "Requires the same ready-world predicate before spawning or stamping a selected location. Failed entry restores the visible selector. Existing saved selections and title controls remain. Exploration prompt begins only after successful entry; timed dismissal releases its listener.",
+      "beforeMode": "100644",
+      "before": "0a874820611be2ff3381dfd18fe59ee428e0197a3aa777582ae1b60b4f53bb64",
+      "afterMode": "100644",
+      "after": "d4fd000a56bb3e65ba846206c2384f59595c4925725c6fc8ee2991b072511903"
+    },
     "app/js/world/budgets.js": {
       "before": "823757a17a17833c31c012691bc6f202289f0d6fd38532b7feff6244540d2ecb",
       "beforeMode": "100644",
@@ -382,6 +417,13 @@
       "afterMode": "100644",
       "review": "Building geometry and private temporary-buffer lifetime only. Tests require unchanged final triangle attributes, source-building edit boundaries and retained shared buffers. No persistent data writes or identity migration."
     },
+    "app/js/world/load-failure.js": {
+      "review": "Centralizes rejected-world resource retirement under current runtime identity; does not delete player records, favorites, account data or saved sessions.",
+      "beforeMode": null,
+      "before": null,
+      "afterMode": "100644",
+      "after": "21775095eb72a449d0ab08796cfa425eb8ac81d387e6edd80fa312b3bedced4b"
+    },
     "app/js/world/load-geometry.js": {
       "before": "31f452f553af96784ea0e3d2cc7df939c169d676b9ad9494a7c64d40f3bfb3fa",
       "beforeMode": "100644",
@@ -389,12 +431,19 @@
       "afterMode": "100644",
       "review": "Building geometry and private temporary-buffer lifetime only. Tests require unchanged final triangle attributes, source-building edit boundaries and retained shared buffers. No persistent data writes or identity migration."
     },
-    "app/js/world/load-runtime-session.js": {
-      "before": "561afb54eda9cc0a739312b40d798c13815a542294be84b80eb05f977cbcf26b",
+    "app/js/world/load-roads.js": {
+      "review": "Admits valid selection before reset, drains request-owned providers, awaits finalization and routes exceptions through guarded cleanup. Existing location and persistent source authorities remain.",
       "beforeMode": "100644",
-      "after": "62611ee4d76e81ae5bdf2da467a712107daf0841aed7c9c506bc45123eb9089f",
+      "before": "161cfd5773b61056e927975487d954fc594fed53e908ef7b1943be8d082c983e",
       "afterMode": "100644",
-      "review": "Restores coverage and land-purpose/physical-cover classification with bounded source caches. Location presets, source IDs, saved map preferences and schema owners are preserved; current real-city coverage must be tested. The final October 6 fix keeps the desktop building publication/collision district fixed across automatic quality changes. It retains the existing fixed mobile radius and presentation quality state. No saved location, coordinate origin or persistent record is replaced."
+      "after": "088b2b3fd30ee2c91571bc4c874a0b98b778ddef84b97147468ba20c69a05180"
+    },
+    "app/js/world/load-runtime-session.js": {
+      "review": "Moves request validation before destructive reset, owns provider admission/drain, and guards publication-specific ambient work. The established successful world publication and save owners remain.",
+      "beforeMode": "100644",
+      "before": "561afb54eda9cc0a739312b40d798c13815a542294be84b80eb05f977cbcf26b",
+      "afterMode": "100644",
+      "after": "583bb72052cb5fdeb70f843d0e66933f9e6ad33718b1a3f2a5b8c2d51a4739e0"
     },
     "app/js/world/pavement-terrain-mask.js": {
       "before": "15327bb63fc26f4f81b6a486d73442b4d2b1cb07107e4d2da1b0ac1f234e171e",
@@ -438,6 +487,13 @@
       "afterMode": "100644",
       "review": "Pavement material detail and lifecycle-managed authored furniture; terrain/save/protocol owners unchanged."
     },
+    "app/js/world/surface-publication-error.js": {
+      "review": "Existing compiler error delegates to common request-identity-guarded cleanup; no save or migration changes.",
+      "beforeMode": "100644",
+      "before": "fba8d3f757faf4e04c74ef50a18fa6c06df67660ef0ce8926d96d8769417891a",
+      "afterMode": "100644",
+      "after": "3284ecc61382dca950c05bfb01be31a19e5ff5b9c5c535c81a721582de546973"
+    },
     "app/js/world/vegetation.js": {
       "before": "6cadc778abba8a909bb5e6d7df8dd6bb51213a4ba5d303a109b36f8f0c1f20f4",
       "beforeMode": "100644",
@@ -445,12 +501,33 @@
       "afterMode": "100644",
       "review": "Existing placement pipeline accepts authored planter trees; transient placement and collision clearance only."
     },
+    "app/js/world/world-load-coordinator.js": {
+      "review": "Rejects invalid requests before cancelling in-flight work; existing request coalescing and ordered replacement retained.",
+      "beforeMode": "100644",
+      "before": "41b82ed2b8efab6091428297fb22a8822fc34b241c5120fd5136c7fccd1081a9",
+      "afterMode": "100644",
+      "after": "30d4d446201a47d2070804504f77f0289be55212615aafc51c7a6dcb3eecd23c"
+    },
+    "config/context-write-allowlist.json": {
+      "review": "Static guard registration moves failed-world state writes to the new common owner; no guard disabled or runtime behavior configured.",
+      "beforeMode": "100644",
+      "before": "80d58ce0305e25b6358ed606db89ac88da6f0eb1773cd36fb0c303290ef0acb2",
+      "afterMode": "100644",
+      "after": "2e3f7863d3363f485f2979a9479b81c0b99debd647aaeca9f5d15c88ef557794"
+    },
     "config/system-release-gates.json": {
       "before": "d5184bd18f6b116f90c94820c9b6581750722fdb82217ad44fb0d5a5f752fbae",
       "beforeMode": "100644",
       "after": "524378b731e64c12ca3883c14b54800b0a30349f58fe7fae34a264bac3970ebf",
       "afterMode": "100644",
       "review": "Adds the actual packaged city-switch preservation gate and its Earth-compilation assertion. Existing release gate commands, limits and approval requirements remain unchanged. This release configuration has no client persistence or backend protocol behavior."
+    },
+    "docs/system-review/2026-10-06/inventory-summary.json": {
+      "review": "Audit metadata classified fail-closed as runtime by fingerprint tool; not shipped or imported by gameplay. Contains source inventory counts, not player data.",
+      "beforeMode": null,
+      "before": null,
+      "afterMode": "100644",
+      "after": "cc545151be841117aa19e073cb19a75c66686f6841197eb4b34e56f2fa1add56"
     },
     "scripts/hosting-artifact.mjs": {
       "before": "1ebfedce6aac9d44fe62d9496c1d48063669a948ee35de4642ee717d9f0fae20",

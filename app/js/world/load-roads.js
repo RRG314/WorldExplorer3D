@@ -1160,6 +1160,9 @@ export function createWorldRoadLoader(deps = {}) {
       worldSession
     });
     } catch(error) {
+      // Retire resources only after already-launched providers have stopped;
+      // a delayed completion must not repopulate an owner during disposal.
+      await session.drainProviderWork('world-load-failed');
       if (!session.isActiveLoadContext()) {
         return finishSupersededWorldLoadRuntimeSession(session, 'superseded-after-load-error');
       }

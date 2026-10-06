@@ -23,7 +23,7 @@ const browserErrors = [];
 const localFailures = [];
 const cancelledLocationRequests = [];
 const pendingRequests = new Set();
-const supersededRequests = new WeakSet();
+const supersededRequests = new WeakMap();
 page.on('request', request => pendingRequests.add(request));
 page.on('requestfinished', request => pendingRequests.delete(request));
 page.on('pageerror', (error) => browserErrors.push(String(error?.stack || error)));
@@ -35,7 +35,7 @@ page.on('response', (response) => {
 page.on('requestfailed', (request) => {
   pendingRequests.delete(request);
   if (supersededRequests.has(request) && request.failure()?.errorText === 'net::ERR_ABORTED') {
-    cancelledLocationRequests.push({ url: request.url(), reason: 'superseded-location' });
+    cancelledLocationRequests.push({ url: request.url(), reason: supersededRequests.get(request) });
     return;
   }
   if (request.url().startsWith(baseUrl)) {
@@ -43,10 +43,10 @@ page.on('requestfailed', (request) => {
   }
 });
 
-function markSupersededLocationRequests() {
+function markSupersededLocationRequests(reason = 'superseded-location') {
   for (const request of pendingRequests) {
     const url = new URL(request.url());
-    if (url.origin === baseUrl && url.pathname === '/api/geospatial/marine') supersededRequests.add(request);
+    if (url.origin === baseUrl && url.pathname === '/api/geospatial/marine') supersededRequests.set(request, reason);
   }
 }
 
@@ -140,6 +140,9 @@ try {
   originalFavorites.push(...await page.evaluate(() => JSON.parse(localStorage.getItem('worldExplorer3D.globeSelector.savedFavorites') || '[]')));
   assert.ok(originalFavorites.length > 0, 'The current selected place must be saved');
   logStep('injecting one ground-provider failure before entry, then retrying through the visible menu');
+  // Match only marine requests already pending at the deliberately triggered
+  // retirement boundary. Do not ignore unrelated aborts or HTTP failures.
+  await page.exposeFunction('__we3dAuditProviderWillFail', () => markSupersededLocationRequests('injected-failure-retirement'));
   await page.evaluate(async () => {
     const {ctx} = await import('/app/js/shared-context.js?v=55');
     await ctx.ensureEarthRuntimeReady();
@@ -147,9 +150,11 @@ try {
     if (typeof prepare !== 'function') throw Error('Ground provider boundary unavailable');
     ctx.prepareAcceptedGroundFromCatalog = async (...args) => {
       ctx.prepareAcceptedGroundFromCatalog = prepare;
+      await globalThis.__we3dAuditProviderWillFail();
       throw Error('audit-injected-ground-failure');
     };
   });
+  markSupersededLocationRequests('first-world-entry');
   await page.locator('#globeSelectorStartBtn').click();
   await page.waitForFunction(async () => {
     const {ctx} = await import('/app/js/shared-context.js?v=55');
@@ -161,13 +166,15 @@ try {
     return {started:ctx.gameStarted, ready:ctx.initialEarthWorldReady, publication:!!ctx.worldPublication,
       loading:ctx.worldLoading, buildings:ctx.buildings.length, roads:ctx.roads.length,
       providers:ctx.worldLoadRuntimeState.session.outstandingProviderWork,
-      error:ctx.worldLoadRuntimeState.error, loadingCover:document.getElementById('loading').classList.contains('show')};
+      error:ctx.worldLoadRuntimeState.error, explorationPrompt:getComputedStyle(document.getElementById('explorationModeMsg')).display, loadingCover:document.getElementById('loading').classList.contains('show')};
   });
   assert.equal(failedLoad.started, false);assert.equal(failedLoad.ready, false);
   assert.equal(failedLoad.publication, false);assert.equal(failedLoad.loadingCover, false);
+  assert.equal(failedLoad.explorationPrompt, 'none');
   assert.equal(failedLoad.buildings, 0);assert.equal(failedLoad.roads, 0);assert.equal(failedLoad.providers, 0);
   assert.match(failedLoad.error, /audit-injected-ground-failure/);
   await page.screenshot({path:`${outputDir}/failed-load-recovered-menu.png`});
+  markSupersededLocationRequests('failed-world-retry');
   await page.locator('#globeSelectorStartBtn').click();
   logStep('waiting for initial Baltimore world');
   await waitForWorld(39.2904, -76.6122);

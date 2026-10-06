@@ -708,28 +708,6 @@ function initTitleScreenUi({
     appCtx.ensureEnginePbrTextures?.();
     commitEnvironment(ENV.EARTH, { source: 'title_earth_start' });
     resetTitleEarthTravelMode('title_earth_start');
-    const explorationMsg = document.getElementById('explorationModeMsg');
-    let explorationMsgTimeout;
-    if (explorationMsg && !isTouchPreferredClient) {
-      explorationMsg.style.display = 'block';
-      explorationMsg.style.opacity = '0';
-      const hideExplorationMsg = () => {
-        if (explorationMsgTimeout) clearTimeout(explorationMsgTimeout);
-        explorationMsg.style.opacity = '0';
-        setTimeout(() => {
-          explorationMsg.style.display = 'none';
-        }, 500);
-      };
-      explorationMsg.addEventListener('click', hideExplorationMsg, { once: true });
-      setTimeout(() => {
-        explorationMsg.style.transition = 'opacity 0.5s';
-        explorationMsg.style.opacity = '1';
-      }, 100);
-      explorationMsgTimeout = setTimeout(() => hideExplorationMsg(), 5000);
-    } else if (explorationMsg) {
-      explorationMsg.style.display = 'none';
-    }
-
     const earthLoadResult = await appCtx.loadRoads();
     if (!isEarthWorldUsable(appCtx, earthLoadResult)) {
       appCtx.gameStarted=false;
@@ -786,6 +764,30 @@ function initTitleScreenUi({
     document.getElementById('fPaths')?.classList.remove('on');
     document.getElementById('fLandUse')?.classList.remove('on');
     document.getElementById('fLandUseRE')?.classList.remove('on');
+    // Announce exploration only after the successful gameplay handoff.
+    const explorationMsg = document.getElementById('explorationModeMsg');
+    let explorationMsgTimeout;
+    if (explorationMsg && !isTouchPreferredClient) {
+      explorationMsg.style.display = 'block';
+      explorationMsg.style.opacity = '0';
+      const hideExplorationMsg = () => {
+        if (explorationMsgTimeout) clearTimeout(explorationMsgTimeout);
+        explorationMsg.removeEventListener('click', hideExplorationMsg);
+        explorationMsg.style.opacity = '0';
+        setTimeout(() => {
+          explorationMsg.style.display = 'none';
+        }, 500);
+      };
+      explorationMsg.addEventListener('click', hideExplorationMsg, { once: true });
+      setTimeout(() => {
+        explorationMsg.style.transition = 'opacity 0.5s';
+        explorationMsg.style.opacity = '1';
+      }, 100);
+      explorationMsgTimeout = setTimeout(() => hideExplorationMsg(), 5000);
+    } else if (explorationMsg) {
+      explorationMsg.style.display = 'none';
+    }
+
     // World publication and all entry-mode setup are complete. A late optional
     // loader may have reasserted the transition overlay after loadRoads hid it;
     // the title launch owns the final handoff to playable input.

@@ -44,7 +44,9 @@ test('failed Earth reload cannot restore, render or stamp a location; a later va
  let poses=0,renders=0,stamps=0;
  Object.assign(replacements,{applyResolvedWorldSpawn:()=>poses++,prepareFirstWorldRender:()=>renders++,
   markLocationSelectionLoaded:()=>stamps++,setTravelMode(){}});
- const saved=new Map(Object.keys(replacements).map(k=>[k,Object.getOwnPropertyDescriptor(ctx,k)]));
+ const savedKeys=new Set([...Object.keys(replacements),'_worldLoadSequence','worldPublication','worldLoading',
+  'earthResumeDiagnostics','earthResumePending','earthResumeRenderReady']);
+ const saved=new Map([...savedKeys].map(k=>[k,Object.getOwnPropertyDescriptor(ctx,k)]));
  const frame=globalThis.requestAnimationFrame;
  t.after(()=>{for(const [k,d]of saved)d?Object.defineProperty(ctx,k,d):delete ctx[k];if(frame)globalThis.requestAnimationFrame=frame;else delete globalThis.requestAnimationFrame;});
  Object.assign(ctx,replacements);
