@@ -381,6 +381,7 @@ export async function loadBuildingDetailForPublication(options = {}) {
         coveragePolicy: {
           publicationDomain: options.loadMetrics.buildings.publicationDomain,
           globalCap: publicationSelection.globalCap,
+          budgetExceeded: requested.length > publicationSelection.globalCap,
           targetRatio: publicationSelection.coverageTarget,
           basePerTile: publicationSelection.basePerTile,
           recursiveTileThinning: publicationSelection.useRdt,

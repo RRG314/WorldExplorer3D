@@ -1,6 +1,6 @@
 # Current development and release state
 
-Updated October 6, 2026. Current request: restore at least 90% building coverage and all identified major buildings, roads, recognizable land uses, public GIS and a bounded continuous Earth. Free data only; local implementation. **Coverage restoration is implemented; continuous geographic streaming and expanded GIS/ecology are not complete. Production is not cleared.**
+Updated October 6, 2026. Current request: restore at least 90% building coverage and all identified major buildings, roads, recognizable land uses, public GIS and a bounded continuous Earth. Free data only; local implementation. **Regional coverage is restored, but a stronger check found the detailed district retained only53%of available buildings; its correction is now in progress. Continuous geographic streaming and expanded GIS/ecology are not complete. Production is not cleared.**
 
 Details: [FREE-ENVIRONMENT-DATA.md](docs/release-review/2026-10-05/FREE-ENVIRONMENT-DATA.md). Visual work: [REFERENCE-BLOCK.md](docs/visual-quality/REFERENCE-BLOCK.md). Earlier architecture acceptance: [LOCAL-RESULT.md](docs/system-review/2026-10-04/LOCAL-RESULT.md).
 

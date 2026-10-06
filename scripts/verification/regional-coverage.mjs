@@ -123,6 +123,14 @@ try{
  }
 
  report.after=await page.evaluate(()=>{const s=globalThis.getWorldExplorerRuntimeDiagnostics();return {actor:s.activeActor,counts:s.worldCounts,far:s.farTerrainClipmap,runtimeErrors:s.runtimeErrors};});
+ await page.evaluate(()=>{delete globalThis.__WE3D_TRAVEL_ACTOR__;});
+ await page.locator('#mainMenuBtn').click();
+ await page.waitForFunction(()=>{const s=globalThis.getWorldExplorerRuntimeDiagnostics?.();return s?.gameStarted===false&&s.lastEarthWorldRelease?.released===true;},null,{timeout:30000});
+ await page.waitForTimeout(2000);
+ const cdp=await page.context().newCDPSession(page);await cdp.send('HeapProfiler.collectGarbage');
+ report.releasedHeapBytes=(await cdp.send('Runtime.getHeapUsage')).usedSize;
+ report.release=await page.evaluate(()=>{const s=globalThis.getWorldExplorerRuntimeDiagnostics();return {counts:s.worldCounts,streaming:s.lastEarthStreamingRelease};});
+ assert.equal(report.release.counts.buildings,0);assert.equal(report.release.counts.roads,0);assert.equal(report.release.counts.terrainTiles,0);
  if(tag!=='baseline'){
   const near=report.before.buildings;
   assert.equal(near?.status,'ready','Detailed building publication completed');
@@ -138,14 +146,6 @@ try{
  }
  assert.equal(report.pageErrors.length,0);
  assert.equal(report.shaderErrors.length,0);
- await page.evaluate(()=>{delete globalThis.__WE3D_TRAVEL_ACTOR__;});
- await page.locator('#mainMenuBtn').click();
- await page.waitForFunction(()=>{const s=globalThis.getWorldExplorerRuntimeDiagnostics?.();return s?.gameStarted===false&&s.lastEarthWorldRelease?.released===true;},null,{timeout:30000});
- await page.waitForTimeout(2000);
- const cdp=await page.context().newCDPSession(page);await cdp.send('HeapProfiler.collectGarbage');
- report.releasedHeapBytes=(await cdp.send('Runtime.getHeapUsage')).usedSize;
- report.release=await page.evaluate(()=>{const s=globalThis.getWorldExplorerRuntimeDiagnostics();return {counts:s.worldCounts,streaming:s.lastEarthStreamingRelease};});
- assert.equal(report.release.counts.buildings,0);assert.equal(report.release.counts.roads,0);assert.equal(report.release.counts.terrainTiles,0);
  report.coverageAndCleanupPassed=true;
  report.flightStallCheckPassed=report.flight?report.flight.hitches.passed:null;
  // Retain cleanup evidence even when a requested flight check fails. A failed
