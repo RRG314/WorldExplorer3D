@@ -135,16 +135,19 @@ test('failed road readiness retains collision protection and an owned retry with
  };
  t.after(()=>Object.assign(globalThis,prior));
  const {prepareTransportDetail}=await import('../app/js/terrain/transport-detail-runtime.js');
- let captures=0,reloads=0,current=true;
- const ctx={terrainGroup:{children:[]},renderer:{capabilities:{maxTextureSize:4096}},terrainMeshHeightAt:()=>0,
-  captureEarthWorldSession(){captures++;},async reloadEarthWorldSession(){reloads++;throw Error('Controlled retry failure');}};
- const detail=await prepareTransportDetail(ctx,[],{isCurrent:()=>current});t.after(()=>detail.dispose());
+ let reloads=0,current=true,rejectRetry;
+ const ctx={terrainGroup:{children:[]},renderer:{capabilities:{maxTextureSize:4096}},terrainMeshHeightAt:()=>0};
+ const detail=await prepareTransportDetail(ctx,[],{isCurrent:()=>current,retryWorldLoad:()=>{
+  reloads++;return new Promise((_resolve,reject)=>{rejectRetry=reject;});
+ }});t.after(()=>detail.dispose());
  detail.attach(()=>{});assert.equal(detail.readyAt({x:2500,z:300},0),false);
  const button=elements.find(e=>e.tag==='button');assert.equal(button.hidden,true);
  detail.step({x:2500,z:300});await new Promise(r=>setTimeout(r,5));
  assert.equal(detail.readyAt({x:2500,z:300},0),false);assert.equal(button.hidden,false);
  assert.equal(detail.stats.blockedCount,1);assert.equal(detail.stats.status,'failed');
- await button.onclick();assert.equal(captures,1);assert.equal(reloads,1);assert.equal(button.disabled,false);
+ const retry=button.onclick();assert.equal(reloads,1);assert.equal(button.disabled,true);
+ await button.onclick();assert.equal(reloads,1,'a repeated retry must not replace the in-flight load');
+ rejectRetry(Error('Controlled retry failure'));await retry;assert.equal(button.disabled,false);
  assert.equal(detail.readyAt({x:0,z:0},0),true);assert.ok(detail.stats.blockedTotalMs>0);assert.equal(detail.stats.blockedAtMs,null);
  current=false;await button.onclick();assert.equal(reloads,1);detail.dispose();
  assert.equal(elements.find(e=>e.tag==='div').removed,true);

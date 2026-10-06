@@ -5,7 +5,7 @@ import {TRANSPORT_REGION_SIZE,actorNeedsRoadDetail,actorRequestsRoadDetail,
   transportRegionBounds,transportRegionInWindow,transportRegionDistanceSquared,
   TRANSPORT_DETAIL_RADIUS,TRANSPORT_RETENTION_RADIUS,MAX_MOVING_TRANSPORT_REGIONS} from './transport-detail-plan.js';
 
-export async function prepareTransportDetail(appCtx,roads,{isCurrent,focus={x:0,z:0},terrainReady=null}) {
+export async function prepareTransportDetail(appCtx,roads,{isCurrent,focus={x:0,z:0},terrainReady=null,retryWorldLoad=null}) {
   const url=globalThis.__WORLD_EXPLORER_PRODUCTION__?.transportDetailWorkerUrl||new URL('./transport-detail-worker.js',import.meta.url);
   const worker=new Worker(url,{type:'module'});
   let pending=null,disposed=false,active=null,publish=null,complete=null,retire=null,mask=null,notice=null,noticeText=null,retryButton=null,lastSync=0;
@@ -48,9 +48,9 @@ export async function prepareTransportDetail(appCtx,roads,{isCurrent,focus={x:0,
       notice=document.createElement('div');notice.setAttribute('role','status');notice.dataset.transportReadiness='true';
       notice.style.cssText='position:fixed;bottom:100px;left:50%;transform:translateX(-50%);z-index:2000;padding:8px 14px;background:#10202ee8;color:white;border-radius:8px;font:14px sans-serif';
       noticeText=document.createElement('span');notice.append(noticeText);
-      if(typeof appCtx.reloadEarthWorldSession==='function'){
+      if(typeof retryWorldLoad==='function'){
         retryButton=document.createElement('button');retryButton.textContent='Retry roads';retryButton.style.cssText='margin-left:10px;min-height:44px';
-        retryButton.onclick=async()=>{if(disposed||!isCurrent())return;retryButton.disabled=true;appCtx.captureEarthWorldSession?.();try{await appCtx.reloadEarthWorldSession({transitionDurationMs:0});}catch{/* Keep the failed readiness notice available for another attempt. */}finally{if(retryButton&&!disposed)retryButton.disabled=false;}};
+        retryButton.onclick=async()=>{if(disposed||!isCurrent()||retryButton?.disabled)return;retryButton.disabled=true;try{await retryWorldLoad();}catch{/* Keep the failed readiness notice available for another attempt. */}finally{if(retryButton&&!disposed)retryButton.disabled=false;}};
         notice.append(retryButton);
       }
       document.body.appendChild(notice);

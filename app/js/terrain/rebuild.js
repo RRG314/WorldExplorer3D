@@ -1,4 +1,5 @@
 import {prepareTransportDetail} from './transport-detail-runtime.js';
+import {captureEarthWorldSession,reloadEarthWorldSession} from '../earth-session.js?v=17';
 import {createRegionalRoadContact} from './regional-road-contact.js';
 import {transportRegionKey} from './transport-detail-plan.js';
 import { STREET_POLYGON_GRID_WORLD } from '../world/compiler/street-polygon-kernel.js';
@@ -451,7 +452,10 @@ export async function publishCompiledTransportMeshes(deps = {}) {
       if(renderRoad.structureSemantics?.terrainMode==='at_grade'&&renderRoad.pts?.length>=2)planRoads.push(renderRoad);
     }
     const terrainReady=new Promise(resolve=>releaseTerrain=resolve);
-    preparingDetail=prepareTransportDetail(appCtx,planRoads,{isCurrent,terrainReady});
+    preparingDetail=prepareTransportDetail(appCtx,planRoads,{isCurrent,terrainReady,retryWorldLoad:()=>{
+      captureEarthWorldSession();
+      return reloadEarthWorldSession({transitionDurationMs:0});
+    }});
     // The final publication awaits this same promise. Handle early rejection
     // while terrain is still compiling, so cancellation never leaks a worker.
     preparingDetail.catch(()=>{});
