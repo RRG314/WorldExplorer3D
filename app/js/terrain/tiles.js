@@ -38,6 +38,9 @@ let terrainCacheGeneration = 0;
 const TERRAIN_TILE_MAX_ATTEMPTS = 3;
 const TERRAIN_TILE_RETRY_BASE_MS = 300;
 const TERRAIN_TILE_ATTEMPT_TIMEOUT_MS = 2400;
+// Direct mesh loaders also await tile.ready, without the retry-wait wrapper.
+// Every admitted source must settle even if Image dispatches neither event.
+const TERRAIN_TILE_SOURCE_TIMEOUT_MS = 10000;
 const terrainTileLifetime = { failures: 0, retries: 0, recovered: 0 };
 const recentTerrainFailures = new Map();
 const TERRAIN_FAILURE_HISTORY_MS = 30000;
@@ -77,7 +80,9 @@ function touchTerrainTile(tile) {
 }
 
 function failTerrainTileAttempt(tile, reason) {
-  if (!tile || tile.evicted || tile.failed) return;
+  if (!tile || tile.evicted || tile.failed || !tile.loading) return;
+  clearTimeout(tile.attemptTimer);tile.attemptTimer=null;
+  if(tile.img){tile.img.onload=null;tile.img.onerror=null;tile.img.src='';}
   tile.polarAbort?.abort();
   tile.loaded = false;
   tile.loading = false;
@@ -92,9 +97,11 @@ function failTerrainTileAttempt(tile, reason) {
     recentTerrainFailures.delete(recentTerrainFailures.keys().next().value);
   }
   tile.resolveReady?.(false);
+  tile.resolveReady=null;
 }
 
 function startTerrainTileAttempt(tile, z, x, y, deps) {
+  clearTimeout(tile.attemptTimer);tile.attemptTimer=null;
   const img = new Image();
   const attempt = tile.attempts + 1;
   let resolveReady;
@@ -114,11 +121,11 @@ function startTerrainTileAttempt(tile, z, x, y, deps) {
   const polarRequest = fetchPolarElevationTile(z, x, y, {
     signal: tile.polarAbort.signal,
     priority: Math.hypot(x - selectedTile.x, y - selectedTile.y) + Math.max(0, 15 - z) * 100,
-    onError: error => { tile.polarError = error; }
+    onError: error => { if(!tile.evicted&&tile.attempts===attempt)tile.polarError=error; }
   });
 
   img.onload = async () => {
-    if (tile.evicted || tile.attempts !== attempt) {
+    if (tile.evicted || tile.failed || tile.attempts !== attempt) {
       resolveReady(false);
       return;
     }
@@ -140,6 +147,7 @@ function startTerrainTileAttempt(tile, z, x, y, deps) {
       const merged = mergePolarElevation(elev, polar);
       tile.polarMask = merged?.mask || null;
       tile.polarSampleCount = merged?.count || 0;
+      clearTimeout(tile.attemptTimer);tile.attemptTimer=null;
       tile.loaded = true;
       tile.loading = false;
       tile.failed = false;
@@ -148,6 +156,8 @@ function startTerrainTileAttempt(tile, z, x, y, deps) {
       if (tile.recovered) terrainTileLifetime.recovered += 1;
       recentTerrainFailures.delete(tile.key);
       touchTerrainTile(tile);
+      resolveReady(true);
+      tile.resolveReady=null;
 
       if (appCtx.terrainGroup && typeof deps.reapplyTerrainMeshHeights === "function") {
         appCtx.terrainGroup.children.forEach((mesh) => {
@@ -164,13 +174,19 @@ function startTerrainTileAttempt(tile, z, x, y, deps) {
         });
       }
 
-      resolveReady(true);
     } catch (error) {
+      if(tile.evicted||tile.attempts!==attempt){resolveReady(false);return;}
       console.warn("Terrain tile decode failed:", z, x, y, error);
       failTerrainTileAttempt(tile, error);
     }
   };
-  img.onerror = () => failTerrainTileAttempt(tile, "terrain tile image request failed");
+  img.onerror = () => {
+    if(!tile.evicted&&tile.attempts===attempt)failTerrainTileAttempt(tile,"terrain tile image request failed");
+  };
+  const sourceTimeout=isPolarElevationTile(z,x,y)?11000:TERRAIN_TILE_SOURCE_TIMEOUT_MS;
+  tile.attemptTimer=setTimeout(()=>{
+    if(!tile.evicted&&tile.attempts===attempt)failTerrainTileAttempt(tile,`terrain tile source timed out after ${sourceTimeout}ms`);
+  },sourceTimeout);
   img.src = appCtx.TERRAIN_TILE_URL(z, x, y);
   return tile;
 }
@@ -277,6 +293,7 @@ export function terrainTileCacheSnapshot() {
 function releaseTerrainTile(tile) {
   if (!tile) return;
   tile.evicted = true;
+  clearTimeout(tile.attemptTimer);tile.attemptTimer=null;
   tile.resolveReady?.(false);
   tile.resolveReady = null;
   if (tile.img) {

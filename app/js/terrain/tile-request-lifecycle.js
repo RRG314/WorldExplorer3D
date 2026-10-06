@@ -4,6 +4,7 @@ export function cancelTerrainTileRequest(cache, z, x, y) {
   if (!tile || !tile.loading) return false;
   cache.delete(key);
   tile.evicted = true;
+  clearTimeout(tile.attemptTimer);tile.attemptTimer=null;
   tile.loading = false;
   tile.polarAbort?.abort();
   if (tile.img) {

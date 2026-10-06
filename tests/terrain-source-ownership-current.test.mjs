@@ -110,3 +110,33 @@ test('post-compilation pruning retains detailed mesh sources and their shared ea
   assert.equal(ctx.terrainTileCache.get(next.key),next);
   clearTerrainTileCache();
 });
+
+
+test('direct image readiness has an owner deadline, and stale callbacks cannot fail a retry',async t=>{
+  setup();t.mock.timers.enable({apis:['setTimeout']});
+  const tile=getOrLoadTerrainTile(15,9466,12518),ready=tile.ready;
+  const lateError=tile.img.onerror,lateLoad=tile.img.onload;
+  t.mock.timers.tick(9999);assert.equal(tile.loading,true);
+  t.mock.timers.tick(1);assert.equal(await ready,false);
+  assert.equal(tile.failed,true);assert.equal(tile.loading,false);assert.equal(tile.attemptTimer,null);
+  assert.equal(tile.img.url,'');assert.equal(tile.img.onload,null);assert.equal(tile.img.onerror,null);
+  tile.nextRetryAt=0;getOrLoadTerrainTile(15,9466,12518);
+  assert.equal(tile.attempts,2);const nextReady=tile.ready,nextImage=tile.img;
+  lateError();await lateLoad();
+  assert.equal(tile.loading,true);assert.equal(tile.failed,false);assert.equal(tile.img,nextImage);
+  clearTerrainTileCache();assert.equal(await nextReady,false);
+  t.mock.timers.tick(11000);assert.equal(terrainTileCacheSnapshot().entries,0);
+});
+
+test('successful decode retires its deadline and cannot fail after publication',async t=>{
+  setup();t.mock.timers.enable({apis:['setTimeout']});
+  const priorDocument=globalThis.document;
+  globalThis.document={createElement:()=>({getContext:()=>({drawImage(){},getImageData:()=>({data:new Uint8ClampedArray(256*256*4)})})})};
+  try{
+    const tile=getOrLoadTerrainTile(15,9466,12518),ready=tile.ready,error=tile.img.onerror;
+    await tile.img.onload();assert.equal(await ready,true);assert.equal(tile.attemptTimer,null);
+    const failures=terrainTileCacheSnapshot().failures;
+    t.mock.timers.tick(11000);error();
+    assert.equal(tile.loaded,true);assert.equal(tile.failed,false);assert.equal(terrainTileCacheSnapshot().failures,failures);
+  }finally{clearTerrainTileCache();if(priorDocument===undefined)delete globalThis.document;else globalThis.document=priorDocument;}
+});

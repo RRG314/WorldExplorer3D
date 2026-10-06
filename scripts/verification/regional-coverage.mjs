@@ -22,12 +22,15 @@ const out=`output/verification/continuous-world/${tag}`;
 await fs.mkdir(out,{recursive:true});
 const flightSeconds=Math.max(0,Math.min(120,Number(process.env.WE3D_COVERAGE_FLIGHT_SECONDS)||0));
 const profileFlight=process.env.WE3D_COVERAGE_PROFILE==='1';
-const owned=await chromium.launchServer({headless:true,channel:'chrome',args:flightSeconds?[]:['--js-flags=--max-old-space-size=1536']});
+const profileLoad=process.env.WE3D_COVERAGE_LOAD_PROFILE==='1';
+const owned=await chromium.launchServer({headless:true,channel:'chrome',args:flightSeconds||profileLoad?[]:['--js-flags=--max-old-space-size=1536']});
 const browser=await chromium.connect(owned.wsEndpoint());
-const report={ok:false,scope:'Regional coverage and controlled day/night cameras; not worldwide streaming acceptance',location,instrumented:profileFlight,pageErrors:[],shaderErrors:[]};
+const report={ok:false,scope:'Regional coverage and controlled day/night cameras; not worldwide streaming acceptance',location,instrumented:profileFlight||profileLoad,pageErrors:[],shaderErrors:[]};
 try{
  const page=await browser.newPage({viewport:{width:1440,height:900}});
  await configureStagingAppCheck(page,base);
+ const loadProfiler=profileLoad?await page.context().newCDPSession(page):null;
+ if(loadProfiler)await loadProfiler.send('HeapProfiler.startSampling',{samplingInterval:131072});
  page.on('pageerror',e=>report.pageErrors.push(String(e)));
  page.on('console',message=>{if(message.type()==='error'&&/WebGL|shader|GL_INVALID/i.test(message.text())&&report.shaderErrors.length<20)report.shaderErrors.push(message.text().slice(0,10000));});
  report.build=await fetch(base+'/build-manifest.json').then(r=>r.json()).then(m=>({buildId:m.buildId,commit:m.commit,sourceDirty:m.sourceDirty}));
@@ -39,6 +42,11 @@ try{
  await page.getByRole('button',{name:'Explore',exact:true}).click();
  await page.waitForFunction(()=>{const s=globalThis.getWorldExplorerRuntimeDiagnostics?.();return s?.gameStarted&&!s.worldLoading&&s.farTerrainClipmap?.status==='ready'&&!document.getElementById('loading')?.classList.contains('show');},null,{timeout:360000,polling:500});
  report.loadMs=Date.now()-start;
+ if(loadProfiler){
+  report.loadedHeap=await loadProfiler.send('Runtime.getHeapUsage');
+  await fs.writeFile(`${out}/load-allocation.json`,JSON.stringify({scope:'Instrumented construction allocations still present at ready; not a heap-retention or performance pass',...await loadProfiler.send('HeapProfiler.stopSampling')}));
+  await loadProfiler.detach();
+ }
  report.programFailures=await page.evaluate(async()=>{const {ctx}=await import('/app/js/shared-context.js?v=55');return (ctx.renderer.info.programs||[]).filter(p=>p.diagnostics?.runnable===false).map(p=>({name:p.name,diagnostics:p.diagnostics}));});
  if(report.shaderErrors.length||report.programFailures.length)throw new Error('Terrain/WebGL shader compilation failed; see shaderErrors/programFailures');
  report.terrainCache=await page.evaluate(async()=>{const {ctx}=await import('/app/js/shared-context.js?v=55');return ctx.terrainTileCacheSnapshot();});

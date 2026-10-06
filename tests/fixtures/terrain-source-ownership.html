@@ -38,7 +38,24 @@ function draw(){
  paint.fillText('This is a lifecycle test, not world imagery.',35,660);
 }
 try{
- await load();draw();window.fixtureReady=true;
+ await load();
+ if(new URLSearchParams(location.search).has('deadline')){
+  clearTerrainTileCache();
+  const normalUrl=ctx.TERRAIN_TILE_URL;
+  ctx.TERRAIN_TILE_URL=()=>{requests++;return '/we3d-stalled-terrain.png';};
+  const stalled=getOrLoadTerrainTile(15,center.x,center.y),lateError=stalled.img.onerror;
+  const started=performance.now();
+  assert(await stalled.ready===false,'Unanswered direct image did not fail');
+  const elapsed=performance.now()-started;
+  assert(elapsed>=9900&&elapsed<16000,'Image request exceeded its owner deadline');
+  assert(stalled.failed&&stalled.attemptTimer===null,'Failed source retained its timer');
+  ctx.TERRAIN_TILE_URL=normalUrl;stalled.nextRetryAt=0;
+  const retry=getOrLoadTerrainTile(15,center.x,center.y);lateError();
+  assert(await retry.ready===true&&retry.loaded,'Old callback corrupted the retry');
+  history.push({stage:'deadline-and-recovery',elapsedMs:Math.round(elapsed),attempts:retry.attempts});
+  clearTerrainTileCache();await load();
+ }
+ draw();window.fixtureReady=true;
  document.addEventListener('keydown',event=>{if(event.key==='ArrowLeft'||event.key==='ArrowRight')operation=operation.then(()=>event.key==='ArrowLeft'?load():retire()).then(draw).catch(error=>{window.fixtureError=String(error.stack||error);throw error;});});
  window.advanceTime=async()=>{await operation;draw();};
  window.render_game_to_text=()=>JSON.stringify({ready:window.fixtureReady,error:window.fixtureError||null,requests,queries,cycles,cache:terrainTileCacheSnapshot(),history});
