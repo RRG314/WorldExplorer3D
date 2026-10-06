@@ -332,6 +332,10 @@ function createFarFieldTerrainApi(deps = {}) {
     };
 
     const mappedBuildings = mappedContext?.buildings || [];
+    const packedDescriptors = typeof mappedBuildings.read === 'function';
+    const descriptorScratch = { massing: { color: [0,0,0] } };
+    const centerScratch = {};
+    const retireDescriptors = () => packedDescriptors ? mappedBuildings.dispose() : (mappedBuildings.length = 0);
     const instances=new FarBuildingInstanceStorage(mappedBuildings.length);
     let buildingSliceStarted = performance.now();
     try {
@@ -341,14 +345,14 @@ function createFarFieldTerrainApi(deps = {}) {
         await yieldToMainThread();
         buildingSliceStarted = performance.now();
       }
-      const building = mappedBuildings[buildingIndex];
+      const building = packedDescriptors ? mappedBuildings.read(buildingIndex, descriptorScratch) : mappedBuildings[buildingIndex];
       // The loader hands this compiler exclusive descriptors. Retire each one
       // as it is consumed instead of promoting an entire second city into the
       // main-thread old generation while GPU construction is underway.
-      mappedBuildings[buildingIndex]=null;
+      if (!packedDescriptors) mappedBuildings[buildingIndex]=null;
       // Ground, height and eligibility are shared by both visual LODs. Losing
       // vertices while simplifying a polygon must not delete a valid building.
-      const center = appCtx.geoToWorld(building.centerLat, building.centerLon);
+      const center = appCtx.geoToWorld(building.centerLat, building.centerLon, centerScratch);
       if (center.x < spec.outer.minX || center.x > spec.outer.maxX ||
           center.z < spec.outer.minZ || center.z > spec.outer.maxZ) {
         rejectedBuildings.outside++; continue;
@@ -356,7 +360,8 @@ function createFarFieldTerrainApi(deps = {}) {
       const groundMeters = groundMetersAt(building.centerLat, building.centerLon);
       if (!Number.isFinite(groundMeters)) { rejectedBuildings.missingGround++; continue; }
       const areaWorld = Number(building.areaMeters) * unitsPerMeter * unitsPerMeter;
-      const massing = resolveFarBuildingMassing(building, null, areaWorld, unitsPerMeter);
+      const massing = packedDescriptors ? (building.validMassing ? building.massing : null)
+        : resolveFarBuildingMassing(building, null, areaWorld, unitsPerMeter);
       if (!massing) { rejectedBuildings.implausibleMassing++; continue; }
       const baseY = groundMeters * unitsPerMeter * yExaggeration + 0.25;
       const footprint = farBuildingRenderFootprint(building, appCtx.geoToWorld, unitsPerMeter);
@@ -401,7 +406,7 @@ function createFarFieldTerrainApi(deps = {}) {
       exactPublished += 1;
     }
 
-    mappedBuildings.length=0;
+    retireDescriptors();
     let geometry = null;
     if (exactPublished > 0) {
       geometry = new THREE.BufferGeometry();
@@ -425,7 +430,7 @@ function createFarFieldTerrainApi(deps = {}) {
       heightAuthority: 'shared-building-semantics',
       buildings: exactPublished + instances.length
     };
-    } catch(error) {mappedBuildings.length=0;instances.dispose();throw error;}
+    } catch(error) {retireDescriptors();instances.dispose();throw error;}
   }
 
   async function buildAndPublish(spec, requestGeneration, signal) {
@@ -463,6 +468,8 @@ function createFarFieldTerrainApi(deps = {}) {
         spec.geographic,
         {
           signal,
+          detailedBuildingFrame: { origin: {lat: appCtx.LOC.lat, lon: appCtx.LOC.lon}, scale: appCtx.SCALE,
+            radius: Number(appCtx.worldLoadRuntimeState?.buildingVisibleRadiusWorld) },
           roadCoverageFrame: { bounds: spec.contextOuter, geoToWorld: appCtx.geoToWorld,
             unitsPerMeter: Number(appCtx.WORLD_UNITS_PER_METER || 1) },
           // The provider rectangle is only a coarse exclusion. Detailed
@@ -482,6 +489,7 @@ function createFarFieldTerrainApi(deps = {}) {
         priority: -10
       }).catch(() => null))
     ]);
+    try {
     if (requestGeneration !== generation) return;
     // The detailed mesh queue must settle before the far mesh chooses its
     // holes. Otherwise late near tiles cover a far surface that was compiled
@@ -817,6 +825,7 @@ function createFarFieldTerrainApi(deps = {}) {
       waterTerrainMaskBuildMs,
       skippedDuplicateNearBuildings: mappedContext.skippedNearBuildings,
       farBuildingsAvailable: mappedContext.availableBuildings,
+      regionalBuildingCompiler: mappedContext.compiler || {mode: 'main-thread'},
       farBuildingsSource: mappedContext.sourceBuildings,
       regionalRoadCoverage: regionalRoadCoverage?.stats || { status:'unavailable', reason:roadCoverageError },
       farBuildingsInvalid: mappedContext.invalidBuildings,
@@ -855,6 +864,7 @@ function createFarFieldTerrainApi(deps = {}) {
       landAreaSpatialByTile: mappedContext.landAreaSpatialByTile,
       surfaceFallbackByTile: mappedContext.surfaceFallbackByTile
     });
+    } finally { mappedContext?.buildings?.dispose?.(); }
   }
 
   function refreshFarWaterDetailCoverage() {

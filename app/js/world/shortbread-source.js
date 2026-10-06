@@ -206,7 +206,7 @@ export async function fetchShortbreadTile(z, x, y, options = {}) {
     rawTileCache.set(cacheKey, rawCached);
     const { Pbf, VectorTile } = await loadVectorTileLib();
     if (externalSignal?.aborted) throw shortbreadAbortError(z, x, y);
-    const record = { tile: new VectorTile(new Pbf(rawCached.bytes)), z, x, y };
+    const record = { tile: new VectorTile(new Pbf(rawCached.bytes)), bytes: rawCached.bytes, z, x, y };
     decodedTileCache.set(cacheKey, record);
     while (decodedTileCache.size > SHORTBREAD_DECODED_TILE_CACHE_LIMIT) {
       decodedTileCache.delete(decodedTileCache.keys().next().value);
@@ -239,7 +239,7 @@ export async function fetchShortbreadTile(z, x, y, options = {}) {
       }
       if (controller.signal.aborted) throw shortbreadAbortError(z, x, y);
       cacheRawTile(cacheKey, bytes);
-      const record = { tile: new VectorTile(new Pbf(bytes)), z, x, y };
+      const record = { tile: new VectorTile(new Pbf(bytes)), bytes, z, x, y };
       if (attempt.generation === health.generation) {
         health.failures = 0; health.blockedUntil = 0;
       }

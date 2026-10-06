@@ -25,7 +25,7 @@ const locKeys = Object.keys(LOCS);
 const SCALE = 100000;
 let LOC = { lat: 39.2904, lon: -76.6122 };
 let customLoc = null;
-const geoToWorld = (lat, lon) => earthCoordinateFrame(LOC, SCALE).toWorld(lat, lon);
+const geoToWorld = (lat, lon, result = {}) => earthCoordinateFrame(LOC, SCALE).toWorld(lat, lon, result);
 const worldToGeo = (x, z, result = {}) => earthCoordinateFrame(LOC, SCALE).toGeographic(x, z, result);
 
 const TERRAIN_TILE_URL = (z, x, y) =>
