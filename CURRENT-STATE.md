@@ -82,6 +82,12 @@ Large-asset corruption regression and all 160 reviewed file pairs pass.
 
 ## Remaining release work
 
+Actual preview-server checks found older save-state code and rejection of the
+current preview origin, despite that hostname already being authorized for sign-in.
+A staging-only source/configuration alignment is prepared; production origin checks
+pass. Complete that alignment and an ordinary hosted journey before calling the
+preview representative of the tested backend.
+
 Live providers passed on the identical `316` game payload. Seven sustained
 movement windows completed: five fail the hitch limits, with worst observed
 walking/drive frames of 583.2/366.6 ms. The cleanup sequence was stopped after six
@@ -125,6 +131,8 @@ Private cloud configuration and credentials remain outside the repository under
 raw configuration or credential files, and never attach them to release material.
 
 Four provider-cache field policies were applied without changing the 11 existing
-composite indexes or 19 unrelated field policies. The two expiration policies
-were still activating at 21:51 UTC; activation must be rechecked before calling
-cache lifecycle verification complete. Only generated provider caches are affected.
+composite indexes or 19 unrelated field policies. Both expiration policies are ACTIVE as of 22:06 UTC. Only generated provider
+caches are affected. The exact live 5.4 frontend was independently matched by
+Hosting version and both manifest bytes; its preserved `release-54-1532` channel
+now expires November 6 at 22:26:58 UTC. This exact-live copy is separate from the
+reviewed save-compatible 37a fallback.

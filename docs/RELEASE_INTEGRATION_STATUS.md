@@ -26,8 +26,10 @@ downloading the actual deployed archives. All 11 existing parameters are preserv
 Firestore accepts the tested ocean-presence values; Storage rules are unchanged.
 Live protocol probes pass for voyage authority, save retry and legacy compatibility,
 receipt ownership and isolation. All temporary fixtures and accounts were removed
-and checked absent. Provider-cache expiration is applied, with activation pending
-at the last 21:51 UTC observation. The public frontend remains on 5.4.
+and checked absent. Both provider-cache expiration policies are ACTIVE as of
+22:06 UTC. The exact live frontend is retained through November 6, independently
+verified against its Hosting version and both manifests. The public frontend
+remains on 5.4.
 
 The full frozen 91-gate candidate matrix is running. The current 4dd2 save upgrade,
 fallback write and candidate return pass, retaining existing records and unrelated

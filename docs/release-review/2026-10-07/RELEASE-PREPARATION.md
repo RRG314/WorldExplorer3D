@@ -49,8 +49,16 @@ checks; they do not substitute for an ordinary complete browser journey.
 
 Four field overrides apply only to place/weather cache payloads and expiration.
 All 11 existing composite indexes and 19 unrelated field policies were preserved.
-The two TTL policies were still activating at 21:51 UTC and require a final check.
+Both TTL policies are ACTIVE as of 22:06 UTC.
 No existing player document was changed by this operation.
+
+The preview backend still needs alignment: a downloaded-source audit found 79
+older packages, including the previous condition-save implementation. Its current
+preview hostname is authorized for Firebase sign-in, but two actual server CORS
+preflights return 403. Production's origin returns 204 with the exact allowed
+origin. The prepared staging-only rollout updates the tested source and adds only
+this exact preview origin, preserving the other ten parameters and existing
+allowed origins. It has not yet run; an ordinary hosted browser check follows it.
 
 ## Current acceptance
 

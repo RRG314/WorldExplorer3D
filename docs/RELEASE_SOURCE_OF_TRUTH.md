@@ -26,7 +26,10 @@ presence, condition-save idempotency and legacy compatibility, discovery receipt
 and account isolation. Their temporary accounts and private fixtures were removed
 and verified absent. This is hosted HTTP/rules evidence, not an ordinary complete
 player journey. Staging aircraft version 6 is ACTIVE. Provider-cache expiration
-policies are applied; activation was still pending at 21:51 UTC.
+policies are ACTIVE as of 22:06 UTC. The exact live frontend's preserved
+`release-54-1532` channel retains Hosting version `f8a50a498fe78123` through
+November 6 at 22:26:58 UTC; both manifest bytes match live. This is separate
+from the reviewed save-compatible 37a fallback.
 
 The current package's three-stage save/fallback/return and packaged live weather
 and ocean UI checks pass. Public-use rights, deployed provider-source identity and
