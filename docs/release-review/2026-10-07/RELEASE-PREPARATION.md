@@ -1,53 +1,105 @@
 # 5.5.0 release preparation
 
-The owner authorized GitHub, Pages, semantic versioning and production on October 7. Public prose and a curated gameplay gallery are prepared; production has not changed. Internal evidence is not attached to the public release body.
+The owner authorized GitHub, Pages, semantic versioning and production deployment.
+Use the `steven/visual-quality` checkout identified in CURRENT-STATE.md and explicit
+production project `worldexplorer3d-d9b83`. The production backend has been updated;
+the public frontend remains on 5.4. PR 96 and v5.5.0 remain drafts. Stable and Pages
+have not been promoted.
 
-## Fresh dependency blockers
+## Candidate and public presentation
 
-The first audit found [proxy-addr GHSA-jqcg-44mw-7w3h](https://github.com/advisories/GHSA-jqcg-44mw-7w3h), fixed in 2.0.8, and [sharp GHSA-wq5f-xc86-pv6w](https://github.com/advisories/GHSA-wq5f-xc86-pv6w), fixed in 0.35.5. Upstream advisories reviewed October 7. Targeted updates change only sharp, matching native/libvips packages, and backend proxy-addr. Direct package integrity and lock inventory are reviewed. The initial c4c90c3a package is superseded; it is retained, not deployed.
+The local and hosted candidate is `5.5.0+4dd2e37c69a9.e85c0302553a7fda.staging`.
+All 615 delivered file hashes match the Android-tested 135 preview and the 316
+game payload. Later source changes corrected verification races and large Git-blob
+hashing. Current source checks pass 2,109 tests; GitHub PR and secret scanning pass.
+The packaged-world preflight passes 29 checks without browser errors or failed
+local resources.
 
-## Gallery and HUD
+The public README, release notes, roadmap, known issues and project page use a
+curated gallery of actual unedited gameplay screenshots. They do not include an
+internal file dump. The deck and diving images show the existing custom vessel;
+licensed replacement art, broader wildlife, spearfishing and unrestricted worldwide
+streaming are explicitly outside this release. Complex transport edges and remaining
+movement pauses are acknowledged.
 
-Actual Baltimore keyboard/drone controls retain 48,296 near buildings and 95% eligible regional coverage. Fresh ocean entry, normal daylight selection and jump/descent capture the deck and scuba journey. Published PNG files are unedited browser screenshots. Collapsed HUD overlap discovered during capture is repaired and checked at desktop and phone widths. No errors in the final marine capture. These screenshots do not claim new licensed ship art, broad wildlife or worldwide streaming.
+## Backend reconciliation and live verification
 
-## Verification boundary
+The initial live inventory lacked place lookup and environmental data and used an
+older aircraft gateway. Those three providers were deployed first. A subsequent
+audit downloaded actual deployed source archives and found 77 other functions still
+using older packages, including marine authority, save revisions and discovery
+receipt changes. Comparing only the last release's Git commit would have missed this.
 
-Before the dependency patch, the full PR chain passes 2,102 contracts. New dependency and final candidate/backend results will be recorded separately. Production was rechecked as 5.4.0+1532bdfbb5c1.319d215f60318297.production; the older preview is 86fdc6e3. Production has 78 Functions, with getPlaceLookup and getEnvironmentalData absent. No performance or external acceptance result is assumed from the owner's deployment authorization.
+The remaining 77 functions and the two Firestore ocean-presence enum additions are
+now deployed. All 80 functions are ACTIVE, and their source archives match all 36
+tracked backend JS/CJS/JSON files. All 11 existing runtime parameters are preserved;
+Storage rules are unchanged. Firebase CLI reported IAM read failures for
+`createCheckoutSession` and `getAdminOverlayFeatureDetail`, but both updated versions
+are ACTIVE and their actual invoker policies already match the source. No extra
+permission change or broad retry was needed. Private configuration snapshots stay
+outside the repository; the temporary deployment environment file was removed.
 
-## Completed candidate investigation
+Actual production tests using three disposable accounts and an exclusively owned
+private room pass seven protocol groups: authentication/admission rejection,
+marine create/join/exclusive pilot/replay/stale revision, crew and outsider rules,
+ocean presence, rejected-write preservation, condition save/retry/legacy compatibility,
+and discovery receipt/owner/schema-2 behavior. Every fixture document and temporary
+account was deleted and independently checked absent. These are live HTTP/rules
+checks; they do not substitute for an ordinary complete browser journey.
 
-The first complete immutable candidate run finished 61 passed / 30 failed. Twenty-one later checks stopped on an expired disposable staging test credential and did not establish gameplay results. The renewed verifier keeps credentials private, refreshes them during long runs, and cleans up its own identities. Historical failed receipts remain preserved.
+Four field overrides apply only to place/weather cache payloads and expiration.
+All 11 existing composite indexes and 19 unrelated field policies were preserved.
+The two TTL policies were still activating at 21:51 UTC and require a final check.
+No existing player document was changed by this operation.
 
-Corrected actual-UI checks pass on the retained package: marine habitat (7 cases), research outing (8 cases), real held-key Earth/ship/lift/exit, and prescribed Moon movement/pause. The marine fixture now targets the current geocoder endpoint and uses explicit staging attestation. No physical-phone or ordinary-hosted claim is inferred from these local checks.
+## Current acceptance
 
-Successful live aircraft replies exceeded the former 10-second client deadline. The repaired client allows 20 seconds; the IPv4 gateway now has an absolute 9-second upstream deadline through connection and body delivery. Focused provider checks pass 27 tests. This still requires packaged and deployed service validation.
+All three frozen backend gates pass, including 14 general backend stages and the
+complete two-client marine voyage with 12 journey and three rules cases. The marine
+verifier now releases controls during bounded network backpressure and waits for a
+fresh authoritative stopped pose before recording a study. Gameplay authority,
+scan distance, speed and lease constraints were not relaxed.
 
-Actual geometry queries identified three Monaco surface junctions removed by a lower tunnel's excavation. Full mapped carriageway-width roof constraints now participate in the existing graph/grade solver. Source Monaco passes 28 assembled assertions with 987 junction samples, zero coverage gaps and zero discontinuities across 1,216 sampled connections. Real keyboard approach/bore/exit passes all 6 checks. Screenshots inspected; terrain/retaining edges remain visibly rough and are not accepted as finished professional art.
+The current packaged save upgrade, compatible fallback writes and candidate return
+all pass. Existing records, new writes, equipment state and unrelated pending
+account data survive the roundtrip. The reviewed fallback artifact remains retained.
+The public weather/marine rights, exact deployed source and packaged attribution
+review passes. Visible MET, NOAA fallback and HYCOM guidance retains source and valid
+time; the UI labels modeled conditions and missing observations clearly. Its local
+browser test used registered staging debug attestation, not ordinary production
+attestation.
 
-The complete updated source chain passes 2,108 tests. New package, backend, sustained-performance, save/rollback and external acceptance remain required. The old dense-city resource baseline represents 25,529 buildings, compared with 49,023 after the requested coverage restoration; no buildings were removed or thresholds silently raised to pass it. Production, stable, Pages and the public release remain unchanged; PR 96 and v5.5.0 remain drafts.
+The full 91-gate candidate regression is running. The earlier 1033 aggregate result
+of 61 passes / 30 failures remains preserved: 21 later checks stopped on an expired
+disposable staging credential before establishing gameplay results. The current
+wrapper renews its private identities and cleans them up at completion.
 
-## Current preview and save compatibility
+Sustained movement on the identical 316 payload still failed five of seven hitch
+windows, with worst walking/driving frames of 583.2/366.6 ms. Its twelve-cycle
+retention run was stopped after six reported reloads when disk availability reached
+541 MiB. These results remain failed/incomplete. No building coverage was removed
+and no performance threshold was relaxed to change the result.
 
-Preview `5.5.0+135e3895f89d.e85c0302553a7fda.staging` is deployed to visual-review-1005 after all 29 packaged-world preflight checks passed with no browser errors or failed local resources. GitHub checks pass; the complete source chain passes 2,109 tests. The game payload matches the retained 316 package. The large-asset Git buffer failure and a Start-control readiness race were repaired in the release verifier. All three real packaged save stages now pass: upgrade, fallback writes and candidate return. Existing records, new writes, equipment control state and unrelated pending account data are retained.
+The owner reports that Android works. Device model/browser, thermal and resume
+measurements were not supplied. Ordinary hosted, named physical-device, iOS and
+uncoached-player acceptance remain open. Deployment authorization is not recorded
+as proof of those checks.
 
-The 316 live-provider gate passed. Its seven sustained movement windows exposed remaining hitches. The twelve-cycle cleanup run was stopped after six reported reloads when free disk fell to 541 MiB; unrun stages remain incomplete. At the owner's request, approximately 3.8 GiB of obsolete raw heap/test-profile data and 47 superseded clean staging packages were removed. Source commits were confirmed in pushed Git ancestry; compact reports, manifests, source history, production and required rollback packages were preserved. Backend and remaining release acceptance are still pending.
+## Repairs and preservation
 
-## Frozen verifier and production providers
+The Monaco geometry repair retains surface junctions over tunnel excavation. Source
+checks report zero coverage gaps and zero discontinuities across 1,216 sampled
+connections; actual keyboard approach, bore and exit pass six checks. Retaining
+terrain remains visually rough and is not called finished professional art.
+Aircraft requests allow a 20-second client envelope and an absolute nine-second
+upstream deadline. Production access-control and live bounded aircraft probes pass.
+Targeted sharp 0.35.5 and proxy-addr 2.0.8 security updates clear the dependency audits
+and are included in the deployed source packages.
 
-Current local/hosted preview is 4dd2e37c; all 615 delivered file hashes match the
-owner-tested 135 preview. The shared-marine verifier now waits through bounded
-acknowledgment pauses and observes a fresh server stop before recording a study.
-The actual complete two-client voyage passes, and all three frozen backend gates
-pass. The normal preview preflight passes all 29 world checks.
-
-Production place lookup and environmental data version 1 and aircraft version 5
-are ACTIVE, with all 11 parameters preserved and the other 77 functions unchanged.
-Protected endpoints return 401 without App Check; the public aircraft endpoint
-rejects invalid coordinates and returned a valid bounded response in 1,005 ms.
-The first ad hoc probe incorrectly expected aircraft to require App Check;
-source review confirmed its existing public bounded-query contract, and the
-corrected probe tests that contract. No service policy was weakened.
-
-The public frontend remains on 5.4. The owner reports Android works; no measured
-phone, iOS or fresh-player acceptance is inferred. Full frozen candidate checks,
-current save receipt and remaining external acceptance are still required.
+Owner-authorized cleanup removed about 3.8 GiB of obsolete raw diagnostic/profile
+data and 47 superseded clean staging packages after confirming their source in
+pushed ancestry. Compact reports, manifests, source/history, current production,
+the required rollback and recent diagnostics remain. No player data or ordinary
+Chrome profile was removed. When the Git index in the older Documents metadata
+became unreadable, the inaccessible file was preserved and a private HEAD index
+first established that the working tree was clean before rebuilding the index.

@@ -62,9 +62,17 @@ the IPv4 upstream has one absolute nine-second deadline through connection and
 body delivery. Focused provider tests pass. Staging `getAircraftStates` version 6
 is ACTIVE. Production now has aircraft version 5, place lookup version 1 and
 environmental data version 1 ACTIVE. All 11 existing deployment parameters are
-preserved; the other 77 Functions are unchanged. The protected endpoints reject
+preserved. A downloaded-source audit then found the other 77 Functions still
+used older packages. All 77 are now updated, and all 80 deployed source archives
+match the 36 tracked backend code/configuration files. The protected endpoints reject
 missing App Check with 401, and a live bounded aircraft query returned 200 in
-1,005 ms. The public frontend remains on 5.4.
+1,005 ms. The public frontend remains on 5.4. Firestore now admits the tested ocean
+presence values; Storage rules are unchanged. Actual production protocol tests
+pass for marine authority, condition-save retry/legacy compatibility, discovery
+receipts and account isolation. All three temporary accounts and owned fixture
+documents were removed and their absence verified. Two deployment IAM lookup
+errors were reconciled against live ACTIVE versions and matching permissions;
+no permission change or whole-rollout retry was needed.
 
 The current preview was deployed after its packaged-world preflight passed all
 29 checks with no browser errors or failed local resources. Hosted manifests
@@ -84,7 +92,7 @@ test-browser data were then removed at the owner's request, recovering about
 diagnostic reports and analysis scripts were preserved. No threshold was relaxed.
 
 The packaged save upgrade → fallback write → candidate return journey
-passed on the 135 package, retaining 64 seeded items, existing and new records, equipment controls
+passed on the current 4dd2 package, retaining 64 seeded items, existing and new records, equipment controls
 and unrelated pending account data. No browser errors or failed local requests
 were recorded.
 The current 4dd2 backend matrix passes all three gates: the general backend
@@ -93,9 +101,10 @@ suite (14 stages), place authority, and shared marine. The latter passes all
 corrected: temporary network backpressure and waiting for the server's stopped
 pose before recording a study. Runtime ownership rules are unchanged.
 The owner reports the current preview works on Android. This is a smoke check,
-not measured device/thermal or iOS acceptance. The frozen aggregate candidate,
-current-package save roundtrip, ordinary hosted journey and remaining external
-acceptance still need current evidence. The old resource baseline covers 25,529 Baltimore
+not measured device/thermal or iOS acceptance. The full frozen 91-gate candidate
+run is in progress. The current save roundtrip and public weather/marine rights,
+deployed-source and packaged-attribution review pass. Ordinary hosted, named
+physical-device and uncoached-player acceptance remain unverified. The old resource baseline covers 25,529 Baltimore
 buildings; restored coverage retains 49,023. No coverage was removed or resource
 threshold silently changed to turn that mismatch into a pass.
 
@@ -114,3 +123,8 @@ in Git history, their dated evidence folders and `progress.md`.
 Private cloud configuration and credentials remain outside the repository under
 `~/Library/Application Support/WorldExplorer3D/verification-private`. Never print
 raw configuration or credential files, and never attach them to release material.
+
+Four provider-cache field policies were applied without changing the 11 existing
+composite indexes or 19 unrelated field policies. The two expiration policies
+were still activating at 21:51 UTC; activation must be rechecked before calling
+cache lifecycle verification complete. Only generated provider caches are affected.

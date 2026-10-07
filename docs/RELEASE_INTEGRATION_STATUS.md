@@ -1,7 +1,7 @@
 # Release status
 
 Updated October 7, 2026. The 5.5.0 update is being prepared for release.
-Production remains on 5.4 until a verified promotion is recorded here.
+The production frontend remains on 5.4 until a verified promotion is recorded here.
 
 The owner has authorized the GitHub update, versioned release, public project
 page and production deployment. Authorization is recorded separately from
@@ -21,14 +21,18 @@ file hashes as the owner-tested `135e3895` preview. Source checks pass 2,109 tes
 world preflight passes 29 checks. All three current backend gates pass, including
 14 general backend stages and the complete two-client shared research voyage.
 
-The supporting production provider rollout is complete: place lookup and
-environmental data version 1, plus aircraft version 5, are ACTIVE. Existing
-parameters and unrelated functions are preserved. Live endpoint probes pass;
-the production frontend remains on 5.4.
+All 80 production Functions now contain the tested backend source, verified by
+downloading the actual deployed archives. All 11 existing parameters are preserved.
+Firestore accepts the tested ocean-presence values; Storage rules are unchanged.
+Live protocol probes pass for voyage authority, save retry and legacy compatibility,
+receipt ownership and isolation. All temporary fixtures and accounts were removed
+and checked absent. Provider-cache expiration is applied, with activation pending
+at the last 21:51 UTC observation. The public frontend remains on 5.4.
 
-The full frozen candidate matrix and current save roundtrip still need their final
-receipts. The previous 135 save upgrade, fallback write and candidate return
-passed with existing records and unrelated pending account data preserved.
+The full frozen 91-gate candidate matrix is running. The current 4dd2 save upgrade,
+fallback write and candidate return pass, retaining existing records and unrelated
+pending account data. Public weather/marine rights, deployed-source identity and
+packaged UI attribution are reviewed; no paid data subscription is required.
 Sustained movement on this game payload still has visible pauses; its retention
 run was interrupted when disk space became critically low. The original failed
 matrix and resource measurements are preserved. No performance threshold was

@@ -13,12 +13,25 @@ Subsequent changes repair release verification. The packaged-world preflight
 passes 29 checks, and the current backend matrix passes all three gates.
 The complete candidate and remaining external acceptance are pending.
 
-Production now has 80 Functions. On October 7 at 21:24 UTC, `getPlaceLookup` and
-`getEnvironmentalData` version 1 were added and `getAircraftStates` advanced to
-version 5. All are ACTIVE; all 11 existing deployment parameters are preserved,
-and the other 77 Functions are unchanged. Live access-control and bounded
-public aircraft probes pass. Staging aircraft version 6 is ACTIVE.
-No signed-in production journey is inferred from these service probes.
+Production has 80 ACTIVE Functions. Place/environmental data version 1 and
+aircraft version 5 were deployed first, preserving all 11 existing parameters.
+An audit of the actual downloaded production source then identified 77 older
+packages. Those have now been updated; all 80 deployed packages match all 36
+tracked backend code/configuration files. The tested Firestore ocean-presence
+additions are live; Storage rules are unchanged. Two IAM lookup errors reported
+by the CLI were reconciled against already-correct live permissions.
+
+Actual production protocol checks pass for shared marine authority, ocean
+presence, condition-save idempotency and legacy compatibility, discovery receipts
+and account isolation. Their temporary accounts and private fixtures were removed
+and verified absent. This is hosted HTTP/rules evidence, not an ordinary complete
+player journey. Staging aircraft version 6 is ACTIVE. Provider-cache expiration
+policies are applied; activation was still pending at 21:51 UTC.
+
+The current package's three-stage save/fallback/return and packaged live weather
+and ocean UI checks pass. Public-use rights, deployed provider-source identity and
+attribution are reviewed. The 91-gate aggregate candidate run is in progress;
+remaining ordinary-hosted, physical-device and fresh-player evidence stays open.
 
 See [current state](../CURRENT-STATE.md) and
 [finite release gates](product-audit/2026-10-01/RELEASE-ACCEPTANCE.md).
