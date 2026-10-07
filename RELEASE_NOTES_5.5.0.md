@@ -49,6 +49,11 @@ subscription. Weather, wave and current models show their sources and available
 times; aircraft observations use ADSB.lol. Missing information stays unavailable
 rather than being presented as a live reading.
 
+Live Earth also includes a regional road-camera wall for Finland and parts of
+California, with up to four views, saved favorites and clear recovery when an
+image is unavailable. Remote camera references remain separate from places you
+have visited in the game.
+
 ## Less repeated work as you explore
 
 Nearby actor queries, road-detail scheduling, shoreline checks and rendering

@@ -1,8 +1,9 @@
 # Controls Reference
 
-Last reviewed: 2026-09-06 for World Explorer 3D 5.2.0.
+Updated October 7, 2026 for World Explorer 3D 5.5.
 
-Canonical control map for current runtime behavior.
+Default controls are listed below. Rebound keys and the visible contextual
+prompt take precedence.
 
 ## Global Controls
 
@@ -66,6 +67,38 @@ Walking/navigation note:
 - Walk routing currently follows the core road-and-ground traversal network on Earth scenes.
 - Supported interiors initialize their doorway prompt while walking but enter
   only after deliberate keyboard/touch interaction at the published door.
+
+## Research vessel, swimming and diving
+
+Ocean selection starts aboard the research vessel. Use **Deck destination** to
+choose a station, then walk there with the normal walking controls. The station
+button becomes available when you are close enough.
+
+- At the dive platform, use its action or press `Space` to enter the water.
+- At the submarine station, use its action to deploy the submarine.
+- At the wet lab, take a survey briefing or review and submit collected findings.
+- **Vessel options** contains Return to helm, Shared crew and saved survey reports.
+- Stop the vessel and use **Walk research deck** to explore it again.
+
+In the ocean, `W` / `S` move forward and back, `A` / `D` turn, and
+`Space` / `Shift` rise and descend. Arrow keys provide alternate movement and
+turning. Stop the submarine before using the diver control. Swimming and scuba
+equipment are selected automatically for the water context. Oxygen and depth
+limits still apply.
+
+**Dive controls & sound** opens additional controls and the sound toggle.
+**Recover** returns you aboard the same vessel. At mapped Earth shorelines,
+normal walking controls also support swimming where the loaded water is deep
+enough; a vessel’s ladder is available only when its entry conditions are met.
+
+## Solis Reach interior
+
+Use the normal walking controls aboard the ship. `E` activates the nearby door,
+station or central deck lift when its prompt is visible. The lift offers the
+command, habitat and engineering decks. **Map** shows the deck layout; **Views**
+opens the observation screen with exterior and interior choices. **Return to
+Flight** leaves the interior. The flight destination controls provide the route
+back to Earth.
 
 ## Drone Mode
 
