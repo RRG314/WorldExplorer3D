@@ -1,5 +1,24 @@
 import test from 'node:test';import assert from 'node:assert/strict';
-import {oceanDiveAdmission,resolveOceanDiverCameraPose} from '../app/js/ocean/diver.js';
+import {oceanDiveAdmission,resolveOceanDiverCameraPose,parentVesselExitPose} from '../app/js/ocean/diver.js';
+import {parentHullCollision} from '../app/js/ocean/parent-vessel.js';
+test('parent vessel hull uses catalogue draft and blocks its submerged volume at every heading',()=>{
+ for(const yaw of [0,.5,Math.PI/2,Math.PI]){
+  const ship={transportCatalogId:'ocean-research-vessel',yaw};
+  assert.equal(parentHullCollision(ship,{x:0,y:-3,z:0},.3,0),true);
+  assert.equal(parentHullCollision(ship,{x:0,y:-8,z:0},.3,0),false);
+  assert.equal(parentHullCollision(ship,{x:100,y:-3,z:100},.3,0),false);
+ }
+});
+test('research-vessel water entry remains outside the hull and rotates with its heading',()=>{
+ for(const yaw of [0,.5,Math.PI/2,Math.PI]){
+  const ship={transportCatalogId:'ocean-research-vessel',yaw};
+  const ladder=parentVesselExitPose(ship,1),jump=parentVesselExitPose(ship,1,true);
+  assert.equal(parentHullCollision(ship,ladder,.4,1),false);
+  assert.ok(jump.y-ladder.y>5);assert.equal(jump.x,ladder.x);assert.equal(jump.z,ladder.z);
+  assert.ok(Math.abs(Math.hypot(ladder.x,ladder.z)-Math.hypot(9,23.4))<1e-9);
+ }
+ assert.equal(parentVesselExitPose(null,0),null);
+});
 test('a diver may leave only a stopped sub at playable human depth with bottom clearance',()=>{
  assert.equal(oceanDiveAdmission({depthMeters:10,bottomClearance:8}).allowed,true);
  assert.match(oceanDiveAdmission({speed:3,depthMeters:10,bottomClearance:8}).reason,/Stop/);

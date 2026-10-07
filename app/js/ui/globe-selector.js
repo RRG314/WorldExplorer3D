@@ -587,6 +587,15 @@ function createGlobeSelector(options = {}) {
       if (!isCurrent() || !openState || selected !== requestedSelection || coordinateInputsDirty) {
         throw new Error('The selected location changed. Check the current point and press Ocean again.');
       }
+      // URL/saved initial selections have no reverse-lookup promise. Check
+      // their depth on demand, and let an unknown/outage result be retried.
+      if (!requestedSelection.surfaceEvidence || !Number.isFinite(requestedSelection.surfaceEvidence.elevationMeters)) {
+        const evidence = await resolveCoordinateSurfaceEvidence(requestedSelection.lat, requestedSelection.lon);
+        if (!isCurrent() || !openState || selected !== requestedSelection || coordinateInputsDirty) {
+          throw new Error('The selected location changed. Check the current point and press Ocean again.');
+        }
+        requestedSelection.surfaceEvidence = evidence;
+      }
       const decision = oceanEntryDecision(requestedSelection);
       if (!decision.allowed) throw new Error(decision.reason);
       if (typeof options.onOceanShortcut !== 'function') throw new Error('Ocean launch is unavailable.');

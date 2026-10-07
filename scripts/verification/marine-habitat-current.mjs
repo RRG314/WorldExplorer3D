@@ -1,3 +1,4 @@
+import {deployResearchSubmarineFromDeck} from './marine-entry-ui.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import { chromium } from 'playwright';
@@ -32,7 +33,7 @@ try {
    await page.locator('#globeCustomLon').press('Tab');
  };
  const click = () => page.locator('#globeSelectorOceanBtn').click();
- await select(-18.2861,147.7);await click();
+ await select(-18.2861,147.7);await click();await deployResearchSubmarineFromDeck(page);
  await page.waitForFunction(()=>window.getWorldExplorerRuntimeDiagnostics?.().modes?.ocean===true,null,{timeout:90000});
  await page.evaluate(async()=>{window.marineCtx=(await import('/app/js/shared-context.js?v=55')).ctx;await marineCtx.oceanMode.habitat.ready;});
  await page.waitForFunction(()=>getOceanModeDebugState().habitat?.assetState==='ready');

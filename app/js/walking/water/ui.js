@@ -1,4 +1,4 @@
-export function createSwimmingHud({recover,id='swimmingHud'}) {
+export function createSwimmingHud({recover,id='swimmingHud',host=null}) {
   const panel=document.createElement('section');
   panel.id=id;panel.setAttribute('aria-label','Swimming');
   Object.assign(panel.style,{position:'fixed',left:'50%',bottom:'calc(100px + env(safe-area-inset-bottom))',transform:'translateX(-50%)',zIndex:'120',maxWidth:'calc(100vw - 24px)',width:'340px',boxSizing:'border-box',padding:'10px 12px',borderRadius:'12px',background:'rgba(5,27,40,.94)',border:'1px solid #5896a9',color:'#f3fbff',font:'13px/1.4 system-ui',pointerEvents:'auto'});
@@ -17,7 +17,7 @@ export function createSwimmingHud({recover,id='swimmingHud'}) {
     } else button.onclick=()=>{button.blur();recover()};
     controls.append(button);
   }
-  panel.append(label,status,controls);document.body.append(panel);panel.hidden=true;
+  panel.append(label,status,controls);(host||document.body).append(panel);if(host)panel.classList.add('marine-swim-inline');panel.hidden=true;
   return {dispose:()=>{held=0;panel.remove();layoutStyle.remove()},vertical:()=>held,hide:()=>{panel.hidden=true;held=0},show:state=>{
     panel.hidden=false;
     const heading=state.recovering?(state.submerged?'Low air — returning to surface':'Low air — return to shore'):state.submerged?'Diving':'Swimming';

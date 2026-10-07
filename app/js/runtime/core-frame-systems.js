@@ -109,7 +109,7 @@ function createCoreFrameSystems(appCtx, hooks = {}) {
       owner: 'platform',
       phase: 'camera',
       priority: 20,
-      enabled: () => !!appCtx.gameStarted && !appCtx.worldLoading && !appCtx.titleLaunchPending,
+      enabled: () => !!appCtx.gameStarted && !appCtx.worldLoading && !appCtx.titleLaunchPending && !appCtx.activeShipInterior,
       update(frame) {
         appCtx.updateActivityCreator?.(frame.dt, frame.timestamp);
         appCtx.updateActivityDiscovery?.(frame.dt, frame.timestamp);
@@ -128,6 +128,9 @@ function createCoreFrameSystems(appCtx, hooks = {}) {
       phase: 'presentation',
       enabled: () => !!appCtx.gameStarted && !appCtx.worldLoading && !appCtx.titleLaunchPending,
       update(frame) {
+        // The ship owns its HUD, maps and visual detail. Retaining the city for
+        // return does not give its hidden map/LOD systems an interior frame.
+        if (appCtx.activeShipInterior) return;
         weatherUiTimer += frame.dt;
         if (weatherUiTimer >= 1) {
           weatherUiTimer %= 1;

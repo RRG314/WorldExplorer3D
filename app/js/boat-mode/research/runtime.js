@@ -6,9 +6,9 @@ import {resolveThirdPersonCameraCollision} from '../../walking/camera-collision.
 import {updateCuratedCharacterAnimation} from '../../walking/curated-explorer-character.js?v=8';
 import {createIndexedDbDiscoveryProfileStore} from '../../discovery/profile-store.js?v=5';
 
-export function createResearchDeck({ctx,resetDynamics,updateVessel,hudFactory=createResearchDeckHud}) {
+export function createResearchDeck({ctx,resetDynamics,updateVessel,onActivityChanged=()=>{},hudFactory=createResearchDeckHud}) {
  const research=ensureMarineResearch(ctx);
- let active=false,host=null,parent=null,hud=null,targetId='lab',busy=false,epoch=0;
+ let active=false,host=null,parent=null,hud=null,targetId='lab',busy=false,epoch=0,jumpHeld=false;
  let pose={x:2.4,z:-24,yaw:0},world={x:0,y:0,z:0},origin='';
  const supported=()=>ctx.boatMode?.active&&ctx.boatMode.transportCatalogId==='ocean-research-vessel';
  const stopped=()=>Math.hypot(ctx.boat.vx||0,ctx.boat.vz||0,ctx.boat.speed||0)*(ctx.METERS_PER_WORLD_UNIT||1)<=.5;
@@ -18,17 +18,29 @@ export function createResearchDeck({ctx,resetDynamics,updateVessel,hudFactory=cr
   ctx.Walk.deactivateWater?.();resetDynamics();ctx.boatMode.moored=true;
   host=ctx.Walk.state.characterMesh;parent=host.parent;ctx.boatMode.mesh.add(host);host.visible=true;
   pose={x:atLadder?6.1:2.4,z:-23.4,yaw:0};origin=`${ctx.LOC?.lat}:${ctx.LOC?.lon}`;active=true;epoch++;
-  ctx.clearControlInputState?.('research-deck-enter');ctx.updateControlsModeUI?.();return true;
+  ctx.clearControlInputState?.('research-deck-enter');ctx.updateControlsModeUI?.();onActivityChanged();return true;
  }
  function release(){
   if(!active)return;
   active=false;epoch++;busy=false;
   if(host){host.visible=false;host.rotation.set(0,0,0);if(parent)parent.add(host);else host.parent?.remove(host);}
-  host=null;parent=null;ctx.clearControlInputState?.('research-deck-exit');ctx.updateControlsModeUI?.();
+  host=null;parent=null;ctx.clearControlInputState?.('research-deck-exit');ctx.updateControlsModeUI?.();onActivityChanged();
  }
  function helm(){release();return true;}
  function moor(){if(ctx.sharedMarine?.active)return false;if(!supported())return false;ctx.boatMode.moored=!ctx.boatMode.moored;if(ctx.boatMode.moored)resetDynamics();return true;}
  const select=id=>{if(RESEARCH_STATIONS.some(s=>s.id===id))targetId=id};
+ async function enterWater(jump=false){
+  if(!active||busy||researchStationDistance(pose,'dive')>2.4)return false;
+  const synthetic=ctx.boatMode.currentWater?.synthetic||ctx.boatMode.currentWater?.source?.synthetic;
+  if(synthetic){
+   busy=true;
+   try{return !!await ctx.transferBoatToSubmarine?.({source:'research-platform-swim',asDiver:true,jump});}
+   finally{busy=false;}
+  }
+  const started=ctx.boatSwimming?.start();
+  if(!started)hud?.message('The water beside the ladder is too shallow, obstructed or has not loaded. Move into clear deep water.');
+  return !!started;
+ }
  async function act(){
   if(!active||busy||researchStationDistance(pose,targetId)>2.4)return false;
   if(targetId==='helm')return helm();
@@ -37,9 +49,7 @@ export function createResearchDeck({ctx,resetDynamics,updateVessel,hudFactory=cr
    busy=true;try{const started=!!await ctx.transferBoatToSubmarine?.({source:'research-cradle'});if(!started)hud?.message(ctx.boatMode.promptMessage||'Submarine launch is unavailable here. Move to deeper open water and try again.');return started;}finally{busy=false;}
   }
   if(targetId==='dive'){
-   const started=ctx.boatSwimming?.start();
-   if(!started)hud?.message('Ladder swimming needs loaded mapped deep water. Use Travel → Submarine for open-ocean exploration.');
-   return !!started;
+   return enterWater();
   }
   const record=researchLabRecord(ctx);if(!record){hud?.message('Location unavailable; conditions were not recorded.');return false;}
   const token=epoch;busy=true;hud?.message('Saving conditions to your Journal…');
@@ -60,6 +70,9 @@ export function createResearchDeck({ctx,resetDynamics,updateVessel,hudFactory=cr
   if(active){
    updateVessel(ctx.paused?0:dt);
    const actions=ctx.paused||ctx.showLargeMap?{}:ctx.readControlActions?.('walk')||{};
+   const jump=Number(actions.jump)>0;
+   if(jump&&!jumpHeld&&researchStationDistance(pose,'dive')<=2.4){jumpHeld=jump;void enterWater(true);if(!active)return false;}
+   jumpHeld=jump;
    const step=Math.min(.05,Math.max(0,dt));pose.yaw+=(Number(actions.turn)||Number(actions.lookYaw)||0)*2*step;
    const forward=Number(actions.move)||0,side=Number(actions.strafe)||0,length=Math.max(1,Math.hypot(forward,side)),speed=(actions.sprint?3.8:2.2)*step/length;
    pose=moveOnResearchDeck(pose,(Math.sin(pose.yaw)*forward-Math.cos(pose.yaw)*side)*speed,(Math.cos(pose.yaw)*forward+Math.sin(pose.yaw)*side)*speed);

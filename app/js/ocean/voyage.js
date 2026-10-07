@@ -1,4 +1,5 @@
 import {ensureMarineResearch,REEF_SURVEY} from './research-outing.js';
+import {styleMarinePanel} from './interface.js';
 import {earthLocalToGeographic} from '../earth-core/location-origin.js?v=1';
 import {createOceanVoyageStore,validateOceanVoyage} from './voyage-store.js';
 const id=()=>globalThis.crypto?.randomUUID?.()||`voyage-${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -85,7 +86,9 @@ export function ensureOceanVoyage(ctx,{store=createOceanVoyageStore()}={}){
   const scan=document.createElement('button');scan.id='marineResearchScan';scan.type='button';scan.style.cssText=recover.style.cssText;scan.onclick=()=>{scan.blur();void research.scan().then(refresh)};
   const site=document.createElement('select');site.id='marineResearchSite';site.setAttribute('aria-label','Follow-up study site');site.style.cssText='width:100%;min-height:44px;margin-top:5px;background:#173d4c;color:white';
   REEF_SURVEY.sites.forEach((id,index)=>{const option=document.createElement('option');option.value=id;option.textContent=REEF_SURVEY.labels[index];site.append(option)});site.onchange=()=>{research.select(site.value);site.blur();refresh()};
-  panel.append(title,distance,statusElement,site,scan,recover,shared);document.body.append(panel);ui={resume:resumeButton,panel,title,status:statusElement,distance,recover,scan,site};refresh();
+  style.remove();styleMarinePanel(panel,'voyage');
+  const more=document.createElement('details'),summary=document.createElement('summary');summary.textContent='Voyage details & crew';more.append(summary,statusElement,shared);
+  panel.append(title,distance,site,scan,recover,more);for(const control of panel.querySelectorAll('button,select'))control.removeAttribute('style');document.body.append(panel);ui={resume:resumeButton,panel,title,status:statusElement,distance,recover,scan,site};refresh();
  }
  const api={restorePersonal(){if(personalBeforeShared){current=personalBeforeShared.current;personalBeforeShared=null;}return current;},begin,checkpoint,surfaceCheckpoint,surfaced,tick,tickSurface,mount,resume,refresh,get current(){return current},get saved(){return saved},get status(){return status}};
  ctx.oceanVoyage=api;

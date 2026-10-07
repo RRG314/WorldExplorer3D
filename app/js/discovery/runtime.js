@@ -2321,6 +2321,12 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
     id: `${owner}:runtime`, owner, phase: 'presentation', priority: 24, critical: false,
     enabled: () => !state.disposed && appCtx.worldPublication?.requestId === publication.requestId && appCtx.worldPublication?.sequence === publication.sequence,
     update(frame) {
+      // A retained Earth publication is not an active Earth field session.
+      // Keep its journal accessible aboard without advancing hidden searches.
+      if (appCtx.getEnv?.() && appCtx.getEnv() !== 'EARTH') {
+        if (state.ui?.open) state.ui.render(state.actions, state.lastSnapshot, state.activeActivityId);
+        return;
+      }
       const position = playerPosition(appCtx);
       state.actionTimer -= frame.dt;
       if (state.actionTimer <= 0) {

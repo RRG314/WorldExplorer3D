@@ -1,3 +1,4 @@
+import {deployResearchSubmarineFromDeck} from './marine-entry-ui.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import {chromium} from 'playwright';
@@ -101,6 +102,7 @@ try{
  await page.route('https://wms.gebco.net/**',route=>route.fulfill({contentType:'text/plain',body:"value_list = '-80'"}));
  await page.locator('#globeCustomLat').fill('-18.2861');await page.locator('#globeCustomLon').fill('147.7');await page.locator('#globeCustomLon').press('Tab');
  await page.locator('#globeSelectorOceanBtn').click();
+  await deployResearchSubmarineFromDeck(page);
  await page.waitForFunction(()=>globalThis.getOceanModeDebugState?.().active===true,null,{timeout:90000});
  await page.locator('#oceanDiverToggle').waitFor({state:'visible'});await measure('ocean','ocean');
  await page.locator('#oceanDiverToggle').click();

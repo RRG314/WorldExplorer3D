@@ -44,6 +44,7 @@ async function transferBoatToSubmarine(options = {}) {
   if(appCtx.sharedMarine?.active)return false; // Shared deployment is server-owned.
   if (transferPending) return false;
   if (!appCtx.boatMode?.active) return false;
+  if (options.asDiver && (!appCtx.boatDeck?.atDivePlatform() || Math.hypot(appCtx.boat.vx||0,appCtx.boat.vz||0,appCtx.boat.speed||0)*(appCtx.METERS_PER_WORLD_UNIT||1)>.5)) return false;
   if (!canDiveBoatMode({ showNotice: options.showNotice !== false })) return false;
   if (typeof appCtx.startOceanMode !== 'function') return false;
 
@@ -78,11 +79,12 @@ async function transferBoatToSubmarine(options = {}) {
     setPromptSignature('boat_to_submarine_transfer');
     showBoatPrompt('Diving underwater…', 'supported', promptDurationMs);
     suspendBoatModeForOceanTransfer();
-    if (typeof appCtx.showTransitionLoad === 'function') await appCtx.showTransitionLoad('ocean', 700);
+    if (!options.asDiver && typeof appCtx.showTransitionLoad === 'function') await appCtx.showTransitionLoad('ocean', 700);
     if (!canRestore()) return false;
     started = !!await appCtx.startOceanMode({
       waveOffset: launchWaveOffset,
       parentVessel: vessel,
+      diverEntry: options.asDiver ? {from:'parent-vessel',jump:options.jump===true} : null,
       isTransferCurrent: canRestore,
       launchSite: {lat:geo.lat,lon:geo.lon,name:appCtx.customLoc?.name || 'Open Water',region:'Underwater'},
       entry: {lat:geo.lat,lon:geo.lon,source:'mapped-boat-water',kind:'mapped-water-area'},
@@ -123,7 +125,7 @@ async function transferSubmarineToBoat(options = {}) {
   const voyage=appCtx.oceanVoyage?.current;
   const {lat,lon} = voyage?.ship?.anchor || earthLocalToGeographic(launchSite, appCtx.SCALE, sub.position.x, sub.position.z);
   if (!Number.isFinite(lat) || !Number.isFinite(lon)) return false;
-  const customName = `${launchSite.name || 'Ocean Site'} Surface`;
+  const customName = String(launchSite.name || 'Ocean Site').replace(/(?: Surface)+$/, '');
   const surfaceWaveOffset = voyage?.waveOffset || {x:sub.position.x+(appCtx.oceanMode?.waveOffset?.x||0),z:sub.position.z+(appCtx.oceanMode?.waveOffset?.z||0)};
   const surfaceYaw = voyage?.ship?.yaw ?? (Number.isFinite(sub.yaw)?sub.yaw:0);
   const transferVessel = appCtx.boatMode?.oceanTransferVessel || null;
@@ -198,6 +200,12 @@ async function transferSubmarineToBoat(options = {}) {
       appCtx.oceanVoyage?.surfaced();
       appCtx.resetMinimapView?.();
       appCtx.drawMinimap?.();
+      if(options.enterDeck!==false && appCtx.boatMode.transportCatalogId==='ocean-research-vessel') {
+        await appCtx.setPlanetaryCharacter?.('earth');
+        if(appCtx.boatMode.active && appCtx.LOC?.lat===lat && appCtx.LOC?.lon===lon) {
+          if(!appCtx.boatDeck?.enter(true)) showBoatPrompt('Your vessel is ready. Choose Walk research deck when the explorer finishes loading.','notice',promptDurationMs);
+        }
+      }
     }
     return surfaced;
   } catch (error) {

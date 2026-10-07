@@ -97,7 +97,7 @@ body.game-activity-layer-open #authFloatPanel,
 body.game-activity-layer-open #proAccessPanel{display:none!important}
 #boatPrompt[data-variant="supported"],#boatPrompt[data-variant="active"]{border-color:rgba(56,189,248,0.78);color:#e0f2fe}
 #boatPrompt[data-variant="notice"]{border-color:rgba(248,113,113,0.65);color:#fee2e2}
-#boatWaveDock{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);display:none;align-items:center;gap:12px;min-width:min(88vw,380px);padding:10px 14px;border-radius:999px;background:rgba(6,24,40,0.9);border:1px solid rgba(125,211,252,0.36);color:#e0f2fe;font-family:'Poppins',sans-serif;z-index:142;box-shadow:0 14px 34px rgba(2,12,27,0.34);backdrop-filter:blur(10px)}
+#boatWaveDock{position:fixed;left:50%;bottom:96px;transform:translateX(-50%);display:none;align-items:center;gap:12px;min-width:min(88vw,380px);padding:10px 14px;border-radius:999px;background:rgba(6,24,40,0.9);border:1px solid rgba(125,211,252,0.36);color:#e0f2fe;font-family:'Poppins',sans-serif;z-index:142;box-shadow:0 14px 34px rgba(2,12,27,0.34);backdrop-filter:blur(10px)}
 #boatWaveDock.show{display:flex}
 .boatWaveMeta{display:flex;flex-direction:column;gap:2px;min-width:90px}
 #boatWaveLabel{font-size:12px;font-weight:700;letter-spacing:0.2px}

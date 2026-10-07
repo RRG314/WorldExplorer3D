@@ -1,5 +1,6 @@
 import {validateOceanVoyage} from '../ocean/voyage-store.js';
 import { oceanEntryDecision } from '../ocean/entry-policy.js?v=1';
+import { startOceanExploration } from '../ocean/start-exploration.js';
 import { resolveCoordinateSurfaceEvidence } from './globe-selector/helpers.js?v=9';
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { ENV, getEnv } from "../env.js?v=58";
@@ -428,7 +429,7 @@ function initTitleScreenUi({
       }
       if (typeof appCtx.startOceanMode !== 'function') return false;
       if (typeof appCtx.showTransitionLoad === 'function') await appCtx.showTransitionLoad('ocean', 700);
-      return appCtx.startOceanMode({
+      return startOceanExploration(appCtx,{
         launchSite: {
           lat: Number(selection.lat),
           lon: Number(selection.lon),
@@ -668,7 +669,7 @@ function initTitleScreenUi({
         if (!decision.allowed) throw new Error(decision.reason);
         oceanEntry = decision.entry;
       }
-      const oceanStarted = await appCtx.startOceanMode({
+      const oceanStarted = await startOceanExploration(appCtx,{
         launchSite: Number.isFinite(Number(selectedOceanLocation?.lat)) && Number.isFinite(Number(selectedOceanLocation?.lon))
           ? {
               lat: Number(selectedOceanLocation.lat),

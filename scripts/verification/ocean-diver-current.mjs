@@ -1,3 +1,4 @@
+import {deployResearchSubmarineFromDeck} from './marine-entry-ui.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import { chromium } from 'playwright';
@@ -32,7 +33,7 @@ try {
  };
  const click = () => page.locator('#globeSelectorOceanBtn').click();
 
- elevation=-80;await select(-18.2861,147.7);await click();
+ elevation=-80;await select(-18.2861,147.7);await click();await deployResearchSubmarineFromDeck(page);
  await page.waitForFunction(()=>window.getOceanModeDebugState?.().active===true,null,{timeout:90000});
  await page.locator('#oceanDiverToggle').waitFor({state:'visible'});
  await page.locator('#oceanDiverToggle').click();

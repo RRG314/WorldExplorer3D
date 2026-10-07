@@ -40,7 +40,7 @@ export function createBoatPromptUi({ appCtx, getSeaStateConfig, getWaveIntensity
       seaStateButton.textContent = `🌊 Sea State: ${getSeaStateConfig().label}`;
     }
     if (waveDock && waveSlider && waveLabel && waveValue) {
-      const active = !!appCtx.boatMode?.active;
+      const active = !!appCtx.boatMode?.active && !appCtx.boatDeck?.active && !appCtx.boatSwimming?.active;
       waveDock.classList.toggle('show', active);
       waveDock.setAttribute('aria-hidden', active ? 'false' : 'true');
       const percent = Math.round(getWaveIntensity() * 100);

@@ -1,3 +1,4 @@
+import {deployResearchSubmarineFromDeck} from './marine-entry-ui.mjs';
 import { softwareCompositorArgs } from './software-compositor.mjs';
 import { selectLowRenderQuality } from './render-quality-ui.mjs';
 import { collectBrowserGraphicsErrors } from './browser-graphics-errors.mjs';
@@ -294,6 +295,7 @@ try {
   await oceanMobile.locator('#globeCustomLon').press('Tab');
   if (softwareCi) await selectLowRenderQuality(oceanMobile);
   await oceanMobile.locator('#globeSelectorOceanBtn').click();
+  await deployResearchSubmarineFromDeck(oceanMobile);
   await oceanMobile.waitForFunction(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().activeActor?.mode === 'ocean', null, { timeout: 120_000 });
   await waitForInteractiveWorld(oceanMobile);
   try {

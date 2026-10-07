@@ -41,6 +41,7 @@ async function openClient(user){
   await import(manifest.runtimePackaging?.entries?.['multiplayer-rooms']?'/app/'+manifest.runtimePackaging.entries['multiplayer-rooms']:'/app/js/multiplayer/rooms.js?v=67');
   await globalThis.__WE3D_ROOM_SUPPORT__.join(roomCode);
  },{email:user.email,roomCode});
+ await page.getByText('Vessel options',{exact:true}).click();
  await page.locator('#researchSharedCrew').click();
  await page.waitForSelector('#sharedMarineControls');
 

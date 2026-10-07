@@ -1,3 +1,4 @@
+import {deployResearchSubmarineFromDeck} from './marine-entry-ui.mjs';
 import { collectBrowserGraphicsErrors } from './browser-graphics-errors.mjs';
 import { configureStagingAppCheck } from './staging-app-check.mjs';
 import assert from 'node:assert/strict';
@@ -61,6 +62,7 @@ async function verifyDestination(destination) {
       await page.locator('#globeCustomLon').press('Tab');
     }
     await page.locator(destination.selector).click();
+  if(destination.id==='ocean')await deployResearchSubmarineFromDeck(page);
     await page.waitForFunction((expected) => {
       const diagnostics = globalThis.getWorldExplorerRuntimeDiagnostics?.() || {};
       if (diagnostics.environment !== expected.environment || diagnostics.gameStarted !== true || diagnostics.titleVisible === true) return false;

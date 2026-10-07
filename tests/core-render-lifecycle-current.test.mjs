@@ -3,6 +3,19 @@ import assert from 'node:assert/strict';
 import { createRuntimeKernel } from '../app/js/runtime/kernel.js';
 import { createCoreFrameSystems, createCoreRenderSystem } from '../app/js/runtime/core-frame-systems.js';
 
+test('ship presentation does not run retained Earth map, detail or activity work and resumes afterward',()=>{
+ const calls=[];
+ const app={gameStarted:true,activeShipInterior:true,updateHUD:()=>calls.push('hud'),drawMinimap:()=>calls.push('map'),updateStreetFurnitureVisibility:()=>calls.push('lod'),updateActivityCreator:()=>calls.push('activity')};
+ const kernel=createRuntimeKernel();
+ for(const system of createCoreFrameSystems(app).filter(s=>['core.presentation','platform.activities'].includes(s.id)))kernel.registerSystem(system);
+ for(let i=0;i<200;i++)kernel.runFrame(i*16);
+ assert.deepEqual(calls,[]);
+ app.activeShipInterior=false;
+ for(let i=200;i<230;i++)kernel.runFrame(i*16);
+ for(const name of ['hud','map','lod','activity'])assert.ok(calls.includes(name),name);
+ kernel.dispose();
+});
+
 for (const composer of [false, true]) test(`manual pause releases drawing while other pause owners retain their presentation (${composer})`, () => {
   let draws = 0, networkTicks = 0;
   const reasons = new Set();

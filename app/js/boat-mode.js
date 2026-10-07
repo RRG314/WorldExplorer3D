@@ -716,6 +716,7 @@ const updateBoatDynamics = createBoatRuntimeDynamics({
 });
 
 const boatDeck=createResearchDeck({ctx:appCtx,resetDynamics:resetBoatDynamics,
+  onActivityChanged:updateBoatMenuUi,
   updateVessel(dt){applyBoatWavePose(appCtx.boat.x,appCtx.boat.z,appCtx.boat.angle,appCtx.boatMode.currentWater,dt);updateBoatMesh();}
 });
 function updateBoatMode(dt){appCtx.oceanVoyage?.tickSurface(dt);if(boatDeck.update(dt))return true;return updateBoatDynamics(dt);}

@@ -2,8 +2,11 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import { chromium } from 'playwright';
 import { startStaticServer } from './static-server.mjs';
+import {configureStagingAppCheck} from './staging-app-check.mjs';
+import {closeOwnedBrowser} from './owned-browser.mjs';
 const server = await startStaticServer({ rootDir: process.env.WE3D_VERIFY_ROOT || process.cwd(), ports: [4396] });
-const browser = await chromium.launch({ channel: 'chrome', headless: true });
+const owned = await chromium.launchServer({ channel: 'chrome', headless: false });
+const browser = await chromium.connect(owned.wsEndpoint());
 const dir = process.env.WE3D_OCEAN_ENTRY_OUTPUT || 'output/verification/ocean-plan';
 await fs.mkdir(dir, { recursive: true });
 const report = { scope: 'Selected artifact/source, real UI and ocean renderer; controlled provider responses for entry boundary cases', cases: [], errors: [] };
@@ -18,6 +21,7 @@ try {
    await route.fulfill({ status: captured === null ? 503 : 200, contentType: 'text/plain', body: captured === null ? 'unavailable' : `value_list = '${captured}'` }).catch(() => {});
  });
  const page = await context.newPage();
+ await configureStagingAppCheck(page,`http://127.0.0.1:${server.port}`);
  page.on('pageerror', error => report.errors.push(error.message));
  page.on('console', message => {if(message.text().includes('[BoatMode]')) (report.boatWarnings ||= []).push(message.text());});
  await page.goto(`http://127.0.0.1:${server.port}/`, { waitUntil: 'load' });
@@ -48,7 +52,14 @@ try {
  delay = 0; elevation = -30;
  await context.route('**/api/geospatial/reverse?**',route=>route.fulfill({status:503,json:{error:'Controlled naming outage'}}));
  await select(-18.2862, 147.7001); await click();
- await page.waitForFunction(() => window.getWorldExplorerRuntimeDiagnostics?.().modes?.ocean === true, null, { timeout: 90000 });
+ await page.evaluate(async()=>{window.oceanEntryCtx=(await import('/app/js/shared-context.js?v=55')).ctx;});
+ await page.waitForFunction(()=>oceanEntryCtx.boatDeck?.active&&!oceanEntryCtx.titleLaunchPending,null,{timeout:90000});
+ report.cases.push({id:'fresh-ocean-entry-starts-on-research-deck',passed:true});
+ await page.getByLabel('Deck destination').selectOption('sub');
+ await page.keyboard.down('KeyD');await page.waitForTimeout(2700);await page.keyboard.up('KeyD');
+ await page.keyboard.down('KeyS');await page.waitForTimeout(1000);await page.keyboard.up('KeyS');
+ await page.locator('#researchDeckAction').click();
+ await page.waitForFunction(()=>oceanEntryCtx.oceanMode.active&&!oceanEntryCtx.oceanMode.diver.active,null,{timeout:60000});
  await page.waitForTimeout(2000);
  report.before = await page.evaluate(() => JSON.parse(window.render_game_to_text()));
  await page.screenshot({ path: `${dir}/coastal-water-arrival.png` });
@@ -169,8 +180,7 @@ try {
  report.cases.push({id:'surface-boat-stationary-continuity-and-framing',passed:true});
  report.cases.push({id:'actual-surface-boat-shader-physics-profile-agreement',passed:true});
  assert.equal(await page.evaluate(()=>waterCheckContext.boatMode.transportCatalogId),'ocean-research-vessel');
- await page.waitForFunction(()=>document.getElementById('researchDeckEnter')?.disabled===false,null,{timeout:30000});
- await page.locator('#researchDeckEnter').click();await page.waitForFunction(()=>waterCheckContext.boatDeck.active);
+ await page.waitForFunction(()=>waterCheckContext.boatDeck?.active,null,{timeout:30000});
  const deckStart=await page.evaluate(()=>waterCheckContext.boatDeck.snapshot());
  await page.keyboard.down('w');try{await page.waitForFunction(z=>waterCheckContext.boatDeck.snapshot().pose.z>z+.4,deckStart.pose.z,{timeout:8000})}finally{await page.keyboard.up('w')}
  await page.screenshot({path:`${dir}/actual-research-deck.png`});
@@ -189,6 +199,7 @@ try {
  await page.screenshot({path:`${dir}/actual-research-chart.png`});
  await page.keyboard.press('Escape');await page.waitForFunction(()=>!waterCheckContext.showLargeMap);
  report.cases.push({id:'actual-research-bridge-chart-opens-and-closes',passed:true});
+ await page.getByText('Vessel options',{exact:true}).click();
  await page.locator('#researchDeckHelm').click();assert.equal(await page.evaluate(()=>waterCheckContext.boatDeck.active),false);
  report.cases.push({id:'actual-ocean-surface-research-ship-deck-and-helm',passed:true});
 
@@ -220,7 +231,7 @@ try {
  const shipResume=await page.evaluate(async()=>{const {ctx}=await import('/app/js/shared-context.js?v=55');return {id:ctx.boatMode.transportEntityId,stage:ctx.oceanVoyage.current.stage,subId:ctx.oceanVoyage.current.subId}});
  assert.equal(shipResume.id,voyageBefore.ship.transportEntityId);assert.equal(shipResume.subId,voyageBefore.subId);assert.equal(shipResume.stage,'aboard');report.cases.push({id:'reload-after-recovery-restores-same-ship-and-docked-sub',passed:true});
  await page.evaluate(async()=>{window.waterCheckContext=(await import('/app/js/shared-context.js?v=55')).ctx;});
- await page.waitForFunction(()=>document.querySelector('#researchDeckEnter')?.disabled===false,null,{timeout:30000});await page.locator('#researchDeckEnter').click();
+ await page.waitForFunction(()=>waterCheckContext.boatDeck?.active,null,{timeout:30000});
  const reachedCradle=await page.evaluate(()=>{const ctx=waterCheckContext,read=ctx.readControlActions;try{for(let i=0;i<200;i++){const p=ctx.boatDeck.snapshot().pose,dx=-p.x,dz=-26-p.z;if(Math.hypot(dx,dz)<.25)return true;ctx.readControlActions=()=>Math.abs(dx)>.15?{strafe:-Math.sign(dx)}:{move:Math.sign(dz)};ctx.boatDeck.update(.05);}return false;}finally{ctx.readControlActions=read;}});assert.equal(reachedCradle,true);
  await page.getByLabel('Deck destination').selectOption('sub');await page.screenshot({path:`${dir}/research-submarine-cradle.png`});await page.locator('#researchDeckAction').click();await page.waitForFunction(()=>waterCheckContext.oceanMode.active,null,{timeout:30000});
  const deployed=await page.evaluate(()=>({subId:waterCheckContext.oceanMode.submarine.transportEntityId,parentId:waterCheckContext.oceanMode.parentVessel.root.userData.transportEntityId}));assert.equal(deployed.subId,voyageBefore.subId);assert.equal(deployed.parentId,voyageBefore.ship.transportEntityId);report.cases.push({id:'walk-to-cradle-and-redeploy-the-same-recovered-submarine',passed:true});
@@ -230,6 +241,6 @@ try {
  report.passed = true;
 } finally {
  await fs.writeFile(`${dir}/entry-browser.json`, JSON.stringify(report, null, 2));
- await browser.close(); await server.close();
+ await closeOwnedBrowser(owned); await server.close();
 }
 console.log(JSON.stringify({ passed: report.passed, cases: report.cases, errors: report.errors }));

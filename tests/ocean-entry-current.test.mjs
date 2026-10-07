@@ -2,6 +2,17 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { oceanEntryDecision, hasOceanEntry } from '../app/js/ocean/entry-policy.js';
 import { createGlobeSelectorLaunch } from '../app/js/ui/globe-selector/launch.js';
+import {startOceanExploration} from '../app/js/ocean/start-exploration.js';
+test('fresh ocean exploration boards the research deck; saved dives and boat deployments retain their authority',async()=>{
+ const calls=[];const ctx={startOceanMode:async options=>{calls.push(['ocean',options]);return true},transferSubmarineToBoat:async options=>{calls.push(['vessel',options]);return true}};
+ assert.equal(await startOceanExploration(ctx,{launchSite:{lat:1,lon:2}}),true);
+ assert.equal(calls[1][1].enterDeck,true);
+ for(const options of [{voyageResume:{stage:'underwater'}},{parentVessel:{transportEntityId:'own-ship'}}]){
+  calls.length=0;assert.equal(await startOceanExploration(ctx,options),true);assert.equal(calls.length,1);
+ }
+ calls.length=0;ctx.startOceanMode=async()=>false;assert.equal(await startOceanExploration(ctx,{}),false);assert.equal(calls.length,0);
+ ctx.startOceanMode=async()=>true;ctx.transferSubmarineToBoat=async()=>false;assert.equal(await startOceanExploration(ctx,{}),false);
+});
 const site = { lat: -18.2861, lon: 147.7 };
 const evidence = (elevationMeters, kind = 'open_ocean') => ({ verified: true, source: 'gebco-elevation-sample', kind, elevationMeters });
 test('land, shallow, unknown, invalid and reverse-name-only sites cannot start an ocean', () => {

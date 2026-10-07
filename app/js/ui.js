@@ -10,7 +10,8 @@ import { initShareUi } from "./ui/share-links.js?v=64";
 import { setupSettingsUi } from "./ui/settings.js?v=2";
 import { bindSpaceActions } from "./ui/space-actions.js?v=17";
 import { initTitleScreenUi } from "./ui/title-screen.js?v=120";
-import { commitEnvironment, exitCurrentEnvironmentSync } from './session-coordinator.js?v=2';
+import { exitCurrentEnvironmentSync } from './session-coordinator.js?v=2';
+import { createEarthReturnAction } from './travel/earth-return.js';
 
 function emitTutorialEvent(eventName, payload = {}) {
   if (typeof appCtx.tutorialOnEvent === 'function') {
@@ -511,20 +512,9 @@ function setupUI() {
     updateControlsModeUI();
   };
 
-  const switchToEarthMode = async () => {
-    const comingFromOcean = !!(appCtx.oceanMode && appCtx.oceanMode.active);
-    exitCurrentEnvironmentSync(appCtx.ENV.EARTH, { source: 'earth_menu' });
-
-    if (comingFromOcean) {
-      await resumeEarthWorldSession({
-        transitionDurationMs: 700
-      });
-    } else if (appCtx.ENV?.EARTH) {
-      commitEnvironment(appCtx.ENV.EARTH, { source: 'earth_menu' });
-    }
-
-    updateControlsModeUI();
-  };
+  const switchToEarthMode = createEarthReturnAction({ctx:appCtx,
+    exitEnvironment:exitCurrentEnvironmentSync,resumeEarth:resumeEarthWorldSession});
+  appCtx.returnToEarthFromMenu = switchToEarthMode;
 
   if (oceanModeMenuItem) {
     oceanModeMenuItem.addEventListener('click', async () => {

@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import {deployResearchSubmarineFromDeck} from './marine-entry-ui.mjs';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { chromium, devices } from 'playwright';
@@ -117,6 +118,7 @@ async function verifyGrantedDestination(destination) {
       await page.locator('#globeCustomLon').press('Tab');
     }
     await page.locator(destination.selector).click();
+    if(destination.environment==='ocean') await deployResearchSubmarineFromDeck(page);
     await page.waitForFunction((expectedEnvironment) => {
       if (document.getElementById('loading')?.classList.contains('show')) return false;
       const runtime = globalThis.getWorldExplorerRuntimeDiagnostics?.() || {};

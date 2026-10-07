@@ -4,7 +4,7 @@ export function parentHullCollision(ship,point,radius=1,surfaceY=.08){
  if(!ship||!point)return false;
  const catalog=getMaritimeCatalogEntry(ship.transportCatalogId),c=Math.cos(ship.yaw),s=Math.sin(ship.yaw);
  const x=c*point.x-s*point.z,z=s*point.x+c*point.z;
- return Math.abs(x)<catalog.width/2+radius&&Math.abs(z)<catalog.length/2+radius&&point.y+radius>surfaceY-catalog.draft&&point.y-radius<surfaceY+1;
+ return Math.abs(x)<catalog.dimensions.width/2+radius&&Math.abs(z)<catalog.dimensions.length/2+radius&&point.y+radius>surfaceY-catalog.dimensions.draft&&point.y-radius<surfaceY+1;
 }
 export function createOceanParentVessel(THREE,mode,voyage){
  const ship=voyage.current?.ship;if(!ship)return null;

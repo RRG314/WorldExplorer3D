@@ -312,7 +312,7 @@ function createOceanScene() {
   rebuildOceanTerrainLayers(scene, renderer);
   oceanMode.diver=createOceanDiver(appCtx,oceanMode,{sampleSeabedHeight,worldRadius:OCEAN_CONSTANTS.WORLD_RADIUS});
 
-  oceanMode.soundscape=createOceanSoundscape({host:document.getElementById('oceanDiverControls')});
+  oceanMode.soundscape=createOceanSoundscape({host:document.getElementById('oceanDiverOptions')});
 
   primeLocalBathymetryGrid().then((ready) => {
     if (!ready || oceanMode.scene !== scene) return;
@@ -557,7 +557,7 @@ function updateSubmarine(dt,time) {
   const cameraWater=oceanMode.waterSurface.sample(oceanMode.camera.position.x,oceanMode.camera.position.z,{time});
   oceanMode.camera.position.y=Math.min(oceanMode.camera.position.y,cameraWater.surfaceY-.2);
   const parentShip=appCtx.oceanVoyage?.current?.ship;
-  if(parentHullCollision(parentShip,oceanMode.camera.position,.4,oceanMode.waterSurface.sample(0,0,{time}).surfaceY))oceanMode.camera.position.y=oceanMode.waterSurface.sample(0,0,{time}).surfaceY-getMaritimeCatalogEntry(parentShip.transportCatalogId).draft-.5;
+  if(parentHullCollision(parentShip,oceanMode.camera.position,.4,oceanMode.waterSurface.sample(0,0,{time}).surfaceY))oceanMode.camera.position.y=oceanMode.waterSurface.sample(0,0,{time}).surfaceY-getMaritimeCatalogEntry(parentShip.transportCatalogId).dimensions.draft-.5;
   oceanMode.camera.lookAt(oceanMode.cameraLookTarget);
 }
 
@@ -595,7 +595,7 @@ function animateOceanMode(nowMs = 0) {
   oceanMode.renderer.render(oceanMode.scene, oceanMode.camera);
 }
 
-function startOceanMode(options = {}) {
+async function startOceanMode(options = {}) {
   if(options.isTransferCurrent?.()===false)return false;
   const resume=validateOceanVoyage(options.voyageResume);
   const savedEntry=resume&&resume.site.lat===options.launchSite?.lat&&resume.site.lon===options.launchSite?.lon;
@@ -608,7 +608,7 @@ function startOceanMode(options = {}) {
     if (options.launchSite) appCtx.oceanVoyage?.checkpoint();
     if (options.launchSite && resetOceanLaunchSite(options.launchSite)) {
       oceanMode.waveOffset={x:Number(options.waveOffset?.x)||0,z:Number(options.waveOffset?.z)||0};
-      oceanMode.diver?.board(true);
+      oceanMode.diver?.stop();
       resetSubmarineAtLaunch(options.submarinePose || null);
       void refreshWaterEnvironmentEvidence();
       rebuildOceanTerrainLayers(oceanMode.scene, oceanMode.renderer);
@@ -648,6 +648,12 @@ function startOceanMode(options = {}) {
     ensureOceanVoyage(appCtx).begin(options,oceanMode);
     placeSubmarineClearOfParent();
     oceanMode.parentVessel?.dispose();oceanMode.parentVessel=createOceanParentVessel(THREE,oceanMode,appCtx.oceanVoyage);
+    if(options.diverEntry) {
+      const entered=await oceanMode.diver.start(options.diverEntry);
+      if(!currentSite())return false;
+      if(!entered)throw new Error('The research-vessel water entry was not ready.');
+    }
+    if(!currentSite())return false;
     void refreshWaterEnvironmentEvidence();
     appCtx.updateInteriorInteraction?.();
     oceanMode.lastFrameMs = 0;
@@ -676,6 +682,7 @@ function startOceanMode(options = {}) {
 
     return true;
   } catch (error) {
+    if (siteGeneration !== oceanSiteGeneration) return false;
     console.error('[OceanMode] start failed', error);
     oceanMode.active = false;
     oceanSessionScope?.dispose('ocean-start-failed');

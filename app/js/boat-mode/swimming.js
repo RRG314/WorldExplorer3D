@@ -1,5 +1,6 @@
 import {resolveSwimHullCamera} from '../walking/water/hull-camera.js';
 import {getMaritimeCatalogEntry} from '../transport/maritime-catalog.js?v=1';
+import {styleMarinePanel,setMarineText} from '../ocean/interface.js';
 
 export function boatSwimAdmission({speed,coverage,depth,synthetic=false,walkingReady=true}) {
   if (!walkingReady) return {allowed:false,reason:'Explorer is still loading.'};
@@ -107,14 +108,13 @@ export function createBoatSwimming({ctx,sample,groundY,park,resume,updateParked,
 
 function createBoatSwimHud({start,board}) {
   const panel=document.createElement('section');panel.id='boatSwimmingControls';panel.setAttribute('aria-label','Vessel swimming');
-  panel.style.cssText='position:fixed;right:12px;top:116px;z-index:120;background:#092a3bf2;border:1px solid #50879c;border-radius:10px;padding:10px;width:220px;max-width:calc(100vw - 24px);box-sizing:border-box;color:#eefaff;font:13px/1.4 system-ui';
-  const style=document.createElement('style');style.textContent='@media(max-width:600px){#boatSwimmingControls{top:276px}}';document.head.append(style);
-  const button=document.createElement('button'),status=document.createElement('div');button.type='button';button.id='boatSwimmingToggle';button.style.cssText='width:100%;min-height:44px;background:#175069;color:white;border:1px solid #91c2d0;border-radius:7px;font:inherit';
+  styleMarinePanel(panel,'swimmer');
+  const button=document.createElement('button'),status=document.createElement('div');button.type='button';button.id='boatSwimmingToggle';status.setAttribute('role','status');
   panel.append(button,status);document.body.append(panel);let swimming=false;
   button.onclick=()=>{button.blur();if(swimming)board();else start()};
-  return {hide:()=>{panel.hidden=true},dispose:()=>{panel.remove();style.remove()},show:value=>{
+  return {hide:()=>{panel.hidden=true},dispose:()=>{panel.remove()},show:value=>{
     panel.hidden=false;swimming=value.swimming;button.disabled=!value.allowed;
-    button.textContent=swimming?`Board via ladder · ${Math.round(value.distance)} m`:'Enter water at ladder';
-    status.textContent=swimming?'Return to the ladder at the surface. Recover brings you aboard.':value.reason||'Vessel stays moored while you swim.';
+    setMarineText(button,swimming?`Board via ladder · ${Math.round(value.distance)} m`:'Enter water at ladder');
+    setMarineText(status,swimming?'Return to the ladder at the surface. Recover brings you aboard.':value.reason||'Vessel stays moored while you swim.');
   }};
 }

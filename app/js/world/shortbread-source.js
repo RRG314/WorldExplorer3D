@@ -1,4 +1,5 @@
 import { markRoadsAtMissingTiles } from './shortbread-missing-coverage.js';
+import { clipVectorLineToTile, stitchVectorRoadElements } from './vector-line-ownership.js';
 import { createRoadNameResolver } from './shortbread-road-labels.js?v=1';
 import { yieldToMainThread } from './cooperative-scheduling.js?v=1';
 import { runBoundedProviderBatch } from '../earth-core/bounded-provider-batch.js?v=1';
@@ -465,6 +466,11 @@ function geometryParts(geometry) {
 
 function geometrySignature(layerName, part, tags) {
   const coords = part.coords || [];
+  if (layerName === 'streets' && !part.polygon) {
+    const forward=coords.map(p=>`${Number(p[0]).toFixed(7)},${Number(p[1]).toFixed(7)}`);
+    const reverse=[...forward].reverse().join(';'),path=forward.join(';');
+    return [layerName,tags.highway||tags.aeroway||tags.railway||'',tags.bridge||'',tags.tunnel||'',tags.layer||'',tags.level||'',path<reverse?path:reverse].join(':');
+  }
   const first = coords[0] || [];
   const last = coords[coords.length - 1] || [];
   return [
@@ -566,7 +572,8 @@ async function convertTilesToElements(tiles, layerNames, bounds = null) {
           });
           continue;
         }
-          const parts = geometryParts(geojson.geometry);
+          const parts = geometryParts(geojson.geometry).flatMap(part => layerName === 'streets' && !part.polygon
+            ? clipVectorLineToTile(part.coords,x,y,z).map(coords=>({...part,coords})) : [part]);
           for (let partIndex = 0; partIndex < parts.length; partIndex++) {
             const part = parts[partIndex];
             if (!Array.isArray(part.coords) || part.coords.length < (part.polygon ? 4 : 2)) continue;
@@ -604,6 +611,7 @@ async function convertTilesToElements(tiles, layerNames, bounds = null) {
             type: 'way',
             id: nextWayId--,
             nodes: nodeIds,
+            ...(layerName === 'streets' && !part.polygon ? {vectorRoadTile:{x,y,z}} : {}),
             ...(['land', 'sites', 'street_polygons'].includes(layerName)
               ? { surfaceHoles: part.holes || [] } : {}),
             tags: { ...resolvedTags, _sourceFeatureId: sourceFeatureId }
@@ -617,7 +625,7 @@ async function convertTilesToElements(tiles, layerNames, bounds = null) {
       }
     }
   }
-  return elements;
+  return stitchVectorRoadElements(elements);
 }
 
 function normalizeCoverageBounds(lat, lon, radius, explicitBounds = null, maxRadius = 0.04) {

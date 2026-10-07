@@ -1,3 +1,4 @@
+import {deployResearchSubmarineFromDeck} from './marine-entry-ui.mjs';
 import assert from 'node:assert/strict';
 import { mkdir } from 'node:fs/promises';
 import path from 'node:path';
@@ -39,6 +40,7 @@ try {
   await page.locator('#globeCustomLon').fill('147.7');
   await page.locator('#globeCustomLon').press('Tab');
   await page.locator('#globeSelectorOceanBtn').click();
+  await deployResearchSubmarineFromDeck(page);
   await page.waitForFunction(() => {
     const diagnostics = globalThis.getWorldExplorerRuntimeDiagnostics?.() || {};
     const ocean = globalThis.getOceanModeDebugState?.() || {};

@@ -128,6 +128,8 @@ export function auditTransportJunctionContinuity(
       authority: 'compiled_transport_graph_node_continuity',
       toleranceMeters,
       authoritativeConnectionCount: 0,
+      auditedConnectionCount: 0,
+      generalizedConnectionCount: 0,
       sampledConnectionCount: 0,
       maximumVerticalDeltaMeters: 0,
       discontinuityCount: 0,
@@ -140,6 +142,8 @@ export function auditTransportJunctionContinuity(
   }
 
   let authoritativeConnectionCount = 0;
+  let auditedConnectionCount = 0;
+  let generalizedConnectionCount = 0;
   let sampledConnectionCount = 0;
   let maximumVerticalDeltaMeters = 0;
   const discontinuities = [];
@@ -147,10 +151,10 @@ export function auditTransportJunctionContinuity(
     const leftFeature = featureById.get(String(connection?.left?.featureId || ''));
     const rightFeature = featureById.get(String(connection?.right?.featureId || ''));
     if (!leftFeature || !rightFeature) continue;
+    const complete = [leftFeature, rightFeature].every((feature) =>
+      feature?.transportRecord?.routeState !== 'incomplete');
     const exactComplete = [leftFeature, rightFeature].every((feature) =>
-      feature?.transportRecord?.completeness === 'lossless' &&
-      feature?.transportRecord?.routeState !== 'incomplete'
-    );
+      feature?.transportRecord?.completeness === 'lossless');
     const structureConnection = [
       { feature: leftFeature, side: connection.left },
       { feature: rightFeature, side: connection.right }
@@ -158,8 +162,13 @@ export function auditTransportJunctionContinuity(
       feature?.structureSemantics?.terrainMode !== 'at_grade' ||
       hasEngineeredGraphConstraintAt(feature, side)
     );
-    if (!exactComplete || !structureConnection) continue;
-    authoritativeConnectionCount += 1;
+    if (!complete || !structureConnection) continue;
+    // Generalized coordinates are not surveyed elevations, but once rendered
+    // as connected drivable surfaces their physical join must still agree.
+    // Skipping them hid metre-scale steps whenever the exact provider failed.
+    auditedConnectionCount += 1;
+    if (exactComplete) authoritativeConnectionCount += 1;
+    else generalizedConnectionCount += 1;
     const sampleSide = (feature, side) => Number(sampleSurfaceY(
       feature,
       finite(side?.point?.x),
@@ -202,6 +211,7 @@ export function auditTransportJunctionContinuity(
       connectionId: String(connection.id || ''),
       kind: String(connection.kind || ''),
       provenance: String(connection?.provenance?.method || ''),
+      sourceCompleteness: exactComplete ? 'lossless' : 'generalized',
       leftFeatureId: String(connection.left.featureId || ''),
       rightFeatureId: String(connection.right.featureId || ''),
       leftTerrainMode: String(leftFeature?.structureSemantics?.terrainMode || ''),
@@ -219,11 +229,13 @@ export function auditTransportJunctionContinuity(
     authority: 'compiled_transport_graph_node_continuity',
     toleranceMeters,
     authoritativeConnectionCount,
+    auditedConnectionCount,
+    generalizedConnectionCount,
     sampledConnectionCount,
     maximumVerticalDeltaMeters,
     discontinuityCount: discontinuities.length,
-    // This is a bounded release diagnostic (exact structure-related graph
-    // joins only). Preserve the complete failing set so provider-dependent
+    // Preserve every structure-related failure, regardless of source fidelity,
+    // so provider-dependent
     // topology cannot hide behind a top-N sample during repair.
     discontinuities: Object.freeze(discontinuities),
     generalizedEngineeredApproachCount: generalizedEngineeredApproaches.length,
