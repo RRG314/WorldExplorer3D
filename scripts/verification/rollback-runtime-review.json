@@ -1,9 +1,16 @@
 {
   "schema": "we3d-reviewed-rollback-runtime-v1",
-  "id": "journal-v5-backpack-v2-portal-surface-resume-20261007",
+  "id": "journal-v5-backpack-v2-5.5-release-20261007",
   "fallbackCommit": "37a12d117111446a128888384df67ac52445d972",
   "scope": "Existing fixed-location coverage/resource work plus current request admission, provider ownership, terminal failure, readiness and deferred-work repair. Save/migration, equipment, account, room, backend and Firebase configuration owners are unchanged. Failed loads cannot restore or stamp a world; valid location and player schemas remain. Exact reviewed differences are pinned; actual packaged upgrade/fallback/write/return remains required. Does not certify worldwide streaming or performance. Marine/space transition, directed vector ownership, graph endpoint and occupied tunnel spawn repairs are additionally reviewed below. Voyage v1 remains compatible; packaged upgrade/fallback/return is required. October 7: generalized structure ownership, foundation-constrained grades and excavations, finite-height contacts, direct admitted surface entry and pedestrian snapshot filtering are reviewed. Physical traversal/visual/performance release acceptance remains independent. Final October 7 cuts are shared by terrain, ordinary ground surfaces and contacts before worker publication; saved aboard voyages resume directly through the existing voyage authority. No save schema or key changes. Actual packaged rollback remains required.",
   "files": {
+    ".github/workflows/deploy-pages-public.yml": {
+      "before": "d75a74e99ae8cb2230af40fefd3c2f744854050a26e646f7058d861997b684b9",
+      "beforeMode": "100644",
+      "after": "fe5dfbb6426170090919404c2f4712d2494ce3ff141fe120734d2866d3f997ed",
+      "afterMode": "100644",
+      "review": "Publishes only the curated public site and selected screenshot assets; no internal evidence or tests in Pages output."
+    },
     "app/index.html": {
       "before": "94bdb7f627e930e09c6e1946aacd6dbbd447c6b332e4629b9dc1153660659ec2",
       "beforeMode": "100644",
@@ -67,6 +74,20 @@
       "afterMode": "100644",
       "review": "Connected marine entry, deck/swim/submarine handoffs and compact UI. Existing voyage v1 identity, geographic anchor, stage, condition, save key, revision and conflict owner remain. Parent yaw stays independent of submarine yaw; no account/backpack or shared protocol change. New-session admission still requires checked water; saved underwater and aboard records retain their resume path."
     },
+    "app/js/boat-mode/water-geometry.js": {
+      "before": "df2ea7ae9ab707ab5e190c70d4341583d8b4e0a26b3fa130c7445a9a053c7d12",
+      "beforeMode": "100644",
+      "after": "d1b2d911e391c793c4af40b77ab6e2526a9f693f0e88c1095295e04fb5633f6b",
+      "afterMode": "100644",
+      "review": "Nearest shoreline selection retains source order and exact coordinates while allocating only the winning result; no persistence or transport command change."
+    },
+    "app/js/character/capability-resolver.js": {
+      "before": "bda4bd18bdd8adf47f508e33d704277efd2f30decb741ad07f493d657b7d8a19",
+      "beforeMode": "100644",
+      "after": "bdf98fc148f175ac3981f81e3576a7173d2038de34e60ba227379dca7b8d63c1",
+      "afterMode": "100644",
+      "review": "Read-only immutable capability projection and semantic cache invalidation; persisted complete character records and version remain owned by the existing profile store."
+    },
     "app/js/config.js": {
       "before": "1193b1bcb3b54fa72c8ecb21277186c3614a96c34172db09791fe2b08b699365",
       "beforeMode": "100644",
@@ -77,9 +98,9 @@
     "app/js/discovery/runtime.js": {
       "before": "7b94a5c733f0aa6150af951e40303e0848a0c7aab905491cd0a6263c81073dd0",
       "beforeMode": "100644",
-      "after": "43b23af238b942088750fa809dd14198185f30ecbcd67a296a5e19f74b8ecb0b",
+      "after": "cb2ec8a50d699c35c6e9fa1a9e36a523b31dc5f175b916c4d83815f6fca4519d",
       "afterMode": "100644",
-      "review": "Single-flight Earth return awaits ready publication; hidden retained-Earth work is suspended while the separate ship interior owns play. Runtime-only ownership and presentation; retained location, player saves, schemas and server protocol remain unchanged."
+      "review": "Single-flight Earth return awaits ready publication; hidden retained-Earth work is suspended while the separate ship interior owns play. Runtime-only ownership and presentation; retained location, player saves, schemas and server protocol remain unchanged. Follow-up review: Capability projection refreshed with character publication; inventory membership uses its adapter. Full progression, Journal, save format and synchronization owners unchanged by this follow-up."
     },
     "app/js/earth-core/coordinate-frame.js": {
       "before": null,
@@ -136,6 +157,13 @@
       "after": "d7a70e2a6a13664ed953a715d5f8a5eeec50138d6a0b860cbc5d97fa371ec098",
       "afterMode": "100644",
       "review": "Transient window emission and bounded light intensity under existing lighting owner; no saved settings format changes."
+    },
+    "app/js/engine/opaque-order.js": {
+      "before": "25fb33a050990cf55f527451970e368570364f8ed0460cc4a0b5878f16463001",
+      "beforeMode": "100644",
+      "after": "a82956235377468fe2c0c5be1e88873934cc0063ab7d59f4d969951dd278c9e1",
+      "afterMode": "100644",
+      "review": "Integer depth comparator preserves authored groups and tie ordering; rendering only, no saved representation."
     },
     "app/js/engine/procedural-textures.js": {
       "before": "3980f393f7104ed25886ab0096036689d31f6a6514995bb8646a828e034f6d33",
@@ -290,6 +318,13 @@
       "after": "face163f17d4161f040eee4ca1ae19b11e80a8a127e6110d1bc9da3db25c6d3e",
       "afterMode": "100644",
       "review": "Single-flight Earth return awaits ready publication; hidden retained-Earth work is suspended while the separate ship interior owns play. Runtime-only ownership and presentation; retained location, player saves, schemas and server protocol remain unchanged."
+    },
+    "app/js/player/backpack-model.js": {
+      "before": "24f381815f05505f45c74c876b4b87f619e8011623fddb26b6ba95d058583fd0",
+      "beforeMode": "100644",
+      "after": "5dcdcd7f76b7c7493dcd542dca8d477fb06289f48cf4e406b68ed9328559a576",
+      "afterMode": "100644",
+      "review": "Cached immutable owned-catalog view invalidates on every mutation including silent changes. Existing item records, snapshots and storage format are preserved."
     },
     "app/js/runtime/core-frame-systems.js": {
       "before": "dbde26a81cfc7e3737a846cde219ea78334ad0c2030d39b120ed5f91f214f3fe",
@@ -532,16 +567,16 @@
     "app/js/terrain/transport-detail-plan.js": {
       "before": "5438b4a2bf90be4f0e4a5b56ad26ffe1f6cc27948b506d768a4621fdce46f39f",
       "beforeMode": "100644",
-      "after": "9ddc9ed29569f2786e8b8b38f00992579451cbcfce36bb230b289cb7a2ae2500",
+      "after": "b11cebbe096ba647e77c0d86edd13081894a0928b67996c277928b1fc18b3e46",
       "afterMode": "100644",
-      "review": "Bounded road render/contact residency within the existing fixed source catalog and shared road-mask ownership. Existing retry calls the existing session capture/reload authority. No new save schema, geographic migration, room authority or persistent write protocol."
+      "review": "Bounded road render/contact residency within the existing fixed source catalog and shared road-mask ownership. Existing retry calls the existing session capture/reload authority. No new save schema, geographic migration, room authority or persistent write protocol. Follow-up review: Grid lookup preserves the former nearest-region distance and queue-order ties, including signed boundaries; runtime scheduling only."
     },
     "app/js/terrain/transport-detail-runtime.js": {
       "before": "9b839e6e6348061704fc89cb50592aab56d847f20966fe66461abe68c701a66c",
       "beforeMode": "100644",
-      "after": "a4a4df75ef81de5054bcd932c657c6e53bf0532efee2149e6cd4c98f56f090f1",
+      "after": "aa9e28117a63fd9142b102d4db1f7f2393d8af309a2841090cabcc9e3c13e7e3",
       "afterMode": "100644",
-      "review": "Bounded road render/contact residency within the existing fixed source catalog and shared road-mask ownership. Existing retry calls the existing session capture/reload authority. No new save schema, geographic migration, room authority or persistent write protocol. The October 6 repair passes an explicit recovery callback from the terrain builder to the existing Earth-session capture/reload exports. It replaces an unregistered context method; retry duplication and stale/disposed callbacks are guarded. No new persistence owner or schema."
+      "review": "Bounded road render/contact residency within the existing fixed source catalog and shared road-mask ownership. Existing retry calls the existing session capture/reload authority. No new save schema, geographic migration, room authority or persistent write protocol. The October 6 repair passes an explicit recovery callback from the terrain builder to the existing Earth-session capture/reload exports. It replaces an unregistered context method; retry duplication and stale/disposed callbacks are guarded. No new persistence owner or schema. Follow-up review: Preserves queue ordering during retirement/reinsertion and uses bounded lookup; no change to retained world identities or save fields."
     },
     "app/js/terrain/transport-detail-worker.js": {
       "before": "9c25ef70e9cbd2a2d4190dc252c2c312f65acbfea1df903257299dc010854e6e",
@@ -591,6 +626,13 @@
       "after": "aa02f8525570770dd75fece688c873ec5bdce3f6b2843f7f24fb685868360e3a",
       "afterMode": "100644",
       "review": "Requires the same ready-world predicate before spawning or stamping a selected location. Failed entry restores the visible selector. Existing saved selections and title controls remain. Exploration prompt begins only after successful entry; timed dismissal releases its listener. Connected marine entry, deck/swim/submarine handoffs and compact UI. Existing voyage v1 identity, geographic anchor, stage, condition, save key, revision and conflict owner remain. Parent yaw stays independent of submarine yaw; no account/backpack or shared protocol change. New-session admission still requires checked water; saved underwater and aboard records retain their resume path."
+    },
+    "app/js/urban-sandbox/equipment-model.js": {
+      "before": "d51776bfbe73f1f89267b5872751678bf95598670c57cab29b1ae3d4b2bf69d2",
+      "beforeMode": "100644",
+      "after": "1246d2e1ab13588b08ade7e343a5939d385b54fa34feb02d9d3ab911bdf4f9b4",
+      "afterMode": "100644",
+      "review": "Read-only inventory membership merges actual consumable quantities and invalidates after use or grant; no inventory schema or backend command changes."
     },
     "app/js/urban-sandbox/runtime.js": {
       "before": "96784d4915c897ae9ac063b9ed0b4bdc1a925075ab3c8f0935ae88f3f00ad341",
@@ -669,12 +711,19 @@
       "afterMode": "100644",
       "review": "Recompiles transient transport geometry and contacts from existing source records. Preserves higher-resolution ownership, retained road coverage, layer/access/direction and published foundation authority; connected grades, cuts, enclosures and finite actor-height contacts now agree. No persistent geography, player pose schema, inventory, account or server writes. Existing fixed-location loads rebuild this derived state; packaged movement and retained-save roundtrip remain required."
     },
+    "app/js/world/compiler/street-frontage-policy.js": {
+      "before": "7de3bcebfcde09ef74ee87652d725a08b63dbb92b9ce7d51acf8f4fa0e8e9ae6",
+      "beforeMode": "100644",
+      "after": "1ccfaeb6bfb623b5ee62c51535f59b8b476e2b1bf728780d8e931920cf6196fd",
+      "afterMode": "100644",
+      "review": "Releases construction-only corner records and bounds sharing of immutable semantic sections. Exact attachment geometry and mutable-source lookup behavior remain covered."
+    },
     "app/js/world/compiler/transport-junction-profile.js": {
       "before": "d8c6edd657bdb719a3cf8790c03a73f21ee4d2524486a04b8d850b62ea67b994",
       "beforeMode": "100644",
-      "after": "db6bdf1c35e3c3b9d82af6fc16309d5fb94d88d732b164723904dfca05f62ce3",
+      "after": "aae7202a6ba326a2e5e71c3b9276c9776255feace7e48713b7d8c7bb7cbe3804",
       "afterMode": "100644",
-      "review": "Recompiles transient transport geometry and contacts from existing source records. Preserves higher-resolution ownership, retained road coverage, layer/access/direction and published foundation authority; connected grades, cuts, enclosures and finite actor-height contacts now agree. No persistent geography, player pose schema, inventory, account or server writes. Existing fixed-location loads rebuild this derived state; packaged movement and retained-save roundtrip remain required."
+      "review": "Recompiles transient transport geometry and contacts from existing source records. Preserves higher-resolution ownership, retained road coverage, layer/access/direction and published foundation authority; connected grades, cuts, enclosures and finite actor-height contacts now agree. No persistent geography, player pose schema, inventory, account or server writes. Existing fixed-location loads rebuild this derived state; packaged movement and retained-save roundtrip remain required. Follow-up review: Adds explicit valid-owner/finite-height audit for vertical anchors. The prior reviewed physical profile repair remains; this follow-up adds diagnostics only."
     },
     "app/js/world/compiler/transport-network-model.js": {
       "before": "051a2d57ffd7c5f5f9bb02a124ea96cff6598f640999d23609d69cbe22782fac",
@@ -921,12 +970,40 @@
       "afterMode": "100644",
       "review": "Rejects invalid requests before cancelling in-flight work; existing request coalescing and ordered replacement retained."
     },
+    "app/styles/interface-v4.css": {
+      "before": "8f91986b6dd84adb0e89b7ccb6fe4de2e538aaca0ab88c60287a5f69dcc1ccce",
+      "beforeMode": "100644",
+      "after": "aa6a6dc9d795680fb973c3ecebc4598b2a7ace02027c7a251f38d8f4bf8326fe",
+      "afterMode": "100644",
+      "review": "Collapsed desktop HUD hides decorative labels and clock; phone layout remains visible on viewport changes. No player persistence changes."
+    },
     "app/styles/runtime-shell.css": {
       "before": "fd3e95e0b582da93a8d691b0381a4e69b87ecc26b96d7229cca3574accc8b06a",
       "beforeMode": "100644",
       "after": "981dd876b52a7f12777ac5048a1d07d06b52121fe5aa19892aa9b1089ef9e4fc",
       "afterMode": "100644",
       "review": "Connected marine entry, deck/swim/submarine handoffs and compact UI. Existing voyage v1 identity, geographic anchor, stage, condition, save key, revision and conflict owner remain. Parent yaw stays independent of submarine yaw; no account/backpack or shared protocol change. New-session admission still requires checked water; saved underwater and aboard records retain their resume path."
+    },
+    "assets/readme/baltimore-coverage-5.5.png": {
+      "before": null,
+      "beforeMode": null,
+      "after": "e356263d33b8db9771bf621868fc2d62ac077bb24aa4fb5d88b9da12d30486f9",
+      "afterMode": "100644",
+      "review": "Unedited actual browser gameplay screenshot for the public 5.5 gallery; no persistence or runtime behavior change."
+    },
+    "assets/readme/research-deck-5.5.png": {
+      "before": null,
+      "beforeMode": null,
+      "after": "bff8bb35bd93f989c097e9d148b6ed1d264acb3143158da58c2e738341ea7ec0",
+      "afterMode": "100644",
+      "review": "Unedited actual browser gameplay screenshot for the public 5.5 gallery; no persistence or runtime behavior change."
+    },
+    "assets/readme/research-dive-5.5.png": {
+      "before": null,
+      "beforeMode": null,
+      "after": "84da929b80b91a519d71c580591d2ce1804b4a8afee64acb1242f3cdefec4be0",
+      "afterMode": "100644",
+      "review": "Unedited actual browser gameplay screenshot for the public 5.5 gallery; no persistence or runtime behavior change."
     },
     "config/context-write-allowlist.json": {
       "before": "80d58ce0305e25b6358ed606db89ac88da6f0eb1773cd36fb0c303290ef0acb2",
@@ -935,12 +1012,40 @@
       "afterMode": "100644",
       "review": "Adds the existing boat authority as the sole root-context publisher of startSurfaceResearchVoyage. This is a static ownership check, not a production rule, secret or backend protocol change."
     },
+    "config/performance-budgets.json": {
+      "before": "84a2d943ee56208eb034b2ec643288dc612823817747803cd947d7990fbbf945",
+      "beforeMode": "100644",
+      "after": "ee51f80265a36e908b39dab181add1dfb93f5fe35f7d8bd18f8530e13152ebae",
+      "afterMode": "100644",
+      "review": "Release version label advances to 5.5.0. Numeric performance and memory thresholds remain unchanged."
+    },
+    "config/production-program-gates.json": {
+      "before": "1bc076e81d99e858b317b25381ea2864d711c955330e25a94f49a4574e939520",
+      "beforeMode": "100644",
+      "after": "f0c1f9dcf68e0616ab19f2c8163a491c15dd270a8e7714299626bfbe92a01aa7",
+      "afterMode": "100644",
+      "review": "5.5 release identity and public notes; same required acceptance classes and checkpoint requirements."
+    },
+    "config/public-feature-claims.json": {
+      "before": "f98db78f72a7a0f35b344ee6ec309ac9eaadcb2b25344db757e59440ec9ab723",
+      "beforeMode": "100644",
+      "after": "f2422181f6a4291ddfee8cae0935ba1e5df63dc60161af78f8ccfe5ecdbea1ef",
+      "afterMode": "100644",
+      "review": "5.5 target version with existing public claim contract retained."
+    },
+    "config/runtime-dependencies.json": {
+      "before": "8a4326a32df9b80049c3e43e46c5f887f1cc93a6b96d1860bebf62e575bb1b10",
+      "beforeMode": "100644",
+      "after": "5d8ff06432ee9dbd0bb58a40a42bf0c6fc201ed85cf0bcc14316d226c8ab2cba",
+      "afterMode": "100644",
+      "review": "Refreshes the reviewed root lock hash for version-only edits; all dependency versions and integrity pins remain unchanged."
+    },
     "config/system-release-gates.json": {
       "before": "d5184bd18f6b116f90c94820c9b6581750722fdb82217ad44fb0d5a5f752fbae",
       "beforeMode": "100644",
-      "after": "524378b731e64c12ca3883c14b54800b0a30349f58fe7fae34a264bac3970ebf",
+      "after": "13c76f2c903d86a17737d39d338e0be10af6397f7959f02714f38ff54f51c2e0",
       "afterMode": "100644",
-      "review": "Adds the actual packaged city-switch preservation gate and its Earth-compilation assertion. Existing release gate commands, limits and approval requirements remain unchanged. This release configuration has no client persistence or backend protocol behavior."
+      "review": "Adds the actual packaged city-switch preservation gate and its Earth-compilation assertion. Existing release gate commands, limits and approval requirements remain unchanged. This release configuration has no client persistence or backend protocol behavior. Follow-up review: 5.5 target version; previous reviewed gate additions and existing acceptance requirements retained."
     },
     "docs/system-review/2026-10-06/inventory-summary.json": {
       "before": null,
@@ -949,12 +1054,47 @@
       "afterMode": "100644",
       "review": "Audit metadata classified fail-closed as runtime by fingerprint tool; not shipped or imported by gameplay. Contains source inventory counts, not player data."
     },
+    "github-pages/index.html": {
+      "before": "b8b3fe53410032da5665abafaca6841fea2d7a3a45ff262df8f1b3a3877a11fe",
+      "beforeMode": "100644",
+      "after": "5cb2a3f639d36e71f2d746c0ef05eaa6751dc395da2d183d9d2f2bfc116e9e30",
+      "afterMode": "100644",
+      "review": "Public project presentation and screenshots; no application state or backend access."
+    },
+    "github-pages/styles.css": {
+      "before": "4a64677942389580950c247e263cfcd9f48c9a8fa092fcfc67e202ab07348813",
+      "beforeMode": "100644",
+      "after": "8bce66552ffb6b59692ad84f4513dda25205ff36af0f5cbe07f91b6e566ab599",
+      "afterMode": "100644",
+      "review": "Public gallery background image reference only; no player state or runtime command changes."
+    },
+    "package-lock.json": {
+      "before": "5e574f939a5aa4443301b32b0edd7f854ae4c3dea6c50002037caee06eb9531c",
+      "beforeMode": "100644",
+      "after": "6d804bfcd3bf222e326f610c2b32aaf626fa7179bdad0640c4a241b208f2feda",
+      "afterMode": "100644",
+      "review": "Only the product and root package version change to 5.5.0; dependencies and integrity unchanged."
+    },
+    "package.json": {
+      "before": "75010bfd649267cc55e8ad5509e964f07bc481352df4c0c9f07a18d172011a14",
+      "beforeMode": "100644",
+      "after": "e9fdd100395f091a4115c0ecdb96e98904f914239a1e46c7786dd9f417170b56",
+      "afterMode": "100644",
+      "review": "Product version advances to compatible minor 5.5.0; existing runtime dependencies and save protocols retained."
+    },
     "scripts/hosting-artifact.mjs": {
       "before": "1ebfedce6aac9d44fe62d9496c1d48063669a948ee35de4642ee717d9f0fae20",
       "beforeMode": "100644",
       "after": "542207767e95581aa47dd23619d9355895da41f6ec0975bdacdb651670662b81",
       "afterMode": "100644",
       "review": "Adds the regional worker entry and its bundled URL to the immutable artifact. Environment config, existing save modules and backend bytes unchanged."
+    },
+    "scripts/lib/release-source-identity.mjs": {
+      "before": "67b6e623f66d0ea7142c8ff1cc527c4b380940265fd6185a15cd8a37b59f7422",
+      "beforeMode": "100644",
+      "after": "3de2e2e30623636cab980650309d7a5b8f122409b854f00dae53ea12b6318570",
+      "afterMode": "100644",
+      "review": "Release source checks disable stale Git filesystem caches per invocation; no player runtime or save format change."
     }
   }
 }

@@ -27,6 +27,30 @@ test('exact source identity and unavailable contact remain distinguishable',()=>
  assert.equal(missing.generalizedConnectionCount,0);
 });
 
+test('modeled approaches keep a finite complete owner in their own source family',()=>{
+ const f=fixture();
+ f.features[1].transportSurfaceModel={engineeredApproach:true};
+ const anchor={source:'transport_graph_node',ownerFeatureId:'road-0',targetSurfaceY:21.64};
+ f.features[1].structureTransitionAnchors=[anchor];
+ assert.equal(f.audit().auditedVerticalAnchorCount,1);
+ assert.equal(f.audit().generalizedEngineeredApproachCount,1);
+ assert.equal(f.audit().invalidVerticalAnchorCount,0);
+ f.features[0].transportRecord.completeness='lossless';
+ assert.equal(f.audit().invalidVerticalAnchors[0].reason,'mixed_vertical_source_family');
+ f.features[0].transportRecord.completeness='generalized';
+ f.features[0].transportRecord.routeState='incomplete';
+ assert.equal(f.audit().invalidVerticalAnchors[0].reason,'incomplete_vertical_owner');
+ f.features[0].transportRecord.routeState='complete';
+ anchor.targetSurfaceY=NaN;
+ assert.equal(f.audit().invalidVerticalAnchors[0].reason,'nonfinite_vertical_target');
+ anchor.targetSurfaceY=21.64;anchor.ownerFeatureId='retired-road';
+ assert.equal(f.audit().invalidVerticalAnchors[0].reason,'missing_vertical_owner');
+ f.features[1].structureTransitionAnchors=[];
+ assert.equal(f.audit().invalidVerticalAnchors[0].reason,'engineered_approach_without_graph_anchor');
+ const disconnected=auditTransportJunctionContinuity(f.features,null,()=>0);
+ assert.equal(disconnected.invalidVerticalAnchorCount,1,'no network cannot hide orphaned approaches');
+});
+
 function route(id,points,mode,type='primary') {
  return {sourceFeatureId:id,pts:points.map(([x,z])=>({x,z})),type,
   structureSemantics:{terrainMode:mode,verticalOrder:mode==='subgrade'?-1:0},

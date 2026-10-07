@@ -1,8 +1,6 @@
 # World Explorer 3D
 
-[Release status](docs/RELEASE_INTEGRATION_STATUS.md) · [5.3 release notes](RELEASE_NOTES_5.3.0.md) · [Roadmap](ROADMAP.md)
-
-[Full project description](docs/PROJECT_DESCRIPTION.md) · [System inventory](docs/SYSTEM_INVENTORY.md) · [Architecture map](docs/ARCHITECTURE_MAP.md) · [Source reference](docs/SYSTEM_INVENTORY_REFERENCE.md)
+[5.5 release notes](RELEASE_NOTES_5.5.0.md) · [Known limitations](KNOWN_ISSUES.md) · [Roadmap](ROADMAP.md)
 
 [![Code and package checks](https://github.com/RRG314/WorldExplorer3D/actions/workflows/runtime-verify.yml/badge.svg?branch=stable)](https://github.com/RRG314/WorldExplorer3D/actions/workflows/runtime-verify.yml)
 [![Secret Scan](https://github.com/RRG314/WorldExplorer3D/actions/workflows/secret-scan.yml/badge.svg?branch=stable)](https://github.com/RRG314/WorldExplorer3D/actions/workflows/secret-scan.yml)
@@ -10,39 +8,29 @@
 [![Release](https://img.shields.io/github/v/release/RRG314/WorldExplorer3D?sort=date)](https://github.com/RRG314/WorldExplorer3D/releases/latest)
 [![License: Source Available](https://img.shields.io/badge/license-source--available-lightgrey)](LICENSE)
 
-[Manual browser/backend verification](https://github.com/RRG314/WorldExplorer3D/actions/workflows/release-verify.yml)
-reports selected checks; it is not an overall release or performance badge.
-
 World Explorer 3D is a browser-based world sandbox built around real places.
 Choose a location, step into a bounded playable world, and explore by land,
 water, air, or space. Discovery, vehicles, virtual property, persistent building,
 photo-based home improvements and shared rooms connect the experience.
 
-The live game is on 5.3, with a redesigned Solis Reach, physical specimen
-research, richer space environments, building-photo interiors and faster world
-loading. The September 28 update reduces terrain and building allocation,
-worker memory and shader growth while preserving mapped-world coverage.
-[Release status](docs/RELEASE_INTEGRATION_STATUS.md) records the shipped build
-and remaining performance limits. Workflow badges report their named checks;
-they do not certify phone performance or a fully passing performance gate.
+The 5.5 update brings fuller regional building and road coverage, more connected
+bridge and tunnel approaches, and a research-vessel journey from deck to water
+and back. Public weather and marine data add context without a paid data
+subscription. Existing locations and player progress remain part of the same
+game. Dense-city pauses, uneven art quality and bounded world size remain
+[known limitations](KNOWN_ISSUES.md).
 
 <p align="center">
   <a href="https://worldexplorer3d.io/app/"><strong>Play World Explorer 3D</strong></a>
   · <a href="CONTROLS_REFERENCE.md">Controls</a>
-  · <a href="RELEASE_NOTES_5.3.0.md">5.3 release notes</a>
+  · <a href="RELEASE_NOTES_5.5.0.md">5.5 release notes</a>
   · <a href="ROADMAP.md">Roadmap</a>
 </p>
 
-![The current BMW chase view on East Pratt Street in World Explorer 3D](assets/readme/bmw-chase-september-2026.webp)
+![Baltimore building and road coverage during drone flight in World Explorer 3D 5.5](assets/readme/baltimore-coverage-5.5.png)
 
-*Explore real places—and help make them your own. September's update brings
-manual building-photo contributions, richer ground and building detail, and
-restored BMW chase and driver-seat views.*
-
-Read [Further into the world](RELEASE_NOTES_5.3.0.md) for the 5.3 release,
-[the last published update](RELEASE_NOTES_2026_09_08.md), or the
-[full project description](docs/PROJECT_DESCRIPTION.md) for how
-travel, discovery, property, building, community and space fit together.
+*Choose a real place, explore its streets and surroundings, and carry your
+Explorer’s progress between land, sea and space.*
 
 ## A world you can play in
 
@@ -104,27 +92,21 @@ active world.*
   Explorer Credits, and connect planetary samples to the same Backpack, cargo,
   and mapped-business exchange loop.
 
-## The released 5.2 foundation
+## Explore the ocean
 
-Version 5.2 established the connected sandbox foundation. The
-Explorer and companion travel together, roads carry denser traffic and
-pedestrians, mapped businesses connect to useful supplies and services, and one
-wallet follows the player through property, fieldwork, vehicle upgrades, and
-space. A shorter optional First Journey, configurable controls, calmer nearby
-prompts, and rebuilt touch and accessibility settings make it easier to start
-playing without covering the screen in instructions.
+Start an ocean outing aboard the research vessel. Walk to deck stations, enter
+the water, swim and scuba dive, deploy the submarine, and recover to the same
+ship. A saved aboard voyage resumes on deck. Ocean environments and wildlife
+remain limited; the larger licensed-asset and ecology upgrade is still planned.
 
-Beyond Earth, Interstellar Expeditions Alpha connects shipboard life,
-planetary fieldwork, Pathfinder travel, and a surprise pirate interception in
-one continuing voyage. The established Earth, Ocean, vehicle, flight,
-Backpack, Journal, multiplayer, and free-exploration paths remain available.
+![Walking the research-vessel deck in World Explorer 3D 5.5](assets/readme/research-deck-5.5.png)
 
-Interstellar Expeditions are intentionally labeled Alpha. They provide a
-connected playable journey and saved progression, while ship art, crew motion,
-mission variety, audio, and planetary detail continue to grow.
+## Beyond Earth
 
-Read the full [5.2 release notes](RELEASE_NOTES_5.2.0.md) and the current
-[known issues](KNOWN_ISSUES.md).
+Fly manually or use optional Wayfinder assistance. Interstellar Expeditions
+Alpha connects life aboard Solis Reach, planetary fieldwork, Pathfinder travel
+and saved voyage progression. Ship art, crew motion, mission variety, sound and
+planetary detail continue to develop.
 
 ## Multiplayer and building
 
@@ -175,15 +157,11 @@ Core exploration can run without production credentials. Accounts,
 multiplayer, moderation, and other online features require an authorized
 environment. Secrets are not included in the repository.
 
-## Project guide
+## More about the project
 
-- [Active release repair program](docs/RELEASE_REPAIR_PROGRAM.md)
-
-- [5.3 release notes](RELEASE_NOTES_5.3.0.md)
+- [What changed in 5.5](RELEASE_NOTES_5.5.0.md)
 - [Changelog](CHANGELOG.md)
 - [Roadmap](ROADMAP.md)
-- [System inventory](docs/SYSTEM_INVENTORY.md)
-- [Architecture](docs/ARCHITECTURE_MAP.md)
 - [Controls](CONTROLS_REFERENCE.md)
 - [Contributing](CONTRIBUTING.md)
 - [Security policy](SECURITY.md)

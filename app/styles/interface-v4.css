@@ -376,6 +376,9 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .hud-box::before { content: 'WORLD EXPLORER'; display: block; margin: 0 0 24px; padding-bottom: 9px; color: var(--wx-muted); border-bottom: 1px solid var(--wx-line-soft); font: 600 9px/1 Orbitron, sans-serif; }
 .hud-box::after { content: attr(data-build-label); position: absolute; top: 39px; left: 16px; max-width: 190px; overflow: hidden; color: var(--wx-blue); font: 600 9px/1 Orbitron, sans-serif; text-overflow: ellipsis; white-space: nowrap; }
 .hud-box:not([data-build-label])::after { content: 'SOURCE PREVIEW'; }
+.hud-box.compact { width: 72px; max-width: 72px; min-width: 0; min-height: 44px; padding: 8px; }
+.hud-box.compact::before, .hud-box.compact::after,
+.hud-box.compact #hudClockDisplay { display: none !important; }
 #hudToggleBtn { color: var(--wx-text); background: transparent; border: 1px solid var(--wx-line); border-radius: 50%; }
 #hudHeader { gap: 12px; padding-right: 0; }
 #hudSpeedBlock { flex: 0 0 92px; min-width: 0; }
@@ -629,6 +632,8 @@ body.deflock-active .floatBtn::after {
     border-right: 0;
   }
   .hud-box::before, .hud-box::after, #hudToggleBtn, #conditionBar, .indicators, #locationLine, #hudClockDisplay { display: none; }
+  .hud-box.compact { width: 100%; max-width: none; padding: 9px 62px 8px 12px; display: grid; }
+  .hud-box.compact #hudHeader, .hud-box.compact #hudDetails { display: contents; }
   #hudHeader { display: contents; padding: 0; }
   #hudSpeedBlock { min-width: 0; display: flex; align-items: baseline; gap: 5px; }
   #speed { font-size: 21px; }

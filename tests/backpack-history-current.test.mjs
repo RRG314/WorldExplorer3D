@@ -1,6 +1,39 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createBackpackModel} from '../app/js/player/backpack-model.js';
+import {createEquipmentInventory} from '../app/js/urban-sandbox/equipment-model.js';
+
+test('live equipment adapter exposes membership and removes depleted consumables until replenished',()=>{
+  const inventory=createEquipmentInventory(),first=inventory.catalogIds();
+  assert.ok(first.includes('concussion-charge'));
+  assert.equal(inventory.catalogIds(),first);
+  assert.ok(Object.isFrozen(first));
+  inventory.equip('concussion-charge');
+  for(let i=0;i<4;i++)assert.equal(inventory.prepareUse(1000+i*2000).ok,true);
+  assert.equal(inventory.catalogIds().includes('concussion-charge'),false);
+  inventory.grantQuantity('concussion-charge',1);
+  assert.equal(inventory.catalogIds().includes('concussion-charge'),true);
+  inventory.upsertItem({catalogId:'field-specimen'},{silent:true});
+  assert.ok(inventory.catalogIds().includes('field-specimen'));
+  inventory.consumeItem('field-specimen');
+  assert.equal(inventory.catalogIds().includes('field-specimen'),false);
+});
+
+test('capability membership is immutable and invalidated by silent acquisition, replacement and consumption',()=>{
+  const model=createBackpackModel(),empty=model.catalogIds();
+  assert.deepEqual(empty,[]);
+  model.upsertItem({instanceId:'one',catalogId:'dive-kit',quantity:2},{silent:true});
+  model.upsertItem({instanceId:'two',catalogId:'dive-kit'},{silent:true});
+  const first=model.catalogIds();assert.deepEqual(first,['dive-kit']);
+  assert.equal(model.catalogIds(),first);
+  assert.throws(()=>first.push('unowned-tool'),TypeError);
+  model.consume('one',2,{silent:true});assert.deepEqual(model.catalogIds(),['dive-kit']);
+  model.upsertItem({instanceId:'two',catalogId:'camera'},{silent:true});
+  assert.deepEqual(model.catalogIds(),['camera']);
+  assert.deepEqual(first,['dive-kit'],'a previous reader never sees its snapshot mutate');
+  model.consume('two',1,{silent:true});assert.deepEqual(model.catalogIds(),[]);
+  assert.deepEqual(empty,[]);
+});
 
 test('same-instance updates retain precedence and original insertion order among duplicate event rows',()=>{
   const model=createBackpackModel();

@@ -1,15 +1,15 @@
 # Known Issues and Limitations
 
-Last reviewed: 2026-09-28. Production runs 5.3.0; the local visual-quality
-update targets 5.4.0 and has not been released.
+Last reviewed: October 7, 2026, for the 5.5 update. These are known product
+limits, not a promise that every location or device has been validated.
+The [GitHub releases](https://github.com/RRG314/WorldExplorer3D/releases) identify
+published versions.
 
 ## Release acceptance and visual coverage
 
 - Physical-phone responsiveness has not yet been accepted on the current visual-quality branch.
   Emulated touch layouts and software-rendered browser journeys are functional
   evidence, not hardware frame-rate, battery or thermal measurements.
-- The production research handler and required indexes are deployed. The
-  visual-quality update still requires final package and performance acceptance.
 - Licensed ship furnishings replace major placeholders, but galley appliances,
   hydroponics, thermal/life-support equipment, exercise/EVA fittings and parts
   of fabrication still use simpler custom geometry. Art detail is not uniform.
@@ -52,11 +52,25 @@ update targets 5.4.0 and has not been released.
   timing can produce a shorter or less detailed structure than the real one.
 - Road and structure geometry is intended for exploration gameplay, not
   turn-by-turn navigation, engineering, surveying or safety-critical use.
+- Some portal-adjacent crossings, retaining walls and complex junctions remain
+  visually rough. Passing a drivable route does not establish professional
+  visual quality for every bridge and tunnel.
 - Very narrow service roads and unusually complex multi-level junctions can
   leave limited clearance for larger vehicles.
 - Airport runways, aprons, terminals, gates, and towers use available map data.
   The shared airport experience fills missing playable details, but its shape
   and scale may differ from the real airport when mapping is incomplete.
+
+## Ocean exploration
+
+- Ocean entry, deck walking, swimming, automatic scuba, submarine deployment and
+  recovery share a vessel journey. The ocean scene is bounded; it is not a
+  continuously populated simulation of the entire ocean.
+- The research vessel still uses custom geometry. A licensed replacement with
+  a fully traversable layout, richer wildlife, deeper ecology and additional
+  activities remain planned. Spearfishing is not included.
+- Water support and effects are gameplay approximations. Swimmer animation,
+  vessel motion and underwater presentation still need art and tuning work.
 
 ## Performance and compatibility
 

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "targetVersion": "5.4.0",
+  "targetVersion": "5.5.0",
   "documents": {
     "docs/SYSTEM_INVENTORY.md": ["Product model", "Player systems", "World systems", "Data and truth boundaries", "Persistence and backend", "Repository map", "Current limits"],
     "docs/ARCHITECTURE_MAP.md": ["Application overview", "Earth world flow", "Player movement and cameras", "Character, companions, and urban play", "Field exploration and progression", "Planetary and space environments", "Quick Build and persistent Blocks", "Multiplayer and backend", "Data classification", "Release shape"]

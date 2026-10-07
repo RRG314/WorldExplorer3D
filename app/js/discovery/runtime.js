@@ -41,7 +41,7 @@ import { createStableWorldIdentity } from '../living-world/model.js?v=1';
 import { evaluateArEligibility } from '../ar/eligibility.js?v=2';
 import { getScreenLayoutService } from '../ui/screen-layout.js?v=2';
 import { ATTRIBUTE_DEFINITIONS, BACKGROUND_DEFINITIONS, SPECIALTY_DEFINITIONS, SPECIALTY_RANKS, definitionById, rankForXp } from '../character/catalog.js?v=1';
-import { createCapabilityResolver } from '../character/capability-resolver.js?v=2';
+import { createCapabilityResolver, prepareCharacterCapabilities } from '../character/capability-resolver.js?v=2';
 import { companionHandlingTuning, wildlifeObservationTuning } from '../character/wildlife-assistance.js?v=1';
 
 const RELEASED_EXPLORER_ACTIVITIES = new Set([
@@ -58,7 +58,8 @@ const CHARACTER_CAPABILITY_BY_ACTIVITY = Object.freeze({
 });
 
 function backpackEquipmentIds(appCtx, fallbackIds = []) {
-  const itemIds = appCtx.playerBackpackInventory?.snapshot?.().items
+  const inventory=appCtx.playerBackpackInventory;
+  const itemIds = inventory?.catalogIds?.() || inventory?.snapshot?.().items
     ?.filter((item) => Number(item.quantity || 1) > 0)
     .map((item) => String(item.catalogId || ''))
     .filter(Boolean) || [];
@@ -1175,8 +1176,9 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
   const backpackEquipped = backpackInventory?.snapshot?.().equippedCatalogId;
   const initialEquippedToolId = entitlements.canUseTool(backpackEquipped).allowed ? backpackEquipped : legacyEquippedToolId;
   const capabilityResolver = createCapabilityResolver();
+  const capabilityCharacterState=prepareCharacterCapabilities(discoveryProfile.characterState);
   const initialEquipmentIds = backpackEquipmentIds(appCtx, entitlements.listAvailableTools().map((tool) => tool.id));
-  const initialDetectorCapability = capabilityResolver.resolve(discoveryProfile.characterState, 'detector', {
+  const initialDetectorCapability = capabilityResolver.resolve(capabilityCharacterState, 'detector', {
     difficulty: 'basic',
     equipmentIds: initialEquipmentIds,
     environment: appCtx.getEnv?.() || 'EARTH'
@@ -1191,7 +1193,7 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
   const owner = `world-discovery:${snapshot.sequence}`;
   const state = {
     type: 'WorldDiscoveryRuntime', owner, appCtx, publication, environment, profileStore, entitlements, session, fieldSession,
-    capabilityResolver, characterState: discoveryProfile.characterState, activeCharacterCapability: initialDetectorCapability,
+    capabilityResolver, capabilityCharacterState, characterState: discoveryProfile.characterState, activeCharacterCapability: initialDetectorCapability,
     actions: [], currentCellId: null, presentation: null, ui: null,
     disposed: false, reason: null, actionTimer: 0, toneTimer: 0, audioContext: null, fieldFeedbackPhase: 'idle',
     active: true, activeActivityId: 'metal-detect', equippedToolId: initialEquippedToolId,
@@ -1208,7 +1210,7 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
     creatureQualityAudit: auditRegionalCreatureQuality(resolveRegionalEcologyPack(worldIdentity.location))
   };
   state.resolveCharacterCapability = (capabilityId, context = {}) => state.capabilityResolver.resolve(
-    state.characterState,
+    state.capabilityCharacterState,
     capabilityId,
     {
       difficulty: 'basic',
@@ -1230,6 +1232,7 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
   state.syncCharacterState = (profile) => {
     if (!profile?.characterState) return state.characterState;
     state.characterState = profile.characterState;
+    state.capabilityCharacterState=prepareCharacterCapabilities(profile.characterState);
     state.capabilityResolver.clear();
     state.applyCharacterCapability();
     return state.characterState;

@@ -7,7 +7,7 @@ import {
   SPECIALTY_RANKS,
   rankForXp
 } from '../app/js/character/catalog.js';
-import { resolveCharacterCapability } from '../app/js/character/capability-resolver.js';
+import { CAPABILITY_DEFINITIONS, createCapabilityResolver, prepareCharacterCapabilities, resolveCharacterCapability } from '../app/js/character/capability-resolver.js';
 import { companionHandlingTuning, wildlifeObservationTuning } from '../app/js/character/wildlife-assistance.js';
 import { constructionTuning } from '../app/js/character/construction-assistance.js';
 import { spacecraftOperationTuning } from '../app/js/character/spacecraft-assistance.js';
@@ -15,6 +15,44 @@ import { createCharacter, createDefaultCharacterState, validateCreationAttribute
 import { migrateLegacyCharacterState, projectCharacterProgress } from '../app/js/character/progression.js';
 import { createDetectorSession } from '../app/js/discovery/detector-session.js';
 import { createMemoryDiscoveryProfileStore } from '../app/js/discovery/profile-store.js';
+
+test('prepared capability reads preserve rules, own their data and never retain history',()=>{
+  for(const background of BACKGROUND_DEFINITIONS){
+    const character=createCharacter({backgroundId:background.id,now:100});
+    const prepared=prepareCharacterCapabilities(character),resolver=createCapabilityResolver();
+    Object.defineProperty(character,'rewardLedger',{get(){throw Error('Frame query read saved history');}});
+    Object.defineProperty(character,'repetitionLedger',{get(){throw Error('Frame query read saved history');}});
+    assert.equal(Object.hasOwn(prepared,'rewardLedger'),false);
+    for(const capabilityId of Object.keys(CAPABILITY_DEFINITIONS))for(const difficulty of ['basic','advanced','expert']){
+      const context={difficulty,equipmentIds:['metal-detector','hand-trowel','virtual-dive-kit','field-camera','portable-sonar'],vehicleAvailable:true};
+      assert.deepEqual(resolver.resolve(prepared,capabilityId,context),resolveCharacterCapability(character,capabilityId,context));
+    }
+    const prior=prepared.attributes.awareness;character.attributes.awareness=prior===2?8:2;
+    assert.equal(prepared.attributes.awareness,prior);
+    assert.throws(()=>{prepared.attributes.awareness=7},TypeError);
+    assert.equal(prepareCharacterCapabilities(prepared),prepared);
+  }
+});
+
+test('capability cache detects same-revision edits and keeps equipment identities unambiguous',()=>{
+  const resolver=createCapabilityResolver(),character=createDefaultCharacterState({now:100});
+  const before=resolver.resolve(character,'inspection');
+  character.attributes.awareness=8;character.attributes.fieldKnowledge=8;
+  const after=resolver.resolve(character,'inspection');
+  assert.notDeepEqual(before.assistance,after.assistance);
+  const context={difficulty:'advanced',equipmentIds:['virtual-dive-kit']};
+  assert.equal(resolver.resolve(character,'dive',context).allowed,false);
+  character.qualifications.push('advanced-dive-ready');
+  assert.equal(resolver.resolve(character,'dive',context).allowed,true);
+  assert.equal(resolver.resolve(character,'detector',{equipmentIds:['metal-detector,other']}).allowed,false);
+  assert.equal(resolver.resolve(character,'detector',{equipmentIds:['metal-detector','other']}).allowed,true);
+  const prepared=prepareCharacterCapabilities(character);
+  const first=resolver.resolve(prepared,'detector',{equipmentIds:['metal-detector','other']});
+  assert.equal(resolver.resolve(prepared,'detector',{equipmentIds:['other','metal-detector','other']}),first);
+  for(let i=0;i<500;i++)resolver.resolve(prepared,'inspection',{environment:`visit-${i}`});
+  assert.ok(resolver.snapshot().cachedCapabilities<=128);
+  resolver.clear();assert.equal(resolver.snapshot().cachedCapabilities,0);
+});
 
 function event(overrides = {}) {
   return {

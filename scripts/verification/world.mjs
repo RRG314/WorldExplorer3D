@@ -392,8 +392,12 @@ try {
       Number(continuity.sampledConnectionCount || 0) ===
         Number(continuity.auditedConnectionCount || 0) &&
       Number(continuity.discontinuityCount || 0) === 0,
-    generalizedRoadsHaveNoVerticalAuthority:
-      Number(continuity.generalizedEngineeredApproachCount || 0) === 0,
+    // Modeled fallback approaches are necessary at real structures. Audit
+    // their actual owners instead of banning the geometry that closes joins.
+    // A missing audit must fail, including on older packaged artifacts.
+    verticalAnchorsKeepSourceOwnership:
+      Number.isInteger(continuity.auditedVerticalAnchorCount) &&
+      continuity.invalidVerticalAnchorCount === 0,
     gameplayLayoutHasNoProtectedOverlap: layoutIntersections.length === 0,
     noRuntimeErrors: Number(beforeInput.state.developerDiagnostics?.capturedErrors || 0) === 0,
     noBrowserErrors: browserErrors.length === 0,

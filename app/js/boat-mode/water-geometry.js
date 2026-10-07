@@ -130,28 +130,36 @@ function classifyWaterway(way) {
   return { kind: 'harbor', label: 'Harbor Water' };
 }
 
-function nearestPointOnPolygon(px, pz, pts) {
-  let best = null;
+function nearestPointOnSegments(px, pz, pts, closed) {
   if (!Array.isArray(pts)) return null;
-  for (let i = 0; i < pts.length; i++) {
-    const a = pts[i];
-    const b = pts[(i + 1) % pts.length];
-    const info = segmentDistanceInfo(px, pz, a.x, a.z, b.x, b.z);
-    if (!best || info.dist < best.dist) best = info;
+  let bestIndex = -1, bestDistance = Infinity;
+  const count = closed ? pts.length : pts.length - 1;
+  for (let i = 0; i < count; i++) {
+    const a = pts[i], b = pts[(i + 1) % pts.length];
+    const dx = b.x - a.x, dz = b.z - a.z;
+    const lengthSquared = dx * dx + dz * dz;
+    const t = lengthSquared <= 1e-9 ? 0
+      : Math.max(0, Math.min(1, ((px - a.x) * dx + (pz - a.z) * dz) / lengthSquared));
+    const distanceX = px - (a.x + dx * t), distanceZ = pz - (a.z + dz * t);
+    // Either axis bounds Euclidean distance. Equal-distance segments keep
+    // their original source order, as did the allocating reference query.
+    if (bestIndex >= 0 && (Math.abs(distanceX) >= bestDistance || Math.abs(distanceZ) >= bestDistance)) continue;
+    const distance = Math.hypot(distanceX, distanceZ);
+    if (bestIndex < 0 || distance < bestDistance) { bestIndex = i; bestDistance = distance; }
   }
-  return best;
+  if (bestIndex < 0) return null;
+  const a = pts[bestIndex], b = pts[(bestIndex + 1) % pts.length];
+  // Materialize only the selected point/tangent. Never share mutable scratch
+  // records between simultaneous candidates or retained boat state.
+  return segmentDistanceInfo(px, pz, a.x, a.z, b.x, b.z);
+}
+
+function nearestPointOnPolygon(px, pz, pts) {
+  return nearestPointOnSegments(px, pz, pts, true);
 }
 
 function nearestPointOnPolyline(px, pz, pts) {
-  let best = null;
-  if (!Array.isArray(pts)) return null;
-  for (let i = 0; i < pts.length - 1; i++) {
-    const a = pts[i];
-    const b = pts[i + 1];
-    const info = segmentDistanceInfo(px, pz, a.x, a.z, b.x, b.z);
-    if (!best || info.dist < best.dist) best = info;
-  }
-  return best;
+  return nearestPointOnSegments(px, pz, pts, false);
 }
 
 function isPointInsideWaterAreaFootprint(area, x, z, edgeBuffer = 0) {

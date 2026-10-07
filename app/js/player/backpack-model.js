@@ -74,6 +74,7 @@ function createBackpackModel(options = {}) {
   let revision = 0;
   let duplicateEventMerges = 0;
   let orderedPresentation = null;
+  let availableCatalogIds = null;
 
   function registerDefinitions(next = []) {
     orderedPresentation = null;
@@ -111,6 +112,7 @@ function createBackpackModel(options = {}) {
 
   function upsertItem(next, settings = {}) {
     orderedPresentation = null;
+    availableCatalogIds = null;
     const candidateDefinition = settings.definition || next?.definition;
     if (candidateDefinition) registerDefinitions([candidateDefinition]);
     const definition = definitions.get(text(next?.catalogId || next?.id || candidateDefinition?.catalogId || candidateDefinition?.id));
@@ -172,6 +174,7 @@ function createBackpackModel(options = {}) {
     const amount = Math.max(1, Math.floor(Number(quantity) || 1));
     if (!item || item.quantity < amount) return false;
     orderedPresentation = null;
+    availableCatalogIds = null;
     const remaining = item.quantity - amount;
     if (remaining > 0) {
       items.set(item.instanceId, { ...item, quantity: remaining });
@@ -276,6 +279,12 @@ function createBackpackModel(options = {}) {
   return Object.freeze({
     type: 'BackpackModel',
     assignHotbar,
+    // Capability checks need membership only. Keep presentation, metadata and
+    // sorting out of frame queries; silent mutations invalidate this too.
+    catalogIds() {
+      if(!availableCatalogIds)availableCatalogIds=Object.freeze([...new Set([...items.values()].filter(item=>item.quantity>0).map(item=>item.catalogId))]);
+      return availableCatalogIds;
+    },
     consume,
     definition(id) { return definitions.get(text(id)) || null; },
     equip,

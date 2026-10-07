@@ -1,16 +1,13 @@
 # World Explorer 3D
 
-Updated September 25, 2026 for the 5.3 candidate. The public game remains on 5.2.
-See [release status](RELEASE_INTEGRATION_STATUS.md) for deployment and acceptance,
-[the release comparison](RELEASE_COMPARISON_5.3.md) for changes from the last release,
-and [known limitations](../KNOWN_ISSUES.md).
+Updated October 7, 2026 for the 5.5 update. See the
+[release notes](../RELEASE_NOTES_5.5.0.md), [known limitations](../KNOWN_ISSUES.md)
+and [roadmap](../ROADMAP.md).
 
-The candidate expands Solis Reach with circular corridors, function-specific
-rooms, licensed furnishings, physical specimen research and a controlled pod
-launch. Space gains selectable bodies beyond the Solar System, improved imagery
-and spatial galactic environments. Earth work includes facade, pavement, water,
-mobile-control and shared-room repairs. Photo contributions connect room plans,
-interior surfaces, saved revisions and approved in-game entry.
+Version 5.5 improves regional coverage, connected road and tunnel surfaces,
+ocean entry aboard the research vessel, and public environmental data. Existing
+locations and progression remain central. Worldwide streaming and the larger
+licensed ocean-art expansion remain future work.
 
 World Explorer 3D is a browser-based sandbox that turns mapped places into
 playable worlds. You can explore a neighborhood on foot, drive its streets,
@@ -46,9 +43,8 @@ to reproduce a real store's stock or interior.
 Roads, bridges and tunnels share transport and terrain rules. Vehicles, the
 camera and visible surfaces need to agree on those rules. Complex entrances,
 intersections and provider gaps remain quality work, not solved worldwide
-simply because a tunnel can be driven through. The rejected offset-strip
-sidewalk treatment has been removed; a finished city-block sidewalk replacement
-is not claimed.
+simply because a tunnel can be driven through. Pavement and retaining structures follow shared transport surfaces; unusual
+crossings and complex city blocks still need visual refinement.
 
 ## Movement, vehicles and the explorer
 
@@ -125,8 +121,10 @@ a real building.
 
 ## Ocean, planets and space
 
-Ocean and underwater exploration are separate environment experiences with
-marine systems and field activities. Planetary surfaces support exploration
+Ocean selection starts aboard the research vessel. Deck walking, swimming,
+automatic scuba, submarine deployment and same-vessel recovery form one journey
+within a bounded ocean scene. The vessel still uses custom geometry; richer
+licensed art, wildlife and activities remain planned. Planetary surfaces support exploration
 appropriate to each world, including astronaut presentation, rovers, drones
 and field procedures rather than Earth aircraft everywhere.
 

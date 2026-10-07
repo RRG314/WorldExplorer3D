@@ -2,7 +2,7 @@ import { leaseRoadOverview } from './road-overview-owner.js';
 import {captureTransportTerrain} from './transport-terrain-snapshot.js';
 import {createPavementTerrainMask} from '../world/pavement-terrain-mask.js';
 import {TRANSPORT_REGION_SIZE,actorNeedsRoadDetail,actorRequestsRoadDetail,
-  transportRegionBounds,transportRegionInWindow,transportRegionDistanceSquared,
+  transportRegionBounds,transportRegionInWindow,transportRegionDistanceSquared,nearestPendingTransportRegion,
   TRANSPORT_DETAIL_RADIUS,TRANSPORT_RETENTION_RADIUS,MAX_MOVING_TRANSPORT_REGIONS} from './transport-detail-plan.js';
 
 export async function prepareTransportDetail(appCtx,roads,{isCurrent,focus={x:0,z:0},terrainReady=null,retryWorldLoad=null}) {
@@ -11,6 +11,7 @@ export async function prepareTransportDetail(appCtx,roads,{isCurrent,focus={x:0,
   let pending=null,disposed=false,active=null,publish=null,complete=null,retire=null,mask=null,notice=null,noticeText=null,retryButton=null,lastSync=0;
   const remaining=new Map(),resident=new Map(),latestFocus={x:focus.x,z:focus.z};
   let requestsDetail=true;
+  let queueOrder=0;
   const stats={status:'preparing',sourceRoads:roads.length,completedRegions:0,pendingRegions:0,
     pinnedRegions:0,residentMovingRegions:0,maxMovingRegions:MAX_MOVING_TRANSPORT_REGIONS,
     activeJobs:0,evictedRegions:0,cancelledRegions:0,
@@ -23,7 +24,7 @@ export async function prepareTransportDetail(appCtx,roads,{isCurrent,focus={x:0,
   function evict(key){
     const bounds=resident.get(key);if(!bounds)return;
     if(typeof retire!=='function')throw new Error('Transport residency requires a render/contact eviction owner');
-    retire(key);resident.delete(key);remaining.set(key,bounds);stats.evictedRegions++;refreshCounts();
+    retire(key);resident.delete(key);bounds.queueOrder=queueOrder++;remaining.set(key,bounds);stats.evictedRegions++;refreshCounts();
   }
   const request=data=>new Promise((resolve,reject)=>{
     const timeout=setTimeout(()=>{pending=null;reject(new Error('Transport detail worker exceeded its deadline'));},60000);
@@ -92,7 +93,7 @@ export async function prepareTransportDetail(appCtx,roads,{isCurrent,focus={x:0,
       // Keep the complete overview below detailed surfaces. Eviction must not
       // erase distant roads, including when the regional source is unavailable.
     }
-    for(const region of initial.pending)remaining.set(region.key,transportRegionBounds(region.key));
+    for(const region of initial.pending)remaining.set(region.key,{...transportRegionBounds(region.key),queueOrder:queueOrder++});
     mask?.syncMaterials();
     // Texture data are bulk-uploaded once. The overview stays available after
     // contact/render eviction; it never needs to be rebuilt during travel.
@@ -123,12 +124,7 @@ export async function prepareTransportDetail(appCtx,roads,{isCurrent,focus={x:0,
         for(const [key,bounds] of resident)if(!transportRegionInWindow(bounds,latestFocus,TRANSPORT_RETENTION_RADIUS))evict(key);
         if(active||stats.error)return;
         if(!requestsDetail){stats.status='dormant';return;}
-        let key=null,best=Infinity;
-        for(const [candidate,bounds] of remaining){
-          if(!transportRegionInWindow(bounds,latestFocus,TRANSPORT_DETAIL_RADIUS))continue;
-          const distance=transportRegionDistanceSquared(bounds,latestFocus);
-          if(distance<best){best=distance;key=candidate;}
-        }
+        const key=nearestPendingTransportRegion(remaining,latestFocus);
         if(key===null){
           if(!remaining.size&&stats.status!=='complete')complete?.();
           stats.status=remaining.size?'window-ready':'complete';return;

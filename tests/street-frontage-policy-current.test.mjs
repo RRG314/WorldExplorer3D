@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {createStreetFrontagePolicy,streetScaleForWorld} from '../app/js/world/compiler/street-frontage-policy.js';
 import {createStreetFrontageGrading} from '../app/js/terrain/street-frontage-grading.js';
 import {prepareStreetPavement,compilePavementTile} from '../app/js/world/compiler/street-pavement.js';
+import {resolveStreetSection} from '../app/js/world/compiler/street-section.js';
 const rect=(x,z,w,h)=>({pts:[{x,z},{x:x+w,z},{x:x+w,z:z+h},{x,z:z+h}]});
 const area=polys=>polys.reduce((sum,poly)=>sum+poly.reduce((s,r,i)=>{
   // Subtract a local origin to avoid cancellation at large map coordinates.
@@ -119,4 +120,43 @@ test('squared broad comparison agrees with hypot at random and rounding-boundary
     }
     policy.dispose();
   }
+});
+
+test('repeated street sections share immutable values without conflating source evidence',()=>{
+  const policy=createStreetFrontagePolicy([],1),sections=new Set();
+  for(let i=0;i<5000;i++){
+    const tags={sidewalk:i%2?'left':'both','sidewalk:width':String(1.5+i%4)};
+    const road={type:'residential',tags,pts:[{x:0,z:i},{x:20,z:i}]};
+    const section=policy.section(road);
+    assert.deepEqual(section,resolveStreetSection({...tags,highway:road.type}));
+    assert.ok(Object.isFrozen(section)&&Object.isFrozen(section.left)&&Object.isFrozen(section.right));
+    sections.add(section);
+  }
+  assert.equal(sections.size,4,'equal source semantics must not retain per-road duplicates');
+  const road={type:'residential',tags:{sidewalk:'left'},pts:[{x:0,z:0},{x:20,z:0},{x:40,z:0}]};
+  const before=policy.section(road,0);
+  road.tags.sidewalk='right';
+  assert.equal(policy.section(road,1).right.presence,'present','new segments resolve the current tags');
+  assert.equal(before.left.presence,'present');
+  assert.throws(()=>{before.left={presence:'absent'}},TypeError);
+  const bridge={...road,structureSemantics:{terrainMode:'elevated'}};
+  assert.equal(policy.section(bridge).left.source,'excluded-structure');
+  assert.equal(policy.section(bridge).right.presence,'absent');
+  policy.dispose();
+  assert.equal(policy.section(road,0).right.presence,'present','retired segment caches are released');
+});
+
+test('semantic section pool eviction preserves widths and inferred-versus-mapped evidence',()=>{
+  const policy=createStreetFrontagePolicy([rect(0,-10,20,5)],1);
+  for(let i=0;i<400;i++){
+    const tags={sidewalk:'both','sidewalk:width':String(.1+i/25)};
+    const road={type:'residential',tags,pts:[{x:0,z:0},{x:20,z:0}]};
+    assert.deepEqual(policy.section(road),resolveStreetSection({...tags,highway:'residential'},{urban:true}));
+  }
+  const inferred=policy.section({type:'residential',pts:[{x:0,z:0},{x:20,z:0}]});
+  const mapped=policy.section({type:'residential',tags:{sidewalk:'both'},pts:[{x:0,z:0},{x:20,z:0}]});
+  assert.equal(inferred.left.source,'inferred-urban-road');
+  assert.equal(mapped.left.source,'mapped-tag');
+  assert.notEqual(inferred,mapped);
+  policy.dispose();
 });

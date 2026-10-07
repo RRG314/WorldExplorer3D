@@ -123,9 +123,43 @@ export function auditTransportJunctionContinuity(
     feature?.transportSurfaceModel?.engineeredApproach === true &&
     feature?.transportRecord?.completeness !== 'lossless'
   );
+  // Generalized routes may need graded approaches to remain drivable. Their
+  // modeled heights must stay in that source family, with an actual published
+  // owner; an exact bridge's elevation cannot leak into a fallback duplicate.
+  const invalidVerticalAnchors = [];
+  let auditedVerticalAnchorCount = 0;
+  for (const feature of features) {
+    const anchors = (feature?.structureTransitionAnchors || []).filter((anchor) =>
+      anchor?.source === 'transport_graph_node');
+    if (feature?.transportSurfaceModel?.engineeredApproach === true && !anchors.length) {
+      invalidVerticalAnchors.push(Object.freeze({
+        featureId: String(feature?.transportGraphRef?.featureId || ''),
+        reason: 'engineered_approach_without_graph_anchor'
+      }));
+    }
+    for (const anchor of anchors) {
+      auditedVerticalAnchorCount += 1;
+      const owner = featureById.get(String(anchor.ownerFeatureId || ''));
+      const family = feature?.transportRecord?.completeness;
+      const reason = !owner ? 'missing_vertical_owner'
+        : owner.transportRecord?.routeState === 'incomplete' ? 'incomplete_vertical_owner'
+        : owner.transportRecord?.completeness !== family ? 'mixed_vertical_source_family'
+        : !Number.isFinite(anchor.targetSurfaceY) ? 'nonfinite_vertical_target' : null;
+      if (reason) invalidVerticalAnchors.push(Object.freeze({
+        featureId: String(feature?.transportGraphRef?.featureId || ''),
+        ownerFeatureId: String(anchor.ownerFeatureId || ''), reason
+      }));
+    }
+  }
+  const verticalOwnership = Object.freeze({
+    auditedVerticalAnchorCount,
+    invalidVerticalAnchorCount: invalidVerticalAnchors.length,
+    invalidVerticalAnchors: Object.freeze(invalidVerticalAnchors)
+  });
   if (!transportNetworkModel?.connections?.length || typeof sampleSurfaceY !== 'function') {
     return Object.freeze({
       authority: 'compiled_transport_graph_node_continuity',
+      ...verticalOwnership,
       toleranceMeters,
       authoritativeConnectionCount: 0,
       auditedConnectionCount: 0,
@@ -227,6 +261,7 @@ export function auditTransportJunctionContinuity(
   discontinuities.sort((left, right) => right.verticalDeltaMeters - left.verticalDeltaMeters);
   return Object.freeze({
     authority: 'compiled_transport_graph_node_continuity',
+    ...verticalOwnership,
     toleranceMeters,
     authoritativeConnectionCount,
     auditedConnectionCount,

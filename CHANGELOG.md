@@ -2,6 +2,36 @@
 
 Notable user-facing changes are recorded here. Git history and GitHub releases contain the complete change record.
 
+## [5.5.0] - Unreleased
+
+### Added
+
+- Direct research-vessel ocean starts, deck-to-water exploration, automatic
+  scuba equipment, submarine deployment and same-vessel recovery.
+- Public weather, wave and current providers without a paid data subscription;
+  ADSB.lol aircraft observations with clear source and time labels.
+
+### Improved
+
+- Regional building and road coverage, quality-setting consistency, land-cover
+  planting, street facades, storefronts and pavement.
+- Connected bridge and tunnel approach heights, shared portal cuts, vehicle
+  contact and camera transitions.
+- World-load cancellation, failure recovery and resource cleanup.
+- Swimmer and diver visibility, vessel water support, saved aboard resumes,
+  spacecraft walking and Earth return.
+- Nearby actor, shoreline, rendering and road-detail work; capability queries
+  now avoid copying character history and the full Backpack during play.
+
+### Fixed
+
+- Character capability caches returning stale results after same-revision edits.
+- Inventory capability views retaining depleted consumables.
+
+Dense-city pauses, complex junction visuals, uneven art quality and physical
+phone acceptance remain open. Worldwide streaming and the larger ocean art and
+activity expansion are not included. [Release notes](RELEASE_NOTES_5.5.0.md).
+
 ## [5.4.0] - 2026-09-30
 
 ### Changed

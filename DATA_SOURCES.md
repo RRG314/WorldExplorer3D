@@ -164,8 +164,7 @@ with DeFlock and uses no DeFlock application code or DeFlock-owned data feed.
 | --- | --- | --- | --- |
 | CelesTrak GP data | Satellite positions propagated from current orbital elements | Observed orbital elements / propagated position | Two-hour shared cache; partial groups can degrade independently |
 | USGS GeoJSON earthquake feed | Recent earthquake locations and magnitudes | Observed events | Five-minute shared cache |
-| OpenSky Network | Aircraft state vectors near the selected location | Observed state vectors | Same-origin server adapter; hosting egress and provider terms apply |
-| ADSB.lol | Fallback aircraft observations when OpenSky is unavailable | Observed ADS-B state vectors | Same-origin server adapter; ODbL 1.0; provider availability and rate limits apply |
+| ADSB.lol | Aircraft observations near the selected location | Observed ADS-B state vectors | Same-origin server adapter; ODbL 1.0; provider availability and rate limits apply |
 | MET Norway Locationforecast | Hourly weather samples | Modeled, CC BY 4.0; converted units/categories | Shared backend cache honors Expires and Last-Modified |
 | PacIOOS global WAVEWATCH III | Wave and swell guidance | Free-use model; half-degree grid, per-source valid time | Fifteen-minute shared backend cache |
 | HYCOM / FNMOC ESPC | Surface currents and temperature | Freely available model; explicit grid and valid time | Fifteen-minute shared backend cache |
@@ -202,7 +201,7 @@ persistence authorities remain separate from the model.
 ## Provider Boundaries
 
 - Browser clients do not receive private provider credentials.
-- Panoramax, KartaView, OpenSky, and ADSB.lol requests use allowlisted same-origin server adapters.
+- Panoramax, KartaView, and ADSB.lol requests use allowlisted same-origin server adapters.
 - Provider requests use bounded caches, timeouts, in-flight deduplication, and health diagnostics.
 - Production Firebase, payment, and administrative credentials are never included in this repository.
 

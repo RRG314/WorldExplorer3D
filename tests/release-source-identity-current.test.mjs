@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, chmodSync, rmSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -53,6 +53,17 @@ test('a source copy inside another repository cannot borrow its parent identity'
   const child = path.join(root, 'copy');
   mkdirSync(child);
   assert.throws(() => readReleaseSourceIdentity(child), /Cannot establish/);
+});
+
+test('artifact creation cannot mistake a stale Git monitor for clean source',t=>{
+  const {root,git}=fixture(t),hook=path.join(root,'.git','stale-monitor');
+  writeFileSync(hook,"#!/bin/sh\nprintf 'stale-token\\000'\n");chmodSync(hook,0o755);
+  git('config','core.fsmonitor',hook);git('config','core.fsmonitorHookVersion','2');
+  git('status','--porcelain');git('update-index','--fsmonitor-valid','source.txt');
+  writeFileSync(path.join(root,'source.txt'),'changed while the monitor lost the event');
+  assert.equal(git('status','--porcelain'),'','control reproduces stale monitor');
+  assert.equal(readReleaseSourceIdentity(root).sourceDirty,true);
+  assert.equal(git('config','core.fsmonitor'),hook,'keep the user configuration');
 });
 
 test('verification rejects falsely clean, missing or altered source identity', (t) => {

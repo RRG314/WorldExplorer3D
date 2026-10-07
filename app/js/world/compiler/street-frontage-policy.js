@@ -60,8 +60,9 @@ function segmentWithinReach(a,b,c,d,reach) {
   return squared<limit;
 }
 export function createStreetFrontagePolicy(buildings = [], metersPerWorldUnit = 1.11) {
-  const scale=streetScale(metersPerWorldUnit), edges=[], corners=new Map(), buckets=new Map(), sections=new WeakMap();
-  const candidateRegions=new Map();
+  const scale=streetScale(metersPerWorldUnit), edges=[], corners=new Map(), buckets=new Map();
+  let sections=new WeakMap();
+  const candidateRegions=new Map(),sectionValues=new Map();
   const rings=buildings.map(streetFootprint);
   // Exact shared source vertices are invariant under translation and rotation.
   // Quantizing absolute coordinates made attachment depend on the map origin.
@@ -81,6 +82,9 @@ export function createStreetFrontagePolicy(buildings = [], metersPerWorldUnit = 
       }
     }
   }
+  // Attachment is now encoded on each edge. The source-vertex strings and
+  // their counts are construction scratch, not part of a live terrain query.
+  corners.clear();
   function query(a,b=a,pad=0){
     const box=bounds(a,b);
     const x0=Math.floor((box.minX-pad)/cell),x1=Math.floor((box.maxX+pad)/cell);
@@ -117,10 +121,21 @@ export function createStreetFrontagePolicy(buildings = [], metersPerWorldUnit = 
       const a=road.pts?.[index],b=road.pts?.[index+1]||a;
       const urban=!!a && query(a,b,FRONTAGE_RULES.urbanReach/scale).some(edge=>edge.facadeEligible);
       const tags=road.transportRecord?.sourceTags||road.tags||{};
-      const section={...resolveStreetSection({...tags,highway:tags.highway||road.type},{urban})};
-      if (!isGroundStreet(road)) for (const side of ['left','right']) section[side]={...section[side],presence:'absent',source:'excluded-structure',widthMeters:null};
+      let section=resolveStreetSection({...tags,highway:tags.highway||road.type},{urban});
+      if (!isGroundStreet(road)) section=Object.freeze({...section,
+        left:Object.freeze({...section.left,presence:'absent',source:'excluded-structure',widthMeters:null}),
+        right:Object.freeze({...section.right,presence:'absent',source:'excluded-structure',widthMeters:null})});
+      // Many sampled segments have exactly the same immutable semantic value.
+      // Share that value instead of retaining three objects per segment. Key
+      // the resolved evidence, not mutable road tags or an assumed revision.
+      const valueKey=JSON.stringify(section),shared=sectionValues.get(valueKey);
+      if(shared)section=shared;
+      else {
+        if(sectionValues.size>=128)sectionValues.delete(sectionValues.keys().next().value);
+        sectionValues.set(valueKey,section);
+      }
       cache.set(index,section);return section;
     },
-    dispose(){edges.length=0;buckets.clear();corners.clear();candidateRegions.clear();}
+    dispose(){edges.length=0;buckets.clear();corners.clear();candidateRegions.clear();sectionValues.clear();sections=new WeakMap();}
   };
 }

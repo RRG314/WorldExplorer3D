@@ -1,8 +1,8 @@
 # Release source identities
 
-## Current observation — October 3, 2026
+## Current observation — October 7, 2026
 
-Fresh hosted manifest: **5.4.0+1532bdfbb5c1.319d215f60318297.production**, source **1532bdfbb5c11e002d278b058d1ebdba88384f60**. Current product-plan work remains on steven/visual-quality and is not deployed. The preserved dist and historical execution receipts are not acceptance of this new source. See [current state](../CURRENT-STATE.md) and [finite release gates](product-audit/2026-10-01/RELEASE-ACCEPTANCE.md).
+Fresh hosted manifest: **5.4.0+1532bdfbb5c1.319d215f60318297.production**, source **1532bdfbb5c11e002d278b058d1ebdba88384f60**. The next compatible release is 5.5.0. Current work remains on steven/visual-quality and is not deployed. The existing preview still serves 5.4.0+86fdc6e3e6a2.febba16c0a5e3daa.staging. Production has 78 Functions; getPlaceLookup and getEnvironmentalData are absent and need a coordinated backend rollout. The preserved dist and historical execution receipts are not acceptance of this new source. See [current state](../CURRENT-STATE.md) and [finite release gates](product-audit/2026-10-01/RELEASE-ACCEPTANCE.md).
 
 ## Historical September 28 receipt
 

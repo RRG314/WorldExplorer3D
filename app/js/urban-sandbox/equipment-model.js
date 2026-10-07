@@ -67,6 +67,7 @@ function createEquipmentInventory(options = {}) {
   });
   const lastUseAtByEquipment = new Map();
   let flashlightEnabled = false;
+  let catalogSource=null,availableCatalogIds=null;
   function present(item) {
     if (!item) return null;
     const rounds=ammo.get(item.catalogId);
@@ -94,6 +95,14 @@ function createEquipmentInventory(options = {}) {
     type: 'CharacterBackpackEquipmentAdapter',
     backpack,
     snapshot,
+    catalogIds() {
+      const source=backpack.catalogIds();
+      if(source!==catalogSource||!availableCatalogIds){
+        catalogSource=source;
+        availableCatalogIds=Object.freeze(source.filter(id=>!quantities.has(id)||quantities.get(id)>0));
+      }
+      return availableCatalogIds;
+    },
     summary() { const base=backpack.summary();return Object.freeze({...base,equipped:present(base.equipped),hotbar:Object.freeze(base.hotbar.map(present))}); },
     page(options) { const base=backpack.page(options);return Object.freeze({...base,items:Object.freeze(base.items.map(present))}); },
     item(identity) { return present(backpack.present(identity)); },
@@ -152,6 +161,7 @@ function createEquipmentInventory(options = {}) {
       const amount = Math.max(0, Math.floor(Number(quantity) || 0));
       if (!definition?.quantity || amount <= 0) return 0;
       quantities.set(definition.id, Number(quantities.get(definition.id) || 0) + amount);
+      availableCatalogIds=null;
       backpack.touch?.('quantity-added', { catalogId: definition.id, quantity: amount });
       return amount;
     },
@@ -174,7 +184,7 @@ function createEquipmentInventory(options = {}) {
       const quantity = quantities.get(definition.id);
       if (quantity !== undefined && quantity <= 0) return Object.freeze({ ok: false, reason: 'empty', definition });
       if (rounds) rounds.magazine -= 1;
-      if (quantity !== undefined) quantities.set(definition.id, quantity - 1);
+      if (quantity !== undefined) {quantities.set(definition.id, quantity - 1);availableCatalogIds=null;}
       if (rounds || quantity !== undefined) backpack.touch?.('equipment-consumed', { catalogId: definition.id });
       lastUseAtByEquipment.set(definition.id, timestamp);
       return Object.freeze({ ok: true, definition });

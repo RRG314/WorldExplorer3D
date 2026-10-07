@@ -1,4 +1,5 @@
 import test from 'node:test';
+import {nearestPendingTransportRegion,transportRegionDistanceSquared,transportRegionInWindow} from '../app/js/terrain/transport-detail-plan.js';
 import {Worker as NodeWorker} from 'node:worker_threads';
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
@@ -9,6 +10,30 @@ import {restoreTransportTerrain} from '../app/js/terrain/transport-terrain-snaps
 import {createRegionalRoadContact} from '../app/js/terrain/regional-road-contact.js';
 import {createRoadContactIndex} from '../app/js/terrain/road-contact-index.js';
 import {prepareCarriagewayTiles} from '../app/js/world/compiler/street-carriageway.js';
+
+test('pending-region query preserves full-scan order with at most nine grid lookups',()=>{
+ let order=0,lookups=0;
+ class MeasuredMap extends Map { get(key){lookups++;return super.get(key);} }
+ const regions=new MeasuredMap();
+ // Reverse order makes insertion-order ties disagree with grid iteration.
+ for(let x=50;x>=-50;x--)for(let z=50;z>=-50;z--){const key=`${x}:${z}`;regions.set(key,{...transportRegionBounds(key),queueOrder:order++});}
+ const baseline=focus=>{let best=Infinity,key=null;for(const [candidate,bounds] of regions){
+  if(!transportRegionInWindow(bounds,focus,1024))continue;
+  const distance=transportRegionDistanceSquared(bounds,focus);
+  if(distance<best){best=distance;key=candidate;}
+ }return key;};
+ for(const focus of [{x:0,z:0},{x:1024,z:-1024},{x:-1024.001,z:1023.999},{x:1e9,z:-1e9},
+  ...Array.from({length:200},(_,i)=>({x:Math.sin(i)*60000,z:Math.cos(i*7)*60000}))]){
+  const expected=baseline(focus);lookups=0;
+  assert.equal(nearestPendingTransportRegion(regions,focus),expected);
+  assert.ok(lookups<=9,`${lookups} lookups for ${regions.size} pending regions`);
+ }
+ const focus={x:0,z:0},first=nearestPendingTransportRegion(regions,focus),bounds=regions.get(first);
+ regions.delete(first);bounds.queueOrder=order++;regions.set(first,bounds);
+ assert.notEqual(nearestPendingTransportRegion(regions,focus),first,'requeued tie moves to the end');
+ assert.equal(nearestPendingTransportRegion(regions,focus),baseline(focus));
+ for(const x of [NaN,Infinity,1e30])assert.equal(nearestPendingTransportRegion(regions,{x,z:0}),null);
+});
 import {meshCarriagewayTile} from '../app/js/world/compiler/street-carriageway-mesh.js';
 import {createPavementTerrainPartition} from '../app/js/world/pavement-terrain-partition.js';
 

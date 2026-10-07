@@ -1,5 +1,11 @@
 # Current development and release state
 
+## October 7 — 5.5.0 release preparation
+
+The owner now explicitly authorizes GitHub, Pages, semantic versioning and production deployment. 5.5.0 public notes, known limitations, roadmap and current-game screenshots are prepared. No publication yet. Full source PR passes 2,102 contracts and the complete dependency/source/ownership/type/inventory/sensitivity chain. Gallery inspection found collapsed HUD overlap; the CSS repair passes desktop collapse and phone-resize checks. Daylight deck and scuba screenshots use normal entry, time-of-day and movement controls, with no browser errors. Production and preview identities rechecked and unchanged. GitHub stable has the identical tree as source 1532bdfb, an ancestor of this branch, despite squash history; preserve that ancestry when integrating.
+
+The frontage and capability projection allocation work and completed travel/residency results are documented in [movement evidence](docs/system-review/2026-10-06/MOVEMENT-ALLOCATION-1007.md). Dense-city stalls remain. Required exact-candidate, backend and external acceptance still need current results; user authorization does not fabricate those results. Earlier status below is historical.
+
 Updated October 7, 2026. **Production acceptance remains open.** Current local artifact is **5.4.0+7101339662ce.1a5695e5aa23c4bf.staging**, 612 verified files; asset-manifest SHA256 `e15d1d814809362e2d8c1e48ca13679a018277979a698f73544cdb67450e4976`. Full PR passes 2,091 contracts and the dependency/source/ownership/type/inventory/sensitivity chain. Packaged connected marine passes seven cases, prescribed deck movement passes, the complete Monaco approach → tunnel → exit drive passes all six checks, and all three save upgrade/fallback/write/return stages pass with 136 reviewed runtime differences. [Current test instructions and exact evidence](docs/system-review/2026-10-06/TEST-BUILD.md).
 
 This artifact includes portal publication order, shared physical pavement cuts, sparse path sampling, camera feedback and direct saved-aboard resume repairs. Earlier sections below retain historical evidence; their artifact identities and old failure counts do not describe the current candidate. Hosted preview remains the older 86fdc6e3 build until an explicit refresh record below. No GitHub push or production change.

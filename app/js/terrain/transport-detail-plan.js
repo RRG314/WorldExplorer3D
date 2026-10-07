@@ -30,6 +30,30 @@ export function transportRegionBounds(key) {
   const [x,z]=key.split(':').map(Number);
   return {minX:x*TRANSPORT_REGION_SIZE,maxX:(x+1)*TRANSPORT_REGION_SIZE,minZ:z*TRANSPORT_REGION_SIZE,maxZ:(z+1)*TRANSPORT_REGION_SIZE};
 }
+
+// The pending queue already uses the region grid as its key. Query only cells
+// intersecting the detail window, rather than allocating an entry pair for
+// every distant pending region on every frame. queueOrder preserves the old
+// Map insertion-order tie break, including regions requeued after eviction.
+export function nearestPendingTransportRegion(regions, focus) {
+  if (!Number.isFinite(focus?.x) || !Number.isFinite(focus?.z)) return null;
+  const radius = TRANSPORT_DETAIL_RADIUS;
+  let selected = null, best = Infinity, first = Infinity;
+  const minX = Math.floor((focus.x - radius) / TRANSPORT_REGION_SIZE);
+  const maxX = Math.ceil((focus.x + radius) / TRANSPORT_REGION_SIZE) - 1;
+  const minZ = Math.floor((focus.z - radius) / TRANSPORT_REGION_SIZE);
+  const maxZ = Math.ceil((focus.z + radius) / TRANSPORT_REGION_SIZE) - 1;
+  if (!Number.isSafeInteger(minX) || !Number.isSafeInteger(maxX) || !Number.isSafeInteger(minZ) || !Number.isSafeInteger(maxZ)) return null;
+  for (let x = minX; x <= maxX; x++) for (let z = minZ; z <= maxZ; z++) {
+    const key = `${x}:${z}`, bounds = regions.get(key);
+    if (!bounds || !transportRegionInWindow(bounds, focus, radius)) continue;
+    const distance = transportRegionDistanceSquared(bounds, focus);
+    if (distance < best || (distance === best && bounds.queueOrder < first)) {
+      selected = key; best = distance; first = bounds.queueOrder;
+    }
+  }
+  return selected;
+}
 export function planTransportRegions(tiles,focus={x:0,z:0},radius=INITIAL_TRANSPORT_RADIUS) {
   const regions=new Map();
   for(const tile of tiles){

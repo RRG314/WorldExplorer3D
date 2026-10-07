@@ -18,14 +18,11 @@ release. An intended migration must be tested before compatibility is claimed.
 
 ## Next release
 
-Production currently runs **5.3.0**. The visual-quality work is targeting
-**5.4.0**, provided existing saves, room commands and links remain compatible.
-The packaged 5.4.0 artifact remains a candidate until release acceptance and
-production promotion complete. A 6.0 release is not justified by refactoring alone.
-
-The GitHub 5.3 release remains a draft; this does not make deployed 5.3 code
-unreleased. Do not overwrite its version with new runtime changes. The final
-5.4 notes must describe the difference from the deployed 5.3 build.
+Production currently runs **5.4.0**. The next update is **5.5.0**: compatible
+features and substantial improvements to Earth coverage, transport, ocean
+journeys, public environmental data and runtime ownership. A 6.0 release is not
+justified because the intended save, room and supported-link contracts remain.
+The 5.5 artifact is a candidate until verification and deployment complete.
 
 `package.json` and the root package-lock entries own the product version.
 The packaging process adds the commit, content hash and target environment.
