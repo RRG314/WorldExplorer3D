@@ -80,3 +80,18 @@ test('Git ignores cannot hide bytes that the Hosting builder actually ships', t 
   f.write('app/assets/local.bin', 'changed ignored bytes');
   assert.equal(sameAcceptanceSource(added, f.read()), false);
 });
+
+test('a stale filesystem-monitor cache cannot hide changed release inputs', t => {
+  const f=fixture(t),before=f.read();
+  const hook=path.join(f.root,'.git','stale-monitor');
+  writeFileSync(hook,"#!/bin/sh\nprintf 'stale-token\\000'\n");chmodSync(hook,0o755);
+  f.git(['config','core.fsmonitor',hook]);f.git(['config','core.fsmonitorHookVersion','2']);
+  f.git(['status','--porcelain']);
+  f.git(['update-index','--fsmonitor-valid','app/game.js']);
+  f.write('app/game.js','changed while the monitor lost the event');
+  assert.equal(f.git(['status','--porcelain']).toString(),'','control reproduces a false clean monitor result');
+  const after=f.read();
+  assert.equal(after.dirty,true,'release admission performs a fresh filesystem check');
+  assert.equal(sameAcceptanceSource(before,after),false,'changed bytes cannot inherit a previous acceptance identity');
+  assert.equal(f.git(['config','core.fsmonitor']).toString().trim(),hook,'verification must not change user Git settings');
+});

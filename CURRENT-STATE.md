@@ -8,6 +8,14 @@ This artifact includes portal publication order, shared physical pavement cuts, 
 
 Details: [FREE-ENVIRONMENT-DATA.md](docs/release-review/2026-10-05/FREE-ENVIRONMENT-DATA.md). Visual work: [REFERENCE-BLOCK.md](docs/visual-quality/REFERENCE-BLOCK.md). Earlier architecture acceptance: [LOCAL-RESULT.md](docs/system-review/2026-10-04/LOCAL-RESULT.md).
 
+## October 7 final acceptance follow-through
+
+The packaged f182 candidate passes the seven-case connected marine journey, prescribed deck input bursts, full Monaco approach/bore/exit drive and three-stage save compatibility (136 runtime differences). The first clean sustained performance attempt remains **failed/incomplete**: the first 90-second flight passes its budget, but walking records a 450 ms frame, and a carried-over police incident opens custody before the next mode can be selected. The 12 reload checks did not execute. Receipt: `output/verification/performance-sustained-f182/`, log `/tmp/we3d-sustained-f182.log`.
+
+The verification harness now records custody as a failed journey, uses the ordinary Continue button only between measured windows and continues independent checks. Interrupted/short windows still fail the unchanged travel thresholds; no police/physics behavior or frame limits are altered. Partial failures get explicit failed receipts. A separate disposable-repository regression reproduced a stale Git filesystem monitor returning false-clean for a changed runtime file. Source fingerprint reads now disable that cache per invocation without changing user Git configuration; the reproduction fails before the repair and passes afterwards. Full final PR passes 2,091 contracts and the full chain; replacement packaging is in progress.
+
+Free disk fell below 400 MiB during the save test. Byte-identical large files in retained builds were shared using independent APFS copy-on-write clones with before/after SHA256 checks. 1,575 files retain their original paths and bytes; about 3.7 GiB was reclaimed. No source, player data or build was deleted. Receipt: `output/architecture-evaluation/retained-artifact-cow-dedup-1007.json`.
+
 ## October 7 transport implementation in progress
 
 Current source completes a real 322.17-unit Monaco surface approach → tunnel → surface exit using keyboard driving: all six checks pass (completed, entered/exited, zero network join discontinuities, within the carriageway, no airborne frames, no captured JavaScript errors). Receipt: `output/verification/transport-portal-drive-quantized-1007/report.json`. The preceding two complete drives also pass. These are source/browser movement results, **not professional visual or release acceptance**. Final images were opened: portal-adjacent crossing roads and automatic camera transitions still need acceptance. Current dist remains the older bf10b392 artifact.

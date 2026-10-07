@@ -29,6 +29,7 @@ export const currentContractTests = [
   'tests/collision-candidates-current.test.mjs',
   'tests/water-profile-cache-current.test.mjs',
   'tests/frame-hitches-current.test.mjs',
+  'tests/sustained-traversal-contract-current.test.mjs',
   'tests/simulation-clock-current.test.mjs',
   'tests/context-ownership-current.test.mjs',
   'tests/session-ownership-current.test.mjs',

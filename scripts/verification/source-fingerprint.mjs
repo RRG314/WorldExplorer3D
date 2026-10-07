@@ -8,7 +8,11 @@ import { completeReleaseEnvironment } from './release-environment.mjs';
 export const FINGERPRINT_CONTRACT = 'world-explorer-source-fingerprint-v2';
 const classes = ['runtime', 'tests', 'environment', 'documentation'];
 const digest = value => createHash('sha256').update(value).digest('hex');
-const git = (root, args) => execFileSync('git', args, { cwd: root, encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 });
+// Release admission cannot trust a filesystem monitor that missed an edit.
+// Override only this read, retaining the user's repository configuration.
+const git = (root, args) => execFileSync('git', ['-c','core.fsmonitor=false',
+  '-c','core.untrackedCache=false','-c','core.ignoreStat=false','-c','core.trustctime=true',...args],
+  { cwd: root, encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 });
 export const SHIPPED_SOURCE_ENTRIES = Object.freeze(['about.html', 'favicon.svg', 'index.html',
   'about', 'account', 'app', 'assets', 'js', 'legal', 'styles']);
 

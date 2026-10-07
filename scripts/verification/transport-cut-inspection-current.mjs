@@ -13,7 +13,7 @@ const server=await startStaticServer({rootDir:process.env.WE3D_VERIFY_ROOT||proc
 const owned=await chromium.launchServer({channel:'chrome',headless:false});
 const browser=await chromium.connect(owned.wsEndpoint());
 const page=await browser.newPage({viewport:{width:1440,height:900}});
-const report={scope:'Monaco mapped main-carriageway entry, bore and exit using real vehicle controls',errors:[],frames:[],checks:{}};
+const report={scope:'Inspection only: explicit placement at a Monaco tunnel exit to trace road/terrain ownership; not a driven-route acceptance test',errors:[],frames:[],checks:{}};
 page.on('pageerror',e=>report.errors.push(e.message));
 try{
  await configureStagingAppCheck(page,`http://127.0.0.1:${server.port}`);

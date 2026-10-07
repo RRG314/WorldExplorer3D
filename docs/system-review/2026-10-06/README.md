@@ -93,3 +93,10 @@ Remaining work has explicit exit conditions:
 4. **Optional worldwide mode:** implement geographic persistence, cell-owned terrain/roads/buildings/collisions, origin transitions and bounded eviction, followed by off/on/off compatibility and long travel. The current fixed-location boundaries and local poses are not unrestricted streaming. Existing locations and saves remain the supported mode; no partial toggle is exposed.
 
 Shared-context coupling remains a structural liability, but the inventory found no resolved static import cycle. Future extraction should transfer behavior and lifetime ownership together and require a concrete regression/performance benefit. File splitting or a framework rewrite alone is not an acceptance criterion.
+
+
+## October 7 release-admission regression
+
+Observed ordinary Git status return a clean checkout while a fresh monitor-disabled scan found modified verification source. An isolated Git repository with a monitor that missed an edit reproduces the flaw: sourceFingerprint previously returned dirty=false and the previous accepted identity for changed game bytes. Release fingerprint Git reads now override filesystem-monitor/untracked-cache/ignore-stat settings for that invocation, retain normal ctime checks and preserve user repository settings. The new regression fails before the fix and passes after; seven focused fingerprint/artifact/traversal-contract checks pass. This strengthens release admission without changing game runtime.
+
+The first f182 sustained run records a 450 ms walking pause and then terminates on the actual custody dialog; it is not accepted. The harness now acknowledges custody through the ordinary UI between windows, records it as failure, preserves required movement/time thresholds and can finish the independent retention checks. No failed movement window becomes a pass.

@@ -4,6 +4,7 @@ import { sampleFrameWindow } from './frame-window.mjs';
 import { frameHitches } from './frame-hitches.mjs';
 import {planRoadRoute,followRoadRoute} from './travel-road-route.mjs';
 import {followFlightOrbit} from './travel-flight-orbit.mjs';
+import {sustainedTraversalObserved} from './sustained-traversal-contract.mjs';
 import { mkdir, readFile, writeFile, mkdtemp } from 'node:fs/promises';
 import {createWriteStream} from 'node:fs';
 import {finished} from 'node:stream/promises';
@@ -13,12 +14,14 @@ import { chromium, devices } from 'playwright';
 import { startStaticServer } from './static-server.mjs';
 import { requirePerformanceHost, requireHardwareGraphics } from './performance-host.mjs';
 import { collectBrowserGraphicsErrors } from './browser-graphics-errors.mjs';
+import {artifactIdentity} from './artifact-identity.mjs';
 
 // Reject cloud/other hardware before opening a browser or loading a world.
 const hostAuthority = requirePerformanceHost();
 const root = process.cwd();
 const evidenceDirectory=process.env.WE3D_PERF_OUTPUT || 'output/verification/performance-retention';
 const verifyRoot = process.env.WE3D_VERIFY_ROOT || root;
+const measuredArtifact=artifactIdentity(root,verifyRoot);
 const budgets = JSON.parse(await readFile(`${root}/config/performance-budgets.json`, 'utf8'));
 const server = await startStaticServer({ rootDir: verifyRoot, ports: [4421, 4422, 4423] });
 const baseUrl = `http://127.0.0.1:${server.port}`;
@@ -31,6 +34,7 @@ const requestedProfile = String(process.env.WE3D_VERIFY_PROFILE || 'all').trim()
 const auditOnly = process.env.WE3D_VERIFY_AUDIT_ONLY === '1';
 const sustained=process.env.WE3D_PERF_SUSTAINED==='1';
 const retainedHeapCycles=new Set(String(process.env.WE3D_PERF_RETAINED_HEAPS||'').split(',').filter(Boolean).map(Number));
+const gameplayInterruptions=[];
 assert.ok(['all', 'desktop', 'mobile'].includes(requestedProfile), `Unsupported WE3D_VERIFY_PROFILE: ${requestedProfile}`);
 
 const percentile = (values, portion) => {
@@ -188,7 +192,20 @@ async function launchWorld(client) {
   return { firstPlayableMs: milestones.playableMs, titleHeapBytes, milestones, diagnostics };
 }
 
+async function recoverCaughtJourney(page, phase) {
+  if(!await page.locator('#caughtScreen.show').isVisible())return false;
+  const receipt={phase,title:await page.locator('#caughtScreenTitle').innerText(),action:'ordinary Continue / Try Again button'};
+  gameplayInterruptions.push(receipt);
+  await page.screenshot({path:`${evidenceDirectory}/interruption-${gameplayInterruptions.length}.png`});
+  await writeFile(`${evidenceDirectory}/gameplay-interruptions.json`,JSON.stringify(gameplayInterruptions,null,2));
+  await page.locator('#caughtBtn').click();
+  await page.waitForFunction(()=>!document.getElementById('caughtScreen')?.classList.contains('show')&&!globalThis.__WE3D_PERF_CONTEXT__.paused,null,{timeout:20000});
+  console.log('[performance-retention] gameplay interruption retained as failure',JSON.stringify(receipt));
+  return true;
+}
+
 async function selectMode(page, expected, selector) {
+  await recoverCaughtJourney(page,`before-${expected}`);
   await page.locator('#travelBtn').click();
   await page.waitForSelector('#travelMenu.open', { timeout: 10_000 });
   assert.equal(await page.locator(selector).isVisible(), true, `${selector} is not a visible Travel action.`);
@@ -354,8 +371,8 @@ async function sustainedTravel(client){
     try{sample=await measureMode(client,`${mode}-sustained-${index}`,90000);}
     finally{signal.stopped=true;progress=await driver;await writeFile(`${evidenceDirectory}/${mode}-sustained-${index}-input.json`,JSON.stringify(progress));}
     if(driverFailure)throw driverFailure;
-    assert.ok(sample.distanceTraveled>=(mode==='walk'?100:mode==='drive'?300:1000),`${mode} sustained sample did not traverse the world`);
-    assert.ok(sample.movingMs>=60000,`${mode} sustained sample spent too long stationary`);
+    sample.gameplayInterrupted=await recoverCaughtJourney(page,`after-${mode}-sustained-${index}`);
+    sample.traversalObserved=sustainedTraversalObserved(mode,sample,sample.gameplayInterrupted);
     sample.scenario='sustained-keyboard-route';sample.initialPlacement='Test setup only; no physics/pose writes during the window';
     samples.push(sample);console.log('[performance-retention] sustained',JSON.stringify({id:sample.id,fps:sample.averageFps,p99:sample.p99FrameMs,hitches:sample.hitches,distance:sample.distanceTraveled}));
   }
@@ -423,6 +440,7 @@ async function runDesktop() {
       preparation: { keys: ['s', 'Space'], heldForMs: 2_000, before: flightBefore, after: flightAfter } };
     console.log('[performance-retention] desktop plane', JSON.stringify({ fps: plane.averageFps, withinBudgets: modesWithinBudgets([plane], budgets.desktopTier) }));
     const sustainedModes=sustained?await sustainedTravel(client):[];
+    await recoverCaughtJourney(client.page,'before-retention');
     const modes = [walk, walkMoving, drive, driveMoving, plane,...sustainedModes];
     const baselineCounts = walk.worldCounts;
     const releases = [];
@@ -507,7 +525,8 @@ async function runDesktop() {
       completeWorld: modes.every((mode) => Number(mode.worldCounts?.buildings) > 0 && Number(mode.worldCounts?.roads) > 0 && Number(mode.worldCounts?.terrainTiles) > 0),
       modesWithinBudgets: modesWithinBudgets(modes, budgets.desktopTier),
       activePlayHitchesWithinBudget:modes.every(mode=>mode.hitches.passed),
-      sustainedMixedTraversal:!sustained||sustainedModes.reduce((sum,mode)=>sum+mode.elapsedMs,0)>=600000,
+      sustainedMixedTraversal:!sustained||sustainedModes.length===7&&sustainedModes.every(mode=>mode.traversalObserved)&&sustainedModes.reduce((sum,mode)=>sum+mode.elapsedMs,0)>=600000,
+      noGameplayInterruptions:gameplayInterruptions.length===0,
       settledRetentionPlateau:!sustained||releases.length>=12&&releases.slice(2).every(entry=>{
         const baseline=releases[2];return Math.abs(entry.after.rendererGeometries-baseline.after.rendererGeometries)<=16&&
           Math.abs(entry.after.rendererTextures-baseline.after.rendererTextures)<=8&&entry.jsHeapUsedBytes-baseline.jsHeapUsedBytes<=50*1024*1024&&
@@ -535,7 +554,7 @@ async function runDesktop() {
     };
     return { ok: Object.values(checks).every(Boolean), tier: budgets.desktopTier, launch, modes, releases, reloadCounts,
       transfer,shortRunTransfer,reloadTransfers,transferScope:'Original total budget through two reloads; same limits checked separately on every additional reload; cumulative transfers retained.',
-      storage, checks, browserErrors: client.browserErrors, localFailures: client.localFailures, providerDegradations:client.providerDegradations };
+      storage, checks, gameplayInterruptions, browserErrors: client.browserErrors, localFailures: client.localFailures, providerDegradations:client.providerDegradations };
   } finally {
     await client.context.close();
   }
@@ -611,6 +630,7 @@ try {
     generatedAt: new Date().toISOString(),
     baseUrl,
     writesProduction: false,
+    artifactIdentity:measuredArtifact,
     evidenceScope: {
       kind: auditOnly||process.env.WE3D_PERF_TRACE_MODE?'instrumented-or-short-diagnostic':'single-artifact-budget-and-retention',
       comparativeImprovementEstablished: false,
@@ -634,6 +654,11 @@ try {
   await writeFile(`${evidenceDirectory}/report.json`, `${JSON.stringify(report, null, 2)}\n`);
   console.log(JSON.stringify(report, null, 2));
   if(!auditOnly)assert.equal(report.ok, true, 'Desktop/mobile-regression performance or retention budget failed.');
+} catch(error) {
+  await writeFile(`${evidenceDirectory}/failure.json`,JSON.stringify({ok:false,artifactIdentity:measuredArtifact,
+    error:String(error.stack||error).replace(/https?:\/\/\S+/g,'[URL]'),gameplayInterruptions,
+    scope:'Incomplete or failed acceptance; existing per-window receipts remain, unrun checks are not passes'},null,2));
+  throw error;
 } finally {
   // Always close the loopback listener even if a profiled browser's transport
   // fails to finish its close handshake after the Chrome process has exited.
