@@ -196,16 +196,16 @@
     "app/js/ocean/diver.js": {
       "before": "2a7e436bae51319a9e875815b6ca26bef48f40ff66b00fa711fdf3166d954ed1",
       "beforeMode": "100644",
-      "after": "cd4f0ad0b93a0461e9fe9f6bfa63e553e0b6fc81f6c56c9f24ed1b613ce0bc65",
+      "after": "473ae929dc99bdf5500db98a57d99f8fd1151108615b262ee39e97fc5e274f30",
       "afterMode": "100644",
-      "review": "Connected marine entry, deck/swim/submarine handoffs and compact UI. Existing voyage v1 identity, geographic anchor, stage, condition, save key, revision and conflict owner remain. Parent yaw stays independent of submarine yaw; no account/backpack or shared protocol change. New-session admission still requires checked water; saved underwater and aboard records retain their resume path."
+      "review": "Connected marine entry, deck/swim/submarine handoffs and compact UI. Existing voyage v1 identity, geographic anchor, stage, condition, save key, revision and conflict owner remain. Parent yaw stays independent of submarine yaw; no account/backpack or shared protocol change. New-session admission still requires checked water; saved underwater and aboard records retain their resume path. Portrait optical framing keeps the diver clear of the HUD; collision anchors and saved pose remain unchanged. Marine swim controls inherit the compact shared type scale."
     },
     "app/js/ocean/interface.js": {
       "before": null,
       "beforeMode": null,
-      "after": "e03191693156e6e534dab5ec16e1c4ce158cca1db19271cae8d7d9b80220606a",
+      "after": "94494308b86d2fbe9bd36b514e48f4c2c3084493fd0111e8e03e33753996ea8d",
       "afterMode": "100644",
-      "review": "Connected marine entry, deck/swim/submarine handoffs and compact UI. Existing voyage v1 identity, geographic anchor, stage, condition, save key, revision and conflict owner remain. Parent yaw stays independent of submarine yaw; no account/backpack or shared protocol change. New-session admission still requires checked water; saved underwater and aboard records retain their resume path."
+      "review": "Connected marine entry, deck/swim/submarine handoffs and compact UI. Existing voyage v1 identity, geographic anchor, stage, condition, save key, revision and conflict owner remain. Parent yaw stays independent of submarine yaw; no account/backpack or shared protocol change. New-session admission still requires checked water; saved underwater and aboard records retain their resume path. Portrait optical framing keeps the diver clear of the HUD; collision anchors and saved pose remain unchanged. Marine swim controls inherit the compact shared type scale."
     },
     "app/js/ocean/parent-vessel.js": {
       "before": "84a2cde22d65d335b85b09bde2f5979e7e6868b60e8e0969b2b354c79a023211",

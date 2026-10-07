@@ -120,8 +120,12 @@ export function createOceanDiver(ctx,mode,{sampleSeabedHeight,worldRadius=1200})
     cameraTarget.set(safeTarget.x,safeTarget.y,safeTarget.z);
     mode.camera.position.lerp(cameraTarget,1-Math.exp(-dt*7));
     const cameraPose=resolveOceanDiverCameraPose({anchor:lookTarget,target:mode.camera.position,submarinePosition:mode.submarine.position,checkBuildingCollision:allHullCollisionAt});
-    mode.camera.position.set(cameraPose.x,cameraPose.y,cameraPose.z);mode.camera.lookAt(lookTarget);
-    button.textContent=`${returnTarget==='vessel'?'Board research vessel':'Board submarine'} · ${Math.round(boardingDistance())} m`;button.disabled=falling||boardingDistance()>8;
+    mode.camera.position.set(cameraPose.x,cameraPose.y,cameraPose.z);
+    // On a portrait display, keep the explorer left of the compact right HUD.
+    // Collision stays anchored to the actual body; only optical framing shifts.
+    if(mode.camera.aspect<.8){lookTarget.x+=Math.cos(yaw)*.8;lookTarget.z-=Math.sin(yaw)*.8;}
+    mode.camera.lookAt(lookTarget);
+    button.textContent=`${returnTarget==='vessel'?'Board vessel':'Board submarine'} · ${Math.round(boardingDistance())} m`;button.disabled=falling||boardingDistance()>8;
     return true;
   }
   return {get active(){return active},start,stop,board,update,

@@ -12,7 +12,7 @@ export function styleMarinePanel(panel,kind) {
   .marine-panel [role=status]{color:var(--wx-muted,#a7b6c2);margin-top:6px}
   .marine-panel details{margin-top:8px;border-top:1px solid var(--wx-line-soft,#52636f);padding-top:4px}
   .marine-voyage{top:auto;bottom:96px}.marine-swim-inline{position:static!important;transform:none!important;max-width:none!important;width:100%!important;border:0!important;border-radius:0!important;padding:8px 0 0!important;background:none!important;box-shadow:none!important}
-  .marine-swim-inline>div:last-child{display:flex;gap:4px}.marine-swim-inline button{width:auto;min-width:0;flex:1;padding:6px 4px}
+  .marine-swim-inline{font:inherit!important}.marine-swim-inline>div:last-child{display:flex;gap:4px}.marine-swim-inline button{width:auto;min-width:0;flex:1;padding:6px 4px}
   body:has(#researchDeckControls[data-active=true]) #boatPrompt{display:none}
   @media(max-width:600px){.marine-panel{top:124px;right:8px;width:184px;max-width:calc(100vw - 16px);padding:9px;max-height:calc(100dvh - 390px);font-size:11px}.marine-panel button,.marine-panel select{min-height:44px}.marine-voyage{top:auto;bottom:130px;max-height:220px}.marine-swim-inline{max-height:none!important}}
   `;document.head.append(style);

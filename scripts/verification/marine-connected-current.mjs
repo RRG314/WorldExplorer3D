@@ -35,8 +35,13 @@ try{
  await page.keyboard.down('ShiftLeft');await page.waitForTimeout(2400);await page.keyboard.up('ShiftLeft');
  report.dive=await snapshot();assert.equal(report.dive.diver.swimming.equipment,'scuba');assert.ok(report.dive.diver.position.y<report.swim.diver.position.y-.5);
  await page.screenshot({path:`${out}/02-dive.png`});report.cases.push('platform jump enters shared ocean, scuba equips and descent works');
- await page.setViewportSize({width:390,height:844});await page.screenshot({path:`${out}/03-diver-phone.png`});
+ await page.setViewportSize({width:390,height:844});
+ await page.waitForFunction(()=>marineCtx.oceanMode.camera.aspect<.8);
+ await page.screenshot({path:`${out}/03-diver-phone.png`});
  report.phone=await page.locator('#oceanDiverControls').boundingBox();assert.ok(report.phone.x>=0&&report.phone.x+report.phone.width<=390&&report.phone.y+report.phone.height<700);
+ report.phoneExplorer=await page.evaluate(()=>{const m=marineCtx.oceanMode,p=m.diver.snapshot().position,head=new THREE.Vector3(p.x,p.y,p.z).project(m.camera);return {x:(head.x+1)*195,y:(1-head.y)*422};});
+ assert.ok(report.phoneExplorer.x>10&&report.phoneExplorer.x<380&&report.phoneExplorer.y>80&&report.phoneExplorer.y<760,'Explorer head remains on-screen');
+ assert.ok(report.phoneExplorer.x<report.phone.x||report.phoneExplorer.x>report.phone.x+report.phone.width||report.phoneExplorer.y<report.phone.y||report.phoneExplorer.y>report.phone.y+report.phone.height,'Diver panel covers explorer head');
  await page.getByRole('button',{name:'Recover',exact:true}).click();
  await page.waitForFunction(()=>marineCtx.boatDeck?.active&&!marineCtx.oceanMode.active,null,{timeout:60000});
  assert.equal(await page.locator('#boatWaveDock').isVisible(),false);

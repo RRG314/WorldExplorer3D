@@ -3,8 +3,11 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import { chromium } from 'playwright';
 import { startStaticServer } from './static-server.mjs';
+import {configureStagingAppCheck} from './staging-app-check.mjs';
+import {closeOwnedBrowser} from './owned-browser.mjs';
 const server = await startStaticServer({ rootDir: process.env.WE3D_VERIFY_ROOT || process.cwd(), ports: [4396] });
-const browser = await chromium.launch({ channel: 'chrome', headless: true });
+const owned = await chromium.launchServer({ channel: 'chrome', headless: false });
+const browser = await chromium.connect(owned.wsEndpoint());
 const dir = process.env.WE3D_OCEAN_DIVER_OUTPUT || 'output/verification/ocean-plan';
 await fs.mkdir(dir, { recursive: true });
 const report = { scope: 'Mutable source, actual standalone Ocean explorer/sub handoff; controlled bathymetry provider', cases: [], errors: [] };
@@ -19,6 +22,7 @@ try {
    await route.fulfill({ status: captured === null ? 503 : 200, contentType: 'text/plain', body: captured === null ? 'unavailable' : `value_list = '${captured}'` }).catch(() => {});
  });
  const page = await context.newPage();
+ await configureStagingAppCheck(page,`http://127.0.0.1:${server.port}`);
  page.on('pageerror', error => report.errors.push(error.message));
  page.on('console', message => {if(message.text().includes('[BoatMode]')) (report.boatWarnings ||= []).push(message.text());});
  await page.goto(`http://127.0.0.1:${server.port}/`, { waitUntil: 'load' });
@@ -44,7 +48,14 @@ try {
  const initial=await page.evaluate(()=>getOceanModeDebugState());
  assert.equal(initial.diver.ready,true);assert.equal(initial.diver.swimming.equipment,'scuba');
  await page.keyboard.down('w');
- try{await page.waitForFunction(position=>{const d=getOceanModeDebugState().diver;return Math.hypot(d.position.x-position.x,d.position.z-position.z)>.6},initial.diver.position,{timeout:12000})}catch(error){report.motionFailure=await page.evaluate(async()=>{const {ctx}=await import('/app/js/shared-context.js?v=55');return {state:getOceanModeDebugState(),actions:ctx.readControlActions('ocean'),focus:document.activeElement?.id}});throw error}finally{await page.keyboard.up('w')}
+ try{
+  await page.waitForFunction(position=>{const d=getOceanModeDebugState().diver;return Math.hypot(d.position.x-position.x,d.position.z-position.z)>.6},initial.diver.position,{timeout:12000});
+  report.swimPose=await page.evaluate(async()=>{const {ctx}=await import('/app/js/shared-context.js?v=55');const actor=ctx.oceanMode.scene.getObjectByName('Player Character');return {pitch:actor.rotation.x,animation:actor.userData.characterAnimation.snapshot()};});
+  assert.ok(report.swimPose.pitch>.5,'Forward swimming retains an upright standing pose');
+  assert.ok(Object.entries(report.swimPose.animation.weights).some(([name,weight])=>name.startsWith('Explorer_Swim:')&&weight>.5),'Forward motion has no swimming stroke');
+  await page.screenshot({path:`${dir}/diver-swimming.png`});
+  report.cases.push({id:'forward-swimming-pose-and-stroke',passed:true});
+ }catch(error){report.motionFailure=await page.evaluate(async()=>{const {ctx}=await import('/app/js/shared-context.js?v=55');return {state:getOceanModeDebugState(),actions:ctx.readControlActions('ocean'),focus:document.activeElement?.id}});throw error}finally{await page.keyboard.up('w')}
 
  const moved=await page.evaluate(()=>getOceanModeDebugState());
  assert.ok(Math.hypot(moved.diver.position.x-initial.diver.position.x,moved.diver.position.z-initial.diver.position.z)>.5);
@@ -56,7 +67,8 @@ try {
  await page.setViewportSize({width:390,height:844});
  const layout=await page.locator('#oceanDiverControls').boundingBox();assert.ok(layout.x>=0&&layout.x+layout.width<=391);
  const diveHud=await page.locator('#oceanSwimmingHud').boundingBox(),prompt=await page.locator('#boatPrompt').boundingBox(),map=await page.locator('#minimap').boundingBox();
- assert.ok(!prompt||prompt.y+prompt.height<=diveHud.y);assert.ok(layout.y>=map.y+map.height);
+ const separated=(a,b)=>!a||!b||a.x+a.width<=b.x||b.x+b.width<=a.x||a.y+a.height<=b.y||b.y+b.height<=a.y;
+ assert.ok(separated(prompt,diveHud));assert.ok(separated(layout,map),'Map overlaps boarding controls');
  await page.screenshot({path:`${dir}/diver-phone.png`});report.cases.push({id:'phone-width-boarding-controls-fit',passed:true});
  await page.setViewportSize({width:1440,height:900});
  await page.locator('#oceanDiverToggle').click();
@@ -70,5 +82,6 @@ try {
  await page.evaluate(()=>diverCtx.stopOceanMode());
  assert.equal(await page.locator('#oceanDiverControls').count(),0);assert.equal(await page.locator('#oceanSwimmingHud').count(),0);report.cases.push({id:'environment-exit-disposes-diver-ui',passed:true});
  assert.deepEqual(report.errors,[]);report.passed=true;
-}finally{await fs.writeFile(`${dir}/diver-browser.json`,JSON.stringify(report,null,2));await browser.close();await server.close()}
+}catch(error){report.failure=String(error.stack||error);process.exitCode=1;}
+finally{await fs.writeFile(`${dir}/diver-browser.json`,JSON.stringify(report,null,2));await closeOwnedBrowser(owned);await server.close()}
 console.log(JSON.stringify(report));
