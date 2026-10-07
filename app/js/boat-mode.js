@@ -1,4 +1,5 @@
 import {ensureOceanVoyage} from './ocean/voyage.js';
+import {resolveBoatEntryReference,boatExitActorHeights} from './boat-mode/entry-reference.js';
 import {createResearchDeck} from './boat-mode/research/runtime.js';
 import {addBoatSwimLadder,createBoatSwimming} from './boat-mode/swimming.js';
 import { ctx as appCtx } from "./shared-context.js?v=55";
@@ -381,7 +382,7 @@ function startBoatMode(options = {}) {
   if (boatSwimming.active) return boatSwimming.board();
   if (appCtx.boatMode?.active) return true;
   if (appCtx.oceanMode?.active || appCtx.onMoon || appCtx.travelingToMoon) return false;
-  const baseRef = getReferencePosition();
+  const baseRef = resolveBoatEntryReference(getReferencePosition(),options,appCtx.LOC);
   if (!baseRef) return false;
   if (baseRef.structureTerrainMode === 'subgrade') return false;
   const ref = {
@@ -619,11 +620,12 @@ function stopBoatMode(options = {}) {
   if (resolvedExit && typeof appCtx.applyResolvedWorldSpawn === 'function') {
     appCtx.applyResolvedWorldSpawn(resolvedExit, { mode: exitModeName });
   } else {
+    const exitHeights=boatExitActorHeights(appCtx,exitX,exitZ,vesselSnapshot.y);
     if (exitMode === 'walk' && appCtx.Walk?.state?.walker) {
       const walker = appCtx.Walk.state.walker;
       walker.x = exitX;
       walker.z = exitZ;
-      walker.y = appCtx.GroundHeight?.walkSurfaceY ? appCtx.GroundHeight.walkSurfaceY(exitX, exitZ) : appCtx.elevationWorldYAtWorldXZ(exitX, exitZ) + 1.7;
+      walker.y = exitHeights.walkerY;
       walker.vy = 0;
       walker.angle = exitAngle;
       walker.yaw = exitAngle;
@@ -640,7 +642,7 @@ function stopBoatMode(options = {}) {
     appCtx.car.speed = 0;
     appCtx.car.vx = 0;
     appCtx.car.vz = 0;
-    appCtx.car.y = (appCtx.GroundHeight?.roadSurfaceY ? appCtx.GroundHeight.roadSurfaceY(exitX, exitZ) : appCtx.elevationWorldYAtWorldXZ(exitX, exitZ)) + 1.1;
+    appCtx.car.y = exitHeights.carY;
     if (appCtx.carMesh) {
       appCtx.carMesh.position.set(appCtx.car.x, appCtx.car.y, appCtx.car.z);
       appCtx.carMesh.rotation.y = appCtx.car.angle;
@@ -669,9 +671,10 @@ function handleBoatAction() {
   }
   if (appCtx.boatMode?.active) {
     if (typeof appCtx.setTravelMode === 'function') {
-      appCtx.setTravelMode(appCtx.boatMode.lastEntryMode || 'walk', { source: 'boat_prompt_exit', force: true });
+      appCtx.setTravelMode(appCtx.boatMode.lastEntryMode || 'walk', { source: 'boat_prompt_exit' });
     } else {
-      stopBoatMode({ targetMode: appCtx.boatMode.lastEntryMode || 'walk' });
+      const targetMode=appCtx.boatMode.lastEntryMode || 'walk';
+      if(canExitBoatMode(targetMode,{source:'boat_prompt_exit',showNotice:true}))stopBoatMode({targetMode});
     }
     return true;
   }

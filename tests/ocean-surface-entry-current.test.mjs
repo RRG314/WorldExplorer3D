@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createBoatOceanTransferApi} from '../app/js/boat-mode/ocean-transfer.js';
+import {resolveBoatEntryReference,boatExitActorHeights} from '../app/js/boat-mode/entry-reference.js';
 import {ensureOceanVoyage} from '../app/js/ocean/voyage.js';
 import {createOceanVoyageStore,OCEAN_VOYAGE_KEY} from '../app/js/ocean/voyage-store.js';
 
@@ -21,6 +22,21 @@ function fixture(){
  return{ctx,api,calls,storage,voyage,supersede:()=>generation++,setLoad:fn=>load=fn,rejectBoat:()=>accept=false};
 }
 const site={lat:10,lon:20,name:'Verified sea',region:'Ocean'},entry={lat:10,lon:20,source:'gebco-elevation-sample',kind:'modeled-ocean',elevationMeters:-50};
+test('sea-first teardown needs no terrestrial module and ground floor heights retain eye clearance',()=>{
+ assert.deepEqual(boatExitActorHeights({},0,0,2),{walkerY:3.7,carY:3.1});
+ assert.deepEqual(boatExitActorHeights({GroundHeight:{walkSurfaceY:()=>10,roadSurfaceY:()=>12}},1,2,0),{walkerY:11.7,carY:13.1});
+ assert.deepEqual(boatExitActorHeights({elevationWorldYAtWorldXZ:()=>4,GroundHeight:{walkSurfaceY:()=>NaN}},1,2,0),{walkerY:5.7,carY:5.1});
+});
+test('accepted ocean arrival uses its new surface frame; ordinary air and tunnel boarding stays restricted',()=>{
+ const tunnel={x:200,y:-30,z:50,mode:'drive',structureTerrainMode:'subgrade'};
+ const options={surfaceArrival:{lat:10,lon:20},spawnX:0,spawnZ:0,yaw:.7,candidate:{surfaceY:.08,source:{synthetic:true,provenance:{dataset:'synthetic-transition'}}}};
+ for(const current of [null,tunnel,{x:20,y:100,z:30,mode:'drone'}]){
+  assert.equal(resolveBoatEntryReference(current,{},site),current);
+  assert.deepEqual(resolveBoatEntryReference(current,options,site),{x:0,y:.08,z:0,angle:.7,mode:'walk',structureTerrainMode:'at_grade'});
+  assert.equal(resolveBoatEntryReference(current,options,{lat:11,lon:20}),null);
+  assert.equal(resolveBoatEntryReference(current,{...options,candidate:{surfaceY:.08,source:{synthetic:false}}},site),null);
+ }
+});
 async function withDocument(fn){const original=globalThis.document;globalThis.document={getElementById:()=>null};try{await fn();}finally{globalThis.document=original;}}
 
 test('fresh surface entry validates water before mutating the location, scene or voyage',()=>withDocument(async()=>{

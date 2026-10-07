@@ -21,16 +21,23 @@
     "app/js/boat-mode.js": {
       "before": "d1b0f271f9529e2ea7e971f02a9f1a077a9fd464016fae266c386c64556a0981",
       "beforeMode": "100644",
-      "after": "89ac0bb2586b8d0e5ab57b510e071d92c78b2ba006359b9824bc79fe4b0c2df9",
+      "after": "043c29866c05d1df691040fd5c4230f4307ac0d438be9aee80c858a6794fa9e6",
       "afterMode": "100644",
-      "review": "Direct admitted surface entry reuses the existing boat handoff without creating an underwater scene. Voyage v1 fields, save key, validation, revision/conflict owner and fallback resume remain compatible; only successful vessel publication writes an aboard record. Future/malformed records are retained. Existing underwater/resume/parent-ship paths are preserved. No inventory, account, room or server schema changes."
+      "review": "An admitted ocean surface arrival uses its committed geographic frame and synthetic-water reference instead of outgoing airborne or tunnel reachability. Normal nearby boarding still uses the current actor. Sea-first teardown no longer requires unloaded terrestrial elevation functions; transient walker poses include eye height. Ordinary Exit Vessel no longer bypasses the existing shoreline policy. No save schema/key, inventory, account, backend or shared protocol changes; guarded voyage v1 persistence and rollback remain required."
+    },
+    "app/js/boat-mode/entry-reference.js": {
+      "before": null,
+      "beforeMode": null,
+      "after": "25a453688f80a20aeba0042243c8d876df6eb874d680f96e7af9661d37be6534",
+      "afterMode": "100644",
+      "review": "An admitted ocean surface arrival uses its committed geographic frame and synthetic-water reference instead of outgoing airborne or tunnel reachability. Normal nearby boarding still uses the current actor. Sea-first teardown no longer requires unloaded terrestrial elevation functions; transient walker poses include eye height. Ordinary Exit Vessel no longer bypasses the existing shoreline policy. No save schema/key, inventory, account, backend or shared protocol changes; guarded voyage v1 persistence and rollback remain required."
     },
     "app/js/boat-mode/ocean-transfer.js": {
       "before": "3e58a2c17b9d78e4b17fceb9d26afd18da1b94dfea43cc478c05ca459215ac8d",
       "beforeMode": "100644",
-      "after": "8ac1c25cf4d54d4d9525e3f4698201fd6f18936f9849efd953534b911dcf1030",
+      "after": "a377c9d48a923b0cb61f40b2d9baf30f432384d387ebcb15a349e9b68e7b957e",
       "afterMode": "100644",
-      "review": "Direct admitted surface entry reuses the existing boat handoff without creating an underwater scene. Voyage v1 fields, save key, validation, revision/conflict owner and fallback resume remain compatible; only successful vessel publication writes an aboard record. Future/malformed records are retained. Existing underwater/resume/parent-ship paths are preserved. No inventory, account, room or server schema changes."
+      "review": "An admitted ocean surface arrival uses its committed geographic frame and synthetic-water reference instead of outgoing airborne or tunnel reachability. Normal nearby boarding still uses the current actor. Sea-first teardown no longer requires unloaded terrestrial elevation functions; transient walker poses include eye height. Ordinary Exit Vessel no longer bypasses the existing shoreline policy. No save schema/key, inventory, account, backend or shared protocol changes; guarded voyage v1 persistence and rollback remain required."
     },
     "app/js/boat-mode/prompt-ui.js": {
       "before": "d41c780e615d7d004009e23832dbb722aeb940ecd35350a01fe78849fa32942e",
@@ -521,6 +528,13 @@
       "after": "d04a560efbbbe649cd2cf7a2142c560f5b65490be0910b4efae5cff542c10753",
       "afterMode": "100644",
       "review": "Bounded road render/contact residency within the existing fixed source catalog and shared road-mask ownership. Existing retry calls the existing session capture/reload authority. No new save schema, geographic migration, room authority or persistent write protocol."
+    },
+    "app/js/travel-mode.js": {
+      "before": "38dbb7260a048cda3fedaef55eb59d2d36dd81a71887fbbc7437ee9d3410ab24",
+      "beforeMode": "100644",
+      "after": "2fa2cc91167d43635ea4ee3366b9bfdefea1d47d19a512cced2aab2960a539b7",
+      "afterMode": "100644",
+      "review": "An admitted ocean surface arrival uses its committed geographic frame and synthetic-water reference instead of outgoing airborne or tunnel reachability. Normal nearby boarding still uses the current actor. Sea-first teardown no longer requires unloaded terrestrial elevation functions; transient walker poses include eye height. Ordinary Exit Vessel no longer bypasses the existing shoreline policy. No save schema/key, inventory, account, backend or shared protocol changes; guarded voyage v1 persistence and rollback remain required."
     },
     "app/js/travel/earth-return.js": {
       "before": null,

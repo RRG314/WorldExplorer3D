@@ -27,6 +27,17 @@ try{
  report.arrival=await snapshot();assert.equal(report.arrival.catalog,'ocean-research-vessel');assert.equal(report.arrival.deck.active,true);
  report.directSurface=await page.evaluate(()=>({underwaterStarts:marineOceanStarts,underwaterRenderer:!!marineCtx.oceanMode.renderer,stage:marineCtx.oceanVoyage.current.stage}));
  assert.deepEqual(report.directSurface,{underwaterStarts:0,underwaterRenderer:false,stage:'aboard'});
+ // A new ocean destination must be admitted independently of the outgoing
+ // controller's ground reach. The actual drone is deliberately airborne.
+ report.airborneArrival=await page.evaluate(async()=>{
+  marineCtx.suspendBoatModeForOceanTransfer();const priorMode=marineCtx.setTravelMode('drone');marineCtx.drone.y=200;
+  const launchSite={lat:-18.2861,lon:147.7,name:'Coral Shelf',region:'Ocean'};
+  const started=await marineCtx.startSurfaceResearchVoyage({launchSite,entry:{...launchSite,source:'gebco-elevation-sample',kind:'modeled-ocean',elevationMeters:-80}});
+  return {priorMode,started,deck:marineCtx.boatDeck.active,underwaterStarts:marineOceanStarts,droneActive:marineCtx.droneMode};
+ });
+ assert.deepEqual(report.airborneArrival,{priorMode:'drone',started:true,deck:true,underwaterStarts:0,droneActive:false});
+ report.arrival=await snapshot();
+ report.cases.push('fresh admitted surface entry from an airborne drone');
  assert.equal(await page.locator('#boatWaveDock').isVisible(),false,'Helm-only wave slider covers deck navigation');
  await page.screenshot({path:`${out}/01-arrival.png`});report.cases.push('fresh ocean selection starts on research deck');
  await page.locator('[aria-label="Deck destination"]').selectOption('dive');
@@ -54,6 +65,14 @@ try{
  report.submarine=await snapshot();assert.equal(report.submarine.voyage.ship.transportEntityId,report.arrival.vessel);
  await page.screenshot({path:`${out}/05-submarine.png`});
  await page.setViewportSize({width:390,height:844});await page.screenshot({path:`${out}/06-submarine-phone.png`});report.cases.push('walk to cradle and deploy the same voyage submarine');
+ await page.setViewportSize({width:1440,height:900});
+ await page.getByRole('button',{name:'Recover to parent vessel',exact:true}).click();
+ await page.waitForFunction(()=>marineCtx.boatDeck?.active&&!marineCtx.oceanMode.active,null,{timeout:60000});
+ await page.getByRole('button',{name:/Main Menu/}).click();
+ await page.waitForFunction(()=>!marineCtx.gameStarted&&document.querySelector('#globeSelectorScreen')?.classList.contains('show'),null,{timeout:30000});
+ report.menu=await page.evaluate(()=>({boat:marineCtx.boatMode.active,deck:marineCtx.boatDeck.active,ocean:marineCtx.oceanMode.active,stage:marineCtx.oceanVoyage.saved?.stage}));
+ assert.deepEqual(report.menu,{boat:false,deck:false,ocean:false,stage:'aboard'});
+ await page.screenshot({path:`${out}/07-main-menu.png`});report.cases.push('return to main menu from a sea-first session preserves the saved voyage');
  assert.deepEqual(report.errors,[]);report.passed=true;
 }catch(e){report.failure=String(e.stack||e);process.exitCode=1;if(page){await page.screenshot({path:`${out}/failure.png`}).catch(()=>{});report.failedState=await page.evaluate(()=>({text:globalThis.render_game_to_text?.(),status:document.querySelector('#globeLocationSearchStatus')?.textContent,boat:globalThis.marineCtx?.boatDeck?.snapshot(),diver:globalThis.marineCtx?.oceanMode.diver?.snapshot()})).catch(()=>null);}}
 finally{await writeFile(`${out}/report.json`,JSON.stringify(report,null,2));if(owned)await closeOwnedBrowser(owned);await server.close();}
