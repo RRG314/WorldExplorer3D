@@ -59,6 +59,7 @@ try {
     timeout: 120_000
   });
   console.log('[bridge-endpoints] runtime ready');
+  await page.evaluate(async()=>{globalThis.bridgeCtx=(await import('/app/js/shared-context.js?v=55')).ctx;});
   const consent = page.locator('#analyticsConsentDenyBtn');
   if (await consent.isVisible()) await consent.click();
   await page.getByRole('button', { name: 'Explore', exact: true }).click();
@@ -67,6 +68,7 @@ try {
     const state = JSON.parse(globalThis.render_game_to_text?.() || '{}');
     const diagnostics = globalThis.getWorldExplorerRuntimeDiagnostics?.() || {};
     return state.gameStarted === true &&
+      !bridgeCtx.worldLoading && bridgeCtx.worldLoadRuntimeState?.status === 'ready' &&
       Number(diagnostics.worldCounts?.roads || 0) > 0 &&
       Number(diagnostics.transportStructures?.publishedBodies || 0) > 0 &&
       diagnostics.transportStructures?.generalizedEndpointIntegrity?.authority ===

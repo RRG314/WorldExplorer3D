@@ -1,6 +1,8 @@
 # Current development and release state
 
-Updated October 6, 2026. **Marine/transport implementation is in progress, not production ready. Space Return to Earth, retained-Earth work while aboard, fresh Ocean entry on the research deck, connected swim/scuba/recovery/submarine controls, vector tile road ownership and false cross-layer topology are repaired locally. Full PR passed 2,038 contracts before the latest focused topology/UI refinements. All-deck ship traversal passes. The expanded Monaco audit still fails 237 generalized structure joins (maximum 18.70 world units); bridge/tunnel alignment and professional portal acceptance remain open. No replacement vessel/animal assets or spearfishing are installed.** See [the current implementation ledger](docs/system-review/2026-10-06/MARINE-TRANSPORT.md). The preserved dist is still runtime 9579cd62; the new source has not been packaged. Earth GC stalls and optional worldwide travel remain unresolved. Public preview 86fdc6e3 and production 1532bdfb are unchanged.
+Updated October 6, 2026. **Marine/transport work is locally checkpointed and packaged; production remains blocked.** Current runtime **dcb1687fda2c**, artifact **5.4.0+dcb1687fda2c.47bf4be4a6acfde0.staging**. Source checks pass **2,045 contracts** plus the full PR check chain. Final packaged connected marine journey and nine independent diver checks pass; ship walking/visible Earth return passes (60.04 FPS / 18.8 ms worst frame in a 30-second sample, 49,023 buildings / 18,828 roads retained). Packaged candidate → 37a12d11 fallback → candidate save/read/write passes all three stages with 104 reviewed runtime/configuration differences. Artifact verification passes 612 files / 188 bundles / 84 ground files. See [local test instructions](docs/system-review/2026-10-06/TEST-BUILD.md) and [the implementation ledger](docs/system-review/2026-10-06/MARINE-TRANSPORT.md).
+
+**Not complete:** the Monaco audit still fails 237 generalized structure joins (maximum 18.70 world units); Baltimore also fails 62 of 677 sampled joins (maximum 8.49 units). Bridge/tunnel alignment and professional portal acceptance remain open; ten packaged internal-bore movement/handoff checks pass. The RCRV model is downloaded/provenanced but not integrated; no replacement vessel/animal assets or spearfishing are installed. Continuous ocean/worldwide travel and Earth GC stalls remain unresolved. Existing artifacts, source/history and player data are preserved. Public preview 86fdc6e3 and production 1532bdfb are unchanged.
 
 Details: [FREE-ENVIRONMENT-DATA.md](docs/release-review/2026-10-05/FREE-ENVIRONMENT-DATA.md). Visual work: [REFERENCE-BLOCK.md](docs/visual-quality/REFERENCE-BLOCK.md). Earlier architecture acceptance: [LOCAL-RESULT.md](docs/system-review/2026-10-04/LOCAL-RESULT.md).
 
@@ -11,7 +13,7 @@ Use `/Users/stevenreid/.codex/worktrees/architecture-evaluation/WorldExplorer3D-
 Physical Apple M1 Mac mini, 8 GiB RAM. Heavy checks run sequentially. Preserve ordinary user Chrome, player data, four saved candidates and retained artifacts. Close owned verification browsers; an open 3D preview measurably interferes with performance testing. Private credentials stay outside the repository and reports.
 
 
-## Latest local architecture repair
+## Earlier local architecture repair (preserved 9579cd62 artifact)
 
 [Fresh audit, plan, implementation and evidence](docs/system-review/2026-10-06/README.md). Runtime **9579cd62ae62**, local artifact **5.4.0+9579cd62ae62.a9ec3bf5ff67cacf.staging**, 612 verified files, 188 runtime bundles, 84 accepted-ground files; asset-manifest SHA256 `304d55287078e43aa8f5ee744d328d959ae426b29f74c0b375d25999c5e70263`.
 

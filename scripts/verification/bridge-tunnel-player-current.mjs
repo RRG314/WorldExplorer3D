@@ -1,9 +1,23 @@
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { chromium } from 'playwright';
+import { build } from 'esbuild';
 import {startStaticServer} from './static-server.mjs';
 import {configureStagingAppCheck} from './staging-app-check.mjs';
+import {closeOwnedBrowser} from './owned-browser.mjs';
 
+// Read-only geometry inspectors are a test instrument, not additional product
+// entry points. Packaged games expose the shared context but not source modules.
+// Bundle these pure helpers separately; movement and surface placement still
+// use the running artifact's actual authorities and compiled feature models.
+const inspection = await build({
+  absWorkingDir: process.cwd(), bundle: true, write: false, format: 'esm',
+  stdin: { resolveDir: process.cwd(), contents: `
+    export {resolveTunnelSpace} from './app/js/world/compiler/tunnel-space-query.js';
+    export {projectPointToFeature} from './app/js/structure-semantics.js';
+    export {createVehicleCameraBody,vehicleCameraProbeRadius} from './app/js/hud/vehicle-camera-body.js';
+  ` }
+});
 const server=process.env.WE3D_VERIFY_BASE_URL?null:await startStaticServer({rootDir:process.env.WE3D_VERIFY_ROOT||process.cwd(),ports:[4196]});
 const base = process.env.WE3D_VERIFY_BASE_URL || `http://127.0.0.1:${server.port}`;
 const output = process.env.WE3D_VERIFY_OUTPUT_DIR || 'output/playwright/bridge-tunnel-current';
@@ -11,6 +25,9 @@ await mkdir(output, { recursive: true });
 const browserServer = await chromium.launchServer({ channel: 'chrome', headless: false });
 const browser = await chromium.connect(browserServer.wsEndpoint());
 const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+await page.route('**/__verification/transport-inspection.mjs', route => route.fulfill({
+  status: 200, contentType: 'text/javascript', body: inspection.outputFiles[0].text
+}));
 const report = { baseline: base, providerPath: 'explicit-worldwide-fallback', errors: [], frames: [], checks: {} };
 // This transport-only source fixture must not contact production capture
 // services. Capture publication is exercised separately on staged hosting.
@@ -21,20 +38,12 @@ await page.route('**/listApprovedExteriorRepresentations', route => route.fulfil
 }));
 // A graceful Chrome close can hang after a WebGL run. Own only this test's
 // browser and keep a hard bound through cleanup, not merely through assertions.
-async function closeOwnedBrowser() {
-  let timer;
-  const closed=await Promise.race([
-    browserServer.close().then(()=>true,()=>false),
-    new Promise(resolve=>{timer=setTimeout(()=>resolve(false),8000);})
-  ]);
-  clearTimeout(timer);
-  if(!closed)await browserServer.kill();
-  return closed;
-}
+let closing;
+const closeTestBrowser=()=>closing ||= closeOwnedBrowser(browserServer);
 const deadline = setTimeout(() => {
   report.failure='Transport verification exceeded its 360 second wall-clock limit.';
   process.exitCode=1;
-  void browserServer.kill();
+  void closeTestBrowser().catch(error=>{report.cleanupFailure=String(error);});
 }, 360_000);
 page.on('pageerror', error => report.errors.push(String(error)));
 page.on('console', message => { if (message.type() === 'error') report.errors.push({ message: message.text(), location: message.location() }); });
@@ -48,9 +57,7 @@ async function snapshot(label) {
   await page.screenshot({ path: `${output}/${label}.png` });
   const state = await page.evaluate(async () => {
     const { ctx } = await import('/app/js/shared-context.js?v=55');
-    const { resolveTunnelSpace } = await import('/app/js/world/compiler/tunnel-space-query.js');
-    const { projectPointToFeature } = await import('/app/js/structure-semantics.js?v=63');
-    const { createVehicleCameraBody, vehicleCameraProbeRadius } = await import('/app/js/hud/vehicle-camera-body.js');
+    const { resolveTunnelSpace, projectPointToFeature, createVehicleCameraBody, vehicleCameraProbeRadius } = await import('/__verification/transport-inspection.mjs');
     const walker = ctx.Walk.state.walker;
     const walk = ctx.Walk.state.mode === 'walk';
     const actor = walk ? walker : ctx.car;
@@ -83,7 +90,6 @@ try {
   }, null, { timeout: 240_000 });
   await page.evaluate(async () => {
     const { ctx } = await import('/app/js/shared-context.js?v=55');
-    const { sampleFeatureSurfaceY } = await import('/app/js/structure-semantics.js?v=63');
     window.testTunnel = ctx.roads.find(r => r.name === 'Fort McHenry Tunnel (Bore 2)' && r.tunnelSystemModel?.shellRanges.length);
     if (!window.testTunnel) throw new Error('Mapped test tunnel did not load');
     window.placeOnTestTunnel = (distance, normal = false) => {
@@ -98,7 +104,7 @@ try {
         }
         left -= length;
       }
-      const y = sampleFeatureSurfaceY(r, point.x, point.z);
+      const y = ctx.sampleFeatureSurfaceY(r, point.x, point.z);
       Object.assign(ctx.car, { ...point, y: y + 1.2, vy: 0, road: r, onRoad: true, isAirborne: false,
         _lastSurfaceY: y, _lastRawSurfaceY: y, _roadContinuityTimer: .7, speed: 0, vFwd: 0, vLat: 0 });
       ctx.invalidateRoadCache();
@@ -185,9 +191,7 @@ try {
   process.exitCode = 1;
 } finally {
   await writeFile(`${output}/report.json`, JSON.stringify(report, null, 2));
-  report.gracefulBrowserClose = await closeOwnedBrowser();
-  clearTimeout(deadline);
-  await server?.close();
-  await writeFile(`${output}/report.json`, JSON.stringify(report, null, 2));
+  try{await closeTestBrowser();report.ownedBrowserClosed=true;}
+  finally{clearTimeout(deadline);await server?.close();await writeFile(`${output}/report.json`, JSON.stringify(report, null, 2));}
   console.log(JSON.stringify({ ok: report.ok || false, checks: report.checks, failure: report.failure }, null, 2));
 }
