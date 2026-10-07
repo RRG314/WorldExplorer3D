@@ -1,12 +1,18 @@
 # Current development and release state
 
-Updated October 7, 2026. **Production acceptance remains open.** Current local artifact is **5.4.0+f182ab8552ed.1a5695e5aa23c4bf.staging**, 612 verified files; asset-manifest SHA256 `e15d1d814809362e2d8c1e48ca13679a018277979a698f73544cdb67450e4976`. Full PR passes 2,089 contracts and the dependency/source/ownership/type/inventory/sensitivity chain. Packaged connected marine passes seven cases, prescribed deck movement passes, the complete Monaco approach → tunnel → exit drive passes all six checks, and all three save upgrade/fallback/write/return stages pass with 136 reviewed runtime differences. [Current test instructions and exact evidence](docs/system-review/2026-10-06/TEST-BUILD.md).
+Updated October 7, 2026. **Production acceptance remains open.** Current local artifact is **5.4.0+7101339662ce.1a5695e5aa23c4bf.staging**, 612 verified files; asset-manifest SHA256 `e15d1d814809362e2d8c1e48ca13679a018277979a698f73544cdb67450e4976`. Full PR passes 2,091 contracts and the dependency/source/ownership/type/inventory/sensitivity chain. Packaged connected marine passes seven cases, prescribed deck movement passes, the complete Monaco approach → tunnel → exit drive passes all six checks, and all three save upgrade/fallback/write/return stages pass with 136 reviewed runtime differences. [Current test instructions and exact evidence](docs/system-review/2026-10-06/TEST-BUILD.md).
 
 This artifact includes portal publication order, shared physical pavement cuts, sparse path sampling, camera feedback and direct saved-aboard resume repairs. Earlier sections below retain historical evidence; their artifact identities and old failure counts do not describe the current candidate. Hosted preview remains the older 86fdc6e3 build until an explicit refresh record below. No GitHub push or production change.
 
 **Open release scope:** sustained Earth stalls, professional portal/crossing/bridge visual acceptance, licensed vessel and wildlife replacement, broader ocean activities/spearfishing, optional continuous worldwide travel and final coordinated live-service/device acceptance. The existing location game, source/history, artifacts and player data remain preserved. Building coverage was not traded away: the latest prescribed Baltimore run retains 48,296 near buildings and 95% eligible regional coverage.
 
 Details: [FREE-ENVIRONMENT-DATA.md](docs/release-review/2026-10-05/FREE-ENVIRONMENT-DATA.md). Visual work: [REFERENCE-BLOCK.md](docs/visual-quality/REFERENCE-BLOCK.md). Earlier architecture acceptance: [LOCAL-RESULT.md](docs/system-review/2026-10-04/LOCAL-RESULT.md).
+
+## October 7 completed sustained/retention run
+
+Current 71013396 package has exactly the same 612 application bytes as the route/marine/save-tested f182 package (`output/verification/final-harness-artifact-equivalence-1007.json`); only build identity and verification provenance changed. The corrected full sustained run finishes all seven 90-second traversal windows and all 12 reload cycles. **Overall acceptance fails.** Driving records a 500 ms worst frame in the first sustained window and four >100 ms pauses (worst 150 ms) in the second. One walking window is interrupted by ordinary custody and remains failed; the harness records and acknowledges that dialog between samples. Several average-FPS samples also miss their separate target. All three sustained flights pass the unchanged hitch limits.
+
+**Retention and coverage pass:** every reload contains 49,023 buildings, 18,952 roads and 49 terrain tiles. World owners and retired population feature references release; renderer/heap retention, transfer and storage budgets pass. Settled post-unload heap is 107.04 MiB after the mixed journey, 47.19 MiB on the next cycle, and 52.46 MiB at cycle 12. There are no captured browser errors or failed local resources. These post-unload collections are solely retention diagnostics; no forced GC runs during active movement. Receipt: `output/verification/performance-sustained-7101/report.json`. No performance, global-world or release-ready claim follows from the passing cleanup checks.
 
 ## October 7 final acceptance follow-through
 
@@ -46,7 +52,7 @@ The current packaged 462e5ffc build passed all three save upgrade/fallback/write
 
 ## Workspace and authorization
 
-Use `/Users/stevenreid/.codex/worktrees/architecture-evaluation/WorldExplorer3D-live-deployed-20260320`, branch `steven/visual-quality`. Do not edit older Documents/Developer checkouts. Local repairs, commits and a staging preview plus supporting staging backend are authorized. No GitHub push or production promotion is part of this request.
+Use `/Users/stevenreid/.codex/worktrees/architecture-evaluation/WorldExplorer3D-live-deployed-20260320`, branch `steven/visual-quality`. Do not edit older Documents/Developer checkouts. Local repairs, commits and a staging preview plus supporting staging backend are authorized. Earlier deployment authorization remains conditional on required release checks. This unverified run has not pushed GitHub or changed production.
 
 Physical Apple M1 Mac mini, 8 GiB RAM. Heavy checks run sequentially. Preserve ordinary user Chrome, player data, four saved candidates and retained artifacts. Close owned verification browsers; an open 3D preview measurably interferes with performance testing. Private credentials stay outside the repository and reports.
 
