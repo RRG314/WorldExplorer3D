@@ -2,6 +2,7 @@ import {parentVesselSubmarinePose} from '../ocean/parent-vessel.js';
 import {DEFAULT_OCEAN_SITE} from '../ocean/launch-site.js';
 import {hasOceanEntry} from '../ocean/entry-policy.js?v=1';
 import {ensureOceanVoyage,prepareSurfaceVoyage} from '../ocean/voyage.js';
+import {validateOceanVoyage} from '../ocean/voyage-store.js';
 import { commitEarthLocationOrigin, earthLocalToGeographic } from '../earth-core/location-origin.js?v=1';
 export function createBoatOceanTransferApi(options = {}) {
   const {
@@ -28,12 +29,16 @@ let transferPending = false;
 
 function startSurfaceResearchVoyage(options={}) {
   if(transferPending||appCtx.sharedMarine?.active||options.isTransferCurrent?.()===false)return Promise.resolve(false);
-  const site=options.launchSite||DEFAULT_OCEAN_SITE;
-  if(options.launchSite&&!hasOceanEntry(site,options.entry))return Promise.resolve(false);
-  const voyage=prepareSurfaceVoyage(site,options.waveOffset);
+  const saved=options.voyageResume?validateOceanVoyage(options.voyageResume):null;
+  if(options.voyageResume&&(!saved||saved.stage!=='aboard'))return Promise.resolve(false);
+  const site=saved?.site||options.launchSite||DEFAULT_OCEAN_SITE;
+  // A validated saved voyage restores its existing geographic claim and
+  // vessel identity. Only a new selection needs fresh coordinate admission.
+  if(!saved&&options.launchSite&&!hasOceanEntry(site,options.entry))return Promise.resolve(false);
+  const voyage=saved||prepareSurfaceVoyage(site,options.waveOffset);
   if(!voyage)return Promise.resolve(false);
   // Admission and record preparation precede any environment or save mutation.
-  return transferSubmarineToBoat({...options,source:'ocean-exploration-start',enterDeck:true},voyage);
+  return transferSubmarineToBoat({...options,source:saved?'ocean-exploration-resume':'ocean-exploration-start',enterDeck:true},voyage);
 }
 
 function suspendBoatModeForOceanTransfer() {

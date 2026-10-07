@@ -4,7 +4,7 @@ const MAX_PORTAL_MASKS_PER_TERRAIN_MESH = Infinity;
 // The aperture must remove terrain at the pavement too. Leaving twelve
 // centimetres above it produces grass bands across shallow graded approaches.
 // Keep the same bounded volume for rendering, raycasts and support queries.
-const PORTAL_FLOOR_MARGIN = -0.02;
+export const PORTAL_FLOOR_MARGIN = -0.02;
 const portalQueryGrids = new WeakMap();
 
 // Publications replace descriptor arrays. Index them once and share the

@@ -1,8 +1,8 @@
 {
   "schema": "we3d-reviewed-rollback-runtime-v1",
-  "id": "journal-v5-backpack-v2-transport-surface-20261007",
+  "id": "journal-v5-backpack-v2-portal-surface-resume-20261007",
   "fallbackCommit": "37a12d117111446a128888384df67ac52445d972",
-  "scope": "Existing fixed-location coverage/resource work plus current request admission, provider ownership, terminal failure, readiness and deferred-work repair. Save/migration, equipment, account, room, backend and Firebase configuration owners are unchanged. Failed loads cannot restore or stamp a world; valid location and player schemas remain. Exact reviewed differences are pinned; actual packaged upgrade/fallback/write/return remains required. Does not certify worldwide streaming or performance. Marine/space transition, directed vector ownership, graph endpoint and occupied tunnel spawn repairs are additionally reviewed below. Voyage v1 remains compatible; packaged upgrade/fallback/return is required. October 7: generalized structure ownership, foundation-constrained grades and excavations, finite-height contacts, direct admitted surface entry and pedestrian snapshot filtering are reviewed. Physical traversal/visual/performance release acceptance remains independent.",
+  "scope": "Existing fixed-location coverage/resource work plus current request admission, provider ownership, terminal failure, readiness and deferred-work repair. Save/migration, equipment, account, room, backend and Firebase configuration owners are unchanged. Failed loads cannot restore or stamp a world; valid location and player schemas remain. Exact reviewed differences are pinned; actual packaged upgrade/fallback/write/return remains required. Does not certify worldwide streaming or performance. Marine/space transition, directed vector ownership, graph endpoint and occupied tunnel spawn repairs are additionally reviewed below. Voyage v1 remains compatible; packaged upgrade/fallback/return is required. October 7: generalized structure ownership, foundation-constrained grades and excavations, finite-height contacts, direct admitted surface entry and pedestrian snapshot filtering are reviewed. Physical traversal/visual/performance release acceptance remains independent. Final October 7 cuts are shared by terrain, ordinary ground surfaces and contacts before worker publication; saved aboard voyages resume directly through the existing voyage authority. No save schema or key changes. Actual packaged rollback remains required.",
   "files": {
     "app/index.html": {
       "before": "94bdb7f627e930e09c6e1946aacd6dbbd447c6b332e4629b9dc1153660659ec2",
@@ -35,9 +35,9 @@
     "app/js/boat-mode/ocean-transfer.js": {
       "before": "3e58a2c17b9d78e4b17fceb9d26afd18da1b94dfea43cc478c05ca459215ac8d",
       "beforeMode": "100644",
-      "after": "a377c9d48a923b0cb61f40b2d9baf30f432384d387ebcb15a349e9b68e7b957e",
+      "after": "0c768a1651d48247bc487f28779d048fb0a276d7dd5f7f49b6f90e72a6ed8234",
       "afterMode": "100644",
-      "review": "An admitted ocean surface arrival uses its committed geographic frame and synthetic-water reference instead of outgoing airborne or tunnel reachability. Normal nearby boarding still uses the current actor. Sea-first teardown no longer requires unloaded terrestrial elevation functions; transient walker poses include eye height. Ordinary Exit Vessel no longer bypasses the existing shoreline policy. No save schema/key, inventory, account, backend or shared protocol changes; guarded voyage v1 persistence and rollback remain required."
+      "review": "Saved aboard voyages use the guarded surface transaction directly, preserving existing voyage v1 identity, ship/sub condition, anchor, wave frame and optimistic revision owner. Saved underwater journeys retain their renderer. Invalid/future records remain rejected and failures retain the save. No persistence schema/key or account/shared protocol changes. Packaged candidate/fallback/write/return is required."
     },
     "app/js/boat-mode/prompt-ui.js": {
       "before": "d41c780e615d7d004009e23832dbb722aeb940ecd35350a01fe78849fa32942e",
@@ -172,6 +172,20 @@
       "afterMode": "100644",
       "review": "Recompiles transient transport geometry and contacts from existing source records. Preserves higher-resolution ownership, retained road coverage, layer/access/direction and published foundation authority; connected grades, cuts, enclosures and finite actor-height contacts now agree. No persistent geography, player pose schema, inventory, account or server writes. Existing fixed-location loads rebuild this derived state; packaged movement and retained-save roundtrip remain required."
     },
+    "app/js/hud.js": {
+      "before": "2acd81d07f8f3be0f1c86684ba351a1f15157129d83171fafd20dac1f24b7710",
+      "beforeMode": "100644",
+      "after": "a290592fec026ddf7ef8b841ad5bbfa900f57ea684e5a18792cff3bb7bfa00d6",
+      "afterMode": "100644",
+      "review": "Camera clearance uses the retained chase near plane while automatic cabin mode is active, removing a self-induced radius feedback. Roof clearance looks ahead along the road. Camera transforms only; no inventory, location or persistence changes."
+    },
+    "app/js/hud/vehicle-camera-body.js": {
+      "before": "e1e63f5ed9f6b7582911efd83c889468abb216414861e34fd294837a24dd6e05",
+      "beforeMode": "100644",
+      "after": "c0ec8263625da3968edaf7ddcfa6b71add66692226d9cdee8b765f529a017d02",
+      "afterMode": "100644",
+      "review": "Camera clearance uses the retained chase near plane while automatic cabin mode is active, removing a self-induced radius feedback. Roof clearance looks ahead along the road. Camera transforms only; no inventory, location or persistence changes."
+    },
     "app/js/input.js": {
       "before": "d55e7f3dbf95bffc20ed28e82b0f0c30e5553bd74b90ddf4af98ed8e96c736c6",
       "beforeMode": "100644",
@@ -252,16 +266,16 @@
     "app/js/ocean/start-exploration.js": {
       "before": null,
       "beforeMode": null,
-      "after": "3c318b876cc6c5cd6f43977f0becdfdc0ebbb3bd79669d1c3440ec665bfddc00",
+      "after": "5a3b27b6449d2bdbb55d2dea6897d6c667372c50cc064a1ae46572c7a37469b1",
       "afterMode": "100644",
-      "review": "Direct admitted surface entry reuses the existing boat handoff without creating an underwater scene. Voyage v1 fields, save key, validation, revision/conflict owner and fallback resume remain compatible; only successful vessel publication writes an aboard record. Future/malformed records are retained. Existing underwater/resume/parent-ship paths are preserved. No inventory, account, room or server schema changes."
+      "review": "Saved aboard voyages use the guarded surface transaction directly, preserving existing voyage v1 identity, ship/sub condition, anchor, wave frame and optimistic revision owner. Saved underwater journeys retain their renderer. Invalid/future records remain rejected and failures retain the save. No persistence schema/key or account/shared protocol changes. Packaged candidate/fallback/write/return is required."
     },
     "app/js/ocean/voyage.js": {
       "before": "76df3fdea7d21ea745018f742091d5ab55a561dd929284738efb2a39e6118ba7",
       "beforeMode": "100644",
-      "after": "f3da46e33037b143f65ac91464063876997572296e9a018bab422f16251254cb",
+      "after": "67f19b5f477ae27e3c9cc28c0ab97f59b7644201de8443e14bb7bf93cc3d28f7",
       "afterMode": "100644",
-      "review": "Direct admitted surface entry reuses the existing boat handoff without creating an underwater scene. Voyage v1 fields, save key, validation, revision/conflict owner and fallback resume remain compatible; only successful vessel publication writes an aboard record. Future/malformed records are retained. Existing underwater/resume/parent-ship paths are preserved. No inventory, account, room or server schema changes."
+      "review": "Saved aboard voyages use the guarded surface transaction directly, preserving existing voyage v1 identity, ship/sub condition, anchor, wave frame and optimistic revision owner. Saved underwater journeys retain their renderer. Invalid/future records remain rejected and failures retain the save. No persistence schema/key or account/shared protocol changes. Packaged candidate/fallback/write/return is required."
     },
     "app/js/physics.js": {
       "before": "39e0b88474178cfc089c56e7d3cec2cc1ef950560cc1255b4ee1842823e321df",
@@ -389,12 +403,19 @@
       "afterMode": "100644",
       "review": "Terrain source cache, sampled surface and land-cover lookup lifetime changes. No durable schema or provider credential changes; memory bounds and location replacement must be verified against the package."
     },
+    "app/js/terrain/portal-surface-clip.js": {
+      "before": null,
+      "beforeMode": null,
+      "after": "e632c394c621a8a232238189537eeb285f2b46be443c3afcd35590aad7f600c0",
+      "afterMode": "100644",
+      "review": "Finite tunnel cuts publish before road terrain snapshots and contacts. Ordinary roads, paths and pavements subtract the same finite excavation while engineered approaches and bridges retain independent grades. Sparse linear ribbons sample intervening terrain. Cooperative publication rejects superseded sessions. Geometry and contact data are derived; no source-feature, location, account, save schema/key or backend changes. Physical and visual acceptance remains independent."
+    },
     "app/js/terrain/rebuild.js": {
       "before": "18c3dcfa8980bf654481eb46e26b93f3b0db56de529782baac08402f51ca6276",
       "beforeMode": "100644",
-      "after": "6112b5ca869f90d357f7be9b1e848945ef4246f908b748ae72bbe3fa533447ae",
+      "after": "eaaed1ebe8f83665c75e18cf5aca3869d1d0b86263a65dc90aea1ec3d30960ea",
       "afterMode": "100644",
-      "review": "Recompiles transient transport geometry and contacts from existing source records. Preserves higher-resolution ownership, retained road coverage, layer/access/direction and published foundation authority; connected grades, cuts, enclosures and finite actor-height contacts now agree. No persistent geography, player pose schema, inventory, account or server writes. Existing fixed-location loads rebuild this derived state; packaged movement and retained-save roundtrip remain required."
+      "review": "Finite tunnel cuts publish before road terrain snapshots and contacts. Ordinary roads, paths and pavements subtract the same finite excavation while engineered approaches and bridges retain independent grades. Sparse linear ribbons sample intervening terrain. Cooperative publication rejects superseded sessions. Geometry and contact data are derived; no source-feature, location, account, save schema/key or backend changes. Physical and visual acceptance remains independent."
     },
     "app/js/terrain/regional-building-compiler.js": {
       "before": null,
@@ -455,9 +476,9 @@
     "app/js/terrain/structure-terrain-portals.js": {
       "before": "e054bed114cd7c37e795ab211ac5ea618425c255ba0c9ad41a43930a75a01dae",
       "beforeMode": "100644",
-      "after": "b7cbb87c90dc487c29866abf57d9cf0710bee95f57c02c91a6523cf249940cdd",
+      "after": "7ff5ba66c435981a9924c06411a8e5af76596c62dd505841fe153d5f35f0afc0",
       "afterMode": "100644",
-      "review": "Recompiles transient transport geometry and contacts from existing source records. Preserves higher-resolution ownership, retained road coverage, layer/access/direction and published foundation authority; connected grades, cuts, enclosures and finite actor-height contacts now agree. No persistent geography, player pose schema, inventory, account or server writes. Existing fixed-location loads rebuild this derived state; packaged movement and retained-save roundtrip remain required."
+      "review": "Finite tunnel cuts publish before road terrain snapshots and contacts. Ordinary roads, paths and pavements subtract the same finite excavation while engineered approaches and bridges retain independent grades. Sparse linear ribbons sample intervening terrain. Cooperative publication rejects superseded sessions. Geometry and contact data are derived; no source-feature, location, account, save schema/key or backend changes. Physical and visual acceptance remains independent."
     },
     "app/js/terrain/structure-tunnel-visuals.js": {
       "before": "67b994583859432361446dfabf5ba4c2f1d7f094b8c0d6dda206cbc012d842db",
@@ -476,9 +497,9 @@
     "app/js/terrain/structure-visuals.js": {
       "before": "5bef945d32bbe3bd3ddd35e2bb26f0ace6d69f699103a2be2f53badc6cb95850",
       "beforeMode": "100644",
-      "after": "3bdb3c2ff488d38771b79dd1c02994f47a6043ea317f508a9fc507ed8545dcdf",
+      "after": "e5db10e5ab168af1b536adcc3c04dde251a532d77c043b9a57b78848ff96cd25",
       "afterMode": "100644",
-      "review": "Recompiles transient transport geometry and contacts from existing source records. Preserves higher-resolution ownership, retained road coverage, layer/access/direction and published foundation authority; connected grades, cuts, enclosures and finite actor-height contacts now agree. No persistent geography, player pose schema, inventory, account or server writes. Existing fixed-location loads rebuild this derived state; packaged movement and retained-save roundtrip remain required."
+      "review": "Finite tunnel cuts publish before road terrain snapshots and contacts. Ordinary roads, paths and pavements subtract the same finite excavation while engineered approaches and bridges retain independent grades. Sparse linear ribbons sample intervening terrain. Cooperative publication rejects superseded sessions. Geometry and contact data are derived; no source-feature, location, account, save schema/key or backend changes. Physical and visual acceptance remains independent."
     },
     "app/js/terrain/surface-profiles.js": {
       "before": "ce4693e0b90eba7a393bdb9ea949aa80e1c3bba5268aa436db32ebfa0f6ad1a8",
@@ -504,9 +525,9 @@
     "app/js/terrain/transport-detail-compiler.js": {
       "before": "34540c2f26bf0f8a20d21abfe692f94a431f186fb27e55947c7318c4829e23ff",
       "beforeMode": "100644",
-      "after": "b657cc06922ffb3d98e9b7041218d09a88c29d3e89db3eead1f964df6bbd9684",
+      "after": "a98bf6137c66b25068689d5b2f5ea580fa218d1f89e24995aeffb4ee66015478",
       "afterMode": "100644",
-      "review": "Bounded road render/contact residency within the existing fixed source catalog and shared road-mask ownership. Existing retry calls the existing session capture/reload authority. No new save schema, geographic migration, room authority or persistent write protocol."
+      "review": "Finite tunnel cuts publish before road terrain snapshots and contacts. Ordinary roads, paths and pavements subtract the same finite excavation while engineered approaches and bridges retain independent grades. Sparse linear ribbons sample intervening terrain. Cooperative publication rejects superseded sessions. Geometry and contact data are derived; no source-feature, location, account, save schema/key or backend changes. Physical and visual acceptance remains independent."
     },
     "app/js/terrain/transport-detail-plan.js": {
       "before": "5438b4a2bf90be4f0e4a5b56ad26ffe1f6cc27948b506d768a4621fdce46f39f",
@@ -528,6 +549,13 @@
       "after": "d04a560efbbbe649cd2cf7a2142c560f5b65490be0910b4efae5cff542c10753",
       "afterMode": "100644",
       "review": "Bounded road render/contact residency within the existing fixed source catalog and shared road-mask ownership. Existing retry calls the existing session capture/reload authority. No new save schema, geographic migration, room authority or persistent write protocol."
+    },
+    "app/js/terrain/transport-terrain-snapshot.js": {
+      "before": "36b1259506d4ef4d19fb8b68ca42639edcda1aa2058a3f44388f9dd6bbe578af",
+      "beforeMode": "100644",
+      "after": "3c9125caaf6dc965eba0e78a0c0616ffe7b8c8dbbee5d616ac30a7cedc0c738b",
+      "afterMode": "100644",
+      "review": "Finite tunnel cuts publish before road terrain snapshots and contacts. Ordinary roads, paths and pavements subtract the same finite excavation while engineered approaches and bridges retain independent grades. Sparse linear ribbons sample intervening terrain. Cooperative publication rejects superseded sessions. Geometry and contact data are derived; no source-feature, location, account, save schema/key or backend changes. Physical and visual acceptance remains independent."
     },
     "app/js/travel-mode.js": {
       "before": "38dbb7260a048cda3fedaef55eb59d2d36dd81a71887fbbc7437ee9d3410ab24",
@@ -718,6 +746,20 @@
       "afterMode": "100644",
       "review": "Building geometry and private temporary-buffer lifetime only. Tests require unchanged final triangle attributes, source-building edit boundaries and retained shared buffers. No persistent data writes or identity migration."
     },
+    "app/js/world/linear-feature-presentation.js": {
+      "before": "db700762e66599f1e68af1a0f0322c3a0a3d1ec0112d72f526f29e7c78300313",
+      "beforeMode": "100644",
+      "after": "8134d9ea9f6044509568a80b828d4a1c66517edc8db5bdc3907a5f91e5a1a065",
+      "afterMode": "100644",
+      "review": "Finite tunnel cuts publish before road terrain snapshots and contacts. Ordinary roads, paths and pavements subtract the same finite excavation while engineered approaches and bridges retain independent grades. Sparse linear ribbons sample intervening terrain. Cooperative publication rejects superseded sessions. Geometry and contact data are derived; no source-feature, location, account, save schema/key or backend changes. Physical and visual acceptance remains independent."
+    },
+    "app/js/world/linear-ribbon-stations.js": {
+      "before": null,
+      "beforeMode": null,
+      "after": "b4216904c61e3410895f6e7447441a5b09bc3be3464555eea04e5ae10bba20d1",
+      "afterMode": "100644",
+      "review": "Finite tunnel cuts publish before road terrain snapshots and contacts. Ordinary roads, paths and pavements subtract the same finite excavation while engineered approaches and bridges retain independent grades. Sparse linear ribbons sample intervening terrain. Cooperative publication rejects superseded sessions. Geometry and contact data are derived; no source-feature, location, account, save schema/key or backend changes. Physical and visual acceptance remains independent."
+    },
     "app/js/world/load-budgeting.js": {
       "before": "0d6f54f43dc62c878264b7b9c076b8ff43d5563bfad11a27a7886f7ea6cde5a9",
       "beforeMode": "100644",
@@ -826,9 +868,9 @@
     "app/js/world/street-pavement-runtime.js": {
       "before": "e58e6722d03337009a5477ba26c5d17eaff12356fefa766990d2736457d8b25c",
       "beforeMode": "100644",
-      "after": "cd160bb256d579263c32ac56c5e76cd69b6c338c02f5b422239dafea5bad8cdf",
+      "after": "f0d628ed80b177de9a461bdfe1bee2e9db440daa7b7679fe0fdeff10278f3248",
       "afterMode": "100644",
-      "review": "Pavement material detail and lifecycle-managed authored furniture; terrain/save/protocol owners unchanged."
+      "review": "Finite tunnel cuts publish before road terrain snapshots and contacts. Ordinary roads, paths and pavements subtract the same finite excavation while engineered approaches and bridges retain independent grades. Sparse linear ribbons sample intervening terrain. Cooperative publication rejects superseded sessions. Geometry and contact data are derived; no source-feature, location, account, save schema/key or backend changes. Physical and visual acceptance remains independent."
     },
     "app/js/world/structure-aware.js": {
       "before": "def099cc97990cfd74cd1a3a2fd6110a9fac28fbe2c85459ddf477e65f30b92e",

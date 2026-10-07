@@ -4,7 +4,10 @@
 const bodyCache = new WeakMap();
 
 export function vehicleCameraProbeRadius(camera) {
-  const near = Math.max(.01, Number(camera?.near) || .5);
+  // Automatic cabin view temporarily shortens near. Feeding that smaller
+  // sphere back into the chase solver makes the next frame "fit", restores
+  // near, then collides again. Solve every chase frame at its original near.
+  const near = Math.max(.01, Number(camera?.userData?.drivingCabinPreviousNear ?? camera?.near) || .5);
   const halfHeight = near * Math.tan((Number(camera?.fov) || 70) * Math.PI / 360);
   return Math.max(.38, Math.hypot(near, halfHeight, halfHeight * (Number(camera?.aspect) || 1)));
 }
@@ -62,4 +65,13 @@ export function selectBodySafeCamera(desired, candidates, body, isClear) {
 // suspension changes can flip the camera heading.
 export function vehicleRoofOrbitPoint(roof, viewAngle, distance = 2) {
   return { x: roof.x - Math.sin(viewAngle) * distance, y: roof.y, z: roof.z - Math.cos(viewAngle) * distance };
+}
+
+// A retracted roof view is a forward driving view. Looking down at the usual
+// ground-level chase anchor fills the image with the player's own roof.
+export function vehicleClearanceLookTarget(anchor, viewAngle, pitch = 0) {
+  const distance = 8;
+  return { x: anchor.x + Math.sin(viewAngle) * distance,
+    y: anchor.y + .8 + Math.sin(pitch) * distance * .72,
+    z: anchor.z + Math.cos(viewAngle) * distance };
 }

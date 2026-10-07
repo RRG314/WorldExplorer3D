@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { selectBodySafeCamera, vehicleCameraProbeRadius, vehicleRoofOrbitPoint } from '../app/js/hud/vehicle-camera-body.js';
+import { selectBodySafeCamera, vehicleCameraProbeRadius, vehicleRoofOrbitPoint, vehicleClearanceLookTarget } from '../app/js/hud/vehicle-camera-body.js';
 import {setCabinNearClip} from '../app/js/hud/driving-cabin-camera.js';
 
 test('cabin near plane is scoped and restored without per-frame projection churn',()=>{
@@ -20,6 +20,26 @@ test('camera clearance includes near-plane corners and follows viewport aspect',
   const wide = vehicleCameraProbeRadius({near:.5,fov:70,aspect:16/9});
   const phone = vehicleCameraProbeRadius({near:.5,fov:70,aspect:390/844});
   assert.ok(wide > .85 && phone > .6 && wide > phone);
+});
+test('automatic cabin clipping never changes the following chase clearance decision', () => {
+  const camera={near:.5,fov:70,aspect:16/9,userData:{},updateProjectionMatrix(){}};
+  const radius=vehicleCameraProbeRadius(camera);
+  for(let frame=0;frame<20;frame++) {
+    setCabinNearClip(camera,true);
+    assert.equal(vehicleCameraProbeRadius(camera),radius);
+    setCabinNearClip(camera,false);
+    assert.equal(vehicleCameraProbeRadius(camera),radius);
+  }
+});
+test('roof clearance view looks along the requested heading, including reverse, beyond the car', () => {
+  const anchor={x:12,y:3,z:-4};
+  for(const angle of [-2.4,0,1.2,Math.PI]) {
+    const point=vehicleClearanceLookTarget(anchor,angle);
+    assert.ok(Math.abs(Math.hypot(point.x-anchor.x,point.z-anchor.z)-8)<1e-9);
+    assert.ok(Math.abs(Math.atan2(point.x-anchor.x,point.z-anchor.z)-angle)<1e-9);
+    assert.equal(point.y,3.8);
+  }
+  assert.ok(vehicleClearanceLookTarget(anchor,0,.5).y>3.8);
 });
 test('a shortened boom inside the BMW chooses a clear external pose', () => {
   const roof = { x: 0, y: 2.1, z: 0 };

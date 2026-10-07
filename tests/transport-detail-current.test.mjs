@@ -45,6 +45,19 @@ test('staged exact regions retain the complete compiler geometry and contact, in
  compiler.dispose();partition.dispose();restored.dispose();
 });
 
+test('final terrain snapshot carries cuts into road rendering and contact without lowering an upper street',()=>{
+ const input=terrain(),mask={x:0,z:0,tangentX:1,tangentZ:0,halfWidth:8,halfDepth:5,roadY:-5,grade:0,cutHeight:10};
+ input.portalMasks=[mask];input.far.portals=[mask];
+ const restored=restoreTransportTerrain(input);
+ assert.equal(restored.sampleTop(0,0),-4.82);assert.equal(restored.sampleUncutTop(0,0),.18);
+ restored.dispose();
+ const compiler=createTransportDetailCompiler({roads:[roads[0]],terrain:input,radius:1024,heightProbes:[{x:0,z:0,y:-4.82}]});
+ const index=createRoadContactIndex(meshes(compiler.initial.regions.flatMap(r=>r.batches)));
+ assert.equal(index.sampleAt(0,0),null,'removed asphalt cannot remain as an invisible driving floor');
+ assert.ok(Math.abs(index.sampleAt(8,0)-.26)<1e-5,'surviving road remains on the original terrain');
+ index.dispose();compiler.dispose();
+});
+
 test('regional contact selects the matching deck and ground and rejects duplicate owners',()=>{
  const batch=y=>({positions:Float32Array.from([0,y,0,10,y,0,0,y,10]),indices:Uint16Array.from([0,2,1])});
  const index=createRegionalRoadContact(createRoadContactIndex(meshes([batch(20)])));

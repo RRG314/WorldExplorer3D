@@ -5,6 +5,7 @@ import {pavementMaskLayout,rasterizePavementMask} from '../world/compiler/paveme
 import {restoreTransportTerrain} from './transport-terrain-snapshot.js';
 import {planTransportRegions,nearestTransportRegion} from './transport-detail-plan.js';
 import {createSpatialRoadBatches} from './spatial-road-batches.js';
+import {createPortalSurfaceClipper} from './portal-surface-clip.js';
 
 // The planar footprint is independent of terrain elevation. It can compile
 // while the main thread publishes the final cut/fill surface.
@@ -29,13 +30,15 @@ export function createTransportDetailCompiler({roads,terrain,focus={x:0,z:0},rad
     heightParity.maximumDifference=Math.max(heightParity.maximumDifference,difference);
   }
   const partition=createPavementTerrainPartition(restored.meshes,{includeFarTerrain:true});
+  const clipSurface=createPortalSurfaceClipper(terrain.portalMasks);
   const {tiles,keys,layout,masks,plan}=preparedPlan || prepareTransportDetailPlan({roads,focus,radius,maxTextureSize,includeOverview});
   const regions=new Map([...plan.initial,...plan.pending].map(region=>[region.key,region]));
   function compile(region){
     const builder=createSpatialRoadBatches();
     for(const tile of region.tiles){
-      const mesh=meshCarriagewayTile(tile,restored.sampleTop,partition,{polygons:tile.polygons});
-      builder.append(mesh.positions,mesh.indices,'at_grade');
+      const mesh=meshCarriagewayTile(tile,restored.sampleUncutTop,partition,{polygons:tile.polygons});
+      const cut=clipSurface(mesh.positions,mesh.indices);
+      builder.append(cut.positions,cut.indices,'at_grade');
       tile.polygons=null;
     }
     builder.finish();

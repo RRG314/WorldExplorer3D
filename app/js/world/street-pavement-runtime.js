@@ -1,4 +1,5 @@
 import {publishReferenceBlockDressing} from './reference-block-dressing.js';
+import {createPortalSurfaceClipper} from '../terrain/portal-surface-clip.js';
 import {createPavementTerrainPartitionCooperatively} from './pavement-terrain-partition.js';
 import { captureStreetSurfaceGeometry,serializeStreetSurfaceCapture } from './street-surface-capture.js';
 import { createRoadMarkingMaterial } from '../road-render.js?v=4';
@@ -49,7 +50,8 @@ async function refreshMappedPaths(appCtx,pavementBounds){
   const schedule={current,yieldWork:()=>appCtx.gameStarted&&!appCtx.worldLoading?yieldToWorldFrame():yieldToMainThread(),budgetMs:2};
   try {
     await publishLinearFeaturePresentationCooperatively({appCtx:{scene:appCtx.scene,linearFeatureMeshes:meshes,addEarthWorldObject(){}},buildFeatureRibbonEdges,features,pavementBounds,
-      worldBaseTerrainY:(x,z)=>{const y=appCtx.terrainMeshHeightAt?.(x,z);return Number.isFinite(y)?y:appCtx.elevationWorldYAtWorldXZ?.(x,z);}}, schedule);
+      portalMasks:appCtx.structureTerrainPortalDescriptors,
+      worldBaseTerrainY:(x,z)=>{const y=appCtx.terrainMeshHeightAt?.(x,z,{ignorePortalCuts:true});return Number.isFinite(y)?y:appCtx.elevationWorldYAtWorldXZ?.(x,z);}}, schedule);
     const retained=appCtx.linearFeatureMeshes.filter(m=>!m.userData?.isLinearFeatureBatch);
     index=await createRoadContactIndexCooperatively(selectLinearWalkContactMeshes([...retained,...meshes]),16,schedule);
     if(!current())throw new Error('Mapped path publication superseded');
@@ -134,9 +136,10 @@ export async function publishStreetPavement(appCtx, options = {}) {
   const markingMaterial = createRoadMarkingMaterial({color:0xeee9df,roughness:.9,emissive:0,emissiveIntensity:0});
   const curbMaterial = new THREE.MeshStandardMaterial({ color: 0x99978f, roughness: 0.96, side: THREE.DoubleSide });
   const ground = (x, z) => {
-    const y = appCtx.terrainMeshHeightAt?.(x, z);
+    const y = appCtx.terrainMeshHeightAt?.(x, z, {ignorePortalCuts:true});
     return Number.isFinite(y) ? y : appCtx.elevationWorldYAtWorldXZ?.(x, z);
   };
+  const clipGroundSurface=createPortalSurfaceClipper(appCtx.structureTerrainPortalDescriptors);
   const stats = { tiles: 0, triangles: 0, curbTriangles: 0, markingTriangles:0, ramps:0, workerMs: 0, inferredFrontages: 0, managedPaths: managedPaths.length, residentRoads:roadRecords.length, residentBuildings:input.buildings.length, roads: appCtx.roads.length, roadMeshes: appCtx.roadMeshes.length, buildings: appCtx.buildings.length, worldLoadSequence: sequence };
   const yieldConstruction=()=>appCtx.gameStarted&&!appCtx.worldLoading?yieldToWorldFrame():yieldToMainThread();
   const sliceBudgetMs=appCtx.gameStarted&&!appCtx.worldLoading?2:8;
@@ -296,7 +299,12 @@ export async function publishStreetPavement(appCtx, options = {}) {
       stats.terrainRefinementTriangles = (stats.terrainRefinementTriangles || 0) + addedTriangles;
       await yieldConstruction();
       if (!current()) { disposeStaged(); return null; }
-      const markingVertices=[];
+      // Retire the cut from render and walk-contact geometry together. Keep
+      // upper streets on their original terrain; never fold their pavement
+      // down a tunnel's excavation wall just because its floor is lower.
+      mesh.vertices=clipGroundSurface(mesh.vertices).positions;
+      mesh.curbVertices=clipGroundSurface(mesh.curbVertices).positions;
+      let markingVertices=[];
       let markingYieldAt=performance.now();
       for(let i=0;i<(mesh.markingVertices?.length || 0);i+=9) {
         const points=[];
@@ -308,6 +316,7 @@ export async function publishStreetPavement(appCtx, options = {}) {
           if(!current()){disposeStaged();return null;}
         }
       }
+      markingVertices=clipGroundSurface(markingVertices).positions;
       stats.markingTriangles+=markingVertices.length/9; stats.ramps+=packet.rampCount || 0;
       stats.tiles++; stats.triangles += mesh.vertices.length / 9; stats.curbTriangles += mesh.curbVertices.length / 9; stats.inferredFrontages += inferredFrontages;
       const [ix,iz]=packet.key.split(':').map(Number);
@@ -348,7 +357,8 @@ export async function publishStreetPavement(appCtx, options = {}) {
     trace('mapped-paths-start',{features:appCtx.linearFeatures.length});
     if(replaceMappedLines)await publishLinearFeaturePresentationCooperatively({
       appCtx: { scene: appCtx.scene, linearFeatureMeshes: stagedLines, addEarthWorldObject() {} },
-      buildFeatureRibbonEdges, features: appCtx.linearFeatures, pavementBounds: coverageBounds, worldBaseTerrainY: ground
+      buildFeatureRibbonEdges, features: appCtx.linearFeatures, pavementBounds: coverageBounds, worldBaseTerrainY: ground,
+      portalMasks:appCtx.structureTerrainPortalDescriptors
     },schedule);
     trace('mapped-paths-complete',{batches:stagedLines.length});
     // Publish all surfaces and contact data together. Old coverage is retained until this point.

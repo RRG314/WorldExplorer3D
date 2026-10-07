@@ -1,4 +1,5 @@
 import {prepareTransportDetail} from './transport-detail-runtime.js';
+import {createPortalSurfaceClipper} from './portal-surface-clip.js';
 import {captureEarthWorldSession,reloadEarthWorldSession} from '../earth-session.js?v=17';
 import {createRegionalRoadContact} from './regional-road-contact.js';
 import {transportRegionKey} from './transport-detail-plan.js';
@@ -488,6 +489,21 @@ export async function publishCompiledTransportMeshes(deps = {}) {
     await yieldToMainThread();
   }
 
+  // Cuts are a physical terrain publication, not a late visual decoration.
+  // The road worker and fallback compiler must receive the final cuts before
+  // either snapshots terrain or builds contacts. Otherwise asphalt survives
+  // suspended over the terrain that the portal shader removes afterwards.
+  if(!isCurrent())return;
+  await measureAsync('rebuildStructureVisuals', () => (
+    typeof rebuildStructureVisualMeshesCooperatively === 'function'
+      ? rebuildStructureVisualMeshesCooperatively
+      : rebuildStructureVisualMeshes
+  )({boundsIntersect:boundsIntersectLocal,cachedTerrainHeight,pointAlongPolyline,polylineCurvatureMetric,current:isCurrent}));
+  if(!isCurrent())return;
+  clearTerrainHeightCache?.();
+  const clipGroundSurface=createPortalSurfaceClipper(appCtx.structureTerrainPortalDescriptors);
+  const uncutRoadTop=(x,z)=>appCtx.terrainMeshHeightAt(x,z,{ignorePortalCuts:true})+ROAD_SURFACE_BIAS;
+
   const intersections = measure('detectIntersections', () => detectRoadIntersections(baseRoads));
   await yieldToMainThread();
   // Junction footprints are resolved by the same planar union as road
@@ -662,9 +678,10 @@ export async function publishCompiledTransportMeshes(deps = {}) {
       for(const [tileIndex,tile] of tiles.entries()) {
         if(!isCurrent())return;
         if(tileIndex%128===0)trace('meshCarriageway:progress',{completed:tileIndex,total:tiles.length,key:tile.key});
-        const mesh=meshCarriagewayTile(tile,(x,z)=>cachedTerrainHeight(x,z)+ROAD_SURFACE_BIAS,partition);
+        const mesh=meshCarriagewayTile(tile,uncutRoadTop,partition);
         if(mesh.indices.length) {
-          appendRoadMainGeometry(mesh.positions,mesh.indices,'at_grade');
+          const cut=clipGroundSurface(mesh.positions,mesh.indices);
+          appendRoadMainGeometry(cut.positions,cut.indices,'at_grade');
           roadSurfaceIntegrity.carriagewayRegions++;
 
         }
@@ -817,17 +834,6 @@ export async function publishCompiledTransportMeshes(deps = {}) {
   // own replacement is ready; road rebuilds must never dispose only the render half.
   markGroundSurfaceChanged(appCtx);
   await yieldToMainThread();
-  await measureAsync('rebuildStructureVisuals', () => (
-    typeof rebuildStructureVisualMeshesCooperatively === 'function'
-      ? rebuildStructureVisualMeshesCooperatively
-      : rebuildStructureVisualMeshes
-  )({
-    boundsIntersect: boundsIntersectLocal,
-    cachedTerrainHeight,
-    pointAlongPolyline,
-    polylineCurvatureMetric
-  }));
-
   const roadTerrainConformance = finalizeRoadTerrainConformanceAudit(roadTerrainAudit);
 
   appCtx.transportSurfacePublication = Object.freeze({

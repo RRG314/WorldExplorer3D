@@ -307,6 +307,8 @@ export const currentContractTests = [
   'tests/transport-corridor-feasibility-current.test.mjs',
   'tests/tunnel-foundation-clearance-current.test.mjs',
   'tests/linear-transport-authority-current.test.mjs',
+  'tests/linear-ribbon-stations-current.test.mjs',
+  'tests/portal-surface-clip-current.test.mjs',
   'tests/urban-vertical-contact-current.test.mjs',
   'tests/transport-junction-audit-current.test.mjs',
   'tests/model-skeleton-sharing-current.test.mjs',

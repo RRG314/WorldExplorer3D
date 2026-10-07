@@ -3,15 +3,19 @@ import assert from 'node:assert/strict';
 import { oceanEntryDecision, hasOceanEntry } from '../app/js/ocean/entry-policy.js';
 import { createGlobeSelectorLaunch } from '../app/js/ui/globe-selector/launch.js';
 import {startOceanExploration} from '../app/js/ocean/start-exploration.js';
+import {prepareSurfaceVoyage} from '../app/js/ocean/voyage.js';
 test('fresh ocean exploration boards the research deck; saved dives and boat deployments retain their authority',async()=>{
  const calls=[];const ctx={startOceanMode:async options=>{calls.push(['ocean',options]);return true},startSurfaceResearchVoyage:async options=>{calls.push(['vessel',options]);return true}};
  assert.equal(await startOceanExploration(ctx,{launchSite:{lat:1,lon:2}}),true);
  assert.equal(calls.length,1);assert.equal(calls[0][0],'vessel');
- for(const options of [{voyageResume:{stage:'underwater'}},{parentVessel:{transportEntityId:'own-ship'}}]){
+ const saved=prepareSurfaceVoyage({lat:10,lon:20});
+ calls.length=0;assert.equal(await startOceanExploration(ctx,{voyageResume:saved}),true);assert.equal(calls[0][0],'vessel');
+ for(const options of [{voyageResume:{...saved,stage:'underwater'}},{parentVessel:{transportEntityId:'own-ship'}}]){
   calls.length=0;assert.equal(await startOceanExploration(ctx,options),true);assert.equal(calls.length,1);assert.equal(calls[0][0],'ocean');
  }
  calls.length=0;ctx.startSurfaceResearchVoyage=async()=>false;assert.equal(await startOceanExploration(ctx,{}),false);assert.equal(calls.length,0);
  ctx.startOceanMode=async()=>false;assert.equal(await startOceanExploration(ctx,{parentVessel:{}}),false);
+ for(const voyageResume of [{...saved,version:99},{...saved,site:{lat:NaN,lon:20}}])assert.equal(await startOceanExploration(ctx,{voyageResume}),false);
 });
 const site = { lat: -18.2861, lon: 147.7 };
 const evidence = (elevationMeters, kind = 'open_ocean') => ({ verified: true, source: 'gebco-elevation-sample', kind, elevationMeters });

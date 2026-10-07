@@ -2,11 +2,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createBoatOceanTransferApi} from '../app/js/boat-mode/ocean-transfer.js';
 import {resolveBoatEntryReference,boatExitActorHeights} from '../app/js/boat-mode/entry-reference.js';
-import {ensureOceanVoyage} from '../app/js/ocean/voyage.js';
+import {ensureOceanVoyage,prepareSurfaceVoyage} from '../app/js/ocean/voyage.js';
 import {createOceanVoyageStore,OCEAN_VOYAGE_KEY} from '../app/js/ocean/voyage-store.js';
 
-function fixture(){
- const values=new Map(),calls=[],storage={getItem:k=>values.get(k)||null,setItem:(k,v)=>values.set(k,v)};
+function fixture(initial=null){
+ const values=new Map(initial?[[OCEAN_VOYAGE_KEY,JSON.stringify(initial)]]:[]),calls=[],storage={getItem:k=>values.get(k)||null,setItem:(k,v)=>values.set(k,v)};
  let generation=0,load=async()=>{},accept=true;
  const ctx={LOC:{lat:39,lon:-76},customLoc:{lat:39,lon:-76,name:'Original city'},SCALE:100000,ENV:{EARTH:'EARTH'},boatMode:{active:false},boat:{x:0,z:0,angle:0},oceanMode:{active:false},getEnv:()=> 'EARTH',
   setCustomLocation(value){this.customLoc=value;},commitEnvironment(){generation++;},
@@ -38,6 +38,21 @@ test('accepted ocean arrival uses its new surface frame; ordinary air and tunnel
  }
 });
 async function withDocument(fn){const original=globalThis.document;globalThis.document={getElementById:()=>null};try{await fn();}finally{globalThis.document=original;}}
+
+test('saved aboard entry retains ship/sub identity and conditions without creating an underwater world',()=>withDocument(async()=>{
+ const saved=prepareSurfaceVoyage(site,{x:400,z:-500});
+ saved.ship.condition=.8;saved.ship.yaw=1.3;saved.sub.condition=.6;saved.sub.x=35;
+ // The ordinary owner rereads the current record before it dispatches resume.
+ const g=fixture(saved);
+ assert.equal(await g.api.startSurfaceResearchVoyage({voyageResume:saved}),true);
+ assert.equal(g.voyage.current.id,saved.id);assert.equal(g.voyage.current.subId,saved.subId);
+ assert.deepEqual(g.voyage.current.ship,saved.ship);assert.deepEqual(g.voyage.current.sub,saved.sub);
+ assert.deepEqual(g.voyage.current.waveOffset,saved.waveOffset);assert.equal(g.voyage.current.stage,'aboard');
+ assert.equal(g.ctx.boatMode.transportEntityId,saved.ship.transportEntityId);
+ for(const invalid of [{...saved,version:3},{...saved,stage:'underwater'}]) {
+  const h=fixture();assert.equal(await h.api.startSurfaceResearchVoyage({voyageResume:invalid}),false);assert.deepEqual(h.calls,[]);
+ }
+}));
 
 test('fresh surface entry validates water before mutating the location, scene or voyage',()=>withDocument(async()=>{
  const f=fixture();

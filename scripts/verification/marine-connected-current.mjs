@@ -73,6 +73,14 @@ try{
  report.menu=await page.evaluate(()=>({boat:marineCtx.boatMode.active,deck:marineCtx.boatDeck.active,ocean:marineCtx.oceanMode.active,stage:marineCtx.oceanVoyage.saved?.stage}));
  assert.deepEqual(report.menu,{boat:false,deck:false,ocean:false,stage:'aboard'});
  await page.screenshot({path:`${out}/07-main-menu.png`});report.cases.push('return to main menu from a sea-first session preserves the saved voyage');
+ const resumeStarts=await page.evaluate(()=>marineOceanStarts);
+ await page.getByRole('button',{name:'Return to saved research vessel',exact:true}).click();
+ await page.waitForFunction(()=>marineCtx.gameStarted&&marineCtx.boatDeck?.active&&!marineCtx.oceanMode.active,null,{timeout:60000});
+ report.resumed=await snapshot();
+ assert.equal(report.resumed.vessel,report.arrival.vessel);assert.equal(report.resumed.voyage.id,report.arrival.voyage.id);
+ assert.equal(report.resumed.voyage.subId,report.arrival.voyage.subId);
+ assert.equal(await page.evaluate(()=>marineOceanStarts),resumeStarts,'Aboard resume must not allocate an underwater session');
+ await page.screenshot({path:`${out}/08-resumed-deck.png`});report.cases.push('saved aboard voyage resumes the same ship and submarine directly on deck');
  assert.deepEqual(report.errors,[]);report.passed=true;
 }catch(e){report.failure=String(e.stack||e);process.exitCode=1;if(page){await page.screenshot({path:`${out}/failure.png`}).catch(()=>{});report.failedState=await page.evaluate(()=>({text:globalThis.render_game_to_text?.(),status:document.querySelector('#globeLocationSearchStatus')?.textContent,boat:globalThis.marineCtx?.boatDeck?.snapshot(),diver:globalThis.marineCtx?.oceanMode.diver?.snapshot()})).catch(()=>null);}}
 finally{await writeFile(`${out}/report.json`,JSON.stringify(report,null,2));if(owned)await closeOwnedBrowser(owned);await server.close();}

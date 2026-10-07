@@ -637,6 +637,7 @@ export async function collectStructureVisualInstancesCooperatively(deps = {}) {
   const merged = {};
   const chunkSize = 180;
   for (let start = 0; start < allElevatedFeatures.length; start += chunkSize) {
+    if(deps.current?.()===false)return null;
     const partial = collectStructureVisualInstances({
       ...deps,
       allElevatedFeatures,
@@ -650,6 +651,7 @@ export async function collectStructureVisualInstancesCooperatively(deps = {}) {
     }
     await yieldToMainThread();
   }
+  if(deps.current?.()===false)return null;
   return merged;
 }
 
@@ -669,6 +671,7 @@ export function rebuildStructureVisualMeshes(deps = {}) {
 
 export async function rebuildStructureVisualMeshesCooperatively(deps = {}) {
   const collected = await collectStructureVisualInstancesCooperatively(deps);
+  if(!collected||deps.current?.()===false)return null;
   applyTerrainPortalMasksForContext(appCtx, collected.tunnelPortalMasks);
   return rebuildStructureVisualMeshesForContext(appCtx, () => collected, deps);
 }

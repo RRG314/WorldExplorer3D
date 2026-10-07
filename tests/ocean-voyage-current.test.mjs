@@ -93,6 +93,19 @@ test('leaving a shared session can resume retained personal traversal even when 
  assert.equal(await voyage.resume(record()),true);assert.equal(suspended,true);assert.equal(restored.id,'voyage-1');assert.equal(restored.ship.transportEntityId,'ship-1');
 });
 
+test('aboard resume dispatches directly to the guarded surface transaction and preserves the save on failure',async()=>{
+ const saved={...record(),stage:'aboard'},storage=memory();storage.setItem(OCEAN_VOYAGE_KEY,JSON.stringify(saved));
+ const calls=[],ctx={gameStarted:true,boatMode:{active:true},oceanMode:{active:false},
+  startSurfaceResearchVoyage:async options=>{calls.push(options);return false},
+  startOceanMode:()=>{throw Error('Unnecessary underwater renderer')},
+  suspendBoatModeForOceanTransfer:()=>{throw Error('The surface transaction owns rollback')}};
+ const voyage=ensureOceanVoyage(ctx,{store:createOceanVoyageStore({storage})}),before=storage.getItem(OCEAN_VOYAGE_KEY);
+ assert.equal(await voyage.resume(),false);assert.deepEqual(calls[0].voyageResume,saved);
+ assert.equal(storage.getItem(OCEAN_VOYAGE_KEY),before);assert.equal(ctx.boatMode.active,true);
+ ctx.startSurfaceResearchVoyage=async options=>{calls.push(options);return true};
+ assert.equal(await voyage.resume(),true);assert.equal(calls[1].voyageResume.ship.transportEntityId,'ship-1');
+});
+
 test('stern deployment moves away from the parent at every heading and retains vessel orientation',()=>{
  for(const yaw of [0,.5,Math.PI/2,Math.PI,5.9]){
   const ship={transportCatalogId:'ocean-research-vessel',transportEntityId:'ship',yaw};

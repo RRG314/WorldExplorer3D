@@ -1,5 +1,7 @@
 import {drainCooperatively} from './cooperative-scheduling.js?v=1';
 import { appendUpwardRibbonGeometry } from '../road-render.js?v=4';
+import { linearRibbonStations } from './linear-ribbon-stations.js';
+import {createPortalSurfaceClipper} from '../terrain/portal-surface-clip.js';
 
 const FEATURE_COLORS = Object.freeze({
   cycleway: 0x8ca99a,
@@ -26,7 +28,7 @@ function outsidePaths(feature, bounds) {
   return paths;
 }
 
-function* buildBatchGeometry(features, buildFeatureRibbonEdges, worldBaseTerrainY, pavementBounds) {
+function* buildBatchGeometry(features, buildFeatureRibbonEdges, worldBaseTerrainY, pavementBounds, clipSurface) {
   const vertices = [];
   const indices = [];
   for (const feature of features) {
@@ -38,12 +40,18 @@ function* buildBatchGeometry(features, buildFeatureRibbonEdges, worldBaseTerrain
     for (const points of outsidePaths(feature, pavementBounds)) {
     const edges = buildFeatureRibbonEdges(
       feature,
-      points,
+      linearRibbonStations(feature, points),
       halfWidth,
       worldBaseTerrainY,
       { surfaceBias: feature.surfaceBias }
     );
-    appendUpwardRibbonGeometry(
+    if(clipSurface && feature.structureSemantics?.terrainMode==='at_grade' && !feature.transportSurfaceModel?.engineeredApproach) {
+      const positions=[],triangles=[];
+      appendUpwardRibbonGeometry(edges.leftEdge,edges.rightEdge,positions,triangles);
+      const cut=clipSurface(positions,triangles),base=vertices.length/3;
+      for(const value of cut.positions)vertices.push(value);
+      for(const value of cut.indices)indices.push(base+value);
+    } else appendUpwardRibbonGeometry(
       edges.leftEdge,
       edges.rightEdge,
       vertices,
@@ -69,7 +77,8 @@ function* linearFeaturePresentationSteps(options = {}) {
     buildFeatureRibbonEdges,
     features = [],
     worldBaseTerrainY,
-    pavementBounds = null
+    pavementBounds = null,
+    portalMasks = appCtx?.structureTerrainPortalDescriptors || []
   } = options;
   if (
     !appCtx?.scene ||
@@ -95,12 +104,14 @@ function* linearFeaturePresentationSteps(options = {}) {
   }
 
   let published = 0;
+  const clipSurface=portalMasks.length?createPortalSurfaceClipper(portalMasks):null;
   for (const [kind, groupedFeatures] of groups) {
     const geometry = yield* buildBatchGeometry(
       groupedFeatures,
       buildFeatureRibbonEdges,
       worldBaseTerrainY,
-      pavementBounds
+      pavementBounds,
+      clipSurface
     );
     if (!geometry) continue;
     const material = new THREE.MeshStandardMaterial({

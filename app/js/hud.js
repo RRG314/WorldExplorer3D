@@ -11,7 +11,7 @@ import {
 import { resolveChaseCameraTerrainCollision } from "./hud/chase-camera-terrain.js?v=1";
 import { resolveTunnelCameraState } from "./hud/tunnel-camera-controller.js?v=6";
 import { resolveTunnelCameraBoom } from './hud/tunnel-camera-boom.js';
-import { createVehicleCameraBody, selectBodySafeCamera, vehicleCameraProbeRadius, vehicleRoofOrbitPoint } from './hud/vehicle-camera-body.js';
+import { createVehicleCameraBody, selectBodySafeCamera, vehicleCameraProbeRadius, vehicleRoofOrbitPoint, vehicleClearanceLookTarget } from './hud/vehicle-camera-body.js';
 import { applyDrivingCabinCamera, setCabinNearClip } from './hud/driving-cabin-camera.js';
 import { cameraSmoothingBlend } from "./controls/traversal-control-policy.js?v=8";
 import { beginCameraFollowFrame, cameraFollowHistory, smoothMovingCameraTarget } from "./hud/moving-camera-target.js";
@@ -620,9 +620,12 @@ function updateCamera(dt = 1 / 60) {
     appCtx.camera.userData.vehicleClearanceMode = choice.mode === 'chase' ? targetChoice.mode : choice.mode;
     if (choice.mode === 'clearance-chase') {
       appCtx.camera.position.copy(choice.point);
-      appCtx.camera.lookAt(lookX, lookY, lookZ);
     } else if (choice.mode === 'clearance-first-person') {
       applyDrivingCabinCamera(THREE, appCtx.camera, appCtx.carMesh, {yaw:carLook.yaw + (lb ? Math.PI : 0),pitch:carLook.pitch});
+    }
+    if (appCtx.camera.userData.vehicleClearanceMode === 'clearance-chase') {
+      const forwardLook = vehicleClearanceLookTarget(anchor, viewAngle, carLook.pitch);
+      appCtx.camera.lookAt(forwardLook.x, forwardLook.y, forwardLook.z);
     }
   } else if (appCtx.camMode === 1) {
     appCtx.camera.userData.vehicleClearanceMode = 'selected-first-person';
