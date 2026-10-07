@@ -1,6 +1,6 @@
 # Controls Reference
 
-Updated October 7, 2026 for World Explorer 3D 5.5.
+Last reviewed: 2026-10-07 for World Explorer 3D 5.5.0.
 
 Default controls are listed below. Rebound keys and the visible contextual
 prompt take precedence.

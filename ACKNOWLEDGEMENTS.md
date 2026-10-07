@@ -1,6 +1,6 @@
 # Acknowledgements
 
-Updated October 7, 2026 for World Explorer 3D 5.5.
+Last reviewed: 2026-10-07 for World Explorer 3D 5.5.0.
 
 World Explorer 3D is made possible by open web technology, public geographic
 and scientific data, licensed creative assets, and the communities that

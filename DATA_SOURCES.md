@@ -1,6 +1,6 @@
 # Data Sources
 
-Updated October 7, 2026 for World Explorer 3D 5.5.
+Last reviewed: 2026-10-07 for World Explorer 3D 5.5.0.
 
 World Explorer keeps source identity and data type with its geographic and
 scientific context. Observations, forecasts, predictions, mapped features and
