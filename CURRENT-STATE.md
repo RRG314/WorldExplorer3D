@@ -82,8 +82,14 @@ The complete packaged save upgrade → fallback write → candidate return journ
 passes, retaining 64 seeded items, existing and new records, equipment controls
 and unrelated pending account data. No browser errors or failed local requests
 were recorded.
-The complete current candidate and backend matrices, ordinary hosted journey,
-named physical devices and uncoached player acceptance
+The general backend suite (14 stages) and place authority pass on the 135
+candidate. A real two-client shared marine rerun passes all 12 journey cases and
+three rules cases after two verifier races were corrected: temporary network
+backpressure and waiting for the server's stopped pose before recording a study.
+These are verification-only repairs; the 135 game payload is unchanged.
+The owner reports the current preview works on Android. This is a smoke check,
+not measured device/thermal or iOS acceptance. The frozen aggregate candidate and
+backend receipts, ordinary hosted journey and remaining external acceptance
 still need current evidence. The old resource baseline covers 25,529 Baltimore
 buildings; restored coverage retains 49,023. No coverage was removed or resource
 threshold silently changed to turn that mismatch into a pass.

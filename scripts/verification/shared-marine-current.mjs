@@ -107,17 +107,39 @@ try{
  for(const targetId of ['table-garden','branch-ridge','seagrass-edge']){
   await pilot.bringToFront();
   const reached=await pilot.evaluate(async id=>{
-   const c=marineCtx,t=c.oceanMode.habitat.plan.landmarks.find(t=>t.id===id),read=c.readControlActions;let input={};c.readControlActions=()=>input;
-   const until=performance.now()+85000;
+   const c=marineCtx,t=c.oceanMode.habitat.plan.landmarks.find(t=>t.id===id),read=c.readControlActions;let input={},pauseStarted=null,pauseCount=0,pausedMs=0;c.readControlActions=()=>input;
+   const pilotUid=c.sharedMarine.snapshot().state.seats.pilot?.uid,until=performance.now()+85000;
    try{while(performance.now()<until){
-    if(!c.sharedMarine.canPilot)return {ok:false,error:c.sharedMarine.snapshot().error};
+    if(!c.sharedMarine.canPilot){
+     // Real clients stop prediction while an acknowledgment is delayed. Keep
+     // controls neutral during that bounded recovery, without extending the
+     // overall approach deadline or masking a lost seat/stage/connection.
+     input={};const state=c.sharedMarine.snapshot(),now=performance.now();
+     if(!pilotUid||!state.active||state.state?.stage!=='underwater'||state.state.seats.pilot?.uid!==pilotUid||state.transition||!state.connection?.blocked)
+      return {ok:false,error:state.error||'Pilot authority lost',state};
+     if(pauseStarted===null){pauseStarted=now;pauseCount++;}
+     if(now-pauseStarted>15000)return {ok:false,error:'Pilot recovery timed out',state};
+     await new Promise(requestAnimationFrame);continue;
+    }
+    if(pauseStarted!==null){pausedMs+=performance.now()-pauseStarted;pauseStarted=null;}
     const sub=c.oceanMode.submarine,dx=t.x-sub.position.x,dz=t.z-sub.position.z,d=Math.hypot(dx,dz),dy=-12-sub.position.y,e=Math.atan2(Math.sin(Math.atan2(dx,dz)-sub.yaw),Math.cos(Math.atan2(dx,dz)-sub.yaw));
-    if(d<7&&Math.abs(sub.speed)<.2)return {ok:true,distance:d};
+    if(d<7&&Math.abs(sub.speed)<.2)return {ok:true,distance:d,pauseCount,pausedMs};
     input={turn:d>6?Math.max(-1,Math.min(1,e*2)):0,move:d>6&&Math.abs(e)<.22?Math.min(1,d/24):0,vertical:Math.max(-1,Math.min(1,dy*.5))};await new Promise(requestAnimationFrame);
    }return {ok:false,error:'approach timed out',position:{...c.oceanMode.submarine.position},target:t,state:c.sharedMarine.snapshot()};
    }finally{c.readControlActions=read;}
   },targetId);assert.equal(reached.ok,true,JSON.stringify(reached));
-  await pilot.waitForTimeout(6000);await captain.locator('#sharedMarineScan').click();await captain.waitForFunction(id=>marineCtx.sharedMarine.snapshot().state.manifest.some(r=>r.id===id),targetId);
+  (report.approaches||=[]).push({targetId,...reached});
+  // A fixed sleep races the authoritative stop publication under real latency.
+  // Wait for a fresh, stationary server pose at the marker, then check the
+  // actual scan response so a rejected command cannot be hidden by heartbeats.
+  await captain.waitForFunction(({id,after})=>{
+   const s=marineCtx.sharedMarine.snapshot().state,t=marineCtx.oceanMode.habitat.plan.landmarks.find(t=>t.id===id),p=s.submarine.pose;
+   return s.submarine.poseAtMs>after&&s.submarine.speed<=.6&&Math.hypot(p.x-t.x,p.z-t.z)*(marineCtx.METERS_PER_WORLD_UNIT||1)<18;
+  },{id:targetId,after:Date.now()},{timeout:15000});
+  const scanResponse=captain.waitForResponse(response=>response.url().endsWith('/mutateSharedExpedition')&&response.request().method()==='POST'&&response.request().postDataJSON()?.command?.type==='scan',{timeout:15000});
+  await captain.locator('#sharedMarineScan').click();const response=await scanResponse;
+  assert.equal(response.status(),200,`Study scan rejected: ${await response.text()}`);
+  await captain.waitForFunction(id=>marineCtx.sharedMarine.snapshot().state.manifest.some(r=>r.id===id),targetId);
  }
  report.cases.push('three actual-controller approaches produce shared server observations');await captain.screenshot({path:`${dir}/crew-three-observations.png`});
  const savedId=(await marine.get()).data().id;
