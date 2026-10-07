@@ -63,6 +63,7 @@ try {
       globalThis.__WE3D_TRAVEL_ACTOR__=a;
     },{mode,route});
     await page.waitForTimeout(1500);
+    const transportBefore=await page.evaluate(()=>({...globalThis.__WE3D_AUDIT_CONTEXT__.transportDetail?.stats}));
     // Trace only GC events with numeric metadata; no network, DOM, or credentials.
     const gc=[];
     const capture=({value})=>{for(const e of value) if (/GC|Garbage|Scavenge|MarkCompact/i.test(e.name||'')) {
@@ -99,6 +100,7 @@ try {
       p99Ms:sorted[Math.ceil(sorted.length*.99)-1],hitches:frameHitches(raw.deltas),
       distanceTraveled:raw.distanceTraveled,movingMs:raw.movingMs,routeProgress:progress.progress,
       gcEvents:gc.length,background:raw.background};
+    sample.transport={before:transportBefore,after:await page.evaluate(()=>({...globalThis.__WE3D_AUDIT_CONTEXT__.transportDetail?.stats}))};
     report.samples.push(sample);await save();
     console.log(JSON.stringify({mode,fps:sample.fps,maxMs:sample.hitches.worstFrameMs,distance:sample.distanceTraveled,gcEvents:gc.length}));
     await page.screenshot({path:`${output}/${mode}.png`});

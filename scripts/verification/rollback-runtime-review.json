@@ -109,12 +109,33 @@
       "afterMode": "100644",
       "review": "Centralizes existing location-relative conversion and corrects wrapped longitude/polar consumers. No origin rebase, session migration or save-key change. Existing location identity and records remain under unchanged persistence owners; actual return and save roundtrips required."
     },
+    "app/js/input.js": {
+      "before": "d55e7f3dbf95bffc20ed28e82b0f0c30e5553bd74b90ddf4af98ed8e96c736c6",
+      "beforeMode": "100644",
+      "after": "91f24e865e06b860795a586071b543e2c320bac8298a7609c4ea5d551cbde034",
+      "afterMode": "100644",
+      "review": "Map-search travel requires the current ready publication before applying a spawn. Existing coordinate parsing, location persistence and valid-arrival behavior remain; failed/retried actual consumer test required."
+    },
     "app/js/interiors/core.js": {
       "before": "44fbe2e15d0727b5be8eec8dcfc01cf2e141940a13f7f72c9a6f163be0b69a2b",
       "beforeMode": "100644",
       "after": "1af43166dc242bbf3e1d9a0921446f943ef88c0f07b6835c5406491647072c8f",
       "afterMode": "100644",
       "review": "Centralizes existing location-relative conversion and corrects wrapped longitude/polar consumers. No origin rebase, session migration or save-key change. Existing location identity and records remain under unchanged persistence owners; actual return and save roundtrips required."
+    },
+    "app/js/live-gps/runtime.js": {
+      "before": "8f729333677c29a94259f006b4d284c1cb9b4f159a8c8f435fe85e5ecd9a87e5",
+      "beforeMode": "100644",
+      "after": "fea3f995412fa20dc19fcdedf5d59052745afc25d31a39e85e58584a80741429",
+      "afterMode": "100644",
+      "review": "GPS recenter holds following paused and retains its origin when world publication fails. Existing GPS permission, transient location policy, field-credit and persistence owners remain. Actual controller failure/retry tested with a simulated sensor."
+    },
+    "app/js/multiplayer/ui-room-runtime.js": {
+      "before": "00b4e097b3c70ce6ca9f1c7a9aaac8e295226205a68ecc91e6971baad0035b5c",
+      "beforeMode": "100644",
+      "after": "38b9e3ebca9b95b2e19be3bf942d030f45f2f1863db7bfec726103a37ddaf87f",
+      "afterMode": "100644",
+      "review": "Room sync waits for successful Earth publication/title launch before respawn, removes pre-load duplicate spawn and clears a failed transient signature for retry. Room schema, membership, authority, entitlements and server writes unchanged. Actual controller tested with remote boundaries replaced; hosted room acceptance remains separate."
     },
     "app/js/runtime/core-frame-systems.js": {
       "before": "dbde26a81cfc7e3737a846cde219ea78334ad0c2030d39b120ed5f91f214f3fe",
@@ -331,7 +352,7 @@
       "beforeMode": "100644",
       "before": "0a874820611be2ff3381dfd18fe59ee428e0197a3aa777582ae1b60b4f53bb64",
       "afterMode": "100644",
-      "after": "d4fd000a56bb3e65ba846206c2384f59595c4925725c6fc8ee2991b072511903"
+      "after": "cf4bb8a3023893dc50f17d1c835a5552ab9bc98dbcb6e1849a78fedadb40f252"
     },
     "app/js/world/budgets.js": {
       "before": "823757a17a17833c31c012691bc6f202289f0d6fd38532b7feff6244540d2ecb",
@@ -418,11 +439,11 @@
       "review": "Building geometry and private temporary-buffer lifetime only. Tests require unchanged final triangle attributes, source-building edit boundaries and retained shared buffers. No persistent data writes or identity migration."
     },
     "app/js/world/load-failure.js": {
-      "review": "Centralizes rejected-world resource retirement under current runtime identity; does not delete player records, favorites, account data or saved sessions.",
+      "review": "Centralizes rejected-world resource retirement under current runtime identity; does not delete player records, favorites, account data or saved sessions. Uses the existing globe selector status surface to expose a recoverable failure for every caller.",
       "beforeMode": null,
       "before": null,
       "afterMode": "100644",
-      "after": "21775095eb72a449d0ab08796cfa425eb8ac81d387e6edd80fa312b3bedced4b"
+      "after": "96bf5ac63c48bfc2c229ebb1a1fa7ecf686ca55c7871910a43b43b9190b46787"
     },
     "app/js/world/load-geometry.js": {
       "before": "31f452f553af96784ea0e3d2cc7df939c169d676b9ad9494a7c64d40f3bfb3fa",

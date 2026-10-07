@@ -1,4 +1,5 @@
 import { ensureEntitlements } from "../../../js/entitlements.js?v=71";
+import {isEarthWorldUsable} from '../earth-core/world-readiness.js';
 import { createGhostManager } from "./ghosts.js?v=58";
 import { listenExplorerLeaderboard } from "./loop.js?v=56";
 import { stopPresence } from "./presence.js?v=63";
@@ -216,9 +217,7 @@ export function createUiRoomRuntime({ appCtx, refs, state, renderers, helpers })
       return true;
     }
 
-    if (respawn && typeof appCtx.spawnOnRoad === "function") {
-      appCtx.spawnOnRoad();
-    }
+    // Earth arrival belongs to the successful load below, not this environment check.
     return true;
   }
 
@@ -226,6 +225,13 @@ export function createUiRoomRuntime({ appCtx, refs, state, renderers, helpers })
     if (!room || !room.world || state.currentRoom?.id !== room.id) return;
     const generation = state.roomSessionGeneration;
     const isCurrent = () => state.roomSessionGeneration === generation && state.currentRoom?.id === room.id;
+    const failSync = (error) => {
+      if (!isCurrent()) return;
+      state.activeRoomWorldSignature = '';
+      clearPendingRoomWorldRetry();
+      setStatus('The room location could not load. Retry from the location menu.', true);
+      console.warn('[multiplayer][ui] room world sync failed:', error);
+    };
 
     const signature = roomWorldSignature(room);
     if (!force && signature && state.activeRoomWorldSignature === signature) return;
@@ -250,7 +256,14 @@ export function createUiRoomRuntime({ appCtx, refs, state, renderers, helpers })
       setTitleLaunchMode(kind);
       appCtx.pendingCustomLaunchBypass = true;
       if (typeof appCtx.triggerTitleStart === "function") {
-        appCtx.triggerTitleStart({ bypassCustomGate: true });
+        try {
+          const launched = await appCtx.triggerTitleStart({ bypassCustomGate: true });
+          if (!isCurrent()) return;
+          if (launched === false || (kind === 'earth' && !isEarthWorldUsable(appCtx))) {
+            throw new Error('The room location did not finish loading.');
+          }
+          clearPendingRoomWorldRetry();
+        } catch (error) { failSync(error); }
       } else {
         const startBtn = document.getElementById("startBtn");
         if (startBtn instanceof HTMLButtonElement) startBtn.click();
@@ -279,14 +292,15 @@ export function createUiRoomRuntime({ appCtx, refs, state, renderers, helpers })
 
     setStatus(`Syncing room world ${room.code} (seed ${roomSeed})...`);
     try {
-      await appCtx.loadRoads();
+      const loaded = await appCtx.loadRoads();
       if (!isCurrent()) return;
+      if (!isEarthWorldUsable(appCtx, loaded)) throw new Error('The room location did not finish loading.');
       if (respawn && typeof appCtx.spawnOnRoad === "function") {
         appCtx.spawnOnRoad();
       }
       clearPendingRoomWorldRetry();
     } catch (err) {
-      console.warn("[multiplayer][ui] room world sync failed:", err);
+      failSync(err);
     }
   }
 

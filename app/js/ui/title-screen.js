@@ -400,7 +400,8 @@ function initTitleScreenUi({
       } else if (typeof appCtx.loadRoads === 'function') {
         await ensureEarthWorldRuntime();
         resetTitleEarthTravelMode('globe_location_change');
-        await appCtx.loadRoads();
+        const loaded = await appCtx.loadRoads();
+        if (!isEarthWorldUsable(appCtx, loaded)) return false;
         // loadRoads publishes the world and applies its final arrival once.
         // Do not run a second title-layer spawn over that resolved surface.
         if (!appCtx.boatMode?.active) {

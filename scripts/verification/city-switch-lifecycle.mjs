@@ -166,11 +166,12 @@ try {
     return {started:ctx.gameStarted, ready:ctx.initialEarthWorldReady, publication:!!ctx.worldPublication,
       loading:ctx.worldLoading, buildings:ctx.buildings.length, roads:ctx.roads.length,
       providers:ctx.worldLoadRuntimeState.session.outstandingProviderWork,
-      error:ctx.worldLoadRuntimeState.error, explorationPrompt:getComputedStyle(document.getElementById('explorationModeMsg')).display, loadingCover:document.getElementById('loading').classList.contains('show')};
+      error:ctx.worldLoadRuntimeState.error, failureMessage:document.getElementById('globeLocationSearchStatus').textContent, explorationPrompt:getComputedStyle(document.getElementById('explorationModeMsg')).display, loadingCover:document.getElementById('loading').classList.contains('show')};
   });
   assert.equal(failedLoad.started, false);assert.equal(failedLoad.ready, false);
   assert.equal(failedLoad.publication, false);assert.equal(failedLoad.loadingCover, false);
   assert.equal(failedLoad.explorationPrompt, 'none');
+  assert.match(failedLoad.failureMessage, /could not finish loading/);
   assert.equal(failedLoad.buildings, 0);assert.equal(failedLoad.roads, 0);assert.equal(failedLoad.providers, 0);
   assert.match(failedLoad.error, /audit-injected-ground-failure/);
   await page.screenshot({path:`${outputDir}/failed-load-recovered-menu.png`});

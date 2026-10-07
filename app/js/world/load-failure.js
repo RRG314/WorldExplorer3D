@@ -24,7 +24,10 @@ export function finishFailedWorldLoad(session = {}, error, options = {}) {
       () => appCtx.discardEarthWorldSceneLoad?.(runtimeState.sequence),
       () => appCtx.releaseEarthWorldForTitle?.(),
       () => appCtx.enforceEnvironmentSceneOwnership?.(),
-      () => appCtx.hideLoad?.()
+      () => appCtx.hideLoad?.(),
+      () => appCtx.globeSelector?.open?.(),
+      () => appCtx.globeSelector?.setSearchStatus?.(
+        options.message || 'This location could not finish loading. Select Explore to retry, or choose another location.', '#fca5a5')
     ]) {
       try { cleanup(); }
       catch (failure) { cleanupErrors.push(String(failure?.message || failure)); }
