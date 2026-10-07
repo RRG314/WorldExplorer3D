@@ -260,15 +260,21 @@ export function buildTransportContinuityRepairAnchors(
     const featureId = String(feature?.transportGraphRef?.featureId || '');
     if (featureId) featureById.set(featureId, feature);
   }
-  const groups = connectedSideGroups(transportNetworkModel.connections).map((sides, index) => ({
-    id: index,
-    sides: sides.map((side) => ({
+  const groups = connectedSideGroups(transportNetworkModel.connections).map((sides, index) => {
+    const complete = sides.map((side) => ({
       side,
       feature: featureById.get(String(side.featureId || ''))
     })).filter(({ feature }) =>
-      feature?.transportRecord?.completeness === 'lossless' &&
-      feature?.transportRecord?.routeState !== 'incomplete')
-  }));
+      feature?.transportRecord && feature.transportRecord.routeState !== 'incomplete');
+    const exact = complete.filter(({feature}) => feature.transportRecord.completeness === 'lossless');
+    // Once a complete generalized route is published as a physical road, its
+    // shared junction and along-route grade constraints are just as binding.
+    // Previously only the initial per-node pass handled these roads; each
+    // independent profile then rejected incompatible nodes and left a step.
+    // Preserve exact-source ownership in a mixed group: source conflation,
+    // not a vertical solver, must retire a lower-detail duplicate there.
+    return {id:index,sides:exact.length?exact:complete};
+  });
   const membershipsByFeature = new Map();
   const targetByGroup = new Map();
   const ownerByGroup = new Map();

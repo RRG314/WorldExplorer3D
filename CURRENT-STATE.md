@@ -6,6 +6,14 @@ Updated October 6, 2026. **Marine/transport work is locally checkpointed and pac
 
 Details: [FREE-ENVIRONMENT-DATA.md](docs/release-review/2026-10-05/FREE-ENVIRONMENT-DATA.md). Visual work: [REFERENCE-BLOCK.md](docs/visual-quality/REFERENCE-BLOCK.md). Earlier architecture acceptance: [LOCAL-RESULT.md](docs/system-review/2026-10-04/LOCAL-RESULT.md).
 
+## October 7 transport implementation in progress
+
+The current local source now passes the Baltimore worldwide-fallback bridge gate (9/9, no vertical discontinuities) and the Monaco network audit (825 sampled joins, zero discontinuities, maximum 0.1952 world units). The full PR chain passes 2,053 contracts. Receipts: `output/verification/bridge-corridor-1007/report.json`, `output/verification/transport-portal-linear-1007/report.json`, `/tmp/we3d-corridor-linear-pr.log`. These supersede the earlier **source** continuity failures below; the retained packaged artifact still contains the older runtime.
+
+The repairs retire only entirely covered lower-resolution road copies, preserve uncovered/parallel/access-separated geometry, reconcile complete generalized corridors with shared grade constraints, and give pedestrian/rail features proper source identity/topology instead of anonymous duplicate records. A captured Baltimore replay converges without repeatedly lifting streets. Source regression tests preserve incomplete-route exclusion and original coverage.
+
+Portal screenshots were inspected and are **not yet accepted**: exposed crossing geometry, vegetation inside a cut approach, and complete entrance/exit driving require further work. No claim of completed marine assets, continuous travel, performance acceptance or production readiness. No GitHub or production change.
+
 ## Workspace and authorization
 
 Use `/Users/stevenreid/.codex/worktrees/architecture-evaluation/WorldExplorer3D-live-deployed-20260320`, branch `steven/visual-quality`. Do not edit older Documents/Developer checkouts. Local repairs, commits and a staging preview plus supporting staging backend are authorized. No GitHub push or production promotion is part of this request.
