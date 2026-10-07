@@ -1,6 +1,6 @@
 # Current development and release state
 
-Updated October 6, 2026. Current focus: preserve the existing location-based game and prepare optional worldwide travel without reducing building coverage or losing progress. **The test preview now serves 86fdc6e3. Graphics adaptation no longer shrinks the authoritative building district on reload, and the road retry action is connected. Full PR passes 2,009 contracts; five actual location loads and the packaged candidate → fallback → candidate save journey pass. Continuous worldwide travel and its on/off control are not implemented. The completed long performance run still reproduces walking/driving stalls. This is a test build, not a production-cleared release.**
+Updated October 6, 2026. **The fresh architecture audit and implemented loading repairs are complete and locally tested at 9579cd62. Full PR passes 2,024 contracts; the final packaged failure/retry and five-location journey, prescribed game client and save/fallback/return all pass. Existing building/road coverage is preserved. Active-play GC stalls remain a release blocker; a real WebGL cache experiment worsened allocations and was rejected. Optional worldwide travel and its toggle remain unimplemented. The public preview remains 86fdc6e3; production remains 1532bdfb.**
 
 Details: [FREE-ENVIRONMENT-DATA.md](docs/release-review/2026-10-05/FREE-ENVIRONMENT-DATA.md). Visual work: [REFERENCE-BLOCK.md](docs/visual-quality/REFERENCE-BLOCK.md). Earlier architecture acceptance: [LOCAL-RESULT.md](docs/system-review/2026-10-04/LOCAL-RESULT.md).
 
@@ -11,11 +11,23 @@ Use `/Users/stevenreid/.codex/worktrees/architecture-evaluation/WorldExplorer3D-
 Physical Apple M1 Mac mini, 8 GiB RAM. Heavy checks run sequentially. Preserve ordinary user Chrome, player data, four saved candidates and retained artifacts. Close owned verification browsers; an open 3D preview measurably interferes with performance testing. Private credentials stay outside the repository and reports.
 
 
-## Current location-preservation test build
+## Latest local architecture repair
 
-Runtime source **86fdc6e3e6a2292e90abf17eb86dc309d09637b8**. Local `dist` and hosted preview both contain **5.4.0+86fdc6e3e6a2.febba16c0a5e3daa.staging**: 611 byte-verified files, 187 runtime bundles and 84 accepted-ground files. Asset-manifest SHA256 `db184d042f3f83bbb399c95cf12bb8e8f39861965d2bfb073436633f1709bb7d`; build-manifest SHA256 `6ea9c922021e030857e360943e6d1d647a2120be84ebda25366ded5aa733f1bd`. Documentation-only checkpoints do not change these runtime bytes.
+[Fresh audit, plan, implementation and evidence](docs/system-review/2026-10-06/README.md). Runtime **9579cd62ae62**, local artifact **5.4.0+9579cd62ae62.a9ec3bf5ff67cacf.staging**, 612 verified files, 188 runtime bundles, 84 accepted-ground files; asset-manifest SHA256 `304d55287078e43aa8f5ee744d328d959ae426b29f74c0b375d25999c5e70263`.
 
-[Open test preview](https://we3d-staging-20260712--visual-review-1005-e5075bnu.web.app); expires October 13. [Test instructions](docs/continuous-world/TEST-BUILD.md) describe the completed checks and remaining limits. Publication used the normal artifact and packaged-world preflight. Both hosted manifests byte-match the local artifact. An ordinary in-app browser without debug attestation entered Baltimore gameplay on this build with no captured console errors; it was returned to the main menu afterward. This is not signed-in/shared-session or physical-device acceptance.
+Invalid requests now preserve the active world. Provider operations have owned cancellation/draining, unexpected load failures share guarded cleanup and a visible retry menu, and every identified Earth entry consumer requires the exact ready publication/result before spawning or restoring state. Stale deferred callbacks are discarded without accumulating publication completion IDs. Four unsafe async browser wait predicates were corrected and guarded against recurrence.
+
+The final packaged five-load journey passes all 11 checks: all four Baltimore visits retain **49,023 buildings / 18,758 roads**, including the lower-quality reload; Hollywood retains 34,999 / 18,832. The actual injected failure returns to the visible menu and retry succeeds; invalid admission preserves identity and pose. Final candidate → 37a12d11 fallback → candidate save/read/write passes all three stages and all 79 runtime/configuration differences are pinned. Short prescribed driving bursts pass without error files. Exact receipts are listed in the audit; these do not certify the full release matrix.
+
+A fresh causal trace proves GC dominates the worst walking/driving pauses (517.4/151 ms). Road-readiness wait delta is zero. The final-source renderer-storage A/B/restored experiment increases estimated allocations per frame by 23% and is rejected; the original vendor renderer remains unchanged. Next work is a proven allocation/retained-graph repair and capture-selector cost isolation before another complete release matrix. Preserve coverage and stall thresholds.
+
+Local commits and previous artifacts are retained. The currently open hosted preview still serves the earlier build below; no GitHub, preview, production or player-data mutation occurred during this audit. No world-streaming toggle is claimed.
+
+## Hosted location-preservation preview (previous source)
+
+Runtime source **86fdc6e3e6a2292e90abf17eb86dc309d09637b8**. The hosted preview and its preserved original artifact contain **5.4.0+86fdc6e3e6a2.febba16c0a5e3daa.staging**; local `dist` is the newer architecture build identified above. The older artifact has 611 byte-verified files, 187 runtime bundles and 84 accepted-ground files. Asset-manifest SHA256 `db184d042f3f83bbb399c95cf12bb8e8f39861965d2bfb073436633f1709bb7d`; build-manifest SHA256 `6ea9c922021e030857e360943e6d1d647a2120be84ebda25366ded5aa733f1bd`. Documentation-only checkpoints do not change these runtime bytes.
+
+[Open test preview](https://we3d-staging-20260712--visual-review-1005-e5075bnu.web.app); expires October 13. [Test instructions](docs/continuous-world/TEST-BUILD.md) describe the completed checks and remaining limits. Publication used the normal artifact and packaged-world preflight. At publication, both hosted manifests byte-matched that preserved artifact. An ordinary in-app browser without debug attestation entered Baltimore gameplay on this build with no captured console errors; it was returned to the main menu afterward. This is not signed-in/shared-session or physical-device acceptance.
 
 Three concrete repairs preserve the location game:
 
@@ -27,7 +39,7 @@ Final-artifact verification:
 
 - Full PR: **2,009 contracts plus dependency/source/ownership/types/inventory/sensitivity pass** (`/tmp/we3d-fixed-district-registered-pr.log`).
 - Five actual world loads pass all nine preservation checks: custom Baltimore → same location after lower graphics quality → preset Baltimore → Hollywood → Baltimore. Baltimore retains **49,023 buildings / 18,758 roads** on all four visits; Hollywood has 34,999 / 18,832. Saved favorite, live frames, healthy renderer, source resources and repeat-key isolation pass. Explicit post-GC retention observations return to approximately 465 MB in Baltimore; these are not active-play performance measurements. Receipt: `output/verification/city-switch-lifecycle/report.json`.
-- Packaged **86fdc6e3 → 37a12d11 fallback → 86fdc6e3** save/read/write journey passes all three stages with original and newer Journal records, equipment/ammo changes, unknown fields and unrelated pending account data preserved. Uses disposable test storage. Receipt: `output/release-evidence/current/migration-rollback/report.json`.
+- Packaged **86fdc6e3 → 37a12d11 fallback → 86fdc6e3** save/read/write journey passes all three stages with original and newer Journal records, equipment/ammo changes, unknown fields and unrelated pending account data preserved. Uses disposable test storage. Receipt: `output/release-evidence/history/pre-lifecycle-613293ea/migration-rollback/report.json`.
 - The prescribed browser client completes three drive/turn/idle bursts without error files. Baltimore retains 48,294/48,834 nearby buildings (98.9%) and 95% regional buildings at this different starting coordinate. Screenshot inspected: `output/verification/continuous-world/fixed-district-game-client/`.
 - Packaged world preflight and artifact verification pass; hosted identity receipt: `output/verification/continuous-world/preservation-preview-86fdc6e3.json`.
 
@@ -110,7 +122,7 @@ Next performance work: demonstrate a bounded before/after repair of the captured
 
 ## Preservation and production boundary
 
-Tested fallback: `output/preserved-artifacts/5.4.0+37a12d117111.9496ab31100b61ae.staging`, branch `steven/free-data-fallback`, commit `37a12d117111446a128888384df67ac52445d972`, 603 files. It retains free providers, HUD, save/control/backend and commerce fixes with earlier street visuals. All 65 current reviewed runtime/configuration differences are pinned in `scripts/verification/rollback-runtime-review.json`; the exact packaged 86fdc6e3 → fallback → 86fdc6e3 save roundtrip passes. These differences include coverage/resource/transport repairs, not only visual changes. All previous builds, four `.local-candidates`, source history and player data remain intact.
+Tested fallback: `output/preserved-artifacts/5.4.0+37a12d117111.9496ab31100b61ae.staging`, branch `steven/free-data-fallback`, commit `37a12d117111446a128888384df67ac52445d972`, 603 files. It retains free providers, HUD, save/control/backend and commerce fixes with earlier street visuals. All 79 current reviewed runtime/configuration differences are pinned in `scripts/verification/rollback-runtime-review.json`; the exact packaged 9579cd62 → fallback → 9579cd62 save roundtrip passes. These differences include coverage/resource/transport repairs, not only visual changes. All previous builds, four `.local-candidates`, source history and player data remain intact.
 
 Production rechecked October 6 after publishing the 86fdc6e3 test preview: **5.4.0+1532bdfbb5c1.319d215f60318297.production**. No production frontend or GitHub changes. A future coordinated release needs `getPlaceLookup`, `getEnvironmentalData`, updated `getAircraftStates` and supporting configuration together with accepted frontend bytes. Do not promote with unresolved performance or required external acceptance.
 
