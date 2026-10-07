@@ -91,7 +91,11 @@ try {
     await page.goto(`${base}/app/?loc=custom&lat=39.2904&lon=-76.6122&lname=Baltimore&launch=earth&gm=free&mode=walking`, { waitUntil: 'domcontentloaded' });
     await page.waitForFunction(() => globalThis.__WE3D_RUNTIME_READY__, null, { timeout: 120000 });
     if (await page.locator('#analyticsConsentDenyBtn').isVisible()) await page.locator('#analyticsConsentDenyBtn').click();
-    if (await page.locator('#globeSelectorStartBtn').isVisible()) await page.locator('#globeSelectorStartBtn').click();
+    // Runtime module readiness precedes the async title/globe presentation.
+    // Every stage deliberately starts from the title; an instantaneous
+    // isVisible check can skip Start entirely on a warm artifact replacement.
+    await page.locator('#globeSelectorStartBtn').waitFor({state: 'visible', timeout: 60000});
+    await page.locator('#globeSelectorStartBtn').click();
     await page.waitForFunction(() => { const d = globalThis.getWorldExplorerRuntimeDiagnostics?.(); return d?.gameStarted && !d.worldLoading && d.worldDiscovery?.active; }, null, { timeout: 180000 });
     assert.equal(await page.evaluate(() => fetch('/build-manifest.json', { cache: 'no-store' }).then(r => r.json()).then(m => m.buildId)), manifest.buildId);
     const result = await page.evaluate(async ({ seed, label, expectedMagazine, writeMagazine, previous }) => {
@@ -136,7 +140,20 @@ try {
   assert.ok(sameArtifactIdentity(candidate, artifactIdentity(root, candidateRoot)));
   assert.ok(sameArtifactIdentity(fallback, artifactIdentity(root, fallbackRoot)));
   report.passed = true;
-} catch (error) { report.error = error.stack; throw error; }
+} catch (error) {
+  report.error = error.stack;
+  if (page && !page.isClosed()) {
+    report.failureState = await page.evaluate(() => {
+      const state = globalThis.getWorldExplorerRuntimeDiagnostics?.() || {};
+      return {runtimeReady: globalThis.__WE3D_RUNTIME_READY__, gameStarted: state.gameStarted,
+        worldLoading: state.worldLoading, titleVisible: state.titleVisible,
+        worldLoad: state.worldLoad, discoveryActive: state.worldDiscovery?.active,
+        loadingText: document.getElementById('loading')?.textContent?.trim().slice(0, 500)};
+    }).catch(() => null);
+    await page.screenshot({path: `${output}/${stage}-failed.png`}).catch(() => {});
+  }
+  throw error;
+}
 finally {
   await writeFile(`${output}/report.json`, JSON.stringify(report, null, 2));
   try { await page?.close().catch(() => {}); await browser?.close().catch(() => {}); if (browserServer) await closeOwnedBrowser(browserServer); }
