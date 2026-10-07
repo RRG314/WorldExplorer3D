@@ -1,6 +1,6 @@
 # Local marine and transport test build
 
-Build: **5.4.0+dcb1687fda2c.47bf4be4a6acfde0.staging**. Runtime commit: **dcb1687fda2c**. Branch: `steven/visual-quality`. This is a local test artifact, not a production release. The public staging preview still contains the earlier release.
+Build: **5.4.0+bf10b392ff59.47bf4be4a6acfde0.staging**. Last game-code commit: **dcb1687fda2c**; packaging includes the final verification-harness checkpoint bf10b392. All 612 application files byte-match the tested dcb1687fda2c artifact; see `output/verification/marine-artifact-equivalence.json`. Branch: `steven/visual-quality`. This is a local test artifact, not a production release. The public staging preview still contains the earlier release.
 
 ## What is implemented and verified
 
