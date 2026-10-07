@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import { chromium } from 'playwright';
 import { startStaticServer } from './static-server.mjs';
+import { configureStagingAppCheck } from './staging-app-check.mjs';
 const server = await startStaticServer({ rootDir: process.env.WE3D_VERIFY_ROOT || process.cwd(), ports: [4396] });
 const browser = await chromium.launch({ channel: 'chrome', headless: true });
 const dir = 'output/verification/product-plan/habitat';
@@ -20,6 +21,12 @@ try {
    await route.fulfill({ status: captured === null ? 503 : 200, contentType: 'text/plain', body: captured === null ? 'unavailable' : `value_list = '${captured}'` }).catch(() => {});
  });
  page = await context.newPage();
+ const base = `http://127.0.0.1:${server.port}`;
+ report.attestation = await configureStagingAppCheck(page, base);
+ // Preserve the declared controlled place fixture after the gateway migration.
+ await page.route(`${base}/api/geospatial/reverse?**`, route => route.fulfill({json: {display_name: 'Entry check fixture', lat: '39.2898', lon: '-76.6122', address: {city: 'Entry check fixture'}}}));
+ report.localFailures = [];
+ page.on('response', response => { if (response.url().startsWith(base + '/') && response.status() >= 400) report.localFailures.push({url: response.url(), status: response.status()}); });
  page.on('pageerror', error => report.errors.push(error.message));
  page.on('console', message => {if(['warning','error'].includes(message.type())) (report.consoleWarnings ||= []).push(message.text());});
  await page.goto(`http://127.0.0.1:${server.port}/`, { waitUntil: 'load' });
@@ -62,8 +69,10 @@ try {
  report.cases.push({id:'actual-submarine-contact-stop-and-reverse',passed:true});
 
  assert.deepEqual(report.arrival.underwaterSpeciesIds,['giant_trevally']);
+ await page.locator('#oceanDiverOptions > summary').click();
  await page.locator('#oceanSoundToggle').click();assert.equal(await page.evaluate(()=>marineCtx.oceanMode.soundscape.snapshot().enabled),true);
  await page.locator('#oceanSoundToggle').click();assert.equal(await page.evaluate(()=>marineCtx.oceanMode.soundscape.snapshot().enabled),false);
+ await page.locator('#oceanDiverOptions > summary').click();
  report.cases.push({id:'actual-sound-opt-in-and-mute',passed:true});
  await page.evaluate(()=>{marineCtx.setPauseReason('verification_pause',false);});
  report.frameTiming=await page.evaluate(async()=>{const samples=[];let last=performance.now();for(let i=0;i<180;i++){await new Promise(requestAnimationFrame);const now=performance.now();samples.push(now-last);last=now;}samples.sort((a,b)=>a-b);return {frames:samples.length,p50:samples[90],p95:samples[171],p99:samples[178],max:samples.at(-1),over100ms:samples.filter(n=>n>100).length};});
@@ -83,6 +92,6 @@ try {
  await page.reload();await page.waitForFunction(()=>window.ready===true);assert.equal(await page.evaluate(()=>habitatTest.habitat.group.userData.habitat.assetState),'unavailable');
  assert.equal(await page.evaluate(()=>habitatTest.habitat.group.children.filter(c=>c.name.includes('coral')).length),0);
  report.cases.push({id:'asset-outage-preserves-seabed-and-releases-partial-assets',passed:true});
- assert.deepEqual(report.errors,[]);report.passed=true;
+ assert.deepEqual(report.errors,[]);assert.deepEqual(report.localFailures,[]);report.passed=true;
 }catch(error){report.failure=error.message;report.ui=await page?.locator('body').innerText();await page?.screenshot({path:`${dir}/failure.png`});throw error;}finally{await fs.writeFile(`${dir}/browser.json`,JSON.stringify(report,null,2));await browser.close();await server.close();await fixtureServer?.close();}
 console.log(JSON.stringify(report));

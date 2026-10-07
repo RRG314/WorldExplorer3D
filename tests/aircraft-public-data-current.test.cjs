@@ -33,3 +33,55 @@ test('aircraft details do not invent speed, northward heading or a recent observ
  renderLiveEarthDetails({escapeHtml:String,selectorSelection:()=>null,selectedAircraft:()=>selected,setDetailsHtml:(_state,value)=>{html=value;}},{selector:{ui:{details:{}}},activeLayerId:'aircraft',aircraftItems:[selected],aircraftRoutes:[],aircraftSourceMode:'observed'});
  assert.match(html,/Speed unavailable/);assert.match(html,/Heading unavailable/);assert.match(html,/observation time unavailable/);assert.doesNotMatch(html,/null kt|heading 0°|observed recently/);
 });
+
+test('IPv4 aircraft deadline includes connection setup and a trickling body', async t => {
+ const https=require('node:https'),{EventEmitter}=require('node:events');
+ t.mock.timers.enable({apis:['setTimeout']});
+ for(const bodyStarted of [false,true]) {
+  const request=new EventEmitter();let receive;
+  request.destroy=error=>{request.destroyed=true;request.emit('error',error);};
+  const mock=t.mock.method(https,'get',(_url,_options,callback)=>{receive=callback;return request;});
+  const pending=queryAircraft({lat:39,lon:-76},{force:true});
+  const rejection=assert.rejects(pending,{name:'AbortError'});
+  if(bodyStarted) {
+   const response=new EventEmitter();response.statusCode=200;response.setEncoding=()=>{};
+   receive(response);response.emit('data','{');
+   t.mock.timers.tick(8000);response.emit('data','"ac":');
+   t.mock.timers.tick(999);
+  } else t.mock.timers.tick(8999);
+  assert.notEqual(request.destroyed,true);
+  t.mock.timers.tick(1);await rejection;assert.equal(request.destroyed,true);mock.mock.restore();
+ }
+});
+
+test('completed IPv4 aircraft responses clear the deadline and interrupted bodies reject', async t => {
+ const https=require('node:https'),{EventEmitter}=require('node:events');
+ t.mock.timers.enable({apis:['setTimeout']});
+ for(const interrupted of [false,true]) {
+  const request=new EventEmitter();let receive;
+  request.destroy=error=>{request.destroyed=true;request.emit('error',error);};
+  const mock=t.mock.method(https,'get',(_url,_options,callback)=>{receive=callback;return request;});
+  const pending=queryAircraft({lat:38,lon:-76},{force:true});
+  const settled=interrupted?assert.rejects(pending,/interrupted/):pending;
+  const response=new EventEmitter();response.statusCode=200;response.setEncoding=()=>{};receive(response);
+  if(interrupted)response.emit('aborted');
+  else {response.emit('data',JSON.stringify({now:Date.now(),ac:[]}));response.emit('end');}
+  const result=await settled;if(!interrupted)assert.equal(result.provider,'adsb-lol');
+  t.mock.timers.tick(9000);assert.notEqual(request.destroyed,true);mock.mock.restore();
+ }
+});
+
+test('aircraft client accepts a valid gateway response after ten seconds but still cancels a stalled request', async t => {
+ const {createAircraftService}=await import('../app/js/geospatial/aircraft.js');
+ t.mock.timers.enable({apis:['setTimeout']});
+ let signal,reply;
+ const service=createAircraftService({fetchImpl:(_url,options)=>{signal=options.signal;return new Promise(resolve=>{reply=resolve;});}});
+ const pending=service.search({lat:39,lon:-76});await Promise.resolve();
+ t.mock.timers.tick(14000);assert.equal(signal.aborted,false);
+ reply(new Response(JSON.stringify({provider:'adsb-lol',fetchedAt:new Date().toISOString(),items:[]})));
+ assert.equal((await pending).providerId,'adsb-lol');
+ const stalled=service.search({lat:38,lon:-76});await Promise.resolve();
+ const rejected=assert.rejects(stalled,{name:'AbortError'});
+ t.mock.timers.tick(19999);assert.equal(signal.aborted,false);
+ t.mock.timers.tick(1);await rejected;assert.equal(signal.aborted,true);
+});

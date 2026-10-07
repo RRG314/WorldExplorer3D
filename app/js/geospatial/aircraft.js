@@ -44,7 +44,8 @@ function createAircraftService(options = {}) {
     id: 'adsb-lol',
     sourceId: 'adsb-lol',
     cacheTtlMs: 60 * 1000,
-    timeoutMs: 10000,
+    // Leave room for gateway startup and network transit around its bounded upstream request.
+    timeoutMs: 20000,
     normalizeRequest: normalizeAircraftRequest,
     async query(request, context) {
       const query = new URLSearchParams(Object.entries(request).map(([key, value]) => [key, String(value)]));

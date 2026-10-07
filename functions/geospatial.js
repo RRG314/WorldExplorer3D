@@ -55,36 +55,53 @@ function safeUrl(value, base = '') {
 async function fetchJson(url, options = {}) {
   if (!options.fetchImpl && options.forceIpv4) {
     return new Promise((resolve, reject) => {
+      let settled = false;
+      let deadline;
+      const finish = (callback, value) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(deadline);
+        callback(value);
+      };
+      const fail = error => finish(reject, error);
       const request = https.get(url, {
         family: 4,
         headers: { Accept: 'application/json', 'User-Agent': 'WorldExplorer3D/3.1 geospatial-client' }
       }, (response) => {
         let body = '';
+        let bytes = 0;
         response.setEncoding('utf8');
+        response.on('error', fail);
+        response.on('aborted', () => fail(new Error('Upstream response was interrupted.')));
         response.on('data', (chunk) => {
+          bytes += Buffer.byteLength(chunk);
+          if (bytes > 8 * 1024 * 1024) {
+            request.destroy(new Error('Upstream response exceeded 8 MB.'));
+            return;
+          }
           body += chunk;
-          if (body.length > 8 * 1024 * 1024) request.destroy(new Error('Upstream response exceeded 8 MB.'));
         });
         response.on('end', () => {
           if ((response.statusCode || 500) < 200 || (response.statusCode || 500) >= 300) {
-            reject(new Error(`Upstream HTTP ${response.statusCode || 500}`));
+            fail(new Error(`Upstream HTTP ${response.statusCode || 500}`));
             return;
           }
-          try {
-            resolve(JSON.parse(body));
-          } catch {
-            reject(new Error('Upstream returned invalid JSON.'));
-          }
+          try { finish(resolve, JSON.parse(body)); }
+          catch { fail(new Error('Upstream returned invalid JSON.')); }
         });
       });
-      request.setTimeout(options.timeoutMs || 9000, () => {
+      // A socket inactivity timeout does not bound DNS, connection setup or a
+      // slowly trickling response. Keep one deadline through the complete body.
+      deadline = setTimeout(() => {
         const error = new Error('Upstream request timed out.');
         error.name = 'AbortError';
         request.destroy(error);
-      });
-      request.on('error', reject);
+        fail(error);
+      }, options.timeoutMs || 9000);
+      request.on('error', fail);
     });
   }
+
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), options.timeoutMs || 9000);
   try {

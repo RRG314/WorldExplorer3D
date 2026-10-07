@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {compileTunnelObstructionLimits, tunnelObstructionMaximumY} from '../app/js/world/compiler/tunnel-obstruction-limits.js';
+import {compileTunnelObstructionLimits, compileTunnelRoadObstructionLimits, tunnelObstructionMaximumY} from '../app/js/world/compiler/tunnel-obstruction-limits.js';
 import {compileTransportSurfaceModel, sampleTransportSurfaceAtDistance} from '../app/js/world/compiler/transport-surface-model.js';
 import {attachCompiledTransportSurface} from '../app/js/world/compiler/transport-surface-model.js';
 import {buildTransportContinuityRepairAnchors,auditTransportJunctionContinuity} from '../app/js/world/compiler/transport-junction-profile.js';
@@ -71,4 +71,38 @@ test('a foundation at a tunnel entrance lowers the connected approach over its g
   assert.ok(sampleFeatureSurfaceY(tunnel,0,0)<=23.58001);
   const solved=features.map(f=>[...f.transportSurfaceModel.centerHeights]);solve();
   assert.deepEqual(features.map(f=>[...f.transportSurfaceModel.centerHeights]),solved);
+});
+
+
+test('separate surface carriageway width protects a near-miss crossing and an ordinary connected entry remains open', () => {
+  const tunnel=road();
+  const crossing={sourceFeatureId:'crossing',pts:[{x:90,z:3.5},{x:110,z:3.5}],width:4,structureSemantics:{terrainMode:'at_grade'}};
+  const unrelated={...crossing,pts:[{x:90,z:8},{x:110,z:8}]};
+  const connected={...crossing,sourceFeatureId:'entry',pts:[{x:-20,z:0},{x:0,z:0}]};
+  const limits=compileTunnelRoadObstructionLimits(tunnel,[crossing,unrelated,connected],()=>40,(_a,b)=>b===connected);
+  assert.equal(limits.length,1);
+  assert.equal(limits[0].sourceFeatureId,'crossing');
+  assert.equal(limits[0].start,90);assert.equal(limits[0].end,110);
+  assert.ok(Math.abs(limits[0].maximumSurfaceY-34.58)<1e-9);
+  assert.equal(tunnelObstructionMaximumY(limits,50),Infinity);
+});
+
+test('road roof constraints survive grade reconciliation without moving the road above', () => {
+  const tunnel=road(),crossing={pts:[{x:97,z:-20},{x:103,z:20}],width:4,structureSemantics:{terrainMode:'at_grade'}};
+  const ground=(x,z)=>40+x*.005+z*.003;
+  const before=structuredClone(crossing);
+  tunnel.tunnelObstructionLimits=compileTunnelRoadObstructionLimits(tunnel,[crossing],ground,()=>false);
+  const model=compileTransportSurfaceModel(tunnel,ground,{sampleStep:2});
+  assert.ok(tunnel.tunnelObstructionLimits.length>0);
+  for(const limit of tunnel.tunnelObstructionLimits)for(let d=limit.start;d<=limit.end;d+=.1)
+    assert.ok(sampleTransportSurfaceAtDistance(model,d,0)<=limit.maximumSurfaceY+1e-5);
+  assert.ok(model.stats.maximumGrade<=.13501);
+  assert.deepEqual(crossing,before);
+});
+
+test('unknown road heights, separate structures and incomplete tunnels cannot invent a roof constraint', () => {
+  const tunnel=road(),crossing={pts:[{x:100,z:-20},{x:100,z:20}],width:4,structureSemantics:{terrainMode:'at_grade'}};
+  assert.deepEqual(compileTunnelRoadObstructionLimits(tunnel,[crossing],()=>NaN),[]);
+  assert.deepEqual(compileTunnelRoadObstructionLimits(tunnel,[{...crossing,structureSemantics:{terrainMode:'elevated'}}],()=>40),[]);
+  assert.deepEqual(compileTunnelRoadObstructionLimits({...tunnel,transportRecord:{routeState:'incomplete'}},[crossing],()=>40),[]);
 });

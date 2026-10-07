@@ -1,6 +1,6 @@
 import { compileEngineeredApproachExcavation } from './compiler/engineered-approach-excavation.js';
 import {createFeatureProjectionIndex} from '../terrain/feature-projection-index.js';
-import {compileTunnelObstructionLimits} from './compiler/tunnel-obstruction-limits.js';
+import {compileTunnelObstructionLimits, compileTunnelRoadObstructionLimits} from './compiler/tunnel-obstruction-limits.js';
 import {assignOrdinaryStreetJunctions} from './compiler/ordinary-street-profile.js';
 import {roadMetersPerWorldUnit} from './road-units.js';
 import { streetScaleForWorld } from './compiler/street-frontage-policy.js';
@@ -398,6 +398,12 @@ function* compileStructureAwareFeatureProfileSteps() {
   // stack ranks. Reusing the pre-refresh models makes a merge target sample a
   // stale deck height and leaves visible steps or open-air ramp ends.
   measure('ordinaryStreetJunctions',()=>assignOrdinaryStreetJunctions(transportFeatures,appCtx.transportNetworkModel,worldBaseTerrainY));
+  measure('surfaceRoadRoofClearance', () => {
+    for (const feature of structureFeatures) {
+      const roads = compileTunnelRoadObstructionLimits(feature, nearbyTransportFeatures(feature), worldBaseTerrainY, areRoadsConnected);
+      if (roads.length) feature.tunnelObstructionLimits = Object.freeze([...feature.tunnelObstructionLimits, ...roads]);
+    }
+  });
   measure('buildInitialProfiles', () => {
     for (let i = 0; i < transportFeatures.length; i++) {
       const feature = transportFeatures[i];

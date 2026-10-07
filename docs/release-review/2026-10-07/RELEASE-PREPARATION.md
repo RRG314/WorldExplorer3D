@@ -13,3 +13,15 @@ Actual Baltimore keyboard/drone controls retain 48,296 near buildings and 95% el
 ## Verification boundary
 
 Before the dependency patch, the full PR chain passes 2,102 contracts. New dependency and final candidate/backend results will be recorded separately. Production was rechecked as 5.4.0+1532bdfbb5c1.319d215f60318297.production; the older preview is 86fdc6e3. Production has 78 Functions, with getPlaceLookup and getEnvironmentalData absent. No performance or external acceptance result is assumed from the owner's deployment authorization.
+
+## Completed candidate investigation
+
+The first complete immutable candidate run finished61passed/30failed. Twenty-one later checks stopped on an expired disposable staging test credential and did not establish gameplay results. The renewed verifier keeps credentials private, refreshes them during long runs, and cleans up its own identities. Historical failed receipts remain preserved.
+
+Corrected actual-UI checks pass on the retained package: marine habitat7cases, research outing8cases, real held-key Earth/ship/lift/exit, and prescribed Moon movement/pause. The marine fixture now targets the current geocoder endpoint and uses explicit staging attestation. No physical-phone or ordinary-hosted claim is inferred from these local checks.
+
+Successful live aircraft replies exceeded the former10second client deadline. The repaired client allows20seconds; the IPv4 gateway now has an absolute9second upstream deadline through connection and body delivery. Focused provider checks pass27tests. This still requires packaged and deployed service validation.
+
+Actual geometry queries identified three Monaco surface junctions removed by a lower tunnel's excavation. Full mapped carriageway-width roof constraints now participate in the existing graph/grade solver. Source Monaco passes28assembled assertions with987junction samples, zero coverage gaps and zero discontinuities across1,216sampled connections. Real keyboard approach/bore/exit passes all6checks. Screenshots inspected; terrain/retaining edges remain visibly rough and are not accepted as finished professional art.
+
+The complete updated source chain passes2,108tests. New package, backend, sustained-performance, save/rollback and external acceptance remain required. The old dense-city resource baseline represents25,529buildings, compared with49,023after the requested coverage restoration; no buildings were removed or thresholds silently raised to pass it. Production, stable, Pages and the public release remain unchanged; PR96and v5.5.0 remain drafts.

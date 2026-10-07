@@ -193,6 +193,13 @@
       "afterMode": "100644",
       "review": "Centralizes existing location-relative conversion and corrects wrapped longitude/polar consumers. No origin rebase, session migration or save-key change. Existing location identity and records remain under unchanged persistence owners; actual return and save roundtrips required."
     },
+    "app/js/geospatial/aircraft.js": {
+      "before": "12eee6cc478b99e4007a1e0207cbccc640f1c52e88b75bcb5a90b5af3ef617a4",
+      "beforeMode": "100644",
+      "after": "830818f3fb9ab27152111ff321fa662605e41c1eb18faf871b9bbbf6d040bd05",
+      "afterMode": "100644",
+      "review": "Client deadline expands from10to20seconds around the bounded gateway; response normalization, provider provenance, cache keys and persisted state are unchanged."
+    },
     "app/js/ground.js": {
       "before": "f8587d359c87fd4c5f807a38ab843bb59830b21fb6853e20eefbba29fe869ad5",
       "beforeMode": "100644",
@@ -763,9 +770,9 @@
     "app/js/world/compiler/tunnel-obstruction-limits.js": {
       "before": null,
       "beforeMode": null,
-      "after": "9262c721189302ab7ff74d6559d99fc62448b0b40ee95266e88ea0dc276d964b",
+      "after": "82c66e53ea2995907a8b75d287d3e7897ebc9f9a7c2c334951b3f16d248b5c5b",
       "afterMode": "100644",
-      "review": "Recompiles transient transport geometry and contacts from existing source records. Preserves higher-resolution ownership, retained road coverage, layer/access/direction and published foundation authority; connected grades, cuts, enclosures and finite actor-height contacts now agree. No persistent geography, player pose schema, inventory, account or server writes. Existing fixed-location loads rebuild this derived state; packaged movement and retained-save roundtrip remain required."
+      "review": "Recompiles transient transport geometry and contacts from existing source records. Preserves higher-resolution ownership, retained road coverage, layer/access/direction and published foundation authority; connected grades, cuts, enclosures and finite actor-height contacts now agree. No persistent geography, player pose schema, inventory, account or server writes. Existing fixed-location loads rebuild this derived state; packaged movement and retained-save roundtrip remain required. Follow-up review: Mapped surface-road carriageway overlap adds hard roof-clearance intervals to the existing foundation/grade solver. Connected approaches remain openings. Geometry compilation only; no saved schema, geographic identity or shared protocol change."
     },
     "app/js/world/compiler/tunnel-solid-model.js": {
       "before": "d1a0f616e93d333c4b1d7198fdc5bd5ac9e54208551cfac7bbdba4c17ea106a7",
@@ -924,9 +931,9 @@
     "app/js/world/structure-aware.js": {
       "before": "def099cc97990cfd74cd1a3a2fd6110a9fac28fbe2c85459ddf477e65f30b92e",
       "beforeMode": "100644",
-      "after": "3180417d3dbb219d6d64b996a6504f1fe98c1e03475d1f7fb803d51c9ea325e8",
+      "after": "912667add1725c7275288a7c0eb470469b46dc30a31c1b20de233bd99f339366",
       "afterMode": "100644",
-      "review": "Recompiles transient transport geometry and contacts from existing source records. Preserves higher-resolution ownership, retained road coverage, layer/access/direction and published foundation authority; connected grades, cuts, enclosures and finite actor-height contacts now agree. No persistent geography, player pose schema, inventory, account or server writes. Existing fixed-location loads rebuild this derived state; packaged movement and retained-save roundtrip remain required."
+      "review": "Recompiles transient transport geometry and contacts from existing source records. Preserves higher-resolution ownership, retained road coverage, layer/access/direction and published foundation authority; connected grades, cuts, enclosures and finite actor-height contacts now agree. No persistent geography, player pose schema, inventory, account or server writes. Existing fixed-location loads rebuild this derived state; packaged movement and retained-save roundtrip remain required. Follow-up review: Publishes mapped-road roof constraints after topology assignment and before initial profiles so graph reconciliation and per-feature compilation share them. Existing save and backend authorities are unchanged. Source Monaco zero-gap/zero-discontinuity and actual tunnel traversal pass; final package validation remains required."
     },
     "app/js/world/structure-colliders.js": {
       "before": "25e6df83a06c02713c29632c74f66d35f179dedf700720d35bbee1030d45e1cf",
@@ -1053,6 +1060,13 @@
       "after": "cc545151be841117aa19e073cb19a75c66686f6841197eb4b34e56f2fa1add56",
       "afterMode": "100644",
       "review": "Audit metadata classified fail-closed as runtime by fingerprint tool; not shipped or imported by gameplay. Contains source inventory counts, not player data."
+    },
+    "functions/geospatial.js": {
+      "before": "73cc09c9669ba6d9666a6c399e0e5500087b110aadbcd2c4e966ba87aa57a983",
+      "beforeMode": "100644",
+      "after": "c4ae45df5e73a404148d2eb7966bd35c15dc147bb45a65e2479687acced797c9",
+      "afterMode": "100644",
+      "review": "IPv4 upstream is bounded through DNS/connect/body by one9second deadline and UTF8 byte cap, with settle-once completion and aborted-body rejection. Existing aircraft JSON contract, authorization and cache schema remain unchanged."
     },
     "functions/package-lock.json": {
       "before": "0c3add62f22c741bdccb438c7b15fea4619549c286b73518e28b607df186f9e2",
