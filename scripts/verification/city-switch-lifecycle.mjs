@@ -146,6 +146,7 @@ try {
   await page.evaluate(async () => {
     const {ctx} = await import('/app/js/shared-context.js?v=55');
     await ctx.ensureEarthRuntimeReady();
+    globalThis.__WE3D_LIFECYCLE_CONTEXT__ = ctx;
     const prepare = ctx.prepareAcceptedGroundFromCatalog;
     if (typeof prepare !== 'function') throw Error('Ground provider boundary unavailable');
     ctx.prepareAcceptedGroundFromCatalog = async (...args) => {
@@ -156,8 +157,8 @@ try {
   });
   markSupersededLocationRequests('first-world-entry');
   await page.locator('#globeSelectorStartBtn').click();
-  await page.waitForFunction(async () => {
-    const {ctx} = await import('/app/js/shared-context.js?v=55');
+  await page.waitForFunction(() => {
+    const ctx = globalThis.__WE3D_LIFECYCLE_CONTEXT__;
     return ctx.worldLoadRuntimeState?.status === 'failed' && !ctx.worldLoading &&
       document.getElementById('globeSelectorScreen')?.classList.contains('show');
   }, null, {timeout: 60000});
