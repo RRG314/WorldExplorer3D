@@ -32,7 +32,10 @@ test('actual map search does not spawn on a failed load and supports a later val
   const status={dataset:{}};
   assert.equal(await searchAndTravelToLocation('39.29,-76.61',{statusElement:status}),null);
   assert.equal(spawns,0);assert.equal(status.dataset.tone,'error');assert.match(status.textContent,/finish loading/);
-  ctx.loadRoads=async()=>({state:'published'});
+  ctx.loadRoads=async()=>({state:'published',sequence:4,requestId:'previous-world'});
+  assert.equal(await searchAndTravelToLocation('39.29,-76.61',{statusElement:status}),null);
+  assert.equal(spawns,0);
+  ctx.loadRoads=async()=>({state:'published',...ctx.worldPublication});
   assert.ok(await searchAndTravelToLocation('39.29,-76.61',{statusElement:status}));
   assert.equal(spawns,1);
 });
@@ -49,7 +52,7 @@ test('actual GPS recenter leaves following paused and retains its origin after l
   assert.equal(await recenterLiveGpsWorld(),false);
   assert.equal(session.following,false);assert.equal(session.recentering,false);assert.equal(spawns,0);
   assert.deepEqual(session.model.origin,origin);assert.match(session.notice,/did not finish loading/);
-  ctx.loadRoads=async()=>({state:'published'});
+  ctx.loadRoads=async()=>({state:'published',...ctx.worldPublication});
   assert.equal(await recenterLiveGpsWorld(),true);assert.equal(session.following,true);assert.equal(spawns,1);
 });
 test('actual room sync cannot respawn before publication or mark a failed room synchronized',async()=>{
@@ -69,7 +72,7 @@ test('actual room sync cannot respawn before publication or mark a failed room s
   await context.controller.syncRoomWorldContext(room,true,true);
   assert.equal(spawns,0);assert.equal(state.activeRoomWorldSignature,'');
   assert.match(messages.at(-1)[0],/could not load/);assert.equal(messages.at(-1)[1],true);
-  appCtx.loadRoads=async()=>({state:'published'});
+  appCtx.loadRoads=async()=>({state:'published',...appCtx.worldPublication});
   await context.controller.syncRoomWorldContext(room,false,true);
   assert.equal(spawns,1);assert.notEqual(state.activeRoomWorldSignature,'');
   appCtx.gameStarted=false;

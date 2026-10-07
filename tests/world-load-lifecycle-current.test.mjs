@@ -95,3 +95,13 @@ test('entry requires the same fully published world; conflicting booleans cannot
   const replaced=publishedContext();replaced._worldLoadSequence++;assert.equal(isEarthWorldUsable(replaced),false);
   const uncommitted=publishedContext();uncommitted.worldLoadRuntimeState.session.state='compiling';assert.equal(isEarthWorldUsable(uncommitted),false);
 });
+test('an old successful result cannot authorize entry into a newer ready publication',()=>{
+  const ctx=publishedContext();
+  assert.equal(isEarthWorldUsable(ctx,{state:'published',sequence:3,requestId:'third'}),true);
+  for(const result of [
+    {state:'published',sequence:2,requestId:'second'},
+    {state:'published',sequence:3,requestId:'second'},
+    {state:'published',sequence:2,requestId:'third'},
+    {state:'published'}
+  ]) assert.equal(isEarthWorldUsable(ctx,result),false);
+});

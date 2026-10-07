@@ -57,7 +57,7 @@ test('failed Earth reload cannot restore, render or stamp a location; a later va
  ctx.loadRoads=async()=>{
   Object.assign(ctx,{initialEarthWorldReady:true,worldLoading:false,_worldLoadSequence:33,worldPublication:publication,
    worldLoadRuntimeState:{sequence:33,publication,status:'ready',geometryReady:true,gameplayRuntimesReady:true,
-    session:{state:'published',requestId:'retry'}}});return {state:'published'};
+    session:{state:'published',requestId:'retry'}}});return {state:'published',...publication};
  };
  globalThis.requestAnimationFrame=fn=>queueMicrotask(fn);
  assert.equal((await reloadEarthWorldSession({transitionDurationMs:0})).resumed,false);

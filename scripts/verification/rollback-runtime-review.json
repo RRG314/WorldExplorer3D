@@ -54,11 +54,11 @@
       "after": "0e958a2a427bd8b0c166a6314b31a69b2615a9f7ea5910fb7592b2c70baf2077"
     },
     "app/js/earth-core/world-readiness.js": {
-      "review": "Pure validation of current in-memory publication/session identity. No state mutation or persistence writes.",
+      "review": "Shared admission for the exact ready publication and completed request identity; rejects failed, superseded and older successful outcomes before pose/spawn changes. No persistent schema or protocol changes.",
       "beforeMode": null,
       "before": null,
       "afterMode": "100644",
-      "after": "b0d95fc69febae8cc169ed483f763611ea0c0f34cf6bce0f42a7d1a92263602a"
+      "after": "0cc0acbaf19989f01dbd00053e505f6ac59246c5d49cf74058c604e6771a107e"
     },
     "app/js/earth-session.js": {
       "review": "Resume and reload reject unsuccessful world publications before restoring pose or stamping the loaded selection; successful pose restoration and existing save owners are retained. Actual failure/retry and packaged save roundtrip required.",
