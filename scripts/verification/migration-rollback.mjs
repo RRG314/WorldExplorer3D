@@ -29,7 +29,7 @@ assert.equal(manifests[0].firebaseProjectId, 'we3d-staging-20260712', 'This test
 // Pin every changed runtime file to the reviewed before/after bytes. A later
 // edit to even an already-listed path requires another compatibility review.
 const compatibility = JSON.parse(await readFile(path.join(root, 'scripts/verification/rollback-runtime-review.json'), 'utf8'));
-const changed = assertReviewedRollbackRuntime(root, manifests[1].commit, manifests[0].commit, compatibility);
+const changed = await assertReviewedRollbackRuntime(root, manifests[1].commit, manifests[0].commit, compatibility);
 const report = { passed: false, scope: 'Packaged IndexedDB v4→v5 upgrade, fallback owner reads/writes, candidate return, Backpack controls and unchanged pending account data; identical remaining client/backend protocol bytes. SDK authority tests remain separate.',
   baseline, artifactIdentity: candidate, fallbackArtifactIdentity: fallback, fallbackArtifactRoot: fallbackRoot,
   compatibilityContract: compatibility.id,
