@@ -1,8 +1,8 @@
 {
   "schema": "we3d-reviewed-rollback-runtime-v1",
-  "id": "journal-v5-backpack-v2-world-lifecycle-20261006",
+  "id": "journal-v5-backpack-v2-marine-transport-20261006",
   "fallbackCommit": "37a12d117111446a128888384df67ac52445d972",
-  "scope": "Existing fixed-location coverage/resource work plus current request admission, provider ownership, terminal failure, readiness and deferred-work repair. Save/migration, equipment, account, room, backend and Firebase configuration owners are unchanged. Failed loads cannot restore or stamp a world; valid location and player schemas remain. Exact reviewed differences are pinned; actual packaged upgrade/fallback/write/return remains required. Does not certify worldwide streaming or performance.",
+  "scope": "Existing fixed-location coverage/resource work plus current request admission, provider ownership, terminal failure, readiness and deferred-work repair. Save/migration, equipment, account, room, backend and Firebase configuration owners are unchanged. Failed loads cannot restore or stamp a world; valid location and player schemas remain. Exact reviewed differences are pinned; actual packaged upgrade/fallback/write/return remains required. Does not certify worldwide streaming or performance. Marine/space transition, directed vector ownership, graph endpoint and occupied tunnel spawn repairs are additionally reviewed below. Voyage v1 remains compatible; packaged upgrade/fallback/return is required.",
   "files": {
     "app/index.html": {
       "before": "94bdb7f627e930e09c6e1946aacd6dbbd447c6b332e4629b9dc1153660659ec2",
@@ -18,12 +18,61 @@
       "afterMode": "100644",
       "review": "Centralizes existing location-relative conversion and corrects wrapped longitude/polar consumers. No origin rebase, session migration or save-key change. Existing location identity and records remain under unchanged persistence owners; actual return and save roundtrips required."
     },
+    "app/js/boat-mode.js": {
+      "before": "d1b0f271f9529e2ea7e971f02a9f1a077a9fd464016fae266c386c64556a0981",
+      "beforeMode": "100644",
+      "after": "5ba6202b5303f96e4b837945ae2a1a9b92333a377d8c01baacc3770845906161",
+      "afterMode": "100644",
+      "review": "Connected marine entry, deck/swim/submarine handoffs and compact UI. Existing voyage v1 identity, geographic anchor, stage, condition, save key, revision and conflict owner remain. Parent yaw stays independent of submarine yaw; no account/backpack or shared protocol change. New-session admission still requires checked water; saved underwater and aboard records retain their resume path."
+    },
+    "app/js/boat-mode/ocean-transfer.js": {
+      "before": "3e58a2c17b9d78e4b17fceb9d26afd18da1b94dfea43cc478c05ca459215ac8d",
+      "beforeMode": "100644",
+      "after": "6ebadb23a72cbe72bb77b989990ede4cc7a4fc5e99ea14132a1f8f76b7683227",
+      "afterMode": "100644",
+      "review": "Connected marine entry, deck/swim/submarine handoffs and compact UI. Existing voyage v1 identity, geographic anchor, stage, condition, save key, revision and conflict owner remain. Parent yaw stays independent of submarine yaw; no account/backpack or shared protocol change. New-session admission still requires checked water; saved underwater and aboard records retain their resume path."
+    },
+    "app/js/boat-mode/prompt-ui.js": {
+      "before": "d41c780e615d7d004009e23832dbb722aeb940ecd35350a01fe78849fa32942e",
+      "beforeMode": "100644",
+      "after": "f0de96b805fa4f96614156696016a07dfd8199f98a63e8a9f0f4ac04d093c6fc",
+      "afterMode": "100644",
+      "review": "Connected marine entry, deck/swim/submarine handoffs and compact UI. Existing voyage v1 identity, geographic anchor, stage, condition, save key, revision and conflict owner remain. Parent yaw stays independent of submarine yaw; no account/backpack or shared protocol change. New-session admission still requires checked water; saved underwater and aboard records retain their resume path."
+    },
+    "app/js/boat-mode/research/runtime.js": {
+      "before": "0b458d0ea76b2c0bca12b25fe9a0c3f469dad422ac2b34f8d8d6a297d90b6c9a",
+      "beforeMode": "100644",
+      "after": "ffe1863f6726f7282dccd2a998201aee03ef5cea47d2e958b428a436ad23c496",
+      "afterMode": "100644",
+      "review": "Connected marine entry, deck/swim/submarine handoffs and compact UI. Existing voyage v1 identity, geographic anchor, stage, condition, save key, revision and conflict owner remain. Parent yaw stays independent of submarine yaw; no account/backpack or shared protocol change. New-session admission still requires checked water; saved underwater and aboard records retain their resume path."
+    },
+    "app/js/boat-mode/research/ui.js": {
+      "before": "b88d5a3b6db96710e71b5c3ca20c1ded3ac7e0ce0076ef02b614bedbe0593cc3",
+      "beforeMode": "100644",
+      "after": "59520ee19f21a81898c25ed8f1d578118184b4a903bf769a60d14568829b7992",
+      "afterMode": "100644",
+      "review": "Connected marine entry, deck/swim/submarine handoffs and compact UI. Existing voyage v1 identity, geographic anchor, stage, condition, save key, revision and conflict owner remain. Parent yaw stays independent of submarine yaw; no account/backpack or shared protocol change. New-session admission still requires checked water; saved underwater and aboard records retain their resume path."
+    },
+    "app/js/boat-mode/swimming.js": {
+      "before": "36c9f480149652ce14d15b904a2c2b5ff98d1dfe426370c0d6bf0a47c296c68a",
+      "beforeMode": "100644",
+      "after": "38730febe137a938d637d17be0e3064d8bcaa8d4b1ba7fdad22a368f94a8f1ac",
+      "afterMode": "100644",
+      "review": "Connected marine entry, deck/swim/submarine handoffs and compact UI. Existing voyage v1 identity, geographic anchor, stage, condition, save key, revision and conflict owner remain. Parent yaw stays independent of submarine yaw; no account/backpack or shared protocol change. New-session admission still requires checked water; saved underwater and aboard records retain their resume path."
+    },
     "app/js/config.js": {
       "before": "1193b1bcb3b54fa72c8ecb21277186c3614a96c34172db09791fe2b08b699365",
       "beforeMode": "100644",
       "after": "126af1c21e595da311ec6f8e357a23d99e446ec8a85b6345d22c7b8eb59648a2",
       "afterMode": "100644",
       "review": "Centralizes existing location-relative conversion and corrects wrapped longitude/polar consumers. No origin rebase, session migration or save-key change. Existing location identity and records remain under unchanged persistence owners; actual return and save roundtrips required."
+    },
+    "app/js/discovery/runtime.js": {
+      "before": "7b94a5c733f0aa6150af951e40303e0848a0c7aab905491cd0a6263c81073dd0",
+      "beforeMode": "100644",
+      "after": "43b23af238b942088750fa809dd14198185f30ecbcd67a296a5e19f74b8ecb0b",
+      "afterMode": "100644",
+      "review": "Single-flight Earth return awaits ready publication; hidden retained-Earth work is suspended while the separate ship interior owns play. Runtime-only ownership and presentation; retained location, player saves, schemas and server protocol remain unchanged."
     },
     "app/js/earth-core/coordinate-frame.js": {
       "before": null,
@@ -137,12 +186,61 @@
       "afterMode": "100644",
       "review": "Room sync waits for successful Earth publication/title launch before respawn, removes pre-load duplicate spawn and clears a failed transient signature for retry. Room schema, membership, authority, entitlements and server writes unchanged. Actual controller tested with remote boundaries replaced; hosted room acceptance remains separate."
     },
+    "app/js/ocean.js": {
+      "before": "db31c767e1f5964ac3808c32bfd9e46b788df670aa5fe8a35a548c09cc74486d",
+      "beforeMode": "100644",
+      "after": "d03692ee636d37e6fc23dada22206dfdac1cdb886dd49475f2fd613d2d111c88",
+      "afterMode": "100644",
+      "review": "Connected marine entry, deck/swim/submarine handoffs and compact UI. Existing voyage v1 identity, geographic anchor, stage, condition, save key, revision and conflict owner remain. Parent yaw stays independent of submarine yaw; no account/backpack or shared protocol change. New-session admission still requires checked water; saved underwater and aboard records retain their resume path."
+    },
+    "app/js/ocean/diver.js": {
+      "before": "2a7e436bae51319a9e875815b6ca26bef48f40ff66b00fa711fdf3166d954ed1",
+      "beforeMode": "100644",
+      "after": "cd4f0ad0b93a0461e9fe9f6bfa63e553e0b6fc81f6c56c9f24ed1b613ce0bc65",
+      "afterMode": "100644",
+      "review": "Connected marine entry, deck/swim/submarine handoffs and compact UI. Existing voyage v1 identity, geographic anchor, stage, condition, save key, revision and conflict owner remain. Parent yaw stays independent of submarine yaw; no account/backpack or shared protocol change. New-session admission still requires checked water; saved underwater and aboard records retain their resume path."
+    },
+    "app/js/ocean/interface.js": {
+      "before": null,
+      "beforeMode": null,
+      "after": "e03191693156e6e534dab5ec16e1c4ce158cca1db19271cae8d7d9b80220606a",
+      "afterMode": "100644",
+      "review": "Connected marine entry, deck/swim/submarine handoffs and compact UI. Existing voyage v1 identity, geographic anchor, stage, condition, save key, revision and conflict owner remain. Parent yaw stays independent of submarine yaw; no account/backpack or shared protocol change. New-session admission still requires checked water; saved underwater and aboard records retain their resume path."
+    },
+    "app/js/ocean/parent-vessel.js": {
+      "before": "84a2cde22d65d335b85b09bde2f5979e7e6868b60e8e0969b2b354c79a023211",
+      "beforeMode": "100644",
+      "after": "fb69405bea5789106b7cf92601ec5015a3cc9563164f237bfef0f47bb48065bc",
+      "afterMode": "100644",
+      "review": "Connected marine entry, deck/swim/submarine handoffs and compact UI. Existing voyage v1 identity, geographic anchor, stage, condition, save key, revision and conflict owner remain. Parent yaw stays independent of submarine yaw; no account/backpack or shared protocol change. New-session admission still requires checked water; saved underwater and aboard records retain their resume path."
+    },
+    "app/js/ocean/start-exploration.js": {
+      "before": null,
+      "beforeMode": null,
+      "after": "4b41acca5aa30f7c6a58afa3d1c1efba75d15de701734a52bdd1f9cb3fffb1bc",
+      "afterMode": "100644",
+      "review": "Connected marine entry, deck/swim/submarine handoffs and compact UI. Existing voyage v1 identity, geographic anchor, stage, condition, save key, revision and conflict owner remain. Parent yaw stays independent of submarine yaw; no account/backpack or shared protocol change. New-session admission still requires checked water; saved underwater and aboard records retain their resume path."
+    },
+    "app/js/ocean/voyage.js": {
+      "before": "76df3fdea7d21ea745018f742091d5ab55a561dd929284738efb2a39e6118ba7",
+      "beforeMode": "100644",
+      "after": "c65c3b87e988ceb4e11cb0f24c9294ec1f5609a59e127457c7c192425c39e940",
+      "afterMode": "100644",
+      "review": "Connected marine entry, deck/swim/submarine handoffs and compact UI. Existing voyage v1 identity, geographic anchor, stage, condition, save key, revision and conflict owner remain. Parent yaw stays independent of submarine yaw; no account/backpack or shared protocol change. New-session admission still requires checked water; saved underwater and aboard records retain their resume path."
+    },
+    "app/js/planetary/scene-ownership.js": {
+      "before": "c07e32a4db37af48efe5f8bdc34e530ac953b5313f25feded79a788af47485bb",
+      "beforeMode": "100644",
+      "after": "face163f17d4161f040eee4ca1ae19b11e80a8a127e6110d1bc9da3db25c6d3e",
+      "afterMode": "100644",
+      "review": "Single-flight Earth return awaits ready publication; hidden retained-Earth work is suspended while the separate ship interior owns play. Runtime-only ownership and presentation; retained location, player saves, schemas and server protocol remain unchanged."
+    },
     "app/js/runtime/core-frame-systems.js": {
       "before": "dbde26a81cfc7e3737a846cde219ea78334ad0c2030d39b120ed5f91f214f3fe",
       "beforeMode": "100644",
-      "after": "c75a4d8a6d0e6e461e4989280ea7202f2b7d63b4dd3edc9b008cb4b43b6d2e59",
+      "after": "ff20e726d7086d8b9ff69e5a9d4baebb680aaaa73d839978a49183779e51c006",
       "afterMode": "100644",
-      "review": "Bounded road render/contact residency within the existing fixed source catalog and shared road-mask ownership. Existing retry calls the existing session capture/reload authority. No new save schema, geographic migration, room authority or persistent write protocol."
+      "review": "Bounded road render/contact residency within the existing fixed source catalog and shared road-mask ownership. Existing retry calls the existing session capture/reload authority. No new save schema, geographic migration, room authority or persistent write protocol. Single-flight Earth return awaits ready publication; hidden retained-Earth work is suspended while the separate ship interior owns play. Runtime-only ownership and presentation; retained location, player saves, schemas and server protocol remain unchanged."
     },
     "app/js/runtime/workload-policy.js": {
       "review": "Transient deferred-task freshness and completion retention only; no persisted task format or account state.",
@@ -150,6 +248,13 @@
       "before": "906650cb92037aa8437f9dac05c2c0209ccd28dfdd2513e165c8a5ceedf0e003",
       "afterMode": "100644",
       "after": "f2a3c6b8529632b34f6cfba629f6cb324e3dbee08726eae9bc1722cec35b6ebd"
+    },
+    "app/js/solar-system/info-panel.js": {
+      "before": "eb0e630e2aee4926ec61a7244e1b2d9333560e082904ad2a042558772bd3af25",
+      "beforeMode": "100644",
+      "after": "a5e3046a74684655860d528add08632d90b1145b64efc8ecb90df1cc55a5d11a",
+      "afterMode": "100644",
+      "review": "Single-flight Earth return awaits ready publication; hidden retained-Earth work is suspended while the separate ship interior owns play. Runtime-only ownership and presentation; retained location, player saves, schemas and server protocol remain unchanged."
     },
     "app/js/surface-rules.js": {
       "before": "ea104bd9fdf47651542a6e4832f4946e5181df36a91c94a2b8da18a1900949e7",
@@ -347,12 +452,40 @@
       "afterMode": "100644",
       "review": "Bounded road render/contact residency within the existing fixed source catalog and shared road-mask ownership. Existing retry calls the existing session capture/reload authority. No new save schema, geographic migration, room authority or persistent write protocol."
     },
-    "app/js/ui/title-screen.js": {
-      "review": "Requires the same ready-world predicate before spawning or stamping a selected location. Failed entry restores the visible selector. Existing saved selections and title controls remain. Exploration prompt begins only after successful entry; timed dismissal releases its listener.",
-      "beforeMode": "100644",
-      "before": "0a874820611be2ff3381dfd18fe59ee428e0197a3aa777582ae1b60b4f53bb64",
+    "app/js/travel/earth-return.js": {
+      "before": null,
+      "beforeMode": null,
+      "after": "2cc8af1a30f6a74296f402b2db99d97ddcad09bfdf83ed7101300ac22c40cfea",
       "afterMode": "100644",
-      "after": "cf4bb8a3023893dc50f17d1c835a5552ab9bc98dbcb6e1849a78fedadb40f252"
+      "review": "Single-flight Earth return awaits ready publication; hidden retained-Earth work is suspended while the separate ship interior owns play. Runtime-only ownership and presentation; retained location, player saves, schemas and server protocol remain unchanged."
+    },
+    "app/js/ui.js": {
+      "before": "df6c423d280c894f3370c7094098bf74478cce1702b56289d788b30f5dfb4b17",
+      "beforeMode": "100644",
+      "after": "575511daeb56cd8499bf158be1cd9c93cd1e48828be15fef4e6373c95d442797",
+      "afterMode": "100644",
+      "review": "Single-flight Earth return awaits ready publication; hidden retained-Earth work is suspended while the separate ship interior owns play. Runtime-only ownership and presentation; retained location, player saves, schemas and server protocol remain unchanged."
+    },
+    "app/js/ui/globe-selector.js": {
+      "before": "92ce09a2d4d312522989f6e7f9d9aa182cbfd1be42afdb741fc7f6468690e802",
+      "beforeMode": "100644",
+      "after": "5b728cc2b1533a03ccf5df0ee148b5daf944d2fa15c6b30a034db27397d304e4",
+      "afterMode": "100644",
+      "review": "Connected marine entry, deck/swim/submarine handoffs and compact UI. Existing voyage v1 identity, geographic anchor, stage, condition, save key, revision and conflict owner remain. Parent yaw stays independent of submarine yaw; no account/backpack or shared protocol change. New-session admission still requires checked water; saved underwater and aboard records retain their resume path."
+    },
+    "app/js/ui/title-screen.js": {
+      "before": "0a874820611be2ff3381dfd18fe59ee428e0197a3aa777582ae1b60b4f53bb64",
+      "beforeMode": "100644",
+      "after": "aa02f8525570770dd75fece688c873ec5bdce3f6b2843f7f24fb685868360e3a",
+      "afterMode": "100644",
+      "review": "Requires the same ready-world predicate before spawning or stamping a selected location. Failed entry restores the visible selector. Existing saved selections and title controls remain. Exploration prompt begins only after successful entry; timed dismissal releases its listener. Connected marine entry, deck/swim/submarine handoffs and compact UI. Existing voyage v1 identity, geographic anchor, stage, condition, save key, revision and conflict owner remain. Parent yaw stays independent of submarine yaw; no account/backpack or shared protocol change. New-session admission still requires checked water; saved underwater and aboard records retain their resume path."
+    },
+    "app/js/walking/water/ui.js": {
+      "before": "0a4e0e78bdb3510679402973e8ace87fc1c4a779223151989d74360661030cc1",
+      "beforeMode": "100644",
+      "after": "d3409688babc125657b370ae3e5d173082a653773c20f90b6290ffa87e5640cb",
+      "afterMode": "100644",
+      "review": "Connected marine entry, deck/swim/submarine handoffs and compact UI. Existing voyage v1 identity, geographic anchor, stage, condition, save key, revision and conflict owner remain. Parent yaw stays independent of submarine yaw; no account/backpack or shared protocol change. New-session admission still requires checked water; saved underwater and aboard records retain their resume path."
     },
     "app/js/world/budgets.js": {
       "before": "823757a17a17833c31c012691bc6f202289f0d6fd38532b7feff6244540d2ecb",
@@ -395,6 +528,20 @@
       "after": "0237168a831b657abfdae843e4fe8c24ff4477411bf39ed85b84afc282267fb7",
       "afterMode": "100644",
       "review": "Building geometry and private temporary-buffer lifetime only. Tests require unchanged final triangle attributes, source-building edit boundaries and retained shared buffers. No persistent data writes or identity migration."
+    },
+    "app/js/world/compiler/transport-junction-profile.js": {
+      "before": "d8c6edd657bdb719a3cf8790c03a73f21ee4d2524486a04b8d850b62ea67b994",
+      "beforeMode": "100644",
+      "after": "a656f0c59c3c30fd27d64996e27206f33c7248740981e7b79fd49be6620ecae4",
+      "afterMode": "100644",
+      "review": "Vector buffer clipping/stitching preserves geographic road coverage, directed semantics and stacked layers while retiring duplicate geometry. Whole-route graph endpoint classification prevents false underground joins. Continuity audit now covers generalized sources. Compiled runtime identities may consolidate duplicate source fragments; location coordinates and durable player/item schemas are unchanged. No worldwide streaming or completed alignment claim."
+    },
+    "app/js/world/compiler/transport-network-model.js": {
+      "before": "051a2d57ffd7c5f5f9bb02a124ea96cff6598f640999d23609d69cbe22782fac",
+      "beforeMode": "100644",
+      "after": "9b0fecf1ecfab475a9d3b3d8457e9e2bf58b01bce56fb731d29b01c51a4d517f",
+      "afterMode": "100644",
+      "review": "Vector buffer clipping/stitching preserves geographic road coverage, directed semantics and stacked layers while retiring duplicate geometry. Whole-route graph endpoint classification prevents false underground joins. Continuity audit now covers generalized sources. Compiled runtime identities may consolidate duplicate source fragments; location coordinates and durable player/item schemas are unchanged. No worldwide streaming or completed alignment claim."
     },
     "app/js/world/compiler/transport-source-normalizer.js": {
       "before": "7807fc7c5f4340c9e8bae18f61d7a85cf08db2779e3c10d38acd1ae0665b78ff",
@@ -483,9 +630,23 @@
     "app/js/world/shortbread-source.js": {
       "before": "c45eb20adf5e2d4a5262dfc0b7ca67bfc0a29789f8d26d7b4db28da8fe2293f4",
       "beforeMode": "100644",
-      "after": "cf6e43e22c4a819c79a9eb9e5ee454143af812e9be29c9c30560a3c3fb823083",
+      "after": "3444a074752b89316e5e1dceb79ce6dcfcf4a76e842875b958bad631e2b0cbd6",
       "afterMode": "100644",
-      "review": "Restores coverage and land-purpose/physical-cover classification with bounded source caches. Location presets, source IDs, saved map preferences and schema owners are preserved; current real-city coverage must be tested."
+      "review": "Restores coverage and land-purpose/physical-cover classification with bounded source caches. Location presets, source IDs, saved map preferences and schema owners are preserved; current real-city coverage must be tested. Vector buffer clipping/stitching preserves geographic road coverage, directed semantics and stacked layers while retiring duplicate geometry. Whole-route graph endpoint classification prevents false underground joins. Continuity audit now covers generalized sources. Compiled runtime identities may consolidate duplicate source fragments; location coordinates and durable player/item schemas are unchanged. No worldwide streaming or completed alignment claim."
+    },
+    "app/js/world/spawn-surface.js": {
+      "before": "257b1b4ba9952761546e673dd941aa3dadc873eb3ace0caebe1484157bc54efc",
+      "beforeMode": "100644",
+      "after": "93a55dc16d642b8971ecfcc3880fa76f3e6d1584cb24a72952508e4e55a82ebb",
+      "afterMode": "100644",
+      "review": "Occupied tunnel mode handoff validates the same floor and a centered car with physical clearance. Fresh geographic arrivals still exclude tunnels. Only transient spawn resolution/collision probes change; no save schema, actor identity or backend protocol change."
+    },
+    "app/js/world/spawn.js": {
+      "before": "51c45341f470e82cdafe85ebfeb7395a8a6d620658498c39b3ef85d8f67587d9",
+      "beforeMode": "100644",
+      "after": "7653da3d9f3512d211547f432812911b9de5d1f00675114d11c2c75f71395b28",
+      "afterMode": "100644",
+      "review": "Occupied tunnel mode handoff validates the same floor and a centered car with physical clearance. Fresh geographic arrivals still exclude tunnels. Only transient spawn resolution/collision probes change; no save schema, actor identity or backend protocol change."
     },
     "app/js/world/storefront-layout.js": {
       "before": "4c0dc37055d9822b92c4c0fc678514f9f617cf01b3d87b841fc7d9b71ef9a1ee",
@@ -515,6 +676,13 @@
       "afterMode": "100644",
       "after": "3284ecc61382dca950c05bfb01be31a19e5ff5b9c5c535c81a721582de546973"
     },
+    "app/js/world/vector-line-ownership.js": {
+      "before": null,
+      "beforeMode": null,
+      "after": "4fc9baf51aaf823649789d4c23db4a9977f06193dcf0ab533f3170cff2c3e36b",
+      "afterMode": "100644",
+      "review": "Vector buffer clipping/stitching preserves geographic road coverage, directed semantics and stacked layers while retiring duplicate geometry. Whole-route graph endpoint classification prevents false underground joins. Continuity audit now covers generalized sources. Compiled runtime identities may consolidate duplicate source fragments; location coordinates and durable player/item schemas are unchanged. No worldwide streaming or completed alignment claim."
+    },
     "app/js/world/vegetation.js": {
       "before": "6cadc778abba8a909bb5e6d7df8dd6bb51213a4ba5d303a109b36f8f0c1f20f4",
       "beforeMode": "100644",
@@ -529,12 +697,19 @@
       "afterMode": "100644",
       "after": "30d4d446201a47d2070804504f77f0289be55212615aafc51c7a6dcb3eecd23c"
     },
-    "config/context-write-allowlist.json": {
-      "review": "Static guard registration moves failed-world state writes to the new common owner; no guard disabled or runtime behavior configured.",
+    "app/styles/runtime-shell.css": {
+      "before": "fd3e95e0b582da93a8d691b0381a4e69b87ecc26b96d7229cca3574accc8b06a",
       "beforeMode": "100644",
-      "before": "80d58ce0305e25b6358ed606db89ac88da6f0eb1773cd36fb0c303290ef0acb2",
+      "after": "981dd876b52a7f12777ac5048a1d07d06b52121fe5aa19892aa9b1089ef9e4fc",
       "afterMode": "100644",
-      "after": "2e3f7863d3363f485f2979a9479b81c0b99debd647aaeca9f5d15c88ef557794"
+      "review": "Connected marine entry, deck/swim/submarine handoffs and compact UI. Existing voyage v1 identity, geographic anchor, stage, condition, save key, revision and conflict owner remain. Parent yaw stays independent of submarine yaw; no account/backpack or shared protocol change. New-session admission still requires checked water; saved underwater and aboard records retain their resume path."
+    },
+    "config/context-write-allowlist.json": {
+      "before": "80d58ce0305e25b6358ed606db89ac88da6f0eb1773cd36fb0c303290ef0acb2",
+      "beforeMode": "100644",
+      "after": "daa5232ecde91d52e1c37f740a8707cc4cb5a27b84c330ae4711dc66545c8ecd",
+      "afterMode": "100644",
+      "review": "Static guard registration moves failed-world state writes to the new common owner; no guard disabled or runtime behavior configured. Registers the single coalesced ui.js Earth-return action in the existing explicit context ownership list. No persistence, credential or backend rules changes."
     },
     "config/system-release-gates.json": {
       "before": "d5184bd18f6b116f90c94820c9b6581750722fdb82217ad44fb0d5a5f752fbae",

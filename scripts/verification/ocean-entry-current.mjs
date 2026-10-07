@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import {deployResearchSubmarineFromDeck} from './marine-entry-ui.mjs';
 import fs from 'node:fs/promises';
 import { chromium } from 'playwright';
 import { startStaticServer } from './static-server.mjs';
@@ -55,11 +56,7 @@ try {
  await page.evaluate(async()=>{window.oceanEntryCtx=(await import('/app/js/shared-context.js?v=55')).ctx;});
  await page.waitForFunction(()=>oceanEntryCtx.boatDeck?.active&&!oceanEntryCtx.titleLaunchPending,null,{timeout:90000});
  report.cases.push({id:'fresh-ocean-entry-starts-on-research-deck',passed:true});
- await page.getByLabel('Deck destination').selectOption('sub');
- await page.keyboard.down('KeyD');await page.waitForTimeout(2700);await page.keyboard.up('KeyD');
- await page.keyboard.down('KeyS');await page.waitForTimeout(1000);await page.keyboard.up('KeyS');
- await page.locator('#researchDeckAction').click();
- await page.waitForFunction(()=>oceanEntryCtx.oceanMode.active&&!oceanEntryCtx.oceanMode.diver.active,null,{timeout:60000});
+ await deployResearchSubmarineFromDeck(page);
  await page.waitForTimeout(2000);
  report.before = await page.evaluate(() => JSON.parse(window.render_game_to_text()));
  await page.screenshot({ path: `${dir}/coastal-water-arrival.png` });
@@ -71,13 +68,13 @@ try {
  report.cases.push({ id: 'coastal-water-entry-and-controls-despite-naming-outage', passed: true });
  const mapBefore = report.after.ocean.navigationMap;
  assert.ok(mapBefore.widthMeters > 0);
- assert.equal(mapBefore.headingDegrees, 180);
+ assert.equal(mapBefore.headingDegrees, 0);
  await page.locator('#minimapZoomIn').click();
  await page.keyboard.down('ArrowLeft'); await page.waitForTimeout(700); await page.keyboard.up('ArrowLeft');
  const turned = await page.evaluate(() => window.getOceanModeDebugState());
  report.turned = turned;
  assert.equal(turned.navigationMap.widthMeters, mapBefore.widthMeters / 2);
- assert.ok(Math.abs(turned.navigationMap.headingDegrees - 180) > 1);
+ assert.ok(Math.abs(turned.navigationMap.headingDegrees - mapBefore.headingDegrees) > 1);
  assert.ok(Math.abs(turned.navigationMap.gameplaySeabedWorldY - turned.seabed.presentationWorldY) < 1);
  assert.match(await page.locator('#minimap').getAttribute('aria-label'), /North-up gameplay seabed/);
  await page.screenshot({ path: `${dir}/seabed-map-zoom-heading.png` });

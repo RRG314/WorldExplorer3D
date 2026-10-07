@@ -19,7 +19,7 @@ export function ensureOceanVoyage(ctx,{store=createOceanVoyageStore()}={}){
    const voyageId=vessel&&previous?.ship.transportEntityId===vessel.transportEntityId?previous.id:id();
    current={version:1,id:voyageId,subId:previous?.id===voyageId?previous.subId:`sub:${vessel?.transportEntityId||voyageId}`,stage:'underwater',revision:previous?.revision||0,savedAt:Date.now(),
     site:{...ocean.launchSite},waveOffset:{...ocean.waveOffset},
-    ship:{transportEntityId:vessel?.transportEntityId||`research:${voyageId}`,transportCatalogId:vessel?.transportCatalogId||'ocean-research-vessel',condition:vessel?.condition??1,yaw:ocean.submarine.yaw,anchor:{lat:ocean.launchSite.lat,lon:ocean.launchSite.lon}},
+    ship:{transportEntityId:vessel?.transportEntityId||`research:${voyageId}`,transportCatalogId:vessel?.transportCatalogId||'ocean-research-vessel',condition:vessel?.condition??1,yaw:Number.isFinite(vessel?.yaw)?vessel.yaw:ocean.submarine.yaw,anchor:{lat:ocean.launchSite.lat,lon:ocean.launchSite.lon}},
     sub:{x:ocean.submarine.position.x,y:ocean.submarine.position.y,z:ocean.submarine.position.z,yaw:ocean.submarine.yaw,condition:previous?.id===voyageId?previous.sub.condition:1}};
   }
   ocean.submarine.transportEntityId=current.subId;
@@ -79,16 +79,15 @@ export function ensureOceanVoyage(ctx,{store=createOceanVoyageStore()}={}){
   const oceanButton=document.getElementById('globeSelectorOceanBtn');if(!oceanButton)return;
   const resumeButton=document.createElement('button');resumeButton.id='oceanVoyageResume';resumeButton.type='button';resumeButton.className='globe-selector-action-btn';resumeButton.style.cssText='margin-top:8px;width:100%;min-height:44px;font:600 12px system-ui;background:#112b3a;color:#e8f6ff;border:1px solid #5689a3;border-radius:4px;padding:10px';resumeButton.onclick=()=>void resume();(document.getElementById('globeSelectorStartBtn')||oceanButton).after(resumeButton);
   const panel=document.createElement('section');panel.id='oceanVoyageControls';panel.setAttribute('aria-label','Ocean voyage');panel.style.cssText='position:fixed;top:245px;right:12px;width:250px;max-width:calc(100vw - 24px);padding:10px;box-sizing:border-box;border-radius:10px;background:#092a3bee;color:#eefaff;font:13px/1.4 system-ui;z-index:110';
-  const style=document.createElement('style');style.textContent='@media(max-width:600px){#oceanVoyageControls{top:auto!important;bottom:146px;max-height:calc(100dvh - 588px);overflow:auto}}';document.head.append(style);
   const title=document.createElement('strong');title.textContent='Research voyage';const distance=document.createElement('div'),statusElement=document.createElement('div');statusElement.setAttribute('role','status');
   const recover=document.createElement('button');recover.id='oceanVoyageRecover';recover.textContent='Recover to parent vessel';recover.style.cssText='width:100%;min-height:44px;margin-top:6px;background:#175069;color:white;border:1px solid #91c2d0;border-radius:7px';recover.onclick=()=>{recover.blur();void ctx.transferSubmarineToBoat({source:'voyage-recovery'})};
   const shared=document.createElement('button');shared.id='oceanSharedCrew';shared.textContent='Shared crew';shared.style.cssText=recover.style.cssText;shared.onclick=()=>void import('./shared-marine-runtime.js').then(m=>m.openSharedMarine(ctx)).catch(e=>{status=e.message;refresh()});
   const scan=document.createElement('button');scan.id='marineResearchScan';scan.type='button';scan.style.cssText=recover.style.cssText;scan.onclick=()=>{scan.blur();void research.scan().then(refresh)};
   const site=document.createElement('select');site.id='marineResearchSite';site.setAttribute('aria-label','Follow-up study site');site.style.cssText='width:100%;min-height:44px;margin-top:5px;background:#173d4c;color:white';
   REEF_SURVEY.sites.forEach((id,index)=>{const option=document.createElement('option');option.value=id;option.textContent=REEF_SURVEY.labels[index];site.append(option)});site.onchange=()=>{research.select(site.value);site.blur();refresh()};
-  style.remove();styleMarinePanel(panel,'voyage');
-  const more=document.createElement('details'),summary=document.createElement('summary');summary.textContent='Voyage details & crew';more.append(summary,statusElement,shared);
-  panel.append(title,distance,site,scan,recover,more);for(const control of panel.querySelectorAll('button,select'))control.removeAttribute('style');document.body.append(panel);ui={resume:resumeButton,panel,title,status:statusElement,distance,recover,scan,site};refresh();
+  styleMarinePanel(panel,'voyage');
+  const more=document.createElement('details'),summary=document.createElement('summary');summary.textContent='Voyage details & crew';more.append(summary,distance,statusElement,shared);
+  panel.append(title,site,scan,recover,more);for(const control of panel.querySelectorAll('button,select'))control.removeAttribute('style');document.body.append(panel);ui={resume:resumeButton,panel,title,status:statusElement,distance,recover,scan,site};refresh();
  }
  const api={restorePersonal(){if(personalBeforeShared){current=personalBeforeShared.current;personalBeforeShared=null;}return current;},begin,checkpoint,surfaceCheckpoint,surfaced,tick,tickSurface,mount,resume,refresh,get current(){return current},get saved(){return saved},get status(){return status}};
  ctx.oceanVoyage=api;

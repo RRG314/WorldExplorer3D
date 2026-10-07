@@ -126,7 +126,8 @@ test('ocean transfer keeps the selected vessel identity and condition', async ()
     assert.deepEqual(appCtx.boatMode.oceanTransferVessel, {
       transportEntityId: 'generated-vessel:test:research',
       transportCatalogId: 'ocean-research-vessel',
-      condition: .63
+      condition: .63,
+      yaw: .7
     });
     assert.equal(await api.transferSubmarineToBoat(), true);
     assert.equal(travelCalls.length, 1);

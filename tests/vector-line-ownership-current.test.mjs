@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {clipVectorLineToTile} from '../app/js/world/vector-line-ownership.js';
+import {clipVectorLineToTile,stitchVectorRoadElements,vectorRoadIsDirected} from '../app/js/world/vector-line-ownership.js';
 import {fetchShortbreadWorldData} from '../app/js/world/shortbread-source.js';
 const ll=(x,y,z=14)=>[x/2**z*360-180,Math.atan(Math.sinh(Math.PI*(1-2*y/2**z)))*180/Math.PI];
 const merc=([lon,lat],z=14)=>[(lon+180)/360*2**z,(1-Math.asinh(Math.tan(lat*Math.PI/180))/Math.PI)/2*2**z];
@@ -44,4 +44,27 @@ test('provider conversion clips before graph nodes and preserves stacked roads w
  }
  assert.equal(ways.filter(w=>w.tags.tunnel==='yes').length,1);
  assert.equal(ways.filter(w=>w.tags.bridge==='yes').length,1);
+});
+
+test('tile stitching preserves directed carriageways and implicit roundabouts',()=>{
+ for(const tags of [{oneway:'yes'},{oneway:'-1'},{junction:'roundabout'},{highway:'motorway'}]){
+  assert.equal(vectorRoadIsDirected(tags),true);
+  const node=(id,x)=>{const [lon,lat]=ll(x,5974.5);return {id,type:'node',lon,lat}};
+  const a={type:'way',id:1,nodes:[1,2],vectorRoadTile:{z:14,x:8529,y:5974},tags:{highway:'primary',...tags,_sourceFeatureId:'a'}};
+  const b={type:'way',id:2,nodes:[3,2],vectorRoadTile:{z:14,x:8530,y:5974},tags:{highway:'primary',...tags,_sourceFeatureId:'b'}};
+  const nodes=[node(1,8529.9),node(2,8530),node(3,8530.1)];
+  assert.equal(stitchVectorRoadElements([...nodes,a,b]).filter(x=>x.type==='way').length,2);
+  b.nodes.reverse();const joined=stitchVectorRoadElements([...nodes,a,b]).filter(x=>x.type==='way');
+  assert.equal(joined.length,1);assert.deepEqual(joined[0].nodes,[1,2,3]);
+ }
+ assert.equal(vectorRoadIsDirected({junction:'roundabout',oneway:'no'}),false);
+});
+
+test('provider deduplication cannot discard opposite one-way or access-distinct roads',async()=>{
+ const result=await fetchShortbreadWorldData({lat:30,lon:0,zoom:2,bounds:{minLat:29,maxLat:31,minLon:.1,maxLon:.9},layerNames:['streets'],includeBuildings:false,
+  shortbreadFetchTile:async(z,x,y)=>({z,x,y,tile:{layers:{streets:{length:3,feature:i=>({id:i,toGeoJSON:()=>({properties:{kind:'primary',oneway:true,...(i===2?{access:'private'}:{})},geometry:{type:'LineString',coordinates:i===1?[[.8,30],[.2,30]]:[[.2,30],[.8,30]]}})})}}}})});
+ const ways=result.elements.filter(e=>e.type==='way');assert.equal(ways.length,3);
+ const nodes=new Map(result.elements.filter(e=>e.type==='node').map(e=>[e.id,e]));
+ assert.equal(ways.filter(w=>nodes.get(w.nodes[0]).lon>nodes.get(w.nodes.at(-1)).lon).length,1);
+ assert.equal(ways.filter(w=>w.tags.access==='private').length,1);
 });

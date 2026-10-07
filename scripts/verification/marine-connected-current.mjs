@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import {deployResearchSubmarineFromDeck} from './marine-entry-ui.mjs';
 import {mkdir,writeFile} from 'node:fs/promises';
 import {chromium} from 'playwright';
 import {startStaticServer} from './static-server.mjs';
@@ -38,15 +39,13 @@ try{
  report.phone=await page.locator('#oceanDiverControls').boundingBox();assert.ok(report.phone.x>=0&&report.phone.x+report.phone.width<=390&&report.phone.y+report.phone.height<700);
  await page.getByRole('button',{name:'Recover',exact:true}).click();
  await page.waitForFunction(()=>marineCtx.boatDeck?.active&&!marineCtx.oceanMode.active,null,{timeout:60000});
+ assert.equal(await page.locator('#boatWaveDock').isVisible(),false);
  report.recovered=await snapshot();assert.equal(report.recovered.vessel,report.arrival.vessel);assert.ok(Math.abs(report.recovered.site.lat-report.arrival.site.lat)<1e-7);assert.ok(Math.abs(report.recovered.site.lon-report.arrival.site.lon)<1e-7);
  await page.setViewportSize({width:1440,height:900});await page.screenshot({path:`${out}/04-recovered.png`});report.cases.push('recover restores the same vessel, location and deck');
- await page.locator('[aria-label="Deck destination"]').selectOption('sub');
- await page.keyboard.down('KeyD');await page.waitForTimeout(2700);await page.keyboard.up('KeyD');
- await page.keyboard.down('KeyS');await page.waitForTimeout(1000);await page.keyboard.up('KeyS');
- await page.locator('#researchDeckAction').click();
- await page.waitForFunction(()=>marineCtx.oceanMode.active&&!marineCtx.oceanMode.diver.active,null,{timeout:60000});
+ await deployResearchSubmarineFromDeck(page);
  report.submarine=await snapshot();assert.equal(report.submarine.voyage.ship.transportEntityId,report.arrival.vessel);
- await page.screenshot({path:`${out}/05-submarine.png`});report.cases.push('walk to cradle and deploy the same voyage submarine');
+ await page.screenshot({path:`${out}/05-submarine.png`});
+ await page.setViewportSize({width:390,height:844});await page.screenshot({path:`${out}/06-submarine-phone.png`});report.cases.push('walk to cradle and deploy the same voyage submarine');
  assert.deepEqual(report.errors,[]);report.passed=true;
 }catch(e){report.failure=String(e.stack||e);process.exitCode=1;if(page){await page.screenshot({path:`${out}/failure.png`}).catch(()=>{});report.failedState=await page.evaluate(()=>({text:globalThis.render_game_to_text?.(),status:document.querySelector('#globeLocationSearchStatus')?.textContent,boat:globalThis.marineCtx?.boatDeck?.snapshot(),diver:globalThis.marineCtx?.oceanMode.diver?.snapshot()})).catch(()=>null);}}
 finally{await writeFile(`${out}/report.json`,JSON.stringify(report,null,2));if(owned)await closeOwnedBrowser(owned);await server.close();}

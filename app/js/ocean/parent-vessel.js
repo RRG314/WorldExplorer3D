@@ -1,5 +1,12 @@
 import {getMaritimeCatalogEntry} from '../transport/maritime-catalog.js?v=1';
 import {createVesselVisual} from '../transport/vessel-visual-recipe.js?v=8';
+// A stern deployment must face away from the carrier. Keep the parent's
+// heading independent of the submarine so turning the sub cannot rotate it.
+export function parentVesselSubmarinePose(ship, y=-8.5) {
+ const yaw=Number.isFinite(ship?.yaw)?ship.yaw:0;
+ const distance=getMaritimeCatalogEntry(ship?.transportCatalogId).dimensions.length/2+12;
+ return {x:-Math.sin(yaw)*distance,y,z:-Math.cos(yaw)*distance,yaw:yaw+Math.PI};
+}
 export function parentHullCollision(ship,point,radius=1,surfaceY=.08){
  if(!ship||!point)return false;
  const catalog=getMaritimeCatalogEntry(ship.transportCatalogId),c=Math.cos(ship.yaw),s=Math.sin(ship.yaw);

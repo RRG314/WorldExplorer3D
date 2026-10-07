@@ -1,4 +1,4 @@
-import {getMaritimeCatalogEntry} from '../transport/maritime-catalog.js?v=1';
+import {parentVesselSubmarinePose} from '../ocean/parent-vessel.js';
 import { commitEarthLocationOrigin, earthLocalToGeographic } from '../earth-core/location-origin.js?v=1';
 export function createBoatOceanTransferApi(options = {}) {
   const {
@@ -68,9 +68,9 @@ async function transferBoatToSubmarine(options = {}) {
   const vessel = Object.freeze({
     transportEntityId: String(appCtx.boatMode.transportEntityId || ''),
     transportCatalogId: String(appCtx.boatMode.transportCatalogId || 'marina-runabout'),
-    condition: Number(appCtx.boatMode.condition ?? 1)
+    condition: Number(appCtx.boatMode.condition ?? 1),
+    yaw: Number.isFinite(pose.yaw) ? pose.yaw : 0
   });
-  const launchDistance=(getMaritimeCatalogEntry(vessel.transportCatalogId).length||80)/2+12;
   transferPending = true;
   let started = false;
   try {
@@ -88,7 +88,7 @@ async function transferBoatToSubmarine(options = {}) {
       isTransferCurrent: canRestore,
       launchSite: {lat:geo.lat,lon:geo.lon,name:appCtx.customLoc?.name || 'Open Water',region:'Underwater'},
       entry: {lat:geo.lat,lon:geo.lon,source:'mapped-boat-water',kind:'mapped-water-area'},
-      submarinePose: {x:-Math.sin(pose.yaw||0)*launchDistance,y:-8.5,z:-Math.cos(pose.yaw||0)*launchDistance,yaw:Number.isFinite(pose.yaw)?pose.yaw:0}
+      submarinePose: parentVesselSubmarinePose(vessel)
     });
     return started;
   } catch (error) {

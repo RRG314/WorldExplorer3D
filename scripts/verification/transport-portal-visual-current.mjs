@@ -84,7 +84,7 @@ try{
       const ray=new THREE.Raycaster();ray.setFromCamera(new THREE.Vector2(0,0),ctx.camera);
       const hits=ray.intersectObjects(ctx.scene.children,true).filter(h=>h.object.visible).slice(0,5).map(h=>({distance:h.distance,point:h.point.toArray(),name:h.object.name,type:h.object.userData.structureVisualType,terrain:h.object.userData.isTerrainMesh,keys:Object.keys(h.object.userData)}));
       const occluders=[];
-      for(const [x,y] of [[0,.28],[-.15,.28],[.15,.28],[0,.1]]){
+      for(const [x,y] of [[0,.6],[.1,.45],[-.1,.45],[0,.28],[-.15,.28],[.15,.28],[0,.1]]){
         ray.setFromCamera(new THREE.Vector2(x,y),ctx.camera);
         const visible=o=>{for(let p=o;p;p=p.parent){if(p.visible===false||p===ctx.carMesh)return false;}return true;};
         const hits=ray.intersectObjects(ctx.scene.children,true).filter(h=>visible(h.object)).slice(0,3).map(h=>{

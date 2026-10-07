@@ -1,7 +1,7 @@
 import {createOceanSoundscape} from './ocean/soundscape.js';
 import {createMarineHabitat} from './ocean/habitat.js';
 import {getMaritimeCatalogEntry} from './transport/maritime-catalog.js?v=1';
-import {createOceanParentVessel,parentHullCollision} from './ocean/parent-vessel.js';
+import {createOceanParentVessel,parentHullCollision,parentVesselSubmarinePose} from './ocean/parent-vessel.js';
 import {ensureOceanVoyage} from './ocean/voyage.js';
 import {validateOceanVoyage} from './ocean/voyage-store.js';
 import { createOceanDiver } from './ocean/diver.js';
@@ -464,9 +464,7 @@ function resetSubmarineAtLaunch(spawn = null) {
 function placeSubmarineClearOfParent() {
   const ship=appCtx.oceanVoyage?.current?.ship,sub=oceanMode.submarine;
   if(!ship||!parentHullCollision(ship,sub.position,3,oceanMode.waterSurface.sample(0,0).surfaceY))return;
-  const distance=(getMaritimeCatalogEntry(ship.transportCatalogId).length/2)+12;
-  sub.position.x=-Math.sin(ship.yaw)*distance;sub.position.z=-Math.cos(ship.yaw)*distance;
-  resetSubmarineAtLaunch({x:sub.position.x,y:sub.position.y,z:sub.position.z,yaw:sub.yaw});
+  resetSubmarineAtLaunch(parentVesselSubmarinePose(ship,sub.position.y));
 }
 
 function updateSubmarine(dt,time) {

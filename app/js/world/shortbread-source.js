@@ -1,5 +1,5 @@
 import { markRoadsAtMissingTiles } from './shortbread-missing-coverage.js';
-import { clipVectorLineToTile, stitchVectorRoadElements } from './vector-line-ownership.js';
+import { clipVectorLineToTile, stitchVectorRoadElements, vectorRoadIsDirected, vectorRoadSemanticKey } from './vector-line-ownership.js';
 import { createRoadNameResolver } from './shortbread-road-labels.js?v=1';
 import { yieldToMainThread } from './cooperative-scheduling.js?v=1';
 import { runBoundedProviderBatch } from '../earth-core/bounded-provider-batch.js?v=1';
@@ -469,7 +469,7 @@ function geometrySignature(layerName, part, tags) {
   if (layerName === 'streets' && !part.polygon) {
     const forward=coords.map(p=>`${Number(p[0]).toFixed(7)},${Number(p[1]).toFixed(7)}`);
     const reverse=[...forward].reverse().join(';'),path=forward.join(';');
-    return [layerName,tags.highway||tags.aeroway||tags.railway||'',tags.bridge||'',tags.tunnel||'',tags.layer||'',tags.level||'',path<reverse?path:reverse].join(':');
+    return [layerName,vectorRoadSemanticKey(tags),vectorRoadIsDirected(tags)||path<reverse?path:reverse].join(':');
   }
   const first = coords[0] || [];
   const last = coords[coords.length - 1] || [];

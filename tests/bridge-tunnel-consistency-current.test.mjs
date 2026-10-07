@@ -187,3 +187,17 @@ test('reviewed bridge replacement preserves distant spans, parallel lanes, parti
   const result = removeLiveStructuresSupersededByReviewedPack(live, reviewed);
   assert.deepEqual(result.elements.filter((e) => e.type === 'way').map((e) => e.id), [100, 102, 103, 104, 105]);
 });
+
+test('a walker at a tunnel wall re-enters a centered car on the occupied floor, never the surface above',()=>{
+ const feature=tunnel(),floor=feature.transportSurfaceModel.centerHeights[0],bases=[];
+ ctx.SurfaceQuery={terrainAt:()=>({position:{y:20}}),walkAt:()=>({position:{y:floor}}),driveAt:()=>({position:{y:floor}})};
+ ctx.checkBuildingCollision=(x,z,radius,actor)=>{bases.push(actor.actorBaseY);return {collision:Math.abs(x)>2,building:{isTransportStructureCollider:true}}};
+ initWorldSpawning({findNearestRoad:(x,z)=>({road:feature,y:floor,dist:Math.abs(x),verticalDelta:0,pt:{x:0,z},segIndex:0}),
+  sampleFeatureSurfaceY:()=>floor,buildingContainingPoint:()=>null,isInsideWaterArea:()=>false,isVehicleRoad:()=>true,traversableFeaturesForMode:()=>[]});
+ try{
+  const result=resolveSafeWorldSpawn(3.5,60,{mode:'drive',angle:Math.PI/2,feetY:floor,preserveCurrentSupport:true,preferredRoad:feature});
+  assert.equal(result.road,feature);assert.equal(result.x,0);assert.equal(result.z,60);assert.equal(result.carY,floor+1.2);
+  assert.ok(bases.length>=7);assert.ok(bases.every(y=>Math.abs(y-floor)<1e-6),'departure collision probes must use the tunnel floor');
+  assert.equal(resolveSafeWorldSpawn(3.5,60,{mode:'drive',feetY:20,preserveCurrentSupport:true}).road,null,'a player above the tunnel is not admitted');
+ }finally{delete ctx.SurfaceQuery;delete ctx.checkBuildingCollision;}
+});

@@ -38,13 +38,27 @@ export function clipVectorLineToTile(coordinates, tileX, tileY, zoom) {
   return paths;
 }
 
+export function vectorRoadIsDirected(tags={}) {
+ const value=String(tags.oneway||'').toLowerCase();
+ if(['no','0','false'].includes(value))return false;
+ return ['yes','1','true','-1'].includes(value)||tags.junction==='roundabout'||tags.highway==='motorway';
+}
+
+export function vectorRoadSemanticKey(tags={}) {
+ return JSON.stringify(Object.entries(tags).filter(([key,value])=>!key.startsWith('_')&&value!==''&&value!=null)
+  .sort(([a],[b])=>a.localeCompare(b)));
+}
+
 // Clipping creates tile seams, not physical junctions or tunnel portals. Join
 // unambiguous continuations before vertical fitting so a short tile fragment
 // cannot invent a separate depth/chord for part of one continuous structure.
 export function stitchVectorRoadElements(elements) {
   const ways=elements.filter(e=>e.type==='way'&&e.vectorRoadTile),byNode=new Map(),consumed=new Set(),replacement=new Map();
-  const nodes=new Map(elements.filter(e=>e.type==='node').map(e=>[e.id,e]));
-  const keyFor=way=>Object.entries(way.tags).filter(([key])=>!key.startsWith('_')).sort(([a],[b])=>a.localeCompare(b)).map(([k,v])=>`${k}=${v}`).join('|');
+  const endpointIds=new Set();
+  for(const way of ways){endpointIds.add(way.nodes[0]);endpointIds.add(way.nodes.at(-1));}
+  const nodes=new Map();
+  for(const element of elements)if(element.type==='node'&&endpointIds.has(element.id))nodes.set(element.id,element);
+  const keyFor=way=>vectorRoadSemanticKey(way.tags);
   const semantics=new Map(ways.map(w=>[w,keyFor(w)]));
   const boundary=(way,id)=>{
     const n=nodes.get(id),t=way.vectorRoadTile;if(!n)return false;
@@ -68,7 +82,7 @@ export function stitchVectorRoadElements(elements) {
         if(a.z!==b.z||(a.x===b.x&&a.y===b.y))break;
         const joinsAtStart=next.nodes[0]===id;
         const reversed=atStart?joinsAtStart:!joinsAtStart;
-        if(reversed&&['yes','1','-1'].includes(String(next.tags.oneway)))break;
+        if(reversed&&vectorRoadIsDirected(next.tags))break;
         const addition=reversed?[...next.nodes].reverse():next.nodes;
         if(atStart)line.unshift(...addition.slice(0,-1));else line.push(...addition.slice(1));
         sources.push(next.tags._sourceFeatureId);consumed.add(next);replacement.set(next,null);current=next;

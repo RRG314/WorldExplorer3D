@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import {createVesselVisual} from '../app/js/transport/vessel-visual-recipe.js';
 import {getMaritimeCatalogEntry} from '../app/js/transport/maritime-catalog.js';
-import {parentHullCollision} from '../app/js/ocean/parent-vessel.js';
+import {parentHullCollision,parentVesselSubmarinePose} from '../app/js/ocean/parent-vessel.js';
 import test from 'node:test';import assert from 'node:assert/strict';
 import {OCEAN_VOYAGE_KEY,createOceanVoyageStore,validateOceanVoyage} from '../app/js/ocean/voyage-store.js';
 import {ensureOceanVoyage} from '../app/js/ocean/voyage.js';
@@ -76,4 +76,21 @@ test('leaving a shared session can resume retained personal traversal even when 
  const ctx={gameStarted:true,boatMode:{active:true},suspendBoatModeForOceanTransfer(){suspended=true;ctx.boatMode.active=false;},startOceanMode:async options=>{restored=options.voyageResume;return true},oceanMode:{active:false}};
  const voyage=ensureOceanVoyage(ctx,{store:{read:()=>null,write:()=>({saved:false,reason:'unavailable'})}});
  assert.equal(await voyage.resume(record()),true);assert.equal(suspended,true);assert.equal(restored.id,'voyage-1');assert.equal(restored.ship.transportEntityId,'ship-1');
+});
+
+test('stern deployment moves away from the parent at every heading and retains vessel orientation',()=>{
+ for(const yaw of [0,.5,Math.PI/2,Math.PI,5.9]){
+  const ship={transportCatalogId:'ocean-research-vessel',transportEntityId:'ship',yaw};
+  const pose=parentVesselSubmarinePose(ship);
+  let lastRadius=0;
+  for(let distance=0;distance<=40;distance+=.5){
+   const point={x:pose.x+Math.sin(pose.yaw)*distance,y:pose.y,z:pose.z+Math.cos(pose.yaw)*distance};
+   assert.equal(parentHullCollision(ship,point,3,.08),false);
+   const radius=Math.hypot(point.x,point.z);assert.ok(radius>lastRadius);lastRadius=radius;
+  }
+  const ctx={boatMode:{},oceanMode:{active:true,launchSite:{lat:10,lon:20},waveOffset:{x:0,z:0},submarine:{position:pose,yaw:pose.yaw}}};
+  const voyage=ensureOceanVoyage(ctx,{store:createOceanVoyageStore({storage:memory()})});
+  voyage.begin({parentVessel:ship},ctx.oceanMode);
+  assert.equal(voyage.current.ship.yaw,yaw);assert.equal(voyage.current.sub.yaw,pose.yaw);
+ }
 });
