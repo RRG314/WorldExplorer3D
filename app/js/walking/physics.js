@@ -612,7 +612,7 @@ function createWalkingPhysicsHelpers({
         const urbanCollision = appCtx.resolveUrbanActorCollision(
           { x: state.walker.x, z: state.walker.z },
           { x: newX, z: newZ },
-          { mode: 'walk', radius: .3 }
+          { mode: 'walk', radius: .3, actorBaseY: state.walker.y, actorHeight: 1.8 }
         );
         newX = urbanCollision.x;
         newZ = urbanCollision.z;

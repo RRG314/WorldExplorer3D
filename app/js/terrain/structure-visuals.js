@@ -120,6 +120,13 @@ export function collectStructureVisualInstances(deps = {}) {
     const visualSurface = sharedSurface || feature;
     const sampleVisualSurfaceY = (x, z) => sampleFeatureSurfaceY(visualSurface, x, z);
     const category = String(semantics.featureCategory || feature.networkKind || feature.kind || "road").toLowerCase();
+    const excavation = feature.engineeredApproachExcavation;
+    if (excavation) {
+      tunnelPortalMasks.push(...excavation.masks);
+      tunnelShells.push({ approachOnly: true, rings: excavation.rings,
+        approaches: [{ rings: excavation.rings }], halfWidth: excavation.halfWidth,
+        wallOpenings: excavation.wallOpenings });
+    }
     const generalizedRoadVisual =
       category === 'road' &&
       feature?.transportRecord?.completeness !== 'lossless';

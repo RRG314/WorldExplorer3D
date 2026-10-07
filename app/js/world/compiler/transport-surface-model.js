@@ -1,4 +1,5 @@
 import { sampleSortedProfileAtDistance } from '../../structure-semantics/profile-sampling.js';
+import {tunnelObstructionMaximumY} from './tunnel-obstruction-limits.js';
 import {fitOrdinaryStreetProfile} from './ordinary-street-profile.js';
 import {roadPlacementOffsetWorld} from '../road-units.js';
 import {
@@ -212,7 +213,8 @@ function compileTransportSurfaceModel(feature, sampleTerrainY, options = {}) {
   const sourceSampleDistances = createSampleDistances(
     total,
     options.sampleStep,
-    exactGraphNodeDistances.concat((feature.ordinaryStreetAnchors||[]).map(a=>a.distance))
+    exactGraphNodeDistances.concat((feature.ordinaryStreetAnchors||[]).map(a=>a.distance),
+      (feature.tunnelObstructionLimits || []).flatMap(limit => [limit.start, limit.end]))
   );
   // All nine published numeric fields have the model's lifetime. Use one
   // backing store with disjoint views rather than five native buffers per
@@ -372,7 +374,8 @@ function compileTransportSurfaceModel(feature, sampleTerrainY, options = {}) {
       // the maximum grade are mutually infeasible, staying underground is
       // safer and visually correct; a compiled portal transition can still
       // own the deliberate emergence at a mapped entrance.
-      ? lowestCrossSectionGround + offset + surfaceBias
+      ? Math.min(lowestCrossSectionGround + offset + surfaceBias,
+          tunnelObstructionMaximumY(feature.tunnelObstructionLimits, distance))
       : atGrade
       ? groundY + surfaceBias + maximumAtGradeFill
       : Number.POSITIVE_INFINITY;
@@ -502,6 +505,17 @@ function compileTransportSurfaceModel(feature, sampleTerrainY, options = {}) {
         sampleDistances,
         maximumGrade
       );
+      if (feature.tunnelObstructionLimits?.length) {
+        // A portal can relax modeled terrain cover, but it cannot move through
+        // a published building foundation. Propagate that hard clearance over
+        // the full grade run. The shared corridor pass then reconciles any
+        // affected graph joins against this physically feasible profile.
+        const obstructionBounds = Float64Array.from(sampleDistances, distance =>
+          tunnelObstructionMaximumY(feature.tunnelObstructionLimits, distance));
+        if (centerHeights.some((height,index) => height > obstructionBounds[index] + 1e-5)) {
+          centerHeights = smoothUpperBoundedGradeProfile(centerHeights, obstructionBounds, sampleDistances, maximumGrade);
+        }
+      }
       // The mirrored constrained solver is the final tunnel authority. A
       // post-solver exact write would satisfy one node by violating the
       // drivable grade/containment contract immediately beside it.

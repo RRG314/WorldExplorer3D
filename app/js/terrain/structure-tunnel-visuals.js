@@ -102,6 +102,11 @@ export function collectTunnelVisualInstances(feature, structurePts, total, deps 
         distances.push(cumulative);
       }
     }
+    // The road grade can bend within a long generalized source segment.
+    // Its enclosure must use those same stations to preserve clearance.
+    for (const distance of feature.transportSurfaceModel?.distances || []) {
+      if (distance > startDistance + .001 && distance < endDistance - .001) distances.push(distance);
+    }
     for (const zone of model.junctionZones || []) {
       for (const boundary of [Number(zone?.start), Number(zone?.end)]) {
         if (boundary > startDistance + 0.15 && boundary < endDistance - 0.15) {

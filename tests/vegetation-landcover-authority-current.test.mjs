@@ -99,3 +99,13 @@ test('vector land/site conversion retains protected areas and physical wood/wetl
   assert.ok(tags.some(t=>t.natural==='wood'));
   assert.ok(tags.some(t=>t.natural==='wetland'));
 });
+
+test('portal excavation excludes vegetation at the cut floor while preserving cover over buried tunnels',()=>{
+ const nodes=[{id:1,lat:100,lon:100},{id:2,lat:100,lon:120},{id:3,lat:100,lon:140}];
+ const mask={x:100,z:100,tangentX:1,tangentZ:0,roadY:0,grade:0,halfWidth:5,halfDepth:6,cutHeight:30};
+ setup([],{osmTreeNodes:nodes,baseTerrainHeightAt:()=>20,terrainMeshHeightAt:(x)=>x===100?0:20,structureTerrainPortalDescriptors:[mask]});
+ const cut=collectWorldVegetationPlacements().filter(p=>p.source==='node');
+ assert.ok(cut.length>0);assert.ok(cut.every(p=>p.x!==100),'a removed hillside cannot become a planted tunnel lane');
+ setup([],{osmTreeNodes:nodes,baseTerrainHeightAt:()=>40,terrainMeshHeightAt:()=>40,structureTerrainPortalDescriptors:[mask]});
+ assert.ok(collectWorldVegetationPlacements().some(p=>p.x===100),'intact ground above the aperture still supports trees');
+});

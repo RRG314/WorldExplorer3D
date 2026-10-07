@@ -690,7 +690,7 @@ function buildFeatureRibbonEdges(feature, points, halfWidth, sampleTerrainY, opt
     // Junction planes may smooth the road upward, but without a compiled
     // terrain cut they may never pull an at-grade surface under the rendered
     // terrain envelope.
-    const centerY = atGrade && Number.isFinite(terrainY)
+    const centerY = terrainDraped && Number.isFinite(terrainY)
       ? Math.max(transitionedCenterY, terrainY + baseTopBias)
       : transitionedCenterY;
     centerlineHeights.push(centerY);
@@ -713,10 +713,10 @@ function buildFeatureRibbonEdges(feature, points, halfWidth, sampleTerrainY, opt
     const transitionedRightY = applyJunctionTransitionY(feature, rightX, rightZ, rawRightY);
     const leftTerrainEnvelope = Number(sampleTerrainY(leftX, leftZ)) + baseTopBias;
     const rightTerrainEnvelope = Number(sampleTerrainY(rightX, rightZ)) + baseTopBias;
-    const leftY = atGrade && Number.isFinite(leftTerrainEnvelope)
+    const leftY = terrainDraped && Number.isFinite(leftTerrainEnvelope)
       ? Math.max(transitionedLeftY, leftTerrainEnvelope)
       : transitionedLeftY;
-    const rightY = atGrade && Number.isFinite(rightTerrainEnvelope)
+    const rightY = terrainDraped && Number.isFinite(rightTerrainEnvelope)
       ? Math.max(transitionedRightY, rightTerrainEnvelope)
       : transitionedRightY;
     leftEdge.push({

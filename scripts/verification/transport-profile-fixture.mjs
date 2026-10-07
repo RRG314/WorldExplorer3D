@@ -44,7 +44,7 @@ try{
    for(const c of ctx.transportNetworkModel.connections)if(selected.has(c.left.featureId)||selected.has(c.right.featureId)){next.add(c.left.featureId);next.add(c.right.featureId)}
    for(const id of next)selected.add(id);
   }
-  const fields=['id','sourceFeatureId','name','pts','width','type','surfaceBias','structureSemantics','structureStations','structureTransitionAnchors','structureStackOffset','minimumStructureSurfaceY','ordinaryStreetAnchors','transportRecord','subdivideMaxDist','fixedRegionalContext','transportGraphRef'];
+  const fields=['id','sourceFeatureId','name','pts','width','type','surfaceBias','structureSemantics','structureStations','structureTransitionAnchors','structureStackOffset','minimumStructureSurfaceY','ordinaryStreetAnchors','transportRecord','subdivideMaxDist','fixedRegionalContext','transportGraphRef','tunnelObstructionLimits'];
   const features=[];
   for(const id of selected){
    const r=byId.get(id);if(!r?.transportSurfaceModel)continue;

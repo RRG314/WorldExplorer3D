@@ -1,5 +1,6 @@
 // Component and source-contract checks; browser and emulator journeys run separately.
 export const currentContractTests = [
+  'tests/engineered-approach-excavation-current.test.mjs',
   'tests/earth-return-action-current.test.mjs',
   'tests/retained-earth-transform-current.test.mjs',
   'tests/world-load-lifecycle-current.test.mjs',
@@ -301,7 +302,9 @@ export const currentContractTests = [
   'tests/vector-line-ownership-current.test.mjs',
   'tests/vector-resolution-ownership-current.test.mjs',
   'tests/transport-corridor-feasibility-current.test.mjs',
+  'tests/tunnel-foundation-clearance-current.test.mjs',
   'tests/linear-transport-authority-current.test.mjs',
+  'tests/urban-vertical-contact-current.test.mjs',
   'tests/transport-junction-audit-current.test.mjs',
   'tests/model-skeleton-sharing-current.test.mjs',
   'tests/model-template-cache-current.test.mjs',

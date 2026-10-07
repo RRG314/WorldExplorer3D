@@ -4,6 +4,7 @@ import { ctx as appCtx } from "../shared-context.js?v=55";
 import { isPointInsideWaterFootprint } from "../boat-mode/water-query.js?v=21";
 import { vegetationIdentitySeed, semanticForestWeightAt, nearbyVegetationCells } from './vegetation-spatial.js';
 import {renderVegetationModels} from './vegetation-models.js';
+import {terrainHeightWithPortalCuts} from '../terrain/structure-terrain-portals.js?v=2';
 
 const VEGETATION_ELIGIBLE_TYPES = new Set([
   'forest',
@@ -169,6 +170,11 @@ function isVegetationPlacementBlocked(x, z, options = {}) {
     typeof appCtx.terrainMeshHeightAt === 'function' ?
       appCtx.terrainMeshHeightAt(x, z) :
       appCtx.elevationWorldYAtWorldXZ(x, z);
+
+  // Placement eligibility must use the same excavation as rendered ground.
+  // Probing the original hillside alone admitted a tree above a deep road;
+  // its visual/contact publication then dropped that tree onto the cut floor.
+  if (terrainHeightWithPortalCuts(appCtx.structureTerrainPortalDescriptors,x,z,terrainY) < terrainY - .001) return true;
 
   const nr = runtime.findNearestRoad(x, z, {
     y: Number.isFinite(terrainY) ? terrainY + 0.4 : NaN,

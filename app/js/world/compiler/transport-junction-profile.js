@@ -589,6 +589,56 @@ export function buildTransportContinuityRepairAnchors(
     if (!changed) break;
   }
 
+  // Foundations are hard upper bounds, unlike adjustable terrain cover at a
+  // portal. Carry their grade cones through the actual graph before compiling
+  // either side of a join. Stop excavating where an ordinary surface node is
+  // already below the cone; unrelated streets must retain their terrain fit.
+  const foundationAffectedGroups = new Set();
+  const ceilingByGroup = new Map();
+  const adjacency = new Map();
+  const ceilingQueue = [];
+  const constrainCeiling = (groupId, ceiling, owner) => {
+    if (!Number.isFinite(ceiling) || ceiling >= (ceilingByGroup.get(groupId) ?? Infinity) - 1e-6) return;
+    ceilingByGroup.set(groupId, ceiling);
+    ceilingQueue.push({groupId, ceiling, owner});
+  };
+  for (const [feature, memberships] of membershipsByFeature) {
+    const grade = maximumGradeFor(feature);
+    const ordered = [...memberships].sort((a,b) => finite(a.side.distanceAlong) - finite(b.side.distanceAlong));
+    for (let i = 1; i < ordered.length; i++) {
+      const left = ordered[i-1], right = ordered[i];
+      const cost = grade * Math.abs(finite(right.side.distanceAlong) - finite(left.side.distanceAlong));
+      for (const [from,to] of [[left,right],[right,left]]) {
+        if (!adjacency.has(from.group.id)) adjacency.set(from.group.id,[]);
+        adjacency.get(from.group.id).push({id:to.group.id,cost,feature});
+      }
+    }
+    for (const member of ordered) for (const limit of feature.tunnelObstructionLimits || []) {
+      const d = finite(member.side.distanceAlong);
+      const run = Math.max(0, limit.start-d, d-limit.end);
+      constrainCeiling(member.group.id,limit.maximumSurfaceY+grade*run,member);
+    }
+  }
+  for (let index=0; index<ceilingQueue.length; index++) {
+    const {groupId,ceiling,owner}=ceilingQueue[index];
+    if (ceiling > ceilingByGroup.get(groupId)+1e-6) continue;
+    let target=targetByGroup.get(groupId);
+    if (!Number.isFinite(target)) {
+      const samples=groups[groupId].sides.map(entry=>surfaceFor(entry)).filter(Number.isFinite);
+      if (!samples.length) continue;
+      target=Math.max(...samples);
+    }
+    const lowered=target>ceiling+1e-6;
+    if (lowered) {
+      targetByGroup.set(groupId,ceiling);
+      ownerByGroup.set(groupId,owner);
+      foundationAffectedGroups.add(groupId);
+    }
+    for (const edge of adjacency.get(groupId)||[]) {
+      if (lowered || edge.feature.structureSemantics?.terrainMode !== 'at_grade' || edge.feature.transportSurfaceModel?.engineeredApproach) constrainCeiling(edge.id,ceiling+edge.cost,owner);
+    }
+  }
+
   const anchorsByFeature = new Map();
   for (const group of groups) {
     const targetSurfaceY = targetByGroup.get(group.id);
@@ -624,7 +674,7 @@ export function buildTransportContinuityRepairAnchors(
         (targetDelta > 1e-5 || conflictingPublishedTarget);
       const reconcilingAtGrade = terrainMode === 'at_grade' &&
         (targetDelta > toleranceMeters || requiredForGradeFeasibility) &&
-        targetSurfaceY >= terrainY + surfaceBias - 0.02;
+        (targetSurfaceY >= terrainY + surfaceBias - 0.02 || foundationAffectedGroups.has(group.id));
       const reconcilingStructure = terrainMode !== 'at_grade' &&
         (targetDelta > toleranceMeters || requiredForGradeFeasibility);
       if (!reconcilingAtGrade && !reconcilingStructure) continue;

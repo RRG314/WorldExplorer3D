@@ -356,6 +356,15 @@ function applyEndpointTieIns(
   return new Float32Array(corrected);
 }
 
+// Exact joins and obstruction edges add nonuniform sample spacing. An
+// unweighted neighbor mean bends a straight ramp beside every close pair of
+// stations. Interpolate at the actual distance so a constant grade is fixed.
+function neighborProfileHeight(heights, distances, index, leftHeight = heights[index - 1]) {
+  const run = distances[index + 1] - distances[index - 1];
+  const t = run > 1e-9 ? (distances[index] - distances[index - 1]) / run : .5;
+  return leftHeight + (heights[index + 1] - leftHeight) * t;
+}
+
 function reconcileExactGraphNodeConstraints(
   feature,
   heights,
@@ -507,7 +516,7 @@ function reconcileExactGraphNodeConstraints(
       if (fixedTargets.has(index)) continue;
       next[index] = clampToBounds(
         index,
-        corrected[index] * 0.58 + (corrected[index - 1] + corrected[index + 1]) * 0.21
+        corrected[index] * 0.58 + neighborProfileHeight(corrected, distances, index) * 0.42
       );
     }
     corrected.set(next);
@@ -544,7 +553,7 @@ function smoothGradeLimitedProfile(initialHeights, lowerBounds, distances, maxim
   for (let pass = 0; pass < 6; pass += 1) {
     const next = new Float64Array(heights);
     for (let index = 1; index < heights.length - 1; index += 1) {
-      const neighborAverage = (heights[index - 1] + heights[index + 1]) * 0.5;
+      const neighborAverage = neighborProfileHeight(heights, distances, index);
       next[index] = Math.max(
         finiteNumber(lowerBounds?.[index], -Infinity),
         heights[index] * 0.58 + neighborAverage * 0.42
@@ -607,7 +616,7 @@ function smoothSignedCutFillProfile(
     for (let index = 1; index < heights.length - 1; index += 1) {
       const current = heights[index];
       heights[index] = clamp(
-        current * 0.45 + (previous + heights[index + 1]) * 0.275,
+        current * 0.45 + neighborProfileHeight(heights, distances, index, previous) * 0.55,
         lowerBounds[index],
         upperBounds[index]
       );

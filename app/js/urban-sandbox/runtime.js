@@ -1,3 +1,4 @@
+import {urbanTargetOverlapsHeight} from './vertical-contact.js';
 import { bindPlayerConditionAuthority } from './player-condition-binding.js';
 import {createServiceLightPool} from './service-light-pool.js';
 import {urbanPresentationFocus, urbanPresentationDistance, setRetainedNpcPresentation} from './presentation-focus.js';
@@ -370,13 +371,13 @@ function updateCrashBodies(state, dt) {
     const nextZ = vehicle.z + motion.velocityZ / metersPerWorldUnit * step;
     const secondaryTarget = [
       ...state.vehicles.filter((entry) => entry !== vehicle && !entry.attachedToPlayer && Number(entry.condition ?? 1) > .05).map((entry) => ({
-        kind: 'vehicle', ref: entry, x: entry.x, z: entry.z,
+        kind: 'vehicle', ref: entry, x: entry.x, y: entry.y, z: entry.z,
         radius: Math.max(.78, Number(entry.variant?.width || 1.8) * .5)
       })),
       ...state.npcs.filter((entry) => Number(entry.condition ?? 1) > .05).map((entry) => ({
-        kind: 'npc', ref: entry, x: entry.x, z: entry.z, radius: .42
+        kind: 'npc', ref: entry, x: entry.x, y: entry.y, z: entry.z, radius: .42
       }))
-    ].find((target) => Math.hypot(Number(target.x) - nextX, Number(target.z) - nextZ) < target.radius + Math.max(.78, Number(vehicle.variant?.width || 1.8) * .5));
+    ].find((target) => urbanTargetOverlapsHeight(target,vehicle.y-VEHICLE_ROOT_TO_GROUND_METERS,Number(vehicle.variant?.height)||1.8) && Math.hypot(Number(target.x) - nextX, Number(target.z) - nextZ) < target.radius + Math.max(.78, Number(vehicle.variant?.width || 1.8) * .5));
     const secondaryKey = secondaryTarget ? `${vehicle.id}:${secondaryTarget.kind}:${secondaryTarget.ref.id}` : '';
     const lastSecondary = Number(state.secondaryCrashCooldowns.get(secondaryKey) || 0);
     if (secondaryTarget && at - lastSecondary > 700) {
@@ -556,7 +557,10 @@ function resolveUrbanActorCollision(from = {}, to = {}, options = {}) {
   const source = { x: Number(from.x) || 0, z: Number(from.z) || 0 };
   const destination = { x: Number(to.x) || 0, z: Number(to.z) || 0 };
   const travelDistance = Math.hypot(destination.x - source.x, destination.z - source.z);
-  const targets = urbanCollisionTargets(state, destination, Math.max(mode === 'drive' ? 12 : 5, travelDistance + VEHICLE_COLLISION_FLEET_RADIUS + actorRadius));
+  const actorBaseY=Number.isFinite(options.actorBaseY)?options.actorBaseY:mode==='drive'?appCtx.car?.y-1.2:appCtx.Walk?.state?.walker?.y;
+  const actorHeight=Number.isFinite(options.actorHeight)?options.actorHeight:1.8;
+  const targets = urbanCollisionTargets(state, destination, Math.max(mode === 'drive' ? 12 : 5, travelDistance + VEHICLE_COLLISION_FLEET_RADIUS + actorRadius))
+    .filter(target=>urbanTargetOverlapsHeight(target,actorBaseY,actorHeight));
   const blockerAlong = (start, end) => {
     const dx = end.x - start.x;
     const dz = end.z - start.z;

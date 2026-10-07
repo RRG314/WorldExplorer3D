@@ -626,6 +626,8 @@ function update(dt) {
         { x: nx, z: nz },
         {
           mode: 'drive',
+          actorBaseY: appCtx.car.y-1.2,
+          actorHeight: 1.8,
           radius: .92,
           speedMph: carSpeedToMph(appCtx.car.speed),
           velocityX: appCtx.car.vx,

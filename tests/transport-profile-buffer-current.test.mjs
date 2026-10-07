@@ -1,9 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {smoothSignedCutFillProfile as current} from '../app/js/world/compiler/transport-surface-profile.js';
-import {smoothSignedCutFillProfile as reference} from './fixtures/signed-profile-before-buffer-reuse.js';
+import {smoothSignedCutFillProfile as reference} from './fixtures/signed-profile-weighted-allocating.js';
 
-test('rolling smoothing preserves every Float32 result across constrained, irregular profiles', () => {
+test('rolling storage matches the allocating distance-weighted solver across constrained, irregular profiles', () => {
   let seed = 78131;
   const random = () => ((seed = Math.imul(seed, 1664525) + 1013904223 >>> 0) / 4294967296);
   for (let trial = 0; trial < 600; trial++) {

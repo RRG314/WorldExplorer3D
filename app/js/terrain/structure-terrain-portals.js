@@ -5,6 +5,15 @@ const MAX_PORTAL_MASKS_PER_TERRAIN_MESH = Infinity;
 // centimetres above it produces grass bands across shallow graded approaches.
 // Keep the same bounded volume for rendering, raycasts and support queries.
 const PORTAL_FLOOR_MARGIN = -0.02;
+const portalQueryGrids = new WeakMap();
+
+// Publications replace descriptor arrays. Index them once and share the
+// broadphase with the shader; a ground probe must not scan a city's cuts.
+export function prepareTerrainPortalMasks(masks) {
+  const grid = buildPortalSpatialGrid(masks);
+  portalQueryGrids.set(masks, grid);
+  return grid;
+}
 
 export function portalFloorAt(mask, x, z) {
   const dx = x - mask.x;
@@ -21,14 +30,34 @@ export function terrainPointRemovedByPortal(mask, point) {
     point.y < floor + (Number(mask.cutHeight) || 6);
 }
 
-export function terrainHeightWithPortalCuts(masks, x, z, terrainY) {
-  let height = terrainY;
-  for (const mask of masks || []) {
-    if (terrainPointRemovedByPortal(mask, { x, y: terrainY, z })) {
-      height = Math.min(height, portalFloorAt(mask, x, z));
-    }
+function cutFloorAt(masks, x, z, terrainY) {
+  if (!masks?.length) return NaN;
+  const grid = portalQueryGrids.get(masks);
+  let start = 0, count = masks.length;
+  if (grid) {
+    const column = Math.floor(x / grid.cellSize) - grid.minX;
+    const row = Math.floor(z / grid.cellSize) - grid.minZ;
+    if (column < 0 || row < 0 || column >= grid.width || row >= grid.height) return NaN;
+    const cell = (row * grid.width + column) * 4;
+    start = grid.lookup[cell]; count = grid.lookup[cell + 1];
   }
-  return height;
+  let result = Infinity;
+  for (let i = 0; i < count; i++) {
+    const mask = masks[grid ? grid.references[(start + i) * 4] : i];
+    const floor = portalFloorAt(mask, x, z);
+    if (Number.isFinite(floor) && terrainY > floor + PORTAL_FLOOR_MARGIN &&
+        terrainY < floor + (Number(mask.cutHeight) || 6)) result = Math.min(result, floor);
+  }
+  return Number.isFinite(result) ? result : NaN;
+}
+
+export function terrainPointRemovedByPortals(masks, point) {
+  return Number.isFinite(cutFloorAt(masks, point.x, point.z, point.y));
+}
+
+export function terrainHeightWithPortalCuts(masks, x, z, terrainY) {
+  const floor = cutFloorAt(masks, x, z, terrainY);
+  return Number.isFinite(floor) ? Math.min(terrainY, floor) : terrainY;
 }
 
 function maskRadius(mask) {
@@ -141,7 +170,7 @@ function installPortalMaskShader(material, masks) {
     });
   }
   const previousCount = state.count, previousMaxCount = state.maxCount;
-  const grid = buildPortalSpatialGrid(masks);
+  const grid = portalQueryGrids.get(masks) || prepareTerrainPortalMasks(masks);
   state.grid.value.set(grid.minX,grid.minZ,grid.width,grid.height);
   const lookupOffset=masks.length*3,referenceOffset=lookupOffset+grid.width*grid.height;
   const texels=referenceOffset+grid.count;
@@ -179,6 +208,7 @@ function installPortalMaskShader(material, masks) {
 }
 
 export function applyTerrainPortalMasksForContext(appCtx, masks = []) {
+  prepareTerrainPortalMasks(masks);
   appCtx.structureTerrainPortalDescriptors = masks;
   const terrainMeshes = (appCtx?.terrainGroup?.children || []).filter(
     (mesh) => (mesh?.userData?.isTerrainMesh === true || mesh?.userData?.isFarTerrainClipmap === true) &&
@@ -188,14 +218,14 @@ export function applyTerrainPortalMasksForContext(appCtx, masks = []) {
   let publishedMasks = 0;
   for (const mesh of terrainMeshes) {
     const selected = selectPortalMasksForBounds(terrainMeshBounds(mesh), masks);
+    prepareTerrainPortalMasks(selected);
     mesh.userData.structureTerrainPortalDescriptors = selected;
     if (!mesh.userData.structurePortalOriginalRaycast) {
       mesh.userData.structurePortalOriginalRaycast = mesh.raycast;
       mesh.raycast = function (raycaster, intersects) {
         const hits = [];
         this.userData.structurePortalOriginalRaycast.call(this, raycaster, hits);
-        intersects.push(...hits.filter((hit) => !(this.userData.structureTerrainPortalDescriptors || [])
-          .some((mask) => terrainPointRemovedByPortal(mask, hit.point))));
+        intersects.push(...hits.filter(hit => !terrainPointRemovedByPortals(this.userData.structureTerrainPortalDescriptors, hit.point)));
       };
     }
     if (selected.length === 0) {

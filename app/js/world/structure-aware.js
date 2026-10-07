@@ -1,4 +1,6 @@
+import { compileEngineeredApproachExcavation } from './compiler/engineered-approach-excavation.js';
 import {createFeatureProjectionIndex} from '../terrain/feature-projection-index.js';
+import {compileTunnelObstructionLimits} from './compiler/tunnel-obstruction-limits.js';
 import {assignOrdinaryStreetJunctions} from './compiler/ordinary-street-profile.js';
 import {roadMetersPerWorldUnit} from './road-units.js';
 import { streetScaleForWorld } from './compiler/street-frontage-policy.js';
@@ -332,6 +334,7 @@ function* compileStructureAwareFeatureProfileSteps() {
   measure('buildingContext', () => {
     for (let i = 0; i < transportFeatures.length; i++) {
       applyBuildingContextSemanticsToFeature(transportFeatures[i]);
+      transportFeatures[i].tunnelObstructionLimits = compileTunnelObstructionLimits(transportFeatures[i], runtime.getNearbyBuildings);
     }
   });
   yield;
@@ -759,6 +762,9 @@ export async function refreshTransportStructureAssembliesForPublishedTerrain() {
       })
     }
   );
+  for (const feature of transportFeatures) {
+    feature.engineeredApproachExcavation = compileEngineeredApproachExcavation(feature, samplePublishedTerrainY);
+  }
   refreshStructureColliders(appCtx, transportFeatures);
   return appCtx.transportStructureAssembly;
 }
