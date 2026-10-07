@@ -1,181 +1,83 @@
 # Current development and release state
 
-## October 7 — 5.5.0 release preparation
-
-The owner now explicitly authorizes GitHub, Pages, semantic versioning and production deployment. 5.5.0 public notes, known limitations, roadmap and current-game screenshots are prepared. No publication yet. Full source PR passes 2,102 contracts and the complete dependency/source/ownership/type/inventory/sensitivity chain. Gallery inspection found collapsed HUD overlap; the CSS repair passes desktop collapse and phone-resize checks. Daylight deck and scuba screenshots use normal entry, time-of-day and movement controls, with no browser errors. Production and preview identities rechecked and unchanged. GitHub stable has the identical tree as source 1532bdfb, an ancestor of this branch, despite squash history; preserve that ancestry when integrating.
-
-The frontage and capability projection allocation work and completed travel/residency results are documented in [movement evidence](docs/system-review/2026-10-06/MOVEMENT-ALLOCATION-1007.md). Dense-city stalls remain. Required exact-candidate, backend and external acceptance still need current results; user authorization does not fabricate those results. Earlier status below is historical.
-
-Updated October 7, 2026. **Production acceptance remains open.** Current local artifact is **5.4.0+7101339662ce.1a5695e5aa23c4bf.staging**, 612 verified files; asset-manifest SHA256 `e15d1d814809362e2d8c1e48ca13679a018277979a698f73544cdb67450e4976`. Full PR passes 2,091 contracts and the dependency/source/ownership/type/inventory/sensitivity chain. Packaged connected marine passes seven cases, prescribed deck movement passes, the complete Monaco approach → tunnel → exit drive passes all six checks, and all three save upgrade/fallback/write/return stages pass with 136 reviewed runtime differences. [Current test instructions and exact evidence](docs/system-review/2026-10-06/TEST-BUILD.md).
-
-This artifact includes portal publication order, shared physical pavement cuts, sparse path sampling, camera feedback and direct saved-aboard resume repairs. Earlier sections below retain historical evidence; their artifact identities and old failure counts do not describe the current candidate. Hosted preview remains the older 86fdc6e3 build until an explicit refresh record below. No GitHub push or production change.
-
-**Open release scope:** sustained Earth stalls, professional portal/crossing/bridge visual acceptance, licensed vessel and wildlife replacement, broader ocean activities/spearfishing, optional continuous worldwide travel and final coordinated live-service/device acceptance. The existing location game, source/history, artifacts and player data remain preserved. Building coverage was not traded away: the latest prescribed Baltimore run retains 48,296 near buildings and 95% eligible regional coverage.
-
-Details: [FREE-ENVIRONMENT-DATA.md](docs/release-review/2026-10-05/FREE-ENVIRONMENT-DATA.md). Visual work: [REFERENCE-BLOCK.md](docs/visual-quality/REFERENCE-BLOCK.md). Earlier architecture acceptance: [LOCAL-RESULT.md](docs/system-review/2026-10-04/LOCAL-RESULT.md).
-
-## October 7 completed sustained/retention run
-
-Current 71013396 package has exactly the same 612 application bytes as the route/marine/save-tested f182 package (`output/verification/final-harness-artifact-equivalence-1007.json`); only build identity and verification provenance changed. The corrected full sustained run finishes all seven 90-second traversal windows and all 12 reload cycles. **Overall acceptance fails.** Driving records a 500 ms worst frame in the first sustained window and four >100 ms pauses (worst 150 ms) in the second. One walking window is interrupted by ordinary custody and remains failed; the harness records and acknowledges that dialog between samples. Several average-FPS samples also miss their separate target. All three sustained flights pass the unchanged hitch limits.
-
-**Retention and coverage pass:** every reload contains 49,023 buildings, 18,952 roads and 49 terrain tiles. World owners and retired population feature references release; renderer/heap retention, transfer and storage budgets pass. Settled post-unload heap is 107.04 MiB after the mixed journey, 47.19 MiB on the next cycle, and 52.46 MiB at cycle 12. There are no captured browser errors or failed local resources. These post-unload collections are solely retention diagnostics; no forced GC runs during active movement. Receipt: `output/verification/performance-sustained-7101/report.json`. No performance, global-world or release-ready claim follows from the passing cleanup checks.
-
-## October 7 final acceptance follow-through
-
-The packaged f182 candidate passes the seven-case connected marine journey, prescribed deck input bursts, full Monaco approach/bore/exit drive and three-stage save compatibility (136 runtime differences). The first clean sustained performance attempt remains **failed/incomplete**: the first 90-second flight passes its budget, but walking records a 450 ms frame, and a carried-over police incident opens custody before the next mode can be selected. The 12 reload checks did not execute. Receipt: `output/verification/performance-sustained-f182/`, log `/tmp/we3d-sustained-f182.log`.
-
-The verification harness now records custody as a failed journey, uses the ordinary Continue button only between measured windows and continues independent checks. Interrupted/short windows still fail the unchanged travel thresholds; no police/physics behavior or frame limits are altered. Partial failures get explicit failed receipts. A separate disposable-repository regression reproduced a stale Git filesystem monitor returning false-clean for a changed runtime file. Source fingerprint reads now disable that cache per invocation without changing user Git configuration; the reproduction fails before the repair and passes afterwards. Full final PR passes 2,091 contracts and the full chain; replacement packaging is in progress.
-
-Free disk fell below 400 MiB during the save test. Byte-identical large files in retained builds were shared using independent APFS copy-on-write clones with before/after SHA256 checks. 1,575 files retain their original paths and bytes; about 3.7 GiB was reclaimed. No source, player data or build was deleted. Receipt: `output/architecture-evaluation/retained-artifact-cow-dedup-1007.json`.
-
-## October 7 transport implementation in progress
-
-Current source completes a real 322.17-unit Monaco surface approach → tunnel → surface exit using keyboard driving: all six checks pass (completed, entered/exited, zero network join discontinuities, within the carriageway, no airborne frames, no captured JavaScript errors). Receipt: `output/verification/transport-portal-drive-quantized-1007/report.json`. The preceding two complete drives also pass. These are source/browser movement results, **not professional visual or release acceptance**. Final images were opened: portal-adjacent crossing roads and automatic camera transitions still need acceptance. Current dist remains the older bf10b392 artifact.
-
-The repairs preserve source identity/coverage, reconcile generalized corridors together, include linear-feature topology, constrain tunnels below actual building foundations, propagate those constraints into grade-limited approaches, preserve linear grades at irregular stations, and stop overhead actors colliding as infinite vertical columns. Engineered approach profiles now own their road ribbons, terrain cuts, retaining walls and collision. Vegetation cannot be planted into an excavated lane. Graph-connected tunnel branches, including quantized endpoint-to-interior joins, use a shared Boolean enclosure; unrelated/stacked roads stay separate. CPU terrain/raycast queries reuse the spatial cut index. Consolidating straight cuts and excluding raised pavement reduces the Monaco publication from 57,380 to 8,700 descriptors; this is a geometry-count observation, **not a passed performance gate**.
-
-The prescribed game client completes three Baltimore drive/turn/idle bursts, with 48,296 near buildings and 95% eligible regional building coverage, no error files; images opened (`output/verification/transport-prescribed-1007/`). This short test ends at a facade and does not prove sustained smooth movement. Earlier source bridge evidence remains `output/verification/bridge-corridor-1007/report.json` (9/9). Full PR passes 2,067 contracts plus the dependency/source/ownership/types/inventory/sensitivity chain (`/tmp/we3d-transport-complete-source-pr.log`). The historical equal-spacing solver fixture remains untouched; a separate allocating reference verifies the intentional distance-weighted solver, alongside constant-grade/irregular-station checks.
-
-No replacement vessel/wildlife asset, broad ocean ecology, spearfishing, continuous-world toggle or production promotion has been completed by this transport repair. Existing source, artifacts and player data are preserved. No GitHub or production change.
-
-## October 7 direct surface entry and allocation repair
-
-Fresh ocean selection uses the existing surface-vessel transaction directly. It checks the selected water evidence before any world/save mutation, retains the previous Earth visit, creates a local voyage only after the vessel starts, and preserves malformed/future saves. Duplicate requests and superseded sessions cannot publish an old vessel; failed starts restore the prior Earth origin/selection. Saved underwater voyages and explicit submarine deployments retain their existing owner. The application context registers this capability with the boat owner, and module identity checks remain enforced.
-
-Real source browser evidence: `output/verification/marine-direct-surface-1007/report.json` passes the four connected checks (deck → jump → automatic scuba/descent → same-vessel recovery → walk to cradle/deploy), no JavaScript errors. Arrival records zero underwater starts, no underwater renderer and an aboard voyage. Desktop and phone screenshots were opened. Prescribed skill client runs: `marine-prescribed-surface-1007/` and `pedestrian-prescribed-1007/`, three action bursts each, no error files; walking retains 48,296 near buildings / 48,834 requested and 95% eligible regional coverage. These are bounded source journeys, not global ocean or device acceptance.
-
-Nearby pedestrian queries now reject distant/hidden/promoted actors before making immutable full snapshots. Tests compare the exact actors/order against the original query over diagonal paths, offsets, segment transitions and boundary cases. In the instrumented live walking A/B/restored diagnostic (`output/architecture-evaluation/pedestrian-query-walking-1007/`), 60-second snapshot counts are 340,442 → 448 → 335,084, with 131.6 / 141.5 / 142.8 units traveled. The candidate and restored old query both pass that bounded hitch sample, while the first baseline has a 1,583 ms frame. **This confirms reduced snapshot construction, not a causal elimination of GC stalls or full performance acceptance.** The earlier stationary diagnostic is invalid for movement: the driver incorrectly used the car's speed field for a walker. The driver now uses walking yaw/velocity, rejects nonfinite input and requires actual travel.
-
-Full PR passes 2,075 contracts plus dependency/source/ownership/types/inventory/sensitivity (`/tmp/we3d-surface-pedestrian-pr-owner-reviewed.log`). The first runs caught a duplicate module URL and an unregistered context capability; both were corrected. Generated diagnostics were transparently compressed with macOS filesystem compression and before/after SHA256 checks: their original paths and bytes remain readable, and no source, save or artifact was removed. Compression receipts are under `output/architecture-evaluation/*compression*1007.json`.
-
-## October 7 sea-first handoff completion
-
-Fresh admitted surface entry now supplies its own committed geographic/surface reference through the travel authority. An outgoing airborne controller or underground contact can no longer veto a different admitted ocean destination. Ordinary nearby vessel boarding still uses the actual actor's reachable surface. The connected browser harness includes a controlled airborne-drone setup, then the real admitted surface handoff.
-
-That check exposed a second loading-order defect: direct sea sessions may never load the terrestrial elevation module, but boat teardown unconditionally called it. Teardown now uses optional terrain support or the outgoing vessel's transient actor height, without publishing a false ground surface. Existing ground support receives the correct walker eye offset. The ordinary Exit Vessel action no longer bypasses the shoreline policy. Actual source deck → jump/dive → recover → sub → recover → Main Menu passes six checks with no JavaScript errors (`output/verification/marine-sea-first-teardown-1007/report.json`). The menu retains the aboard save and exposes its resume action; screenshot inspected. Full PR passes 2,077 contracts (`/tmp/we3d-sea-first-final-pr.log`). The earlier forced boat-to-drone harness failure is retained separately; that unsupported setup is not counted as a completed ordinary journey.
-
-The current packaged 462e5ffc build passed all three save upgrade/fallback/write/return stages with 128 reviewed runtime differences, but it predates this last surface-reference/teardown repair and must be replaced before final handoff. No source or player record was discarded.
-
-## Workspace and authorization
-
-Use `/Users/stevenreid/.codex/worktrees/architecture-evaluation/WorldExplorer3D-live-deployed-20260320`, branch `steven/visual-quality`. Do not edit older Documents/Developer checkouts. Local repairs, commits and a staging preview plus supporting staging backend are authorized. Earlier deployment authorization remains conditional on required release checks. This unverified run has not pushed GitHub or changed production.
-
-Physical Apple M1 Mac mini, 8 GiB RAM. Heavy checks run sequentially. Preserve ordinary user Chrome, player data, four saved candidates and retained artifacts. Close owned verification browsers; an open 3D preview measurably interferes with performance testing. Private credentials stay outside the repository and reports.
-
-
-## Earlier local architecture repair (preserved 9579cd62 artifact)
-
-[Fresh audit, plan, implementation and evidence](docs/system-review/2026-10-06/README.md). Runtime **9579cd62ae62**, local artifact **5.4.0+9579cd62ae62.a9ec3bf5ff67cacf.staging**, 612 verified files, 188 runtime bundles, 84 accepted-ground files; asset-manifest SHA256 `304d55287078e43aa8f5ee744d328d959ae426b29f74c0b375d25999c5e70263`.
-
-Invalid requests now preserve the active world. Provider operations have owned cancellation/draining, unexpected load failures share guarded cleanup and a visible retry menu, and every identified Earth entry consumer requires the exact ready publication/result before spawning or restoring state. Stale deferred callbacks are discarded without accumulating publication completion IDs. Four unsafe async browser wait predicates were corrected and guarded against recurrence.
-
-The final packaged five-load journey passes all 11 checks: all four Baltimore visits retain **49,023 buildings / 18,758 roads**, including the lower-quality reload; Hollywood retains 34,999 / 18,832. The actual injected failure returns to the visible menu and retry succeeds; invalid admission preserves identity and pose. Final candidate → 37a12d11 fallback → candidate save/read/write passes all three stages and all 79 runtime/configuration differences are pinned. Short prescribed driving bursts pass without error files. Exact receipts are listed in the audit; these do not certify the full release matrix.
-
-A fresh causal trace proves GC dominates the worst walking/driving pauses (517.4/151 ms). Road-readiness wait delta is zero. The final-source renderer-storage A/B/restored experiment increases estimated allocations per frame by 23% and is rejected; the original vendor renderer remains unchanged. Next work is a proven allocation/retained-graph repair and capture-selector cost isolation before another complete release matrix. Preserve coverage and stall thresholds.
-
-Local commits and previous artifacts are retained. The currently open hosted preview still serves the earlier build below; no GitHub, preview, production or player-data mutation occurred during this audit. No world-streaming toggle is claimed.
-
-## Hosted location-preservation preview (previous source)
-
-Runtime source **86fdc6e3e6a2292e90abf17eb86dc309d09637b8**. The hosted preview and its preserved original artifact contain **5.4.0+86fdc6e3e6a2.febba16c0a5e3daa.staging**; local `dist` is the newer architecture build identified above. The older artifact has 611 byte-verified files, 187 runtime bundles and 84 accepted-ground files. Asset-manifest SHA256 `db184d042f3f83bbb399c95cf12bb8e8f39861965d2bfb073436633f1709bb7d`; build-manifest SHA256 `6ea9c922021e030857e360943e6d1d647a2120be84ebda25366ded5aa733f1bd`. Documentation-only checkpoints do not change these runtime bytes.
-
-[Open test preview](https://we3d-staging-20260712--visual-review-1005-e5075bnu.web.app); expires October 13. [Test instructions](docs/continuous-world/TEST-BUILD.md) describe the completed checks and remaining limits. Publication used the normal artifact and packaged-world preflight. At publication, both hosted manifests byte-matched that preserved artifact. An ordinary in-app browser without debug attestation entered Baltimore gameplay on this build with no captured console errors; it was returned to the main menu afterward. This is not signed-in/shared-session or physical-device acceptance.
-
-Three concrete repairs preserve the location game:
-
-- Private building construction/compaction scratch now retires after publication while adopted GPU attribute storage stays intact. This does not establish a reliable reduction in loaded heap: observed ready heaps varied, and the latest clean pre-radius flight used about 1.09 GB.
-- The visible road retry action now calls the existing Earth session authority. Pending repeated clicks cannot launch duplicate reloads; failure permits another retry.
-- Automatic graphics quality previously reduced the authoritative district radius on reload, dropping downtown Baltimore from 49,023 to 39,001 buildings. Desktop publication now keeps its 2,700-unit radius while presentation detail still adapts. Existing mobile coverage policy remains unchanged.
-
-Final-artifact verification:
-
-- Full PR: **2,009 contracts plus dependency/source/ownership/types/inventory/sensitivity pass** (`/tmp/we3d-fixed-district-registered-pr.log`).
-- Five actual world loads pass all nine preservation checks: custom Baltimore → same location after lower graphics quality → preset Baltimore → Hollywood → Baltimore. Baltimore retains **49,023 buildings / 18,758 roads** on all four visits; Hollywood has 34,999 / 18,832. Saved favorite, live frames, healthy renderer, source resources and repeat-key isolation pass. Explicit post-GC retention observations return to approximately 465 MB in Baltimore; these are not active-play performance measurements. Receipt: `output/verification/city-switch-lifecycle/report.json`.
-- Packaged **86fdc6e3 → 37a12d11 fallback → 86fdc6e3** save/read/write journey passes all three stages with original and newer Journal records, equipment/ammo changes, unknown fields and unrelated pending account data preserved. Uses disposable test storage. Receipt: `output/release-evidence/history/pre-lifecycle-613293ea/migration-rollback/report.json`.
-- The prescribed browser client completes three drive/turn/idle bursts without error files. Baltimore retains 48,294/48,834 nearby buildings (98.9%) and 95% regional buildings at this different starting coordinate. Screenshot inspected: `output/verification/continuous-world/fixed-district-game-client/`.
-- Packaged world preflight and artifact verification pass; hosted identity receipt: `output/verification/continuous-world/preservation-preview-86fdc6e3.json`.
-
-**Release remains blocked.** The completed performance gate on immediately preceding source 044dd362 ran seven sustained travel windows and twelve reloads. Resource retirement, retention, transfer/storage and error checks passed, but walking/driving stalls reached **533.3 / 649.9 ms**, and some FPS budgets failed. The run also exposed the district-shrink bug repaired above. Final-artifact city tests verify that coverage repair; they do not turn the older performance result into a pass. A separate clean 90-second flight on 044dd362 passed (46.06 FPS, maximum 66.7 ms, no frames over 100 ms), so a short flight alone does not establish smooth long-session play. No thresholds were relaxed and no forced collection ran during movement.
-
-Performance receipt: `output/verification/performance-retention/report.json`; clean flight: `output/verification/continuous-world/location-preservation-final-flight/report.json`. Current candidate inventory is **91 gates**, including the new city-preservation journey, plus **3 backend groups**. The complete current matrix has not passed. Ordinary hosted sign-in/shared/save recovery, named physical devices and fresh-player acceptance remain outstanding. The chained mobile-load-time command did not run after the performance failure; phone-viewport regression is not physical-phone acceptance.
-
-Existing location selection, presets, custom coordinates, favorites, saves and authored geography remain. [Mode isolation requirements](docs/continuous-world/WORLDWIDE-READINESS.md) require a separate optional continuous mode, successful off/on/off transitions and compatibility before enabling it. There is **no working worldwide toggle** in this preview. No GitHub push or production mutation occurred; production still serves **5.4.0+1532bdfbb5c1.319d215f60318297.production**.
-
-## Earlier local worldwide-readiness checkpoint
-
-Historical source commit **c2acc7a3**. Its retained artifact: **5.4.0+c2acc7a3c2a2.e6911e31f7a7ab25.staging**, 610 byte-verified files, 186 runtime bundles and 84 accepted-ground files; asset-manifest SHA256 `4b9400ed0f85ee3a5ec0f2527e747b08e6cbe5ea60f22ea06bbfd8671642a127`. At that checkpoint the artifact was local only and the preview still served abb8e8a9. Both artifacts remain preserved; the current preview is identified above.
-
-[Worldwide readiness](docs/continuous-world/WORLDWIDE-READINESS.md) records fresh source findings, the implemented changes and four finite remaining gates. Region construction now has an explicit resource owner, drains every launched dependency, preserves serial cancellation across reset, skips obsolete queued work, and stages terrain/buildings/water before publication. Failed construction keeps the old region and the same window can retry. Water animation registration follows region ownership. Regional instance matrices are relative to 2,048-unit cells; coverage, culling, picking and original source IDs remain. Large-coordinate component cases stay within 0.00013 units. The facade shader no longer depends on lighting flags to declare its world position.
-
-Full PR chain passes 2,004 contracts plus dependencies/source/ownership/types/inventory/sensitivity (`/tmp/we3d-region-readiness-pr.log`). The prescribed real-WebGL fixture uses the actual regional publisher with controlled sources: four complete replacements, failed draft, same-window retry, reset during late source work, cancellation during instance assembly, latest-request selection and exit all pass. Sixty observations verify the old complete scene remains during construction. Resident counts stay at 14 geometries / 3 materials / 9 textures; exit returns to zero regional geometry/material/water owners and the original 7 shared texture resources. All 1,536 fixture buildings and 5 road lines remain. Final images opened, no error files: `output/verification/continuous-world/region-publication-final/`. This is not real geographic traversal.
-
-Packaged actual-city receipt: `worldwide-c2-baltimore/`. Load 52.131 seconds; 48,294/48,834 near and 384,814/405,067 regional buildings; all 1,489 identified majors; 240/240 source tiles; 76,450 surface-road fragments. No JS/shader errors; all world/source collections retire at exit, heap 43,967,784 bytes after exit. Ordinary 90.013-second flight reaches 46.40 FPS, p95/p99 33.4 ms, but **fails** clustered-stall acceptance at 133.4/183.2 ms near 77 seconds. Earlier abb8e8a9 flight success does not override this latest failure. No performance threshold changed. The separate prescribed packaged client completes three drive/turn/idle bursts, remains active/unpaused on Earth, reports no errors and retains coverage (`worldwide-c2-game-client/`); screenshot opened. This bounded journey ends near a facade and is not an extended road-route acceptance.
-
-No GitHub push, Hosting deployment or production promotion. Four saved candidates, prior artifacts, source history and player data remain preserved.
-
-## Earlier October 6 hosted test checkpoint
-
-Previously published preview artifact: **5.4.0+abb8e8a9274a.0218ea3cefb3aa7c.staging**, source abb8e8a9. Build verification passes 610 files, 186 runtime bundles and 84 ground files; asset-manifest SHA256 `28bfe22270011c28c1dba2132a8ec97c1165cd732b5ed291837d2217b7bd8360`. It includes the regional compiler worker, bounded transient-source recovery, exact straight-wall body geometry, road raster worker and immutable POI classification. The last change fixes the map search accessibility class; actual desktop and phone-viewport map pan/zoom/recenter/close, input isolation, accessible name and control hit-target checks pass, with screenshots opened. No physical-phone acceptance is implied.
-
-At the preceding 27924374 artifact (same game logic; final change is map-label markup), London has 400/400 source tiles, 758,110/798,010 regional buildings, all 1,319 majors, 141,168 regional at-grade road fragments, no JS/shader errors and 45.46 MB exit heap. Ordinary 90-second flight fails with a 216.6/400.1 ms late cluster. Baltimore has 240/240 tiles, 384,814/405,067 regional buildings, all 1,489 majors, 76,450 regional road fragments and 44.74 MB exit heap. Five actual-city placements exercise 39 road-region evictions, 9–12 moving residents and identical return contact; the settled chassis remains within 0.092 units of expected support. Its flight records a 150/133/166 ms cluster, but a source check may have overlapped the run; use the separate clean repeat for performance conclusions.
-
-Controlled real MVT/worker/WebGL verification proves worker road masks match every main-thread raster pixel and three retirement cycles return GPU buffers/textures to baseline. Unsupported worker canvas falls back to existing main-thread road compilation. 22 focused worker/source/road tests and the full 1,996 contract chain pass; the subsequent POI table change passes 1,997. Prescribed actual-game client toggles food off/on, preserves park toggles, then drives/turns/idles without errors; images inspected.
-
-Preserved build files were deduplicated by identical-byte hardlinks with every replacement rehashed. All build paths, source/history and four `.local-candidates` remain; 6.02 GB of duplicate bytes reclaimed. Current dist was not hardlinked. Read-only October 6 hosting check still shows production 1532bdfb and preview 078250e5; the verified abb8e8a9 test preview is now published after its packaged-world smoke passed. Hosted build/asset manifests byte-match the local artifact; production remains 1532bdfb. A normal in-app browser (no debug App Check token) loads Baltimore and live weather with no error-console entries. The automated hosted client received 403/401 resource errors and stopped after its first burst; that failed receipt is preserved. Exact Overpass transport timed out in the normal browser and used the existing generalized fallback, so this does not certify exact bridges or routes.
-
-## Latest local coverage work
-
-Readable status: [RESULT.md](docs/continuous-world/RESULT.md). Plan and evidence: [IMPLEMENTATION.md](docs/continuous-world/IMPLEMENTATION.md). The fixed Earth region remains in place until terrain, transport, collisions, player state and cleanup can cross geographic windows safely. Removing the boundary alone is not accepted.
-
-- Regional building selection targets 95% of eligible footprints, prioritizes every source-identified major, and reports source holes and safety ceilings separately. Removed per-tile quotas and empty mobile building zoom; corrected a near/far exclusion corner and degenerate polygon loss.
-- Complete at-grade regional road linework reuses the fetched building tiles and a bounded terrain mask. This restores visual roads without overloading physical road compilation. Engineered structures and route coverage remain limited by their existing physical owner; the mask is not a road physics implementation.
-- Instance GPU buffers now release. Regional and temporary road masks share one presentation owner; independent shader retirement and cached-program uniforms are corrected. The latest source also clears retired CPU atlas references. Twelve real WebGL allocation/render/retirement cycles end at zero coverage textures; cancellation releases staged inputs.
-- One coordinate conversion authority now serves map/scene/interiors/property/activity/marine consumers, including longitude wrapping and existing polar ENU. This is not automatic origin rebasing.
-
-Earlier regional-only checkpoint (historical): artifact **5.4.0+39dcdff721f0.f9204870cbad707d.staging** passed regional coverage in two cities. This did not check the detailed-district denominator and is not current flight acceptance:
-
-| Location | Eligible regional buildings rendered | Identified major footprints | Source tiles |
-| --- | --- | --- | --- |
-| Baltimore | 384,814 / 405,067 (95.0001%) | 1,489 / 1,489 | 240 / 240 |
-| London | 758,081 / 797,979 (95.0001%) | 1,319 / 1,319 | 400 / 400 |
-
-Both runs have zero JavaScript/shader errors and pass exit cleanup. Day/night, near/regional and gameplay images were opened and inspected. Baltimore's 90-second ordinary flight passes the existing stall check: 44.5 FPS, p95/p99 33.4 ms, maximum 133.3 ms, no frames over 250 ms. All world collections return to zero at exit; post-GC heap observations are 42.74 MiB (Baltimore) and 42.85 MiB (London). London did not run a sustained flight window. Artifact byte verification passes: 606 files, 182 runtime bundles, 84 accepted-ground files; asset-manifest SHA256 `77fdbe1cc972ce5e5ae72e581ed15d7563e6a9de23de840b16f5bd7ddc583e89`.
-
-Evidence: `output/verification/continuous-world/final-baltimore/`, `recovered-london/`, `source-recovery-lifetime/`. Full PR chain at this artifact: **1,961 contracts plus dependency/source/ownership/types/inventory/sensitivity pass** (`/tmp/we3d-source-recovery-pr.log`). A prior London run failed with 399/400 tiles; one bounded recovery pass for isolated transient gaps is now implemented and controlled tests exercise it. Both successful final real-city runs loaded all tiles in the primary pass; they do not prove a real-network recovery occurred.
-
-These remain regional checks. Shortbread has no mapped regional heights in either sample; the major count cannot establish all real-world landmark identities/heights. Baltimore has 17,754 compiled physical roads, while the road mask renders 76,445 in-window surface fragments using 8.76 MiB; the mask does not certify complete physical routes/bridges. Earlier a804 flight failed with 1.4/1.2-second pauses, and a separate trace captured a 307.8 ms major GC. The latest single-window pass does not prove that long-session or future streaming stalls are eliminated. The rejected 8ad0d224 artifact had duplicate road GLSL/missing terrain; failed artifacts and receipts remain preserved.
-
-Subsequent source correction: land-use vegetation now shares terrain's physical-cover ownership, respects holes/clearings and distinguishes protected-area purpose and wetlands. The e120e05d artifact passed all1,968contracts and controlled vegetation tests. Baltimore retained95%coverage and clean exit but failed the90second stall gate (216.7/316.6mscluster). Druid Hill Park exposed860terrain cache entries and2late entries after exit; that run failed. A subsequent local terrain-source ownership repair is implemented and component/browser tested, now accepted in the 1b35 Druid Hill Park check: 72 terrain sources, zero after exit. A bounded hierarchy also replaces land-cover polygon duplication. The eedcd024 artifact passes nearby Baltimore coverage (48,294 / 48,834), regional coverage and exit cleanup, but fails the 90-second flight gate (1,333 / 950 ms pauses). See the implementation ledger. None of these artifacts is cleared for production or complete worldwide streaming.
-
-## Test preview and existing free data
-
-- MET Norway weather; PacIOOS waves with NOAA/NCEP fallback through NSF Unidata; HYCOM/FNMOC surface currents and temperature; existing NOAA tides retained.
-- ADSB.lol public ODbL aircraft observations replace OpenSky. Active runtime contains neither Open-Meteo nor OpenSky integration.
-- Fixed-source environmental gateway with App Check, shared cache/leases, rate/day limits, bounded requests, cooldowns and stale/malformed-data rejection. Missing values, independent model times/grids and reference-versus-observed labels remain explicit. Catalogs, attribution and privacy updated. No paid data subscription or data API key needed; existing Firebase infrastructure remains separate.
-- Submarine HUD weather width repaired; nine actual-markup layout cases and weather-location race pass. Previous facade/pavement/furniture/planting and indexed commerce work remain intact. Manifest counting includes zero-byte emitted files.
-
-Test preview: https://we3d-staging-20260712--visual-review-1005-e5075bnu.web.app (expires October 13).
-
-Previous hosted preview, replaced October 6: **5.4.0+078250e5e401.c530fbdb9b6a1cb4.staging**, source `078250e5e401c3366c3a6e21b2bb09909bfc3938`, 605 content files. At preview publication, both hosted manifests byte-matched that preserved artifact. Asset-manifest SHA256: `b448607fa75f78383bf3f9dc0434045117ca73f8f5a3419baafaac75d1aef39a`. Acceptance fingerprint: `922e0d875875ac1766eb72f41a5b715854ab80dfb3288f95d27705a2a0c42347`. Later documentation-only commits do not rebuild this artifact.
-
-Staging Functions verified ACTIVE: environmental gateway v1, aircraft v5, place lookup v2; environmental cache TTL/index settings deployed. Ordinary Chrome without debug attestation displayed MET weather, 80 ADSB observations, NOAA waves and HYCOM currents/temperature. Source/licence links and model timestamps inspected. Only the exact preview hostname was added to staging reCAPTCHA allowed domains; allow-all remains disabled. These observations cover public-data panels, not the full signed-in hosted journey.
-
-## Previous free-data candidate verification and remaining release work
-
-The preceding free-data release checkpoint passed **1,931 PR contracts** and dependency/source/ownership/type/inventory/sensitivity checks pass. Frozen candidate ran all 90 gates: **89 pass; performance fails**. All **3 backend groups pass**, including isolated security/multiplayer/economy cases. Packaged save upgrade → fallback read/write → candidate return passes all 3 stages, preserving legacy/new Journal records, equipment/ammo, unknown fields and unrelated pending account data. Images inspected. Current public-data rights and migration receipts match the artifact.
-
-The first complete performance run passed loading, coverage, resources, storage and retention, including seven sustained travel windows and twelve reloads. FPS and clustered hitch limits failed. Its open owned preview consumed graphics resources; after closing that preview, the clean repeat still reproduced flight hitches near 71 seconds (200/133/250 ms) and initial driving around 41 FPS. The repeat was deliberately stopped once failure reproduced by terminating only its verified owned Chrome; the matrix unwound, preserving a failed result. Its unfinished retention portion is not a pass.
-
-A separate bounded CPU/GC/allocation diagnostic captured main-thread incremental-GC start ~139 ms and major collection ~131 ms (~491 MB before / ~375 MB after collection); instrumented frame outliers were 183/167 ms. Allocation paths include aircraft collision sweeps, map drawing, water updates, vegetation work and rendering. This identifies candidates for repair, not a proven minimal fix. No runtime or budget was changed to conceal failure. These measurements occurred at night; historical daytime/older-browser passes are not interchangeable evidence.
-
-Historical evidence was preserved under `output/release-evidence/history/pre-preservation-tests-20261006/` before the latest focused checks updated current receipts. It includes original/repeat candidate manifests, backend manifest, matching acceptance receipts, save roundtrip, hosted preview, public rights and diagnostics. Performance directories under `output/verification/`: `performance-078-initial-with-preview`, `performance-078-clean-repeat-partial`, `performance-078-flight-diagnostic`. Do not print entire runtime snapshots or raw private data.
-
-Next performance work: demonstrate a bounded before/after repair of the captured stall, controlling time/weather/browser conditions, before another full immutable matrix. Prioritize stalls; the owner does not require perfect FPS. Do not relax budgets or trust historical 5.2/5.4 acceptance. Ordinary hosted sign-in/shared-voyage/save-recovery, named physical iOS/Android, and uncoached fresh-player acceptance also remain unverified.
-
-## Preservation and production boundary
-
-Tested fallback: `output/preserved-artifacts/5.4.0+37a12d117111.9496ab31100b61ae.staging`, branch `steven/free-data-fallback`, commit `37a12d117111446a128888384df67ac52445d972`, 603 files. It retains free providers, HUD, save/control/backend and commerce fixes with earlier street visuals. All 79 current reviewed runtime/configuration differences are pinned in `scripts/verification/rollback-runtime-review.json`; the exact packaged 9579cd62 → fallback → 9579cd62 save roundtrip passes. These differences include coverage/resource/transport repairs, not only visual changes. All previous builds, four `.local-candidates`, source history and player data remain intact.
-
-Production rechecked October 6 after publishing the 86fdc6e3 test preview: **5.4.0+1532bdfbb5c1.319d215f60318297.production**. No production frontend or GitHub changes. A future coordinated release needs `getPlaceLookup`, `getEnvironmentalData`, updated `getAircraftStates` and supporting configuration together with accepted frontend bytes. Do not promote with unresolved performance or required external acceptance.
-
-The bounded product sequence remains in [DELIVERY-PLAN.md](docs/product-audit/2026-10-01/DELIVERY-PLAN.md). Existing research ship/submarine, planetary research, district activities, shared marine voyage and regional still-camera slice do not imply worldwide video or No Man's Sky scale. Do not reopen completed feature phases without a new task or reproduced problem.
+Updated October 7, 2026. **5.5.0 is a release candidate; production promotion is pending.**
+The owner has authorized GitHub, Pages, a versioned release and production deployment.
+The draft release acknowledges the remaining product limitations. Failed or missing
+verification has not been represented as acceptance.
+
+## Working checkout
+
+Use `/Users/stevenreid/.codex/worktrees/architecture-evaluation/WorldExplorer3D-live-deployed-20260320`,
+branch `steven/visual-quality`. Do not edit the older Documents/Developer checkouts.
+Preserve existing location work, player data, retained artifacts and Git history.
+On this observed 8 GiB Apple M1 Mac, run heavy verification sequentially and close
+only owned browsers and servers. Ordinary user Chrome must remain open.
+
+## Build identities
+
+| Surface | Current identity |
+| --- | --- |
+| Production | `5.4.0+1532bdfbb5c1.319d215f60318297.production` |
+| Existing hosted preview | `5.4.0+86fdc6e3e6a2.febba16c0a5e3daa.staging` |
+| Local immutable candidate | `5.5.0+316ba33d0d7f.e85c0302553a7fda.staging` |
+| Candidate runtime source | `316ba33d0d7f6e75c4054fe7bcf92682c8b33d29` |
+
+The candidate has 615 verified files. Its asset manifest SHA256 is
+`c46fe0700a1f804fafd19531896587a217134a48f18691015dcb095d21d442e0`.
+Earlier candidates and the compatible `37a12d11` rollback artifact remain retained.
+A documentation-only commit does not change this packaged runtime identity.
+
+## Completed verification and repairs
+
+The full source chain passes **2,108 tests**, dependency/source/ownership/type
+checks, inventory and sensitivity checks. GitHub PR and secret scanning pass.
+The targeted dependency audits report no known vulnerabilities.
+
+The first complete candidate matrix on the previous `1033fb88` package finished
+61 passes and 30 failures. Twenty-one later checks stopped before gameplay when
+a disposable staging test credential expired. Those results are preserved under
+`output/release-evidence/history/candidate-1033-20261007`; they are not passes for
+this candidate. The private wrapper now renews and cleans up its staging identities.
+
+Real geometry queries identified three Monaco junctions removed by tunnel
+excavation. Full surface-carriageway roof constraints now participate in the
+existing graph/grade solver. The source Monaco check reports zero junction gaps
+and zero discontinuities across 1,216 sampled joins. Real keyboard tunnel
+approach, bore and exit pass six checks. Terrain and retaining edges still need
+visual polish; functional passage is not final art acceptance.
+
+On the retained previous package, corrected marine research (eight cases),
+habitat (seven cases), real Earth/ship/lift/exit and prescribed Moon movement/pause
+checks pass. Screenshots were inspected. A prescribed Monaco source run recorded
+external Overpass and imagery CORS failures; it is retained as failed evidence.
+The public Pages layout passes desktop and phone-width overflow/image checks.
+
+The aircraft client now permits gateway startup within a 20-second envelope;
+the IPv4 upstream has one absolute nine-second deadline through connection and
+body delivery. Focused provider tests pass. Staging `getAircraftStates` version 6
+is ACTIVE with the existing deployment parameters verified unchanged. No
+production Function was changed.
+
+## Remaining release work
+
+Current-package live-provider and sustained performance checks are in progress.
+The complete current candidate and backend matrices, save/fallback/write/return,
+ordinary hosted journey, named physical devices and uncoached player acceptance
+still need current evidence. The old resource baseline covers 25,529 Baltimore
+buildings; restored coverage retains 49,023. No coverage was removed or resource
+threshold silently changed to turn that mismatch into a pass.
+
+PR [96](https://github.com/RRG314/WorldExplorer3D/pull/96) and release `v5.5.0` are
+drafts. Stable, public Pages and production have not been promoted. Production
+still needs its coordinated place/environment provider rollout.
+
+The licensed replacement research vessel, broader ocean wildlife/activities,
+spearfishing and worldwide streaming are **not implemented by this release**.
+Earth remains bounded and location based. See [known issues](KNOWN_ISSUES.md),
+[release preparation](docs/release-review/2026-10-07/RELEASE-PREPARATION.md), and
+[release identities](docs/RELEASE_SOURCE_OF_TRUTH.md). Earlier investigations remain
+in Git history, their dated evidence folders and `progress.md`.
+
+Private cloud configuration and credentials remain outside the repository under
+`~/Library/Application Support/WorldExplorer3D/verification-private`. Never print
+raw configuration or credential files, and never attach them to release material.

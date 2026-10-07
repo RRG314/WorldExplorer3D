@@ -16,10 +16,13 @@ ledger, rather than the public release body.
 
 ## Remaining acceptance
 
-The final 5.5 package and backend matrix need current results. The latest
-completed 5.4 candidate retains mapped coverage and passes cleanup checks, but
-sustained ground travel still records noticeable pauses. Physical-phone,
-uncoached-player and coordinated hosted-service acceptance remain open.
+The current package is built from runtime source `316ba33d`. Its provider and
+sustained-performance checks are in progress; the complete package and backend
+matrices still need current results. Source Monaco junction and actual tunnel
+traversal checks pass after the latest clearance repair. The first full candidate
+run found remaining resource and performance failures as well as expired test
+credentials; those receipts are preserved. Physical-device, uncoached-player,
+save/rollback and coordinated hosted-service acceptance remain open.
 
 The research vessel still uses its existing custom model. The licensed vessel,
 broader wildlife and ocean activities, spearfishing, and unrestricted continuous
