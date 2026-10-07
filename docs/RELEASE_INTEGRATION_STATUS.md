@@ -16,19 +16,28 @@ ledger, rather than the public release body.
 
 ## Remaining acceptance
 
-The current package and hosted preview are built from source `135e3895`, with the
-same game payload as `316ba33d`. Packaged-world preflight passes. Live providers
-pass on that payload; sustained movement still has visible pauses, and the
-retention run was interrupted to protect disk space. The complete package and
-backend matrices still need current results. Source Monaco junction and actual tunnel
-traversal checks pass after the latest clearance repair. The first full candidate
-run found remaining resource and performance failures as well as expired test
-credentials; those receipts are preserved. Physical-device, uncoached-player,
-and coordinated hosted-service acceptance remain open. The complete packaged
-save upgrade, fallback write and candidate return now pass with existing records
-and unrelated pending account data preserved. Owner-authorized cleanup removed obsolete
-raw diagnostic data and superseded staging packages while retaining their source
-history, compact reports, production and reviewed rollback artifacts.
+The current package and hosted preview are `4dd2e37c`, with the same 615 delivered
+file hashes as the owner-tested `135e3895` preview. Source checks pass 2,109 tests;
+world preflight passes 29 checks. All three current backend gates pass, including
+14 general backend stages and the complete two-client shared research voyage.
+
+The supporting production provider rollout is complete: place lookup and
+environmental data version 1, plus aircraft version 5, are ACTIVE. Existing
+parameters and unrelated functions are preserved. Live endpoint probes pass;
+the production frontend remains on 5.4.
+
+The full frozen candidate matrix and current save roundtrip still need their final
+receipts. The previous 135 save upgrade, fallback write and candidate return
+passed with existing records and unrelated pending account data preserved.
+Sustained movement on this game payload still has visible pauses; its retention
+run was interrupted when disk space became critically low. The original failed
+matrix and resource measurements are preserved. No performance threshold was
+relaxed or building coverage removed.
+
+The owner reports that the 135 preview works on Android. This is smoke feedback,
+not measured thermal/memory, iOS, uncoached-player or ordinary hosted acceptance.
+Those remaining checks are kept explicit. Owner-authorized cleanup preserved
+source history, compact evidence, production and the reviewed rollback artifact.
 
 The research vessel still uses its existing custom model. The licensed vessel,
 broader wildlife and ocean activities, spearfishing, and unrestricted continuous

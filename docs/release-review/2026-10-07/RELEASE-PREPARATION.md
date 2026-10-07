@@ -31,3 +31,23 @@ The complete updated source chain passes 2,108 tests. New package, backend, sust
 Preview `5.5.0+135e3895f89d.e85c0302553a7fda.staging` is deployed to visual-review-1005 after all 29 packaged-world preflight checks passed with no browser errors or failed local resources. GitHub checks pass; the complete source chain passes 2,109 tests. The game payload matches the retained 316 package. The large-asset Git buffer failure and a Start-control readiness race were repaired in the release verifier. All three real packaged save stages now pass: upgrade, fallback writes and candidate return. Existing records, new writes, equipment control state and unrelated pending account data are retained.
 
 The 316 live-provider gate passed. Its seven sustained movement windows exposed remaining hitches. The twelve-cycle cleanup run was stopped after six reported reloads when free disk fell to 541 MiB; unrun stages remain incomplete. At the owner's request, approximately 3.8 GiB of obsolete raw heap/test-profile data and 47 superseded clean staging packages were removed. Source commits were confirmed in pushed Git ancestry; compact reports, manifests, source history, production and required rollback packages were preserved. Backend and remaining release acceptance are still pending.
+
+## Frozen verifier and production providers
+
+Current local/hosted preview is 4dd2e37c; all 615 delivered file hashes match the
+owner-tested 135 preview. The shared-marine verifier now waits through bounded
+acknowledgment pauses and observes a fresh server stop before recording a study.
+The actual complete two-client voyage passes, and all three frozen backend gates
+pass. The normal preview preflight passes all 29 world checks.
+
+Production place lookup and environmental data version 1 and aircraft version 5
+are ACTIVE, with all 11 parameters preserved and the other 77 functions unchanged.
+Protected endpoints return 401 without App Check; the public aircraft endpoint
+rejects invalid coordinates and returned a valid bounded response in 1,005 ms.
+The first ad hoc probe incorrectly expected aircraft to require App Check;
+source review confirmed its existing public bounded-query contract, and the
+corrected probe tests that contract. No service policy was weakened.
+
+The public frontend remains on 5.4. The owner reports Android works; no measured
+phone, iOS or fresh-player acceptance is inferred. Full frozen candidate checks,
+current save receipt and remaining external acceptance are still required.

@@ -2,14 +2,26 @@
 
 ## Current observation — October 7, 2026
 
-Fresh hosted manifest: **5.4.0+1532bdfbb5c1.319d215f60318297.production**, source **1532bdfbb5c11e002d278b058d1ebdba88384f60**. The next compatible release is 5.5.0. Current work remains on steven/visual-quality and has reached the hosted preview, not production. Production has 78 Functions; getPlaceLookup and getEnvironmentalData are absent and need a coordinated backend rollout. Historical execution receipts are not complete acceptance of this candidate. See [current state](../CURRENT-STATE.md) and [finite release gates](product-audit/2026-10-01/RELEASE-ACCEPTANCE.md).
+The production frontend remains **5.4.0+1532bdfbb5c1.319d215f60318297.production**,
+source **1532bdfbb5c11e002d278b058d1ebdba88384f60**. The next compatible release is
+5.5.0 on `steven/visual-quality`. Stable, Pages and the public release remain unpromoted.
 
-The current local and hosted preview candidate is `5.5.0+135e3895f89d.e85c0302553a7fda.staging`, built from source
-`135e3895f89dc4459e073bd9ac85dbef2087420f`. It has 615 verified files; its game payload is identical
-to `316ba33d`, with subsequent changes confined to release verification. The preview's complete-world
-preflight passes. Staging's aircraft gateway is
-version 6 with its existing parameters preserved; production Functions are unchanged.
-The complete current-package acceptance remains pending.
+The local and hosted preview candidate is `5.5.0+4dd2e37c69a9.e85c0302553a7fda.staging`,
+source `4dd2e37c69a9ccd0a946d3bf2af984faaaadb5a5`. Its 615 delivered file hashes are
+identical to the owner-tested `135e3895` preview and the `316ba33d` game payload.
+Subsequent changes repair release verification. The packaged-world preflight
+passes 29 checks, and the current backend matrix passes all three gates.
+The complete candidate and remaining external acceptance are pending.
+
+Production now has 80 Functions. On October 7 at 21:24 UTC, `getPlaceLookup` and
+`getEnvironmentalData` version 1 were added and `getAircraftStates` advanced to
+version 5. All are ACTIVE; all 11 existing deployment parameters are preserved,
+and the other 77 Functions are unchanged. Live access-control and bounded
+public aircraft probes pass. Staging aircraft version 6 is ACTIVE.
+No signed-in production journey is inferred from these service probes.
+
+See [current state](../CURRENT-STATE.md) and
+[finite release gates](product-audit/2026-10-01/RELEASE-ACCEPTANCE.md).
 
 ## Historical September 28 receipt
 

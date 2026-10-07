@@ -18,9 +18,9 @@ only owned browsers and servers. Ordinary user Chrome must remain open.
 | Surface | Current identity |
 | --- | --- |
 | Production | `5.4.0+1532bdfbb5c1.319d215f60318297.production` |
-| Hosted preview | `5.5.0+135e3895f89d.e85c0302553a7fda.staging` |
-| Local immutable candidate | `5.5.0+135e3895f89d.e85c0302553a7fda.staging` |
-| Candidate source | `135e3895f89dc4459e073bd9ac85dbef2087420f` |
+| Hosted preview | `5.5.0+4dd2e37c69a9.e85c0302553a7fda.staging` |
+| Local immutable candidate | `5.5.0+4dd2e37c69a9.e85c0302553a7fda.staging` |
+| Candidate source | `4dd2e37c69a9ccd0a946d3bf2af984faaaadb5a5` |
 
 The candidate has 615 verified files. Its asset manifest SHA256 is
 `c46fe0700a1f804fafd19531896587a217134a48f18691015dcb095d21d442e0`.
@@ -28,6 +28,8 @@ The compatible `37a12d11` rollback, production, earlier hosted preview and recen
 `1033`/`316` diagnostic packages remain retained. Forty-seven obsolete clean
 staging packages were removed at the owner's request after their source was
 verified in pushed Git ancestry; their manifests and test reports remain.
+The local 4dd2 candidate records the corrected marine verifier; all 615 delivered
+file hashes exactly match the owner-tested 135 preview. The 135 package is retained.
 A documentation-only commit does not change this packaged runtime identity.
 
 ## Completed verification and repairs
@@ -58,8 +60,11 @@ The public Pages layout passes desktop and phone-width overflow/image checks.
 The aircraft client now permits gateway startup within a 20-second envelope;
 the IPv4 upstream has one absolute nine-second deadline through connection and
 body delivery. Focused provider tests pass. Staging `getAircraftStates` version 6
-is ACTIVE with the existing deployment parameters verified unchanged. No
-production Function was changed.
+is ACTIVE. Production now has aircraft version 5, place lookup version 1 and
+environmental data version 1 ACTIVE. All 11 existing deployment parameters are
+preserved; the other 77 Functions are unchanged. The protected endpoints reject
+missing App Check with 401, and a live bounded aircraft query returned 200 in
+1,005 ms. The public frontend remains on 5.4.
 
 The current preview was deployed after its packaged-world preflight passed all
 29 checks with no browser errors or failed local resources. Hosted manifests
@@ -78,27 +83,26 @@ test-browser data were then removed at the owner's request, recovering about
 3.8 GiB; pruning old staging packages recovered additional space. Compact
 diagnostic reports and analysis scripts were preserved. No threshold was relaxed.
 
-The complete packaged save upgrade → fallback write → candidate return journey
-passes, retaining 64 seeded items, existing and new records, equipment controls
+The packaged save upgrade → fallback write → candidate return journey
+passed on the 135 package, retaining 64 seeded items, existing and new records, equipment controls
 and unrelated pending account data. No browser errors or failed local requests
 were recorded.
-The general backend suite (14 stages) and place authority pass on the 135
-candidate. A real two-client shared marine rerun passes all 12 journey cases and
-three rules cases after two verifier races were corrected: temporary network
-backpressure and waiting for the server's stopped pose before recording a study.
-These are verification-only repairs; the 135 game payload is unchanged.
+The current 4dd2 backend matrix passes all three gates: the general backend
+suite (14 stages), place authority, and shared marine. The latter passes all
+12 two-client journey cases and three rules cases. Two verifier races were
+corrected: temporary network backpressure and waiting for the server's stopped
+pose before recording a study. Runtime ownership rules are unchanged.
 The owner reports the current preview works on Android. This is a smoke check,
-not measured device/thermal or iOS acceptance. The frozen aggregate candidate and
-backend receipts, ordinary hosted journey and remaining external acceptance
-still need current evidence. The old resource baseline covers 25,529 Baltimore
+not measured device/thermal or iOS acceptance. The frozen aggregate candidate,
+current-package save roundtrip, ordinary hosted journey and remaining external
+acceptance still need current evidence. The old resource baseline covers 25,529 Baltimore
 buildings; restored coverage retains 49,023. No coverage was removed or resource
 threshold silently changed to turn that mismatch into a pass.
 
 PR [96](https://github.com/RRG314/WorldExplorer3D/pull/96) and release `v5.5.0` are
 drafts. Stable, public Pages and production have not been promoted. The updated
 preview is available at `https://we3d-staging-20260712--visual-review-1005-e5075bnu.web.app`.
-Production
-still needs its coordinated place/environment provider rollout.
+The supporting production provider rollout is complete; frontend promotion is pending.
 
 The licensed replacement research vessel, broader ocean wildlife/activities,
 spearfishing and worldwide streaming are **not implemented by this release**.
