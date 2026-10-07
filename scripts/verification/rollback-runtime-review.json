@@ -210,9 +210,9 @@
     "app/js/ocean/parent-vessel.js": {
       "before": "84a2cde22d65d335b85b09bde2f5979e7e6868b60e8e0969b2b354c79a023211",
       "beforeMode": "100644",
-      "after": "fb69405bea5789106b7cf92601ec5015a3cc9563164f237bfef0f47bb48065bc",
+      "after": "314810c299cde8745b6b35a5e87e7ccfd3f555bbd55fed7eab7b5d6281b3423f",
       "afterMode": "100644",
-      "review": "Connected marine entry, deck/swim/submarine handoffs and compact UI. Existing voyage v1 identity, geographic anchor, stage, condition, save key, revision and conflict owner remain. Parent yaw stays independent of submarine yaw; no account/backpack or shared protocol change. New-session admission still requires checked water; saved underwater and aboard records retain their resume path."
+      "review": "Connected marine entry, deck/swim/submarine handoffs and compact UI. Existing voyage v1 identity, geographic anchor, stage, condition, save key, revision and conflict owner remain. Parent yaw stays independent of submarine yaw; no account/backpack or shared protocol change. New-session admission still requires checked water; saved underwater and aboard records retain their resume path. Retained parent presentation now uses the same seven-point vessel water fit and damped pitch/roll/heave. No persisted wave state or voyage schema changes."
     },
     "app/js/ocean/start-exploration.js": {
       "before": null,

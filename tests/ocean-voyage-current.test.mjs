@@ -1,13 +1,28 @@
 import * as THREE from 'three';
 import {createVesselVisual} from '../app/js/transport/vessel-visual-recipe.js';
 import {getMaritimeCatalogEntry} from '../app/js/transport/maritime-catalog.js';
-import {parentHullCollision,parentVesselSubmarinePose} from '../app/js/ocean/parent-vessel.js';
+import {parentHullCollision,parentVesselSubmarinePose,createOceanParentVessel} from '../app/js/ocean/parent-vessel.js';
 import test from 'node:test';import assert from 'node:assert/strict';
 import {OCEAN_VOYAGE_KEY,createOceanVoyageStore,validateOceanVoyage} from '../app/js/ocean/voyage-store.js';
 import {ensureOceanVoyage} from '../app/js/ocean/voyage.js';
 import {createBoatOceanTransferApi} from '../app/js/boat-mode/ocean-transfer.js';
 const memory=()=>{const m=new Map();return {getItem:k=>m.get(k)||null,setItem:(k,v)=>m.set(k,v)}};
 const record=()=>({version:1,id:'voyage-1',subId:'sub-1',revision:0,savedAt:100,stage:'underwater',site:{lat:10,lon:20,name:'Sea',region:'Ocean'},ship:{transportEntityId:'ship-1',transportCatalogId:'ocean-research-vessel',condition:.8,yaw:.5,anchor:{lat:10,lon:20}},sub:{x:1,y:-20,z:-52,yaw:.5,condition:.7},waveOffset:{x:100,z:300}});
+test('underwater carrier uses its hull footprint and heading for stable water support',()=>{
+ for(const yaw of [0,.7,Math.PI/2,Math.PI]){
+  let sampled=0,heightOffset=0;
+  const mode={scene:new THREE.Scene(),waterSurface:{sample(x,z){sampled++;return {surfaceY:2+heightOffset+.01*x+.02*z}}}};
+  const vessel=createOceanParentVessel(THREE,mode,{current:{ship:{...record().ship,yaw}}});
+  vessel.update(0);assert.equal(sampled,7);assert.ok(Math.abs(vessel.root.position.y-2)<1e-8);
+  const expectedForward=.01*Math.sin(yaw)+.02*Math.cos(yaw),expectedSide=.01*Math.cos(yaw)-.02*Math.sin(yaw);
+  assert.ok(Math.abs(vessel.root.rotation.x+Math.atan(expectedForward))<1e-8);
+  assert.ok(Math.abs(vessel.root.rotation.z-Math.atan(expectedSide))<1e-8);assert.equal(vessel.root.rotation.order,'YXZ');
+  heightOffset=1;vessel.update(1/60);assert.ok(vessel.root.position.y>2&&vessel.root.position.y<2.02,'No single-frame wave teleport');
+  for(let i=2;i<600;i++)vessel.update(i/60);
+  assert.ok(Math.abs(vessel.root.position.y-3)<.001);assert.equal(vessel.root.rotation.y,yaw);
+  const calls=sampled;vessel.dispose();vessel.dispose();vessel.update(10);assert.equal(sampled,calls);assert.equal(mode.scene.children.length,0);
+ }
+});
 test('voyage store validates finite coordinates and preserves malformed/future saves',()=>{
  const storage=memory(),store=createOceanVoyageStore({storage,now:()=>200});assert.equal(store.read(),null);assert.equal(store.write(record()).saved,true);assert.equal(store.read().revision,1);
  for(const mutate of [v=>v.site.lat=91,v=>v.sub.x=Infinity,v=>v.ship.condition=-1,v=>v.version=2,v=>v.subId='',v=>v.waveOffset.z=NaN]){const value=record();mutate(value);assert.equal(validateOceanVoyage(value),null);}
