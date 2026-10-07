@@ -3,6 +3,7 @@ import {createResearchDeck} from './boat-mode/research/runtime.js';
 import {addBoatSwimLadder,createBoatSwimming} from './boat-mode/swimming.js';
 import { ctx as appCtx } from "./shared-context.js?v=55";
 import { captureEarthWorldSession } from "./earth-session.js?v=17";
+import { captureEnvironmentSession } from './session-coordinator.js?v=2';
 import {
   DEFAULT_WAVE_INTENSITY,
   SEA_STATE_CONFIG,
@@ -356,6 +357,7 @@ const boatModePolicy = createBoatModePolicy({
 const { canDiveBoatMode, canExitBoatMode } = boatModePolicy;
 
 const boatOceanTransferApi = createBoatOceanTransferApi({
+  captureEnvironmentSession,
   appCtx,
   buildSyntheticBoatCandidate,
   canDiveBoatMode,
@@ -373,7 +375,7 @@ const boatOceanTransferApi = createBoatOceanTransferApi({
   updateWaterWaveVisuals,
   restoreEarthSurfaceLayers: () => syncOpenOceanSurfaceLayers(true)
 });
-const { suspendBoatModeForOceanTransfer, transferBoatToSubmarine, transferSubmarineToBoat } = boatOceanTransferApi;
+const { suspendBoatModeForOceanTransfer, transferBoatToSubmarine, transferSubmarineToBoat, startSurfaceResearchVoyage } = boatOceanTransferApi;
 
 function startBoatMode(options = {}) {
   if (boatSwimming.active) return boatSwimming.board();
@@ -785,6 +787,7 @@ Object.assign(appCtx, {
   suspendBoatModeForOceanTransfer,
   transferBoatToSubmarine,
   transferSubmarineToBoat,
+  startSurfaceResearchVoyage,
   startBoatMode,
   stopBoatMode,
   waterSurfaceYAt,
@@ -813,6 +816,7 @@ export {
   suspendBoatModeForOceanTransfer,
   transferBoatToSubmarine,
   transferSubmarineToBoat,
+  startSurfaceResearchVoyage,
   startBoatMode,
   stopBoatMode,
   waterSurfaceYAt,

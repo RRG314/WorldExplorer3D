@@ -18,12 +18,15 @@ try{
  await page.goto(`http://127.0.0.1:${server.port}/app/?launch=earth&loc=custom&lat=-18.2861&lon=147.7&lname=Coral%20Shelf&diagnostics=1`);
  await page.waitForFunction(()=>globalThis.__WE3D_RUNTIME_READY__,null,{timeout:90000});
  await page.evaluate(async()=>{globalThis.marineCtx=(await import('/app/js/shared-context.js?v=55')).ctx;});
+ await page.evaluate(()=>{globalThis.marineOceanStarts=0;const start=marineCtx.startOceanMode;marineCtx.startOceanMode=(...args)=>{marineOceanStarts++;return start(...args);};});
  if(await page.locator('#analyticsConsentDenyBtn').isVisible())await page.locator('#analyticsConsentDenyBtn').click();
  await page.locator('#globeSelectorOceanBtn').click();
  await page.waitForFunction(()=>marineCtx.boatDeck?.active&&!marineCtx.titleLaunchPending,null,{timeout:120000});console.log('Research deck ready');
  await page.evaluate(()=>marineCtx.setTimeOfDay('day'));
  const snapshot=()=>page.evaluate(()=>({environment:marineCtx.getEnv(),site:{...marineCtx.LOC},vessel:marineCtx.boatMode.transportEntityId,catalog:marineCtx.boatMode.transportCatalogId,deck:marineCtx.boatDeck.snapshot(),diver:marineCtx.oceanMode.diver?.snapshot(),voyage:marineCtx.oceanVoyage.current,paused:marineCtx.paused}));
  report.arrival=await snapshot();assert.equal(report.arrival.catalog,'ocean-research-vessel');assert.equal(report.arrival.deck.active,true);
+ report.directSurface=await page.evaluate(()=>({underwaterStarts:marineOceanStarts,underwaterRenderer:!!marineCtx.oceanMode.renderer,stage:marineCtx.oceanVoyage.current.stage}));
+ assert.deepEqual(report.directSurface,{underwaterStarts:0,underwaterRenderer:false,stage:'aboard'});
  assert.equal(await page.locator('#boatWaveDock').isVisible(),false,'Helm-only wave slider covers deck navigation');
  await page.screenshot({path:`${out}/01-arrival.png`});report.cases.push('fresh ocean selection starts on research deck');
  await page.locator('[aria-label="Deck destination"]').selectOption('dive');

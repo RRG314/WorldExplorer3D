@@ -1,4 +1,7 @@
 import {parentVesselSubmarinePose} from '../ocean/parent-vessel.js';
+import {DEFAULT_OCEAN_SITE} from '../ocean/launch-site.js';
+import {hasOceanEntry} from '../ocean/entry-policy.js?v=1';
+import {ensureOceanVoyage,prepareSurfaceVoyage} from '../ocean/voyage.js';
 import { commitEarthLocationOrigin, earthLocalToGeographic } from '../earth-core/location-origin.js?v=1';
 export function createBoatOceanTransferApi(options = {}) {
   const {
@@ -6,6 +9,7 @@ export function createBoatOceanTransferApi(options = {}) {
     buildSyntheticBoatCandidate,
     canDiveBoatMode,
     captureEarthWorldSession,
+    captureEnvironmentSession,
     findNearestBoatCandidate,
     hideBoatPrompt,
     maxCandidateDistance,
@@ -21,6 +25,16 @@ export function createBoatOceanTransferApi(options = {}) {
   } = options;
 
 let transferPending = false;
+
+function startSurfaceResearchVoyage(options={}) {
+  if(transferPending||appCtx.sharedMarine?.active||options.isTransferCurrent?.()===false)return Promise.resolve(false);
+  const site=options.launchSite||DEFAULT_OCEAN_SITE;
+  if(options.launchSite&&!hasOceanEntry(site,options.entry))return Promise.resolve(false);
+  const voyage=prepareSurfaceVoyage(site,options.waveOffset);
+  if(!voyage)return Promise.resolve(false);
+  // Admission and record preparation precede any environment or save mutation.
+  return transferSubmarineToBoat({...options,source:'ocean-exploration-start',enterDeck:true},voyage);
+}
 
 function suspendBoatModeForOceanTransfer() {
   appCtx.boatDeck?.release();
@@ -109,51 +123,61 @@ async function transferBoatToSubmarine(options = {}) {
   }
 }
 
-async function transferSubmarineToBoat(options = {}) {
+async function transferSubmarineToBoat(options = {},surfaceVoyage=null) {
   if(options.isTransferCurrent?.()===false)return false;
   if(appCtx.sharedMarine?.active && options.source!=='shared-marine-authority')return false;
   if (transferPending) return false;
-  if (!appCtx.oceanMode?.active) return false;
+  const wasUnderwater=!!appCtx.oceanMode?.active;
+  if (!wasUnderwater&&!surfaceVoyage) return false;
   if(appCtx.oceanMode.diver?.active){showBoatPrompt('Board the submarine or use Recover before switching to the surface boat.','notice',promptDurationMs);return false;}
-  const launchSite = appCtx.oceanMode?.launchSite || {};
+  const launchSite = surfaceVoyage?.site || appCtx.oceanMode?.launchSite || {};
   const sub = appCtx.oceanMode?.submarine || {};
-  if (!Number.isFinite(sub?.position?.x) || !Number.isFinite(sub?.position?.z) || !Number.isFinite(launchSite.lat) || !Number.isFinite(launchSite.lon)) {
+  if ((!surfaceVoyage&&(!Number.isFinite(sub?.position?.x)||!Number.isFinite(sub?.position?.z))) || !Number.isFinite(launchSite.lat) || !Number.isFinite(launchSite.lon)) {
     showBoatPrompt('Could not resolve submarine position for boat transfer', 'notice', promptDurationMs);
     return false;
   }
-  appCtx.oceanVoyage?.checkpoint();
-  const voyage=appCtx.oceanVoyage?.current;
+  if(wasUnderwater)appCtx.oceanVoyage?.checkpoint();
+  const voyage=surfaceVoyage||appCtx.oceanVoyage?.current;
   const {lat,lon} = voyage?.ship?.anchor || earthLocalToGeographic(launchSite, appCtx.SCALE, sub.position.x, sub.position.z);
   if (!Number.isFinite(lat) || !Number.isFinite(lon)) return false;
   const customName = String(launchSite.name || 'Ocean Site').replace(/(?: Surface)+$/, '');
   const surfaceWaveOffset = voyage?.waveOffset || {x:sub.position.x+(appCtx.oceanMode?.waveOffset?.x||0),z:sub.position.z+(appCtx.oceanMode?.waveOffset?.z||0)};
   const surfaceYaw = voyage?.ship?.yaw ?? (Number.isFinite(sub.yaw)?sub.yaw:0);
-  const transferVessel = appCtx.boatMode?.oceanTransferVessel || null;
+  const transferVessel = surfaceVoyage?.ship || appCtx.boatMode?.oceanTransferVessel || null;
   const candidate = buildSyntheticBoatCandidate(0,0,{waterKind:'open_ocean',surfaceY:.08,waveOffset:surfaceWaveOffset});
   if(!candidate){showBoatPrompt('Surface vessel unavailable. Your submarine remains here.','notice',promptDurationMs);return false;}
-  const priorOrigin={lat:appCtx.LOC?.lat,lon:appCtx.LOC?.lon};
-  const priorPose={x:sub.position.x,y:sub.position.y,z:sub.position.z,yaw:sub.yaw};
-  const priorWave={...appCtx.oceanMode.waveOffset};
-  let surfaced=false,originCommitted=false;
-  const stillHere=()=>options.isTransferCurrent?.()!==false&&!appCtx.boatMode.active&&!appCtx.oceanMode.active&&(!appCtx.getEnv||appCtx.getEnv()===(appCtx.ENV?.EARTH||'EARTH'))&&(originCommitted?appCtx.LOC?.lat===lat&&appCtx.LOC?.lon===lon:appCtx.LOC?.lat===priorOrigin.lat&&appCtx.LOC?.lon===priorOrigin.lon);
+  const priorOrigin={...appCtx.LOC},priorSelection=appCtx.customLoc?{...appCtx.customLoc}:null;
+  const priorOceanSite={...appCtx.oceanMode?.launchSite},priorVoyage=appCtx.oceanVoyage?.current;
+  const priorPose=wasUnderwater?{x:sub.position.x,y:sub.position.y,z:sub.position.z,yaw:sub.yaw}:null;
+  const priorWave={...appCtx.oceanMode?.waveOffset};
+  const priorBoat=appCtx.boatMode.active?{candidate:appCtx.boatMode.currentWater,spawnX:appCtx.boat.x,spawnZ:appCtx.boat.z,yaw:appCtx.boat.angle,transportEntityId:appCtx.boatMode.transportEntityId,transportCatalogId:appCtx.boatMode.transportCatalogId,condition:appCtx.boatMode.condition,moored:appCtx.boatMode.moored,onDeck:!!appCtx.boatDeck?.active}:null;
+  let surfaced=false,originCommitted=false,session=null;
+  const current=()=>options.isTransferCurrent?.()!==false&&(!session||session.isCurrent());
+  const stillHere=()=>current()&&!appCtx.boatMode.active&&!appCtx.oceanMode?.active&&(!appCtx.getEnv||appCtx.getEnv()===(appCtx.ENV?.EARTH||'EARTH'))&&(originCommitted?appCtx.LOC?.lat===lat&&appCtx.LOC?.lon===lon:appCtx.LOC?.lat===priorOrigin.lat&&appCtx.LOC?.lon===priorOrigin.lon);
   const customLatInput = document.getElementById('customLat');
   const customLonInput = document.getElementById('customLon');
   if (customLatInput) customLatInput.value = lat.toFixed(6);
   if (customLonInput) customLonInput.value = lon.toFixed(6);
 
-  appCtx.setCustomLocation?.({ lat, lon, name: customName });
-
   setPromptSignature('submarine_transfer');
-  showBoatPrompt(voyage?'Recovering submarine to its parent vessel…':'Switching from submarine to surface boat…', 'supported', promptDurationMs);
+  showBoatPrompt(surfaceVoyage?'Preparing your research vessel…':voyage?'Recovering submarine to its parent vessel…':'Switching from submarine to surface boat…', 'supported', promptDurationMs);
 
   transferPending = true;
   try {
+    if(surfaceVoyage){
+      // Capture before rebasing the surface frame; this preserves the previous
+      // location-based Earth visit for the existing return authority.
+      captureEarthWorldSession();
+      if(priorBoat)suspendBoatModeForOceanTransfer();
+    }
     appCtx.exitCurrentEnvironmentSync?.(appCtx.ENV?.EARTH, { source: 'submarine_transfer' });
     appCtx.commitEnvironment?.(appCtx.ENV?.EARTH, { source: 'submarine_transfer' });
+    session=captureEnvironmentSession?.();
     if (typeof appCtx.showTransitionLoad === 'function') {
       await appCtx.showTransitionLoad('earth', 700);
     }
     if(!stillHere())return false;
+    appCtx.setCustomLocation?.({ lat, lon, name: customName });
     // A submarine surfaces into the modeled open-ocean patch, not a terrestrial
     // OSM scene. Waiting for a complete road/building/vegetation reload here
     // both delays control and can place land cover over the boat. The explicit
@@ -197,17 +221,18 @@ async function transferSubmarineToBoat(options = {}) {
     if (surfaced) {
       appCtx.boatMode.oceanTransferVessel = null;
       appCtx.boatMode.moored = !!voyage;
-      appCtx.oceanVoyage?.surfaced();
+      if(surfaceVoyage)ensureOceanVoyage(appCtx).beginAboard(surfaceVoyage);
+      else appCtx.oceanVoyage?.surfaced();
       appCtx.resetMinimapView?.();
       appCtx.drawMinimap?.();
       if(options.enterDeck!==false && appCtx.boatMode.transportCatalogId==='ocean-research-vessel') {
         await appCtx.setPlanetaryCharacter?.('earth');
-        if(appCtx.boatMode.active && appCtx.LOC?.lat===lat && appCtx.LOC?.lon===lon) {
+        if(current() && appCtx.boatMode.active && appCtx.boatMode.transportEntityId===(transferVessel?.transportEntityId||appCtx.boatMode.transportEntityId) && appCtx.LOC?.lat===lat && appCtx.LOC?.lon===lon) {
           if(!appCtx.boatDeck?.enter(true)) showBoatPrompt('Your vessel is ready. Choose Walk research deck when the explorer finishes loading.','notice',promptDurationMs);
         }
       }
     }
-    return surfaced;
+    return surfaced&&current();
   } catch (error) {
     console.warn('[BoatMode] submarine transfer failed', error);
     setPromptSignature('submarine_transfer_error');
@@ -215,12 +240,19 @@ async function transferSubmarineToBoat(options = {}) {
     return false;
   } finally {
     try{if(!surfaced&&stillHere()){
-      const restored=await appCtx.startOceanMode?.({launchSite:{...launchSite},entry:{lat:launchSite.lat,lon:launchSite.lon,source:'mapped-boat-water',kind:'mapped-water-area'},waveOffset:priorWave,submarinePose:priorPose,voyageResume:voyage,isTransferCurrent:stillHere});
-      showBoatPrompt(restored?'Surface transfer failed. Returned to your submarine.':'Recovery could not finish. Resume your saved voyage from the location menu.','notice',promptDurationMs);
+      if(wasUnderwater){
+        const restored=await appCtx.startOceanMode?.({launchSite:priorOceanSite,entry:{lat:priorOceanSite.lat,lon:priorOceanSite.lon,source:'mapped-boat-water',kind:'mapped-water-area'},waveOffset:priorWave,submarinePose:priorPose,voyageResume:priorVoyage,isTransferCurrent:stillHere});
+        showBoatPrompt(restored?'Surface transfer failed. Returned to your submarine.':'Recovery could not finish. Resume your saved voyage from the location menu.','notice',promptDurationMs);
+      }else{
+        if(Number.isFinite(priorOrigin.lat)&&Number.isFinite(priorOrigin.lon))commitEarthLocationOrigin(appCtx,priorOrigin);
+        if(priorSelection)appCtx.setCustomLocation?.(priorSelection);
+        if(priorBoat&&startBoatMode({...priorBoat,allowSynthetic:!!priorBoat.candidate?.source?.synthetic})){appCtx.boatMode.moored=priorBoat.moored;if(priorBoat.onDeck)appCtx.boatDeck?.enter();}
+        showBoatPrompt('The research vessel could not start. Your saved voyage is retained.','notice',promptDurationMs);
+      }
     }}catch{showBoatPrompt('Recovery could not finish. Your saved voyage is retained.','notice',promptDurationMs);}finally{transferPending=false;}
   }
 }
 
 
-  return { suspendBoatModeForOceanTransfer, transferBoatToSubmarine, transferSubmarineToBoat };
+  return { suspendBoatModeForOceanTransfer, transferBoatToSubmarine, transferSubmarineToBoat, startSurfaceResearchVoyage };
 }

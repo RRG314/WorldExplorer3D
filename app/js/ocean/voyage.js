@@ -3,6 +3,15 @@ import {styleMarinePanel} from './interface.js';
 import {earthLocalToGeographic} from '../earth-core/location-origin.js?v=1';
 import {createOceanVoyageStore,validateOceanVoyage} from './voyage-store.js';
 const id=()=>globalThis.crypto?.randomUUID?.()||`voyage-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+// Preparing an aboard journey allocates data only; it must not create an
+// underwater renderer or write a save before the surface vessel is accepted.
+export function prepareSurfaceVoyage(site,waveOffset={x:0,z:0}) {
+ const voyageId=id();
+ return validateOceanVoyage({version:1,id:voyageId,subId:`sub:research:${voyageId}`,stage:'aboard',revision:0,savedAt:Date.now(),
+  site:{...site},waveOffset:{x:Number(waveOffset.x)||0,z:Number(waveOffset.z)||0},
+  ship:{transportEntityId:`research:${voyageId}`,transportCatalogId:'ocean-research-vessel',condition:1,yaw:0,anchor:{lat:site.lat,lon:site.lon}},
+  sub:{x:0,y:-8.5,z:0,yaw:Math.PI,condition:1}});
+}
 export function ensureOceanVoyage(ctx,{store=createOceanVoyageStore()}={}){
  if(ctx.oceanVoyage)return ctx.oceanVoyage;
  const setText=(element,text)=>{if(element.textContent!==text)element.textContent=text;};
@@ -34,6 +43,11 @@ export function ensureOceanVoyage(ctx,{store=createOceanVoyageStore()}={}){
   return commit();
  }
  function surfaced(){if(!current)return;current={...current,stage:'aboard'};commit();}
+ function beginAboard(record){
+  const accepted=validateOceanVoyage(record);
+  if(!accepted||accepted.stage!=='aboard'||ctx.sharedMarine?.active)return false;
+  current=accepted;elapsed=0;commit();return current;
+ }
  function surfaceCheckpoint(){
   if(!current||current.stage!=='aboard'||!ctx.boatMode?.active||ctx.boatMode.transportEntityId!==current.ship.transportEntityId)return false;
   const anchor=earthLocalToGeographic(ctx.LOC,ctx.SCALE,ctx.boat.x,ctx.boat.z);if(!Number.isFinite(anchor?.lat)||!Number.isFinite(anchor?.lon))return false;
@@ -89,7 +103,7 @@ export function ensureOceanVoyage(ctx,{store=createOceanVoyageStore()}={}){
   const more=document.createElement('details'),summary=document.createElement('summary');summary.textContent='Voyage details & crew';more.append(summary,distance,statusElement,shared);
   panel.append(title,site,scan,recover,more);for(const control of panel.querySelectorAll('button,select'))control.removeAttribute('style');document.body.append(panel);ui={resume:resumeButton,panel,title,status:statusElement,distance,recover,scan,site};refresh();
  }
- const api={restorePersonal(){if(personalBeforeShared){current=personalBeforeShared.current;personalBeforeShared=null;}return current;},begin,checkpoint,surfaceCheckpoint,surfaced,tick,tickSurface,mount,resume,refresh,get current(){return current},get saved(){return saved},get status(){return status}};
+ const api={restorePersonal(){if(personalBeforeShared){current=personalBeforeShared.current;personalBeforeShared=null;}return current;},begin,beginAboard,checkpoint,surfaceCheckpoint,surfaced,tick,tickSurface,mount,resume,refresh,get current(){return current},get saved(){return saved},get status(){return status}};
  ctx.oceanVoyage=api;
  if(typeof window!=='undefined')window.addEventListener('pagehide',()=>ctx.oceanMode?.active?checkpoint():surfaceCheckpoint());
  return api;

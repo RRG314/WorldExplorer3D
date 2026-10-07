@@ -144,6 +144,7 @@
       "sampleDynamicWaterAt",
       "setBoatWaveIntensity",
       "startBoatMode",
+      "startSurfaceResearchVoyage",
       "stopBoatMode",
       "suspendBoatModeForOceanTransfer",
       "transferBoatToSubmarine",

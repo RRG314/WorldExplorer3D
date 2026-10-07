@@ -37,12 +37,7 @@ import {
 import { createLifecycleScope } from './runtime/lifecycle-scope.js?v=2';
 import {acceptedSimulationDelta} from './runtime/simulation-clock.js';
 
-const OCEAN_SITE = Object.freeze({
-  name: 'Coral Shelf Reserve',
-  region: 'Great Barrier Reef',
-  lat: -18.2861,
-  lon: 147.7000
-});
+import {DEFAULT_OCEAN_SITE as OCEAN_SITE} from './ocean/launch-site.js';
 
 const OCEAN_CONSTANTS = Object.freeze({
   MAX_SPEED: 32.0,

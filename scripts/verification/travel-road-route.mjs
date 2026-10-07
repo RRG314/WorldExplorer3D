@@ -35,7 +35,8 @@ export async function followRoadRoute(page,route,signal,{mode='drive'}={}) {
   const setKey=async(key,down)=>{if(down===held.has(key))return;if(down){await page.keyboard.down(key);held.add(key);}else{await page.keyboard.up(key);held.delete(key);}};
   try{
     while(!signal.stopped){
-      const pose=await page.evaluate(()=>{const a=globalThis.__WE3D_TRAVEL_ACTOR__;return {x:a.x,z:a.z,angle:a.angle,speed:a.speed,yawRate:a.yawRate,at:performance.now()};});
+      const pose=await page.evaluate(walking=>{const a=globalThis.__WE3D_TRAVEL_ACTOR__;return {x:a.x,z:a.z,angle:walking?a.yaw:a.angle,speed:walking?Math.hypot(a.vx||0,a.vz||0):a.speed,yawRate:a.yawRate,at:performance.now()};},mode==='walk');
+      if(![pose.x,pose.z,pose.angle,pose.speed].every(Number.isFinite))throw Error('Travel driver received an invalid actor pose');
       let a=points[segment],b=points[segment+1],dx=b.x-a.x,dz=b.z-a.z,length=Math.hypot(dx,dz);
       let t=((pose.x-a.x)*dx+(pose.z-a.z)*dz)/(length*length);
       while((t>=1||Math.hypot(pose.x-b.x,pose.z-b.z)<3)&&segment<points.length-2){
