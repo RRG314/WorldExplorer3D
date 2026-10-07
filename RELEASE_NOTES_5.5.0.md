@@ -55,6 +55,7 @@ Nearby actor queries, road-detail scheduling, shoreline checks and rendering
 create less temporary work. Character capability checks use the information they
 need without repeatedly copying progression history or the entire Backpack.
 This also corrects stale capability results after character changes.
+Image-processing and backend dependencies include current security fixes.
 
 ## What still needs work
 

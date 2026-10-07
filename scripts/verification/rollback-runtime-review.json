@@ -1036,9 +1036,9 @@
     "config/runtime-dependencies.json": {
       "before": "8a4326a32df9b80049c3e43e46c5f887f1cc93a6b96d1860bebf62e575bb1b10",
       "beforeMode": "100644",
-      "after": "5d8ff06432ee9dbd0bb58a40a42bf0c6fc201ed85cf0bcc14316d226c8ab2cba",
+      "after": "8a7a274e3dcc8242d339f2a877879dfc5c7fad38541c3049aeae0b20ef7fc088",
       "afterMode": "100644",
-      "review": "Refreshes the reviewed root lock hash for version-only edits; all dependency versions and integrity pins remain unchanged."
+      "review": "Refreshes the reviewed root lock hash for version-only edits; all dependency versions and integrity pins remain unchanged. Follow-up review: Reviews both locks after targeted sharp 0.35.5 and proxy-addr 2.0.8 fixes, including the matching sharp integrity pin; other direct versions and vendor bytes remain unchanged."
     },
     "config/system-release-gates.json": {
       "before": "d5184bd18f6b116f90c94820c9b6581750722fdb82217ad44fb0d5a5f752fbae",
@@ -1053,6 +1053,20 @@
       "after": "cc545151be841117aa19e073cb19a75c66686f6841197eb4b34e56f2fa1add56",
       "afterMode": "100644",
       "review": "Audit metadata classified fail-closed as runtime by fingerprint tool; not shipped or imported by gameplay. Contains source inventory counts, not player data."
+    },
+    "functions/package-lock.json": {
+      "before": "0c3add62f22c741bdccb438c7b15fea4619549c286b73518e28b607df186f9e2",
+      "beforeMode": "100644",
+      "after": "361e666b1a0f449fc19a9827749eb4a8ad35357e74719a5be4de2655f8176ab5",
+      "afterMode": "100644",
+      "review": "Sharp/native/libvips patch plus proxy-addr 2.0.8 trust-subnet correction; no unrelated packages changed. Capture decoder and backend authorization checks verify compatibility."
+    },
+    "functions/package.json": {
+      "before": "073161fa367108603dbee47e9a99ef4fd46b3421afdf9d49a8ef00e06a744f4c",
+      "beforeMode": "100644",
+      "after": "4794b4d8338b23455ec6d56f51b8afd1ed45de71f9bb9f79fe250dd88fa624f2",
+      "afterMode": "100644",
+      "review": "Pins sharp 0.35.5 for the upstream librsvg security patch; photo admission rules, saved schemas and HTTP contracts unchanged."
     },
     "github-pages/index.html": {
       "before": "b8b3fe53410032da5665abafaca6841fea2d7a3a45ff262df8f1b3a3877a11fe",
@@ -1071,9 +1085,9 @@
     "package-lock.json": {
       "before": "5e574f939a5aa4443301b32b0edd7f854ae4c3dea6c50002037caee06eb9531c",
       "beforeMode": "100644",
-      "after": "6d804bfcd3bf222e326f610c2b32aaf626fa7179bdad0640c4a241b208f2feda",
+      "after": "72be3152746aa26e945253a3f57220c6b944ca97aa96a395cd6901f551356a69",
       "afterMode": "100644",
-      "review": "Only the product and root package version change to 5.5.0; dependencies and integrity unchanged."
+      "review": "Only the product and root package version change to 5.5.0; dependencies and integrity unchanged. Follow-up review: Product version 5.5.0 plus sharp 0.35.5 and its matching native/libvips packages; no unrelated dependency changes. Build-time image decoding patch, no save format."
     },
     "package.json": {
       "before": "75010bfd649267cc55e8ad5509e964f07bc481352df4c0c9f07a18d172011a14",

@@ -4,6 +4,8 @@ Notable user-facing changes are recorded here. Git history and GitHub releases c
 
 ## [5.5.0] - Unreleased
 
+- Updated image-processing and backend proxy dependencies for current security fixes.
+
 ### Added
 
 - Direct research-vessel ocean starts, deck-to-water exploration, automatic

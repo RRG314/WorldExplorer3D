@@ -329,7 +329,7 @@
   "locks": [
     {
       "path": "package-lock.json",
-      "sha256": "6d804bfcd3bf222e326f610c2b32aaf626fa7179bdad0640c4a241b208f2feda",
+      "sha256": "72be3152746aa26e945253a3f57220c6b944ca97aa96a395cd6901f551356a69",
       "direct": [
         {
           "package": "@babel/parser",
@@ -395,7 +395,7 @@
     },
     {
       "path": "functions/package-lock.json",
-      "sha256": "0c3add62f22c741bdccb438c7b15fea4619549c286b73518e28b607df186f9e2",
+      "sha256": "361e666b1a0f449fc19a9827749eb4a8ad35357e74719a5be4de2655f8176ab5",
       "direct": [
         {
           "package": "firebase-admin",
@@ -414,8 +414,8 @@
         },
         {
           "package": "sharp",
-          "version": "0.35.4",
-          "integrity": "sha512-n++8XWcj+jCOr2IOl7h8LbKnGBDY4aPbmprMONBNFdn0ImXqpGVv5zliDs0V9HbmbCQLpbuo2ej9rAoOQTvMDA=="
+          "version": "0.35.5",
+          "integrity": "sha512-Ywn4OnzGukp7CDMrp08RQ50YKmuwG47brZgIVPTvBaaAfQlRlygrRqSrxdCiL9M+LlzLBiJ68IR1QqvzHyjC7g=="
         },
         {
           "package": "stripe",
