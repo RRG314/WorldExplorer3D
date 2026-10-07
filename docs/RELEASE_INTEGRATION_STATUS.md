@@ -16,13 +16,19 @@ ledger, rather than the public release body.
 
 ## Remaining acceptance
 
-The current package is built from runtime source `316ba33d`. Its provider and
-sustained-performance checks are in progress; the complete package and backend
-matrices still need current results. Source Monaco junction and actual tunnel
+The current package and hosted preview are built from source `135e3895`, with the
+same game payload as `316ba33d`. Packaged-world preflight passes. Live providers
+pass on that payload; sustained movement still has visible pauses, and the
+retention run was interrupted to protect disk space. The complete package and
+backend matrices still need current results. Source Monaco junction and actual tunnel
 traversal checks pass after the latest clearance repair. The first full candidate
 run found remaining resource and performance failures as well as expired test
 credentials; those receipts are preserved. Physical-device, uncoached-player,
-save/rollback and coordinated hosted-service acceptance remain open.
+and coordinated hosted-service acceptance remain open. The complete packaged
+save upgrade, fallback write and candidate return now pass with existing records
+and unrelated pending account data preserved. Owner-authorized cleanup removed obsolete
+raw diagnostic data and superseded staging packages while retaining their source
+history, compact reports, production and reviewed rollback artifacts.
 
 The research vessel still uses its existing custom model. The licensed vessel,
 broader wildlife and ocean activities, spearfishing, and unrestricted continuous

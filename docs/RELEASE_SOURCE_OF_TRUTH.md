@@ -2,10 +2,12 @@
 
 ## Current observation — October 7, 2026
 
-Fresh hosted manifest: **5.4.0+1532bdfbb5c1.319d215f60318297.production**, source **1532bdfbb5c11e002d278b058d1ebdba88384f60**. The next compatible release is 5.5.0. Current work remains on steven/visual-quality and is not deployed. The existing preview still serves 5.4.0+86fdc6e3e6a2.febba16c0a5e3daa.staging. Production has 78 Functions; getPlaceLookup and getEnvironmentalData are absent and need a coordinated backend rollout. The preserved dist and historical execution receipts are not acceptance of this new source. See [current state](../CURRENT-STATE.md) and [finite release gates](product-audit/2026-10-01/RELEASE-ACCEPTANCE.md).
+Fresh hosted manifest: **5.4.0+1532bdfbb5c1.319d215f60318297.production**, source **1532bdfbb5c11e002d278b058d1ebdba88384f60**. The next compatible release is 5.5.0. Current work remains on steven/visual-quality and has reached the hosted preview, not production. Production has 78 Functions; getPlaceLookup and getEnvironmentalData are absent and need a coordinated backend rollout. Historical execution receipts are not complete acceptance of this candidate. See [current state](../CURRENT-STATE.md) and [finite release gates](product-audit/2026-10-01/RELEASE-ACCEPTANCE.md).
 
-The current local candidate is `5.5.0+316ba33d0d7f.e85c0302553a7fda.staging`, built from runtime source
-`316ba33d0d7f6e75c4054fe7bcf92682c8b33d29`. It has 615 verified files. Staging's aircraft gateway is
+The current local and hosted preview candidate is `5.5.0+135e3895f89d.e85c0302553a7fda.staging`, built from source
+`135e3895f89dc4459e073bd9ac85dbef2087420f`. It has 615 verified files; its game payload is identical
+to `316ba33d`, with subsequent changes confined to release verification. The preview's complete-world
+preflight passes. Staging's aircraft gateway is
 version 6 with its existing parameters preserved; production Functions are unchanged.
 The complete current-package acceptance remains pending.
 

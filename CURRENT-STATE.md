@@ -18,18 +18,21 @@ only owned browsers and servers. Ordinary user Chrome must remain open.
 | Surface | Current identity |
 | --- | --- |
 | Production | `5.4.0+1532bdfbb5c1.319d215f60318297.production` |
-| Existing hosted preview | `5.4.0+86fdc6e3e6a2.febba16c0a5e3daa.staging` |
-| Local immutable candidate | `5.5.0+316ba33d0d7f.e85c0302553a7fda.staging` |
-| Candidate runtime source | `316ba33d0d7f6e75c4054fe7bcf92682c8b33d29` |
+| Hosted preview | `5.5.0+135e3895f89d.e85c0302553a7fda.staging` |
+| Local immutable candidate | `5.5.0+135e3895f89d.e85c0302553a7fda.staging` |
+| Candidate source | `135e3895f89dc4459e073bd9ac85dbef2087420f` |
 
 The candidate has 615 verified files. Its asset manifest SHA256 is
 `c46fe0700a1f804fafd19531896587a217134a48f18691015dcb095d21d442e0`.
-Earlier candidates and the compatible `37a12d11` rollback artifact remain retained.
+The compatible `37a12d11` rollback, production, earlier hosted preview and recent
+`1033`/`316` diagnostic packages remain retained. Forty-seven obsolete clean
+staging packages were removed at the owner's request after their source was
+verified in pushed Git ancestry; their manifests and test reports remain.
 A documentation-only commit does not change this packaged runtime identity.
 
 ## Completed verification and repairs
 
-The full source chain passes **2,108 tests**, dependency/source/ownership/type
+The full source chain passes **2,109 tests**, dependency/source/ownership/type
 checks, inventory and sensitivity checks. GitHub PR and secret scanning pass.
 The targeted dependency audits report no known vulnerabilities.
 
@@ -58,17 +61,37 @@ body delivery. Focused provider tests pass. Staging `getAircraftStates` version 
 is ACTIVE with the existing deployment parameters verified unchanged. No
 production Function was changed.
 
+The current preview was deployed after its packaged-world preflight passed all
+29 checks with no browser errors or failed local resources. Hosted manifests
+confirm the preview identity above and unchanged production. The rollback
+verifier now streams large Git blobs and awaits the visible Start control.
+Large-asset corruption regression and all 160 reviewed file pairs pass.
+
 ## Remaining release work
 
-Current-package live-provider and sustained performance checks are in progress.
-The complete current candidate and backend matrices, save/fallback/write/return,
-ordinary hosted journey, named physical devices and uncoached player acceptance
+Live providers passed on the identical `316` game payload. Seven sustained
+movement windows completed: five fail the hitch limits, with worst observed
+walking/drive frames of 583.2/366.6 ms. The cleanup sequence was stopped after six
+reported reload cycles when disk availability fell to 541 MiB; remaining cleanup
+and mobile checks are incomplete. Obsolete private heap captures and inactive
+test-browser data were then removed at the owner's request, recovering about
+3.8 GiB; pruning old staging packages recovered additional space. Compact
+diagnostic reports and analysis scripts were preserved. No threshold was relaxed.
+
+The complete packaged save upgrade → fallback write → candidate return journey
+passes, retaining 64 seeded items, existing and new records, equipment controls
+and unrelated pending account data. No browser errors or failed local requests
+were recorded.
+The complete current candidate and backend matrices, ordinary hosted journey,
+named physical devices and uncoached player acceptance
 still need current evidence. The old resource baseline covers 25,529 Baltimore
 buildings; restored coverage retains 49,023. No coverage was removed or resource
 threshold silently changed to turn that mismatch into a pass.
 
 PR [96](https://github.com/RRG314/WorldExplorer3D/pull/96) and release `v5.5.0` are
-drafts. Stable, public Pages and production have not been promoted. Production
+drafts. Stable, public Pages and production have not been promoted. The updated
+preview is available at `https://we3d-staging-20260712--visual-review-1005-e5075bnu.web.app`.
+Production
 still needs its coordinated place/environment provider rollout.
 
 The licensed replacement research vessel, broader ocean wildlife/activities,
