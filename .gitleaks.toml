@@ -12,6 +12,8 @@ paths = [
   '''public/__/firebase/init\.(js|json)'''
 ]
 regexes = [
+  # Exact device-local save namespace; it grants no authentication or access.
+  '''^we3d\.ocean\.voyage\.v1$''',
   '''sk_(live|test)_\.\.\.''',
   '''whsec_\.\.\.''',
   '''price_\.\.\.'''
