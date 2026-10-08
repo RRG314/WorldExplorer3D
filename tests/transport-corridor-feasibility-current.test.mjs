@@ -35,3 +35,27 @@ test('incomplete routes cannot become a constraint authority',()=>{
  const f=fixture();f.features.forEach(r=>r.transportRecord.routeState='incomplete');
  assert.equal(f.solve().anchorsByFeature.size,0);
 });
+
+test('nearby terrain and obstruction samples cannot displace exact shared road nodes',()=>{
+ // Actual Baltimore failure: a surface crossing 4.9 mm before the Central
+ // Avenue approach node replaced its station during sample deduplication.
+ // That made a feasible 8.5% profile look infeasible and discarded all ties.
+ const length=17.75103230740185, middle=10.992434576769382;
+ const low=-1.4986537945414529, mid=-.5642968555160554, high=.010183951587704465;
+ for(const auxiliary of ['ordinary','obstruction']){
+  const road={type:'service',width:5,surfaceBias:.08,pts:[{x:0,z:0},{x:length,z:0}],
+   structureSemantics:{terrainMode:'at_grade'},
+   structureTransitionAnchors:[[0,low,'start'],[middle,mid,null],[length,high,'end']].map(([distance,targetSurfaceY,endpoint])=>({
+    distance,targetSurfaceY,endpoint,span:length,source:'transport_graph_node',engineeredApproach:true
+   }))};
+  if(auxiliary==='ordinary')road.ordinaryStreetAnchors=[{distance:middle-.004897592523930072,targetSurfaceY:3.34}];
+  else road.tunnelObstructionLimits=[{start:middle-.004897592523930072,end:middle+.004,maximumSurfaceY:3.34}];
+  const model=compileTransportSurfaceModel(road,()=>3.24);
+  assert.ok([...model.distances].includes(middle),`${auxiliary} displaced the authoritative station`);
+  for(const anchor of road.structureTransitionAnchors){
+   const i=[...model.distances].indexOf(anchor.distance);
+   assert.ok(i>=0);assert.ok(Math.abs(model.centerHeights[i]-anchor.targetSurfaceY)<1e-6,auxiliary);
+  }
+  assert.ok(model.stats.maximumGrade<=.08501,'the shared height must not introduce a vertical cliff');
+ }
+});

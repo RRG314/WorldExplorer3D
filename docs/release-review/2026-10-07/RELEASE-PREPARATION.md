@@ -110,9 +110,12 @@ pavement owner. The repaired Manhattan scene now passes actual intersection and
 bridge driving in both directions, lower-bore exit and mapped-footway walking.
 The first bridge test failed and led to a further repair: lower retaining-wall
 tops and their collision margins must respect an overlying road. Fallback paved
-paths now share the resident concrete pattern and scale. Final material images were inspected and all 2,133 source tests plus dependency,
-ownership, type, inventory and sensitivity checks pass. The new immutable package
-and release checks remain pending. A cold Baltimore source action run exceeded
+paths now share the resident concrete pattern and scale. Final material images were inspected and all 2,134 source tests plus dependency,
+ownership, type, inventory and sensitivity checks pass. The first new package failed continuity at nine Baltimore joins before deploy.
+The measured cause was a nearby terrain station displacing an exact junction
+station. Its regression and the actual corrected scene now pass, with zero
+broken joins across 741 samples. The replacement package and release checks
+remain pending. A cold Baltimore source action run exceeded
 its 90-second startup limit; it remains failed loading evidence, with no runtime
 exception recorded. Both prescribed movement bursts subsequently pass with staging services
 configured and a documented longer diagnostic wait. Optional Overpass failures

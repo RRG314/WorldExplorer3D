@@ -213,7 +213,8 @@ function compileTransportSurfaceModel(feature, sampleTerrainY, options = {}) {
   const sourceSampleDistances = createSampleDistances(
     total,
     options.sampleStep,
-    exactGraphNodeDistances.concat((feature.ordinaryStreetAnchors||[]).map(a=>a.distance),
+    exactGraphNodeDistances,
+    (feature.ordinaryStreetAnchors||[]).map(a=>a.distance).concat(
       (feature.tunnelObstructionLimits || []).flatMap(limit => [limit.start, limit.end]))
   );
   // All nine published numeric fields have the model's lifetime. Use one

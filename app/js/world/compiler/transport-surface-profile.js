@@ -53,11 +53,11 @@ function tangentAtDistance(points, pathDistances, distance) {
   };
 }
 
-function createSampleDistances(totalDistance, sampleStep, exactDistances = []) {
+function createSampleDistances(totalDistance, sampleStep, exactDistances = [], auxiliaryDistances = []) {
   const total = Math.max(0, finiteNumber(totalDistance));
   const step = Math.max(0.5, finiteNumber(sampleStep, DEFAULT_SAMPLE_STEP));
   const segmentCount = Math.max(1, Math.ceil(total / step));
-  const exact = exactDistances
+  const normalize = values => values
     .map((distance) => clamp(finiteNumber(distance, NaN), 0, total))
     // Projection round-off can place an endpoint graph station fractions of
     // a millimetre beside the mathematically identical polyline endpoint.
@@ -67,6 +67,13 @@ function createSampleDistances(totalDistance, sampleStep, exactDistances = []) {
     .filter(Number.isFinite)
     .sort((left, right) => left - right)
     .filter((value, index, values) => index === 0 || Math.abs(value - values[index - 1]) > 0.01);
+  const primary = normalize(exactDistances);
+  // Surface-fit samples and roof edges may lie millimetres beside an exact
+  // transport node. Keep the node's original station: shifting it can make
+  // a feasible design-grade constraint appear impossible to the solver.
+  const secondary = normalize(auxiliaryDistances).filter(distance =>
+    !primary.some(node => Math.abs(node - distance) <= 0.01));
+  const exact = primary.concat(secondary).sort((left, right) => left - right);
   // Exact graph nodes are hard samples. Keeping a regular sample only a few
   // centimetres beside one creates a numerically tiny road segment; a later
   // exact-node assignment then turns an otherwise smooth profile into a

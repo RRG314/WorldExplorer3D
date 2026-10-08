@@ -51,7 +51,7 @@ Retaining wall tops now respect an overlying road/bridge, with the visible and
 collision geometry sharing that boundary. Compiled structure collisions use a
 0.02 world-unit vertical margin instead of the approximate-building 0.45 margin.
 
-The complete source suite passes **2,133 tests**, inventory and sensitivity after
+The complete source suite passes **2,134 tests**, inventory and sensitivity after
 the wall/material additions. The focused wall/tunnel/collision and
 pavement/publication/ownership checks also pass. Manhattan keyboard driving passes both ways
 across West 33rd Street and the West 35th Street bridge, plus the lower tunnel
@@ -66,7 +66,16 @@ that failure remains open, not converted into a loading/performance pass. The fi
 three images were inspected. Near pavement took 23.35 seconds to build and
 30.3 seconds from the arrival capture to acceptance, following an earlier
 41-second build. These variable source diagnostics do not establish release
-loading/performance acceptance. A new packaged candidate remains pending.
+loading/performance acceptance. The first updated package (`00c56b56`) failed its world preflight before any
+preview deployment: 28 checks passed, but nine Baltimore joins had height gaps.
+A diagnostic identified auxiliary terrain stations replacing exact junction
+stations by 4.9–5.0 mm, which made a feasible 8.5% grade appear infeasible. Exact
+transport stations now take priority over nearby ordinary/obstruction samples.
+The regression failed before the repair; all 22 focused tests now pass. Actual
+Baltimore movement then passes with zero discontinuities across 741 joins,
+49,023 buildings, 18,952 roads and no game errors. Both screenshots were inspected.
+The complete source chain now passes 2,134 tests. A replacement package and
+its normal preflight remain pending; neither failed run was relabeled passing.
 
 The first complete candidate matrix on the previous `1033fb88` package finished
 61 passes and 30 failures. Twenty-one later checks stopped before gameplay when
