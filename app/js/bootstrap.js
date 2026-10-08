@@ -1,4 +1,6 @@
 // ES module bootstrap: modular loader + legacy app compatibility.
+// The runtime binds shell controls, so wait for that module before booting.
+import './app-shell-fragments.js?v=91';
 import {
   classicScripts,
   moduleEntrypoint,
@@ -142,24 +144,7 @@ async function boot() {
         cause: error?.cause || null
       })
     );
-    const loadingText = document.getElementById('loadText');
-    if (loadingText) {
-      loadingText.textContent = 'The game could not finish starting. Please reload to try again.';
-    }
-    const loading = document.getElementById('loading');
-    if (loading) {
-      loading.dataset.state = 'error';
-      loading.setAttribute('aria-busy', 'false');
-      loading.classList.add('show');
-    }
-    const title = document.getElementById('loadTitle');
-    if (title) title.textContent = 'Let’s try that again';
-    const note = document.getElementById('loadNote');
-    if (note) note.textContent = 'Something interrupted loading. Check your connection, then try again.';
-    const progress = document.getElementById('loadProgress');
-    if (progress) progress.hidden = true;
-    const retry = document.getElementById('loadRetry');
-    if (retry) retry.hidden = false;
+    globalThis.dispatchEvent(new CustomEvent('we3d:startup-failed'));
     if (new URLSearchParams(location.search).get('startupDiagnostics') === '1') showStartupDiagnostics('Startup failed before the app booted');
   }
 }

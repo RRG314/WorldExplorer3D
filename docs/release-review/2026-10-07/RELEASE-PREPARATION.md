@@ -193,3 +193,20 @@ visual correction. See CURRENT-STATE for the separate unmatched-workload terrain
 publication observation; no speculative repair was applied.
 
 Compact loading correction: complete source verification passes 2,141 tests, dependency/source/ownership/type checks, inventory and sensitivity. The 7099ad4c compact-loading preview is now hosted after 29/29 packaged-world checks. Both hosted manifests match local bytes, with zero browser errors or failed local resources. Production remains 5.4; the PR and v5.5.0 release remain drafts, with updated loading copy and current immutable links.
+
+
+## Chrome initial-startup recovery
+
+The owner reported a blank page before world entry. The ordinary Chrome journey
+on this Mac completed, but a controlled unavailable-bootstrap test reproduced
+an entirely blank screen. Recovery previously depended on modules that could
+fail before it existed. The same loading markup now ships in initial HTML, with
+an independent startup owner, critical-script failure handling, a delayed reload
+offer and an explicit ready handoff. Shell controls are a bootstrap dependency.
+Six lifecycle regressions, ten existing loading/script tests, four Chrome browser
+groups and the five themed UI groups pass. The real prescribed startup/menu/world
+journey passes both input bursts with no browser/runtime errors; images inspected.
+The actual cause on the owner's Chrome device is unconfirmed. No road, terrain,
+provider or account protection was changed as part of this repair.
+
+Chrome startup repair: complete source verification passes 2,147 tests plus dependency, ownership, type, inventory and sensitivity checks. Packaging and preview verification follow.

@@ -28,7 +28,8 @@ as you leave a place.
 
 Loading now shows a progress bar, a clear note about longer waits, and short
 tips about travel, fieldwork, ocean outings and space exploration. Browse the
-tips yourself or let them rotate while your location takes shape.
+tips yourself or let them rotate while your location takes shape. Initial game
+startup also stays visible, with a reload option if required files cannot load.
 
 ![Baltimore streets and regional buildings during drone flight](assets/readme/baltimore-coverage-5.5.png)
 

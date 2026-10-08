@@ -231,11 +231,11 @@ async function rewriteGameHtml(runtime, groundData) {
   }).trim();
   const replacement = [
     `<script>globalThis.__WORLD_EXPLORER_PRODUCTION__ = Object.freeze(${productionConfig});</script>`,
-    `<script type="module" src="${runtime.entries['app-shell-fragments']}"></script>`,
+    `<script type="module" data-startup-critical src="${runtime.entries['app-shell-fragments']}"></script>`,
     `<script type="module" src="${runtime.entries['app-auth-shell']}"></script>`,
-    `<script type="module" src="${runtime.entries.bootstrap}"></script>`
+    `<script type="module" data-startup-critical src="${runtime.entries.bootstrap}"></script>`
   ].join('\n');
-  const sourceScripts = /<script type="module" src="js\/app-shell-fragments\.js\?v=\d+"><\/script>\s*<script type="module" src="js\/app-auth-shell\.js\?v=\d+"><\/script>\s*<script type="module" src="js\/bootstrap\.js\?v=\d+"><\/script>/;
+  const sourceScripts = /<script type="module" data-startup-critical src="js\/app-shell-fragments\.js\?v=\d+"><\/script>\s*<script type="module" src="js\/app-auth-shell\.js\?v=\d+"><\/script>\s*<script type="module" data-startup-critical src="js\/bootstrap\.js\?v=\d+"><\/script>/;
   if (!sourceScripts.test(html)) {
     throw new Error('Game HTML no longer contains the expected source entry scripts.');
   }

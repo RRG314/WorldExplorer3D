@@ -53,6 +53,22 @@ patch was made from that result. Preserve prior repairs and evidence; compare th
 exact build, browser, settings, provider responses and budget before revisiting
 runtime authority. This remains separate from loading-presentation acceptance.
 
+The owner now reports a blank Chrome page before entering the world. Ordinary
+Chrome on this Mac opened 7099ad4c twice; normal unsigned search and Baltimore
+entry completed, so the device-specific cause is not yet identified. A controlled
+Chrome test reproduced a concrete startup gap: blocking only bootstrap.js left
+no visible menu, progress or retry action. Initial loading markup now lives in
+HTML, independent of the module graph; critical-script errors and boot failures
+show recovery, slow startup offers reload, and readiness hands off without hiding
+a direct world load. Bootstrap waits for shell controls before binding runtime UI.
+Six lifecycle regressions and ten existing checks pass, along with four Chrome
+failure/slow/disabled-JavaScript groups and all five themed layout/control groups.
+The prescribed source journey confirms visible startup → menu → world loading →
+play, monotonic progress and both movement bursts, with no runtime or browser
+errors. Screenshots were inspected. Source suite and replacement package are
+pending. This fixes the reproduced failure behavior; it does not establish the
+owner's exact cause or resolve the separate terrain/performance gates.
+
 ## Completed verification and repairs
 
 The frozen 4dd2 source chain passes **2,109 tests**, dependency/source/ownership/type
@@ -229,3 +245,5 @@ caches are affected. The exact live 5.4 frontend was independently matched by
 Hosting version and both manifest bytes; its preserved `release-54-1532` channel
 now expires November 6 at 22:26:58 UTC. This exact-live copy is separate from the
 reviewed save-compatible 37a fallback.
+
+Chrome startup repair: complete source verification passes 2,147 tests plus dependency, ownership, type, inventory and sensitivity checks. Packaging and preview verification follow.

@@ -171,7 +171,8 @@ body.deflock-active.live-gps-active #liveGpsHud{top:164px}
 #loadRetry{display:inline-block;margin-top:12px;border:1px solid var(--wx-blue);border-radius:2px;padding:12px 14px;color:var(--wx-text);font-size:12px;text-decoration:none}
 #loading [hidden]{display:none!important}
 #loading[data-state="error"] .loadingTip,#loading[data-state="error"] #loadProgressNote,#loading[data-state="error"] #loadPercent{display:none}
-#loading[data-state="error"] .loadingCard{display:block;max-width:460px}
+#loading[data-state="starting"] .loadingTip,#loading[data-state="starting"] #loadProgressNote,#loading[data-state="starting"] #loadPercent{display:none}
+#loading[data-state="starting"] .loadingCard,#loading[data-state="error"] .loadingCard{display:block;max-width:460px}
 @media(max-width:600px){#loading{padding:12px;padding-top:max(12px,env(safe-area-inset-top));padding-bottom:max(12px,env(safe-area-inset-bottom))}.loadingCard{grid-template-columns:minmax(0,1fr);gap:14px;padding:14px}#loadTitle{font-size:14px}#loadNote{margin-bottom:8px}#loadProgressNote{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip-path:inset(50%);white-space:nowrap}.loadingTip{border-left:0;border-top:1px solid var(--wx-line-soft);padding:12px 0 0}.loadingTipControls button{min-width:44px;min-height:44px}.loadingTipControls{padding-top:8px}#loadTipText{min-height:72px}}
 @media(pointer:coarse){.loadingTipControls button{min-width:44px;min-height:44px}}
 @media(prefers-reduced-motion:reduce){#loadProgress:indeterminate{animation:none}}

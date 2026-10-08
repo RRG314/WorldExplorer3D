@@ -23,7 +23,7 @@ if (location.protocol === 'file:') document.documentElement.classList.add('unsup
 <script type="module" src="../js/site-analytics.js?v=1"></script>
 <style>@layer legacy, interface;</style>
 <link rel="stylesheet" href="styles/title-shell.css?v=95">
-<link rel="stylesheet" href="styles/runtime-shell.css?v=129">
+<link rel="stylesheet" href="styles/runtime-shell.css?v=130">
 <link rel="stylesheet" href="styles/block-builder.css?v=9">
 <link rel="stylesheet" href="styles/universe.css?v=9">
 <link rel="stylesheet" href="styles/fishing-game.css?v=6">
@@ -38,6 +38,73 @@ if (location.protocol === 'file:') document.documentElement.classList.add('unsup
 <link rel="stylesheet" href="styles/reality-capture.css?v=2">
 </head>
 <body>
+<!-- Initial loading and recovery are available before any game module. -->
+<div id="loading" class="show" data-state="starting" role="dialog" aria-modal="true" aria-busy="true" aria-labelledby="loadTitle" tabindex="-1">
+  <section class="loadingCard">
+    <div class="loadingOverview">
+      <div class="loadingBrand">WORLD EXPLORER 3D</div>
+      <h1 id="loadTitle">Starting World Explorer</h1>
+      <p id="loadNote">Preparing the globe and controls. Your first visit can take a little longer.</p>
+      <div class="loadingStatus"><span id="loadText" role="status" aria-live="polite">Opening the game</span><span id="loadPercent" aria-hidden="true"></span></div>
+      <progress id="loadProgress" max="100" aria-label="World loading progress" aria-describedby="loadText loadProgressNote"></progress>
+      <p id="loadProgressNote">Progress follows loading steps. Some steps take longer than others.</p>
+      <a id="loadRetry" href="" hidden>Reload and try again</a>
+    </div>
+    <noscript><p>JavaScript is required to start World Explorer. Enable it for this site, then reload.</p></noscript>
+    <div id="loadTip" class="loadingTip" role="group" aria-label="Things to try in World Explorer">
+      <div id="loadTipTopic" class="loadingTipTopic">While you wait</div>
+      <h2 id="loadTipTitle">Pick your next outing</h2>
+      <p id="loadTipText">Explore on foot, take a flight or set out on the water.</p>
+      <div class="loadingTipControls">
+        <span id="loadTipCount" aria-label="Tip number"></span>
+        <button id="loadTipPause" type="button" aria-pressed="false">Pause tips</button>
+        <button id="loadTipPrevious" type="button" aria-label="Previous tip">←</button>
+        <button id="loadTipNext" type="button" aria-label="Next tip">→</button>
+      </div>
+    </div>
+  </section>
+</div>
+<script id="startupCoverController">
+// This runs before the module graph: a failed bootstrap cannot hide its own recovery UI.
+(() => {
+  const cover = document.getElementById('loading');
+  const el = id => document.getElementById(id);
+  const write = (id, text) => { const node = el(id); if (node) node.textContent = text; };
+  function cleanup() {
+    clearTimeout(slowTimer);
+    window.removeEventListener('error', scriptFailed, true);
+    window.removeEventListener('we3d:startup-failed', failed);
+    window.removeEventListener('we3d:runtime-ready', ready);
+  }
+  function failed() {
+    if (cover.dataset.state !== 'starting') return;
+    cleanup(); cover.dataset.state = 'error'; cover.setAttribute('aria-busy', 'false');
+    write('loadTitle', 'Unable to start the game');
+    write('loadNote', 'Part of the game could not load. Check your connection and try again.');
+    write('loadText', 'Reload to try again. Your saved progress will stay here.');
+    if (el('loadProgress')) el('loadProgress').hidden = true;
+    if (el('loadRetry')) el('loadRetry').hidden = false;
+  }
+  function scriptFailed(event) {
+    if (event.target?.tagName === 'SCRIPT' && event.target.hasAttribute('data-startup-critical')) failed();
+  }
+  function ready() {
+    cleanup();
+    // A direct journey may already own the same screen. Never hide its world load.
+    if (cover.dataset.state !== 'starting') return;
+    cover.classList.remove('show'); cover.setAttribute('aria-busy', 'false');
+    cover.dataset.state = 'idle';
+  }
+  const slowTimer = setTimeout(() => {
+    if (cover.dataset.state !== 'starting') return;
+    write('loadNote', 'The game is still starting. You can wait, or reload if nothing changes.');
+    if (el('loadRetry')) el('loadRetry').hidden = false;
+  }, 30000);
+  window.addEventListener('error', scriptFailed, true);
+  window.addEventListener('we3d:startup-failed', failed);
+  window.addEventListener('we3d:runtime-ready', ready);
+})();
+</script>
 <a class="we3d-skip-link" href="#globeSelectorStartBtn">Skip to world controls</a>
 <div id="accessibilityAnnouncements" class="we3d-visually-hidden" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="fileLaunchError" role="alert"><div><strong>World Explorer needs a local web server.</strong><code>npm run dev</code></div></div>
@@ -1627,7 +1694,7 @@ Explore the area
 </div>
 
 <!-- Real Estate System -->
-<script type="module" src="js/app-shell-fragments.js?v=90"></script>
+<script type="module" data-startup-critical src="js/app-shell-fragments.js?v=91"></script>
 <script type="module" src="js/app-auth-shell.js?v=87"></script>
-<script type="module" src="js/bootstrap.js?v=611"></script>
+<script type="module" data-startup-critical src="js/bootstrap.js?v=612"></script>
 </body></html>
