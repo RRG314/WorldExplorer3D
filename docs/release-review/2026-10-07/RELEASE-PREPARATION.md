@@ -178,3 +178,18 @@ Ordinary installed Chrome on the 61cc preview also returned three Baltimore plac
 results without debug attestation. This verifies unsigned real search; it does
 not erase the earlier isolated automation App Check failure or certify all other
 ordinary-browser journeys.
+
+
+The first loading package, dfa29bb, passed its normal 29-check world preflight and
+was hosted. The owner then rejected the oversized rounded card. The replacement
+is a compact bottom panel using the app's actual interface tokens, fonts and
+controls. All five actual-theme component groups and 16 focused lifecycle/loading
+checks pass. The prescribed source launch passes with monotonic progress, six
+cards and successful dismissal over 88.3 seconds, followed by both driving bursts.
+No runtime errors; optional external Overpass CORS is separately retained. All
+images were inspected. This measures UI behavior, not faster loading or full
+release readiness. Road, terrain and gameplay authority are unchanged by this
+visual correction. See CURRENT-STATE for the separate unmatched-workload terrain
+publication observation; no speculative repair was applied.
+
+Compact loading correction: complete source verification passes 2,141 tests, dependency/source/ownership/type checks, inventory and sensitivity. New immutable preview packaging follows.

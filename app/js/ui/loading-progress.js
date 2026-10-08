@@ -1,19 +1,19 @@
 // Player-facing loading copy. Feature cards describe available play, not work
 // supposedly happening in the loader. Only pipeline events advance the bar.
-export const LOADING_NOTE = 'A whole place takes a little unpacking. Detailed locations can take more than a minute to load, especially on your first visit.';
+export const LOADING_NOTE = 'Detailed locations can take more than a minute to load, especially on your first visit.';
 export const LOADING_CARDS = Object.freeze([
-  { id: 'drive', modes: ['earth'], topic: 'On the road', title: 'Take the E34 for a spin', text: 'Explore by car in the BMW 525i E34, then switch to walking for a closer look at the neighborhood.' },
-  { id: 'flight', modes: ['earth'], topic: 'Travel tip', title: 'A different view from above', text: 'At supported airports, board an aircraft for a local flight or choose a destination. You can travel as pilot or passenger.' },
-  { id: 'ocean', modes: ['ocean'], topic: 'Ocean exploration', title: 'Start on deck. Go deeper.', text: 'Ocean outings begin aboard the research vessel. Walk the deck, swim, scuba dive or deploy the submarine, then return to your ship.' },
-  { id: 'journal', modes: ['earth', 'ocean', 'moon', 'mars'], topic: 'Field tip', title: 'Bring back more than a photo', text: 'Inspect, photograph and survey as you explore. Open the Journal to revisit your recorded finds and the Field Guide to see what you have discovered.' },
-  { id: 'ship', modes: ['space'], topic: 'Interstellar Expeditions · Alpha', title: 'Your home between worlds', text: 'Live aboard Solis Reach, meet the crew and follow voyage missions. Pathfinder takes you from the ship to supported planetary field sites and back.' },
-  { id: 'gps', modes: ['earth'], topic: 'Explore nearby', title: 'Your neighborhood is a starting point', text: 'Choose your current location to explore nearby. Live GPS is a separate walking mode that follows your position when you allow location access.' },
-  { id: 'quake', modes: ['earth'], topic: 'Real-world data', title: 'See where Earth has been moving', text: 'The globe’s Earthquakes view shows recent reports from the USGS. Select an event to inspect its location, magnitude and depth.' },
+  { id: 'drive', modes: ['earth'], topic: 'On the road', title: 'Drive the BMW 525i E34', text: 'Explore by car in the BMW 525i E34, then switch to walking for a closer look at the neighborhood.' },
+  { id: 'flight', modes: ['earth'], topic: 'Travel tip', title: 'Travel by plane', text: 'At supported airports, board an aircraft for a local flight or choose a destination. You can travel as pilot or passenger.' },
+  { id: 'ocean', modes: ['ocean'], topic: 'Ocean exploration', title: 'Your research vessel', text: 'Ocean outings begin aboard the research vessel. Walk the deck, swim, scuba dive or deploy the submarine, then return to your ship.' },
+  { id: 'journal', modes: ['earth', 'ocean', 'moon', 'mars'], topic: 'Field tip', title: 'Record your discoveries', text: 'Inspect, photograph and survey as you explore. Open the Journal to revisit your recorded finds and the Field Guide to see what you have discovered.' },
+  { id: 'ship', modes: ['space'], topic: 'Interstellar Expeditions · Alpha', title: 'Solis Reach and Pathfinder', text: 'Live aboard Solis Reach, meet the crew and follow voyage missions. Pathfinder takes you from the ship to supported planetary field sites and back.' },
+  { id: 'gps', modes: ['earth'], topic: 'Explore nearby', title: 'Start near home', text: 'Choose your current location to explore nearby. Live GPS is a separate walking mode that follows your position when you allow location access.' },
+  { id: 'quake', modes: ['earth'], topic: 'Real-world data', title: 'Earthquakes from the USGS', text: 'The globe’s Earthquakes view shows recent reports from the USGS. Select an event to inspect its location, magnitude and depth.' },
   { id: 'stars', modes: ['space'], topic: 'Beyond the solar system', title: 'Pick a star system', text: 'Explore selected systems and exoplanets using catalog data, including the NASA Exoplanet Archive. Playable surfaces are imagined landscapes, not photographs of those worlds.' },
-  { id: 'boat', modes: ['earth', 'ocean'], topic: 'On the water', title: 'Trade the road for a waterway', text: 'Look for boardable vessels at supported ports and marinas. Boats and ships offer another way to explore the water around your location.' },
-  { id: 'terrain', modes: ['earth'], topic: 'The world around you', title: 'Follow the lay of the land', text: 'Roads, bridges, tunnels and terrain come together from real map data. Coverage varies by location, so each place has a different level of detail.' },
-  { id: 'backpack', modes: ['earth', 'ocean', 'moon', 'mars'], topic: 'Field tip', title: 'Keep a tool within reach', text: 'Open your Backpack and set up quick slots for the tools you use most. A little preparation makes it easier to stop and investigate something along the way.' },
-  { id: 'planets', modes: ['moon', 'mars', 'space'], topic: 'Planetary exploration', title: 'Look closer at familiar worlds', text: 'Supported planetary destinations combine NASA and USGS source imagery with terrain built for exploration. Check a destination’s information to see where its data comes from.' }
+  { id: 'boat', modes: ['earth', 'ocean'], topic: 'On the water', title: 'Explore by boat', text: 'Look for boardable vessels at supported ports and marinas. Boats and ships offer another way to explore the water around your location.' },
+  { id: 'terrain', modes: ['earth'], topic: 'The world around you', title: 'Roads, bridges and tunnels', text: 'Roads, bridges, tunnels and terrain come together from real map data. Coverage varies by location, so each place has a different level of detail.' },
+  { id: 'backpack', modes: ['earth', 'ocean', 'moon', 'mars'], topic: 'Field tip', title: 'Set up your quick slots', text: 'Open your Backpack to put tools in your quick slots. You can then switch equipment while exploring without reopening the full inventory.' },
+  { id: 'planets', modes: ['moon', 'mars', 'space'], topic: 'Planetary exploration', title: 'Explore the Moon and Mars', text: 'Supported planetary destinations combine NASA and USGS source imagery with terrain built for exploration. Check a destination’s information to see where its data comes from.' }
 ].map(card => Object.freeze({ ...card, modes: Object.freeze(card.modes) })));
 
 export function loadingCardsForMode(mode) {
@@ -108,7 +108,7 @@ export function createLoadingPresentation(doc, { setInterval: startTimer = globa
       el('loading')?.setAttribute('aria-busy', 'true');
       if (el('loading')) el('loading').dataset.state = 'loading';
       if (el('loadRetry')) el('loadRetry').hidden = true;
-      write('loadTitle', 'Getting the world ready');
+      write('loadTitle', 'Loading your world');
       write('loadNote', LOADING_NOTE);
       write('loadText', state.label);
       const progress = el('loadProgress');

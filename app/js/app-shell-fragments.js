@@ -172,13 +172,15 @@ const APP_SHELL_FRAGMENT_HTML = `
 <div id="perfPanel" style="position:fixed;top:var(--perf-panel-top,20px);right:var(--perf-panel-right,180px);background:rgba(2,6,23,0.85);color:#38bdf8;font-family:monospace;font-size:11px;padding:10px 12px;border-radius:8px;z-index:var(--perf-panel-z,145);display:none;line-height:1.45;white-space:pre;pointer-events:none;border:1px solid rgba(56,189,248,0.4);min-width:var(--perf-panel-min-width,260px);max-width:var(--perf-panel-max-width,320px)"></div>
 <div id="loading" role="dialog" aria-modal="true" aria-busy="false" aria-labelledby="loadTitle" tabindex="-1">
   <section class="loadingCard">
-    <div class="loadingBrand">WORLD EXPLORER 3D</div>
-    <h1 id="loadTitle">Getting the world ready</h1>
-    <p id="loadNote">A whole place takes a little unpacking. Detailed locations can take more than a minute to load, especially on your first visit.</p>
-    <div class="loadingStatus"><span id="loadText" role="status" aria-live="polite">Preparing your visit</span><span id="loadPercent" aria-hidden="true"></span></div>
-    <progress id="loadProgress" max="100" aria-label="World loading progress" aria-describedby="loadText loadProgressNote"></progress>
-    <p id="loadProgressNote">Progress follows loading steps. Some steps take longer than others.</p>
-    <a id="loadRetry" href="" hidden>Reload and try again</a>
+    <div class="loadingOverview">
+      <div class="loadingBrand">WORLD EXPLORER 3D</div>
+      <h1 id="loadTitle">Loading your world</h1>
+      <p id="loadNote">Detailed locations can take more than a minute to load, especially on your first visit.</p>
+      <div class="loadingStatus"><span id="loadText" role="status" aria-live="polite">Preparing your visit</span><span id="loadPercent" aria-hidden="true"></span></div>
+      <progress id="loadProgress" max="100" aria-label="World loading progress" aria-describedby="loadText loadProgressNote"></progress>
+      <p id="loadProgressNote">Progress follows loading steps. Some steps take longer than others.</p>
+      <a id="loadRetry" href="" hidden>Reload and try again</a>
+    </div>
     <div id="loadTip" class="loadingTip" role="group" aria-label="Things to try in World Explorer">
       <div id="loadTipTopic" class="loadingTipTopic">While you wait</div>
       <h2 id="loadTipTitle">Pick your next outing</h2>
