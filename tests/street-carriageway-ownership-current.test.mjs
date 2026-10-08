@@ -2,12 +2,35 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createTerrainHeightSamplingApi} from '../app/js/terrain/height-sampling.js';
 import {createStreetFrontageGrading} from '../app/js/terrain/street-frontage-grading.js';
+import {compileEngineeredApproachExcavation} from '../app/js/world/compiler/engineered-approach-excavation.js';
+import {terrainHeightWithPortalCuts} from '../app/js/terrain/structure-terrain-portals.js';
 const road=(z,y)=>({pts:[{x:0,z},{x:20,z}],width:4,type:'residential',tags:{sidewalk:'both'},surfaceBias:.18,structureSemantics:{terrainMode:'at_grade'},transportSurfaceModel:{distances:new Float32Array([0,20]),pathDistances:new Float32Array([0,20]),centerHeights:new Float32Array([y,y]),leftHeights:new Float32Array([y,y]),rightHeights:new Float32Array([y,y])}});
 const buildings=[0,10].map(x=>({pts:[{x,z:-12},{x:x+10,z:-12},{x:x+10,z:-10},{x,z:-10}]}));
 const sample=roads=>{
  const api=createTerrainHeightSamplingApi({appCtx:{structureTerrainCuts:roads,streetFrontageGrading:createStreetFrontageGrading(buildings,1)},elevationWorldYAtWorldXZ:()=>0});
  return z=>api.applyStructureTerrainCuts(10,z,0)+.18;
 };
+
+test('a depressed engineered approach excavates its own lane without dragging down neighboring streets',()=>{
+ const approach=road(0,2),street=road(4,10.18);
+ approach.transportSurfaceModel.engineeredApproach=true;
+ for(const roads of [[approach,street],[street,approach]]){
+  const api=createTerrainHeightSamplingApi({appCtx:{structureTerrainCuts:roads},elevationWorldYAtWorldXZ:()=>10});
+  const ground=(x,z)=>api.applyStructureTerrainCuts(x,z,10);
+  for(let z=-6;z<=8;z+=.25)assert.ok(Math.abs(ground(10,z)-10)<1e-6,'cut must not smear into the terrain grid');
+  const excavation=compileEngineeredApproachExcavation(approach,ground);
+  assert.ok(excavation?.walls.length>0);
+  assert.ok(Math.abs(terrainHeightWithPortalCuts(excavation.masks,10,0,ground(10,0))-2)<.02);
+  assert.equal(terrainHeightWithPortalCuts(excavation.masks,10,4,ground(10,4)),ground(10,4));
+ }
+});
+
+test('engineered approach fill still supports the road above natural ground',()=>{
+ const approach=road(0,6);approach.transportSurfaceModel.engineeredApproach=true;
+ const api=createTerrainHeightSamplingApi({appCtx:{structureTerrainCuts:[approach]},elevationWorldYAtWorldXZ:()=>2});
+ assert.ok(Math.abs(api.applyStructureTerrainCuts(10,0,2)-5.82)<1e-6);
+ assert.equal(api.applyStructureTerrainCuts(10,10,2),2);
+});
 test('neighboring frontage cannot lift or lower either disjoint carriageway',()=>{
  const a=road(0,2),b=road(6,6),height=sample([a,b]);
  for(let z=-2;z<=2;z+=.25)assert.ok(Math.abs(height(z)-2)<1e-6);

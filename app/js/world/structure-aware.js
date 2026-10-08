@@ -1,6 +1,6 @@
 import { compileEngineeredApproachExcavation } from './compiler/engineered-approach-excavation.js';
 import {createFeatureProjectionIndex} from '../terrain/feature-projection-index.js';
-import {compileTunnelObstructionLimits, compileTunnelRoadObstructionLimits} from './compiler/tunnel-obstruction-limits.js';
+import {compileTunnelObstructionLimits, compileTunnelRoadObstructionLimits, compileSurfaceRoadOverlapRanges} from './compiler/tunnel-obstruction-limits.js';
 import {assignOrdinaryStreetJunctions} from './compiler/ordinary-street-profile.js';
 import {roadMetersPerWorldUnit} from './road-units.js';
 import { streetScaleForWorld } from './compiler/street-frontage-policy.js';
@@ -768,8 +768,11 @@ export async function refreshTransportStructureAssembliesForPublishedTerrain() {
       })
     }
   );
+  const nearbyCoverRoads=createFeatureBoundsIndex(roadFeatures);
   for (const feature of transportFeatures) {
-    feature.engineeredApproachExcavation = compileEngineeredApproachExcavation(feature, samplePublishedTerrainY);
+    const roadCover=feature.structureSemantics?.terrainMode==='at_grade'&&feature.transportSurfaceModel?.engineeredApproach
+      ? compileSurfaceRoadOverlapRanges(feature,nearbyCoverRoads(feature),samplePublishedTerrainY,areRoadsConnected,{includeElevated:true}) : [];
+    feature.engineeredApproachExcavation = compileEngineeredApproachExcavation(feature, samplePublishedTerrainY,{roadCover});
   }
   refreshStructureColliders(appCtx, transportFeatures);
   return appCtx.transportStructureAssembly;

@@ -4,6 +4,10 @@ import {createCollisionCandidates,appendCollisionCandidate,releaseCollisionCandi
 
 function buildingVerticalRangeOverlap(building, actorBaseY, actorHeight, tolerance = 0.45) {
   if (!Number.isFinite(actorBaseY)) return true;
+  // Compiled transport boundaries are published with their visible geometry.
+  // Inflating their tops like approximate building heights makes a lower
+  // retaining wall obstruct people and vehicles on the separate road above.
+  if (building?.geometrySource === 'compiled_transport_structures') tolerance = .02;
   const actorTopY = actorBaseY + (Number.isFinite(actorHeight) ? Math.max(0.5, actorHeight) : 1.8);
   const minY = Number.isFinite(building?.minY) ? building.minY : Number.isFinite(building?.baseY) ? building.baseY : NaN;
   const maxY = Number.isFinite(building?.maxY) ? building.maxY : Number.isFinite(minY) && Number.isFinite(building?.height) ? minY + building.height : NaN;

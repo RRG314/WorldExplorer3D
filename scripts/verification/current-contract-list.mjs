@@ -1,5 +1,11 @@
 // Component and source-contract checks; browser and emulator journeys run separately.
 export const currentContractTests = [
+  'tests/optional-provider-console-current.test.mjs',
+  'tests/pavement-footway-ownership-current.test.mjs',
+  'tests/portal-surface-clip-parity-current.test.mjs',
+  'tests/recorded-overpass-scope-current.test.mjs',
+  'tests/staging-proxy-delivery-current.test.mjs',
+  'tests/tunnel-overhead-road-current.test.mjs',
   'tests/movement-allocation-parity-current.test.mjs',
   'tests/engineered-approach-excavation-current.test.mjs',
   'tests/earth-return-action-current.test.mjs',

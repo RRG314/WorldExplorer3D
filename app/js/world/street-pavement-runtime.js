@@ -4,6 +4,7 @@ import {createPavementTerrainPartitionCooperatively} from './pavement-terrain-pa
 import { captureStreetSurfaceGeometry,serializeStreetSurfaceCapture } from './street-surface-capture.js';
 import { createRoadMarkingMaterial } from '../road-render.js?v=4';
 import { streetSourceInput } from './street-source-input.js';
+import {isPavementFootway,isPavementCrossing} from './compiler/pavement-footway-policy.js';
 import { indexPavementPositionsCooperatively } from './pavement-indexed-mesh.js';
 import { createPavementBaseSamplerCooperatively } from './pavement-height-sampler.js';
 import { assessStreetQuality } from './street-quality-assessment.js';
@@ -12,6 +13,7 @@ import { createStreetOverview } from './street-overview.js';
 import { StreetPacketCache } from './street-packet-cache.js';
 import { streetMotion, streetPrefetch } from './street-prefetch.js';
 import { getWorkloadPolicySnapshot } from '../runtime/workload-policy.js?v=1';
+import {createConcretePavementTexture} from './pavement-texture.js';
 import { conformPavementMeshCooperatively } from './pavement-terrain-conformance.js';
 import { rampCurbScale } from './compiler/street-crossings.js';
 import { createRoadContactIndexCooperatively, selectLinearWalkContactMeshes } from '../terrain/road-contact-index.js?v=1';
@@ -19,25 +21,6 @@ import { createRoadContactIndexCooperatively, selectLinearWalkContactMeshes } fr
 import { publishLinearFeaturePresentationCooperatively } from './linear-feature-presentation.js?v=1';
 import { buildFeatureRibbonEdges } from '../structure-semantics.js?v=63';
 import { yieldToMainThread, yieldToWorldFrame } from './cooperative-scheduling.js?v=1';
-
-function concreteTexture(THREE) {
-  const canvas=document.createElement('canvas');canvas.width=canvas.height=256;
-  const paint=canvas.getContext('2d'),pixels=paint.createImageData(256,256);
-  let seed=7231;
-  for(let y=0;y<256;y++)for(let x=0;x<256;x++){
-    seed=(Math.imul(seed,1664525)+1013904223)>>>0;
-    const edge=Math.min(x,y,255-x,255-y),grain=(seed%17)-8;
-    const bevel=edge<2?-34:edge<5?8:0;
-    const mottling=4*Math.sin(x*.043)*Math.sin(y*.051);
-    const v=184+grain+bevel+mottling,i=(y*256+x)*4;
-    pixels.data.set([v+4,v+2,v-2,255],i);
-  }
-  paint.putImageData(pixels,0,0);
-  const texture=new THREE.CanvasTexture(canvas);
-  texture.wrapS=texture.wrapT=THREE.RepeatWrapping;
-  texture.encoding=THREE.sRGBEncoding;texture.anisotropy=4;
-  return texture;
-}
 
 function focusActor(appCtx) {
   return appCtx.planeMode?.active ? appCtx.planeMode : appCtx.droneMode ? appCtx.drone : appCtx.Walk?.state?.mode === 'walk' ? appCtx.Walk.state.walker : appCtx.car;
@@ -49,7 +32,7 @@ async function refreshMappedPaths(appCtx,pavementBounds){
   let index=null,committed=false;
   const schedule={current,yieldWork:()=>appCtx.gameStarted&&!appCtx.worldLoading?yieldToWorldFrame():yieldToMainThread(),budgetMs:2};
   try {
-    await publishLinearFeaturePresentationCooperatively({appCtx:{scene:appCtx.scene,linearFeatureMeshes:meshes,addEarthWorldObject(){}},buildFeatureRibbonEdges,features,pavementBounds,
+    await publishLinearFeaturePresentationCooperatively({appCtx:{scene:appCtx.scene,linearFeatureMeshes:meshes,addEarthWorldObject(){}},buildFeatureRibbonEdges,features,pavementBounds,metersPerWorldUnit:appCtx.METERS_PER_WORLD_UNIT||1.11,
       portalMasks:appCtx.structureTerrainPortalDescriptors,
       worldBaseTerrainY:(x,z)=>{const y=appCtx.terrainMeshHeightAt?.(x,z,{ignorePortalCuts:true});return Number.isFinite(y)?y:appCtx.elevationWorldYAtWorldXZ?.(x,z);}}, schedule);
     const retained=appCtx.linearFeatureMeshes.filter(m=>!m.userData?.isLinearFeatureBatch);
@@ -95,7 +78,7 @@ export async function publishStreetPavement(appCtx, options = {}) {
   };
   const current = () => sequence === appCtx._worldLoadSequence && generation === appCtx._streetPavementGeneration && groundRevision === (appCtx._groundSurfaceRevision || 0) && !appCtx.onMoon && !cancelled;
   const metersPerWorldUnit = appCtx.METERS_PER_WORLD_UNIT || 1.11;
-  const managedPaths = (appCtx.linearFeatures || []).filter(f => nearby(f) && f.kind === 'footway' && ['sidewalk','crossing'].includes(f.subtype) && !f.isStructureConnector && !f.structureSemantics?.gradeSeparated && ['at_grade', undefined].includes(f.structureSemantics?.terrainMode));
+  const managedPaths = (appCtx.linearFeatures || []).filter(f => nearby(f) && (isPavementFootway(f) || isPavementCrossing(f)));
   const workerUrl = globalThis.__WORLD_EXPLORER_PRODUCTION__?.streetPavementWorkerUrl ||
     new URL('./compiler/street-pavement-worker.js', import.meta.url);
   const worker = new Worker(workerUrl, { type: 'module' });
@@ -128,7 +111,7 @@ export async function publishStreetPavement(appCtx, options = {}) {
   let committed = false;
   const stagedLines = [];
   const batches = new Map();
-  const staged = [], texture = concreteTexture(THREE);
+  const staged = [], texture = createConcretePavementTexture(THREE);
   let contactIndex = null, stagedWalkContactIndex = null;
   const material = new THREE.MeshStandardMaterial({ color: 0xffffff, map: texture,
     normalMap: appCtx.pavementNormal || null, roughnessMap: appCtx.pavementRoughness || null, roughness: 0.96, metalness: 0 });
@@ -357,7 +340,7 @@ export async function publishStreetPavement(appCtx, options = {}) {
     trace('mapped-paths-start',{features:appCtx.linearFeatures.length});
     if(replaceMappedLines)await publishLinearFeaturePresentationCooperatively({
       appCtx: { scene: appCtx.scene, linearFeatureMeshes: stagedLines, addEarthWorldObject() {} },
-      buildFeatureRibbonEdges, features: appCtx.linearFeatures, pavementBounds: coverageBounds, worldBaseTerrainY: ground,
+      buildFeatureRibbonEdges, features: appCtx.linearFeatures, pavementBounds: coverageBounds, worldBaseTerrainY: ground,metersPerWorldUnit,
       portalMasks:appCtx.structureTerrainPortalDescriptors
     },schedule);
     trace('mapped-paths-complete',{batches:stagedLines.length});

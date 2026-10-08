@@ -1,4 +1,5 @@
 import {deployResearchSubmarineFromDeck} from './marine-entry-ui.mjs';
+import {isExpectedTerrainProviderCancellation} from './terrain-provider-cancellation.mjs';
 import { collectBrowserGraphicsErrors } from './browser-graphics-errors.mjs';
 import { configureStagingAppCheck } from './staging-app-check.mjs';
 import assert from 'node:assert/strict';
@@ -11,12 +12,14 @@ const root = process.cwd();
 const requestedRoot = String(process.env.WE3D_VERIFY_ROOT || '').trim();
 const servedRoot = requestedRoot ? path.resolve(root, requestedRoot) : root;
 const externalUrl = String(process.env.WE3D_VERIFY_BASE_URL || '').replace(/\/$/, '');
+const reportPath = path.join(root, 'output', 'verification', 'environments', 'report.json');
+await fs.mkdir(path.dirname(reportPath), { recursive: true });
+await fs.writeFile(reportPath, JSON.stringify({ok: false, state: 'initializing', generatedAt: new Date().toISOString(), destinations: []}, null, 2));
 const server = externalUrl ? null : await startStaticServer({
   rootDir: servedRoot,
   ports: [4370, 4371, 4372, 4373]
 });
 const baseUrl = externalUrl || `http://127.0.0.1:${server.port}`;
-const reportPath = path.join(root, 'output', 'verification', 'environments', 'report.json');
 const browser = await chromium.launch({ headless: true, channel: 'chrome' });
 
 const destinations = Object.freeze([
@@ -34,6 +37,7 @@ async function verifyDestination(destination) {
   collectBrowserGraphicsErrors(page, browserErrors);
   const localFailures = [];
   const providerDegradations = [];
+  const cancelledProviderRequests = [];
   page.on('pageerror', (error) => browserErrors.push(String(error?.stack || error)));
   page.on('response', (response) => {
     if (response.url().startsWith(baseUrl) && response.status() >= 400) {
@@ -45,7 +49,13 @@ async function verifyDestination(destination) {
   });
   page.on('requestfailed', (request) => {
     if (request.url().startsWith(baseUrl)) {
-      localFailures.push({ kind: 'request', url: request.url(), reason: request.failure()?.errorText || 'failed' });
+      const entry = { kind: 'request', url: request.url(), reason: request.failure()?.errorText || 'failed' };
+      // Environment-session teardown explicitly cancels its marine consumer.
+      // Keep that evidence; HTTP failures, assets and other network failures
+      // must still fail this gate. Live data availability has a separate gate.
+      if (destination.id === 'ocean' && new URL(request.url()).pathname === '/api/geospatial/marine' &&
+          isExpectedTerrainProviderCancellation(request.url(), entry.reason)) cancelledProviderRequests.push(entry);
+      else localFailures.push(entry);
     }
   });
 
@@ -105,15 +115,17 @@ async function verifyDestination(destination) {
       noFailedLocalResources: localFailures.length === 0
     };
     await fs.mkdir(path.dirname(reportPath), { recursive: true });
-    await fs.writeFile(path.join(path.dirname(reportPath), `${destination.id}.json`), JSON.stringify({ id: destination.id, checks, snapshot, browserErrors, localFailures, providerDegradations }, null, 2));
+    await fs.writeFile(path.join(path.dirname(reportPath), `${destination.id}.json`), JSON.stringify({ id: destination.id, checks, snapshot, browserErrors, localFailures, providerDegradations, cancelledProviderRequests }, null, 2));
     assert.ok(Object.values(checks).every(Boolean), `${destination.id} destination verification failed`);
-    return { id: destination.id, ok: true, checks, snapshot, browserErrors, localFailures, providerDegradations };
+    return { id: destination.id, ok: true, checks, snapshot, browserErrors, localFailures, providerDegradations, cancelledProviderRequests };
   } finally {
     await context.close();
   }
 }
 
 const results = [];
+await fs.mkdir(path.dirname(reportPath), { recursive: true });
+await fs.writeFile(reportPath, JSON.stringify({ok: false, state: 'running', destinations: []}, null, 2));
 try {
   for (const destination of destinations) results.push(await verifyDestination(destination));
   const report = {
@@ -125,6 +137,9 @@ try {
   await fs.mkdir(path.dirname(reportPath), { recursive: true });
   await fs.writeFile(reportPath, `${JSON.stringify(report, null, 2)}\n`, 'utf8');
   console.log(JSON.stringify(report, null, 2));
+} catch (error) {
+  await fs.writeFile(reportPath, JSON.stringify({ok: false, state: 'failed', generatedAt: new Date().toISOString(), destinations: results, failure: String(error?.stack || error)}, null, 2));
+  throw error;
 } finally {
   await browser.close().catch(() => {});
   await server?.close().catch(() => {});

@@ -49,48 +49,17 @@ export function createPortalSurfaceClipper(masks = []) {
       if(indices){outputIndices.push(index);if(point.index!==undefined)sourceVertices.set(point.index,index);}
     };
     const original = at => {const index=indices?indices[at]:at,a=index*3;return {x:positions[a],y:positions[a+1],z:positions[a+2],index};};
-    const appendSource = index => {
-      if(indices && sourceVertices.has(index)) {outputIndices.push(sourceVertices.get(index));return;}
-      const at=index*3,next=output.length/3;output.push(positions[at],positions[at+1],positions[at+2]);
-      if(indices){outputIndices.push(next);sourceVertices.set(index,next);}
-    };
     let changed=false;
     for(let i=0;i<count;i+=3) {
-      const ia=indices?indices[i]:i,ib=indices?indices[i+1]:i+1,ic=indices?indices[i+2]:i+2;
-      const ax=positions[ia*3],ay=positions[ia*3+1],az=positions[ia*3+2];
-      const bx=positions[ib*3],by=positions[ib*3+1],bz=positions[ib*3+2];
-      const cx=positions[ic*3],cy=positions[ic*3+1],cz=positions[ic*3+2];
-      const minX=Math.min(ax,bx,cx),maxX=Math.max(ax,bx,cx);
-      const minZ=Math.min(az,bz,cz),maxZ=Math.max(az,bz,cz);
+      const triangle=[original(i),original(i+1),original(i+2)];
+      const minX=Math.min(...triangle.map(p=>p.x)),maxX=Math.max(...triangle.map(p=>p.x));
+      const minZ=Math.min(...triangle.map(p=>p.z)),maxZ=Math.max(...triangle.map(p=>p.z));
       candidates.clear();
       for(let row=Math.max(0,Math.floor(minZ/grid.cellSize)-grid.minZ);row<=Math.min(grid.height-1,Math.floor(maxZ/grid.cellSize)-grid.minZ);row++)
         for(let col=Math.max(0,Math.floor(minX/grid.cellSize)-grid.minX);col<=Math.min(grid.width-1,Math.floor(maxX/grid.cellSize)-grid.minX);col++) {
           const cell=(row*grid.width+col)*4,start=grid.lookup[cell],length=grid.lookup[cell+1];
           for(let j=0;j<length;j++)candidates.add(grid.references[(start+j)*4]);
         }
-      // Most pavement triangles miss every excavation. Use the original
-      // half-space rejection on source coordinates before allocating polygons.
-      // If any volume might cut, preserve the full original clipping order.
-      let possibleCut=false;
-      for(const id of candidates) {
-        let separated=false;
-        for(const q of planes[id]) {
-          if(ax*q[0]+ay*q[1]+az*q[2]+q[3]>=0 &&
-             bx*q[0]+by*q[1]+bz*q[2]+q[3]>=0 &&
-             cx*q[0]+cy*q[1]+cz*q[2]+q[3]>=0) {separated=true;break;}
-        }
-        if(!separated){possibleCut=true;break;}
-      }
-      if(!possibleCut) {
-        if(changed) {
-          const ux=bx-ax,uy=by-ay,uz=bz-az,vx=cx-ax,vy=cy-ay,vz=cz-az;
-          if(!(Math.hypot(uy*vz-uz*vy,uz*vx-ux*vz,ux*vy-uy*vx)<1e-10)) {
-            appendSource(ia);appendSource(ib);appendSource(ic);
-          }
-        }
-        continue;
-      }
-      const triangle=[original(i),original(i+1),original(i+2)];
       let pieces=[triangle];
       for(const id of candidates) {
         const next=[];
@@ -101,7 +70,7 @@ export function createPortalSurfaceClipper(masks = []) {
         changed=true;
         // Most tiles never meet an excavation. Allocate replacement storage
         // only after a real cut, and retain shared source vertex indices.
-        for(let j=0;j<i;j++)appendSource(indices?indices[j]:j);
+        for(let j=0;j<i;j++)append(original(j));
       }
       if(!changed)continue;
       for(const polygon of pieces)for(let j=1;j<polygon.length-1;j++) {

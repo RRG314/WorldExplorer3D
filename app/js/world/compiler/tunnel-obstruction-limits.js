@@ -1,5 +1,6 @@
 import {polylineDistances} from '../../structure-semantics/geometry.js?v=2';
 import {tunnelClearance, TUNNEL_ROOF_THICKNESS, MINIMUM_TUNNEL_ROOF_COVER} from './tunnel-envelope.js';
+import {sampleFeatureSurfaceY} from '../../structure-semantics.js?v=63';
 
 // Clip an actual foundation footprint into the tunnel's roof corridor. Keep
 // the resulting longitudinal interval, not the source building or a callback
@@ -63,11 +64,19 @@ export function compileTunnelRoadObstructionLimits(feature, roads, sampleTerrain
   if (feature?.structureSemantics?.terrainMode !== 'subgrade' ||
       feature?.transportRecord?.routeState !== 'complete' ||
       typeof sampleTerrain !== 'function') return Object.freeze([]);
+  const clearance = tunnelClearance(feature.structureSemantics) + TUNNEL_ROOF_THICKNESS + MINIMUM_TUNNEL_ROOF_COVER;
+  return Object.freeze(compileSurfaceRoadOverlapRanges(feature,roads,sampleTerrain,connected).map(limit=>
+    Object.freeze({...limit,maximumSurfaceY:limit.maximumSurfaceY-clearance})));
+}
+
+// Shared footprint intersection for tunnel roofs and exposed approach cuts.
+// This reports the upper terrain height; each consumer owns its clearance.
+export function compileSurfaceRoadOverlapRanges(feature, roads, sampleTerrain, connected, {includeElevated=false}={}) {
   const pts = feature.pts || [], path = polylineDistances(pts), limits = [];
   const halfWidth = Math.max(3.4, Number(feature.width) || 6) * .5 + .95;
-  const clearance = tunnelClearance(feature.structureSemantics) + TUNNEL_ROOF_THICKNESS + MINIMUM_TUNNEL_ROOF_COVER;
   for (const road of roads || []) {
-    if (road === feature || road?.structureSemantics?.terrainMode !== 'at_grade' ||
+    const elevated=includeElevated && road?.structureSemantics?.terrainMode==='elevated' && !!road.transportSurfaceModel;
+    if (road === feature || (!elevated && road?.structureSemantics?.terrainMode !== 'at_grade') ||
         road.transportSurfaceModel?.engineeredApproach || connected?.(feature, road)) continue;
     const roadPoints = road.pts || [], roadHalfWidth = Math.max(1.2, Number(road.width) || 4) * .5;
     for (let j = 1; j < roadPoints.length; j++) {
@@ -92,10 +101,13 @@ export function compileTunnelRoadObstructionLimits(feature, roads, sampleTerrain
         if (!polygon.length) continue;
         const start = Math.min(...polygon.map(p=>p.x)), end = Math.max(...polygon.map(p=>p.x));
         if (end-start <= 1e-5) continue;
-        const heights = polygon.map(p=>sampleTerrain(a.x+tx*p.x-tz*p.z,a.z+tz*p.x+tx*p.z));
+        const heights = polygon.map(p=>{
+          const x=a.x+tx*p.x-tz*p.z,z=a.z+tz*p.x+tx*p.z;
+          return elevated ? sampleFeatureSurfaceY(road,x,z) : sampleTerrain(x,z);
+        });
         if (!heights.every(Number.isFinite)) continue;
         limits.push(Object.freeze({start:path.distances[i-1]+start,end:path.distances[i-1]+end,
-          maximumSurfaceY:Math.min(...heights)-clearance,source:'mapped-surface-road',sourceFeatureId:road.sourceFeatureId}));
+          maximumSurfaceY:Math.min(...heights),source:'mapped-surface-road',sourceFeatureId:road.sourceFeatureId}));
       }
     }
   }

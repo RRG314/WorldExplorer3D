@@ -4,6 +4,35 @@ import {assignOrdinaryStreetJunctions,fitOrdinaryStreetProfile} from '../app/js/
 import {compileTransportSurfaceModel} from '../app/js/world/compiler/transport-surface-model.js';
 import {sampleFeatureSurfaceY} from '../app/js/structure-semantics.js';
 const feature=(id,pts)=>({pts,width:5,type:'residential',surfaceBias:.18,structureSemantics:{terrainMode:'at_grade'},transportGraphRef:{featureId:id}});
+test('simplified interior street intersections share one terrain elevation without adding routing topology',()=>{
+ for(const reverse of [false,true]){
+  const main=feature('main',[{x:-100,z:0},{x:100,z:0}]),crossing=feature('crossing',[{x:20,z:-50},{x:20,z:50}]);
+  for(const f of [main,crossing])f.transportRecord={completeness:'generalized',routeState:'complete'};
+  const terrain=x=>7-6*Math.exp(-(((x+8)/10)**2)),network={connections:[]};
+  const roads=reverse?[crossing,main]:[main,crossing];
+  const result=assignOrdinaryStreetJunctions(roads,network,terrain);
+  assert.equal(result.surfaceIntersections,1);assert.deepEqual(network.connections,[]);
+  for(const f of roads){
+   f.transportSurfaceModel=compileTransportSurfaceModel(f,terrain);
+   assert.ok(Math.abs(sampleFeatureSurfaceY(f,20,0)-terrain(20)-.18)<1e-5);
+   assert.equal(f.transportSurfaceModel.engineeredApproach,false);
+  }
+ }
+});
+
+test('surface crossing inference preserves explicit topology and grade separation',()=>{
+ for(const variant of ['lossless','bridge','layer','highway','engineered','parallel']){
+  const a=feature('a',[{x:-20,z:0},{x:20,z:0}]),b=feature('b',[{x:0,z:-20},{x:0,z:20}]);
+  for(const f of [a,b])f.transportRecord={completeness:'generalized'};
+  if(variant==='lossless')a.transportRecord.completeness='lossless';
+  if(variant==='bridge')a.structureSemantics.gradeSeparated=true;
+  if(variant==='layer')a.structureSemantics.verticalOrder=1;
+  if(variant==='highway')a.type='motorway';
+  if(variant==='engineered')a.transportSurfaceModel={engineeredApproach:true};
+  if(variant==='parallel')b.pts=[{x:-20,z:2},{x:20,z:2}];
+  assert.equal(assignOrdinaryStreetJunctions([a,b],{connections:[]},()=>7).surfaceIntersections,0,variant);
+ }
+});
 test('ordinary endpoint-to-interior junctions meet without becoming bridge approaches',()=>{
  const through=feature('through',[{x:0,z:0},{x:60,z:0}]),branch=feature('branch',[{x:23,z:0},{x:23,z:30}]);
  const point={x:23,z:0},terrain=(x,z)=>.2*x+.04*z;

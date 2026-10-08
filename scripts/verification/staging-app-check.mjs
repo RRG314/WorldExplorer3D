@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { readFile, stat } from 'node:fs/promises';
+import { fulfillStagingProxyRoute } from './staging-proxy-delivery.mjs';
 
 // Credentials stay outside the build and reports. This only configures the
 // documented Firebase debug provider in an explicitly local staging browser.
@@ -37,8 +38,7 @@ export async function configureStagingAppCheck(page, baseUrl) {
       const environmental = ['/api/geospatial/weather','/api/geospatial/marine'].includes(request.pathname);
       const target = new URL('https://us-central1-we3d-staging-20260712.cloudfunctions.net/'+(environmental?'getEnvironmentalData':request.pathname==='/api/geospatial/aircraft'?'getAircraftStates':'getPlaceLookup'));
       target.search = request.search;
-      try { const response = await route.fetch({url: target.href, timeout: 55000}); await route.fulfill({response}); }
-      catch { await route.fulfill({status: 502, contentType: 'application/json', body: JSON.stringify({error: 'Staging geospatial provider unavailable.'})}); }
+      await fulfillStagingProxyRoute({ page, route, target: target.href });
     });
   }
   return { provider: 'registered-staging-debug' , projectId: config.projectId, artifactConfigurationOverridden: true, productionAttestationVerified: false };

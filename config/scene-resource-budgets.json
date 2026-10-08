@@ -1,10 +1,31 @@
 {
   "schemaVersion": 1,
   "scope": "Regression ceilings for the named desktop baseline scenes, including hidden scene references. Not global geographic limits, physical-phone budgets or measured GPU residency.",
-  "baselineEvidence": "output/verification/architecture-polish/diagnostics-browser-rerun/report.json",
-  "baselineHardware": "Apple M1, 8 GiB, Chrome 154, 1440x900, source preview, balanced",
+  "baselineEvidence": "output/architecture-evaluation/resource-baseline-55/report.json",
+  "baselineHardware": "Apple M1, 8 GiB, Chrome 155.0.8059.39, 1440x900, packaged 4dd2, default desktop quality",
+  "baselineChange": {
+    "date": "2026-10-08",
+    "reason": "The owner-requested restored coverage nearly doubles the named Baltimore fixture; the old collider ceilings described the smaller footprint.",
+    "oldBaltimore": {
+      "mappedBuildings": 25529,
+      "transportStructures": 2938,
+      "geometrySourceBytes": 232692742
+    },
+    "observedBaltimore": {
+      "mappedBuildings": 49748,
+      "transportStructures": 7701,
+      "geometrySourceBytes": 375726562
+    },
+    "fallbackObservation": {
+      "mappedBuildings": 49023,
+      "transportStructures": 9172,
+      "geometrySourceBytes": 363756506
+    },
+    "evidenceSha256": "9857636090c543f80a6e4f5eee20c9cb4527a340c5e112ee9104f955ad5c3778",
+    "scope": "Measured scene references, not GPU residency or phone capacity. Independent frame-time, full-coverage and 12-reload retention gates remain required and unchanged."
+  },
   "scenes": {
-    "earth": {"fixture": "Baltimore 39.2904,-76.6122 walking spawn", "maximum": {"materials": 3300, "geometries": 5600, "textures": 260, "skeletons": 80, "geometrySourceBytes": 314572800, "textureSourceBytes": 335544320, "unknownTextures": 0, "drawCalls": 1800, "triangles": 4950000, "programs": 128}, "colliders": {"mappedBuildings": 40000, "transportStructures": 5000, "dynamic": 32}, "maximumAnimationTimeRatio": 0.12},
+    "earth": {"fixture": "Baltimore 39.2904,-76.6122 walking spawn", "maximum": {"materials": 3300, "geometries": 5600, "textures": 260, "skeletons": 80, "geometrySourceBytes": 419430400, "textureSourceBytes": 335544320, "unknownTextures": 0, "drawCalls": 1800, "triangles": 4950000, "programs": 128}, "colliders": {"mappedBuildings": 60000, "transportStructures": 12000, "dynamic": 32}, "maximumAnimationTimeRatio": 0.12},
     "space": {"fixture": "Initial Space flight, Moon course", "maximum": {"materials": 350, "geometries": 330, "textures": 70, "skeletons": 0, "geometrySourceBytes": 4194304, "textureSourceBytes": 402653184, "unknownTextures": 0, "drawCalls": 150, "triangles": 80000, "programs": 24}, "maximumAnimationTimeRatio": 0.02},
     "ocean": {"fixture": "Coral Shelf -18.2861,147.7, submarine, controlled GEBCO -80 m", "maximum": {"materials": 64, "geometries": 80, "textures": 32, "skeletons": 0, "geometrySourceBytes": 6291456, "textureSourceBytes": 33554432, "unknownTextures": 0, "drawCalls": 300, "triangles": 900000, "programs": 24}, "maximumAnimationTimeRatio": 0.02}
   }

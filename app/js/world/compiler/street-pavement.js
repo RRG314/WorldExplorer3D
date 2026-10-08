@@ -1,4 +1,5 @@
 import {frontageCornerRegions} from './street-frontage-corners.js';
+import {isPavementFootway,isPavementCrossing} from './pavement-footway-policy.js';
 import {streetRoadSegments,unionCarriageway} from './street-carriageway.js';
 import {roadPlacementOffsetWorld} from '../road-units.js';
 import {createStreetCarriagewayBarriers,frontageBlocked} from './street-carriageway-barriers.js';
@@ -125,7 +126,7 @@ function prepareStreetRegions({ roads = [], buildings = [], landuses = [], linea
     const item = { polygon: areaPolygon(land), bounds: box(ringOf(land)) };
     const tags = land.tags || {};
     if (['footway','pedestrian'].includes(tags['area:highway']) || (tags.highway === 'pedestrian' && tags.area === 'yes') || (tags.place === 'square' && /^(paved|concrete|concrete:plates|paving_stones|sett|cobblestone)$/.test(tags.surface || ''))) mappedAreas.push(item);
-    else if (['water', 'garden', 'park', 'grass', 'forest', 'wood', 'parking'].includes(land.type)) obstacles.push(item);
+    else if (['water', 'garden', 'park', 'grass', 'forest', 'wood', 'parking'].includes(land.type)) obstacles.push({...item,blocksMappedPaths:land.type==='water'});
   }
   for (const road of roads) {
     if (!groundFeature(road) || !Array.isArray(road.pts)) continue;
@@ -144,11 +145,11 @@ function prepareStreetRegions({ roads = [], buildings = [], landuses = [], linea
     }
   }
   for (const feature of linearFeatures) {
-    if (groundFeature(feature) && feature.kind === 'footway' && feature.subtype === 'crossing' && feature.pts?.length>1) {
+    if (isPavementCrossing(feature) && feature.pts?.length>1) {
       insert('crossings',feature,box(feature.pts),4/metersPerWorldUnit);
       continue;
     }
-    if (!groundFeature(feature) || feature.kind !== 'footway' || feature.subtype !== 'sidewalk') continue;
+    if (!isPavementFootway(feature)) continue;
     for (let i = 1; i < feature.pts.length; i++) {
       const a = feature.pts[i - 1], b = feature.pts[i];
       const shape = quad(a, b, feature.width / 2, feature.width / 2);
@@ -188,7 +189,7 @@ function prepareStreetRegions({ roads = [], buildings = [], landuses = [], linea
   }
   frontagePolicy.dispose();frontageBarriers.dispose();
   return { tiles: [...tiles.values()].sort((a, b) => a.ix - b.ix || a.iz - b.iz), sourceCellCount, metersPerWorldUnit, chunkSize,
-    managedPaths: linearFeatures.filter(f => groundFeature(f) && f.kind === 'footway' && f.subtype === 'sidewalk') };
+    managedPaths: linearFeatures.filter(isPavementFootway) };
 }
 
 function frontageDistance(point, nx, nz, edges, minimum, maximum) {
@@ -308,6 +309,15 @@ export function compilePavementTile(tile, metersPerWorldUnit = 1.11, {includeMar
   let polygons=union(localParts(polygonsToUnion));
   const blockers = carriageway.concat(tile.obstacles.map(o => o.polygon));
   if (polygons.length && blockers.length) polygons = clip.difference(polygons, union(localParts(blockers)));
+  // Parks and planting exclude inferred frontage, but an explicitly mapped
+  // path through them must survive the handoff from its coarse ribbon. Keep
+  // only its mapped width, still excluding buildings, water and carriageways.
+  if (tile.paths.length && tile.obstacles.some(o=>o.blocksMappedPaths===false)) {
+    let mapped=union(localParts(tile.paths.map(p=>p.polygon)));
+    const hardBlockers=carriageway.concat(tile.obstacles.filter(o=>o.blocksMappedPaths!==false).map(o=>o.polygon));
+    if(mapped.length&&hardBlockers.length)mapped=clip.difference(mapped,union(localParts(hardBlockers)));
+    if(mapped.length)polygons=polygons.length?clip.union(polygons,mapped):mapped;
+  }
   const ramps=includeMarkings?crossingRamps(tile.crossings || [],roadEdges,metersPerWorldUnit):[];
   const paintParts=[];
   for(const crossing of includeMarkings?(tile.crossings || []):[]) {
