@@ -7,7 +7,8 @@ published versions.
 
 ## Release acceptance and visual coverage
 
-- Physical-phone responsiveness has not yet been accepted on the current visual-quality branch.
+- The owner reports that the preview works, including an earlier Android check.
+  Named-device responsiveness, battery, thermal and resume measurements remain unverified for 5.5.
   Emulated touch layouts and software-rendered browser journeys are functional
   evidence, not hardware frame-rate, battery or thermal measurements.
 - Licensed ship furnishings replace major placeholders, but galley appliances,
@@ -19,9 +20,9 @@ published versions.
 - Research currently offers a limited set of measurements and fabrication
   outcomes; broader experiments and expedition consequences remain planned.
 
-- Current full-game performance evidence still exceeds the existing memory
-  budget and misses some frame-rate and travel-transition targets. Component
-  improvements do not establish a whole-game performance pass.
+- Some full-game performance targets remain unmet, particularly frame pacing
+  and travel transitions. Component improvements do not establish consistent
+  responsiveness across locations and devices.
 - Historic sites and regional vegetation are not uniformly complete. Dedicated
   landmark geometry, mapped footprints and inferred buildings require visual
   ownership checks; generic detail must not cover a landmark.

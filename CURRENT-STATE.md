@@ -1,34 +1,60 @@
 # Current development and release state
 
-Updated October 8, 2026. **5.5.0 is a release candidate; production promotion is pending.**
-The owner has authorized GitHub, Pages, a versioned release and production deployment.
-The draft release acknowledges the remaining product limitations. Failed or missing
-verification has not been represented as acceptance.
+Updated October 8, 2026. **5.5.0 is deployed to production.**
+Release: https://github.com/RRG314/WorldExplorer3D/releases/tag/v5.5.0
+Public project page: https://rrg314.github.io/WorldExplorer3D/
 
-## October 8 production release attempt
+## Current release
 
-The owner reports the preview works and authorizes release. Named phone thermal,
-memory/resume measurements and independent new-player review remain explicitly
-unverified and are deferred for 5.5; ordinary hosted, provider-rights, rollback and
-all automated gates remain required. See
-`docs/release-review/2026-10-08/OWNER-RELEASE-DECISION.md`.
+- Production: https://worldexplorer3d.io/app/
+- Build: `5.5.0+d8775a392c42.88e67f97c00bb4c2.production`
+- Product source: `d8775a392c4246b2552842c37f40508bd664d4c5`
+- Firebase project: `worldexplorer3d-d9b83`; live version `1036aacf01a2b97d`.
+- Local dist contains the production package. Its game files match the verified
+  staging package; only the three reviewed Firebase configuration assets differ.
+- The custom-domain and Firebase-hosted build/asset manifests match local bytes.
+- The owner reports that the preview works and repeatedly requested publication.
+  This is an owner-directed release with disclosed limitations, not a complete
+  automated release certification. See
+  `docs/release-review/2026-10-08/OWNER-RELEASE-DECISION.md`.
 
-Six previously failing/current-candidate rechecks now pass. The normal-provider
-assembled check exposed a real duplicate building passage at two heights. A
-shared source-ownership repair and captured regression are in progress; see
-`docs/release-review/2026-10-08/MIXED-PROVIDER-PASSAGE.md`. The live source check
-used fallback; captured mixed-source replay proves zero discontinuities across
-495 connections. Both prescribed driving bursts complete without errors, with inspected images.
-The complete source chain passes 2,183 tests plus dependency, ownership, type,
-inventory and sensitivity checks. Immutable release checks remain pending. Production remains 5.4 and the hosted preview remains e5dadb07.
+All 2,183 source tests and the source chain pass. GitHub code/package and secret
+checks pass. Current immutable regional arrival/recovery, all 29 packaged-world
+checks and the three-stage save/rollback roundtrip pass. The captured mixed-provider
+passage regression has zero discontinuities across 495 connections. Final normal
+packaged world retains 49,023 buildings and 18,952 roads without runtime errors.
+
+The final broad matrix was interrupted during city-switch verification and remains
+explicitly incomplete. Prior performance failures and the unverified named-phone,
+new-player and complete ordinary-hosted acceptance are not relabeled as passing.
+The new Firebase preview hostname triggered Chrome's Dangerous site warning;
+that warning was not bypassed. The established custom domain opened normally and
+live search worked before promotion. After promotion, ordinary Chrome opened
+5.5, returned place-search results, displayed loading progress and entered the
+Light Street world with live weather and no captured browser errors. Day/night
+controls worked and both scenes were visually inspected. This does not certify
+the separate sign-in/shared-voyage or physical-device acceptance classes.
+
+Four saved packages are retained: unique 0e4, previous production 1532, compatible
+37a fallback, and the verified d877 staging package. Superseded generated e5 and
+4413 packages were pruned only after complete payload/hash and pushed-ancestry
+verification; their manifests and receipts remain. Source/history/player data and
+the owner's ordinary Chrome remain intact.
 
 ## Working checkout
 
 Use `/Users/stevenreid/.codex/worktrees/architecture-evaluation/WorldExplorer3D-live-deployed-20260320`,
 branch `steven/visual-quality`. Do not edit the older Documents/Developer checkouts.
-Preserve existing location work, player data, retained artifacts and Git history.
-On this observed 8 GiB Apple M1 Mac, run heavy verification sequentially and close
-only owned browsers and servers. Ordinary user Chrome must remain open.
+Run heavy tasks sequentially on this observed 8 GiB Mac and close only owned
+browsers/servers. Production deployment evidence is under
+`output/release-evidence/current/production-deployment.json` and
+`production-promotion.json`; acceptance gaps remain in their own receipts.
+
+## Historical preparation records
+
+The dated records below describe earlier candidates and checks. Statements that
+production or publication was pending are historical; the current release above
+is authoritative.
 
 ## October 8 regional-arrival repair
 

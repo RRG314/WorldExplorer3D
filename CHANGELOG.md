@@ -2,7 +2,7 @@
 
 Notable user-facing changes are recorded here. Git history and GitHub releases contain the complete change record.
 
-## [5.5.0] - Unreleased
+## [5.5.0] - 2026-10-08
 
 - Updated image-processing and backend proxy dependencies for current security fixes.
 
@@ -29,6 +29,8 @@ Notable user-facing changes are recorded here. Git history and GitHub releases c
 
 ### Fixed
 
+- Regional buildings staying behind at the starting location during travel.
+- Duplicate mixed-provider building passages publishing road surfaces at different heights.
 - Duplicate sidewalk strips, oversized building-frontage fill and concrete
   overlays hiding mapped plaza materials.
 - Character capability caches returning stale results after same-revision edits.
