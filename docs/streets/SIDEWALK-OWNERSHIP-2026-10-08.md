@@ -70,7 +70,10 @@ are not replaced by the pavement compiler.
 | Multi-location pavement | All six Monaco/San Francisco hill cases pass. Captured Baltimore, Monaco and San Francisco layouts preserve coverage at 32/64/128 output sizes with zero area beyond rounding allowance |
 | Baltimore bridge regression | All nine checks pass; 742 joins, zero discontinuities, maximum vertical delta 0.23025 m within the unchanged 0.25 m threshold; no runtime errors or missing local assets. Screenshot inspected. `sidewalk-bridge-endpoints` |
 | Monaco tunnel drive | All six checks pass: entered and exited, zero junction steps, remained on the carriageway, no airborne frames or runtime errors. Approach, bore and exit images inspected. `sidewalk-monaco-tunnel`. This certifies the tested driving path, not the surrounding hillside art |
-| Packaged or hosted acceptance | Pending; source evidence above does not certify the old hosted package |
+| Immutable package | `5.5.0+e5dadb078ee4.921fdb6e4e4a7a21.staging`; same fallback geometry/counts as the accepted source capture, zero runtime errors, six images inspected. Compiler cache 6,915,376 bytes. `sidewalk-packaged` |
+| Normal packaged-world preflight | All 29 checks pass; zero discontinuities across 741 joins; no browser/runtime errors or missing local resources. `sidewalk-packaged/world-preflight.json` |
+| Hosted preview | `visual-review-1005` deployed; both hosted manifests byte-match the tested package. `sidewalk-packaged/hosted-receipt.json` |
+| Ordinary hosted Chrome | Not rerun: native UI reported the Mac locked. The installed-Chrome diagnostic and packaged preflight above are isolated browser evidence |
 
 Earlier road and plaza tests expecting unsupported 19–24 metre fill were changed
 deliberately: shared building vertices are not evidence for that fill. Mapped

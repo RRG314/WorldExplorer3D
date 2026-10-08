@@ -1,6 +1,6 @@
 # Known Issues and Limitations
 
-Last reviewed: October 7, 2026, for the 5.5 update. These are known product
+Last reviewed: October 8, 2026, for the 5.5 update. These are known product
 limits, not a promise that every location or device has been validated.
 The [GitHub releases](https://github.com/RRG314/WorldExplorer3D/releases) identify
 published versions.
@@ -51,6 +51,9 @@ published versions.
 
 ## Roads and structures
 
+- Generalized map data can omit road widths and sidewalk boundaries. Those
+  dimensions are inferred where missing; curb placement can differ from the
+  real street, even when the road and pedestrian surfaces connect correctly.
 - Bridges, ramps, elevated roads, overpasses and tunnels depend on mapped
   structure, layer and connection tags. Incomplete source tagging or provider
   timing can produce a shorter or less detailed structure than the real one.

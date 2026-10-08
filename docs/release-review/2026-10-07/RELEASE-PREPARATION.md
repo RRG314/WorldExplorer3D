@@ -8,8 +8,18 @@ have not been promoted.
 
 ## Candidate and public presentation
 
-The local and hosted candidate is `5.5.0+4413d5d9b2ce.d69c6d4fb5e9fe9c.staging`.
-Source checks pass 2,158 tests. Its normal packaged-world preflight passes all 29
+The local and hosted candidate is `5.5.0+e5dadb078ee4.921fdb6e4e4a7a21.staging`.
+Its sidewalk correction passes 2,170 source tests, captured Baltimore/Monaco/San
+Francisco pavement checks, actual Baltimore bridge checks and Monaco tunnel driving.
+The immutable Light Street fallback capture retains all 44,090 buildings and
+18,912 roads; mapped paths and inferred sidewalks share ownership, mapped plazas
+retain their materials, and unsupported wide frontage fill is removed. No road
+width or structure profile change is included. All 29 normal packaged-world checks
+pass, and both hosted manifests match local bytes. Ordinary hosted Chrome was not
+rerun because the Mac is locked. Source/package evidence and limits are recorded in
+`docs/streets/SIDEWALK-OWNERSHIP-2026-10-08.md`.
+
+The preceding regional-arrival package was 4413d5d9. Its source checks passed 2,158 tests. Its normal packaged-world preflight passes all 29
 checks with zero discontinuities across 741 joins, retained building/road coverage
 and no game errors. Its added regional journey passes arrival at the reported
 coordinates, return, incomplete-provider retention, recovery, resource retirement,

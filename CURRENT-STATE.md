@@ -69,14 +69,27 @@ actions but its Node process retained service connections after browser cleanup;
 the isolated verifier now explicitly exits after successful browser closure.
 The final run completed normally. Baltimore bridge checks pass (742 joins, zero
 discontinuities); the Monaco entrance-to-exit tunnel drive passes all six checks,
-with images inspected. Packaged/hosted verification for this change is pending.
-Existing preview and production identities below are unchanged until that finishes.
+with images inspected. The immutable package reproduces the repaired fallback
+scene with identical coverage and no runtime errors; its compiler cache is
+6,915,376 bytes. All 29 normal packaged-world checks pass with zero discontinuities
+across 741 joins. The preview is deployed and both hosted manifests match local
+bytes. Ordinary hosted Chrome could not be rerun because the Mac is locked.
+Production remains unchanged; full release acceptance remains open.
 
 | Surface | Current identity |
 | --- | --- |
 | Production | `5.4.0+1532bdfbb5c1.319d215f60318297.production` |
-| Hosted preview and local dist | `5.5.0+4413d5d9b2ce.d69c6d4fb5e9fe9c.staging` |
-| Hosted candidate source | `4413d5d9b2ce01369a5bf8bde7a2d584c68bd243` |
+| Hosted preview and local dist | `5.5.0+e5dadb078ee4.921fdb6e4e4a7a21.staging` |
+| Hosted candidate source | `e5dadb078ee4de769afa630a93eb924fc30308a4` |
+
+Current sidewalk package evidence is under `output/verification/sidewalk-packaged`.
+Build manifest SHA256: `017063cf545625da52e895bd15820dba2ab47e30233dd0846e3c4d9af3c2db9d`.
+Asset manifest SHA256: `017ed7c05821768c5d7c5cdf34ae00214bb7ea5793d7019d546886e150d93939`.
+Preview channel `visual-review-1005` is renewed through October 15. The previous
+4413d5d9 package was preserved before building; only the verified superseded
+016537ce generated package was pruned, with its manifests and receipt retained.
+
+Previous regional-arrival evidence (not a rerun on the sidewalk package):
 
 The 4413d5d9 regional-arrival package passes all 29 normal packaged-world checks
 with no browser errors, zero discontinuities across 741 joins, and retained

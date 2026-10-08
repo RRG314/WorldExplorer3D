@@ -29,6 +29,8 @@ Notable user-facing changes are recorded here. Git history and GitHub releases c
 
 ### Fixed
 
+- Duplicate sidewalk strips, oversized building-frontage fill and concrete
+  overlays hiding mapped plaza materials.
 - Character capability caches returning stale results after same-revision edits.
 - Inventory capability views retaining depleted consumables.
 

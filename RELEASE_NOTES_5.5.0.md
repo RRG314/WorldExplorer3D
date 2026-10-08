@@ -16,6 +16,9 @@ Parks, woodland, wetlands and protected areas use their physical land cover to
 shape planting and terrain, rather than treating every green area alike.
 
 Street facades, storefronts, pavement and roadside details have been refined.
+Mapped walking paths and roadside sidewalks now share pavement instead of drawing
+duplicate strips. Plazas retain their mapped boundaries and surface materials,
+and nearby buildings no longer cause oversized pavement fill.
 These scenes still depend on the available map data; they are reconstructions,
 not exact digital copies of every place.
 
