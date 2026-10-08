@@ -261,7 +261,7 @@ export async function publishStreetPavement(appCtx, options = {}) {
       const inferredFrontages = packet.inferredFrontages;
       const diagnostics = document.querySelector('#streetSurfaceDiagnostics pre');
       if (diagnostics) diagnostics.textContent = JSON.stringify({...stats,completedTiles:packet.completed,plannedTiles:packet.total},null,2);
-      if (appCtx.worldLoading) appCtx.showLoad?.(`Compiling nearby pavement grid: ${packet.completed} / ${packet.total} cells (not whole-location coverage)`);
+      if (appCtx.worldLoading && current()) appCtx.showLoad?.('', { phase: 'publishStreetPavement', completed: packet.completed, total: packet.total });
       stats.workerMs += Number(packet.durationMs) || 0;
       if (!packet.mesh.vertices.length && !packet.mesh.markingVertices?.length) continue;
       const mesh = packet.mesh;

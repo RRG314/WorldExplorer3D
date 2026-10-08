@@ -18,20 +18,31 @@ only owned browsers and servers. Ordinary user Chrome must remain open.
 | Surface | Current identity |
 | --- | --- |
 | Production | `5.4.0+1532bdfbb5c1.319d215f60318297.production` |
-| Hosted preview | `5.5.0+4dd2e37c69a9.e85c0302553a7fda.staging` |
-| Retained immutable candidate | `5.5.0+4dd2e37c69a9.e85c0302553a7fda.staging` |
-| Candidate source | `4dd2e37c69a9ccd0a946d3bf2af984faaaadb5a5` |
+| Hosted preview and local dist | `5.5.0+61cc497e6d5a.97fd90a968edc376.staging` |
+| Candidate source | `61cc497e6d5ae50cf3de69c3afe0cb707bf4e042` |
 
-The candidate has 615 verified files. Its asset manifest SHA256 is
-`c46fe0700a1f804fafd19531896587a217134a48f18691015dcb095d21d442e0`.
-The compatible `37a12d11` rollback, production, unique `0e4c8d42` snapshot and
-`4dd2` package remain retained. Fifty-one obsolete clean staging packages were
-removed at the owner's request after verifying their source in pushed ancestry;
-manifests and test reports remain. The latest four removals also verified every
-payload hash and retained receipts. The 135/316 runtime is byte-identical to 4dd2.
-The local 4dd2 candidate records the corrected marine verifier; all 615 delivered
-file hashes exactly match the owner-tested 135 preview; that runtime remains in 4dd2.
-A documentation-only commit does not change this packaged runtime identity.
+The 61cc road-repair package passes all 29 normal packaged-world checks with no
+browser errors, zero discontinuities across 741 joins, and retained coverage of
+49,023 buildings, 18,952 roads, 111 land-use areas and 49 terrain tiles. Both
+hosted manifests match local bytes. Production remains unchanged. Source and
+GitHub PR/secret-scanning checks pass. Its asset manifest SHA256 is
+`52047c86ff3736dcb96d0ce4fff596318352d6dbbf8a84ef4d38c2f584915b31`.
+
+The current dist, compatible 37a fallback, production and unique 0e snapshot must
+be preserved. Old generated packages were removed only after pushed ancestry and
+payload verification, with manifests, receipts and test evidence retained. The
+owner-tested 4dd2 runtime was byte-identical to the earlier 135/316 preview.
+
+The owner has limited the final feature addition to loading presentation. Source
+now has a pipeline-driven progress bar, a longer-load note, twelve browsable
+feature/tutorial cards, reduced-motion behavior and friendly startup recovery.
+The initial source suite passed 2,141 tests. Desktop and 360px phone layouts,
+all card widths, keyboard/modal focus, short-screen scrolling and actual bootstrap
+failure/reload pass. A prescribed real Baltimore launch records monotonic 3–99%
+progress and automatic card rotation across 71.6 seconds, then hides the overlay
+and passes both driving bursts. No game errors; optional external Overpass CORS
+errors are retained separately. Images were inspected. The final phone-sized launch also passes, showing road, flight and ocean cards before play; its 27.5-second result is browser emulation, not a physical-phone measurement. All final source checks pass 2,141 tests. A new immutable preview is pending.
+This is loading-UI evidence, not a performance or full-release acceptance claim.
 
 ## Completed verification and repairs
 
@@ -74,8 +85,7 @@ transport stations now take priority over nearby ordinary/obstruction samples.
 The regression failed before the repair; all 22 focused tests now pass. Actual
 Baltimore movement then passes with zero discontinuities across 741 joins,
 49,023 buildings, 18,952 roads and no game errors. Both screenshots were inspected.
-The complete source chain now passes 2,134 tests. A replacement package and
-its normal preflight remain pending; neither failed run was relabeled passing.
+The complete source chain now passes 2,134 tests. The replacement 61cc package passes its normal 29-check preflight and is hosted; neither failed run was relabeled passing.
 
 The first complete candidate matrix on the previous `1033fb88` package finished
 61 passes and 30 failures. Twenty-one later checks stopped before gameplay when
@@ -125,16 +135,14 @@ Staging alignment is complete: all 80 Functions are ACTIVE, their downloaded
 archives match all 36 tracked backend files, and the current preview origin is
 allowed. The other ten parameters and all existing origins are preserved. Shared
 expedition, environmental data and condition-save preflights each return 204 with
-the exact preview origin. The temporary parameter file was removed. An ordinary
-hosted-browser journey remains necessary; source equality and CORS are not that
-acceptance.
+the exact preview origin. The temporary parameter file was removed. The complete ordinary hosted journey remains necessary; source equality and CORS are not that acceptance.
 An ordinary hosted Chrome probe signed in successfully but live search failed
 with 401. A separate read-only probe observed reCAPTCHA requests returning 200
 and the actual App Check token exchange returning 403, `App attestation failed`.
 Project/app/site-key alignment and browser-key API permissions were checked;
 the cause of the rejected attestation is not established. Debug-attested browser
 checks are not ordinary-browser acceptance. No protection was disabled. The
-temporary test account and owned records were deleted and absence verified.
+temporary test account and owned records were deleted and absence verified. Subsequently, the owner’s ordinary installed Chrome (without debug attestation) successfully searched Baltimore on the 61cc preview and displayed three real place results. That unsigned search is verified; the prior automation attestation failure and remaining ordinary journeys are not reclassified.
 
 Live providers passed on the identical `316` game payload. Seven sustained
 movement windows completed: five fail the hitch limits, with worst observed

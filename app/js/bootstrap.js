@@ -144,13 +144,23 @@ async function boot() {
     );
     const loadingText = document.getElementById('loadText');
     if (loadingText) {
-      loadingText.textContent = 'Failed to load scripts. Check console for details.';
+      loadingText.textContent = 'The game could not finish starting. Please reload to try again.';
     }
     const loading = document.getElementById('loading');
     if (loading) {
+      loading.dataset.state = 'error';
+      loading.setAttribute('aria-busy', 'false');
       loading.classList.add('show');
     }
-    showStartupDiagnostics('Startup failed before the app booted');
+    const title = document.getElementById('loadTitle');
+    if (title) title.textContent = 'Let’s try that again';
+    const note = document.getElementById('loadNote');
+    if (note) note.textContent = 'Something interrupted loading. Check your connection, then try again.';
+    const progress = document.getElementById('loadProgress');
+    if (progress) progress.hidden = true;
+    const retry = document.getElementById('loadRetry');
+    if (retry) retry.hidden = false;
+    if (new URLSearchParams(location.search).get('startupDiagnostics') === '1') showStartupDiagnostics('Startup failed before the app booted');
   }
 }
 

@@ -114,6 +114,7 @@ export function createWorldLoadRuntimeSession(options = {}) {
       runtimeState.activePhases = Object.keys(phaseStartedAt);
       runtimeState.updatedAt = performance.now();
     }
+    if (runtimeState?.status === 'loading' && appCtx.worldLoadRuntimeState === runtimeState) appCtx.showLoad?.('', { phase: name });
   };
   const endLoadPhase = (name) => {
     if (!name) return;
@@ -510,6 +511,7 @@ export async function finishWorldLoadRuntimeSession(session = {}) {
     runtimeState.updatedAt = performance.now();
   }
   const gameplayRuntimeStartedAt = performance.now();
+  if (appCtx.worldLoadRuntimeState === runtimeState) appCtx.showLoad?.('', { phase: 'gameplay' });
   let livingWorld = null;
   let urbanSandbox = null;
   let aviation = null;
@@ -526,7 +528,11 @@ export async function finishWorldLoadRuntimeSession(session = {}) {
     const startedAt = performance.now();
     traceStartup('start', name);
     try {
-      return await task();
+      const result = await task();
+      if (result && appCtx.worldLoadRuntimeState === runtimeState && worldSession?.isActive?.()) {
+        appCtx.showLoad?.('', { phase: name });
+      }
+      return result;
     } finally {
       gameplayStartupDurationsMs[name] = Math.round(performance.now() - startedAt);
       traceStartup('end', name, gameplayStartupDurationsMs[name]);

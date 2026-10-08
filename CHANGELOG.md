@@ -20,6 +20,8 @@ Notable user-facing changes are recorded here. Git history and GitHub releases c
 - Connected bridge and tunnel approach heights, shared portal cuts, vehicle
   contact and camera transitions.
 - World-load cancellation, failure recovery and resource cleanup.
+- Loading progress, plain-language status updates and browsable feature tips
+  for travel, fieldwork, ocean and space exploration.
 - Swimmer and diver visibility, vessel water support, saved aboard resumes,
   spacecraft walking and Earth return.
 - Nearby actor, shoreline, rendering and road-detail work; capability queries

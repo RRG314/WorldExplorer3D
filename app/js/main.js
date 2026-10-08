@@ -2,6 +2,9 @@ import { ctx as appCtx } from './shared-context.js?v=55';
 import { createCoreFrameSystems, createCoreRenderSystem } from './runtime/core-frame-systems.js?v=11';
 import { createDebugPresentationSystem } from './runtime/debug-presentation.js?v=3';
 import { createRuntimeKernel } from './runtime/kernel.js?v=3';
+import { createLoadingPresentation } from './ui/loading-progress.js?v=1';
+
+let loadingPresentation = null;
 
 let perfPanelTimer = 0;
 let runtimeSystemsRegistered = false;
@@ -163,7 +166,8 @@ function showLoad(text, options = {}) {
   const loading = document.getElementById('loading');
   const loadText = document.getElementById('loadText');
   if (!loading || !loadText) return;
-  const spinner = loading.querySelector('.spinner');
+  const wasVisible = loading.classList.contains('show');
+  loadingPresentation ||= createLoadingPresentation(document);
   const selectedMode = options.mode || appCtx.loadingScreenMode || 'earth';
   const background = options.background || LOADING_BG_BY_MODE[selectedMode] || DEFAULT_LOADING_BG;
   const overlay = Number.isFinite(options.overlay) ? options.overlay : 0.32;
@@ -175,23 +179,18 @@ function showLoad(text, options = {}) {
   loading.style.backgroundPosition = 'center center';
   loading.style.backgroundSize = 'cover';
   loading.style.backgroundRepeat = 'no-repeat';
-  loadText.textContent = text || 'Loading...';
-  loadText.style.fontWeight = options.bold ? '700' : '500';
-  loadText.style.letterSpacing = options.letterSpacing || '';
-  loadText.style.textShadow = options.transition ? '0 4px 18px rgba(0,0,0,0.9)' : '';
-  if (spinner) spinner.style.display = options.hideSpinner ? 'none' : '';
+  // Legacy loader strings remain useful to callers/diagnostics, but are not
+  // player copy. Progress and feature tips have one presentation owner.
+  loadingPresentation.show({ ...options, mode: selectedMode });
   loading.classList.add('show');
+  if (!wasVisible) loading.focus({ preventScroll: true });
 }
 
 function hideLoad() {
   const loading = document.getElementById('loading');
   const loadText = document.getElementById('loadText');
   if (!loading || !loadText) return;
-  const spinner = loading.querySelector('.spinner');
-  if (spinner) spinner.style.display = '';
-  loadText.style.fontWeight = '';
-  loadText.style.letterSpacing = '';
-  loadText.style.textShadow = '';
+  loadingPresentation?.hide();
   loading.style.backgroundColor = '';
   loading.style.backgroundImage = '';
   loading.style.backgroundPosition = '';
@@ -204,6 +203,7 @@ async function showTransitionLoad(mode, durationMs = 1400) {
   const config = TRANSITION_LOADING[mode];
   if (!config) return;
   showLoad(config.text, {
+    mode,
     background: config.background,
     hideSpinner: true,
     transition: true,

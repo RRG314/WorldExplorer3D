@@ -8,13 +8,11 @@ have not been promoted.
 
 ## Candidate and public presentation
 
-The local and hosted candidate is `5.5.0+4dd2e37c69a9.e85c0302553a7fda.staging`.
-All 615 delivered file hashes match the Android-tested 135 preview and the 316
-game payload. Later source changes corrected verification races and large Git-blob
-hashing. That frozen source passes 2,109 tests; its GitHub PR and secret scanning pass.
-The packaged-world preflight passes 29 checks without browser errors or failed
-local resources. New road and sidewalk repairs are local and require a new package;
-the frozen candidate's results do not certify those changes.
+The local and hosted road-repair candidate is `5.5.0+61cc497e6d5a.97fd90a968edc376.staging`.
+Its normal packaged-world preflight passes all 29 checks, with zero discontinuities
+across 741 joins and no game errors. Hosted manifests match local bytes. Source
+checks pass 2,134 tests; GitHub PR and secret scanning pass. Production is unchanged.
+The newer loading-presentation addition described below still needs packaging.
 
 The public README, release notes, roadmap, known issues and project page use a
 curated gallery of actual unedited gameplay screenshots. They do not include an
@@ -140,3 +138,43 @@ the required rollback and recent diagnostics remain. No player data or ordinary
 Chrome profile was removed. When the Git index in the older Documents metadata
 became unreadable, the inaccessible file was preserved and a private HEAD index
 first established that the working tree was clean before rebuilding the index.
+
+## Final loading-screen addition
+
+The owner requested this as the only new feature before release. The screen has
+three separate jobs: explain that detailed locations may take over a minute;
+show real pipeline progress without a fake countdown; and introduce useful things
+to try. Twelve cards rotate at twelve-second intervals, start with two relevant
+destination tips, then mix travel, fieldwork, ocean, space and data features.
+Previous/next pause rotation, with an explicit play/pause control. Reduced motion
+starts paused. The timer stops on hide and startup failure; background tabs do
+not advance cards. No new asset downloads or provider requests are introduced.
+
+Copy was checked against current source: the curated E34 model, aviation boarding,
+maritime boarding, current-location/Live GPS entry, Explorer Journal/Field Guide,
+Backpack, research-vessel journey, Solis Reach/Pathfinder, USGS earthquake registry,
+NASA Exoplanet Archive catalog and planetary surface attribution. Supported sites
+and Alpha status are stated where needed. Exoplanet landscapes are explicitly
+imagined; cards do not promise worldwide travel or the planned ocean expansion.
+The feature copy is not labeled as work presently being loaded.
+
+Earth progress follows loader milestones, with actual pavement worker completion
+within its reserved interval. Stale sessions and late earlier phases cannot move
+it backwards; failed tasks do not complete it. Other-world short transitions use
+an indeterminate bar. The overlay is removed only by the existing ready/abort
+lifecycle. Startup failure presents a reload action; technical diagnostics remain
+recorded and can be explicitly requested with the diagnostic URL option.
+
+Evidence: `output/verification/loading-presentation-55` uses actual HTML/CSS,
+presenter and accessibility code for desktop, phone, all-card width, keyboard,
+reduced-motion and bootstrap-failure/reload checks. `loading-gameplay-55` records
+an actual source Baltimore launch and two prescribed driving bursts, with images
+inspected. The 71.6-second load shows monotonic progress and rotating cards. Two
+optional external Overpass CORS errors are separately retained; no game errors.
+These are loading-presentation checks, not a replacement for the open release
+matrix or a claim that loading became faster. Final source checks pass 2,141 tests. The final phone-sized launch passes both prescribed driving bursts after monotonic progress and three cards over 27.5 seconds. All screenshots were inspected. Physical-device performance is not inferred from this emulation. Final package verification pending.
+
+Ordinary installed Chrome on the 61cc preview also returned three Baltimore place
+results without debug attestation. This verifies unsigned real search; it does
+not erase the earlier isolated automation App Check failure or certify all other
+ordinary-browser journeys.

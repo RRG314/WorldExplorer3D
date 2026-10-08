@@ -116,7 +116,7 @@ export function resetWorldForReload(options = {}) {
   appCtx.fixedRegionalContextRadiusWorld = 0;
   appCtx.fixedRegionalStructureWaterAreas = [];
 
-  if (options.showLoading !== false) appCtx.showLoad(`Loading ${locName}...`);
+  if (options.showLoading !== false) appCtx.showLoad(`Loading ${locName}...`, { restart: true });
   appCtx.worldLoading = true;
   if (options.beginSceneLoad !== false) appCtx.beginEarthWorldSceneLoad?.(options.loadSequence);
   appCtx.urbanSurfaceStats = {

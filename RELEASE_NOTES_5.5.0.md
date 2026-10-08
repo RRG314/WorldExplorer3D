@@ -26,6 +26,10 @@ Location changes handle cancellation and failed loads more reliably. A failed
 request keeps a clear recovery path, and retired world resources are released
 as you leave a place.
 
+Loading now shows a progress bar, a clear note about longer waits, and short
+tips about travel, fieldwork, ocean outings and space exploration. Browse the
+tips yourself or let them rotate while your location takes shape.
+
 ![Baltimore streets and regional buildings during drone flight](assets/readme/baltimore-coverage-5.5.png)
 
 ## An ocean journey that stays together

@@ -138,8 +138,9 @@ export async function finalizeLoadedWorld(options = {}) {
     runFinalStep('retireGroundFallbackPlaceholder', () => appCtx.retireGroundFallbackPlaceholder());
   }
   try {
-    appCtx.showLoad?.('Building connected sidewalks and street surfaces...');
+    startLoadPhase('publishStreetPavement');
     loadMetrics.streetPavement = await publishStreetPavement(appCtx);
+    endLoadPhase('publishStreetPavement');
   } catch (error) {
     recordWorldLoadWarning(loadMetrics, 'publishStreetPavement', error);
     appCtx.streetPavementError = String(error?.message || error);

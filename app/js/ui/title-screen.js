@@ -628,6 +628,7 @@ function initTitleScreenUi({
     // transition background while their scene is still being assembled.
     appCtx.showLoad?.(launchLoadingText, {
       mode: requestedLaunchMode,
+      restart: true,
       bold: true,
       overlay: 0.24
     });

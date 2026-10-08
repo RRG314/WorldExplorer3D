@@ -22,6 +22,21 @@ function publishedContext() {
       session:{state:'published',requestId:'third'}}};
 }
 
+test('only the active loading session can advance the player loading screen',()=>{
+  const messages=[];
+  const {ctx,deps}=setup({showLoad:(_text,options)=>messages.push(options)});
+  const first=createWorldLoadRuntimeSession(deps);
+  first.startLoadPhase('buildRoadGeometry');
+  assert.equal(messages.at(-1).phase,'buildRoadGeometry');
+  const second=createWorldLoadRuntimeSession(deps);
+  const count=messages.length;
+  first.startLoadPhase('publishStreetPavement');assert.equal(messages.length,count);
+  second.startLoadPhase('buildLanduseGeometry');assert.equal(messages.at(-1).phase,'buildLanduseGeometry');
+  ctx.worldLoadRuntimeState.status='failed';
+  const failedCount=messages.length;
+  second.startLoadPhase('spawnPlayer');assert.equal(messages.length,failedCount);
+});
+
 test('request admission rejects missing/blank/coerced coordinates and accepts actual zero',()=>{
   for(const value of [null,undefined,'','  ',false,[],{},Infinity,NaN]) {
     assert.equal(createWorldLoadRequest({...selection,lat:value},1),null);
