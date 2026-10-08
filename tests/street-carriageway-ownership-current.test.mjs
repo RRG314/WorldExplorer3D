@@ -48,9 +48,12 @@ test('carriageway ownership is independent of source ordering',()=>{
  for(let z=-2;z<=8;z+=.1)assert.ok(Math.abs(forward(z)-reverse(z))<1e-9);
 });
 test('frontage visibility stops at an intervening carriageway',()=>{
- const a=road(0,2),b=road(6,6),grading=createStreetFrontageGrading(buildings,1,[a,b]);
- assert.equal(grading.outerDistance(a,{segIndex:0,t:.5},10,-3,2),10);
- assert.equal(grading.outerDistance(b,{segIndex:0,t:.5},10,3,2),3.8);
+ // Keep both sightlines inside the bounded frontage search. Otherwise the
+ // reach limit alone can make this pass even with occlusion disabled.
+ const a=road(0,2),b=road(4,6),nearby=buildings.map(b=>({pts:b.pts.map(p=>({...p,z:p.z+20}))}));
+ const grading=createStreetFrontageGrading(nearby,1,[a,b]);
+ assert.equal(grading.outerDistance(a,{segIndex:0,t:.5},10,3,2),3.8);
+ assert.equal(grading.outerDistance(b,{segIndex:0,t:.5},10,7,2),4);
  grading.dispose();
 });
 

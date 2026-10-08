@@ -4,6 +4,7 @@ import { linearRibbonStations } from './linear-ribbon-stations.js';
 import {createPortalSurfaceClipper} from '../terrain/portal-surface-clip.js';
 import {isPavementFootway} from './compiler/pavement-footway-policy.js';
 import {createConcretePavementTexture} from './pavement-texture.js';
+import {createMappedPavementClipper} from './mapped-pavement-clip.js';
 
 const FEATURE_COLORS = Object.freeze({
   cycleway: 0x8ca99a,
@@ -30,7 +31,7 @@ function outsidePaths(feature, bounds) {
   return paths;
 }
 
-function* buildBatchGeometry(features, buildFeatureRibbonEdges, worldBaseTerrainY, pavementBounds, clipSurface, metersPerWorldUnit) {
+function* buildBatchGeometry(features, buildFeatureRibbonEdges, worldBaseTerrainY, pavementBounds, clipSurface, clipPavement, metersPerWorldUnit) {
   const vertices = [];
   const indices = [];
   for (const feature of features) {
@@ -47,10 +48,13 @@ function* buildBatchGeometry(features, buildFeatureRibbonEdges, worldBaseTerrain
       worldBaseTerrainY,
       { surfaceBias: feature.surfaceBias }
     );
-    if(clipSurface && feature.structureSemantics?.terrainMode==='at_grade' && !feature.transportSurfaceModel?.engineeredApproach) {
+    const pavementCut=clipPavement&&isPavementFootway(feature);
+    if((clipSurface||pavementCut) && feature.structureSemantics?.terrainMode==='at_grade' && !feature.transportSurfaceModel?.engineeredApproach) {
       const positions=[],triangles=[];
       appendUpwardRibbonGeometry(edges.leftEdge,edges.rightEdge,positions,triangles);
-      const cut=clipSurface(positions,triangles),base=vertices.length/3;
+      let cut=clipSurface?clipSurface(positions,triangles):{positions,indices:triangles};
+      if(pavementCut)cut=clipPavement(cut.positions,cut.indices);
+      const base=vertices.length/3;
       for(const value of cut.positions)vertices.push(value);
       for(const value of cut.indices)indices.push(base+value);
     } else appendUpwardRibbonGeometry(
@@ -90,7 +94,8 @@ function* linearFeaturePresentationSteps(options = {}) {
     worldBaseTerrainY,
     metersPerWorldUnit = appCtx?.METERS_PER_WORLD_UNIT || 1.11,
     pavementBounds = null,
-    portalMasks = appCtx?.structureTerrainPortalDescriptors || []
+    portalMasks = appCtx?.structureTerrainPortalDescriptors || [],
+    landuses = appCtx?.landuses || []
   } = options;
   if (
     !appCtx?.scene ||
@@ -117,6 +122,7 @@ function* linearFeaturePresentationSteps(options = {}) {
 
   let published = 0;
   const clipSurface=portalMasks.length?createPortalSurfaceClipper(portalMasks):null;
+  const clipPavement=createMappedPavementClipper(landuses);
   for (const [group, groupedFeatures] of groups) {
     const paved=group==='pavement',kind=paved?'footway':group;
     const geometry = yield* buildBatchGeometry(
@@ -125,6 +131,7 @@ function* linearFeaturePresentationSteps(options = {}) {
       worldBaseTerrainY,
       pavementBounds,
       clipSurface,
+      clipPavement,
       paved ? metersPerWorldUnit : null
     );
     if (!geometry) continue;

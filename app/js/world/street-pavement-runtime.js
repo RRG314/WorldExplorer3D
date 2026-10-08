@@ -14,6 +14,7 @@ import { StreetPacketCache } from './street-packet-cache.js';
 import { streetMotion, streetPrefetch } from './street-prefetch.js';
 import { getWorkloadPolicySnapshot } from '../runtime/workload-policy.js?v=1';
 import {createConcretePavementTexture} from './pavement-texture.js';
+import {mappedPavementContactSources} from './mapped-pavement-contact.js';
 import { conformPavementMeshCooperatively } from './pavement-terrain-conformance.js';
 import { rampCurbScale } from './compiler/street-crossings.js';
 import { createRoadContactIndexCooperatively, selectLinearWalkContactMeshes } from '../terrain/road-contact-index.js?v=1';
@@ -33,7 +34,7 @@ async function refreshMappedPaths(appCtx,pavementBounds){
   const schedule={current,yieldWork:()=>appCtx.gameStarted&&!appCtx.worldLoading?yieldToWorldFrame():yieldToMainThread(),budgetMs:2};
   try {
     await publishLinearFeaturePresentationCooperatively({appCtx:{scene:appCtx.scene,linearFeatureMeshes:meshes,addEarthWorldObject(){}},buildFeatureRibbonEdges,features,pavementBounds,metersPerWorldUnit:appCtx.METERS_PER_WORLD_UNIT||1.11,
-      portalMasks:appCtx.structureTerrainPortalDescriptors,
+      portalMasks:appCtx.structureTerrainPortalDescriptors,landuses:appCtx.landuses,
       worldBaseTerrainY:(x,z)=>{const y=appCtx.terrainMeshHeightAt?.(x,z,{ignorePortalCuts:true});return Number.isFinite(y)?y:appCtx.elevationWorldYAtWorldXZ?.(x,z);}}, schedule);
     const retained=appCtx.linearFeatureMeshes.filter(m=>!m.userData?.isLinearFeatureBatch);
     index=await createRoadContactIndexCooperatively(selectLinearWalkContactMeshes([...retained,...meshes]),16,schedule);
@@ -341,11 +342,12 @@ export async function publishStreetPavement(appCtx, options = {}) {
     if(replaceMappedLines)await publishLinearFeaturePresentationCooperatively({
       appCtx: { scene: appCtx.scene, linearFeatureMeshes: stagedLines, addEarthWorldObject() {} },
       buildFeatureRibbonEdges, features: appCtx.linearFeatures, pavementBounds: coverageBounds, worldBaseTerrainY: ground,metersPerWorldUnit,
-      portalMasks:appCtx.structureTerrainPortalDescriptors
+      portalMasks:appCtx.structureTerrainPortalDescriptors,landuses:appCtx.landuses
     },schedule);
     trace('mapped-paths-complete',{batches:stagedLines.length});
     // Publish all surfaces and contact data together. Old coverage is retained until this point.
-    contactIndex = await createRoadContactIndexCooperatively(staged.filter(mesh => mesh.userData.kind === 'sidewalk'), 4,schedule);
+    const mappedContacts=await mappedPavementContactSources(appCtx.landuseMeshes,schedule);
+    contactIndex = await createRoadContactIndexCooperatively([...staged.filter(mesh => mesh.userData.kind === 'sidewalk'),...mappedContacts], 4,{...schedule,bounds:coverageBounds});
     if(replaceMappedLines){
       const nextLines=[...appCtx.linearFeatureMeshes.filter(m=>!m.userData?.isLinearFeatureBatch),...stagedLines];
       stagedWalkContactIndex=await createRoadContactIndexCooperatively(selectLinearWalkContactMeshes(nextLines),16,schedule);

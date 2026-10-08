@@ -26,9 +26,9 @@ export function createStreetFrontageGrading(buildings = [], metersPerWorldUnit =
       let outer=edge;
       if(section.presence==='present')outer+=section.widthMeters/scale;
       // A spatial bucket is deliberately broader than the physical influence.
-      // Reject only beyond every legal facade reach, including attached rows
-      // and explicitly wide sidewalks, before the expensive per-point raycast.
-      const maximum=section.presence==='present' ? Math.max(edge+FRONTAGE_RULES.ordinaryReach/scale,outer+FRONTAGE_RULES.attachedReach/scale) : outer;
+      // Explicit widths remain authoritative. Building adjacency cannot expand
+      // the terrain influence into an otherwise unmapped plaza or courtyard.
+      const maximum=section.presence==='present' ? Math.max(edge+FRONTAGE_RULES.ordinaryReach/scale,outer) : outer;
       if(Number.isFinite(shoulderBlend)&&Number.isFinite(projection.dist)&&projection.dist>maximum+shoulderBlend+1e-7){stats.outsideInfluence++;return null;}
       if(section.presence==='present'){
         const reach=halfWidth+44/scale;

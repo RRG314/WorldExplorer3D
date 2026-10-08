@@ -3,7 +3,7 @@ import { resolveStreetSection } from './street-section.js';
 
 // Policy dimensions are metres. Road widths passed to geometry are world
 // coordinates; source placement is converted through the shared unit adapter.
-export const FRONTAGE_RULES = Object.freeze({ minimumFacade: 3, urbanReach: 20, attachedReach: 24, ordinaryReach: 7 });
+export const FRONTAGE_RULES = Object.freeze({ minimumFacade: 3, urbanReach: 20, ordinaryReach: 7 });
 export const isGroundStreet = feature => !feature.isStructureConnector &&
   ['at_grade', undefined].includes(feature.structureSemantics?.terrainMode) &&
   !feature.structureSemantics?.gradeSeparated && !feature.structureSemantics?.rampCandidate;
@@ -60,31 +60,25 @@ function segmentWithinReach(a,b,c,d,reach) {
   return squared<limit;
 }
 export function createStreetFrontagePolicy(buildings = [], metersPerWorldUnit = 1.11) {
-  const scale=streetScale(metersPerWorldUnit), edges=[], corners=new Map(), buckets=new Map();
+  const scale=streetScale(metersPerWorldUnit), edges=[], buckets=new Map();
   let sections=new WeakMap();
   const candidateRegions=new Map(),sectionValues=new Map();
   const rings=buildings.map(streetFootprint);
-  // Exact shared source vertices are invariant under translation and rotation.
-  // Quantizing absolute coordinates made attachment depend on the map origin.
-  const key=p=>`${p.x}:${p.z}`;
-  for(const pts of rings)for(const k of new Set(pts.map(key)))corners.set(k,(corners.get(k)||0)+1);
   const cell=64/scale;
   for(const pts of rings){
-    const attached=pts.some(p=>corners.get(key(p))>1);
     for(let i=0;i<pts.length;i++){
       const a=pts[i],b=pts[(i+1)%pts.length];
       const length=Math.hypot(b.x-a.x,b.z-a.z)*scale;
       if(length<1e-8)continue;
-      const edge={a,b,bounds:bounds(a,b),facadeEligible:length>=FRONTAGE_RULES.minimumFacade-1e-8,extendedFrontage:attached ? FRONTAGE_RULES.attachedReach/scale : 0};edges.push(edge);
+      // Shared building vertices describe buildings, not public paving rights.
+      // A plaza beyond the bounded street frontage needs a mapped area.
+      const edge={a,b,bounds:bounds(a,b),facadeEligible:length>=FRONTAGE_RULES.minimumFacade-1e-8};edges.push(edge);
       const box=edge.bounds;
       for(let x=Math.floor(box.minX/cell);x<=Math.floor(box.maxX/cell);x++)for(let z=Math.floor(box.minZ/cell);z<=Math.floor(box.maxZ/cell);z++){
         const k=`${x}:${z}`;if(!buckets.has(k))buckets.set(k,[]);buckets.get(k).push(edge);
       }
     }
   }
-  // Attachment is now encoded on each edge. The source-vertex strings and
-  // their counts are construction scratch, not part of a live terrain query.
-  corners.clear();
   function query(a,b=a,pad=0){
     const box=bounds(a,b);
     const x0=Math.floor((box.minX-pad)/cell),x1=Math.floor((box.maxX+pad)/cell);
@@ -136,6 +130,6 @@ export function createStreetFrontagePolicy(buildings = [], metersPerWorldUnit = 
       }
       cache.set(index,section);return section;
     },
-    dispose(){edges.length=0;buckets.clear();corners.clear();candidateRegions.clear();sectionValues.clear();sections=new WeakMap();}
+    dispose(){edges.length=0;buckets.clear();candidateRegions.clear();sectionValues.clear();sections=new WeakMap();}
   };
 }

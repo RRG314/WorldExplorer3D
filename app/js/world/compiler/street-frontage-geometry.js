@@ -3,7 +3,7 @@
 export function frontageHit(point, nx, nz, edges, minimum, maximum) {
   let best = null;
   for (const edge of edges) {
-    const { a, b, extendedFrontage=0 } = edge;
+    const { a, b } = edge;
     const dx = b.x - a.x, dz = b.z - a.z;
     const den = nx * dz - nz * dx;
     if (Math.abs(den) < 1e-8) continue;
@@ -11,7 +11,7 @@ export function frontageHit(point, nx, nz, edges, minimum, maximum) {
     const distance = (ax * dz - az * dx) / den;
     const t = (ax * nz - az * nx) / den;
     if (t >= -1e-7 && t <= 1 + 1e-7 && distance >= -1e-7 && (!best || distance < best.distance))
-      best = { edge, distance:Math.max(0,distance), maximum: Math.max(maximum, minimum + extendedFrontage) };
+      best = { edge, distance:Math.max(0,distance), maximum: Math.max(maximum, minimum) };
   }
   return best && best.edge.facadeEligible !== false && best.distance >= minimum-1e-7 && best.distance <= best.maximum+1e-7 ? best : null;
 }
@@ -32,12 +32,11 @@ export function splitFrontageIntervals(segment, edges, {nx,nz,minimumA,minimumB=
     const start=Math.max(0,Math.min(a.t,b.t)),end=Math.min(1,Math.max(a.t,b.t));
     if(end<=start)continue;
     const slope=(b.d-a.d)/span,intercept=a.d-slope*a.t;
-    const extended=edge.extendedFrontage||0;
-    const reach=Math.max(maximumA,maximumB,minimumA+extended,minimumB+extended);
+    const reach=Math.max(maximumA,maximumB,minimumA,minimumB);
     if(Math.min(intercept+slope*start,intercept+slope*end)>reach+1e-7 || Math.max(intercept+slope*start,intercept+slope*end)<-1e-7)continue;
     cut(start);cut(end);
     const event=(base,delta)=>{const denominator=slope-delta;if(Math.abs(denominator)>1e-12){const t=(base-intercept)/denominator;if(t>start&&t<end)cut(t);}};
-    event(0,0);event(minimumA,minimumDelta);event(maximumA,maximumDelta);event(minimumA+extended,minimumDelta);
+    event(0,0);event(minimumA,minimumDelta);event(maximumA,maximumDelta);
     candidates.push({start,end,slope,intercept});
   }
   // Overlapping source footprints can exchange the nearest visible edge.

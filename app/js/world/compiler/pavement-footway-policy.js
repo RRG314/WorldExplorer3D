@@ -15,3 +15,13 @@ export function isPavementFootway(feature) {
 export function isPavementCrossing(feature) {
   return !!feature && feature.kind === 'footway' && feature.subtype === 'crossing' && isGroundStreet(feature);
 }
+
+export function isMappedPedestrianArea(feature) {
+  if(!isGroundStreet(feature))return false;
+  const tags=feature.tags||feature.sourceTags||{};
+  const present=value=>!['','no','false','0'].includes(String(value??'').trim().toLowerCase());
+  if(present(tags.bridge)||present(tags.tunnel)||present(tags.indoor))return false;
+  return ['footway','pedestrian'].includes(tags['area:highway']) ||
+    (['footway','pedestrian'].includes(tags.highway)&&tags.area==='yes') ||
+    (tags.place==='square'&&/^(paved|asphalt|concrete(?::plates)?|paving_stones|sett|cobblestone|bricks)$/.test(tags.surface||''));
+}

@@ -6,6 +6,12 @@ import {prepareStreetPavement,compilePavementTile,meshPavementTile} from '../app
 import {publishLinearFeaturePresentation} from '../app/js/world/linear-feature-presentation.js';
 import {buildFeatureRibbonEdges} from '../app/js/structure-semantics.js?v=63';
 import {createConcretePavementTexture} from '../app/js/world/pavement-texture.js';
+import {createMappedPavementClipper} from '../app/js/world/mapped-pavement-clip.js';
+import {mappedPavementContactSources} from '../app/js/world/mapped-pavement-contact.js';
+import {createRoadContactIndex} from '../app/js/terrain/road-contact-index.js';
+import {readFileSync} from 'node:fs';
+import {isMappedPedestrianArea} from '../app/js/world/compiler/pavement-footway-policy.js';
+import {streetPolygonKernel} from '../app/js/world/compiler/street-polygon-kernel.js';
 
 const bounds={minX:0,maxX:64,minZ:0,maxZ:64};
 const path=(subtype='footway')=>({kind:'footway',subtype,width:2,surfaceBias:.08,pts:[{x:-10,z:10},{x:74,z:10}],structureSemantics:{terrainMode:'at_grade'}});
@@ -14,6 +20,116 @@ const compile=input=>prepareStreetPavement({...input,coverageBounds:bounds,meter
  return meshPavementTile(tile,result.polygons,()=>0).triangles;
 });
 const area=triangles=>triangles.reduce((s,[a,b,c])=>s+Math.abs((b.x-a.x)*(c.z-a.z)-(b.z-a.z)*(c.x-a.x))/2,0);
+const covers=(triangles,x,z)=>triangles.some(triangle=>{
+ const signs=triangle.map((a,i)=>{const b=triangle[(i+1)%3];return (b.x-a.x)*(z-a.z)-(b.z-a.z)*(x-a.x);});
+ return signs.every(s=>s>=-1e-7)||signs.every(s=>s<=1e-7);
+});
+const building=(x0,z0,x1,z1)=>({pts:[{x:x0,z:z0},{x:x1,z:z0},{x:x1,z:z1},{x:x0,z:z1}]});
+
+test('captured Light Street keeps concrete outside mapped plazas and preserves transport sources',()=>{
+ const {input}=JSON.parse(readFileSync(new URL('./fixtures/streets/baltimore-light-street-layout.json',import.meta.url)));
+ const before=JSON.stringify(input.roads),plan=prepareStreetPavement(input);
+ const polygons=plan.tiles.flatMap(tile=>compilePavementTile(tile,input.metersPerWorldUnit).polygons);
+ assert.ok(polygons.length>20,'the actual neighborhood retains sidewalk coverage');
+ const polygonArea=ring=>Math.abs(ring.reduce((s,p,i)=>{const q=ring[(i+1)%ring.length];return s+p[0]*q[1]-q[0]*p[1];},0)/2);
+ const overlapArea=polys=>polys.reduce((s,p)=>s+polygonArea(p[0])-p.slice(1).reduce((n,h)=>n+polygonArea(h),0),0);
+ const mapped=input.landuses.filter(isMappedPedestrianArea).map(f=>[f.pts,...(f.holeRings||[])].map(r=>r.map(p=>[p.x,p.z])));
+ assert.ok(mapped.length>3,'multiple surveyed paved areas are present');
+ const overlap=overlapArea(streetPolygonKernel.intersection(polygons,streetPolygonKernel.union(mapped)));
+ assert.ok(overlap<.05,`duplicate concrete area ${overlap}`);
+ assert.equal(JSON.stringify(input.roads),before,'sidewalk publication leaves transport data untouched');
+});
+
+test('a generic routing path cannot expand into a nearby building courtyard',()=>{
+ const feature=path();feature.pts=[{x:0,z:20},{x:64,z:20}];
+ const triangles=compile({linearFeatures:[feature],buildings:[building(0,24,32,35),building(32,24,64,35)]});
+ assert.ok(Math.abs(area(triangles)-128)<.001);
+ assert.ok(covers(triangles,20,20));assert.ok(!covers(triangles,20,22));
+});
+
+test('an inferred urban sidewalk and mapped path form one curb-connected surface without paving planting',()=>{
+ const road={type:'primary',width:8,pts:[{x:0,z:20},{x:64,z:20}]};
+ const feature={...path(),pts:[{x:0,z:30},{x:64,z:30}]};
+ const input={roads:[road],linearFeatures:[feature],buildings:[building(0,4,64,9)]};
+ const triangles=compile(input);
+ for(const z of [24.5,26,28,30])assert.ok(covers(triangles,20,z),`continuous curb to path at ${z}`);
+ assert.ok(!covers(triangles,20,20),'carriageway remains clear');
+ const grass={...building(10,26,30,29),type:'grass'};
+ const planted=compile({...input,landuses:[grass]});
+ assert.ok(!covers(planted,20,27),'physical planting excludes inferred connection');
+ assert.ok(covers(planted,20,30),'mapped path remains beside planting');
+});
+
+test('a mapped parallel sidewalk replaces just the corresponding inferred street interval',()=>{
+ const road={type:'residential',width:8,pts:[{x:0,z:20},{x:64,z:20}],tags:{sidewalk:'both'}};
+ const feature={...path('sidewalk'),pts:[{x:12,z:30},{x:48,z:30}]};
+ const triangles=compile({roads:[road],linearFeatures:[feature],buildings:[building(12,33,48,40)]});
+ assert.ok(covers(triangles,5,25),'unmapped road interval keeps its sidewalk');
+ assert.ok(!covers(triangles,25,25),'mapped interval cannot paint a second curb near the centerline');
+ assert.ok(covers(triangles,25,30)&&covers(triangles,25,32),'mapped sidewalk retains its close frontage');
+ assert.ok(covers(triangles,25,15),'the opposite side is independent');
+});
+
+test('an unclassified mapped path needs street-frontage evidence before replacing a sidewalk',()=>{
+ const road={type:'residential',width:8,pts:[{x:0,z:20},{x:64,z:20}],tags:{sidewalk:'both'}};
+ const feature={...path(),pts:[{x:12,z:30},{x:48,z:30}],sourceTags:{_sourceCompleteness:'generalized'}};
+ const standalone=compile({roads:[road],linearFeatures:[feature]});
+ assert.ok(covers(standalone,25,25)&&covers(standalone,25,30),'a parallel park path remains a separate path');
+ const frontage=compile({roads:[road],linearFeatures:[feature],buildings:[building(12,33,48,40)]});
+ assert.ok(!covers(frontage,25,25));assert.ok(covers(frontage,25,32));
+});
+
+test('crossing connections cannot suppress longitudinal sidewalks or pave the carriageway',()=>{
+ const road={type:'residential',width:8,pts:[{x:0,z:20},{x:64,z:20}],tags:{sidewalk:'both'}};
+ const triangles=compile({roads:[road],linearFeatures:[{...path(),pts:[{x:30,z:10},{x:30,z:30}]}]});
+ assert.ok(!covers(triangles,30,20));assert.ok(covers(triangles,20,25)&&covers(triangles,40,15));
+});
+
+test('sidewalk reconciliation leaves source roads, bridges and tunnels unchanged',()=>{
+ for(const terrainMode of ['at_grade','elevated','subgrade']) {
+  const road={type:'residential',width:8,pts:[{x:0,z:20},{x:64,z:20}],tags:{sidewalk:'both'},structureSemantics:{terrainMode,gradeSeparated:terrainMode!=='at_grade'}};
+  const input={roads:[road],linearFeatures:[{...path('sidewalk'),pts:[{x:12,z:30},{x:48,z:30}]}]};
+  const before=structuredClone(input);compile(input);assert.deepEqual(input,before);
+  if(terrainMode!=='at_grade')assert.ok(covers(compile(input),25,30),'independent ground path survives a grade-separated road');
+ }
+});
+
+test('mapped plazas own their paving instead of receiving concrete route overlays',()=>{
+ const plaza={...building(10,5,50,15),type:'paved',tags:{'area:highway':'pedestrian',surface:'bricks'},presentationOwner:'mapped_geometry'};
+ const input=streetSourceInput({linearFeatures:[path()],landuses:[plaza],METERS_PER_WORLD_UNIT:1});
+ assert.equal(input.landuses[0].presentationOwner,'mapped_geometry');
+ const triangles=compile(input);
+ assert.ok(covers(triangles,5,10)&&covers(triangles,55,10),'paths continue outside the plaza');
+ assert.ok(!covers(triangles,25,10),'the existing plaza material owns its interior');
+ const withoutOwner={...plaza,presentationOwner:undefined};
+ assert.ok(covers(compile({landuses:[withoutOwner]}),25,10),'raw area input can still be compiled when no renderer owns it');
+});
+
+test('coarse path clipping keeps plaza holes and the original sloping contact plane',()=>{
+ const plaza={...building(10,5,50,15),tags:{'area:highway':'footway'},presentationOwner:'mapped_geometry',holeRings:[building(25,8,35,12).pts]};
+ const clip=createMappedPavementClipper([plaza]);
+ const positions=[0,0,9,64,6.4,9,64,6.4,11,0,0,11],indices=[0,2,1,0,3,2];
+ const result=clip(positions,indices);
+ const triangles=[];
+ for(let i=0;i<result.indices.length;i+=3)triangles.push(result.indices.slice(i,i+3).map(j=>({x:result.positions[j*3],z:result.positions[j*3+2]})));
+ assert.ok(Math.abs(area(triangles)-68)<.01,'subtract 40m of plaza but retain its 10m hole');
+ assert.ok(covers(triangles,30,10)&&!covers(triangles,20,10));
+ for(let i=0;i<result.positions.length;i+=3)assert.ok(Math.abs(result.positions[i+1]-result.positions[i]*.1)<1e-6);
+ assert.equal(createMappedPavementClipper([{...plaza,tags:{...plaza.tags,bridge:'yes'}}]),null,'a pedestrian bridge cannot cut a ground path');
+});
+
+test('mapped plaza contact uses accepted world transforms and releases with its publication',async()=>{
+ const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.Float32BufferAttribute([0,1,0,10,2,0,0,1,10],3));
+ const mesh=new THREE.Mesh(geometry);mesh.position.set(100,20,-100);mesh.userData.mappedPedestrianArea=true;
+ const before=Array.from(geometry.attributes.position.array);
+ const sources=await mappedPavementContactSources([mesh]);
+ const index=createRoadContactIndex(sources,4,{bounds:{minX:100,maxX:110,minZ:-100,maxZ:-90}});
+ assert.ok(Math.abs(index.sampleAt(102,-98)-21.2)<1e-5);assert.equal(index.sampleAt(2,2),null);
+ assert.deepEqual(Array.from(geometry.attributes.position.array),before,'rendered geometry is not rewritten for collision');
+ index.dispose();assert.equal(index.sampleAt(102,-98),null);
+ await assert.rejects(mappedPavementContactSources([mesh],{current:()=>false}),/superseded/);
+ geometry.dispose();mesh.material.dispose();
+});
 
 test('mapped footways share sidewalk area ownership and retain coarse coverage only outside the resident window',()=>{
  globalThis.THREE=THREE;

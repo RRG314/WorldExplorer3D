@@ -47,6 +47,31 @@ unrestricted worldwide simulation. Public capability/limitation text says so.
 
 ## Build identities
 
+### October 8 sidewalk ownership correction
+
+The owner's Light Street report was reproduced in the current source scene.
+The shared pavement compiler now reconciles mapped pedestrian paths with inferred
+roadside sidewalks, preserves mapped plazas and their materials, and stops
+building adjacency from authorizing unsupported 24-metre infill. Mapped-area
+walking contact uses the existing pavement index. The final fallback capture
+retains the baseline 18,912 roads, 44,090 buildings and 426 road meshes. The
+road-width inference experiment was removed; no transport width/profile change
+is part of the repair. Generalized road widths and terrain material detail remain
+approximate. See `docs/streets/SIDEWALK-OWNERSHIP-2026-10-08.md` for the evidence
+ledger, rejected experiments and the deliberate correction of older tests.
+
+The complete source chain passes 2,170 tests, dependencies, ownership, types,
+inventory and sensitivity. Captured Baltimore/Monaco/San Francisco pavement
+packaging checks pass with zero area beyond rounding allowances; all six hill
+quality cases pass. Both prescribed movement bursts pass with no reported game
+or provider errors, and images were inspected. One earlier run completed its
+actions but its Node process retained service connections after browser cleanup;
+the isolated verifier now explicitly exits after successful browser closure.
+The final run completed normally. Baltimore bridge checks pass (742 joins, zero
+discontinuities); the Monaco entrance-to-exit tunnel drive passes all six checks,
+with images inspected. Packaged/hosted verification for this change is pending.
+Existing preview and production identities below are unchanged until that finishes.
+
 | Surface | Current identity |
 | --- | --- |
 | Production | `5.4.0+1532bdfbb5c1.319d215f60318297.production` |

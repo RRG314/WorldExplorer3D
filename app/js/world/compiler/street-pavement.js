@@ -1,5 +1,6 @@
 import {frontageCornerRegions} from './street-frontage-corners.js';
-import {isPavementFootway,isPavementCrossing} from './pavement-footway-policy.js';
+import {isPavementFootway,isPavementCrossing,isMappedPedestrianArea} from './pavement-footway-policy.js';
+import {createStreetSidewalkOwnership} from './street-sidewalk-ownership.js';
 import {streetRoadSegments,unionCarriageway} from './street-carriageway.js';
 import {roadPlacementOffsetWorld} from '../road-units.js';
 import {createStreetCarriagewayBarriers,frontageBlocked} from './street-carriageway-barriers.js';
@@ -90,6 +91,7 @@ function prepareStreetRegions({ roads = [], buildings = [], landuses = [], linea
   streetScale(metersPerWorldUnit);
   const frontageBarriers=createStreetCarriagewayBarriers(roads);
   const frontagePolicy = createStreetFrontagePolicy(buildings, metersPerWorldUnit);
+  const sidewalkOwnership=createStreetSidewalkOwnership(roads,linearFeatures,frontagePolicy,metersPerWorldUnit);
   const segments = [], paths = [], obstacles = [], mappedAreas = [], buildingEdges = [];
   const tiles = new Map();
   // Overview has no marking-only cells. Determine work keys before allocating
@@ -124,8 +126,12 @@ function prepareStreetRegions({ roads = [], buildings = [], landuses = [], linea
   for (const land of landuses) {
     if (ringOf(land).length < 3) continue;
     const item = { polygon: areaPolygon(land), bounds: box(ringOf(land)) };
-    const tags = land.tags || {};
-    if (['footway','pedestrian'].includes(tags['area:highway']) || (tags.highway === 'pedestrian' && tags.area === 'yes') || (tags.place === 'square' && /^(paved|concrete|concrete:plates|paving_stones|sett|cobblestone)$/.test(tags.surface || ''))) mappedAreas.push(item);
+    if (isMappedPedestrianArea(land)) {
+      // Preserve the existing mapped surface, its material and its holes.
+      // Pedestrian routing lines within a plaza must not paint concrete on it.
+      if(land.presentationOwner==='mapped_geometry')obstacles.push({...item,blocksMappedPaths:true});
+      else mappedAreas.push(item);
+    }
     else if (['water', 'garden', 'park', 'grass', 'forest', 'wood', 'parking'].includes(land.type)) obstacles.push({...item,blocksMappedPaths:land.type==='water'});
   }
   for (const road of roads) {
@@ -135,11 +141,12 @@ function prepareStreetRegions({ roads = [], buildings = [], landuses = [], linea
       const point=road.pts[i];
       if (coverageBounds && !intersects(box([point]),coverageBounds,20)) continue;
       const halfWidth=roadWidthAtSegment(road,i,0)/2;
-      insert('joins',{road,section:frontagePolicy.section(road,i),previous:road.pts[i-1],point,next:road.pts[i+1],halfWidth,offset},box([point]),halfWidth+Math.abs(offset)+32/metersPerWorldUnit);
+      insert('joins',{road,sidewalkMasks:sidewalkOwnership.masks.get(road),section:frontagePolicy.section(road,i),previous:road.pts[i-1],point,next:road.pts[i+1],halfWidth,offset},box([point]),halfWidth+Math.abs(offset)+32/metersPerWorldUnit);
     }
     for (const segment of streetRoadSegments(road)) {
       if(coverageBounds && !intersects(segment.bounds,coverageBounds,Math.max(segment.wa,segment.wb,20)))continue;
       segment.section=frontagePolicy.section(road,segment.index);
+      segment.sidewalkMasks=sidewalkOwnership.masks.get(road);
       segments.push(segment);
       insert('segments',segment,segment.bounds,Math.max(segment.wa,segment.wb)/2+Math.abs(offset)+32/metersPerWorldUnit);
     }
@@ -152,13 +159,21 @@ function prepareStreetRegions({ roads = [], buildings = [], landuses = [], linea
     if (!isPavementFootway(feature)) continue;
     for (let i = 1; i < feature.pts.length; i++) {
       const a = feature.pts[i - 1], b = feature.pts[i];
-      const shape = quad(a, b, feature.width / 2, feature.width / 2);
-      if (shape) { const item = { a, b, width: feature.width, polygon: shape, bounds: box([a, b]) }; paths.push(item); insert('paths', item, item.bounds, feature.width + 32 / metersPerWorldUnit); }
       if (i < feature.pts.length - 1) {
         for (const polygon of roadTurnFootprint({previous:a,point:b,next:feature.pts[i+1],leftDistance:feature.width/2,rightDistance:feature.width/2})) {
           const item={polygon,bounds:box([b])};paths.push(item);insert('paths',item,item.bounds,feature.width);
         }
       }
+    }
+  }
+  for(const path of sidewalkOwnership.paths) {
+    const shape=quad(path.a,path.b,path.width/2,path.width/2);
+    if(!shape)continue;
+    const item={a:path.a,b:path.b,width:path.width,frontageEligible:path.frontageEligible,polygon:shape,bounds:box([path.a,path.b])};
+    paths.push(item);insert('paths',item,item.bounds,path.width+32/metersPerWorldUnit);
+    if(path.curbConnection){
+      const connection={polygon:path.curbConnection,bounds:box(path.curbConnection[0].map(([x,z])=>({x,z}))),inferred:true};
+      paths.push(connection);insert('paths',connection,connection.bounds);
     }
   }
   for (const area of mappedAreas) insert('areas', area, area.bounds);
@@ -228,19 +243,20 @@ export function compilePavementTile(tile, metersPerWorldUnit = 1.11, {includeMar
     const a={x:ring[i-1][0],z:ring[i-1][1]},b={x:ring[i][0],z:ring[i][1]};
     if(Math.hypot(b.x-a.x,b.z-a.z)>1e-6)roadEdges.push({a,b,bounds:box([a,b])});
   }
-  // A separately mapped sidewalk is still a centerline, not its complete area.
-  // Use the same bounded frontage evidence as roadway-side inference.
+  // Only a sidewalk associated with a street may extend to a nearby facade.
+  // Generic paths are routing centerlines, not permission to pave their block.
+  const pathEdges=tile.edges;
   for (const path of tile.paths) {
-    if (!path.a || !path.b) continue;
+    if (!path.a || !path.b || !path.frontageEligible) continue;
     const length=Math.hypot(path.b.x-path.a.x,path.b.z-path.a.z);
     const nx=(path.b.z-path.a.z)/length,nz=-(path.b.x-path.a.x)/length;
     for (const sign of [-1,1]) {
-      const pieces=splitFrontageIntervals({...path,wa:path.width,wb:path.width},tile.edges.concat(roadEdges),{nx:nx*sign,nz:nz*sign,minimumA:path.width/2,maximumA:7/metersPerWorldUnit});
+      const pieces=splitFrontageIntervals({...path,wa:path.width,wb:path.width},pathEdges.concat(roadEdges),{nx:nx*sign,nz:nz*sign,minimumA:path.width/2,maximumA:7/metersPerWorldUnit});
       const outer=[];
       for (const s of pieces) {
         const midpoint={x:(s.a.x+s.b.x)/2,z:(s.a.z+s.b.z)/2};
-        let distances=frontageProfile(s.a,s.b,nx*sign,nz*sign,tile.edges,path.width/2,7/metersPerWorldUnit);
-        const oppositeFront=frontageDistance(midpoint,-nx*sign,-nz*sign,tile.edges,path.width/2,7/metersPerWorldUnit);
+        let distances=frontageProfile(s.a,s.b,nx*sign,nz*sign,pathEdges,path.width/2,7/metersPerWorldUnit,tile.frontageBarriers);
+        const oppositeFront=frontageDistance(midpoint,-nx*sign,-nz*sign,pathEdges,path.width/2,7/metersPerWorldUnit);
         if(!distances && Number.isFinite(oppositeFront)) {
           // A mapped sidewalk between a close façade and a parallel carriageway
           // supports filling the small curb-side gap. Explicit obstacles still
@@ -284,7 +300,8 @@ export function compilePavementTile(tile, metersPerWorldUnit = 1.11, {includeMar
       }
       // One outline per street side, including frontage steps. Unioning a stack
       // of touching slivers made Clipper's containment repair quadratic in cities.
-      pavementParts.push(polygon([[original.a.x,original.a.z],[original.b.x,original.b.z],...outerPoints.reverse()]));
+      const inferred=polygon([[original.a.x,original.a.z],[original.b.x,original.b.z],...outerPoints.reverse()]);
+      pavementParts.push(...(original.sidewalkMasks?.length?clip.difference(inferred,union(original.sidewalkMasks)):[inferred]));
     }
   }
   for (const join of tile.joins || []) {
@@ -295,7 +312,10 @@ export function compilePavementTile(tile, metersPerWorldUnit = 1.11, {includeMar
     // Renderer normals are opposite source-way sidewalk left/right normals.
     const leftExtra=section.right.presence==='present' ? section.right.widthMeters/metersPerWorldUnit : 0;
     const rightExtra=section.left.presence==='present' ? section.left.widthMeters/metersPerWorldUnit : 0;
-    if(leftExtra || rightExtra) pavementParts.push(...roadTurnFootprint({...join,leftDistance:leftDistance+leftExtra,rightDistance:rightDistance+rightExtra}));
+    if(leftExtra || rightExtra) {
+      const inferred=roadTurnFootprint({...join,leftDistance:leftDistance+leftExtra,rightDistance:rightDistance+rightExtra});
+      pavementParts.push(...(join.sidewalkMasks?.length?clip.difference(inferred,union(join.sidewalkMasks)):inferred));
+    }
   }
   const b = tile.bounds, boundary = polygon([[b.minX, b.minZ], [b.maxX, b.minZ], [b.maxX, b.maxZ], [b.minX, b.maxZ]]);
 
@@ -313,7 +333,7 @@ export function compilePavementTile(tile, metersPerWorldUnit = 1.11, {includeMar
   // path through them must survive the handoff from its coarse ribbon. Keep
   // only its mapped width, still excluding buildings, water and carriageways.
   if (tile.paths.length && tile.obstacles.some(o=>o.blocksMappedPaths===false)) {
-    let mapped=union(localParts(tile.paths.map(p=>p.polygon)));
+    let mapped=union(localParts(tile.paths.filter(p=>!p.inferred).map(p=>p.polygon)));
     const hardBlockers=carriageway.concat(tile.obstacles.filter(o=>o.blocksMappedPaths!==false).map(o=>o.polygon));
     if(mapped.length&&hardBlockers.length)mapped=clip.difference(mapped,union(localParts(hardBlockers)));
     if(mapped.length)polygons=polygons.length?clip.union(polygons,mapped):mapped;

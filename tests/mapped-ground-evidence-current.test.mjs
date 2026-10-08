@@ -70,6 +70,17 @@ test('physical hardscape does not override raised surfaces with a camera-depende
   }
 });
 
+test('mapped brick plazas retain the installed brick material and its physical repeat',()=>{
+ const brick={map:{name:'brick'},roughnessMap:{name:'brick-roughness'}};
+ const material=hardscapeMaterialOptions({surfaceTextureSets:{brick,pavement:{map:{name:'concrete'}}}},'paved',{}, {surface:'bricks'});
+ assert.equal(material.material.map,brick.map);assert.equal(material.material.roughnessMap,brick.roughnessMap);
+ assert.equal(material.metersPerTile,1.6);
+ // The live engine publishes facade sets under these legacy handles, not in
+ // surfaceTextureSets. Exercise that actual integration shape as well.
+ const live=hardscapeMaterialOptions({brickDiffuse:brick.map,brickRoughness:brick.roughnessMap,surfaceTextureSets:{pavement:{map:{name:'pavement'}}}},'paved',{}, {surface:'bricks'});
+ assert.equal(live.material.map,brick.map);assert.equal(live.material.roughnessMap,brick.roughnessMap);
+});
+
 
 test('large forests retain physical cover without expanding an area-sized spatial grid',()=>{
   const forest=feature('forest',-150000,150000,{sourceFeatureId:'large-forest',holeRings:[ring(-500,500)]});

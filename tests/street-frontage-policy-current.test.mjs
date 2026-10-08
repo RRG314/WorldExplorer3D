@@ -16,7 +16,7 @@ for(const scale of [0.5,1,1.11,2])for(const angle of [0,Math.PI/3,Math.PI/2])tes
   const road={pts:[{x:0,z:0},{x:20,z:0}].map(transform),width:8/scale,type:'residential',tags:{}};
   const policy=createStreetFrontagePolicy(buildings,scale);
   assert.equal(policy.section(road).left.presence,'present');
-  assert.equal(policy.edges.filter(e=>e.extendedFrontage>0).length,8);
+  assert.equal(policy.edges.length,8);
   const grading=createStreetFrontageGrading(buildings,scale),sample=transform({x:5,z:-5});
   assert.ok(Math.abs(grading.outerDistance(road,{segIndex:0,t:.25},sample.x,sample.z,4/scale)*scale-10)<1e-7);
   const plan=prepareStreetPavement({roads:[road],buildings,metersPerWorldUnit:scale});

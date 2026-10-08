@@ -252,15 +252,15 @@ test('reported Baltimore building corner has continuous paving instead of a lowe
   assert.ok(supports.flat().every(p=>Math.abs(p.y-25.108108)<1e-6));
 });
 
-test('attached urban frontages reach their walls beyond the isolated-house search distance',()=>{
+test('building adjacency alone cannot authorize an eleven-metre sidewalk',()=>{
   const r=road([{x:0,z:0},{x:64,z:0}]);
   const attached=[box(4,15,24,25),box(24,15,44,25)];
   const detached=[box(4,15,24,25),box(26,15,44,25)];
   const area=buildings=>compile({roads:[r],buildings}).reduce((s,p)=>s+regionArea(p.polygons),0);
-  assert.ok(area(attached)>area(detached)+200);
+  assert.ok(Math.abs(area(attached)-area(detached))<.001);
   const protectedGarden={...box(4,7,44,14),type:'garden'};
   const protectedArea=compile({roads:[r],buildings:attached,landuses:[protectedGarden]}).reduce((s,p)=>s+regionArea(p.polygons),0);
-  assert.ok(protectedArea<area(attached)-250);
+  assert.ok(Math.abs(protectedArea-area(attached))<.001,'no inferred pavement entered the setback');
 });
 
 test('frontage and corner coverage is independent of the worker cell boundary',()=>{
@@ -275,7 +275,7 @@ test('a continuous angled facade does not require a constant sidewalk width',()=
   assert.ok(Math.abs(area-201.6)<.02,`Expected 32m × (4.5m frontage + 1.8m opposite sidewalk), received ${area}`);
 });
 
-test('captured Chase frontage reaches a recessed wall despite its neighbor at the endpoint',async()=>{
+test('captured Chase setback requires mapped paving rather than a nineteen-metre adjacency fill',async()=>{
   const fs=await import('node:fs/promises');
   const {tile,metersPerWorldUnit}=JSON.parse(await fs.readFile(new URL('./fixtures/streets/baltimore-chase-frontage.json',import.meta.url),'utf8'));
   const {polygons}=compilePavementTile(tile,metersPerWorldUnit);
@@ -284,7 +284,7 @@ test('captured Chase frontage reaches a recessed wall despite its neighbor at th
     const signs=tri.map((a,i)=>{const b=tri[(i+1)%3];return (b.x-a.x)*(z-a.z)-(b.z-a.z)*(x-a.x);});
     return signs.every(s=>s>=-1e-7)||signs.every(s=>s<=1e-7);
   });
-  for(const z of [14.5,16.5,18.5,20.5])assert.ok(covers(-24.5,z),`Unpaved frontage at -24.5,${z}`);
+  for(const z of [14.5,16.5,18.5,20.5])assert.ok(!covers(-24.5,z),`Unsupported plaza fill at -24.5,${z}`);
   assert.ok(!covers(-10,10),'building footprint remains excluded');
 });
 

@@ -3,6 +3,7 @@ import { landusePresentationOwner, surfaceComposition } from './surface-contract
 import { normalizeWaterBody } from './water-body-contract.js?v=4';
 import { createWaterSurfaceRegistry } from './water-surface-registry.js?v=3';
 import { runBoundedProviderBatch } from '../earth-core/bounded-provider-batch.js?v=1';
+import {isMappedPedestrianArea} from './compiler/pavement-footway-policy.js';
 
 const WATER_VECTOR_TILE_CONCURRENCY = 8;
 
@@ -52,9 +53,12 @@ export function hardscapeMaterialOptions(appCtx, landuseType, composition, tags 
   const surface = String(tags.surface || '').toLowerCase();
   const materialFamily = ['gravel', 'fine_gravel', 'pebblestone'].includes(surface) ? 'rock' :
     ['dirt', 'earth', 'compacted', 'unpaved'].includes(surface) ? 'soil' :
-    surface === 'grass' ? 'grass' : surface === 'sand' ? 'sand' : 'pavement';
+    surface === 'grass' ? 'grass' : surface === 'sand' ? 'sand' : surface === 'bricks' ? 'brick' :
+    /^(sett|cobblestone|unhewn_cobblestone)(?::flattened)?$/.test(surface) ? 'concrete' : 'pavement';
   const textures = appCtx.surfaceTextureSets?.[materialFamily]?.map
     ? appCtx.surfaceTextureSets[materialFamily]
+    : appCtx[`${materialFamily}Diffuse`]
+    ? {map:appCtx[`${materialFamily}Diffuse`],normalMap:appCtx[`${materialFamily}Normal`],roughnessMap:appCtx[`${materialFamily}Roughness`]}
     : appCtx.surfaceTextureSets?.pavement?.map
     ? appCtx.surfaceTextureSets.pavement
     : appCtx.pavementDiffuse
@@ -78,7 +82,7 @@ export function hardscapeMaterialOptions(appCtx, landuseType, composition, tags 
   if (textures?.normalMap) material.normalScale = new THREE.Vector2(0.34, 0.34);
   return {
     material,
-    metersPerTile: 3.2
+    metersPerTile: materialFamily==='brick' ? 1.6 : 3.2
   };
 }
 
@@ -320,6 +324,7 @@ export function createWorldLandusePass(options = {}) {
     // an LOD radius. Geometry detail may change, but the land-use layer stays.
     mesh.userData.alwaysVisible = true;
     mesh.userData.landuseType = landuseType;
+    mesh.userData.mappedPedestrianArea = !isWater&&isMappedPedestrianArea({tags:featureMeta.tags||{}});
     mesh.userData.waterFlattenFactor = waterFlattenFactor;
     mesh.userData.surfaceVariant = isWater ? waterVisualProfile?.mode || 'water' : landuseType;
     if (isWater) mesh.userData.waterSurfaceBase = surfaceBaseElevation;
@@ -329,13 +334,14 @@ export function createWorldLandusePass(options = {}) {
       mesh.userData.waterRegistryId = waterArea.registryId;
       mesh.userData.waterSurfaceProvenance = waterArea.registryProvenance;
     }
-    mesh.receiveShadow = false;
+    mesh.receiveShadow = !isWater;
     mesh.visible = appCtx.landUseVisible || mesh.userData.alwaysVisible;
     appCtx.addEarthWorldObject(mesh);
     appCtx.landuseMeshes.push(mesh);
     appCtx.landuses.push({
       type: landuseType,
       pts: ring,
+      presentationOwner: 'mapped_geometry',
       tags: featureMeta.tags || {},
       holeRings,
       sourceFeatureId: featureMeta.sourceFeatureId || null,

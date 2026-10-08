@@ -15,7 +15,7 @@ function* streetSourceInputSteps(appCtx, select) {
   for(const [items,target,buildingsOnly] of [[appCtx.buildings,buildings,true],[appCtx.landuses,landuses,false]]){
     for(const item of items||[]){
       yield;
-      if((!buildingsOnly||!item.allowsPassageBelow)&&select(item))target.push({pts:item.surfaceFootprint||item.pts||item.footprint,holes:item.holes,holeRings:item.holeRings,type:item.type,tags:item.tags});
+      if((!buildingsOnly||!item.allowsPassageBelow)&&select(item))target.push({pts:item.surfaceFootprint||item.pts||item.footprint,holes:item.holes,holeRings:item.holeRings,type:item.type,tags:item.tags,presentationOwner:item.presentationOwner});
     }
   }
   for(const f of appCtx.linearFeatures||[]){

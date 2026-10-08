@@ -28,7 +28,9 @@ self.onmessage = async ({ data }) => {
       for(const name of ['vertices','curbVertices','markingVertices']){mesh[name]=new Float64Array(mesh[name]||[]);transfer.push(mesh[name].buffer);}
       // A single acknowledged chunk is in flight. No unbounded mesh message queue.
       self.postMessage({ type: 'tile', key: tile.key, fingerprint, bounds: tile.bounds,
-        segments: tile.segments.map(s => ({ ...s, road: undefined, roadIndex: s.road.auditIndex })),
+        // Boolean ownership masks are compile-only. The height sampler needs
+        // the segment and road index, not repeated copies of a street's masks.
+        segments: tile.segments.map(({road,sidewalkMasks,...s}) => ({ ...s, roadIndex: road.auditIndex })),
         inferredFrontages: result.inferredFrontages, ramps:result.ramps, rampCount:result.ramps?.length || 0, mesh, completed: cursor, total: plan.tiles.length,
         durationMs: Math.round(performance.now() - started) }, transfer);
     }
