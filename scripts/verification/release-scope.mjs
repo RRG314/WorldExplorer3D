@@ -1,4 +1,4 @@
-import { readAcceptanceClasses, REQUIRED_ACCEPTANCE } from './acceptance-classes.mjs';
+import { readAcceptanceClasses, acceptanceReleaseDecision } from './acceptance-classes.mjs';
 import { promotedEvidenceIdentity } from './production-promotion.mjs';
 import assert from 'node:assert/strict';
 import { access, readFile } from 'node:fs/promises';
@@ -52,10 +52,11 @@ if (missingCommands.length) failures.push(`missing package commands: ${missingCo
 if (program.statusAuthority !== 'current-execution-evidence') failures.push('statusAuthority must be current-execution-evidence');
 const scopes = Array.isArray(program.requiredExecutionScopes) ? program.requiredExecutionScopes : [];
 if (JSON.stringify(scopes) !== JSON.stringify(['candidate', 'backend'])) failures.push('candidate and backend execution scopes are required');
-if (JSON.stringify(program.requiredAcceptanceClasses) !== JSON.stringify(Object.keys(REQUIRED_ACCEPTANCE))) failures.push('All six external acceptance classes are required');
 const current = currentBaseline(root);
 const artifact = promotedIdentity || currentArtifactIdentity(root);
 const acceptanceClasses = readAcceptanceClasses(root, { artifact, baseline: current });
+const acceptanceDecision = acceptanceReleaseDecision(acceptanceClasses, program.requiredAcceptanceClasses, program.deferredAcceptanceClasses);
+failures.push(...acceptanceDecision.failures);
 const evidenceByScope = Object.fromEntries(scopes.map((scope) => [scope, readExecutionEvidence(root, scope)]));
 const evidenceFailures = Object.fromEntries(scopes.map((scope) => [
   scope,
@@ -78,7 +79,7 @@ const recordedComplete = expectedIds.filter((id) => missingExecutionGates[id]?.l
 const evidenceCurrent = Object.values(evidenceFailures).every((entries) => entries.length === 0);
 const complete = evidenceCurrent ? recordedComplete : [];
 const automatedReady = failures.length === 0 && evidenceCurrent && complete.length === expectedIds.length;
-const releaseReady = automatedReady && Object.values(acceptanceClasses).every(result => result.status === 'passed');
+const releaseReady = automatedReady && acceptanceDecision.ready;
 const report = {
   ok: failures.length === 0 && (!requireReady || releaseReady),
   contract: 'world-explorer-release-scope-v2',
@@ -88,6 +89,8 @@ const report = {
   releaseReady,
   automatedReady,
   acceptanceClasses,
+  unverifiedAcceptanceClasses: acceptanceDecision.unverified,
+  deferredAcceptanceClasses: program.deferredAcceptanceClasses || {},
   currentBaseline: current,
   evidenceCurrent,
   evidenceFailures,

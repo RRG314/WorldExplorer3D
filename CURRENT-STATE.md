@@ -5,6 +5,23 @@ The owner has authorized GitHub, Pages, a versioned release and production deplo
 The draft release acknowledges the remaining product limitations. Failed or missing
 verification has not been represented as acceptance.
 
+## October 8 production release attempt
+
+The owner reports the preview works and authorizes release. Named phone thermal,
+memory/resume measurements and independent new-player review remain explicitly
+unverified and are deferred for 5.5; ordinary hosted, provider-rights, rollback and
+all automated gates remain required. See
+`docs/release-review/2026-10-08/OWNER-RELEASE-DECISION.md`.
+
+Six previously failing/current-candidate rechecks now pass. The normal-provider
+assembled check exposed a real duplicate building passage at two heights. A
+shared source-ownership repair and captured regression are in progress; see
+`docs/release-review/2026-10-08/MIXED-PROVIDER-PASSAGE.md`. The live source check
+used fallback; captured mixed-source replay proves zero discontinuities across
+495 connections. Both prescribed driving bursts complete without errors, with inspected images.
+The complete source chain passes 2,183 tests plus dependency, ownership, type,
+inventory and sensitivity checks. Immutable release checks remain pending. Production remains 5.4 and the hosted preview remains e5dadb07.
+
 ## Working checkout
 
 Use `/Users/stevenreid/.codex/worktrees/architecture-evaluation/WorldExplorer3D-live-deployed-20260320`,

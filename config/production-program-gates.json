@@ -11,7 +11,21 @@
   "deploymentRequiresExplicitUserApproval": true,
   "statusAuthority": "current-execution-evidence",
   "requiredExecutionScopes": ["candidate", "backend"],
-  "requiredAcceptanceClasses": ["ordinary-hosted", "physical-ios", "physical-android", "fresh-player", "weather-entitlement", "migration-rollback"],
+  "requiredAcceptanceClasses": ["ordinary-hosted", "weather-entitlement", "migration-rollback"],
+  "deferredAcceptanceClasses": {
+    "physical-ios": {
+      "reason": "No named iPhone memory, thermal and resume measurements were supplied; remains unverified.",
+      "ownerDecision": "docs/release-review/2026-10-08/OWNER-RELEASE-DECISION.md"
+    },
+    "physical-android": {
+      "reason": "Owner reports the preview works on Android; named device and sustained memory, thermal and resume measurements remain unverified.",
+      "ownerDecision": "docs/release-review/2026-10-08/OWNER-RELEASE-DECISION.md"
+    },
+    "fresh-player": {
+      "reason": "Owner reports testing; an independent uncoached new-player review remains unverified.",
+      "ownerDecision": "docs/release-review/2026-10-08/OWNER-RELEASE-DECISION.md"
+    }
+  },
   "executionGateRequirements": {
     "CP0": ["source-graph", "artifact-world", "explorer-browser"],
     "CP1": ["assembled-worlds", "assembled-fallback", "provider-release"],

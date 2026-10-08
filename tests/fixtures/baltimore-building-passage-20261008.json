@@ -1,0 +1,98 @@
+{
+  "sources": [
+    "https://api.openstreetmap.org/api/0.6/way/757223800/full.json",
+    "https://api.openstreetmap.org/api/0.6/way/757223802/full.json",
+    "https://vector.openstreetmap.org/shortbread_v1/13/2352/3121.mvt"
+  ],
+  "captured": "2026-10-08",
+  "note": "Shortbread streets feature index 2800. Nearby road-label association is presentation metadata, not structure identity. Raw mapped nodes and OSM building_passage are retained.",
+  "elements": [
+    {
+      "type": "node",
+      "id": 49525519,
+      "lat": 39.3102821,
+      "lon": -76.6347404
+    },
+    {
+      "type": "node",
+      "id": 7071480790,
+      "lat": 39.3100601,
+      "lon": -76.6348247
+    },
+    {
+      "type": "node",
+      "id": 7071480791,
+      "lat": 39.3099834,
+      "lon": -76.6348274
+    },
+    {
+      "type": "node",
+      "id": 9692151945,
+      "lat": 39.3102077,
+      "lon": -76.6347832,
+      "tags": {
+        "crossing": "unmarked",
+        "crossing:markings": "no",
+        "highway": "crossing"
+      }
+    },
+    {
+      "type": "way",
+      "id": 757223800,
+      "nodes": [
+        49525519,
+        9692151945,
+        7071480790,
+        7071480791
+      ],
+      "tags": {
+        "highway": "service"
+      }
+    },
+    {
+      "type": "node",
+      "id": 7071480792,
+      "lat": 39.3099355,
+      "lon": -76.6348713
+    },
+    {
+      "type": "way",
+      "id": 757223802,
+      "nodes": [
+        7071480791,
+        7071480792
+      ],
+      "tags": {
+        "highway": "service",
+        "tunnel": "building_passage"
+      }
+    },
+    {
+      "type": "node",
+      "id": -100,
+      "lat": 39.30997907932371,
+      "lon": -76.63483142852783
+    },
+    {
+      "type": "node",
+      "id": -101,
+      "lat": 39.30992927197954,
+      "lon": -76.63487434387207
+    },
+    {
+      "type": "way",
+      "id": -200,
+      "nodes": [
+        -100,
+        -101
+      ],
+      "tags": {
+        "highway": "service",
+        "tunnel": "yes",
+        "name": "Madison Avenue",
+        "_nameProvenance": "spatial-label-association",
+        "_sourceCompleteness": "generalized"
+      }
+    }
+  ]
+}

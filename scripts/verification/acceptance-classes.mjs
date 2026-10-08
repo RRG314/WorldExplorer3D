@@ -16,6 +16,28 @@ export const REQUIRED_ACCEPTANCE = Object.freeze({
   'migration-rollback': { checks: ['existingSaveUpgrade', 'compatibleFallbackReadsUpgradedSave', 'fallbackWriteAndReturn', 'backendCompatibility', 'artifactRetained'], maxAgeDays: 7 }
 });
 
+// The owner may release with a documented device/usability review still open.
+// This affects release scope only: pending receipts never become passed, and
+// ordinary hosted operation, public data rights and rollback cannot be deferred.
+export function acceptanceReleaseDecision(results, required, deferred = {}) {
+  const mandatory = ['ordinary-hosted', 'weather-entitlement', 'migration-rollback'];
+  const deferrable = ['physical-ios', 'physical-android', 'fresh-player'];
+  const failures = [];
+  if (!Array.isArray(required) || new Set(required).size !== required.length ||
+      required.some(id => !Object.hasOwn(REQUIRED_ACCEPTANCE, id))) failures.push('Invalid required acceptance classes');
+  const selected = new Set(Array.isArray(required) ? required : []);
+  for (const id of mandatory) if (!selected.has(id)) failures.push(`Cannot defer ${id}`);
+  for (const id of Object.keys(deferred)) {
+    if (!deferrable.includes(id) || selected.has(id)) failures.push(`Invalid deferral: ${id}`);
+    if (!String(deferred[id]?.reason || '').trim() || !String(deferred[id]?.ownerDecision || '').trim()) failures.push(`Undocumented deferral: ${id}`);
+  }
+  for (const id of Object.keys(REQUIRED_ACCEPTANCE)) {
+    if (!selected.has(id) && !Object.hasOwn(deferred, id)) failures.push(`Unaccounted acceptance class: ${id}`);
+  }
+  return { failures, ready: failures.length === 0 && [...selected].every(id => results[id]?.status === 'passed'),
+    unverified: Object.keys(REQUIRED_ACCEPTANCE).filter(id => results[id]?.status !== 'passed') };
+}
+
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
 export function evaluateAcceptanceReceipt(id, receipt, { artifact, baseline, now = Date.now(), verifyEvidence = () => false, verifyFallback = () => false }) {
   const rule = REQUIRED_ACCEPTANCE[id];

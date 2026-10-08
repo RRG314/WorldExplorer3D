@@ -4,7 +4,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
-import { REQUIRED_ACCEPTANCE, evaluateAcceptanceReceipt, readAcceptanceClasses } from '../scripts/verification/acceptance-classes.mjs';
+import { REQUIRED_ACCEPTANCE, evaluateAcceptanceReceipt, readAcceptanceClasses, acceptanceReleaseDecision } from '../scripts/verification/acceptance-classes.mjs';
 const hash = value => createHash('sha256').update(value).digest('hex');
 const artifact = { buildManifestSha256: hash('build'), assetManifestSha256: hash('assets'), verifiedContentSha256: hash('content') };
 const baseline = { acceptanceFingerprint: hash('source') }, now = Date.parse('2026-10-04T12:00:00Z');
@@ -59,4 +59,26 @@ test('receipt file reader hashes the evidence and treats absent or malformed rec
   assert.equal(readAcceptanceClasses(root, context)['fresh-player'].status, 'passed');
   writeFileSync(path.join(base, 'fixture.txt'), 'changed'); assert.equal(readAcceptanceClasses(root, context)['fresh-player'].status, 'invalid');
   writeFileSync(receiptPath, '{'); assert.equal(readAcceptanceClasses(root, context)['fresh-player'].status, 'invalid');
+});
+
+
+test('documented owner scope can defer only device and independent usability reviews without passing them', () => {
+  const results=Object.fromEntries(Object.keys(REQUIRED_ACCEPTANCE).map(id=>[id,{status:'pending'}]));
+  const required=['ordinary-hosted','weather-entitlement','migration-rollback'];
+  const deferred=Object.fromEntries(['physical-ios','physical-android','fresh-player'].map(id=>[id,{reason:'Explicitly unverified',ownerDecision:'Owner release decision'}]));
+  assert.equal(acceptanceReleaseDecision(results,required,deferred).ready,false);
+  for(const id of required)results[id]={status:'passed'};
+  const decision=acceptanceReleaseDecision(results,required,deferred);
+  assert.equal(decision.ready,true);
+  assert.deepEqual(decision.unverified,Object.keys(deferred));
+  assert.equal(results['physical-ios'].status,'pending');
+  for(const id of required) {
+    const changed={...results,[id]:{status:'invalid'}};
+    assert.equal(acceptanceReleaseDecision(changed,required,deferred).ready,false);
+    assert.equal(acceptanceReleaseDecision(results,required.filter(k=>k!==id),{...deferred,[id]:deferred['physical-ios']}).ready,false);
+  }
+  assert.equal(acceptanceReleaseDecision(results,required,{}).ready,false);
+  assert.equal(acceptanceReleaseDecision(results,required,{...deferred,'physical-ios':{reason:'No measurements'}}).ready,false);
+  assert.equal(acceptanceReleaseDecision(results,[...required,'unknown'],deferred).ready,false);
+  assert.equal(acceptanceReleaseDecision(results,[...required,required[0]],deferred).ready,false);
 });
