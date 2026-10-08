@@ -119,7 +119,8 @@ const GroundHeight = {
     const semantics = road?.structureSemantics || null;
     // Ground-level transport follows the published graded mesh. The profile
     // is a grading input and may differ after intersecting corridors blend.
-    if (semantics?.terrainMode === 'at_grade') return true;
+    if (semantics?.terrainMode === 'at_grade' && road.transportSurfaceModel?.engineeredApproach !== true) return true;
+    if (road?.transportSurfaceModel?.engineeredApproach === true) return delta <= .25;
     if (semantics?.terrainMode === 'subgrade' && meshY > profileY + 1.2) return false;
     if (delta <= 2.6) return true;
     const hasTransitionAnchors = Array.isArray(road?.structureTransitionAnchors) && road.structureTransitionAnchors.length > 0;
@@ -130,6 +131,7 @@ const GroundHeight = {
   },
 
   _resolveRoadSurfaceY(road, meshY, profileY) {
+    if (road?.transportSurfaceModel?.engineeredApproach === true && Number.isFinite(profileY)) return profileY;
     if (road?.structureSemantics?.terrainMode === 'subgrade' && Number.isFinite(profileY)) return profileY;
     if (road?.structureSemantics?.terrainMode === 'at_grade' && Number.isFinite(meshY)) return meshY;
     if (Number.isFinite(meshY) && Number.isFinite(profileY)) return Math.max(profileY, meshY);

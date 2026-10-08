@@ -1,0 +1,12 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Harbor waypoint presentation</title><style>body{margin:0}canvas{display:block}</style></head><body><script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script><script type="module">
+import {dressHarborWaypoint} from '/app/js/interiors/harbor-waypoint.js';
+const scene=new THREE.Scene(),group=new THREE.Group();scene.add(group);scene.background=new THREE.Color(0xd9d6cd);scene.add(new THREE.HemisphereLight(0xffffff,0x7e7a67,1));
+const materials=Object.fromEntries(['roomMaterial','corridorMaterial','wallMaterial','accentWallMaterial'].map(k=>[k,new THREE.MeshStandardMaterial()]));
+const footprint=[{x:-6,z:-5},{x:6,z:-5},{x:6,z:5},{x:-6,z:5}];
+dressHarborWaypoint({THREE,group,footprint,center:{x:0,z:0},floorY:0,wallHeight:3.3,entry:{x:0,z:-3},...materials});
+for(let i=0;i<4;i++){const a=footprint[i],b=footprint[(i+1)%4],wall=new THREE.Mesh(new THREE.BoxGeometry(Math.hypot(b.x-a.x,b.z-a.z),3.3,.32),materials.wallMaterial);wall.position.set((a.x+b.x)/2,1.65,(a.z+b.z)/2);wall.rotation.y=Math.atan2(-(b.z-a.z),b.x-a.x);group.add(wall)}
+const floor=new THREE.Mesh(new THREE.PlaneGeometry(12,10),materials.roomMaterial);floor.rotation.x=-Math.PI/2;scene.add(floor);
+const camera=new THREE.PerspectiveCamera(60,innerWidth/innerHeight,.05,100),renderer=new THREE.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});renderer.setSize(innerWidth,innerHeight);renderer.outputEncoding=THREE.sRGBEncoding;document.body.append(renderer.domElement);let yaw=0;const keys=new Set();onkeydown=e=>keys.add(e.key);onkeyup=e=>keys.delete(e.key);
+function render(){camera.position.set(0,1.7,0);camera.lookAt(Math.sin(yaw),1.6,-5);renderer.render(scene,camera)}
+window.advanceTime=async ms=>{yaw+=(keys.has('ArrowRight')?1:0)*ms*.0005;render()};window.render_game_to_text=()=>JSON.stringify({scene:'original harbor waypoint dressing fixture; full mapped building tested separately',coordinates:'metres, Y up',panels:group.children.filter(o=>o.name==='Harbor game orientation panel').length,ownedTextures:group.userData.ownedInteriorTextures.length,drawCalls:renderer.info.render.calls});render();
+</script></body></html>

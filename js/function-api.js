@@ -1,4 +1,4 @@
-import { getCurrentUserToken } from './auth-ui.js?v=56';
+import { getCurrentUser, getCurrentUserToken } from './auth-ui.js?v=56';
 import { getFirebaseAppCheckToken, readFirebaseConfig } from './firebase-init.js?v=58';
 import { assertFunctionsOrigin } from './firebase-environment-policy.js';
 
@@ -111,6 +111,9 @@ async function requestFunction(path, body, options, authenticated) {
       const token = authenticated ? await getCurrentUserToken(options.forceRefreshToken !== false) : null;
       const appCheckToken = await getFirebaseAppCheckToken();
       if (signal.aborted) throw signal.reason;
+      if(options.expectedUserId && getCurrentUser()?.uid!==options.expectedUserId) {
+        throw interruptedError('account-changed','Account changed before the request could be sent.');
+      }
       const serializedBody = JSON.stringify(body);
       const candidates = buildFunctionCandidates(path);
       const attempts = [];

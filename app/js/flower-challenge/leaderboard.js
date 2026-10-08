@@ -301,9 +301,11 @@ function createFlowerChallengeLeaderboardApi(context) {
     }
   }
 
+  let refreshSequence = 0;
   async function refreshFlowerLeaderboard(challengeType = challengeState.leaderboardView || 'flower') {
     const normalizedType = normalizeChallengeType(challengeType);
     const definition = getLeaderboardDefinition(normalizedType);
+    const sequence = ++refreshSequence;
     challengeState.leaderboardView = normalizedType;
     if (ui.titleFlowerTabBtn) ui.titleFlowerTabBtn.classList.toggle('active', normalizedType === 'flower');
     if (ui.titlePaintTabBtn) ui.titlePaintTabBtn.classList.toggle('active', normalizedType === 'painttown');
@@ -329,14 +331,18 @@ function createFlowerChallengeLeaderboardApi(context) {
     const localEntries = normalizedType === 'explorer' || normalizedType === 'property'
       ? []
       : readLocalLeaderboard(normalizedType).map((entry) => ({ ...entry, source: 'device' }));
+    // Replace the old board immediately, then accept only the newest query.
+    renderLeaderboard(localEntries);
+    if (ui.titleHint) ui.titleHint.textContent = [definition.objective,definition.resultDisclosure].filter(Boolean).join(' ');
     const remoteEntries = await readRemoteLeaderboard(normalizedType);
+    if (sequence !== refreshSequence) return null;
     const entries = remoteEntries === null
       ? localEntries
       : sortLeaderboardEntries([...remoteEntries, ...localEntries], normalizedType).slice(0, LEADERBOARD_LIMIT);
     renderLeaderboard(entries);
 
     if (ui.titleHint) {
-      ui.titleHint.textContent = definition.objective;
+      ui.titleHint.textContent = [definition.objective,definition.resultDisclosure].filter(Boolean).join(' ');
     }
     if (ui.status) {
       const prefix = {

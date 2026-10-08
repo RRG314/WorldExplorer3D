@@ -297,6 +297,7 @@ function careForCompanion(instance, interaction = 'pet', now = Date.now()) {
 function resolveCompanionTravelPolicy(instance, mode = 'walk', environment = 'EARTH') {
   if (!instance) return Object.freeze({ visible: false, state: 'none' });
   if (environment !== 'EARTH') return Object.freeze({ visible: false, state: 'protected-quarters' });
+  if (mode === 'swim') return Object.freeze({ visible: false, state: 'safe-during-exposed-travel', positionMode: 'interior' });
   if (mode === 'drone' || mode === 'skydive') return Object.freeze({ visible: false, state: 'safe-during-exposed-travel' });
   if (String(instance.speciesArchetype || '').startsWith('livestock-') && ['car', 'boat'].includes(mode)) {
     return Object.freeze({ visible: false, state: 'waiting' });

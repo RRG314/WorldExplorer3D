@@ -1,4 +1,5 @@
 const LIVE_EARTH_CATEGORIES = [
+  { id:'cameras',label:'Public Cameras',summary:'Timestamped public camera still images, with source and coverage.',layers:['public-cameras'] },
   {
     id: 'overview',
     label: 'Overview',
@@ -44,6 +45,7 @@ const LIVE_EARTH_CATEGORIES = [
 ];
 
 const LIVE_EARTH_LAYERS = {
+  'public-cameras': {id:'public-cameras',categoryId:'cameras',label:'Public Camera Views',shortLabel:'Cameras',status:'observed',globeMode:'markers',summary:'Finland and California district 3/4 road-camera stills; regional coverage, not live video.',localSummary:'Choose a camera, inspect its capture time, then explore that location.',sourceIds:['digitraffic-cameras','caltrans-cameras']},
   overview: {
     id: 'overview',
     categoryId: 'overview',
@@ -107,7 +109,7 @@ const LIVE_EARTH_LAYERS = {
     globeMode: 'markers',
     summary: 'Current weather-model conditions tied to selected globe and local-world locations.',
     localSummary: 'Uses the same real local weather system already active in the 3D world.',
-    sourceIds: ['open-meteo']
+    sourceIds: ['met-norway']
   },
   storms: {
     id: 'storms',
@@ -118,7 +120,7 @@ const LIVE_EARTH_LAYERS = {
     globeMode: 'markers',
     summary: 'Live severe-weather watchpoints derived from regional weather samples.',
     localSummary: 'Uses live weather snapshots to surface the strongest nearby storm-like conditions.',
-    sourceIds: ['open-meteo']
+    sourceIds: ['met-norway']
   },
   'ocean-state': {
     id: 'ocean-state',
@@ -129,7 +131,7 @@ const LIVE_EARTH_LAYERS = {
     globeMode: 'markers',
     summary: 'Global modeled marine conditions plus NOAA water-level observations and tide predictions where covered.',
     localSummary: 'Separates modeled guidance, observed gauges, predicted tides, and the runtime water simulation.',
-    sourceIds: ['open-meteo-marine', 'noaa-coops-observations', 'noaa-coops-predictions']
+    sourceIds: ['pacioos-ww3', 'noaa-ww3', 'hycom-espc', 'noaa-coops-observations', 'noaa-coops-predictions']
   },
   ships: {
     id: 'ships',
@@ -151,7 +153,7 @@ const LIVE_EARTH_LAYERS = {
     globeMode: 'markers-tracks',
     summary: 'Current live ADS-B aircraft observations near the selected point, with labeled reference routes only as fallback.',
     localSummary: 'Shows observed ADS-B and Mode S state vectors without presenting schedules or inferred destinations as facts.',
-    sourceIds: ['opensky', 'adsb-lol', 'transport-reference']
+    sourceIds: ['adsb-lol', 'transport-reference']
   }
 };
 

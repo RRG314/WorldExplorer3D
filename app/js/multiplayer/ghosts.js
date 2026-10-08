@@ -328,6 +328,9 @@ function createGhostManager(scene, options = {}) {
     for (const player of playersSnapshot) {
       const uid = String(player?.uid || '');
       if (!uid || uid === selfUid) continue;
+      // Marine crew share the authoritative vessel in Ocean's own scene.
+      // The Earth proxy renderer must never substitute a car or walker.
+      if(player?.frame?.kind==='ocean')continue;
       if (!areMultiplayerFramesCompatible(localFrame, player?.frame)) continue;
       seen.add(uid);
 

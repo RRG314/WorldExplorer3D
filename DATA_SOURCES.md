@@ -1,75 +1,11 @@
 # Data Sources
 
-## Local geology data integration — September 9
+Last reviewed: 2026-10-07 for World Explorer 3D 5.5.0.
 
-- USGS Cooperative National Geologic Map surface-unit service:
-  `https://energy.usgs.gov/arcgis/rest/services/Hosted/mapunitpolys_esurf_labels/FeatureServer/0`.
-  Exact point queries return names, geomaterials, ages, confidence and original map
-  citations. Preserve source scale and age uncertainty. This integration identifies
-  the deployed service, not a guessed version from the viewer announcement.
-- Macrostrat point API: `https://macrostrat.org/api/v2/geologic_units/map`.
-  Missing USGS coverage falls back to regional geology with source references and
-  CC-BY-4.0 attribution. Multiple returned units remain explicit alternatives.
-- On-demand lookup only; bounded cache, ten-second timeout, no map embedding or
-  paid reconstruction. Records retain provider, query point, fetched time and
-  evidence snapshot. Data is a regional map reference, not proof of an exposed
-  sample, a mineral occurrence, or collecting access. No user images are sent.
-- Live spot queries verified Manchester (Wissahickon schist/gneiss) and Hawaii
-  (mafic lava flows). See `docs/GEOLOGY_DATA_IMPLEMENTATION.md` for later regional
-  packages, USMIN, exposure logic and validation boundaries.
-
-Local September 8 mapped-ground revision: existing Shortbread z14 coverage is
-also decoded for nearby land, sites and street polygons. These are generalized
-OSM-derived polygons, not parcel surveys. Source identity, available surface tags
-and interior rings are retained. Explicit physical cover outranks broad property
-purpose; unknown purpose-only areas retain existing cover fallback. Texture
-detail is representative CC0 material, not a photograph of that exact ground.
-No new provider requests or paid datasets were introduced by this revision.
-
-Herbaceous wetland groundcover uses numeric ESA WorldCover class90, not inferred
-open water. The local CC0 Quaternius nature subset now also includes
-Grass_Common_Tall (grass.glb); its source, conversion hash and triangle count are
-recorded with the other nature assets. Models are generic vegetation, not surveyed
-species. The distant-context30s budget preserves partial mapped evidence and
-records deadline/skipped-request metrics rather than fabricating missing tiles.
-
-Last reviewed: 2026-09-08 for World Explorer 3D 5.2.0.
-
-## Local ground ecosystem update (not yet deployed)
-
-ESA WorldCover v200/2021 numeric classes are delivered as bounded nearest-sampled
-NPY windows from the [Microsoft Planetary Computer data API](https://planetarycomputer.microsoft.com/api/data/v1/openapi.json).
-The [dataset](https://planetarycomputer.microsoft.com/dataset/esa-worldcover)
-remains ESA remote-sensing classification, not live conditions or a species map.
-Only validated class bytes are persistently cached. Terrascope WMS remains an
-explicit display-color fallback; unavailable/nodata regions retain mapped/local
-fallbacks, not invented provider observations. Biome labels are gameplay
-inferences from local cover, latitude and existing elevation, not surveyed
-ecoregion boundaries. Roads, water and terrain elevation retain their owners.
-
-Curated vegetation comes from Quaternius' [Stylized Nature MegaKit](https://quaternius.itch.io/stylized-nature-megakit),
-CC0. Selected pine, broadleaf, shrub and fern models are packaged locally as GLB,
-with512px textures; woody trees have simplified distance models. The conversion
-script and asset manifest record source names and hashes. These are regional
-visual forms, not evidence of the exact species or individual tree at a location.
-
-## Functional POI research note (2026-09-05)
-
-The functional POI foundation currently consumes the mapped POI records already
-published by the Shortbread and exact OpenStreetMap/Overpass loaders. Shortbread
-is a deliberately lean vector-tile schema, so it is not assumed to cover every
-functional category or every OSM tag. Overture Places is being evaluated as a
-future normalized input for stable place identity, taxonomy, provenance,
-operating status, and confidence. No Overture Places runtime dependency has
-been added, and no generated gameplay inventory, service, interior, price, or
-opening state is described as provider data.
-
-See [FUNCTIONAL_POI_SYSTEM.md](FUNCTIONAL_POI_SYSTEM.md) for the provider
-reconciliation and truth-boundary rules.
-
-World Explorer keeps source identity and truth type with its data. Observations,
-forecasts and models, predictions, mapped features, and visual fallbacks are not
-interchangeable.
+World Explorer keeps source identity and data type with its geographic and
+scientific context. Observations, forecasts, predictions, mapped features and
+procedural presentation serve different purposes. Coverage and freshness vary
+by provider; none of these layers makes the game a survey or navigation tool.
 
 ## Community Reality Capture
 
@@ -87,18 +23,17 @@ private and owner-only independently of any public exterior contribution.
 Unapproved photos and private processed assets are not public data sources and
 must only be delivered through the authorized short-lived asset broker.
 
-See [COMMUNITY_REALITY_CAPTURE_RND.md](COMMUNITY_REALITY_CAPTURE_RND.md) and
-[COMMUNITY_REALITY_CAPTURE_V1.md](COMMUNITY_REALITY_CAPTURE_V1.md).
+See [Community Reality Capture](COMMUNITY_REALITY_CAPTURE_V1.md) for contribution and publication boundaries.
 
 ## Earth Geometry And Surfaces
 
 | Source | Runtime use | Data class | License / terms |
 | --- | --- | --- | --- |
 | OpenStreetMap contributors | Detailed location roads, buildings, land use, water, paths, bridges, tunnels, place context, and mapped surveillance objectives through Overpass | Community-mapped | ODbL 1.0 |
-| OSM Shortbread vector tiles | Bounded building and water fallback geometry | Community-mapped | ODbL 1.0 and OSM service terms |
+| OSM Shortbread vector tiles | Bounded roads, buildings, water and land-cover context | Community-mapped | ODbL 1.0 and OSM service terms |
 | OSM raster tiles | Minimap and map context | Community-mapped | ODbL 1.0 and tile usage policy |
 | Nominatim | Forward and reverse place lookup | Community-mapped service | OSMF Nominatim policy |
-| Overture Maps Foundation | Bounded building-massing fallback when selected-location OSM building coverage is unavailable | Compiled mapped data | Overture source licenses and attribution |
+| Overture Maps Foundation | Detailed building coverage within the selected region, reconciled with mapped location geometry | Compiled mapped data | Overture source licenses and attribution |
 | ESA WorldCover 2021 | Global semantic surface classification and land-cover fallback | Remote-sensing classification | CC BY 4.0; contains modified Copernicus Sentinel data |
 | USGS 3DEP accepted-ground data | Baltimore bare-earth terrain height and collision | Government elevation model normalized to EGM2008 | Public USGS data |
 | Copernicus DEM GLO-30 classified-ground data | Accepted terrain for documented locations | Public DEM-derived, correction-attested ground normalized to EGM2008 | Public free use with required attribution |
@@ -106,6 +41,30 @@ See [COMMUNITY_REALITY_CAPTURE_RND.md](COMMUNITY_REALITY_CAPTURE_RND.md) and
 | GEBCO 2020 via OpenTopodata | Bundled Great Barrier Reef bathymetry seed | Bathymetric model | CC BY 4.0 |
 
 Required map attribution: `© OpenStreetMap contributors`.
+
+## Land cover, geology and vegetation
+
+ESA WorldCover v200/2021 supplies semantic land-cover classes through the
+[Microsoft Planetary Computer](https://planetarycomputer.microsoft.com/dataset/esa-worldcover).
+Terrascope WMS provides a display-color fallback. These are remote-sensing
+classifications, not live ground conditions or a species census. Mapped physical
+cover takes precedence over broad land-use labels; unknown coverage retains
+available local context. Wetland vegetation is distinct from open water.
+
+[USGS geologic maps](https://energy.usgs.gov/arcgis/rest/services/Hosted/mapunitpolys_esurf_labels/FeatureServer/0)
+and [Macrostrat](https://macrostrat.org/api/v2/geologic_units/map) provide regional
+rock-unit references, ages and original citations where available. Scale and
+uncertainty are retained. A mapped unit does not establish a visible outcrop,
+a mineral occurrence, or permission to collect there. Macrostrat attribution
+follows CC BY 4.0.
+
+Tree, shrub, fern and grass models from Quaternius’ CC0
+[Stylized Nature MegaKit](https://quaternius.itch.io/stylized-nature-megakit)
+represent regional visual forms. Their placement is generated from available
+habitat context; it does not identify exact real trees or species at a point.
+Representative ground materials include Poly Haven’s CC0
+[Snow 02](https://polyhaven.com/a/snow_02). Surface textures are visual detail,
+not measurements of local topography.
 
 ## Maryland Parcel Context
 
@@ -164,16 +123,30 @@ with DeFlock and uses no DeFlock application code or DeFlock-owned data feed.
 | --- | --- | --- | --- |
 | CelesTrak GP data | Satellite positions propagated from current orbital elements | Observed orbital elements / propagated position | Two-hour shared cache; partial groups can degrade independently |
 | USGS GeoJSON earthquake feed | Recent earthquake locations and magnitudes | Observed events | Five-minute shared cache |
-| OpenSky Network | Aircraft state vectors near the selected location | Observed state vectors | Same-origin server adapter; hosting egress and provider terms apply |
-| ADSB.lol | Fallback aircraft observations when OpenSky is unavailable | Observed ADS-B state vectors | Same-origin server adapter; ODbL 1.0; provider availability and rate limits apply |
-| Open-Meteo Forecast API | Current weather samples | Modeled current conditions | Ten-minute shared cache |
-| Open-Meteo Marine API | Wave, current, temperature, and sea-level guidance | Modeled marine guidance | Fifteen-minute shared cache |
+| ADSB.lol | Aircraft observations near the selected location | Observed ADS-B state vectors | Same-origin server adapter; ODbL 1.0; provider availability and rate limits apply |
+| MET Norway Locationforecast | Hourly weather samples | Modeled, CC BY 4.0; converted units/categories | Shared backend cache honors Expires and Last-Modified |
+| PacIOOS global WAVEWATCH III | Wave and swell guidance | Free-use model; half-degree grid, per-source valid time | Fifteen-minute shared backend cache |
+| NOAA / NCEP WAVEWATCH III via NSF Unidata | Wave guidance when the primary wave model is unavailable | Modeled | Uses its own three-hour valid time; unavailable swell partitions remain absent |
+| HYCOM / FNMOC ESPC | Surface currents and temperature | Freely available model; explicit grid and valid time | Fifteen-minute shared backend cache |
 | NOAA CO-OPS | Water-level station metadata and observations | Observed station data | Coverage is station-dependent; datum and quality are retained |
 | NOAA CO-OPS | High/low tide times and levels | Predicted tides | Kept separate from observations |
 | Panoramax | Nearby community street imagery and official viewer links | Community observations | CC BY-SA 4.0; coverage varies |
 | KartaView | Nearby community street imagery and official viewer links | Community observations | CC BY-SA 4.0; coverage varies |
 
 Marine traffic is currently a labeled reference layer, not observed AIS. No synthetic route is presented as a live vessel position.
+
+## Public road-camera stills
+
+Live Earth includes Fintraffic Digitraffic cameras in Finland and Caltrans-owned
+CWWP cameras from California districts 3 and 4. Fintraffic imagery carries
+CC BY 4.0 attribution and provider capture times. Caltrans imagery follows its
+Conditions of Use; catalogue timestamps are not represented as image capture
+times. Each view links to its publisher and terms.
+
+The camera wall supports up to four views and saved favorites. Images are not
+archived or rehosted. Remote Journal references do not award an in-person visit.
+Coverage is regional and depends on the publisher; this is not a worldwide
+camera catalogue.
 
 ## Astronomy And Planetary Data
 
@@ -198,20 +171,30 @@ drawn from Quaternius' CC0 Ultimate Spaceships Pack. The raider is an optimized
 local presentation asset; Expedition encounter, damage, crew, resource, and
 persistence authorities remain separate from the model.
 
+## Weather and ocean-model boundaries
+
+Weather and marine models use public providers without a paid data subscription
+or private provider key. Shared backend caches and request scheduling limit
+upstream traffic. MET Norway caching and rate-limit responses are respected;
+ordinary Firebase infrastructure usage still applies.
+
+Weather coordinates are rounded to two decimals. Marine results retain grid
+resolution, source and valid time. Missing cells, stale data and outages remain
+unavailable. Wave directions are from-bearings; current directions are
+toward-bearings. HYCOM surface elevation is not labeled as mean sea level because
+that datum has not been established. NOAA station observations and tide
+predictions remain distinct from ocean models.
+
+Provider references: [MET Norway terms](https://api.met.no/doc/TermsOfService),
+[MET Norway license](https://docs.api.met.no/doc/License.html),
+[PacIOOS WAVEWATCH III](https://pae-paha.pacioos.hawaii.edu/erddap/info/ww3_global/index.html),
+and [HYCOM/FNMOC catalogue](https://tds.hycom.org/thredds/catalogs/GLBy0.08/latest.html?dataset=GLBy0.08-latest).
+
 ## Provider Boundaries
 
 - Browser clients do not receive private provider credentials.
-- Panoramax, KartaView, OpenSky, and ADSB.lol requests use allowlisted same-origin server adapters.
+- Panoramax, KartaView, and ADSB.lol requests use allowlisted same-origin server adapters.
 - Provider requests use bounded caches, timeouts, in-flight deduplication, and health diagnostics.
 - Production Firebase, payment, and administrative credentials are never included in this repository.
 
 See [ATTRIBUTION.md](ATTRIBUTION.md), [ACKNOWLEDGEMENTS.md](ACKNOWLEDGEMENTS.md), and [KNOWN_ISSUES.md](KNOWN_ISSUES.md).
-# Natural snow surface — September 8, 2026
-
-The active snow material uses [Snow 02 by Rob Tuytel, Poly Haven](https://polyhaven.com/a/snow_02),
-CC0, nominal 2 m width. Diffuse, OpenGL normal and roughness maps are reduced
-to 512px JPEGs (137,703 bytes total). The existing Snow 01 footprint texture
-is no longer selected by the Earth material registry. Rebuild with
-`node scripts/build-snow-assets.mjs`; source checksums and resulting SHA-256
-hashes are recorded in `app/assets/textures/earth/snow_02.provenance.json`.
-This is representative surface detail, not measured Antarctic topography.

@@ -1,32 +1,40 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, renameSync, symlinkSync, statSync, utimesSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { createHash } from 'node:crypto';
 import { currentArtifactIdentity, sameArtifactIdentity, compareEvidenceToBaseline } from '../scripts/verification/execution-evidence.mjs';
+const hash = value => createHash('sha256').update(value).digest('hex');
 
-test('release evidence cannot transfer between artifacts from the same source commit', (t) => {
-  const previousRoot = process.env.WE3D_VERIFY_ROOT;
-  process.env.WE3D_VERIFY_ROOT = 'dist'; // This fixture owns its artifact directory.
-  t.after(() => { if (previousRoot === undefined) delete process.env.WE3D_VERIFY_ROOT; else process.env.WE3D_VERIFY_ROOT = previousRoot; });
+test('artifact receipts validate real bytes, file set and symlinks as well as both manifests', t => {
   const root = mkdtempSync(path.join(tmpdir(), 'we3d-artifact-evidence-'));
   t.after(() => rmSync(root, { recursive: true, force: true }));
-  mkdirSync(path.join(root, 'dist'));
-  const build = path.join(root, 'dist/build-manifest.json');
-  const assets = path.join(root, 'dist/asset-manifest.json');
-  assert.equal(currentArtifactIdentity(root), null);
-  writeFileSync(build, JSON.stringify({ buildId: 'staging-candidate', commit: 'same-commit' }));
-  writeFileSync(assets, JSON.stringify({ files: { 'index.html': 'content-a' } }));
-  const identity = currentArtifactIdentity(root);
-  const baseline = { headCommit: 'same-commit', workspaceFingerprint: 'same-source' };
-  const evidence = { contract: 'world-explorer-execution-evidence-v1', scope: 'candidate', ok: true, baseline, artifactIdentity: identity };
-  assert.deepEqual(compareEvidenceToBaseline(evidence, baseline, 'candidate', identity), []);
-  writeFileSync(build, JSON.stringify({ buildId: 'production-candidate', commit: 'same-commit' }));
-  assert.equal(sameArtifactIdentity(identity, currentArtifactIdentity(root)), false);
-  assert.match(compareEvidenceToBaseline(evidence, baseline, 'candidate', currentArtifactIdentity(root)).join(), /artifact/);
-  writeFileSync(build, JSON.stringify({ buildId: 'staging-candidate', commit: 'same-commit' }));
-  writeFileSync(assets, JSON.stringify({ files: { 'index.html': 'content-b' } }));
-  assert.equal(sameArtifactIdentity(identity, currentArtifactIdentity(root)), false);
-  assert.match(compareEvidenceToBaseline({ ...evidence, artifactIdentity: undefined }, baseline, 'candidate', identity).join(), /artifact/);
+  const dist = path.join(root, 'dist'); mkdirSync(dist);
+  const write = (name, value) => writeFileSync(path.join(dist, name), value);
+  const identity = () => currentArtifactIdentity(root, 'dist');
+  assert.equal(identity(), null);
+  write('index.html', 'content-a');
+  write('build-manifest.json', JSON.stringify({ buildId: 'staging-candidate' }));
+  write('asset-manifest.json', JSON.stringify({ files: { 'index.html': hash('content-a') } }));
+  const original = identity(); assert.ok(original);
+  const baseline = { contract: 'world-explorer-source-fingerprint-v2', acceptanceFingerprint: hash('source') };
+  const evidence = { contract: 'world-explorer-execution-evidence-v2', scope: 'candidate', ok: true, baseline, artifactIdentity: original };
+  assert.deepEqual(compareEvidenceToBaseline(evidence, baseline, 'candidate', original), []);
+  assert.match(compareEvidenceToBaseline({ ...evidence, contract: 'world-explorer-execution-evidence-v1' }, baseline, 'candidate', original).join(), /contract/);
+  const priorStat = statSync(path.join(dist, 'index.html'));
+  write('index.html', 'content-b'); // same length, unchanged manifests
+  utimesSync(path.join(dist, 'index.html'), priorStat.atime, priorStat.mtime);
+  assert.equal(identity(), null, 'restoring mtime must not hide modified bytes');
+  write('index.html', 'content-a'); assert.ok(sameArtifactIdentity(identity(), original));
+  write('extra.js', 'unlisted'); assert.equal(identity(), null); rmSync(path.join(dist, 'extra.js'));
+  renameSync(path.join(dist, 'index.html'), path.join(root, 'outside.html'));
+  assert.equal(identity(), null, 'missing file');
+  symlinkSync('../outside.html', path.join(dist, 'index.html')); assert.equal(identity(), null, 'links cannot smuggle mutable external files');
+  rmSync(path.join(dist, 'index.html')); renameSync(path.join(root, 'outside.html'), path.join(dist, 'index.html'));
+  write('build-manifest.json', JSON.stringify({ buildId: 'production-candidate' }));
+  assert.equal(sameArtifactIdentity(original, identity()), false);
+  assert.match(compareEvidenceToBaseline(evidence, baseline, 'candidate', identity()).join(), /artifact/);
   assert.equal(sameArtifactIdentity(null, null), false);
+  assert.equal(sameArtifactIdentity({ ...original, verifiedContentSha256: undefined }, original), false);
 });

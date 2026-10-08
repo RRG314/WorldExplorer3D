@@ -81,3 +81,37 @@ test('road overview and pavement retain separate shader uniforms and retirement 
  road.dispose();assert.equal(shader.uniforms.roadCoverageMaskEnabled.value,0);
  pavement.dispose();
 });
+
+
+for (const order of ['road-first','pavement-first']) test(`coverage layer disposal ${order} never revives a retired shader`,t=>{
+ const {material,ctx,compile}=fixture(t),originalCompile=material.onBeforeCompile,originalKey=material.customProgramCacheKey;
+ const road=createPavementTerrainMask(ctx,['0:0'],{kind:'road',deferUpload:true});
+ const pavement=createPavementTerrainMask(ctx,['0:0'],{deferUpload:true});
+ road.syncMaterials();pavement.syncMaterials();
+ const first=order==='road-first'?road:pavement,second=order==='road-first'?pavement:road;
+ first.dispose();const shader=compile();
+ assert.equal('roadCoverageMaskAtlas' in shader.uniforms,order!=='road-first');
+ assert.equal('pavementMaskAtlas' in shader.uniforms,order==='road-first');
+ second.dispose();assert.equal(material.onBeforeCompile,originalCompile);assert.equal(material.customProgramCacheKey,originalKey);
+});
+
+test('regional and temporary road coverage share one shader owner through late arrival and eviction',async t=>{
+ const {leaseRoadOverview}=await import('../app/js/terrain/road-overview-owner.js');
+ const {material,ctx,compile}=fixture(t),original=material.onBeforeCompile;
+ const fallback=createPavementTerrainMask(ctx,['0:0'],{kind:'road',cellSize:128,deferUpload:true});
+ const fallbackLease=leaseRoadOverview(ctx,fallback,10);
+ const oldUniform=compile().uniforms.roadCoverageMaskAtlas;
+ const regional=createPavementTerrainMask(ctx,['0:0'],{kind:'road',cellSize:256,deferUpload:true});
+ const regionalLease=leaseRoadOverview(ctx,regional,20);
+ const shader=compile();
+ assert.equal(shader.vertexShader.match(/varying vec2 roadCoverageWorldXZ;/g).length,1);
+ assert.equal(shader.uniforms.roadCoverageCellSize.value,256);assert.equal(shader.uniforms.roadCoverageMaskAtlas,oldUniform);
+ assert.match(shader.fragmentShader,/uniform vec3 roadCoverageColor/);
+ fallbackLease.syncMaterials();fallbackLease.setEnabled(false);
+ assert.equal(compile().uniforms.roadCoverageMaskEnabled.value,1,'inactive fallback cannot disable regional coverage');
+ fallbackLease.setEnabled(true);regionalLease.dispose();
+ assert.equal(compile().uniforms.roadCoverageCellSize.value,128,'retiring regional coverage restores a still-live fallback');
+ fallbackLease.dispose();assert.equal(material.onBeforeCompile,original);
+ assert.equal(oldUniform.value,null,'retired shader must not retain the CPU atlas');
+ assert.equal(shader.uniforms.roadCoverageMaskLookup.value,null,'retired lookup must be released too');
+});

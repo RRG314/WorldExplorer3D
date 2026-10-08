@@ -24,31 +24,14 @@ import {
 } from './surface-material-blend.js?v=2';
 import { yieldToMainThread } from '../world/cooperative-scheduling.js?v=1';
 import { scheduleWorldCoverRecovery } from './worldcover-recovery.js';
-import { indexMappedGround } from './mapped-ground-evidence.js';
+import { currentMappedGroundIndex, resetMappedGroundIndex } from './mapped-ground-evidence.js';
 
-let detailedGroundCollection = null;
-let detailedGroundCount = -1;
-let detailedGroundOrigin = '';
-let detailedGroundIndex = null;
 export function resetTerrainSurfaceProfileCache() {
-  detailedGroundCollection = null;
-  detailedGroundCount = -1;
-  detailedGroundOrigin = '';
-  detailedGroundIndex = null;
+  resetMappedGroundIndex(appCtx);
   cachedGroundFallbackMesh = null;
 }
 
-function currentDetailedGroundIndex() {
-  const collection = appCtx.landuses || [];
-  const origin = `${appCtx.LOC?.lat}/${appCtx.LOC?.lon}`;
-  if (collection !== detailedGroundCollection || collection.length !== detailedGroundCount || origin !== detailedGroundOrigin) {
-    detailedGroundOrigin = origin;
-    detailedGroundCollection = collection;
-    detailedGroundCount = collection.length;
-    detailedGroundIndex = indexMappedGround(collection);
-  }
-  return detailedGroundIndex;
-}
+function currentDetailedGroundIndex() { return currentMappedGroundIndex(appCtx); }
 
 const SNOW_COLOR_HEX = 0xffffff; const ALPINE_SNOW_COLOR_HEX = 0xe5ebf2;
 const SAND_COLOR_HEX = 0xd7c08a;

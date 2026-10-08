@@ -1,9 +1,12 @@
+import {readBoundedJson} from './bounded-response.js';
+import {providerResponseError} from './provider-error.js';
 import { createProvenance } from './data-contract.js?v=3';
 import { createProviderRegistry } from './provider-registry.js?v=2';
 
 const DEFAULT_ENDPOINT = '/api/geospatial/aircraft';
 
 function normalizeAircraftRequest(input = {}) {
+  if ([input.lat, input.lon].some(value => !['number', 'string'].includes(typeof value) || (typeof value === 'string' && !value.trim()))) throw new RangeError('Aircraft coordinates are invalid.');
   const lat = Number(input.lat);
   const lon = Number(input.lon);
   if (!Number.isFinite(lat) || lat < -90 || lat > 90) throw new RangeError('Aircraft latitude is invalid.');
@@ -13,14 +16,14 @@ function normalizeAircraftRequest(input = {}) {
   return Object.freeze({ lat, lon, radiusKm, limit });
 }
 
-function normalizeAircraftItem(item, fetchedAt, providerId = 'opensky') {
+function normalizeAircraftItem(item, fetchedAt, providerId = 'adsb-lol') {
   return Object.freeze({
     ...item,
     id: String(item.id || item.icao24 || ''),
     label: String(item.callsign || item.icao24 || 'Aircraft').trim(),
     lat: Number(item.lat),
     lon: Number(item.lon),
-    headingDeg: Number.isFinite(Number(item.headingDeg)) ? Number(item.headingDeg) : 0,
+    headingDeg: item.headingDeg == null ? null : Number.isFinite(Number(item.headingDeg)) ? Number(item.headingDeg) : null,
     altitude: 1.024 + Math.min(0.04, Math.max(0.004, (Number(item.altitudeM) || 0) / 400000)),
     dataSource: providerId,
     provenance: createProvenance({
@@ -34,14 +37,15 @@ function normalizeAircraftItem(item, fetchedAt, providerId = 'opensky') {
 function createAircraftService(options = {}) {
   const endpoint = options.endpoint || DEFAULT_ENDPOINT;
   const fetchImpl = options.fetchImpl || globalThis.fetch?.bind(globalThis);
-  const registry = createProviderRegistry({ maxCacheEntries: 24 });
+  const registry = createProviderRegistry({ now: options.now, maxCacheEntries: 24 });
   if (typeof fetchImpl !== 'function') throw new Error('Aircraft service requires fetch().');
 
   registry.register({
-    id: 'opensky',
-    sourceId: 'opensky',
+    id: 'adsb-lol',
+    sourceId: 'adsb-lol',
     cacheTtlMs: 60 * 1000,
-    timeoutMs: 10000,
+    // Leave room for gateway startup and network transit around its bounded upstream request.
+    timeoutMs: 20000,
     normalizeRequest: normalizeAircraftRequest,
     async query(request, context) {
       const query = new URLSearchParams(Object.entries(request).map(([key, value]) => [key, String(value)]));
@@ -49,11 +53,12 @@ function createAircraftService(options = {}) {
         headers: { Accept: 'application/json' },
         signal: context.signal
       });
-      const payload = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(payload.error || `Aircraft provider failed (${response.status}).`);
+      if (!response.ok) throw providerResponseError(response);
+      const payload = await readBoundedJson(response, 5000000);
+      if (payload.provider !== 'adsb-lol' || !Array.isArray(payload.items)) throw new Error('Aircraft feed source is unavailable.');
       return {
         fetchedAt: payload.fetchedAt,
-        items: (payload.items || []).map((item) => normalizeAircraftItem(item, payload.fetchedAt, payload.provider || 'opensky')),
+        items: (payload.items || []).map((item) => normalizeAircraftItem(item, payload.fetchedAt, payload.provider || 'adsb-lol')),
         warnings: payload.warnings || []
       };
     }
@@ -61,7 +66,7 @@ function createAircraftService(options = {}) {
 
   return Object.freeze({
     search(request, queryOptions = {}) {
-      return registry.query('opensky', request, queryOptions);
+      return registry.query('adsb-lol', request, queryOptions);
     },
     inspect() {
       return registry.snapshot();

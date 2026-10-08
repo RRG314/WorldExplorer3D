@@ -53,11 +53,11 @@ function tangentAtDistance(points, pathDistances, distance) {
   };
 }
 
-function createSampleDistances(totalDistance, sampleStep, exactDistances = []) {
+function createSampleDistances(totalDistance, sampleStep, exactDistances = [], auxiliaryDistances = []) {
   const total = Math.max(0, finiteNumber(totalDistance));
   const step = Math.max(0.5, finiteNumber(sampleStep, DEFAULT_SAMPLE_STEP));
   const segmentCount = Math.max(1, Math.ceil(total / step));
-  const exact = exactDistances
+  const normalize = values => values
     .map((distance) => clamp(finiteNumber(distance, NaN), 0, total))
     // Projection round-off can place an endpoint graph station fractions of
     // a millimetre beside the mathematically identical polyline endpoint.
@@ -67,6 +67,13 @@ function createSampleDistances(totalDistance, sampleStep, exactDistances = []) {
     .filter(Number.isFinite)
     .sort((left, right) => left - right)
     .filter((value, index, values) => index === 0 || Math.abs(value - values[index - 1]) > 0.01);
+  const primary = normalize(exactDistances);
+  // Surface-fit samples and roof edges may lie millimetres beside an exact
+  // transport node. Keep the node's original station: shifting it can make
+  // a feasible design-grade constraint appear impossible to the solver.
+  const secondary = normalize(auxiliaryDistances).filter(distance =>
+    !primary.some(node => Math.abs(node - distance) <= 0.01));
+  const exact = primary.concat(secondary).sort((left, right) => left - right);
   // Exact graph nodes are hard samples. Keeping a regular sample only a few
   // centimetres beside one creates a numerically tiny road segment; a later
   // exact-node assignment then turns an otherwise smooth profile into a
@@ -356,6 +363,15 @@ function applyEndpointTieIns(
   return new Float32Array(corrected);
 }
 
+// Exact joins and obstruction edges add nonuniform sample spacing. An
+// unweighted neighbor mean bends a straight ramp beside every close pair of
+// stations. Interpolate at the actual distance so a constant grade is fixed.
+function neighborProfileHeight(heights, distances, index, leftHeight = heights[index - 1]) {
+  const run = distances[index + 1] - distances[index - 1];
+  const t = run > 1e-9 ? (distances[index] - distances[index - 1]) / run : .5;
+  return leftHeight + (heights[index + 1] - leftHeight) * t;
+}
+
 function reconcileExactGraphNodeConstraints(
   feature,
   heights,
@@ -507,7 +523,7 @@ function reconcileExactGraphNodeConstraints(
       if (fixedTargets.has(index)) continue;
       next[index] = clampToBounds(
         index,
-        corrected[index] * 0.58 + (corrected[index - 1] + corrected[index + 1]) * 0.21
+        corrected[index] * 0.58 + neighborProfileHeight(corrected, distances, index) * 0.42
       );
     }
     corrected.set(next);
@@ -544,7 +560,7 @@ function smoothGradeLimitedProfile(initialHeights, lowerBounds, distances, maxim
   for (let pass = 0; pass < 6; pass += 1) {
     const next = new Float64Array(heights);
     for (let index = 1; index < heights.length - 1; index += 1) {
-      const neighborAverage = (heights[index - 1] + heights[index + 1]) * 0.5;
+      const neighborAverage = neighborProfileHeight(heights, distances, index);
       next[index] = Math.max(
         finiteNumber(lowerBounds?.[index], -Infinity),
         heights[index] * 0.58 + neighborAverage * 0.42
@@ -607,7 +623,7 @@ function smoothSignedCutFillProfile(
     for (let index = 1; index < heights.length - 1; index += 1) {
       const current = heights[index];
       heights[index] = clamp(
-        current * 0.45 + (previous + heights[index + 1]) * 0.275,
+        current * 0.45 + neighborProfileHeight(heights, distances, index, previous) * 0.55,
         lowerBounds[index],
         upperBounds[index]
       );

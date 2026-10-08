@@ -2,6 +2,24 @@ import { normalizeCharacterState } from './model.js?v=1';
 import { PROFICIENCY_RANKS, SPECIALTY_RANKS } from './catalog.js?v=1';
 
 const DIFFICULTY_ORDER = Object.freeze({ basic: 0, intermediate: 1, advanced: 2, expert: 3 });
+const preparedStates=new WeakSet();
+
+// Runtime readers consume a private immutable projection. Journal/reward
+// history stays with persistence and must never be cloned by a frame query.
+function prepareCharacterCapabilities(input) {
+  if(preparedStates.has(input))return input;
+  const source=input&&typeof input==='object'?input:{};
+  const normalized=normalizeCharacterState({
+    characterId:source.characterId,revision:source.revision,attributes:source.attributes,
+    specialties:source.specialties,proficiencies:source.proficiencies,
+    traits:source.traits,qualifications:source.qualifications
+  });
+  const result={characterId:normalized.characterId,revision:normalized.revision,
+    attributes:normalized.attributes,specialties:normalized.specialties,
+    proficiencies:normalized.proficiencies,traits:normalized.traits,qualifications:normalized.qualifications};
+  const freeze=value=>{if(value&&typeof value==='object'){for(const child of Object.values(value))freeze(child);Object.freeze(value);}return value;};
+  freeze(result);preparedStates.add(result);return result;
+}
 
 const CAPABILITY_DEFINITIONS = Object.freeze({
   inspection: Object.freeze({
@@ -132,7 +150,7 @@ function traitAssistance(character, capabilityId) {
 }
 
 function resolveCharacterCapability(input, capabilityId, context = {}) {
-  const character = normalizeCharacterState(input);
+  const character = prepareCharacterCapabilities(input);
   const definition = CAPABILITY_DEFINITIONS[capabilityId];
   if (!definition) return Object.freeze({ allowed: false, capabilityId, reason: 'unknown-capability', requirements: Object.freeze([]), explanations: Object.freeze(['This activity does not have a character capability definition.']) });
   const difficulty = normalizedDifficulty(context.difficulty);
@@ -187,17 +205,26 @@ function resolveCharacterCapability(input, capabilityId, context = {}) {
 
 function createCapabilityResolver() {
   const cache = new Map();
+  let currentCharacter=null,currentValue='';
   return Object.freeze({
-    clear() { cache.clear(); },
+    clear() { cache.clear();currentCharacter=null;currentValue=''; },
     resolve(character, capabilityId, context = {}) {
-      const state = normalizeCharacterState(character);
-      const equipmentKey = (context.equipmentIds || []).map(String).sort().join(',');
-      const key = `${state.characterId}|${state.revision}|${capabilityId}|${normalizedDifficulty(context.difficulty)}|${context.environment || ''}|${context.vehicleAvailable === true}|${equipmentKey}`;
-      if (!cache.has(key)) cache.set(key, resolveCharacterCapability(state, capabilityId, context));
+      const state = prepareCharacterCapabilities(character);
+      if(state!==currentCharacter){
+        const value=JSON.stringify(state);
+        if(value!==currentValue)cache.clear();
+        currentCharacter=state;currentValue=value;
+      }
+      const equipmentIds=[...new Set((Array.isArray(context.equipmentIds)?context.equipmentIds:[]).map(String))].sort();
+      const key=JSON.stringify([capabilityId,normalizedDifficulty(context.difficulty),context.environment||'',context.vehicleAvailable===true,equipmentIds]);
+      if (!cache.has(key)) {
+        if(cache.size>=128)cache.delete(cache.keys().next().value);
+        cache.set(key, resolveCharacterCapability(state, capabilityId, context));
+      }
       return cache.get(key);
     },
     snapshot() { return Object.freeze({ cachedCapabilities: cache.size }); }
   });
 }
 
-export { CAPABILITY_DEFINITIONS, createCapabilityResolver, resolveCharacterCapability };
+export { CAPABILITY_DEFINITIONS, createCapabilityResolver, prepareCharacterCapabilities, resolveCharacterCapability };

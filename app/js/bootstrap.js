@@ -1,4 +1,6 @@
 // ES module bootstrap: modular loader + legacy app compatibility.
+// The runtime binds shell controls, so wait for that module before booting.
+import './app-shell-fragments.js?v=91';
 import {
   classicScripts,
   moduleEntrypoint,
@@ -142,15 +144,8 @@ async function boot() {
         cause: error?.cause || null
       })
     );
-    const loadingText = document.getElementById('loadText');
-    if (loadingText) {
-      loadingText.textContent = 'Failed to load scripts. Check console for details.';
-    }
-    const loading = document.getElementById('loading');
-    if (loading) {
-      loading.classList.add('show');
-    }
-    showStartupDiagnostics('Startup failed before the app booted');
+    globalThis.dispatchEvent(new CustomEvent('we3d:startup-failed'));
+    if (new URLSearchParams(location.search).get('startupDiagnostics') === '1') showStartupDiagnostics('Startup failed before the app booted');
   }
 }
 

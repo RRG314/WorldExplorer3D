@@ -156,3 +156,9 @@ body:has(#urbanVehiclePrompt.show) #discoveryContextPrompt,body:has(#interiorPro
 #sandboxPathGuide>strong{display:block;margin-top:14px}#urbanEquipment>.sandboxPathActions{padding:0 14px}
 
 .sandboxWalletNote{font-size:12px;line-height:1.5;color:#bdd0df;margin:0;padding:8px 14px}
+
+@layer interface {
+  .discoveryIdentity { flex:1 1 0; }
+  .discoveryIdentity > div { min-width:0; }
+  .discoveryMark, .discoveryHeadActions { flex-shrink:0; }
+}

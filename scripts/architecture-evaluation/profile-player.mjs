@@ -43,6 +43,7 @@ let deadline, page;try{
  const start=Date.now();console.log('profile: title');
  await page.goto(`http://127.0.0.1:${server.port}/app/?graphicsDiagnostics=${process.env.WE3D_PROFILE_GRAPHICS==='1'?'1':'0'}&loc=custom&lat=${location.lat}&lon=${location.lon}&lname=${encodeURIComponent(location.name)}&launch=earth&gm=free&mode=walk`,{waitUntil:'domcontentloaded',timeout:90000});
  await page.waitForFunction(()=>globalThis.__WE3D_RUNTIME_READY__===true,null,{timeout:120000});
+ await page.evaluate(async()=>{globalThis.__WE3D_PROFILE_CONTEXT__=(await import('/app/js/shared-context.js?v=55')).ctx;});
  report.titleReadyMs=Date.now()-start;report.titleMetrics=await metrics();
  report.graphics=await page.evaluate(()=>{const c=document.createElement('canvas'),gl=c.getContext('webgl2')||c.getContext('webgl');const e=gl.getExtension('WEBGL_debug_renderer_info');const renderer=e?gl.getParameter(e.UNMASKED_RENDERER_WEBGL):gl.getParameter(gl.RENDERER);gl.getExtension('WEBGL_lose_context')?.loseContext();return renderer;});requireHardwareGraphics(report.graphics);await save();
  if(await page.locator('#analyticsConsentDenyBtn').isVisible())await page.locator('#analyticsConsentDenyBtn').click();
@@ -237,7 +238,7 @@ let deadline, page;try{
     const {ctx}=await import('/app/js/shared-context.js?v=55');const x=4.854101966249685,z=3.526711513754839;
     Object.assign(ctx.car,{x,z,y:ctx.GroundHeight.carCenterY(x,z),speed:0,vFwd:0,vLat:0,vx:0,vy:0,vz:0});
    });
-   await page.waitForFunction(async()=> (await import('/app/js/shared-context.js?v=55')).ctx.urbanSandboxRuntime?.npcs?.length>0,null,{timeout:15000,polling:500});
+   await page.waitForFunction(()=> globalThis.__WE3D_PROFILE_CONTEXT__.urbanSandboxRuntime?.npcs?.length>0,null,{timeout:15000,polling:500});
    await page.waitForTimeout(1500);
    report.populationPresentation.returnGround=await populationPresentation();
    await page.screenshot({path:`${out}/return-ground.png`});await save();
@@ -254,7 +255,7 @@ let deadline, page;try{
   await page.locator('#travelBtn').click();await page.locator('#fPlane').click();await page.mouse.click(640,400);
   const pose=()=>page.evaluate(async()=>(await import('/app/js/shared-context.js?v=55')).ctx.getPlaneSnapshot());
   const before=await pose();await page.keyboard.down('Space');await page.keyboard.down('s');
-  try{await page.waitForFunction(async()=> (await import('/app/js/shared-context.js?v=55')).ctx.getPlaneSnapshot().pitch>=.12,null,{timeout:5000,polling:'raf'});}finally{await page.keyboard.up('s');await page.keyboard.up('Space');}
+  try{await page.waitForFunction(()=> globalThis.__WE3D_PROFILE_CONTEXT__.getPlaneSnapshot().pitch>=.12,null,{timeout:5000,polling:'raf'});}finally{await page.keyboard.up('s');await page.keyboard.up('Space');}
   const after=await pose();report.flightPreparation={before,after};
   if(!(after.pitch>.05&&after.y>before.y&&after.throttle>before.throttle))throw Error('Normal flight input did not establish climb');
   await sample('plane-sustained','Space',90000);await page.screenshot({path:`${out}/plane.png`});

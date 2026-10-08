@@ -1,10 +1,15 @@
+import {validateOceanVoyage} from '../ocean/voyage-store.js';
+import { oceanEntryDecision } from '../ocean/entry-policy.js?v=1';
+import { startOceanExploration } from '../ocean/start-exploration.js';
+import { resolveCoordinateSurfaceEvidence } from './globe-selector/helpers.js?v=9';
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { ENV, getEnv } from "../env.js?v=58";
 import { commitEnvironment } from '../session-coordinator.js?v=2';
-import { createGlobeSelector } from "./globe-selector.js?v=93";
+import { createGlobeSelector } from "./globe-selector.js?v=94";
 import { readSharedExperienceParams } from "./share-links.js?v=64";
 import { prepareTitleEnvironment } from "../planetary/entry.js?v=9";
 import { markFirstPlayReady, scheduleAfterFirstPlay } from '../runtime/workload-policy.js?v=1';
+import {isEarthWorldUsable} from '../earth-core/world-readiness.js';
 import { setupGlobeHub } from './title-screen/globe-hub.js?v=5';
 import {
   clampDetectedCoords,
@@ -39,6 +44,8 @@ function initTitleScreenUi({
     ocean: oceanLaunchToggle
   };
   const sharedExperienceParams = readSharedExperienceParams();
+  let pendingOceanSelection = null;
+  let pendingOceanResume = null;
   let titleLaunchMode = 'earth';
   let globeSelector = null;
   let skipGlobeGateOnce = false;
@@ -355,6 +362,8 @@ function initTitleScreenUi({
   };
 
   appCtx.triggerTitleStart = (options = {}) => {
+    if(titleStartPromise)return titleStartPromise;
+    pendingOceanResume=options.launchMode==='ocean'?validateOceanVoyage(options.voyageResume):null;
     const forcedLaunchMode = ['earth', 'ocean', 'moon', 'mars', 'space'].includes(options?.launchMode)
       ? options.launchMode
       : '';
@@ -392,7 +401,8 @@ function initTitleScreenUi({
       } else if (typeof appCtx.loadRoads === 'function') {
         await ensureEarthWorldRuntime();
         resetTitleEarthTravelMode('globe_location_change');
-        await appCtx.loadRoads();
+        const loaded = await appCtx.loadRoads();
+        if (!isEarthWorldUsable(appCtx, loaded)) return false;
         // loadRoads publishes the world and applies its final arrival once.
         // Do not run a second title-layer spawn over that resolved surface.
         if (!appCtx.boatMode?.active) {
@@ -413,18 +423,20 @@ function initTitleScreenUi({
         arrivalMode: 'boat'
       }, { transient: false });
       if (!appCtx.gameStarted) {
+        pendingOceanSelection = selection;
         setLaunchMode('ocean');
         return appCtx.triggerTitleStart({ bypassCustomGate: true, launchMode: 'ocean' });
       }
       if (typeof appCtx.startOceanMode !== 'function') return false;
       if (typeof appCtx.showTransitionLoad === 'function') await appCtx.showTransitionLoad('ocean', 700);
-      return appCtx.startOceanMode({
+      return startOceanExploration(appCtx,{
         launchSite: {
           lat: Number(selection.lat),
           lon: Number(selection.lon),
           name: String(selection.name || 'Open Ocean'),
           region: 'Selected coordinates'
-        }
+        },
+        entry: selection.oceanEntry
       });
     },
     onMoonShortcut: async () => {
@@ -577,6 +589,7 @@ function initTitleScreenUi({
 
   const runTitleStart = async () => {
     if (appCtx.runtimeReady !== true) return false;
+    const voyageResume=pendingOceanResume;pendingOceanResume=null;
     const forcedLaunchMode = pendingForcedLaunchMode;
     pendingForcedLaunchMode = '';
     const requestedLaunchMode = forcedLaunchMode || Object.entries(launchModeButtons)
@@ -615,6 +628,7 @@ function initTitleScreenUi({
     // transition background while their scene is still being assembled.
     appCtx.showLoad?.(launchLoadingText, {
       mode: requestedLaunchMode,
+      restart: true,
       bold: true,
       overlay: 0.24
     });
@@ -647,8 +661,16 @@ function initTitleScreenUi({
     if (requestedLaunchMode === 'ocean' && typeof appCtx.startOceanMode === 'function') {
       oceanEntryHadEarthWorld = hasLoadedEarthWorld();
       if (typeof appCtx.setBuildModeEnabled === 'function') appCtx.setBuildModeEnabled(false);
-      const selectedOceanLocation = appCtx.resolveLocationSelection?.() || appCtx.customLoc || null;
-      const oceanStarted = appCtx.startOceanMode({
+      const selectedOceanLocation = voyageResume?.site || pendingOceanSelection || appCtx.resolveLocationSelection?.() || appCtx.customLoc || null;
+      pendingOceanSelection = null;
+      let oceanEntry = selectedOceanLocation?.oceanEntry;
+      if (selectedOceanLocation && !oceanEntry && !voyageResume) {
+        const evidence = await resolveCoordinateSurfaceEvidence(Number(selectedOceanLocation.lat), Number(selectedOceanLocation.lon));
+        const decision = oceanEntryDecision({ lat: Number(selectedOceanLocation.lat), lon: Number(selectedOceanLocation.lon) }, evidence);
+        if (!decision.allowed) throw new Error(decision.reason);
+        oceanEntry = decision.entry;
+      }
+      const oceanStarted = await startOceanExploration(appCtx,{
         launchSite: Number.isFinite(Number(selectedOceanLocation?.lat)) && Number.isFinite(Number(selectedOceanLocation?.lon))
           ? {
               lat: Number(selectedOceanLocation.lat),
@@ -656,7 +678,11 @@ function initTitleScreenUi({
               name: String(selectedOceanLocation.name || 'Open Ocean'),
               region: 'Selected coordinates'
             }
-          : undefined
+          : undefined,
+        entry: oceanEntry,
+        voyageResume,
+        submarinePose:voyageResume?.sub,
+        waveOffset:voyageResume?.waveOffset
       });
       if (oceanStarted === false) throw new Error('Ocean mode did not accept the selected coordinates.');
       updateControlsModeUI?.();
@@ -685,33 +711,13 @@ function initTitleScreenUi({
     appCtx.ensureEnginePbrTextures?.();
     commitEnvironment(ENV.EARTH, { source: 'title_earth_start' });
     resetTitleEarthTravelMode('title_earth_start');
-    const explorationMsg = document.getElementById('explorationModeMsg');
-    let explorationMsgTimeout;
-    if (explorationMsg && !isTouchPreferredClient) {
-      explorationMsg.style.display = 'block';
-      explorationMsg.style.opacity = '0';
-      const hideExplorationMsg = () => {
-        if (explorationMsgTimeout) clearTimeout(explorationMsgTimeout);
-        explorationMsg.style.opacity = '0';
-        setTimeout(() => {
-          explorationMsg.style.display = 'none';
-        }, 500);
-      };
-      explorationMsg.addEventListener('click', hideExplorationMsg, { once: true });
-      setTimeout(() => {
-        explorationMsg.style.transition = 'opacity 0.5s';
-        explorationMsg.style.opacity = '1';
-      }, 100);
-      explorationMsgTimeout = setTimeout(() => hideExplorationMsg(), 5000);
-    } else if (explorationMsg) {
-      explorationMsg.style.display = 'none';
-    }
-
-    await appCtx.loadRoads();
-    if(appCtx.worldLoadRuntimeState?.status==='failed') {
+    const earthLoadResult = await appCtx.loadRoads();
+    if (!isEarthWorldUsable(appCtx, earthLoadResult)) {
       appCtx.gameStarted=false;
+      appCtx.hideLoad?.();
+      document.getElementById('titleScreen')?.classList.remove('hidden');
       globeSelector.open();
-      return;
+      return false;
     }
     scheduleAfterFirstPlay('earth-star-catalog', () => appCtx.ensureStarCatalogLoaded?.(), {
       timeout: 1800
@@ -761,6 +767,30 @@ function initTitleScreenUi({
     document.getElementById('fPaths')?.classList.remove('on');
     document.getElementById('fLandUse')?.classList.remove('on');
     document.getElementById('fLandUseRE')?.classList.remove('on');
+    // Announce exploration only after the successful gameplay handoff.
+    const explorationMsg = document.getElementById('explorationModeMsg');
+    let explorationMsgTimeout;
+    if (explorationMsg && !isTouchPreferredClient) {
+      explorationMsg.style.display = 'block';
+      explorationMsg.style.opacity = '0';
+      const hideExplorationMsg = () => {
+        if (explorationMsgTimeout) clearTimeout(explorationMsgTimeout);
+        explorationMsg.removeEventListener('click', hideExplorationMsg);
+        explorationMsg.style.opacity = '0';
+        setTimeout(() => {
+          explorationMsg.style.display = 'none';
+        }, 500);
+      };
+      explorationMsg.addEventListener('click', hideExplorationMsg, { once: true });
+      setTimeout(() => {
+        explorationMsg.style.transition = 'opacity 0.5s';
+        explorationMsg.style.opacity = '1';
+      }, 100);
+      explorationMsgTimeout = setTimeout(() => hideExplorationMsg(), 5000);
+    } else if (explorationMsg) {
+      explorationMsg.style.display = 'none';
+    }
+
     // World publication and all entry-mode setup are complete. A late optional
     // loader may have reasserted the transition overlay after loadRoads hid it;
     // the title launch owns the final handoff to playable input.

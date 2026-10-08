@@ -3,7 +3,6 @@ const DEFLOCK_BALTIMORE_SNAPSHOT = require('./data/deflock-baltimore.json');
 
 const PANORAMAX_API = 'https://panoramax.openstreetmap.fr/api';
 const KARTAVIEW_API = 'https://api.openstreetcam.org/2.0/photo/';
-const OPENSKY_API = 'https://opensky-network.org/api/states/all';
 const ADSB_LOL_API = 'https://api.adsb.lol/v2/point';
 const MEMORY_CACHE = new Map();
 const AIRCRAFT_CACHE = new Map();
@@ -56,36 +55,53 @@ function safeUrl(value, base = '') {
 async function fetchJson(url, options = {}) {
   if (!options.fetchImpl && options.forceIpv4) {
     return new Promise((resolve, reject) => {
+      let settled = false;
+      let deadline;
+      const finish = (callback, value) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(deadline);
+        callback(value);
+      };
+      const fail = error => finish(reject, error);
       const request = https.get(url, {
         family: 4,
         headers: { Accept: 'application/json', 'User-Agent': 'WorldExplorer3D/3.1 geospatial-client' }
       }, (response) => {
         let body = '';
+        let bytes = 0;
         response.setEncoding('utf8');
+        response.on('error', fail);
+        response.on('aborted', () => fail(new Error('Upstream response was interrupted.')));
         response.on('data', (chunk) => {
+          bytes += Buffer.byteLength(chunk);
+          if (bytes > 8 * 1024 * 1024) {
+            request.destroy(new Error('Upstream response exceeded 8 MB.'));
+            return;
+          }
           body += chunk;
-          if (body.length > 8 * 1024 * 1024) request.destroy(new Error('Upstream response exceeded 8 MB.'));
         });
         response.on('end', () => {
           if ((response.statusCode || 500) < 200 || (response.statusCode || 500) >= 300) {
-            reject(new Error(`Upstream HTTP ${response.statusCode || 500}`));
+            fail(new Error(`Upstream HTTP ${response.statusCode || 500}`));
             return;
           }
-          try {
-            resolve(JSON.parse(body));
-          } catch {
-            reject(new Error('Upstream returned invalid JSON.'));
-          }
+          try { finish(resolve, JSON.parse(body)); }
+          catch { fail(new Error('Upstream returned invalid JSON.')); }
         });
       });
-      request.setTimeout(options.timeoutMs || 9000, () => {
+      // A socket inactivity timeout does not bound DNS, connection setup or a
+      // slowly trickling response. Keep one deadline through the complete body.
+      deadline = setTimeout(() => {
         const error = new Error('Upstream request timed out.');
         error.name = 'AbortError';
         request.destroy(error);
-      });
-      request.on('error', reject);
+        fail(error);
+      }, options.timeoutMs || 9000);
+      request.on('error', fail);
     });
   }
+
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), options.timeoutMs || 9000);
   try {
@@ -101,9 +117,10 @@ async function fetchJson(url, options = {}) {
 }
 
 function normalizeAircraftQuery(input = {}) {
-  const lat = numberInRange(input.lat, -90, 90);
-  const lon = numberInRange(input.lon, -180, 180);
-  if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+  const coordinate = value => ['number', 'string'].includes(typeof value) && String(value).trim() ? Number(value) : NaN;
+  const lat = coordinate(input.lat);
+  const lon = coordinate(input.lon);
+  if (!Number.isFinite(lat) || Math.abs(lat) > 90 || !Number.isFinite(lon) || Math.abs(lon) > 180) {
     const error = new Error('Valid aircraft latitude and longitude are required.');
     error.statusCode = 400;
     throw error;
@@ -283,59 +300,32 @@ function aircraftBounds(query) {
   };
 }
 
-function normalizeOpenSkyState(state, query, responseTime) {
-  if (!Array.isArray(state)) return null;
-  const lon = Number(state[5]);
-  const lat = Number(state[6]);
-  const icao24 = String(state[0] || '').trim().toLowerCase();
-  if (!icao24 || !Number.isFinite(lat) || !Number.isFinite(lon)) return null;
-  const observedSeconds = Number(state[3] || state[4] || responseTime);
-  const altitudeM = Number.isFinite(Number(state[13])) ? Number(state[13]) : (Number.isFinite(Number(state[7])) ? Number(state[7]) : null);
-  const velocityKt = Number.isFinite(Number(state[9])) ? Number(state[9]) * 1.943844 : null;
-  return {
-    id: `opensky-${icao24}`,
-    icao24,
-    callsign: String(state[1] || '').trim() || icao24.toUpperCase(),
-    originCountry: String(state[2] || 'Unknown'),
-    observedAt: Number.isFinite(observedSeconds) ? new Date(observedSeconds * 1000).toISOString() : '',
-    lat,
-    lon,
-    altitudeM,
-    onGround: state[8] === true,
-    velocityKt: Number.isFinite(velocityKt) ? Math.round(velocityKt) : null,
-    headingDeg: Number.isFinite(Number(state[10])) ? Number(state[10]) : null,
-    verticalRateMps: Number.isFinite(Number(state[11])) ? Number(state[11]) : null,
-    squawk: String(state[14] || ''),
-    positionSource: Number.isFinite(Number(state[16])) ? Number(state[16]) : null,
-    category: Number.isFinite(Number(state[17])) ? Number(state[17]) : null,
-    distanceKm: Math.round(distanceM(query.lat, query.lon, lat, lon) / 1000)
-  };
-}
-
 function normalizeAdsbLolState(state, query, responseTimeMs) {
-  const lat = Number(state?.lat);
-  const lon = Number(state?.lon);
+  const finite = value => value === null || value === undefined || value === '' ? null : Number.isFinite(Number(value)) ? Number(value) : null;
+  const lat = finite(state?.lat);
+  const lon = finite(state?.lon);
   const icao24 = String(state?.hex || '').replace(/^~/, '').trim().toLowerCase();
-  if (!icao24 || !Number.isFinite(lat) || !Number.isFinite(lon)) return null;
-  const altitudeFt = Number(state.alt_geom ?? state.alt_baro);
-  const seenSeconds = Math.max(0, Number(state.seen_pos ?? state.seen) || 0);
+  if (!/^[a-f0-9]{6}$/.test(icao24) || lat === null || lon === null || Math.abs(lat)>90 || Math.abs(lon)>180) return null;
+  const altitudeFt = finite(state.alt_geom ?? state.alt_baro);
+  const seenSeconds = finite(state.seen_pos ?? state.seen);
+  if (seenSeconds !== null && (seenSeconds < 0 || seenSeconds > 300)) return null;
   return {
     id: `adsblol-${icao24}`,
     icao24,
     callsign: String(state.flight || state.r || icao24).trim(),
     originCountry: '',
-    observedAt: new Date(responseTimeMs - seenSeconds * 1000).toISOString(),
+    observedAt: seenSeconds !== null && seenSeconds >= 0 ? new Date(responseTimeMs - seenSeconds * 1000).toISOString() : '',
     lat,
     lon,
-    altitudeM: Number.isFinite(altitudeFt) ? altitudeFt * 0.3048 : null,
+    altitudeM: altitudeFt !== null ? altitudeFt * 0.3048 : null,
     onGround: state.alt_baro === 'ground',
-    velocityKt: Number.isFinite(Number(state.gs)) ? Math.round(Number(state.gs)) : null,
-    headingDeg: Number.isFinite(Number(state.track)) ? Number(state.track) : null,
-    verticalRateMps: Number.isFinite(Number(state.geom_rate ?? state.baro_rate)) ? Number(state.geom_rate ?? state.baro_rate) * 0.00508 : null,
+    velocityKt: finite(state.gs) !== null ? Math.round(finite(state.gs)) : null,
+    headingDeg: finite(state.track),
+    verticalRateMps: finite(state.geom_rate ?? state.baro_rate) !== null ? finite(state.geom_rate ?? state.baro_rate) * 0.00508 : null,
     squawk: String(state.squawk || ''),
     positionSource: String(state.type || ''),
     category: String(state.category || ''),
-    distanceKm: Number.isFinite(Number(state.dst)) ? Math.round(Number(state.dst) * 1.852) : Math.round(distanceM(query.lat, query.lon, lat, lon) / 1000)
+    distanceKm: finite(state.dst) !== null ? Math.round(finite(state.dst) * 1.852) : Math.round(distanceM(query.lat, query.lon, lat, lon) / 1000)
   };
 }
 
@@ -343,7 +333,8 @@ async function queryAdsbLol(query, options = {}) {
   const radiusNm = Math.max(11, Math.min(250, Math.ceil(query.radiusKm / 1.852)));
   const url = `${ADSB_LOL_API}/${query.lat}/${query.lon}/${radiusNm}`;
   const payload = await fetchJson(url, { ...options, timeoutMs: 9000, forceIpv4: true });
-  const responseTimeMs = Number(payload.now || payload.ctime) || Date.now();
+  const responseTimeMs = Number(payload?.now ?? payload?.ctime);
+  if (!Array.isArray(payload?.ac) || !Number.isFinite(responseTimeMs) || responseTimeMs <= 0 || Math.abs(Date.now()-responseTimeMs)>5*60000) throw new Error('Aircraft feed is malformed or stale.');
   return {
     schemaVersion: 1,
     provider: 'adsb-lol',
@@ -355,7 +346,7 @@ async function queryAdsbLol(query, options = {}) {
       .filter(Boolean)
       .sort((a, b) => a.distanceKm - b.distanceKm)
       .slice(0, query.limit),
-    warnings: ['OpenSky was unavailable; current observations are supplied by ADSB.lol under ODbL.'],
+    warnings: [],
     cache: 'upstream'
   };
 }
@@ -369,30 +360,8 @@ async function queryAircraft(input = {}, options = {}) {
   const key = aircraftCacheKey(query);
   const cached = AIRCRAFT_CACHE.get(key);
   if (!options.force && cached?.expiresAt > Date.now()) return { ...cached.value, cache: 'memory' };
-  const bounds = aircraftBounds(query);
-  const url = new URL(OPENSKY_API);
-  Object.entries({ ...bounds, extended: 1 }).forEach(([name, value]) => url.searchParams.set(name, String(value)));
-  let value;
-  try {
-    const payload = await fetchJson(url.href, { ...options, timeoutMs: 9000, forceIpv4: true });
-    const responseTime = Number(payload.time) || Math.floor(Date.now() / 1000);
-    value = {
-      schemaVersion: 1,
-      provider: 'opensky',
-      fetchedAt: new Date(responseTime * 1000).toISOString(),
-      query,
-      bounds,
-      items: (payload.states || [])
-        .map((state) => normalizeOpenSkyState(state, query, responseTime))
-        .filter(Boolean)
-        .sort((a, b) => a.distanceKm - b.distanceKm)
-        .slice(0, query.limit),
-      warnings: [],
-      cache: 'upstream'
-    };
-  } catch (openSkyError) {
-    value = await queryAdsbLol(query, options);
-  }
+  // The public ODbL feed requires no operational-use contract or subscription.
+  const value = await queryAdsbLol(query, options);
   AIRCRAFT_CACHE.set(key, { value, expiresAt: Date.now() + AIRCRAFT_CACHE_TTL_MS });
   while (AIRCRAFT_CACHE.size > 24) AIRCRAFT_CACHE.delete(AIRCRAFT_CACHE.keys().next().value);
   return value;
@@ -576,7 +545,7 @@ function buildGeospatialExports({ functions, setCors }) {
       } catch (error) {
         const status = Number(error?.statusCode) || (error?.name === 'AbortError' ? 504 : 502);
         console.warn('[getAircraftStates] request failed:', error?.message || error);
-        res.status(status).json({ error: status === 504 ? 'OpenSky timed out.' : (error?.message || 'Aircraft observations unavailable.') });
+        res.status(status).json({ error: status === 504 ? 'Aircraft provider timed out.' : (error?.message || 'Aircraft observations unavailable.') });
       }
     })
   };
@@ -589,7 +558,6 @@ module.exports = {
   normalizeDeFlockQuery,
   normalizeAircraftQuery,
   normalizeAdsbLolState,
-  normalizeOpenSkyState,
   normalizeQuery,
   queryAircraft,
   queryDeFlockCameras,

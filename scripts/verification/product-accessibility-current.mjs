@@ -1,0 +1,5 @@
+import fs from 'node:fs/promises';import {tmpdir} from 'node:os';import path from 'node:path';import {spawn} from 'node:child_process';import assert from 'node:assert/strict';import {stagingCaptureAttestation} from './staging-capture-attestation.mjs';
+const privateDir=await fs.mkdtemp(path.join(tmpdir(),'we3d-product-accessibility-'));let identity;
+try{identity=await stagingCaptureAttestation();const credential=path.join(privateDir,'attestation.json');await fs.writeFile(credential,JSON.stringify({projectId:'we3d-staging-20260712',appId:'1:524178734996:web:f59acbc9014f0e26f51981',expiresAt:new Date(Date.now()+1800000).toISOString(),token:identity.token}),{mode:0o600});
+const child=spawn(process.execPath,['scripts/verification/accessibility-release.mjs'],{stdio:'inherit',env:{...process.env,WE3D_STAGING_APP_CHECK_FILE:credential,WE3D_PLACE_LOOKUP_EMULATOR_ORIGIN:'http://127.0.0.1:5001',WE3D_VERIFY_ROOT:process.cwd()}});const code=await new Promise((resolve,reject)=>{child.on('error',reject);child.on('exit',resolve)});assert.equal(code,0);
+}finally{await identity?.cleanup();await fs.rm(privateDir,{recursive:true,force:true});}

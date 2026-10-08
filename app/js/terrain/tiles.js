@@ -29,9 +29,18 @@ import {
 } from './tile-request-lifecycle.js?v=1';
 
 const TERRAIN_TILE_CACHE_LIMIT = 72;
+// Detailed sources (including shared edges), regional sources and parent
+// fallbacks may coexist during compilation. Sampling never admits a tile;
+// explicit loading has a separate absolute ceiling, including pending images.
+const TERRAIN_TILE_REQUEST_LIMIT = 192;
+const TERRAIN_BOUNDS_REQUEST_CONCURRENCY = 8;
+let terrainCacheGeneration = 0;
 const TERRAIN_TILE_MAX_ATTEMPTS = 3;
 const TERRAIN_TILE_RETRY_BASE_MS = 300;
 const TERRAIN_TILE_ATTEMPT_TIMEOUT_MS = 2400;
+// Direct mesh loaders also await tile.ready, without the retry-wait wrapper.
+// Every admitted source must settle even if Image dispatches neither event.
+const TERRAIN_TILE_SOURCE_TIMEOUT_MS = 10000;
 const terrainTileLifetime = { failures: 0, retries: 0, recovered: 0 };
 const recentTerrainFailures = new Map();
 const TERRAIN_FAILURE_HISTORY_MS = 30000;
@@ -55,6 +64,12 @@ const INVALID_TERRAIN_TILE = Object.freeze({
   lastUsedAt: 0
 });
 
+const REQUEST_BUDGET_TERRAIN_TILE = Object.freeze({
+  ...INVALID_TERRAIN_TILE,
+  key: 'request-budget',
+  lastError: 'terrain source working set is full'
+});
+
 function terrainNow() {
   return typeof globalThis.performance?.now === "function" ? globalThis.performance.now() : Date.now();
 }
@@ -65,7 +80,9 @@ function touchTerrainTile(tile) {
 }
 
 function failTerrainTileAttempt(tile, reason) {
-  if (!tile || tile.evicted || tile.failed) return;
+  if (!tile || tile.evicted || tile.failed || !tile.loading) return;
+  clearTimeout(tile.attemptTimer);tile.attemptTimer=null;
+  if(tile.img){tile.img.onload=null;tile.img.onerror=null;tile.img.src='';}
   tile.polarAbort?.abort();
   tile.loaded = false;
   tile.loading = false;
@@ -80,9 +97,11 @@ function failTerrainTileAttempt(tile, reason) {
     recentTerrainFailures.delete(recentTerrainFailures.keys().next().value);
   }
   tile.resolveReady?.(false);
+  tile.resolveReady=null;
 }
 
 function startTerrainTileAttempt(tile, z, x, y, deps) {
+  clearTimeout(tile.attemptTimer);tile.attemptTimer=null;
   const img = new Image();
   const attempt = tile.attempts + 1;
   let resolveReady;
@@ -102,11 +121,11 @@ function startTerrainTileAttempt(tile, z, x, y, deps) {
   const polarRequest = fetchPolarElevationTile(z, x, y, {
     signal: tile.polarAbort.signal,
     priority: Math.hypot(x - selectedTile.x, y - selectedTile.y) + Math.max(0, 15 - z) * 100,
-    onError: error => { tile.polarError = error; }
+    onError: error => { if(!tile.evicted&&tile.attempts===attempt)tile.polarError=error; }
   });
 
   img.onload = async () => {
-    if (tile.evicted || tile.attempts !== attempt) {
+    if (tile.evicted || tile.failed || tile.attempts !== attempt) {
       resolveReady(false);
       return;
     }
@@ -128,6 +147,7 @@ function startTerrainTileAttempt(tile, z, x, y, deps) {
       const merged = mergePolarElevation(elev, polar);
       tile.polarMask = merged?.mask || null;
       tile.polarSampleCount = merged?.count || 0;
+      clearTimeout(tile.attemptTimer);tile.attemptTimer=null;
       tile.loaded = true;
       tile.loading = false;
       tile.failed = false;
@@ -136,6 +156,8 @@ function startTerrainTileAttempt(tile, z, x, y, deps) {
       if (tile.recovered) terrainTileLifetime.recovered += 1;
       recentTerrainFailures.delete(tile.key);
       touchTerrainTile(tile);
+      resolveReady(true);
+      tile.resolveReady=null;
 
       if (appCtx.terrainGroup && typeof deps.reapplyTerrainMeshHeights === "function") {
         appCtx.terrainGroup.children.forEach((mesh) => {
@@ -152,13 +174,19 @@ function startTerrainTileAttempt(tile, z, x, y, deps) {
         });
       }
 
-      resolveReady(true);
     } catch (error) {
+      if(tile.evicted||tile.attempts!==attempt){resolveReady(false);return;}
       console.warn("Terrain tile decode failed:", z, x, y, error);
       failTerrainTileAttempt(tile, error);
     }
   };
-  img.onerror = () => failTerrainTileAttempt(tile, "terrain tile image request failed");
+  img.onerror = () => {
+    if(!tile.evicted&&tile.attempts===attempt)failTerrainTileAttempt(tile,"terrain tile image request failed");
+  };
+  const sourceTimeout=isPolarElevationTile(z,x,y)?11000:TERRAIN_TILE_SOURCE_TIMEOUT_MS;
+  tile.attemptTimer=setTimeout(()=>{
+    if(!tile.evicted&&tile.attempts===attempt)failTerrainTileAttempt(tile,`terrain tile source timed out after ${sourceTimeout}ms`);
+  },sourceTimeout);
   img.src = appCtx.TERRAIN_TILE_URL(z, x, y);
   return tile;
 }
@@ -187,6 +215,9 @@ export function getOrLoadTerrainTile(z, x, y, deps = {}) {
     return cached;
   }
 
+  if (appCtx.terrainTileCache.size >= TERRAIN_TILE_REQUEST_LIMIT) {
+    return REQUEST_BUDGET_TERRAIN_TILE;
+  }
   const recentFailure = recentTerrainFailures.get(key);
   const initialAttempts = recentFailure && terrainNow() - recentFailure.failedAt <= TERRAIN_FAILURE_HISTORY_MS
     ? Math.min(TERRAIN_TILE_MAX_ATTEMPTS, Number(recentFailure.attempts) || 0)
@@ -254,6 +285,7 @@ export function terrainTileCacheSnapshot() {
     cachedRecovered,
     elevationBytes,
     limit: TERRAIN_TILE_CACHE_LIMIT,
+    requestLimit: TERRAIN_TILE_REQUEST_LIMIT,
     maxAttempts: TERRAIN_TILE_MAX_ATTEMPTS
   };
 }
@@ -261,6 +293,7 @@ export function terrainTileCacheSnapshot() {
 function releaseTerrainTile(tile) {
   if (!tile) return;
   tile.evicted = true;
+  clearTimeout(tile.attemptTimer);tile.attemptTimer=null;
   tile.resolveReady?.(false);
   tile.resolveReady = null;
   if (tile.img) {
@@ -277,6 +310,7 @@ function releaseTerrainTile(tile) {
 }
 
 export function clearTerrainTileCache() {
+  terrainCacheGeneration += 1;
   const before = terrainTileCacheSnapshot();
   appCtx.terrainTileCache.forEach(releaseTerrainTile);
   appCtx.terrainTileCache.clear();
@@ -296,6 +330,15 @@ export function pruneTerrainTileCache(limit = TERRAIN_TILE_CACHE_LIMIT) {
   appCtx.terrainGroup?.children?.forEach?.((mesh) => {
     const key = mesh?.userData?.terrainTileKey;
     if (key) protectedKeys.add(key);
+    const tile = mesh?.userData?.terrainTile;
+    if (tile) {
+      const n = 2 ** tile.z;
+      for (let dx = 0; dx <= 1; dx += 1) {
+        for (let dy = 0; dy <= 1; dy += 1) {
+          if (tile.ty + dy < n) protectedKeys.add(`${tile.z}/${(tile.tx + dx) % n}/${tile.ty + dy}`);
+        }
+      }
+    }
   });
   const candidates = [...appCtx.terrainTileCache.entries()]
     .filter(([key, tile]) => !protectedKeys.has(key) && (tile?.loaded || tile?.failed))
@@ -312,8 +355,10 @@ export function pruneTerrainTileCache(limit = TERRAIN_TILE_CACHE_LIMIT) {
 }
 
 function waitForTerrainTileReady(z, x, y, deadline, deps, options = {}) {
+  const generation = terrainCacheGeneration;
   return waitForTerrainTileRequest({
     z, x, y, deadline, deps, signal: options.signal,
+    isActive: () => generation === terrainCacheGeneration,
     getOrLoadTerrainTile, failTerrainTileAttempt, terrainNow,
     cancelTile: (tileZ, tileX, tileY) => cancelTileRequest(appCtx.terrainTileCache, tileZ, tileX, tileY),
     maxAttempts: TERRAIN_TILE_MAX_ATTEMPTS,
@@ -361,15 +406,23 @@ export async function waitForTerrainReadyBounds(bounds, timeoutMs = 6000, deps =
     for (let x = 0; x <= southEast.x; x += 1) xValues.push(x);
   }
   const deadline = terrainNow() + Math.max(0, Number(timeoutMs) || 0);
-  const waits = [];
-  xValues.forEach((x) => {
-    for (let y = minY; y <= maxY; y += 1) {
-      waits.push(waitForTerrainTileReady(zoom, x, y, deadline, deps));
+  const count = xValues.length * (maxY - minY + 1);
+  // This entry point prepares the detailed district, not a global DEM. Refuse
+  // an oversized window before issuing requests instead of allocating an
+  // unbounded Promise/image set or pretending partial coverage is ready.
+  if (count === 0 || count > TERRAIN_TILE_CACHE_LIMIT) return false;
+  const generation = terrainCacheGeneration;
+  let next = 0;
+  let ready = true;
+  await Promise.all(Array.from({ length: Math.min(TERRAIN_BOUNDS_REQUEST_CONCURRENCY, count) }, async () => {
+    while (next < count && generation === terrainCacheGeneration) {
+      const index = next++;
+      const x = xValues[Math.floor(index / (maxY - minY + 1))];
+      const y = minY + index % (maxY - minY + 1);
+      if (!await waitForTerrainTileReady(zoom, x, y, deadline, deps)) ready = false;
     }
-  });
-  if (waits.length === 0) return false;
-  const results = await Promise.all(waits);
-  return results.every(Boolean);
+  }));
+  return ready && next === count && generation === terrainCacheGeneration;
 }
 
 export function sampleTileElevationMeters(tile, u, v, clampElevationMeters = null) {
@@ -413,37 +466,18 @@ export function worldToLatLon(x, z) {
 
 export function elevationMetersAtLatLon(lat, lon, deps = {}) {
   const t = latLonToTileXY(lat, lon, appCtx.TERRAIN_ZOOM);
-  const tile = getOrLoadTerrainTile(appCtx.TERRAIN_ZOOM, t.x, t.y, deps);
-  if (!tile.loaded) return null;
+  const tile = peekTerrainTile(appCtx.TERRAIN_ZOOM, t.x, t.y);
+  if (!tile?.loaded) return null;
 
   const u = t.xf - t.x;
   const v = t.yf - t.y;
   return sampleTileElevationMeters(tile, u, v, deps.clampElevationMeters);
 }
 
+// Height queries are reads. Only publication/readiness owners request sources;
+// a vegetation/physics/diagnostic query must never start network work.
 export function terrainSourceSampleAtLatLon(lat, lon, deps = {}) {
-  const preflight = adaptTerrariumTileSample({
-    latitude: lat,
-    longitude: lon,
-    zoom: appCtx.TERRAIN_ZOOM,
-    tile: null
-  });
-  if (preflight.status === "outside-coverage") return preflight;
-  const tilePoint = latLonToTileXY(lat, lon, appCtx.TERRAIN_ZOOM);
-  const tile = getOrLoadTerrainTile(
-    appCtx.TERRAIN_ZOOM,
-    tilePoint.x,
-    tilePoint.y,
-    deps
-  );
-  return adaptTerrariumTileSample({
-    latitude: lat,
-    longitude: lon,
-    zoom: appCtx.TERRAIN_ZOOM,
-    tile,
-    sourceFacts: polarSourceAt(tile, tilePoint.xf - tilePoint.x, tilePoint.yf - tilePoint.y) || undefined,
-    clampElevationMeters: deps.clampElevationMeters
-  });
+  return peekTerrainSourceSampleAtLatLon(lat, lon, deps);
 }
 
 export function peekTerrainSourceSampleAtLatLon(lat, lon, deps = {}) {

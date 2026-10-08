@@ -1,3 +1,5 @@
+import {urbanTargetOverlapsHeight} from './vertical-contact.js';
+import { bindPlayerConditionAuthority } from './player-condition-binding.js';
 import {createServiceLightPool} from './service-light-pool.js';
 import {urbanPresentationFocus, urbanPresentationDistance, setRetainedNpcPresentation} from './presentation-focus.js';
 import { setDomText, setDomAttribute, setDomHidden, setDomClass } from '../ui/dom-state.js?v=1';
@@ -369,13 +371,13 @@ function updateCrashBodies(state, dt) {
     const nextZ = vehicle.z + motion.velocityZ / metersPerWorldUnit * step;
     const secondaryTarget = [
       ...state.vehicles.filter((entry) => entry !== vehicle && !entry.attachedToPlayer && Number(entry.condition ?? 1) > .05).map((entry) => ({
-        kind: 'vehicle', ref: entry, x: entry.x, z: entry.z,
+        kind: 'vehicle', ref: entry, x: entry.x, y: entry.y, z: entry.z,
         radius: Math.max(.78, Number(entry.variant?.width || 1.8) * .5)
       })),
       ...state.npcs.filter((entry) => Number(entry.condition ?? 1) > .05).map((entry) => ({
-        kind: 'npc', ref: entry, x: entry.x, z: entry.z, radius: .42
+        kind: 'npc', ref: entry, x: entry.x, y: entry.y, z: entry.z, radius: .42
       }))
-    ].find((target) => Math.hypot(Number(target.x) - nextX, Number(target.z) - nextZ) < target.radius + Math.max(.78, Number(vehicle.variant?.width || 1.8) * .5));
+    ].find((target) => urbanTargetOverlapsHeight(target,vehicle.y-VEHICLE_ROOT_TO_GROUND_METERS,Number(vehicle.variant?.height)||1.8) && Math.hypot(Number(target.x) - nextX, Number(target.z) - nextZ) < target.radius + Math.max(.78, Number(vehicle.variant?.width || 1.8) * .5));
     const secondaryKey = secondaryTarget ? `${vehicle.id}:${secondaryTarget.kind}:${secondaryTarget.ref.id}` : '';
     const lastSecondary = Number(state.secondaryCrashCooldowns.get(secondaryKey) || 0);
     if (secondaryTarget && at - lastSecondary > 700) {
@@ -555,7 +557,10 @@ function resolveUrbanActorCollision(from = {}, to = {}, options = {}) {
   const source = { x: Number(from.x) || 0, z: Number(from.z) || 0 };
   const destination = { x: Number(to.x) || 0, z: Number(to.z) || 0 };
   const travelDistance = Math.hypot(destination.x - source.x, destination.z - source.z);
-  const targets = urbanCollisionTargets(state, destination, Math.max(mode === 'drive' ? 12 : 5, travelDistance + VEHICLE_COLLISION_FLEET_RADIUS + actorRadius));
+  const actorBaseY=Number.isFinite(options.actorBaseY)?options.actorBaseY:mode==='drive'?appCtx.car?.y-1.2:appCtx.Walk?.state?.walker?.y;
+  const actorHeight=Number.isFinite(options.actorHeight)?options.actorHeight:1.8;
+  const targets = urbanCollisionTargets(state, destination, Math.max(mode === 'drive' ? 12 : 5, travelDistance + VEHICLE_COLLISION_FLEET_RADIUS + actorRadius))
+    .filter(target=>urbanTargetOverlapsHeight(target,actorBaseY,actorHeight));
   const blockerAlong = (start, end) => {
     const dx = end.x - start.x;
     const dz = end.z - start.z;
@@ -1415,7 +1420,7 @@ function maintainNearbyVehicleDetails(state) {
   if (!activeWorldMatches(state) || state.transition) return;
   const actor = urbanPresentationFocus(appCtx.activeEarthActorPosition?.(), civicActorPosition(state));
   if (!actor) return;
-  const snapshots = state.population?.vehicleSnapshots?.() || [];
+  const snapshots = state.population?.vehiclePresentationSnapshots?.() || [];
   const byId = new Map(snapshots.map((snapshot) => [snapshot.id, snapshot]));
   const existingDetails = state.vehicles.filter((vehicle) => vehicle.ambientTraffic === true);
   for (const vehicle of existingDetails) {
@@ -2787,6 +2792,9 @@ function disposeRuntime(state, reason = 'disposed') {
   state.npcs.length = 0;
   state.curatedNpcAssetOwners.clear();
   state.pickups.length = 0;
+  // Borrowed population is valid only during this world. Retired visual
+  // callbacks must not retain the traffic sampler and all source geometry.
+  state.population = null;
   state.activeVehicle = null;
   state.civic?.clear?.();
   if (appCtx.isUrbanParachuteDeployed === state.isParachuteDeployed) delete appCtx.isUrbanParachuteDeployed;
@@ -3042,12 +3050,7 @@ function startUrbanSandboxRuntime(options = {}) {
     remoteEntities: new Map(),
     roomAuthorityRuntime: null
   };
-  Object.defineProperty(state, 'playerCondition', {
-    configurable: true,
-    enumerable: true,
-    get: () => state.playerConditionAuthority.snapshot().condition,
-    set: (value) => { state.playerConditionAuthority.set(value, 'urban-runtime'); }
-  });
+  bindPlayerConditionAuthority(state);
   void state.commerce.recoverPending?.((service, receiptId) => applyPoiService(state, service, receiptId)).then((result) => {
     if (result?.recovered > 0 && activeWorldMatches(state)) {
       setStatus(state, `${result.recovered} Explorer Wallet service ${result.recovered === 1 ? 'receipt' : 'receipts'} recovered.`, 2600);
@@ -3232,6 +3235,11 @@ function startUrbanSandboxRuntime(options = {}) {
     return true;
   };
   state.onEquipmentSlotClick = (event) => {
+    const pageButton = event.target?.closest?.('[data-backpack-page]');
+    if (pageButton && state.equipmentUi.contents?.contains(pageButton)) {
+      state.equipmentRuntime?.changePage?.(pageButton.dataset.backpackPage);
+      return;
+    }
     const button = event.target?.closest?.('[data-equipment-id]');
     if (!button || !state.equipmentUi.root.contains(button)) return;
     state.equipmentRuntime?.inspectItem?.(button.dataset.equipmentId);
@@ -3270,8 +3278,13 @@ function startUrbanSandboxRuntime(options = {}) {
   storeUi.close?.addEventListener('click', state.onStoreClose);
   storeUi.root?.addEventListener('click', state.onStoreAction);
   document.addEventListener('keydown', state.onStoreKeyDown);
-  state.unsubscribeBackpack = state.equipment.subscribe(() => {
-    backpackStore.save(state.equipment.exportState());
+  const controlsOnlyReasons = new Set(['ammunition-reloaded','ammunition-added','quantity-added','equipment-consumed','equipped-changed','hotbar-changed']);
+  state.unsubscribeBackpack = state.equipment.subscribe(change => {
+    const saved = controlsOnlyReasons.has(change.reason)
+      ? backpackStore.saveControls(state.equipment.exportControls())
+      : backpackStore.save(state.equipment.exportState());
+    if (!saved && !state.backpackSaveFailed) setStatus(state, 'Backpack changes could not be saved. Keep this tab open until browser storage is available.', 8000);
+    state.backpackSaveFailed = !saved;
     if (activeWorldMatches(state)) renderEquipment(state);
   });
   backpackStore.save(state.equipment.exportState());
@@ -3336,7 +3349,7 @@ function startUrbanSandboxRuntime(options = {}) {
     state.parachute.automaticEquip = options.autoEquip === true;
     if (options.autoEquip === true && state.equipment.has?.('parachute')) {
       state.equipment.equip?.('parachute');
-      state.backpackStore.save(state.equipment.exportState());
+      state.backpackStore.saveControls(state.equipment.exportControls());
       state.equipmentRuntime?.render?.();
       setStatus(state, 'Parachute ready · press Space while descending to deploy.', 2600);
     } else {
@@ -3390,8 +3403,10 @@ function startUrbanSandboxRuntime(options = {}) {
 function handleWalletReconnect() {
   if (activeRuntime) setStatus(activeRuntime, 'Explorer Wallet is reconnecting.', 2200);
 }
-function handlePlayerStateReconnect() {
-  if (activeRuntime) setStatus(activeRuntime, 'Explorer health and upgrades are reconnecting.', 2200);
+function handlePlayerStateReconnect(error) {
+  if (activeRuntime) setStatus(activeRuntime,
+    error?.code === 'condition-storage-unavailable' ? error.message : 'Explorer health and upgrades are reconnecting.',
+    error?.code === 'condition-storage-unavailable' ? 8000 : 2200);
 }
 function refreshActiveEquipment() { if (activeRuntime) renderEquipment(activeRuntime); }
 

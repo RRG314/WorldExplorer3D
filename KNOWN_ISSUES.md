@@ -1,15 +1,16 @@
 # Known Issues and Limitations
 
-Last reviewed: 2026-09-28. Production runs 5.3.0; the local visual-quality
-update targets 5.4.0 and has not been released.
+Last reviewed: October 8, 2026, for the 5.5 update. These are known product
+limits, not a promise that every location or device has been validated.
+The [GitHub releases](https://github.com/RRG314/WorldExplorer3D/releases) identify
+published versions.
 
 ## Release acceptance and visual coverage
 
-- Physical-phone responsiveness has not yet been accepted on the current visual-quality branch.
+- The owner reports that the preview works, including an earlier Android check.
+  Named-device responsiveness, battery, thermal and resume measurements remain unverified for 5.5.
   Emulated touch layouts and software-rendered browser journeys are functional
   evidence, not hardware frame-rate, battery or thermal measurements.
-- The production research handler and required indexes are deployed. The
-  visual-quality update still requires final package and performance acceptance.
 - Licensed ship furnishings replace major placeholders, but galley appliances,
   hydroponics, thermal/life-support equipment, exercise/EVA fittings and parts
   of fabrication still use simpler custom geometry. Art detail is not uniform.
@@ -19,17 +20,21 @@ update targets 5.4.0 and has not been released.
 - Research currently offers a limited set of measurements and fabrication
   outcomes; broader experiments and expedition consequences remain planned.
 
-- Current full-game performance evidence still exceeds the existing memory
-  budget and misses some frame-rate and travel-transition targets. Component
-  improvements do not establish a whole-game performance pass.
+- Some full-game performance targets remain unmet, particularly frame pacing
+  and travel transitions. Component improvements do not establish consistent
+  responsiveness across locations and devices.
 - Historic sites and regional vegetation are not uniformly complete. Dedicated
   landmark geometry, mapped footprints and inferred buildings require visual
   ownership checks; generic detail must not cover a landmark.
 
 ## Location and map coverage
 
-- Earth is a location-based experience. Each session loads one bounded selected
-  area; player movement does not turn it into a continuously streaming world.
+- Detailed Earth roads, interiors and activities remain within the selected
+  location. Optional regional terrain and mapped buildings follow travel, but
+  do not extend those gameplay systems. New scenery depends on map availability;
+  a slow connection or fast aircraft can outrun loading. The previous complete
+  region remains visible during retries. Polar and projection-edge travel is
+  not supported by this regional view.
 - Roads, buildings, building heights, roofs, entrances, indoor details,
   vegetation and water depend on available mapped data. Coverage and freshness
   vary by location and provider.
@@ -47,16 +52,33 @@ update targets 5.4.0 and has not been released.
 
 ## Roads and structures
 
+- Generalized map data can omit road widths and sidewalk boundaries. Those
+  dimensions are inferred where missing; curb placement can differ from the
+  real street, even when the road and pedestrian surfaces connect correctly.
 - Bridges, ramps, elevated roads, overpasses and tunnels depend on mapped
   structure, layer and connection tags. Incomplete source tagging or provider
   timing can produce a shorter or less detailed structure than the real one.
 - Road and structure geometry is intended for exploration gameplay, not
   turn-by-turn navigation, engineering, surveying or safety-critical use.
+- Some portal-adjacent crossings, retaining walls and complex junctions remain
+  visually rough. Passing a drivable route does not establish professional
+  visual quality for every bridge and tunnel.
 - Very narrow service roads and unusually complex multi-level junctions can
   leave limited clearance for larger vehicles.
 - Airport runways, aprons, terminals, gates, and towers use available map data.
   The shared airport experience fills missing playable details, but its shape
   and scale may differ from the real airport when mapping is incomplete.
+
+## Ocean exploration
+
+- Ocean entry, deck walking, swimming, automatic scuba, submarine deployment and
+  recovery share a vessel journey. The ocean scene is bounded; it is not a
+  continuously populated simulation of the entire ocean.
+- The research vessel still uses custom geometry. A licensed replacement with
+  a fully traversable layout, richer wildlife, deeper ecology and additional
+  activities remain planned. Spearfishing is not included.
+- Water support and effects are gameplay approximations. Swimmer animation,
+  vessel motion and underwater presentation still need art and tuning work.
 
 ## Performance and compatibility
 

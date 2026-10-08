@@ -332,10 +332,14 @@ async function walkToPoint(target, options = {}) {
 }
 
 async function interiorOwnershipSnapshot(targetKey) {
-  return page.evaluate((key) => {
+  return page.evaluate(async (key) => {
+    const {ctx}=await import('/app/js/shared-context.js?v=55');
     const diagnostics = globalThis.getWorldExplorerRuntimeDiagnostics?.() || {};
     const active = diagnostics.interior || { active: false };
     const actor = diagnostics.activeActor || {};
+    const colliders=ctx.dynamicBuildingColliders || [];
+    if(!active.active&&!globalThis.__interiorExteriorBaseline)globalThis.__interiorExteriorBaseline=colliders.slice();
+    const baseline=globalThis.__interiorExteriorBaseline || [];
     return {
       active: active.active === true,
       key: active?.key || null,
@@ -350,6 +354,7 @@ async function interiorOwnershipSnapshot(targetKey) {
       interactionKinds: Array.isArray(active?.interactions) ? active.interactions.map((entry) => entry.kind) : [],
       walkSurfaceCount: Number(active?.walkSurfaceCount || 0),
       colliderCount: Number(active?.colliderCount || 0),
+      exteriorColliderReferencesRestored: colliders.length===baseline.length&&colliders.every((entry,index)=>entry===baseline[index]),
       buildingCollisionDisabled: active?.buildingCollisionDisabled === true,
       promptVisible: document.querySelector('#interiorPrompt')?.classList.contains('show') === true,
       promptText: document.querySelector('#interiorPrompt')?.textContent || '',
@@ -648,6 +653,7 @@ try {
     const bounds = element.getBoundingClientRect();
     return { left: bounds.left, right: bounds.right, top: bounds.top, bottom: bounds.bottom };
   });
+  const mobileExteriorBefore = await interiorOwnershipSnapshot(target.sourceBuildingId);
   const mobileEntryLayout = await mobileInteriorPromptLayout();
   await tapVisibleInteriorPrompt();
   await page.waitForFunction(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().interior?.active === true, null, { timeout: 30_000 });
@@ -707,12 +713,12 @@ try {
       elevatorPickerUp.some((choice) => choice.current && choice.level === 0 && /Here/.test(choice.label)) &&
       elevatorPickerUp.some((choice) => choice.level === stairTraversal.targetLevel && /↑/.test(choice.label)),
     contextualKeyboardExit: afterExit.active === false && distanceRestored < 0.6,
-    exteriorOwnershipRestored: afterExit.colliderCount === 0 && afterExit.buildingCollisionDisabled === false,
+    exteriorOwnershipRestored: afterExit.colliderCount === exteriorBefore.colliderCount && afterExit.exteriorColliderReferencesRestored && afterExit.buildingCollisionDisabled === false,
     mobilePromptFitsViewport: mobileEnterBounds.left >= 0 && mobileEnterBounds.right <= 390 &&
       mobileEnterBounds.top >= 0 && mobileEnterBounds.bottom <= 844,
     mobilePromptKeepsControlsClear: mobileEntryLayout.ok && mobileInsideLayout.ok,
     contextualTouchEntryExitRecovery: mobileEntered.active === true && mobileExited.active === false &&
-      mobileExited.colliderCount === 0 && mobileReentered.active === true && mobileReentered.key === target.key,
+      mobileExited.colliderCount === mobileExteriorBefore.colliderCount && mobileExited.exteriorColliderReferencesRestored && mobileReentered.active === true && mobileReentered.key === target.key,
     reloadTearsDownInterior: afterReload.diagnostics.active === false,
     noBrowserErrors: browserErrors.length === 0,
     noFailedLocalResources: localFailures.length === 0
@@ -738,6 +744,7 @@ try {
     afterExit,
     mobileEnterBounds,
     mobileEntryLayout,
+    mobileExteriorBefore,
     mobileInsideLayout,
     mobileTarget,
     mobileApproach,

@@ -1,3 +1,4 @@
+import {publishHarborDistrict,harborDistrictFocus} from './harbor-district.js';
 import {yieldToWorldFrame} from './cooperative-scheduling.js?v=1';
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import {disposeVegetationBatch,renderVegetationModelsCooperatively} from './vegetation-models.js';
@@ -498,7 +499,7 @@ function trafficControlPlacements(mappedFurnitureNodes = [], roads = appCtx.road
 }
 
 export function generateStreetFurniture(options = {}) {
-  try { return publishStreetFurniture(options); }
+  try { const result=publishStreetFurniture(options); publishHarborDistrict(appCtx,{THREE,registerLamp:registerStreetLamp}); return result; }
   finally { roadsideResolver = null; }
 }
 
@@ -509,12 +510,18 @@ function publishStreetFurniture(options = {}) {
   roadsideResolver = createRoadsidePlacementResolver(appCtx.roads || [], { blocked: fixtureObstacleAt });
 
   const budget = getStreetFurnitureBudget();
+  const focus=activeFurnitureReference()||{x:0,z:0},harbor=harborDistrictFocus(appCtx);
+  const distance=p=>Math.min(Math.hypot(p.x-focus.x,p.z-focus.z),harbor?Math.hypot(p.x-harbor.x,p.z-harbor.z):Infinity);
+  const segmentDistance=(a,b)=>{const dx=b.x-a.x,dz=b.z-a.z,len=dx*dx+dz*dz;return Math.min(...[focus,harbor].filter(Boolean).map(p=>{const t=len?Math.max(0,Math.min(1,((p.x-a.x)*dx+(p.z-a.z)*dz)/len)):0;return Math.hypot(a.x+t*dx-p.x,a.z+t*dz-p.z)}));};
+  // Spend finite furniture budgets around playable streets, not provider order.
+  const orderedRoads=(appCtx.roads||[]).map(road=>({road,distance:(road.pts||[]).reduce((best,p,i,pts)=>Math.min(best,i?segmentDistance(pts[i-1],p):distance(p)),Infinity)})).filter(r=>r.distance<700).sort((a,b)=>a.distance-b.distance).map(r=>r.road);
+
   const semanticPlacements = trafficControlPlacements(options.mappedFurnitureNodes);
   const orderedPlacements = [...semanticPlacements].sort((left, right) => {
     const leftControl = left.kind === 'traffic_signal' || left.kind === 'stop_sign';
     const rightControl = right.kind === 'traffic_signal' || right.kind === 'stop_sign';
     if (leftControl !== rightControl) return leftControl ? -1 : 1;
-    return Math.hypot(left.x, left.z) - Math.hypot(right.x, right.z);
+    return distance(left)-distance(right);
   });
   const publishedTrafficControls = [];
   let totalControls = 0, totalLamps = 0, totalTrash = 0;
@@ -566,7 +573,7 @@ function publishStreetFurniture(options = {}) {
   const signSpacing = budget.signSpacing;
   const signedRoads = new Set();
   let totalSigns = 0;
-  appCtx.roads.forEach((road) => {
+  orderedRoads.forEach((road) => {
     if (totalSigns >= budget.maxSignsTotal) return;
     if (!isGroundRoad(road)) return;
     if (!road.name || road.name === road.type.charAt(0).toUpperCase() + road.type.slice(1)) return;
@@ -579,6 +586,7 @@ function publishStreetFurniture(options = {}) {
       if (totalSigns >= budget.maxSignsTotal) break;
       const p1 = road.pts[i];
       const p2 = road.pts[i + 1];
+      if(segmentDistance(p1,p2)>700)continue;
       const segLen = Math.hypot(p2.x - p1.x, p2.z - p1.z);
       distAccum += segLen;
 
@@ -606,7 +614,7 @@ function publishStreetFurniture(options = {}) {
   refreshWorldCoverVegetation();
 
   const lampSpacing = budget.lampSpacing;
-  appCtx.roads.forEach((road) => {
+  orderedRoads.forEach((road) => {
     if (totalLamps >= budget.maxLampsTotal) return;
     if (road.width < budget.minLampRoadWidth) return;
     let distAccum = 0;
@@ -614,6 +622,7 @@ function publishStreetFurniture(options = {}) {
       if (totalLamps >= budget.maxLampsTotal) break;
       const p1 = road.pts[i];
       const p2 = road.pts[i + 1];
+      if(segmentDistance(p1,p2)>700)continue;
       const segLen = Math.hypot(p2.x - p1.x, p2.z - p1.z);
       distAccum += segLen;
 
@@ -731,6 +740,8 @@ export function flushWorldCoverVegetationRefresh() {
 export function resetWorldFurnitureCaches() {
   resetStreetLampFixtures();
   appCtx.trafficControlPlacements = [];
+  appCtx.harborDistrictPresentation = null;
+  appCtx.harborDistrictPlanting = [];
   roadsideResolver = null;
   vegetationRefreshRevision++;
   vegetationFocus = null;

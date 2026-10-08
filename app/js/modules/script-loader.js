@@ -2,6 +2,9 @@ const DEFAULT_SCRIPT_TIMEOUT_MS = 12000;
 const inFlightClassicScripts = new Map();
 
 export function loadClassicScript(src, options = {}) {
+  // DOM script.src is absolute. Use the same identity for local and absolute
+  // callers so reopening a viewer cannot reload THREE or its extensions.
+  src = new URL(src, document.baseURI).href;
   const timeoutMs =
     Number.isFinite(options.timeoutMs) && options.timeoutMs > 0
       ? options.timeoutMs

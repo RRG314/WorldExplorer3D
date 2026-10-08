@@ -143,6 +143,7 @@ function drawWaterLayers(ctx, w, h, isLarge, worldToScreen, mx, my) {
   if (!(appCtx.waterAreas.length > 0 || appCtx.waterways.length > 0)) return;
 
   const viewPad = isLarge ? 100 : 45;
+  const projected = {};
 
   if (appCtx.waterAreas.length > 0) {
     ctx.save();
@@ -157,7 +158,7 @@ function drawWaterLayers(ctx, w, h, isLarge, worldToScreen, mx, my) {
       let inView = false;
       ctx.beginPath();
       area.pts.forEach((pt, idx) => {
-        const pos = worldToScreen(pt.x, pt.z);
+        const pos = worldToScreen(pt.x, pt.z, projected);
         if (Math.abs(pos.x - mx) < w / 2 + viewPad && Math.abs(pos.y - my) < h / 2 + viewPad) {
           inView = true;
         }
@@ -187,7 +188,7 @@ function drawWaterLayers(ctx, w, h, isLarge, worldToScreen, mx, my) {
       );
       ctx.beginPath();
       way.pts.forEach((pt, idx) => {
-        const pos = worldToScreen(pt.x, pt.z);
+        const pos = worldToScreen(pt.x, pt.z, projected);
         if (Math.abs(pos.x - mx) < w / 2 + viewPad && Math.abs(pos.y - my) < h / 2 + viewPad) {
           inView = true;
         }

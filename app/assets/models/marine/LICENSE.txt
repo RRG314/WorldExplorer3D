@@ -1,0 +1,14 @@
+Smithsonian Institution, National Museum of Natural History
+CC0 1.0 — https://creativecommons.org/publicdomain/zero/1.0/
+API rights statement: https://3d-api.si.edu/api-docs/
+Policy: https://www.si.edu/openaccess/faq
+Converted from Draco to self-contained GLB; scaled to 2 m maximum extent; base aligned with museum mounts cropped and cut embedded into authored rock; simplified near/far meshes. Runtime living-colony colors are authored. These specimens are shape references, not field observations at the game site.
+
+Madrepora spicifera (USNM 244)
+https://3d-api.si.edu/content/document/3d_package:debebbb8-f7ee-4a6d-941c-12ea01dec71a/usnm_244-20k-thumb.glb
+
+Madrepora formosa (USNM 292)
+https://3d-api.si.edu/content/document/3d_package:03d6b38a-bf7d-4334-90c9-1f7b4c3041a9/USNM_292-20k-thumb.glb
+
+Porites lobata (USNM 646)
+https://3d-api.si.edu/content/document/3d_package:010228bb-75de-4fff-a848-c70584ce1087/USNM_646-20k-thumb.glb

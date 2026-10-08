@@ -87,12 +87,11 @@ function getMapReferencePosition() {
   return appCtx.Walk ? appCtx.Walk.getMapRefPosition(appCtx.droneMode, appCtx.drone) : { x: appCtx.car.x, z: appCtx.car.z };
 }
 
-function worldToLatLon(worldX, worldZ) {
-  if (typeof appCtx.worldToGeo === 'function') return appCtx.worldToGeo(worldX, worldZ);
-  return {
-    lat: appCtx.LOC.lat - worldZ / appCtx.SCALE,
-    lon: appCtx.LOC.lon + worldX / (appCtx.SCALE * Math.cos(appCtx.LOC.lat * Math.PI / 180))
-  };
+function worldToLatLon(worldX, worldZ, result = {}) {
+  if (typeof appCtx.worldToGeo === 'function') return appCtx.worldToGeo(worldX, worldZ, result);
+  result.lat = appCtx.LOC.lat - worldZ / appCtx.SCALE;
+  result.lon = appCtx.LOC.lon + worldX / (appCtx.SCALE * Math.cos(appCtx.LOC.lat * Math.PI / 180));
+  return result;
 }
 
 function resolveMinimapCenter(actorRef, zoom) {
@@ -107,21 +106,24 @@ function resolveMinimapCenter(actorRef, zoom) {
 
 function createLatLonToScreenProjector(view) {
   const { zoom, centerTileX, centerTileY, pixelOffsetX, pixelOffsetY, mx, my } = view;
-  return (lat, lon) => {
+  return (lat, lon, result = {}) => {
     const n = Math.pow(2, zoom);
     const xt = (lon + 180) / 360 * n;
     const yt = (1 - Math.log(Math.tan(lat * Math.PI / 180) + 1 / Math.cos(lat * Math.PI / 180)) / Math.PI) / 2 * n;
     const px = (xt - centerTileX) * 256 - pixelOffsetX;
     const py = (yt - centerTileY) * 256 - pixelOffsetY;
-    return { x: mx + px, y: my + py };
+    result.x = mx + px;
+    result.y = my + py;
+    return result;
   };
 }
 
 function createWorldToScreenProjector(view) {
   const latLonToScreen = createLatLonToScreenProjector(view);
-  return (worldX, worldZ) => {
-    const { lat, lon } = worldToLatLon(worldX, worldZ);
-    return latLonToScreen(lat, lon);
+  const geographic = {};
+  return (worldX, worldZ, result) => {
+    const { lat, lon } = worldToLatLon(worldX, worldZ, geographic);
+    return latLonToScreen(lat, lon, result);
   };
 }
 

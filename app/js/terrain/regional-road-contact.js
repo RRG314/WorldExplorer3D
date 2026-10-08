@@ -20,6 +20,7 @@ export function createRegionalRoadContact(base) {
   };
   return {
     add(key,index){if(regions.has(key))throw new Error(`Duplicate road contact region ${key}`);regions.set(key,index);},
+    remove(key){const index=regions.get(key);if(!index)return false;regions.delete(key);index.dispose();return true;},
     stats(){const total={regions:regions.size};for(const index of [base,...regions.values()])for(const [key,value] of Object.entries(index.stats()))total[key]=(total[key]||0)+value;return total;},
     sampleAt(x,z,referenceY=NaN,mode=null){
       let best=null;

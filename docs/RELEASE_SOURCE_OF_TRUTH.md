@@ -1,5 +1,56 @@
 # Release source identities
 
+## Current observation — October 8, 2026
+
+The production frontend remains **5.4.0+1532bdfbb5c1.319d215f60318297.production**,
+source **1532bdfbb5c11e002d278b058d1ebdba88384f60**. The next compatible release is
+5.5.0 on `steven/visual-quality`. Stable, Pages and the public release remain unpromoted.
+
+The hosted preview and local dist are `5.5.0+4413d5d9b2ce.d69c6d4fb5e9fe9c.staging`,
+source `4413d5d9b2ce01369a5bf8bde7a2d584c68bd243`. The source passes 2,158 tests;
+the immutable package passes all 29 normal world checks and the added regional
+arrival/return/failure/recovery/retirement/settings journey. Four prescribed
+source keyboard-flight bursts pass. Hosted build and asset manifests match local
+bytes. Ordinary Chrome verification is blocked by the locked Mac, so the earlier
+016537ce ordinary-startup result does not certify this new artifact.
+
+The release gate rejects promotion because complete matching execution and external
+acceptance evidence are still missing. Production remains 5.4; stable, public
+Pages and the v5.5.0 release have not been promoted. The 016537ce package, compatible
+37a fallback, live production and unique 0e snapshot remain retained. Only the
+verified, pushed, superseded 7099 generated payload was removed; its manifests and
+cleanup receipt remain saved.
+
+Production has 80 ACTIVE Functions. Place/environmental data version 1 and
+aircraft version 5 were deployed first, preserving all 11 existing parameters.
+An audit of the actual downloaded production source then identified 77 older
+packages. Those have now been updated; all 80 deployed packages match all 36
+tracked backend code/configuration files. The tested Firestore ocean-presence
+additions are live; Storage rules are unchanged. Two IAM lookup errors reported
+by the CLI were reconciled against already-correct live permissions.
+
+Actual production protocol checks pass for shared marine authority, ocean
+presence, condition-save idempotency and legacy compatibility, discovery receipts
+and account isolation. Their temporary accounts and private fixtures were removed
+and verified absent. This is hosted HTTP/rules evidence, not an ordinary complete
+player journey. Staging aircraft version 6 is ACTIVE. Provider-cache expiration
+policies are ACTIVE as of 22:06 UTC. The exact live frontend's preserved
+`release-54-1532` channel retains Hosting version `f8a50a498fe78123` through
+November 6 at 22:26:58 UTC; both manifest bytes match live. This is separate
+from the reviewed save-compatible 37a fallback.
+
+The earlier accepted package's three-stage save/fallback/return and packaged live weather
+and ocean UI checks pass. Public-use rights, deployed provider-source identity and
+attribution are reviewed. The earlier 91-gate candidate run completed with 83 passes and eight failures.
+The source now includes an additional regional-arrival gate. Matching full release
+verification and ordinary-hosted, physical-device and fresh-player evidence remain
+open; targeted scenery checks are not whole-release acceptance.
+
+See [current state](../CURRENT-STATE.md) and
+[finite release gates](product-audit/2026-10-01/RELEASE-ACCEPTANCE.md).
+
+## Historical September 28 receipt
+
 Verified September 28, 2026 from hosted manifests and deployment results.
 A version label or URL parameter alone does not identify deployed code.
 

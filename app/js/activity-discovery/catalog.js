@@ -1,3 +1,5 @@
+import {earthCoordinateFrame} from '../earth-core/coordinate-frame.js?v=1';
+import {buildHarborWalk} from './harbor-walk.js';
 import { ctx as appCtx } from '../shared-context.js?v=55';
 import {
   createDefaultAnchorDraft,
@@ -59,14 +61,8 @@ function currentReferencePose() {
   };
 }
 
-function worldToGeo(worldX, worldZ) {
-  const scale = finiteNumber(appCtx.SCALE, 1);
-  const refLat = finiteNumber(appCtx.LOC?.lat, 0);
-  const refLon = finiteNumber(appCtx.LOC?.lon, 0);
-  return {
-    lat: refLat - finiteNumber(worldZ, 0) / scale,
-    lon: refLon + finiteNumber(worldX, 0) / Math.max(0.0001, scale * Math.cos(refLat * Math.PI / 180))
-  };
+function worldToGeo(x, z) {
+  return earthCoordinateFrame(appCtx.LOC, appCtx.SCALE).toGeographic(x, z);
 }
 
 function distanceToRef(ref, point) {
@@ -514,7 +510,9 @@ function buildCreatorActivities(ref) {
 
 function buildActivityCatalog() {
   const ref = currentReferencePose();
+  const harborWalk = buildHarborWalk(appCtx);
   const items = [
+    ...(harborWalk ? [buildActivityRecord(harborWalk, ref)] : []),
     ...buildGeneratedActivities(ref),
     ...buildRoomActivities(ref)
   ];

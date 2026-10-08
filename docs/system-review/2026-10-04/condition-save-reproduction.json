@@ -1,0 +1,22 @@
+{
+  "source": "919888ec31984b59f4da16c3a93936e5ded86e1f",
+  "scope": "Actual connected-player-state module in VM with controlled auth/subscription/timer/transport dependencies. Not a hosted persistence test.",
+  "scenario": "First .9-condition write is in flight. New .4 change is queued. First write rejects before the newer timer fires.",
+  "observedWrites": [
+    {
+      "condition": 0.9,
+      "reason": "first-damage"
+    },
+    {
+      "condition": 0.9,
+      "reason": "first-damage"
+    }
+  ],
+  "expectedLatestCondition": 0.4,
+  "newerConditionDropped": true,
+  "errors": [
+    "Controlled network failure"
+  ],
+  "snapshotPendingAfterFailure": false,
+  "retryTimersRemaining": 0
+}

@@ -10,6 +10,8 @@ const TRUTH_TYPES = Object.freeze([
 ]);
 
 const DATA_SOURCES = Object.freeze({
+  'caltrans-cameras': Object.freeze({id:'caltrans-cameras',label:'Caltrans CWWP',operator:'California Department of Transportation',truthType:'observed',licenseId:'caltrans-conditions',licenseUrl:'https://dot.ca.gov/conditions-of-use',homepage:'https://cwwp2.dot.ca.gov/',description:'Caltrans-owned regional road-camera stills from districts 3 and 4. Capture timestamps unavailable; metadata timestamps are not image age.'}),
+  'digitraffic-cameras': Object.freeze({id:'digitraffic-cameras',label:'Fintraffic / digitraffic.fi',operator:'Fintraffic',truthType:'observed',licenseId:'CC-BY-4.0',licenseUrl:'https://creativecommons.org/licenses/by/4.0/',homepage:'https://www.digitraffic.fi/en/road-traffic/',description:'Timestamped road-weather still images in Finland. Catalogue counts are not online-image guarantees.'}),
   'usgs-cngm-surface': Object.freeze({
     id:'usgs-cngm-surface',label:'USGS Cooperative National Geologic Map · surface units',
     operator:'USGS and contributing geological surveys',truthType:'reference',
@@ -39,23 +41,30 @@ const DATA_SOURCES = Object.freeze({
     homepage: 'https://earthquake.usgs.gov/earthquakes/feed/',
     description: 'Observed earthquake events from the USGS GeoJSON feed.'
   }),
-  'open-meteo': Object.freeze({
-    id: 'open-meteo',
-    label: 'Open-Meteo',
-    operator: 'Open-Meteo',
-    truthType: 'modeled',
-    licenseId: 'provider-terms',
-    homepage: 'https://open-meteo.com/',
-    description: 'Current and forecast weather assembled from numerical weather models.'
+  'met-norway': Object.freeze({
+    id:'met-norway', label:'MET Norway', operator:'Norwegian Meteorological Institute', truthType:'modeled',
+    licenseId:'CC-BY-4.0', licenseUrl:'https://creativecommons.org/licenses/by/4.0/', homepage:'https://api.met.no/',
+    description:'Hourly Locationforecast guidance, rounded coordinates and converted wind units; symbols mapped to weather categories. Not station observations.'
   }),
-  'open-meteo-marine': Object.freeze({
-    id: 'open-meteo-marine',
-    label: 'Open-Meteo Marine',
-    operator: 'Open-Meteo',
-    truthType: 'modeled',
-    licenseId: 'provider-terms',
-    homepage: 'https://open-meteo.com/en/docs/marine-weather-api',
-    description: 'Global wave, current, sea-temperature, and modeled sea-level guidance.'
+  'public-marine': Object.freeze({
+    id:'public-marine', label:'PacIOOS waves · HYCOM / FNMOC ocean', operator:'PacIOOS and HYCOM / FNMOC', truthType:'modeled',
+    licenseId:'free-public-model-data', homepage:'https://www.pacioos.hawaii.edu/waves/model-global/',
+    description:'Independent public numerical models. Each field retains its model grid and valid time; missing cells remain unavailable.'
+  }),
+  'pacioos-ww3': Object.freeze({
+    id:'pacioos-ww3', label:'PacIOOS WAVEWATCH III', operator:'Pacific Islands Ocean Observing System', truthType:'modeled',
+    licenseId:'free-use-and-redistribution', licenseUrl:'https://pae-paha.pacioos.hawaii.edu/erddap/info/ww3_global/index.html',
+    homepage:'https://www.pacioos.hawaii.edu/waves/model-global/', description:'Hourly global half-degree wave/swell guidance. Coverage ends at 77.5° north/south; land cells may be missing.'
+  }),
+  'noaa-ww3': Object.freeze({
+    id:'noaa-ww3', label:'NOAA WAVEWATCH III via NSF Unidata', operator:'NOAA / NCEP; hosted by NSF Unidata', truthType:'modeled',
+    licenseId:'us-government-work', licenseUrl:'https://www.weather.gov/disclaimer', homepage:'https://tds.scigw.unidata.ucar.edu/thredds/catalog/grib/NCEP/WW3/Global/catalog.html',
+    description:'Fallback combined waves, primary direction/period and wind-wave height. Half-degree grid and three-hour valid times; separate swell partitions unavailable.'
+  }),
+  'hycom-espc': Object.freeze({
+    id:'hycom-espc', label:'HYCOM / FNMOC ESPC', operator:'Fleet Numerical Meteorology and Oceanography Center', truthType:'modeled',
+    licenseId:'freely-available', licenseUrl:'https://tds.hycom.org/thredds/catalogs/GLBy0.08/latest.html?dataset=GLBy0.08-latest',
+    homepage:'https://www.hycom.org/', description:'Surface current vectors converted to speed and toward-bearing; sea temperature at the model grid. No inferred tide or MSL datum.'
   }),
   'noaa-coops-observations': Object.freeze({
     id: 'noaa-coops-observations',
@@ -95,16 +104,6 @@ const DATA_SOURCES = Object.freeze({
     homepage: 'https://kartaview.org/',
     description: 'Timestamped, geolocated community street imagery.'
   }),
-  opensky: Object.freeze({
-    id: 'opensky',
-    label: 'OpenSky Network',
-    operator: 'The OpenSky Network',
-    truthType: 'observed',
-    licenseId: 'OpenSky terms',
-    licenseUrl: 'https://opensky-network.org/about/terms-of-use',
-    homepage: 'https://opensky-network.org/',
-    description: 'Current aircraft state vectors derived from ADS-B and Mode S observations.'
-  }),
   'adsb-lol': Object.freeze({
     id: 'adsb-lol',
     label: 'ADSB.lol',
@@ -113,7 +112,7 @@ const DATA_SOURCES = Object.freeze({
     licenseId: 'ODbL-1.0',
     licenseUrl: 'https://opendatacommons.org/licenses/odbl/1-0/',
     homepage: 'https://www.adsb.lol/',
-    description: 'Current community-fed ADS-B observations used when OpenSky is unavailable.'
+    description: 'Current community-fed aircraft observations supplied by the open ODbL API.'
   }),
   'transport-reference': Object.freeze({
     id: 'transport-reference',
@@ -161,6 +160,7 @@ function getDataSource(sourceId) {
 }
 
 function finiteCoordinate(value, min, max, label) {
+  if (!['number', 'string'].includes(typeof value) || (typeof value === 'string' && !value.trim())) throw new RangeError(`${label} is invalid.`);
   const number = Number(value);
   if (!Number.isFinite(number) || number < min || number > max) {
     throw new RangeError(`${label} must be between ${min} and ${max}.`);

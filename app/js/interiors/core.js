@@ -1,3 +1,4 @@
+import {earthCoordinateFrame} from '../earth-core/coordinate-frame.js?v=1';
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { buildingLabel, pointToSegmentDistance } from "../building-entry.js?v=9";
 import {
@@ -31,10 +32,7 @@ export function isWalkModeActive() {
 }
 
 export function worldToGeo(x, z) {
-  const lat = finiteNumber(appCtx.LOC?.lat, 0) - z / Math.max(1, finiteNumber(appCtx.SCALE, 1));
-  const cosLat = Math.cos(lat * Math.PI / 180) || 1;
-  const lon = finiteNumber(appCtx.LOC?.lon, 0) + x / (Math.max(1, finiteNumber(appCtx.SCALE, 1)) * cosLat);
-  return { lat, lon };
+  return earthCoordinateFrame(appCtx.LOC, appCtx.SCALE).toGeographic(x, z);
 }
 
 export function parseLevelValue(raw) {

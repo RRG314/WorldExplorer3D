@@ -1,5 +1,27 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
 
+const terrainMapCache = new WeakMap();
+function terrainMapRaster(surface,onMars) {
+  const geometry=surface.geometry;
+  const cached=terrainMapCache.get(geometry);
+  if(cached?.version===geometry.attributes.position.version)return cached;
+  geometry.computeBoundingBox();
+  const bounds=geometry.boundingBox,positions=geometry.attributes.position;
+  const width=(geometry.parameters.widthSegments||144)+1,height=(geometry.parameters.heightSegments||640)+1;
+  const canvas=document.createElement('canvas');canvas.width=width;canvas.height=height;
+  const context=canvas.getContext('2d'),pixels=context.createImageData(width,height);
+  const relief=Math.max(1,bounds.max.y-bounds.min.y);
+  for(let i=0;i<positions.count;i++) {
+    const x=Math.round((positions.getX(i)-bounds.min.x)/(bounds.max.x-bounds.min.x)*(width-1));
+    const z=Math.round((positions.getZ(i)-bounds.min.z)/(bounds.max.z-bounds.min.z)*(height-1));
+    const shade=.28+.65*(positions.getY(i)-bounds.min.y)/relief,offset=(z*width+x)*4;
+    pixels.data[offset]=Math.round((onMars?190:205)*shade);
+    pixels.data[offset+1]=Math.round((onMars?120:205)*shade);
+    pixels.data[offset+2]=Math.round((onMars?84:200)*shade);pixels.data[offset+3]=255;
+  }
+  context.putImageData(pixels,0,0);const result={canvas,bounds,version:positions.version};terrainMapCache.set(geometry,result);return result;
+}
+
 function drawMoonMap(ctx, w, h, isLarge) {
   const surface = appCtx.onMars ? appCtx.marsSurface : appCtx.onMoon ? appCtx.moonSurface : null;
   if (!surface) {
@@ -13,30 +35,11 @@ function drawMoonMap(ctx, w, h, isLarge) {
   const centerX = appCtx.Walk && appCtx.Walk.state.mode === "walk" ? appCtx.Walk.state.walker.x : appCtx.car.x;
   const centerZ = appCtx.Walk && appCtx.Walk.state.mode === "walk" ? appCtx.Walk.state.walker.z : appCtx.car.z;
   const mapRange = isLarge ? (onMars ? 6500 : 2000) : (onMars ? 1600 : 500);
-  const geometry = surface.geometry;
-  const positions = geometry.attributes.position;
-  const colors = geometry.attributes.color;
-  const pixelSize = w / (mapRange * 2);
-
-  for (let i = 0; i < positions.count; i += 1) {
-    const x = positions.getX(i);
-    const z = positions.getZ(i);
-    const dx = x - centerX;
-    const dz = z - centerZ;
-
-    if (Math.abs(dx) < mapRange && Math.abs(dz) < mapRange) {
-      const screenX = dx / mapRange * (w / 2) + w / 2;
-      const screenZ = dz / mapRange * (h / 2) + h / 2;
-      const elevation = positions.getY(i);
-      const shade = Math.max(0, Math.min(1, onMars ? (elevation + 120) / 1100 : 0.5));
-      const r = colors ? Math.floor(colors.getX(i) * 255) : Math.round(92 + shade * 116);
-      const g = colors ? Math.floor(colors.getY(i) * 255) : Math.round(38 + shade * 54);
-      const b = colors ? Math.floor(colors.getZ(i) * 255) : Math.round(27 + shade * 40);
-
-      ctx.fillStyle = `rgb(${r},${g},${b})`;
-      ctx.fillRect(screenX, screenZ, Math.max(2, pixelSize), Math.max(2, pixelSize));
-    }
-  }
+  const raster=terrainMapRaster(surface,onMars),bounds=raster.bounds;
+  const sx=w/(mapRange*2),sz=h/(mapRange*2);
+  ctx.drawImage(raster.canvas,(bounds.min.x+surface.position.x-centerX)*sx+w/2,
+    (bounds.min.z+surface.position.z-centerZ)*sz+h/2,
+    (bounds.max.x-bounds.min.x)*sx,(bounds.max.z-bounds.min.z)*sz);
 
   drawMoonCompass(ctx, w, isLarge);
   drawMoonPlayer(ctx, w, h);

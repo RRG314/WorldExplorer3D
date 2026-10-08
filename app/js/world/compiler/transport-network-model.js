@@ -223,7 +223,13 @@ function sampleCompiledSurface(feature, distance) {
   return finite(heights[index]) + (finite(heights[index + 1]) - finite(heights[index])) * t;
 }
 
-function metricConnectionCompatible(leftDescriptor, rightDescriptor, leftDistance, segmentT, distanceAlong, snapDistance) {
+function projectedFeatureEndpoint(descriptor, segmentIndex, segmentT) {
+  if (segmentIndex === 0 && segmentT <= 0.001) return 'start';
+  if (segmentIndex === descriptor.points.length - 2 && segmentT >= 0.999) return 'end';
+  return 'interior';
+}
+
+function metricConnectionCompatible(leftDescriptor, rightDescriptor, leftDistance, rightEndpoint, distanceAlong, snapDistance) {
   const leftFeature = leftDescriptor.feature;
   const rightFeature = rightDescriptor.feature;
   if (!verticalCompatible(leftFeature, rightFeature)) {
@@ -238,7 +244,8 @@ function metricConnectionCompatible(leftDescriptor, rightDescriptor, leftDistanc
     // cross-mode tie-in is still valid at a near-exact ramp endpoint, but a
     // generic nearby crossing is not topology.
     return snapDistance <= 0.35 &&
-      (segmentT <= 0.001 || segmentT >= 0.999 || featureIsLink(leftFeature) || featureIsLink(rightFeature));
+      (rightEndpoint !== 'interior' ||
+        (featureIsLink(leftFeature) && roadFamily(leftFeature) === roadFamily(rightFeature)));
   }
   if (leftFeature?.structureSemantics?.terrainMode === 'at_grade') return true;
   const leftY = sampleCompiledSurface(leftFeature, leftDistance);
@@ -579,11 +586,10 @@ function compileTransportNetworkModel(features = [], options = {}) {
           projected.x - endpoint.point.x,
           projected.z - endpoint.point.z
         );
-        const projectedEndpoint = segmentT <= 0.001
-          ? 'start'
-          : segmentT >= 0.999
-            ? 'end'
-            : 'interior';
+        // A polyline vertex is an endpoint of its *segment*, not necessarily
+        // of the route. Treating every vertex as a portal joined surface
+        // streets to underground roads passing beneath them.
+        const projectedEndpoint = projectedFeatureEndpoint(candidate.descriptor, candidate.segmentIndex, segmentT);
         const conflatedEndpoint = distance <= crossProviderTolerance &&
           crossProviderEndpointCompatible(
             descriptor,
@@ -635,7 +641,7 @@ function compileTransportNetworkModel(features = [], options = {}) {
           descriptor,
           candidate.descriptor,
           endpoint.endpoint === 'start' ? 0 : descriptor.totalDistance,
-          segmentT,
+          projectedEndpoint,
           candidateDistanceAlong,
           distance
         )) continue;
@@ -666,11 +672,7 @@ function compileTransportNetworkModel(features = [], options = {}) {
               (match.generalizedNamedRouteGap && match.segmentT > 0.001 && match.segmentT < 0.999)) &&
           match !== nearestExpandedInterior
         ) continue;
-        const otherEndpoint = match.segmentT <= 0.001
-          ? 'start'
-          : match.segmentT >= 0.999
-            ? 'end'
-            : 'interior';
+        const otherEndpoint = projectedFeatureEndpoint(match.candidate.descriptor, match.candidate.segmentIndex, match.segmentT);
         const left = {
           featureId: descriptor.featureId,
           endpoint: endpoint.endpoint,

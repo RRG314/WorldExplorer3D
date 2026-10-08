@@ -55,6 +55,12 @@ try {
  report.movementDiagnostics=await page.evaluate(()=>{const c=globalThis.__sandboxTestContext,w=c.Walk.state.walker;const h=c.checkBuildingCollision(w.x,w.z-.4,.28,{actorBaseY:0,actorHeight:1.7});return{keys:c.keys,actions:c.readControlActions('walk'),enabled:c.Walk.state.enabled,mode:c.Walk.state.mode,paused:c.paused,focus:document.activeElement?.outerHTML?.slice(0,240),ship:c.activeShipInterior,space:c.spaceFlight.active,blocker:h.building?.sourceBuildingId,interiorKind:c.activeInterior?.environmentKind};});
  assert.ok(report.entry.z-report.afterWalk.z>15,'Retained Earth geometry blocked the ship corridor');
  assert.ok(report.samples.every(p=>p.y>1.6&&p.y<1.9&&Math.abs(p.x)<.1),'Ship floor support was replaced after Earth boarding');
+ // Finish the approach by observed position, not a machine-dependent duration.
+ await page.keyboard.down('ArrowDown');
+ try { await page.waitForFunction(()=>{const w=globalThis.__sandboxTestContext.Walk.state.walker;return Math.hypot(w.x,w.z)<1.6;},null,{timeout:10000,polling:50}); }
+ finally { await page.keyboard.up('ArrowDown'); }
+ report.liftArrival=await read();
+ assert.ok(Math.hypot(report.liftArrival.x,report.liftArrival.z)<2,'Actor must reach the lift before interacting');
  await page.keyboard.press('KeyE');await page.locator('#shipDeckPicker').waitFor({state:'visible'});await page.locator('#shipDeckPicker [data-deck="engineering"]').click();
  report.lift=await read();await page.keyboard.down('ArrowUp');await page.waitForTimeout(1000);await page.keyboard.up('ArrowUp');report.resumed=await read();
  assert.ok(report.resumed.z-report.lift.z>2,'Walking did not resume after the lift');

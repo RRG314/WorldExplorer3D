@@ -384,17 +384,20 @@ try {
     waterHasOneRenderOwner:
       Number(beforeInput.diagnostics.visualOwners?.water?.animationLoopCount || 0) === 0 &&
       Number(beforeInput.diagnostics.visualOwners?.water?.renderTargetCount || 0) === 0,
-    // This general-world journey may contain only generalized provider roads,
-    // which deliberately have no exact vertical authority. Require every
-    // authoritative connection that is present to be sampled and continuous;
+    // Generalized roads still need continuous physical joins. Require every
+    // structure connection that is present to be sampled and continuous;
     // the immediately following Jones Falls release gate independently
     // requires a nonzero lossless OSM connection set.
-    exactTransportContinuity:
+    transportContinuity:
       Number(continuity.sampledConnectionCount || 0) ===
-        Number(continuity.authoritativeConnectionCount || 0) &&
+        Number(continuity.auditedConnectionCount || 0) &&
       Number(continuity.discontinuityCount || 0) === 0,
-    generalizedRoadsHaveNoVerticalAuthority:
-      Number(continuity.generalizedEngineeredApproachCount || 0) === 0,
+    // Modeled fallback approaches are necessary at real structures. Audit
+    // their actual owners instead of banning the geometry that closes joins.
+    // A missing audit must fail, including on older packaged artifacts.
+    verticalAnchorsKeepSourceOwnership:
+      Number.isInteger(continuity.auditedVerticalAnchorCount) &&
+      continuity.invalidVerticalAnchorCount === 0,
     gameplayLayoutHasNoProtectedOverlap: layoutIntersections.length === 0,
     noRuntimeErrors: Number(beforeInput.state.developerDiagnostics?.capturedErrors || 0) === 0,
     noBrowserErrors: browserErrors.length === 0,

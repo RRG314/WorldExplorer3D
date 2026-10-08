@@ -4,7 +4,7 @@ import { loadClassicScript } from '../app/js/modules/script-loader.js';
 function install(t) {
  const prior=globalThis.document;const scripts=[];
  class Script extends EventTarget {dataset={};remove(){const i=scripts.indexOf(this);if(i>=0)scripts.splice(i,1);}}
- globalThis.document={scripts,createElement:()=>new Script(),head:{appendChild:s=>scripts.push(s)}};
+ globalThis.document={baseURI:'https://game.invalid/app/',scripts,createElement:()=>new Script(),head:{appendChild:s=>scripts.push(s)}};
  t.after(()=>{if(prior===undefined)delete globalThis.document;else globalThis.document=prior;});
  return {scripts,Script};
 }
@@ -15,8 +15,16 @@ test('timeout removes stale script and retry loads a fresh element',async t=>{
  scripts[0].dispatchEvent(new Event('load'));await p;assert.equal(scripts[0].dataset.loaded,'true');
 });
 test('existing unfinished script also times out and is removed',async t=>{
- const {scripts,Script}=install(t);const s=new Script();s.src='existing.js';scripts.push(s);
+ const {scripts,Script}=install(t);const s=new Script();s.src='https://game.invalid/app/existing.js';scripts.push(s);
  await assert.rejects(loadClassicScript('existing.js',{timeoutMs:5}),/timeout/);assert.equal(scripts.length,0);
+});
+test('relative and absolute script requests preserve one loaded renderer identity',async t=>{
+ const {scripts}=install(t);
+ const first=loadClassicScript('/app/vendor/three/build/three.min.js');
+ const second=loadClassicScript('https://game.invalid/app/vendor/three/build/three.min.js');
+ assert.equal(first,second);assert.equal(scripts.length,1);
+ scripts[0].dispatchEvent(new Event('load'));await first;
+ await loadClassicScript('vendor/three/build/three.min.js');assert.equal(scripts.length,1);
 });
 test('concurrent callers share one load and error recovery creates one replacement',async t=>{
  const {scripts}=install(t);const a=loadClassicScript('error.js'),b=loadClassicScript('error.js');assert.equal(a,b);

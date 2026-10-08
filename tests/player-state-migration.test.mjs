@@ -3,6 +3,7 @@ import test from 'node:test';
 import { createBackpackModel } from '../app/js/player/backpack-model.js';
 import {
   BACKPACK_BACKUP_KEY,
+  BACKPACK_CONTROLS_KEY,
   BACKPACK_STORAGE_KEY,
   createLocalBackpackStore
 } from '../app/js/player/backpack-store.js';
@@ -55,6 +56,43 @@ test('legacy Backpack migration is versioned, idempotent, backed up, and reversi
   assert.deepEqual(JSON.parse(storage.getItem(LEGACY_KEY)), legacy);
 });
 
+test('small equipment saves retain all inventory rows and survive projection replacement without full rewrites',()=>{
+ const storage=memoryStorage(),writes=[],reads=[];
+ const tracked={...storage,getItem:key=>{reads.push(key);return storage.getItem(key);},setItem:(key,value)=>{writes.push({key,bytes:value.length});storage.setItem(key,value);}};
+ const store=createLocalBackpackStore(tracked);
+ const items=Array.from({length:50000},(_,i)=>({instanceId:`item:${i}`,catalogId:'specimen',sourceEventId:`event:${i}`,metadata:{index:i}}));
+ assert.equal(store.save({items,hotbar:['item:0'],equippedInstanceId:'item:0',ammo:{tool:{magazine:8,reserve:20}}}),true);
+ const baseBytes=storage.getItem(BACKPACK_STORAGE_KEY);writes.length=0;reads.length=0;
+ for(let i=7;i>=0;i--)assert.equal(store.saveControls({revision:8-i,hotbar:['item:1'],equippedInstanceId:'item:1',ammo:{tool:{magazine:i,reserve:20}}}),true);
+ assert.equal(storage.getItem(BACKPACK_STORAGE_KEY),baseBytes);assert.equal(reads.includes(BACKPACK_STORAGE_KEY),false);
+ assert.ok(writes.every(row=>row.key===BACKPACK_CONTROLS_KEY&&row.bytes<1000));
+ const reloaded=createLocalBackpackStore(storage).load();assert.equal(reloaded.items.length,50000);assert.equal(reloaded.ammo.tool.magazine,0);assert.equal(reloaded.equippedInstanceId,'item:1');
+ assert.equal(store.save({items,hotbar:['item:1'],equippedInstanceId:'item:1'}),true,'Journal projection can replace items without resetting ammunition');
+ const projected=createLocalBackpackStore(storage).load();assert.equal(projected.ammo.tool.magazine,0);assert.equal(projected.items.at(-1).metadata.index,49999);
+ const obsolete=storage.getItem(BACKPACK_CONTROLS_KEY);
+ assert.equal(store.save({items:[items[0]],ammo:{tool:{magazine:3,reserve:4}}}),true);
+ storage.setItem(BACKPACK_CONTROLS_KEY,obsolete);
+ const replaced=createLocalBackpackStore(storage).load();assert.equal(replaced.items.length,1);assert.equal(replaced.ammo.tool.magazine,3,'Old control record cannot overwrite a newer complete inventory');
+});
+
+test('control quota failure reports failure and does not change the last durable inventory',()=>{
+ const storage=memoryStorage();let deny=false;
+ const store=createLocalBackpackStore({...storage,setItem:(key,value)=>{if(deny&&key===BACKPACK_CONTROLS_KEY)throw Error('quota');storage.setItem(key,value);}});
+ assert.equal(store.save({items:[{instanceId:'one',catalogId:'one'}],ammo:{tool:{magazine:5,reserve:0}}}),true);
+ const before=storage.getItem(BACKPACK_STORAGE_KEY);deny=true;
+ assert.equal(store.saveControls({ammo:{tool:{magazine:4,reserve:0}}}),false);
+ assert.equal(storage.getItem(BACKPACK_STORAGE_KEY),before);
+ assert.equal(createLocalBackpackStore(storage).load().ammo.tool.magazine,5);
+ assert.equal(store.save({items:[{instanceId:'one',catalogId:'one'}]}),true);
+ assert.equal(createLocalBackpackStore(storage).load().ammo.tool.magazine,4,'Later complete save retains the newest in-memory controls');
+});
+
+test('Backpack save normalization cannot merge different event/catalog pairs through a delimiter',()=>{
+ const storage=memoryStorage(),store=createLocalBackpackStore(storage);
+ assert.equal(store.save({items:[{instanceId:'one',catalogId:'c',sourceEventId:'a\0b'},{instanceId:'two',catalogId:'b\0c',sourceEventId:'a'}]}),true);
+ assert.equal(store.load().items.length,2);
+});
+
 test('one authoritative event cannot create two Backpack rewards under different instance IDs', () => {
   const backpack = createBackpackModel({
     definitions: [{ id: 'harbor-token', label: 'Harbor token', category: 'field-find', verbs: ['inspect'] }]
@@ -92,7 +130,7 @@ test('signed-in receipt reconciliation upgrades the local claim without duplicat
   const first = await store.collect(local);
   const retry = await store.collect({ ...local, instanceId: 'item:server', collectedAt: 2_000 });
   const upgraded = await store.applyTrustedReceipt(first.item.instanceId, {
-    authority: 'server-receipt', itemId: 'server-item-1', tradeable: false
+    authority: 'server-receipt', itemId: 'server-item-1', tradeable: false, ownerUid: 'test-owner', claimId: local.claimId, catalogId: local.catalogId
   });
 
   assert.equal(first.recorded, true);

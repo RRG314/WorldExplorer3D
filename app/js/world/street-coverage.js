@@ -1,4 +1,5 @@
 import { resolveStreetSection } from './compiler/street-section.js';
+import {isPavementFootway} from './compiler/pavement-footway-policy.js';
 
 // Measures source coverage, not visible pavement. A compiled window cannot
 // certify its polygons, heights or pixels merely by containing a road.
@@ -58,8 +59,8 @@ export function auditStreetCoverage({roads = [], buildings = [], linearFeatures 
     }
   }
   for(const path of linearFeatures) {
-    if(!groundFeature(path)||path.kind!=='footway'||path.subtype!=='sidewalk')continue;
-    for(let i=1;i<(path.pts?.length||0);i++)add(path.pts[i-1],path.pts[i],1,'mapped-sidewalk',path.name);
+    if(!isPavementFootway(path))continue;
+    for(let i=1;i<(path.pts?.length||0);i++)add(path.pts[i-1],path.pts[i],1,'mapped-footway',path.name);
   }
   return {scope:'Loaded source network requiring inferred or mapped sidewalks; length within the compilation window, not proof of rendered pavement. Separately tagged sidewalks need mapped path data.',
     requiredSidewalkMeters:required,withinCompilationWindowMeters:covered,outsideCompilationWindowMeters:Math.max(0,required-covered),

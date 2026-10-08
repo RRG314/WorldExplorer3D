@@ -3,6 +3,27 @@ import assert from 'node:assert/strict';
 import {publishVegetationCooperatively} from '../app/js/world/vegetation-publication.js';
 import {collectWorldVegetationPlacements,collectWorldVegetationPlacementsCooperatively,initWorldVegetation} from '../app/js/world/vegetation.js?v=10';
 import {ctx} from '../app/js/shared-context.js?v=55';
+import {retainTreeRowNodes} from '../app/js/world/vegetation-source-nodes.js';
+
+test('compilation node retirement preserves exact seeded tree-row placements and later refreshes',()=>{
+ const saved={...ctx};
+ try {
+  const nodes=Object.fromEntries(Array.from({length:3000},(_,i)=>[i,{id:i,lat:i,lon:30}]));
+  const rows=[{id:42,nodes:[10,11,12,12,13,14,15]},{id:43,nodes:[900,910,920,9999]}];
+  Object.assign(ctx,{worldSeed:3,osmTreeNodes:[],osmTreeRows:rows,_worldLoadNodes:nodes,landuses:[],waterAreas:[],waterways:[],
+   geoToWorld:(lat,lon)=>({x:lat,z:lon}),rand01FromInt:n=>(n>>>0)%1000/1000,baseTerrainHeightAt:()=>0,
+   streetPavement:{sampleAt:()=>NaN},terrainGroup:{children:[]}});
+  initWorldVegetation({getNearbyBuildings:()=>[],findNearestRoad:()=>null,isRoadSurfaceReachable:()=>false});
+  const expected=collectWorldVegetationPlacements();assert.ok(expected.length>0);
+  ctx._worldLoadNodes=retainTreeRowNodes(nodes,rows);
+  assert.equal(Object.keys(ctx._worldLoadNodes).length,9);assert.equal(ctx._worldLoadNodes[10],nodes[10]);
+  assert.deepEqual(collectWorldVegetationPlacements(),expected);
+  ctx.worldSeed=14;const refreshed=collectWorldVegetationPlacements();
+  ctx._worldLoadNodes=nodes;assert.deepEqual(collectWorldVegetationPlacements(),refreshed);
+  assert.deepEqual(Object.keys(retainTreeRowNodes(nodes,[])),[]);
+  assert.equal(Object.keys(nodes).length,3000,'Compilation input remains intact');
+ }finally{Object.assign(ctx,saved);}
+});
 
 test('scheduled vegetation preserves seeded placement order and exclusions',async()=>{
  Object.assign(ctx,{worldSeed:3,osmTreeNodes:Array.from({length:100},(_,id)=>({id,lat:100+id,lon:30})),osmTreeRows:[],landuses:[],geoToWorld:(lat,lon)=>({x:lat,z:lon}),rand01FromInt:n=>(n>>>0)%1000/1000,baseTerrainHeightAt:()=>0,streetPavement:{sampleAt:(x)=>x%7===0?0:NaN},terrainGroup:{children:[]}});

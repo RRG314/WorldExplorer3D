@@ -1,3 +1,4 @@
+import {associatePoiToBuilding} from '../app/js/poi/building-association.js?v=1';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
@@ -233,4 +234,26 @@ test('a service effect failure leaves the local wallet unchanged', async () => {
   const result = await commerce.service(mechanic, 'vehicle-full-repair', async () => false);
   assert.equal(result.reason, 'service_effect_failed_refunded');
   assert.equal(commerce.wallet().credits, before);
+});
+
+
+test('commerce resolves one indexed building snapshot while preserving exact associations and published doors',()=>{
+ let reads=0;
+ const buildings=Array.from({length:1000},(_,i)=>{
+  const x=i===0?0:1000+i*30;
+  const points=[{x,z:0},{x:x+20,z:0},{x:x+20,z:20},{x,z:20}];
+  return {sourceBuildingId:`way:${i}`,buildingType:'commercial',minX:x,maxX:x+20,minZ:0,maxZ:20,get pts(){reads++;return points;}};
+ });
+ const pois=Array.from({length:30},(_,i)=>({type:'shop=convenience',sourceFeatureId:`node:shop-${i}`,sourceElementType:'node',sourceElementId:`shop-${i}`,name:`Shop ${i}`,x:5+i*.1,z:5,tags:{shop:'convenience'}}));
+ const options={buildings,entranceByBuilding:new Map([['way:0',{x:10,z:0,approachX:10,approachZ:-2}]])};
+ const stores=mappedCommercePlaces(pois,options),indexedReads=reads;
+ assert.equal(stores.length,30);
+ assert.ok(indexedReads<20000,`Expected bounded footprint reads, received ${indexedReads}`);
+ for(const store of stores){
+  assert.deepEqual(store.buildingAssociation,associatePoiToBuilding(store,buildings,options));
+  assert.equal(store.buildingAssociation.entryType,'published-door');assert.ok(Object.isFrozen(store));
+ }
+ assert.ok(pois.every(p=>!p.buildingAssociation),'Source POIs are not mutated');
+ const updated=mappedCommercePlaces(pois,{buildings:buildings.slice(1)});
+ assert.ok(updated.every(s=>s.buildingAssociation===null),'A removed building cannot survive in a cached association');
 });

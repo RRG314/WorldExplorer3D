@@ -1,7 +1,7 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
 import { clamp } from './dynamics.js?v=1';
 import { normalizeWaterKind, waterKindLabel } from '../world/water-body-contract.js?v=4';
-import { pointInWaterBody } from '../world/water-surface-registry.js?v=3';
+import { pointInWaterBody, distanceToWaterBoundary } from '../world/water-surface-registry.js?v=3';
 
 const BOAT_ENTRY_OFFSET = 9;
 const BOAT_MAX_CANDIDATE_DISTANCE = 58;
@@ -130,28 +130,36 @@ function classifyWaterway(way) {
   return { kind: 'harbor', label: 'Harbor Water' };
 }
 
-function nearestPointOnPolygon(px, pz, pts) {
-  let best = null;
+function nearestPointOnSegments(px, pz, pts, closed) {
   if (!Array.isArray(pts)) return null;
-  for (let i = 0; i < pts.length; i++) {
-    const a = pts[i];
-    const b = pts[(i + 1) % pts.length];
-    const info = segmentDistanceInfo(px, pz, a.x, a.z, b.x, b.z);
-    if (!best || info.dist < best.dist) best = info;
+  let bestIndex = -1, bestDistance = Infinity;
+  const count = closed ? pts.length : pts.length - 1;
+  for (let i = 0; i < count; i++) {
+    const a = pts[i], b = pts[(i + 1) % pts.length];
+    const dx = b.x - a.x, dz = b.z - a.z;
+    const lengthSquared = dx * dx + dz * dz;
+    const t = lengthSquared <= 1e-9 ? 0
+      : Math.max(0, Math.min(1, ((px - a.x) * dx + (pz - a.z) * dz) / lengthSquared));
+    const distanceX = px - (a.x + dx * t), distanceZ = pz - (a.z + dz * t);
+    // Either axis bounds Euclidean distance. Equal-distance segments keep
+    // their original source order, as did the allocating reference query.
+    if (bestIndex >= 0 && (Math.abs(distanceX) >= bestDistance || Math.abs(distanceZ) >= bestDistance)) continue;
+    const distance = Math.hypot(distanceX, distanceZ);
+    if (bestIndex < 0 || distance < bestDistance) { bestIndex = i; bestDistance = distance; }
   }
-  return best;
+  if (bestIndex < 0) return null;
+  const a = pts[bestIndex], b = pts[(bestIndex + 1) % pts.length];
+  // Materialize only the selected point/tangent. Never share mutable scratch
+  // records between simultaneous candidates or retained boat state.
+  return segmentDistanceInfo(px, pz, a.x, a.z, b.x, b.z);
+}
+
+function nearestPointOnPolygon(px, pz, pts) {
+  return nearestPointOnSegments(px, pz, pts, true);
 }
 
 function nearestPointOnPolyline(px, pz, pts) {
-  let best = null;
-  if (!Array.isArray(pts)) return null;
-  for (let i = 0; i < pts.length - 1; i++) {
-    const a = pts[i];
-    const b = pts[i + 1];
-    const info = segmentDistanceInfo(px, pz, a.x, a.z, b.x, b.z);
-    if (!best || info.dist < best.dist) best = info;
-  }
-  return best;
+  return nearestPointOnSegments(px, pz, pts, false);
 }
 
 function isPointInsideWaterAreaFootprint(area, x, z, edgeBuffer = 0) {
@@ -160,8 +168,7 @@ function isPointInsideWaterAreaFootprint(area, x, z, edgeBuffer = 0) {
   if (!pointInWaterBody(area, x, z)) return false;
   const buffer = Math.max(0, Number(edgeBuffer) || 0);
   if (buffer <= 0) return true;
-  const edge = nearestPointOnPolygon(x, z, pts);
-  return !!edge && edge.dist >= buffer;
+  return distanceToWaterBoundary(area, x, z) >= buffer;
 }
 
 function isPointInsideWaterwayFootprint(way, x, z, edgeBuffer = 0) {
@@ -243,12 +250,10 @@ function pointInsideBoatCandidate(candidate, x, z, edgeBuffer = 0) {
     const halfWidth = Math.max(3, (Number(candidate.source?.width) || 8) * 0.5);
     return nearest.dist <= Math.max(0.8, halfWidth - buffer);
   }
-  const pts = Array.isArray(candidate.source?.pts) ? candidate.source.pts : [];
   const inside = pointInWaterBody(candidate.source, x, z);
   if (!inside) return false;
   if (buffer <= 0) return true;
-  const edge = nearestPointOnPolygon(x, z, pts);
-  return !!edge && edge.dist >= buffer;
+  return distanceToWaterBoundary(candidate.source, x, z) >= buffer;
 }
 
 function measureBoatShorelineDistance(candidate, x, z) {
@@ -260,10 +265,7 @@ function measureBoatShorelineDistance(candidate, x, z) {
     const halfWidth = Math.max(3, (Number(candidate.source?.width) || 8) * 0.5);
     return Math.max(0, halfWidth - nearest.dist);
   }
-  const pts = Array.isArray(candidate.source?.pts) ? candidate.source.pts : [];
-  if (!(typeof appCtx.pointInPolygon === 'function' && appCtx.pointInPolygon(x, z, pts))) return 0;
-  const nearest = nearestPointOnPolygon(x, z, pts);
-  return Math.max(0, Number(nearest?.dist || 0));
+  return distanceToWaterBoundary(candidate.source, x, z);
 }
 
 function findBestAreaInteriorSpawn(candidate, preferredX, preferredZ, minEdge) {

@@ -1,6 +1,6 @@
 # Acknowledgements
 
-Last reviewed: 2026-09-03 for World Explorer 3D 5.2.0.
+Last reviewed: 2026-10-07 for World Explorer 3D 5.5.0.
 
 World Explorer 3D is made possible by open web technology, public geographic
 and scientific data, licensed creative assets, and the communities that
@@ -20,7 +20,8 @@ maintain them.
 - [OpenStreetMap contributors](https://www.openstreetmap.org/copyright) provide
   the primary community-mapped geographic context under ODbL 1.0.
 - Overture Maps Foundation, ESA WorldCover, USGS, Copernicus, GEBCO, NOAA,
-  Open-Meteo, CelesTrak, OpenSky Network, ADSB.lol, Panoramax, and KartaView
+  MET Norway, PacIOOS, HYCOM/FNMOC, CelesTrak, ADSB.lol, Fintraffic, Caltrans,
+  Panoramax, and KartaView
   contribute mapped, modeled, reference, or observed context where available.
 - The independent [DeFlock project](https://deflock.org/) inspired DeFlock
   Hunt. World Explorer 3D is unaffiliated with DeFlock and uses publicly mapped
@@ -40,7 +41,7 @@ maintain them.
 
 - NASA, JPL-Caltech, USGS Astrogeology, ESA, CSA, STScI, LROC, and the Gaia
   project provide planetary, astronomical, and space-science source material.
-- Adobe Mixamo, Google Model Viewer contributors, Wikimedia Commons creators,
+- Quaternius, Adobe Mixamo, Google Model Viewer contributors, Wikimedia Commons creators,
   ambientCG, and Poly Haven provide licensed models or materials used by the
   game.
 

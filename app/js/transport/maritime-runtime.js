@@ -1,3 +1,4 @@
+import {selectMaritimeAnchor} from './maritime-placement-policy.js';
 import { ctx as appCtx } from '../shared-context.js?v=55';
 import { MARITIME_CATALOG } from './maritime-catalog.js?v=1';
 import { createVesselVisual, updateVesselVisual } from './vessel-visual-recipe.js?v=8';
@@ -54,17 +55,6 @@ function maritimeAnchors(graph) {
   return (graph?.byDomain?.maritime || [])
     .filter((record) => recordPoint(record))
     .sort((left, right) => priority.indexOf(left.type) - priority.indexOf(right.type));
-}
-
-function preferredAnchor(anchors, catalog, index) {
-  const roleTypes = catalog.role === 'runabout' || catalog.role === 'sailboat'
-    ? ['marina', 'mooring', 'pier']
-    : catalog.role === 'ferry'
-      ? ['ferry_terminal', 'ferry_route', 'pier']
-      : catalog.role === 'cargo' || catalog.role === 'tug'
-        ? ['port', 'harbour', 'quay', 'dock', 'berth']
-        : ['pier', 'quay', 'dock', 'port', 'harbour'];
-  return anchors.find((record) => roleTypes.includes(record.type)) || anchors[index % anchors.length];
 }
 
 function vesselFootprintFitsWater(x, z, yaw, catalog, candidate = null) {
@@ -158,17 +148,7 @@ function findWaterPlacement(anchor, catalog, index) {
             candidate: centerCandidate
           });
         }
-        if (!operationalLaunch) {
-          const syntheticCandidate = appCtx.buildSyntheticBoatCandidate?.(centerX, centerZ, {
-            waterKind: candidate.waterKind === 'harbor' ? 'coastal' : candidate.waterKind || 'coastal'
-          });
-          if (syntheticCandidate) operationalLaunch = Object.freeze({
-            x: centerX,
-            z: centerZ,
-            yaw: candidateYaw,
-            candidate: syntheticCandidate
-          });
-        }
+
       }
       const inwardX = Number(candidate.centerX) - Number(candidate.entryPoint.x);
       const inwardZ = Number(candidate.centerZ) - Number(candidate.entryPoint.z);
@@ -223,7 +203,8 @@ function derivedFleet(graph, options = {}) {
   const anchors = maritimeAnchors(graph);
   if (!anchors.length) return [];
   return MARITIME_CATALOG.map((catalog, index) => {
-    const anchor = preferredAnchor(anchors, catalog, index);
+    const anchor = selectMaritimeAnchor(anchors, catalog);
+    if (!anchor) return null;
     const placement = findWaterPlacement(anchor, catalog, index);
     if (!placement || ![placement.x, placement.z].every(Number.isFinite)) return null;
     return {
@@ -255,7 +236,7 @@ function waterYAt(x, z) {
 }
 
 function placeVessel(vessel) {
-  vessel.y = waterYAt(vessel.x, vessel.z) + Math.min(vessel.catalog.dimensions.draft * .5, vessel.catalog.dimensions.width * .22);
+  vessel.y = waterYAt(vessel.x, vessel.z);
   vessel.visual.root.position.set(vessel.x, vessel.y, vessel.z);
   vessel.visual.root.rotation.order = 'YXZ';
   vessel.visual.root.rotation.set(0, vessel.yaw, 0);
@@ -338,7 +319,7 @@ function updateAmbientVessel(vessel, dt) {
   if (!motion || vessel.condition <= .05) return false;
   advanceAmbientRouteMotion(vessel, motion, dt);
   vessel.available = motion.state === 'docked';
-  vessel.y = waterYAt(vessel.x, vessel.z) + Math.min(vessel.catalog.dimensions.draft * .5, vessel.catalog.dimensions.width * .22);
+  vessel.y = waterYAt(vessel.x, vessel.z);
   vessel.visual.root.position.set(vessel.x, vessel.y, vessel.z);
   vessel.visual.root.rotation.set(0, vessel.yaw, 0);
   updateVesselVisual(vessel.visual, vessel.condition);

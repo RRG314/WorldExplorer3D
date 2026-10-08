@@ -1,0 +1,25 @@
+{
+  "source": "919888ec31984b59f4da16c3a93936e5ded86e1f",
+  "scope": "Actual space camera function with installed pinned Three math. Fixed-target overview camera at three simulated presentation cadences; no browser or performance measurement.",
+  "rows": [
+    {
+      "fps": 30,
+      "elapsedSeconds": 0.3333333333333333,
+      "remainingDistance": 3962.232323620697,
+      "remainingFraction": 0.43438845422363204
+    },
+    {
+      "fps": 60,
+      "elapsedSeconds": 0.3333333333333333,
+      "remainingDistance": 1721.1479743325046,
+      "remainingFraction": 0.1886933291627965
+    },
+    {
+      "fps": 120,
+      "elapsedSeconds": 0.3333333333333333,
+      "remainingDistance": 324.769141258604,
+      "remainingFraction": 0.0356051724705395
+    }
+  ],
+  "observed": "Camera converges per frame, not per elapsed second. At the same elapsed time, 30 FPS leaves over ten times the distance remaining at 120 FPS."
+}

@@ -21,6 +21,11 @@ let count=0,failed=0;
 for (const directory of roots) for await(const file of modules(path.join(root,directory))){
   try {
     const code=await readFile(file,'utf8');
+    // This Playwright build tests the predicate's immediate truthiness. An
+    // async function returns a truthy Promise even when it resolves false.
+    if(directory==='scripts' && /\.waitForFunction\(\s*async\b/.test(code)) {
+      throw new Error('Use a synchronous waitForFunction predicate; resolve imports in page.evaluate first.');
+    }
     if(file.endsWith('.cjs') || (directory==='functions' && !file.endsWith('.mjs'))) new Script(code,{filename:file});
     else new SourceTextModule(code,{identifier:file});
     count++;

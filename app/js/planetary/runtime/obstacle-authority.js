@@ -9,6 +9,8 @@ function normalizedObstacle(value = {}) {
     x: Number(value.x) || 0,
     z: Number(value.z) || 0,
     radius,
+    minY: Number.isFinite(value.minY) ? value.minY : -Infinity,
+    maxY: Number.isFinite(value.maxY) ? value.maxY : Infinity,
     kind: String(value.kind || 'solid')
   });
 }
@@ -28,13 +30,14 @@ function clearActivePlanetaryObstacles(bodyId = null) {
   return true;
 }
 
-function queryPlanetaryObstacle(x, z, radius = 0, bodyId = activeBodyId) {
+function queryPlanetaryObstacle(x, z, radius = 0, bodyId = activeBodyId, vertical = null) {
   if (!activeBodyId || String(bodyId || '') !== activeBodyId) return null;
   const px = Number(x);
   const pz = Number(z);
   const actorRadius = Math.max(0, Number(radius) || 0);
   if (!Number.isFinite(px) || !Number.isFinite(pz)) return null;
-  const obstacle = activeObstacles.find((entry) => Math.hypot(px - entry.x, pz - entry.z) < entry.radius + actorRadius);
+  const obstacle = activeObstacles.find((entry) => Math.hypot(px - entry.x, pz - entry.z) < entry.radius + actorRadius &&
+    (!vertical || vertical.maxY >= entry.minY && vertical.minY <= entry.maxY));
   return obstacle ? Object.freeze({ collision: true, obstacle }) : null;
 }
 

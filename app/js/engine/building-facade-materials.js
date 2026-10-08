@@ -1,3 +1,4 @@
+import { facadeNightUniform, FACADE_EMISSION_GLSL } from '../world/facade-lighting.js';
 import { createHistoricWallMaterial } from '../world/historic-wall-material.js';
 import { FACADE_OPENINGS_GLSL } from '../world/building-facade-layout.js?v=3';
 import {
@@ -360,10 +361,11 @@ function facadeEntranceAtlas(appCtx) {
 function applyWallOnlyFacadeMap(material, roof, entranceAtlas, exteriorProfile) {
   material.extensions = { ...material.extensions, derivatives: true };
   const facadeProjection = new THREE.Vector4(...material.userData.facadeProjection);
-  const roofA = new THREE.Color(roof.colorA);
-  const roofB = new THREE.Color(roof.colorB);
+  const roofA = new THREE.Color(roof.colorA); roofA.convertSRGBToLinear?.();
+  const roofB = new THREE.Color(roof.colorB); roofB.convertSRGBToLinear?.();
   const grainScale = Number(roof.grainScale || 0.6);
   material.onBeforeCompile = (shader) => {
+    shader.uniforms.facadeNight = facadeNightUniform;
     // Facades use wall-local coordinates; remove the unused standard map UV
     // varying so merged buildings stay within eight vertex attribute slots.
     shader.vertexShader = shader.vertexShader.replace('#include <uv_vertex>', '');
@@ -393,6 +395,7 @@ function applyWallOnlyFacadeMap(material, roof, entranceAtlas, exteriorProfile) 
       'varying vec4 vFacadeEntrance;',
       'varying vec4 vFacadeLayout; varying vec4 vFacadeOpening;',
       FACADE_OPENINGS_GLSL,
+      'uniform float facadeNight;',
       'uniform sampler2D facadeEntranceAtlas;',
       'uniform vec4 facadeProjection;',
       'uniform vec3 facadeRoofA;',
@@ -436,7 +439,10 @@ function applyWallOnlyFacadeMap(material, roof, entranceAtlas, exteriorProfile) 
         '  float entranceTangentSign = mix(-1.0, 1.0, step(1.5, vFacadeEntrance.y));',
         '  float bayCenterFromDoor = vFacadeEntrance.x - entranceTangentSign * (fract(vFacadeLayout.x) - 0.5) * fittedBayWidth;',
         '  if (vFacadeEntrance.y > 0.5 && vFacadeLayout.y >= 0.0 && vFacadeLayout.y < 1.0 && abs(bayCenterFromDoor) < fittedBayWidth * vFacadeOpening.x * 0.5 + 1.2) openingLayout.x = -1.0;',
-        '  if (vFacadeWallMask > 0.5) diffuseColor.rgb = facadeOpenings(diffuseColor.rgb, openingLayout, vFacadeOpening);',
+        '  float facadeBuildingSeed=dot(floor(facadeBase*16.0+.001),vec3(17.0,3.0,7.0));',
+        '  vec4 facadeSurface = vec4(diffuseColor.rgb,0.0);',
+        '  if (vFacadeWallMask > 0.5) facadeSurface = facadeOpenings(diffuseColor.rgb, openingLayout, vFacadeOpening, facadeViewRay(vViewPosition,vFacadeLayout.zw),facadeBuildingSeed);',
+        '  diffuseColor.rgb = facadeSurface.rgb;',
         '  float entranceActive = step(0.5, vFacadeEntrance.y) * vFacadeWallMask;',
         '  if (entranceActive > 0.0) {',
         '    float entranceAtlasStyle = floor(fract(vFacadeEntrance.w) * 16.0 + 0.1);',
@@ -462,8 +468,12 @@ function applyWallOnlyFacadeMap(material, roof, entranceAtlas, exteriorProfile) 
         '#endif'
       ].join('\n')
     );
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n' + FACADE_EMISSION_GLSL)
+      .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\nroughnessFactor=mix(roughnessFactor,.22,facadeSurface.a);')
+      .replace('#include <normal_fragment_maps>', '#include <normal_fragment_maps>\nnormal=facadeGrainNormal(normal,vViewPosition,dot(facadeTexel.rgb,vec3(.2126,.7152,.0722)),.018*vFacadeWallMask*(1.0-facadeSurface.a));');
   };
-  material.customProgramCacheKey = () => 'building-facade-local-layout-v11-filtered-openings';
+  material.customProgramCacheKey = () => 'building-facade-local-layout-v12-room-depth';
 }
 
 export function buildingRoofSurface(appCtx, materialName = '') {
@@ -581,6 +591,7 @@ export function getBuildingMaterial(engineContext, buildingType, buildingSeed, b
     textureProjectionStyle
   } = resolved;
   const tint = new THREE.Color(resolved.tintHex);
+  tint.convertSRGBToLinear?.();
   const storefrontBucket = exteriorProfile.storefrontStyle === 'none'
     ? 'none'
     : Number(exteriorProfile.storefront?.glazing || 0) >= 0.76

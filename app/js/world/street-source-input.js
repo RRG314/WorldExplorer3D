@@ -1,5 +1,6 @@
 import {drainCooperatively} from './cooperative-scheduling.js?v=1';
 import { streetScaleForWorld } from './compiler/street-frontage-policy.js';
+import {isPavementFootway,isPavementCrossing} from './compiler/pavement-footway-policy.js';
 // A compact source snapshot. Rendering objects, textures and caches never cross
 // the worker boundary. The overview retains the complete loaded source domain.
 function* streetSourceInputSteps(appCtx, select) {
@@ -14,12 +15,12 @@ function* streetSourceInputSteps(appCtx, select) {
   for(const [items,target,buildingsOnly] of [[appCtx.buildings,buildings,true],[appCtx.landuses,landuses,false]]){
     for(const item of items||[]){
       yield;
-      if((!buildingsOnly||!item.allowsPassageBelow)&&select(item))target.push({pts:item.surfaceFootprint||item.pts||item.footprint,holes:item.holes,holeRings:item.holeRings,type:item.type,tags:item.tags});
+      if((!buildingsOnly||!item.allowsPassageBelow)&&select(item))target.push({pts:item.surfaceFootprint||item.pts||item.footprint,holes:item.holes,holeRings:item.holeRings,type:item.type,tags:item.tags,presentationOwner:item.presentationOwner});
     }
   }
   for(const f of appCtx.linearFeatures||[]){
     yield;
-    if(select(f)&&f.kind==='footway'&&['sidewalk','crossing'].includes(f.subtype)&&!f.isStructureConnector)linearFeatures.push({kind:f.kind,subtype:f.subtype,width:f.width,pts:f.pts,sourceTags:f.sourceTags,crossingNodes:f.crossingNodes,structureSemantics:f.structureSemantics});
+    if(select(f)&&(isPavementFootway(f)||isPavementCrossing(f)))linearFeatures.push({kind:f.kind,subtype:f.subtype,width:f.width,pts:f.pts,sourceTags:f.sourceTags||f.transportRecord?.sourceTags||f.tags,crossingNodes:f.crossingNodes,structureSemantics:f.structureSemantics});
   }
   return {roads,buildings,landuses,linearFeatures,metersPerWorldUnit:streetScaleForWorld(appCtx)};
 }

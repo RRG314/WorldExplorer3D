@@ -490,6 +490,7 @@ function initMobileControls() {
     if ((typeof appCtx.isEnv === 'function' && typeof appCtx.ENV !== 'undefined' && appCtx.isEnv(appCtx.ENV.SPACE_FLIGHT)) || appCtx.spaceFlight?.active) {
       return 'rocket';
     }
+    if (appCtx.boatDeck?.active) return 'walking';
     if (appCtx.boatMode?.active) return 'boat';
     if (appCtx.planeMode?.active) return 'plane';
     if (appCtx.droneMode) return 'drone';

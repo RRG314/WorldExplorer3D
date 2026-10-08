@@ -57,6 +57,15 @@ function ensureEarthSceneRoot() {
   if (earthSceneRoot?.parent !== appCtx.scene) {
     earthSceneRoot = new THREE.Group();
     earthSceneRoot.matrixAutoUpdate = false;
+    // Three r128 recursively updates even invisible subtrees. This retained
+    // world has an identity root and no simulation owner while hidden. Skip
+    // that traversal, while explicit updateWorldMatrix queries remain usable
+    // during compilation and normal propagation resumes on the first visible
+    // frame. Never detach or dispose the retained city to enter a ship.
+    const updateWorld = earthSceneRoot.updateMatrixWorld;
+    earthSceneRoot.updateMatrixWorld = function(force) {
+      if (this.visible) updateWorld.call(this, force);
+    };
     earthSceneRoot.name = 'Earth Runtime Root';
     earthSceneRoot.userData.environmentOwner = appCtx.ENV?.EARTH || 'EARTH';
     earthSceneRoot.visible = stagedWorldLoadSequence === null && appCtx.worldLoading !== true;

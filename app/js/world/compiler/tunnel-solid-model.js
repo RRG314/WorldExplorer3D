@@ -11,9 +11,8 @@ export function tunnelSolidComponents(features) {
     const component = [], pending = [first]; visited.add(first);
     while (pending.length) {
       const feature = pending.pop(); component.push(feature);
-      for (const endpoint of ['start', 'end']) for (const link of feature.connectedFeatures?.[endpoint] || []) {
-        const other = link.feature;
-        if (!eligible.has(other) || visited.has(other) || !solidConnectionCompatible(feature, endpoint, other)) continue;
+      for (const {other, ownDistance, otherDistance} of physicalTunnelConnections(feature)) {
+        if (!eligible.has(other) || visited.has(other) || !solidStationsCompatible(feature, ownDistance, other, otherDistance)) continue;
         visited.add(other); pending.push(other);
       }
     }
@@ -22,11 +21,44 @@ export function tunnelSolidComponents(features) {
   return components;
 }
 
-function solidConnectionCompatible(feature, endpoint, other) {
+function physicalTunnelConnections(feature) {
+  const stations = new Map((feature.transportGraphRef?.stations || []).map(s => [s.nodeId, s]));
+  const result = [];
+  for (const link of feature.transportConnections || []) {
+    const own = stations.get(link.graphConnectionId), other = link.feature;
+    const theirs = other?.transportGraphRef?.stations?.find(s => s.nodeId === link.graphConnectionId);
+    // Quantized generalized endpoints can sit inside the other carriageway
+    // without coinciding with its centerline. Admit only the graph-local width
+    // overlap here; the Boolean union uses actual sweeps and adds no gap hull.
+    const overlapReach = Math.min(Number(feature.width)||0, Number(other?.width)||0) * .5;
+    if (!own || !theirs || Math.hypot(own.point.x-theirs.point.x, own.point.z-theirs.point.z) > overlapReach) continue;
+    result.push({other, ownDistance:own.distanceAlong, otherDistance:theirs.distanceAlong});
+  }
+  for (const endpoint of ['start','end']) for (const link of feature.connectedFeatures?.[endpoint] || []) {
+    const other = link.feature;
+    if (!other?.pts?.length || result.some(r => r.other === other)) continue;
+    const p = endpoint === 'start' ? feature.pts[0] : feature.pts.at(-1);
+    const start = Math.hypot(p.x-other.pts[0].x,p.z-other.pts[0].z);
+    const end = Math.hypot(p.x-other.pts.at(-1).x,p.z-other.pts.at(-1).z);
+    if (Math.min(start,end) > .3) continue;
+    result.push({other,ownDistance:endpoint==='start'?0:feature.tunnelSystemModel?.total,
+      otherDistance:start<=end?0:other.tunnelSystemModel?.total});
+  }
+  return result;
+}
+
+function solidStationsCompatible(feature, a, other, b) {
   if (feature.transportRecord?.completeness !== other.transportRecord?.completeness) return false;
   const ownLayer = feature.transportRecord?.rawTags?.layer;
   const otherLayer = other.transportRecord?.rawTags?.layer;
   if (ownLayer && otherLayer && ownLayer !== otherLayer) return false;
+  const inShell = (f,d) => f.tunnelSystemModel?.shellRanges?.some(r=>d>=r.start-.15&&d<=r.end+.15);
+  return inShell(feature,a) && inShell(other,b) && Math.abs(
+    sampleTransportSurfaceAtDistance(feature.transportSurfaceModel,a,0) -
+    sampleTransportSurfaceAtDistance(other.transportSurfaceModel,b,0)) <= .75;
+}
+
+function solidConnectionCompatible(feature, endpoint, other) {
   const p = endpoint === 'start' ? feature.pts[0] : feature.pts.at(-1);
   const candidates = [other.pts[0], other.pts.at(-1)];
   const index = Math.hypot(p.x-candidates[0].x,p.z-candidates[0].z) <= Math.hypot(p.x-candidates[1].x,p.z-candidates[1].z) ? 0 : 1;
@@ -36,10 +68,7 @@ function solidConnectionCompatible(feature, endpoint, other) {
   if (Math.hypot(p.x-q.x,p.z-q.z) > 0.3) return false;
   const a = endpoint === 'start' ? 0 : feature.tunnelSystemModel.total;
   const b = index === 0 ? 0 : other.tunnelSystemModel.total;
-  const inShell = (f,d) => f.tunnelSystemModel.shellRanges.some(r=>d>=r.start-.15&&d<=r.end+.15);
-  return inShell(feature,a) && inShell(other,b) && Math.abs(
-    sampleTransportSurfaceAtDistance(feature.transportSurfaceModel,a,0) -
-    sampleTransportSurfaceAtDistance(other.transportSurfaceModel,b,0)) <= 0.75;
+  return solidStationsCompatible(feature, a, other, b);
 }
 
 export function buildTunnelSolidInput(features) {

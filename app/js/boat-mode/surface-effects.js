@@ -1,9 +1,12 @@
+import {vesselWaterSamples,fitVesselWaterPlane} from './water-contact.js';
+import {getMaritimeCatalogEntry} from '../transport/maritime-catalog.js?v=1';
+import { createWaterPatchGeometry } from '../world/water-patch-geometry.js?v=1';
+import { registerWaterWaveMaterial } from '../world/water-materials.js?v=5';
 import { ctx as appCtx } from "../shared-context.js?v=55";
-import { getSeaStateConfig, getWaveIntensity, inferWaterRenderContext, resolveWaterMotionProfile, surfaceNormalFromMotion } from "../water-dynamics.js?v=9";
+import { getSeaStateConfig, getWaveIntensity, surfaceNormalFromMotion } from "../water-dynamics.js?v=9";
 import { getWaterPalette } from "../water-palette.js?v=2";
 import {
   getBoatWaveProfile,
-  resolveBoatWaterKind,
   sampleDynamicWaterAt,
   waterSurfaceBaseYAt,
   waterSurfaceYAt
@@ -11,13 +14,13 @@ import {
 import { clamp, stepBoatSpring } from "./dynamics.js?v=1";
 import { resetBoatFoamFx, updateBoatFoamFx } from "./foam-effects.js?v=1";
 import { customizeBoatWaterPatchShader } from "./water-patch-shader.js?v=2";
-import { modeledWaveRenderControls } from '../world/water-optics-evidence.js?v=2';
+import { resolveBodyWaveProfile } from '../world/water-motion-profile.js?v=1';
 
 function registerBoatWaterPatchMaterial(material) {
-  if (!material || material.userData?.weWaterWavePatched || typeof appCtx.registerWaterWaveMaterial !== 'function') return false;
-  appCtx.registerWaterWaveMaterial(material, {
-    waveScale: 1.08,
-    waveBase: 1.28,
+  if (!material || material.userData?.weWaterWavePatched) return false;
+  registerWaterWaveMaterial(material, {
+    waveScale: 1,
+    waveBase: 1,
     visualBase: 0.78,
     foamBase: 1.38,
     edgeFade: 0.46,
@@ -40,8 +43,7 @@ function ensureBoatWaterPatch() {
     return appCtx.boatMode.waterPatch;
   }
   if (typeof THREE === 'undefined' || !appCtx.scene) return null;
-  const geometry = new THREE.PlaneGeometry(1, 1, 128, 128);
-  geometry.rotateX(-Math.PI / 2);
+  const geometry = createWaterPatchGeometry(THREE,14000);
   const palette = getWaterPalette(appCtx.boatMode?.waterKind);
   const material = new THREE.MeshStandardMaterial({
     color: palette.surface,
@@ -96,7 +98,11 @@ function updateBoatWaterPatch(candidate = null) {
   );
   // The geometry is pre-rotated onto the XZ plane, so scale the footprint on X/Z.
   // Scaling Y here collapses the patch into a moving strip and exaggerates wave height.
-  patch.scale.set(radius * 2.05, 1, radius * 2.05);
+  if (patch.geometry.userData.waterPatchRadius !== radius) {
+    patch.geometry.dispose();
+    patch.geometry=createWaterPatchGeometry(THREE,radius);
+  }
+  patch.scale.set(1,1,1);
   patch.material.opacity = 1;
   if (patch.material.color?.setHex) patch.material.color.setHex(palette.surface);
   if (patch.material.emissive?.setHex) patch.material.emissive.setHex(palette.emissive);
@@ -112,70 +118,65 @@ function updateBoatWaterPatch(candidate = null) {
 
 function buildBoatWaveProfile(material, runtimeIntensity = getWaveIntensity(), timeOverride = null) {
   const config = material?.userData?.weWaterWaveConfig || {};
-  const runtimeKind = resolveBoatWaterKind(appCtx.boatMode?.currentWater || null);
-  const runtimeShoreline = Number(appCtx.boatMode?.shorelineDistance || 0);
-  const boatDriven = appCtx.boatMode?.active || config.localPatch === true;
-  const modeledControls = modeledWaveRenderControls(appCtx.activeWaterOpticsEvidence?.wave);
-  const effectiveIntensity = modeledControls.usable ? modeledControls.intensity : runtimeIntensity;
-  const profile = resolveWaterMotionProfile({
-    waterKind: config.useRuntimeKind === true ? runtimeKind : inferWaterRenderContext({ kindHint: config.waterKind || runtimeKind }),
-    shorelineDistance: Number.isFinite(config.shorelineDistance) ? config.shorelineDistance : runtimeShoreline,
-    intensity: appCtx.boatMode?.active ? effectiveIntensity : Math.min(effectiveIntensity, 0.24),
-    // Shared mapped water keeps a restrained optical wave field in walk and
-    // flight modes. This is presentation only; CPU sampling and buoyancy stay
-    // on the existing boat-mode water dynamics authority.
-    active: true,
-    energyScale: (Number.isFinite(config.energyBase) ? config.energyBase : 1) * (boatDriven ? 1 : 0.38)
+  if (config.localPatch === true) return {
+    config,
+    profile: getBoatWaveProfile(appCtx.boatMode?.currentWater || null, {intensity:runtimeIntensity}),
+    time: Number.isFinite(timeOverride) ? Number(timeOverride) : performance.now() * 0.001
+  };
+  const profile = resolveBodyWaveProfile(config.waterBody || {waterKind:config.waterKind}, {
+    intensity:runtimeIntensity, waveEvidence:appCtx.activeWaterOpticsEvidence?.wave
   });
-  if (modeledControls.usable) {
-    profile.speed *= modeledControls.speedScale;
-    profile.waveEvidenceSource = modeledControls.sourceId;
-    profile.modeledWaveHeightM = modeledControls.waveHeightM;
-    profile.modeledWavePeriodS = modeledControls.wavePeriodS;
-  }
   const time = Number.isFinite(timeOverride) ? Number(timeOverride) : performance.now() * 0.001;
   return { config, profile, time };
+}
+
+// Uniforms are owned by this water presentation. Avoid rewriting unchanged
+// boxed values each frame. Compare the actual destination too, so shader
+// replacement and external edits cannot leave a stale cached value behind.
+const appliedWaterColors = new WeakMap();
+function setWaterScalar(uniform, value) {
+  if (uniform && uniform.value !== value) uniform.value = value;
+}
+function setWaterColor(color, hex) {
+  if (typeof color?.setHex !== 'function') return;
+  const prior = appliedWaterColors.get(color);
+  if (prior && prior.hex === hex && prior.r === color.r && prior.g === color.g && prior.b === color.b) return;
+  color.setHex(hex);
+  if (prior) { prior.hex = hex; prior.r = color.r; prior.g = color.g; prior.b = color.b; }
+  else appliedWaterColors.set(color, { hex, r: color.r, g: color.g, b: color.b });
 }
 
 function applyWaveUniformsToMaterial(material, profileBundle) {
   const shader = material?.userData?.weWaterWaveShader;
   if (!shader?.uniforms) return false;
   const { config, profile, time } = profileBundle;
-  shader.uniforms.weWaveTime.value = time;
-  shader.uniforms.weWaveSpeed.value = profile.speed;
-  shader.uniforms.weWaveAmplitude.value = profile.primaryAmplitude * (Number(config.waveBase) || 1);
-  if (shader.uniforms.weWaveSecondaryAmplitude) {
-    shader.uniforms.weWaveSecondaryAmplitude.value = profile.secondaryAmplitude * (Number(config.waveBase) || 1);
-  }
-  if (shader.uniforms.weWaveSwellAmplitude) {
-    shader.uniforms.weWaveSwellAmplitude.value = profile.swellAmplitude * (Number(config.waveBase) || 1);
-  }
-  if (shader.uniforms.weWaveRippleAmplitude) {
-    shader.uniforms.weWaveRippleAmplitude.value = profile.rippleAmplitude * (Number(config.waveBase) || 1);
-  }
-  if (shader.uniforms.weWaveVisualStrength) {
-    shader.uniforms.weWaveVisualStrength.value = profile.visualStrength * (Number(config.visualBase) || 1);
-  }
-  if (shader.uniforms.weWaveFoamStrength) {
-    shader.uniforms.weWaveFoamStrength.value = (profile.foamStrength + profile.whitecapStrength * 0.4) * (Number(config.foamBase) || 1);
-  }
+  if (shader.uniforms.weWaveTime.value !== time) shader.uniforms.weWaveTime.value = time;
+  const body = config.localPatch ? appCtx.boatMode?.currentWater?.source : config.waterBody;
+  const origin = shader.uniforms.weWaveOrigin?.value;
+  const originX = Number(body?.waveOffset?.x) || 0, originZ = Number(body?.waveOffset?.z) || 0;
+  if (origin && (origin.x !== originX || origin.y !== originZ)) origin.set?.(originX, originZ);
+  if (shader.uniforms.weWaveSpeed.value !== profile.speed) shader.uniforms.weWaveSpeed.value = profile.speed;
+  setWaterScalar(shader.uniforms.weWaveScale, profile.spatialScale);
+  if (shader.uniforms.weWaveAmplitude.value !== profile.primaryAmplitude) shader.uniforms.weWaveAmplitude.value = profile.primaryAmplitude;
+  setWaterScalar(shader.uniforms.weWaveSecondaryAmplitude, profile.secondaryAmplitude);
+  setWaterScalar(shader.uniforms.weWaveSwellAmplitude, profile.swellAmplitude);
+  setWaterScalar(shader.uniforms.weWaveRippleAmplitude, profile.rippleAmplitude);
+  setWaterScalar(shader.uniforms.weWaveVisualStrength, profile.visualStrength * (Number(config.visualBase) || 1));
+  setWaterScalar(shader.uniforms.weWaveFoamStrength, (profile.foamStrength + profile.whitecapStrength * 0.4) * (Number(config.foamBase) || 1));
   const atmosphere = appCtx.earthAtmosphereProfile;
   if (atmosphere) {
-    shader.uniforms.weWaterZenithColor?.value?.setHex?.(atmosphere.zenithColor);
-    shader.uniforms.weWaterHorizonColor?.value?.setHex?.(atmosphere.horizonColor);
-    shader.uniforms.weWaterSunColor?.value?.setHex?.(atmosphere.sunColor);
-    shader.uniforms.weWaterSunDirection?.value?.set?.(
-      atmosphere.sunDirection.x,
-      atmosphere.sunDirection.y,
-      atmosphere.sunDirection.z
-    );
-    if (shader.uniforms.weWaterDaylight) shader.uniforms.weWaterDaylight.value = atmosphere.daylight;
-    if (shader.uniforms.weWaterNight) shader.uniforms.weWaterNight.value = atmosphere.night;
-    if (shader.uniforms.weWaterOvercast) shader.uniforms.weWaterOvercast.value = atmosphere.overcast;
+    setWaterColor(shader.uniforms.weWaterZenithColor?.value, atmosphere.zenithColor);
+    setWaterColor(shader.uniforms.weWaterHorizonColor?.value, atmosphere.horizonColor);
+    setWaterColor(shader.uniforms.weWaterSunColor?.value, atmosphere.sunColor);
+    const direction = shader.uniforms.weWaterSunDirection?.value, sun = atmosphere.sunDirection;
+    if (direction && (direction.x !== sun.x || direction.y !== sun.y || direction.z !== sun.z)) direction.set?.(sun.x, sun.y, sun.z);
+    setWaterScalar(shader.uniforms.weWaterDaylight, atmosphere.daylight);
+    setWaterScalar(shader.uniforms.weWaterNight, atmosphere.night);
+    setWaterScalar(shader.uniforms.weWaterOvercast, atmosphere.overcast);
   }
   if (shader.uniforms.weWaterNormalStrength) {
     const quality = String(appCtx.renderQualityLevel || 'medium').toLowerCase();
-    shader.uniforms.weWaterNormalStrength.value = quality === 'low' ? 0.42 : quality === 'high' ? 1 : 0.72;
+    setWaterScalar(shader.uniforms.weWaterNormalStrength, quality === 'low' ? 0.42 : quality === 'high' ? 1 : 0.72);
   }
   return true;
 }
@@ -255,21 +256,9 @@ function applyBoatWavePose(x, z, angle, candidate = null, dt = 0, forceSnap = fa
   );
   const sinA = Math.sin(angle);
   const cosA = Math.cos(angle);
-  const sampleOffsets = [
-    { forward: 0, side: 0, weight: 2.2, zone: 'center' },
-    { forward: 4.9, side: 0, weight: 1.28, zone: 'bow' },
-    { forward: 6.4, side: 0.98, weight: 0.92, zone: 'bow' },
-    { forward: 6.4, side: -0.98, weight: 0.92, zone: 'bow' },
-    { forward: 3.1, side: 1.78, weight: 0.94, zone: 'port' },
-    { forward: 3.1, side: -1.78, weight: 0.94, zone: 'starboard' },
-    { forward: 0.2, side: 1.96, weight: 0.88, zone: 'port' },
-    { forward: 0.2, side: -1.96, weight: 0.88, zone: 'starboard' },
-    { forward: -2.85, side: 1.58, weight: 0.82, zone: 'port' },
-    { forward: -2.85, side: -1.58, weight: 0.82, zone: 'starboard' },
-    { forward: -4.8, side: 0, weight: 1.14, zone: 'stern' },
-    { forward: -3.45, side: 1.08, weight: 0.78, zone: 'stern' },
-    { forward: -3.45, side: -1.08, weight: 0.78, zone: 'stern' }
-  ];
+  const catalog=getMaritimeCatalogEntry(appCtx.boatMode?.transportCatalogId);
+  const sampleOffsets=vesselWaterSamples(catalog.dimensions);
+  const contactSamples=[];
 
   let weightedSurfaceY = 0;
   let totalWeight = 0;
@@ -296,6 +285,7 @@ function applyBoatWavePose(x, z, angle, candidate = null, dt = 0, forceSnap = fa
     const sampleZ = z + cosA * offset.forward - sinA * offset.side;
     const sample = sampleDynamicWaterAt(sampleX, sampleZ, candidate, { time, profile });
 
+    contactSamples.push({...offset,height:sample.surfaceY});
     weightedSurfaceY += sample.surfaceY * offset.weight;
     totalWeight += offset.weight;
     if (sample.surfaceY > maxSurfaceY) maxSurfaceY = sample.surfaceY;
@@ -335,59 +325,12 @@ function applyBoatWavePose(x, z, angle, candidate = null, dt = 0, forceSnap = fa
   };
   const steepness = totalWeight > 0 ? steepnessWeighted / totalWeight : 0;
 
-  const pitchDelta = bowAverage - sternAverage;
-  const rollDelta = portAverage - starboardAverage;
-  const waveDirectionX = Number(centerMotion?.directionX || 0);
-  const waveDirectionZ = Number(centerMotion?.directionZ || 1);
-  const waveAlignment = clamp(sinA * waveDirectionX + cosA * waveDirectionZ, -1, 1);
-  const intoWave = clamp(-waveAlignment, 0, 1);
-  const followingSea = clamp(waveAlignment, 0, 1);
-  const heaveBoost = 1 + profile.breakerStrength * 0.46 + speedNorm * 0.18;
-  const bowDipAssist = clamp(
-    (sternAverage - bowAverage) * (0.078 + intoWave * 0.132 + profile.breakerStrength * 0.034),
-    0,
-    0.28
-  );
-  const planingTrim = clamp(speedNorm * 0.02 + intoWave * 0.038 - followingSea * 0.012, -0.026, 0.072);
-  const crestBias = Math.max(0, (Number.isFinite(maxSurfaceY) ? maxSurfaceY : averageSurfaceY) - averageSurfaceY);
-  const prevHeave = appCtx.boat.heave;
-  let normalPitch = Math.atan2(
-    -((blendedNormal.x * sinA) + (blendedNormal.z * cosA)),
-    Math.max(0.42, blendedNormal.y)
-  );
-  let normalRoll = Math.atan2(
-    -((blendedNormal.x * cosA) - (blendedNormal.z * sinA)),
-    Math.max(0.42, blendedNormal.y)
-  );
-  if (pitchDelta * normalPitch < 0) normalPitch *= -1;
-  if (rollDelta * normalRoll < 0) normalRoll *= -1;
-  const samplePitch = Math.atan2(
-    pitchDelta * profile.pitchScale * (1.22 + speedNorm * 0.34 + profile.breakerStrength * 0.28 + intoWave * 0.56),
-    Math.max(3.4, 4.9 - intoWave * 1.0 - profile.breakerStrength * 0.64)
-  );
-  const sampleRoll = Math.atan2(
-    rollDelta * profile.rollScale * (1.06 + profile.breakerStrength * 0.26 + steepness * 0.08),
-    2.38
-  );
-  const targetPitch = clamp(
-    samplePitch * 0.9 +
-    normalPitch * (0.72 + profile.breakerStrength * 0.14 + speedNorm * 0.1) +
-    bowDipAssist +
-    planingTrim,
-    -0.62,
-    0.68
-  );
-  const targetRoll = clamp(
-    sampleRoll * 0.82 +
-    normalRoll * (0.6 + profile.breakerStrength * 0.12 + steepness * 0.05) -
-    (appCtx.boat.turnRate || 0) * Math.min(0.28, 0.12 + speedNorm * 0.14),
-    -0.58,
-    0.58
-  );
-  const targetHeave =
-    (averageSurfaceY - baseCenterY) * heaveBoost +
-    crestBias * (0.22 + intoWave * 0.14 + profile.breakerStrength * 0.1) +
-    steepness * (0.06 + profile.breakerStrength * 0.024);
+  const plane=fitVesselWaterPlane(contactSamples) || {height:averageSurfaceY,pitch:0,roll:0};
+  const waveDirectionX=Number(centerMotion?.directionX||0),waveDirectionZ=Number(centerMotion?.directionZ||1);
+  const intoWave=clamp(-(sinA*waveDirectionX+cosA*waveDirectionZ),0,1);
+  const prevHeave=appCtx.boat.heave;
+  const targetPitch=clamp(plane.pitch,-.5,.5),targetRoll=clamp(plane.roll,-.5,.5);
+  const targetHeave=plane.height-baseCenterY;
   const sampledMaxSurfaceY = Number.isFinite(maxSurfaceY) ? maxSurfaceY : averageSurfaceY;
   appCtx.boatMode.waveDirectionX = waveDirectionX;
   appCtx.boatMode.waveDirectionZ = waveDirectionZ;
@@ -463,47 +406,10 @@ function applyBoatWavePose(x, z, angle, candidate = null, dt = 0, forceSnap = fa
   appCtx.boat.verticalVelocity = dt > 0 ? (appCtx.boat.heave - prevHeave) / dt : 0;
   updateBoatSurfaceEffects(profile, dt > 0 ? dt : 1 / 60, centerMotion, speedNorm, bowAverage, sternAverage);
 
-  const buoyancyBase = 0.76 + profile.breakerStrength * 0.16;
-  const hullDraft = Math.max(0.36, Number(appCtx.boatMode?.meshDraft || 0.42));
-  const keelClearance = clamp(
-    hullDraft * 0.56 +
-    0.06 +
-    profile.breakerStrength * 0.18 +
-    speedNorm * 0.08 +
-    steepness * 0.03,
-    0.24,
-    0.64
-  );
-  const rotationClearance = Math.abs(appCtx.boat.pitch) * 0.72 + Math.abs(appCtx.boat.roll) * 0.46;
-  const bowClearance = Math.max(0, (Number.isFinite(bowPeakSurface) ? bowPeakSurface : sampledMaxSurfaceY) - sampledMaxSurfaceY) * 0.26;
-  const visualFreeboard = 0.08;
-  const staticWaterFloor = baseCenterY + clamp(0.14 + profile.breakerStrength * 0.08 + speedNorm * 0.04, 0.14, 0.28);
-  const targetBoatY = baseCenterY + buoyancyBase + appCtx.boat.heave;
-  const hullFloorY =
-    Math.max(
-      sampledMaxSurfaceY,
-      Number.isFinite(bowPeakSurface) ? bowPeakSurface : sampledMaxSurfaceY,
-      Number.isFinite(sternPeakSurface) ? sternPeakSurface : sampledMaxSurfaceY,
-      staticWaterFloor
-    ) +
-    keelClearance +
-    rotationClearance +
-    bowClearance +
-    visualFreeboard;
-  const resolvedBoatY = Math.max(targetBoatY, hullFloorY);
-  appCtx.boat.y = resolvedBoatY;
-  appCtx.boatMode.surfaceEnvelope = {
-    baseY: baseCenterY,
-    averageY: averageSurfaceY,
-    maximumY: sampledMaxSurfaceY,
-    targetBoatY,
-    hullFloorY,
-    resolvedBoatY,
-    hullDraft,
-    keelClearance,
-    rotationClearance,
-    sampledAt: time
-  };
+  appCtx.boat.y=baseCenterY+appCtx.boat.heave;
+  appCtx.boatMode.surfaceEnvelope={baseY:baseCenterY,averageY:averageSurfaceY,maximumY:sampledMaxSurfaceY,
+    targetBoatY:plane.height,resolvedBoatY:appCtx.boat.y,hullDraft:catalog.dimensions.draft,
+    waterlinePolicy:'authored-design-waterline',sampledAt:time};
 }
 
 
@@ -528,6 +434,8 @@ function updateWaterWaveVisuals() {
 }
 
 export {
+  buildBoatWaveProfile,
+  applyWaveUniformsToMaterial,
   applyBoatWavePose,
   ensureBoatWaterPatch,
   resetBoatFoamFx,

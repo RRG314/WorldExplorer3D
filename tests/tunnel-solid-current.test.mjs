@@ -98,3 +98,19 @@ test('nearby display labels cannot create route links across generalized gaps',(
   for(const f of features)f.transportRecord.capabilities={routeName:'display-only'};
   assert.equal(compileTransportNetworkModel(features).connections.length,0,'inferred label is not topology');
 });
+
+test('a mapped endpoint-to-interior tunnel branch unions actual clearance sweeps without an internal wall',()=>{
+  const main=road('through',[{x:0,z:-60},{x:0,z:60}]);
+  const branch=road('branch',[{x:.31,z:0},{x:50,z:0}]);
+  compileTransportNetworkModel([main,branch]);
+  compileTunnelSystemModels([main,branch],()=>20);
+  const components=tunnelSolidComponents([main,branch]);
+  assert.equal(components.length,1);
+  assert.equal(components[0].length,2);
+  const {boundary}=compile(components[0]);
+  const floor=main.transportSurfaceModel.centerHeights[0];
+  for(const x of [0,2,4,6,10])assert.equal(queryTunnelSolid(boundary,x,0,floor+1).inside,true);
+  assert.equal(boundary.walls.some(w=>Math.abs(w.a[0]-4.02)<.01&&Math.abs(w.b[0]-4.02)<.01&&Math.min(w.a[2],w.b[2])<0&&Math.max(w.a[2],w.b[2])>0),false);
+  branch.transportSurfaceModel={...branch.transportSurfaceModel,centerHeights:Float64Array.from(branch.transportSurfaceModel.centerHeights,y=>y+10)};
+  assert.equal(tunnelSolidComponents([main,branch]).length,0,'planar overlap at another height cannot union');
+});

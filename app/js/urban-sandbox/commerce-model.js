@@ -1,6 +1,6 @@
 import { TRANSFERABLE_MATERIAL_DEFINITIONS } from '../resources/material-catalog.js?v=2';
 import { normalizePoi } from '../poi/semantic-authority.js?v=3';
-import { associatePoiToBuilding } from '../poi/building-association.js?v=1';
+import { associatePoisToBuildings } from '../poi/building-association.js?v=1';
 import { VEHICLE_UPGRADE_SERVICES } from '../transport/vehicle-upgrades.js?v=1';
 
 const COMMERCE_SCHEMA_VERSION = 4;
@@ -93,7 +93,7 @@ function commercePresentation(record) {
 }
 
 function mappedCommercePlaces(pois = [], options = {}) {
-  return (Array.isArray(pois) ? pois : []).map((poi) => {
+  const places = (Array.isArray(pois) ? pois : []).map((poi) => {
     const record = poi?.type === 'WorldExplorerPoi' ? poi : normalizePoi(poi);
     const presentation = commercePresentation(record);
     const sourceTags = record.source?.tags || {};
@@ -120,10 +120,17 @@ function mappedCommercePlaces(pois = [], options = {}) {
       sourceElementId: record.source.elementId,
       semantic: record.semantic,
       sourceFacts: record.source,
-      buildingAssociation: record.buildingAssociation || associatePoiToBuilding(record, options.buildings || [], options),
+      buildingAssociation: record.buildingAssociation || null,
       provenance: 'loaded-map-poi'
     });
   }).filter(Boolean);
+  // Associate unresolved shops in one indexed snapshot. Scanning every city
+  // building per shop produced hundreds of MB of temporary footprint objects.
+  const pending=places.filter(place=>!place.buildingAssociation);
+  if(!pending.length || !options.buildings?.length)return places;
+  const associated=associatePoisToBuildings(pending,options.buildings,options);
+  let index=0;
+  return places.map(place=>place.buildingAssociation?place:associated[index++]);
 }
 
 function mappedConvenienceStores(pois = []) {

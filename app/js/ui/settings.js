@@ -1,9 +1,35 @@
+import { readRegionalSceneryPreference, writeRegionalSceneryPreference } from '../terrain/regional-scenery-scheduler.js';
+
 export function setupSettingsUi(appCtx) {
+  document.getElementById('copySupportReceiptBtn')?.addEventListener('click', async () => {
+    const status=document.getElementById('supportReceiptStatus');
+    const preview=document.getElementById('supportReceiptPreview');
+    const read=globalThis.getWorldExplorerSupportReceipt;
+    if(typeof read!=='function'){if(status)status.textContent='Game diagnostics are still loading. Try again.';return;}
+    const text=JSON.stringify(read(),null,2);
+    if(preview){preview.value=text;preview.hidden=false;}
+    try{
+      if(!navigator.clipboard?.writeText)throw new Error('Clipboard unavailable');
+      await navigator.clipboard.writeText(text);
+      if(status)status.textContent='Report copied. You can review it below before sharing.';
+    }catch{
+      if(status)status.textContent='Select and copy the report below.';
+      preview?.focus();preview?.select();
+    }
+  });
   // Settings Tab - API Keys
   const rentcastKeyInput = document.getElementById('rentcastKeyInput');
   const attomKeyInput = document.getElementById('attomKeyInput');
   const estatedKeyInput = document.getElementById('estatedKeyInput');
   const saveApiKeyBtn = document.getElementById('saveApiKey');
+  const regionalSceneryToggle = document.getElementById('regionalSceneryToggle');
+  if (regionalSceneryToggle) {
+    regionalSceneryToggle.checked = appCtx.getRegionalSceneryState?.().enabled ?? readRegionalSceneryPreference();
+    regionalSceneryToggle.addEventListener('change', () => {
+      writeRegionalSceneryPreference(regionalSceneryToggle.checked);
+      appCtx.setRegionalSceneryEnabled?.(regionalSceneryToggle.checked);
+    });
+  }
   const renderQualitySelect = document.getElementById('renderQualitySelect');
   const highQualityToggle = document.getElementById('highQualityToggle');
   const ssaoToggle = document.getElementById('ssaoToggle');

@@ -58,7 +58,8 @@ try {
   assert.equal(runtimeState.cardHidden, false, `Current Journey stayed hidden in Space Flight: ${JSON.stringify(runtimeState)}`);
   await page.waitForSelector('#currentJourneyCard:not([hidden])');
   const initialCopy = await page.locator('#currentJourneyCard').textContent();
-  assert.match(initialCopy, /Space Flight.*Choose a destination or fly freely.*Wayfinder/is);
+  assert.match(initialCopy, /ACTIVE COURSE.*Moon.*Wayfinder/is);
+  assert.equal(await page.locator('#sfDestination').textContent(), 'Moon');
   assert.doesNotMatch(initialCopy, /authority|schema|pipeline|scaffold|procedural|generated/i);
   await page.screenshot({ path: path.join(evidenceDir, '01-space-flight-journey.png') });
 
@@ -133,11 +134,11 @@ try {
 
   await page.locator('#currentJourneyAction').click();
   await page.waitForSelector('#universeNavigator:not([hidden])');
-  assert.match(await page.locator('#universeNavigator').textContent(), /Wayfinder.*Choose a destination.*Set Course/is);
+  assert.match(await page.locator('#universeNavigator').textContent(), /Wayfinder.*Catalog destination.*Set Course/is);
   await page.selectOption('#universeDestinationSelect', 'proxima-centauri');
   await page.locator('#universeTravelBtn').click();
   await page.waitForFunction(() => document.getElementById('universeNavigator')?.hidden === true);
-  await page.waitForFunction(() => /ACTIVE COURSE|WAYFINDER ASSIST/i.test(document.getElementById('currentJourneyEyebrow')?.textContent || ''));
+  await page.waitForFunction(() => /Proxima Centauri/i.test(document.getElementById('currentJourneyCard')?.textContent || ''));
   const activeCopy = await page.locator('#currentJourneyCard').textContent();
   assert.match(activeCopy, /Proxima Centauri.*course|course.*Proxima Centauri/is);
   await page.screenshot({ path: path.join(evidenceDir, '03-active-space-course.png') });

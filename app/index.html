@@ -23,7 +23,7 @@ if (location.protocol === 'file:') document.documentElement.classList.add('unsup
 <script type="module" src="../js/site-analytics.js?v=1"></script>
 <style>@layer legacy, interface;</style>
 <link rel="stylesheet" href="styles/title-shell.css?v=95">
-<link rel="stylesheet" href="styles/runtime-shell.css?v=127">
+<link rel="stylesheet" href="styles/runtime-shell.css?v=130">
 <link rel="stylesheet" href="styles/block-builder.css?v=9">
 <link rel="stylesheet" href="styles/universe.css?v=9">
 <link rel="stylesheet" href="styles/fishing-game.css?v=6">
@@ -38,6 +38,73 @@ if (location.protocol === 'file:') document.documentElement.classList.add('unsup
 <link rel="stylesheet" href="styles/reality-capture.css?v=2">
 </head>
 <body>
+<!-- Initial loading and recovery are available before any game module. -->
+<div id="loading" class="show" data-state="starting" role="dialog" aria-modal="true" aria-busy="true" aria-labelledby="loadTitle" tabindex="-1">
+  <section class="loadingCard">
+    <div class="loadingOverview">
+      <div class="loadingBrand">WORLD EXPLORER 3D</div>
+      <h1 id="loadTitle">Starting World Explorer</h1>
+      <p id="loadNote">Preparing the globe and controls. Your first visit can take a little longer.</p>
+      <div class="loadingStatus"><span id="loadText" role="status" aria-live="polite">Opening the game</span><span id="loadPercent" aria-hidden="true"></span></div>
+      <progress id="loadProgress" max="100" aria-label="World loading progress" aria-describedby="loadText loadProgressNote"></progress>
+      <p id="loadProgressNote">Progress follows loading steps. Some steps take longer than others.</p>
+      <a id="loadRetry" href="" hidden>Reload and try again</a>
+    </div>
+    <noscript><p>JavaScript is required to start World Explorer. Enable it for this site, then reload.</p></noscript>
+    <div id="loadTip" class="loadingTip" role="group" aria-label="Things to try in World Explorer">
+      <div id="loadTipTopic" class="loadingTipTopic">While you wait</div>
+      <h2 id="loadTipTitle">Pick your next outing</h2>
+      <p id="loadTipText">Explore on foot, take a flight or set out on the water.</p>
+      <div class="loadingTipControls">
+        <span id="loadTipCount" aria-label="Tip number"></span>
+        <button id="loadTipPause" type="button" aria-pressed="false">Pause tips</button>
+        <button id="loadTipPrevious" type="button" aria-label="Previous tip">←</button>
+        <button id="loadTipNext" type="button" aria-label="Next tip">→</button>
+      </div>
+    </div>
+  </section>
+</div>
+<script id="startupCoverController">
+// This runs before the module graph: a failed bootstrap cannot hide its own recovery UI.
+(() => {
+  const cover = document.getElementById('loading');
+  const el = id => document.getElementById(id);
+  const write = (id, text) => { const node = el(id); if (node) node.textContent = text; };
+  function cleanup() {
+    clearTimeout(slowTimer);
+    window.removeEventListener('error', scriptFailed, true);
+    window.removeEventListener('we3d:startup-failed', failed);
+    window.removeEventListener('we3d:runtime-ready', ready);
+  }
+  function failed() {
+    if (cover.dataset.state !== 'starting') return;
+    cleanup(); cover.dataset.state = 'error'; cover.setAttribute('aria-busy', 'false');
+    write('loadTitle', 'Unable to start the game');
+    write('loadNote', 'Part of the game could not load. Check your connection and try again.');
+    write('loadText', 'Reload to try again. Your saved progress will stay here.');
+    if (el('loadProgress')) el('loadProgress').hidden = true;
+    if (el('loadRetry')) el('loadRetry').hidden = false;
+  }
+  function scriptFailed(event) {
+    if (event.target?.tagName === 'SCRIPT' && event.target.hasAttribute('data-startup-critical')) failed();
+  }
+  function ready() {
+    cleanup();
+    // A direct journey may already own the same screen. Never hide its world load.
+    if (cover.dataset.state !== 'starting') return;
+    cover.classList.remove('show'); cover.setAttribute('aria-busy', 'false');
+    cover.dataset.state = 'idle';
+  }
+  const slowTimer = setTimeout(() => {
+    if (cover.dataset.state !== 'starting') return;
+    write('loadNote', 'The game is still starting. You can wait, or reload if nothing changes.');
+    if (el('loadRetry')) el('loadRetry').hidden = false;
+  }, 30000);
+  window.addEventListener('error', scriptFailed, true);
+  window.addEventListener('we3d:startup-failed', failed);
+  window.addEventListener('we3d:runtime-ready', ready);
+})();
+</script>
 <a class="we3d-skip-link" href="#globeSelectorStartBtn">Skip to world controls</a>
 <div id="accessibilityAnnouncements" class="we3d-visually-hidden" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="fileLaunchError" role="alert"><div><strong>World Explorer needs a local web server.</strong><code>npm run dev</code></div></div>
@@ -178,8 +245,8 @@ Not case sensitive! Try: "Seattle" • "Tokyo" • "Paris, France" • "Austin, 
 <div class="mode" data-mode="deflock"><div class="mode-icon">📷</div><div><div class="mode-name">DeFlock Hunt</div><div class="mode-desc">Find publicly mapped virtual cameras and disable them inside the game. Physical infrastructure is never affected.</div></div><div class="mode-check">✓</div></div>
 <div class="mode" data-mode="livegps"><div class="mode-icon">📍</div><div><div class="mode-name">Live GPS Explore</div><div class="mode-desc">Walk through one loaded Earth location as you move in real life. Foreground use only; never use while driving.</div></div><div class="mode-check">✓</div></div>
 <div class="mode sel" data-mode="free"><div class="mode-icon">🚗</div><div><div class="mode-name">Free Roam</div><div class="mode-desc">Explore the city at your own pace</div></div><div class="mode-check">✓</div></div>
-<div class="mode" data-mode="trial"><div class="mode-icon">⏱️</div><div><div class="mode-name">Time Trial</div><div class="mode-desc">Race to the destination as fast as you can</div></div><div class="mode-check">✓</div></div>
-<div class="mode" data-mode="checkpoint"><div class="mode-icon">🏁</div><div><div class="mode-name">Checkpoints</div><div class="mode-desc">Collect all markers scattered across the map</div></div><div class="mode-check">✓</div></div>
+<div class="mode" data-mode="trial"><div class="mode-icon">⏱️</div><div><div class="mode-name">Time Trial</div><div class="mode-desc">Drive through the gold destination ring before time runs out. Pause stops the timer.</div></div><div class="mode-check">✓</div></div>
+<div class="mode" data-mode="checkpoint"><div class="mode-icon">🏁</div><div><div class="mode-name">Checkpoints</div><div class="mode-desc">Drive through every pink road marker, in any order. Free Roam ends the run.</div></div><div class="mode-check">✓</div></div>
 <div class="mode" data-mode="painttown"><div class="mode-icon">🟥</div><div><div class="mode-name">Paint the Town Red</div><div class="mode-desc">Use touch paint or paintball gun to claim buildings. Room rules can enforce roof-only or gun-only rounds.</div></div><div class="mode-check">✓</div></div>
 <div class="mode" data-mode="flower"><div class="mode-icon">🌹</div><div><div class="mode-name">Flower Sprint</div><div class="mode-desc">Instantly start the red flower hunt and race for the fastest time.</div></div><div class="mode-check">✓</div></div>
 <div style="grid-column:1/-1;padding:12px 0;text-align:center;font-size:11px;color:#64748b;border-top:2px solid #e8eef5;margin-top:8px;">💡 Cycle through walking, the BMW, the plane, and the drone with <b>F</b>, or choose a mode directly from Travel</div>
@@ -276,6 +343,13 @@ Not case sensitive! Try: "Seattle" • "Tokyo" • "Paris, France" • "Austin, 
 </div>
 </div>
 <div class="tab-content" id="tab-settings">
+<section class="support-receipt-card" aria-labelledby="supportReceiptTitle">
+<h3 id="supportReceiptTitle">Help with a problem</h3>
+<p>Copy a report of the game version and recent errors to share with support. Coordinates, account details and personal media are excluded.</p>
+<button id="copySupportReceiptBtn" type="button">Copy support report</button>
+<p id="supportReceiptStatus" role="status" aria-live="polite"></p>
+<textarea id="supportReceiptPreview" readonly hidden aria-label="Support report for copying" spellcheck="false"></textarea>
+</section>
 <div style="padding:8px 0">
 <div style="margin-bottom:24px">
 <div style="font-family:'Poppins',sans-serif;font-size:15px;font-weight:600;color:#667eea;margin-bottom:12px;display:flex;align-items:center;gap:8px">
@@ -296,6 +370,11 @@ High Quality Boost (stronger shadows + car paint)
 <input type="checkbox" id="ssaoToggle" style="width:16px;height:16px;cursor:pointer">
 High-only SSAO contact shadows
 </label>
+<label style="display:flex;align-items:center;gap:10px;font-size:12px;margin-bottom:6px;cursor:pointer">
+<input type="checkbox" id="regionalSceneryToggle" checked style="width:16px;height:16px;cursor:pointer">
+Load regional scenery as you travel
+</label>
+<p style="font-size:11px;margin:0 0 12px">Terrain and mapped buildings follow your journey. Roads and activities stay with your starting location. Turn off to keep the original fixed view.</p>
 <div id="perfSettingsStatus" style="font-size:11px;color:#64748b;min-height:16px">
 Graphics changes apply to the current session.
 </div>
@@ -425,8 +504,8 @@ How Connected Data Is Used
 <div id="gameLeaderboardBadge" class="flowerChallengeBadge">Flower Sprint</div>
 </div>
 <div class="flowerChallengeBody">
-<div id="gameLeaderboardHint" class="flowerChallengeHint">Fastest red-flower runs. Signed-in scores publish to the shared board.</div>
-<div id="gameLeaderboardScope" class="flowerLeaderboardScope">Global • All time</div>
+<div id="gameLeaderboardHint" class="flowerChallengeHint">Fastest Flower Sprint finishes. Player-reported results.</div>
+<div id="gameLeaderboardScope" class="flowerLeaderboardScope">Global • All time • Casual</div>
 <div class="flowerChallengeLocation">Location: <b id="flowerChallengeLocation">Baltimore</b></div>
 <div class="flowerLeaderboardTabs">
 <button id="leaderboardTabFlower" class="flowerLeaderboardTab active" type="button">🌹 Flower</button>
@@ -501,11 +580,12 @@ How Connected Data Is Used
     </section>
     <section>
       <h3>Live &amp; community feeds</h3>
-      <p>OpenSky Network and ADSB.lol aircraft observations; USGS earthquakes; CelesTrak orbital elements; Open-Meteo weather and marine models; NOAA CO-OPS observations and tide predictions.</p>
+      <p><a href="https://www.adsb.lol/docs/open-data/api/" target="_blank" rel="noopener noreferrer">ADSB.lol</a> aircraft observations (<a href="https://opendatacommons.org/licenses/odbl/1-0/" target="_blank" rel="noopener noreferrer">ODbL 1.0</a>); USGS earthquakes; CelesTrak orbital elements; <a href="https://api.met.no/" target="_blank" rel="noopener noreferrer">MET Norway</a> hourly weather (<a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener noreferrer">CC BY 4.0</a>; wind units and weather categories converted); <a href="https://www.pacioos.hawaii.edu/waves/model-global/" target="_blank" rel="noopener noreferrer">PacIOOS WAVEWATCH III</a> waves with <a href="https://www.weather.gov/disclaimer" target="_blank" rel="noopener noreferrer">NOAA / NCEP WAVEWATCH III</a> fallback via NSF Unidata; <a href="https://tds.hycom.org/thredds/catalogs/GLBy0.08/latest.html?dataset=GLBy0.08-latest" target="_blank" rel="noopener noreferrer">HYCOM / FNMOC ESPC</a> surface currents and temperature; NOAA CO-OPS observations and tide predictions.</p>
       <p>Panoramax and KartaView street imagery is provided by their contributors under CC BY-SA 4.0.</p>
     </section>
     <section>
       <h3>Software, fonts &amp; assets</h3>
+      <p>Marine coral forms: <a href="https://3d.si.edu/corals" target="_blank" rel="noopener noreferrer">Smithsonian Institution, National Museum of Natural History</a>, CC0 1.0. Museum scans were simplified, scaled and recolored for authored habitat. They are not observations of living colonies at the game coordinates.</p>
       <p>Three.js r128 — MIT License. Inter, Poppins, Orbitron, Righteous, Barlow, and Chakra Petch fonts — SIL Open Font License.</p>
       <p>Vegetation: <a href="https://sketchfab.com/3d-models/low-poly-vegetation-for-games-cdac82eb61ab4d83bf162b4c44b44d6d" target="_blank" rel="noopener noreferrer">Low poly vegetation for games</a> by denoises; <a href="https://sketchfab.com/3d-models/bush-844e6a315757431da97efb5f17383bb5" target="_blank" rel="noopener noreferrer">Bush</a> by lev26. Ship surface maps and computer-room equipment: <a href="https://sketchfab.com/3d-models/sci-fi-computer-room-a149d5bfcef6496c9a0606b5ce5ebf27" target="_blank" rel="noopener noreferrer">Sci-Fi Computer Room</a> by Michael V. Adapted for the game under <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener noreferrer">CC BY 4.0</a>.</p>
       <p>NASA, ESA, JPL-Caltech, USGS Astrogeology, LROC, Wikimedia contributors, ambientCG, and Poly Haven assets retain the credits and terms documented in the attribution index.</p>
@@ -514,10 +594,10 @@ How Connected Data Is Used
       <h3>Project terms</h3>
       <p>World Explorer 3D is publicly viewable under its proprietary source-available license. Attribution alone does not grant permission to copy, publish, host, or redistribute the game. Third-party components and data remain under their original terms.</p>
       <nav class="data-licenses-links" aria-label="Detailed legal and attribution documents">
-        <a href="https://github.com/RRG314/WorldExplorer3D/blob/main/ATTRIBUTION.md" target="_blank" rel="noopener noreferrer">Attribution index</a>
-        <a href="https://github.com/RRG314/WorldExplorer3D/blob/main/DATA_SOURCES.md" target="_blank" rel="noopener noreferrer">Data sources</a>
-        <a href="https://github.com/RRG314/WorldExplorer3D/blob/main/ACKNOWLEDGEMENTS.md" target="_blank" rel="noopener noreferrer">Acknowledgements</a>
-        <a href="https://github.com/RRG314/WorldExplorer3D/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">Project license</a>
+        <a href="https://github.com/RRG314/WorldExplorer3D/blob/stable/ATTRIBUTION.md" target="_blank" rel="noopener noreferrer">Attribution index</a>
+        <a href="https://github.com/RRG314/WorldExplorer3D/blob/stable/DATA_SOURCES.md" target="_blank" rel="noopener noreferrer">Data sources</a>
+        <a href="https://github.com/RRG314/WorldExplorer3D/blob/stable/ACKNOWLEDGEMENTS.md" target="_blank" rel="noopener noreferrer">Acknowledgements</a>
+        <a href="https://github.com/RRG314/WorldExplorer3D/blob/stable/LICENSE" target="_blank" rel="noopener noreferrer">Project license</a>
       </nav>
       <button id="analyticsConsentManageBtn" class="analytics-consent-manage" type="button">Analytics preference</button>
     </section>
@@ -647,7 +727,7 @@ How Connected Data Is Used
   <button id="globeSelectorMoonBtn" class="globe-selector-shortcut" type="button" title="Explore the Moon" aria-label="Explore the Moon"><span class="destination-thumb moon" aria-hidden="true"></span></button>
   <button id="globeSelectorMarsBtn" type="button" title="Explore Mars" aria-label="Explore Mars"><span class="destination-thumb mars" aria-hidden="true"></span></button>
   <button id="globeSelectorSpaceBtn" class="globe-selector-shortcut" type="button" title="Explore space" aria-label="Explore space"><span class="destination-thumb space" aria-hidden="true"></span></button>
-  <button id="globeSelectorOceanBtn" type="button" title="Explore underwater at the selected coordinates" aria-label="Explore underwater at the selected coordinates"><span class="destination-thumb ocean" aria-hidden="true"></span></button>
+  <button id="globeSelectorOceanBtn" type="button" title="Explore by submarine at eligible ocean coordinates" aria-label="Explore by submarine at eligible ocean coordinates"><span class="destination-thumb ocean" aria-hidden="true"></span></button>
 </div>
 <section id="globeHubOverlay" class="globe-hub-overlay" hidden aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="globeHubOverlayTitle" tabindex="-1">
   <header class="globe-hub-overlay-header">
@@ -776,7 +856,7 @@ How Connected Data Is Used
         <section id="discoveryJourneyOverview" class="discoveryJourneyOverview" aria-label="Ways to explore"></section>
         <div id="discoveryProgress" class="discoveryProgressGrid"></div>
         <section class="discoveryCompanionSection"><div class="discoverySectionHead"><span>COMPANIONS</span><small>ANIMALS YOU KNOW</small></div><p>Wild species belong in the Guide. Individual animals you befriend and care for live here.</p><div id="discoveryCompanionList" class="discoveryList"></div></section>
-        <details class="discoveryOnlineService"><summary>Data and backup</summary><p>Your Journal, Guide, companions, and local Backpack history are stored in this browser. Signed-in receipts cover eligible collected items; the full Journal does not yet follow you between devices.</p><div class="discoveryResultActions"><button id="discoveryExportBtn" type="button">Download backup</button><button id="discoveryImportBtn" type="button">Restore backup</button><input id="discoveryImportFile" type="file" accept="application/json,.json" hidden></div><p id="discoveryBackupStatus" role="status" aria-live="polite"></p></details>
+        <details class="discoveryOnlineService"><summary>Data and backup</summary><p id="discoverySaveStatus" role="status" aria-live="polite">Checking local save status…</p><p>Your Journal, Guide, companions, and local Backpack history are stored in this browser. Signed-in receipts cover eligible collected items; the full Journal does not yet follow you between devices.</p><div class="discoveryResultActions"><button id="discoveryExportBtn" type="button">Download backup</button><button id="discoveryImportBtn" type="button">Restore backup</button><button id="discoveryUndoImportBtn" type="button">Undo last restore</button><input id="discoveryImportFile" type="file" accept="application/json,.json" hidden></div><p id="discoveryBackupStatus" role="status" aria-live="polite"></p></details>
         <div class="discoveryLegacyEquipmentData" hidden><div id="discoveryEquippedSummary"></div><button id="discoveryOpenBackpackBtn" type="button">Open Backpack</button><div id="discoveryToolList"></div></div>
       </section>
     </div>
@@ -957,7 +1037,7 @@ How Connected Data Is Used
 <header id="mapExplorerHeader">
   <div><span>WORLD MAP</span><strong id="mapExplorerStatus">Following your position</strong></div>
   <form id="mapSearchForm" class="mapSearchForm" role="search">
-    <label class="sr-only" for="mapSearchInput">Search for a city, place, airport, or coordinates</label>
+    <label class="we3d-visually-hidden" for="mapSearchInput">Search for a city, place, airport, or coordinates</label>
     <input id="mapSearchInput" type="search" autocomplete="off" placeholder="City, place, airport, or coordinates">
     <button id="mapSearchBtn" type="submit">Search</button>
     <span id="mapSearchStatus" role="status" aria-live="polite"></span>
@@ -1592,7 +1672,8 @@ Explore the area
 • A/D - Turn left / right; arrow keys are an alternate<br>
 • Space - Ascend<br>
 • Shift/Ctrl - Descend<br>
-• Explore the reef shelf and open deep ocean
+• Explore a bounded ocean scene by submarine; swimming and scuba are not available yet<br>
+• The seabed map shows gameplay contours; modeled geographic depths are labeled separately
 </div>
 </div></div>
 <div id="mobileTouchControls" aria-label="Mobile navigation controls">
@@ -1618,7 +1699,7 @@ Explore the area
 </div>
 
 <!-- Real Estate System -->
-<script type="module" src="js/app-shell-fragments.js?v=88"></script>
+<script type="module" data-startup-critical src="js/app-shell-fragments.js?v=91"></script>
 <script type="module" src="js/app-auth-shell.js?v=87"></script>
-<script type="module" src="js/bootstrap.js?v=610"></script>
+<script type="module" data-startup-critical src="js/bootstrap.js?v=612"></script>
 </body></html>

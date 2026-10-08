@@ -30,12 +30,13 @@ export function planRoadRoute(roads) {
   return best;
 }
 
-export async function followRoadRoute(page,route,signal) {
+export async function followRoadRoute(page,route,signal,{mode='drive'}={}) {
   const points=route.points,held=new Set(),samples=[];let segment=0,progress=0,completedLength=0;
   const setKey=async(key,down)=>{if(down===held.has(key))return;if(down){await page.keyboard.down(key);held.add(key);}else{await page.keyboard.up(key);held.delete(key);}};
   try{
     while(!signal.stopped){
-      const pose=await page.evaluate(()=>{const a=globalThis.__WE3D_TRAVEL_ACTOR__;return {x:a.x,z:a.z,angle:a.angle,speed:a.speed,yawRate:a.yawRate,at:performance.now()};});
+      const pose=await page.evaluate(walking=>{const a=globalThis.__WE3D_TRAVEL_ACTOR__;return {x:a.x,z:a.z,angle:walking?a.yaw:a.angle,speed:walking?Math.hypot(a.vx||0,a.vz||0):a.speed,yawRate:a.yawRate,at:performance.now()};},mode==='walk');
+      if(![pose.x,pose.z,pose.angle,pose.speed].every(Number.isFinite))throw Error('Travel driver received an invalid actor pose');
       let a=points[segment],b=points[segment+1],dx=b.x-a.x,dz=b.z-a.z,length=Math.hypot(dx,dz);
       let t=((pose.x-a.x)*dx+(pose.z-a.z)*dz)/(length*length);
       while((t>=1||Math.hypot(pose.x-b.x,pose.z-b.z)<3)&&segment<points.length-2){
@@ -48,11 +49,11 @@ export async function followRoadRoute(page,route,signal) {
       const error=Math.atan2(Math.sin(targetAngle-pose.angle),Math.cos(targetAngle-pose.angle));
       const correction=error-(pose.yawRate||0)*.18;
       const complete=segment===points.length-2&&Math.hypot(pose.x-b.x,pose.z-b.z)<5;
-      const targetSpeed=Math.abs(error)>.4?12:24;
-      await setKey('w',!complete&&pose.speed<targetSpeed);
-      await setKey('s',!complete&&pose.speed>targetSpeed+8);
-      await setKey('a',!complete&&correction>.055);
-      await setKey('d',!complete&&correction<-.055);
+      const walking=mode==='walk',targetSpeed=Math.abs(error)>.4?12:24;
+      await setKey('w',!complete&&(walking?Math.abs(error)<1:pose.speed<targetSpeed));
+      await setKey('s',!walking&&!complete&&pose.speed>targetSpeed+8);
+      await setKey(walking?'ArrowLeft':'a',!complete&&correction>.055);
+      await setKey(walking?'ArrowRight':'d',!complete&&correction<-.055);
       samples.push({...pose,segment,progress,error,complete});
       if(complete){signal.completed=true;break;}
       await new Promise(resolve=>setTimeout(resolve,100));

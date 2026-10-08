@@ -1,4 +1,6 @@
 import {prepareTransportDetail} from './transport-detail-runtime.js';
+import {createPortalSurfaceClipper} from './portal-surface-clip.js';
+import {captureEarthWorldSession,reloadEarthWorldSession} from '../earth-session.js?v=17';
 import {createRegionalRoadContact} from './regional-road-contact.js';
 import {transportRegionKey} from './transport-detail-plan.js';
 import { STREET_POLYGON_GRID_WORLD } from '../world/compiler/street-polygon-kernel.js';
@@ -46,7 +48,9 @@ function appendIndexedGeometry(targetVerts, targetIndices, verts, indices) {
 }
 
 export function shouldRenderRoadCenterMarkings(road) {
-  if (!/(motorway|trunk|primary)/.test(String(road?.type || ""))) return false;
+  const type=String(road?.type||'');
+  if(!/^(motorway|trunk|primary|secondary|tertiary)(_link)?$/.test(type))return false;
+  if(/^(secondary|tertiary)/.test(type) && !(Number(road?.transportRecord?.crossSection?.lanes)>=2))return false;
   // Elevated ribbons and their engineered bodies are compiled by separate
   // owners. Until those meshes share one published top surface, lane quads can
   // remain visible when the body is occluded. Preserve ordinary ground-road
@@ -223,7 +227,7 @@ export function createCompiledRoadSurfaceSampler(feature, fallbackSampler, diagn
       // the cut half of the profile hovering over its own graded ground.
       // Read the published ground in both directions. Bridges and tunnels
       // retain their independent engineered profiles.
-      if (feature?.structureSemantics?.terrainMode === 'at_grade' && typeof fallbackSampler === 'function') {
+      if (feature?.structureSemantics?.terrainMode === 'at_grade' && feature.transportSurfaceModel?.engineeredApproach !== true && typeof fallbackSampler === 'function') {
         const renderedTerrainY = fallbackSampler(x, z);
         if (Number.isFinite(renderedTerrainY)) {
           if (diagnostics && renderedTerrainY > compiledY) diagnostics.renderedTerrainClamps = Number(diagnostics.renderedTerrainClamps || 0) + 1;
@@ -446,10 +450,13 @@ export async function publishCompiledTransportMeshes(deps = {}) {
       const shared=road.transportSurfacePresentation?.status==='compiled'?road.transportSurfacePresentation:null;
       if(shared){if(seen.has(shared.id))continue;seen.add(shared.id);}
       const renderRoad=shared||road;
-      if(renderRoad.structureSemantics?.terrainMode==='at_grade'&&renderRoad.pts?.length>=2)planRoads.push(renderRoad);
+      if(renderRoad.structureSemantics?.terrainMode==='at_grade'&&renderRoad.transportSurfaceModel?.engineeredApproach!==true&&renderRoad.pts?.length>=2)planRoads.push(renderRoad);
     }
     const terrainReady=new Promise(resolve=>releaseTerrain=resolve);
-    preparingDetail=prepareTransportDetail(appCtx,planRoads,{isCurrent,terrainReady});
+    preparingDetail=prepareTransportDetail(appCtx,planRoads,{isCurrent,terrainReady,retryWorldLoad:()=>{
+      captureEarthWorldSession();
+      return reloadEarthWorldSession({transitionDurationMs:0});
+    }});
     // The final publication awaits this same promise. Handle early rejection
     // while terrain is still compiling, so cancellation never leaks a worker.
     preparingDetail.catch(()=>{});
@@ -481,6 +488,21 @@ export async function publishCompiledTransportMeshes(deps = {}) {
     );
     await yieldToMainThread();
   }
+
+  // Cuts are a physical terrain publication, not a late visual decoration.
+  // The road worker and fallback compiler must receive the final cuts before
+  // either snapshots terrain or builds contacts. Otherwise asphalt survives
+  // suspended over the terrain that the portal shader removes afterwards.
+  if(!isCurrent())return;
+  await measureAsync('rebuildStructureVisuals', () => (
+    typeof rebuildStructureVisualMeshesCooperatively === 'function'
+      ? rebuildStructureVisualMeshesCooperatively
+      : rebuildStructureVisualMeshes
+  )({boundsIntersect:boundsIntersectLocal,cachedTerrainHeight,pointAlongPolyline,polylineCurvatureMetric,current:isCurrent}));
+  if(!isCurrent())return;
+  clearTerrainHeightCache?.();
+  const clipGroundSurface=createPortalSurfaceClipper(appCtx.structureTerrainPortalDescriptors);
+  const uncutRoadTop=(x,z)=>appCtx.terrainMeshHeightAt(x,z,{ignorePortalCuts:true})+ROAD_SURFACE_BIAS;
 
   const intersections = measure('detectIntersections', () => detectRoadIntersections(baseRoads));
   await yieldToMainThread();
@@ -556,7 +578,7 @@ export async function publishCompiledTransportMeshes(deps = {}) {
       // junctions with fan polygons, exposing circles and triangle boundaries.
       const pts = basePts;
       if (!Array.isArray(pts) || pts.length < 2) continue;
-      if(renderRoad.structureSemantics?.terrainMode==='at_grade') {
+      if(renderRoad.structureSemantics?.terrainMode==='at_grade'&&renderRoad.transportSurfaceModel?.engineeredApproach!==true) {
         atGradeRoads.push({road:renderRoad,points:pts,widths:sharedSurface ? null : mapPublishedPointsToCrossSectionWidths(road,pts)});
         // Keep the independent profile audit after retiring per-road meshes.
         // Sample each source's cross-section; agreement among rendered layers
@@ -656,9 +678,10 @@ export async function publishCompiledTransportMeshes(deps = {}) {
       for(const [tileIndex,tile] of tiles.entries()) {
         if(!isCurrent())return;
         if(tileIndex%128===0)trace('meshCarriageway:progress',{completed:tileIndex,total:tiles.length,key:tile.key});
-        const mesh=meshCarriagewayTile(tile,(x,z)=>cachedTerrainHeight(x,z)+ROAD_SURFACE_BIAS,partition);
+        const mesh=meshCarriagewayTile(tile,uncutRoadTop,partition);
         if(mesh.indices.length) {
-          appendRoadMainGeometry(mesh.positions,mesh.indices,'at_grade');
+          const cut=clipGroundSurface(mesh.positions,mesh.indices);
+          appendRoadMainGeometry(cut.positions,cut.indices,'at_grade');
           roadSurfaceIntegrity.carriagewayRegions++;
 
         }
@@ -811,17 +834,6 @@ export async function publishCompiledTransportMeshes(deps = {}) {
   // own replacement is ready; road rebuilds must never dispose only the render half.
   markGroundSurfaceChanged(appCtx);
   await yieldToMainThread();
-  await measureAsync('rebuildStructureVisuals', () => (
-    typeof rebuildStructureVisualMeshesCooperatively === 'function'
-      ? rebuildStructureVisualMeshesCooperatively
-      : rebuildStructureVisualMeshes
-  )({
-    boundsIntersect: boundsIntersectLocal,
-    cachedTerrainHeight,
-    pointAlongPolyline,
-    polylineCurvatureMetric
-  }));
-
   const roadTerrainConformance = finalizeRoadTerrainConformanceAudit(roadTerrainAudit);
 
   appCtx.transportSurfacePublication = Object.freeze({
@@ -856,21 +868,26 @@ export async function publishCompiledTransportMeshes(deps = {}) {
       if(!junctionsByRegion.has(key))junctionsByRegion.set(key,[]);
       junctionsByRegion.get(key).push(intersection);
     }
+    // Only this generation appends committed road batches. Keep exact counts
+    // incrementally instead of rescanning the growing world after each packet.
+    let detailVertices=appCtx.transportSurfacePublication.vertices;
+    let detailTriangles=appCtx.transportSurfacePublication.triangles;
+    const residentRegions=new Map();
     const updateSummary=complete=>{
       const previous=appCtx.transportSurfacePublication;
       if(!previous||!isCurrent())return;
       appCtx.transportSurfacePublication=Object.freeze({...previous,
         detailScope:complete?'complete-region':'starting-neighborhood-and-committed-regions',regionalDetailComplete:complete,
         meshCount:appCtx.roadMeshes.length,
-        vertices:appCtx.roadMeshes.reduce((sum,mesh)=>sum+(mesh.geometry.attributes.position?.count||0),0),
-        triangles:appCtx.roadMeshes.reduce((sum,mesh)=>sum+(mesh.geometry.getIndex()?.count||0)/3,0),
+        vertices:detailVertices,
+        triangles:detailTriangles,
         roadSurfaceIntegrity:Object.freeze({...roadSurfaceIntegrity})});
     };
-    detail.attach(async packet=>{
+    detail.attach(async (packet,{isCurrent:publicationCurrent=isCurrent}={})=>{
       if(!isCurrent())throw new DOMException('Transport region superseded','AbortError');
       const group=new THREE.Group(),meshes=[];
       let contact=null,committed=false;
-      const schedule={current:isCurrent,yieldWork:yieldToWorldFrame,budgetMs:2};
+      const schedule={current:publicationCurrent,yieldWork:yieldToWorldFrame,budgetMs:2};
       try {
         for(const batch of packet.batches)buildIndexedBatchMesh({scene:group,targetList:meshes,
           verts:batch.positions,indices:batch.indices,material:roadMat,renderOrder:2,frustumCulled:true,
@@ -887,7 +904,7 @@ export async function publishCompiledTransportMeshes(deps = {}) {
             (x,z)=>cachedTerrainHeight(x,z)+ROAD_SURFACE_BIAS,contact);
           marks.append(verts,indices,'at_grade');
           if(now()-sliceStartedAt>=2){await yieldToWorldFrame();sliceStartedAt=now();}
-          if(!isCurrent())throw new DOMException('Transport region superseded','AbortError');
+          if(!publicationCurrent())throw new DOMException('Transport region superseded','AbortError');
         }
         marks.finish();
         for(const batch of marks.batches)buildIndexedBatchMesh({scene:group,targetList:meshes,
@@ -912,22 +929,46 @@ export async function publishCompiledTransportMeshes(deps = {}) {
           junctionStats.junctionPrecisionContacts++;
           junctionStats.maximumJunctionContactDistance=Math.max(junctionStats.maximumJunctionContactDistance,nearest.distance);
         }
-        if(!isCurrent())throw new DOMException('Transport region superseded','AbortError');
+        if(!publicationCurrent())throw new DOMException('Transport region superseded','AbortError');
         // No await between render/contact publication and retirement of the
         // terrain coverage mask in the controller that owns this callback.
         regionalContact.add(packet.key,contact);
         for(const mesh of meshes)appCtx.addEarthWorldObject(mesh);
         appCtx.replaceWorldCollection('roadMeshes',[...appCtx.roadMeshes,...meshes]);
+        let vertices=0,triangles=0;
+        for(const mesh of meshes){vertices+=mesh.geometry.attributes.position?.count||0;triangles+=(mesh.geometry.getIndex()?.count||0)/3;}
+        detailVertices+=vertices;detailTriangles+=triangles;
+        residentRegions.set(packet.key,{meshes,vertices,triangles,measurements,junctionStats,cells:packet.keys.length});
         committed=true;
         roadSurfaceIntegrity.carriagewayRegions+=packet.keys.length;
         for(const [key,value] of Object.entries(junctionStats))roadSurfaceIntegrity[key]=key.startsWith('maximum')
           ?Math.max(roadSurfaceIntegrity[key],value):roadSurfaceIntegrity[key]+value;
         for(const [key,value] of Object.entries(measurements))roadSurfaceIntegrity[key]+=value;
         updateSummary(false);
+      } catch(error) {
+        if(!publicationCurrent())throw new DOMException('Transport region superseded','AbortError');
+        throw error;
       } finally {
         if(!committed){contact?.dispose();for(const mesh of meshes){mesh.parent?.remove(mesh);mesh.geometry?.dispose();}}
       }
-    },()=>updateSummary(true));
+    },()=>updateSummary(true),key=>{
+      const region=residentRegions.get(key);if(!region)return;
+      residentRegions.delete(key);
+      // A reset can retire the controller after another world became current;
+      // that world's collections must never be edited by this generation.
+      if(!isCurrent())return;
+      regionalContact.remove(key);
+      const retired=new Set(region.meshes);
+      appCtx.replaceWorldCollection('roadMeshes',appCtx.roadMeshes.filter(mesh=>!retired.has(mesh)));
+      for(const mesh of region.meshes){mesh.parent?.remove(mesh);mesh.geometry?.dispose();}
+      detailVertices-=region.vertices;detailTriangles-=region.triangles;
+      roadSurfaceIntegrity.carriagewayRegions-=region.cells;
+      for(const [name,value] of Object.entries(region.measurements))roadSurfaceIntegrity[name]-=value;
+      // Maximum tolerances are lifetime evidence; event/sample counts describe
+      // the currently published contact set.
+      for(const [name,value] of Object.entries(region.junctionStats))if(!name.startsWith('maximum'))roadSurfaceIntegrity[name]-=value;
+      updateSummary(false);
+    });
   }
   return appCtx.transportSurfacePublication;
   } finally {

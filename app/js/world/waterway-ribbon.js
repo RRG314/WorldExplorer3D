@@ -173,6 +173,7 @@ export function addWaterwayRibbon(pts, tags) {
   });
 
   registerWaterWaveMaterial(material, {
+    waterBody: waterway,
     waveScale: clampNumber(width / 42, 0.55, 1.1, 0.7),
     waveBase: clampNumber(width / 60, 0.4, 0.85, 0.55),
     width,

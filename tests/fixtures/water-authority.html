@@ -1,0 +1,24 @@
+<!doctype html><html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Water authority verification</title><style>body{margin:0;background:#0a1c2b;color:#e9f1f7;font:16px/1.4 system-ui}header{padding:16px;max-width:800px}h1{font-size:22px;margin:0}p{margin:8px 0}canvas{display:block;width:100%}button{padding:9px;margin-right:8px}#state{white-space:pre-wrap}</style>
+<header><h1>Water surface / physics verification</h1><p>Actual shared water shader with CPU sample markers. Controlled scene, not full-world acceptance.</p><button id="advance">Advance waves</button><button id="storm">Modeled rough sea</button><div id="state"></div></header>
+<script type="module">
+import * as THREE from '/node_modules/three/build/three.module.js';
+globalThis.THREE=THREE;
+const {ctx}=await import('/app/js/shared-context.js?v=55');
+ctx.waterWaveVisuals=[];
+const {registerWaterWaveMaterial}=await import('/app/js/world/water-materials.js');
+const {buildBoatWaveProfile,applyWaveUniformsToMaterial}=await import('/app/js/boat-mode/surface-effects.js');
+const {sampleDynamicWaterAt}=await import('/app/js/boat-mode/water-query.js');
+const scene=new THREE.Scene();scene.background=new THREE.Color(0x406579);
+const renderer=new THREE.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});renderer.setSize(innerWidth,Math.min(570,innerHeight-220));document.body.appendChild(renderer.domElement);
+const camera=new THREE.PerspectiveCamera(48,renderer.domElement.width/renderer.domElement.height,.1,100);camera.position.set(10,8,14);camera.lookAt(0,0,0);
+scene.add(new THREE.HemisphereLight(0xc8edff,0x17475a,1.5));const sun=new THREE.DirectionalLight(0xfff0db,1.8);sun.position.set(-5,10,8);scene.add(sun);
+const material=new THREE.MeshStandardMaterial({color:0x1b889e,roughness:.3,side:THREE.DoubleSide});
+registerWaterWaveMaterial(material,{localPatch:true,useRuntimeKind:true,waveBase:1,waveScale:1});
+const geometry=new THREE.PlaneGeometry(40,40,180,180);geometry.rotateX(-Math.PI/2);scene.add(new THREE.Mesh(geometry,material));
+const candidate={surfaceY:0,waterKind:'open_ocean',shorelineDistance:150};ctx.boatMode={active:true,currentWater:candidate,shorelineDistance:150,waveIntensity:.4};
+const probes=[[-4,-3],[-2,0],[0,0],[2,0],[4,3]].map(([x,z])=>{const marker=new THREE.Mesh(new THREE.SphereGeometry(.15,12,8),new THREE.MeshStandardMaterial({color:0xffda70}));scene.add(marker);return {x,z,marker}});
+let time=4;
+function render(){renderer.render(scene,camera);const bundle=buildBoatWaveProfile(material,.4,time);applyWaveUniformsToMaterial(material,bundle);const heights=probes.map(({x,z,marker})=>{const sample=sampleDynamicWaterAt(x,z,candidate,{time});marker.position.set(x,sample.surfaceY+.15,z);return +sample.surfaceY.toFixed(4)});renderer.render(scene,camera);window.state={time,shaderCompiled:!!material.userData.weWaterWaveShader,source:bundle.profile.waveEvidenceSource||'simulation',heights};document.querySelector('#state').textContent=JSON.stringify(state);}
+document.querySelector('#advance').onclick=()=>{time+=2;render()};document.querySelector('#storm').onclick=()=>{ctx.activeWaterOpticsEvidence={wave:{truthType:'modeled',renderUsable:true,waveHeightM:3,wavePeriodS:9,sourceId:'controlled-model'}};render()};
+window.render_game_to_text=()=>JSON.stringify(state);window.advanceTime=async ms=>{time+=ms/1000;render()};render();window.ready=true;
+</script></html>

@@ -22,6 +22,8 @@ function isLanduseCandidate(tags) {
     tags?.natural === 'glacier' ||
     tags?.natural === 'water' ||
     tags?.water ||
+    tags?.boundary === 'national_park' ||
+    tags?.boundary === 'protected_area' ||
     tags?.leisure === 'park' ||
     tags?.leisure === 'garden' ||
     tags?.leisure === 'nature_reserve'

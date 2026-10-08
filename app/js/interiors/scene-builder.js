@@ -1,3 +1,4 @@
+import {isHarborWaypoint,dressHarborWaypoint} from './harbor-waypoint.js';
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import {buildAuthoredInterior} from './authored-geometry.js';
 import {normalizeLayout,assertPlayableLayout,roomRing,pointInRoom,layoutEntrance} from '../../../functions/interior-layout.mjs';
@@ -330,6 +331,8 @@ function buildInteriorLevelScene(definition, options = {}) {
       group.add(fixture);
     }
   }
+
+  if(isHarborWaypoint(definition)) dressHarborWaypoint({THREE,group,footprint:shellFootprint,center:centroid,floorY,wallHeight,entry:desiredEntry,roomMaterial,corridorMaterial,wallMaterial,accentWallMaterial});
 
   const effectiveMode = featurePlan.mode;
   if (Array.isArray(shellFootprint) && shellFootprint.length >= 3) {

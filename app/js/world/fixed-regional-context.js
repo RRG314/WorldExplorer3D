@@ -1,3 +1,4 @@
+import {retireCoveredRegionalRoads} from './vector-resolution-ownership.js';
 // The mapped context must cover the fixed location visible from the map and
 // aerial modes. Eight kilometres ended before northern Manhattan and exposed
 // terrain-only sectors in nearby New Jersey even though the 22 km terrain LOD
@@ -110,7 +111,8 @@ export function retainRegionalTransportOutsideCore(data, options = {}) {
 
 export function mergeFixedRegionalTransport(primaryData, regionalData) {
   const primaryElements = Array.isArray(primaryData?.elements) ? primaryData.elements : [];
-  const regionalElements = Array.isArray(regionalData?.elements) ? regionalData.elements : [];
+  const ownership = retireCoveredRegionalRoads(primaryElements, Array.isArray(regionalData?.elements) ? regionalData.elements : []);
+  const regionalElements = ownership.elements;
   const usedIds = new Set(primaryElements.map((element) => element?.id).filter(Number.isFinite));
   let nextId = -2;
   for (const id of usedIds) nextId = Math.min(nextId, id - 1);
@@ -133,7 +135,7 @@ export function mergeFixedRegionalTransport(primaryData, regionalData) {
   return {
     ...primaryData,
     elements: [...primaryElements, ...remappedRegionalElements],
-    _fixedRegionalContext: regionalData?._regionalContext || null,
+    _fixedRegionalContext: {...regionalData?._regionalContext,retiredCoveredCoarseRoads:ownership.retiredRoadCount},
     _fixedRegionalTiles: regionalData?._shortbreadTiles || null
   };
 }

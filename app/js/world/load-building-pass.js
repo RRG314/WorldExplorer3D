@@ -1,3 +1,4 @@
+import {createBuildingBodyGeometry} from './building-body-geometry.js';
 import {resolveBuildingFoundation} from './building-foundation.js';
 import { attachBuildingFacadeLayout } from './building-facade-layout.js?v=3';
 import { ctx as appCtx } from "../shared-context.js?v=55";
@@ -520,14 +521,7 @@ export async function buildBuildingGeometryPass(options = {}) {
       }));
     } else {
       const meshCreationStartedAt = now();
-      const shape = new THREE.Shape();
-      pts.forEach((p, i) => {
-        if (i === 0) shape.moveTo(p.x, -p.z);
-        else shape.lineTo(p.x, -p.z);
-      });
-      shape.closePath();
-      const geo = new THREE.ExtrudeGeometry(shape, { depth: bodyHeight, bevelEnabled: false });
-      geo.rotateX(-Math.PI / 2);
+      const geo = createBuildingBodyGeometry(THREE, pts, bodyHeight);
       if (!geometryHasFinitePositions(geo)) {
         geo.dispose();
         continue;

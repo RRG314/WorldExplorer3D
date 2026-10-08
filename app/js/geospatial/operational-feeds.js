@@ -1,12 +1,15 @@
+import {fetchAuthenticatedData} from './authenticated-fetch.js';
+import {providerResponseError, providerCooldownError} from './provider-error.js';
+import {readBoundedJson,readBoundedText} from './bounded-response.js';
 import { createProviderRegistry } from './provider-registry.js?v=2';
 
 const CELESTRAK_BASE = 'https://celestrak.org/NORAD/elements/gp.php';
 const USGS_DAY_FEED = 'https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_day.geojson';
-const OPEN_METEO_CURRENT = 'https://api.open-meteo.com/v1/forecast';
-const WEATHER_FIELDS = 'temperature_2m,relative_humidity_2m,apparent_temperature,is_day,weather_code,cloud_cover,wind_speed_10m,wind_direction_10m,precipitation,rain,showers,snowfall,visibility';
+const WEATHER_API = '/api/geospatial/weather';
 const CELESTRAK_GROUPS = new Set(['stations', 'weather', 'resource', 'science']);
 
 function finiteCoordinate(value, min, max, label) {
+  if (!['number', 'string'].includes(typeof value) || (typeof value === 'string' && !value.trim())) throw new RangeError(`${label} is invalid.`);
   const number = Number(value);
   if (!Number.isFinite(number) || number < min || number > max) throw new RangeError(`${label} is invalid.`);
   return number;
@@ -31,14 +34,16 @@ function normalizeWeatherRequest(input = {}) {
 }
 
 async function readJson(response, providerId) {
-  if (!response.ok) throw new Error(`${providerId}_http_${response.status}`);
-  return response.json();
+  if (!response.ok) throw providerResponseError(response);
+  return readBoundedJson(response,5000000);
 }
 
 function createOperationalFeedService(options = {}) {
   const fetchImpl = options.fetchImpl || globalThis.fetch?.bind(globalThis);
   if (typeof fetchImpl !== 'function') throw new Error('Operational feeds require fetch support.');
+  const fetchWeather = options.fetchImpl || fetchAuthenticatedData;
   const registry = createProviderRegistry({ now: options.now, maxCacheEntries: 40 });
+  const clock = options.now || Date.now, groupCooldowns = new Map();
 
   registry.register({
     id: 'celestrak-gp',
@@ -48,16 +53,21 @@ function createOperationalFeedService(options = {}) {
     normalizeRequest: normalizeCelestrakRequest,
     async query(request, context) {
       const settled = await Promise.allSettled(request.sources.map(async (source) => {
+        if ((groupCooldowns.get(source) || 0) > clock()) throw providerCooldownError(groupCooldowns.get(source));
         const url = new URL(CELESTRAK_BASE);
         url.searchParams.set('GROUP', source);
         url.searchParams.set('FORMAT', 'tle');
         const response = await fetchImpl(url.href, { signal: context.signal, cache: 'no-store' });
-        if (!response.ok) throw new Error(`celestrak_${source}_${response.status}`);
-        return { source, text: await response.text() };
+        if (!response.ok) {
+          const error = providerResponseError(response, clock());
+          if (error.status === 429 || error.retryAfterMs > 0) groupCooldowns.set(source, clock() + Math.max(60000, error.retryAfterMs || 0));
+          throw error;
+        }
+        return { source, text: await readBoundedText(response,3000000) };
       }));
       const items = settled.filter((result) => result.status === 'fulfilled').map((result) => result.value);
       const warnings = settled.filter((result) => result.status === 'rejected').map((result) => String(result.reason?.message || result.reason));
-      if (!items.length) throw new Error(warnings[0] || 'CelesTrak feeds unavailable.');
+      if (!items.length) throw settled.find(result => result.status === 'rejected')?.reason || new Error('CelesTrak feeds unavailable.');
       return { items, warnings };
     }
   });
@@ -76,22 +86,20 @@ function createOperationalFeedService(options = {}) {
   });
 
   registry.register({
-    id: 'open-meteo-current',
-    sourceId: 'open-meteo',
+    id: 'met-norway-current',
+    sourceId: 'met-norway',
     cacheTtlMs: 10 * 60 * 1000,
-    timeoutMs: 10000,
+    timeoutMs: 35000,
     normalizeRequest: normalizeWeatherRequest,
     async query(request, context) {
-      const url = new URL(OPEN_METEO_CURRENT);
+      const url = new URL(WEATHER_API, globalThis.location?.origin || 'http://localhost');
       url.searchParams.set('latitude', request.locations.map((location) => location.lat.toFixed(4)).join(','));
       url.searchParams.set('longitude', request.locations.map((location) => location.lon.toFixed(4)).join(','));
-      url.searchParams.set('current', WEATHER_FIELDS);
-      url.searchParams.set('timezone', 'auto');
-      url.searchParams.set('forecast_days', '1');
-      if (request.ocean) url.searchParams.set('cell_selection', 'sea');
-      const response = await fetchImpl(url.href, { signal: context.signal });
-      const payload = await readJson(response, 'open_meteo');
-      return { items: Array.isArray(payload) ? payload : [payload] };
+      url.searchParams.set('kind', 'weather');
+      const response = await fetchWeather(url.href, { signal: context.signal });
+      const payload = await readJson(response, 'met_norway');
+      const items = Array.isArray(payload) ? payload : [payload];
+      return {items, warnings: items.some(item => !item) ? ['Weather is unavailable for some selected locations.'] : []};
     }
   });
 
@@ -103,7 +111,7 @@ function createOperationalFeedService(options = {}) {
       return registry.query('usgs-earthquakes-day', {}, queryOptions);
     },
     weather(locations, options = {}) {
-      return registry.query('open-meteo-current', { locations, ocean: options.ocean === true }, { force: options.force === true });
+      return registry.query('met-norway-current', { locations, ocean: options.ocean === true }, { force: options.force === true, signal: options.signal });
     },
     diagnostics() {
       return registry.snapshot();

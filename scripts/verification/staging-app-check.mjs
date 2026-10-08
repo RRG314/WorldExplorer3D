@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { readFile, stat } from 'node:fs/promises';
+import { fulfillStagingProxyRoute } from './staging-proxy-delivery.mjs';
 
 // Credentials stay outside the build and reports. This only configures the
 // documented Firebase debug provider in an explicitly local staging browser.
@@ -29,5 +30,16 @@ export async function configureStagingAppCheck(page, baseUrl) {
     globalThis.WORLD_EXPLORER_FIREBASE = config;
     globalThis.FIREBASE_APPCHECK_DEBUG_TOKEN = token;
   }, { token: credential.token, config });
-  return { provider: 'registered-staging-debug', projectId: config.projectId, artifactConfigurationOverridden: true, productionAttestationVerified: false };
+  // Local immutable-artifact verification mirrors the Hosting rewrite against
+  // the explicit staging authority. No production endpoint or free-provider bypass.
+  if (process.env.WE3D_VERIFY_HOSTED_PLACE_LOOKUP === '1') {
+    await page.route(candidate => candidate.origin === url.origin && ['/api/geospatial/search', '/api/geospatial/reverse', '/api/geospatial/weather', '/api/geospatial/marine', '/api/geospatial/aircraft'].includes(candidate.pathname), async route => {
+      const request = new URL(route.request().url());
+      const environmental = ['/api/geospatial/weather','/api/geospatial/marine'].includes(request.pathname);
+      const target = new URL('https://us-central1-we3d-staging-20260712.cloudfunctions.net/'+(environmental?'getEnvironmentalData':request.pathname==='/api/geospatial/aircraft'?'getAircraftStates':'getPlaceLookup'));
+      target.search = request.search;
+      await fulfillStagingProxyRoute({ page, route, target: target.href });
+    });
+  }
+  return { provider: 'registered-staging-debug' , projectId: config.projectId, artifactConfigurationOverridden: true, productionAttestationVerified: false };
 }

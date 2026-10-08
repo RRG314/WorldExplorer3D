@@ -1,5 +1,6 @@
 import { ctx as appCtx } from "./shared-context.js?v=55"; // ============================================================================
 import { resolvePrimaryPlace } from './places/place-search.js?v=4';
+import {isEarthWorldUsable} from './earth-core/world-readiness.js';
 // input.js - Keyboard handling, track recording, city switching
 // ============================================================================
 
@@ -414,7 +415,8 @@ async function searchAndTravelToLocation(queryInput, options = {}) {
 
     if (appCtx.gameStarted) {
       if (options.closeMap === true) appCtx.closeLargeMap?.();
-      await appCtx.loadRoads();
+      const loaded = await appCtx.loadRoads();
+      if (!isEarthWorldUsable(appCtx, loaded)) throw new Error('This location could not finish loading. Choose a location and try again.');
       const currentMode = appCtx.Walk?.state?.mode === 'walk' ? 'walk' : 'drive';
       if (typeof appCtx.applyCustomLocationSpawn === 'function') {
         appCtx.applyCustomLocationSpawn(currentMode, { source: 'search_location' });

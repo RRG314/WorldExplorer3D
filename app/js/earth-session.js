@@ -1,8 +1,10 @@
 import { ctx as appCtx } from "./shared-context.js?v=55";
 import { currentActorWorldPosition } from "./earth-location.js?v=2";
-import { commitEnvironment, registerEnvironmentLifecycle } from './session-coordinator.js?v=2';
+import { captureEnvironmentSession, commitEnvironment, registerEnvironmentLifecycle } from './session-coordinator.js?v=2';
+import {isEarthWorldUsable} from './earth-core/world-readiness.js';
 
 const REUSE_EXISTING_EARTH_WORLD = true;
+let resumeSequence=0;
 
 function markEarthResumePhase(phase, details = {}) {
   const previous = appCtx.earthResumeDiagnostics || {};
@@ -32,7 +34,7 @@ function showEarthResumeLoad() {
 }
 
 function finishEarthResumeLoad() {
-  markEarthResumePhase('complete');
+  if (appCtx.earthResumeDiagnostics?.phase !== 'failed') markEarthResumePhase('complete');
   appCtx.earthResumePending = false;
   appCtx.earthResumeRenderReady = false;
   appCtx.hideLoad?.();
@@ -67,14 +69,16 @@ function getEarthSessionState() {
 }
 
 function hasLoadedEarthWorld() {
-  return appCtx.initialEarthWorldReady === true;
+  return isEarthWorldUsable(appCtx);
 }
 
-async function restoreEarthActorOwnership() {
+async function restoreEarthActorOwnership(isCurrent) {
   markEarthResumePhase('restore_vehicle');
   await appCtx.setPlanetaryVehicle?.('earth');
+  if(!isCurrent())return false;
   markEarthResumePhase('restore_character');
   await appCtx.setPlanetaryCharacter?.('earth');
+  return isCurrent();
 }
 
 function captureCurrentPose() {
@@ -119,7 +123,7 @@ function stampLoadedSelection() {
 }
 
 function canResumeEarthSession() {
-  if (!hasLoadedEarthWorld()) return false;
+  if (!isEarthWorldUsable(appCtx)) return false;
   return appCtx.isLoadedLocationSelectionCurrent?.() === true;
 }
 
@@ -243,9 +247,12 @@ export function captureEarthWorldSession() {
 }
 
 export async function reloadEarthWorldSession(options = {}) {
+  const invocation=options.resumeSequence??++resumeSequence;
+  let session=null;
   const transitionDurationMs = Number.isFinite(options.transitionDurationMs) ? options.transitionDurationMs : 700;
   const shouldSwitchEnv = options.switchEnv !== false;
   const isCurrent = () => {
+    if(invocation!==resumeSequence||session&&!session.isCurrent())return false;
     if (typeof options.isCurrent === 'function' && !options.isCurrent()) return false;
     return !appCtx.ENV?.EARTH || typeof appCtx.getEnv !== 'function' || appCtx.getEnv() === appCtx.ENV.EARTH;
   };
@@ -254,7 +261,8 @@ export async function reloadEarthWorldSession(options = {}) {
   try {
     if (shouldSwitchEnv && appCtx.ENV?.EARTH) commitEnvironment(appCtx.ENV.EARTH, { source: 'earth_reload' });
     markEarthResumePhase('reload_actor');
-    await restoreEarthActorOwnership();
+    session=captureEnvironmentSession({includeWorld:false});
+    if(!await restoreEarthActorOwnership(isCurrent))return {aborted:true,resumed:false};
     appCtx.loadingScreenMode = 'earth';
     normalizeEarthSelection();
 
@@ -262,11 +270,14 @@ export async function reloadEarthWorldSession(options = {}) {
       await new Promise((resolve) => globalThis.setTimeout(resolve, Math.min(transitionDurationMs, 240)));
     }
     if (!isCurrent()) return { aborted: true, resumed: false };
-    if (typeof appCtx.loadRoads === 'function') {
-      markEarthResumePhase('reload_world');
-      await appCtx.loadRoads();
-    }
+    if (typeof appCtx.loadRoads !== 'function') throw new Error('Earth world loader is unavailable.');
+    markEarthResumePhase('reload_world');
+    const result = await appCtx.loadRoads();
     if (!isCurrent()) return { aborted: true, resumed: false };
+    if (!isEarthWorldUsable(appCtx, result)) {
+      markEarthResumePhase('failed');
+      throw new Error('The Earth location did not finish loading. Return to the location menu and try again.');
+    }
     const resolved = restorePoseFromSession();
     markEarthResumePhase('reload_finalize');
     if (!await finalizeEarthResume(resolved, isCurrent, { syncSurface: true })) {
@@ -277,15 +288,21 @@ export async function reloadEarthWorldSession(options = {}) {
       resumed: false,
       selLoc: appCtx.selLoc === 'custom' ? 'custom' : String(appCtx.selLoc || 'baltimore')
     };
+  } catch (error) {
+    if (isCurrent()) markEarthResumePhase('failed');
+    throw error;
   } finally {
-    finishEarthResumeLoad();
+    if(isCurrent())finishEarthResumeLoad();
   }
 }
 
 export async function resumeEarthWorldSession(options = {}) {
+  const invocation=++resumeSequence;
+  let session=null;
   const transitionDurationMs = Number.isFinite(options.transitionDurationMs) ? options.transitionDurationMs : 350;
   const shouldSwitchEnv = options.switchEnv !== false;
   const isCurrent = () => {
+    if(invocation!==resumeSequence||session&&!session.isCurrent())return false;
     if (typeof options.isCurrent === 'function' && !options.isCurrent()) return false;
     return !appCtx.ENV?.EARTH || typeof appCtx.getEnv !== 'function' || appCtx.getEnv() === appCtx.ENV.EARTH;
   };
@@ -294,12 +311,14 @@ export async function resumeEarthWorldSession(options = {}) {
   try {
     if (shouldSwitchEnv && appCtx.ENV?.EARTH) commitEnvironment(appCtx.ENV.EARTH, { source: 'earth_resume' });
     markEarthResumePhase('resume_actor');
-    await restoreEarthActorOwnership();
+    session=captureEnvironmentSession({includeWorld:false});
+    if(!await restoreEarthActorOwnership(isCurrent))return {aborted:true,resumed:false};
     appCtx.loadingScreenMode = 'earth';
 
     if (!canResumeEarthSession()) {
       restoreSelectionFromState();
-      return reloadEarthWorldSession({
+      return await reloadEarthWorldSession({
+        resumeSequence:invocation,
         transitionDurationMs,
         switchEnv: false,
         isCurrent
@@ -322,8 +341,11 @@ export async function resumeEarthWorldSession(options = {}) {
       resumed: true,
       selLoc: appCtx.selLoc === 'custom' ? 'custom' : String(appCtx.selLoc || 'baltimore')
     };
+  } catch (error) {
+    if (isCurrent()) markEarthResumePhase('failed');
+    throw error;
   } finally {
-    finishEarthResumeLoad();
+    if(isCurrent())finishEarthResumeLoad();
   }
 }
 

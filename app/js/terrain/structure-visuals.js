@@ -120,6 +120,13 @@ export function collectStructureVisualInstances(deps = {}) {
     const visualSurface = sharedSurface || feature;
     const sampleVisualSurfaceY = (x, z) => sampleFeatureSurfaceY(visualSurface, x, z);
     const category = String(semantics.featureCategory || feature.networkKind || feature.kind || "road").toLowerCase();
+    const excavation = feature.engineeredApproachExcavation;
+    if (excavation) {
+      tunnelPortalMasks.push(...excavation.masks);
+      tunnelShells.push({ approachOnly: true, rings: excavation.rings,
+        approaches: [{ rings: excavation.rings }], halfWidth: excavation.halfWidth,
+        wallOpenings: excavation.wallOpenings });
+    }
     const generalizedRoadVisual =
       category === 'road' &&
       feature?.transportRecord?.completeness !== 'lossless';
@@ -630,6 +637,7 @@ export async function collectStructureVisualInstancesCooperatively(deps = {}) {
   const merged = {};
   const chunkSize = 180;
   for (let start = 0; start < allElevatedFeatures.length; start += chunkSize) {
+    if(deps.current?.()===false)return null;
     const partial = collectStructureVisualInstances({
       ...deps,
       allElevatedFeatures,
@@ -643,6 +651,7 @@ export async function collectStructureVisualInstancesCooperatively(deps = {}) {
     }
     await yieldToMainThread();
   }
+  if(deps.current?.()===false)return null;
   return merged;
 }
 
@@ -662,6 +671,7 @@ export function rebuildStructureVisualMeshes(deps = {}) {
 
 export async function rebuildStructureVisualMeshesCooperatively(deps = {}) {
   const collected = await collectStructureVisualInstancesCooperatively(deps);
+  if(!collected||deps.current?.()===false)return null;
   applyTerrainPortalMasksForContext(appCtx, collected.tunnelPortalMasks);
   return rebuildStructureVisualMeshesForContext(appCtx, () => collected, deps);
 }

@@ -1,5 +1,12 @@
 import { vehicleWheelContactLayout } from './vehicle-catalog.js?v=6';
 
+// Sampling metadata is immutable; each solve keeps its own height buffer so a
+// surface callback can safely invoke another contact solve.
+const WHEEL_CONTACTS = Object.freeze([
+  Object.freeze({front: -1, side: -1}), Object.freeze({front: -1, side: 1}),
+  Object.freeze({front: 1, side: -1}), Object.freeze({front: 1, side: 1})
+]);
+
 function finiteNumber(value, fallback = 0) {
   const number = Number(value);
   return Number.isFinite(number) ? number : fallback;
@@ -38,19 +45,23 @@ function resolveVehicleRoadContactPose(options = {}) {
   // Wheel positions change in X/Z when the chassis pitches and rolls. Sampling
   // the unrotated footprint then rotating only Y made long vehicles float on
   // grades even when the published road was a perfectly planar surface.
+  const heights = new Float64Array(4);
   const footprint = (pitch, roll) => {
-    const contacts = [];
-    for (const front of [-1, 1]) for (const side of [-1, 1]) {
+    let valid = true;
+    for (let index = 0; index < 4; index += 1) {
+      const contact = WHEEL_CONTACTS[index];
+      const {front, side} = contact;
       const localX = side * layout.halfTrack;
       const localZ = front * layout.halfWheelbase;
       const lateral = Math.cos(roll) * localX;
       const longitudinal = Math.sin(pitch) * Math.sin(roll) * localX + Math.cos(pitch) * localZ;
       const contactX = x + rightX * lateral + forwardX * longitudinal;
       const contactZ = z + rightZ * lateral + forwardZ * longitudinal;
-      const sample = sampleSurface?.(contactX, contactZ, { front, side });
-      contacts.push({ front, side, x: contactX, z: contactZ, y: sample == null ? NaN : Number(sample) });
+      const sample = sampleSurface?.(contactX, contactZ, contact);
+      heights[index] = sample == null ? NaN : Number(sample);
+      if (!Number.isFinite(heights[index])) valid = false;
     }
-    return contacts;
+    return valid;
   };
   const fallback = () => Object.freeze({
     x, y, z, yaw, pitch: fallbackPitch, roll: fallbackRoll,
@@ -62,17 +73,19 @@ function resolveVehicleRoadContactPose(options = {}) {
     Math.sin(pitch) * contact.front * layout.halfWheelbase;
   let pitch = clamp(fallbackPitch, -.55, .55);
   let roll = clamp(fallbackRoll, -.55, .55);
-  let contacts = footprint(pitch, roll);
-  if (!sampleSurface || contacts.some(contact => !Number.isFinite(contact.y))) return fallback();
-  const previousMaximumWheelPenetration = Math.max(0, ...contacts.map(contact =>
-    contact.y - (y + poseDelta(fallbackPitch, fallbackRoll, contact))));
+  if (!footprint(pitch, roll) || !sampleSurface) return fallback();
+  let previousMaximumWheelPenetration = 0;
+  for (let index = 0; index < 4; index += 1) {
+    previousMaximumWheelPenetration = Math.max(previousMaximumWheelPenetration,
+      heights[index] - (y + poseDelta(fallbackPitch, fallbackRoll, WHEEL_CONTACTS[index])));
+  }
   for (let iteration = 0; iteration < 3; iteration += 1) {
     // footprint order is rear-left, rear-right, front-left, front-right.
     // Avoid allocating four filtered arrays for every contact iteration.
-    const rearHeight = (contacts[0].y + contacts[1].y) * .5;
-    const frontHeight = (contacts[2].y + contacts[3].y) * .5;
-    const leftHeight = (contacts[0].y + contacts[2].y) * .5;
-    const rightHeight = (contacts[1].y + contacts[3].y) * .5;
+    const rearHeight = (heights[0] + heights[1]) * .5;
+    const frontHeight = (heights[2] + heights[3]) * .5;
+    const leftHeight = (heights[0] + heights[2]) * .5;
+    const rightHeight = (heights[1] + heights[3]) * .5;
     const forwardSlope = (frontHeight - rearHeight) /
       (2 * layout.halfWheelbase * Math.cos(pitch));
     const rightSlope = ((rightHeight - leftHeight) / (2 * layout.halfTrack) -
@@ -82,21 +95,38 @@ function resolveVehicleRoadContactPose(options = {}) {
     if (Math.abs(nextPitch - pitch) + Math.abs(nextRoll - roll) < 1e-7) break;
     pitch = nextPitch;
     roll = nextRoll;
-    contacts = footprint(pitch, roll);
-    if (contacts.some(contact => !Number.isFinite(contact.y))) return fallback();
+    if (!footprint(pitch, roll)) return fallback();
   }
   // A rigid chassis cannot fit an arbitrarily twisted surface. Preserve actual
   // residuals and lift only to prevent penetration; never clamp reported gaps.
-  const resolvedY = Math.max(...contacts.map(contact => contact.y - poseDelta(pitch, roll, contact)));
-  const gaps = contacts.map(contact => resolvedY + poseDelta(pitch, roll, contact) - contact.y);
+  let resolvedY = -Infinity;
+  for (let index = 0; index < 4; index += 1) {
+    resolvedY = Math.max(resolvedY, heights[index] - poseDelta(pitch, roll, WHEEL_CONTACTS[index]));
+  }
+  let maximumWheelPenetration = 0, maximumWheelGap = 0;
+  for (let index = 0; index < 4; index += 1) {
+    const gap = resolvedY + poseDelta(pitch, roll, WHEEL_CONTACTS[index]) - heights[index];
+    maximumWheelPenetration = Math.max(maximumWheelPenetration, -gap);
+    maximumWheelGap = Math.max(maximumWheelGap, gap);
+  }
+  // Detailed coordinates are only published for a real contact anomaly.
+  const contactAnomaly = maximumWheelGap > .22 ? WHEEL_CONTACTS.map((contact, index) => {
+    const localX = contact.side * layout.halfTrack;
+    const localZ = contact.front * layout.halfWheelbase;
+    const lateral = Math.cos(roll) * localX;
+    const longitudinal = Math.sin(pitch) * Math.sin(roll) * localX + Math.cos(pitch) * localZ;
+    return {...contact, x: x + rightX * lateral + forwardX * longitudinal,
+      z: z + rightZ * lateral + forwardZ * longitudinal, y: heights[index],
+      gap: resolvedY + poseDelta(pitch, roll, contact) - heights[index]};
+  }) : null;
 
   return Object.freeze({
     x, y: resolvedY, z, yaw, pitch, roll,
-    sampledWheelContacts: contacts.length,
-    maximumWheelPenetration: Math.max(0, ...gaps.map((gap) => -gap)),
-    maximumWheelGap: Math.max(0, ...gaps),
+    sampledWheelContacts: 4,
+    maximumWheelPenetration,
+    maximumWheelGap,
     previousMaximumWheelPenetration,
-    contactAnomaly: Math.max(0, ...gaps) > .22 ? contacts.map((contact, index) => ({ ...contact, gap: gaps[index] })) : null,
+    contactAnomaly,
     authority: 'published-road-four-wheel-contact'
   });
 }

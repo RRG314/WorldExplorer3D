@@ -1,0 +1,37 @@
+<!doctype html><html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Research deck acceptance</title><link rel="icon" href="/favicon.svg"><style>body{margin:0;background:#234452;color:white;font:14px system-ui}header{position:absolute;padding:12px;background:#123844cc}canvas{display:block}</style><header>Research vessel · actual model, rig and deck controller<br>WASD walk · arrows turn · controlled waves and mapped water</header>
+<script src="/node_modules/three/build/three.min.js"></script><script src="/node_modules/three/examples/js/loaders/GLTFLoader.js"></script><script type="module">
+import {createBoatModeMesh} from '/app/js/boat-mode/boat-model.js?v=7';
+import {getMaritimeCatalogEntry} from '/app/js/transport/maritime-catalog.js?v=1';
+import {createResearchDeck} from '/app/js/boat-mode/research/runtime.js';
+import {createBoatSwimming,addBoatSwimLadder} from '/app/js/boat-mode/swimming.js';
+import {createPlayerCharacterHost} from '/app/js/walking/player-character-host.js';
+import {attachCuratedExplorerCharacter,updateCuratedCharacterAnimation} from '/app/js/walking/curated-explorer-character.js?v=8';
+import {createWalkingWaterRuntime} from '/app/js/walking/water/runtime.js';
+import {resolveWalkingMoveVector} from '/app/js/walking/physics.js?v=32';
+const scene=new THREE.Scene();scene.background=new THREE.Color(0x8cb8c7);scene.fog=new THREE.Fog(0x8cb8c7,160,400);
+const renderer=new THREE.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});renderer.setSize(innerWidth,innerHeight);renderer.outputEncoding=THREE.sRGBEncoding;renderer.toneMapping=THREE.ACESFilmicToneMapping;document.body.append(renderer.domElement);
+const camera=new THREE.PerspectiveCamera(55,innerWidth/innerHeight,.1,500);camera.position.set(50,35,-65);camera.lookAt(0,5,0);
+scene.add(new THREE.HemisphereLight(0xc8eaff,0x536d72,1.1));const sun=new THREE.DirectionalLight(0xffefda,1.7);sun.position.set(30,50,-20);scene.add(sun);
+const water=new THREE.Mesh(new THREE.PlaneGeometry(700,700),new THREE.MeshStandardMaterial({color:0x28788c,transparent:true,opacity:.75,side:THREE.DoubleSide,roughness:.3}));water.rotation.x=-Math.PI/2;scene.add(water);
+const catalog=getMaritimeCatalogEntry('ocean-research-vessel'),mesh=createBoatModeMesh(catalog);addBoatSwimLadder(THREE,mesh,catalog);mesh.visible=true;scene.add(mesh);
+const host=createPlayerCharacterHost(THREE);scene.add(host);await attachCuratedExplorerCharacter(THREE,host,{assetId:'character-field-explorer-v1',role:'player-character',failClosed:true});
+const held=new Set();let override=null,time=0,chartOpened=false;
+onkeydown=e=>{held.add(e.code);if(e.code.startsWith('Arrow')||e.code==='Space')e.preventDefault()};onkeyup=e=>held.delete(e.code);
+const actions=()=>override||{move:Number(held.has('KeyW')||held.has('ArrowUp'))-Number(held.has('KeyS')||held.has('ArrowDown')),strafe:Number(held.has('KeyD'))-Number(held.has('KeyA')),turn:Number(held.has('ArrowLeft'))-Number(held.has('ArrowRight')),vertical:Number(held.has('Space'))-Number(held.has('ShiftLeft'))};
+const state={mode:'drive',characterMesh:host,walker:{x:0,y:6,z:0,yaw:0,angle:0,vy:0,pitch:0,lookYawOffset:0}};
+const ctx={LOC:{lat:39.27,lon:-76.6},SCALE:100000,METERS_PER_WORLD_UNIT:1,getEnv:()=> 'EARTH',scene,camera,boat:{x:0,y:0,z:0,angle:0,speed:0,vx:0,vz:0},boatMode:{active:true,transportEntityId:'fixture-research',transportCatalogId:catalog.id,currentWater:{},mesh},readControlActions:actions,openLargeMap:()=>{chartOpened=true},activeWaterOpticsEvidence:{wave:{truthType:'modeled',waveHeightM:.5,wavePeriodS:8,sourceId:'controlled-browser-fixture',validAt:'2026-10-02T12:00:00Z'}},waterEnvironmentStatus:{location:{lat:39.27,lon:-76.6}}};
+const sample=()=>({coverage:'known-water-body',surfaceY:0,baseY:0,volume:{volumeId:'fixture',current:null}});
+const waterRuntime=createWalkingWaterRuntime({ctx,state,CFG:{eyeHeight:1.7},groundAt:()=>({effectiveGroundY:-30}),sample,moveVector:resolveWalkingMoveVector,animate:updateCuratedCharacterAnimation});
+ctx.Walk={state,deactivateWater:waterRuntime.deactivate,resupplyWater:waterRuntime.resupply,setModeWalk(){state.mode='walk';host.visible=true},setModeDrive(){state.mode='drive';waterRuntime.deactivate();host.visible=false}};
+function updateVessel(){ctx.boat.y=Math.sin(time)*.14;mesh.position.set(ctx.boat.x,ctx.boat.y,ctx.boat.z);mesh.rotation.set(Math.sin(time*.8)*.012,ctx.boat.angle,Math.sin(time*.6)*.015);mesh.updateMatrixWorld(true);}
+if(new URLSearchParams(location.search).has('survey')){ctx.LOC={lat:-18.2861,lon:147.7};ctx.oceanVoyage={current:{site:{...ctx.LOC},ship:{transportEntityId:'fixture-research'}}};}
+ctx.boatDeck=createResearchDeck({ctx,resetDynamics(){ctx.boat.speed=ctx.boat.vx=ctx.boat.vz=0},updateVessel});
+ctx.boatSwimming=createBoatSwimming({ctx,sample,groundY:()=>-30,park(){ctx.boatDeck.release();ctx.boatMode.active=false},resume(){ctx.boatMode.active=true;ctx.boatDeck.enter(true)},updateParked:updateVessel});
+ctx.recoverBoatSwimmer=()=>ctx.boatSwimming.board(true);ctx.checkVesselSwimCollision=(...args)=>ctx.boatSwimming.collision(...args);
+function step(dt){time+=dt;updateVessel();ctx.boatDeck.update(dt);ctx.boatSwimming.update(dt);if(state.mode==='walk'){const a=actions();waterRuntime.update(dt,{actions:a,forward:a.move||0,strafe:-(a.strafe||0),groundState:{effectiveGroundY:-30}});const w=state.walker;camera.position.set(w.x+4,w.y+2,w.z-4);camera.lookAt(w.x,w.y-.4,w.z);}else ctx.boatDeck.camera();}
+window.advanceTime=async ms=>{for(let i=0;i<Math.ceil(ms/16.667);i++)step(1/60);renderer.render(scene,camera)};
+window.render_game_to_text=()=>JSON.stringify({coordinateSystem:'ship local: x port, y up, z bow; deck y=4.3',deck:ctx.boatDeck.snapshot(),swimming:ctx.boatSwimming.snapshot(),walker:state.walker,chartOpened,research:ctx.marineResearch?.snapshot()});
+window.researchTest={ctx,setActions:value=>override=value,get chartOpened(){return chartOpened}};
+let last=performance.now();function frame(now){step(Math.min(.05,(now-last)/1000));last=now;renderer.render(scene,camera);requestAnimationFrame(frame)}requestAnimationFrame(frame);window.ready=true;
+onresize=()=>{renderer.setSize(innerWidth,innerHeight);camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix()};
+</script></html>

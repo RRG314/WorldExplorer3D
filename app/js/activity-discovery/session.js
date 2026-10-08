@@ -1,3 +1,4 @@
+import {activityCompletionMessage,activityCompletions} from './completion.js';
 import { ambientNotices } from '../ui/ambient-notices.js';
 import { ctx as appCtx } from '../shared-context.js?v=55';
 import { buildActivityCatalog, currentReferencePose } from './catalog.js?v=5';
@@ -6,6 +7,8 @@ import { bindMarkerClicks, refreshWorldMarkers } from './markers.js?v=3';
 import {
   distanceToStart,
   getCompletionState,
+  getCompletionStatus,
+  retryActivityCompletion,
   getRuntimeSnapshot,
   navigateToActivityStart,
   registerActivityGameplayPlugin,
@@ -163,6 +166,22 @@ function updateExternalState() {
   );
 }
 
+// Background catalog refreshes must not replace unchanged controls or live regions.
+const activityMarkup = new WeakMap();
+function publishActivityMarkup(host, markup) {
+  if (activityMarkup.get(host) === markup) return;
+  const focused = host.contains(document.activeElement) ? document.activeElement : null;
+  const id = focused?.id;
+  const attributes = ['data-activity-scope', 'data-activity-category', 'data-activity-select'];
+  const key = focused && attributes.find(name => focused.hasAttribute(name));
+  const value = key ? focused.getAttribute(key) : null;
+  host.innerHTML = markup;
+  activityMarkup.set(host, markup);
+  const replacement = id ? document.getElementById(id) : key
+    ? Array.from(host.querySelectorAll(`[${key}]`)).find(node => node.getAttribute(key) === value) : null;
+  if (replacement && host.contains(replacement) && !replacement.disabled) replacement.focus({preventScroll:true});
+}
+
 function cardHtml(activity = {}) {
   const distance = finiteNumber(activity.distanceMeters, 0);
   const completion = getCompletionState(activity.id);
@@ -185,12 +204,12 @@ function renderDetail() {
   if (!refsNow.detail) return;
   const activity = selectedActivity();
   if (!activity) {
-    refsNow.detail.innerHTML = `
+    publishActivityMarkup(refsNow.detail, `
       <div class="activityDiscoveryEmptyDetail">
         <div class="activityDiscoveryDetailTitle">Select an activity</div>
         <div class="activityDiscoveryDetailText">Choose a ready-to-play world activity or multiplayer room to inspect it and start.</div>
       </div>
-    `;
+    `);
     return;
   }
   const completion = getCompletionState(activity.id);
@@ -201,13 +220,14 @@ function renderDetail() {
   const roomActivityRunning = activity.sourceType === 'room_activity'
     && sanitizeText(appCtx.getCurrentMultiplayerRoomActivity?.()?.activityId || '', 120).toLowerCase() === sanitizeText(activity.id || '', 120).toLowerCase();
   const route = Array.isArray(activity.previewRoute) ? activity.previewRoute : [];
-  refsNow.detail.innerHTML = `
+  publishActivityMarkup(refsNow.detail, `
     <div class="activityDiscoveryDetailHead">
       <div class="activityDiscoveryDetailBadge" style="border-color:${escapeHtml(activity.color)};color:${escapeHtml(activity.color)}">${escapeHtml(activity.badge)}</div>
       <div class="activityDiscoveryDetailTitle">${escapeHtml(activity.title)}</div>
       <div class="activityDiscoveryDetailMeta">${escapeHtml(activity.locationLabel)} • ${escapeHtml(activity.traversalMode)} • ${escapeHtml(discoveryVisibilityLabel(activity))}</div>
     </div>
     <div class="activityDiscoveryDetailText">${escapeHtml(activity.description)}</div>
+    <div class="activityDiscoveryDetailText">Follow the route in ${escapeHtml(activity.traversalMode)} mode. Reach each marker in order. Pause stops the timer; Stop ends the run without a reward.</div>
     <div class="activityDiscoveryStatGrid">
       <div><span>Presented by</span><strong>${escapeHtml(activity.creatorAvatar || '🌍')} ${escapeHtml(activity.creatorName)}</strong></div>
       <div><span>Difficulty</span><strong>${escapeHtml(activity.difficulty)}</strong></div>
@@ -226,9 +246,10 @@ function renderDetail() {
     </div>
     <div class="activityDiscoveryDetailSection">
       <div class="activityDiscoveryDetailSectionTitle">Completion</div>
-      <div class="activityDiscoveryCompletionText">${completion?.count ? `Completed ${completion.count} time${completion.count === 1 ? '' : 's'}${completion.bestTimeMs ? ` • best ${(completion.bestTimeMs / 1000).toFixed(1)}s` : ''} • saved in your Journal` : 'First completion adds this activity to your Journal and Games path.'}</div>
+      <div class="activityDiscoveryCompletionText" role="status">${escapeHtml(activityCompletionMessage(completion,getCompletionStatus(activity.id)))}</div>
+      ${['retry','cache-retry'].includes(getCompletionStatus(activity.id).status)?'<div class="activityDiscoveryDetailActions"><button type="button" class="secondary" id="activityDiscoveryRetrySave">Retry Journal save</button></div>':''}
     </div>
-  `;
+  `);
 }
 
 function renderPrompt() {
@@ -271,22 +292,22 @@ function renderUi() {
   if (refsNow.search && refsNow.search.value !== state.search) refsNow.search.value = state.search;
   if (refsNow.sort && refsNow.sort.value !== state.sort) refsNow.sort.value = state.sort;
   if (refsNow.scope) {
-    refsNow.scope.innerHTML = [
+    publishActivityMarkup(refsNow.scope, [
       ['all', 'All'],
       ['nearby', 'Nearby'],
       ['featured', 'Featured'],
       ['rooms', 'Multiplayer']
-    ].map(([id, label]) => `<button type="button" class="${state.scope === id ? 'active' : ''}" data-activity-scope="${escapeHtml(id)}">${escapeHtml(label)}</button>`).join('');
+    ].map(([id, label]) => `<button type="button" class="${state.scope === id ? 'active' : ''}" data-activity-scope="${escapeHtml(id)}">${escapeHtml(label)}</button>`).join(''));
   }
   if (refsNow.categories) {
-    refsNow.categories.innerHTML = listDiscoveryCategories()
+    publishActivityMarkup(refsNow.categories, listDiscoveryCategories()
       .filter((entry) => entry.id !== 'nearby' && entry.id !== 'featured' && entry.id !== 'creator' && entry.id !== 'room')
       .map((entry) => `<button type="button" class="${state.categoryId === entry.id ? 'active' : ''}" data-activity-category="${escapeHtml(entry.id)}">${escapeHtml(entry.icon)} ${escapeHtml(entry.label)}</button>`)
-      .join('');
+      .join(''));
   }
   if (refsNow.featured) {
     const featured = featuredActivities();
-    refsNow.featured.innerHTML = featured.length > 0
+    publishActivityMarkup(refsNow.featured, featured.length > 0
       ? featured.map((activity) => `
           <button type="button" class="activityDiscoveryFeaturedCard" data-activity-select="${escapeHtml(activity.id)}">
             <span>${escapeHtml(activity.icon)}</span>
@@ -294,13 +315,13 @@ function renderUi() {
             <em>${escapeHtml(activity.locationLabel)}</em>
           </button>
         `).join('')
-      : '<div class="activityDiscoveryEmptyState">No featured activities are available in this area yet.</div>';
+      : '<div class="activityDiscoveryEmptyState">No featured activities are available in this area yet.</div>');
   }
   if (refsNow.list) {
     const items = filteredCatalog();
-    refsNow.list.innerHTML = items.length > 0
+    publishActivityMarkup(refsNow.list, items.length > 0
       ? items.map(cardHtml).join('')
-      : '<div class="activityDiscoveryEmptyState">No activities match the current filters here yet.</div>';
+      : '<div class="activityDiscoveryEmptyState">No activities match the current filters here yet.</div>');
   }
   renderDetail();
   renderPrompt();
@@ -334,6 +355,7 @@ function inspectActivity(activityId = '', options = {}) {
   const id = sanitizeText(activityId, 120).toLowerCase();
   if (!id) return false;
   state.selectedId = id;
+  void activityCompletions.verify(id).then(()=>{if(state.selectedId===id)renderDetail()});
   if (options.open !== false) state.active = true;
   updateExternalState();
   renderUi();
@@ -343,6 +365,7 @@ function inspectActivity(activityId = '', options = {}) {
 function openActivityBrowser(options = {}) {
   state.active = true;
   if (options.activityId) state.selectedId = sanitizeText(options.activityId, 120).toLowerCase();
+  const selected=state.selectedId;void activityCompletions.verify(selected).then(()=>{if(state.selectedId===selected)renderDetail()});
   if (options.scope) state.scope = sanitizeText(options.scope, 24).toLowerCase();
   if (options.categoryId) state.categoryId = sanitizeText(options.categoryId, 32).toLowerCase();
   refreshCatalog(true);
@@ -371,6 +394,9 @@ function bindEvents() {
     const selectBtn = target.closest('[data-activity-select]');
     if (selectBtn) {
       inspectActivity(selectBtn.getAttribute('data-activity-select') || '', { open: true });
+      if (window.matchMedia('(max-width:860px)').matches) {
+        document.querySelector('.activityDiscoveryDetailCol')?.scrollIntoView({block:'start'});
+      }
       return;
     }
     const scopeBtn = target.closest('[data-activity-scope]');
@@ -424,11 +450,12 @@ function bindEvents() {
       renderUi();
       return;
     }
+    if(target.id==='activityDiscoveryRetrySave'){const activity=selectedActivity();if(!activity)return;const pending=retryActivityCompletion(activity.id);renderDetail();await pending;renderDetail();return;}
     if (target.id === 'activityDiscoveryReplayAction') {
       const activity = selectedActivity();
       if (!activity) return;
       if (getCompletionState(activity.id) || getRuntimeSnapshot().activityId === activity.id) {
-        const ok = await replayLastActivity();
+        const ok = await replayLastActivity(activity);
         state.status = ok ? `Replaying ${activity.title}.` : `Could not replay ${activity.title}.`;
         if (ok) closeActivityBrowser();
       } else {

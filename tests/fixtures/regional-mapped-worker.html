@@ -1,0 +1,78 @@
+<!doctype html><meta charset="utf-8"><title>Regional building worker lifecycle</title><link rel="icon" href="data:,"><style>body{margin:0;background:#8eb9cf}canvas{display:block}pre{position:absolute;left:16px;top:8px;background:#ffffffdd;padding:12px;font:16px monospace}</style>
+<pre id="status">Checking real worker decoding and scene publication…</pre>
+<script src="/node_modules/three/build/three.min.js"></script>
+<script type="module">
+import {fetchShortbreadTile,getVectorTileLib} from '/app/js/world/shortbread-source.js?v=20';
+import {createRegionalRoadCoveragePlan,buildRegionalRoadCoverageMask} from '/app/js/terrain/regional-road-coverage.js';
+import {rasterizeRegionalRoadPlan} from '/app/js/terrain/regional-road-raster.js';
+import {earthCoordinateFrame} from '/app/js/earth-core/coordinate-frame.js?v=1';
+import {createRegionalBuildingWorker} from '/app/js/terrain/regional-building-runtime.js';
+import {buildFarBuildingInstanceBatches} from '/app/js/terrain/far-building-instance-batches.js';
+import {FarBuildingInstanceStorage} from '/app/js/terrain/far-building-instance-storage.js';
+import {disposeFarFieldMesh} from '/app/js/terrain/far-field-geometry.js';
+const varint=n=>{const a=[];do{let b=n&127;n>>>=7;if(n)b|=128;a.push(b);}while(n);return a;};
+const scalar=(n,v)=>[...varint(n*8),...varint(v)];
+const bytes=(n,v)=>[...varint(n*8+2),...varint(v.length),...v];
+const string=(n,s)=>bytes(n,new TextEncoder().encode(s));
+const features=[];
+for(let i=0;i<1200;i++){
+ const x=(i%40)*90+200,y=Math.floor(i/40)*90+200;
+ const geometry=[9,x*2,y*2,26,80,0,0,80,79,0,15].flatMap(varint);
+ features.push(...bytes(2,[...scalar(1,i+1),...bytes(2,[0,0]),...scalar(3,3),...bytes(4,geometry)]));
+}
+const streets=[];
+for(let i=0;i<31;i++){
+ const x=150+i*120,y=150;
+ const geometry=[9,x*2,y*2,10,0,7200].flatMap(varint);
+ streets.push(...bytes(2,[...scalar(1,i+1),...bytes(2,[0,0]),...scalar(3,2),...bytes(4,geometry)]));
+}
+const source=new Uint8Array([...bytes(3,[...string(1,'buildings'),...features,...string(3,'kind'),...bytes(4,string(1,'residential')),...scalar(5,4096),...scalar(15,2)]),
+ ...bytes(3,[...string(1,'streets'),...streets,...string(3,'kind'),...bytes(4,string(1,'residential')),...scalar(5,4096),...scalar(15,2)])]);
+const roadFrame={origin:{lat:0,lon:0},scale:111000,unitsPerMeter:1,maxTextureSize:4096,bounds:{minX:0,minZ:0,maxX:2500,maxZ:2500}};
+const frame=earthCoordinateFrame(roadFrame.origin,roadFrame.scale),{Pbf,VectorTile}=await getVectorTileLib();
+const plan=createRegionalRoadCoveragePlan({...roadFrame,geoToWorld:(lat,lon)=>frame.toWorld(lat,lon)});
+const layer=new VectorTile(new Pbf(source)).layers.streets;
+for(let i=0;i<layer.length;i++){const feature=layer.feature(i).toGeoJSON(8192,8192,14);plan.addGeometry(feature.geometry,feature.properties);}
+const referenceRoad=rasterizeRegionalRoadPlan(plan,4096);
+
+const renderer=new THREE.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});renderer.setSize(1000,700);document.body.append(renderer.domElement);
+const scene=new THREE.Scene();scene.background=new THREE.Color(0x8eb9cf);scene.add(new THREE.HemisphereLight(0xffffff,0x666644,1));
+const camera=new THREE.PerspectiveCamera(50,1000/700,.1,10000);camera.position.set(2700,1800,3300);camera.lookAt(1200,0,1000);
+const gl=renderer.getContext(),live=new Set(),create=gl.createBuffer.bind(gl),remove=gl.deleteBuffer.bind(gl);
+gl.createBuffer=()=>{const b=create();live.add(b);return b;};gl.deleteBuffer=b=>{live.delete(b);return remove(b);};
+const terrainGroup=new THREE.Group();scene.add(terrainGroup);
+const ground=new THREE.PlaneGeometry(2500,2500);ground.rotateX(-Math.PI/2);ground.translate(1250,-.1,1250);
+const terrain=new THREE.Mesh(ground,new THREE.MeshStandardMaterial({color:0x94a573}));terrain.userData.isTerrainMesh=true;terrainGroup.add(terrain);
+renderer.render(scene,camera);const baseline=live.size,baselineTextures=renderer.info.memory.textures;
+const ctx={renderer,terrainGroup},cycles=[];let demo,demoRoadMask;
+try{
+ for(let cycle=0;cycle<4;cycle++){
+  const runtime=await createRegionalBuildingWorker({bounds:{latS:-90,latN:90,lonW:-180,lonE:180},tileCount:1,unitsPerMeter:1,roadFrame});
+  if(!runtime.roadWorkerEnabled)throw Error('Expected real worker OffscreenCanvas');
+  let descriptors,instances,roadMask;
+  try{
+   await runtime.addTile({bytes:source,z:14,x:8192,y:8192});const result=await runtime.finish();descriptors=result.buildings;
+   const packet=result.roadCoveragePlan.packet;
+   if(JSON.stringify(packet.keys)!==JSON.stringify(referenceRoad.keys)||packet.masks.length!==referenceRoad.masks.length||packet.masks.some((value,i)=>value!==referenceRoad.masks[i]))throw Error('Worker road pixels changed');
+   roadMask=(await buildRegionalRoadCoverageMask(ctx,result.roadCoveragePlan)).mask;roadMask.syncMaterials();
+   if(packet.masks!==null)throw Error('Transferred road packet retained after publication');
+   if(result.availableBuildings!==1200||descriptors.length!==1140||source.byteLength===0)throw Error('Coverage or source ownership changed');
+   const scratch={massing:{color:[0,0,0]}};instances=new FarBuildingInstanceStorage(descriptors.length);
+   for(let i=0;i<descriptors.length;i++){
+    const b=descriptors.read(i,scratch),m=b.massing;
+    instances.append(b.centerLon*111000,-b.centerLat*111000,0,b.widthMeters,b.depthMeters,m.heightMeters,b.rotationY,m.color);
+   }
+   const group=new THREE.Group(),material=new THREE.MeshStandardMaterial();
+   for(const mesh of await buildFarBuildingInstanceBatches(THREE,instances,material,{cellSize:256}))group.add(mesh);
+   descriptors.dispose();instances.dispose();scene.add(group);renderer.render(scene,camera);
+   if(cycle===3){demo=group;demoRoadMask=roadMask;roadMask=null;break;}
+   scene.remove(group);disposeFarFieldMesh(group);roadMask.dispose();renderer.render(scene,camera);
+   cycles.push({cycle,buffers:live.size-baseline,textures:renderer.info.memory.textures-baselineTextures,coverage:result.selectedBuildingTarget/result.availableBuildings});
+   if(live.size!==baseline||renderer.info.memory.textures!==baselineTextures)throw Error('Worker publication retained GPU resources');
+  }finally{runtime.dispose();descriptors?.dispose();instances?.dispose();roadMask?.dispose();}
+ }
+ window.advanceTime=()=>renderer.render(scene,camera);
+ window.render_game_to_text=()=>JSON.stringify({ok:true,cycles,sourceBytes:source.byteLength,workerTerminatedBeforeRender:true,roadPixelsMatch:true,roadCells:referenceRoad.keys.length,scope:'Real MVT worker decoding, transfer, geometry and retirement; controlled fixture'});
+ window.fixtureReady=true;document.querySelector('#status').textContent='Real worker: 1,200 source footprints → 1,140 rendered (95%)\n31 road lines: worker pixels identical to reference\n3 decode → render → retirement cycles: 0 retained GPU buffers/textures\nWorkers and construction buffers retire before each render';window.advanceTime();
+}catch(e){window.fixtureError=e.stack;throw e;}
+</script>

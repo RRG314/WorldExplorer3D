@@ -40,10 +40,10 @@ function collectLiveEarthProviderHealth(state, now = Date.now()) {
   return Object.freeze({
     satellites: describeProviderHealth(operational, 'celestrak-gp', now),
     earthquakes: describeProviderHealth(operational, 'usgs-earthquakes-day', now),
-    weather: describeProviderHealth(operational, 'open-meteo-current', now),
+    weather: describeProviderHealth(operational, 'met-norway-current', now),
     streetImagery: describeProviderHealth(street, streetProvider, now),
-    aircraft: describeProviderHealth(aircraft, 'opensky', now),
-    marineModel: describeProviderHealth(marine, 'open-meteo-marine', now),
+    aircraft: describeProviderHealth(aircraft, 'adsb-lol', now),
+    marineModel: describeProviderHealth(marine, 'public-marine', now),
     marineObservation: describeProviderHealth(marine, 'noaa-water-level', now)
   });
 }

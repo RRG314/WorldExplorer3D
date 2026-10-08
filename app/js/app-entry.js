@@ -8,7 +8,7 @@ import { ctx as appCtx } from './shared-context.js?v=55';
 import { createAccountService } from './platform/account-service.js?v=1';
 import { createPlatformServiceRegistry } from './platform/service-registry.js?v=1';
 import { scheduleAfterFirstPlay } from './runtime/workload-policy.js?v=1';
-import './runtime-diagnostics.js?v=83';
+import './runtime-diagnostics.js?v=84';
 import './ui/legal-attribution.js?v=1';
 import './state.js?v=65';
 import './camera-mode.js?v=1';
@@ -49,7 +49,7 @@ import './game.js?v=71';
 import './input.js?v=79';
 import './hud.js?v=105';
 import './map.js?v=61';
-import { renderLoop } from './main.js?v=77';
+import { renderLoop } from './main.js?v=78';
 import './memory.js?v=55';
 import { setupUI } from './ui.js?v=174';
 import { initAccessibility } from './ui/accessibility.js?v=2';
@@ -371,6 +371,10 @@ function registerLazySubsystemEntrypoints() {
         type: 'ArPlatformSnapshot', phase: 'idle', active: false
     };
     appCtx.getPlatformServicesSnapshot = () => platformServices.snapshot();
+    appCtx.getAccountUserId = () => {
+        const user = platformServices.peek('account')?.getUser?.();
+        return user && !user.isAnonymous ? user.uid : null;
+    };
     appCtx.getAccountSnapshot = () => platformServices.peek('account')?.snapshot?.() || {
         started: false,
         signedIn: false,

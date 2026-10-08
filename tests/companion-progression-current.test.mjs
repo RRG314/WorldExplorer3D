@@ -105,6 +105,7 @@ test('travel policy keeps companions safely inside enclosed vehicles instead of 
   assert.deepEqual(resolveCompanionTravelPolicy(companion, 'boat', 'EARTH'), { visible: true, state: 'aboard', positionMode: 'aboard' });
   assert.deepEqual(resolveCompanionTravelPolicy(companion, 'plane', 'EARTH'), { visible: false, state: 'vehicle-occupant', positionMode: 'interior' });
   assert.deepEqual(resolveCompanionTravelPolicy(companion, 'walk', 'MOON'), { visible: false, state: 'protected-quarters' });
+  assert.deepEqual(resolveCompanionTravelPolicy(companion, 'swim', 'EARTH'), { visible: false, state: 'safe-during-exposed-travel', positionMode: 'interior' });
   assert.deepEqual(resolveCompanionTravelPolicy(companion, 'skydive', 'EARTH'), { visible: false, state: 'safe-during-exposed-travel' });
 });
 

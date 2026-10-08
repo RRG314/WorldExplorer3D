@@ -1,4 +1,7 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
+import {captureEnvironmentSession} from '../session-coordinator.js?v=2';
+
+let requestedMode = 0;
 
 const modeLoads = {
   ocean: null,
@@ -43,7 +46,7 @@ export function ensureSpaceRuntime() {
 
 export function ensureOceanRuntime() {
   if (!modeLoads.ocean) {
-    modeLoads.ocean = import('../ocean.js?v=10').catch((error) => {
+    modeLoads.ocean = import('../ocean.js?v=11').catch((error) => {
       modeLoads.ocean = null;
       throw error;
     });
@@ -52,7 +55,9 @@ export function ensureOceanRuntime() {
 }
 
 async function invokeSpace(method, args) {
+  const request=++requestedMode,session=captureEnvironmentSession();
   const runtime = await ensureSpaceRuntime();
+  if(request!==requestedMode||!session.isCurrent())return false;
   if (typeof runtime?.[method] !== 'function') {
     throw new Error(`Space runtime action ${method} is unavailable.`);
   }
@@ -60,7 +65,9 @@ async function invokeSpace(method, args) {
 }
 
 async function invokeOcean(method, args) {
+  const request=++requestedMode,session=captureEnvironmentSession();
   const runtime = await ensureOceanRuntime();
+  if(request!==requestedMode||!session.isCurrent())return false;
   if (typeof runtime?.[method] !== 'function') {
     throw new Error(`Ocean runtime action ${method} is unavailable.`);
   }

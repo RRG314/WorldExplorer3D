@@ -1,3 +1,4 @@
+import {harborDistrictFocus} from '../world/harbor-district.js';
 import {
   createLivingWorldPublication,
   createLivingWorldPublicationStore,
@@ -80,7 +81,8 @@ function sourceSegmentProjection(feature, edge, x, z) {
 }
 
 export function createTrafficVehicleSurfaceSampler(appCtx, trafficCompilation) {
-  return (edge, x, z) => {
+  const sample = (edge, x, z) => {
+    if (!trafficCompilation) return NaN;
     const feature = trafficCompilation?.runtimeFeatureByEdge?.get(edge?.id);
     const projection = feature ? sourceSegmentProjection(feature, edge, x, z) : null;
     const surfaceY = Number(appCtx?.sampleFeatureSurfaceY?.(feature, x, z, projection));
@@ -90,6 +92,8 @@ export function createTrafficVehicleSurfaceSampler(appCtx, trafficCompilation) {
     if (!Number.isFinite(surfaceY)) return sampleEdgeTransitionPlane(edge, x, z);
     return surfaceY + 0.08;
   };
+  sample.dispose = () => { trafficCompilation = null; };
+  return sample;
 }
 
 function disposeRuntimeState(appCtx, state, reason = 'disposed') {
@@ -98,6 +102,11 @@ function disposeRuntimeState(appCtx, state, reason = 'disposed') {
   state.reason = String(reason || 'disposed');
   appCtx?.unregisterRuntimeOwner?.(state.owner);
   state.population?.dispose?.();
+  state.sampleVehicleSurface?.dispose?.();
+  // Retired callbacks and engine feedback can outlive a world. Drop the
+  // owned feature maps explicitly so they cannot keep that city's roads alive.
+  state.trafficCompilation?.runtimeFeatureByEdge?.clear();
+  state.pedestrianCompilation?.runtimeFeatureByEdge?.clear();
   if (appCtx?.handleLivingWorldSelection === state.handleWorldSelection) delete appCtx.handleLivingWorldSelection;
   if (appCtx?.livingWorldRuntime === state) appCtx.livingWorldRuntime = null;
   return true;
@@ -161,6 +170,7 @@ export function startLivingWorldRuntime(appCtx, options = {}) {
   const activityAnchors = livingWorldActivityAnchors(appCtx);
   const pedestrianCompilation = compilePedestrianGraph({
     traversal: traversal.walk,
+    neighborhoodFocuses: [harborDistrictFocus(appCtx)].filter(Boolean),
     entrances: catalog.entrances,
     metersPerWorldUnit: appCtx.METERS_PER_WORLD_UNIT || 1.11,
     isPedestrianSurface: (x,z) => {
@@ -189,6 +199,12 @@ export function startLivingWorldRuntime(appCtx, options = {}) {
     getReferencePosition: () => appCtx.activeEarthActorPosition?.() || (appCtx.Walk?.state?.mode === 'walk'
       ? appCtx.Walk.state.walker
       : appCtx.droneMode ? appCtx.drone : appCtx.car),
+    canPedestrianAppearAt(point) {
+      const camera=appCtx.camera;
+      if(!camera?.isCamera)return false;
+      const projected=new THREE.Vector3(point.x,Number(point.y||0)+1,point.z).project(camera);
+      return projected.z < -1 || projected.z > 1 || Math.abs(projected.x)>1.3 || Math.abs(projected.y)>1.3;
+    },
     getTimePhase: () => appCtx.timeOfDay,
     getTrafficFlow: () => appCtx.currentTrafficFlowProfile || null,
     trafficControls: appCtx.trafficControlPlacements,
@@ -268,6 +284,7 @@ export function startLivingWorldRuntime(appCtx, options = {}) {
     reason: null
   };
   state.handleWorldSelection = (target) => {
+    if (state.disposed) return false;
     const activeActor = appCtx.activeTransportActor?.();
     const reference = activeActor?.position || (appCtx.Walk?.state?.mode === 'walk'
       ? appCtx.Walk?.state?.walker

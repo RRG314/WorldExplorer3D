@@ -64,6 +64,9 @@ function actorRecord(mode, actor, options = {}) {
 
 function activeTransportActor() {
   const mode = currentTransportMode();
+  if (mode === 'ocean' && appCtx.oceanMode?.diver?.active) {
+    return actorRecord(mode,appCtx.oceanMode.diver.navigationActor(),{domain:'person',catalogId:'scuba-explorer',bounds:{radius:.35,height:1.7},grounded:false,contactKind:'water_column',enterable:false,companionAboard:false});
+  }
   if (mode === 'ocean') {
     return actorRecord(mode, appCtx.oceanMode?.submarine, {
       bounds: { radius: 2.6, height: 2.4 },
@@ -77,6 +80,9 @@ function activeTransportActor() {
       grounded: false,
       contactKind: 'space'
     });
+  }
+  if (mode === 'boat' && appCtx.boatDeck?.active) {
+    return actorRecord(mode,appCtx.boatDeck.navigationActor(),{domain:'person',catalogId:'research-deck-explorer',bounds:{radius:.35,height:1.7},grounded:true,contactKind:'vessel_deck',enterable:false,companionAboard:false});
   }
   if (mode === 'boat') {
     const catalog = getMaritimeCatalogEntry(appCtx.boatMode?.transportCatalogId);

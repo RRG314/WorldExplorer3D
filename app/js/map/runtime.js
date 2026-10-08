@@ -41,6 +41,7 @@ function drawMapOnCanvas(ctx, w, h, isLarge) {
       actorY: Number(actor.y.toFixed(2)),
       centerX: view.mx,
       centerY: view.my,
+      centerLatLon: { ...view.centerLatLon },
       zoom: view.zoom
     };
   }

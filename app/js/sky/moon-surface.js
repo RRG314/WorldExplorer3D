@@ -1,3 +1,6 @@
+import { createSurfaceDressing } from '../planetary/surface-dressing.js';
+import { addSurfaceMaterialDetail } from '../planetary/surface-material-detail.js';
+import { setActivePlanetaryObstacles } from '../planetary/runtime/obstacle-authority.js?v=1';
 import { APOLLO11_TERRAIN, loadApollo11Terrain } from './moon-lroc-terrain.js?v=1';
 import {
   APOLLO11_SURFACE_REGION,
@@ -19,6 +22,7 @@ function createMeasuredSurface(appCtx) {
     emissive: 0x090909,
     emissiveIntensity: 0.08
   });
+  addSurfaceMaterialDetail(material, .45);
   const surface = new THREE.Mesh(geometry, material);
   surface.name = 'Apollo 11 LROC measured terrain';
   surface.receiveShadow = true;
@@ -45,41 +49,15 @@ function createMeasuredSurface(appCtx) {
 }
 
 function addScaleRocks(appCtx, surface, sampleHeight) {
-  const count = 420;
-  const geometry = new THREE.DodecahedronGeometry(1, 0);
-  const material = new THREE.MeshStandardMaterial({ color: 0x777773, roughness: 1, metalness: 0 });
-  const rocks = new THREE.InstancedMesh(geometry, material, count);
-  const transform = new THREE.Object3D();
-  const color = new THREE.Color();
-  let seed = 0x4c524f43;
-  const random = () => {
-    seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
-    return seed / 4294967296;
-  };
-
-  for (let index = 0; index < count; index++) {
-    const localX = (random() - 0.5) * APOLLO11_TERRAIN.widthMeters * 0.94;
-    const localZ = (random() - 0.5) * APOLLO11_TERRAIN.lengthMeters * 0.94;
-    const worldX = localX + surface.position.x;
-    const worldZ = localZ + surface.position.z;
-    const scale = 0.35 + Math.pow(random(), 2.4) * 3.8;
-    transform.position.set(worldX, sampleHeight(localX, localZ) + surface.position.y + scale * 0.32, worldZ);
-    transform.rotation.set(random() * 0.6, random() * Math.PI * 2, random() * 0.6);
-    transform.scale.setScalar(scale);
-    transform.updateMatrix();
-    rocks.setMatrixAt(index, transform.matrix);
-    const tone = 0.3 + random() * 0.24;
-    color.setRGB(tone, tone, tone * 0.97);
-    rocks.setColorAt(index, color);
-  }
-  rocks.instanceMatrix.needsUpdate = true;
-  rocks.instanceColor.needsUpdate = true;
-  rocks.castShadow = true;
-  rocks.receiveShadow = true;
-  rocks.userData = {
-    moonObject: true,
-    provenance: 'Deterministic display-scale rocks; not georeferenced survey features'
-  };
+  const rocks = createSurfaceDressing(THREE, {
+    bodyId:'moon',kind:'regolith',spawn:{x:200,z:-950},seed:0x4c524f43,
+    bounds:{minX:surface.position.x-APOLLO11_TERRAIN.widthMeters/2,maxX:surface.position.x+APOLLO11_TERRAIN.widthMeters/2,
+      minZ:surface.position.z-APOLLO11_TERRAIN.lengthMeters/2,maxZ:surface.position.z+APOLLO11_TERRAIN.lengthMeters/2},
+    sampleHeight:(x,z)=>sampleHeight(x-surface.position.x,z-surface.position.z)+surface.position.y
+  });
+  rocks.userData.moonObject=true;
+  surface.userData.obstacles=rocks.userData.obstacles;
+  setActivePlanetaryObstacles('moon',rocks.userData.obstacles);
   appCtx.scene.add(rocks);
   if (!Array.isArray(window._moonObjects)) window._moonObjects = [];
   window._moonObjects.push(rocks);

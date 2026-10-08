@@ -164,13 +164,14 @@ function nearestFacadeEdge(candidate, point) {
   return best;
 }
 
-function candidatePriority(building, index) {
+function candidatePriority(building, index, focus) {
   const points = cleanPoints(building?.pts);
   if (points.length < 3 || building?.collisionKind === 'barrier' || building?.collisionDisabled) return null;
   const buildingType = String(building?.buildingType || 'building').trim().toLowerCase();
   if (EXCLUDED_BUILDING_TYPES.has(buildingType)) return null;
   const center = polygonCentroid(points);
-  const distance = Math.hypot(center.x, center.z);
+  const distance = Math.min(Math.hypot(center.x, center.z),
+    Number.isFinite(focus?.x) && Number.isFinite(focus?.z) ? Math.hypot(center.x-focus.x,center.z-focus.z) : Infinity);
   if (distance > 520) return null;
   const commercial = COMMERCIAL_BUILDING_TYPES.has(buildingType);
   return {
@@ -315,7 +316,7 @@ export function compileEntranceCatalog(options = {}) {
     if (buildingId && !mappedByBuilding.has(buildingId)) mappedByBuilding.set(buildingId, mapped);
   }
   const candidates = (Array.isArray(options.buildings) ? options.buildings : [])
-    .map(candidatePriority)
+    .map((building,index)=>candidatePriority(building,index,options.focus))
     .filter(Boolean)
     .sort((a, b) => a.score - b.score || a.buildingId.localeCompare(b.buildingId))
     .slice(0, limit);

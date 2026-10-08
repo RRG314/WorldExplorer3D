@@ -204,7 +204,7 @@ function createWorldSpawnSurfaceApi(context) {
     return shallowRoadsideCollision || likelyRoadGhostCollision;
   }
 
-  function spawnDepartureAssessment(x, z, angle, mode = "drive") {
+  function spawnDepartureAssessment(x, z, angle, mode = "drive", options = {}) {
     if (typeof appCtx.checkBuildingCollision !== "function") {
       return { valid: true, reverseHeading: false, penalty: 0 };
     }
@@ -221,7 +221,8 @@ function createWorldSpawnSurfaceApi(context) {
       for (let i = 0; i < distances.length; i++) {
         const sampleX = x + forwardX * distances[i] * direction;
         const sampleZ = z + forwardZ * distances[i] * direction;
-        const actorBaseY = terrainYAtWorld(sampleX, sampleZ);
+        const supportY = options.surfaceYAt?.(sampleX,sampleZ);
+        const actorBaseY = Number.isFinite(supportY) ? supportY : terrainYAtWorld(sampleX, sampleZ);
         const buildingCheck = appCtx.checkBuildingCollision(sampleX, sampleZ, radius, {
           actorBaseY,
           actorHeight

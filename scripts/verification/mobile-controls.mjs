@@ -81,7 +81,8 @@ async function touchDrag(selector, deltaX, deltaY, holdMs = 900) {
     else {
       const startedAt = Date.now();
       const receipt = await advanceGameplay(page, holdMs);
-      touchTimingReceipts.push({ selector, holdMs, receipt, wallElapsedMs: Date.now() - startedAt });
+      const held=await page.evaluate(async()=>{const {ctx}=await import('/app/js/shared-context.js?v=55');return {actor:globalThis.getWorldExplorerRuntimeDiagnostics?.().activeActor,camera:globalThis.getWorldExplorerRuntimeDiagnostics?.().cameraFollow,carLook:ctx.camera?.userData?.carLook,cameraMode:ctx.camMode,clearanceMode:ctx.camera?.userData?.vehicleClearanceMode,cameraPosition:{...ctx.camera?.position},car:{x:ctx.car?.x,y:ctx.car?.y,z:ctx.car?.z,angle:ctx.car?.angle},controls:ctx.readControlActions?.('drive')};});
+      touchTimingReceipts.push({ selector, holdMs, receipt, held, wallElapsedMs: Date.now() - startedAt });
     }
   } finally {
     await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
@@ -337,6 +338,7 @@ try {
   const driveMoved = await diagnostics();
   await touchDrag('#mobileLookPad', 43, 0, 900);
   const driveLooked = await diagnostics();
+  await page.screenshot({path:'output/verification/mobile-controls/drive-look-held.png'});
   const driveRecovery = await settleReleasedCamera(page, { maximumHeadingDegrees: 6, minimumTrailingDistance: 2, maximumSimulationMs: 1500 });
   const driveRecentered = driveRecovery.state;
   await page.screenshot({ path: 'output/verification/mobile-controls/drive-standard-mobile.png', fullPage: false });

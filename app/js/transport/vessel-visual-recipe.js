@@ -1,3 +1,5 @@
+import {RESEARCH_DECK} from '../boat-mode/research/layout.js';
+import {addResearchDeckVisual} from '../boat-mode/research/visual.js';
 import {batchStaticVesselParts} from './batch-static-vessel-parts.js';
 import { transportDamagePresentation } from './damage-model.js?v=1';
 
@@ -43,7 +45,7 @@ function hullGeometry(THREE, entry, lower = false) {
   const vertices = [];
   const indices = [];
   stations.forEach((station) => {
-    const yTop = lower ? 0 : station.top;
+    const yTop = lower ? 0 : entry.role==='research' && station.z<=.25 ? RESEARCH_DECK.y-.05 : station.top;
     const yKeel = station.keel;
     vertices.push(
       -halfWidth * station.width, yTop, length * station.z,
@@ -63,9 +65,9 @@ function hullGeometry(THREE, entry, lower = false) {
       indices.push(a, c, b, b, c, d);
     }
   }
-  indices.push(0, 3, 2, 0, 2, 1);
+  indices.push(0, 2, 3, 0, 1, 2);
   const last = (stations.length - 1) * 4;
-  indices.push(last, last + 1, last + 2, last, last + 2, last + 3);
+  indices.push(last, last + 2, last + 1, last, last + 3, last + 2);
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
   geometry.setIndex(indices);
@@ -250,15 +252,13 @@ function addFerry(THREE, group, entry, materials, options) {
 }
 
 function addResearch(THREE, group, entry, materials, options) {
-  const house = addWheelhouse(THREE, group, entry, materials, { z: entry.dimensions.length * .14, widthScale: .68, lengthScale: .27, height: entry.dimensions.height * .22, mobile: options.mobile });
-  const upper = addWheelhouse(THREE, group, entry, materials, { z: entry.dimensions.length * .2, widthScale: .54, lengthScale: .15, baseY: house.topY, height: entry.dimensions.height * .12, mobile: options.mobile });
-  addMast(THREE, group, 0, upper.topY, upper.z, entry.dimensions.height * .32, materials);
+  const deck=addResearchDeckVisual(THREE,group,materials,{detailed:options.state==='active'});
+  addMast(THREE,group,0,deck.bridgeTop,entry.dimensions.length*.2,entry.dimensions.height*.45,materials);
   const craneBase = new THREE.Vector3(entry.dimensions.width * .23, 1.25, -entry.dimensions.length * .25);
   const craneTop = craneBase.clone().add(new THREE.Vector3(0, entry.dimensions.height * .25, 0));
   const craneTip = craneTop.clone().add(new THREE.Vector3(-entry.dimensions.width * .32, -.5, -entry.dimensions.length * .18));
   group.add(cylinderBetween(THREE, craneBase, craneTop, .18, materials.dark, 10));
   group.add(cylinderBetween(THREE, craneTop, craneTip, .15, materials.dark, 10));
-  addRail(THREE, group, entry, materials, -.43, -.05);
 }
 
 function addCargo(THREE, group, entry, materials, options) {
@@ -410,6 +410,7 @@ function createVesselVisual(THREE, entry, options = {}) {
     else root.removeFromParent?.();
     root.traverse((object) => {
       object.geometry?.dispose?.();
+      if(object.isSprite||object.material?.userData?.ownedLocalCanvasTexture)object.material?.map?.dispose?.();
       if (Array.isArray(object.material)) object.material.forEach((entryMaterial) => entryMaterial?.dispose?.());
       else object.material?.dispose?.();
     });

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {buildingCenter,nearestCaptureBuildingIds} from '../app/js/reality-capture/nearby-buildings.js';
+import {buildingCenter,nearestCaptureBuildingIds,createNearestCaptureSelection} from '../app/js/reality-capture/nearby-buildings.js';
 
 const oracle=(buildings,actor,limit=60)=>[...new Set(buildings.filter(b=>b.sourceBuildingId)
   .map(b=>({id:String(b.sourceBuildingId),center:buildingCenter(b)}))
@@ -19,4 +19,14 @@ test('ties, closer duplicate IDs, missing IDs and footprint centers preserve exi
     {sourceBuildingId:'d',minX:3,maxX:5,minZ:0,maxZ:0},{centerX:0,centerZ:0}];
   for(const limit of [0,1,2,3,60])assert.deepEqual(nearestCaptureBuildingIds(buildings,{x:0,z:0},limit),oracle(buildings,{x:0,z:0},limit));
   assert.deepEqual(nearestCaptureBuildingIds([],{x:0,z:0}),[]);
+});
+
+test('nearest selection handles out-of-order ties and snapshots without changing future selection',()=>{
+ const selection=createNearestCaptureSelection(2);
+ selection.consider('later',2,10);selection.consider('earlier',2,3);
+ const first=selection.ids();assert.deepEqual(first,['earlier','later']);
+ selection.consider('replacement',2,1);assert.deepEqual(selection.ids(),['replacement','earlier']);
+ selection.consider('earlier',2,0);assert.deepEqual(selection.ids(),['earlier','replacement']);
+ selection.consider('later',1,20);assert.deepEqual(selection.ids(),['later','earlier']);
+ assert.deepEqual(first,['earlier','later']);assert.equal(selection.maximumDistance(),2);
 });

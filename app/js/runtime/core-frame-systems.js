@@ -1,4 +1,7 @@
+import {updateBuildingExteriorFocus} from '../world/building-exterior-details.js?v=2';
+import {beginSwimmingRender} from '../walking/water/presentation.js';
 import {createGraphicsCallEvidence} from './graphics-call-evidence.js';
+import {activePresentationOwner} from './renderer-owners.js';
 import { updateStreetPavementFocus, updateStreetOverviewFrame, prepareStreetOverviewMaterials } from '../world/street-pavement-runtime.js';
 function createCoreFrameSystems(appCtx, hooks = {}) {
   appCtx.presentationPose = null;
@@ -8,6 +11,7 @@ function createCoreFrameSystems(appCtx, hooks = {}) {
   let weatherTimer = 0;
   let weatherUiTimer = 0;
   let boatTimer = 0;
+  let regionalSceneryTimer = 0;
   let liveEarthTimer = 0;
   return [
     {
@@ -32,9 +36,10 @@ function createCoreFrameSystems(appCtx, hooks = {}) {
       }
     },
     {
-      id: 'core.simulation',
+      id: 'core.readiness',
       owner: 'engine',
-      phase: 'simulation',
+      phase: 'input',
+      priority: 10,
       enabled: () => !!appCtx.gameStarted && !appCtx.worldLoading && !appCtx.titleLaunchPending,
       update(frame) {
         const earthActive=!appCtx.onMoon&&!appCtx.onMars&&!appCtx.activePlanetaryBodyId&&
@@ -42,10 +47,17 @@ function createCoreFrameSystems(appCtx, hooks = {}) {
         const detail=earthActive?appCtx.transportDetail:null;
         if(detail){
           const point=appCtx.activeEarthActorPosition?.()||{x:0,z:0};
-          detail.step(point);
           const terrainY=['plane','drone'].includes(point.source)?appCtx.terrainMeshHeightAt?.(point.x,point.z):NaN;
-          if(!detail.readyForActor(point,terrainY))return;
+          detail.step(point,terrainY);
+          if(!detail.readyForActor(point,terrainY))frame.flags.simulationBlocked=true;
         }
+      }
+    },
+    {
+      id:'core.simulation',owner:'engine',phase:'simulation',
+      enabled:()=>!!appCtx.gameStarted&&!appCtx.worldLoading&&!appCtx.titleLaunchPending,
+      update(frame){
+        if(frame.flags?.simulationBlocked)return;
         appCtx.update(frame.dt);
       }
     },
@@ -63,6 +75,12 @@ function createCoreFrameSystems(appCtx, hooks = {}) {
           appCtx.updateExpeditionShipInterior?.(frame.dt);
           return;
         }
+        regionalSceneryTimer += frame.dt;
+        if (regionalSceneryTimer >= 1) {
+          regionalSceneryTimer = 0;
+          appCtx.updateRegionalSceneryFocus?.();
+        }
+        appCtx.updateBoatSwimming?.(frame.dt);
         appCtx.updatePlanetaryTracks?.();
         appCtx.updatePlanetaryFieldMap?.(frame.dt);
         if (!appCtx.onMars && !appCtx.activePlanetaryBodyId) appCtx.refreshAstronomicalSky?.(false);
@@ -97,7 +115,7 @@ function createCoreFrameSystems(appCtx, hooks = {}) {
       owner: 'platform',
       phase: 'camera',
       priority: 20,
-      enabled: () => !!appCtx.gameStarted && !appCtx.worldLoading && !appCtx.titleLaunchPending,
+      enabled: () => !!appCtx.gameStarted && !appCtx.worldLoading && !appCtx.titleLaunchPending && !appCtx.activeShipInterior,
       update(frame) {
         appCtx.updateActivityCreator?.(frame.dt, frame.timestamp);
         appCtx.updateActivityDiscovery?.(frame.dt, frame.timestamp);
@@ -116,6 +134,9 @@ function createCoreFrameSystems(appCtx, hooks = {}) {
       phase: 'presentation',
       enabled: () => !!appCtx.gameStarted && !appCtx.worldLoading && !appCtx.titleLaunchPending,
       update(frame) {
+        // The ship owns its HUD, maps and visual detail. Retaining the city for
+        // return does not give its hidden map/LOD systems an interior frame.
+        if (appCtx.activeShipInterior) return;
         weatherUiTimer += frame.dt;
         if (weatherUiTimer >= 1) {
           weatherUiTimer %= 1;
@@ -145,6 +166,7 @@ function createCoreFrameSystems(appCtx, hooks = {}) {
           lodTimer = 0;
           appCtx.updateStreetFurnitureVisibility?.();
           appCtx.updateVegetationFocus?.();
+          updateBuildingExteriorFocus(appCtx);
           updateStreetPavementFocus(appCtx);
           appCtx.updateStructureVisualVisibility?.();
           appCtx.enforceEnvironmentSceneOwnership?.();
@@ -160,11 +182,12 @@ function createCoreRenderSystem(appCtx, shouldUseComposer) {
   appCtx.graphicsCallEvidence=graphicsEvidence;
   const draw = () => {
     graphicsEvidence?.begin();
+    const restoreWaterPresentation=beginSwimmingRender(appCtx);
     try {
       if (shouldUseComposer()) appCtx.composer.render();
       else appCtx.renderer.render(appCtx.scene, appCtx.camera);
       appCtx.recordPerfRendererInfo?.(appCtx.renderer);
-    } finally {graphicsEvidence?.end();}
+    } finally {restoreWaterPresentation?.();graphicsEvidence?.end();}
   };
   // The completed world must have produced its first frame before the loading
   // cover is dismissed. Use the real render path, including postprocessing.
@@ -201,7 +224,7 @@ function createCoreRenderSystem(appCtx, shouldUseComposer) {
     // partial city batches competes with compilation and uploads them early.
     // Manual pause retains the last frame beneath its dimmed dialog. Network
     // listeners and lease heartbeats remain alive without redrawing the city.
-    enabled: (frame) => frame?.manualRender !== false && !!appCtx.gameStarted && !appCtx.worldLoading && !appCtx.titleLaunchPending && !appCtx.hasPauseReason?.('manual_pause'),
+    enabled: (frame) => frame?.manualRender !== false && activePresentationOwner(appCtx)==='main' && !appCtx.worldLoading && !appCtx.titleLaunchPending && !appCtx.hasPauseReason?.('manual_pause'),
     update() {
       draw();
     }

@@ -4,6 +4,7 @@ export const backendSteps = [
   { id: 'storage-rules', command: [process.execPath, '--test', '--test-concurrency=1', 'tests/storage.rules.reality-capture.test.mjs'] },
   { id: 'firestore-rules', command: [process.execPath, '--test', '--test-concurrency=1', 'tests/firestore.rules.security.test.mjs', 'tests/room-profile-emulator.test.mjs'] },
   { id: 'discovery-receipts', command: [process.execPath, '--test', 'tests/discovery-receipt-endpoint-current.test.mjs'] },
+  { id: 'environment-data', command: [process.execPath, 'scripts/verification/environment-data-current.mjs'] },
   { id: 'public-user-count', command: [process.execPath, 'scripts/verification/public-user-count-backend-current.mjs'] },
   { id: 'connected-property-backend', command: [process.execPath, 'scripts/verification/connected-property-backend-current.mjs'] },
   { id: 'urban-civic-backend', command: [process.execPath, 'scripts/verification/urban-civic-backend-current.mjs'] },
@@ -14,7 +15,7 @@ export const backendSteps = [
   { id: 'account-backend', command: [process.execPath, 'scripts/verification/account-backend-current.mjs'] },
 ];
 
-export const backendGroups = [backendSteps.slice(0, 8), ...backendSteps.slice(8).map(step => [step])];
+export const backendGroups = [backendSteps.slice(0, 9), ...backendSteps.slice(9).map(step => [step])];
 
 // Both wrappers use these deadlines. CI compiles two complete Earth worlds
 // serially before exercising shared vehicles; emulator startup/teardown must

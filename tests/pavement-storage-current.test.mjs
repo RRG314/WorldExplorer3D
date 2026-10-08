@@ -4,6 +4,15 @@ import {indexPavementPositions} from '../app/js/world/pavement-indexed-mesh.js';
 import {createPavementBaseSampler} from '../app/js/world/pavement-height-sampler.js';
 import {serializeStreetPavementFingerprint} from '../app/js/world/compiler/street-pavement-fingerprint.js';
 
+test('sidewalk ownership masks are hashed once without losing cache invalidation',()=>{
+ const masks=Array.from({length:100},(_,i)=>[[[i,0],[i+1,0],[i+1,8],[i,8],[i,0]]]);
+ const tile={segments:Array.from({length:50},(_,i)=>({a:{x:i,z:0},sidewalkMasks:masks})),joins:[{sidewalkMasks:masks}]};
+ const key=serializeStreetPavementFingerprint(tile,1),decoded=JSON.parse(key);
+ assert.equal(decoded.masks.length,1);assert.ok(key.length<JSON.stringify(tile).length*.1);
+ assert.equal(serializeStreetPavementFingerprint(structuredClone(tile),1),key);
+ masks[0][0][1][0]+=.01;assert.notEqual(serializeStreetPavementFingerprint(tile,1),key);
+});
+
 test('pavement cache keys retain geometry and shared road ownership without expanding each edge owner',()=>{
  const road={auditIndex:7,type:'residential',tags:{sidewalk:'both'},pts:Array.from({length:1000},(_,i)=>({x:i,z:i*.1})),resolvedCrossSection:{placementOffset:1}};
  const tile={key:'0:0',segments:[{road,a:{x:0,z:0},b:{x:10,z:1}}],joins:[{road,point:{x:5,z:.5}}],frontageBarriers:Array.from({length:1000},(_,i)=>({a:{x:i,z:0},b:{x:i+1,z:1},road}))};

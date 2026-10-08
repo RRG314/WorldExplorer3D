@@ -1,0 +1,53 @@
+<!doctype html><meta charset="utf-8"><title>Road residency and return</title><link rel="icon" href="data:,"><style>body{margin:0}canvas{display:block}pre{position:absolute;left:16px;top:8px;background:#ffffffec;padding:12px;font:15px monospace}</style><pre id="status">Checking road region residency…</pre>
+<script src="/app/vendor/three/build/three.min.js"></script>
+<script>window.addEventListener('error',e=>window.fixtureError=e.message);window.addEventListener('unhandledrejection',e=>window.fixtureError=String(e.reason));</script>
+<script type="module">
+import {prepareTransportDetail} from '/app/js/terrain/transport-detail-runtime.js';
+import {createRegionalRoadContact} from '/app/js/terrain/regional-road-contact.js';
+import {createRoadContactIndex} from '/app/js/terrain/road-contact-index.js';
+import {buildIndexedBatchMesh} from '/app/js/road-render.js';
+const renderer=new THREE.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});renderer.setSize(1000,700);document.body.append(renderer.domElement);
+const scene=new THREE.Scene();scene.background=new THREE.Color(0xaac9dc);scene.add(new THREE.HemisphereLight(0xffffff,0x777755,1));
+const camera=new THREE.PerspectiveCamera(45,1000/700,.1,40000);camera.position.set(600,700,1000);camera.lookAt(0,0,0);
+const terrainGroup=new THREE.Group();scene.add(terrainGroup);
+const geometry=new THREE.PlaneGeometry(32000,32000);geometry.rotateX(-Math.PI/2);
+const terrain=new THREE.Mesh(geometry,new THREE.MeshStandardMaterial({color:0x95a978}));terrain.userData.isFarTerrainClipmap=true;terrain.userData.isFixedLocationTerrainLod=true;terrainGroup.add(terrain);
+const grid={xValues:[-16000,16000],zValues:[-16000,16000],worldYs:[0,0,0,0]};
+const ctx={renderer,terrainGroup,TERRAIN_SEGMENTS:1,terrainMeshHeightAt:()=>0,getFarTerrainSurfaceSnapshot:()=>({grid,portals:[]})};
+const roads=[];
+for(const z of [-1000,0,1000])roads.push({pts:[{x:-13000,z},{x:13000,z}],width:16,metersPerWorldUnit:1,structureSemantics:{terrainMode:'at_grade'}});
+for(let x=-12000;x<=12000;x+=1000)roads.push({pts:[{x,z:-2000},{x,z:2000}],width:12,metersPerWorldUnit:1,structureSemantics:{terrainMode:'at_grade'}});
+const material=new THREE.MeshStandardMaterial({color:0x272a2d});const cycles=[];
+const draw=()=>renderer.render(scene,camera);draw();const baseline={...renderer.info.memory};
+const check=(condition,message)=>{if(!condition)throw Error(message);};
+const makeMeshes=packet=>{const result=[];for(const batch of packet.batches)buildIndexedBatchMesh({scene,targetList:result,verts:batch.positions,indices:batch.indices,material,userData:{terrainMode:'at_grade'}});return result;};
+const destroy=meshes=>{for(const mesh of meshes){mesh.parent?.remove(mesh);mesh.geometry.dispose();}};
+for(let cycle=0;cycle<3;cycle++){
+ const detail=await prepareTransportDetail(ctx,roads,{isCurrent:()=>true});
+ const initial=detail.initial.regions.flatMap(makeMeshes);detail.initial=null;
+ const contact=createRegionalRoadContact(createRoadContactIndex(initial));const resident=new Map();
+ detail.attach((packet,{isCurrent})=>{
+  check(isCurrent(),'Obsolete region reached publication');const meshes=makeMeshes(packet);
+  contact.add(packet.key,createRoadContactIndex(meshes));resident.set(packet.key,meshes);
+ },()=>{},key=>{contact.remove(key);destroy(resident.get(key));resident.delete(key);});
+ for(const x of [250,2500,4500,6500,8500,10500,6500,2500,-2500,-6500,-10500,250]){
+  const point={x,z:0,source:'drive'};const start=performance.now();
+  do{
+   detail.step(point,0);draw();await new Promise(r=>setTimeout(r,8));
+   check(detail.stats.activeJobs<=1,'Compilation queue grew');check(resident.size<=16,'Resident region cap exceeded');
+   check(!detail.stats.error,detail.stats.error);check(performance.now()-start<20000,'Window never became ready');
+  }while(detail.stats.status!=='window-ready'&&detail.stats.status!=='complete');
+  check(detail.readyAt(point),'Published contact window remained blocked');
+  check(Math.abs(contact.sampleAt(x,0)-.18)<1e-4,'Physical road missing on outward or return route');
+ }
+ const evicted=detail.stats.evictedRegions;check(evicted>20,'Journey did not exercise eviction');
+ detail.dispose();contact.dispose();destroy(initial);draw();
+ check(resident.size===0,'Retired meshes retained');check(renderer.info.memory.geometries===baseline.geometries,'GPU geometry accumulated');check(renderer.info.memory.textures===baseline.textures,'Overview textures accumulated');
+ cycles.push({cycle,evicted,geometries:renderer.info.memory.geometries,textures:renderer.info.memory.textures});
+}
+// Leave a real compiled road scene visible after the lifetime checks.
+const demo=await prepareTransportDetail(ctx,roads,{isCurrent:()=>true});const demoMeshes=demo.initial.regions.flatMap(makeMeshes);demo.initial=null;
+draw();window.advanceTime=draw;window.render_game_to_text=()=>JSON.stringify({ok:true,cycles,baseline,visibleRoadMeshes:demoMeshes.length,maxMovingRegions:16,scope:'Actual worker, road geometry/contact and WebGL lifetime; controlled flat terrain, not global-world acceptance'});
+document.querySelector('#status').textContent='3 outward → return → release cycles\nExact road contact restored on every return\nAt most16 moving road regions; one compilation job\nGPU geometry and coverage textures return to baseline';
+window.fixtureReady=true;
+</script>

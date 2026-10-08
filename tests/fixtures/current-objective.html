@@ -1,0 +1,10 @@
+<!doctype html><html><meta charset="utf-8"><title>Current objective component verification</title>
+<link rel="stylesheet" href="/app/styles/tutorial.css"><style>body{background:#09121e;color:#eee;font:16px system-ui}#currentJourneyCard{position:static;margin:40px;width:340px}</style>
+<p>Controlled component fixture: selected Solar System course with retained voyage history.</p>
+<aside id="currentJourneyCard" hidden><div class="currentJourneyCopy"><span id="currentJourneyEyebrow"></span><strong id="currentJourneyTitle"></strong><small id="currentJourneyDetail"></small></div><button id="currentJourneyAction"></button><button id="currentJourneyDismiss">×</button></aside>
+<script type="module">
+import {createCurrentJourneyUi} from '/app/js/tutorial/current-journey.js';
+const ctx={gameStarted:true,getEnv:()=> 'SPACE_FLIGHT',spaceFlight:{active:true},getInterstellarExpeditionSnapshot:()=>({state:'completed'}),getSpaceTravelSession:()=>({active:true,destination:{id:'mars',name:'Mars'},guidance:'manual'})};
+const ui=createCurrentJourneyUi(ctx);ui.update(1);
+window.render_game_to_text=()=>JSON.stringify(ctx.getCurrentJourneySnapshot());window.advanceTime=ms=>ui.update(ms/1000);
+</script></html>

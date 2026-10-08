@@ -1,3 +1,4 @@
+import { nearbyPedestrianSnapshots } from './nearby-pedestrians.js';
 import { nearbyVehicleSnapshots } from './nearby-vehicles.js';
 import {setPopulationHostVisible} from './presentation-attachment.js';
 import { createPedestrianSpacing } from './pedestrian-spacing.js';
@@ -271,11 +272,26 @@ function agentPose(agent, graph, sampleVehicleSurface = null) {
     pitch: Number.isFinite(Number(edge.surfacePitch)) ? Number(edge.surfacePitch) : 0,
     roll: 0
   };
+  return resolveAgentRoadPose(agent, edge, edgePose, sampleVehicleSurface);
+}
+
+function resolveAgentRoadPose(agent, edge, edgePose, sampleVehicleSurface) {
   if (!agent.variant || typeof sampleVehicleSurface !== 'function') return edgePose;
   return resolveVehicleRoadContactPose({
     ...edgePose,
     variant: agent.variant,
     sampleSurface: (sampleX, sampleZ) => sampleVehicleSurface(edge, sampleX, sampleZ)
+  });
+}
+
+function vehicleContactSnapshot(pose) {
+  return Object.freeze({
+    authority: String(pose.authority || 'edge-plane-fallback'),
+    sampledWheelContacts: Number(pose.sampledWheelContacts || 0),
+    maximumWheelPenetration: Number(pose.maximumWheelPenetration || 0),
+    maximumWheelGap: Number(pose.maximumWheelGap || 0),
+    previousMaximumWheelPenetration: Number(pose.previousMaximumWheelPenetration || 0),
+    contactAnomaly: pose.contactAnomaly || null
   });
 }
 
@@ -306,6 +322,26 @@ function relocateAgent(agent, graph, random, kind, reference) {
   if (kind === 'pedestrian') agent.pathOffset = pedestrianPathOffset(graph.edges[agent.edgeIndex], random);
   agent.visibleTarget = false;
   agent.relocationCooldown = POPULATION_VISIBILITY_POLICY.relocationHideSeconds;
+}
+
+// Reuse at most one distant, off-camera pedestrian per second. Never move a
+// selected actor or introduce someone in the camera's visible street corridor.
+export function rebalanceHiddenPedestrian(agents, graph, reference, random, {exitRadius=260, canAppearAt=()=>false}={}) {
+  if(!reference || !graph?.edges?.length)return false;
+  const agent=agents.find(a=>!a.promoted && !a.bridge && a.relocationCooldown<=0 && (()=>{const p=agentPose(a,graph);return p && Math.hypot(p.x-reference.x,p.z-reference.z)>exitRadius && (a.visibility<=0 || canAppearAt(p));})());
+  if(!agent)return false;
+  const start=Math.floor(random()*graph.edges.length);
+  for(let n=0;n<Math.min(80,graph.edges.length);n++) {
+    const index=(start+n)%graph.edges.length,edge=graph.edges[index];
+    if(edge.role==='crossing' || edge.role==='entrance')continue;
+    const progress=edge.length*.5,pathOffset=pedestrianPathOffset(edge,random),p={...edgePoint(edge,progress,pathOffset),y:(Number(edge.p1.y||0)+Number(edge.p2.y||0))*.5};
+    const distance=Math.hypot(p.x-reference.x,p.z-reference.z);
+    if(distance<45 || distance>180 || !canAppearAt(p))continue;
+    if(agents.some(other=>other!==agent && (()=>{const q=agentPose(other,graph);return q && Math.hypot(p.x-q.x,p.z-q.z)<7.5;})()))continue;
+    Object.assign(agent,{edgeIndex:index,progress,pathOffset,visibility:0,visibleTarget:false,relocationCooldown:POPULATION_VISIBILITY_POLICY.relocationHideSeconds,waiting:false,currentSpeed:0,reaction:'',reactionRemaining:0});
+    return true;
+  }
+  return false;
 }
 
 export function yieldToOpposingPedestrian(agent, agents, graph) {
@@ -349,7 +385,7 @@ function advanceAgents(agents, graph, outgoing, random, dt, kind, behavior = {})
     }
     agent.relocationCooldown = Math.max(0, agent.relocationCooldown - dt);
     if (kind === 'vehicle' && agent.routeEndHold > 0) {
-      const heldPose = agentPose(agent, graph, behavior.sampleVehicleSurface);
+      const heldPose = agentPose(agent, graph);
       const heldDistance = heldPose && behavior.reference
         ? Math.hypot(heldPose.x - behavior.reference.x, heldPose.z - behavior.reference.z)
         : 0;
@@ -383,7 +419,9 @@ function advanceAgents(agents, graph, outgoing, random, dt, kind, behavior = {})
     }
     const edge = graph.edges[agent.edgeIndex];
     if (!edge) continue;
-    const pose = agentPose(agent, graph, kind === 'vehicle' ? behavior.sampleVehicleSurface : null);
+    // Distance and following decisions use X/Z only; visual wheel support is
+    // resolved once when publishing the vehicle host below.
+    const pose = agentPose(agent, graph);
     const reference = behavior.reference;
     const distance = pose && reference ? Math.hypot(pose.x - reference.x, pose.z - reference.z) : 0;
     const stride = kind === 'vehicle' ? 1 : distance > 900 ? 8 : distance > 480 ? 4 : distance > 220 ? 2 : 1;
@@ -521,7 +559,7 @@ export function createLivingWorldPopulation(options = {}) {
   const pedestrianGraph = options.pedestrianGraph;
   const trafficGraph = options.trafficGraph;
   const random = typeof options.random === 'function' ? options.random : Math.random;
-  const sampleVehicleSurface = typeof options.sampleVehicleSurface === 'function' ? options.sampleVehicleSurface : null;
+  let sampleVehicleSurface = typeof options.sampleVehicleSurface === 'function' ? options.sampleVehicleSurface : null;
   const initialReference = options.getReferencePosition?.() || null;
   const pedestrians = createAgents(budget.pedestrians, pedestrianGraph, random, 'pedestrian', initialReference);
   const vehicles = createAgents(budget.vehicles, trafficGraph, random, 'vehicle', initialReference);
@@ -587,6 +625,8 @@ export function createLivingWorldPopulation(options = {}) {
   let accumulator = 0;
   let tick = 0;
   let elapsedSeconds = 0;
+  let nextPopulationRebalance = 1;
+  let pedestrianRebalances = 0;
   const referencePosition = () => options.getReferencePosition?.() || null;
   const currentDemand = () => resolveLivingWorldDemand({
     latitude: options.latitude,
@@ -595,8 +635,7 @@ export function createLivingWorldPopulation(options = {}) {
     liveFlow: options.getTrafficFlow?.()
   });
 
-  const vehicleSnapshot = (agent) => {
-    const pose = agentPose(agent, trafficGraph, sampleVehicleSurface);
+  const vehicleSnapshotFromPose = (agent, pose, contact = agent.wheelContact) => {
     if (!pose) return null;
     return Object.freeze({
       id: agent.id,
@@ -609,7 +648,7 @@ export function createLivingWorldPopulation(options = {}) {
       renderedPitch: Number(agent.renderedPitch || 0),
       renderedRoll: Number(agent.renderedRoll || 0),
       renderedGroundY: Number(agent.renderedGroundY || 0),
-      wheelContact: agent.wheelContact || null,
+      wheelContact: contact || null,
       speed: Number(Number.isFinite(agent.currentSpeed) ? agent.currentSpeed : agent.speed || 0),
       visible: agent.detailPromoted === true || agent.visibility > 0.08,
       promoted: agent.promoted === true,
@@ -621,6 +660,13 @@ export function createLivingWorldPopulation(options = {}) {
       waitReason: agent.waitReason || '',
       signalAspect: agent.signalAspect || 'none'
     });
+  };
+  // Gameplay queries can request current support independently. Presentation
+  // reads the pose already published by the fixed simulation, so both visual
+  // detail levels use the same contact solution without solving it per draw.
+  const vehicleSnapshot = agent => {
+    const pose = agentPose(agent, trafficGraph, sampleVehicleSurface);
+    return vehicleSnapshotFromPose(agent, pose, pose ? vehicleContactSnapshot(pose) : null);
   };
 
   const pedestrianSnapshot = (agent) => {
@@ -686,27 +732,30 @@ export function createLivingWorldPopulation(options = {}) {
     const ratio = demand.vehicleActiveRatio;
     const visibilityPolicy = { enterDistance: demand.vehicleRadius, exitDistance: demand.vehicleExitRadius };
     vehicles.forEach((agent) => {
-      const pose = agentPose(agent, trafficGraph, sampleVehicleSurface);
+      const pathPose = agentPose(agent, trafficGraph);
       const host = agent.visualHost;
-      if (!pose || !host) return;
-      const distance = reference ? Math.hypot(pose.x - reference.x, pose.z - reference.z) : 0;
+      if (!pathPose || !host) { agent.presentationPose = null; return; }
+      const distance = reference ? Math.hypot(pathPose.x - reference.x, pathPose.z - reference.z) : 0;
       if (agent.promoted) {
         agent.visibleTarget = false;
         agent.visibility = 0;
       } else {
         updateAgentVisibility(agent, distance, ratio, dt, visibilityPolicy);
       }
+      // Route motion/following continues for hidden agents. Their detached
+      // visual rigs need no wheel solve. Resolve support before either visual
+      // detail level becomes visible, including a promoted detail host.
+      if (agent.visibility <= .01 && !agent.detailPromoted) {
+        agent.presentationPose = null;
+        setPopulationHostVisible(host, group, false);
+        return;
+      }
+      const pose = resolveAgentRoadPose(agent, agent.bridge || trafficGraph.edges[agent.edgeIndex], pathPose, sampleVehicleSurface);
+      agent.presentationPose = pose;
       agent.renderedPitch = Number(pose.pitch || 0);
       agent.renderedRoll = Number(pose.roll || 0);
       agent.renderedGroundY = Number(pose.y || 0);
-      agent.wheelContact = Object.freeze({
-        authority: String(pose.authority || 'edge-plane-fallback'),
-        sampledWheelContacts: Number(pose.sampledWheelContacts || 0),
-        maximumWheelPenetration: Number(pose.maximumWheelPenetration || 0),
-        maximumWheelGap: Number(pose.maximumWheelGap || 0),
-        previousMaximumWheelPenetration: Number(pose.previousMaximumWheelPenetration || 0),
-        contactAnomaly: pose.contactAnomaly || null
-      });
+      agent.wheelContact = vehicleContactSnapshot(pose);
       const scale = Math.max(.001, agent.visibility);
       host.position.set(pose.x, pose.y + VEHICLE_ROOT_TO_GROUND_METERS * scale, pose.z);
       host.rotation.order = 'YXZ';
@@ -757,18 +806,13 @@ export function createLivingWorldPopulation(options = {}) {
       return nearbyVehicleSnapshots(vehicles, trafficGraph, reference || referencePosition(), radius, vehicleSnapshot);
     },
     nearbyPedestrians(reference, radius = 8) {
-      const origin = reference || referencePosition();
-      if (!origin) return Object.freeze([]);
-      const safeRadius = Math.max(1, Math.min(180, Number(radius) || 8));
-      return Object.freeze(pedestrians.map(pedestrianSnapshot).filter((pedestrian) => (
-        pedestrian && pedestrian.visible && !pedestrian.promoted &&
-        Math.hypot(pedestrian.x - origin.x, pedestrian.z - origin.z) <= safeRadius
-      )).sort((a, b) => (
-        Math.hypot(a.x - origin.x, a.z - origin.z) - Math.hypot(b.x - origin.x, b.z - origin.z)
-      )));
+      return nearbyPedestrianSnapshots(pedestrians, pedestrianGraph, reference || referencePosition(), radius, pedestrianSnapshot);
     },
     vehicleSnapshots() {
       return Object.freeze(vehicles.map(vehicleSnapshot).filter(Boolean));
+    },
+    vehiclePresentationSnapshots() {
+      return Object.freeze(vehicles.map(agent => vehicleSnapshotFromPose(agent, agent.presentationPose)).filter(Boolean));
     },
     pedestrianSnapshots() {
       return Object.freeze(pedestrians.map(pedestrianSnapshot).filter(Boolean));
@@ -901,6 +945,7 @@ export function createLivingWorldPopulation(options = {}) {
       return true;
     },
     fixedUpdate(dt) {
+      if (disposed) return;
       accumulator += dt;
       if (accumulator < POPULATION_STEP_SECONDS) return;
       const stepCount = Math.min(4, Math.floor(accumulator / POPULATION_STEP_SECONDS));
@@ -910,6 +955,10 @@ export function createLivingWorldPopulation(options = {}) {
         elapsedSeconds += POPULATION_STEP_SECONDS;
         const reference = referencePosition();
         const demand = currentDemand();
+        if(elapsedSeconds>=nextPopulationRebalance){
+          nextPopulationRebalance=elapsedSeconds+1;
+          if(rebalanceHiddenPedestrian(pedestrians,pedestrianGraph,reference,random,{exitRadius:Math.min(260,demand.pedestrianExitRadius),canAppearAt:options.canPedestrianAppearAt}))pedestrianRebalances++;
+        }
         advanceAgents(vehicles, trafficGraph, trafficOutgoing, random, POPULATION_STEP_SECONDS, 'vehicle', {
           reference,
           tick,
@@ -917,7 +966,7 @@ export function createLivingWorldPopulation(options = {}) {
           speedScale: demand.vehicleSpeedScale,
           signalDirective: (edgeIndex, progress, speed) => trafficControls.directive(edgeIndex, progress, speed, elapsedSeconds)
         });
-        const vehiclePoses = vehicles.map((agent) => agentPose(agent, trafficGraph, sampleVehicleSurface)).filter(Boolean);
+        const vehiclePoses = vehicles.map((agent) => agentPose(agent, trafficGraph)).filter(Boolean);
         advanceAgents(pedestrians, pedestrianGraph, pedestrianOutgoing, random, POPULATION_STEP_SECONDS, 'pedestrian', {
           reference,
           tick,
@@ -933,48 +982,63 @@ export function createLivingWorldPopulation(options = {}) {
       updateCuratedVehicleHosts(stepCount * POPULATION_STEP_SECONDS);
     },
     activeCounts() {
-      const vehicleAttitudeMismatches = vehicles.filter((agent) => {
-        const pose = agentPose(agent, trafficGraph, sampleVehicleSurface);
-        return pose && (
+      // Diagnostic queries still independently solve every agent's current
+      // road support. Only published poses have a rendered attitude to compare.
+      const solutions = vehicles.map(agent => ({agent, pose: agentPose(agent, trafficGraph, sampleVehicleSurface)}));
+      const vehicleAttitudeMismatches = solutions.filter(({agent, pose}) => {
+        return pose && agent.presentationPose && (
           Math.abs(Number(agent.renderedPitch || 0) - Number(pose.pitch || 0)) > 0.001 ||
           Math.abs(Number(agent.renderedRoll || 0) - Number(pose.roll || 0)) > 0.001 ||
           Math.abs(Number(agent.renderedGroundY || 0) - Number(pose.y || 0)) > 0.001
         );
       }).length;
-      const contactSamples = vehicles.map((agent) => agent.wheelContact).filter((contact) => contact?.sampledWheelContacts === 4);
+      const contactSamples = solutions.map(({pose}) => pose).filter((contact) => contact?.sampledWheelContacts === 4);
       return Object.freeze({
+        pedestrianRebalances,
         pedestrians: pedestrians.filter((agent) => !agent.promoted && agent.visibility > .08).length,
         vehicles: vehicles.filter((agent) => !agent.promoted && agent.visibility > .08).length,
         promotedPedestrians: pedestrians.filter((agent) => agent.promoted).length,
         promotedVehicles: vehicles.filter((agent) => agent.promoted).length,
         detailedMovingVehicles: vehicles.filter((agent) => agent.detailPromoted).length,
-        slopedVehicles: vehicles.filter((agent) => {
-          const pose = agentPose(agent, trafficGraph, sampleVehicleSurface);
+        slopedVehicles: solutions.filter(({pose}) => {
           return pose && (Math.abs(Number(pose.pitch || 0)) > 0.01 || Math.abs(Number(pose.roll || 0)) > 0.01);
         }).length,
         vehicleAttitudeMismatches,
+        vehicleContactQueryScope: 'fresh-all-agents',
+        publishedVehicleContacts: vehicles.filter(agent => agent.presentationPose?.sampledWheelContacts === 4).length,
         fourWheelContactVehicles: contactSamples.length,
         maximumWheelPenetration: Math.max(0, ...contactSamples.map((contact) => Number(contact.maximumWheelPenetration || 0))),
         maximumWheelGap: Math.max(0, ...contactSamples.map((contact) => Number(contact.maximumWheelGap || 0))),
-        contactAnomalies: vehicles.filter(agent => agent.wheelContact?.contactAnomaly).slice(0, 8).map(agent => ({
+        contactAnomalies: solutions.filter(({pose}) => pose?.contactAnomaly).slice(0, 8).map(({agent, pose}) => ({
           id: agent.id, variant: agent.variant?.id, edge: agent.bridge || trafficGraph.edges[agent.edgeIndex],
-          contacts: agent.wheelContact.contactAnomaly
+          contacts: pose.contactAnomaly
         })),
         previousMaximumWheelPenetration: Math.max(0, ...contactSamples.map((contact) => Number(contact.previousMaximumWheelPenetration || 0))),
         entranceVirtualizations: pedestrians.reduce((sum, agent) => sum + Number(agent.virtualizedEntries || 0), 0)
       });
     },
     dispose() {
+      if (disposed) return;
       disposed = true;
       group.removeFromParent?.();
       vehicles.forEach((agent) => {
         disposeCuratedTrafficVehicle(agent.visualHost);
         agent.visualHost = null;
+        agent.presentationPose = null;
       });
       pedestrians.forEach((agent) => {
         disposeCuratedCharacter(agent.visualHost);
         agent.visualHost = null;
       });
+      pedestrians.length = 0;
+      vehicles.length = 0;
+      pedestrianHosts.length = 0;
+      vehicleHosts.length = 0;
+      pedestrianOutgoing.clear();
+      trafficOutgoing.clear();
+      group.clear();
+      sampleVehicleSurface = null;
+      options = {};
     }
   });
 }

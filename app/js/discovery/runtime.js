@@ -1,3 +1,7 @@
+import { projectDiscoveryItemsToBackpack } from './backpack-projection.js?v=1';
+import { discoverySaveMessage } from './save-status.js?v=1';
+import { createDiscoveryReceiptSync } from './receipt-outbox.js?v=1';
+import { hydrateDiscoveryReceipts } from './receipt-hydration.js?v=1';
 import { ambientNotices } from '../ui/ambient-notices.js';
 import { BUILTIN_DISCOVERY_CATALOGS, COMPANION_CATALOG, TOOL_CATALOG, validateDiscoveryCatalogs } from './catalog.js?v=4';
 import { createCompanionRuntime } from './companion-runtime.js?v=10';
@@ -37,7 +41,7 @@ import { createStableWorldIdentity } from '../living-world/model.js?v=1';
 import { evaluateArEligibility } from '../ar/eligibility.js?v=2';
 import { getScreenLayoutService } from '../ui/screen-layout.js?v=2';
 import { ATTRIBUTE_DEFINITIONS, BACKGROUND_DEFINITIONS, SPECIALTY_DEFINITIONS, SPECIALTY_RANKS, definitionById, rankForXp } from '../character/catalog.js?v=1';
-import { createCapabilityResolver } from '../character/capability-resolver.js?v=2';
+import { createCapabilityResolver, prepareCharacterCapabilities } from '../character/capability-resolver.js?v=2';
 import { companionHandlingTuning, wildlifeObservationTuning } from '../character/wildlife-assistance.js?v=1';
 
 const RELEASED_EXPLORER_ACTIVITIES = new Set([
@@ -54,7 +58,8 @@ const CHARACTER_CAPABILITY_BY_ACTIVITY = Object.freeze({
 });
 
 function backpackEquipmentIds(appCtx, fallbackIds = []) {
-  const itemIds = appCtx.playerBackpackInventory?.snapshot?.().items
+  const inventory=appCtx.playerBackpackInventory;
+  const itemIds = inventory?.catalogIds?.() || inventory?.snapshot?.().items
     ?.filter((item) => Number(item.quantity || 1) > 0)
     .map((item) => String(item.catalogId || ''))
     .filter(Boolean) || [];
@@ -79,53 +84,6 @@ function fieldToolBackpackDefinition(tool) {
     discipline: tool.discipline,
     sourceRefs: tool.sourceRefs
   });
-}
-
-function discoveryItemBackpackRecord(item) {
-  if (!item?.instanceId || !item?.catalogId) return null;
-  return {
-    instanceId: item.instanceId,
-    catalogId: item.catalogId,
-    quantity: Number(item.quantity) || 1,
-    authority: item.authority || 'anonymous-local',
-    provenance: item.provenance || 'field-discovery',
-    sourceEventId: item.sourceEventId || item.eventId || item.claimId || '',
-    acquiredAt: Number(item.collectedAt) || 0,
-    tradeable: item.tradeable === true,
-    metadata: {
-      label: item.name || item.catalogId,
-      category: 'specimen',
-      icon: 'FIND',
-      verbs: ['inspect'],
-      description: item.description || `${item.name || item.catalogId} was added through ${displayDiscoveryLabel(item.activityId, 'an Explorer activity')}.`,
-      regionLabel: item.regionLabel || '',
-      evidenceClass: item.evidenceClass || ''
-    }
-  };
-}
-
-function projectDiscoveryItemsToBackpack(appCtx, items = []) {
-  const inventory = appCtx.playerBackpackInventory;
-  if (!inventory) return 0;
-  let projected = 0;
-  for (const item of items) {
-    const record = discoveryItemBackpackRecord(item);
-    if (!record) continue;
-    inventory.upsertItem(record, {
-      definition: {
-        id: record.catalogId,
-        label: record.metadata.label,
-        category: record.metadata.category,
-        icon: record.metadata.icon,
-        verbs: record.metadata.verbs,
-        description: record.metadata.description
-      },
-      silent: true
-    });
-    projected += 1;
-  }
-  appCtx.playerBackpackStore?.save?.(inventory.exportState?.());
-  return projected;
 }
 
 const WILDLIFE_COMPANION_CATALOG = Object.freeze({
@@ -253,6 +211,7 @@ function publishExplorerResult(event, profileStore) {
 function createDiscoveryUi(state) {
   const byId = (id) => document.getElementById(id);
   const elements = {
+    saveStatus: byId('discoverySaveStatus'),
     panel: byId('discoveryPanel'), close: byId('discoveryCloseBtn'), help: byId('discoveryHelpBtn'), quick: byId('discoveryQuickToolBtn'), menu: byId('fWorldDiscovery'),
     todayBackpack: byId('discoveryOpenBackpackTodayBtn'),
     encounterLead: byId('discoveryEncounterLeadBtn'), encounterLeadDetail: byId('discoveryEncounterLeadDetail'),
@@ -275,7 +234,7 @@ function createDiscoveryUi(state) {
     sectionTutorialSteps: byId('discoverySectionTutorialSteps'), sectionTutorialDone: byId('discoverySectionTutorialDoneBtn'),
     inspection: byId('discoveryInspection'), arChallenge: byId('discoveryArChallengeBtn'), rank: byId('discoveryRankSummary'), goal: byId('discoveryGoal'),
     fieldSession: byId('discoveryFieldSession'), expedition: byId('discoveryExpeditionList'), expeditionMode: byId('discoveryExpeditionMode'),
-    exportData: byId('discoveryExportBtn'), importData: byId('discoveryImportBtn'), importFile: byId('discoveryImportFile'), backupStatus: byId('discoveryBackupStatus')
+    undoImport: byId('discoveryUndoImportBtn'), exportData: byId('discoveryExportBtn'), importData: byId('discoveryImportBtn'), importFile: byId('discoveryImportFile'), backupStatus: byId('discoveryBackupStatus')
   };
   const listeners = [];
   let activeTab = 'today';
@@ -413,6 +372,14 @@ function createDiscoveryUi(state) {
     guideRecords = guide;
     journalRecords = events;
     projectDiscoveryItemsToBackpack(state.appCtx, items);
+    if (elements.saveStatus) {
+      const ownerUid = state.appCtx.getAccountUserId?.();
+      const receipts = await state.profileStore.getReceiptSyncStatus?.(ownerUid);
+      if (ownerUid === state.appCtx.getAccountUserId?.()) elements.saveStatus.textContent = discoverySaveMessage({
+        durable: state.profileStore.type === 'IndexedDbDiscoveryProfileStore', signedIn: !!ownerUid,
+        receipts, backpackSaved: state.appCtx.discoveryBackpackSaved !== false, online: globalThis.navigator?.onLine !== false
+      });
+    }
     if (elements.journalRegion) {
       const selectedRegion = elements.journalRegion.value || 'all';
       const regions = [...new Map(events.filter((event) => event.regionId).map((event) => [event.regionId, event.regionLabel || 'Saved region'])).entries()];
@@ -625,7 +592,7 @@ function createDiscoveryUi(state) {
     const storageNote = state.profileStore?.type === 'IndexedDbDiscoveryProfileStore'
       ? 'Journal saved in this browser on this device. The full Journal is not backed up to your account.'
       : 'Journal available for this session only. Browser storage is unavailable.';
-    elements.result.innerHTML = `<span class="discoveryResultEyebrow">RESULT SAVED</span><strong>${escapeHtml(event.name || 'Explorer record')}</strong><p>${escapeHtml(collection ? 'Journal updated · Added to Backpack' : fieldGuide ? 'Journal and Field Guide updated' : 'Journal updated')}</p><div class="discoveryResultProgress">${escapeHtml(rewardSummary || 'Your result is saved')}</div><p class="discoveryResultStorage">${escapeHtml(storageNote)}</p><div class="discoveryResultActions"><button data-result-tab="journal" type="button">View in Journal</button>${fieldGuide ? '<button data-result-tab="guide" type="button">Open Field Guide</button>' : ''}${collection ? '<button data-open-backpack="true" type="button">Open Backpack</button>' : ''}<button data-result-continue="true" type="button">Back to exploring</button></div>`;
+    elements.result.innerHTML = `<span class="discoveryResultEyebrow">${state.profileStore?.type === 'IndexedDbDiscoveryProfileStore' ? 'SAVED ON THIS DEVICE' : 'SESSION ONLY'}</span><strong>${escapeHtml(event.name || 'Explorer record')}</strong><p>${escapeHtml(collection ? 'Journal updated · Added to Backpack' : fieldGuide ? 'Journal and Field Guide updated' : 'Journal updated')}</p><div class="discoveryResultProgress">${escapeHtml(rewardSummary || 'Your result is saved')}</div><p class="discoveryResultStorage">${escapeHtml(storageNote)}</p><div class="discoveryResultActions"><button data-result-tab="journal" type="button">View in Journal</button>${fieldGuide ? '<button data-result-tab="guide" type="button">Open Field Guide</button>' : ''}${collection ? '<button data-open-backpack="true" type="button">Open Backpack</button>' : ''}<button data-result-continue="true" type="button">Back to exploring</button></div>`;
     document.querySelector('.discoveryPane[data-discovery-pane="today"]')?.scrollTo?.({ top: 0 });
     publishExplorerResult(event, state.profileStore);
     return true;
@@ -734,16 +701,25 @@ function createDiscoveryUi(state) {
       if (elements.backupStatus) elements.backupStatus.textContent = error?.message || 'The backup could not be created.';
     }
   });
+  listen(elements.undoImport, 'click', async () => {
+    if (!globalThis.confirm?.('Undo the last Journal restore? This returns to the local records saved immediately before that restore and reloads the app.')) return;
+    try {
+      if (await state.profileStore.rollbackLastImport()) globalThis.location?.reload();
+      else if (elements.backupStatus) elements.backupStatus.textContent = 'There is no Journal restore to undo on this device.';
+    } catch (error) {
+      if (elements.backupStatus) elements.backupStatus.textContent = error?.message || 'The previous Journal could not be recovered.';
+    }
+  });
   listen(elements.importData, 'click', () => elements.importFile?.click());
   listen(elements.importFile, 'change', async () => {
     const file = elements.importFile?.files?.[0];
     if (!file) return;
     try {
       const data = JSON.parse(await file.text());
-      if (!globalThis.confirm?.('Restore this Journal backup? Current local Explorer records in this browser will be replaced.')) return;
+      if (!globalThis.confirm?.('Restore this Journal backup? Current local Explorer records in this browser will be replaced and the app will reload. You can undo the last restore in Data and backup.')) return;
       const result = await state.profileStore.importData(data);
-      await refreshData();
-      if (elements.backupStatus) elements.backupStatus.textContent = `Restored ${result.events} Journal memories and ${result.guide} Guide entries.`;
+      if (elements.backupStatus) elements.backupStatus.textContent = `Restored ${result.events} Journal memories and ${result.guide} Guide entries. Reloading…`;
+      globalThis.location?.reload();
     } catch (error) {
       if (elements.backupStatus) elements.backupStatus.textContent = error?.message || 'This backup could not be restored.';
     } finally {
@@ -902,8 +878,8 @@ function createDiscoveryUi(state) {
     };
     const controls = (isDetector ? detectorControls : fieldControls)[snapshot.phase] || ['Begin', 'Close'];
     if (elements.primary) {
-      elements.primary.textContent = controls[0];
-      elements.primary.disabled = snapshot.phase === 'excavating' || snapshot.phase === 'observing' || snapshot.phase === 'seeking';
+      elements.primary.textContent = state.activitySelectionPending ? 'Preparing tool…' : controls[0];
+      elements.primary.disabled = state.activitySelectionPending === true || snapshot.phase === 'excavating' || snapshot.phase === 'observing' || snapshot.phase === 'seeking';
     }
     if (elements.secondary) elements.secondary.textContent = controls[1];
   }
@@ -995,61 +971,28 @@ function discoveryHaptic(pattern = 18) {
   try { globalThis.navigator?.vibrate?.(pattern); } catch (_) {}
 }
 
-async function syncTrustedReceipt(appCtx, profileStore, item) {
-  if (!item || appCtx.getAccountSnapshot?.().signedIn !== true) return null;
+async function syncTrustedReceipt(appCtx) {
   try {
-    const { claimExplorerDiscovery } = await import('../../../js/discovery-api.js?v=1');
-    const receipt = await claimExplorerDiscovery({
-      claimId: item.claimId,
-      catalogId: item.catalogId,
-      worldIdentity: item.worldIdentity,
-      activityId: item.activityId || 'metal-detect',
-      evidenceClass: item.evidenceClass,
-      name: item.name,
-      family: item.family,
-      rarityBand: item.rarityBand,
-      qualityBand: item.qualityBand,
-      catalogVersion: BUILTIN_DISCOVERY_CATALOGS.version
-    });
-    const updated = await profileStore.applyTrustedReceipt?.(item.instanceId, receipt);
-    const discoveryUi = appCtx.worldDiscoveryRuntime?.ui;
-    if (discoveryUi?.open) void discoveryUi.refreshData?.();
-    return updated;
+    const runtime = appCtx.worldDiscoveryRuntime;
+    const completed = await runtime?.receiptSync?.flush?.();
+    if (runtime?.ui?.open) await runtime.ui.refreshData();
+    return completed;
   } catch (error) {
-    console.warn('[world-discovery] Trusted receipt sync deferred:', error?.message || error);
+    console.warn('[world-discovery] Receipt queue unavailable:', error?.message || error);
     return null;
   }
 }
 
 async function hydrateSignedInReceipts(appCtx, profileStore, claimedIds) {
-  if (appCtx.getAccountSnapshot?.().signedIn !== true) return 0;
+  const ownerUid = appCtx.getAccountUserId?.();
+  const revision = appCtx.getAccountSnapshot?.().revision;
+  if (!ownerUid || appCtx.getAccountSnapshot?.().signedIn !== true) return 0;
   try {
     const { listExplorerDiscoveries } = await import('../../../js/discovery-api.js?v=1');
-    const response = await listExplorerDiscoveries();
-    let imported = 0;
-    for (const receipt of response.items || []) {
-      if (!receipt?.claimId || !receipt?.catalogId) continue;
-      const result = await profileStore.collect({
-        instanceId: `item:${receipt.itemId || receipt.instanceId}`,
-        claimId: receipt.claimId,
-        catalogId: receipt.catalogId,
-        name: receipt.name || receipt.catalogId,
-        family: receipt.family || 'discovery',
-        rarityBand: receipt.rarityBand || 'common',
-        qualityBand: receipt.qualityBand || 'observed',
-        discipline: 'exploration',
-        activityId: receipt.activityId || 'inspect',
-        regionId: receipt.worldIdentity || 'server-region',
-        worldIdentity: receipt.worldIdentity || 'server-region',
-        evidenceClass: receipt.evidenceClass || 'virtual-field-record',
-        collectedAt: Date.now()
-      });
-      const instanceId = result.item?.instanceId;
-      if (instanceId) await profileStore.applyTrustedReceipt?.(instanceId, receipt);
-      claimedIds.add(receipt.claimId);
-      if (result.collected) imported++;
-    }
-    return imported;
+    const result = await hydrateDiscoveryReceipts({ownerUid, profileStore, claimedIds,
+      isCurrentOwner: () => appCtx.getAccountUserId?.() === ownerUid && appCtx.getAccountSnapshot?.().revision === revision,
+      listPage: listExplorerDiscoveries});
+    return result.imported;
   } catch (error) {
     console.warn('[world-discovery] Signed-in receipt hydration deferred:', error?.message || error);
     return 0;
@@ -1077,6 +1020,8 @@ function disposeWorldDiscoveryRuntime(appCtx, reason = 'world-reload') {
   if (!state || state.disposed) return false;
   state.disposed = true;
   state.reason = reason;
+  state.receiptSync?.dispose();
+  if (state.receiptRetryTimer) clearInterval(state.receiptRetryTimer);
   void appCtx.closeArExperience?.(`discovery_${reason}`);
   appCtx.unregisterRuntimeOwner?.(state.owner);
   state.ui?.dispose?.();
@@ -1098,6 +1043,7 @@ function disposeWorldDiscoveryRuntime(appCtx, reason = 'world-reload') {
   appCtx.handleWorldDiscoveryToolUse = null;
   if (appCtx.recordFishingExplorerCatch === state.recordFishingExplorerCatch) appCtx.recordFishingExplorerCatch = null;
   if (appCtx.recordExplorerEvent === state.recordExplorerEvent) appCtx.recordExplorerEvent = null;
+  if (appCtx.getExplorerEventsById === state.getExplorerEventsById) appCtx.getExplorerEventsById = null;
   if (appCtx.assignCompanionPrimaryHome === state.assignCompanionPrimaryHome) appCtx.assignCompanionPrimaryHome = null;
   if (appCtx.resolveCharacterCapability === state.resolveCharacterCapability) appCtx.resolveCharacterCapability = null;
   return true;
@@ -1176,21 +1122,24 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
   const published = appCtx.worldDiscoveryPublicationStore.publish(publication, { requestId: request.id, sequence: snapshot.sequence });
   if (!published.published) return null;
 
-  const profileStore = appCtx.discoveryProfileStore || createIndexedDbDiscoveryProfileStore();
+  const profileStore = appCtx.discoveryProfileStore || createIndexedDbDiscoveryProfileStore({
+    getReceiptOwnerUid: () => appCtx.getAccountUserId?.(), catalogVersion: BUILTIN_DISCOVERY_CATALOGS.version
+  });
   appCtx.discoveryProfileStore = profileStore;
+  profileStore.setReceiptOwnerProvider?.(() => appCtx.getAccountUserId?.(), BUILTIN_DISCOVERY_CATALOGS.version);
   const bootstrap = typeof profileStore.loadRuntimeBootstrap === 'function'
     ? await profileStore.loadRuntimeBootstrap().catch(() => null)
     : null;
   const [existingItems, existingEvents, existingGuide, discoveryProfile] = bootstrap
-    ? [bootstrap.items, bootstrap.events, bootstrap.fieldGuide, bootstrap.profile]
+    ? [bootstrap.items, bootstrap.events || [], bootstrap.fieldGuide || [], bootstrap.profile]
     : await Promise.all([
         profileStore.listItems(10000).catch(() => []),
         profileStore.listEvents?.(10000).catch(() => []) || [],
         profileStore.listFieldGuide?.(10000).catch(() => []) || [],
         profileStore.getProfile().catch(() => ({ tutorials: {} }))
       ]);
-  const claimedIds = new Set([...existingItems, ...existingEvents].map((entry) => entry.claimId).filter(Boolean));
-  const observedCatalogIds = new Set([...existingItems, ...existingGuide].map((entry) => entry.catalogId).filter(Boolean));
+  const claimedIds = new Set([...(bootstrap?.claimedIds || []), ...[...existingItems, ...existingEvents].map((entry) => entry.claimId).filter(Boolean)]);
+  const observedCatalogIds = new Set([...(bootstrap?.observedCatalogIds || []), ...[...existingItems, ...existingGuide].map((entry) => entry.catalogId).filter(Boolean)]);
   const progress = fieldProgress(discoveryProfile);
   const initialToolProgress = explorerToolProgress(discoveryProfile);
   const entitlements = createExplorationEntitlementService({
@@ -1218,7 +1167,7 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
       metadata: { category: 'field-tool' }
     }, { silent: true });
   }
-  projectDiscoveryItemsToBackpack(appCtx, existingItems);
+  projectDiscoveryItemsToBackpack(appCtx, existingItems, {reconcile:true});
   const legacyEquippedToolId = entitlements.canUseTool(discoveryProfile.equippedToolId).allowed
     ? String(discoveryProfile.equippedToolId)
     : 'field-lens';
@@ -1227,8 +1176,9 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
   const backpackEquipped = backpackInventory?.snapshot?.().equippedCatalogId;
   const initialEquippedToolId = entitlements.canUseTool(backpackEquipped).allowed ? backpackEquipped : legacyEquippedToolId;
   const capabilityResolver = createCapabilityResolver();
+  const capabilityCharacterState=prepareCharacterCapabilities(discoveryProfile.characterState);
   const initialEquipmentIds = backpackEquipmentIds(appCtx, entitlements.listAvailableTools().map((tool) => tool.id));
-  const initialDetectorCapability = capabilityResolver.resolve(discoveryProfile.characterState, 'detector', {
+  const initialDetectorCapability = capabilityResolver.resolve(capabilityCharacterState, 'detector', {
     difficulty: 'basic',
     equipmentIds: initialEquipmentIds,
     environment: appCtx.getEnv?.() || 'EARTH'
@@ -1243,7 +1193,7 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
   const owner = `world-discovery:${snapshot.sequence}`;
   const state = {
     type: 'WorldDiscoveryRuntime', owner, appCtx, publication, environment, profileStore, entitlements, session, fieldSession,
-    capabilityResolver, characterState: discoveryProfile.characterState, activeCharacterCapability: initialDetectorCapability,
+    capabilityResolver, capabilityCharacterState, characterState: discoveryProfile.characterState, activeCharacterCapability: initialDetectorCapability,
     actions: [], currentCellId: null, presentation: null, ui: null,
     disposed: false, reason: null, actionTimer: 0, toneTimer: 0, audioContext: null, fieldFeedbackPhase: 'idle',
     active: true, activeActivityId: 'metal-detect', equippedToolId: initialEquippedToolId,
@@ -1260,7 +1210,7 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
     creatureQualityAudit: auditRegionalCreatureQuality(resolveRegionalEcologyPack(worldIdentity.location))
   };
   state.resolveCharacterCapability = (capabilityId, context = {}) => state.capabilityResolver.resolve(
-    state.characterState,
+    state.capabilityCharacterState,
     capabilityId,
     {
       difficulty: 'basic',
@@ -1282,6 +1232,7 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
   state.syncCharacterState = (profile) => {
     if (!profile?.characterState) return state.characterState;
     state.characterState = profile.characterState;
+    state.capabilityCharacterState=prepareCharacterCapabilities(profile.characterState);
     state.capabilityResolver.clear();
     state.applyCharacterCapability();
     return state.characterState;
@@ -1304,8 +1255,14 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
       // The Explorer panel reloads current data whenever it opens. Rebuilding
       // all hidden Journal, Guide, companion, and profile markup here made a
       // background world-visit receipt compete with first-play rendering.
+      if(record.metadata?.resultOwner!=='game-result'){
       const hasResultCard = ['activity-completed', 'creation-saved', 'building-milestone', 'vehicle-route-completed'].includes(result.event?.eventType) && state.ui?.showResult?.(result);
       if (!hasResultCard) publishExplorerResult(result.event, profileStore);
+      } else {
+        // The game owns its result card, but tutorial and Journal observers
+        // still need the committed receipt. Do not create a second result UI.
+        publishExplorerResult(result.event, profileStore);
+      }
       if (state.ui?.open) await state.ui.refreshData?.();
     }
     return result || { recorded: false, reason: 'event-store-unavailable' };
@@ -1324,14 +1281,18 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
       updatedAt: Math.max(0, Number(entry.updatedAt) || Date.now())
     };
     state.companionEncounters.set(normalized.encounterId, normalized);
-    const current = await profileStore.getProfile();
-    const companionEncounters = [...state.companionEncounters.values()]
-      .sort((left, right) => Number(left.updatedAt || 0) - Number(right.updatedAt || 0))
-      .slice(-120);
-    await profileStore.saveProfile({ ...current, companionEncounters });
+    await profileStore.saveProfile((current) => {
+      const encounters = new Map((current.companionEncounters || []).map((record) => [record.encounterId, record]));
+      const previous = encounters.get(normalized.encounterId);
+      if (!previous || Number(previous.updatedAt || 0) <= normalized.updatedAt) encounters.set(normalized.encounterId, normalized);
+      return { ...current, companionEncounters: [...encounters.values()]
+        .sort((left, right) => Number(left.updatedAt || 0) - Number(right.updatedAt || 0)).slice(-120) };
+    });
     return normalized;
   };
   appCtx.recordExplorerEvent = state.recordExplorerEvent;
+  state.getExplorerEventsById=ids=>profileStore.getEventsById(ids);
+  appCtx.getExplorerEventsById=state.getExplorerEventsById;
   state.unregisterExplorerListeners = [];
   const listenForExplorerEvent = (type, handler) => {
     globalThis.addEventListener?.(type, handler);
@@ -1584,15 +1545,8 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
     });
     globalThis.__WE3D_COMPANION_SUPPORT__ = state.companionSupportHook;
   }
-  state.awardActiveCompanionForField = async (receiptBase, firstIdentification = false) => {
-    const stable = String(receiptBase || '').trim();
-    if (!stable || !state.companionRuntime.snapshot().activeInstanceId) return false;
-    const fieldAward = await state.companionRuntime.awardXp({ receiptId: `field:${stable}`, reasonId: 'field-activity' });
-    if (firstIdentification) {
-      await state.companionRuntime.awardXp({ receiptId: `species:${stable}`, reasonId: 'new-species' });
-    }
-    return fieldAward;
-  };
+  // Field credit is committed by the Journal owner; this only refreshes presentation.
+  state.awardActiveCompanionForField = async () => state.companionRuntime.refresh();
   state.wildlifeRuntime = createAmbientWildlifeRuntime(appCtx, wildlife);
   state.refreshToolProgress = async () => {
     const profile = await profileStore.getProfile();
@@ -1650,8 +1604,7 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
     state.activeTutorialId = '';
     if (!tutorialId || state.tutorials[tutorialId]) return true;
     state.tutorials[tutorialId] = true;
-    const profile = await profileStore.getProfile();
-    await profileStore.saveProfile({ ...profile, tutorials: { ...profile.tutorials, [tutorialId]: true } });
+    await profileStore.saveProfile((profile) => ({ ...profile, tutorials: { ...profile.tutorials, [tutorialId]: true } }));
     return true;
   };
   state.equipTool = async (toolId, options = {}) => {
@@ -1672,7 +1625,8 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
     if (!equippedId || state.entitlements.canUseTool(equippedId).allowed !== true || equippedId === state.equippedToolId) return;
     state.equippedToolId = equippedId;
     state.applyCharacterCapability();
-    void profileStore.getProfile().then((profile) => profileStore.saveProfile({ ...profile, equippedToolId: equippedId }));
+    void profileStore.saveProfile((profile) => ({ ...profile, equippedToolId: equippedId }))
+      .catch((error) => console.warn('[world-discovery] Tool preference was not saved:', error?.message));
     void state.ui?.refreshData?.();
   });
   state.showToolHelp = async (toolId) => {
@@ -1980,6 +1934,8 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
     await state.ui?.refreshData?.();
     return true;
   };
+  let activitySelectionGeneration = 0;
+  let committedActivityId = state.activeActivityId;
   state.selectActivity = async (activityId, options = {}) => {
     const id = String(activityId || 'inspect');
     const selectedAction = state.actions.find((action) => action.id === id);
@@ -1988,12 +1944,15 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
       appCtx.showToast?.(`${displayDiscoveryLabel(activityToolId)} unlocks at a later Explorer rank.`);
       return false;
     }
-    emitDiscoveryTelemetry('activity_started', {
+    if (options.telemetry !== false) emitDiscoveryTelemetry('activity_started', {
       activityId: id,
       discipline: selectedAction?.discipline,
       contextBands: telemetryContextBands(),
       liveGps: appCtx.liveGpsActive === true
     });
+    if (!state.activitySelectionPending) committedActivityId = state.activeActivityId;
+    const selectionGeneration = ++activitySelectionGeneration;
+    state.activitySelectionPending = id !== 'fish';
     if (id === 'fish') {
       await appCtx.openFishingGame?.();
       return true;
@@ -2001,11 +1960,25 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
     // Commit the visible selection before any IndexedDB/profile refresh. The
     // previous ordering left the old activity highlighted during the await,
     // so a single click could visibly bounce old → new several times.
-    const previousActivityId = state.activeActivityId;
+    const previousActivityId = committedActivityId;
     state.activeActivityId = id;
     state.applyCharacterCapability(id);
     state.ui.render(state.actions, state.lastSnapshot, state.activeActivityId);
-    if (activityToolId && await state.equipTool(activityToolId, { silent: true }) !== true) {
+    // A fast Begin click must not start a session that this async selection
+    // resets afterward; late selections must not replace the newest choice.
+    let equipped = true;
+    try { if (activityToolId) equipped = await state.equipTool(activityToolId, { silent: true }); }
+    catch {
+      // Equipment is applied synchronously; a later Journal refresh failure
+      // must not make the selected activity disagree with the actual tool.
+      equipped = state.equippedToolId === activityToolId;
+      if (!state.disposed && selectionGeneration === activitySelectionGeneration) {
+        appCtx.showToast?.(equipped ? 'Tool ready. Journal data could not refresh; reopen it to retry.' : 'The tool could not be prepared. Please try again.');
+      }
+    }
+    if (state.disposed || selectionGeneration !== activitySelectionGeneration) return false;
+    state.activitySelectionPending = false;
+    if (equipped !== true) {
       state.activeActivityId = previousActivityId;
       state.applyCharacterCapability(previousActivityId);
       state.ui.render(state.actions, state.lastSnapshot, state.activeActivityId);
@@ -2020,6 +1993,7 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
       state.fieldSession.reset();
       state.lastSnapshot = state.fieldSession.snapshot(playerPosition(appCtx));
     }
+    committedActivityId = id;
     state.presentation.setRevealed(null, false);
     state.presentation.setExcavation(null, 'idle');
     state.ui.showResult(null);
@@ -2048,8 +2022,7 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
       appCtx.showToast?.(`${displayDiscoveryLabel(toolId)} unlocks at a later Explorer rank.`);
       return false;
     }
-    if (toolId) await state.equipTool(toolId, { silent: true });
-    state.activeActivityId = activityId;
+    if (!await state.selectActivity(activityId, { openPanel: true, tutorial: false, telemetry: false })) return false;
     const characterCapability = state.applyCharacterCapability(activityId);
     state.session.reset();
     state.detectorSnapshot = state.session.snapshot(playerPosition(appCtx));
@@ -2085,8 +2058,7 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
       appCtx.showToast?.(`${displayDiscoveryLabel(toolId)} unlocks at a later Explorer rank.`);
       return false;
     }
-    if (toolId) await state.equipTool(toolId, { silent: true });
-    state.activeActivityId = lead.activityId;
+    if (!await state.selectActivity(lead.activityId, { openPanel: false, tutorial: false, telemetry: false })) return false;
     const characterCapability = state.applyCharacterCapability(lead.activityId);
     state.session.reset();
     state.detectorSnapshot = state.session.snapshot(position);
@@ -2122,6 +2094,7 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
     return true;
   };
   state.handlePrimary = async () => {
+    if (state.activitySelectionPending || state.disposed) return false;
     resumeDiscoveryAudio(state);
     const position = playerPosition(appCtx);
     if (state.activeActivityId !== 'metal-detect') {
@@ -2251,6 +2224,19 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
   state.ui = createDiscoveryUi(state);
   appCtx.worldDiscoveryPublication = publication;
   appCtx.worldDiscoveryRuntime = state;
+  state.receiptSync = createDiscoveryReceiptSync({store:profileStore,
+    getOwnerUid: () => appCtx.getAccountUserId?.(),
+    isAvailable: () => !state.disposed && globalThis.navigator?.onLine !== false,
+    send: async (payload) => {
+      const {claimExplorerDiscovery} = await import('../../../js/discovery-api.js?v=1');
+      return claimExplorerDiscovery(payload);
+    }
+  });
+  const retryReceipts = () => { void syncTrustedReceipt(appCtx); };
+  state.receiptRetryTimer = setInterval(retryReceipts, 30000);
+  globalThis.addEventListener?.('online', retryReceipts);
+  state.unregisterExplorerListeners.push(() => globalThis.removeEventListener?.('online', retryReceipts));
+  retryReceipts();
   appCtx.worldDiscoveryRuntimeSnapshot = () => worldDiscoveryRuntimeSnapshot(appCtx);
   void hydrateSignedInReceipts(appCtx, profileStore, claimedIds).then(() => {
     if (state.ui?.open) return state.ui.refreshData?.();
@@ -2338,6 +2324,12 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
     id: `${owner}:runtime`, owner, phase: 'presentation', priority: 24, critical: false,
     enabled: () => !state.disposed && appCtx.worldPublication?.requestId === publication.requestId && appCtx.worldPublication?.sequence === publication.sequence,
     update(frame) {
+      // A retained Earth publication is not an active Earth field session.
+      // Keep its journal accessible aboard without advancing hidden searches.
+      if (appCtx.getEnv?.() && appCtx.getEnv() !== 'EARTH') {
+        if (state.ui?.open) state.ui.render(state.actions, state.lastSnapshot, state.activeActivityId);
+        return;
+      }
       const position = playerPosition(appCtx);
       state.actionTimer -= frame.dt;
       if (state.actionTimer <= 0) {

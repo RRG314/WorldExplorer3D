@@ -44,30 +44,112 @@ function inside(x, z, ring) {
   return result;
 }
 
-// Built once per collection revision, not per frame/terrain vertex. Small
-// polygons win equal-evidence overlaps; identity breaks ties deterministically.
-export function indexMappedGround(features = [], cellSize = 128) {
-  const cells = new Map();
+export function mappedAreaContains(feature, x, z) {
+  const b = feature?.bounds;
+  return !!(b && x >= b.minX && x <= b.maxX && z >= b.minZ && z <= b.maxZ &&
+    feature.pts?.length >= 3 && inside(x, z, feature.pts) &&
+    !(feature.holeRings || []).some(hole => inside(x, z, hole)));
+}
+
+// Terrain and vegetation share the same physical-cover winner. The context
+// reset drops the cache as well as the collection, so retired polygons cannot
+// survive through an otherwise idle sampler after leaving Earth.
+const contextIndexes = new WeakMap();
+export function resetMappedGroundIndex(ctx) { contextIndexes.delete(ctx); }
+export function currentMappedGroundIndex(ctx) {
+  const collection = ctx.landuses;
+  const count = collection?.length || 0;
+  const lat = ctx.LOC?.lat, lon = ctx.LOC?.lon, generation = ctx._worldLoadSequence;
+  let state = contextIndexes.get(ctx);
+  if (!state || state.collection !== collection || state.count !== count ||
+      state.lat !== lat || state.lon !== lon || state.generation !== generation) {
+    state = { collection, count, lat, lon, generation, index: indexMappedGround(collection || []) };
+    contextIndexes.set(ctx, state);
+  }
+  return state.index;
+}
+
+// A balanced bounds tree retains each polygon once, including large national
+// forests. A grid duplicated every feature into every covered cell and silently
+// dropped sufficiently large polygons. Index memory is now O(feature count),
+// independent of geographic extent, overlap and query history.
+export function indexMappedGround(features = []) {
+  const items = [];
   for (const feature of features) {
-    const profile = mappedGroundProfile(feature.type, feature.tags);
-    const b = feature.bounds;
-    if (!profile || !b || ![b.minX, b.maxX, b.minZ, b.maxZ].every(Number.isFinite) || !feature.pts?.length) continue;
-    const item = { ...feature, ...profile, area: (b.maxX - b.minX) * (b.maxZ - b.minZ) };
-    const x0 = Math.floor(b.minX / cellSize); const x1 = Math.floor(b.maxX / cellSize);
-    const z0 = Math.floor(b.minZ / cellSize); const z1 = Math.floor(b.maxZ / cellSize);
-    // Source guards normally bound these. Reject malformed unbounded geometry.
-    if ((x1 - x0 + 1) * (z1 - z0 + 1) > 65536) continue;
-    for (let x = x0; x <= x1; x++) for (let z = z0; z <= z1; z++) {
-      const key = `${x}/${z}`;
-      if (!cells.has(key)) cells.set(key, []);
-      cells.get(key).push(item);
+    const profile = mappedGroundProfile(feature?.type, feature?.tags);
+    const b = feature?.bounds;
+    if (!profile || !b || ![b.minX, b.maxX, b.minZ, b.maxZ].every(Number.isFinite) ||
+        b.minX > b.maxX || b.minZ > b.maxZ || !(feature.pts?.length >= 3)) continue;
+    items.push({ ...feature, ...profile, area: (b.maxX - b.minX) * (b.maxZ - b.minZ) });
+  }
+  const capacity = Math.max(1, items.length * 2);
+  const bounds = new Float64Array(capacity * 4);
+  const ranges = new Uint32Array(capacity * 2);
+  const children = new Int32Array(capacity * 2).fill(-1);
+  let nodes = 0;
+  const center = (item, axis) => axis === 0
+    ? item.bounds.minX / 2 + item.bounds.maxX / 2
+    : item.bounds.minZ / 2 + item.bounds.maxZ / 2;
+  function partition(begin, end, median, axis) {
+    let lo = begin, hi = end - 1;
+    while (lo < hi) {
+      const pivot = center(items[(lo + hi) >>> 1], axis);
+      let left = lo, right = hi;
+      while (left <= right) {
+        while (center(items[left], axis) < pivot) left++;
+        while (center(items[right], axis) > pivot) right--;
+        if (left <= right) {
+          const item = items[left]; items[left++] = items[right]; items[right--] = item;
+        }
+      }
+      if (median <= right) hi = right;
+      else if (median >= left) lo = left;
+      else return;
     }
   }
-  for (const bucket of cells.values()) bucket.sort((a, b) => b.priority - a.priority || a.area - b.area ||
-    String(a.sourceFeatureId || '').localeCompare(String(b.sourceFeatureId || '')));
-  return { sample(x, z) {
-    return (cells.get(`${Math.floor(x / cellSize)}/${Math.floor(z / cellSize)}`) || []).find((f) =>
-      x >= f.bounds.minX && x <= f.bounds.maxX && z >= f.bounds.minZ && z <= f.bounds.maxZ &&
-      inside(x, z, f.pts) && !(f.holeRings || []).some((hole) => inside(x, z, hole))) || null;
-  } };
+  function build(begin, end) {
+    const node = nodes++, offset = node * 4;
+    let minX = Infinity, minZ = Infinity, maxX = -Infinity, maxZ = -Infinity;
+    for (let i = begin; i < end; i++) {
+      const b = items[i].bounds;
+      minX = Math.min(minX, b.minX); minZ = Math.min(minZ, b.minZ);
+      maxX = Math.max(maxX, b.maxX); maxZ = Math.max(maxZ, b.maxZ);
+    }
+    bounds.set([minX, minZ, maxX, maxZ], offset);
+    ranges[node * 2] = begin; ranges[node * 2 + 1] = end;
+    if (end - begin > 8) {
+      const median = (begin + end) >>> 1;
+      partition(begin, end, median, maxX - minX >= maxZ - minZ ? 0 : 1);
+      children[node * 2] = build(begin, median);
+      children[node * 2 + 1] = build(median, end);
+    }
+    return node;
+  }
+  if (items.length) build(0, items.length);
+  const stack = [];
+  return {
+    stats: Object.freeze({ features: items.length, nodes, featureReferences: items.length,
+      indexBytes: bounds.byteLength + ranges.byteLength + children.byteLength }),
+    sample(x, z) {
+      if (!items.length || !Number.isFinite(x) || !Number.isFinite(z)) return null;
+      let best = null;
+      stack.length = 0; stack.push(0);
+      while (stack.length) {
+        const node = stack.pop(), offset = node * 4;
+        if (x < bounds[offset] || z < bounds[offset + 1] || x > bounds[offset + 2] || z > bounds[offset + 3]) continue;
+        if (children[node * 2] >= 0) {
+          stack.push(children[node * 2], children[node * 2 + 1]);
+          continue;
+        }
+        for (let i = ranges[node * 2]; i < ranges[node * 2 + 1]; i++) {
+          const candidate = items[i];
+          if (best && (candidate.priority < best.priority ||
+              (candidate.priority === best.priority && (candidate.area > best.area ||
+                (candidate.area === best.area && String(candidate.sourceFeatureId || '').localeCompare(String(best.sourceFeatureId || '')) >= 0))))) continue;
+          if (mappedAreaContains(candidate, x, z)) best = candidate;
+        }
+      }
+      return best;
+    }
+  };
 }

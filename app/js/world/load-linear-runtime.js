@@ -1,6 +1,8 @@
 import {
   publishLinearFeaturePresentation
 } from './linear-feature-presentation.js?v=1';
+import {normalizeTransportSource} from './compiler/transport-source-normalizer.js?v=4';
+import {publishedRoadSourceTopology} from './road-source-topology.js';
 
 export function shouldOmitUnmatchedElevatedPedestrianFeature(
   classification,
@@ -57,6 +59,16 @@ export function createLinearFeatureRuntime(options = {}) {
       structureSemantics,
       runtimeOptions
     )) return false;
+    const sourceFeatureId=String(tags?._sourceFeatureId || tags?.sourceFeatureId || '');
+    const transportRecord=sourceFeatureId?normalizeTransportSource({
+      sourceId:sourceFeatureId,
+      providerNamespace:sourceFeatureId.startsWith('shortbread:')?'shortbread':'osm',
+      completeness:sourceFeatureId.startsWith('shortbread:')?'generalized':'lossless',
+      incomplete:runtimeOptions.incomplete===true,
+      geometryProvenance:sourceFeatureId.startsWith('shortbread:')?'shortbread-v1':'osm-overpass'
+    },tags):null;
+    const sourceTopologyNodes=publishedRoadSourceTopology(
+      runtimeOptions.sourceNodes || [],runtimeOptions.sourcePoints || pts,centerline);
     const feature = {
       kind: classification.kind,
       subtype: classification.subtype,
@@ -64,7 +76,10 @@ export function createLinearFeatureRuntime(options = {}) {
       crossingNodes: runtimeOptions.crossingNodes || [],
       networkKind: classification.kind,
       name: String(tags?.name || '').trim(),
-      sourceFeatureId: tags?.sourceFeatureId ? String(tags.sourceFeatureId) : '',
+      sourceFeatureId,
+      transportRecord,
+      sourceNodeIds:Object.freeze(sourceTopologyNodes.map(node=>node.id)),
+      sourceTopologyNodes,
       width: spec.width,
       bias: spec.bias,
       surfaceBias: spec.bias,
@@ -132,21 +147,25 @@ export function createLinearFeatureRuntime(options = {}) {
       { ways: structureConnectorWays, force: true, alwaysVisible: true }
     ];
 
+    const publishedWays=new Set();
     linearFeatureGroups.forEach((group) => {
       const featureWays = group.ways;
       if (!Array.isArray(featureWays) || featureWays.length === 0) return;
       featureWays.forEach((way) => {
-        const rawPts = way.nodes
-          .map((id) => nodes[id])
-          .filter((node) => node)
+        const identity=String(way.tags?._sourceFeatureId || way.sourceId || way.id);
+        if(publishedWays.has(identity))return;
+        const sourceNodes=way.nodes.map(id=>nodes[id]).filter(Boolean);
+        const rawPts = sourceNodes
           .map((node) => appCtx.geoToWorld(node.lat, node.lon));
         const pts = sanitizeWorldPathPoints(rawPts, geometryGuards);
         if (pts.length < 2) return;
-        addLinearFeatureRecord(pts, { ...(way.tags || {}), sourceFeatureId: way.id ? String(way.id) : '' }, {
+        const added=addLinearFeatureRecord(pts, { ...(way.tags || {}), sourceFeatureId: identity }, {
+          sourceNodes,sourcePoints:rawPts,incomplete:sourceNodes.length!==way.nodes.length,
           crossingNodes: way.nodes.map(id => nodes[id]).filter(n => n?.tags?.kerb || n?.tags?.highway === 'crossing').map(n => ({ ...appCtx.geoToWorld(n.lat,n.lon), kerb:n.tags.kerb, tags:{...n.tags} })),
           force: group.force === true,
           alwaysVisible: group.alwaysVisible === true
         });
+        if(added)publishedWays.add(identity);
       });
     });
 

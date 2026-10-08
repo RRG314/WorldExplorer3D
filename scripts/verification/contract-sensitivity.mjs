@@ -14,8 +14,8 @@ writeFileSync(loader, `export async function load(url, context, next) {
   const result = await next(url, context);
   if (url.split('?')[0] === ${JSON.stringify(target)}) {
     const original = String(result.source);
-    const source = original.replace('export function clearBuildingExteriorDetails(appCtx) {',
-      'export function clearBuildingExteriorDetails(appCtx) { return; // injected cleanup defect\\n');
+    const source = original.replace(/(export function clearBuildingExteriorDetails\\(appCtx\\)\\s*\\{)/,
+      '$1 return; // injected cleanup defect\\n');
     if (source === original) throw new Error('Mutation target was not found');
     return { ...result, source };
   }

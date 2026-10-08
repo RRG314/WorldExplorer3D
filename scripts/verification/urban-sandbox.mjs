@@ -18,10 +18,12 @@ const requestedScope = String(process.argv.find(arg => arg.startsWith('--scope='
 assert.ok(['all', 'arrest', 'medical', 'vehicle'].includes(requestedScope),
   `Unsupported WE3D_URBAN_SCOPE: ${requestedScope}`);
 const servedRoot = requestedRoot ? path.resolve(root, requestedRoot) : root;
-const server = await startStaticServer({ rootDir: servedRoot, ports: [4410, 4411, 4412] });
-const baseUrl = `http://127.0.0.1:${server.port}`;
 const reportPath = path.join(root, 'output', 'verification', 'urban-sandbox',
   requestedScope === 'all' ? 'report.json' : `report-${requestedScope}.json`);
+await mkdir(path.dirname(reportPath), { recursive: true });
+await writeFile(reportPath, JSON.stringify({ok: false, complete: false, state: 'initializing', generatedAt: new Date().toISOString(), scope: requestedScope}, null, 2));
+const server = await startStaticServer({ rootDir: servedRoot, ports: [4410, 4411, 4412] });
+const baseUrl = `http://127.0.0.1:${server.port}`;
 const browserErrors = [];
 const localFailures = [];
 
@@ -927,11 +929,13 @@ function vehicleEquipmentChecks(primary) {
 let report;
 const verificationMode = {
   evidenceScope: 'urban functional input; deterministic DOM keyboard navigation and transitions; not rendering performance',
-  vehicleMapInput: 'exact recorded Logan road query; not live map-provider availability',
+  vehicleMapInput: 'exact recorded Logan road query and controlled-empty title-city suggestions; not live map-provider availability',
   deviceScaleFactor: process.env.CI ? .5 : 1,
   renderQuality: process.env.CI ? 'low (selected through Settings)' : 'default'
 };
 console.log(JSON.stringify(verificationMode));
+await mkdir(path.dirname(reportPath), { recursive: true });
+await writeFile(reportPath, JSON.stringify({ok: false, complete: false, state: 'running', scope: requestedScope, verificationMode}, null, 2));
 try {
   if (requestedScope === 'arrest') {
   console.log('[urban-sandbox] START arrest recovery');
@@ -1077,6 +1081,9 @@ try {
   await writeFile(reportPath, `${JSON.stringify(report, null, 2)}\n`, 'utf8');
   console.log(JSON.stringify(report, null, 2));
   assert.equal(report.ok, true, `Urban Sandbox ${requestedScope} normal-input journey failed.`);
+} catch (error) {
+  await writeFile(reportPath, JSON.stringify({ok: false, complete: false, state: 'failed', scope: requestedScope, verificationMode, failure: String(error?.stack || error), browserErrors, localFailures}, null, 2));
+  throw error;
 } finally {
   await server.close();
 }

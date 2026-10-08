@@ -2,7 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { compileTransportSurfaceModel } from '../app/js/world/compiler/transport-surface-model.js';
 import { compileTunnelSystemModels, compileTunnelSystemModel } from '../app/js/world/compiler/tunnel-system-model.js';
-import { tunnelWallIsOpen } from '../app/js/world/compiler/tunnel-junction-openings.js';
+import {compileTransportNetworkModel} from '../app/js/world/compiler/transport-network-model.js';
+import { compileTunnelWallOpenings, tunnelWallIsOpen } from '../app/js/world/compiler/tunnel-junction-openings.js';
 import { shouldPublishTunnelShellSection, portalCopingHeight, portalFaceUV } from '../app/js/terrain/structure-visual-meshes.js';
 import { compileStructureColliderDescriptors } from '../app/js/world/structure-colliders.js';
 import { sampleStructureAssemblyThicknessAt } from '../app/js/world/compiler/transport-structure-assembly.js';
@@ -126,4 +127,26 @@ test('a wholly generalized tunnel junction receives the same canonical height co
   north.transportRecord.completeness = 'lossless';
   const mixed = buildTransportJunctionProfileAnchors([south, north], graph, () => 20, sampleFeatureSurfaceY);
   assert.equal(mixed.anchorsByFeature.has(south), false, 'never carry exact elevations into a generalized duplicate');
+});
+
+
+test('an interior branch opens both real retaining-wall approaches, without requiring a roof at the join',()=>{
+  const main=road('main',[{x:0,z:-100},{x:0,z:100}]);
+  const branch=road('branch',[{x:0,z:0},{x:60,z:0}]);
+  compileTransportNetworkModel([main,branch]);
+  compileTunnelSystemModels([main,branch],()=>20);
+  // The main portal lies 30 units beyond the join; both roads are modeled
+  // tunnels but their junction is an uncovered excavation.
+  main.tunnelSystemModel.shellRanges=[{start:130,end:200}];
+  main.tunnelSystemModel.portalZones=[{approachStart:0,approachEnd:130}];
+  branch.tunnelSystemModel.shellRanges=[{start:20,end:60}];
+  branch.tunnelSystemModel.portalZones=[{approachStart:0,approachEnd:20}];
+  for(const f of [main,branch])f.tunnelSystemModel.wallOpenings=compileTunnelWallOpenings(f);
+  assert.equal(tunnelWallIsOpen(main.tunnelSystemModel,-1,100),true);
+  assert.equal(tunnelWallIsOpen(main.tunnelSystemModel,1,100),false);
+  assert.equal(tunnelWallIsOpen(main.tunnelSystemModel,-1,90),false);
+  assert.equal(tunnelWallIsOpen(branch.tunnelSystemModel,-1,1),true);
+  assert.equal(tunnelWallIsOpen(branch.tunnelSystemModel,1,1),true);
+  const walls=compileStructureColliderDescriptors([main,branch],{sampleTerrain:()=>30});
+  assert.equal(walls.some(w=>w.minX>0&&w.minX<4.3&&w.minZ<0&&w.maxZ>0),false,'through road wall does not barricade the branch');
 });

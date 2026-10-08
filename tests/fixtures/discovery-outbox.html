@@ -1,0 +1,19 @@
+<!doctype html><html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Offline receipt queue verification</title><style>body{background:#09121e;color:#e5f0fa;font:18px/1.6 system-ui;padding:32px}pre{white-space:pre-wrap}</style>
+<h1>Offline receipt queue — controlled test</h1><p>Real browser storage; simulated account and server responses.</p><button id="prepare">Save locally while offline</button><button id="retry">Reconnect and retry</button><p id="saveStatus" role="status"></p><pre id="state">Ready</pre>
+<script type="module">
+import {createIndexedDbDiscoveryProfileStore} from '/app/js/discovery/profile-store.js';
+import {discoverySaveMessage} from '/app/js/discovery/save-status.js';
+import {createDiscoveryReceiptSync} from '/app/js/discovery/receipt-outbox.js';
+window.owner='fixture-a';window.clock=1000;window.online=false;window.calls=0;
+window.store=createIndexedDbDiscoveryProfileStore();
+// Exercise a store created by another world before discovery binds account ownership.
+store.setReceiptOwnerProvider(()=>owner);
+window.sync=createDiscoveryReceiptSync({store,getOwnerUid:()=>owner,now:()=>clock,send:async payload=>{
+ calls++;if(!online)throw new Error('Controlled lost response');return {...payload,ownerUid:payload.expectedOwnerUid,itemId:'fixture-server-item',authority:'server-receipt',tradeable:false};
+}});
+window.refresh=async()=>{window.state={owner,pendingA:(await store.listPendingReceipts('fixture-a',Infinity)).length,pendingB:(await store.listPendingReceipts('fixture-b',Infinity)).length,records:(await store.getProfile()).explorerProgress.totalRecords,calls,items:(await store.listItems()).map(i=>({id:i.instanceId,authority:i.authority}))};document.querySelector('#state').textContent=JSON.stringify(state,null,2);document.querySelector('#saveStatus').textContent=discoverySaveMessage({durable:true,signedIn:!!owner,receipts:await store.getReceiptSyncStatus(owner),online});return state;};
+window.prepare=async()=>{await store.collect({claimId:'offline:1',instanceId:'offline:item',catalogId:'rock',worldIdentity:'fixture',activityId:'inspect',evidenceClass:'virtual-field-record'});await sync.flush();return refresh();};
+window.retry=async()=>{online=true;clock+=30000;await sync.flush();return refresh();};
+document.querySelector('#prepare').onclick=prepare;document.querySelector('#retry').onclick=retry;
+window.render_game_to_text=()=>JSON.stringify(window.state||{});window.advanceTime=()=>Promise.resolve();await refresh();window.ready=true;
+</script></html>

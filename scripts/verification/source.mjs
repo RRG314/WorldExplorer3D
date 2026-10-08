@@ -589,11 +589,12 @@ if (
 }
 const overtureReleaseDate = Date.parse(`${OVERTURE_RELEASE_POLICY.release.slice(0, 10)}T00:00:00Z`);
 const overtureReviewedDate = Date.parse(`${OVERTURE_RELEASE_POLICY.reviewedOn}T00:00:00Z`);
-const verificationDate = Date.parse('2026-08-21T00:00:00Z');
+const verificationDate = Date.now();
 if (OVERTURE_RELEASE_POLICY.authority !== 'build-pinned-reviewed-overture-release' ||
     !Number.isFinite(overtureReleaseDate) || !Number.isFinite(overtureReviewedDate) ||
     overtureReleaseDate > overtureReviewedDate ||
-    overtureReviewedDate - overtureReleaseDate > 7 * 24 * 60 * 60 * 1000 ||
+    overtureReviewedDate > verificationDate ||
+    overtureReleaseDate + OVERTURE_RELEASE_POLICY.publicRetentionDays * 86400000 - verificationDate < 14 * 86400000 ||
     verificationDate - overtureReviewedDate > 45 * 24 * 60 * 60 * 1000 ||
     OVERTURE_RELEASE_POLICY.publicRetentionDays !== 60 ||
     !overtureThemeArchiveUrl('buildings').includes(`/${OVERTURE_RELEASE_POLICY.release}/buildings.pmtiles`)) {

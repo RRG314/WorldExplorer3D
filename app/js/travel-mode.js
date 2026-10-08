@@ -358,6 +358,7 @@ function setTravelMode(mode, options = {}) {
         spawnZ: Number.isFinite(options.spawnZ) ? options.spawnZ : undefined,
         yaw: Number.isFinite(options.yaw) ? options.yaw : undefined,
         candidate: options.candidate || undefined,
+        surfaceArrival: options.surfaceArrival || undefined,
         entryMode: options.entryMode || undefined,
         transportEntityId: options.transportEntityId || undefined,
         transportCatalogId: options.transportCatalogId || undefined,

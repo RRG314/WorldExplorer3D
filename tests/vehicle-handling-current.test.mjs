@@ -209,3 +209,19 @@ test('traffic transition connectors publish a continuous four-wheel surface', ()
   assert.equal(sample(connector, 1, 5), 3);
   assert.equal(sample(connector, -1, 7.5), 3.5);
 });
+
+test('nested wheel-contact queries keep independent heights and stable sampling metadata', () => {
+  const seen=[];
+  const plane=(x,z)=>3+.12*x-.18*z;
+  const options={x:12,z:-8,yaw:.6,variant:{width:2,length:7}};
+  const expected=resolveVehicleRoadContactPose({...options,sampleSurface:plane});
+  const actual=resolveVehicleRoadContactPose({...options,sampleSurface:(x,z,contact)=>{
+    seen.push(contact);
+    const nested=resolveVehicleRoadContactPose({x:-200,z:800,sampleSurface:()=>27});
+    assert.equal(nested.y,27);
+    assert.ok(Object.isFrozen(contact));
+    return plane(x,z);
+  }});
+  assert.deepEqual(actual,expected);
+  assert.deepEqual(seen.slice(0,4),[{front:-1,side:-1},{front:-1,side:1},{front:1,side:-1},{front:1,side:1}]);
+});

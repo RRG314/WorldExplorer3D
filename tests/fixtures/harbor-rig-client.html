@@ -1,0 +1,13 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Reviewed museum ship rig inspection</title><style>body{margin:0;background:#172730;color:white;font:16px sans-serif}#label{position:absolute;top:20px;left:24px}canvas{display:block}</style></head><body><div id="label">Museum sailing ship · original interpretive rig<br>Arrow keys rotate the inspection camera</div><script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script><script type="module">
+import {createMappedVesselMesh} from '/app/js/world/water-adjacent-structures.js';
+import {REVIEWED_MAPPED_VESSELS} from '/app/js/world/reviewed-mapped-vessels.js?v=1';
+const record=REVIEWED_MAPPED_VESSELS[0],points=record.footprint.map(p=>({x:(p.lon-record.center.lon)*111320*Math.cos(record.center.lat*Math.PI/180),z:(record.center.lat-p.lat)*111320}));
+const scene=new THREE.Scene();scene.background=new THREE.Color(0x94b5c5);const camera=new THREE.PerspectiveCamera(45,innerWidth/innerHeight,.1,1000),renderer=new THREE.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});renderer.setSize(innerWidth,innerHeight);renderer.setPixelRatio(Math.min(devicePixelRatio,1.5));document.body.append(renderer.domElement);
+scene.add(new THREE.HemisphereLight(0xd9e9ee,0x536050,1.2));const sun=new THREE.DirectionalLight(0xfff2dd,1.2);sun.position.set(-35,80,50);scene.add(sun);
+const ship=createMappedVesselMesh(points,0,record.tags);scene.add(ship);const water=new THREE.Mesh(new THREE.PlaneGeometry(400,400),new THREE.MeshStandardMaterial({color:0x3b7985,roughness:.55}));water.rotation.x=-Math.PI/2;scene.add(water);
+let yaw=1.1;const keys=new Set();onkeydown=e=>keys.add(e.key);onkeyup=e=>keys.delete(e.key);
+function render(){camera.position.set(Math.sin(yaw)*90,25,Math.cos(yaw)*90);camera.lookAt(0,13,0);renderer.render(scene,camera);}
+window.advanceTime=async ms=>{yaw+=(keys.has('ArrowRight')?1:keys.has('ArrowLeft')?-1:0)*ms*.0006;render();};
+window.render_game_to_text=()=>JSON.stringify({scene:'reviewed-footprint museum ship fixture',source:'OSM footprint; original interpretive rig',masts:3,coordinates:'world metres: y up',drawCalls:renderer.info.render.calls,triangles:renderer.info.render.triangles,yaw});
+onresize=()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);render()};render();
+</script></body></html>

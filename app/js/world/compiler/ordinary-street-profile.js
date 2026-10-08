@@ -1,4 +1,5 @@
 import {connectedSideGroups} from './transport-junction-profile.js?v=21';
+import {assignSurfaceStreetJunctions} from './surface-street-junctions.js';
 
 // Ordinary street nodes have terrain-owned elevations. Keep these constraints
 // separate from bridge approaches so a street junction cannot promote an
@@ -23,7 +24,7 @@ export function assignOrdinaryStreetJunctions(features,network,sampleTerrain) {
     }
     nodes++;
   }
-  return {nodes};
+  return {nodes,surfaceIntersections:assignSurfaceStreetJunctions(features,sampleTerrain)};
 }
 
 // Fit a continuous profile through physical street nodes. A universal 12%

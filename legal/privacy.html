@@ -42,7 +42,7 @@
     <p>Payments and recurring support are processed by Stripe. Card details are handled by Stripe and are not stored by World Explorer servers.</p>
 
     <h2>Location and Live Earth Requests</h2>
-    <p>When you search places, use Live Earth layers, or load local weather and environmental context, your browser may request data from open providers such as OpenStreetMap/Nominatim, Open-Meteo, USGS, and CelesTrak. Those providers may receive your selected coordinates, IP address, and standard request metadata under their own terms. World Explorer uses those results to render the place you chose; it does not treat that as background location tracking of your real-world device position unless you intentionally use a locate feature.</p>
+    <p>When you search places, use Live Earth layers, or load local weather and environmental context, your browser may request data from open providers such as OpenStreetMap/Nominatim, MET Norway, PacIOOS, HYCOM/FNMOC, USGS, and CelesTrak. Weather, ocean-model, and place-search requests pass through our server cache; those upstream providers receive the selected coordinates and server request metadata, not your browser IP address. Providers contacted directly, such as USGS and CelesTrak, may receive your browser IP address and standard request metadata under their own terms. World Explorer uses those results to render the place you chose; it does not treat that as background location tracking of your real-world device position unless you intentionally use a locate feature.</p>
 
     <h2>How We Use Data</h2>
     <ul>

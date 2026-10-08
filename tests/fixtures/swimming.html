@@ -1,0 +1,52 @@
+<!doctype html><html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Swimming acceptance</title><link rel="icon" href="/favicon.svg"><style>body{margin:0;background:#102c3d;color:white;font:14px system-ui}header{padding:12px;position:absolute;z-index:2;background:#102c3dd9}canvas{display:block}button{padding:8px}</style><header>Existing explorer rig · controlled water and bank<br>WASD move · Space rise · Shift dive<br><button id="enter">Enter water</button><button id="bank">Return to bank</button></header>
+<script src="/node_modules/three/build/three.min.js"></script><script src="/node_modules/three/examples/js/loaders/GLTFLoader.js"></script><script type="module">
+import {createCharacterAnimationController} from '/app/js/character/animation/controller.js';
+import {createWalkingWaterRuntime} from '/app/js/walking/water/runtime.js';
+import {resolveWalkingMoveVector,createWalkingPhysicsHelpers} from '/app/js/walking/physics.js';
+const boatFixture=new URLSearchParams(location.search).has('boat');
+const shoreMode=new URLSearchParams(location.search).has('shore');
+const {ctx:appCtx}=await import('/app/js/shared-context.js?v=55');
+const {normalizeWaterBody}=await import('/app/js/world/water-body-contract.js?v=4');
+const bedY=x=>shoreMode?Math.max(-8,Math.min(.2,.2-(x+4)*.45)):(x<-4?.2:-8);
+const scene=new THREE.Scene();scene.background=new THREE.Color(0x81b9cd);const renderer=new THREE.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});renderer.setSize(innerWidth,innerHeight);renderer.outputEncoding=THREE.sRGBEncoding;renderer.toneMapping=THREE.ACESFilmicToneMapping;document.body.append(renderer.domElement);
+const camera=new THREE.PerspectiveCamera(50,innerWidth/innerHeight,.1,100);scene.add(new THREE.HemisphereLight(0xd8f1ff,0x345f42,1.7));const sun=new THREE.DirectionalLight(0xffeddb,1.5);sun.position.set(4,7,6);scene.add(sun);
+const floor=new THREE.Mesh(new THREE.PlaneGeometry(60,60,120,1),new THREE.MeshStandardMaterial({color:0xc4b77e}));floor.rotation.x=-Math.PI/2;floor.position.y=-8;scene.add(floor);if(shoreMode){floor.geometry.rotateX(-Math.PI/2);floor.rotation.x=0;floor.position.y=0;const p=floor.geometry.attributes.position;for(let i=0;i<p.count;i++)p.setY(i,bedY(p.getX(i)));floor.geometry.computeVertexNormals();}
+const water=new THREE.Mesh(new THREE.PlaneGeometry(60,60),new THREE.MeshStandardMaterial({color:0x238b9f,transparent:true,opacity:.5,side:THREE.DoubleSide,roughness:.25}));water.rotation.x=-Math.PI/2;scene.add(water);
+const bank=new THREE.Mesh(new THREE.BoxGeometry(8,8,20),new THREE.MeshStandardMaterial({color:0xa1a47b}));bank.position.set(-8,-3.8,0);scene.add(bank);bank.visible=!shoreMode;
+const host=new THREE.Group();scene.add(host);
+const gltf=await new THREE.GLTFLoader().loadAsync(new URLSearchParams(location.search).get('gender')==='woman'?'/app/assets/models/characters/field-explorer-woman-v1.glb':'/app/assets/models/characters/field-explorer-v1.glb');const root=gltf.scene;root.updateMatrixWorld(true);const bounds=new THREE.Box3().setFromObject(root),size=bounds.getSize(new THREE.Vector3()),center=bounds.getCenter(new THREE.Vector3());root.position.set(-center.x,-bounds.min.y,-center.z);const visual=new THREE.Group();visual.scale.setScalar(1.78/size.y);visual.add(root);host.add(visual);const animation=createCharacterAnimationController(THREE,visual,gltf.animations,{}, {swimming:true});
+const state={walker:{x:-5,y:1.9,z:0,yaw:0,angle:0,lookYawOffset:0,pitch:0},characterMesh:host};
+const groundAt=(x,z)=>({groundY:bedY(x),effectiveGroundY:bedY(x)});
+const sample=(x,z,c,o)=>({coverage:x>=-4?'known-water-body':'unresolved',surfaceY:0,volume:{volumeId:'fixture',current:null}});
+const ctx={LOC:{lat:0,lon:0},initialEarthWorldReady:true,METERS_PER_WORLD_UNIT:1,checkBuildingCollision:(x,z)=>({collision:z>4})};
+const waterController=createWalkingWaterRuntime({ctx,state,CFG:{eyeHeight:1.7},groundAt,sample,moveVector:resolveWalkingMoveVector,animate:(host,moving,dt)=>animation.update({swimming:host.userData.swimming,moving},dt)});
+let boatSwimming=null;
+if(boatFixture){
+ const {createBoatModeMesh}=await import('/app/js/boat-mode/boat-model.js?v=7');
+ const {getMaritimeCatalogEntry}=await import('/app/js/transport/maritime-catalog.js?v=1');
+ const {addBoatSwimLadder,createBoatSwimming}=await import('/app/js/boat-mode/swimming.js');
+ const catalog=getMaritimeCatalogEntry('marina-runabout'),mesh=createBoatModeMesh(catalog);addBoatSwimLadder(THREE,mesh,catalog);mesh.visible=true;mesh.position.set(5,0,0);scene.add(mesh);
+ Object.assign(ctx,{boat:{x:5,y:0,z:0,angle:0,speed:0,vx:0,vz:0},boatMode:{active:true,transportEntityId:'fixture-vessel',transportCatalogId:catalog.id,currentWater:{},mesh},Walk:{state,setModeWalk(){state.mode='walk';host.visible=true},setModeDrive(){state.mode='drive';host.visible=false;waterController.deactivate()},resupplyWater:waterController.resupply}});
+ state.mode='drive';host.visible=false;
+ boatSwimming=createBoatSwimming({ctx,sample,groundY:bedY,park:()=>{ctx.boatMode.active=false},resume:()=>{ctx.boatMode.active=true},updateParked:()=>{}});
+ ctx.recoverBoatSwimmer=()=>boatSwimming.board(true);ctx.checkVesselSwimCollision=(...args)=>boatSwimming.collision(...args);
+ document.querySelector('header').textContent='Surface vessel · actual ladder and swim controller · B/Shift dive';
+ window.boatSwimTest={ctx,controller:boatSwimming};
+}
+let physics=null;
+if(shoreMode){
+ Object.assign(appCtx,{getEnv:()=> 'EARTH',METERS_PER_WORLD_UNIT:1,waterAreas:[normalizeWaterBody({pts:[{x:-3.55,z:-30},{x:30,z:-30},{x:30,z:30},{x:-3.55,z:30}],surfaceY:0,kindHint:'lake'})],waterways:[],boatMode:{active:false},readControlActions:()=>({}),elevationWorldYAtWorldXZ:bedY});
+ physics=createWalkingPhysicsHelpers({CFG:{eyeHeight:1.7,walkSpeed:2.8,runSpeed:5.6,turnSpeed:2.6,wallDetectRadius:1.65,wallJumpVelocity:7.2,wallJumpOutward:.28,wallJumpCooldown:.18,blockStepHeight:.65},state,keys:{},getWalkGroundY:bedY,getBuildingsArray:()=>[],animateCharacterWalk:(host,moving,dt)=>animation.update({swimming:host.userData.swimming,moving},dt)});
+ Object.assign(state.walker,{onGround:true,wallJumpTimer:0,vy:0,mode:'walk'});
+}
+const controller=shoreMode?{snapshot:()=>({active:!!state.walker.swimming})}:waterController;
+const held=new Set();onkeydown=e=>{held.add(e.code);if(['Space','ShiftLeft'].includes(e.code))e.preventDefault()};onkeyup=e=>held.delete(e.code);
+let override=null;
+function step(dt){const w=state.walker,actions=override||{vertical:Number(held.has('Space'))-Number(held.has('ShiftLeft')||held.has('KeyB'))};const forward=override?.move??Number((held.has('KeyW')||held.has('ArrowUp')))-Number((held.has('KeyS')||held.has('ArrowDown'))),strafe=override?.strafe??Number(held.has('KeyA'))-Number(held.has('KeyD'));if(shoreMode){appCtx.readControlActions=()=>({...actions,move:forward,strafe});physics.updateWalkPhysics(dt,(v,f)=>Number.isFinite(v)?v:f)}else if(!boatFixture||state.mode==='walk')waterController.update(dt,{actions,forward,strafe,groundState:groundAt(w.x,w.z)});if(!w.swimming){host.position.set(w.x,w.y-1.7,w.z);animation.update({},dt)}camera.position.set(w.x+4,w.swimming?.submerged?Math.min(w.y+.65,-.25):w.y+2.4,w.z+5);camera.lookAt(w.x,w.y-.55,w.z);
+ if(boatFixture){boatSwimming.update(dt);if(state.mode!=='walk'){camera.position.set(12,5,-12);camera.lookAt(5,0,0);}else{const p=boatSwimming.cameraPose({x:w.x,y:w.y,z:w.z},camera.position);camera.position.set(p.x,p.y,p.z);camera.lookAt(w.x,w.y-.55,w.z)}}renderer.render(scene,camera)}
+window.advanceTime=async ms=>{for(let i=0;i<Math.ceil(ms/16.667);i++)step(1/60)};
+window.render_game_to_text=()=>JSON.stringify({coordinateSystem:'x east, y up, z south; water y=0',walker:state.walker,boat:boatSwimming?.snapshot(),controller:controller.snapshot(),animation:animation.snapshot()});
+window.swimTest={state,controller,setInput:value=>override=value,step:window.advanceTime};
+if(!boatFixture)document.querySelector('#enter').onclick=()=>Object.assign(state.walker,{x:0,y:.18,z:0});if(!boatFixture)document.querySelector('#bank').onclick=()=>{Object.assign(state.walker,{x:-5,y:1.9,z:0});step(.016)};
+step(.016);let last=performance.now();function frame(now){step(Math.min(.05,(now-last)/1000));last=now;requestAnimationFrame(frame)}requestAnimationFrame(frame);window.ready=true;onresize=()=>{renderer.setSize(innerWidth,innerHeight);camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix()};
+</script></html>

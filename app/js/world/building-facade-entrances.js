@@ -1,3 +1,4 @@
+import {harborDistrictFocus} from './harbor-district.js';
 import { compileEntranceCatalog } from '../living-world/entrance-catalog.js?v=6';
 
 const STYLE_CODE = Object.freeze({
@@ -129,9 +130,16 @@ export function attachEntranceAttribute(mesh, entrance) {
  */
 export function publishBuildingFacadeEntrances(appCtx, options = {}) {
   const tier = String(options.tier || tierForContext(appCtx));
+  const focus = harborDistrictFocus(appCtx);
+  const inDistrict = mesh => {
+    const p=mesh?.userData?.buildingFootprint;
+    if(!focus || !p?.length)return false;
+    const x=p.reduce((s,p)=>s+p.x,0)/p.length,z=p.reduce((s,p)=>s+p.z,0)/p.length;
+    return Math.hypot(x-focus.x,z-focus.z)<=235;
+  };
   const nearFacadeMeshes = (Array.isArray(appCtx?.buildingMeshes) ? appCtx.buildingMeshes : []).filter((mesh) =>
     !mesh?.userData?.buildingSemantics?.historicMasonry &&
-    mesh?.userData?.lodTier === 'near' &&
+    (mesh?.userData?.lodTier === 'near' || mesh?.userData?.lodTier === 'mid' && inDistrict(mesh)) &&
     !mesh?.userData?.isRoofDetail &&
     mesh?.material?.userData?.buildingExterior === true
   );
@@ -142,6 +150,7 @@ export function publishBuildingFacadeEntrances(appCtx, options = {}) {
     buildings: (Array.isArray(appCtx?.buildings) ? appCtx.buildings : []).filter((building) =>
       nearBuildingIds.has(String(building?.sourceBuildingId || building?.id || ''))
     ),
+    focus,
     mappedEntrances: appCtx?.mappedBuildingEntrances,
     nearestRoad: appCtx?.findNearestRoad,
     sampleGround: (x, z) => appCtx?.GroundHeight?.walkSurfaceY?.(x, z) ?? appCtx?.elevationWorldYAtWorldXZ?.(x, z),

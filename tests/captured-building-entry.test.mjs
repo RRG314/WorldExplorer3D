@@ -18,3 +18,13 @@ test('reviewed exterior without a generated door can be entered; ordinary buildi
  assert.equal(pickNearbyEnterableBuildingSupport(0,7,options)?.support.key,id);
  ctx.communityRealityCaptureEntryBuildings.clear();assert.equal(pickNearbyEnterableBuildingSupport(0,7,options),null);
 });
+test('nearby interior directory applies the same visible-entry eligibility as interaction',async()=>{
+ const {listEnterableBuildingSupportsNear}=await import('../app/js/building-entry.js');
+ ctx.buildings=[building];ctx.buildingEntranceByBuilding.clear();ctx.communityRealityCaptureEntryBuildings.clear();
+ assert.equal(listEnterableBuildingSupportsNear(0,7,50,8,{requireExteriorEntrance:true}).length,0);
+ ctx.buildingEntranceByBuilding.set(id,{x:0,z:-6,approachX:0,approachZ:-8});
+ assert.equal(listEnterableBuildingSupportsNear(0,7,50,8,{requireExteriorEntrance:true})[0]?.key,id);
+ ctx.buildingEntranceByBuilding.clear();ctx.communityRealityCaptureEntryBuildings.add(id);
+ assert.equal(listEnterableBuildingSupportsNear(0,7,50,8,{requireExteriorEntrance:true})[0]?.key,id);
+ ctx.communityRealityCaptureEntryBuildings.clear();
+});

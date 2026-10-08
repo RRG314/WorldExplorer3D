@@ -81,7 +81,9 @@ function setPlanetarySky(body, date = new Date(), options = {}) {
   }
   appCtx.starField.visible = true;
   const requestedOpacity = Number(options.starOpacity);
-  const starOpacity = orientation?.starOpacity ?? (Number.isFinite(requestedOpacity) ? requestedOpacity : 0.9);
+  const starOpacity = Number.isFinite(requestedOpacity) ? Math.max(0,Math.min(1,requestedOpacity)) : (orientation?.starOpacity ?? 0.9);
+  // Opaque horizon-safe star materials cannot dim via alpha. Daylight exposure hides the field.
+  appCtx.starField.visible = starOpacity >= .05;
   appCtx.starField.traverse((child) => {
     if (!child.material || child.userData?.skyHitbox) return;
     const baseOpacity = Number(child.userData?.baseOpacity ?? child.material.opacity ?? 1);

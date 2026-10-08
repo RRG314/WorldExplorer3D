@@ -25,3 +25,18 @@ test('wide geographic bounds coarsen without losing apertures and empty maps sta
  for(let i=0;i<2;i++)assert.ok(candidates(grid,masks[i]).includes(i));
  assert.deepEqual(candidates(buildPortalSpatialGrid([]),{x:0,z:0}),[]);
 });
+
+test('published CPU cuts and raycasts use the same bounded candidates without allocating point snapshots',async()=>{
+ const {prepareTerrainPortalMasks,terrainPointRemovedByPortals,terrainHeightWithPortalCuts}=await import('../app/js/terrain/structure-terrain-portals.js');
+ const masks=Array.from({length:2000},(_,i)=>({x:i*151,z:0,tangentX:1,tangentZ:0,roadY:i%4,grade:.1,halfWidth:5,halfDepth:10,cutHeight:40}));
+ const plain=masks.map(m=>({...m}));let reads=0;
+ const counted=new Proxy(masks,{get(target,key){if(/^\d+$/.test(String(key)))reads++;return target[key];}});
+ prepareTerrainPortalMasks(counted);reads=0;
+ for(const x of [-12,0,5,10,11,151,300,301])for(const z of [-6,0,5,6])for(const y of [0,3,20,45]){
+   const point={x,y,z};
+   const expected=plain.some(mask=>terrainPointRemovedByPortal(mask,point));
+   assert.equal(terrainPointRemovedByPortals(counted,point),expected);
+   assert.equal(terrainHeightWithPortalCuts(counted,x,z,y),terrainHeightWithPortalCuts(plain,x,z,y));
+ }
+ assert.ok(reads<5000,`local probes scanned ${reads} masks`);
+});

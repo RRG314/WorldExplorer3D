@@ -5,22 +5,23 @@ import {pavementMaskLayout,rasterizePavementMask} from '../world/compiler/paveme
 import {restoreTransportTerrain} from './transport-terrain-snapshot.js';
 import {planTransportRegions,nearestTransportRegion} from './transport-detail-plan.js';
 import {createSpatialRoadBatches} from './spatial-road-batches.js';
+import {createPortalSurfaceClipper} from './portal-surface-clip.js';
 
 // The planar footprint is independent of terrain elevation. It can compile
 // while the main thread publishes the final cut/fill surface.
-export function prepareTransportDetailPlan({roads,focus={x:0,z:0},radius,maxTextureSize=4096}) {
+export function prepareTransportDetailPlan({roads,focus={x:0,z:0},radius,maxTextureSize=4096,includeOverview=true}) {
   const tiles=prepareCarriagewayTiles(roads);
   const keys=tiles.map(tile=>tile.key),layout=pavementMaskLayout(keys,maxTextureSize);
-  const masks=new Uint8Array(keys.length*layout.resolution**2);
-  for(let i=0;i<tiles.length;i++){
+  const masks=new Uint8Array(includeOverview?keys.length*layout.resolution**2:0);
+  for(let i=0;includeOverview&&i<tiles.length;i++){
     const tile=tiles[i];tile.polygons=unionCarriageway(tile);
-    masks.set(rasterizePavementMask(tile.polygons,tile.bounds,layout.resolution),i*layout.resolution**2);
+    if(includeOverview)masks.set(rasterizePavementMask(tile.polygons,tile.bounds,layout.resolution),i*layout.resolution**2);
   }
   const plan=planTransportRegions(tiles,focus,radius);
   return {tiles,keys,layout,masks,plan};
 }
 
-export function createTransportDetailCompiler({roads,terrain,focus={x:0,z:0},radius,maxTextureSize=4096,heightProbes=[],preparedPlan=null}) {
+export function createTransportDetailCompiler({roads,terrain,focus={x:0,z:0},radius,maxTextureSize=4096,includeOverview=true,heightProbes=[],preparedPlan=null}) {
   const restored=restoreTransportTerrain(terrain);
   const heightParity={samples:heightProbes.length,maximumDifference:0};
   for(const point of heightProbes){
@@ -29,12 +30,15 @@ export function createTransportDetailCompiler({roads,terrain,focus={x:0,z:0},rad
     heightParity.maximumDifference=Math.max(heightParity.maximumDifference,difference);
   }
   const partition=createPavementTerrainPartition(restored.meshes,{includeFarTerrain:true});
-  const {tiles,keys,layout,masks,plan}=preparedPlan || prepareTransportDetailPlan({roads,focus,radius,maxTextureSize});
+  const clipSurface=createPortalSurfaceClipper(terrain.portalMasks);
+  const {tiles,keys,layout,masks,plan}=preparedPlan || prepareTransportDetailPlan({roads,focus,radius,maxTextureSize,includeOverview});
+  const regions=new Map([...plan.initial,...plan.pending].map(region=>[region.key,region]));
   function compile(region){
     const builder=createSpatialRoadBatches();
     for(const tile of region.tiles){
-      const mesh=meshCarriagewayTile(tile,restored.sampleTop,partition,{polygons:tile.polygons});
-      builder.append(mesh.positions,mesh.indices,'at_grade');
+      const mesh=meshCarriagewayTile(tile,restored.sampleUncutTop,partition,{polygons:tile.polygons});
+      const cut=clipSurface(mesh.positions,mesh.indices);
+      builder.append(cut.positions,cut.indices,'at_grade');
       tile.polygons=null;
     }
     builder.finish();
@@ -45,12 +49,17 @@ export function createTransportDetailCompiler({roads,terrain,focus={x:0,z:0},rad
   const initial=plan.initial.map(compile);
   return {
     initial:{keys,layout,masks,heightParity,regions:initial,pending:plan.pending.map(({key,bounds})=>({key,bounds})),totalCells:tiles.length},
+    compile(key){
+      const region=regions.get(key);
+      if(!region)throw new Error(`Unknown transport region ${key}`);
+      return compile(region);
+    },
     next(focus={x:0,z:0}){
       const index=nearestTransportRegion(plan.pending,focus);
       if(index<0)return null;
       const region=plan.pending.splice(index,1)[0];
       return {...compile(region),remaining:plan.pending.length};
     },
-    dispose(){partition.dispose();restored.dispose();plan.pending.length=0;plan.initial.length=0;tiles.length=0;}
+    dispose(){partition.dispose();restored.dispose();regions.clear();plan.pending.length=0;plan.initial.length=0;tiles.length=0;}
   };
 }

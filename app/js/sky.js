@@ -1,3 +1,6 @@
+import { captureSurfaceLightPresentation } from './planetary/surface-lighting.js';
+let restoreSurfaceLights = null;
+import { setActivePlanetaryObstacles, clearActivePlanetaryObstacles } from './planetary/runtime/obstacle-authority.js?v=1';
 import { ctx as appCtx } from "./shared-context.js?v=55";
 import { captureEarthWorldSession, resumeEarthWorldSession } from "./earth-session.js?v=17";
 import {
@@ -232,12 +235,14 @@ function arriveAtMoon() {
   const weatherPanel = document.getElementById('weatherPanel');
   if (weatherPanel) weatherPanel.style.display = 'none';
 
+  restoreSurfaceLights ||= captureSurfaceLightPresentation(appCtx);
+  appCtx.scene.environment=null;
   // IMMEDIATELY set black background and hide car to prevent earth ground flash
   appCtx.scene.background = new THREE.Color(0x000000);
   appCtx.scene.fog = new THREE.FogExp2(0x000000, 0);
-  if (appCtx.renderer) appCtx.renderer.toneMappingExposure = 1.05;
+  if (appCtx.renderer) appCtx.renderer.toneMappingExposure = 1.35;
   appCtx.setLunarEarthVisible?.(true);
-  appCtx.setPlanetarySky?.('moon');
+  appCtx.setPlanetarySky?.('moon', new Date(), { starOpacity: .025 });
   if (appCtx.carMesh) appCtx.carMesh.visible = false;
   appCtx.setPauseReason?.('planetary_transition', true);
 
@@ -270,6 +275,7 @@ function arriveAtMoon() {
     // (positionCarOnMoon is called in createMoonSurface's setTimeout)
   } else {
     const surfaceActivation = activateMoonSurface(appCtx);
+    setActivePlanetaryObstacles('moon',appCtx.moonSurface.userData.obstacles || []);
     if (surfaceActivation.status !== 'accepted') {
       console.error('Apollo 11 surface could not be activated.', surfaceActivation.reason);
     }
@@ -296,16 +302,21 @@ function arriveAtMoon() {
   void appCtx.setPlanetaryVehicle?.('moon');
   appCtx.setPlanetaryCharacter?.('moon');
 
+  if(appCtx.hemiLight)appCtx.hemiLight.visible=false;
+  appCtx.ambientLight?.color?.setHex(0xffffff);
+  appCtx.fillLight?.color?.setHex(0xffffff);
+  appCtx.sun?.color?.setHex(0xffffff);
+
   // Adjust lighting for moon - stronger sun for better shading and shadows
   if (appCtx.sun) {
-    appCtx.sun.intensity = 2.0; // Brighter sun for stronger shadows on moon
+    appCtx.sun.intensity = 2.8; // Brighter sun for stronger shadows on moon
     appCtx.sun.position.set(100, 200, 100); // Higher angle for better shadow casting
   }
   if (appCtx.ambientLight) {
-    appCtx.ambientLight.intensity = 0.15; // Lower ambient for more dramatic shadows
+    appCtx.ambientLight.intensity = 0.45; // Lower ambient for more dramatic shadows
   }
   if (appCtx.fillLight) {
-    appCtx.fillLight.intensity = 0.1; // Very low fill light
+    appCtx.fillLight.intensity = 0.4; // Very low fill light
   }
 
   // Show return button
@@ -419,6 +430,8 @@ Object.defineProperty(appCtx, 'apollo11Flag', {
 });
 
 function suspendMoonEnvironment() {
+  restoreSurfaceLights?.();restoreSurfaceLights=null;
+  clearActivePlanetaryObstacles('moon');
   hideReturnToEarthButton();
   appCtx.setLunarEarthVisible?.(false);
   if (appCtx.moonSurface) {

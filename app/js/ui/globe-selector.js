@@ -1,7 +1,9 @@
+import {CORAL_SHELF_SITE} from '../ocean/habitat-plan.js';
+import { oceanEntryDecision } from '../ocean/entry-policy.js?v=1';
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { searchPlaces } from '../places/place-search.js?v=4';
 import { createGlobeSelectorScene } from './globe-selector/scene.js?v=22';
-import { createGlobeSelectorLaunch } from './globe-selector/launch.js?v=2';
+import { createGlobeSelectorLaunch } from './globe-selector/launch.js?v=3';
 import { getGlobeSelectorElements } from './globe-selector/dom.js?v=4';
 import { fetchNearbyCities, nearbyMajorCities } from './globe-selector/catalog.js?v=2';
 import { bindCityListInteractions, renderNearbyCityItems, renderPresetCityItems } from './globe-selector/city-list-view.js?v=4';
@@ -211,9 +213,12 @@ function createGlobeSelector(options = {}) {
       saveFavoriteBtn.title = saved ? 'Remove selected place from favorites' : 'Add selected place to favorites';
       saveFavoriteBtn.setAttribute('aria-label', saveFavoriteBtn.title);
     }
-    if (latInput) latInput.value = selected.lat.toFixed(6);
-    if (lonInput) lonInput.value = selected.lon.toFixed(6);
-    coordinateInputsDirty = false;
+    // A late lookup may rename the selected point, but must not erase a
+    // coordinate edit made while the request was in flight.
+    if (!coordinateInputsDirty) {
+      if (latInput) latInput.value = selected.lat.toFixed(6);
+      if (lonInput) lonInput.value = selected.lon.toFixed(6);
+    }
 
     globeScene.setSelectionMarker(selected);
     nearbyCities = buildNearbyCitiesFromData({
@@ -248,8 +253,7 @@ function createGlobeSelector(options = {}) {
   function setSelection(lat, lon, meta = {}) {
     const clamped = clampLatLon(lat, lon);
     const coordsChanged = !selected ||
-      Math.abs(selected.lat - clamped.lat) > 0.00001 ||
-      Math.abs(selected.lon - clamped.lon) > 0.00001;
+      selected.lat !== clamped.lat || selected.lon !== clamped.lon;
     if (coordsChanged) {
       liveNearbyCity = null;
       mappedNearbyCities = [];
@@ -270,6 +274,7 @@ function createGlobeSelector(options = {}) {
       locationDetails: meta.locationDetails || (coordsChanged ? null : selected?.locationDetails || null),
       surfaceEvidence: meta.surfaceEvidence || (coordsChanged ? null : selected?.surfaceEvidence || null)
     };
+    coordinateInputsDirty = false;
     if (meta.focus) focusOnSelection(selected.lat, selected.lon);
     syncLegacyCustomState(selected);
     renderSelection();
@@ -320,7 +325,7 @@ function createGlobeSelector(options = {}) {
 
   async function reverseLookupPlace(lat, lon) {
     const requestToken = ++reverseLookupToken;
-    const cacheKey = `${Number(lat).toFixed(3)},${Number(lon).toFixed(3)}`;
+    const cacheKey = `${Number(lat)},${Number(lon)}`;
     const cached = reverseLookupCache.get(cacheKey);
     if (cached && selected && Math.abs(selected.lat - lat) <= 0.00001 && Math.abs(selected.lon - lon) <= 0.00001) {
       selected.name = cached.display;
@@ -340,11 +345,14 @@ function createGlobeSelector(options = {}) {
       return;
     }
     try {
-      const payload = await fetchReversePayload(lat, lon);
+      // Place naming is optional. Its outage must not suppress independent
+      // bathymetry evidence or block a verified offshore launch.
+      const payload = await fetchReversePayload(lat, lon).catch(() => null);
       if (!openState || requestToken !== reverseLookupToken || !selected) return;
       if (Math.abs(selected.lat - lat) > 0.00001 || Math.abs(selected.lon - lon) > 0.00001) return;
 
-      const parsed = parseReverseAddress(payload);
+      const parsed = parseReverseAddress(payload || {});
+      parsed.display ||= selected.name || `Remote Region ${lat.toFixed(2)}, ${lon.toFixed(2)}`;
       parsed.surfaceEvidence = await resolveCoordinateSurfaceEvidence(lat, lon, payload);
       parsed.waterKind = parsed.surfaceEvidence?.kind === 'open_ocean' ? 'open_ocean' : null;
       if (parsed.waterKind) {
@@ -545,6 +553,7 @@ function createGlobeSelector(options = {}) {
       if (moonBtn) moonBtn.disabled = isBusy;
       if (spaceBtn) spaceBtn.disabled = isBusy;
       if (oceanBtn) oceanBtn.disabled = isBusy;
+      const researchButton=document.getElementById('coralResearchStart');if(researchButton)researchButton.disabled=isBusy;
     },
     setStartButtonBusy,
     setStatus(message, color) {
@@ -571,20 +580,31 @@ function createGlobeSelector(options = {}) {
       }
       return Promise.resolve(false);
     }
-    setSelection(selected.lat, selected.lon, {
-      name: selected.name,
-      arrivalMode: 'boat'
-    });
-    if (typeof options.onOceanShortcut === 'function') {
-      recentPlaces = addRecentPlace(selected, recentPlaces);
+    const requestedSelection = selected;
+    const pendingResolution = selectionResolvePromise;
+    return launchCoordinator.startEnvironment(async (isCurrent) => {
+      await pendingResolution;
+      if (!isCurrent() || !openState || selected !== requestedSelection || coordinateInputsDirty) {
+        throw new Error('The selected location changed. Check the current point and press Ocean again.');
+      }
+      // URL/saved initial selections have no reverse-lookup promise. Check
+      // their depth on demand, and let an unknown/outage result be retried.
+      if (!requestedSelection.surfaceEvidence || !Number.isFinite(requestedSelection.surfaceEvidence.elevationMeters)) {
+        const evidence = await resolveCoordinateSurfaceEvidence(requestedSelection.lat, requestedSelection.lon);
+        if (!isCurrent() || !openState || selected !== requestedSelection || coordinateInputsDirty) {
+          throw new Error('The selected location changed. Check the current point and press Ocean again.');
+        }
+        requestedSelection.surfaceEvidence = evidence;
+      }
+      const decision = oceanEntryDecision(requestedSelection);
+      if (!decision.allowed) throw new Error(decision.reason);
+      if (typeof options.onOceanShortcut !== 'function') throw new Error('Ocean launch is unavailable.');
+      const launchSelection = { ...requestedSelection, arrivalMode: 'boat', oceanEntry: decision.entry };
+      recentPlaces = addRecentPlace(launchSelection, recentPlaces);
       favoriteRecentList = recentPlaces;
-      syncLegacyCustomState(selected);
-      return launchCoordinator.startEnvironment(
-        () => options.onOceanShortcut({ ...selected }),
-        'Ocean'
-      );
-    }
-    return triggerStartHere();
+      syncLegacyCustomState(launchSelection);
+      return options.onOceanShortcut(launchSelection);
+    }, 'Ocean');
   }
 
   function bindLiveEarthBridge() {
@@ -723,6 +743,18 @@ function createGlobeSelector(options = {}) {
   moonBtn?.addEventListener('click', () => void launchCoordinator.startEnvironment(options.onMoonShortcut, 'Moon'));
   spaceBtn?.addEventListener('click', () => void launchCoordinator.startEnvironment(options.onSpaceShortcut, 'Space'));
   oceanBtn?.addEventListener('click', () => void startSelectedOcean());
+  if(startBtn&&!document.getElementById('coralResearchStart')){
+    const researchButton=document.createElement('button');researchButton.id='coralResearchStart';researchButton.type='button';researchButton.textContent='Coral Shelf · first research outing';researchButton.style.cssText='margin-top:8px;width:100%;min-height:44px;font:600 12px system-ui;background:#112b3a;color:#e8f6ff;border:1px solid #5689a3;border-radius:4px;padding:10px';startBtn.after(researchButton);
+    researchButton.onclick=async()=>{
+      if(researchButton.disabled)return;researchButton.disabled=true;
+      try{setSelection(CORAL_SHELF_SITE.lat,CORAL_SHELF_SITE.lon,{name:'Coral Shelf research outing',focus:true});
+        beginReverseLookup(CORAL_SHELF_SITE.lat,CORAL_SHELF_SITE.lon);
+        if(await startSelectedOcean()&&appCtx.oceanMode?.active){if(await appCtx.transferSubmarineToBoat?.({source:'research-outing'})){appCtx.boatDeck?.enter();appCtx.boatDeck?.select('lab');}}
+      }catch{if(searchStatus)searchStatus.textContent='The research outing could not start. Your saved voyage is retained; try again.';}
+      finally{researchButton.disabled=false;}
+    };
+  }
+
   for (const coordinateInput of [latInput, lonInput]) {
     coordinateInput?.addEventListener('input', () => {
       coordinateInputsDirty = true;

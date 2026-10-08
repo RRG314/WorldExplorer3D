@@ -14,12 +14,13 @@ export function isExpectedTerrainProviderCancellation(url, reason) {
   if (reason !== 'net::ERR_ABORTED') return false;
   let parsed;
   try { parsed = new URL(url); } catch { return false; }
+  if (['http:','https:'].includes(parsed.protocol) && parsed.pathname === '/api/geospatial/marine' &&
+      ['127.0.0.1','localhost','worldexplorer3d.io','www.worldexplorer3d.io','worldexplorer3d-d9b83.web.app','we3d-staging-20260712.web.app'].includes(parsed.hostname)) return true;
   if (parsed.protocol !== 'https:') return false;
   if (isTerrainElevationTileUrl(url)) return true;
   if (parsed.origin === 'https://vector.openstreetmap.org') {
     return /^\/shortbread_v1\/\d+\/\d+\/\d+\.mvt$/.test(parsed.pathname);
   }
-  if (parsed.origin === 'https://marine-api.open-meteo.com') return parsed.pathname === '/v1/marine';
   return parsed.origin === 'https://planetarycomputer.microsoft.com' &&
     /^\/api\/data\/v1\/item\/bbox\/[\d.,-]+\/\d{1,3}x\d{1,3}\.npy$/.test(parsed.pathname) &&
     parsed.searchParams.get('collection') === 'esa-worldcover' &&

@@ -1,15 +1,17 @@
+import { mountCapabilityGuide } from './product/capability-guide.js?v=1';
 import { ctx as appCtx } from "./shared-context.js?v=55"; // ============================================================================
 // ui.js - UI setup, event binding, button handlers
 // ============================================================================
 import { captureEarthWorldSession, resumeEarthWorldSession } from "./earth-session.js?v=17";
 import { prepareTitleEnvironment } from "./planetary/entry.js?v=9";
-import { initMapInteractions } from "./ui/map-interactions.js?v=61";
+import { initMapInteractions } from "./ui/map-interactions.js?v=62";
 import { initMobileControls } from "./ui/mobile-controls.js?v=86";
 import { initShareUi } from "./ui/share-links.js?v=64";
 import { setupSettingsUi } from "./ui/settings.js?v=2";
 import { bindSpaceActions } from "./ui/space-actions.js?v=17";
-import { initTitleScreenUi } from "./ui/title-screen.js?v=119";
-import { commitEnvironment, exitCurrentEnvironmentSync } from './session-coordinator.js?v=2';
+import { initTitleScreenUi } from "./ui/title-screen.js?v=120";
+import { exitCurrentEnvironmentSync } from './session-coordinator.js?v=2';
+import { createEarthReturnAction } from './travel/earth-return.js';
 
 function emitTutorialEvent(eventName, payload = {}) {
   if (typeof appCtx.tutorialOnEvent === 'function') {
@@ -18,6 +20,7 @@ function emitTutorialEvent(eventName, payload = {}) {
 }
 
 function setupUI() {
+  mountCapabilityGuide();
   const LAST_LOCATION_STORAGE_KEY = 'worldExplorer3D.lastLocation.v1';
   const bindTouchFriendlyPress = (el, handler) => {
     if (!el || typeof handler !== 'function') return;
@@ -504,25 +507,14 @@ function setupUI() {
       await appCtx.showTransitionLoad('ocean', 900);
     }
     if (typeof appCtx.startOceanMode === 'function') {
-      appCtx.startOceanMode();
+      await appCtx.startOceanMode();
     }
     updateControlsModeUI();
   };
 
-  const switchToEarthMode = async () => {
-    const comingFromOcean = !!(appCtx.oceanMode && appCtx.oceanMode.active);
-    exitCurrentEnvironmentSync(appCtx.ENV.EARTH, { source: 'earth_menu' });
-
-    if (comingFromOcean) {
-      await resumeEarthWorldSession({
-        transitionDurationMs: 700
-      });
-    } else if (appCtx.ENV?.EARTH) {
-      commitEnvironment(appCtx.ENV.EARTH, { source: 'earth_menu' });
-    }
-
-    updateControlsModeUI();
-  };
+  const switchToEarthMode = createEarthReturnAction({ctx:appCtx,
+    exitEnvironment:exitCurrentEnvironmentSync,resumeEarth:resumeEarthWorldSession});
+  appCtx.returnToEarthFromMenu = switchToEarthMode;
 
   if (oceanModeMenuItem) {
     oceanModeMenuItem.addEventListener('click', async () => {
@@ -676,7 +668,7 @@ function setupUI() {
     if (appCtx.handleUrbanCustodyContinue?.() === true) return;
     appCtx.spawnOnRoad();
   });
-  document.getElementById('againBtn').addEventListener('click', () => {appCtx.hideResult();appCtx.setPauseReason?.('game_result', false);appCtx.startMode();});
+  document.getElementById('againBtn').addEventListener('click', () => {appCtx.replayGameResult?.();});
   document.getElementById('freeBtn').addEventListener('click', () => {
     appCtx.hideResult();
     appCtx.setPauseReason?.('game_result', false);

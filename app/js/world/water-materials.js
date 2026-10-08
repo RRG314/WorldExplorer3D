@@ -46,6 +46,7 @@ function getWaterOpticsSnapshot() {
 
 export function registerWaterWaveMaterial(material, options = {}) {
   if (!material || material.userData?.weWaterWavePatched || typeof THREE === 'undefined') return material;
+  material.side = THREE.DoubleSide;
   const waveScale = Number.isFinite(options.waveScale) ? options.waveScale : 1;
   const waveBase = Number.isFinite(options.waveBase) ? options.waveBase : 1;
   const visualBase = Number.isFinite(options.visualBase) ? options.visualBase : 1;
@@ -65,6 +66,7 @@ export function registerWaterWaveMaterial(material, options = {}) {
   material.userData.weWaterWaveConfig = {
     waveScale,
     waveBase,
+    waterBody: options.waterBody || null,
     visualBase,
     foamBase,
     edgeFade,
@@ -96,6 +98,7 @@ export function registerWaterWaveMaterial(material, options = {}) {
   // A later compile must not leave a cached lighting variant with stale waves.
   const uniforms = {};
   uniforms.weWaveTime = { value: 0 };
+  uniforms.weWaveOrigin = { value: new THREE.Vector2(0, 0) };
   uniforms.weWaveAmplitude = { value: 0 };
   uniforms.weWaveSecondaryAmplitude = { value: 0 };
   uniforms.weWaveSwellAmplitude = { value: 0 };
@@ -124,7 +127,7 @@ export function registerWaterWaveMaterial(material, options = {}) {
     material.userData.weWaterWaveShader = shader;
 
     shader.vertexShader = shader.vertexShader
-      .replace('#include <common>', `#include <common>\n${shaderLibrary}`)
+      .replace('#include <common>', `#include <common>\n${shaderLibrary}\nuniform vec2 weWaveOrigin;`)
       .replace(
         '#include <begin_vertex>',
         `vec3 transformed = vec3(position);
@@ -136,23 +139,23 @@ vWePatchUv = uv;
 #else
 vWePatchUv = vec2(0.5);
 #endif
-transformed.y += weWaveField(weWorldPos.xz);`
+transformed.y += weWaveField(weWorldPos.xz + weWaveOrigin);`
       );
 
     shader.fragmentShader = shader.fragmentShader
-      .replace('#include <common>', `#include <common>\n${shaderLibrary}`)
+      .replace('#include <common>', `#include <common>\n${shaderLibrary}\nuniform vec2 weWaveOrigin;`)
       .replace(
         '#include <normal_fragment_maps>',
         `#include <normal_fragment_maps>
-vec3 weAnalyticWaterNormalView = normalize(mat3(viewMatrix) * weWaveWorldNormal(vWeWaveWorldXZ, weWaterNormalStrength));
+vec3 weAnalyticWaterNormalView = normalize(mat3(viewMatrix) * weWaveWorldNormal(vWeWaveWorldXZ + weWaveOrigin, weWaterNormalStrength));
 normal = normalize(mix(normal, weAnalyticWaterNormalView, clamp(weWaterNormalStrength, 0.0, 1.0)));`
       )
       .replace(
         'vec4 diffuseColor = vec4( diffuse, opacity );',
         `vec4 diffuseColor = vec4( diffuse, opacity );
-float weWaveHeight = weWaveField(vWeWaveWorldXZ);
-float weWaveCrestValue = weWaveCrest(vWeWaveWorldXZ);
-vec3 weOpticalNormal = weWaveWorldNormal(vWeWaveWorldXZ, weWaterNormalStrength);
+float weWaveHeight = weWaveField(vWeWaveWorldXZ + weWaveOrigin);
+float weWaveCrestValue = weWaveCrest(vWeWaveWorldXZ + weWaveOrigin);
+vec3 weOpticalNormal = weWaveWorldNormal(vWeWaveWorldXZ + weWaveOrigin, weWaterNormalStrength);
 vec3 weViewDirection = normalize(cameraPosition - vWeWaveWorldPosition);
 float weViewFacing = clamp(dot(weOpticalNormal, weViewDirection), 0.0, 1.0);
 float weFresnel = 0.02 + 0.98 * pow(1.0 - weViewFacing, 5.0);
@@ -176,6 +179,7 @@ diffuseColor.rgb += vec3(0.045, 0.062, 0.078) * (weFoamBands * 0.4 + weWhitecapB
 diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.88, 0.93, 0.98), clamp(weWhitecapBands * 0.18, 0.0, 0.22));
 // WE_WATER_COLOR_EXTENSION
 diffuseColor.rgb *= mix(1.0, 0.58, clamp(weWaterNight, 0.0, 1.0));
+if (!gl_FrontFacing) diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.025, 0.12, 0.16), 0.75);
 if (weWaveEdgeFade > 0.0) {
   float weEdge = min(min(vWePatchUv.x, 1.0 - vWePatchUv.x), min(vWePatchUv.y, 1.0 - vWePatchUv.y));
   float wePatchMask = smoothstep(0.0, weWaveEdgeFade, weEdge);
@@ -197,8 +201,10 @@ totalEmissiveRadiance += vec3(0.018, 0.026, 0.034) * (weFoamBands * 0.22 + weWhi
     }
   };
 
-  if (Array.isArray(appCtx.waterWaveVisuals)) appCtx.waterWaveVisuals.push(material);
-  else appCtx.replaceWorldCollection('waterWaveVisuals', [material]);
+  if (options.track !== false) {
+    if (Array.isArray(appCtx.waterWaveVisuals)) appCtx.waterWaveVisuals.push(material);
+    else appCtx.replaceWorldCollection('waterWaveVisuals', [material]);
+  }
   material.needsUpdate = true;
   return material;
 }

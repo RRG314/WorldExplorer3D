@@ -232,7 +232,7 @@ function buildTunnelShellMeshForContext(appCtx, shellDescriptors = []) {
       }
     }
     // The solid is the enclosure, not an overlay on the old independent tubes.
-    if (!solid) {
+    if (!solid && !shell.approachOnly) {
     for (const ring of rings) {
       const nx = -Number(ring.tangentZ || 0);
       const nz = Number(ring.tangentX || 0);
@@ -335,6 +335,8 @@ function buildTunnelShellMeshForContext(appCtx, shellDescriptors = []) {
       }
       for (let ringIndex = 0; ringIndex < approachRings.length - 1; ringIndex += 1) {
         for (let sideIndex = 0; sideIndex < 2; sideIndex += 1) {
+          const distance=(approachRings[ringIndex].distance+approachRings[ringIndex+1].distance)*.5;
+          if(tunnelWallIsOpen(shell,sideIndex===0?-1:1,distance))continue;
           const a = approachBase + ringIndex * 4 + sideIndex * 2;
           const b = a + 1;
           const c = a + 4;

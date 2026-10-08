@@ -1,13 +1,14 @@
+import { createPublicCameraState, loadPublicCameras, stopPublicCamera } from './public-camera-ui.js';
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { resolveObservedEarthLocation, haversineKm } from "../earth-location.js?v=2";
 import { getWeatherSnapshotForLocation } from "../weather.js?v=12";
-import { getWeatherSampleSnapshots } from "./weather-samples.js?v=2";
+import { getWeatherSampleSnapshots, ensureSelectedWeather } from "./weather-samples.js?v=2";
 import { aircraftService } from "../geospatial/aircraft.js?v=1";
 import { marineService } from "../geospatial/marine.js?v=2";
 import { streetImageryService } from "../geospatial/street-imagery.js?v=1";
 import { cameraAt, loadDeFlockGlobeIndex, nearestCamera } from "../deflock/globe-index.js?v=1";
 import { loadSurveillanceFeatures } from "../deflock/source.js?v=7";
-import { createMarineState, ensureSelectedMarineData } from "./marine-state.js?v=1";
+import { createMarineState, ensureSelectedMarineData, cancelSelectedMarineData } from "./marine-state.js?v=1";
 import { LIVE_EARTH_CATEGORIES, LIVE_EARTH_LAYERS, getLiveEarthLayer } from "./registry.js?v=11";
 import { getSatelliteLookAngles, getSatelliteSnapshot, getSatelliteTrack, refreshSatelliteCatalog } from "./satellites.js?v=6";
 import { buildEarthquakeReplayProfile, refreshEarthquakes } from "./earthquakes.js?v=2";
@@ -88,7 +89,8 @@ function buildLiveEarthState() {
   return {
     ready: true,
     panelMode: 'explore',
-    activeCategoryId: LIVE_EARTH_CATEGORIES[0].id,
+    activeCategoryId: 'overview',
+    publicCamera: createPublicCameraState(),
     activeLayerId: 'overview',
     satelliteFilter: 'all',
     selectedSatelliteId: '',
@@ -190,6 +192,7 @@ function buildLiveEarthModuleContext() {
     ensureSatellitePositions,
     ensureShipTrafficData,
     ensureStreetImagery,
+    ensurePublicCameras: loadPublicCameras,
     ensureWeatherSamples,
     filteredSatelliteItems,
     getLiveEarthLayer,
@@ -402,22 +405,8 @@ async function ensureWeatherSamples(state, force = false) {
   return samples;
 }
 
-async function ensureSelectionWeather(state, force = false) {
-  const selected = selectorSelection(state);
-  if (!Number.isFinite(selected?.lat) || !Number.isFinite(selected?.lon)) {
-    state.selectionWeather = null;
-    return null;
-  }
-  const current = state.selectionWeather;
-  if (!force && current && Math.abs(current.lat - selected.lat) < 0.01 && Math.abs(current.lon - selected.lon) < 0.01) {
-    return current;
-  }
-  try {
-    state.selectionWeather = await getWeatherSnapshotForLocation(selected.lat, selected.lon, { force });
-  } catch {
-    state.selectionWeather = null;
-  }
-  return state.selectionWeather;
+function ensureSelectionWeather(state, force = false) {
+  return ensureSelectedWeather({selectorSelection,getWeatherSnapshotForLocation},state,force);
 }
 
 async function ensureMarineData(state, force = false) {
@@ -550,7 +539,7 @@ async function ensureAircraftTrafficData(state, force = false) {
     try {
       const result = await aircraftService.search({ lat, lon, radiusKm: 160, limit: 80 }, { force });
       if (result.items.length) {
-        const providerLabel = result.items[0]?.dataSource === 'adsb-lol' ? 'ADSB.lol' : 'OpenSky';
+        const providerLabel = 'ADSB.lol';
         state.aircraftRoutes = [];
         state.aircraftItems = result.items.map((item) => ({
           ...item,
@@ -560,9 +549,9 @@ async function ensureAircraftTrafficData(state, force = false) {
           routeLabel: `${providerLabel} observation`,
           routeSummary: `Current aircraft state vector observed by ${providerLabel}.`,
           region: `${item.distanceKm} km from selected point`,
-          speedKt: item.velocityKt || 0,
+          speedKt: item.velocityKt,
           progressPct: null,
-          meta: `${item.onGround ? 'On ground' : `${Math.round(item.altitudeM || 0).toLocaleString()} m`} • ${item.velocityKt ?? '--'} kt`
+          meta: `${item.onGround ? 'On ground' : item.altitudeM == null ? 'Altitude unavailable' : `${Math.round(item.altitudeM).toLocaleString()} m`} • ${item.velocityKt ?? '--'} kt`
         }));
         state.aircraftLoadedAt = now;
         state.aircraftQueryKey = queryKey;
@@ -702,6 +691,7 @@ function resetSelectorVisuals(state) {
     satelliteGroup: null,
     earthquakeGroup: null,
     weatherGroup: null,
+    publicCameraGroup: null,
     deFlockGroup: null,
     deFlockPointGroup: null,
     deFlockSelectionGroup: null,
@@ -716,6 +706,7 @@ function resetSelectorVisuals(state) {
 function initLiveEarth() {
   if (appCtx.liveEarth?.ready) return appCtx.liveEarth;
   const state = buildLiveEarthState();
+  document.addEventListener('visibilitychange',()=>{if(document.hidden){stopPublicCamera(state);cancelSelectedMarineData(state);}else if(state.selector.api?.isOpen?.()&&state.activeLayerId==='public-cameras'&&state.panelMode==='live-earth')void loadPublicCameras(buildLiveEarthModuleContext(),state);});
 
   const liveEarth = {
     ready: true,
@@ -732,6 +723,8 @@ function initLiveEarth() {
       refreshForOpenSelector(buildLiveEarthModuleContext(), state);
     },
     onSelectorClose() {
+      stopPublicCamera(state);
+      cancelSelectedMarineData(state);
       state.deFlockResolveToken += 1;
       resetSelectorVisuals(state);
     },
@@ -777,6 +770,7 @@ function initLiveEarth() {
         aircraft: state.aircraftItems.length,
         aircraftSourceMode: state.aircraftSourceMode,
         streetImagery: state.streetImageryItems.length,
+        publicCameras: {indexed:state.publicCamera.items.length,selectedId:state.publicCamera.selectedId,verifiedImages:state.publicCamera.verified.size,loading:state.publicCamera.loading,error:state.publicCamera.error,mode:'still',coverage:state.publicCamera.providerId==='caltrans'?'California districts 3 and 4':'Finland',wallViews:state.publicCamera.wall.length,wallOpen:state.publicCamera.wallOpen,favorites:state.publicCamera.favorites.length},
         deFlockCameras: state.deFlockIndex?.count || 0,
         localEventId: state.localEvent?.id || '',
         selectedSatelliteId: state.selectedSatelliteId || '',
@@ -814,8 +808,8 @@ function initLiveEarth() {
         } : null,
         selectionWeather: state.selectionWeather ? {
           conditionLabel: state.selectionWeather.conditionLabel || '',
-          temperatureF: Number(state.selectionWeather.temperatureF || 0),
-          cloudCover: Number(state.selectionWeather.cloudCover || 0)
+          temperatureF: state.selectionWeather.temperatureF ?? null,
+          cloudCover: state.selectionWeather.cloudCover ?? null
         } : null
       };
     }

@@ -202,13 +202,28 @@ function pedestrianSegmentAllowed(segment) {
   return pedestrianSegmentMode(segment) !== '';
 }
 
+// Give each authored playable district a contiguous neighborhood before the
+// finite edge budget is exhausted by the origin. This changes priority only;
+// source eligibility, pavement checks and graph limits still own every edge.
+export function prioritizePedestrianNeighborhoods(segments, focuses=[]) {
+  const points=[{x:0,z:0},...focuses.filter(p=>Number.isFinite(p?.x)&&Number.isFinite(p?.z)).slice(0,3)];
+  if(points.length===1)return segments;
+  const queues=points.map(p=>[...segments].sort((a,b)=>{
+    const d=s=>Math.hypot((s.p1.x+s.p2.x)*.5-p.x,(s.p1.z+s.p2.z)*.5-p.z);
+    return d(a)-d(b);
+  }));
+  const used=new Set(),ordered=[];
+  for(let i=0;i<segments.length;i++)for(const queue of queues){const s=queue[i];if(s&&!used.has(s)){used.add(s);ordered.push(s)}}
+  return ordered;
+}
+
 export function compilePedestrianGraph(options = {}) {
   const tier = String(options.tier || 'balanced').toLowerCase();
   const budget = GRAPH_BUDGET_BY_TIER[tier] || GRAPH_BUDGET_BY_TIER.balanced;
   const traversalSegments = Array.isArray(options.traversal?.segments) ? options.traversal.segments : [];
-  const sourceSegments = traversalSegments
+  const sourceSegments = prioritizePedestrianNeighborhoods(traversalSegments
     .filter((segment) => segment?.p1 && segment?.p2 && pedestrianSegmentAllowed(segment) && segmentPriority(segment) <= 900)
-    .sort((a, b) => segmentPriority(a) - segmentPriority(b));
+    .sort((a, b) => segmentPriority(a) - segmentPriority(b)),options.neighborhoodFocuses);
   const store = makeNodeStore();
   const edges = [];
   const runtimeFeatureByEdge = new Map();

@@ -1,9 +1,11 @@
+import { readAcceptanceClasses, acceptanceReleaseDecision } from './acceptance-classes.mjs';
 import { promotedEvidenceIdentity } from './production-promotion.mjs';
 import assert from 'node:assert/strict';
 import { access, readFile } from 'node:fs/promises';
 import {
   compareEvidenceToBaseline,
   currentBaseline,
+  currentArtifactIdentity,
   readExecutionEvidence
 } from './execution-evidence.mjs';
 
@@ -19,7 +21,7 @@ const failures = [];
 const expectedIds = Array.from({ length: 12 }, (_, index) => `CP${index}`);
 const checkpointIds = Object.keys(program.checkpoints || {});
 
-if (program.schemaVersion !== 4) failures.push('schemaVersion must be 4');
+if (program.schemaVersion !== 5) failures.push('schemaVersion must be 5');
 if (program.targetVersion !== packageJson.version) failures.push(`targetVersion must match package version ${packageJson.version}`);
 if (!/^\d+\.\d+\.\d+$/.test(program.productionBaseline?.version || '')) failures.push('production baseline version must use semantic versioning');
 if (!/^[0-9a-f]{40}$/.test(program.productionBaseline?.releaseCommit || '')) failures.push('production baseline release commit must be a full Git commit');
@@ -51,10 +53,14 @@ if (program.statusAuthority !== 'current-execution-evidence') failures.push('sta
 const scopes = Array.isArray(program.requiredExecutionScopes) ? program.requiredExecutionScopes : [];
 if (JSON.stringify(scopes) !== JSON.stringify(['candidate', 'backend'])) failures.push('candidate and backend execution scopes are required');
 const current = currentBaseline(root);
+const artifact = promotedIdentity || currentArtifactIdentity(root);
+const acceptanceClasses = readAcceptanceClasses(root, { artifact, baseline: current });
+const acceptanceDecision = acceptanceReleaseDecision(acceptanceClasses, program.requiredAcceptanceClasses, program.deferredAcceptanceClasses);
+failures.push(...acceptanceDecision.failures);
 const evidenceByScope = Object.fromEntries(scopes.map((scope) => [scope, readExecutionEvidence(root, scope)]));
 const evidenceFailures = Object.fromEntries(scopes.map((scope) => [
   scope,
-  compareEvidenceToBaseline(evidenceByScope[scope], current, scope, promotedIdentity)
+  compareEvidenceToBaseline(evidenceByScope[scope], current, scope, artifact)
 ]));
 const passedGateIds = new Set(scopes.flatMap((scope) =>
   (evidenceByScope[scope]?.results || []).filter((result) => result.ok).map((result) => result.id)
@@ -69,16 +75,22 @@ for (const id of expectedIds) {
   }
   missingExecutionGates[id] = required.filter((gateId) => !passedGateIds.has(gateId));
 }
-const complete = expectedIds.filter((id) => missingExecutionGates[id]?.length === 0);
+const recordedComplete = expectedIds.filter((id) => missingExecutionGates[id]?.length === 0);
 const evidenceCurrent = Object.values(evidenceFailures).every((entries) => entries.length === 0);
-const releaseReady = failures.length === 0 && evidenceCurrent && complete.length === expectedIds.length;
+const complete = evidenceCurrent ? recordedComplete : [];
+const automatedReady = failures.length === 0 && evidenceCurrent && complete.length === expectedIds.length;
+const releaseReady = automatedReady && acceptanceDecision.ready;
 const report = {
   ok: failures.length === 0 && (!requireReady || releaseReady),
-  contract: 'world-explorer-release-scope-v1',
+  contract: 'world-explorer-release-scope-v2',
   targetVersion: program.targetVersion,
   productionBaseline: program.productionBaseline,
   structurallyValid: failures.length === 0,
   releaseReady,
+  automatedReady,
+  acceptanceClasses,
+  unverifiedAcceptanceClasses: acceptanceDecision.unverified,
+  deferredAcceptanceClasses: program.deferredAcceptanceClasses || {},
   currentBaseline: current,
   evidenceCurrent,
   evidenceFailures,

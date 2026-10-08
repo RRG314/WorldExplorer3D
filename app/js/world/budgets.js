@@ -1,6 +1,11 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
 
 const FEATURE_TILE_DEGREES = 0.002;
+// Coverage is independent of rendering quality. The former scaled 26k cap
+// removed nearly half of a normal Baltimore district before LOD/batching.
+// Keep an explicit source safety ceiling; detailed meshes remain limited to
+// the close 300-unit ring and the rest use the existing batched presentation.
+const MAX_DISTRICT_BUILDING_FEATURES = 96000;
 
 const runtime = {
   getPerfModeValue: () => 'baseline',
@@ -258,7 +263,7 @@ export function getAdaptiveLoadProfile(
     featureRadiusScale: clampNumber(1.0 * radiusScale, 0.90, 1.02, 1),
     poiRadiusScale: clampNumber(1.0 * radiusScale, 0.88, 1.02, 1),
     maxRoadWays: scaledInt(20000, scale, 3200),
-    maxBuildingWays: scaledInt(26000, scale, 7000),
+    maxBuildingWays: MAX_DISTRICT_BUILDING_FEATURES,
     maxLanduseWays: scaledInt(15000, scale, 2200),
     maxPoiNodes: scaledInt(8000, scale, 1200),
     tileBudgetCfg: {

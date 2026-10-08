@@ -287,7 +287,7 @@ function navigationSurfaceY(x, z, mode = 'drive') {
 function routePointsToWorldVectors(points, mode = 'drive') {
   return points.map((point) => {
     const baseY = navigationSurfaceY(point.x, point.z, mode);
-    return new THREE.Vector3(point.x, baseY + 2.3, point.z);
+    return new THREE.Vector3(point.x, baseY + (mode === 'walk' ? .22 : 2.3), point.z);
   });
 }
 
@@ -319,7 +319,7 @@ export function createNavigationRoute(fromX, fromZ, toX, toZ, forceRebuild = fal
 
   const curve = new THREE.CatmullRomCurve3(worldPoints);
   const tubularSegments = Math.max(24, (worldPoints.length - 1) * 10);
-  const tubeGeometry = new THREE.TubeGeometry(curve, tubularSegments, 0.3, 8, false);
+  const tubeGeometry = new THREE.TubeGeometry(curve, tubularSegments, navMode === 'walk' ? .09 : .3, 8, false);
   const tubeMaterial = new THREE.MeshBasicMaterial({
     color: 0x00ff88,
     transparent: true,

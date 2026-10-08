@@ -4,6 +4,16 @@ import { resolveUniverseAddress } from './catalog.js?v=11';
 import { DEFAULT_CREW } from '../expedition/catalog.js?v=2';
 import { createExpeditionStore } from '../expedition/store.js?v=12';
 
+import { canAnalyzeDestination, canResumeDestinationSurvey, planetarySurveyEquipment } from './mission-progression.js?v=1';
+
+let analysisPending = false;
+let equipmentLedger = null;
+let equipmentSnapshot = null;
+function surveyEquipment() {
+  const ledger = missionStore?.load();
+  if (ledger !== equipmentLedger || !equipmentSnapshot) { equipmentLedger = ledger; equipmentSnapshot = planetarySurveyEquipment(ledger); }
+  return equipmentSnapshot;
+}
 let activeContext = null;
 let missionStore = null;
 let scanTimer = 0;
@@ -13,7 +23,7 @@ const SURFACE_EVIDENCE = Object.freeze(['photograph', 'geology-inspect', 'habita
 const THERMAL_ORBIT_EVIDENCE = Object.freeze(['dayside', 'terminator', 'nightside']);
 const ANALYSIS_OUTCOMES = Object.freeze([
   Object.freeze({ id: 'cautious-baseline', label: 'Publish a cautious baseline', points: 30, requiresScienceLead: false }),
-  Object.freeze({ id: 'priority-follow-up', label: 'Mark a priority return site', points: 40, requiresScienceLead: true })
+  Object.freeze({ id: 'priority-follow-up', label: 'Recommend a follow-up survey', points: 40, requiresScienceLead: true })
 ]);
 const SURFACE_MISSION_PLANS = Object.freeze({
   'trappist-1-e': Object.freeze([
@@ -97,7 +107,7 @@ function analysisOutcomeOptions(mission, state = missionStore?.get?.(mission)) {
     crewLeadId: outcome.requiresScienceLead ? scienceLead?.id || null : scienceLead?.id || null,
     crewLeadName: scienceLead?.name || null,
     consequence: outcome.id === 'priority-follow-up'
-      ? `${mission.destinationName} remains marked for a higher-value return survey.`
+      ? `${mission.destinationName} has a follow-up recommendation recorded in the report.`
       : `${mission.destinationName} is recorded as a bounded baseline with unresolved questions preserved.`
   }));
 }
@@ -250,6 +260,7 @@ function closeDestinationMission() {
 function missionAtDestination(mission) {
   const universe = activeContext?.universeRuntime;
   if (!mission || !universe || universe.transition) return false;
+  if (canResumeDestinationSurvey(activeContext, mission)) return true;
   if (activeContext?.activePlanetaryBodyId === mission.destinationId) return true;
   if (mission.scope === 'system') return universe.current?.id === mission.destinationId;
   if (mission.scope === 'planet') {
@@ -322,11 +333,11 @@ function renderDestinationMission(destinationId = '') {
     action = '<button type="button" class="universe-action" disabled>Mission recorded in the Captain’s Log</button>';
   }
   const completion = state.phase === DESTINATION_MISSION_PHASE.COMPLETE && state.returnConsequence
-    ? `<div class="destination-mission-current"><span>RETURN CONSEQUENCE</span><strong>${state.returnConsequence}</strong>${state.crewLeadId ? `<small>Analysis led by ${crewNameForId(state.crewLeadId) || 'the Solis Reach science team'}</small>` : ''}</div>`
+    ? `<div class="destination-mission-current"><span>RETURN CONSEQUENCE</span><strong>${state.returnConsequence}</strong>${requiresSurfaceMission(mission) ? '<small>Field Link II installed on this device · remote stations: 30 m · samples: 18 m.</small>' : ''}${state.crewLeadId ? `<small>Analysis led by ${crewNameForId(state.crewLeadId) || 'the Solis Reach science team'}</small>` : ''}</div>`
     : '';
   panel.innerHTML = `<article class="destination-mission-card" role="dialog" aria-modal="true" aria-labelledby="destinationMissionTitle">
     <header><div><span>DESTINATION MISSION · ${mission.destinationName}</span><h2 id="destinationMissionTitle">${mission.title}</h2></div><button type="button" class="universe-icon-button" data-mission-close aria-label="Close mission">×</button></header>
-    <p>${mission.premise}</p>${evidence}
+    <p>${mission.premise}</p>${requiresSurfaceMission(mission) ? '<p>Complete the fieldwork, return in the same pod, and publish at the Analysis Lab. Your first completed surface report installs Field Link II: operate photo and environment stations within 30 m instead of 18 m on future worlds. Local device progress.</p>' : ''}${evidence}
     <div class="destination-mission-current"><span>CURRENT OBJECTIVE</span><strong>${phaseObjective(mission, state)}</strong></div>${completion}
     <ol>${stageRows}</ol>
     <div class="destination-mission-actions">${action}</div>
@@ -436,19 +447,21 @@ function performDestinationMissionFieldwork() {
 }
 
 async function completeDestinationMissionAnalysis(outcomeId = 'cautious-baseline') {
+  if (analysisPending) return false;
+  analysisPending = true;
+  try { return await commitDestinationMissionAnalysis(outcomeId); }
+  catch { activeContext?.showToast?.('Report could not be saved. Your field evidence is retained; retry in the Analysis Lab.'); return false; }
+  finally { analysisPending = false; }
+}
+
+async function commitDestinationMissionAnalysis(outcomeId) {
   const mission = currentDefinition();
-  if (!mission || !missionStore || missionStore.get(mission).phase !== DESTINATION_MISSION_PHASE.ANALYSIS) return false;
-  const outcome = analysisOutcomeOptions(mission).find((entry) => entry.id === String(outcomeId || ''));
+  if (!mission || !missionStore || missionStore.get(mission).phase !== DESTINATION_MISSION_PHASE.ANALYSIS || !canAnalyzeDestination(activeContext, mission)) return false;
+  const pendingOutcome = missionStore.get(mission).evidence.find(id => id.startsWith('analysis:'))?.slice(9);
+  const outcome = analysisOutcomeOptions(mission).find((entry) => entry.id === String(pendingOutcome || outcomeId || ''));
   if (!outcome?.available) return false;
   missionStore.recordEvidence(mission, `analysis:${outcome.id}`, { evidenceId: `${mission.id}:analysis:${outcome.id}` });
-  const result = missionStore.advance(mission, 'complete_analysis', {
-    evidenceId: `${mission.id}:analysis:${outcome.id}`,
-    outcomeId: outcome.id,
-    crewLeadId: outcome.crewLeadId,
-    returnConsequence: outcome.consequence
-  });
-  if (!result.accepted) return false;
-  await recordDestinationExplorerEvent({
+  const saved = await recordDestinationExplorerEvent({
     eventId: `event:destination-mission:${mission.destinationId}`,
     eventType: 'destination-mission-complete',
     sourceSystem: 'destination-missions',
@@ -462,8 +475,20 @@ async function completeDestinationMissionAnalysis(outcomeId = 'cautious-baseline
     environment: 'SPACE_FLIGHT',
     points: outcome.points,
     firstCompletion: true,
-    projections: { journal: true, profile: true, place: false, fieldGuide: true }
+    projections: { journal: true, profile: true, place: false, fieldGuide: true },
+    metadata: { missionId: mission.id, outcomeId: outcome.id, truthType: 'authored' }
   });
+  const confirmed = saved?.event?.sourceSystem === 'destination-missions' && saved.event.eventType === 'destination-mission-complete'
+    && (saved.recorded === true || saved.reason === 'already-recorded')
+    && (!saved.event.metadata?.outcomeId || saved.event.metadata.outcomeId === outcome.id);
+  if (!confirmed) return false;
+  const result = missionStore.advance(mission, 'complete_analysis', {
+    evidenceId: `${mission.id}:analysis:${outcome.id}`,
+    outcomeId: outcome.id,
+    crewLeadId: outcome.crewLeadId,
+    returnConsequence: outcome.consequence
+  });
+  if (!result.accepted) return false;
   globalThis.dispatchEvent?.(new CustomEvent('we3d:destination-mission-complete', {
     detail: {
       missionId: mission.id,
@@ -475,7 +500,8 @@ async function completeDestinationMissionAnalysis(outcomeId = 'cautious-baseline
       points: outcome.points
     }
   }));
-  activeContext?.showToast?.(`${mission.title} completed · ${outcome.label}.`);
+  const equipment = planetarySurveyEquipment(missionStore.load());
+  activeContext?.showToast?.(`${mission.title} saved · ${equipment.earned ? 'Field Link II: photo and environment stations now work within 30 m on future worlds.' : outcome.label}`);
   return true;
 }
 
@@ -499,6 +525,8 @@ function destinationMissionSnapshot() {
       lifeEvidence: mission.habitability.lifeEvidence
     } : null,
     evidence: [...state.evidence],
+    equipment: surveyEquipment(),
+    fieldRecords: requiresSurfaceMission(mission) ? surfaceEvidencePlan(mission).filter(entry => state.evidence.includes(entry.evidenceId)).map(entry => ({ label:entry.label, description:entry.description })) : [],
     outcomeId: state.outcomeId,
     crewLeadId: state.crewLeadId,
     returnConsequence: state.returnConsequence,
@@ -521,6 +549,7 @@ function initDestinationMissionRuntime(appContext) {
   if (activeContext) Object.assign(activeContext, {
     completeDestinationMissionAnalysis,
     getDestinationMissionSnapshot: destinationMissionSnapshot,
+    getPlanetarySurveyEquipment: surveyEquipment,
     isDestinationMissionSurfaceTarget,
     openDestinationMission,
     prepareDestinationMissionSurface,

@@ -32,3 +32,9 @@ test('planetary frames update shared stars and the cached atmosphere without sce
   for(const env of ['moon','mars','planetary']){setEnv(env);updatePlanetarySky();}
   assert.deepEqual(counts(),{lookups:1,starMoves:3,domeMoves:3});
 }));
+
+
+test('explicit daylight exposure hides stars on known bodies and later night entry restores them',()=>fixture(()=>{
+ setPlanetarySky('moon',new Date(),{starOpacity:.02});assert.equal(ctx.starField.visible,false);
+ setPlanetarySky('moon',new Date(),{starOpacity:.9});assert.equal(ctx.starField.visible,true);
+}));

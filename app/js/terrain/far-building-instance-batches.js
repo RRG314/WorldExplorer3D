@@ -1,12 +1,14 @@
 // Preserve every regional building while allowing the renderer to reject
-// off-screen groups. Instance transforms remain in the original world frame.
+// off-screen groups. Each cell keeps small GPU transforms; its double-precision
+// Object3D position carries the world offset into the camera-relative matrix.
 export function partitionFarBuildingInstances(buildings, cellSize = 2048) {
   if (!(cellSize > 0) || !Number.isFinite(cellSize)) throw new TypeError('Invalid building batch size');
   const buckets = new Map();
+  const scratch={color:[0,0,0]};
   for (let index = 0; index < buildings.length; index++) {
-    const { x, z } = buildings[index];
+    const { x, z, roofFraction = 0 } = buildings.read ? buildings.read(index,scratch) : buildings[index];
     if (!Number.isFinite(x) || !Number.isFinite(z)) throw new TypeError('Invalid building position');
-    const key = `${Math.floor(x / cellSize)}:${Math.floor(z / cellSize)}`;
+    const key = `${Math.floor(x / cellSize)}:${Math.floor(z / cellSize)}` + (roofFraction > 0 ? `:g${Math.round(roofFraction*20)}` : '');
     if (!buckets.has(key)) buckets.set(key, []);
     buckets.get(key).push(index);
   }
@@ -37,7 +39,8 @@ function preserveInstanceRaycasting(mesh, localBox, localSphere, sourceIndices) 
 
 export async function buildFarBuildingInstanceBatches(THREE, buildings, material, {
   cellSize = 2048,
-  yieldControl = async () => {}
+  yieldControl = async () => {},
+  now = () => performance.now()
 } = {}) {
   const buckets = partitionFarBuildingInstances(buildings, cellSize);
   const batches = [];
@@ -48,11 +51,25 @@ export async function buildFarBuildingInstanceBatches(THREE, buildings, material
   const color = new THREE.Color();
   const up = new THREE.Vector3(0, 1, 0);
   const transformedBox = new THREE.Box3();
+  const scratch={color:[0,0,0]};
   let completed = 0;
+  let sliceStarted = now();
   try {
     for (const [key, indices] of buckets) {
-      const geometry = new THREE.BoxGeometry(1, 1, 1);
-      geometry.translate(0, .5, 0);
+      const [cellX, cellZ] = key.split(':').map(Number);
+      const originX = cellX * cellSize, originZ = cellZ * cellSize;
+      const roofFraction = key.includes(':g') ? Number(key.split(':g')[1]) / 20 : 0;
+      let geometry;
+      if (roofFraction > 0) {
+        const wall = 1 - roofFraction, shape = new THREE.Shape();
+        shape.moveTo(-.5,0); shape.lineTo(.5,0); shape.lineTo(.5,wall);
+        shape.lineTo(0,1); shape.lineTo(-.5,wall); shape.closePath();
+        geometry = new THREE.ExtrudeGeometry(shape,{depth:1,bevelEnabled:false,steps:1});
+        geometry.translate(0,0,-.5);
+      } else {
+        geometry = new THREE.BoxGeometry(1, 1, 1);
+        geometry.translate(0, .5, 0);
+      }
       geometry.computeBoundingBox();
       geometry.computeBoundingSphere();
       const localBox = geometry.boundingBox;
@@ -60,10 +77,11 @@ export async function buildFarBuildingInstanceBatches(THREE, buildings, material
       const bounds = new THREE.Box3().makeEmpty();
       const mesh = new THREE.InstancedMesh(geometry, material, indices.length);
       batches.push(mesh);
+      mesh.position.set(originX, 0, originZ);
       mesh.instanceMatrix.setUsage(THREE.StaticDrawUsage);
       for (let index = 0; index < indices.length; index++) {
-        const building = buildings[indices[index]];
-        position.set(building.x, building.baseY, building.z);
+        const building = buildings.read ? buildings.read(indices[index],scratch) : buildings[indices[index]];
+        position.set(building.x - originX, building.baseY, building.z - originZ);
         rotation.setFromAxisAngle(up, building.rotationY);
         scale.set(building.width, building.height, building.depth);
         matrix.compose(position, rotation, scale);
@@ -73,7 +91,10 @@ export async function buildFarBuildingInstanceBatches(THREE, buildings, material
         // Bound the Float32 transform actually uploaded, including rotation.
         mesh.getMatrixAt(index, matrix);
         bounds.union(transformedBox.copy(localBox).applyMatrix4(matrix));
-        if (++completed % 12000 === 0) await yieldControl();
+        if ((++completed & 63) === 0 && now() - sliceStarted >= 8) {
+          await yieldControl();
+          sliceStarted = now();
+        }
       }
       geometry.boundingBox = bounds;
       geometry.boundingSphere = bounds.getBoundingSphere(new THREE.Sphere());
@@ -88,11 +109,12 @@ export async function buildFarBuildingInstanceBatches(THREE, buildings, material
       mesh.frustumCulled = true;
       mesh.userData.isFarMappedBuildingInstances = true;
       mesh.userData.spatialBatchKey = key;
+      mesh.userData.regionalRoofFraction = roofFraction;
       preserveInstanceRaycasting(mesh, localBox, localSphere, Uint32Array.from(indices));
     }
     return batches;
   } catch (error) {
-    for (const mesh of batches) mesh.geometry.dispose();
+    for (const mesh of batches) { mesh.dispose(); mesh.geometry.dispose(); }
     throw error;
   }
 }

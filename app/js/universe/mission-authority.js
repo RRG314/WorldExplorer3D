@@ -95,8 +95,9 @@ function createDestinationMissionStore(storage = globalThis.localStorage) {
     ledger = normalizeLedger();
   }
   const persist = (next) => {
-    ledger = normalizeLedger(next);
-    storage?.setItem?.(DESTINATION_MISSION_STORAGE_KEY, JSON.stringify(ledger));
+    const candidate = normalizeLedger(next);
+    storage?.setItem?.(DESTINATION_MISSION_STORAGE_KEY, JSON.stringify(candidate));
+    ledger = candidate;
     return ledger;
   };
   const stateFor = (definition) => ledger.missions[definition.id] || createDestinationMissionState(definition);

@@ -206,6 +206,8 @@ function setupGlobeHub({
     if (destination === 'controls') {
       const accessibilitySettings = document.getElementById('accessibilitySettings');
       if (accessibilitySettings && accessibilitySettings.parentElement !== panel) panel.prepend(accessibilitySettings);
+      const capabilities = panel.querySelector('#capabilityGuide');
+      if (capabilities) panel.prepend(capabilities);
     }
     panelHost.querySelectorAll('.tab-content').forEach((node) => node.classList.remove('active'));
     panel.classList.add('active');

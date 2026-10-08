@@ -36,7 +36,8 @@ try{for(const [id,lat,lon] of locations.filter(l=>!selected.length||selected.inc
  await page.evaluate(async()=>{const{ctx}=await import('/app/js/shared-context.js?v=55');ctx.setTimeOfDay?.('day');ctx.setWeatherMode?.('clear');});
  await page.waitForTimeout(3500);
  if(['giza','great-wall','big-ben'].includes(id)) {
-  await page.waitForFunction(async()=>{const{ctx}=await import('/app/js/shared-context.js?v=55');return !!ctx.mappedLandmarkMetrics;},null,{timeout:60000});
+  await page.evaluate(async()=>{globalThis.__WE3D_GEOGRAPHY_CONTEXT__=(await import('/app/js/shared-context.js?v=55')).ctx;});
+  await page.waitForFunction(()=>!!globalThis.__WE3D_GEOGRAPHY_CONTEXT__.mappedLandmarkMetrics,null,{timeout:60000});
  }
 
  result.snapshot=await page.evaluate(async()=>{const{ctx}=await import('/app/js/shared-context.js?v=55');const d=globalThis.getWorldExplorerRuntimeDiagnostics?.()||{};return{state:JSON.parse(globalThis.render_game_to_text()),landmarks:ctx.mappedLandmarkMetrics,historicVisuals:(ctx.historicMarkers||[]).map(m=>({name:m.name,kind:m.userData?.landmarkKind,id:m.userData?.curatedLandmarkId,visible:m.visible,attached:!!m.parent})),profile:ctx.worldSurfaceProfile,counts:d.worldCounts,surface:d.surfaceChain,providers:d.worldLoad?.session?.providers,vegetation:ctx.vegetationModelStatus,lighting:{skyMode:ctx.skyMode,skyState:ctx.skyState,exposure:ctx.renderer?.toneMappingExposure,lights:[ctx.sun,ctx.hemiLight,ctx.fillLight,ctx.ambientLight].map(l=>l?{type:l.type,intensity:l.intensity,color:l.color?.getHexString(),position:l.position?.toArray()}:null)},terrainMaterials:(ctx.terrainTiles instanceof Map?[...ctx.terrainTiles.values()]:[]).slice(0,2).map(t=>({keys:Object.keys(t),material:t.mesh?.material?.toJSON?.()})),renderer:{memory:{...ctx.renderer?.info.memory},render:{...ctx.renderer?.info.render},programs:ctx.renderer?.info.programs?.length},heap:performance.memory?.usedJSHeapSize};});

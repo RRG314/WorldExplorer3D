@@ -1,3 +1,4 @@
+import {deployResearchSubmarineFromDeck} from './marine-entry-ui.mjs';
 import { softwareCompositorArgs } from './software-compositor.mjs';
 import { selectLowRenderQuality } from './render-quality-ui.mjs';
 import { collectBrowserGraphicsErrors } from './browser-graphics-errors.mjs';
@@ -21,13 +22,19 @@ const verificationProfile = { scope: 'functional-controls-and-layout', quality: 
 const touchTimings = [];
 const browserErrors = [];
 const localFailures = [];
+const providerDegradations = [];
 
 function observe(page) {
   collectBrowserGraphicsErrors(page, browserErrors);
   page.on('pageerror', (error) => browserErrors.push(String(error?.stack || error)));
   page.on('response', (response) => {
     if (response.url().startsWith(baseUrl) && response.status() >= 400) {
-      localFailures.push({ url: response.url(), status: response.status() });
+      const endpoint = new URL(response.url()).pathname;
+      // Naming availability does not control movement; retain the degradation
+      // and still require every gameplay assertion. Auth and asset errors fail.
+      if (['/api/geospatial/search', '/api/geospatial/reverse'].includes(endpoint) && [429, 502, 503, 504].includes(response.status())) {
+        providerDegradations.push({ endpoint, status: response.status() });
+      } else localFailures.push({ url: response.url(), status: response.status() });
     }
   });
 }
@@ -282,9 +289,13 @@ try {
   observe(oceanMobile);
   await oceanMobile.goto(`${baseUrl}/app/`, { waitUntil: 'load', timeout: 120_000 });
   await waitForRuntime(oceanMobile);
-  await selectBaltimore(oceanMobile);
+  // Ocean entry now requires water/depth authority; city-center land must be rejected.
+  await oceanMobile.locator('#globeCustomLat').fill('-18.2861');
+  await oceanMobile.locator('#globeCustomLon').fill('147.7');
+  await oceanMobile.locator('#globeCustomLon').press('Tab');
   if (softwareCi) await selectLowRenderQuality(oceanMobile);
   await oceanMobile.locator('#globeSelectorOceanBtn').click();
+  await deployResearchSubmarineFromDeck(oceanMobile);
   await oceanMobile.waitForFunction(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().activeActor?.mode === 'ocean', null, { timeout: 120_000 });
   await waitForInteractiveWorld(oceanMobile);
   try {
@@ -341,7 +352,7 @@ try {
       /m$/.test(droneMove.held.hud.secondary) && droneMove.held.hud.speed > 0 && droneMove.held.hud.speed < 160,
     planeSpeedUsesKnots: planeMove.held.hud.unit === 'KTS' && planeMove.held.hud.secondaryLabel === 'ALT' &&
       planeMove.held.hud.speed > 0 && planeMove.held.hud.speed < 500,
-    oceanSpeedUsesKnots: oceanMove.held.hud.unit === 'KTS' && oceanMove.held.hud.secondaryLabel === 'DEPTH' &&
+    oceanSpeedUsesKnots: oceanMove.held.hud.unit === 'KTS' && oceanMove.held.hud.secondaryLabel === 'SIM DEPTH' &&
       /m$/.test(oceanMove.held.hud.secondary) && oceanMove.held.hud.speed > 0 && oceanMove.held.hud.speed < 100 &&
       horizontalDistance(oceanMove.before.activeActor?.position, oceanMove.held.diagnostics?.activeActor?.position) > 0.8,
     bottomMenuOwnsHudArea: menuOwnership.menuOpen && menuOwnership.prompts.every((prompt) =>
@@ -374,7 +385,8 @@ try {
     },
     menuOwnership,
     browserErrors,
-    localFailures
+    localFailures,
+    providerDegradations
   };
   await writeFile(path.join(outputDir, 'report.json'), JSON.stringify(report, null, 2));
   console.log(JSON.stringify(report, null, 2));

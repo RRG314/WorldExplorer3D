@@ -116,6 +116,11 @@ export function compileStructureColliderDescriptors(features = [], options = {})
   const publishedSolids = new Set();
   for (const feature of features) {
     if (!Array.isArray(feature?.pts) || feature.pts.length < 2) continue;
+    let excavationIndex = 0;
+    for (const wall of feature.engineeredApproachExcavation?.walls || []) {
+      colliders.push(descriptor(feature, 'approach_retaining_wall', wall.points,
+        wall.minY, wall.maxY, excavationIndex++));
+    }
     const semantics = feature.structureSemantics || {};
     // A published representative tunnel is still solid gameplay geometry.
     // Provider precision affects provenance, not whether its walls exist.

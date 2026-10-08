@@ -197,6 +197,7 @@ function createInteriorRuntimeUiApi() {
   function disposeObject3D(root) {
     if (!root) return;
     root.traverse((node) => {
+      node?.userData?.ownedInteriorTextures?.forEach(texture => texture.dispose());
       if (node?.geometry?.dispose) node.geometry.dispose();
       if (node?.material) {
         eachMeshMaterial(node, (material) => {

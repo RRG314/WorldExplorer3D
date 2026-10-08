@@ -21,12 +21,12 @@ function isPlanetaryCharacterRequestCurrent({
     character?.userData?.requestedCuratedCharacterAssetId === assetId;
 }
 
-function desiredPlanetaryCharacter(body = 'earth') {
+function desiredPlanetaryCharacter(body = 'earth', { solidSurface = false } = {}) {
   const astronomicalBody = getAstronomicalBody(body);
-  const planetary = astronomicalBody?.id !== 'earth' &&
-    astronomicalBody?.exploration?.landingMode === LANDING_MODE.SOLID_SURFACE;
+  const planetary = body !== 'earth' && (solidSurface ||
+    astronomicalBody?.exploration?.landingMode === LANDING_MODE.SOLID_SURFACE);
   if (planetary) {
-    return Object.freeze({ assetId: SHIP_CREW_ASSET_ID, role: 'planetary-player-character', bodyId: astronomicalBody.id });
+    return Object.freeze({ assetId: SHIP_CREW_ASSET_ID, role: 'planetary-player-character', bodyId: astronomicalBody?.id || body });
   }
   const gender = String(appCtx.getPlayerCharacterGender?.() || 'man');
   return Object.freeze({
@@ -36,10 +36,10 @@ function desiredPlanetaryCharacter(body = 'earth') {
   });
 }
 
-function setPlanetaryCharacter(body = 'earth') {
+function setPlanetaryCharacter(body = 'earth', options = {}) {
   const character = appCtx.Walk?.state?.characterMesh;
   if (!character) return false;
-  const desired = desiredPlanetaryCharacter(body);
+  const desired = desiredPlanetaryCharacter(body, options);
   const requestId = ++characterRequestId;
   character.userData.requestedCuratedCharacterAssetId = desired.assetId;
   character.userData.requestedCharacterRole = desired.role;

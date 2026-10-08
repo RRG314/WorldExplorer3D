@@ -3,6 +3,12 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
+import vm from 'node:vm';
+import { parse } from '@babel/parser';
+import { createLifecycleScope } from '../app/js/runtime/lifecycle-scope.js';
+import { createSpaceLaunchReadiness } from '../app/js/space/launch-readiness.js';
+import { SPACE_CRAFT_IDENTITY } from '../app/js/space/craft-identity.js';
+import { installSpaceTravelSession, SPACE_GUIDANCE_MODE, SPACE_TRAVEL_LOCATION, SPACE_TRAVEL_PHASE } from '../app/js/space/travel-session.js';
 import { fileURLToPath } from 'node:url';
 
 import { getModelAsset, modelAssetsForRole } from '../app/js/assets/model-asset-catalog.js';
@@ -82,13 +88,53 @@ test('new parachute and pod models remain presentation-only while the original m
   assert.doesNotMatch(starship, /attachCuratedExpeditionStarship/);
 });
 
-test('choosing Space starts visible manual free flight while Moon remains a separate destination', () => {
+test('choosing Space starts visible manual free flight while Moon remains a separate destination', t => {
   const title = read('app/js/ui/title-screen.js');
   const space = read('app/js/space.js');
   assert.match(title, /launchMode === 'space'[\s\S]*startFreeSpaceFlight/);
   assert.match(title, /appCtx\.hideLoad\?\.\(\);[\s\S]*markFirstPlayReady/);
-  assert.match(space, /setPauseReason\?\.\('planetary_transition', false\)/);
-  assert.match(space, /function startFreeSpaceFlight\(\)[\s\S]*freeFlight: true/);
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  // Execute the actual entry functions with real session/readiness owners.
+  // Rendering is supplied separately by the assembled browser journey.
+  const names = new Set(['beginSpaceFlightSession', 'startSpaceFlightToMoon', 'startFreeSpaceFlight']);
+  const functions = parse(space, { sourceType: 'module' }).program.body
+    .filter(node => node.type === 'FunctionDeclaration' && names.has(node.id.name))
+    .map(node => space.slice(node.start, node.end)).join('\n');
+  for (const freeFlight of [true, false]) {
+    const pauses = new Set(), elements = new Map(); let manual = 0, assisted = 0;
+    const appCtx = {
+      ENV: { SPACE_FLIGHT: 'SPACE_FLIGHT' }, car: { x: 0, z: 0, angle: 0 }, scene: {},
+      spaceFlight: { active: false, scene: {}, renderer: {}, camera: {}, canvas: { style: {} }, hud: { style: {} } },
+      setPauseReason(reason, active) { if (active) pauses.add(reason); else pauses.delete(reason); },
+      setEnvironmentTransitionActive() {},
+      releaseRenderedJourneyToManualFlight() { manual++; },
+      beginRenderedSpaceJourney() { assisted++; }
+    };
+    installSpaceTravelSession(appCtx);
+    const noOp = () => {};
+    const fixture = vm.runInNewContext(`let spaceSessionScope, spaceLaunchReadiness;\n${functions}\n({startFreeSpaceFlight,startSpaceFlightToMoon,dispose:()=>spaceSessionScope?.dispose()})`, {
+      appCtx, createLifecycleScope, createSpaceLaunchReadiness,
+      SPACE_CRAFT_IDENTITY, SPACE_GUIDANCE_MODE, SPACE_TRAVEL_LOCATION, SPACE_TRAVEL_PHASE,
+      THREE: { Color: class {} }, console: { log: noOp },
+      document: { getElementById(id) { if (!elements.has(id)) elements.set(id, {}); return elements.get(id); } },
+      beginEnvironmentTransition: () => ({}), commitEnvironment: () => true,
+      captureEarthWorldSession: noOp, suspendEarthModesForPlanetaryEntry: noOp,
+      emitTutorialEvent: noOp, prepareSpaceFlightHudForEntry: noOp, getPrimaryWorldCanvas: () => null,
+      hideGameUI: noOp, ensureExtendedSpaceScene: noOp, leaseSpaceFlightResources: noOp,
+      resetSpaceFlightForMoon: noOp, animateSpaceFlight: noOp, showFlightMessage: noOp
+    });
+    try {
+      assert.equal(freeFlight ? fixture.startFreeSpaceFlight() : fixture.startSpaceFlightToMoon(), true);
+      assert.equal(appCtx.spaceFlight.canvas.style.display, 'block');
+      assert.equal(appCtx.spaceFlight.hud.style.display, 'block');
+      assert.equal(elements.get('sfLandBtn').textContent, freeFlight ? 'SELECT A DESTINATION' : 'LAND ON MOON');
+      assert.equal(manual, Number(freeFlight)); assert.equal(assisted, Number(!freeFlight));
+      assert.equal(pauses.size, 1);
+      t.mock.timers.tick(1000);
+      assert.equal(pauses.size, 0); assert.equal(appCtx.spaceFlight.mode, 'flying');
+      assert.equal(appCtx.getSpaceTravelSession().phase, freeFlight ? SPACE_TRAVEL_PHASE.FREE_FLIGHT : SPACE_TRAVEL_PHASE.ASCENT);
+    } finally { fixture.dispose(); }
+  }
 });
 
 test('animated Explorer equipment tracks the curated wrist and driving uses the longer NPC detail range', () => {

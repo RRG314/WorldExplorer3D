@@ -1,0 +1,23 @@
+<!doctype html><html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Regional reef visual acceptance</title><link rel="icon" href="/favicon.svg"><style>body{margin:0;background:#10394e;color:white;font:14px system-ui}header{position:absolute;left:12px;top:12px;padding:12px;background:#092a3be0;border-radius:8px}canvas{display:block}button{min-height:36px}</style><header>Coral Shelf · authored habitat<br>Smithsonian CC0 specimen shapes · controlled flat seabed<br>Arrow keys move camera · A: wide view · B: close view<div id="sound"></div></header>
+<script src="/node_modules/three/build/three.min.js"></script><script src="/node_modules/three/examples/js/loaders/GLTFLoader.js"></script><script type="module">
+import {createMarineHabitat} from '/app/js/ocean/habitat.js';
+import {CORAL_SHELF_SITE} from '/app/js/ocean/habitat-plan.js';
+import {disposeObject3D} from '/app/js/ocean/scene-assets.js?v=1';
+import {createOceanSoundscape} from '/app/js/ocean/soundscape.js';
+import {modelAssetCacheSnapshot} from '/app/js/assets/model-asset-runtime.js?v=16';
+const scene=new THREE.Scene();scene.background=new THREE.Color(0x123e55);scene.fog=new THREE.FogExp2(0x123e55,.009);
+const renderer=new THREE.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});renderer.setSize(innerWidth,innerHeight);renderer.outputEncoding=THREE.sRGBEncoding;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=.93;document.body.append(renderer.domElement);
+const camera=new THREE.PerspectiveCamera(58,innerWidth/innerHeight,.1,1500);
+scene.add(new THREE.HemisphereLight(0xa8e9ff,0x143246,.5),new THREE.AmbientLight(0x84d9ef,.34));const sun=new THREE.DirectionalLight(0xb8f1ff,.86);sun.position.set(30,60,-30);scene.add(sun);
+const bed=new THREE.Mesh(new THREE.PlaneGeometry(1800,1800),new THREE.MeshStandardMaterial({color:0x677967,roughness:.95}));bed.rotation.x=-Math.PI/2;bed.position.y=-30;scene.add(bed);
+let habitat=createMarineHabitat(THREE,{site:CORAL_SHELF_SITE,scale:100000,sampleSeabedHeight:()=>-30});scene.add(habitat.group);await habitat.ready;
+const sound=createOceanSoundscape({host:document.getElementById('sound')});let time=0;const held=new Set();const target=new THREE.Vector3(-38,-27,66);
+function close(){camera.position.set(-26,-23,50);target.set(-38,-27,66)}function wide(){camera.position.set(10,-12,32);target.set(0,-27,130)}close();
+onkeydown=e=>{held.add(e.code);if(e.code==='KeyA')wide();if(e.code==='KeyB')close();if(e.code.startsWith('Arrow'))e.preventDefault()};onkeyup=e=>held.delete(e.code);
+function step(dt){time+=dt;const dx=(Number(held.has('ArrowRight'))-Number(held.has('ArrowLeft')))*dt*4,dz=(Number(held.has('ArrowDown'))-Number(held.has('ArrowUp')))*dt*4;camera.position.x+=dx;target.x+=dx;camera.position.z+=dz;target.z+=dz;camera.lookAt(target);habitat.update(dt,camera.position,time);sound.update({time});renderer.render(scene,camera)}
+window.advanceTime=async ms=>{for(let i=0;i<Math.ceil(ms/16.667);i++)step(1/60)};
+window.render_game_to_text=()=>JSON.stringify({coordinateSystem:'x east, y up, z south, controlled floor y=-30',habitat:habitat.group.userData.habitat,camera:camera.position,render:renderer.info.render,memory:renderer.info.memory,sound:sound.snapshot()});
+window.habitatTest={renderer,scene,camera,get habitat(){return habitat},cache:modelAssetCacheSnapshot,async rebuild(){scene.remove(habitat.group);disposeObject3D(habitat.group);habitat=createMarineHabitat(THREE,{site:CORAL_SHELF_SITE,sampleSeabedHeight:()=>-30});scene.add(habitat.group);await habitat.ready;step(.3)},async cancel(){const h=createMarineHabitat(THREE,{site:CORAL_SHELF_SITE,sampleSeabedHeight:()=>-30});disposeObject3D(h.group);await h.ready;return h.group.children.filter(c=>c.name.includes('coral')).length},dispose(){scene.remove(habitat.group);disposeObject3D(habitat.group);sound.dispose();step(0)}};
+window.ready=true;let last=performance.now();function frame(now){step(Math.min(.05,(now-last)/1000));last=now;requestAnimationFrame(frame)}requestAnimationFrame(frame);
+onresize=()=>{renderer.setSize(innerWidth,innerHeight);camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix()};
+</script></html>

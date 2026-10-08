@@ -1,10 +1,11 @@
+import {createBuildingBodyGeometry} from './building-body-geometry.js';
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import {
   classifyWaterSurfaceProfile,
   normalizeLanduseSurfaceType
 } from "../surface-rules.js?v=18";
 import { geometryHasFinitePositions } from "./geometry-batching.js?v=7";
-import { markPrivateBuildingGeometry, releaseRetiredBuildingCpuBuffers } from './retired-building-buffers.js';
+import { releaseRetiredBuildingCpuBuffers } from './retired-building-buffers.js';
 import { resolveBuildingExteriorPresentation } from '../engine/building-facade-materials.js?v=19';
 import {
   fetchShortbreadTile,
@@ -102,19 +103,9 @@ function fallbackMidLodBuildingMesh(pts, height, avgElevation, colorHex = '#7f8c
   const d = Math.max(4, maxZ - minZ);
   const h = Math.max(3.2, Number.isFinite(height) ? height : 10);
 
-  const shape = new THREE.Shape();
-  shape.moveTo(minX, -minZ);
-  shape.lineTo(maxX, -minZ);
-  shape.lineTo(maxX, -maxZ);
-  shape.lineTo(minX, -maxZ);
-  shape.closePath();
-  const geo = markPrivateBuildingGeometry(new THREE.ExtrudeGeometry(shape, {
-    depth: h,
-    bevelEnabled: false,
-    curveSegments: 1,
-    steps: 1
-  }));
-  geo.rotateX(-Math.PI / 2);
+  const geo = createBuildingBodyGeometry(THREE, [
+    {x:minX,z:minZ},{x:maxX,z:minZ},{x:maxX,z:maxZ},{x:minX,z:maxZ}
+  ], h);
   const facade = midFacadeMaterial(
     options.buildingType || 'yes',
     options.buildingSeed || 0,
@@ -190,20 +181,7 @@ export function createMidLodBuildingMesh(pts, height, avgElevation, options = {}
   const renderPts = midLodRenderFootprint(pts);
 
   try {
-    const shape = new THREE.Shape();
-    renderPts.forEach((p, i) => {
-      if (i === 0) shape.moveTo(p.x, -p.z);
-      else shape.lineTo(p.x, -p.z);
-    });
-    shape.closePath();
-
-    const geo = markPrivateBuildingGeometry(new THREE.ExtrudeGeometry(shape, {
-      depth: h,
-      bevelEnabled: false,
-      curveSegments: 1,
-      steps: 1
-    }));
-    geo.rotateX(-Math.PI / 2);
+    const geo = createBuildingBodyGeometry(THREE, renderPts, h);
     if (!geometryHasFinitePositions(geo)) {
       geo.dispose();
       releaseRetiredBuildingCpuBuffers(geo);

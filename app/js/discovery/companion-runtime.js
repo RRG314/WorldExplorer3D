@@ -112,19 +112,19 @@ async function ensureStarterCompanion(profileStore, options = {}) {
     });
   }
   if (profileStore.saveProfile && profile) {
-    await profileStore.saveProfile({
-      ...profile,
-      activeCompanionId: active?.instanceId || starter.instanceId,
+    await profileStore.saveProfile((current) => ({
+      ...current,
+      activeCompanionId: current.activeCompanionId || active?.instanceId || starter.instanceId,
       companionOnboarding: {
-        ...marker,
+        ...current.companionOnboarding,
         schemaVersion: 1,
         starterDogGranted: true,
         starterDogInstanceId: starter.instanceId,
         starterDogGrantedAt: Number(marker.starterDogGrantedAt) || starter.adoptedAt || now,
-        starterDogFirstNamedAt: Number(marker.starterDogFirstNamedAt) || 0,
-        primaryHomeId
+        starterDogFirstNamedAt: Number(current.companionOnboarding?.starterDogFirstNamedAt) || 0,
+        primaryHomeId: current.companionOnboarding?.primaryHomeId || primaryHomeId
       }
-    });
+    }));
   }
   return Object.freeze({ starter, created: !stored.some((entry) => entry.instanceId === starter.instanceId), activeInstanceId: active?.instanceId || starter.instanceId, primaryHomeId });
 }
@@ -212,8 +212,7 @@ async function createCompanionRuntime(appCtx, options = {}) {
     if (!result.renamed) return result;
     await profileStore.saveCompanion(result.companion);
     if (result.firstStarterNaming && profileStore.getProfile && profileStore.saveProfile) {
-      const profile = await profileStore.getProfile();
-      await profileStore.saveProfile({
+      await profileStore.saveProfile((profile) => ({
         ...profile,
         companionOnboarding: {
           ...(profile.companionOnboarding || {}),
@@ -221,7 +220,7 @@ async function createCompanionRuntime(appCtx, options = {}) {
           starterDogInstanceId: result.companion.instanceId,
           starterDogFirstNamedAt: result.companion.namedAt
         }
-      });
+      }));
     }
     await refresh();
     options.onRename?.(result.companion, result);
@@ -237,11 +236,10 @@ async function createCompanionRuntime(appCtx, options = {}) {
       .filter(Boolean);
     await Promise.all(updates.map((entry) => profileStore.saveCompanion(entry)));
     if (profileStore.getProfile && profileStore.saveProfile) {
-      const profile = await profileStore.getProfile();
-      await profileStore.saveProfile({
+      await profileStore.saveProfile((profile) => ({
         ...profile,
         companionOnboarding: { ...(profile.companionOnboarding || {}), primaryHomeId }
-      });
+      }));
     }
     await refresh();
     return primaryHomeId;
@@ -288,15 +286,16 @@ async function createCompanionRuntime(appCtx, options = {}) {
     progressWrites = progressWrites.then(async () => {
       const current = companions.find((entry) => entry.instanceId === completed.instanceId);
       if (!current) return false;
-      const learned = [...new Set([...(current.training?.learnedCommands || ['follow']), 'recall'])];
-      const records = { ...(current.training?.records || {}), recall: { completed: true, completedAt: Date.now() } };
-      const trained = Object.freeze({ ...current, training: Object.freeze({ ...current.training, learnedCommands: Object.freeze(learned), records: Object.freeze(records) }) });
-      const result = awardCompanionXp(trained, {
-        receiptId: `training:${current.instanceId}:recall:first-clear`,
-        reasonId: 'training-first-clear'
+      let result;
+      const next = await profileStore.saveCompanion(current, latest => {
+        const learned = [...new Set([...(latest.training?.learnedCommands || ['follow']), 'recall'])];
+        const records = { ...(latest.training?.records || {}), recall: { completed: true, completedAt: Date.now() } };
+        const trained = { ...latest, training: { ...latest.training, learnedCommands: learned, records } };
+        result = awardCompanionXp(trained, {
+          receiptId: `training:${latest.instanceId}:recall:first-clear`, reasonId: 'training-first-clear'
+        });
+        return result.companion;
       });
-      const next = result.companion;
-      await profileStore.saveCompanion(next);
       companions = companions.map((entry) => entry.instanceId === next.instanceId ? next : entry);
       active = next;
       if (result.awarded) options.onXpAward?.(next, result);
@@ -331,10 +330,12 @@ async function createCompanionRuntime(appCtx, options = {}) {
     progressWrites = progressWrites.then(async () => {
       const current = companions.find((entry) => entry.instanceId === instanceId);
       if (!current) return false;
-      const result = awardCompanionXp(current, award);
+      let result;
+      const next = await profileStore.saveCompanion(current, latest => {
+        result = awardCompanionXp(latest, award);
+        return result.companion;
+      });
       if (!result.awarded) return false;
-      const next = result.companion;
-      await profileStore.saveCompanion(next);
       companions = companions.map((entry) => entry.instanceId === instanceId ? next : entry);
       if (active?.instanceId === instanceId) active = next;
       options.onXpAward?.(next, result);
@@ -355,6 +356,7 @@ async function createCompanionRuntime(appCtx, options = {}) {
 
   function update(actor, dt, mode = 'walk', environment = 'EARTH') {
     if (disposed || !presentation) return;
+    if(mode === 'walk' && appCtx.Walk?.state?.walker?.swimming) mode = 'swim';
     const policy = resolveCompanionTravelPolicy(active, mode, environment);
     travelState = policy.state;
     presentation.group.visible = policy.visible;

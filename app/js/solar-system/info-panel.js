@@ -243,6 +243,9 @@ function showGalaxyInfo(ctx, entry) {
 }
 
 function handleSpaceReturnAction(ctx) {
+  if (typeof ctx.appCtx.returnToEarthFromMenu === 'function') {
+    return ctx.appCtx.returnToEarthFromMenu();
+  }
   if (typeof ctx.appCtx.onMoon !== 'undefined' && ctx.appCtx.onMoon) {
     if (typeof ctx.appCtx.returnToEarth === 'function') ctx.appCtx.returnToEarth();
     return;

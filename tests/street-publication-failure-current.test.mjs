@@ -28,7 +28,7 @@ test('roadless terrain failure cannot spawn a player on the loading placeholder'
 
 test('surface failure cancels work and retires staging without starting gameplay',()=>{
   const calls=[],runtimeState={sequence:9,status:'loading',activePhases:['roads']};
-  const appCtx={worldLoading:true,initialEarthWorldReady:true,
+  const appCtx={worldLoadRuntimeState:runtimeState,worldLoading:true,initialEarthWorldReady:true,
     _cancelStreetPavementBuild:()=>calls.push('pavement-cancel'),streetOverview:{dispose:()=>calls.push('overview-dispose')},
     releaseEarthWorldForTitle:()=>calls.push('world-resources-release'),
     discardEarthWorldSceneLoad:sequence=>calls.push(`discard-${sequence}`),hideLoad:()=>calls.push('hide'),showToast:text=>calls.push(text)};

@@ -1,0 +1,303 @@
+{
+  "source": "7f5b22c675886f28a4fb4b19fe11ec7c08ea0840",
+  "method": "Fresh Babel AST of tracked runtime JS excluding vendor. Direct binding-aware imported-context accesses and literal dependencies; alias/transitive/reflective writes are not counted. Syntax counts are not performance, defect or coverage metrics.",
+  "summary": {
+    "files": 989,
+    "lines": 217832,
+    "bytes": 10703778,
+    "contextModules": 167,
+    "contextMembers": 1136,
+    "contextWriterModules": 121,
+    "staticCycles": 0,
+    "domains": {
+      "app/js": {
+        "files": 923,
+        "lines": 199548
+      },
+      "js": {
+        "files": 29,
+        "lines": 5411
+      },
+      "functions": {
+        "files": 37,
+        "lines": 12873
+      }
+    },
+    "signals": {
+      "addEventListener": 679,
+      "getBoundingClientRect": 28,
+      "setTimeout": 113,
+      "removeEventListener": 99,
+      "createLifecycleScope": 9,
+      "requestAnimationFrame": 34,
+      "localStorage.setItem": 34,
+      "localStorage.getItem": 41,
+      "localStorage.removeItem": 7,
+      "setInterval": 8,
+      "registerRuntimeSystem": 6,
+      "getComputedStyle": 5,
+      "fixedUpdate": 1,
+      "sessionStorage.setItem": 2,
+      "sessionStorage.removeItem": 2,
+      "sessionStorage.getItem": 2
+    },
+    "largeFiles": 19,
+    "largest": [
+      {
+        "file": "app/js/urban-sandbox/runtime.js",
+        "lines": 3428,
+        "bytes": 155657
+      },
+      {
+        "file": "functions/index.js",
+        "lines": 2792,
+        "bytes": 115232
+      },
+      {
+        "file": "functions/generated/expedition-command-engine.cjs",
+        "lines": 2760,
+        "bytes": 182084
+      },
+      {
+        "file": "app/js/discovery/runtime.js",
+        "lines": 2442,
+        "bytes": 152375
+      },
+      {
+        "file": "app/js/expedition/ship-interior.js",
+        "lines": 2403,
+        "bytes": 123020
+      },
+      {
+        "file": "js/admin-dashboard.js",
+        "lines": 2202,
+        "bytes": 100923
+      },
+      {
+        "file": "app/js/expedition/runtime.js",
+        "lines": 1880,
+        "bytes": 106072
+      },
+      {
+        "file": "app/js/runtime-diagnostics.js",
+        "lines": 1465,
+        "bytes": 70970
+      },
+      {
+        "file": "app/js/planetary/solid-world-runtime.js",
+        "lines": 1409,
+        "bytes": 66037
+      },
+      {
+        "file": "app/js/space/journey-runtime.js",
+        "lines": 1205,
+        "bytes": 52644
+      },
+      {
+        "file": "functions/community-reality-capture.js",
+        "lines": 1176,
+        "bytes": 73947
+      },
+      {
+        "file": "app/js/world/load-roads.js",
+        "lines": 1174,
+        "bytes": 53596
+      },
+      {
+        "file": "app/js/urban-sandbox/equipment-runtime.js",
+        "lines": 1151,
+        "bytes": 57007
+      },
+      {
+        "file": "app/js/discovery/profile-store.js",
+        "lines": 1115,
+        "bytes": 53809
+      },
+      {
+        "file": "app/js/world/compiler/transport-junction-profile.js",
+        "lines": 1111,
+        "bytes": 53217
+      },
+      {
+        "file": "app/js/reality-capture/ui.js",
+        "lines": 1102,
+        "bytes": 78002
+      },
+      {
+        "file": "app/js/terrain/far-field.js",
+        "lines": 1081,
+        "bytes": 47736
+      },
+      {
+        "file": "functions/admin-dashboard.js",
+        "lines": 1070,
+        "bytes": 48769
+      },
+      {
+        "file": "app/js/living-world/population.js",
+        "lines": 1061,
+        "bytes": 49994
+      },
+      {
+        "file": "app/js/universe/runtime.js",
+        "lines": 982,
+        "bytes": 40866
+      }
+    ],
+    "widest": [
+      {
+        "file": "app/js/shared-context.js",
+        "importers": 167
+      },
+      {
+        "file": "js/auth-ui.js",
+        "importers": 34
+      },
+      {
+        "file": "js/firebase-init.js",
+        "importers": 29
+      },
+      {
+        "file": "app/js/astronomy/body-catalog.js",
+        "importers": 27
+      },
+      {
+        "file": "app/js/world/cooperative-scheduling.js",
+        "importers": 27
+      },
+      {
+        "file": "app/js/structure-semantics.js",
+        "importers": 19
+      },
+      {
+        "file": "app/js/multiplayer/rooms.js",
+        "importers": 16
+      },
+      {
+        "file": "app/js/world/road-cross-section-profile.js",
+        "importers": 16
+      },
+      {
+        "file": "app/js/world/road-units.js",
+        "importers": 14
+      },
+      {
+        "file": "js/function-api.js",
+        "importers": 14
+      },
+      {
+        "file": "functions/interior-layout.mjs",
+        "importers": 13
+      },
+      {
+        "file": "app/js/assets/model-asset-runtime.js",
+        "importers": 12
+      },
+      {
+        "file": "app/js/discovery/catalog.js",
+        "importers": 12
+      },
+      {
+        "file": "app/js/session-coordinator.js",
+        "importers": 12
+      },
+      {
+        "file": "app/js/transport/damage-model.js",
+        "importers": 12
+      }
+    ],
+    "multiwriter": [
+      {
+        "root": "car",
+        "writers": 18,
+        "readers": 48
+      },
+      {
+        "root": "Walk",
+        "writers": 13,
+        "readers": 56
+      },
+      {
+        "root": "carMesh",
+        "writers": 12,
+        "readers": 13
+      },
+      {
+        "root": "camera",
+        "writers": 10,
+        "readers": 20
+      },
+      {
+        "root": "spaceFlight",
+        "writers": 10,
+        "readers": 27
+      },
+      {
+        "root": "drone",
+        "writers": 9,
+        "readers": 28
+      },
+      {
+        "root": "scene",
+        "writers": 8,
+        "readers": 35
+      },
+      {
+        "root": "renderer",
+        "writers": 8,
+        "readers": 16
+      },
+      {
+        "root": "boatMode",
+        "writers": 6,
+        "readers": 29
+      },
+      {
+        "root": "[computed]",
+        "writers": 6,
+        "readers": 4
+      },
+      {
+        "root": "sun",
+        "writers": 6,
+        "readers": 7
+      },
+      {
+        "root": "fillLight",
+        "writers": 6,
+        "readers": 6
+      },
+      {
+        "root": "hemiLight",
+        "writers": 6,
+        "readers": 6
+      },
+      {
+        "root": "ambientLight",
+        "writers": 6,
+        "readers": 5
+      },
+      {
+        "root": "showNavigation",
+        "writers": 5,
+        "readers": 2
+      },
+      {
+        "root": "navigationRoutePoints",
+        "writers": 5,
+        "readers": 2
+      },
+      {
+        "root": "navigationRouteDistance",
+        "writers": 5,
+        "readers": 0
+      },
+      {
+        "root": "gameMode",
+        "writers": 5,
+        "readers": 12
+      }
+    ]
+  },
+  "cycles": []
+}

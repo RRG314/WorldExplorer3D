@@ -32,11 +32,15 @@ function appendInterval(values, start, end, interval, includeStart = true) {
 }
 
 function buildClipmapAxis(outerMin, innerMin, innerMax, outerMax, interval, innerInterval = interval) {
+  // A travelling outer window can leave the fixed detailed district behind.
+  // Clamp the dense seam band instead of growing geometry back to the origin.
+  innerMin = Math.max(outerMin, Math.min(outerMax, innerMin));
+  innerMax = Math.max(innerMin, Math.min(outerMax, innerMax));
   const values = [];
   appendInterval(values, outerMin, innerMin, interval, true);
   appendInterval(values, innerMin, innerMax, innerInterval, false);
   appendInterval(values, innerMax, outerMax, interval, false);
-  return values;
+  return values.filter((value, index) => index === 0 || value > values[index - 1]);
 }
 
 function distanceOutsideInnerBounds(x, z, innerBounds) {
@@ -165,7 +169,7 @@ function parentTerrainTile(tile, levels = 1) {
 }
 
 function disposeFarFieldMesh(mesh) {
-  if (!mesh) return;
+  if (!mesh || mesh.userData?.farFieldDisposed) return;
   mesh.userData.farFieldDisposed = true;
   mesh.userData?.mappedWaterOwnershipMask?.dispose?.();
   for (const textures of Object.values(mesh.userData?.terrainTextureSetsByMode || {})) {
@@ -176,6 +180,9 @@ function disposeFarFieldMesh(mesh) {
   const geometries = new Set();
   const materials = new Set();
   const collect = (node) => {
+    // r128 owns instanceMatrix/instanceColor outside the geometry attribute
+    // table. Its InstancedMesh dispose event is the only buffer-release path.
+    if (node?.isInstancedMesh) node.dispose?.();
     if (node?.geometry) geometries.add(node.geometry);
     const nodeMaterials = Array.isArray(node?.material) ? node.material : [node?.material];
     nodeMaterials.filter(Boolean).forEach((material) => materials.add(material));
@@ -434,7 +441,7 @@ function createFarFieldGeometryPlanner(deps = {}) {
       spec.detailedCoverage,
       'minX',
       'maxX'
-    );
+    ).filter(value => value >= spec.outer.minX && value <= spec.outer.maxX);
     const zValues = addCoverageEdges(
       buildClipmapAxis(
         spec.outer.minZ,
@@ -447,7 +454,7 @@ function createFarFieldGeometryPlanner(deps = {}) {
       spec.detailedCoverage,
       'minZ',
       'maxZ'
-    );
+    ).filter(value => value >= spec.outer.minZ && value <= spec.outer.maxZ);
     const positions = [];
     const surfaceWorldYs = [];
     const colors = [];

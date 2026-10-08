@@ -167,10 +167,12 @@ function elevationWorldYAtWorldXZ(x, z) {
   }
   if (appCtx.worldLoadRuntimeState?.groundMode === 'worldwide-terrain-fallback') {
     const sample = terrainSourceSampleAtWorldXZ(x, z, terrainTileDeps);
-    return sample.status === 'available' && Number.isFinite(Number(sample.elevationMeters))
-      ? clampElevationMeters(Number(sample.elevationMeters)) *
-        appCtx.WORLD_UNITS_PER_METER * appCtx.TERRAIN_Y_EXAGGERATION
-      : null;
+    if (sample.status === 'available' && Number.isFinite(Number(sample.elevationMeters))) {
+      return clampElevationMeters(Number(sample.elevationMeters)) *
+        appCtx.WORLD_UNITS_PER_METER * appCtx.TERRAIN_Y_EXAGGERATION;
+    }
+    const farTerrainY = appCtx.sampleFarTerrainWorldYAt?.(x, z);
+    return Number.isFinite(farTerrainY) ? farTerrainY : null;
   }
   const meters = acceptedGroundRuntime.elevationAtWorldXZ(x, z);
   if (!Number.isFinite(meters)) {
@@ -397,11 +399,15 @@ const {
   getFarTerrainSurfaceSnapshot,
   scheduleFarTerrainSurfaceRefresh,
   updateFarTerrainClipmap,
+  updateRegionalSceneryFocus,
+  setRegionalSceneryEnabled,
+  getRegionalSceneryState,
   waitForFarTerrainClipmap
 } = createFarFieldTerrainApi({
   appCtx,
   clampElevationMeters,
   getOrLoadTerrainTile,
+  pruneTerrainTileCache,
   latLonToTileXY,
   sampleDetailedTerrainMetersAtLatLon: (lat, lon) => {
     const sample = peekTerrainSourceSampleAtLatLon(lat, lon, terrainTileDeps);
@@ -647,6 +653,9 @@ Object.assign(appCtx, {
   terrainTileCacheSnapshot,
   updateStructureVisualVisibility,
   updateFarTerrainClipmap,
+  updateRegionalSceneryFocus,
+  setRegionalSceneryEnabled,
+  getRegionalSceneryState,
   waitForFarTerrainClipmap,
   setWorldSurfaceProfile,
   subdivideRoadPoints,

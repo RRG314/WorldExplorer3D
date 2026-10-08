@@ -1,0 +1,30 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs/promises';
+import {chromium} from 'playwright';
+const browser=await chromium.launch({channel:'chrome',headless:true});
+const dir='output/verification/product-plan';
+const report={scope:'Actual swimming controller, authored rig motion and touch HUD in controlled terrain/water fixture; not full-world marine expedition acceptance',cases:[],errors:[]};
+try {
+ const page=await browser.newPage({viewport:{width:1280,height:800}});page.on('pageerror',e=>report.errors.push(e.message));
+ await page.goto('http://127.0.0.1:4398/tests/fixtures/swimming.html');await page.waitForFunction(()=>window.ready);
+ await page.locator('#enter').click();await page.waitForSelector('#swimmingHud');
+ const advance=(input,ms)=>page.evaluate(async({input,ms})=>{swimTest.setInput(input);await swimTest.step(ms)}, {input,ms});
+ const snapshot=()=>page.evaluate(()=>JSON.parse(render_game_to_text()));
+ await advance({move:1},900);let s=await snapshot();assert.ok(s.walker.z>1);assert.equal(s.walker.swimming.equipment,'none');assert.ok(s.animation.weights['Explorer_Swim:swim:lower']>.9);
+ await page.screenshot({path:`${dir}/swimming-stroke.png`});report.cases.push('Forward stroke moves the explorer; no scuba at the surface');
+ await advance({move:0,vertical:-1},3500);s=await snapshot();assert.ok(s.walker.y<-2);assert.equal(s.walker.swimming.equipment,'scuba');assert.ok(s.walker.swimming.airSeconds<180);
+ assert.equal(await page.evaluate(()=>swimTest.state.characterMesh.userData.swimmingEquipment.visible),true);
+ await page.screenshot({path:`${dir}/swimming-scuba.png`});report.cases.push('Dive automatically equips scuba and consumes air');
+ await advance({move:1},5000);s=await snapshot();assert.ok(s.walker.z<=4);report.cases.push('A wall stops horizontal swimming');
+ await advance({vertical:-1},160000);s=await snapshot();assert.equal(s.walker.swimming.recovering,true);await advance({vertical:-1},15000);s=await snapshot();assert.ok(s.walker.y>=-.22);report.cases.push('Low air overrides descent and recovers to the surface');
+ await page.getByRole('button',{name:'Recover',exact:true}).click();s=await snapshot();assert.equal(s.controller.active,false);assert.equal(s.walker.x,-5);assert.equal(await page.locator('#swimmingHud').isVisible(),false);report.cases.push('Recovery revalidates and returns to the known bank');
+ await page.setViewportSize({width:390,height:844});await page.locator('#enter').click();await advance({},100);
+ const button=page.getByRole('button',{name:'Dive',exact:true});const bounds=await button.boundingBox();await page.mouse.move(bounds.x+bounds.width/2,bounds.y+bounds.height/2);await page.mouse.down();await advance({},2200);await page.mouse.up();s=await snapshot();assert.ok(s.walker.y<-.5);assert.equal(s.walker.swimming.equipment,'scuba');
+ await page.screenshot({path:`${dir}/swimming-phone.png`});report.cases.push('Phone-sized HUD supports held dive and pointer release');
+ const airBeforeReload=s.walker.swimming.airSeconds;
+ await page.reload();await page.waitForFunction(()=>window.ready);s=await snapshot();
+ assert.equal(s.walker.swimming.equipment,'scuba');assert.ok(s.walker.y>=-.22);assert.ok(s.walker.swimming.airSeconds<=airBeforeReload+.1);
+ report.cases.push('Reload resumes at the validated surface and retains remaining air');
+ assert.deepEqual(report.errors,[]);report.passed=true;
+}finally{await fs.writeFile(`${dir}/swimming-browser.json`,JSON.stringify(report,null,2));await browser.close()}
+console.log(JSON.stringify(report));

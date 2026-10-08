@@ -123,11 +123,47 @@ export function auditTransportJunctionContinuity(
     feature?.transportSurfaceModel?.engineeredApproach === true &&
     feature?.transportRecord?.completeness !== 'lossless'
   );
+  // Generalized routes may need graded approaches to remain drivable. Their
+  // modeled heights must stay in that source family, with an actual published
+  // owner; an exact bridge's elevation cannot leak into a fallback duplicate.
+  const invalidVerticalAnchors = [];
+  let auditedVerticalAnchorCount = 0;
+  for (const feature of features) {
+    const anchors = (feature?.structureTransitionAnchors || []).filter((anchor) =>
+      anchor?.source === 'transport_graph_node');
+    if (feature?.transportSurfaceModel?.engineeredApproach === true && !anchors.length) {
+      invalidVerticalAnchors.push(Object.freeze({
+        featureId: String(feature?.transportGraphRef?.featureId || ''),
+        reason: 'engineered_approach_without_graph_anchor'
+      }));
+    }
+    for (const anchor of anchors) {
+      auditedVerticalAnchorCount += 1;
+      const owner = featureById.get(String(anchor.ownerFeatureId || ''));
+      const family = feature?.transportRecord?.completeness;
+      const reason = !owner ? 'missing_vertical_owner'
+        : owner.transportRecord?.routeState === 'incomplete' ? 'incomplete_vertical_owner'
+        : owner.transportRecord?.completeness !== family ? 'mixed_vertical_source_family'
+        : !Number.isFinite(anchor.targetSurfaceY) ? 'nonfinite_vertical_target' : null;
+      if (reason) invalidVerticalAnchors.push(Object.freeze({
+        featureId: String(feature?.transportGraphRef?.featureId || ''),
+        ownerFeatureId: String(anchor.ownerFeatureId || ''), reason
+      }));
+    }
+  }
+  const verticalOwnership = Object.freeze({
+    auditedVerticalAnchorCount,
+    invalidVerticalAnchorCount: invalidVerticalAnchors.length,
+    invalidVerticalAnchors: Object.freeze(invalidVerticalAnchors)
+  });
   if (!transportNetworkModel?.connections?.length || typeof sampleSurfaceY !== 'function') {
     return Object.freeze({
       authority: 'compiled_transport_graph_node_continuity',
+      ...verticalOwnership,
       toleranceMeters,
       authoritativeConnectionCount: 0,
+      auditedConnectionCount: 0,
+      generalizedConnectionCount: 0,
       sampledConnectionCount: 0,
       maximumVerticalDeltaMeters: 0,
       discontinuityCount: 0,
@@ -140,6 +176,8 @@ export function auditTransportJunctionContinuity(
   }
 
   let authoritativeConnectionCount = 0;
+  let auditedConnectionCount = 0;
+  let generalizedConnectionCount = 0;
   let sampledConnectionCount = 0;
   let maximumVerticalDeltaMeters = 0;
   const discontinuities = [];
@@ -147,10 +185,10 @@ export function auditTransportJunctionContinuity(
     const leftFeature = featureById.get(String(connection?.left?.featureId || ''));
     const rightFeature = featureById.get(String(connection?.right?.featureId || ''));
     if (!leftFeature || !rightFeature) continue;
+    const complete = [leftFeature, rightFeature].every((feature) =>
+      feature?.transportRecord?.routeState !== 'incomplete');
     const exactComplete = [leftFeature, rightFeature].every((feature) =>
-      feature?.transportRecord?.completeness === 'lossless' &&
-      feature?.transportRecord?.routeState !== 'incomplete'
-    );
+      feature?.transportRecord?.completeness === 'lossless');
     const structureConnection = [
       { feature: leftFeature, side: connection.left },
       { feature: rightFeature, side: connection.right }
@@ -158,8 +196,13 @@ export function auditTransportJunctionContinuity(
       feature?.structureSemantics?.terrainMode !== 'at_grade' ||
       hasEngineeredGraphConstraintAt(feature, side)
     );
-    if (!exactComplete || !structureConnection) continue;
-    authoritativeConnectionCount += 1;
+    if (!complete || !structureConnection) continue;
+    // Generalized coordinates are not surveyed elevations, but once rendered
+    // as connected drivable surfaces their physical join must still agree.
+    // Skipping them hid metre-scale steps whenever the exact provider failed.
+    auditedConnectionCount += 1;
+    if (exactComplete) authoritativeConnectionCount += 1;
+    else generalizedConnectionCount += 1;
     const sampleSide = (feature, side) => Number(sampleSurfaceY(
       feature,
       finite(side?.point?.x),
@@ -202,6 +245,7 @@ export function auditTransportJunctionContinuity(
       connectionId: String(connection.id || ''),
       kind: String(connection.kind || ''),
       provenance: String(connection?.provenance?.method || ''),
+      sourceCompleteness: exactComplete ? 'lossless' : 'generalized',
       leftFeatureId: String(connection.left.featureId || ''),
       rightFeatureId: String(connection.right.featureId || ''),
       leftTerrainMode: String(leftFeature?.structureSemantics?.terrainMode || ''),
@@ -217,13 +261,16 @@ export function auditTransportJunctionContinuity(
   discontinuities.sort((left, right) => right.verticalDeltaMeters - left.verticalDeltaMeters);
   return Object.freeze({
     authority: 'compiled_transport_graph_node_continuity',
+    ...verticalOwnership,
     toleranceMeters,
     authoritativeConnectionCount,
+    auditedConnectionCount,
+    generalizedConnectionCount,
     sampledConnectionCount,
     maximumVerticalDeltaMeters,
     discontinuityCount: discontinuities.length,
-    // This is a bounded release diagnostic (exact structure-related graph
-    // joins only). Preserve the complete failing set so provider-dependent
+    // Preserve every structure-related failure, regardless of source fidelity,
+    // so provider-dependent
     // topology cannot hide behind a top-N sample during repair.
     discontinuities: Object.freeze(discontinuities),
     generalizedEngineeredApproachCount: generalizedEngineeredApproaches.length,
@@ -248,15 +295,21 @@ export function buildTransportContinuityRepairAnchors(
     const featureId = String(feature?.transportGraphRef?.featureId || '');
     if (featureId) featureById.set(featureId, feature);
   }
-  const groups = connectedSideGroups(transportNetworkModel.connections).map((sides, index) => ({
-    id: index,
-    sides: sides.map((side) => ({
+  const groups = connectedSideGroups(transportNetworkModel.connections).map((sides, index) => {
+    const complete = sides.map((side) => ({
       side,
       feature: featureById.get(String(side.featureId || ''))
     })).filter(({ feature }) =>
-      feature?.transportRecord?.completeness === 'lossless' &&
-      feature?.transportRecord?.routeState !== 'incomplete')
-  }));
+      feature?.transportRecord && feature.transportRecord.routeState !== 'incomplete');
+    const exact = complete.filter(({feature}) => feature.transportRecord.completeness === 'lossless');
+    // Once a complete generalized route is published as a physical road, its
+    // shared junction and along-route grade constraints are just as binding.
+    // Previously only the initial per-node pass handled these roads; each
+    // independent profile then rejected incompatible nodes and left a step.
+    // Preserve exact-source ownership in a mixed group: source conflation,
+    // not a vertical solver, must retire a lower-detail duplicate there.
+    return {id:index,sides:exact.length?exact:complete};
+  });
   const membershipsByFeature = new Map();
   const targetByGroup = new Map();
   const ownerByGroup = new Map();
@@ -571,6 +624,56 @@ export function buildTransportContinuityRepairAnchors(
     if (!changed) break;
   }
 
+  // Foundations are hard upper bounds, unlike adjustable terrain cover at a
+  // portal. Carry their grade cones through the actual graph before compiling
+  // either side of a join. Stop excavating where an ordinary surface node is
+  // already below the cone; unrelated streets must retain their terrain fit.
+  const foundationAffectedGroups = new Set();
+  const ceilingByGroup = new Map();
+  const adjacency = new Map();
+  const ceilingQueue = [];
+  const constrainCeiling = (groupId, ceiling, owner) => {
+    if (!Number.isFinite(ceiling) || ceiling >= (ceilingByGroup.get(groupId) ?? Infinity) - 1e-6) return;
+    ceilingByGroup.set(groupId, ceiling);
+    ceilingQueue.push({groupId, ceiling, owner});
+  };
+  for (const [feature, memberships] of membershipsByFeature) {
+    const grade = maximumGradeFor(feature);
+    const ordered = [...memberships].sort((a,b) => finite(a.side.distanceAlong) - finite(b.side.distanceAlong));
+    for (let i = 1; i < ordered.length; i++) {
+      const left = ordered[i-1], right = ordered[i];
+      const cost = grade * Math.abs(finite(right.side.distanceAlong) - finite(left.side.distanceAlong));
+      for (const [from,to] of [[left,right],[right,left]]) {
+        if (!adjacency.has(from.group.id)) adjacency.set(from.group.id,[]);
+        adjacency.get(from.group.id).push({id:to.group.id,cost,feature});
+      }
+    }
+    for (const member of ordered) for (const limit of feature.tunnelObstructionLimits || []) {
+      const d = finite(member.side.distanceAlong);
+      const run = Math.max(0, limit.start-d, d-limit.end);
+      constrainCeiling(member.group.id,limit.maximumSurfaceY+grade*run,member);
+    }
+  }
+  for (let index=0; index<ceilingQueue.length; index++) {
+    const {groupId,ceiling,owner}=ceilingQueue[index];
+    if (ceiling > ceilingByGroup.get(groupId)+1e-6) continue;
+    let target=targetByGroup.get(groupId);
+    if (!Number.isFinite(target)) {
+      const samples=groups[groupId].sides.map(entry=>surfaceFor(entry)).filter(Number.isFinite);
+      if (!samples.length) continue;
+      target=Math.max(...samples);
+    }
+    const lowered=target>ceiling+1e-6;
+    if (lowered) {
+      targetByGroup.set(groupId,ceiling);
+      ownerByGroup.set(groupId,owner);
+      foundationAffectedGroups.add(groupId);
+    }
+    for (const edge of adjacency.get(groupId)||[]) {
+      if (lowered || edge.feature.structureSemantics?.terrainMode !== 'at_grade' || edge.feature.transportSurfaceModel?.engineeredApproach) constrainCeiling(edge.id,ceiling+edge.cost,owner);
+    }
+  }
+
   const anchorsByFeature = new Map();
   for (const group of groups) {
     const targetSurfaceY = targetByGroup.get(group.id);
@@ -606,7 +709,7 @@ export function buildTransportContinuityRepairAnchors(
         (targetDelta > 1e-5 || conflictingPublishedTarget);
       const reconcilingAtGrade = terrainMode === 'at_grade' &&
         (targetDelta > toleranceMeters || requiredForGradeFeasibility) &&
-        targetSurfaceY >= terrainY + surfaceBias - 0.02;
+        (targetSurfaceY >= terrainY + surfaceBias - 0.02 || foundationAffectedGroups.has(group.id));
       const reconcilingStructure = terrainMode !== 'at_grade' &&
         (targetDelta > toleranceMeters || requiredForGradeFeasibility);
       if (!reconcilingAtGrade && !reconcilingStructure) continue;

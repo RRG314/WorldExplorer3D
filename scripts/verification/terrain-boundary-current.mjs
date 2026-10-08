@@ -4,6 +4,7 @@ import path from 'node:path';
 import { chromium } from 'playwright';
 import { configureStagingAppCheck } from './staging-app-check.mjs';
 import { collectBrowserGraphicsErrors } from './browser-graphics-errors.mjs';
+import { isOptionalExternalUrl, isOptionalProviderConsole } from './optional-provider-console.mjs';
 import { isExpectedTerrainProviderCancellation, isTerrainElevationTileUrl } from './terrain-provider-cancellation.mjs';
 
 const baseUrl = String(process.env.WE3D_VERIFY_BASE_URL || 'http://127.0.0.1:4192').replace(/\/$/, '');
@@ -20,7 +21,6 @@ report.mapRequests = [];
 
 const optionalExternalFailures = [];
 const cancelledProviderRequests = [];
-const isOptionalExternalUrl = (url) => /(?:overpass-api\.de|overpass\.private\.coffee|google-analytics\.com)\//i.test(String(url || ''));
 page.on('pageerror', (error) => failures.push(`pageerror: ${error.stack || error}`));
 page.on('response', (response) => {
   if (response.status() >= 400 && (response.url().startsWith(`${baseUrl}/`) ||
@@ -33,7 +33,7 @@ page.on('console', (message) => {
   const location = message.location();
   const source = location?.url ? ` (${location.url}${location.lineNumber ? `:${location.lineNumber}` : ''})` : '';
   const entry = `console.error: ${message.text()}${source}`;
-  (isOptionalExternalUrl(location?.url) ? optionalExternalFailures : failures).push(entry);
+  (isOptionalProviderConsole({ text: message.text(), sourceUrl: location?.url, pageOrigin: baseUrl }) ? optionalExternalFailures : failures).push(entry);
 });
 page.on('requestfailed', (request) => {
   const entry = `requestfailed: ${request.failure()?.errorText || 'unknown'} ${request.url()}`;

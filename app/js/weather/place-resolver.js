@@ -1,3 +1,4 @@
+import {fetchPlaceLookup} from '../places/place-lookup-fetch.js';
 import { ctx as appCtx } from '../shared-context.js?v=55';
 import { weatherStateService } from './state-service.js?v=2';
 
@@ -89,7 +90,7 @@ async function fetchJsonWithTimeout(url, timeoutMs = PLACE_API_TIMEOUT_MS) {
   const controller = new AbortController();
   const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const response = await fetch(url, { signal: controller.signal });
+    const response = await (url.startsWith('/api/geospatial/')?fetchPlaceLookup:fetch)(url, { signal: controller.signal });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     return await response.json();
   } finally {
@@ -98,13 +99,8 @@ async function fetchJsonWithTimeout(url, timeoutMs = PLACE_API_TIMEOUT_MS) {
 }
 
 async function fetchPlaceForLocation(lat, lon) {
-  const nominatimUrl = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=10&addressdetails=1&lat=${encodeURIComponent(lat.toFixed(6))}&lon=${encodeURIComponent(lon.toFixed(6))}`;
-  try {
-    return parseReverseAddress(await fetchJsonWithTimeout(nominatimUrl, 6000));
-  } catch {
-    const bdcUrl = `https://api-bdc.io/data/reverse-geocode-client?latitude=${encodeURIComponent(lat.toFixed(6))}&longitude=${encodeURIComponent(lon.toFixed(6))}&localityLanguage=en`;
-    return parseReverseAddress(await fetchJsonWithTimeout(bdcUrl, 7000));
-  }
+  const lookupUrl = `/api/geospatial/reverse?kind=reverse&format=jsonv2&zoom=10&addressdetails=1&lat=${encodeURIComponent(lat.toFixed(6))}&lon=${encodeURIComponent(lon.toFixed(6))}`;
+  return parseReverseAddress(await fetchJsonWithTimeout(lookupUrl, 10000));
 }
 
 function getFallbackPlaceLabel(location) {

@@ -6,15 +6,18 @@ import {createShipNavigation} from '../../app/js/expedition/ship-navigation.js';
 import {mkdir,writeFile} from 'node:fs/promises';
 import {chromium} from 'playwright';
 import {startStaticServer} from './static-server.mjs';
+import {configureStagingAppCheck} from './staging-app-check.mjs';
+import {closeOwnedBrowser} from './owned-browser.mjs';
 const controlsOnly=process.env.WE3D_SHIP_SCOPE==='controls';
 const out=controlsOnly?'output/verification/ship-controls':'output/verification/ship-traversal';
 await mkdir(out,{recursive:true});
 const report={ok:false,runtimeRoot:process.env.WE3D_VERIFY_ROOT||'.',errors:[],decks:[]};
-let browser,server,page;
+let browser,server,page,owned;
 try{
  server=await startStaticServer({rootDir:process.env.WE3D_VERIFY_ROOT||process.cwd(),ports:[4477]});
- browser=await chromium.launch({headless:true,channel:'chrome'});
+ owned=await chromium.launchServer({headless:false,channel:'chrome'});browser=await chromium.connect(owned.wsEndpoint());
  page=await browser.newPage({viewport:{width:1280,height:800}});
+ await configureStagingAppCheck(page,`http://127.0.0.1:${server.port}`);
  page.on('pageerror',e=>report.errors.push(String(e)));
  await page.goto(`http://127.0.0.1:${server.port}/app/?launch=space&diagnostics=1`,{waitUntil:'domcontentloaded'});
  await page.waitForFunction(()=>globalThis.__WE3D_RUNTIME_READY__,null,{timeout:120000});
@@ -141,4 +144,4 @@ try{
  assert.deepEqual(report.errors,[]);
  report.ok=true;
 }catch(e){report.failure=String(e);process.exitCode=1;await page?.screenshot({path:`${out}/failure.png`}).catch(()=>{});}
-finally{await writeFile(`${out}/report.json`,JSON.stringify(report,null,2));await browser?.close();await server?.close();console.log(JSON.stringify({ok:report.ok,failure:report.failure,errors:report.errors,liftBefore:report.liftBefore&&{x:report.liftBefore.x,z:report.liftBefore.z,focus:report.liftBefore.focus},liftAfter:report.liftAfter&&{x:report.liftAfter.x,z:report.liftAfter.z,focus:report.liftAfter.focus}}));}
+finally{await writeFile(`${out}/report.json`,JSON.stringify(report,null,2));await (owned?closeOwnedBrowser(owned):browser?.close());await server?.close();console.log(JSON.stringify({ok:report.ok,failure:report.failure,errors:report.errors,liftBefore:report.liftBefore&&{x:report.liftBefore.x,z:report.liftBefore.z,focus:report.liftBefore.focus},liftAfter:report.liftAfter&&{x:report.liftAfter.x,z:report.liftAfter.z,focus:report.liftAfter.focus}}));}

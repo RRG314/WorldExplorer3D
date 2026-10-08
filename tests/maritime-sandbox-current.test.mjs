@@ -70,6 +70,7 @@ test('ocean transfer keeps the selected vessel identity and condition', async ()
   const travelCalls = [];
   const appCtx = {
     SCALE: 1000,
+    LOC: {lat:12,lon:34},
     ENV: { EARTH: 'EARTH' },
     boat: { x: 12, z: 18, angle: .7 },
     boatMode: {
@@ -83,7 +84,6 @@ test('ocean transfer keeps the selected vessel identity and condition', async ()
     },
     customLoc: { name: 'Test Water' },
     oceanMode: { active: false },
-    worldToLatLon: () => ({ lat: 12, lon: 34 }),
     startOceanMode(options) {
       this.oceanMode = {
         active: true,
@@ -98,7 +98,7 @@ test('ocean transfer keeps the selected vessel identity and condition', async ()
       return mode;
     },
     setCustomLocation() {},
-    exitCurrentEnvironmentSync() {},
+    exitCurrentEnvironmentSync() {this.oceanMode.active=false;},
     commitEnvironment() {}
   };
   const originalDocument = globalThis.document;
@@ -126,7 +126,8 @@ test('ocean transfer keeps the selected vessel identity and condition', async ()
     assert.deepEqual(appCtx.boatMode.oceanTransferVessel, {
       transportEntityId: 'generated-vessel:test:research',
       transportCatalogId: 'ocean-research-vessel',
-      condition: .63
+      condition: .63,
+      yaw: .7
     });
     assert.equal(await api.transferSubmarineToBoat(), true);
     assert.equal(travelCalls.length, 1);

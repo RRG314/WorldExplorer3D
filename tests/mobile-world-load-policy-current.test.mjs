@@ -55,7 +55,7 @@ test('mobile world load policy bounds provider time and geometry without changin
     assert.equal(mobile.optionalProviderTimeoutMs, 2_500);
     assert.equal(mobile.fixedRegionalGroundTimeoutMs, 2_500);
     assert.equal(mobile.regionalContextRadiusMeters, 6_000);
-    assert.ok(mobile.maxBuildingWays < desktop.maxBuildingWays);
+    assert.equal(mobile.maxBuildingWays, desktop.maxBuildingWays, 'Quality adaptation must not remove mapped buildings from the visible district');
     assert.ok(mobile.maxRoadWays < desktop.maxRoadWays);
     // Legacy mode arguments now use the production policy, independent of hash depth.
     assert.equal(desktop.maxTotalLoadMs, 62_000);

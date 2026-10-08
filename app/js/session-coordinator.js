@@ -6,6 +6,17 @@ import { createLifecycleScope, getLifecycleRegistrySnapshot } from './runtime/li
 const environmentAdapters = new Map();
 let transitionSequence = 0;
 let activeTransition = null;
+let lastTransition = null;
+let sessionAbort = new AbortController();
+
+// Capture this before awaiting work owned by the current environment. World
+// loaders retain their own request generation; consumers may also opt into it.
+export function captureEnvironmentSession({includeWorld = true} = {}) {
+  const generation=transitionSequence,environment=getEnv(),world=appCtx._worldLoadSequence||0;
+  const signal=sessionAbort.signal;
+  return Object.freeze({generation,environment,world,signal,
+    isCurrent:()=>!signal.aborted&&generation===transitionSequence&&environment===getEnv()&&(!includeWorld||world===(appCtx._worldLoadSequence||0))});
+}
 
 function validEnvironment(environment) {
   return Object.values(ENV).includes(environment);
@@ -19,6 +30,7 @@ function finishEnvironmentTransition(token, reason = 'completed') {
   if (!isEnvironmentTransitionCurrent(token)) return false;
   token.finishedAt = performance.now();
   token.finishReason = reason;
+  lastTransition = {generation:token.id,from:token.from,to:token.target,phase:'completed'};
   token.scope.dispose(reason);
   activeTransition = null;
   return true;
@@ -28,15 +40,23 @@ function cancelEnvironmentTransition(token = activeTransition, reason = 'superse
   if (!token || !token.scope.isActive()) return false;
   token.cancelledAt = performance.now();
   token.cancelReason = reason;
+  lastTransition = {generation:token.id,from:token.from,to:token.target,phase:reason === 'failed' ? 'failed' : 'cancelled'};
   token.abortController.abort(reason);
   token.scope.dispose(reason);
-  if (activeTransition === token) activeTransition = null;
+  if (activeTransition === token) {
+    activeTransition = null;
+    sessionAbort.abort(reason);
+    sessionAbort = new AbortController();
+  }
   return true;
 }
 
 function beginEnvironmentTransition(target, options = {}) {
   if (!validEnvironment(target)) throw new Error(`Unknown environment: ${target}`);
   if (activeTransition) cancelEnvironmentTransition(activeTransition, 'superseded');
+  sessionAbort.abort('environment-requested');
+  appCtx.cancelWaterEnvironmentEvidence?.();
+  sessionAbort = new AbortController();
   const id = ++transitionSequence;
   const source = String(options.source || 'runtime');
   const scope = createLifecycleScope(`environment-transition:${id}:${source}`);
@@ -78,6 +98,9 @@ function commitEnvironment(target, options = {}) {
   }
   if (previousEnvironment === ENV.EARTH && target !== ENV.EARTH) {
     clearEarthInteractionPresentation();
+    appCtx.Walk?.deactivateWater?.();
+    appCtx.boatSwimming?.cancel();
+    appCtx.boatDeck?.release();
   }
   token.committedAt = performance.now();
   if (options.finish !== false) finishEnvironmentTransition(token);
@@ -130,6 +153,12 @@ async function transitionEnvironment(target, options = {}) {
   }
 }
 
+// Small status contract; does not invoke environment adapters or copy their
+// player positions, destination labels or room snapshots.
+export function getSessionStatus() {
+  return {generation:transitionSequence,environment:getEnv(),transition:activeTransition?{generation:activeTransition.id,from:activeTransition.from,to:activeTransition.target,phase:Number.isFinite(activeTransition.committedAt)?'committed':'requested'}:lastTransition?{...lastTransition}:null};
+}
+
 function getSessionCoordinatorDebugState() {
   const environments = {};
   environmentAdapters.forEach((adapter, environment) => {
@@ -145,6 +174,7 @@ function getSessionCoordinatorDebugState() {
     }
   });
   return {
+    generation: transitionSequence,
     environment: getEnv(),
     registeredEnvironments: [...environmentAdapters.keys()],
     environments,

@@ -26,7 +26,7 @@ const ROTATE_THRESHOLD_RAD = 0.05;
 const STALE_LAST_SEEN_MS = 45 * 1000;
 const STALE_CLOCK_SKEW_TOLERANCE_MS = 2 * 60 * 1000;
 const MAX_PLAYER_DOCS_READ = 32;
-const ALLOWED_MODES = new Set(['drive', 'walk', 'drone', 'space', 'moon']);
+const ALLOWED_MODES = new Set(['drive', 'walk', 'drone', 'space', 'moon', 'ocean']);
 
 let activeRoomId = null;
 let getPose = null;
@@ -74,7 +74,7 @@ function finiteNumber(value, fallback = 0) {
 
 function normalizeFrame(rawFrame = {}, fallbackKind = 'earth') {
   const kindRaw = String(rawFrame.kind || fallbackKind || 'earth').toLowerCase();
-  const kind = kindRaw === 'moon' || kindRaw === 'space' ? kindRaw : 'earth';
+  const kind = kindRaw === 'moon' || kindRaw === 'space' || kindRaw === 'ocean' ? kindRaw : 'earth';
   return {
     kind,
     locLat: finiteNumber(rawFrame.locLat, 0),

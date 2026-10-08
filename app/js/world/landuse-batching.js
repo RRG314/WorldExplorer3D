@@ -36,7 +36,7 @@ export function batchLanduseMeshes() {
         keep.push(mesh);
         continue;
       }
-      const key = `${type}|${isWaterwayLine ? 1 : 0}|${mesh.renderOrder || 0}|${matKey}`;
+      const key = `${type}|${isWaterwayLine ? 1 : 0}|${mesh.userData?.mappedPedestrianArea?1:0}|${mesh.renderOrder || 0}|${matKey}`;
 
       if (!groups.has(key)) {
         groups.set(key, {
@@ -44,6 +44,7 @@ export function batchLanduseMeshes() {
           material: mesh.material,
           renderOrder: mesh.renderOrder || 0,
           landuseType: type,
+          mappedPedestrianArea: !!mesh.userData?.mappedPedestrianArea,
           isWaterwayLine,
           surfaceVariant: mesh.userData?.surfaceVariant || type,
           alwaysVisible: false,
@@ -114,7 +115,7 @@ export function batchLanduseMeshes() {
       const material = group.material.clone();
       const mergedMesh = new THREE.Mesh(geometry, material);
       mergedMesh.renderOrder = group.renderOrder;
-      mergedMesh.receiveShadow = false;
+      mergedMesh.receiveShadow = true;
       mergedMesh.castShadow = false;
       mergedMesh.frustumCulled = false;
 
@@ -134,6 +135,7 @@ export function batchLanduseMeshes() {
 
       mergedMesh.userData = {
         landuseType: group.landuseType,
+        mappedPedestrianArea: group.mappedPedestrianArea,
         isWaterwayLine: !!group.isWaterwayLine,
         surfaceVariant: group.surfaceVariant,
         isLanduseBatch: true,

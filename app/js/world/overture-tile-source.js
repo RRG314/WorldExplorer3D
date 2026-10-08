@@ -4,11 +4,11 @@ import { getVectorTileLib } from './shortbread-source.js?v=20';
 // release explicit so one immutable application build never changes datasets
 // underneath the player. Release reachability and age are enforced by the
 // source/release gates before a candidate can be accepted.
-const OVERTURE_RELEASE = '2026-08-19.0';
+const OVERTURE_RELEASE = '2026-09-23.1';
 const OVERTURE_RELEASE_POLICY = Object.freeze({
   authority: 'build-pinned-reviewed-overture-release',
   release: OVERTURE_RELEASE,
-  reviewedOn: '2026-08-21',
+  reviewedOn: '2026-10-03',
   publicRetentionDays: 60
 });
 const OVERTURE_THEME_ZOOM = Object.freeze({

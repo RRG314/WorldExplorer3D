@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import {deployResearchSubmarineFromDeck} from './marine-entry-ui.mjs';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { chromium, devices } from 'playwright';
@@ -110,7 +111,14 @@ async function verifyGrantedDestination(destination) {
     const banner = page.locator('#analyticsConsentBanner');
     assert.equal(await banner.isVisible(), false, `${destination.id}: stored analytics preference must not interrupt entry`);
 
+    if(destination.environment==='ocean'){
+      // Consent coverage uses an eligible marine site, not the default land city.
+      await page.locator('#globeCustomLat').fill('-18.2861');
+      await page.locator('#globeCustomLon').fill('147.7');
+      await page.locator('#globeCustomLon').press('Tab');
+    }
     await page.locator(destination.selector).click();
+    if(destination.environment==='ocean') await deployResearchSubmarineFromDeck(page);
     await page.waitForFunction((expectedEnvironment) => {
       if (document.getElementById('loading')?.classList.contains('show')) return false;
       const runtime = globalThis.getWorldExplorerRuntimeDiagnostics?.() || {};

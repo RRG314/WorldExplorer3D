@@ -1,5 +1,7 @@
+import {supportRecorder} from '../runtime/support-receipt.js';
 const BACKPACK_STORAGE_SCHEMA_VERSION = 2;
 const BACKPACK_STORAGE_KEY = 'world-explorer:character-backpack:v2';
+const BACKPACK_CONTROLS_KEY = 'world-explorer:backpack-controls:v1';
 const LEGACY_BACKPACK_STORAGE_KEYS = Object.freeze([
   'world-explorer:character-backpack:v1'
 ]);
@@ -30,7 +32,7 @@ function normalizeBackpackState(value = {}, options = {}) {
     const catalogId = text(candidate?.catalogId, text(candidate?.id));
     if (!instanceId || !catalogId) continue;
     const sourceEventId = text(candidate?.sourceEventId || candidate?.eventId);
-    const eventRewardKey = sourceEventId ? `${sourceEventId}\u0000${catalogId}` : '';
+    const eventRewardKey = sourceEventId ? JSON.stringify([sourceEventId, catalogId]) : '';
     const canonicalForEvent = eventRewardKey ? eventRewards.get(eventRewardKey) : '';
     if (canonicalForEvent) {
       instanceAliases.set(instanceId, canonicalForEvent);
@@ -77,7 +79,8 @@ function normalizeBackpackState(value = {}, options = {}) {
       sourceVersion,
       migratedAt,
       duplicateEventRewardsRemoved: priorDuplicateEventRewardsRemoved + duplicateEventRewardsRemoved,
-      backupAvailable: options.backupAvailable === true
+      backupAvailable: options.backupAvailable === true,
+      saveGeneration: typeof source.migration?.saveGeneration === 'string' ? source.migration.saveGeneration : ''
     }
   };
 }
@@ -93,15 +96,21 @@ function parseStored(storage, key) {
 
 function createLocalBackpackStore(storage = globalThis.localStorage) {
   let lastMigration = null;
+  let lastControls = null;
+  const controls = snapshot => Object.fromEntries(['revision','equippedInstanceId','hotbar','ammo','quantities']
+    .filter(key=>snapshot?.[key]!==undefined).map(key=>[key,clone(snapshot[key])]));
 
   function saveNormalized(snapshot, settings = {}) {
     if (!storage?.setItem || !snapshot) return false;
     try {
-      const normalized = normalizeBackpackState(snapshot, {
+      // A Journal projection contains items/slots but not equipment ammo. Keep
+      // the latest small equipment state when replacing that full projection.
+      const normalized = normalizeBackpackState({...lastControls,...snapshot}, {
         sourceVersion: settings.sourceVersion ?? snapshot.migration?.sourceVersion ?? lastMigration?.sourceVersion,
         migratedAt: settings.migratedAt ?? snapshot.migration?.migratedAt ?? lastMigration?.migratedAt,
         backupAvailable: storage.getItem?.(BACKPACK_BACKUP_KEY) != null
       });
+      normalized.migration.saveGeneration = crypto.randomUUID();
       if (!snapshot.migration && lastMigration) {
         normalized.migration.duplicateEventRewardsRemoved = Math.max(
           normalized.migration.duplicateEventRewardsRemoved,
@@ -110,8 +119,10 @@ function createLocalBackpackStore(storage = globalThis.localStorage) {
       }
       storage.setItem(BACKPACK_STORAGE_KEY, JSON.stringify(normalized));
       lastMigration = normalized.migration;
+      lastControls = controls(normalized);
       return true;
-    } catch (_) {
+    } catch (error) {
+      supportRecorder.record({operation:'inventory-save',error});
       return false;
     }
   }
@@ -125,7 +136,16 @@ function createLocalBackpackStore(storage = globalThis.localStorage) {
         backupAvailable: storage.getItem?.(BACKPACK_BACKUP_KEY) != null
       });
       lastMigration = normalized.migration;
-      if (JSON.stringify(normalized) !== JSON.stringify(current)) saveNormalized(normalized, normalized.migration);
+      const needsNormalizationSave = JSON.stringify(normalized) !== JSON.stringify(current);
+      const supplement = parseStored(storage, BACKPACK_CONTROLS_KEY);
+      if (supplement?.schemaVersion === 1 && supplement.saveGeneration && supplement.saveGeneration === lastMigration?.saveGeneration) {
+        Object.assign(normalized, controls(supplement));
+        const ids = new Set(normalized.items.map(item=>item.instanceId));
+        normalized.hotbar = Array.from({length:6},(_,index)=>ids.has(normalized.hotbar?.[index])?normalized.hotbar[index]:null);
+        if (!ids.has(normalized.equippedInstanceId)) normalized.equippedInstanceId = null;
+      }
+      if (needsNormalizationSave && saveNormalized(normalized, normalized.migration)) normalized.migration = {...lastMigration};
+      lastControls = controls(normalized);
       return normalized;
     }
 
@@ -158,8 +178,10 @@ function createLocalBackpackStore(storage = globalThis.localStorage) {
       storage.setItem(String(backup.sourceKey), JSON.stringify(backup.state));
       storage.removeItem(BACKPACK_STORAGE_KEY);
       lastMigration = null;
+      lastControls = null;
       return true;
-    } catch (_) {
+    } catch (error) {
+      supportRecorder.record({operation:'inventory-save',error});
       return false;
     }
   }
@@ -173,12 +195,22 @@ function createLocalBackpackStore(storage = globalThis.localStorage) {
     load,
     migrationSnapshot() { return lastMigration ? { ...lastMigration } : null; },
     rollbackMigration,
-    save(snapshot) { return saveNormalized(snapshot); }
+    save(snapshot) { return saveNormalized(snapshot); },
+    saveControls(snapshot) {
+      if (!storage?.setItem || !lastMigration?.saveGeneration) return false;
+      try {
+        const latest = controls(snapshot);
+        lastControls = {...lastControls,...latest};
+        storage.setItem(BACKPACK_CONTROLS_KEY, JSON.stringify({schemaVersion:1,saveGeneration:lastMigration.saveGeneration,...lastControls}));
+        return true;
+      } catch (error) { supportRecorder.record({operation:'inventory-save',error}); return false; }
+    }
   });
 }
 
 export {
   BACKPACK_BACKUP_KEY,
+  BACKPACK_CONTROLS_KEY,
   BACKPACK_STORAGE_KEY,
   BACKPACK_STORAGE_SCHEMA_VERSION,
   LEGACY_BACKPACK_STORAGE_KEYS,

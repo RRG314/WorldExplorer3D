@@ -23,14 +23,14 @@ function currentActorWorldPosition() {
 
 function resolveObservedEarthLocation() {
   if (appCtx.oceanMode?.active) {
-    const sub = appCtx.oceanMode.submarine;
+    const sub = appCtx.oceanMode.diver?.active?appCtx.oceanMode.diver.navigationActor():appCtx.oceanMode.submarine;
     const launchSite = appCtx.oceanMode.launchSite || {};
     if (Number.isFinite(sub?.position?.x) && Number.isFinite(sub?.position?.z) && Number.isFinite(launchSite.lat) && Number.isFinite(launchSite.lon)) {
       const lonDenom = appCtx.SCALE * Math.cos(launchSite.lat * Math.PI / 180);
       return {
         lat: launchSite.lat - sub.position.z / appCtx.SCALE,
         lon: launchSite.lon + sub.position.x / (Math.abs(lonDenom) > 0.0001 ? lonDenom : appCtx.SCALE),
-        source: 'ocean_sub'
+        source: appCtx.oceanMode.diver?.active?'ocean_diver':'ocean_sub'
       };
     }
   }

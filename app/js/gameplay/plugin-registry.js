@@ -82,6 +82,19 @@ function createGameplayPluginRegistry(options = {}) {
 
     try {
       const state = record.start?.(context) ?? null;
+      if(state && typeof state.then==='function'){
+        const session={record,state:null,startedAt:now(),starting:true};active=session;
+        return Promise.resolve(state).then(value=>{
+          if(active!==session)return false;
+          if(value===false){stop('start-declined',context);emit('declined',record);return false;}
+          session.state=value;session.starting=false;record.starts++;transitionCount++;emit('started',record);return value;
+        },error=>{
+          if(active!==session)return false;
+          record.failures++;record.lastError=safeError(error);failureCount++;stop('start-failed',context);
+          options.onError?.(error,record.id,'start');emit('failed',record,{phase:'start',error:record.lastError});return false;
+        });
+      }
+      if(state===false){record.stop?.(context,state,'start-declined');emit('declined',record);return false;}
       record.starts++;
       record.lastError = '';
       active = { record, state, startedAt: now() };
@@ -99,7 +112,7 @@ function createGameplayPluginRegistry(options = {}) {
   }
 
   function update(dt, context = {}) {
-    if (!active?.record.update) return;
+    if (!active?.record.update || active.starting || context.appCtx?.paused || context.appCtx?.worldLoading) return;
     const session = active;
     const startedAt = now();
     try {
@@ -129,6 +142,7 @@ function createGameplayPluginRegistry(options = {}) {
   function snapshot() {
     return {
       activeId: active?.record.id || null,
+      starting: active?.starting===true,
       activeForMs: active ? Math.max(0, now() - active.startedAt) : 0,
       registered: plugins.size,
       transitionCount,

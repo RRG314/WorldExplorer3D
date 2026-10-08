@@ -1,3 +1,4 @@
+import { findCoveredCoarseRoadIds } from './vector-resolution-ownership.js';
 import { fixedRegionalContextBounds } from './fixed-regional-context.js?v=9';
 import { fetchBundledLandmarkData } from './landmark-source.js?v=3';
 
@@ -210,6 +211,35 @@ function isDriveableWay(element) {
   return new RegExp(`^(?:${DRIVEABLE_HIGHWAYS})$`).test(highway);
 }
 
+function hasOnlyAssociatedStructureName(way) {
+  const tags = way.tags || {};
+  return tags._nameProvenance === 'spatial-label-association' &&
+    ![tags._reviewedStructureName, tags['bridge:name'], tags['tunnel:name'], tags.ref]
+      .some(value => String(value || '').trim());
+}
+
+function fullyCoveredAssociatedStructures(exactWays, generalizedWays, nodes, originLatitude) {
+  const records = (ways, level) => ways.flatMap(way => {
+    if (way.tags?._sourceTruncated === 'yes') return [];
+    const points = way.nodes.map(id => projectedStructurePoint(nodes.get(id), originLatitude));
+    if (points.some(point => !point)) return [];
+    const layer = Number(way.tags?.layer || 0);
+    if (!Number.isFinite(layer)) return [];
+    return [{
+      id: way.id, level,
+      key: `${structureFamily(way.tags)}:${way.tags.highway}:${layer}`,
+      oneway: way.tags.oneway || '',
+      directed: ['yes', '1', 'true', '-1'].includes(String(way.tags.oneway || '')),
+      points: points.map(point => ({x: point.x, z: point.y}))
+    }];
+  });
+  // A nearby map label cannot identify a structure. Ignore that label only
+  // when every segment is covered within 1.5 m by accepted exact geometry of
+  // the same class and layer. Partial overlaps and neighboring corridors keep
+  // their fallback. In particular, exact building_passage remains at grade.
+  return findCoveredCoarseRoadIds(records(exactWays, 2), records(generalizedWays, 1));
+}
+
 export function pruneSupersededGeneralizedStructures(ways = [], nodes = {}) {
   const worldWays = Array.isArray(ways) ? ways : [];
   const nodeMap = structureNodeMapFromLookup(nodes);
@@ -230,11 +260,16 @@ export function pruneSupersededGeneralizedStructures(ways = [], nodes = {}) {
     nodeMap,
     originLatitude
   );
+  const associatedWays = worldWays.filter(way => isDriveableStructureWay(way) &&
+    way.tags?._sourceCompleteness === 'generalized' && hasOnlyAssociatedStructureName(way));
+  const fullyCovered = fullyCoveredAssociatedStructures(exactWays, associatedWays, nodeMap, originLatitude);
   let supersededGeneralizedStructures = 0;
   const retained = worldWays.filter((way) => {
     if (!isDriveableStructureWay(way) ||
         String(way.tags?._sourceCompleteness || '') !== 'generalized') return true;
-    const spatialDuplicate = generalizedStructureDuplicatesExact(
+    const spatialDuplicate = hasOnlyAssociatedStructureName(way)
+      ? fullyCovered.has(way.id)
+      : generalizedStructureDuplicatesExact(
       way,
       nodeMap,
       originLatitude,

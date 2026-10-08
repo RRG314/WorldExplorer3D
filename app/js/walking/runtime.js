@@ -1,3 +1,4 @@
+import { queryPlanetaryObstacle } from '../planetary/runtime/obstacle-authority.js?v=1';
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { resolveTunnelCameraEnvelope } from '../hud/tunnel-camera-envelope.js?v=6';
 import { resolveTunnelCameraBoom } from '../hud/tunnel-camera-boom.js';
@@ -10,6 +11,7 @@ function createWalkingRuntimeHelpers({
   carMesh,
   clampPointInsideFootprint,
   createCharacterMesh,
+  deactivateWater,
   finiteOr,
   getSafeDriveY,
   getWalkGroundY,
@@ -84,6 +86,7 @@ function createWalkingRuntimeHelpers({
       return;
     }
 
+    deactivateWater?.();
     const wasWalk = state.mode === "walk";
     state.mode = "drive";
     state.walker._resolvedGroundState = null;
@@ -208,7 +211,8 @@ function createWalkingRuntimeHelpers({
     const pitchBackScale = Math.max(0.46, Math.cos(walker.pitch));
     const camX = walker.x - Math.sin(cameraYaw) * pitchBackScale * back;
     const camZ = walker.z - Math.cos(cameraYaw) * pitchBackScale * back;
-    const camY = baseY + up - Math.sin(walker.pitch) * back * 0.42;
+    const swim = state.walker.swimming;
+    const camY = swim?.submerged ? Math.min(swim.surfaceY-.25,baseY+.65) : baseY + up - Math.sin(walker.pitch) * back * 0.42;
 
     let resolvedCamX = camX;
     let resolvedCamZ = camZ;
@@ -218,14 +222,18 @@ function createWalkingRuntimeHelpers({
       resolvedCamZ = clamped.z;
     }
 
-    const cameraAnchor = { x: walker.x, y: tunnelEnvelope.inside ? baseY : baseY + 1.35, z: walker.z };
+    const cameraAnchor = { x: walker.x, y: tunnelEnvelope.inside || swim?.submerged ? baseY : baseY + 1.35, z: walker.z };
     let collisionSafeCamera = resolveThirdPersonCameraCollision({
       anchor: cameraAnchor,
       target: { x: resolvedCamX, y: camY, z: resolvedCamZ },
-      checkBuildingCollision: appCtx.checkBuildingCollision,
+      checkBuildingCollision: appCtx.onMoon || appCtx.onMars || appCtx.activePlanetaryBodyId
+        ? (x,z,radius,vertical) => queryPlanetaryObstacle(x,z,radius,appCtx.activePlanetaryBodyId || (appCtx.onMoon?'moon':'mars'),
+          {minY:vertical.actorBaseY,maxY:vertical.actorBaseY+vertical.actorHeight})
+        : appCtx.checkBuildingCollision,
       probeSpacing: interiorCamera ? 0.24 : 0.45,
       clearance: interiorCamera ? 0.22 : 0.32
     });
+    collisionSafeCamera=appCtx.boatSwimming?.cameraPose(cameraAnchor,collisionSafeCamera)||collisionSafeCamera;
     if (tunnelEnvelope.inside) {
       collisionSafeCamera = { ...collisionSafeCamera,
         ...resolveTunnelCameraBoom(tunnelRoad, cameraAnchor, collisionSafeCamera) };

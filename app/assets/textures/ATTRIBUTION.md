@@ -69,9 +69,9 @@ Each source is a two-dimensional material surface with no triangle count. Runtim
 
 ## Live Data Providers
 
-- Aircraft state vectors: The OpenSky Network live API, used under OpenSky terms for research and non-commercial use. Source: https://openskynetwork.github.io/opensky-api/
+- Aircraft state vectors: ADSB.lol public API, ODbL 1.0. Source: https://www.adsb.lol/docs/open-data/api/ . Altitude and climb rates are converted to metric units; unavailable fields remain unknown.
 - Street imagery: Panoramax and KartaView community observations, CC BY-SA 4.0.
-- Global marine model guidance: Open-Meteo Marine Weather API under provider terms. Source: https://open-meteo.com/en/docs/marine-weather-api
+- Marine guidance: PacIOOS WAVEWATCH III waves and HYCOM / FNMOC ESPC surface current/temperature models. Free public data; independent grids and timestamps. See root ATTRIBUTION.md for source and licence links.
 - United States water-level observations and tide predictions: NOAA Center for Operational Oceanographic Products and Services. Source: https://tidesandcurrents.noaa.gov/
 
 ## September 25 space image correction

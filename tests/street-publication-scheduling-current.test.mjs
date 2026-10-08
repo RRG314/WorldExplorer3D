@@ -32,7 +32,11 @@ test('cancelled contact construction cannot return a partial index',async()=>{
 test('scheduled mapped paths preserve clipping, vertex order and material groups',async t=>{
  const prior=globalThis.THREE;t.after(()=>{globalThis.THREE=prior;});
  class Geometry{setAttribute(k,v){(this.attributes||={})[k]=v;}setIndex(v){this.index=v;}computeVertexNormals(){}computeBoundingSphere(){}}
- globalThis.THREE={BufferGeometry:Geometry,Float32BufferAttribute:class{constructor(array){this.array=new Float32Array(array);}},MeshStandardMaterial:class{constructor(options){this.options=options;}},Mesh:class{constructor(geometry,material){Object.assign(this,{geometry,material,userData:{}});}},DoubleSide:2};
+ class Attribute{constructor(array){this.array=new Float32Array(array);}}
+ globalThis.THREE={BufferGeometry:Geometry,Float32BufferAttribute:Attribute,BufferAttribute:Attribute,
+  DataTexture:class{constructor(data,width,height){Object.assign(this,{data,width,height});}dispose(){}},
+  MeshStandardMaterial:class{constructor(options){this.options=options;}addEventListener(){}},
+  Mesh:class{constructor(geometry,material){Object.assign(this,{geometry,material,userData:{}});}},DoubleSide:2};
  const context=()=>({scene:{},linearFeatureMeshes:[],addEarthWorldObject(){}});
  const options={features:Array.from({length:100},(_,i)=>({kind:i%2?'footway':'cycleway',subtype:'sidewalk',width:2,pts:[{x:-20,z:i},{x:20,z:i}]})),pavementBounds:{minX:-2,maxX:2,minZ:0,maxZ:50},worldBaseTerrainY:()=>0,
  buildFeatureRibbonEdges:(feature,points,half)=>({leftEdge:points.map(p=>({x:p.x,y:0,z:p.z-half})),rightEdge:points.map(p=>({x:p.x,y:0,z:p.z+half}))})};

@@ -2,6 +2,7 @@ let modulePromise = null;
 let removeTitleActivator = null;
 
 function installOnDemandFlowerChallenge(appCtx) {
+  let startGeneration=0;
   function installTitleActivator() {
     if (removeTitleActivator) return false;
     const button = document.getElementById('flowerChallengeToggleBtn');
@@ -62,12 +63,16 @@ function installOnDemandFlowerChallenge(appCtx) {
     },
     setupFlowerChallenge: installTitleActivator,
     startFlowerChallenge: async (...args) => {
+      const generation=++startGeneration;
       const challenge = await ensureFlowerChallengeReady();
+      if(generation!==startGeneration)return false;
       return challenge.startFlowerChallenge?.(...args) ?? false;
     },
-    stopFlowerChallenge: (...args) => modulePromise
-      ? void modulePromise.then((challenge) => challenge.stopFlowerChallenge?.(...args))
-      : false,
+    stopFlowerChallenge: (...args) => {
+      const generation=++startGeneration;
+      if(modulePromise)void modulePromise.then(challenge=>{if(generation===startGeneration)challenge.stopFlowerChallenge?.(...args)});
+      return false;
+    },
     submitFishingScore: async (...args) => {
       const challenge = await ensureFlowerChallengeReady();
       return challenge.submitFishingScore?.(...args) ?? false;

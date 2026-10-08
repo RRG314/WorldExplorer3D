@@ -1,3 +1,5 @@
+import {supportRecorder} from '../runtime/support-receipt.js';
+import { commitEarthLocationOrigin } from '../earth-core/location-origin.js?v=1';
 import {rdtDepth} from '../rdt.js';
 import {emitLocalLoadTrace} from './load-trace.js';
 import { createBuildingProvenanceSnapshot } from './building-provenance-model.js?v=1';
@@ -15,6 +17,8 @@ import { WORLD_COLLECTION_NAMES } from './collection-registry.js?v=1';
 import { compileWorldLayerProducts } from './compiler/world-layer-products.js?v=4';
 import { publishWorldPublicationSnapshot } from './world-snapshot-adapter.js?v=4';
 import { compilePoiLifecycle } from '../poi/lifecycle.js?v=1';
+import {worldLoadAbortError} from '../earth-core/request-cancellation.js?v=1';
+import {finishFailedWorldLoad} from './load-failure.js';
 
 export function createWorldLoadRuntimeSession(options = {}) {
   const {
@@ -36,6 +40,13 @@ export function createWorldLoadRuntimeSession(options = {}) {
   const locationSelection = appCtx.resolveLocationSelection?.() || null;
   const nextLoadSequence = Number(appCtx._worldLoadSequence || 0) + 1;
   const loadRequest = createWorldLoadRequest(locationSelection, nextLoadSequence);
+  // Admission precedes reset: rejecting an input must leave the current world,
+  // publication and player pose intact.
+  if (!loadRequest) {
+    appCtx.showToast?.('Choose a valid location. The current world has been kept.');
+    return {aborted: true, reason: 'invalid_location_selection'};
+  }
+  if (appCtx.boatMode?.active) appCtx.stopBoatMode?.({targetMode: 'walk'});
   const locName = loadRequest?.name || 'Unknown location';
   const perfModeNow = 'baseline';
   const loadMetrics = {
@@ -84,6 +95,7 @@ export function createWorldLoadRuntimeSession(options = {}) {
     if (perfLoadFinalized) return;
     perfLoadFinalized = true;
     loadMetrics.success = !!success;
+    if(!success) supportRecorder.record({operation:'world-load',category:'request-failed'});
     const payload = { ...loadMetrics, ...extra };
     if (typeof appCtx.finishPerfLoad === 'function') appCtx.finishPerfLoad(payload);
   };
@@ -102,6 +114,7 @@ export function createWorldLoadRuntimeSession(options = {}) {
       runtimeState.activePhases = Object.keys(phaseStartedAt);
       runtimeState.updatedAt = performance.now();
     }
+    if (runtimeState?.status === 'loading' && appCtx.worldLoadRuntimeState === runtimeState) appCtx.showLoad?.('', { phase: name });
   };
   const endLoadPhase = (name) => {
     if (!name) return;
@@ -139,15 +152,7 @@ export function createWorldLoadRuntimeSession(options = {}) {
   appCtx.poiTenanciesByBuilding = new Map();
   appCtx.refreshActiveFunctionalPois = null;
 
-  if (!loadRequest) {
-    appCtx.showLoad('Choose a valid location');
-    appCtx.worldLoading = false;
-    appCtx.discardEarthWorldSceneLoad?.(nextLoadSequence);
-    appCtx.enforceEnvironmentSceneOwnership?.();
-    finalizePerfLoad(false, { reason: 'invalid_location_selection' });
-    return { aborted: true };
-  }
-  appCtx.LOC = { ...loadRequest.location };
+  commitEarthLocationOrigin(appCtx, loadRequest.location);
   if (loadRequest.selection.key === 'custom') {
     appCtx.setCustomLocation?.(loadRequest.selection, { syncInputs: false });
   }
@@ -160,6 +165,8 @@ export function createWorldLoadRuntimeSession(options = {}) {
   const loadLocation = loadRequest.location;
   const worldSession = createWorldLoadSession(loadRequest, { now: () => performance.now() });
   const providerAbortController = new AbortController();
+  const providerTasks = new Set();
+  let providersClosed = false;
   const restoreCommand = createSelectionRestoreCommand(loadRequest);
   const restoreRequestedSelection = () => {
     if (restoreCommand?.method === 'setCustomLocation') {
@@ -201,10 +208,14 @@ export function createWorldLoadRuntimeSession(options = {}) {
     }
     return active;
   };
-  const runProviderWork = async (provider, operation, task) => {
+  const runProviderWork = (provider, operation, task) => {
+    if (providersClosed || providerAbortController.signal.aborted ||
+        !worldSession.isActive() || !isActiveLoadContext()) {
+      return Promise.reject(worldLoadAbortError(providerAbortController.signal, 'World load no longer accepts provider work'));
+    }
     const token = worldSession.beginProviderWork(provider, operation);
     syncWorldSessionState();
-    try {
+    const pending = (async () => { try {
       const result = await task(providerAbortController.signal);
       if (token) worldSession.settleProviderWork(token, isActiveLoadContext() ? 'completed' : 'discarded');
       syncWorldSessionState();
@@ -216,7 +227,18 @@ export function createWorldLoadRuntimeSession(options = {}) {
       if (token) worldSession.settleProviderWork(token, outcome);
       syncWorldSessionState();
       throw error;
-    }
+    } })();
+    providerTasks.add(pending);
+    // Observe both outcomes immediately, including callers that only join a
+    // parallel result later. Keep the original rejection visible to the caller.
+    pending.then(() => providerTasks.delete(pending), () => providerTasks.delete(pending));
+    return pending;
+  };
+  const drainProviderWork = async (reason = 'world-load-finished') => {
+    providersClosed = true;
+    providerAbortController.abort(reason);
+    await Promise.allSettled([...providerTasks]);
+    syncWorldSessionState();
   };
   const releaseWorldLoadCancellation = typeof registerWorldLoadCancellation === 'function'
     ? registerWorldLoadCancellation((reason = 'superseded') => {
@@ -276,7 +298,14 @@ export function createWorldLoadRuntimeSession(options = {}) {
     authorityBudgetScale,
     dynamicBudgetState.deviceClass
   );
-  const lodThresholds = getWorldLodThresholds(0, perfModeNow, dynamicBudgetState.lodScale);
+  // These thresholds also define source selection, colliders and the near/far
+  // publication boundary. A slower previous frame must not shrink the next
+  // desktop world's authoritative district. Keep the fixed mobile device cap.
+  const authorityLodScale = dynamicBudgetState.deviceClass === 'mobile'
+    ? dynamicBudgetState.lodScale
+    : 1;
+  const lodThresholds = getWorldLodThresholds(0, perfModeNow, authorityLodScale);
+  runtimeState.buildingVisibleRadiusWorld = lodThresholds.farVisible;
   const plannedDetailRadiusDeg = Number(loadProfile.radii?.[0]);
   appCtx.plannedEarthDetailRadiusWorld = Number.isFinite(plannedDetailRadiusDeg)
     ? Math.max(800, Math.round(plannedDetailRadiusDeg * (appCtx.SCALE || 100000) * 0.92))
@@ -324,6 +353,7 @@ export function createWorldLoadRuntimeSession(options = {}) {
     runtimeState,
     restoreRequestedSelection,
     abortProviderWork: reason=>providerAbortController.abort(reason),
+    drainProviderWork,
     releaseWorldLoadCancellation,
     runProviderWork,
     startLoadPhase,
@@ -481,6 +511,7 @@ export async function finishWorldLoadRuntimeSession(session = {}) {
     runtimeState.updatedAt = performance.now();
   }
   const gameplayRuntimeStartedAt = performance.now();
+  if (appCtx.worldLoadRuntimeState === runtimeState) appCtx.showLoad?.('', { phase: 'gameplay' });
   let livingWorld = null;
   let urbanSandbox = null;
   let aviation = null;
@@ -497,7 +528,11 @@ export async function finishWorldLoadRuntimeSession(session = {}) {
     const startedAt = performance.now();
     traceStartup('start', name);
     try {
-      return await task();
+      const result = await task();
+      if (result && appCtx.worldLoadRuntimeState === runtimeState && worldSession?.isActive?.()) {
+        appCtx.showLoad?.('', { phase: name });
+      }
+      return result;
     } finally {
       gameplayStartupDurationsMs[name] = Math.round(performance.now() - startedAt);
       traceStartup('end', name, gameplayStartupDurationsMs[name]);
@@ -579,23 +614,7 @@ export async function finishWorldLoadRuntimeSession(session = {}) {
     if (worldSession?.isActive?.() === false) {
       return finishSupersededWorldLoadRuntimeSession(session, 'superseded-during-gameplay-runtime-startup');
     }
-    if (runtimeState) {
-      runtimeState.status = 'failed';
-      runtimeState.gameplayRuntimesReady = false;
-      runtimeState.gameplayRuntimeError = String(error?.message || error);
-      runtimeState.updatedAt = performance.now();
-      runtimeState.finishedAt = runtimeState.updatedAt;
-    }
-    console.warn('[WorldLoad] Essential Earth gameplay runtime startup failed:', error);
-    worldSession?.fail?.('essential-gameplay-runtime-startup-failed');
-    syncWorldSessionState?.();
-    appCtx.worldLoading = false;
-    appCtx.enforceEnvironmentSceneOwnership?.();
-    appCtx.hideLoad?.();
-    appCtx.showToast?.('This location could not finish loading. Try switching locations or reload.');
-    finalizePerfLoad(false, { reason: 'essential-gameplay-runtime-startup-failed' });
-    releaseWorldLoadCancellation?.();
-    return worldSession?.snapshot?.() || null;
+    return finishFailedWorldLoad(session, error, {reason: 'essential-gameplay-runtime-startup-failed'});
   }
   if (runtimeState) {
     runtimeState.gameplayRuntimesReady = !!(
@@ -617,29 +636,17 @@ export async function finishWorldLoadRuntimeSession(session = {}) {
     if(runtimeState)runtimeState.firstRender=firstRender || null;
   } catch(error) {
     disposeGameplayRuntimesForPublication(appCtx,publication,'first-render-failed');
-    worldSession?.fail?.('first-render-failed');
-    syncWorldSessionState?.();
-    if(runtimeState){
-      runtimeState.status='failed';runtimeState.geometryReady=false;runtimeState.gameplayRuntimesReady=false;
-      runtimeState.firstRenderError=String(error?.message || error);
-      runtimeState.finishedAt=runtimeState.updatedAt=performance.now();
-    }
-    appCtx.gameStarted=false;
-    appCtx.initialEarthWorldReady=false;
-    try {appCtx.releaseEarthWorldForTitle?.();}
-    catch(cleanupError){console.error('[World] First-render failure cleanup failed',cleanupError);}
-    appCtx.hideLoad?.();
-    appCtx.showToast?.('This location could not draw its first frame. Return to the menu and try again.');
-    finalizePerfLoad(false,{reason:'first-render-failed'});
-    releaseWorldLoadCancellation?.();
-    return worldSession?.snapshot?.() || null;
+    return finishFailedWorldLoad(session, error, {reason: 'first-render-failed'});
   }
   appCtx.hideLoad?.();
   void appCtx.refreshNearbyCapturePresentation?.();
   scheduleAfterFirstPlay(`earth-ambient-state-${publication.sequence}`, () => {
     appCtx.refreshAstronomicalSky?.(true);
     return appCtx.refreshLiveWeather?.(true);
-  }, { timeout: 1200 });
+  }, { timeout: 1200, once: false, isCurrent: () =>
+    appCtx.worldPublication === publication && appCtx.initialEarthWorldReady === true &&
+    !appCtx.worldLoading && !!appCtx.gameStarted && !appCtx.activeShipInterior &&
+    appCtx.isEnv?.(appCtx.ENV?.EARTH) === true });
   markFirstPlayReady({
     environment: 'earth',
     loadDurationMs: Math.round(performance.now() - Number(runtimeState?.startedAt || performance.now())),

@@ -1,7 +1,9 @@
+import { geometryAttributeBuffers, releaseOwnedConstructionBuffers } from './geometry-batch-storage.js';
+
 // Collapse only byte-identical vertices belonging to the same source mesh.
 // Keep triangle order and index ranges: editing one building must never move
 // a neighbor, even when their walls touch at exactly the same coordinates.
-export function compactBuildingVertices(geometry, ranges) {
+export function compactBuildingVertices(geometry, ranges, { consumeSource = false } = {}) {
   const attributes=Object.entries(geometry.attributes),indices=geometry.index?.array;
   if(!indices?.length || !ranges?.length || attributes.some(([,a])=>!(a.array instanceof Float32Array)||a.isInterleavedBufferAttribute))return null;
   let end=0;
@@ -11,6 +13,11 @@ export function compactBuildingVertices(geometry, ranges) {
   const vertexCount=geometry.attributes.position.count;
   let size=1;while(size<indices.length*2)size*=2;
   const slots=new Uint32Array(size),domains=new Uint32Array(indices.length),sources=new Uint32Array(indices.length),nextIndices=new Uint32Array(indices.length);
+  const scratchBuffers=[slots.buffer,domains.buffer,sources.buffer,nextIndices.buffer];
+  // Only the unpublished building batch opts into consuming its old attributes.
+  // Default callers may share those arrays with another mesh or editor.
+  const sourceBuffers=consumeSource?geometryAttributeBuffers(geometry):new Set();
+  try {
   let count=0,domain=0;
   for(const range of ranges){
     domain++;
@@ -41,4 +48,9 @@ export function compactBuildingVertices(geometry, ranges) {
   savedBytes+=indices.byteLength-packed.byteLength;
   geometry.index.array=packed;geometry.index.count=packed.length;
   return {beforeVertices:vertexCount,afterVertices:count,savedBytes};
+  } finally {
+    const retained=geometryAttributeBuffers(geometry);
+    releaseOwnedConstructionBuffers(scratchBuffers,retained);
+    releaseOwnedConstructionBuffers(sourceBuffers,retained);
+  }
 }

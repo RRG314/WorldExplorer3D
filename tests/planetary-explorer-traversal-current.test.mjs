@@ -81,3 +81,13 @@ test('Earth explorer restoration remains valid while its host is temporarily off
     assetId: 'character-field-explorer-woman-v1'
   }), false);
 });
+
+
+test('registered extrasolar solid surfaces use a sealed suit without inventing an Earth identity', () => {
+  for (const id of ['proxima-centauri-b','andromeda-explorer-a-b']) {
+    const desired=desiredPlanetaryCharacter(id,{solidSurface:true});
+    assert.equal(desired.assetId,'character-ship-crew-v1');assert.equal(desired.bodyId,id);
+  }
+  assert.equal(desiredPlanetaryCharacter('earth',{solidSurface:true}).role,'player-character');
+  assert.equal(desiredPlanetaryCharacter('unknown').role,'player-character');
+});

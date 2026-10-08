@@ -1,12 +1,56 @@
 import {pavementMaskLayout} from './compiler/pavement-mask.js';
 
+// Terrain road and pavement coverage share one compositional hook. Disposing
+// the earlier layer must not leave its closure/textures captured by the later
+// layer, nor restore a retired hook when the later layer is eventually removed.
+const materialCoverageLayers = new WeakMap();
+// r128 reuses a material's previously compiled program without calling
+// onBeforeCompile again. Keep each material's uniform objects stable even when
+// an entire coverage owner is retired and later reinstalled on that material.
+const materialCoverageUniforms = new WeakMap();
+function stableCoverageUniforms(material, values) {
+  let uniforms = materialCoverageUniforms.get(material);
+  if (!uniforms) { uniforms={};materialCoverageUniforms.set(material,uniforms); }
+  for (const [name, uniform] of Object.entries(values)) {
+    if (uniforms[name]) uniforms[name].value=uniform.value;
+    else uniforms[name]={value:uniform.value};
+  }
+  return Object.fromEntries(Object.keys(values).map(name=>[name,uniforms[name]]));
+}
+function registerCoverageLayer(material, token, layer) {
+  let entry = materialCoverageLayers.get(material);
+  if (!entry) {
+    const previousCompile = material.onBeforeCompile, previousKey = material.customProgramCacheKey;
+    entry = { previousCompile, previousKey, layers: new Map() };
+    entry.compile = (shader, renderer) => {
+      previousCompile?.call(material, shader, renderer);
+      for (const value of entry.layers.values()) value.apply(shader);
+    };
+    entry.key = () => `${previousKey?.call(material) || ''}:${[...entry.layers.values()].map(value => value.key).join(':')}`;
+    material.onBeforeCompile = entry.compile; material.customProgramCacheKey = entry.key;
+    materialCoverageLayers.set(material, entry);
+  }
+  entry.layers.set(token, layer); material.needsUpdate = true;
+}
+function unregisterCoverageLayer(material, token) {
+  const entry = materialCoverageLayers.get(material);
+  if (!entry || !entry.layers.delete(token)) return;
+  if (!entry.layers.size) {
+    if (material.onBeforeCompile === entry.compile) material.onBeforeCompile = entry.previousCompile;
+    if (material.customProgramCacheKey === entry.key) material.customProgramCacheKey = entry.previousKey;
+    materialCoverageLayers.delete(material);
+  }
+  material.needsUpdate = true;
+}
+
 export function createPavementMaterialBinding(appCtx,{kind="pavement",color=[0.5029,0.4851,0.4564]}={}) {
-  const hooks=new Map(),uniforms={};
+  const hooks=new Set(),uniforms={pavementColor:{value:new Float32Array(color)}},token={};
   const names=text=>kind==="road"?text.replaceAll("pavement","roadCoverage").replaceAll("Pavement","RoadCoverage"):text;
   const prelude=`varying vec2 pavementWorldXZ;
   uniform sampler2D pavementMaskAtlas;
   uniform sampler2D pavementMaskLookup;
   uniform float pavementMaskEnabled;
+  uniform vec3 pavementColor;
   uniform float pavementCellSize;
   uniform vec4 pavementMaskGrid;
   uniform vec4 pavementMaskLayout;
@@ -23,33 +67,48 @@ export function createPavementMaterialBinding(appCtx,{kind="pavement",color=[0.5
     vec2 local=clamp(fract(pavementWorldXZ/pavementCellSize)*pavementMaskLayout.y,vec2(0.5),vec2(pavementMaskLayout.y-0.5));
     return texture2D(pavementMaskAtlas,(tile*pavementMaskLayout.y+local)/pavementMaskLayout.zw).r;
   }`;
-  function restore(material,entry){
-    if(material.onBeforeCompile===entry.compile)material.onBeforeCompile=entry.previousCompile;
-    if(material.customProgramCacheKey===entry.key)material.customProgramCacheKey=entry.previousKey;
-    material.needsUpdate=true;
-  }
   function syncMaterials(){
     const materials=new Set();
     for(const mesh of appCtx.terrainGroup?.children||[])if(mesh.userData?.isTerrainMesh||mesh.userData?.isFixedLocationTerrainLod){for(const material of Array.isArray(mesh.material)?mesh.material:[mesh.material])if(material)materials.add(material);}
     for(const mesh of appCtx.landuseMeshes||[])if(!['water','river','pond','reservoir','basin'].includes(mesh.userData?.landuseType))for(const material of Array.isArray(mesh.material)?mesh.material:[mesh.material])if(material)materials.add(material);
-    for(const [material,entry] of hooks)if(!materials.has(material)){restore(material,entry);hooks.delete(material);}
+    for(const material of hooks)if(!materials.has(material)){unregisterCoverageLayer(material,token);hooks.delete(material);}
     for(const material of materials)if(!hooks.has(material)){
-      const previousCompile=material.onBeforeCompile,previousKey=material.customProgramCacheKey;
-      const compile=(shader,renderer)=>{
-        previousCompile?.call(material,shader,renderer);Object.assign(shader.uniforms,Object.fromEntries(Object.entries(uniforms).map(([key,value])=>[names(key),value])));
+      const values=()=>Object.fromEntries(Object.entries(uniforms).map(([key,value])=>[names(key),value]));
+      stableCoverageUniforms(material,values());
+      const apply=shader=>{
+        Object.assign(shader.uniforms,stableCoverageUniforms(material,values()));
         shader.vertexShader=names('varying vec2 pavementWorldXZ;\n')+shader.vertexShader.replace('#include <begin_vertex>',names('#include <begin_vertex>\npavementWorldXZ=(modelMatrix*vec4(transformed,1.0)).xz;'));
-        shader.fragmentShader=names(prelude)+'\n'+shader.fragmentShader.replace('#include <color_fragment>',names(`#include <color_fragment>\ndiffuseColor.rgb=mix(diffuseColor.rgb,vec3(${color.map(n=>n.toFixed(6)).join(',')}),pavementCoverage());`));
+        shader.fragmentShader=names(prelude)+'\n'+shader.fragmentShader.replace('#include <color_fragment>',names(`#include <color_fragment>\ndiffuseColor.rgb=mix(diffuseColor.rgb,pavementColor,pavementCoverage());`));
       };
-      const key=()=>`${previousKey?.call(material)||''}:${kind}-terrain-mask-v2`;
-      hooks.set(material,{previousCompile,previousKey,compile,key});material.onBeforeCompile=compile;material.customProgramCacheKey=key;material.needsUpdate=true;
+      registerCoverageLayer(material,token,{apply,key:`${kind}-terrain-mask-v2`});hooks.add(material);
     }
     return materials.size;
   }
-  return {syncMaterials,
+  function detachMaterials(){
+    for(const material of hooks){
+      // A cached Three program can outlive this lease. Release its CPU atlas
+      // references as well as disabling the shader; GPU disposal alone does
+      // not free the typed arrays retained through those stable uniforms.
+      stableCoverageUniforms(material,{
+        [names('pavementMaskEnabled')]:{value:0},
+        [names('pavementMaskAtlas')]:{value:null},
+        [names('pavementMaskLookup')]:{value:null}
+      });
+      unregisterCoverageLayer(material,token);
+    }
+    hooks.clear();
+  }
+  return {syncMaterials,detachMaterials,
     setUniforms(next){for(const [key,uniform] of Object.entries(next)){
       if(uniforms[key])uniforms[key].value=uniform.value;else uniforms[key]={value:uniform.value};
+      for(const material of hooks)stableCoverageUniforms(material,{[names(key)]:uniform});
     }},
-    dispose(){if(uniforms.pavementMaskEnabled)uniforms.pavementMaskEnabled.value=0;for(const [material,entry] of hooks)restore(material,entry);hooks.clear();}
+    dispose(){
+      if(uniforms.pavementMaskEnabled)uniforms.pavementMaskEnabled.value=0;
+      for(const key of ['pavementMaskAtlas','pavementMaskLookup'])if(uniforms[key])uniforms[key].value=null;
+      const values=Object.fromEntries(Object.entries(uniforms).map(([key,value])=>[names(key),value]));
+      for(const material of hooks){stableCoverageUniforms(material,values);unregisterCoverageLayer(material,token);}hooks.clear();
+    }
   };
 }
 
@@ -77,7 +136,7 @@ export function createPavementTerrainMask(appCtx,keys,{kind="pavement",cellSize=
   const binding=materialBinding||createPavementMaterialBinding(appCtx,{kind,color});
   const activate=()=>binding.setUniforms(uniforms);
   if(ownsBinding)activate();
-  return {layout,uploadStats,bytes:bytes.byteLength+addresses.byteLength,syncMaterials:binding.syncMaterials,activate,
+  return {layout,uploadStats,bytes:bytes.byteLength+addresses.byteLength,syncMaterials:binding.syncMaterials,detachMaterials:binding.detachMaterials,activate,
     setEnabled(enabled){uniforms.pavementMaskEnabled.value=enabled?1:0;binding.setUniforms({pavementMaskEnabled:uniforms.pavementMaskEnabled});},
     setDetailBounds(b){uniforms.nearPavementBounds.value.set(...(b?[b.minX,b.minZ,b.maxX,b.maxZ]:[1,1,-1,-1]));},
     publish(key,mask){

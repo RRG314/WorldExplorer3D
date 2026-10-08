@@ -114,7 +114,7 @@ const TOOL_CATALOG = Object.freeze([
     tutorialId: 'portable-sonar-v1', sourceRefs: [sourceRef('we3d-original', 'tool:portable-sonar')]
   },
   {
-    id: 'virtual-dive-kit', label: 'Virtual Dive Kit', discipline: 'exploration',
+    id: 'virtual-dive-kit', label: 'Virtual Dive Survey Kit', discipline: 'exploration',
     capabilities: ['dive-survey'], depthBands: ['surface', 'shallow', 'moderate', 'deep'],
     tutorialId: 'virtual-dive-kit-v1', sourceRefs: [sourceRef('we3d-original', 'tool:virtual-dive-kit')]
   },
@@ -209,7 +209,7 @@ const ACTIVITY_CATALOG = Object.freeze([
     contexts: ['fresh-water', 'coast', 'open-ocean'], exclusions: ['sensitive'], sourceRefs: [sourceRef('we3d-original', 'activity:sonar-survey')]
   },
   {
-    id: 'dive-survey', label: 'Dive Virtually', discipline: 'exploration', toolCapability: 'dive-survey',
+    id: 'dive-survey', label: 'Virtual Dive Survey', discipline: 'exploration', toolCapability: 'dive-survey',
     contexts: ['coast', 'open-ocean'], exclusions: ['sensitive'], sourceRefs: [sourceRef('we3d-original', 'activity:dive-survey')]
   },
   {

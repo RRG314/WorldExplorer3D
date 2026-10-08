@@ -2,20 +2,25 @@ import { ctx as appCtx } from "../shared-context.js?v=55";
 
 export function createAsphaltTexture() {
   const canvas = document.createElement('canvas');
-  canvas.width = 256;
-  canvas.height = 256;
-  const ctx = canvas.getContext('2d');
-  ctx.fillStyle = '#2a2a2a';ctx.fillRect(0, 0, 256, 256);
-  const rng = typeof appCtx.seededRandom === 'function' ? appCtx.seededRandom(appCtx.worldSeed ^ 0xA5FA17) : Math.random.bind(Math);
-  for (let i = 0; i < 2000; i++) {
-    const x = rng() * 256,y = rng() * 256;
-    const brightness = 20 + rng() * 40;
-    ctx.fillStyle = `rgb(${brightness}, ${brightness}, ${brightness})`;
-    ctx.fillRect(x, y, 1.5, 1.5);
+  const size=512; canvas.width=canvas.height=size;
+  const paint=canvas.getContext('2d'),pixels=paint.createImageData(size,size);
+  let seed=0xA5FA17;
+  for(let y=0;y<size;y++)for(let x=0;x<size;x++){
+    seed=(Math.imul(seed,1664525)+1013904223)>>>0;
+    const grain=((seed>>>16)&255)/255;
+    // Seamless aggregate plus broad wear. The road owner supplies metre UVs;
+    // one four-metre repeat avoids the previous featureless tiny noise tile.
+    const wear=Math.sin(x/size*Math.PI*2)*Math.cos(y/size*Math.PI*4)*1.2+
+      Math.sin((x+y)/size*Math.PI*6)*.6;
+    const aggregate=grain>.94?12:grain<.08?-13:grain*9-4;
+    const value=103+wear+aggregate,i=(y*size+x)*4;
+    pixels.data.set([value,value+1,value+2,255],i);
   }
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
-  texture.repeat.set(8, 8);
+  paint.putImageData(pixels,0,0);
+  const texture=new THREE.CanvasTexture(canvas);
+  texture.wrapS=texture.wrapT=THREE.RepeatWrapping;
+  texture.encoding=THREE.sRGBEncoding;
+  texture.repeat.set(1,1);
   return texture;
 }
 

@@ -1,8 +1,10 @@
+import { currentMappedGroundIndex, mappedAreaContains } from '../terrain/mapped-ground-evidence.js';
 import {drainCooperatively} from './cooperative-scheduling.js?v=1';
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { isPointInsideWaterFootprint } from "../boat-mode/water-query.js?v=21";
 import { vegetationIdentitySeed, semanticForestWeightAt, nearbyVegetationCells } from './vegetation-spatial.js';
 import {renderVegetationModels} from './vegetation-models.js';
+import {terrainHeightWithPortalCuts} from '../terrain/structure-terrain-portals.js?v=2';
 
 const VEGETATION_ELIGIBLE_TYPES = new Set([
   'forest',
@@ -159,7 +161,7 @@ function isInsideWaterArea(x, z) {
 }
 
 function isVegetationPlacementBlocked(x, z, options = {}) {
-  if (Number.isFinite(appCtx.streetPavement?.sampleAt(x,z))) return true;
+  if (!options.authoredPlanter && Number.isFinite(appCtx.streetPavement?.sampleAt(x,z))) return true;
   if (Math.hypot(x, z) < 18) return true;
   const roadPadding = Number.isFinite(options.roadPadding) ? options.roadPadding : 4.5;
   const buildingPadding = Number.isFinite(options.buildingPadding) ? options.buildingPadding : 1.8;
@@ -168,6 +170,11 @@ function isVegetationPlacementBlocked(x, z, options = {}) {
     typeof appCtx.terrainMeshHeightAt === 'function' ?
       appCtx.terrainMeshHeightAt(x, z) :
       appCtx.elevationWorldYAtWorldXZ(x, z);
+
+  // Placement eligibility must use the same excavation as rendered ground.
+  // Probing the original hillside alone admitted a tree above a deep road;
+  // its visual/contact publication then dropped that tree onto the cut floor.
+  if (terrainHeightWithPortalCuts(appCtx.structureTerrainPortalDescriptors,x,z,terrainY) < terrainY - .001) return true;
 
   const nr = runtime.findNearestRoad(x, z, {
     y: Number.isFinite(terrainY) ? terrainY + 0.4 : NaN,
@@ -184,6 +191,8 @@ function isVegetationPlacementBlocked(x, z, options = {}) {
   for (let i = 0; i < nearbyBuildings.length; i++) {
     const building = nearbyBuildings[i];
     if (!building || building.collisionDisabled) continue;
+    // The planter is the intended support, not an obstruction to its own tree.
+    if (options.authoredPlanter && building.sourceBuildingId === 'authored-calvert-street-fixture') continue;
     if (
       x < building.minX - buildingPadding ||
       x > building.maxX + buildingPadding ||
@@ -199,19 +208,11 @@ function isVegetationPlacementBlocked(x, z, options = {}) {
   return false;
 }
 
-function mappedLanduseAt(x, z) {
-  const landuses = Array.isArray(appCtx.landuses) ? appCtx.landuses : [];
-  for (let i = 0; i < landuses.length; i++) {
-    const landuse = landuses[i];
-    const bounds = landuse?.bounds;
-    if (!bounds || x < bounds.minX || x > bounds.maxX || z < bounds.minZ || z > bounds.maxZ) continue;
-    if (Array.isArray(landuse.pts) && runtime.pointInPolygon(x, z, landuse.pts)) return landuse;
-  }
-  return null;
-}
-
 function* vegetationPlacementSteps() {
   const placements = [];
+  const groundIndex = currentMappedGroundIndex(appCtx);
+  const mappedLanduseAt = (x, z) => groundIndex.sample(x, z);
+  const occupied = new Set();
   const actor=appCtx.activeTransportActor?.();
   const focus={x:Number(actor?.position?.x)||0,z:Number(actor?.position?.z)||0};
   const treeNodes = Array.isArray(appCtx.osmTreeNodes) ? appCtx.osmTreeNodes : [];
@@ -229,10 +230,27 @@ function* vegetationPlacementSteps() {
     if (!placement || placements.length >= maxTrees) return false;
     if (!Number.isFinite(placement.x) || !Number.isFinite(placement.z)) return false;
     if (!['node','tree_row'].includes(placement.source) && Math.hypot(placement.x-focus.x,placement.z-focus.z)>1800) return false;
+    // Explicit trees/rows and authored planters have their own evidence. An
+    // inferred tree cannot overwrite a mapped clearing, wetland or hardscape.
+    if (!['node', 'tree_row', 'authored-reference-block', 'authored-harbor-district'].includes(placement.source)) {
+      const cover = mappedLanduseAt(placement.x, placement.z);
+      if (cover && cover.mode !== 'forest') return false;
+    }
     if (isVegetationPlacementBlocked(placement.x, placement.z, placement.options || undefined)) return false;
+    const key = `${Math.round(placement.x * 10)}:${Math.round(placement.z * 10)}`;
+    if (occupied.has(key)) return false;
+    occupied.add(key);
     placements.push(placement);
     return true;
   };
+
+  for(const root of appCtx.streetFurnitureMeshes || [])if(root.userData?.referenceBlock){
+    for(const p of root.userData.plan || [])if(p.kind==='planter')pushPlacement({x:p.x,z:p.z,scale:.65,rotation:p.yaw,leafType:'broadleaved',landuseType:'garden',source:'authored-reference-block',options:{authoredPlanter:true,roadPadding:1,buildingPadding:.4}});
+  }
+
+  for(const p of appCtx.harborDistrictPlanting || []) {
+    pushPlacement({x:p.x,z:p.z,scale:.85,rotation:p.yaw,leafType:'broadleaved',landuseType:'garden',source:'authored-harbor-district'});
+  }
 
   for (let i = 0; i < treeNodes.length && placements.length < maxTrees; i++) {
     yield;
@@ -329,7 +347,11 @@ function* vegetationPlacementSteps() {
       if (lu.type !== 'orchard' && appCtx.rand01FromInt(seed ^ 0x94d049bb) > 0.45 + cluster * 0.5) continue;
       const tx = (cell.cx + 0.1 + appCtx.rand01FromInt(seed ^ 0x7f4a7c15) * 0.8) * spacing;
       const tz = (cell.cz + 0.1 + appCtx.rand01FromInt(seed ^ 0x165667b1) * 0.8) * spacing;
-      if (!runtime.pointInPolygon(tx, tz, lu.pts)) continue;
+      if (!mappedAreaContains(lu, tx, tz)) continue;
+      const cover = mappedLanduseAt(tx, tz);
+      // Overlapping mapped polygons share one physical owner. Do not stack
+      // independently seeded forests on top of one another.
+      if (cover && cover.pts !== lu.pts) continue;
       pushPlacement({
         x: tx,
         z: tz,
@@ -347,6 +369,7 @@ function* vegetationPlacementSteps() {
         )[Math.floor(appCtx.rand01FromInt(seed ^ 0xd3a2646c) * 4) % (lu.type === 'orchard' || lu.type === 'scrub' ? 3 : 4)],
         source: 'polygon',
         landuseType: lu.type,
+        leafType: lu.tags?.leaf_type || '',
         options: {
           roadPadding:
             lu.type === 'forest' || lu.type === 'wood' ? 2.2 :
@@ -427,7 +450,7 @@ function* vegetationPlacementSteps() {
         const cluster=appCtx.rand01FromInt(vegetationIdentitySeed(`${Math.floor(cx/5)}:${Math.floor(cz/5)}`));
         if(appCtx.rand01FromInt(seed^0x27d4eb2f)>.6+.35*cluster) continue;
         const mappedLanduse = mappedLanduseAt(x, z);
-        if (mappedLanduse?.type && !VEGETATION_ELIGIBLE_TYPES.has(mappedLanduse.type)) continue;
+        if (mappedLanduse && mappedLanduse.mode !== 'forest') continue;
         const layerRoll = appCtx.rand01FromInt(seed ^ 0xd3a2646c);
         const layer = tropicalCanopy
           ? layerRoll > 0.86 ? 'emergent' : layerRoll < 0.22 ? 'understory' : 'canopy'
@@ -467,8 +490,8 @@ function* vegetationPlacementSteps() {
       const lu = appCtx.landuses[i];
       if (!lu || !VEGETATION_ELIGIBLE_TYPES.has(lu.type) || !Array.isArray(lu.pts) || lu.pts.length < 3) continue;
       const centroid = polygonCentroid(lu.pts);
-      if (!centroid || isVegetationPlacementBlocked(centroid.x, centroid.z, { roadPadding: 0.8, buildingPadding: 0.6 })) continue;
-      placements.push({
+      if (!centroid || !mappedAreaContains(lu, centroid.x, centroid.z)) continue;
+      pushPlacement({
         x: centroid.x,
         z: centroid.z,
         scale: 0.92,
@@ -477,6 +500,7 @@ function* vegetationPlacementSteps() {
         color: 0x356f2d,
         source: 'fallback_polygon',
         landuseType: lu.type,
+        leafType: lu.tags?.leaf_type || '',
         options: { roadPadding: 0.8, buildingPadding: 0.6 }
       });
     }
@@ -493,12 +517,44 @@ function* vegetationPlacementSteps() {
     const x=tree.x+Math.cos(seed)*1.3, z=tree.z+Math.sin(seed)*1.3;
     if (isVegetationPlacementBlocked(x,z)) continue;
     const mapped=mappedLanduseAt(x,z);
-    const supported=mapped ? ['forest','wood'].includes(mapped.type) : (appCtx.terrainGroup?.children||[]).some(mesh=>semanticForestWeightAt(mesh,x,z)>.7);
+    const supported=mapped ? mapped.mode === 'forest' : (appCtx.terrainGroup?.children||[]).some(mesh=>semanticForestWeightAt(mesh,x,z)>.7);
     if (supported) groundcover.push({x,z,scale:0.7+(seed%40)/100,rotation:seed%628/100,landuseType:'forest_groundcover',source:'supported-forest-understory'});
   }
   // Herbaceous wetland cover is not a forest. Close clumps use the same
   // accepted numeric raster, exclusion checks and existing instance publisher.
   const marsh=[];
+  const marshCells=new Set();
+  const pushMarsh=(x,z,seed,source)=>{
+    if(marsh.length>=600 || Math.hypot(x-focus.x,z-focus.z)>90)return false;
+    const cover=mappedLanduseAt(x,z);
+    if(cover && cover.mode!=='wetland')return false;
+    if(isVegetationPlacementBlocked(x,z,{roadPadding:1.8,buildingPadding:1}))return false;
+    const key=`${Math.floor(x/4)}:${Math.floor(z/4)}`;
+    if(marshCells.has(key))return false;
+    marshCells.add(key);
+    marsh.push({x,z,scale:.65+(seed%65)/100,rotation:seed%628/100,
+      landuseType:'wetland_groundcover',source});
+    return true;
+  };
+  // Use actual mapped wetland polygons even when the optional raster is absent.
+  // Swamps can have woody cover; bogs/marshes must not turn into generic trees.
+  for(const lu of prioritizedLanduses) {
+    yield;
+    if(marsh.length>=600)break;
+    if(lu.type!=='wetland' || !lu.bounds ||
+      !['marsh','bog','string_bog','wet_meadow','fen','saltmarsh','reedbed'].includes(lu.tags?.wetland))continue;
+    const area={minX:Math.max(lu.bounds.minX,focus.x-90),maxX:Math.min(lu.bounds.maxX,focus.x+90),
+      minZ:Math.max(lu.bounds.minZ,focus.z-90),maxZ:Math.min(lu.bounds.maxZ,focus.z+90)};
+    if(area.minX>=area.maxX || area.minZ>=area.maxZ)continue;
+    for(const cell of nearbyVegetationCells(area,4,2400,focus)) {
+      yield;
+      if(marsh.length>=600)break;
+      const seed=vegetationIdentitySeed(`wetland:${cell.cx}:${cell.cz}`);
+      const x=(cell.cx+.15+(seed%700)/1000)*4,z=(cell.cz+.15+((seed>>>12)%700)/1000)*4;
+      if(!mappedAreaContains(lu,x,z) || mappedLanduseAt(x,z)?.pts!==lu.pts)continue;
+      pushMarsh(x,z,seed,'mapped-herbaceous-wetland');
+    }
+  }
   for(const mesh of appCtx.terrainGroup?.children||[]) {
     yield;
     if(marsh.length>=600)break;
@@ -515,8 +571,8 @@ function* vegetationPlacementSteps() {
       const x=(cell.cx+.15+(seed%700)/1000)*4,z=(cell.cz+.15+((seed>>>12)%700)/1000)*4;
       if(x<area.minX || x>area.maxX || z<area.minZ || z>area.maxZ)continue;
       const u=Math.min(n-1,Math.floor((x-nw.x)/(se.x-nw.x)*n)),v=Math.min(n-1,Math.floor((z-nw.z)/(se.z-nw.z)*n));
-      if(classes[v*n+u]!==90 || isVegetationPlacementBlocked(x,z,{roadPadding:1.8,buildingPadding:1}))continue;
-      marsh.push({x,z,scale:.65+(seed%65)/100,rotation:seed%628/100,landuseType:'wetland_groundcover',source:'numeric-herbaceous-wetland'});
+      if(classes[v*n+u]!==90)continue;
+      pushMarsh(x,z,seed,'numeric-herbaceous-wetland');
     }
   }
   return placements.concat(groundcover,marsh);

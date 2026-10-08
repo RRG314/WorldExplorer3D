@@ -1,3 +1,5 @@
+const { mutateMarineExpedition } = require('./marine-expedition-authority');
+const { activeExpeditionPresence, requireExpeditionMembership } = require('./expedition-room-access');
 const { admitRoomPlayer } = require('./room-admission');
 const functions = require('firebase-functions/v1');
 // Browser HTTP routes use Firebase ID tokens inside verifyAuth/requireModerator.
@@ -19,6 +21,7 @@ const {
 } = require('./creator-profile');
 const { buildOverlayExports } = require('./overlay');
 const { buildGeospatialExports } = require('./geospatial');
+const { buildPlaceLookupExport } = require('./place-lookup');
 const { buildDiscoveryExports } = require('./discovery');
 const { buildCommunityRealityCaptureExports } = require('./community-reality-capture');
 const {
@@ -53,7 +56,7 @@ const {
   validatePropertyProximity
 } = require('./property-authority');
 const { settleCommerceOutcome, settleCommerceTransaction } = require('./economy-authority');
-const { normalizePlayerConditionInput } = require('./player-state-authority');
+const { applyPlayerConditionMutation } = require('./player-state-authority');
 
 if (!admin.apps.length) {
   admin.initializeApp();
@@ -2159,13 +2162,16 @@ exports.saveExplorerPlayerCondition = functions.region('us-central1').runWith({ 
   const auth = await verifyAuth(req, res);
   if (!auth) return;
   try {
-    const state = normalizePlayerConditionInput(req.body || {});
-    await db.collection('users').doc(auth.uid).collection('gameplay').doc('condition').set({
-      ...state,
-      updatedAt: AdminTimestamp.now()
-    }, { merge: false });
+    const ref=db.collection('users').doc(auth.uid).collection('gameplay').doc('condition');
+    const state=await db.runTransaction(async tx=>{
+      const previous=await tx.get(ref),current=previous.exists?previous.data():null;
+      const next=applyPlayerConditionMutation(current,req.body||{});
+      if(next!==current)tx.set(ref,{...next,updatedAt:AdminTimestamp.now()});
+      return {authority:next.authority,schemaVersion:next.schemaVersion,condition:next.condition,reason:next.reason,revision:next.revision};
+    });
     res.status(200).json(state);
   } catch (error) {
+    if([400,409].includes(error?.status))return res.status(error.status).json({error:error.message,...(error.state?{state:error.state}:{})});
     if (String(error?.message || '') === 'invalid_player_condition') {
       return res.status(400).json({ error: 'Player condition must be between 0 and 1.' });
     }
@@ -2285,38 +2291,14 @@ exports.resolveUrbanCivicOutcome = functions.region('us-central1').runWith({ inv
   }
 });
 
-async function requireExpeditionRoomContext(req, res, auth) {
+function requireExpeditionRoomContext(req, res) {
   const roomCode = sanitizeText(req.body && req.body.roomCode, 12).toUpperCase().replace(/[^A-Z0-9]/g, '');
   if (!roomCode) {
     res.status(400).json({ error: 'A valid multiplayer room is required.' });
     return null;
   }
   const roomRef = db.collection('rooms').doc(roomCode);
-  const [roomSnap, memberSnap] = await Promise.all([
-    roomRef.get(),
-    roomRef.collection('players').doc(auth.uid).get()
-  ]);
-  if (!roomSnap.exists) {
-    res.status(404).json({ error: 'Room not found.' });
-    return null;
-  }
-  const room = roomSnap.data() || {};
-  if (room.ownerUid !== auth.uid && !memberSnap.exists) {
-    res.status(403).json({ error: 'Join this room before using its Expedition.' });
-    return null;
-  }
-  const playerSnap = memberSnap.exists ? memberSnap : await roomRef.collection('players').doc(auth.uid).get();
-  if (!playerSnap.exists) {
-    res.status(409).json({ error: 'Active room presence is required.' });
-    return null;
-  }
-  const player = playerSnap.data() || {};
-  const lastSeenMs = timestampToMillis(player.lastSeenAt);
-  if (!Number.isFinite(lastSeenMs) || Date.now() - lastSeenMs > 120_000) {
-    res.status(409).json({ error: 'Room presence is stale. Rejoin the room and try again.' });
-    return null;
-  }
-  return { roomCode, roomRef, room, player };
+  return { roomCode, roomRef };
 }
 
 exports.mutateSharedExpedition = functions.region('us-central1').runWith({ invoker: 'public' }).https.onRequest(async (req, res) => {
@@ -2325,31 +2307,33 @@ exports.mutateSharedExpedition = functions.region('us-central1').runWith({ invok
   const auth = await verifyAuth(req, res);
   if (!auth) return;
   try {
-    const context = await requireExpeditionRoomContext(req, res, auth);
+    const context = requireExpeditionRoomContext(req, res);
     if (!context) return;
     const action = sanitizeText(req.body && req.body.action, 32).toLowerCase();
-    const nowMs = Date.now();
     const authUser = await admin.auth().getUser(auth.uid);
     const actor = {
       uid: auth.uid,
-      displayName: sanitizeText(authUser.displayName || authUser.email || context.player.displayName || 'Explorer', 60),
+      displayName: sanitizeText(authUser.displayName || authUser.email || 'Explorer', 60),
       role: sanitizeText(req.body && req.body.role, 32)
     };
-    const expeditionRef = context.roomRef.collection('expeditions').doc('active');
-    const playersSnap = await context.roomRef.collection('players').get();
-    const activeUids = playersSnap.docs.filter((entry) => {
-      const data = entry.data() || {};
-      const lastSeen = timestampToMillis(data.lastSeenAt);
-      const expiresAt = timestampToMillis(data.expiresAt);
-      return Number.isFinite(lastSeen) && nowMs - lastSeen <= 120_000 &&
-        (!Number.isFinite(expiresAt) || expiresAt >= nowMs - 2_000);
-    }).map((entry) => entry.id);
-
+    const marine = req.body?.domain === 'marine';
+    const expeditionRef = context.roomRef.collection('expeditions').doc(marine ? 'marine' : 'active');
     const state = await db.runTransaction(async (transaction) => {
+      const roomSnapshot = await transaction.get(context.roomRef);
+      const playersSnap = await transaction.get(context.roomRef.collection('players'));
+      const nowMs = Date.now();
+      const actorPresence = playersSnap.docs.find(entry => entry.id === auth.uid);
+      requireExpeditionMembership(roomSnapshot.exists ? roomSnapshot.data() : null,
+        actorPresence?.data() || null, auth.uid, nowMs);
+      const activeUids = playersSnap.docs.filter(entry =>
+        activeExpeditionPresence(entry.data(), entry.id, nowMs)
+      ).map(entry => entry.id);
       const snapshot = await transaction.get(expeditionRef);
       const current = snapshot.exists ? snapshot.data() || null : null;
       let next;
-      if (action === 'create') {
+      if (marine) {
+        next = mutateMarineExpedition(current, {roomCode:context.roomCode,uid:auth.uid,displayName:sanitizeText(authUser.displayName || 'Explorer',48),command:req.body?.command,activeUids,nowMs,newId:crypto.randomUUID()});
+      } else if (action === 'create') {
         if (current && current.expedition?.state !== 'failed' && current.expedition?.state !== 'arrived') {
           throw new Error('shared_expedition_already_active');
         }
@@ -2376,8 +2360,9 @@ exports.mutateSharedExpedition = functions.region('us-central1').runWith({ invok
       transaction.set(expeditionRef, { ...next, updatedAt: FieldValue.serverTimestamp() });
       return next;
     });
-    res.status(200).json({ accepted: true, state });
+    res.status(200).json({ accepted: true, state, serverNowMs: Date.now() });
   } catch (error) {
+    if ([403, 404, 409, 422].includes(error?.status)) return res.status(error.status).json({ error: error.message });
     const code = String(error && error.message || '');
     const conflicts = new Set([
       'shared_expedition_already_active', 'shared_expedition_not_found',
@@ -2748,6 +2733,8 @@ Object.assign(exports, buildAdminDashboardExports({
   logAdminActivity
 }));
 
+exports.getPlaceLookup = buildPlaceLookupExport({functions,db,setCors,verifyAppCheck});
+
 Object.assign(exports, buildGeospatialExports({
   functions,
   setCors
@@ -2799,3 +2786,6 @@ exports.sealRealityCaptureOriginal=functions.storage.object().onFinalize(async o
   if(tombstone.exists||!capture.exists||capture.data().ownerUid!==uid||capture.data().status==='deleting'){await file.delete({ignoreNotFound:true});return;}
   const [metadata]=await file.getMetadata();await require('./reality-capture-storage-privacy').sealCapturePhoto(file,metadata);
 });
+
+// Free public weather and ocean models share bounded, authenticated cache authority.
+exports.getEnvironmentalData = require('./environment-data').buildEnvironmentDataExport({functions, db, setCors, verifyAppCheck});

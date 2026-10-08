@@ -1,3 +1,4 @@
+import { createSurfaceDressing } from './surface-dressing.js';
 import { surfaceLightingGain } from './surface-lighting.js';
 import { parentSkyPlacement } from './parent-sky-placement.js';
 import { addSurfaceMaterialDetail } from './surface-material-detail.js';
@@ -435,7 +436,7 @@ async function addParentBodyView(pack, world) {
   appCtx.scene.add(group);
 }
 
-function addGeneratedSurfaceDetail(pack, world) {
+function addStandardGeneratedSurfaceDetail(pack, world) {
   const count = pack.rockCount;
   const geometry = new THREE.DodecahedronGeometry(1, 0);
   const material = new THREE.MeshStandardMaterial({
@@ -469,6 +470,18 @@ function addGeneratedSurfaceDetail(pack, world) {
   rocks.userData.truthClass = 'generated_game_detail';
   world.objects.push(rocks);
   appCtx.scene.add(rocks);
+}
+
+function addGeneratedSurfaceDetail(pack, world) {
+  if (pack.bodyId !== 'andromeda-explorer-a-b') return addStandardGeneratedSurfaceDetail(pack, world);
+  const dressing = createSurfaceDressing(THREE, {
+    bodyId: pack.bodyId, spawn: pack.spawn, bounds: pack.manifest.localBounds,
+    seed: pack.detailSeed, kind: pack.bodyId === 'andromeda-explorer-a-b' ? 'basalt' : 'regolith',
+    sampleHeight: (x,z) => pack.manifest.renderPlacement.y + sampleRenderedRelief(pack,x,z)
+  });
+  world.obstacles = dressing.userData.obstacles;
+  world.objects.push(dressing);
+  appCtx.scene.add(dressing);
 }
 
 function visualHorizonRegions(manifest, outerExtent = 45_000) {
@@ -979,6 +992,15 @@ function renderActiveExpeditionOutpost() {
   return placed;
 }
 
+function positionReturnButton() {
+  const button=document.getElementById('solidWorldReturnBtn');
+  if(!button || !activePack)return;
+  const compact=globalThis.innerWidth<=600;
+  const bottom=document.getElementById('solidWorldPanel')?.getBoundingClientRect?.().bottom;
+  button.style.setProperty('top',compact?`${Number.isFinite(bottom)?Math.ceil(bottom+10):330}px`:'82px',compact?'important':'');
+  button.style.right=compact?'10px':'20px';
+}
+
 function showReturnButton(pack) {
   let button = document.getElementById('solidWorldReturnBtn');
   if (!button) {
@@ -996,15 +1018,12 @@ function showReturnButton(pack) {
       appCtx.startSpaceFlightToEarth?.();
     });
     document.body.appendChild(button);
+    window.addEventListener('resize',positionReturnButton);
   }
   button.textContent = ['expedition-contact', 'destination-mission', 'space-flight'].includes(pack.returnMode)
     ? 'Pathfinder · approach to board'
     : `Return to Space from ${getAstronomicalBody(pack.bodyId)?.name || pack.bodyName || pack.title}`;
-  const compact = globalThis.innerWidth <= 600;
-  const panelBottom = document.getElementById('solidWorldPanel')?.getBoundingClientRect?.().bottom;
-  const compactTop = Number.isFinite(panelBottom) ? Math.ceil(panelBottom + 10) : 330;
-  button.style.setProperty('top', compact ? `${compactTop}px` : '82px', compact ? 'important' : '');
-  button.style.right = compact ? '10px' : '20px';
+  positionReturnButton();
   button.style.display = 'block';
 }
 
@@ -1096,13 +1115,13 @@ async function arriveAtSolidWorld(bodyInput) {
   if (requestId !== transitionId) return false;
   activePack = pack;
   activeReturnPod = world.returnPod || null;
-  setActivePlanetaryObstacles(bodyId, activeReturnPod ? [Object.freeze({
+  setActivePlanetaryObstacles(bodyId, [...(world.obstacles || []), ...(activeReturnPod ? [Object.freeze({
     id: 'expedition-return-pod',
     x: activeReturnPod.position.x,
     z: activeReturnPod.position.z,
     radius: 1.62,
     kind: 'spacecraft-hull'
-  })] : []);
+  })] : [])]);
   ensureReturnPodInteraction();
   appCtx.activePlanetaryBodyId = bodyId;
   appCtx.activeSolidWorldSurface = world.surface;
@@ -1151,9 +1170,9 @@ async function arriveAtSolidWorld(bodyInput) {
   if (appCtx.fillLight) appCtx.fillLight.intensity = pack.fillIntensity*lightingGain;
   appCtx.setTravelMode?.(pack.arrivalMode || 'drive', { source: `${bodyId}_arrival`, emitTutorial: false });
   positionPlayer(pack);
-  await appCtx.setPlanetaryVehicle?.(pack.vehicleBodyId || bodyId);
+  await appCtx.setPlanetaryVehicle?.(pack.vehicleBodyId || bodyId, { solidSurface: true });
   if (requestId !== transitionId) return false;
-  appCtx.setPlanetaryCharacter?.(pack.vehicleBodyId || bodyId);
+  appCtx.setPlanetaryCharacter?.(bodyId, { solidSurface: true });
   const surfaceStarOpacity = pack.fogColor == null
     ? 0.94
     : Math.max(0.04, Math.min(0.55, 0.55 - Number(pack.fogDensity || 0) * 900));

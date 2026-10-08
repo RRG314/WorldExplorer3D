@@ -1,0 +1,58 @@
+<!doctype html><meta charset="utf-8"><link rel="icon" href="data:,">
+<style>body{margin:0;background:#cad7dc;color:#15241e;font:16px system-ui}canvas{display:block}#caption{position:absolute;bottom:14px;left:14px;background:#fffd;padding:12px;max-width:650px}</style>
+<div id="caption">Land-cover authority fixture · loading actual vegetation models…</div>
+<script src="/node_modules/three/build/three.min.js"></script>
+<script src="/node_modules/three/examples/js/loaders/GLTFLoader.js"></script>
+<script type="module">
+import {ctx} from '/app/js/shared-context.js?v=55';
+import {normalizeLanduseSurfaceType} from '/app/js/surface-rules.js';
+import {collectWorldVegetationPlacements,initWorldVegetation} from '/app/js/world/vegetation.js';
+import {renderVegetationModels,disposeVegetationBatch} from '/app/js/world/vegetation-models.js';
+import {mappedAreaContains,resetMappedGroundIndex} from '/app/js/terrain/mapped-ground-evidence.js';
+const renderer=new THREE.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});renderer.setSize(1000,700);
+renderer.outputEncoding=THREE.sRGBEncoding;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=.9;renderer.physicallyCorrectLights=true;document.body.append(renderer.domElement);
+const scene=new THREE.Scene();scene.background=new THREE.Color('#cad7dc');
+scene.add(new THREE.HemisphereLight(0xcdddeb,0x726b52,1.2));
+const sun=new THREE.DirectionalLight(0xfff1d2,3);sun.position.set(100,220,80);scene.add(sun);
+const ring=(x,z,w)=>[{x,z},{x:x+w,z},{x:x+w,z:z+w},{x,z:z+w}];
+const feature=(type,x,z,w,extra={})=>({type,pts:ring(x,z,w),bounds:{minX:x,maxX:x+w,minZ:z,maxZ:z+w},sourceFeatureId:`${type}:${x}:${z}:${w}`,tags:{},...extra});
+const reserve=feature(normalizeLanduseSurfaceType({leisure:'nature_reserve'}),0,0,400);
+const forest=feature('wood',30,30,160,{tags:{natural:'wood',leaf_type:'broadleaved'},holeRings:[ring(90,90,55)]});
+const wetland=feature('wetland',230,215,130,{tags:{natural:'wetland',wetland:'marsh'},holeRings:[ring(270,255,45)]});
+const sand=feature('park',230,30,130,{tags:{surface:'sand'}});
+for(const [x,z,w,color] of [[-30,-30,460,0x849a6b],[30,30,160,0x597641],[90,90,55,0x94a978],[230,215,130,0x5d7968],[270,255,45,0x94a978],[230,30,130,0xd6c593]]){
+ const m=new THREE.Mesh(new THREE.PlaneGeometry(w,w),new THREE.MeshStandardMaterial({color,roughness:1}));m.rotation.x=-Math.PI/2;m.position.set(x+w/2,scene.children.length*.16-.5,z+w/2);scene.add(m);
+}
+Object.assign(ctx,{LOC:{lat:40,lon:0},worldSeed:1,_worldLoadSequence:1,worldSurfaceProfile:{biome:{id:'temperate-forest'}},landuses:[reserve,forest,wetland,sand],
+ waterAreas:[],waterways:[],osmTreeNodes:[],osmTreeRows:[],terrainGroup:{children:[]},vegetationMeshes:[],
+ geoToWorld:(lat,lon)=>({x:lon,z:lat}),terrainMeshHeightAt:()=>0,elevationWorldYAtWorldXZ:()=>0,
+ activeTransportActor:()=>({position:{x:280,z:240}}),rand01FromInt:n=>((Math.imul(n>>>0,1664525)+1013904223)>>>0)/4294967296,
+ addEarthWorldObject:o=>scene.add(o),replaceWorldCollection:(key,value)=>ctx[key]=value});
+initWorldVegetation({findNearestRoad:()=>({road:null,dist:Infinity}),getNearbyBuildings:()=>[],isRoadSurfaceReachable:()=>false,
+ pointInPolygon:(x,z,pts)=>mappedAreaContains({pts,bounds:{minX:-Infinity,maxX:Infinity,minZ:-Infinity,maxZ:Infinity}},x,z),
+ signedPolygonAreaXZ:pts=>pts.reduce((a,p,i)=>{const q=pts[(i+1)%pts.length];return a+p.x*q.z-q.x*p.z;},0)/2});
+const camera=new THREE.PerspectiveCamera(42,1000/700,1,1500);
+let mode=0,cycles=0,placements=[];
+const dispose=()=>{for(const mesh of ctx.vegetationMeshes)disposeVegetationBatch(mesh);ctx.vegetationMeshes=[];};
+function publish(){dispose();resetMappedGroundIndex(ctx);placements=collectWorldVegetationPlacements();renderVegetationModels(ctx,placements);}
+function draw(){camera.position.set(mode?320:200,mode?3:350,mode?300:580);camera.lookAt(mode?280:200,mode?1:0,mode?265:185);camera.updateMatrixWorld(true);for(const mesh of ctx.vegetationMeshes){mesh.updateMatrixWorld(true);mesh.update(camera);}renderer.render(scene,camera);}
+function check(){
+ if(reserve.type!=='nature_reserve')throw Error('Protected-area purpose became forest');
+ if(!placements.some(p=>p.landuseType==='wood') || !placements.some(p=>p.landuseType==='wetland_groundcover'))throw Error('Forest or marsh missing');
+ if(placements.some(p=>mappedAreaContains(sand,p.x,p.z)))throw Error('Tree in explicit sand clearing');
+ for(const p of placements)if(!mappedAreaContains(p.landuseType==='wetland_groundcover'?wetland:forest,p.x,p.z))throw Error('Plant outside supporting cover or in a hole');
+ if(renderer.info.programs.some(p=>p.diagnostics?.runnable===false))throw Error('Shader failure');
+}
+try{
+ publish();const deadline=performance.now()+20000;
+ while(performance.now()<deadline){publish();if(Object.values(ctx.vegetationModelStatus).every(v=>v==='ready'))break;await new Promise(r=>setTimeout(r,50));}
+ if(Object.values(ctx.vegetationModelStatus).some(v=>v!=='ready'))throw Error('Models did not load');
+ draw();check();
+ document.addEventListener('keydown',e=>{if(e.key==='ArrowRight'){mode=1-mode;draw();}if(e.key==='ArrowLeft'){ctx.landuses.reverse();publish();cycles++;draw();check();}});
+ window.advanceTime=draw;
+ window.render_game_to_text=()=>JSON.stringify({ready:window.fixtureReady,mode,cycles,purpose:reserve.type,
+  counts:placements.reduce((r,p)=>(r[p.landuseType]=(r[p.landuseType]||0)+1,r),{}),
+  published:ctx.vegetationFeatures.length,models:ctx.vegetationModelStatus,geometries:renderer.info.memory.geometries,textures:renderer.info.memory.textures,glError:renderer.getContext().getError()});
+ window.fixtureReady=true;document.getElementById('caption').textContent='Land-cover authority fixture · protected-area boundary preserves mixed cover · forest clearing stays open · marsh uses soft plants · sand remains bare';
+}catch(error){window.fixtureError=String(error.stack||error);throw error;}
+</script>

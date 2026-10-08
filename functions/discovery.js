@@ -1,5 +1,5 @@
 const crypto = require('node:crypto');
-const { FieldValue } = require('firebase-admin/firestore');
+const { FieldValue, FieldPath } = require('firebase-admin/firestore');
 
 const TRADEABLE_CATALOG_IDS = new Set([
   'brass-transit-token', 'iron-trade-buckle', 'copper-keepsake',
@@ -40,6 +40,7 @@ function normalizeDiscoveryClaim(input = {}) {
   if (!claimId || !catalogId || !worldIdentity || !ACCEPTED_DISCOVERY_EVIDENCE_CLASSES.has(evidenceClass)) return null;
   return Object.freeze({
     claimId, catalogId, worldIdentity, activityId,
+    recordKind: ['collection', 'observation'].includes(input.recordKind) ? input.recordKind : 'unknown',
     name: shortText(input.name || catalogId, 100),
     family: shortText(input.family || 'discovery', 60),
     rarityBand: ['common', 'uncommon', 'rare'].includes(input.rarityBand) ? input.rarityBand : 'common',
@@ -67,6 +68,7 @@ function buildDiscoveryExports({ functions, setCors, verifyAuth, db, admin }) {
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed.' });
     const auth = await verifyAuth(req, res);
     if (!auth) return;
+    if (req.body?.expectedOwnerUid && req.body.expectedOwnerUid !== auth.uid) return res.status(409).json({ error: 'Account changed. Retry from the original account.' });
     const claim = normalizeDiscoveryClaim(req.body || {});
     if (!claim) return res.status(400).json({ error: 'Invalid discovery claim.' });
     try {
@@ -75,7 +77,16 @@ function buildDiscoveryExports({ functions, setCors, verifyAuth, db, admin }) {
       const itemRef = profileRef.collection('items').doc(itemDocumentId(claim.claimId));
       const result = await db.runTransaction(async (transaction) => {
         const existing = await transaction.get(claimRef);
-        if (existing.exists) return { awarded: false, itemId: existing.data().itemId };
+        if (existing.exists) {
+          const stored = await transaction.get(itemRef);
+          if (!stored.exists || stored.data().catalogId !== claim.catalogId || stored.data().ownerUid !== auth.uid) {
+            throw Object.assign(new Error('Existing discovery receipt requires reconciliation.'), {status:409});
+          }
+          const item = stored.data();
+          return { awarded:false, itemId:itemRef.id, authority:item.authority,
+            tradeable:item.authority === 'trusted-server' && item.tradeable === true,
+            recordKind:item.recordKind || 'unknown' };
+        }
         const independentlyValidated = auth.admin === true;
         const item = {
           ...claim,
@@ -89,17 +100,16 @@ function buildDiscoveryExports({ functions, setCors, verifyAuth, db, admin }) {
         transaction.set(profileRef, { uid: auth.uid, schemaVersion: 1, updatedAt: serverTimestamp() }, { merge: true });
         transaction.create(itemRef, item);
         transaction.create(claimRef, { claimId: claim.claimId, itemId: itemRef.id, catalogId: claim.catalogId, createdAt: serverTimestamp() });
-        return { awarded: true, itemId: itemRef.id };
+        return { awarded:true, itemId:itemRef.id, authority:item.authority, tradeable:item.tradeable, recordKind:item.recordKind };
       });
-      const independentlyValidated = auth.admin === true;
       return res.status(200).json({
         ...result,
+        ownerUid: auth.uid,
         claimId: claim.claimId,
-        catalogId: claim.catalogId,
-        authority: independentlyValidated ? 'trusted-server' : 'server-receipt',
-        tradeable: independentlyValidated && claim.tradeEligibleCatalog
+        catalogId: claim.catalogId
       });
     } catch (error) {
+      if (error.status === 409) return res.status(409).json({error:error.message});
       console.error('[claimExplorerDiscovery] failed:', error);
       return res.status(500).json({ error: 'Could not issue a trusted discovery receipt.' });
     }
@@ -143,11 +153,20 @@ function buildDiscoveryExports({ functions, setCors, verifyAuth, db, admin }) {
     const auth = await verifyAuth(req, res);
     if (!auth) return;
     try {
-      const snapshot = await db.collection('explorerProfiles').doc(auth.uid).collection('items').limit(250).get();
-      const items = snapshot.docs.map((doc) => {
+      if (req.body?.expectedOwnerUid && req.body.expectedOwnerUid !== auth.uid) return res.status(409).json({ error: 'Account changed. Reload receipts for the current account.' });
+      const cursor = req.body?.cursor;
+      if (cursor != null && (typeof cursor !== 'string' || !/^[a-f0-9]{40}$/.test(cursor))) return res.status(400).json({ error: 'Invalid receipt cursor.' });
+      let query = db.collection('explorerProfiles').doc(auth.uid).collection('items').orderBy(FieldPath.documentId());
+      if (cursor) query = query.startAfter(cursor);
+      const snapshot = await query.limit(251).get();
+      const pageDocs = snapshot.docs.slice(0, 250);
+      const items = pageDocs.map((doc) => {
         const item = doc.data() || {};
         return {
           itemId: doc.id,
+          recordKind: item.recordKind || 'unknown',
+          ownerUid: auth.uid,
+          createdAtMs: item.createdAt?.toMillis?.() || null,
           instanceId: item.instanceId || doc.id,
           claimId: item.claimId,
           catalogId: item.catalogId,
@@ -163,7 +182,7 @@ function buildDiscoveryExports({ functions, setCors, verifyAuth, db, admin }) {
           lockedByTradeId: item.lockedByTradeId || null
         };
       });
-      return res.status(200).json({ items, schemaVersion: 1 });
+      return res.status(200).json({ items, ownerUid: auth.uid, nextCursor: snapshot.docs.length > 250 ? pageDocs.at(-1).id : null, schemaVersion: 2 });
     } catch (error) {
       console.error('[listExplorerDiscoveries] failed:', error);
       return res.status(500).json({ error: 'Could not load discovery receipts.' });

@@ -1,0 +1,19 @@
+<!doctype html><html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Ocean diver acceptance</title><link rel="icon" href="/favicon.svg"><style>body{margin:0;background:#15445c;color:white;font:14px system-ui}header{position:absolute;padding:12px}canvas{display:block}</style><header>Controlled Ocean diver fixture · actual explorer/controller<br>Arrow Up swim · Left/Right turn · Space rise · Shift dive</header>
+<script src="/node_modules/three/build/three.min.js"></script><script src="/node_modules/three/examples/js/loaders/GLTFLoader.js"></script><script type="module">
+import {createOceanDiver} from '/app/js/ocean/diver.js';
+const scene=new THREE.Scene();scene.background=new THREE.Color(0x15445c);scene.fog=new THREE.Fog(0x15445c,12,65);
+const renderer=new THREE.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});renderer.setSize(innerWidth,innerHeight);renderer.outputEncoding=THREE.sRGBEncoding;renderer.toneMapping=THREE.ACESFilmicToneMapping;document.body.append(renderer.domElement);
+const camera=new THREE.PerspectiveCamera(55,innerWidth/innerHeight,.1,100);camera.position.set(10,-3,14);camera.lookAt(0,-8,0);
+scene.add(new THREE.HemisphereLight(0xb9e6ff,0x486155,1.3));const sun=new THREE.DirectionalLight(0xffefd7,1.2);sun.position.set(4,8,5);scene.add(sun);
+const floor=new THREE.Mesh(new THREE.PlaneGeometry(100,100),new THREE.MeshStandardMaterial({color:0x998c6b}));floor.rotation.x=-Math.PI/2;floor.position.y=-20;scene.add(floor);
+const hull=new THREE.Mesh(new THREE.BoxGeometry(4,3,8),new THREE.MeshStandardMaterial({color:0xd8c473,roughness:.5}));hull.position.set(0,-8,0);scene.add(hull);
+const mode={active:true,scene,camera,launchSite:{lat:0,lon:0},submarine:{mesh:hull,position:hull.position,yaw:0,speed:0,verticalSpeed:0},waterSurface:{sample:()=>({coverage:'known-water-body',surfaceY:0,baseY:0,volume:{volumeId:'fixture',current:null}})}};
+const held=new Set();onkeydown=e=>{held.add(e.code);if(e.code.startsWith('Arrow')||e.code==='Space')e.preventDefault()};onkeyup=e=>held.delete(e.code);
+const ctx={getEnv:()=> 'OCEAN',METERS_PER_WORLD_UNIT:1,readControlActions:()=>({move:Number(held.has('ArrowUp'))-Number(held.has('ArrowDown')),turn:Number(held.has('ArrowLeft'))-Number(held.has('ArrowRight')),vertical:Number(held.has('Space'))-Number(held.has('ShiftLeft'))})};
+mode.diver=createOceanDiver(ctx,mode,{sampleSeabedHeight:()=>-20});let time=0;
+function step(dt){time+=dt;mode.diver.update(dt,time);renderer.render(scene,camera)}
+window.advanceTime=async ms=>{for(let i=0;i<Math.ceil(ms/16.667);i++)step(1/60)};
+window.render_game_to_text=()=>JSON.stringify({coordinateSystem:'x east, y up, z south; water y=0',diver:mode.diver.snapshot(),submarine:mode.submarine.position,camera:camera.position});
+let last=performance.now();function frame(now){step(Math.min(.05,(now-last)/1000));last=now;requestAnimationFrame(frame)}requestAnimationFrame(frame);
+onresize=()=>{renderer.setSize(innerWidth,innerHeight);camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix()};
+</script></html>

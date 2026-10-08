@@ -103,8 +103,8 @@ function prepareExplorerVisual(THREE, instance, options = {}) {
   return visual;
 }
 
-function createAnimationState(THREE, visual, clips, record) {
-  const controller = createCharacterAnimationController(THREE, visual, clips, record.animationClips);
+function createAnimationState(THREE, visual, clips, record, options) {
+  const controller = createCharacterAnimationController(THREE, visual, clips, record.animationClips, {swimming:options.role === 'player-character'});
   return { mixer: controller.mixer, actions: controller.actions, controller };
 }
 
@@ -112,7 +112,7 @@ function updateCuratedCharacterAnimation(host, isMoving, deltaTime, isRunning = 
   const controller = host?.userData?.characterAnimation;
   if (!controller) return false;
   const armed = !!host.userData.heldEquipmentId && host.userData.weaponPose !== 'holstered';
-  return controller.update({ moving: isMoving, running: isRunning, aiming: armed }, deltaTime);
+  return controller.update({ moving: isMoving, running: isRunning, aiming: armed, swimming: host.userData.swimming === true }, deltaTime);
 }
 
 function disposeCuratedCharacter(host) {
@@ -159,7 +159,7 @@ async function attachCuratedExplorerCharacter(THREE, host, options = {}) {
       return false;
     }
     const visual = prepareExplorerVisual(THREE, instance, options);
-    const animation = createAnimationState(THREE, visual, instance.animations, instance.record);
+    const animation = createAnimationState(THREE, visual, instance.animations, instance.record, options);
     setFallbackVisible(host, false);
     host.add(visual);
     host.userData.curatedCharacterAssetId = instance.record.id;

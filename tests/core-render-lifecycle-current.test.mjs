@@ -3,6 +3,19 @@ import assert from 'node:assert/strict';
 import { createRuntimeKernel } from '../app/js/runtime/kernel.js';
 import { createCoreFrameSystems, createCoreRenderSystem } from '../app/js/runtime/core-frame-systems.js';
 
+test('ship presentation does not run retained Earth map, detail or activity work and resumes afterward',()=>{
+ const calls=[];
+ const app={gameStarted:true,activeShipInterior:true,updateHUD:()=>calls.push('hud'),drawMinimap:()=>calls.push('map'),updateStreetFurnitureVisibility:()=>calls.push('lod'),updateActivityCreator:()=>calls.push('activity')};
+ const kernel=createRuntimeKernel();
+ for(const system of createCoreFrameSystems(app).filter(s=>['core.presentation','platform.activities'].includes(s.id)))kernel.registerSystem(system);
+ for(let i=0;i<200;i++)kernel.runFrame(i*16);
+ assert.deepEqual(calls,[]);
+ app.activeShipInterior=false;
+ for(let i=200;i<230;i++)kernel.runFrame(i*16);
+ for(const name of ['hud','map','lod','activity'])assert.ok(calls.includes(name),name);
+ kernel.dispose();
+});
+
 for (const composer of [false, true]) test(`manual pause releases drawing while other pause owners retain their presentation (${composer})`, () => {
   let draws = 0, networkTicks = 0;
   const reasons = new Set();
@@ -77,7 +90,7 @@ test('flight telemetry records full stalls while simulation catch-up stays bound
  kernel.registerSystem({id:'test.simulation',phase:'simulation',update:frame=>steps.push(frame.dt)});
  for(const timestamp of [0,16,2016,2032])kernel.runFrame(timestamp);
  assert.deepEqual(observed,[0,.016,2,.016]);
- assert.deepEqual(steps,[0,.016,.1,.016]);
+ assert.equal(steps[0],0);assert.equal(steps[1],.016);assert.ok(Math.abs(steps[2]-(5/60-.016))<1e-9);assert.equal(steps[3],.016);
  kernel.dispose();
 });
 

@@ -1,13 +1,16 @@
+import {fetchAuthenticatedData} from './authenticated-fetch.js';
+import {providerResponseError} from './provider-error.js';
+import {readBoundedJson} from './bounded-response.js';
 import { createProvenance } from './data-contract.js?v=3';
 import { createProviderRegistry } from './provider-registry.js?v=2';
 
-const MARINE_API = 'https://marine-api.open-meteo.com/v1/marine';
+const MARINE_API = '/api/geospatial/marine';
 const NOAA_METADATA_API = 'https://api.tidesandcurrents.noaa.gov/mdapi/prod/webapi/stations.json';
 const NOAA_DATA_API = 'https://api.tidesandcurrents.noaa.gov/api/prod/datagetter';
-const MARINE_FIELDS = 'wave_height,wave_direction,wave_period,wind_wave_height,swell_wave_height,swell_wave_direction,swell_wave_period,ocean_current_velocity,ocean_current_direction,sea_surface_temperature,sea_level_height_msl';
 const NOAA_COVERAGE_KM = 250;
 
 function normalizeMarineLocation(input = {}) {
+  if ([input.lat, input.lon].some(value => !['number', 'string'].includes(typeof value) || (typeof value === 'string' && !value.trim()))) throw new RangeError('Marine coordinates are invalid.');
   const lat = Number(input.lat);
   const lon = Number(input.lon);
   if (!Number.isFinite(lat) || lat < -90 || lat > 90) throw new RangeError('Marine latitude is invalid.');
@@ -78,14 +81,16 @@ function normalizeMarineModel(payload = {}, requested = {}, fetchedAt = new Date
     seaLevelHeightMslM: numberOrNull(current.sea_level_height_msl)
   };
   return Object.freeze({
-    sourceId: 'open-meteo-marine',
+    sourceId: 'public-marine',
+    sources: (payload.sources || []).map(source => Object.freeze({...source, gridDistanceKm: haversineKm(requested, {lat: source.latitude, lon: source.longitude})})),
+    warnings: payload.warnings || [],
     modelLat: lat,
     modelLon: lon,
     gridDistanceKm: lat != null && lon != null ? haversineKm(requested, { lat, lon }) : null,
     validAt: String(current.time || ''),
     hasGuidance: Object.values(fields).some((value) => value != null),
     ...fields,
-    provenance: createProvenance({ sourceId: 'open-meteo-marine', validAt: current.time, fetchedAt })
+    provenance: createProvenance({ sourceId: 'public-marine', validAt: current.time, fetchedAt })
   });
 }
 
@@ -125,8 +130,9 @@ function normalizeNoaaPredictions(payload = {}, station = {}, fetchedAt = new Da
 }
 
 async function jsonResponse(response, provider) {
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok || payload?.error) throw new Error(payload?.error?.message || `${provider}_http_${response.status}`);
+  if (!response.ok) throw providerResponseError(response);
+  const payload = await readBoundedJson(response,5000000);
+  if (payload?.error) throw new Error('Marine data is unavailable for this request.');
   return payload;
 }
 
@@ -139,16 +145,17 @@ function stationRequest(input = {}) {
 function createMarineService(options = {}) {
   const fetchImpl = options.fetchImpl || globalThis.fetch?.bind(globalThis);
   if (typeof fetchImpl !== 'function') throw new Error('Marine service requires fetch support.');
+  const fetchMarine = options.fetchImpl || fetchAuthenticatedData;
   const registry = createProviderRegistry({ now: options.now, maxCacheEntries: 32 });
 
   registry.register({
-    id: 'open-meteo-marine', sourceId: 'open-meteo-marine', cacheTtlMs: 15 * 60 * 1000, timeoutMs: 10000,
+    id: 'public-marine', sourceId: 'public-marine', cacheTtlMs: 15 * 60 * 1000, timeoutMs: 55000,
     normalizeRequest: normalizeMarineLocation,
     async query(request, context) {
-      const url = new URL(MARINE_API);
-      Object.entries({ latitude: request.lat.toFixed(4), longitude: request.lon.toFixed(4), current: MARINE_FIELDS, cell_selection: 'sea', timezone: 'GMT', forecast_days: 1 }).forEach(([key, value]) => url.searchParams.set(key, String(value)));
-      const payload = await jsonResponse(await fetchImpl(url.href, { signal: context.signal }), 'open_meteo_marine');
-      return { items: [payload] };
+      const url = new URL(MARINE_API, globalThis.location?.origin || 'http://localhost');
+      Object.entries({ latitude: request.lat.toFixed(4), longitude: request.lon.toFixed(4), kind: 'marine' }).forEach(([key, value]) => url.searchParams.set(key, String(value)));
+      const payload = await jsonResponse(await fetchMarine(url.href, { signal: context.signal }), 'public_marine');
+      return { items: [payload], warnings: payload.warnings || [] };
     }
   });
   registry.register({
@@ -180,21 +187,23 @@ function createMarineService(options = {}) {
 
   async function modelAt(location, queryOptions = {}) {
     const requested = normalizeMarineLocation(location);
-    const result = await registry.query('open-meteo-marine', requested, { force: queryOptions.force === true });
+    const result = await registry.query('public-marine', requested, { force: queryOptions.force === true, signal: queryOptions.signal });
     return normalizeMarineModel(result.items[0], requested, result.fetchedAt);
   }
 
   async function selected(location, queryOptions = {}) {
     const requested = normalizeMarineLocation(location);
-    const force = queryOptions.force === true;
+    const force = queryOptions.force === true, signal = queryOptions.signal;
     const [modelResult, stationsResult] = await Promise.allSettled([
-      registry.query('open-meteo-marine', requested, { force }),
-      registry.query('noaa-water-level-stations', {}, { force: false })
+      registry.query('public-marine', requested, { force, signal }),
+      registry.query('noaa-water-level-stations', {}, { force: false, signal })
     ]);
+    if (signal?.aborted) throw new DOMException('Marine request cancelled.', 'AbortError');
     const warnings = [];
     const model = modelResult.status === 'fulfilled'
       ? normalizeMarineModel(modelResult.value.items[0], requested, modelResult.value.fetchedAt)
       : (warnings.push(String(modelResult.reason?.message || modelResult.reason)), null);
+    if (model?.warnings?.length) warnings.push(...model.warnings);
     const stations = stationsResult.status === 'fulfilled' ? stationsResult.value.items : [];
     if (stationsResult.status === 'rejected') warnings.push(String(stationsResult.reason?.message || stationsResult.reason));
     const nearest = nearestStation(stations, requested);
@@ -204,14 +213,15 @@ function createMarineService(options = {}) {
     if (station) {
       const stationRequestValue = { stationId: station.id, greatLakes: station.greatLakes };
       const [observedResult, predictedResult] = await Promise.allSettled([
-        registry.query('noaa-water-level', stationRequestValue, { force }),
-        station.tidal ? registry.query('noaa-tide-predictions', stationRequestValue, { force }) : Promise.resolve(null)
+        registry.query('noaa-water-level', stationRequestValue, { force, signal }),
+        station.tidal ? registry.query('noaa-tide-predictions', stationRequestValue, { force, signal }) : Promise.resolve(null)
       ]);
       if (observedResult.status === 'fulfilled') observation = normalizeNoaaObservation(observedResult.value.items[0], station, observedResult.value.fetchedAt);
       else warnings.push(String(observedResult.reason?.message || observedResult.reason));
       if (predictedResult.status === 'fulfilled' && predictedResult.value) predictions = normalizeNoaaPredictions(predictedResult.value.items[0], station, predictedResult.value.fetchedAt);
       else if (predictedResult.status === 'rejected') warnings.push(String(predictedResult.reason?.message || predictedResult.reason));
     }
+    if (signal?.aborted) throw new DOMException('Marine request cancelled.', 'AbortError');
     return Object.freeze({ requested, model, station, observation, predictions, warnings, noaaCoverageKm: NOAA_COVERAGE_KM });
   }
 

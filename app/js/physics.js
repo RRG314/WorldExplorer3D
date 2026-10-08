@@ -1,3 +1,4 @@
+import { resolvePlanetaryVehicleObstacle } from './physics/planetary-obstacle-response.js';
 import { shouldRefreshRoadQuery } from './physics/road-query-policy.js';
 import { ctx as appCtx } from "./shared-context.js?v=55";
 import { constrainTunnelActorCeiling } from './world/compiler/tunnel-space-query.js';
@@ -600,6 +601,14 @@ function update(dt) {
     nz = liveGpsDriveTarget.z;
   }
 
+  if (isPlanetarySurface()) {
+    const resolved = resolvePlanetaryVehicleObstacle(appCtx.car, {x:nx,z:nz}, planetaryBodyId);
+    nx=resolved.x;nz=resolved.z;
+    if(resolved.collision) {
+      appCtx.car.vx=0;appCtx.car.vz=0;appCtx.car.vFwd=0;appCtx.car.vLat=0;appCtx.car.speed=0;
+    }
+  }
+
   // Building collisions remain enforced without a second terrain-handling mode.
 
   if (!isPlanetarySurface()) {
@@ -617,6 +626,8 @@ function update(dt) {
         { x: nx, z: nz },
         {
           mode: 'drive',
+          actorBaseY: appCtx.car.y-1.2,
+          actorHeight: 1.8,
           radius: .92,
           speedMph: carSpeedToMph(appCtx.car.speed),
           velocityX: appCtx.car.vx,

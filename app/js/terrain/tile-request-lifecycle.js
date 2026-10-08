@@ -4,6 +4,7 @@ export function cancelTerrainTileRequest(cache, z, x, y) {
   if (!tile || !tile.loading) return false;
   cache.delete(key);
   tile.evicted = true;
+  clearTimeout(tile.attemptTimer);tile.attemptTimer=null;
   tile.loading = false;
   tile.polarAbort?.abort();
   if (tile.img) {
@@ -35,22 +36,23 @@ function delayUntil(ms, signal) {
 
 export async function waitForTerrainTileRequest(options = {}) {
   const {
-    z, x, y, deadline, deps, signal,
+    z, x, y, deadline, deps, signal, isActive = () => true,
     getOrLoadTerrainTile, failTerrainTileAttempt, terrainNow,
     cancelTile, maxAttempts, attemptTimeoutMs
   } = options;
   while (terrainNow() < deadline) {
+    if (!isActive()) return false;
     if (signal?.aborted) {
       cancelTile(z, x, y);
       return false;
     }
     const tile = getOrLoadTerrainTile(z, x, y, deps);
-    if (tile.loaded) return true;
+    if (tile.loaded) return isActive();
     if (tile.failed) {
       if (tile.attempts >= maxAttempts) return false;
       const delay = Math.min(Math.max(0, tile.nextRetryAt - terrainNow()), deadline - terrainNow());
       if (!await delayUntil(delay, signal)) {
-        cancelTile(z, x, y);
+        if (isActive()) cancelTile(z, x, y);
         return false;
       }
       continue;
@@ -73,6 +75,7 @@ export async function waitForTerrainTileRequest(options = {}) {
       abortPromise
     ]);
     if (abortListener) signal.removeEventListener('abort', abortListener);
+    if (!isActive()) return false;
     if (result === true) return true;
     if (result === aborted) {
       cancelTile(z, x, y);

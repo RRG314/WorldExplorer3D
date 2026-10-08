@@ -15,6 +15,9 @@ self.onmessage=({data})=>{
       compiler?.dispose();compiler=createTransportDetailCompiler({...data.input,preparedPlan});preparedPlan=null;
       const initial=compiler.initial;compiler.initial=null;
       self.postMessage({type:'prepared',...initial},buffers(initial));
+    } else if(data.type==='compile'&&compiler){
+      const region=compiler.compile(data.key);
+      self.postMessage({type:'region',...region},buffers(region));
     } else if(data.type==='next'&&compiler){
       const region=compiler.next(data.focus);
       if(region)self.postMessage({type:'region',...region},buffers(region));

@@ -2,10 +2,46 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import * as THREE from 'three';
-import { clearBuildingExteriorDetails } from '../app/js/world/building-exterior-details.js';
+import { clearBuildingExteriorDetails, selectExteriorDetailSources } from '../app/js/world/building-exterior-details.js';
 
 const root = new URL('../', import.meta.url);
 const read = (path) => readFile(new URL(path, root), 'utf8');
+
+test('bounded exterior distance work preserves circular selection, district focus, ties and exact distances', () => {
+  let seed = 61937;
+  const random = () => ((seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 2 ** 32);
+  const sources = Array.from({length: 25000}, (_, i) => ({
+    detailCenter: {x: (random() - .5) * 5000, z: (random() - .5) * 5000},
+    userData: {sourceBuildingId: String(i)}
+  }));
+  for (const [id, x, z] of [['tie-b', 115, 0], ['tie-a', -115, 0], ['corner', 115, 115], ['inside', 0, 0]]) {
+    sources.push({detailCenter: {x, z}, userData: {sourceBuildingId: id}});
+  }
+  const hypot = Math.hypot;
+  for (const radius of [0, 115, 180, 235]) for (const limit of [0, 72, 150, 240]) {
+    for (const focus of [{x: 0, z: 0}, {x: 2200, z: -2100}, {x: 12000, z: 0}]) {
+      for (const districtFocus of [null, {x: 500, z: -350}]) {
+        const options = {focus, districtFocus, radius, limit};
+        const expected = sources.map(mesh => ({mesh, distance: Math.min(
+          hypot(mesh.detailCenter.x - focus.x, mesh.detailCenter.z - focus.z),
+          districtFocus ? hypot(mesh.detailCenter.x - districtFocus.x, mesh.detailCenter.z - districtFocus.z) : Infinity
+        )})).filter(row => row.distance <= radius)
+          .sort((a, b) => a.distance - b.distance || a.mesh.userData.sourceBuildingId.localeCompare(b.mesh.userData.sourceBuildingId)).slice(0, limit);
+        let calls = 0;
+        try {
+          Math.hypot = (...args) => {calls++; return hypot(...args);};
+          const actual = selectExteriorDetailSources(sources, options);
+          assert.equal(actual.length, expected.length);
+          actual.forEach((row, index) => {
+            assert.equal(row.mesh, expected[index].mesh);
+            assert.equal(row.distance, expected[index].distance);
+          });
+          assert.ok(calls < sources.length / 10, 'far buildings must not execute radial distance calculations');
+        } finally { Math.hypot = hypot; }
+      }
+    }
+  }
+});
 
 test('runtime exterior cleanup detaches meshes, disposes owned resources once and clears references', () => {
   const scene = new THREE.Scene();
@@ -65,7 +101,7 @@ test('facade material selection preserves mapped tags and uses bounded shared te
   assert.match(material, /materialClaim: mappedFamily \? 'mapped'/);
   assert.match(material, /colorClaim: mappedColor \? 'mapped'/);
   assert.match(material, /sharedRuntimeTexture: true/);
-  assert.match(material, /building-facade-local-layout-v11-filtered-openings/);
+  assert.match(material, /building-facade-local-layout-v12-room-depth/);
   assert.doesNotMatch(material, /new THREE\.TextureLoader\(\).*forEach/);
 });
 

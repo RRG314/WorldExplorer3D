@@ -18,6 +18,7 @@ console.log(JSON.stringify({ evidenceScope: 'functional hotbar journeys; not fra
 const failures = [];
 const completed = [];
 const localRequestFailures = [];
+const providerDegradations = [];
 const pageErrors = [];
 
 async function withJourney(name, mobile, run) {
@@ -69,7 +70,13 @@ function watchPage(page) {
   });
   page.on('response', (response) => {
     if (response.url().startsWith(baseUrl) && response.status() >= 400) {
-      localRequestFailures.push(`${response.status()} ${response.url()}`);
+      const request = new URL(response.url());
+      // Optional place naming may be rate limited or unavailable. Preserve the
+      // evidence while requiring every gameplay journey below to finish. Auth
+      // failures, invalid requests and missing packaged resources still fail.
+      if (['/api/geospatial/search', '/api/geospatial/reverse'].includes(request.pathname) && [429, 502, 503, 504].includes(response.status())) {
+        providerDegradations.push({status:response.status(), endpoint:request.pathname});
+      } else localRequestFailures.push(`${response.status()} ${response.url()}`);
     }
   });
 }
@@ -466,7 +473,7 @@ try {
 
 failures.push(...pageErrors, ...localRequestFailures);
 const report = {
-  ok: failures.length === 0, baseUrl, completed, failures,
+  ok: failures.length === 0, baseUrl, completed, failures, providerDegradations,
   complete: !onlyAction && resumeStage === 0,
   browserBudget: { maxOldSpaceMiB: 1280, freshBrowserPerJourney: true }
 };

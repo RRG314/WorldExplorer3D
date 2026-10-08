@@ -441,18 +441,18 @@ function buildWaveSlopeExpression(components, amplitudeVar, speedVar, scaleVar, 
 }
 
 function buildWaterShaderLibrary() {
-  const primaryHeightExpr = buildWaveHeightExpression(PRIMARY_COMPONENTS, 'weWaveAmplitude', 'weWaveSpeed', 'weWaveScale', 'worldXZ', 'weWaveTime');
-  const secondaryHeightExpr = buildWaveHeightExpression(SECONDARY_COMPONENTS, 'weWaveSecondaryAmplitude', 'weWaveSpeed', 'weWaveScale * 1.12', 'vec2(worldXZ.x + 23.5, worldXZ.y - 11.8)', 'weWaveTime * 1.08');
-  const swellHeightExpr = buildWaveHeightExpression(SWELL_COMPONENTS, 'weWaveSwellAmplitude', 'weWaveSpeed', 'weWaveScale * 0.72', 'vec2(worldXZ.x - 41.7, worldXZ.y + 28.3)', 'weWaveTime * 0.72');
-  const rippleHeightExpr = buildWaveHeightExpression(RIPPLE_COMPONENTS, 'weWaveRippleAmplitude', 'weWaveSpeed', 'weWaveScale * 1.42', 'vec2(worldXZ.x - 8.2, worldXZ.y + 4.6)', 'weWaveTime * 1.3');
-  const swellCrestExpr = buildWaveCrestExpression(SWELL_COMPONENTS, 'weWaveSpeed', 'weWaveScale * 0.72', 'vec2(worldXZ.x - 41.7, worldXZ.y + 28.3)', 'weWaveTime * 0.72');
-  const primaryCrestExpr = buildWaveCrestExpression(PRIMARY_COMPONENTS, 'weWaveSpeed', 'weWaveScale', 'worldXZ', 'weWaveTime');
-  const secondaryCrestExpr = buildWaveCrestExpression(SECONDARY_COMPONENTS, 'weWaveSpeed', 'weWaveScale * 1.12', 'vec2(worldXZ.x + 23.5, worldXZ.y - 11.8)', 'weWaveTime * 1.08');
-  const rippleCrestExpr = buildWaveCrestExpression(RIPPLE_COMPONENTS, 'weWaveSpeed', 'weWaveScale * 1.42', 'vec2(worldXZ.x - 8.2, worldXZ.y + 4.6)', 'weWaveTime * 1.3');
-  const primarySlopeExpr = buildWaveSlopeExpression(PRIMARY_COMPONENTS, 'weWaveAmplitude', 'weWaveSpeed', 'weWaveScale', 'worldXZ', 'weWaveTime');
-  const secondarySlopeExpr = buildWaveSlopeExpression(SECONDARY_COMPONENTS, 'weWaveSecondaryAmplitude', 'weWaveSpeed', 'weWaveScale * 1.12', 'vec2(worldXZ.x + 23.5, worldXZ.y - 11.8)', 'weWaveTime * 1.08');
-  const swellSlopeExpr = buildWaveSlopeExpression(SWELL_COMPONENTS, 'weWaveSwellAmplitude', 'weWaveSpeed', 'weWaveScale * 0.72', 'vec2(worldXZ.x - 41.7, worldXZ.y + 28.3)', 'weWaveTime * 0.72');
-  const rippleSlopeExpr = buildWaveSlopeExpression(RIPPLE_COMPONENTS, 'weWaveRippleAmplitude', 'weWaveSpeed', 'weWaveScale * 1.42', 'vec2(worldXZ.x - 8.2, worldXZ.y + 4.6)', 'weWaveTime * 1.3');
+  const primaryHeightExpr = buildWaveHeightExpression(PRIMARY_COMPONENTS, 'weWaveAmplitude', 'weWaveSpeed', 'weWaveScale * 0.92', 'worldXZ', 'weWaveTime');
+  const secondaryHeightExpr = buildWaveHeightExpression(SECONDARY_COMPONENTS, 'weWaveSecondaryAmplitude', 'weWaveSpeed * 1.16', 'weWaveScale * 1.12', 'vec2(worldXZ.x + 23.5, worldXZ.y - 11.8)', 'weWaveTime * 1.08');
+  const swellHeightExpr = buildWaveHeightExpression(SWELL_COMPONENTS, 'weWaveSwellAmplitude', 'weWaveSpeed * 0.62', 'weWaveScale * 0.72', 'vec2(worldXZ.x - 41.7, worldXZ.y + 28.3)', 'weWaveTime * 0.72');
+  const rippleHeightExpr = buildWaveHeightExpression(RIPPLE_COMPONENTS, 'weWaveRippleAmplitude', 'weWaveSpeed * 1.34', 'weWaveScale * 1.42', 'vec2(worldXZ.x - 8.2, worldXZ.y + 4.6)', 'weWaveTime * 1.3');
+  const swellCrestExpr = buildWaveCrestExpression(SWELL_COMPONENTS, 'weWaveSpeed * 0.62', 'weWaveScale * 0.72', 'vec2(worldXZ.x - 41.7, worldXZ.y + 28.3)', 'weWaveTime * 0.72');
+  const primaryCrestExpr = buildWaveCrestExpression(PRIMARY_COMPONENTS, 'weWaveSpeed', 'weWaveScale * 0.92', 'worldXZ', 'weWaveTime');
+  const secondaryCrestExpr = buildWaveCrestExpression(SECONDARY_COMPONENTS, 'weWaveSpeed * 1.16', 'weWaveScale * 1.12', 'vec2(worldXZ.x + 23.5, worldXZ.y - 11.8)', 'weWaveTime * 1.08');
+  const rippleCrestExpr = buildWaveCrestExpression(RIPPLE_COMPONENTS, 'weWaveSpeed * 1.34', 'weWaveScale * 1.42', 'vec2(worldXZ.x - 8.2, worldXZ.y + 4.6)', 'weWaveTime * 1.3');
+  const primarySlopeExpr = buildWaveSlopeExpression(PRIMARY_COMPONENTS, 'weWaveAmplitude', 'weWaveSpeed', 'weWaveScale * 0.92', 'worldXZ', 'weWaveTime');
+  const secondarySlopeExpr = buildWaveSlopeExpression(SECONDARY_COMPONENTS, 'weWaveSecondaryAmplitude', 'weWaveSpeed * 1.16', 'weWaveScale * 1.12', 'vec2(worldXZ.x + 23.5, worldXZ.y - 11.8)', 'weWaveTime * 1.08');
+  const swellSlopeExpr = buildWaveSlopeExpression(SWELL_COMPONENTS, 'weWaveSwellAmplitude', 'weWaveSpeed * 0.62', 'weWaveScale * 0.72', 'vec2(worldXZ.x - 41.7, worldXZ.y + 28.3)', 'weWaveTime * 0.72');
+  const rippleSlopeExpr = buildWaveSlopeExpression(RIPPLE_COMPONENTS, 'weWaveRippleAmplitude', 'weWaveSpeed * 1.34', 'weWaveScale * 1.42', 'vec2(worldXZ.x - 8.2, worldXZ.y + 4.6)', 'weWaveTime * 1.3');
 
   return `uniform float weWaveTime;
 uniform float weWaveAmplitude;

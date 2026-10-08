@@ -1,6 +1,8 @@
 import { getAstronomicalBody } from '../astronomy/body-catalog.js?v=3';
 import { ctx as appCtx } from '../shared-context.js?v=55';
 import { createIndexedDbDiscoveryProfileStore } from '../discovery/profile-store.js?v=5';
+import { createDestinationMissionStore } from '../universe/mission-authority.js?v=3';
+import { planetarySurveyEquipment } from '../universe/mission-progression.js?v=1';
 
 const INTERACTION_RADIUS = 18;
 const ACTIVITY_OFFSETS = Object.freeze([
@@ -68,6 +70,8 @@ const BODY_FIELD_NOTES = Object.freeze({
 });
 
 let active = null;
+let arrivalEquipment = planetarySurveyEquipment(null);
+function fieldEquipment() { return appCtx.getPlanetarySurveyEquipment?.() || arrivalEquipment; }
 let profileStore = null;
 let mapTimer = 0;
 let planetaryJournalOpen = false;
@@ -184,19 +188,21 @@ function playerPosition() {
   return walker || appCtx.car || null;
 }
 
-function closestActivity(maxDistance = Infinity) {
+function closestActivity(maxDistance = Infinity, admitted = false) {
   const player = playerPosition();
   if (!active || !player) return null;
   let nearest = null;
   active.activities.forEach((activity) => {
     const distance = Math.hypot(activity.x - Number(player.x || 0), activity.z - Number(player.z || 0));
-    if (distance <= maxDistance && (!nearest || distance < nearest.distance)) nearest = { ...activity, distance };
+    const equipment = fieldEquipment();
+    const range = admitted && activity.activityId !== 'geology-inspect' ? equipment?.remoteRangeM || INTERACTION_RADIUS : maxDistance;
+    if (distance <= range && (!nearest || distance < nearest.distance)) nearest = { ...activity, distance };
   });
   return nearest;
 }
 
 function nearestActivity() {
-  return closestActivity(INTERACTION_RADIUS);
+  return closestActivity(INTERACTION_RADIUS, true);
 }
 
 function fieldMaterial(color, options = {}) {
@@ -366,6 +372,7 @@ function updateFieldSitePresentation(activity, step) {
 }
 
 function activatePlanetaryFieldActivities(pack, world, sampleHeight) {
+  arrivalEquipment = planetarySurveyEquipment(createDestinationMissionStore().load());
   const definitions = pack?.fieldNotes || BODY_FIELD_NOTES[pack?.bodyId];
   if (!definitions || !world || typeof sampleHeight !== 'function') {
     active = null;
@@ -455,13 +462,18 @@ function updatePlanetaryFieldMap(dt = 0) {
   const closest = nearby || closestActivity();
   const nearbyProcedure = nearby ? procedureState(nearby) : null;
   if (hint) hint.textContent = nearby
-    ? `${nearbyProcedure.label} · ${Math.round(nearby.distance)} m · use E or Explore`
+    ? `${nearbyProcedure.label} · ${Math.round(nearby.distance)} m · ${fieldEquipment().label} · use E or Explore`
     : closest
       ? `Nearest: ${closest.label} · ${Math.round(closest.distance)} m`
       : 'Blue: photo · gold: surface · green: environment';
 }
 
 async function recordActivity(activity) {
+  try { return await persistActivity(activity); }
+  catch { appCtx.showSpaceFlightMessage?.('FIELD RECORD NOT SAVED · RETRY AT THIS STATION', '#f59e0b'); return false; }
+}
+
+async function persistActivity(activity) {
   const body = getAstronomicalBody(activity.bodyId);
   const bodyName = body?.name || active?.bodyName || activity.bodyId;
   profileStore ||= appCtx.discoveryProfileStore || createIndexedDbDiscoveryProfileStore();
@@ -490,6 +502,7 @@ async function recordActivity(activity) {
     description: activity.description,
     collectedAt: Date.now()
   }, { collection: false });
+  if (!result?.recorded && result?.reason !== 'already-claimed') return false;
   const message = result.recorded
     ? `${activity.label.toUpperCase()} · SAVED TO JOURNAL`
     : `${activity.label.toUpperCase()} · ALREADY DOCUMENTED`;
@@ -506,13 +519,15 @@ async function advanceActivity(activity) {
   const procedure = procedureState(activity);
   if (procedure.complete) return recordActivity(activity);
   const nextStep = procedure.step + 1;
-  updateFieldSitePresentation(activity, nextStep);
   if (nextStep < procedure.steps.length) {
+    updateFieldSitePresentation(activity, nextStep);
     appCtx.showSpaceFlightMessage?.(`${procedure.steps[procedure.step].toUpperCase()} · ${nextStep} OF ${procedure.steps.length}`, '#8ab4ff');
     globalThis.dispatchEvent?.(new CustomEvent('we3d:planetary-field-step', { detail: { activity, step: nextStep, total: procedure.steps.length } }));
     return true;
   }
-  return recordActivity(activity);
+  const saved = await recordActivity(activity);
+  if (saved) updateFieldSitePresentation(activity, nextStep);
+  return saved;
 }
 
 appCtx.registerContextInteraction?.({
@@ -545,6 +560,7 @@ Object.assign(appCtx, {
   planetaryFieldActivitySnapshot: () => Object.freeze({
     activeBodyId: active?.bodyId || null,
     regionId: active?.regionId || null,
+    equipment: fieldEquipment(),
     activities: Object.freeze((active?.activities || []).map((entry) => Object.freeze({ ...entry, procedure: procedureState(entry) }))),
     nearest: nearestActivity(),
     closest: closestActivity()

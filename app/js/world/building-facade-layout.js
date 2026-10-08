@@ -71,34 +71,89 @@ float facadeBox(vec2 p, vec2 halfSize, float feather) {
   vec2 edge=1.0-smoothstep(halfSize,halfSize+vec2(feather),abs(p));
   return edge.x*edge.y;
 }
-vec3 facadeOpenings(vec3 wall, vec4 wallLayout, vec4 style) {
-  // Measure the continuous bay coordinate before fract() introduces seams.
+// Screen derivatives recover the wall's metre-space basis after arbitrary
+// rotations and spatial batching. No extra vertex attributes or room meshes.
+vec3 facadeViewRay(vec3 viewPosition, vec2 wallMeters) {
+  vec3 dx=dFdx(-viewPosition),dy=dFdy(-viewPosition);
+  vec2 ux=dFdx(wallMeters),uy=dFdy(wallMeters);
+  float orientation=sign(ux.x*uy.y-ux.y*uy.x);
+  vec3 tangent=normalize((dx*uy.y-dy*ux.y)*orientation);
+  vec3 up=normalize((dy*ux.x-dx*uy.x)*orientation);
+  vec3 towardCamera=normalize(viewPosition);
+  return vec3(dot(towardCamera,tangent),dot(towardCamera,up),
+    max(0.12,abs(dot(towardCamera,normalize(cross(tangent,up))))));
+}
+vec3 facadeRoom(vec2 point, vec2 halfSize, vec3 viewRay, float seed, float shop) {
+  vec3 origin=vec3(clamp(point/halfSize,vec2(-.999),vec2(.999)),0.0);
+  // Rooms have finite depth: at an oblique angle a side wall occludes the
+  // back wall. Looking through the same window produces continuous parallax.
+  vec3 ray=vec3(-viewRay.xy*mix(.72,.95,shop)/halfSize,-viewRay.z);
+  vec3 safeRay=mix(vec3(-1.0),vec3(1.0),step(vec3(0.0),ray))*max(abs(ray),vec3(.0001));
+  vec3 hitTimes=(sign(safeRay)-origin)/safeRay;
+  vec3 hit=origin+ray*min(hitTimes.x,min(hitTimes.y,hitTimes.z));
+  float back=step(abs(hit.z+1.0),.002);
+  float ceiling=step(.998,hit.y);
+  float floorSurface=step(hit.y,-.998);
+  vec3 paint=mix(vec3(.115,.101,.082),vec3(.22,.19,.14),seed);
+  vec3 room=paint*mix(.58,1.0,back);
+  room=mix(room,vec3(.055,.043,.028),floorSurface);
+  room=mix(room,vec3(.24,.215,.17),ceiling);
+  float edgeShade=smoothstep(0.0,.22,1.0-max(abs(hit.x),abs(hit.y)));
+  room*=mix(.7,1.0,edgeShade*back);
+  // Restrained shelves/display volumes in retail; varied blinds upstairs.
+  float shelf=(1.0-smoothstep(.025,.045,abs(hit.y+.28)))*back;
+  float objects=step(.19,fract(hit.x*4.0+seed))*step(-.24,hit.y)*step(hit.y,.12)*back;
+  room=mix(room,vec3(.055,.040,.027),shop*shelf);
+  room=mix(room,mix(vec3(.27,.15,.075),vec3(.075,.17,.16),seed),objects*shop*.70);
+  float blind=step(.57,seed)*step(mix(.12,.73,seed),point.y/halfSize.y);
+  float slat=.86+.14*smoothstep(.07,.15,abs(fract(point.y*35.0)-.5));
+  room=mix(room,vec3(.25,.235,.20)*slat,blind*(1.0-shop));
+  return room;
+}
+float facadeRoomSeed(vec2 cell, float buildingSeed) {
+  return fract(sin(dot(floor(cell)+vec2(buildingSeed,buildingSeed*.37),vec2(12.9898,78.233)))*43758.5453);
+}
+// RGB is the surface albedo; alpha is glazing coverage for physical response.
+vec4 facadeOpenings(vec3 wall, vec4 wallLayout, vec4 style, vec3 viewRay, float buildingSeed) {
   float pixelWidth=max(fwidth(wallLayout.x),fwidth(wallLayout.y));
-  float edgeWidth=clamp(pixelWidth,0.006,0.25);
+  float edgeWidth=clamp(pixelWidth,0.004,0.25);
   float curtain=1.0-step(-0.5,style.w);
-  wall=mix(wall,vec3(0.20,0.26,0.30),curtain);
-  if(wallLayout.x<0.0 || wallLayout.y<0.0 || wallLayout.y>=floor(style.z)) return wall;
+  wall=mix(wall,vec3(0.055,0.072,0.08),curtain);
+  // Ground contact and a restrained base course anchor otherwise flat walls.
+  wall*=mix(.73,1.0,smoothstep(0.0,.65,wallLayout.w));
+  if(wallLayout.x<0.0 || wallLayout.y<0.0 || wallLayout.y>=floor(style.z)) return vec4(wall,0.0);
   float shop=step(0.01,style.w)*(1.0-step(1.0,wallLayout.y));
   vec2 point=vec2(fract(wallLayout.x)-0.5,fract(wallLayout.y)-mix(0.55,0.5,curtain));
   vec2 halfSize=mix(vec2(style.x,style.y)*0.5,vec2(0.465,0.455),curtain);
   halfSize=mix(halfSize,vec2(style.w*0.47,0.39),shop);
-  float reveal=facadeBox(point,halfSize+vec2(0.035,0.028),max(0.008,edgeWidth));
+  float reveal=facadeBox(point,halfSize+vec2(0.025,0.023),max(0.005,edgeWidth));
   float outer=facadeBox(point,halfSize,edgeWidth);
-  float inner=facadeBox(point,max(vec2(0.02),halfSize-vec2(mix(fract(style.z),0.016,curtain))),edgeWidth);
-  vec3 frame=mix(wall*0.55,vec3(0.22,0.25,0.26),curtain);
-  float reflection=smoothstep(-halfSize.y,halfSize.y,point.y);
-  float room=fract(sin(dot(floor(wallLayout.xy),vec2(12.9898,78.233)))*43758.5453);
-  vec3 glass=mix(vec3(0.075,0.115,0.14),vec3(0.32,0.43,0.48),reflection*0.6+room*0.12);
-  vec3 result=mix(wall,wall*0.48,reveal);
+  float inner=facadeBox(point,max(vec2(0.02),halfSize-vec2(mix(fract(style.z),0.012,curtain))),edgeWidth);
+  vec3 frame=mix(wall*.30,vec3(.035,.041,.043),max(curtain,shop));
+  float room=facadeRoomSeed(wallLayout.xy,buildingSeed);
+  vec3 interior=facadeRoom(point,halfSize,viewRay,room,shop);
+  // Environment specular is added by MeshStandardMaterial. A subtle cool
+  // albedo tint avoids the previous painted sky-gradient windows.
+  float fresnel=pow(1.0-viewRay.z,4.0);
+  vec3 glass=mix(interior,vec3(.08,.13,.16),.12+fresnel*.6);
+  vec3 result=mix(wall,wall*.36,reveal);
   result=mix(result,frame,outer);
   result=mix(result,glass,inner);
-  float mullion=(1.0-smoothstep(0.006,0.015+edgeWidth,abs(point.x)))*inner;
+  float mullion=(1.0-smoothstep(0.004,0.010+edgeWidth,abs(point.x)))*inner;
   result=mix(result,frame,mullion);
-  float sill=facadeBox(point+vec2(0.0,halfSize.y+0.028),vec2(halfSize.x+0.045,0.018),edgeWidth);
-  result=mix(result,wall*1.18,sill*(1.0-curtain));
-  // Subpixel windows resolve to coverage, rather than inventing larger bays.
+  float sill=facadeBox(point+vec2(0.0,halfSize.y+0.023),vec2(halfSize.x+0.035,0.014),edgeWidth);
+  result=mix(result,wall*1.12,sill*(1.0-curtain));
   float coverage=clamp(4.0*halfSize.x*halfSize.y,0.0,1.0);
-  vec3 average=mix(wall,vec3(0.16,0.23,0.27),coverage);
-  return mix(result,average,smoothstep(0.18,0.75,pixelWidth));
+  vec3 average=mix(wall,vec3(.095,.115,.12),coverage);
+  float lod=smoothstep(0.18,0.75,pixelWidth);
+  return vec4(mix(result,average,lod),mix(inner-mullion,coverage,lod));
+}
+
+vec3 facadeGrainNormal(vec3 normal, vec3 viewPosition, float height, float strength) {
+  vec3 dx=dFdx(-viewPosition),dy=dFdy(-viewPosition);
+  vec3 r1=cross(dy,normal),r2=cross(normal,dx);
+  float determinant=dot(dx,r1);
+  vec3 gradient=r1*dFdx(height)+r2*dFdy(height);
+  return normalize(abs(determinant)*normal-sign(determinant)*strength*gradient);
 }
 `;

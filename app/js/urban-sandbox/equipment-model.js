@@ -48,7 +48,7 @@ function createEquipmentInventory(options = {}) {
   backpack.registerDefinitions(EQUIPMENT_DEFINITIONS);
   for (const definition of EQUIPMENT_DEFINITIONS.filter((entry) => acquired.has(entry.id))) {
     if (!backpack.has(definition.id)) backpack.upsertItem(starterItem(definition), { silent: true });
-    if (Number.isInteger(definition.slot) && !backpack.snapshot().hotbar[definition.slot - 1]) {
+    if (Number.isInteger(definition.slot) && !backpack.summary().hotbar[definition.slot - 1]) {
       backpack.assignHotbar(definition.slot, definition.id, { silent: true });
     }
   }
@@ -67,6 +67,13 @@ function createEquipmentInventory(options = {}) {
   });
   const lastUseAtByEquipment = new Map();
   let flashlightEnabled = false;
+  let catalogSource=null,availableCatalogIds=null;
+  function present(item) {
+    if (!item) return null;
+    const rounds=ammo.get(item.catalogId);
+    return Object.freeze({...item,slot:item.hotbarSlot,magazine:rounds?.magazine??null,
+      reserve:rounds?.reserve??null,quantity:quantities.get(item.catalogId)??item.quantity??null});
+  }
 
   const snapshot = () => {
     const base = backpack.snapshot();
@@ -74,27 +81,36 @@ function createEquipmentInventory(options = {}) {
       ...base,
       equippedId: base.equippedCatalogId,
       flashlightEnabled,
-      items: Object.freeze(base.items.map((item) => {
-        const rounds = ammo.get(item.catalogId);
-        return Object.freeze({
-          ...item,
-          slot: item.hotbarSlot,
-          magazine: rounds?.magazine ?? null,
-          reserve: rounds?.reserve ?? null,
-          quantity: quantities.get(item.catalogId) ?? item.quantity ?? null
-        });
-      }))
+      items: Object.freeze(base.items.map(present))
     });
   };
 
   function equippedDefinition() {
-    return definitionFor(backpack.snapshot().equippedCatalogId, backpack);
+    // Frame-time equipment decisions need one catalog entry, not a sorted
+    // copy of every collected item in an established player's Backpack.
+    return definitionFor(backpack.equipped()?.catalogId, backpack);
   }
 
   return Object.freeze({
     type: 'CharacterBackpackEquipmentAdapter',
     backpack,
     snapshot,
+    catalogIds() {
+      const source=backpack.catalogIds();
+      if(source!==catalogSource||!availableCatalogIds){
+        catalogSource=source;
+        availableCatalogIds=Object.freeze(source.filter(id=>!quantities.has(id)||quantities.get(id)>0));
+      }
+      return availableCatalogIds;
+    },
+    summary() { const base=backpack.summary();return Object.freeze({...base,equipped:present(base.equipped),hotbar:Object.freeze(base.hotbar.map(present))}); },
+    page(options) { const base=backpack.page(options);return Object.freeze({...base,items:Object.freeze(base.items.map(present))}); },
+    item(identity) { return present(backpack.present(identity)); },
+    exportControls() {
+      const summary=backpack.summary();
+      return {revision:summary.revision,equippedInstanceId:summary.equippedInstanceId,hotbar:summary.hotbar.map(item=>item?.instanceId||null),
+        ammo:Object.fromEntries([...ammo.entries()].map(([id,rounds])=>[id,{...rounds}])),quantities:Object.fromEntries(quantities)};
+    },
     exportState: () => ({
       ...backpack.exportState(),
       ammo: Object.fromEntries([...ammo.entries()].map(([id, rounds]) => [id, { ...rounds }])),
@@ -113,8 +129,8 @@ function createEquipmentInventory(options = {}) {
     assignHotbar(slot, id) { return backpack.assignHotbar(slot, id); },
     consumeItem(id, quantity = 1) { return backpack.consume(id, quantity); },
     cycle(direction = 1) {
-      const state = backpack.snapshot();
-      const available = state.hotbar.filter(Boolean);
+      const state = backpack.summary();
+      const available = state.hotbar.filter(Boolean).map(item=>item.instanceId);
       if (!available.length) return equippedDefinition();
       const current = Math.max(0, available.indexOf(state.equippedInstanceId));
       const next = available[(current + (direction < 0 ? -1 : 1) + available.length) % available.length];
@@ -145,6 +161,7 @@ function createEquipmentInventory(options = {}) {
       const amount = Math.max(0, Math.floor(Number(quantity) || 0));
       if (!definition?.quantity || amount <= 0) return 0;
       quantities.set(definition.id, Number(quantities.get(definition.id) || 0) + amount);
+      availableCatalogIds=null;
       backpack.touch?.('quantity-added', { catalogId: definition.id, quantity: amount });
       return amount;
     },
@@ -167,7 +184,7 @@ function createEquipmentInventory(options = {}) {
       const quantity = quantities.get(definition.id);
       if (quantity !== undefined && quantity <= 0) return Object.freeze({ ok: false, reason: 'empty', definition });
       if (rounds) rounds.magazine -= 1;
-      if (quantity !== undefined) quantities.set(definition.id, quantity - 1);
+      if (quantity !== undefined) {quantities.set(definition.id, quantity - 1);availableCatalogIds=null;}
       if (rounds || quantity !== undefined) backpack.touch?.('equipment-consumed', { catalogId: definition.id });
       lastUseAtByEquipment.set(definition.id, timestamp);
       return Object.freeze({ ok: true, definition });

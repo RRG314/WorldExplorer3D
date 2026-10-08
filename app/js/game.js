@@ -1,3 +1,5 @@
+import { isPoiMapLayerVisible } from './game/poi-map-visibility.js';
+import {createGameResultController} from './gameplay/result-controller.js';
 import { ctx as appCtx } from "./shared-context.js?v=55";
 import { clearPolice, spawnPolice, updatePolice } from "./game/police.js?v=2";
 import {
@@ -68,51 +70,7 @@ import {
 import { escapeHtml, escapeJsString, formatPrice, toFiniteNumber } from "./game/ui-utils.js?v=1";
 
 function isPOIVisible(poiType) {
-  const categoryMap = {
-    'amenity=school': 'schools',
-    'amenity=university': 'schools',
-    'amenity=hospital': 'healthcare',
-    'amenity=clinic': 'healthcare',
-    'amenity=pharmacy': 'healthcare',
-    'amenity=police': 'emergency',
-    'amenity=fire_station': 'emergency',
-    'amenity=restaurant': 'food',
-    'amenity=cafe': 'food',
-    'amenity=fast_food': 'food',
-    'amenity=bar': 'food',
-    'amenity=pub': 'food',
-    'shop=supermarket': 'shopping',
-    'shop=mall': 'shopping',
-    'shop=convenience': 'shopping',
-    'shop=hardware': 'shopping',
-    'shop=doityourself': 'shopping',
-    'shop=pawnbroker': 'shopping',
-    'shop=second_hand': 'shopping',
-    'shop=car_repair': 'shopping',
-    'shop=car_parts': 'shopping',
-    'shop=outdoor': 'shopping',
-    'shop=fishing': 'shopping',
-    'shop=boat': 'shopping',
-    'shop=aviation': 'shopping',
-    'tourism=museum': 'culture',
-    'tourism=attraction': 'tourism',
-    'tourism=viewpoint': 'tourism',
-    'tourism=hotel': 'hotels',
-    'tourism=artwork': 'culture',
-    'historic=monument': 'historic',
-    'historic=memorial': 'historic',
-    'leisure=park': 'parks',
-    'leisure=playground': 'parks',
-    'leisure=sports_centre': 'parks',
-    'leisure=stadium': 'parks',
-    'amenity=parking': 'parking',
-    'amenity=fuel': 'fuel',
-    'amenity=charging_station': 'fuel',
-    'amenity=bank': 'banks',
-    'amenity=post_office': 'postal'
-  };
-  const category = categoryMap[poiType];
-  return category ? appCtx.mapLayers[category] : false;
+  return isPoiMapLayerVisible(poiType, appCtx.mapLayers);
 }
 
 function showMapInfo(type, data) {
@@ -212,16 +170,12 @@ function fmtTime(seconds) {
   return String(Math.floor(whole / 60)).padStart(2, '0') + ':' + String(whole % 60).padStart(2, '0');
 }
 
-function showResult(title, stats) {
-  document.getElementById('resultTitle').textContent = title;
-  document.getElementById('resultStats').textContent = stats;
-  document.getElementById('resultScreen').classList.add('show');
-  appCtx.setPauseReason?.('game_result', true);
-}
-
-function hideResult() {
-  document.getElementById('resultScreen').classList.remove('show');
-}
+const resultController=createGameResultController(appCtx);
+function showResult(title,stats,options){return resultController.show(title,stats,options);}
+function hideResult(){resultController.hide();}
+appCtx.replayGameResult=()=>resultController.replay();
+appCtx.retryGameResult=()=>resultController.retry();
+appCtx.getGameResultSnapshot=()=>resultController.snapshot();
 
 Object.assign(appCtx, {
   applyPaintTownRemoteClaimsFromSync,

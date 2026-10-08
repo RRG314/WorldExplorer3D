@@ -1,3 +1,4 @@
+import { facadeNightUniform } from '../world/facade-lighting.js';
 import { ctx as appCtx } from '../shared-context.js?v=55';
 
 const STREET_LIGHT_COLOR = 0xffd7a3;
@@ -108,10 +109,12 @@ export function resetStreetLampFixtures() {
   }
 }
 
-export function registerStreetLamp(group, head, target = null) {
+export function registerStreetLamp(group, head, target = null, options = {}) {
   if (!group) return;
   if (!Array.isArray(appCtx.streetLampFixtures)) appCtx.streetLampFixtures = [];
-  appCtx.streetLampFixtures.push({ group, head, target });
+  const value=Number(options.intensityScale ?? 1);
+  const intensityScale=Number.isFinite(value)?Math.max(.05,Math.min(1,value)):1;
+  appCtx.streetLampFixtures.push({ group, head, target, intensityScale });
 }
 
 function updateHeadlights(factor) {
@@ -139,9 +142,7 @@ function updateHeadlights(factor) {
 }
 
 function nearestFixtures(limit) {
-  const origin = appCtx.carMesh?.visible === false || appCtx.droneMode
-    ? appCtx.camera?.position
-    : appCtx.carMesh?.position;
+  const origin = appCtx.activeEarthActorPosition?.() || appCtx.camera?.position || appCtx.carMesh?.position;
   if (!origin) return [];
   const candidates = [];
   for (const fixture of appCtx.streetLampFixtures || []) {
@@ -181,7 +182,7 @@ function updateStreetLights(factor, now) {
       Number.isFinite(targetZ) ? targetZ : fixture.group.position.z
     );
     entry.target.updateMatrixWorld();
-    light.intensity = STREET_LIGHT_INTENSITY * factor;
+    light.intensity = STREET_LIGHT_INTENSITY * factor * fixture.intensityScale;
     light.visible = true;
     light.updateMatrixWorld();
   }
@@ -193,6 +194,7 @@ function updateStreetLights(factor, now) {
 export function updateNightLighting() {
   if (!appCtx.scene) return;
   const factor = nightFactor();
+  facadeNightUniform.value = factor;
   updateHeadlights(factor);
   updateStreetLights(factor, typeof performance !== 'undefined' ? performance.now() : Date.now());
 }

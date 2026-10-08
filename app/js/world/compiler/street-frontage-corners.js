@@ -1,4 +1,5 @@
 import {frontageHit} from './street-frontage-geometry.js';
+import {FRONTAGE_RULES} from './street-frontage-policy.js';
 function inRing(x,z,ring){
   let inside=false;
   for(let i=0,j=ring.length-1;i<ring.length;j=i++){
@@ -14,7 +15,7 @@ const covers=(point,polygons)=>polygons.some(p=>inRing(point.x,point.z,p[0])&&!p
 // lines. This is a geometric construction, not dilation/erosion of a tile.
 // Building, carriageway and protected-land subtraction still apply afterward.
 export function frontageCornerRegions(buildingPolygons,pavementParts,roadEdges,metersPerWorldUnit){
-  const result=[],probe=.04/metersPerWorldUnit,maxReach=24/metersPerWorldUnit;
+  const result=[],probe=.04/metersPerWorldUnit,maxReach=FRONTAGE_RULES.ordinaryReach/metersPerWorldUnit;
   for(const polygon of buildingPolygons){
     const ring=polygon[0];if(!ring||ring.length<4)continue;
     const points=ring.slice(0,-1),[ox,oz]=points[0];let area=0;

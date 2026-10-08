@@ -1,4 +1,5 @@
 import { markRoadsAtMissingTiles } from './shortbread-missing-coverage.js';
+import { clipVectorLineToTile, stitchVectorRoadElements, vectorRoadIsDirected, vectorRoadSemanticKey } from './vector-line-ownership.js';
 import { createRoadNameResolver } from './shortbread-road-labels.js?v=1';
 import { yieldToMainThread } from './cooperative-scheduling.js?v=1';
 import { runBoundedProviderBatch } from '../earth-core/bounded-provider-batch.js?v=1';
@@ -206,7 +207,7 @@ export async function fetchShortbreadTile(z, x, y, options = {}) {
     rawTileCache.set(cacheKey, rawCached);
     const { Pbf, VectorTile } = await loadVectorTileLib();
     if (externalSignal?.aborted) throw shortbreadAbortError(z, x, y);
-    const record = { tile: new VectorTile(new Pbf(rawCached.bytes)), z, x, y };
+    const record = { tile: new VectorTile(new Pbf(rawCached.bytes)), bytes: rawCached.bytes, z, x, y };
     decodedTileCache.set(cacheKey, record);
     while (decodedTileCache.size > SHORTBREAD_DECODED_TILE_CACHE_LIMIT) {
       decodedTileCache.delete(decodedTileCache.keys().next().value);
@@ -239,7 +240,7 @@ export async function fetchShortbreadTile(z, x, y, options = {}) {
       }
       if (controller.signal.aborted) throw shortbreadAbortError(z, x, y);
       cacheRawTile(cacheKey, bytes);
-      const record = { tile: new VectorTile(new Pbf(bytes)), z, x, y };
+      const record = { tile: new VectorTile(new Pbf(bytes)), bytes, z, x, y };
       if (attempt.generation === health.generation) {
         health.failures = 0; health.blockedUntil = 0;
       }
@@ -337,15 +338,16 @@ function landTags(properties = {}) {
     'farmyard', 'farmland'
   ]);
   if (directLanduse.has(kind)) return { landuse: kind };
+  if (kind === 'national_park' || kind === 'protected_area') return { boundary: kind };
   if (kind === 'grave_yard') return { amenity: 'grave_yard', landuse: 'cemetery' };
   if (kind === 'sand' || kind === 'beach') return { natural: kind };
-  if (['heath', 'scrub', 'grassland', 'bare_rock', 'scree', 'shingle'].includes(kind)) {
+  if (['wood', 'heath', 'scrub', 'grassland', 'bare_rock', 'scree', 'shingle', 'wetland'].includes(kind)) {
     return { natural: kind };
   }
   if (['swamp', 'bog', 'string_bog', 'wet_meadow', 'marsh'].includes(kind)) {
     return { natural: 'wetland', wetland: kind };
   }
-  if (['park', 'garden', 'playground', 'golf_course', 'miniature_golf'].includes(kind)) {
+  if (['park', 'garden', 'nature_reserve', 'playground', 'golf_course', 'miniature_golf'].includes(kind)) {
     return { leisure: kind };
   }
   return null;
@@ -353,6 +355,7 @@ function landTags(properties = {}) {
 
 function siteTags(properties = {}) {
   const kind = String(properties.kind || '').toLowerCase();
+  if (['park', 'garden', 'nature_reserve', 'national_park', 'protected_area'].includes(kind)) return landTags(properties);
   if (kind === 'parking' || kind === 'bicycle_parking') return { amenity: kind };
   if (kind === 'construction') return { landuse: 'construction' };
   if (['sports_centre'].includes(kind)) return { leisure: kind };
@@ -463,6 +466,11 @@ function geometryParts(geometry) {
 
 function geometrySignature(layerName, part, tags) {
   const coords = part.coords || [];
+  if (layerName === 'streets' && !part.polygon) {
+    const forward=coords.map(p=>`${Number(p[0]).toFixed(7)},${Number(p[1]).toFixed(7)}`);
+    const reverse=[...forward].reverse().join(';'),path=forward.join(';');
+    return [layerName,vectorRoadSemanticKey(tags),vectorRoadIsDirected(tags)||path<reverse?path:reverse].join(':');
+  }
   const first = coords[0] || [];
   const last = coords[coords.length - 1] || [];
   return [
@@ -564,13 +572,18 @@ async function convertTilesToElements(tiles, layerNames, bounds = null) {
           });
           continue;
         }
-          const parts = geometryParts(geojson.geometry);
+          const parts = geometryParts(geojson.geometry).flatMap(part => layerName === 'streets' && !part.polygon
+            ? clipVectorLineToTile(part.coords,x,y,z).map(coords=>({...part,coords})) : [part]);
           for (let partIndex = 0; partIndex < parts.length; partIndex++) {
             const part = parts[partIndex];
             if (!Array.isArray(part.coords) || part.coords.length < (part.polygon ? 4 : 2)) continue;
             if (!partIntersectsBounds(part, bounds)) continue;
           const resolvedTags = {
             ...tags,
+            ...(['land', 'sites'].includes(layerName) ? Object.fromEntries(
+              ['leaf_type', 'leaf_cycle', 'wetland'].filter(key => typeof geojson.properties?.[key] === 'string')
+                .map(key => [key, geojson.properties[key]])
+            ) : {}),
             ...(['land', 'sites', 'street_polygons'].includes(layerName) &&
                 typeof geojson.properties?.surface === 'string'
               ? { surface: geojson.properties.surface } : {}),
@@ -598,6 +611,7 @@ async function convertTilesToElements(tiles, layerNames, bounds = null) {
             type: 'way',
             id: nextWayId--,
             nodes: nodeIds,
+            ...(layerName === 'streets' && !part.polygon ? {vectorRoadTile:{x,y,z}} : {}),
             ...(['land', 'sites', 'street_polygons'].includes(layerName)
               ? { surfaceHoles: part.holes || [] } : {}),
             tags: { ...resolvedTags, _sourceFeatureId: sourceFeatureId }
@@ -611,7 +625,7 @@ async function convertTilesToElements(tiles, layerNames, bounds = null) {
       }
     }
   }
-  return elements;
+  return stitchVectorRoadElements(elements);
 }
 
 function normalizeCoverageBounds(lat, lon, radius, explicitBounds = null, maxRadius = 0.04) {

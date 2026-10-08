@@ -31,3 +31,13 @@ test('invalid frame deltas and unavailable clips do not poison the mixer',()=>{
  controller.update({moving:true,aiming:true,direction:'left'},NaN);
  assert.ok(Object.values(controller.snapshot().weights).every(Number.isFinite));
 });
+test('sanitized explorer bone names receive swim motion and release back to walking',()=>{
+ const visual=new THREE.Group(),hips=new THREE.Bone(),chest=new THREE.Bone(),arm=new THREE.Bone();hips.name='Hips';chest.name='Chest';arm.name='UpperArmL';visual.add(hips);hips.add(chest);chest.add(arm);
+ const idle=new THREE.AnimationClip('Idle',1,[new THREE.QuaternionKeyframeTrack(arm.uuid+'.quaternion',[0,1],[0,0,0,1,0,0,0,1])]);
+ const controller=createCharacterAnimationController(THREE,visual,[idle],{}, {swimming:true});
+ for(let i=0;i<20;i++)controller.update({swimming:true,moving:true},.05);
+ assert.ok(controller.snapshot().weights['Explorer_Swim:swim:upper']>.99);assert.ok(Math.abs(arm.quaternion.z)>.01);
+ for(let i=0;i<30;i++)controller.update({swimming:false},.05);
+ assert.equal(controller.snapshot().weights['Explorer_Swim:swim:upper'],undefined);assert.ok(Math.abs(arm.quaternion.z)<.01);
+ controller.dispose();
+});

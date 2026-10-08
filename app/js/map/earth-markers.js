@@ -110,11 +110,11 @@ function drawGameModeMarkers(ctx, w, h, isLarge, worldToScreen, mx, my) {
 
 function drawPois(ctx, w, h, isLarge, worldToScreen, mx, my) {
   if (appCtx.pois.length <= 0) return;
-
+  const projected = {};
   appCtx.pois.forEach((poi) => {
     if (!appCtx.isPOIVisible(poi.type)) return;
 
-    const pos = worldToScreen(poi.x, poi.z);
+    const pos = worldToScreen(poi.x, poi.z, projected);
     const dist = Math.sqrt((pos.x - mx) * (pos.x - mx) + (pos.y - my) * (pos.y - my));
     if (!(Math.abs(pos.x - mx) < w / 2 && Math.abs(pos.y - my) < h / 2)) return;
 

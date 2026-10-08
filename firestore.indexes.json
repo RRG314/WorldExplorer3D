@@ -395,6 +395,28 @@
           "queryScope": "COLLECTION_GROUP"
         }
       ]
+    },
+    {
+      "collectionGroup": "placeLookupCache",
+      "fieldPath": "expiresAt",
+      "ttl": true,
+      "indexes": []
+    },
+    {
+      "collectionGroup": "placeLookupCache",
+      "fieldPath": "payload",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "environmentDataCache",
+      "fieldPath": "expiresAt",
+      "ttl": true,
+      "indexes": []
+    },
+    {
+      "collectionGroup": "environmentDataCache",
+      "fieldPath": "payload",
+      "indexes": []
     }
   ]
 }

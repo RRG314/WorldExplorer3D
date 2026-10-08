@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import {readFile} from 'node:fs/promises';
 import * as THREE from 'three';
+import {publishHarborDistrict,harborDistrictFocus} from '../app/js/world/harbor-district.js';
 import {packTraversalAdjacency,traversalSourceInterval} from '../app/js/world/traversal-graph-storage.js';
 import {ctx} from '../app/js/shared-context.js?v=55';
 import {initWorldTraversal,buildTraversalNetworks,invalidateTraversalNetworks,findTraversalRoute} from '../app/js/world/traversal.js';
@@ -44,7 +45,7 @@ test('real route search retains one-way restrictions, walking and disconnected l
 test('furniture publication releases its road index on success, failure and reset',async()=>{
  const source=(await readFile(new URL('../app/js/world/furniture.js',import.meta.url),'utf8')).replace(/^import[\s\S]*?from\s+['"][^'"]+['"];?\s*/gm,'').replaceAll('export function','function');
  const appCtx={roads:[],pois:[]};
- const context=vm.createContext({appCtx,THREE,performance,collectWorldVegetationPlacements:()=>[],buildWorldVegetationInstancing:()=>0,disposeVegetationBatch(){},createRoadsidePlacementResolver:roads=>({roads}),resetStreetLampFixtures(){}});
+ const context=vm.createContext({appCtx,THREE,performance,publishHarborDistrict,harborDistrictFocus,registerStreetLamp:()=>{},collectWorldVegetationPlacements:()=>[],buildWorldVegetationInstancing:()=>0,disposeVegetationBatch(){},createRoadsidePlacementResolver:roads=>({roads}),resetStreetLampFixtures(){}});
  vm.runInContext(source,context);
  context.generateStreetFurniture();assert.equal(vm.runInContext('roadsideResolver',context),null);
  appCtx.pois={forEach(){throw new Error('publication failed');}};
@@ -60,12 +61,14 @@ test('world reset releases derived transport models as well as scene objects',as
  const keys=['transportNetworkModel','transportStructureModel','transportStructureAssembly','transportJunctionProfile','sharedTransportSurfacePresentation','tunnelSolidCompilation','structureProfileCompilation'];
  const appCtx={resetEarthStreaming(){},replaceWorldCollection(k){this[k]=[];},clearWorldCollections(keys){for(const k of keys)this[k]=[];}};
  appCtx.Walk={state:{walker:{_walkSupportFeature:{transportConnections:[{}]}}}};
+ let waterCacheResets=0;
  let groundInvalidations=0;appCtx.GroundHeight={invalidate(){groundInvalidations++;}};
  for(const key of keys)appCtx[key]={oldWorldFeature:{}};
- const context=vm.createContext({appCtx,resetRoadMapIndex(){},resetRoadSearchIndex(){},releaseLocationModels(){},clearBuildingExteriorMaterialPool(){},clearBuildingExteriorDetails(){}});
+ const context=vm.createContext({appCtx,clearWaterMeshCache(){waterCacheResets++;},resetRoadMapIndex(){},resetRoadSearchIndex(){},releaseLocationModels(){},clearBuildingExteriorMaterialPool(){},clearBuildingExteriorDetails(){}});
  vm.runInContext(source,context);context.resetWorldForReload({showLoading:false});
  for(const key of keys)assert.equal(appCtx[key],null,key);
  assert.equal(groundInvalidations,1);
+ assert.equal(waterCacheResets,1);
  assert.equal(appCtx.Walk.state.walker._walkSupportFeature,null);
 });
 

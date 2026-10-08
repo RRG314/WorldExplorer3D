@@ -1,0 +1,40 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {createWaterEnvironmentController} from '../app/js/world/water-environment-controller.js';
+const deferred=()=>{let resolve,reject;const promise=new Promise((a,b)=>{resolve=a;reject=b});return {promise,resolve,reject}};
+const tick=()=>new Promise(r=>setImmediate(r));
+function setup(){const requests=[],stations=[];const appCtx={LOC:{lat:1,lon:1}};const controller=createWaterEnvironmentController({appCtx,marineService:{modelAt(place,{signal}){const d=deferred();requests.push({...d,place,signal});return d.promise},selected(place,{signal}){const d=deferred();stations.push({...d,place,signal});return d.promise}},resolveEvidence:({marine})=>({wave:{truthType:marine.model,renderUsable:true}})});return {appCtx,controller,requests,stations};}
+test('out-of-order model responses cannot publish, relabel cache or start obsolete station requests',async()=>{
+ const t=setup();const a=t.controller.refresh();await tick();t.appCtx.LOC={lat:2,lon:2};const b=t.controller.refresh();await tick();
+ t.requests[1].resolve('B');await b;t.requests[0].resolve('A');assert.equal(await a,null);await tick();
+ assert.equal(t.appCtx.activeWaterOpticsEvidence.wave.truthType,'B');assert.equal(t.stations.length,1);
+ assert.equal((await t.controller.refresh()).wave.truthType,'B');assert.equal(t.requests.length,2);
+});
+test('location change clears old evidence immediately; station completion cannot revive it',async()=>{
+ const t=setup();const a=t.controller.refresh();await tick();t.requests[0].resolve('A');await a;await tick();
+ t.appCtx.LOC={lat:2,lon:2};const b=t.controller.refresh();assert.equal(t.appCtx.activeMarineSnapshot,null);await tick();
+ t.stations[0].resolve({model:'old-station'});await tick();assert.equal(t.appCtx.activeMarineSnapshot,null);
+ t.requests[1].reject(Error('offline'));assert.equal(await b,null);assert.equal(t.appCtx.waterEnvironmentStatus.state,'unavailable');
+});
+test('same-place calls coalesce and invalid coordinates cancel publication instead of becoming 0,0',async()=>{
+ const t=setup();const a=t.controller.refresh();assert.equal(a,t.controller.refresh());await tick();
+ t.appCtx.LOC={lat:null,lon:null};assert.equal(await t.controller.refresh(),null);t.requests[0].resolve('A');await a;
+ assert.equal(t.appCtx.activeMarineSnapshot,null);assert.equal(t.appCtx.waterEnvironmentStatus.reason,'invalid-location');assert.equal(t.stations.length,0);
+});
+test('changing selected location without another refresh still invalidates a late result',async()=>{
+ const t=setup();const a=t.controller.refresh();await tick();t.appCtx.LOC={lat:3,lon:3};t.requests[0].resolve('A');assert.equal(await a,null);assert.equal(t.stations.length,0);
+});
+
+test('Ocean launch owns marine evidence even when an older Earth selection remains',async()=>{
+ const t=setup();const old=t.controller.refresh();await tick();
+ t.appCtx.oceanMode={active:true,launchSite:{lat:0,lon:-140}};
+ const ocean=t.controller.refresh();await tick();
+ assert.deepEqual(t.requests[1].place,{lat:0,lon:-140});
+ t.requests[0].resolve('old-earth');assert.equal(await old,null);
+ t.requests[1].resolve('ocean');await ocean;assert.equal(t.appCtx.activeWaterOpticsEvidence.wave.truthType,'ocean');
+ t.appCtx.oceanMode.active=false;t.controller.refresh();assert.equal(t.appCtx.activeWaterOpticsEvidence,null);
+});
+
+test('world replacement and explicit owner cancellation release both marine phases',async()=>{
+ const t=setup();const old=t.controller.refresh();await tick();t.appCtx.LOC={lat:2,lon:2};const next=t.controller.refresh();assert.equal(t.requests[0].signal.aborted,true);await tick();t.requests[1].resolve('current');await next;await tick();t.controller.cancel(true);assert.equal(t.stations[0].signal.aborted,true);assert.equal(t.appCtx.activeMarineSnapshot,null);t.requests[0].resolve('old');assert.equal(await old,null);t.stations[0].resolve({model:'late'});await tick();assert.equal(t.appCtx.activeMarineSnapshot,null);
+});

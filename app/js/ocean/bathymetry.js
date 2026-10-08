@@ -6,6 +6,23 @@ import {
   normalizeDepthEvidence
 } from '../geospatial/bathymetry-evidence.js?v=1';
 
+// Missing samples are not zero elevation. Only corners that contribute to
+// this interpolation may be used; an exact observed node remains usable.
+function sampleGrid(values, cols, rows, x, y) {
+  if (!Number.isFinite(x) || !Number.isFinite(y) || x < 0 || y < 0 || x > cols - 1 || y > rows - 1) return null;
+  const x0 = Math.floor(x), y0 = Math.floor(y);
+  const x1 = Math.min(cols - 1, x0 + 1), y1 = Math.min(rows - 1, y0 + 1);
+  const fx = x - x0, fy = y - y0;
+  const h00 = values[y0 * cols + x0], h10 = values[y0 * cols + x1];
+  const h01 = values[y1 * cols + x0], h11 = values[y1 * cols + x1];
+  const w00 = (1 - fx) * (1 - fy), w10 = fx * (1 - fy);
+  const w01 = (1 - fx) * fy, w11 = fx * fy;
+  if ((w00 > 0 && !Number.isFinite(h00)) || (w10 > 0 && !Number.isFinite(h10))
+    || (w01 > 0 && !Number.isFinite(h01)) || (w11 > 0 && !Number.isFinite(h11))) return null;
+  return (w00 ? h00 * w00 : 0) + (w10 ? h10 * w10 : 0)
+    + (w01 ? h01 * w01 : 0) + (w11 ? h11 * w11 : 0);
+}
+
 export function createOceanBathymetryApi({
   appCtx,
   oceanMode,
@@ -73,12 +90,12 @@ export function createOceanBathymetryApi({
     if (!bounds || !grid || !Array.isArray(values)) return null;
     const rows = Number(grid.rows);
     const cols = Number(grid.cols);
-    if (!Number.isFinite(rows) || !Number.isFinite(cols) || rows < 2 || cols < 2) return null;
+    if (!Number.isInteger(rows) || !Number.isInteger(cols) || rows < 2 || cols < 2) return null;
     if (values.length !== rows * cols) return null;
-    const latMin = Number(bounds.latMin);
-    const latMax = Number(bounds.latMax);
-    const lonMin = Number(bounds.lonMin);
-    const lonMax = Number(bounds.lonMax);
+    const latMin = bounds.latMin;
+    const latMax = bounds.latMax;
+    const lonMin = bounds.lonMin;
+    const lonMax = bounds.lonMax;
     if (![latMin, latMax, lonMin, lonMax].every((v) => Number.isFinite(v))) return null;
     if (latMax <= latMin || lonMax <= lonMin) return null;
     return {
@@ -122,35 +139,16 @@ export function createOceanBathymetryApi({
 
   function sampleLocalBathymetryMeters(lat, lon) {
     const grid = oceanMode.localBathymetryGrid;
-    if (!grid) return null;
+    if (!grid || !Number.isFinite(lat) || !Number.isFinite(lon)) return null;
     if (lat < grid.latMin || lat > grid.latMax || lon < grid.lonMin || lon > grid.lonMax) return null;
-
-    const u = (lon - grid.lonMin) / (grid.lonMax - grid.lonMin);
-    const v = (grid.latMax - lat) / (grid.latMax - grid.latMin); // north->south rows
-    const x = clamp01(u) * (grid.cols - 1);
-    const y = clamp01(v) * (grid.rows - 1);
-    const x0 = Math.floor(x);
-    const y0 = Math.floor(y);
-    const x1 = Math.min(grid.cols - 1, x0 + 1);
-    const y1 = Math.min(grid.rows - 1, y0 + 1);
-    const fx = x - x0;
-    const fy = y - y0;
-
-    const idx = (r, c) => r * grid.cols + c;
-    const h00 = Number(grid.values[idx(y0, x0)]);
-    const h10 = Number(grid.values[idx(y0, x1)]);
-    const h01 = Number(grid.values[idx(y1, x0)]);
-    const h11 = Number(grid.values[idx(y1, x1)]);
-    if (![h00, h10, h01, h11].every((v2) => Number.isFinite(v2))) return null;
-
-    const h0 = lerp(h00, h10, fx);
-    const h1 = lerp(h01, h11, fx);
-    return lerp(h0, h1, fy);
+    const x = (lon - grid.lonMin) / (grid.lonMax - grid.lonMin) * (grid.cols - 1);
+    const y = (grid.latMax - lat) / (grid.latMax - grid.latMin) * (grid.rows - 1);
+    return sampleGrid(grid.values, grid.cols, grid.rows, x, y);
   }
 
   async function primeGlobalBathymetryGrid() {
     if (oceanMode.globalBathymetryPromise) return oceanMode.globalBathymetryPromise;
-    const launchSignature = `${Number(oceanMode.launchSite?.lat).toFixed(6)},${Number(oceanMode.launchSite?.lon).toFixed(6)}`;
+    const launchSite = oceanMode.launchSite;
     oceanMode.globalBathymetryPromise = (async () => {
       const samples = [];
       for (let row = 0; row < GEBCO_GRID_SIZE; row += 1) {
@@ -165,8 +163,7 @@ export function createOceanBathymetryApi({
       }
       const values = await Promise.all(samples);
       const validCount = values.filter(Number.isFinite).length;
-      const currentSignature = `${Number(oceanMode.launchSite?.lat).toFixed(6)},${Number(oceanMode.launchSite?.lon).toFixed(6)}`;
-      if (currentSignature !== launchSignature || validCount < Math.ceil(values.length * 0.6)) return false;
+      if (oceanMode.launchSite !== launchSite || validCount < Math.ceil(values.length * 0.6)) return false;
       oceanMode.globalBathymetryGrid = {
         size: GEBCO_GRID_SIZE,
         extent: GEBCO_GRID_EXTENT,
@@ -179,6 +176,7 @@ export function createOceanBathymetryApi({
       oceanMode.bathymetryCache.clear();
       return true;
     })().catch((error) => {
+      if (oceanMode.launchSite !== launchSite) return false;
       console.warn('[OceanMode] Global GEBCO bathymetry unavailable; retaining local/procedural seabed.', error);
       oceanMode.globalBathymetryGrid = null;
       oceanMode.globalBathymetryReady = false;
@@ -189,22 +187,12 @@ export function createOceanBathymetryApi({
 
   function sampleGlobalBathymetryMeters(x, z) {
     const grid = oceanMode.globalBathymetryGrid;
-    if (!grid || !Array.isArray(grid.values) || grid.size < 2) return null;
-    const gridX = clamp01((x + grid.extent) / (grid.extent * 2)) * (grid.size - 1);
-    const gridY = clamp01((z + grid.extent) / (grid.extent * 2)) * (grid.size - 1);
-    const x0 = Math.floor(gridX);
-    const y0 = Math.floor(gridY);
-    const x1 = Math.min(grid.size - 1, x0 + 1);
-    const y1 = Math.min(grid.size - 1, y0 + 1);
-    const valueAt = (row, column) => Number(grid.values[row * grid.size + column]);
-    const h00 = valueAt(y0, x0);
-    const h10 = valueAt(y0, x1);
-    const h01 = valueAt(y1, x0);
-    const h11 = valueAt(y1, x1);
-    if (![h00, h10, h01, h11].every(Number.isFinite)) return null;
-    const top = lerp(h00, h10, gridX - x0);
-    const bottom = lerp(h01, h11, gridX - x0);
-    return lerp(top, bottom, gridY - y0);
+    if (!grid || !Array.isArray(grid.values) || !Number.isInteger(grid.size) || grid.size < 2
+      || grid.values.length !== grid.size * grid.size || !Number.isFinite(grid.extent) || grid.extent <= 0) return null;
+    if (!Number.isFinite(x) || !Number.isFinite(z) || Math.abs(x) > grid.extent || Math.abs(z) > grid.extent) return null;
+    const gridX = (x + grid.extent) / (grid.extent * 2) * (grid.size - 1);
+    const gridY = (z + grid.extent) / (grid.extent * 2) * (grid.size - 1);
+    return sampleGrid(grid.values, grid.size, grid.size, gridX, gridY);
   }
 
   function sampleTerrainMetersAtLatLon(lat, lon) {
@@ -282,16 +270,11 @@ export function createOceanBathymetryApi({
   }
 
   function sampleRealSeabedHeight(x, z) {
-    const key = `${Math.round(x / 18)},${Math.round(z / 18)}`;
-    if (oceanMode.bathymetryCache.has(key)) {
-      return oceanMode.bathymetryCache.get(key);
-    }
-
+    // Sampling exact coordinates avoids leaking a cached edge value into an
+    // adjacent missing cell or beyond the provider's coverage boundary.
     const evidence = sampleBathymetryEvidence(x, z);
     const mapped = mapBathymetryMetersToWorldY(evidence.elevationMeters);
-    const sampled = Number.isFinite(mapped) ? mapped : null;
-    oceanMode.bathymetryCache.set(key, sampled);
-    return sampled;
+    return Number.isFinite(mapped) ? mapped : null;
   }
 
   function sampleProceduralSeabedHeight(x, z) {
@@ -345,7 +328,7 @@ export function createOceanBathymetryApi({
     const reefDx = x - 24;
     const reefDz = z - 124;
     const reefWeight = Math.exp(-(reefDx * reefDx + reefDz * reefDz) / 25000);
-    const bathymetryBlend = clamp01(0.52 * (1 - reefWeight * 0.44));
+    const bathymetryBlend = clamp01((oceanMode.bathymetryReady ? 0.52 : 0.3) * (1 - reefWeight * 0.44));
     return Object.freeze({
       bathymetry,
       presentationMode: 'procedural-bathymetry-blend',

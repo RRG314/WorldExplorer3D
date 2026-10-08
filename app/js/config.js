@@ -2,11 +2,7 @@
 // config.js - Game configuration, locations, and constants
 // ============================================================================
 import { ctx as appCtx } from "./shared-context.js?v=55";
-import {
-  createLocalEnuFrame,
-  geographicToLocalEnu,
-  localEnuToGeographic
-} from "./terrain/source-contract.js?v=2";
+import {earthCoordinateFrame} from './earth-core/coordinate-frame.js?v=1';
 
 const LOCS = {
   baltimore: { name: 'Baltimore', lat: 39.2904, lon: -76.6122, countryCode: 'US' },
@@ -29,51 +25,9 @@ const locKeys = Object.keys(LOCS);
 const SCALE = 100000;
 let LOC = { lat: 39.2904, lon: -76.6122 };
 let customLoc = null;
-let projectionFrameKey = '';
-let projectionFrame = null;
-function localProjectionFrame() {
-  const key = `${Number(LOC.lat).toFixed(9)}:${Number(LOC.lon).toFixed(9)}`;
-  if (projectionFrameKey !== key) {
-    projectionFrameKey = key;
-    projectionFrame = createLocalEnuFrame({ latitude: Number(LOC.lat), longitude: Number(LOC.lon) });
-  }
-  return projectionFrame;
-}
-const usesPolarLocalProjection = () => Math.abs(Number(LOC.lat) || 0) >= 84;
-const geoToWorld = (lat, lon) => {
-  if (!usesPolarLocalProjection()) {
-    return { x: (lon - LOC.lon) * SCALE * Math.cos(LOC.lat * Math.PI / 180), z: -(lat - LOC.lat) * SCALE };
-  }
-  const local = geographicToLocalEnu(localProjectionFrame(), {
-    latitude: Number(lat),
-    longitude: Number(lon),
-    heightMeters: 0
-  });
-  return {
-    x: local.eastMeters * WORLD_UNITS_PER_METER,
-    z: -local.northMeters * WORLD_UNITS_PER_METER
-  };
-};
-const worldToGeo = (x, z) => {
-  if (!usesPolarLocalProjection()) {
-    return {
-      lat: LOC.lat - z / SCALE,
-      lon: LOC.lon + x / (SCALE * Math.cos(LOC.lat * Math.PI / 180))
-    };
-  }
-  const geographic = localEnuToGeographic(localProjectionFrame(), {
-    eastMeters: Number(x) / WORLD_UNITS_PER_METER,
-    northMeters: -Number(z) / WORLD_UNITS_PER_METER,
-    upMeters: 0
-  });
-  return { lat: geographic.latitude, lon: geographic.longitude };
-};
+const geoToWorld = (lat, lon, result = {}) => earthCoordinateFrame(LOC, SCALE).toWorld(lat, lon, result);
+const worldToGeo = (x, z, result = {}) => earthCoordinateFrame(LOC, SCALE).toGeographic(x, z, result);
 
-// =====================
-// TERRAIN (Terrarium tiles)
-// =====================
-
-// AWS Terrarium tiles for elevation data
 const TERRAIN_TILE_URL = (z, x, y) =>
 `https://s3.amazonaws.com/elevation-tiles-prod/terrarium/${z}/${x}/${y}.png`;
 

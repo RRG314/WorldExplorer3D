@@ -1,8 +1,11 @@
+import {activityCompletions as completions} from './completion.js';
 import { ctx as appCtx } from '../shared-context.js?v=55';
 import { orderedRouteAnchors, sanitizeText } from './schema-core.js?v=1';
 import { getStoredActivityById } from './library.js?v=3';
 
-const COMPLETION_STORAGE_KEY = 'worldExplorer3D.activityCompletions.v1';
+const getCompletionState=id=>completions.get(sanitizeText(id,120).toLowerCase());
+const getCompletionStatus=id=>completions.status(sanitizeText(id,120).toLowerCase());
+const retryActivityCompletion=id=>completions.retry(sanitizeText(id,120).toLowerCase());
 
 const state = {
   active: false,
@@ -11,6 +14,9 @@ const state = {
   targetIndex: 0,
   completedIds: [],
   startedAt: 0,
+  elapsedMs: 0,
+  worldSequence: null,
+  environment: '',
   lastPose: null,
   message: '',
   lastCompletedAt: 0,
@@ -24,66 +30,6 @@ function finiteNumber(value, fallback = 0) {
 
 function cloneJson(value) {
   return value == null ? value : JSON.parse(JSON.stringify(value));
-}
-
-function completionStore() {
-  if (typeof localStorage === 'undefined') return {};
-  try {
-    const raw = localStorage.getItem(COMPLETION_STORAGE_KEY);
-    if (!raw) return {};
-    const parsed = JSON.parse(raw);
-    return parsed && typeof parsed === 'object' ? parsed : {};
-  } catch {
-    return {};
-  }
-}
-
-function writeCompletionStore(store) {
-  if (typeof localStorage === 'undefined') return;
-  try {
-    localStorage.setItem(COMPLETION_STORAGE_KEY, JSON.stringify(store));
-  } catch {
-    // ignore storage errors
-  }
-}
-
-function getCompletionState(activityId = '') {
-  const key = sanitizeText(activityId, 120).toLowerCase();
-  const store = completionStore();
-  return key ? store[key] || null : null;
-}
-
-function markCompleted(activity = {}, durationMs = 0) {
-  const key = sanitizeText(activity.id || '', 120).toLowerCase();
-  if (!key) return null;
-  const store = completionStore();
-  const current = store[key] && typeof store[key] === 'object' ? store[key] : {};
-  const firstCompletion = Math.max(0, finiteNumber(current.count, 0)) === 0;
-  store[key] = {
-    count: Math.max(0, finiteNumber(current.count, 0)) + 1,
-    lastCompletedAt: Date.now(),
-    bestTimeMs: !finiteNumber(current.bestTimeMs, 0) || (durationMs > 0 && durationMs < finiteNumber(current.bestTimeMs, Infinity))
-      ? durationMs
-      : finiteNumber(current.bestTimeMs, 0)
-  };
-  writeCompletionStore(store);
-  const pose = currentPose();
-  void appCtx.recordExplorerEvent?.({
-    eventId: `event:activity-completed:${key}:${store[key].count}`,
-    eventType: 'activity-completed',
-    sourceSystem: 'games-and-activities',
-    sourceId: key,
-    pathId: 'activity',
-    name: sanitizeText(activity.title || activity.name || 'Activity complete', 120),
-    detail: firstCompletion ? 'First completion saved.' : `Completed again${durationMs > 0 ? ` in ${Math.max(1, Math.round(durationMs / 1000))} seconds` : ''}.`,
-    activityId: key,
-    localPosition: pose,
-    metadata: { shared: activity.sourceType === 'room_activity' },
-    firstCompletion,
-    points: firstCompletion ? 2 : 0,
-    progressReason: firstCompletion ? 'first-activity-completion' : 'activity-replay'
-  });
-  return cloneJson(store[key]);
 }
 
 function currentPose() {
@@ -310,7 +256,8 @@ async function joinRoomActivity(activity = {}) {
 }
 
 function beginActivityRuntime(activity = {}) {
-  if (!applySpawnForActivity(activity)) return false;
+  if(resolveSequence(activity).length<2 || !['walk','drive','boat','drone'].includes(activity.traversalMode||'drive') || !completions.canStart(activity.id))return false;
+  if (!applySpawnForActivity(activity) || currentPose().mode !== (activity.traversalMode||'drive')) return false;
   const sequence = resolveSequence(activity);
   const startsWithStart = sequence[0]?.typeId === 'start';
   const initialTargetIndex = startsWithStart
@@ -322,6 +269,9 @@ function beginActivityRuntime(activity = {}) {
   state.targetIndex = initialTargetIndex;
   state.completedIds = startsWithStart && sequence[0]?.id ? [sequence[0].id] : [];
   state.startedAt = performance.now();
+  state.elapsedMs = 0;
+  state.worldSequence = appCtx._worldLoadSequence;
+  state.environment = appCtx.getEnv?.();
   state.lastPose = currentPose();
   state.lastCompletedAt = 0;
   state.message = sequence[initialTargetIndex]
@@ -363,7 +313,7 @@ function registerActivityGameplayPlugin() {
     label: 'Created Activity',
     category: 'created-game',
     start: ({ activity }) => beginActivityRuntime(activity),
-    update: () => updateActivityRuntime(),
+    update: dt => updateActivityRuntime(dt),
     stop: (context = {}) => resetActivityRuntime(context.activityStopOptions || {}),
     save: () => getRuntimeSnapshot(),
     leaderboard: () => getCompletionState(state.activity?.id || state.lastActivity?.id || '')
@@ -396,8 +346,8 @@ function stopActivity(options = {}) {
   return resetActivityRuntime(options);
 }
 
-function replayLastActivity() {
-  const last = state.activity
+function replayLastActivity(selected = null) {
+  const last = selected || state.activity
     || state.lastActivity
     || (typeof appCtx.findActivityById === 'function' ? appCtx.findActivityById(appCtx.activityDiscoverySelectedId) : null)
     || (appCtx.activityDiscoverySelectedId ? getStoredActivityById(appCtx.activityDiscoverySelectedId) : null);
@@ -406,20 +356,25 @@ function replayLastActivity() {
   return startActivity(last);
 }
 
-function updateActivityRuntime() {
+function updateActivityRuntime(dt = 1/60) {
   if (!state.active || !state.activity) return;
+  if(appCtx._worldLoadSequence!==state.worldSequence || appCtx.getEnv?.()!==state.environment){state.message='Activity ended because you left this world.';state.lastMessage=state.message;stopActivity({keepMessage:true});return;}
+  const pose=currentPose();
+  if(appCtx.paused || appCtx.worldLoading || pose.mode!==(state.activity.traversalMode||'drive')){
+    state.lastPose=null;state.message=appCtx.paused?'Activity paused.':`Return to ${state.activity.traversalMode||'drive'} mode to continue.`;return;
+  }
+  state.elapsedMs += Math.min(.1,Math.max(0,Number(dt)||0))*1000;
   const sequence = resolveSequence(state.activity);
   const target = sequence[state.targetIndex] || null;
   if (!target) {
-    const durationMs = Math.max(0, performance.now() - finiteNumber(state.startedAt, performance.now()));
-    markCompleted(state.activity, durationMs);
+    const activity=state.activity;
+    void completions.complete(activity,state.elapsedMs,pose).then(saved=>{if(!state.active&&state.lastActivity?.id===activity.id){state.message=saved?'Activity complete. Saved in your Journal.':'Activity complete. Open Activities to retry the Journal save.';state.lastMessage=state.message;}});
     state.lastCompletedAt = Date.now();
     state.message = 'Activity complete. Replay when ready.';
     state.lastMessage = state.message;
     stopActivity({ clearNavigation: true, keepMessage: true });
     return;
   }
-  const pose = currentPose();
   const previousPose = state.lastPose;
   const distance = activityDistanceToAnchor(state.activity, pose, target);
   state.message = `${target.label} • ${Math.round(distance)}m`;
@@ -443,6 +398,8 @@ function getRuntimeSnapshot() {
   const target = sequence[state.targetIndex] || null;
   return {
     active: state.active,
+    elapsedMs: state.elapsedMs,
+    completionStatus: getCompletionStatus(state.activity?.id||state.lastActivity?.id||''),
     activityId: sanitizeText(state.activity?.id || '', 120).toLowerCase(),
     activityTitle: sanitizeText(state.activity?.title || '', 120),
     sourceType: sanitizeText(state.activity?.sourceType || '', 32).toLowerCase(),
@@ -458,6 +415,8 @@ function getRuntimeSnapshot() {
 export {
   distanceToStart,
   getCompletionState,
+  getCompletionStatus,
+  retryActivityCompletion,
   getRuntimeSnapshot,
   navigateToActivityStart,
   registerActivityGameplayPlugin,

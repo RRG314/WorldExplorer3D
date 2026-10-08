@@ -3,16 +3,20 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { chromium } from 'playwright';
 import { startStaticServer } from './static-server.mjs';
+import {configureStagingAppCheck} from './staging-app-check.mjs';
+import {closeOwnedBrowser} from './owned-browser.mjs';
 
 const root = process.cwd();
-const server = await startStaticServer({ rootDir: root, ports: [4521, 4522, 4523] });
+const server = await startStaticServer({ rootDir: process.env.WE3D_VERIFY_ROOT || root, ports: [4521, 4522, 4523] });
 const baseUrl = `http://127.0.0.1:${server.port}`;
-const outputDir = path.join(root, 'output', 'verification', 'bridge-endpoints-current');
+const outputDir = path.resolve(process.env.WE3D_VERIFY_OUTPUT_DIR || path.join(root, 'output', 'verification', 'bridge-endpoints-current'));
 const reportPath = path.join(outputDir, 'report.json');
 const screenshotPath = path.join(outputDir, 'baltimore-jfx-after.png');
-const browser = await chromium.launch({ headless: true, channel: 'chrome' });
+const owned = await chromium.launchServer({ headless: false, channel: 'chrome' });
+const browser = await chromium.connect(owned.wsEndpoint());
 const context = await browser.newContext({ viewport: { width: 1280, height: 720 } });
 const page = await context.newPage();
+await configureStagingAppCheck(page,baseUrl);
 const browserErrors = [];
 const localFailures = [];
 
@@ -55,6 +59,7 @@ try {
     timeout: 120_000
   });
   console.log('[bridge-endpoints] runtime ready');
+  await page.evaluate(async()=>{globalThis.bridgeCtx=(await import('/app/js/shared-context.js?v=55')).ctx;});
   const consent = page.locator('#analyticsConsentDenyBtn');
   if (await consent.isVisible()) await consent.click();
   await page.getByRole('button', { name: 'Explore', exact: true }).click();
@@ -63,6 +68,7 @@ try {
     const state = JSON.parse(globalThis.render_game_to_text?.() || '{}');
     const diagnostics = globalThis.getWorldExplorerRuntimeDiagnostics?.() || {};
     return state.gameStarted === true &&
+      !bridgeCtx.worldLoading && bridgeCtx.worldLoadRuntimeState?.status === 'ready' &&
       Number(diagnostics.worldCounts?.roads || 0) > 0 &&
       Number(diagnostics.transportStructures?.publishedBodies || 0) > 0 &&
       diagnostics.transportStructures?.generalizedEndpointIntegrity?.authority ===
@@ -80,6 +86,7 @@ try {
       provider: diagnostics.worldLoad?.transportProviderDecision || null,
       transportNetwork: diagnostics.transportStructures?.transportNetwork || null,
       endpointIntegrity: diagnostics.transportStructures?.generalizedEndpointIntegrity || null,
+      continuity: diagnostics.transportStructures?.junctionContinuity || null,
       runtimeErrors: diagnostics.runtimeErrors || [],
       worldCounts: diagnostics.worldCounts || {}
     };
@@ -95,6 +102,11 @@ try {
     noUnsupportedElevatedEndpoints:
       snapshot.endpointIntegrity?.authority === 'compiled-generalized-structure-endpoints' &&
       Number(snapshot.endpointIntegrity?.unsupportedOpenBoundaryCount || 0) === 0,
+    allStructureJoinsSampled:
+      Number(snapshot.continuity?.auditedConnectionCount || 0) > 0 &&
+      snapshot.continuity?.sampledConnectionCount === snapshot.continuity?.auditedConnectionCount,
+    noVerticalSteps:
+      snapshot.continuity?.discontinuityCount === 0,
     playerOwnsCompiledRoadSurface:
       snapshot.surfaceChain?.surfaces?.walk?.kind === 'road' &&
       snapshot.surfaceChain?.surfaces?.walk?.feature?.structureAssembly?.authority ===
@@ -119,6 +131,6 @@ try {
   console.log(JSON.stringify({ report: path.relative(root, reportPath), checks }, null, 2));
 } finally {
   await context.close();
-  await browser.close();
+  await closeOwnedBrowser(owned);
   await server.close();
 }

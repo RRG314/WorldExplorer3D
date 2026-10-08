@@ -153,6 +153,11 @@ function createTerrainHeightSamplingApi(deps = {}) {
         const surfaceY = sampleFeatureSurfaceY(feature, worldX, worldZ, projected);
         if (!Number.isFinite(surfaceY)) continue;
         const targetTerrainY = surfaceY - Math.max(0, Number(feature.surfaceBias) || 0.08);
+        // A depressed engineered approach has an explicit excavation, floor
+        // and retaining walls. Blending that floor into the coarse terrain
+        // grid also depresses neighboring surface streets and wall tops.
+        // Keep its cut with that owner; raised approaches still need fill.
+        if (feature.transportSurfaceModel?.engineeredApproach === true && targetTerrainY < terrainY) continue;
         const shoulderT = Math.max(0, Math.min(1,
           (projected.dist - gradedEdge) / shoulderBlend
         ));

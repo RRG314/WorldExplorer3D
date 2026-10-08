@@ -147,6 +147,34 @@ function contiguousCoveredRanges(samples, total, continuesAtStart, continuesAtEn
   return ranges;
 }
 
+// A mapped road can cover part of the roof while the terrain beside it drops
+// below the liner. The three terrain probes locate natural portals, but must
+// not shorten an existing bore through that separate road's protected span.
+// Use the same feasible roof constraints that compiled the floor. Checking
+// every profile knot also rejects stale constraints after a profile change.
+function protectedRoadRoofRanges(feature, total) {
+  const profile = feature.transportSurfaceModel;
+  const ranges = [];
+  for (const limit of feature.tunnelObstructionLimits || []) {
+    if (limit.source !== 'mapped-surface-road' ||
+        ![limit.start, limit.end, limit.maximumSurfaceY].every(Number.isFinite)) continue;
+    const start = Math.max(0, limit.start), end = Math.min(total, limit.end);
+    if (end - start <= 1e-5) continue;
+    const stations = [start, end];
+    for (const distance of profile?.distances || []) {
+      if (distance > start && distance < end) stations.push(distance);
+    }
+    if (!stations.every(distance => {
+      const floor = sampleTransportSurfaceAtDistance(profile, distance, 0);
+      return Number.isFinite(floor) && floor <= limit.maximumSurfaceY + 1e-4;
+    })) continue;
+    // Portal cut volumes overlap their endpoint by 2 cm. Keep the headwall
+    // outside the protected footprint, including that numerical overlap.
+    ranges.push({start: Math.max(0, start - .05), end: Math.min(total, end + .05)});
+  }
+  return ranges;
+}
+
 function crossingShellRanges(feature, features, pathDistances, total) {
   const ranges = [];
   const ownOrder = Number(feature?.structureSemantics?.verticalOrder) || -1;
@@ -369,12 +397,16 @@ export function compileTunnelSystemModel(feature, sampleTerrainY, options = {}) 
   }
 
   const coveredRanges = contiguousCoveredRanges(samples, total, continuesAtStart, continuesAtEnd);
+  if (coveredRanges.length) {
+    coveredRanges.push(...protectedRoadRoofRanges(feature, total));
+    coveredRanges.sort((left, right) => left.start - right.start);
+  }
   // Cover locates the two external transitions; it is not a license to tear
   // holes in the middle of a mapped tunnel. The structural liner must bridge
   // internal DEM dips between confirmed covered stations. An entirely
   // uncovered way still follows the explicit no-shell policy above.
   const shellRanges = coveredRanges.length > 1
-    ? [{ start: coveredRanges[0].start, end: coveredRanges[coveredRanges.length - 1].end }]
+    ? [{ start: coveredRanges[0].start, end: coveredRanges.reduce((end, range) => Math.max(end, range.end), 0) }]
     : coveredRanges;
   if (shellRanges.length === 0) {
     return {

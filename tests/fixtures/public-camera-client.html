@@ -1,0 +1,14 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Live Earth camera browser check</title><style>html,body,iframe{margin:0;width:100%;height:100%;border:0;overflow:hidden}#launch{position:fixed;z-index:3;top:8px;left:8px;padding:12px}</style></head><body><button id="launch">Open public camera</button><iframe id="game" src="/app/"></iframe><script type="module">
+const frame=document.getElementById('game');let busy=false;
+document.getElementById('launch').onclick=async()=>{
+ if(busy)return;busy=true;
+ while(frame.contentDocument?.getElementById('startBtn')?.disabled!==false)await new Promise(resolve=>setTimeout(resolve,100));
+ const w=frame.contentWindow;
+ await w.eval(`(async()=>{const {ctx}=await import('/app/js/shared-context.js?v=55');await ctx.ensureLiveEarthReady();await ctx.openLiveEarthSelector('public-cameras');})()`);
+ while(!frame.contentDocument.querySelector('[data-live-earth-action="camera-select"]'))await new Promise(resolve=>setTimeout(resolve,100));
+ frame.contentDocument.querySelector('[data-live-earth-action="camera-select"]').click();
+ document.getElementById('launch').hidden=true;w.focus();
+};
+window.render_game_to_text=()=>frame.contentWindow.render_game_to_text?.()||JSON.stringify({loading:true});
+window.advanceTime=async()=>new Promise(resolve=>setTimeout(resolve,50));
+</script></body></html>

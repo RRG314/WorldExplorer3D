@@ -1,3 +1,4 @@
+import {servePlaceLookupPreview} from '../place-lookup-preview.mjs';
 import fs from 'node:fs/promises';
 import http from 'node:http';
 import net from 'node:net';
@@ -29,6 +30,7 @@ async function listen(rootDir, host, port) {
   const server = http.createServer(async (request, response) => {
     try {
       const requestUrl = new URL(request.url || '/', `http://${host}:${port}`);
+      if(await servePlaceLookupPreview(request,response,requestUrl))return;
       // Match the local preview's read-only backend route. A static 404 here
       // prevents real DeFlock journeys from exercising their production source.
       if (requestUrl.pathname === '/api/geospatial/deflock-cameras') {

@@ -1,3 +1,4 @@
+import { createWalkingWaterRuntime } from './water/runtime.js';
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { resolveMobileCameraRecenter } from "../controls/mobile-touch-authority.js?v=5";
 import { worldUnitsPerSecondToMph } from "../physics/vehicle-speed-units.js?v=2";
@@ -224,6 +225,10 @@ function createWalkingPhysicsHelpers({
     return { groundY, effectiveGroundY, onBuilding };
   }
 
+  const waterRuntime = createWalkingWaterRuntime({ctx:appCtx,state,CFG,
+    groundAt:(x,z,y)=>resolveWalkGroundState(x,z,y,(v,f)=>Number.isFinite(v)?v:f),
+    moveVector:resolveWalkingMoveVector,animate:animateCharacterWalk});
+
   function updateWalkPhysics(dt, finiteOr) {
     const profileEnabled = appCtx.phase5WalkProfileEnabled === true;
     const profileStartedAt = profileEnabled ? performance.now() : 0;
@@ -240,7 +245,7 @@ function createWalkingPhysicsHelpers({
     const skydiving = appCtx.urbanSandboxRuntime?.parachute?.skydiving === true;
     const wasOnBuilding = state.walker.onBuilding === true;
     const parachuteDeployedAtFrameStart = appCtx.isUrbanParachuteDeployed?.() === true;
-    const speed = skydiving
+    let speed = skydiving
       ? parachuteHorizontalSpeed(parachuteDeployedAtFrameStart)
       : Number(actions.sprint) > 0.05 ? CFG.runSpeed : CFG.walkSpeed;
     const lookSpeed = 2.5 * dt;
@@ -313,6 +318,8 @@ function createWalkingPhysicsHelpers({
     if (state.walker.y === undefined || state.walker.y === 0) {
       state.walker.y = groundY + CFG.eyeHeight;
     }
+    if (waterRuntime.update(dt,{actions,forward,strafe,groundState})) return;
+    if (state.walker.waterTraversal === 'wading') speed *= .55;
     let effectiveGroundY = groundState.effectiveGroundY;
     let finalGroundState = groundState;
     state.walker.onBuilding = groundState.onBuilding;
@@ -605,7 +612,7 @@ function createWalkingPhysicsHelpers({
         const urbanCollision = appCtx.resolveUrbanActorCollision(
           { x: state.walker.x, z: state.walker.z },
           { x: newX, z: newZ },
-          { mode: 'walk', radius: .3 }
+          { mode: 'walk', radius: .3, actorBaseY: state.walker.y, actorHeight: 1.8 }
         );
         newX = urbanCollision.x;
         newZ = urbanCollision.z;
@@ -689,7 +696,10 @@ function createWalkingPhysicsHelpers({
 
   return {
     resolveWalkGroundState,
-    updateWalkPhysics
+    updateWalkPhysics,
+    deactivateWater:waterRuntime.deactivate,
+    resupplyWater:waterRuntime.resupply,
+    disposeWater:waterRuntime.dispose
   };
 }
 

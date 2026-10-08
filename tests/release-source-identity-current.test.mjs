@@ -1,10 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, chmodSync, rmSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { readReleaseSourceIdentity, assertReleaseSourceIdentity } from '../scripts/lib/release-source-identity.mjs';
+import { readReleaseSourceIdentity, assertReleaseSourceIdentity, assertCompatibleReleaseSourceIdentity } from '../scripts/lib/release-source-identity.mjs';
+import { sourceFingerprint } from '../scripts/verification/source-fingerprint.mjs';
 
 function fixture(t, { committed = true } = {}) {
   const root = mkdtempSync(path.join(tmpdir(), 'we3d-source-identity-'));
@@ -54,6 +55,17 @@ test('a source copy inside another repository cannot borrow its parent identity'
   assert.throws(() => readReleaseSourceIdentity(child), /Cannot establish/);
 });
 
+test('artifact creation cannot mistake a stale Git monitor for clean source',t=>{
+  const {root,git}=fixture(t),hook=path.join(root,'.git','stale-monitor');
+  writeFileSync(hook,"#!/bin/sh\nprintf 'stale-token\\000'\n");chmodSync(hook,0o755);
+  git('config','core.fsmonitor',hook);git('config','core.fsmonitorHookVersion','2');
+  git('status','--porcelain');git('update-index','--fsmonitor-valid','source.txt');
+  writeFileSync(path.join(root,'source.txt'),'changed while the monitor lost the event');
+  assert.equal(git('status','--porcelain'),'','control reproduces stale monitor');
+  assert.equal(readReleaseSourceIdentity(root).sourceDirty,true);
+  assert.equal(git('config','core.fsmonitor'),hook,'keep the user configuration');
+});
+
 test('verification rejects falsely clean, missing or altered source identity', (t) => {
   const { root } = fixture(t);
   const source = readReleaseSourceIdentity(root);
@@ -67,4 +79,19 @@ test('verification rejects falsely clean, missing or altered source identity', (
   ]) assert.throws(() => assertReleaseSourceIdentity(invalid, source), /does not match/);
   writeFileSync(path.join(root, 'source.txt'), 'dirty\n');
   assert.throws(() => assertReleaseSourceIdentity(manifest, readReleaseSourceIdentity(root)), /does not match/);
+});
+
+test('new artifacts survive documentation-only commits while retaining their actual build commit and rejecting changed inputs', t => {
+  const { root, git } = fixture(t), source = readReleaseSourceIdentity(root);
+  const manifest = { ...source, buildTimestamp: source.commitTime, sourceInputFingerprint: sourceFingerprint(root).acceptanceFingerprint };
+  writeFileSync(path.join(root, 'README.md'), 'verification notes');
+  assert.doesNotThrow(() => assertCompatibleReleaseSourceIdentity(manifest, root));
+  git('add', 'README.md'); git('-c', 'commit.gpgsign=false', 'commit', '-m', 'documentation');
+  assert.notEqual(readReleaseSourceIdentity(root).commit, manifest.commit);
+  assert.doesNotThrow(() => assertCompatibleReleaseSourceIdentity(manifest, root));
+  assert.throws(() => assertCompatibleReleaseSourceIdentity({ ...manifest, sourceInputFingerprint: undefined }, root));
+  assert.throws(() => assertCompatibleReleaseSourceIdentity({ ...manifest, commit: 'a'.repeat(40) }, root));
+  assert.throws(() => assertCompatibleReleaseSourceIdentity({ ...manifest, buildTimestamp: '2020-01-01' }, root));
+  writeFileSync(path.join(root, 'source.txt'), 'changed runtime');
+  assert.throws(() => assertCompatibleReleaseSourceIdentity(manifest, root), /does not match/);
 });

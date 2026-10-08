@@ -430,7 +430,9 @@ function resolveProjectedRoadSpawn(targetX, targetZ, options = {}) {
   });
   const road = nearest?.road;
   if (!road || !worldSpawnDeps.isVehicleRoad(road) || Number(nearest.dist) > maxDistance) return null;
-  if (road?.structureSemantics?.terrainMode === "subgrade") return null;
+  const occupiedTunnel = road?.structureSemantics?.terrainMode === "subgrade" &&
+    preservesOccupiedTunnel({road,x:targetX,z:targetZ},options);
+  if (road?.structureSemantics?.terrainMode === "subgrade" && !occupiedTunnel) return null;
   const point = { x: Number(nearest.pt?.x), z: Number(nearest.pt?.z) };
   if (!Number.isFinite(point.x) || !Number.isFinite(point.z)) return null;
   const angle = roadHeadingAtSegment(road, nearest.segIndex, options.angle);
@@ -442,7 +444,10 @@ function resolveProjectedRoadSpawn(targetX, targetZ, options = {}) {
     source: 'projected_road'
   });
   if (!evaluated.valid) return null;
-  const departure = spawnDepartureAssessment(point.x, point.z, angle, 'drive');
+  if (occupiedTunnel && evaluated.road !== road) return null;
+  const departure = spawnDepartureAssessment(point.x, point.z, angle, 'drive', occupiedTunnel ? {
+    surfaceYAt: (x,z) => worldSpawnDeps.sampleFeatureSurfaceY(road,x,z)
+  } : {});
   if (!departure.valid) return null;
   if (departure.reverseHeading) evaluated.angle += Math.PI;
   return evaluated;
@@ -524,8 +529,12 @@ function resolveSafeWorldSpawn(targetX, targetZ, options = {}) {
     angle,
     feetY: options.feetY,
     preferredRoad: options.preferredRoad || null,
-    maxDistance: options.maxRoadDistance
+    maxDistance: options.maxRoadDistance,
+    preserveCurrentSupport: options.preserveCurrentSupport
   });
+  // The projected helper admitted this only after proving that the original
+  // actor occupies the same tunnel and the centered car has physical clearance.
+  if (projectedRoad && isSubgradeArrival(projectedRoad)) return projectedRoad;
   const localGroundFallback = options.fastLocalFallback === true && !projectedRoad ?
     searchNearestSafeDriveGroundSpawn(x, z, {
       angle,

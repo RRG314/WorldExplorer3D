@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFileSync, spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 
 test('a requested gate in another scope fails instead of silently running a subset', t => {
   const root = mkdtempSync(path.join(tmpdir(), 'we3d-scope-selection-'));
@@ -24,6 +25,33 @@ test('a requested gate in another scope fails instead of silently running a subs
   assert.notEqual(result.status, 0);
   assert.match(result.stdout + result.stderr, /service belongs to backend, not candidate/);
   assert.doesNotMatch(result.stdout, /START local/);
+});
+
+test('matrix reuses documentation-only receipts but rejects changed code, executor configuration and artifact bytes', t => {
+  const root = mkdtempSync(path.join(tmpdir(), 'we3d-reuse-evidence-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const write = (file, value) => { mkdirSync(path.dirname(path.join(root, file)), { recursive: true }); writeFileSync(path.join(root, file), value); };
+  const git = args => execFileSync('git', args, { cwd: root, stdio: 'pipe' });
+  write('.gitignore', 'output/\ndist/\n'); write('package.json', JSON.stringify({ version: '5.4.0' }));
+  write('app/game.js', 'original'); write('docs/audit.md', 'draft');
+  write('config/system-release-gates.json', JSON.stringify({ schemaVersion: 1, targetVersion: '5.4.0', documents: {}, systems: [], gates: {
+    probe: { scope: 'candidate', artifactRequired: false, command: [process.execPath, '-e', 'process.exit(0)'] }
+  } }));
+  write('dist/build-manifest.json', '{}'); write('dist/index.html', 'original');
+  write('dist/asset-manifest.json', JSON.stringify({ files: { 'index.html': createHash('sha256').update('original').digest('hex') } }));
+  git(['init', '-q']); git(['add', '.']); git(['-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.test', 'commit', '-qm', 'fixture']);
+  const script = fileURLToPath(new URL('../scripts/verification/system-release.mjs', import.meta.url));
+  const run = env => spawnSync(process.execPath, [script, '--run', '--scope=candidate'], {
+    cwd: root, env: { ...process.env, WE3D_VERIFY_ROOT: 'dist', ...env }, encoding: 'utf8', timeout: 15000
+  });
+  let result = run(); assert.equal(result.status, 0, result.stderr); assert.match(result.stdout, /START probe/);
+  write('docs/audit.md', 'finished report');
+  result = run(); assert.equal(result.status, 0, result.stderr); assert.match(result.stdout, /REUSE probe/);
+  result = run({ GCLOUD_PROJECT: 'another-test-target' }); assert.equal(result.status, 0, result.stderr); assert.match(result.stdout, /START probe/);
+  write('app/game.js', 'changed'); result = run(); assert.equal(result.status, 0, result.stderr); assert.match(result.stdout, /START probe/);
+  write('dist/index.html', 'modified'); result = run(); assert.equal(result.status, 1, result.stderr);
+  const report = JSON.parse(readFileSync(path.join(root, 'output/release-evidence/current/execution-manifest.json'), 'utf8'));
+  assert.equal(report.ok, false, 'same manifest cannot approve changed bytes');
 });
 
 test('interrupting a fresh gate cannot leave an earlier success as current evidence', t => {

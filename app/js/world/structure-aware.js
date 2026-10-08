@@ -1,4 +1,6 @@
+import { compileEngineeredApproachExcavation } from './compiler/engineered-approach-excavation.js';
 import {createFeatureProjectionIndex} from '../terrain/feature-projection-index.js';
+import {compileTunnelObstructionLimits, compileTunnelRoadObstructionLimits, compileSurfaceRoadOverlapRanges} from './compiler/tunnel-obstruction-limits.js';
 import {assignOrdinaryStreetJunctions} from './compiler/ordinary-street-profile.js';
 import {roadMetersPerWorldUnit} from './road-units.js';
 import { streetScaleForWorld } from './compiler/street-frontage-policy.js';
@@ -15,6 +17,7 @@ import {
   updateFeatureSurfaceProfile
 } from "../structure-semantics.js?v=63";
 import { compileTunnelSystemModels } from "./compiler/tunnel-system-model.js?v=15";
+import { packCompiledTransportSurfaces } from './compiler/transport-surface-model.js?v=25';
 import { compileTunnelSolidBoundaries } from './compiler/tunnel-solid-publication.js';
 import { compileTransportStructureModel } from "./compiler/transport-structure-model.js?v=1";
 import { compileTransportStructureAssemblies } from "./compiler/transport-structure-assembly.js?v=15";
@@ -331,6 +334,7 @@ function* compileStructureAwareFeatureProfileSteps() {
   measure('buildingContext', () => {
     for (let i = 0; i < transportFeatures.length; i++) {
       applyBuildingContextSemanticsToFeature(transportFeatures[i]);
+      transportFeatures[i].tunnelObstructionLimits = compileTunnelObstructionLimits(transportFeatures[i], runtime.getNearbyBuildings);
     }
   });
   yield;
@@ -394,6 +398,12 @@ function* compileStructureAwareFeatureProfileSteps() {
   // stack ranks. Reusing the pre-refresh models makes a merge target sample a
   // stale deck height and leaves visible steps or open-air ramp ends.
   measure('ordinaryStreetJunctions',()=>assignOrdinaryStreetJunctions(transportFeatures,appCtx.transportNetworkModel,worldBaseTerrainY));
+  measure('surfaceRoadRoofClearance', () => {
+    for (const feature of structureFeatures) {
+      const roads = compileTunnelRoadObstructionLimits(feature, nearbyTransportFeatures(feature), worldBaseTerrainY, areRoadsConnected);
+      if (roads.length) feature.tunnelObstructionLimits = Object.freeze([...feature.tunnelObstructionLimits, ...roads]);
+    }
+  });
   measure('buildInitialProfiles', () => {
     for (let i = 0; i < transportFeatures.length; i++) {
       const feature = transportFeatures[i];
@@ -634,6 +644,8 @@ function* compileStructureAwareFeatureProfileSteps() {
   });
   yield;
 
+  const profileStorage = measure('packFinalProfiles', () => packCompiledTransportSurfaces(transportFeatures));
+  yield;
   measure('compileTunnels', () => compileTunnelSystemModels(transportFeatures, worldBaseTerrainY));
   yield;
   measure('compileSharedPhysicalSurfaces', () => {
@@ -682,6 +694,7 @@ function* compileStructureAwareFeatureProfileSteps() {
   appCtx.structureProfileCompilation = Object.freeze({
     roadCount: roadFeatures.length,
     structureCount: structureFeatures.length,
+    profileStorage,
     phaseDurationsMs: Object.freeze({
       ...phaseDurationsMs,
       total: Number((now() - compilationStartedAt).toFixed(2))
@@ -755,6 +768,12 @@ export async function refreshTransportStructureAssembliesForPublishedTerrain() {
       })
     }
   );
+  const nearbyCoverRoads=createFeatureBoundsIndex(roadFeatures);
+  for (const feature of transportFeatures) {
+    const roadCover=feature.structureSemantics?.terrainMode==='at_grade'&&feature.transportSurfaceModel?.engineeredApproach
+      ? compileSurfaceRoadOverlapRanges(feature,nearbyCoverRoads(feature),samplePublishedTerrainY,areRoadsConnected,{includeElevated:true}) : [];
+    feature.engineeredApproachExcavation = compileEngineeredApproachExcavation(feature, samplePublishedTerrainY,{roadCover});
+  }
   refreshStructureColliders(appCtx, transportFeatures);
   return appCtx.transportStructureAssembly;
 }

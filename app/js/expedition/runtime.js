@@ -740,6 +740,11 @@ function launchDestinationMissionPod(released = false) {
   }
   window.requestAnimationFrame(() => {
     if (!activePodJourney || activePodJourney.bodyId !== mission.destinationId) return;
+    if (activeContext?.universeRuntime?.course?.destination?.id !== mission.destinationId && !activeContext?.travelToUniverseDestination?.(mission.destinationId)) {
+      advancePodJourney('fail', { reason: 'destination-course-unavailable' });
+      activeContext?.showToast?.('The survey course could not be restored. Set the destination in Wayfinder.');
+      return;
+    }
     advancePodJourney('course_acquired');
     activeContext?.showSpaceFlightMessage?.(`POD RELEASED · ${mission.destinationId.replaceAll('-', ' ').toUpperCase()} · MANUAL APPROACH`, '#6fe8ff');
   });
@@ -942,10 +947,8 @@ function leaveExpeditionSurface(bodyId) {
 function leaveDestinationMissionSurface(bodyId) {
   const mission = activeContext?.getDestinationMissionSnapshot?.();
   if (!activePodJourney || activePodJourney.bodyId !== bodyId || mission?.destinationId !== bodyId) return false;
-  if (mission.phase !== 'analysis') {
-    activeContext?.showToast?.(`Complete all three marked field records before returning to ${STARSHIP_NAME}.`);
-    return false;
-  }
+  if (!['fieldwork', 'analysis'].includes(mission.phase)) return false;
+  if (mission.phase === 'fieldwork') activeContext?.showToast?.('Returning with a partial survey. Saved records are retained; relaunch from the Pod Bay to continue.');
   if (!markExpeditionPodSurfaceLaunch(bodyId)) return false;
   const launchVisible = playSurfacePodLaunch(activeContext, {
     bodyId,
@@ -1706,8 +1709,8 @@ function renderPodLaunchPanel(interaction) {
     : '<small class="ship-station-readonly">No surveyed surface target is available in this voyage chapter. Continue the Expedition until the crew identifies a local world.</small>';
   panel.innerHTML = `<div class="ship-station-card pod-launch-card" role="dialog" aria-modal="true" aria-labelledby="shipStationTitle">
     <header><div><span>${STARSHIP_NAME.toUpperCase()} FLIGHT DECK</span><strong id="shipStationTitle">Pod Launch Bay</strong></div><button type="button" data-close-station aria-label="Close pod launch">×</button></header>
-    <p>Board Pathfinder and launch from ${STARSHIP_NAME}. The pod enters the existing local Space world under manual control; approach and landing preserve the destination body's modeled environment, collision, and surface authorities.</p>
-    <div class="ship-station-metrics"><div><span>Pod</span><strong>Sealed · fueled · surface capable</strong></div><div><span>Flight</span><strong>Manual after bay departure</strong></div><div><span>Landing</span><strong>Descent masks surface preparation</strong></div><div><span>Return</span><strong>Board the same pod on the surface</strong></div></div>
+    <p>Launch Pathfinder toward the marked world. Pilot the approach, land and visit the three field stations. Return to the ship at any time; saved survey records remain available for your next visit.</p>
+    <div class="ship-station-metrics"><div><span>Pod</span><strong>Sealed · fueled · surface capable</strong></div><div><span>Flight</span><strong>Manual after bay departure</strong></div><div><span>Landing</span><strong>Guided surface approach</strong></div><div><span>Return</span><strong>Board the same pod on the surface</strong></div></div>
     ${targetMarkup}
   </div>`;
   panel.classList.add('show');
@@ -1726,7 +1729,7 @@ function renderPodLaunchPanel(interaction) {
 
 function renderDestinationMissionAnalysisPanel(interaction) {
   const mission = activeContext?.getDestinationMissionSnapshot?.();
-  if (!interaction || !mission || mission.phase !== 'analysis') return false;
+  if (!interaction || !mission || !['analysis','complete'].includes(mission.phase)) return false;
   let panel = document.getElementById('shipStationPanel');
   if (!panel) {
     panel = document.createElement('section');
@@ -1737,19 +1740,23 @@ function renderDestinationMissionAnalysisPanel(interaction) {
   const lifeFinding = mission.habitability?.lifeEvidence === 'none-confirmed'
     ? 'No confirmed evidence of life'
     : mission.habitability?.lifeEvidence || 'No confirmed extraterrestrial life';
+  const completedReport = mission.phase === 'complete';
   const outcomes = mission.analysisOutcomes || [];
+  const report = completedReport ? `<p>Report saved on this device. ${mission.returnConsequence || ''}</p><ul class="destination-field-records">${(mission.fieldRecords || []).map(record => `<li><strong>${record.label}</strong><br>${record.description}</li>`).join('')}</ul>${mission.equipment?.earned ? '<p><strong>Field Link II installed</strong> · photo and environment stations: 30 m range (previously 18 m). Surface samples still require an approach within 18 m.</p>' : ''}` : '';
   const outcomeActions = outcomes.map((outcome) => `<button type="button" data-complete-destination-analysis="${outcome.id}" ${outcome.available ? '' : 'disabled'}>${outcome.label}</button><small>${outcome.consequence}${outcome.requiresScienceLead ? ` · ${outcome.crewLeadName ? `${outcome.crewLeadName} can lead the review` : 'Science lead unavailable'}` : ''}</small>`).join('');
   panel.innerHTML = `<div class="ship-station-card destination-analysis-card" role="dialog" aria-modal="true" aria-labelledby="shipStationTitle">
     <header><div><span>${STARSHIP_NAME.toUpperCase()} ANALYSIS LAB</span><strong id="shipStationTitle">${mission.title}</strong></div><button type="button" data-close-station aria-label="Close analysis">×</button></header>
-    <p>The field package is aboard. Compare the instrument record, preserve uncertainty, and publish the destination report to the Captain’s Log and Explorer Journal.</p>
+    <p>${completedReport ? 'Review the saved field findings and your equipment improvement.' : 'The field package is aboard. Compare the instrument record, preserve uncertainty, and publish the destination report to the Captain’s Log and Explorer Journal.'}</p>
     <div class="ship-station-metrics"><div><span>Destination</span><strong>${destinationName}</strong></div><div><span>Evidence</span><strong>Field survey secured</strong></div><div><span>Life finding</span><strong>${lifeFinding}</strong></div></div>
-    <div class="ship-station-actions">${outcomeActions || '<small>The evidence package is not ready for a supported result.</small>'}</div>
+    ${report}<div class="ship-station-actions">${completedReport ? '' : outcomeActions || '<small>The evidence package is not ready for a supported result.</small>'}</div>
   </div>`;
   panel.classList.add('show');
   panel.querySelector('[data-close-station]')?.addEventListener('click', closeShipStationPanel);
   panel.querySelectorAll('[data-complete-destination-analysis]').forEach((button) => button.addEventListener('click', async () => {
+    panel.querySelectorAll('[data-complete-destination-analysis]').forEach(action => { action.disabled = true; });
     const completed = await activeContext?.completeDestinationMissionAnalysis?.(button.dataset.completeDestinationAnalysis);
-    if (!completed) return activeContext?.showToast?.('That analysis result is not supported by the current evidence and crew readiness.');
+    if (!completed) panel.querySelectorAll('[data-complete-destination-analysis]').forEach(action => { action.disabled = !outcomes.find(outcome => outcome.id === action.dataset.completeDestinationAnalysis)?.available; });
+    if (!completed) return activeContext?.showToast?.('Report not completed. Your field records remain saved; check the lab, evidence and crew readiness, then retry.');
     activeContext?.playExpeditionShipAction?.({ actionId: 'destination-analysis', kind: 'science', message: `${mission.title} analysis complete.`, interaction });
     closeShipStationPanel();
   }));
@@ -1783,7 +1790,7 @@ async function handleShipInteraction(interaction) {
     return activeContext?.exitExpeditionShipInterior?.() === true;
   }
   if (interaction?.id === 'craft-bay-status') return renderPodLaunchPanel(interaction);
-  if (interaction?.id === 'analysis-review' && activeContext?.getDestinationMissionSnapshot?.()?.phase === 'analysis') {
+  if (interaction?.id === 'analysis-review' && ['analysis','complete'].includes(activeContext?.getDestinationMissionSnapshot?.()?.phase)) {
     return renderDestinationMissionAnalysisPanel(interaction);
   }
   return renderShipStationPanel(interaction);

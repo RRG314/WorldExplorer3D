@@ -1,4 +1,5 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
+import {isEarthWorldUsable} from '../earth-core/world-readiness.js';
 import {
   LIVE_GPS_POLICY,
   createLiveGpsModel,
@@ -503,8 +504,9 @@ async function recenterLiveGpsWorld() {
     }, { transient: true });
     appCtx.setCustomLocationTransient?.(true);
     forceWalkingMode('live_gps_recenter_prepare');
-    await appCtx.loadRoads();
+    const loaded = await appCtx.loadRoads();
     if (session !== activeSession) return false;
+    if (!isEarthWorldUsable(appCtx, loaded)) throw new Error('The location did not finish loading. GPS-follow remains paused.');
     forceWalkingMode('live_gps_recenter_ready');
     if (typeof appCtx.applyCustomLocationSpawn === 'function') {
       appCtx.applyCustomLocationSpawn('walk', { source: 'live_gps_recenter', preferBoatIfWater: false });

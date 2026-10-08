@@ -1,3 +1,5 @@
+import {readBoundedJson} from './bounded-response.js';
+import {providerResponseError} from './provider-error.js';
 import { createProviderRegistry } from './provider-registry.js?v=2';
 
 // Query data, never a rendered map. Service identity is explicit: do not label
@@ -29,11 +31,14 @@ export function normalizeMacrostrat(body) {
 }
 export function createGeologyService({fetchImpl=globalThis.fetch?.bind(globalThis),now}={}) {
   const registry=createProviderRegistry({now,maxCacheEntries:64});
+  const cooldowns=new Map();
+  const clock=now || Date.now;
   async function read(url,signal) {
+    const origin=new URL(url).origin;
+    if((cooldowns.get(origin)||0)>clock()) throw new Error('Geology source is cooling down.');
     const response=await fetchImpl(url,{signal});
-    if(!response.ok)throw new Error(`Geology provider HTTP ${response.status}`);
-    const body=await response.text();if(body.length>1024*1024)throw new Error('Geology response exceeds budget');
-    return JSON.parse(body);
+    if(!response.ok){const error=providerResponseError(response,clock());if(error.status===429||error.retryAfterMs>0)cooldowns.set(origin,clock()+Math.max(60000,error.retryAfterMs||0));throw error;}
+    return readBoundedJson(response,1024*1024);
   }
   registry.register({id:'geology-point',sourceId:'geology-source-selection-v1',cacheTtlMs:86400000,timeoutMs:10000,normalizeRequest:coordinates,
     async query(point,{signal}) {

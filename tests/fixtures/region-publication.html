@@ -1,0 +1,107 @@
+<!doctype html><meta charset="utf-8"><title>Regional publication lifecycle</title><link rel="icon" href="data:,"><style>body{margin:0;background:#92bad2}canvas{display:block}pre{position:absolute;left:16px;top:8px;background:#ffffffdf;padding:12px;font:16px monospace}</style>
+<pre id="status">Testing transactional regional publication…</pre>
+<script src="/node_modules/three/build/three.min.js"></script>
+<script type="module">
+import {ctx} from '/app/js/shared-context.js?v=55';
+import {createFarFieldTerrainApi} from '/app/js/terrain/far-field.js?v=74';
+import {earthCoordinateFrame} from '/app/js/earth-core/coordinate-frame.js?v=1';
+import {latLonToTileXY,tileXYToLatLonBounds} from '/app/js/terrain/tile-coordinates.js?v=1';
+import {createRegionalRoadCoveragePlan} from '/app/js/terrain/regional-road-coverage.js';
+const check=(condition,message)=>{if(!condition)throw Error(message);};
+const deferred=()=>{let resolve;const promise=new Promise(r=>{resolve=r;});return {promise,resolve};};
+const frame=earthCoordinateFrame({lat:0,lon:0},100000);
+const renderer=new THREE.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});renderer.setSize(1000,700);document.body.append(renderer.domElement);
+const scene=new THREE.Scene();scene.background=new THREE.Color(0x92bad2);scene.add(new THREE.HemisphereLight(0xffffff,0x62624a,1.2));
+const camera=new THREE.PerspectiveCamera(50,1000/700,1,70000);camera.position.set(10000,15000,18000);camera.lookAt(0,0,0);
+const terrainGroup=new THREE.Group();scene.add(terrainGroup);
+Object.assign(ctx,{LOC:frame.origin,SCALE:100000,WORLD_UNITS_PER_METER:1,TERRAIN_Y_EXAGGERATION:1,
+ renderer,terrainGroup,camera,geoToWorld:(lat,lon,out)=>frame.toWorld(lat,lon,out),worldToLatLon:(x,z)=>frame.toGeographic(x,z),
+ replaceWorldCollection(key,values){this[key]=values;},waterWaveVisuals:[],worldLoadRuntimeState:{buildingVisibleRadiusWorld:100},
+ _worldLoadSequence:1,detailedWaterPublicationSequence:1,renderQualityLevel:'medium',landAreas:[],landuseAreas:[],waterAreas:[]});
+const geometryOwners=new Set(),materialOwners=new Set();
+for(const [name,set] of [['BufferGeometry',geometryOwners],['BoxGeometry',geometryOwners],['MeshStandardMaterial',materialOwners]]){
+ const Original=THREE[name];THREE[name]=new Proxy(Original,{construct(target,args){const object=Reflect.construct(target,args);set.add(object);object.addEventListener('dispose',()=>set.delete(object));return object;}});
+}
+let instanceObservation=null;
+const InstancedMesh=THREE.InstancedMesh;
+THREE.InstancedMesh=new Proxy(InstancedMesh,{construct(target,args){instanceObservation?.();return Reflect.construct(target,args);}});
+const grass=new THREE.DataTexture(new Uint8Array([100,140,80,255]),1,1,THREE.RGBAFormat);grass.needsUpdate=true;
+ctx.grassDiffuse=grass;
+const requests=[],contexts=[];let behavior='normal',gate=null;
+function contextFor(id,malformed=false){
+ let retired=false;
+ const buildings={length:1536,dispose(){retired=true;this.length=0;},read(i,out){
+  if(malformed&&i===256)throw Error('controlled malformed building');
+  Object.assign(out,{centerLon:((i%48)*95-2200)/100000,centerLat:-(Math.floor(i/48)*130-2100)/100000,
+   widthMeters:60,depthMeters:70,areaMeters:4200,rotationY:0,priority:1000000,validMassing:true,ring:null});
+  Object.assign(out.massing,{heightMeters:50+(i%8)*20,color:[.65+(id%2)*.1,.56,.44]});return out;
+ }};
+ const roadCoveragePlan=createRegionalRoadCoveragePlan({bounds:{minX:-5000,minZ:-5000,maxX:5000,maxZ:5000},geoToWorld:ctx.geoToWorld});
+ for(let i=-2;i<=2;i++)roadCoveragePlan.addGeometry({type:'LineString',coordinates:[[-.045,i*.012],[.045,i*.012]]},{kind:'residential'});
+ const waterAreas=[{identity:'fixture-water',kind:'ocean',outer:[[.05,-.05],[.09,-.05],[.09,.05],[.05,.05],[.05,-.05]],holes:[],bounds:{minLon:.05,maxLon:.09,minLat:-.05,maxLat:.05},spanMeters:11000}];
+ const result={buildings,roadCoveragePlan,waterAreas,contextZoom:14,landAreas:0,landAreasByTile:new Map(),landAreaSpatialByTile:new Map(),surfaceFallbackByTile:new Map(),
+  availableBuildings:1536,sourceBuildings:1536,majorBuildingsAvailable:1536,majorBuildingsSelected:1536,loadedTiles:1,requestedTiles:1,waterZoom:11,waterTilesLoaded:1,waterTilesRequested:1,sourceCoverageComplete:true};
+ contexts.push({id,result,get retired(){return retired;}});return result;
+}
+const api=createFarFieldTerrainApi({appCtx:ctx,worldToLatLon:ctx.worldToLatLon,latLonToTileXY,tileXYToLatLonBounds,
+ sampleAcceptedGroundAtLatLon:()=>({status:'available',groundElevationMeters:10}),sampleAcceptedGroundElevationAtLatLon:()=>10,
+ terrainTileDeps:{usesAcceptedGround:()=>true},pruneTerrainTileCache(){},
+ loadWorldCover:async()=>null,
+ loadMappedContext:async(_a,_b,_c,{signal})=>{const id=requests.length,mode=behavior,wait=gate;requests.push({id,signal});if(mode==='wait')await wait.promise;return contextFor(id,mode==='malformed');}
+});
+const request=n=>api.updateFarTerrainClipmap({z:15,centerX:16384+n,centerY:16384,ring:3});
+const capture=()=>({geometries:renderer.info.memory.geometries,textures:renderer.info.memory.textures,geometryOwners:geometryOwners.size,materialOwners:materialOwners.size,water:ctx.waterWaveVisuals.length,children:terrainGroup.children.length});
+const render=()=>renderer.render(scene,camera);
+const reports=[];
+try{
+ await request(0);render();await new Promise(r=>setTimeout(r,100));render();
+ await api.resetFarTerrainClipmap();render();const sharedBaseline=capture();
+ await request(0);render();
+ check(ctx.farTerrainClipmapState.status==='ready','initial publication missing');
+ check(ctx.farTerrainClipmapState.farBuildings===1536,'initial building coverage');
+ check(ctx.farTerrainClipmapState.regionalRoadCoverage.status==='ready'&&ctx.farTerrainClipmapState.regionalRoadCoverage.surfaceLines===5,'road mask publication missing '+JSON.stringify(ctx.farTerrainClipmapState.regionalRoadCoverage));
+ const baseline=capture();check(baseline.children===3&&baseline.water===1,'terrain/buildings/water ownership');
+ let old=terrainGroup.children.slice(),observations=0;
+ instanceObservation=()=>{observations++;check(terrainGroup.children.length===3&&terrainGroup.children.every((mesh,i)=>mesh===old[i]),'partial replacement visible during instance construction');};
+ for(let i=1;i<=4;i++){
+  await request(i);render();const state=capture();
+  check(JSON.stringify(state)===JSON.stringify(baseline),'resident resources grew on replacement '+JSON.stringify({baseline,state}));
+  check(old.every(mesh=>mesh.userData.farFieldDisposed),'old region did not retire');old=terrainGroup.children.slice();reports.push({operation:'replace',...state});
+ }
+ behavior='malformed';const before=capture();let failed=false;
+ try{await request(5);}catch(error){failed=/controlled malformed building/.test(error.message);}
+ check(failed,'construction failure not surfaced');render();
+ check(old.every((mesh,i)=>terrainGroup.children[i]===mesh),'failure removed working region');
+ check(JSON.stringify(capture())===JSON.stringify(before),'failed draft retained resources');
+ check(contexts.every(context=>context.retired),'construction descriptors leaked');reports.push({operation:'failed-draft-keeps-old',...capture()});
+ behavior='normal';await request(5);render();check(ctx.farTerrainClipmapState.status==='ready','same window retry stuck after failure');old=terrainGroup.children.slice();
+ reports.push({operation:'same-window-retry',...capture()});
+ // A reset during a late provider result must preserve the serial drain barrier.
+ behavior='wait';gate=deferred();const obsolete=request(6);await Promise.resolve();await Promise.resolve();
+ const starts=requests.length;const reset=api.resetFarTerrainClipmap();behavior='normal';const replacement=request(7);
+ await Promise.resolve();await Promise.resolve();check(requests.length===starts,'replacement overlapped old source work');
+ check(terrainGroup.children.length===0&&ctx.waterWaveVisuals.length===0,'reset retained published owners');
+ instanceObservation=null;gate.resolve();await obsolete;await reset;await replacement;render();
+ check(requests.length===starts+1,'latest replacement not admitted');check(contexts.every(context=>context.retired),'late result leaked');
+ check(JSON.stringify(capture())===JSON.stringify(baseline),'post-cancellation resource growth');reports.push({operation:'cancel-drain-replace',...capture()});
+ old=terrainGroup.children.slice();let next=null;
+ instanceObservation=()=>{check(old.every((mesh,i)=>terrainGroup.children[i]===mesh),'cancelled instance draft was visible');
+  instanceObservation=null;next=request(9);};
+ await request(8);await next;render();
+ check(JSON.stringify(capture())===JSON.stringify(baseline),'instance cancellation retained draft resources');
+ reports.push({operation:'cancel-during-instances',...capture()});
+ behavior='wait';gate=deferred();const first=request(10);await Promise.resolve();await Promise.resolve();
+ const queuedStarts=requests.length;behavior='normal';const superseded=request(11),latest=request(12);gate.resolve();
+ await first;await superseded;await latest;render();
+ check(requests.length===queuedStarts+1,'superseded queued region was compiled');
+ check(JSON.stringify(capture())===JSON.stringify(baseline),'rapid direction reversal grew residency');
+ reports.push({operation:'latest-request-wins',...capture()});
+ await api.resetFarTerrainClipmap();render();
+ const empty=capture();check(empty.geometries===0&&empty.textures===sharedBaseline.textures&&empty.geometryOwners===0&&empty.materialOwners===0&&empty.water===0&&empty.children===0,'exit retained owners '+JSON.stringify(empty));
+ reports.push({operation:'exit',...empty});
+ behavior='normal';await request(0);render();
+ window.advanceTime=render;window.render_game_to_text=()=>JSON.stringify({ok:true,scope:'Actual regional publisher; controlled flat elevation and mapped inputs, not continuous travel',sharedBaseline,observations,reports,buildings:ctx.farTerrainClipmapState.farBuildings,roads:ctx.farTerrainClipmapState.regionalRoadCoverage});
+ document.querySelector('#status').textContent='Actual region publisher: 1,536 buildings + roads + water\n4 replacements: stable CPU/GPU owners\nFailed draft preserves the previous region\nCancelled load drains before replacement; exit releases every owner';
+ window.fixtureReady=true;
+}catch(error){window.fixtureError=error.stack;document.querySelector('#status').textContent=error.stack;throw error;}
+</script>
