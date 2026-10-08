@@ -18,14 +18,19 @@ only owned browsers and servers. Ordinary user Chrome must remain open.
 | Surface | Current identity |
 | --- | --- |
 | Production | `5.4.0+1532bdfbb5c1.319d215f60318297.production` |
-| Hosted preview and local dist | `5.5.0+7099ad4c0e82.7f4d5fac46e87c12.staging` |
-| Hosted candidate source | `7099ad4c0e82f8c7de9c1cb336af10f0261f115d` |
+| Hosted preview and local dist | `5.5.0+016537ce49c3.8261cab03dab1f15.staging` |
+| Hosted candidate source | `016537ce49c3a5e84251cafef42d8efc74f5936a` |
 
-The 7099ad4c compact-loading package passes all 29 normal packaged-world checks with no
-browser errors, zero discontinuities across 741 joins, and retained coverage of
-49,023 buildings, 18,952 roads, 111 land-use areas and 49 terrain tiles. Both
-hosted manifests match local bytes. Production remains unchanged. The local source chain passes all 2,141 tests and checks. GitHub Code and Package Checks and secret scans pass for 7099ad4c. Its asset manifest SHA256 is
-`6f63c42a096ff6a3f4b15da4e2d3f6210f0ac2f94f0897d0c99587ddb539f0a4`.
+The 016537ce startup-recovery package passes all 29 normal packaged-world checks
+with no browser errors, zero discontinuities across 741 joins, and retained
+coverage of 49,023 buildings, 18,952 roads, 111 land-use areas and 49 terrain tiles.
+Both hosted manifests match local bytes. Production remains unchanged. The source
+chain passes all 2,147 tests and checks. GitHub Code and Package Checks and secret
+scans pass for 016537ce. Asset manifest SHA256:
+`ec2cffebf20ef77ff8db6d0a21aba08b0a098f61ca2fbcf223013038812e349b`.
+The preview channel is `visual-review-1005` on `we3d-staging-20260712`, renewed
+through October 15. The final ordinary installed-Chrome check visibly reached
+the globe/menu from the initial startup cover with no console warnings or errors.
 
 The current dist, compatible 37a fallback, production and unique 0e snapshot must
 be preserved. Old generated packages were removed only after pushed ancestry and
@@ -65,9 +70,20 @@ Six lifecycle regressions and ten existing checks pass, along with four Chrome
 failure/slow/disabled-JavaScript groups and all five themed layout/control groups.
 The prescribed source journey confirms visible startup → menu → world loading →
 play, monotonic progress and both movement bursts, with no runtime or browser
-errors. Screenshots were inspected. Source suite and replacement package are
-pending. This fixes the reproduced failure behavior; it does not establish the
-owner's exact cause or resolve the separate terrain/performance gates.
+errors. Screenshots were inspected. The full source chain passes 2,147 tests;
+all four failure/slow/disabled-JavaScript groups also pass against the immutable
+package. Its 29-check world preflight passes, and the replacement preview is
+hosted with independently matched manifest bytes. Final ordinary Chrome startup
+reaches the globe and menu without warnings/errors. PR 96 and v5.5.0 remain drafts.
+This fixes the reproduced failure behavior; it does not establish the owner's
+exact cause or resolve the separate terrain/performance gates.
+
+Current startup evidence: `output/verification/chrome-startup-55` (before, source,
+packaged and hosted identities), `chrome-startup-gameplay-55` (prescribed real
+startup/menu/world/driving), and `loading-startup-recovery-55` (themed layouts).
+The previous 7099 package is retained; the superseded dfa generated package was
+pruned only after hash and pushed-ancestry verification, retaining its manifests
+and receipts. No player data, source/history or ordinary Chrome profile was removed.
 
 ## Completed verification and repairs
 

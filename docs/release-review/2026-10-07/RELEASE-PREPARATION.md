@@ -8,11 +8,13 @@ have not been promoted.
 
 ## Candidate and public presentation
 
-The local and hosted road-repair candidate is `5.5.0+61cc497e6d5a.97fd90a968edc376.staging`.
+The local and hosted candidate is `5.5.0+016537ce49c3.8261cab03dab1f15.staging`.
 Its normal packaged-world preflight passes all 29 checks, with zero discontinuities
-across 741 joins and no game errors. Hosted manifests match local bytes. Source
-checks pass 2,134 tests; GitHub PR and secret scanning pass. Production is unchanged.
-The newer loading-presentation addition described below still needs packaging.
+across 741 joins, retained building/road coverage and no game errors. Hosted
+manifests match local bytes. Source checks pass 2,147 tests; GitHub code/package
+and secret scanning pass. Ordinary installed Chrome reaches the globe/menu with
+no startup warnings/errors. Production remains unchanged on 5.4. This verifies
+the compact loading UI and startup recovery, not the outstanding release gates.
 
 The public README, release notes, roadmap, known issues and project page use a
 curated gallery of actual unedited gameplay screenshots. They do not include an
@@ -209,4 +211,11 @@ journey passes both input bursts with no browser/runtime errors; images inspecte
 The actual cause on the owner's Chrome device is unconfirmed. No road, terrain,
 provider or account protection was changed as part of this repair.
 
-Chrome startup repair: complete source verification passes 2,147 tests plus dependency, ownership, type, inventory and sensitivity checks. Packaging and preview verification follow.
+Chrome startup repair: complete source verification passes 2,147 tests plus
+dependency, ownership, type, inventory and sensitivity checks. All four startup
+browser groups pass against the source and immutable package. The 016537ce
+preview is deployed after 29/29 normal packaged-world checks. Hosted manifests
+match local bytes, and final ordinary Chrome visibly reaches the main menu with
+no console warnings/errors. GitHub checks pass. PR 96 and v5.5.0 remain drafts;
+the release body and immutable public links refer to this tested runtime.
+Production, stable and Pages have not been promoted.
