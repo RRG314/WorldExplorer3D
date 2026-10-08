@@ -8,13 +8,19 @@ have not been promoted.
 
 ## Candidate and public presentation
 
-The local and hosted candidate is `5.5.0+016537ce49c3.8261cab03dab1f15.staging`.
-Its normal packaged-world preflight passes all 29 checks, with zero discontinuities
-across 741 joins, retained building/road coverage and no game errors. Hosted
-manifests match local bytes. Source checks pass 2,147 tests; GitHub code/package
-and secret scanning pass. Ordinary installed Chrome reaches the globe/menu with
-no startup warnings/errors. Production remains unchanged on 5.4. This verifies
-the compact loading UI and startup recovery, not the outstanding release gates.
+The local and hosted candidate is `5.5.0+4413d5d9b2ce.d69c6d4fb5e9fe9c.staging`.
+Source checks pass 2,158 tests. Its normal packaged-world preflight passes all 29
+checks with zero discontinuities across 741 joins, retained building/road coverage
+and no game errors. Its added regional journey passes arrival at the reported
+coordinates, return, incomplete-provider retention, recovery, resource retirement,
+menu preference before Earth loading and persistence after reload. All 187 retired
+regional instance batches dispose, and return restores the same 38,804,284-byte
+regional allocation. Four prescribed source flight-input bursts pass.
+Hosted manifests match local bytes. An ordinary Chrome recheck was blocked by the
+locked Mac; the previous 016537ce startup result is historical. Production remains
+5.4. Current release-scope verification rejects promotion because full matching
+execution and external acceptance evidence are absent. These targeted checks do
+not certify the complete release or sustained performance.
 
 The public README, release notes, roadmap, known issues and project page use a
 curated gallery of actual unedited gameplay screenshots. They do not include an

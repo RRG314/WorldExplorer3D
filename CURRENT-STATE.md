@@ -30,8 +30,11 @@ retained and 18 terrain-group children before/after return. The corrected failed
 provider test verifies that the previous group remains published. Recovery and return pass with 187/187 old instance batches disposed and exactly
 38,804,284 regional buffer bytes restored. Four prescribed keyboard-flight bursts
 pass across a refresh boundary with no errors. The final source chain passes
-2,158 tests. Persisted menu settings and the final immutable package/hosting checks
-remain to be run; do not infer completion from the older 016537ce package below.
+2,158 tests. The same journey passes on the clean immutable package, including menu choices
+before lazy Earth startup and preference restoration after reload. All 29 normal
+packaged-world checks pass, and both hosted manifests match local bytes. The new
+preview is deployed. Ordinary hosted Chrome could not be rechecked because the
+Mac was locked; its earlier startup result below belongs to 016537ce.
 One release-wrapper run incorrectly selected that older dist and was stopped.
 The repository journey now rejects packages without the scenery scheduler.
 An additional prescribed downtown startup exceeded its 180-second wait before
@@ -47,19 +50,31 @@ unrestricted worldwide simulation. Public capability/limitation text says so.
 | Surface | Current identity |
 | --- | --- |
 | Production | `5.4.0+1532bdfbb5c1.319d215f60318297.production` |
-| Hosted preview and local dist | `5.5.0+016537ce49c3.8261cab03dab1f15.staging` |
-| Hosted candidate source | `016537ce49c3a5e84251cafef42d8efc74f5936a` |
+| Hosted preview and local dist | `5.5.0+4413d5d9b2ce.d69c6d4fb5e9fe9c.staging` |
+| Hosted candidate source | `4413d5d9b2ce01369a5bf8bde7a2d584c68bd243` |
 
-The 016537ce startup-recovery package passes all 29 normal packaged-world checks
+The 4413d5d9 regional-arrival package passes all 29 normal packaged-world checks
 with no browser errors, zero discontinuities across 741 joins, and retained
 coverage of 49,023 buildings, 18,952 roads, 111 land-use areas and 49 terrain tiles.
-Both hosted manifests match local bytes. Production remains unchanged. The source
-chain passes all 2,147 tests and checks. GitHub Code and Package Checks and secret
-scans pass for 016537ce. Asset manifest SHA256:
-`ec2cffebf20ef77ff8db6d0a21aba08b0a098f61ca2fbcf223013038812e349b`.
+The source chain passes 2,158 tests and checks. Its added packaged regional journey
+passes arrival, return, failed-provider retention, recovery, GPU retirement, and
+menu/reload settings persistence. Both hosted manifests match local bytes.
+Production remains unchanged. Build manifest SHA256:
+`f2c34c23177d244806348dfa106c76fab912f06d01e45305c8c6500afad25a79`.
+Asset manifest SHA256:
+`1c98a8dd4ce34249cec3265f5c636190caaa751ac29c85ec0c58607234c0e4fd`.
 The preview channel is `visual-review-1005` on `we3d-staging-20260712`, renewed
-through October 15. The final ordinary installed-Chrome check visibly reached
-the globe/menu from the initial startup cover with no console warnings or errors.
+through October 15. Evidence is under `output/verification/regional-scenery-journey`
+(package and hosted receipt), `regional-scenery-source-evidence` (earlier source),
+and `regional-flight-actions-checked` (prescribed flight inputs). The final ordinary
+Chrome check could not run because the Mac was locked. No successful ordinary
+Chrome startup or gameplay is claimed for 4413d5d9.
+
+`release-scope --require-ready` rejects production promotion: current full
+candidate/backend execution evidence is absent and external acceptance receipts
+are pending or tied to older artifacts. No guard was bypassed, no physical-device
+result was invented, and stable/Pages/v5.5.0 remain unpromoted. The previously
+failing broad release gates still require a complete matching run and review.
 
 The current dist, compatible 37a fallback, production and unique 0e snapshot must
 be preserved. Old generated packages were removed only after pushed ancestry and
@@ -110,7 +125,8 @@ exact cause or resolve the separate terrain/performance gates.
 Current startup evidence: `output/verification/chrome-startup-55` (before, source,
 packaged and hosted identities), `chrome-startup-gameplay-55` (prescribed real
 startup/menu/world/driving), and `loading-startup-recovery-55` (themed layouts).
-The previous 7099 package is retained; the superseded dfa generated package was
+The 016537ce package is now retained; 7099 was pruned after payload/hash and
+pushed-ancestry verification. Earlier, the superseded dfa generated package was
 pruned only after hash and pushed-ancestry verification, retaining its manifests
 and receipts. No player data, source/history or ordinary Chrome profile was removed.
 

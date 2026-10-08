@@ -6,14 +6,20 @@ The production frontend remains **5.4.0+1532bdfbb5c1.319d215f60318297.production
 source **1532bdfbb5c11e002d278b058d1ebdba88384f60**. The next compatible release is
 5.5.0 on `steven/visual-quality`. Stable, Pages and the public release remain unpromoted.
 
-The hosted preview and local dist are `5.5.0+016537ce49c3.8261cab03dab1f15.staging`,
-source `016537ce49c3a5e84251cafef42d8efc74f5936a`. Its startup-recovery package passes
-29 normal world checks and ordinary installed Chrome startup. The current source
-adds regional scenery following travel and passes 2,158 source tests, controlled
-arrival/return/provider-recovery/resource retirement, and four keyboard-flight
-bursts. Packaging and preview replacement for that change are pending. Refer to
-CURRENT-STATE.md for its final artifact receipt; an unchanged preview URL is not
-proof that a newly edited runtime has been deployed.
+The hosted preview and local dist are `5.5.0+4413d5d9b2ce.d69c6d4fb5e9fe9c.staging`,
+source `4413d5d9b2ce01369a5bf8bde7a2d584c68bd243`. The source passes 2,158 tests;
+the immutable package passes all 29 normal world checks and the added regional
+arrival/return/failure/recovery/retirement/settings journey. Four prescribed
+source keyboard-flight bursts pass. Hosted build and asset manifests match local
+bytes. Ordinary Chrome verification is blocked by the locked Mac, so the earlier
+016537ce ordinary-startup result does not certify this new artifact.
+
+The release gate rejects promotion because complete matching execution and external
+acceptance evidence are still missing. Production remains 5.4; stable, public
+Pages and the v5.5.0 release have not been promoted. The 016537ce package, compatible
+37a fallback, live production and unique 0e snapshot remain retained. Only the
+verified, pushed, superseded 7099 generated payload was removed; its manifests and
+cleanup receipt remain saved.
 
 Production has 80 ACTIVE Functions. Place/environmental data version 1 and
 aircraft version 5 were deployed first, preserving all 11 existing parameters.
