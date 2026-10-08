@@ -192,4 +192,4 @@ release readiness. Road, terrain and gameplay authority are unchanged by this
 visual correction. See CURRENT-STATE for the separate unmatched-workload terrain
 publication observation; no speculative repair was applied.
 
-Compact loading correction: complete source verification passes 2,141 tests, dependency/source/ownership/type checks, inventory and sensitivity. New immutable preview packaging follows.
+Compact loading correction: complete source verification passes 2,141 tests, dependency/source/ownership/type checks, inventory and sensitivity. The 7099ad4c compact-loading preview is now hosted after 29/29 packaged-world checks. Both hosted manifests match local bytes, with zero browser errors or failed local resources. Production remains 5.4; the PR and v5.5.0 release remain drafts, with updated loading copy and current immutable links.

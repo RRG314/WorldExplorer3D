@@ -18,14 +18,14 @@ only owned browsers and servers. Ordinary user Chrome must remain open.
 | Surface | Current identity |
 | --- | --- |
 | Production | `5.4.0+1532bdfbb5c1.319d215f60318297.production` |
-| Hosted preview and local dist | `5.5.0+dfa29bb7598d.8d884ce70069fc71.staging` |
-| Hosted candidate source | `dfa29bb7598d82da3993ed4df5bf915437522df1` |
+| Hosted preview and local dist | `5.5.0+7099ad4c0e82.7f4d5fac46e87c12.staging` |
+| Hosted candidate source | `7099ad4c0e82f8c7de9c1cb336af10f0261f115d` |
 
-The dfa29bb loading package passes all 29 normal packaged-world checks with no
+The 7099ad4c compact-loading package passes all 29 normal packaged-world checks with no
 browser errors, zero discontinuities across 741 joins, and retained coverage of
 49,023 buildings, 18,952 roads, 111 land-use areas and 49 terrain tiles. Both
-hosted manifests match local bytes. Production remains unchanged. The prior 61cc GitHub checks pass; dfa29bb CI status still needs confirmation. Its asset manifest SHA256 is
-`d188c2d4b8f3a9ab4fad8cff8fe3c04892a4bc669ebc039deb4ef01723fc9114`.
+hosted manifests match local bytes. Production remains unchanged. The local source chain passes all 2,141 tests and checks. GitHub Code and Package Checks and secret scans pass for 7099ad4c. Its asset manifest SHA256 is
+`6f63c42a096ff6a3f4b15da4e2d3f6210f0ac2f94f0897d0c99587ddb539f0a4`.
 
 The current dist, compatible 37a fallback, production and unique 0e snapshot must
 be preserved. Old generated packages were removed only after pushed ancestry and
@@ -40,7 +40,7 @@ all card widths, keyboard/modal focus, short-screen scrolling and actual bootstr
 failure/reload pass. A prescribed real Baltimore launch records monotonic 3–99%
 progress and automatic card rotation across 71.6 seconds, then hides the overlay
 and passes both driving bursts. No game errors; optional external Overpass CORS
-errors are retained separately. Images were inspected. The final phone-sized launch also passes, showing road, flight and ocean cards before play; its 27.5-second result is browser emulation, not a physical-phone measurement. All final source checks pass 2,141 tests. The dfa29bb immutable preview passed its 29-check preflight and is hosted. The owner subsequently rejected the large rounded card. A compact bottom panel now uses the real app theme, Inter/Orbitron, blue accents and small corners, with concise activity headings. All five component browser groups and 16 focused loading/lifecycle checks pass. The fixture includes the real theme/fonts; reviewed images fit desktop, phone and short landscape. The prescribed actual launch also passes: 88.3 seconds, monotonic 3–99% progress, six cards, overlay dismissal, both driving bursts and no runtime errors. Optional Overpass CORS is retained separately. Images were inspected. Replacement preview is pending.
+errors are retained separately. Images were inspected. The final phone-sized launch also passes, showing road, flight and ocean cards before play; its 27.5-second result is browser emulation, not a physical-phone measurement. All final source checks pass 2,141 tests. The dfa29bb immutable preview passed its 29-check preflight and is hosted. The owner subsequently rejected the large rounded card. A compact bottom panel now uses the real app theme, Inter/Orbitron, blue accents and small corners, with concise activity headings. All five component browser groups and 16 focused loading/lifecycle checks pass. The fixture includes the real theme/fonts; reviewed images fit desktop, phone and short landscape. The prescribed actual launch also passes: 88.3 seconds, monotonic 3–99% progress, six cards, overlay dismissal, both driving bursts and no runtime errors. Optional Overpass CORS is retained separately. Images were inspected. The replacement 7099ad4c preview passes all 29 packaged-world checks and is hosted. Both manifests match local bytes; production remains unchanged. The PR and v5.5.0 draft release are updated, including loading tips and immutable public image/document links.
 This is loading-UI evidence, not a performance or full-release acceptance claim.
 
 An ordinary Chrome launch on dfa29bb rejected Baltimore transport publication
@@ -229,5 +229,3 @@ caches are affected. The exact live 5.4 frontend was independently matched by
 Hosting version and both manifest bytes; its preserved `release-54-1532` channel
 now expires November 6 at 22:26:58 UTC. This exact-live copy is separate from the
 reviewed save-compatible 37a fallback.
-
-Compact loading correction: complete source verification passes 2,141 tests, dependency/source/ownership/type checks, inventory and sensitivity. New immutable preview packaging follows.
