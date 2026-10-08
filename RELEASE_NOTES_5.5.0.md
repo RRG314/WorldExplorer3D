@@ -7,7 +7,11 @@ Explorer records and saved voyages remain central to the game.
 ## More of the place around you
 
 Buildings and regional roads remain visible across a wider surrounding area.
-Changing graphics quality preserves the selected location’s building coverage.
+Terrain and mapped buildings now load around you as you travel beyond that area.
+Regional buildings share the existing facade colors and use simple pitched roofs
+where supported by the map. Changing graphics quality preserves the selected
+location’s building coverage. Graphics settings can turn traveling scenery off
+to retain the original fixed surroundings.
 Parks, woodland, wetlands and protected areas use their physical land cover to
 shape planting and terrain, rather than treating every green area alike.
 
@@ -73,8 +77,10 @@ Dense cities can still produce noticeable pauses during movement. Some complex
 bridge and tunnel junctions remain visually rough, and graphics quality is not
 uniform across locations. Physical-phone performance has not been fully validated.
 
-Earth remains a bounded, location-based experience. Unrestricted worldwide
-streaming is not included. The research vessel still uses the existing custom
+Detailed roads, interiors and activities remain tied to the selected location.
+Traveling regional scenery does not extend those systems into a fully playable
+worldwide map. Slow or missing map data can delay new scenery; the last complete
+region stays visible while a request is retried. The research vessel still uses the existing custom
 model; the licensed replacement, broader ocean wildlife and activities, and
 spearfishing are not part of this update. Interstellar Expeditions remain Alpha.
 

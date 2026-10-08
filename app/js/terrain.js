@@ -399,6 +399,9 @@ const {
   getFarTerrainSurfaceSnapshot,
   scheduleFarTerrainSurfaceRefresh,
   updateFarTerrainClipmap,
+  updateRegionalSceneryFocus,
+  setRegionalSceneryEnabled,
+  getRegionalSceneryState,
   waitForFarTerrainClipmap
 } = createFarFieldTerrainApi({
   appCtx,
@@ -650,6 +653,9 @@ Object.assign(appCtx, {
   terrainTileCacheSnapshot,
   updateStructureVisualVisibility,
   updateFarTerrainClipmap,
+  updateRegionalSceneryFocus,
+  setRegionalSceneryEnabled,
+  getRegionalSceneryState,
   waitForFarTerrainClipmap,
   setWorldSurfaceProfile,
   subdivideRoadPoints,

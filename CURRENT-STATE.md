@@ -13,6 +13,35 @@ Preserve existing location work, player data, retained artifacts and Git history
 On this observed 8 GiB Apple M1 Mac, run heavy verification sequentially and close
 only owned browsers and servers. Ordinary user Chrome must remain open.
 
+## October 8 regional-arrival repair
+
+The owner reports empty scenery after flying to 39.4347, -76.6912. Source tracing
+found that the far terrain/building region was created around the starting point
+and never followed the active Earth actor. The working change replaces that one
+regional publication as travel advances; the original detailed district stays
+owned by its existing location systems. Settings can retain the fixed view.
+Failed or incomplete provider data must keep the last complete publication.
+Regional facade colors now use the existing building exterior catalog; supported
+low residential roof metadata can produce a batched gabled silhouette.
+
+Controlled installed-Chrome checks reproduce 371 nearby regional instances before
+arrival and 751 after replacement, with all 48,296 original detailed buildings
+retained and 18 terrain-group children before/after return. The corrected failed
+provider test verifies that the previous group remains published. Recovery and return pass with 187/187 old instance batches disposed and exactly
+38,804,284 regional buffer bytes restored. Four prescribed keyboard-flight bursts
+pass across a refresh boundary with no errors. The final source chain passes
+2,158 tests. Persisted menu settings and the final immutable package/hosting checks
+remain to be run; do not infer completion from the older 016537ce package below.
+One release-wrapper run incorrectly selected that older dist and was stopped.
+The repository journey now rejects packages without the scenery scheduler.
+An additional prescribed downtown startup exceeded its 180-second wait before
+flight; its owned browser needed forced cleanup. The successful regional-flight
+run uses the owner-reported starting point and less frequent, cheaper readiness
+inspection. That does not certify the downtown startup timeout as resolved.
+
+This extends regional scenery, not detailed streets, interiors, activities or
+unrestricted worldwide simulation. Public capability/limitation text says so.
+
 ## Build identities
 
 | Surface | Current identity |

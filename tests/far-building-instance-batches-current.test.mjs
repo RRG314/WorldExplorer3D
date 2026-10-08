@@ -95,7 +95,7 @@ test('interrupted cooperative building assembly releases its geometry and retain
 test('packed city construction preserves every uploaded byte, bounds and raycast after its scratch buffer retires',async()=>{
   const material=new THREE.MeshBasicMaterial(),packed=new FarBuildingInstanceStorage(buildings.length);
   for(const b of buildings)packed.append(b.x,b.z,b.baseY,b.width,b.depth,b.height,b.rotationY,b.color);
-  assert.equal(packed.data.byteLength,80*buildings.length);
+  assert.equal(packed.data.byteLength,88*buildings.length);
   const ordinary=await buildFarBuildingInstanceBatches(THREE,buildings,material);
   const compact=await buildFarBuildingInstanceBatches(THREE,packed,material);
   try{
@@ -147,4 +147,17 @@ test('cell transforms retain sub-millimetre placement at worldwide-scale positiv
   const ray=new THREE.Raycaster(new THREE.Vector3(source[3].x,2000,source[3].z),new THREE.Vector3(0,-1,0));
   assert.ok(ray.intersectObjects(batches).some(hit=>hit.sourceInstanceId===3));
  }finally{for(const batch of batches)batch.dispose();cleanup(batches,material);}
+});
+
+
+test('gabled regional batches keep mapped height, culling and roof raycasts with one draw per cell/style',async()=>{
+ const material=new THREE.MeshBasicMaterial();const house={x:0,z:0,baseY:10,width:10,depth:8,height:8,rotationY:0,color:[.4,.2,.1],roofFraction:.25};
+ const batches=await buildFarBuildingInstanceBatches(THREE,[house,{...house,x:20}],material);
+ try{
+  assert.equal(batches.length,1);assert.equal(batches[0].count,2);assert.equal(batches[0].userData.regionalRoofFraction,.25);
+  batches[0].updateMatrixWorld(true);
+  const ridge=new THREE.Raycaster(new THREE.Vector3(0,50,0),new THREE.Vector3(0,-1,0)).intersectObjects(batches);
+  const eave=new THREE.Raycaster(new THREE.Vector3(4.9,50,0),new THREE.Vector3(0,-1,0)).intersectObjects(batches);
+  assert.ok(Math.abs(ridge[0].point.y-18)<1e-5);assert.ok(eave[0].point.y<16.1);assert.equal(batches[0].geometry.boundingBox.max.y,18);
+ }finally{for(const m of batches)m.dispose();cleanup(batches,material);}
 });

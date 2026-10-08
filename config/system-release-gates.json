@@ -6,6 +6,7 @@
     "docs/ARCHITECTURE_MAP.md": ["Application overview", "Earth world flow", "Player movement and cameras", "Character, companions, and urban play", "Field exploration and progression", "Planetary and space environments", "Quick Build and persistent Blocks", "Multiplayer and backend", "Data classification", "Release shape"]
   },
   "gates": {
+    "regional-scenery-arrival": {"scope":"candidate","command":["node","scripts/verification/regional-scenery-journey.mjs"],"artifactRequired":true,"timeoutMs":1200000},
     "city-switch-preservation": {"scope":"candidate","command":["node","scripts/verification/city-switch-lifecycle.mjs"],"artifactRequired":true,"timeoutMs":1500000},
     "runtime-diagnostics": {"scope":"candidate","command":["node","scripts/verification/runtime-diagnostics-browser.mjs"],"artifactRequired":true,"timeoutMs":540000},
     "provider-outages": {"scope":"candidate","command":["node","scripts/verification/provider-outage-browser.mjs"],"artifactRequired":false,"timeoutMs":90000},

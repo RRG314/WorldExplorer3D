@@ -11,6 +11,7 @@ function createCoreFrameSystems(appCtx, hooks = {}) {
   let weatherTimer = 0;
   let weatherUiTimer = 0;
   let boatTimer = 0;
+  let regionalSceneryTimer = 0;
   let liveEarthTimer = 0;
   return [
     {
@@ -73,6 +74,11 @@ function createCoreFrameSystems(appCtx, hooks = {}) {
         if (appCtx.activeShipInterior === true) {
           appCtx.updateExpeditionShipInterior?.(frame.dt);
           return;
+        }
+        regionalSceneryTimer += frame.dt;
+        if (regionalSceneryTimer >= 1) {
+          regionalSceneryTimer = 0;
+          appCtx.updateRegionalSceneryFocus?.();
         }
         appCtx.updateBoatSwimming?.(frame.dt);
         appCtx.updatePlanetaryTracks?.();

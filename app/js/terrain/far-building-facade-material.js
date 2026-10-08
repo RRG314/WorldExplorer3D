@@ -55,13 +55,15 @@ function applyFarBuildingFacadeDetail(material) {
       '#include <color_fragment>',
       [
         '#include <color_fragment>',
-        'float farFacadeHorizontal = vFarBuildingWorldPosition.x * 0.73 + vFarBuildingWorldPosition.z * 0.68;',
+        'vec3 farFacadeNormal = normalize(cross(dFdx(vFarBuildingWorldPosition), dFdy(vFarBuildingWorldPosition)));',
+        'float farFacadeWall = min(vFarBuildingWallMask, 1.0 - smoothstep(0.24, 0.78, abs(farFacadeNormal.y)));',
+        'float farFacadeHorizontal = abs(farFacadeNormal.x) > abs(farFacadeNormal.z) ? vFarBuildingWorldPosition.z : vFarBuildingWorldPosition.x;',
         'vec2 farFacadeGrid = vec2(farFacadeHorizontal / 3.4, vFarBuildingWorldPosition.y / 3.15);',
         'vec2 farFacadeCell = abs(fract(farFacadeGrid) - 0.5);',
         'vec2 farFacadeAa = max(fwidth(farFacadeGrid) * 0.85, vec2(0.012));',
         'float farFacadeColumn = 1.0 - smoothstep(0.31 - farFacadeAa.x, 0.31 + farFacadeAa.x, farFacadeCell.x);',
         'float farFacadeRow = 1.0 - smoothstep(0.27 - farFacadeAa.y, 0.27 + farFacadeAa.y, farFacadeCell.y);',
-        'float farFacadeWindow = farFacadeColumn * farFacadeRow * vFarBuildingWallMask;',
+        'float farFacadeWindow = farFacadeColumn * farFacadeRow * farFacadeWall;',
         // Window-scale detail aliases into a flat pale wall at the aerial
         // distances used to explore a whole city. Preserve the same facade
         // owner and blend to a larger, antialiased floor/bay pattern instead
@@ -71,7 +73,7 @@ function applyFarBuildingFacadeDetail(material) {
         'vec2 farFacadeMacroAa = max(fwidth(farFacadeMacroGrid), vec2(0.008));',
         'float farFacadeMacroColumn = 1.0 - smoothstep(0.34 - farFacadeMacroAa.x, 0.34 + farFacadeMacroAa.x, farFacadeMacroCell.x);',
         'float farFacadeMacroRow = 1.0 - smoothstep(0.30 - farFacadeMacroAa.y, 0.30 + farFacadeMacroAa.y, farFacadeMacroCell.y);',
-        'float farFacadeMacroWindow = farFacadeMacroColumn * farFacadeMacroRow * vFarBuildingWallMask;',
+        'float farFacadeMacroWindow = farFacadeMacroColumn * farFacadeMacroRow * farFacadeWall;',
         'float farFacadePixelFootprint = max(fwidth(farFacadeGrid.x), fwidth(farFacadeGrid.y));',
         'float farFacadeAerialLod = smoothstep(0.18, 0.82, farFacadePixelFootprint);',
         'farFacadeWindow = mix(farFacadeWindow, farFacadeMacroWindow, farFacadeAerialLod);',
@@ -82,26 +84,26 @@ function applyFarBuildingFacadeDetail(material) {
         'vec2 farFacadeAtlasUv = vec2(farFacadeHorizontal * 0.08, vFarBuildingWorldPosition.y / 16.0);',
         'vec3 farFacadeAtlasColor = sRGBToLinear(texture2D(farFacadeAtlas, farFacadeAtlasUv)).rgb;',
         'float farFacadeAtlasLod = (1.0 - smoothstep(0.32, 1.05, farFacadePixelFootprint)) * farFacadeDistanceFade;',
-        'float farFacadeAtlasBlend = vFarBuildingWallMask * farFacadeAtlasLod * 0.82;',
-        'vec3 farFacadeTintedAtlas = farFacadeAtlasColor * mix(vec3(0.82), diffuseColor.rgb * 1.22, 0.38);',
+        'float farFacadeAtlasBlend = farFacadeWall * farFacadeAtlasLod * 0.45;',
+        'vec3 farFacadeTintedAtlas = diffuseColor.rgb * mix(vec3(0.65), farFacadeAtlasColor * 1.8, 0.55);',
         'diffuseColor.rgb = mix(diffuseColor.rgb, farFacadeTintedAtlas, farFacadeAtlasBlend);',
         'float farFacadeVariation = farFacadeHash(farFacadeGrid);',
         'vec3 farFacadeGlass = mix(vec3(0.035, 0.075, 0.105), vec3(0.12, 0.20, 0.25), farFacadeVariation);',
         // Roofs remain light enough to read from above, while walls retain
         // enough contrast for the city to look constructed instead of like a
         // field of untextured white blocks.
-        'float farFacadeWallTone = mix(1.0, 0.62, vFarBuildingWallMask * farFacadeAerialLod);',
-        'diffuseColor.rgb *= farFacadeWallTone;',
+        'float farFacadeWallTone = mix(1.0, 0.62, farFacadeWall * farFacadeAerialLod);',
+        'diffuseColor.rgb *= farFacadeWallTone * mix(0.45, 1.0, farFacadeWall);',
         'diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * 0.28 + farFacadeGlass * 0.72, farFacadeWindow * farFacadeDistanceFade * 0.82);'
       ].join('\n')
     );
   };
-  material.customProgramCacheKey = () => 'far-building-facade-detail-v5-cell-transform';
+  material.customProgramCacheKey = () => 'far-building-facade-detail-v6-regional-palette';
   material.userData = {
     ...(material.userData || {}),
     farBuildingFacadeDetail: 'world-space-distance-adaptive-window-grid',
     farBuildingFacadeOwner: 'terrain/far-building-facade-material',
-    farBuildingFacadeCoverage: 'entire-fixed-map',
+    farBuildingFacadeCoverage: 'active-regional-window',
     farBuildingFacadeAtlas: FAR_FACADE_ATLAS_URL,
     farBuildingFacadeAtlasMode: 'shared-neutral-urban-atlas'
   };

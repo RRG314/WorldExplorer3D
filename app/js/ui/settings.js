@@ -1,3 +1,5 @@
+import { readRegionalSceneryPreference, writeRegionalSceneryPreference } from '../terrain/regional-scenery-scheduler.js';
+
 export function setupSettingsUi(appCtx) {
   document.getElementById('copySupportReceiptBtn')?.addEventListener('click', async () => {
     const status=document.getElementById('supportReceiptStatus');
@@ -20,6 +22,14 @@ export function setupSettingsUi(appCtx) {
   const attomKeyInput = document.getElementById('attomKeyInput');
   const estatedKeyInput = document.getElementById('estatedKeyInput');
   const saveApiKeyBtn = document.getElementById('saveApiKey');
+  const regionalSceneryToggle = document.getElementById('regionalSceneryToggle');
+  if (regionalSceneryToggle) {
+    regionalSceneryToggle.checked = appCtx.getRegionalSceneryState?.().enabled ?? readRegionalSceneryPreference();
+    regionalSceneryToggle.addEventListener('change', () => {
+      writeRegionalSceneryPreference(regionalSceneryToggle.checked);
+      appCtx.setRegionalSceneryEnabled?.(regionalSceneryToggle.checked);
+    });
+  }
   const renderQualitySelect = document.getElementById('renderQualitySelect');
   const highQualityToggle = document.getElementById('highQualityToggle');
   const ssaoToggle = document.getElementById('ssaoToggle');

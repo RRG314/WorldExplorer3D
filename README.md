@@ -13,9 +13,9 @@ Choose a location, step into a bounded playable world, and explore by land,
 water, air, or space. Discovery, vehicles, virtual property, persistent building,
 photo-based home improvements and shared rooms connect the experience.
 
-The 5.5 update brings fuller regional building and road coverage, more connected
-bridge and tunnel approaches, and a research-vessel journey from deck to water
-and back. Public weather and marine data add context without a paid data
+The 5.5 update brings fuller regional building and road coverage, terrain and
+buildings that follow travel, more connected bridge and tunnel approaches, and
+a research-vessel journey from deck to water and back. Public weather and marine data add context without a paid data
 subscription. Existing locations and player progress remain part of the same
 game. Dense-city pauses, uneven art quality and bounded world size remain
 [known limitations](KNOWN_ISSUES.md).
@@ -44,6 +44,10 @@ The same Explorer connects your Backpack, quick slots, Journal, Field Guide,
 activities, Expeditions, specialties, companions, property, and seasonal
 surveys. Quick Build places persistent Blocks directly in the current world,
 including shared builds inside multiplayer rooms.
+
+Regional terrain and mapped buildings can load as you fly farther from your
+starting point. Detailed streets, interiors and activities remain in the selected
+district. Turn traveling scenery on or off in Graphics settings.
 
 | Water and shore | Flight |
 | :--: | :--: |

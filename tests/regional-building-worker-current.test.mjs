@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createRegionalBuildingCompiler } from '../app/js/terrain/regional-building-compiler.js';
-import { RegionalBuildingDescriptors } from '../app/js/terrain/regional-building-descriptors.js';
+import { RegionalBuildingDescriptors, DESCRIPTOR_STRIDE } from '../app/js/terrain/regional-building-descriptors.js';
 import { createRegionalBuildingWorker } from '../app/js/terrain/regional-building-runtime.js';
 import { loadFarMappedContext } from '../app/js/terrain/far-field-mapped-context.js';
 import { resolveFarBuildingMassing } from '../app/js/terrain/far-building-massing.js?v=2';
@@ -36,7 +36,7 @@ test('packed tile compilation preserves reference selection, every massing value
         assert.deepEqual(got.ring,expected.ring);
         const massing=resolveFarBuildingMassing(expected,null,expected.areaMeters*units*units,units);
         assert.equal(got.validMassing,Boolean(massing));
-        if(massing){assert.equal(got.massing.heightMeters,massing.heightMeters);assert.deepEqual(got.massing.color,massing.color);
+        if(massing){assert.equal(got.massing.heightMeters,massing.heightMeters);assert.deepEqual(got.massing.color,massing.color);assert.equal(got.massing.roofFraction,massing.roofFraction);
           assert.equal(['explicit_height','levels'].includes(got.massing.heightSource),['explicit_height','levels'].includes(massing.heightSource));}
       }
     }finally{packed.dispose();}
@@ -53,7 +53,7 @@ test('serialized geographic frame excludes exactly the same near circle as the s
   const compiler=createRegionalBuildingCompiler({bounds,excludedBounds:bounds,detailedFrame,tileCount:tiles.length});
   tiles.forEach(t=>compiler.addTile(t));const packet=compiler.finish();
   assert.equal(packet.skippedNearBuildings,reference.skippedNearBuildings);assert.equal(packet.availableBuildings,reference.availableBuildings);
-  assert.deepEqual([...packet.data].filter((_,i)=>i%12===0),reference.buildings.map(b=>b.centerLat));
+  assert.deepEqual([...packet.data].filter((_,i)=>i%DESCRIPTOR_STRIDE===0),reference.buildings.map(b=>b.centerLat));
 });
 
 function fakeWorker(handler){
@@ -67,7 +67,7 @@ test('one admitted job transfers an owned copy, ignores wrong replies, and termi
   const worker=fakeWorker((m,w)=>{
     if(m.type==='start')answer(w,m.id);
     if(m.type==='tile'){sourceCopy=m.tile.bytes;gate=()=>answer(w,m.id,{tileAvailableBuildings:1});answer(w,m.id+100,{wrong:true});}
-    if(m.type==='finish')answer(w,m.id,{data:new Float64Array(12),rings:[],availableBuildings:1});
+    if(m.type==='finish')answer(w,m.id,{data:new Float64Array(DESCRIPTOR_STRIDE),rings:[],availableBuildings:1});
   });
   const runtime=await createRegionalBuildingWorker({}, {workerFactory:()=>worker});
   const original=new Uint8Array([1,2,3]), pending=runtime.addTile({bytes:original,z:14,x:1,y:1});
@@ -98,7 +98,7 @@ test('worker errors, malformed result packets and message failures close the own
       else if(mode==='error')queueMicrotask(()=>w.onerror({message:'compiler failed'}));
       else if(mode==='decode')queueMicrotask(()=>w.onmessageerror());
       else if(mode==='post')throw Error('post failed');
-      else answer(w,m.id,{data:new Float64Array(13)});
+      else answer(w,m.id,{data:new Float64Array(DESCRIPTOR_STRIDE + 1)});
     });
     const runtime=await createRegionalBuildingWorker({}, {workerFactory:()=>worker});
     await assert.rejects(runtime.finish());assert.equal(worker.terminated,1);

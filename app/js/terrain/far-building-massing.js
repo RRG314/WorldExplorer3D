@@ -1,3 +1,5 @@
+import { resolveMappedRoof } from '../world/mapped-roof-geometry.js?v=6';
+import { selectBuildingExteriorProfile } from '../world/building-exterior-catalog.js?v=1';
 import { isImplausibleTallBuildingFootprint } from '../world/building-geometry-quality.js?v=1';
 import {
   buildingSeedFromIdentity,
@@ -9,7 +11,7 @@ function mappedBuildingTags(properties = {}) {
   const buildingType = String(
     properties.building || properties.kind || properties.type || 'yes'
   ).trim() || 'yes';
-  const tags = { building: buildingType };
+  const tags = { ...properties, building: buildingType };
   const height = properties.height ?? properties.render_height ?? properties['building:height'];
   const levels = properties['building:levels'] ?? properties.levels ?? properties.num_floors;
   if (height !== null && height !== undefined && String(height).trim()) tags.height = height;
@@ -60,12 +62,26 @@ function resolveFarBuildingMassing(building, footprint, areaWorld, unitsPerMeter
     footprintAreaMeters: footprintArea,
     intentionalVerticalStructure
   })) return null;
-  const shade = 0.44 + random * 0.12;
+  const profile = selectBuildingExteriorProfile({ tags, buildingType: kind, buildingSeed: seed,
+    buildingIdentity: building?.identity, heightMeters, footprintArea, footprintWidth, footprintDepth,
+    geographicCenter: { lat: building?.centerLat, lon: building?.centerLon },
+    location: { lat: building?.centerLat, lon: building?.centerLon }, qualityTier: 'low' });
+  const roof = heightMeters <= 24 && (/house|detached|bungalow|cabin|farmhouse|semi/.test(kind) || tags['roof:shape'])
+    ? resolveMappedRoof(tags, heightMeters, semantics,
+      [{x:0,z:0},{x:footprintWidth,z:0},{x:footprintWidth,z:footprintDepth},{x:0,z:footprintDepth}],
+      {location:{lat:building?.centerLat,lon:building?.centerLon}}) : null;
+  // Regional box LOD supports a gabled silhouette without adding one mesh per
+  // roof. Other observed shapes keep their existing flat coarse representation.
+  const roofFraction = roof?.shape === 'gabled' && heightMeters > 0
+    ? Math.min(.4, Math.max(.1, Math.round(roof.roofHeight / heightMeters * 20) / 20)) : 0;
+  const tint = profile.material.color;
+  const linear = value => value <= .04045 ? value / 12.92 : ((value + .055) / 1.055) ** 2.4;
   return {
     heightMeters,
+    roofFraction,
     heightSource: semantics.heightSource,
     identity: String(building?.identity || ''),
-    color: [shade * 1.02, shade, shade * 0.95]
+    color: [linear(((tint >> 16) & 255) / 255), linear(((tint >> 8) & 255) / 255), linear((tint & 255) / 255)]
   };
 }
 

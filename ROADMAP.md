@@ -47,10 +47,11 @@ available.
 
 ## Connected travel across Earth
 
-Current Earth play loads one bounded selected location. Optional continuous
-world travel is future work. It must preserve existing locations and saves,
-load ahead of the player, unload retired regions, and keep roads, terrain,
-bridges and tunnels connected at boundaries.
+Regional terrain and mapped buildings now follow travel in a replaceable
+window, with an option to keep the original fixed surroundings. Detailed roads,
+interiors and activities still belong to the starting district. Extending those
+systems needs connected terrain, bridges and tunnels across region boundaries,
+while preserving existing locations and saves.
 
 Worldwide travel is only ready when long journeys remain recoverable and memory
 stays bounded. A streaming toggle alone does not complete this feature.

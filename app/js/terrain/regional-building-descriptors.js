@@ -1,6 +1,6 @@
 // Exclusive, transferable construction data. No per-house JS objects cross
 // from the compiler to the scene. Exact footprint rings have a separate budget.
-export const DESCRIPTOR_STRIDE = 12;
+export const DESCRIPTOR_STRIDE = 13;
 export const HEIGHT_SOURCES = Object.freeze(['invalid', 'explicit_height', 'levels', 'inferred']);
 
 export function writeBuildingDescriptor(data, index, building, massing) {
@@ -9,7 +9,7 @@ export function writeBuildingDescriptor(data, index, building, massing) {
     building.depthMeters, building.areaMeters, building.rotationY, building.priority,
     massing?.heightMeters || 0,
     massing ? Math.max(1, HEIGHT_SOURCES.indexOf(massing.heightSource)) : 0,
-    ...(massing?.color || [0, 0, 0])], at);
+    ...(massing?.color || [0, 0, 0]), massing?.roofFraction || 0], at);
   // Unmapped semantic height sources all have the same inferred audit category.
   if (massing && !['explicit_height', 'levels'].includes(massing.heightSource)) data[at + 8] = 3;
 }
@@ -37,6 +37,7 @@ export class RegionalBuildingDescriptors {
     const massing = target.massing;
     massing.heightMeters = a[at + 7]; massing.heightSource = HEIGHT_SOURCES[a[at + 8]];
     massing.color[0] = a[at + 9]; massing.color[1] = a[at + 10]; massing.color[2] = a[at + 11];
+    massing.roofFraction = a[at + 12];
     target.validMassing = a[at + 8] !== 0;
     return target;
   }

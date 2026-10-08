@@ -28,8 +28,12 @@ published versions.
 
 ## Location and map coverage
 
-- Earth is a location-based experience. Each session loads one bounded selected
-  area; player movement does not turn it into a continuously streaming world.
+- Detailed Earth roads, interiors and activities remain within the selected
+  location. Optional regional terrain and mapped buildings follow travel, but
+  do not extend those gameplay systems. New scenery depends on map availability;
+  a slow connection or fast aircraft can outrun loading. The previous complete
+  region remains visible during retries. Polar and projection-edge travel is
+  not supported by this regional view.
 - Roads, buildings, building heights, roofs, entrances, indoor details,
   vegetation and water depend on available mapped data. Coverage and freshness
   vary by location and provider.

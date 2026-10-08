@@ -314,7 +314,7 @@ async function loadFarMappedContext(bounds, excludedBounds = null, waterBounds =
   const [contextBatch, waterContext] = await Promise.all([
     fetchWithConcurrency(
       coordinates,
-      FAR_CONTEXT_TILE_CONCURRENCY,
+      Math.max(1, Math.min(FAR_CONTEXT_TILE_CONCURRENCY, Number(options.concurrency) || FAR_CONTEXT_TILE_CONCURRENCY)),
       ({ x, y }, signal) => fetchTile(contextZoom, x, y, { signal }),
       options.signal
     ),
@@ -510,6 +510,7 @@ export {
   FAR_WATER_CONTEXT_ZOOM,
   FAR_WATER_MIN_SPAN_METERS,
   distributedFeatureIndices,
+  contextTileCount,
   limitContextTiles,
   farBuildingPriority,
   selectFarBuildingCoverage,

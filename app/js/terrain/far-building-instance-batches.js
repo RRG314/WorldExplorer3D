@@ -6,9 +6,9 @@ export function partitionFarBuildingInstances(buildings, cellSize = 2048) {
   const buckets = new Map();
   const scratch={color:[0,0,0]};
   for (let index = 0; index < buildings.length; index++) {
-    const { x, z } = buildings.read ? buildings.read(index,scratch) : buildings[index];
+    const { x, z, roofFraction = 0 } = buildings.read ? buildings.read(index,scratch) : buildings[index];
     if (!Number.isFinite(x) || !Number.isFinite(z)) throw new TypeError('Invalid building position');
-    const key = `${Math.floor(x / cellSize)}:${Math.floor(z / cellSize)}`;
+    const key = `${Math.floor(x / cellSize)}:${Math.floor(z / cellSize)}` + (roofFraction > 0 ? `:g${Math.round(roofFraction*20)}` : '');
     if (!buckets.has(key)) buckets.set(key, []);
     buckets.get(key).push(index);
   }
@@ -58,8 +58,18 @@ export async function buildFarBuildingInstanceBatches(THREE, buildings, material
     for (const [key, indices] of buckets) {
       const [cellX, cellZ] = key.split(':').map(Number);
       const originX = cellX * cellSize, originZ = cellZ * cellSize;
-      const geometry = new THREE.BoxGeometry(1, 1, 1);
-      geometry.translate(0, .5, 0);
+      const roofFraction = key.includes(':g') ? Number(key.split(':g')[1]) / 20 : 0;
+      let geometry;
+      if (roofFraction > 0) {
+        const wall = 1 - roofFraction, shape = new THREE.Shape();
+        shape.moveTo(-.5,0); shape.lineTo(.5,0); shape.lineTo(.5,wall);
+        shape.lineTo(0,1); shape.lineTo(-.5,wall); shape.closePath();
+        geometry = new THREE.ExtrudeGeometry(shape,{depth:1,bevelEnabled:false,steps:1});
+        geometry.translate(0,0,-.5);
+      } else {
+        geometry = new THREE.BoxGeometry(1, 1, 1);
+        geometry.translate(0, .5, 0);
+      }
       geometry.computeBoundingBox();
       geometry.computeBoundingSphere();
       const localBox = geometry.boundingBox;
@@ -99,6 +109,7 @@ export async function buildFarBuildingInstanceBatches(THREE, buildings, material
       mesh.frustumCulled = true;
       mesh.userData.isFarMappedBuildingInstances = true;
       mesh.userData.spatialBatchKey = key;
+      mesh.userData.regionalRoofFraction = roofFraction;
       preserveInstanceRaycasting(mesh, localBox, localSphere, Uint32Array.from(indices));
     }
     return batches;

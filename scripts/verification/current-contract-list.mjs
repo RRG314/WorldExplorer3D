@@ -22,6 +22,7 @@ export const currentContractTests = [
   'tests/regional-building-worker-current.test.mjs',
   'tests/building-body-geometry-current.test.mjs',
   'tests/regional-building-lifetime-current.test.mjs',
+  'tests/regional-scenery-scheduler-current.test.mjs',
   'tests/rollback-runtime-contract-current.test.mjs',
   'tests/immutable-world-facts-current.test.mjs',
   'tests/water-uniform-storage-current.test.mjs',
