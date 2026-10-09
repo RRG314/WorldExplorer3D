@@ -1,0 +1,50 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><link rel="icon" href="/favicon.svg"><title>Night readability — controlled asset check</title>
+<style>body{margin:0;background:#0b1720;color:white;font:14px system-ui}header{position:absolute;top:10px;left:12px;z-index:2}button{padding:8px;margin:4px}canvas{display:block}</style>
+<header>Controlled lighting check · actual player models <button id="ready" disabled>Loading models</button><button id="day">Day</button><button id="night">Night</button><button id="storm">Storm</button></header>
+<script src="/app/vendor/three/build/three.min.js"></script>
+<script src="/app/vendor/three/examples/js/loaders/GLTFLoader.js"></script>
+<script src="/app/vendor/three/examples/js/shaders/CopyShader.js"></script>
+<script src="/app/vendor/three/examples/js/postprocessing/EffectComposer.js"></script>
+<script src="/app/vendor/three/examples/js/postprocessing/RenderPass.js"></script>
+<script src="/app/vendor/three/examples/js/postprocessing/ShaderPass.js"></script>
+<script src="/app/vendor/three/examples/js/shaders/LuminosityHighPassShader.js"></script>
+<script src="/app/vendor/three/examples/js/postprocessing/UnrealBloomPass.js"></script>
+<script src="/app/vendor/three/examples/js/shaders/SMAAShader.js"></script>
+<script src="/app/vendor/three/examples/js/postprocessing/SMAAPass.js"></script>
+<script type="module">
+import {ctx} from '/app/js/shared-context.js?v=55';
+import {setTimeOfDay} from '/app/js/sky/astronomical-state.js';
+import {applyWeatherPresentation} from '/app/js/weather.js';
+import {setupPostProcessingPipeline,applyRenderQuality} from '/app/js/engine/quality.js';
+import {attachCuratedPlayerCar} from '/app/js/engine/curated-player-car.js';
+import {createPlayerCharacterHost} from '/app/js/walking/player-character-host.js';
+import {attachCuratedExplorerCharacter,updateCuratedCharacterAnimation} from '/app/js/walking/curated-explorer-character.js?v=8';
+const renderer=new THREE.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});renderer.setSize(innerWidth,innerHeight);renderer.setPixelRatio(1);renderer.outputEncoding=THREE.sRGBEncoding;renderer.toneMapping=THREE.ACESFilmicToneMapping;document.body.append(renderer.domElement);
+const scene=new THREE.Scene(),camera=new THREE.PerspectiveCamera(42,innerWidth/innerHeight,.1,100);camera.position.set(9,5.4,11);camera.lookAt(0,1,0);
+Object.assign(ctx,{scene,camera,renderer,hemiLight:new THREE.HemisphereLight(),sun:new THREE.DirectionalLight(),fillLight:new THREE.DirectionalLight(),ambientLight:new THREE.AmbientLight(),applyWeatherPresentation,weatherMode:'clear',weatherState:{category:'clear',cloudCover:8},carMesh:new THREE.Group()});
+ctx.sun.position.set(4,8,5);ctx.fillLight.position.set(-4,4,-3);for(const light of [ctx.hemiLight,ctx.sun,ctx.fillLight,ctx.ambientLight])scene.add(light);
+scene.add(ctx.carMesh);ctx.carMesh.position.set(2,1.1,0);
+const floor=new THREE.Mesh(new THREE.PlaneGeometry(80,80),new THREE.MeshStandardMaterial({color:0x303840,roughness:.95}));floor.rotation.x=-Math.PI/2;floor.position.y=-.015;scene.add(floor);
+const hosts=[];for(const [index,assetId] of ['character-field-explorer-v1','character-field-explorer-woman-v1'].entries()){const h=createPlayerCharacterHost(THREE);h.position.set(-2-index*1.7,0,0);h.rotation.y=.4;h.visible=true;scene.add(h);hosts.push(h);await attachCuratedExplorerCharacter(THREE,h,{assetId,role:'player-character',failClosed:true});}
+await attachCuratedPlayerCar(THREE,ctx);
+const engine={appCtx:ctx,state:{currentGpuTier:'high',renderQualityLevel:'med',ssaoEnabled:false},isLikelyMobileDevice:()=>false,RENDER_QUALITY_LOW:'low',RENDER_QUALITY_MED:'med',RENDER_QUALITY_HIGH:'high',normalizeRenderQualityLevel:v=>v,writeStorage:()=>{},setSsaoEnabled:()=>{}};
+setupPostProcessingPipeline(engine);setTimeOfDay('night');
+const keys=new Set();addEventListener('keydown',e=>keys.add(e.key));addEventListener('keyup',e=>keys.delete(e.key));
+let last=performance.now();function draw(now){const dt=Math.min(.05,(now-last)/1000);last=now;for(const h of hosts){if(keys.has('ArrowUp'))h.position.z+=dt*1.5;updateCuratedCharacterAnimation(h,keys.has('ArrowUp'),dt,false);}ctx.composer.render(dt);requestAnimationFrame(draw);}requestAnimationFrame(draw);
+for(const phase of ['day','night'])document.getElementById(phase).onclick=()=>setTimeOfDay(phase);
+document.getElementById('storm').onclick=()=>{ctx.weatherMode='storm';ctx.weatherState={category:'storm',cloudCover:100};applyWeatherPresentation();};
+document.getElementById('ready').disabled=false;document.getElementById('ready').textContent='Models ready';
+window.render_game_to_text=()=>JSON.stringify({ready:true,phase:ctx.timeOfDay,weather:ctx.weatherMode,paint:ctx.carMesh.userData.curatedVehicleVisual.userData.paintFinish,characters:hosts.map(h=>({asset:h.userData.curatedCharacterAssetId,z:h.position.z})),coordinateSystem:'Y up, metres'});
+window.checkDisplayParity=()=>{
+ const patchScene=new THREE.Scene(),patchCamera=new THREE.OrthographicCamera(-1,1,1,-1,.1,10);patchCamera.position.z=1;
+ const material=new THREE.MeshBasicMaterial();patchScene.add(new THREE.Mesh(new THREE.PlaneGeometry(2,2),material));
+ const renderPass=ctx.composer.passes[0],oldScene=renderPass.scene,oldCamera=renderPass.camera,oldExposure=renderer.toneMappingExposure;
+ renderPass.scene=patchScene;renderPass.camera=patchCamera;
+ const gl=renderer.getContext(),sample=()=>{const b=new Uint8Array(4);gl.readPixels(Math.floor(renderer.domElement.width/2),Math.floor(renderer.domElement.height/2),1,1,gl.RGBA,gl.UNSIGNED_BYTE,b);return Array.from(b).slice(0,3);};
+ const cases=[];
+ try{for(const quality of ['low','med','high']){applyRenderQuality(engine,quality,{persist:false});for(const exposure of [1.02,1.2]){renderer.toneMappingExposure=exposure;for(const gray of [.015,.07,.18,.4]){material.color.setRGB(gray,gray,gray);renderer.setRenderTarget(null);renderer.render(patchScene,patchCamera);const direct=sample();ctx.composer.render();const composed=sample();cases.push({quality,exposure,gray,direct,composed,maxDifference:Math.max(...direct.map((n,i)=>Math.abs(n-composed[i])))});}}}}
+ finally{renderPass.scene=oldScene;renderPass.camera=oldCamera;renderer.toneMappingExposure=oldExposure;material.dispose();patchScene.children[0].geometry.dispose();applyRenderQuality(engine,'med',{persist:false});}
+ return {cases,outputPassCount:ctx.composer.passes.filter(p=>p.material?.name==='World Explorer display output').length,lastPass:ctx.composer.passes.at(-1).material.name};
+};
+window.__fixtureReady=true;
+</script></html>

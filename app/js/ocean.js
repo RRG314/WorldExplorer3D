@@ -329,16 +329,18 @@ function applyOceanSkyState(state = null) {
 
   oceanMode.scene.fog.color.setHex(dayFactor > 0.35 ? 0x0b3551 : twilightFactor > 0.25 ? 0x10253c : 0x06131d);
   oceanMode.scene.fog.density = .008 + nightFactor * .003;
-  oceanMode.renderer.toneMappingExposure = .78 + dayFactor * .15 + twilightFactor * .04;
+  // Preserve daytime exposure; dark-water atmosphere comes from fog, not
+  // from extinguishing the light needed to read the diver and nearby seabed.
+  oceanMode.renderer.toneMappingExposure = .9 + dayFactor * .03 + twilightFactor * .04;
 
   if (oceanMode.ambientLight) {
-    oceanMode.ambientLight.color.setHex(dayFactor > 0.4 ? 0x84d9ef : twilightFactor > 0.2 ? 0x537ba2 : 0x1a3149);
-    oceanMode.ambientLight.intensity = .12 + dayFactor * .22 + twilightFactor * .06;
+    oceanMode.ambientLight.color.setHex(dayFactor > 0.4 ? 0x84d9ef : twilightFactor > 0.2 ? 0x537ba2 : 0x78aacb);
+    oceanMode.ambientLight.intensity = .28 + dayFactor * .06 + twilightFactor * .06;
   }
   if (oceanMode.hemiLight) {
-    oceanMode.hemiLight.color.setHex(dayFactor > 0.4 ? 0xa8e9ff : twilightFactor > 0.2 ? 0x7fa9cb : 0x173149);
-    oceanMode.hemiLight.groundColor.setHex(dayFactor > 0.4 ? 0x143246 : twilightFactor > 0.2 ? 0x122f42 : 0x081521);
-    oceanMode.hemiLight.intensity = .20 + dayFactor * .30 + twilightFactor * .07;
+    oceanMode.hemiLight.color.setHex(dayFactor > 0.4 ? 0xa8e9ff : twilightFactor > 0.2 ? 0x7fa9cb : 0x8aafcd);
+    oceanMode.hemiLight.groundColor.setHex(dayFactor > 0.4 ? 0x143246 : twilightFactor > 0.2 ? 0x122f42 : 0x294457);
+    oceanMode.hemiLight.intensity = .4 + dayFactor * .1 + twilightFactor * .07;
   }
   if (oceanMode.keyLight) {
     const sun = state.sun?.direction || { x: 0.45, y: 0.8, z: 0.18 };
@@ -348,7 +350,8 @@ function applyOceanSkyState(state = null) {
   }
   if (oceanMode.fillLight) {
     const sun = state.sun?.direction || { x: 0.45, y: 0.8, z: 0.18 };
-    oceanMode.fillLight.intensity = .06 + dayFactor * .12 + twilightFactor * .05;
+    oceanMode.fillLight.color.setHex(dayFactor > .4 ? 0x3f9dca : 0x86b4d0);
+    oceanMode.fillLight.intensity = .38 - dayFactor * .20 + twilightFactor * .05;
     oceanMode.fillLight.position.set(-sun.x * 160, Math.max(40, Math.abs(sun.y) * 110), -sun.z * 160);
   }
 }
@@ -655,6 +658,9 @@ async function startOceanMode(options = {}) {
     if (typeof appCtx.refreshAstronomicalSky === 'function') {
       appCtx.refreshAstronomicalSky(true);
     }
+    // A manual sky preset intentionally skips astronomical refresh. Apply it
+    // to this newly created renderer as well as to later time-selector changes.
+    if (appCtx.skyMode !== 'live') applyOceanSkyState(appCtx.skyState);
     if (typeof appCtx.refreshLiveWeather === 'function') {
       void appCtx.refreshLiveWeather(true);
     }

@@ -42,6 +42,16 @@ try {
  await page.locator('#oceanDiverToggle').waitFor({state:'visible'});
  await page.locator('#oceanDiverToggle').click();
  await page.waitForFunction(()=>window.getOceanModeDebugState?.().diver?.swimming?.equipment==='scuba',null,{timeout:30000});
+ // The time selector must update the active Ocean renderer, including manual
+ // night. This exercises the real diver scene rather than a light-only mock.
+ report.lighting=[];
+ for(const phase of ['night','day']){
+  const lighting=await page.evaluate(async phase=>{const {ctx}=await import('/app/js/shared-context.js?v=55');ctx.setTimeOfDay(phase);return {phase:ctx.skyState.phase,daylight:ctx.skyState.sun.daylightFactor,exposure:ctx.oceanMode.renderer.toneMappingExposure,ambient:ctx.oceanMode.ambientLight.intensity,hemisphere:ctx.oceanMode.hemiLight.intensity};},phase);
+  assert.equal(lighting.phase,phase);assert.equal(lighting.daylight,phase==='night'?0:1);
+  assert.ok(lighting.exposure>=.9);assert.ok(lighting.ambient>=.28);
+  report.lighting.push(lighting);await page.waitForTimeout(250);await page.screenshot({path:`${dir}/diver-${phase}.png`});
+ }
+ report.cases.push({id:'manual-day-night-updates-active-ocean-and-keeps-diver-fill',passed:true});
  const paused=await page.evaluate(async()=>{const {ctx}=await import('/app/js/shared-context.js?v=55');ctx.setPauseReason('verification_pause',true);return getOceanModeDebugState().diver});
  await page.waitForTimeout(500);const stillPaused=await page.evaluate(()=>getOceanModeDebugState().diver);assert.deepEqual(stillPaused.position,paused.position);assert.equal(stillPaused.swimming.airSeconds,paused.swimming.airSeconds);
  await page.evaluate(async()=>{const {ctx}=await import('/app/js/shared-context.js?v=55');ctx.setPauseReason('verification_pause',false)});report.cases.push({id:'pause-preserves-diver-position-and-air',passed:true});

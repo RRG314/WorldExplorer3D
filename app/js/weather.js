@@ -382,7 +382,7 @@ function applyWeatherPresentation() {
       Number(skyVisual.hemiIntensity) || 0
     );
     const upperBlend = Math.max(weatherCloudFactor * 0.38, weatherFogBlend * 0.58, precipitationBoost * 1.6);
-    appCtx.hemiLight.color.setHex(mixColorHex(skyVisual.skyColor, profile.skyTint || WEATHER_FOG_COLOR, upperBlend));
+    appCtx.hemiLight.color.setHex(mixColorHex(skyVisual.hemisphereColor ?? skyVisual.skyColor, profile.skyTint || WEATHER_FOG_COLOR, upperBlend));
     if (appCtx.hemiLight.groundColor) {
       appCtx.hemiLight.groundColor.setHex(mixColorHex(skyVisual.groundColor || 0x545454, 0x59636f, Math.max(weatherCloudFactor * 0.2, weatherFogBlend * 0.46)));
     }

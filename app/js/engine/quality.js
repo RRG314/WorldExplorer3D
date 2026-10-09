@@ -1,3 +1,4 @@
+import { createDisplayOutputPass } from './display-output-pass.js';
 import {
   applyEarthAtmosphereProfile,
   buildEarthAtmosphereProfile,
@@ -213,6 +214,9 @@ export function setupPostProcessingPipeline(ctx) {
         console.warn('SMAA not available:', e);
       }
     }
+    // This must stay last and enabled at every quality level. Without it,
+    // linear render-target values reach the sRGB display and crush shadows.
+    ctx.appCtx.composer.addPass(createDisplayOutputPass(THREE));
     return true;
   } catch (e) {
     console.warn('Post-processing not available:', e);
