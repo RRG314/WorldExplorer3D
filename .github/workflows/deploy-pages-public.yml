@@ -30,10 +30,8 @@ jobs:
 
       - name: Assemble public site
         run: |
-          mkdir -p _site/assets/showcase
-          cp -R github-pages/. _site/
-          cp assets/readme/*.webp _site/assets/showcase/
-          cp assets/readme/baltimore-coverage-5.5.png assets/readme/research-deck-5.5.png assets/readme/research-dive-5.5.png _site/assets/showcase/
+          node scripts/sync-public-gallery.mjs --check
+          node scripts/prepare-public-pages.mjs
 
       - name: Upload project explainer
         uses: actions/upload-pages-artifact@v5
