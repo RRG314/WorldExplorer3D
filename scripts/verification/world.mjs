@@ -18,20 +18,18 @@ const worldReadyTimeoutMs = Number.isFinite(configuredWorldReadyTimeoutMs) && co
   ? configuredWorldReadyTimeoutMs
   : process.env.CI ? 480_000 : 240_000;
 const policy = JSON.parse(await fs.readFile(path.join(root, 'config', 'verification-policy.json'), 'utf8'));
-const captureManifest = JSON.parse(await fs.readFile(path.join(root, 'config', 'public-capture-manifest.json'), 'utf8'));
+const captureManifest = JSON.parse(await fs.readFile(path.join(root, 'config', 'public-gallery.json'), 'utf8'));
 const firebaseConfig = JSON.parse(await fs.readFile(path.join(root, 'firebase.json'), 'utf8'));
 const localFunctionRoutes = new Set((firebaseConfig.hosting?.rewrites || [])
   .filter((rewrite) => rewrite?.function && typeof rewrite.source === 'string' && !rewrite.source.includes('*'))
   .map((rewrite) => rewrite.source));
-const captureByFile = new Map(captureManifest.captures.map((capture) => [capture.file, capture]));
-const requiredGalleryFiles = new Set([
-  'assets/landing/current/world-entry-5.0.png',
-  'assets/landing/current/street-walk-5.0.png',
-  'assets/landing/current/driving-5.0.png',
-  'assets/landing/current/drone-5.0.png',
-  'assets/landing/current/plane-5.0.png',
-  'assets/landing/current/ocean-5.0.png'
-]);
+const captureByFile = new Map(captureManifest.images.map((capture) => [capture.file, capture]));
+const requiredGalleryFiles = new Set(captureManifest.landingGallery.map(id => {
+  const image=captureManifest.images.find(image=>image.id===id);
+  assert.ok(image, `Missing gallery image ${id}`);
+  return image.file;
+}));
+const packageVersion=JSON.parse(await fs.readFile(path.join(root,'package.json'),'utf8')).version;
 const reportPath = path.join(root, 'output', 'verification', 'world', 'report.json');
 const evidenceDir = path.join(root, policy.visualEvidence.outputDirectory);
 const server = externalUrl ? null : await startStaticServer({
@@ -263,7 +261,7 @@ try {
       manifestEntry,
       sha256,
       valid:
-        captureManifest.release === '5.0.0' &&
+        captureManifest.version === packageVersion &&
         manifestEntry?.sha256 === sha256 &&
         manifestEntry?.width === entry.naturalWidth &&
         manifestEntry?.height === entry.naturalHeight &&
@@ -274,7 +272,7 @@ try {
   assert.ok(await page.locator('#landingPrimaryCta').isVisible(), 'public landing CTA is not visible');
   const landingUsesApprovedAsset = !policy.blockedLandingAssets.includes(landingHero);
   const landingGalleryUsesCurrentGameplay = landingGallery.length === requiredGalleryFiles.size && landingGallery.every((entry) =>
-    entry.src.startsWith('assets/landing/current/') &&
+    entry.src.startsWith('assets/gallery/') &&
     !policy.blockedLandingAssets.includes(entry.src) &&
     entry.complete && entry.naturalWidth > 0 && entry.naturalHeight > 0
   ) && landingGalleryEvidence.every((entry) => entry.valid) &&
@@ -425,10 +423,10 @@ try {
     landingGallery,
     landingGalleryEvidence,
     captureManifest: {
-      release: captureManifest.release,
-      generatedAt: captureManifest.generatedAt,
-      captureCommand: captureManifest.captureCommand,
-      writesProduction: captureManifest.writesProduction
+      release: captureManifest.version,
+      generatedAt: captureManifest.capturedAt,
+      sourceBuild: captureManifest.sourceBuild,
+      writesProduction: false
     },
     platformSurfaces,
     checks,

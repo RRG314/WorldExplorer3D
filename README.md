@@ -2,11 +2,10 @@
 
 [5.5 release notes](RELEASE_NOTES_5.5.0.md) · [Known limitations](KNOWN_ISSUES.md) · [Roadmap](ROADMAP.md)
 
-[![Code and package checks](https://github.com/RRG314/WorldExplorer3D/actions/workflows/runtime-verify.yml/badge.svg?branch=stable)](https://github.com/RRG314/WorldExplorer3D/actions/workflows/runtime-verify.yml)
-[![Secret Scan](https://github.com/RRG314/WorldExplorer3D/actions/workflows/secret-scan.yml/badge.svg?branch=stable)](https://github.com/RRG314/WorldExplorer3D/actions/workflows/secret-scan.yml)
-[![GitHub Pages](https://github.com/RRG314/WorldExplorer3D/actions/workflows/deploy-pages-public.yml/badge.svg?branch=stable)](https://rrg314.github.io/WorldExplorer3D/)
-[![Release](https://img.shields.io/github/v/release/RRG314/WorldExplorer3D?sort=date)](https://github.com/RRG314/WorldExplorer3D/releases/latest)
-[![License: Source Available](https://img.shields.io/badge/license-source--available-lightgrey)](LICENSE)
+[![Play in your browser](https://img.shields.io/badge/Play-in_your_browser-1677ff?style=flat-square)](https://worldexplorer3d.io/app/)
+[![Latest release](https://img.shields.io/github/v/release/RRG314/WorldExplorer3D?sort=date&style=flat-square&label=release)](https://github.com/RRG314/WorldExplorer3D/releases/latest)
+[![Platform: WebGL](https://img.shields.io/badge/platform-WebGL-546e7a?style=flat-square)](https://worldexplorer3d.io/app/)
+[![License: Source Available](https://img.shields.io/badge/license-source_available-546e7a?style=flat-square)](LICENSE)
 
 World Explorer 3D is a browser-based world sandbox built around real places.
 Choose a location, step into a bounded playable world, and explore by land,
@@ -27,42 +26,37 @@ game. Dense-city pauses, uneven art quality and bounded world size remain
   · <a href="ROADMAP.md">Roadmap</a>
 </p>
 
-![Baltimore building and road coverage during drone flight in World Explorer 3D 5.5](assets/readme/baltimore-coverage-5.5.png)
+## Explore by land, sea, air and space
 
-*Choose a real place, explore its streets and surroundings, and carry your
-Explorer’s progress between land, sea and space.*
-
-## A world you can play in
-
-Select a city, landmark, airport, harbor, or coordinates and enter a bounded 3D
-world shaped by available terrain, roads, buildings, water, land cover, and
-places. Walk the streets, cross bridges and rooftops, enter mapped or eligible
-generated interiors, drive, fly, sail, fish, survey habitats, build, or meet
-other players in a room tied to that location.
-
-The same Explorer connects your Backpack, quick slots, Journal, Field Guide,
-activities, Expeditions, specialties, companions, property, and seasonal
-surveys. Quick Build places persistent Blocks directly in the current world,
-including shared builds inside multiplayer rooms.
+Search for a city, landmark, airport, harbor or coordinates. Walk its streets,
+drive, fly, sail, fish, survey habitats, build, or join a multiplayer room.
+Your Backpack, Journal, Field Guide, companions and saved places travel with you.
 
 Regional terrain and mapped buildings can load as you fly farther from your
 starting point. Detailed streets, interiors and activities remain in the selected
 district. Turn traveling scenery on or off in Graphics settings.
 
-| Water and shore | Flight |
+<!-- public-gallery:start -->
+![Drone view between downtown Baltimore buildings](assets/gallery/5.5/drone.webp)
+
+*Gameplay screenshots from the released 5.5.0 build.*
+
+| Explore on foot | Drive the city |
 | :--: | :--: |
-| ![Shore fishing beside Baltimore's Inner Harbor](assets/readme/baltimore-shore-fishing-mobile.webp) | ![Personal aircraft at BWI](assets/readme/bwi-personal-plane.webp) |
-| **Fish from shore, pilot boats, dive, and explore ports** | **Use a personal aircraft or board aircraft at mapped airports** |
+| ![Walking with a companion along Light Street in Baltimore](assets/gallery/5.5/walking.webp) | ![The BMW E34 on Light Street near Baltimore Inner Harbor](assets/gallery/5.5/driving.webp) |
 
-| Deep space | Explorer progression |
+| Take flight | Your research vessel |
 | :--: | :--: |
-| ![Wayfinder approach to Sagittarius A star](assets/readme/space-wayfinder-sagittarius.webp) | ![Field Today in My Explorer](assets/readme/explorer-today.webp) |
-| **Fly manually or use optional Wayfinder assistance** | **Choose an activity and carry the result into one Explorer record** |
+| ![A player aircraft flying beside Baltimore Inner Harbor](assets/gallery/5.5/flight.webp) | ![Walking beside the dive platform on the research vessel](assets/gallery/5.5/research-deck.webp) |
 
-![A playable container cargo ship underway near Rotterdam](assets/readme/rotterdam-cargo-ship.webp)
+| Below the surface | Aboard Solis Reach |
+| :--: | :--: |
+| ![Scuba swimming over the seabed during the Coral Shelf research outing](assets/gallery/5.5/diving.webp) | ![Bridge instruments and a crew member on the Solis Reach command deck](assets/gallery/5.5/ship-interior.webp) |
 
-*A playable cargo ship underway near Rotterdam, with the shoreline kept in the
-active world.*
+| Beyond Earth | Live Earth |
+| :--: | :--: |
+| ![Approaching Saturn and its rings using flight assistance](assets/gallery/5.5/space.webp) | ![The Live Earth globe displaying recent observed USGS earthquakes](assets/gallery/5.5/live-earth.webp) |
+<!-- public-gallery:end -->
 
 ## What you can do
 
@@ -103,8 +97,6 @@ the water, swim and scuba dive, deploy the submarine, and recover to the same
 ship. A saved aboard voyage resumes on deck. Ocean environments and wildlife
 remain limited; the larger licensed-asset and ecology upgrade is still planned.
 
-![Walking the research-vessel deck in World Explorer 3D 5.5](assets/readme/research-deck-5.5.png)
-
 ## Beyond Earth
 
 Fly manually or use optional Wayfinder assistance. Interstellar Expeditions
@@ -119,9 +111,8 @@ shares one location, player presence, chat, activities, persistent vehicles,
 and player-built Blocks. Private rooms use invite codes; public rooms can be
 found by city.
 
-Quick Build is the single player-facing Blocks workspace. Existing supported
-local and room Blocks remain on the same persistence path, with one owner for
-placement, permissions, saving, and recovery.
+Quick Build places persistent Blocks in the current location. Local builds stay
+on your device; room builds can be shared with other signed-in explorers.
 
 ## World data and accuracy
 

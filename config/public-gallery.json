@@ -1,0 +1,140 @@
+{
+  "schemaVersion": 1,
+  "version": "5.5.0",
+  "capturedAt": "2026-10-08",
+  "sourceBuild": "5.5.0+d8775a392c42.88e67f97c00bb4c2.production",
+  "sourceUrl": "https://worldexplorer3d.io/app/",
+  "landingGallery": [
+    "walking",
+    "driving",
+    "drone",
+    "flight",
+    "diving",
+    "research-deck",
+    "ship-interior",
+    "space",
+    "live-earth"
+  ],
+  "images": [
+    {
+      "id": "world-entry",
+      "title": "Choose a place",
+      "alt": "World Explorer 3D location selector with Baltimore selected on the globe",
+      "file": "assets/gallery/5.5/world-entry.webp",
+      "width": 1920,
+      "height": 1080,
+      "sha256": "aebb334feff5280dd73ee2c9413b32fcefbe2b8c73160d142c21e52c84218161",
+      "provenance": "Normal-input browser runtime capture; no synthetic camera or test-only scene."
+    },
+    {
+      "id": "walking",
+      "title": "Explore on foot",
+      "alt": "Walking with a companion along Light Street in Baltimore",
+      "file": "assets/gallery/5.5/walking.webp",
+      "width": 1920,
+      "height": 1080,
+      "sha256": "f91e1f4c7c40c639b0a26db934007191e8bff8813815c006cb8d13912a6b57cc",
+      "provenance": "Normal-input browser runtime capture; no synthetic camera or test-only scene."
+    },
+    {
+      "id": "driving",
+      "title": "Drive the city",
+      "alt": "The BMW E34 on Light Street near Baltimore Inner Harbor",
+      "file": "assets/gallery/5.5/driving.webp",
+      "width": 1920,
+      "height": 1080,
+      "sha256": "6b6e1d0b4f232dc6dbc6366183b7a8d48694a59b278e5c2a6a226fe654cda73c",
+      "provenance": "Normal-input browser runtime capture; no synthetic camera or test-only scene."
+    },
+    {
+      "id": "drone",
+      "title": "See the city from above",
+      "alt": "Drone view between downtown Baltimore buildings",
+      "file": "assets/gallery/5.5/drone.webp",
+      "width": 1920,
+      "height": 1080,
+      "sha256": "7b83bc089ee830989ff6640c35f15da8f3ba7df2eead2047d830c3a40f543d6c",
+      "provenance": "Normal-input browser runtime capture; no synthetic camera or test-only scene."
+    },
+    {
+      "id": "flight",
+      "title": "Take flight",
+      "alt": "A player aircraft flying beside Baltimore Inner Harbor",
+      "file": "assets/gallery/5.5/flight.webp",
+      "width": 1920,
+      "height": 1080,
+      "sha256": "701b7b3f538e21f5bded8c766312c0783f08d4e631fd98c9385c631549a143cf",
+      "provenance": "Normal-input browser runtime capture; no synthetic camera or test-only scene."
+    },
+    {
+      "id": "research-deck",
+      "title": "Your research vessel",
+      "alt": "Walking beside the dive platform on the research vessel",
+      "file": "assets/gallery/5.5/research-deck.webp",
+      "width": 1920,
+      "height": 1080,
+      "sha256": "d492fc29b174c91d92430afc4aab1c9a75e9ad7a20a0dacfac8e94840d25d8cd",
+      "provenance": "Normal-input browser runtime capture; no synthetic camera or test-only scene."
+    },
+    {
+      "id": "diving",
+      "title": "Below the surface",
+      "alt": "Scuba swimming over the seabed during the Coral Shelf research outing",
+      "file": "assets/gallery/5.5/diving.webp",
+      "width": 1920,
+      "height": 1080,
+      "sha256": "dc2b587b2cc93b12b8e68f2c90d00929ead21aabe468eb2641a974d450e59412",
+      "provenance": "Normal-input browser runtime capture; no synthetic camera or test-only scene."
+    },
+    {
+      "id": "ship-interior",
+      "title": "Aboard Solis Reach",
+      "alt": "Bridge instruments and a crew member on the Solis Reach command deck",
+      "file": "assets/gallery/5.5/ship-interior.webp",
+      "width": 1920,
+      "height": 1080,
+      "sha256": "c824cbb937f3ecb7eb2905ed27d31fa8dff11cd8dd3a93d1c8be448df902bd01",
+      "provenance": "Normal-input browser runtime capture; no synthetic camera or test-only scene."
+    },
+    {
+      "id": "space",
+      "title": "Beyond Earth",
+      "alt": "Approaching Saturn and its rings using flight assistance",
+      "file": "assets/gallery/5.5/space.webp",
+      "width": 1920,
+      "height": 1080,
+      "sha256": "dac33c699e8878a4394783dde806b6c05fcb2fdfc2ea2664d1e2b919688c5d32",
+      "provenance": "Normal-input browser runtime capture; no synthetic camera or test-only scene."
+    },
+    {
+      "id": "live-earth",
+      "title": "Live Earth",
+      "alt": "The Live Earth globe displaying recent observed USGS earthquakes",
+      "file": "assets/gallery/5.5/live-earth.webp",
+      "width": 1920,
+      "height": 1080,
+      "sha256": "fa30460820a9b2333ecf09fd7bc4fac280e42569665f809921e15faf288862bb",
+      "provenance": "Normal-input browser runtime capture; no synthetic camera or test-only scene."
+    },
+    {
+      "id": "world-entry-phone",
+      "title": "Choose a destination",
+      "alt": "The globe and destination controls at phone width",
+      "file": "assets/gallery/5.5/world-entry-phone.webp",
+      "width": 390,
+      "height": 844,
+      "sha256": "d6d0e45a9702eb6a1231ea5bf613cb47aef2a5686d54d4eb18099a89d41dd51f",
+      "provenance": "Normal-input browser runtime capture; no synthetic camera or test-only scene."
+    },
+    {
+      "id": "diver-phone",
+      "title": "Swim and return aboard",
+      "alt": "Scuba exploration with Rise, Dive and Recover controls at phone width",
+      "file": "assets/gallery/5.5/diver-phone.webp",
+      "width": 390,
+      "height": 844,
+      "sha256": "5e325aa1c59b9f598c6b5139320793418063d6a9951c2f1c2b116617e4d29f2c",
+      "provenance": "Normal-input browser runtime capture; no synthetic camera or test-only scene."
+    }
+  ]
+}
