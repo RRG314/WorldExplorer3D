@@ -4,7 +4,15 @@ import {
 
 export function disposeObject3D(obj) {
   if (!obj) return;
-  const managed=[];obj.traverse(child=>{if(child.userData?.disposeOceanHabitat)managed.push(child.userData.disposeOceanHabitat)});for(const dispose of managed)dispose();
+  const managed = [];
+  obj.traverse(child => {
+    for (const key of ['disposeOceanHabitat', 'disposeCuratedMarineVisual']) {
+      if (child.userData?.[key]) managed.push(child.userData[key]);
+    }
+  });
+  // Detach leased models before visiting shared resources. A docked instance
+  // can still be using the same textures in another scene.
+  for (const dispose of managed) dispose();
   obj.traverse((child) => {
     if (!child || !child.isMesh) return;
     if (child.geometry && typeof child.geometry.dispose === "function") {

@@ -1,5 +1,14 @@
 Curated Vehicle Assets
 
+Atlantic Explorer Research Submarine
+
+- File: `marine/atlantic-explorer-submarine.glb`
+- Creator: JosephWPugsley
+- Source: https://sketchfab.com/3d-models/atlantic-explorer-submarineglb-f1645a6ec3b54e81aed7b2c105cdd6e2
+- License: [Creative Commons Attribution 4.0](https://creativecommons.org/licenses/by/4.0/).
+- Changes: geometry simplified with bounded error; opaque color maps compressed, data maps resized. Original design, cockpit and materials retained. Uniform in-game scale: 0.86.
+- Used by the playable research submarine and its docked presentation. Intake metadata records the source and bundled checksums.
+
 BMW 525i E34 Player Vehicle
 
 - File: `vehicles/bmw-525i-e34.glb`

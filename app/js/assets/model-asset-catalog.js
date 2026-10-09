@@ -1,6 +1,19 @@
 const MODEL_ASSET_SCHEMA_VERSION = 1;
 
 const MODEL_ASSET_CATALOG = Object.freeze([
+  Object.freeze({
+    schemaVersion: MODEL_ASSET_SCHEMA_VERSION,
+    id: 'marine-atlantic-explorer-submarine', label: 'Atlantic Explorer research submarine',
+    url: '/app/assets/models/marine/atlantic-explorer-submarine.glb',
+    roles: Object.freeze(['research-submarine']), license: 'CC-BY-4.0',
+    sourceUrl: 'https://sketchfab.com/3d-models/atlantic-explorer-submarineglb-f1645a6ec3b54e81aed7b2c105cdd6e2',
+    attribution: 'Atlantic Explorer Submarine by JosephWPugsley; simplified geometry and resized textures.',
+    sourceUpAxis: 'y', sourceForwardAxis: 'z',
+    dimensionsMeters: Object.freeze({length: 8.108, width: 3.239, height: 3.277}),
+    collisionPolicy: 'ocean-submarine-clearance-and-obstacle-envelope',
+    instancePolicy: Object.freeze({geometry: 'shared', materials: 'shared'}),
+    budgets: Object.freeze({bytes: 8600000, triangles: 69000, textureEdgePixels: 1024, maxInstances: 2})
+  }),
   ...['table-coral','branch-coral','massive-coral'].flatMap(kind=>['','-lod'].map(suffix=>Object.freeze({
     schemaVersion:MODEL_ASSET_SCHEMA_VERSION,id:`marine-${kind}${suffix}`,label:`Smithsonian ${kind.replaceAll('-',' ')}${suffix?' distant model':''}`,
     url:`/app/assets/models/marine/${kind}${suffix}.glb`,roles:Object.freeze(['marine-habitat']),license:'CC0-1.0',

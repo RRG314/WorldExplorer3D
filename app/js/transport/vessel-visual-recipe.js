@@ -406,6 +406,11 @@ function createVesselVisual(THREE, entry, options = {}) {
     child.receiveShadow = true;
   });
   const dispose = () => {
+    const managed = [];
+    root.traverse(object => {
+      if (object.userData?.disposeCuratedMarineVisual) managed.push(object.userData.disposeCuratedMarineVisual);
+    });
+    for (const release of managed) release();
     if (root.parent?.remove) root.parent.remove(root);
     else root.removeFromParent?.();
     root.traverse((object) => {

@@ -50,6 +50,32 @@ browsers/servers. Production deployment evidence is under
 `output/release-evidence/current/production-deployment.json` and
 `production-promotion.json`; acceptance gaps remain in their own receipts.
 
+## October 8 public gallery and local visual work
+
+PR 98 is merged to stable `33edf9ad5074fbaf0f7298396f180c37a0bf9735`.
+The README, 5.5 release notes and GitHub Pages use the refreshed released-build
+gallery, with public Play/release/WebGL/license badges. All twelve served Pages
+images match the reviewed hashes; live README/release text and Pages HTML match
+source. Six desktop/tablet/phone layout checks and all GitHub workflows pass.
+The root landing-page refresh is committed but has not been deployed to Firebase.
+The production game remains the d877 build identified above.
+
+Local visual work is on `steven/visual-quality`: display output and nighttime
+readability, the author's white E34 finish, and the licensed Atlantic Explorer
+submarine. The submarine retains its author materials, uses an 8.6 MB bundled
+asset, and has cancellable shared-model leases and measured vertical clearance.
+Its 38 focused component checks, prescribed model-view client, eleven controlled
+Ocean browser cases, source syntax, ownership and boundary types pass. Front and
+rear model views were inspected; the rear also has glazing, and actual camera
+coordinates confirm the correct following side. This is local evidence, not a
+full release or live-provider acceptance. The retained surface boat owns one
+legitimate docked-model lease after underwater teardown.
+
+The licensed research-vessel and sailing-boat candidates are retained for further
+integration. Replacement research-deck navigation, other fleet/ship asset work,
+and the final video/media package remain unfinished. Do not describe the twelve
+released-build gallery images as proof that those unreleased upgrades are live.
+
 ## Historical preparation records
 
 The dated records below describe earlier candidates and checks. Statements that

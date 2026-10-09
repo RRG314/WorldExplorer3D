@@ -39,6 +39,23 @@ try {
 
  elevation=-80;await select(-18.2861,147.7);await click();await deployResearchSubmarineFromDeck(page);
  await page.waitForFunction(()=>window.getOceanModeDebugState?.().active===true,null,{timeout:90000});
+ const submarine=await page.evaluate(async()=>{
+  const {ctx}=await import('/app/js/shared-context.js?v=55');
+  const mesh=ctx.oceanMode.submarine.mesh;
+  return {asset:mesh.userData.curatedMarineAssetId,loaded:mesh.userData.visualLoaded,position:{...getOceanModeDebugState().position}};
+ });
+ assert.equal(submarine.asset,'marine-atlantic-explorer-submarine');assert.equal(submarine.loaded,true);
+ await page.keyboard.down('w');
+ try { await page.waitForFunction(before=>{
+   const now=getOceanModeDebugState().position;return Math.hypot(now.x-before.x,now.z-before.z)>2;
+ },submarine.position,{timeout:12000}); } finally { await page.keyboard.up('w'); }
+ report.submarineView=await page.evaluate(()=>{
+  const {submarine:sub,camera}=__marineEntryContext.oceanMode;
+  return {yaw:sub.yaw,meshYaw:sub.mesh.rotation.y,position:sub.position.toArray(),camera:camera.position.toArray(),localCamera:sub.mesh.worldToLocal(camera.position.clone()).toArray()};
+ });
+ assert.ok(report.submarineView.localCamera[2]<-5,'The launch camera should follow behind the authored submarine');
+ await page.screenshot({path:`${dir}/submarine-underway.png`});
+ report.cases.push({id:'authored-submarine-loaded-and-keyboard-driven',passed:true});
  await page.locator('#oceanDiverToggle').waitFor({state:'visible'});
  await page.locator('#oceanDiverToggle').click();
  await page.waitForFunction(()=>window.getOceanModeDebugState?.().diver?.swimming?.equipment==='scuba',null,{timeout:30000});
@@ -90,6 +107,11 @@ try {
  await page.evaluate(async()=>{const {ctx}=await import('/app/js/shared-context.js?v=55');window.diverCtx=ctx;ctx.oceanMode.submarine.position.y=-40});
  await page.waitForFunction(()=>document.querySelector('#oceanDiverToggle').disabled===true);assert.match(await page.locator('#oceanDiverControls').innerText(),/1–16/);report.cases.push({id:'deep-sub-exit-is-blocked-with-instructions',passed:true});
  await page.evaluate(()=>diverCtx.stopOceanMode());
+ const retained=await page.evaluate(async()=>{
+  const {modelAssetCacheSnapshot}=await import('/app/js/assets/model-asset-runtime.js');
+  return modelAssetCacheSnapshot();
+ });
+ report.modelCacheAfterExit=retained;
  assert.equal(await page.locator('#oceanDiverControls').count(),0);assert.equal(await page.locator('#oceanSwimmingHud').count(),0);report.cases.push({id:'environment-exit-disposes-diver-ui',passed:true});
  assert.deepEqual(report.errors,[]);report.passed=true;
 }catch(error){report.failure=String(error.stack||error);process.exitCode=1;}

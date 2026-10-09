@@ -38,6 +38,7 @@ import { createLifecycleScope } from './runtime/lifecycle-scope.js?v=2';
 import {acceptedSimulationDelta} from './runtime/simulation-clock.js';
 
 import {DEFAULT_OCEAN_SITE as OCEAN_SITE} from './ocean/launch-site.js';
+import {submarineVerticalClearance} from './ocean/submarine-envelope.js';
 
 const OCEAN_CONSTANTS = Object.freeze({
   MAX_SPEED: 32.0,
@@ -52,10 +53,10 @@ const OCEAN_CONSTANTS = Object.freeze({
   HARD_MIN_Y: -210,
   WORLD_RADIUS: 1200,
   SUB_SCALE: 0.86,
-  FOLLOW_DISTANCE: 19,
-  FOLLOW_HEIGHT: 6.6,
-  LOOK_AHEAD: 13,
-  LOOK_HEIGHT: 1.8,
+  FOLLOW_DISTANCE: 13,
+  FOLLOW_HEIGHT: 4.5,
+  LOOK_AHEAD: 7,
+  LOOK_HEIGHT: 1,
   FOLLOW_LERP: 4.4,
   LOOK_LERP: 5.6,
   MODEL_YAW_OFFSET: 0,
@@ -505,14 +506,20 @@ function updateSubmarine(dt,time) {
     sub.speed *= 0.84;
   }
 
+  const targetPitch = THREE.MathUtils.clamp(-sub.verticalSpeed * OCEAN_CONSTANTS.PITCH_FROM_VERTICAL, -OCEAN_CONSTANTS.MAX_PITCH, OCEAN_CONSTANTS.MAX_PITCH);
+  const targetRoll = THREE.MathUtils.clamp(-sub.turnSpeed * OCEAN_CONSTANTS.ROLL_FROM_TURN, -OCEAN_CONSTANTS.MAX_ROLL, OCEAN_CONSTANTS.MAX_ROLL);
+  sub.pitch += (targetPitch - sub.pitch) * expApproachFactor(5.6, dt);
+  sub.roll += (targetRoll - sub.roll) * expApproachFactor(4.5, dt);
+
   const floorY = sampleSeabedHeight(sub.position.x, sub.position.z);
-  const minY = Math.max(floorY + OCEAN_CONSTANTS.MIN_CLEARANCE, OCEAN_CONSTANTS.HARD_MIN_Y);
+  const clearance = submarineVerticalClearance(sub.pitch, sub.roll, OCEAN_CONSTANTS.SUB_SCALE);
+  const minY = Math.max(floorY + Math.max(OCEAN_CONSTANTS.MIN_CLEARANCE, clearance.below), OCEAN_CONSTANTS.HARD_MIN_Y);
   if (sub.position.y < minY) {
     sub.position.y = minY;
     if (sub.verticalSpeed < 0) sub.verticalSpeed = 0;
   }
   const water = oceanMode.waterSurface.sample(sub.position.x,sub.position.z,{time});
-  const ceilingY = water.surfaceY - 1.4;
+  const ceilingY = water.surfaceY - clearance.above;
   oceanMode.waterSample = water.volume;
   if (sub.position.y > ceilingY) {
     sub.position.y = ceilingY;
@@ -521,10 +528,6 @@ function updateSubmarine(dt,time) {
 
   if(parentHullCollision(appCtx.oceanVoyage?.current?.ship,sub.position,3,oceanMode.waterSurface.sample(0,0,{time}).surfaceY)||oceanMode.habitat?.collision(sub.position,3)){sub.position.set(previousPosition.x,previousPosition.y,previousPosition.z);sub.speed=0;sub.verticalSpeed=0;oceanMode.contactUntil=time+1.2;}
 
-  const targetPitch = THREE.MathUtils.clamp(-sub.verticalSpeed * OCEAN_CONSTANTS.PITCH_FROM_VERTICAL, -OCEAN_CONSTANTS.MAX_PITCH, OCEAN_CONSTANTS.MAX_PITCH);
-  const targetRoll = THREE.MathUtils.clamp(-sub.turnSpeed * OCEAN_CONSTANTS.ROLL_FROM_TURN, -OCEAN_CONSTANTS.MAX_ROLL, OCEAN_CONSTANTS.MAX_ROLL);
-  sub.pitch += (targetPitch - sub.pitch) * expApproachFactor(5.6, dt);
-  sub.roll += (targetRoll - sub.roll) * expApproachFactor(4.5, dt);
 
   if (sub.mesh) {
     sub.mesh.position.copy(sub.position);
@@ -631,6 +634,10 @@ async function startOceanMode(options = {}) {
     }
     if (!oceanMode.scene || !oceanMode.renderer || !oceanMode.camera) createOceanScene();
     oceanSessionScope.defer(() => destroyOceanScene(), 'renderer');
+    const startingScope = oceanSessionScope;
+    const visualReady = await oceanMode.submarine.mesh.userData.visualReady;
+    if (siteGeneration !== oceanSiteGeneration || oceanSessionScope !== startingScope || !oceanMode.scene) return false;
+    if (!visualReady) throw new Error('The research submarine could not be loaded. Please try again.');
     oceanMode.waveOffset={x:Number(options.waveOffset?.x)||0,z:Number(options.waveOffset?.z)||0};
     resetSubmarineAtLaunch(options.submarinePose || null);
     rebuildOceanTerrainLayers(oceanMode.scene, oceanMode.renderer);
