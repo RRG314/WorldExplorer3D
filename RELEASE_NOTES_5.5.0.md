@@ -38,7 +38,8 @@ tips about travel, fieldwork, ocean outings and space exploration. Browse the
 tips yourself or let them rotate while your location takes shape. Initial game
 startup also stays visible, with a reload option if required files cannot load.
 
-![Baltimore streets and regional buildings during drone flight](assets/readme/baltimore-coverage-5.5.png)
+<!-- public-gallery:drone -->
+![Drone view between downtown Baltimore buildings](assets/gallery/5.5/drone.webp)
 
 ## An ocean journey that stays together
 
@@ -52,7 +53,11 @@ surface, and returning between ocean, Earth and spacecraft activities has been
 repaired. Shipboard walking also avoids unnecessary work in the retained Earth
 scene.
 
-![Walking the research-vessel deck](assets/readme/research-deck-5.5.png)
+<!-- public-gallery:research-deck -->
+![Walking beside the dive platform on the research vessel](assets/gallery/5.5/research-deck.webp)
+
+<!-- public-gallery:diving -->
+![Scuba swimming over the seabed during the Coral Shelf research outing](assets/gallery/5.5/diving.webp)
 
 ## Public data, clearly labeled
 
@@ -65,6 +70,9 @@ Live Earth also includes a regional road-camera wall for Finland and parts of
 California, with up to four views, saved favorites and clear recovery when an
 image is unavailable. Remote camera references remain separate from places you
 have visited in the game.
+
+<!-- public-gallery:live-earth -->
+![The Live Earth globe displaying recent observed USGS earthquakes](assets/gallery/5.5/live-earth.webp)
 
 ## Less repeated work as you explore
 
