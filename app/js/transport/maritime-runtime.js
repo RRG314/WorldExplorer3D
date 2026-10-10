@@ -1,3 +1,4 @@
+import {detachSceneObject} from '../engine/scene-object-lifecycle.js';
 import {selectMaritimeAnchor} from './maritime-placement-policy.js';
 import { ctx as appCtx } from '../shared-context.js?v=55';
 import { MARITIME_CATALOG } from './maritime-catalog.js?v=1';
@@ -514,7 +515,7 @@ function disposeMaritimeRuntime(runtime, reason = 'disposed') {
   if (globalThis.__WE3D_MARITIME_SUPPORT__ === runtime.supportHook) delete globalThis.__WE3D_MARITIME_SUPPORT__;
   runtime.vessels.forEach((vessel) => vessel.visual.dispose());
   if (runtime.group.parent?.remove) runtime.group.parent.remove(runtime.group);
-  else runtime.group.removeFromParent?.();
+  else detachSceneObject(runtime.group);
   runtime.vessels.length = 0;
   runtime.reason = String(reason);
   if (activeRuntime === runtime) activeRuntime = null;

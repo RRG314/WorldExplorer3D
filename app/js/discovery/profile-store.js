@@ -1,4 +1,5 @@
 import { THREE_VIEWS, normalizeThreeViews, emptyPhotoAlbum, transitionThreeViews } from '../campaign/three-views.js';
+import { homeAchievementEvent } from '../campaign/home-achievements.js';
 import {supportRecorder} from '../runtime/support-receipt.js';
 import { normalizeCameraFavorites } from '../live-earth/public-camera-directory.js';
 import { validateJournalBackup } from './backup-validation.js?v=1';
@@ -396,6 +397,20 @@ function createIndexedDbDiscoveryProfileStore(options = {}) {
       try { transaction?.abort(); } catch { /* Already ended. */ }
       throw error;
     } finally { db.close(); }
+  }
+
+  async function recordHomeAchievement(kind,home) {
+    const db=await open();let tx;
+    try {
+      await ensureCharacterMigration(db);
+      tx=db.transaction(['profiles','events',JOURNAL_ORDER_STORE],'readwrite');
+      const profiles=tx.objectStore('profiles'),profile=normalizeProfile(await requestPromise(profiles.get(PROFILE_ID)));
+      if(profile.homeAchievements?.[kind]){await transactionPromise(tx);return clone(profile.homeAchievements[kind]);}
+      const event=createExplorerStoryEvent(homeAchievementEvent(kind,home,profile));
+      profiles.put(normalizeProfile({...profile,homeAchievements:{...profile.homeAchievements,[kind]:event}}));
+      tx.objectStore('events').put(event);putJournalOrder(tx,'events',event);
+      await transactionPromise(tx);return clone(event);
+    }catch(error){try{tx?.abort();}catch{}throw error;}finally{db.close();}
   }
 
   // Album images live in a separate profile-owned document. Ordinary profile
@@ -964,6 +979,7 @@ function createIndexedDbDiscoveryProfileStore(options = {}) {
     startOpeningChapter,
     completeOpeningChapter,
     updateHarborRun,
+    recordHomeAchievement,
     updateThreeViews,
     getThreeViewsAlbum,
     rollbackCharacterMigration,
@@ -1084,6 +1100,12 @@ function createMemoryDiscoveryProfileStore(seed = {}) {
 
   return Object.freeze({
     type: 'MemoryDiscoveryProfileStore',
+    async recordHomeAchievement(kind,home) {
+      if(profile.homeAchievements?.[kind])return clone(profile.homeAchievements[kind]);
+      const event=createExplorerStoryEvent(homeAchievementEvent(kind,home,profile));
+      profile=normalizeProfile({...profile,homeAchievements:{...profile.homeAchievements,[kind]:event}});
+      events.set(event.eventId,event);return clone(event);
+    },
     async startOpeningChapter(location, now = Date.now()) {
       profile = normalizeProfile({ ...profile, openingChapter: beginOpeningChapter(profile.openingChapter, location, now) });
       return clone(profile);

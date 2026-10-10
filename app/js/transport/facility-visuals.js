@@ -1,3 +1,4 @@
+import {detachSceneObject} from '../engine/scene-object-lifecycle.js';
 import {batchOwnedStaticStructure} from '../world/static-structure-batching.js';
 import { compileAirportOperationalLayout, recordPoints } from './airport-layout.js?v=6';
 
@@ -495,7 +496,7 @@ function createTransportFacilityVisuals(THREE, graph, options = {}) {
       return profileSurfaceYAt(surfaceProfiles, Number(x), Number(z));
     },
     dispose() {
-      group.removeFromParent?.();
+      detachSceneObject(group);
       resources.geometries.forEach((geometry) => geometry.dispose?.());
       resources.materials.forEach((material) => material.dispose?.());
       resources.textures.forEach((texture) => texture.dispose?.());

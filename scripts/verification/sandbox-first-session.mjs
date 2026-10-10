@@ -1,4 +1,5 @@
 import { verifyThreeViews } from './three-views-journey.mjs';
+import { verifyPersonalHome } from './personal-home-journey.mjs';
 import { captureVisualSceneAudit } from './visual-scene-audit.mjs';
 import { verifyHarborRun } from './harbor-run-journey.mjs';
 // Actual source world + field recording and Journal UI. Position placement is
@@ -28,7 +29,7 @@ try {
  browserServer=await chromium.launchServer({headless:true,channel:'chrome'});
  browser=await chromium.connect(browserServer.wsEndpoint());
  const context=await browser.newContext({viewport:{width:1440,height:900}});
- page=await context.newPage();
+ page=await context.newPage();page.setDefaultTimeout(30000);
  page.on('pageerror',e=>errors.push(String(e)));
  page.on('response',r=>{
   const url=new URL(r.url());
@@ -174,6 +175,7 @@ try {
  }
  if(process.env.WE3D_SANDBOX_HARBOR==='1')await verifyHarborRun({page,out,report});
  if(process.env.WE3D_SANDBOX_PHOTOS==='1')await verifyThreeViews({page,out,report});
+ if(process.env.WE3D_SANDBOX_HOME==='1')await verifyPersonalHome({page,out,report});
  await page.locator('#discoveryCloseBtn').click();await page.locator('#realEstateFloatBtn').click();
  assert.equal(await page.locator('#fQuickBuild').isVisible(),true);
  await page.screenshot({path:`${out}/mobile-build-menu.png`});
@@ -244,6 +246,10 @@ try {
    return {phase:profile.openingChapter.phase,receipts:records.length};});
   assert.deepEqual(saved,{phase:'complete',receipts:1});report.checks.chapterSurvivesReload=true;
   if(process.env.WE3D_SANDBOX_PHOTOS==='1'){const album=await page.evaluate(async()=>{const store=globalThis.__sandboxTestContext.discoveryProfileStore;return {phase:(await store.getProfile()).threeViews.phase,photos:(await store.getThreeViewsAlbum()).photos.length};});assert.deepEqual(album,{phase:'complete',photos:3});report.checks.albumSurvivesReload=true;}
+  if(process.env.WE3D_SANDBOX_HOME==='1'){
+   const saved=await page.evaluate(async()=>{const c=globalThis.__sandboxTestContext;const p=await c.discoveryProfileStore.getProfile();const h=c.explorerHousing.snapshot();const home=h.homes.find(h=>h.personalStarter);return {id:home?.id,pose:home?.workspace?.pose,returned:!!home?.journey?.returned,primary:h.primaryHomeId,maker:p.homeAchievements?.maker?.metadata?.homeId,home:p.homeAchievements?.home?.metadata?.homeId,receipts:(await c.discoveryProfileStore.getEventsById(['event:campaign:useful-place:v1','event:campaign:place-to-return:v1'])).length};});
+   assert.equal(saved.id,report.personalHome.homeId);assert.equal(saved.primary,saved.id);assert.equal(saved.maker,saved.id);assert.equal(saved.home,saved.id);assert.equal(saved.returned,true);assert.equal(saved.receipts,2);assert.deepEqual(saved.pose,report.personalHome.workspace.pose);report.checks.personalHomeAndTwoBadgesSurviveReload=true;
+  }
   if(process.env.WE3D_SANDBOX_HARBOR==='1'){
    const saved=await page.evaluate(async()=>{const store=globalThis.__sandboxTestContext.discoveryProfileStore;return {phase:(await store.getProfile()).harborRun.phase,receipts:(await store.getEventsById(['event:campaign-completed:harbor-run:v1'])).length};});
    assert.deepEqual(saved,{phase:'complete',receipts:1});report.checks.harborSurvivesReload=true;
@@ -275,7 +281,7 @@ try {
  report.checks.flowerSprintReceipt=true;
  report.errors=errors;report.failedLocal=failedLocal;assert.deepEqual(errors,[]);assert.deepEqual(failedLocal,[]);
  report.ok=true;
-} catch(error){report.errors=errors;report.failedLocal=failedLocal;report.error=String(error.stack||error);if(page){await page.screenshot({path:`${out}/failure.png`}).catch(()=>{});report.state=await page.evaluate(()=>{const d=globalThis.getWorldExplorerRuntimeDiagnostics?.();return {gameStarted:d?.gameStarted,worldCounts:d?.worldCounts,worldLoad:d?.worldLoad,activeActor:d?.activeActor,photos:d?.worldDiscovery?.threeViews,harbor:d?.worldDiscovery?.harborRun,worldLoading:d?.worldLoading,environment:d?.environment,interaction:d?.worldDiscovery?.interaction,loading:document.getElementById('loading')?.textContent,flower:{mode:globalThis.__sandboxTestContext?.Walk?.state?.mode,walker:{x:globalThis.__sandboxTestContext?.Walk?.state?.walker?.x,y:globalThis.__sandboxTestContext?.Walk?.state?.walker?.y,z:globalThis.__sandboxTestContext?.Walk?.state?.walker?.z},marker:globalThis.__sandboxTestContext?.scene?.getObjectByName('redFlowerChallenge')?.position,backend:globalThis.__sandboxTestContext?.getFlowerChallengeBackendStatus?.(),receipts:globalThis.__sandboxSavedResults}};}).catch(()=>null);}throw error;}
+} catch(error){report.errors=errors;report.failedLocal=failedLocal;report.error=String(error.stack||error);if(page){await page.screenshot({path:`${out}/failure.png`}).catch(()=>{});report.state=await page.evaluate(()=>{const d=globalThis.getWorldExplorerRuntimeDiagnostics?.();return {gameStarted:d?.gameStarted,worldCounts:d?.worldCounts,worldLoad:d?.worldLoad,activeActor:d?.activeActor,personalHome:globalThis.__sandboxTestContext?.worldDiscoveryRuntime?.personalHome?.snapshot?.(),photos:d?.worldDiscovery?.threeViews,harbor:d?.worldDiscovery?.harborRun,worldLoading:d?.worldLoading,environment:d?.environment,interaction:d?.worldDiscovery?.interaction,loading:document.getElementById('loading')?.textContent,flower:{mode:globalThis.__sandboxTestContext?.Walk?.state?.mode,walker:{x:globalThis.__sandboxTestContext?.Walk?.state?.walker?.x,y:globalThis.__sandboxTestContext?.Walk?.state?.walker?.y,z:globalThis.__sandboxTestContext?.Walk?.state?.walker?.z},marker:globalThis.__sandboxTestContext?.scene?.getObjectByName('redFlowerChallenge')?.position,backend:globalThis.__sandboxTestContext?.getFlowerChallengeBackendStatus?.(),receipts:globalThis.__sandboxSavedResults}};}).catch(()=>null);}throw error;}
 finally{
  await writeFile(`${out}/report.json`,JSON.stringify(report,null,2));
  try {if(browserServer)await closeOwnedBrowser(browserServer);}

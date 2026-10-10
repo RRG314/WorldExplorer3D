@@ -1,3 +1,4 @@
+import {detachSceneObject} from './engine/scene-object-lifecycle.js';
 import {ensureOceanVoyage} from './ocean/voyage.js';
 import {resolveBoatEntryReference,boatExitActorHeights} from './boat-mode/entry-reference.js';
 import {createResearchDeck} from './boat-mode/research/runtime.js';
@@ -188,7 +189,7 @@ function disposeBoatMesh() {
   if (typeof mesh.userData?.disposeVesselVisual === 'function') mesh.userData.disposeVesselVisual();
   else {
     if (mesh.parent?.remove) mesh.parent.remove(mesh);
-    else mesh.removeFromParent?.();
+    else detachSceneObject(mesh);
     mesh.traverse?.((object) => {
       object.geometry?.dispose?.();
       if (Array.isArray(object.material)) object.material.forEach((entryMaterial) => entryMaterial?.dispose?.());

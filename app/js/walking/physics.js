@@ -571,7 +571,7 @@ function createWalkingPhysicsHelpers({
                 if (sx < b.minX || sx > b.maxX || sz < b.minZ || sz > b.maxZ) continue;
 
                 const roofY = buildingRoofYAt(b, sx, sz);
-                if (walkerFeetY >= roofY - 1.0) continue;
+                if (!b.isInteriorCollider && !b.isTransportCollider && walkerFeetY >= roofY - 1.0) continue;
 
                 const inside = isPointInPolygon && b.pts && b.pts.length > 0
                   ? isPointInPolygon(sx, sz, b.pts)

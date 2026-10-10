@@ -1,3 +1,4 @@
+import {detachSceneObject} from '../engine/scene-object-lifecycle.js';
 import { loadModelAsset } from '../assets/model-asset-runtime.js?v=16';
 
 const CURATED_EQUIPMENT_ASSET_BY_ID = Object.freeze({
@@ -106,7 +107,7 @@ function disposeCuratedEquipmentVisual(host) {
   if (host?.userData) host.userData.curatedEquipmentDisposed = true;
   const attachment = host?.userData?.curatedEquipmentAttachment;
   if (!attachment) return false;
-  attachment.visual.removeFromParent?.();
+  detachSceneObject(attachment.visual);
   attachment.instance.dispose();
   delete host.userData.curatedEquipmentAttachment;
   delete host.userData.curatedEquipmentAssetId;

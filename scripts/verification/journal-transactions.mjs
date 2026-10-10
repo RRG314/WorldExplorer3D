@@ -129,12 +129,28 @@ try {
     await store.importData(photoBackup);check((await store.getThreeViewsAlbum()).photos.length===3,'Import did not recover pictures');
     await store.rollbackLastImport();check((await store.getThreeViewsAlbum()).photos.length===0,'Rollback did not restore deletion tombstone');
     await store.importData(photoBackup);cases.push('photo-concurrency-ordinary-writes-v5-client-export-delete-import-rollback');
+    const workspaceHome={id:'local-home:transactions',locationId:'test',locationLabel:'Test region',workspace:{schemaVersion:1,pose:{x:0,z:0,turn:0},purpose:'journal',rotated:true,undone:true,usedAt:20000},journey:{entered:19000,displayed:20000,departed:21000,returned:22000}};
+    await atomicFailure('failed-maker-achievement-is-atomic',()=>store.recordHomeAchievement('maker',workspaceHome));
+    await Promise.all([store.recordHomeAchievement('maker',workspaceHome),createIndexedDbDiscoveryProfileStore().recordHomeAchievement('maker',workspaceHome)]);
+    check((await store.getEventsById(['event:campaign:useful-place:v1'])).length===1,'Concurrent Maker writers duplicated the receipt');
+    await atomicFailure('failed-home-achievement-is-atomic',()=>store.recordHomeAchievement('home',workspaceHome));
+    await Promise.all([store.recordHomeAchievement('home',workspaceHome),createIndexedDbDiscoveryProfileStore().recordHomeAchievement('home',workspaceHome)]);
+    const homeBackup=await store.exportData();
+    check(homeBackup.events.filter(event=>event.eventId==='event:campaign:place-to-return:v1').length===1,'Concurrent home writers duplicated the receipt');
+    const invalidHomeBackup=structuredClone(homeBackup);invalidHomeBackup.events=invalidHomeBackup.events.filter(event=>event.eventId!=='event:campaign:useful-place:v1');
+    let homeRejected=false;try{await store.importData(invalidHomeBackup);}catch{homeRejected=true;}
+    check(homeRejected,'Home backup without its achievement evidence was accepted');
+    check((await store.getProfile()).homeAchievements.maker.metadata.homeId===workspaceHome.id,'Rejected backup lost the saved Maker badge');
+    await store.importData(homeBackup);
+    check((await store.getProfile()).homeAchievements.home.metadata.homeId===workspaceHome.id,'Home achievement did not survive backup restore');
+    cases.push('home-and-maker-concurrency-evidence-backup-restore');
     const migrationDb=await request(indexedDB.open('world-explorer-discovery'));const migrationTx=migrationDb.transaction(['migrationBackups'],'readwrite'),migrationDone=done(migrationTx);
     migrationTx.objectStore('migrationBackups').put({id:'character-v1:local-explorer',profile:{id:'local-explorer',displayName:'Historical character'}});await migrationDone;migrationDb.close();
     await atomicFailure('failed-character-rollback-preserves-newer-campaign',()=>store.rollbackCharacterMigration(),'migrationBackups');
     await store.rollbackCharacterMigration();const afterCharacterRollback=await store.exportData();
     check(afterCharacterRollback.profile.threeViews.phase==='complete'&&afterCharacterRollback.albums[0].photos.length===3,'Character rollback discarded new album progress');
     check(afterCharacterRollback.profile.harborRun.phase==='complete'&&afterCharacterRollback.profile.openingChapter.phase==='complete','Character rollback discarded other completed careers');
+    check(afterCharacterRollback.profile.homeAchievements.maker.metadata.homeId===workspaceHome.id&&afterCharacterRollback.profile.homeAchievements.home.metadata.homeId===workspaceHome.id,'Character rollback discarded the newer home achievements');
     await store.importData(afterCharacterRollback);cases.push('character-only-rollback-keeps-campaign-photos-and-valid-backup');
     const rewards=(await store.getProfile()).explorerProgress;
     await Promise.all([store.saveProfile(p=>({...p,tutorials:{...p.tutorials,first:true}})),createIndexedDbDiscoveryProfileStore().saveProfile(p=>({...p,tutorials:{...p.tutorials,second:true}}))]);

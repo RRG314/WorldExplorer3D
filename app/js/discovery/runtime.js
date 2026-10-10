@@ -1,4 +1,6 @@
 import { researchStarter, availableResearchStarters, starterAcceptsActivity } from '../campaign/research-starters.js';
+import { createPersonalHomeRuntime } from '../campaign/personal-home-runtime.js';
+import { homeAchievementBadges } from '../campaign/home-achievements.js';
 import { createThreeViewsRuntime } from '../campaign/three-views-runtime.js';
 import { threeViewsBadge } from '../campaign/three-views.js';
 import { createHarborRunRuntime } from '../campaign/harbor-run-runtime.js';
@@ -483,6 +485,7 @@ function createDiscoveryUi(state) {
     renderOpeningChapter();
     void state.harborRun?.refresh(profile);
     void state.threeViews?.refresh(profile);
+    void state.personalHome?.refresh(profile);
     guideRecords = guide;
     journalRecords = events;
     projectDiscoveryItemsToBackpack(state.appCtx, items);
@@ -620,7 +623,7 @@ function createDiscoveryUi(state) {
         .sort((left, right) => Number(right[1].xp) - Number(left[1].xp));
       const pathLabels = { field: 'Fieldwork', activity: 'Games', creation: 'Making', travel: 'Travel', community: 'Community', companion: 'Companions' };
       const paths = Object.entries(progress.paths || {}).filter(([, path]) => path.records > 0);
-      const badges = [...(progress.badgeAwards || []), ...[openingChapterBadge(profile.openingChapter), harborRunBadge(profile.harborRun), threeViewsBadge(profile.threeViews)].filter(Boolean)];
+      const badges = [...(progress.badgeAwards || []), ...homeAchievementBadges(profile), ...[openingChapterBadge(profile.openingChapter), harborRunBadge(profile.harborRun), threeViewsBadge(profile.threeViews)].filter(Boolean)];
       const activeCompanion = ownedCompanions.find((entry) => entry.active);
       const background = definitionById(BACKGROUND_DEFINITIONS, profile.characterState?.backgroundId) || BACKGROUND_DEFINITIONS[0];
       const strengths = ATTRIBUTE_DEFINITIONS.map((definition) => ({
@@ -1151,6 +1154,7 @@ function disposeWorldDiscoveryRuntime(appCtx, reason = 'world-reload') {
   appCtx.unregisterRuntimeOwner?.(state.owner);
   state.harborRun?.dispose();
   state.threeViews?.dispose();
+  state.personalHome?.dispose();
   state.ui?.dispose?.();
   state.presentation?.dispose?.();
   state.companionRuntime?.dispose?.();
@@ -1182,6 +1186,8 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
   if (!appCtx || snapshot?.type !== 'WorldSnapshot' || !request?.id) return null;
   if (!globalThis.indexedDB && !appCtx.discoveryProfileStore) return null;
   if (snapshot.requestId !== request.id || appCtx.worldPublication?.sequence !== snapshot.sequence) return null;
+  const personalHousing = await import('../game/property-ui.js?v=9');
+  if (appCtx.worldPublication?.sequence !== snapshot.sequence) return null;
   disposeWorldDiscoveryRuntime(appCtx, 'replacement');
   const validation = validateDiscoveryCatalogs(BUILTIN_DISCOVERY_CATALOGS);
   if (!validation.ok) throw new Error(`World Discovery catalog rejected: ${validation.errors.join('; ')}`);
@@ -2359,6 +2365,7 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
   state.ui = createDiscoveryUi(state);
   state.harborRun = createHarborRunRuntime(state);
   state.threeViews = createThreeViewsRuntime(state);
+  state.personalHome = createPersonalHomeRuntime(state,{getHousing:personalHousing.getPersonalHousing,candidates:personalHousing.getPersonalHomeCandidates,route:personalHousing.routeToPersonalHome});
   appCtx.worldDiscoveryPublication = publication;
   appCtx.worldDiscoveryRuntime = state;
   state.receiptSync = createDiscoveryReceiptSync({store:profileStore,
@@ -2463,6 +2470,7 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
     update(frame) {
       state.harborRun?.update(frame.dt);
       state.threeViews?.update();
+      state.personalHome?.update(frame.dt);
       // A retained Earth publication is not an active Earth field session.
       // Keep its journal accessible aboard without advancing hidden searches.
       if (appCtx.getEnv?.() && appCtx.getEnv() !== 'EARTH') {
@@ -2554,6 +2562,7 @@ function worldDiscoveryRuntimeSnapshot(appCtx) {
     missionAuthority: state.retentionSnapshot?.missionAuthority || null,
     harborRun: state.harborRun?.snapshot() || null,
     threeViews: state.threeViews?.snapshot() || null,
+    personalHome: state.personalHome?.snapshot() || null,
     logicalEncounterSlots: state.publication.encounters.slots.length,
     logicalFieldActivitySlots: state.publication.fieldActivities?.slots.length || 0,
     regionalEcology: Object.freeze({

@@ -2,7 +2,7 @@ import {earthCoordinateFrame} from '../earth-core/coordinate-frame.js?v=1';
 import { ctx as appCtx } from '../shared-context.js?v=55';
 import { ensurePlayerBackpackInventory } from '../urban-sandbox/equipment-model.js?v=10';
 import { createLocalCommerceModel } from '../urban-sandbox/commerce-model.js?v=5';
-import { createHousingModel, makeHomeCandidates } from '../real-estate/housing-model.js?v=2';
+import { createHousingModel, makeHomeCandidates, mergeInteriorHomeSnapshots } from '../real-estate/housing-model.js?v=2';
 import { createConnectedPropertyAuthority } from '../real-estate/connected-property-authority.js?v=3';
 import { createConnectedExplorerWallet } from '../economy/connected-wallet-authority.js?v=2';
 import { getCurrentUser } from '../../../js/auth-ui.js?v=56';
@@ -94,10 +94,11 @@ function surfaceYAt(x, z) {
 }
 
 function ensureHousing() {
+  if (housing) return housing;
   const inventory = ensurePlayerBackpackInventory(appCtx);
-  const economy = appCtx.worldEconomy || appCtx.localConvenienceStoreCommerce || createLocalCommerceModel({ inventory });
-  appCtx.worldEconomy = economy;
-  appCtx.localConvenienceStoreCommerce = economy;
+  const current=appCtx.worldEconomy || appCtx.localConvenienceStoreCommerce;
+  const economy = current?.localBackpackStore ? current : createLocalCommerceModel({ inventory, backpackStore:appCtx.playerBackpackStore });
+  if (!current) {appCtx.worldEconomy = economy;appCtx.localConvenienceStoreCommerce = economy;}
   if (!housing) {
     housing = createHousingModel({
       economy,
@@ -157,7 +158,25 @@ function snapshot() {
 
 // Interiors consume only this read-only ownership view. The furnishing layer
 // never grants, transfers, or mutates a property deed.
-appCtx.getExplorerPropertySnapshot = snapshot;
+appCtx.getExplorerPropertySnapshot = () => {
+  const view=snapshot(),personal=ensureHousing().snapshot();
+  return mergeInteriorHomeSnapshots(view,personal);
+};
+export function getPersonalHousing() {return ensureHousing();}
+export function getPersonalHomeCandidates() {
+  const location=runtimeLocation();
+  return makeHomeCandidates((appCtx.buildings||[]).filter(b=>/house|residential|apartments|terrace|townhouse|detached|bungalow|dormitory/i.test(b.buildingType||'')),{
+    actor:actorPosition(),locationId:location.id,locationLabel:location.label,worldToGeo,radius:1800,limit:80
+  });
+}
+export function routeToPersonalHome(home) {
+  if (!home || home.locationId!==runtimeLocation().id) return false;
+  const actor=actorPosition(),target=getNavigationTargetForDestination(home);
+  if (!target.support?.enterable) return false;
+  appCtx.selectedProperty=home;appCtx.showNavigation=true;
+  createNavigationRoute(Number(actor.x||0),Number(actor.z||0),target.x,target.z,true);
+  return true;
+}
 appCtx.marylandParcelRuntimeSnapshot = () => Object.freeze({ ...parcelRuntime, provider: marylandParcelProviderSnapshot() });
 
 appCtx.canPlaceQuickBuildAt = ({ x, z } = {}) => {

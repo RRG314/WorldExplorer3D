@@ -130,9 +130,10 @@ async function attachCuratedPlayerCar(THREE, appCtx) {
   carMesh.userData.curatedVehicleLoadStarted = true;
   carMesh.userData.curatedVehicleLoading = true;
   const loadPromise = (async () => {
+    let instance;
     try {
-      const instance = await loadModelAsset(THREE, 'vehicle-bmw-525i-e34');
-      if (!carMesh.parent) return false;
+      instance = await loadModelAsset(THREE, 'vehicle-bmw-525i-e34');
+      if (!carMesh.parent) { instance.dispose(); return false; }
       const visual = prepareE34Model(THREE, instance.root, instance.record);
       visual.visible = !carMesh.userData.activeUrbanVehicleId;
       carMesh.add(visual);
@@ -140,6 +141,7 @@ async function attachCuratedPlayerCar(THREE, appCtx) {
       carMesh.userData.curatedVehicleVisual = visual;
       return true;
     } catch (error) {
+      instance?.dispose();
       carMesh.userData.curatedVehicleLoadStarted = false;
       carMesh.userData.curatedVehicleLoadFailed = true;
       console.warn('Curated player car unavailable; player vehicle remains hidden.', error);

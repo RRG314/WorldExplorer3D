@@ -1,0 +1,39 @@
+<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width"><link rel="icon" href="/favicon.svg"><title>Personal workspace component verification</title>
+<link rel="stylesheet" href="/app/styles/discovery.css">
+<style>body{margin:0;background:#101d24;color:#e1ebef;font:14px sans-serif}canvas{display:block}aside{position:absolute;right:12px;top:12px;width:min(365px,calc(100vw - 44px));max-height:92vh;overflow:auto;padding:10px;background:#0b171e}#hint{position:absolute;left:12px;bottom:12px;background:#0b171e;padding:10px}button{margin:3px}input{max-width:100%;box-sizing:border-box}</style>
+<aside><section id="discoveryPersonalHome" class="discoveryOpeningChapter"></section></aside><div id="hint">Controlled room · E to open the desk · arrows to walk · J to show the Journal</div>
+<script src="/app/vendor/three/build/three.min.js"></script><script src="/app/vendor/three/examples/js/loaders/GLTFLoader.js"></script>
+<script type="module">
+import {createPersonalHomeRuntime} from '/app/js/campaign/personal-home-runtime.js';
+import {createIndexedDbDiscoveryProfileStore} from '/app/js/discovery/profile-store.js?v=5';
+import {createLocalBackpackStore} from '/app/js/player/backpack-store.js?v=2';
+import {createEquipmentInventory} from '/app/js/urban-sandbox/equipment-model.js?v=10';
+import {createHousingModel} from '/app/js/real-estate/housing-model.js?v=2';
+import {applyDisplayColorPolicy} from '/app/js/engine/display-color-policy.js';
+const T=THREE,scene=new T.Scene(),camera=new T.PerspectiveCamera(58,innerWidth/innerHeight,.08,100),renderer=new T.WebGLRenderer({antialias:true});
+renderer.setSize(innerWidth,innerHeight);renderer.shadowMap.enabled=true;renderer.shadowMap.type=T.PCFSoftShadowMap;applyDisplayColorPolicy(renderer,T);scene.background=new T.Color('#c6d4d9');document.body.prepend(renderer.domElement);
+scene.add(new T.HemisphereLight(0xffffff,0x6d6a5e,.95));const sun=new T.DirectionalLight(0xffefd9,1.25);sun.position.set(-3,7,3);sun.castShadow=true;sun.shadow.mapSize.set(1024,1024);scene.add(sun);
+const room=new T.Group();scene.add(room);const floor=new T.Mesh(new T.PlaneGeometry(8,8),new T.MeshStandardMaterial({color:'#b1a797',roughness:.88}));floor.rotation.x=-Math.PI/2;floor.receiveShadow=true;room.add(floor);
+const wallMaterial=new T.MeshStandardMaterial({color:'#e6e2d6',roughness:.9});
+for(const [x,z,w,d] of [[-4,0,.1,8],[4,0,.1,8],[0,4,8,.1]]){const wall=new T.Mesh(new T.BoxGeometry(w,3,d),wallMaterial);wall.position.set(x,1.5,z);wall.receiveShadow=true;room.add(wall);}
+const backpack=createLocalBackpackStore();await backpack.ready;const inventory=createEquipmentInventory({persistedState:backpack.load()});
+const walker={x:0,y:1.732,z:-3.5,angle:0,pitch:0},housing=createHousingModel({backpackStore:backpack,inventory,getActorPosition:()=>walker,getActiveLocationId:()=> 'test'});
+if(!housing.snapshot().starterHomeId){const r=housing.claimStarter({id:'home:test:way:42',sourceBuildingId:'way:42',label:'Research workspace',locationId:'test',locationLabel:'Controlled room',x:0,z:0,mappedResidential:true,sharedEligible:true,price:100000});if(!r.ok)throw Error(r.reason);}
+const store=createIndexedDbDiscoveryProfileStore();let profile=await store.getProfile();
+if(profile.openingChapter.phase!=='complete'){
+ await store.startOpeningChapter({regionId:'test',regionLabel:'Controlled room',environment:'EARTH'},1000);
+ const result=await store.recordObservation({claimId:'workspace:field',catalogId:'workspace:maple',family:'tree',activityId:'habitat-survey',name:'Maple canopy at the edge of the park',regionId:'test',regionLabel:'Controlled room',environment:'EARTH',collectedAt:2000});await store.completeOpeningChapter(result.event.eventId,3000);
+}
+let interaction,open=true,look=true;
+const active={group:room,ownedHome:housing.snapshot().homes[0],center:{x:0,z:0},floorBaseY:0,activeLevel:0,entryPoint:{x:0,z:-3.5},usableFootprint:[{x:-4,z:-4},{x:4,z:-4},{x:4,z:4},{x:-4,z:4}]};
+const ctx={scene,camera,renderer,activeInterior:active,dynamicBuildingColliders:[],playerBackpackInventory:inventory,playerBackpackStore:backpack,Walk:{state:{walker},CFG:{eyeHeight:1.7}},getEnv:()=> 'EARTH',getCurrentTravelMode:()=> 'walk',getLiveGpsSnapshot:()=>({active:false}),registerContextInteraction(i){interaction=i;return()=>{interaction=null;};},showToast(t){document.querySelector('#hint').textContent=t;},openWorldDiscoverySection(){state.ui.setOpen(true);}};
+const state={appCtx:ctx,profileStore:store,worldIdentityId:'test',regionLabel:'Controlled room',ui:{get open(){return open;},setOpen(v){open=v;document.querySelector('aside').hidden=!v;},refreshData:()=>runtime.refresh()}};
+const runtime=createPersonalHomeRuntime(state,{getHousing:()=>housing});
+function draw(){camera.position.set(walker.x,walker.y,walker.z);camera.lookAt(0,.7,0);runtime.update(.016);renderer.render(scene,camera);}
+function loop(){draw();requestAnimationFrame(loop);}requestAnimationFrame(loop);
+window.addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);});
+window.addEventListener('keydown',e=>{if(e.key==='e'&&interaction?.evaluate())interaction.perform();if(e.key==='j')state.ui.setOpen(true);if(e.key==='ArrowLeft')walker.x-=.12;if(e.key==='ArrowRight')walker.x+=.12;if(e.key==='ArrowUp')walker.z+=.12;if(e.key==='ArrowDown')walker.z-=.12;});
+window.advanceTime=async ms=>{for(let i=0;i<Math.max(1,Math.round(ms/16));i++)draw();await new Promise(r=>setTimeout(r,20));};
+window.render_game_to_text=()=>JSON.stringify({evidence:'controlled furnished room',coordinateFrame:'x east, y up, z south; metres',walker,...runtime.snapshot()});
+window.fixture={ctx,state,runtime,store,housing,backpack,inventory,walker,active,interaction:()=>interaction,draw};
+</script>

@@ -2,6 +2,8 @@ import { TRANSFERABLE_MATERIAL_DEFINITIONS } from '../resources/material-catalog
 import { normalizePoi } from '../poi/semantic-authority.js?v=3';
 import { associatePoisToBuildings } from '../poi/building-association.js?v=1';
 import { VEHICLE_UPGRADE_SERVICES } from '../transport/vehicle-upgrades.js?v=1';
+import { createLocalBackpackStore } from '../player/backpack-store.js?v=2';
+import { localCommerceState, commerceChange, withCommerceItem, withoutCommerceItems } from './local-commerce-state.js';
 
 const COMMERCE_SCHEMA_VERSION = 4;
 const COMMERCE_STORAGE_KEY = 'world-explorer:local-commerce:v1';
@@ -189,7 +191,19 @@ function createLocalCommerceModel(options = {}) {
   const inventory = options.inventory;
   const transactionAuthority = options.transactionAuthority || null;
   const clock = options.now || (() => Date.now());
-  let state = parseState(storage) || {
+  const backpackStore = transactionAuthority ? null : options.backpackStore || createLocalBackpackStore(storage);
+  let unreadable = false;
+  const settlingServices = new Set();
+  let initial;
+  if (backpackStore) {
+    try {
+      const embedded=backpackStore.loadCommerce(),raw=storage?.getItem?.(COMMERCE_STORAGE_KEY);
+      const legacy=embedded || (raw==null?null:JSON.parse(raw));
+      if (!embedded && raw!=null && !legacy) throw Error('Invalid saved wallet');
+      initial=localCommerceState(legacy);
+    } catch { unreadable=true;initial=localCommerceState();initial.credits=0; }
+  }
+  let state = initial || parseState(storage) || {
     schemaVersion: COMMERCE_SCHEMA_VERSION,
     credits: STARTING_EXPLORER_CREDITS,
     purchases: {},
@@ -200,6 +214,7 @@ function createLocalCommerceModel(options = {}) {
   inventory?.registerDefinitions?.(COMMERCE_ITEM_DEFINITIONS);
 
   function save() {
+    if (backpackStore) return false; // Local changes must use commitLocal below.
     try {
       storage?.setItem?.(COMMERCE_STORAGE_KEY, JSON.stringify(state));
       return true;
@@ -214,6 +229,23 @@ function createLocalCommerceModel(options = {}) {
     save();
   }
 
+  function commitLocal(next, nextInventory, nextHousing, expectedHousing) {
+    if (unreadable || !backpackStore?.writable()) return Object.freeze({ok:false,reason:'save_failed',credits:state.credits});
+    const raw=nextInventory || inventory?.exportState?.() || backpackStore.load() || {items:[]};
+    if (!backpackStore.saveCommerce(next,raw,nextHousing,expectedHousing)) return Object.freeze({ok:false,reason:'save_failed',credits:state.credits});
+    state=next;
+    if (nextInventory) inventory.applySavedState({...raw,housing:backpackStore.loadHousing()});
+    return Object.freeze({ok:true,credits:state.credits});
+  }
+
+  function changeCredits(delta, detail = {}, nextHousing, expectedHousing) {
+    if (transactionAuthority) return Object.freeze({ok:false,reason:'connected_wallet_action_required',credits:wallet().credits});
+    const {type=delta<0?'debit':'credit',...fields}=detail;
+    const result=commerceChange(state,delta,String(type),fields,Number(clock())||Date.now());
+    if (!result.ok) return Object.freeze({...result,credits:state.credits});
+    return commitLocal(result.next,null,nextHousing,expectedHousing);
+  }
+
   function wallet() {
     const connected = transactionAuthority?.snapshot?.();
     if (connected) return Object.freeze({ type: 'ExplorerWallet', schemaVersion: COMMERCE_SCHEMA_VERSION, ...connected, transactions: Object.freeze(state.transactions.slice()) });
@@ -221,29 +253,23 @@ function createLocalCommerceModel(options = {}) {
       type: 'ExplorerWallet',
       schemaVersion: COMMERCE_SCHEMA_VERSION,
       credits: state.credits,
+      writable: !unreadable && backpackStore?.writable() === true,
       transactions: Object.freeze(state.transactions.slice())
     });
   }
 
   function debit(amount, detail = {}) {
     if (transactionAuthority) return Object.freeze({ ok: false, reason: 'connected_wallet_action_required', credits: wallet().credits });
-    const credits = Math.max(0, Math.floor(Number(amount) || 0));
-    if (credits <= 0) return Object.freeze({ ok: false, reason: 'invalid_amount', credits: state.credits });
-    if (state.credits < credits) return Object.freeze({ ok: false, reason: 'not_enough_credits', credits: state.credits });
-    const { type = 'debit', ...transactionDetail } = detail;
-    state.credits -= credits;
-    record(String(type), { ...transactionDetail, credits });
-    return Object.freeze({ ok: true, amount: credits, credits: state.credits });
+    const credits = Number(amount);
+    if (!Number.isSafeInteger(credits) || credits <= 0) return Object.freeze({ok:false,reason:'invalid_amount',credits:state.credits});
+    return Object.freeze({...changeCredits(-credits,detail),amount:credits});
   }
 
   function credit(amount, detail = {}) {
     if (transactionAuthority) return Object.freeze({ ok: false, reason: 'connected_wallet_action_required', credits: wallet().credits });
-    const credits = Math.max(0, Math.floor(Number(amount) || 0));
-    if (credits <= 0) return Object.freeze({ ok: false, reason: 'invalid_amount', credits: state.credits });
-    const { type = 'credit', ...transactionDetail } = detail;
-    state.credits += credits;
-    record(String(type), { ...transactionDetail, credits });
-    return Object.freeze({ ok: true, amount: credits, credits: state.credits });
+    const credits = Number(amount);
+    if (!Number.isSafeInteger(credits) || credits <= 0) return Object.freeze({ok:false,reason:'invalid_amount',credits:state.credits});
+    return Object.freeze({...changeCredits(credits,detail),amount:credits});
   }
 
   function inventoryItem(catalogId) {
@@ -352,12 +378,14 @@ function createLocalCommerceModel(options = {}) {
         return Object.freeze({ ok: true, item, credits: receipt.credits, receiptId: receipt.requestId });
       }).catch(() => Object.freeze({ ok: false, reason: 'wallet_unavailable', credits: wallet().credits }));
     }
-    if (!grant(item.id, store, 'local-store-purchase')) return Object.freeze({ ok: false, reason: 'inventory_unavailable' });
+    if (!inventory?.applySavedState) return Object.freeze({ok:false,reason:'inventory_unavailable'});
+    const nextInventory=withCommerceItem(inventory.exportState(),item,store,'local-store-purchase',Number(clock()));
+    if (!nextInventory) return Object.freeze({ok:false,reason:'inventory_unavailable'});
     const key = `${snapshot.dayKey}:${store.id}:${item.id}`;
-    state.purchases[key] = Math.max(0, Number(state.purchases[key]) || 0) + 1;
-    state.credits -= item.buyPrice;
-    record('buy', { storeId: store.id, catalogId: item.id, credits: item.buyPrice });
-    return Object.freeze({ ok: true, item, credits: state.credits });
+    const change=commerceChange(state,-item.buyPrice,'buy',{storeId:store.id,catalogId:item.id},Number(clock()));
+    if (!change.ok) return Object.freeze(change);
+    change.next.purchases[key]=Math.max(0,Number(state.purchases[key])||0)+1;
+    return Object.freeze({...commitLocal(change.next,nextInventory),item});
   }
 
   function sell(store, instanceId) {
@@ -376,10 +404,11 @@ function createLocalCommerceModel(options = {}) {
         return Object.freeze({ ok: true, item, credits: receipt.credits, receiptId: receipt.requestId });
       }).catch(() => Object.freeze({ ok: false, reason: 'wallet_unavailable', credits: wallet().credits }));
     }
-    if (!inventory?.consumeItem?.(item.instanceId, 1)) return Object.freeze({ ok: false, reason: 'inventory_unavailable' });
-    state.credits += sellPrice;
-    record('sell', { storeId: store.id, catalogId: item.catalogId, credits: sellPrice });
-    return Object.freeze({ ok: true, item, credits: state.credits });
+    if (!inventory?.applySavedState) return Object.freeze({ok:false,reason:'inventory_unavailable'});
+    const nextInventory=withoutCommerceItems(inventory.exportState(),item.instanceId,1);
+    if (!nextInventory) return Object.freeze({ok:false,reason:'inventory_unavailable'});
+    const change=commerceChange(state,sellPrice,'sell',{storeId:store.id,catalogId:item.catalogId},Number(clock()));
+    return Object.freeze({...change.ok?commitLocal(change.next,nextInventory):change,item});
   }
 
   function trade(store) {
@@ -388,21 +417,20 @@ function createLocalCommerceModel(options = {}) {
     if (snapshot.rare.claimed) return Object.freeze({ ok: false, reason: 'already_traded_today' });
     if (state.credits < snapshot.rare.credits) return Object.freeze({ ok: false, reason: 'not_enough_credits' });
     if (snapshot.rare.requirementCarried < snapshot.rare.requirementQuantity) return Object.freeze({ ok: false, reason: 'missing_trade_items' });
-    if (!inventory?.consumeItem?.(snapshot.rare.requirementId, snapshot.rare.requirementQuantity)) {
-      return Object.freeze({ ok: false, reason: 'inventory_unavailable' });
-    }
-    if (!grant(snapshot.rare.itemId, store, 'local-store-rare-trade')) return Object.freeze({ ok: false, reason: 'inventory_unavailable' });
+    if (!inventory?.applySavedState) return Object.freeze({ok:false,reason:'inventory_unavailable'});
+    const spent=withoutCommerceItems(inventory.exportState(),snapshot.rare.requirementId,snapshot.rare.requirementQuantity);
+    const nextInventory=spent&&withCommerceItem(spent,ITEM_BY_ID.get(snapshot.rare.itemId),store,'local-store-rare-trade',Number(clock()));
+    if (!nextInventory) return Object.freeze({ok:false,reason:'inventory_unavailable'});
     const claimKey = `${snapshot.dayKey}:${store.id}:${snapshot.rare.itemId}`;
-    state.claimedTrades[claimKey] = true;
-    state.credits -= snapshot.rare.credits;
-    record('rare-trade', {
+    const change=commerceChange(state,-snapshot.rare.credits,'rare-trade', {
       storeId: store.id,
       catalogId: snapshot.rare.itemId,
       requirementId: snapshot.rare.requirementId,
       requirementQuantity: snapshot.rare.requirementQuantity,
-      credits: snapshot.rare.credits
-    });
-    return Object.freeze({ ok: true, item: snapshot.rare.item, credits: state.credits });
+    },Number(clock()));
+    if (!change.ok) return Object.freeze(change);
+    change.next.claimedTrades[claimKey]=true;
+    return Object.freeze({...commitLocal(change.next,nextInventory),item:snapshot.rare.item});
   }
 
   async function service(store, serviceId, applyEffect = null, serviceContext = {}) {
@@ -465,22 +493,48 @@ function createLocalCommerceModel(options = {}) {
         });
       }
     }
-    let applied = false;
+    // Reserve the payment before any asynchronous effect. A terminated page
+    // leaves a receipt to settle for this exact target; it cannot spend twice.
+    if (Object.keys(state.pendingSettlements).length) return Object.freeze({ok:false,reason:'settlement_recovery_required',credits:state.credits});
+    const requestId=`local-service:${crypto.randomUUID()}`;
+    const change=commerceChange(state,-definition.price,'service-reserved',{storeId:store.id,catalogId:definition.id,receiptId:requestId},Number(clock()));
+    if (!change.ok) return Object.freeze(change);
+    change.next.pendingSettlements[requestId]={requestId,serviceId:definition.id,targetId:String(serviceContext.targetId||''),price:definition.price,phase:'effect_pending'};
+    const reserve=commitLocal(change.next);if (!reserve.ok) return reserve;
+    const outcome=await settleLocalService(requestId,applyEffect,false);
+    return Object.freeze({...outcome,service:definition,receiptId:requestId});
+  }
+
+  async function settleLocalService(requestId, applyEffect, recovery) {
+    if (settlingServices.has(requestId) || unreadable || !backpackStore.writable()) return Object.freeze({ok:false,reason:'settlement_recovery_required',credits:state.credits});
+    settlingServices.add(requestId);
     try {
-      applied = typeof applyEffect === 'function' && await applyEffect(
-        definition,
-        `local:${snapshot.dayKey}:${store.id}:${definition.id}`
-      ) === true;
-    } catch (_) {
-      applied = false;
-    }
-    if (!applied) return Object.freeze({ ok: false, reason: 'service_effect_failed_refunded', credits: state.credits });
-    state.credits -= definition.price;
-    record('service', { storeId: store.id, catalogId: definition.id, credits: definition.price });
-    return Object.freeze({ ok: true, service: definition, credits: state.credits, receiptId: `local:${snapshot.dayKey}:${store.id}:${definition.id}` });
+    const pending=state.pendingSettlements[requestId],definition=SERVICE_BY_ID.get(pending?.serviceId);
+    if (!pending || !definition || typeof applyEffect!=='function') return Object.freeze({ok:false,reason:'settlement_recovery_required',credits:state.credits});
+    let outcome;
+    try {outcome=await applyEffect(definition,requestId,{recovery,targetId:pending.targetId});}
+    catch {return Object.freeze({ok:false,reason:'settlement_recovery_required',credits:state.credits});}
+    // Unknown target or uncertain effect: keep its funded receipt, never refund
+    // or replay it on a different vehicle, vessel or companion.
+    if (outcome!==true && outcome!==false) return Object.freeze({ok:false,reason:'settlement_recovery_required',credits:state.credits});
+    const change=commerceChange(state,outcome?0:pending.price,outcome?'service':'service-refund',{catalogId:definition.id,receiptId:requestId},Number(clock()));
+    if (!change.ok) return Object.freeze(change);
+    delete change.next.pendingSettlements[requestId];
+    const committed=commitLocal(change.next);
+    if (!committed.ok) return Object.freeze({...committed,reason:'settlement_recovery_required'});
+    return outcome?committed:Object.freeze({ok:false,reason:'service_effect_failed_refunded',credits:state.credits});
+    } finally {settlingServices.delete(requestId);}
   }
 
   async function recoverPending(applyEffect = null) {
+    if (backpackStore) {
+      let recovered=0;
+      for (const id of Object.keys(state.pendingSettlements)) {
+        await settleLocalService(id,applyEffect,true);
+        if (!state.pendingSettlements[id]) recovered++;
+      }
+      return Object.freeze({recovered,remaining:Object.keys(state.pendingSettlements).length});
+    }
     if (!transactionAuthority?.settle) return Object.freeze({ recovered: 0, remaining: 0 });
     let recovered = 0;
     for (const [requestId, pending] of Object.entries(state.pendingSettlements)) {
@@ -507,9 +561,11 @@ function createLocalCommerceModel(options = {}) {
     return Object.freeze({ recovered, remaining: Object.keys(state.pendingSettlements).length });
   }
 
-  save();
+  if (transactionAuthority) save();
   return Object.freeze({
     type: 'WorldExplorerEconomy',
+    localBackpackStore: backpackStore,
+    commitHomeChange(delta, nextHousing, detail, expectedHousing) { return changeCredits(delta,detail,nextHousing,expectedHousing); },
     buy,
     credit,
     debit,

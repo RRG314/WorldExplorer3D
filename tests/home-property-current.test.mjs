@@ -29,7 +29,7 @@ function mappedBuilding(overrides = {}) {
 test('failed return-home selection keeps the previous saved home and can be retried', () => {
   const storage=memoryStorage(),write=storage.setItem;let fail=false;
   storage.setItem=(...args)=>{if(fail)throw Error('Quota exceeded');write(...args);};
-  const economy={debit:()=>({ok:true,credits:100}),wallet:()=>({credits:100})};
+  const economy=createLocalCommerceModel({storage});
   const model=createHousingModel({storage,economy});
   model.buy({id:'first',price:1});model.buy({id:'second',price:1});
   const before=model.snapshot();fail=true;

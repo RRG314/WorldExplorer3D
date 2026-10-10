@@ -102,6 +102,7 @@ function createLocalBackpackStore(storage = globalThis.localStorage) {
   const session = localSaveSession(storage);
   let lastMigration = null;
   let housing = null;
+  let commerce = null;
   let loaded = false;
   let pendingLegacy = null;
   let blocked = false;
@@ -118,7 +119,7 @@ function createLocalBackpackStore(storage = globalThis.localStorage) {
       if ((latest?.migration?.saveGeneration || '') !== (lastMigration?.saveGeneration || '')) return false;
       // A Journal projection contains items/slots but not equipment ammo. Keep
       // the latest small equipment state when replacing that full projection.
-      const normalized = normalizeBackpackState({...lastControls,...snapshot, housing: settings.housing ?? housing}, {
+      const normalized = normalizeBackpackState({...lastControls,...snapshot, housing: settings.housing ?? housing, commerce: settings.commerce ?? commerce}, {
         sourceVersion: settings.sourceVersion ?? snapshot.migration?.sourceVersion ?? lastMigration?.sourceVersion,
         migratedAt: settings.migratedAt ?? snapshot.migration?.migratedAt ?? lastMigration?.migratedAt,
         backupAvailable: storage.getItem?.(BACKPACK_BACKUP_KEY) != null
@@ -136,6 +137,7 @@ function createLocalBackpackStore(storage = globalThis.localStorage) {
       }
       storage.setItem(BACKPACK_STORAGE_KEY, JSON.stringify(normalized));
       housing = clone(normalized.housing);
+      commerce = clone(normalized.commerce);
       pendingLegacy = null;
       lastMigration = normalized.migration;
       lastControls = controls(normalized);
@@ -159,6 +161,8 @@ function createLocalBackpackStore(storage = globalThis.localStorage) {
       const legacyHousing = storage.getItem(LEGACY_HOUSING_KEY);
       housing = clone(current?.housing ?? (legacyHousing == null ? null : JSON.parse(legacyHousing)));
       if (housing && (!Array.isArray(housing.homes) || Number(housing.schemaVersion || 1) > 2)) throw Error('Unsupported home save');
+      commerce = clone(current?.commerce ?? null);
+      if (commerce && (Number(commerce.schemaVersion) !== 4 || !Number.isSafeInteger(commerce.credits) || commerce.credits < 0)) throw Error('Unsupported local wallet save');
     } catch (error) { blocked = true; supportRecorder.record({operation:'inventory-load',error}); return null; }
     if (current) {
       const normalized = normalizeBackpackState({...current, housing}, {
@@ -203,7 +207,7 @@ function createLocalBackpackStore(storage = globalThis.localStorage) {
     if (!storage?.getItem || !storage?.setItem || !storage?.removeItem || !session.writable() || blocked) return false;
     // An inventory migration rollback must not erase later home ownership/items.
     if (!loaded) load();
-    if (blocked || housing?.homes?.length) return false;
+    if (blocked || housing?.homes?.length || commerce) return false;
     const backup = parseStored(storage, BACKPACK_BACKUP_KEY);
     if (!backup?.sourceKey || !backup?.state) return false;
     try {
@@ -229,9 +233,20 @@ function createLocalBackpackStore(storage = globalThis.localStorage) {
     writable: () => session.writable() && !blocked,
     saveStatus: () => blocked ? 'unreadable-save' : session.status(),
     loadHousing() { if (!loaded) load(); return clone(housing); },
+    loadCommerce() { if (!loaded) load(); return clone(commerce); },
+    saveCommerce(next, inventory, nextHousing, expectedHousing) {
+      if (!loaded) load();
+      if ((Number(next?.revision) || 0) !== (Number(commerce?.revision) || 0) + 1) return false;
+      if (expectedHousing!==undefined && JSON.stringify(housing)!==expectedHousing) return false;
+      return saveNormalized(inventory, {commerce:next, housing:nextHousing});
+    },
     // The Backpack and all personal home contents commit in one atomic setItem.
     // Legacy home bytes are retained as recovery material, not a second writer.
-    saveHousing(next, inventory) { return saveNormalized(inventory, {housing: next}); },
+    saveHousing(next, inventory, expectedHousing) {
+      if (!loaded) load();
+      if (expectedHousing!==undefined && JSON.stringify(housing)!==expectedHousing) return false;
+      return saveNormalized(inventory, {housing: next});
+    },
     migrationSnapshot() { return lastMigration ? { ...lastMigration } : null; },
     rollbackMigration,
     save(snapshot) { return saveNormalized(snapshot); },

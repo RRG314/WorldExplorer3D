@@ -272,3 +272,9 @@ All following sources are Creative Commons Attribution 4.0: https://creativecomm
 `nature/pine*.glb`, `nature/broadleaf*.glb`, `nature/fern.glb`, `nature/grass.glb`: [Low poly vegetation for games](https://sketchfab.com/3d-models/low-poly-vegetation-for-games-cdac82eb61ab4d83bf162b4c44b44d6d) by **denoises**, [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Downloaded September 28, 2026. Selected conifer, broadleaf, fern and grass plants; normalized placement origins, resized textures to 512px and created distant tree variants. Source and derivative checksums are recorded in `nature/asset-manifest.json`. Conversion: `scripts/build-sketchfab-vegetation-assets.mjs`.
 
 `nature/shrub.glb`: [Bush](https://sketchfab.com/3d-models/bush-844e6a315757431da97efb5f17383bb5) by **lev26**, [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Downloaded September 28, 2026. Base aligned, resized map, alpha-tested leaves. Checksums and conversion details: `nature/asset-manifest.json`.
+
+Personal Workspace Furniture
+
+- `interiors/personal-workspace/workspace-table.glb` — [Wooden Table 02](https://polyhaven.com/a/wooden_table_02) by Serhii Khromov, Poly Haven, CC0.
+- `interiors/personal-workspace/workspace-chair.glb` — [School Chair 01](https://polyhaven.com/a/SchoolChair_01) by Ethan Place, Poly Haven, CC0.
+- Repacked as self-contained GLBs with 1K JPEG material maps. Source geometry, material channels and metre scale are retained. These are real modeled assets; the in-game field record uses the player's saved Journal evidence. Per-file checksums and intake details are in the adjacent `PROVENANCE.json` and `LICENSE.txt`.

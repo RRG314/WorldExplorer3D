@@ -1,3 +1,4 @@
+import {detachSceneObject} from '../engine/scene-object-lifecycle.js';
 const MATERIAL_COLORS = Object.freeze({
   default: 0x8a765f,
   brick: 0x8f4f3d,
@@ -32,7 +33,7 @@ function materialForGroup(materialId, type) {
 
 function disposeGroup(group) {
   if (!group) return;
-  group.removeFromParent?.();
+  detachSceneObject(group);
   group.children.forEach((child) => {
     child.geometry?.dispose?.();
     child.material?.dispose?.();

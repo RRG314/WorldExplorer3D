@@ -66,10 +66,11 @@ function resolveDestinationEntrySupport(destination) {
 
 export function getNavigationTargetForDestination(destination) {
   const support = resolveDestinationEntrySupport(destination);
-  if (support?.enterable && support.entryAnchor) {
+  const entrance=support?.exteriorEntrance||support?.entryAnchor;
+  if (support?.enterable && entrance) {
     return {
-      x: toFiniteNumber(support.entryAnchor.x, toFiniteNumber(destination?.x, 0)),
-      z: toFiniteNumber(support.entryAnchor.z, toFiniteNumber(destination?.z, 0)),
+      x: toFiniteNumber(entrance.x, toFiniteNumber(destination?.x, 0)),
+      z: toFiniteNumber(entrance.z, toFiniteNumber(destination?.z, 0)),
       support
     };
   }
@@ -365,6 +366,11 @@ export function createNavigationRoute(fromX, fromZ, toX, toZ, forceRebuild = fal
   animateMarker();
 }
 
+export function navigationDestinationLabel(destination) {
+  const address=typeof destination?.address==='string'?destination.address:destination?.address?.formatted;
+  return String(destination?.label||destination?.name||address||'Destination');
+}
+
 export function updateNavigationRoute() {
   const navHud = document.getElementById('navigationHud');
   if (!appCtx.showNavigation) {
@@ -392,17 +398,18 @@ export function updateNavigationRoute() {
     currentAngle = appCtx.car.angle;
   }
 
-  createNavigationRoute(currentX, currentZ, destination.x, destination.z);
+  const target=getNavigationTargetForDestination(destination);
+  createNavigationRoute(currentX, currentZ, target.x, target.z);
 
   const routePoints = Array.isArray(appCtx.navigationRoutePoints) ? appCtx.navigationRoutePoints : [];
   const guidancePoint = routePoints.length > 1 && typeof appCtx.pickNavigationTargetPoint === 'function'
     ? appCtx.pickNavigationTargetPoint(currentX, currentZ, routePoints)
-    : destination;
-  const dx = (guidancePoint?.x ?? destination.x) - currentX;
-  const dz = (guidancePoint?.z ?? destination.z) - currentZ;
+    : target;
+  const dx = (guidancePoint?.x ?? target.x) - currentX;
+  const dz = (guidancePoint?.z ?? target.z) - currentZ;
   const dist = routePoints.length > 1 && typeof appCtx.measureRemainingPolylineDistance === 'function'
     ? appCtx.measureRemainingPolylineDistance(currentX, currentZ, routePoints)
-    : Math.hypot(destination.x - currentX, destination.z - currentZ);
+    : Math.hypot(target.x - currentX, target.z - currentZ);
   const angleToDestination = Math.atan2(dx, dz);
   let normalizedAngle = angleToDestination - currentAngle;
   while (normalizedAngle > Math.PI) normalizedAngle -= 2 * Math.PI;
@@ -410,10 +417,7 @@ export function updateNavigationRoute() {
   const arrowRotation = -normalizedAngle * (180 / Math.PI);
 
   navHud.style.display = 'block';
-  document.getElementById('navDestination').textContent =
-    appCtx.selectedProperty
-      ? appCtx.selectedProperty.address.substring(0, 30)
-      : appCtx.selectedHistoric.name.substring(0, 30);
+  document.getElementById('navDestination').textContent = navigationDestinationLabel(destination).slice(0,30);
   document.getElementById('navDistance').textContent = dist < 1000 ? Math.floor(dist) + 'm' : (dist / 1000).toFixed(1) + 'km';
   document.getElementById('navDirection').style.transform = `rotate(${arrowRotation}deg)`;
   if (dist < 10) {

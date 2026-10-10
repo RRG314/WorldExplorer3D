@@ -1,4 +1,5 @@
 import { THREE_VIEWS, validateThreeViewsBackup } from '../campaign/three-views.js';
+import {HOME_ACHIEVEMENTS} from '../campaign/home-achievements.js';
 import { HARBOR_RUN, normalizeHarborRun, validateDeliveryRoute } from '../campaign/harbor-run.js';
 // Validate the entire file before opening a destructive replacement transaction.
 // Older backups may omit optional collections, but malformed rows are never dropped.
@@ -25,6 +26,10 @@ export function validateJournalBackup(input) {
     for (const row of rows) if (row.claimId) { if (claims.has(row.claimId)) fail(); claims.add(row.claimId); }
   }
   const chapter = normalizeOpeningChapter(data.profile.openingChapter);
+  for(const [kind,entry] of Object.entries(data.profile.homeAchievements||{})) {
+    const definition=HOME_ACHIEVEMENTS[kind],receipt=data.events.find(event=>event.eventId===entry?.eventId);
+    if(!definition || entry?.eventId!==`event:campaign:${definition.id}:v1` || !(entry.occurredAt>0) || !entry.metadata?.homeId || !receipt || receipt.eventType!=='campaign-completed' || receipt.metadata?.homeId!==entry.metadata.homeId)fail();
+  }
   if (chapter.schemaVersion === 1 && ['review', 'complete'].includes(chapter.phase)) {
     const evidence = data.events.find(event => event.eventId === chapter.eventId);
     try { finishOpeningChapter({ ...chapter, completedAt: 0 }, evidence); } catch { fail(); }

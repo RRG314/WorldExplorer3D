@@ -604,3 +604,58 @@ The final source chain after the possession replacement guard passes **2,260
 tests**, zero failed, plus dependencies/source/ownership/boundary types and test
 inventory/sensitivity. The world journey precedes that final denied-write guard;
 its explicit preservation regression is included in this final chain.
+
+## October 10 — personal workspace chapters and local transaction safety
+
+Continue in the architecture-evaluation worktree on `steven/visual-quality`.
+The local H04 Maker and H05 personal-home flow now works through the existing
+Today panel, mapped building entry, room, Backpack, Journal and badge owners.
+It includes one personal starter workspace, two licensed Poly Haven furniture
+models, placement/rotation/undo with reachable circulation, a real saved record
+at the desk, reusable design export/import, storage, a return destination and
+leave/return completion. H01 admits a practice workspace so Maker can be the
+first branch. The room's existing generic shell is still basic; this is not a
+completed whole-interior art pass or a real/shared property grant.
+
+Local wallet, stock, inventory and property purchase/sale now commit together
+in the v3 possession record, retaining legacy wallet data and rejecting corrupt
+or stale writers. Failed vehicle-upgrade writes cannot install an unpaid upgrade.
+Local services reserve a target-specific funded receipt before effects and retain
+uncertain receipts for retry. Connected transactions retain their server owners;
+these local passes do not certify all connected economic flows.
+
+The audit fixed Three r128-incompatible object removal across presentation
+cleanup, cancelled/invalid player-car asset leases, low furniture incorrectly
+being treated as walkable roofs, route updates reverting to building centers,
+and address-object crashes in the navigation HUD. Property dependencies now enter
+the new home runtime at startup without pulling account modules into ordinary
+Explorer imports. Existing roof and ship walking remain covered.
+
+Final `verify:pr` passes **2,288 tests**, zero failed, plus dependency/source,
+module ownership, boundary types, inventory and sensitivity checks. Actual
+IndexedDB verification passes 27 cases; workspace and photo/home display browser
+checks pass 6 and 12 respectively, including the prescribed action clients. Four
+possession/lock/recovery checks also pass. The final city run passes **21 checks**,
+including actual keyboard contact against the desk, storage roundtrip, both new
+badges, leaving/returning and layout/badge persistence after reload, plus earlier
+field/Build/room/property/Flower paths. No captured page errors or failed local
+resources. Actor placement is deliberate setup, not a fully walked or uncoached
+route. Desktop and phone-width images were inspected. The city run precedes only
+the cancelled/invalid-car lease repair, whose failure-path test and final full
+source chain follow it.
+
+Evidence: ignored `output/career-finish-20261010/`; final city `world-home-verified`,
+workspace `workspace-collision-final`, photo display `camera-final`, Journal
+`journal-final`, source `verify-pr-release-checkpoint.log`. Failed and interrupted
+receipts remain separate, with causes/fixes in the delivery ledger. All owned
+browsers and servers are closed after their checks. Retained builds, source/history,
+owner player data and Collision Lab source are preserved; no deployment occurred.
+
+The complete roadmap is still open: H02's promised finish/handling distinction,
+H06–H12 and the research-vessel upgrade, expanded research/mining/CERN play,
+repeatable/connected/GPS work, full realism and final release/media acceptance.
+Before any release, prepare and prove a fallback preserving commerce, workspace
+and visit fields as well as all v3 custody; a prior v3 build is not automatically
+compatible. The earlier unexplained return-load timeout and external Overpass
+CORS observation remain release observations, despite the later bounded passes.
+See `docs/design/EXPLORER-CAREER-DELIVERY.md` for precise scope and evidence.

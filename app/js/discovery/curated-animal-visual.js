@@ -1,3 +1,4 @@
+import {detachSceneObject} from '../engine/scene-object-lifecycle.js';
 import { loadModelAsset } from '../assets/model-asset-runtime.js?v=16';
 
 const CURATED_ANIMAL_ASSET_BY_SPECIES = Object.freeze({
@@ -96,7 +97,7 @@ function disposeCuratedAnimal(host) {
   const attachment = host?.userData?.curatedAnimalAttachment;
   if (!attachment) return false;
   attachment.mixer.stopAllAction();
-  attachment.visual.removeFromParent?.();
+  detachSceneObject(attachment.visual);
   attachment.instance.dispose();
   delete host.userData.curatedAnimalAttachment;
   delete host.userData.curatedAnimalAssetId;

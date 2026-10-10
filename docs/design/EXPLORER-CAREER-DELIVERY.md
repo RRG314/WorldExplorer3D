@@ -6,8 +6,9 @@ Baseline `eb18b9c7`, October 9, 2026. Production remains released 5.5.0.
 | --- | --- | --- |
 | 0 — design and authority review | Specified | Direct source review; full mission, reward, GPS, property and release specification in `EXPLORER-CAREER-PLAN.md` |
 | 1 — First Bearings | Implemented and verified locally | Explicit start, actual field procedure, exact Journal review, one badge/receipt, history recovery and reload; evidence below |
-| 2 — Pilot / Explorer / Maker | In progress | Harbor Run and Three Views are implemented locally; acceptance below. Useful arrangement, starter-home integration and additional cosmetic/mastery rewards remain open. |
-| 3–12 | Planned | Specific deliverables and exit checks in the plan; no gameplay completion claim |
+| 2 — Pilot / Explorer / Maker | Core jobs implemented locally | Harbor Run, Three Views and the useful-workspace Maker branch have executed evidence below. H02 cosmetic/handling distinction remains open. |
+| 3 — Personal home | Implemented locally | One starter workspace, licensed furniture, atomic storage, record display, return journey and durable badges; acceptance below. Full interior art and release compatibility remain separate gates. |
+| 4–12 | Planned | Specific deliverables and exit checks in the plan; no gameplay completion claim |
 
 The first delivery is local and does not deploy or replace retained builds. Later
 career jobs, the vessel/fleet asset work, full campaign and final video package
@@ -44,11 +45,12 @@ packages are unchanged. No promotional posts, paid service or deployment occurre
 
 ## Next bounded delivery
 
-Step 2 implements H02–H04: Harbor Run, A Place in Three Views, and Make a Useful
-Place. Each needs its actual actions, meaningful choice, durable outcome and
-route/target admission checks before it appears as a playable mission. The
-research vessel/fleet art, later ocean/space campaign and media dependencies
-remain listed in the full plan. There are no placeholder mission buttons for them.
+H01, H03, H04 and the functional H05 personal-home journey have local acceptance
+evidence below. Finish H02's promised cosmetic/handling distinction, then delivery
+step 4: the licensed vessel upgrade and H06 Coastal Departure. The vessel must
+pass deck, door, mooring, sub-cradle and water-return checks before the chapter is
+exposed. Later ocean/space, research/CERN, realism and release/media dependencies
+remain listed in the full plan; they have no placeholder mission buttons.
 
 
 ## October 9 continued — Harbor Run and realism foundation
@@ -275,3 +277,93 @@ state-preservation test. The prescribed Develop Web Game keyboard run reached th
 walking world and retained 49,023 buildings/18,952 roads, but stopped after its
 first captured burst on external Overpass CORS errors. Its composed image was
 inspected; this is not a clean provider or physical-movement acceptance.
+
+## October 10 continued — Maker, personal home and local transactions
+
+H04 and the H05 personal-home journey are implemented locally. First Bearings
+opens a practice workspace so Maker can be the first branch; the return-home
+completion still requires a completed branch. A player chooses a mapped residence,
+arrives at its entrance, claims one personal workspace, enters the actual interior,
+places a usable desk and chair, rotates and undoes a change, and reviews their
+real saved field record. The arrangement exports/imports as a bounded reusable
+local design. An album desk uses the existing Three Views record when available.
+The room is a personal game space, not ownership of a real address or a shared deed.
+
+The two furniture models are Poly Haven CC0 assets by Serhii Khromov and Ethan
+Place, with original geometry/material channels and metre scale, 1K textures and
+less than 1 MB combined transfer. The original room shell, floors and doors retain
+their existing authority. Furniture placement checks wall/obstacle clearance and
+a bounded walkable route from the entrance. The existing walking controller owns
+physical contact; the furniture explicitly uses the interior-obstacle protocol,
+so low tables cannot be mistaken for accessible rooftops. H04 earns one Maker
+receipt/badge without additional money or XP.
+
+H05 uses the same owned room for item storage, record display, a return destination
+and the next-journey entry. Leaving and entering again completes one A Place to
+Return receipt/badge. Supplies/specimens move through the existing Backpack/home
+custody transaction; attached equipment stays carried. The storage disclosure
+stays open after a transfer. Snapshot consumers cannot mutate workspace or visit
+state. The default generic interior remains visually basic: these assets and the
+functional chapter do not complete the wider interior art/realism gate.
+
+Local purchases, sales, trades, wallet adjustments and home purchase/sale now
+commit the wallet with inventory/stock/deeds in the same v3 possession record.
+Failed writes change none of them. Old wallet bytes remain intact. Corrupt/future
+wallets cannot create a fresh balance. Stale home/wallet handles cannot erase a
+newer commit. Services save a funded, target-specific receipt before an effect;
+uncertain delivery retains it for recovery, without applying it to another
+vehicle or companion or guessing a refund. Vehicle-upgrade writes fail without
+installing the upgrade. Connected wallet/property transactions retain their
+existing server owners and are not certified by these local checks.
+
+The runtime audit also found calls to an Object3D removal API absent from the
+bundled Three r128. Furniture, equipment, vehicle, animal and effect cleanup now
+use the compatible parent removal operation. An unloaded/rejected player-car
+model releases its acquired asset lease. Property navigation keeps the exterior
+entrance through updates and accepts absent/structured addresses. The new home
+runtime receives its property dependency at startup; importing ordinary Explorer
+logic no longer eagerly loads browser account modules.
+
+Evidence for this delivery is under ignored `output/career-finish-20261010/`.
+Executed acceptance follows below. Earlier failed runs
+are retained: verifier serialization of a full walker graph; storage disclosure
+closure; unsupported Three removal; and the desk's incorrect rooftop classification.
+No failed or interrupted run counts as acceptance. No production deployment,
+public release, owner-save change or replacement of retained artifacts occurred.
+
+Release remains gated by a fallback that preserves the full v3 possession,
+commerce, workspace and home-journey record, followed by an actual roundtrip.
+An older build merely opening a v3 key is not sufficient compatibility evidence.
+H02's new finish/handling distinction, H06–H12, repeatable/connected/GPS work,
+expanded scientific/mining/CERN careers, vessel/fleet art, the realism gates and
+final release/media validation remain open. This delivery does not relabel them
+as complete or expose placeholder mission controls.
+
+Executed acceptance for the personal-home delivery:
+
+- The final city replay (`world-home-verified/report.json`) passes **21 checks**,
+  with zero captured page errors or failed local resources. It verifies actual
+  entry navigation, claim/enter, furniture rotation/undo, keyboard contact against
+  the desk, the in-world interaction, design export/import, item custody roundtrip,
+  departure/return, both badges and the saved layout after reload. Existing
+  fieldwork, Build/undo, room/property controls and Flower Sprint still pass.
+  Actor placement is explicit setup; this is not a fully walked route, uncoached
+  player study or physical-device test.
+- Six workspace WebGL/DOM/storage checks pass in `workspace-collision-final`,
+  including injected save failure, model/collider disposal and the prescribed
+  Develop Web Game client. Twelve existing photo/home-display checks pass in
+  `camera-final`, including deletion, restored images and the prescribed client.
+  Composed screenshots avoid the generic client's cleared WebGL-buffer read.
+- Twenty-seven actual IndexedDB cases pass in `journal-final`: both new badges
+  are atomic under failed writes, concurrent award calls and backup restore;
+  character rollback preserves them alongside earlier campaign progress.
+- The four real-browser possession/lock/recovery checks pass in `possessions`.
+  Focused transaction tests cover local economic failures and retained old saves.
+  Actual bundled-Three cleanup, walking-controller shared/fallback collision,
+  ship furniture and ordinary rooftop behavior also have executed tests.
+- Desktop and phone-width game images and controlled-scene images were inspected.
+  The current source-world run precedes only the player-car cancellation/error
+  lease repair; its explicit failure-path test and final source chain follow it.
+
+The final source-chain result is recorded in CURRENT-STATE.md and
+`output/career-finish-20261010/verify-pr-release-checkpoint.log`.

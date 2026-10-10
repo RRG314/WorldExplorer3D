@@ -1,3 +1,4 @@
+import {detachSceneObject} from '../engine/scene-object-lifecycle.js';
 import { loadModelAsset } from '../assets/model-asset-runtime.js?v=16';
 
 const PARACHUTE_ASSET_ID = 'equipment-explorer-parachute-v1';
@@ -75,7 +76,7 @@ function disposeCuratedParachuteVisual(host) {
   if (host?.userData) host.userData.curatedParachuteDisposed = true;
   const attachment = host?.userData?.curatedParachuteAttachment;
   if (!attachment) return false;
-  attachment.visual.removeFromParent?.();
+  detachSceneObject(attachment.visual);
   attachment.instance.dispose();
   delete host.userData.curatedParachuteAttachment;
   delete host.userData.curatedParachuteAssetId;

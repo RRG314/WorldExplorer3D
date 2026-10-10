@@ -123,8 +123,10 @@ Times exclude world loading and can be adjusted after player observation.
 
 ### H04 — Make a Useful Place (Maker branch; 8–15 minutes)
 
-- Enter a personal building space, choose a reading corner, workshop or display
-  area, place a small functional arrangement and use its resulting interaction.
+- Enter a personal building space and arrange a Field Journal desk, or an album
+  desk after completing Three Views. Review the actual saved record at the desk.
+  Additional workshop recipes require their own usable tools and asset acceptance;
+  they are not offered as empty alternatives.
 - Teach placement, rotation, undo and one spatial constraint. A chair or work
   surface must be reachable; counting arbitrary overlapping blocks is insufficient.
 - Reward: Maker badge and the saved arrangement as a reusable local design.
@@ -133,7 +135,9 @@ Times exclude world loading and can be adjusted after player observation.
 
 ### H05 — A Place to Return (home chapter; 5–10 minutes)
 
-- Available after H01 plus any one branch. Show eligible starter-home options
+- The practice workspace is available after H01 so Maker can be the first branch.
+  H05 completion requires H01 plus any one completed branch, including Maker.
+  Show eligible starter-home options
   with honest previews, arrival access and storage limitations.
 - Claim one personal starter home, enter it, choose a display position and show
   an earned record/photo. Set it as a return destination and test that return.

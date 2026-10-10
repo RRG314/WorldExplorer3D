@@ -1,3 +1,4 @@
+import {detachSceneObject} from '../engine/scene-object-lifecycle.js';
 import {RESEARCH_DECK} from '../boat-mode/research/layout.js';
 import {addResearchDeckVisual} from '../boat-mode/research/visual.js';
 import {batchStaticVesselParts} from './batch-static-vessel-parts.js';
@@ -412,7 +413,7 @@ function createVesselVisual(THREE, entry, options = {}) {
     });
     for (const release of managed) release();
     if (root.parent?.remove) root.parent.remove(root);
-    else root.removeFromParent?.();
+    else detachSceneObject(root);
     root.traverse((object) => {
       object.geometry?.dispose?.();
       if(object.isSprite||object.material?.userData?.ownedLocalCanvasTexture)object.material?.map?.dispose?.();

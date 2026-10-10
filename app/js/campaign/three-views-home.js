@@ -1,3 +1,4 @@
+import {detachSceneObject} from '../engine/scene-object-lifecycle.js';
 // A personal display belongs to the current interior. It grants no ownership,
 // changes no collision, and is never published to the shared building.
 export function homeAlbumPlacement(active){
@@ -15,7 +16,7 @@ export function homeAlbumPlacement(active){
 export function disposeThreeViewsHome(active){
   const display=active?.threeViewsDisplay;if(!display)return;
   active.threeViewsDisplay=null;display.disposed=true;
-  display.root?.removeFromParent();
+  detachSceneObject(display.root);
   display.resources?.forEach(resource=>resource.dispose());
 }
 

@@ -1,3 +1,4 @@
+import {createLocalCommerceModel} from '../app/js/urban-sandbox/commerce-model.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createLocalBackpackStore,BACKPACK_STORAGE_KEY} from '../app/js/player/backpack-store.js';
@@ -11,7 +12,7 @@ function setup() {
  const store=createLocalBackpackStore(storage),inventory=createEquipmentInventory();
  const item={instanceId:'sample',catalogId:'quartz',quantity:3,sourceEventId:'field:quartz',provenance:'field-discovery',metadata:{label:'Quartz',discoveryJournalProjection:true}};
  inventory.upsertItem(item);store.save(inventory.exportState());
- const economy={debit:()=>({ok:true}),credit:()=>({ok:true}),wallet:()=>({credits:100})};
+ const economy=createLocalCommerceModel({storage,backpackStore:store,inventory});
  const housing=createHousingModel({storage,backpackStore:store,inventory,economy});
  housing.buy({id:'home',price:1,locationId:'test'});writes.length=0;
  return {rows,writes,storage,store,inventory,housing,economy,item,setDeny:v=>{deny=v;}};

@@ -17,7 +17,9 @@ try {
   const store=createLocalBackpackStore();if(!await store.ready)throw Error('Writer not acquired');
   const inventory=createEquipmentInventory();inventory.upsertItem({instanceId:'test-quartz',catalogId:'quartz',quantity:4,metadata:{label:'Quartz specimen'}});
   if(!store.save(inventory.exportState()))throw Error('Save failed');
-  const model=createHousingModel({backpackStore:store,inventory,economy:{debit:()=>({ok:true}),credit:()=>({ok:true}),wallet:()=>({credits:100})}});
+  const {createLocalCommerceModel}=await import('/app/js/urban-sandbox/commerce-model.js?v=5');
+  const economy=createLocalCommerceModel({backpackStore:store,inventory});
+  const model=createHousingModel({backpackStore:store,inventory,economy});
   if(!model.buy({id:'test-home',price:1}).ok)throw Error('Home did not save');
   const original=Storage.prototype.setItem, before=localStorage.getItem(BACKPACK_STORAGE_KEY);let writes=0;
   Storage.prototype.setItem=function(key,value){if(key===BACKPACK_STORAGE_KEY)throw new DOMException('Quota','QuotaExceededError');return original.call(this,key,value);};
