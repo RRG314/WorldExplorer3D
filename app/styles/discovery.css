@@ -175,3 +175,12 @@ body:has(#urbanVehiclePrompt.show) #discoveryContextPrompt,body:has(#interiorPro
 
 .discoveryDeliveryOffer{padding:10px 0;margin-top:8px;border-top:1px solid var(--wx-line-soft)}
 .discoveryDeliveryOffer strong,.discoveryDeliveryOffer small{display:block;margin-bottom:7px;line-height:1.45}
+
+.discoveryPhotoActions{display:flex;gap:8px;flex-wrap:wrap}
+.discoveryPhotoAlbum{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-top:12px}
+.discoveryPhotoAlbum figure,.discoveryPhotoPreview{margin:0;min-width:0;width:100%}
+.discoveryPhotoAlbum img,.discoveryPhotoPreview img{display:block;width:100%;height:auto;border:1px solid var(--wx-line-soft);box-sizing:border-box}
+.discoveryPhotoAlbum figcaption,.discoveryPhotoPreview figcaption{font-size:11px;line-height:1.5;padding:6px 0}
+
+.discoveryCameraReticle{position:fixed;left:50%;top:50%;width:14px;height:14px;margin:-7px;border:1px solid #e1efff;box-shadow:0 0 2px #09131b;border-radius:50%;pointer-events:none;z-index:30}
+.discoveryCameraReticle[hidden]{display:none}

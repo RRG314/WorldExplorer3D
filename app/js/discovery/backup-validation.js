@@ -1,3 +1,4 @@
+import { THREE_VIEWS, validateThreeViewsBackup } from '../campaign/three-views.js';
 import { HARBOR_RUN, normalizeHarborRun, validateDeliveryRoute } from '../campaign/harbor-run.js';
 // Validate the entire file before opening a destructive replacement transaction.
 // Older backups may omit optional collections, but malformed rows are never dropped.
@@ -43,5 +44,8 @@ export function validateJournalBackup(input) {
         || delivery.nextPoint !== delivery.route.points.length || !data.events.some(event => event.eventId === HARBOR_RUN.receiptId
         && event.metadata?.routeId === delivery.route.id && event.eventType === 'campaign-completed'))) fail();
   }
+  if(data.albums==null)data.albums=[];
+  if(!Array.isArray(data.albums)||data.albums.length>1||data.albums.some(a=>a?.id!==THREE_VIEWS.albumId))fail();
+  try{validateThreeViewsBackup(data.profile.threeViews,data.albums[0],data.events);}catch{fail();}
   return data;
 }

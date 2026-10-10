@@ -1,3 +1,4 @@
+import { disposeThreeViewsHome } from '../campaign/three-views-home.js';
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import {
   buildingKey,
@@ -155,6 +156,7 @@ function replaceActiveInteriorFloor(active, targetLevel, deps) {
       floorBaseY: active.floorBaseY,
       curatedHome: !!active.ownedHome
     });
+    disposeThreeViewsHome(active);
     deps.disposeCuratedHomeFurnishing?.(active);
     appCtx.scene.add(sceneState.group);
     appCtx.replaceWorldCollection('dynamicBuildingColliders', sceneState.dynamicColliders.slice());
@@ -533,7 +535,8 @@ export function clearActiveInterior(options = {}, deps) {
   // fresh collection and must never inherit old district obstacles.
   appCtx.replaceWorldCollection('dynamicBuildingColliders',
     active.outsideWorldSequence === appCtx._worldLoadSequence ? (active.outsideColliders || []) : []);
-  deps.disposeCuratedHomeFurnishing?.(active);
+  disposeThreeViewsHome(active);
+    deps.disposeCuratedHomeFurnishing?.(active);
   disposeObject3D(active.group);
   appCtx.activeInterior = null;
   appCtx.interiorHint = null;

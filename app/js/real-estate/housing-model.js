@@ -253,9 +253,9 @@ function createHousingModel(options = {}) {
 
   function notify(action, home, detail = {}) {
     const event = { action, homeId: home?.id || '', label: home?.label || '', at: Number(now()) || Date.now(), ...detail };
-    state.transactions.push(event);
-    state.transactions = state.transactions.slice(-80);
-    save();
+    const previousTransactions = state.transactions;
+    state.transactions = [...previousTransactions.slice(-79), event];
+    if (!save()) { state.transactions = previousTransactions; return null; }
     if (typeof globalThis.CustomEvent === 'function') {
       globalThis.dispatchEvent?.(new CustomEvent('we3d:property-change', { detail: event }));
     }
@@ -324,8 +324,12 @@ function createHousingModel(options = {}) {
   function setPrimary(homeId) {
     const home = findHome(homeId);
     if (!home) return Object.freeze({ ok: false, reason: 'not_owned' });
+    const previous = state.primaryHomeId;
     state.primaryHomeId = home.id;
-    notify('primary-set', home);
+    if (!notify('primary-set', home)) {
+      state.primaryHomeId = previous;
+      return Object.freeze({ ok: false, reason: 'save_failed' });
+    }
     return Object.freeze({ ok: true, home: { ...home } });
   }
 

@@ -104,6 +104,38 @@ try {
     check((await store.getEventsById(['event:campaign-completed:harbor-run:v1'])).length===1,'Delivery receipt duplicated');
     check((await store.getProfile()).harborRun.phase==='complete','Completed delivery did not restore');
     cases.push('delivery-concurrent-unload-cargo-and-backup-restore');
+    const {THREE_VIEWS}=await import('/app/js/campaign/three-views.js');
+    const canvas=document.createElement('canvas');canvas.width=160;canvas.height=100;const painter=canvas.getContext('2d');
+    painter.fillStyle='#337799';painter.fillRect(0,0,160,100);painter.fillStyle='#aa7733';painter.fillRect(20,20,30,40);
+    const jpeg=canvas.toDataURL('image/jpeg',.8);
+    let photos=(await store.updateThreeViews({type:'accept',revision:0,mode:'photo',regionId:'test',regionLabel:'Test region'})).state;
+    photos=(await store.updateThreeViews({type:'choose',revision:photos.revision,subject:{id:'mapped',name:'Mapped subject',regionId:'test',regionLabel:'Test region',position:point(39)}})).state;
+    for(const [i,kind] of THREE_VIEWS.kinds.entries()){
+      const command={type:'keep',revision:photos.revision,photo:{id:`three-views:${kind}`,kind,width:160,height:100,dataUrl:jpeg},
+        view:{kind,subjectId:'mapped',regionId:'test',environment:'EARTH',travelMode:'walk',visible:true,liveGps:false,position:point(39+i*.0002),bearing:i*.4,range:[40,15,50][i],coverage:.4,fingerprint:String(i).repeat(64)}};
+      if(i===0)await atomicFailure('failed-photo-document-does-not-advance-job',()=>store.updateThreeViews(command),'profiles');
+      photos=(await store.updateThreeViews(command)).state;
+    }
+    await atomicFailure('failed-photo-receipt-keeps-review-and-all-images',()=>store.updateThreeViews({type:'finish',revision:photos.revision}));
+    const photoFinishes=await Promise.allSettled([store.updateThreeViews({type:'finish',revision:photos.revision}),createIndexedDbDiscoveryProfileStore().updateThreeViews({type:'finish',revision:photos.revision})]);
+    check(photoFinishes.filter(r=>r.status==='fulfilled').length===1,'Stale album writer accepted');
+    const photoBackup=await store.exportData();check(photoBackup.albums[0].photos.length===3,'Export omitted photographs');
+    await store.saveProfile(p=>({...p,displayName:'Photographer'}));check((await store.getThreeViewsAlbum()).photos.length===3,'Ordinary profile write erased album');
+    const oldClient=await request(indexedDB.open('world-explorer-discovery',5));check(oldClient.version===5,'Album blocked released database client');oldClient.close();
+    const missing=structuredClone(photoBackup);missing.albums=[];let rejected=false;try{await store.importData(missing);}catch{rejected=true;}
+    check(rejected&&(await store.getThreeViewsAlbum()).photos.length===3,'Missing-media backup overwrote original photos');
+    await store.importData(photoBackup);await store.updateThreeViews({type:'delete-photos',revision:(await store.getProfile()).threeViews.revision});
+    check((await store.getThreeViewsAlbum()).photos.length===0,'Delete retained images');check((await store.getEventsById([THREE_VIEWS.receiptId])).length===1,'Delete lost or duplicated completion receipt');
+    await store.importData(photoBackup);check((await store.getThreeViewsAlbum()).photos.length===3,'Import did not recover pictures');
+    await store.rollbackLastImport();check((await store.getThreeViewsAlbum()).photos.length===0,'Rollback did not restore deletion tombstone');
+    await store.importData(photoBackup);cases.push('photo-concurrency-ordinary-writes-v5-client-export-delete-import-rollback');
+    const migrationDb=await request(indexedDB.open('world-explorer-discovery'));const migrationTx=migrationDb.transaction(['migrationBackups'],'readwrite'),migrationDone=done(migrationTx);
+    migrationTx.objectStore('migrationBackups').put({id:'character-v1:local-explorer',profile:{id:'local-explorer',displayName:'Historical character'}});await migrationDone;migrationDb.close();
+    await atomicFailure('failed-character-rollback-preserves-newer-campaign',()=>store.rollbackCharacterMigration(),'migrationBackups');
+    await store.rollbackCharacterMigration();const afterCharacterRollback=await store.exportData();
+    check(afterCharacterRollback.profile.threeViews.phase==='complete'&&afterCharacterRollback.albums[0].photos.length===3,'Character rollback discarded new album progress');
+    check(afterCharacterRollback.profile.harborRun.phase==='complete'&&afterCharacterRollback.profile.openingChapter.phase==='complete','Character rollback discarded other completed careers');
+    await store.importData(afterCharacterRollback);cases.push('character-only-rollback-keeps-campaign-photos-and-valid-backup');
     const rewards=(await store.getProfile()).explorerProgress;
     await Promise.all([store.saveProfile(p=>({...p,tutorials:{...p.tutorials,first:true}})),createIndexedDbDiscoveryProfileStore().saveProfile(p=>({...p,tutorials:{...p.tutorials,second:true}}))]);
     const profile=await store.getProfile();check(profile.tutorials.first&&profile.tutorials.second,'Concurrent profile writes lost independent edits');

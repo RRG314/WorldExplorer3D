@@ -6,7 +6,7 @@ Baseline `eb18b9c7`, October 9, 2026. Production remains released 5.5.0.
 | --- | --- | --- |
 | 0 — design and authority review | Specified | Direct source review; full mission, reward, GPS, property and release specification in `EXPLORER-CAREER-PLAN.md` |
 | 1 — First Bearings | Implemented and verified locally | Explicit start, actual field procedure, exact Journal review, one badge/receipt, history recovery and reload; evidence below |
-| 2 — Pilot / Explorer / Maker | In progress | Harbor Run delivery loop implemented and verified locally; acceptance below. Photography, useful arrangement and the additional cosmetic/mastery rewards are still open. |
+| 2 — Pilot / Explorer / Maker | In progress | Harbor Run and Three Views are implemented locally; acceptance below. Useful arrangement, starter-home integration and additional cosmetic/mastery rewards remain open. |
 | 3–12 | Planned | Specific deliverables and exit checks in the plan; no gameplay completion claim |
 
 The first delivery is local and does not deploy or replace retained builds. Later
@@ -141,3 +141,68 @@ zero failed, followed by dependency, module ownership, boundary type, inventory
 and sensitivity checks. The exact final source run is `verify-pr-recovery.log`;
 the post-review runtime receipt is `runtime-recovery/report.json`. These local
 passes do not replace the full release matrix or physical-device acceptance.
+
+
+## October 10 — Three Views and save recovery, local
+
+H03 now offers actual in-game photography or an explicitly labeled observation
+record. Players choose a visible mapped subject, move between street, detail and
+setting views, review each result and finish one durable record/badge. The camera
+copies the normal renderer/composer output after drawing; it does not enable a
+persistent drawing buffer or render another scene. Foreground geometry blocks
+selection. The view rules require distinct positions and framing, and Live GPS,
+interiors and other travel modes cannot satisfy this outdoor job.
+
+Three JPEGs are bounded at 384 KiB each and held in a separate profile-owned
+document in the existing IndexedDB v5 store. Ordinary profile saves do not copy
+image data. Metadata, image changes and the completion receipt commit together.
+Export includes the media; malformed or missing referenced media fails before
+replacement. The album has a standalone HTML export, deletion controls and a
+personal home display with three bounded 512 × 384 textures. The display is
+removed immediately on deletion and disposed on interior/floor changes. The
+observation variant has a text record and never generates pretend photographs.
+
+Additional recovery repairs preserve newer campaign progress during character
+migration rollback, reject stale campaign writers, refresh different images from
+same-revision backup branches, and report failed return-home selection without
+changing the previous home. Local housing/Backpack item transfers still use
+separate writes; that is an open prerequisite for H05 storage acceptance.
+
+Executed evidence:
+
+- Full `verify:pr`: **2,243 tests passed**, then source identity/dependency,
+  ownership, boundary types, inventory and sensitivity checks. An initial source
+  failure detected an unversioned world-click import; it now uses the existing
+  v3 module identity.
+- **24 actual IndexedDB cases** pass, including image quota failures, completion
+  races, v5 client access, media export/delete/import/rollback, and atomic
+  character-only rollback retaining the newer careers and album.
+- **15 controlled city checks** pass with no captured page errors or failed local
+  resources. The normal renderer produced three distinct city photographs; DOM
+  controls kept/completed/exported/restored them and reload retained the album.
+  Foreground occlusion was enabled in the final city run. Camera/actor poses are
+  explicit test setup, not an uncoached walk between viewpoints.
+- **12 camera/home component checks** pass, covering failed-save recovery,
+  actual frame capture, occlusion, bounded home textures, immediate deletion,
+  same-revision restore, observation mode, future state and complete disposal.
+  The prescribed action client chooses and captures a real frame. Its screenshot
+  adapter uses the browser's composed image because the generic client's delayed
+  canvas read returned a cleared WebGL buffer. The final headed client image and
+  city desktop/phone images were inspected.
+
+Home display placement/cleanup is verified in a controlled scene. It is not yet
+an acceptance run through starter-home claim, actual furnished-room placement and
+return travel. H04/H05 and the later campaign remain open. The final reticle,
+backup-cache and recovery refinements have component/source evidence following
+the city run. No release matrix, physical-phone test or retention claim is added.
+Production, dist and the four saved packages are unchanged. Private receipts are
+under ignored `output/career-continuation-20261010/` (final city: `world-occlusion`,
+final camera: `camera-complete`, storage: `journal-final`).
+
+The final album render cache avoids decoding/rebuilding unchanged images on normal
+Journal refreshes; the reticle changes its DOM visibility only when necessary.
+The twelve-case component/action check passes again after that refinement.
+
+Continue later puts the camera away without abandoning the job. Equal-revision
+backup restore replaces the home display as well as the Journal thumbnails; both
+behaviors are exercised in the final twelve-case component check.

@@ -26,6 +26,21 @@ function mappedBuilding(overrides = {}) {
   };
 }
 
+test('failed return-home selection keeps the previous saved home and can be retried', () => {
+  const storage=memoryStorage(),write=storage.setItem;let fail=false;
+  storage.setItem=(...args)=>{if(fail)throw Error('Quota exceeded');write(...args);};
+  const economy={debit:()=>({ok:true,credits:100}),wallet:()=>({credits:100})};
+  const model=createHousingModel({storage,economy});
+  model.buy({id:'first',price:1});model.buy({id:'second',price:1});
+  const before=model.snapshot();fail=true;
+  assert.deepEqual(model.setPrimary('second'),{ok:false,reason:'save_failed'});
+  assert.equal(model.snapshot().primaryHomeId,'first');
+  assert.deepEqual(model.snapshot().transactions,before.transactions);
+  assert.equal(createHousingModel({storage,economy}).snapshot().primaryHomeId,'first');
+  fail=false;assert.equal(model.setPrimary('second').ok,true);
+  assert.equal(createHousingModel({storage,economy}).snapshot().primaryHomeId,'second');
+});
+
 test('public mapped addresses omit private resident fields and never invent missing values', () => {
   const address = mappedBuildingAddress({
     'addr:housenumber': '12', 'addr:street': 'Harbor Street', 'addr:city': 'Baltimore',

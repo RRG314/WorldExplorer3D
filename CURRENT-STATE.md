@@ -526,3 +526,32 @@ now expires November 6 at 22:26:58 UTC. This exact-live copy is separate from th
 reviewed save-compatible 37a fallback.
 
 Chrome startup repair: complete source verification passes 2,147 tests plus dependency, ownership, type, inventory and sensitivity checks. Packaging and preview verification follow.
+
+
+## October 10 — Three Views and recovery checkpoint, local
+
+The photography branch now captures the actual rendered city, enforces three
+visible/distinct viewpoints, offers honest observation-only play, and saves one
+album/badge/receipt. It includes bounded image storage, export/delete, backup
+validation and a personal home-display implementation. Images are separate from
+ordinary profile metadata in the existing IndexedDB v5 database. Character
+migration rollback now preserves later campaign progress; failed primary-home
+selection leaves the previous saved home intact.
+
+Full source verification passes **2,243 tests** and the source/ownership/type/
+inventory/sensitivity chain. Twenty-four actual IndexedDB cases, fifteen
+controlled city cases and twelve WebGL/DOM camera-home cases pass. Actual city
+images and desktop/phone layouts were inspected. The prescribed action client
+passes with composed browser screenshots; its generic delayed canvas screenshot
+read a cleared drawing buffer, which was a verification-method issue. Home
+placement/cleanup is component evidence, not a full furnished-home ownership and
+return journey. The source, storage and component refinements follow the city run.
+
+The full campaign is **not finished**. H02 cosmetic/mastery, H04 arrangements,
+H05 starter homes and later ocean/space/GPS/co-op phases remain open, followed by
+the realism delivery gates. The housing audit found separate unchecked local
+home/Backpack item writes; resolve that ownership/recovery problem before H05
+storage acceptance. City capture also shows that landmark semantics and generic
+facades still need the R2 visual/data treatment; a higher-resolution texture alone
+will not correct them. See `docs/design/EXPLORER-CAREER-DELIVERY.md` for bounded
+acceptance and the remaining work. No deployment or public release change.

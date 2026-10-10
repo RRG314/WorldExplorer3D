@@ -313,3 +313,16 @@ provider or claim of worldwide surveyed photorealism is assumed.
 The architecture, rollout order and provisional budgets above are project design
 judgments based on these references and the inspected code. They are not claims
 that another engine or game solves this project's missing content automatically.
+
+
+## Additional observed scene issue — October 10
+
+The Three Views city journey provides a reproducible R2 case: the loaded feature
+`overture:25ccfdfc-084c-4595-a6e6-c1723df352f6`, labeled Battle Monument, is
+represented by a narrow generic building facade. Its landmark form is not
+communicated by that geometry. Review source classification, landmark admission
+and any existing specific representation before applying building materials.
+This is an observed representation mismatch, not a claim that the source geometry
+or the surrounding street reconstruction has been surveyed. The final city
+photographs are in the ignored career-continuation evidence folder. Campaign
+capture adds no road, bridge, tunnel, terrain or building geometry changes.

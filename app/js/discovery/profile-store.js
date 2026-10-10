@@ -1,3 +1,4 @@
+import { THREE_VIEWS, normalizeThreeViews, emptyPhotoAlbum, transitionThreeViews } from '../campaign/three-views.js';
 import {supportRecorder} from '../runtime/support-receipt.js';
 import { normalizeCameraFavorites } from '../live-earth/public-camera-directory.js';
 import { validateJournalBackup } from './backup-validation.js?v=1';
@@ -99,6 +100,7 @@ function createDefaultProfile() {
     explorerProgress: defaultExplorerProgress(),
     openingChapter: normalizeOpeningChapter(),
     harborRun: normalizeHarborRun(),
+    threeViews: normalizeThreeViews(),
     characterState: createDefaultCharacterState()
   };
 }
@@ -117,6 +119,7 @@ function normalizeProfile(profile) {
     explorerProgress: normalizeExplorerProgress(profile?.explorerProgress),
     openingChapter: normalizeOpeningChapter(profile?.openingChapter),
     harborRun: normalizeHarborRun(profile?.harborRun),
+    threeViews: normalizeThreeViews(profile?.threeViews),
     characterState: normalizeCharacterState(profile?.characterState),
     schemaVersion: DISCOVERY_DB_VERSION,
     updatedAt: Date.now()
@@ -393,6 +396,35 @@ function createIndexedDbDiscoveryProfileStore(options = {}) {
       try { transaction?.abort(); } catch { /* Already ended. */ }
       throw error;
     } finally { db.close(); }
+  }
+
+  // Album images live in a separate profile-owned document. Ordinary profile
+  // reads and gate updates never deserialize/rewrite image bytes. The existing
+  // store keeps media, evidence and completion in one transaction without a DB
+  // version upgrade that would prevent the released client opening old saves.
+  async function getThreeViewsAlbum() {
+    const db=await open();
+    try {
+      const tx=db.transaction(['profiles'],'readonly');
+      const album=await requestPromise(tx.objectStore('profiles').get(THREE_VIEWS.albumId));
+      await transactionPromise(tx);return clone(album||emptyPhotoAlbum());
+    } finally {db.close();}
+  }
+  async function updateThreeViews(command, now=Date.now()) {
+    const db=await open();let transaction;
+    try {
+      await ensureCharacterMigration(db);
+      transaction=db.transaction(['profiles','events',JOURNAL_ORDER_STORE],'readwrite');
+      const profiles=transaction.objectStore('profiles');
+      const [current,album]=await Promise.all([requestPromise(profiles.get(PROFILE_ID)),requestPromise(profiles.get(THREE_VIEWS.albumId))]);
+      if(command.type==='accept'&&current?.openingChapter?.phase!=='complete')throw Error('Finish First Bearings before starting this job.');
+      const result=transitionThreeViews(current?.threeViews,album,command,now);
+      profiles.put(normalizeProfile({...current,threeViews:result.state}));
+      if(result.album.photos.length)profiles.put(result.album);else profiles.delete(THREE_VIEWS.albumId);
+      if(result.event){const event=createExplorerStoryEvent(result.event);transaction.objectStore('events').put(event);putJournalOrder(transaction,'events',event);}
+      await transactionPromise(transaction);return clone(result);
+    } catch(error){try{transaction?.abort();}catch{}throw error;}
+    finally{db.close();}
   }
 
   async function recordDiscovery(record, policy = {}) {
@@ -782,9 +814,9 @@ function createIndexedDbDiscoveryProfileStore(options = {}) {
   }
 
   async function rollbackCharacterMigration() {
-    const db = await open();
+    const db = await open();let transactionToAbort;
     try {
-      const transaction = db.transaction(['profiles', 'migrationBackups'], 'readwrite');
+      const transaction = transactionToAbort = db.transaction(['profiles', 'migrationBackups'], 'readwrite');
       const backups = transaction.objectStore('migrationBackups');
       const backup = await requestPromise(backups.get(CHARACTER_MIGRATION_BACKUP_ID));
       if (!backup?.profile) {
@@ -796,12 +828,15 @@ function createIndexedDbDiscoveryProfileStore(options = {}) {
         ...createDefaultCharacterState({ now: rolledBackAt }),
         migration: { version: 1, rolledBackAt, backupAvailable: true }
       });
-      transaction.objectStore('profiles').put(normalizeProfile({ ...backup.profile, characterState }));
+      // Roll back character creation only. Newer Journal/career state and
+      // preferences do not belong to the historical character migration.
+      const current = await requestPromise(transaction.objectStore('profiles').get(PROFILE_ID));
+      transaction.objectStore('profiles').put(normalizeProfile({ ...(current || backup.profile), characterState }));
       backups.put({ ...backup, rolledBackAt });
       await transactionPromise(transaction);
       characterMigrationReady = true;
       return true;
-    } finally {
+    } catch(error) {try{transactionToAbort?.abort();}catch{}throw error;} finally {
       db.close();
     }
   }
@@ -814,7 +849,7 @@ function createIndexedDbDiscoveryProfileStore(options = {}) {
       const tx = db.transaction(names, 'readonly');
       const rows = await Promise.all(names.map(name => requestPromise(tx.objectStore(name).getAll())));
       await transactionPromise(tx);
-      return {schemaVersion:DISCOVERY_DB_VERSION, exportedAt:Date.now(), profile:rows[0].find(p=>p.id===PROFILE_ID), items:rows[1], fieldGuide:rows[2], companions:rows[3], events:rows[4]};
+      return {schemaVersion:DISCOVERY_DB_VERSION, exportedAt:Date.now(), profile:rows[0].find(p=>p.id===PROFILE_ID), albums:rows[0].filter(p=>p.id===THREE_VIEWS.albumId), items:rows[1], fieldGuide:rows[2], companions:rows[3], events:rows[4]};
     } finally { db.close(); }
   }
 
@@ -877,6 +912,7 @@ function createIndexedDbDiscoveryProfileStore(options = {}) {
             updatedAt: Date.now()
           };
       profiles.put(importedProfile);
+      for(const album of data.albums)profiles.put(clone(album));
       const items = Array.isArray(data.items) ? data.items : [];
       const companions = Array.isArray(data.companions) ? data.companions : [];
       items.forEach((item) => {
@@ -928,6 +964,8 @@ function createIndexedDbDiscoveryProfileStore(options = {}) {
     startOpeningChapter,
     completeOpeningChapter,
     updateHarborRun,
+    updateThreeViews,
+    getThreeViewsAlbum,
     rollbackCharacterMigration,
     rollbackLastImport,
     saveCompanion,
@@ -940,6 +978,7 @@ function createMemoryDiscoveryProfileStore(seed = {}) {
   let beforeImport = null;
   let legacyProfileBackup = seed.profile && !seed.profile.characterState ? clone(seed.profile) : null;
   let profile = normalizeProfile(seed.profile);
+  let photoAlbum = clone(seed.albums?.find(a=>a.id===THREE_VIEWS.albumId)||emptyPhotoAlbum());
   if (legacyProfileBackup) {
     profile = normalizeProfile({
       ...legacyProfileBackup,
@@ -1061,6 +1100,14 @@ function createMemoryDiscoveryProfileStore(seed = {}) {
       events.set(event.eventId, event);
       return { recorded: true, event: clone(event), profile: clone(profile) };
     },
+    async getThreeViewsAlbum(){return clone(photoAlbum);},
+    async updateThreeViews(command,now=Date.now()){
+      if(command.type==='accept'&&profile.openingChapter?.phase!=='complete')throw Error('Finish First Bearings before starting this job.');
+      const result=transitionThreeViews(profile.threeViews,photoAlbum,command,now);
+      profile=normalizeProfile({...profile,threeViews:result.state});photoAlbum=clone(result.album);
+      if(result.event){const event=createExplorerStoryEvent(result.event);events.set(event.eventId,event);}
+      return clone(result);
+    },
     async updateHarborRun(command, now = Date.now()) {
       const harborRun = transitionHarborRun(profile.harborRun, command, now);
       profile = normalizeProfile({ ...profile, harborRun });
@@ -1145,7 +1192,7 @@ function createMemoryDiscoveryProfileStore(seed = {}) {
       if (!legacyProfileBackup) return false;
       const rolledBackAt = Date.now();
       profile = normalizeProfile({
-        ...legacyProfileBackup,
+        ...profile,
         characterState: {
           ...createDefaultCharacterState({ now: rolledBackAt }),
           migration: { version: 1, rolledBackAt, backupAvailable: true }
@@ -1157,6 +1204,7 @@ function createMemoryDiscoveryProfileStore(seed = {}) {
       return {
         schemaVersion: DISCOVERY_DB_VERSION,
         profile: clone(profile),
+        albums: photoAlbum.photos.length?[clone(photoAlbum)]:[],
         items: [...items.values()].map(clone),
         fieldGuide: [...guide.values()].map(clone),
         companions: [...companions.values()].map(clone),
@@ -1165,6 +1213,7 @@ function createMemoryDiscoveryProfileStore(seed = {}) {
     },
     async rollbackLastImport() {
       if (!beforeImport) return false;
+      photoAlbum=clone(beforeImport.photoAlbum);
       profile = clone(beforeImport.profile); legacyProfileBackup = clone(beforeImport.legacyProfileBackup);
       for (const [name,map] of Object.entries({items,guide,companions,events,claims,outbox})) {
         map.clear(); for (const [id,row] of beforeImport[name]) map.set(id,clone(row));
@@ -1173,7 +1222,7 @@ function createMemoryDiscoveryProfileStore(seed = {}) {
     },
     async importData(data = {}) {
       data = validateJournalBackup(data);
-      beforeImport = clone({profile, legacyProfileBackup, items:[...items], guide:[...guide], companions:[...companions], events:[...events], claims:[...claims], outbox:[...outbox]});
+      beforeImport = clone({profile, photoAlbum, legacyProfileBackup, items:[...items], guide:[...guide], companions:[...companions], events:[...events], claims:[...claims], outbox:[...outbox]});
       const importedByInstance = new Map(data.items.map(item=>[item.instanceId,item]));
       const importedByClaim = new Map(data.items.filter(item=>item.claimId).map(item=>[item.claimId,item]));
       for (const [id,row] of outbox) {
@@ -1192,6 +1241,7 @@ function createMemoryDiscoveryProfileStore(seed = {}) {
             backupAvailable: true
           });
       profile = normalizeProfile({ ...data.profile, characterState: importedCharacter });
+      photoAlbum=clone(data.albums.find(a=>a.id===THREE_VIEWS.albumId)||emptyPhotoAlbum());
       items.clear(); guide.clear(); companions.clear(); events.clear(); claims.clear();
       (data.items || []).filter((item) => item?.instanceId && item?.catalogId).forEach((item) => items.set(item.instanceId, clone(item)));
       for (const item of items.values()) if (item.claimId) claims.set(item.claimId,{claimId:item.claimId,item:clone(item),event:null});
