@@ -5,6 +5,11 @@ Design baseline: October 9, 2026. Implementation begins from `eb18b9c7` on
 that the later features already work. Delivery evidence is kept in
 `EXPLORER-CAREER-DELIVERY.md` beside this document.
 
+October 10 expansion: [Research careers and CERN](RESEARCH-CAREERS-AND-CERN.md)
+defines broad specialist campaigns, mining, physical asset admission and reuse of
+the existing Collision Lab. This extends the sequence below without resetting
+existing progress or adding a separate progression authority.
+
 ## 1. Product direction
 
 World Explorer is a browser sandbox in which a player builds a personal history

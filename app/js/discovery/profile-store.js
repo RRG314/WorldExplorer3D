@@ -150,7 +150,7 @@ function openingChapterReceipt(chapter, evidence) {
     name: 'First Bearings complete', detail: 'First Bearings badge earned. A local discovery recorded and reviewed.',
     occurredAt: chapter.completedAt, regionId: chapter.regionId, regionLabel: chapter.regionLabel,
     environment: 'EARTH', locationKey: evidence.locationKey, locationSnapshot: evidence.locationSnapshot,
-    metadata: { chapterId: FIRST_BEARINGS.id, evidenceEventId: evidence.eventId },
+    metadata: { chapterId: FIRST_BEARINGS.id, careerId: chapter.careerId, evidenceEventId: evidence.eventId },
     projections: { profile: false, place: false }, points: 0
   });
 }

@@ -3280,6 +3280,11 @@ function startUrbanSandboxRuntime(options = {}) {
   document.addEventListener('keydown', state.onStoreKeyDown);
   const controlsOnlyReasons = new Set(['ammunition-reloaded','ammunition-added','quantity-added','equipment-consumed','equipped-changed','hotbar-changed']);
   state.unsubscribeBackpack = state.equipment.subscribe(change => {
+    if (change.reason === 'possessions-committed') {
+      state.backpackSaveFailed = false;
+      if (activeWorldMatches(state)) renderEquipment(state);
+      return;
+    }
     const saved = controlsOnlyReasons.has(change.reason)
       ? backpackStore.saveControls(state.equipment.exportControls())
       : backpackStore.save(state.equipment.exportState());

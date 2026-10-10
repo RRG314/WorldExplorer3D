@@ -190,6 +190,7 @@ export const currentContractTests = [
   'tests/graphics-call-evidence-current.test.mjs',
   'tests/ground-reconstruction-current.test.mjs',
   'tests/home-property-current.test.mjs',
+  'tests/home-backpack-transaction.test.mjs',
   'tests/interstellar-expedition-current.test.mjs',
   'tests/living-world-demand-current.test.mjs',
   'tests/living-world-population-distribution-current.test.mjs',

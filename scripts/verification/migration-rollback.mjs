@@ -113,7 +113,7 @@ try {
       check((await store.listPendingReceipts('disposable-unrelated-account')).some(row => same(row, seed.pendingReceipt)), 'Another account pending receipt changed');
       check(localStorage.getItem('world-explorer:condition-outbox:v1:disposable-unrelated-account') === seed.pendingCondition, 'Another account offline intent changed');
       check(backpack.load().ammo['pulse-sidearm'].magazine === expectedMagazine, 'Backpack controls lost across artifact switch');
-      check(!!localStorage.getItem('world-explorer:character-backpack:migration-backup:v1'), 'Legacy Backpack backup lost');
+      check(!!localStorage.getItem(backpack.backupKey), 'Legacy Backpack backup lost');
       const record = { eventId: `compat:${label}`, eventType: 'location-visit', sourceId: 'compatibility-test', name: `Save compatibility: ${label}`, occurredAt: Date.now(), points: 1, metadata: { retained: label } };
       const saved = await store.recordExplorerEvent(record);
       check(saved.recorded === true, 'New Journal write did not commit');

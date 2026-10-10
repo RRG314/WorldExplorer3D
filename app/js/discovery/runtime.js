@@ -1,3 +1,4 @@
+import { researchStarter, availableResearchStarters, starterAcceptsActivity } from '../campaign/research-starters.js';
 import { createThreeViewsRuntime } from '../campaign/three-views-runtime.js';
 import { threeViewsBadge } from '../campaign/three-views.js';
 import { createHarborRunRuntime } from '../campaign/harbor-run-runtime.js';
@@ -251,36 +252,41 @@ function createDiscoveryUi(state) {
   let expeditionSignature = '';
   let openingChapter = normalizeOpeningChapter();
   let chapterBusy = false;
+  let starterChoice = 'general';
   let chapterMessage = '';
   let refreshSequence = 0;
   let disposed = false;
 
-  function hasChapterLead() {
-    return state.fieldExpedition?.snapshot?.(playerPosition(state.appCtx))?.objectives?.some(row =>
-      !row.complete && (!ACTIVITY_TOOL[row.activityId] || state.entitlements.canUseTool(ACTIVITY_TOOL[row.activityId]).allowed)) === true;
+  function chapterLeads(careerId = openingChapter.phase === 'available' ? starterChoice : openingChapter.careerId) {
+    return state.chapterLeads?.(careerId) || [];
   }
+  function hasChapterLead() { return chapterLeads().length > 0; }
 
   function renderOpeningChapter() {
     if (disposed || !elements.chapter) return;
     const chapter = openingChapter;
     const here = chapter.regionId === state.worldIdentityId && state.appCtx.getEnv?.() === 'EARTH';
     const earth = state.appCtx.getEnv?.() === 'EARTH';
+    const supported = chapter.schemaVersion === 1 && !!researchStarter(chapter.careerId);
+    const choices = availableResearchStarters(state.chapterLeads?.('general') || []);
+    if (chapter.phase === 'available' && !choices.some(row=>row.id===starterChoice)) starterChoice = 'general';
+    const starter = researchStarter(chapter.phase === 'available' ? starterChoice : chapter.careerId);
     const hasLead = hasChapterLead();
-    const supported = chapter.schemaVersion === 1;
     const phase = supported ? chapter.phase : 'unavailable';
     const copy = phase === 'complete' ? 'Badge earned. Your first chapter is saved with your discoveries.'
       : phase === 'review' ? `You recorded ${chapter.resultName || 'a discovery'}. Review that entry to finish your chapter.`
-      : phase === 'active' ? (here ? 'Choose a nearby field lead, record what you find, then review it in your Journal.' : `Continue your fieldwork in ${chapter.regionLabel || 'the place where you started'}. Your progress is kept.`)
+      : phase === 'active' ? (here ? starter.brief : `Continue your fieldwork in ${chapter.regionLabel || 'the place where you started'}. Your progress is kept.`)
       : phase === 'unavailable' ? 'This chapter needs a newer version of World Explorer.'
-      : earth ? (hasLead ? 'Make a local discovery, keep the record and earn your First Bearings badge. Optional · no time limit.' : 'No fresh field lead is ready in this area. Try another Earth location to begin.') : 'Start this chapter when you return to an Earth location.';
+      : earth ? (hasLead ? `${starter.question} Keep one field record and review it to earn First Bearings. Optional · no time limit.` : 'No fresh field lead is ready in this area. Try another Earth location to begin.') : 'Start this chapter when you return to an Earth location.';
     const action = phase === 'available' && earth && hasLead ? ['start', 'Begin chapter']
-      : phase === 'active' && here && hasLead ? ['leads', 'Choose a nearby lead']
+      : phase === 'active' && here && hasLead ? ['leads', 'Go to the field lead']
       : phase === 'review' ? ['review', 'Review your record']
       : phase === 'complete' ? ['profile', 'View your badge'] : null;
     const durable = state.profileStore.type === 'IndexedDbDiscoveryProfileStore';
     elements.chapter.dataset.chapterPhase = phase;
     elements.chapter.setAttribute('aria-busy', String(chapterBusy));
-    elements.chapter.innerHTML = `<span class="discoveryChapterEyebrow">FROM THE HARBOR · OPENING CHAPTER</span><strong>First Bearings${phase === 'complete' ? ' · Complete' : ''}</strong><p>${escapeHtml(copy)}</p>${action ? `<button type="button" data-chapter-action="${action[0]}"${chapterBusy ? ' disabled' : ''}>${action[1]}</button>` : ''}<small>${durable ? 'Progress saved on this device' : 'Session only · export your Journal before leaving'}${chapterMessage ? ` · ${escapeHtml(chapterMessage)}` : ''}</small>`;
+    const chooser = phase === 'available' && earth && choices.length ? `<label class="discoveryStarterChoice" for="discoveryStarterChoice">Choose your first field assignment<select id="discoveryStarterChoice"${chapterBusy ? ' disabled' : ''}>${choices.map(row=>`<option value="${row.id}"${row.id===starterChoice ? ' selected' : ''}>${escapeHtml(row.label)}</option>`).join('')}</select></label>` : '';
+    elements.chapter.innerHTML = `<span class="discoveryChapterEyebrow">FROM THE HARBOR · OPENING CHAPTER</span><strong>First Bearings${phase === 'complete' ? ' · Complete' : ''}</strong>${chooser}<p>${escapeHtml(copy)}</p>${starter && starter.id !== 'general' ? `<small>Result: ${escapeHtml(starter.result)}</small>` : ''}${action ? `<button type="button" data-chapter-action="${action[0]}"${chapterBusy ? ' disabled' : ''}>${action[1]}</button>` : ''}<small>${durable ? 'Progress saved on this device' : 'Session only · export your Journal before leaving'}${chapterMessage ? ` · ${escapeHtml(chapterMessage)}` : ''}</small>`;
   }
 
   async function chapterAction(action) {
@@ -290,16 +296,20 @@ function createDiscoveryUi(state) {
     renderOpeningChapter();
     try {
       if (action === 'start') {
-        if (!hasChapterLead()) throw new Error('No fresh field lead is ready here. Try another Earth location.');
+        const lead = chapterLeads()[0];
+        if (!lead) throw new Error('No fresh field lead is ready here. Try another Earth location.');
         const profile = await state.profileStore.startOpeningChapter({ regionId: state.worldIdentityId,
-          regionLabel: state.regionLabel, environment: state.appCtx.getEnv?.() });
+          regionLabel: state.regionLabel, environment: state.appCtx.getEnv?.(), careerId: starterChoice });
         if (disposed) return;
         openingChapter = normalizeOpeningChapter(profile.openingChapter);
         state.appCtx.restartTutorial?.('explore');
+        if (!await state.startFieldObjective?.(lead.id, {careerId:openingChapter.careerId})) {
+          throw Error('Your chapter is saved. This lead is no longer available; choose Go to the field lead to continue nearby.');
+        }
         setOpen(false);
       } else if (action === 'leads') {
-        const route = elements.expedition?.closest('details');
-        if (route) { route.open = true; route.scrollIntoView({ block: 'nearest' }); }
+        const lead = chapterLeads()[0];
+        if (!lead || !await state.startFieldObjective?.(lead.id, {careerId:openingChapter.careerId})) throw Error('That field lead is unavailable. Your chapter is kept; try another nearby lead.');
       } else if (action === 'review') {
         if (elements.journalCategory) elements.journalCategory.value = 'all';
         if (elements.journalRegion) elements.journalRegion.value = 'all';
@@ -760,6 +770,10 @@ function createDiscoveryUi(state) {
   listen(elements.guideCategory, 'change', renderGuide);
   listen(elements.journalCategory, 'change', renderJournal);
   listen(elements.journalRegion, 'change', renderJournal);
+  listen(elements.chapter, 'change', (event) => {
+    if (event.target?.id !== 'discoveryStarterChoice' || chapterBusy) return;
+    starterChoice = event.target.value; renderOpeningChapter();
+  });
   listen(elements.chapter, 'click', (event) => {
     const button = event.target?.closest?.('[data-chapter-action]');
     if (button) void chapterAction(button.dataset.chapterAction);
@@ -2125,9 +2139,17 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
     if (!selected) return false;
     return state.handlePrimary();
   };
-  state.startFieldObjective = async (slotId) => {
-    const objective = state.fieldExpedition.snapshot(playerPosition(appCtx), state.evaluateFieldTarget)
-      .objectives.find((entry) => entry.slotId === slotId && !entry.complete);
+  state.chapterLeads = (careerId = 'general') => {
+    const position=playerPosition(appCtx),progress=state.fieldSession.snapshot().fieldProgress;
+    return fieldActivities.slots.filter(slot=>!claimedIds.has(slot.claimId) && RELEASED_EXPLORER_ACTIVITIES.has(slot.activityId)
+      && starterAcceptsActivity(careerId,slot.activityId) && slotAvailableAtProgress(slot,progress)
+      && (!ACTIVITY_TOOL[slot.activityId] || state.entitlements.canUseTool(ACTIVITY_TOOL[slot.activityId]).allowed))
+      .sort((a,b)=>Math.hypot(a.position.x-position.x,a.position.z-position.z)-Math.hypot(b.position.x-position.x,b.position.z-position.z));
+  };
+  state.startFieldObjective = async (slotId, {careerId} = {}) => {
+    const objective = careerId ? state.chapterLeads(careerId).find(entry=>entry.id===slotId)
+      : state.fieldExpedition.snapshot(playerPosition(appCtx), state.evaluateFieldTarget)
+        .objectives.find(entry => entry.slotId === slotId && !entry.complete);
     if (!objective) return false;
     const activityId = objective.activityId;
     const toolId = ACTIVITY_TOOL[activityId];

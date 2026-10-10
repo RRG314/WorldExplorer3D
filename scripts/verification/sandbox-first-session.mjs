@@ -60,7 +60,10 @@ try {
  };
  await page.goto(url,{waitUntil:'domcontentloaded'});await ready();
  await page.evaluate(async()=>{const{ctx}=await import('/app/js/shared-context.js?v=55');ctx.setTimeOfDay?.('day');ctx.setWeatherMode?.('clear');});
- if(process.env.WE3D_SANDBOX_FLOWER_ONLY !== '1') {
+ if(process.env.WE3D_SANDBOX_RELOAD_ONLY === '1') {
+  await page.reload({waitUntil:'domcontentloaded'});await ready();report.checks.entryAndReturnReload=true;
+ }
+ if(process.env.WE3D_SANDBOX_FLOWER_ONLY !== '1' && process.env.WE3D_SANDBOX_RELOAD_ONLY !== '1') {
  await page.locator('#backpackBtn').click();
  await page.locator('#fBackpack').click();
  await page.locator('#urbanEquipment.show').waitFor({state:'visible'});
@@ -81,16 +84,36 @@ try {
  assert.equal(await page.locator('#discoveryPanel').evaluate(e=>e.scrollWidth>e.clientWidth+1),false);
  await page.setViewportSize({width:1440,height:900});
  if(process.env.WE3D_SANDBOX_CHAPTER==='1') {
+  if(process.env.WE3D_SANDBOX_RESEARCH) {
+   await page.locator('#discoveryStarterChoice').selectOption(process.env.WE3D_SANDBOX_RESEARCH);
+   await page.locator('#discoveryStarterChoice').scrollIntoViewIfNeeded();
+   await page.screenshot({path:`${out}/research-choice-desktop.png`});
+   await page.setViewportSize({width:390,height:844});
+   await page.locator('#discoveryStarterChoice').scrollIntoViewIfNeeded();
+   await page.screenshot({path:`${out}/research-choice-phone.png`});
+   assert.equal(await page.locator('#discoveryPanel').evaluate(e=>e.scrollWidth>e.clientWidth+1),false);
+   await page.setViewportSize({width:1440,height:900});
+  }
   await page.locator('[data-chapter-action="start"]').click();
   await page.waitForFunction(()=>!document.getElementById('discoveryPanel')?.classList.contains('show'));
  } else await page.locator('#discoveryFirstJourneyBtn').click();
  assert.equal(await page.evaluate(()=>globalThis.__sandboxTestContext.getTutorialSnapshot().completed),false);
  // Route selection uses the real field plan and entitlement checks.
- await page.evaluate(async()=>{const{ctx}=await import('/app/js/shared-context.js?v=55');ctx.openWorldDiscoverySection('today');});
- await page.locator('.discoveryTodayRoute summary').click();
- const objective=await page.locator('[data-field-objective]:not([disabled])').first().getAttribute('data-field-objective');
+ let objective;
+ if(process.env.WE3D_SANDBOX_RESEARCH) {
+  await page.waitForFunction(()=>!!__sandboxTestContext.worldDiscoveryRuntime.fieldSession.snapshot().targetId);
+  objective=await page.evaluate(()=>__sandboxTestContext.worldDiscoveryRuntime.fieldSession.snapshot().targetId);
+  const selected=await page.evaluate(async()=>(await __sandboxTestContext.discoveryProfileStore.getProfile()).openingChapter.careerId);
+  assert.equal(selected,process.env.WE3D_SANDBOX_RESEARCH);
+  await page.screenshot({path:`${out}/research-started.png`});
+ } else {
+  await page.evaluate(async()=>{const{ctx}=await import('/app/js/shared-context.js?v=55');ctx.openWorldDiscoverySection('today');});
+  await page.locator('.discoveryTodayRoute summary').click();
+  objective=await page.locator('[data-field-objective]:not([disabled])').first().getAttribute('data-field-objective');
+  await page.locator(`[data-field-objective="${objective}"]`).click();
+ }
  assert.ok(objective,'World must supply a valid field opportunity');
- await page.locator(`[data-field-objective="${objective}"]`).click();
+ if(process.env.WE3D_SANDBOX_RESEARCH) report.checks.researchChoiceAndTarget=true;
  const setup=await page.evaluate(async id=>{
   const{ctx}=await import('/app/js/shared-context.js?v=55');const state=ctx.worldDiscoveryRuntime;
   const slot=state.publication.fieldActivities.slots.find(s=>s.id===id);
@@ -252,7 +275,7 @@ try {
  report.checks.flowerSprintReceipt=true;
  report.errors=errors;report.failedLocal=failedLocal;assert.deepEqual(errors,[]);assert.deepEqual(failedLocal,[]);
  report.ok=true;
-} catch(error){report.errors=errors;report.failedLocal=failedLocal;report.error=String(error.stack||error);if(page){await page.screenshot({path:`${out}/failure.png`}).catch(()=>{});report.state=await page.evaluate(()=>{const d=globalThis.getWorldExplorerRuntimeDiagnostics?.();return {photos:d?.worldDiscovery?.threeViews,harbor:d?.worldDiscovery?.harborRun,worldLoading:d?.worldLoading,environment:d?.environment,interaction:d?.worldDiscovery?.interaction,loading:document.getElementById('loading')?.textContent,flower:{mode:globalThis.__sandboxTestContext?.Walk?.state?.mode,walker:{x:globalThis.__sandboxTestContext?.Walk?.state?.walker?.x,y:globalThis.__sandboxTestContext?.Walk?.state?.walker?.y,z:globalThis.__sandboxTestContext?.Walk?.state?.walker?.z},marker:globalThis.__sandboxTestContext?.scene?.getObjectByName('redFlowerChallenge')?.position,backend:globalThis.__sandboxTestContext?.getFlowerChallengeBackendStatus?.(),receipts:globalThis.__sandboxSavedResults}};}).catch(()=>null);}throw error;}
+} catch(error){report.errors=errors;report.failedLocal=failedLocal;report.error=String(error.stack||error);if(page){await page.screenshot({path:`${out}/failure.png`}).catch(()=>{});report.state=await page.evaluate(()=>{const d=globalThis.getWorldExplorerRuntimeDiagnostics?.();return {gameStarted:d?.gameStarted,worldCounts:d?.worldCounts,worldLoad:d?.worldLoad,activeActor:d?.activeActor,photos:d?.worldDiscovery?.threeViews,harbor:d?.worldDiscovery?.harborRun,worldLoading:d?.worldLoading,environment:d?.environment,interaction:d?.worldDiscovery?.interaction,loading:document.getElementById('loading')?.textContent,flower:{mode:globalThis.__sandboxTestContext?.Walk?.state?.mode,walker:{x:globalThis.__sandboxTestContext?.Walk?.state?.walker?.x,y:globalThis.__sandboxTestContext?.Walk?.state?.walker?.y,z:globalThis.__sandboxTestContext?.Walk?.state?.walker?.z},marker:globalThis.__sandboxTestContext?.scene?.getObjectByName('redFlowerChallenge')?.position,backend:globalThis.__sandboxTestContext?.getFlowerChallengeBackendStatus?.(),receipts:globalThis.__sandboxSavedResults}};}).catch(()=>null);}throw error;}
 finally{
  await writeFile(`${out}/report.json`,JSON.stringify(report,null,2));
  try {if(browserServer)await closeOwnedBrowser(browserServer);}

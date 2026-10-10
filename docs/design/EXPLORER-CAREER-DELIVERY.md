@@ -206,3 +206,72 @@ The twelve-case component/action check passes again after that refinement.
 Continue later puts the camera away without abandoning the job. Equal-revision
 backup restore replaces the home display as well as the Journal thumbnails; both
 behaviors are exercised in the final twelve-case component check.
+
+## October 10 — research entry and possession custody, local
+
+The expanded plan is [Research careers and CERN](RESEARCH-CAREERS-AND-CERN.md).
+It includes mining, hydrology, meteorology, palaeontology, astronomy, accelerator
+science and the other field careers. Each specifies methods, actual equipment,
+locations, progression and useful outcomes. Mining and a traversable CERN
+facility remain **unimplemented**; the design and reuse audit do not close them.
+
+First Bearings now offers eligible research introductions through the existing
+Today panel. The chosen method is saved with the chapter and receipt. Begin
+chapter selects an actual matching lead and equips its existing tool. Wrong-method
+records do not complete it; free-roam methods remain available. Observation
+researchers can continue surveying without a mandatory collection step. The
+obsolete center-screen exploration announcement no longer covers the choices.
+
+Personal home storage now commits the Backpack and home contents in one v3
+localStorage record. Failed writes leave both containers unchanged, and a Journal
+refresh subtracts quantities already held at home. An empty carried save does not
+regrant legacy stored equipment. Equipped tools remain carried; new storage admits
+supplies and specimens, while existing stored gear remains withdrawable. One
+browser tab owns possession writes using Web Locks. Another tab explains the
+read-only state and requires closing the owner and reloading to resume writes.
+
+Migration retains v1/v2 inventory and legacy housing bytes, preserves the latest
+v2 ammunition/hotbar supplement, and keeps new controls in their own versioned
+key. Corrupt/future saves and unsafe inventory-only rollback cannot overwrite
+housing. **Existing released v2 fallback builds do not share new v3 progress.**
+They keep their older branch of data; a new release needs a compatible v3 fallback
+and an actual candidate/fallback roundtrip before promotion. Home/wallet purchase
+and sale atomicity, connected storage, and the complete H05 home journey remain
+open. This repair is not approval of the entire property system.
+
+Executed browser evidence:
+
+- Four real localStorage/Web Locks checks pass: quota failure/retry, one durable
+  transfer commit, a blocked second tab, and recovery after owner close/reload or
+  interruption between commit and presentation. The storage fixture injects an
+  economy and does not certify purchase authority or home art.
+- The 50,008-item Backpack component passes. Closed renders build no hidden item
+  DOM; the visible list stays at 48 rows, control writes stay small, ammunition
+  survives reload, focus is released correctly, and the phone layout fits.
+- The final research world journey passes **16 checks**, with no captured page
+  errors or failed local resources: chosen lead/tool, actual habitat record,
+  Journal review beyond the recent-history page, one badge, actual three-view
+  photos/export/restore, existing Build/room/property controls, reload restoration
+  and Flower Sprint receipt. Positioning/history insertion are explicit test
+  setup. This is not a full manually walked route or physical-phone acceptance.
+- An earlier full journey timed out on return loading. The isolated launch/return
+  probe and the later full journey passed. The timeout remains retained and
+  unexplained; it must be considered in the release loading/performance gate.
+- Collision Lab's original source passes ten numerical/data/integrity reuse
+  checks. A separate disposable browser opens its tunnel, apparatus and detector
+  hall without page/geometry errors and checks a phone-width layout. All 18 model
+  hashes match. Neither test certifies a realistic connected CERN destination.
+
+The detailed receipts and inspected images are under ignored
+`output/production-readiness-20261010/`. No production hosting, cloud configuration,
+player data, Collision Lab source/notebooks, dist or retained release package was
+changed. The full roadmap, asset integration, manual route and release gates
+remain open rather than being inferred from these bounded passes.
+
+Final source chain after the read-only inventory guard: **2,260 tests passed**,
+zero failed; dependencies, syntax/module imports, ownership, boundary types, test
+inventory and sensitivity also pass. The final guard has an explicit denied-write
+state-preservation test. The prescribed Develop Web Game keyboard run reached the
+walking world and retained 49,023 buildings/18,952 roads, but stopped after its
+first captured burst on external Overpass CORS errors. Its composed image was
+inspected; this is not a clean provider or physical-movement acceptance.

@@ -184,3 +184,6 @@ body:has(#urbanVehiclePrompt.show) #discoveryContextPrompt,body:has(#interiorPro
 
 .discoveryCameraReticle{position:fixed;left:50%;top:50%;width:14px;height:14px;margin:-7px;border:1px solid #e1efff;box-shadow:0 0 2px #09131b;border-radius:50%;pointer-events:none;z-index:30}
 .discoveryCameraReticle[hidden]{display:none}
+
+.discoveryStarterChoice{display:grid;gap:6px;color:#bdd0df;font-size:11px;margin-top:8px}
+.discoveryStarterChoice select{box-sizing:border-box;width:100%;min-width:0;min-height:44px;border:1px solid #496886;background:#102b42;color:#eef5ff;padding:8px;font:inherit}

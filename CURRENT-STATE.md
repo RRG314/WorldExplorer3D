@@ -555,3 +555,52 @@ storage acceptance. City capture also shows that landmark semantics and generic
 facades still need the R2 visual/data treatment; a higher-resolution texture alone
 will not correct them. See `docs/design/EXPLORER-CAREER-DELIVERY.md` for bounded
 acceptance and the remaining work. No deployment or public release change.
+
+## October 10 — research introductions, home custody and CERN reuse
+
+First Bearings now saves an optional research method and starts the matching
+available field lead/tool from its existing Today panel. Wrong-method records
+cannot complete the assignment. Observation research continues into regional
+survey goals without a mandatory specimen collection. The obsolete center-screen
+exploration popup was removed after it obscured the desktop/phone mission choices.
+This is the introductory chapter; the complete mining, scientific and other
+career campaigns are specified in `docs/design/RESEARCH-CAREERS-AND-CERN.md` and
+remain unfinished.
+
+Home contents and carried possessions now use a single v3 local save transaction,
+with an exclusive page writer, failed-write recovery, custody-aware Journal
+projection and retained legacy files. Four real browser custody/lock/reload checks
+and the 50,008-item Backpack presentation check pass. An additional source guard
+prevents replacing a read-only inventory. Local home/wallet economic transactions,
+connected storage and the complete H05 furnished-home/return journey still need
+work. Released v2 fallback artifacts retain a separate older save branch: they
+are **not compatible current-progress fallbacks** for v3. Prepare and verify a v3
+fallback before releasing this migration; never delete the retained old saves.
+
+The final controlled research/photo/build/return journey passes 16 checks without
+page errors or failed local resources. An earlier return load timed out; the
+isolated return probe and the later full journey passed, but the initial timeout
+remains an unresolved loading/performance observation. The prescribed keyboard
+client reached walking and captured its first burst, then correctly failed on
+external Overpass CORS errors. It is degraded-provider evidence, not a clean
+release pass. Desktop/phone images and the keyboard image were inspected.
+
+The owner's existing `lhc game` / Collision Lab project was inspected in place,
+without modifying its source or notebooks. Ten direct reuse checks verify its
+numerical exercises, all 100,000 recorded events, reproducible analysis receipts
+and all 18 detector files. The actual source browser opened tunnel/apparatus/CMS
+views and fit the phone layout. Those four alternative scene groups are not a
+connected walkable facility. CERN still needs site layout, circulation/collision,
+asset upgrades, station interactions and integration with World Explorer's
+renderer and Journal. No new playable CERN/mining button or duplicate engine was
+added. Detailed scope/evidence: `docs/design/EXPLORER-CAREER-DELIVERY.md` and ignored
+`output/production-readiness-20261010/`.
+
+Production identity and 80 live Functions were checked read-only this turn.
+Production, dist, retained packages and owner saves remain unchanged. This local
+work does not close the campaign, visual-quality or release gates.
+
+The final source chain after the possession replacement guard passes **2,260
+tests**, zero failed, plus dependencies/source/ownership/boundary types and test
+inventory/sensitivity. The world journey precedes that final denied-write guard;
+its explicit preservation regression is included in this final chain.

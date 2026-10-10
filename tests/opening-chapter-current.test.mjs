@@ -136,3 +136,38 @@ test('failed review does not alter chapter, Journal, inventory or rewards', asyn
   for(const key of ['events','items','fieldGuide'])assert.deepEqual(after[key],before[key]);
   assert.deepEqual(after.profile.openingChapter,before.profile.openingChapter);
 });
+
+test('a chosen research starter accepts its own method and preserves old general chapters',async()=>{
+ const store=createMemoryDiscoveryProfileStore();
+ await store.startOpeningChapter({...location,careerId:'geology'},1000);
+ await store.recordObservation(observation('wrong-method'));
+ assert.equal((await store.getProfile()).openingChapter.phase,'active');
+ const result=await store.recordObservation(observation('geology',{activityId:'geology-inspect',family:'geology-record'}));
+ assert.equal((await store.getProfile()).openingChapter.eventId,result.event.eventId);
+ await store.completeOpeningChapter(result.event.eventId,3000);
+ const backup=await store.exportData();assert.equal(backup.profile.openingChapter.careerId,'geology');
+ assert.equal(backup.events.find(e=>e.eventId===FIRST_BEARINGS.receiptId).metadata.careerId,'geology');
+ await store.importData(backup);assert.equal((await store.getProfile()).openingChapter.phase,'complete');
+ const tampered=structuredClone(backup);tampered.events.find(e=>e.eventId===result.event.eventId).activityId='nature-observe';
+ await assert.rejects(()=>store.importData(tampered));
+ assert.equal(normalizeOpeningChapter({acceptedAt:1000,regionId:'baltimore'}).careerId,'general');
+ assert.throws(()=>beginOpeningChapter({}, {...location,careerId:'made-up-career'},1000),/newer version/);
+});
+
+test('research starter admission depends on actual field methods, not planned careers',async()=>{
+ const {availableResearchStarters,starterAcceptsActivity}=await import('../app/js/campaign/research-starters.js');
+ assert.deepEqual(availableResearchStarters([]),[]);
+ assert.deepEqual(availableResearchStarters([{activityId:'geology-inspect'}]).map(row=>row.id),['general','geology']);
+ assert.equal(starterAcceptsActivity('geology','inspect'),false);
+ assert.equal(starterAcceptsActivity('wildlife','wildlife-track'),true);
+ assert.equal(starterAcceptsActivity('mining','inspect'),false);
+});
+
+test('research introduction keeps observation play valid and does not forget old fieldwork',async()=>{
+ const {explorerGoalSnapshot}=await import('../app/js/discovery/explorer-goals.js');
+ const profile={openingChapter:{careerId:'habitats'},explorerProgress:{paths:{field:{records:1}}}};
+ const goal=explorerGoalSnapshot({profile,events:[],items:[],regionId:'baltimore'});
+ assert.equal(goal.id,'regional-starter','Journal paging and an empty specimen bag do not restart an observation researcher');
+ const general=explorerGoalSnapshot({profile:{...profile,openingChapter:{careerId:'general'}},events:[],items:[]});
+ assert.equal(general.id,'first-collection','Free explorer keeps the optional collecting introduction');
+});

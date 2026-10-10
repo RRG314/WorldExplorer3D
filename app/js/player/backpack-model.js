@@ -52,6 +52,8 @@ function normalizeItem(item = {}, definition = null) {
 
 function createBackpackModel(options = {}) {
   const definitions = new Map();
+  let initializing = true;
+  const canMutate = () => initializing || options.canMutate?.() !== false;
   const items = new Map();
   const aliases = new Map();
   const catalogMembers = createOrderedMembership(), eventMembers = createOrderedMembership();
@@ -111,6 +113,7 @@ function createBackpackModel(options = {}) {
   }
 
   function upsertItem(next, settings = {}) {
+    if (!canMutate()) return null;
     orderedPresentation = null;
     availableCatalogIds = null;
     const candidateDefinition = settings.definition || next?.definition;
@@ -141,6 +144,7 @@ function createBackpackModel(options = {}) {
   }
 
   function assignHotbar(slot, identity, settings = {}) {
+    if (!canMutate()) return false;
     const index = Number(slot) - 1;
     if (!Number.isInteger(index) || index < 0 || index >= HOTBAR_SLOT_COUNT) return false;
     const item = identity == null ? null : resolveItem(identity);
@@ -154,6 +158,7 @@ function createBackpackModel(options = {}) {
   }
 
   function equip(identity, settings = {}) {
+    if (!canMutate()) return false;
     const item = resolveItem(identity);
     if (!item) return false;
     const definition = definitionForItem(item);
@@ -170,6 +175,7 @@ function createBackpackModel(options = {}) {
   }
 
   function consume(identity, quantity = 1, settings = {}) {
+    if (!canMutate()) return false;
     const item = resolveItem(identity);
     const amount = Math.max(1, Math.floor(Number(quantity) || 1));
     if (!item || item.quantity < amount) return false;
@@ -260,6 +266,17 @@ function createBackpackModel(options = {}) {
     });
   }
 
+  function replaceState(next) {
+    if (!canMutate() || !next || !Array.isArray(next.items)) return false;
+    for (const item of [...items.values()]) consume(item.instanceId, item.quantity, {silent:true});
+    aliases.clear();
+    for (const item of next.items) upsertItem(item, {silent:true});
+    for (let index=0; index<HOTBAR_SLOT_COUNT; index++) assignHotbar(index+1, next.hotbar?.[index] || null, {silent:true});
+    equippedInstanceId = resolveItem(next.equippedInstanceId)?.instanceId || resolveItem('hands')?.instanceId || null;
+    revision = Math.max(revision, Number(next.revision) || 0);
+    return true;
+  }
+
   function exportState() {
     return {
       schemaVersion: BACKPACK_SCHEMA_VERSION,
@@ -276,6 +293,7 @@ function createBackpackModel(options = {}) {
   const requestedEquipped = options.equippedInstanceId || options.equippedCatalogId;
   if (requestedEquipped) equip(requestedEquipped, { silent: true });
 
+  initializing = false;
   return Object.freeze({
     type: 'BackpackModel',
     assignHotbar,
@@ -297,6 +315,7 @@ function createBackpackModel(options = {}) {
       return item ? { ...item, metadata: { ...item.metadata } } : null;
     },
     registerDefinitions,
+    replaceState,
     summary,
     page,
     present(identity) { return presentItem(resolveItem(identity)); },
