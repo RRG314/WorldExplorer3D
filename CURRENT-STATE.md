@@ -113,6 +113,33 @@ finished video exports were produced. Private audit data and the small promotion
 kit are under ignored `output/analytics-review-20261009/`; only the public event
 contract belongs in `docs/analytics/README.md`.
 
+## October 9 Explorer career plan and First Bearings — local
+
+`docs/design/EXPLORER-CAREER-PLAN.md` specifies twelve authored missions, three
+optional careers, useful homes, coastal/planetary chapters, GPS/live-data variants,
+rewards, save/authority rules and finite acceptance gates. The plan preserves
+free exploration and existing progress. Later chapters are planned, not shipped.
+
+The first opening chapter is implemented in Today, Journal and Profile. Explicit
+acceptance selects a region; a new committed field record advances it; reviewing
+that exact record grants one personal badge and Journal completion receipt in a
+single transaction. No extra currency, reward store or always-open overlay was
+added. Indexed retrieval retains the result beyond the recent Journal page;
+backup validation rejects missing evidence/receipts. Newer campaign state is
+preserved without downgrade. Missing fresh field leads suppress the start offer.
+
+The full source chain passes 2,218 tests. Fifteen focused cases and fifteen actual
+IndexedDB transaction cases pass, including failed saves, concurrent completion
+and backup restore. The controlled world journey passes thirteen checks, including
+historical-record review and reload. Visual inspection corrected the phone
+completion-button grid placement. The final direct badge shortcut and full
+thirteen-check journey pass with no captured page errors or failed local resources.
+These are controlled desktop/phone-width checks, not an uncoached player study
+or physical-phone acceptance.
+The prescribed keyboard run reaches walking but stops after one burst on the
+existing external Overpass CORS failure; this remains degraded provider evidence.
+Production/dist and the four retained release packages remain unchanged.
+
 ## Historical preparation records
 
 The dated records below describe earlier candidates and checks. Statements that

@@ -77,7 +77,10 @@ try {
  await page.screenshot({path:`${out}/mobile-walkthrough.png`});
  assert.equal(await page.locator('#discoveryPanel').evaluate(e=>e.scrollWidth>e.clientWidth+1),false);
  await page.setViewportSize({width:1440,height:900});
- await page.locator('#discoveryFirstJourneyBtn').click();
+ if(process.env.WE3D_SANDBOX_CHAPTER==='1') {
+  await page.locator('[data-chapter-action="start"]').click();
+  await page.waitForFunction(()=>!document.getElementById('discoveryPanel')?.classList.contains('show'));
+ } else await page.locator('#discoveryFirstJourneyBtn').click();
  assert.equal(await page.evaluate(()=>globalThis.__sandboxTestContext.getTutorialSnapshot().completed),false);
  // Route selection uses the real field plan and entitlement checks.
  await page.evaluate(async()=>{const{ctx}=await import('/app/js/shared-context.js?v=55');ctx.openWorldDiscoverySection('today');});
@@ -112,6 +115,36 @@ try {
  assert.ok((await page.locator('#discoveryJournalList').innerText()).includes(result.name));
  await page.screenshot({path:`${out}/mobile-journal.png`});
  report.checks.touchSizedResultAction=true;report.checks.actualFieldResultReviewed=true;report.checks.mobileNoPanelOverflow=true;
+ if(process.env.WE3D_SANDBOX_CHAPTER==='1') {
+  // Bounded history setup proves that a real chapter record remains reviewable
+  // after it leaves the recent page. These are not claimed gameplay actions.
+  const olderThanPage=await page.evaluate(async id=>{
+   const store=globalThis.__sandboxTestContext.discoveryProfileStore;
+   const start=Date.now();
+   for(let i=0;i<105;i++)await store.recordExplorerEvent({eventId:`verification:history:${i}`,eventType:'verification-history',sourceId:String(i),name:'History paging fixture',occurredAt:start+i,projections:{profile:false,place:false}});
+   return !(await store.listEvents(100)).some(event=>event.eventId===id);
+  },result.eventId);
+  assert.equal(olderThanPage,true);report.checks.chapterHistorySetupBeyondRecentPage=true;
+  await page.locator('[data-discovery-tab="today"]').click();
+  await page.locator('#discoveryOpeningChapter[data-chapter-phase="review"]').waitFor();
+  await page.locator('[data-chapter-action="review"]').click();
+  const finish=page.locator('[data-chapter-action="finish"]');
+  await finish.waitFor({state:'visible'});
+  const box=await finish.boundingBox();assert.ok(box.height>=44&&box.height<=70&&box.width>=200&&box.x+box.width<=390,'Chapter finish spans the Journal card and stays touch-sized');
+  await page.screenshot({path:`${out}/chapter-review-phone.png`});
+  await finish.click();
+  await page.locator('#discoveryOpeningChapter[data-chapter-phase="complete"]').waitFor();
+  await page.screenshot({path:`${out}/chapter-complete-phone.png`});
+  await page.setViewportSize({width:1440,height:900});
+  await page.screenshot({path:`${out}/chapter-complete-desktop.png`});
+  await page.locator('[data-chapter-action="profile"]').click();
+  const badges=page.locator('#discoveryProgress details').filter({has:page.locator('summary', {hasText:'Badges'})});
+  await page.locator('[data-explorer-badge="first-bearings"]').waitFor({state:'visible'});
+  assert.equal(await badges.evaluate(element=>element.open),true,'View your badge expands the actual badge');
+  assert.match(await badges.innerText(),/First Bearings/);
+  await page.screenshot({path:`${out}/chapter-badge-desktop.png`});
+  report.checks.chapterCompletedAndBadgeVisible=true;
+ }
  await page.locator('#discoveryCloseBtn').click();await page.locator('#realEstateFloatBtn').click();
  assert.equal(await page.locator('#fQuickBuild').isVisible(),true);
  await page.screenshot({path:`${out}/mobile-build-menu.png`});
@@ -176,6 +209,12 @@ try {
  await page.evaluate(async()=>{await globalThis.__sandboxTestContext.ensureBlockBuilderReady();});
  assert.equal(await page.evaluate(()=>globalThis.__sandboxTestContext.getBlockBuilderSnapshot().count),1,'Solo block survives reload');
  assert.deepEqual(restored,{completed:true,hasRecord:true});report.checks.savedAndReloaded=true;
+ if(process.env.WE3D_SANDBOX_CHAPTER==='1') {
+  const saved=await page.evaluate(async()=>{const store=globalThis.__sandboxTestContext.discoveryProfileStore;
+   const profile=await store.getProfile();const records=await store.getEventsById(['event:campaign-completed:first-bearings:v1']);
+   return {phase:profile.openingChapter.phase,receipts:records.length};});
+  assert.deepEqual(saved,{phase:'complete',receipts:1});report.checks.chapterSurvivesReload=true;
+ }
 
  }
  report.flowerSetup=await page.evaluate(async()=>{

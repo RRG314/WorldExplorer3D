@@ -74,6 +74,18 @@ try {
     check(await store.rollbackLastImport(),'Rollback unavailable after failed attempt');
     check(JSON.stringify((await store.exportData()).items)===JSON.stringify(backup.items),'Successful rollback lost original items');
     cases.push('rollback-recovers-originals-after-failed-attempt');
+    await store.startOpeningChapter({regionId:'test',regionLabel:'Test region',environment:'EARTH'},9000);
+    await atomicFailure('failed-chapter-field-record-is-atomic',()=>store.recordObservation({...record('chapter-fail'),environment:'EARTH',collectedAt:10000}));
+    const chapterRecord=await store.recordObservation({...record('chapter'),environment:'EARTH',collectedAt:10000});
+    check((await store.getProfile()).openingChapter.eventId===chapterRecord.event.eventId,'Chapter did not retain its committed field evidence');
+    await atomicFailure('failed-chapter-completion-is-atomic',()=>store.completeOpeningChapter(chapterRecord.event.eventId,11000));
+    const outcomes=await Promise.all([store.completeOpeningChapter(chapterRecord.event.eventId,11000),createIndexedDbDiscoveryProfileStore().completeOpeningChapter(chapterRecord.event.eventId,11000)]);
+    check(outcomes.filter(row=>row.recorded).length===1,'Concurrent chapter completion granted twice');
+    const completed=await store.exportData();
+    check(completed.events.filter(event=>event.eventId==='event:campaign-completed:first-bearings:v1').length===1,'Chapter receipt duplicated');
+    await store.importData(completed);
+    check((await store.getProfile()).openingChapter.phase==='complete','Chapter did not survive backup restore');
+    cases.push('chapter-concurrent-completion-and-backup-restore');
     const rewards=(await store.getProfile()).explorerProgress;
     await Promise.all([store.saveProfile(p=>({...p,tutorials:{...p.tutorials,first:true}})),createIndexedDbDiscoveryProfileStore().saveProfile(p=>({...p,tutorials:{...p.tutorials,second:true}}))]);
     const profile=await store.getProfile();check(profile.tutorials.first&&profile.tutorials.second,'Concurrent profile writes lost independent edits');

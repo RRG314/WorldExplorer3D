@@ -149,6 +149,7 @@ export const currentContractTests = [
   'tests/analytics-page-context-current.test.mjs',
   'tests/gameplay-analytics-current.test.mjs',
   'tests/entry-journey-current.test.mjs',
+  'tests/opening-chapter-current.test.mjs',
   'tests/aviation-sandbox-current.test.mjs',
   'tests/biome-evidence-current.test.mjs',
   'tests/boat-camera-framing-current.test.mjs',

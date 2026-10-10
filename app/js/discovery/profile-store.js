@@ -17,6 +17,7 @@ import {
 } from './explorer-events.js?v=3';
 import { createDefaultCharacterState, normalizeCharacterState } from '../character/model.js?v=1';
 import { migrateLegacyCharacterState, projectCharacterProgress } from '../character/progression.js?v=1';
+import { FIRST_BEARINGS, normalizeOpeningChapter, beginOpeningChapter, projectOpeningChapter, finishOpeningChapter } from '../campaign/first-bearings.js?v=1';
 
 const DISCOVERY_DB_NAME = 'world-explorer-discovery';
 const DISCOVERY_DB_VERSION = 5;
@@ -95,6 +96,7 @@ function createDefaultProfile() {
     collectionCount: 0,
     fieldGuideCount: 0,
     explorerProgress: defaultExplorerProgress(),
+    openingChapter: normalizeOpeningChapter(),
     characterState: createDefaultCharacterState()
   };
 }
@@ -111,6 +113,7 @@ function normalizeProfile(profile) {
     toolMastery: { ...(profile?.toolMastery || {}) },
     companionOnboarding: normalizeCompanionOnboarding(profile?.companionOnboarding),
     explorerProgress: normalizeExplorerProgress(profile?.explorerProgress),
+    openingChapter: normalizeOpeningChapter(profile?.openingChapter),
     characterState: normalizeCharacterState(profile?.characterState),
     schemaVersion: DISCOVERY_DB_VERSION,
     updatedAt: Date.now()
@@ -132,6 +135,18 @@ function fieldCompanionReward(companion, event, firstIdentification) {
   return clone(firstIdentification
     ? awardCompanionXp(first.companion, { receiptId: `species:${event.eventId}`, reasonId: 'new-species' }).companion
     : first.companion);
+}
+
+function openingChapterReceipt(chapter, evidence) {
+  return createExplorerStoryEvent({
+    eventId: FIRST_BEARINGS.receiptId, eventType: 'campaign-completed',
+    sourceSystem: 'explorer-campaign', sourceId: FIRST_BEARINGS.id, pathId: 'field',
+    name: 'First Bearings complete', detail: 'First Bearings badge earned. A local discovery recorded and reviewed.',
+    occurredAt: chapter.completedAt, regionId: chapter.regionId, regionLabel: chapter.regionLabel,
+    environment: 'EARTH', locationKey: evidence.locationKey, locationSnapshot: evidence.locationSnapshot,
+    metadata: { chapterId: FIRST_BEARINGS.id, evidenceEventId: evidence.eventId },
+    projections: { profile: false, place: false }, points: 0
+  });
 }
 
 function validateReceipt(item, receipt) {
@@ -321,6 +336,38 @@ function createIndexedDbDiscoveryProfileStore(options = {}) {
     }
   }
 
+  async function startOpeningChapter(location, now = Date.now()) {
+    return saveProfile(current => ({ ...current, openingChapter: beginOpeningChapter(current.openingChapter, location, now) }));
+  }
+
+  async function completeOpeningChapter(eventId, now = Date.now()) {
+    const db = await open();
+    let transaction;
+    try {
+      await ensureCharacterMigration(db);
+      transaction = db.transaction(['profiles', 'events', JOURNAL_ORDER_STORE], 'readwrite');
+      const profiles = transaction.objectStore('profiles'), events = transaction.objectStore('events');
+      const current = normalizeProfile(await requestPromise(profiles.get(PROFILE_ID)));
+      const existing = await requestPromise(events.get(FIRST_BEARINGS.receiptId));
+      if (current.openingChapter.schemaVersion === 1 && current.openingChapter.phase === 'complete' && existing) {
+        await transactionPromise(transaction);
+        return { recorded: false, reason: 'already-recorded', event: clone(existing), profile: clone(current) };
+      }
+      const evidence = await requestPromise(events.get(String(eventId)));
+      const chapter = finishOpeningChapter(current.openingChapter, evidence, now);
+      const event = openingChapterReceipt(chapter, evidence);
+      const profile = normalizeProfile({ ...current, openingChapter: chapter });
+      events.put(event);
+      putJournalOrder(transaction, 'events', event);
+      profiles.put(profile);
+      await transactionPromise(transaction);
+      return { recorded: true, event: clone(event), profile: clone(profile) };
+    } catch (error) {
+      try { transaction?.abort(); } catch { /* Transaction already ended. */ }
+      throw error;
+    } finally { db.close(); }
+  }
+
   async function recordDiscovery(record, policy = {}) {
     if (!record?.claimId || !record?.catalogId) throw new TypeError('Discovery recording requires stable claim and catalog IDs.');
     const receiptOwnerUid = options.getReceiptOwnerUid?.() || null;
@@ -379,6 +426,7 @@ function createIndexedDbDiscoveryProfileStore(options = {}) {
         fieldGuideCount: Number(current.fieldGuideCount || 0) + (existingGuide ? 0 : 1),
         disciplineProgress: { ...current.disciplineProgress, [discipline]: disciplineProgress },
         explorerProgress: projected.progress,
+        openingChapter: record.receiptRestore ? current.openingChapter : projectOpeningChapter(current.openingChapter, event),
         characterState: characterProjection.character
       });
       if (item) {
@@ -850,6 +898,8 @@ function createIndexedDbDiscoveryProfileStore(options = {}) {
     recordDiscovery,
     recordExplorerEvent,
     recordObservation,
+    startOpeningChapter,
+    completeOpeningChapter,
     rollbackCharacterMigration,
     rollbackLastImport,
     saveCompanion,
@@ -932,6 +982,7 @@ function createMemoryDiscoveryProfileStore(seed = {}) {
       fieldGuideCount: Number(profile.fieldGuideCount || 0) + (existingGuide ? 0 : 1),
       disciplineProgress: { ...profile.disciplineProgress, [discipline]: legacy },
       explorerProgress: projected.progress,
+      openingChapter: record.receiptRestore ? profile.openingChapter : projectOpeningChapter(profile.openingChapter, event),
       characterState: characterProjection.character
     });
     return {
@@ -966,6 +1017,22 @@ function createMemoryDiscoveryProfileStore(seed = {}) {
 
   return Object.freeze({
     type: 'MemoryDiscoveryProfileStore',
+    async startOpeningChapter(location, now = Date.now()) {
+      profile = normalizeProfile({ ...profile, openingChapter: beginOpeningChapter(profile.openingChapter, location, now) });
+      return clone(profile);
+    },
+    async completeOpeningChapter(eventId, now = Date.now()) {
+      const existing = events.get(FIRST_BEARINGS.receiptId);
+      if (profile.openingChapter.schemaVersion === 1 && profile.openingChapter.phase === 'complete' && existing) {
+        return { recorded: false, reason: 'already-recorded', event: clone(existing), profile: clone(profile) };
+      }
+      const evidence = events.get(String(eventId));
+      const chapter = finishOpeningChapter(profile.openingChapter, evidence, now);
+      const event = openingChapterReceipt(chapter, evidence);
+      profile = normalizeProfile({ ...profile, openingChapter: chapter });
+      events.set(event.eventId, event);
+      return { recorded: true, event: clone(event), profile: clone(profile) };
+    },
     async getReceiptSyncStatus(ownerUid) { return summarizeReceiptState([...items.values()], [...outbox.values()], ownerUid); },
     async listPendingReceipts(ownerUid, now = Date.now()) { return [...outbox.values()].filter(row => row.ownerUid === ownerUid && row.status === 'pending' && row.nextAttemptAt <= now)
       .sort((a,b)=>Number(a.nextAttemptAt)-Number(b.nextAttemptAt)||(a.id<b.id?-1:a.id>b.id?1:0)).slice(0,25).map(clone); },

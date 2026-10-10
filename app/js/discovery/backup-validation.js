@@ -1,5 +1,6 @@
 // Validate the entire file before opening a destructive replacement transaction.
 // Older backups may omit optional collections, but malformed rows are never dropped.
+import { FIRST_BEARINGS, normalizeOpeningChapter, finishOpeningChapter } from '../campaign/first-bearings.js?v=1';
 export function validateJournalBackup(input) {
   const fail = () => { throw new TypeError('This Journal backup is incomplete, damaged, or from an unsupported version. Existing records have not been changed.'); };
   if (!input || typeof input !== 'object' || !input.profile || typeof input.profile !== 'object' || Array.isArray(input.profile)) fail();
@@ -20,6 +21,13 @@ export function validateJournalBackup(input) {
   for (const rows of [data.events,data.items]) {
     const claims = new Set();
     for (const row of rows) if (row.claimId) { if (claims.has(row.claimId)) fail(); claims.add(row.claimId); }
+  }
+  const chapter = normalizeOpeningChapter(data.profile.openingChapter);
+  if (chapter.schemaVersion === 1 && ['review', 'complete'].includes(chapter.phase)) {
+    const evidence = data.events.find(event => event.eventId === chapter.eventId);
+    try { finishOpeningChapter({ ...chapter, completedAt: 0 }, evidence); } catch { fail(); }
+    if (chapter.phase === 'complete' && !data.events.some(event => event.eventId === FIRST_BEARINGS.receiptId
+      && event.eventType === 'campaign-completed' && event.metadata?.evidenceEventId === chapter.eventId)) fail();
   }
   return data;
 }
