@@ -109,3 +109,8 @@ for(const shared of [true,false])test(`actual walking physics stops at the desk 
     physics.disposeWater();
   }finally{for(const key of Object.keys(ctx))delete ctx[key];Object.assign(ctx,saved);}
 });
+test('an expedition record is selected durably without resetting the furniture or use achievement',()=>{
+ const w=completeWorkspace(),next=transitionWorkspace(w,{type:'record',recordId:'coastal-investigation-v1:report',revision:w.revision});
+ assert.equal(next.recordId,'coastal-investigation-v1:report');assert.deepEqual(next.pose,w.pose);assert.equal(next.usedAt,w.usedAt);assert.equal(normalizeWorkspace(JSON.parse(JSON.stringify(next))).recordId,next.recordId);
+ assert.throws(()=>transitionWorkspace(next,{type:'record',recordId:'',revision:next.revision}));assert.throws(()=>transitionWorkspace(next,{type:'record',recordId:'other',revision:w.revision}),/changed/);
+});

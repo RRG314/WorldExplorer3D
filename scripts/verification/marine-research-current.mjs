@@ -1,3 +1,4 @@
+import {verifyCoastalInvestigation} from './coastal-investigation-journey.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import { chromium } from 'playwright';
@@ -73,7 +74,8 @@ try {
  const deploy=async()=>{await goDeck(-1.8,-31.5);await page.getByLabel('Deck destination').selectOption('sub');await page.locator('#researchDeckAction').click();await page.waitForFunction(()=>marineCtx.oceanMode.active,null,{timeout:30000});await page.waitForFunction(()=>marineCtx.oceanMode.habitat?.group.userData.habitat.assetState==='ready');};
  await deploy();
  if(coastal){await chapterClick('complete','coastalOcean');const saved=await page.evaluate(async()=>marineCtx.discoveryProfileStore.exportData());const events=saved.events.filter(e=>e.sourceSystem==='coastal-departure');assert.equal(events.length,5);assert.equal(events.filter(e=>e.eventType==='campaign-completed').length,1);await page.evaluate(async data=>marineCtx.discoveryProfileStore.importData(data),saved);await page.evaluate(()=>marineCtx.marineResearch.coastal.refresh());assert.equal(await page.evaluate(()=>marineCtx.marineResearch.coastal.snapshot().completed),true);report.cases.push({id:'coastal-deployed-same-sub-completion-and-backup-roundtrip',passed:true});}
- if(process.env.WE3D_COASTAL_ONLY==='1'){await page.locator('#oceanVoyageRecover').click();await page.waitForFunction(()=>marineCtx.boatDeck.active&&!marineCtx.oceanMode.active);const same=await page.evaluate(()=>{const s=marineCtx.marineResearch.coastal.snapshot(),v=marineCtx.oceanVoyage.current;return s.completed&&s.plan.metadata.shipId===v.ship.transportEntityId&&s.plan.metadata.subId===v.subId;});assert.equal(same,true);report.cases.push({id:'alternate-completed-voyage-recovers-same-vessel-and-sub',passed:true});}
+ if(process.env.WE3D_COASTAL_INVESTIGATION==='1'){await verifyCoastalInvestigation({page,dir,report,goDeck,deploy});}
+ else if(process.env.WE3D_COASTAL_ONLY==='1'){await page.locator('#oceanVoyageRecover').click();await page.waitForFunction(()=>marineCtx.boatDeck.active&&!marineCtx.oceanMode.active);const same=await page.evaluate(()=>{const s=marineCtx.marineResearch.coastal.snapshot(),v=marineCtx.oceanVoyage.current;return s.completed&&s.plan.metadata.shipId===v.ship.transportEntityId&&s.plan.metadata.subId===v.subId;});assert.equal(same,true);report.cases.push({id:'alternate-completed-voyage-recovers-same-vessel-and-sub',passed:true});}
  else {
  const approach=async(extraHeight=8)=>{const result=await page.evaluate(async extraHeight=>{
   const ctx=marineCtx,original=ctx.readControlActions,t=ctx.marineResearch.snapshot().target;let controls={};ctx.readControlActions=()=>controls;

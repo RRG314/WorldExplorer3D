@@ -74,7 +74,7 @@ export function createResearchDeck({ctx,resetDynamics,updateVessel,onActivityCha
  function update(dt){
   if(active&&(!ready()||!supported()||origin!==`${ctx.LOC?.lat}:${ctx.LOC?.lon}`||ctx.getEnv?.()&&ctx.getEnv()!=='EARTH'))release();
   if(!supported()){hud?.hide();return false;}
-  hud ||= hudFactory({enter:()=>enter(),helm,moor,act:()=>void act(),select,retry:()=>void ctx.boatMode?.mesh?.userData.retryResearchVisual?.(),coastalApi:()=>research.coastal,researchAct:()=>void research.labAction(),sharedAct:()=>void import('../../ocean/shared-marine-runtime.js').then(m=>m.openSharedMarine(ctx)).catch(e=>hud?.message(e.message))});
+  hud ||= hudFactory({enter:()=>enter(),helm,moor,act:()=>void act(),select,retry:()=>void ctx.boatMode?.mesh?.userData.retryResearchVisual?.(),coastalApi:()=>research.coastal,investigationApi:()=>research.investigation,researchAct:()=>void research.labAction(),sharedAct:()=>void import('../../ocean/shared-marine-runtime.js').then(m=>m.openSharedMarine(ctx)).catch(e=>hud?.message(e.message))});
   if(active){
    updateVessel(ctx.paused?0:dt);
    const actions=ctx.paused||ctx.showLargeMap?{}:ctx.readControlActions?.('walk')||{};

@@ -88,6 +88,9 @@ export function transitionWorkspace(value,command,now=Date.now()) {
   } else if(command.type==='undo') {
     if(!current.pose)throw Error('Place the desk first.');
     next.pose=current.previous?{...current.previous}:null;next.previous=null;next.undone=true;next.usedAt=0;
+  } else if(command.type==='record') {
+    if(!current.pose||typeof command.recordId!=='string'||!command.recordId.trim()||command.recordId.length>200)throw Error('Choose a saved Journal record for your desk.');
+    next.recordId=command.recordId;
   } else if(command.type==='use') {
     if(!current.pose||!current.rotated||!current.undone)throw Error('Place the desk, try rotating it, then undo a change before reviewing your records.');
     next.usedAt=current.usedAt||Math.max(1,now);

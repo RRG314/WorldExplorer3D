@@ -1,3 +1,4 @@
+import {marineStudyOffset} from './habitat-plan.js';
 import {
   DEPTH_TRUTH_TYPE,
   GEBCO_WMS_ENDPOINT,
@@ -281,7 +282,9 @@ export function createOceanBathymetryApi({
     return Number.isFinite(mapped) ? mapped : null;
   }
 
-  function sampleProceduralSeabedHeight(x, z) {
+  function studyCoordinates(x,z){const offset=marineStudyOffset(oceanMode.launchSite,appCtx.SCALE);return {x:x-offset.x,z:z-offset.z};}
+  function sampleProceduralSeabedHeight(localX, localZ) {
+    const {x,z}=studyCoordinates(localX,localZ);
     const reefDx = x - 24;
     const reefDz = z - 124;
     const reefLift = Math.exp(-(reefDx * reefDx + reefDz * reefDz) / 23000) * 30;
@@ -306,8 +309,9 @@ export function createOceanBathymetryApi({
     const real = sampleRealSeabedHeight(x, z);
     if (!Number.isFinite(real)) return procedural;
 
-    const reefDx = x - 24;
-    const reefDz = z - 124;
+    const study=studyCoordinates(x,z);
+    const reefDx = study.x - 24;
+    const reefDz = study.z - 124;
     const reefWeight = Math.exp(-(reefDx * reefDx + reefDz * reefDz) / 25000);
 
     const baseBlend = oceanMode.bathymetryReady ? 0.52 : 0.3;
@@ -329,8 +333,9 @@ export function createOceanBathymetryApi({
         bathymetryBlend: 0
       });
     }
-    const reefDx = x - 24;
-    const reefDz = z - 124;
+    const study=studyCoordinates(x,z);
+    const reefDx = study.x - 24;
+    const reefDz = study.z - 124;
     const reefWeight = Math.exp(-(reefDx * reefDx + reefDz * reefDz) / 25000);
     const bathymetryBlend = clamp01((oceanMode.bathymetryReady ? 0.52 : 0.3) * (1 - reefWeight * 0.44));
     return Object.freeze({
@@ -365,6 +370,7 @@ export function createOceanBathymetryApi({
     sampleBathymetryEvidence,
     sampleSeabedEvidence,
     sampleSeabedHeight,
+    studyCoordinates,
     smoothstep,
     valueNoise2D
   };

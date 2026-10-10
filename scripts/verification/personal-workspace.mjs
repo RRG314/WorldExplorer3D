@@ -33,6 +33,14 @@ try{
   assert.deepEqual(evidence,{colliders:2,events:1});report.checks.push('in-world-interaction-reviews-real-record-and-earns-one-maker-badge');
   await page.evaluate(()=>{Object.assign(fixture.walker,{x:-2.6,y:1.95,z:-2.8});fixture.state.ui.setOpen(false);});
   await page.screenshot({path:`${out}/furniture.png`});
+  if(process.env.WE3D_COASTAL_JOURNAL){
+    const data=JSON.parse(await readFile(process.env.WE3D_COASTAL_JOURNAL,'utf8'));
+    assert.ok(data.investigationRecords?.some(e=>e.eventId==='coastal-investigation-v1:report'));
+    await page.evaluate(async rows=>{for(const row of rows)await fixture.store.recordExplorerEvent(row);await fixture.runtime.refresh();const {workspaceGeometry}=await import('/app/js/campaign/personal-workspace.js');const g=workspaceGeometry(fixture.active,fixture.runtime.snapshot().workspace.pose);Object.assign(fixture.walker,{...g.use,y:g.use.y+1.7});fixture.state.ui.setOpen(true);},data.investigationRecords);
+    await page.locator('[data-home-action="coastal-display"]').click();await page.waitForFunction(()=>fixture.runtime.snapshot().workspace.recordId==='coastal-investigation-v1:report'&&fixture.runtime.snapshot().furnitureReady&&!fixture.runtime.snapshot().busy);
+    assert.match(await page.locator('#discoveryPersonalHome').innerText(),/modern research equipment case/);await page.screenshot({path:`${out}/coastal-display.png`});
+    await page.reload();await page.waitForFunction(()=>globalThis.fixture&&fixture.runtime.snapshot().furnitureReady);assert.equal(await page.evaluate(()=>fixture.runtime.snapshot().workspace.recordId),'coastal-investigation-v1:report');report.checks.push('completed-world-coastal-report-displayed-at-real-desk-and-retained-after-reload');
+  }
   await page.evaluate(()=>fixture.state.ui.setOpen(true));await page.setViewportSize({width:390,height:844});
   assert.equal(await page.locator('aside').evaluate(e=>e.scrollWidth>e.clientWidth+1),false);await page.screenshot({path:`${out}/phone.png`});
   await page.setViewportSize({width:1280,height:800});

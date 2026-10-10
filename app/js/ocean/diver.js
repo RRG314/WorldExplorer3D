@@ -1,3 +1,4 @@
+import {createInvestigationControls} from '../campaign/coastal-investigation-ui.js';
 import {parentHullCollision} from './parent-vessel.js';
 import {getMaritimeCatalogEntry} from '../transport/maritime-catalog.js?v=1';
 import {RCRV_LAYOUT,RESEARCH_EYE_HEIGHT} from '../boat-mode/research/layout.js';
@@ -31,13 +32,14 @@ export function parentVesselExitPose(ship,surfaceY,jump=false) {
 // identity and transform; boarding changes control, never creates another sub.
 export function createOceanDiver(ctx,mode,{sampleSeabedHeight,worldRadius=1200}) {
   const host=createPlayerCharacterHost(THREE);mode.scene.add(host);
-  let active=false,pending=false,disposed=false,controller=null,ready=false,returnTarget='submarine',falling=false,fallVelocity=0,entryEpoch=0;
+  let active=false,pending=false,disposed=false,controller=null,ready=false,returnTarget='submarine',falling=false,fallVelocity=0,entryEpoch=0,lastAdmission='';
   const state={walker:{x:0,y:0,z:0,yaw:0,angle:0,lookYawOffset:0,pitch:0,vy:0},characterMesh:host};
   const panel=document.createElement('section');panel.id='oceanDiverControls';panel.setAttribute('aria-label','Ocean explorer');
   const button=document.createElement('button'),status=document.createElement('div');button.id='oceanDiverToggle';button.type='button';button.textContent='Explore outside submarine';status.setAttribute('role','status');panel.append(button,status);document.body.append(panel);
   const optionsDetails=document.createElement('details'),optionsSummary=document.createElement('summary');optionsSummary.textContent='Dive controls & sound';optionsDetails.id='oceanDiverOptions';optionsDetails.append(optionsSummary);panel.append(optionsDetails);
   const help=document.createElement('div');help.textContent='W/S swim · A/D turn · Space/Shift rise/dive. Recover returns you aboard.';optionsDetails.append(help);
   styleMarinePanel(panel,'diver');
+  const investigation=createInvestigationControls({api:()=>ctx.marineResearch?.investigation,prefix:'coastalDiver'});panel.append(investigation.node);
   const box=new THREE.Box3(),cameraTarget=new THREE.Vector3(),lookTarget=new THREE.Vector3();
   const units=Number(ctx.METERS_PER_WORLD_UNIT)>0?ctx.METERS_PER_WORLD_UNIT:1;
   function subCollisionAt(x,z,radius,actor){return {collision:x>box.min.x-radius&&x<box.max.x+radius&&z>box.min.z-radius&&z<box.max.z+radius&&actor.actorBaseY<box.max.y&&actor.actorBaseY+actor.actorHeight>box.min.y};}
@@ -52,6 +54,7 @@ export function createOceanDiver(ctx,mode,{sampleSeabedHeight,worldRadius=1200})
   function board(rescue=false) {
     if(!active)return false;
     if(!rescue&&boardingDistance()>8){status.textContent='Swim back within 8 m of your entry point, or use Recover for assistance.';return false;}
+    if(!rescue)ctx.marineResearch?.investigation?.onBoard();
     stop();
     mode.submarine.speed=0;mode.submarine.verticalSpeed=0;mode.submarine.turnSpeed=0;
     ctx.refreshBoatAvailability?.(true);
@@ -85,9 +88,9 @@ export function createOceanDiver(ctx,mode,{sampleSeabedHeight,worldRadius=1200})
           const water=mode.waterSurface.sample(px,pz);
           return {collision:inside||Math.hypot(px,pz)>worldRadius||water.surfaceY-sampleSeabedHeight(px,pz)<1.5};
         }};
-      controller=createWalkingWaterRuntime({ctx:localContext,state,CFG:{eyeHeight:1.7},environment:'OCEAN',checkpointEnabled:false,onRecover:()=>board(true),
+      controller=createWalkingWaterRuntime({ctx:localContext,state,CFG:{eyeHeight:1.7},environment:'OCEAN',checkpointEnabled:false,swimPolicy:ctx.marineResearch?.investigation?.diveEquipment(),onRecover:()=>board(true),
         groundAt:(px,pz)=>({effectiveGroundY:sampleSeabedHeight(px,pz)}),sample:(px,pz)=>mode.waterSurface.sample(px,pz),moveVector:resolveWalkingMoveVector,
-        animate:updateCuratedCharacterAnimation,hudFactory:options=>createSwimmingHud({...options,id:'oceanSwimmingHud',host:panel})});
+        animate:updateCuratedCharacterAnimation,hudFactory:options=>{const hud=createSwimmingHud({...options,id:'oceanSwimmingHud',host:panel});panel.insertBefore(document.getElementById('oceanSwimmingHud'),investigation.node);panel.append(optionsDetails);return hud;}});
       sub.speed=0;sub.turnSpeed=0;sub.verticalSpeed=0;active=true;host.visible=true;ctx.refreshBoatAvailability?.(true);
       status.textContent='';
       return true;
@@ -96,8 +99,9 @@ export function createOceanDiver(ctx,mode,{sampleSeabedHeight,worldRadius=1200})
   button.onclick=()=>{button.blur();if(active)board();else void start().catch(()=>{if(!disposed)status.textContent='Explorer could not start. Try again.'})};
   function update(dt,time){
     if(disposed)return false;
-    panel.hidden=!mode.active;
-    if(!active){button.textContent='Explore outside submarine';if(!pending){const gate=admission();button.disabled=!gate.allowed;if(!gate.allowed)status.textContent=gate.reason;}return false;}
+    panel.hidden=!mode.active||!!ctx.paused;
+    investigation.render(active?ctx.marineResearch?.investigation?.snapshot():null);
+    if(!active){button.textContent='Explore outside submarine';if(!pending){const gate=admission();button.disabled=!gate.allowed;if(!gate.allowed){status.textContent=gate.reason;lastAdmission=gate.reason;}else if(status.textContent===lastAdmission){status.textContent='';lastAdmission='';}}return false;}
     const w=state.walker,actions=ctx.readControlActions?.('ocean')||{};
     w.yaw+=(Number(actions.turn)||0)*2*dt;w.angle=w.yaw;
     w.lookYawOffset+=(Number(actions.lookYaw)||0)*2*dt;
@@ -124,7 +128,7 @@ export function createOceanDiver(ctx,mode,{sampleSeabedHeight,worldRadius=1200})
     mode.camera.position.set(cameraPose.x,cameraPose.y,cameraPose.z);
     // On a portrait display, keep the explorer left of the compact right HUD.
     // Collision stays anchored to the actual body; only optical framing shifts.
-    if(mode.camera.aspect<.8){lookTarget.x+=Math.cos(yaw)*.8;lookTarget.z-=Math.sin(yaw)*.8;}
+    if(mode.camera.aspect<.8){lookTarget.x-=Math.cos(yaw)*1.05;lookTarget.z+=Math.sin(yaw)*1.05;}
     mode.camera.lookAt(lookTarget);
     button.textContent=`${returnTarget==='vessel'?'Board vessel':'Board submarine'} · ${Math.round(boardingDistance())} m`;button.disabled=falling||boardingDistance()>8;
     return true;

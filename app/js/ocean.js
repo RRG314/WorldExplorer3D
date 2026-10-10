@@ -128,6 +128,7 @@ const {
   primeLocalBathymetryGrid,
   sampleSeabedHeight,
   sampleSeabedEvidence,
+  studyCoordinates,
   smoothstep,
   valueNoise2D
 } = createOceanBathymetryApi({
@@ -141,6 +142,7 @@ const oceanSceneAssetDeps = {
   OCEAN_CONSTANTS,
   lerp,
   sampleSeabedHeight,
+  studyCoordinates,
   smoothstep,
   valueNoise2D
 };

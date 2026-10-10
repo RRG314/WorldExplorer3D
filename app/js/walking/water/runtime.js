@@ -11,8 +11,8 @@ function sampleCharacterWater(x,z,candidate,options) {
   return body ? sampleDynamicWaterAt(x,z,body,options) : {coverage:'unresolved',surfaceY:null,volume:null};
 }
 
-export function createWalkingWaterRuntime({ctx,state,CFG,groundAt,moveVector,animate,sample=sampleCharacterWater,hudFactory=createSwimmingHud,resumeStore=createSwimResumeStore(),environment='EARTH',checkpointEnabled=true,onRecover=null}) {
-  let active=false, resources=createSwimState(), lastDry=null, hud=null;
+export function createWalkingWaterRuntime({ctx,state,CFG,groundAt,moveVector,animate,sample=sampleCharacterWater,hudFactory=createSwimmingHud,resumeStore=createSwimResumeStore(),environment='EARTH',checkpointEnabled=true,onRecover=null,swimPolicy=null}) {
+  let active=false, resources=createSwimState({},swimPolicy), lastDry=null, hud=null;
   let lastBody=null, bodyPitch=0, resumeChecked=false, saveElapsed=0, checkpointSaved=false, checkpointAttempted=false, regionKey=null;
   const checkpoint=()=>{if(active&&checkpointEnabled){checkpointAttempted=true;checkpointSaved=resumeStore.write(ctx.LOC,state.walker,resources);}};
   globalThis.addEventListener?.('pagehide',checkpoint);
@@ -39,7 +39,7 @@ export function createWalkingWaterRuntime({ctx,state,CFG,groundAt,moveVector,ani
     if(lastDry && ground && Math.abs(ground.effectiveGroundY+CFG.eyeHeight-lastDry.y)<.5
       && (water.coverage!=='known-water-body'||ground.effectiveGroundY>=water.surfaceY-.25)
       && Math.hypot(walker.x-lastDry.x,walker.z-lastDry.z)<500) {
-      Object.assign(walker,lastDry,{vy:0,vx:0,vz:0});resources=createSwimState();deactivate();
+      Object.assign(walker,lastDry,{vy:0,vx:0,vz:0});resources=createSwimState({},swimPolicy);deactivate();
     } else if(walker.swimming) {
       walker.y=walker.swimming.surfaceY+.18;resources.verticalVelocity=0;
     }
@@ -47,7 +47,7 @@ export function createWalkingWaterRuntime({ctx,state,CFG,groundAt,moveVector,ani
   function update(dt,{actions,forward,strafe,groundState}) {
     const w=state.walker;
     const nextRegion=Number.isFinite(ctx.LOC?.lat)&&Number.isFinite(ctx.LOC?.lon)?`${ctx.LOC.lat}:${ctx.LOC.lon}`:null;
-    if(regionKey!==nextRegion){deactivate();lastDry=null;resources=createSwimState();resumeChecked=false;regionKey=nextRegion;}
+    if(regionKey!==nextRegion){deactivate();lastDry=null;resources=createSwimState({},swimPolicy);resumeChecked=false;regionKey=nextRegion;}
     if((ctx.getEnv && ctx.getEnv()!==environment)||ctx.activeInterior||ctx.activePlanetaryBodyId||ctx.onMoon||ctx.onMars||ctx.boatMode?.active
       ||ctx.liveGpsTranslationOwned?.()===true||ctx.urbanSandboxRuntime?.parachute?.skydiving===true) {
       deactivate();lastDry=null;return false;
@@ -62,7 +62,7 @@ export function createWalkingWaterRuntime({ctx,state,CFG,groundAt,moveVector,ani
         if(surface.coverage==='known-water-body' && Number.isFinite(support.effectiveGroundY)
           && surface.surfaceY-support.effectiveGroundY>1.45 && !obstruction?.collision) {
           Object.assign(w,saved.pose,{y:surface.surfaceY+.18,angle:saved.pose.yaw,vy:0});
-          resources=createSwimState(saved);groundState=support;
+          resources=createSwimState(saved,swimPolicy);groundState=support;
         }
       }
     }
@@ -72,7 +72,7 @@ export function createWalkingWaterRuntime({ctx,state,CFG,groundAt,moveVector,ani
     if(kind!=='swimming') {
       if(active) { w.vy=0; deactivate(); w.waterTraversal=kind; }
       if(kind==='dry'&&Math.abs(w.y-groundState.effectiveGroundY-CFG.eyeHeight)<.35) {
-        lastDry={x:w.x,y:w.y,z:w.z};resources=createSwimState();lastBody=null;
+        lastDry={x:w.x,y:w.y,z:w.z};resources=createSwimState({},swimPolicy);lastBody=null;
       }
       return false;
     }
@@ -109,7 +109,7 @@ export function createWalkingWaterRuntime({ctx,state,CFG,groundAt,moveVector,ani
     w.vy=resources.verticalVelocity;w.onGround=false;w.onBuilding=false;
     w.speedMph=Math.hypot(w.vx,w.vz)*units*2.236936;
     w._resolvedGroundState=null;
-    w.swimming={equipment:resources.equipment,airSeconds:resources.airSeconds,submerged:result.submerged,recovering:result.recovering,surfaceY:water.surfaceY,depthMeters:Math.max(0,(water.surfaceY-w.y)*units),volumeId:lastBody};
+    w.swimming={equipment:resources.equipment,airSeconds:resources.airSeconds,airCapacity:resources.airCapacity,maximumDiveMeters:resources.maximumDiveMeters,submerged:result.submerged,recovering:result.recovering,surfaceY:water.surfaceY,depthMeters:Math.max(0,(water.surfaceY-w.y)*units),volumeId:lastBody};
     const mesh=state.characterMesh;
     if(mesh) {
       mesh.userData.swimming=true;
@@ -128,5 +128,5 @@ export function createWalkingWaterRuntime({ctx,state,CFG,groundAt,moveVector,ani
     hud.show(w.swimming);
     return true;
   }
-  return {update,deactivate,recover,resupply:()=>{deactivate();resources=createSwimState();},dispose:()=>{deactivate();hud?.dispose?.();hud=null;disposeSwimmingEquipment(state.characterMesh);globalThis.removeEventListener?.('pagehide',checkpoint);},snapshot:()=>({active,resources:{...resources},lastDry})};
+  return {update,deactivate,recover,resupply:()=>{deactivate();resources=createSwimState({},swimPolicy);},dispose:()=>{deactivate();hud?.dispose?.();hud=null;disposeSwimmingEquipment(state.characterMesh);globalThis.removeEventListener?.('pagehide',checkpoint);},snapshot:()=>({active,resources:{...resources},lastDry})};
 }

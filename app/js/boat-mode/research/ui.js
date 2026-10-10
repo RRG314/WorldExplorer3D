@@ -1,7 +1,8 @@
+import {createInvestigationControls} from '../../campaign/coastal-investigation-ui.js';
 import {RCRV_LAYOUT} from './layout.js';
 import {styleMarinePanel,setMarineText} from '../../ocean/interface.js';
 import {createCoastalDepartureControls} from '../../campaign/coastal-departure-ui.js';
-export function createResearchDeckHud({enter,helm,moor,act,select,retry,researchAct,sharedAct,coastalApi}) {
+export function createResearchDeckHud({enter,helm,moor,act,select,retry,researchAct,sharedAct,coastalApi,investigationApi}) {
  const panel=document.createElement('section');panel.id='researchDeckControls';panel.setAttribute('aria-label','Research ship');
  styleMarinePanel(panel,'deck');
  const title=document.createElement('strong');title.textContent='Research vessel';
@@ -15,15 +16,20 @@ export function createResearchDeckHud({enter,helm,moor,act,select,retry,research
  const researchButton=make('marineResearchLab',()=>researchAct?.()),researchInfo=document.createElement('div');researchInfo.style.cssText='margin-top:8px;border-top:1px solid #50879c;padding-top:7px';
  const reportDetails=document.createElement('details');reportDetails.id='marineResearchReport';reportDetails.style.cssText='margin-top:8px;border-top:1px solid #50879c;padding-top:6px';const reportSummary=document.createElement('summary');reportSummary.textContent='Saved survey report';const reportBody=document.createElement('div');reportDetails.append(reportSummary,reportBody);let reportSignature='';
  enterButton.textContent='Walk research deck';helmButton.textContent='Return to helm';
- const more=document.createElement('details'),summary=document.createElement('summary');summary.textContent='Vessel options';more.append(summary,helmButton,reportDetails,sharedButton);
+ const legacy=document.createElement('details'),legacyTitle=document.createElement('summary');legacyTitle.textContent='Optional reef mapping · Scanner II';legacy.append(legacyTitle);let investigating=null;
+ const more=document.createElement('details'),summary=document.createElement('summary');summary.textContent='Vessel options';more.append(summary,helmButton,reportDetails,sharedButton,legacy);
+ const investigation=createInvestigationControls({api:investigationApi,prefix:'coastalDeck'});
  const coastal=createCoastalDepartureControls({api:coastalApi,prefix:'coastalDeck'});
- panel.append(title,message,choice,actionButton,enterButton,retryButton,moorButton,coastal.node,researchInfo,researchButton,result,more);
+ panel.append(title,message,choice,actionButton,enterButton,retryButton,moorButton,coastal.node,investigation.node,researchInfo,researchButton,result,more);
  for(const control of panel.querySelectorAll('button,select'))control.removeAttribute('style');document.body.append(panel);
  return {hide:()=>{panel.hidden=true},dispose:()=>{panel.remove()},message:text=>{result.textContent=text},show:s=>{
   retryButton.hidden=!s.failed;
   for(const option of choice.options){const station=s.stations?.find(station=>station.id===option.value);if(station)setMarineText(option,station.label);}
   const research=s.research;researchInfo.hidden=!research?.visible;researchButton.hidden=!research?.visible||!s.active||s.target?.id!=='lab';researchInfo.textContent=research?.visible?`${research.instruction} ${research.message}`:'';researchButton.textContent=research?.labLabel||'Reef survey';researchButton.disabled=!research?.atLab||research?.busy;
-  coastal.render(research?.coastal);
+  coastal.render(research?.coastal);investigation.render(research?.investigation);
+  const nextInvestigating=!!research?.investigation?.started;
+  if(investigating!==nextInvestigating){investigating=nextInvestigating;if(investigating)legacy.append(researchInfo,researchButton);else{panel.insertBefore(researchInfo,result);panel.insertBefore(researchButton,result);}}
+  legacy.hidden=!investigating;if(investigating)coastal.node.hidden=true;
   const guiding=research?.coastal?.visible&&!research.coastal.completed&&(!!research.coastal.plan||coastal.node.open);
   if(guiding){researchInfo.hidden=true;if(research.coastal.phase!=='station')researchButton.hidden=true;}
   reportDetails.hidden=!research?.visible||!research?.completed;

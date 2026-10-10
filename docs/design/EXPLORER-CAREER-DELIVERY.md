@@ -9,7 +9,8 @@ Baseline `eb18b9c7`, October 9, 2026. Production remains released 5.5.0.
 | 2 — Pilot / Explorer / Maker | Implemented and verified locally | Harbor Run with cosmetic/handling distinction, Three Views and useful workspace have executed evidence below. |
 | 3 — Personal home | Implemented locally | One starter workspace, licensed furniture, atomic storage, record display, return journey and durable badges; acceptance below. Full interior art and release compatibility remain separate gates. |
 | 4 — vessel / Coastal Departure | Implemented and verified locally | Licensed vessel, actual working-deck navigation, both survey choices, mooring, same-sub launch/recovery and durable Journal; evidence below. |
-| 5–12 | Planned | Specific deliverables and exit checks in the plan; no gameplay completion claim |
+| 5 — seabed / dive / lab | Implemented and verified locally | Three physical contacts, all three dive choices, partial and normal return, supported report, repeatable Coastal watch, badges and home display; acceptance below. |
+| 6–12 | Planned | Specific deliverables and exit checks in the plan; no gameplay completion claim |
 
 The first delivery is local and does not deploy or replace retained builds. Later
 career jobs, the remaining fleet assets, full campaign and final video package
@@ -46,11 +47,11 @@ packages are unchanged. No promotional posts, paid service or deployment occurre
 
 ## Next bounded delivery
 
-H01–H06 have local implementation and acceptance evidence. Next is delivery
-step 5: actual sonar contacts, selected-target diving and comparative lab
-interpretation (H07–H09). These are not satisfied by the older three-scan reef
-survey. Continue through space, research/mining/CERN, realism and release/media
-in the specified sequence. No placeholder mission controls expose those stages.
+H01–H09 have local implementation and acceptance evidence. Next is delivery
+step 6: ship preparation, two-site lunar fieldwork, actual evidence analysis,
+Earth return and home display (H10–H12). Continue through the remaining
+research/mining/CERN, repeatable/GPS/connected work, realism and release/media
+gates in the specified sequence. No placeholder mission controls expose them.
 
 
 ## October 9 continued — Harbor Run and realism foundation
@@ -491,3 +492,87 @@ identity/ownership, boundary types, inventory and sensitivity checks
 identity and the rule rejecting fresh land/shallow samples. The last session-only
 presentation change then passed all five component/client cases; the final source
 check is recorded separately. No new physical-device or immutable-package claim.
+
+
+## October 10 — Read the Seabed, Outside the Hull and coastal report, local
+
+The optional investigation uses the existing Journal, voyage, boat-deck, Ocean,
+diver, navigation map and home-workspace owners. It does not create another
+scene, currency or inventory authority. Free exploration and the older reef
+mapping / Scanner II survey remain available; the older survey moves into
+explicit optional controls once the investigation starts.
+
+- H07 charts actual reef, outcrop and licensed modern equipment-case geometry.
+  Range, heading, motion and terrain/object occlusion are checked. Sonar shape
+  does not identify a target. The saved chart adds working map annotations.
+- H08 lets the player choose any of the three contacts. Actual scuba movement,
+  two distinct viewpoints and normal boarding of the original submarine earn
+  Diver. Assisted recovery keeps evidence without granting normal-return credit.
+  Survey equipment is automatic only for the owning voyage after its chart:
+  game depth rating 42 m and 300 seconds of air; earned reserve gives 360 seconds
+  on subsequent dives. Ordinary swimming remains 18 m / 180 seconds. These are
+  game rules, not real diving guidance.
+- H09 compares saved sonar returns and direct observations at the physical wet
+  lab. Unsupported interpretations cannot finish. Partial reports preserve the
+  next step. A supported report earns Coastal Explorer, can be displayed on the
+  actual personal desk, and enables repeatable direct Coastal watch observations
+  (one per contact per hour; no repeated reward).
+- Geographic study offsets now govern authored seabed shape, color and object
+  placement together. Alternate launches no longer move the reef relative to its
+  support. Observations compare positions in a common study frame.
+- The leased case retains its licensed geometry and palette. Its painted shell
+  uses a dielectric coating instead of glTF's default metalness=1. Disposal
+  detaches leased roots before generic Ocean texture cleanup.
+- Portrait camera framing now shifts the explorer to the clear side of the
+  screen. Air, rise/dive and recovery appear before collapsible mission notes.
+
+Executed evidence under ignored `output/roadmap-20261010/`:
+
+- `investigation-portrait`: **12 actual-game checks**, including case inspection,
+  partial recovery, normal return, report, IndexedDB backup restore, reload,
+  earned air capacity and prescribed game-client keyboard choreography.
+- `investigation-north-habitat`: **14 actual-game checks**, including actual boat
+  controller travel to the alternate station, both reef viewpoints, follow-up
+  observation deduplication, recovery/reload and the prescribed keyboard client.
+- `investigation-rock`: **13 actual-game checks**, including the third dive
+  choice and repeatable observation. All final world runs captured zero page
+  errors and zero failed local assets; four external 503s per run are deliberate
+  H06 provider-outage injection. Submarine controls ran under normal frames;
+  deck and diver traversals used bounded controller stepping. This is not an
+  uncoached playthrough or a physical-device certification.
+- `investigation-home`: **7 actual DOM/WebGL/storage checks**, including display
+  of the completed world's saved coastal report, reload, failed home writes,
+  model/collider disposal and the prescribed room movement client. Controlled
+  room evidence is separate from mapped-city traversal.
+- `investigation-lifecycle`: **7 actual Ocean/component checks**. Three habitat
+  rebuilds show no tracked resource growth; cancelled and disposed case/coral
+  leases are released. Asset failure retains seabed and removes partial models.
+  Close rendering uses 18 calls / 570,306 triangles in this controlled view;
+  these are not device-wide performance guarantees.
+- Nine model tests cover geometry admission, evidence ordering, wrong vessels,
+  corruption, save failure, normal-return/write races, follow-up deduplication,
+  scoped equipment and geographic origin continuity. The additional home model
+  test checks persistent record selection without resetting layout or earned use.
+
+Screenshots of the three targets, phone return, report, home display and keyboard
+movement were opened and inspected. Early failures remain separate: a test route
+stopped beyond sonar range; the diver test initially demanded less drift than
+the current; a pause assertion incorrectly included continuing wave presentation.
+The initial phone image exposed a real camera-offset sign error, now corrected.
+The final normal-return/write-race refinement has model evidence after the
+rendered world runs. Source-chain results are recorded at the saved checkpoint.
+
+The outcrop and seabed still use the existing procedural art; the complete ocean
+art/lighting matrix, physical phones, later space chapters and release rollback
+remain open. No production or release package has been replaced.
+
+### Lunar research references checked for the next delivery
+
+R&D only, not completed lunar gameplay: NASA's [Apollo 11 contingency sample
+account](https://www.nasa.gov/wp-content/uploads/static/history/alsj/a11/a11ContingencySample.html),
+[NASA's lunar sample information catalogue](https://ntrs.nasa.gov/citations/19780010031),
+and the [Lunar and Planetary Institute Apollo 11 sample overview](https://www.lpi.usra.edu/lunar/missions/apollo/apollo_11/samples/index.shtml).
+These distinguish basalt and regolith breccia and document sample context. New
+virtual study placements must not be described as exact historical sample sites.
+
+Final source checkpoint: `npm run verify:pr` passes **2,318 tests**, zero failed, plus identity, dependency ownership, boundary types, test inventory and sensitivity checks. This includes the final asynchronous boarding/write regression.

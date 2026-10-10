@@ -1,3 +1,4 @@
+import {validateInvestigationBackup} from '../campaign/coastal-investigation.js';
 import {validateCoastalBackup} from '../campaign/coastal-departure.js';
 import { THREE_VIEWS, validateThreeViewsBackup } from '../campaign/three-views.js';
 import {HOME_ACHIEVEMENTS} from '../campaign/home-achievements.js';
@@ -27,7 +28,7 @@ export function validateJournalBackup(input) {
     const claims = new Set();
     for (const row of rows) if (row.claimId) { if (claims.has(row.claimId)) fail(); claims.add(row.claimId); }
   }
-  try{validateCoastalBackup(data.events);}catch{fail();}
+  try{validateCoastalBackup(data.events);validateInvestigationBackup(data.events);}catch{fail();}
   const chapter = normalizeOpeningChapter(data.profile.openingChapter);
   for(const [kind,entry] of Object.entries(data.profile.homeAchievements||{})) {
     const definition=HOME_ACHIEVEMENTS[kind],receipt=data.events.find(event=>event.eventId===entry?.eventId);

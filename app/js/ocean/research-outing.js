@@ -1,3 +1,4 @@
+import {createCoastalInvestigation} from '../campaign/coastal-investigation-runtime.js';
 import {createIndexedDbDiscoveryProfileStore} from '../discovery/profile-store.js?v=5';
 import {CORAL_SHELF_SITE} from './habitat-plan.js';
 import {researchStationDistance} from '../boat-mode/research/layout.js';
@@ -27,6 +28,7 @@ export function ensureMarineResearch(ctx,{store:providedStore,now=()=>Date.now()
  const store=()=>providedStore||(ctx.discoveryProfileStore ||= createIndexedDbDiscoveryProfileStore());
  const state=()=>reefSurveyState(events);
  const coastal=createCoastalDeparture(ctx,{store,survey:state,now});
+ const investigation=createCoastalInvestigation(ctx,{store,coastal:()=>coastal.snapshot(),atLab,now});
  async function refresh(){const token=++sequence;try{const records=await store().getEventsById(ids);if(token===sequence){events=records;ready=true;error='';}return true;}catch{if(token===sequence){ready=false;error='Journal unavailable. Progress has not been changed; retry when storage is available.';}return false;}}
  function atLab(){
   const deck=ctx.boatDeck?.snapshot(),voyage=ctx.oceanVoyage?.current;
@@ -67,7 +69,7 @@ export function ensureMarineResearch(ctx,{store:providedStore,now=()=>Date.now()
   else if(!ctx.oceanMode?.active)instruction=s.completed?'Scanner II installed · 35 m range. Walk to the submarine cradle for a follow-up dive.':`${s.scans.length}/3 scans saved. Walk to the submarine cradle and deploy to continue.`;
   else if(t){const actor=ctx.oceanMode.diver?.active?ctx.oceanMode.diver.navigationActor():ctx.oceanMode.submarine;const heading=((180-Math.atan2(t.x-actor.position.x,t.z-actor.position.z)*180/Math.PI)%360+360)%360;instruction=`${s.completed?'Scanner II':`${s.scans.length}/3 saved`} · ${t.label} · ${Number.isFinite(gate.distance)?Math.round(gate.distance):'—'} m · bearing ${Math.round(heading)}° · target SIM depth ${Math.round(-t.y*(ctx.METERS_PER_WORLD_UNIT||1))} m. ${gate.reason}`;}
   else instruction='Return to the Coral Shelf launch area; the next study site is outside this local scene.';
-  return {...s,coastal:coastal.snapshot(),report:s.completed?events.filter(e=>e.eventId!==eventId('brief')).map(({eventId,name,detail})=>({eventId,name,detail})):[],ready,busy,visible:visible(),atLab:atLab(),targetId:t?.id||null,target:t?{...t}:null,canScan:ready&&s.started&&gate.allowed,labLabel:!ready?'Retry Journal':!s.started?'Take reef survey briefing':s.stage==='report'?'Submit survey · install Scanner II':s.completed?'Review Scanner II':'Review survey progress',instruction,message:error||message,storage:store().type==='IndexedDbDiscoveryProfileStore'?'device':'session'};
+  return {...s,coastal:coastal.snapshot(),investigation:investigation.snapshot(),report:s.completed?events.filter(e=>e.eventId!==eventId('brief')).map(({eventId,name,detail})=>({eventId,name,detail})):[],ready,busy,visible:visible(),atLab:atLab(),targetId:t?.id||null,target:t?{...t}:null,canScan:ready&&s.started&&gate.allowed,labLabel:!ready?'Retry Journal':!s.started?'Take reef survey briefing':s.stage==='report'?'Submit survey · install Scanner II':s.completed?'Review Scanner II':'Review survey progress',instruction,message:error||message,storage:store().type==='IndexedDbDiscoveryProfileStore'?'device':'session'};
  }
- const api={coastal,refresh,labAction,scan,snapshot,select:id=>{if(REEF_SURVEY.sites.includes(id)){selected=id;message='';}}};ctx.marineResearch=api;void refresh();void coastal.refresh();return api;
+ const api={coastal,investigation,refresh,labAction,scan,snapshot,select:id=>{if(REEF_SURVEY.sites.includes(id)){selected=id;message='';}}};ctx.marineResearch=api;void refresh();void coastal.refresh();void investigation.refresh();return api;
 }

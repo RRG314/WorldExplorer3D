@@ -50,9 +50,10 @@ export function createSeabedMesh(renderer = null, deps = {}) {
     const y = deps.sampleSeabedHeight(x, z);
     pos.setY(i, y);
 
-    const reefWeight = Math.exp(-((x - 24) ** 2 + (z - 124) ** 2) / 25500);
-    const deepWeight = deps.smoothstep(55, 420, -z + 70);
-    const noise = deps.valueNoise2D(x * 0.028 + 20, z * 0.028 - 14, 31);
+    const study=deps.studyCoordinates?.(x,z)||{x,z};
+    const reefWeight = Math.exp(-((study.x - 24) ** 2 + (study.z - 124) ** 2) / 25500);
+    const deepWeight = deps.smoothstep(55, 420, -study.z + 70);
+    const noise = deps.valueNoise2D(study.x * 0.028 + 20, study.z * 0.028 - 14, 31);
 
     const sandR = 0.48 + noise * 0.08;
     const sandG = 0.49 + noise * 0.08;

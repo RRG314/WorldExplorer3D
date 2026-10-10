@@ -1,3 +1,4 @@
+import {createInvestigationControls} from '../campaign/coastal-investigation-ui.js';
 import {ensureMarineResearch,REEF_SURVEY} from './research-outing.js';
 import {styleMarinePanel} from './interface.js';
 import {earthLocalToGeographic} from '../earth-core/location-origin.js?v=1';
@@ -62,13 +63,16 @@ export function ensureOceanVoyage(ctx,{store=createOceanVoyageStore()}={}){
   ui.resume.hidden=!saved;ui.resume.style.display=saved?'':'none';setText(ui.resume,saved?.stage==='aboard'?'Return to saved research vessel':'Resume saved ocean voyage');
   ui.panel.hidden=!ctx.oceanMode?.active||!!ctx.paused||!!ctx.oceanMode?.diver?.active;
   const survey=research.snapshot();
-  ui.coastal.render(survey.coastal);
+  ui.coastal.render(survey.coastal);ui.investigation.render(survey.investigation);
   setText(ui.title,survey.visible?'Coral Shelf survey':'Research voyage');
   setText(ui.status,survey.visible&&survey.message?survey.message:status);
   ui.scan.hidden=!survey.visible||!survey.started||survey.stage==='report';ui.scan.disabled=!survey.canScan||survey.busy;
   setText(ui.scan,`Scan ${survey.target?.label||'study site'} · ${survey.rangeMeters} m range`);
   ui.site.hidden=!survey.visible||!survey.completed;
 
+  const investigating=!!survey.investigation?.started;
+  if(ui.investigating!==investigating){ui.investigating=investigating;if(investigating)ui.reef.append(ui.site,ui.scan);else{ui.panel.insertBefore(ui.site,ui.recover);ui.panel.insertBefore(ui.scan,ui.recover);}}
+  ui.reef.hidden=!investigating;if(investigating){ui.coastal.node.hidden=true;setText(ui.title,'Coastal investigation');}
   const sub=ctx.oceanMode?.submarine;
   if(survey.visible)setText(ui.distance,survey.instruction);
   else if(current&&sub){const metres=Math.hypot(sub.position.x,sub.position.z)*(ctx.METERS_PER_WORLD_UNIT||1);setText(ui.distance,`Parent vessel · ${Math.round(metres)} m from launch point. Recovery returns you and this submarine aboard.`);}
@@ -106,8 +110,10 @@ export function ensureOceanVoyage(ctx,{store=createOceanVoyageStore()}={}){
   REEF_SURVEY.sites.forEach((id,index)=>{const option=document.createElement('option');option.value=id;option.textContent=REEF_SURVEY.labels[index];site.append(option)});site.onchange=()=>{research.select(site.value);site.blur();refresh()};
   styleMarinePanel(panel,'voyage');
   const more=document.createElement('details'),summary=document.createElement('summary');summary.textContent='Voyage details & crew';more.append(summary,distance,statusElement,shared);
+  const investigation=createInvestigationControls({api:()=>research.investigation,prefix:'coastalOcean'});
+  const reef=document.createElement('details'),reefTitle=document.createElement('summary');reefTitle.textContent='Optional reef mapping · Scanner II';reef.append(reefTitle);more.append(reef);
   const coastal=createCoastalDepartureControls({api:()=>research.coastal,prefix:'coastalOcean'});
-  panel.append(title,site,scan,recover,coastal.node,more);for(const control of panel.querySelectorAll('button,select'))control.removeAttribute('style');document.body.append(panel);ui={resume:resumeButton,panel,title,status:statusElement,distance,recover,scan,site,coastal};refresh();
+  panel.append(title,site,scan,recover,coastal.node,investigation.node,more);for(const control of panel.querySelectorAll('button,select'))control.removeAttribute('style');document.body.append(panel);ui={resume:resumeButton,panel,title,status:statusElement,distance,recover,scan,site,coastal,investigation,reef};refresh();
  }
  const api={restorePersonal(){if(personalBeforeShared){current=personalBeforeShared.current;personalBeforeShared=null;}return current;},begin,beginAboard,checkpoint,surfaceCheckpoint,surfaced,tick,tickSurface,mount,resume,refresh,get current(){return current},get saved(){return saved},get status(){return status}};
  ctx.oceanVoyage=api;

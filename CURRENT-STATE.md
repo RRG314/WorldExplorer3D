@@ -50,7 +50,29 @@ browsers/servers. Production deployment evidence is under
 `output/release-evidence/current/production-deployment.json` and
 `production-promotion.json`; acceptance gaps remain in their own receipts.
 
-## October 10 latest local continuation — Harbor and Coastal Departure
+## October 10 current continuation — coastal investigation
+
+H07–H09 now implement physical geometry sonar, three eligible diver choices,
+partial recovery, normal same-submarine return, supported wet-lab interpretation,
+Diver / Coastal Explorer badges, repeatable Coastal watch and home-desk display.
+The case, northern reef and rock journeys pass 12, 14 and 13 controlled actual-game
+checks respectively. Home display passes seven DOM/WebGL/storage cases; habitat
+lifecycle passes seven. Phone images exposed and verified a corrected portrait
+camera offset and compact, resource-first diver controls. These are local checks,
+not a physical-phone or complete release certification.
+
+The authored seabed now uses the same geographic study frame as its reef objects,
+including alternate launches. Survey scuba reuses the existing water controller;
+ordinary swimming rules are preserved. No additional scene or storage owner was
+introduced. The final write/boarding-race repair has model evidence after those
+world runs. Full detail and exact receipts are in the delivery ledger.
+
+Continue with H10–H12, the remaining careers/mining/CERN, repeatable/GPS/connected
+work, fleet/realism and release/media gates. The compatible possession fallback
+and actual candidate/fallback roundtrip remain release prerequisites. Production,
+local dist and the four retained packages are unchanged.
+
+## October 10 previous local continuation — Harbor and Coastal Departure
 
 H02 now grants the licensed BMW's slate body finish once, with a separate
 observed-driving distinction. H06 uses the licensed OSU RCRV educational model,
@@ -73,7 +95,7 @@ Exact receipts and limits: `docs/design/EXPLORER-CAREER-DELIVERY.md`, ignored
 `output/roadmap-20261010/`. The live build and all four retained packages remain
 unchanged. No frontend build, GitHub push or deployment was made for this work.
 
-The full roadmap remains open beyond H06: H07–H12, broader specialist/mining/CERN
+The full roadmap remains open beyond H09: H10–H12, broader specialist/mining/CERN
 campaigns, repeatable/GPS/connected work, the remaining fleet, realism gates and
 release/media acceptance. The compatible v3 possession/commerce/workspace
 fallback and actual candidate/fallback roundtrip are still release prerequisites.

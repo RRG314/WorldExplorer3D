@@ -1,3 +1,4 @@
+import {investigationId,investigationState,investigationEventIds} from './coastal-investigation.js';
 import {resolveBuildingEntrySupport} from '../building-entry.js?v=9';
 import {normalizeWorkspace,findWorkspacePlacement,validateWorkspacePlacement} from './personal-workspace.js';
 import {createWorkspaceVisual} from '../interiors/personal-workspace-visual.js';
@@ -9,6 +10,7 @@ export function createPersonalHomeRuntime(state,dependencies={}) {
   const ctx=state.appCtx,store=state.profileStore,element=document.getElementById('discoveryPersonalHome');
   const abort=new AbortController(),housing=(dependencies.getHousing||getPersonalHousing)();
   let profile={},home=null,offers=[],record=null,visual=null,visualKey='',renderKey='',message='',busy=false,disposed=false,saveFailed=false,reviewing=false,loaded=false,elapsed=0,generation=0;
+  let coastalReport=null;
   let selectedPurpose='journal';
   let storageOpen=false;
   let importedDesign=null;
@@ -33,7 +35,7 @@ export function createPersonalHomeRuntime(state,dependencies={}) {
     if(disposed||!element)return;
     const w=workspace(),v=housing.snapshot(),bag=ctx.playerBackpackInventory?.page?.({offset:0,limit:24})?.items||[];
     const supplies=bag.filter(item=>item.catalogId!=='hands'&&!item.equipped&&!item.verbs?.includes('equip')&&item.category!=='field-tool');
-    const key=JSON.stringify([loaded,profile.openingChapter?.phase,profile.homeAchievements,w,home?.id,home?.journey,home?.storage,v.primaryHomeId,offers.map(o=>o.id),busy,insideHome(),message,reviewing,!!visual,saveFailed,supplies.map(i=>[i.instanceId,i.quantity])]);
+    const key=JSON.stringify([loaded,profile.openingChapter?.phase,profile.homeAchievements,w,home?.id,home?.journey,home?.storage,coastalReport?.eventId,record?.eventId,v.primaryHomeId,offers.map(o=>o.id),busy,insideHome(),message,reviewing,!!visual,saveFailed,supplies.map(i=>[i.instanceId,i.quantity])]);
     if(key===renderKey)return;renderKey=key;
     const button=(action,label,disabled=false)=>`<button type="button" data-home-action="${escape(action)}"${busy||disabled?' disabled':''}>${escape(label)}</button>`;
     let body='';
@@ -53,6 +55,7 @@ export function createPersonalHomeRuntime(state,dependencies={}) {
       }
       const j=home.journey||{};
       body+=`<p>A Place to Return${profile.homeAchievements?.home?' · Complete':''}: ${j.entered?'entered':'enter your room'} · ${j.displayed?'record displayed':'use your desk'} · ${j.departed?'outing started':'leave for an outing'} · ${j.returned?'returned':'walk back and enter again'}.</p>`;
+      if(insideHome()&&coastalReport&&w.pose)body+=button('coastal-display',w.recordId===coastalReport.eventId?'Coastal expedition displayed':'Display coastal expedition',w.recordId===coastalReport.eventId);
       if(reviewing&&record)body+=`<article class="discoveryDeliveryOffer"><strong>${escape(record.name)}</strong><p>${escape(record.detail||record.description||'Your saved First Bearings observation.')}</p><small>${escape(record.regionLabel||home.locationLabel)}</small>${button('review','Review this record at the desk')}${w.purpose==='album'?button('album','Open saved album'):''}</article>`;
       body+=button('journeys','Choose your next journey');
     }
@@ -63,15 +66,19 @@ export function createPersonalHomeRuntime(state,dependencies={}) {
   async function refresh(provided){
     try{
       profile=provided||await store.getProfile();if(disposed)return;
-      const [evidence]=profile.openingChapter?.eventId?await store.getEventsById([profile.openingChapter.eventId]):[];
-      if(disposed)return;record=evidence||null;reloadHome();loaded=true;render();
+      reloadHome();
+      const investigationEvents=await store.getEventsById(investigationEventIds);
+      coastalReport=investigationState(investigationEvents).report||null;
+      const recordId=workspace().recordId||profile.openingChapter?.eventId;
+      const [evidence]=recordId?await store.getEventsById([recordId]):[];
+      if(disposed)return;record=evidence||null;loaded=true;render();
     }catch{if(!disposed){message='Your workspace could not refresh. Reopen the Journal to retry.';render();}}
   }
   function clearVisual(){generation++;visual?.dispose();visual=null;visualKey='';}
   async function present(){
     const active=ctx.activeInterior,w=workspace();
     if(!insideHome()||!w.pose){if(visual||visualKey)clearVisual();return;}
-    const key=`${active.group.uuid}:${home.id}:${w.revision}`;if(key===visualKey)return;
+    const key=`${active.group.uuid}:${home.id}:${w.revision}:${record?.eventId||""}`;if(key===visualKey)return;
     clearVisual();const seq=generation;visualKey=key;
     disposeCuratedHomeFurnishing(active);
     const placement=currentPlacement();
@@ -129,6 +136,11 @@ export function createPersonalHomeRuntime(state,dependencies={}) {
         if(!canUse()||!record)throw Error('Review your saved field record while standing beside the desk.');
         check(housing.updateWorkspace(home.id,{type:'use',revision:workspace().revision}));check(housing.recordHomeVisit(home.id,'displayed'));
         await award('maker');reviewing=false;message='Record reviewed. Your working arrangement is saved for future visits.';
+      }else if(action==='coastal-display'){
+        if(!canUse())throw Error('Stand beside your desk to display the expedition.');
+        const rows=await store.getEventsById(investigationEventIds),report=investigationState(rows).report;
+        if(!report||report.eventId!==investigationId('report'))throw Error('File a complete coastal report before displaying it.');
+        check(housing.updateWorkspace(home.id,{type:'record',recordId:report.eventId,revision:workspace().revision}));record=report;coastalReport=report;await present();reviewing=true;message='Your coastal expedition is displayed on the desk. Open the field record to review its evidence.';
       }else if(action==='album'){if(!canUse())throw Error('Stand beside your desk.');ctx.openWorldDiscoverySection?.('today');document.getElementById('discoveryThreeViews')?.scrollIntoView({block:'nearest'});}
       else if(action.startsWith('store:')||action.startsWith('withdraw:')){
         if(!insideHome())throw Error('Enter your personal workspace to use its storage.');

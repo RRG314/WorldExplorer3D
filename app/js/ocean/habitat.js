@@ -4,6 +4,7 @@ export function createMarineHabitat(THREE,{site,scale,sampleSeabedHeight,rockTex
  const group=new THREE.Group();group.name='Marine regional habitat';
  const plan=createMarineHabitatPlan({site,scale,sampleSeabedHeight});
  group.userData.habitat={id:plan.id,truthType:plan.truthType,label:plan.label,assetState:plan.featured?'loading':'not-required',coralCount:plan.corals.length};
+ const abort=new AbortController();
  let disposed=false,lodElapsed=0,lastX=Infinity,lastZ=Infinity;const assets=[],models=[],matrix=new THREE.Object3D();
  const palette=[0x9e7954,0xb58b60,0x797446,0x846689,0xab7464,0x587d74];
  const rockGeometry=new THREE.IcosahedronGeometry(1,2),rockMaterial=new THREE.MeshStandardMaterial({color:0xffffff,roughness:.98,metalness:0,...rockTextures});
@@ -28,19 +29,32 @@ export function createMarineHabitat(THREE,{site,scale,sampleSeabedHeight,rockTex
   model.mesh.count=count;model.mesh.instanceMatrix.needsUpdate=true;if(model.mesh.instanceColor)model.mesh.instanceColor.needsUpdate=true;
  }
  function update(dt,focus,time){if(shader)shader.uniforms.habitatTime.value=time;lodElapsed+=dt;if(lodElapsed<.25||Math.hypot(focus.x-lastX,focus.z-lastZ)<7)return;lodElapsed=0;lastX=focus.x;lastZ=focus.z;for(const model of models)fill(model,focus);}
- function releaseModels(){for(const model of models){group.remove(model.mesh);model.mesh.geometry.dispose();model.mesh.material.dispose();}models.length=0;for(const asset of assets)asset.dispose();assets.length=0;}
+ function releaseModels(){for(const model of models){group.remove(model.mesh);model.mesh.geometry.dispose();model.mesh.material.dispose();}models.length=0;for(const asset of assets){asset.root.parent?.remove(asset.root);asset.dispose();}assets.length=0;}
  const ready=(async()=>{
   if(!plan.featured)return true;
   try{for(const kind of ['table-coral','branch-coral','massive-coral'])for(const near of [false,true]){
-   const asset=await loadModelAsset(THREE,`marine-${kind}${near?'':'-lod'}`);if(disposed){asset.dispose();return false;}assets.push(asset);asset.root.updateMatrixWorld(true);
+   const asset=await loadModelAsset(THREE,`marine-${kind}${near?'':'-lod'}`,{signal:abort.signal});if(disposed){asset.dispose();return false;}assets.push(asset);asset.root.updateMatrixWorld(true);
    asset.root.traverse(object=>{if(!object.isMesh)return;
     const geometry=object.geometry.clone().applyMatrix4(object.matrixWorld),material=object.material.clone();material.color.setHex(0xffffff);material.roughness=.94;material.metalness=0;
     const mesh=new THREE.InstancedMesh(geometry,material,plan.corals.filter(c=>c.kind===kind).length);mesh.frustumCulled=false;mesh.castShadow=near;mesh.receiveShadow=true;mesh.name=`${kind} ${near?'near':'far'}`;group.add(mesh);
     const model={kind,near,mesh};models.push(model);fill(model,{x:Number.isFinite(lastX)?lastX:0,z:Number.isFinite(lastZ)?lastZ:62});
    });
    await new Promise(resolve=>requestAnimationFrame(resolve));if(disposed)return false;
-  }group.userData.habitat.assetState='ready';return true;}catch{releaseModels();group.userData.habitat.assetState='unavailable';return false;}
+  }
+  const target=plan.contacts.find(c=>c.kind==='case');
+  if(target){
+   const asset=await loadModelAsset(THREE,'solis-cargo-case',{signal:abort.signal});
+   if(disposed){asset.dispose();return false;}assets.push(asset);
+   // These named painted shell materials inherit glTF's metalness=1 default.
+   // The leased clone uses a dielectric coating so its detail remains visible underwater.
+   asset.root.traverse(object=>{for(const material of [].concat(object.material||[]))if(['Color1','Color2','Color3'].includes(material.name)){material.metalness=.12;material.roughness=.65;material.clearcoat=.12;material.clearcoatRoughness=.45;}});
+   const box=new THREE.Box3().setFromObject(asset.root),size=box.getSize(new THREE.Vector3()),center=box.getCenter(new THREE.Vector3()),factor=1.6/Math.max(size.x,size.z,.01);
+   asset.root.scale.multiplyScalar(factor);asset.root.position.set(-center.x*factor,-box.min.y*factor,-center.z*factor);
+   const holder=new THREE.Group();holder.name='Modern research instrument case';holder.position.set(target.x,target.baseY,target.z);holder.add(asset.root);group.add(holder);
+   target.y=target.baseY+size.y*factor*.5;
+  }
+  group.userData.habitat.assetState='ready';return true;}catch{releaseModels();group.userData.habitat.assetState='unavailable';return false;}
  })();
- group.userData.disposeOceanHabitat=()=>{if(disposed)return;disposed=true;releaseModels();};
- return {group,plan,ready,update,collision:(point,radius)=>marineHabitatCollision(group.userData.habitat.assetState==='ready'?plan:{rocks:plan.rocks,corals:[]},point,radius)};
+ group.userData.disposeOceanHabitat=()=>{if(disposed)return;disposed=true;abort.abort();releaseModels();};
+ return {group,plan,ready,update,sampleSeabedHeight,collision:(point,radius)=>marineHabitatCollision(group.userData.habitat.assetState==='ready'?plan:{rocks:plan.rocks,corals:[],contacts:[]},point,radius)};
 }

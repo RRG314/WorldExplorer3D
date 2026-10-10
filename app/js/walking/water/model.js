@@ -6,8 +6,10 @@ export function classifyWaterTraversal({surfaceY,bottomY,eyeY,eyeHeight=1.7,wasS
  if(depth<=(wasSwimming?SWIM_POLICY.exitDepth:SWIM_POLICY.entryDepth)||feet>=surfaceY-.45)return feet<surfaceY&&depth>0?'wading':'dry';
  return 'swimming';
 }
-export function createSwimState(saved={}) {
- return {equipment:saved.equipment==='scuba'?'scuba':'none',airSeconds:clamp(Number.isFinite(saved.airSeconds)?saved.airSeconds:SWIM_POLICY.airSeconds,0,SWIM_POLICY.airSeconds),stamina:clamp(Number.isFinite(saved.stamina)?saved.stamina:1,0,1),verticalVelocity:0,elapsed:0};
+export function createSwimState(saved={},policy={}) {
+ const airCapacity=clamp(Number(policy?.airCapacity)||SWIM_POLICY.airSeconds,SWIM_POLICY.airSeconds,360);
+ const maximumDiveMeters=clamp(Number(policy?.maximumDiveMeters)||SWIM_POLICY.maximumDiveMeters,SWIM_POLICY.maximumDiveMeters,42);
+ return {airCapacity,maximumDiveMeters,equipment:saved.equipment==='scuba'?'scuba':'none',airSeconds:clamp(Number.isFinite(saved.airSeconds)?saved.airSeconds:airCapacity,0,airCapacity),stamina:clamp(Number.isFinite(saved.stamina)?saved.stamina:1,0,1),verticalVelocity:0,elapsed:0};
 }
 export function stepSwimming(state,{eyeY,surfaceY,bottomY,dt,vertical=0,moving=false,boost=false,metersPerUnit=1}) {
  const step=clamp(Number(dt)||0,0,.1),units=metersPerUnit>0?metersPerUnit:1;
@@ -26,7 +28,7 @@ export function stepSwimming(state,{eyeY,surfaceY,bottomY,dt,vertical=0,moving=f
    :submerged&&wantsDive?0:clamp((targetSurface-eyeY)*3,-1.8,1.8);
  next.verticalVelocity+=(targetV-next.verticalVelocity)*(1-Math.exp(-step*6));
  let y=eyeY+next.verticalVelocity*step;
- const floor=Math.max(bottomY+1.65,surfaceY-SWIM_POLICY.maximumDiveMeters/units);
+ const floor=Math.max(bottomY+1.65,surfaceY-(state.maximumDiveMeters||SWIM_POLICY.maximumDiveMeters)/units);
  y=clamp(y,Math.min(floor,targetSurface),targetSurface);
  if(y===targetSurface||y===floor)next.verticalVelocity=0;
  return {state:next,y,submerged:y<surfaceY-.22,recovering,speed:(boosted?SWIM_POLICY.boostSpeedMps:SWIM_POLICY.swimSpeedMps)/units};

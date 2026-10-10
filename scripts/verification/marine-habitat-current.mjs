@@ -6,7 +6,7 @@ import { startStaticServer } from './static-server.mjs';
 import { configureStagingAppCheck } from './staging-app-check.mjs';
 const server = await startStaticServer({ rootDir: process.env.WE3D_VERIFY_ROOT || process.cwd(), ports: [4396] });
 const browser = await chromium.launch({ channel: 'chrome', headless: true });
-const dir = 'output/verification/product-plan/habitat';
+const dir = process.env.WE3D_HABITAT_OUTPUT || 'output/verification/product-plan/habitat';
 await fs.mkdir(dir, { recursive: true });
 const report = { scope: 'Actual app UI and ocean renderer from selected runtime root; controlled providers. Separate source fixture for resource lifetime and asset outage.', runtimeRoot: process.env.WE3D_VERIFY_ROOT || '.', fixtureScope: 'source component only', cases: [], errors: [] };
 let page, fixtureServer;
@@ -84,9 +84,9 @@ try {
  await page.goto(`http://127.0.0.1:${fixtureServer.port}/tests/fixtures/marine-habitat.html`);await page.waitForFunction(()=>window.ready===true);
  report.cycles=[];for(let i=0;i<3;i++){await page.evaluate(()=>habitatTest.rebuild());report.cycles.push(await page.evaluate(()=>({memory:{...habitatTest.renderer.info.memory},cache:habitatTest.cache()})));}
  assert.deepEqual(report.cycles[0].memory,report.cycles[2].memory);
- assert.ok(report.cycles.every(c=>c.cache.entries.filter(a=>a.id.startsWith('marine-')).every(a=>a.leases===1)));
+ assert.ok(report.cycles.every(c=>c.cache.entries.filter(a=>(a.id.startsWith('marine-')||a.id==='solis-cargo-case')).every(a=>a.leases===1)));
  assert.equal(await page.evaluate(()=>habitatTest.cancel()),0);
- await page.evaluate(()=>habitatTest.dispose());assert.ok(await page.evaluate(()=>habitatTest.cache().entries.filter(a=>a.id.startsWith('marine-')).every(a=>a.leases===0)));
+ await page.evaluate(()=>habitatTest.dispose());assert.ok(await page.evaluate(()=>habitatTest.cache().entries.filter(a=>(a.id.startsWith('marine-')||a.id==='solis-cargo-case')).every(a=>a.leases===0)));
  report.cases.push({id:'three-rebuilds-no-resource-growth-and-late-load-cancelled',passed:true});
  await page.route('**/app/assets/models/marine/*',route=>route.abort());
  await page.reload();await page.waitForFunction(()=>window.ready===true);assert.equal(await page.evaluate(()=>habitatTest.habitat.group.userData.habitat.assetState),'unavailable');
