@@ -260,6 +260,15 @@ body.start-hub-open #authFloatPanel { z-index: 10006; top: 64px; }
 #globeSelectorPlace { padding-right: 38px; }
 .globe-selector-stat-value { margin-top: 7px; font: 700 17px/1.2 Inter, sans-serif; }
 .globe-selector-actions { position: static; display: block; padding: 0; background: transparent; border: 0; }
+.globe-first-journey { display: grid; gap: 6px; }
+.globe-first-journey button { display: grid; gap: 5px; width: 100%; min-height: 48px; padding: 10px; text-align: left; color: var(--hub-text); background: var(--hub-panel-2); border: 1px solid var(--hub-line); border-radius: 2px; cursor: pointer; font: 12px/1.4 Inter, sans-serif; }
+.globe-first-journey button:hover { border-color: var(--hub-blue); background: var(--hub-hover); }
+.globe-first-journey button:focus-visible { outline: 2px solid var(--hub-blue); outline-offset: 2px; }
+.globe-first-journey button:disabled { opacity: .65; cursor: wait; }
+.globe-first-journey button[hidden] { display: none; }
+.globe-first-journey small, #globeJourneyStatus { color: var(--hub-muted); font-size: 11px; }
+#globeJourneyStatus:empty { display: none; }
+.globe-selector-side:has(#globeSelectorLiveEarthPanel.active) .globe-first-journey { display: none; }
 #globeSelectorBackBtn { display: none; }
 #globeSelectorStartBtn {
   width: 100%;

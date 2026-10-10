@@ -77,7 +77,7 @@ async function saveFailure(page, name, error) {
 }
 
 async function openStartHub(page) {
-  await page.goto(`${baseUrl}/`, { waitUntil: 'load', timeout: 120_000 });
+  await page.goto(`${baseUrl}/?utm_source=reddit&utm_medium=social&utm_campaign=city_exploration&analytics_test=1`, { waitUntil: 'load', timeout: 120_000 });
   await page.locator('#landingPrimaryCta').click();
   await page.waitForFunction(() => globalThis.__WE3D_RUNTIME_READY__ === true, null, { timeout: 120_000 });
   await page.waitForSelector('#globeSelectorScreen.show', { timeout: 60_000 });
@@ -156,7 +156,7 @@ async function verifyGrantedDestination(destination) {
     }));
     for (let attempt = 0; attempt < 40; attempt += 1) {
       const evidence = collectionRequests.join('\n');
-      if (/we3d_runtime_ready/.test(evidence) && /we3d_world_session_start/.test(evidence)) break;
+      if (/we3d_runtime_ready/.test(evidence) && /we3d_world_session_start/.test(evidence) && /we3d_launch_ready/.test(evidence)) break;
       await page.waitForTimeout(250);
     }
     const collectionEvidence = collectionRequests.join('\n');
@@ -167,6 +167,15 @@ async function verifyGrantedDestination(destination) {
     assert.equal(snapshot.errors.length, 0);
     assert.match(collectionEvidence, /we3d_runtime_ready/, `${destination.id}: runtime-ready collection request was not formed`);
     assert.match(collectionEvidence, /we3d_world_session_start/, `${destination.id}: session-start collection request was not formed`);
+    assert.match(collectionEvidence, /we3d_launch_start/);
+    assert.match(collectionEvidence, /we3d_launch_ready/);
+    assert.equal((collectionEvidence.match(/en=we3d_launch_start(?:&|\r|\n|$)/g) || []).length, 1, 'one launch owner');
+    assert.ok(collectionEvidence.indexOf('en=we3d_launch_start') < collectionEvidence.indexOf('en=we3d_first_play_ready'), 'launch starts before playable readiness, even with deferred gameplay analytics');
+    assert.match(collectionEvidence, /load_duration_ms/);
+    assert.match(collectionEvidence, /(?:[?&]|%26)cs=reddit/);
+    assert.match(collectionEvidence, /city_exploration/);
+    assert.match(collectionEvidence, /telemetry_version/);
+    assert.match(collectionEvidence, /(?:tt|ep\.traffic_type)=internal/);
     assert.equal(browserErrors.length, 0, `${destination.id}: browser errors`);
     assert.equal(failedLocalResources.length, 0, `${destination.id}: failed local resources`);
     return {
@@ -222,7 +231,7 @@ async function verifyDefaultStoredFirstEntry() {
     }, null, { timeout: 30_000 });
     for (let attempt = 0; attempt < 40; attempt += 1) {
       const evidence = collectionRequests.join('\n');
-      if (/we3d_runtime_ready/.test(evidence) && /we3d_world_session_start/.test(evidence)) break;
+      if (/we3d_runtime_ready/.test(evidence) && /we3d_world_session_start/.test(evidence) && /we3d_launch_ready/.test(evidence)) break;
       await page.waitForTimeout(250);
     }
     const snapshot = await analyticsSnapshot(page);
@@ -258,7 +267,7 @@ async function verifyDefaultStoredFirstEntry() {
     }, null, { timeout: 30_000 });
     for (let attempt = 0; attempt < 40; attempt += 1) {
       const evidence = collectionRequests.join('\n');
-      if (/we3d_runtime_ready/.test(evidence) && /we3d_world_session_start/.test(evidence)) break;
+      if (/we3d_runtime_ready/.test(evidence) && /we3d_world_session_start/.test(evidence) && /we3d_launch_ready/.test(evidence)) break;
       await page.waitForTimeout(250);
     }
     const grantedSnapshot = await analyticsSnapshot(page);
@@ -322,6 +331,31 @@ async function verifyStorageBlockedConsent() {
   }
 }
 
+async function verifyEarlyLaunchFailure() {
+  const context = await createContext({ viewport: { width: 1000, height: 700 } });
+  const page = await context.newPage();
+  const requests = [];
+  await page.route(/https:\/\/(?:www\.|region\d+\.)?(?:google-analytics\.com|analytics\.google\.com|app-measurement\.com)\/.*collect/i, route => {
+    requests.push(`${route.request().url()}&${route.request().postData() || ''}`);
+    return route.fulfill({ status: 204, body: '' });
+  });
+  await page.route(`${baseUrl}/launch-failure-fixture`, route => route.fulfill({ contentType: 'text/html', body: `<!doctype html><title>Launch fixture</title><script src="/js/firebase-project-config.js"></script><script type="module" src="/js/site-analytics.js"></script>` }));
+  try {
+    await page.goto(`${baseUrl}/launch-failure-fixture`, { waitUntil: 'load' });
+    await page.evaluate(async () => {
+      const { createLaunchMeasurement } = await import('/app/js/platform/launch-telemetry.js');
+      createLaunchMeasurement('earth').finish('failed', 'world_not_ready');
+    });
+    for (let i = 0; i < 60 && !requests.join('\n').includes('en=we3d_launch_failed'); i++) await page.waitForTimeout(250);
+    const evidence = requests.join('\n');
+    assert.match(evidence, /en=we3d_launch_start/);
+    assert.match(evidence, /en=we3d_launch_failed/);
+    assert.doesNotMatch(evidence, /en=we3d_world_session_start/);
+    assert.equal(await page.evaluate(() => typeof globalThis.getWorldExplorerAnalyticsSnapshot), 'undefined');
+    return { ok: true, evidence: 'real SDK and launch publisher with no gameplay services; injected failure outcome, not a provider outage' };
+  } finally { await context.close(); }
+}
+
 await fs.mkdir(outputDir, { recursive: true });
 const result = {
   ok: false, contract: 'default-standard-analytics-with-explicit-limited-mode',
@@ -331,11 +365,12 @@ const result = {
   storageBlocked: null, defaultStorage: null, destinations: []
 };
 try {
+  result.earlyFailure = await verifyEarlyLaunchFailure();
   result.storageBlocked = await verifyStorageBlockedConsent();
   result.defaultStorage = await verifyDefaultStoredFirstEntry();
   for (const destination of destinations) result.destinations.push(await verifyGrantedDestination(destination));
   result.browserErrors = allBrowserErrors;
-  result.ok = allBrowserErrors.length === 0 && result.storageBlocked.ok && result.defaultStorage.ok && result.destinations.every((entry) => entry.ok);
+  result.ok = allBrowserErrors.length === 0 && result.earlyFailure.ok && result.storageBlocked.ok && result.defaultStorage.ok && result.destinations.every((entry) => entry.ok);
   await fs.writeFile(path.join(outputDir, 'report.json'), `${JSON.stringify(result, null, 2)}\n`, 'utf8');
   console.log(JSON.stringify(result, null, 2));
   assert.equal(result.ok, true);

@@ -36,10 +36,22 @@ try {
  });
  await configureStagingAppCheck(page,base);
  const url=`${base}/app/?loc=custom&lat=39.2904&lon=-76.6122&lname=Baltimore&launch=earth&gm=free&mode=walking`;
+ let entryCount=0;
  const ready=async()=>{
   await page.waitForFunction(()=>globalThis.__WE3D_RUNTIME_READY__,null,{timeout:120000});
   if(await page.locator('#analyticsConsentDenyBtn').isVisible())await page.locator('#analyticsConsentDenyBtn').click();
-  if(await page.locator('#globeSelectorStartBtn').isVisible())await page.locator('#globeSelectorStartBtn').click();
+  if(process.env.WE3D_SANDBOX_ENTRY_SHORTCUTS==='1') {
+   const entry=entryCount++===0?'#globeGuidedStartBtn':'#globeReturnPlaceBtn';
+   await page.locator(entry).waitFor({state:'visible'});
+   await page.screenshot({path:`${out}/entry-${entryCount}-desktop.png`});
+   await page.setViewportSize({width:390,height:844});
+   await page.locator(entry).scrollIntoViewIfNeeded();
+   const box=await page.locator(entry).boundingBox();
+   assert.ok(box.width>=100&&box.height>=44&&box.x>=0&&box.x+box.width<=390,'Entry action fits the phone');
+   await page.screenshot({path:`${out}/entry-${entryCount}-phone.png`});
+   await page.setViewportSize({width:1440,height:900});
+   await page.locator(entry).click();
+  } else if(await page.locator('#globeSelectorStartBtn').isVisible())await page.locator('#globeSelectorStartBtn').click();
   await page.waitForFunction(()=>{const d=globalThis.getWorldExplorerRuntimeDiagnostics?.();return d?.gameStarted&&!d.worldLoading&&d.worldDiscovery?.active&&!document.getElementById('loading')?.classList.contains('show');},null,{timeout:180000});
   await page.evaluate(async()=>{globalThis.__sandboxTestContext=(await import('/app/js/shared-context.js?v=55')).ctx;});
  };

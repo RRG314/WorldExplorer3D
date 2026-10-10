@@ -4,6 +4,7 @@ import { ctx as appCtx } from '../shared-context.js?v=55';
 import { createTutorialUi } from './ui.js?v=6';
 import { createCurrentJourneyUi } from './current-journey.js?v=5';
 import { panelIsVisiblyOpen, worldPresentationReady } from './visibility-contract.js?v=1';
+import { consumeGuidedJourney } from './entry-journey.js';
 
 const STORAGE_KEY = 'worldExplorer3D.tutorialState.v6';
 const PREVIOUS_STORAGE_KEY = 'worldExplorer3D.tutorialState.v5';
@@ -179,7 +180,7 @@ function startSelectedPath() {
     appCtx.toggleWorldDiscoveryJournal?.(false);
     document.getElementById(selected === 'build' ? 'fQuickBuild' : 'fMultiplayer')?.click();
   } else {
-    document.getElementById('discoveryActionList')?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    openNearbyActivities();
   }
 }
 
@@ -287,6 +288,15 @@ function openExplorer() {
   else appCtx.toggleWorldDiscoveryJournal?.(true);
 }
 
+function openNearbyActivities() {
+  if (!appCtx.openWorldDiscoverySection?.('today')) openExplorer();
+  globalThis.requestAnimationFrame?.(() => {
+    const route = document.querySelector('.discoveryTodayRoute');
+    if (route) route.open = true;
+    (route || document.getElementById('discoveryActionList'))?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  });
+}
+
 function openExplorerJournal() {
   for (const id of ['discoveryJournalCategory', 'discoveryJournalRegion']) {
     const filter = document.getElementById(id);
@@ -309,7 +319,7 @@ function presentCurrentStage() {
       .filter(Boolean)
       .join('');
     showPrompt(STAGES.MOVE, {
-      title: touchControls ? 'Move left · Look right' : `${moveKeys || 'WASD'} to move · Mouse to look`,
+      title: touchControls ? 'Left control to move' : `${moveKeys || 'WASD'} to move`,
       body: touchControls
         ? 'Move a short distance with the left control. Use the right control to look around; action buttons change with what you are doing.'
         : `${moveKeys || 'WASD'} moves your explorer. Drag on the world with either mouse button to look, ${appCtx.getControlBindingLabel?.('modifier_action') || 'Shift'} runs, and ${appCtx.getControlBindingLabel?.('primary_action') || 'Space'} jumps. Arrow keys remain an alternate.`,
@@ -321,20 +331,20 @@ function presentCurrentStage() {
     showPrompt(STAGES.INTERACT, {
       title: 'Try one nearby action',
       body: `Walk close to a visible door, person, parked vehicle, or usable object. Its small action prompt appears only when you can actually use it; press ${interactKey} or tap the action.`,
-      actionLabel: 'Skip to adventures',
+      actionLabel: 'Find an activity instead',
       onAction: () => {
         setStage(STAGES.EXPLORE, 'interaction_skipped');
-        openExplorer();
+        openNearbyActivities();
       },
       progress: 50,
       expanded: false
     });
   } else if (runtime.state.stage === STAGES.EXPLORE) {
     showPrompt(STAGES.EXPLORE, {
-      title: SANDBOX_PATHS[runtime.state.selectedPath]?.title || 'Choose your direction',
-      body: SANDBOX_PATHS[runtime.state.selectedPath]?.steps[1] || 'Open Today to explore, build, or play together. Choose one direction, finish an action, then review its result in your Journal. You can change direction or roam freely at any time.',
-      actionLabel: 'Open my walkthrough',
-      onAction: openExplorer,
+      title: SANDBOX_PATHS[runtime.state.selectedPath]?.title || 'Find your first discovery',
+      body: SANDBOX_PATHS[runtime.state.selectedPath]?.steps[1] || 'Open nearby activities, pick one that interests you, and follow its instructions. Record the result to keep it in your Journal.',
+      actionLabel: 'Find an activity',
+      onAction: runtime.state.selectedPath === 'build' || runtime.state.selectedPath === 'together' ? openExplorer : openNearbyActivities,
       progress: 75,
       expanded: false
     });
@@ -355,6 +365,8 @@ function setStage(nextStage, reason = 'progress') {
   const previous = runtime.state.stage;
   runtime.state.stage = nextStage;
   hidePrompt();
+  // Completing a lesson is an explicit continuation, not another ambient tip.
+  ambientNotices.reset('tutorial');
   runtime.sessionPresented.delete(nextStage);
   saveState();
   tutorialTelemetry('we3d_tutorial_step', { action: 'completed', step_id: previous, result: reason });
@@ -530,6 +542,7 @@ function detectContextTransitions() {
 
 function tutorialUpdate(dt = 0) {
   if (!runtime.initialized) return;
+  if (consumeGuidedJourney()) restartTutorial('explore');
   runtime.currentJourneyUi?.update?.(dt);
   // Initialization can finish while the world is still compiling. Do not spend
   // the one-shot invitation or count spawn placement as player movement.
@@ -575,9 +588,10 @@ function setTutorialEnabled(enabled) {
   else hidePrompt();
 }
 
-function restartTutorial() {
+function restartTutorial(path = '') {
   ambientNotices.reset('tutorial');
   runtime.state = defaultState();
+  runtime.state.selectedPath = normalizeSandboxPath(path);
   runtime.state.mobileHintsConsent = true;
   runtime.state.startedAtMs = Date.now();
   runtime.state.analyticsBegan = true;
@@ -612,6 +626,7 @@ function initTutorial(appContext = null) {
   if (runtime.initialized) return;
   if (appContext && typeof appContext === 'object') Object.assign(appCtx, appContext);
   runtime.state = loadState();
+  if (consumeGuidedJourney()) runtime.state = { ...defaultState(), mobileHintsConsent: true, selectedPath: 'explore' };
   // Phone controls are already labelled. Optional teaching cards are opened
   // from Learning settings, rather than covering play on every fresh install.
   if (appCtx.isLikelyMobileDevice?.() && !runtime.state.mobileHintsConsent) runtime.state.enabled = false;

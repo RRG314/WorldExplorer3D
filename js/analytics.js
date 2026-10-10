@@ -1,3 +1,5 @@
+import { createGameplayAnalyticsSession, analyticsTravelMode } from './gameplay-analytics-session.js';
+import { analyticsEventContext } from './analytics-service.js?v=2';
 import { observeAuth } from './auth-ui.js?v=56';
 import { initFirebaseAnalytics, readFirebaseConfig } from './firebase-init.js?v=58';
 import { analyticsStorageAllowed, readAnalyticsConsent } from './analytics-consent.js?v=3';
@@ -14,7 +16,6 @@ let analyticsToolsPromise = null;
 let analyticsTools = null;
 let trackingStarted = false;
 let trackingInterval = 0;
-let unloadBound = false;
 let authUnsubscribe = null;
 let productEventsBound = false;
 let discoveryEventListener = null;
@@ -23,7 +24,6 @@ let productEventListener = null;
 let consentEventListener = null;
 let lastAuthUser = null;
 let runtimeReadyLogPending = false;
-let worldSessionStartPending = false;
 
 const ALLOWED_PRODUCT_EVENTS = new Set([
   'tutorial_begin',
@@ -49,7 +49,6 @@ const state = {
   runtimeStartedAt: 0,
   runtimeReadyLogged: false,
   worldSessionActive: false,
-  worldSessionStartedAt: 0,
   worldSessionCount: 0,
   flushCount: 0,
   productEventCount: 0,
@@ -108,14 +107,7 @@ function currentEnvironment(appCtx) {
   return 'earth';
 }
 
-function currentTravelMode(appCtx) {
-  if (appCtx.spaceFlight?.active || (typeof appCtx.isEnv === 'function' && appCtx.ENV && appCtx.isEnv(appCtx.ENV.SPACE_FLIGHT))) return 'space_flight';
-  if (appCtx.boatMode?.active) return 'boat';
-  if (appCtx.oceanMode?.active || (typeof appCtx.isEnv === 'function' && appCtx.ENV && appCtx.isEnv(appCtx.ENV.OCEAN))) return 'submarine';
-  if (appCtx.Walk?.state?.mode === 'walk') return 'walking';
-  if (appCtx.droneMode) return 'drone';
-  return 'driving';
-}
+const currentTravelMode = analyticsTravelMode;
 
 function worldSessionParams(appCtx, extra = {}) {
   const loc = locationContext(appCtx);
@@ -178,7 +170,7 @@ async function logAnalyticsEvent(eventName, params = {}) {
   const tools = await ensureAnalyticsTools();
   if (!tools?.analytics || typeof tools.logEvent !== 'function') return false;
   try {
-    tools.logEvent(tools.analytics, eventName, params);
+    tools.logEvent(tools.analytics, eventName, { ...analyticsEventContext(), ...params });
     state.eventLoggedCount += 1;
     state.recentEvents.push(eventName);
     state.recentEvents = state.recentEvents.slice(-8);
@@ -294,42 +286,28 @@ async function logRuntimeReady(appCtx) {
   }
 }
 
-async function startWorldSession(appCtx, reason = 'game_started') {
-  if (state.worldSessionActive || worldSessionStartPending) return false;
-  worldSessionStartPending = true;
-  try {
-    const nextSessionIndex = state.worldSessionCount + 1;
-    const logged = await logAnalyticsEvent(ANALYTICS_EVENT_WORLD_START, worldSessionParams(appCtx, {
-      start_reason: sanitizeAnalyticsName(reason, 'game_started', 32),
-      session_index: nextSessionIndex
-    }));
-    if (!logged) return false;
-    state.worldSessionActive = true;
-    state.worldSessionStartedAt = Date.now();
-    state.worldSessionCount = nextSessionIndex;
-    state.lastReason = reason;
-    state.lastMode = currentTravelMode(appCtx);
-    state.lastEnvironment = currentEnvironment(appCtx);
-    state.lastLocationKey = locationContext(appCtx).locationKey;
-    state.lastMultiplayer = !!appCtx.multiplayerMapRooms?.currentRoomCode;
-    return true;
-  } finally {
-    worldSessionStartPending = false;
-  }
-}
-
-async function endWorldSession(appCtx, reason = 'ended') {
-  if (!state.worldSessionActive) return;
-  const durationSec = clampDurationSec((Date.now() - state.worldSessionStartedAt) / 1000);
-  state.worldSessionActive = false;
-  state.worldSessionStartedAt = 0;
-  state.flushCount += 1;
-  state.lastReason = reason;
-  await logAnalyticsEvent(ANALYTICS_EVENT_WORLD_END, worldSessionParams(appCtx, {
-    end_reason: sanitizeAnalyticsName(reason, 'ended', 32),
-    duration_sec: durationSec,
-    session_index: state.worldSessionCount
-  }));
+let activeContext = null;
+let lifecycleCleanup = null;
+const gameplay = createGameplayAnalyticsSession({ emit(name, params) {
+  if (name === ANALYTICS_EVENT_WORLD_END) state.flushCount++;
+  if (name === ANALYTICS_EVENT_WORLD_START) { state.lastMode = params.travel_mode; state.lastEnvironment = params.environment; }
+  if (activeContext) void logAnalyticsEvent(name, worldSessionParams(activeContext, params));
+} });
+function sampleGameplay(appCtx) {
+  activeContext = appCtx;
+  const mode = currentTravelMode(appCtx);
+  const controls = appCtx.readControlActions?.(appCtx.getCurrentTravelMode?.() || 'walk') || {};
+  const actor = appCtx.oceanMode?.diver?.active ? appCtx.oceanMode.diver.navigationActor?.()
+    : appCtx.activeTransportActor?.()?.position || appCtx.Walk?.state?.walker || appCtx.car;
+  const ready = !!appCtx.gameStarted && !appCtx.worldLoading && !appCtx.titleLaunchPending &&
+    !document.getElementById('loading')?.classList.contains('show');
+  const measured = gameplay.sample({ started: !!appCtx.gameStarted, ready,
+    visible: !document.hidden, paused: !!appCtx.paused,
+    mode, environment: currentEnvironment(appCtx),
+    input: ['move', 'strafe', 'throttle', 'reverse', 'ascend', 'descend'].some(key => Math.abs(Number(controls[key]) || 0) > .05),
+    position: actor ? { x: actor.x, y: actor.y, z: actor.z } : null });
+  state.worldSessionActive = measured.active;
+  state.worldSessionCount = measured.count;
 }
 
 async function maybeLogModeChange(appCtx) {
@@ -359,39 +337,42 @@ async function maybeLogEnvironmentChange(appCtx) {
 }
 
 async function tick(appCtx) {
-  if (!appCtx) return;
+  if (!appCtx || !trackingStarted) return;
+  sampleGameplay(appCtx);
   await logRuntimeReady(appCtx);
-
-  if (appCtx.gameStarted && !state.worldSessionActive) {
-    await startWorldSession(appCtx);
-  } else if (!appCtx.gameStarted && state.worldSessionActive) {
-    await endWorldSession(appCtx, 'returned_to_title');
-  }
-
   await maybeLogModeChange(appCtx);
   await maybeLogEnvironmentChange(appCtx);
-
-  const loc = locationContext(appCtx);
-  state.lastLocationKey = loc.locationKey;
+  state.lastLocationKey = locationContext(appCtx).locationKey;
   state.lastMultiplayer = !!appCtx.multiplayerMapRooms?.currentRoomCode;
 }
 
 function bindLifecycle(appCtx) {
-  if (unloadBound || typeof window === 'undefined') return;
-  unloadBound = true;
-
-  const flushHidden = () => {
-    if (document.visibilityState === 'hidden') {
-      void endWorldSession(appCtx, 'tab_hidden');
-    }
+  if (lifecycleCleanup || typeof window === 'undefined') return;
+  const changed = () => sampleGameplay(appCtx);
+  const closed = event => {
+    sampleGameplay(appCtx);
+    if (!event.persisted) { gameplay.end('page_closed'); state.worldSessionActive = false; }
   };
-  const flushUnload = () => {
-    void endWorldSession(appCtx, 'page_unload');
+  const input = event => { if (event.isTrusted) gameplay.touch(); };
+  const action = event => {
+    if (event.type === 'we3d:explorer-result-saved' && !['discovery-recorded', 'specimen-collected', 'activity-completed', 'creation-saved', 'building-milestone', 'vehicle-route-completed', 'companion-befriended'].includes(event.detail?.eventType)) return;
+    sampleGameplay(appCtx); gameplay.action('interaction');
   };
-
-  document.addEventListener('visibilitychange', flushHidden);
-  window.addEventListener('pagehide', flushUnload);
-  window.addEventListener('beforeunload', flushUnload);
+  document.addEventListener('visibilitychange', changed);
+  window.addEventListener('pagehide', closed);
+  window.addEventListener('pageshow', changed);
+  for (const type of ['keydown', 'pointerdown', 'touchstart']) document.addEventListener(type, input, { passive: true });
+  window.addEventListener('we3d:context-interaction-completed', action);
+  window.addEventListener('we3d:explorer-result-saved', action);
+  lifecycleCleanup = () => {
+    document.removeEventListener('visibilitychange', changed);
+    window.removeEventListener('pagehide', closed);
+    window.removeEventListener('pageshow', changed);
+    for (const type of ['keydown', 'pointerdown', 'touchstart']) document.removeEventListener(type, input);
+    window.removeEventListener('we3d:context-interaction-completed', action);
+    window.removeEventListener('we3d:explorer-result-saved', action);
+    lifecycleCleanup = null;
+  };
 }
 
 function startAnalyticsTracking(appCtx) {
@@ -441,6 +422,9 @@ function startAnalyticsTracking(appCtx) {
 
 function stopAnalyticsTracking() {
   if (!trackingStarted) return;
+  gameplay.end('tracking_stopped');
+  lifecycleCleanup?.();
+  state.worldSessionActive = false;
   trackingStarted = false;
   if (trackingInterval) {
     window.clearInterval(trackingInterval);
@@ -471,7 +455,9 @@ function getAnalyticsSessionSnapshot(appCtx = null) {
     trackingStarted,
     runtimeAgeSec: clampDurationSec((now - (state.runtimeStartedAt || now)) / 1000),
     worldSessionActive: !!state.worldSessionActive,
-    worldSessionAgeSec: state.worldSessionActive ? clampDurationSec((now - state.worldSessionStartedAt) / 1000) : 0,
+    worldSessionAgeSec: gameplay.snapshot().activeSeconds,
+    firstAction: gameplay.snapshot().firstAction,
+    fiveMinutes: gameplay.snapshot().fiveMinutes,
     worldSessionCount: state.worldSessionCount,
     flushCount: state.flushCount,
     productEventCount: state.productEventCount,

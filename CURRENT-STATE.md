@@ -1,6 +1,6 @@
 # Current development and release state
 
-Updated October 8, 2026. **5.5.0 is deployed to production.**
+Updated October 9, 2026. **5.5.0 is deployed to production.**
 Release: https://github.com/RRG314/WorldExplorer3D/releases/tag/v5.5.0
 Public project page: https://rrg314.github.io/WorldExplorer3D/
 
@@ -75,6 +75,43 @@ The licensed research-vessel and sailing-boat candidates are retained for furthe
 integration. Replacement research-deck navigation, other fleet/ship asset work,
 and the final video/media package remain unfinished. Do not describe the twelve
 released-build gallery images as proof that those unreleased upgrades are live.
+
+## October 9 analytics and first-session work — local
+
+The audience audit led to readiness/foreground gameplay measurement, explicit
+launch outcomes and duration, first-action/five-minute milestones, bounded
+campaign handoff and tab-scoped owner-test marking. An optional guided Baltimore
+walk and Return to last place use the existing tutorial, location save and Journal.
+Completed tutorial steps no longer wait for the ambient-notification cooldown.
+Landing copy now explains the browser sandbox and device/loading expectations;
+the gallery continues to show the released 5.5 game.
+
+The controlled ten-check first-session/save/return journey passes against staging
+services. Real Firebase SDK request formation passes with a local collector,
+including failure before gameplay initialization. Desktop/touch-sized tutorial
+controller and six public-page layouts pass. Two prescribed keyboard runs reach
+walking but retain external Overpass CORS errors and stop after their first burst;
+these are degraded provider runs, not clean end-to-end passes. Screenshots were
+inspected. The final source chain passes all 2,207 tests, module ownership,
+boundary types, inventory and sensitivity checks. Limited analytics clears the
+bounded campaign cache; its regression check passes.
+
+The production GA property now has two gameplay key events (once per session,
+no monetary value), six event dimensions and a millisecond launch-duration
+metric. The existing internal-traffic filter remains in Testing. The saved
+Exclude marked tests comparison retains unmarked historical traffic; new marked
+traffic exclusion still needs post-release verification. Search Console's
+URL-prefix property exists but is unverified; its public verification tag is
+prepared in the local homepage. GA ingestion, Search Console verification and a
+complete seven-day return cohort require the frontend release and subsequent
+observation. Do not infer improved retention from registration alone.
+
+The broader source review also aligned the local submarine import with the shared
+asset-loader module version and registered its previously omitted component test.
+Production/dist and four release packages are unchanged. No promotional posts or
+finished video exports were produced. Private audit data and the small promotion
+kit are under ignored `output/analytics-review-20261009/`; only the public event
+contract belongs in `docs/analytics/README.md`.
 
 ## Historical preparation records
 

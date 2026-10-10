@@ -11,7 +11,7 @@ function panelIsVisiblyOpen(element, content = null) {
 }
 
 function worldPresentationReady(appCtx, documentRoot = globalThis.document) {
-  return !!appCtx.gameStarted && !appCtx.worldLoading &&
+  return !!appCtx.gameStarted && !appCtx.worldLoading && !appCtx.titleLaunchPending &&
     !classContains(documentRoot?.getElementById?.('loading'), 'show');
 }
 

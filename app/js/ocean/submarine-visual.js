@@ -1,4 +1,4 @@
-import {loadModelAsset} from '../assets/model-asset-runtime.js';
+import {loadModelAsset} from '../assets/model-asset-runtime.js?v=16';
 
 export const SUBMARINE_ASSET_ID = 'marine-atlantic-explorer-submarine';
 

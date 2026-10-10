@@ -7,7 +7,7 @@ import {
   getToken as getAppCheckToken,
   initializeAppCheck
 } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-app-check.js';
-import { getAnalyticsTools } from './analytics-service.js?v=1';
+import { getAnalyticsTools } from './analytics-service.js?v=2';
 import { assertFirebaseEnvironment } from './firebase-environment-policy.js';
 
 import { FIREBASE_CONFIG_STORAGE_KEY, normalizeConfig, readFirebaseConfig, hasFirebaseConfig } from './firebase-config.js';

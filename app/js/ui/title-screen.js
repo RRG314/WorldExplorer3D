@@ -1,3 +1,5 @@
+import { requestGuidedJourney, consumeGuidedJourney, readReturnPlace } from '../tutorial/entry-journey.js';
+import { createLaunchMeasurement } from '../platform/launch-telemetry.js';
 import {validateOceanVoyage} from '../ocean/voyage-store.js';
 import { oceanEntryDecision } from '../ocean/entry-policy.js?v=1';
 import { startOceanExploration } from '../ocean/start-exploration.js';
@@ -201,7 +203,6 @@ function initTitleScreenUi({
     }
     appCtx.setBuildModeEnabled?.(false);
     updateControlsModeUI?.();
-    persistLastLocationSelection(launchMode);
     emitTutorialEvent('spawned_in_world', {
       location: appCtx.selLoc === 'custom' ? appCtx.customLoc : appCtx.LOCS?.[appCtx.selLoc] || null,
       launchMode
@@ -390,7 +391,7 @@ function initTitleScreenUi({
   globeLiveGpsBtn?.addEventListener('click', () => void runLiveGpsExplore());
 
   globeSelector = createGlobeSelector({
-    onOpen: () => emitTutorialEvent('opened_globe_selector'),
+    onOpen: () => { refreshReturnPlace(); emitTutorialEvent('opened_globe_selector'); },
     onUseMyLocation: () => runUseMyLocation('globe'),
     onBack: () => customPanel?.classList.remove('show'),
     onStartHere: async (selection = null) => {
@@ -587,6 +588,8 @@ function initTitleScreenUi({
     appCtx.gameMode = element.dataset.mode;
   }));
 
+  let activeLaunchMode = 'earth';
+  let launchMeasurement = null;
   const runTitleStart = async () => {
     if (appCtx.runtimeReady !== true) return false;
     const voyageResume=pendingOceanResume;pendingOceanResume=null;
@@ -611,13 +614,15 @@ function initTitleScreenUi({
     if (externalBypassCustomGate) appCtx.pendingCustomLaunchBypass = false;
     if (globeSelector?.isOpen?.()) globeSelector.close();
 
+    activeLaunchMode = requestedLaunchMode;
+    launchMeasurement = createLaunchMeasurement(requestedLaunchMode);
     const pendingFlowerChallengeRequested = typeof appCtx.consumePendingFlowerChallengeStart === 'function' ? appCtx.consumePendingFlowerChallengeStart() : false;
     appCtx.loadingScreenMode = requestedLaunchMode;
     const selectedLocation = appCtx.resolveLocationSelection?.() || appCtx.customLoc || null;
     const launchLoadingText = requestedLaunchMode === 'earth'
       ? `Loading ${String(selectedLocation?.name || 'the selected location')}...`
       : requestedLaunchMode === 'ocean'
-        ? 'Diving Into Ocean Mode...'
+        ? 'Preparing your research voyage...'
         : requestedLaunchMode === 'moon'
           ? 'Approaching The Moon...'
           : requestedLaunchMode === 'mars'
@@ -747,7 +752,6 @@ function initTitleScreenUi({
     updateControlsModeUI?.();
     applySharedRuntimeState?.();
     if (typeof appCtx.startMode === 'function') appCtx.startMode();
-    persistLastLocationSelection(requestedLaunchMode);
     emitTutorialEvent('spawned_in_world', {
       location: appCtx.selLoc === 'custom' ? appCtx.customLoc : appCtx.LOCS?.[appCtx.selLoc] || null,
       launchMode: requestedLaunchMode
@@ -800,12 +804,21 @@ function initTitleScreenUi({
     return true;
   };
 
+  window.addEventListener('pagehide', event => { if (!event.persisted) launchMeasurement?.finish('abandoned', 'page_closed'); });
   let titleStartPromise = null;
   requestTitleStart = () => {
     if (titleStartPromise) return titleStartPromise;
     const pending = runTitleStart();
     const tracked = pending
+      .then(result => {
+        launchMeasurement?.finish(result === true ? 'ready' : 'failed', 'world_not_ready');
+        if (result === true) { persistLastLocationSelection(activeLaunchMode); refreshReturnPlace(); }
+        else consumeGuidedJourney();
+        return result;
+      })
       .catch((error) => {
+        launchMeasurement?.finish('failed');
+        consumeGuidedJourney();
         console.error('[title] World launch failed:',error);
         appCtx.gameStarted=false;
         appCtx.worldLoading=false;
@@ -819,12 +832,53 @@ function initTitleScreenUi({
         throw error;
       })
       .finally(() => {
+        launchMeasurement = null;
         appCtx.titleLaunchPending = false;
         if (titleStartPromise === tracked) titleStartPromise = null;
       });
     titleStartPromise = tracked;
     return titleStartPromise;
   };
+  function refreshReturnPlace() {
+    const button = document.getElementById('globeReturnPlaceBtn');
+    let saved = null;
+    try { saved = readReturnPlace(localStorage, lastLocationStorageKey, appCtx.LOCS); } catch {}
+    if (button) button.hidden = !saved;
+    const label = document.getElementById('globeReturnPlaceLabel');
+    if (label && saved) label.textContent = `Return to ${saved.name}`;
+    return saved;
+  }
+  const entryButtons = ['globeGuidedStartBtn', 'globeReturnPlaceBtn'].map(id => document.getElementById(id));
+  let entryBusy = false;
+  async function startEntry(guided) {
+    if (entryBusy || titleStartPromise || appCtx.runtimeReady !== true) return;
+    const saved = guided ? null : refreshReturnPlace();
+    if (!guided && !saved) return;
+    if (guided) {
+      if (!applyLastLocationSelection({ selLoc: 'baltimore', launchMode: 'earth' })) return;
+      requestGuidedJourney();
+    } else if (!applyLastLocationSelection(saved.record)) return;
+    appCtx.pendingExperienceState = null;
+    appCtx.gameMode = 'free';
+    document.querySelectorAll('.mode').forEach(node => node.classList.toggle('sel', node.dataset.mode === 'free'));
+    entryBusy = true;
+    entryButtons.forEach(button => { if (button) button.disabled = true; });
+    const status = document.getElementById('globeJourneyStatus');
+    if (status) status.textContent = '';
+    try {
+      const started = await appCtx.triggerTitleStart({ bypassCustomGate: true, launchMode: guided ? 'earth' : saved.record.launchMode });
+      if (started === false && status) status.textContent = 'That place could not open. Try again or choose another location.';
+    } catch {
+      if (status) status.textContent = 'That place could not open. Try again or choose another location.';
+    } finally {
+      entryBusy = false;
+      entryButtons.forEach(button => { if (button) button.disabled = false; });
+    }
+  }
+  entryButtons[0]?.addEventListener('click', () => void startEntry(true));
+  entryButtons[1]?.addEventListener('click', () => void startEntry(false));
+  refreshReturnPlace();
+
   document.getElementById('startBtn')?.addEventListener('click', () => {
     void requestTitleStart().catch((error) => {
       console.error('[title] launch failed:', error);
