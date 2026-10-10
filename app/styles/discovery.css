@@ -172,3 +172,6 @@ body:has(#urbanVehiclePrompt.show) #discoveryContextPrompt,body:has(#interiorPro
 .discoveryOpeningChapter button:focus-visible,.discoveryChapterFinish:focus-visible{outline:2px solid #91c4ff;outline-offset:2px}
 .discoveryOpeningChapter button:disabled,.discoveryChapterFinish:disabled{opacity:.6;cursor:wait}
 .discoveryChapterFinish{grid-column:1/-1;justify-self:stretch;margin-top:8px}
+
+.discoveryDeliveryOffer{padding:10px 0;margin-top:8px;border-top:1px solid var(--wx-line-soft)}
+.discoveryDeliveryOffer strong,.discoveryDeliveryOffer small{display:block;margin-bottom:7px;line-height:1.45}

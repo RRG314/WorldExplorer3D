@@ -247,11 +247,6 @@ function createOceanScene() {
   if (!renderer) {
     throw new Error('Ocean renderer unavailable');
   }
-  if (typeof renderer.outputColorSpace !== 'undefined' && typeof THREE.SRGBColorSpace !== 'undefined') {
-    renderer.outputColorSpace = THREE.SRGBColorSpace;
-  } else {
-    renderer.outputEncoding = THREE.sRGBEncoding;
-  }
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = .92;
   renderer.shadowMap.enabled = true;

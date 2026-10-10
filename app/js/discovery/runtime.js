@@ -1,3 +1,5 @@
+import { createHarborRunRuntime } from '../campaign/harbor-run-runtime.js';
+import { harborRunBadge } from '../campaign/harbor-run.js';
 import { projectDiscoveryItemsToBackpack } from './backpack-projection.js?v=1';
 import { discoverySaveMessage } from './save-status.js?v=1';
 import { normalizeOpeningChapter, openingChapterBadge } from '../campaign/first-bearings.js?v=1';
@@ -467,6 +469,7 @@ function createDiscoveryUi(state) {
       else chapterMessage = 'The referenced record is missing. Restore your complete Journal backup to continue.';
     }
     renderOpeningChapter();
+    void state.harborRun?.refresh(profile);
     guideRecords = guide;
     journalRecords = events;
     projectDiscoveryItemsToBackpack(state.appCtx, items);
@@ -604,7 +607,7 @@ function createDiscoveryUi(state) {
         .sort((left, right) => Number(right[1].xp) - Number(left[1].xp));
       const pathLabels = { field: 'Fieldwork', activity: 'Games', creation: 'Making', travel: 'Travel', community: 'Community', companion: 'Companions' };
       const paths = Object.entries(progress.paths || {}).filter(([, path]) => path.records > 0);
-      const badges = [...(progress.badgeAwards || []), ...[openingChapterBadge(profile.openingChapter)].filter(Boolean)];
+      const badges = [...(progress.badgeAwards || []), ...[openingChapterBadge(profile.openingChapter), harborRunBadge(profile.harborRun)].filter(Boolean)];
       const activeCompanion = ownedCompanions.find((entry) => entry.active);
       const background = definitionById(BACKGROUND_DEFINITIONS, profile.characterState?.backgroundId) || BACKGROUND_DEFINITIONS[0];
       const strengths = ATTRIBUTE_DEFINITIONS.map((definition) => ({
@@ -1129,6 +1132,7 @@ function disposeWorldDiscoveryRuntime(appCtx, reason = 'world-reload') {
   if (state.receiptRetryTimer) clearInterval(state.receiptRetryTimer);
   void appCtx.closeArExperience?.(`discovery_${reason}`);
   appCtx.unregisterRuntimeOwner?.(state.owner);
+  state.harborRun?.dispose();
   state.ui?.dispose?.();
   state.presentation?.dispose?.();
   state.companionRuntime?.dispose?.();
@@ -2327,6 +2331,7 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
     return true;
   };
   state.ui = createDiscoveryUi(state);
+  state.harborRun = createHarborRunRuntime(state);
   appCtx.worldDiscoveryPublication = publication;
   appCtx.worldDiscoveryRuntime = state;
   state.receiptSync = createDiscoveryReceiptSync({store:profileStore,
@@ -2429,6 +2434,7 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
     id: `${owner}:runtime`, owner, phase: 'presentation', priority: 24, critical: false,
     enabled: () => !state.disposed && appCtx.worldPublication?.requestId === publication.requestId && appCtx.worldPublication?.sequence === publication.sequence,
     update(frame) {
+      state.harborRun?.update(frame.dt);
       // A retained Earth publication is not an active Earth field session.
       // Keep its journal accessible aboard without advancing hidden searches.
       if (appCtx.getEnv?.() && appCtx.getEnv() !== 'EARTH') {
@@ -2518,6 +2524,7 @@ function worldDiscoveryRuntimeSnapshot(appCtx) {
     interaction: state.lastSnapshot,
     fieldExpedition: state.fieldExpedition?.snapshot?.(playerPosition(appCtx), state.evaluateFieldTarget) || null,
     missionAuthority: state.retentionSnapshot?.missionAuthority || null,
+    harborRun: state.harborRun?.snapshot() || null,
     logicalEncounterSlots: state.publication.encounters.slots.length,
     logicalFieldActivitySlots: state.publication.fieldActivities?.slots.length || 0,
     regionalEcology: Object.freeze({

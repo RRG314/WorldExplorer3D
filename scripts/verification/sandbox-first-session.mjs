@@ -1,3 +1,5 @@
+import { captureVisualSceneAudit } from './visual-scene-audit.mjs';
+import { verifyHarborRun } from './harbor-run-journey.mjs';
 // Actual source world + field recording and Journal UI. Position placement is
 // bounded test setup, not a claim of an uncoached navigation/usability test.
 import assert from 'node:assert/strict';
@@ -97,6 +99,7 @@ try {
   return {slotId:id,activityId:slot.activityId,phase:state.fieldSession.snapshot(actor).phase};
  },objective);
  report.setup=setup;
+ if(process.env.WE3D_SANDBOX_HARBOR==='1'){report.visualAudit=await captureVisualSceneAudit(page);await writeFile(`${out}/visual-audit.json`,JSON.stringify(report.visualAudit,null,2));}
  await page.waitForFunction(()=>globalThis.getWorldExplorerRuntimeDiagnostics?.().worldDiscovery?.interaction?.phase==='revealed',null,{timeout:45000});
  await page.evaluate(async()=>{const{ctx}=await import('/app/js/shared-context.js?v=55');ctx.openWorldDiscoverySection('today');});
  await page.locator('#discoveryPrimaryBtn').click();
@@ -145,6 +148,7 @@ try {
   await page.screenshot({path:`${out}/chapter-badge-desktop.png`});
   report.checks.chapterCompletedAndBadgeVisible=true;
  }
+ if(process.env.WE3D_SANDBOX_HARBOR==='1')await verifyHarborRun({page,out,report});
  await page.locator('#discoveryCloseBtn').click();await page.locator('#realEstateFloatBtn').click();
  assert.equal(await page.locator('#fQuickBuild').isVisible(),true);
  await page.screenshot({path:`${out}/mobile-build-menu.png`});
@@ -214,6 +218,10 @@ try {
    const profile=await store.getProfile();const records=await store.getEventsById(['event:campaign-completed:first-bearings:v1']);
    return {phase:profile.openingChapter.phase,receipts:records.length};});
   assert.deepEqual(saved,{phase:'complete',receipts:1});report.checks.chapterSurvivesReload=true;
+  if(process.env.WE3D_SANDBOX_HARBOR==='1'){
+   const saved=await page.evaluate(async()=>{const store=globalThis.__sandboxTestContext.discoveryProfileStore;return {phase:(await store.getProfile()).harborRun.phase,receipts:(await store.getEventsById(['event:campaign-completed:harbor-run:v1'])).length};});
+   assert.deepEqual(saved,{phase:'complete',receipts:1});report.checks.harborSurvivesReload=true;
+  }
  }
 
  }
@@ -241,7 +249,7 @@ try {
  report.checks.flowerSprintReceipt=true;
  report.errors=errors;report.failedLocal=failedLocal;assert.deepEqual(errors,[]);assert.deepEqual(failedLocal,[]);
  report.ok=true;
-} catch(error){report.errors=errors;report.failedLocal=failedLocal;report.error=String(error.stack||error);if(page){await page.screenshot({path:`${out}/failure.png`}).catch(()=>{});report.state=await page.evaluate(()=>{const d=globalThis.getWorldExplorerRuntimeDiagnostics?.();return {worldLoading:d?.worldLoading,environment:d?.environment,interaction:d?.worldDiscovery?.interaction,loading:document.getElementById('loading')?.textContent,flower:{mode:globalThis.__sandboxTestContext?.Walk?.state?.mode,walker:{x:globalThis.__sandboxTestContext?.Walk?.state?.walker?.x,y:globalThis.__sandboxTestContext?.Walk?.state?.walker?.y,z:globalThis.__sandboxTestContext?.Walk?.state?.walker?.z},marker:globalThis.__sandboxTestContext?.scene?.getObjectByName('redFlowerChallenge')?.position,backend:globalThis.__sandboxTestContext?.getFlowerChallengeBackendStatus?.(),receipts:globalThis.__sandboxSavedResults}};}).catch(()=>null);}throw error;}
+} catch(error){report.errors=errors;report.failedLocal=failedLocal;report.error=String(error.stack||error);if(page){await page.screenshot({path:`${out}/failure.png`}).catch(()=>{});report.state=await page.evaluate(()=>{const d=globalThis.getWorldExplorerRuntimeDiagnostics?.();return {harbor:d?.worldDiscovery?.harborRun,worldLoading:d?.worldLoading,environment:d?.environment,interaction:d?.worldDiscovery?.interaction,loading:document.getElementById('loading')?.textContent,flower:{mode:globalThis.__sandboxTestContext?.Walk?.state?.mode,walker:{x:globalThis.__sandboxTestContext?.Walk?.state?.walker?.x,y:globalThis.__sandboxTestContext?.Walk?.state?.walker?.y,z:globalThis.__sandboxTestContext?.Walk?.state?.walker?.z},marker:globalThis.__sandboxTestContext?.scene?.getObjectByName('redFlowerChallenge')?.position,backend:globalThis.__sandboxTestContext?.getFlowerChallengeBackendStatus?.(),receipts:globalThis.__sandboxSavedResults}};}).catch(()=>null);}throw error;}
 finally{
  await writeFile(`${out}/report.json`,JSON.stringify(report,null,2));
  try {if(browserServer)await closeOwnedBrowser(browserServer);}

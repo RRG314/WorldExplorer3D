@@ -1,6 +1,6 @@
 # Current development and release state
 
-Updated October 9, 2026. **5.5.0 is deployed to production.**
+Updated October 10, 2026. **5.5.0 is deployed to production.**
 Release: https://github.com/RRG314/WorldExplorer3D/releases/tag/v5.5.0
 Public project page: https://rrg314.github.io/WorldExplorer3D/
 
@@ -139,6 +139,53 @@ or physical-phone acceptance.
 The prescribed keyboard run reaches walking but stops after one burst on the
 existing external Overpass CORS failure; this remains degraded provider evidence.
 Production/dist and the four retained release packages remain unchanged.
+
+## October 10 — Harbor Run and realism architecture, local
+
+The next personal career job now supports choosing an admitted Baltimore road
+route, loading a licensed physical field case from a stopped car, driving its
+ordered gates, stopping to unload and retaining one Harbor Driver badge/receipt.
+Surface and clearance admission use existing road/terrain/collision owners.
+The job adds no currency, timer, duplicate road geometry or always-open HUD.
+Live GPS pauses the virtual job; interrupted travel retains cargo and requires
+resuming the last confirmed route point. Failed writes pause automatic retries.
+Stale UI reads resolve against current storage; deliberate backup restores still
+recover the older job and physical case. Scene/collider/model leases are released.
+
+The controlled world journey passes 16 checks, including the first chapter,
+delivery, badge, reload, building/undo, room, property and Flower Sprint. It uses
+keyboard input initially and explicit actor-stepping for full route coverage;
+it is not a complete manual drive. Nineteen actual IndexedDB cases and the final
+eight-case DOM/GLTF runtime check pass, including concurrent unload, injected
+save/read failures, deliberate restore and teardown. Coverage remains 49,023 buildings
+and 18,952 roads. Desktop/phone-width images were inspected. The separate
+prescribed world keyboard client retains its external Overpass CORS failure;
+it reached walking and one captured burst, not a clean live-provider pass.
+
+`docs/design/WORLD-REALISM-ARCHITECTURE.md` defines five finite visual gates:
+calibration, common materials/lighting, a complete street plus streamed neighbor,
+marine/space integration, and measured quality/streaming tiers. It records actual
+material/resource evidence and current primary-source research. No claim of
+spare GPU memory, universal hyperrealism or completed art work follows from it.
+The first implemented correction centralizes display color across all renderer
+constructors, repairing missing Space output and the ineffective legacy AR setting.
+Scene lighting, tone mapping/exposure and the existing composer output pass are
+preserved. Twenty-eight direct/auxiliary and 24 direct/composer pixel comparisons
+pass. Actual Space scene and day/night/storm player-asset images were inspected;
+the prescribed asset-fixture client completes both movement bursts without errors.
+These are bounded rendering checks, not physical AR-device acceptance.
+
+The final source chain passes 2,234 tests, dependency/module ownership, boundary
+types, inventory and sensitivity checks after the recovery refinements.
+
+H03/H04, the proposed additional H02 cosmetic/mastery reward, later chapters,
+research vessel/fleet/ship replacements, full visual gates and final media remain
+open. There are no placeholder mission/reward buttons for them. Full-step
+acceptance and evidence limits are in `docs/design/EXPLORER-CAREER-DELIVERY.md`.
+On October 10 production still matches the local d877 manifest; explicit project
+`worldexplorer3d-d9b83` reports 80 Functions. Production, dist, player data and the
+four retained builds are unchanged. Evidence is under ignored
+`output/harbor-realism-20261009/`; no push or deployment occurred.
 
 ## Historical preparation records
 

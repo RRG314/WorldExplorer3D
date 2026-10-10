@@ -54,10 +54,10 @@ try {
     }finally{IDBObjectStore.prototype.get=get;IDBObjectStore.prototype.getAll=getAll;}
     cases.push('receipt-counts-match-originals-with-bounded-ready-reads');
 
-    async function atomicFailure(label,action){
+    async function atomicFailure(label,action,failStore='journalOrder'){
       const before=JSON.stringify(await raw());const put=IDBObjectStore.prototype.put,clear=IDBObjectStore.prototype.clear;let failed=false;
-      IDBObjectStore.prototype.put=function(...args){if(this.name==='journalOrder')throw new DOMException('Injected index quota failure','QuotaExceededError');return put.apply(this,args);};
-      IDBObjectStore.prototype.clear=function(...args){if(this.name==='journalOrder')throw new DOMException('Injected index quota failure','QuotaExceededError');return clear.apply(this,args);};
+      IDBObjectStore.prototype.put=function(...args){if(this.name===failStore)throw new DOMException('Injected index quota failure','QuotaExceededError');return put.apply(this,args);};
+      IDBObjectStore.prototype.clear=function(...args){if(this.name===failStore)throw new DOMException('Injected index quota failure','QuotaExceededError');return clear.apply(this,args);};
       try{await action();}catch{failed=true;}finally{IDBObjectStore.prototype.put=put;IDBObjectStore.prototype.clear=clear;}
       check(failed,`${label}: failure injection did not execute`);check(JSON.stringify(await raw())===before,`${label}: failed transaction changed saved records or indexes`);cases.push(label);
     }
@@ -86,6 +86,24 @@ try {
     await store.importData(completed);
     check((await store.getProfile()).openingChapter.phase==='complete','Chapter did not survive backup restore');
     cases.push('chapter-concurrent-completion-and-backup-restore');
+    const point=lat=>({lat,lon:-76,y:10});
+    const deliveryRoute={id:'transaction-route',regionId:'test',regionLabel:'Test region',environment:'EARTH',distance:222,turns:1,pickup:point(39),dropoff:point(39.002),pickupCase:point(39),dropoffCase:point(39.002),points:[point(39),point(39.001),point(39.002)],destinationLabel:'Test stop'};
+    const driveEvidence=p=>({...p,mode:'drive',speed:0,road:true,continuous:true,environment:'EARTH',regionId:'test'});
+    await atomicFailure('failed-delivery-acceptance-is-atomic',()=>store.updateHarborRun({type:'accept',revision:0,route:deliveryRoute}),'profiles');
+    let delivery=await store.updateHarborRun({type:'accept',revision:0,route:deliveryRoute});
+    await atomicFailure('failed-cargo-load-is-atomic',()=>store.updateHarborRun({type:'load',revision:delivery.revision,evidence:driveEvidence(deliveryRoute.pickup)}),'profiles');
+    delivery=await store.updateHarborRun({type:'load',revision:delivery.revision,evidence:driveEvidence(deliveryRoute.pickup)});
+    const inTransit=await store.exportData();await store.importData(inTransit);
+    check((await store.getProfile()).harborRun.cargo==='in-vehicle','Cargo custody was lost in backup restore');
+    for(let i=0;i<deliveryRoute.points.length;i++)delivery=await store.updateHarborRun({type:'reach',revision:delivery.revision,pointIndex:i,evidence:driveEvidence(deliveryRoute.points[i])});
+    const unload={type:'unload',revision:delivery.revision,evidence:driveEvidence(deliveryRoute.dropoff)};
+    await atomicFailure('failed-delivery-reward-is-atomic',()=>store.updateHarborRun(unload));
+    const finishes=await Promise.allSettled([store.updateHarborRun(unload),createIndexedDbDiscoveryProfileStore().updateHarborRun(unload)]);
+    check(finishes.filter(r=>r.status==='fulfilled').length===1,'Stale delivery writer was not rejected');
+    const deliveryBackup=await store.exportData();await store.importData(deliveryBackup);
+    check((await store.getEventsById(['event:campaign-completed:harbor-run:v1'])).length===1,'Delivery receipt duplicated');
+    check((await store.getProfile()).harborRun.phase==='complete','Completed delivery did not restore');
+    cases.push('delivery-concurrent-unload-cargo-and-backup-restore');
     const rewards=(await store.getProfile()).explorerProgress;
     await Promise.all([store.saveProfile(p=>({...p,tutorials:{...p.tutorials,first:true}})),createIndexedDbDiscoveryProfileStore().saveProfile(p=>({...p,tutorials:{...p.tutorials,second:true}}))]);
     const profile=await store.getProfile();check(profile.tutorials.first&&profile.tutorials.second,'Concurrent profile writes lost independent edits');

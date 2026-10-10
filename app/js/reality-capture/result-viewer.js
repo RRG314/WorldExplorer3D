@@ -1,4 +1,5 @@
 import {prepareHomePhotoSurfaces} from './home-photo-surfaces.js';
+import { applyDisplayColorPolicy } from '../engine/display-color-policy.js';
 import { loadClassicScript } from '../modules/script-loader.js?v=56';
 import { vendorScriptsCritical } from '../modules/manifest.js?v=606';
 import { applyCaptureAlignment } from './alignment.js?v=1';
@@ -59,7 +60,7 @@ export async function createCaptureViewer(host, bytes, signal, options = {}) {
   const camera = new T.PerspectiveCamera(50, 1, radius / 1000, radius * 100);
   const renderer = new T.WebGLRenderer({ antialias: true, alpha: false });
   renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 1.5));
-  renderer.outputEncoding = T.sRGBEncoding;
+  applyDisplayColorPolicy(renderer, T);
   if(options.interiorLighting){renderer.toneMapping=T.ACESFilmicToneMapping;renderer.toneMappingExposure=.8;}
   const canvas = renderer.domElement;
   canvas.tabIndex = 0;

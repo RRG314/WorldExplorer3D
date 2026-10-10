@@ -13,13 +13,15 @@
 <script src="/app/vendor/three/examples/js/postprocessing/SMAAPass.js"></script>
 <script type="module">
 import {ctx} from '/app/js/shared-context.js?v=55';
+import {applyDisplayColorPolicy} from '/app/js/engine/display-color-policy.js';
+import {createAuxiliaryRenderer,disposeThreeRenderer} from '/app/js/engine/webgl-lifecycle.js?v=2';
 import {setTimeOfDay} from '/app/js/sky/astronomical-state.js';
 import {applyWeatherPresentation} from '/app/js/weather.js';
 import {setupPostProcessingPipeline,applyRenderQuality} from '/app/js/engine/quality.js';
 import {attachCuratedPlayerCar} from '/app/js/engine/curated-player-car.js';
 import {createPlayerCharacterHost} from '/app/js/walking/player-character-host.js';
 import {attachCuratedExplorerCharacter,updateCuratedCharacterAnimation} from '/app/js/walking/curated-explorer-character.js?v=8';
-const renderer=new THREE.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});renderer.setSize(innerWidth,innerHeight);renderer.setPixelRatio(1);renderer.outputEncoding=THREE.sRGBEncoding;renderer.toneMapping=THREE.ACESFilmicToneMapping;document.body.append(renderer.domElement);
+const renderer=new THREE.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});renderer.setSize(innerWidth,innerHeight);renderer.setPixelRatio(1);applyDisplayColorPolicy(renderer,THREE);renderer.toneMapping=THREE.ACESFilmicToneMapping;document.body.append(renderer.domElement);
 const scene=new THREE.Scene(),camera=new THREE.PerspectiveCamera(42,innerWidth/innerHeight,.1,100);camera.position.set(9,5.4,11);camera.lookAt(0,1,0);
 Object.assign(ctx,{scene,camera,renderer,hemiLight:new THREE.HemisphereLight(),sun:new THREE.DirectionalLight(),fillLight:new THREE.DirectionalLight(),ambientLight:new THREE.AmbientLight(),applyWeatherPresentation,weatherMode:'clear',weatherState:{category:'clear',cloudCover:8},carMesh:new THREE.Group()});
 ctx.sun.position.set(4,8,5);ctx.fillLight.position.set(-4,4,-3);for(const light of [ctx.hemiLight,ctx.sun,ctx.fillLight,ctx.ambientLight])scene.add(light);
@@ -47,4 +49,25 @@ window.checkDisplayParity=()=>{
  return {cases,outputPassCount:ctx.composer.passes.filter(p=>p.material?.name==='World Explorer display output').length,lastPass:ctx.composer.passes.at(-1).material.name};
 };
 window.__fixtureReady=true;
+window.checkAuxiliaryDisplayParity=()=>{
+ const auxiliary=createAuxiliaryRenderer({optionsList:[{antialias:false,preserveDrawingBuffer:true}],pixelRatioCap:1,size:{width:32,height:32}});
+ if(!auxiliary)throw Error('Auxiliary renderer unavailable');
+ const chart=new THREE.Scene(),view=new THREE.OrthographicCamera(-1,1,1,-1,.1,10);view.position.z=1;
+ const surface=new THREE.MeshBasicMaterial(),tile=new THREE.Mesh(new THREE.PlaneGeometry(2,2),surface);chart.add(tile);
+ const oldTone=renderer.toneMapping,oldExposure=renderer.toneMappingExposure;
+ const sample=r=>{const gl=r.getContext(),bytes=new Uint8Array(4);gl.readPixels(Math.floor(r.domElement.width/2),Math.floor(r.domElement.height/2),1,1,gl.RGBA,gl.UNSIGNED_BYTE,bytes);return [...bytes].slice(0,3);};
+ const cases=[];
+ try{
+  for(const [name,tone,exposure] of [['space',THREE.NoToneMapping,1],['earth',THREE.ACESFilmicToneMapping,.9],['ocean',THREE.ACESFilmicToneMapping,.92],['interior',THREE.ACESFilmicToneMapping,1]]){
+   renderer.toneMapping=auxiliary.toneMapping=tone;renderer.toneMappingExposure=auxiliary.toneMappingExposure=exposure;
+   for(const color of [[0,0,0],[.018,.018,.018],[.18,.18,.18],[.5,.5,.5],[1,1,1],[.5,.1,.02],[.02,.1,.5]]){
+    surface.color.setRGB(...color);renderer.setRenderTarget(null);renderer.render(chart,view);const direct=sample(renderer);
+    auxiliary.render(chart,view);const other=sample(auxiliary);
+    const expected=tone===THREE.NoToneMapping?color.map(v=>Math.round(255*(v<=.0031308?12.92*v:1.055*Math.pow(v,1/2.4)-.055))):null;
+    cases.push({name,color,direct,auxiliary:other,expected,maxDifference:Math.max(...direct.map((n,i)=>Math.abs(n-other[i])))});
+   }
+  }
+  return {cases,encoding:auxiliary.outputEncoding,revision:THREE.REVISION};
+ }finally{renderer.toneMapping=oldTone;renderer.toneMappingExposure=oldExposure;surface.dispose();tile.geometry.dispose();disposeThreeRenderer(auxiliary);}
+};
 </script></html>

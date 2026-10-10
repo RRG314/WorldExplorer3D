@@ -3,7 +3,7 @@ import fs from 'node:fs/promises';
 import {chromium} from 'playwright';
 import {closeOwnedBrowser} from './owned-browser.mjs';
 const base=process.env.WE3D_VERIFY_BASE_URL||'http://127.0.0.1:4192';
-const dir='output/verification/visual-consistency-20261008';await fs.mkdir(dir,{recursive:true});
+const dir=process.env.WE3D_DISPLAY_OUTPUT||'output/verification/visual-consistency-20261008';await fs.mkdir(dir,{recursive:true});
 const owned=await chromium.launchServer({channel:'chrome',headless:false});const browser=await chromium.connect(owned.wsEndpoint());
 const report={scope:'Controlled real-WebGL output parity and actual bundled player assets; no live world data',errors:[]};
 try{
@@ -12,6 +12,11 @@ try{
  report.parity=await page.evaluate(()=>checkDisplayParity());
  assert.equal(report.parity.outputPassCount,1);assert.equal(report.parity.lastPass,'World Explorer display output');
  for(const c of report.parity.cases)assert.ok(c.maxDifference<=5,`Display changed at ${JSON.stringify(c)}`);
+ report.auxiliary=await page.evaluate(()=>checkAuxiliaryDisplayParity());
+ for(const c of report.auxiliary.cases){
+  assert.ok(c.maxDifference<=2,`Scene-owner encoding differs: ${JSON.stringify(c)}`);
+  if(c.expected)assert.ok(c.direct.every((n,i)=>Math.abs(n-c.expected[i])<=2),`Incorrect sRGB transfer: ${JSON.stringify(c)}`);
+ }
  for(const phase of ['night','day']){await page.locator(`#${phase}`).click();await page.waitForTimeout(250);await page.screenshot({path:`${dir}/controlled-${phase}.png`});}
  await page.locator('#night').click();await page.locator('#storm').click();await page.waitForTimeout(250);await page.screenshot({path:`${dir}/controlled-storm-night.png`});
  report.assets=JSON.parse(await page.evaluate(()=>render_game_to_text()));assert.equal(report.assets.paint,'artist-white-exterior');assert.equal(report.assets.characters.length,2);

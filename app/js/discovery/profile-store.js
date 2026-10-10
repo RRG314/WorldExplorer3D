@@ -17,6 +17,7 @@ import {
 } from './explorer-events.js?v=3';
 import { createDefaultCharacterState, normalizeCharacterState } from '../character/model.js?v=1';
 import { migrateLegacyCharacterState, projectCharacterProgress } from '../character/progression.js?v=1';
+import { normalizeHarborRun, transitionHarborRun, harborRunReceipt } from '../campaign/harbor-run.js';
 import { FIRST_BEARINGS, normalizeOpeningChapter, beginOpeningChapter, projectOpeningChapter, finishOpeningChapter } from '../campaign/first-bearings.js?v=1';
 
 const DISCOVERY_DB_NAME = 'world-explorer-discovery';
@@ -97,6 +98,7 @@ function createDefaultProfile() {
     fieldGuideCount: 0,
     explorerProgress: defaultExplorerProgress(),
     openingChapter: normalizeOpeningChapter(),
+    harborRun: normalizeHarborRun(),
     characterState: createDefaultCharacterState()
   };
 }
@@ -114,6 +116,7 @@ function normalizeProfile(profile) {
     companionOnboarding: normalizeCompanionOnboarding(profile?.companionOnboarding),
     explorerProgress: normalizeExplorerProgress(profile?.explorerProgress),
     openingChapter: normalizeOpeningChapter(profile?.openingChapter),
+    harborRun: normalizeHarborRun(profile?.harborRun),
     characterState: normalizeCharacterState(profile?.characterState),
     schemaVersion: DISCOVERY_DB_VERSION,
     updatedAt: Date.now()
@@ -364,6 +367,30 @@ function createIndexedDbDiscoveryProfileStore(options = {}) {
       return { recorded: true, event: clone(event), profile: clone(profile) };
     } catch (error) {
       try { transaction?.abort(); } catch { /* Transaction already ended. */ }
+      throw error;
+    } finally { db.close(); }
+  }
+
+  async function updateHarborRun(command, now = Date.now()) {
+    const db = await open();
+    let transaction;
+    try {
+      await ensureCharacterMigration(db);
+      transaction = db.transaction(['profiles', 'events', JOURNAL_ORDER_STORE], 'readwrite');
+      const profiles = transaction.objectStore('profiles');
+      const current = normalizeProfile(await requestPromise(profiles.get(PROFILE_ID)));
+      const harborRun = transitionHarborRun(current.harborRun, command, now);
+      const profile = normalizeProfile({ ...current, harborRun });
+      if (harborRun.phase === 'complete') {
+        const event = createExplorerStoryEvent(harborRunReceipt(harborRun));
+        transaction.objectStore('events').put(event);
+        putJournalOrder(transaction, 'events', event);
+      }
+      profiles.put(profile);
+      await transactionPromise(transaction);
+      return clone(harborRun);
+    } catch (error) {
+      try { transaction?.abort(); } catch { /* Already ended. */ }
       throw error;
     } finally { db.close(); }
   }
@@ -900,6 +927,7 @@ function createIndexedDbDiscoveryProfileStore(options = {}) {
     recordObservation,
     startOpeningChapter,
     completeOpeningChapter,
+    updateHarborRun,
     rollbackCharacterMigration,
     rollbackLastImport,
     saveCompanion,
@@ -1032,6 +1060,15 @@ function createMemoryDiscoveryProfileStore(seed = {}) {
       profile = normalizeProfile({ ...profile, openingChapter: chapter });
       events.set(event.eventId, event);
       return { recorded: true, event: clone(event), profile: clone(profile) };
+    },
+    async updateHarborRun(command, now = Date.now()) {
+      const harborRun = transitionHarborRun(profile.harborRun, command, now);
+      profile = normalizeProfile({ ...profile, harborRun });
+      if (harborRun.phase === 'complete') {
+        const event = createExplorerStoryEvent(harborRunReceipt(harborRun));
+        events.set(event.eventId, event);
+      }
+      return clone(harborRun);
     },
     async getReceiptSyncStatus(ownerUid) { return summarizeReceiptState([...items.values()], [...outbox.values()], ownerUid); },
     async listPendingReceipts(ownerUid, now = Date.now()) { return [...outbox.values()].filter(row => row.ownerUid === ownerUid && row.status === 'pending' && row.nextAttemptAt <= now)

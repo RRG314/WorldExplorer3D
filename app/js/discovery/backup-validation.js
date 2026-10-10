@@ -1,3 +1,4 @@
+import { HARBOR_RUN, normalizeHarborRun, validateDeliveryRoute } from '../campaign/harbor-run.js';
 // Validate the entire file before opening a destructive replacement transaction.
 // Older backups may omit optional collections, but malformed rows are never dropped.
 import { FIRST_BEARINGS, normalizeOpeningChapter, finishOpeningChapter } from '../campaign/first-bearings.js?v=1';
@@ -28,6 +29,19 @@ export function validateJournalBackup(input) {
     try { finishOpeningChapter({ ...chapter, completedAt: 0 }, evidence); } catch { fail(); }
     if (chapter.phase === 'complete' && !data.events.some(event => event.eventId === FIRST_BEARINGS.receiptId
       && event.eventType === 'campaign-completed' && event.metadata?.evidenceEventId === chapter.eventId)) fail();
+  }
+  const delivery = normalizeHarborRun(data.profile.harborRun);
+  if (delivery.schemaVersion === 1 && delivery.phase !== 'available') {
+    try { validateDeliveryRoute(delivery.route); } catch { fail(); }
+    if (!['pickup', 'driving', 'unload', 'complete'].includes(delivery.phase) || !Number.isInteger(delivery.nextPoint)
+        || delivery.nextPoint < 0 || delivery.nextPoint > delivery.route.points.length) fail();
+    if (delivery.phase === 'pickup' && (delivery.cargo !== 'at-pickup' || delivery.nextPoint !== 0)) fail();
+    if (['driving', 'unload'].includes(delivery.phase) && (delivery.cargo !== 'in-vehicle' || !(delivery.loadedAt > 0))) fail();
+    if (delivery.phase === 'driving' && delivery.nextPoint >= delivery.route.points.length) fail();
+    if (delivery.phase === 'unload' && delivery.nextPoint !== delivery.route.points.length) fail();
+    if (delivery.phase === 'complete' && (!delivery.completedAt || delivery.cargo !== 'delivered'
+        || delivery.nextPoint !== delivery.route.points.length || !data.events.some(event => event.eventId === HARBOR_RUN.receiptId
+        && event.metadata?.routeId === delivery.route.id && event.eventType === 'campaign-completed'))) fail();
   }
   return data;
 }
