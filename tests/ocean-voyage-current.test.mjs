@@ -54,9 +54,8 @@ test('duplicate launch and a changed region during loading cannot create or revi
  const f=transferFixture();let release;f.ctx.showTransitionLoad=()=>new Promise(resolve=>release=resolve);const pending=f.api.transferBoatToSubmarine();assert.equal(await f.api.transferBoatToSubmarine(),false);f.ctx.LOC={lat:30,lon:40};release();assert.equal(await pending,false);assert.equal(f.calls.length,0);assert.equal(f.restores(),0);
 });
 
-test('parent hull is closed from outside and rejects submerged hull overlaps at rotated headings',()=>{
- const ship=record().ship,catalog=getMaritimeCatalogEntry(ship.transportCatalogId),visual=createVesselVisual(THREE,catalog);visual.root.updateMatrixWorld(true);
- const hits=new THREE.Raycaster(new THREE.Vector3(0,-1,-100),new THREE.Vector3(0,0,1)).intersectObject(visual.root,true);assert.ok(hits.length);assert.ok(Math.abs(hits[0].point.z+39*1.002)<1e-6);assert.ok(hits[0].face.normal.z<-.9);visual.dispose();
+test('parent hull rejects submerged overlaps and admits stern deployment at rotated headings',()=>{
+ const ship=record().ship;
  assert.equal(parentHullCollision(ship,{x:0,y:-3,z:0},1),true);assert.equal(parentHullCollision(ship,{x:0,y:-30,z:0},1),false);
  const distance=51;assert.equal(parentHullCollision(ship,{x:-Math.sin(ship.yaw)*distance,y:-8.5,z:-Math.cos(ship.yaw)*distance},3),false);
 });

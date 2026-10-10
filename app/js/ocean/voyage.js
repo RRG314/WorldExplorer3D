@@ -2,6 +2,7 @@ import {ensureMarineResearch,REEF_SURVEY} from './research-outing.js';
 import {styleMarinePanel} from './interface.js';
 import {earthLocalToGeographic} from '../earth-core/location-origin.js?v=1';
 import {createOceanVoyageStore,validateOceanVoyage} from './voyage-store.js';
+import {createCoastalDepartureControls} from '../campaign/coastal-departure-ui.js';
 const id=()=>globalThis.crypto?.randomUUID?.()||`voyage-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 // Preparing an aboard journey allocates data only; it must not create an
 // underwater renderer or write a save before the surface vessel is accepted.
@@ -61,6 +62,7 @@ export function ensureOceanVoyage(ctx,{store=createOceanVoyageStore()}={}){
   ui.resume.hidden=!saved;ui.resume.style.display=saved?'':'none';setText(ui.resume,saved?.stage==='aboard'?'Return to saved research vessel':'Resume saved ocean voyage');
   ui.panel.hidden=!ctx.oceanMode?.active||!!ctx.paused||!!ctx.oceanMode?.diver?.active;
   const survey=research.snapshot();
+  ui.coastal.render(survey.coastal);
   setText(ui.title,survey.visible?'Coral Shelf survey':'Research voyage');
   setText(ui.status,survey.visible&&survey.message?survey.message:status);
   ui.scan.hidden=!survey.visible||!survey.started||survey.stage==='report';ui.scan.disabled=!survey.canScan||survey.busy;
@@ -104,7 +106,8 @@ export function ensureOceanVoyage(ctx,{store=createOceanVoyageStore()}={}){
   REEF_SURVEY.sites.forEach((id,index)=>{const option=document.createElement('option');option.value=id;option.textContent=REEF_SURVEY.labels[index];site.append(option)});site.onchange=()=>{research.select(site.value);site.blur();refresh()};
   styleMarinePanel(panel,'voyage');
   const more=document.createElement('details'),summary=document.createElement('summary');summary.textContent='Voyage details & crew';more.append(summary,distance,statusElement,shared);
-  panel.append(title,site,scan,recover,more);for(const control of panel.querySelectorAll('button,select'))control.removeAttribute('style');document.body.append(panel);ui={resume:resumeButton,panel,title,status:statusElement,distance,recover,scan,site};refresh();
+  const coastal=createCoastalDepartureControls({api:()=>research.coastal,prefix:'coastalOcean'});
+  panel.append(title,site,scan,recover,coastal.node,more);for(const control of panel.querySelectorAll('button,select'))control.removeAttribute('style');document.body.append(panel);ui={resume:resumeButton,panel,title,status:statusElement,distance,recover,scan,site,coastal};refresh();
  }
  const api={restorePersonal(){if(personalBeforeShared){current=personalBeforeShared.current;personalBeforeShared=null;}return current;},begin,beginAboard,checkpoint,surfaceCheckpoint,surfaced,tick,tickSurface,mount,resume,refresh,get current(){return current},get saved(){return saved},get status(){return status}};
  ctx.oceanVoyage=api;

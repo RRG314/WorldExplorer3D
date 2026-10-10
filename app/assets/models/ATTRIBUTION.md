@@ -1,5 +1,17 @@
 Curated Vehicle Assets
 
+## Research vessel
+
+[RCRV — Regional Class Research Vessel](https://sketchfab.com/3d-models/rcrv-regional-class-research-vessel-11b4b97a9e60497ea91c0727e404ecf6)
+by Oregon State University Extension Service / Alan Dennis, licensed under
+[CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
+The educational ship design is adapted for the game: uniform scale and orientation,
+paint response, science-van floor and entrance, dive opening, equipment placement,
+and optimized near and distant geometry. It is not an exact model of a current
+operational vessel. The original notice and intake checksums accompany the models
+in `marine/research-vessel/`. Deck instruments reuse the credited Michael V assets
+below; the docked submarine retains JosephWPugsley's credit.
+
 Atlantic Explorer Research Submarine
 
 - File: `marine/atlantic-explorer-submarine.glb`

@@ -1,6 +1,6 @@
 import {parentHullCollision} from './parent-vessel.js';
 import {getMaritimeCatalogEntry} from '../transport/maritime-catalog.js?v=1';
-import {RESEARCH_DECK} from '../boat-mode/research/layout.js';
+import {RCRV_LAYOUT,RESEARCH_EYE_HEIGHT} from '../boat-mode/research/layout.js';
 import {styleMarinePanel} from './interface.js';
 import {getPlayerCharacterGender} from '../../../js/player-character-preference.js?v=1';
 import {createWalkingWaterRuntime} from '../walking/water/runtime.js';
@@ -21,9 +21,10 @@ export function oceanDiveAdmission({speed=0,verticalSpeed=0,depthMeters,bottomCl
 export function parentVesselExitPose(ship,surfaceY,jump=false) {
   if(!ship || !Number.isFinite(surfaceY))return null;
   const {width,length}=getMaritimeCatalogEntry(ship.transportCatalogId).dimensions;
-  const yaw=Number(ship.yaw)||0,c=Math.cos(yaw),s=Math.sin(yaw),side=width*.5+1,forward=-length*.3;
+  const research=ship.transportCatalogId==='ocean-research-vessel';
+  const yaw=Number(ship.yaw)||0,c=Math.cos(yaw),s=Math.sin(yaw),side=research?RCRV_LAYOUT.ladder.x+1:width*.5+1,forward=research?RCRV_LAYOUT.ladder.z:-length*.3;
   return {x:side*c+forward*s,z:-side*s+forward*c,
-    y:surfaceY+(jump?RESEARCH_DECK.y+RESEARCH_DECK.eyeHeight:.18),yaw:yaw+Math.PI/2};
+    y:surfaceY+(jump?(research?RCRV_LAYOUT.floorY:Math.max(.7,Math.min(getMaritimeCatalogEntry(ship.transportCatalogId).dimensions.height*.17,width*.45)))+RESEARCH_EYE_HEIGHT:.18),yaw:yaw+Math.PI/2};
 }
 
 // One diver shares the existing Ocean loop. The parked submarine retains its

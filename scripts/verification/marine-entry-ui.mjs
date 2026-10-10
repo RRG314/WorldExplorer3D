@@ -11,8 +11,10 @@ export async function deployResearchSubmarineFromDeck(page) {
     try{await page.waitForFunction(predicate,null,{timeout:12000});}
     finally{await page.keyboard.up(key);}
   };
-  await moveUntil('KeyD',()=>__marineEntryContext.boatDeck.snapshot().pose.x<.6);
-  await moveUntil('KeyS',()=>__marineEntryContext.boatDeck.snapshot().pose.z< -25.5);
+  // Retained 5.5 packages have the procedural deck; new candidates expose the
+  // licensed layout. Follow the actual admitted vessel, not release-number guesses.
+  await moveUntil('KeyD',()=>__marineEntryContext.boatDeck.snapshot().pose.x<(__marineEntryContext.boatMode.mesh.userData.researchLayout?-1.5:.6));
+  await moveUntil('KeyS',()=>__marineEntryContext.boatDeck.snapshot().pose.z<(__marineEntryContext.boatMode.mesh.userData.researchLayout?-31.1:-25.5));
   await page.locator('#researchDeckAction').click();
   await page.waitForFunction(()=>__marineEntryContext.oceanMode?.active &&
     !__marineEntryContext.oceanMode.diver?.active,null,{timeout:60000});

@@ -252,7 +252,9 @@ try {
   }
   if(process.env.WE3D_SANDBOX_HARBOR==='1'){
    const saved=await page.evaluate(async()=>{const store=globalThis.__sandboxTestContext.discoveryProfileStore;return {phase:(await store.getProfile()).harborRun.phase,receipts:(await store.getEventsById(['event:campaign-completed:harbor-run:v1'])).length};});
-   assert.deepEqual(saved,{phase:'complete',receipts:1});report.checks.harborSurvivesReload=true;
+   assert.deepEqual(saved,{phase:'complete',receipts:1});
+   const finish=await page.evaluate(async()=>({saved:(await globalThis.__sandboxTestContext.discoveryProfileStore.getProfile()).harborRun.finishId,actual:globalThis.__sandboxTestContext.carMesh.userData.curatedVehicleVisual?.userData.paintFinish}));
+   assert.deepEqual(finish,{saved:'slate',actual:'artist-slate-exterior'});report.checks.harborSurvivesReload=true;
   }
  }
 

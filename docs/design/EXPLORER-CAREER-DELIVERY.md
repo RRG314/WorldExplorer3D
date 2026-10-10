@@ -6,12 +6,13 @@ Baseline `eb18b9c7`, October 9, 2026. Production remains released 5.5.0.
 | --- | --- | --- |
 | 0 — design and authority review | Specified | Direct source review; full mission, reward, GPS, property and release specification in `EXPLORER-CAREER-PLAN.md` |
 | 1 — First Bearings | Implemented and verified locally | Explicit start, actual field procedure, exact Journal review, one badge/receipt, history recovery and reload; evidence below |
-| 2 — Pilot / Explorer / Maker | Core jobs implemented locally | Harbor Run, Three Views and the useful-workspace Maker branch have executed evidence below. H02 cosmetic/handling distinction remains open. |
+| 2 — Pilot / Explorer / Maker | Implemented and verified locally | Harbor Run with cosmetic/handling distinction, Three Views and useful workspace have executed evidence below. |
 | 3 — Personal home | Implemented locally | One starter workspace, licensed furniture, atomic storage, record display, return journey and durable badges; acceptance below. Full interior art and release compatibility remain separate gates. |
-| 4–12 | Planned | Specific deliverables and exit checks in the plan; no gameplay completion claim |
+| 4 — vessel / Coastal Departure | Implemented and verified locally | Licensed vessel, actual working-deck navigation, both survey choices, mooring, same-sub launch/recovery and durable Journal; evidence below. |
+| 5–12 | Planned | Specific deliverables and exit checks in the plan; no gameplay completion claim |
 
 The first delivery is local and does not deploy or replace retained builds. Later
-career jobs, the vessel/fleet asset work, full campaign and final video package
+career jobs, the remaining fleet assets, full campaign and final video package
 remain outstanding. Test results will be recorded here after execution.
 
 ## First Bearings acceptance — October 9
@@ -45,12 +46,11 @@ packages are unchanged. No promotional posts, paid service or deployment occurre
 
 ## Next bounded delivery
 
-H01, H03, H04 and the functional H05 personal-home journey have local acceptance
-evidence below. Finish H02's promised cosmetic/handling distinction, then delivery
-step 4: the licensed vessel upgrade and H06 Coastal Departure. The vessel must
-pass deck, door, mooring, sub-cradle and water-return checks before the chapter is
-exposed. Later ocean/space, research/CERN, realism and release/media dependencies
-remain listed in the full plan; they have no placeholder mission buttons.
+H01–H06 have local implementation and acceptance evidence. Next is delivery
+step 5: actual sonar contacts, selected-target diving and comparative lab
+interpretation (H07–H09). These are not satisfied by the older three-scan reef
+survey. Continue through space, research/mining/CERN, realism and release/media
+in the specified sequence. No placeholder mission controls expose those stages.
 
 
 ## October 9 continued — Harbor Run and realism foundation
@@ -367,3 +367,127 @@ Executed acceptance for the personal-home delivery:
 
 The final source-chain result is recorded in CURRENT-STATE.md and
 `output/career-finish-20261010/verify-pr-release-checkpoint.log`.
+
+## October 10 — Harbor distinction and licensed research vessel, local
+
+H02's promised slate finish now uses the licensed BMW author's exterior atlas;
+interior, glazing and trim stay intact. White remains the default. A stopped,
+complete delivery unlocks the finish once; the optional Steady Cargo distinction
+requires observed route distance and restrained speed, braking and lateral force.
+Interruptions and test teleports cannot earn that distinction. The ordinary job
+remains completable. Failed storage writes leave the previous finish applied.
+
+- Six real Chrome/GLTF/IndexedDB finish checks pass, including an injected write
+  failure, retry, reload, one receipt, backup and narrow controls. Day/night/finish
+  images were inspected (`finish-recovery/report.json`).
+- Seventeen controlled city checks pass with no page errors or failed local
+  resources (`harbor-world/report.json`). Initial keyboard driving was followed
+  by bounded actor placement to complete the route; this is not a manual whole
+  route or Steady Cargo qualification.
+
+The existing CC BY 4.0 Oregon State University RCRV model replaces the research
+vessel's procedural shell. Its licensed, attributed 2017 design is adapted to
+the game's dimensions, not represented as an exact current-vessel digital twin.
+A reproducible intake retains the hull, crane, bridge, rails and exterior stairs,
+adds actual openings and a science-van floor, and publishes a 6.42 MB detailed
+model and 386 KB distant model. The latter has 19,740 triangles. The old invisible
+flat navigation deck and procedural deck owner are removed. Walk support, walls,
+camera clearance and stairs use the actual model triangles in a bounded spatial
+index. Navigation, lab, ladder and submarine stations match the physical assets.
+
+- Eleven controlled real-browser vessel checks pass, including science-van door,
+  upper exterior stairs both ways, mooring, swim/return, phone layout, failure and
+  explicit retry, damage isolation, canceled loads and zero retained model leases
+  after disposal. The prescribed keyboard client passes and images were inspected
+  (`deck-acceptance/research-deck-browser.json`).
+- Walking/camera query p95 in that controlled fixture was 0.1 ms. This is not a
+  whole-world frame-rate or physical-phone claim.
+- Eight full-game research outing checks pass with registered staging attestation,
+  no captured page errors and no failed local resources (`marine-attested/browser.json`).
+  This covers vessel entry, actual controller movement, three scans, partial
+  recovery, reload and Scanner II use beyond the original range. The earlier
+  unattested run had provider 401 responses and is retained as a failed run.
+- Stair construction-joint support and missing-model transfer failure have
+  focused regression coverage. A subsequent full source pass is still required
+  after the coastal chapter below.
+
+Primary geometry references were checked against Oregon State's
+[RCRV ship design](https://ceoas.oregonstate.edu/regional-class-research-vessel-ship-design)
+and [ship particulars](https://ceoas.oregonstate.edu/sites/ceoas.oregonstate.edu/files/2024-07/rcrv-particulars.pdf).
+Source/art attribution and the exact adaptations are in the bundled provenance.
+Paint remains mostly solid material; unmodeled ship interiors and the rest of the
+fleet are not completed realism work. Private receipts are under ignored
+`output/roadmap-20261010/`. Production, dist and four retained packages are unchanged.
+
+## October 10 — Coastal Departure integration, local acceptance in progress
+
+H06 now uses the existing marine panels, Journal and voyage owner. At the real
+chart, players compare two nearby stations, check GEBCO model depth, review
+labeled current/wave evidence or its absence, and accept a plan. They take the
+existing wet-lab briefing, moor within 80 m of their chosen station, check the
+return ladder, prepare the loaded submarine and deploy from the same vessel.
+Five immutable Journal records include one completion with zero added XP/money.
+The chapter retains a validated voyage snapshot so beginning another outing
+cannot strand its original vessel and submarine. Ordinary free exploration and
+the existing reef survey remain available.
+
+- Twelve focused coastal/research source cases pass, including failed depth/save,
+  physical admission, idempotency, old-history retrieval, backup, vessel recovery,
+  clock rollback and rejecting orphan/wrong-voyage evidence.
+- Twelve complete in-game checks pass (`coastal-world/browser.json`), covering
+  depth failure/retry, chart/briefing/ladder/cradle, deployment, backup, real reload,
+  partial recovery, full reef survey and the earned 35 m scanner. Registered
+  staging attestation; no page errors or failed local resources. Two deliberately
+  injected GEBCO 503 responses are expected failure-path evidence.
+- Initial phone screenshots exposed excessive expanded guidance. The subsequent
+  compact presentation and independent diver regression still need their final
+  acceptance run; do not mark delivery step 4 fully closed yet.
+
+H07–H12, repeatable families, expanded careers/mining/CERN, GPS packs, connected
+expeditions, realism gates and the current release/media matrix remain open.
+The existing three-target reef scan loop is not relabeled as the planned
+sonar/contact interpretation, diver investigation and comparative report chain.
+
+
+### Coastal Departure final acceptance — October 10
+
+The final primary voyage (`coastal-recovery/browser.json`) passes twelve checks.
+The alternate Northern approach (`coastal-north/browser.json`) passes seven:
+real boat-controller stepping sailed 458 m, stopped/moored within 46 m of the
+station, then completed the actual deck/submarine/recovery sequence. These are
+controlled navigation tests, not uncoached manual-player sessions. Both used
+registered staging attestation and captured no page errors or failed local
+resources. Four deliberately injected external 503 responses tested online
+provider failure. The bundled GEBCO 2020 grid provides a dated modeled fallback;
+a fresh shallow/land result may never be replaced by an older deep chart. The
+shared Ocean parser/interpolator serves both owners. Its earlier malformed-chart
+cache failure and retry repair remain documented in separate receipts.
+
+The compact UI passes five real DOM/GLTF/IndexedDB checks, including a visible
+injected save failure, explicit retry, one plan receipt, session-only disclosure, another voyage and the
+prescribed keyboard client (`coastal-storage-final/report.json`). Screenshots
+were inspected. The initial keyboard failure was a fixture attempting to open
+an unmounted panel; the fixture now waits for its actual creation. It was not
+papered over as a game success. Unrelated reef instructions are suppressed while
+the coastal guidance is open; recovery remains above optional Ocean details.
+
+Eleven additional actual-game diver checks pass (`diver-attested/diver-browser.json`):
+keyboard sub/swim movement, swimming animation, day/night fill, pause, phone
+controls, boarding, recovery, deep-exit refusal and complete environment disposal.
+The final cache snapshot is empty. No physical-phone acceptance or full release
+matrix is inferred. More complete ship interiors, the rest of the fleet, sonar
+investigations and the wider visual-quality roadmap remain open.
+
+Next-step R&D distinguishes geometric game sonar from identification: NOAA's
+[sonar overview](https://oceanexplorer.noaa.gov/technology/sonar/) and
+[side-scan explanation](https://oceanexplorer.noaa.gov/technology/sonar-side-scan/)
+support separating contact detection from closer visual inspection. This is a
+design reference for H07, not a claim that the new sonar system is implemented.
+
+
+Final source chain: **2,308 tests passed**, zero failed, followed by module
+identity/ownership, boundary types, inventory and sensitivity checks
+(`verify-pr-final.log`). That pass follows the corrected shared bathymetry import
+identity and the rule rejecting fresh land/shallow samples. The last session-only
+presentation change then passed all five component/client cases; the final source
+check is recorded separately. No new physical-device or immutable-package claim.

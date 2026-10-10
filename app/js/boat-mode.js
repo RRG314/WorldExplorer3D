@@ -231,6 +231,8 @@ function updateBoatMesh() {
   mesh.rotation.y = appCtx.boat.angle;
   mesh.rotation.x = appCtx.boat.pitch;
   mesh.rotation.z = appCtx.boat.roll;
+  const docked=mesh.userData.researchSubmarine;
+  if(docked)docked.userData.transportEntityId=appCtx.oceanVoyage?.current?.ship.transportEntityId===appCtx.boatMode.transportEntityId?appCtx.oceanVoyage.current.subId:`sub:${appCtx.boatMode.transportEntityId}`;
   updateVesselVisual({ root: mesh }, Number(appCtx.boatMode.condition ?? 1));
 }
 
@@ -725,7 +727,13 @@ const boatDeck=createResearchDeck({ctx:appCtx,resetDynamics:resetBoatDynamics,
   onActivityChanged:updateBoatMenuUi,
   updateVessel(dt){applyBoatWavePose(appCtx.boat.x,appCtx.boat.z,appCtx.boat.angle,appCtx.boatMode.currentWater,dt);updateBoatMesh();}
 });
-function updateBoatMode(dt){appCtx.oceanVoyage?.tickSurface(dt);if(boatDeck.update(dt))return true;return updateBoatDynamics(dt);}
+function updateBoatMode(dt){
+  const visual=appCtx.boatMode?.mesh?.userData;
+  if(appCtx.boatMode?.active&&visual?.researchVesselState&&visual.researchVesselState!=='ready'){
+    resetBoatDynamics();boatDeck.update(0);updateBoatMesh();return true;
+  }
+  appCtx.oceanVoyage?.tickSurface(dt);if(boatDeck.update(dt))return true;return updateBoatDynamics(dt);
+}
 
 const boatSwimming=createBoatSwimming({
   ctx:appCtx,sample:sampleDynamicWaterAt,

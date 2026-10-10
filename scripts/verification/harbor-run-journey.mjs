@@ -71,6 +71,15 @@ export async function verifyHarborRun({page,out,report}) {
  await page.waitForTimeout(1800);await page.locator('[data-delivery-action="unload"]').click();
  await page.locator('#discoveryHarborRun[data-delivery-phase="complete"]').waitFor();
  await page.screenshot({path:`${out}/harbor-complete-desktop.png`});
+ await page.locator('#discoveryHarborRun summary').click();
+ await page.locator('[data-delivery-action="finish:slate"]').click();
+ await page.waitForFunction(()=>globalThis.__sandboxTestContext.worldDiscoveryRuntime.harborRun.snapshot().finishId==='slate'&&!globalThis.__sandboxTestContext.worldDiscoveryRuntime.harborRun.snapshot().busy);
+ assert.equal(await page.evaluate(()=>globalThis.__sandboxTestContext.carMesh.userData.curatedVehicleVisual.userData.paintFinish),'artist-slate-exterior');
+ assert.equal(await page.evaluate(()=>globalThis.__sandboxTestContext.worldDiscoveryRuntime.harborRun.snapshot().distinction),null,'Actor-stepped test traversal must not earn a smooth-driving distinction');
+ report.checks.harborFinishAppliesAndProbeCannotEarnDistinction=true;
+ await page.evaluate(()=>globalThis.__sandboxTestContext.worldDiscoveryRuntime.ui?.setOpen?.(false));
+ await page.screenshot({path:`${out}/harbor-slate-world.png`});
+ await page.evaluate(()=>globalThis.__sandboxTestContext.openWorldDiscoverySection('today'));
  await page.setViewportSize({width:390,height:844});await page.locator('#discoveryHarborRun').scrollIntoViewIfNeeded();await page.screenshot({path:`${out}/harbor-complete-phone.png`});
  await page.locator('[data-delivery-action="badge"]').click();
  await page.locator('[data-explorer-badge="harbor-driver"]').waitFor({state:'visible'});

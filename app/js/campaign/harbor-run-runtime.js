@@ -2,6 +2,8 @@ import { earthCoordinateFrame } from '../earth-core/coordinate-frame.js?v=1';
 import { loadModelAsset } from '../assets/model-asset-runtime.js?v=16';
 import { buildDeliveryOffers } from './delivery-routes.js';
 import { normalizeHarborRun, deliveryDistance } from './harbor-run.js';
+import { createDeliveryHandling } from './delivery-handling.js';
+import { applyPlayerCarFinish, PLAYER_CAR_FINISHES } from '../engine/player-car-finish.js';
 const escape = value => String(value ?? '').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
 export function createHarborRunRuntime(state) {
@@ -9,6 +11,7 @@ export function createHarborRunRuntime(state) {
   const abort=new AbortController();
   let delivery=normalizeHarborRun(), offers=[],admission={},saveError=false,busy=false,disposed=false,message='',caseAsset=null,group=null,marker=null,caseCollider=null,colliderOwner=null;
   let timer=0,lastPose=null,stationarySeconds=0,started=false,renderKey='',hydration=0,resumeNeeded=true;
+  let handling=null;
   const refreshFailure='This job could not refresh. Reopen the Journal to retry; saved progress is kept.';
   const here=()=>ctx.getLiveGpsSnapshot?.().active!==true && ctx.getEnv?.()==='EARTH' && delivery.route?.regionId===state.worldIdentityId && !ctx.worldLoading && !ctx.activeInterior;
   const frame=()=>earthCoordinateFrame(ctx.LOC,ctx.SCALE);
@@ -17,6 +20,7 @@ export function createHarborRunRuntime(state) {
     locationSnapshot:{...state.publication.worldIdentity.location,name:state.regionLabel}});
   function snapshot(){return {phase:delivery.phase,cargo:delivery.cargo||null,nextPoint:delivery.nextPoint||0,total:delivery.route?.points.length||0,
     destination:delivery.route?.destinationLabel||'',revision:delivery.revision,resumeNeeded,admission,offers:offers.map(r=>({id:r.id,distance:r.distance,turns:r.turns})),busy,saveError,message,
+    finishId:delivery.finishId||'white',distinction:delivery.distinction||null,handling:handling?.snapshot()||delivery.handling||null,
     marker:marker?.visible?{x:marker.position.x,y:marker.position.y,z:marker.position.z}:null,caseVisible:caseAsset?.root?.visible===true};}
   function render(){
     if(disposed||!element)return;
@@ -25,7 +29,7 @@ export function createHarborRunRuntime(state) {
     const button=(action,label)=>`<button type="button" data-delivery-action="${action}"${busy?' disabled':''}>${escape(label)}</button>`;
     const phase=delivery.schemaVersion===1?delivery.phase:'unavailable';
     const gps=ctx.getLiveGpsSnapshot?.().active===true;
-    const text=gps?'This is an in-game driving job. Turn off Live GPS to continue; your cargo is kept.':phase==='complete'?'Case delivered. Your Harbor Driver badge and delivery record are saved.'
+    const text=gps?'This is an in-game driving job. Turn off Live GPS to continue; your cargo is kept.':phase==='complete'?`Case delivered. Your Harbor Driver badge, delivery record and Slate BMW finish are saved.${delivery.distinction==='steady-cargo'?' Steady cargo distinction earned.':''}`
       :phase==='pickup'?'Drive to the blue ring beside the field case. Stop, then load it. There is no time limit.'
       :phase==='driving'?`Case aboard · ${delivery.nextPoint} of ${delivery.route.points.length} road points reached. Follow the blue ring to ${delivery.route.destinationLabel}.`
       :phase==='unload'?'You reached the destination. Stop at the blue ring and unload the field case.'
@@ -35,10 +39,13 @@ export function createHarborRunRuntime(state) {
     if(phase==='available'&&started&&!gps)actions=button('find','Find local deliveries')+offers.map((r,i)=>`<article class="discoveryDeliveryOffer"><strong>${escape(r.destinationLabel)}</strong><small>${r.distance} m · ${r.turns} turn${r.turns===1?'':'s'} · virtual field delivery</small>${button(`accept:${i}`,'Take this delivery')}</article>`).join('');
     else if(['pickup','unload'].includes(phase)&&here())actions=button(phase==='pickup'?'load':'unload',phase==='pickup'?'Load the case':'Unload the case');
     if(['pickup','driving','unload'].includes(phase))actions+=button('continue','Back to the route');
+    if(phase==='complete')actions=button('badge','View your badge')+`<details><summary>BMW finish · ${escape(PLAYER_CAR_FINISHES[delivery.finishId||'white'])}</summary><p>Choose the artist’s White or Slate bodywork. This changes the BMW’s appearance; handling stays the same.</p>`+Object.entries(PLAYER_CAR_FINISHES).map(([id,label])=>button(`finish:${id}`,`${label}${(delivery.finishId||'white')===id?' · Selected':''}`)).join('')+'</details>';
     if(saveError)actions+=button('retry','Retry Journal save');
-    if(phase==='complete')actions=button('badge','View your badge');
     element.dataset.deliveryPhase=phase;element.setAttribute('aria-busy',String(busy));
-    element.innerHTML=`<span class="discoveryChapterEyebrow">FROM THE HARBOR · PILOT</span><strong>Harbor Run${phase==='complete'?' · Complete':''}</strong><p>${escape(text)}</p>${!here()&&delivery.route&&phase!=='complete'?`<p>Continue in ${escape(delivery.route.regionLabel)}. Your cargo is kept.</p>`:''}${actions}<small>${store.type==='IndexedDbDiscoveryProfileStore'?'Saved on this device':'Session only · export your Journal before leaving'}${message?` · ${escape(message)}`:''}</small>`;
+    const detailsOpen=element.querySelector('details')?.open===true;
+    const handlingNote=['available','pickup','driving'].includes(phase)?'<details><summary>Optional · Steady cargo</summary><p>Stay on the road below 31 mph / 50 km/h, brake gently and take turns smoothly. There is no time limit. A complete, uninterrupted driving record earns the distinction. Reloading or switching modes keeps the delivery but ends its handling review.</p></details>':'';
+    element.innerHTML=`<span class="discoveryChapterEyebrow">FROM THE HARBOR · PILOT</span><strong>Harbor Run${phase==='complete'?' · Complete':''}</strong><p>${escape(text)}</p>${!here()&&delivery.route&&phase!=='complete'?`<p>Continue in ${escape(delivery.route.regionLabel)}. Your cargo is kept.</p>`:''}${actions}${handlingNote}<small>${store.type==='IndexedDbDiscoveryProfileStore'?'Saved on this device':'Session only · export your Journal before leaving'}${message?` · ${escape(message)}`:''}</small>`;
+    if(detailsOpen&&element.querySelector('details'))element.querySelector('details').open=true;
   }
   async function hydrate(providedProfile){
     const seq=++hydration;
@@ -52,7 +59,13 @@ export function createHarborRunRuntime(state) {
       if(disposed||seq!==hydration)return;
       restored=normalizeHarborRun(profile.harborRun);
     }
-    delivery=restored;started=profile.openingChapter?.phase==='complete';render();
+    const changed=restored.revision!==delivery.revision;
+    delivery=restored;
+    if(changed&&['driving','unload'].includes(delivery.phase)){
+      handling=createDeliveryHandling(delivery.handling);handling.interrupt();
+    }
+    applyPlayerCarFinish(ctx,delivery.phase==='complete'?delivery.finishId||'white':'white');
+    started=profile.openingChapter?.phase==='complete';render();
     if(delivery.route&&delivery.phase!=='complete')await ensurePresentation();
   }
   async function refresh(providedProfile){
@@ -99,12 +112,12 @@ export function createHarborRunRuntime(state) {
   function evidence(){
     const car=ctx.car||{},geo=frame().toGeographic(car.x,car.z);
     const hit=ctx.SurfaceQuery?.driveAt?.(car.x,car.z,{currentY:car.y,preferRoad:true});
-    return {...geo,y:Number(car.y),speed:Number(car.speed),mode:ctx.getCurrentTravelMode?.(),environment:ctx.getEnv?.(),regionId:state.worldIdentityId,
+    return {...geo,y:Number(car.y),speed:Number(car.speed),yaw:Number(car.angle),mode:ctx.getCurrentTravelMode?.(),environment:ctx.getEnv?.(),regionId:state.worldIdentityId,
       road:hit?.kind==='road'&&Number.isFinite(car.y)&&Math.abs(car.y-hit.position.y)<2.5};
   }
   async function save(command){
     busy=true;hydration++;render();
-    try {const next=await store.updateHarborRun({...command,revision:delivery.revision});if(disposed)return;delivery=next;saveError=false;message='';present();}
+    try {const next=await store.updateHarborRun({...command,revision:delivery.revision});if(disposed)return;delivery=next;saveError=false;message='';if(delivery.phase==='complete')applyPlayerCarFinish(ctx,delivery.finishId||'white');present();}
     catch(error){if(disposed)return;saveError=true;resumeNeeded=true;message=error?.message||'Delivery save did not finish. Try again.';ctx.showToast?.('Delivery progress could not save. Open the Journal to retry; saved cargo is kept.');await refresh();}
     finally{busy=false;render();}
   }
@@ -113,6 +126,7 @@ export function createHarborRunRuntime(state) {
     message='';
     try {
       if(value==='retry'){await hydrate();saveError=false;message='Return to the blue marker to continue.';}
+      else if(value.startsWith('finish:')){await save({type:'finish',finishId:value.slice(7)});}
       else if(value==='find'){
         busy=true;render();await hydrate();if(disposed||!started)return;
         admission={};offers=buildDeliveryOffers(ctx,identity(),{diagnostic:admission});
@@ -134,8 +148,8 @@ export function createHarborRunRuntime(state) {
       else if(value==='load'||value==='unload'){
         if(!here()||stationarySeconds<1.2)throw Error('Bring your car to a complete stop beside the blue ring first.');
         if(value==='load'&&!caseAsset){busy=true;render();await ensurePresentation();if(disposed)return;}
-        await save({type:value,evidence:evidence()});
-        if(value==='load'&&delivery.phase==='driving'){lastPose=null;state.ui?.setOpen(false);ctx.showToast?.('Case loaded. Follow the blue road marker.');}
+        await save({type:value,evidence:{...evidence(),handling:handling?.snapshot()}});
+        if(value==='load'&&delivery.phase==='driving'){handling=createDeliveryHandling();lastPose=null;state.ui?.setOpen(false);ctx.showToast?.('Case loaded. Follow the blue road marker.');}
         if(delivery.phase==='complete'){ctx.showToast?.('Delivery saved · Harbor Driver badge earned');await state.ui?.refreshData();}
       }
     } catch(error){if(!disposed)message=error?.message||'This delivery is not available right now.';}
@@ -144,9 +158,16 @@ export function createHarborRunRuntime(state) {
   function update(dt){
     if(disposed)return;
     present();timer+=dt;if(timer<.2)return;const elapsed=timer;timer=0;
-    if(delivery.schemaVersion!==1||!here()||ctx.paused||document.hidden||!delivery.route||delivery.phase==='complete'){lastPose=null;stationarySeconds=0;return;}
+    if(delivery.schemaVersion!==1||!here()||ctx.paused||document.hidden||!delivery.route||delivery.phase==='complete'){
+      if(['driving','unload'].includes(delivery.phase)&&(!here()||document.hidden))handling?.interrupt();
+      lastPose=null;stationarySeconds=0;return;
+    }
     const p=evidence();stationarySeconds=p.mode==='drive'&&p.road&&Math.abs(p.speed)<.6?stationarySeconds+Math.min(elapsed,.3):0;
     const now=performance.now(),continuous=lastPose&&now-lastPose.time<1500&&deliveryDistance(p,lastPose)<=Math.max(5,(now-lastPose.time)/1000*65);
+    if(['driving','unload'].includes(delivery.phase)&&handling){
+      if(lastPose&&!continuous)handling.interrupt();
+      handling.sample(p,elapsed,lastPose?deliveryDistance(p,lastPose):0);
+    }
     if(lastPose&&!continuous)resumeNeeded=true;
     lastPose={...p,time:now};
     if(saveError){present();render();return;}
@@ -157,7 +178,7 @@ export function createHarborRunRuntime(state) {
       present();render();return;
     }
     if(!busy&&!saveError&&delivery.phase==='driving'&&continuous&&p.mode==='drive'&&p.road&&deliveryDistance(p,delivery.route.points[delivery.nextPoint])<14
-       &&Math.abs(p.y-delivery.route.points[delivery.nextPoint].y)<2.5)void save({type:'reach',pointIndex:delivery.nextPoint,evidence:{...p,continuous:true}});
+       &&Math.abs(p.y-delivery.route.points[delivery.nextPoint].y)<2.5)void save({type:'reach',pointIndex:delivery.nextPoint,evidence:{...p,continuous:true,handling:handling?.snapshot()}});
     render();
   }
   const click=e=>{const button=e.target.closest('[data-delivery-action]');if(button)void action(button.dataset.deliveryAction);};

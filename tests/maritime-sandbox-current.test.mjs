@@ -19,8 +19,9 @@ test('all seven vessel classes use the shared playable transport contract', () =
     assert.equal(entry.playable, true);
     assert.equal(entry.enterable, true);
     assert.equal(entry.interaction.companionAboard, true);
-    assert.equal(entry.rights.kind, 'original-generic-design');
-    assert.equal(entry.rights.brand, 'unbranded');
+    assert.equal(entry.rights.kind, entry.role==='research'?'licensed-adaptation':'original-generic-design');
+    if(entry.role==='research')assert.match(entry.rights.attribution,/Oregon State.*CC BY 4.0/);
+    else assert.equal(entry.rights.brand, 'unbranded');
     assert.match(entry.visual.referenceEvidence, /maritime-fleet-and-damage-2026-08-29\.png$/);
     assert.ok(entry.dimensions.draft > 0);
     assert.equal(entry.performance.topSpeedUnit, 'knots');

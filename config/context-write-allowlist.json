@@ -162,11 +162,6 @@
       "boatMode",
       "discoveryProfileStore"
     ],
-    "app/js/boat-mode/research/visual.js": [
-      "fillStyle",
-      "font",
-      "textAlign"
-    ],
     "app/js/boat-mode/runtime-dynamics.js": [
       "boat",
       "boatMode"
@@ -362,6 +357,10 @@
       "streetLampFixtures",
       "streetLampHeadMaterial",
       "streetLightPool"
+    ],
+    "app/js/engine/player-car-finish.js": [
+      "carMesh",
+      "playerCarFinish"
     ],
     "app/js/engine/procedural-textures.js": [
       "fillStyle",
@@ -1995,6 +1994,11 @@
       "buildingProvenanceRecords",
       "urbanSurfaceStats"
     ],
+    "app/js/world/load-failure.js": [
+      "gameStarted",
+      "initialEarthWorldReady",
+      "worldLoading"
+    ],
     "app/js/world/load-landuse-pass.js": [
       "detailedWaterPublicationSequence",
       "waterSurfaceRegistry"
@@ -2179,11 +2183,6 @@
     "app/js/world/world-snapshot-adapter.js": [
       "worldPublication",
       "worldSnapshotStore"
-    ],
-    "app/js/world/load-failure.js": [
-      "gameStarted",
-      "initialEarthWorldReady",
-      "worldLoading"
     ]
   }
 }

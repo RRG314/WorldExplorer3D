@@ -1,5 +1,5 @@
 import {ensureMarineResearch} from '../../ocean/research-outing.js';
-import {RESEARCH_DECK as deck,RESEARCH_STATIONS,moveOnResearchDeck,researchDeckCollision,researchStationDistance} from './layout.js';
+import {RCRV_LAYOUT,RESEARCH_EYE_HEIGHT} from './layout.js';
 import {createResearchDeckHud} from './ui.js';
 import {researchLabRecord} from './lab.js';
 import {resolveThirdPersonCameraCollision} from '../../walking/camera-collision.js?v=1';
@@ -11,13 +11,21 @@ export function createResearchDeck({ctx,resetDynamics,updateVessel,onActivityCha
  let active=false,host=null,parent=null,hud=null,targetId='lab',busy=false,epoch=0,jumpHeld=false;
  let pose={x:2.4,z:-24,yaw:0},world={x:0,y:0,z:0},origin='';
  const supported=()=>ctx.boatMode?.active&&ctx.boatMode.transportCatalogId==='ocean-research-vessel';
+ const navigation=()=>ctx.boatMode?.mesh?.userData.researchNavigation;
+ const layout=()=>RCRV_LAYOUT;
+ const stations=()=>layout().stations;
+ const ready=()=>ctx.boatMode?.mesh?.userData.researchVesselState==='ready'&&!!navigation();
+ const stationDistance=id=>{
+  const station=stations().find(s=>s.id===id);
+  return station?Math.hypot(pose.x-station.x,pose.z-station.z,(pose.y??RCRV_LAYOUT.floorY)-(station.y??RCRV_LAYOUT.floorY)):Infinity;
+ };
  const stopped=()=>Math.hypot(ctx.boat.vx||0,ctx.boat.vz||0,ctx.boat.speed||0)*(ctx.METERS_PER_WORLD_UNIT||1)<=.5;
  function enter(atLadder=false) {
   if(active)return true;
-  if(!supported()||!stopped()||!ctx.Walk?.state?.characterMesh)return false;
+  if(!supported()||!ready()||!stopped()||!ctx.Walk?.state?.characterMesh)return false;
   ctx.Walk.deactivateWater?.();resetDynamics();ctx.boatMode.moored=true;
   host=ctx.Walk.state.characterMesh;parent=host.parent;ctx.boatMode.mesh.add(host);host.visible=true;
-  pose={x:atLadder?6.1:2.4,z:-23.4,yaw:0};origin=`${ctx.LOC?.lat}:${ctx.LOC?.lon}`;active=true;epoch++;
+  pose={...(atLadder?stations().find(s=>s.id==='dive'):layout().spawn),yaw:0};origin=`${ctx.LOC?.lat}:${ctx.LOC?.lon}`;active=true;epoch++;
   ctx.clearControlInputState?.('research-deck-enter');ctx.updateControlsModeUI?.();onActivityChanged();return true;
  }
  function release(){
@@ -28,9 +36,9 @@ export function createResearchDeck({ctx,resetDynamics,updateVessel,onActivityCha
  }
  function helm(){release();return true;}
  function moor(){if(ctx.sharedMarine?.active)return false;if(!supported())return false;ctx.boatMode.moored=!ctx.boatMode.moored;if(ctx.boatMode.moored)resetDynamics();return true;}
- const select=id=>{if(RESEARCH_STATIONS.some(s=>s.id===id))targetId=id};
+ const select=id=>{if(stations().some(s=>s.id===id))targetId=id};
  async function enterWater(jump=false){
-  if(!active||busy||researchStationDistance(pose,'dive')>2.4)return false;
+  if(!active||busy||stationDistance('dive')>2.4)return false;
   const synthetic=ctx.boatMode.currentWater?.synthetic||ctx.boatMode.currentWater?.source?.synthetic;
   if(synthetic){
    busy=true;
@@ -42,7 +50,7 @@ export function createResearchDeck({ctx,resetDynamics,updateVessel,onActivityCha
   return !!started;
  }
  async function act(){
-  if(!active||busy||researchStationDistance(pose,targetId)>2.4)return false;
+  if(!active||busy||stationDistance(targetId)>2.4)return false;
   if(targetId==='helm')return helm();
   if(targetId==='chart'){ctx.openLargeMap?.();return true;}
   if(targetId==='sub'){
@@ -64,39 +72,41 @@ export function createResearchDeck({ctx,resetDynamics,updateVessel,onActivityCha
   finally{if(token===epoch)busy=false;}
  }
  function update(dt){
-  if(active&&(!supported()||origin!==`${ctx.LOC?.lat}:${ctx.LOC?.lon}`||ctx.getEnv?.()&&ctx.getEnv()!=='EARTH'))release();
+  if(active&&(!ready()||!supported()||origin!==`${ctx.LOC?.lat}:${ctx.LOC?.lon}`||ctx.getEnv?.()&&ctx.getEnv()!=='EARTH'))release();
   if(!supported()){hud?.hide();return false;}
-  hud ||= hudFactory({enter:()=>enter(),helm,moor,act:()=>void act(),select,researchAct:()=>void research.labAction(),sharedAct:()=>void import('../../ocean/shared-marine-runtime.js').then(m=>m.openSharedMarine(ctx)).catch(e=>hud?.message(e.message))});
+  hud ||= hudFactory({enter:()=>enter(),helm,moor,act:()=>void act(),select,retry:()=>void ctx.boatMode?.mesh?.userData.retryResearchVisual?.(),coastalApi:()=>research.coastal,researchAct:()=>void research.labAction(),sharedAct:()=>void import('../../ocean/shared-marine-runtime.js').then(m=>m.openSharedMarine(ctx)).catch(e=>hud?.message(e.message))});
   if(active){
    updateVessel(ctx.paused?0:dt);
    const actions=ctx.paused||ctx.showLargeMap?{}:ctx.readControlActions?.('walk')||{};
    const jump=Number(actions.jump)>0;
-   if(jump&&!jumpHeld&&researchStationDistance(pose,'dive')<=2.4){jumpHeld=jump;void enterWater(true);if(!active)return false;}
+   if(jump&&!jumpHeld&&stationDistance('dive')<=2.4){jumpHeld=jump;void enterWater(true);if(!active)return false;}
    jumpHeld=jump;
    const step=Math.min(.05,Math.max(0,dt));pose.yaw+=(Number(actions.turn)||Number(actions.lookYaw)||0)*2*step;
    const forward=Number(actions.move)||0,side=Number(actions.strafe)||0,length=Math.max(1,Math.hypot(forward,side)),speed=(actions.sprint?3.8:2.2)*step/length;
-   pose=moveOnResearchDeck(pose,(Math.sin(pose.yaw)*forward-Math.cos(pose.yaw)*side)*speed,(Math.cos(pose.yaw)*forward+Math.sin(pose.yaw)*side)*speed);
-   host.position.set(pose.x,deck.y,pose.z);host.rotation.set(0,pose.yaw,0);host.visible=true;
+   const move=navigation().move;
+   pose=move(pose,(Math.sin(pose.yaw)*forward-Math.cos(pose.yaw)*side)*speed,(Math.cos(pose.yaw)*forward+Math.sin(pose.yaw)*side)*speed);
+   host.position.set(pose.x,pose.y??RCRV_LAYOUT.floorY,pose.z);host.rotation.set(0,pose.yaw,0);host.visible=true;
    updateCuratedCharacterAnimation(host,Math.hypot(forward,side)>.05,step,false);
-   host.updateWorldMatrix(true,true);const p=ctx.boatMode.mesh.localToWorld(new THREE.Vector3(pose.x,deck.y+deck.eyeHeight,pose.z));world={x:p.x,y:p.y,z:p.z};
+   host.updateWorldMatrix(true,true);const p=ctx.boatMode.mesh.localToWorld(new THREE.Vector3(pose.x,(pose.y??RCRV_LAYOUT.floorY)+RESEARCH_EYE_HEIGHT,pose.z));world={x:p.x,y:p.y,z:p.z};
   }
-  const target=RESEARCH_STATIONS.find(s=>s.id===targetId),distance=researchStationDistance(pose,targetId);
+  const target=stations().find(s=>s.id===targetId),distance=stationDistance(targetId);
   const bearing=Math.atan2(target.x-pose.x,target.z-pose.z)-pose.yaw;
   const turn=Math.atan2(Math.sin(bearing),Math.cos(bearing));const direction=Math.abs(turn)<.6?'ahead':Math.abs(turn)>2.5?'behind':turn>0?'to port':'to starboard';
-  hud.show({active,canEnter:stopped()&&!!ctx.Walk?.state?.characterMesh,reason:stopped()?'Explorer is loading.':'Stop the vessel before walking the deck.',moored:!!ctx.boatMode.moored,target,distance,direction,busy,research:research.snapshot()});
+  hud.show({active,canEnter:ready()&&stopped()&&!!ctx.Walk?.state?.characterMesh,failed:ctx.boatMode.mesh?.userData.researchVesselState==='failed',reason:!ready()?'Preparing the vessel and its equipment.':stopped()?'Explorer is loading.':'Stop the vessel before walking the deck.',moored:!!ctx.boatMode.moored,target,stations:stations(),distance,direction,busy,research:research.snapshot()});
   return active;
  }
  function camera(){
   if(!active)return false;
-  const anchor={x:pose.x,y:deck.y+1.4,z:pose.z};
-  const desired={x:pose.x-Math.sin(pose.yaw)*3.5,y:deck.y+2.5,z:pose.z-Math.cos(pose.yaw)*3.5};
-  const safe=resolveThirdPersonCameraCollision({anchor,target:desired,checkBuildingCollision:(x,z,r,actor)=>({collision:researchDeckCollision(x,z,r,actor.actorBaseY,actor.actorHeight)})});
+  const y=pose.y??RCRV_LAYOUT.floorY,anchor={x:pose.x,y:y+1.4,z:pose.z};
+  const desired={x:pose.x-Math.sin(pose.yaw)*3.5,y:y+2.5,z:pose.z-Math.cos(pose.yaw)*3.5};
+  const collision=navigation().blocked;
+  const safe=resolveThirdPersonCameraCollision({anchor,target:desired,checkBuildingCollision:(x,z,r,actor)=>({collision:collision(x,z,r,actor.actorBaseY,actor.actorHeight)})});
   const point=ctx.boatMode.mesh.localToWorld(new THREE.Vector3(safe.x,safe.y,safe.z));
   const look=ctx.boatMode.mesh.localToWorld(new THREE.Vector3(anchor.x,anchor.y,anchor.z));
   ctx.camera.position.copy(point);ctx.camera.up.set(0,1,0);ctx.camera.lookAt(look);host.visible=safe.ratio>.12;return true;
  }
  return {enter,release,helm,moor,select,act,update,camera,get active(){return active},
-  atDivePlatform:()=>active&&researchStationDistance(pose,'dive')<=2.4,
+  stationDistance,atDivePlatform:()=>active&&stationDistance('dive')<=2.4,
   navigationActor:()=>({position:{...world},yaw:pose.yaw+(ctx.boat.angle||0)}),
   snapshot:()=>({active,pose:{...pose},world:{...world},targetId,moored:!!ctx.boatMode?.moored,busy}),
   dispose(){release();hud?.dispose();hud=null;}};

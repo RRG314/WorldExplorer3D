@@ -1,6 +1,8 @@
+import {validateCoastalBackup} from '../campaign/coastal-departure.js';
 import { THREE_VIEWS, validateThreeViewsBackup } from '../campaign/three-views.js';
 import {HOME_ACHIEVEMENTS} from '../campaign/home-achievements.js';
 import { HARBOR_RUN, normalizeHarborRun, validateDeliveryRoute } from '../campaign/harbor-run.js';
+import { validHandling, deliveryDistinction } from '../campaign/delivery-handling.js';
 // Validate the entire file before opening a destructive replacement transaction.
 // Older backups may omit optional collections, but malformed rows are never dropped.
 import { FIRST_BEARINGS, normalizeOpeningChapter, finishOpeningChapter } from '../campaign/first-bearings.js?v=1';
@@ -25,6 +27,7 @@ export function validateJournalBackup(input) {
     const claims = new Set();
     for (const row of rows) if (row.claimId) { if (claims.has(row.claimId)) fail(); claims.add(row.claimId); }
   }
+  try{validateCoastalBackup(data.events);}catch{fail();}
   const chapter = normalizeOpeningChapter(data.profile.openingChapter);
   for(const [kind,entry] of Object.entries(data.profile.homeAchievements||{})) {
     const definition=HOME_ACHIEVEMENTS[kind],receipt=data.events.find(event=>event.eventId===entry?.eventId);
@@ -39,6 +42,9 @@ export function validateJournalBackup(input) {
   const delivery = normalizeHarborRun(data.profile.harborRun);
   if (delivery.schemaVersion === 1 && delivery.phase !== 'available') {
     try { validateDeliveryRoute(delivery.route); } catch { fail(); }
+    if (delivery.finishId != null && (delivery.phase !== 'complete' || !['white', 'slate'].includes(delivery.finishId))) fail();
+    if (delivery.handling != null && !validHandling(delivery.handling)) fail();
+    if (delivery.distinction != null && (delivery.phase !== 'complete' || delivery.distinction !== deliveryDistinction(delivery.handling, delivery.route.distance))) fail();
     if (!['pickup', 'driving', 'unload', 'complete'].includes(delivery.phase) || !Number.isInteger(delivery.nextPoint)
         || delivery.nextPoint < 0 || delivery.nextPoint > delivery.route.points.length) fail();
     if (delivery.phase === 'pickup' && (delivery.cargo !== 'at-pickup' || delivery.nextPoint !== 0)) fail();

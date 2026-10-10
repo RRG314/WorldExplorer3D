@@ -28,7 +28,8 @@ async function carFixture(parent){
   const realm=vm.createContext({console:{warn(){}}});
   const loader=new vm.SyntheticModule(['loadModelAsset'],function(){this.setExport('loadModelAsset',async()=>instance);},{context:realm});
   const module=new vm.SourceTextModule(readFileSync('app/js/engine/curated-player-car.js','utf8'),{context:realm});
-  await module.link(()=>loader);await module.evaluate();
+  const finish=new vm.SourceTextModule(readFileSync('app/js/engine/player-car-finish.js','utf8'),{context:realm});
+  await module.link(specifier=>specifier.includes('player-car-finish')?finish:loader);await module.evaluate();
   const carMesh={parent,userData:{}};const result=await module.namespace.attachCuratedPlayerCar(T,{carMesh});
   return {result,released,state:carMesh.userData};
 }

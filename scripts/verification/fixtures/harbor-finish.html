@@ -1,0 +1,40 @@
+<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width"><link rel="icon" href="/favicon.svg"><title>Harbor finish verification</title>
+<link rel="stylesheet" href="/app/styles/discovery.css">
+<style>body{margin:0;background:#14202a;color:#e1ebef;font:14px sans-serif}canvas{display:block}aside{position:absolute;right:12px;top:12px;width:min(350px,calc(100vw - 44px));max-height:90vh;overflow:auto;padding:10px;background:#0b171e}button{margin:3px}#hint{position:absolute;left:12px;bottom:12px;background:#0b171e;padding:10px}</style>
+<aside><section id="discoveryHarborRun" class="discoveryOpeningChapter"></section></aside><div id="hint">Licensed BMW · controlled showroom · arrows rotate view · N changes lighting</div>
+<script src="/app/vendor/three/build/three.min.js"></script><script src="/app/vendor/three/examples/js/loaders/GLTFLoader.js"></script>
+<script type="module">
+import {attachCuratedPlayerCar} from '/app/js/engine/curated-player-car.js';
+import {createHarborRunRuntime} from '/app/js/campaign/harbor-run-runtime.js';
+import {createIndexedDbDiscoveryProfileStore} from '/app/js/discovery/profile-store.js?v=5';
+import {applyDisplayColorPolicy} from '/app/js/engine/display-color-policy.js';
+const T=THREE,scene=new T.Scene(),camera=new T.PerspectiveCamera(48,innerWidth/innerHeight,.05,100),renderer=new T.WebGLRenderer({antialias:true});
+renderer.setSize(innerWidth,innerHeight);applyDisplayColorPolicy(renderer,T);document.body.prepend(renderer.domElement);
+const sky=new T.HemisphereLight(0xffffff,0x6c675e,.8),sun=new T.DirectionalLight(0xffedd8,1.4);sun.position.set(-3,7,4);scene.add(sky,sun);
+const floor=new T.Mesh(new T.PlaneGeometry(80,80),new T.MeshStandardMaterial({color:0x687079,roughness:.9}));floor.rotation.x=-Math.PI/2;scene.add(floor);
+const carMesh=new T.Group();carMesh.position.y=1.1;scene.add(carMesh);
+const store=createIndexedDbDiscoveryProfileStore();
+let profile=await store.getProfile();
+if(profile.harborRun.phase!=='complete'){
+ const p=lat=>({lat,lon:-76,y:0}),points=[p(39),p(39.001),p(39.002)];
+ const route={id:'finish-fixture',regionId:'test',regionLabel:'Showroom fixture',destinationLabel:'Controlled stop',environment:'EARTH',distance:222,turns:0,points,pickup:points[0],dropoff:points[2],pickupCase:points[0],dropoffCase:points[2]};
+ const evidence=point=>({...point,environment:'EARTH',regionId:'test',mode:'drive',road:true,speed:0,continuous:true});
+ let job=await store.updateHarborRun({type:'accept',revision:0,route});
+ job=await store.updateHarborRun({type:'load',revision:job.revision,evidence:evidence(points[0])});
+ for(let i=0;i<3;i++)job=await store.updateHarborRun({type:'reach',revision:job.revision,pointIndex:i,evidence:evidence(points[i])});
+ await store.updateHarborRun({type:'unload',revision:job.revision,evidence:evidence(points[2])});
+}
+const ctx={scene,carMesh,getEnv:()=> 'EARTH',getLiveGpsSnapshot:()=>({active:false}),showToast:text=>document.querySelector('#hint').textContent=text};
+const state={appCtx:ctx,profileStore:store,worldIdentityId:'test',ui:{refreshData:()=>runtime.refresh()}};
+const runtime=createHarborRunRuntime(state);await runtime.refresh();await attachCuratedPlayerCar(T,ctx);
+let angle=-.85,night=false;
+function lighting(value){night=value;scene.background=new T.Color(night?0x172438:0xa7bac4);sky.intensity=night?.4:.8;sun.intensity=night?.35:1.4;}
+lighting(false);
+function draw(){camera.position.set(Math.sin(angle)*7,3.25,Math.cos(angle)*7);camera.lookAt(.8,.7,0);renderer.render(scene,camera);}
+function loop(){draw();requestAnimationFrame(loop);}loop();
+window.addEventListener('keydown',event=>{if(event.key==='ArrowLeft')angle-=.12;if(event.key==='ArrowRight')angle+=.12;if(event.key==='n')lighting(!night);});
+window.addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);});
+window.advanceTime=async()=>{draw();await new Promise(resolve=>setTimeout(resolve,30));};
+window.render_game_to_text=()=>JSON.stringify({evidence:'controlled showroom; completion seeded, not road driving',coordinateFrame:'metres, y up',night,angle,paint:ctx.carMesh.userData.curatedVehicleVisual?.userData.paintFinish,...runtime.snapshot()});
+window.fixture={ctx,store,runtime,lighting,draw};
+</script>

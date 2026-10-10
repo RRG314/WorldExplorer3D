@@ -1,4 +1,5 @@
 import { loadModelAsset } from '../assets/model-asset-runtime.js?v=16';
+import { applyPlayerCarFinish } from './player-car-finish.js';
 
 function retainPrimaryE34Variant(THREE, root) {
   let triangles = 0;
@@ -60,10 +61,12 @@ function prepareE34Model(THREE, source, record) {
   // that authored finish before discarding showroom geometry: a color tint
   // cannot recover details baked into the nearly-black original body texture.
   let whiteExteriorMap = null;
+  let slateExteriorMap = null;
   source.traverse(object => {
     if (object.isMesh && object.material?.name === '.003') {
       whiteExteriorMap = object.material.map || whiteExteriorMap;
     }
+    if (object.isMesh && object.material?.name === '.004') slateExteriorMap = object.material.map || slateExteriorMap;
   });
   if (!whiteExteriorMap) throw new Error('BMW white exterior atlas is missing.');
   const triangles = retainPrimaryE34Variant(THREE, source);
@@ -101,6 +104,7 @@ function prepareE34Model(THREE, source, record) {
   oriented.updateMatrixWorld(true);
   oriented.userData.defaultPlayerVehicleVisual = true;
   oriented.userData.paintFinish = 'artist-white-exterior';
+  oriented.userData.finishMaps = { white: whiteExteriorMap, slate: slateExteriorMap };
   oriented.userData.curatedVehicleAssetId = record.id;
   oriented.userData.collisionPolicy = record.collisionPolicy;
   oriented.userData.importDimensions = Object.freeze({
@@ -139,6 +143,7 @@ async function attachCuratedPlayerCar(THREE, appCtx) {
       carMesh.add(visual);
       carMesh.userData.curatedVehicleAssetId = instance.record.id;
       carMesh.userData.curatedVehicleVisual = visual;
+      applyPlayerCarFinish(appCtx, appCtx.playerCarFinish || 'white');
       return true;
     } catch (error) {
       instance?.dispose();

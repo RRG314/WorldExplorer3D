@@ -50,6 +50,35 @@ browsers/servers. Production deployment evidence is under
 `output/release-evidence/current/production-deployment.json` and
 `production-promotion.json`; acceptance gaps remain in their own receipts.
 
+## October 10 latest local continuation — Harbor and Coastal Departure
+
+H02 now grants the licensed BMW's slate body finish once, with a separate
+observed-driving distinction. H06 uses the licensed OSU RCRV educational model,
+actual working-deck/stair collision, a science-van lab, a loaded submarine cradle
+and a correctly placed water-return ladder. The older procedural research visual
+and invisible flat deck are removed. Both chart choices complete through the
+existing Journal/voyage owners, including saving/reloading, failed-write retry,
+a dated bundled-depth fallback and recovery to the same ship/submarine.
+
+The primary full-game coastal journey passes twelve checks; the northern route
+passes seven including real boat-controller stepping; the final coastal DOM,
+IndexedDB and prescribed-client check passes five. Eleven vessel and eleven diver
+browser checks also pass. Harbor's finish has six controlled browser/storage
+checks and its city journey has seventeen. Images were inspected; these are
+local/controlled source checks, not physical-device or production certification.
+The full source chain passes 2,308 tests plus identity, ownership, boundary type,
+inventory and sensitivity checks. The final session-only UI disclosure has its
+subsequent five-case browser/client pass.
+Exact receipts and limits: `docs/design/EXPLORER-CAREER-DELIVERY.md`, ignored
+`output/roadmap-20261010/`. The live build and all four retained packages remain
+unchanged. No frontend build, GitHub push or deployment was made for this work.
+
+The full roadmap remains open beyond H06: H07–H12, broader specialist/mining/CERN
+campaigns, repeatable/GPS/connected work, the remaining fleet, realism gates and
+release/media acceptance. The compatible v3 possession/commerce/workspace
+fallback and actual candidate/fallback roundtrip are still release prerequisites.
+No unfinished later mission buttons have been added.
+
 ## October 8 public gallery and local visual work
 
 PR 98 is merged to stable `33edf9ad5074fbaf0f7298396f180c37a0bf9735`.

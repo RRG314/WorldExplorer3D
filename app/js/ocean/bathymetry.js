@@ -23,6 +23,45 @@ function sampleGrid(values, cols, rows, x, y) {
     + (w01 ? h01 * w01 : 0) + (w11 ? h11 * w11 : 0);
 }
 
+export function parseLocalBathymetryGrid(payload) {
+  if (!payload || typeof payload !== 'object') return null;
+  const bounds = payload.bounds;
+  const grid = payload.grid;
+  const values = payload.elevationsMeters;
+  if (!bounds || !grid || !Array.isArray(values)) return null;
+  const rows = Number(grid.rows);
+  const cols = Number(grid.cols);
+  if (!Number.isInteger(rows) || !Number.isInteger(cols) || rows < 2 || cols < 2) return null;
+  if (values.length !== rows * cols) return null;
+  const latMin = bounds.latMin;
+  const latMax = bounds.latMax;
+  const lonMin = bounds.lonMin;
+  const lonMax = bounds.lonMax;
+  if (![latMin, latMax, lonMin, lonMax].every((v) => Number.isFinite(v))) return null;
+  if (latMax <= latMin || lonMax <= lonMin) return null;
+  return {
+    rows,
+    cols,
+    latMin,
+    latMax,
+    lonMin,
+    lonMax,
+    values,
+    source: payload.source && typeof payload.source === 'object' ? { ...payload.source } : null,
+    generatedAt: String(payload.generatedAt || '') || null,
+    spacingDegreesLat: Number.isFinite(Number(grid.spacingDegreesLat)) ? Number(grid.spacingDegreesLat) : null,
+    spacingDegreesLon: Number.isFinite(Number(grid.spacingDegreesLon)) ? Number(grid.spacingDegreesLon) : null
+  };
+}
+
+export function sampleLocalBathymetryGrid(grid,lat,lon){
+ if (!grid || !Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+ if (lat < grid.latMin || lat > grid.latMax || lon < grid.lonMin || lon > grid.lonMax) return null;
+ const x = (lon - grid.lonMin) / (grid.lonMax - grid.lonMin) * (grid.cols - 1);
+ const y = (grid.latMax - lat) / (grid.latMax - grid.latMin) * (grid.rows - 1);
+ return sampleGrid(grid.values, grid.cols, grid.rows, x, y);
+}
+
 export function createOceanBathymetryApi({
   appCtx,
   oceanMode,
@@ -82,36 +121,6 @@ export function createOceanBathymetryApi({
     return { lat, lon };
   }
 
-  function parseLocalBathymetryGrid(payload) {
-    if (!payload || typeof payload !== 'object') return null;
-    const bounds = payload.bounds;
-    const grid = payload.grid;
-    const values = payload.elevationsMeters;
-    if (!bounds || !grid || !Array.isArray(values)) return null;
-    const rows = Number(grid.rows);
-    const cols = Number(grid.cols);
-    if (!Number.isInteger(rows) || !Number.isInteger(cols) || rows < 2 || cols < 2) return null;
-    if (values.length !== rows * cols) return null;
-    const latMin = bounds.latMin;
-    const latMax = bounds.latMax;
-    const lonMin = bounds.lonMin;
-    const lonMax = bounds.lonMax;
-    if (![latMin, latMax, lonMin, lonMax].every((v) => Number.isFinite(v))) return null;
-    if (latMax <= latMin || lonMax <= lonMin) return null;
-    return {
-      rows,
-      cols,
-      latMin,
-      latMax,
-      lonMin,
-      lonMax,
-      values,
-      source: payload.source && typeof payload.source === 'object' ? { ...payload.source } : null,
-      generatedAt: String(payload.generatedAt || '') || null,
-      spacingDegreesLat: Number.isFinite(Number(grid.spacingDegreesLat)) ? Number(grid.spacingDegreesLat) : null,
-      spacingDegreesLon: Number.isFinite(Number(grid.spacingDegreesLon)) ? Number(grid.spacingDegreesLon) : null
-    };
-  }
 
   function primeLocalBathymetryGrid() {
     if (oceanMode.localBathymetryPromise) return oceanMode.localBathymetryPromise;
@@ -138,12 +147,7 @@ export function createOceanBathymetryApi({
   }
 
   function sampleLocalBathymetryMeters(lat, lon) {
-    const grid = oceanMode.localBathymetryGrid;
-    if (!grid || !Number.isFinite(lat) || !Number.isFinite(lon)) return null;
-    if (lat < grid.latMin || lat > grid.latMax || lon < grid.lonMin || lon > grid.lonMax) return null;
-    const x = (lon - grid.lonMin) / (grid.lonMax - grid.lonMin) * (grid.cols - 1);
-    const y = (grid.latMax - lat) / (grid.latMax - grid.latMin) * (grid.rows - 1);
-    return sampleGrid(grid.values, grid.cols, grid.rows, x, y);
+    return sampleLocalBathymetryGrid(oceanMode.localBathymetryGrid,lat,lon);
   }
 
   async function primeGlobalBathymetryGrid() {

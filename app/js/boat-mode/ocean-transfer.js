@@ -42,7 +42,7 @@ function startSurfaceResearchVoyage(options={}) {
 }
 
 function suspendBoatModeForOceanTransfer() {
-  appCtx.boatDeck?.release();
+  appCtx.boatDeck?.release?.();
   appCtx.boatMode.active = false;
   restoreEarthSurfaceLayers?.();
   appCtx.boatMode.available = false;
@@ -225,6 +225,11 @@ async function transferSubmarineToBoat(options = {},surfaceVoyage=null) {
         condition: transferVessel?.condition
       });
     surfaced = resolved === 'boat' || resolved === true;
+    if(surfaced&&appCtx.boatMode.mesh?.userData?.visualReady){
+      const loaded=await appCtx.boatMode.mesh.userData.visualReady;
+      if(!current())return false;
+      if(!loaded){surfaced=false;suspendBoatModeForOceanTransfer();return false;}
+    }
     if (surfaced) {
       appCtx.boatMode.oceanTransferVessel = null;
       appCtx.boatMode.moored = !!voyage;

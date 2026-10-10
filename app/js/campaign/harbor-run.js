@@ -1,5 +1,6 @@
 // Personal, optional career state. The world runtime supplies physical-road
 // evidence; this model owns the durable cargo/route transitions, never money.
+import { deliveryDistinction, validHandling } from './delivery-handling.js';
 export const HARBOR_RUN = Object.freeze({ id: 'harbor-run', receiptId: 'event:campaign-completed:harbor-run:v1', schemaVersion: 1 });
 const copy = value => structuredClone(value);
 const finite = value => typeof value === 'number' && Number.isFinite(value);
@@ -33,8 +34,12 @@ export function transitionHarborRun(input, command, now = Date.now()) {
   const state = normalizeHarborRun(input);
   if (state.schemaVersion !== 1) throw Error('This delivery needs a newer version of World Explorer.');
   if (command.revision !== state.revision) throw Error('Delivery progress changed in another window. Reopen the Journal to continue.');
-  if (state.phase === 'complete') return state;
   const next = { ...state, revision: state.revision + 1 };
+  if (command.type === 'finish') {
+    if (state.phase !== 'complete' || !['white', 'slate'].includes(command.finishId)) throw Error('Complete Harbor Run before choosing this finish.');
+    return { ...next, finishId: command.finishId };
+  }
+  if (state.phase === 'complete') return state;
   if (command.type === 'accept') {
     if (state.phase !== 'available') throw Error('Your delivery is already saved. Continue it first.');
     const route = validateDeliveryRoute(command.route);
@@ -44,7 +49,7 @@ export function transitionHarborRun(input, command, now = Date.now()) {
   const evidence = command.evidence;
   if (command.type === 'load') {
     if (state.phase !== 'pickup' || !stoppedAt(state, evidence, state.route.pickup)) throw Error('Stop your car beside the case to load it.');
-    return { ...next, phase: 'driving', cargo: 'in-vehicle', loadedAt: now };
+    return { ...next, phase: 'driving', cargo: 'in-vehicle', loadedAt: now, handling: null };
   }
   if (command.type === 'reach') {
     if (state.phase !== 'driving' || command.pointIndex !== state.nextPoint || evidence?.continuous !== true
@@ -52,11 +57,13 @@ export function transitionHarborRun(input, command, now = Date.now()) {
         || !finite(evidence.y) || Math.abs(evidence.y-state.route.points[state.nextPoint].y) >= 2.5
         || deliveryDistance(evidence, state.route.points[state.nextPoint]) > 14) throw Error('Follow the marked road to the next route point.');
     const nextPoint = state.nextPoint + 1;
-    return { ...next, nextPoint, phase: nextPoint === state.route.points.length ? 'unload' : 'driving' };
+    return { ...next, nextPoint, handling: validHandling(evidence.handling) ? copy(evidence.handling) : null, phase: nextPoint === state.route.points.length ? 'unload' : 'driving' };
   }
   if (command.type === 'unload') {
     if (state.phase !== 'unload' || !stoppedAt(state, evidence, state.route.dropoff)) throw Error('Stop at the delivery marker before unloading.');
-    return { ...next, phase: 'complete', cargo: 'delivered', completedAt: now };
+    const handling = validHandling(evidence.handling) ? copy(evidence.handling) : null;
+    return { ...next, phase: 'complete', cargo: 'delivered', completedAt: now, handling,
+      distinction: deliveryDistinction(handling, state.route.distance), finishId: 'white' };
   }
   throw Error('Unknown delivery action.');
 }
@@ -66,10 +73,10 @@ export function harborRunBadge(state) {
 export function harborRunReceipt(state) {
   return {
     eventId: HARBOR_RUN.receiptId, eventType: 'campaign-completed', sourceSystem: 'explorer-campaign', sourceId: HARBOR_RUN.id,
-    name: 'Harbor Run complete', detail: `Delivered the field case to ${state.route.destinationLabel}. Harbor Driver badge earned.`,
+    name: 'Harbor Run complete', detail: `Delivered the field case to ${state.route.destinationLabel}. Harbor Driver badge and Slate BMW finish earned.${state.distinction === 'steady-cargo' ? ' Steady cargo: a measured, smooth road delivery.' : ''}`,
     pathId: 'travel', occurredAt: state.completedAt, regionId: state.route.regionId, regionLabel: state.route.regionLabel,
     environment: 'EARTH', locationKey: state.route.locationKey, locationSnapshot: state.route.locationSnapshot,
     projections: { profile: false, place: false },
-    metadata: { chapterId: HARBOR_RUN.id, routeId: state.route.id, distanceMeters: state.route.distance, cargo: 'delivered', reward: 'harbor-driver' }
+    metadata: { chapterId: HARBOR_RUN.id, routeId: state.route.id, distanceMeters: state.route.distance, cargo: 'delivered', reward: 'harbor-driver', finish: 'slate', distinction: state.distinction || null, handling: state.handling || null }
   };
 }

@@ -85,3 +85,21 @@ test('future local saves survive a successful new session; no pretend durable sa
  assert.equal(await f.api.startSurfaceResearchVoyage({launchSite:site,entry}),true);
  assert.equal(f.storage.getItem(OCEAN_VOYAGE_KEY),'future-format-retain');assert.equal(f.voyage.saved,null);assert.match(f.voyage.status,/not saved/);
 }));
+
+test('a rejected licensed vessel cannot publish a voyage or leave the previous Earth origin behind',()=>withDocument(async()=>{
+ const f=fixture();f.storage.setItem(OCEAN_VOYAGE_KEY,'future-format-retain');
+ f.ctx.boatMode.mesh={userData:{visualReady:Promise.resolve(false)}};
+ assert.equal(await f.api.startSurfaceResearchVoyage({launchSite:site,entry}),false);
+ assert.deepEqual(f.ctx.LOC,{lat:39,lon:-76});assert.equal(f.ctx.boatMode.active,false);
+ assert.equal(f.storage.getItem(OCEAN_VOYAGE_KEY),'future-format-retain');assert.equal(f.calls.includes('deck'),false);
+}));
+
+test('pending vessel admission stays single-flight and a late model cannot publish into a superseding world',()=>withDocument(async()=>{
+ const f=fixture();let release;f.ctx.boatMode.mesh={userData:{visualReady:new Promise(r=>release=r)}};
+ const pending=f.api.startSurfaceResearchVoyage({launchSite:site,entry});
+ for(let i=0;i<12&&!f.ctx.boatMode.active;i++)await Promise.resolve();
+ assert.equal(f.ctx.boatMode.active,true);assert.equal(f.storage.getItem(OCEAN_VOYAGE_KEY),null);
+ assert.equal(await f.api.startSurfaceResearchVoyage({launchSite:site,entry}),false);
+ f.supersede();release(true);assert.equal(await pending,false);
+ assert.equal(f.storage.getItem(OCEAN_VOYAGE_KEY),null);assert.equal(f.calls.includes('deck'),false);
+}));

@@ -75,7 +75,10 @@ const MARITIME_CATALOG = Object.freeze(definitions.map((definition) => defineTra
     mobileBudget: definition.role === 'cargo' || definition.role === 'ferry' ? 'one-promoted-two-large-berthed' : 'one-promoted-six-berthed',
     referenceEvidence: REFERENCE_EVIDENCE
   },
-  rights: {
+  rights: definition.role==='research'?{
+    kind:'licensed-adaptation',brand:'RCRV educational design',
+    attribution:'Oregon State University Extension Service / Alan Dennis · CC BY 4.0; game scale, access and equipment adaptation'
+  }:{
     kind: 'original-generic-design',
     brand: 'unbranded',
     attribution: 'World Explorer original vessel design'

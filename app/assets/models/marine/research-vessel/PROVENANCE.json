@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "title": "RCRV - Regional Class Research Vessel",
+  "author": "Oregon State University Extension Service (https://sketchfab.com/alan.dennis)",
+  "source": "https://sketchfab.com/3d-models/rcrv-regional-class-research-vessel-11b4b97a9e60497ea91c0727e404ecf6",
+  "license": "CC-BY-4.0",
+  "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+  "sourceSha256": "a6a7cc9926dcf11cb5aba530c09e17fafc29488933579971f238e5fda721ec43",
+  "sourceBytes": 9352932,
+  "outputSha256": "e87213601da7624c95ad0c78b25ae4386e2527c9323175d766e0ce983b36e991",
+  "outputBytes": 6419320,
+  "triangles": 166414,
+  "distant": {
+    "bytes": 386204,
+    "sha256": "6d609c9b1dc0ef8acdad4cecdd038438512cb721b8ced46e3d096e200c104eb4",
+    "triangles": 19740
+  },
+  "adaptation": "Ocean presentation and van placeholder cylinders removed; uniform 1.2 scale and waterline alignment; science-van door, visible interior sole plate and removable bulwark opening; painted surfaces given dielectric material response; conservative geometry simplification and material batching. Game adaptation of a 2017 educational vessel model, not an exact model of the commissioned vessel.",
+  "references": [
+    "https://ceoas.oregonstate.edu/regional-class-research-vessel-ship-design",
+    "https://ceoas.oregonstate.edu/sites/ceoas.oregonstate.edu/files/2024-07/rcrv-particulars.pdf"
+  ],
+  "bounds": {
+    "min": [
+      -9.875816345214844,
+      -5.530539512634277,
+      -38.29151916503906
+    ],
+    "max": [
+      9.875829696655273,
+      27.513599395751953,
+      38.31972122192383
+    ]
+  }
+}
