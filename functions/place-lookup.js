@@ -14,8 +14,8 @@ function lookupUrl(query,base='https://nominatim.openstreetmap.org/'){
  else{url.searchParams.set('lat',query.lat);url.searchParams.set('lon',query.lon);url.searchParams.set('zoom','10');}
  return url.href;
 }
-async function boundedJson(response){
- if(!response.ok)throw fail(502,'Place source is unavailable. Try coordinates or a saved place.');
+async function boundedJson(response,{allowNotFound=false}={}){
+ if(!response.ok&&!(allowNotFound&&response.status===404)){await response.body?.cancel();throw fail(502,'Place source is unavailable. Try coordinates or a saved place.');}
  if(Number(response.headers.get('content-length'))>2000000){await response.body?.cancel();throw fail(502,'Place response exceeds the limit.');}
  const reader=response.body.getReader(),decoder=new TextDecoder();let bytes=0,text='';
  try{while(true){const part=await reader.read();if(part.done)break;bytes+=part.value.byteLength;if(bytes>2000000){await reader.cancel();throw fail(502,'Place response exceeds the limit.');}text+=decoder.decode(part.value,{stream:true});}return JSON.parse(text+decoder.decode());}finally{reader.releaseLock();}
@@ -44,10 +44,16 @@ function createPlaceLookupService({db,now=Date.now,fetchImpl=fetch,baseUrl=()=>p
   const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),8000);let succeeded=false;
   try{
    const response=await fetchImpl(url,{signal:controller.signal,redirect:'error',headers:{Accept:'application/json','User-Agent':'WorldExplorer3D/5.4 (https://worldexplorer3d.io; place lookup)'}});
-   const data=await boundedJson(response);if(controller.signal.aborted)throw fail(504,'Place lookup timed out.');
-   if(request.kind==='search'&&!Array.isArray(data)||request.kind==='reverse'&&(!data||Array.isArray(data)||data.error))throw fail(502,'Place source returned an unavailable result.');
-   const payload=request.kind==='search'?data.slice(0,8).map(cleanResult).filter(Boolean):cleanResult(data)||{},fetchedAt=new Date(now()).toISOString();
-   await cacheRef.set({payload,fetchedAt,expiresAtMs:now()+7*DAY,expiresAt:new Date(now()+7*DAY)});succeeded=true;return {payload,fetchedAt,cache:'upstream',source:'OpenStreetMap / Nominatim-compatible geocoder'};
+   const data=await boundedJson(response,{allowNotFound:request.kind==='reverse'});if(controller.signal.aborted)throw fail(504,'Place lookup timed out.');
+   // An unnamed ocean coordinate is a valid negative lookup, not an outage.
+   // Only the provider's specific no-coverage response is cached as empty;
+   // arbitrary errors, throttling and malformed results remain failures.
+   const noCoverage=request.kind==='reverse'&&data&&typeof data.error==='string'&&/^Unable to geocode\.?$/i.test(data.error.trim());
+   if(request.kind==='search'&&!Array.isArray(data)||request.kind==='reverse'&&(!data||Array.isArray(data)||(data.error&&!noCoverage)||(!response.ok&&!noCoverage)))throw fail(502,'Place source returned an unavailable result.');
+   const payload=noCoverage?{}:request.kind==='search'?data.slice(0,8).map(cleanResult).filter(Boolean):cleanResult(data),fetchedAt=new Date(now()).toISOString();
+   if(!payload)throw fail(502,'Place source returned an invalid location.');
+   const ttl=noCoverage?DAY:7*DAY;
+   await cacheRef.set({payload,fetchedAt,expiresAtMs:now()+ttl,expiresAt:new Date(now()+ttl)});succeeded=true;return {payload,fetchedAt,cache:'upstream',source:'OpenStreetMap / Nominatim-compatible geocoder'};
   }finally{
    clearTimeout(timer);
    await db.runTransaction(async tx=>{const snapshot=await tx.get(controlRef);if(snapshot.data()?.owner===owner)tx.update(controlRef,{nextAtMs:now()+(succeeded?1100:10000),owner:''});});
