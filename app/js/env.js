@@ -84,6 +84,12 @@ function switchEnv(newEnv) {
 
   _transitioning = false;
 
+  // Detach structures belonging to the departed coordinate frame and restore
+  // only the destination's existing creative owner. This does not create rooms.
+  appCtx.refreshEditableWorldPresentation?.();
+  appCtx.refreshEditableBuildingVisibility?.();
+  appCtx.refreshBlockBuilderForCurrentLocation?.();
+
   if (typeof appCtx.updateControlsModeUI === 'function') {
     appCtx.updateControlsModeUI();
   }

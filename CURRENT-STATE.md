@@ -50,7 +50,32 @@ browsers/servers. Production deployment evidence is under
 `output/release-evidence/current/production-deployment.json` and
 `production-promotion.json`; acceptance gaps remain in their own receipts.
 
-## October 10 latest local continuation — creative save preservation
+## October 10 latest local continuation — creative room and environment isolation
+
+Creative tools now use the room's declared coordinate frame. Solo building
+removals restore visually on room entry and return on exit. Earth edits cannot
+mutate a Moon/Ocean visit; room blocks detach outside their frame and return with
+the same room identity. Geographic blocks use the existing polar/date-line frame.
+Late saves retain their original room, rejected previews use the latest accepted
+room data, and the lazy builder drains only the latest queued room and its rows.
+Room permission updates refresh mapped-building controls.
+
+Full source chain: **2,401 tests pass**. `creative-room-isolation-final/browser.json`
+passes **23** actual builder DOM/Three/storage checks in a controlled scene,
+including delayed runtime loading. Shared responses are controlled; live cloud
+room acceptance remains separate. `lunar-creative-scope-regression/report.json`
+passes **15** actual-game checks through ship/Moon/ship/Earth with the optical
+method, deliberate save/ascent failures, no GPU/page errors, and the known external
+Overpass CORS error recorded separately. Images were inspected. The Earth arrival
+capture is not general street-layout/visual certification; allow the ordinary
+publication stages to settle before diagnosing its pavement appearance.
+
+No room is automatically created during travel. Existing save formats are retained.
+This does not implement chunked worldwide creative storage, terrain/farms or
+multi-body room storage. Those finite roadmap gates and release fallback remain
+open. Production, dist, the four retained packages and player data are unchanged.
+
+## October 10 previous local continuation — creative save preservation
 
 Both existing creative stores now protect unreadable, unsupported, lossy and
 oversize records, preserve original recovery copies, reject stale writers and

@@ -49,7 +49,8 @@ function syncBlockBuilderUi(snapshot = {}) {
   const saved = document.getElementById('blockBuilderSaveState');
   const persistence = appCtx.getBuildPersistenceStatus?.() || {};
   if (saved) saved.textContent = snapshot.shared
-    ? persistence.shared?.connected === false ? 'Room offline. Reconnect before saving more blocks.'
+    ? persistence.shared?.availableHere === false ? 'Room blocks are saved at its starting world. Return there to keep building.'
+      : persistence.shared?.connected === false ? 'Room offline. Reconnect before saving more blocks.'
       : persistence.shared?.pendingCount > 0 ? 'Saving to room… Keep your connection until this finishes.'
         : 'Connected room · accepted blocks are saved to this room. Keep its code to return.'
     : persistence.enabled === false ? persistence.detail || 'Device storage is unavailable. Check the status below before leaving.'
@@ -57,7 +58,16 @@ function syncBlockBuilderUi(snapshot = {}) {
   const blockRecovery = document.getElementById('blockBuilderRecovery');
   if (blockRecovery) blockRecovery.hidden = snapshot.shared === true || !['protected', 'conflict', 'error'].includes(persistence.notice);
   const undo = document.getElementById('blockBuilderUndo');
-  const edits = appCtx.editableWorldRuntimeSnapshot?.()?.persistence;
+  const editState = appCtx.editableWorldRuntimeSnapshot?.();
+  const edits = editState?.persistence;
+  const buildingTools = panel.querySelector('.editableWorldBuildingTools');
+  if (buildingTools) buildingTools.hidden = editState?.active === false;
+  const reset = document.getElementById('editableWorldReset');
+  if (reset) { reset.hidden = editState?.active === false; reset.disabled = editState?.canManage === false; }
+  for (const id of ['editableWorldSuppressBuilding', 'editableWorldRestoreBuilding']) {
+    const button = document.getElementById(id);
+    if (button) { button.disabled = editState?.canManage === false; button.title = button.disabled ? 'Room owners and moderators manage mapped buildings.' : ''; }
+  }
   const protectedEdits = snapshot.shared !== true && ['invalid-existing', 'backup-read-only', 'backup-protected'].includes(edits?.recovery);
   const recoveryNotice = document.getElementById('editableWorldSaveNotice');
   if (recoveryNotice) { recoveryNotice.hidden = !protectedEdits; recoveryNotice.textContent = protectedEdits ? 'Saved building edits need recovery. The original data is preserved and editing is paused. Download a recovery copy to keep it safe.' : ''; }
@@ -218,15 +228,18 @@ function initBlockBuilderUi() {
   document.getElementById('editableWorldSuppressBuilding')?.addEventListener('click', async () => {
     if (!globalThis.confirm('Virtually remove the selected mapped building from this saved world? The real map data is never changed.')) return;
     const result = await appCtx.suppressSelectedEditableBuilding?.();
+    if (result?.previousWorld) { setStatus(result.committed ? 'Edit saved to your previous room.' : 'The edit in your previous room could not be saved.'); return; }
     setStatus(result?.committed ? 'Building removed from this saved world.' : editFailure(result,`Could not remove building: ${result?.reason || 'select a nearby building first'}.`));
   });
   document.getElementById('editableWorldRestoreBuilding')?.addEventListener('click', async () => {
     const result = await appCtx.restoreSelectedEditableBuilding?.();
+    if (result?.previousWorld) { setStatus(result.committed ? 'Edit saved to your previous room.' : 'The edit in your previous room could not be saved.'); return; }
     setStatus(result?.committed ? 'Building restored.' : editFailure(result,`Could not restore building: ${result?.reason || 'nothing selected'}.`));
   });
   document.getElementById('editableWorldReset')?.addEventListener('click', async () => {
     if (!globalThis.confirm('Reset building edits here? This restores mapped buildings and removes custom structures. To remove blocks, use Clear.')) return;
     const result = await appCtx.resetLocalEditableWorld?.();
+    if (result?.previousWorld) { setStatus(result.committed ? 'Building edits reset in your previous room.' : 'The reset in your previous room could not be saved.'); return; }
     setStatus(result?.committed ? 'Building edits reset.' : editFailure(result,`Could not reset building edits: ${result?.reason || 'unknown error'}.`));
     syncBlockBuilderUi(appCtx.getBlockBuilderSnapshot?.() || {});
   });

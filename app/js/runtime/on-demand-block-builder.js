@@ -1,8 +1,3 @@
-let modulePromise = null;
-let pendingSharedConfig = null;
-let pendingSharedEntries = null;
-let pendingSharedConnected = true;
-
 function emptySnapshot() {
   return {
     enabled: false,
@@ -17,33 +12,59 @@ function emptySnapshot() {
   };
 }
 
-function emptyPersistenceStatus() {
+function emptyPersistenceStatus(connected = true) {
   return {
     ready: false,
     totalCount: 0,
     currentLocationCount: 0,
-    shared: { enabled: false, totalCount: 0, connected: pendingSharedConnected, pendingCount: 0 }
+    shared: { enabled: false, totalCount: 0, connected, pendingCount: 0 }
   };
 }
 
-function installOnDemandBlockBuilder(appCtx) {
+function installOnDemandBlockBuilder(appCtx, options = {}) {
+  let modulePromise = null, loadedModules = null;
+  let pendingSharedConfig = null, pendingSharedEntries = null;
+  let pendingSharedConnected = true, pendingScope = '';
+  const loadBlocks = options.loadBlocks || (() => import('../blocks.js?v=70'));
+  const loadUi = options.loadUi || (() => import('../block-builder/ui.js?v=9'));
+
+  function applyPendingSharedState() {
+    if (!loadedModules) return;
+    const { blocks } = loadedModules;
+    if (pendingSharedConfig) {
+      const config = pendingSharedConfig; pendingSharedConfig = null;
+      blocks.configureSharedBuildSync?.(config);
+    }
+    blocks.setSharedBuildConnectionState?.(pendingSharedConnected);
+    if (pendingSharedEntries) {
+      const entries = pendingSharedEntries; pendingSharedEntries = null;
+      blocks.setSharedBuildEntries?.(entries);
+    }
+  }
+
   async function ensureBlockBuilderReady() {
     if (!modulePromise) {
-      modulePromise = import('../blocks.js?v=70').then(async (blocks) => {
-        const ui = await import('../block-builder/ui.js?v=9');
-        if (pendingSharedConfig) blocks.configureSharedBuildSync?.(pendingSharedConfig);
-        blocks.setSharedBuildConnectionState?.(pendingSharedConnected);
-        if (pendingSharedEntries) blocks.setSharedBuildEntries?.(pendingSharedEntries);
-        pendingSharedConfig = null;
-        pendingSharedEntries = null;
+      // Load UI before the runtime publishes its direct context methods, then
+      // drain the latest room exactly once. Replaying one callback per queued
+      // join used to attach old rows to a newer room during this lazy load.
+      modulePromise = Promise.resolve().then(loadUi).then(async ui => {
+        const blocks = await loadBlocks();
+        loadedModules = { blocks, ui };
+        applyPendingSharedState();
         if (appCtx.gameStarted) blocks.refreshBlockBuilderForCurrentLocation?.();
-        return { blocks, ui };
+        return loadedModules;
       }).catch((error) => {
         modulePromise = null;
+        loadedModules = null;
         throw error;
       });
     }
     return modulePromise;
+  }
+
+  function loadQueuedSharedState() {
+    if (loadedModules) applyPendingSharedState();
+    else void ensureBlockBuilderReady().catch(error => console.warn('[blocks] Builder could not load; room state retained for retry.', error));
   }
 
   const enableBuilder = async (forceState) => {
@@ -66,24 +87,27 @@ function installOnDemandBlockBuilder(appCtx) {
       return !!enabled;
     },
     configureSharedBuildSync: (config = {}) => {
-      pendingSharedConfig = { ...config };
+      const scope = config.enabled === true ? JSON.stringify([config.roomId, config.world || null]) : '';
+      if (scope !== pendingScope) pendingSharedEntries = null;
+      pendingScope = scope;
+      pendingSharedConfig = { ...config, ...(config.world ? { world: { ...config.world } } : {}) };
       if (config.enabled === true || modulePromise) {
-        void ensureBlockBuilderReady().then(({ blocks }) => blocks.configureSharedBuildSync?.(pendingSharedConfig || config));
+        loadQueuedSharedState();
       }
       return false;
     },
     setSharedBuildEntries: (entries = []) => {
       pendingSharedEntries = Array.isArray(entries) ? entries.slice() : [];
-      void ensureBlockBuilderReady().then(({ blocks }) => blocks.setSharedBuildEntries?.(pendingSharedEntries || entries));
+      if (pendingScope || modulePromise || loadedModules) loadQueuedSharedState();
       return false;
     },
     setSharedBuildConnectionState: (connected) => {
       pendingSharedConnected = connected !== false;
-      if (modulePromise) void modulePromise.then(({ blocks }) => blocks.setSharedBuildConnectionState?.(pendingSharedConnected));
+      if (loadedModules) loadedModules.blocks.setSharedBuildConnectionState?.(pendingSharedConnected);
       return pendingSharedConnected;
     },
     getBlockBuilderSnapshot: emptySnapshot,
-    getBuildPersistenceStatus: emptyPersistenceStatus,
+    getBuildPersistenceStatus: () => emptyPersistenceStatus(pendingSharedConnected),
     getBuildLimits: () => ({ maxPerLocation: 200, maxTotal: 5000, currentLocationCount: 0, totalCount: 0 }),
     getSharedBuildSyncStatus: () => ({ enabled: false, totalCount: 0, connected: pendingSharedConnected, pendingCount: 0 }),
     getBuildCollisionAtWorldXZ: () => null,

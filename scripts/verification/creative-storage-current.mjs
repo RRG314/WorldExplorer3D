@@ -37,20 +37,24 @@ try{
   localStorage.setItem(PRIMARY_KEY,original);localStorage.setItem(BACKUP_KEY,rawBackup);
   return checks;
  });
- async function mountBuilder(){await page.evaluate(async()=>{
+ async function mountBuilder(lazy=false){await page.evaluate(async lazy=>{
   const {ctx}=await import('/app/js/shared-context.js?v=55');window.creativeCtx=ctx;ctx.LOC={lat:39.3,lon:-76.6};
   ctx.SCALE=111320;ctx.getEnv=()=> 'EARTH';ctx.gameStarted=true;ctx.car={x:0,y:0,z:0};ctx.scene=new THREE.Scene();
+  ctx.initialEarthWorldReady=true;ctx.worldLoading=false;
   ctx.scene.add(new THREE.AmbientLight(0xffffff,1));ctx.camera=new THREE.PerspectiveCamera(45,900/600,.1,100);ctx.camera.position.set(10,7,14);ctx.camera.lookAt(4,0,6);
   ctx.renderer=new THREE.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});ctx.renderer.setSize(900,600);ctx.renderer.setClearColor(0x203345);document.body.append(ctx.renderer.domElement);
   const floor=new THREE.Mesh(new THREE.PlaneGeometry(20,20),new THREE.MeshStandardMaterial({color:0x65745f}));floor.rotation.x=-Math.PI/2;ctx.scene.add(floor);
   const building=new THREE.Mesh(new THREE.BoxGeometry(2,4,2),new THREE.MeshStandardMaterial({color:0x9b8a75}));building.position.set(-2,2,0);building.userData.sourceBuildingId='fixture:building';ctx.scene.add(building);
   ctx.buildingMeshes=[building];ctx.buildings=[{sourceBuildingId:'fixture:building',name:'Saved building',minX:-3,maxX:-1,minZ:-1,maxZ:1}];
   const {initEditableWorldRuntime}=await import('/app/js/editable-world/runtime.js?v=4');initEditableWorldRuntime(ctx);
+  if(lazy){const {installOnDemandBlockBuilder}=await import('/app/js/runtime/on-demand-block-builder.js');installOnDemandBlockBuilder(ctx);}
+  else {
   await import('/app/js/blocks.js');
   const {syncBlockBuilderUi}=await import('/app/js/block-builder/ui.js');syncBlockBuilderUi({enabled:true,shared:false,count:0,maxCount:500});
   ctx.toggleBlockBuildMode(true);ctx.refreshBlockBuilderForCurrentLocation();ctx.renderer.render(ctx.scene,ctx.camera);
+  }
   window.advanceTime=()=>ctx.renderer.render(ctx.scene,ctx.camera);window.render_game_to_text=()=>JSON.stringify({blocks:ctx.getBlockBuilderSnapshot(),storage:ctx.getBuildPersistenceStatus()});
- });}
+ },lazy);}
  await mountBuilder();
  assert.equal(await page.locator('#editableWorldSaveNotice').isVisible(),true);
  const downloadEvent=page.waitForEvent('download');await page.locator('#editableWorldRecovery').click();const download=await downloadEvent;
@@ -115,6 +119,93 @@ try{
  await page.reload();await mountBuilder();
  assert.equal(await page.evaluate(()=>creativeCtx.getBuildTopSurfaceAtWorldXZ(4,6)),null);
  report.cases.push({id:'legacy-geographic-blocks-keep-position-and-actually-remove-from-save-across-reload',passed:true});
+ await page.evaluate(async()=>{
+  await import('/app/js/env.js');creativeCtx.switchEnv('EARTH');
+  creativeCtx.placeBuildBlock(4,.5,6,2,{shape:'wall'});creativeCtx.selectNearestEditableBuilding();await creativeCtx.suppressSelectedEditableBuilding();
+  window.roomWorld={kind:'earth',lat:39.3,lon:-76.6};
+  window.enterFixtureRoom=(id,adapters={})=>{
+   creativeCtx.configureSharedBuildSync({enabled:true,roomId:id,world:roomWorld,upsert:async()=>{},remove:async()=>{},...adapters});
+   creativeCtx.configureSharedEditableWorld({enabled:true,roomId:id,worldId:`room-world:${id}:earth:test`,world:roomWorld,canManage:true});
+  };
+  enterFixtureRoom('A');
+ });
+ assert.equal(await page.evaluate(()=>creativeCtx.buildingMeshes[0].visible),true);
+ assert.equal(await page.evaluate(()=>creativeCtx.getBuildTopSurfaceAtWorldXZ(4,6)),null);
+ assert.equal(await page.evaluate(()=>creativeCtx.editableWorldRuntimeSnapshot().worldId),'room-world:A:earth:test');
+ assert.equal(await page.evaluate(()=>creativeCtx.isLocalBuildingSuppressed('fixture:building')),false);
+ report.cases.push({id:'joining-an-empty-room-restores-its-base-building-and-isolates-solo-blocks',passed:true});
+ await page.evaluate(()=>{
+  enterFixtureRoom('A',{upsert:()=>new Promise((_resolve,reject)=>{window.rejectFixtureWrite=reject;})});
+  creativeCtx.setSharedBuildEntries([{gx:4,gy:.5,gz:6,shape:'wall',materialIndex:1}]);
+  if(!creativeCtx.placeBuildBlock(5,.5,6,0,{shape:'wall'}))throw Error('pending placement rejected');
+  creativeCtx.setSharedBuildEntries([{gx:4,gy:.5,gz:6,shape:'wall',materialIndex:1},{gx:5,gy:.5,gz:6,shape:'wall',materialIndex:5}]);
+  rejectFixtureWrite(Error('controlled server rejection'));
+ });
+ await page.waitForFunction(()=>creativeCtx.getSharedBuildSyncStatus().pendingCount===0);
+ assert.equal(await page.evaluate(()=>creativeCtx.scene.getObjectByName('buildBlocksGroup').children.find(m=>m.userData.gx===5).userData.materialIndex),5);
+ assert.equal(await page.evaluate(()=>creativeCtx.getBuildCollisionAtWorldXZ(5,6,0,.1,1.8).blocked),true);
+ report.cases.push({id:'rejected-room-preview-restores-latest-other-builder-render-and-collision',passed:true});
+ await page.evaluate(()=>{
+  enterFixtureRoom('A',{remove:()=>new Promise((_resolve,reject)=>{window.rejectFixtureRemoval=reject;})});
+  if(!creativeCtx.removeBuildBlock(5,.5,6))throw Error('pending removal rejected');
+  creativeCtx.setSharedBuildEntries([{gx:4,gy:.5,gz:6,shape:'wall',materialIndex:1}]);
+  rejectFixtureRemoval(Error('controlled removal rejection'));
+ });
+ await page.waitForFunction(()=>creativeCtx.getSharedBuildSyncStatus().pendingCount===0);
+ assert.equal(await page.evaluate(()=>creativeCtx.getBuildTopSurfaceAtWorldXZ(5,6)),null);
+ report.cases.push({id:'failed-room-removal-does-not-resurrect-a-block-already-removed-by-another-builder',passed:true});
+ await page.evaluate(()=>{
+  enterFixtureRoom('A',{upsert:()=>new Promise(resolve=>{window.finishOldRoomWrite=resolve;})});
+  creativeCtx.placeBuildBlock(6,.5,6,0,{shape:'wall'});enterFixtureRoom('B');
+  creativeCtx.setSharedBuildEntries([{gx:8,gy:.5,gz:6,shape:'wall',materialIndex:1}]);finishOldRoomWrite();
+ });
+ await page.waitForFunction(()=>creativeCtx.getSharedBuildSyncStatus().pendingCount===0);
+ assert.equal(await page.evaluate(()=>creativeCtx.getBuildTopSurfaceAtWorldXZ(6,6)),null);
+ assert.equal(await page.evaluate(()=>creativeCtx.getBuildCollisionAtWorldXZ(8,6,0,.1,1.8).blocked),true);
+ report.cases.push({id:'late-previous-room-acknowledgement-cannot-publish-blocks-in-the-next-room',passed:true});
+ const roomSavesBefore=await page.evaluate(()=>localStorage.getItem('worldExplorer3D.buildBlocks.v2'));
+ await page.evaluate(()=>creativeCtx.switchEnv('MOON'));
+ assert.equal(await page.evaluate(()=>creativeCtx.getBuildTopSurfaceAtWorldXZ(8,6)),null);
+ assert.equal(await page.evaluate(()=>creativeCtx.placeBuildBlock(9,.5,6,2,{shape:'wall'})),false);
+ assert.equal(await page.locator('#editableWorldReset').isVisible(),false);
+ assert.equal(await page.evaluate(async()=> (await creativeCtx.resetLocalEditableWorld()).committed),false);
+ await page.evaluate(()=>creativeCtx.switchEnv('EARTH'));
+ assert.equal(await page.evaluate(()=>creativeCtx.getBuildCollisionAtWorldXZ(8,6,0,.1,1.8).blocked),true);
+ await page.evaluate(()=>{creativeCtx.LOC={lat:40,lon:-75};creativeCtx.refreshBlockBuilderForCurrentLocation();creativeCtx.refreshEditableWorldPresentation();});
+ assert.equal(await page.evaluate(()=>creativeCtx.placeBuildBlock(9,.5,6,2,{shape:'wall'})),false);
+ assert.equal(await page.evaluate(()=>creativeCtx.getBuildTopSurfaceAtWorldXZ(8,6)),null);
+ assert.equal(await page.evaluate(()=>creativeCtx.getSharedBuildSyncStatus().roomId),'B');
+ assert.equal(await page.evaluate(()=>localStorage.getItem('worldExplorer3D.buildBlocks.v2')),roomSavesBefore);
+ await page.evaluate(()=>{creativeCtx.LOC={lat:39.3,lon:-76.6};creativeCtx.refreshBlockBuilderForCurrentLocation();creativeCtx.refreshEditableWorldPresentation();creativeCtx.renderer.render(creativeCtx.scene,creativeCtx.camera);});
+ await page.screenshot({path:`${dir}/room-scope.png`});
+ report.cases.push({id:'environment-and-location-travel-retain-room-identity-without-cross-world-edits-or-geometry',passed:true});
+ await page.evaluate(()=>{creativeCtx.configureSharedBuildSync({enabled:false});creativeCtx.configureSharedEditableWorld({enabled:false});});
+ assert.equal(await page.evaluate(()=>creativeCtx.buildingMeshes[0].visible),false);
+ assert.equal(await page.evaluate(()=>creativeCtx.getBuildCollisionAtWorldXZ(4,6,0,.1,1.8).blocked),true);
+ await page.evaluate(()=>creativeCtx.switchEnv('OCEAN'));
+ assert.equal(await page.evaluate(()=>creativeCtx.placeBuildBlock(8,.5,6,2)),false);
+ assert.equal(await page.evaluate(()=>creativeCtx.getBuildTopSurfaceAtWorldXZ(4,6)),null);
+ await page.evaluate(()=>creativeCtx.switchEnv('EARTH'));
+ assert.equal(await page.evaluate(()=>creativeCtx.getBuildCollisionAtWorldXZ(4,6,0,.1,1.8).blocked),true);
+ report.cases.push({id:'leaving-room-and-returning-from-ocean-restores-solo-work-without-writing-in-the-wrong-environment',passed:true});
+ for(const loc of [{lat:10,lon:179.99995},{lat:85,lon:179.99995}]){
+  await page.evaluate(loc=>{creativeCtx.LOC=loc;creativeCtx.refreshBlockBuilderForCurrentLocation();},loc);
+  assert.equal(await page.evaluate(()=>creativeCtx.placeBuildBlock(20,.5,50,2,{shape:'wall'})),true);
+  await page.evaluate(()=>creativeCtx.refreshBlockBuilderForCurrentLocation());
+  assert.equal(await page.evaluate(()=>creativeCtx.getBuildCollisionAtWorldXZ(20,50,0,.1,1.8).blocked),true);
+ }
+ report.cases.push({id:'actual-block-geographic-save-and-reload-use-the-shared-dateline-and-polar-projection',passed:true});
+ await page.reload();await mountBuilder(true);
+ let heldRoute,releaseRequest;const requested=new Promise(resolve=>{releaseRequest=resolve;});
+ await page.route('**/app/js/blocks.js?v=70',route=>{heldRoute=route;releaseRequest();});
+ await page.evaluate(()=>{creativeCtx.configureSharedBuildSync({enabled:true,roomId:'LAZY-A',world:{kind:'earth',lat:39.3,lon:-76.6}});creativeCtx.setSharedBuildEntries([{gx:3,gy:.5,gz:6,shape:'wall'}]);});
+ await Promise.race([requested,new Promise((_,reject)=>setTimeout(()=>reject(Error('Builder module was not requested')),10000))]);
+ await page.evaluate(()=>{creativeCtx.configureSharedBuildSync({enabled:true,roomId:'LAZY-B',world:{kind:'earth',lat:39.3,lon:-76.6}});creativeCtx.setSharedBuildEntries([{gx:4,gy:.5,gz:6,shape:'wall',materialIndex:1}]);});
+ await heldRoute.continue();await page.evaluate(async()=>{await creativeCtx.ensureBlockBuilderReady();creativeCtx.toggleBlockBuildMode(true);creativeCtx.renderer.render(creativeCtx.scene,creativeCtx.camera);});
+ assert.equal(await page.evaluate(()=>creativeCtx.getSharedBuildSyncStatus().roomId),'LAZY-B');
+ assert.equal(await page.evaluate(()=>creativeCtx.getBuildTopSurfaceAtWorldXZ(3,6)),null);
+ assert.equal(await page.evaluate(()=>creativeCtx.getBuildCollisionAtWorldXZ(4,6,0,.1,1.8).blocked),true);
+ report.cases.push({id:'actual-delayed-builder-module-load-publishes-only-the-latest-room-and-its-own-blocks',passed:true});
  await runPrescribedGameActions(page,dir,[{buttons:[],frames:3}],'canvas');
  assert.deepEqual(report.errors,[]);report.passed=true;
 }catch(error){report.failure=String(error.stack||error);process.exitCode=1;}

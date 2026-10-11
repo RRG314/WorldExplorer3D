@@ -205,9 +205,13 @@ function listenSharedBlocks(roomId, callback, options = {}) {
   let closed = false;
   let listenerDeliveries = 0;
   let lastListenerSize = null;
-  const unsubscribe = onSnapshot(blocksQuery, (snap) => {
-    const rows = rowsFromSnapshot(snap);
+  const unsubscribe = onSnapshot(blocksQuery, { includeMetadataChanges: true }, (snap) => {
+    if (closed) return;
     listenerDeliveries += 1;
+    // The builder owns its pending preview. A local Firestore echo is not an
+    // accepted room snapshot, especially when a write will later be rejected.
+    if (snap.metadata?.hasPendingWrites === true) { lastListenerSize = null; return; }
+    const rows = rowsFromSnapshot(snap);
     lastListenerSize = rows.length;
     callback(rows);
   }, (err) => {
@@ -221,7 +225,7 @@ function listenSharedBlocks(roomId, callback, options = {}) {
   // apply this read after the listener has delivered a non-empty or subsequent
   // state, which prevents an older response from reviving a removed block.
   void getDocsFromServer(blocksQuery).then((snap) => {
-    if (closed) return;
+    if (closed || snap.metadata?.hasPendingWrites === true) return;
     const rows = rowsFromSnapshot(snap);
     const listenerOnlyDeliveredEmptyCache = listenerDeliveries === 1 && lastListenerSize === 0;
     if (listenerDeliveries === 0 || (listenerOnlyDeliveredEmptyCache && rows.length > 0)) {

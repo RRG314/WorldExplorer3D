@@ -52,7 +52,7 @@ test('connection loss rolls back an unresolved upsert and preserves its failure 
   assert.deepEqual(sync.getEntries(), []);
   assert.equal(sync.getStatus().pendingCount, 0);
   assert.equal(failures.length, 1);
-  assert.match(failures[0].message, /not committed/i);
+  assert.match(failures[0].message, /not confirmed/i);
   assert.equal(failures[0].entry.id, placed.id);
   request.resolve();
   await request.promise;
@@ -131,4 +131,72 @@ test('save-state observers see the final pending count after placement and Undo'
   sync.remove(input);
   await new Promise(resolve => setImmediate(resolve));
   assert.deepEqual(settled, [0, 0], 'Save status must leave pending after both actions');
+});
+
+test('a rejected pending placement preserves newer room changes at that address and elsewhere', async () => {
+  const request = deferred(); let rendered = [];
+  const sync = createSync({ onRefresh: () => { rendered = sync.getEntries(); } });
+  sync.configure({ enabled: true, roomId: 'BUILD', upsert: () => request.promise });
+  const address = { gx: 2, gy: 0, gz: 3, materialIndex: 1 };
+  sync.upsert(address, () => { rendered = []; });
+  sync.setEntries([{ ...address, materialIndex: 4 }, { gx: 8, gy: 0, gz: 9 }]);
+  assert.equal(sync.getEntries()[0].materialIndex, 1, 'pending preview remains visible');
+  request.reject(Error('rejected')); await new Promise(resolve => setImmediate(resolve));
+  assert.equal(rendered[0].materialIndex, 4, 'latest accepted room value wins after failure');
+  assert.equal(rendered.length, 2); assert.equal(sync.getStatus().pendingCount, 0);
+});
+
+test('a rejected removal cannot resurrect a block deleted in a newer room snapshot', async () => {
+  const request = deferred(), input = { gx: 2, gy: 0, gz: 3 };
+  const sync = createSync();sync.configure({ enabled: true, roomId: 'BUILD', remove: () => request.promise });
+  sync.setEntries([input]);assert.ok(sync.remove(input));sync.setEntries([]);
+  request.reject(Error('denied'));await new Promise(resolve => setImmediate(resolve));
+  assert.deepEqual(sync.getEntries(), []); assert.equal(sync.getStatus().pendingCount, 0);
+});
+
+test('synchronous write failure restores actual room state and disabled/missing adapters cannot preview edits', async () => {
+  const input = { gx: 2, gy: 0, gz: 3 };const sync = createSync();
+  assert.equal(sync.upsert(input), null);
+  sync.configure({ enabled: true, roomId: 'BUILD' });sync.setEntries([input]);
+  assert.equal(sync.upsert(input), null);assert.equal(sync.remove(input), null);
+  sync.configure({ enabled: true, roomId: 'BUILD', remove() { throw Error('synchronous denial'); } });
+  const errors=[];assert.ok(sync.remove(input,error=>errors.push(error.message)));
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(sync.getEntries().length, 1);assert.equal(sync.getStatus().pendingCount, 0);assert.deepEqual(errors,['synchronous denial']);
+});
+
+test('duplicate snapshots publish one immutable block per address', () => {
+  const sync=createSync();sync.configure({enabled:true,roomId:'BUILD'});
+  sync.setEntries([{gx:1,gy:0,gz:1,materialIndex:0},{gx:1,gy:0,gz:1,materialIndex:3}]);
+  assert.equal(sync.getEntries().length,1);assert.equal(sync.getEntries()[0].materialIndex,3);
+  assert.throws(()=>{sync.getEntries()[0].gx=7;},TypeError);
+});
+
+test('Clear waits for pending edits, converts synchronous failures, and cannot target a newly joined room', async () => {
+  const write=deferred(),clear=deferred();let calls=0;
+  const sync=createSync();sync.configure({enabled:true,roomId:'OLD',upsert:()=>write.promise,clearMine:()=>{calls++;return clear.promise;}});
+  sync.upsert({gx:1,gy:0,gz:1});await assert.rejects(sync.clearMine(),/Wait for/);assert.equal(calls,0);
+  write.resolve();await new Promise(resolve=>setImmediate(resolve));
+  const cancelled=sync.clearMine();sync.configure({enabled:true,roomId:'NEW',clearMine:()=>{throw Error('must not clear new room');}});
+  assert.equal(await cancelled,null);assert.equal(calls,0);
+  sync.configure({enabled:true,roomId:'OLD',clearMine:()=>clear.promise});const pending=sync.clearMine();await Promise.resolve();
+  sync.configure({enabled:false});clear.resolve(4);assert.equal(await pending,null);
+  sync.configure({enabled:true,roomId:'NEW',clearMine(){throw Error('clear failure');}});
+  await assert.rejects(sync.clearMine(),/clear failure/);
+});
+
+test('accepted receipt counts are not reduced by an unrelated pending removal', async () => {
+  const removal=deferred(),receipts=[],sync=createSync();
+  sync.configure({enabled:true,roomId:'BUILD',upsert:async()=>{},remove:()=>removal.promise});
+  sync.setEntries([{gx:1,gy:0,gz:1}]);sync.remove({gx:1,gy:0,gz:1});
+  sync.upsert({gx:2,gy:0,gz:2},()=>{},(_entry,receipt)=>receipts.push(receipt));
+  await new Promise(resolve=>setImmediate(resolve));assert.equal(receipts[0].count,2);
+  removal.resolve();await new Promise(resolve=>setImmediate(resolve));assert.equal(sync.getEntries().length,1);
+});
+
+test('late accepted writes cannot replace a newer confirmed room snapshot', async () => {
+  const request=deferred(),sync=createSync(),input={gx:1,gy:0,gz:1,materialIndex:0};
+  sync.configure({enabled:true,roomId:'BUILD',upsert:()=>request.promise});sync.upsert(input);
+  sync.setEntries([{...input,materialIndex:5}]);request.resolve();await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(sync.getEntries()[0].materialIndex,5);
 });

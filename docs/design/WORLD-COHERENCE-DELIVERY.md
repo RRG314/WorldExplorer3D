@@ -35,6 +35,44 @@ is not a full recovery/import tool. Atomic chunked persistence, worldwide creati
 identity, terrain/farm simulation and the compatible release roundtrip remain
 open; no production package was changed.
 
+## Creative room/frame authority continuation
+
+The audit found mismatches between saved scope, collision and rendering: solo
+suppression remained visible after joining an empty room; shared coordinates could
+appear in a different environment; stale block failure callbacks could restore an
+older object over another builder's newer snapshot; lazy module callbacks could
+replay the previous room after a newer join. These paths now use the declared room
+frame and generation, preserve accepted data separately from pending previews,
+and drain the latest lazy configuration/rows once. Permission changes refresh
+the same tools. No new persistence owner or automatic room creation was added.
+
+Earth building edits are limited to Earth. A room's blocks are available only in
+its declared Earth origin or its supported Moon frame. Visiting elsewhere retains
+membership/data but cannot write to that coordinate frame. Returning restores it;
+leaving restores solo work. This is admission/isolation, not a new multi-body room
+schema. Local block projection now reuses the existing date-line/polar authority.
+
+The Firestore listener subscribes to metadata acknowledgements and excludes local
+pending echoes from accepted room snapshots; the builder owns that preview.
+An offline write is described as unconfirmed, since a previously queued SDK write
+may still reach the server. Reference: [Firebase listener and pending-write semantics](https://firebase.google.com/docs/firestore/query-data/listen).
+
+`creative-room-isolation-final/browser.json` passes **23** real Chromium builder
+DOM/render/collision/storage checks in a controlled scene, including room failure
+races, environment return, actual date-line/polar save/reload and an intentionally
+delayed real builder-module download. It uses controlled room replies, not live
+shared-service certification. `lunar-creative-scope-regression/report.json` passes
+**15** actual-game ship/Moon/ship/Earth checks, optical method, native terrain and
+injected persistence/ascent failures. Images were inspected; page/GPU errors are
+absent, the external Overpass CORS outage is recorded. Full source chain:
+**2,401 passed**. Receipts remain under ignored `output/roadmap-20261010/`.
+
+The Earth arrival image is not accepted as a complete street-visual review; any
+layout concern needs a settled publication capture and geometric evidence before
+altering already repaired road/sidewalk rules. Global creative persistence,
+terrain/farm implementation, multi-body shared storage, live collaboration and
+release/candidate/fallback acceptance remain open.
+
 ## Product structure
 
 Free roam is the persistent personal sandbox. Campaigns are optional journeys
