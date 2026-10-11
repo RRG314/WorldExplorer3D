@@ -127,5 +127,5 @@ try {
  assert.equal(await page.locator('#oceanDiverControls').count(),0);assert.equal(await page.locator('#oceanSwimmingHud').count(),0);report.cases.push({id:'environment-exit-disposes-diver-ui',passed:true});
  assert.deepEqual(report.errors,[]);report.passed=true;
 }catch(error){report.failure=String(error.stack||error);process.exitCode=1;}
-finally{await fs.writeFile(`${dir}/diver-browser.json`,JSON.stringify(report,null,2));await closeOwnedBrowser(owned);await server.close()}
+finally{await fs.writeFile(`${dir}/diver-browser.json`,JSON.stringify(report,null,2));try{await browser.close();}finally{await closeOwnedBrowser(owned);await server.close();}}
 console.log(JSON.stringify(report));

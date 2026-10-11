@@ -122,5 +122,5 @@ try{
  report.cases.push('Remote recovery returns to the original research vessel and disposes streamed scene');
  await page.screenshot({path:`${dir}/parent-recovered.png`});report.requests=requests;assert.deepEqual(report.errors,[]);if(identityBefore)assert.equal(sameArtifactIdentity(identityBefore,artifactIdentity(process.cwd(),root)),true);if(fallbackIdentity)assert.equal(sameArtifactIdentity(fallbackIdentity,artifactIdentity(process.cwd(),fallback)),true);report.artifactIdentity=identityBefore;report.fallbackArtifactIdentity=fallbackIdentity;report.passed=true;
 }catch(error){report.failure=String(error.stack||error);if(page){report.lastState=await page.evaluate(()=>window.getOceanModeDebugState?.()).catch(()=>null);await page.screenshot({path:`${dir}/failure.png`}).catch(()=>{});}process.exitCode=1;}
-finally{await fs.writeFile(`${dir}/report.json`,JSON.stringify(report,null,2));await closeOwnedBrowser(owned);await server.close();}
+finally{await fs.writeFile(`${dir}/report.json`,JSON.stringify(report,null,2));try{await browser.close();}finally{await closeOwnedBrowser(owned);await server.close();}}
 console.log(JSON.stringify(report));

@@ -303,6 +303,6 @@ try {
  report.passed = true;
 } finally {
  await fs.writeFile(`${dir}/entry-browser.json`, JSON.stringify(report, null, 2));
- await closeOwnedBrowser(owned); await server.close();
+ try{await browser.close();}finally{await closeOwnedBrowser(owned);await server.close();}
 }
 console.log(JSON.stringify({ passed: report.passed, cases: report.cases, errors: report.errors }));
