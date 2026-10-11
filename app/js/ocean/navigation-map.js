@@ -1,3 +1,4 @@
+import {OCEAN_DEPTH_MODEL} from './depth-model.js';
 // North-up gameplay map. +X is east, +Z is south. Heights come from the
 // collision sampler; geographic source coverage is an independent overlay.
 export function oceanHeadingDegrees(yaw = 0) {
@@ -24,6 +25,11 @@ export function createSeabedMapData({ sample, centerX = 0, centerZ = 0, halfExte
       }
     }
   }
+  // Geographic bathymetry can span kilometres. Bound contour count before
+  // marching so a steep native-depth tile cannot generate millions of lines.
+  const finite=[...depths].filter(Number.isFinite);
+  const span=finite.length?Math.max(...finite)-Math.min(...finite):0;
+  contourIntervalMeters=Math.max(contourIntervalMeters,Math.ceil(span/24/10)*10,10);
   const contours = [];
   // Marching triangles avoids ambiguous four-edge saddle connections.
   for (let row = 0; row < size - 1; row++) {
@@ -147,7 +153,7 @@ export function drawOceanNavigationMap(appCtx, oceanMode, sample) {
   ctx.moveTo(7, height - 8); ctx.lineTo(7 + width / 4, height - 8); ctx.stroke();
   ctx.fillStyle = '#d3eef1'; ctx.font = '8px sans-serif'; ctx.fillText(scaleText, 7, height - 15);
   ctx.fillText(`${Math.round(heading) % 360}°`, width * .46, height - 15);
-  const detail = `North-up gameplay seabed, 10 m contour interval. Heading ${Math.round(heading) % 360} degrees. ${sourceLabel}: ${modelDepth}. Geographic datum: ${evidence.bathymetry.verticalDatum || 'unknown'}; ≈MSL means assumed mean sea level. Hatched areas lack geographic depth data. Terrain is compressed for gameplay; not a navigation chart. ${landmarks.map((l,i)=>`${String.fromCharCode(65+i)}: ${l.label} (authored)`).join('; ')}`;
+  const detail = `North-up gameplay seabed, ${cached.data.contourIntervalMeters} m contour interval. Heading ${Math.round(heading) % 360} degrees. ${sourceLabel}: ${modelDepth}. Geographic datum: ${evidence.bathymetry.verticalDatum || 'unknown'}; ≈MSL means assumed mean sea level. Hatched areas lack geographic depth data. ${oceanMode.depthProfile?.model===OCEAN_DEPTH_MODEL.GEOGRAPHIC?'Metre-scale seabed. Hatched areas extend nearby model depth for rendering only.':'Terrain is compressed for the authored study.'} Not a navigation chart. ${landmarks.map((l,i)=>`${String.fromCharCode(65+i)}: ${l.label} (authored)`).join('; ')}`;
   const contactDetail=(investigation?.annotations||[]).map(c=>`${c.code}: ${c.label}`).join('; ');canvas.title = detail+' '+contactDetail; canvas.setAttribute('aria-label', detail+' '+contactDetail);
   oceanMode.navigationMapSnapshot = { headingDegrees: heading, halfExtentWorldUnits: halfExtent,
     widthMeters: halfExtent * 2 * units, contourIntervalMeters: 10,

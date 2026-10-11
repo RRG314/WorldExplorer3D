@@ -1,3 +1,5 @@
+import {OCEAN_DEPTH_MODEL} from '../ocean/depth-model.js';
+import {marineStudyOffset} from '../ocean/habitat-plan.js';
 import {parentVesselSubmarinePose} from '../ocean/parent-vessel.js';
 import {DEFAULT_OCEAN_SITE} from '../ocean/launch-site.js';
 import {hasOceanEntry} from '../ocean/entry-policy.js?v=1';
@@ -35,7 +37,8 @@ function startSurfaceResearchVoyage(options={}) {
   // A validated saved voyage restores its existing geographic claim and
   // vessel identity. Only a new selection needs fresh coordinate admission.
   if(!saved&&options.launchSite&&!hasOceanEntry(site,options.entry))return Promise.resolve(false);
-  const voyage=saved||prepareSurfaceVoyage(site,options.waveOffset);
+  const depthProfile=!marineStudyOffset(site).featured&&Number.isFinite(options.entry?.elevationMeters)?{model:OCEAN_DEPTH_MODEL.GEOGRAPHIC,entryDepthMeters:-options.entry.elevationMeters}:{model:OCEAN_DEPTH_MODEL.LEGACY};
+  const voyage=saved||prepareSurfaceVoyage(site,options.waveOffset,depthProfile);
   if(!voyage)return Promise.resolve(false);
   // Admission and record preparation precede any environment or save mutation.
   return transferSubmarineToBoat({...options,source:saved?'ocean-exploration-resume':'ocean-exploration-start',enterDeck:true},voyage);

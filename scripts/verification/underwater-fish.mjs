@@ -79,8 +79,8 @@ try {
 
   const checks = {
     enteredOceanByNormalTouchPath: underwater.diagnostics.environment === 'OCEAN' && underwater.diagnostics.modes?.ocean === true,
-    sharedFishAuthority: underwater.ocean.fishAuthorityVersion === 'water-fish-authority-v2' &&
-      /^water-fish-authority-v2:/.test(underwater.ocean.fishPopulationContextId || ''),
+    sharedFishAuthority: underwater.ocean.fishAuthorityVersion === 'water-fish-authority-v3' &&
+      /^water-fish-authority-v3:/.test(underwater.ocean.fishPopulationContextId || ''),
     deterministicAuthorityBackedSchools: underwater.ocean.underwaterSchoolCount >= 1 &&
       underwater.ocean.underwaterSchoolCount <= 5 &&
       underwater.ocean.underwaterSpeciesIds.length === underwater.ocean.underwaterSchoolCount &&
@@ -96,7 +96,7 @@ try {
     noBrowserErrors: browserErrors.length === 0,
     noFailedLocalResources: localFailures.length === 0
   };
-  const report = { ok: Object.values(checks).every(Boolean), contract: 'underwater-water-fish-authority-v2', checks, animatedFish, underwater, recovered, browserErrors, localFailures, providerDegradations };
+  const report = { ok: Object.values(checks).every(Boolean), contract: 'underwater-water-fish-authority-v3', checks, animatedFish, underwater, recovered, browserErrors, localFailures, providerDegradations };
   console.log(JSON.stringify(report, null, 2));
   assert.equal(report.ok, true, 'Underwater fish authority journey failed.');
 } finally {

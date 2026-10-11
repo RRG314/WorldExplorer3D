@@ -1,3 +1,4 @@
+import {OCEAN_DEPTH_MODEL,geographicBottomY,extendPresentationDepth} from './depth-model.js';
 import {marineStudyOffset} from './habitat-plan.js';
 import {
   DEPTH_TRUTH_TYPE,
@@ -304,7 +305,17 @@ export function createOceanBathymetryApi({
     return -58 + reefLift + shelfLift + ripples - abyssDrop;
   }
 
+  function nativeSeabed(x,z,bathymetry=sampleBathymetryEvidence(x,z)) {
+    const units=Number(appCtx.METERS_PER_WORLD_UNIT)>0?appCtx.METERS_PER_WORLD_UNIT:1.11;
+    const known=Number.isFinite(bathymetry.elevationMeters);
+    const elevation=known?bathymetry.elevationMeters:extendPresentationDepth(oceanMode.globalBathymetryGrid,x,z,oceanMode.depthProfile.entryDepthMeters);
+    return {bathymetry,presentationMode:known?'geographic-bathymetry-metres':'origin-grid-depth-extension',
+      presentationWorldY:geographicBottomY(elevation,units),bathymetryWorldY:known?geographicBottomY(elevation,units):null,
+      proceduralWorldY:null,bathymetryBlend:known?1:0,depthModel:OCEAN_DEPTH_MODEL.GEOGRAPHIC};
+  }
+
   function sampleSeabedHeight(x, z) {
+    if(oceanMode.depthProfile?.model===OCEAN_DEPTH_MODEL.GEOGRAPHIC)return nativeSeabed(x,z).presentationWorldY;
     const procedural = sampleProceduralSeabedHeight(x, z);
     const real = sampleRealSeabedHeight(x, z);
     if (!Number.isFinite(real)) return procedural;
@@ -321,6 +332,7 @@ export function createOceanBathymetryApi({
 
   function sampleSeabedEvidence(x, z) {
     const bathymetry = sampleBathymetryEvidence(x, z);
+    if(oceanMode.depthProfile?.model===OCEAN_DEPTH_MODEL.GEOGRAPHIC)return Object.freeze(nativeSeabed(x,z,bathymetry));
     const proceduralWorldY = sampleProceduralSeabedHeight(x, z);
     const bathymetryWorldY = mapBathymetryMetersToWorldY(bathymetry.elevationMeters);
     if (!Number.isFinite(bathymetryWorldY)) {

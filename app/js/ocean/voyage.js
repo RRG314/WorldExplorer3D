@@ -1,3 +1,4 @@
+import {OCEAN_DEPTH_MODEL,normalizeOceanDepthProfile} from './depth-model.js';
 import {createInvestigationControls} from '../campaign/coastal-investigation-ui.js';
 import {ensureMarineResearch,REEF_SURVEY} from './research-outing.js';
 import {styleMarinePanel} from './interface.js';
@@ -7,9 +8,9 @@ import {createCoastalDepartureControls} from '../campaign/coastal-departure-ui.j
 const id=()=>globalThis.crypto?.randomUUID?.()||`voyage-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 // Preparing an aboard journey allocates data only; it must not create an
 // underwater renderer or write a save before the surface vessel is accepted.
-export function prepareSurfaceVoyage(site,waveOffset={x:0,z:0}) {
+export function prepareSurfaceVoyage(site,waveOffset={x:0,z:0},depthProfile={model:OCEAN_DEPTH_MODEL.LEGACY}) {
  const voyageId=id();
- return validateOceanVoyage({version:1,id:voyageId,subId:`sub:research:${voyageId}`,stage:'aboard',revision:0,savedAt:Date.now(),
+ return validateOceanVoyage({version:2,depthProfile:normalizeOceanDepthProfile(depthProfile),id:voyageId,subId:`sub:research:${voyageId}`,stage:'aboard',revision:0,savedAt:Date.now(),
   site:{...site},waveOffset:{x:Number(waveOffset.x)||0,z:Number(waveOffset.z)||0},
   ship:{transportEntityId:`research:${voyageId}`,transportCatalogId:'ocean-research-vessel',condition:1,yaw:0,anchor:{lat:site.lat,lon:site.lon}},
   sub:{x:0,y:-8.5,z:0,yaw:Math.PI,condition:1}});
@@ -28,7 +29,7 @@ export function ensureOceanVoyage(ctx,{store=createOceanVoyageStore()}={}){
    const previous=current;
    const vessel=options.parentVessel;
    const voyageId=vessel&&previous?.ship.transportEntityId===vessel.transportEntityId?previous.id:id();
-   current={version:1,id:voyageId,subId:previous?.id===voyageId?previous.subId:`sub:${vessel?.transportEntityId||voyageId}`,stage:'underwater',revision:previous?.revision||0,savedAt:Date.now(),
+   current={...(previous?.id===voyageId&&previous.version===1?{version:1}:{version:2,depthProfile:normalizeOceanDepthProfile(ocean.depthProfile)||{model:OCEAN_DEPTH_MODEL.LEGACY}}),id:voyageId,subId:previous?.id===voyageId?previous.subId:`sub:${vessel?.transportEntityId||voyageId}`,stage:'underwater',revision:previous?.revision||0,savedAt:Date.now(),
     site:{...ocean.launchSite},waveOffset:{...ocean.waveOffset},
     ship:{transportEntityId:vessel?.transportEntityId||`research:${voyageId}`,transportCatalogId:vessel?.transportCatalogId||'ocean-research-vessel',condition:vessel?.condition??1,yaw:Number.isFinite(vessel?.yaw)?vessel.yaw:ocean.submarine.yaw,anchor:{lat:ocean.launchSite.lat,lon:ocean.launchSite.lon}},
     sub:{x:ocean.submarine.position.x,y:ocean.submarine.position.y,z:ocean.submarine.position.z,yaw:ocean.submarine.yaw,condition:previous?.id===voyageId?previous.sub.condition:1}};

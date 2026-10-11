@@ -1,3 +1,4 @@
+import {OCEAN_DEPTH_MODEL} from './depth-model.js';
 import { worldUnitsPerSecondToKnots } from '../physics/vehicle-speed-units.js?v=2';
 
 import { drawOceanNavigationMap } from './navigation-map.js?v=1';
@@ -15,6 +16,7 @@ export function updateOceanHud(appCtx, oceanMode, nowSeconds = 0, sampleSeabedEv
   const indDrift = document.getElementById('indDrift');
   const conditionBar = document.getElementById('conditionBar');
   const conditionFill = document.getElementById('conditionFill');
+  const nativeDepth=oceanMode.depthProfile?.model===OCEAN_DEPTH_MODEL.GEOGRAPHIC;
   const diving=!!oceanMode.diver?.active;
   const sub = diving?oceanMode.diver.navigationActor():oceanMode.submarine;
 
@@ -26,7 +28,7 @@ export function updateOceanHud(appCtx, oceanMode, nowSeconds = 0, sampleSeabedEv
   const conditionPct = Math.round(condition * 100);
 
   if (speedUnitLabel) speedUnitLabel.textContent = 'KTS';
-  if (limitLabel) limitLabel.textContent = 'SIM DEPTH';
+  if (limitLabel) limitLabel.textContent = nativeDepth?'DEPTH':'SIM DEPTH';
   if (speedEl) {
     speedEl.textContent = String(Math.round(speedKnots));
     speedEl.classList.remove('fast');
@@ -44,7 +46,7 @@ export function updateOceanHud(appCtx, oceanMode, nowSeconds = 0, sampleSeabedEv
   const lat = oceanMode.launchSite.lat - sub.position.z / appCtx.SCALE;
   const lonDenom = appCtx.SCALE * Math.cos(oceanMode.launchSite.lat * Math.PI / 180);
   const lon = oceanMode.launchSite.lon + sub.position.x / (Math.abs(lonDenom) > 0.0001 ? lonDenom : appCtx.SCALE);
-  if (coordsEl) coordsEl.textContent = `${lat.toFixed(4)}, ${lon.toFixed(4)} | SIM DEPTH ${depth}m`;
+  if (coordsEl) coordsEl.textContent = `${lat.toFixed(4)}, ${lon.toFixed(4)} | ${nativeDepth?'DEPTH':'SIM DEPTH'} ${depth}m`;
   const osmUrl = `https://www.openstreetmap.org/edit?editor=id#map=19/${lat.toFixed(7)}/${lon.toFixed(7)}`;
   document.querySelectorAll('[data-osm-location-link]').forEach((link) => {
     link.href = osmUrl;
@@ -52,7 +54,7 @@ export function updateOceanHud(appCtx, oceanMode, nowSeconds = 0, sampleSeabedEv
     link.setAttribute('aria-disabled', 'false');
   });
   drawOceanNavigationMap(appCtx, oceanMode, sampleSeabedEvidence);
-  if (limitEl) limitEl.title = 'Simulated depth below the game sea surface; terrain depth is compressed for gameplay.';
+  if (limitEl) limitEl.title = nativeDepth?'Metre-scale depth below the game sea surface. Seabed uses the available geographic model; unknown areas are marked on the map.':'Authored study depth below the game sea surface. Seabed is compressed; geographic model depth is separate.';
 
   if (conditionFill) {
     conditionFill.style.width = `${conditionPct}%`;

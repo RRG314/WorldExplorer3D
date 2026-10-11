@@ -1,3 +1,4 @@
+import {verifyOceanEcology,verifyOceanEcologySwitch} from './ocean-ecology-observation.mjs';
 import {readFile,writeFile,unlink} from 'node:fs/promises';
 import {resolve} from 'node:path';
 import {pathToFileURL} from 'node:url';
@@ -38,6 +39,7 @@ export async function verifyCoastalInvestigation({page,dir,report,goDeck,deploy}
  const parked=await page.evaluate(()=>({...marineCtx.oceanMode.submarine.position}));
  await swimTo({x:target.x+3,y:target.y+2.1,z:target.z-2,face:target});await click('coastalDiver');assert.equal(await page.evaluate(()=>marineCtx.marineResearch.investigation.snapshot().views.length),1);
  await page.screenshot({path:`${dir}/direct-target-observation.png`});
+ if(process.env.WE3D_ECOLOGY_CAPTURE==='1')await verifyOceanEcology({page,dir,report});
  await page.evaluate(()=>marineCtx.setPauseReason('investigation-check',true));const paused=await page.evaluate(()=>marineCtx.oceanMode.diver.snapshot());await page.waitForTimeout(250);const held=await page.evaluate(()=>marineCtx.oceanMode.diver.snapshot());assert.deepEqual(held.position,paused.position);assert.equal(held.swimming.airSeconds,paused.swimming.airSeconds);await page.evaluate(()=>marineCtx.setPauseReason('investigation-check',false));
  report.cases.push({id:'survey-scuba-reaches-chosen-target-first-view-pause-retains-air',passed:true});
  await page.evaluate(()=>marineCtx.oceanMode.diver.board(true));await page.locator('#oceanVoyageRecover').click();await page.waitForFunction(()=>marineCtx.boatDeck.active&&!marineCtx.oceanMode.active);await goDeck(6,-23.5);await page.getByLabel('Deck destination').selectOption('lab');await click('coastalDeck');assert.equal(await page.evaluate(()=>marineCtx.marineResearch.investigation.snapshot().phase),'dive');
@@ -73,4 +75,5 @@ export async function verifyCoastalInvestigation({page,dir,report,goDeck,deploy}
   report.cases.push({id:'prescribed-game-client-keyboard-burst-on-actual-attested-ocean-page',passed:true});
  }finally{await unlink(adapter);}
  report.investigation=await page.evaluate(()=>marineCtx.marineResearch.investigation.snapshot());
+ if(process.env.WE3D_ECOLOGY_CAPTURE==='1')await verifyOceanEcologySwitch({page,dir,report});
 }

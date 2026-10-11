@@ -159,7 +159,7 @@ try {
       teardown.fishing.reeling === false && teardown.fishing.givingLine === false && teardown.panelOpen === false,
     mobileControlsRecoverAfterClose: teardown.modesButtonVisible && teardown.modesButtonOwnsHit,
     reopenStartsClean: reopened.open === true && reopened.active === false && reopened.stage === 'idle' &&
-      reopened.accessMode === 'boat' && reopened.populationContext?.authorityVersion === 'water-fish-authority-v2',
+      reopened.accessMode === 'boat' && reopened.populationContext?.authorityVersion === 'water-fish-authority-v3',
     cancellationCreatesNoCatchOrJournalRecord: teardown.fishing.catches === catchesBefore && recordsAfterClose === recordsBefore,
     noBrowserErrors: browserErrors.length === 0,
     noFailedLocalResources: localFailures.length === 0

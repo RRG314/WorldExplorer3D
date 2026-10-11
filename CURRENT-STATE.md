@@ -50,7 +50,30 @@ browsers/servers. Production deployment evidence is under
 `output/release-evidence/current/production-deployment.json` and
 `production-promotion.json`; acceptance gaps remain in their own receipts.
 
-## October 10 current continuation — coherent marine and saved worlds
+## October 10 latest local continuation — ecology and native ocean depth
+
+Marine fish authority v3 now uses coarse reviewed geographic ranges and explicit
+water-column/habitat rules. Fish stay within the shared water volume and avoid
+terrain/hulls; region rebuilds replace the population and dispose shared assets
+once. The final reef/region journey passes 15 controlled actual-game checks,
+including four region visits with a 47-geometry / 41-texture plateau.
+
+New geographic voyages use saved format-2 metre-scale depths. Version-1 voyages
+and the authored Coral Shelf preserve their layout. Submarine hull terrain checks
+reject rising ground without snapping upward. Native depth/custody acceptance
+passes 23 actual-game checks, including deep controls, diver refusal, outage,
+reload, recovery and redeployment of the same vessel/sub/profile. Source chain:
+2,343 passing tests. Exact receipts, earlier verifier failures and limits are in
+`docs/design/WORLD-COHERENCE-DELIVERY.md`.
+
+This remains a bounded ocean outing, with coarse depth data, generic fish visuals,
+no completed global ocean streaming, seasonal ecology or pressure simulation.
+Creative terrain/farming, H10–H12, broader careers/CERN and realism remain open.
+The compatible fallback must preserve both possession v3 and voyage format 2.
+Production, local dist and four retained packages are unchanged. Continue the
+mission lifecycle audit and remaining gates; do not call the full roadmap done.
+
+## October 10 previous continuation — coherent marine and saved worlds
 
 The owner’s expanded marine/creative/farming requirements are integrated in
 `docs/design/WORLD-COHERENCE-DELIVERY.md`. Vessel entry and motion share hull-fit

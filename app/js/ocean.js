@@ -1,3 +1,6 @@
+import {OCEAN_DEPTH_MODEL,normalizeOceanDepthProfile} from './ocean/depth-model.js';
+import {marineStudyOffset} from './ocean/habitat-plan.js';
+import {fetchGebcoDepthEvidence} from './geospatial/bathymetry-evidence.js?v=1';
 import {createOceanSoundscape} from './ocean/soundscape.js';
 import {createMarineHabitat} from './ocean/habitat.js';
 import {getMaritimeCatalogEntry} from './transport/maritime-catalog.js?v=1';
@@ -39,6 +42,7 @@ import {acceptedSimulationDelta} from './runtime/simulation-clock.js';
 
 import {DEFAULT_OCEAN_SITE as OCEAN_SITE} from './ocean/launch-site.js';
 import {submarineVerticalClearance} from './ocean/submarine-envelope.js';
+import {resolveSubmarineTerrainMotion} from './ocean/submarine-terrain-motion.js';
 
 const OCEAN_CONSTANTS = Object.freeze({
   MAX_SPEED: 32.0,
@@ -114,6 +118,7 @@ appCtx.oceanMode = oceanMode;
 const oceanModuleScope = createLifecycleScope('ocean-module');
 let oceanSessionScope = null;
 let oceanSiteGeneration = 0;
+let oceanEntryGeneration = 0;
 
 const _tmpVecA = new THREE.Vector3();
 const _tmpVecB = new THREE.Vector3();
@@ -181,7 +186,17 @@ function createSubmarineMesh() {
 }
 const { clearFishLife, initFishLife, updateFishLife } = createOceanFishLifeApi({
   oceanMode,
-  disposeObject3D
+  disposeObject3D,
+  metersPerUnit:appCtx.METERS_PER_WORLD_UNIT,
+  sampleWater:(x,z)=>oceanMode.waterSurface?.sample(x,z),
+  isBlocked:(point,radius)=>{
+    if(oceanMode.habitat?.collision(point,radius))return true;
+    const sub=oceanMode.submarine?.position;
+    if(sub&&Math.hypot(point.x-sub.x,point.y-sub.y,point.z-sub.z)<4+radius)return true;
+    const diver=oceanMode.diver;
+    if(diver?.active){const p=diver.navigationActor().position;if(Math.hypot(point.x-p.x,point.y-p.y,point.z-p.z)<1.2+radius)return true;}
+    return parentHullCollision(appCtx.oceanVoyage?.current?.ship,point,radius,oceanMode.waterSurface?.sample(0,0)?.surfaceY||0);
+  }
 });
 
 function oceanFishPopulationContext() {
@@ -194,6 +209,7 @@ function oceanFishPopulationContext() {
     waterbodyId: `ocean-site:${latitude.toFixed(4)}:${longitude.toFixed(4)}`,
     waterKind: 'open_ocean',
     waterClass: 'marine',
+    habitat:oceanMode.habitat?.plan.featured?'coral-reef':'unknown',
     waterLabel: String(site.name || site.region || 'Ocean Site'),
     sourceDataset: 'world-explorer-reviewed-ocean-site',
     sourceTruth: 'modeled-ocean-environment',
@@ -226,6 +242,9 @@ function rebuildOceanTerrainLayers(scene = oceanMode.scene, renderer = oceanMode
 
   oceanMode.seabedMesh = seabed;
   oceanMode.reefGroup = reef;
+  // A changed site or late depth grid invalidates the old school envelope.
+  // Rebuild through its existing owner so old-region fish/resources cannot stay.
+  if(oceanMode.fishPopulationContext)initFishLife(scene,oceanFishPopulationContext());
 }
 
 function createOceanScene() {
@@ -466,7 +485,7 @@ function placeSubmarineClearOfParent() {
 function updateSubmarine(dt,time) {
   placeSubmarineClearOfParent();
   const sub = oceanMode.submarine;
-  const previousPosition={x:sub.position.x,y:sub.position.y,z:sub.position.z};
+  const previousPosition={x:sub.position.x,y:sub.position.y,z:sub.position.z,yaw:sub.yaw,pitch:sub.pitch,roll:sub.roll};
   const motionDt=appCtx.sharedMarine?.active&&!appCtx.sharedMarine.canPilot?0:dt;
   const actions = motionDt>0 ? appCtx.readControlActions?.('ocean') || {} : {};
   const forwardInput = Number(actions.move) || 0;
@@ -508,13 +527,12 @@ function updateSubmarine(dt,time) {
   sub.pitch += (targetPitch - sub.pitch) * expApproachFactor(5.6, dt);
   sub.roll += (targetRoll - sub.roll) * expApproachFactor(4.5, dt);
 
-  const floorY = sampleSeabedHeight(sub.position.x, sub.position.z);
+  const lowerLimit=oceanMode.depthProfile?.model===OCEAN_DEPTH_MODEL.GEOGRAPHIC?-12000/(appCtx.METERS_PER_WORLD_UNIT||1.11):OCEAN_CONSTANTS.HARD_MIN_Y;
+  const terrainMotion=resolveSubmarineTerrainMotion(previousPosition,{...sub.position,yaw:sub.yaw,pitch:sub.pitch,roll:sub.roll},sampleSeabedHeight,{lowerLimit,scale:OCEAN_CONSTANTS.SUB_SCALE,minimumClearance:OCEAN_CONSTANTS.MIN_CLEARANCE});
+  sub.position.set(terrainMotion.pose.x,terrainMotion.pose.y,terrainMotion.pose.z);
+  sub.yaw=terrainMotion.pose.yaw;sub.pitch=terrainMotion.pose.pitch;sub.roll=terrainMotion.pose.roll;
+  if(terrainMotion.blocked){sub.speed=0;sub.turnSpeed=0;sub.verticalSpeed=Math.max(0,sub.verticalSpeed);oceanMode.contactUntil=time+1.2;}
   const clearance = submarineVerticalClearance(sub.pitch, sub.roll, OCEAN_CONSTANTS.SUB_SCALE);
-  const minY = Math.max(floorY + Math.max(OCEAN_CONSTANTS.MIN_CLEARANCE, clearance.below), OCEAN_CONSTANTS.HARD_MIN_Y);
-  if (sub.position.y < minY) {
-    sub.position.y = minY;
-    if (sub.verticalSpeed < 0) sub.verticalSpeed = 0;
-  }
   const water = oceanMode.waterSurface.sample(sub.position.x,sub.position.z,{time});
   const ceilingY = water.surfaceY - clearance.above;
   oceanMode.waterSample = water.volume;
@@ -579,7 +597,7 @@ function animateOceanMode(nowMs = 0) {
     oceanMode.weatherRefreshTimer = 0;
     void appCtx.refreshLiveWeather(false);
   }
-  updateFishLife(nowMs * 0.001);
+  updateFishLife(nowMs * 0.001,dt);
 
   if (oceanMode.marineParticles) {
     oceanMode.marineParticles.rotation.y += dt * 0.02;
@@ -598,6 +616,24 @@ async function startOceanMode(options = {}) {
   // Reject before exiting Earth or replacing an existing ocean session.
   if (options.launchSite && !savedEntry && !hasOceanEntry(options.launchSite, options.entry)) return false;
   if (!options.launchSite) options = { ...options, launchSite: OCEAN_SITE };
+  const request=++oceanEntryGeneration;
+  const prior=appCtx.oceanVoyage?.current;
+  const oldParent=prior?.version===1&&prior.ship.transportEntityId===options.parentVessel?.transportEntityId;
+  let depthProfile=resume?.version===2?normalizeOceanDepthProfile(resume.depthProfile):null;
+  if(!depthProfile&&prior?.version===2&&prior.ship.transportEntityId===options.parentVessel?.transportEntityId
+    &&Math.abs(prior.site.lat-options.launchSite.lat)<1e-6&&Math.abs(prior.site.lon-options.launchSite.lon)<1e-6)depthProfile=normalizeOceanDepthProfile(prior.depthProfile);
+  if(!depthProfile && (resume?.version===1||oldParent||options.sharedVoyage||marineStudyOffset(options.launchSite).featured))depthProfile={model:OCEAN_DEPTH_MODEL.LEGACY};
+  if(!depthProfile){
+    let depth=Number.isFinite(options.entry?.elevationMeters)?-options.entry.elevationMeters:null;
+    if(depth===null){
+      try{depth=(await fetchGebcoDepthEvidence(options.launchSite.lat,options.launchSite.lon)).depthMeters;}
+      catch{appCtx.showToast?.('Depth data is unavailable. Stay aboard and retry the dive.');return false;}
+    }
+    depthProfile=normalizeOceanDepthProfile({model:OCEAN_DEPTH_MODEL.GEOGRAPHIC,entryDepthMeters:depth});
+    if(!depthProfile)return false;
+  }
+  if(request!==oceanEntryGeneration||options.isTransferCurrent?.()===false)return false;
+  oceanMode.depthProfile=depthProfile;
   const siteGeneration=++oceanSiteGeneration;
   const currentSite=()=>siteGeneration===oceanSiteGeneration&&oceanMode.active&&!!oceanMode.scene;
   if (oceanMode.active) {
@@ -704,6 +740,7 @@ async function startOceanMode(options = {}) {
 }
 
 function stopOceanMode(options = {}) {
+  oceanEntryGeneration++;
   const wasActive = !!oceanMode.active;
   if(wasActive)appCtx.oceanVoyage?.checkpoint();
   oceanMode.active = false;
@@ -796,6 +833,7 @@ function getOceanModeDebugState() {
     sharedVoyage:marine?.active?{stage:marine.state?.stage,revision:marine.state?.revision,observations:marine.state?.manifest.length,canPilot:appCtx.sharedMarine.canPilot,transition:marine.transition,error:marine.error}:null,
     active: !!oceanMode.active,
     launchSite: { ...oceanMode.launchSite },
+    depthProfile:oceanMode.depthProfile?{...oceanMode.depthProfile}:null,
     navigationMap: oceanMode.navigationMapSnapshot || null,
     water: oceanMode.waterSample || null,
     diver:oceanMode.diver?.snapshot() || null,

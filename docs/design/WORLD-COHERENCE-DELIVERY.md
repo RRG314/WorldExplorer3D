@@ -182,3 +182,72 @@ page errors. Direct target, portrait dive and same-vessel wet-lab report images
 were inspected. Final `verify:pr`: 2,331 passing tests plus the complete source
 chain and unresolved-name gate. The source gate initially rejected a mixed v1/v3
 import of world geometry; that was aligned to the existing v3 identity and rerun.
+
+
+## Regional ecology and geographic depth continuation
+
+Marine population authority v3 adds reviewed coarse geographic eligibility for
+nine existing species, explicit water-column depth bands and habitat exclusions.
+An unknown longitude no longer admits a marine pool. The stable bluefin ID now
+specifically represents Atlantic bluefin. The rectangles and depth bands are
+bounded game rules, not occurrence polygons or a live abundance estimate.
+Freshwater still uses the older water-kind/latitude rules; seasonal ecology and
+licensed species-specific visuals remain unfinished.
+
+Actual fish placement samples the same water volume as the diver: surface,
+rendered bed and metres per scene unit. Bottom-associated species cannot float
+above an abyssal bottom. Seeded schools avoid terrain, habitat and vessel/player
+hulls with bounded motion. A region/bed rebuild removes the previous population;
+shared fish mesh buffers are disposed only after their final instances detach.
+The unused procedural shark builder was removed; this adds no advertised shark,
+whale, dolphin or squid encounter.
+
+`reef-ecology-final/browser.json` passes 15 actual-game checks. Eight reef fish
+remain visible and move within their water/habitat envelope over 180 frames.
+Four Florida/Ryukyu visits replace the former population; geometry/texture counts
+return to 47/41 on each repeat visit. This bounded test does not certify a long
+continuous voyage. Ordinary diver/target and portrait captures were inspected;
+the separate fish close-up uses a controlled asset-review camera. Generic fish
+silhouettes and sparse habitat remain visual deficiencies. An earlier lifecycle
+verifier incorrectly compared a short browser-sampling interval with the game's
+whole-frame motion; it remains a failed receipt. The final verifier uses the
+simulation's frame clock and production fish updates accept simulation delta.
+
+New geographic voyages outside the preserved Coral Shelf study use the saved
+`geographic-metres-v1` depth profile in voyage format 2. Terrain, water volume,
+map and diver/sub HUD use the same metres-per-unit transform, including deep
+water. Version-1 voyages and the authored study keep their previous layout.
+Missing grid cells and coordinates beyond the finite grid use a presentation
+extension while the evidence remains unknown. A provider outage can reuse the
+accepted origin depth; it cannot invent a surveyed depth. The 5×5 provider grid
+is coarse, non-navigation data, and the 1,200-unit outing boundary remains.
+This is not yet continuous ocean streaming, a precision coastline, a pressure
+simulation or a solution for the mislocated legacy shallow study.
+
+Submarine terrain motion now samples the measured hull footprint and sweeps
+bounded movement/turn steps. It rejects a rising seabed instead of snapping the
+craft upward; ordinary descent can settle onto a level bed. Ascent out of a
+late-data overlap remains possible. Tests cover these differences and unknown
+floor rejection; the sampling interval is 1.25 scene units, not a guarantee for
+arbitrarily thin unrepresented geometry. Habitat collision remains its owner.
+
+The complete source chain passes 2,343 tests, including native depth, format-1
+preservation/format-2 persistence, bounded contour generation and submarine
+terrain motion. Actual browser depth/custody acceptance is recorded separately
+below. Release must now also test format-2 voyages through a compatible fallback;
+the older production/fallback cannot be assumed to support the new format.
+
+
+`native-depth-accepted/entry-browser.json` passes 23 actual-game checks with no
+page errors: ordinary menu selection, loaded research deck/cradle, 30 m native
+bed, actual deep-water controls beyond the former -210 limit, stopped-craft
+human exit refusal, version-1 resume, provider outage, map/water agreement,
+real chart/helm/deck traversal, same-vessel recovery, actual reload and same-sub
+redeployment retaining the 80 m origin profile. The prescribed keyboard client
+runs on the same attested page. Desktop and narrow-layout images were inspected.
+Earlier `native-depth-entry`, `native-depth-entry-final` and
+`native-depth-custody` receipts remain failures: respectively an attempted click
+of a correctly disabled button, an obsolete deck waypoint, and a premature
+assertion before the asynchronous vessel load committed recovery. The verifier
+now uses the current layout and completed transfer state; those failures did not
+justify changing correct gameplay or weakening the acceptance requirement.

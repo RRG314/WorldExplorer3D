@@ -1,6 +1,7 @@
+import { MARINE_SPECIES_RULES, marineSpeciesEligible } from './marine-species-rules.js';
 import { FISH_SPECIES, generateFish } from './catalog.js?v=2';
 
-const FISH_POPULATION_AUTHORITY_VERSION = 'water-fish-authority-v2';
+const FISH_POPULATION_AUTHORITY_VERSION = 'water-fish-authority-v3';
 
 const ACCESS_PROFILES = Object.freeze({
   shore: Object.freeze({
@@ -63,12 +64,13 @@ function stableUnit(value) {
   return (hash >>> 0) / 0x100000000;
 }
 
-function gameCatalogCandidates(waterKind, latitude, accessMode) {
+function gameCatalogCandidates(waterKind, latitude, accessMode, longitude, habitat) {
   const lat = finiteOrNull(latitude);
   if (lat === null || Math.abs(lat)>90) return [];
   const accessEligible = FISH_SPECIES.filter((species) => accessMode !== 'shore' || SHORE_GAMEPLAY_SPECIES.has(species.id));
   const exact = accessEligible.filter((species) => (
     species.waterKinds.includes(waterKind) && lat >= species.latitude[0] && lat <= species.latitude[1]
+    && marineSpeciesEligible(species.id,{latitude:lat,longitude,habitat})
   ));
   return exact.map((species) => species.id);
 }
@@ -79,7 +81,9 @@ function createFishPopulationContext(options = {}) {
   const waterKind = normalizedWaterKind(options.waterKind);
   const latitude = finiteOrNull(options.latitude);
   const waterbodyId = String(options.waterbodyId || `unresolved-water:${waterKind}`).slice(0, 220);
-  const eligible = gameCatalogCandidates(waterKind, latitude, accessMode);
+  const longitude=finiteOrNull(options.longitude);
+  const habitat=String(options.habitat || 'unknown');
+  const eligible = gameCatalogCandidates(waterKind, latitude, accessMode, longitude, habitat);
   const candidateSpeciesIds = unique(options.candidateSpeciesIds || eligible).filter(id => eligible.includes(id));
   const sourceDataset = String(options.sourceDataset || 'unresolved-water-source').slice(0, 120);
   const sourceTruth = String(options.sourceTruth || (
@@ -102,7 +106,8 @@ function createFishPopulationContext(options = {}) {
     access: Object.freeze({ mode: accessMode, ...accessProfile }),
     environment: Object.freeze({
       latitude,
-      longitude: finiteOrNull(options.longitude),
+      longitude,
+      habitat,
       season: String(options.season || 'not-evaluated'),
       timeBand: String(options.timeBand || 'not-evaluated'),
       weather: String(options.weather || 'not-evaluated'),
@@ -115,8 +120,12 @@ function createFishPopulationContext(options = {}) {
     evidence: Object.freeze({
       populationTruth: 'gameplay-model-only',
       populationConfidence: 'not-a-population-survey',
-      candidatePoolBasis: String(options.candidatePoolBasis || 'we3d-game-catalog-water-kind-latitude-access-v2').slice(0,120),
+      candidatePoolBasis: String(options.candidatePoolBasis || 'we3d-water-geographic-range-access-v3').slice(0,120),
       regionalEcologyPackApplied: false,
+      marineRangeRulesApplied: true,
+      rangeTruth: 'coarse-game-eligibility-not-occurrence',
+      freshwaterRangeTruth: 'legacy-water-kind-latitude-only',
+      seasonalityApplied: false,
       regionalExclusionReason: 'regional-catalog-is-not-catch-probability-evidence',
       livePresenceClaim: false,
       measuredAbundanceClaim: false,
@@ -155,7 +164,11 @@ function createUnderwaterSchoolPlan(context, options = {}) {
       behavior: species?.behavior || 'schooling',
       rarity: species?.rarity || 'common',
       visual: Object.freeze({ ...(species?.visual || {}) }),
-      count: Math.max(8, 24 - index * 3),
+      count: MARINE_SPECIES_RULES[speciesId]?.groupSize || 8,
+      spawnDepthMeters: MARINE_SPECIES_RULES[speciesId]?.spawnDepthMeters || Object.freeze([1,20]),
+      waterColumnPosition: MARINE_SPECIES_RULES[speciesId]?.position || 'water-column',
+      lengthCm: Object.freeze([...(species?.length || [24,78])]),
+      spawnDepthTruth: 'authored-game-presentation-band',
       visualTruth: 'generated-game-school',
       populationEvidence: context.evidence.populationTruth,
       livePresenceClaim: false,
@@ -187,6 +200,8 @@ function selectFishFromPopulation(context, options = {}) {
   const fish = generateFish({
     waterKind: context.waterbody.waterKind,
     latitude: context.environment.latitude,
+    longitude: context.environment.longitude,
+    habitat: context.environment.habitat,
     allowedSpeciesIds: candidateSpeciesIds,
     random: typeof options.random === 'function' ? options.random : Math.random
   });
