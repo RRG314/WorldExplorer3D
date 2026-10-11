@@ -35,6 +35,28 @@ is not a full recovery/import tool. Atomic chunked persistence, worldwide creati
 identity, terrain/farm simulation and the compatible release roundtrip remain
 open; no production package was changed.
 
+## October 11 street publication dependency repair
+
+The actual Moon-to-Earth regression led to a settled-arrival investigation. A
+controlled one-kilometre reposition revealed delayed nearby frontage; its early
+image alone was not evidence to change the sidewalk geometry rules. Detail
+publication was also waiting for overview source transfer and city-wide worker
+preparation. Nearby publication now retires unfinished overview work, preserves
+accepted atlas cells, fences late worker replies and resumes uncompleted cells.
+This leaves the road/bridge/tunnel geometry owners intact.
+
+Full source chain: **2,405 passed**. The bounded rendered acceptance at
+`output/roadmap-20261011/street-priority-final/report.json` passes **11** cases:
+pending preparation/cell interruption, return publication, render/contact parity,
+all 344 overview cells, disposal and the captured hill scene compilers. Native
+workers and rendering are real; artificial pending requests control the races.
+No full-city performance claim follows from this fixture.
+
+The larger source-app follow-up was stopped for measured host disk/memory
+pressure, preserved as incomplete, and its owned browser was closed. The
+full-city verifier now has disk preflight and a running safety stop. Full-city
+timing/memory, world-scale storage and the release matrix remain separate gates.
+
 ## Creative room/frame authority continuation
 
 The audit found mismatches between saved scope, collision and rendering: solo

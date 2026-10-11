@@ -15,7 +15,7 @@ test('packet cache is bounded, rejects changed inputs and never returns mutable 
  cache.clear();assert.equal(cache.bytes,0);assert.deepEqual(cache.manifest(),{});
 });
 
-function harness(t){
+function harness(t,{holdType}={}){
  const oldThree=globalThis.THREE,oldWorker=globalThis.Worker,resources=[];
  class Texture{constructor(data,width,height){this.image={data,width,height};resources.push(this);}dispose(){this.disposed=true;}}
  class Vector4{constructor(...v){this.set(...v);}set(...v){this.values=v;}}
@@ -28,13 +28,15 @@ function harness(t){
   terminate(){this.terminated=true;}
   postMessage(data){
    if(data.type==='next')assert.deepEqual(Object.keys(data.focus).sort(),['x','z'],'worker messages must exclude live scene objects');
-   structuredClone(data);calls++;queueMicrotask(()=>{
+   structuredClone(data);calls++;const deliver=()=>{
     if(this.terminated)return;
     if(data.type==='source-begin'||data.type==='source-chunk'){this.onmessage({data:{type:'source-ready'}});return;}
-    if(data.type==='prepare'){this.cursor=0;this.onmessage({data:{type:'prepared',tiles:2,keys:['0:0','16:0'],sourceCells:2,excludedCells:0}});return;}
-    const x=this.cursor++*1024;
-    this.onmessage({data:x>1024?{type:'complete'}:{type:'tile',key:`${x/64}:0`,mask:new Uint8Array(data.resolution**2).fill(255),coveredSquareWorldUnits:4096,remaining:this.cursor<2?1:0}});
-   });
+    if(data.type==='prepare'){this.keys=['0:0','16:0'].filter(key=>!data.completedKeys?.includes(key));this.resumeKeys=data.completedKeys;this.onmessage({data:{type:'prepared',tiles:2,keys:['0:0','16:0'],sourceCells:2,excludedCells:0}});return;}
+    const key=this.keys.shift();
+    this.onmessage({data:key===undefined?{type:'complete'}:{type:'tile',key,mask:new Uint8Array(data.resolution**2).fill(255),coveredSquareWorldUnits:4096,remaining:this.keys.length}});
+   };
+   if(data.type===holdType){this.held={data,deliver};return;}
+   queueMicrotask(deliver);
   }
  };
  t.after(()=>{globalThis.THREE=oldThree;globalThis.Worker=oldWorker;});
@@ -56,6 +58,46 @@ test('terrain coverage survives movement and terrain revisions without rebuildin
  for(let i=0;i<2;i++){overview.step({x:0,z:0});await overview.pause();}
  assert.equal(overview.stats.status,'complete');assert.ok(h.calls>calls);
  overview.dispose();assert.equal(h.material.onBeforeCompile,h.originalCompile);assert.equal(overview.stats.retainedBytes,0);assert.ok(h.worker.terminated);assert.ok(h.resources.every(r=>r.disposed));
+});
+
+for(const holdType of ['source-begin','prepare'])test(`nearby detail interrupts pending ${holdType} without awaiting city preparation`,async t=>{
+ const h=harness(t,{holdType}),overview=createStreetOverview(h.ctx);
+ overview.step({x:0,z:0});
+ for(let i=0;i<20&&!h.worker?.held;i++)await new Promise(resolve=>setImmediate(resolve));
+ assert.equal(h.worker.held.data.type,holdType);
+ const inFlight=overview.pause(),prior=h.worker;
+ await overview.suspendForDetail();await inFlight;
+ assert.equal(prior.terminated,true);assert.equal(overview.stats.status,'suspended');
+ assert.equal(overview.stats.workerActive,false);assert.equal(overview.stats.error,null);
+ assert.equal(overview.stats.completedCells,0);
+ prior.onmessage({data:{type:'tile',key:'bad',mask:new Uint8Array(1),remaining:0}});
+ assert.equal(overview.stats.completedCells,0,'late retired worker data cannot publish');
+ overview.dispose();
+});
+
+test('suspension retains accepted distant cells and resumes remaining work without a replacement atlas',async t=>{
+ const h=harness(t),overview=createStreetOverview(h.ctx);
+ overview.step({x:0,z:0});await overview.pause();
+ const resources=h.resources.length,bytes=overview.stats.retainedBytes;
+ assert.equal(overview.stats.completedCells,1);
+ await overview.suspendForDetail();assert.equal(overview.stats.completedCells,1);
+ assert.equal(overview.stats.retainedBytes,bytes);
+ overview.step({x:1024,z:0});await overview.pause();
+ assert.deepEqual(h.worker.resumeKeys,['0:0']);
+ assert.equal(h.resources.length,resources,'accepted coverage atlas must survive interruption');
+ assert.equal(overview.stats.status,'complete');assert.equal(overview.stats.completedCells,2);
+ assert.equal(overview.stats.coveredSquareWorldUnits,8192);
+ overview.dispose();
+});
+
+test('source replacement after suspension never reuses prior world cell acknowledgements',async t=>{
+ const h=harness(t),overview=createStreetOverview(h.ctx);
+ overview.step({x:0,z:0});await overview.pause();await overview.suspendForDetail();
+ h.ctx.roads=[];
+ overview.step({x:1024,z:0});await overview.pause();
+ assert.deepEqual(h.worker.resumeKeys,[]);assert.equal(overview.stats.completedCells,1);
+ overview.step({x:0,z:0});await overview.pause();assert.equal(overview.stats.status,'complete');
+ overview.dispose();
 });
 
 test('disposed or superseded overview work cannot publish a late cell',async t=>{
@@ -96,6 +138,11 @@ test('actual overview worker covers a multi-kilometre network beyond the old 144
   assert.ok(packet.mask instanceof Uint8Array);if(packet.mask.some(value=>value>0)){if(packet.bounds.minX<384&&packet.bounds.maxX>-384)near++;if(packet.bounds.maxX>1400||packet.bounds.minX<-1400)far++;}
  }
  assert.equal(count,plan.tiles);assert.ok(near>0);assert.ok(far>0,'far pavement must exist, not only source inventory');
+ const resumed=await request({type:'prepare',input:{roads,metersPerWorldUnit:1},completedKeys:plan.keys.slice(1)});
+ assert.deepEqual(resumed,plan,'resumed plans retain the complete coverage inventory');
+ const remaining=await request({type:'next',focus:{x:0,z:0}});
+ assert.equal(remaining.key,plan.keys[0]);assert.equal(remaining.remaining,0);
+ assert.equal((await request({type:'next',focus:{x:0,z:0}})).type,'complete');
  const excluded=await request({type:'prepare',input:{roads:[{type:'motorway',width:20,pts:[{x:-1600,z:0},{x:1600,z:0}],transportRecord:{sourceTags:{highway:'motorway',sidewalk:'no'}}}],metersPerWorldUnit:1}});
  assert.ok(excluded.sourceCells>0);assert.equal(excluded.tiles,0);assert.equal(excluded.excludedCells,excluded.sourceCells);
  assert.equal((await request({type:'next',focus:{x:0,z:0}})).type,'complete');

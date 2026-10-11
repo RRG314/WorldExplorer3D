@@ -1,6 +1,6 @@
 # Current development and release state
 
-Updated October 10, 2026. **5.5.0 is deployed to production.**
+Updated October 11, 2026. **5.5.0 is deployed to production.**
 Release: https://github.com/RRG314/WorldExplorer3D/releases/tag/v5.5.0
 Public project page: https://rrg314.github.io/WorldExplorer3D/
 
@@ -50,7 +50,40 @@ browsers/servers. Production deployment evidence is under
 `output/release-evidence/current/production-deployment.json` and
 `production-promotion.json`; acceptance gaps remain in their own receipts.
 
-## October 10 latest local continuation — creative room and environment isolation
+## October 11 latest local continuation — nearby street publication priority
+
+Actual Earth-return inspection exposed delayed pavement publication, not new
+evidence that the already repaired sidewalk polygons should be redesigned. The
+first controlled arrival filled its nearby frontage after a 67-second rebuild.
+The follow-up measured an additional architectural conflict: detail waited on
+the city overview's whole source/preparation task. Nearby work now interrupts
+that worker, retains accepted atlas cells, rejects late replies and resumes only
+unfinished cells. Roads, bridges, tunnels and sidewalk geometry rules are unchanged.
+Phase durations now distinguish source, terrain, cell, mesh, path and contact work.
+
+Full `verify:pr`: **2,405 tests pass**. `street-priority-final/report.json` passes
+**11** bounded native-worker/Three/browser checks, including held preparation,
+held cell work, return travel, render/contact parity, all **344** overview cells,
+disposal and captured Monaco/San Francisco hill scenes. Images were inspected;
+there were no page/GPU errors. Two old verification pages also used a retired
+road export; they now use the current compiler and local Three runtime.
+
+The full-city follow-up was deliberately stopped when free disk fell below
+1 GiB under memory pressure. It is **not passing** and was not rerun. The owned
+browser was closed; free disk recovered to about 4.2 GiB. Its earlier captured
+initial arrival had matching actor/pavement focus at the origin, 49,023 buildings
+and 18,952 roads. This does not certify full-city latency or memory. That verifier
+now requires 8 GiB free before starting and closes its own browser below 1.5 GiB.
+The prior failed canvas-selector run is also retained as failed evidence.
+
+Evidence: `output/roadmap-20261010/street-arrival-review/`,
+`street-arrival-phases/`, `output/roadmap-20261011/street-priority-final/`;
+source receipt `/tmp/we3d-street-priority-full-source.log`. Worldwide creative
+storage, terrain/farms, expanded oceans/fauna, remaining careers and compatible
+release fallback are still open. Production, dist, four retained packages and
+player data remain unchanged.
+
+## October 10 previous local continuation — creative room and environment isolation
 
 Creative tools now use the room's declared coordinate frame. Solo building
 removals restore visually on room entry and return on exit. Earth edits cannot

@@ -53,7 +53,7 @@ export async function publishStreetPavement(appCtx, options = {}) {
   let partitionSurface = null;
   const profileCache=new Map();
   if (appCtx.onMoon || !appCtx.scene || !appCtx.terrainEnabled) return null;
-  if(appCtx.streetOverview){const sequence=appCtx._worldLoadSequence;await appCtx.streetOverview.pause();if(sequence!==appCtx._worldLoadSequence)return null;}
+  if(appCtx.streetOverview){const sequence=appCtx._worldLoadSequence;await appCtx.streetOverview.suspendForDetail();if(sequence!==appCtx._worldLoadSequence)return null;}
   appCtx._cancelStreetPavementBuild?.();
   const startedAt = performance.now();
   const trace = (phase, detail={}) => { if(new URLSearchParams(location.search).has('streetDiagnostics')) console.info('[StreetPavement]', phase, JSON.stringify(detail)); };
@@ -125,6 +125,9 @@ export async function publishStreetPavement(appCtx, options = {}) {
   };
   const clipGroundSurface=createPortalSurfaceClipper(appCtx.structureTerrainPortalDescriptors);
   const stats = { tiles: 0, triangles: 0, curbTriangles: 0, markingTriangles:0, ramps:0, workerMs: 0, inferredFrontages: 0, managedPaths: managedPaths.length, residentRoads:roadRecords.length, residentBuildings:input.buildings.length, roads: appCtx.roads.length, roadMeshes: appCtx.roadMeshes.length, buildings: appCtx.buildings.length, worldLoadSequence: sequence };
+  const phaseTimes=stats.phaseDurationsMs={};
+  let phaseStart=performance.now();
+  const finishPhase=name=>{const now=performance.now();phaseTimes[name]=Math.round(now-phaseStart);phaseStart=now;trace(name,{durationMs:phaseTimes[name]});};
   const yieldConstruction=()=>appCtx.gameStarted&&!appCtx.worldLoading?yieldToWorldFrame():yieldToMainThread();
   const sliceBudgetMs=appCtx.gameStarted&&!appCtx.worldLoading?2:8;
   const schedule={current:()=>current()&&!cancelled,yieldWork:yieldConstruction,budgetMs:sliceBudgetMs,onSlice:ms=>{stats.maxPublicationSliceMs=Math.max(stats.maxPublicationSliceMs||0,ms);}};
@@ -245,8 +248,10 @@ export async function publishStreetPavement(appCtx, options = {}) {
     }
   try {
     partitionSurface = await createPavementTerrainPartitionCooperatively(appCtx.terrainGroup?.children, {includeFarTerrain:true,bounds:coverageBounds,...schedule});
+    finishPhase('terrain-support');
     const prepared = await request({ type: 'prepare', input, cached:packetCache.manifest(), debug: new URLSearchParams(location.search).has('streetDiagnostics') });
     stats.plannedTiles = prepared.tiles;
+    finishPhase('source-prepare');
     trace('prepared',{tiles:prepared.tiles,paths:managedPaths.length});
     for (;;) {
       if (!current()) { disposeStaged(); return null; }
@@ -313,6 +318,7 @@ export async function publishStreetPavement(appCtx, options = {}) {
       await yieldConstruction();
     }
     if (!current()) { disposeStaged(); return null; }
+    finishPhase('cell-surfaces');
     for (const [key,batch] of batches) {
       const {chunks,length,mat,kind}=batch;
       const positions=new Float32Array(length);let offset=0;
@@ -333,6 +339,7 @@ export async function publishStreetPavement(appCtx, options = {}) {
       await yieldConstruction();
     }
     if(!current()) {disposeStaged();return null;}
+    finishPhase('indexed-meshes');
     stats.drawCalls=staged.length;
     stats.compilerCacheBytes=packetCache.bytes;
     stats.coverageBounds=coverageBounds;
@@ -344,6 +351,7 @@ export async function publishStreetPavement(appCtx, options = {}) {
       buildFeatureRibbonEdges, features: appCtx.linearFeatures, pavementBounds: coverageBounds, worldBaseTerrainY: ground,metersPerWorldUnit,
       portalMasks:appCtx.structureTerrainPortalDescriptors,landuses:appCtx.landuses
     },schedule);
+    finishPhase('mapped-paths');
     trace('mapped-paths-complete',{batches:stagedLines.length});
     // Publish all surfaces and contact data together. Old coverage is retained until this point.
     const mappedContacts=await mappedPavementContactSources(appCtx.landuseMeshes,schedule);
@@ -353,6 +361,7 @@ export async function publishStreetPavement(appCtx, options = {}) {
       stagedWalkContactIndex=await createRoadContactIndexCooperatively(selectLinearWalkContactMeshes(nextLines),16,schedule);
     }
     if(!current()||cancelled){disposeLines();disposeStaged();return null;}
+    finishPhase('contact-indexes');
     batches.clear();
     stats.indexBytes=staged.reduce((sum,mesh)=>sum+(mesh.geometry.index?.array.byteLength||0),0);
     stats.positionBytes = staged.reduce((sum, mesh) => sum + mesh.geometry.attributes.position.array.byteLength, 0);
