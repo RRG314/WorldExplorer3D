@@ -8,6 +8,12 @@ const RARITY = Object.freeze({
 
 const FISH_SPECIES = Object.freeze([
   {
+    id:'barramundi',name:'Barramundi',waterKinds:['coastal','harbor','channel','river'],
+    latitude:[-26,-10],length:[35,110],trophyLength:95,condition:1.1,
+    strength:.8,rarity:'uncommon',behavior:'surge',
+    visual:{assetId:'marine-barramundi',body:'#85917e',belly:'#d1d5ca',fin:'#5b6859',shape:'bass'}
+  },
+  {
     id: 'largemouth_bass', name: 'Largemouth Bass', waterKinds: ['lake', 'river', 'channel'],
     latitude: [-48, 58], length: [24, 78], trophyLength: 61, condition: 1.08,
     strength: 0.48, rarity: 'common', behavior: 'head-shake',

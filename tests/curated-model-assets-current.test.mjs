@@ -360,3 +360,18 @@ test('tree LOD material maps are byte-identical to their primary model', async (
     }
   }
 });
+
+test('licensed barramundi retains bounded textured geometry and reproducible CC0 provenance',()=>{
+ const asset=getModelAsset('marine-barramundi');
+ const {bytes,json}=readGlbAssetMetadata(path.join(root,asset.url.slice(1)));
+ const provenance=JSON.parse(fs.readFileSync(path.join(root,'app/assets/models/marine/barramundi/PROVENANCE.json'),'utf8'));
+ assert.equal(asset.license,'CC0-1.0');assert.equal(provenance.author,'Microsoft');
+ assert.equal(crypto.createHash('sha256').update(bytes).digest('hex'),provenance.sha256);
+ assert.ok(bytes.length<=asset.budgets.bytes);assert.ok(triangleCount(json)<=asset.budgets.triangles);
+ assert.equal(triangleCount(json),3864);assert.equal(json.images.length,3);
+ assert.equal(json.materials.length,1);assert.ok(json.materials[0].normalTexture);assert.ok(json.materials[0].pbrMetallicRoughness.baseColorTexture);
+ assert.ok((json.images||[]).every(image=>Number.isInteger(image.bufferView)&&!image.uri));
+ assert.ok((json.buffers||[]).every(buffer=>!buffer.uri));assert.deepEqual(json.extensionsRequired||[],[]);
+ assert.ok(provenance.textures.every(t=>t.dimensions.every(n=>n<=1024)));
+ assert.deepEqual(asset.instancePolicy,{geometry:'shared',materials:'clone'});assert.equal(asset.budgets.maxInstances,3);
+});

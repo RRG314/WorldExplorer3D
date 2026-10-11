@@ -50,7 +50,24 @@ browsers/servers. Production deployment evidence is under
 `output/release-evidence/current/production-deployment.json` and
 `production-promotion.json`; acceptance gaps remain in their own receipts.
 
-## October 10 latest local continuation — mission and water custody
+## October 10 latest local continuation — first licensed swimming fish
+
+Northern Australian coastal encounters can now use the reviewed Microsoft
+barramundi model (CC0): textured, normal-mapped geometry with authored tail motion,
+real catalogue size and regional/water/depth eligibility. It is 2.75 MB / 3,864
+triangles with shared model resources and three individuals per population.
+Loading, cancellation, region retirement and failed assets are covered; an
+unavailable licensed model is not replaced by a generic stand-in.
+
+The final marine journey passes 28 actual-game checks, including four region
+visits with the same renderer resource counts on return and zero released-region
+asset leases. Full source chain: 2,356 tests pass. Images and scope are in the
+coherence ledger. Other fish remain generated visuals; whales, dolphins, deep
+squid, global ocean streaming, terrain/farms and remaining careers are not done.
+Continue H10–H12's real Sol/Moon journey and the remaining finite gates. Production,
+dist and all four retained packages remain unchanged.
+
+## October 10 previous local continuation — mission and water custody
 
 Space scans now cancel when eligibility changes; old callbacks cannot award a
 new mission. Resuming an earlier mission is explicit. Corrupt/future mission

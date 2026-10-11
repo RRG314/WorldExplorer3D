@@ -1,3 +1,4 @@
+import {verifyLicensedOceanFish} from './licensed-ocean-fish.mjs';
 import assert from 'node:assert/strict';
 import {runPrescribedGameActions} from './prescribed-game-actions.mjs';
 import {deployResearchSubmarineFromDeck} from './marine-entry-ui.mjs';
@@ -25,6 +26,7 @@ try {
  const page = await context.newPage();
  await configureStagingAppCheck(page,`http://127.0.0.1:${server.port}`);
  page.on('pageerror', error => report.errors.push(error.message));
+ page.on('console',message=>{if(message.type()==='error'&&/WebGLProgram|shader error/i.test(message.text()))report.errors.push(message.text());});
  page.on('console', message => {if(message.text().includes('[BoatMode]')) (report.boatWarnings ||= []).push(message.text());});
  await page.goto(`http://127.0.0.1:${server.port}/`, { waitUntil: 'load' });
  await page.locator('#landingPrimaryCta').click();
@@ -299,6 +301,7 @@ try {
  const retried=await page.evaluate(async()=>{const ctx=waterCheckContext;const started=await ctx.transferBoatToSubmarine({source:'moved-depth-retry'});return {started,profile:ctx.oceanMode.depthProfile,site:ctx.oceanMode.launchSite,subId:ctx.oceanVoyage.current.subId,water:ctx.oceanVoyage.current.waterContext};});
  assert.equal(retried.started,true);assert.equal(retried.profile.entryDepthMeters,60);assert.equal(retried.subId,voyageBefore.subId);assert.equal(retried.water.waterKind,'coastal');assert.equal(retried.profile.origin.lat,retried.site.lat);assert.equal(retried.profile.origin.lon,retried.site.lon);
  report.cases.push({id:'moved-vessel-retry-adopts-new-native-depth-with-same-submarine',passed:true});
+ if(process.env.WE3D_VERIFY_LICENSED_FISH==='1')await verifyLicensedOceanFish({page,dir,report});
  assert.deepEqual(report.errors, []);
  report.passed = true;
 } finally {

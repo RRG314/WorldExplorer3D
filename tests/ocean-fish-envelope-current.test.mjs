@@ -58,3 +58,35 @@ test('real Three fish stay bounded above changing bed, outside reef, and dispose
   api.clearFishLife(scene);assert.equal(scene.children.length,0);
  }finally{api.clearFishLife(scene);if(previous===undefined)delete globalThis.THREE;else globalThis.THREE=previous;}
 });
+
+test('licensed animals admit only their reviewed region, water and depth plan',()=>{
+ const context=opts=>createFishPopulationContext({latitude:-12.5,longitude:130.9,waterKind:'coastal',accessMode:'underwater',...opts});
+ assert.ok(context().candidateSpeciesIds.includes('barramundi'));
+ for(const options of [{longitude:-80},{latitude:35},{waterKind:'open_ocean'},{habitat:'coral-reef'},{habitat:'abyssal-bottom'}])assert.equal(context(options).candidateSpeciesIds.includes('barramundi'),false);
+ assert.ok(context({waterKind:'river',habitat:'freshwater'}).candidateSpeciesIds.includes('barramundi'));
+});
+test('late animal assets cannot repopulate a retired region; current instances animate, pause and release once',async()=>{
+ const previous=globalThis.THREE;globalThis.THREE=THREE;
+ const scene=new THREE.Scene(),mode={fishEntities:[],fishSchools:[]},loads=[],leases=[];
+ const ctx=createFishPopulationContext({latitude:-12.5,longitude:130.9,waterKind:'coastal',accessMode:'underwater',candidateSpeciesIds:['barramundi']});
+ const api=createOceanFishLifeApi({oceanMode:mode,disposeObject3D(){},sampleWater:()=>({volume:volume()}),loadVisual:()=>new Promise(resolve=>loads.push(()=>{
+  const lease={root:new THREE.Group(),updates:[],count:0,update(phase){this.updates.push(phase)},dispose(){this.count++}};leases.push(lease);resolve(lease);
+ }))});
+ try{
+  api.initFishLife(scene,ctx);const first=mode.fishVisualsReady;assert.equal(loads.length,3);assert.ok(mode.fishEntities.every(f=>!f.mesh.visible));
+  api.initFishLife(scene,ctx);assert.equal(loads.length,6);loads.slice(0,3).forEach(done=>done());await first;assert.ok(leases.every(l=>l.count===1));assert.ok(mode.fishEntities.every(f=>f.mesh.children.length===0));
+  loads.slice(3).forEach(done=>done());await mode.fishVisualsReady;api.updateFishLife(10,.05);assert.ok(mode.fishEntities.every(f=>f.mesh.visible&&f.visualState==='licensed'));
+  const phases=leases.slice(3).map(l=>l.updates.at(-1));api.updateFishLife(1000,0);assert.deepEqual(leases.slice(3).map(l=>l.updates.at(-1)),phases);
+  api.updateFishLife(1001,.05);assert.ok(leases.slice(3).every((l,i)=>l.updates.at(-1)>phases[i]));
+  api.clearFishLife();api.clearFishLife();assert.equal(scene.children.length,0);assert.ok(leases.every(l=>l.count===1));
+ }finally{api.clearFishLife();if(previous===undefined)delete globalThis.THREE;else globalThis.THREE=previous;}
+});
+test('unavailable licensed animal does not become a generic species stand-in',async()=>{
+ const previous=globalThis.THREE;globalThis.THREE=THREE;
+ const mode={fishEntities:[],fishSchools:[]},scene=new THREE.Scene();
+ const api=createOceanFishLifeApi({oceanMode:mode,disposeObject3D(){},sampleWater:()=>({volume:volume()}),loadVisual:async()=>{throw Error('asset unavailable')}});
+ try{
+  api.initFishLife(scene,createFishPopulationContext({latitude:-12.5,longitude:130.9,waterKind:'coastal',accessMode:'underwater',candidateSpeciesIds:['barramundi']}));
+  await mode.fishVisualsReady;api.updateFishLife(1,.1);assert.ok(mode.fishEntities.every(f=>f.visualState==='unavailable'&&!f.mesh.visible&&f.mesh.children.length===0));
+ }finally{api.clearFishLife();if(previous===undefined)delete globalThis.THREE;else globalThis.THREE=previous;}
+});

@@ -29,7 +29,7 @@ const ACCESS_PROFILES = Object.freeze({
 
 const SHORE_GAMEPLAY_SPECIES = new Set([
   'largemouth_bass', 'rainbow_trout', 'northern_pike', 'channel_catfish',
-  'common_carp', 'striped_bass', 'red_drum', 'summer_flounder'
+  'common_carp', 'striped_bass', 'red_drum', 'summer_flounder', 'barramundi'
 ]);
 
 function normalizedWaterKind(value) {
@@ -169,7 +169,7 @@ function createUnderwaterSchoolPlan(context, options = {}) {
       waterColumnPosition: MARINE_SPECIES_RULES[speciesId]?.position || 'water-column',
       lengthCm: Object.freeze([...(species?.length || [24,78])]),
       spawnDepthTruth: 'authored-game-presentation-band',
-      visualTruth: 'generated-game-school',
+      visualTruth: species?.visual?.assetId ? 'licensed-species-model-authored-motion' : 'generated-game-school',
       populationEvidence: context.evidence.populationTruth,
       livePresenceClaim: false,
       measuredAbundanceClaim: false

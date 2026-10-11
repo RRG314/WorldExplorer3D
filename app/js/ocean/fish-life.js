@@ -1,7 +1,8 @@
+import {loadFishVisual} from './fish-visual.js';
 import {fitFishToWater,fishSeededRandom} from './fish-water-envelope.js';
 import { createUnderwaterSchoolPlan } from '../fishing/population-authority.js?v=2';
 
-export function createOceanFishLifeApi({ oceanMode, disposeObject3D, sampleWater, isBlocked=()=>false, metersPerUnit=1 }) {
+export function createOceanFishLifeApi({ oceanMode, disposeObject3D, sampleWater, isBlocked=()=>false, metersPerUnit=1,loadVisual=loadFishVisual }) {
   const _tmpVecA = new THREE.Vector3();
 
   function createFishTemplate(options = {}) {
@@ -29,19 +30,20 @@ export function createOceanFishLifeApi({ oceanMode, disposeObject3D, sampleWater
     return group;
   }
 
-  let templates=[],lastTime=null;
+  let templates=[],lastTime=null,simulationTime=0,visualGeneration=0,visualController=null;
   function clearFishLife() {
-    for(const fish of oceanMode.fishEntities)fish.mesh?.parent?.remove(fish.mesh);
+    visualGeneration++;visualController?.abort();visualController=null;
+    for(const fish of oceanMode.fishEntities){fish.visual?.dispose();fish.mesh?.parent?.remove(fish.mesh);}
     // Instances share template buffers/materials. Dispose once, only after the
     // last instance detaches; never dispose a template while clones still live.
     const geometry=new Set(),materials=new Set();
-    for(const root of templates)root.traverse(child=>{
+    for(const root of templates)root?.traverse(child=>{
       if(child.geometry)geometry.add(child.geometry);
       for(const material of [].concat(child.material||[]))materials.add(material);
     });
     for(const item of geometry)item.dispose();
     for(const item of materials)item.dispose();
-    templates=[];lastTime=null;
+    templates=[];lastTime=null;simulationTime=0;
     oceanMode.fishEntities=[];oceanMode.fishSchools=[];
     oceanMode.underwaterSchoolPlan=null;oceanMode.fishPopulationContext=null;
     if(oceanMode.sharkEntity?.mesh)disposeObject3D(oceanMode.sharkEntity.mesh);
@@ -58,7 +60,9 @@ export function createOceanFishLifeApi({ oceanMode, disposeObject3D, sampleWater
     clearFishLife();
     const schoolPlan=createUnderwaterSchoolPlan(populationContext,{maximumSchools:5});
     oceanMode.fishPopulationContext=populationContext;oceanMode.underwaterSchoolPlan=schoolPlan;
+    oceanMode.fishVisualsReady=Promise.resolve();
     if(!schoolPlan.playable)return;
+    const generation=visualGeneration;visualController=new AbortController();const signal=visualController.signal,pending=[];
     const random=fishSeededRandom(populationContext.contextId);
     const offset=oceanMode.habitat?.plan?.offset || {x:0,z:0};
     const anchors=[[-38,66],[36,112],[-46,157],[92,178],[-103,118]];
@@ -70,7 +74,7 @@ export function createOceanFishLifeApi({ oceanMode, disposeObject3D, sampleWater
       return {...school,anchor:new THREE.Vector3(x,y,z),center:new THREE.Vector3(x,y,z),radius:12+index*3,
         speed:.08+random()*.045,verticalAmp:1.4,driftPhase:random()*Math.PI*2};
     });
-    templates=oceanMode.fishSchools.map(school=>createFishTemplate({bodyColor:school.visual?.body,finColor:school.visual?.fin}));
+    templates=oceanMode.fishSchools.map(school=>school.visual?.assetId?null:createFishTemplate({bodyColor:school.visual?.body,finColor:school.visual?.fin}));
     oceanMode.fishSchools.forEach((school,schoolIndex)=>{
       for(let i=0;i<school.count;i++){
         // Use the catalogue's centimetre range in this world's metres/units.
@@ -85,17 +89,28 @@ export function createOceanFishLifeApi({ oceanMode, disposeObject3D, sampleWater
           initial=fit({x:school.anchor.x+Math.cos(angle)*radius,y:school.anchor.y+fish.drift,z:school.anchor.z+Math.sin(angle)*radius},fish,school);
         }
         if(!initial)continue;
-        const mesh=templates[schoolIndex].clone(true);mesh.scale.setScalar(length/1.76);
+        const mesh=templates[schoolIndex]?.clone(true)||new THREE.Group();mesh.scale.setScalar(length/1.76);
         mesh.position.set(initial.x,initial.y,initial.z);mesh.name=`Ocean fish · ${school.species}`;
         mesh.userData.speciesId=school.speciesId;mesh.userData.livePresenceClaim=false;
         mesh.traverse(child=>{if(child.isMesh){child.castShadow=false;child.receiveShadow=false;}});
         fish.mesh=mesh;fish.tail=mesh.getObjectByName('fishTail');scene.add(mesh);oceanMode.fishEntities.push(fish);
+        fish.visualState=school.visual?.assetId?'loading':'generated';
+        if(school.visual?.assetId){
+          mesh.visible=false;
+          pending.push(loadVisual(THREE,school.visual.assetId,{signal}).then(visual=>{
+            if(generation!==visualGeneration||signal.aborted){visual.dispose();return;}
+            fish.visual=visual;fish.visualState='licensed';mesh.add(visual.root);
+          }).catch(error=>{if(generation===visualGeneration&&!signal.aborted){fish.visualState='unavailable';fish.visualError=String(error.message||error).slice(0,200);}}));
+        }
+
       }
     });
+    oceanMode.fishVisualsReady=Promise.all(pending).then(()=>undefined);
   }
 
   function updateFishLife(t,simulationDelta=null) {
     const dt=Number.isFinite(simulationDelta)?Math.max(0,Math.min(.1,simulationDelta)):(lastTime==null?0:Math.max(0,Math.min(.1,t-lastTime)));lastTime=t;
+    simulationTime+=dt;t=simulationTime;
     for(const school of oceanMode.fishSchools){
       const drift=t*.035+school.driftPhase;
       school.center.set(school.anchor.x+Math.sin(drift)*2,school.anchor.y,school.anchor.z+Math.cos(drift)*2);
@@ -119,7 +134,8 @@ export function createOceanFishLifeApi({ oceanMode, disposeObject3D, sampleWater
       // A changed terrain tile or a hull arriving on top of an animal must not
       // leave a visible fish clipping through it while it finds a clear route.
       const current=fit({x:mesh.position.x,y:mesh.position.y,z:mesh.position.z},fish,school);
-      mesh.visible=!!current&&Math.abs(current.y-mesh.position.y)<.01;
+      mesh.visible=['generated','licensed'].includes(fish.visualState)&&!!current&&Math.abs(current.y-mesh.position.y)<.01;
+      fish.visual?.update(t*fish.tailSpeed+fish.tailPhase);
       if(fish.tail)fish.tail.rotation.y=Math.sin(t*fish.tailSpeed+fish.tailPhase)*fish.tailAmp;
     }
   }

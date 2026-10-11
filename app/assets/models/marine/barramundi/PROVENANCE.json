@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 1,
+  "assetId": "marine-barramundi",
+  "title": "Barramundi fish",
+  "author": "Microsoft",
+  "license": "CC0-1.0",
+  "sourceUrl": "https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/BarramundiFish",
+  "downloadUrl": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/main/Models/BarramundiFish/glTF-Binary/BarramundiFish.glb",
+  "rightsEvidence": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/main/Models/BarramundiFish/README.md",
+  "sourceSha256": "ecc3bafb6b00f2c8b810863c388e3768a7b7ea0d0335e8cb8c574c266e571f4a",
+  "sourceBytes": 12488144,
+  "sha256": "9d8973af06d671c340d899ec71114810e2ae5e5d6d46ce077e83bd4514a85ea1",
+  "bytes": 2747548,
+  "triangles": 3864,
+  "bounds": {
+    "min": [
+      -0.1955418437719345,
+      -0.3934093117713928,
+      -0.8799999952316284
+    ],
+    "max": [
+      0.1955418437719345,
+      0.3934093117713928,
+      0.8799999952316284
+    ]
+  },
+  "textures": [
+    {
+      "mimeType": "image/jpeg",
+      "dimensions": [
+        1024,
+        1024
+      ]
+    },
+    {
+      "mimeType": "image/png",
+      "dimensions": [
+        1024,
+        1024
+      ]
+    },
+    {
+      "mimeType": "image/png",
+      "dimensions": [
+        1024,
+        1024
+      ]
+    }
+  ],
+  "modifications": "Baked source transform; centered and normalized to 1.76 local length for catalogue-sized instances; 1K textures, JPEG color and lossless data maps. Original topology and PBR material retained. Runtime tail deformation is authored game animation, not source motion capture."
+}

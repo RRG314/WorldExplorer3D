@@ -283,3 +283,39 @@ unresolved-name, inventory and sensitivity checks. The first chain caught an
 unregistered scan-cancellation API, then a vessel test fixture missing the water
 candidate that actual admission requires. The API owner was reviewed explicitly;
 the fixture was completed without weakening admission. Failed logs are retained.
+
+
+## Licensed swimming animal — October 10
+
+The first new fish visual is Microsoft's CC0 barramundi from the
+[Khronos sample collection](https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/BarramundiFish).
+Its original 3,864-triangle topology and PBR maps are preserved; 1K textures
+reduce the source from 12.49 MB to 2.75 MB. Intake pins the source hash, records
+output hashes/rights and enforces the browser budget. Geometry/textures use the
+existing leased model cache; instance materials animate the body/tail with
+matching deformed normals. Size follows catalogue centimetres, not decorative
+scene scale. There are at most three in this population. No paid asset or service.
+
+A conservative northern Australian subset follows the
+[Australian Museum species account](https://australian.museum/learn/animals/fishes/barramundi-lates-calcarifer-bloch-1790/).
+Only eligible coastal/estuarine/river context admits it; no open-ocean, coral-reef,
+abyssal or Florida substitution. This is a generated encounter, not occurrence
+survey data or coverage of the full native range. Other existing fish still use
+generated visual meshes; this does not complete the fauna art backlog.
+
+`licensed-fish-accepted/entry-browser.json` passes **28** actual-game checks with
+no page/shader errors. It extends the 26 marine checks with loaded, moving,
+visible barramundi and Australia/Florida/Australia/Florida visits. Instance leases
+are three in the eligible region and zero after leaving; corresponding renderer
+geometry/texture counts remain bounded on return. Model/front/side and in-world
+images were inspected. Close review uses a deliberate camera pose, not a claim
+about the normal diver camera; the first pose was overwritten by the retained
+camera target and the final verifier restores/controls both. Model-only review
+is separately recorded in `barramundi-intake/report.json`.
+
+Unit cases cover late-load cancellation, no repopulation of retired scenes,
+failed assets staying absent, pause holding animation, exactly-once release,
+regional exclusion, provenance and payload budget. Full source chain: **2,356
+passing tests**. This checkpoint does not complete animal observation missions,
+seasonal ecology, globally streamed dive areas, whales/dolphins/squid or release
+certification. Production and retained artifacts are untouched.

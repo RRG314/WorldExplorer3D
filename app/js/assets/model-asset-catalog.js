@@ -1,6 +1,15 @@
 const MODEL_ASSET_SCHEMA_VERSION = 1;
 
 const MODEL_ASSET_CATALOG = Object.freeze([
+  Object.freeze({
+    schemaVersion:MODEL_ASSET_SCHEMA_VERSION,id:'marine-barramundi',label:'Barramundi · Microsoft',
+    url:'/app/assets/models/marine/barramundi/barramundi.glb',roles:Object.freeze(['marine-fauna']),license:'CC0-1.0',
+    sourceUrl:'https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/BarramundiFish',
+    attribution:'Barramundi Fish by Microsoft, CC0. Textures resized; normalized geometry and authored swimming motion.',
+    sourceUpAxis:'y',sourceForwardAxis:'z',collisionPolicy:'regional-fish-water-volume-and-obstacle-envelope',
+    instancePolicy:Object.freeze({geometry:'shared',materials:'clone'}),
+    budgets:Object.freeze({bytes:2800000,triangles:4000,textureEdgePixels:1024,maxInstances:3})
+  }),
   ...['','-lod'].map(suffix=>Object.freeze({
     schemaVersion: MODEL_ASSET_SCHEMA_VERSION, id: `marine-research-vessel-rcrv${suffix}`, label: `Explorer research vessel · RCRV adaptation${suffix?' distant model':''}`,
     url: `/app/assets/models/marine/research-vessel/rcrv${suffix}.glb`, roles: Object.freeze(['research-vessel']),

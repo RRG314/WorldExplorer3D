@@ -9,6 +9,9 @@ const rule = (scientificName, regions, spawnDepthMeters, sources, options = {}) 
 });
 const allWarmOceans = [[-180, 180, -34, 34]];
 export const MARINE_SPECIES_RULES = Object.freeze({
+  // Curated northern Australian subset; not a claim to cover its full range.
+  barramundi: rule('Lates calcarifer', [[114,154,-26,-10]], [1,20],
+    ['https://australian.museum/learn/animals/fishes/barramundi-lates-calcarifer-bloch-1790/'], {groupSize:3,freshwaterAllowed:true}),
   striped_bass: rule('Morone saxatilis', [[-92,-52,28,50],[-130,-114,28,53]], [1,35],
     ['https://www.fisheries.noaa.gov/species/atlantic-striped-bass']),
   red_drum: rule('Sciaenops ocellatus', [[-98,-66,20,42]], [1,25],
@@ -37,7 +40,7 @@ export function marineSpeciesEligible(speciesId, {latitude,longitude,habitat='un
   if(!entry.regions.some(([west,east,south,north])=>longitude>=west&&longitude<=east&&latitude>=south&&latitude<=north))return false;
   // A known abyssal benthic habitat cannot substitute for coastal or epipelagic
   // animals. Unknown habitat never becomes a claim of a surveyed reef.
-  if(['abyssal-bottom','hydrothermal-vent','freshwater'].includes(habitat))return false;
+  if(['abyssal-bottom','hydrothermal-vent'].includes(habitat)||(habitat==='freshwater'&&!entry.freshwaterAllowed))return false;
   if(habitat==='coral-reef' && !['giant_trevally'].includes(speciesId))return false;
   return true;
 }

@@ -290,3 +290,7 @@ Personal Workspace Furniture
 - `interiors/personal-workspace/workspace-table.glb` — [Wooden Table 02](https://polyhaven.com/a/wooden_table_02) by Serhii Khromov, Poly Haven, CC0.
 - `interiors/personal-workspace/workspace-chair.glb` — [School Chair 01](https://polyhaven.com/a/SchoolChair_01) by Ethan Place, Poly Haven, CC0.
 - Repacked as self-contained GLBs with 1K JPEG material maps. Source geometry, material channels and metre scale are retained. These are real modeled assets; the in-game field record uses the player's saved Journal evidence. Per-file checksums and intake details are in the adjacent `PROVENANCE.json` and `LICENSE.txt`.
+
+### Barramundi
+
+[Barramundi Fish](https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/BarramundiFish) by Microsoft (2017), Creative Commons Zero v1.0 Universal. The game uses resized textures, normalized scale and authored swimming motion. Source hashes, rights evidence and conversion details are retained with the model. Its modeled encounters use a reviewed northern Australian subset, not live sightings or the species' entire range.
