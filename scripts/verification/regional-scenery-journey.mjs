@@ -20,7 +20,19 @@ const page=await browser.newPage({viewport:{width:1280,height:800}});await confi
  await page.evaluate(()=>{const t=document.getElementById('regionalSceneryToggle');t.checked=true;t.dispatchEvent(new Event('change',{bubbles:true}));});
  await page.locator('#globeSelectorStartBtn').click();await page.waitForFunction(()=>{const s=globalThis.getWorldExplorerRuntimeDiagnostics?.();return s?.gameStarted&&!s.worldLoading&&s.farTerrainClipmap?.status==='ready';},null,{timeout:300000,polling:1000});
  assert.equal(await page.evaluate(async()=>typeof (await import('/app/js/shared-context.js?v=55')).ctx.getRegionalSceneryState),'function','The served build must include regional scenery scheduling');
- await page.evaluate(async()=>{globalThis.__regionCtx=(await import('/app/js/shared-context.js?v=55')).ctx;globalThis.__regionalImagerySnapshot=(await import('/app/js/terrain/regional-imagery.js')).regionalImagerySnapshot;});
+ await page.evaluate(async()=>{globalThis.__regionCtx=(await import('/app/js/shared-context.js?v=55')).ctx;
+ // Inspect the actual published material owners. Internal source modules are
+ // bundled in a release and must not be imported through a source-only URL.
+ globalThis.__regionalImagerySnapshot=ctx=>{
+  const entries=new Map(),records=[];
+  ctx.terrainGroup.traverse(mesh=>{const evidence=mesh.userData?.regionalImagery;if(!evidence)return;
+   records.push(evidence);const uniforms=mesh.material?.userData?.terrainSurfaceMaterialBlend?.uniforms;
+   for(const layer of ['Regional','Local']){const texture=uniforms?.[`terrain${layer}Map`]?.value;
+    if(texture&&uniforms[`terrain${layer}Ready`]?.value===1)entries.set(texture.uuid,{id:texture.uuid,status:'available'});
+   }
+  });
+  const current=records.find(r=>r.localBounds);return {scope:'Published material textures; in-flight cache bounds checked by lifecycle tests',entries:[...entries.values()],local:{current:current?JSON.stringify(current.localBounds):null,pending:records.find(r=>r.localPending)?.localPending||null}};
+ };});
  await page.waitForFunction(()=>{const ctx=globalThis.__regionCtx;let ready=false;ctx.terrainGroup.children.find(m=>m.name==='FarMappedBuildingContext')?.traverse(o=>{if(o.material?.userData?.regionalSurfaceState?.status==='ready')ready=true;});return ready;},null,{timeout:60000,polling:500});
  const snapshot=async(label)=>{const started=Date.now();
  if(label!=='arrival')await page.waitForFunction(()=>{const s=__regionalImagerySnapshot(__regionCtx);return !s.local?.pending&&!!s.local?.current;},null,{timeout:60000,polling:500});
