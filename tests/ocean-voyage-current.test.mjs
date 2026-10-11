@@ -121,3 +121,30 @@ test('stern deployment moves away from the parent at every heading and retains v
   assert.equal(voyage.current.ship.yaw,yaw);assert.equal(voyage.current.sub.yaw,pose.yaw);
  }
 });
+
+import {normalizeOceanWaterContext,defaultOceanWaterContext,oceanWaterContextFromCandidate} from '../app/js/ocean/water-context.js';
+import {prepareSurfaceVoyage} from '../app/js/ocean/voyage.js';
+import {oceanDepthProfileMatchesSite} from '../app/js/ocean/depth-model.js';
+test('coastal admission survives deployment, save, recovery and reuse without becoming open ocean',async()=>{
+ const f=transferFixture();f.ctx.boatMode.currentWater.waterKind='coastal';f.ctx.boatMode.currentWater.source={registryId:'osm:coast-1',geometrySource:'osm',waveOffset:{x:3,z:4}};
+ await f.api.transferBoatToSubmarine();
+ const context=f.calls[0].entry.waterContext;assert.equal(context.waterKind,'coastal');assert.equal(context.sourceTruth,'published-water-surface');assert.equal(context.waterbodyId,'osm:coast-1');
+ const site={lat:10,lon:20},profile={model:'geographic-metres-v1',entryDepthMeters:40};
+ const saved=prepareSurfaceVoyage(site,undefined,profile,context),storage=memory(),store=createOceanVoyageStore({storage});assert.equal(store.write(saved).saved,true);
+ const restored=store.read();assert.deepEqual(restored.waterContext,context);
+ const synthetic={waterKind:'coastal',source:{synthetic:true,oceanWaterContext:restored.waterContext}};assert.deepEqual(oceanWaterContextFromCandidate(synthetic,site),context);
+ assert.equal(oceanWaterContextFromCandidate({...synthetic,waterKind:'lake'},site).waterKind,'lake','A different admitted type cannot inherit the previous marine context');
+ const before=storage.getItem(OCEAN_VOYAGE_KEY);assert.equal(store.write({...restored,waterContext:{...context,version:2}}).saved,false);assert.equal(storage.getItem(OCEAN_VOYAGE_KEY),before);
+ assert.equal(normalizeOceanWaterContext({...context,waterKind:'future-sea'}),null);
+ const old={...restored};delete old.waterContext;assert.ok(validateOceanVoyage(old));assert.equal(defaultOceanWaterContext(site,{legacy:true}).sourceTruth,'legacy-ocean-assumption');
+});
+test('surface movement preserves the depth sample origin and requires a new depth at the new deployment site',()=>{
+ const site={lat:10,lon:20},profile={model:'geographic-metres-v1',entryDepthMeters:40};
+ const saved=prepareSurfaceVoyage(site,undefined,profile),storage=memory();
+ const ctx={LOC:site,SCALE:100000,boat:{x:1000,z:500,angle:0},boatMode:{active:true,transportEntityId:saved.ship.transportEntityId,condition:1,currentWater:{waterKind:'coastal',source:{geometrySource:'osm'}}}};
+ const voyage=ensureOceanVoyage(ctx,{store:createOceanVoyageStore({storage})});voyage.beginAboard(saved);assert.equal(voyage.surfaceCheckpoint(),true);
+ assert.deepEqual(voyage.current.depthProfile.origin,site);assert.equal(voyage.current.waterContext.waterKind,'coastal');
+ assert.equal(oceanDepthProfileMatchesSite(voyage.current.depthProfile,voyage.current.site,voyage.current.site),false);
+ assert.equal(oceanDepthProfileMatchesSite(voyage.current.depthProfile,site),true);
+ const read=createOceanVoyageStore({storage}).read();assert.deepEqual(read.depthProfile.origin,site);assert.equal(read.site.lat,9.995);
+});

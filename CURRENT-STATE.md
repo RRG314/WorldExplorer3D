@@ -50,7 +50,27 @@ browsers/servers. Production deployment evidence is under
 `output/release-evidence/current/production-deployment.json` and
 `production-promotion.json`; acceptance gaps remain in their own receipts.
 
-## October 10 latest local continuation — ecology and native ocean depth
+## October 10 latest local continuation — mission and water custody
+
+Space scans now cancel when eligibility changes; old callbacks cannot award a
+new mission. Resuming an earlier mission is explicit. Corrupt/future mission
+saves and stale writers are protected. The scan visual stays on the planet
+instead of expanding into an obscuring wireframe. The Proxima thermal journey
+passes five actual-game checks through the physical Analysis Lab; this is not
+H10–H12 completion.
+
+Coastal water context now survives deployment, save, recovery and redeployment,
+and drives the underwater population and wave profile. Geographic depth retains
+its sample origin: moving the vessel requires fresh depth rather than reusing
+the previous location's value. The final marine journey passes 26 actual-game
+checks, including moved-vessel outage recovery and successful retry. Full source
+chain passes 2,352 tests. Receipts and scope are in the coherence/delivery ledgers.
+
+Production, dist and four retained packages remain unchanged. Continue licensed
+fauna visual integration and the remaining finite gates; the full roadmap is
+not complete. A compatible possession-v3/voyage-v2 fallback is still required.
+
+## October 10 previous local continuation — ecology and native ocean depth
 
 Marine fish authority v3 now uses coarse reviewed geographic ranges and explicit
 water-column/habitat rules. Fish stay within the shared water volume and avoid

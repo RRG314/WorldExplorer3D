@@ -1,3 +1,4 @@
+import {normalizeOceanWaterContext,defaultOceanWaterContext,oceanWaterContextFromCandidate} from '../ocean/water-context.js';
 import {OCEAN_DEPTH_MODEL} from '../ocean/depth-model.js';
 import {marineStudyOffset} from '../ocean/habitat-plan.js';
 import {parentVesselSubmarinePose} from '../ocean/parent-vessel.js';
@@ -37,8 +38,8 @@ function startSurfaceResearchVoyage(options={}) {
   // A validated saved voyage restores its existing geographic claim and
   // vessel identity. Only a new selection needs fresh coordinate admission.
   if(!saved&&options.launchSite&&!hasOceanEntry(site,options.entry))return Promise.resolve(false);
-  const depthProfile=!marineStudyOffset(site).featured&&Number.isFinite(options.entry?.elevationMeters)?{model:OCEAN_DEPTH_MODEL.GEOGRAPHIC,entryDepthMeters:-options.entry.elevationMeters}:{model:OCEAN_DEPTH_MODEL.LEGACY};
-  const voyage=saved||prepareSurfaceVoyage(site,options.waveOffset,depthProfile);
+  const depthProfile=!marineStudyOffset(site).featured&&Number.isFinite(options.entry?.elevationMeters)?{model:OCEAN_DEPTH_MODEL.GEOGRAPHIC,entryDepthMeters:-options.entry.elevationMeters,origin:{lat:site.lat,lon:site.lon}}:{model:OCEAN_DEPTH_MODEL.LEGACY};
+  const voyage=saved||prepareSurfaceVoyage(site,options.waveOffset,depthProfile,normalizeOceanWaterContext(options.entry?.waterContext)||defaultOceanWaterContext(site));
   if(!voyage)return Promise.resolve(false);
   // Admission and record preparation precede any environment or save mutation.
   return transferSubmarineToBoat({...options,source:saved?'ocean-exploration-resume':'ocean-exploration-start',enterDeck:true},voyage);
@@ -79,6 +80,8 @@ async function transferBoatToSubmarine(options = {}) {
   // Capture before suspension clears the water authority. Keep rollback data
   // local to this transaction; a late load may not revive an abandoned region.
   const water = appCtx.boatMode.currentWater;
+  const waterContext=oceanWaterContextFromCandidate(water,geo);
+  if(!waterContext){showBoatPrompt('Water type could not be verified. Stay aboard and retry.','notice',promptDurationMs);return false;}
   const waveOffset = water?.source?.waveOffset || {};
   const launchWaveOffset = {x:appCtx.boat.x+(waveOffset.x||0),z:appCtx.boat.z+(waveOffset.z||0)};
   const priorTransfer = appCtx.boatMode.oceanTransferVessel;
@@ -109,7 +112,7 @@ async function transferBoatToSubmarine(options = {}) {
       diverEntry: options.asDiver ? {from:'parent-vessel',jump:options.jump===true} : null,
       isTransferCurrent: canRestore,
       launchSite: {lat:geo.lat,lon:geo.lon,name:appCtx.customLoc?.name || 'Open Water',region:'Underwater'},
-      entry: {lat:geo.lat,lon:geo.lon,source:'mapped-boat-water',kind:'mapped-water-area'},
+      entry: {lat:geo.lat,lon:geo.lon,source:'mapped-boat-water',kind:'mapped-water-area',waterContext},
       submarinePose: parentVesselSubmarinePose(vessel)
     });
     return started;
@@ -152,7 +155,9 @@ async function transferSubmarineToBoat(options = {},surfaceVoyage=null) {
   const surfaceWaveOffset = voyage?.waveOffset || {x:sub.position.x+(appCtx.oceanMode?.waveOffset?.x||0),z:sub.position.z+(appCtx.oceanMode?.waveOffset?.z||0)};
   const surfaceYaw = voyage?.ship?.yaw ?? (Number.isFinite(sub.yaw)?sub.yaw:0);
   const transferVessel = surfaceVoyage?.ship || appCtx.boatMode?.oceanTransferVessel || null;
-  const candidate = buildSyntheticBoatCandidate(0,0,{waterKind:'open_ocean',surfaceY:.08,waveOffset:surfaceWaveOffset});
+  const waterContext=normalizeOceanWaterContext(voyage?.waterContext)||defaultOceanWaterContext(launchSite,{legacy:true});
+  const candidate = buildSyntheticBoatCandidate(0,0,{waterKind:waterContext.waterKind,surfaceY:.08,waveOffset:surfaceWaveOffset});
+  if(candidate?.source)candidate.source.oceanWaterContext=waterContext;
   if(!candidate){showBoatPrompt('Surface vessel unavailable. Your submarine remains here.','notice',promptDurationMs);return false;}
   const priorOrigin={...appCtx.LOC},priorSelection=appCtx.customLoc?{...appCtx.customLoc}:null;
   const priorOceanSite={...appCtx.oceanMode?.launchSite},priorVoyage=appCtx.oceanVoyage?.current;

@@ -1,4 +1,5 @@
-import {OCEAN_DEPTH_MODEL,normalizeOceanDepthProfile} from './ocean/depth-model.js';
+import {normalizeOceanWaterContext,defaultOceanWaterContext} from './ocean/water-context.js';
+import {OCEAN_DEPTH_MODEL,normalizeOceanDepthProfile,oceanDepthProfileMatchesSite} from './ocean/depth-model.js';
 import {marineStudyOffset} from './ocean/habitat-plan.js';
 import {fetchGebcoDepthEvidence} from './geospatial/bathymetry-evidence.js?v=1';
 import {createOceanSoundscape} from './ocean/soundscape.js';
@@ -206,13 +207,12 @@ function oceanFishPopulationContext() {
   return createFishPopulationContext({
     accessMode: 'underwater',
     ...(oceanMode.habitat?.plan.featured?{candidateSpeciesIds:['giant_trevally'],candidatePoolBasis:'authored-coral-shelf-visual-pack-v1'}:{}),
-    waterbodyId: `ocean-site:${latitude.toFixed(4)}:${longitude.toFixed(4)}`,
-    waterKind: 'open_ocean',
-    waterClass: 'marine',
+    waterbodyId: oceanMode.waterContext.waterbodyId,
+    waterKind: oceanMode.waterContext.waterKind,
     habitat:oceanMode.habitat?.plan.featured?'coral-reef':'unknown',
     waterLabel: String(site.name || site.region || 'Ocean Site'),
-    sourceDataset: 'world-explorer-reviewed-ocean-site',
-    sourceTruth: 'modeled-ocean-environment',
+    sourceDataset: oceanMode.waterContext.sourceDataset,
+    sourceTruth: oceanMode.waterContext.sourceTruth,
     latitude,
     longitude,
     depthTruth: oceanMode.localBathymetryReady ? 'modeled-local-bathymetry' : 'modeled-bathymetry-pending'
@@ -621,7 +621,7 @@ async function startOceanMode(options = {}) {
   const oldParent=prior?.version===1&&prior.ship.transportEntityId===options.parentVessel?.transportEntityId;
   let depthProfile=resume?.version===2?normalizeOceanDepthProfile(resume.depthProfile):null;
   if(!depthProfile&&prior?.version===2&&prior.ship.transportEntityId===options.parentVessel?.transportEntityId
-    &&Math.abs(prior.site.lat-options.launchSite.lat)<1e-6&&Math.abs(prior.site.lon-options.launchSite.lon)<1e-6)depthProfile=normalizeOceanDepthProfile(prior.depthProfile);
+    &&Math.abs(prior.site.lat-options.launchSite.lat)<1e-6&&Math.abs(prior.site.lon-options.launchSite.lon)<1e-6)depthProfile=oceanDepthProfileMatchesSite(prior.depthProfile,options.launchSite,prior.site)?normalizeOceanDepthProfile(prior.depthProfile):null;
   if(!depthProfile && (resume?.version===1||oldParent||options.sharedVoyage||marineStudyOffset(options.launchSite).featured))depthProfile={model:OCEAN_DEPTH_MODEL.LEGACY};
   if(!depthProfile){
     let depth=Number.isFinite(options.entry?.elevationMeters)?-options.entry.elevationMeters:null;
@@ -629,11 +629,12 @@ async function startOceanMode(options = {}) {
       try{depth=(await fetchGebcoDepthEvidence(options.launchSite.lat,options.launchSite.lon)).depthMeters;}
       catch{appCtx.showToast?.('Depth data is unavailable. Stay aboard and retry the dive.');return false;}
     }
-    depthProfile=normalizeOceanDepthProfile({model:OCEAN_DEPTH_MODEL.GEOGRAPHIC,entryDepthMeters:depth});
+    depthProfile=normalizeOceanDepthProfile({model:OCEAN_DEPTH_MODEL.GEOGRAPHIC,entryDepthMeters:depth,origin:{lat:options.launchSite.lat,lon:options.launchSite.lon}});
     if(!depthProfile)return false;
   }
   if(request!==oceanEntryGeneration||options.isTransferCurrent?.()===false)return false;
   oceanMode.depthProfile=depthProfile;
+  oceanMode.waterContext=normalizeOceanWaterContext(resume?.waterContext)||normalizeOceanWaterContext(options.entry?.waterContext)||defaultOceanWaterContext(options.launchSite,{legacy:!!resume});
   const siteGeneration=++oceanSiteGeneration;
   const currentSite=()=>siteGeneration===oceanSiteGeneration&&oceanMode.active&&!!oceanMode.scene;
   if (oceanMode.active) {
@@ -834,6 +835,7 @@ function getOceanModeDebugState() {
     active: !!oceanMode.active,
     launchSite: { ...oceanMode.launchSite },
     depthProfile:oceanMode.depthProfile?{...oceanMode.depthProfile}:null,
+    waterContext:oceanMode.waterContext?{...oceanMode.waterContext}:null,
     navigationMap: oceanMode.navigationMapSnapshot || null,
     water: oceanMode.waterSample || null,
     diver:oceanMode.diver?.snapshot() || null,

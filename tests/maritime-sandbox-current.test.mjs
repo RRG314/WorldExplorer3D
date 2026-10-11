@@ -67,7 +67,7 @@ test('maritime activity adapts the existing Boat Mode and shared lifecycle rathe
 });
 
 test('ocean transfer keeps the selected vessel identity and condition', async () => {
-  const candidate = { spawnX: 4, spawnZ: 8, waterKind: 'open_ocean' };
+  const candidate = { spawnX: 4, spawnZ: 8, waterKind: 'open_ocean', source:{geometrySource:'osm'} };
   const travelCalls = [];
   const appCtx = {
     SCALE: 1000,
@@ -77,6 +77,7 @@ test('ocean transfer keeps the selected vessel identity and condition', async ()
     boatMode: {
       active: true,
       available: true,
+      currentWater: candidate,
       transportEntityId: 'generated-vessel:test:research',
       transportCatalogId: 'ocean-research-vessel',
       condition: .63,

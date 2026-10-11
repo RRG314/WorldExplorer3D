@@ -1,3 +1,4 @@
+import {normalizeOceanWaterContext,defaultOceanWaterContext,oceanWaterContextFromCandidate} from './water-context.js';
 import {OCEAN_DEPTH_MODEL,normalizeOceanDepthProfile} from './depth-model.js';
 import {createInvestigationControls} from '../campaign/coastal-investigation-ui.js';
 import {ensureMarineResearch,REEF_SURVEY} from './research-outing.js';
@@ -8,9 +9,9 @@ import {createCoastalDepartureControls} from '../campaign/coastal-departure-ui.j
 const id=()=>globalThis.crypto?.randomUUID?.()||`voyage-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 // Preparing an aboard journey allocates data only; it must not create an
 // underwater renderer or write a save before the surface vessel is accepted.
-export function prepareSurfaceVoyage(site,waveOffset={x:0,z:0},depthProfile={model:OCEAN_DEPTH_MODEL.LEGACY}) {
+export function prepareSurfaceVoyage(site,waveOffset={x:0,z:0},depthProfile={model:OCEAN_DEPTH_MODEL.LEGACY},waterContext=defaultOceanWaterContext(site)) {
  const voyageId=id();
- return validateOceanVoyage({version:2,depthProfile:normalizeOceanDepthProfile(depthProfile),id:voyageId,subId:`sub:research:${voyageId}`,stage:'aboard',revision:0,savedAt:Date.now(),
+ return validateOceanVoyage({version:2,waterContext:normalizeOceanWaterContext(waterContext),depthProfile:normalizeOceanDepthProfile(depthProfile),id:voyageId,subId:`sub:research:${voyageId}`,stage:'aboard',revision:0,savedAt:Date.now(),
   site:{...site},waveOffset:{x:Number(waveOffset.x)||0,z:Number(waveOffset.z)||0},
   ship:{transportEntityId:`research:${voyageId}`,transportCatalogId:'ocean-research-vessel',condition:1,yaw:0,anchor:{lat:site.lat,lon:site.lon}},
   sub:{x:0,y:-8.5,z:0,yaw:Math.PI,condition:1}});
@@ -29,7 +30,7 @@ export function ensureOceanVoyage(ctx,{store=createOceanVoyageStore()}={}){
    const previous=current;
    const vessel=options.parentVessel;
    const voyageId=vessel&&previous?.ship.transportEntityId===vessel.transportEntityId?previous.id:id();
-   current={...(previous?.id===voyageId&&previous.version===1?{version:1}:{version:2,depthProfile:normalizeOceanDepthProfile(ocean.depthProfile)||{model:OCEAN_DEPTH_MODEL.LEGACY}}),id:voyageId,subId:previous?.id===voyageId?previous.subId:`sub:${vessel?.transportEntityId||voyageId}`,stage:'underwater',revision:previous?.revision||0,savedAt:Date.now(),
+   current={...(previous?.id===voyageId&&previous.version===1?{version:1}:{version:2,waterContext:normalizeOceanWaterContext(ocean.waterContext)||defaultOceanWaterContext(ocean.launchSite),depthProfile:normalizeOceanDepthProfile(ocean.depthProfile)||{model:OCEAN_DEPTH_MODEL.LEGACY}}),id:voyageId,subId:previous?.id===voyageId?previous.subId:`sub:${vessel?.transportEntityId||voyageId}`,stage:'underwater',revision:previous?.revision||0,savedAt:Date.now(),
     site:{...ocean.launchSite},waveOffset:{...ocean.waveOffset},
     ship:{transportEntityId:vessel?.transportEntityId||`research:${voyageId}`,transportCatalogId:vessel?.transportCatalogId||'ocean-research-vessel',condition:vessel?.condition??1,yaw:Number.isFinite(vessel?.yaw)?vessel.yaw:ocean.submarine.yaw,anchor:{lat:ocean.launchSite.lat,lon:ocean.launchSite.lon}},
     sub:{x:ocean.submarine.position.x,y:ocean.submarine.position.y,z:ocean.submarine.position.z,yaw:ocean.submarine.yaw,condition:previous?.id===voyageId?previous.sub.condition:1}};
@@ -55,7 +56,7 @@ export function ensureOceanVoyage(ctx,{store=createOceanVoyageStore()}={}){
   if(!current||current.stage!=='aboard'||!ctx.boatMode?.active||ctx.boatMode.transportEntityId!==current.ship.transportEntityId)return false;
   const anchor=earthLocalToGeographic(ctx.LOC,ctx.SCALE,ctx.boat.x,ctx.boat.z);if(!Number.isFinite(anchor?.lat)||!Number.isFinite(anchor?.lon))return false;
   const offset=ctx.boatMode.currentWater?.source?.waveOffset||{};
-  current={...current,site:{...current.site,...anchor},ship:{...current.ship,anchor,yaw:ctx.boat.angle,condition:ctx.boatMode.condition??1},waveOffset:{x:ctx.boat.x+(offset.x||0),z:ctx.boat.z+(offset.z||0)}};return commit();
+  current={...current,...(current.version===2?{waterContext:oceanWaterContextFromCandidate(ctx.boatMode.currentWater,anchor)||current.waterContext,depthProfile:current.depthProfile.model===OCEAN_DEPTH_MODEL.GEOGRAPHIC?{...current.depthProfile,origin:current.depthProfile.origin||{lat:current.site.lat,lon:current.site.lon}}:current.depthProfile}:{}),site:{...current.site,...anchor},ship:{...current.ship,anchor,yaw:ctx.boat.angle,condition:ctx.boatMode.condition??1},waveOffset:{x:ctx.boat.x+(offset.x||0),z:ctx.boat.z+(offset.z||0)}};return commit();
  }
  function tickSurface(dt){ctx.sharedMarine?.tick(dt);elapsed+=dt;if(elapsed>=5){elapsed=0;surfaceCheckpoint();}refresh();}
  function tick(dt){elapsed+=dt;if(elapsed>=5){elapsed=0;checkpoint();}refresh();}

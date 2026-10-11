@@ -591,3 +591,31 @@ inventory and sensitivity. The initial duplicate world-geometry v1/v3 import
 failed the gate and was corrected to the established v3 identity. No deployment,
 worldwide-storage migration or production artifact replacement. Continue the
 regional ecology / placement work and the active career/realism roadmap.
+
+
+## Space mission lifecycle acceptance — October 10
+
+Scans now require actual eligible flight state throughout capture, not a stale
+planet reference. Pause, leaving range, changing destination/mission or entering
+the ship cancels the pending action and its visual. A delayed callback cannot
+award another mission or clear its newer pending scan. Surface work cannot be
+completed through a generic orbital scan. Returning to a begun mission uses an
+explicit Resume action. Protected/unavailable/conflicting mission storage is
+reported and preserves existing bytes; background evidence cannot change the
+selected mission. These localStorage checks do not claim atomic cross-tab CAS.
+
+The real Proxima d three-angle capture and physical Analysis Lab report pass
+five browser checks in `output/roadmap-20261010/mission-scan-framed/report.json`.
+Arrived expedition/rocket positions and the lab walker approach are controlled
+setup; scan controls, timers, cancellation, keyboard interaction and saving are
+actual app code. Images were inspected. The original visual was an expanding
+wireframe obstruction; it is now one depth-tested surface sweep with verified
+shader compilation and cancellation cleanup. The first lab attempt used obsolete
+rectangular-layout test coordinates; the corrected verifier follows the compiled
+ship station. A subsequent camera setup was corrected to use the existing chase
+camera snap before visual review. Earlier receipts remain separate.
+
+This does not close H10–H12: the Sol/Moon expedition adapter, two distinct lunar
+sites, return/home loop and chapter reward still require implementation and
+acceptance. Source chain at this checkpoint: 2,352 tests pass. No production,
+dist, retained package, GitHub publication or release change was made.

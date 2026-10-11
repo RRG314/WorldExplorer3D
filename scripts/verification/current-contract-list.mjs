@@ -187,6 +187,7 @@ export const currentContractTests = [
   'tests/environment-data-current.test.cjs',
   'tests/aircraft-public-data-current.test.cjs',
   'tests/destination-missions-current.test.mjs',
+  'tests/destination-scan-runtime-current.test.mjs',
   'tests/detail-boundary-current.test.mjs',
   'tests/discovery-receipt-endpoint-current.test.mjs',
   'tests/economy-authority-current.test.cjs',

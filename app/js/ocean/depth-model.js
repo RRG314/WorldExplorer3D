@@ -2,7 +2,8 @@ export const OCEAN_DEPTH_MODEL=Object.freeze({LEGACY:'authored-depth-v1',GEOGRAP
 export function normalizeOceanDepthProfile(profile){
  if(profile?.model===OCEAN_DEPTH_MODEL.LEGACY)return Object.freeze({model:OCEAN_DEPTH_MODEL.LEGACY});
  if(profile?.model!==OCEAN_DEPTH_MODEL.GEOGRAPHIC||!Number.isFinite(profile.entryDepthMeters)||profile.entryDepthMeters<5||profile.entryDepthMeters>12000)return null;
- return Object.freeze({model:OCEAN_DEPTH_MODEL.GEOGRAPHIC,entryDepthMeters:profile.entryDepthMeters});
+ if(profile.origin!==undefined&&(!Number.isFinite(profile.origin?.lat)||Math.abs(profile.origin.lat)>90||!Number.isFinite(profile.origin?.lon)||Math.abs(profile.origin.lon)>180))return null;
+ return Object.freeze({model:OCEAN_DEPTH_MODEL.GEOGRAPHIC,entryDepthMeters:profile.entryDepthMeters,...(profile.origin?{origin:Object.freeze({lat:profile.origin.lat,lon:profile.origin.lon})}:{})});
 }
 export function geographicBottomY(elevationMeters,metersPerWorldUnit){
  if(!Number.isFinite(elevationMeters)||!Number.isFinite(metersPerWorldUnit)||metersPerWorldUnit<=0)return null;
@@ -27,4 +28,12 @@ export function extendPresentationDepth(grid,x,z,entryDepthMeters){
  }
  const x0=Math.floor(gx),z0=Math.floor(gz),x1=Math.min(grid.size-1,x0+1),z1=Math.min(grid.size-1,z0+1),fx=gx-x0,fz=gz-z0;
  return node(x0,z0)*(1-fx)*(1-fz)+node(x1,z0)*fx*(1-fz)+node(x0,z1)*(1-fx)*fz+node(x1,z1)*fx*fz;
+}
+
+export function oceanDepthProfileMatchesSite(profile,site,fallbackOrigin){
+ const accepted=normalizeOceanDepthProfile(profile);
+ if(!accepted)return false;
+ if(accepted.model===OCEAN_DEPTH_MODEL.LEGACY)return true;
+ const origin=accepted.origin||fallbackOrigin;
+ return !!origin&&Math.abs(origin.lat-site?.lat)<1e-6&&Math.abs(origin.lon-site?.lon)<1e-6;
 }

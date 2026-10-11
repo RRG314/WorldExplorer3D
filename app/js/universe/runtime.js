@@ -14,6 +14,7 @@ import {
 } from './course-authority.js?v=3';
 import { SPACE_CONSTANTS } from '../space/constants.js?v=3';
 import { initDestinationMissionRuntime, updateDestinationMissionRuntime } from './mission-runtime.js?v=8';
+import {createMissionScanVisual,updateMissionScanVisual} from './mission-scan-visual.js';
 import { createUniverseSky, setUniverseSkyFrame, updateUniverseSky } from './sky-field.js?v=6';
 import { releaseGaiaSkyLayers } from '../sky/gaia-catalog.js?v=4';
 import {
@@ -178,57 +179,29 @@ function playDestinationMissionScan(destinationId, operation = 'survey') {
   const mesh = getUniverseDestinationMesh(universeRuntime.frameGroup, destinationId);
   if (!mesh) return false;
   const radius = Number(mesh.geometry?.parameters?.radius) || 12;
-  const thermalScale = operation.includes('thermal') ? 3.4 : 1;
-  const group = new THREE.Group();
-  group.name = `destination-mission-scan:${destinationId}`;
   const scanColor = operation.includes('nightside') ? 0x739dff
     : operation.includes('thermal') ? 0xffa35c
       : operation.includes('biosignature') ? 0x76f0c7 : 0x6fe8ff;
-  const shellMaterial = new THREE.MeshBasicMaterial({
-    color: scanColor,
-    transparent: true,
-    opacity: 0.68,
-    wireframe: true,
-    depthTest: false,
-    depthWrite: false,
-    blending: THREE.AdditiveBlending
-  });
-  const shell = new THREE.Mesh(new THREE.SphereGeometry(radius * 1.16 * thermalScale, 24, 16), shellMaterial);
-  group.add(shell);
-  for (let index = 0; index < 3; index += 1) {
-    const ring = new THREE.Mesh(
-      new THREE.TorusGeometry(radius * (1.25 + index * 0.18) * thermalScale, Math.max(0.12, radius * 0.018 * thermalScale), 8, 48),
-      shellMaterial.clone()
-    );
-    ring.rotation.set(index * 0.73, index * 1.05, index * 0.41);
-    group.add(ring);
-  }
-  if (operation.includes('thermal')) {
-    for (let index = 0; index < 7; index += 1) {
-      const band = new THREE.Mesh(
-        new THREE.BoxGeometry(radius * 0.065 * thermalScale, radius * (0.45 + index * 0.12) * thermalScale, radius * 0.04 * thermalScale),
-        shellMaterial.clone()
-      );
-      band.position.x = (index - 3) * radius * 0.19 * thermalScale;
-      band.position.z = radius * 1.22 * thermalScale;
-      group.add(band);
-    }
-  }
+  stopDestinationMissionScan(destinationId);
+  const group=createMissionScanVisual(THREE,{radius,color:scanColor});
+  group.name = `destination-mission-scan:${destinationId}`;
   mesh.add(group);
-  missionScanEffects.push({ group, startedAt: performance.now(), durationMs: 2200 });
+  missionScanEffects.push({ group, destinationId,startedAt: performance.now(), durationMs: 2200 });
   return true;
+}
+
+function stopDestinationMissionScan(destinationId){
+  for(let index=missionScanEffects.length-1;index>=0;index--){
+    const effect=missionScanEffects[index];if(destinationId&&effect.destinationId!==destinationId)continue;
+    effect.group.parent?.remove(effect.group);disposeThreeObjectTree(effect.group);missionScanEffects.splice(index,1);
+  }
 }
 
 function updateMissionScanEffects(nowMs = performance.now()) {
   for (let index = missionScanEffects.length - 1; index >= 0; index -= 1) {
     const effect = missionScanEffects[index];
     const progress = Math.min(1, Math.max(0, (nowMs - effect.startedAt) / effect.durationMs));
-    effect.group.rotation.y += 0.018;
-    effect.group.rotation.x += 0.006;
-    effect.group.scale.setScalar(1 + progress * 1.8);
-    effect.group.children.forEach((child) => {
-      if (child.material) child.material.opacity = Math.max(0, 0.72 * (1 - progress));
-    });
+    updateMissionScanVisual(effect.group,progress);
     if (progress < 1) continue;
     effect.group.parent?.remove(effect.group);
     disposeThreeObjectTree(effect.group);
@@ -948,6 +921,7 @@ Object.assign(appCtx, {
   hideUniverseUI,
   initUniverseRuntime,
   playDestinationMissionScan,
+  stopDestinationMissionScan,
   releaseUniverseRuntimeScene,
   returnToEarthFromUniverse,
   returnUniverseToSol,

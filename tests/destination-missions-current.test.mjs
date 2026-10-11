@@ -117,3 +117,19 @@ test('version-one mission records migrate in place and preserve a selected retur
   assert.equal(restored.outcomeId, 'priority-follow-up');
   assert.equal(restored.crewLeadId, 'crew-science');
 });
+
+test('unsupported or corrupt mission saves are retained instead of being replaced by an empty ledger',()=>{
+ const mission=getDestinationMission('sol');
+ for(const raw of ['{broken',JSON.stringify({type:'DestinationMissionLedger',version:99,missions:{},activeMissionId:null,updatedAtMs:0})]){
+  const values=new Map([[DESTINATION_MISSION_STORAGE_KEY,raw]]),storage={getItem:k=>values.get(k)||null,setItem:(k,v)=>values.set(k,v)};
+  const store=createDestinationMissionStore(storage);assert.throws(()=>store.activate(mission),/retained/);assert.equal(values.get(DESTINATION_MISSION_STORAGE_KEY),raw);
+ }
+});
+test('a stale mission writer cannot overwrite newer progress and background evidence does not select a mission',()=>{
+ const values=new Map(),storage={getItem:k=>values.get(k)||null,setItem:(k,v)=>values.set(k,v)};
+ const first=createDestinationMissionStore(storage),stale=createDestinationMissionStore(storage),a=getDestinationMission('sol'),b=getDestinationMission('moon');
+ first.activate(a);first.advance(a,'review_briefing');first.advance(a,'arrive');first.activate(b);
+ first.recordEvidence(a,'observed');first.advance(a,'complete_fieldwork');assert.equal(first.load().activeMissionId,b.id);
+ const before=values.get(DESTINATION_MISSION_STORAGE_KEY);assert.throws(()=>stale.activate(a),/Another tab/);assert.equal(values.get(DESTINATION_MISSION_STORAGE_KEY),before);
+ assert.equal(createDestinationMissionStore(storage).get(a).phase,'analysis');
+});

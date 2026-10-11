@@ -130,14 +130,18 @@ try {
  elevation = null;
  const outage = await page.evaluate(async () => {
    const { ctx } = await import('/app/js/shared-context.js?v=55');
-   const site = { lat: 0, lon: -140, name: 'Provider outage fixture', region: 'Pacific' };
+   const site = { lat: 25.51, lon: -80.31, name: 'Admitted coastal outage fixture', region: 'Florida' };
    const started = await ctx.startOceanMode({ launchSite: site, entry: {
-     ...site, source: 'gebco-elevation-sample', kind: 'modeled-ocean', elevationMeters: -80
+     ...site, source: 'gebco-elevation-sample', kind: 'modeled-ocean', elevationMeters: -80,
+     waterContext:{version:1,waterKind:'coastal',sourceDataset:'controlled-mapped-coast',sourceTruth:'published-water-surface',waterbodyId:'test-coastal-water'}
    } });
    await ctx.oceanMode.bathymetryPromise;
    return { started, state: window.getOceanModeDebugState() };
  });
  assert.equal(outage.started, true);
+ assert.equal(outage.state.waterContext.waterKind,'coastal');
+ const coastalPopulation=await page.evaluate(()=>oceanEntryCtx.oceanMode.fishPopulationContext);
+ assert.equal(coastalPopulation.waterbody.waterKind,'coastal');assert.ok(coastalPopulation.candidateSpeciesIds.includes('red_drum'));assert.equal(coastalPopulation.candidateSpeciesIds.includes('giant_trevally'),false);
  assert.equal(outage.state.seabed.bathymetry.truthType, 'unknown');
  assert.equal(outage.state.seabed.presentationMode, 'origin-grid-depth-extension');
  assert.equal(outage.state.depthProfile.model,'geographic-metres-v1');
@@ -185,6 +189,7 @@ try {
    return true;
  },null,{timeout:30000});
  report.boatWater=await page.evaluate(()=>window.waterCheckResult);
+ assert.equal(await page.evaluate(()=>waterCheckContext.boatMode.currentWater.waterKind),'coastal');
  report.waveOffset=await page.evaluate(()=>({actual:waterCheckContext.boatMode.currentWater.source.waveOffset,expected:expectedWaveOffset}));
  assert.deepEqual(report.waveOffset.actual,report.waveOffset.expected);
  report.surfaceOrigin=await page.evaluate(()=>({actual:waterCheckContext.LOC,expected:expectedSurfaceOrigin}));
@@ -274,8 +279,26 @@ try {
  assert.equal(await page.evaluate(()=>waterCheckContext.oceanMode.depthProfile.model),'geographic-metres-v1');
  assert.equal(await page.evaluate(()=>waterCheckContext.oceanVoyage.current.depthProfile.entryDepthMeters),80);
  report.cases.push({id:'native-depth-profile-survives-menu-reload-recovery-redeployment-during-provider-outage',passed:true});
+ const coast=await page.evaluate(()=>({stored:waterCheckContext.oceanVoyage.current.waterContext,runtime:waterCheckContext.oceanMode.waterContext,population:waterCheckContext.oceanMode.fishPopulationContext.waterbody,shader:waterCheckContext.oceanMode.waterSurface.mesh.material.userData.weWaterWaveConfig.waterKind}));
+ assert.equal(coast.stored.waterKind,'coastal');assert.deepEqual(coast.runtime,coast.stored);assert.equal(coast.population.waterKind,'coastal');assert.equal(coast.shader,'coastal');
+ report.cases.push({id:'coastal-water-kind-provenance-population-and-wave-profile-survive-entire-voyage-roundtrip',passed:true});
  await page.setViewportSize({width:390,height:844});await page.waitForTimeout(200);await page.screenshot({path:`${dir}/voyage-phone.png`});
  const phone=await page.evaluate(()=>{const a=document.querySelector('#oceanVoyageControls').getBoundingClientRect(),b=document.querySelector('#oceanDiverControls').getBoundingClientRect();return {inside:a.left>=0&&a.right<=innerWidth&&a.bottom<=innerHeight,overlap:a.left<b.right&&a.right>b.left&&a.top<b.bottom&&a.bottom>b.top};});assert.equal(phone.inside,true);assert.equal(phone.overlap,false);report.cases.push({id:'phone-voyage-and-diver-controls-remain-separate',passed:true});
+ await page.setViewportSize({width:1440,height:900});
+ const moved=await page.evaluate(async()=>{
+  const ctx=waterCheckContext;if(!await ctx.transferSubmarineToBoat({source:'depth-origin-check'}))throw Error('Recovery failed');
+  ctx.boatDeck.release();ctx.boat.x=100;ctx.boat.z=0;ctx.boat.vx=0;ctx.boat.vz=0;ctx.boat.speed=0;
+  ctx.oceanVoyage.surfaceCheckpoint();
+  const before=structuredClone(ctx.oceanVoyage.current),started=await ctx.transferBoatToSubmarine({source:'moved-depth-check'});
+  return {started,before,boatActive:ctx.boatMode.active,oceanActive:ctx.oceanMode.active,parentId:ctx.boatMode.transportEntityId};
+ });
+ assert.equal(moved.started,false);assert.equal(moved.boatActive,true);assert.equal(moved.oceanActive,false);assert.equal(moved.parentId,moved.before.ship.transportEntityId);
+ assert.ok(Math.abs(moved.before.site.lon-moved.before.depthProfile.origin.lon)>.0001);
+ report.cases.push({id:'moving-vessel-invalidates-old-depth-provider-failure-restores-same-boat',passed:true});
+ elevation=-60;
+ const retried=await page.evaluate(async()=>{const ctx=waterCheckContext;const started=await ctx.transferBoatToSubmarine({source:'moved-depth-retry'});return {started,profile:ctx.oceanMode.depthProfile,site:ctx.oceanMode.launchSite,subId:ctx.oceanVoyage.current.subId,water:ctx.oceanVoyage.current.waterContext};});
+ assert.equal(retried.started,true);assert.equal(retried.profile.entryDepthMeters,60);assert.equal(retried.subId,voyageBefore.subId);assert.equal(retried.water.waterKind,'coastal');assert.equal(retried.profile.origin.lat,retried.site.lat);assert.equal(retried.profile.origin.lon,retried.site.lon);
+ report.cases.push({id:'moved-vessel-retry-adopts-new-native-depth-with-same-submarine',passed:true});
  assert.deepEqual(report.errors, []);
  report.passed = true;
 } finally {

@@ -1790,6 +1790,7 @@
       "setUniverseDestination",
       "showUniverseUI",
       "spaceFlight",
+      "stopDestinationMissionScan",
       "toggleUniverseCourseAssist",
       "travelToUniverseDestination",
       "universeRuntime",

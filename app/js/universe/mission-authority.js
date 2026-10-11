@@ -87,16 +87,37 @@ function normalizeLedger(input = {}) {
   });
 }
 
+function validStoredLedger(value){
+  if(value?.type!=='DestinationMissionLedger'||![1,2].includes(value.version)
+    ||!value.missions||typeof value.missions!=='object'||Array.isArray(value.missions)
+    ||!(value.activeMissionId===null||typeof value.activeMissionId==='string')||!Number.isFinite(value.updatedAtMs))return false;
+  return Object.entries(value.missions).every(([id,state])=>
+    state?.type==='DestinationMissionState'&&[1,2].includes(state.version)&&state.missionId===id
+    &&id===`mission:${state.destinationId}`&&Object.values(PHASE).includes(state.phase)
+    &&Number.isFinite(state.updatedAtMs)&&Array.isArray(state.evidence)&&state.evidence.every(v=>typeof v==='string')
+    &&Array.isArray(state.history)&&state.history.every(v=>v&&typeof v.event==='string'&&Number.isFinite(v.atMs)));
+}
+
 function createDestinationMissionStore(storage = globalThis.localStorage) {
   let ledger = normalizeLedger();
+  let expectedRaw=null,protectedRecord=false,conflicted=false;
   try {
-    ledger = normalizeLedger(JSON.parse(storage?.getItem?.(DESTINATION_MISSION_STORAGE_KEY) || 'null') || {});
+    expectedRaw=storage?.getItem?.(DESTINATION_MISSION_STORAGE_KEY)||null;
+    if(expectedRaw){
+      const parsed=expectedRaw.length<=2_000_000?JSON.parse(expectedRaw):null;
+      if(validStoredLedger(parsed))ledger=normalizeLedger(parsed);else protectedRecord=true;
+    }
   } catch {
-    ledger = normalizeLedger();
+    protectedRecord=true;
   }
   const persist = (next) => {
+    if(protectedRecord)throw new Error('Existing mission progress is unreadable or newer and has been retained.');
+    if(typeof storage?.setItem!=='function'||typeof storage?.getItem!=='function')throw new Error('Mission storage unavailable.');
+    if((storage.getItem(DESTINATION_MISSION_STORAGE_KEY)||null)!==expectedRaw){conflicted=true;throw new Error('Another tab changed mission progress. Reload to resume it.');}
     const candidate = normalizeLedger(next);
-    storage?.setItem?.(DESTINATION_MISSION_STORAGE_KEY, JSON.stringify(candidate));
+    const raw=JSON.stringify(candidate);
+    storage.setItem(DESTINATION_MISSION_STORAGE_KEY, raw);
+    expectedRaw=raw;
     ledger = candidate;
     return ledger;
   };
@@ -112,7 +133,7 @@ function createDestinationMissionStore(storage = globalThis.localStorage) {
       if (!result.accepted) return Object.freeze({ ...result, ledger });
       const nextLedger = persist({
         ...ledger,
-        activeMissionId: definition.id,
+        activeMissionId: ledger.activeMissionId,
         missions: { ...ledger.missions, [definition.id]: result.state },
         updatedAtMs: result.state.updatedAtMs
       });
@@ -135,7 +156,7 @@ function createDestinationMissionStore(storage = globalThis.localStorage) {
       });
       const nextLedger = persist({
         ...ledger,
-        activeMissionId: definition.id,
+        activeMissionId: ledger.activeMissionId,
         missions: { ...ledger.missions, [definition.id]: state },
         updatedAtMs: atMs
       });
@@ -143,6 +164,7 @@ function createDestinationMissionStore(storage = globalThis.localStorage) {
     },
     get(definition) { return stateFor(definition); },
     load() { return ledger; },
+    get status(){return protectedRecord?'protected':conflicted?'conflict':typeof storage?.setItem!=='function'?'unavailable':'ready';},
     storageKey: DESTINATION_MISSION_STORAGE_KEY
   });
 }

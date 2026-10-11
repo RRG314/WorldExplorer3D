@@ -251,3 +251,35 @@ of a correctly disabled button, an obsolete deck waypoint, and a premature
 assertion before the asynchronous vessel load committed recovery. The verifier
 now uses the current layout and completed transfer state; those failures did not
 justify changing correct gameplay or weakening the acceptance requirement.
+
+
+## Coastal identity and depth ownership — October 10
+
+The Ocean entry and return adapters previously replaced mapped coastal water
+with open ocean. One bounded saved water context now retains admitted kind,
+source and waterbody identity through the existing voyage owner. It supplies
+population selection and underwater waves; recovery retains the same context
+without claiming its synthetic surface patch is surveyed coastline. Existing
+voyages without it use an explicitly legacy context. Unknown/future contexts
+cannot overwrite the existing save. This does not extend the mapped coastline
+or complete inland submarine entry.
+
+A second defect was stale depth: surface checkpoints moved the voyage site but
+retained an unlocated depth value. Geographic profiles now retain their sample
+origin. A moved vessel needs new depth before deployment; an unavailable provider
+returns the player to that same boat. Legacy authored layouts remain unchanged.
+
+`coastal-water-custody/entry-browser.json` passed 24 checks. The final extended
+`coastal-depth-origin/entry-browser.json` passes **26** actual-game checks,
+including ordinary deck/cradle UI, driving, native deep refusal, pause/controls,
+recovery, reload, same-sub redeployment, coastal population/shader agreement,
+and moved-vessel failure/retry. Provider responses and the moved-vessel pose are
+controlled test setup. Desktop/cradle and phone images were inspected; no
+physical-phone or worldwide-streaming claim. Both reports capture no page errors.
+All receipt paths here are under ignored `output/roadmap-20261010/`.
+
+Full source chain: **2,352 tests pass**, plus source/ownership/boundary types,
+unresolved-name, inventory and sensitivity checks. The first chain caught an
+unregistered scan-cancellation API, then a vessel test fixture missing the water
+candidate that actual admission requires. The API owner was reviewed explicitly;
+the fixture was completed without weakening admission. Failed logs are retained.
