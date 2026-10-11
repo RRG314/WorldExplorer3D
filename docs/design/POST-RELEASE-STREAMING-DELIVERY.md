@@ -114,6 +114,16 @@ bounded transport source. Regional road color deliberately excludes bridges and
 tunnels; it cannot substitute for their physical structure. Pole/date-line
 projection boundaries and unlimited-distance Earth origin rebasing remain
 separate work. The existing transport authority is preserved by this repair.
+Regional facade detail also does not extend the starting district's building
+interaction/collision collection. The current settings description correctly
+limits this option to moving terrain and mapped scenery.
+
+A complete physical-world expansion must publish source roads, structures,
+building contacts and interaction indexes as one bounded geographic cell set,
+then rebase every dependent actor/camera/navigation frame together. Acceptance
+must include long travel in both directions, bridge/tunnel crossings at cell
+edges, returning to authored locations, save reload and failed-source rollback.
+Replacing the regional appearance renderer alone cannot close those requirements.
 
 The installed explorer rig has no authored jump clip. Jumping now has real
 gravity, deck landing and ceiling collision, but uses the rig's neutral airborne
