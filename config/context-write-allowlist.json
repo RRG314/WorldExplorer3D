@@ -1653,6 +1653,9 @@
       "activeTransportActor",
       "currentTransportMode"
     ],
+    "app/js/transport/facility-perimeter-runtime.js": [
+      "dynamicBuildingColliders"
+    ],
     "app/js/transport/aviation-runtime.js": [
       "Walk",
       "aviationRuntime",

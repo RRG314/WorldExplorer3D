@@ -12,7 +12,10 @@ export async function runPrescribedGameActions(page,dir,steps,canvas='#oceanMode
  await writeFile(adapter,source.slice(0,source.indexOf(marker))+'\nexport {doChoreography};\n');
  try {
   const {doChoreography}=await import(pathToFileURL(adapter));
-  await page.evaluate(()=>{window.advanceTime=async ms=>{for(let left=ms;left>0;left-=1000/60)await new Promise(requestAnimationFrame);};window.render_game_to_text=()=>JSON.stringify({coordinateSystem:'x east, y up, z south; Ocean launch origin',ocean:window.getOceanModeDebugState?.()});});
+  await page.evaluate(()=>{
+    if(typeof window.advanceTime!=='function')window.advanceTime=async ms=>{for(let left=ms;left>0;left-=1000/60)await new Promise(requestAnimationFrame);};
+    if(typeof window.render_game_to_text!=='function')window.render_game_to_text=()=>JSON.stringify({coordinateSystem:'x east, y up, z south; Ocean launch origin',ocean:window.getOceanModeDebugState?.()});
+  });
   await doChoreography(page,await page.locator(canvas).elementHandle(),steps);
  } finally {await unlink(adapter);}
 }

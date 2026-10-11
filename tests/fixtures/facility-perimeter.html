@@ -1,0 +1,24 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><link rel="icon" href="/favicon.svg"><title>Facility boundary verification</title>
+<style>body{margin:0;background:#132329;color:white;font:14px system-ui}canvas{display:block}header{position:absolute;top:12px;left:12px;padding:10px;background:#101e2dde}button{padding:8px;margin:4px}p{margin:4px}</style>
+<header><p>Mapped boundary component check · licensed Poly Haven model</p><p>Arrow keys move the camera actor. Gate at x −45; road at 0; taxiway at 50.</p><button id="overview">Overview</button><button id="detail">Fence detail</button><button id="away">Leave area</button><button id="return">Return</button></header>
+<script src="/app/vendor/three/build/three.min.js"></script><script src="/app/vendor/three/examples/js/loaders/GLTFLoader.js"></script>
+<script type="module">
+import {perimeterFixture} from './facility-perimeter-data.js';
+import {createFacilityPerimeter} from '/app/js/transport/facility-perimeter-runtime.js';
+import {createBuildingCollisionQuery} from '/app/js/physics/building-collision.js';
+const renderer=new THREE.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});renderer.setSize(innerWidth,innerHeight);renderer.setPixelRatio(1);renderer.outputEncoding=THREE.sRGBEncoding;renderer.toneMapping=THREE.ACESFilmicToneMapping;document.body.append(renderer.domElement);
+const scene=new THREE.Scene();scene.background=new THREE.Color(0x96bace);const camera=new THREE.PerspectiveCamera(48,innerWidth/innerHeight,.1,600);
+scene.add(new THREE.HemisphereLight(0xedf6ff,0x7c805b,1));const sun=new THREE.DirectionalLight(0xffeddb,2);sun.position.set(40,70,25);scene.add(sun);
+const ctx={dynamicBuildingColliders:[]};let focus={x:-35,z:6};const ground=(x,z)=>Math.max(0,(x-55)*.07);
+const terrain=new THREE.PlaneGeometry(230,230,40,40);terrain.rotateX(-Math.PI/2);for(let i=0;i<terrain.attributes.position.count;i++){const p=terrain.attributes.position;p.setY(i,ground(p.getX(i),p.getZ(i)));}terrain.computeVertexNormals();
+scene.add(new THREE.Mesh(terrain,new THREE.MeshStandardMaterial({color:0x61764e,roughness:1})));
+for(const [x,width,color] of [[0,8,0x464b4d],[50,14,0x687273]]){const m=new THREE.Mesh(new THREE.PlaneGeometry(width,100),new THREE.MeshStandardMaterial({color}));m.rotation.x=-Math.PI/2;m.position.set(x,.025,20);scene.add(m);}
+const runtime=createFacilityPerimeter(THREE,perimeterFixture(),{appCtx:ctx,focus:()=>focus,sampleGround:ground});scene.add(runtime.group);await runtime.ready;
+const collision=createBuildingCollisionQuery(ctx),keys=new Set();addEventListener('keydown',e=>keys.add(e.key));addEventListener('keyup',e=>keys.delete(e.key));
+function render(){renderer.render(scene,camera);}function detail(){focus={x:-35,z:6};runtime.refresh(true);camera.position.set(-38,2.2,7);camera.lookAt(-32,1.1,0);render();}function overview(){focus={x:0,z:25};runtime.refresh(true);camera.position.set(90,32,90);camera.lookAt(0,0,0);render();}
+document.getElementById('detail').onclick=detail;document.getElementById('overview').onclick=overview;document.getElementById('away').onclick=()=>{focus={x:2000,z:2000};runtime.refresh(true);render();};document.getElementById('return').onclick=detail;overview();
+function step(dt){let x=focus.x,z=focus.z;if(keys.has('ArrowUp'))z-=dt*5;if(keys.has('ArrowDown'))z+=dt*5;if(keys.has('ArrowLeft'))x-=dt*5;if(keys.has('ArrowRight'))x+=dt*5;if(!collision(x,z,.35,{actorBaseY:ground(x,z),actorHeight:1.8}).collision){focus={x,z};}runtime.refresh();render();}
+window.advanceTime=ms=>step(ms/1000);let last=performance.now();function frame(now){step(Math.min(.05,(now-last)/1000));last=now;requestAnimationFrame(frame);}requestAnimationFrame(frame);
+window.render_game_to_text=()=>JSON.stringify({coordinateSystem:'x east, y up, z south',actor:focus,perimeter:runtime.snapshot()});
+window.facilityTest={runtime,ctx,collision,ground,detail,overview,snapshot:()=>({runtime:runtime.snapshot(),actor:focus,render:renderer.info.render,parts:runtime.group.children.map(m=>({name:m.name,count:m.count,alphaTest:m.material.alphaTest}))}),move:(x,z)=>{focus={x,z};runtime.refresh(true);},dispose:()=>runtime.dispose()};window.ready=true;
+</script></html>

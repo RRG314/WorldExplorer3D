@@ -483,3 +483,24 @@ regional exclusion, provenance and payload budget. Full source chain: **2,356
 passing tests**. This checkpoint does not complete animal observation missions,
 seasonal ecology, globally streamed dive areas, whales/dolphins/squid or release
 certification. Production and retained artifacts are untouched.
+
+
+## Facilities and navigation continuation — October 11
+
+The [facility delivery ledger](FACILITIES-AND-NAVIGATION-DELIVERY.md) records the
+new mapped perimeter/access layer, licensed Poly Haven kit, source/memory bounds,
+airport transfer failure fixes, large-vessel overview camera and four current
+marine captures. The actual world loader was verified with controlled facility
+data; this is not a live worldwide airport acceptance result.
+
+The clickable navigation study keeps the visual identity and proposes Explore,
+Journeys, Journal and Create. It has not replaced the live HUD. The landing page
+adds explicitly labeled development gameplay; the released gallery remains tied
+to 5.5. Full source verification passes 2,436 tests. Forty bounded browser checks
+cover the fence component, actual app assembly, airport dialog, prototype and
+landing display, in addition to the actual marine capture journey.
+
+Complete airport interiors/aircraft, harbor boarding and site assets, real launch
+site packs, full media replacement and release qualification remain open. Public
+OSM/Overpass availability blocked live-site checks (429/406). No deployment,
+source deletion, save reset or retained-build replacement occurred.

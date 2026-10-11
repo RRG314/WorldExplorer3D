@@ -1,0 +1,9 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><link rel="icon" href="/favicon.svg"><title>Airport journey contract</title><style>body{background:#203544;color:white;font:16px system-ui}button{padding:14px}canvas{width:1px;height:1px}</style>
+<button id="open">Airport travel</button><canvas></canvas>
+<script type="module">
+import {createAirportHub} from '/app/js/transport/airport-hub.js';
+let fail=false,hold=false,release,loadCount=0,arrivals=0,modes=[],toasts=[],searchRelease;const ctx={LOC:{lat:39,lon:-76},worldLoading:false,elevationWorldYAtWorldXZ:()=>10,setTravelMode(mode){modes.push(mode);return mode;},setCustomLocation(loc){this.LOC=loc;},async loadRoads(){loadCount++;if(hold)await new Promise(r=>release=r);return{state:fail?'failed':'published'};},async recordExplorerEvent(event){arrivals++;return{event};},showToast(text){toasts.push(text);}};
+let delayedSearch=false;const hub=createAirportHub({appCtx:ctx,searchPlaces:async()=>{if(delayedSearch)await new Promise(r=>searchRelease=r);return[{name:'Test airport',lat:40,lon:-75,country:'Example'}];}});
+document.getElementById('open').onclick=()=>hub.open();
+window.airportTest={hub,fail:value=>{fail=value;ctx.LOC={lat:39,lon:-76};},hold:value=>hold=value,release:()=>release?.(),delaySearch:value=>delayedSearch=value,releaseSearch:()=>searchRelease?.(),snapshot:()=>({loadCount,arrivals,modes,toasts,hub:hub.snapshot()})};window.ready=true;
+</script></html>

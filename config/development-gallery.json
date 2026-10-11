@@ -1,0 +1,60 @@
+{
+  "stage": "local-development",
+  "capturedAt": "2026-10-11T05:46:06.198Z",
+  "sourceCommit": "f3affdbf88051f927fa2094d0d48c06fa38c79a1",
+  "sourceFingerprint": {
+    "contract": "world-explorer-source-fingerprint-v2",
+    "headCommit": "f3affdbf88051f927fa2094d0d48c06fa38c79a1",
+    "workspaceFingerprint": "78070b853a523a540a886ecf5a28e81ad493fa9c36eea99189aabdc77a01a52b",
+    "acceptanceFingerprint": "19c41aa211b719efc9faee69b70b32d2175059722d96177541fdca011b8cc318",
+    "fingerprints": {
+      "runtime": "f0d60f282abe120d0615304b23395340e23276e7636b6bf10949db4066831b1f",
+      "tests": "0bfa82502c164a6907a064a13f89f00ababe4ceb529200c46b9bff4e9e594747",
+      "environment": "2c68d2bc2b8be43a6d25a6818981d1ccdc594b5780e2404951707d42185e797d",
+      "documentation": "3a559f03a6957fdf59b602979a4fd9018925e17f87ccdef15d406a441e084c26"
+    },
+    "executionEnvironmentFingerprint": "c9ef6dcd7353742b1cc08c604b91cdbde242ad72fe7629748c910d2217fb08a4",
+    "dirty": true,
+    "untrackedShippedCount": 10,
+    "untrackedCount": 25
+  },
+  "scope": "Actual local app, normal UI and keyboard input; no mocked provider data or synthetic camera pose. Not evidence of worldwide streaming or a released build.",
+  "images": [
+    {
+      "id": "research-deck",
+      "title": "A working research deck",
+      "alt": "Walking aboard the licensed RCRV research vessel in the current development build",
+      "file": "assets/gallery/development-20261011/research-deck.webp",
+      "width": 1600,
+      "height": 900,
+      "sha256": "8720ecbb459c3259d0f08ceeac4b4c7f434a528caa3fc8ad60387ea183c3931e"
+    },
+    {
+      "id": "research-vessel",
+      "title": "Research vessel",
+      "alt": "The licensed research vessel on the water, viewed through the normal overview camera",
+      "file": "assets/gallery/development-20261011/research-vessel.webp",
+      "width": 1600,
+      "height": 900,
+      "sha256": "3e89524944d5799fde860c34d0b0b1e15d3cb81ad5c18763f937b9bbe1d303e4"
+    },
+    {
+      "id": "submarine",
+      "title": "Deploy and explore",
+      "alt": "The licensed Atlantic Explorer submarine after deployment from its parent vessel",
+      "file": "assets/gallery/development-20261011/submarine.webp",
+      "width": 1600,
+      "height": 900,
+      "sha256": "f6c0c00596dc38124279b0ad4d21a0ea294a4cd72078565ccf1ff718b1033811"
+    },
+    {
+      "id": "diving",
+      "title": "Swim from the submarine",
+      "alt": "Scuba exploration using the current diver and submarine in the local development build",
+      "file": "assets/gallery/development-20261011/diving.webp",
+      "width": 1600,
+      "height": 900,
+      "sha256": "1d5a559a407c3b2eb2906a5ca0c7d2ca14266e65b75026120eac8d8f15051390"
+    }
+  ]
+}

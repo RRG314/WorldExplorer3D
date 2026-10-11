@@ -1,3 +1,4 @@
+import {completeAirportTransfer} from './airport-transfer.js';
 import { searchPlaces } from '../places/place-search.js?v=4';
 
 function escapeHtml(value = '') {
@@ -62,6 +63,7 @@ function createAirportHub(options = {}) {
     travel: dialog.querySelector('.airport-hub__travel'),
     progress: dialog.querySelector('.airport-hub__progress')
   };
+  let disposed = false, searchGeneration = 0;
   const state = { role: 'pilot', selected: null, vehicle: null, results: [], traveling: false };
 
   function setRole(role) {
@@ -85,20 +87,25 @@ function createAirportHub(options = {}) {
   }
 
   async function runSearch() {
+    if (disposed || state.traveling) return;
+    const generation = ++searchGeneration;
     const query = refs.input.value.trim();
     if (!query) { refs.status.textContent = 'Enter a city, place, airport, or coordinates.'; return; }
     refs.search.disabled = true;
     refs.status.textContent = 'Finding destinations…';
     try {
-      state.results = await searchPlaces(query, { limit: 6 });
+      const results = await (options.searchPlaces || searchPlaces)(query, { limit: 6 });
+      if (disposed || generation !== searchGeneration) return;
+      state.results = results;
       state.selected = null;
       refs.status.textContent = state.results.length ? `${state.results.length} destination${state.results.length === 1 ? '' : 's'} found.` : 'No matching destination. Try a nearby city or landmark.';
       refs.travel.disabled = true;
       renderResults();
     } catch (error) {
+      if (disposed || generation !== searchGeneration) return;
       refs.status.textContent = error?.message || 'Destination search is unavailable right now.';
     } finally {
-      refs.search.disabled = false;
+      if (!disposed && generation === searchGeneration) refs.search.disabled = false;
     }
   }
 
@@ -109,75 +116,26 @@ function createAirportHub(options = {}) {
     refs.travel.disabled = true;
     refs.status.textContent = `Preparing ${state.role === 'pilot' ? 'your flight' : 'the flight'} to ${destination.name}…`;
     const vehicleCatalogId = state.vehicle?.catalog?.id || (state.role === 'passenger' ? 'regional-jet' : 'personal-prop');
-    const currentLat = Number(appCtx.LOC?.lat);
-    const currentLon = Number(appCtx.LOC?.lon);
-    const destinationLat = Number(destination.lat);
-    const destinationLon = Number(destination.lon);
-    const sameLoadedWorld = Number.isFinite(currentLat) && Number.isFinite(currentLon) &&
-      Number.isFinite(destinationLat) && Number.isFinite(destinationLon) &&
-      Math.hypot(destinationLat - currentLat, destinationLon - currentLon) < .001;
+    // The transfer outlives this airport's dialog: loading the destination
+    // intentionally disposes the departure airport runtime.
+    const role = state.role;
     dialog.close();
-    appCtx.setTravelMode?.('walk', { source: 'airport_transfer_prepare', force: true, emitTutorial: false });
-    if (!sameLoadedWorld) {
-      appCtx.setCustomLocation?.({
-        lat: destinationLat,
-        lon: destinationLon,
-        name: destination.name,
-        countryCode: destination.countryCode,
-        arrivalMode: 'walk',
-        locationDetails: {
-          region: destination.region,
-          country: destination.country,
-          displayName: destination.displayName,
-          airportClass: destination.airportClass || '',
-          isAirport: destination.isAirport === true,
-          airportBounds: destination.airportBounds || null,
-          iata: destination.iata || '',
-          icao: destination.icao || ''
-        }
-      }, { transient: false });
-      await appCtx.loadRoads?.();
+    try {
+      const result = await completeAirportTransfer(appCtx, { destination, role, vehicleCatalogId });
+      appCtx.showToast?.(`${destination.name} · ${role === 'passenger' ? 'Passenger tour underway. Exit whenever you want to skydive.' : 'You have the controls.'}${result.journalSaved ? '' : ' Arrival could not be saved to your Journal.'}`);
+      return true;
+    } catch (error) {
+      appCtx.showToast?.(error?.message || 'The flight could not start. Choose a destination and try again.');
+      return false;
+    } finally {
+      state.traveling = false;
+      if (!disposed) refs.travel.disabled = !state.selected;
     }
-    const layout = appCtx.aviationRuntime?.airportLayout;
-    const center = layout?.center || { x: 0, z: 0 };
-    const groundY = Number(appCtx.SurfaceQuery?.terrainAt?.(center.x, center.z)?.position?.y ?? appCtx.elevationWorldYAtWorldXZ?.(center.x, center.z)) || 0;
-    const started = appCtx.setTravelMode?.('plane', {
-      source: 'airport_destination_arrival',
-      force: true,
-      x: center.x,
-      y: groundY + (state.role === 'passenger' ? 125 : 92),
-      z: center.z,
-      yaw: layout?.yaw || 0,
-      speed: state.role === 'passenger' ? 58 : 42,
-      throttle: .68,
-      airborne: true,
-      transportCatalogId: vehicleCatalogId,
-      transportEntityId: `airport-arrival:${vehicleCatalogId}`,
-      airportPassenger: state.role === 'passenger',
-      airportTourCenter: center
-    }) === 'plane';
-    const day = new Date().toISOString().slice(0, 10);
-    const event = await appCtx.recordExplorerEvent?.({
-      eventId: `airport-arrival:${day}:${Number(destination.lat).toFixed(4)}:${Number(destination.lon).toFixed(4)}`,
-      eventType: 'vehicle-route-completed',
-      activityId: 'airport-travel',
-      pathId: 'travel',
-      name: `Arrived by air in ${destination.name}`,
-      detail: state.role === 'pilot' ? 'Piloted an airport journey.' : 'Traveled as a passenger and arrived above the destination.',
-      family: 'airport-travel',
-      sourceId: `${Number(destination.lat).toFixed(4)}:${Number(destination.lon).toFixed(4)}`,
-      firstCompletion: true,
-      metadata: { vehicleClass: 'aircraft', role: state.role }
-    });
-    const points = Number(event?.event?.progress?.points || 0);
-    appCtx.showToast?.(started
-      ? `${destination.name} · ${state.role === 'passenger' ? 'Passenger tour underway. Exit whenever you want to skydive.' : 'You have the controls.'}${points ? ` +${points} Explorer points` : ''}`
-      : `Arrived in ${destination.name}.`);
-    state.traveling = false;
-    return started;
   }
 
   function open(context = {}) {
+    if (disposed || state.traveling) return false;
+    searchGeneration++; refs.search.disabled = false;
     state.vehicle = context.vehicle || null;
     state.selected = null;
     state.results = [];
@@ -189,7 +147,7 @@ function createAirportHub(options = {}) {
     refs.status.textContent = 'Search worldwide. These are game journeys, not real airline schedules.';
     setRole('pilot');
     dialog.showModal();
-    setTimeout(() => refs.input.focus(), 0);
+    setTimeout(() => { if (!disposed && dialog.open) refs.input.focus(); }, 0);
     return true;
   }
 
@@ -207,7 +165,7 @@ function createAirportHub(options = {}) {
 
   return Object.freeze({
     open,
-    dispose() { dialog.remove(); },
+    dispose() { disposed = true; searchGeneration++; dialog.remove(); },
     snapshot: () => Object.freeze({ open: dialog.open, role: state.role, selectedDestination: state.selected?.name || '', hasAircraft: !!state.vehicle, traveling: state.traveling })
   });
 }

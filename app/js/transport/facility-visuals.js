@@ -1,3 +1,4 @@
+import { createFacilityPerimeter } from './facility-perimeter-runtime.js';
 import {detachSceneObject} from '../engine/scene-object-lifecycle.js';
 import {batchOwnedStaticStructure} from '../world/static-structure-batching.js';
 import { compileAirportOperationalLayout, recordPoints } from './airport-layout.js?v=6';
@@ -406,6 +407,8 @@ function createTransportFacilityVisuals(THREE, graph, options = {}) {
   const surfaceProfiles = [];
   for (const record of graph.records) {
     if (!physicalPublicationAllowed(record)) continue;
+    // These are extents or access metadata, not strips of concrete.
+    if (record.domain === 'site' || ['aerodrome','heliport','port','harbour','marina'].includes(record.type)) continue;
     const points = pointsFor(record, options.sampleGround);
     if (!points.length) continue;
     if (record.type === 'control_tower') continue;
@@ -487,15 +490,22 @@ function createTransportFacilityVisuals(THREE, graph, options = {}) {
   const liveGeometry=new Set(),liveMaterials=new Set();
   group.traverse(object=>{if(object.geometry)liveGeometry.add(object.geometry);for(const material of Array.isArray(object.material)?object.material:[object.material])if(material)liveMaterials.add(material);});
   resources.geometries=[...liveGeometry];resources.materials=[...liveMaterials];
+  // Leased model resources have their own owner, outside the static surface
+  // disposal list assembled above.
+  const perimeter = createFacilityPerimeter(THREE, graph, options);
+  group.add(perimeter.group);
   group.userData.airportLayoutAuthority = airportLayout?.authority || '';
   group.userData.generatedAirportFallback = airportLayout?.generatedFallback === true;
   return Object.freeze({
     group,
     airportLayout,
+    perimeter,
+    ready: perimeter.ready,
     surfaceYAt(x, z) {
       return profileSurfaceYAt(surfaceProfiles, Number(x), Number(z));
     },
     dispose() {
+      perimeter.dispose();
       detachSceneObject(group);
       resources.geometries.forEach((geometry) => geometry.dispose?.());
       resources.materials.forEach((material) => material.dispose?.());

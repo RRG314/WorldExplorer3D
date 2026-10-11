@@ -50,7 +50,7 @@ test('airport map requests are divided into a bounded number of small cells', ()
   }
 });
 
-test('the fallback retains exact airport facilities and their geometry nodes only', async () => {
+test('the fallback retains exact airport facilities and access paths with their geometry nodes', async () => {
   const previousFetch = globalThis.fetch;
   let active = 0;
   let maximumActive = 0;
@@ -87,10 +87,45 @@ test('the fallback retains exact airport facilities and their geometry nodes onl
     const result = await fetchMappedAirportData(selection, { timeoutMs: 5000 });
     assert.ok(requestCount >= 1);
     assert.equal(maximumActive, 1);
-    assert.equal(result.elements.some((element) => element.tags?.highway === 'service'), false);
+    assert.equal(result.elements.some((element) => element.tags?.highway === 'service'), true);
     assert.equal(result.elements.some((element) => element.tags?.aeroway === 'runway'), true);
-    assert.deepEqual(result.elements.filter((element) => element.type === 'node').map(({ id }) => id).sort(), [1, 2]);
+    assert.deepEqual(result.elements.filter((element) => element.type === 'node').map(({ id }) => id).sort(), [1, 2, 3]);
   } finally {
     globalThis.fetch = previousFetch;
   }
+});
+
+test('travelling between airports keeps only a bounded source cache',async()=>{
+ const {airportSourceCacheSnapshot}=await import('../app/js/world/osm-airport-source.js');const previous=globalThis.fetch;
+ globalThis.fetch=async()=>({ok:true,json:async()=>({elements:[{type:'node',id:1,lat:1,lon:1,tags:{aeroway:'helipad'}}]})});
+ try{for(let i=0;i<5;i++)await fetchMappedAirportData({lat:20+i,lon:30,name:'Test Airport',locationDetails:{isAirport:true,airportBounds:{minLat:20+i-.001,maxLat:20+i+.001,minLon:29.999,maxLon:30.001}}});const s=airportSourceCacheSnapshot();assert.ok(s.entries<=s.entryLimit&&s.entries<=2);assert.ok(s.elements<=s.elementLimit);}finally{globalThis.fetch=previous;}
+});
+
+test('subdividing dense map responses shares one total request budget', async () => {
+  const previous = globalThis.fetch;
+  let calls = 0;
+  globalThis.fetch = async url => {
+    calls++;
+    const [left, bottom, right, top] = new URL(url).searchParams.get('bbox').split(',').map(Number);
+    return top-bottom > .007 || right-left > .007
+      ? {ok:false,status:400,text:async()=> 'Too many nodes'}
+      : {ok:true,status:200,json:async()=>({elements:[]})};
+  };
+  try {
+    await assert.rejects(fetchMappedAirportData({lat:30,lon:40,name:'Budget Airport'}), /request count exhausted/);
+    assert.equal(calls, MAX_CELL_REQUESTS);
+  } finally { globalThis.fetch = previous; }
+});
+
+test('oversized source intake fails before partial airport publication or caching', async () => {
+  const {MAX_SOURCE_ELEMENTS,airportSourceCacheSnapshot} = await import('../app/js/world/osm-airport-source.js');
+  const previous = globalThis.fetch, before = airportSourceCacheSnapshot();
+  let calls = 0;
+  const elements = Array.from({length:60001},(_,id)=>({type:'node',id,lat:1,lon:1}));
+  globalThis.fetch = async () => {calls++;return {ok:true,status:200,json:async()=>({elements})};};
+  try {
+    await assert.rejects(fetchMappedAirportData({lat:31,lon:41,name:'Large Airport'}), /source size/);
+    assert.equal(calls, Math.ceil(MAX_SOURCE_ELEMENTS / elements.length));
+    assert.deepEqual(airportSourceCacheSnapshot(), before);
+  } finally { globalThis.fetch = previous; }
 });

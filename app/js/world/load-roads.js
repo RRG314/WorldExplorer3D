@@ -39,35 +39,12 @@ import {
   completeFixedRegionalStructureLoad
 } from "./fixed-regional-structures.js?v=16";
 import { reviewedCivicFacilitiesForLocation } from "./regional-civic-facilities.js?v=2";
-import { compileTransportFacilityGraph } from "../transport/facility-compiler.js?v=4";
+import { compileTransportFacilityGraph, selectFacilitySourceElements } from "../transport/facility-compiler.js?v=4";
 import { createTransportFacilityVisuals } from "../transport/facility-visuals.js?v=7";
 import { fetchMappedAirportData, isAirportSelection } from "./osm-airport-source.js?v=1";
 
-const EXACT_AVIATION_TYPES = new Set([
-  'aerodrome', 'heliport', 'runway', 'taxiway', 'apron', 'terminal',
-  'helipad', 'hangar', 'parking_position', 'gate', 'control_tower'
-]);
-
-function isExactTransportFacilityElement(element = {}) {
-  const tags = element.tags || {};
-  if (EXACT_AVIATION_TYPES.has(String(tags.aeroway || '').toLowerCase())) return true;
-  if (String(tags.route || '').toLowerCase() === 'ferry') return true;
-  if (String(tags.amenity || '').toLowerCase() === 'ferry_terminal') return true;
-  if (String(tags.leisure || '').toLowerCase() === 'marina') return true;
-  if (['port', 'harbour'].includes(String(tags.landuse || '').toLowerCase())) return true;
-  if (['pier', 'quay'].includes(String(tags.man_made || '').toLowerCase())) return true;
-  if (String(tags.waterway || '').toLowerCase() === 'dock') return true;
-  if (String(tags.harbour || '').toLowerCase() === 'yes') return true;
-  if (String(tags.mooring || '').toLowerCase() && String(tags.mooring).toLowerCase() !== 'no') return true;
-  return ['harbour', 'berth'].includes(String(tags['seamark:type'] || '').toLowerCase());
-}
-
 export function selectExactFacilityElements(data = {}) {
-  const elements = Array.isArray(data?.elements) ? data.elements : [];
-  const facilities = elements.filter(isExactTransportFacilityElement);
-  const nodeIds = new Set(facilities.flatMap((element) => Array.isArray(element.nodes) ? element.nodes.map(String) : []));
-  return elements.filter((element) => isExactTransportFacilityElement(element) ||
-    (element.type === 'node' && nodeIds.has(String(element.id))));
+  return selectFacilitySourceElements(Array.isArray(data?.elements) ? data.elements : []);
 }
 
 export function createWorldRoadLoader(deps = {}) {
@@ -767,7 +744,8 @@ export function createWorldRoadLoader(deps = {}) {
           globalThis.matchMedia?.('(pointer: coarse)')?.matches === true ||
           Number(globalThis.navigator?.maxTouchPoints || 0) > 0;
         appCtx.transportFacilityVisual = createTransportFacilityVisuals(globalThis.THREE, transportFacilityGraph, {
-          sampleGround: (x, z) => appCtx.elevationWorldYAtWorldXZ?.(x, z) || 0,
+          appCtx,
+          sampleGround: (x, z) => appCtx.elevationWorldYAtWorldXZ?.(x, z),
           location: worldSession?.request?.selection || appCtx.resolveLocationSelection?.() || appCtx.LOC,
           mobile: mobileTransportClient
         });

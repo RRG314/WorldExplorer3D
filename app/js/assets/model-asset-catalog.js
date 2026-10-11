@@ -2,6 +2,15 @@ const MODEL_ASSET_SCHEMA_VERSION = 1;
 
 const MODEL_ASSET_CATALOG = Object.freeze([
   Object.freeze({
+    schemaVersion:MODEL_ASSET_SCHEMA_VERSION,id:'facility-chainlink-kit',label:'Modular Chainlink Fence · Poly Haven',
+    url:'/app/assets/models/facilities/chainlink/chainlink-kit.glb',roles:Object.freeze(['facility-boundary']),license:'CC0-1.0',
+    sourceUrl:'https://polyhaven.com/a/modular_chainlink_fence',
+    attribution:'Modular Chainlink Fence by James Ray Cock; wire material by Amal Kumar. CC0. Extracted panel and post, simplified hardware, restored wire opacity.',
+    sourceUpAxis:'y',collisionPolicy:'mapped-facility-perimeter-with-access-clearance',
+    instancePolicy:Object.freeze({geometry:'shared',materials:'shared'}),
+    budgets:Object.freeze({bytes:2200000,triangles:1500,textureEdgePixels:1024,maxInstances:256})
+  }),
+  Object.freeze({
     schemaVersion:MODEL_ASSET_SCHEMA_VERSION,id:'marine-common-dolphin',label:'Common Dolphin · CGreature / kenchoo',
     url:'/app/assets/models/marine/common-dolphin/common-dolphin.glb',roles:Object.freeze(['marine-fauna']),license:'CC-BY-4.0',
     sourceUrl:'https://sketchfab.com/3d-models/common-dolphin-12c27d41204f4b92895e36072b0ba8a6',

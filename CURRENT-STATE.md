@@ -942,3 +942,30 @@ and visit fields as well as all v3 custody; a prior v3 build is not automaticall
 compatible. The earlier unexplained return-load timeout and external Overpass
 CORS observation remain release observations, despite the later bounded passes.
 See `docs/design/EXPLORER-CAREER-DELIVERY.md` for precise scope and evidence.
+
+
+## October 11 local facility and navigation checkpoint
+
+Active checkout remains the architecture-evaluation worktree, branch
+`steven/visual-quality`; do not edit the older Documents checkout. The new
+[facility ledger](docs/design/FACILITIES-AND-NAVIGATION-DELIVERY.md) extends the
+world-coherence roadmap without closing unfinished stages. It documents licensed
+mapped fencing with shared collision and bounded disposal, retained gates/access
+paths/multipolygons, airport transfer failure handling, a vessel overview camera
+fix, the interactive navigation proposal and fresh marine development images.
+
+`verify:pr` passes **2,436 tests**, zero failures, and every source/ownership/type/
+inventory/sensitivity gate. **40 bounded browser checks** pass across the actual
+world-loader integration (controlled facility map), fence asset/collision, airport
+dialog/navigation prototype and landing display. The actual deck → helm → cradle
+→ submarine → diver capture has no page/graphics errors; its four images are
+reviewed and labeled unreleased. All owned browser test processes and servers are
+closed. Receipt scope and failed attempts remain in ignored
+`output/facilities-20261011/`; no complete-airport or global-coverage claim.
+
+Production checked at start: `5.5.0+d8775a392c42.88e67f97c00bb4c2.production`;
+80 Functions ACTIVE. No push or deployment. OSM/Overpass returned 429/406 during
+real-site attempts, which were stopped. Full terminal/cabin journeys, port
+gangways/berths/artwork, real launch sites, navigation adoption, the remaining
+roadmap and release/fallback acceptance are still open. Preserve current dist,
+saved candidates, player state, original source and Git history.

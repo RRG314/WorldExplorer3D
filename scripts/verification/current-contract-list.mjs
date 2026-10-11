@@ -308,6 +308,8 @@ export const currentContractTests = [
   'tests/boat-wake-shader-current.test.mjs',
   'tests/provider-lifecycle-current.test.mjs',
   'tests/transport-facility-compiler-current.test.mjs',
+  'tests/facility-perimeter-current.test.mjs',
+  'tests/airport-transfer-current.test.mjs',
   'tests/water-lod-ownership-current.test.mjs',
   'tests/water-terrain-datum-current.test.mjs',
   'tests/earth-atmosphere-color-current.test.mjs',

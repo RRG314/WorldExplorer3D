@@ -1,3 +1,4 @@
+import {recordedFacilityReplayQuery} from '../scripts/verification/recorded-facility-query.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
@@ -19,7 +20,7 @@ test('controlled city suggestions cannot replace or count as the recorded primar
   assert.deepEqual(JSON.parse(suggestions.response.body).elements, []);
   assert.equal(receipt.nearbyCities.mode, 'controlled-empty');
   assert.equal(receipt.nearbyCities.hits, 1); assert.equal(receipt.hits, 0);
-  const primary = await run(meta.query);
+  const primary = await run(recordedFacilityReplayQuery(meta.query));
   assert.equal(createHash('sha256').update(primary.response.body).digest('hex'), meta.sha256);
   assert.equal(receipt.hits, 1);
   for (const [query, url] of [[nearby.replace('41.73533', '40.00000'), meta.endpoint],

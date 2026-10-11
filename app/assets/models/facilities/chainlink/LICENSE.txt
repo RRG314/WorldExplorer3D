@@ -1,0 +1,4 @@
+Modular Chainlink Fence by James Ray Cock; fence wire material by Amal Kumar.
+CC0-1.0 https://creativecommons.org/publicdomain/zero/1.0/
+https://polyhaven.com/a/modular_chainlink_fence
+Extracted, optimized and repacked for World Explorer. See PROVENANCE.json.

@@ -1,0 +1,81 @@
+{
+  "schemaVersion": 1,
+  "assetId": "facility-chainlink-kit",
+  "sourceUrl": "https://polyhaven.com/a/modular_chainlink_fence",
+  "license": "CC0-1.0",
+  "licenseUrl": "https://polyhaven.com/license",
+  "authors": {
+    "James Ray Cock": "All",
+    "Amal Kumar": "Fence Wire Material"
+  },
+  "sourceFiles": [
+    {
+      "name": "modular_chainlink_fence.gltf",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/modular_chainlink_fence/modular_chainlink_fence_1k.gltf",
+      "bytes": 41838,
+      "sha256": "4204f151f809b4abd41ea0b18b1b6a5d9c23e6bcc0b6a81e44d03690f26604e9"
+    },
+    {
+      "name": "modular_chainlink_fence.bin",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/modular_chainlink_fence/modular_chainlink_fence.bin",
+      "bytes": 3168016,
+      "sha256": "be9ea1817089fd35b0927a8271358f6abd2ec80b306a085de435613d936fcb9a"
+    },
+    {
+      "name": "textures/modular_chainlink_fence_posts_nor_gl_1k.jpg",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/modular_chainlink_fence/modular_chainlink_fence_posts_nor_gl_1k.jpg",
+      "bytes": 505743,
+      "sha256": "b43b8214c90a55bb84222d2a27430b31080d68dc14879632b86dbd316cb5f060"
+    },
+    {
+      "name": "textures/modular_chainlink_fence_wire_arm_1k.jpg",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/modular_chainlink_fence/modular_chainlink_fence_wire_arm_1k.jpg",
+      "bytes": 694743,
+      "sha256": "88af8364890b0645cd730eca11b30e6cd1c7578ad3aa1f012bb84915b9be5a03"
+    },
+    {
+      "name": "textures/modular_chainlink_fence_wire_nor_gl_1k.jpg",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/modular_chainlink_fence/modular_chainlink_fence_wire_nor_gl_1k.jpg",
+      "bytes": 664165,
+      "sha256": "5cbf280f80e948de2422f0bb2fe2223a3b6f8e6fc75f54b00cd8d3e070938230"
+    },
+    {
+      "name": "textures/modular_chainlink_fence_wire_diff_1k.jpg",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/modular_chainlink_fence/modular_chainlink_fence_wire_diff_1k.jpg",
+      "bytes": 670536,
+      "sha256": "79253847a00b67a616148d753df8f4e44ba4615f848b82310426618b5a8dd79b"
+    },
+    {
+      "name": "textures/modular_chainlink_fence_posts_arm_1k.jpg",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/modular_chainlink_fence/modular_chainlink_fence_posts_arm_1k.jpg",
+      "bytes": 839858,
+      "sha256": "1694ecc2746ddaa93951ea5d2f2b830f544adf929f7ac9fae855f8b8fdfbad50"
+    },
+    {
+      "name": "textures/modular_chainlink_fence_posts_diff_1k.jpg",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/modular_chainlink_fence/modular_chainlink_fence_posts_diff_1k.jpg",
+      "bytes": 707116,
+      "sha256": "ec273fedef04fbcac26460b996beeeceeff3f91c1bea73ed2c6db1d0fdb30b73"
+    }
+  ],
+  "opacity": {
+    "url": "https://dl.polyhaven.org/file/ph-assets/Models/png/1k/modular_chainlink_fence/modular_chainlink_fence_wire_opacity_1k.png",
+    "sha256": "92ea700345a61f78fdbc3d4ff2ba4ea580f7fdfa167b3963b1167e9aaba88255"
+  },
+  "sha256": "bea430894a530823876db9ff344d84ffca56216345b80a8198105fab4c73d904",
+  "bytes": 2194820,
+  "triangles": 1461,
+  "bounds": {
+    "min": [
+      -0.07470667362213135,
+      0.000012452597729861736,
+      -0.07470128685235977
+    ],
+    "max": [
+      1.9620295763015747,
+      2.522132396697998,
+      0.07216384261846542
+    ]
+  },
+  "modifications": "Extracted authored two-metre panel and post; normalized part pivots; simplified metal hardware; retained 1K PBR maps and authored texture transforms; restored published wire opacity as alpha-tested RGBA. Geometry is placed along mapped fence paths, not used to invent facility perimeters."
+}

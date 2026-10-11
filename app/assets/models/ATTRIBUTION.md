@@ -1,5 +1,10 @@
 Curated Vehicle Assets
 
+## Facility boundaries
+
+[Modular Chainlink Fence](https://polyhaven.com/a/modular_chainlink_fence) by James Ray Cock, with wire material by Amal Kumar, [CC0](https://polyhaven.com/license). The authored panel and post are optimized for instancing; original PBR maps and published wire opacity are retained. Mapped fence ways establish placement, with access openings preserved. Source checksums and modifications accompany `facilities/chainlink/chainlink-kit.glb`.
+
+
 ## Research vessel
 
 [RCRV — Regional Class Research Vessel](https://sketchfab.com/3d-models/rcrv-regional-class-research-vessel-11b4b97a9e60497ea91c0727e404ecf6)
