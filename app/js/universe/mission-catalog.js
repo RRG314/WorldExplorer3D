@@ -61,7 +61,7 @@ const PLANET_MISSIONS = Object.freeze({
 });
 
 const SOLAR_MISSIONS = Object.freeze({
-  moon: ['The Lunar Field Book', 'Link orbital context, landing-site geology, and a returned lunar sample.', 'surface-geology-survey'],
+  moon: ['The Lunar Field Book', 'Compare two lunar sites, choose observations or returned sample analogs, and bring the evidence back to the ship.', 'surface-geology-survey'],
   mercury: ['Caloris Under the Sun', 'Cross Caloris Planitia, map impact structures, and protect the field team from extreme solar exposure.', 'surface-geology-survey'],
   venus: ['Radar Through the Clouds', 'Use a protected craft and orbital radar to investigate Maxwell Montes without claiming an Earth-like surface visit.', 'protected-surface-survey'],
   mars: ['Water Written in Stone', 'Follow landforms and minerals that preserve evidence of Mars’s changing water history.', 'surface-geology-survey'],
@@ -146,7 +146,12 @@ const SOLAR_BODY_MISSIONS = new Map(SOLAR_SYSTEM_EXPLORATION_DESTINATION_IDS.map
     premise: authored[1],
     operation: authored[2],
     observationTargets: Object.freeze([]),
-    stages: missionStages(authored[2]),
+    stages: bodyId === 'moon' ? Object.freeze([
+      { id: 'briefing', label: 'Read the Lunar Field Book at Navigation & Cartography.' },
+      { id: 'approach', label: 'Prepare your method at the Science Lab, then launch Pathfinder from the Pod Bay.' },
+      { id: 'fieldwork', label: 'Compare both sites with the prepared optical or sample-collection method.' },
+      { id: 'analysis', label: 'Return in the same pod and compare the evidence in the Analysis Lab.' }
+    ].map(Object.freeze)) : missionStages(authored[2]),
     habitability: null,
     truthClass: 'observed-context-with-modeled-gameplay',
     lifePolicy: 'No extraterrestrial life is confirmed. Astrobiology objectives preserve contamination controls and uncertainty.',

@@ -1,3 +1,4 @@
+import { createLunarFieldPower } from '../planetary/lunar-field-power.js';
 const POD_JOURNEY_SCHEMA_VERSION = 2;
 
 const POD_ROUTE_KIND = Object.freeze({
@@ -23,7 +24,7 @@ const TRANSITIONS = Object.freeze({
   [POD_PHASE.LOCAL_FLIGHT]: Object.freeze({ begin_descent: POD_PHASE.DESCENT, fail: POD_PHASE.FAILED }),
   [POD_PHASE.DESCENT]: Object.freeze({ surface_ready: POD_PHASE.SURFACE, fail: POD_PHASE.FAILED }),
   [POD_PHASE.SURFACE]: Object.freeze({ launch: POD_PHASE.SURFACE_LAUNCH, fail: POD_PHASE.FAILED }),
-  [POD_PHASE.SURFACE_LAUNCH]: Object.freeze({ rendezvous: POD_PHASE.RENDEZVOUS, fail: POD_PHASE.FAILED }),
+  [POD_PHASE.SURFACE_LAUNCH]: Object.freeze({ cancel_launch: POD_PHASE.SURFACE, rendezvous: POD_PHASE.RENDEZVOUS, fail: POD_PHASE.FAILED }),
   [POD_PHASE.RENDEZVOUS]: Object.freeze({ recover: POD_PHASE.RECOVERED, fail: POD_PHASE.FAILED }),
   [POD_PHASE.RECOVERED]: Object.freeze({}),
   [POD_PHASE.FAILED]: Object.freeze({})
@@ -70,6 +71,8 @@ function transitionPodJourney(journey, event, details = {}) {
   const next = frozenRecord({
     ...journey,
     phase: nextPhase,
+    ...(nextPhase === POD_PHASE.SURFACE && journey.bodyId === 'moon' && journey.contactId === 'destination-mission:moon' && !journey.fieldPower
+      ? { fieldPower: createLunarFieldPower() } : {}),
     updatedAtMs: atMs,
     failureReason: nextPhase === POD_PHASE.FAILED ? String(details.reason || 'pod-journey-failed') : journey.failureReason
   });

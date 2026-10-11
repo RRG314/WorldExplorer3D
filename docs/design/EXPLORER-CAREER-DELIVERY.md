@@ -10,7 +10,8 @@ Baseline `eb18b9c7`, October 9, 2026. Production remains released 5.5.0.
 | 3 — Personal home | Implemented locally | One starter workspace, licensed furniture, atomic storage, record display, return journey and durable badges; acceptance below. Full interior art and release compatibility remain separate gates. |
 | 4 — vessel / Coastal Departure | Implemented and verified locally | Licensed vessel, actual working-deck navigation, both survey choices, mooring, same-sub launch/recovery and durable Journal; evidence below. |
 | 5 — seabed / dive / lab | Implemented and verified locally | Three physical contacts, all three dive choices, partial and normal return, supported report, repeatable Coastal watch, badges and home display; acceptance below. |
-| 6–12 | Planned | Specific deliverables and exit checks in the plan; no gameplay completion claim |
+| 6 — H10–H12 | Implemented locally; bounded acceptance | Prepared native Moon fieldwork, power reserve, same-pod recovery, report, Earth return and home display. Exact evidence and limits below. |
+| 7–12 | Planned | Specific deliverables and exit checks in the plan; no gameplay completion claim |
 
 The first delivery is local and does not deploy or replace retained builds. Later
 career jobs, the remaining fleet assets, full campaign and final video package
@@ -47,9 +48,8 @@ packages are unchanged. No promotional posts, paid service or deployment occurre
 
 ## Next bounded delivery
 
-H01–H09 have local implementation and acceptance evidence. Next is delivery
-step 6: ship preparation, two-site lunar fieldwork, actual evidence analysis,
-Earth return and home display (H10–H12). Continue through the remaining
+H01–H12 now have local implementation and bounded acceptance evidence. Complete
+the campaign-wide release traversal and continue through the remaining
 research/mining/CERN, repeatable/GPS/connected work, realism and release/media
 gates in the specified sequence. No placeholder mission controls expose them.
 
@@ -619,3 +619,70 @@ This does not close H10–H12: the Sol/Moon expedition adapter, two distinct lun
 sites, return/home loop and chapter reward still require implementation and
 acceptance. Source chain at this checkpoint: 2,352 tests pass. No production,
 dist, retained package, GitHub publication or release change was made.
+
+
+## October 10 — native Moon fieldwork and homecoming, local
+
+Preparation is a physical Science station action aboard Solis Reach. The saved
+choice changes the two-site procedure: optical observations leave specimens in
+place; collection secures two named game analogs in the existing Backpack.
+NASA/ASU LROC terrain is the actual native Moon surface. Authored analogs are
+explicitly not Apollo specimens. The local mission preserves the planned Proxima
+expedition; solar navigation, pod custody and the mission ledger keep their
+existing owners.
+
+The 20-minute instrument budget is a game resource. It reserves 15-second blocks
+through the existing expedition save before consuming them, so a crash/reload
+can lose at most the unused block and cannot replenish charge. It stops during
+pause/hidden play and bounds long frame deltas. A distance-based return estimate
+uses 1 m/s plus a 50% route allowance and two-minute recovery margin; it is not a
+computed terrain path or a real EVA safety rule. Low power pauses measurements;
+walking and pod recovery remain available. Recovered records survive relaunch.
+NASA's xEVA concept-of-operations walk-back/safe-haven planning informed the
+return-reserve design, not these fictional battery values:
+https://www.nasa.gov/sites/default/files/atoms/files/eva-exp-0042_xeva_system_con_ops_rev_b_final_dtd_10192020_ref_doc.pdf
+
+Ship analysis requires four exact records, the same recovered Moon pod and the
+actual Analysis station. Sample analysis additionally requires both carried
+specimens. The saved report records method, preparation and pod identity. An
+Earth home desk can display it, review the earned journey steps and retain the
+Lunar Surveyor badge. The full From the Harbor badge requires the actual earlier
+chapters; a Moon-only profile does not receive it. No extra currency is introduced.
+
+Executed evidence under `output/roadmap-20261010/`:
+
+- `lunar-resource-authority/report.json`: 15 actual-game checks. Preparation,
+  real failed battery/Journal writes and retry, empty-power return, throwing
+  ascent retry, same-pod partial recovery, fresh charged sortie, four records and
+  two Backpack specimens, phone collapse, ship report and actual Earth return.
+- `lunar-earth-ground-repaired/report.json`: 12 checks of the independent optical
+  method through Earth return, with no collected specimens and no graphics errors.
+- `lunar-home-resource-report/report.json`: seven checks using the exported
+  sample-method report in a controlled room with real licensed furniture,
+  IndexedDB/localStorage, failed homecoming event write/retry, repeat/reload,
+  earned badge and display persistence, and disposal. Prescribed game keyboard
+  client runs in both the game and room checks. Images opened and inspected.
+- `verify:pr`: 2,375 tests and complete source/dependency/ownership/type/name,
+  inventory and sensitivity chain pass. GPU terrain fixture now exercises
+  imagery with absent, sRGB, linear and removed base maps as well as tunnel and
+  pavement refresh/retirement. Regional/local sRGB decoding is independent of
+  the optional base material map.
+
+The native terrain sampler previously read raw elevation pixels while the mesh
+rendered coarser triangles; actor support now agrees with actual indexed mesh
+triangles (249 ray comparisons plus grid edges). A real Earth return exposed a
+missing `mapTexelToLinear` shader helper on unmapped terrain: fixed at the shared
+material owner. The verifier now fails on GPU errors. That earlier functionally
+passing run with invisible ground is not accepted visual evidence. The first
+power-pause verifier attempted to assign a read-only getter; the passing rerun
+uses and verifies the game's pause authority. The initial apparent stale landing
+card was captured before Earth restoration settled; it clears after restoration.
+No unnecessary game-state patch was made for that verifier timing problem.
+
+Source poses/flight approach and battery time are controlled/accelerated. The
+home check is a room fixture, not mapped-city traversal. External Overpass CORS
+failure remains degraded provider evidence. A complete H01–H12 journey in one
+ordinary player profile, final device/performance/release checks and art quality
+remain distinct gates. Moon instrument/rock art is still basic. The remaining
+career/CERN/mining/repeatable/GPS, creative terrain/farm, realism, worldwide ocean
+and release compatibility work is not marked complete.

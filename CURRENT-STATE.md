@@ -50,7 +50,34 @@ browsers/servers. Production deployment evidence is under
 `output/release-evidence/current/production-deployment.json` and
 `production-promotion.json`; acceptance gaps remain in their own receipts.
 
-## October 10 latest local continuation — first licensed swimming fish
+## October 10 latest local continuation — Moon fieldwork and homecoming
+
+H10–H12 now have local implementation: physical ship briefing/preparation, saved
+observation or sample method, two native LROC surface sites, actual Backpack
+specimens for collection, partial same-pod recovery, ship analysis, Earth return
+and a saved home display. Instrument power has a 20-minute game budget and a
+visible return reserve; pause/offline time does not drain it, failed writes stop
+measurements for explicit retry, and a new ship sortie supplies a fresh charge.
+It is instrument power, not a physiological oxygen simulation.
+
+Final `lunar-resource-authority/report.json`: 15 controlled actual-game checks.
+Final `lunar-home-resource-report/report.json`: seven WebGL/DOM/storage checks in
+a controlled room using the exported actual Moon report. Source chain: 2,375 tests
+pass. Native terrain support now matches rendered triangles; independent regional
+imagery compiles without a base map. GPU shader lifecycle checks preserve tunnel
+openings and pavement. Final Earth image has ground and no stale landing prompt.
+
+An earlier Earth run functionally passed but had shader errors and invisible
+ground; it is rejected visual evidence. An initial battery test incorrectly wrote
+read-only pause state; its corrected rerun uses the real pause authority. External
+Overpass CORS failure remains separately recorded. Actor/flight setup and battery
+time are controlled/accelerated; this is not a complete uncoached campaign,
+physical-device or release certification. Moon station/rock art is still basic.
+Full roadmap, worldwide ocean/creative streaming, terrain/farms, remaining careers,
+licensed fauna, realism and compatible release fallback remain open. Production,
+dist and retained packages are unchanged.
+
+## October 10 previous local continuation — first licensed swimming fish
 
 Northern Australian coastal encounters can now use the reviewed Microsoft
 barramundi model (CC0): textured, normal-mapped geometry with authored tail motion,

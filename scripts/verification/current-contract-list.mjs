@@ -179,6 +179,8 @@ export const currentContractTests = [
   'tests/curated-home-interior-current.test.mjs',
   'tests/curated-model-assets-current.test.mjs',
   'tests/planetary-mission-completion-current.test.mjs',
+  'tests/lunar-field-mission-current.test.mjs',
+  'tests/lunar-homecoming-current.test.mjs',
   'tests/planetary-dressing-current.test.mjs',
   'tests/public-cameras-current.test.mjs',
   'tests/provider-resilience-current.test.mjs',

@@ -542,6 +542,7 @@ function startSpaceFlightFromExpeditionSurface(options = {}) {
     guidance: SPACE_GUIDANCE_MODE.MANUAL,
     reason: 'pathfinder-surface-return'
   });
+  options.onBeforeTransition?.();
   const transition = beginEnvironmentTransition(appCtx.ENV.SPACE_FLIGHT, { source: 'expedition_surface_return' });
   appCtx.setEnvironmentTransitionActive(true);
   suspendEarthModesForPlanetaryEntry(appCtx.ENV.SPACE_FLIGHT);

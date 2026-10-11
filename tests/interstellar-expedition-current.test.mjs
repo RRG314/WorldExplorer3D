@@ -602,3 +602,41 @@ test('Solis Reach publishes three bounded mapped decks and retains every require
   assert.ok(SHIP_STATIONS.some((station) => station.id === 'science-survey'));
   assert.ok(SHIP_CREW_POSTS.every((post) => DEFAULT_CREW.some((crew) => crew.id === post.crewId)));
 });
+
+
+test('expedition storage protects unsupported, malformed, oversized and stale progress', () => {
+  const memory = new Map();
+  const storage = { getItem: key => memory.get(key) ?? null, setItem: (key,value) => memory.set(key,String(value)), removeItem: key => memory.delete(key) };
+  const plan = createExpeditionPlan({ destinationId:'proxima-centauri', crew:DEFAULT_CREW, createdAtMs:2000 });
+  const key=createExpeditionStore(storage).storageKey;
+  for (const raw of ['{broken', JSON.stringify({...plan,schemaVersion:99}), JSON.stringify({...plan,crew:{}}), JSON.stringify({...plan,podJourney:{type:'ExpeditionPodJourney',schemaVersion:99}}), 'x'.repeat(2_000_001)]) {
+    memory.set(key,raw); const store=createExpeditionStore(storage);
+    assert.equal(store.load(),null);assert.equal(store.status().protectedRecord,true);
+    assert.throws(()=>store.save(plan),/preserved/);assert.throws(()=>store.clear(),/preserved/);assert.throws(()=>store.restoreBackup(),/preserved/);
+    assert.equal(memory.get(key),raw);
+  }
+  memory.clear();const first=createExpeditionStore(storage),second=createExpeditionStore(storage);
+  first.save(plan);second.load();first.save({...plan,updatedAtMs:3000});
+  assert.throws(()=>second.save({...plan,updatedAtMs:4000}),/Another tab/);assert.equal(JSON.parse(memory.get(key)).updatedAtMs,3000);
+  assert.throws(()=>createExpeditionStore({getItem(){throw Error('denied')}}).save(plan),/preserved/);
+});
+
+test('expedition commit survives redundant-copy failures and failed clear keeps the primary', () => {
+  const memory=new Map();let denied=null;
+  const storage={getItem:key=>memory.get(key)??null,setItem:(key,value)=>{if(key===denied)throw Error('quota');memory.set(key,String(value));},removeItem:key=>memory.delete(key)};
+  const store=createExpeditionStore(storage),plan=createExpeditionPlan({destinationId:'proxima-centauri',crew:DEFAULT_CREW,createdAtMs:2000});
+  store.save(plan);denied=store.storageKey;assert.throws(()=>store.save({...plan,updatedAtMs:3000}),/quota/);assert.equal(store.load().updatedAtMs,2000);
+  denied=store.backupKey;assert.equal(store.save({...plan,updatedAtMs:4000}).updatedAtMs,4000);assert.ok(store.status().warning);assert.equal(store.load().updatedAtMs,4000);
+  assert.throws(()=>store.clear(),/quota/);assert.equal(store.load().updatedAtMs,4000);
+  denied=EXPEDITION_DISCOVERY_KEY;assert.equal(store.save({...plan,updatedAtMs:5000}).updatedAtMs,5000);assert.match(store.status().warning,/archive/);
+});
+
+test('reading or merging an unknown discovery archive never replaces its bytes', () => {
+  const plan=createExpeditionPlan({destinationId:'proxima-centauri',crew:DEFAULT_CREW,createdAtMs:2000});
+  const memory=new Map(),storage={getItem:key=>memory.get(key)??null,setItem:(key,value)=>memory.set(key,String(value)),removeItem:key=>memory.delete(key)};
+  for(const raw of ['broken',JSON.stringify({type:'InterstellarDiscoveryArchive',schemaVersion:99,discoveries:[]}),JSON.stringify({type:'InterstellarDiscoveryArchive',schemaVersion:1,discoveries:[{}]})]) {
+    memory.set(EXPEDITION_DISCOVERY_KEY,raw);const archive=createExpeditionArchive(storage);
+    assert.deepEqual(archive.load().discoveries,[]);assert.throws(()=>archive.mergeExpedition(plan),/preserved/);assert.equal(memory.get(EXPEDITION_DISCOVERY_KEY),raw);
+    const store=createExpeditionStore(storage);store.save(plan);assert.equal(memory.get(EXPEDITION_DISCOVERY_KEY),raw);assert.ok(store.status().warning);
+  }
+});

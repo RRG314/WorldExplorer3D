@@ -1,4 +1,5 @@
-import {investigationBadges,investigationEventIds} from '../campaign/coastal-investigation.js';
+import { harborJourneyEventIds, lunarCampaignBadges } from '../campaign/lunar-homecoming.js';
+import {investigationBadges} from '../campaign/coastal-investigation.js';
 import { researchStarter, availableResearchStarters, starterAcceptsActivity } from '../campaign/research-starters.js';
 import { createPersonalHomeRuntime } from '../campaign/personal-home-runtime.js';
 import { homeAchievementBadges } from '../campaign/home-achievements.js';
@@ -483,7 +484,7 @@ function createDiscoveryUi(state) {
       if (evidence) events.unshift(evidence);
       else chapterMessage = 'The referenced record is missing. Restore your complete Journal backup to continue.';
     }
-    const investigationEvents=await state.profileStore.getEventsById(investigationEventIds);
+    const investigationEvents=await state.profileStore.getEventsById(harborJourneyEventIds);
     if(request!==refreshSequence)return;
     void state.appCtx.marineResearch?.investigation?.refresh();
     renderOpeningChapter();
@@ -627,7 +628,7 @@ function createDiscoveryUi(state) {
         .sort((left, right) => Number(right[1].xp) - Number(left[1].xp));
       const pathLabels = { field: 'Fieldwork', activity: 'Games', creation: 'Making', travel: 'Travel', community: 'Community', companion: 'Companions' };
       const paths = Object.entries(progress.paths || {}).filter(([, path]) => path.records > 0);
-      const badges = [...(progress.badgeAwards || []), ...investigationBadges(investigationEvents), ...homeAchievementBadges(profile), ...[openingChapterBadge(profile.openingChapter), harborRunBadge(profile.harborRun), threeViewsBadge(profile.threeViews)].filter(Boolean)];
+      const badges = [...(progress.badgeAwards || []), ...lunarCampaignBadges(profile,investigationEvents), ...investigationBadges(investigationEvents), ...homeAchievementBadges(profile), ...[openingChapterBadge(profile.openingChapter), harborRunBadge(profile.harborRun), threeViewsBadge(profile.threeViews)].filter(Boolean)];
       const activeCompanion = ownedCompanions.find((entry) => entry.active);
       const background = definitionById(BACKGROUND_DEFINITIONS, profile.characterState?.backgroundId) || BACKGROUND_DEFINITIONS[0];
       const strengths = ATTRIBUTE_DEFINITIONS.map((definition) => ({

@@ -362,11 +362,13 @@ export function configureTerrainSurfaceMaterialBlend(mesh, textureSets = {}) {
             '  regionalWeight *= (1.0 - clamp(vTerrainSurfaceMixA.x + terrainSnowWeight, 0.0, 1.0));',
             // One geographic colour field across every LOD, with metre-scale texture detail.
             // Exact hardscape and snow remain controlled by mapped surfaces/weather.
-            '  vec3 regionalColor = mapTexelToLinear(texture2D(terrainRegionalMap, clamp(vTerrainGeographicUv, 0.0, 1.0))).rgb;',
+            // These independent imagery samplers are always sRGB. The base
+            // material may have no map, or a map with a different encoding.
+            '  vec3 regionalColor = sRGBToLinear(texture2D(terrainRegionalMap, clamp(vTerrainGeographicUv, 0.0, 1.0))).rgb;',
             '  vec2 localUv = (vTerrainGeographicUv - vec2(0.5)) * (40000.0 / 6000.0) + vec2(0.5);',
             '  vec2 localEdge = min(localUv, vec2(1.0) - localUv);',
             '  float localWeight = terrainLocalReady * smoothstep(0.0, 0.12, min(localEdge.x, localEdge.y));',
-            '  regionalColor = mix(regionalColor, mapTexelToLinear(texture2D(terrainLocalMap, clamp(localUv, 0.0, 1.0))).rgb, localWeight);',
+            '  regionalColor = mix(regionalColor, sRGBToLinear(texture2D(terrainLocalMap, clamp(localUv, 0.0, 1.0))).rgb, localWeight);',
             '  regionalWeight = max(regionalWeight, localWeight * (1.0 - clamp(vTerrainSurfaceMixA.x + terrainSnowWeight, 0.0, 1.0)));',
             '  float regionalLuminance = dot(regionalColor, vec3(0.2126, 0.7152, 0.0722));',
             // Deep photographic shadows contain little usable reflectance evidence.
@@ -398,7 +400,7 @@ export function configureTerrainSurfaceMaterialBlend(mesh, textureSets = {}) {
     };
     material.customProgramCacheKey = () => [
       previousProgramCacheKey?.() || '',
-      'terrain-semantic-pbr-material-mix-v14'
+      'terrain-semantic-pbr-material-mix-v15'
     ].join(':');
   }
   if (!state.uniforms.terrainRegionalMap.value) state.uniforms.terrainRegionalMap.value = material.map;

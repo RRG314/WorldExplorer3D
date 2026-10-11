@@ -23,12 +23,13 @@ function normalizeDiscovery(value) {
 }
 
 function parseArchive(value) {
-  if (!value) return null;
+  if (!value || value.length > 2_000_000) return null;
   try {
     const record = JSON.parse(value);
     if (record?.type !== 'InterstellarDiscoveryArchive') return null;
-    if (Number(record.schemaVersion) !== EXPEDITION_DISCOVERY_SCHEMA_VERSION) return null;
-    const discoveries = (record.discoveries || []).map(normalizeDiscovery).filter(Boolean);
+    if (record.schemaVersion !== EXPEDITION_DISCOVERY_SCHEMA_VERSION || !Array.isArray(record.discoveries)) return null;
+    const discoveries = record.discoveries.map(normalizeDiscovery);
+    if (discoveries.some(entry => !entry)) return null;
     return Object.freeze({
       type: 'InterstellarDiscoveryArchive',
       schemaVersion: EXPEDITION_DISCOVERY_SCHEMA_VERSION,
@@ -62,41 +63,41 @@ function discoveriesFromExpedition(expedition, previous = []) {
 }
 
 function createExpeditionArchive(storage = globalThis.localStorage) {
+  let expectedRaw = null, protectedRecord = false;
+  const empty = () => Object.freeze({ type: 'InterstellarDiscoveryArchive', schemaVersion: EXPEDITION_DISCOVERY_SCHEMA_VERSION, discoveries: Object.freeze([]) });
   function persist(discoveries) {
-    const record = Object.freeze({
-      type: 'InterstellarDiscoveryArchive',
-      schemaVersion: EXPEDITION_DISCOVERY_SCHEMA_VERSION,
-      discoveries: Object.freeze(discoveries)
-    });
-    storage?.setItem?.(EXPEDITION_DISCOVERY_KEY, JSON.stringify(record));
+    if (protectedRecord) throw new Error('The existing discovery archive is unreadable or newer and has been preserved.');
+    if (typeof storage?.setItem !== 'function' || typeof storage?.getItem !== 'function') throw new Error('Discovery storage unavailable.');
+    if (storage.getItem(EXPEDITION_DISCOVERY_KEY) !== expectedRaw) throw new Error('The discovery archive changed. Reload before saving.');
+    const record = Object.freeze({ ...empty(), discoveries: Object.freeze(discoveries) });
+    const raw = JSON.stringify(record);
+    if (raw.length > 2_000_000) throw new Error('The discovery archive is full. Existing discoveries have been preserved.');
+    storage.setItem(EXPEDITION_DISCOVERY_KEY, raw);
+    expectedRaw = raw;
     return record;
   }
-
   function load() {
-    const current = parseArchive(storage?.getItem?.(EXPEDITION_DISCOVERY_KEY));
-    if (current) return current;
     try {
-      const legacy = JSON.parse(storage?.getItem?.(LEGACY_ACTIVE_EXPEDITION_KEY) || 'null');
-      const discoveries = discoveriesFromExpedition(legacy);
-      return discoveries.length ? persist(discoveries) : Object.freeze({
-        type: 'InterstellarDiscoveryArchive',
-        schemaVersion: EXPEDITION_DISCOVERY_SCHEMA_VERSION,
-        discoveries: Object.freeze([])
-      });
+      if (typeof storage?.getItem !== 'function') throw new Error('Storage unavailable');
+      expectedRaw = storage.getItem(EXPEDITION_DISCOVERY_KEY);
+      const current = parseArchive(expectedRaw);
+      protectedRecord = expectedRaw !== null && !current;
+      if (current) return current;
+      if (protectedRecord) return empty();
+      const legacyRaw = storage.getItem(LEGACY_ACTIVE_EXPEDITION_KEY);
+      const legacy = legacyRaw && legacyRaw.length <= 2_000_000 ? JSON.parse(legacyRaw) : null;
+      const discoveries = legacy?.schemaVersion === 1 ? discoveriesFromExpedition(legacy) : [];
+      // Reading is never an implicit migration write.
+      return Object.freeze({ ...empty(), discoveries: Object.freeze(discoveries) });
     } catch {
-      return Object.freeze({
-        type: 'InterstellarDiscoveryArchive',
-        schemaVersion: EXPEDITION_DISCOVERY_SCHEMA_VERSION,
-        discoveries: Object.freeze([])
-      });
+      protectedRecord = true;
+      return empty();
     }
   }
-
   function mergeExpedition(expedition) {
     const current = load();
     return persist(discoveriesFromExpedition(expedition, current.discoveries));
   }
-
   return Object.freeze({ key: EXPEDITION_DISCOVERY_KEY, load, mergeExpedition });
 }
 

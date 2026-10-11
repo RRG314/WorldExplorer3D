@@ -1,12 +1,13 @@
+import { planetarySurfaceYAtRenderXZ } from './runtime/surface-query.js?v=3';
 import { createExpeditionPodMesh } from '../space/expedition-pod-mesh.js?v=7';
 
 const ASCENT_HANDOFF_ALTITUDE = 165;
 const SURFACE_CAMERA_MODES = Object.freeze(['chase', 'side', 'cockpit']);
 let activeLaunch = null;
-let stagedEarthPod = null;
-let stagedEarthContext = null;
-let stagedEarthBoard = null;
-let unregisterStagedEarthInteraction = null;
+let stagedSurfacePod = null;
+let stagedSurfaceContext = null;
+let stagedSurfaceBoard = null;
+let unregisterStagedSurfaceInteraction = null;
 
 function smoothstep(value) {
   const t = Math.max(0, Math.min(1, Number(value) || 0));
@@ -25,6 +26,10 @@ function actorPosition(appCtx) {
 }
 
 function terrainHeightAt(appCtx, x, z, actorY = 0) {
+  if (appCtx?.onMoon || appCtx?.onMars) {
+    const height = planetarySurfaceYAtRenderXZ(appCtx, x, z);
+    if (Number.isFinite(height)) return height;
+  }
   const samplers = [appCtx?.terrainMeshHeightAt, appCtx?.elevationWorldYAtWorldXZ];
   for (const sampler of samplers) {
     if (typeof sampler !== 'function') continue;
@@ -119,69 +124,66 @@ function createSurfacePod(appCtx, bodyId = 'earth') {
   return pod;
 }
 
-function stagedEarthPodDistance() {
-  if (!stagedEarthPod || !stagedEarthContext) return Infinity;
-  const actor = actorPosition(stagedEarthContext);
-  return Math.hypot(actor.x - stagedEarthPod.position.x, actor.z - stagedEarthPod.position.z);
+function stagedSurfacePodDistance() {
+  if (!stagedSurfacePod || !stagedSurfaceContext) return Infinity;
+  const actor = actorPosition(stagedSurfaceContext);
+  return Math.hypot(actor.x - stagedSurfacePod.position.x, actor.z - stagedSurfacePod.position.z, actor.y - Number(stagedSurfacePod.userData.surfaceGroundY));
 }
 
 function releaseStagedEarthPod({ remove = true } = {}) {
-  unregisterStagedEarthInteraction?.();
-  unregisterStagedEarthInteraction = null;
-  const pod = stagedEarthPod;
-  const context = stagedEarthContext;
-  stagedEarthPod = null;
-  stagedEarthContext = null;
-  stagedEarthBoard = null;
-  if (remove && pod) pod.userData.curatedPodDisposed = true;
-  if (remove && pod?.parent) pod.parent.remove(pod);
-  if (remove) pod?.traverse?.((child) => {
-    child.geometry?.dispose?.();
-    if (Array.isArray(child.material)) child.material.forEach((material) => material?.dispose?.());
-    else child.material?.dispose?.();
-  });
+  unregisterStagedSurfaceInteraction?.();
+  unregisterStagedSurfaceInteraction = null;
+  const pod = stagedSurfacePod;
+  const context = stagedSurfaceContext;
+  stagedSurfacePod = null;
+  stagedSurfaceContext = null;
+  stagedSurfaceBoard = null;
+  if (remove) disposeSurfacePod(pod);
   context?.updateControlsModeUI?.();
   return pod;
 }
 
-function stageEarthPod(appCtx, options = {}) {
-  if (!appCtx?.scene || appCtx.getEnv?.() !== appCtx.ENV?.EARTH || appCtx.spaceFlight?.active) return null;
-  if (stagedEarthPod?.parent !== appCtx.earthSceneRoot) releaseStagedEarthPod();
-  if (!stagedEarthPod) stagedEarthPod = createSurfacePod(appCtx, 'earth');
-  stagedEarthContext = appCtx;
-  stagedEarthBoard = typeof options.onBoard === 'function' ? options.onBoard : null;
-  stagedEarthPod.userData.boardingRadius = 7.5;
-  faceActorTowardPod(appCtx, stagedEarthPod);
-  if (!unregisterStagedEarthInteraction && typeof appCtx.registerContextInteraction === 'function') {
-    unregisterStagedEarthInteraction = appCtx.registerContextInteraction({
+function getStagedSurfacePod(bodyId) {
+  return stagedSurfacePod?.userData.bodyId === bodyId ? stagedSurfacePod : null;
+}
+
+function stageSurfacePod(appCtx, options = {}) {
+  const bodyId = options.bodyId || 'earth';
+  const env = bodyId === 'earth' ? appCtx?.ENV?.EARTH : bodyId === 'moon' ? appCtx?.ENV?.MOON : null;
+  if (!env || !appCtx?.scene || appCtx.getEnv?.() !== env || appCtx.spaceFlight?.active) return null;
+  const parent = bodyId === 'earth' ? appCtx.earthSceneRoot : appCtx.scene;
+  if (stagedSurfacePod?.parent !== parent || stagedSurfacePod?.userData.bodyId !== bodyId) releaseStagedEarthPod();
+  if (!stagedSurfacePod) stagedSurfacePod = createSurfacePod(appCtx, bodyId);
+  stagedSurfacePod.userData.bodyId = bodyId;
+  stagedSurfaceContext = appCtx;
+  stagedSurfaceBoard = typeof options.onBoard === 'function' ? options.onBoard : null;
+  stagedSurfacePod.userData.boardingRadius = 7.5;
+  faceActorTowardPod(appCtx, stagedSurfacePod);
+  if (!unregisterStagedSurfaceInteraction && typeof appCtx.registerContextInteraction === 'function') {
+    unregisterStagedSurfaceInteraction = appCtx.registerContextInteraction({
       id: 'expedition-earth-pathfinder',
       priority: 180,
       evaluate() {
-        const distance = stagedEarthPodDistance();
-        if (
-          !stagedEarthPod ||
-          stagedEarthPod.userData.curatedPodStatus === 'loading' ||
-          stagedEarthContext?.getEnv?.() !== stagedEarthContext?.ENV?.EARTH ||
-          stagedEarthPod.parent !== stagedEarthContext?.earthSceneRoot ||
-          !Number.isFinite(distance) ||
-          distance > Number(stagedEarthPod.userData.boardingRadius || 7.5)
-        ) return null;
+        const distance = stagedSurfacePodDistance();
+        if (!stagedSurfacePod || stagedSurfacePod.userData.curatedPodStatus === 'loading'
+          || stagedSurfaceContext?.getEnv?.() !== env || stagedSurfaceContext?.paused
+          || stagedSurfacePod.parent !== parent || !Number.isFinite(distance)
+          || distance > Number(stagedSurfacePod.userData.boardingRadius || 7.5)) return null;
         return {
-          available: true,
-          action: 'board-earth-pathfinder',
-          label: 'Board Pathfinder',
-          detail: 'Launch to Solis Reach in Earth orbit',
-          distance,
-          data: { destination: 'solis-reach' }
+          available: true, action: 'board-earth-pathfinder', label: 'Board Pathfinder',
+          detail: bodyId === 'moon' ? 'Return to Solis Reach · partial survey records are kept' : 'Launch to Solis Reach in Earth orbit',
+          distance, data: { destination: 'solis-reach', bodyId }
         };
       },
-      perform() {
-        return stagedEarthBoard?.(stagedEarthPod) ?? false;
-      }
+      perform() { return stagedSurfaceBoard?.(stagedSurfacePod) ?? false; }
     });
   }
   appCtx.updateControlsModeUI?.();
-  return stagedEarthPod;
+  return stagedSurfacePod;
+}
+
+function stageEarthPod(appCtx, options = {}) {
+  return stageSurfacePod(appCtx, { ...options, bodyId: 'earth' });
 }
 
 function createGroundEffects(appCtx, pod) {
@@ -382,13 +384,8 @@ function clearLaunch(appCtx, launch, { restore = false } = {}) {
     child.geometry?.dispose?.();
     child.material?.dispose?.();
   });
-  if (launch.temporary && launch.pod) launch.pod.userData.curatedPodDisposed = true;
-  if (launch.temporary && launch.pod?.parent) launch.pod.parent.remove(launch.pod);
-  if (launch.temporary) launch.pod?.traverse?.((child) => {
-    child.geometry?.dispose?.();
-    if (Array.isArray(child.material)) child.material.forEach((material) => material?.dispose?.());
-    else child.material?.dispose?.();
-  });
+  if (launch.temporary && !restore) disposeSurfacePod(launch.pod);
+  if (restore && launch.pod) launch.pod.position.copy(launch.startPosition);
   if (launch.pod && !launch.temporary) launch.pod.position.copy(launch.startPosition);
   if (restore && appCtx.camera) {
     appCtx.camera.position.copy(launch.cameraPosition);
@@ -501,7 +498,7 @@ function playSurfacePodLaunch(appCtx, options = {}) {
     }
     if (launch.committing) return;
     launch.committing = true;
-    Promise.resolve(options.onCommit?.()).then((accepted) => {
+    Promise.resolve().then(() => options.onCommit?.()).then((accepted) => {
       if (accepted === false) {
         clearLaunch(appCtx, launch, { restore: true });
         options.onFailure?.();
@@ -517,38 +514,50 @@ function playSurfacePodLaunch(appCtx, options = {}) {
   return true;
 }
 
-function consumeStagedEarthPod(pod = stagedEarthPod) {
-  if (!pod || pod !== stagedEarthPod) return pod || null;
+function disposeSurfacePod(pod) {
+  if (!pod || pod.userData.surfacePodDisposed) return;
+  pod.userData.surfacePodDisposed = true;
+  pod.userData.curatedPodDisposed = true;
+  const attachment = pod.userData.curatedPodAttachment;
+  if (attachment) { pod.remove(attachment.visual); attachment.instance.dispose(); delete pod.userData.curatedPodAttachment; }
+  if (pod.parent) pod.parent.remove(pod);
+  const geometries = new Set(), materials = new Set();
+  pod.traverse(child => { if (child.geometry) geometries.add(child.geometry); for (const material of Array.isArray(child.material) ? child.material : [child.material]) if (material) materials.add(material); });
+  geometries.forEach(value => value.dispose()); materials.forEach(value => value.dispose());
+}
+
+function consumeStagedEarthPod(pod = stagedSurfacePod) {
+  if (!pod || pod !== stagedSurfacePod) return pod || null;
   return releaseStagedEarthPod({ remove: false });
 }
 
 function getStagedEarthPodSnapshot() {
   let bottomY = null;
   let groundClearance = null;
-  if (stagedEarthPod) {
-    stagedEarthPod.updateMatrixWorld(true);
-    const bounds = solidPodBounds(stagedEarthPod);
+  if (stagedSurfacePod) {
+    stagedSurfacePod.updateMatrixWorld(true);
+    const bounds = solidPodBounds(stagedSurfacePod);
     if (Number.isFinite(bounds.min.y)) {
       bottomY = Number(bounds.min.y.toFixed(3));
-      const groundY = Number(stagedEarthPod.userData?.surfaceGroundY);
+      const groundY = Number(stagedSurfacePod.userData?.surfaceGroundY);
       if (Number.isFinite(groundY)) groundClearance = Number((bounds.min.y - groundY).toFixed(3));
     }
   }
   return Object.freeze({
-    active: !!stagedEarthPod?.parent,
-    distance: Number.isFinite(stagedEarthPodDistance()) ? Number(stagedEarthPodDistance().toFixed(2)) : null,
-    boardingRadius: Number(stagedEarthPod?.userData?.boardingRadius || 0),
+    active: !!stagedSurfacePod?.parent,
+    distance: Number.isFinite(stagedSurfacePodDistance()) ? Number(stagedSurfacePodDistance().toFixed(2)) : null,
+    boardingRadius: Number(stagedSurfacePod?.userData?.boardingRadius || 0),
     bottomY,
-    groundY: Number.isFinite(Number(stagedEarthPod?.userData?.surfaceGroundY))
-      ? Number(Number(stagedEarthPod.userData.surfaceGroundY).toFixed(3))
+    groundY: Number.isFinite(Number(stagedSurfacePod?.userData?.surfaceGroundY))
+      ? Number(Number(stagedSurfacePod.userData.surfaceGroundY).toFixed(3))
       : null,
     groundClearance,
-    position: stagedEarthPod ? Object.freeze({
-      x: Number(stagedEarthPod.position.x.toFixed(2)),
-      y: Number(stagedEarthPod.position.y.toFixed(2)),
-      z: Number(stagedEarthPod.position.z.toFixed(2))
+    position: stagedSurfacePod ? Object.freeze({
+      x: Number(stagedSurfacePod.position.x.toFixed(2)),
+      y: Number(stagedSurfacePod.position.y.toFixed(2)),
+      z: Number(stagedSurfacePod.position.z.toFixed(2))
     }) : null
   });
 }
 
-export { consumeStagedEarthPod, getStagedEarthPodSnapshot, playSurfacePodLaunch, releaseStagedEarthPod, stageEarthPod };
+export { stageSurfacePod, getStagedSurfacePod, consumeStagedEarthPod, getStagedEarthPodSnapshot, playSurfacePodLaunch, releaseStagedEarthPod, stageEarthPod };

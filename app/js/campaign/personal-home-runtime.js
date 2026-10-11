@@ -1,3 +1,4 @@
+import { harborJourneyEventIds, harborJourneyState, lunarHomecomingRecord, harborCompletionRecord } from './lunar-homecoming.js';
 import {investigationId,investigationState,investigationEventIds} from './coastal-investigation.js';
 import {resolveBuildingEntrySupport} from '../building-entry.js?v=9';
 import {normalizeWorkspace,findWorkspacePlacement,validateWorkspacePlacement} from './personal-workspace.js';
@@ -10,7 +11,7 @@ export function createPersonalHomeRuntime(state,dependencies={}) {
   const ctx=state.appCtx,store=state.profileStore,element=document.getElementById('discoveryPersonalHome');
   const abort=new AbortController(),housing=(dependencies.getHousing||getPersonalHousing)();
   let profile={},home=null,offers=[],record=null,visual=null,visualKey='',renderKey='',message='',busy=false,disposed=false,saveFailed=false,reviewing=false,loaded=false,elapsed=0,generation=0;
-  let coastalReport=null;
+  let coastalReport=null, lunarJourney=harborJourneyState();
   let selectedPurpose='journal';
   let storageOpen=false;
   let importedDesign=null;
@@ -35,7 +36,7 @@ export function createPersonalHomeRuntime(state,dependencies={}) {
     if(disposed||!element)return;
     const w=workspace(),v=housing.snapshot(),bag=ctx.playerBackpackInventory?.page?.({offset:0,limit:24})?.items||[];
     const supplies=bag.filter(item=>item.catalogId!=='hands'&&!item.equipped&&!item.verbs?.includes('equip')&&item.category!=='field-tool');
-    const key=JSON.stringify([loaded,profile.openingChapter?.phase,profile.homeAchievements,w,home?.id,home?.journey,home?.storage,coastalReport?.eventId,record?.eventId,v.primaryHomeId,offers.map(o=>o.id),busy,insideHome(),message,reviewing,!!visual,saveFailed,supplies.map(i=>[i.instanceId,i.quantity])]);
+    const key=JSON.stringify([loaded,profile.openingChapter?.phase,profile.homeAchievements,w,home?.id,home?.journey,home?.storage,coastalReport?.eventId,lunarJourney,record?.eventId,v.primaryHomeId,offers.map(o=>o.id),busy,insideHome(),message,reviewing,!!visual,saveFailed,supplies.map(i=>[i.instanceId,i.quantity])]);
     if(key===renderKey)return;renderKey=key;
     const button=(action,label,disabled=false)=>`<button type="button" data-home-action="${escape(action)}"${busy||disabled?' disabled':''}>${escape(label)}</button>`;
     let body='';
@@ -56,6 +57,10 @@ export function createPersonalHomeRuntime(state,dependencies={}) {
       const j=home.journey||{};
       body+=`<p>A Place to Return${profile.homeAchievements?.home?' · Complete':''}: ${j.entered?'entered':'enter your room'} · ${j.displayed?'record displayed':'use your desk'} · ${j.departed?'outing started':'leave for an outing'} · ${j.returned?'returned':'walk back and enter again'}.</p>`;
       if(insideHome()&&coastalReport&&w.pose)body+=button('coastal-display',w.recordId===coastalReport.eventId?'Coastal expedition displayed':'Display coastal expedition',w.recordId===coastalReport.eventId);
+      if(lunarJourney.report){
+        if(insideHome()&&w.pose)body+=button('lunar-display',w.recordId===lunarJourney.report.eventId?'Lunar field book displayed':'Display lunar field book',w.recordId===lunarJourney.report.eventId);
+        body+=`<details><summary>From the Harbor · your journey${lunarJourney.complete?' · complete':''}</summary><ol>${lunarJourney.steps.map(step=>`<li>${step.complete?'✓ ':''}<strong>${escape(step.label)}</strong><br><small>${escape(step.decision)}</small></li>`).join('')}</ol><p>Free roam remains open. Choose another research journey whenever you like.</p>${insideHome()&&w.recordId===lunarJourney.report.eventId?button('lunar-review','Review journey at the desk'):''}</details>`;
+      }
       if(reviewing&&record)body+=`<article class="discoveryDeliveryOffer"><strong>${escape(record.name)}</strong><p>${escape(record.detail||record.description||'Your saved First Bearings observation.')}</p><small>${escape(record.regionLabel||home.locationLabel)}</small>${button('review','Review this record at the desk')}${w.purpose==='album'?button('album','Open saved album'):''}</article>`;
       body+=button('journeys','Choose your next journey');
     }
@@ -67,8 +72,9 @@ export function createPersonalHomeRuntime(state,dependencies={}) {
     try{
       profile=provided||await store.getProfile();if(disposed)return;
       reloadHome();
-      const investigationEvents=await store.getEventsById(investigationEventIds);
+      const investigationEvents=await store.getEventsById(harborJourneyEventIds);
       coastalReport=investigationState(investigationEvents).report||null;
+      lunarJourney=harborJourneyState(profile,investigationEvents);
       const recordId=workspace().recordId||profile.openingChapter?.eventId;
       const [evidence]=recordId?await store.getEventsById([recordId]):[];
       if(disposed)return;record=evidence||null;loaded=true;render();
@@ -141,6 +147,25 @@ export function createPersonalHomeRuntime(state,dependencies={}) {
         const rows=await store.getEventsById(investigationEventIds),report=investigationState(rows).report;
         if(!report||report.eventId!==investigationId('report'))throw Error('File a complete coastal report before displaying it.');
         check(housing.updateWorkspace(home.id,{type:'record',recordId:report.eventId,revision:workspace().revision}));record=report;coastalReport=report;await present();reviewing=true;message='Your coastal expedition is displayed on the desk. Open the field record to review its evidence.';
+      }else if(action==='lunar-display'||action==='lunar-review'){
+        if(ctx.getEnv?.()!=='EARTH'||!canUse())throw Error('Stand beside your desk on Earth to review the lunar field book.');
+        const rows=await store.getEventsById(harborJourneyEventIds),journey=harborJourneyState(await store.getProfile(),rows);
+        if(!journey.report)throw Error('Return the lunar comparison to Solis Reach’s Analysis Lab first.');
+        if(action==='lunar-display'){
+          check(housing.updateWorkspace(home.id,{type:'record',recordId:journey.report.eventId,revision:workspace().revision}));
+          record=journey.report;await present();reviewing=true;message='Lunar field book displayed. Review your journey beside the desk to record the homecoming.';
+        }else{
+          const saved=await store.recordExplorerEvent(lunarHomecomingRecord(home,journey.report));
+          if(saved?.recorded!==true&&saved?.reason!=='already-recorded')throw Error('Your homecoming could not be saved. Retry at the desk.');
+          const updated=await store.getEventsById(harborJourneyEventIds),currentProfile=await store.getProfile();
+          const completed=harborJourneyState(currentProfile,updated);
+          if(completed.ready){
+            const award=await store.recordExplorerEvent(harborCompletionRecord(currentProfile,updated));
+            if(award?.recorded!==true&&award?.reason!=='already-recorded')throw Error('The homecoming is saved. Retry to record the campaign badge.');
+            message='From the Harbor complete. Your field records and choices are saved. Choose your next journey, or keep exploring.';
+          }else message='Homecoming saved. Your journey record shows the remaining chapters; each can be completed in free roam.';
+          await refresh();await state.ui?.refreshData();
+        }
       }else if(action==='album'){if(!canUse())throw Error('Stand beside your desk.');ctx.openWorldDiscoverySection?.('today');document.getElementById('discoveryThreeViews')?.scrollIntoView({block:'nearest'});}
       else if(action.startsWith('store:')||action.startsWith('withdraw:')){
         if(!insideHome())throw Error('Enter your personal workspace to use its storage.');

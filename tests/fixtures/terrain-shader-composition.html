@@ -7,6 +7,7 @@
 <script type="module">
 import {applyTerrainPortalMasksForContext} from '/app/js/terrain/structure-terrain-portals.js';
 import {createPavementTerrainMask} from '/app/js/world/pavement-terrain-mask.js';
+import {configureTerrainSurfaceMaterialBlend} from '/app/js/terrain/surface-material-blend.js';
 const renderer=new THREE.WebGLRenderer({antialias:false,preserveDrawingBuffer:true});
 renderer.setSize(384,384);document.body.append(renderer.domElement);
 const scene=new THREE.Scene();scene.background=new THREE.Color(0x083344);scene.add(new THREE.AmbientLight(0xffffff,1));
@@ -37,5 +38,29 @@ window.advanceTime=async()=>render();
 window.render_game_to_text=()=>JSON.stringify({phase:phases[phase].name,phaseIndex:phase,coordinateSystem:'world x/z 0..32, terrain y=1, top view',background,pavedReference,
  probes:[4,8,16,24].map(x=>({x,z:x===4?4:16,expected:phases[phase].holes.includes(x)?'opening':'pavement',rgba:pixel(x,x===4?4:16)})),
  glError:renderer.getContext().getError(),contextLost:renderer.getContext().isContextLost(),calls:renderer.info.render.calls});
+// Return-to-Earth terrain can acquire imagery before its base map. Exercise
+// actual GPU compilation, colour and subsequent base-map arrival/retirement.
+window.verifyRegionalMaterialLifecycle=()=>{
+ const texture=rgb=>{const t=new THREE.DataTexture(new Uint8Array([...rgb,255]),1,1);t.encoding=THREE.sRGBEncoding;t.needsUpdate=true;return t;};
+ const regional=texture([60,170,80]),local=texture([180,60,40]),base=texture([255,255,255]);
+ const g=new THREE.PlaneGeometry(32,32).rotateX(-Math.PI/2).translate(16,1,16);
+ g.setAttribute('terrainGeographicUv',g.getAttribute('uv').clone());
+ const m=new THREE.MeshStandardMaterial({roughness:1});m.defines={WE3D_TERRAIN_REGIONAL_IMAGE:1};
+ const mesh=new THREE.Mesh(g,m);scene.add(mesh);terrain.visible=false;
+ configureTerrainSurfaceMaterialBlend(mesh,{});
+ const u=m.userData.terrainSurfaceMaterialBlend.uniforms;
+ u.terrainRegionalMap.value=regional;u.terrainLocalMap.value=local;
+ const results=[];
+ for(const mode of ['no-base-map','srgb-base-map','linear-base-map','removed-base-map']){
+  m.map=mode==='no-base-map'||mode==='removed-base-map'?null:base;
+  base.encoding=mode==='linear-base-map'?THREE.LinearEncoding:THREE.sRGBEncoding;base.needsUpdate=true;m.needsUpdate=true;
+  const pixels=[];
+  for(const layer of ['none','regional','local']){
+   u.terrainRegionalReady.value=layer==='none'?0:1;u.terrainLocalReady.value=layer==='local'?1:0;render();pixels.push(pixel(16,16));
+  }
+  results.push({mode,pixels,glError:renderer.getContext().getError()});
+ }
+ scene.remove(mesh);g.dispose();m.dispose();regional.dispose();local.dispose();base.dispose();terrain.visible=true;render();return results;
+};
 window.ready=true;
 </script>

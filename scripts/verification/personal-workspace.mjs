@@ -41,6 +41,35 @@ try{
     assert.match(await page.locator('#discoveryPersonalHome').innerText(),/modern research equipment case/);await page.screenshot({path:`${out}/coastal-display.png`});
     await page.reload();await page.waitForFunction(()=>globalThis.fixture&&fixture.runtime.snapshot().furnitureReady);assert.equal(await page.evaluate(()=>fixture.runtime.snapshot().workspace.recordId),'coastal-investigation-v1:report');report.checks.push('completed-world-coastal-report-displayed-at-real-desk-and-retained-after-reload');
   }
+  if(process.env.WE3D_LUNAR_JOURNAL){
+    const data=JSON.parse(await readFile(process.env.WE3D_LUNAR_JOURNAL,'utf8'));
+    const lunar=data.events.find(event=>event.eventId==='event:destination-mission:moon');assert.ok(lunar?.metadata?.prepared);
+    await page.evaluate(async row=>{
+      await fixture.store.recordExplorerEvent(row);await fixture.runtime.refresh();
+      const {workspaceGeometry}=await import('/app/js/campaign/personal-workspace.js'),g=workspaceGeometry(fixture.active,fixture.runtime.snapshot().workspace.pose);
+      Object.assign(fixture.walker,{...g.use,y:g.use.y+1.7});fixture.state.ui.setOpen(true);
+    },lunar);
+    await page.locator('[data-home-action="lunar-display"]').click();
+    await page.waitForFunction(()=>fixture.runtime.snapshot().workspace.recordId==='event:destination-mission:moon'&&fixture.runtime.snapshot().furnitureReady&&!fixture.runtime.snapshot().busy);
+    await page.locator('#discoveryPersonalHome details').filter({has:page.locator('[data-home-action="lunar-review"]')}).locator('summary').click();
+    await page.evaluate(()=>{window.homeWriteFailure=false;const original=IDBObjectStore.prototype.put;IDBObjectStore.prototype.put=function(value,...rest){if(this.name==='events'&&value?.eventId==='event:campaign:lunar-homecoming:v1'){IDBObjectStore.prototype.put=original;window.homeWriteFailure=true;throw new DOMException('Homecoming save rejected for verification','QuotaExceededError');}return original.call(this,value,...rest);};});
+    await page.locator('[data-home-action="lunar-review"]').click();await page.waitForFunction(()=>!fixture.runtime.snapshot().busy);
+    assert.equal(await page.evaluate(()=>window.homeWriteFailure),true,'The targeted failed write must execute');
+    assert.equal(await page.evaluate(async()=>(await fixture.store.getEventsById(['event:campaign:lunar-homecoming:v1'])).length),0);
+    // Runtime rerender closes ordinary disclosure widgets; expand the current one.
+    await page.locator('#discoveryPersonalHome details').filter({has:page.locator('[data-home-action="lunar-review"]')}).locator('summary').click();
+    await page.locator('[data-home-action="lunar-review"]').click();await page.waitForFunction(()=>!fixture.runtime.snapshot().busy);
+    assert.equal(await page.evaluate(async()=>(await fixture.store.getEventsById(['event:campaign:lunar-homecoming:v1'])).length),1);
+    assert.equal(await page.evaluate(async()=>(await fixture.store.getEventsById(['event:campaign:from-the-harbor:v1'])).length),0,'Missing coastal and home chapters must not grant the combined badge');
+    await page.locator('#discoveryPersonalHome details').filter({has:page.locator('[data-home-action="lunar-review"]')}).locator('summary').click();
+    await page.screenshot({path:`${out}/lunar-homecoming.png`});
+    await page.locator('[data-home-action="lunar-review"]').click();await page.waitForFunction(()=>!fixture.runtime.snapshot().busy);
+    assert.equal(await page.evaluate(async()=>(await fixture.store.getEventsById(['event:campaign:lunar-homecoming:v1'])).length),1);
+    await page.reload();await page.waitForFunction(()=>globalThis.fixture&&fixture.runtime.snapshot().furnitureReady);
+    assert.equal(await page.evaluate(()=>fixture.runtime.snapshot().workspace.recordId),'event:destination-mission:moon');
+    assert.equal(await page.evaluate(async()=>{const {lunarCampaignBadges,harborJourneyEventIds}=await import('/app/js/campaign/lunar-homecoming.js');return lunarCampaignBadges(await fixture.store.getProfile(),await fixture.store.getEventsById(harborJourneyEventIds)).some(b=>b.id==='lunar-surveyor');}),true);
+    report.checks.push('actual-moon-report-at-desk-failed-save-retry-duplicate-reload-and-no-unearned-campaign-badge');
+  }
   await page.evaluate(()=>fixture.state.ui.setOpen(true));await page.setViewportSize({width:390,height:844});
   assert.equal(await page.locator('aside').evaluate(e=>e.scrollWidth>e.clientWidth+1),false);await page.screenshot({path:`${out}/phone.png`});
   await page.setViewportSize({width:1280,height:800});
