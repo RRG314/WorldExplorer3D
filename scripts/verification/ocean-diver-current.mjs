@@ -11,7 +11,7 @@ const owned = await chromium.launchServer({ channel: 'chrome', headless: false }
 const browser = await chromium.connect(owned.wsEndpoint());
 const dir = process.env.WE3D_OCEAN_DIVER_OUTPUT || 'output/verification/ocean-plan';
 await fs.mkdir(dir, { recursive: true });
-const report = { scope: 'Mutable source, actual standalone Ocean explorer/sub handoff; controlled bathymetry provider', cases: [], errors: [] };
+const report = { scope: 'Selected artifact/source, actual standalone Ocean explorer/sub handoff; controlled bathymetry provider', runtimeRoot:process.env.WE3D_VERIFY_ROOT||process.cwd(), cases: [], errors: [] };
 try {
  const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
  let elevation = 50, delay = 0;
@@ -118,11 +118,12 @@ try {
  assert.equal(await page.evaluate(()=>diverCtx.boatMode.transportEntityId),parentId);
  await page.screenshot({path:`${dir}/same-research-vessel-recovered.png`});report.cases.push({id:'operated-submarine-recovers-to-same-parent-research-vessel',passed:true});
  await page.evaluate(()=>diverCtx.stopOceanMode());
- const retained=await page.evaluate(async()=>{
-  const {modelAssetCacheSnapshot}=await import('/app/js/assets/model-asset-runtime.js');
-  return modelAssetCacheSnapshot();
- });
- report.modelCacheAfterExit=retained;
+ // Inspect the running package. The unbundled asset-cache diagnostic is not a
+ // production entry point (and an unversioned source import creates a new cache).
+ report.afterExit=await page.evaluate(()=>({active:getOceanModeDebugState().active,canvasVisible:!!diverCtx.oceanMode.canvas?.getClientRects().length,diverActive:!!diverCtx.oceanMode.diver?.active,renderer:!!diverCtx.oceanMode.renderer,scene:!!diverCtx.oceanMode.scene,animation:!!diverCtx.oceanMode.animationId}));
+ // The shared canvas node is retained hidden; scene, renderer and RAF are owned
+ // by the departed session and must be released.
+ for(const value of Object.values(report.afterExit))assert.equal(value,false);
  assert.equal(await page.locator('#oceanDiverControls').count(),0);assert.equal(await page.locator('#oceanSwimmingHud').count(),0);report.cases.push({id:'environment-exit-disposes-diver-ui',passed:true});
  assert.deepEqual(report.errors,[]);report.passed=true;
 }catch(error){report.failure=String(error.stack||error);process.exitCode=1;}

@@ -1,4 +1,5 @@
 import {verifyLicensedOceanFish} from './licensed-ocean-fish.mjs';
+import {walkResearchStation} from './research-station-walk.mjs';
 import assert from 'node:assert/strict';
 import {runPrescribedGameActions} from './prescribed-game-actions.mjs';
 import {deployResearchSubmarineFromDeck} from './marine-entry-ui.mjs';
@@ -229,22 +230,15 @@ try {
  await page.keyboard.down('w');try{await page.waitForFunction(z=>waterCheckContext.boatDeck.snapshot().pose.z>z+.4,deckStart.pose.z,{timeout:8000})}finally{await page.keyboard.up('w')}
  await page.screenshot({path:`${dir}/actual-research-deck.png`});
  assert.equal(await page.evaluate(()=>waterCheckContext.Walk.state.characterMesh.parent===waterCheckContext.boatMode.mesh),true);
- const chartReached=await page.evaluate(()=>{
-  const ctx=waterCheckContext,read=ctx.readControlActions;
-  try{for(const target of [{x:6,z:-30.7},{x:3,z:-30.7},{x:3,z:-30.3}]){
-   let reached=false;for(let i=0;i<1000;i++){const p=ctx.boatDeck.snapshot().pose,dx=target.x-p.x,dz=target.z-p.z;
-    if(Math.hypot(dx,dz)<.28){reached=true;break;}
-    ctx.readControlActions=()=>Math.abs(dx)>.17?{strafe:-Math.sign(dx)}:{move:Math.sign(dz)};ctx.boatDeck.update(.05);
-   }if(!reached)return false;
-  }return true;}finally{ctx.readControlActions=read;}
- });assert.equal(chartReached,true);
+ await walkResearchStation(page,'chart',{context:'waterCheckContext'});
  await page.getByLabel('Deck destination').selectOption('chart');await page.locator('#researchDeckAction').click();
  await page.waitForFunction(()=>waterCheckContext.showLargeMap===true);
  await page.screenshot({path:`${dir}/actual-research-chart.png`});
  await page.keyboard.press('Escape');await page.waitForFunction(()=>!waterCheckContext.showLargeMap);
  report.cases.push({id:'actual-research-navigation-chart-opens-and-closes',passed:true});
  await page.getByText('Vessel options',{exact:true}).click();
- await page.locator('#researchDeckHelm').click();assert.equal(await page.evaluate(()=>waterCheckContext.boatDeck.active),false);
+ await page.locator('#researchDeckHelm').click();assert.equal(await page.evaluate(()=>waterCheckContext.boatDeck.snapshot().targetId),'helm');
+ await walkResearchStation(page,'helm',{context:'waterCheckContext'});await page.locator('#researchDeckAction').click();assert.equal(await page.evaluate(()=>waterCheckContext.boatDeck.active),false);
  report.cases.push({id:'actual-ocean-surface-research-ship-deck-and-helm',passed:true});
 
  report.roundTrip=await page.evaluate(async()=>{
