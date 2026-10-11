@@ -60,16 +60,29 @@ map tabs show the player and walking route. Stations reuse the existing Journal,
 Field Guide, Backpack/condition and voyage authorities. The licensed source hull
 is retained beside a reproducibly adapted walkable model. No production deploy.
 
-Full source chain: **2,455 tests pass**. Furnished browser fixtures pass **11 + 18**
+Full source chain: **2,459 tests pass** after the offshore geocoder repair.
+Furnished browser fixtures pass **11 + 18**
 checks, including all 55 connections, galley consumption/reload, map input lock,
 swimming/reboarding and complete disposal. The expanded full-app journey passes
 16 checks: survey/rewards, each room action, real chart, desktop/phone ship map,
-and surface save/reload returning to the same vessel. Immutable packaging is
-being verified; provider responses in these gameplay checks are controlled.
+and surface save/reload returning to the same vessel. The final immutable package
+`5.5.0+fcb8c70305f1.83820089a4eff4ba.staging` passes seven selected gates and the
+11-case continuous-ocean/real-fallback roundtrip. Gameplay provider responses are
+controlled; whole-release acceptance remains separate. The review preview is
+https://we3d-staging-20260712--ship-review-1011-pb8x1l4l.web.app/ (October 18 expiry).
+The final hosted Chrome journey passes five cases, including live weather and
+HTTP 200 responses from reverse-place, marine and weather gateways, with no page
+errors or failed requests. Staging's exact preview hostname is now registered for
+ordinary AppCheck. Staging `getPlaceLookup` version 4 fixes expected unmapped ocean
+addresses; existing cloud configuration is unchanged. Production still needs this
+backend repair in the eventual approved release. Five focused controller-cleanup
+tests and a real-browser listener-close probe also pass. Whole-release acceptance
+and the broader roadmap remain open; this is a ship/ocean review build.
 Evidence and limitations: `docs/design/RESEARCH-VESSEL-INTERIOR-DELIVERY.md`.
 
 Ocean code is checkpointed at `b145ab83` / `4821c59b`. Its prior immutable
-`output/hosting-validation/ocean-482` passes 11 continuous-ocean/fallback checks.
+`ocean-482` passed 11 continuous-ocean/fallback checks; its manifests and retirement
+receipt are retained under the current delivery evidence.
 This supersedes the older note below that continuous ocean implementation itself
 was still open. Whole-release acceptance and the broader facility/creative/career
 roadmap remain separate and incomplete. Preserve dist and the four saved packages.

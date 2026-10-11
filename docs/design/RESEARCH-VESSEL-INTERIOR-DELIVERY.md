@@ -75,7 +75,7 @@ throttled and only runs while open. At most three nearby interior lights run.
   matrix. No production readiness claim is based on these probes.
 
 
-### Current evidence update
+### Earlier assembled-app evidence
 
 The full app survey journey passed 8 cases at
 `output/research-interior-20261011/full-app/browser.json`: actual interior briefing,
@@ -89,7 +89,7 @@ passed at `journey-3`; subsequent visual review fixed a coplanar display frame a
 added inner accommodation lining. `journey-4` reached all 18 journey cases but
 failed final disposal: a later animation frame recreated the already-disposed
 HUD. The deck controller now rejects updates/entry after disposal; a source
-regression verifies that terminal state. The final fixture rerun remains required.
+regression verifies that terminal state. The final fixture rerun subsequently passed; see the final checks below.
 
 The prior habitat gate's environmental HTTP 503s were emitted intentionally by
 `scripts/place-lookup-preview.mjs` because no local Functions origin was configured.
@@ -125,3 +125,130 @@ ship map on desktop/phone, carried provisions and surface reload followed by
 walking to the helm. No page errors or local HTTP failures. This run uses
 controlled environmental providers and retains local AppCheck warnings; ordinary
 hosted attestation is a separate acceptance class.
+
+### Review package
+
+Candidate: `5.5.0+fcb8c70305f1.83820089a4eff4ba.staging`, in
+`output/hosting-validation/research-ready`. All seven selected gates pass:
+capabilities, marine habitat, marine research/rooms, diving, local marine entry,
+weather/location UI and artifact integrity. Receipt:
+`/tmp/we3d-research-interior-ready-gates.log`. Their component/provider scope
+remains explicit; this is not the entire production release matrix.
+
+Continuous-ocean/fallback acceptance passes **11 cases** at
+`output/research-interior-20261011/continuous-final/report.json`. It verifies
+geographic rebasing, nine-tile residency, resource plateau, outage handling,
+remote reload, diver reboarding and same-parent recovery. The old released save
+is preserved byte-for-byte. The actual retained d877 staging package can resume
+and write its old voyage; the new candidate subsequently reads that write and
+can resume its retained continuous voyage.
+
+The licensed-fish extension passes **28 local-entry cases** at
+`output/research-interior-20261011/packaged-fish/entry-browser.json` on identical
+game bytes. Four regional visits check modeled ranges, real asset movement,
+detachment, exactly-once disposal and bounded renderer resources. These are
+controlled ecology/depth inputs, not live animal observations.
+
+Verification repairs were necessary: two older checks expected the retired deck
+chart/instant helm, and a diagnostic tried importing development-only files from
+the bundle. They now walk the current ship and inspect actual runtime ownership.
+One runner completed gameplay but retained its Playwright control connection;
+explicit client disconnect before closing its owned browser server fixes shutdown.
+The stopped runner is retained as failed execution evidence, not a passing gate.
+No app behavior was changed by these verifier repairs. All final manifest payload
+files are byte-identical to the initial passing ship package; see
+`final-payload-parity.json` in the delivery evidence folder.
+
+Review preview (expires October 18):
+https://we3d-staging-20260712--ship-review-1011-pb8x1l4l.web.app/
+Production is unchanged. User approval is still required before promotion. Wider
+facility, creative, career and visual-realism roadmap work remains open; this
+ship/ocean delivery does not complete those separate milestones.
+
+
+### Preview host and artifact housekeeping
+
+The initial hosted run completed all four room/map journeys but received HTTP 401
+from marine and reverse-place endpoints. An ordinary user-profile Chrome session
+confirmed the AppCheck reCAPTCHA failure; it was not dismissed as automation noise.
+The exact new preview hostname was absent from staging's reCAPTCHA domain list.
+It was registered using a field-specific update; existing domains, enforcement and
+production settings are unchanged. Receipt: `preview-domain-registration.json`.
+The [Google Cloud key-update reference](https://docs.cloud.google.com/recaptcha/docs/reference/rest/v1/projects.keys/patch)
+describes the scoped update mask. Every future new preview hostname needs this
+configuration check before ordinary hosted provider acceptance.
+
+Generated validation roots `ocean-482`, `research-39bf` and `research-review` were
+retired only after full content-hash verification and confirming their commits
+are ancestors of the current checkout. Both manifests and a receipt for each are
+under `output/research-interior-20261011/retired/`. The final `research-ready`
+package, production `dist`, all four saved packages, source/history and player
+records are retained.
+
+
+### Offshore place-name repair found by hosted acceptance
+
+Once the domain change propagated, all hosted ship checks completed and AppCheck
+401s stopped. The stricter all-network check then failed on one reverse-geocoder
+502. A direct, bounded diagnostic at the public Coral Shelf coordinates returned
+HTTP 200 with `Unable to geocode`. Nominatim's [reverse API documentation](https://nominatim.org/release-docs/latest/api/Reverse/)
+identifies no-coverage coordinates as a normal possible result; ocean coordinates
+need not have a street/city address.
+
+The gateway now recognizes only that specific no-coverage result (200 or 404),
+returns an empty place object and caches it for one day. Existing coordinate/name
+fallbacks remain in charge; no fabricated address or water classification is
+introduced. Other failures, throttling and malformed coordinates still fail.
+Focused tests cover negative caching/expiry, genuine provider errors, valid land
+addresses, search isolation and AppCheck-before-budget enforcement: 12 pass.
+The failed hosted receipt is retained separately; it is not relabeled a pass.
+
+
+The complete source chain was rerun after this backend repair: **2,459 tests
+pass**, with inventory and mutation sensitivity checks also passing. Receipt:
+`/tmp/we3d-research-interior-geocoder-source.log`. The frontend package remains
+byte-identical; the geocoder repair is a separate backend commit, `dfa42e6c`.
+
+The ordinary Firebase deploy command stopped before upload because discovery
+requested unrelated payment/email/admin parameter values. No values were invented
+or cleared. The staging-only follow-up uses Cloud Functions' documented
+[source update mask](https://docs.cloud.google.com/functions/docs/reference/rest/v1/projects.locations.functions/patch)
+with the committed Functions archive. Only `sourceUploadUrl` is sent; the running
+function's environment, secret bindings, service account, runtime, resource limits
+and networking settings are compared before/after without logging their values.
+
+
+Staging `getPlaceLookup` is now version **4**, updated successfully with the
+source-only operation. The before/after configuration comparison passed.
+`geocoder-staging-deploy.json` records the source archive hash, commit, operation
+and safe metadata. Production was not changed. A future approved production
+release must include this backend fix as well as the reviewed frontend package.
+
+
+### Final hosted acceptance and handoff
+
+`output/research-interior-20261011/hosted-ready/report.json` passes **five cases**
+on the actual hosted package, with no provider interception, debug attestation,
+seeded saves or source overlays. Room traversal uses the real controller; the
+separate prescribed keyboard fixture verifies input. Galley provisions, internal
+stairs, actual bridge chart and desktop/phone ship maps work. Live weather showed
+76°F, 82% humidity and SE wind; reverse-place, marine and weather gateways all
+returned HTTP 200. No page errors or failed HTTP requests were captured. The
+runner exited normally with code 0. Final galley/map screenshots were inspected.
+
+One preceding run completed the same gameplay/provider assertions but its Node
+controller retained a loopback listener after Chrome exited. That run's receipt
+records manual termination of only the identified controller, zero remaining
+browser children and no whole-run pass. Inspection of installed Playwright 1.61.1
+showed asynchronous launchServer listener shutdown. The owned-browser helper now
+awaits its available test-only disconnect hook with a deadline. Five focused
+cleanup tests pass, including a real TCP listener and error propagation, plus a
+real Chrome probe confirms browser exit and closed listener with natural Node
+exit. Receipt: `controller-cleanup.json`. These are verification-only changes;
+frontend game bytes remain unchanged. The full 2,459-test source chain predates
+this final helper change; those five scoped cleanup tests cover the latter.
+
+The preview is ready for the owner's ship/ocean review. The test guide is
+`output/research-interior-20261011/TEST-GUIDE.md`. Physical-phone acceptance and the
+full production matrix are still separate. No GitHub push, production Hosting
+promotion or production Functions deployment occurred during this delivery.

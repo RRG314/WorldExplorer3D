@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { once } from 'node:events';
+import { createServer } from 'node:net';
 import { closeOwnedBrowser, withinDeadline } from '../scripts/verification/owned-browser.mjs';
 
 test('a stalled diagnostic times out and a real error is preserved', async () => {
@@ -42,4 +43,21 @@ test('successful browser-parent close also reaps its detached owned descendant',
     if (descendant) { try { process.kill(descendant, 'SIGKILL'); } catch {} }
     if (parent.exitCode === null && !parent.signalCode) parent.kill('SIGKILL');
   }
+});
+
+
+test('completed browser cleanup also releases its remaining loopback listener', async () => {
+  const listener = createServer();
+  listener.listen(0, '127.0.0.1'); await once(listener, 'listening');
+  try {
+    await closeOwnedBrowser({ process: () => ({exitCode: 0}), close: async () => {},
+      _disconnectForTest: () => new Promise((resolve, reject) => listener.close(error => error ? reject(error) : resolve())) });
+    assert.equal(listener.listening, false, 'a completed browser must not leave its controller listening');
+  } finally { if (listener.listening) await new Promise(resolve => listener.close(resolve)); }
+});
+
+test('listener cleanup errors stay visible after successful browser shutdown', async () => {
+  const original = Error('listener close failed');
+  await assert.rejects(closeOwnedBrowser({process: () => ({exitCode: 0}), close: async () => {},
+    _disconnectForTest: async () => {throw original;} }), error => error === original);
 });
