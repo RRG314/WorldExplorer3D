@@ -30,23 +30,23 @@ const MODEL_ASSET_CATALOG = Object.freeze([
   }),
   ...['','-lod'].map(suffix=>Object.freeze({
     schemaVersion: MODEL_ASSET_SCHEMA_VERSION, id: `marine-research-vessel-rcrv${suffix}`, label: `Explorer research vessel · RCRV adaptation${suffix?' distant model':''}`,
-    url: `/app/assets/models/marine/research-vessel/rcrv${suffix}.glb`, roles: Object.freeze(['research-vessel']),
+    url: `/app/assets/models/marine/research-vessel/rcrv${suffix||'-walkable'}.glb`, roles: Object.freeze(['research-vessel']),
     license: 'CC-BY-4.0', sourceUrl: 'https://sketchfab.com/3d-models/rcrv-regional-class-research-vessel-11b4b97a9e60497ea91c0727e404ecf6',
-    attribution: 'RCRV by Oregon State University Extension Service / Alan Dennis; game scale, science-van and dive openings, optimized geometry.',
+    attribution: 'RCRV by Oregon State University Extension Service / Alan Dennis; game scale, walkable interior and door/stair openings, optimized geometry.',
     sourceUpAxis: 'y', sourceForwardAxis: 'z', collisionPolicy: 'licensed-research-vessel-triangle-navigation',
     instancePolicy: Object.freeze({geometry:'shared',materials:'shared'}),
-    budgets: Object.freeze({bytes:suffix?1200000:6500000,triangles:suffix?35000:170000,maxInstances:suffix?4:2})
+    budgets: Object.freeze({bytes:suffix?1200000:7000000,triangles:suffix?35000:180000,maxInstances:suffix?4:2})
   })),
   ...[
     ['workspace-table','wooden_table_02','Wooden Table 02 by Serhii Khromov',196],
     ['workspace-chair','SchoolChair_01','School Chair 01 by Ethan Place',5072]
   ].map(([id,source,attribution,triangles])=>Object.freeze({
     schemaVersion:MODEL_ASSET_SCHEMA_VERSION,id,label:attribution,
-    url:`/app/assets/models/interiors/personal-workspace/${id}.glb`,roles:Object.freeze(['personal-workspace-furnishing']),
+    url:`/app/assets/models/interiors/personal-workspace/${id}.glb`,roles:Object.freeze(['personal-workspace-furnishing','ship-interior-furnishing']),
     license:'CC0-1.0',sourceUrl:`https://polyhaven.com/a/${source}`,attribution,
     sourceUpAxis:'y',collisionPolicy:'personal-workspace-validated-furniture-envelopes',
     instancePolicy:Object.freeze({geometry:'clone',materials:'clone'}),
-    budgets:Object.freeze({bytes:500000,triangles,textureEdgePixels:1024,maxInstances:1})
+    budgets:Object.freeze({bytes:500000,triangles,textureEdgePixels:1024,maxInstances:8})
   })),
   Object.freeze({
     schemaVersion: MODEL_ASSET_SCHEMA_VERSION,

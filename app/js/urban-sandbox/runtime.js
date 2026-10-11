@@ -1,3 +1,4 @@
+import {consumePlayerProvision} from '../player/provisions.js';
 import {detachSceneObject} from '../engine/scene-object-lifecycle.js';
 import {urbanTargetOverlapsHeight} from './vertical-contact.js';
 import { bindPlayerConditionAuthority } from './player-condition-binding.js';
@@ -3165,13 +3166,9 @@ function startUrbanSandboxRuntime(options = {}) {
     onNpcShot: (impact) => applyArmedNpcImpact(state, impact),
     onNpcDowned: (npc) => dropNpcLoot(state, npc),
     onConsume: (item) => {
-      const restore = Math.max(0, Number(item?.metadata?.conditionRestore || item?.conditionRestore || 0));
-      if (!restore) return Object.freeze({ ok: false, reason: 'not_consumable' });
-      if (state.playerCondition >= .999) return Object.freeze({ ok: false, reason: 'full_health' });
-      if (!state.equipment.consumeItem(item.instanceId, 1)) return Object.freeze({ ok: false, reason: 'inventory_unavailable' });
-      const result = state.playerConditionAuthority.restore(restore, `consumed:${item.catalogId}`);
-      renderEquipment(state);
-      return Object.freeze({ ok: true, condition: result.after });
+      const result=consumePlayerProvision(state.equipment,state.playerConditionAuthority,item);
+      if(result.ok)renderEquipment(state);
+      return Object.freeze(result);
     },
     setStatus: (message, duration) => setStatus(state, message, duration),
     now

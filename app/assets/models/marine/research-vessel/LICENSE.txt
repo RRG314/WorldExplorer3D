@@ -5,3 +5,5 @@ Licensed under Creative Commons Attribution 4.0 International
 https://creativecommons.org/licenses/by/4.0/
 
 Ocean presentation and van placeholder cylinders removed; uniform 1.2 scale and waterline alignment; science-van door, visible interior sole plate and removable bulwark opening; painted surfaces given dielectric material response; conservative geometry simplification and material batching. Game adaptation of a 2017 educational vessel model, not an exact model of the commissioned vessel.
+
+The derived rcrv-walkable.glb adds main-deck accommodation openings and an internal stairwell through the upper decks. The original rcrv.glb and distant model remain available. INTERIOR-PROVENANCE.json records the reproducible adaptation and source/output hashes. Authored room geometry and furnishings are assembled separately at runtime; this arrangement is not the commissioned vessel's deck plan.

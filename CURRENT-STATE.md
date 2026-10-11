@@ -52,6 +52,28 @@ browsers/servers. Production deployment evidence is under
 
 ## October 11 current continuation — ocean streaming and save safety
 
+### Latest: research vessel interior, awaiting owner preview
+
+The working ship now has an enclosed wet lab, galley, mess, dry lab, quarters,
+briefing room and wheelhouse, connected by actual internal stairs. Deck-level
+map tabs show the player and walking route. Stations reuse the existing Journal,
+Field Guide, Backpack/condition and voyage authorities. The licensed source hull
+is retained beside a reproducibly adapted walkable model. No production deploy.
+
+Full source chain: **2,455 tests pass**. Furnished browser fixtures pass **11 + 18**
+checks, including all 55 connections, galley consumption/reload, map input lock,
+swimming/reboarding and complete disposal. The expanded full-app journey passes
+16 checks: survey/rewards, each room action, real chart, desktop/phone ship map,
+and surface save/reload returning to the same vessel. Immutable packaging is
+being verified; provider responses in these gameplay checks are controlled.
+Evidence and limitations: `docs/design/RESEARCH-VESSEL-INTERIOR-DELIVERY.md`.
+
+Ocean code is checkpointed at `b145ab83` / `4821c59b`. Its prior immutable
+`output/hosting-validation/ocean-482` passes 11 continuous-ocean/fallback checks.
+This supersedes the older note below that continuous ocean implementation itself
+was still open. Whole-release acceptance and the broader facility/creative/career
+roadmap remain separate and incomplete. Preserve dist and the four saved packages.
+
 Continuous personal open-ocean travel is implemented locally, with a player toggle,
 geographic tiles, origin rebasing, bounded residency, truthful provider outage
 behavior and the original parent-vessel recovery. The old location dive and shared

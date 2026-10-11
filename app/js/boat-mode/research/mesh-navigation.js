@@ -130,6 +130,14 @@ export function createShipMeshNavigation(THREE, root, { minimumDeckY = .8, maxTr
     }
     return result;
   }
-  return { support, blocked, move, stats: Object.freeze({ triangles: triangles.length, floors: floorIds.size, cells: cells.size }),
+  function walkableSegment(from,to){
+    const distance=Math.hypot(to.x-from.x,to.z-from.z);if(distance>40||!Number.isFinite(distance))return false;
+    let p={...from};const count=Math.max(1,Math.ceil(distance/.12));
+    for(let i=1;i<=count;i++){const x=from.x+(to.x-from.x)*i/count,z=from.z+(to.z-from.z)*i/count;
+      p=move(p,x-p.x,z-p.z);if(Math.hypot(p.x-x,p.z-z)>.025)return false;
+    }
+    return Math.abs(p.y-to.y)<.35;
+  }
+  return { support, blocked, move, walkableSegment, stats: Object.freeze({ triangles: triangles.length, floors: floorIds.size, cells: cells.size }),
     dispose() { disposed = true; cells.clear();floorCells.clear(); floorIds.clear(); triangles.length = bounds.length = 0; } };
 }

@@ -3,7 +3,7 @@ export const MODEL_ASSET_REVISIONS = Object.freeze({
   "facility-chainlink-kit": "bea430894a530823",
   "marine-common-dolphin": "bfea2dc00f659159",
   "marine-barramundi": "9d8973af06d671c3",
-  "marine-research-vessel-rcrv": "e87213601da7624c",
+  "marine-research-vessel-rcrv": "c5ae43172ff525bc",
   "marine-research-vessel-rcrv-lod": "6d609c9b1dc0ef8a",
   "workspace-table": "00118c5397d86824",
   "workspace-chair": "5356c6def2ee416e",

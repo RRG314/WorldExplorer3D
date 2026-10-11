@@ -1,3 +1,4 @@
+import {walkResearchStation} from './research-station-walk.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import {spawn} from 'node:child_process';
@@ -12,6 +13,7 @@ try{
  await page.goto(`http://127.0.0.1:${server.port}/tests/fixtures/research-deck.html`);await page.waitForFunction(()=>window.ready===true||!!window.admissionFailure,{},{timeout:30000});
  assert.equal(await page.evaluate(()=>researchTest.ctx.boatMode.mesh.userData.researchVesselState),'ready');
  await page.locator('#researchDeckEnter').click();await page.waitForFunction(()=>researchTest.ctx.boatDeck.active);
+ const goStation=id=>walkResearchStation(page,id,{fixture:true});
  const go=async(x,z)=>{const result=await page.evaluate(async({x,z})=>{
    for(let i=0;i<180;i++){
     const p=researchTest.ctx.boatDeck.snapshot().pose,dx=x-p.x,dz=z-p.z;
@@ -21,24 +23,24 @@ try{
     await advanceTime(delta*1000);
    }researchTest.setActions({});const pose=researchTest.ctx.boatDeck.snapshot().pose,nav=researchTest.ctx.boatMode.mesh.userData.researchNavigation;return {reached:false,pose,probes:[.02,.04,.08,.1,.2].map(d=>({d,move:nav.move(pose,0,d),y:nav.support(pose.x,pose.z+d,pose.y),blocked:nav.blocked(pose.x,pose.z+d,.3,nav.support(pose.x,pose.z+d,pose.y)??pose.y),feet:[[.2,0],[-.2,0],[0,.2],[0,-.2]].map(([x,z])=>nav.support(pose.x+x,pose.z+d+z,pose.y))}))};
  },{x,z});assert.equal(result.reached,true,JSON.stringify(result));};
- await go(6,-30.5);await go(6,-23.5);
+ await goStation('lab');
  await page.locator('#researchDeckAction').click();await page.waitForFunction(()=>document.querySelector('#researchDeckControls').textContent.includes('Saved to this device'));
  let events=await page.evaluate(()=>researchTest.ctx.discoveryProfileStore.listEvents(100));assert.equal(events.filter(e=>e.eventType==='marine-conditions-reviewed').length,1);assert.equal(events.find(e=>e.eventType==='marine-conditions-reviewed').metadata.truthType,'modeled');
  await page.locator('#researchDeckAction').click();await page.waitForFunction(()=>document.querySelector('#researchDeckControls').textContent.includes('Already recorded'));
  events=await page.evaluate(()=>researchTest.ctx.discoveryProfileStore.listEvents(100));assert.equal(events.filter(e=>e.eventType==='marine-conditions-reviewed').length,1);
  report.cases.push({id:'walk-to-lab-save-and-deduplicate-journal-review',passed:true});await page.evaluate(async()=>{researchTest.setActions({turn:1});await advanceTime(1570);researchTest.setActions({});});await page.screenshot({path:`${dir}/research-lab.png`});
- await page.evaluate(async()=>{researchTest.setActions({turn:-1});await advanceTime(1570);researchTest.setActions({});});await go(6,-30.5);await go(3,-30.3);await page.getByLabel('Deck destination').selectOption('chart');await page.locator('#researchDeckAction').click();assert.equal(await page.evaluate(()=>researchTest.chartOpened),true);
- report.cases.push({id:'walk-through-science-van-door-and-open-deck-chart',passed:true});await page.screenshot({path:`${dir}/research-chart.png`});
- await go(0,-30.3);await go(0,-26.5);await go(-3.1,-26.5);await go(-3.1,-18.4);
- assert.ok(await page.evaluate(()=>researchTest.ctx.boatDeck.snapshot().pose.y>5));await page.screenshot({path:`${dir}/research-upper-deck.png`});
- await go(-3.1,-26.5);assert.ok(await page.evaluate(()=>researchTest.ctx.boatDeck.snapshot().pose.y<2.1));await go(0,-26.5);
- report.cases.push({id:'actual-companionway-up-down-and-clear-equipment-routes',passed:true});
+ await page.evaluate(async()=>{researchTest.setActions({turn:-1});await advanceTime(1570);researchTest.setActions({});});await goStation('chart');await page.getByLabel('Deck destination').selectOption('chart');await page.locator('#researchDeckAction').click();assert.equal(await page.evaluate(()=>researchTest.chartOpened),true);
+ report.cases.push({id:'walk-through-ship-and-open-bridge-chart',passed:true});await page.screenshot({path:`${dir}/research-chart.png`});
+ await goStation('helm');assert.ok(await page.evaluate(()=>researchTest.ctx.boatDeck.snapshot().pose.y>12));await page.screenshot({path:`${dir}/research-upper-deck.png`});
+ await goStation('lab');assert.ok(await page.evaluate(()=>researchTest.ctx.boatDeck.snapshot().pose.y<2.1));
+ report.cases.push({id:'actual-interior-companionway-up-down-and-clear-equipment-routes',passed:true});
+
  const timing=await page.evaluate(()=>{const nav=researchTest.ctx.boatMode.mesh.userData.researchNavigation,values=[];let p={x:0,y:1.944,z:-29,yaw:0};for(let i=0;i<240;i++){const t=performance.now();p=nav.move(p,i%2?.04:-.04,0);nav.blocked(p.x,p.z,.25,p.y+1.4,.5);values.push(performance.now()-t);}return {mean:values.reduce((a,b)=>a+b,0)/values.length,p95:values.sort((a,b)=>a-b)[228],stats:nav.stats};});report.navigationTiming=timing;assert.ok(timing.p95<8,JSON.stringify(timing));
  report.cases.push({id:'bounded-walking-and-camera-query-budget',passed:true});
- await page.getByLabel('Deck destination').selectOption('helm');await page.locator('#researchDeckAction').click();assert.equal(await page.evaluate(()=>researchTest.ctx.boatDeck.active),false);
+ await goStation('helm');await page.getByLabel('Deck destination').selectOption('helm');await page.locator('#researchDeckAction').click();assert.equal(await page.evaluate(()=>researchTest.ctx.boatDeck.active),false);
  await page.locator('#researchDeckMoor').click();assert.equal(await page.evaluate(()=>researchTest.ctx.boatMode.moored),false);await page.locator('#researchDeckMoor').click();assert.equal(await page.evaluate(()=>researchTest.ctx.boatMode.moored),true);
  report.cases.push({id:'deck-helm-and-explicit-mooring',passed:true});
- await page.locator('#researchDeckEnter').click();await go(7,-30.7);await page.getByLabel('Deck destination').selectOption('dive');await page.locator('#researchDeckAction').click();await page.waitForFunction(()=>researchTest.ctx.boatSwimming.active&&!!researchTest.ctx.Walk.state.walker.swimming);
+ await page.locator('#researchDeckEnter').click();await goStation('dive');await page.getByLabel('Deck destination').selectOption('dive');await page.locator('#researchDeckAction').click();await page.waitForFunction(()=>researchTest.ctx.boatSwimming.active&&!!researchTest.ctx.Walk.state.walker.swimming);
  await page.locator('#boatSwimmingToggle').click();await page.waitForFunction(()=>researchTest.ctx.boatDeck.active&&!researchTest.ctx.boatSwimming.active);
  assert.equal(await page.evaluate(()=>researchTest.ctx.Walk.state.characterMesh.parent===researchTest.ctx.boatMode.mesh),true);
  report.cases.push({id:'dive-platform-ladder-swim-and-return-to-same-deck',passed:true});
@@ -60,9 +62,9 @@ try{
   return {damaged,isolated,restored,lights,lodTriangles,late,children:root.children.length,leases:modelAssetCacheSnapshot().entries.filter(e=>/marine-research-vessel|marine-atlantic|solis-/.test(e.id)).map(e=>({id:e.id,leases:e.leases}))};
  });assert.ok(lifecycle.damaged&&lifecycle.isolated&&lifecycle.restored);assert.deepEqual(lifecycle.lights,[false,false]);assert.equal(lifecycle.late,false);assert.equal(lifecycle.children,0);assert.ok(lifecycle.leases.every(e=>e.leases===0),JSON.stringify(lifecycle));report.lifecycle=lifecycle;
  report.cases.push({id:'isolated-damage-distant-model-and-complete-canceled-load-disposal',passed:true});
- const retry=await browser.newPage({viewport:{width:1440,height:900}});await retry.route('**/research-vessel/rcrv.glb*',route=>route.abort());
+ const retry=await browser.newPage({viewport:{width:1440,height:900}});await retry.route('**/research-vessel/rcrv-walkable.glb*',route=>route.abort());
  await retry.goto(`http://127.0.0.1:${server.port}/tests/fixtures/research-deck.html`);await retry.waitForFunction(()=>window.ready);
- assert.equal(await retry.locator('#researchDeckEnter').isEnabled(),false);await retry.unroute('**/research-vessel/rcrv.glb*');await retry.locator('#researchVesselRetry').click();
+ assert.equal(await retry.locator('#researchDeckEnter').isEnabled(),false);await retry.unroute('**/research-vessel/rcrv-walkable.glb*');await retry.locator('#researchVesselRetry').click();
  await retry.waitForFunction(()=>researchTest.ctx.boatMode.mesh.userData.researchVesselState==='ready');await retry.locator('#researchDeckEnter').click();assert.equal(await retry.evaluate(()=>researchTest.ctx.boatDeck.active),true);await retry.close();
  report.cases.push({id:'missing-vessel-fails-closed-and-explicit-retry-recovers',passed:true});
  assert.deepEqual(report.errors,[]);await browser.close();

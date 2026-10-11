@@ -72,6 +72,7 @@ export const currentContractTests = [
   'tests/ocean-diver-current.test.mjs',
   'tests/boat-swimming-current.test.mjs',
   'tests/research-deck-current.test.mjs',
+  'tests/research-interior-current.test.mjs',
   'tests/research-vessel-navigation-current.test.mjs',
   'tests/delivery-handling-current.test.mjs',
   'tests/ocean-voyage-current.test.mjs',

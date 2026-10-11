@@ -333,8 +333,17 @@ test('ship furnishings have local bounded GLBs and attributable sources', () => 
     const {bytes,json}=readGlbAssetMetadata(path.join(root,asset.url.replace(/^\//,'')));
     assert.ok(bytes.length<=asset.budgets.bytes,`${asset.id} download budget`);
     assert.ok(triangleCount(json)<=asset.budgets.triangles,`${asset.id} geometry budget`);
-    assert.ok(asset.sourceUrl.startsWith('https://sketchfab.com/3d-models/'));
-    assert.equal(asset.license,'CC-BY-4.0');
+    const workspaceSources={
+      'workspace-table':'https://polyhaven.com/a/wooden_table_02',
+      'workspace-chair':'https://polyhaven.com/a/SchoolChair_01'
+    };
+    if(workspaceSources[asset.id]){
+      assert.equal(asset.sourceUrl,workspaceSources[asset.id]);
+      assert.equal(asset.license,'CC0-1.0');
+    }else{
+      assert.ok(asset.sourceUrl.startsWith('https://sketchfab.com/3d-models/'));
+      assert.equal(asset.license,'CC-BY-4.0');
+    }
     assert.ok((json.images||[]).every(image=>Number.isInteger(image.bufferView)),`${asset.id} must not fetch external textures`);
   }
 });

@@ -1,3 +1,4 @@
+import {installControlledMarineWeather} from './controlled-marine-weather.mjs';
 import {deployResearchSubmarineFromDeck} from './marine-entry-ui.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
@@ -25,6 +26,7 @@ try {
  report.attestation = await configureStagingAppCheck(page, base);
  // Preserve the declared controlled place fixture after the gateway migration.
  await page.route(`${base}/api/geospatial/reverse?**`, route => route.fulfill({json: {display_name: 'Entry check fixture', lat: '39.2898', lon: '-76.6122', address: {city: 'Entry check fixture'}}}));
+ report.environmentalFixture=await installControlledMarineWeather(page);
  report.localFailures = [];
  page.on('response', response => { if (response.url().startsWith(base + '/') && response.status() >= 400) report.localFailures.push({url: response.url(), status: response.status()}); });
  page.on('pageerror', error => report.errors.push(error.message));

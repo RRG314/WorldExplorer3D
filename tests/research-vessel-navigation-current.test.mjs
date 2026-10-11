@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import {createShipMeshNavigation} from '../app/js/boat-mode/research/mesh-navigation.js';
 
 function actualModel(){
- const bytes=readFileSync('app/assets/models/marine/research-vessel/rcrv.glb'),length=bytes.readUInt32LE(12),data=JSON.parse(bytes.subarray(20,20+length)),bin=bytes.subarray(28+length),root=new THREE.Group();
+ const bytes=readFileSync('app/assets/models/marine/research-vessel/rcrv-walkable.glb'),length=bytes.readUInt32LE(12),data=JSON.parse(bytes.subarray(20,20+length)),bin=bytes.subarray(28+length),root=new THREE.Group();
  function accessor(id){
   const a=data.accessors[id],v=data.bufferViews[a.bufferView],size={SCALAR:1,VEC3:3}[a.type],types={5123:Uint16Array,5125:Uint32Array,5126:Float32Array},Type=types[a.componentType],result=new Type(a.count*size);
   const buffer=new DataView(bin.buffer,bin.byteOffset,bin.byteLength),offset=(v.byteOffset||0)+(a.byteOffset||0),stride=v.byteStride||size*Type.BYTES_PER_ELEMENT;
