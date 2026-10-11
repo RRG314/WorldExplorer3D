@@ -576,3 +576,18 @@ These distinguish basalt and regolith breccia and document sample context. New
 virtual study placements must not be described as exact historical sample sites.
 
 Final source checkpoint: `npm run verify:pr` passes **2,318 tests**, zero failed, plus identity, dependency ownership, boundary types, test inventory and sensitivity checks. This includes the final asynchronous boarding/write regression.
+
+## October 10 — marine admission and persistence checkpoint
+
+See WORLD-COHERENCE-DELIVERY.md for the owner’s integrated finite gates. Local
+marine-custody-repaired passes 13 game checks; coherence-coastal-return passes
+14 with no page errors, including the final hull envelope and 40 m/300 s HUD.
+The latest direct-observation, phone and returned wet-lab images were opened.
+The water environment remains visually sparse and geographically compressed;
+those are open quality gates, not cleared by functional evidence. Creative-storage
+passes seven actual-browser cases. Final verify:pr passes 2,331 source tests,
+module identity, 1,008-file unresolved names with a failing control, types,
+inventory and sensitivity. The initial duplicate world-geometry v1/v3 import
+failed the gate and was corrected to the established v3 identity. No deployment,
+worldwide-storage migration or production artifact replacement. Continue the
+regional ecology / placement work and the active career/realism roadmap.

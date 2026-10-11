@@ -21,8 +21,8 @@ export function updateOceanHud(appCtx, oceanMode, nowSeconds = 0, sampleSeabedEv
   const speedKnots = Math.abs(worldUnitsPerSecondToKnots(sub.speed, appCtx.METERS_PER_WORLD_UNIT));
   const metersPerUnit = Number(appCtx.METERS_PER_WORLD_UNIT) > 0 ? appCtx.METERS_PER_WORLD_UNIT : 1.11;
   const depth = Math.max(0, Math.round(((oceanMode.waterSample?.surfaceY ?? .08)-sub.position.y) * metersPerUnit));
-  const air=diving?oceanMode.diver.snapshot().swimming?.airSeconds:null;
-  const condition = diving?Math.max(0,Math.min(1,(air??180)/180)):Math.max(0, Math.min(1, Number(oceanMode.condition ?? sub.condition ?? 1)));
+  const breathing=diving?oceanMode.diver.snapshot().swimming:null;
+  const condition = diving?Math.max(0,Math.min(1,(breathing?.airSeconds??180)/(breathing?.airCapacity||180))):Math.max(0, Math.min(1, Number(oceanMode.condition ?? sub.condition ?? 1)));
   const conditionPct = Math.round(condition * 100);
 
   if (speedUnitLabel) speedUnitLabel.textContent = 'KTS';

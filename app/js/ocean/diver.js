@@ -1,3 +1,4 @@
+import {SWIM_POLICY,SURVEY_SWIM_POLICY} from '../walking/water/model.js';
 import {createInvestigationControls} from '../campaign/coastal-investigation-ui.js';
 import {parentHullCollision} from './parent-vessel.js';
 import {getMaritimeCatalogEntry} from '../transport/maritime-catalog.js?v=1';
@@ -12,9 +13,10 @@ import {resolveWalkingMoveVector} from '../walking/physics.js?v=32';
 import {createPlayerCharacterHost} from '../walking/player-character-host.js';
 import {attachCuratedExplorerCharacter,disposeCuratedCharacter,updateCuratedCharacterAnimation,EXPLORER_ASSET_BY_GENDER} from '../walking/curated-explorer-character.js?v=8';
 
-export function oceanDiveAdmission({speed=0,verticalSpeed=0,depthMeters,bottomClearance}) {
+export function oceanDiveAdmission({speed=0,verticalSpeed=0,depthMeters,bottomClearance,maximumDiveMeters=SWIM_POLICY.maximumDiveMeters}) {
   if(!Number.isFinite(speed)||!Number.isFinite(verticalSpeed)||Math.abs(speed)>.5||Math.abs(verticalSpeed)>.5)return {allowed:false,reason:'Stop the submarine before leaving.'};
-  if(!Number.isFinite(depthMeters)||depthMeters<1||depthMeters>16)return {allowed:false,reason:'Move the submarine to 1–16 m simulated depth.'};
+  const exitLimit=Math.max(1,Math.min(40,Number(maximumDiveMeters)||SWIM_POLICY.maximumDiveMeters)-2);
+  if(!Number.isFinite(depthMeters)||depthMeters<1||depthMeters>exitLimit)return {allowed:false,reason:`Move the submarine to 1–${exitLimit} m game depth for your current scuba equipment.`};
   if(!Number.isFinite(bottomClearance)||bottomClearance<2)return {allowed:false,reason:'Move away from the seabed before leaving.'};
   return {allowed:true,reason:''};
 }
@@ -44,7 +46,8 @@ export function createOceanDiver(ctx,mode,{sampleSeabedHeight,worldRadius=1200})
   const units=Number(ctx.METERS_PER_WORLD_UNIT)>0?ctx.METERS_PER_WORLD_UNIT:1;
   function subCollisionAt(x,z,radius,actor){return {collision:x>box.min.x-radius&&x<box.max.x+radius&&z>box.min.z-radius&&z<box.max.z+radius&&actor.actorBaseY<box.max.y&&actor.actorBaseY+actor.actorHeight>box.min.y};}
   function allHullCollisionAt(x,z,radius,actor){return {collision:mode.habitat?.collision({x,z,y:actor.actorBaseY+actor.actorHeight*.5},radius)||subCollisionAt(x,z,radius,actor).collision||parentHullCollision(ctx.oceanVoyage?.current?.ship,{x,z,y:actor.actorBaseY+actor.actorHeight*.5},radius,mode.waterSurface.sample(0,0).surfaceY)}}
-  function admission(){const sub=mode.submarine;const water=mode.waterSurface.sample(sub.position.x,sub.position.z);return oceanDiveAdmission({speed:sub.speed,verticalSpeed:sub.verticalSpeed,depthMeters:(water.surfaceY-sub.position.y)*units,bottomClearance:(sub.position.y-sampleSeabedHeight(sub.position.x,sub.position.z))*units})}
+  function diveEquipment(){return ctx.marineResearch?.investigation?.diveEquipment() || (getMaritimeCatalogEntry(ctx.oceanVoyage?.current?.ship?.transportCatalogId).capabilities?.walkableResearchDeck ? SURVEY_SWIM_POLICY : SWIM_POLICY);}
+  function admission(){const sub=mode.submarine;const water=mode.waterSurface.sample(sub.position.x,sub.position.z);return oceanDiveAdmission({maximumDiveMeters:diveEquipment().maximumDiveMeters,speed:sub.speed,verticalSpeed:sub.verticalSpeed,depthMeters:(water.surfaceY-sub.position.y)*units,bottomClearance:(sub.position.y-sampleSeabedHeight(sub.position.x,sub.position.z))*units})}
   function separation(){return Math.hypot(state.walker.x-mode.submarine.position.x,state.walker.y-mode.submarine.position.y,state.walker.z-mode.submarine.position.z)}
   function boardingDistance(){
     if(returnTarget!=='vessel')return separation()*units;
@@ -88,7 +91,7 @@ export function createOceanDiver(ctx,mode,{sampleSeabedHeight,worldRadius=1200})
           const water=mode.waterSurface.sample(px,pz);
           return {collision:inside||Math.hypot(px,pz)>worldRadius||water.surfaceY-sampleSeabedHeight(px,pz)<1.5};
         }};
-      controller=createWalkingWaterRuntime({ctx:localContext,state,CFG:{eyeHeight:1.7},environment:'OCEAN',checkpointEnabled:false,swimPolicy:ctx.marineResearch?.investigation?.diveEquipment(),onRecover:()=>board(true),
+      controller=createWalkingWaterRuntime({ctx:localContext,state,CFG:{eyeHeight:1.7},environment:'OCEAN',checkpointEnabled:false,swimPolicy:diveEquipment(),onRecover:()=>board(true),
         groundAt:(px,pz)=>({effectiveGroundY:sampleSeabedHeight(px,pz)}),sample:(px,pz)=>mode.waterSurface.sample(px,pz),moveVector:resolveWalkingMoveVector,
         animate:updateCuratedCharacterAnimation,hudFactory:options=>{const hud=createSwimmingHud({...options,id:'oceanSwimmingHud',host:panel});panel.insertBefore(document.getElementById('oceanSwimmingHud'),investigation.node);panel.append(optionsDetails);return hud;}});
       sub.speed=0;sub.turnSpeed=0;sub.verticalSpeed=0;active=true;host.visible=true;ctx.refreshBoatAvailability?.(true);

@@ -116,10 +116,8 @@ function selectSpecies({ waterKind = 'coastal', latitude = 0, allowedSpeciesIds 
     lat >= species.latitude[0] &&
     lat <= species.latitude[1]
   ));
-  if (!candidates.length) {
-    candidates = eligible.filter((species) => species.waterKinds.includes(normalizedWater));
-  }
-  if (!candidates.length && !allowed) candidates = FISH_SPECIES.slice();
+  // No reviewed candidate is an empty pool, never permission to transplant a
+  // tropical or freshwater fish into an unsupported region or water type.
   if (!candidates.length) return null;
   return weightedPick(candidates.map((species) => ({
     species,

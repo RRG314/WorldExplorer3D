@@ -1,3 +1,4 @@
+import {vesselWaterAdmission} from './transport/maritime-admission.js';
 import {detachSceneObject} from './engine/scene-object-lifecycle.js';
 import {ensureOceanVoyage} from './ocean/voyage.js';
 import {resolveBoatEntryReference,boatExitActorHeights} from './boat-mode/entry-reference.js';
@@ -404,6 +405,21 @@ function startBoatMode(options = {}) {
       structureTerrainMode: ref.structureTerrainMode
     });
   if (!candidate) return false;
+  const transferVessel = appCtx.boatMode.oceanTransferVessel || null;
+  const catalog = getMaritimeCatalogEntry(options.transportCatalogId || transferVessel?.transportCatalogId);
+  const startAngle = Number.isFinite(options.yaw) ?
+    options.yaw :
+    resolveBoatHeading(candidate, Number.isFinite(ref.angle) ? ref.angle : 0);
+  const spawnPoint = resolveBoatSpawnPoint(candidate, ref.x, ref.z) || {
+    x: candidate.spawnX,
+    z: candidate.spawnZ,
+    shorelineDistance: candidate.shorelineDistance || 0
+  };
+  const activeCandidate = localizeBoatCandidate(candidate, spawnPoint.shorelineDistance || candidate.shorelineDistance || 0);
+  const admission = vesselWaterAdmission({catalog,candidate:activeCandidate,x:spawnPoint.x,z:spawnPoint.z,yaw:startAngle,
+    metersPerUnit:appCtx.METERS_PER_WORLD_UNIT||1,contains:(x,z,opts)=>
+      candidate.synthetic||candidate.source?.synthetic ? isPointInsideBoatCandidate(candidate,x,z) : isPointInsideWaterFootprint(x,z,opts)});
+  if (!admission.allowed) {showBoatPrompt(admission.reason,'notice',BOAT_PROMPT_DURATION_MS);return false;}
 
   const requestedEntryMode = options.entryMode === 'drive' ? 'drive' : options.entryMode === 'walk' ? 'walk' : null;
   appCtx.boatMode.lastEntryMode = requestedEntryMode || (ref.mode === 'drive' ? 'drive' : 'walk');
@@ -431,8 +447,6 @@ function startBoatMode(options = {}) {
   appCtx.boatMode.active = true;
   appCtx.boatMode.moored = false;
   appCtx.boatMode.available = true;
-  const transferVessel = appCtx.boatMode.oceanTransferVessel || null;
-  const catalog = getMaritimeCatalogEntry(options.transportCatalogId || transferVessel?.transportCatalogId);
   appCtx.boatMode.transportEntityId = String(options.transportEntityId || transferVessel?.transportEntityId || 'boat-mode:marina-runabout');
   appCtx.boatMode.transportCatalogId = catalog.id;
   appCtx.boatMode.vesselLabel = catalog.label;
@@ -440,15 +454,6 @@ function startBoatMode(options = {}) {
   appCtx.boatMode.durabilityPolicy = catalog.damage.durabilityPolicy;
   appCtx.boatMode.lastDamageBand = transportDamagePresentation(appCtx.boatMode.condition).band;
 
-  const startAngle = Number.isFinite(options.yaw) ?
-    options.yaw :
-    resolveBoatHeading(candidate, Number.isFinite(ref.angle) ? ref.angle : 0);
-  const spawnPoint = resolveBoatSpawnPoint(candidate, ref.x, ref.z) || {
-    x: candidate.spawnX,
-    z: candidate.spawnZ,
-    shorelineDistance: candidate.shorelineDistance || 0
-  };
-  const activeCandidate = localizeBoatCandidate(candidate, spawnPoint.shorelineDistance || candidate.shorelineDistance || 0);
   appCtx.boatMode.currentWater = activeCandidate;
   appCtx.boatMode.waterKind = activeCandidate?.waterKind || candidate.waterKind;
   appCtx.boatMode.shorelineDistance = activeCandidate?.shorelineDistance || 0;
@@ -494,6 +499,10 @@ function enterBoatAtWorldPoint(worldX, worldZ, options = {}) {
       shorelineDistance: candidate.shorelineDistance || 0
     };
     const activeCandidate = localizeBoatCandidate(candidate, spawnPoint.shorelineDistance || candidate.shorelineDistance || 0);
+    const admission=vesselWaterAdmission({catalog:getMaritimeCatalogEntry(appCtx.boatMode.transportCatalogId),candidate:activeCandidate,
+      x:spawnPoint.x,z:spawnPoint.z,yaw,metersPerUnit:appCtx.METERS_PER_WORLD_UNIT||1,
+      contains:(x,z,opts)=>candidate.synthetic||candidate.source?.synthetic?isPointInsideBoatCandidate(candidate,x,z):isPointInsideWaterFootprint(x,z,opts)});
+    if(!admission.allowed){showBoatPrompt(admission.reason,'notice',BOAT_PROMPT_DURATION_MS);return false;}
     appCtx.boatMode.currentWater = activeCandidate;
     appCtx.boatMode.waterKind = activeCandidate?.waterKind || candidate.waterKind;
     appCtx.boatMode.shorelineDistance = activeCandidate?.shorelineDistance || 0;

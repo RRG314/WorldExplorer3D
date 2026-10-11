@@ -6,6 +6,20 @@ import {
   createUnderwaterSchoolPlan,
   selectFishFromPopulation
 } from '../app/js/fishing/population-authority.js';
+import {generateFish} from '../app/js/fishing/catalog.js';
+
+test('unsupported polar and unknown water never fall back to worldwide game species',()=>{
+ for(const waterKind of ['open_ocean','lake','unresolved']){
+  const context=createFishPopulationContext({waterKind,latitude:-80,longitude:30,accessMode:'underwater'});
+  assert.equal(context.playable,false);assert.deepEqual(context.candidateSpeciesIds,[]);
+  assert.equal(generateFish({waterKind,latitude:-80}),null);
+ }
+});
+test('an authored pool cannot override water and latitude exclusions or invent species',()=>{
+ const context=createFishPopulationContext({waterKind:'lake',latitude:40,longitude:-75,accessMode:'underwater',candidateSpeciesIds:['giant_trevally','imaginary','largemouth_bass']});
+ assert.deepEqual(context.candidateSpeciesIds,['largemouth_bass']);
+ assert.equal(createFishPopulationContext({waterKind:'open_ocean',latitude:20,depthMeters:null}).environment.depthMeters,null);
+});
 
 const water = Object.freeze({
   waterbodyId: 'water:baltimore-harbor',

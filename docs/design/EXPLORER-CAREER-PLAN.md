@@ -355,6 +355,13 @@ mission transitions. A phone-sized browser is not a physical-phone certificate.
 
 ## 11. Finite implementation sequence and exit criteria
 
+October 10 owner steering adds the cross-system acceptance contract in
+[One world, explicit rules](WORLD-COHERENCE-DELIVERY.md). It folds marine custody,
+contextual equipment, ecological placement, persistent creative rooms, terrain
+editing and farming into the steps below. Its source findings reopen those
+parts of the marine exit checks; earlier chapter acceptance is retained but
+does not certify those newly requested capabilities.
+
 | Step | Deliverable | Exit evidence |
 | --- | --- | --- |
 | 0 | Source/authority inventory and this content specification | Verified owners, current limitations, no lost saves or deployment artifacts |

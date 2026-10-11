@@ -22,7 +22,7 @@ export function createSwimmingHud({recover,id='swimmingHud',host=null}) {
     panel.hidden=false;
     const heading=state.recovering?(state.submerged?'Low air — returning to surface':'Low air — return to shore'):state.submerged?'Diving':'Swimming';
     if(label.textContent!==heading)label.textContent=heading;
-    let detail=state.equipment==='scuba'?`Scuba auto-equipped · Air ${Math.ceil(state.airSeconds)}s${state.airCapacity>180?` / ${state.airCapacity}s survey`:``} · Sim. depth ${state.depthMeters.toFixed(1)}m`:'Space: rise · Shift: dive · Scuba equips for deep water';
+    let detail=state.equipment==='scuba'?`Scuba auto-equipped · Air ${Math.ceil(state.airSeconds)}s${state.airCapacity>180?` / ${state.airCapacity}s survey`:``} · Game depth ${state.depthMeters.toFixed(1)}m / ${state.maximumDiveMeters||18}m`:'Space: rise · Shift: dive · Scuba equips for deep water';
     if(state.checkpointStatus==='session-only')detail+=' · Local saving unavailable';
     if(status.textContent!==detail)status.textContent=detail;
   }};

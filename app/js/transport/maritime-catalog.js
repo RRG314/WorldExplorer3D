@@ -64,6 +64,7 @@ const definitions = [
 const MARITIME_CATALOG = Object.freeze(definitions.map((definition) => defineTransportCatalogEntry({
   ...definition,
   domain: 'maritime',
+  capabilities: Object.freeze({swimmingLadder:true, walkableResearchDeck:definition.role==='research', deploySubmarine:definition.role==='research'}),
   playable: true,
   enterable: true,
   companionAboard: true,

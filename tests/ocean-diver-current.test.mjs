@@ -27,6 +27,12 @@ test('a diver may leave only a stopped sub at playable human depth with bottom c
  assert.equal(oceanDiveAdmission({depthMeters:10,bottomClearance:1}).allowed,false);
  assert.equal(oceanDiveAdmission({depthMeters:null,bottomClearance:8}).allowed,false);
 });
+test('equipped research dives admit the current gear range without permitting abyssal exits',()=>{
+ assert.equal(oceanDiveAdmission({depthMeters:30,bottomClearance:8,maximumDiveMeters:40}).allowed,true);
+ assert.equal(oceanDiveAdmission({depthMeters:39,bottomClearance:8,maximumDiveMeters:40}).allowed,false);
+ assert.equal(oceanDiveAdmission({depthMeters:200,bottomClearance:80,maximumDiveMeters:900}).allowed,false);
+ assert.equal(oceanDiveAdmission({depthMeters:30,bottomClearance:8}).allowed,false);
+});
 
 import {ctx} from '../app/js/shared-context.js?v=55';
 import {activeTransportActor} from '../app/js/transport/actor-contract.js';

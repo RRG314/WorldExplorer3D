@@ -167,6 +167,12 @@ function initBlockBuilderUi() {
     if (!appCtx.undoLastBuildAction?.()) setStatus('Nothing to undo.');
   });
   const selectionLabel = document.getElementById('editableWorldSelection');
+  const editFailure = (result,fallback) => ({
+    'world-limit':'This device has reached its saved-area limit. Existing creations are kept. You can still edit those areas.',
+    'storage-conflict':'Another tab changed your saved world. Reload before editing; your existing creations are kept.',
+    'storage-unavailable':'World editing could not save on this device. Existing records are kept.',
+    'storage-write-failed':'This edit could not be saved. Free browser storage and try again; the previous world is unchanged.'
+  }[result?.reason] || fallback);
   document.getElementById('editableWorldSelectBuilding')?.addEventListener('click', () => {
     const radius = Number(appCtx.getConstructionAssistance?.().mappedSelectionRadiusMeters) || 42;
     const selected = appCtx.selectNearestEditableBuilding?.(radius);
@@ -180,16 +186,16 @@ function initBlockBuilderUi() {
   document.getElementById('editableWorldSuppressBuilding')?.addEventListener('click', async () => {
     if (!globalThis.confirm('Virtually remove the selected mapped building from this saved world? The real map data is never changed.')) return;
     const result = await appCtx.suppressSelectedEditableBuilding?.();
-    setStatus(result?.committed ? 'Saved. Rebuilding this fixed world from cached source data…' : `Could not remove building: ${result?.reason || 'select a nearby building first'}.`);
+    setStatus(result?.committed ? 'Building removed from this saved world.' : editFailure(result,`Could not remove building: ${result?.reason || 'select a nearby building first'}.`));
   });
   document.getElementById('editableWorldRestoreBuilding')?.addEventListener('click', async () => {
     const result = await appCtx.restoreSelectedEditableBuilding?.();
-    setStatus(result?.committed ? 'Building restored. Rebuilding this fixed world…' : `Could not restore building: ${result?.reason || 'nothing selected'}.`);
+    setStatus(result?.committed ? 'Building restored.' : editFailure(result,`Could not restore building: ${result?.reason || 'nothing selected'}.`));
   });
   document.getElementById('editableWorldReset')?.addEventListener('click', async () => {
     if (!globalThis.confirm('Restore the base world here? This clears virtual removals, custom structures, and your local blocks at this location.')) return;
     const result = await appCtx.resetLocalEditableWorld?.();
-    setStatus(result?.committed ? 'Base world restored. Reloading this fixed location…' : `Could not reset world: ${result?.reason || 'unknown error'}.`);
+    setStatus(result?.committed ? 'Base world restored.' : editFailure(result,`Could not reset world: ${result?.reason || 'unknown error'}.`));
   });
   document.getElementById('blockBuilderClear')?.addEventListener('click', () => {
     if (!globalThis.confirm('Clear your blocks at this location?')) return;

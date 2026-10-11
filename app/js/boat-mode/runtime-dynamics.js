@@ -1,3 +1,4 @@
+import {vesselWaterAdmission} from '../transport/maritime-admission.js';
 import { clamp, normalizeAngle } from "./dynamics.js?v=1";
 import { getMaritimeCatalogEntry } from '../transport/maritime-catalog.js?v=1';
 import { resolveVesselHandling, vesselYawRateTarget } from './vessel-handling.js?v=1';
@@ -108,6 +109,7 @@ export function createBoatRuntimeDynamics(deps = {}) {
     const turnBlend = 1 - Math.exp(-handling.rudderResponse * (0.35 + steerAuthority * .65) * dt);
     appCtx.boat.turnRate += (desiredTurn - appCtx.boat.turnRate) * turnBlend;
     appCtx.boat.turnRate -= appCtx.boat.lateralSpeed * 0.008 * dt;
+    const previousYaw=appCtx.boat.angle;
     appCtx.boat.angle += appCtx.boat.turnRate * dt;
 
     const forwardX = Math.sin(appCtx.boat.angle);
@@ -163,28 +165,17 @@ export function createBoatRuntimeDynamics(deps = {}) {
         inside: true
       };
     }
-    if (nextCandidate && currentWater?.synthetic !== true && currentWater?.source?.synthetic !== true) {
-      const halfLength = catalog.dimensions.length * .44;
-      const halfWidth = catalog.dimensions.width * .44;
-      const forwardX = Math.sin(appCtx.boat.angle);
-      const forwardZ = Math.cos(appCtx.boat.angle);
-      const rightX = Math.cos(appCtx.boat.angle);
-      const rightZ = -Math.sin(appCtx.boat.angle);
-      const includeWaterways = catalog.dimensions.length < 32;
-      const edgeBuffer = Math.max(1.2, Math.min(8, catalog.dimensions.width * .08));
-      const footprintSamples = [
-        [0, 0], [0, halfLength], [0, -halfLength],
-        [halfWidth, halfLength * .72], [-halfWidth, halfLength * .72],
-        [halfWidth, -halfLength * .72], [-halfWidth, -halfLength * .72]
-      ];
-      const footprintFits = footprintSamples.every(([right, forward]) => appCtx.isPointInsideWaterFootprint?.(
-        nextX + rightX * right + forwardX * forward,
-        nextZ + rightZ * right + forwardZ * forward,
-        { includeWaterways, edgeBuffer }
-      ) === true);
-      if (!footprintFits) nextCandidate = null;
+    if (nextCandidate) {
+      const synthetic = nextCandidate.synthetic === true || nextCandidate.source?.synthetic === true;
+      const admission = vesselWaterAdmission({catalog,candidate:nextCandidate,x:nextX,z:nextZ,yaw:appCtx.boat.angle,metersPerUnit:metersPerWorldUnit,
+        contains:(x,z,options)=>synthetic ? appCtx.isPointInsideBoatCandidate?.(nextCandidate,x,z) === true : appCtx.isPointInsideWaterFootprint?.(x,z,options) === true});
+      if (!admission.allowed) nextCandidate = null;
     }
     if (!nextCandidate) {
+      // A rejected translation must also reject the rotation that put the bow
+      // ashore. Retaining that rotation slowly swept large hulls through land.
+      appCtx.boat.angle=previousYaw;
+      appCtx.boat.turnRate*=.42;
       const impactSpeed = Math.hypot(Number(appCtx.boat.vx) || 0, Number(appCtx.boat.vz) || 0);
       if (impactSpeed > 1.8) onBoatImpact?.(impactSpeed, { catalog, reason: 'shoreline' });
       appCtx.boat.speed *= 0.45;
@@ -195,15 +186,9 @@ export function createBoatRuntimeDynamics(deps = {}) {
       applyBoatWavePose(appCtx.boat.x, appCtx.boat.z, appCtx.boat.angle, appCtx.boatMode.currentWater || null, dt, false);
     } else {
       const nextShorelineDistance = nextCandidate.inside ? measureBoatShorelineDistance(nextCandidate, nextX, nextZ) : 0;
-      const desiredDepth = minimumBoatShorelineDistance(nextCandidate.waterKind);
-      const shouldCorrectShallowArea =
-        nextCandidate.type === 'area' &&
-        nextCandidate.inside &&
-        (nextCandidate.waterKind === 'open_ocean' || nextCandidate.waterKind === 'coastal') &&
-        nextShorelineDistance < desiredDepth * 0.72;
-      const spawnPoint = shouldCorrectShallowArea ?
-        resolveBoatSpawnPoint(nextCandidate, nextX, nextZ) :
-        nextCandidate.inside ? { x: nextX, z: nextZ, shorelineDistance: nextShorelineDistance } :
+      // Hull clearance has already been accepted. Do not teleport the vessel
+      // away from shore using shoreline distance as an invented water depth.
+      const spawnPoint = nextCandidate.inside ? { x: nextX, z: nextZ, shorelineDistance: nextShorelineDistance } :
         resolveBoatSpawnPoint(nextCandidate, nextX, nextZ);
       const activeCandidate = localizeBoatCandidate(
         nextCandidate,

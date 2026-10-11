@@ -6,9 +6,10 @@ export function classifyWaterTraversal({surfaceY,bottomY,eyeY,eyeHeight=1.7,wasS
  if(depth<=(wasSwimming?SWIM_POLICY.exitDepth:SWIM_POLICY.entryDepth)||feet>=surfaceY-.45)return feet<surfaceY&&depth>0?'wading':'dry';
  return 'swimming';
 }
+export const SURVEY_SWIM_POLICY=Object.freeze({airCapacity:300,maximumDiveMeters:40});
 export function createSwimState(saved={},policy={}) {
  const airCapacity=clamp(Number(policy?.airCapacity)||SWIM_POLICY.airSeconds,SWIM_POLICY.airSeconds,360);
- const maximumDiveMeters=clamp(Number(policy?.maximumDiveMeters)||SWIM_POLICY.maximumDiveMeters,SWIM_POLICY.maximumDiveMeters,42);
+ const maximumDiveMeters=clamp(Number(policy?.maximumDiveMeters)||SWIM_POLICY.maximumDiveMeters,SWIM_POLICY.maximumDiveMeters,40);
  return {airCapacity,maximumDiveMeters,equipment:saved.equipment==='scuba'?'scuba':'none',airSeconds:clamp(Number.isFinite(saved.airSeconds)?saved.airSeconds:airCapacity,0,airCapacity),stamina:clamp(Number.isFinite(saved.stamina)?saved.stamina:1,0,1),verticalVelocity:0,elapsed:0};
 }
 export function stepSwimming(state,{eyeY,surfaceY,bottomY,dt,vertical=0,moving=false,boost=false,metersPerUnit=1}) {

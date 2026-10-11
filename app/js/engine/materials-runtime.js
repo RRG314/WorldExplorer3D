@@ -16,6 +16,7 @@ import {
   createRoughnessMap
 } from "./procedural-textures.js?v=2";
 import { getBuildingMaterial } from "./building-facade-materials.js?v=19";
+import {signedPolygonAreaXZ} from '../world/world-geometry.js?v=3';
 
 const EARTH_TEXTURE_ROOT = 'assets/textures/earth';
 export const LOCAL_PBR_ASSET_IDS = Object.freeze({
@@ -127,7 +128,7 @@ export function createBuildingGroundPatch(ctx, pts, avgElevation, options = {}) 
   const maxRadius = footprint.reduce((best, point) => {
     return Math.max(best, Math.hypot(point.x - cx, point.z - cz));
   }, 0);
-  const footprintArea = Number.isFinite(opts.footprintArea) ? opts.footprintArea : polygonAreaXZ(footprint);
+  const footprintArea = Number.isFinite(opts.footprintArea) ? opts.footprintArea : Math.abs(signedPolygonAreaXZ(footprint));
   const heightMeters = Number.isFinite(opts.heightMeters) ? opts.heightMeters : 0;
   const denseUrban = opts.denseUrban === true;
   const roadside = opts.roadside === true;

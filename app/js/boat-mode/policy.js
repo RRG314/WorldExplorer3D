@@ -1,3 +1,5 @@
+import {getMaritimeCatalogEntry} from '../transport/maritime-catalog.js?v=1';
+import {submarineDeploymentAdmission} from '../transport/maritime-admission.js';
 export function createBoatModePolicy(options = {}) {
   const { appCtx, exitMaxShorelineDrive, exitMaxShorelineWalk, minimumBoatShorelineDistance, promptDurationMs, setPromptSignature, showBoatPrompt, updateBoatMenuUi } = options;
 
@@ -33,15 +35,16 @@ function canDiveBoatMode(options = {}) {
     waterKind === 'lake' ? 8 :
     6
   );
-  const diveEligible =
-    currentWater?.type === 'area' &&
-    waterKind !== 'channel' &&
-    waterKind !== 'harbor' &&
-    shoreline >= minimumDiveDistance;
+  const decision = submarineDeploymentAdmission({
+    catalog:getMaritimeCatalogEntry(appCtx.boatMode.transportCatalogId),
+    speedMetersPerSecond:Math.hypot(appCtx.boat?.vx||0,appCtx.boat?.vz||0,appCtx.boat?.speed||0)*(appCtx.METERS_PER_WORLD_UNIT||1),
+    waterKind,waterType:currentWater?.type,shorelineDistance:shoreline,requiredShorelineDistance:minimumDiveDistance
+  });
+  const diveEligible = decision.allowed;
 
   if (!diveEligible && options.showNotice !== false) {
     setPromptSignature('blocked_dive');
-    showBoatPrompt('Move into larger open water before diving underwater', 'notice', promptDurationMs);
+    showBoatPrompt(decision.reason, 'notice', promptDurationMs);
   }
   return diveEligible;
 }

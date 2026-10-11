@@ -23,7 +23,7 @@ test('geometric sonar requires range, heading, stopped controls and clear terrai
  assert.equal(contactLineClear({rocks:[]},()=>-40,actor.position,target),true);assert.equal(contactLineClear({rocks:[]},()=>-18,actor.position,target),false);assert.equal(contactLineClear({rocks:[{x:0,y:-25,z:10,rx:5,ry:5,rz:5}]},()=>-40,actor.position,target),false);
 });
 test('three contacts, chosen target, distinct observations, actual boarding and supported conclusion form one saved expedition',async()=>{
- const f=fixture();await f.chart();assert.equal(f.api.snapshot().phase,'selection');assert.equal(f.api.snapshot().annotations.length,3);assert.deepEqual(f.api.diveEquipment(),{airCapacity:300,maximumDiveMeters:42});await f.views();assert.equal(f.api.snapshot().phase,'return');assert.equal(await f.api.act('return'),false);await f.board();assert.equal(f.api.snapshot().phase,'report');assert.equal(f.api.diveEquipment().airCapacity,360);f.surface();f.api.conclude('wreck');assert.equal(await f.api.act('report'),false);f.api.conclude('case');assert.equal(await f.api.act('report'),true);assert.equal(f.api.snapshot().completed,true);
+ const f=fixture();await f.chart();assert.equal(f.api.snapshot().phase,'selection');assert.equal(f.api.snapshot().annotations.length,3);assert.deepEqual(f.api.diveEquipment(),{airCapacity:300,maximumDiveMeters:40});await f.views();assert.equal(f.api.snapshot().phase,'return');assert.equal(await f.api.act('return'),false);await f.board();assert.equal(f.api.snapshot().phase,'report');assert.equal(f.api.diveEquipment().airCapacity,360);f.surface();f.api.conclude('wreck');assert.equal(await f.api.act('report'),false);f.api.conclude('case');assert.equal(await f.api.act('report'),true);assert.equal(f.api.snapshot().completed,true);
  const events=await f.store.listEvents(100);assert.equal(events.length,10);assert.equal(investigationBadges(events).length,2);assert.equal((await f.store.getProfile()).explorerProgress.points,0);validateInvestigationBackup(events);await f.store.importData(await f.store.exportData());await f.api.refresh();assert.equal(f.api.snapshot().completed,true);
 });
 test('partial report and failed writes preserve the next real step; wrong vessel and rescue do not grant return',async()=>{
@@ -39,8 +39,8 @@ test('orphan, mismatched identity, contradictory conclusion and damaged backup c
  assert.equal(investigationState(await f.store.listEvents()).completed,true);
 });
 test('game survey equipment has bounded added air and depth without changing ordinary swimming',()=>{
- const ordinary=createSwimState(),survey=createSwimState({}, {airCapacity:300,maximumDiveMeters:42}),reserve=createSwimState({}, {airCapacity:360,maximumDiveMeters:42});assert.equal(ordinary.airSeconds,180);assert.equal(survey.airSeconds,300);assert.equal(reserve.airSeconds,360);
- assert.equal(createSwimState({}, {airCapacity:Infinity,maximumDiveMeters:900}).airSeconds,360);assert.equal(createSwimState({}, {airCapacity:900,maximumDiveMeters:900}).maximumDiveMeters,42);
+ const ordinary=createSwimState(),survey=createSwimState({}, {airCapacity:300,maximumDiveMeters:40}),reserve=createSwimState({}, {airCapacity:360,maximumDiveMeters:40});assert.equal(ordinary.airSeconds,180);assert.equal(survey.airSeconds,300);assert.equal(reserve.airSeconds,360);
+ assert.equal(createSwimState({}, {airCapacity:Infinity,maximumDiveMeters:900}).airSeconds,360);assert.equal(createSwimState({}, {airCapacity:900,maximumDiveMeters:900}).maximumDiveMeters,40);
  const step=s=>stepSwimming(s,{eyeY:-30,surfaceY:0,bottomY:-55,dt:.1,vertical:-1,metersPerUnit:1});assert.equal(step(ordinary).y,-18);assert.ok(step(survey).y< -30);assert.equal(step({...reserve,airSeconds:19,equipment:'scuba'}).recovering,true);
 });
 test('the same geographic study keeps target positions and procedural seabed across alternate launch origins',()=>{

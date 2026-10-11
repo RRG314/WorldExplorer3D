@@ -50,7 +50,25 @@ browsers/servers. Production deployment evidence is under
 `output/release-evidence/current/production-deployment.json` and
 `production-promotion.json`; acceptance gaps remain in their own receipts.
 
-## October 10 current continuation — coastal investigation
+## October 10 current continuation — coherent marine and saved worlds
+
+The owner’s expanded marine/creative/farming requirements are integrated in
+`docs/design/WORLD-COHERENCE-DELIVERY.md`. Vessel entry and motion share hull-fit
+admission; deployed equipment follows vessel capability. Research scuba uses a
+40 m game-depth profile. The same-sub reboarding/drive/recovery journey passes
+13 actual-game checks; the final northern coastal investigation passes 14.
+Creative storage passes seven browser checks including capacity, stale writers,
+failed writes and reload; no existing area is silently pruned. These are local,
+controlled-provider checks, not global-ocean or release certification.
+
+The final source chain passes 2,331 tests and the new 1,008-file unresolved-name
+gate. It caught a missing building-ground area helper; the existing geometry
+owner now supplies it. The first final chain caught a duplicate query-version
+import, corrected before the passing rerun. Production and retained artifacts
+remain unchanged. Next: regional ecology/placement, the documented geographic
+depth mismatch, continuous ocean and remaining career/creative/realism gates.
+
+## October 10 previous continuation — coastal investigation
 
 H07–H09 now implement physical geometry sonar, three eligible diver choices,
 partial recovery, normal same-submarine return, supported wet-lab interpretation,

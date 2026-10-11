@@ -1,4 +1,5 @@
 import {deployResearchSubmarineFromDeck} from './marine-entry-ui.mjs';
+import {runPrescribedGameActions} from './prescribed-game-actions.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import { chromium } from 'playwright';
@@ -101,11 +102,21 @@ try {
  await page.locator('#oceanDiverToggle').click();
  await page.waitForFunction(()=>getOceanModeDebugState().diver.active===false);
  assert.equal(await page.locator('#oceanSwimmingHud').count(),0);report.cases.push({id:'boarding-restores-sub-control-and-removes-dive-ui',passed:true});
+ const beforeReboardDrive=await page.evaluate(()=>({position:{...__marineEntryContext.oceanMode.submarine.position},id:__marineEntryContext.oceanMode.submarine.transportEntityId}));
+ await runPrescribedGameActions(page,dir,[{buttons:['up'],frames:90},{buttons:[],frames:60}]);
+ const afterReboardDrive=await page.evaluate(()=>({position:{...__marineEntryContext.oceanMode.submarine.position},id:__marineEntryContext.oceanMode.submarine.transportEntityId}));
+ assert.equal(afterReboardDrive.id,beforeReboardDrive.id);assert.ok(Math.hypot(afterReboardDrive.position.x-beforeReboardDrive.position.x,afterReboardDrive.position.z-beforeReboardDrive.position.z)>.5);
+ await page.screenshot({path:`${dir}/same-submarine-driven-after-reboarding.png`});await fs.writeFile(`${dir}/reboard-drive-state.json`,await page.evaluate(()=>render_game_to_text()));
+ report.cases.push({id:'same-submarine-moves-after-physical-reboarding-prescribed-keyboard-client',passed:true});
  await page.locator('#oceanDiverToggle').click();await page.waitForFunction(()=>getOceanModeDebugState().diver.active===true);
  await page.locator('#oceanSwimmingHud').getByRole('button',{name:'Recover',exact:true}).click();
  await page.waitForFunction(()=>getOceanModeDebugState().diver.active===false);report.cases.push({id:'explicit-recovery-returns-aboard',passed:true});
  await page.evaluate(async()=>{const {ctx}=await import('/app/js/shared-context.js?v=55');window.diverCtx=ctx;ctx.oceanMode.submarine.position.y=-40});
- await page.waitForFunction(()=>document.querySelector('#oceanDiverToggle').disabled===true);assert.match(await page.locator('#oceanDiverControls').innerText(),/1–16/);report.cases.push({id:'deep-sub-exit-is-blocked-with-instructions',passed:true});
+ await page.waitForFunction(()=>document.querySelector('#oceanDiverToggle').disabled===true);assert.match(await page.locator('#oceanDiverControls').innerText(),/1–38/);report.cases.push({id:'deep-sub-exit-is-blocked-with-instructions',passed:true});
+ const parentId=await page.evaluate(()=>diverCtx.oceanVoyage.current.ship.transportEntityId);
+ await page.locator('#oceanVoyageRecover').click();await page.waitForFunction(()=>diverCtx.boatDeck?.active&&!diverCtx.oceanMode.active,null,{timeout:30000});
+ assert.equal(await page.evaluate(()=>diverCtx.boatMode.transportEntityId),parentId);
+ await page.screenshot({path:`${dir}/same-research-vessel-recovered.png`});report.cases.push({id:'operated-submarine-recovers-to-same-parent-research-vessel',passed:true});
  await page.evaluate(()=>diverCtx.stopOceanMode());
  const retained=await page.evaluate(async()=>{
   const {modelAssetCacheSnapshot}=await import('/app/js/assets/model-asset-runtime.js');

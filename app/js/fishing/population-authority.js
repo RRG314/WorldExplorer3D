@@ -37,6 +37,7 @@ function normalizedWaterKind(value) {
 }
 
 function finiteOrNull(value) {
+  if (value == null || value === '') return null;
   const number = Number(value);
   return Number.isFinite(number) ? number : null;
 }
@@ -63,22 +64,23 @@ function stableUnit(value) {
 }
 
 function gameCatalogCandidates(waterKind, latitude, accessMode) {
-  const lat = finiteOrNull(latitude) ?? 0;
+  const lat = finiteOrNull(latitude);
+  if (lat === null || Math.abs(lat)>90) return [];
   const accessEligible = FISH_SPECIES.filter((species) => accessMode !== 'shore' || SHORE_GAMEPLAY_SPECIES.has(species.id));
   const exact = accessEligible.filter((species) => (
     species.waterKinds.includes(waterKind) && lat >= species.latitude[0] && lat <= species.latitude[1]
   ));
-  const waterOnly = exact.length ? exact : accessEligible.filter((species) => species.waterKinds.includes(waterKind));
-  return waterOnly.map((species) => species.id);
+  return exact.map((species) => species.id);
 }
 
 function createFishPopulationContext(options = {}) {
   const accessMode = ['shore', 'boat', 'underwater'].includes(options.accessMode) ? options.accessMode : 'boat';
   const accessProfile = ACCESS_PROFILES[accessMode];
   const waterKind = normalizedWaterKind(options.waterKind);
-  const latitude = finiteOrNull(options.latitude) ?? 0;
+  const latitude = finiteOrNull(options.latitude);
   const waterbodyId = String(options.waterbodyId || `unresolved-water:${waterKind}`).slice(0, 220);
-  const candidateSpeciesIds = unique(options.candidateSpeciesIds || gameCatalogCandidates(waterKind, latitude, accessMode));
+  const eligible = gameCatalogCandidates(waterKind, latitude, accessMode);
+  const candidateSpeciesIds = unique(options.candidateSpeciesIds || eligible).filter(id => eligible.includes(id));
   const sourceDataset = String(options.sourceDataset || 'unresolved-water-source').slice(0, 120);
   const sourceTruth = String(options.sourceTruth || (
     sourceDataset === 'synthetic-transition' ? 'synthetic-transition' : 'published-water-surface'
