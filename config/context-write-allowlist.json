@@ -93,6 +93,7 @@
       "clearAllBuildBlocks",
       "clearBlockBuilderForWorldReload",
       "configureSharedBuildSync",
+      "exportBuildRecovery",
       "getBlockBuilderSnapshot",
       "getBuildCollisionAtWorldXZ",
       "getBuildLimits",

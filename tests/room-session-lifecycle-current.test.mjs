@@ -45,6 +45,20 @@ test('a delayed activation cannot replace a newer room or install duplicate subs
   assert.deepEqual(h.events, [['presence', 'BBBBBB']]);
 });
 
+test('room building reset awaits its own commit and never clears the separate block collection', async () => {
+  const h = harness(), completion = pending(); let configuration, called = 0;
+  h.appCtx.configureSharedEditableWorld = value => { configuration = value; };
+  h.context.editableModule.resetRoomWorldModifications = room => { assert.equal(room.id, 'AAAAAA'); called++; return completion.promise; };
+  h.context.clearRoomSharedBlocks = () => { throw Error('Blocks are a separate explicit action'); };
+  await h.activateRoom({ id: 'AAAAAA', code: 'AAAAAA' });
+  let settled = false; const reset = configuration.reset().then(value => { settled = true; return value; });
+  await Promise.resolve(); assert.equal(called, 1); assert.equal(settled, false);
+  completion.resolve(3); assert.equal(await reset, 3);
+  h.context.editableModule.resetRoomWorldModifications = async () => { throw Error('rejected reset'); };
+  await h.activateRoom({ id: 'BBBBBB', code: 'BBBBBB' });
+  await assert.rejects(configuration.reset(), /rejected reset/);
+});
+
 test('queued old room callbacks cannot overwrite chat or player state after a switch', async () => {
   const h = harness();
   await h.activateRoom({ id: 'AAAAAA', code: 'AAAAAA' });

@@ -1,7 +1,6 @@
 import { listenArtifacts } from "./artifacts.js?v=57";
 import {
   clearMySharedBlocks,
-  clearRoomSharedBlocks,
   listenSharedBlocks,
   removeSharedBlock,
   upsertSharedBlock
@@ -102,13 +101,7 @@ export function createUiRoomSession({ appCtx, refs, state, renderers, helpers, r
       canManage: editablePermissions.resetWorld,
       suppress: (sourceFeatureId) => suppressRoomBuilding(room, sourceFeatureId),
       restore: (sourceFeatureId) => restoreRoomBuilding(room, sourceFeatureId),
-      reset: async () => {
-        const [modifications, blocks] = await Promise.all([
-          resetRoomWorldModifications(room),
-          clearRoomSharedBlocks(room.id)
-        ]);
-        return modifications + blocks;
-      }
+      reset: () => resetRoomWorldModifications(room)
     });
     state.artifacts = [];
     state.roomActivities = [];

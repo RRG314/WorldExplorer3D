@@ -364,9 +364,9 @@ function normalizeBuildEntry(raw) {
     locationKey,
     lat: Number(lat.toFixed(7)),
     lon: Number(lon.toFixed(7)),
-    gx: Number.isInteger(gx) ? gx : null,
+    gx: raw.gx !== null && Number.isInteger(gx) ? gx : null,
     gy: toVerticalGridCoord(gy),
-    gz: Number.isInteger(gz) ? gz : null,
+    gz: raw.gz !== null && Number.isInteger(gz) ? gz : null,
     materialIndex: normalizeBlockMaterial(raw.materialIndex),
     shape: normalizeBlockShape(raw.shape),
     rotation: normalizeBlockRotation(raw.rotation),
@@ -541,7 +541,7 @@ function persistPlacedBuildBlock(gx, gy, gz, materialIndex, shape, rotation) {
   });
 }
 
-function persistRemovedBuildBlock(gx, gy, gz) {
+function persistRemovedBuildBlock(gx, gy, gz, persistedId = '') {
   if (isSharedBuildSyncActive()) {
     const entry = sharedBuildSync.remove({ gx, gy, gz }, (err, previous) => {
       console.warn('[blocks] Failed to remove room block:', err);
@@ -563,6 +563,7 @@ function persistRemovedBuildBlock(gx, gy, gz) {
   if (!canPersistBuildBlocks()) return true;
   const world = getCurrentBuildWorldContext();
   if (!world) return false;
+  if (persistedId) return blockLocalStore.removeAt(world.locationKey, gx, gy, gz, { id: persistedId });
   if (world.kind === 'planetary') {
     const stored = planetaryBlockStorageCoordinates({ gx, gy, gz }, world.placement);
     return blockLocalStore.removeAt(
@@ -636,7 +637,8 @@ function placeBuildBlock(gx, gy, gz, materialIndex = null, options = {}) {
     rotation,
     gx, gy, gz,
     blockKey: key,
-    buildAuthority: String(options.authority || 'player')
+    buildAuthority: String(options.authority || 'player'),
+    persistedId: String(options.persistedId || '')
   };
 
   group.add(mesh);
@@ -674,7 +676,7 @@ function removeBuildBlock(gx, gy, gz, options = {}) {
     return false;
   }
 
-  if (options.persist !== false && !persistRemovedBuildBlock(gx, gy, gz)) {
+  if (options.persist !== false && !persistRemovedBuildBlock(gx, gy, gz, mesh.userData.persistedId)) {
     const sharedStatus = getSharedBuildSyncStatus();
     showBuildTransientMessage(sharedStatus.enabled && sharedStatus.connected === false
       ? 'Room is offline. The block was kept; reconnect and try again.'
@@ -832,6 +834,7 @@ function refreshBlockBuilderForCurrentLocation() {
       const gz = toGridCoord(render.gz);
       placeBuildBlock(gx, gy, gz, entry.materialIndex, {
         persist: false,
+        persistedId: entry.id,
         enforceLimit: false,
         shape: entry.shape,
         rotation: entry.rotation
@@ -845,6 +848,7 @@ function refreshBlockBuilderForCurrentLocation() {
     const gz = toGridCoord(worldPos.z);
     placeBuildBlock(gx, toVerticalGridCoord(entry.gy), gz, entry.materialIndex, {
       persist: false,
+      persistedId: entry.id,
       enforceLimit: false,
       shape: entry.shape,
       rotation: entry.rotation
@@ -887,6 +891,7 @@ Object.assign(appCtx, {
   getConstructionAssistance,
   getBlockBuilderSnapshot,
   getBuildPersistenceStatus,
+  exportBuildRecovery: () => blockLocalStore.exportRecovery(),
   getSharedBuildSyncStatus,
   getBuildTopSurfaceAtWorldXZ,
   getBuildVehicleContact,

@@ -44,7 +44,7 @@ function normalizeEntry(raw) {
   };
 }
 
-function createStore() {
+function createStore(options = {}) {
   return createBlockLocalStore({
     backupKey,
     legacyKeys: [],
@@ -53,7 +53,8 @@ function createStore() {
     migrationKey,
     normalizeEntry,
     storageKey,
-    testKey
+    testKey,
+    ...options
   });
 }
 
@@ -70,6 +71,44 @@ function row() {
     rotation: 1
   };
 }
+
+function withStorage(run) {
+ const previous=globalThis.localStorage,storage=new FaultableStorage();globalThis.localStorage=storage;
+ try { return run(storage); } finally { if(previous===undefined)delete globalThis.localStorage;else globalThis.localStorage=previous; }
+}
+
+test('stale block writers cannot replace another tab or its newer recovery copy',()=>withStorage(storage=>{
+ const first=createStore(),stale=createStore();first.initialize();stale.initialize();assert.equal(first.upsert(row()),true);
+ const committed=storage.getItem(storageKey);assert.equal(stale.upsert({...row(),gx:8}),false);assert.equal(stale.getStatus().notice,'conflict');assert.equal(storage.getItem(storageKey),committed);
+ const next=createStore();next.initialize();storage.setItem(backupKey,'{newer-backup');assert.equal(next.clearLocation(row().locationKey),false);
+ assert.equal(storage.getItem(storageKey),committed);assert.equal(JSON.parse(next.exportRecovery()).backup,'{newer-backup');
+}));
+test('backup failure leaves a successful primary block commit visible after reload',()=>withStorage(storage=>{
+ const store=createStore();store.initialize();storage.failKey=backupKey;assert.equal(store.upsert(row()),true);
+ assert.equal(store.getStatus().backupAvailable,false);assert.equal(store.countForLocation(row().locationKey),1);
+ storage.failKey='';const restored=createStore();restored.initialize();assert.equal(restored.countForLocation(row().locationKey),1);
+ assert.equal(restored.upsert({...row(),gx:8}),true);assert.equal(restored.getStatus().notice,'none');
+}));
+test('unsupported, lossy, duplicate and over-limit saved block rows are preserved read-only',()=>withStorage(storage=>{
+ const valid=normalizeEntry(row()),good=JSON.stringify([valid]);
+ for(const original of ['{damaged',JSON.stringify([{...valid,futureTerrain:{height:3}}]),JSON.stringify([{...valid,shape:null}]),JSON.stringify([valid,valid]),JSON.stringify(Array.from({length:6},(_,gx)=>({...valid,id:`b${gx}`,gx})))]){
+  storage.setItem(storageKey,original);storage.setItem(backupKey,good);const store=createStore({maxTotal:5});store.initialize();
+  assert.equal(store.getStatus().enabled,false);assert.equal(store.upsert({...row(),gx:12}),false);assert.equal(store.countForLocation(row().locationKey),1);
+  assert.equal(storage.getItem(storageKey),original);assert.equal(storage.getItem(backupKey),good);assert.equal(JSON.parse(store.exportRecovery()).primary,original);
+ }
+}));
+test('a missing primary can use a valid backup without writing during load; a damaged backup cannot be erased',()=>withStorage(storage=>{
+ const backup=JSON.stringify([normalizeEntry(row())]);storage.setItem(backupKey,backup);const store=createStore();store.initialize();
+ assert.equal(store.getStatus().enabled,true);assert.equal(store.countForLocation(row().locationKey),1);assert.equal(storage.getItem(storageKey),null);
+ const entry=store.listForLocation(row().locationKey)[0];assert.throws(()=>{entry.gx=99;},TypeError);
+ storage.setItem(backupKey,'{only-original');const blocked=createStore();blocked.initialize();assert.equal(blocked.getStatus().enabled,false);
+ assert.equal(blocked.clearLocation(row().locationKey),false);assert.equal(storage.getItem(backupKey),'{only-original');
+}));
+test('unreadable-only legacy blocks do not receive an empty replacement or completed migration marker',()=>withStorage(storage=>{
+ storage.setItem('legacy','{original');const store=createStore({legacyKeys:['legacy']});store.initialize();
+ assert.equal(store.getStatus().enabled,false);assert.equal(storage.getItem(storageKey),null);assert.equal(storage.getItem(migrationKey),null);
+ assert.equal(JSON.parse(store.exportRecovery()).legacy.legacy,'{original');
+}));
 
 test('current Blocks storage keeps rendered authority aligned with the last committed primary record', () => {
   const priorStorage = globalThis.localStorage;

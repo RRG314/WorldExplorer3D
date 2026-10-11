@@ -5,6 +5,36 @@ This is an implementation and acceptance contract; the table distinguishes code
 that exists from work that still needs delivery. It does not supersede saved
 worlds, release gates or the existing environmental and transport owners.
 
+## Latest creative preservation evidence
+
+Both retained local creative owners now reject lossy read normalization: unknown
+fields, invalid rows, duplicate addresses and over-limit records remain intact.
+Unreadable primary/backup data is read-only, valid backup content can still render,
+and the actual builder offers raw recovery downloads. Stale primary or backup
+changes reject writes. A committed primary remains successful when its redundant
+backup fails. Block limits reject additional work instead of trimming old work.
+Legacy Earth blocks with null grid coordinates retain their geographic address
+and now remove by their saved identity, so deletion survives reload.
+
+The former Restore Base World command could clear mapped edits successfully and
+fail while clearing blocks; the room adapter used two independent concurrent
+writes. The UI now explicitly offers **Reset building edits** and **Clear** blocks.
+Each command changes its own authority and reports that scope. This is deliberate
+scope separation, not a claim of a cross-store transaction or a new storage owner.
+
+`output/roadmap-20261010/creative-scoped-reset/browser.json`: **15 passed** actual
+Chromium checks, isolated controlled scene, real builder DOM/Three collision and
+storage, prescribed keyboard client, zero captured page/shader errors. Includes
+original recovery bytes, failed writes, reset failure/retry and reload. Images
+were inspected. A room-session component check verifies the reset waits for its
+building commit and never clears the block collection; live shared rooms were
+not tested for this change. Full source chain: **2,384 passed**.
+
+The original two stores still use bounded location-based localStorage. Export
+is not a full recovery/import tool. Atomic chunked persistence, worldwide creative
+identity, terrain/farm simulation and the compatible release roundtrip remain
+open; no production package was changed.
+
 ## Product structure
 
 Free roam is the persistent personal sandbox. Campaigns are optional journeys

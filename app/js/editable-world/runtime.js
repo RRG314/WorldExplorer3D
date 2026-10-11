@@ -303,7 +303,8 @@ export async function resetLocalEditableWorld(appCtx) {
   }
   const result = commit(appCtx, { action: 'reset_world' });
   if (result.committed) {
-    appCtx.clearAllBuildBlocks?.();
+    // Reset only this authority's edits. Blocks have a separate durable owner
+    // and Clear action; two independent writes cannot promise one atomic reset.
     selectedBuilding = null;
     lastSelectedSourceId = '';
   }
@@ -400,7 +401,7 @@ export function initEditableWorldRuntime(appCtx) {
     editableWorldRuntimeSnapshot: () => editableWorldRuntimeSnapshot(appCtx),
     configureSharedEditableWorld: (config) => configureSharedEditableWorld(appCtx, config),
     disposeEditableWorldPresentation: () => disposeEditableWorldPresentation(),
-    exportLocalEditableWorld: () => store.exportWorld(currentWorldId(appCtx)),
+    exportLocalEditableWorld: options => options?.recovery === true ? store.exportRecovery() : store.exportWorld(currentWorldId(appCtx)),
     getSuppressedEditableBuildingIds: () => getSuppressedEditableBuildingIds(appCtx),
     getLocalWorldModificationSnapshot: () => getLocalWorldModificationSnapshot(appCtx),
     isLocalBuildingSuppressed: (sourceFeatureId) => isLocalBuildingSuppressed(appCtx, sourceFeatureId),

@@ -50,7 +50,26 @@ browsers/servers. Production deployment evidence is under
 `output/release-evidence/current/production-deployment.json` and
 `production-promotion.json`; acceptance gaps remain in their own receipts.
 
-## October 10 latest local continuation — Moon fieldwork and homecoming
+## October 10 latest local continuation — creative save preservation
+
+Both existing creative stores now protect unreadable, unsupported, lossy and
+oversize records, preserve original recovery copies, reject stale writers and
+treat the primary write as the commit point. The builder provides recovery-file
+downloads. Legacy geographic blocks retain their position and remove by saved
+identity after reload. Reset building edits now resets that authority only;
+blocks use their separate Clear action, in solo play and shared rooms. This
+removes the former partial two-store reset rather than claiming atomic writes
+across independent stores.
+
+`creative-scoped-reset/browser.json` passes 15 browser checks using actual builder
+DOM, Three rendering/collision and browser storage in a controlled scene, including
+failed reset/retry and legacy deletion/reload. Room-reset scope has a component
+check; no new live shared-service acceptance is claimed. The full source chain
+passes **2,384 tests**. Images were inspected. This is preservation work, not
+worldwide creative storage, terrain editing or farming completion. Continue those
+finite gates. Production, dist, retained packages and player data are unchanged.
+
+## October 10 previous local continuation — Moon fieldwork and homecoming
 
 H10–H12 now have local implementation: physical ship briefing/preparation, saved
 observation or sample method, two native LROC surface sites, actual Backpack

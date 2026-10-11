@@ -52,9 +52,17 @@ function syncBlockBuilderUi(snapshot = {}) {
     ? persistence.shared?.connected === false ? 'Room offline. Reconnect before saving more blocks.'
       : persistence.shared?.pendingCount > 0 ? 'Saving to room… Keep your connection until this finishes.'
         : 'Connected room · accepted blocks are saved to this room. Keep its code to return.'
-    : persistence.enabled === false ? 'Device storage is unavailable. Check the status below before leaving.'
+    : persistence.enabled === false ? persistence.detail || 'Device storage is unavailable. Check the status below before leaving.'
       : 'Solo blocks save on this device at this location. Return here to keep building.';
+  const blockRecovery = document.getElementById('blockBuilderRecovery');
+  if (blockRecovery) blockRecovery.hidden = snapshot.shared === true || !['protected', 'conflict', 'error'].includes(persistence.notice);
   const undo = document.getElementById('blockBuilderUndo');
+  const edits = appCtx.editableWorldRuntimeSnapshot?.()?.persistence;
+  const protectedEdits = snapshot.shared !== true && ['invalid-existing', 'backup-read-only', 'backup-protected'].includes(edits?.recovery);
+  const recoveryNotice = document.getElementById('editableWorldSaveNotice');
+  if (recoveryNotice) { recoveryNotice.hidden = !protectedEdits; recoveryNotice.textContent = protectedEdits ? 'Saved building edits need recovery. The original data is preserved and editing is paused. Download a recovery copy to keep it safe.' : ''; }
+  const recoveryButton = document.getElementById('editableWorldRecovery');
+  if (recoveryButton) recoveryButton.hidden = !protectedEdits;
   if (undo) undo.disabled = !snapshot.canUndo;
   const count = document.getElementById('blockBuilderCount');
   if (count) {
@@ -173,6 +181,30 @@ function initBlockBuilderUi() {
     'storage-unavailable':'World editing could not save on this device. Existing records are kept.',
     'storage-write-failed':'This edit could not be saved. Free browser storage and try again; the previous world is unchanged.'
   }[result?.reason] || fallback);
+  document.getElementById('editableWorldRecovery')?.addEventListener('click', () => {
+    let url;
+    try {
+      const data = appCtx.exportLocalEditableWorld?.({ recovery: true });
+      if (typeof data !== 'string') throw Error('Unavailable');
+      url = URL.createObjectURL(new Blob([data], { type: 'application/json' }));
+      const link = document.createElement('a'); link.href = url; link.download = 'world-explorer-building-edits-recovery.json';
+      document.body.append(link); link.click(); link.remove();
+      setStatus('Recovery copy downloaded. Your saved building edits remain unchanged.');
+    } catch { setStatus('The recovery copy could not be read. Keep this browser data and try again.'); }
+    finally { if (url) setTimeout(() => URL.revokeObjectURL(url), 1000); }
+  });
+  document.getElementById('blockBuilderRecovery')?.addEventListener('click', () => {
+    let url;
+    try {
+      const data = appCtx.exportBuildRecovery?.();
+      if (typeof data !== 'string') throw Error('Unavailable');
+      url = URL.createObjectURL(new Blob([data], { type: 'application/json' }));
+      const link = document.createElement('a'); link.href = url; link.download = 'world-explorer-blocks-recovery.json';
+      document.body.append(link); link.click(); link.remove();
+      setStatus('Block recovery copy downloaded. Your original saves remain unchanged.');
+    } catch { setStatus('The block recovery copy could not be read. Keep this browser data and try again.'); }
+    finally { if (url) setTimeout(() => URL.revokeObjectURL(url), 1000); }
+  });
   document.getElementById('editableWorldSelectBuilding')?.addEventListener('click', () => {
     const radius = Number(appCtx.getConstructionAssistance?.().mappedSelectionRadiusMeters) || 42;
     const selected = appCtx.selectNearestEditableBuilding?.(radius);
@@ -193,9 +225,10 @@ function initBlockBuilderUi() {
     setStatus(result?.committed ? 'Building restored.' : editFailure(result,`Could not restore building: ${result?.reason || 'nothing selected'}.`));
   });
   document.getElementById('editableWorldReset')?.addEventListener('click', async () => {
-    if (!globalThis.confirm('Restore the base world here? This clears virtual removals, custom structures, and your local blocks at this location.')) return;
+    if (!globalThis.confirm('Reset building edits here? This restores mapped buildings and removes custom structures. To remove blocks, use Clear.')) return;
     const result = await appCtx.resetLocalEditableWorld?.();
-    setStatus(result?.committed ? 'Base world restored.' : editFailure(result,`Could not reset world: ${result?.reason || 'unknown error'}.`));
+    setStatus(result?.committed ? 'Building edits reset.' : editFailure(result,`Could not reset building edits: ${result?.reason || 'unknown error'}.`));
+    syncBlockBuilderUi(appCtx.getBlockBuilderSnapshot?.() || {});
   });
   document.getElementById('blockBuilderClear')?.addEventListener('click', () => {
     if (!globalThis.confirm('Clear your blocks at this location?')) return;

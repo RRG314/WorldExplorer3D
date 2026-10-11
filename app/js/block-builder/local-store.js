@@ -14,6 +14,29 @@ export function createBlockLocalStore(options = {}) {
   let detail = 'Not initialized.';
   let notice = 'none';
   let entries = [];
+  let expectedPrimary = null, expectedBackup = null, backupAvailable = true;
+
+  function protect(message) { enabled = false; notice = 'protected'; detail = message; }
+
+  function normalizeRows(rows) {
+    if (!Array.isArray(rows) || rows.length > maxTotal) return null;
+    const normalized = [], identities = new Set();
+    for (const raw of rows) {
+      const next = normalizeEntry(raw);
+      if (!next || Object.keys(raw).some(key => {
+        if (key === 'schemaVersion' && raw[key] === 1 && next[key] === 2) return false;
+        return !Object.hasOwn(next, key) || raw[key] !== next[key];
+      })) return null;
+      // Legacy Earth rows may have no integer grid address. Their geographic
+      // position remains authoritative; null must not collapse them at (0, 0).
+      const key = JSON.stringify(next.worldKind === 'earth'
+        ? [next.locationKey, next.lat, next.gy, next.lon]
+        : [next.locationKey, next.gx, next.gy, next.gz]);
+      if (identities.has(key)) return null;
+      identities.add(key); normalized.push(Object.freeze(next));
+    }
+    return normalized;
+  }
 
   function detectStorage() {
     try {
@@ -48,6 +71,7 @@ export function createBlockLocalStore(options = {}) {
         }
         if (!Array.isArray(parsed)) continue;
         const migrated = normalizeRows(parsed);
+        if (!migrated) continue;
         const previous = entries;
         entries = migrated;
         if (!save()) {
@@ -59,93 +83,63 @@ export function createBlockLocalStore(options = {}) {
         detail = `Migrated ${migrated.length} saved block${migrated.length === 1 ? '' : 's'} without deleting the previous copy.`;
         return;
       }
+      if (legacyKeys.some(key => localStorage.getItem(key) !== null)) {
+        protect('The older saved blocks need recovery. Their original copies have been retained.');
+        return;
+      }
       localStorage.setItem(migrationKey, 'done');
     } catch (error) {
       console.warn('[blocks] Failed to migrate legacy build storage:', error);
     }
   }
 
-  function normalizeRows(rows) {
-    const normalized = rows.map(normalizeEntry).filter(Boolean);
-    return normalized.length <= maxTotal ? normalized : normalized.slice(normalized.length - maxTotal);
-  }
-
   function load() {
     if (!enabled) return [];
-    const parseRows = (raw) => {
+    const parseRows = raw => {
       if (raw === null) return { state: 'missing', rows: null };
       try {
-        const parsed = JSON.parse(raw);
-        return Array.isArray(parsed)
-          ? { state: 'valid', rows: parsed }
-          : { state: 'invalid', rows: null };
-      } catch {
-        return { state: 'invalid', rows: null };
-      }
+        const rows = raw.length <= 8_000_000 ? normalizeRows(JSON.parse(raw)) : null;
+        return rows ? { state: 'valid', rows } : { state: 'invalid', rows: null };
+      } catch { return { state: 'invalid', rows: null }; }
     };
     try {
-      const primary = parseRows(localStorage.getItem(storageKey));
-      const backup = parseRows(localStorage.getItem(backupKey));
-
-      if (primary.state === 'valid') return normalizeRows(primary.rows);
-
-      if (backup.state === 'valid') {
-        const recovered = normalizeRows(backup.rows);
-        try {
-          localStorage.setItem(storageKey, JSON.stringify(recovered));
-        } catch {
-          // Backup recovery remains best effort.
-        }
-        notice = 'recovered';
-        detail = primary.state === 'invalid'
-          ? 'Recovered your blocks from the browser backup because the main saved copy was damaged.'
-          : 'Recovered your blocks from the browser backup because the main saved copy was missing.';
-        return recovered;
-      }
-
+      expectedPrimary = localStorage.getItem(storageKey);
+      expectedBackup = localStorage.getItem(backupKey);
+      const primary = parseRows(expectedPrimary), backup = parseRows(expectedBackup);
       if (primary.state === 'invalid' || backup.state === 'invalid') {
-        notice = 'warning';
-        detail = primary.state === 'invalid' && backup.state === 'invalid'
-          ? 'Both saved block copies were damaged. Blocks started empty so corrupted data could not enter the world.'
-          : 'Saved block data was damaged and no usable backup was available. Blocks started empty.';
+        protect('A saved block copy is unreadable or uses unsupported data. Original copies are preserved; download a recovery copy before changing browser data.');
       }
-    } catch (error) {
-      notice = 'warning';
-      detail = `Could not read saved blocks. Blocks started empty: ${error?.message || String(error)}`;
-      console.warn('[blocks] Failed to read storage:', error);
+      if (primary.state === 'valid') return primary.rows;
+      if (backup.state === 'valid') {
+        if (enabled) { notice = 'recovered'; detail = 'Using your browser backup. The original copy is retained until your next saved edit.'; }
+        return backup.rows;
+      }
+    } catch {
+      protect('Saved blocks could not be read. Editing is paused and existing browser records are retained.');
     }
     return [];
   }
 
   function save() {
     if (!enabled) return false;
-    const payload = JSON.stringify(entries);
-    const previousPrimary = localStorage.getItem(storageKey);
-    const previousBackup = localStorage.getItem(backupKey);
+    let payload;
     try {
-      // Write the recovery copy first and the authoritative key last. If the
-      // authoritative write fails, load() still sees the previous committed
-      // primary value. The catch block restores the recovery copy when the
-      // storage provider still permits it.
-      localStorage.setItem(backupKey, payload);
-      localStorage.setItem(storageKey, payload);
-      return true;
-    } catch (error) {
-      try {
-        if (previousBackup === null) localStorage.removeItem(backupKey);
-        else localStorage.setItem(backupKey, previousBackup);
-        if (previousPrimary === null) localStorage.removeItem(storageKey);
-        else localStorage.setItem(storageKey, previousPrimary);
-      } catch {
-        // The authoritative key was written last, so a total write failure
-        // still leaves the previous primary as the next-load authority.
+      if (localStorage.getItem(storageKey) !== expectedPrimary || localStorage.getItem(backupKey) !== expectedBackup) {
+        protect('Another tab changed your saved blocks. Reload before editing; its changes have been kept.');
+        notice = 'conflict'; return false;
       }
-      enabled = false;
-      notice = 'error';
-      detail = `Storage write failed: ${error?.message || String(error)}`;
-      console.warn('[blocks] Failed to save storage:', error);
+      payload = JSON.stringify(entries);
+      // The primary is the only commit point. A failed redundant backup must
+      // never undo or misreport an edit that already committed successfully.
+      localStorage.setItem(storageKey, payload);
+    } catch {
+      enabled = false; notice = 'error'; detail = 'Blocks could not be saved. Your previous saved build is unchanged. Reload when storage is available to retry.';
       return false;
     }
+    expectedPrimary = payload;
+    try { localStorage.setItem(backupKey, payload); expectedBackup = payload; backupAvailable = true; notice = 'none'; detail = 'Blocks saved on this device.'; }
+    catch { backupAvailable = false; notice = 'backup-warning'; detail = 'Blocks saved. The extra recovery copy could not be updated.'; }
+    return true;
   }
 
   function initialize() {
@@ -182,20 +176,20 @@ export function createBlockLocalStore(options = {}) {
       createdAt: existing?.createdAt || new Date().toISOString()
     });
     if (!next) return false;
-    if (existingIndex >= 0) entries[existingIndex] = next;
-    else entries.push(next);
-    if (entries.length > maxTotal) entries = entries.slice(entries.length - maxTotal);
+    if (existingIndex >= 0) entries[existingIndex] = Object.freeze(next);
+    else entries.push(Object.freeze(next));
     if (save()) return true;
     entries = previous;
     return false;
   }
 
-  function removeAt(locationKey, gx, gy, gz) {
+  function removeAt(locationKey, gx, gy, gz, options = {}) {
     if (!enabled) return false;
     const next = entries.filter((entry) =>
-      !(entry.locationKey === locationKey && entry.gx === gx && entry.gy === gy && entry.gz === gz)
+      !(entry.locationKey === locationKey && (options.id
+        ? entry.id === options.id : entry.gx === gx && entry.gy === gy && entry.gz === gz))
     );
-    if (next.length === entries.length) return true;
+    if (next.length === entries.length) return !options.id;
     const previous = entries;
     entries = next;
     if (save()) return true;
@@ -215,8 +209,12 @@ export function createBlockLocalStore(options = {}) {
   }
 
   function getStatus() {
-    return { enabled, detail, notice, storageKey, totalCount: entries.length };
+    return { enabled, detail, notice, backupAvailable, storageKey, totalCount: entries.length };
   }
 
-  return { clearLocation, countForLocation, getStatus, initialize, listForLocation, removeAt, upsert };
+  function exportRecovery() {
+    return JSON.stringify({ format: 'world-explorer-blocks-recovery', version: 1, primary: localStorage.getItem(storageKey), backup: localStorage.getItem(backupKey), legacy: Object.fromEntries(legacyKeys.map(key => [key, localStorage.getItem(key)])) }, null, 2);
+  }
+
+  return { exportRecovery, clearLocation, countForLocation, getStatus, initialize, listForLocation, removeAt, upsert };
 }
