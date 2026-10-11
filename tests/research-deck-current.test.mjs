@@ -39,3 +39,9 @@ test('distant stations cannot act and environment changes remove deck authority'
  const f=fixture();f.api.enter();f.api.select('lab');assert.equal(await f.api.act(),false);
  f.ctx.LOC={lat:1,lon:0};f.api.update(.016);assert.equal(f.api.active,false);assert.equal(f.host.parent,f.scene);
 });
+test('research look is local to the deck and pauses with maps and gameplay',()=>{
+ const f=fixture();assert.equal(f.api.look(1,.4),false);f.api.enter();assert.equal(f.api.look(1,.4),true);
+ assert.equal(f.api.snapshot().pose.pitch,.4);f.ctx.paused=true;const before=f.api.snapshot().pose;
+ assert.equal(f.api.look(1,1),false);assert.deepEqual(f.api.snapshot().pose,before);
+ f.ctx.paused=false;f.ctx.showLargeMap=true;assert.equal(f.api.look(1,1),false);
+});

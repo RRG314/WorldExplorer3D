@@ -1,0 +1,33 @@
+<!doctype html><meta charset="utf-8"><title>Streamed building appearance</title><link rel="icon" href="data:,"><style>body{margin:0}canvas{display:block}</style>
+<script src="/node_modules/three/build/three.min.js"></script><script type="module">
+import {resolveFarBuildingMassing} from '/app/js/terrain/far-building-massing.js';
+import {buildFarBuildingInstanceBatches} from '/app/js/terrain/far-building-instance-batches.js';
+import {applyFarBuildingFacadeDetail} from '/app/js/terrain/far-building-facade-material.js';
+import {appendRegionalBuildingFootprint} from '/app/js/terrain/regional-building-geometry.js';
+import {sharedRegionalFacadeAtlas} from '/app/js/terrain/regional-facade-atlas.js';
+import {facadeNightUniform} from '/app/js/world/facade-lighting.js';
+import {disposeFarFieldMesh} from '/app/js/terrain/far-field-geometry.js';
+const renderer=new THREE.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});renderer.setSize(1280,800);renderer.outputEncoding=THREE.sRGBEncoding;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=.85;document.body.append(renderer.domElement);
+const scene=new THREE.Scene();scene.background=new THREE.Color(0xa0bfd0);scene.add(new THREE.HemisphereLight(0xffffff,0x777366,.9));const sun=new THREE.DirectionalLight(0xffffff,2);sun.position.set(10,80,-40);scene.add(sun);
+const camera=new THREE.PerspectiveCamera(52,1.6,.1,30000);camera.position.set(60,35,-90);camera.lookAt(0,12,0);
+const types=['house','apartments','office','warehouse','commercial','ruins'];const instances=[],buffers={positions:[],colors:[],styles:[],layouts:[],indices:[]};
+for(let i=0;i<12;i++){
+ const x=(i%6-2.5)*22,z=Math.floor(i/6)*35,properties={building:types[i%6],height:types[i%6]==='office'?33:9};
+ const b={identity:`appearance-${i}`,widthMeters:14,depthMeters:18,centerLat:39.43,centerLon:-76.69,properties};
+ const m=resolveFarBuildingMassing(b,null,252,1);
+ if(i<6)instances.push({x,z,baseY:0,width:14,depth:18,height:m.heightMeters,rotationY:.12,color:m.color,roofFraction:m.roofFraction,facadeStyle:m.facadeStyle});
+ else{const footprint=[{x:x-7,z:z-9},{x:x+7,z:z-9},{x:x+7,z:z+9},{x:x-7,z:z+9}];appendRegionalBuildingFootprint(buffers,footprint,[[0,1,2],[0,2,3]],m,0,1);}
+}
+const group=new THREE.Group();
+for(const mesh of await buildFarBuildingInstanceBatches(THREE,instances,applyFarBuildingFacadeDetail(new THREE.MeshStandardMaterial())))group.add(mesh);
+const geometry=new THREE.BufferGeometry();for(const [name,data,size] of [['position',buffers.positions,3],['color',buffers.colors,3],['regionalStyle',buffers.styles,4],['regionalLayout',buffers.layouts,4]])geometry.setAttribute(name,new THREE.Float32BufferAttribute(data,size));geometry.setIndex(buffers.indices);geometry.computeVertexNormals();
+group.add(new THREE.Mesh(geometry,applyFarBuildingFacadeDetail(new THREE.MeshStandardMaterial({vertexColors:true,flatShading:true,side:THREE.DoubleSide}))));scene.add(group);
+const ground=new THREE.Mesh(new THREE.PlaneGeometry(800,800),new THREE.MeshStandardMaterial({color:0x737869}));ground.rotation.x=-Math.PI/2;ground.position.y=-.01;scene.add(ground);
+const atlas=await sharedRegionalFacadeAtlas().ready;
+const render=()=>renderer.render(scene,camera);
+window.setNight=night=>{facadeNightUniform.value=night?1:0;sun.intensity=night?.12:2;render();};
+window.setView=(x,y,z,tx=0,ty=10,tz=0)=>{camera.position.set(x,y,z);camera.lookAt(tx,ty,tz);render();};
+window.advanceTime=render;window.render_game_to_text=()=>JSON.stringify({buildings:12,atlas,geometries:renderer.info.memory.geometries,calls:renderer.info.render.calls,errors:renderer.info.programs.filter(p=>p.diagnostics?.runnable===false).length});
+window.retire=()=>{scene.remove(group);disposeFarFieldMesh(group);render();return renderer.info.memory.geometries;};
+window.fixtureReady=true;render();
+</script>

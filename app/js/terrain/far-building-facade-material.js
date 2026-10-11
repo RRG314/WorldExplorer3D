@@ -1,113 +1,97 @@
-const FAR_FACADE_ATLAS_URL = '/app/assets/textures/facades/neutral-urban-v1.webp';
-let farFacadeAtlas = null;
+import {MATERIAL_VARIANTS,WINDOW_STYLES} from '../world/building-exterior-catalog.js?v=1';
+import {FACADE_OPENINGS_GLSL} from '../world/building-facade-layout.js?v=3';
+import {facadeNightUniform} from '../world/facade-lighting.js';
+import {REGIONAL_MATERIAL_IDS,REGIONAL_WINDOW_IDS} from './regional-building-appearance.js';
+import {REGIONAL_SURFACE_IDS,sharedRegionalFacadeAtlas} from './regional-facade-atlas.js';
+const gl=n=>Number(n).toFixed(5);
+const lookup=(name,values)=>`vec4 ${name}(float id){\n${values.map((v,i)=>`if(id<${gl(i+.5)})return vec4(${v.map(gl).join(',')});`).join('\n')}return vec4(0.0);}`;
+const materials=lookup('regionalMaterial',REGIONAL_MATERIAL_IDS.map(id=>{const m=MATERIAL_VARIANTS[id];return [REGIONAL_SURFACE_IDS.indexOf(m.texture),m.roughness,m.metalness,0];}));
+const windows=lookup('regionalWindow',REGIONAL_WINDOW_IDS.map(id=>{const w=WINDOW_STYLES[id];return [w.bayWidth,w.floorHeight,w.width,w.height];}));
 
-function sharedFarFacadeAtlas() {
-  if (farFacadeAtlas) return farFacadeAtlas;
-  farFacadeAtlas = new THREE.TextureLoader().load(FAR_FACADE_ATLAS_URL);
-  farFacadeAtlas.name = 'far-building-shared-neutral-facade-atlas';
-  farFacadeAtlas.wrapS = THREE.RepeatWrapping;
-  farFacadeAtlas.wrapT = THREE.RepeatWrapping;
-  farFacadeAtlas.colorSpace = THREE.SRGBColorSpace;
-  farFacadeAtlas.anisotropy = 4;
-  return farFacadeAtlas;
+// The regional renderer retains packed batches, but shares the detailed world's
+// floor/bay catalog, surface photographs, window interiors and night authority.
+export function applyFarBuildingFacadeDetail(material,{unitsPerMeter=1}={}){
+ if(!material||typeof material!=='object')return material;
+ const atlas=sharedRegionalFacadeAtlas();
+ material.onBeforeCompile=shader=>{
+  Object.assign(shader.uniforms,{regionalSurfaces:{value:atlas.texture},regionalUnits:{value:unitsPerMeter},facadeNight:facadeNightUniform});
+  shader.vertexShader=`attribute vec4 regionalStyle;
+attribute vec4 regionalLayout;
+uniform float regionalUnits;
+varying vec4 vRegionalStyle;
+varying vec4 vRegionalLayout;
+varying float vRegionalWall;
+${shader.vertexShader}`.replace('#include <beginnormal_vertex>',`#include <beginnormal_vertex>
+vRegionalStyle=regionalStyle;
+vRegionalWall=1.0-step(0.2,abs(objectNormal.y));
+#ifdef USE_INSTANCING
+ vec3 dimensions=regionalLayout.xyz/regionalUnits;
+ float width=abs(objectNormal.x)>.5?dimensions.z:dimensions.x;
+ float along=(abs(objectNormal.x)>.5?position.z+.5:position.x+.5)*width;
+ vRegionalLayout=vec4(along,position.y*dimensions.y,width,dimensions.y*(1.0-regionalLayout.w));
+#else
+ vRegionalLayout=regionalLayout;
+ vRegionalWall=step(.01,regionalLayout.z);
+#endif`);
+  shader.fragmentShader=`uniform sampler2D regionalSurfaces;
+uniform float facadeNight;
+varying vec4 vRegionalStyle;
+varying vec4 vRegionalLayout;
+varying float vRegionalWall;
+${materials}\n${windows}\n${FACADE_OPENINGS_GLSL}
+${shader.fragmentShader}`.replace('#include <color_fragment>',`#include <color_fragment>
+vec4 surfaceProfile=regionalMaterial(vRegionalStyle.x);
+vec4 windowProfile=regionalWindow(vRegionalStyle.y);
+float floors=max(0.0,floor((vRegionalLayout.w-.3)/max(2.4,windowProfile.y)+.5));
+if(vRegionalStyle.y<0.0)floors=0.0;
+float bays=max(1.0,floor(vRegionalLayout.z/windowProfile.x+.5));
+vec4 wallLayout=vec4(vRegionalLayout.x/max(.01,vRegionalLayout.z)*bays,
+ vRegionalLayout.y/max(2.0,(vRegionalLayout.w-.3)/max(1.0,floors)),vRegionalLayout.xy);
+vec4 openingStyle=vec4(windowProfile.zw,floors+.05,vRegionalStyle.z);
+float footprint=max(fwidth(wallLayout.x),fwidth(wallLayout.y));
+float nearDetail=1.0-smoothstep(400.0,900.0,length(vViewPosition));
+vec3 wall=diffuseColor.rgb;
+if(vRegionalWall>.5&&nearDetail>.001){
+ vec2 tile=vec2(mod(surfaceProfile.x,4.0),floor(surfaceProfile.x/4.0));
+ vec2 uv=(tile+mix(vec2(.004),vec2(.996),fract(vRegionalLayout.xy*.25)))/4.0;
+ vec3 grain=sRGBToLinear(texture2D(regionalSurfaces,uv)).rgb;
+ wall=mix(wall,facadeWallSurface(wall,grain),nearDetail*(1.0-smoothstep(.2,.6,footprint)));
 }
-
-function applyFarBuildingFacadeDetail(material) {
-  if (!material || typeof material !== 'object') return material;
-  const facadeAtlas = sharedFarFacadeAtlas();
-  material.onBeforeCompile = (shader) => {
-    shader.uniforms.farFacadeAtlas = { value: facadeAtlas };
-    shader.vertexShader = [
-      'varying vec3 vFarBuildingWorldPosition;',
-      'varying float vFarBuildingWallMask;',
-      shader.vertexShader
-    ].join('\n');
-    shader.vertexShader = shader.vertexShader.replace(
-      '#include <beginnormal_vertex>',
-      [
-        '#include <beginnormal_vertex>',
-        'vFarBuildingWallMask = smoothstep(0.24, 0.78, 1.0 - abs(objectNormal.y));'
-      ].join('\n')
-    );
-    shader.vertexShader = shader.vertexShader.replace(
-      '#include <worldpos_vertex>',
-      [
-        '#include <worldpos_vertex>',
-        // r128 declares worldPosition only for certain lighting/shadow flags.
-        // Regional scenery must also render in an unshadowed scene.
-        'vec4 farFacadeWorldPosition = vec4(transformed, 1.0);',
-        '#ifdef USE_INSTANCING',
-        '  farFacadeWorldPosition = instanceMatrix * farFacadeWorldPosition;',
-        '#endif',
-        'vFarBuildingWorldPosition = (modelMatrix * farFacadeWorldPosition).xyz;'
-      ].join('\n')
-    );
-    shader.fragmentShader = [
-      'varying vec3 vFarBuildingWorldPosition;',
-      'varying float vFarBuildingWallMask;',
-      'uniform sampler2D farFacadeAtlas;',
-      'float farFacadeHash(vec2 p) {',
-      '  return fract(sin(dot(floor(p), vec2(127.1, 311.7))) * 43758.5453);',
-      '}',
-      shader.fragmentShader
-    ].join('\n');
-    shader.fragmentShader = shader.fragmentShader.replace(
-      '#include <color_fragment>',
-      [
-        '#include <color_fragment>',
-        'vec3 farFacadeNormal = normalize(cross(dFdx(vFarBuildingWorldPosition), dFdy(vFarBuildingWorldPosition)));',
-        'float farFacadeWall = min(vFarBuildingWallMask, 1.0 - smoothstep(0.24, 0.78, abs(farFacadeNormal.y)));',
-        'float farFacadeHorizontal = abs(farFacadeNormal.x) > abs(farFacadeNormal.z) ? vFarBuildingWorldPosition.z : vFarBuildingWorldPosition.x;',
-        'vec2 farFacadeGrid = vec2(farFacadeHorizontal / 3.4, vFarBuildingWorldPosition.y / 3.15);',
-        'vec2 farFacadeCell = abs(fract(farFacadeGrid) - 0.5);',
-        'vec2 farFacadeAa = max(fwidth(farFacadeGrid) * 0.85, vec2(0.012));',
-        'float farFacadeColumn = 1.0 - smoothstep(0.31 - farFacadeAa.x, 0.31 + farFacadeAa.x, farFacadeCell.x);',
-        'float farFacadeRow = 1.0 - smoothstep(0.27 - farFacadeAa.y, 0.27 + farFacadeAa.y, farFacadeCell.y);',
-        'float farFacadeWindow = farFacadeColumn * farFacadeRow * farFacadeWall;',
-        // Window-scale detail aliases into a flat pale wall at the aerial
-        // distances used to explore a whole city. Preserve the same facade
-        // owner and blend to a larger, antialiased floor/bay pattern instead
-        // of publishing a second building renderer.
-        'vec2 farFacadeMacroGrid = vec2(farFacadeHorizontal / 13.6, vFarBuildingWorldPosition.y / 12.6);',
-        'vec2 farFacadeMacroCell = abs(fract(farFacadeMacroGrid) - 0.5);',
-        'vec2 farFacadeMacroAa = max(fwidth(farFacadeMacroGrid), vec2(0.008));',
-        'float farFacadeMacroColumn = 1.0 - smoothstep(0.34 - farFacadeMacroAa.x, 0.34 + farFacadeMacroAa.x, farFacadeMacroCell.x);',
-        'float farFacadeMacroRow = 1.0 - smoothstep(0.30 - farFacadeMacroAa.y, 0.30 + farFacadeMacroAa.y, farFacadeMacroCell.y);',
-        'float farFacadeMacroWindow = farFacadeMacroColumn * farFacadeMacroRow * farFacadeWall;',
-        'float farFacadePixelFootprint = max(fwidth(farFacadeGrid.x), fwidth(farFacadeGrid.y));',
-        'float farFacadeAerialLod = smoothstep(0.18, 0.82, farFacadePixelFootprint);',
-        'farFacadeWindow = mix(farFacadeWindow, farFacadeMacroWindow, farFacadeAerialLod);',
-        'float farFacadeDistanceFade = 1.0 - smoothstep(16000.0, 22000.0, distance(cameraPosition, vFarBuildingWorldPosition));',
-        // Match the neutral atlas and meter scale used by the shared near/mid
-        // facade owner. World projection lets both merged and instanced far
-        // geometry use the asset without creating a second render system.
-        'vec2 farFacadeAtlasUv = vec2(farFacadeHorizontal * 0.08, vFarBuildingWorldPosition.y / 16.0);',
-        'vec3 farFacadeAtlasColor = sRGBToLinear(texture2D(farFacadeAtlas, farFacadeAtlasUv)).rgb;',
-        'float farFacadeAtlasLod = (1.0 - smoothstep(0.32, 1.05, farFacadePixelFootprint)) * farFacadeDistanceFade;',
-        'float farFacadeAtlasBlend = farFacadeWall * farFacadeAtlasLod * 0.45;',
-        'vec3 farFacadeTintedAtlas = diffuseColor.rgb * mix(vec3(0.65), farFacadeAtlasColor * 1.8, 0.55);',
-        'diffuseColor.rgb = mix(diffuseColor.rgb, farFacadeTintedAtlas, farFacadeAtlasBlend);',
-        'float farFacadeVariation = farFacadeHash(farFacadeGrid);',
-        'vec3 farFacadeGlass = mix(vec3(0.035, 0.075, 0.105), vec3(0.12, 0.20, 0.25), farFacadeVariation);',
-        // Roofs remain light enough to read from above, while walls retain
-        // enough contrast for the city to look constructed instead of like a
-        // field of untextured white blocks.
-        'float farFacadeWallTone = mix(1.0, 0.62, farFacadeWall * farFacadeAerialLod);',
-        'diffuseColor.rgb *= farFacadeWallTone * mix(0.45, 1.0, farFacadeWall);',
-        'diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * 0.28 + farFacadeGlass * 0.72, farFacadeWindow * farFacadeDistanceFade * 0.82);'
-      ].join('\n')
-    );
-  };
-  material.customProgramCacheKey = () => 'far-building-facade-detail-v6-regional-palette';
-  material.userData = {
-    ...(material.userData || {}),
-    farBuildingFacadeDetail: 'world-space-distance-adaptive-window-grid',
-    farBuildingFacadeOwner: 'terrain/far-building-facade-material',
-    farBuildingFacadeCoverage: 'active-regional-window',
-    farBuildingFacadeAtlas: FAR_FACADE_ATLAS_URL,
-    farBuildingFacadeAtlasMode: 'shared-neutral-urban-atlas'
-  };
-  return material;
+vec4 facadeSurface=vec4(wall,0.0);
+float seed=dot(floor(diffuseColor.rgb*255.0),vec3(17.0,3.0,7.0));
+if(vRegionalWall>.5){
+ if(nearDetail>.001&&footprint<.8){
+  facadeSurface=facadeOpenings(wall,wallLayout,openingStyle,facadeViewRay(vViewPosition,vRegionalLayout.xy),seed);
+  // One restrained entrance on each generated facade, below the windows.
+  // Decoration only: these inferred doors do not advertise an enterable room.
+  if(floors>0.0&&vRegionalLayout.z>2.5&&vRegionalLayout.y<2.65){
+   vec2 p=vec2(vRegionalLayout.x-vRegionalLayout.z*.5,vRegionalLayout.y-1.2);
+   float feather=max(.015,fwidth(vRegionalLayout.x));
+   float frame=facadeBox(p,vec2(.64,1.23),feather);
+   float door=facadeBox(p,vec2(.52,1.15),feather);
+   facadeSurface.rgb=mix(facadeSurface.rgb,wall*.38,frame*nearDetail);
+   facadeSurface.rgb=mix(facadeSurface.rgb,vec3(.042,.05,.052),door*nearDetail);
+   facadeSurface.a*=1.0-frame;
+  }
+ }else if(floors>0.0){
+  float coverage=clamp(windowProfile.z*windowProfile.w,0.0,.85);
+  facadeSurface=vec4(mix(wall,vec3(.065,.092,.11),coverage),coverage);
+ }
+}else{
+ float packed=vRegionalStyle.w;
+ vec3 roof=vec3(floor(packed/65536.0),mod(floor(packed/256.0),256.0),mod(packed,256.0))/255.0;
+ facadeSurface.rgb=sRGBToLinear(vec4(roof,1.0)).rgb;
 }
-
-export { applyFarBuildingFacadeDetail };
+diffuseColor.rgb=facadeSurface.rgb;`)
+   .replace('#include <roughnessmap_fragment>',`#include <roughnessmap_fragment>
+roughnessFactor=mix(surfaceProfile.y,.28,facadeSurface.a*vRegionalWall);`)
+   .replace('#include <metalnessmap_fragment>',`#include <metalnessmap_fragment>
+metalnessFactor=mix(surfaceProfile.z,.12,facadeSurface.a*vRegionalWall);`)
+   .replace('#include <emissivemap_fragment>',`#include <emissivemap_fragment>
+float occupied=step(.62,facadeRoomSeed(wallLayout.xy,seed));
+totalEmissiveRadiance+=facadeSurface.rgb*vec3(2.8,2.15,1.35)*facadeSurface.a*occupied*facadeNight*vRegionalWall;`);
+ };
+ material.customProgramCacheKey=()=> 'regional-building-shared-facades-v1';
+ Object.assign(material.userData,{farBuildingFacadeDetail:'catalog-floor-bays-and-interiors',farBuildingFacadeOwner:'terrain/far-building-facade-material',farBuildingFacadeCoverage:'active-regional-window',farBuildingFacadeAtlas:'shared-licensed-surface-catalog',regionalSurfaceState:atlas.state});
+ return material;
+}

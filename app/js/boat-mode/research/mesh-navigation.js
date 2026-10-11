@@ -28,7 +28,7 @@ function slice(t, y) {
 }
 
 export function createShipMeshNavigation(THREE, root, { minimumDeckY = .8, maxTriangles = 210000 } = {}) {
-  const cells = new Map(), floorCells = new Map(), triangles = [], bounds = [], floorIds = new Set();
+  const cells = new Map(), floorCells = new Map(), triangles = [], bounds = [], floorIds = new Set(), surfaceIds = new Set();
   root.updateMatrixWorld(true);
   const inverse = new THREE.Matrix4().copy(root.matrixWorld).invert();
   const transform = new THREE.Matrix4(), a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3(), ab = new THREE.Vector3(), ac = new THREE.Vector3();
@@ -49,11 +49,11 @@ export function createShipMeshNavigation(THREE, root, { minimumDeckY = .8, maxTr
       const floor = normal.y > .58;
       // Ceilings need wall slices at their edges, but a horizontal underside is
       // not an additional floor. Low deck thickness never blocks a walking step.
-      if (!floor && Math.abs(normal.y) > .98) continue;
+      const ceiling=normal.y < -.58;
       const t = new Float32Array([...a.toArray(), ...b.toArray(), ...c.toArray()]);
       const id = triangles.length;
       if (id >= maxTriangles) throw Error('Ship navigation exceeds its triangle budget.');
-      triangles.push(t); if (floor) floorIds.add(id);
+      triangles.push(t); if (floor) floorIds.add(id);if(floor||ceiling)surfaceIds.add(id);
       bounds.push([Math.min(a.x,b.x,c.x),Math.max(a.x,b.x,c.x),Math.min(a.z,b.z,c.z),Math.max(a.z,b.z,c.z),Math.min(a.y,b.y,c.y),Math.max(a.y,b.y,c.y)]);
       const x0 = Math.floor(Math.min(a.x, b.x, c.x) / CELL), x1 = Math.floor(Math.max(a.x, b.x, c.x) / CELL);
       const z0 = Math.floor(Math.min(a.z, b.z, c.z) / CELL), z1 = Math.floor(Math.max(a.z, b.z, c.z) / CELL);
@@ -99,7 +99,7 @@ export function createShipMeshNavigation(THREE, root, { minimumDeckY = .8, maxTr
       const box=bounds[id];
       if(x+radius<box[0]||x-radius>box[1]||z+radius<box[2]||z-radius>box[3]||box[4]>baseY+height||box[5]<baseY+.36)continue;
       const t = triangles[id];
-      if (floorIds.has(id)) {
+      if (surfaceIds.has(id)) {
         const above = heightAt(t, x, z);
         if (above != null && above > baseY + .36 && above < baseY + height) return true;
         continue;
@@ -138,6 +138,35 @@ export function createShipMeshNavigation(THREE, root, { minimumDeckY = .8, maxTr
     }
     return Math.abs(p.y-to.y)<.35;
   }
-  return { support, blocked, move, walkableSegment, stats: Object.freeze({ triangles: triangles.length, floors: floorIds.size, cells: cells.size }),
-    dispose() { disposed = true; cells.clear();floorCells.clear(); floorIds.clear(); triangles.length = bounds.length = 0; } };
+  function moveAir(position,dx,dz){
+    const result={...position},distance=Math.hypot(dx,dz);
+    if(disposed||!Number.isFinite(distance)||distance>20)return result;
+    const steps=Math.max(1,Math.ceil(distance/.08));
+    const attempt=(x,z)=>{
+      // Open-water entry belongs to the ladder/swimming handoff. An ordinary
+      // deck jump cannot bypass the rail or strand its motor outside the hull.
+      if(support(x,z,result.y,0,2.2)==null||blocked(x,z,.3,result.y))return false;
+      result.x=x;result.z=z;return true;
+    };
+    for(let i=0;i<steps;i++)if(!attempt(result.x+dx/steps,result.z+dz/steps)){
+      attempt(result.x+dx/steps,result.z);attempt(result.x,result.z+dz/steps);
+    }
+    return result;
+  }
+  function vertical(position,nextY,height=1.7){
+    let y=nextY,grounded=false,ceiling=false;
+    if(disposed||!Number.isFinite(nextY))return {y:position.y,grounded:false,ceiling:true};
+    for(const [dx,dz] of [[0,0],[.22,0],[-.22,0],[0,.22],[0,-.22]]){
+      const x=position.x+dx,z=position.z+dz;
+      for(const id of cells.get(key(x,z))||[]){
+        if(!surfaceIds.has(id))continue;
+        const surface=heightAt(triangles[id],x,z);if(surface==null)continue;
+        if(nextY<=position.y&&floorIds.has(id)&&surface<=position.y+.015&&surface>=y){y=surface;grounded=true;}
+        if(nextY>position.y&&surface>=position.y+height-.015&&surface<y+height+.015){y=surface-height-.015;ceiling=true;}
+      }
+    }
+    return {y,grounded,ceiling};
+  }
+  return { support, blocked, move, moveAir, vertical, walkableSegment, stats: Object.freeze({ triangles: triangles.length, floors: floorIds.size, cells: cells.size }),
+    dispose() { disposed = true; cells.clear();floorCells.clear(); floorIds.clear();surfaceIds.clear(); triangles.length = bounds.length = 0; } };
 }

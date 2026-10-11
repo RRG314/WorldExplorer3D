@@ -1,3 +1,4 @@
+import { regionalFacadeStyle } from './regional-building-appearance.js';
 import { resolveMappedRoof } from '../world/mapped-roof-geometry.js?v=6';
 import { selectBuildingExteriorProfile } from '../world/building-exterior-catalog.js?v=1';
 import { isImplausibleTallBuildingFootprint } from '../world/building-geometry-quality.js?v=1';
@@ -78,6 +79,7 @@ function resolveFarBuildingMassing(building, footprint, areaWorld, unitsPerMeter
   const linear = value => value <= .04045 ? value / 12.92 : ((value + .055) / 1.055) ** 2.4;
   return {
     heightMeters,
+    facadeStyle: regionalFacadeStyle(profile, tags, seed),
     roofFraction,
     heightSource: semantics.heightSource,
     identity: String(building?.identity || ''),

@@ -260,6 +260,7 @@ export function configureTerrainSurfaceMaterialBlend(mesh, textureSets = {}) {
         terrainRegionalReady: { value: 0 },
         terrainLocalMap: { value: null },
         terrainLocalReady: { value: 0 },
+        terrainLocalUvTransform: { value: [40000/6000,40000/6000,.5-20000/6000,.5-20000/6000] },
         terrainUrbanMap: { value: null },
         terrainSandMap: { value: null },
         terrainForestMap: { value: null },
@@ -277,7 +278,7 @@ export function configureTerrainSurfaceMaterialBlend(mesh, textureSets = {}) {
       previousOnBeforeCompile?.(shader, renderer);
       Object.assign(shader.uniforms, state.uniforms);
       shader.vertexShader = '#ifdef WE3D_TERRAIN_REGIONAL_IMAGE\nattribute vec2 terrainGeographicUv;\nvarying vec2 vTerrainGeographicUv;\n#endif\n' + shader.vertexShader;
-      shader.fragmentShader = '#ifdef WE3D_TERRAIN_REGIONAL_IMAGE\nuniform sampler2D terrainRegionalMap;\nuniform float terrainRegionalReady;\nuniform sampler2D terrainLocalMap;\nuniform float terrainLocalReady;\nvarying vec2 vTerrainGeographicUv;\n#endif\n' + shader.fragmentShader;
+      shader.fragmentShader = '#ifdef WE3D_TERRAIN_REGIONAL_IMAGE\nuniform sampler2D terrainRegionalMap;\nuniform float terrainRegionalReady;\nuniform sampler2D terrainLocalMap;\nuniform float terrainLocalReady;\nuniform vec4 terrainLocalUvTransform;\nvarying vec2 vTerrainGeographicUv;\n#endif\n' + shader.fragmentShader;
       shader.vertexShader = shader.vertexShader.replace('#include <uv_vertex>', '#include <uv_vertex>\n#ifdef WE3D_TERRAIN_REGIONAL_IMAGE\nvTerrainGeographicUv = terrainGeographicUv;\n#endif');
       shader.fragmentShader = '#ifdef WE3D_TERRAIN_SNOW_MAP\nuniform sampler2D terrainSnowMap;\n#endif\n' + shader.fragmentShader;
       shader.fragmentShader = 'uniform float terrainColdGround;\nuniform float terrainSnowUvScale;\nuniform float terrainBaseSnowNormal;\n' + shader.fragmentShader;
@@ -359,17 +360,19 @@ export function configureTerrainSurfaceMaterialBlend(mesh, textureSets = {}) {
             '#ifdef WE3D_TERRAIN_REGIONAL_IMAGE',
             '  vec2 regionalEdge = min(vTerrainGeographicUv, vec2(1.0) - vTerrainGeographicUv);',
             '  float regionalWeight = terrainRegionalReady * smoothstep(0.0, 0.04, min(regionalEdge.x, regionalEdge.y));',
-            '  regionalWeight *= (1.0 - clamp(vTerrainSurfaceMixA.x + terrainSnowWeight, 0.0, 1.0));',
+            '  regionalWeight *= (1.0 - terrainSnowWeight);',
             // One geographic colour field across every LOD, with metre-scale texture detail.
-            // Exact hardscape and snow remain controlled by mapped surfaces/weather.
+            // Settlement classification is not a pavement polygon: do not erase
+            // imagery from whole residential districts. Road/pavement geometry
+            // and masks still own actual hardscape; snow keeps weather authority.
             // These independent imagery samplers are always sRGB. The base
             // material may have no map, or a map with a different encoding.
             '  vec3 regionalColor = sRGBToLinear(texture2D(terrainRegionalMap, clamp(vTerrainGeographicUv, 0.0, 1.0))).rgb;',
-            '  vec2 localUv = (vTerrainGeographicUv - vec2(0.5)) * (40000.0 / 6000.0) + vec2(0.5);',
+            '  vec2 localUv = vTerrainGeographicUv * terrainLocalUvTransform.xy + terrainLocalUvTransform.zw;',
             '  vec2 localEdge = min(localUv, vec2(1.0) - localUv);',
             '  float localWeight = terrainLocalReady * smoothstep(0.0, 0.12, min(localEdge.x, localEdge.y));',
             '  regionalColor = mix(regionalColor, sRGBToLinear(texture2D(terrainLocalMap, clamp(localUv, 0.0, 1.0))).rgb, localWeight);',
-            '  regionalWeight = max(regionalWeight, localWeight * (1.0 - clamp(vTerrainSurfaceMixA.x + terrainSnowWeight, 0.0, 1.0)));',
+            '  regionalWeight = max(regionalWeight, localWeight * (1.0 - terrainSnowWeight));',
             '  float regionalLuminance = dot(regionalColor, vec3(0.2126, 0.7152, 0.0722));',
             // Deep photographic shadows contain little usable reflectance evidence.
             // Keep semantic rock/soil visible there instead of relighting black pixels.

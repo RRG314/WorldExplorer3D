@@ -95,7 +95,7 @@ test('interrupted cooperative building assembly releases its geometry and retain
 test('packed city construction preserves every uploaded byte, bounds and raycast after its scratch buffer retires',async()=>{
   const material=new THREE.MeshBasicMaterial(),packed=new FarBuildingInstanceStorage(buildings.length);
   for(const b of buildings)packed.append(b.x,b.z,b.baseY,b.width,b.depth,b.height,b.rotationY,b.color);
-  assert.equal(packed.data.byteLength,88*buildings.length);
+  assert.equal(packed.data.byteLength,120*buildings.length);
   const ordinary=await buildFarBuildingInstanceBatches(THREE,buildings,material);
   const compact=await buildFarBuildingInstanceBatches(THREE,packed,material);
   try{
@@ -104,6 +104,7 @@ test('packed city construction preserves every uploaded byte, bounds and raycast
     for(let i=0;i<ordinary.length;i++){
       assert.deepEqual(compact[i].instanceMatrix.array,ordinary[i].instanceMatrix.array);
       assert.deepEqual(compact[i].instanceColor.array,ordinary[i].instanceColor.array);
+      for(const attribute of ['regionalStyle','regionalLayout'])assert.deepEqual(compact[i].geometry.attributes[attribute].array,ordinary[i].geometry.attributes[attribute].array);
       assert.deepEqual(compact[i].geometry.boundingBox,ordinary[i].geometry.boundingBox);
       assert.deepEqual(compact[i].geometry.boundingSphere,ordinary[i].geometry.boundingSphere);
     }

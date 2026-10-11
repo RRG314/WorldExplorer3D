@@ -16,14 +16,25 @@ try{
  const burstBefore=await page.evaluate(()=>researchTest.ctx.boatDeck.snapshot().pose.z);
  await runPrescribedGameActions(page,dir,[{buttons:['up'],frames:8},{buttons:[],frames:2}],'canvas');
  assert.ok(await page.evaluate(()=>researchTest.ctx.boatDeck.snapshot().pose.z)>burstBefore);report.cases.push({id:'prescribed-real-keyboard-walk-input',passed:true});
+ await runPrescribedGameActions(page,dir,[{buttons:['space'],frames:8}],'canvas');
+ const airborne=await page.evaluate(()=>researchTest.ctx.boatDeck.snapshot());
+ assert.equal(airborne.locomotion.grounded,false);assert.ok(airborne.pose.y>1.944+.15);
+ await page.screenshot({path:`${dir}/deck-jump.png`});
+ await page.waitForFunction(()=>researchTest.ctx.boatDeck.snapshot().locomotion.grounded,null,{timeout:4000});
+ report.cases.push({id:'real-keyboard-jump-and-landing-on-licensed-deck',passed:true});
+ const beforeLook=await page.evaluate(()=>researchTest.ctx.boatDeck.snapshot().pose);
+ await page.mouse.move(700,400);await page.mouse.down();await page.mouse.move(740,420,{steps:4});await page.mouse.up();
+ const afterLook=await page.evaluate(()=>({pose:researchTest.ctx.boatDeck.snapshot().pose,boatYaw:researchTest.ctx.boatMode.cameraYawOffset||0}));
+ assert.ok(Math.abs(afterLook.pose.yaw-beforeLook.yaw+.2)<1e-6);assert.ok(Math.abs(afterLook.pose.pitch-beforeLook.pitch-.1)<1e-6);assert.equal(afterLook.boatYaw,0);
+ await page.evaluate(()=>researchTest.ctx.boatDeck.look(.2,-.1));report.cases.push({id:'shared-engine-mouse-drag-controls-deck-heading-and-pitch',passed:true});
  const go=async id=>{await page.getByLabel('Deck destination').selectOption(id);const result=await page.evaluate(id=>{
   const ctx=researchTest.ctx;ctx.boatDeck.select(id);ctx.boatDeck.update(.7);const route=ctx.boatDeck.snapshot().route;
-  if(!route.length)return {ok:false,reason:'No walking route',snapshot:ctx.boatDeck.snapshot()};let steps=0;
+  if(!route.length)return {ok:false,reason:'No walking route',snapshot:ctx.boatDeck.snapshot()};let steps=0,maxCameraStep=0;ctx.boatDeck.camera();let lastCamera=ctx.boatMode.mesh.worldToLocal(ctx.camera.position.clone()).y;
   try{for(const target of route.slice(1)){let reached=false;for(let i=0;i<1200;i++){
    const pose=ctx.boatDeck.snapshot().pose,dx=target.x-pose.x,dz=target.z-pose.z,d=Math.hypot(dx,dz);if(d<.05){reached=true;break;}
-   const length=Math.max(d,.11);researchTest.setActions({move:(Math.sin(pose.yaw)*dx+Math.cos(pose.yaw)*dz)/length,strafe:(-Math.cos(pose.yaw)*dx+Math.sin(pose.yaw)*dz)/length});ctx.boatDeck.update(.05);steps++;
-  }if(!reached)return {ok:false,target,snapshot:ctx.boatDeck.snapshot(),steps};}return {ok:true,snapshot:ctx.boatDeck.snapshot(),steps};}finally{researchTest.setActions({});}
- },id);assert.equal(result.ok,true,JSON.stringify(result));assert.ok(await page.evaluate(()=>researchTest.ctx.boatDeck.stationDistance(researchTest.ctx.boatDeck.snapshot().targetId))<.2);report.cases.push({id:`walk-to-${id}`,passed:true,steps:result.steps});await page.waitForTimeout(150);};
+   const length=Math.max(d,id==='quarters'?.19:.11);researchTest.setActions({sprint:id==='quarters'?1:0,move:(Math.sin(pose.yaw)*dx+Math.cos(pose.yaw)*dz)/length,strafe:(-Math.cos(pose.yaw)*dx+Math.sin(pose.yaw)*dz)/length});ctx.boatDeck.update(.05);ctx.boatDeck.camera();const cameraY=ctx.boatMode.mesh.worldToLocal(ctx.camera.position.clone()).y;maxCameraStep=Math.max(maxCameraStep,Math.abs(cameraY-lastCamera));lastCamera=cameraY;steps++;
+  }if(!reached)return {ok:false,target,snapshot:ctx.boatDeck.snapshot(),steps};}return {ok:true,snapshot:ctx.boatDeck.snapshot(),steps,maxCameraStep};}finally{researchTest.setActions({});}
+ },id);assert.equal(result.ok,true,JSON.stringify(result));assert.ok(await page.evaluate(()=>researchTest.ctx.boatDeck.stationDistance(researchTest.ctx.boatDeck.snapshot().targetId))<.2);report.cases.push({id:`walk-to-${id}`,passed:true,steps:result.steps,maxCameraStep:result.maxCameraStep});assert.ok(result.maxCameraStep<.22,'Stair camera step '+result.maxCameraStep);await page.waitForTimeout(150);};
  const look=async yaw=>{await page.evaluate(yaw=>{const c=researchTest.ctx,current=c.boatDeck.snapshot().pose.yaw,delta=Math.atan2(Math.sin(yaw-current),Math.cos(yaw-current));researchTest.setActions({turn:Math.sign(delta)});for(let left=Math.abs(delta)/2;left>1e-8;left-=.025)c.boatDeck.update(Math.min(left,.025));researchTest.setActions({});},yaw);await page.waitForTimeout(150);};
  await page.locator('#researchDeckAction').isDisabled().then(v=>assert.equal(v,true));
  await go('lab');await page.locator('#researchDeckAction').click();await page.waitForFunction(()=>document.getElementById('researchDeckControls').textContent.includes('Saved to this device'));
@@ -42,6 +53,7 @@ try{
  await go('helm');await look(0);await page.screenshot({path:`${dir}/bridge.png`});
  await page.locator('#researchShipMapButton').click();await page.waitForSelector('#researchShipMap[open]');
  const before=await page.evaluate(()=>researchTest.ctx.boatDeck.snapshot().pose);await runPrescribedGameActions(page,dir,[{buttons:['up'],frames:8},{buttons:[],frames:2}],'canvas');assert.deepEqual(await page.evaluate(()=>researchTest.ctx.boatDeck.snapshot().pose),before);
+ await page.mouse.move(50,400);await page.mouse.down({button:'right'});await page.mouse.move(100,420,{steps:4});await page.mouse.up({button:'right'});assert.deepEqual(await page.evaluate(()=>researchTest.ctx.boatDeck.snapshot().pose),before);
  await page.screenshot({path:`${dir}/ship-map-desktop.png`});await page.setViewportSize({width:390,height:844});await page.screenshot({path:`${dir}/ship-map-phone.png`});const fit=await page.locator('#researchShipMap').boundingBox();assert.ok(fit.x>=0&&fit.x+fit.width<=390&&fit.y>=0&&fit.y+fit.height<=844);
  await page.getByRole('button',{name:'Main deck',exact:true}).click();await page.locator('#researchShipMap [data-station="lab"]').click();assert.equal(await page.evaluate(()=>researchTest.ctx.boatDeck.snapshot().targetId),'lab');assert.equal(await page.locator('#researchShipMap').isVisible(),false);
  report.cases.push({id:'desktop-phone-map-deck-tabs-destination-focus-and-movement-lock',passed:true});await page.setViewportSize({width:1440,height:900});

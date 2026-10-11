@@ -52,6 +52,19 @@ browsers/servers. Production deployment evidence is under
 
 ## October 11 current continuation — ocean streaming and save safety
 
+### Latest: regional detail and ship movement repair
+
+The next local delivery is reviewed in
+`docs/design/POST-RELEASE-STREAMING-DELIVERY.md`. All **2,471 source tests** and the
+complete source chain pass. The furnished research-vessel browser check passes
+20 cases, including real Space jump/landing and shared mouse look, all 55 route
+connections, smooth stair camera, maps, swimming and disposal. The full Earth
+source journey passes arrival/return, moving imagery, provider failure/recovery,
+streaming toggle and regional buffer disposal. Packaged acceptance is next.
+Production and the existing ship preview are unchanged at this checkpoint.
+Worldwide physical transport streaming and the larger roadmap are not claimed
+complete; their current limits are explicit in the delivery review.
+
 ### Latest: research vessel interior, awaiting owner preview
 
 The working ship now has an enclosed wet lab, galley, mess, dry lab, quarters,

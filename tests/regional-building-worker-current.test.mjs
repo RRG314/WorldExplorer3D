@@ -36,7 +36,7 @@ test('packed tile compilation preserves reference selection, every massing value
         assert.deepEqual(got.ring,expected.ring);
         const massing=resolveFarBuildingMassing(expected,null,expected.areaMeters*units*units,units);
         assert.equal(got.validMassing,Boolean(massing));
-        if(massing){assert.equal(got.massing.heightMeters,massing.heightMeters);assert.deepEqual(got.massing.color,massing.color);assert.equal(got.massing.roofFraction,massing.roofFraction);
+        if(massing){assert.equal(got.massing.heightMeters,massing.heightMeters);assert.deepEqual(got.massing.color,massing.color);assert.deepEqual(got.massing.facadeStyle,massing.facadeStyle);assert.equal(got.massing.roofFraction,massing.roofFraction);
           assert.equal(['explicit_height','levels'].includes(got.massing.heightSource),['explicit_height','levels'].includes(massing.heightSource));}
       }
     }finally{packed.dispose();}
