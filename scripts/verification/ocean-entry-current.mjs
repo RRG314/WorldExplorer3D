@@ -32,6 +32,9 @@ try {
  await page.locator('#landingPrimaryCta').click();
  await page.waitForFunction(() => window.__WE3D_RUNTIME_READY__ === true, null, { timeout: 90000 });
  await page.waitForSelector('#globeSelectorScreen.show');
+ // This gate verifies the retained local-depth workflow. Geographic streaming
+ // has its own traversal/outage/rebase/save acceptance journey.
+ if(await page.locator('#oceanContinuousToggle').count())await page.locator('#oceanContinuousToggle').uncheck();
  if (await page.locator('#analyticsConsentDenyBtn').isVisible()) await page.locator('#analyticsConsentDenyBtn').click();
  const select = async (lat, lon) => {
    await page.locator('#globeCustomLat').fill(String(lat));

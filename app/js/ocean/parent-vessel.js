@@ -1,3 +1,4 @@
+import {oceanParentPosition} from './stream-runtime.js';
 import {getMaritimeCatalogEntry} from '../transport/maritime-catalog.js?v=1';
 import {createVesselVisual} from '../transport/vessel-visual-recipe.js?v=8';
 import {vesselWaterSamples,fitVesselWaterPlane} from '../boat-mode/water-contact.js';
@@ -9,10 +10,11 @@ export function parentVesselSubmarinePose(ship, y=-8.5) {
  const distance=getMaritimeCatalogEntry(ship?.transportCatalogId).dimensions.length/2+12;
  return {x:-Math.sin(yaw)*distance,y,z:-Math.cos(yaw)*distance,yaw:yaw+Math.PI};
 }
-export function parentHullCollision(ship,point,radius=1,surfaceY=.08){
+export function parentHullCollision(ship,point,radius=1,surfaceY=.08,origin={x:0,z:0}){
  if(!ship||!point)return false;
- const catalog=getMaritimeCatalogEntry(ship.transportCatalogId),c=Math.cos(ship.yaw),s=Math.sin(ship.yaw);
- const x=c*point.x-s*point.z,z=s*point.x+c*point.z;
+ const yaw=ship.yaw+(origin.yawOffset||0),catalog=getMaritimeCatalogEntry(ship.transportCatalogId),c=Math.cos(yaw),s=Math.sin(yaw);
+ const px=point.x-origin.x,pz=point.z-origin.z;
+ const x=c*px-s*pz,z=s*px+c*pz;
  return Math.abs(x)<catalog.dimensions.width/2+radius&&Math.abs(z)<catalog.dimensions.length/2+radius&&point.y+radius>surfaceY-catalog.dimensions.draft&&point.y-radius<surfaceY+1;
 }
 export function createOceanParentVessel(THREE,mode,voyage){
@@ -25,13 +27,17 @@ export function createOceanParentVessel(THREE,mode,voyage){
  // A single crest sample made the retained carrier bounce like a point buoy
  // after diving, although its surface-mode owner fits a vessel-sized plane.
  const samples=vesselWaterSamples(catalog.dimensions).map(point=>({...point,height:0}));
- const sin=Math.sin(ship.yaw),cos=Math.cos(ship.yaw);
  let previousTime=null,disposed=false;
  let heave={value:0,velocity:0},pitch={value:0,velocity:0},roll={value:0,velocity:0};
  return {root:visual.root,update(time){
   if(disposed||!Number.isFinite(time))return;
+  const anchor=oceanParentPosition(mode,mode.worldScale||100000);
+  const yaw=ship.yaw+(anchor.yawOffset||0),sin=Math.sin(yaw),cos=Math.cos(yaw);
+  visual.root.position.x=anchor.x;visual.root.position.z=anchor.z;
+  const actor=mode.submarine?.position||{x:0,z:0};visual.root.visible=Math.hypot(actor.x-anchor.x,actor.z-anchor.z)<2000;
+  if(!visual.root.visible)return;
   for(const point of samples){
-   point.height=mode.waterSurface.sample(sin*point.forward+cos*point.side,cos*point.forward-sin*point.side,{time}).surfaceY;
+   point.height=mode.waterSurface.sample(anchor.x+sin*point.forward+cos*point.side,anchor.z+cos*point.forward-sin*point.side,{time}).surfaceY;
   }
   const plane=fitVesselWaterPlane(samples);if(!plane)return;
   const dt=previousTime===null?0:Math.min(.05,Math.max(0,time-previousTime));previousTime=time;
@@ -40,6 +46,6 @@ export function createOceanParentVessel(THREE,mode,voyage){
   pitch=stepBoatSpring(pitch.value,pitch.velocity,bounded(plane.pitch),dt,13.4,4.1,2.1);
   roll=stepBoatSpring(roll.value,roll.velocity,bounded(plane.roll),dt,10.6,3.4,1.8);
   visual.root.position.y=heave.value;
-  visual.root.rotation.set(pitch.value,ship.yaw,roll.value,'YXZ');
+  visual.root.rotation.set(pitch.value,yaw,roll.value,'YXZ');
  },dispose(){if(disposed)return;disposed=true;visual.root.parent?.remove(visual.root);visual.dispose();}};
 }

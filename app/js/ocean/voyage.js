@@ -1,10 +1,11 @@
+import {oceanParentPosition} from './stream-runtime.js';
 import {normalizeOceanWaterContext,defaultOceanWaterContext,oceanWaterContextFromCandidate} from './water-context.js';
 import {OCEAN_DEPTH_MODEL,normalizeOceanDepthProfile} from './depth-model.js';
 import {createInvestigationControls} from '../campaign/coastal-investigation-ui.js';
 import {ensureMarineResearch,REEF_SURVEY} from './research-outing.js';
 import {styleMarinePanel} from './interface.js';
 import {earthLocalToGeographic} from '../earth-core/location-origin.js?v=1';
-import {createOceanVoyageStore,validateOceanVoyage} from './voyage-store.js';
+import {createOceanVoyageStore,validateOceanVoyage,oceanStreamingPreference,OCEAN_STREAM_PREFERENCE_KEY} from './voyage-store.js';
 import {createCoastalDepartureControls} from '../campaign/coastal-departure-ui.js';
 const id=()=>globalThis.crypto?.randomUUID?.()||`voyage-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 // Preparing an aboard journey allocates data only; it must not create an
@@ -43,7 +44,7 @@ export function ensureOceanVoyage(ctx,{store=createOceanVoyageStore()}={}){
  }
  function checkpoint(ocean=ctx.oceanMode){
   if(!current||!ocean?.active)return false;
-  const sub=ocean.submarine;current={...current,stage:'underwater',sub:{x:sub.position.x,y:sub.position.y,z:sub.position.z,yaw:sub.yaw,condition:Math.max(0,Math.min(1,ocean.condition??1))}};
+  const sub=ocean.submarine;current={...current,stage:'underwater',...(ocean.continuous?{version:3,frameOrigin:{...ocean.frameOrigin},frameWaveOffset:{...ocean.waveOffset},depthProfile:normalizeOceanDepthProfile(ocean.depthProfile)}:{}),sub:{x:sub.position.x,y:sub.position.y,z:sub.position.z,yaw:sub.yaw,condition:Math.max(0,Math.min(1,ocean.condition??1))}};
   return commit();
  }
  function surfaced(){if(!current)return;current={...current,stage:'aboard'};commit();}
@@ -56,7 +57,7 @@ export function ensureOceanVoyage(ctx,{store=createOceanVoyageStore()}={}){
   if(!current||current.stage!=='aboard'||!ctx.boatMode?.active||ctx.boatMode.transportEntityId!==current.ship.transportEntityId)return false;
   const anchor=earthLocalToGeographic(ctx.LOC,ctx.SCALE,ctx.boat.x,ctx.boat.z);if(!Number.isFinite(anchor?.lat)||!Number.isFinite(anchor?.lon))return false;
   const offset=ctx.boatMode.currentWater?.source?.waveOffset||{};
-  current={...current,...(current.version===2?{waterContext:oceanWaterContextFromCandidate(ctx.boatMode.currentWater,anchor)||current.waterContext,depthProfile:current.depthProfile.model===OCEAN_DEPTH_MODEL.GEOGRAPHIC?{...current.depthProfile,origin:current.depthProfile.origin||{lat:current.site.lat,lon:current.site.lon}}:current.depthProfile}:{}),site:{...current.site,...anchor},ship:{...current.ship,anchor,yaw:ctx.boat.angle,condition:ctx.boatMode.condition??1},waveOffset:{x:ctx.boat.x+(offset.x||0),z:ctx.boat.z+(offset.z||0)}};return commit();
+  current={...current,...(current.version>=2?{waterContext:oceanWaterContextFromCandidate(ctx.boatMode.currentWater,anchor)||current.waterContext,depthProfile:current.depthProfile.model===OCEAN_DEPTH_MODEL.GEOGRAPHIC?{...current.depthProfile,origin:current.depthProfile.origin||{lat:current.site.lat,lon:current.site.lon}}:current.depthProfile}:{}),site:{...current.site,...anchor},ship:{...current.ship,anchor,yaw:ctx.boat.angle,condition:ctx.boatMode.condition??1},waveOffset:{x:ctx.boat.x+(offset.x||0),z:ctx.boat.z+(offset.z||0)}};return commit();
  }
  function tickSurface(dt){ctx.sharedMarine?.tick(dt);elapsed+=dt;if(elapsed>=5){elapsed=0;surfaceCheckpoint();}refresh();}
  function tick(dt){elapsed+=dt;if(elapsed>=5){elapsed=0;checkpoint();}refresh();}
@@ -77,7 +78,7 @@ export function ensureOceanVoyage(ctx,{store=createOceanVoyageStore()}={}){
   ui.reef.hidden=!investigating;if(investigating){ui.coastal.node.hidden=true;setText(ui.title,'Coastal investigation');}
   const sub=ctx.oceanMode?.submarine;
   if(survey.visible)setText(ui.distance,survey.instruction);
-  else if(current&&sub){const metres=Math.hypot(sub.position.x,sub.position.z)*(ctx.METERS_PER_WORLD_UNIT||1);setText(ui.distance,`Parent vessel · ${Math.round(metres)} m from launch point. Recovery returns you and this submarine aboard.`);}
+  else if(current&&sub){const parent=oceanParentPosition(ctx.oceanMode,ctx.SCALE);const metres=Math.hypot(sub.position.x-parent.x,sub.position.z-parent.z)*(ctx.METERS_PER_WORLD_UNIT||1);setText(ui.distance,`Parent vessel · ${Math.round(metres)} m from launch point. Recovery returns you and this submarine aboard.`);}
   ui.recover.disabled=!!ctx.oceanMode?.diver?.active;
  }
  async function resume(sessionRecord=null){
@@ -102,6 +103,7 @@ export function ensureOceanVoyage(ctx,{store=createOceanVoyageStore()}={}){
  function mount(){
   if(ui||typeof document==='undefined')return;
   const oceanButton=document.getElementById('globeSelectorOceanBtn');if(!oceanButton)return;
+  const streamLabel=document.createElement('label'),streamToggle=document.createElement('input');streamToggle.id='oceanContinuousToggle';streamToggle.type='checkbox';streamToggle.checked=oceanStreamingPreference();streamToggle.onchange=()=>{try{localStorage.setItem(OCEAN_STREAM_PREFERENCE_KEY,streamToggle.checked?'on':'off');}catch{ctx.showToast?.('This browser could not save the ocean preference.');}};streamLabel.append(streamToggle,document.createTextNode(' Continue beyond the dive site'));streamLabel.title='New geographic voyages stream nearby depth data. Authored studies and existing saved voyages keep their original mode.';streamLabel.style.cssText='display:block;font:inherit;margin-top:8px';oceanButton.after(streamLabel);
   const resumeButton=document.createElement('button');resumeButton.id='oceanVoyageResume';resumeButton.type='button';resumeButton.className='globe-selector-action-btn';resumeButton.style.cssText='margin-top:8px;width:100%;min-height:44px;font:600 12px system-ui;background:#112b3a;color:#e8f6ff;border:1px solid #5689a3;border-radius:4px;padding:10px';resumeButton.onclick=()=>void resume();(document.getElementById('globeSelectorStartBtn')||oceanButton).after(resumeButton);
   const panel=document.createElement('section');panel.id='oceanVoyageControls';panel.setAttribute('aria-label','Ocean voyage');panel.style.cssText='position:fixed;top:245px;right:12px;width:250px;max-width:calc(100vw - 24px);padding:10px;box-sizing:border-box;border-radius:10px;background:#092a3bee;color:#eefaff;font:13px/1.4 system-ui;z-index:110';
   const title=document.createElement('strong');title.textContent='Research voyage';const distance=document.createElement('div'),statusElement=document.createElement('div');statusElement.setAttribute('role','status');

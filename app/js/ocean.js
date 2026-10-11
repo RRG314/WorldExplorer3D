@@ -1,13 +1,14 @@
+import {createOceanStreamRuntime,oceanRenderFrame,oceanParentPosition,reprojectOceanPose} from './ocean/stream-runtime.js';
 import {normalizeOceanWaterContext,defaultOceanWaterContext} from './ocean/water-context.js';
 import {OCEAN_DEPTH_MODEL,normalizeOceanDepthProfile,oceanDepthProfileMatchesSite} from './ocean/depth-model.js';
-import {marineStudyOffset} from './ocean/habitat-plan.js';
+import {marineStudyOffset,createStreamedMarineHabitatPlan} from './ocean/habitat-plan.js';
 import {fetchGebcoDepthEvidence} from './geospatial/bathymetry-evidence.js?v=1';
 import {createOceanSoundscape} from './ocean/soundscape.js';
 import {createMarineHabitat} from './ocean/habitat.js';
 import {getMaritimeCatalogEntry} from './transport/maritime-catalog.js?v=1';
 import {createOceanParentVessel,parentHullCollision,parentVesselSubmarinePose} from './ocean/parent-vessel.js';
 import {ensureOceanVoyage} from './ocean/voyage.js';
-import {validateOceanVoyage} from './ocean/voyage-store.js';
+import {validateOceanVoyage,oceanStreamingPreference} from './ocean/voyage-store.js';
 import { createOceanDiver } from './ocean/diver.js';
 import { refreshWaterEnvironmentEvidence } from './world/water-environment.js?v=2';
 import { createOceanWaterSurface } from './ocean/water-surface.js?v=1';
@@ -75,6 +76,7 @@ const OCEAN_CONSTANTS = Object.freeze({
 const oceanMode = appCtx.oceanMode && typeof appCtx.oceanMode === 'object' ? appCtx.oceanMode : {};
 Object.assign(oceanMode, {
   active: false,
+  worldScale:appCtx.SCALE,
   scene: null,
   camera: null,
   renderer: null,
@@ -170,7 +172,16 @@ function createSeabedMesh(renderer = null) {
 }
 
 function createReefCluster(renderer = null) {
-  oceanMode.habitat=createMarineHabitat(THREE,{site:oceanMode.launchSite,scale:appCtx.SCALE,sampleSeabedHeight,rockTextures:getRockTextureSet(renderer)});
+  // Scenery must wait for source-backed terrain. The movement fallback used
+  // while charting is not a surface on which to place rocks or habitat.
+  const habitatHeight=oceanMode.continuous?(x,z)=>{
+    const elevation=oceanMode.stream?.sample(x,z)?.elevationMeters;
+    return Number.isFinite(elevation)?elevation/(appCtx.METERS_PER_WORLD_UNIT||1.11):NaN;
+  }:sampleSeabedHeight;
+  const focus=oceanMode.diver?.active?oceanMode.diver.navigationActor().position:oceanMode.submarine.position;
+  const plan=oceanMode.continuous?createStreamedMarineHabitatPlan({tiles:oceanMode.stream.depth.tiles,frame:oceanRenderFrame(oceanMode,appCtx.SCALE),focus,sampleSeabedHeight:habitatHeight}):null;
+  oceanMode.habitatFocus={x:focus.x,z:focus.z};
+  oceanMode.habitat=createMarineHabitat(THREE,{plan,site:oceanMode.frameOrigin||oceanMode.launchSite,scale:appCtx.SCALE,sampleSeabedHeight:habitatHeight,includeAuthoredStudy:!oceanMode.continuous,rockTextures:getRockTextureSet(renderer)});
   return oceanMode.habitat.group;
 }
 
@@ -179,7 +190,7 @@ function createMarineParticles() {
 }
 
 function createDeepOceanBackdrop() {
-  return createDeepOceanBackdropAsset();
+  return createDeepOceanBackdropAsset({includeFloor:!oceanMode.continuous});
 }
 
 function createSubmarineMesh() {
@@ -189,19 +200,19 @@ const { clearFishLife, initFishLife, updateFishLife } = createOceanFishLifeApi({
   oceanMode,
   disposeObject3D,
   metersPerUnit:appCtx.METERS_PER_WORLD_UNIT,
-  sampleWater:(x,z)=>oceanMode.waterSurface?.sample(x,z),
+  sampleWater:(x,z)=>oceanMode.continuous&&!Number.isFinite(oceanMode.stream?.sample(x,z)?.elevationMeters)?null:oceanMode.waterSurface?.sample(x,z),
   isBlocked:(point,radius)=>{
     if(oceanMode.habitat?.collision(point,radius))return true;
     const sub=oceanMode.submarine?.position;
     if(sub&&Math.hypot(point.x-sub.x,point.y-sub.y,point.z-sub.z)<4+radius)return true;
     const diver=oceanMode.diver;
     if(diver?.active){const p=diver.navigationActor().position;if(Math.hypot(point.x-p.x,point.y-p.y,point.z-p.z)<1.2+radius)return true;}
-    return parentHullCollision(appCtx.oceanVoyage?.current?.ship,point,radius,oceanMode.waterSurface?.sample(0,0)?.surfaceY||0);
+    return parentHullCollision(appCtx.oceanVoyage?.current?.ship,point,radius,oceanMode.waterSurface?.sample(0,0)?.surfaceY||0,oceanParentPosition(oceanMode,appCtx.SCALE));
   }
 });
 
 function oceanFishPopulationContext() {
-  const site = oceanMode.launchSite || OCEAN_SITE;
+  const site = oceanMode.frameOrigin || oceanMode.launchSite || OCEAN_SITE;
   const latitude = Number(site.lat);
   const longitude = Number(site.lon);
   return createFishPopulationContext({
@@ -215,8 +226,14 @@ function oceanFishPopulationContext() {
     sourceTruth: oceanMode.waterContext.sourceTruth,
     latitude,
     longitude,
-    depthTruth: oceanMode.localBathymetryReady ? 'modeled-local-bathymetry' : 'modeled-bathymetry-pending'
+    depthTruth: (oceanMode.localBathymetryReady||oceanMode.stream?.canNavigate(0,0)) ? 'modeled-bathymetry' : 'modeled-bathymetry-pending'
   });
+}
+
+function refreshOceanHabitat(scene,renderer) {
+  if(oceanMode.reefGroup){scene.remove(oceanMode.reefGroup);disposeObject3D(oceanMode.reefGroup);}
+  oceanMode.reefGroup=createReefCluster(renderer);scene.add(oceanMode.reefGroup);
+  oceanMode.habitatStreamRevision=oceanMode.stream?.depth.revision;
 }
 
 function rebuildOceanTerrainLayers(scene = oceanMode.scene, renderer = oceanMode.renderer) {
@@ -227,24 +244,20 @@ function rebuildOceanTerrainLayers(scene = oceanMode.scene, renderer = oceanMode
     disposeObject3D(oceanMode.seabedMesh);
     oceanMode.seabedMesh = null;
   }
-  if (oceanMode.reefGroup) {
-    scene.remove(oceanMode.reefGroup);
-    disposeObject3D(oceanMode.reefGroup);
-    oceanMode.reefGroup = null;
-  }
-
   oceanMode.bathymetryCache.clear();
 
-  const seabed = createSeabedMesh(renderer);
-  const reef = createReefCluster(renderer);
-  scene.add(seabed);
-  scene.add(reef);
-
+  if(oceanMode.continuous&&!oceanMode.stream){
+    oceanMode.stream=createOceanStreamRuntime(THREE,{mode:oceanMode,scale:appCtx.SCALE,metersPerUnit:appCtx.METERS_PER_WORLD_UNIT||1.11,textures:getSeabedTextureSet(renderer)});
+    oceanMode.stream.update(oceanMode.submarine.position);
+  }
+  const seabed = oceanMode.continuous?null:createSeabedMesh(renderer);
+  if(seabed)scene.add(seabed);
   oceanMode.seabedMesh = seabed;
-  oceanMode.reefGroup = reef;
+  refreshOceanHabitat(scene,renderer);
   // A changed site or late depth grid invalidates the old school envelope.
   // Rebuild through its existing owner so old-region fish/resources cannot stay.
-  if(oceanMode.fishPopulationContext)initFishLife(scene,oceanFishPopulationContext());
+  if(oceanMode.continuous){clearFishLife();oceanMode.streamLifeReady=false;}
+  else if(oceanMode.fishPopulationContext)initFishLife(scene,oceanFishPopulationContext());
 }
 
 function createOceanScene() {
@@ -292,11 +305,13 @@ function createOceanScene() {
   keyLight.shadow.camera.right = 220;
   keyLight.shadow.camera.top = 220;
   keyLight.shadow.camera.bottom = -220;
-  scene.add(keyLight);
+  scene.add(keyLight);scene.add(keyLight.target);
+  keyLight.userData.oceanOffset=keyLight.position.clone();
 
   const fillLight = new THREE.DirectionalLight(0x3f9dca, 0.48);
   fillLight.position.set(-140, 120, -60);
-  scene.add(fillLight);
+  scene.add(fillLight);scene.add(fillLight.target);
+  fillLight.userData.oceanOffset=fillLight.position.clone();
 
   const backdrop = createDeepOceanBackdrop();
   scene.add(backdrop);
@@ -327,12 +342,12 @@ function createOceanScene() {
   oceanMode.soundscape=createOceanSoundscape({host:document.getElementById('oceanDiverOptions')});
 
   primeLocalBathymetryGrid().then((ready) => {
-    if (!ready || oceanMode.scene !== scene) return;
+    if (!ready || oceanMode.scene !== scene || oceanMode.continuous) return;
     rebuildOceanTerrainLayers(scene, renderer);
   });
 
   primeBathymetryTiles().then((ready) => {
-    if (!ready || oceanMode.scene !== scene) return;
+    if (!ready || oceanMode.scene !== scene || oceanMode.continuous) return;
     rebuildOceanTerrainLayers(scene, renderer);
   });
 }
@@ -364,12 +379,14 @@ function applyOceanSkyState(state = null) {
     oceanMode.keyLight.color.setHex(dayFactor > 0.35 ? 0xb8f1ff : twilightFactor > 0.2 ? 0xffc48a : 0x5870a2);
     oceanMode.keyLight.intensity = .14 + dayFactor * .72 + twilightFactor * .18;
     oceanMode.keyLight.position.set(sun.x * 210, Math.max(60, sun.y * 240), sun.z * 210);
+    oceanMode.keyLight.userData.oceanOffset.copy(oceanMode.keyLight.position);
   }
   if (oceanMode.fillLight) {
     const sun = state.sun?.direction || { x: 0.45, y: 0.8, z: 0.18 };
     oceanMode.fillLight.color.setHex(dayFactor > .4 ? 0x3f9dca : 0x86b4d0);
     oceanMode.fillLight.intensity = .38 - dayFactor * .20 + twilightFactor * .05;
     oceanMode.fillLight.position.set(-sun.x * 160, Math.max(40, Math.abs(sun.y) * 110), -sun.z * 160);
+    oceanMode.fillLight.userData.oceanOffset.copy(oceanMode.fillLight.position);
   }
 }
 
@@ -378,6 +395,7 @@ function getWorldCanvas() {
 }
 
 function destroyOceanScene() {
+  oceanMode.stream?.dispose();oceanMode.stream=null;
   oceanMode.soundscape?.dispose();oceanMode.soundscape=null;
   oceanMode.parentVessel?.dispose();oceanMode.parentVessel=null;
   oceanMode.diver?.dispose();
@@ -422,6 +440,7 @@ function normalizeOceanLaunchSite(site = null) {
 function resetOceanLaunchSite(site = null) {
   const nextSite = normalizeOceanLaunchSite(site);
   if (!nextSite) return false;
+  oceanMode.stream?.dispose();oceanMode.stream=null;
   oceanMode.launchSite = nextSite;
   oceanMode.bathymetryCache.clear();
   oceanMode.bathymetryTileKeys = [];
@@ -441,7 +460,7 @@ function resetSubmarineAtLaunch(spawn = null) {
     Number.isFinite(spawn?.y) ? spawn.y : -10.5,
     Number.isFinite(spawn?.z) ? spawn.z : 62
   );
-  sub.position.x=Math.max(-1100,Math.min(1100,sub.position.x));sub.position.z=Math.max(-1100,Math.min(1100,sub.position.z));
+  if(!oceanMode.continuous){sub.position.x=Math.max(-1100,Math.min(1100,sub.position.x));sub.position.z=Math.max(-1100,Math.min(1100,sub.position.z));}
   sub.position.y=Math.min(-1.6,Math.max(sampleSeabedHeight(sub.position.x,sub.position.z)+OCEAN_CONSTANTS.MIN_CLEARANCE,sub.position.y));
   sub.yaw = Number.isFinite(spawn?.yaw) ? spawn.yaw : 0;
   sub.pitch = Number.isFinite(spawn?.pitch) ? spawn.pitch : 0;
@@ -478,8 +497,9 @@ function resetSubmarineAtLaunch(spawn = null) {
 
 function placeSubmarineClearOfParent() {
   const ship=appCtx.oceanVoyage?.current?.ship,sub=oceanMode.submarine;
-  if(!ship||!parentHullCollision(ship,sub.position,3,oceanMode.waterSurface.sample(0,0).surfaceY))return;
-  resetSubmarineAtLaunch(parentVesselSubmarinePose(ship,sub.position.y));
+  if(!ship||!parentHullCollision(ship,sub.position,3,oceanMode.waterSurface.sample(0,0).surfaceY,oceanParentPosition(oceanMode,appCtx.SCALE)))return;
+  const parent=oceanParentPosition(oceanMode,appCtx.SCALE),pose=parentVesselSubmarinePose({...ship,yaw:ship.yaw+(parent.yawOffset||0)},sub.position.y);
+  resetSubmarineAtLaunch({...pose,x:pose.x+parent.x,z:pose.z+parent.z});
 }
 
 function updateSubmarine(dt,time) {
@@ -515,7 +535,7 @@ function updateSubmarine(dt,time) {
   sub.position.y += sub.verticalSpeed * motionDt;
 
   _tmpVecA.set(sub.position.x, 0, sub.position.z);
-  if (_tmpVecA.length() > OCEAN_CONSTANTS.WORLD_RADIUS) {
+  if (!oceanMode.continuous && _tmpVecA.length() > OCEAN_CONSTANTS.WORLD_RADIUS) {
     _tmpVecA.setLength(OCEAN_CONSTANTS.WORLD_RADIUS);
     sub.position.x = _tmpVecA.x;
     sub.position.z = _tmpVecA.z;
@@ -527,6 +547,9 @@ function updateSubmarine(dt,time) {
   sub.pitch += (targetPitch - sub.pitch) * expApproachFactor(5.6, dt);
   sub.roll += (targetRoll - sub.roll) * expApproachFactor(4.5, dt);
 
+  if(oceanMode.stream&&!oceanMode.stream.canNavigate(sub.position.x,sub.position.z)){
+    sub.position.x=previousPosition.x;sub.position.z=previousPosition.z;sub.speed=0;oceanMode.streamWaiting=true;
+  }else oceanMode.streamWaiting=false;
   const lowerLimit=oceanMode.depthProfile?.model===OCEAN_DEPTH_MODEL.GEOGRAPHIC?-12000/(appCtx.METERS_PER_WORLD_UNIT||1.11):OCEAN_CONSTANTS.HARD_MIN_Y;
   const terrainMotion=resolveSubmarineTerrainMotion(previousPosition,{...sub.position,yaw:sub.yaw,pitch:sub.pitch,roll:sub.roll},sampleSeabedHeight,{lowerLimit,scale:OCEAN_CONSTANTS.SUB_SCALE,minimumClearance:OCEAN_CONSTANTS.MIN_CLEARANCE});
   sub.position.set(terrainMotion.pose.x,terrainMotion.pose.y,terrainMotion.pose.z);
@@ -541,7 +564,7 @@ function updateSubmarine(dt,time) {
     if (sub.verticalSpeed > 0) sub.verticalSpeed = 0;
   }
 
-  if(parentHullCollision(appCtx.oceanVoyage?.current?.ship,sub.position,3,oceanMode.waterSurface.sample(0,0,{time}).surfaceY)||oceanMode.habitat?.collision(sub.position,3)){sub.position.set(previousPosition.x,previousPosition.y,previousPosition.z);sub.speed=0;sub.verticalSpeed=0;oceanMode.contactUntil=time+1.2;}
+  if(parentHullCollision(appCtx.oceanVoyage?.current?.ship,sub.position,3,oceanMode.waterSurface.sample(0,0,{time}).surfaceY,oceanParentPosition(oceanMode,appCtx.SCALE))||oceanMode.habitat?.collision(sub.position,3)){sub.position.set(previousPosition.x,previousPosition.y,previousPosition.z);sub.speed=0;sub.verticalSpeed=0;oceanMode.contactUntil=time+1.2;}
 
 
   if (sub.mesh) {
@@ -571,8 +594,43 @@ function updateSubmarine(dt,time) {
   const cameraWater=oceanMode.waterSurface.sample(oceanMode.camera.position.x,oceanMode.camera.position.z,{time});
   oceanMode.camera.position.y=Math.min(oceanMode.camera.position.y,cameraWater.surfaceY-.2);
   const parentShip=appCtx.oceanVoyage?.current?.ship;
-  if(parentHullCollision(parentShip,oceanMode.camera.position,.4,oceanMode.waterSurface.sample(0,0,{time}).surfaceY))oceanMode.camera.position.y=oceanMode.waterSurface.sample(0,0,{time}).surfaceY-getMaritimeCatalogEntry(parentShip.transportCatalogId).dimensions.draft-.5;
+  if(parentHullCollision(parentShip,oceanMode.camera.position,.4,oceanMode.waterSurface.sample(0,0,{time}).surfaceY,oceanParentPosition(oceanMode,appCtx.SCALE)))oceanMode.camera.position.y=oceanMode.waterSurface.sample(0,0,{time}).surfaceY-getMaritimeCatalogEntry(parentShip.transportCatalogId).dimensions.draft-.5;
   oceanMode.camera.lookAt(oceanMode.cameraLookTarget);
+}
+
+function updateOceanStream(nowMs) {
+  const stream=oceanMode.stream;if(!stream)return;
+  const sub=oceanMode.submarine,focus=oceanMode.diver?.active?oceanMode.diver.navigationActor().position:sub.position;
+  stream.update(focus);
+  oceanMode.bathymetryReady=stream.canNavigate(focus.x,focus.z);
+  if(Math.hypot(focus.x,focus.z)>1000){
+    const oldFrame=oceanRenderFrame(oceanMode,appCtx.SCALE);
+    const cameraAim=oceanMode.camera.position.clone().add(oceanMode.camera.getWorldDirection(new THREE.Vector3()));
+    oceanMode.waveOffset={x:(oceanMode.waveOffset?.x||0)+focus.x,z:(oceanMode.waveOffset?.z||0)+focus.z};
+    oceanMode.frameOrigin=oldFrame.toGeographic(focus.x,focus.z);
+    const frame=oceanRenderFrame(oceanMode,appCtx.SCALE);
+    const pose=reprojectOceanPose({...sub.position,yaw:sub.yaw},oldFrame,frame);
+    sub.position.set(pose.x,pose.y,pose.z);sub.yaw=pose.yaw;sub.mesh.position.copy(sub.position);sub.mesh.rotation.y=sub.yaw;
+    for(const vector of [oceanMode.camera.position,oceanMode.cameraLookTarget]){
+      const point=reprojectOceanPose(vector,oldFrame,frame);vector.set(point.x,point.y,point.z);
+    }
+    const aim=reprojectOceanPose(cameraAim,oldFrame,frame);oceanMode.camera.lookAt(aim.x,aim.y,aim.z);
+    oceanMode.diver?.rebase(oldFrame,frame);
+    void refreshWaterEnvironmentEvidence();
+    stream.reproject();rebuildOceanTerrainLayers(oceanMode.scene,oceanMode.renderer);
+    appCtx.oceanVoyage?.checkpoint();
+  }
+  // Coalesce arriving tiles; refresh only scenery, not fish/model leases.
+  if((stream.depth.revision!==oceanMode.habitatStreamRevision||Math.hypot(focus.x-oceanMode.habitatFocus.x,focus.z-oceanMode.habitatFocus.z)>200)&&nowMs>=(oceanMode.habitatRefreshAfter||0)){
+    refreshOceanHabitat(oceanMode.scene,oceanMode.renderer);oceanMode.habitatRefreshAfter=nowMs+500;
+  }
+  if(!oceanMode.streamLifeReady&&stream.canNavigate(0,0,300)){
+    initFishLife(oceanMode.scene,oceanFishPopulationContext());oceanMode.streamLifeReady=true;
+  }
+  const actor=oceanMode.diver?.active?oceanMode.diver.navigationActor().position:sub.position;
+  oceanMode.deepBackdrop.position.set(actor.x,actor.y,actor.z);
+  for(const light of [oceanMode.keyLight,oceanMode.fillLight]){light.position.copy(light.userData.oceanOffset).add(actor);light.target.position.copy(actor);}
+  oceanMode.marineParticles.position.x=actor.x;oceanMode.marineParticles.position.z=actor.z;
 }
 
 function animateOceanMode(nowMs = 0) {
@@ -585,6 +643,7 @@ function animateOceanMode(nowMs = 0) {
 
   appCtx.sharedMarine?.tick(dt);
   if(!oceanMode.diver?.update(dt,nowMs*.001))updateSubmarine(dt,nowMs*.001);
+  updateOceanStream(nowMs);
   oceanMode.waterSurface.update(nowMs*.001);
   oceanMode.soundscape?.update({paused:appCtx.paused,diving:oceanMode.diver?.active,speed:oceanMode.submarine.speed,time:nowMs*.001});
   oceanMode.parentVessel?.update(nowMs*.001);
@@ -601,7 +660,7 @@ function animateOceanMode(nowMs = 0) {
 
   if (oceanMode.marineParticles) {
     oceanMode.marineParticles.rotation.y += dt * 0.02;
-    oceanMode.marineParticles.position.y = -10 + Math.sin(nowMs * 0.00025) * 1.2;
+    oceanMode.marineParticles.position.y = (oceanMode.continuous?oceanMode.submarine.position.y:0)-10 + Math.sin(nowMs * 0.00025) * 1.2;
   }
 
   appCtx.oceanVoyage?.tick(dt);
@@ -619,8 +678,8 @@ async function startOceanMode(options = {}) {
   const request=++oceanEntryGeneration;
   const prior=appCtx.oceanVoyage?.current;
   const oldParent=prior?.version===1&&prior.ship.transportEntityId===options.parentVessel?.transportEntityId;
-  let depthProfile=resume?.version===2?normalizeOceanDepthProfile(resume.depthProfile):null;
-  if(!depthProfile&&prior?.version===2&&prior.ship.transportEntityId===options.parentVessel?.transportEntityId
+  let depthProfile=resume?.version>=2?normalizeOceanDepthProfile(resume.depthProfile):null;
+  if(!depthProfile&&prior?.version>=2&&prior.ship.transportEntityId===options.parentVessel?.transportEntityId
     &&Math.abs(prior.site.lat-options.launchSite.lat)<1e-6&&Math.abs(prior.site.lon-options.launchSite.lon)<1e-6)depthProfile=oceanDepthProfileMatchesSite(prior.depthProfile,options.launchSite,prior.site)?normalizeOceanDepthProfile(prior.depthProfile):null;
   if(!depthProfile && (resume?.version===1||oldParent||options.sharedVoyage||marineStudyOffset(options.launchSite).featured))depthProfile={model:OCEAN_DEPTH_MODEL.LEGACY};
   if(!depthProfile){
@@ -633,20 +692,29 @@ async function startOceanMode(options = {}) {
     if(!depthProfile)return false;
   }
   if(request!==oceanEntryGeneration||options.isTransferCurrent?.()===false)return false;
+  if(oceanMode.active)appCtx.oceanVoyage?.checkpoint();
+  oceanMode.continuous=!options.sharedVoyage&&depthProfile.model===OCEAN_DEPTH_MODEL.GEOGRAPHIC&&(resume?resume.version===3:oceanStreamingPreference());
+  oceanMode.frameOrigin={...(resume?.version===3?resume.frameOrigin:options.launchSite)};
   oceanMode.depthProfile=depthProfile;
   oceanMode.waterContext=normalizeOceanWaterContext(resume?.waterContext)||normalizeOceanWaterContext(options.entry?.waterContext)||defaultOceanWaterContext(options.launchSite,{legacy:!!resume});
+  oceanMode.continuous=oceanMode.continuous&&oceanMode.waterContext.waterKind==='open_ocean';
   const siteGeneration=++oceanSiteGeneration;
   const currentSite=()=>siteGeneration===oceanSiteGeneration&&oceanMode.active&&!!oceanMode.scene;
   if (oceanMode.active) {
-    if (options.launchSite) appCtx.oceanVoyage?.checkpoint();
     if (options.launchSite && resetOceanLaunchSite(options.launchSite)) {
-      oceanMode.waveOffset={x:Number(options.waveOffset?.x)||0,z:Number(options.waveOffset?.z)||0};
+      oceanMode.waveOffset={x:Number((resume?.frameWaveOffset||options.waveOffset)?.x)||0,z:Number((resume?.frameWaveOffset||options.waveOffset)?.z)||0};
       oceanMode.diver?.stop();
+      oceanMode.scene.remove(oceanMode.deepBackdrop);disposeObject3D(oceanMode.deepBackdrop);
+      oceanMode.deepBackdrop=createDeepOceanBackdrop();oceanMode.scene.add(oceanMode.deepBackdrop);
+      if(!oceanMode.continuous){
+        for(const light of [oceanMode.keyLight,oceanMode.fillLight]){light.position.copy(light.userData.oceanOffset);light.target.position.set(0,0,0);}
+        oceanMode.marineParticles.position.x=0;oceanMode.marineParticles.position.z=0;
+      }
       resetSubmarineAtLaunch(options.submarinePose || null);
       void refreshWaterEnvironmentEvidence();
       rebuildOceanTerrainLayers(oceanMode.scene, oceanMode.renderer);
       void primeBathymetryTiles().then((ready) => {
-        if (ready && currentSite()) {
+        if (ready && currentSite() && !oceanMode.continuous) {
           rebuildOceanTerrainLayers(oceanMode.scene, oceanMode.renderer);
         }
       });
@@ -672,10 +740,10 @@ async function startOceanMode(options = {}) {
     const visualReady = await oceanMode.submarine.mesh.userData.visualReady;
     if (siteGeneration !== oceanSiteGeneration || oceanSessionScope !== startingScope || !oceanMode.scene) return false;
     if (!visualReady) throw new Error('The research submarine could not be loaded. Please try again.');
-    oceanMode.waveOffset={x:Number(options.waveOffset?.x)||0,z:Number(options.waveOffset?.z)||0};
+    oceanMode.waveOffset={x:Number((resume?.frameWaveOffset||options.waveOffset)?.x)||0,z:Number((resume?.frameWaveOffset||options.waveOffset)?.z)||0};
     resetSubmarineAtLaunch(options.submarinePose || null);
     rebuildOceanTerrainLayers(oceanMode.scene, oceanMode.renderer);
-    initFishLife(oceanMode.scene, oceanFishPopulationContext());
+    if(!oceanMode.continuous)initFishLife(oceanMode.scene, oceanFishPopulationContext());
 
     const worldCanvas = getWorldCanvas();
     if (worldCanvas) worldCanvas.style.display = 'none';
@@ -711,12 +779,12 @@ async function startOceanMode(options = {}) {
     updateOceanHud(performance.now() * 0.001);
 
     primeLocalBathymetryGrid().then(oceanSessionScope.guard((ready) => {
-      if (!ready || !currentSite()) return;
+      if (!ready || !currentSite() || oceanMode.continuous) return;
       rebuildOceanTerrainLayers(oceanMode.scene, oceanMode.renderer);
     }));
 
     primeBathymetryTiles().then(oceanSessionScope.guard((ready) => {
-      if (!ready || !currentSite()) return;
+      if (!ready || !currentSite() || oceanMode.continuous) return;
       rebuildOceanTerrainLayers(oceanMode.scene, oceanMode.renderer);
     }));
 
@@ -834,6 +902,8 @@ function getOceanModeDebugState() {
     sharedVoyage:marine?.active?{stage:marine.state?.stage,revision:marine.state?.revision,observations:marine.state?.manifest.length,canPilot:appCtx.sharedMarine.canPilot,transition:marine.transition,error:marine.error}:null,
     active: !!oceanMode.active,
     launchSite: { ...oceanMode.launchSite },
+    streaming:oceanMode.stream?.snapshot()||null,
+    geographic:sub.position?oceanRenderFrame(oceanMode,appCtx.SCALE).toGeographic(sub.position.x,sub.position.z):null,
     depthProfile:oceanMode.depthProfile?{...oceanMode.depthProfile}:null,
     waterContext:oceanMode.waterContext?{...oceanMode.waterContext}:null,
     navigationMap: oceanMode.navigationMapSnapshot || null,

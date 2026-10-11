@@ -1,8 +1,8 @@
 import {loadModelAsset} from '../assets/model-asset-runtime.js?v=16';
 import {createMarineHabitatPlan,marineHabitatCollision} from './habitat-plan.js';
-export function createMarineHabitat(THREE,{site,scale,sampleSeabedHeight,rockTextures={}}){
+export function createMarineHabitat(THREE,{site,scale,sampleSeabedHeight,rockTextures={},includeAuthoredStudy=true,plan:providedPlan=null}){
  const group=new THREE.Group();group.name='Marine regional habitat';
- const plan=createMarineHabitatPlan({site,scale,sampleSeabedHeight});
+ const plan=providedPlan||createMarineHabitatPlan({site,scale,sampleSeabedHeight,includeAuthoredStudy});
  group.userData.habitat={id:plan.id,truthType:plan.truthType,label:plan.label,assetState:plan.featured?'loading':'not-required',coralCount:plan.corals.length};
  const abort=new AbortController();
  let disposed=false,lodElapsed=0,lastX=Infinity,lastZ=Infinity;const assets=[],models=[],matrix=new THREE.Object3D();

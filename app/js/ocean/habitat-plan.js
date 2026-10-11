@@ -1,3 +1,4 @@
+import {oceanTileCoordinate} from './stream-grid.js';
 export const CORAL_SHELF_SITE=Object.freeze({lat:-18.2861,lon:147.7});
 export const MARINE_CONTENT_VERSION=2;
 export function marineStudyOffset(site,scale=100000){
@@ -5,8 +6,8 @@ export function marineStudyOffset(site,scale=100000){
  return {featured,x:featured?(CORAL_SHELF_SITE.lon-site.lon)*scale*Math.cos(site.lat*Math.PI/180):0,z:featured?(site.lat-CORAL_SHELF_SITE.lat)*scale:0};
 }
 function randomFor(seed){return()=>{seed|=0;seed=seed+0x6D2B79F5|0;let t=Math.imul(seed^seed>>>15,1|seed);t=t+Math.imul(t^t>>>7,61|t)^t;return ((t^t>>>14)>>>0)/4294967296;};}
-export function createMarineHabitatPlan({site,scale=100000,sampleSeabedHeight}){
- const offset=marineStudyOffset(site,scale),featured=offset.featured;
+export function createMarineHabitatPlan({site,scale=100000,sampleSeabedHeight,includeAuthoredStudy=true}){
+ const offset=includeAuthoredStudy?marineStudyOffset(site,scale):{featured:false,x:0,z:0},featured=offset.featured;
  const seed=featured?81450:Math.round((site?.lat||0)*10000)^Math.round((site?.lon||0)*10000);
  const random=randomFor(seed);
  const rocks=[],corals=[],grass=[],landmarks=[],contacts=[];
@@ -46,8 +47,9 @@ export function createMarineHabitatPlan({site,scale=100000,sampleSeabedHeight}){
  // carpeted with tropical coral or falsely labeled as a mapped habitat.
  for(let i=0;i<(featured?65:95);i++){
   const angle=random()*Math.PI*2,r=70+Math.sqrt(random())*520,x=Math.cos(angle)*r+offset.x,z=Math.sin(angle)*r+offset.z,y=sampleSeabedHeight(x,z);
+  const size=.6+random()*2.6;
   if(!Number.isFinite(y)||y> -3||Math.hypot(x,z)>1100)continue;
-  const size=.6+random()*2.6;rocks.push({id:`outcrop-${i}`,x,y:y-.3,z,rx:size*1.8,ry:size*.6,rz:size,tint:i%3});
+  rocks.push({id:`outcrop-${i}`,x,y:y-.3,z,rx:size*1.8,ry:size*.6,rz:size,tint:i%3});
  }
  return {id:featured?'coral-shelf-study-v1':'sediment-outcrop-v1',version:MARINE_CONTENT_VERSION,featured,truthType:'authored',label:featured?'Coral Shelf · authored habitat':'Authored sediment · habitat unverified',offset,rocks,corals,grass,landmarks,contacts};
 }
@@ -57,4 +59,22 @@ export function marineHabitatCollision(plan,point,radius=.4){
  for(const c of plan.contacts||[])if(c.kind==='case'&&Math.abs(point.x-c.x)<.85+radius&&Math.abs(point.z-c.z)<.85+radius&&Math.abs(point.y-c.y)<.6+radius)return true;
  for(const c of plan.corals)if(Math.abs(point.y-(c.y+c.scale))<c.scale+radius&&Math.hypot(point.x-c.x,point.z-c.z)<c.scale*.65+radius)return true;
  return false;
+}
+
+// World-addressed scenery: a tile generates the same outcrops regardless of
+// render origin or arrival direction. Keep only nearby instances; no save data.
+export function createStreamedMarineHabitatPlan({tiles,frame,focus,sampleSeabedHeight}){
+ const rocks=[];
+ for(const tile of tiles){
+  let seed=2166136261;for(const c of tile.key){seed^=c.charCodeAt(0);seed=Math.imul(seed,16777619);}
+  const random=randomFor(seed);
+  for(let i=0;i<96;i++){
+   const geo=oceanTileCoordinate(tile,random(),random()),point=frame.toWorld(geo.lat,geo.lon),size=.6+random()*2.6;
+   const range=Math.hypot(point.x-focus.x,point.z-focus.z);if(range>650)continue;
+   const y=sampleSeabedHeight(point.x,point.z);if(!Number.isFinite(y)||y> -3)continue;
+   rocks.push({id:`${tile.key}:outcrop-${i}`,x:point.x,y:y-.3,z:point.z,rx:size*1.8,ry:size*.6,rz:size,tint:i%3,range});
+  }
+ }
+ rocks.sort((a,b)=>a.range-b.range||a.id.localeCompare(b.id));
+ return {id:'geographic-sediment-v1',version:MARINE_CONTENT_VERSION,featured:false,truthType:'authored',label:'Seabed exploration',offset:{x:0,z:0},rocks:rocks.slice(0,128),corals:[],grass:[],landmarks:[],contacts:[]};
 }

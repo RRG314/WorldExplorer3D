@@ -75,6 +75,8 @@ export const currentContractTests = [
   'tests/research-vessel-navigation-current.test.mjs',
   'tests/delivery-handling-current.test.mjs',
   'tests/ocean-voyage-current.test.mjs',
+  'tests/ocean-stream-current.test.mjs',
+  'tests/hosting-validation-output-current.test.mjs',
   'tests/water-environment-current.test.mjs',
   'tests/water-sample-authority-current.test.mjs',
   'tests/discovery-save-recovery-current.test.mjs',

@@ -1,3 +1,4 @@
+import {oceanParentPosition} from './stream-runtime.js';
 import {OCEAN_DEPTH_MODEL} from './depth-model.js';
 // North-up gameplay map. +X is east, +Z is south. Heights come from the
 // collision sampler; geographic source coverage is an independent overlay.
@@ -76,6 +77,7 @@ export function drawOceanNavigationMap(appCtx, oceanMode, sample) {
   let cached = mapCache.get(canvas);
   const now = performance.now();
   const dataChanged = !cached || cached.local !== oceanMode.localBathymetryGrid
+    || cached.streamRevision !== oceanMode.stream?.depth.revision || cached.frame !== oceanMode.frameOrigin
     || cached.global !== oceanMode.globalBathymetryGrid || cached.site !== oceanMode.launchSite
     || cached.ready !== oceanMode.bathymetryReady || cached.data.halfExtent !== halfExtent;
   // Keep marker motion continuous, but bound terrain sampling during travel.
@@ -105,7 +107,7 @@ export function drawOceanNavigationMap(appCtx, oceanMode, sample) {
       paint.lineTo(line.to[0] * width, line.to[1] * height);
     }
     paint.stroke();
-    cached = { key, generatedAt: now, ready: oceanMode.bathymetryReady, local: oceanMode.localBathymetryGrid, global: oceanMode.globalBathymetryGrid,
+    cached = { streamRevision:oceanMode.stream?.depth.revision,frame:oceanMode.frameOrigin,key, generatedAt: now, ready: oceanMode.bathymetryReady, local: oceanMode.localBathymetryGrid, global: oceanMode.globalBathymetryGrid,
       site: oceanMode.launchSite, data, raster };
     mapCache.set(canvas, cached);
   }
@@ -123,7 +125,8 @@ export function drawOceanNavigationMap(appCtx, oceanMode, sample) {
     ctx.fillStyle='#ffc76b';ctx.fillRect(px-3,py-3,6,6);ctx.font='9px sans-serif';ctx.fillText('SUB',px+5,py+3);
   }
   if(appCtx.oceanVoyage?.current){
-    const px=Math.max(7,Math.min(width-7,width*(.5-cached.data.centerX/(halfExtent*2)))),py=Math.max(40,Math.min(height-38,height*(.5-cached.data.centerZ/(halfExtent*2))));
+    const parent=oceanParentPosition(oceanMode,appCtx.SCALE);
+    const px=Math.max(7,Math.min(width-7,width*(.5+(parent.x-cached.data.centerX)/(halfExtent*2)))),py=Math.max(40,Math.min(height-38,height*(.5+(parent.z-cached.data.centerZ)/(halfExtent*2))));
     ctx.fillStyle='#ffdc91';ctx.fillRect(px-4,py-4,8,8);ctx.font='9px sans-serif';ctx.fillText('SHIP',Math.min(width-28,px+6),py+3);
   }
   const investigation=appCtx.marineResearch?.investigation?.snapshot();

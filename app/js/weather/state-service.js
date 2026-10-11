@@ -1,3 +1,5 @@
+export const WEATHER_CACHE_LIMIT=64;
+export const PLACE_CACHE_LIMIT=128;
 import { ctx as appCtx } from '../shared-context.js?v=55';
 
 import { haversineKm } from '../earth-location.js?v=2';
@@ -55,22 +57,20 @@ function createWeatherStateService(context = appCtx) {
     return activeState || liveState;
   }
 
-  function getCachedPlace(key) {
-    return placeCache.get(String(key)) || null;
-  }
+  function touch(cache,key){key=String(key);const value=cache.get(key);if(value){cache.delete(key);cache.set(key,value);}return value||null;}
+  function retain(cache,key,value,limit){cache.delete(String(key));cache.set(String(key),value);while(cache.size>limit)cache.delete(cache.keys().next().value);return value;}
+  function getCachedPlace(key) {return touch(placeCache,key);}
 
   function getCachedWeather(key) {
-    return weatherCache.get(String(key)) || null;
+    return touch(weatherCache,key);
   }
 
   function setCachedPlace(key, value) {
-    placeCache.set(String(key), value);
-    return value;
+    return retain(placeCache,key,value,PLACE_CACHE_LIMIT);
   }
 
   function setCachedWeather(key, value) {
-    weatherCache.set(String(key), value);
-    return value;
+    return retain(weatherCache,key,value,WEATHER_CACHE_LIMIT);
   }
 
   function snapshot() {

@@ -1,3 +1,4 @@
+import {earthLocalToGeographic} from './earth-core/location-origin.js?v=1';
 import { ctx as appCtx } from "./shared-context.js?v=55";
 
 function currentActorWorldPosition() {
@@ -24,12 +25,10 @@ function currentActorWorldPosition() {
 function resolveObservedEarthLocation() {
   if (appCtx.oceanMode?.active) {
     const sub = appCtx.oceanMode.diver?.active?appCtx.oceanMode.diver.navigationActor():appCtx.oceanMode.submarine;
-    const launchSite = appCtx.oceanMode.launchSite || {};
+    const launchSite = appCtx.oceanMode.frameOrigin || appCtx.oceanMode.launchSite || {};
     if (Number.isFinite(sub?.position?.x) && Number.isFinite(sub?.position?.z) && Number.isFinite(launchSite.lat) && Number.isFinite(launchSite.lon)) {
-      const lonDenom = appCtx.SCALE * Math.cos(launchSite.lat * Math.PI / 180);
       return {
-        lat: launchSite.lat - sub.position.z / appCtx.SCALE,
-        lon: launchSite.lon + sub.position.x / (Math.abs(lonDenom) > 0.0001 ? lonDenom : appCtx.SCALE),
+        ...earthLocalToGeographic(launchSite,appCtx.SCALE,sub.position.x,sub.position.z),
         source: appCtx.oceanMode.diver?.active?'ocean_diver':'ocean_sub'
       };
     }

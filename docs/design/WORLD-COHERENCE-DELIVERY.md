@@ -5,6 +5,17 @@ This is an implementation and acceptance contract; the table distinguishes code
 that exists from work that still needs delivery. It does not supersede saved
 worlds, release gates or the existing environmental and transport owners.
 
+## October 11 geographic ocean continuation
+
+Personal open-ocean voyages now have bounded geographic streaming, a launch
+preference, local-frame rebasing and remote recovery to the original ship. Native
+and streamed saves are separated from released v1 records. Scenery and regional
+wildlife wait for streamed water/terrain; caches and depth requests are bounded.
+See [the delivery ledger](OCEAN-STREAMING-DELIVERY.md) for exact contracts and
+current evidence. Earlier finite-scene limitations below are historical for
+personal open-ocean travel; retained local dives and shared outings stay bounded.
+This does not complete the broader wildlife, ports, terrain/farms or release gates.
+
 ## October 11 cross-environment Journal acceptance
 
 Marine records now retain an allowlisted voyage snapshot through the existing

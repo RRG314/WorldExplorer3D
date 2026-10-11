@@ -14,7 +14,7 @@ export function disposeObject3D(obj) {
   // can still be using the same textures in another scene.
   for (const dispose of managed) dispose();
   obj.traverse((child) => {
-    if (!child || !child.isMesh) return;
+    if (!child || !(child.isMesh || child.isPoints || child.isLine)) return;
     if (child.geometry && typeof child.geometry.dispose === "function") {
       child.geometry.dispose();
     }
@@ -131,7 +131,7 @@ export function createMarineParticles() {
   return points;
 }
 
-export function createDeepOceanBackdrop() {
+export function createDeepOceanBackdrop({includeFloor=true}={}) {
   const group = new THREE.Group();
   group.name = "OceanBackdrop";
 
@@ -146,6 +146,7 @@ export function createDeepOceanBackdrop() {
   );
   group.add(shell);
 
+  if(!includeFloor)return group;
   const farFloor = new THREE.Mesh(
     new THREE.PlaneGeometry(2800, 2800),
     new THREE.MeshBasicMaterial({

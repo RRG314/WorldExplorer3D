@@ -1,3 +1,4 @@
+import {oceanRenderFrame} from './stream-runtime.js';
 import {OCEAN_DEPTH_MODEL,geographicBottomY,extendPresentationDepth} from './depth-model.js';
 import {marineStudyOffset} from './habitat-plan.js';
 import {
@@ -117,10 +118,7 @@ export function createOceanBathymetryApi({
   }
 
   function oceanWorldToLatLon(x, z) {
-    const lat = oceanMode.launchSite.lat - z / appCtx.SCALE;
-    const lonDenom = appCtx.SCALE * Math.cos(oceanMode.launchSite.lat * Math.PI / 180);
-    const lon = oceanMode.launchSite.lon + x / (Math.abs(lonDenom) > 0.0001 ? lonDenom : appCtx.SCALE);
-    return { lat, lon };
+    return oceanRenderFrame(oceanMode,appCtx.SCALE).toGeographic(x,z);
   }
 
 
@@ -211,6 +209,7 @@ export function createOceanBathymetryApi({
   }
 
   function sampleBathymetryEvidence(x, z) {
+    if(oceanMode.stream)return oceanMode.stream.sample(x,z);
     const { lat, lon } = oceanWorldToLatLon(x, z);
     const localMeters = sampleLocalBathymetryMeters(lat, lon);
     if (Number.isFinite(localMeters)) {
@@ -361,6 +360,7 @@ export function createOceanBathymetryApi({
   }
 
   function primeBathymetryTiles() {
+    if(oceanMode.continuous)return Promise.resolve(false);
     if (oceanMode.bathymetryPromise) return oceanMode.bathymetryPromise;
     oceanMode.bathymetryPromise = primeGlobalBathymetryGrid().then((globalReady) => {
       const groundActive = appCtx.getAcceptedGroundRuntimeSnapshot?.().status === 'accepted';

@@ -1,3 +1,4 @@
+import {oceanParentPosition} from './stream-runtime.js';
 import {COMMON_DOLPHIN} from './cetacean-rules.js';
 import {earthLocalToGeographic} from '../earth-core/location-origin.js?v=1';
 import {parentHullCollision} from './parent-vessel.js';
@@ -30,14 +31,14 @@ export function createWildlifeObservation(ctx,{store,now=Date.now}) {
         for(let i=1;i<steps;i++){
           const t=i/steps,p={x:from.x+(to.x-from.x)*t,y:from.y+(to.y-from.y)*t,z:from.z+(to.z-from.z)*t};
           const water=m.waterSurface?.sample(p.x,p.z)?.volume;
-          if(!Number.isFinite(water?.bottomY)||p.y<=water.bottomY+.1||m.habitat?.collision(p,.1)||parentHullCollision(ctx.oceanVoyage?.current?.ship,p,.1,water.surfaceY))return false;
+          if(!Number.isFinite(water?.bottomY)||p.y<=water.bottomY+.1||m.habitat?.collision(p,.1)||parentHullCollision(ctx.oceanVoyage?.current?.ship,p,.1,water.surfaceY,oceanParentPosition(m,ctx.SCALE)))return false;
         }
         return true;
       }});
   }
   async function record(){
     if(busy)return false;
-    const match=candidate(),m=ctx.oceanMode,site=m?.launchSite;if(!match)return false;
+    const match=candidate(),m=ctx.oceanMode,site=m?.frameOrigin||m?.launchSite;if(!match)return false;
     const p=match.animal.mesh.position,location=earthLocalToGeographic(site,ctx.SCALE,p.x,p.z);
     const water=m.waterSurface?.sample(p.x,p.z)?.volume;
     if(!location||!Number.isFinite(water?.surfaceY))return false;

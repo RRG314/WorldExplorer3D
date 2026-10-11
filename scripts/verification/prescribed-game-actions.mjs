@@ -12,10 +12,16 @@ export async function runPrescribedGameActions(page,dir,steps,canvas='#oceanMode
  await writeFile(adapter,source.slice(0,source.indexOf(marker))+'\nexport {doChoreography};\n');
  try {
   const {doChoreography}=await import(pathToFileURL(adapter));
-  await page.evaluate(()=>{
+  await page.evaluate(canvas=>{
+    if(canvas==='#oceanModeCanvas'&&window.getOceanModeDebugState?.().active){
+      window.__prescribedPreviousAdvanceTime=window.advanceTime;
+      // Ocean owns a separate RAF loop. The Earth kernel hook returns before
+      // an Ocean frame; wait for its real frames while keys remain pressed.
+      window.advanceTime=async ms=>{const start=performance.now();do{await new Promise(requestAnimationFrame);}while(performance.now()-start<ms);};
+    }
     if(typeof window.advanceTime!=='function')window.advanceTime=async ms=>{for(let left=ms;left>0;left-=1000/60)await new Promise(requestAnimationFrame);};
     if(typeof window.render_game_to_text!=='function')window.render_game_to_text=()=>JSON.stringify({coordinateSystem:'x east, y up, z south; Ocean launch origin',ocean:window.getOceanModeDebugState?.()});
-  });
+  },canvas);
   await doChoreography(page,await page.locator(canvas).elementHandle(),steps);
- } finally {await unlink(adapter);}
+ } finally {await page.evaluate(()=>{if('__prescribedPreviousAdvanceTime' in window){window.advanceTime=window.__prescribedPreviousAdvanceTime;delete window.__prescribedPreviousAdvanceTime;}}).catch(()=>{});await unlink(adapter);}
 }

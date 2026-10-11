@@ -122,9 +122,12 @@ async function fetchGebcoDepthEvidence(lat, lon, options = {}) {
   if (typeof fetchImpl !== 'function') throw new Error('GEBCO bathymetry requires fetch support.');
   const request = gebcoFeatureInfoUrl(lat, lon, options);
   const timeoutMs = Number.isFinite(options.timeoutMs) ? Math.max(1, Number(options.timeoutMs)) : 6500;
-  const controller = options.signal ? null : new AbortController();
-  const signal = options.signal || controller.signal;
-  const timeoutId = controller ? setTimeout(() => controller.abort(), timeoutMs) : null;
+  const controller = new AbortController();
+  const abort = () => controller.abort();
+  if (options.signal?.aborted) abort();
+  else options.signal?.addEventListener('abort', abort, {once:true});
+  const signal = controller.signal;
+  const timeoutId = setTimeout(abort, timeoutMs);
   try {
     const response = await fetchImpl(request.url, {
       cache: options.cache || 'force-cache',
@@ -141,7 +144,8 @@ async function fetchGebcoDepthEvidence(lat, lon, options = {}) {
       sampleWindowDegrees: request.sampleWindowDegrees
     });
   } finally {
-    if (timeoutId !== null) clearTimeout(timeoutId);
+    clearTimeout(timeoutId);
+    options.signal?.removeEventListener('abort', abort);
   }
 }
 

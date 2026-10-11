@@ -30,6 +30,7 @@
     "product-marine-research": {"scope":"candidate","command":["node","scripts/verification/marine-research-current.mjs"],"artifactRequired":true,"timeoutMs":480000},
     "product-diving": {"scope":"candidate","command":["node","scripts/verification/ocean-diver-current.mjs"],"artifactRequired":true,"timeoutMs":480000},
     "product-marine-local": {"scope":"candidate","command":["node","scripts/verification/ocean-entry-current.mjs"],"artifactRequired":true,"timeoutMs":480000},
+    "product-ocean-stream": {"scope":"candidate","command":["node","scripts/verification/ocean-stream-current.mjs"],"artifactRequired":true,"timeoutMs":600000},
     "product-camera-wall": {"scope":"candidate","command":["node","scripts/verification/public-camera-wall-current.mjs"],"artifactRequired":true,"timeoutMs":300000},
     "product-provider-operations": {"scope":"candidate","command":["node","scripts/verification/operations-providers-current.mjs"],"artifactRequired":false,"timeoutMs":180000},
     "product-marine-shared": {"scope":"backend","command":["node","scripts/verification/shared-marine-emulators.mjs"],"artifactRequired":true,"timeoutMs":660000},

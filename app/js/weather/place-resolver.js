@@ -86,21 +86,22 @@ function parseReverseAddress(payload) {
   };
 }
 
-async function fetchJsonWithTimeout(url, timeoutMs = PLACE_API_TIMEOUT_MS) {
+async function fetchJsonWithTimeout(url, timeoutMs = PLACE_API_TIMEOUT_MS, signal = null) {
   const controller = new AbortController();
-  const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
+  const abort=()=>controller.abort();if(signal?.aborted)abort();else signal?.addEventListener('abort',abort,{once:true});
+  const timeoutId = window.setTimeout(abort, timeoutMs);
   try {
     const response = await (url.startsWith('/api/geospatial/')?fetchPlaceLookup:fetch)(url, { signal: controller.signal });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     return await response.json();
   } finally {
-    window.clearTimeout(timeoutId);
+    window.clearTimeout(timeoutId);signal?.removeEventListener('abort',abort);
   }
 }
 
-async function fetchPlaceForLocation(lat, lon) {
+async function fetchPlaceForLocation(lat, lon, signal = null) {
   const lookupUrl = `/api/geospatial/reverse?kind=reverse&format=jsonv2&zoom=10&addressdetails=1&lat=${encodeURIComponent(lat.toFixed(6))}&lon=${encodeURIComponent(lon.toFixed(6))}`;
-  return parseReverseAddress(await fetchJsonWithTimeout(lookupUrl, 10000));
+  return parseReverseAddress(await fetchJsonWithTimeout(lookupUrl, 10000, signal));
 }
 
 function getFallbackPlaceLabel(location) {
@@ -122,12 +123,16 @@ function assignResolvedPlace(place, location) {
   });
 }
 
+function cancelPlaceResolution(){
+  _pendingPlaceRequest?.controller.abort();_pendingPlaceRequest=null;
+}
+
 async function refreshLivePlace(location, force = false) {
   if (!Number.isFinite(location?.lat) || !Number.isFinite(location?.lon)) return appCtx.livePlaceState || null;
   const key = placeCacheKey(location.lat, location.lon);
   const cached = weatherStateService.getCachedPlace(key);
   if (!force && cached) {
-    _pendingPlaceRequest = null;
+    _pendingPlaceRequest?.controller.abort();_pendingPlaceRequest = null;
     return assignResolvedPlace(cached, location);
   }
   if (_pendingPlaceRequest?.key === key && !force) {
@@ -140,9 +145,10 @@ async function refreshLivePlace(location, force = false) {
   }
   if (appCtx.livePlaceState?.key !== key) weatherStateService.setPlaceState(null);
   const fallback = getFallbackPlaceLabel(location);
-  const request = { key, promise: null };
+  _pendingPlaceRequest?.controller.abort();
+  const request = { key, promise: null, controller:new AbortController() };
   const publish = (place) => _pendingPlaceRequest === request ? assignResolvedPlace(place?.display ? place : fallback, location) : appCtx.livePlaceState || null;
-  const promise = fetchPlaceForLocation(location.lat, location.lon).then((place) => {
+  const promise = fetchPlaceForLocation(location.lat, location.lon, request.controller.signal).then((place) => {
     if (_pendingPlaceRequest === request || !weatherStateService.getCachedPlace(key)) weatherStateService.setCachedPlace(key, place);
     return publish(place);
   }).catch(() => publish(fallback)).finally(() => {
@@ -165,5 +171,6 @@ export {
   fetchPlaceForLocation,
   getFallbackPlaceLabel,
   assignResolvedPlace,
-  refreshLivePlace
+  refreshLivePlace,
+  cancelPlaceResolution
 };

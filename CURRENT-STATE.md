@@ -50,6 +50,25 @@ browsers/servers. Production deployment evidence is under
 `output/release-evidence/current/production-deployment.json` and
 `production-promotion.json`; acceptance gaps remain in their own receipts.
 
+## October 11 current continuation — ocean streaming and save safety
+
+Continuous personal open-ocean travel is implemented locally, with a player toggle,
+geographic tiles, origin rebasing, bounded residency, truthful provider outage
+behavior and the original parent-vessel recovery. The old location dive and shared
+crew modes retain their own admission. Scenery uses stable tile identities and
+known depth; regional licensed wildlife waits for a valid streamed water volume.
+
+The audit also corrected native v2 saves replacing the released v1 key. New v2
+and v3 records use their own keys; existing records are retained and readable.
+Weather/place caches are bounded, obsolete consumers cancel, and failed weather
+shows a terminal state plus an explicitly labeled UTC fallback clock.
+
+`docs/design/OCEAN-STREAMING-DELIVERY.md` holds the implementation and evidence
+ledger. Mutable-source browser7 passes 10 checks; retained diver/local-entry
+journeys pass 13/26 checks. These use controlled provider responses, alongside
+separate two-point live GEBCO evidence. Packaging/fallback and whole-release
+acceptance are still in progress. No deployment; dist and retained packages intact.
+
 ## October 11 latest local continuation — licensed wildlife and journey Journal
 
 The ocean lifecycle now owns three licensed animated common dolphins in conservative
