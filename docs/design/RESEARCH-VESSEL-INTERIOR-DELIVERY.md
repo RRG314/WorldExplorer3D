@@ -252,3 +252,9 @@ The preview is ready for the owner's ship/ocean review. The test guide is
 `output/research-interior-20261011/TEST-GUIDE.md`. Physical-phone acceptance and the
 full production matrix are still separate. No GitHub push, production Hosting
 promotion or production Functions deployment occurred during this delivery.
+
+An ordinary user-profile Chrome session separately resumed the saved vessel,
+displayed live weather, captured no AppCheck errors and opened the ship map.
+That tab is left available for the owner. Receipt: `ordinary-chrome.json`.
+The final remote manifest check confirms the preview identity and unchanged
+production build; receipt: `final-hosted-identities.json`.
