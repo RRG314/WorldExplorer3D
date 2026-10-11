@@ -294,3 +294,7 @@ Personal Workspace Furniture
 ### Barramundi
 
 [Barramundi Fish](https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/BarramundiFish) by Microsoft (2017), Creative Commons Zero v1.0 Universal. The game uses resized textures, normalized scale and authored swimming motion. Source hashes, rights evidence and conversion details are retained with the model. Its modeled encounters use a reviewed northern Australian subset, not live sightings or the species' entire range.
+
+## Common dolphin
+
+Common Dolphin by CGreature ([original model](https://skfb.ly/oHswH)), with swimming animation by kenchoo ([animated adaptation](https://sketchfab.com/3d-models/common-dolphin-12c27d41204f4b92895e36072b0ba8a6)). [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). World Explorer applies parent transforms for scale/orientation and resizes textures; the original rig and animation remain. See `marine/common-dolphin/PROVENANCE.json` and `LICENSE.txt`. No author endorsement is implied.

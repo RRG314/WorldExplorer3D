@@ -1,9 +1,83 @@
 # One world, explicit rules
 
-October 10, 2026. Owner steering extends the active Explorer career roadmap.
+Updated October 11, 2026. Owner steering extends the active Explorer career roadmap.
 This is an implementation and acceptance contract; the table distinguishes code
 that exists from work that still needs delivery. It does not supersede saved
 worlds, release gates or the existing environmental and transport owners.
+
+## October 11 cross-environment Journal acceptance
+
+Marine records now retain an allowlisted voyage snapshot through the existing
+Journal. Return reuses the voyage owner, preserving the parent vessel and submarine
+identity; it does not infer Earth road travel from latitude/longitude. Earth
+records use the existing environment/actor restoration before selecting their
+location. Lunar/planetary records without a supported travel target have no
+misleading Earth-return action. Shared marine authority rejects local-voyage return.
+
+Ocean-first and planetary sessions share the same Journal/Guide reader and visual
+shell. Storage remains the existing profile store. Filters, record descriptions,
+retry on unavailable storage, pause, close and session cancellation work before
+an Earth discovery runtime exists. The inactive Earth reader cannot overwrite
+this UI, and late reads cannot reopen it after departure. The old separate
+planetary Journal reader was removed rather than retained as a third UI path.
+
+Full source chain: **2,417 pass**. `journey-journal/report.json` has **15** DOM/CSS
+browser checks; `ocean-journal-final/report.json` has **20** actual licensed-model
+and marine-game checks, including Backpack → Journal → same saved voyage → sub
+movement → parent-vessel recovery. Both are under `output/roadmap-20261011/`.
+Images were inspected; zero captured page/GPU errors. The first game test used
+Explore instead of the actual Backpack menu; its failed receipt is retained.
+Actual game testing uses controlled depth and a deliberate observation pose.
+It does not establish live regional species occurrence or certify a global ocean.
+
+## October 11 licensed offshore wildlife
+
+The existing ocean-life lifecycle now owns a bounded group of three common
+dolphins alongside the fish populations. These are separate from fishing/catch
+targets. The CGreature model with kenchoo's authored skeletal animation is bundled
+under CC BY 4.0, with both authors credited, source/output hashes and a reproducible
+conversion recipe. The 770 KB model has 18,576 triangles, 1K maps and independent
+animation/skeleton instances sharing geometry/materials. There is no runtime
+Sketchfab dependency and no generic substitute when the asset is unavailable.
+
+Eligibility requires admitted open ocean, the geographic metre-scale depth
+profile, an actual water volume over 91–1,980 m of bottom depth, and one of two
+conservative reviewed game ranges: California Current or northwest Atlantic north
+of Cape Hatteras. This is a subset of the species range. It is not a distribution
+survey, seasonal model or guarantee of a live sighting. The animal's shallow
+swimming/surface cycle is independent of bottom depth; it does not place dolphins
+on the deep seabed. Bounded steering avoids terrain, reef, carrier, sub and diver;
+pause does not advance swimming or skeletal animation. Population retirement
+cancels late loads, releases leases and disposes the cloned skeleton palettes.
+
+Wildlife watch is a collapsible section in the existing ocean controls. A
+stationary player must have a loaded, displayed dolphin in view within 45 m, with
+an unobstructed water/reef/carrier line, before recording. The existing research
+Journal stores the simulated encounter and game depth, once per species/area/hour,
+without invented population evidence or currency. Failed writes can retry;
+old-voyage messages cannot appear in the next voyage. A successful save collapses
+the section to keep the phone view clear. Source anchor:
+[NOAA common-dolphin account](https://www.fisheries.noaa.gov/species/short-beaked-common-dolphin).
+
+`output/roadmap-20261011/ocean-cetaceans-final/report.json`: **16 passed**.
+This includes actual GLB skin/animation, independent phases, pause, four regional
+resource cycles, actual deck/cradle/sub deployment, real IndexedDB Journal
+recording, phone layout and vessel recovery; zero page/GPU errors. Images were
+inspected. The provider returns controlled 180 m depth and the observation pose
+is deliberate test setup. It is not an uncoached trip, live ecology validation,
+surface-vessel wildlife mode or continuous global ocean certification.
+
+The first full source check caught a duplicate query-version model cache import;
+the shared import was corrected. The next inventory check caught the new tests
+outside the regular component list; both are now included. Their passing focused
+checks do not erase those earlier failed receipts. The final source-chain result
+is 2,417 passing tests; see CURRENT-STATE.md for the latest journey receipt.
+
+Remaining marine work is explicit: licensed whales and deep squid, broader
+habitat/season evidence, surface-vessel encounters and a genuinely streamed ocean.
+The finite dive scene, generic fish elsewhere and basic distant water presentation
+remain limitations. This addition does not complete creative terrain/farms,
+career/CERN expansion, the realism roadmap or release compatibility.
 
 ## Latest creative preservation evidence
 
@@ -113,14 +187,14 @@ generous; a campaign still requires its declared physical actions. Moving or
 deleting a required target makes the objective temporarily unavailable and
 offers restore/reselect, rather than granting completion or corrupting progress.
 
-## Current source findings
+## Current ownership and remaining delivery
 
 | Area | Existing owner and evidence | Gap to close |
 | --- | --- | --- |
-| Boats | Maritime catalogue, placement policy, boat runtime and mapped-water footprint checks | Entry lacks the movement path's hull-fit check; large ships can be admitted into unsuitable water. Draft and deployment equipment are not consistently consulted. |
-| Submarine | Transactional boat/Ocean transfer, one voyage identity, actual submarine controller, diver returns to parked sub | A generic dive button can manufacture a submarine for a small boat. Some admission uses shoreline distance as a depth proxy. Test moving the sub after boarding, not just showing the diver beside it. |
-| Swimming | Existing walking-water controller supports mapped water and local game beds; Ocean diver reuses it | Sub exit is hardcoded to 16 m regardless of equipment. Survey depth and generic swimming need one policy. Underwater scene depth is compressed and is not measured bathymetry. |
-| Wildlife | Fishing population authority plus separate reviewed regional ecology packs | Latitude-only catch pool falls back outside latitude; some ocean fish have fixed depths and can intersect the bed. Global basin, habitat, depth and season restrictions and licensed species visuals are incomplete. |
+| Boats | Maritime catalogue; entry, relocation and movement share hull-fit and known-draft checks. Research equipment follows the admitted vessel. | Unknown mapped depth remains unknown; complete global water/depth coverage and continuous-voyage tests remain open. |
+| Submarine | Same-vessel/sub custody, physical deck deployment, drive→dive→reboard→drive→recover verified locally. Small boats cannot manufacture research submarines. | Ocean scene is bounded. Shared/live-service and release acceptance remain separate from controlled local journeys. |
+| Swimming | One walking-water controller; ordinary 18 m and research 40 m game profiles; equipment follows the vessel. New geographic voyages use metre-scale bottom depth. | Authored Coral Shelf preserves its older compressed layout. This is not decompression/pressure training; worldwide water geometry and boundary cases still need wider acceptance. |
+| Wildlife | Reviewed geographic/habitat fish admission; water/obstacle envelopes; licensed barramundi and animated common dolphins in restricted ranges; Journal observation. | Most fish visuals remain generated. Whales/squid, seasonal evidence, richer habitats and streamed ocean lifetime are incomplete. |
 | Creative changes | Editable-world local store and server room modifications already support building suppression/restoration and placed objects, revisions and roles | No complete terrain editing or farming authority. Confirm local-world identity through long-distance streaming; do not add a competing builder store. |
 | Land cover | Existing geographic surface, land-use and WorldCover owners | Agricultural presentation is not a farming simulation. Fields need bounded parcel geometry, appropriate crop/season appearance and explicit simulation provenance. |
 | Air and space | Aviation catalogue/facilities, environment session coordinator, ship/pod journey authority | Apply the same capability/clearance/transfer/recovery principles; preserve destination-specific rules rather than a universal teleport button. |

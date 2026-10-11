@@ -50,7 +50,57 @@ browsers/servers. Production deployment evidence is under
 `output/release-evidence/current/production-deployment.json` and
 `production-promotion.json`; acceptance gaps remain in their own receipts.
 
-## October 11 latest local continuation — nearby street publication priority
+## October 11 latest local continuation — licensed wildlife and journey Journal
+
+The ocean lifecycle now owns three licensed animated common dolphins in conservative
+California Current / northwest Atlantic game ranges, gated by admitted open water,
+geographic depth and actual sampled water volume. They swim near the surface,
+avoid obstacles and release their leases/skeletons on departure. Wildlife watch
+records an in-view, stationary, unobstructed encounter through the existing Journal;
+it never claims a live sighting or awards invented survey evidence/currency.
+
+The Journal audit found a separate coherence defect: its return action treated
+all coordinates as Earth, and ocean-first players could not open the Earth-owned
+reader. Ocean and planetary sessions now share one read-only Journal/Guide shell
+with filters, saved details, failed-read retry, pause and environment cancellation.
+Earth's reader cannot overwrite that shell in the background. A saved marine
+observation carries a validated voyage; returning uses existing vessel/sub custody.
+Unsupported planetary returns are unavailable instead of loading Earth roads.
+Earth returns restore the actor/environment through the existing menu authority
+before selecting the saved location. No new inventory/profile persistence owner.
+
+**Full verify:pr: 2,417 tests pass.** Actual licensed model / ocean-game acceptance
+at `output/roadmap-20261011/ocean-journal-final/report.json`: **20 passed**, zero
+page/GPU errors. Covers independent rigs, animation/pause, four region resource
+cycles, research deck/cradle deployment, real IndexedDB observation, phone layout,
+actual Backpack → Journal → saved voyage → sub movement → vessel recovery.
+The provider's 180 m depth and observation pose are controlled test inputs, not
+live ecology or uncoached-play evidence. Screenshots were inspected.
+
+`output/roadmap-20261011/journey-journal/report.json`: **15 passed** actual DOM/CSS
+checks with controlled storage/returns, including filters, retry, late reads,
+repeated open/close, environment cancellation and phone bounds. The first game
+Journal attempt used the wrong test menu (Explore instead of Backpack); that
+failure is retained, and only the test route changed. Initial duplicate asset
+cache import and test-inventory failures were fixed before the passing source run.
+Source receipt: `/tmp/we3d-journal-full-source.log`.
+
+Disk safety: removed npm's downloaded-package cache and an inactive cached
+Playwright CLI, preserving installed dependencies and the active Firebase CLI.
+Two old generated GC traces were losslessly compressed with decompressed SHA-256
+verification; their receipt is `output/architecture-evaluation/current-travel-1007/trace-compression-20261011.json`.
+The marine verifier refused to start below its 3 GiB gate, then ran after measured
+headroom was restored; its running resource stop remained enabled. All owned
+browsers/servers closed. The owner's Chrome, saves, source history, dist and four
+retained packages are intact. No production or GitHub changes.
+
+The full roadmap is still open: continuous ocean streaming, whales/deep squid,
+broader licensed fauna/seasonal evidence, geographic creative persistence,
+terrain/farms, remaining careers/CERN, visual realism and compatible release
+roundtrip. Current ocean scenery is finite and its distant water remains basic.
+This tested addition is not a production-release certification.
+
+## October 11 previous local continuation — nearby street publication priority
 
 Actual Earth-return inspection exposed delayed pavement publication, not new
 evidence that the already repaired sidewalk polygons should be redesigned. The

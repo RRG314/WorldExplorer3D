@@ -1,3 +1,4 @@
+import {openJourneyJournal,closeJourneyJournal,refreshJourneyJournal,journeyJournalIsOpen} from '../discovery/journey-journal.js';
 import { missionSurfaceBody } from '../universe/mission-navigation.js';
 import { secureLunarSample } from './lunar-samples.js';
 import { getAstronomicalBody } from '../astronomy/body-catalog.js?v=3';
@@ -77,9 +78,6 @@ let arrivalEquipment = planetarySurveyEquipment(null);
 function fieldEquipment() { return appCtx.getPlanetarySurveyEquipment?.() || arrivalEquipment; }
 let profileStore = null;
 let mapTimer = 0;
-let planetaryJournalOpen = false;
-let planetaryJournalBound = false;
-let planetaryJournalSection = 'journal';
 
 function escapeHtml(value) {
   return String(value ?? '')
@@ -90,100 +88,10 @@ function escapeHtml(value) {
     .replaceAll("'", '&#39;');
 }
 
-function selectPlanetaryJournalSection(section = 'journal') {
-  planetaryJournalSection = section === 'guide' ? 'guide' : 'journal';
-  document.querySelectorAll('[data-discovery-tab]').forEach((tab) => {
-    const selected = tab.dataset.discoveryTab === planetaryJournalSection;
-    tab.classList.toggle('active', selected);
-    tab.hidden = !['journal', 'guide'].includes(tab.dataset.discoveryTab);
-  });
-  document.querySelectorAll('[data-discovery-pane]').forEach((pane) => {
-    pane.classList.toggle('active', pane.dataset.discoveryPane === planetaryJournalSection);
-  });
-}
-
-function closePlanetaryJournal() {
-  if (!planetaryJournalOpen) return false;
-  planetaryJournalOpen = false;
-  const panel = document.getElementById('discoveryPanel');
-  panel?.classList.remove('show');
-  panel?.setAttribute('aria-hidden', 'true');
-  document.querySelectorAll('[data-discovery-tab]').forEach((tab) => {
-    tab.hidden = false;
-  });
-  document.getElementById('solidWorldPanel')?.style.removeProperty('visibility');
-  document.getElementById('solidWorldReturnBtn')?.style.removeProperty('visibility');
-  appCtx.screenLayout?.setPanelLayer?.('journal', false);
-  return true;
-}
-
-async function refreshPlanetaryJournal() {
-  if (!planetaryJournalOpen) return false;
-  profileStore ||= appCtx.discoveryProfileStore || createIndexedDbDiscoveryProfileStore();
-  appCtx.discoveryProfileStore ||= profileStore;
-  const [events, guide] = await Promise.all([
-    profileStore.listEvents?.(100).catch(() => []) || [],
-    profileStore.listFieldGuide?.(200).catch(() => []) || []
-  ]);
-  const journalList = document.getElementById('discoveryJournalList');
-  const guideList = document.getElementById('discoveryFieldGuideList');
-  const guideOverview = document.getElementById('discoveryGuideOverview');
-  const regionFilter = document.getElementById('discoveryJournalRegion');
-  const categoryFilter = document.getElementById('discoveryJournalCategory');
-  if (regionFilter) {
-    const selected = regionFilter.value || 'all';
-    const regions = [...new Map(events.filter((event) => event.regionId).map((event) => [event.regionId, event.regionLabel || event.regionId])).entries()];
-    regionFilter.innerHTML = `<option value="all">All regions</option>${regions.map(([id, label]) => `<option value="${escapeHtml(id)}">${escapeHtml(label)}</option>`).join('')}`;
-    regionFilter.value = regions.some(([id]) => id === selected) ? selected : 'all';
-  }
-  const category = categoryFilter?.value || 'all';
-  const region = regionFilter?.value || 'all';
-  const filteredEvents = events.filter((event) =>
-    (category === 'all' || (event.pathId || 'field') === category) &&
-    (region === 'all' || event.regionId === region)
-  );
-  if (journalList) journalList.innerHTML = filteredEvents.length
-    ? filteredEvents.slice(0, 24).map((event) => {
-        const when = new Date(Number(event.occurredAt || event.collectedAt) || Date.now()).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
-        return `<article class="discoveryItem discoveryJournalEvent"><span class="discoveryJournalTime">${escapeHtml(when)}</span><span class="discoveryJournalPath">Fieldwork</span><strong>${escapeHtml(event.name || 'Planetary field record')}</strong><small>${escapeHtml(event.regionLabel || event.regionId || 'Planetary surface')} · ${escapeHtml(event.activityId || 'field record')}</small><span class="discoveryJournalProgress">Saved to your Journal</span></article>`;
-      }).join('')
-    : '<div class="discoveryEmpty">No Journal records match these filters.</div>';
-  if (guideList) guideList.innerHTML = guide.length
-    ? guide.slice(0, 40).map((entry) => `<article class="discoveryItem"><strong>${escapeHtml(entry.name || entry.catalogId || 'Field Guide record')}</strong><small>${escapeHtml(entry.family || 'planetary fieldwork')} · ${Number(entry.observations || 1)} observation${Number(entry.observations || 1) === 1 ? '' : 's'}</small></article>`).join('')
-    : '<div class="discoveryEmpty">Document a field point to begin your Field Guide.</div>';
-  if (guideOverview) guideOverview.innerHTML = `<article><strong>${guide.length}</strong><span>identified</span></article><article><strong>${events.length}</strong><span>Journal records</span></article><article><strong>World</strong><span>Guide scope</span></article>`;
-  return true;
-}
-
-async function openPlanetaryJournal(section = 'journal') {
-  if (!missionSurfaceBody(appCtx)) return false;
-  const panel = document.getElementById('discoveryPanel');
-  if (!panel) return false;
-  if (!planetaryJournalBound) {
-    planetaryJournalBound = true;
-    document.getElementById('discoveryCloseBtn')?.addEventListener('click', () => {
-      if (missionSurfaceBody(appCtx)) closePlanetaryJournal();
-    });
-    document.getElementById('discoveryJournalCategory')?.addEventListener('change', () => void refreshPlanetaryJournal());
-    document.getElementById('discoveryJournalRegion')?.addEventListener('change', () => void refreshPlanetaryJournal());
-    document.querySelectorAll('[data-discovery-tab="journal"], [data-discovery-tab="guide"]').forEach((tab) => {
-      tab.addEventListener('click', () => {
-        if (!missionSurfaceBody(appCtx)) return;
-        selectPlanetaryJournalSection(tab.dataset.discoveryTab);
-        void refreshPlanetaryJournal();
-      });
-    });
-  }
-  planetaryJournalOpen = true;
-  document.getElementById('discoveryPanelTitle').textContent = `${getAstronomicalBody(missionSurfaceBody(appCtx))?.name || 'Planetary'} Explorer`;
-  selectPlanetaryJournalSection(section);
-  panel.classList.add('show');
-  panel.setAttribute('aria-hidden', 'false');
-  document.getElementById('solidWorldPanel')?.style.setProperty('visibility', 'hidden');
-  document.getElementById('solidWorldReturnBtn')?.style.setProperty('visibility', 'hidden');
-  appCtx.screenLayout?.setPanelLayer?.('journal', true);
-  await refreshPlanetaryJournal();
-  return true;
+function closePlanetaryJournal() { return closeJourneyJournal(appCtx); }
+function refreshPlanetaryJournal() { return refreshJourneyJournal(appCtx); }
+function openPlanetaryJournal(section = 'journal') {
+  return missionSurfaceBody(appCtx) ? openJourneyJournal(appCtx, section) : Promise.resolve(false);
 }
 
 function playerPosition() {
@@ -544,7 +452,7 @@ async function persistActivity(activity) {
     } else appCtx.collectExpeditionGeologySample?.(activity);
   }
   globalThis.dispatchEvent?.(new CustomEvent('we3d:planetary-field-recorded', { detail: { activity, result } }));
-  if (planetaryJournalOpen) void refreshPlanetaryJournal();
+  if (journeyJournalIsOpen(appCtx)) void refreshPlanetaryJournal();
   return true;
 }
 

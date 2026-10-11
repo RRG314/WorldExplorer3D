@@ -2,6 +2,9 @@
 export const currentContractTests = [
   'tests/ocean-native-depth-current.test.mjs',
   'tests/ocean-fish-envelope-current.test.mjs',
+  'tests/ocean-cetaceans-current.test.mjs',
+  'tests/marine-wildlife-observation-current.test.mjs',
+  'tests/journal-return-current.test.mjs',
   'tests/maritime-admission-current.test.mjs',
   'tests/three-views-current.test.mjs',
   'tests/display-color-policy-current.test.mjs',

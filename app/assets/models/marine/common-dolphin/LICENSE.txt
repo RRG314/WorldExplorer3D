@@ -1,0 +1,5 @@
+Common Dolphin by CGreature, animated by kenchoo.
+CC BY 4.0 — https://creativecommons.org/licenses/by/4.0/
+Model: https://skfb.ly/oHswH
+Animated adaptation: https://sketchfab.com/3d-models/common-dolphin-12c27d41204f4b92895e36072b0ba8a6
+World Explorer modifications: parent-only scale, orientation and centering; textures resized. No endorsement by the authors is implied. See PROVENANCE.json.

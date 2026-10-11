@@ -1,0 +1,22 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><link rel="icon" href="/favicon.svg"><title>Ocean wildlife verification</title>
+<style>body{margin:0;background:#153d50;color:white;font:14px system-ui}canvas{display:block}aside{position:absolute;left:12px;top:12px}</style>
+<aside>Common dolphin · licensed model / simulated encounter</aside>
+<script src="/app/vendor/three/build/three.min.js"></script><script src="/app/vendor/three/examples/js/loaders/GLTFLoader.js"></script>
+<script type="module">
+import {createOceanFishLifeApi} from '/app/js/ocean/fish-life.js';
+import {createFishPopulationContext} from '/app/js/fishing/population-authority.js';
+import {modelAssetCacheSnapshot} from '/app/js/assets/model-asset-runtime.js?v=16';
+const renderer=new THREE.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});renderer.setSize(innerWidth,innerHeight);renderer.setPixelRatio(1);renderer.outputEncoding=THREE.sRGBEncoding;renderer.toneMapping=THREE.ACESFilmicToneMapping;document.body.append(renderer.domElement);
+const scene=new THREE.Scene(),camera=new THREE.PerspectiveCamera(45,innerWidth/innerHeight,.1,500);scene.background=new THREE.Color(0x236278);scene.fog=new THREE.FogExp2(0x236278,.009);
+scene.add(new THREE.HemisphereLight(0xd5efff,0x405865,1.2));const sun=new THREE.DirectionalLight(0xe7f6ff,1.8);sun.position.set(0,20,15);scene.add(sun);
+const mode={fishEntities:[],fishSchools:[],depthProfile:{model:'geographic-metres-v1',entryDepthMeters:180}};
+const api=createOceanFishLifeApi({oceanMode:mode,disposeObject3D(){},sampleWater:()=>({volume:{surfaceY:0,bottomY:-180,metersPerWorldUnit:1}})});
+function render(){scene.updateMatrixWorld(true);renderer.render(scene,camera);}
+function frame(){const p=mode.cetaceans[0]?.mesh.position||new THREE.Vector3();camera.position.copy(p).add(new THREE.Vector3(5,1.4,4));camera.lookAt(p);render();}
+async function init(lat=34,lon=-120){api.initFishLife(scene,{...createFishPopulationContext({latitude:lat,longitude:lon,waterKind:'open_ocean',accessMode:'underwater'}),playable:false,candidateSpeciesIds:[]});await mode.fishVisualsReady;api.updateFishLife(0,0);frame();}
+function bones(a){const values=[];a.mesh.traverse(o=>{if(o.isBone)values.push(...o.quaternion.toArray())});return values;}
+function snapshot(){return {count:mode.cetaceans.length,plan:mode.cetaceanPlan,animals:mode.cetaceans.map(a=>({position:a.mesh.position.toArray(),visible:a.mesh.visible,bones:bones(a)})),memory:{...renderer.info.memory},render:{...renderer.info.render},cache:modelAssetCacheSnapshot()};}
+window.cetaceanTest={mode,api,renderer,scene,camera,init,frame,snapshot,advance(seconds){for(let left=seconds;left>0;left-=1/30)api.updateFishLife(0,Math.min(left,1/30));frame();},dispose(){api.clearFishLife();render();}};
+window.advanceTime=ms=>cetaceanTest.advance(ms/1000);window.render_game_to_text=()=>JSON.stringify(snapshot());
+await init();window.ready=true;
+</script></html>

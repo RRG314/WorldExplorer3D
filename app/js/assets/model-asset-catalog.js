@@ -2,6 +2,15 @@ const MODEL_ASSET_SCHEMA_VERSION = 1;
 
 const MODEL_ASSET_CATALOG = Object.freeze([
   Object.freeze({
+    schemaVersion:MODEL_ASSET_SCHEMA_VERSION,id:'marine-common-dolphin',label:'Common Dolphin · CGreature / kenchoo',
+    url:'/app/assets/models/marine/common-dolphin/common-dolphin.glb',roles:Object.freeze(['marine-fauna']),license:'CC-BY-4.0',
+    sourceUrl:'https://sketchfab.com/3d-models/common-dolphin-12c27d41204f4b92895e36072b0ba8a6',
+    attribution:'Common Dolphin by CGreature, swimming animation by kenchoo. CC BY 4.0. Parent scale/orientation and resized textures; see bundled provenance.',
+    sourceUpAxis:'y',sourceForwardAxis:'z',collisionPolicy:'regional-cetacean-water-volume-and-obstacle-envelope',
+    instancePolicy:Object.freeze({geometry:'shared',materials:'shared'}),
+    budgets:Object.freeze({bytes:1300000,triangles:19000,textureEdgePixels:1024,maxInstances:3})
+  }),
+  Object.freeze({
     schemaVersion:MODEL_ASSET_SCHEMA_VERSION,id:'marine-barramundi',label:'Barramundi · Microsoft',
     url:'/app/assets/models/marine/barramundi/barramundi.glb',roles:Object.freeze(['marine-fauna']),license:'CC0-1.0',
     sourceUrl:'https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/BarramundiFish',

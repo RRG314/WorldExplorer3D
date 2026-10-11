@@ -4,6 +4,7 @@ import {parentHullCollision} from './parent-vessel.js';
 import {getMaritimeCatalogEntry} from '../transport/maritime-catalog.js?v=1';
 import {RCRV_LAYOUT,RESEARCH_EYE_HEIGHT} from '../boat-mode/research/layout.js';
 import {styleMarinePanel} from './interface.js';
+import {createWildlifeObservationControls} from './wildlife-observation.js';
 import {getPlayerCharacterGender} from '../../../js/player-character-preference.js?v=1';
 import {createWalkingWaterRuntime} from '../walking/water/runtime.js';
 import {resolveSwimHullCamera} from '../walking/water/hull-camera.js';
@@ -42,6 +43,7 @@ export function createOceanDiver(ctx,mode,{sampleSeabedHeight,worldRadius=1200})
   const help=document.createElement('div');help.textContent='W/S swim · A/D turn · Space/Shift rise/dive. Recover returns you aboard.';optionsDetails.append(help);
   styleMarinePanel(panel,'diver');
   const investigation=createInvestigationControls({api:()=>ctx.marineResearch?.investigation,prefix:'coastalDiver'});panel.append(investigation.node);
+  const wildlife=createWildlifeObservationControls(()=>ctx.marineResearch?.wildlife);panel.append(wildlife.node);
   const box=new THREE.Box3(),cameraTarget=new THREE.Vector3(),lookTarget=new THREE.Vector3();
   const units=Number(ctx.METERS_PER_WORLD_UNIT)>0?ctx.METERS_PER_WORLD_UNIT:1;
   function subCollisionAt(x,z,radius,actor){return {collision:x>box.min.x-radius&&x<box.max.x+radius&&z>box.min.z-radius&&z<box.max.z+radius&&actor.actorBaseY<box.max.y&&actor.actorBaseY+actor.actorHeight>box.min.y};}
@@ -103,6 +105,7 @@ export function createOceanDiver(ctx,mode,{sampleSeabedHeight,worldRadius=1200})
   function update(dt,time){
     if(disposed)return false;
     panel.hidden=!mode.active||!!ctx.paused;
+    if(!panel.hidden)wildlife.render();
     investigation.render(active?ctx.marineResearch?.investigation?.snapshot():null);
     if(!active){button.textContent='Explore outside submarine';if(!pending){const gate=admission();button.disabled=!gate.allowed;if(!gate.allowed){status.textContent=gate.reason;lastAdmission=gate.reason;}else if(status.textContent===lastAdmission){status.textContent='';lastAdmission='';}}return false;}
     const w=state.walker,actions=ctx.readControlActions?.('ocean')||{};

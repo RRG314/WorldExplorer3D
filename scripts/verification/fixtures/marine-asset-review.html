@@ -9,8 +9,9 @@ const renderer=new THREE.WebGLRenderer({antialias:true,preserveDrawingBuffer:tru
 const scene=new THREE.Scene();scene.background=new THREE.Color(0x526d7c);const camera=new THREE.PerspectiveCamera(40,innerWidth/innerHeight,.1,1000);
 scene.add(new THREE.HemisphereLight(0xd5e9ff,0x576274,1));const sun=new THREE.DirectionalLight(0xffeddb,2);sun.position.set(10,18,10);scene.add(sun);
 const path=new URLSearchParams(location.search).get('asset')||'/app/assets/models/marine/atlantic-explorer-submarine.glb';
-let model;
-if(new URLSearchParams(location.search).has('asset')) model=(await registerMaterialCompatibility(new THREE.GLTFLoader()).loadAsync(path)).scene;
+let model,mixer=null,animations=[];
+if(new URLSearchParams(location.search).has('asset')) {const gltf=await registerMaterialCompatibility(new THREE.GLTFLoader()).loadAsync(path);model=gltf.scene;animations=gltf.animations;
+ if(animations.length){mixer=new THREE.AnimationMixer(model);mixer.clipAction(animations[0]).play();mixer.update(0);}}
 else {model=createSubmarineMesh();if(!await model.userData.visualReady)throw new Error(model.userData.visualError);model.traverse(o=>{if(o.isLight)o.intensity=0;});}
 scene.add(model);
 const box=new THREE.Box3().setFromObject(model),size=box.getSize(new THREE.Vector3()),center=box.getCenter(new THREE.Vector3());
@@ -18,7 +19,8 @@ const ground=new THREE.Mesh(new THREE.PlaneGeometry(300,300),new THREE.MeshStand
 const radius=size.length()*.95;
 function view(x,z){camera.position.copy(center).add(new THREE.Vector3(x*radius,radius*.28,z*radius));camera.lookAt(center);renderer.render(scene,camera);}
 document.getElementById('front').onclick=()=>view(.5,1);document.getElementById('back').onclick=()=>view(-.5,-1);document.getElementById('side').onclick=()=>view(1,0);view(.5,1);
-window.render_game_to_text=()=>JSON.stringify({asset:path,ready:!!model.userData.visualLoaded,bounds:{min:box.min.toArray(),max:box.max.toArray()},draws:renderer.info.render.calls,triangles:renderer.info.render.triangles});window.__fixtureReady=true;
+window.advanceTime=ms=>{mixer?.update(ms/1000);renderer.render(scene,camera);};
+window.render_game_to_text=()=>JSON.stringify({asset:path,ready:!!model,animations:animations.map(a=>({name:a.name,duration:a.duration})),bounds:{min:box.min.toArray(),max:box.max.toArray()},draws:renderer.info.render.calls,triangles:renderer.info.render.triangles});window.__fixtureReady=true;
 document.querySelectorAll('button').forEach(button=>{button.disabled=false;});
 addEventListener('pagehide',()=>model.userData.disposeCuratedMarineVisual?.(),{once:true});
 </script></html>

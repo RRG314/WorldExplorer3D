@@ -1,9 +1,11 @@
 import {loadFishVisual} from './fish-visual.js';
 import {fitFishToWater,fishSeededRandom} from './fish-water-envelope.js';
 import { createUnderwaterSchoolPlan } from '../fishing/population-authority.js?v=2';
+import {createCetaceanLife} from './cetacean-life.js';
 
-export function createOceanFishLifeApi({ oceanMode, disposeObject3D, sampleWater, isBlocked=()=>false, metersPerUnit=1,loadVisual=loadFishVisual }) {
+export function createOceanFishLifeApi({ oceanMode, disposeObject3D, sampleWater, isBlocked=()=>false, metersPerUnit=1,loadVisual=loadFishVisual,loadCetaceanVisual }) {
   const _tmpVecA = new THREE.Vector3();
+  const cetaceans=createCetaceanLife({THREE,oceanMode,sampleWater,isBlocked,loadVisual:loadCetaceanVisual});
 
   function createFishTemplate(options = {}) {
     const group=new THREE.Group();
@@ -32,6 +34,7 @@ export function createOceanFishLifeApi({ oceanMode, disposeObject3D, sampleWater
 
   let templates=[],lastTime=null,simulationTime=0,visualGeneration=0,visualController=null;
   function clearFishLife() {
+    cetaceans.clear();
     visualGeneration++;visualController?.abort();visualController=null;
     for(const fish of oceanMode.fishEntities){fish.visual?.dispose();fish.mesh?.parent?.remove(fish.mesh);}
     // Instances share template buffers/materials. Dispose once, only after the
@@ -60,7 +63,8 @@ export function createOceanFishLifeApi({ oceanMode, disposeObject3D, sampleWater
     clearFishLife();
     const schoolPlan=createUnderwaterSchoolPlan(populationContext,{maximumSchools:5});
     oceanMode.fishPopulationContext=populationContext;oceanMode.underwaterSchoolPlan=schoolPlan;
-    oceanMode.fishVisualsReady=Promise.resolve();
+    const mammalsReady=cetaceans.init(scene,populationContext);
+    oceanMode.fishVisualsReady=mammalsReady;
     if(!schoolPlan.playable)return;
     const generation=visualGeneration;visualController=new AbortController();const signal=visualController.signal,pending=[];
     const random=fishSeededRandom(populationContext.contextId);
@@ -105,12 +109,13 @@ export function createOceanFishLifeApi({ oceanMode, disposeObject3D, sampleWater
 
       }
     });
-    oceanMode.fishVisualsReady=Promise.all(pending).then(()=>undefined);
+    oceanMode.fishVisualsReady=Promise.all([mammalsReady,...pending]).then(()=>undefined);
   }
 
   function updateFishLife(t,simulationDelta=null) {
     const dt=Number.isFinite(simulationDelta)?Math.max(0,Math.min(.1,simulationDelta)):(lastTime==null?0:Math.max(0,Math.min(.1,t-lastTime)));lastTime=t;
     simulationTime+=dt;t=simulationTime;
+    cetaceans.update(dt);
     for(const school of oceanMode.fishSchools){
       const drift=t*.035+school.driftPhase;
       school.center.set(school.anchor.x+Math.sin(drift)*2,school.anchor.y,school.anchor.z+Math.cos(drift)*2);

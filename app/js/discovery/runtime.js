@@ -1,3 +1,5 @@
+import {journalReturnDestination,returnToJournalRecord} from './journal-return.js';
+import {closeJourneyJournal} from './journey-journal.js';
 import { harborJourneyEventIds, lunarCampaignBadges } from '../campaign/lunar-homecoming.js';
 import {investigationBadges} from '../campaign/coastal-investigation.js';
 import { researchStarter, availableResearchStarters, starterAcceptsActivity } from '../campaign/research-starters.js';
@@ -165,6 +167,7 @@ function displayDiscoveryLabel(value, fallback = 'Discovery') {
     'game-wildlife-companion': 'Wildlife companion',
     'wildlife-clue': 'Wildlife sign',
     'wildlife-record': 'Wildlife observation',
+    'marine-wildlife-watch-v1': 'Wildlife watch',
     'botany-record': 'Plant observation',
     'fossil-representation': 'Fossil study',
     'fictional-find': 'Expedition find',
@@ -352,6 +355,10 @@ function createDiscoveryUi(state) {
   }
 
   function setOpen(next) {
+    if(elements.panel?.dataset.journeyJournalOwner){
+      if(!next)return false;
+      closeJourneyJournal(state.appCtx);
+    }
     open = !!next;
     state.appCtx.screenLayout ||= getScreenLayoutService();
     state.appCtx.screenLayout.setPanelLayer('journal', open);
@@ -363,6 +370,7 @@ function createDiscoveryUi(state) {
   }
 
   function renderGuide() {
+    if(elements.panel?.dataset.journeyJournalOwner)return;
     if (!elements.fieldGuide) return;
     const search = String(elements.guideSearch?.value || '').trim().toLowerCase();
     const category = String(elements.guideCategory?.value || 'all');
@@ -437,7 +445,7 @@ function createDiscoveryUi(state) {
   }
 
   function renderJournal() {
-    if (disposed || !elements.journal) return;
+    if (disposed || !elements.journal || elements.panel?.dataset.journeyJournalOwner) return;
     const path = String(elements.journalCategory?.value || 'all');
     const regionId = String(elements.journalRegion?.value || 'all');
     const filtered = journalRecords.filter((event) =>
@@ -456,8 +464,8 @@ function createDiscoveryUi(state) {
         event.projections?.fieldGuide ? 'also in Field Guide' : '',
         event.projections?.collection ? 'also in Backpack' : ''
       ].filter(Boolean).join(' + ');
-      const canReturn = event.locationKey || (Number.isFinite(event.locationSnapshot?.lat) && Number.isFinite(event.locationSnapshot?.lon));
-      const returnButton = canReturn ? `<button class="discoveryJournalReturn" data-journal-return="${escapeHtml(event.eventId)}" type="button">Return to location</button>` : '';
+      const destination = journalReturnDestination(event, state.appCtx.LOCS);
+      const returnButton = destination ? `<button class="discoveryJournalReturn" data-journal-return="${escapeHtml(event.eventId)}" type="button">${escapeHtml(destination.label)}</button>` : '';
       const activity = displayDiscoveryLabel(event.activityId || event.eventType || event.pathId, 'Explorer memory');
       const eventPath = event.pathId || 'field';
       const chapterFinish = openingChapter.schemaVersion === 1 && openingChapter.phase === 'review' && event.eventId === openingChapter.eventId
@@ -468,7 +476,7 @@ function createDiscoveryUi(state) {
   }
 
   async function refreshData() {
-    if (disposed) return;
+    if (disposed || elements.panel?.dataset.journeyJournalOwner) return;
     const request = ++refreshSequence;
     const [profile, items, guide, events] = await Promise.all([
       state.profileStore.getProfile(),
@@ -476,16 +484,16 @@ function createDiscoveryUi(state) {
       state.profileStore.listFieldGuide?.(200) || [],
       state.profileStore.listEvents?.(100) || []
     ]);
-    if (request !== refreshSequence) return;
+    if (request !== refreshSequence || elements.panel?.dataset.journeyJournalOwner) return;
     openingChapter = normalizeOpeningChapter(profile.openingChapter);
     if (openingChapter.schemaVersion === 1 && openingChapter.eventId && !events.some(event => event.eventId === openingChapter.eventId)) {
       const [evidence] = await state.profileStore.getEventsById([openingChapter.eventId]);
-      if (request !== refreshSequence) return;
+      if (request !== refreshSequence || elements.panel?.dataset.journeyJournalOwner) return;
       if (evidence) events.unshift(evidence);
       else chapterMessage = 'The referenced record is missing. Restore your complete Journal backup to continue.';
     }
     const investigationEvents=await state.profileStore.getEventsById(harborJourneyEventIds);
-    if(request!==refreshSequence)return;
+    if(request!==refreshSequence||elements.panel?.dataset.journeyJournalOwner)return;
     void state.appCtx.marineResearch?.investigation?.refresh();
     renderOpeningChapter();
     void state.harborRun?.refresh(profile);
@@ -497,7 +505,7 @@ function createDiscoveryUi(state) {
     if (elements.saveStatus) {
       const ownerUid = state.appCtx.getAccountUserId?.();
       const receipts = await state.profileStore.getReceiptSyncStatus?.(ownerUid);
-      if (request !== refreshSequence) return;
+      if (request !== refreshSequence || elements.panel?.dataset.journeyJournalOwner) return;
       if (ownerUid === state.appCtx.getAccountUserId?.()) elements.saveStatus.textContent = discoverySaveMessage({
         durable: state.profileStore.type === 'IndexedDbDiscoveryProfileStore', signedIn: !!ownerUid,
         receipts, backpackSaved: state.appCtx.discoveryBackpackSaved !== false, online: globalThis.navigator?.onLine !== false
@@ -548,7 +556,7 @@ function createDiscoveryUi(state) {
         lastAt: Math.max(...events.filter((candidate) => candidate.regionId === event.regionId).map((candidate) => Number(candidate.occurredAt) || 0))
       }])).values()].sort((left, right) => right.lastAt - left.lastAt);
       elements.collection.innerHTML = places.length ? places.map((place) => {
-        const latest = events.find((event) => event.regionId === place.id && (event.locationKey || (Number.isFinite(event.locationSnapshot?.lat) && Number.isFinite(event.locationSnapshot?.lon))));
+        const latest = events.find((event) => event.regionId === place.id && journalReturnDestination(event, state.appCtx.LOCS));
         return `<article class="discoveryItem"><strong>${escapeHtml(place.label)}</strong><small>${place.count} Journal record${place.count === 1 ? '' : 's'} · saved Explorer place</small>${latest ? `<button class="discoveryJournalReturn" data-journal-return="${escapeHtml(latest.eventId)}" type="button">Return to place</button>` : ''}</article>`;
       }).join('') : '<div class="discoveryEmpty">Complete an activity or observation to add its region to Places.</div>';
     }
@@ -885,6 +893,7 @@ function createDiscoveryUi(state) {
   listen(elements.arChallenge, 'click', () => void state.handleArChallenge());
 
   function render(actions, snapshot, activityId = 'metal-detect') {
+    if(elements.panel?.dataset.journeyJournalOwner)return;
     const liveGps = state.appCtx.getLiveGpsSnapshot?.() || { active: false };
     if (elements.expeditionMode) elements.expeditionMode.textContent = liveGps.active
       ? 'THREE GPS WALKING STOPS'
@@ -1193,6 +1202,7 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
   if (snapshot.requestId !== request.id || appCtx.worldPublication?.sequence !== snapshot.sequence) return null;
   const personalHousing = await import('../game/property-ui.js?v=9');
   if (appCtx.worldPublication?.sequence !== snapshot.sequence) return null;
+  closeJourneyJournal(appCtx);
   disposeWorldDiscoveryRuntime(appCtx, 'replacement');
   const validation = validateDiscoveryCatalogs(BUILTIN_DISCOVERY_CATALOGS);
   if (!validation.ok) throw new Error(`World Discovery catalog rejected: ${validation.errors.join('; ')}`);
@@ -1786,24 +1796,11 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
   state.returnToJournalEvent = async (eventId) => {
     const events = await profileStore.listEvents?.(500) || [];
     const event = events.find((entry) => entry.eventId === String(eventId));
-    const locationKey = String(event?.locationKey || '');
-    if (!event) return false;
-    const savedLocation = event.locationSnapshot || {};
-    const isPreset = !!(locationKey && appCtx.LOCS?.[locationKey] && typeof appCtx.selectPresetLocation === 'function');
-    const isCoordinate = Number.isFinite(savedLocation.lat) && Number.isFinite(savedLocation.lon) && typeof appCtx.setCustomLocation === 'function';
-    if (!isPreset && !isCoordinate) return false;
+    if (!journalReturnDestination(event, appCtx.LOCS)) return false;
     state.ui?.setOpen(false);
-    if (isPreset && String(appCtx.selLoc) === locationKey) {
-      appCtx.showToast?.(`Already exploring ${event.regionLabel || 'this location'}`);
-      return true;
-    }
-    if (isPreset) appCtx.selectPresetLocation(locationKey);
-    else appCtx.setCustomLocation({ lat: savedLocation.lat, lon: savedLocation.lon, name: savedLocation.name || event.regionLabel || 'Saved place' }, { transient: false });
-    if (appCtx.ENV?.EARTH && appCtx.getEnv?.() !== appCtx.ENV.EARTH) appCtx.switchEnv?.(appCtx.ENV.EARTH);
-    await appCtx.loadRoads?.();
-    appCtx.spawnOnRoad?.();
-    appCtx.showToast?.(`Returned to ${event.regionLabel || appCtx.LOCS?.[locationKey]?.name || savedLocation.name || 'saved place'}`);
-    return true;
+    const returned = await returnToJournalRecord(appCtx, event);
+    if (!returned) appCtx.showToast?.('This journey could not reopen. Your saved record is kept.');
+    return returned;
   };
   const telemetryContextBands = () => environment.cells.find((cell) => cell.cellId === state.currentCellId)?.contexts || [];
   state.isCompanionEligible = (catalog) => catalog?.contexts?.some((context) => telemetryContextBands().includes(context)) === true;
@@ -2398,6 +2395,7 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
     return true;
   };
   appCtx.openWorldDiscoverySection = (section = 'today') => {
+    closeJourneyJournal(appCtx);
     state.ui.setTab(section);
     state.ui.setOpen(true);
     state.ui.render(state.actions, state.lastSnapshot, state.activeActivityId);

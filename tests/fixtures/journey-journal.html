@@ -1,0 +1,21 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>Journey Journal verification</title><link rel="icon" href="/favicon.svg">
+<link rel="stylesheet" href="/app/styles/runtime-shell.css?v=130"><link rel="stylesheet" href="/app/styles/interface-v4.css?v=33"><link rel="stylesheet" href="/app/styles/discovery.css?v=19">
+<style>body{background:#143543}canvas{width:1px;height:1px}</style><body><canvas></canvas><script type="module">
+import {openJourneyJournal,closeJourneyJournal,refreshJourneyJournal,journeyJournalIsOpen} from '/app/js/discovery/journey-journal.js';
+import {createMemoryDiscoveryProfileStore} from '/app/js/discovery/profile-store.js?v=5';
+import {prepareSurfaceVoyage} from '/app/js/ocean/voyage.js';
+import {commitEnvironment} from '/app/js/session-coordinator.js?v=2';
+const html=new DOMParser().parseFromString(await (await fetch('/app/index.html')).text(),'text/html');
+document.body.append(html.getElementById('discoveryPanel'));
+const controls=document.createElement('section');controls.id='solidWorldPanel';document.body.append(controls);
+const backing=createMemoryDiscoveryProfileStore(),voyage=prepareSurfaceVoyage({lat:34,lon:-120,name:'Offshore California'});
+const records=[{eventId:'wildlife',name:'Wildlife watch · Common dolphin',environment:'OCEAN',pathId:'field',regionLabel:'Offshore California',detail:'Swimming below the surface. A simulated encounter, not a real-world sighting.',metadata:{voyage}},{eventId:'moon',name:'Lunar field sample',environment:'MOON',pathId:'field',regionLabel:'Moon'},{eventId:'earth',name:'Coastal drive',environment:'EARTH',pathId:'travel',regionLabel:'California',locationSnapshot:{lat:34,lon:-120}}];
+for(let i=0;i<records.length;i++)await backing.recordExplorerEvent({...records[i],occurredAt:Date.now()+i,eventType:'marine-research-recorded',activityId:'fixture-activity',sourceSystem:'fixture',sourceId:records[i].eventId,projections:{journal:true},progress:{points:0}});
+let fail=false,pending=null,oldClicks=0,pauses={},returns=[],layer=false;
+const store={...backing,listEvents:async n=>{if(fail)throw Error('storage unavailable');if(pending)await new Promise(resolve=>{pending=resolve});return backing.listEvents(n)},listFieldGuide:async()=>[{name:'Common dolphin',catalogId:'dolphin',family:'marine',observations:1},{name:'Basalt',catalogId:'basalt',family:'mineral',observations:2}]};
+const ctx={discoveryProfileStore:store,oceanVoyage:{resume:async v=>{returns.push(v);return true}},setPauseReason:(reason,value)=>pauses[reason]=value,screenLayout:{setPanelLayer:(_,value)=>layer=value}};
+document.getElementById('discoveryPanel').addEventListener('click',()=>oldClicks++);
+commitEnvironment('EARTH');
+window.journalTest={ctx,open:section=>openJourneyJournal(ctx,section),close:()=>closeJourneyJournal(ctx),refresh:()=>refreshJourneyJournal(ctx),fail:value=>fail=value,hold:()=>pending=true,release(){const release=pending;pending=null;release?.();},transition:()=>commitEnvironment('OCEAN'),snapshot:()=>({open:journeyJournalIsOpen(ctx),pauses,oldClicks,layer,returns})};
+window.render_game_to_text=()=>JSON.stringify(journalTest.snapshot());window.advanceTime=async()=>{};window.ready=true;
+</script></body></html>

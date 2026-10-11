@@ -860,7 +860,10 @@ function getOceanModeDebugState() {
     underwaterSchoolCount: Number(oceanMode.underwaterSchoolPlan?.schools?.length || 0),
     underwaterFishCount: Number(oceanMode.fishEntities?.length || 0),
     underwaterSpeciesIds: (oceanMode.underwaterSchoolPlan?.schools || []).map((school) => school.speciesId),
-    fishLivePresenceClaim: oceanMode.underwaterSchoolPlan?.livePresenceClaim === true
+    fishLivePresenceClaim: oceanMode.underwaterSchoolPlan?.livePresenceClaim === true,
+    marineWildlife:{plan:oceanMode.cetaceanPlan,animals:(oceanMode.cetaceans||[]).map(animal=>({
+      speciesId:animal.mesh.userData.speciesId,visualState:animal.visualState,visible:animal.mesh.visible,
+      position:animal.mesh.position.toArray(),catchable:false,livePresenceClaim:false}))}
   };
 }
 

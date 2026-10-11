@@ -375,3 +375,16 @@ test('licensed barramundi retains bounded textured geometry and reproducible CC0
  assert.ok(provenance.textures.every(t=>t.dimensions.every(n=>n<=1024)));
  assert.deepEqual(asset.instancePolicy,{geometry:'shared',materials:'clone'});assert.equal(asset.budgets.maxInstances,3);
 });
+
+test('common dolphin keeps the licensed authored skin and animation in a bounded self-contained asset',()=>{
+ const asset=getModelAsset('marine-common-dolphin'),{bytes,json}=readGlbAssetMetadata(path.join(root,asset.url.slice(1)));
+ const record=JSON.parse(fs.readFileSync(path.join(root,'app/assets/models/marine/common-dolphin/PROVENANCE.json'),'utf8'));
+ assert.equal(asset.license,'CC-BY-4.0');assert.match(record.author,/CGreature.*kenchoo/);
+ assert.equal(crypto.createHash('sha256').update(bytes).digest('hex'),record.sha256);
+ assert.ok(bytes.length<=asset.budgets.bytes);assert.equal(triangleCount(json),18576);assert.ok(triangleCount(json)<=asset.budgets.triangles);
+ assert.equal(json.skins.length,1);assert.equal(json.animations.length,1);assert.ok(json.animations[0].channels.length>20);
+ assert.ok(json.meshes[0].primitives.every(p=>p.attributes.JOINTS_0!==undefined&&p.attributes.WEIGHTS_0!==undefined));
+ assert.ok(json.images.every(i=>Number.isInteger(i.bufferView)&&!i.uri));assert.ok(json.buffers.every(b=>!b.uri));
+ assert.ok(record.textures.every(t=>t.dimensions.every(n=>n<=1024)));assert.ok(Math.abs(record.bounds.max[2]-record.bounds.min[2]-2.3)<1e-8);
+ assert.equal(asset.budgets.maxInstances,3);assert.deepEqual(asset.instancePolicy,{geometry:'shared',materials:'shared'});
+});

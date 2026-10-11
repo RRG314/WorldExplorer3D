@@ -10,7 +10,7 @@ import { initShareUi } from "./ui/share-links.js?v=64";
 import { setupSettingsUi } from "./ui/settings.js?v=2";
 import { bindSpaceActions } from "./ui/space-actions.js?v=17";
 import { initTitleScreenUi } from "./ui/title-screen.js?v=120";
-import { exitCurrentEnvironmentSync } from './session-coordinator.js?v=2';
+import { captureEnvironmentSession, exitCurrentEnvironmentSync } from './session-coordinator.js?v=2';
 import { createEarthReturnAction } from './travel/earth-return.js';
 
 function emitTutorialEvent(eventName, payload = {}) {
@@ -262,7 +262,17 @@ function setupUI() {
     closeAllFloatMenus();
   });
   let pendingExplorerSection = null;
+  let explorerOpenRequest = 0;
   const openExplorerSection = (section) => {
+    const request=++explorerOpenRequest;
+    if(!appCtx.worldDiscoveryRuntime || appCtx.getEnv?.()!=='EARTH'){
+      pendingExplorerSection=null;closeAllFloatMenus();
+      const frame=captureEnvironmentSession(),started=appCtx.gameStarted;
+      void import('./discovery/journey-journal.js').then(module=>{
+        if(request===explorerOpenRequest&&frame.isCurrent()&&started===appCtx.gameStarted) return module.openJourneyJournal(appCtx,section);
+      }).catch(()=>appCtx.showToast?.('The Journal could not open. Your saved records are kept. Try again.'));
+      return;
+    }
     if (typeof appCtx.openWorldDiscoverySection === 'function') {
       pendingExplorerSection = null;
       appCtx.openWorldDiscoverySection(section);
