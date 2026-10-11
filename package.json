@@ -150,7 +150,7 @@
     "verify:expedition-pirate-interception": "node --test tests/pirate-interception-current.test.mjs && node scripts/verification/expedition-pirate-interception-current.mjs",
     "verify:interstellar-polish": "node scripts/verification/interstellar-polish.mjs",
     "verify:interstellar-persistence": "node scripts/verification/interstellar-persistence.mjs",
-    "verify:artifact-runtime": "WE3D_VERIFY_ROOT=dist node scripts/verification/world.mjs",
+    "verify:artifact-runtime": "node scripts/verification/artifact-world.mjs",
     "test": "npm run verify:pr && npm run verify:world",
     "verify:provider-outages": "node scripts/verification/provider-outage-browser.mjs",
     "verify:dependencies": "node scripts/verification/runtime-dependencies.mjs",

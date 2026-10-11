@@ -107,3 +107,12 @@ Two direct live GEBCO requests succeeded at 25°N 60°W and near the date line;
 that is point-service evidence only. The final packaged fallback and whole-release gates remain separate checks.
 This does not finish the separate airport/cabin, berth/gangway, launch-site art,
 creative terrain/farms, complete wildlife-art or full public-media roadmap.
+
+
+Packaged validation attempt `packaged-b145` reached the actual previous-release
+Ocean renderer, then rejected its expected v3 bytes because leaving the candidate
+had legitimately checkpointed once more. The test now compares the payload after
+that departure checkpoint, while still requiring byte preservation throughout
+fallback. No game save behavior was weakened. The same audit found two release
+commands could override the selected artifact with `dist`; both now honor the
+selected validation root. Failed receipts are retained; no completion is inferred.

@@ -16,7 +16,7 @@ if(fallback){
  for(const directory of [root,fallback])assert.equal(JSON.parse(await fs.readFile(`${directory}/build-manifest.json`,'utf8')).firebaseProjectId,'we3d-staging-20260712');
 }
 const dir=process.env.WE3D_OCEAN_STREAM_OUTPUT||'output/ocean-stream-20261011/browser';await fs.mkdir(dir,{recursive:true});
-const report={scope:'Current app, real deck/sub/diver and controls; controlled GEBCO responses. Long-distance setups exercise repeated rebases, not elapsed-time world circumnavigation.',cases:[],errors:[]};
+const report={artifactIdentity:identityBefore,fallbackArtifactIdentity:fallbackIdentity,scope:'Current app, real deck/sub/diver and controls; controlled GEBCO responses. Long-distance setups exercise repeated rebases, not elapsed-time world circumnavigation.',cases:[],errors:[]};
 let server=await startStaticServer({rootDir:root,ports:[4396]});
 const owned=await chromium.launchServer({channel:'chrome',headless:false});const browser=await chromium.connect(owned.wsEndpoint());let page;
 try{
@@ -90,16 +90,23 @@ try{
  assert.equal(await page.evaluate(()=>localStorage.getItem('we3d.ocean.voyage.v1')),legacyRaw);
  report.cases.push('New native and continuous checkpoints leave the existing released save byte-for-byte intact');
  if(fallback){
-  const streamedRaw=await page.evaluate(()=>{__marineEntryContext.oceanVoyage.checkpoint();return localStorage.getItem('we3d.ocean.voyage.v3');});
-  async function reopen(directory){
+  let streamedRaw=await page.evaluate(()=>{__marineEntryContext.oceanVoyage.checkpoint();return localStorage.getItem('we3d.ocean.voyage.v3');});
+  async function reopen(directory,beforeResume=async()=>{}){
    await page.goto('about:blank');await server.close();server=await startStaticServer({rootDir:directory,ports:[4396]});
    await page.goto(`http://127.0.0.1:${server.port}/app/`,{waitUntil:'load'});
    await page.waitForFunction(()=>window.__WE3D_RUNTIME_READY__,null,{timeout:90000});
+   await beforeResume();
    await page.locator('#oceanVoyageResume').waitFor({state:'visible',timeout:30000});await page.locator('#oceanVoyageResume').click();
    await page.waitForFunction(()=>window.getOceanModeDebugState?.()?.active,null,{timeout:90000});
    await page.evaluate(async()=>{globalThis.__marineEntryContext=(await import('/app/js/shared-context.js?v=55')).ctx;});
   }
-  await reopen(fallback);
+  await reopen(fallback,async()=>{
+   const departedRaw=await page.evaluate(()=>localStorage.getItem('we3d.ocean.voyage.v3'));
+   const before=JSON.parse(streamedRaw),after=JSON.parse(departedRaw);
+   assert.ok(after.revision>=before.revision&&after.savedAt>=before.savedAt);
+   for(const value of [before,after]){delete value.revision;delete value.savedAt;}
+   assert.deepEqual(after,before);streamedRaw=departedRaw;
+  });
   const old=await page.evaluate(()=>{const c=__marineEntryContext; c.oceanVoyage.checkpoint();return {id:c.oceanVoyage.current.id,version:c.oceanVoyage.current.version,stream:localStorage.getItem('we3d.ocean.voyage.v3')};});
   assert.equal(old.id,'retained-ocean');assert.equal(old.version,1);assert.equal(old.stream,streamedRaw);
   await reopen(root);assert.equal(await page.evaluate(()=>__marineEntryContext.oceanVoyage.current.id),'retained-ocean');

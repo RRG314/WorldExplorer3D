@@ -12,7 +12,10 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 
 const ROOT = process.cwd();
-const OUTPUT_DIR = await resolveHostingOutput(ROOT,readFlag('--output-dir'),{building:String(process.argv[2]||'build').toLowerCase()==='build'});
+const command = String(process.argv[2] || 'build').toLowerCase();
+const OUTPUT_DIR = command==='verify'&&process.env.WE3D_VERIFY_ROOT&&!readFlag('--output-dir')
+  ? path.resolve(ROOT,process.env.WE3D_VERIFY_ROOT)
+  : await resolveHostingOutput(ROOT,readFlag('--output-dir'),{building:command==='build'});
 const ASSET_MANIFEST = 'asset-manifest.json';
 const BUILD_MANIFEST = 'build-manifest.json';
 const SOURCE_ENTRIES = SHIPPED_SOURCE_ENTRIES;
@@ -539,7 +542,6 @@ async function verifyArtifact() {
   return result;
 }
 
-const command = String(process.argv[2] || 'build').toLowerCase();
 try {
   if (command === 'build') {
     await buildArtifact(String(readFlag('--firebase-env', process.env.WE3D_FIREBASE_ENV || 'staging')).toLowerCase());
