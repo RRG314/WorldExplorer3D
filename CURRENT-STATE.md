@@ -54,18 +54,35 @@ browsers/servers. Production deployment evidence is under
 
 ### Latest: regional detail and ship movement repair
 
-The next local delivery is reviewed in
+The current review delivery is documented in
 `docs/design/POST-RELEASE-STREAMING-DELIVERY.md`. All **2,471 source tests** and the
 complete source chain pass. The furnished research-vessel browser check passes
 20 cases, including real Space jump/landing and shared mouse look, all 55 route
 connections, smooth stair camera, maps, swimming and disposal. The full Earth
 source journey passes arrival/return, moving imagery, provider failure/recovery,
-streaming toggle and regional buffer disposal. Packaged acceptance is next.
-Production and the existing ship preview are unchanged at this checkpoint.
+streaming toggle and regional buffer disposal.
+
+The existing preview now serves **31ab54c**:
+https://we3d-staging-20260712--ship-review-1011-pb8x1l4l.web.app/
+(expires October 18 evening, America/New_York).
+Immutable package: `output/hosting-validation/streaming-reviewed`, build
+`5.5.0+31ab54cd264b.113b39b42da96b2a.staging`. All eight selected packaged gates
+pass, including remote Earth arrival, ship traversal through all 25 rooms,
+marine journeys and artifact integrity. The separate 11-case ocean/actual
+fallback roundtrip passes against the same package. Ordinary hosted Chrome
+passes running, mouse look, jump/landing away from the ladder, galley,
+bridge/chart and desktop/phone-width map, with no captured page or HTTP errors.
+Source/component, controlled-provider and live-service evidence are separated
+in the delivery ledger. Phone-width testing is not physical-device testing.
+
+Production remains d877; no GitHub push or production deployment. The earlier
+same-payload `streaming-ready` validation package was retired after full hash
+verification; its manifests/receipt remain. Preserve production dist, all four
+saved packages, previous `research-ready`, and the current `streaming-reviewed`.
 Worldwide physical transport streaming and the larger roadmap are not claimed
 complete; their current limits are explicit in the delivery review.
 
-### Latest: research vessel interior, awaiting owner preview
+### Previous preview: research vessel interior
 
 The working ship now has an enclosed wet lab, galley, mess, dry lab, quarters,
 briefing room and wheelhouse, connected by actual internal stairs. Deck-level

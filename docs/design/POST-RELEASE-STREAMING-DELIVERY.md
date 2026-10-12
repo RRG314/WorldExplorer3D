@@ -1,6 +1,7 @@
 # Post-release review: continuous Earth and ship movement
 
-October 11, 2026. Work in progress; no production deployment.
+October 11, 2026. Focused repairs implemented and verified in the review preview;
+no production deployment. Broader release gaps are explicit below.
 
 ## Scope and baseline
 
@@ -64,6 +65,20 @@ whales/deep squid/global ecology and the broad navigation redesign remain larger
 expansions. They are not implied complete by ocean streaming, a perimeter fence,
 or a mission starter. This review must not hide them behind a release label.
 
+The production-to-working-source review separates these delivered increments
+from the larger requests they started:
+
+| Area | Implemented increment | Still outside a completion claim |
+| --- | --- | --- |
+| Earth | Preserved source coverage, near pavement scheduling, moving terrain/building presentation | Moving physical transport/building interactions, global coordinate rebasing, full visual parity |
+| Ships | Licensed vessel/sub, furnished rooms, maps, shared Journal/provisions and movement repairs | Authored jump animation and further art polish |
+| Oceans | Separate authored studies and geographic voyages, bounded depth/scenery streaming, vessel custody and save recovery | Complete worldwide ecology, whales/deep squid and expanded activities |
+| Progression | First Bearings, Harbor, Three Views, workspace and lunar/homecoming sequences | Full career campaigns, remaining scientist/mining/CERN requests |
+| Creative play | Room isolation, possession ownership and compatible saves | Geographic terrain/farm editing and a complete construction/destruction loop |
+| Facilities | Mapped perimeters and supported transfers | Fully furnished airport terminals, harbor/gangway packs and launch-site gameplay |
+| Data/backend | Bounded providers/caches, truthful unavailable states, staging offshore address repair | Approved production promotion of that repair and final live-service release acceptance |
+| Release/public presentation | Prior gallery/color/readability/analytics work, current source checks and focused journeys | Final whole-release matrix, final public capture refresh, physical-device performance |
+
 ## Evidence
 
 ### October 11 source and real-browser evidence
@@ -96,10 +111,75 @@ or a mission starter. This review must not hide them behind a release label.
   unrelated world detail is still finishing during the run, so total renderer
   geometry counts are not presented as a whole-app memory plateau.
 
+### Final package and hosted acceptance
+
+The retained package is `output/hosting-validation/streaming-reviewed`, build
+`5.5.0+31ab54cd264b.113b39b42da96b2a.staging`. Its 678 payload files have asset
+manifest SHA-256 `8001cc65e1b2b7462c019bd43820e752c6897f2cbb952a16730b8623273962f9`.
+
+- `selected-gates.json`: all eight selected packaged gates pass: regional
+  arrival, capabilities, marine habitat, research, diving, local water entry,
+  spaceship traversal and artifact integrity. This is a selected run, not the
+  complete release matrix. The matrix's separate aggregate manifest deliberately
+  does not certify an incomplete selection.
+- `packaged-earth-final/report.json`: the built app passes remote arrival,
+  moving imagery, return, toggle, provider recovery and regional disposal. The
+  destination capture shows facade openings, surface variation and roof colors
+  beyond the original detailed district. Provider data is live; arrival position
+  is controlled, so this does not measure sustained flight performance.
+- `packaged-spaceship/report.json`: actual held-key traversal reaches all 25
+  rooms across 27 routes including lift transits. Door passages, jumping and
+  landing, and all 31 observation views pass, with no captured runtime errors.
+- `packaged-research/`: the 16-case full-app journey verifies room actions,
+  navigation chart, survey/rewards, map layouts and the same vessel after reload.
+  Route following steps the real controller; it is not elapsed-time evidence.
+- `packaged-ocean-fallback/report.json`: 11 cases pass against this exact package
+  and the retained d877 release. Keyboard tile crossing, repeated 9 km setups,
+  rebasing, nine-tile residency, outage handling, remote save/reload, diver/sub
+  custody and original-vessel recovery work. The actual fallback reads and
+  writes its old voyage while the candidate preserves the continuous voyage.
+  Depth responses are controlled; the test is not global coverage certification.
+- `hosted/report.json`: ordinary hosted Chrome passes real mouse look,
+  Shift+W running, Space jump and landing, galley entry, bridge stairs/chart,
+  and desktop/phone-width ship map. There is no provider interception or debug
+  attestation, and no captured page errors or failed HTTP requests. Room routes
+  step the real controller. Phone-width screenshots are not a physical-device
+  performance test.
+- The first hosted jump assertion expected a deck jump at the dive ladder.
+  `hosted-diagnostic/report.json` traces the intentional water transfer, not a
+  menu-focus failure. The corrected journey physically runs away from the ladder
+  before jumping; no runtime change or weakened movement assertion was needed.
+- `hosted-identities.json` confirms the preview build and unchanged d877
+  production. Only the existing staging Hosting channel was updated. No source
+  push, production deployment, Functions, rules or player-data changes occurred.
+
 Paths above are under `output/streaming-review-20261011/` unless stated otherwise.
-Final immutable-package and spaceship checks will be added when complete.
 Historical ship/ocean evidence remains in RESEARCH-VESSEL-INTERIOR-DELIVERY.md
 and OCEAN-STREAMING-DELIVERY.md and is not substituted for changed-path checks.
+
+The superseded `streaming-ready` validation package was retired only after all
+678 payload hashes matched the retained package. Its manifests and receipt remain
+in `retired-validation/`; 276,321,775 payload bytes were reclaimed. Production
+dist, the four saved fallback packages, source history, the prior research
+candidate and player storage remain intact. All owned check browsers closed.
+
+## Owner test build
+
+[Open the review preview](https://we3d-staging-20260712--ship-review-1011-pb8x1l4l.web.app/).
+The channel expires October 18 in America/New_York. Check the HUD source label
+`31ab54c` to identify this build.
+
+1. Start the Coral Shelf research outing. Use WASD to move, Shift to run and
+   mouse drag to look. Away from the dive ladder, Space jumps and lands on deck;
+   beside the ladder, Space enters the water.
+2. Use Ship map to choose Galley, Crew quarters and Chart table, then follow the
+   passages and stairs. Destination selection sets a route; it does not teleport.
+3. Enter the spaceship and walk through doors and between decks; check jumping
+   and the observation screen's inside/outside views.
+4. On Earth, keep “Load regional scenery as you travel” enabled and fly beyond
+   the starting district. Arriving facade detail and imagery should follow.
+   Turning it off restores fixed-location scenery. This setting still does not
+   extend physical roads or interactions worldwide.
 
 ## Limits that remain relevant to release
 
@@ -129,6 +209,6 @@ The installed explorer rig has no authored jump clip. Jumping now has real
 gravity, deck landing and ceiling collision, but uses the rig's neutral airborne
 pose. A dedicated authored animation is still an art-quality improvement.
 
-The complete release matrix, ordinary hosted acceptance for this new build and
-physical-device performance are distinct from the checks above. Do not mark the
-entire roadmap or production readiness complete based on this delivery.
+The complete release matrix and physical-device performance remain separate from
+the focused hosted acceptance above. Do not mark the entire roadmap or production
+readiness complete based on this delivery.
