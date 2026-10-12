@@ -18,7 +18,7 @@ not a claim that every proposed career campaign is complete.
 
 ## Life aboard the research vessel
 
-A licensed research hull and submarine replace the earlier custom vessels.
+A new research vessel and submarine replace the earlier models.
 Walk through the wet lab, dry lab, galley, mess, quarters and wheelhouse. Connected
 stairs and a deck map help you find the room you need. Stations use the existing
 Journal, provisions and voyage systems.
@@ -29,13 +29,13 @@ water, swim or dive with the appropriate equipment, deploy the submarine and
 recover to the same parent ship.
 
 <!-- public-gallery:research-interior -->
-![Inside the research vessel galley with its carried-provisions controls open](assets/gallery/5.6/research-interior.webp)
+![Inside the research vessel galley with carried provisions available](assets/gallery/5.6/research-interior.webp)
 
 ## Explore farther
 
 Personal geographic ocean voyages can load nearby seabed scenery while releasing
-the area left behind. They retain geographic depth, vessel custody and save
-recovery. A setting keeps the original fixed-area behavior available. Authored
+the area left behind. Depth follows the selected area, and your vessel and saved voyage
+stay connected as you travel. A setting keeps the original fixed-area behavior available. Authored
 study sites and shared crew voyages retain their own boundaries.
 
 Regional Earth buildings retain more facade and roof detail during travel.
@@ -43,7 +43,7 @@ Terrain imagery now follows the traveling region too. Failed requests retain the
 last complete scenery while recovery proceeds. Existing selected-location roads,
 buildings and land-cover detail are preserved.
 
-Selected licensed fish and dolphins use location and depth rules. Wildlife
+Selected fish and dolphins use location and depth rules. Wildlife
 observations belong to the game Journal and are clearly distinguished from real
 animal sightings. The Journal and Field Guide remain available across ocean and
 planetary journeys, with supported return actions for saved voyages.
@@ -51,18 +51,39 @@ planetary journeys, with supported return actions for saved voyages.
 <!-- public-gallery:submarine -->
 ![The Atlantic Explorer submarine deployed from its research vessel](assets/gallery/5.6/submarine.webp)
 
-## Clearer presentation and safer progress
+## Step inside
 
-A first museum visit opens at The Peale's mapped Baltimore building. Walk a
-finished entrance hall and two galleries, inspect Smithsonian specimen models
-and a Met artwork, and keep notes in your Journal. The public wayfinding guide
-informs the room connections; dimensions and finishes are estimated. This is
-an interpretive collection study, not The Peale's current rooms or collection.
+Enter the National Aquarium from Baltimore’s waterfront and follow the Pavilion
+route to Blacktip Reef. Lifts connect the upper view and the gallery below the
+waterline. Watch sharks and a sea turtle among the coral, look up through the
+water, and save observations in your Journal. The visitor map helps you find
+another level and return outside.
+
+<!-- public-gallery:aquarium -->
+![Looking through the aquarium viewing window at animated marine life and coral](assets/gallery/5.6/aquarium.webp)
+
+A separate museum visit opens at The Peale’s mapped building. Its entrance hall
+and two galleries contain Smithsonian specimen models and a Met artwork to
+inspect, with collection notes saved to the same Journal.
+
+These are limited, independent interpretations. The aquarium route covers the
+Pavilion and Blacktip Reef area; the museum rooms and collection are an
+interpretive study. Neither recreates the entire institution, and dimensions
+and finishes are estimated where published information is unavailable.
+
+<!-- public-gallery:museum -->
+![Inside the interpretive museum gallery at The Peale in Baltimore](assets/gallery/5.6/museum.webp)
+
+## Clearer presentation and progress
+
+Return to Earth now clears the previous flight course before descent. Clicking
+inside a venue no longer selects outdoor buildings through its walls. The ocean
+travel setting sits beside the regional scenery option in Graphics.
 
 The BMW uses a lighter authored finish, and consistent display color and night
 lighting improve character and vehicle visibility. Supported facilities retain
-mapped fences, gates and transfer behavior. Local building edits, room edits,
-possessions and voyage saves keep their separate ownership and recovery paths.
+mapped fences, gates and transfer behavior. Your local building edits, shared-room creations, possessions and saved voyages
+remain available when you return.
 
 ## Still being improved
 
@@ -76,6 +97,5 @@ CERN, fully furnished airport and port packs, terrain farming, worldwide marine
 ecology and spearfishing remain outside this update. Interstellar Expeditions
 remain Alpha.
 
-This is a compatible minor update. Existing save records and recovery copies are
-retained; newer voyage formats use separate keys. See the
+Existing progress and recovery copies are retained when you update. See the
 [known limitations](KNOWN_ISSUES.md) and [roadmap](ROADMAP.md).

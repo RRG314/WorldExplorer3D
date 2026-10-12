@@ -6,6 +6,10 @@ Notable user-facing changes are recorded here. Git history and GitHub releases c
 
 ### Added
 
+- A distinct National Aquarium visitor route with lifts, views above and below
+  the waterline, animated marine life, a visitor map and Journal observations.
+- An interpretive museum visit at The Peale with three collection displays.
+
 - Opening fieldwork, Harbor Run, Three Views and personal-workspace journeys,
   followed by coastal investigation and lunar fieldwork with Journal records.
 - A licensed research vessel and submarine, furnished connected rooms, deck maps,

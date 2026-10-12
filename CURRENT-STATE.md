@@ -50,6 +50,34 @@ browsers/servers. Production deployment evidence is under
 `output/release-evidence/current/production-deployment.json` and
 `production-promotion.json`; acceptance gaps remain in their own receipts.
 
+## October 12 ordinary player walkthroughs — release still under review
+
+The hosted staging build `5.6.0+de975e18e39f.cbaae1ba07061354.staging`
+was exercised in normal Chrome using visible controls and held keyboard/mouse
+input, without provider interception, debug attestation or moved game actors.
+The research vessel sailed 26.17 units and steered, then moored; deck routes,
+galley, map, helm, sub deployment and swimming worked. Aquarium street entry,
+both reef viewing levels, lifts, exit and reentry worked. Three aquarium windows
+measured about 60 / 60 / 55 FPS; reentry still had a 433 ms pause. The Peale street
+entrance and connected gallery route worked. Earth walking, driving, drone and
+plane controls worked, as did hosted MET Norway weather and USGS earthquakes.
+These are bounded journeys, not complete backend or performance certification.
+Receipts: `output/production-readiness-20261012/*-capture/report.json`.
+
+The normal space walkthrough exposed a real Return to Earth failure: the visible
+craft moved but the retained SI journey still targeted Saturn. The local fix
+releases that journey before the existing direct-return descent. Two other
+observed UI defects are fixed locally: exterior roof selections through interior
+walls, and the ocean-streaming checkbox overflowing the destination bar. The
+setting now lives beside regional travel in Graphics. These fixes require the
+updated hosted walkthrough before publication. Current gallery images are new
+5.6 captures; several compositions are being improved before release.
+
+The current production package, saved fallbacks, player data and Git history
+remain intact. Production is still 5.5; 5.6 has not been published to GitHub or
+promoted. The source/backend/full packaged checks and final gallery review must
+finish without relabeling existing pauses or incomplete acceptance as passes.
+
 ## October 12 resource residency cleanup — local verification
 
 The current local changes retire the hidden furnished research vessel after

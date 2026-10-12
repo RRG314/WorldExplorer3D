@@ -32,6 +32,16 @@ should be recognizable in the world itself. Photo contributions should remain
 attached to the correct building, with private drafts and explicit review before
 public sharing.
 
+## Museums and aquariums
+
+Build on the distinct aquarium and museum visits already available. Improve
+recognizable exteriors, room finishes, habitat density, lighting and views while
+preserving clear entrances, visitor routes, accessible lifts and return paths.
+Expand the current limited routes as reliable plans and reference material
+become available. Exhibits should have useful interactions and Journal records,
+with accurate attribution and a clear distinction between reproductions and
+original collections.
+
 ## A richer ocean
 
 The licensed research vessel now has connected rooms, a deck map, working
