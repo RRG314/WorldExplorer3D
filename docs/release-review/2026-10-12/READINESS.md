@@ -204,3 +204,15 @@ All production bytes and retained fallback packages remain preserved.
 Final source validation after the GPU disposal repair: `verify:pr` passes all
 2,524 tests with zero skips/TODOs, and the complete surrounding source chain.
 Log: `/tmp/we3d-resource-final-source-complete.log`.
+
+## Player journeys and public release review
+
+Owner requests ordinary sailing/steering, ship rooms, diving/recovery, starship
+travel/return and exterior aquarium entry, plus frontend/backend verification.
+The nine-gate 69d5632b package sweep passes seven gates; both venues complete
+functional journeys but fail performance. The latest terrain mixture reuse
+source check passes all 54 aquarium checks with no >50 ms frames in three
+10-second windows. Package confirmation and outdoor performance remain open.
+The first backend sweep used the wrong (preserved production) dist. Its
+environment guard refused access; this is an invocation failure, not a gameplay
+regression. Rerun with an explicit staging package.

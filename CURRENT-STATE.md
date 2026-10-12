@@ -110,9 +110,32 @@ failed comparison remain intact; no threshold was relaxed. The final full source
 passes all 2,524 tests after the instance-buffer correction, plus dependency,
 ownership, type, runtime-name, inventory and sensitivity checks.
 
-No new immutable package, production deployment or GitHub push has occurred.
-Outdoor performance, complete release gates and the previously disclosed venue
-showcase scope remain open; production is still d877 and all fallbacks are kept.
+The local immutable resource-reviewed package is
+`5.6.0+69d5632b30b8.2ac1eef14bf650b1.staging`. Seven of nine selected gates pass:
+full land/ocean/land and three sub/recovery cycles, marine habitat, continuous
+ocean, terrain shaders, packaged world, artifact integrity and release contracts.
+The aquarium and museum complete their functional journeys but fail performance
+acceptance. Aquarium reentry includes 666.7/566.7 ms pauses as temporary city
+construction data is collected. These failures remain recorded.
+
+A subsequent terrain material refresh fix reuses private read-only mixtures
+instead of allocating two arrays at every vertex. Exact normalized-byte and
+float parity, including writable public return isolation, passes. The source
+Aquarium journey then passes all 54 checks, including three measured 10-second
+views at about 60 FPS with no frames over 50 ms. Raw heap is 1.027–1.055 GB.
+This source diagnostic requires confirmation in the next immutable package;
+it does not override the previous package's failure or certify outdoor travel.
+Evidence: `output/production-readiness-20261012/aquarium-reuse/report.json`.
+
+The owner's latest request prioritizes complete research-vessel, starship and
+street-to-aquarium player journeys plus frontend/backend review. Only observed
+gameplay defects should change gameplay; harness failures must remain distinct.
+Public README, Pages and release imagery must show the current build with plain
+player-facing descriptions. The current hosted production and fallbacks remain
+untouched. The first backend sweep accidentally used the preserved production
+`dist`; its local protection correctly refused access. The sweep was stopped,
+its owned processes retired, and must run with an explicit staging package.
+No GitHub push or production deployment has occurred.
 
 ## October 12 aquarium audit and venue separation
 

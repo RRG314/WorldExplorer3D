@@ -103,6 +103,21 @@ try {
   report.walks.push(await walkResearchStationWithInput(page, 'helm'));
   await page.locator('#researchDeckAction').click();
   await page.waitForFunction(() => !marineCtx.boatDeck.active && marineCtx.boatMode.active);
+  const departure=await page.evaluate(()=>({x:marineCtx.boat.x,z:marineCtx.boat.z,yaw:marineCtx.boat.angle,moored:marineCtx.boatMode.moored}));
+  if(departure.moored)await page.locator('#researchDeckMoor').click();
+  await page.waitForFunction(()=>marineCtx.boatMode.moored===false);
+  await page.keyboard.down('KeyW');
+  try {
+    await page.waitForTimeout(4000);
+    await page.keyboard.down('ArrowLeft');
+    try {await page.waitForTimeout(1500);}finally{await page.keyboard.up('ArrowLeft');}
+  }finally{await page.keyboard.up('KeyW');}
+  const sailing=await page.evaluate(()=>({x:marineCtx.boat.x,z:marineCtx.boat.z,yaw:marineCtx.boat.angle,speed:marineCtx.boat.speed}));
+  report.sailing={departure,sailing,distance:Math.hypot(sailing.x-departure.x,sailing.z-departure.z),turn:Math.atan2(Math.sin(sailing.yaw-departure.yaw),Math.cos(sailing.yaw-departure.yaw))};
+  assert.ok(report.sailing.distance>3,'Normal throttle must move the research vessel through the ocean');
+  assert.ok(Math.abs(report.sailing.turn)>.04,'Normal steering must turn the research vessel');
+  await page.locator('#researchDeckMoor').click();
+  await page.waitForFunction(()=>marineCtx.boatMode.moored&&Math.abs(marineCtx.boat.speed)<.1);
   await page.keyboard.press('KeyC'); await page.keyboard.press('KeyC');
   await page.waitForTimeout(1000);
   await capture('research-vessel', 'A research ship at sea', 'The licensed research vessel and its docked submarine through the overview camera');

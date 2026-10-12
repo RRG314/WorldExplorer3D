@@ -105,6 +105,7 @@ export function ensureTerrainSurfaceMixAttributes(geometry) {
 }
 
 const worldCoverMixes=Array.from({length:10},(_,i)=>terrainSurfaceMixForClass(i));
+const snowRockMix={mixA:[0,0,0,0],mixB:[0.35,0.65]};
 
 function weightedMixForWorldCover(result, u, v, output) {
   const classes = result?.surfaceMaterialClasses;
@@ -151,7 +152,11 @@ export function applyWorldCoverSurfaceMaterialMix(mesh, result) {
 
 export function setTerrainSurfaceMaterialMixAt(attributes, index, mode) {
   if (!attributes?.mixA || !attributes?.mixB) return false;
-  const mix = terrainSurfaceMixForProfile(mode);
+  // A mapped terrain refresh visits millions of vertices. These weights are
+  // read-only here; creating two new arrays per vertex leaves collection work
+  // that can stall a later drive or venue visit.
+  const mix = String(mode).toLowerCase()==='snowrock'
+    ? snowRockMix : worldCoverMixes[terrainSurfaceClassForMappedMode(mode)];
   setNormalizedTerrainAttribute(attributes.mixA, index, mix.mixA);
   setNormalizedTerrainAttribute(attributes.mixB, index, mix.mixB);
   return true;
