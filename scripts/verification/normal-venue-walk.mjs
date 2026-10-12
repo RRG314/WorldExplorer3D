@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 
 async function focusWorld(page) {
   if (await page.evaluate(() => ['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON'].includes(document.activeElement?.tagName))) {
-    const canvas = page.locator('body > canvas:not(#minimap)');
+    const canvas = page.locator('body > canvas:not(#minimap):visible');
     const box = await canvas.boundingBox();
     const x = box.x + box.width / 2, y = box.y + box.height / 2;
     await page.mouse.move(x, y);

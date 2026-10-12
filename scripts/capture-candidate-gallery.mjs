@@ -28,6 +28,8 @@ const report = { ok: false, capturedAt: new Date().toISOString(), sourceUrl: url
 let owned, browser, page, reentryProfiler;
 async function capture(id, title, alt) {
   const file = `${assets}/${id}.webp`;
+  await page.mouse.move(2, 2);
+  await page.waitForTimeout(150);
   await sharp(await page.screenshot()).webp({ quality: 90 }).toFile(file);
   const bytes = await readFile(file), size = page.viewportSize();
   report.images.push({ id, title, alt, file, ...size,
@@ -80,6 +82,36 @@ async function enterEarth() {
   const skip = page.getByRole('button', { name: 'Skip guide', exact: true });
   if (await skip.isVisible()) await skip.click();
   if (await page.locator('#hudToggleBtn').isVisible()) await page.locator('#hudToggleBtn').click();
+}
+async function pilotToReef() {
+  const start = await page.evaluate(() => ({ ...marineCtx.oceanMode.submarine.position }));
+  const target = await page.evaluate(() => marineCtx.oceanMode.habitat.plan.landmarks.find(p => p.id === 'table-garden'));
+  assert.ok(target, 'The authored outing needs its reef study site');
+  const keys = new Set(), deadline = Date.now() + 120000;
+  try {
+    while (Date.now() < deadline) {
+      const sub = await page.evaluate(() => {
+        const s = marineCtx.oceanMode.submarine;
+        return { ...s.position, yaw: s.yaw, speed: s.speed };
+      });
+      const dx = target.x - sub.x, dz = target.z - sub.z, distance = Math.hypot(dx, dz);
+      const dy = -12 - sub.y;
+      const turn = Math.atan2(Math.sin(Math.atan2(dx, dz) - sub.yaw), Math.cos(Math.atan2(dx, dz) - sub.yaw));
+      if (distance < 12 && Math.abs(dy) < 1 && Math.abs(sub.speed) < .5) {
+        report.submarineTravel = { start, end: sub, target: target.id, distance: Math.hypot(sub.x - start.x, sub.z - start.z) };
+        assert.ok(report.submarineTravel.distance > 20, 'Normal controls must move the sub to its study site');
+        return;
+      }
+      const next = new Set();
+      if (distance > 9 && Math.abs(turn) > .07) next.add(turn > 0 ? 'KeyA' : 'KeyD');
+      if (distance > 10 && Math.abs(turn) < .2) next.add('KeyW');
+      if (Math.abs(dy) > .7) next.add(dy > 0 ? 'Space' : 'ShiftLeft');
+      for (const key of keys) if (!next.has(key)) { await page.keyboard.up(key); keys.delete(key); }
+      for (const key of next) if (!keys.has(key)) { await page.keyboard.down(key); keys.add(key); }
+      await page.waitForTimeout(120);
+    }
+    throw new Error('Normal submarine controls did not reach the reef study site');
+  } finally { for (const key of keys) await page.keyboard.up(key); }
 }
 try {
   owned = await chromium.launchServer({ channel: 'chrome', headless: false });
@@ -202,6 +234,8 @@ try {
     const placement = a.placements.find(p => p.id === exhibit.exhibitId);
     await walkVenueWithInput(page, exhibit, { tolerance: .3 });
     await faceVenueWithInput(page, { x: placement.x + a.center.x, z: placement.z + a.center.z });
+    await page.keyboard.down('ArrowDown');
+    try { await page.waitForTimeout(650); } finally { await page.keyboard.up('ArrowDown'); }
     await page.waitForTimeout(700);
     await capture('museum', 'A collection to explore', 'Inside the interpretive museum gallery at The Peale in Baltimore');
     report.enteredFromOutside = true;
@@ -220,9 +254,16 @@ try {
     await page.waitForFunction(() => document.querySelector('.expeditionSummary .is-ready')?.textContent?.includes('READY'));
     await page.locator('#expeditionEnterShip').click();
     await page.waitForFunction(() => JSON.parse(render_game_to_text()).expeditionShipInterior?.active);
-    await page.keyboard.down('ArrowUp');try { await page.waitForTimeout(1000); } finally { await page.keyboard.up('ArrowUp'); }
-    await page.keyboard.press('KeyE');await page.waitForTimeout(800);
-    await page.keyboard.down('ArrowUp');try { await page.waitForTimeout(1100); } finally { await page.keyboard.up('ArrowUp'); }
+    const bridgeDoor = await page.evaluate(() => marineCtx.activeInterior.interactions.find(i => i.id === 'door:bridge'));
+    await walkVenueWithInput(page, { x: bridgeDoor.x, z: bridgeDoor.z - 1 }, { tolerance: .2 });
+    await page.keyboard.press('KeyE');
+    await page.waitForFunction(() => !marineCtx.dynamicBuildingColliders.some(b => b.sourceBuildingId === 'door:bridge'));
+    // The captain's console stands directly ahead of the doorway. Stop in
+    // the clear threshold instead of asking the walker to cross its desk.
+    await walkVenueWithInput(page, { x: bridgeDoor.x, z: bridgeDoor.z + .7 }, { tolerance: .12 });
+    await faceVenueWithInput(page, { x: bridgeDoor.x + 3, z: bridgeDoor.z + 7 });
+    await page.waitForTimeout(1500);
+    report.bridgeWalk = await page.evaluate(() => marineCtx.getShipInteriorSnapshot());
     await capture('ship-interior', 'Aboard Solis Reach', 'Entering the command deck through the Solis Reach pressure door');
     await page.locator('#shipExitButton').click();
     await page.waitForFunction(() => !marineCtx.activeShipInterior && marineCtx.spaceFlight.active);
@@ -344,6 +385,7 @@ try {
   await page.locator('#researchDeckAction').click();
   await page.waitForFunction(() => marineCtx.oceanMode?.active && !marineCtx.oceanMode.diver?.active, null, { timeout: 60000 });
   await page.evaluate(async () => { await marineCtx.oceanMode.fishVisualsReady; });
+  await pilotToReef();
   await page.waitForTimeout(1200);
   await capture('submarine', 'Deploy and explore', 'The Atlantic Explorer submarine deployed from its research vessel');
   await page.locator('#oceanDiverToggle').click();

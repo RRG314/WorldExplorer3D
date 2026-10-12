@@ -24,7 +24,10 @@ async function update(file, transform) {
 }
 for (const file of ['index.html','github-pages/index.html']) await update(file, source => {
   if (!source.includes('data-gallery="')) throw new Error(`${file} is missing its public gallery.`);
-  return source.replace(/<img\b[^>]*data-gallery="([a-z-]+)"[^>]*>/g,(tag,id)=>{
+  const base = file.startsWith('github-pages/') ? 'https://rrg314.github.io/WorldExplorer3D/' : 'https://worldexplorer3d.io/';
+  return source.replace(/<meta\b[^>]*data-gallery-social="([a-z-]+)"[^>]*>/g, (tag, id) =>
+    tag.replace(/\bcontent="[^"]*"/, `content="${base}${escape(get(id).file)}"`)
+  ).replace(/<img\b[^>]*data-gallery="([a-z-]+)"[^>]*>/g,(tag,id)=>{
   const item=get(id);
   return tag.replace(/\s(?:src|alt|width|height)="[^"]*"/g,'').replace(/>$/,` src="${escape(item.file)}" width="${item.width}" height="${item.height}" alt="${escape(item.alt)}">`);
 });});

@@ -52,31 +52,41 @@ browsers/servers. Production deployment evidence is under
 
 ## October 12 ordinary player walkthroughs — release still under review
 
-The hosted staging build `5.6.0+de975e18e39f.cbaae1ba07061354.staging`
-was exercised in normal Chrome using visible controls and held keyboard/mouse
-input, without provider interception, debug attestation or moved game actors.
-The research vessel sailed 26.17 units and steered, then moored; deck routes,
-galley, map, helm, sub deployment and swimming worked. Aquarium street entry,
-both reef viewing levels, lifts, exit and reentry worked. Three aquarium windows
-measured about 60 / 60 / 55 FPS; reentry still had a 433 ms pause. The Peale street
-entrance and connected gallery route worked. Earth walking, driving, drone and
-plane controls worked, as did hosted MET Norway weather and USGS earthquakes.
-These are bounded journeys, not complete backend or performance certification.
-Receipts: `output/production-readiness-20261012/*-capture/report.json`.
+Hosted staging build `5.6.0+244ef8938e52.e4c49142872300d3.staging` was
+exercised in normal Chrome with visible controls and held keyboard/mouse input,
+without provider interception, debug attestation or moved game actors. Research
+vessel steering, 26.37 units of sailing, mooring, deck routes, galley, map and helm
+passed. The sub deployed and traveled 90.71 units to a reef under keyboard control;
+swimming and phone layout also passed, with live marine weather and no page errors.
 
-The normal space walkthrough exposed a real Return to Earth failure: the visible
-craft moved but the retained SI journey still targeted Saturn. The local fix
-releases that journey before the existing direct-return descent. Two other
-observed UI defects are fixed locally: exterior roof selections through interior
-walls, and the ocean-streaming checkbox overflowing the destination bar. The
-setting now lives beside regional travel in Graphics. These fixes require the
-updated hosted walkthrough before publication. Current gallery images are new
-5.6 captures; several compositions are being improved before release.
+Aquarium street entry, both reef levels, lifts, exit and reentry passed. Interior
+clicks no longer select roofs through the walls. Ten-second viewing windows were
+about 59 / 59 / 54 FPS; reentry still had a 400 ms pause and fails the existing
+frame-pacing target. The profile includes garbage collection, scene traversal and
+water/render shader compilation; it does not establish another resource leak.
+The Peale street entrance and gallery walkthrough passed without page errors.
+Earth walking, driving, drone and plane controls passed with MET Norway weather
+and USGS observations. The ocean setting persisted through a normal reload in
+Graphics and no longer overflows the destination bar.
 
-The current production package, saved fallbacks, player data and Git history
-remain intact. Production is still 5.5; 5.6 has not been published to GitHub or
-promoted. The source/backend/full packaged checks and final gallery review must
-finish without relabeling existing pauses or incomplete acceptance as passes.
+The Return to Earth fix was verified on two normal Saturn/ship/return journeys:
+it releases the prior rendered journey before the existing direct-return descent.
+The latest journey also traversed the bridge pressure door using normal controls.
+Both returned to populated Earth, but a Google reCAPTCHA timeout remains captured;
+those reports are not clean overall passes. The capture route's attempt to walk
+into the captain's desk was corrected in the harness, without changing collision.
+
+All 19 public gallery images now come from this current build, with reviewed
+framing and file hashes shared by README, release notes, landing and Pages.
+The source chain passes 2,527 tests plus dependencies, ownership, boundary types,
+inventory and sensitivity. Receipts: ignored
+`output/production-readiness-20261012/*-capture/report.json` and
+`/tmp/we3d-front-back-source-final.log`. These bounded journeys and source checks
+do not certify all backend functions, multiplayer, devices or performance.
+
+Production remains 5.5. The production package, saved fallbacks, player data and
+Git history are intact. The final packaged/backend/ordinary connected checks
+remain outstanding. Do not relabel known pauses or incomplete acceptance as passes.
 
 ## October 12 resource residency cleanup — local verification
 

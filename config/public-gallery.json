@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "version": "5.6.0",
-  "capturedAt": "2026-10-12T23:07:21.134Z",
-  "sourceBuild": "5.6.0+de975e18e39f.cbaae1ba07061354.staging",
+  "capturedAt": "2026-10-12T23:37:59.533Z",
+  "sourceBuild": "5.6.0+244ef8938e52.e4c49142872300d3.staging",
   "sourceUrl": "https://we3d-staging-20260712--ship-review-1011-pb8x1l4l.web.app/app/",
   "landingGallery": [
     "walking",
@@ -30,9 +30,9 @@
       "file": "assets/gallery/5.6/world-entry.webp",
       "width": 1600,
       "height": 900,
-      "sha256": "ffc84d05af22ad13227fe7b6f8e9fbcec93b8257821fb6587801b08e758d7e79",
-      "sourceBuild": "5.6.0+de975e18e39f.cbaae1ba07061354.staging",
-      "capturedAt": "2026-10-12T22:55:03.737Z",
+      "sha256": "741ec9b6b872ccaa5f78970c0c508072dcea6fc525838444ef955a837e38f29c",
+      "sourceBuild": "5.6.0+244ef8938e52.e4c49142872300d3.staging",
+      "capturedAt": "2026-10-12T23:20:21.781Z",
       "provenance": "Normal-input browser runtime capture; no synthetic camera or test-only scene."
     },
     {
@@ -42,9 +42,9 @@
       "file": "assets/gallery/5.6/walking.webp",
       "width": 1600,
       "height": 900,
-      "sha256": "c707e9c74ef2f0f61a9f773c3e160b4de04aaef17ba3ba01bbeb98587cf01922",
-      "sourceBuild": "5.6.0+de975e18e39f.cbaae1ba07061354.staging",
-      "capturedAt": "2026-10-12T22:56:32.172Z",
+      "sha256": "853e6ef3be92a4ff3d5ba9923014a93867608b43bc871b9debedc8a31431bce6",
+      "sourceBuild": "5.6.0+244ef8938e52.e4c49142872300d3.staging",
+      "capturedAt": "2026-10-12T23:21:50.440Z",
       "provenance": "Normal-input browser runtime capture; no synthetic camera or test-only scene."
     },
     {
@@ -54,9 +54,9 @@
       "file": "assets/gallery/5.6/driving.webp",
       "width": 1600,
       "height": 900,
-      "sha256": "2f0176948680d0e5aa1ae8ce1139809708dd940e56a243764f23d0a1f4c1554b",
-      "sourceBuild": "5.6.0+de975e18e39f.cbaae1ba07061354.staging",
-      "capturedAt": "2026-10-12T22:56:36.345Z",
+      "sha256": "0410b7f29984b1535bf491c89fc56cec1a5e0fce76a8d9e8ccbaa4699142dde9",
+      "sourceBuild": "5.6.0+244ef8938e52.e4c49142872300d3.staging",
+      "capturedAt": "2026-10-12T23:21:52.963Z",
       "provenance": "Normal-input browser runtime capture; no synthetic camera or test-only scene."
     },
     {
@@ -66,9 +66,9 @@
       "file": "assets/gallery/5.6/drone.webp",
       "width": 1600,
       "height": 900,
-      "sha256": "f8ca6c0391ca402cdce5b96cfe89098d65f25a5514c99071a429be8f692f1d22",
-      "sourceBuild": "5.6.0+de975e18e39f.cbaae1ba07061354.staging",
-      "capturedAt": "2026-10-12T22:56:43.076Z",
+      "sha256": "f54417a0ba8201c9fd921cbc638e685d3c9826fbb7b6eb1520847225c0945b26",
+      "sourceBuild": "5.6.0+244ef8938e52.e4c49142872300d3.staging",
+      "capturedAt": "2026-10-12T23:21:58.588Z",
       "provenance": "Normal-input browser runtime capture; no synthetic camera or test-only scene."
     },
     {
@@ -78,9 +78,9 @@
       "file": "assets/gallery/5.6/flight.webp",
       "width": 1600,
       "height": 900,
-      "sha256": "f1fd9121341000b3d086a182061f8187a3406245043b723da6e283d21d66a8e9",
-      "sourceBuild": "5.6.0+de975e18e39f.cbaae1ba07061354.staging",
-      "capturedAt": "2026-10-12T22:56:47.722Z",
+      "sha256": "187ccf43ba91c7fb2ec48071078c355d21eec33c667f297be0b99220ac6f6747",
+      "sourceBuild": "5.6.0+244ef8938e52.e4c49142872300d3.staging",
+      "capturedAt": "2026-10-12T23:22:03.524Z",
       "provenance": "Normal-input browser runtime capture; no synthetic camera or test-only scene."
     },
     {
@@ -90,9 +90,9 @@
       "file": "assets/gallery/5.6/research-deck.webp",
       "width": 1600,
       "height": 900,
-      "sha256": "3a3b495eab28564811ab2958bcbf5ca9c8ae8496965c5e5a16a326349b640704",
-      "sourceBuild": "5.6.0+de975e18e39f.cbaae1ba07061354.staging",
-      "capturedAt": "2026-10-12T22:32:21.751Z",
+      "sha256": "8338dea712cedd906e8617d6158b6ff45c436ed4adc4124d81223c79797ab3ce",
+      "sourceBuild": "5.6.0+244ef8938e52.e4c49142872300d3.staging",
+      "capturedAt": "2026-10-12T23:22:34.899Z",
       "provenance": "Normal-input browser runtime capture; no synthetic camera or test-only scene."
     },
     {
@@ -102,9 +102,9 @@
       "file": "assets/gallery/5.6/diving.webp",
       "width": 1600,
       "height": 900,
-      "sha256": "7ceb8511530a8fafeb174baa17651e6d9dd1e5b03178ef8d6e6495205c6e1fde",
-      "sourceBuild": "5.6.0+de975e18e39f.cbaae1ba07061354.staging",
-      "capturedAt": "2026-10-12T22:35:29.357Z",
+      "sha256": "49b6443fc186c51631eb5f3fc3fa89f4247b819c67eb0d99f5151e53025e43df",
+      "sourceBuild": "5.6.0+244ef8938e52.e4c49142872300d3.staging",
+      "capturedAt": "2026-10-12T23:25:53.048Z",
       "provenance": "Normal-input browser runtime capture; no synthetic camera or test-only scene."
     },
     {
@@ -114,9 +114,9 @@
       "file": "assets/gallery/5.6/ship-interior.webp",
       "width": 1600,
       "height": 900,
-      "sha256": "1fc98b71aac407f66abc114c0c73c969db3592076c00c45367be67e5d38fd401",
-      "sourceBuild": "5.6.0+de975e18e39f.cbaae1ba07061354.staging",
-      "capturedAt": "2026-10-12T22:59:58.962Z",
+      "sha256": "1c06d8d1b4346945a0079b1c312d6aa3f6e70523539ffa70ea5f713267902087",
+      "sourceBuild": "5.6.0+244ef8938e52.e4c49142872300d3.staging",
+      "capturedAt": "2026-10-12T23:29:33.520Z",
       "provenance": "Normal-input browser runtime capture; no synthetic camera or test-only scene."
     },
     {
@@ -126,9 +126,9 @@
       "file": "assets/gallery/5.6/space.webp",
       "width": 1600,
       "height": 900,
-      "sha256": "55ad4b8a13c8777e6e25ee7b6b9f4a0451f5aefc701fa4cf7634e9fcd85ccaa3",
-      "sourceBuild": "5.6.0+de975e18e39f.cbaae1ba07061354.staging",
-      "capturedAt": "2026-10-12T22:59:54.340Z",
+      "sha256": "408691693158b3a54f4700b41df124cf8ba22020e7e53821d766e309fe8f4242",
+      "sourceBuild": "5.6.0+244ef8938e52.e4c49142872300d3.staging",
+      "capturedAt": "2026-10-12T23:29:28.918Z",
       "provenance": "Normal-input browser runtime capture; no synthetic camera or test-only scene."
     },
     {
@@ -138,9 +138,9 @@
       "file": "assets/gallery/5.6/live-earth.webp",
       "width": 1600,
       "height": 900,
-      "sha256": "e05966561316fc3b7035c55e04c597c55e99ffae51881c34fe12ee5dcf4e2d5e",
-      "sourceBuild": "5.6.0+de975e18e39f.cbaae1ba07061354.staging",
-      "capturedAt": "2026-10-12T22:55:11.022Z",
+      "sha256": "06100a41f37c82b69ce68d7e07469e216f9bdb8e48f9de719c30e525f487dcdc",
+      "sourceBuild": "5.6.0+244ef8938e52.e4c49142872300d3.staging",
+      "capturedAt": "2026-10-12T23:20:26.422Z",
       "provenance": "Normal-input browser runtime capture; no synthetic camera or test-only scene."
     },
     {
@@ -150,9 +150,9 @@
       "file": "assets/gallery/5.6/world-entry-phone.webp",
       "width": 390,
       "height": 844,
-      "sha256": "2becd1b80ef1c24a0c133c0ce5fcae367ef1ab41d11ef0e95ee599ca595c9f75",
-      "sourceBuild": "5.6.0+de975e18e39f.cbaae1ba07061354.staging",
-      "capturedAt": "2026-10-12T22:55:04.176Z",
+      "sha256": "a2470bb12a3a1811d78d29057a5ddfdf4c47105f67b681b5f96fb7c5d2fd85c5",
+      "sourceBuild": "5.6.0+244ef8938e52.e4c49142872300d3.staging",
+      "capturedAt": "2026-10-12T23:20:22.211Z",
       "provenance": "Normal-input browser runtime capture; no synthetic camera or test-only scene."
     },
     {
@@ -162,9 +162,9 @@
       "file": "assets/gallery/5.6/diver-phone.webp",
       "width": 390,
       "height": 844,
-      "sha256": "ca8f5c0e7932872e441a90a1ccc05bbc6d096297c6b7cf786bf7cbe9d64928cb",
-      "sourceBuild": "5.6.0+de975e18e39f.cbaae1ba07061354.staging",
-      "capturedAt": "2026-10-12T22:35:29.904Z",
+      "sha256": "9e5b441870061d12ed6a8266da72b14e0b423fe7b85b6e1ac5b7f21bb4d7d38e",
+      "sourceBuild": "5.6.0+244ef8938e52.e4c49142872300d3.staging",
+      "capturedAt": "2026-10-12T23:25:53.833Z",
       "provenance": "Normal-input browser runtime capture; no synthetic camera or test-only scene."
     },
     {
@@ -174,9 +174,9 @@
       "file": "assets/gallery/5.6/research-interior.webp",
       "width": 1600,
       "height": 900,
-      "sha256": "7b9910feacf502de6cb8466de74b3055f743cb8ea3808f31ad0ec4112e1ac120",
-      "sourceBuild": "5.6.0+de975e18e39f.cbaae1ba07061354.staging",
-      "capturedAt": "2026-10-12T22:32:40.051Z",
+      "sha256": "d817fc6c3481f24f9b1578fa94c4326b5e0e01d94ec2e49d51258930ad17ba8a",
+      "sourceBuild": "5.6.0+244ef8938e52.e4c49142872300d3.staging",
+      "capturedAt": "2026-10-12T23:22:52.814Z",
       "provenance": "Normal-input browser runtime capture; no synthetic camera or test-only scene."
     },
     {
@@ -186,9 +186,9 @@
       "file": "assets/gallery/5.6/research-map.webp",
       "width": 1600,
       "height": 900,
-      "sha256": "cf6ae234882e834d5b79da4e7849e1f2eb38b06155adb3278198ee299bbc3bf6",
-      "sourceBuild": "5.6.0+de975e18e39f.cbaae1ba07061354.staging",
-      "capturedAt": "2026-10-12T22:33:27.420Z",
+      "sha256": "f1e10e9e6325c66ca2615f7c3874d73a806d66e5806a96a34d060fc3da942e64",
+      "sourceBuild": "5.6.0+244ef8938e52.e4c49142872300d3.staging",
+      "capturedAt": "2026-10-12T23:23:40.123Z",
       "provenance": "Normal-input browser runtime capture; no synthetic camera or test-only scene."
     },
     {
@@ -198,9 +198,9 @@
       "file": "assets/gallery/5.6/research-vessel.webp",
       "width": 1600,
       "height": 900,
-      "sha256": "2a4148fc6ceb9f92be3d452ce41d791218cc9e93ccfb796182df54a8ddc2b424",
-      "sourceBuild": "5.6.0+de975e18e39f.cbaae1ba07061354.staging",
-      "capturedAt": "2026-10-12T22:35:21.692Z",
+      "sha256": "66c8cae14e23f6f1d2dd5d80e6140a68cf9989da9fd76bd06b91473360a5e7d5",
+      "sourceBuild": "5.6.0+244ef8938e52.e4c49142872300d3.staging",
+      "capturedAt": "2026-10-12T23:25:33.838Z",
       "provenance": "Normal-input browser runtime capture; no synthetic camera or test-only scene."
     },
     {
@@ -210,9 +210,9 @@
       "file": "assets/gallery/5.6/submarine.webp",
       "width": 1600,
       "height": 900,
-      "sha256": "e6b5cdfe463f7f709590ae853384ecc6a386a339fcd73a854f148884820cb556",
-      "sourceBuild": "5.6.0+de975e18e39f.cbaae1ba07061354.staging",
-      "capturedAt": "2026-10-12T22:35:27.642Z",
+      "sha256": "46bd305b8fea6ac50ec70ec7a2f72584de8ea1a4358500bdd37c7f538a9425d2",
+      "sourceBuild": "5.6.0+244ef8938e52.e4c49142872300d3.staging",
+      "capturedAt": "2026-10-12T23:25:51.149Z",
       "provenance": "Normal-input browser runtime capture; no synthetic camera or test-only scene."
     },
     {
@@ -222,9 +222,9 @@
       "file": "assets/gallery/5.6/aquarium-overlook.webp",
       "width": 1600,
       "height": 900,
-      "sha256": "da8f9eb3c3ba2749b0e4d39a42c765be2132798465249eaddaa52fbd2e1b54ab",
-      "sourceBuild": "5.6.0+de975e18e39f.cbaae1ba07061354.staging",
-      "capturedAt": "2026-10-12T22:50:50.545Z",
+      "sha256": "6c33ac82e6129f6c06e82da631f1d5a72e63fb5e9187300dd8e0952faff82500",
+      "sourceBuild": "5.6.0+244ef8938e52.e4c49142872300d3.staging",
+      "capturedAt": "2026-10-12T23:15:36.402Z",
       "provenance": "Normal-input browser runtime capture; no synthetic camera or test-only scene."
     },
     {
@@ -234,9 +234,9 @@
       "file": "assets/gallery/5.6/aquarium.webp",
       "width": 1600,
       "height": 900,
-      "sha256": "eff9f88e24b70d14e956f0948e4562c8c227cfb1fda695917e4a92603420637e",
-      "sourceBuild": "5.6.0+de975e18e39f.cbaae1ba07061354.staging",
-      "capturedAt": "2026-10-12T22:51:20.036Z",
+      "sha256": "f4bdecc4724a2ccc4c665540dccf15744dbb68dbd29f390c8533b27db31cdb33",
+      "sourceBuild": "5.6.0+244ef8938e52.e4c49142872300d3.staging",
+      "capturedAt": "2026-10-12T23:16:09.941Z",
       "provenance": "Normal-input browser runtime capture; no synthetic camera or test-only scene."
     },
     {
@@ -246,9 +246,9 @@
       "file": "assets/gallery/5.6/museum.webp",
       "width": 1600,
       "height": 900,
-      "sha256": "67d6a9728198dd4ca4fa1266a3e91e77968721f7ede560a431cae43b86f03969",
-      "sourceBuild": "5.6.0+de975e18e39f.cbaae1ba07061354.staging",
-      "capturedAt": "2026-10-12T22:54:35.192Z",
+      "sha256": "1e9930c778f371ee7d196b18a8330153efaeb8562946c04d7ded1d78f3afdbb5",
+      "sourceBuild": "5.6.0+244ef8938e52.e4c49142872300d3.staging",
+      "capturedAt": "2026-10-12T23:34:13.820Z",
       "provenance": "Normal-input browser runtime capture; no synthetic camera or test-only scene."
     }
   ],
