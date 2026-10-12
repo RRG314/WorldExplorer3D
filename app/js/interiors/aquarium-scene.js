@@ -32,7 +32,7 @@ export function addAquariumFixtures(T,state,definition,createWallCollider){
  buildAquariumArchitecture(T,{root,plan,layout,box,addWallCollider,materials:{concrete,metal,dark,ceiling,diffuser,carpet}});
  // The same verified elevator stops drive the portal, standing position and UI.
  for(const lift of state.authoredLifts||[])for(const stop of lift.stops){
-  
+
   state.interactions.push({kind:'elevator',liftId:lift.id,level:stop.level,x:stop.x,z:stop.z,radius:1.5*k,label:lift.label});
 
  }

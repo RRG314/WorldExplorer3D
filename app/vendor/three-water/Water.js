@@ -140,7 +140,7 @@ export function makeWater(THREE) {
 
 			function updateFlow() {
 
-				
+
 				const config = scope.material.uniforms[ 'config' ];
 				config.value.x = (flowSpeed * simulationTime) % cycle; // flowMapOffset0
 
