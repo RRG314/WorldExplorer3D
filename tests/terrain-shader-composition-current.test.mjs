@@ -115,3 +115,20 @@ test('regional and temporary road coverage share one shader owner through late a
  assert.equal(oldUniform.value,null,'retired shader must not retain the CPU atlas');
  assert.equal(shader.uniforms.roadCoverageMaskLookup.value,null,'retired lookup must be released too');
 });
+
+test('portal descriptor counts reuse identical shader programs without removing openings',t=>{
+ const {material,ctx,compile}=fixture(t);
+ applyTerrainPortalMasksForContext(ctx,[{...opening,x:-6,halfWidth:1,halfDepth:1}]);
+ const key=material.customProgramCacheKey(),version=material.version,shader=compile();
+ const uniform=shader.uniforms.structurePortalMasks;
+ applyTerrainPortalMasksForContext(ctx,[{...opening,x:-6,halfWidth:1,halfDepth:1},{...opening,x:6,halfWidth:1,halfDepth:1}]);
+ assert.equal(material.customProgramCacheKey(),key);assert.equal(material.version,version);
+ assert.equal(material.userData.structurePortalMaskCount,2);
+ assert.equal(compile().fragmentShader,shader.fragmentShader);
+ assert.equal(compile().uniforms.structurePortalMasks,uniform);
+ assert.deepEqual([uniform.value.image.data[0],uniform.value.image.data[12]],[-6,6]);
+ applyTerrainPortalMasksForContext(ctx,[opening,{...opening,x:4}]);
+ assert.notEqual(material.customProgramCacheKey(),key,'A wider candidate loop still gets its own correct program');
+ assert.equal(material.userData.structurePortalMaxCellCandidates,2);
+ assert.match(compile().fragmentShader,/portalCandidate < 2;/);
+});

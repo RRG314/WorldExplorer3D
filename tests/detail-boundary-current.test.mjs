@@ -18,3 +18,21 @@ test('unrelated or incompletely covered edges do not acquire an invented transit
  assert.equal(detailPointsOnEdge(lines,{x:0,z:0},{x:0,z:10}).length,0);
  assert.equal(detailPointsOnEdge(lines,{x:1,z:0},{x:1,z:5}).length,0);
 });
+
+test('captured terrain boundaries keep independent output and recapture edited elevations',async()=>{
+ const THREE=await import('three');const {collectDetailBoundaryLines}=await import('../app/js/terrain/detail-boundary.js');
+ const geometry=new THREE.PlaneGeometry(10,10,2,2);geometry.rotateX(-Math.PI/2);
+ const p=geometry.attributes.position;
+ for(let i=0;i<p.count;i++)p.setY(i,Math.abs(p.getZ(i))<1?100:10+p.getZ(i));
+ const mesh=new THREE.Mesh(geometry);mesh.userData.isTerrainMesh=true;
+ const lines=collectDetailBoundaryLines([mesh]);
+ const a={x:-5,z:-5},b={x:-5,z:5};
+ assert.deepEqual(detailPointsOnEdge(lines,a,b).map(p=>p.y),[5,100,15]);
+ const returned=detailPointsOnEdge(lines,b,a);returned[1].y=-999;
+ assert.deepEqual(detailPointsOnEdge(lines,a,b).map(p=>p.y),[5,100,15]);
+ for(let i=0;i<p.count;i++)p.setY(i,p.getY(i)+3);
+ const refreshed=collectDetailBoundaryLines([mesh]);
+ assert.deepEqual(detailPointsOnEdge(refreshed,a,b).map(p=>p.y),[8,103,18]);
+ assert.deepEqual(detailPointsOnEdge(lines,a,b).map(p=>p.y),[5,100,15]);
+ geometry.dispose();mesh.material.dispose();
+});

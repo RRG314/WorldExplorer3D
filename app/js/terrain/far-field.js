@@ -1,3 +1,4 @@
+import {createRegionalGeometryStorage} from './regional-geometry-storage.js';
 import {appendRegionalBuildingFootprint} from './regional-building-geometry.js';
 import {updateRegionalImageryFocus} from './regional-imagery.js';
 import { markGroundSurfaceChanged } from './surface-revision.js';
@@ -48,7 +49,6 @@ import {
 } from './surface-profiles.js?v=54';
 import {
   applyWorldCoverSurfaceMaterialMix,
-  createNormalizedTerrainAttribute,
   setNormalizedTerrainAttribute,
   ensureTerrainSurfaceMixAttributes,
   setTerrainSurfaceMaterialMixAt,
@@ -60,12 +60,13 @@ import {
   FAR_WATER_TERRAIN_MASK_SIZE,
   applyMappedWaterTerrainOwnership,
   buildFarWaterGeometry,
+  buildFarWaterGeometryCooperatively,
   publishedWaterDetailAreas,
   buildMappedWaterTerrainOwnershipMask,
   createFarWaterMesh
 } from './far-field-water.js?v=7';
 import { FIXED_REGIONAL_CONTEXT_RADIUS_METERS } from '../world/fixed-regional-context.js?v=9';
-import { yieldToMainThread } from '../world/cooperative-scheduling.js?v=1';
+import { yieldToMainThread, yieldToWorldFrame } from '../world/cooperative-scheduling.js?v=1';
 
 const FAR_FIELD_SOURCE_ZOOM_OFFSET = 3;
 const FAR_FIELD_OUTER_DISTANCE_METERS = 22000;
@@ -96,6 +97,15 @@ function createFarFieldTerrainApi(deps = {}) {
     loadMappedContext = loadFarMappedContext,
     loadWorldCover = loadWorldCoverBaseline
   } = deps;
+
+  // Numeric terrain consumers use the same accepted-ground authority without
+  // allocating a frozen provenance record for every regional building.
+  const acceptedElevation=sampleAcceptedGroundElevationAtLatLon||((lat,lon)=>{
+    const sample=sampleAcceptedGroundAtLatLon(lat,lon);
+    return sample?.status==='available'?Number(sample.groundElevationMeters):NaN;
+  });
+
+  const yieldForRegion=()=>appCtx.gameStarted&&!appCtx.worldLoading?yieldToWorldFrame():yieldToMainThread();
 
   let generation = 0;
   let activeKey = '';
@@ -347,10 +357,8 @@ function createFarFieldTerrainApi(deps = {}) {
   }
 
   async function buildFarBuildingGeometry(spec, loadedTiles, offsetMeters, mappedContext, isCurrent=()=>true) {
-    const positions = [];
-    const colors = [];
-    const styles = [], layouts = [];
-    const indices = [];
+    const storage=createRegionalGeometryStorage(mappedContext?.buildings?.length||0);
+    const {positions,colors,styles,layouts,indices}=storage;
     const unitsPerMeter = Number(appCtx.WORLD_UNITS_PER_METER || 1);
     const yExaggeration = Number(appCtx.TERRAIN_Y_EXAGGERATION || 1);
     let exactPublished = 0;
@@ -360,9 +368,8 @@ function createFarFieldTerrainApi(deps = {}) {
     let simplifiedFootprintFallbacks = 0;
     const rejectedBuildings = { outside: 0, missingGround: 0, implausibleMassing: 0 };
     const groundMetersAt = (latitude, longitude) => {
-      const accepted = sampleAcceptedGroundAtLatLon(latitude, longitude);
-      const acceptedMeters = Number(accepted?.groundElevationMeters);
-      if (accepted?.status === 'available' && Number.isFinite(acceptedMeters)) {
+      const acceptedMeters=acceptedElevation(latitude,longitude);
+      if (Number.isFinite(acceptedMeters)) {
         return acceptedMeters;
       }
       const sampledSourceMeters = sampleSourceMeters(
@@ -388,7 +395,7 @@ function createFarFieldTerrainApi(deps = {}) {
     for (let buildingIndex = 0; buildingIndex < mappedBuildings.length; buildingIndex += 1) {
       if ((buildingIndex & 63) === 0 && !isCurrent())throw new DOMException('Regional buildings superseded','AbortError');
       if ((buildingIndex & 63) === 0 && performance.now() - buildingSliceStarted >= 8) {
-        await yieldToMainThread();
+        await yieldForRegion();
         buildingSliceStarted = performance.now();
       }
       const building = packedDescriptors ? mappedBuildings.read(buildingIndex, descriptorScratch) : mappedBuildings[buildingIndex];
@@ -434,13 +441,13 @@ function createFarFieldTerrainApi(deps = {}) {
     let geometry = null;
     if (exactPublished > 0) {
       geometry = new THREE.BufferGeometry();
-      geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+      geometry.setAttribute('position', new THREE.BufferAttribute(positions.finish(), 3));
       // Facade tint is bounded RGB, like terrain tint. Normalized bytes preserve
       // all vertices and source buildings while using one quarter of RGB floats.
-      geometry.setAttribute('color', createNormalizedTerrainAttribute(colors, 3));
-      geometry.setAttribute('regionalStyle',new THREE.Float32BufferAttribute(styles,4));
-      geometry.setAttribute('regionalLayout',new THREE.Float32BufferAttribute(layouts,4));
-      geometry.setIndex(indices);
+      geometry.setAttribute('color', new THREE.BufferAttribute(colors.finish(), 3, true));
+      geometry.setAttribute('regionalStyle',new THREE.BufferAttribute(styles.finish(),4));
+      geometry.setAttribute('regionalLayout',new THREE.BufferAttribute(layouts.finish(),4));
+      geometry.setIndex(new THREE.BufferAttribute(indices.finish(),1));
       geometry.computeVertexNormals();
       geometry.computeBoundingSphere();
     }
@@ -459,6 +466,7 @@ function createFarFieldTerrainApi(deps = {}) {
       buildings: exactPublished + instances.length
     };
     } catch(error) {retireDescriptors();instances.dispose();throw error;}
+    finally {storage.dispose();}
   }
 
   async function buildAndPublish(spec, requestGeneration, parentSignal) {
@@ -574,7 +582,7 @@ function createFarFieldTerrainApi(deps = {}) {
 
     setState({ status: 'building-geometry', sourceZoom: spec.sourceZoom, sourceTiles: sourceTiles.length, offsetMeters });
     const geometryBuildStartedAt = performance.now();
-    const built = await buildFarFieldGeometry(spec, loadedTiles, offsetMeters, mappedContext);
+    const built = await buildFarFieldGeometry(spec, loadedTiles, offsetMeters, mappedContext, isCurrent);
     build.own(built?.geometry);
     if (!isCurrent()) return;
     const terrainGeometryBuildMs = performance.now() - geometryBuildStartedAt;
@@ -586,10 +594,11 @@ function createFarFieldTerrainApi(deps = {}) {
     const buildingGeometryBuildMs = performance.now() - buildingBuildStartedAt;
     const waterBuildStartedAt = performance.now();
     const waterDetailReady=appCtx.detailedWaterPublicationSequence===appCtx._worldLoadSequence;
-    const builtWater = buildFarWaterGeometry(appCtx, mappedContext, null, {
+    const builtWater = await buildFarWaterGeometryCooperatively(appCtx, mappedContext, null, {
       detailedAreas:waterDetailReady ? publishedWaterDetailAreas(appCtx) : []
-    });
+    },{current:isCurrent,yieldWork:yieldForRegion});
     build.own(builtWater?.geometry);
+    if (!isCurrent()) return;
     const publishedWaterAreaIdentities = builtWater?.publishedAreaIdentities || new Set();
     const fixedRegionalStructureWaterAreas = (mappedContext?.waterAreas || [])
       .filter((area) =>
@@ -616,7 +625,8 @@ function createFarFieldTerrainApi(deps = {}) {
       appCtx,
       mappedContext,
       spec,
-      publishedWaterAreaIdentities
+      publishedWaterAreaIdentities,
+      {current:isCurrent,yieldWork:yieldForRegion}
     );
     build.own(waterTerrainMask?.texture);
     if (!isCurrent()) return;
@@ -748,7 +758,7 @@ function createFarFieldTerrainApi(deps = {}) {
         build.own(instanceMaterial);
         const batches = await buildFarBuildingInstanceBatches(
             THREE, builtBuildings.instances, instanceMaterial, { yieldControl: async()=>{
-              await yieldToMainThread();
+              await yieldForRegion();
               if(requestGeneration!==generation||signal.aborted)throw new DOMException('Regional buildings superseded','AbortError');
             } }
           );
@@ -802,7 +812,7 @@ function createFarFieldTerrainApi(deps = {}) {
       if (detailedMesh?.userData?.isTerrainMesh !== true || detailedMesh.userData?.isFarTerrainClipmap) continue;
       if (!isCurrent()) return;
       detailedMappedSurfaceTintVertices += applyMappedSemanticVertexTints(detailedMesh, appCtx.fixedLocationMappedSurfaceContext);
-      await yieldToMainThread();
+      await yieldForRegion();
     }
     if (!isCurrent()) return;
     setState({

@@ -168,3 +168,39 @@ artifact integrity and release identity. The source helper/inventory were repair
 source changed after that artifact was built. Retain the actual failed receipts.
 Ocean memory and outdoor performance still require repair and full candidate
 revalidation. No new production or GitHub publication occurred.
+
+
+## Ocean residency and regional construction audit
+
+The current source removes hidden world resources only after successful marine
+admission. A failed dive retains the departure ship, and failed licensed surface
+arrival retains the previous presentation. A successful return to Earth restores
+49,080 buildings, 18,952 roads, 49 terrain tiles and the exact saved pose. Repeated
+deck/sub/deck cycles release the inactive renderer and model leases; no player
+save or source assets are deleted. See CURRENT-STATE.md for exact receipts.
+
+A real GPU leak was found in habitat replacement. Disposing geometry alone did
+not release InstancedMesh matrix/color buffers. Actual WebGL instrumentation
+showed 15 extra buffers after each rebuild; explicit mesh disposal now leaves
+38 buffers at every occupied checkpoint and four fixture seabed buffers after
+retirement. The source continuous-ocean browser check passes ten travel, outage,
+resume, diver and recovery cases. Its geography uses controlled provider data.
+The refreshed Ocean scene budget is a measured licensed-asset regression baseline,
+not a geographic limit; previous frame-time and retention acceptance remain.
+
+Regional construction now avoids boxed building buffers, repeated seam sorting,
+per-vertex ground records and coordinate closure allocations. Identical portal
+shaders reuse their program; background terrain/water slices leave paint
+opportunities, cancel stale work and retire temporary mask canvases. Exact
+geometry/tint/water equivalence and the actual GPU portal lifecycle are checked.
+Building, road, bridge and tunnel coverage rules remain unchanged.
+
+The unprofiled travel diagnostic still fails performance acceptance: 49.98 FPS,
+p99 50 ms, worst 483.4 ms, 13 frames over 100 ms and two over 250 ms in the
+90-second flight. The walk/drive windows avoid those stalls but fail FPS/heap
+ceilings. This is not a complete immutable release matrix or production sign-off.
+All production bytes and retained fallback packages remain preserved.
+
+Final source validation after the GPU disposal repair: `verify:pr` passes all
+2,524 tests with zero skips/TODOs, and the complete surrounding source chain.
+Log: `/tmp/we3d-resource-final-source-complete.log`.

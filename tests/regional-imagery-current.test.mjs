@@ -88,3 +88,26 @@ test('cached tile mosaics cover the registered extent with a fixed request budge
     assert.equal(tile.y,Math.floor((1-Math.asinh(Math.tan(lat*Math.PI/180))/Math.PI)/2*n));
   }
 });
+
+
+test('overlapping mosaics reuse bounded compressed tiles and release them with the final owner',async()=>{
+ const originals={fetch:globalThis.fetch,THREE:globalThis.THREE,document:globalThis.document,bitmap:globalThis.createImageBitmap};
+ let requests=0,decoded=0,closed=0;
+ globalThis.THREE=THREE;globalThis.document={createElement:()=>({getContext:()=>({drawImage(){}})})};
+ globalThis.createImageBitmap=async()=>{decoded++;return{width:256,height:256,close(){closed++;}};};
+ globalThis.fetch=async()=>{requests++;return{ok:true,blob:async()=>new Blob([new Uint8Array(65536)],{type:'image/png'})};};
+ const ctx={LOC:{lat:39.3,lon:-76.6},WORLD_UNITS_PER_METER:1,renderer:{capabilities:{maxTextures:16}},worldToGeo:(x,z)=>({lat:39.3-z/111000,lon:-76.6+x/86000})};
+ const mesh=new THREE.Mesh(new THREE.PlaneGeometry(4,4),new THREE.MeshStandardMaterial());
+ const uniforms={terrainRegionalMap:{value:null},terrainRegionalReady:{value:0},terrainLocalMap:{value:null},terrainLocalReady:{value:0}};
+ const settle=async()=>{for(let i=0;i<100;i++){const s=regionalImagerySnapshot(ctx);if(s.entries.every(e=>e.status==='available')&&!s.local.pending)return;await new Promise(r=>setTimeout(r,0));}assert.fail('Mosaic did not settle');};
+ try{
+  attachRegionalImagery(mesh,ctx,uniforms);await settle();const before=requests,previous=uniforms.terrainLocalMap.value;
+  updateRegionalImageryFocus(ctx,{x:1200,z:0});await settle();
+  assert.notEqual(uniforms.terrainLocalMap.value,previous);
+  const next=ctx.worldToGeo(1200,0),tileCount=regionalImageryTileLayout(regionalImagerySpec(next.lat,next.lon,6000)).length;
+  assert.ok(requests-before<tileCount/2,'Adjacent mosaic should fetch only its new edge tiles');
+  for(let i=2;i<=12;i++){updateRegionalImageryFocus(ctx,{x:1200*i,z:0});await settle();const c=regionalImagerySnapshot(ctx).tileCache;assert.ok(c.bytes<=c.byteLimit&&c.count<=c.countLimit);}
+  assert.equal(closed,decoded,'Decoded bitmap is closed after every composite');
+  mesh.material.dispose();assert.deepEqual(regionalImagerySnapshot(ctx).tileCache,{count:0,bytes:0,byteLimit:4194304,countLimit:128});
+ }finally{mesh.material.dispose();mesh.geometry.dispose();globalThis.fetch=originals.fetch;globalThis.THREE=originals.THREE;globalThis.document=originals.document;globalThis.createImageBitmap=originals.bitmap;}
+});

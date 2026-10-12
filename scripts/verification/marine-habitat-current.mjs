@@ -84,11 +84,14 @@ try {
  report.cases.push({id:'phone-controls-fit-and-bounded-rendering',passed:true});
  fixtureServer=await startStaticServer({rootDir:process.cwd(),ports:[4397]});
  await page.goto(`http://127.0.0.1:${fixtureServer.port}/tests/fixtures/marine-habitat.html`);await page.waitForFunction(()=>window.ready===true);
- report.cycles=[];for(let i=0;i<3;i++){await page.evaluate(()=>habitatTest.rebuild());report.cycles.push(await page.evaluate(()=>({memory:{...habitatTest.renderer.info.memory},cache:habitatTest.cache()})));}
+ report.cycles=[];for(let i=0;i<3;i++){await page.evaluate(()=>habitatTest.rebuild());report.cycles.push(await page.evaluate(()=>({memory:{...habitatTest.renderer.info.memory},gpuBuffers:habitatTest.gpuBufferCount(),cache:habitatTest.cache()})));}
  assert.deepEqual(report.cycles[0].memory,report.cycles[2].memory);
+ assert.equal(report.cycles[0].gpuBuffers,report.cycles[2].gpuBuffers,'instance buffers must not accumulate across habitat replacement');
  assert.ok(report.cycles.every(c=>c.cache.entries.filter(a=>(a.id.startsWith('marine-')||a.id==='solis-cargo-case')).every(a=>a.leases===1)));
  assert.equal(await page.evaluate(()=>habitatTest.cancel()),0);
  await page.evaluate(()=>habitatTest.dispose());assert.ok(await page.evaluate(()=>habitatTest.cache().entries.filter(a=>(a.id.startsWith('marine-')||a.id==='solis-cargo-case')).every(a=>a.leases===0)));
+ report.retiredGpuBuffers=await page.evaluate(()=>habitatTest.gpuBufferCount());
+ assert.equal(report.retiredGpuBuffers,4,'only the fixture seabed position, normal, UV and index buffers remain');
  report.cases.push({id:'three-rebuilds-no-resource-growth-and-late-load-cancelled',passed:true});
  await page.route('**/app/assets/models/marine/*',route=>route.abort());
  await page.reload();await page.waitForFunction(()=>window.ready===true);assert.equal(await page.evaluate(()=>habitatTest.habitat.group.userData.habitat.assetState),'unavailable');

@@ -19,11 +19,21 @@ export function earthCoordinateFrame(origin, scale) {
   if (frames.has(key)) {
     const frame = frames.get(key); frames.delete(key); frames.set(key,frame); lastFrame=frame; return frame;
   }
+  const frame=createEarthCoordinateFrame(lat,lon,scale);
+  frames.set(key,frame);
+  lastFrame=frame;
+  while(frames.size>FRAME_LIMIT)frames.delete(frames.keys().next().value);
+  return frame;
+}
+
+// Construct closures only on a cache miss. Keeping this outside the hot lookup
+// avoids allocating a captured lexical context for every terrain/map vertex.
+function createEarthCoordinateFrame(lat,lon,scale) {
   const polar = Math.abs(lat)>=84;
   const enu = polar ? createLocalEnuFrame({latitude:lat,longitude:lon}) : null;
   const unitsPerMeter = scale / 111000;
   const longitudeScale = scale * Math.cos(lat*Math.PI/180);
-  const frame = Object.freeze({
+  return Object.freeze({
     origin: Object.freeze({lat,lon}), scale, projection: polar ? 'local-enu' : 'local-equirectangular',
     toWorld(latitude,longitude,result={}) {
       if (!Number.isFinite(latitude) || !Number.isFinite(longitude) || Math.abs(latitude)>90 || Math.abs(longitude)>180) {
@@ -50,8 +60,4 @@ export function earthCoordinateFrame(origin, scale) {
       return result;
     }
   });
-  frames.set(key,frame);
-  lastFrame=frame;
-  while(frames.size>FRAME_LIMIT)frames.delete(frames.keys().next().value);
-  return frame;
 }

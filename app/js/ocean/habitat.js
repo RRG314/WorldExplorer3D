@@ -29,7 +29,7 @@ export function createMarineHabitat(THREE,{site,scale,sampleSeabedHeight,rockTex
   model.mesh.count=count;model.mesh.instanceMatrix.needsUpdate=true;if(model.mesh.instanceColor)model.mesh.instanceColor.needsUpdate=true;
  }
  function update(dt,focus,time){if(shader)shader.uniforms.habitatTime.value=time;lodElapsed+=dt;if(lodElapsed<.25||Math.hypot(focus.x-lastX,focus.z-lastZ)<7)return;lodElapsed=0;lastX=focus.x;lastZ=focus.z;for(const model of models)fill(model,focus);}
- function releaseModels(){for(const model of models){group.remove(model.mesh);model.mesh.geometry.dispose();model.mesh.material.dispose();}models.length=0;for(const asset of assets){asset.root.parent?.remove(asset.root);asset.dispose();}assets.length=0;}
+ function releaseModels(){for(const model of models){group.remove(model.mesh);model.mesh.dispose();model.mesh.geometry.dispose();model.mesh.material.dispose();}models.length=0;for(const asset of assets){asset.root.parent?.remove(asset.root);asset.dispose();}assets.length=0;}
  const ready=(async()=>{
   if(!plan.featured)return true;
   try{for(const kind of ['table-coral','branch-coral','massive-coral'])for(const near of [false,true]){

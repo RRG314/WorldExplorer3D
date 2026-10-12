@@ -314,7 +314,8 @@ async function refreshAuthoritativeMapData() {
   return loadRoads();
 }
 
-function releaseEarthWorldForTitle() {
+function releaseEarthWorldForTitle(options = {}) {
+  const reason = options.reason || 'title_screen_release';
   const before = Object.freeze({
     roads: Number(appCtx.roads?.length || 0),
     buildings: Number(appCtx.buildings?.length || 0),
@@ -323,13 +324,15 @@ function releaseEarthWorldForTitle() {
   });
   resetWorldForReload({
     beginSceneLoad: false,
+    reason,
+    preserveWaterEvidence: options.preserveWaterEvidence === true,
     clearBuildingSpatialIndex,
     invalidateTraversalNetworks,
     locName: appCtx.LOC?.name || 'World',
     resetWorldFurnitureCaches,
     showLoading: false
   });
-  appCtx.worldSnapshotStore?.clear?.('title_screen_release');
+  appCtx.worldSnapshotStore?.clear?.(reason);
   appCtx.worldPublication = null;
   appCtx.initialEarthWorldReady = false;
   appCtx.worldDetailState = {};
@@ -344,7 +347,7 @@ function releaseEarthWorldForTitle() {
     shortbread: releaseShortbreadRuntimeCache(),
     overpass: releaseOverpassRuntimeCache(),
     releasedAt: performance.now(),
-    reason: 'title_screen_release'
+    reason
   });
   const after = Object.freeze({
     roads: Number(appCtx.roads?.length || 0),
@@ -355,7 +358,7 @@ function releaseEarthWorldForTitle() {
   });
   appCtx.lastEarthWorldRelease = Object.freeze({
     released: true,
-    reason: 'title_screen_release',
+    reason,
     before,
     after,
     releasedAt: performance.now()

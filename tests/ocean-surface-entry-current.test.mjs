@@ -103,3 +103,22 @@ test('pending vessel admission stays single-flight and a late model cannot publi
  f.supersede();release(true);assert.equal(await pending,false);
  assert.equal(f.storage.getItem(OCEAN_VOYAGE_KEY),null);assert.equal(f.calls.includes('deck'),false);
 }));
+
+test('accepted marine arrival retires terrestrial presentation only after the licensed vessel succeeds',()=>withDocument(async()=>{
+ for(const accepted of [false,true]){
+  const f=fixture();let resolveVisual,retirements=0,placeholderRetired=false;
+  f.ctx.buildings=[{id:'retained-city'}];f.ctx.roads=[{id:'retained-road'}];
+  f.ctx.boatMode.mesh={userData:{visualReady:new Promise(resolve=>resolveVisual=resolve)}};
+  f.ctx.suppressGroundFallbackPlaceholder=()=>placeholderRetired=true;
+  f.ctx.releaseEarthWorldForTitle=options=>{
+   assert.deepEqual(options,{reason:'marine_surface_release',preserveWaterEvidence:true});
+   retirements++;f.ctx.buildings=[];f.ctx.roads=[];
+  };
+  const pending=f.api.startSurfaceResearchVoyage({launchSite:site,entry});
+  for(let i=0;i<12&&!f.ctx.boatMode.active;i++)await Promise.resolve();
+  assert.equal(retirements,0);assert.equal(placeholderRetired,false);
+  resolveVisual(accepted);assert.equal(await pending,accepted);
+  assert.equal(retirements,Number(accepted));assert.equal(placeholderRetired,accepted);
+  assert.equal(f.ctx.buildings.length,accepted?0:1);assert.equal(f.ctx.roads.length,accepted?0:1);
+ }
+}));

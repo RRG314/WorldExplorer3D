@@ -23,3 +23,19 @@ test('far terrain seam refresh uses published geometry after construction arrays
  assert.ok(Number.isFinite(before));assert.ok(after>before+3);
  assert.equal(built.refreshBoundaryHeights([near]),0,'unchanged seams do not rewrite geometry');
 });
+
+test('superseded regional terrain stops before sampling more rows or publishing buffers',async()=>{
+ let samples=0;
+ const planner=createFarFieldGeometryPlanner({
+  appCtx:{WORLD_UNITS_PER_METER:1,TERRAIN_Y_EXAGGERATION:1},
+  farFieldGridIntervalMeters:20,farFieldGapFillIntervalMeters:20,
+  worldToLatLon:(x,z)=>({lat:z,lon:x}),
+  sampleAcceptedGroundElevationAtLatLon:()=>{samples++;return 10;},
+  latLonToTileXY:()=>({x:0,y:0})
+ });
+ const spec={outer:{minX:-100,maxX:100,minZ:-100,maxZ:100},inner:{minX:0,maxX:20,minZ:0,maxZ:20},detailedCoverage:[]};
+ assert.equal(await planner.buildFarFieldGeometry(spec,new Map(),0,{contextZoom:0},()=>false),null);
+ assert.equal(samples,0);
+ assert.equal(await planner.buildFarFieldGeometry(spec,new Map(),0,{contextZoom:0},()=>samples<11),null);
+ assert.equal(samples,11,'the cancelled region never samples a second row');
+});

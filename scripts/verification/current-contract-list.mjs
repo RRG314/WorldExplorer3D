@@ -326,6 +326,7 @@ export const currentContractTests = [
   'tests/location-quality-current.test.mjs',
   'tests/polar-elevation-current.test.mjs',
   'tests/regional-imagery-current.test.mjs',
+  'tests/regional-geometry-storage-current.test.mjs',
   'tests/ambient-notices-current.test.mjs',
   'tests/pedestrian-spacing-current.test.mjs',
   'tests/road-marking-polygons-current.test.mjs',

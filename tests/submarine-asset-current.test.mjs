@@ -69,3 +69,16 @@ test('water and seabed clearance encloses all model corners through pitch and ro
     }
   }
 });
+
+
+test('ocean retirement disposes shared owned buffers and light targets once, retaining reusable surface textures',()=>{
+ const scene=new THREE.Scene(),geometry=new THREE.BoxGeometry(),texture=new THREE.Texture(),shared=new THREE.Texture();shared.userData={sharedOceanTexture:true};
+ const material=new THREE.MeshStandardMaterial({map:texture,aoMap:texture,normalMap:shared});
+ const instanced=new THREE.InstancedMesh(geometry,material,3);
+ scene.add(new THREE.Mesh(geometry,material),instanced);
+ const light=new THREE.DirectionalLight(),target=new THREE.WebGLRenderTarget(4,4);light.shadow.map=target;light.shadow.mapPass=target;scene.add(light);
+ const counts={geometry:0,material:0,texture:0,shared:0,target:0,instanced:0};
+ for(const [key,value]of Object.entries({geometry,material,texture,shared,target,instanced}))value.addEventListener('dispose',()=>counts[key]++);
+ disposeObject3D(scene);assert.deepEqual(counts,{geometry:1,material:1,texture:1,shared:0,target:1,instanced:1});assert.equal(light.shadow.map,null);assert.equal(light.shadow.mapPass,null);
+ shared.dispose();
+});

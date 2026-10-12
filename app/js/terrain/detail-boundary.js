@@ -1,5 +1,8 @@
 // The detailed mesh owns its edge heights. Only far cells touching those edges
 // gain vertices; the rest of the regional grid keeps its existing density.
+// Captured boundaries are immutable snapshots. Sort each once per publication,
+// not once for every regional cell edge; weak keys retire with that snapshot.
+const sortedCapturedLines=new WeakMap();
 const key=(axis,value)=>`${axis}:${Math.round(value*100)}`;
 export function collectDetailBoundaryLines(meshes=[]) {
   const lines=new Map();
@@ -12,6 +15,8 @@ export function collectDetailBoundaryLines(meshes=[]) {
       const id=key(axis,points[0][axis]);
       if(!lines.has(id))lines.set(id,[]);
       lines.get(id).push(points);
+      const along=axis==='x'?'z':'x';
+      sortedCapturedLines.set(points,[...points].sort((p,q)=>p[along]-q[along]));
     }
   }
   return lines;
@@ -22,7 +27,7 @@ export function detailPointsOnEdge(lines,a,b) {
   const low=Math.min(a[along],b[along]),high=Math.max(a[along],b[along]);
   const points=[];
   for(const line of lines.get(key(axis,a[axis]))||[]) {
-    const sorted=[...line].sort((p,q)=>p[along]-q[along]);
+    const sorted=sortedCapturedLines.get(line)||[...line].sort((p,q)=>p[along]-q[along]);
     if(sorted[0][along]>low+.02 || sorted.at(-1)[along]<high-.02)continue;
     const sample=value=>{
       for(let i=1;i<sorted.length;i++)if(value<=sorted[i][along]+.02) {
@@ -31,7 +36,9 @@ export function detailPointsOnEdge(lines,a,b) {
       }
       return {...sorted.at(-1),[along]:value};
     };
-    points.push(sample(low),...sorted.filter(p=>p[along]>low+.02 && p[along]<high-.02).map(p=>({...p,[axis]:a[axis]})),sample(high));
+    points.push(sample(low));
+    for(const p of sorted)if(p[along]>low+.02 && p[along]<high-.02)points.push({...p,[axis]:a[axis]});
+    points.push(sample(high));
     break;
   }
   return a[along]>b[along]?points.reverse():points;

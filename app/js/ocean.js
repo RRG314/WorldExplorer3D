@@ -759,6 +759,12 @@ async function startOceanMode(options = {}) {
       if(!entered)throw new Error('The research-vessel water entry was not ready.');
     }
     if(!currentSite())return false;
+    // The saved Earth selection and pose remain owned by earth-session. A
+    // submerged session needs neither the city's scene graph nor its providers;
+    // return-to-Earth can rebuild it through the existing resume authority.
+    if (appCtx.buildings?.length || appCtx.roads?.length || appCtx.terrainTileCache?.size) {
+      appCtx.releaseEarthWorldForTitle?.({reason:'ocean_entry_release',preserveWaterEvidence:true});
+    }
     void refreshWaterEnvironmentEvidence();
     appCtx.updateInteriorInteraction?.();
     oceanMode.lastFrameMs = 0;

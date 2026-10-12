@@ -13,27 +13,26 @@ export function disposeObject3D(obj) {
   // Detach leased models before visiting shared resources. A docked instance
   // can still be using the same textures in another scene.
   for (const dispose of managed) dispose();
+  const geometries=new Set(),materials=new Set(),textures=new Set(),targets=new Set();
   obj.traverse((child) => {
-    if (!child || !(child.isMesh || child.isPoints || child.isLine)) return;
-    if (child.geometry && typeof child.geometry.dispose === "function") {
-      child.geometry.dispose();
+    if (!child) return;
+    // r128 stores instance attributes outside geometry; only the mesh's
+    // disposal event retires those GPU buffers while the renderer stays alive.
+    if (child.isInstancedMesh) child.dispose?.();
+    for (const key of ['map','mapPass']) {
+      const target=child.shadow?.[key];
+      if(target){targets.add(target);child.shadow[key]=null;}
     }
-    const materials = Array.isArray(child.material) ? child.material : [child.material];
-    materials.forEach((material) => {
-      if (!material) return;
-      ["map", "normalMap", "roughnessMap", "metalnessMap", "emissiveMap", "alphaMap"].forEach((key) => {
-        const texture = material[key];
-        if (
-          texture &&
-          typeof texture.dispose === "function" &&
-          !(texture.userData && texture.userData.sharedOceanTexture)
-        ) {
-          texture.dispose();
-        }
-      });
-      if (typeof material.dispose === "function") material.dispose();
-    });
+    if(child.geometry)geometries.add(child.geometry);
+    for(const material of [].concat(child.material||[]))materials.add(material);
   });
+  for(const material of materials){
+    for(const value of Object.values(material))if(value?.isTexture&&!value.userData?.sharedOceanTexture)textures.add(value);
+    material.dispose?.();
+  }
+  for(const geometry of geometries)geometry.dispose?.();
+  for(const texture of textures)texture.dispose?.();
+  for(const target of targets)target.dispose?.();
 }
 
 export function createSeabedMesh(renderer = null, deps = {}) {

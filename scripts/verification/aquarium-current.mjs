@@ -1,16 +1,38 @@
 import assert from 'node:assert/strict';
-import {mkdir,writeFile} from 'node:fs/promises';
+import {mkdir,writeFile,readFile} from 'node:fs/promises';
 import {chromium} from 'playwright';
 import {startStaticServer} from './static-server.mjs';
 import {configureStagingAppCheck} from './staging-app-check.mjs';
 import {stepGameplayKeys} from './gameplay-simulation.mjs';
 import {collectBrowserGraphicsErrors} from './browser-graphics-errors.mjs';
 import {runPrescribedGameActions} from './prescribed-game-actions.mjs';
+import {resolve} from 'node:path';
+import {artifactIdentity} from './artifact-identity.mjs';
+import {requirePerformanceHost,requireHardwareGraphics} from './performance-host.mjs';
+import {sampleFrameWindow} from './frame-window.mjs';
+import {frameHitches} from './frame-hitches.mjs';
+const measured=process.argv.includes('--performance'),performanceHost=measured?requirePerformanceHost():null;
+const performanceBudgets=JSON.parse(await readFile('config/performance-budgets.json','utf8'));
+const servedRoot=resolve(process.env.WE3D_VERIFY_ROOT||process.cwd());
 const faults=process.argv.includes('--faults');
 const out=process.env.WE3D_AQUARIUM_OUTPUT||'output/aquarium-expansion/current-visit';await mkdir(out,{recursive:true});
-const server=await startStaticServer({rootDir:process.cwd(),ports:[4496,4497]});const browser=await chromium.launch({channel:'chrome',headless:true});const context=await browser.newContext({viewport:{width:1280,height:800},deviceScaleFactor:1}),page=await context.newPage(),errors=[],report={ok:false,evidence:'Full source game with ordinary entry, keyboard movement and actual local assets; not hosted release or physical-phone approval.',checks:[]};
+const server=await startStaticServer({rootDir:servedRoot,ports:[4496,4497]});const browser=await chromium.launch({channel:'chrome',headless:true});const context=await browser.newContext({viewport:{width:1280,height:800},deviceScaleFactor:1}),page=await context.newPage(),errors=[],report={ok:false,evidence:`Full ${servedRoot===process.cwd()?'mutable-source':'saved-package'} game with ordinary entry, keyboard movement and actual local assets; not hosted release or physical-phone approval.`,artifactIdentity:artifactIdentity(process.cwd(),servedRoot),checks:[]};
 collectBrowserGraphicsErrors(page,errors);page.on('pageerror',e=>errors.push(String(e)));page.on('console',m=>{if(m.type()==='warning'&&/Interior|aquarium/i.test(m.text()))report.warnings=(report.warnings||[]).concat(m.text());});
 const check=(name,value)=>{report.checks.push({name,passed:!!value});console.log('[aquarium]',name,value?'PASS':'FAIL');assert.ok(value,name);};
+const cdp=measured?await context.newCDPSession(page):null;if(cdp)await cdp.send('Performance.enable');
+report.performance=measured?{host:performanceHost,scope:'Three 10-second live RAF turning windows in Pavilion, lower reef gallery and reentry; not sustained outdoor or physical-phone evidence.',windows:[]}:null;
+async function measureVenue(label){
+ if(!measured)return;
+ const rendererName=await page.evaluate(()=>{const gl=venueCtx.renderer.getContext(),e=gl.getExtension('WEBGL_debug_renderer_info');return gl.getParameter(e?e.UNMASKED_RENDERER_WEBGL:gl.RENDERER);});requireHardwareGraphics(rendererName);
+ await page.evaluate(()=>{globalThis.__aquariumMeasuredActor=venueCtx.Walk.state.walker;});
+ let sample;await page.keyboard.down('ArrowLeft');try{sample=await page.evaluate(sampleFrameWindow,{durationMs:10000,actorKey:'__aquariumMeasuredActor',collectDiagnostics:false});}finally{await page.keyboard.up('ArrowLeft');}
+ const resources=await page.evaluate(()=>{delete globalThis.__aquariumMeasuredActor;return getWorldExplorerRuntimeDiagnostics().renderer;});
+ const metrics=await cdp.send('Performance.getMetrics'),heapBytes=metrics.metrics.find(m=>m.name==='JSHeapUsedSize')?.value||0,b=performanceBudgets.desktopTier.budgets;
+ const ordered=[...sample.deltas].sort((a,b)=>a-b),p=q=>ordered[Math.min(ordered.length-1,Math.ceil(ordered.length*q)-1)]||0;
+ const w={label,rendererName,heapBytes,resources,averageFps:sample.deltas.length/(sample.elapsedMs/1000),p95FrameMs:p(.95),p99FrameMs:p(.99),hitches:frameHitches(sample.deltas,performanceBudgets.desktopTier.hitches)};
+ w.checks={averageFps:w.averageFps>=b.minimumAverageFps,p95:w.p95FrameMs<=b.maximumP95FrameMs,p99:w.p99FrameMs<=b.maximumP99FrameMs,hitches:w.hitches.passed,heap:heapBytes<=b.maximumJsHeapUsedBytes,drawCalls:resources.calls<=b.maximumDrawCalls,triangles:resources.triangles<=b.maximumTriangles};
+ report.performance.windows.push(w);
+}
 async function pose(){return page.evaluate(()=>{const w=globalThis.venueCtx.Walk.state.walker;return{x:w.x,y:w.y,z:w.z,yaw:w.yaw||w.angle};});}
 async function walkTo(point,tolerance=.55){let previous=Infinity,stalled=0;for(let i=0;i<190;i++){const p=await pose(),distance=Math.hypot(point.x-p.x,point.z-p.z);if(distance<tolerance)return;const target=Math.atan2(point.x-p.x,point.z-p.z),delta=Math.atan2(Math.sin(target-p.yaw),Math.cos(target-p.yaw));if(Math.abs(delta)>.09){await stepGameplayKeys(page,delta>0?'ArrowLeft':'ArrowRight',Math.max(16,Math.min(450,Math.abs(delta)/2.6*800)));continue;}await stepGameplayKeys(page,'ArrowUp',Math.max(30,Math.min(450,(distance-tolerance+.1)/2.8*800)));if(distance>previous-.01)stalled++;else stalled=0;previous=distance;assert.ok(stalled<12,`Walking blocked: ${JSON.stringify({point,p,distance})}`);}throw Error(`Walking timed out: ${JSON.stringify(point)}`);}
 async function face(point){
@@ -42,7 +64,7 @@ try{
  await page.waitForFunction(()=>{const d=globalThis.getWorldExplorerRuntimeDiagnostics?.();return d?.gameStarted&&!d.worldLoading&&!document.getElementById('loading')?.classList.contains('show');},null,{timeout:300000});
  await page.evaluate(async()=>{globalThis.venueCtx=(await import('/app/js/shared-context.js?v=55')).ctx;});
  const targets=await page.evaluate(()=>{const c=globalThis.venueCtx;return c.buildings.filter(b=>b.sourceBuildingId==='overture:7bacec0b-326a-401f-ad9f-f3ebed72c8cf').map(b=>{const s=c.resolveBuildingEntrySupport(b,{allowSynthetic:false});return {key:s.key,baseY:b.baseY,minY:b.minY,bodyHeight:b.bodyHeightMeters,ground:c.GroundHeight?.walkSurfaceY?.(b.centerX,b.centerZ),pts:b.pts,center:{x:b.centerX,z:b.centerZ},door:s.exteriorEntrance,enterable:s.enterable};});});report.targets=targets;
- report.entranceDiagnostic=await page.evaluate(async()=>{const c=globalThis.venueCtx,{compileEntranceCatalog}=await import('/app/js/living-world/entrance-catalog.js'),{aquariumMappedEntrance}=await import('/app/js/interiors/aquarium-geography.js');const buildings=c.buildings.filter(b=>b.sourceBuildingId==='overture:7bacec0b-326a-401f-ad9f-f3ebed72c8cf'),mapped=aquariumMappedEntrance(c);return{published:c.buildingEntranceCatalog?.diagnostics,mapped,withoutGround:compileEntranceCatalog({buildings,mappedEntrances:mapped,limit:10}),withGround:compileEntranceCatalog({buildings,mappedEntrances:mapped,limit:10,sampleGround:(x,z)=>c.GroundHeight?.walkSurfaceY?.(x,z)}),meshes:c.buildingMeshes.filter(m=>m.userData.sourceBuildingId==='overture:7bacec0b-326a-401f-ad9f-f3ebed72c8cf').map(m=>({name:m.name,lod:m.userData.lodTier,semantics:m.userData.buildingSemantics,exterior:m.material?.userData?.buildingExterior,roof:m.userData.isRoofDetail,vertices:m.geometry?.attributes?.position?.count}))};});
+ report.entranceDiagnostic=await page.evaluate(()=>globalThis.venueCtx.buildingEntranceCatalog?.diagnostics);
  const target=targets.find(t=>t.door);check('Aquarium has one actual published public entrance',targets.filter(t=>t.door).length===1);
  await walkTo({x:target.door.approachX,z:target.door.approachZ},1);await page.screenshot({path:`${out}/exterior-entry.png`});await interact();
  await page.waitForFunction(()=>globalThis.venueCtx.activeInterior?.aquarium,null,{timeout:20000});check('Geographic entrance admits aquarium-specific layout',true);
@@ -52,7 +74,7 @@ try{
  if(faults){await walkTo(await at(0,10));await interact();await page.getByRole('button',{name:'Retry reef models',exact:true}).waitFor();check('Missing animal leaves map, exit and a visible retry',true);await page.getByRole('button',{name:'Retry reef models',exact:true}).click();await page.waitForFunction(()=>globalThis.venueCtx.activeInterior.aquarium.animals.length===4&&!globalThis.venueCtx.activeInterior.aquarium.loading,null,{timeout:45000});await page.getByRole('button',{name:'Close',exact:true}).click();}
  check('All four animal rigs and coral models load',await page.evaluate(()=>{const s=globalThis.venueCtx.activeInterior.aquarium;return s.animals.length===4&&s.furnishings.length===18&&!s.error;}));
  await runPrescribedGameActions(page,out,[{buttons:[],frames:5}],'body > canvas:not(#minimap)');
- await page.screenshot({path:`${out}/pavilion-arrival.png`});
+ await page.screenshot({path:`${out}/pavilion-arrival.png`});await measureVenue('pavilion');
  await lift('pavilion-lift',2);check('Pavilion lift reaches authored level 1',true);await page.screenshot({path:`${out}/pavilion-overlook.png`});
  await walkTo(await at(0,14));await walkTo(await at(-1,22));await walkTo(await at(-17,41));await walkTo(await at(-17,50));await walkTo(await at(-18,55));
  await face(await at(-36,64));await page.screenshot({path:`${out}/reef-overlook.png`});
@@ -61,7 +83,7 @@ try{
  for(const p of [[-18.5,58],[-19,64],[-18.5,70],[-18.5,73],[-19,75.4],[-24,76.5],[-32,76.5]])await walkTo(await at(...p));
  await lift('reef-lift-a',1);check('Elevator A reaches level M without rebuilding',true);
  for(const p of [[-25,76],[-19,75.4],[-18.5,73],[-18.5,70],[-19.3,63.5]])await walkTo(await at(...p));
- await face(await at(-36,63.5));await page.screenshot({path:`${out}/underwater-window.png`});
+ await face(await at(-36,63.5));await page.screenshot({path:`${out}/underwater-window.png`});await measureVenue('lower-reef');await face(await at(-36,63.5));
  // Use the game's ordinary right-button look control from the dry lower
  // gallery. No camera or actor state assignment is used to stage this view.
  await page.mouse.move(640,360);await page.mouse.down({button:'right'});await page.mouse.move(640,470,{steps:8});await page.mouse.up({button:'right'});await page.evaluate(()=>advanceTime(100));
@@ -82,10 +104,12 @@ try{
  check('Outdoor camera clipping restores exactly',await page.evaluate(saved=>globalThis.venueCtx.camera.near===saved.cameraNear&&globalThis.venueCtx.camera.far===saved.cameraFar,report.savedOutside));
  const outside=await pose();check('Harbor position restores exactly',Math.hypot(outside.x-report.savedOutside.x,outside.y-report.savedOutside.y,outside.z-report.savedOutside.z)<.12);
  check('Water targets and outdoor camera restore on exit',await page.evaluate(()=>globalThis.oldAquariumWater.snapshot().renderTargets===0&&globalThis.venueCtx.camera.layers.mask===1));
- await interact();await page.waitForFunction(()=>globalThis.venueCtx.activeInterior?.aquarium?.saved.size===3);await page.evaluate(()=>globalThis.venueCtx.activeInterior.aquarium.ready);check('Reentry restores all Journal notes',true);
+ await interact();await page.waitForFunction(()=>globalThis.venueCtx.activeInterior?.aquarium?.saved.size===3);await page.evaluate(()=>globalThis.venueCtx.activeInterior.aquarium.ready);check('Reentry restores all Journal notes',true);await measureVenue('reentry');
  check('Reentry creates only two water targets',await page.evaluate(()=>globalThis.venueCtx.activeInterior.aquarium.water.snapshot().renderTargets===2));
  await walkTo(await page.evaluate(()=>globalThis.venueCtx.activeInterior.interactions.find(i=>i.kind==='exit')));await interact();await page.waitForFunction(()=>!globalThis.venueCtx.activeInterior);
  report.assets=await page.evaluate(()=>getWorldExplorerRuntimeDiagnostics().modelAssets);check('Aquarium model leases are released',report.assets.entries.filter(e=>/aquarium-|marine-.*coral/.test(e.id)).every(e=>e.leases===0));
- report.ok=true;check('No page or GPU errors',errors.length===0);
+ check('No page or GPU errors',errors.length===0);
+ if(measured)for(const w of report.performance.windows)for(const [id,passed]of Object.entries(w.checks))check(`${w.label} performance: ${id}`,passed);
+ report.ok=true;
 }catch(error){report.failure=String(error.stack||error);await page.screenshot({path:`${out}/failure.png`}).catch(()=>{});throw error;}
 finally{report.errors=errors;await writeFile(`${out}/report.json`,JSON.stringify(report,null,2));await browser.close();await server.close();}

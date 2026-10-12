@@ -3,6 +3,29 @@
 const R = 6378137;
 const entries = new Map();
 const localOwners = new WeakMap();
+// Keep compressed provider tiles, never decoded bitmaps, between overlapping
+// mosaics. The cache is bounded and belongs to the active imagery session.
+const tileBlobs = new Map();
+const tileByteLimit = 4 * 1024 * 1024, tileCountLimit = 128;
+let tileBytes = 0;
+async function tileBlob(url, signal) {
+  signal.throwIfAborted();
+  const cached = tileBlobs.get(url);
+  if (cached) { tileBlobs.delete(url); tileBlobs.set(url, cached); return cached; }
+  const response = await fetch(url, { signal });
+  if (!response.ok) throw Error(`Imagery tile HTTP ${response.status}`);
+  const blob = await response.blob();
+  signal.throwIfAborted();
+  if (blob.size > 1024 * 1024 || !blob.type.startsWith('image/')) throw Error('Invalid imagery tile');
+  // Concurrent mosaics can finish the same tile; replace its bytes only once.
+  const previous = tileBlobs.get(url); if (previous) tileBytes -= previous.size;
+  tileBlobs.delete(url); tileBlobs.set(url, blob); tileBytes += blob.size;
+  while (tileBytes > tileByteLimit || tileBlobs.size > tileCountLimit) {
+    const oldest = tileBlobs.keys().next().value;
+    tileBytes -= tileBlobs.get(oldest).size; tileBlobs.delete(oldest);
+  }
+  return blob;
+}
 export function imageryMercator(lat, lon) {
   const latitude = Math.max(-85.05112878, Math.min(85.05112878, lat));
   return { x: R * lon * Math.PI / 180, y: R * Math.log(Math.tan(Math.PI / 4 + latitude * Math.PI / 360)) };
@@ -33,19 +56,19 @@ export function regionalImageryTileLayout(spec) {
   if (tiles.length > 81) throw Error('Imagery tile budget exceeded');
   return tiles;
 }
+const tileUrl = tile => `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${tile.zoom}/${tile.y}/${tile.x}`;
 async function loadCachedImage(spec, signal) {
   const canvas = document.createElement('canvas'); canvas.width = canvas.height = 2048;
   const context = canvas.getContext('2d');
-  const tiles = regionalImageryTileLayout(spec); let next = 0;
+  // Composite cached tiles first; fetching a new edge must not evict an
+  // overlapping tile before this mosaic has consumed it.
+  const tiles = regionalImageryTileLayout(spec).sort((a,b) => Number(tileBlobs.has(tileUrl(b))) - Number(tileBlobs.has(tileUrl(a)))); let next = 0;
   async function worker() {
     while (next < tiles.length) {
       signal.throwIfAborted();
       const tile = tiles[next++];
-      const url = `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${tile.zoom}/${tile.y}/${tile.x}`;
-      const response = await fetch(url, { signal });
-      if (!response.ok) throw Error(`Imagery tile HTTP ${response.status}`);
-      const blob = await response.blob();
-      if (blob.size > 1024 * 1024 || !blob.type.startsWith('image/')) throw Error('Invalid imagery tile');
+      const url = tileUrl(tile);
+      const blob = await tileBlob(url, signal);
       const image = await createImageBitmap(blob);
       try {
         signal.throwIfAborted();
@@ -94,7 +117,10 @@ function loadEntry(spec) {
 }
 function releaseEntry(entry,update){
  entry.users.delete(update);
- if(!entry.users.size){entry.controller.abort();entry.texture?.dispose();if(entries.get(entry.spec.key)===entry)entries.delete(entry.spec.key);}
+ if(!entry.users.size){
+  entry.controller.abort();entry.texture?.dispose();if(entries.get(entry.spec.key)===entry)entries.delete(entry.spec.key);
+  if(!entries.size){tileBlobs.clear();tileBytes=0;}
+ }
 }
 export function imageryUvTransform(regional,local){
  const a=regional.bounds,b=local.bounds,w=b[2]-b[0],h=b[3]-b[1];
@@ -132,7 +158,7 @@ function localOwner(ctx){
  localOwners.set(ctx,owner);return owner;
 }
 export function updateRegionalImageryFocus(ctx,point){localOwners.get(ctx)?.focus(point);}
-export function regionalImagerySnapshot(ctx){return {entries:[...entries.values()].map(e=>({key:e.spec.key,users:e.users.size,status:e.status,texture:!!e.texture})),local:localOwners.get(ctx)?.snapshot()||null};}
+export function regionalImagerySnapshot(ctx){return {tileCache:{count:tileBlobs.size,bytes:tileBytes,byteLimit:tileByteLimit,countLimit:tileCountLimit},entries:[...entries.values()].map(e=>({key:e.spec.key,users:e.users.size,status:e.status,texture:!!e.texture})),local:localOwners.get(ctx)?.snapshot()||null};}
 export function attachRegionalImagery(mesh, ctx, uniforms) {
   if (mesh.userData.regionalImagery || Number(ctx.renderer?.capabilities?.maxTextures || 0) < 16) return false;
   const center=mesh.userData.regionalImageryCenter||ctx.LOC;

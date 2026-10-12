@@ -25,7 +25,8 @@ export function createBoatOceanTransferApi(options = {}) {
     startBoatMode,
     updateBoatMenuUi,
     updateWaterWaveVisuals,
-    restoreEarthSurfaceLayers
+    restoreEarthSurfaceLayers,
+    retireBoatVisual
   } = options;
 
 let transferPending = false;
@@ -85,6 +86,7 @@ async function transferBoatToSubmarine(options = {}) {
   const waveOffset = water?.source?.waveOffset || {};
   const launchWaveOffset = {x:appCtx.boat.x+(waveOffset.x||0),z:appCtx.boat.z+(waveOffset.z||0)};
   const priorTransfer = appCtx.boatMode.oceanTransferVessel;
+  const priorVisual = appCtx.boatMode.mesh;
   const origin = {lat:appCtx.LOC?.lat,lon:appCtx.LOC?.lon};
   const pose = {x:appCtx.boat.x,z:appCtx.boat.z,yaw:appCtx.boat.angle};
   const moored = !!appCtx.boatMode.moored, onDeck = !!appCtx.boatDeck?.active;
@@ -115,6 +117,10 @@ async function transferBoatToSubmarine(options = {}) {
       entry: {lat:geo.lat,lon:geo.lon,source:'mapped-boat-water',kind:'mapped-water-area',waterContext},
       submarinePose: parentVesselSubmarinePose(vessel)
     });
+    // Keep the departure vessel until admission succeeds so a failed dive can
+    // restore it immediately. Once underwater, the ocean owns the exterior;
+    // the furnished deck and docked sub must not remain hidden in Earth.
+    if (started && appCtx.oceanMode?.active && !appCtx.boatMode.active && appCtx.boatMode.mesh === priorVisual) retireBoatVisual?.();
     return started;
   } catch (error) {
     console.warn('[BoatMode] submarine launch failed', error);
@@ -239,6 +245,14 @@ async function transferSubmarineToBoat(options = {},surfaceVoyage=null) {
       if(!loaded){surfaced=false;suspendBoatModeForOceanTransfer();return false;}
     }
     if (surfaced) {
+      // The bootstrap ground is only a land-loading placeholder. A fresh
+      // sea launch can reach this point without ever loading terrestrial tiles.
+      appCtx.suppressGroundFallbackPlaceholder?.();
+      // This accepted arrival is an independent open-water scene. Preserve the
+      // saved land visit, not the old city's hidden meshes and provider caches.
+      if (appCtx.buildings?.length || appCtx.roads?.length || appCtx.terrainTileCache?.size) {
+        appCtx.releaseEarthWorldForTitle?.({reason:'marine_surface_release',preserveWaterEvidence:true});
+      }
       appCtx.boatMode.oceanTransferVessel = null;
       appCtx.boatMode.moored = !!voyage;
       if(surfaceVoyage)ensureOceanVoyage(appCtx).beginAboard(surfaceVoyage);

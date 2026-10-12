@@ -378,7 +378,8 @@ const boatOceanTransferApi = createBoatOceanTransferApi({
   startBoatMode: (options) => startBoatMode(options),
   updateBoatMenuUi,
   updateWaterWaveVisuals,
-  restoreEarthSurfaceLayers: () => syncOpenOceanSurfaceLayers(true)
+  restoreEarthSurfaceLayers: () => syncOpenOceanSurfaceLayers(true),
+  retireBoatVisual: disposeBoatMesh
 });
 const { suspendBoatModeForOceanTransfer, transferBoatToSubmarine, transferSubmarineToBoat, startSurfaceResearchVoyage } = boatOceanTransferApi;
 
@@ -673,6 +674,7 @@ function stopBoatMode(options = {}) {
   }
   syncBoatPromptState(true);
   appCtx.onVesselTripEnded?.(vesselSnapshot);
+  disposeBoatMesh();
   return true;
 }
 

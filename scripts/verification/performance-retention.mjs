@@ -436,7 +436,7 @@ async function runDesktop() {
     const flightAfter = await client.page.evaluate(async () => (await import('/app/js/shared-context.js?v=55')).ctx.getPlaneSnapshot());
     assert.ok(flightAfter.pitch > .05 && flightAfter.y > flightBefore.y && flightAfter.throttle > flightBefore.throttle,
       'Real pitch/throttle input must establish a climb before sustained flight');
-    const plane = { ...(await measureMode(client, 'plane', auditOnly && !process.env.WE3D_PERF_TRACE_MODE ? 1_500 : 90_000, 'Space')), activationMs: planeActivationMs,
+    const plane = { ...(await measureMode(client, 'plane', auditOnly && !process.env.WE3D_PERF_TRACE_MODE && !process.argv.includes('--flight-window') ? 1_500 : 90_000, 'Space')), activationMs: planeActivationMs,
       preparation: { keys: ['s', 'Space'], heldForMs: 2_000, before: flightBefore, after: flightAfter } };
     console.log('[performance-retention] desktop plane', JSON.stringify({ fps: plane.averageFps, withinBudgets: modesWithinBudgets([plane], budgets.desktopTier) }));
     const sustainedModes=sustained?await sustainedTravel(client):[];

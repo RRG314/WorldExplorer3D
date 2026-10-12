@@ -33,3 +33,28 @@ test('actual terrain publication reapplies mapped cover after baseline reset and
   applyMappedSemanticVertexTints(mesh,null);
   assert.equal(geometry.attributes.terrainSurfaceMixA.array[1],255);
 });
+
+test('regional land-use colors and holes agree through spatial buckets at temperate and polar latitudes',async()=>{
+ const {latLonToTileXY}=await import('../app/js/terrain/tile-coordinates.js?v=1');
+ for(const latitude of [39,-25,84.2])for(const spatial of [false,true]){
+  const longitude=20,coordinate=(x,z)=>({lat:latitude+z*.0001,lon:longitude+x*.0001});
+  const outer=[[-.00055,-.00055],[.00055,-.00055],[.00055,.00055],[-.00055,.00055]].map(([x,z])=>[longitude+x,latitude+z]);
+  const hole=[[-.00005,-.00005],[.00005,-.00005],[.00005,.00005],[-.00005,.00005]].map(([x,z])=>[longitude+x,latitude+z]);
+  const bounds={minLon:longitude-.00055,maxLon:longitude+.00055,minLat:latitude-.00055,maxLat:latitude+.00055};
+  const area={outer,holes:[hole],bounds,tint:[64/255,128/255,192/255],mode:'forest'};
+  const landAreasByTile=new Map(),landAreaSpatialByTile=new Map(),vertices=[];
+  for(let z=-4;z<=4;z+=2)for(let x=-4;x<=4;x+=2){
+   vertices.push(x,0,z);const p=coordinate(x,z),tile=latLonToTileXY(p.lat,p.lon,14),key=`14/${tile.x}/${tile.y}`;
+   landAreasByTile.set(key,[area]);
+   if(spatial)landAreaSpatialByTile.set(key,{bounds,latSpan:bounds.maxLat-bounds.minLat,lonSpan:bounds.maxLon-bounds.minLon,size:2,cells:Array.from({length:4},()=>[area])});
+  }
+  Object.assign(ctx,{LOC:{lat:latitude,lon:longitude},landuses:[],roads:[],buildings:[],waterAreas:[],linearFeatures:[],worldToLatLon:coordinate});resetTerrainSurfaceProfileCache();
+  const geometry={attributes:{position:new Attribute(new Float32Array(vertices),3)},setAttribute(name,value){this.attributes[name]=value;}};
+  const mesh={geometry,position:{x:0,z:0},material:{},userData:{}};
+  assert.equal(applyMappedSemanticVertexTints(mesh,{contextZoom:14,landAreasByTile,landAreaSpatialByTile}),24);
+  for(let i=0;i<25;i++){
+   assert.deepEqual([...geometry.attributes.color.array.slice(i*3,i*3+3)],i===12?[255,255,255]:[64,128,192]);
+   assert.equal(geometry.attributes.terrainSurfaceMixA.array[i*4+2],i===12?0:255);
+  }
+ }
+});

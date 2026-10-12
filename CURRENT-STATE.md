@@ -50,6 +50,70 @@ browsers/servers. Production deployment evidence is under
 `output/release-evidence/current/production-deployment.json` and
 `production-promotion.json`; acceptance gaps remain in their own receipts.
 
+## October 12 resource residency cleanup — local verification
+
+The current local changes retire the hidden furnished research vessel after
+successful sub admission, release the Ocean scene/renderer on recovery, and
+release the previous Earth city's geometry and provider caches only after
+accepted marine entry. Failed admissions retain their prior presentation.
+The saved land selection/pose and current marine evidence retain their owners.
+Returning to land rebuilds it through the existing Earth session authority.
+
+The actual land/ocean/land check restored all 49,080 buildings, 18,952 roads,
+49 terrain tiles and the exact location/pose. Underwater counts were zero, with
+renderer geometries reduced from 1,043 to 60 and textures from 197 to 35. The
+combined verifier then stopped at an ambiguous canvas selector, now corrected;
+that partial run is not a complete gate pass. Evidence is in
+`output/production-readiness-20261012/resource-lifecycle-checked/report.json`.
+
+The final ocean-only source check passes three real deck/sub/deck cycles, preserves
+ship/sub identities, retires the hidden vessel and inactive renderer, releases
+marine leases at the menu, and retains 60,299,964 / 60,867,748 / 61,636,692 JS heap
+bytes after explicit collection. The earlier inventory comparison removed
+164,394,722 estimated actively leased template bytes without removing assets.
+These are resource/retention measurements, not measured GPU memory or frame-time
+acceptance. Final recovered-deck and underwater screenshots were inspected.
+The green loading-ground patch is now retired on successful surface arrival.
+
+The named Ocean fixture allowance now reflects its licensed submarine, corals
+and parent hull, replacing the obsolete procedural-scene ceiling. This is not a
+limit on geographic exploration or activities. Frame-time budgets remain intact.
+Compressed regional imagery has a 4 MiB/128-tile reuse cache that retires with its
+last owner; decoded bitmaps close after composition. Regional building assembly
+uses exclusive typed storage with exact attribute/index equivalence, preserving
+footprints, facades and all road/bridge/tunnel geometry. Regional edge sorting
+and coordinate frames are reused; terrain sampling avoids per-vertex metadata
+allocation. Background terrain/water work yields between rendered frames and
+stops when superseded. Temporary water-mask canvases retire on success and abort.
+Portal shaders now reuse identical programs without changing tunnel openings.
+The actual GPU terrain/pavement lifecycle fixture passes after this change.
+
+The habitat audit found a real instance-buffer leak invisible to Three's geometry
+counter: actual WebGL buffer counts grew 38/53/68/83, leaving 64 after retirement.
+Explicit InstancedMesh disposal fixes both cloned corals and base habitat meshes:
+the same check is now 38/38/38/38, leaving only the fixture seabed's four buffers.
+Both receipts and the inspected licensed-coral image are retained under
+`output/production-readiness-20261012/habitat-buffers-{before,final}`.
+
+The source continuous-ocean browser journey passes all ten cases, including
+region retirement, provider outage, reload, swimming/reboarding and recovery.
+Nine tiles remain resident across repeated 9 km traversal setups; renderer
+geometry remains at 33 and textures at 30–33. This uses controlled depth responses;
+it is not global bathymetry fidelity or an elapsed-time circumnavigation claim.
+Evidence: `output/production-readiness-20261012/ocean-stream-final/report.json`.
+
+The latest unprofiled 90-second flight averages 49.98 FPS with p99 50 ms, but
+still has 13 frames over 100 ms and two over 250 ms (worst 483.4 ms). Walk/drive
+windows have no frames over 100 ms but do not meet the FPS/heap release ceilings.
+This diagnostic is not a performance pass. CPU/allocation profiles and each
+failed comparison remain intact; no threshold was relaxed. The final full source chain
+passes all 2,524 tests after the instance-buffer correction, plus dependency,
+ownership, type, runtime-name, inventory and sensitivity checks.
+
+No new immutable package, production deployment or GitHub push has occurred.
+Outdoor performance, complete release gates and the previously disclosed venue
+showcase scope remain open; production is still d877 and all fallbacks are kept.
+
 ## October 12 aquarium audit and venue separation
 
 The owner explicitly requires distinct museum and aquarium buildings/experiences.

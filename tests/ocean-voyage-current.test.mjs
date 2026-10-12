@@ -44,8 +44,8 @@ test('same ship/sub identity survives saved dive, recovery, re-launch and local 
 function transferFixture(){
  const water={waterKind:'open_ocean',source:{synthetic:true,waveOffset:{x:300,z:700}}},calls=[];
  const ctx={LOC:{lat:10,lon:20},SCALE:100000,ENV:{EARTH:'EARTH'},getEnv:()=> 'EARTH',boat:{x:12,z:18,angle:.7},boatMode:{active:true,currentWater:water,transportEntityId:'ship-1',transportCatalogId:'ocean-research-vessel',condition:.8,mesh:{visible:true}},oceanMode:{active:false},startOceanMode:async opts=>{calls.push(opts);return false}};
- let restores=0;const api=createBoatOceanTransferApi({appCtx:ctx,canDiveBoatMode:()=>true,captureEarthWorldSession(){},setPromptSignature(){},showBoatPrompt(){},hideBoatPrompt(){},resetBoatDynamics(){},resetBoatFoamFx(){},updateWaterWaveVisuals(){},updateBoatMenuUi(){},startBoatMode:opts=>{restores++;assert.equal(opts.candidate,water);ctx.boatMode.active=true;return true}});
- return {ctx,api,calls,restores:()=>restores};
+ let restores=0,retired=0;const api=createBoatOceanTransferApi({appCtx:ctx,retireBoatVisual(){retired++;ctx.boatMode.mesh=null;},canDiveBoatMode:()=>true,captureEarthWorldSession(){},setPromptSignature(){},showBoatPrompt(){},hideBoatPrompt(){},resetBoatDynamics(){},resetBoatFoamFx(){},updateWaterWaveVisuals(){},updateBoatMenuUi(){},startBoatMode:opts=>{restores++;assert.equal(opts.candidate,water);ctx.boatMode.active=true;return true}});
+ return {ctx,api,calls,restores:()=>restores,retired:()=>retired};
 }
 test('rejected submarine launches restore original vessel and retain water phase before suspension',async()=>{
  const f=transferFixture();assert.equal(await f.api.transferBoatToSubmarine(),false);assert.equal(f.restores(),1);assert.equal(f.ctx.boatMode.active,true);assert.deepEqual(f.calls[0].waveOffset,{x:312,z:718});assert.ok(Math.hypot(f.calls[0].submarinePose.x,f.calls[0].submarinePose.z)>=51);assert.equal(f.ctx.boatMode.oceanTransferVessel,undefined);
@@ -147,4 +147,20 @@ test('surface movement preserves the depth sample origin and requires a new dept
  assert.equal(oceanDepthProfileMatchesSite(voyage.current.depthProfile,voyage.current.site,voyage.current.site),false);
  assert.equal(oceanDepthProfileMatchesSite(voyage.current.depthProfile,site),true);
  const read=createOceanVoyageStore({storage}).read();assert.deepEqual(read.depthProfile.origin,site);assert.equal(read.site.lat,9.995);
+});
+
+
+test('successful sub admission retires only the departure deck; failed or superseded transfers retain it',async()=>{
+ const failed=transferFixture(),original=failed.ctx.boatMode.mesh;
+ await failed.api.transferBoatToSubmarine();assert.equal(failed.retired(),0);assert.equal(failed.ctx.boatMode.mesh,original);
+ const success=transferFixture();let finish;
+ success.ctx.startOceanMode=()=>new Promise(r=>finish=r);
+ const pending=success.api.transferBoatToSubmarine();
+ assert.equal(success.retired(),0,'Departure stays available until admission completes');
+ success.ctx.oceanMode.active=true;finish(true);assert.equal(await pending,true);
+ assert.equal(success.retired(),1);assert.equal(success.ctx.boatMode.mesh,null);
+ assert.equal(success.ctx.boatMode.oceanTransferVessel.transportEntityId,'ship-1');
+ const superseded=transferFixture(),replacement={visible:true};
+ superseded.ctx.startOceanMode=async()=>{superseded.ctx.boatMode.mesh=replacement;superseded.ctx.oceanMode.active=true;return true;};
+ await superseded.api.transferBoatToSubmarine();assert.equal(superseded.retired(),0);assert.equal(superseded.ctx.boatMode.mesh,replacement);
 });
