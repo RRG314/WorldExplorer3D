@@ -1,0 +1,75 @@
+{
+  "schemaVersion": 1,
+  "normalization": "right-handed, +Y up; centered X/Z; base Y=0; maximum extent 1 unit",
+  "sources": [
+    {
+      "id": "smithsonian-triceratops",
+      "url": "https://3d-api.si.edu/content/document/3d_package:d8c623be-4ebc-11ea-b77f-2e728ce88125/resources/Triceratops_horridus_Marsh_1889-150k-4096.glb",
+      "bytes": 14395048,
+      "sha256": "cd8525c7371d14876bcdefe3f579d216bf597db892c2de6ed597da86bf1a98b3",
+      "maxSourceBytes": 20000000,
+      "extensions": [],
+      "meshes": 1,
+      "images": 3,
+      "title": "Triceratops horridus",
+      "author": "Smithsonian Institution, National Museum of Natural History",
+      "rightsEvidence": "https://www.si.edu/openaccess/faq",
+      "license": "CC0-1.0",
+      "kind": "glb",
+      "assetId": "museum-smithsonian-triceratops",
+      "triangles": 50000,
+      "textureEdgePixels": 1024,
+      "maxOutputBytes": 4500000,
+      "review": {
+        "status": "approved",
+        "date": "2026-10-12",
+        "evidence": "docs/interior-expansion/LICENSE-REVIEW.md"
+      }
+    },
+    {
+      "id": "smithsonian-coral",
+      "url": "https://3d-api.si.edu/content/document/3d_package:03d6b38a-bf7d-4334-90c9-1f7b4c3041a9/resources/usnm_292-100k-2048_std.glb",
+      "bytes": 6508664,
+      "sha256": "6516992aa8c3873c09fe000326df79b9953e97c6b1023fdc7a378ce1cd863c2b",
+      "maxSourceBytes": 10000000,
+      "extensions": [],
+      "meshes": 1,
+      "images": 3,
+      "title": "Madrepora formosa \u00b7 USNM 292",
+      "author": "Smithsonian Institution, National Museum of Natural History",
+      "rightsEvidence": "https://www.si.edu/openaccess/faq",
+      "license": "CC0-1.0",
+      "kind": "glb",
+      "assetId": "museum-smithsonian-coral",
+      "triangles": 24000,
+      "textureEdgePixels": 1024,
+      "maxOutputBytes": 4500000,
+      "review": {
+        "status": "approved",
+        "date": "2026-10-12",
+        "evidence": "docs/interior-expansion/LICENSE-REVIEW.md"
+      }
+    },
+    {
+      "id": "met-cypresses",
+      "url": "https://images.metmuseum.org/CRDImages/ep/web-large/DP-42549-001.jpg",
+      "bytes": 221383,
+      "sha256": "af0e3486621c210b54932d055294051b5601aa3362af4b84ab97e2831f8163bc",
+      "maxSourceBytes": 3000000,
+      "title": "Wheat Field with Cypresses",
+      "author": "Vincent van Gogh / The Metropolitan Museum of Art",
+      "rightsEvidence": "https://www.metmuseum.org/hubs/open-access",
+      "license": "CC0-1.0",
+      "kind": "image",
+      "assetId": "museum-met-cypresses",
+      "triangles": 2,
+      "textureEdgePixels": 1024,
+      "maxOutputBytes": 4500000,
+      "review": {
+        "status": "approved",
+        "date": "2026-10-12",
+        "evidence": "docs/interior-expansion/LICENSE-REVIEW.md"
+      }
+    }
+  ]
+}

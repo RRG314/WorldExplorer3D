@@ -1,0 +1,81 @@
+# A place to begin, a vessel to explore
+
+World Explorer 3D 5.6 connects more of the journey: first discoveries, a place
+to work, a research ship and exploration beyond the starting area. Your existing
+locations, Backpack and Journal stay part of the same game.
+
+## Start with a purpose
+
+First Bearings helps you choose a field interest, follow a nearby lead and review
+your first finding. Continue with a Harbor Run delivery, a three-view study of a
+building or a personal research workspace. Completed work earns the corresponding
+Journal records and distinctions; free roam remains available.
+
+Coastal research links a voyage plan, sonar contacts, diving and a report aboard
+your vessel. Lunar fieldwork lets you prepare a method, deploy Pathfinder, work
+on the surface and bring your results back. These are specific playable journeys,
+not a claim that every proposed career campaign is complete.
+
+## Life aboard the research vessel
+
+A licensed research hull and submarine replace the earlier custom vessels.
+Walk through the wet lab, dry lab, galley, mess, quarters and wheelhouse. Connected
+stairs and a deck map help you find the room you need. Stations use the existing
+Journal, provisions and voyage systems.
+
+Deck walking now includes running, jumping and mouse look. The camera follows
+stairs smoothly while feet retain physical contact with the steps. Enter the
+water, swim or dive with the appropriate equipment, deploy the submarine and
+recover to the same parent ship.
+
+<!-- public-gallery:research-interior -->
+![Inside the research vessel galley with its carried-provisions controls open](assets/gallery/5.6/research-interior.webp)
+
+## Explore farther
+
+Personal geographic ocean voyages can load nearby seabed scenery while releasing
+the area left behind. They retain geographic depth, vessel custody and save
+recovery. A setting keeps the original fixed-area behavior available. Authored
+study sites and shared crew voyages retain their own boundaries.
+
+Regional Earth buildings retain more facade and roof detail during travel.
+Terrain imagery now follows the traveling region too. Failed requests retain the
+last complete scenery while recovery proceeds. Existing selected-location roads,
+buildings and land-cover detail are preserved.
+
+Selected licensed fish and dolphins use location and depth rules. Wildlife
+observations belong to the game Journal and are clearly distinguished from real
+animal sightings. The Journal and Field Guide remain available across ocean and
+planetary journeys, with supported return actions for saved voyages.
+
+<!-- public-gallery:submarine -->
+![The Atlantic Explorer submarine deployed from its research vessel](assets/gallery/5.6/submarine.webp)
+
+## Clearer presentation and safer progress
+
+A first museum visit opens at The Peale's mapped Baltimore building. Walk a
+finished entrance hall and two galleries, inspect Smithsonian specimen models
+and a Met artwork, and keep notes in your Journal. The public wayfinding guide
+informs the room connections; dimensions and finishes are estimated. This is
+an interpretive collection study, not The Peale's current rooms or collection.
+
+The BMW uses a lighter authored finish, and consistent display color and night
+lighting improve character and vehicle visibility. Supported facilities retain
+mapped fences, gates and transfer behavior. Local building edits, room edits,
+possessions and voyage saves keep their separate ownership and recovery paths.
+
+## Still being improved
+
+Dense cities and travel transitions can produce pauses. Art quality varies;
+some furnishings and animations remain simple. Named physical-phone performance
+and an independent new-player review remain unverified.
+
+Earth's traveling scenery does not yet extend detailed drivable roads, bridges,
+tunnels, building collisions or activities worldwide. Complete career campaigns,
+CERN, fully furnished airport and port packs, terrain farming, worldwide marine
+ecology and spearfishing remain outside this update. Interstellar Expeditions
+remain Alpha.
+
+This is a compatible minor update. Existing save records and recovery copies are
+retained; newer voyage formats use separate keys. See the
+[known limitations](KNOWN_ISSUES.md) and [roadmap](ROADMAP.md).

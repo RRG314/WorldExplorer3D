@@ -48,6 +48,7 @@ import {
 } from './surface-profiles.js?v=54';
 import {
   applyWorldCoverSurfaceMaterialMix,
+  createNormalizedTerrainAttribute,
   setNormalizedTerrainAttribute,
   ensureTerrainSurfaceMixAttributes,
   setTerrainSurfaceMaterialMixAt,
@@ -434,7 +435,9 @@ function createFarFieldTerrainApi(deps = {}) {
     if (exactPublished > 0) {
       geometry = new THREE.BufferGeometry();
       geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-      geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+      // Facade tint is bounded RGB, like terrain tint. Normalized bytes preserve
+      // all vertices and source buildings while using one quarter of RGB floats.
+      geometry.setAttribute('color', createNormalizedTerrainAttribute(colors, 3));
       geometry.setAttribute('regionalStyle',new THREE.Float32BufferAttribute(styles,4));
       geometry.setAttribute('regionalLayout',new THREE.Float32BufferAttribute(layouts,4));
       geometry.setIndex(indices);

@@ -4,6 +4,7 @@ import {batchSkinnedModelTemplate} from './skinned-model-batching.js';
 import {batchStaticModelTemplate} from './static-model-batching.js?v=1';
 import { getModelAsset } from './model-asset-catalog.js?v=16';
 import { registerMaterialCompatibility } from './gltf-material-compatibility.js';
+import {downloadBoundedModel} from './bounded-model-download.js';
 
 const templateCache = createModelTemplateCache();
 export const modelAssetCacheSnapshot = () => templateCache.snapshot();
@@ -18,9 +19,7 @@ function loaderFor(THREE) {
 
 function loadTemplate(THREE, record) {
   const pending = new Promise((resolve, reject) => {
-    loaderFor(THREE).load(
-      modelAssetRequestUrl(record),
-      (gltf) => {
+    const loaded = (gltf) => {
         const root = gltf?.scene || gltf?.scenes?.[0];
         if (!root) {
           reject(new Error(`${record.label} does not contain a scene.`));
@@ -35,10 +34,12 @@ function loadTemplate(THREE, record) {
           }
           resolve(Object.freeze({ root, animations: Object.freeze([...(gltf?.animations || [])]) }));
         } catch (error) { reject(error); }
-      },
-      undefined,
-      reject
-    );
+      };
+    const url=modelAssetRequestUrl(record),loader=loaderFor(THREE);
+    if(record.loadPolicy?.bounded){
+      downloadBoundedModel(url,{maxBytes:record.budgets.bytes,timeoutMs:record.loadPolicy.timeoutMs})
+        .then(bytes=>loader.parse(bytes,'',loaded,reject)).catch(reject);
+    }else loader.load(url,loaded,undefined,reject);
   });
   return pending;
 }

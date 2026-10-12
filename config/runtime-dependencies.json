@@ -329,7 +329,7 @@
   "locks": [
     {
       "path": "package-lock.json",
-      "sha256": "72be3152746aa26e945253a3f57220c6b944ca97aa96a395cd6901f551356a69",
+      "sha256": "9b6aaebc846b19cc8ea85ab03f8f52c50d26076200bb5b80291fdb8df64db795",
       "direct": [
         {
           "package": "@babel/parser",
@@ -390,6 +390,26 @@
           "package": "typescript",
           "version": "7.0.2",
           "integrity": "sha512-8FYau96o3NKOhbjKi/qNvG/W5jhzxkbdm5sj9AbZ/5T5sWqn3hJgLfGx27sRKZWTvyzCP8dLRBTf5tBTSRVUNA=="
+        },
+        {
+          "package": "@gltf-transform/core",
+          "version": "4.5.0",
+          "integrity": "sha512-JlvShvnB4AtfGZqjnESS/wfPJbpVnyHhTwJBbWN4qXqkB3C5HIoxxpu/orwGBge6Pc0zObeWj70lVf+4gbuu0A=="
+        },
+        {
+          "package": "@gltf-transform/extensions",
+          "version": "4.5.0",
+          "integrity": "sha512-J4cKzrmEr75YkrtdI4cKosBg2vDC4rT56aq/QoijW7GT1Y9gSEMJbqyFO9xcFO3FNpZaZiDrHWUqE5Okrl5nOQ=="
+        },
+        {
+          "package": "@gltf-transform/functions",
+          "version": "4.5.0",
+          "integrity": "sha512-7sMOuEfksMyF+/NTwUnEOgh7djohJ5XfeYg8rzXDG+9JIdbGVUpvJUY3XVBJCUJJ04dusDvcTHloOi1wfM8lnw=="
+        },
+        {
+          "package": "sharp",
+          "version": "0.35.5",
+          "integrity": "sha512-Ywn4OnzGukp7CDMrp08RQ50YKmuwG47brZgIVPTvBaaAfQlRlygrRqSrxdCiL9M+LlzLBiJ68IR1QqvzHyjC7g=="
         }
       ]
     },

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "targetVersion": "5.5.0",
+  "targetVersion": "5.6.0",
   "publicFiles": ["index.html", "about/index.html", "README.md", "github-pages/index.html", "app/index.html"],
   "allowedStatuses": ["review-required", "source-verified", "candidate-verified", "excluded"],
   "forbiddenPublicPatterns": [
@@ -33,7 +33,7 @@
     {
       "id": "buildings-and-interiors",
       "status": "candidate-verified",
-      "source": { "file": "README.md", "pattern": "enter mapped or eligible\\s+generated interiors" },
+      "source": { "file": "README.md", "pattern": "Enter supported buildings to explore their interiors\\." },
       "evidenceCommands": ["verify:interiors"]
     },
     {
@@ -69,13 +69,13 @@
     {
       "id": "quick-build",
       "status": "candidate-verified",
-      "source": { "file": "README.md", "pattern": "Quick Build is the single player-facing Blocks workspace" },
+      "source": { "file": "README.md", "pattern": "Use Quick Build to place persistent Blocks in local play or a multiplayer\\s+room\\." },
       "evidenceCommands": ["verify:gameplay-menu", "verify:hotbar-actions", "verify:block-local-store", "verify:block-shared-sync"]
     },
     {
       "id": "fishing",
       "status": "candidate-verified",
-      "source": { "file": "README.md", "pattern": "Fish from shore, pilot boats, dive, and explore ports" },
+      "source": { "file": "README.md", "pattern": "drive, fly, sail, fish, survey habitats, build, or join a multiplayer room\\." },
       "evidenceCommands": ["verify:shore-fishing", "verify:unified-fishing", "verify:fishing-loss-recovery"]
     },
     {
@@ -93,7 +93,7 @@
     {
       "id": "connected-explorer-journal",
       "status": "candidate-verified",
-      "source": { "file": "README.md", "pattern": "The same Explorer connects your Backpack, quick slots, Journal, Field Guide" },
+      "source": { "file": "README.md", "pattern": "Your Backpack, Journal, Field Guide, companions and saved places travel with you\\." },
       "evidenceCommands": ["verify:explorer-coherence", "verify:explorer-coherence-browser"]
     },
     {

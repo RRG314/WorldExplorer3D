@@ -452,7 +452,8 @@ async function run() {
     assert.equal(nextWorldEquipment.equipment.remoteRangeM,30);
     assert.equal(nextWorldEquipment.restored.remoteRangeM,30);
     assert.equal(nextWorldEquipment.nearest,'photograph');
-    assert.equal(nextWorldEquipment.distance,24);
+    // Survey reach uses 3D distance; the actor above is also 1.7 m above the target.
+    assert.ok(Math.abs(nextWorldEquipment.distance-Math.hypot(24,1.7))<1e-6);
     for(let step=0;step<3;step++) {
       assert.equal(await page.evaluate(async()=>{const {ctx}=await import('/app/js/shared-context.js?v=55');return ctx.handlePrimaryContextInteraction();}),true);
       await page.waitForTimeout(180);

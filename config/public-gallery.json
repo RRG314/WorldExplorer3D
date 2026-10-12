@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
-  "version": "5.5.0",
-  "capturedAt": "2026-10-08",
-  "sourceBuild": "5.5.0+d8775a392c42.88e67f97c00bb4c2.production",
-  "sourceUrl": "https://worldexplorer3d.io/app/",
+  "version": "5.6.0",
+  "capturedAt": "2026-10-12T16:13:32.770Z",
+  "sourceBuild": "5.5.0+31ab54cd264b.113b39b42da96b2a.staging",
+  "sourceUrl": "https://we3d-staging-20260712--ship-review-1011-pb8x1l4l.web.app/app/",
   "landingGallery": [
     "walking",
     "driving",
@@ -24,7 +24,9 @@
       "width": 1920,
       "height": 1080,
       "sha256": "aebb334feff5280dd73ee2c9413b32fcefbe2b8c73160d142c21e52c84218161",
-      "provenance": "Normal-input browser runtime capture; no synthetic camera or test-only scene."
+      "provenance": "Normal-input browser runtime capture; no synthetic camera or test-only scene.",
+      "sourceBuild": "5.5.0+d8775a392c42.88e67f97c00bb4c2.production",
+      "capturedAt": "2026-10-08"
     },
     {
       "id": "walking",
@@ -34,7 +36,9 @@
       "width": 1920,
       "height": 1080,
       "sha256": "f91e1f4c7c40c639b0a26db934007191e8bff8813815c006cb8d13912a6b57cc",
-      "provenance": "Normal-input browser runtime capture; no synthetic camera or test-only scene."
+      "provenance": "Normal-input browser runtime capture; no synthetic camera or test-only scene.",
+      "sourceBuild": "5.5.0+d8775a392c42.88e67f97c00bb4c2.production",
+      "capturedAt": "2026-10-08"
     },
     {
       "id": "driving",
@@ -44,7 +48,9 @@
       "width": 1920,
       "height": 1080,
       "sha256": "6b6e1d0b4f232dc6dbc6366183b7a8d48694a59b278e5c2a6a226fe654cda73c",
-      "provenance": "Normal-input browser runtime capture; no synthetic camera or test-only scene."
+      "provenance": "Normal-input browser runtime capture; no synthetic camera or test-only scene.",
+      "sourceBuild": "5.5.0+d8775a392c42.88e67f97c00bb4c2.production",
+      "capturedAt": "2026-10-08"
     },
     {
       "id": "drone",
@@ -54,7 +60,9 @@
       "width": 1920,
       "height": 1080,
       "sha256": "7b83bc089ee830989ff6640c35f15da8f3ba7df2eead2047d830c3a40f543d6c",
-      "provenance": "Normal-input browser runtime capture; no synthetic camera or test-only scene."
+      "provenance": "Normal-input browser runtime capture; no synthetic camera or test-only scene.",
+      "sourceBuild": "5.5.0+d8775a392c42.88e67f97c00bb4c2.production",
+      "capturedAt": "2026-10-08"
     },
     {
       "id": "flight",
@@ -64,16 +72,20 @@
       "width": 1920,
       "height": 1080,
       "sha256": "701b7b3f538e21f5bded8c766312c0783f08d4e631fd98c9385c631549a143cf",
-      "provenance": "Normal-input browser runtime capture; no synthetic camera or test-only scene."
+      "provenance": "Normal-input browser runtime capture; no synthetic camera or test-only scene.",
+      "sourceBuild": "5.5.0+d8775a392c42.88e67f97c00bb4c2.production",
+      "capturedAt": "2026-10-08"
     },
     {
       "id": "research-deck",
       "title": "Your research vessel",
-      "alt": "Walking beside the dive platform on the research vessel",
-      "file": "assets/gallery/5.5/research-deck.webp",
-      "width": 1920,
-      "height": 1080,
-      "sha256": "d492fc29b174c91d92430afc4aab1c9a75e9ad7a20a0dacfac8e94840d25d8cd",
+      "alt": "Walking on the licensed research vessel beside its enclosed laboratories",
+      "file": "assets/gallery/5.6/research-deck.webp",
+      "width": 1600,
+      "height": 900,
+      "sha256": "0b670767bc162104c6402123beb04efa95e3e9f0f975ffd94312637897b31e93",
+      "sourceBuild": "5.5.0+31ab54cd264b.113b39b42da96b2a.staging",
+      "capturedAt": "2026-10-12T16:13:40.351Z",
       "provenance": "Normal-input browser runtime capture; no synthetic camera or test-only scene."
     },
     {
@@ -84,7 +96,9 @@
       "width": 1920,
       "height": 1080,
       "sha256": "dc2b587b2cc93b12b8e68f2c90d00929ead21aabe468eb2641a974d450e59412",
-      "provenance": "Normal-input browser runtime capture; no synthetic camera or test-only scene."
+      "provenance": "Normal-input browser runtime capture; no synthetic camera or test-only scene.",
+      "sourceBuild": "5.5.0+d8775a392c42.88e67f97c00bb4c2.production",
+      "capturedAt": "2026-10-08"
     },
     {
       "id": "ship-interior",
@@ -94,7 +108,9 @@
       "width": 1920,
       "height": 1080,
       "sha256": "c824cbb937f3ecb7eb2905ed27d31fa8dff11cd8dd3a93d1c8be448df902bd01",
-      "provenance": "Normal-input browser runtime capture; no synthetic camera or test-only scene."
+      "provenance": "Normal-input browser runtime capture; no synthetic camera or test-only scene.",
+      "sourceBuild": "5.5.0+d8775a392c42.88e67f97c00bb4c2.production",
+      "capturedAt": "2026-10-08"
     },
     {
       "id": "space",
@@ -104,7 +120,9 @@
       "width": 1920,
       "height": 1080,
       "sha256": "dac33c699e8878a4394783dde806b6c05fcb2fdfc2ea2664d1e2b919688c5d32",
-      "provenance": "Normal-input browser runtime capture; no synthetic camera or test-only scene."
+      "provenance": "Normal-input browser runtime capture; no synthetic camera or test-only scene.",
+      "sourceBuild": "5.5.0+d8775a392c42.88e67f97c00bb4c2.production",
+      "capturedAt": "2026-10-08"
     },
     {
       "id": "live-earth",
@@ -114,7 +132,9 @@
       "width": 1920,
       "height": 1080,
       "sha256": "fa30460820a9b2333ecf09fd7bc4fac280e42569665f809921e15faf288862bb",
-      "provenance": "Normal-input browser runtime capture; no synthetic camera or test-only scene."
+      "provenance": "Normal-input browser runtime capture; no synthetic camera or test-only scene.",
+      "sourceBuild": "5.5.0+d8775a392c42.88e67f97c00bb4c2.production",
+      "capturedAt": "2026-10-08"
     },
     {
       "id": "world-entry-phone",
@@ -124,7 +144,9 @@
       "width": 390,
       "height": 844,
       "sha256": "d6d0e45a9702eb6a1231ea5bf613cb47aef2a5686d54d4eb18099a89d41dd51f",
-      "provenance": "Normal-input browser runtime capture; no synthetic camera or test-only scene."
+      "provenance": "Normal-input browser runtime capture; no synthetic camera or test-only scene.",
+      "sourceBuild": "5.5.0+d8775a392c42.88e67f97c00bb4c2.production",
+      "capturedAt": "2026-10-08"
     },
     {
       "id": "diver-phone",
@@ -134,7 +156,58 @@
       "width": 390,
       "height": 844,
       "sha256": "5e325aa1c59b9f598c6b5139320793418063d6a9951c2f1c2b116617e4d29f2c",
+      "provenance": "Normal-input browser runtime capture; no synthetic camera or test-only scene.",
+      "sourceBuild": "5.5.0+d8775a392c42.88e67f97c00bb4c2.production",
+      "capturedAt": "2026-10-08"
+    },
+    {
+      "id": "research-interior",
+      "title": "Life aboard",
+      "alt": "Inside the research vessel galley with its carried-provisions controls open",
+      "file": "assets/gallery/5.6/research-interior.webp",
+      "width": 1600,
+      "height": 900,
+      "sha256": "0266c823b6e33a0e142d1db4f67d359b5c3109a87ee6a4ccd64149bf8f45f748",
+      "sourceBuild": "5.5.0+31ab54cd264b.113b39b42da96b2a.staging",
+      "capturedAt": "2026-10-12T16:13:58.502Z",
+      "provenance": "Normal-input browser runtime capture; no synthetic camera or test-only scene."
+    },
+    {
+      "id": "research-map",
+      "title": "Find your way aboard",
+      "alt": "Research vessel map showing main-deck rooms and station destinations",
+      "file": "assets/gallery/5.6/research-map.webp",
+      "width": 1600,
+      "height": 900,
+      "sha256": "dc3f7d55b86ca995588aaf7dd4de740b07ff1c141093476e9b4cf2f10267f1f7",
+      "sourceBuild": "5.5.0+31ab54cd264b.113b39b42da96b2a.staging",
+      "capturedAt": "2026-10-12T16:14:44.430Z",
+      "provenance": "Normal-input browser runtime capture; no synthetic camera or test-only scene."
+    },
+    {
+      "id": "research-vessel",
+      "title": "A research ship at sea",
+      "alt": "The licensed research vessel and its docked submarine through the overview camera",
+      "file": "assets/gallery/5.6/research-vessel.webp",
+      "width": 1600,
+      "height": 900,
+      "sha256": "5c054f5697bc97fd0cc4355f52c66dd45999d81b047a51013060a8657eccb5d5",
+      "sourceBuild": "5.5.0+31ab54cd264b.113b39b42da96b2a.staging",
+      "capturedAt": "2026-10-12T16:16:32.458Z",
+      "provenance": "Normal-input browser runtime capture; no synthetic camera or test-only scene."
+    },
+    {
+      "id": "submarine",
+      "title": "Deploy and explore",
+      "alt": "The Atlantic Explorer submarine deployed from its research vessel",
+      "file": "assets/gallery/5.6/submarine.webp",
+      "width": 1600,
+      "height": 900,
+      "sha256": "ad53aad5eda6b40f7a943853c374711acff980e20db2c07f903a0b3936441051",
+      "sourceBuild": "5.5.0+31ab54cd264b.113b39b42da96b2a.staging",
+      "capturedAt": "2026-10-12T16:16:38.490Z",
       "provenance": "Normal-input browser runtime capture; no synthetic camera or test-only scene."
     }
-  ]
+  ],
+  "reviewScope": "Mixed reviewed gameplay captures: each image records its own build; final candidate recapture remains pending."
 }

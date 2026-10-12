@@ -2188,6 +2188,12 @@
     "app/js/world/world-snapshot-adapter.js": [
       "worldPublication",
       "worldSnapshotStore"
+    ],
+    "app/js/interiors/gallery-ui.js": [
+      "screenLayout"
+    ],
+    "app/js/interiors/gallery-runtime.js": [
+      "camera"
     ]
   }
 }

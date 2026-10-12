@@ -1,11 +1,11 @@
 # World Explorer 3D Roadmap
 
-Updated October 7, 2026.
+Updated October 12, 2026.
 
 World Explorer is growing into a connected world sandbox: choose a real place,
 travel, discover, create and return with progress that matters. The priority is
 to improve the systems already here, with clear controls and reliable journeys.
-See the [5.5 update](RELEASE_NOTES_5.5.0.md) and
+See the [5.6 candidate](RELEASE_NOTES_5.6.0.md) and
 [known limitations](KNOWN_ISSUES.md) for the current scope.
 
 ## First: reliable exploration
@@ -34,16 +34,16 @@ public sharing.
 
 ## A richer ocean
 
-Replace the research vessel with a licensed model that supports a coherent,
-walkable deck and interior, working stations, water access and submarine recovery.
-Improve swimming and diving animation, underwater visibility, vessel motion and
-water presentation together.
+The licensed research vessel now has connected rooms, a deck map, working
+stations, water access and submarine recovery. Personal ocean voyages can stream
+nearby scenery while authored studies retain their own setting. Improve swimming
+and diving animation, underwater composition, vessel motion and water presentation
+together.
 
-Expand habitat-based marine life, sightings, surveys and exploration activities
-beyond the current bounded scene. Whales, dolphins and deep-water wildlife need
-appropriate behavior and asset budgets. Spearfishing requires its own complete
-controls, equipment, feedback and progression; it is planned, not currently
-available.
+Expand the current regional wildlife and research into richer habitats. Whales,
+deep-water creatures and new activities need appropriate behavior and asset
+budgets. Spearfishing requires complete controls, equipment, feedback and
+progression; it is planned, not currently available.
 
 ## Connected travel across Earth
 

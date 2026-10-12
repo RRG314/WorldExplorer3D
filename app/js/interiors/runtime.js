@@ -12,6 +12,7 @@ import { createInteriorRuntimeUiApi } from "./runtime-ui.js?v=4";
 import { elevatorFloorChoices } from './elevator-authority.js?v=1';
 
 let nearbyInteriorScanPromise = null;
+let entryRevision = 0;
 let elevatorFloorPicker = null;
 let exteriorContextInteractionRegistered = false;
 const {
@@ -156,6 +157,7 @@ function replaceActiveInteriorFloor(active, targetLevel, deps) {
       floorBaseY: active.floorBaseY,
       curatedHome: !!active.ownedHome
     });
+    deps.disposeGallery?.(active);
     disposeThreeViewsHome(active);
     deps.disposeCuratedHomeFurnishing?.(active);
     appCtx.scene.add(sceneState.group);
@@ -366,7 +368,13 @@ export async function enterInteriorForSupport(support, deps) {
     clearActiveInterior({ restorePlayer: true, preserveCache: true }, deps);
   }
 
-  const definition = await deps.resolveInteriorDefinitionForEntry(support);
+  const revision = ++entryRevision, worldSequence = appCtx._worldLoadSequence;
+  let definition;
+  try { definition = await deps.resolveInteriorDefinitionForEntry(support); }
+  catch { if(revision===entryRevision)setTransientHint('This interior could not open. Try the entrance again.',deps.INTERIOR_NOTICE_MS,deps); return false; }
+  // A pending provider/access lookup cannot reopen an old world or supersede a
+  // newer doorway request after travel, exit, or a rapid second interaction.
+  if(revision!==entryRevision||worldSequence!==appCtx._worldLoadSequence||!deps.isWalkModeActive())return false;
   if (!definition) {
     setTransientHint(`${support.label || "This building"} is not enterable right now.`, deps.INTERIOR_NOTICE_MS, deps);
     return false;
@@ -426,6 +434,7 @@ export async function enterInteriorForSupport(support, deps) {
   walker.pitch = 0;
   walker.lookYawOffset = 0;
   walker.vy = 0;
+  walker._resolvedGroundState = null;
   if (appCtx.car) {
     appCtx.car.x = walker.x;
     appCtx.car.z = walker.z;
@@ -477,7 +486,8 @@ export async function enterInteriorForSupport(support, deps) {
     floorTransitionPending: false
   };
   applyInteriorSceneState(appCtx.activeInterior, sceneState);
-  if (!definition.communityRealityCapture) void deps.attachCuratedHomeFurnishing?.(appCtx.activeInterior);
+  if (!definition.communityRealityCapture && !definition.curatedContent) void deps.attachCuratedHomeFurnishing?.(appCtx.activeInterior);
+  void deps.attachGallery?.(appCtx.activeInterior);
   void deps.attachCommunityInteriorRepresentation?.(appCtx.activeInterior);
   appCtx.interiorHint = {
     state: "inside",
@@ -490,6 +500,7 @@ export async function enterInteriorForSupport(support, deps) {
 }
 
 export function clearActiveInterior(options = {}, deps) {
+  entryRevision += 1;
   const active = appCtx.activeInterior;
   if(Number.isFinite(active?.outsideState?.cameraNear)&&appCtx.camera){appCtx.camera.near=active.outsideState.cameraNear;appCtx.camera.updateProjectionMatrix();}
   if (active?.environmentKind === 'expedition-ship' && options.shipInternal !== true) {
@@ -513,6 +524,7 @@ export function clearActiveInterior(options = {}, deps) {
     walker.pitch = deps.finiteNumber(active.outsideState.pitch, 0);
     walker.lookYawOffset = deps.finiteNumber(active.outsideState.lookYawOffset, 0);
     walker.vy = 0;
+    walker._resolvedGroundState = null;
     if (appCtx.car) {
       appCtx.car.x = walker.x;
       appCtx.car.z = walker.z;
@@ -535,8 +547,9 @@ export function clearActiveInterior(options = {}, deps) {
   // fresh collection and must never inherit old district obstacles.
   appCtx.replaceWorldCollection('dynamicBuildingColliders',
     active.outsideWorldSequence === appCtx._worldLoadSequence ? (active.outsideColliders || []) : []);
+  deps.disposeGallery?.(active);
   disposeThreeViewsHome(active);
-    deps.disposeCuratedHomeFurnishing?.(active);
+  deps.disposeCuratedHomeFurnishing?.(active);
   disposeObject3D(active.group);
   appCtx.activeInterior = null;
   appCtx.interiorHint = null;
@@ -677,6 +690,7 @@ export async function handleInteriorAction(deps) {
       return true;
     }
     if (interaction?.kind === 'elevator') return openElevatorFloorPicker(active, deps);
+    if (interaction?.kind?.startsWith('museum-')) return deps.handleGalleryAction?.(active,interaction) === true;
     return false;
   }
   const candidate = pickNearbyBuildingCandidate(true, deps);

@@ -97,3 +97,33 @@ test('rollback refuses unreadable current saves even when a legacy backup exists
  assert.equal(createLocalBackpackStore(storage).rollbackMigration(),false);
  assert.equal(rows.get(BACKPACK_STORAGE_KEY),'{unreadable');
 });
+
+
+for(const version of [1,2])test(`delayed writer acquisition keeps v${version} migration history through the real equipment projection`,async()=>{
+ const rows=new Map(),legacyKey=`world-explorer:character-backpack:v${version}`;
+ const legacy=JSON.stringify({schemaVersion:version,items:[
+  {instanceId:'original-lamp',catalogId:'flashlight',sourceEventId:'same-reward'},
+  {instanceId:'duplicate-lamp',catalogId:'flashlight',sourceEventId:'same-reward'}
+ ],hotbar:['duplicate-lamp'],equippedInstanceId:'duplicate-lamp',migration:{saveGeneration:'old-key-generation'}});
+ rows.set(legacyKey,legacy);
+ const storage={getItem:k=>rows.get(k)??null,setItem:(k,v)=>rows.set(k,v)};
+ const priorWindow=Object.getOwnPropertyDescriptor(globalThis,'window'),priorNavigator=Object.getOwnPropertyDescriptor(globalThis,'navigator');
+ let acquire;
+ Object.defineProperty(globalThis,'window',{configurable:true,value:{localStorage:storage}});
+ Object.defineProperty(globalThis,'navigator',{configurable:true,value:{locks:{request(_name,_options,callback){acquire=()=>{void callback({});};return Promise.resolve();}}}});
+ try {
+  const store=createLocalBackpackStore(storage),inventory=createEquipmentInventory({persistedState:store.load()});
+  assert.equal(store.saveStatus(),'starting');assert.equal(rows.has(BACKPACK_STORAGE_KEY),false);
+  assert.equal(inventory.exportState().migration,undefined,'The live equipment projection does not carry migration metadata');
+  acquire();assert.equal(await store.ready,true);assert.equal(store.save(inventory.exportState()),true);
+  const saved=store.load();assert.equal(saved.migration.sourceVersion,version);assert.equal(saved.migration.duplicateEventRewardsRemoved,1);
+  assert.equal(saved.items.filter(i=>i.sourceEventId==='same-reward').length,1);
+  assert.equal(saved.hotbar[0],'original-lamp');assert.equal(saved.equippedInstanceId,'original-lamp');
+  assert.equal(rows.get(legacyKey),legacy);assert.equal(JSON.parse(rows.get(store.backupKey)).state.items.length,2);
+  assert.notEqual(saved.migration.saveGeneration,'old-key-generation');assert.ok(saved.migration.saveGeneration);
+  assert.equal(store.save(inventory.exportState()),true);assert.equal(store.load().migration.duplicateEventRewardsRemoved,1);
+ }finally{
+  if(priorWindow)Object.defineProperty(globalThis,'window',priorWindow);else delete globalThis.window;
+  if(priorNavigator)Object.defineProperty(globalThis,'navigator',priorNavigator);else delete globalThis.navigator;
+ }
+});

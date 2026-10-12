@@ -4,6 +4,7 @@ import {resolveFarBuildingMassing} from '/app/js/terrain/far-building-massing.js
 import {buildFarBuildingInstanceBatches} from '/app/js/terrain/far-building-instance-batches.js';
 import {applyFarBuildingFacadeDetail} from '/app/js/terrain/far-building-facade-material.js';
 import {appendRegionalBuildingFootprint} from '/app/js/terrain/regional-building-geometry.js';
+import {createNormalizedTerrainAttribute} from '/app/js/terrain/surface-material-blend.js';
 import {sharedRegionalFacadeAtlas} from '/app/js/terrain/regional-facade-atlas.js';
 import {facadeNightUniform} from '/app/js/world/facade-lighting.js';
 import {disposeFarFieldMesh} from '/app/js/terrain/far-field-geometry.js';
@@ -20,14 +21,15 @@ for(let i=0;i<12;i++){
 }
 const group=new THREE.Group();
 for(const mesh of await buildFarBuildingInstanceBatches(THREE,instances,applyFarBuildingFacadeDetail(new THREE.MeshStandardMaterial())))group.add(mesh);
-const geometry=new THREE.BufferGeometry();for(const [name,data,size] of [['position',buffers.positions,3],['color',buffers.colors,3],['regionalStyle',buffers.styles,4],['regionalLayout',buffers.layouts,4]])geometry.setAttribute(name,new THREE.Float32BufferAttribute(data,size));geometry.setIndex(buffers.indices);geometry.computeVertexNormals();
+const geometry=new THREE.BufferGeometry();for(const [name,data,size] of [['position',buffers.positions,3],['regionalStyle',buffers.styles,4],['regionalLayout',buffers.layouts,4]])geometry.setAttribute(name,new THREE.Float32BufferAttribute(data,size));geometry.setAttribute('color',createNormalizedTerrainAttribute(buffers.colors,3));geometry.setIndex(buffers.indices);geometry.computeVertexNormals();
+const tint=geometry.attributes.color,colorStorage={normalized:tint.normalized,bytes:tint.array.byteLength,floatBytes:buffers.colors.length*4,maxError:Math.max(...buffers.colors.map((value,index)=>Math.abs(value-tint.array[index]/255)))};
 group.add(new THREE.Mesh(geometry,applyFarBuildingFacadeDetail(new THREE.MeshStandardMaterial({vertexColors:true,flatShading:true,side:THREE.DoubleSide}))));scene.add(group);
 const ground=new THREE.Mesh(new THREE.PlaneGeometry(800,800),new THREE.MeshStandardMaterial({color:0x737869}));ground.rotation.x=-Math.PI/2;ground.position.y=-.01;scene.add(ground);
 const atlas=await sharedRegionalFacadeAtlas().ready;
 const render=()=>renderer.render(scene,camera);
 window.setNight=night=>{facadeNightUniform.value=night?1:0;sun.intensity=night?.12:2;render();};
 window.setView=(x,y,z,tx=0,ty=10,tz=0)=>{camera.position.set(x,y,z);camera.lookAt(tx,ty,tz);render();};
-window.advanceTime=render;window.render_game_to_text=()=>JSON.stringify({buildings:12,atlas,geometries:renderer.info.memory.geometries,calls:renderer.info.render.calls,errors:renderer.info.programs.filter(p=>p.diagnostics?.runnable===false).length});
+window.advanceTime=render;window.render_game_to_text=()=>JSON.stringify({buildings:12,atlas,colorStorage,geometries:renderer.info.memory.geometries,calls:renderer.info.render.calls,errors:renderer.info.programs.filter(p=>p.diagnostics?.runnable===false).length});
 window.retire=()=>{scene.remove(group);disposeFarFieldMesh(group);render();return renderer.info.memory.geometries;};
 window.fixtureReady=true;render();
 </script>

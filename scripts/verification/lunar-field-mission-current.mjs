@@ -8,7 +8,7 @@ import {runPrescribedGameActions} from './prescribed-game-actions.mjs';
 import {collectBrowserGraphicsErrors} from './browser-graphics-errors.mjs';
 import {SHIP_STATIONS} from '../../app/js/expedition/ship-layout.js';
 const out=path.resolve(process.env.WE3D_LUNAR_OUTPUT||'output/roadmap-20261010/lunar-field-mission');await fs.mkdir(out,{recursive:true});
-const server=await startStaticServer({rootDir:process.cwd(),ports:[4399]});const base=`http://127.0.0.1:${server.port}`;
+const server=await startStaticServer({rootDir:process.env.WE3D_VERIFY_ROOT||process.cwd(),ports:[4399]});const base=`http://127.0.0.1:${server.port}`;
 const browser=await chromium.launch({channel:'chrome',headless:false});const context=await browser.newContext({viewport:{width:1360,height:850}});const page=await context.newPage();
 const cases=[],failures=[],consoleErrors=[];let result=null;
 const strategy=process.env.WE3D_LUNAR_STRATEGY==='observe'?'observe':'samples';
@@ -47,7 +47,7 @@ async function record(id,failFirst=false){console.log('Field:',id);
  await page.waitForFunction(id=>lunarCtx.getDestinationMissionSnapshot().evidence.includes(id),id);
 }
 async function recover(){console.log('Recover');
- await page.evaluate(async()=>{const {getStagedSurfacePod}=await import('/app/js/planetary/surface-pod-launch.js?v=11');const pod=getStagedSurfacePod('moon');await pod.userData.curatedPodLoadPromise;Object.assign(lunarCtx.Walk.state.walker,{x:pod.position.x+2,z:pod.position.z,y:pod.userData.surfaceGroundY+1.74,vy:0,onGround:true});});
+ await page.evaluate(async()=>{const pod=lunarCtx.scene.children.find(child=>child.userData?.bodyId==='moon'&&Number.isFinite(child.userData.surfaceGroundY));if(!pod)throw Error('Published lunar recovery pod missing');await pod.userData.curatedPodLoadPromise;Object.assign(lunarCtx.Walk.state.walker,{x:pod.position.x+2,z:pod.position.z,y:pod.userData.surfaceGroundY+1.74,vy:0,onGround:true});});
  await page.waitForTimeout(180);assert.equal(await page.evaluate(()=>lunarCtx.handlePrimaryContextInteraction()),true);
  if(failAscent){
   const prior=(await state()).expedition.podJourney.id;
@@ -70,7 +70,11 @@ try{
  if(await page.locator('#analyticsConsentDenyBtn').isVisible())await page.locator('#analyticsConsentDenyBtn').click();
  await page.evaluate(()=>{document.getElementById('spaceLaunchToggle')?.click();document.getElementById('startBtn').click();});
  await page.waitForFunction(()=>JSON.parse(window.render_game_to_text?.()||'{}').modes?.space===true,null,{timeout:120000});
- await page.evaluate(async()=>{window.lunarCtx=(await import('/app/js/shared-context.js?v=55')).ctx;const {boardSolisReachDirect}=await import('/app/js/expedition/runtime.js?v=52');await boardSolisReachDirect(lunarCtx);});
+ if(await page.locator('#spaceFlightHUD').evaluate(e=>e.classList.contains('collapsed')))await page.locator('#sfHudToggle').click();
+ await page.locator('#sfExpeditionBtn').click();await page.locator('#expeditionPlan').click();
+ await page.waitForFunction(()=>document.querySelector('.expeditionSummary .is-ready')?.textContent?.includes('READY'));
+ await page.locator('#expeditionEnterShip').click();
+ await page.evaluate(async()=>{window.lunarCtx=(await import('/app/js/shared-context.js?v=55')).ctx;});
  await page.waitForFunction(()=>lunarCtx.getShipInteriorSnapshot?.()?.active===true,null,{timeout:30000});
  const original=(await state()).expedition;await station('navigation-course');await page.locator('[data-lunar-brief]').click();await page.locator('[data-mission-begin]').click();await page.locator('[data-mission-close]').click();
  assert.equal((await state()).mission.phase,'approach');cases.push('physical-navigation-station-begins-local-moon-mission');
@@ -120,5 +124,5 @@ try{
 
 } catch(error){failures.push(error.stack||String(error));await page.screenshot({path:path.join(out,'failure.png')}).catch(()=>{});result=await state().catch(()=>null);}
 finally{await context.close();await browser.close();await server.close();}
-await fs.writeFile(path.join(out,'report.json'),JSON.stringify({ok:!failures.length,cases,failures,consoleErrors,result,scope:'Actual source game. Controlled actor and flight approach positions; real station, launch, landing, field, save, recovery and analysis controls. Not a full walked journey or release acceptance.'},null,2));
+await fs.writeFile(path.join(out,'report.json'),JSON.stringify({ok:!failures.length,cases,failures,consoleErrors,result,runtimeRoot:process.env.WE3D_VERIFY_ROOT||'.',scope:'Actual selected game artifact. Controlled actor and flight approach positions; real station, launch, landing, field, save, recovery and analysis controls. Not a full walked journey or release acceptance.'},null,2));
 console.log(JSON.stringify({ok:!failures.length,cases,failures:failures.map(value=>value.slice(0,1500)),consoleErrors},null,2));if(failures.length)process.exitCode=1;

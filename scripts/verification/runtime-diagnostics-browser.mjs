@@ -46,8 +46,9 @@ async function measure(id,owner){
  assert.ok(result.after.resources.geometries>0);assert.ok(result.after.resources.materials>0);
  assert.ok(result.after.resources.geometrySourceBytes>0);assert.ok(result.after.resources.textureSourceBytes>0);
  assert.ok(result.animation.elapsedMs>=1900);
- report.scenes.push({id,...result});
- assert.deepEqual(sceneBudgetFailures({id,...result},budgets.scenes[id]),[]);
+ // Inspect every environment in one bounded run before reporting budget errors.
+ // Functional/ownership errors still abort; no resource ceiling is relaxed.
+ report.scenes.push({id,...result,budgetFailures:sceneBudgetFailures({id,...result},budgets.scenes[id])});
  await page.screenshot({path:`${output}/${id}.png`});
 }
 try{
@@ -104,12 +105,15 @@ try{
  await page.locator('#globeSelectorOceanBtn').click();
   await deployResearchSubmarineFromDeck(page);
  await page.waitForFunction(()=>globalThis.getOceanModeDebugState?.().active===true,null,{timeout:90000});
- await page.locator('#oceanDiverToggle').waitFor({state:'visible'});await measure('ocean','ocean');
+ await page.locator('#oceanDiverToggle').waitFor({state:'visible'});
+ await page.evaluate(async()=>{const {ctx}=await import('/app/js/shared-context.js?v=55');await ctx.oceanMode.fishVisualsReady;});
+ await measure('ocean','ocean');
  await page.locator('#oceanDiverToggle').click();
  await page.waitForFunction(()=>getOceanModeDebugState().diver?.active===true);
  assert.equal(await page.evaluate(()=>getWorldExplorerSupportReceipt().mode),'diver');
  report.checks.push('actual-environment-and-diver-support-context');
- assert.deepEqual(report.errors,[]);assert.deepEqual(report.failedLocal,[]);report.ok=true;
+ assert.deepEqual(report.errors,[]);assert.deepEqual(report.failedLocal,[]);
+ assert.deepEqual(report.scenes.flatMap(scene=>scene.budgetFailures),[]);report.ok=true;
 }catch(error){report.failure=error.message;throw error;}
 finally{await fs.writeFile(`${output}/report.json`,JSON.stringify(report,null,2));await closeOwnedBrowser(browserServer);await server.close();}
 console.log(JSON.stringify({ok:report.ok,checks:report.checks,scenes:report.scenes.map(s=>({id:s.id,resources:s.after.resources,animation:s.animation}))}));

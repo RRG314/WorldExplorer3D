@@ -1,4 +1,5 @@
 import {supportRecorder} from './runtime/support-receipt.js';
+import {modelAssetCacheSnapshot} from './assets/model-asset-runtime.js?v=16';
 import {sceneResourceSnapshot,measureSceneAnimation} from './runtime/scene-resources.js';
 import {capturePresentation} from './runtime/renderer-owners.js';
 import {getSessionStatus,captureEnvironmentSession} from './session-coordinator.js?v=2';
@@ -1056,6 +1057,13 @@ function getWorldExplorerRuntimeDiagnostics() {
     fishing: appCtx.getFishingSnapshot?.() || { open: false, active: false },
     interior: activeInterior ? {
       active: true,
+      gallery: activeInterior.gallery ? {
+        id: activeInterior.definition.curatedContent.id,
+        representation: activeInterior.definition.curatedContent.kind,
+        savedExhibits: [...activeInterior.gallery.saved],
+        exhibits: [...activeInterior.gallery.exhibits.values()].map(r=>({id:r.exhibit.id,status:r.status})),
+        panelOpen: !!activeInterior.gallery.panel
+      } : null,
       key: String(activeInterior.key || ''),
       mode: String(activeInterior.mode || 'generated'),
       floorId: String(activeInterior.floorId || ''),
@@ -1214,6 +1222,7 @@ function getWorldExplorerRuntimeDiagnostics() {
         }
       : null,
     renderer: rendererOwners.main,
+    modelAssets: modelAssetCacheSnapshot(),
     rendererOwners,
     accessibility: globalThis.getWorldExplorerAccessibilitySnapshot?.() || null,
     lastEarthWorldRelease: appCtx.lastEarthWorldRelease || null,
@@ -1406,6 +1415,13 @@ globalThis.render_game_to_text = () => JSON.stringify({
   marylandParcels: appCtx.marylandParcelRuntimeSnapshot?.() || { status: 'idle', parcelCount: 0 },
   interior: appCtx.activeInterior ? {
     active: true,
+    gallery: appCtx.activeInterior.gallery ? {
+      id: appCtx.activeInterior.definition.curatedContent.id,
+      representation: appCtx.activeInterior.definition.curatedContent.kind,
+      savedExhibits: [...appCtx.activeInterior.gallery.saved],
+      exhibits: [...appCtx.activeInterior.gallery.exhibits.values()].map(r=>({id:r.exhibit.id,status:r.status})),
+      panelOpen: !!appCtx.activeInterior.gallery.panel
+    } : null,
     key: String(appCtx.activeInterior.key || ''),
     floorId: String(appCtx.activeInterior.floorId || ''),
     floorLabel: String(appCtx.activeInterior.floorLabel || 'Lobby'),

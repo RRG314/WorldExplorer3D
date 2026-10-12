@@ -9,7 +9,10 @@ const browser = await chromium.launch({ channel: 'chrome', headless: true });
 const directory = 'output/verification/hub-dialog-layout';
 const results = [];
 try {
-  const html = (await fs.readFile('app/index.html', 'utf8')).replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, '');
+  // The component harness does not boot the world, but must preserve the real
+  // startup cover's ready handler instead of leaving it over every hit target.
+  const html = (await fs.readFile('app/index.html', 'utf8')).replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi,
+    script => /id=["']startupCoverController["']/.test(script) ? script : '');
   for (const { width, height, touch } of [
     { width: 390, height: 844, touch: true },
     { width: 1280, height: 800, touch: true },
@@ -26,6 +29,7 @@ try {
       document.getElementById('globeSelectorScreen').classList.add('show');
       const { setupGlobeHub } = await import('./js/ui/title-screen/globe-hub.js');
       setupGlobeHub({});
+      window.dispatchEvent(new Event('we3d:runtime-ready'));
       document.querySelector('[data-globe-destination="games"]').click();
       await document.fonts.ready;
     });

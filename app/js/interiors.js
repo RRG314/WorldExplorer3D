@@ -1,3 +1,5 @@
+import {resolveCuratedInterior} from './interiors/content-resolver.js';
+import {attachGallery,disposeGallery,handleGalleryAction} from './interiors/gallery-runtime.js';
 import { ctx as appCtx } from "./shared-context.js?v=55";
 import { buildInteriorScene, canPublishInteriorConnector } from "./interiors/scene-builder.js?v=13";
 import {
@@ -46,6 +48,9 @@ const interiorRuntimeDeps = {
   INTERIOR_NOTICE_MS,
   buildInteriorScene,
   canPublishInteriorConnector,
+  attachGallery: active => attachGallery(appCtx,THREE,active),
+  disposeGallery: active => disposeGallery(appCtx,active),
+  handleGalleryAction: (active,interaction) => handleGalleryAction(appCtx,active,interaction),
   attachCuratedHomeFurnishing: (active) => attachCuratedHomeFurnishing(THREE, active, {
     isCurrent: (candidate) => appCtx.activeInterior === candidate && candidate.group?.parent === appCtx.scene
   }),
@@ -60,11 +65,12 @@ const interiorRuntimeDeps = {
   isWalkModeActive,
   pointInPolygonSafe,
   requestCommunityInteriorAccess: (definition) => requestCommunityInteriorAccess(appCtx, definition),
-  resolveInteriorDefinitionForEntry: (support) => resolveCommunityInteriorDefinition(
-    appCtx,
-    support,
-    (candidate) => resolveInteriorDefinitionForEntry(candidate, interiorCache, mappedInteriorWarmPromises)
-  ),
+  resolveInteriorDefinitionForEntry: async (support) => {
+    const definition = await resolveCommunityInteriorDefinition(appCtx, support,
+      candidate => resolveInteriorDefinitionForEntry(candidate, interiorCache, mappedInteriorWarmPromises));
+    if (findOwnedHomeForInteriorSupport(support, appCtx.getExplorerPropertySnapshot?.())) return definition;
+    return resolveCuratedInterior(appCtx, support, definition);
+  },
   sampleSurfaceY,
   warmMappedInteriorDefinition: (support) =>
     warmMappedInteriorDefinition(support, interiorCache, mappedInteriorWarmPromises)

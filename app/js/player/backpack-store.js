@@ -197,6 +197,12 @@ function createLocalBackpackStore(storage = globalThis.localStorage) {
       const supplement = parseStored(storage, LEGACY_CONTROLS_KEY);
       const currentControls = supplement?.schemaVersion === 1 && supplement.saveGeneration && supplement.saveGeneration === legacy.migration?.saveGeneration ? controls(supplement) : {};
       const migrated = normalizeBackpackState({...legacy, ...currentControls, housing}, { sourceVersion:Number(legacy.schemaVersion)||1, backupAvailable: false });
+      // Loading can precede the asynchronous Web Lock. Keep migration history
+      // for the first inventory projection, which does not export this metadata.
+      // The legacy generation belongs to a different key; v3 has no write yet.
+      migrated.migration.saveGeneration = '';
+      lastMigration = { ...migrated.migration };
+      lastControls = controls(migrated);
       if (session.writable() && saveNormalized(migrated, migrated.migration)) migrated.migration = {...lastMigration};
       return migrated;
     }

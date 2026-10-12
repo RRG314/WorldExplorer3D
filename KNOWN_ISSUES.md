@@ -1,6 +1,6 @@
 # Known Issues and Limitations
 
-Last reviewed: October 8, 2026, for the 5.5 update. These are known product
+Last reviewed: October 12, 2026, for the 5.6 candidate. These are known product
 limits, not a promise that every location or device has been validated.
 The [GitHub releases](https://github.com/RRG314/WorldExplorer3D/releases) identify
 published versions.
@@ -8,9 +8,9 @@ published versions.
 ## Release acceptance and visual coverage
 
 - The owner reports that the preview works, including an earlier Android check.
-  Named-device responsiveness, battery, thermal and resume measurements remain unverified for 5.5.
-  Emulated touch layouts and software-rendered browser journeys are functional
-  evidence, not hardware frame-rate, battery or thermal measurements.
+  Named-device responsiveness, battery, thermal and resume measurements remain unverified for 5.6.
+  Emulated touch layouts and controlled browser journeys are functional evidence,
+  not physical-phone frame-rate, battery or thermal measurements.
 - Licensed ship furnishings replace major placeholders, but galley appliances,
   hydroponics, thermal/life-support equipment, exercise/EVA fittings and parts
   of fabrication still use simpler custom geometry. Art detail is not uniform.
@@ -71,14 +71,16 @@ published versions.
 
 ## Ocean exploration
 
-- Ocean entry, deck walking, swimming, automatic scuba, submarine deployment and
-  recovery share a vessel journey. The ocean scene is bounded; it is not a
-  continuously populated simulation of the entire ocean.
-- The research vessel still uses custom geometry. A licensed replacement with
-  a fully traversable layout, richer wildlife, deeper ecology and additional
-  activities remain planned. Spearfishing is not included.
-- Water support and effects are gameplay approximations. Swimmer animation,
-  vessel motion and underwater presentation still need art and tuning work.
+- Geographic personal voyages stream bounded nearby ocean scenery and rebase
+  their local coordinates. Authored studies and shared crew voyages keep their
+  own bounded areas. This is not a densely populated simulation of every ocean.
+- The research hull, submarine and selected fauna use licensed models. The ship
+  interior adapts those assets to gameplay; it is not an exact replica of a real
+  vessel. Some furnishings and swimmer animations still need art refinement.
+- Marine species use conservative game ranges and depth rules. Coverage is
+  limited; whales, deep squid, worldwide ecology and spearfishing are not included.
+- Deck jumping has physical takeoff and landing but no dedicated authored jump
+  animation. Water support and vessel motion remain gameplay approximations.
 
 ## Performance and compatibility
 
@@ -106,6 +108,10 @@ published versions.
 
 ## Generated content
 
+- The first museum gallery interprets The Peale's front ground floor using its
+  public room guide. Dimensions and finishes are estimated; rear and upper
+  rooms are not included. Smithsonian and Met reproductions are not The Peale's
+  collection. Other mapped museums do not yet have these curated interiors.
 - Real indoor mapping is uncommon. Eligible buildings without usable indoor
   data receive a footprint-aware generated interior that may be visually sparse.
 - Inferred entrances, facade details, vegetation, distant context and

@@ -35,7 +35,7 @@ await update('README.md', source => {
   return source.replace(block,()=>{
   const markdown = id => {const item=get(id);return `![${item.alt}](${item.file})`;};
   const rows=[['walking','driving'],['flight','research-deck'],['diving','ship-interior'],['space','live-earth']];
-  return `<!-- public-gallery:start -->\n${markdown('drone')}\n\n*Gameplay screenshots from the released ${gallery.version} build.*\n\n` + rows.map(([a,b])=>`| ${get(a).title} | ${get(b).title} |\n| :--: | :--: |\n| ${markdown(a)} | ${markdown(b)} |`).join('\n\n')+'\n<!-- public-gallery:end -->';
+  return `<!-- public-gallery:start -->\n${markdown('drone')}\n\n*In-game views of city travel, ocean research and space exploration.*\n\n` + rows.map(([a,b])=>`| ${get(a).title} | ${get(b).title} |\n| :--: | :--: |\n| ${markdown(a)} | ${markdown(b)} |`).join('\n\n')+'\n<!-- public-gallery:end -->';
 });});
 await update(`RELEASE_NOTES_${version}.md`, source => {
   if (!source.includes('<!-- public-gallery:')) throw new Error('Release notes are missing their public gallery markers.');

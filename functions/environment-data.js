@@ -33,17 +33,20 @@ function createEnvironmentService({db,now=Date.now,fetchImpl=fetch,wait=sleep}={
   }
   async function readShared(request,key){
     const cacheRef=db.doc(`environmentDataCache/${key}`),controlRef=db.doc(`serviceControls/environment-${request.provider}`),owner=crypto.randomUUID();
-    const at=now();
+    const at=now(),exclusive=request.provider==='hycom-espc';
     const reservation=await db.runTransaction(async tx=>{
       const entry=await tx.get(cacheRef),cache=entry.data()||{};
       if(cache.expiresAtMs>at&&cache.payload!=null)return {cache};
       const control=(await tx.get(controlRef)).data()||{};
-      if(cache.leaseUntilMs>at||control.cooldownUntilMs>at)throw fail(429,'Environmental model is refreshing. Try again shortly.');
+      if(cache.leaseUntilMs>at||control.cooldownUntilMs>at||(exclusive&&control.requestLeaseUntilMs>at))throw fail(429,'Environmental model is refreshing. Try again shortly.');
       const day=Math.floor(at/DAY),count=control.day===day?Number(control.count)||0:0;
       if(count>=20000)throw fail(429,'Public model request budget reached.');
       const startAt=Math.max(at,Number(control.nextAtMs)||0);
       if(startAt-at>8000)throw fail(429,'Environmental model is busy. Try again shortly.');
-      tx.set(controlRef,{...control,day,count:count+1,nextAtMs:startAt+request.intervalMs});
+      // HYCOM NCSS permits one active subset request per IP, not just a
+      // start-rate limit. Share the lease across locations and instances.
+      tx.set(controlRef,{...control,day,count:count+1,nextAtMs:startAt+request.intervalMs,
+        ...(exclusive?{requestOwner:owner,requestLeaseUntilMs:at+40000}:{})});
       tx.set(cacheRef,{...cache,owner,leaseUntilMs:at+40000,expiresAt:new Date(at+7*DAY)});
       return {previous:cache,startAt};
     });
@@ -71,7 +74,15 @@ function createEnvironmentService({db,now=Date.now,fetchImpl=fetch,wait=sleep}={
     }catch(error){
       await db.runTransaction(async tx=>{const value=(await tx.get(cacheRef)).data()||{};if(value.owner===owner)tx.set(cacheRef,{...value,owner:'',leaseUntilMs:now()+30000});});
       throw error;
-    }finally{clearTimeout(timer);}
+    }finally{
+      clearTimeout(timer);
+      if(exclusive)await db.runTransaction(async tx=>{
+        const control=(await tx.get(controlRef)).data()||{};
+        // A crashed request expires after its bounded network timeout. A late
+        // completion must not release a successor's reservation.
+        if(control.requestOwner===owner)tx.set(controlRef,{...control,requestOwner:'',requestLeaseUntilMs:0});
+      });
+    }
   }
   function decode(payload,request,at){
     if(request.provider==='noaa-ww3')return normalizeNoaaWaves(payload,request,at);

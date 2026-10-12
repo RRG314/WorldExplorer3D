@@ -77,6 +77,9 @@ try{
    const failed=ctx.discoveryBackpackSaved===false;
    ctx.playerBackpackInventory=createBackpackModel();
    ctx.playerBackpackStore=createLocalBackpackStore(localStorage);
+   // The real runtime waits for its cross-tab write lease before saving.
+   // IndexedDB Journal writes above have a separate transactional authority.
+   if (!await ctx.playerBackpackStore.ready) throw Error('Test profile did not acquire the Backpack write lease');
    projectDiscoveryItemsToBackpack(ctx,bootstrap.items);
    projectDiscoveryItemsToBackpack(ctx,bootstrap.items);
    return {failed, saved:ctx.discoveryBackpackSaved, count:ctx.playerBackpackStore.load().items.length};

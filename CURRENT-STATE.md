@@ -50,6 +50,33 @@ browsers/servers. Production deployment evidence is under
 `output/release-evidence/current/production-deployment.json` and
 `production-promotion.json`; acceptance gaps remain in their own receipts.
 
+## October 12 local museum implementation
+
+The owner included museums in the next release and asked for finished architecture
+and source-supported room layouts. The local Peale-associated visit now uses a
+front hall with two adjoining galleries informed by the museum's public guide.
+Dimensions/finishes are estimated and the limited ground-floor scope is labeled.
+Timber flooring, joinery, ceiling fixtures, bounded indoor lighting, licensed
+furniture and Smithsonian/Met exhibits replace the initial bare room slice.
+Existing entry, Walk, compiled collision, asset leases and Journal remain owners.
+
+The complete source chain passes, including **2,486 component tests**, types,
+ownership, dependencies and test inventory/sensitivity. The extended museum
+source journey passes **65 checks**, including missing-display retry, all exhibits,
+Journal persistence across full reload, phone panels/maps, run/jump, exact exterior
+return, reentry, release and zero page/GPU errors. Images inspected. Two reentries
+retain 48 unique museum geometries, three furnishings and three lights; museum
+leases return to zero. The sealed gallery now uses a scoped camera layer, avoiding
+the outside city's render/shader work and restoring its exact view on exit.
+Three bounded M1 hardware frame windows pass existing budgets at 59.5–60 FPS;
+entry measures 114–171 ms. This is mutable-source evidence, not complete release
+performance or physical-phone certification. Eleven museum and 11 layout component
+checks pass. The corrected fish journey passes 12 checks with all eight observed
+fish swimming after the arrival population replacement. Missing vessel captures
+are supplied with actual per-image build identities. Broader candidate, backend,
+save/fallback and hosted gates remain open. See `docs/interior-expansion/VERIFICATION.md`
+and the October 12 release ledger. Production still d877; no push or deployment.
+
 ## October 11 current continuation — ocean streaming and save safety
 
 ### Latest: regional detail and ship movement repair

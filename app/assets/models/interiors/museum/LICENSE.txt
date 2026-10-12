@@ -1,0 +1,20 @@
+Triceratops horridus
+Smithsonian Institution, National Museum of Natural History
+CC0-1.0 — https://creativecommons.org/publicdomain/zero/1.0/
+Source: https://3d-api.si.edu/content/document/3d_package:d8c623be-4ebc-11ea-b77f-2e728ce88125/resources/Triceratops_horridus_Marsh_1889-150k-4096.glb
+Rights: https://www.si.edu/openaccess/faq
+Uniform display normalization; scan mounts retained; simplified geometry; textures resized (JPEG for opaque images, PNG for alpha). Artwork converted to a textured panel; no reproduction claims about the host museum.
+
+Madrepora formosa · USNM 292
+Smithsonian Institution, National Museum of Natural History
+CC0-1.0 — https://creativecommons.org/publicdomain/zero/1.0/
+Source: https://3d-api.si.edu/content/document/3d_package:03d6b38a-bf7d-4334-90c9-1f7b4c3041a9/resources/usnm_292-100k-2048_std.glb
+Rights: https://www.si.edu/openaccess/faq
+Uniform display normalization; scan mounts retained; simplified geometry; textures resized (JPEG for opaque images, PNG for alpha). Artwork converted to a textured panel; no reproduction claims about the host museum.
+
+Wheat Field with Cypresses
+Vincent van Gogh / The Metropolitan Museum of Art
+CC0-1.0 — https://creativecommons.org/publicdomain/zero/1.0/
+Source: https://images.metmuseum.org/CRDImages/ep/web-large/DP-42549-001.jpg
+Rights: https://www.metmuseum.org/hubs/open-access
+Uniform display normalization; scan mounts retained; simplified geometry; textures resized (JPEG for opaque images, PNG for alpha). Artwork converted to a textured panel; no reproduction claims about the host museum.

@@ -339,11 +339,19 @@ async function verifyEarlyLaunchFailure() {
     requests.push(`${route.request().url()}&${route.request().postData() || ''}`);
     return route.fulfill({ status: 204, body: '' });
   });
+  // This isolated pre-game publisher check is a source component fixture.
+  // A packaged build deliberately omits private source module URLs. Keep the
+  // fixture in its own namespace; do not restore missing production URLs or
+  // substitute source in the actual destination journeys below.
+  for (const name of ['launch-telemetry', 'product-telemetry']) {
+    const body = await fs.readFile(path.join(root, 'app/js/platform', `${name}.js`), 'utf8');
+    await page.route(`${baseUrl}/verification-source/${name}.js*`, route => route.fulfill({contentType:'text/javascript', body}));
+  }
   await page.route(`${baseUrl}/launch-failure-fixture`, route => route.fulfill({ contentType: 'text/html', body: `<!doctype html><title>Launch fixture</title><script src="/js/firebase-project-config.js"></script><script type="module" src="/js/site-analytics.js"></script>` }));
   try {
     await page.goto(`${baseUrl}/launch-failure-fixture`, { waitUntil: 'load' });
     await page.evaluate(async () => {
-      const { createLaunchMeasurement } = await import('/app/js/platform/launch-telemetry.js');
+      const { createLaunchMeasurement } = await import('/verification-source/launch-telemetry.js');
       createLaunchMeasurement('earth').finish('failed', 'world_not_ready');
     });
     for (let i = 0; i < 60 && !requests.join('\n').includes('en=we3d_launch_failed'); i++) await page.waitForTimeout(250);
@@ -352,7 +360,7 @@ async function verifyEarlyLaunchFailure() {
     assert.match(evidence, /en=we3d_launch_failed/);
     assert.doesNotMatch(evidence, /en=we3d_world_session_start/);
     assert.equal(await page.evaluate(() => typeof globalThis.getWorldExplorerAnalyticsSnapshot), 'undefined');
-    return { ok: true, evidence: 'real SDK and launch publisher with no gameplay services; injected failure outcome, not a provider outage' };
+    return { ok: true, evidence: 'real packaged SDK and current source launch-publisher fixture with no gameplay services; injected failure outcome, not an artifact launch or provider outage' };
   } finally { await context.close(); }
 }
 
@@ -360,7 +368,7 @@ await fs.mkdir(outputDir, { recursive: true });
 const result = {
   ok: false, contract: 'default-standard-analytics-with-explicit-limited-mode',
   servedRoot, complete: requestedDestinations.size === 0,
-  evidenceMode: 'real-sdk-local-collection-fixture', productionDeliveryVerified: false,
+  evidenceMode: 'real-sdk-local-collection-fixture; early publisher uses source; destination journeys use the selected artifact', productionDeliveryVerified: false,
   measurementId: safeConfig.measurementId,
   storageBlocked: null, defaultStorage: null, destinations: []
 };

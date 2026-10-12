@@ -244,7 +244,12 @@ try {
   const platformSurfaces = await verifyPlatformSurfaces();
   await page.goto(`${baseUrl}/`, { waitUntil: 'load', timeout: 120000 });
   const landingHero = String(await page.locator('.hero-frame img').getAttribute('src') || '').replace(/^\.\//, '');
-  await page.locator('.gallery').scrollIntoViewIfNeeded();
+  // Every published gallery participates in provenance checks, including
+  // optional sections whose lazy images are behind a native disclosure.
+  for (const details of await page.locator('details').filter({has:page.locator('.gallery')}).all()) {
+    if (!await details.evaluate(element=>element.open)) await details.locator(':scope > summary').click();
+  }
+  for (const image of await page.locator('.gallery img').all()) await image.scrollIntoViewIfNeeded();
   await page.locator('.gallery img').evaluateAll((images) => Promise.all(images.map((image) => image.decode())));
   const landingGallery = await page.locator('.gallery img').evaluateAll((images) => images.map((image) => ({
     src: String(image.getAttribute('src') || '').replace(/^\.\//, ''),

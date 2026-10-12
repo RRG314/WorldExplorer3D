@@ -1,6 +1,148 @@
 const MODEL_ASSET_SCHEMA_VERSION = 1;
 
 const MODEL_ASSET_CATALOG = Object.freeze([
+  ...[
+  {
+    "schemaVersion": 1,
+    "id": "museum-smithsonian-triceratops",
+    "label": "Triceratops horridus",
+    "url": "/app/assets/models/interiors/museum/smithsonian-triceratops.glb",
+    "roles": [
+      "museum-exhibit"
+    ],
+    "license": "CC0-1.0",
+    "sourceUrl": "https://3d-api.si.edu/content/document/3d_package:d8c623be-4ebc-11ea-b77f-2e728ce88125/resources/Triceratops_horridus_Marsh_1889-150k-4096.glb",
+    "attribution": "Smithsonian Institution, National Museum of Natural History. CC0. Uniform display normalization; scan mounts retained; simplified geometry; textures resized (JPEG for opaque images, PNG for alpha). Artwork converted to a textured panel; no reproduction claims about the host museum.",
+    "sourceUpAxis": "y",
+    "collisionPolicy": "validated-gallery-display-proxy",
+    "instancePolicy": {
+      "geometry": "shared",
+      "materials": "shared"
+    },
+    "loadPolicy": {
+      "bounded": true,
+      "timeoutMs": 20000
+    },
+    "budgets": {
+      "bytes": 4500000,
+      "triangles": 50000,
+      "textureEdgePixels": 1024,
+      "maxInstances": 1
+    }
+  },
+  {
+    "schemaVersion": 1,
+    "id": "museum-smithsonian-triceratops-lod",
+    "label": "Triceratops horridus",
+    "url": "/app/assets/models/interiors/museum/smithsonian-triceratops-lod.glb",
+    "roles": [
+      "museum-exhibit"
+    ],
+    "license": "CC0-1.0",
+    "sourceUrl": "https://3d-api.si.edu/content/document/3d_package:d8c623be-4ebc-11ea-b77f-2e728ce88125/resources/Triceratops_horridus_Marsh_1889-150k-4096.glb",
+    "attribution": "Smithsonian Institution, National Museum of Natural History. CC0. Uniform display normalization; scan mounts retained; simplified geometry; textures resized (JPEG for opaque images, PNG for alpha). Artwork converted to a textured panel; no reproduction claims about the host museum.",
+    "sourceUpAxis": "y",
+    "collisionPolicy": "validated-gallery-display-proxy",
+    "instancePolicy": {
+      "geometry": "shared",
+      "materials": "shared"
+    },
+    "loadPolicy": {
+      "bounded": true,
+      "timeoutMs": 20000
+    },
+    "budgets": {
+      "bytes": 4500000,
+      "triangles": 50000,
+      "textureEdgePixels": 512,
+      "maxInstances": 1
+    }
+  },
+  {
+    "schemaVersion": 1,
+    "id": "museum-smithsonian-coral",
+    "label": "Madrepora formosa \u00b7 USNM 292",
+    "url": "/app/assets/models/interiors/museum/smithsonian-coral.glb",
+    "roles": [
+      "museum-exhibit"
+    ],
+    "license": "CC0-1.0",
+    "sourceUrl": "https://3d-api.si.edu/content/document/3d_package:03d6b38a-bf7d-4334-90c9-1f7b4c3041a9/resources/usnm_292-100k-2048_std.glb",
+    "attribution": "Smithsonian Institution, National Museum of Natural History. CC0. Uniform display normalization; scan mounts retained; simplified geometry; textures resized (JPEG for opaque images, PNG for alpha). Artwork converted to a textured panel; no reproduction claims about the host museum.",
+    "sourceUpAxis": "y",
+    "collisionPolicy": "validated-gallery-display-proxy",
+    "instancePolicy": {
+      "geometry": "shared",
+      "materials": "shared"
+    },
+    "loadPolicy": {
+      "bounded": true,
+      "timeoutMs": 20000
+    },
+    "budgets": {
+      "bytes": 4500000,
+      "triangles": 24000,
+      "textureEdgePixels": 1024,
+      "maxInstances": 1
+    }
+  },
+  {
+    "schemaVersion": 1,
+    "id": "museum-smithsonian-coral-lod",
+    "label": "Madrepora formosa \u00b7 USNM 292",
+    "url": "/app/assets/models/interiors/museum/smithsonian-coral-lod.glb",
+    "roles": [
+      "museum-exhibit"
+    ],
+    "license": "CC0-1.0",
+    "sourceUrl": "https://3d-api.si.edu/content/document/3d_package:03d6b38a-bf7d-4334-90c9-1f7b4c3041a9/resources/usnm_292-100k-2048_std.glb",
+    "attribution": "Smithsonian Institution, National Museum of Natural History. CC0. Uniform display normalization; scan mounts retained; simplified geometry; textures resized (JPEG for opaque images, PNG for alpha). Artwork converted to a textured panel; no reproduction claims about the host museum.",
+    "sourceUpAxis": "y",
+    "collisionPolicy": "validated-gallery-display-proxy",
+    "instancePolicy": {
+      "geometry": "shared",
+      "materials": "shared"
+    },
+    "loadPolicy": {
+      "bounded": true,
+      "timeoutMs": 20000
+    },
+    "budgets": {
+      "bytes": 4500000,
+      "triangles": 24000,
+      "textureEdgePixels": 512,
+      "maxInstances": 1
+    }
+  },
+  {
+    "schemaVersion": 1,
+    "id": "museum-met-cypresses",
+    "label": "Wheat Field with Cypresses",
+    "url": "/app/assets/models/interiors/museum/met-cypresses.glb",
+    "roles": [
+      "museum-exhibit"
+    ],
+    "license": "CC0-1.0",
+    "sourceUrl": "https://images.metmuseum.org/CRDImages/ep/web-large/DP-42549-001.jpg",
+    "attribution": "Vincent van Gogh / The Metropolitan Museum of Art. CC0. Uniform display normalization; scan mounts retained; simplified geometry; textures resized (JPEG for opaque images, PNG for alpha). Artwork converted to a textured panel; no reproduction claims about the host museum.",
+    "sourceUpAxis": "y",
+    "collisionPolicy": "validated-gallery-display-proxy",
+    "instancePolicy": {
+      "geometry": "shared",
+      "materials": "shared"
+    },
+    "loadPolicy": {
+      "bounded": true,
+      "timeoutMs": 20000
+    },
+    "budgets": {
+      "bytes": 4500000,
+      "triangles": 2,
+      "textureEdgePixels": 1024,
+      "maxInstances": 1
+    }
+  }
+].map(record=>Object.freeze(record)),
   Object.freeze({
     schemaVersion:MODEL_ASSET_SCHEMA_VERSION,id:'facility-chainlink-kit',label:'Modular Chainlink Fence · Poly Haven',
     url:'/app/assets/models/facilities/chainlink/chainlink-kit.glb',roles:Object.freeze(['facility-boundary']),license:'CC0-1.0',
