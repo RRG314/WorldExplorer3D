@@ -90,6 +90,13 @@ export async function closeOwnedBrowser(server, timeoutMs = 8000, terminateMs = 
     try {
       await reapOwnedDescendants(owned, terminateMs);
     } finally {
+      // Chrome can hand its stderr descriptor to a separately managed updater.
+      // Once our browser has exited, that inherited writer must not keep this
+      // runner alive. Close our readers; do not terminate the shared updater.
+      if (child && (child.exitCode !== null || child.signalCode)) {
+        child.stdout?.destroy();
+        child.stderr?.destroy();
+      }
       // Playwright 1.61.1 closes the browser before its launchServer listener.
       // Await its test-only disconnect hook too: an idle loopback listener can
       // otherwise retain this verification process after every assertion passed.

@@ -133,6 +133,9 @@ function handleWorldCanvasClick(appCtx, event) {
   if (!globalThis.THREE || event?.button !== 0 || event?.target !== appCtx.renderer?.domElement) return false;
   if (!appCtx.gameStarted || appCtx.paused || appCtx.blockBuildMode || appCtx.fishingGame?.open) return false;
   if (appCtx.worldDiscoveryRuntime?.ui?.open || appCtx.urbanSandboxRuntime?.equipmentOpen) return false;
+  // Outdoor meshes remain resident during a building visit. They must not be
+  // selectable through the interior's walls, floors or viewing windows.
+  if (appCtx.activeInterior || appCtx.activeShipInterior) return true;
   // PaintTown handles pointerdown; the subsequent click must not also open
   // a selection card over the painting controls.
   if (appCtx.gameMode === 'painttown' && appCtx.paintTown?.active === true) return true;

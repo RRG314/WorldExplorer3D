@@ -384,12 +384,17 @@ function returnUniverseToSol(options = {}) {
 }
 
 function forceEarthLandingFromSol() {
-  universeRuntime.pendingEarthReturn = false;
   const earth = appCtx.getAllSpaceBodies?.().find((body) => body.name === 'Earth');
-  if (earth?.position && appCtx.spaceFlight?.rocket) {
-    appCtx.spaceFlight.rocket.position.copy(earth.position).add(new THREE.Vector3(0, earth.radius + 150, 0));
-    resetFlightMotion();
-  }
+  if (!earth?.position || !appCtx.spaceFlight?.active || !appCtx.spaceFlight.rocket ||
+      appCtx.spaceFlight.mode === 'landing') return false;
+  universeRuntime.pendingEarthReturn = false;
+  // Return to Earth is a direct navigation shortcut. Retire the local course
+  // before moving its craft, just as an interstellar frame transition does;
+  // otherwise the next physical-flight frame restores the previous course.
+  appCtx.releaseRenderedJourneyToManualFlight?.();
+  appCtx.spaceFlight.presentationAuthority = 'classic';
+  appCtx.spaceFlight.rocket.position.copy(earth.position).add(new THREE.Vector3(0, earth.radius + 150, 0));
+  resetFlightMotion();
   appCtx.spaceFlight.destination = 'earth';
   appCtx.spaceFlight._manualLandingTarget = 'Earth';
   return Boolean(appCtx.forceSpaceFlightLanding?.('Earth'));

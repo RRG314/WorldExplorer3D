@@ -61,3 +61,20 @@ test('listener cleanup errors stay visible after successful browser shutdown', a
   await assert.rejects(closeOwnedBrowser({process: () => ({exitCode: 0}), close: async () => {},
     _disconnectForTest: async () => {throw original;} }), error => error === original);
 });
+
+test('an exited browser releases inherited output readers without terminating an independent writer', async () => {
+  const nested = "process.stdout.write(String(process.pid)); setInterval(()=>{},1000)";
+  const source = `const c=require('node:child_process').spawn(process.execPath,['-e',${JSON.stringify(nested)}],{detached:true,stdio:['ignore',1,2]}); c.unref();`;
+  const parent = spawn(process.execPath, ['-e', source], { stdio: ['ignore', 'pipe', 'pipe'] });
+  const exited = once(parent, 'exit');
+  let writer;
+  try {
+    writer = Number((await once(parent.stdout, 'data'))[0].toString());
+    await exited;
+    assert.equal(parent.stdout.destroyed, false);
+    await closeOwnedBrowser({process: () => parent, close: async () => {}});
+    assert.equal(parent.stdout.destroyed, true);
+    assert.equal(parent.stderr.destroyed, true);
+    assert.doesNotThrow(() => process.kill(writer, 0));
+  } finally { if (writer) { try { process.kill(writer, 'SIGTERM'); } catch {} } }
+});
