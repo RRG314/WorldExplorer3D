@@ -65,3 +65,20 @@ visually inspected. The turtle camera required posed, rather than rest, bounds. 
 files are not added to the runtime catalog or displayed as approved aquarium
 fauna. Original model names/materials and source creator claims are preserved
 for provenance review. Do not call their quality verified based on licensing alone.
+
+## Local runtime intake — October 12 continuation
+
+The originals above have now been transformed by
+`scripts/prepare-aquarium-animals.mjs` into self-contained local GLBs under
+`app/assets/models/interiors/aquarium/`. `PROVENANCE.json` pins both source and
+output hashes and the sampled animated bounds used for normalization. Root
+transforms preserve the original skeletons, bind matrices and clips. The turtle
+retains 1K color/normal/material maps; shark body is 1K, fins 512 and eyes 256.
+Current emitted sizes are 570,128 bytes (6,228 triangles) and 3,758,740 bytes
+(19,678 triangles). Catalog limits are four MB and 20,000 triangles per animal.
+
+Rights permit this attributed adaptation. Runtime/visual approval is separate:
+new full-game journey evidence is still being collected. The prototype population
+is three shark rigs and one turtle rig, independently animated, plus 18 leased
+Smithsonian coral models. It does not claim to represent the real collection's
+current counts. Habitat release removes all model instances and leases.

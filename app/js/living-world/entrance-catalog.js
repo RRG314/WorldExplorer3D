@@ -208,6 +208,13 @@ function normalizeMappedEntrance(mapped, candidate, sampleGround) {
   normalX /= normalLength;
   normalZ /= normalLength;
   const facadeEdge = nearestFacadeEdge(candidate, mapped);
+  // One provider identity may own several disjoint footprint components. A
+  // mapped door belongs only to the nearby wall, never every campus component.
+  if(!facadeEdge||facadeEdge.projection.distance>Math.min(8,Math.max(3,finite(mapped.maxFacadeProjectionMeters,3))))return null;
+  // A geodata bearing is approximate. The rendered wall plane owns its exact
+  // normal; even a half-degree disagreement loses long-wall shader masks.
+  const facadeNormal=outwardNormalForEdge(candidate,facadeEdge);
+  normalX=facadeNormal.x;normalZ=facadeNormal.z;
   const facadeWidth = facadeEdge
     ? Math.hypot(facadeEdge.end.x - facadeEdge.start.x, facadeEdge.end.z - facadeEdge.start.z)
     : 7;

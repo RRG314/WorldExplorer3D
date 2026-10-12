@@ -9,7 +9,7 @@ function updateWalkController(appCtx, dt) {
 
 function updateWalkAuxiliaries(appCtx, dt) {
   if (appCtx.activeShipInterior === true) {
-    appCtx.updateInteriorInteraction?.();
+    appCtx.updateInteriorInteraction?.(dt);
     return;
   }
   appCtx.Walk.syncTerrain?.(false);
@@ -35,7 +35,7 @@ function updateWalkAuxiliaries(appCtx, dt) {
   });
 
   appCtx.updateMode?.(dt);
-  appCtx.updateInteriorInteraction?.();
+  appCtx.updateInteriorInteraction?.(dt);
 }
 
 function createEarthTransportControllers(appCtx, options = {}) {
@@ -104,10 +104,10 @@ function updateAlternateTravelMode(appCtx, dt, options = {}) {
     appCtx.updateMode?.(dt);
   } else if (activeId === 'plane') {
     appCtx.updateMode?.(dt);
-    appCtx.updateInteriorInteraction?.();
+    appCtx.updateInteriorInteraction?.(dt);
   } else if (activeId === 'drone') {
     appCtx.updateMode?.(dt);
-    appCtx.updateInteriorInteraction?.();
+    appCtx.updateInteriorInteraction?.(dt);
   }
   return true;
 }

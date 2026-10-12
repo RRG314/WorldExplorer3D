@@ -111,3 +111,7 @@ Venus orbital clouds: NASA VTAD base-color texture from https://science.nasa.gov
 ### Historic masonry
 
 [Stone Brick Wall 001](https://polyhaven.com/a/stone_brick_wall_001), photographed by Dimitrios Savva and processed by Rico Cilliers, CC0. The 1K diffuse map supplies representative historic masonry; it is not a scan of a particular monument. See [asset notice](facades/HISTORIC_STONE_LICENSE.md).
+
+### Aquarium interior materials
+
+`interiors/terrazzo-tiles/`: [Terrazzo Tiles](https://polyhaven.com/a/terrazzo_tiles) by Amal Kumar, CC0. Unmodified 1K diffuse, OpenGL normal and roughness maps; source URLs and byte hashes are recorded beside the maps. Aquarium galleries also reuse the credited Michael V carpet maps above and the existing CC0 Brushed Concrete maps. Finishes are representative, not scans of the institution.

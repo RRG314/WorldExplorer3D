@@ -13,6 +13,7 @@ import {assertPlayableLayout,compileLayout,containsRegion,roomRing,floorWalls,la
 import {inspectInteriorGlb,validateImportSource} from '../scripts/import-interior-content.mjs';
 import {buildAuthoredInterior} from '../app/js/interiors/authored-geometry.js';
 import {finishGalleryArchitecture,releaseGalleryTextures} from '../app/js/interiors/gallery-finishes.js';
+import {publishEarthEnvironment} from '../app/js/engine/quality.js';
 import {downloadBoundedModel} from '../app/js/assets/bounded-model-download.js';
 import {addGalleryFixtures} from '../app/js/interiors/gallery-scene.js';
 const content=MUSEUM_CONTENT[0],frame=earthCoordinateFrame({lat:39.29184,lon:-76.61005},100000);
@@ -139,4 +140,39 @@ test('a sealed gallery excludes outdoor geometry from its camera and restores th
   for(const exhibit of active.gallery.exhibits.values())assert.equal(ctx.camera.layers.test(exhibit.instance.root.layers),true);
   disposeGallery(ctx,active);assert.equal(ctx.camera.layers.mask,mask);assert.equal(ctx.camera.layers.test(outside.layers),true);
   outside.geometry.dispose();outside.material.dispose();inside.geometry.dispose();inside.material.dispose();
+});
+
+test('venue shadow cameras include interior objects and publish late models with automatic shadows disabled',async()=>{
+  const {ctx,active}=runtime();ctx.camera=new T.PerspectiveCamera();ctx.renderer={shadowMap:{enabled:true,autoUpdate:false,needsUpdate:false}};
+  const spot=new T.SpotLight();spot.castShadow=true;active.group.add(spot);
+  let resolveFirst,loads=0;
+  const instance=()=>({root:new T.Mesh(new T.BoxGeometry(),new T.MeshStandardMaterial()),dispose(){this.root.geometry.dispose();this.root.material.dispose();this.root.parent?.remove(this.root);}});
+  const task=attachGallery(ctx,T,active,{load:()=>++loads===1?new Promise(r=>resolveFirst=r):Promise.resolve(instance())});
+  assert.equal(ctx.renderer.shadowMap.needsUpdate,true);
+  assert.equal(spot.shadow.camera.layers.mask,ctx.camera.layers.mask);
+  ctx.renderer.shadowMap.needsUpdate=false;
+  resolveFirst(instance());await task;
+  for(const e of active.gallery.exhibits.values())assert.equal(spot.shadow.camera.layers.test(e.instance.root.layers),true);
+  assert.equal(ctx.renderer.shadowMap.needsUpdate,true,'a decoded exhibit must invalidate the already-published shadow map');
+  ctx.renderer.shadowMap.needsUpdate=false;disposeGallery(ctx,active);
+  assert.equal(ctx.renderer.shadowMap.needsUpdate,true,'returning outside requests a current outdoor shadow map');
+  assert.equal(ctx.renderer.shadowMap.autoUpdate,false,'the existing renderer scheduling policy stays in charge');
+});
+
+
+test('sealed venue lighting excludes outdoor IBL while weather updates retain the current environment for exit',async()=>{
+ for(const venue of ['gallery','aquarium']){
+  const {ctx,active}=runtime();ctx.scene=new T.Scene();ctx.scene.environment=new T.Texture();ctx.earthEnvironmentMap=ctx.scene.environment;
+  const previous=ctx.scene.environment,next=new T.Texture();
+  await attachGallery(ctx,T,active,{load:async()=>({root:new T.Group(),dispose(){}})});
+  assert.equal(ctx.scene.environment,null,'outdoor sky must not wash out indoor materials');
+  const state=active.gallery;if(venue==='aquarium'){active.gallery=null;active.aquarium=state;}
+  publishEarthEnvironment({appCtx:ctx},next);
+  assert.equal(ctx.earthEnvironmentMap,next);assert.equal(ctx.scene.environment,null,'live weather cannot republish outdoor IBL through sealed walls');
+  if(venue==='aquarium'){active.gallery=state;delete active.aquarium;}
+  disposeGallery(ctx,active);ctx.activeInterior=null;
+  assert.equal(ctx.scene.environment,next,'exit uses current outdoor lighting, not a stale or disposed capture');
+  publishEarthEnvironment({appCtx:ctx},null);assert.equal(ctx.scene.environment,null);
+  previous.dispose();next.dispose();
+ }
 });

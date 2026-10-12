@@ -1,6 +1,6 @@
 # Current development and release state
 
-Updated October 11, 2026. **5.5.0 is deployed to production.**
+Updated October 12, 2026. **5.5.0 is deployed to production.**
 Release: https://github.com/RRG314/WorldExplorer3D/releases/tag/v5.5.0
 Public project page: https://rrg314.github.io/WorldExplorer3D/
 
@@ -72,14 +72,40 @@ maps, run/jump, two reentries, restored exterior/camera, zero page/GPU errors,
 restored aquarium coverage and rejected bridge/fragment entry. Images inspected.
 Evidence: `output/interior-expansion/aquarium-coverage-regression/`.
 
-Aquarium research/design/status is in `docs/aquarium-expansion/`. Two animated
-Sketchfab CC BY originals were acquired and renderer-reviewed; neither is shipped
-content. The detailed aquarium shell, compound entrance, authored vertical travel,
-glass/voids, habitats and study interactions remain **unimplemented**. Do not call
-this a completed aquarium or release. Public sources establish route topology,
-not measured construction dimensions. The brief's map.aquarium.org reference was
-Oregon Coast, not Baltimore; corrected institution sources are recorded.
+Aquarium research/design/status is in `docs/aquarium-expansion/`. The current
+local branch now has a distinct Pavilion/Blacktip Reef route, optimized licensed
+animated animals, physical lift cores, Journal observations and floor maps.
+Shared authored construction supplies slabs, explicit wall thickness and clear
+framed openings for museums too. The central curved aquarium window now uses
+published 27 ft / 4 ft dimensions with four adjacent flat panes. Other geometry
+and the limited route remain estimated, not a complete institutional replica.
 
+The owner rejected the first underside surface appearance despite functional
+passes. Water now uses actual virtual-camera projections and mesh-basis normals,
+with scene-depth ray reprojection where supported and a camera-aligned fallback.
+The clipped tank edge retains transparent coverage, preventing the outdoor
+background leaking as a bright seam. Twelve above/below/rolled marker cases and
+the background-independence pixel check pass; five renderer views inspected.
+Water remains a bounded planar approximation, not exact acrylic/fluid optics.
+
+Final source chain: **2,512 tests pass**, no skips/TODOs; all dependency, ownership,
+type, runtime and test-inventory gates pass. Final actual aquarium source journey:
+**33 checks pass**, including failed asset/retry, all three notes, both phone map
+orientations, real lifts, walking/run/jump, underside mouse look, exact exterior
+return, reentry and released assets; zero page/GPU errors. Final museum lighting
+regression: **28 checks pass**, entry and all three display images inspected.
+Earlier reload evidence is kept separately. These are source/renderer/gameplay
+checks, not immutable release, physical-device or fresh performance acceptance.
+
+The actual aquarium route exposed exterior building collision inside authored
+rooms and a lower-wall tolerance reaching an upper floor. Both are repaired in
+shared contained-interior physics and vertical bounds, retaining legacy partial
+interiors. Venue lighting owns indoor camera/light layers and excludes outdoor
+PMREM while occupied; exit restores the latest outdoor environment. See
+`docs/aquarium-expansion/VERIFICATION.md` for current evidence and real remaining
+art/architecture scope: sparse habitat, blank Pavilion surroundings, upper
+institutional programme, final visual-showcase acceptance. No production/GitHub
+changes; preserve dist and all saved candidates.
 The previous immutable museum diagnostic finished eight passes/six failures.
 Outdoor performance and ocean resource ceilings remain genuine release failures;
 corrected source helpers/inventory do not retroactively pass the older package.

@@ -135,6 +135,7 @@ function applyInteriorSceneState(active, sceneState) {
   active.layoutKind = sceneState.layoutKind;
   active.floorPlan = sceneState.floorPlan;
   active.authoredCeilings = sceneState.authoredCeilings;
+  active.authoredLifts = sceneState.authoredLifts;
   active.floorId = sceneState.floorId;
   active.floorLabel = sceneState.floorLabel;
   active.floorBaseY = sceneState.floorBaseY;
@@ -209,13 +210,29 @@ export function nearestInteriorInteraction(active, walker) {
 }
 
 function closeElevatorFloorPicker(active = appCtx.activeInterior) {
+  const focus=elevatorFloorPicker?._previousFocus;
+  elevatorFloorPicker?.close?.();
   elevatorFloorPicker?.remove?.();
   elevatorFloorPicker = null;
   if (active) active.elevatorPickerOpen = false;
+  appCtx.setPauseReason?.('interior_elevator',false);
+  if(focus?.isConnected)focus.focus({preventScroll:true});
 }
 
 function travelByElevator(active, targetLevel, deps) {
   if (!Number.isFinite(Number(targetLevel))) return false;
+  const authored=active.authoredLifts?.find(l=>l.id===active.selectedLiftId);
+  if(active.floorPlan?.authored){
+    const stop=authored?.stops.find(s=>s.level===Number(targetLevel)),walker=appCtx.Walk?.state?.walker;
+    if(!stop||!walker||!authored.stops.some(s=>s.level===active.activeLevel))return false;
+    closeElevatorFloorPicker(active);
+    // All authored floors are already resident. A lift changes the actor's
+    // supported level; rebuilding would lose the habitat and its asset leases.
+    active.activeLevel=stop.level;active.floorId=stop.floorId;active.floorLabel=active.floorPlan.floors[stop.level].label;
+    Object.assign(walker,{x:stop.x,z:stop.z,y:active.floorBaseY+interiorFloorElevation(active.floorPlan,stop.level)+(appCtx.Walk.CFG?.eyeHeight||1.7)+.03,vy:0,yaw:stop.yaw,angle:stop.yaw,pitch:0,lookYawOffset:0,_resolvedGroundState:null});
+    active.lastValidPosition={x:walker.x,y:walker.y,z:walker.z,yaw:walker.yaw,angle:walker.angle};
+    resetInteriorInteractionCache();return true;
+  }
   closeElevatorFloorPicker(active);
   if (!replaceActiveInteriorFloor(active, Number(targetLevel), deps)) return false;
   const walker = appCtx.Walk?.state?.walker;
@@ -237,11 +254,15 @@ function travelByElevator(active, targetLevel, deps) {
   return true;
 }
 
-function openElevatorFloorPicker(active, deps) {
+function openElevatorFloorPicker(active, deps, interaction) {
   if (!active?.floorPlan || active.floorPlan.floorCount <= 1 || typeof document === 'undefined') return false;
   closeElevatorFloorPicker(active);
-  const choices = elevatorFloorChoices(active.floorPlan, active.activeLevel);
-  const picker = document.createElement('section');
+  active.selectedLiftId=interaction?.liftId;
+  const lift=active.authoredLifts?.find(l=>l.id===active.selectedLiftId);
+  const choices = elevatorFloorChoices(active.floorPlan, active.activeLevel).filter(c=>!active.floorPlan.authored||lift?.stops.some(s=>s.level===c.level));
+  if(!choices.length)return false;
+  const picker = document.createElement('dialog');
+  picker._previousFocus=document.activeElement;
   picker.id = 'interiorElevatorFloorPicker';
   picker.setAttribute('role', 'dialog');
   picker.setAttribute('aria-label', 'Choose an elevator floor');
@@ -252,6 +273,9 @@ function openElevatorFloorPicker(active, deps) {
     button.addEventListener('click', () => travelByElevator(active, Number(button.dataset.elevatorLevel), deps));
   });
   document.body.appendChild(picker);
+  picker.addEventListener('cancel',event=>{event.preventDefault();closeElevatorFloorPicker(active);});
+  picker.addEventListener('keydown',event=>event.stopPropagation());
+  document.exitPointerLock?.();picker.showModal();appCtx.setPauseReason?.('interior_elevator',true);
   elevatorFloorPicker = picker;
   active.elevatorPickerOpen = true;
   picker.querySelector('[data-elevator-level]:not([disabled])')?.focus?.();
@@ -417,7 +441,7 @@ export async function enterInteriorForSupport(support, deps) {
 
   const walker = appCtx.Walk.state.walker;
   const outsideState = {
-    ...(sceneState.mode==='authored'?{cameraNear:appCtx.camera?.near}:{}),
+    ...(sceneState.mode==='authored'?{cameraNear:appCtx.camera?.near,cameraFar:appCtx.camera?.far}:{}),
     x: deps.finiteNumber(walker.x, 0),
     z: deps.finiteNumber(walker.z, 0),
     y: deps.finiteNumber(walker.y, 0),
@@ -450,7 +474,14 @@ export async function enterInteriorForSupport(support, deps) {
   }
 
   const entryHeight = sceneState.entryPoint.y;
-  if(sceneState.mode==='authored'&&appCtx.camera){appCtx.camera.near=.04;appCtx.camera.updateProjectionMatrix();}
+  if(sceneState.mode==='authored'&&appCtx.camera){
+    const points=sceneState.usableFootprint,x=points.map(p=>p.x),z=points.map(p=>p.z),height=Math.max(...sceneState.floorPlan.floors.map(f=>f.elevation+f.height));
+    appCtx.camera.near=.04;
+    // A geographic far plane loses depth precision on millimetre-scale indoor
+    // joints. Bound this camera to its occupied enclosure, then restore on exit.
+    appCtx.camera.far=Math.max(60,Math.hypot(Math.max(...x)-Math.min(...x),Math.max(...z)-Math.min(...z),height)*1.3);
+    appCtx.camera.updateProjectionMatrix();
+  }
   appCtx.activeInterior = {
     key,
     label: definition.label,
@@ -488,8 +519,9 @@ export async function enterInteriorForSupport(support, deps) {
     floorTransitionPending: false
   };
   applyInteriorSceneState(appCtx.activeInterior, sceneState);
-  if (!definition.communityRealityCapture && !definition.curatedContent) void deps.attachCuratedHomeFurnishing?.(appCtx.activeInterior);
+  if (!definition.communityRealityCapture && !definition.curatedContent && !definition.aquariumContent) void deps.attachCuratedHomeFurnishing?.(appCtx.activeInterior);
   void deps.attachGallery?.(appCtx.activeInterior);
+  void deps.attachAquarium?.(appCtx.activeInterior);
   void deps.attachCommunityInteriorRepresentation?.(appCtx.activeInterior);
   appCtx.interiorHint = {
     state: "inside",
@@ -504,7 +536,7 @@ export async function enterInteriorForSupport(support, deps) {
 export function clearActiveInterior(options = {}, deps) {
   entryRevision += 1;
   const active = appCtx.activeInterior;
-  if(Number.isFinite(active?.outsideState?.cameraNear)&&appCtx.camera){appCtx.camera.near=active.outsideState.cameraNear;appCtx.camera.updateProjectionMatrix();}
+  if(Number.isFinite(active?.outsideState?.cameraNear)&&appCtx.camera){appCtx.camera.near=active.outsideState.cameraNear;if(Number.isFinite(active.outsideState.cameraFar))appCtx.camera.far=active.outsideState.cameraFar;appCtx.camera.updateProjectionMatrix();}
   if (active?.environmentKind === 'expedition-ship' && options.shipInternal !== true) {
     return appCtx.exitExpeditionShipInterior?.() === true;
   }
@@ -550,6 +582,7 @@ export function clearActiveInterior(options = {}, deps) {
   appCtx.replaceWorldCollection('dynamicBuildingColliders',
     active.outsideWorldSequence === appCtx._worldLoadSequence ? (active.outsideColliders || []) : []);
   deps.disposeGallery?.(active);
+  deps.disposeAquarium?.(active);
   disposeThreeViewsHome(active);
   deps.disposeCuratedHomeFurnishing?.(active);
   disposeObject3D(active.group);
@@ -691,8 +724,9 @@ export async function handleInteriorAction(deps) {
       appCtx.notifyContextInteractionCompleted?.('exit_interior', { interiorId: active.id || active.key || '' });
       return true;
     }
-    if (interaction?.kind === 'elevator') return openElevatorFloorPicker(active, deps);
+    if (interaction?.kind === 'elevator') return openElevatorFloorPicker(active, deps,interaction);
     if (interaction?.kind?.startsWith('museum-')) return deps.handleGalleryAction?.(active,interaction) === true;
+    if (interaction?.kind?.startsWith('aquarium-')) return deps.handleAquariumAction?.(active,interaction) === true;
     return false;
   }
   const candidate = pickNearbyBuildingCandidate(true, deps);
@@ -705,6 +739,10 @@ export async function handleInteriorAction(deps) {
 export function updateInteriorInteraction(deps) {
   ensureExteriorContextInteraction(deps);
   const now = performance.now();
+
+  // Opening lift controls pauses walking. That pause must not be interpreted
+  // as leaving walk mode, or the next UI refresh closes the dialog immediately.
+  if(elevatorFloorPicker&&appCtx.activeInterior?.elevatorPickerOpen&&appCtx.Walk?.state?.mode==='walk'&&appCtx.hasPauseReason?.('interior_elevator')){clearPrompt();return;}
 
   if (!deps.isWalkModeActive()) {
     closeElevatorFloorPicker(appCtx.activeInterior);

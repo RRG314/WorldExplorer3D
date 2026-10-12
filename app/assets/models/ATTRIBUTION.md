@@ -303,3 +303,14 @@ Personal Workspace Furniture
 ## Common dolphin
 
 Common Dolphin by CGreature ([original model](https://skfb.ly/oHswH)), with swimming animation by kenchoo ([animated adaptation](https://sketchfab.com/3d-models/common-dolphin-12c27d41204f4b92895e36072b0ba8a6)). [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). World Explorer applies parent transforms for scale/orientation and resizes textures; the original rig and animation remain. See `marine/common-dolphin/PROVENANCE.json` and `LICENSE.txt`. No author endorsement is implied.
+
+## Aquarium animal illustrations
+
+[Blacktip reef shark](https://sketchfab.com/3d-models/blacktip-reef-shark-a52bb96c5a0c4157b49982471f8902b0)
+by Lais.Marques and [Green sea turtle](https://sketchfab.com/3d-models/green-sea-turtle-d3dc6a6a4ff74465a59105fd7c66b32b)
+by jgrabo20, [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
+Parent transforms normalize animated bounds to metres; textures are resized for
+the browser. Original bones, topology and swimming clips are retained. These
+illustrate species; they are not scans of named animals or an endorsement by the
+artists or National Aquarium. Source/output hashes and exact changes are in
+`interiors/aquarium/PROVENANCE.json`.

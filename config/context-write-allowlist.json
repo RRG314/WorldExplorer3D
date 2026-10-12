@@ -2192,8 +2192,13 @@
     "app/js/interiors/gallery-ui.js": [
       "screenLayout"
     ],
-    "app/js/interiors/gallery-runtime.js": [
-      "camera"
+    "app/js/interiors/aquarium-ui.js": [
+      "screenLayout"
+    ],
+    "app/js/interiors/venue-lighting.js": [
+      "camera",
+      "renderer",
+      "scene"
     ]
   }
 }

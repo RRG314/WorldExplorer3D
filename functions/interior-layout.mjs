@@ -43,6 +43,7 @@ export function assertPlayableLayout(layout){
   const links=new Map(layout.floors.flatMap(f=>f.rooms.map(r=>[r.id,new Set()]))),entries=[];
   for(const floor of layout.floors)for(const door of floor.doors){const wall=floorWalls(floor).find(w=>w.id===door.wall);if(door.entry)entries.push(wall.rooms[0]);if(wall.rooms.length===2){links.get(wall.rooms[0]).add(wall.rooms[1]);links.get(wall.rooms[1]).add(wall.rooms[0]);}}
   for(const stair of layout.stairs){const from=layout.floors.find(f=>f.id===stair.from),to=layout.floors.find(f=>f.id===stair.to),a=from.rooms.find(r=>pointInRoom(stair.path[0],roomRing(from,r))),b=to.rooms.find(r=>pointInRoom(stair.path.at(-1),roomRing(to,r)));if(!a||!b)fail('Stairs need a reachable landing in each room.');links.get(a.id).add(b.id);links.get(b.id).add(a.id);}
+  for(const lift of layout.lifts||[])for(const a of lift.stops)for(const b of lift.stops)if(a!==b)links.get(a.roomId).add(b.roomId);
   if(!entries.length)fail('Add a home entrance before walking through.');
   const visited=new Set(entries),queue=[...entries];while(queue.length){for(const id of links.get(queue.shift()))if(!visited.has(id)){visited.add(id);queue.push(id);}}
   if(visited.size!==links.size)fail('Some rooms have no route to the entrance. Add a doorway or stairs before walking through.');
@@ -51,6 +52,16 @@ export function assertPlayableLayout(layout){
 function rect(a,b,width) {
   const length=Math.hypot(b.x-a.x,b.z-a.z),nx=-(b.z-a.z)/length*width/2,nz=(b.x-a.x)/length*width/2;
   return [{x:a.x+nx,z:a.z+nz},{x:b.x+nx,z:b.z+nz},{x:b.x-nx,z:b.z-nz},{x:a.x-nx,z:a.z-nz}];
+}
+// A lift is a reserved construction core. Its landing remains in the public
+// room; the shaft volume is removed from floor/ceiling support at every level
+// it crosses. The interaction may transfer floors, but cannot create a floor
+// in the shaft or a decorative door unrelated to its actual enclosure.
+export function liftShaftGeometry(lift) {
+  if(!lift.shaft)return null;
+  const s=lift.stops[0],shaft=lift.shaft,forward={x:Math.sin(s.yaw),z:Math.cos(s.yaw)},right={x:forward.z,z:-forward.x};
+  const point=(side,depth)=>({x:s.x+right.x*side-forward.x*(shaft.landingDistance+depth),z:s.z+right.z*side-forward.z*(shaft.landingDistance+depth)});
+  return {outline:[point(-shaft.width/2,0),point(shaft.width/2,0),point(shaft.width/2,shaft.depth),point(-shaft.width/2,shaft.depth)],front:point(0,0),forward,right};
 }
 function stairParts(stair,from,to){
   const path=stair.path,half=stair.width/2,flights=[],landings=[];
@@ -81,7 +92,7 @@ export function layoutRoomDescriptor(layout,roomId) {
   const surfaceIds=room.vertices.map((a,i)=>`${floor.id}:${wallKey(a,room.vertices[(i+1)%room.vertices.length])}:${room.id}`);
   const openings=room.vertices.flatMap((a,i)=>{const b=room.vertices[(i+1)%room.vertices.length],wall=walls.find(w=>w.id===wallKey(a,b)),length=Math.hypot(wall.b.x-wall.a.x,wall.b.z-wall.a.z);return floor.doors.filter(d=>d.wall===wall.id).map(d=>({wall:i,offset:wall.from===a?d.offset:length-d.offset,width:d.width,height:d.height}));});
   const cuts=direction=>layout.stairs.filter(s=>s[direction]===floor.id).flatMap(s=>stairParts(s,layout.floors.find(f=>f.id===s.from),layout.floors.find(f=>f.id===s.to)).cutouts);
-  return {widthMeters:Math.max(...outline.map(p=>p.x))-Math.min(...outline.map(p=>p.x)),lengthMeters:Math.max(...outline.map(p=>p.z))-Math.min(...outline.map(p=>p.z)),heightMeters:floor.height,outline,openings,wallInset:.052,floorCutouts:cuts('to'),ceilingCutouts:cuts('from'),elevation:floor.elevation,surfaceIds:[...surfaceIds,`${room.id}:floor`,`${room.id}:ceiling`]};
+  return {widthMeters:Math.max(...outline.map(p=>p.x))-Math.min(...outline.map(p=>p.x)),lengthMeters:Math.max(...outline.map(p=>p.z))-Math.min(...outline.map(p=>p.z)),heightMeters:floor.height,outline,openings,wallInset:(floor.wallThickness??.1)/2+.002,floorCutouts:cuts('to'),ceilingCutouts:cuts('from'),elevation:floor.elevation,surfaceIds:[...surfaceIds,`${room.id}:floor`,`${room.id}:ceiling`]};
 }
 export function floorWalls(floor) {
   const walls=new Map();
@@ -122,7 +133,7 @@ export function normalizeLayout(input,envelope) {
   const ids=new Set(), unique=id=>{identifier(id);if(ids.has(id))fail('Duplicate layout identity.');ids.add(id);return id;};
   const layout={schemaVersion:1,id:identifier(input.id),envelopeRevision:String(envelope.revision||''),unitLabel:String(input.unitLabel||'My home').slice(0,80),...(input.unitOutline?{unitOutline:boundary}:{}),floors:[],stairs:[]};
   for(const source of input.floors){
-    const floor={id:unique(source.id),label:String(source.label||'Floor').slice(0,60),elevation:finite(source.elevation,0,maxHeight,'floor elevation'),height:finite(source.height,1.9,6,'ceiling height'),slab:finite(source.slab??.15,.05,.5,'slab thickness'),vertices:{},rooms:[],doors:[]};
+    const floor={id:unique(source.id),label:String(source.label||'Floor').slice(0,60),elevation:finite(source.elevation,0,maxHeight,'floor elevation'),height:finite(source.height,1.9,6,'ceiling height'),slab:finite(source.slab??.15,.05,.5,'slab thickness'),wallThickness:finite(source.wallThickness??.1,.08,.6,'wall thickness'),vertices:{},rooms:[],doors:[]};
     if(floor.elevation+floor.height+floor.slab>maxHeight+EPS)fail(`${floor.label} extends above the supported building height.`);
     if(!source.vertices||Object.keys(source.vertices).length>256)fail('Too many corners on this floor.');
     for(const [id,p] of Object.entries(source.vertices)){identifier(id);floor.vertices[id]={x:finite(p.x,-10000,10000,'corner X'),z:finite(p.z,-10000,10000,'corner Z')};}
@@ -132,11 +143,20 @@ export function normalizeLayout(input,envelope) {
       const room={id:unique(r.id),label:String(r.label||'Room').slice(0,60),type:String(r.type||'room').slice(0,30),vertices:r.vertices.map(identifier)};
       const ring=validateRing(roomRing(floor,room));
       if(!containsRegion(boundary,ring,holes))fail(`${room.label} extends outside the building or into a courtyard.`);
-      for(let i=0;i<ring.length;i++)if(!containsRegion(boundary,rect(ring[i],ring[(i+1)%ring.length],.1),holes))fail(`${room.label} needs space for wall thickness inside the building.`);
+      for(let i=0;i<ring.length;i++)if(!containsRegion(boundary,rect(ring[i],ring[(i+1)%ring.length],floor.wallThickness),holes))fail(`${room.label} needs space for wall thickness inside the building.`);
       for(const existing of floor.rooms)if(multiArea(polygons.intersection(region(ring),region(roomRing(floor,existing))))>EPS)fail(`${room.label} overlaps ${existing.label}.`);
       floor.rooms.push(room);
     }
     const walls=floorWalls(floor);
+    if(source.boundaries!==undefined){
+      if(!Array.isArray(source.boundaries)||source.boundaries.length>walls.length)fail('Invalid architectural boundaries.');
+      const seen=new Set();floor.boundaries=source.boundaries.map(b=>{
+        if(!walls.some(w=>w.id===b.wall)||seen.has(b.wall)||!['glazed','guard'].includes(b.presentation))fail('Invalid glazed boundary.');
+        seen.add(b.wall);
+        const height=b.presentation==='guard'?finite(b.height, .9,Math.min(1.5,floor.height),'guard height'):floor.height;
+        return {wall:b.wall,presentation:b.presentation,sill:finite(b.sill??.18,0,Math.min(1.4,height),'glazing sill'),...(b.presentation==='guard'?{height}:{})};
+      });
+    }
     for(const w of walls){
       if(w.rooms.length>2)fail('More than two rooms share one wall.');
       for(const q of walls)if(q.id>w.id && ![q.from,q.to].some(v=>v===w.from||v===w.to) && intersects(w.a,w.b,q.a,q.b))fail('Join shared wall corners before saving.');
@@ -146,6 +166,7 @@ export function normalizeLayout(input,envelope) {
       const w=walls.find(w=>w.id===d.wall);if(!w)fail('A door has lost its wall. Undo the wall change or remove the door.');
       const length=Math.hypot(w.b.x-w.a.x,w.b.z-w.a.z);
       const door={id:unique(d.id),wall:w.id,offset:finite(d.offset,0,length,'door position'),width:finite(d.width,.7,2.4,'door width'),height:finite(d.height??2.05,1.9,floor.height,'door height'),entry:d.entry===true};
+      if(floor.boundaries?.some(b=>b.wall===w.id&&b.presentation==='guard'))fail('A doorway cannot be placed in a guard.');
       if(door.offset-door.width/2<.1||door.offset+door.width/2>length-.1)fail('The door needs room on both sides of its frame.');
       if(door.entry&&w.rooms.length!==1)fail('The home entrance must be on an outside wall.');
       if(floor.doors.some(p=>p.wall===door.wall&&Math.abs(p.offset-door.offset)<(p.width+door.width)/2+.1))fail('Door openings overlap.');
@@ -156,6 +177,38 @@ export function normalizeLayout(input,envelope) {
   const sorted=[...layout.floors].sort((a,b)=>a.elevation-b.elevation);
   layout.floors=sorted;
   for(let i=1;i<sorted.length;i++)if(sorted[i].elevation<sorted[i-1].elevation+sorted[i-1].height+sorted[i-1].slab-EPS)fail('Floors overlap vertically.');
+  if(input.lifts!==undefined){
+    if(!Array.isArray(input.lifts)||input.lifts.length>4)fail('Too many lifts.');
+    layout.lifts=input.lifts.map(source=>{
+      if(!source.shaft)fail('A lift needs an enclosed construction shaft.');
+      if(!Array.isArray(source.stops)||source.stops.length<2||source.stops.length>8)fail('A lift needs two to eight stops.');
+      const seen=new Set();
+      const lift={id:unique(source.id),label:String(source.label||'Elevator').slice(0,60),stops:source.stops.map(s=>{
+        const floor=layout.floors.find(f=>f.id===s.floorId),room=floor?.rooms.find(r=>r.id===s.roomId);
+        if(!room||seen.has(floor.id))fail('Invalid lift landing.');seen.add(floor.id);
+        const x=finite(s.x,-10000,10000,'lift X'),z=finite(s.z,-10000,10000,'lift Z'),ring=roomRing(floor,room);
+        // A complete standing disc, not just its centre, must fit the landing.
+        for(let i=0;i<16;i++)if(!pointInRoom({x:x+Math.cos(i*Math.PI/8)*.7,z:z+Math.sin(i*Math.PI/8)*.7},ring))fail('Lift landing needs clear standing space.');
+        return {floorId:floor.id,roomId:room.id,x,z,yaw:finite(s.yaw??0,-Math.PI*2,Math.PI*2,'lift facing')};
+      })};
+      if(lift.stops.some(s=>Math.hypot(s.x-lift.stops[0].x,s.z-lift.stops[0].z)>.05))fail('Lift stops must share one vertical shaft.');
+      if(source.shaft){
+        const q=source.shaft;
+        lift.shaft={width:finite(q.width,1.5,4,'lift core width'),depth:finite(q.depth,1.3,4,'lift core depth'),landingDistance:finite(q.landingDistance,.75,2,'lift landing setback'),doorWidth:finite(q.doorWidth,.8,2.4,'lift door width'),doorHeight:finite(q.doorHeight,1.9,Math.min(...lift.stops.map(s=>layout.floors.find(f=>f.id===s.floorId).height)),'lift door height')};
+        if(lift.shaft.doorWidth>lift.shaft.width-.3)fail('Lift doors need a structural jamb on both sides.');
+        if(lift.stops.some(s=>Math.abs(Math.sin((s.yaw-lift.stops[0].yaw)/2))>.001))fail('Lift doors must align with their shaft.');
+        const core=liftShaftGeometry(lift);
+        for(const s of lift.stops){
+          const f=layout.floors.find(f=>f.id===s.floorId),r=f.rooms.find(r=>r.id===s.roomId),ring=roomRing(f,r);
+          if(!containsRegion(ring,core.outline)||core.outline.some((a,i)=>!containsRegion(ring,rect(a,core.outline[(i+1)%4],.1))))fail('The complete lift core must fit inside its landing room.');
+          const occupied=polygons.union(region(core.outline),...core.outline.map((a,i)=>region(rect(a,core.outline[(i+1)%4],.1))));
+          for(const d of f.doors){const w=floorWalls(f).find(w=>w.id===d.wall);if(multiArea(polygons.intersection(occupied,region(rect(w.a,w.b,.7))))>EPS)fail('Lift core blocks a room doorway.');}
+        }
+      }
+      return lift;
+    });
+    for(let i=0;i<layout.lifts.length;i++)for(let j=i+1;j<layout.lifts.length;j++)if(multiArea(polygons.intersection(region(liftShaftGeometry(layout.lifts[i]).outline),region(liftShaftGeometry(layout.lifts[j]).outline)))>EPS)fail('Lift cores overlap.');
+  }
   if(!Array.isArray(input.stairs)||input.stairs.length>16)fail('Too many stairs.');
   for(const s of input.stairs){
     const from=layout.floors.find(f=>f.id===s.from),to=layout.floors.find(f=>f.id===s.to);
@@ -182,30 +235,43 @@ export function normalizeLayout(input,envelope) {
 }
 
 export function compileLayout(layout) {
-  const surfaces=[],solids=[],floors=[],ramps=[];
+  const surfaces=[],solids=[],floors=[],ramps=[],openings=[],cores=[];
+  for(const lift of layout.lifts||[]){
+    const geometry=liftShaftGeometry(lift);if(!geometry)continue;
+    const stops=lift.stops.map(s=>layout.floors.find(f=>f.id===s.floorId));
+    cores.push({id:lift.id,...geometry,bottom:Math.min(...stops.map(f=>f.elevation)),top:Math.max(...stops.map(f=>f.elevation+f.height)),shaft:lift.shaft,stops:lift.stops});
+  }
   for(const floor of layout.floors){
     const cuts=direction=>layout.stairs.filter(s=>s[direction]===floor.id).flatMap(s=>stairParts(s,layout.floors.find(f=>f.id===s.from),layout.floors.find(f=>f.id===s.to)).cutouts.map(region));
-    const openings=cuts('from');
+    const coreCuts=cores.filter(c=>floor.elevation>=c.bottom-EPS&&floor.elevation<c.top).map(c=>region(c.outline));
+    const ceilingCuts=[...cuts('from'),...coreCuts];
     for(const room of floor.rooms){
       const ring=roomRing(floor,room);
       // Upper slabs have a real stairwell; the matching lower ceiling is cut too.
-      const lowerHoles=cuts('to');
+      const lowerHoles=[...cuts('to'),...coreCuts];
       const floorPolys=lowerHoles.length?polygons.difference(region(ring),...lowerHoles):[region(ring)];
-      const ceilingPolys=openings.length?polygons.difference(region(ring),...openings):[region(ring)];
+      const ceilingPolys=ceilingCuts.length?polygons.difference(region(ring),...ceilingCuts):[region(ring)];
       floors.push({floorId:floor.id,roomId:room.id,y:floor.elevation,polygons:floorPolys});
-      surfaces.push({id:`${room.id}:floor`,roomId:room.id,floorId:floor.id,kind:'floor',y:floor.elevation,polygons:floorPolys},{id:`${room.id}:ceiling`,roomId:room.id,floorId:floor.id,kind:'ceiling',y:floor.elevation+floor.height,polygons:ceilingPolys});
+      surfaces.push({id:`${room.id}:floor`,roomId:room.id,floorId:floor.id,kind:'floor',y:floor.elevation,thickness:floor.slab,polygons:floorPolys},{id:`${room.id}:ceiling`,roomId:room.id,floorId:floor.id,kind:'ceiling',y:floor.elevation+floor.height,polygons:ceilingPolys});
     }
     for(const wall of floorWalls(floor)){
       const length=Math.hypot(wall.b.x-wall.a.x,wall.b.z-wall.a.z),doors=floor.doors.filter(d=>d.wall===wall.id).sort((a,b)=>a.offset-b.offset);
+      const boundary=floor.boundaries?.find(v=>v.wall===wall.id),height=boundary?.presentation==='guard'?boundary.height:floor.height;
+      for(const d of doors)openings.push({...d,floorId:floor.id,rooms:[...wall.rooms],a:{x:wall.a.x+(wall.b.x-wall.a.x)*(d.offset-d.width/2)/length,z:wall.a.z+(wall.b.z-wall.a.z)*(d.offset-d.width/2)/length},b:{x:wall.a.x+(wall.b.x-wall.a.x)*(d.offset+d.width/2)/length,z:wall.a.z+(wall.b.z-wall.a.z)*(d.offset+d.width/2)/length},bottom:floor.elevation,top:floor.elevation+d.height,thickness:floor.wallThickness??.1});
       let start=0;const segments=[];
       for(const d of doors){segments.push([start,d.offset-d.width/2,0,floor.height],[d.offset-d.width/2,d.offset+d.width/2,d.height,floor.height]);start=d.offset+d.width/2;}
-      segments.push([start,length,0,floor.height]);
+      segments.push([start,length,0,height]);
       for(const [left,right,bottom,top] of segments){if(right-left<EPS||top-bottom<EPS)continue;
         const a={x:wall.a.x+(wall.b.x-wall.a.x)*left/length,z:wall.a.z+(wall.b.z-wall.a.z)*left/length},b={x:wall.a.x+(wall.b.x-wall.a.x)*right/length,z:wall.a.z+(wall.b.z-wall.a.z)*right/length};
-        solids.push({floorId:floor.id,wallId:wall.id,a,b,bottom:floor.elevation+bottom,top:floor.elevation+top,thickness:.1});
+        solids.push({floorId:floor.id,wallId:wall.id,a,b,bottom:floor.elevation+bottom,top:floor.elevation+top,thickness:floor.wallThickness??.1,...(boundary?{presentation:boundary.presentation,sill:boundary.sill}:{})});
       }
       for(const roomId of wall.rooms)surfaces.push({id:`${floor.id}:${wall.id}:${roomId}`,floorId:floor.id,roomId,kind:'wall',a:wall.a,b:wall.b,y:floor.elevation,height:floor.height,doors});
     }
+  }
+  for(const core of cores){
+    // Closed front includes the lift doors in collision. Floor transfer is an
+    // explicit landing interaction; players cannot fall down or enter a shaft.
+    core.outline.forEach((a,i)=>solids.push({wallId:`${core.id}:core:${i}`,coreId:core.id,a,b:core.outline[(i+1)%4],bottom:core.bottom,top:core.top,thickness:.1}));
   }
   for(const stair of layout.stairs){
     const from=layout.floors.find(f=>f.id===stair.from),to=layout.floors.find(f=>f.id===stair.to);
@@ -213,7 +279,7 @@ export function compileLayout(layout) {
     for(const flight of parts.flights)ramps.push({...flight,stairId:stair.id});
     parts.landings.forEach((landing,i)=>{const polygons=[region(landing.outline)],id=`${stair.id}:landing:${i}`;floors.push({floorId:from.id,roomId:null,y:landing.y,polygons});surfaces.push({id,kind:'floor',floorId:from.id,y:landing.y,polygons});});
   }
-  return {surfaces,solids,floors,ramps};
+  return {surfaces,solids,floors,ramps,openings,cores};
 }
 
 export function makeStarterLayout(envelope,{bedrooms=1,bathrooms=1,floorCount=1,unitOutline,unitLabel}={}) {

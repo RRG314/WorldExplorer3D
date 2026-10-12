@@ -318,7 +318,8 @@ function resolveSupportRecord(building, options = {}) {
   };
   const destination = options.destination || null;
   const key = buildingKey(building);
-  const exteriorEntrance = appCtx.buildingEntranceByBuilding?.get?.(key) || null;
+  const publishedEntrance = appCtx.buildingEntranceByBuilding?.get?.(key) || null;
+  const exteriorEntrance = publishedEntrance && distanceToFootprint(publishedEntrance.x,publishedEntrance.z,building).dist<=3 ? publishedEntrance : null;
   const poiTenancies = appCtx.poiTenanciesByBuilding?.get?.(key) || [];
   const originPoint = destination && Number.isFinite(destination.x) && Number.isFinite(destination.z) ?
     { x: Number(destination.x), z: Number(destination.z) } :

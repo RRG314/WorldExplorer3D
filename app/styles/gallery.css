@@ -9,3 +9,6 @@
 body.panel-museum-open #floatMenuContainer,body.panel-museum-open #minimap,body.panel-museum-open #minimapZoomControls,body.panel-museum-open #coords,body.panel-museum-open #tutorialHintCard,body.panel-museum-open .hud-box,body.panel-museum-open #interiorPrompt{visibility:hidden!important;pointer-events:none!important}
 
 body.panel-museum-open #mainMenuBtn,body.panel-museum-open #gameShareFloatBtn,body.panel-museum-open #quickTimeOfDay,body.panel-museum-open #quickWeatherMode{visibility:hidden!important;pointer-events:none!important}
+
+body.panel-aquarium-open #floatMenuContainer,body.panel-aquarium-open #minimap,body.panel-aquarium-open #minimapZoomControls,body.panel-aquarium-open #coords,body.panel-aquarium-open #tutorialHintCard,body.panel-aquarium-open .hud-box,body.panel-aquarium-open #interiorPrompt{visibility:hidden!important;pointer-events:none!important}
+body.panel-aquarium-open #mainMenuBtn,body.panel-aquarium-open #gameShareFloatBtn,body.panel-aquarium-open #quickTimeOfDay,body.panel-aquarium-open #quickWeatherMode{visibility:hidden!important;pointer-events:none!important}

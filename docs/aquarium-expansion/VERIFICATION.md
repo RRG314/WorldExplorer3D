@@ -1,9 +1,75 @@
 # Aquarium verification ledger
 
-October 12, 2026. **Aquarium runtime not yet implemented or verified.**
-Source inspection, downloaded public metadata and paper designs do not prove playability.
+October 12, 2026. **Local implementation; final showcase/release acceptance remains open.**
+The dated sections below preserve earlier evidence. Source, isolated renderer,
+ordinary gameplay and release checks are distinct.
 
-## Evidence obtained
+## Current construction/water correction
+
+- The owner rejected the earlier water appearance after functional tests passed.
+  `final-sealed-visitor-current` is therefore not visual acceptance. The latest
+  repair corrects ripple projection and clipped optical boundary coverage.
+- Focused components cover published window dimensions, supported observations,
+  four flat panes, collision/slab agreement, physical lift cores, clear framed
+  doors, museum separation, water distance/absorption, exact disposal and renderer
+  state restoration after injected optical-pass failure.
+- `output/aquarium-expansion/water-projection-final/` passes five views through
+  actual engine postprocessing, including SMAA/bloom. GPU readback confirms
+  24-bit depth and half-float color on this Chrome/WebGL 2 host. Twelve physical
+  reflected-marker cases cover above/below, camera roll and both depth/fallback
+  shader paths. Changing the scene background between magenta and green produces
+  **zero pixel difference** at the closed underwater wall contact. Animation,
+  pause and override-material protection pass; zero page/GPU errors. Screenshots
+  inspected. This fixture is not geographic gameplay or performance evidence.
+- `output/aquarium-expansion/water-final-game-current/` passes **33 checks** after
+  the final seam repair: ordinary entry, keyboard movement, real lift controls,
+  actual mouse look at the underside, missing-animal retry, three saved notes,
+  portrait/landscape maps, run/jump, complete return, exit/reentry, released model
+  leases and exactly two active water color targets. Zero page/GPU errors;
+  latest underwater and route images inspected. Live weather was unavailable
+  during this controlled venue check; no provider-success claim is made.
+- `output/interior-expansion/final-display-lighting-current/` passes **28 museum
+  checks**, with all three displays and entry images inspected after the final
+  targeted-light correction. Earlier reload verification remains separately
+  recorded in `shared-construction-current` / `final-venue-lighting-current`.
+- Final `npm run verify:pr` passes **2,512 tests**, no skips/TODOs, plus dependency,
+  syntax/import, ownership, boundary-type, runtime-name, inventory and sensitivity
+  checks. Log: `output/aquarium-expansion/source-final.log`.
+- No immutable package, physical phone, new performance certification or
+  production/GitHub change is included in this local correction.
+
+The current artwork still fails the complete-showcase bar: sparse reef habitat,
+blank geographic surroundings through Pavilion glazing, unmodeled upper atrium
+and limited public programme. Thin distant joints still need final antialiasing/
+detail review. Water is a bounded real-time optical approximation, not fluid
+simulation or a measured reconstruction of the tank. These are real remaining
+limitations; successful functional tests do not close them.
+
+### Diagnosed failures retained
+
+- `complete-route-current`: another geographic building part crossed the authored
+  corridor. Contained interiors now use their own published obstacles.
+- `contained-route-current`: an approximate outdoor wall-height tolerance leaked
+  lower walls into the upper floor. Authored colliders use precise bounds.
+- `route-height-current`: the test's straight waypoint cut a wall corner. The
+  runner follows the actual corridor; collision geometry was not weakened.
+- `route-complete-reviewed`: map/elevator interaction ranges overlapped. The map
+  now has a separate visible station outside the elevator landing.
+- `override-pass-diagnostic`: the normal/depth pass replaced water color targets.
+  The optical adapter excludes those override passes; framebuffer hashes prove
+  the fix, without disabling global postprocessing.
+- `water-edge-diagnostic`: changing the clear color reproduced the bright tank
+  seam. Transparent coverage in enclosed optical passes removes that leakage;
+  the final background-independence pixel check is recorded above.
+- `depth-optics-diagnostic`: the first shader revision had a conflicting local
+  variable name. The GPU compile error was fixed before renderer/game acceptance.
+- `composer-depth-diagnostic`: the isolated direct renderer hid the composer's
+  lower depth precision. Rendering with the real pipeline exposed the conflict.
+  `composer-color-diagnostic` separated linear-color banding from depth issues.
+
+These earlier diagnostic runs are not relabeled as successful complete visits.
+
+## Earlier audit evidence (before the local integration above)
 
 - Read the owner brief and current source owners listed in SOURCE-AUDIT.md.
 - Corrected the Oregon/Baltimore map mismatch against both institutions' pages.
@@ -64,7 +130,7 @@ run/jump, exact exterior return, two reentries and zero page/GPU errors. Screens
 were inspected in `output/interior-expansion/venue-separation/`.
 This is an architectural safeguard, not a finished aquarium scene.
 
-## Acquired animal renderer review
+## Earlier acquired-animal renderer review
 
 `scripts/verification/aquarium-assets-current.mjs` passes both original pinned
 Sketchfab models in the actual r128 GLTF loader. The prescribed game-client

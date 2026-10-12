@@ -100,3 +100,35 @@ Restoring these exterior polygons does not supply a measured height, a professio
 aquarium model, public interior admission or a resolved compound entrance. Those
 remain separate requirements. Multiple polygon components share the provider's
 feature identity; they must not be mistaken for independently verified venues.
+
+## Authored reef route implementation — October 12 continuation
+
+The local implementation now encodes Pavilion G, Pavilion 1/orientation/overlook,
+and Blue Wonders M with two authored lifts. The mapped outer envelope is the
+polygon union of the six OSM r14162263 v4 outer ways, not the rectangular campus
+bounds or a museum template. The habitat is an explicit separate polygon: none
+of the visitor rooms may intersect it. Underwater glazed boundaries retain full collision; upper overlook guards stop
+at their actual guard height. Continuous curved acrylic replaces overlapping
+glass boxes. The central opening uses the published 27 ft width / 4 ft projection;
+its four flanking flat panes follow the audio tour. Public visitor topology follows guide pages 6, 7, 11 and
+16; metric widths, the 0/4.2/8 m floor elevations and finishes remain INFERRED.
+They are not measurements extracted from Matterport.
+
+The OSM entrance node 4390760200 sits several metres inside the provider's
+simplified Pavilion component. The visible door must be projected onto the
+actual rendered wall. Only this reviewed mapped entry allows up to 8 world units
+of projection; general mapped entrances retain the 3-unit cap. This is a source
+alignment compromise, not an exact reconstruction of the main/member doors.
+Distant components of the same Overture ID must never inherit the door.
+A future exterior reconstruction should reconcile the Pavilion glass envelope
+with the same OSM union rather than loosening all entry eligibility.
+
+Current authored material choices are independently made: existing CC0 concrete
+and sand photographs, steel frame geometry, clear curved reef glazing, ceiling
+luminaires and unbranded route signs. The public tour was inspected through its
+ordinary viewer; no meshes, textures, institutional sign artwork or photographs
+were extracted. The acquired rigs illustrate species and retain their authors'
+animations. They do not portray the Aquarium's individual rescued turtle.
+
+This section describes implementation, not visual or gameplay acceptance. Current
+browser evidence and remaining failures belong in VERIFICATION.md.

@@ -1,29 +1,15 @@
+import {acquireVenueLighting} from './venue-lighting.js';
 import {loadModelAsset} from '../assets/model-asset-runtime.js?v=16';
 import {releaseGalleryTextures} from './gallery-finishes.js';
 import {isMuseumContent,exhibitJournalEventId} from './content-contract.js';
 import {openGalleryPanel,closeGalleryPanel} from './gallery-ui.js';
-
-// Layer 1 is reserved for the sealed, opaque gallery. Keep the loaded outdoor
-// world and its visibility/culling owners intact while excluding it from this
-// camera and the new spotlights' shadow passes. Restore the exact mask on exit.
-const GALLERY_LAYER=1;
-function galleryLayer(root){root.traverse(object=>object.layers.set(GALLERY_LAYER));}
 
 export async function attachGallery(ctx,T,active,{load=loadModelAsset}={}){
   const content=active.definition.curatedContent;if(!isMuseumContent(content))return;
   const controller=new AbortController(),state={controller,exhibits:new Map(),saved:new Set(),journalError:false,panel:null,furnishings:[]};active.gallery=state;
   const current=()=>!controller.signal.aborted&&ctx.activeInterior===active&&active.outsideWorldSequence===ctx._worldLoadSequence;
   state.isCurrent=current;
-  const camera=ctx.camera,previousCameraMask=camera?.layers?.mask;
-  galleryLayer(active.group);
-  if(camera?.layers)camera.layers.set(GALLERY_LAYER);
-  state.restoreCamera=()=>{if(camera?.layers&&Number.isInteger(previousCameraMask))camera.layers.mask=previousCameraMask;};
-  // The interior owns its lighting while occupied. Weather may keep updating
-  // the exterior lights' colors/intensities; visibility alone is leased, so
-  // exit resumes the latest sky rather than a stale pre-entry time of day.
-  const exteriorLights=[ctx.sun,ctx.hemiLight,ctx.fillLight,ctx.ambientLight].filter(Boolean).map(light=>({light,visible:light.visible}));
-  exteriorLights.forEach(({light})=>{light.visible=false;});
-  state.restoreLights=()=>exteriorLights.forEach(({light,visible})=>{light.visible=visible;});
+  const lighting=acquireVenueLighting(ctx,active.group);state.releaseLighting=lighting.release;
   for(const exhibit of content.exhibits)state.exhibits.set(exhibit.id,{exhibit,status:'waiting',instance:null});
   state.loadExhibit=async id=>{
     const record=state.exhibits.get(id);if(!record||!current()||record.status==='loading'||record.status==='ready')return false;
@@ -34,8 +20,7 @@ export async function attachGallery(ctx,T,active,{load=loadModelAsset}={}){
       const placement=active.definition.exhibitPlacements.find(p=>p.id===id),root=instance.root,extent=record.exhibit.displayExtentMeters/(ctx.METERS_PER_WORLD_UNIT||1);
       root.scale.setScalar(extent);root.position.set(placement.x,record.exhibit.presentation==='artwork'?1.2:1.06,placement.z);root.rotation.y=placement.yaw;
       root.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;}});
-      galleryLayer(root);
-      active.group.add(root);record.instance=instance;record.status='ready';
+      active.group.add(root);lighting.apply(root);record.instance=instance;record.status='ready';
       state.refresh?.();return true;
     }catch(error){if(current()){record.status='unavailable';record.error=String(error.message).slice(0,160);state.refresh?.();}return false;}
   };
@@ -62,7 +47,7 @@ export async function attachGallery(ctx,T,active,{load=loadModelAsset}={}){
       if(!current())break;
       try{const instance=await load(T,placement.assetId,{signal:controller.signal});if(!current()){instance.dispose();break;}
         instance.root.scale.setScalar(1/(ctx.METERS_PER_WORLD_UNIT||1));instance.root.position.set(placement.x,0,placement.z);instance.root.rotation.y=placement.yaw;active.group.add(instance.root);state.furnishings.push(instance);
-        galleryLayer(instance.root);
+        lighting.apply(instance.root);
       }catch{if(current())state.furnitureUnavailable=true;}
     }
   })();
@@ -71,7 +56,7 @@ export async function attachGallery(ctx,T,active,{load=loadModelAsset}={}){
 export function disposeGallery(ctx,active){
   releaseGalleryTextures(active?.group);
   const state=active?.gallery;if(!state)return;
-  closeGalleryPanel(ctx,active);state.controller.abort();state.restoreLights?.();state.restoreCamera?.();
+  closeGalleryPanel(ctx,active);state.controller.abort();state.releaseLighting?.();
   for(const record of state.exhibits.values())record.instance?.dispose();
   for(const instance of state.furnishings)instance.dispose();
   state.furnishings.length=0;state.exhibits.clear();state.refresh=null;active.gallery=null;

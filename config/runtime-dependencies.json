@@ -324,6 +324,40 @@
         }
       ],
       "provenance": "app/vendor/clipper/PROVENANCE.md"
+    },
+    {
+      "package": "three",
+      "version": "0.128.0",
+      "owner": "contained aquarium reflection and refraction",
+      "generator": null,
+      "availability": "same-origin; aquarium venue only; two bounded offscreen targets",
+      "provenance": "app/vendor/three-water/PROVENANCE.md",
+      "files": [
+        {
+          "path": "app/vendor/three-water/LICENSE",
+          "sha256": "7dddf7c5b8fd10ee654db8857d75d104b5557889aa5a91fc4ca545ea7c07062f"
+        },
+        {
+          "path": "app/vendor/three-water/PROVENANCE.json",
+          "sha256": "a908a7fabb546f0eb279dec8c6a8674971337a64c849d14f90a0c576b8a31b2f"
+        },
+        {
+          "path": "app/vendor/three-water/PROVENANCE.md",
+          "sha256": "09b6a1d86c6dba373423858e787c5908be9baa99e6c06f306fccde440119de1b"
+        },
+        {
+          "path": "app/vendor/three-water/Reflector.js",
+          "sha256": "f3aa589ba1058b89819969adea206ad225760ffc547657a945775320bbe75d6b"
+        },
+        {
+          "path": "app/vendor/three-water/Refractor.js",
+          "sha256": "85b82d05a1e9c8a9326a08863d20ced91dda6490c6521c3bdd6e1111e21e7be7"
+        },
+        {
+          "path": "app/vendor/three-water/Water.js",
+          "sha256": "805741168d5dcf01d8ad3f6e7480652ea9f760fb3c675b1342eb78792ea10891"
+        }
+      ]
     }
   ],
   "locks": [

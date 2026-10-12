@@ -4,6 +4,66 @@ const MODEL_ASSET_CATALOG = Object.freeze([
   ...[
   {
     "schemaVersion": 1,
+    "id": "aquarium-blacktip-reef-shark",
+    "label": "Blacktip reef shark",
+    "url": "/app/assets/models/interiors/aquarium/blacktip-reef-shark.glb",
+    "roles": [
+      "aquarium-animal"
+    ],
+    "license": "CC-BY-4.0",
+    "sourceUrl": "https://sketchfab.com/3d-models/blacktip-reef-shark-a52bb96c5a0c4157b49982471f8902b0",
+    "attribution": "Blacktip reef shark by Lais.Marques. CC BY 4.0. Parent-only centering, orientation and metre scale using sampled animated bounds; textures resized to 1K. Original bones, bind matrices, mesh topology and authored animation retained. This is a species illustration, not a scan of a National Aquarium animal.",
+    "sourceUpAxis": "y",
+    "sourceForwardAxis": "z",
+    "collisionPolicy": "validated-aquarium-habitat",
+    "instancePolicy": {
+      "geometry": "shared",
+      "materials": "shared"
+    },
+    "loadPolicy": {
+      "bounded": true,
+      "timeoutMs": 20000
+    },
+    "budgets": {
+      "bytes": 4000000,
+      "triangles": 20000,
+      "textureEdgePixels": 1024,
+      "maxInstances": 4
+    }
+  },
+  {
+    "schemaVersion": 1,
+    "id": "aquarium-green-sea-turtle",
+    "label": "Green sea turtle",
+    "url": "/app/assets/models/interiors/aquarium/green-sea-turtle.glb",
+    "roles": [
+      "aquarium-animal"
+    ],
+    "license": "CC-BY-4.0",
+    "sourceUrl": "https://sketchfab.com/3d-models/green-sea-turtle-d3dc6a6a4ff74465a59105fd7c66b32b",
+    "attribution": "Green sea turtle by jgrabo20. CC BY 4.0. Parent-only centering, orientation and metre scale using sampled animated bounds; textures resized to 1K. Original bones, bind matrices, mesh topology and authored animation retained. This is a species illustration, not a scan of a National Aquarium animal.",
+    "sourceUpAxis": "y",
+    "sourceForwardAxis": "z",
+    "collisionPolicy": "validated-aquarium-habitat",
+    "instancePolicy": {
+      "geometry": "shared",
+      "materials": "shared"
+    },
+    "loadPolicy": {
+      "bounded": true,
+      "timeoutMs": 20000
+    },
+    "budgets": {
+      "bytes": 4000000,
+      "triangles": 20000,
+      "textureEdgePixels": 1024,
+      "maxInstances": 1
+    }
+  }
+],
+  ...[
+  {
+    "schemaVersion": 1,
     "id": "museum-smithsonian-triceratops",
     "label": "Triceratops horridus",
     "url": "/app/assets/models/interiors/museum/smithsonian-triceratops.glb",

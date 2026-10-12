@@ -5,9 +5,9 @@ import {
   createAtmosphereMaterial
 } from '../sky/earth-atmosphere.js?v=1';
 
-function publishEarthEnvironment(ctx, texture) {
+export function publishEarthEnvironment(ctx, texture) {
   ctx.appCtx.earthEnvironmentMap = texture || null;
-  if (!ctx.appCtx.activeShipInterior && !ctx.appCtx.activePlanetaryBodyId) {
+  if (!ctx.appCtx.activeShipInterior && !ctx.appCtx.activePlanetaryBodyId && !ctx.appCtx.activeInterior?.gallery && !ctx.appCtx.activeInterior?.aquarium) {
     ctx.appCtx.scene.environment = texture || null;
   }
 }
@@ -173,6 +173,19 @@ export function setupPostProcessingPipeline(ctx) {
 
   try {
     ctx.appCtx.composer = new THREE.EffectComposer(ctx.appCtx.renderer);
+    // r128's depth-only composer buffers use DEPTH_COMPONENT16. That loses
+    // centimetre-scale separation even inside a room with a close near plane.
+    // The core packed depth/stencil format preserves 24-bit depth in WebGL 1/2
+    // without a sampled depth texture or another render target. Both ping-pong
+    // buffers need it: either can receive the scene after a pass swap.
+    const hdr=ctx.appCtx.renderer.capabilities.isWebGL2&&ctx.appCtx.renderer.extensions.has('EXT_color_buffer_float');
+    for(const target of [ctx.appCtx.composer.renderTarget1,ctx.appCtx.composer.renderTarget2]){
+      target.stencilBuffer=true;
+      // Linear 8-bit color discards dark material gradients before the final
+      // display encoding. Keep them in half-float where renderable; retain the
+      // existing byte-color fallback on unsupported devices.
+      if(hdr)target.texture.type=THREE.HalfFloatType;
+    }
     ctx.appCtx.composer.setSize(innerWidth, innerHeight);
 
     const renderPass = new THREE.RenderPass(ctx.appCtx.scene, ctx.appCtx.camera);

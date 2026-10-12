@@ -30,6 +30,16 @@ export function addGalleryFixtures(T,sceneState,definition,createWallCollider){
   }
   for(const placement of definition.exhibitPlacements){
     const exhibit=content.exhibits.find(e=>e.id===placement.id);
+    // Light the display itself, not the room centroid: wall-mounted art and
+    // peripheral specimens otherwise sit outside a central downward cone.
+    const light=new T.SpotLight(0xfff3df,80,12,.72,.7,2);
+    light.position.set(placement.approach.x,floor.elevation+floor.height-.42,placement.approach.z);
+    light.target.position.set(placement.x,floor.elevation+1.55,placement.z);
+    light.castShadow=true;light.shadow.mapSize.set(512,512);light.shadow.bias=-.0003;light.shadow.normalBias=.018;light.shadow.camera.near=.12;light.shadow.camera.far=12;
+    light.userData.exhibitId=exhibit.id;root.add(light,light.target);
+    const direction=light.target.position.clone().sub(light.position).normalize();
+    const housing=new T.Mesh(new T.CylinderGeometry(.065,.065,.16,12),brass);
+    housing.position.copy(light.position).addScaledVector(direction,-.1);housing.quaternion.setFromUnitVectors(new T.Vector3(0,-1,0),direction);root.add(housing);
     if(exhibit.presentation==='sculpture'){
       // Reviewed normalized displays and proxy furniture use the same units.
       const width=Math.max(.85,exhibit.displayExtentMeters/(definition.galleryMetersPerUnit||1)),height=1.02;

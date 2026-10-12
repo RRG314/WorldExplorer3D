@@ -1,3 +1,4 @@
+import {aquariumMappedEntrance} from '../interiors/aquarium-geography.js';
 import {harborDistrictFocus} from './harbor-district.js';
 import { compileEntranceCatalog } from '../living-world/entrance-catalog.js?v=6';
 
@@ -151,7 +152,7 @@ export function publishBuildingFacadeEntrances(appCtx, options = {}) {
       nearBuildingIds.has(String(building?.sourceBuildingId || building?.id || ''))
     ),
     focus,
-    mappedEntrances: appCtx?.mappedBuildingEntrances,
+    mappedEntrances: [...aquariumMappedEntrance(appCtx),...(appCtx?.mappedBuildingEntrances||[])],
     nearestRoad: appCtx?.findNearestRoad,
     sampleGround: (x, z) => appCtx?.GroundHeight?.walkSurfaceY?.(x, z) ?? appCtx?.elevationWorldYAtWorldXZ?.(x, z),
     tier
@@ -173,7 +174,8 @@ export function publishBuildingFacadeEntrances(appCtx, options = {}) {
   let coincidentWallBindings = 0;
 
   for (const mesh of nearFacadeMeshes) {
-    const directEntrance = compiledByBuilding.get(String(mesh.userData?.sourceBuildingId || '')) || null;
+    const published = compiledByBuilding.get(String(mesh.userData?.sourceBuildingId || '')) || null;
+    const directEntrance = published && entranceTouchesFacadeMesh(mesh,published) ? published : null;
     const entrance = directEntrance || compiledCatalog.entrances.find((candidate) =>
       entranceTouchesFacadeMesh(mesh, candidate)
     ) || null;

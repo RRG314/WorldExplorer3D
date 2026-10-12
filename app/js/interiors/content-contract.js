@@ -77,6 +77,10 @@ const area = ring => Math.abs(ring.reduce((sum, p, i) => {
 
 export function matchInteriorBuilding(content, support, geoToWorld, metersPerUnit = 1) {
   if (!isMuseumContent(content)) return null;
+  return matchMappedInteriorFootprint(content,support,geoToWorld,metersPerUnit);
+}
+
+export function matchMappedInteriorFootprint(content, support, geoToWorld, metersPerUnit = 1) {
   if (!support?.enterable || support.synthetic || !support.building || typeof geoToWorld !== 'function') return null;
   const building = support.building, provenance = building.buildingProvenance;
   if (provenance?.valid === false || (building.buildingPartKind && building.buildingPartKind !== 'full') || building.allowsPassageBelow) return null;

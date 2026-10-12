@@ -19,8 +19,8 @@ export function finishGalleryArchitecture(T,root,layout){
   for(const mat of [plaster,ceiling,moulding,dado,bronze,black])mat.color.convertSRGBToLinear();
   root.children.filter(o=>o.isHemisphereLight).forEach(light=>{light.color.setHex(0xfff3de);light.groundColor.setHex(0x726959);light.intensity=.72;});
   const oldMaterials=new Set();
-  root.traverse(o=>{if(!o.isMesh)return;const kind=o.userData.kind;if(!['floor','wall','ceiling'].includes(kind))return;
-    oldMaterials.add(o.material);o.material=kind==='floor'?floorMaterial:kind==='wall'?plaster:ceiling;o.receiveShadow=true;o.castShadow=kind==='wall';
+  root.traverse(o=>{if(!o.isMesh)return;const kind=o.userData.kind;if(!['floor','wall','ceiling','door-frame'].includes(kind))return;
+    oldMaterials.add(o.material);o.material=kind==='door-frame'?moulding:kind==='floor'?floorMaterial:kind==='wall'?plaster:ceiling;o.receiveShadow=true;o.castShadow=kind==='wall';
   });oldMaterials.forEach(m=>m.dispose());
   // Batch repeated joinery and light housings into one draw per material.
   const box=(material,x,y,z,w,h,d,yaw=0)=>{if(!batches.has(material))batches.set(material,[]);batches.get(material).push({x,y,z,w,h,d,yaw});};
@@ -44,8 +44,6 @@ export function finishGalleryArchitecture(T,root,layout){
   for(const door of floor.doors){
     const wall=floorWalls(floor).find(w=>w.id===door.wall),length=Math.hypot(wall.b.x-wall.a.x,wall.b.z-wall.a.z),dx=(wall.b.x-wall.a.x)/length,dz=(wall.b.z-wall.a.z)/length,yaw=-Math.atan2(dz,dx);
     const x=wall.a.x+dx*door.offset,z=wall.a.z+dz*door.offset;
-    for(const sign of [-1,1])box(moulding,x+dx*sign*(door.width/2+.055),door.height/2,z+dz*sign*(door.width/2+.055),.11,door.height,.2,yaw);
-    box(moulding,x,door.height+.075,z,door.width+.34,.15,.22,yaw);
     box(bronze,x,.007,z,door.width,.012,.16,yaw);
   }
   for(const room of floor.rooms){
@@ -59,13 +57,10 @@ export function finishGalleryArchitecture(T,root,layout){
       box(bronze,px,floor.height-.27,pz,.18,.16,.18,yaw);
       box(diffuser,px,floor.height-.36,pz,.15,.025,.15,yaw);
     }
-    if(room.type==='gallery'){
-      const light=new T.SpotLight(0xfff0d4,1.45,18,1.05,.7,1.5);
-      light.position.set(x,floor.height-.36,z);light.target.position.set(x,0,z);
-      light.castShadow=true;light.shadow.mapSize.set(512,512);light.shadow.bias=-.0003;light.shadow.normalBias=.018;
-      light.shadow.camera.near=.15;light.shadow.camera.far=18;
-      root.add(light,light.target);
-    }
+    // A bounded diffuse fill per room keeps circulation readable. Exhibit
+    // projectors are aimed separately at the actual reviewed placements.
+    const fill=new T.PointLight(0xfff0dc,80,22,2);
+    fill.position.set(x,floor.height-.4,z);root.add(fill);
     // Plaster ceiling perimeter bands preserve readable room proportions.
     for(const w of floorWalls(floor).filter(w=>w.rooms.includes(room.id))){
       const l=Math.hypot(w.b.x-w.a.x,w.b.z-w.a.z),nx=-(w.b.z-w.a.z)/l,nz=(w.b.x-w.a.x)/l,mx=(w.a.x+w.b.x)/2,mz=(w.a.z+w.b.z)/2;

@@ -50,7 +50,7 @@ export function fitGalleryLayout(envelope, entrance, contentId, profile = null) 
   const rooms=splitX?[['v0','v1','v4','v5'],['v1','v2','v3','v4']]:[['v0','v1','v2','v5'],['v5','v2','v3','v4']];
   const height=Math.min(3.6,envelope.heightMeters-.2);
   if(height<2.6)return null;
-  const floor={id:'gallery-ground',label:'Gallery',elevation:0,height,slab:.15,vertices,
+  const floor={id:'gallery-ground',label:'Gallery',elevation:0,height,slab:.18,wallThickness:.24,vertices,
     rooms:rooms.map((vertices,i)=>({id:`gallery-room-${i}`,label:i?'Landscape studio':'Natural forms',type:'gallery',vertices})),doors:[]};
   const walls=floorWalls(floor),shared=walls.find(w=>w.rooms.length===2);
   const midpoint=w=>({x:(w.a.x+w.b.x)/2,z:(w.a.z+w.b.z)/2});
@@ -74,7 +74,7 @@ function fitEntranceGalleryRooms({fitted,center,world,entryAligned,frontOnX,enve
   coords.forEach((v,i)=>{for(const [side,u]of [['front',along-depth],['back',along+depth]])vertices[`${side}${i}`]=world(frontOnX?{x:u,z:v}:{x:v,z:u});});
   const outlines=[['front0','back0','back1','front1'],['front2','back2','back3','front3'],['front1','back1','back2','front2']];
   const height=Math.min(3.6,envelope.heightMeters-.2);if(height<2.6)return null;
-  const floor={id:'gallery-ground',label:'Front galleries',elevation:0,height,slab:.15,vertices,
+  const floor={id:'gallery-ground',label:'Front galleries',elevation:0,height,slab:.18,wallThickness:.24,vertices,
     rooms:outlines.map((vertices,i)=>({id:`gallery-room-${i}`,label:['Natural forms','Landscape gallery','Entrance hall'][i],type:i===2?'hall':'gallery',vertices})),doors:[]};
   const walls=floorWalls(floor),entrySide=(frontOnX?entryAligned.x:entryAligned.z)<along?'front':'back';
   for(const wall of walls.filter(w=>w.rooms.length===2))floor.doors.push({id:`gallery-passage-${floor.doors.length}`,wall:wall.id,offset:Math.hypot(wall.b.x-wall.a.x,wall.b.z-wall.a.z)*.45,width:1.8,height:2.7});
@@ -97,7 +97,7 @@ export function galleryExhibitPlacements(layout, exhibits, metersPerUnit = 1) {
       const midpoint={x:(wall.a.x+wall.b.x)/2,z:(wall.a.z+wall.b.z)/2};
       const sign=pointInRoom({x:midpoint.x+nx*.4,z:midpoint.z+nz*.4},ring)?1:-1;
       const extent=exhibit.displayExtentMeters/metersPerUnit;
-      const inset=exhibit.presentation==='artwork'?.12:extent/2+.24;
+      const inset=exhibit.presentation==='artwork'?Math.max(.12,(floor.wallThickness||.1)/2+.04):extent/2+.24;
       const point={x:midpoint.x+nx*sign*inset,z:midpoint.z+nz*sign*inset};
       const approach={x:point.x+nx*sign*(exhibit.presentation==='artwork'?2:extent/2+1),z:point.z+nz*sign*(exhibit.presentation==='artwork'?2:extent/2+1)};
       if(!pointInRoom(point,ring)||!pointInRoom(approach,ring)||length<extent+.8)return null;

@@ -397,6 +397,7 @@ export const currentContractTests = [
   'tests/request-reliability.test.mjs',
   'tests/script-loader-recovery.test.mjs',
   'tests/interior-layout-current.test.mjs',
+  'tests/aquarium-content-current.test.mjs',
   'tests/museum-content-current.test.mjs',
   'tests/interior-layout-photos-current.test.mjs',
   'tests/interior-layout-drawing.test.mjs',

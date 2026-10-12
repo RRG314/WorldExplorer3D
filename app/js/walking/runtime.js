@@ -170,7 +170,7 @@ function createWalkingRuntimeHelpers({
 
     // Reading keeps the walking pose intact. The existing camera owner frames
     // the actual display, then resumes normal mouse look when the panel closes.
-    const galleryTarget=appCtx.activeInterior?.gallery?.panel?.viewTarget;
+    const galleryTarget=appCtx.activeInterior?.gallery?.panel?.viewTarget||appCtx.activeInterior?.aquarium?.panel?.viewTarget;
     if(galleryTarget){
       camera.position.set(walker.x,walker.y,walker.z);
       const narrow=typeof window!=='undefined'&&window.innerWidth<=600;
