@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "version": "5.6.0",
-  "capturedAt": "2026-10-12T23:37:59.533Z",
+  "capturedAt": "2026-10-12T23:53:58.982Z",
   "sourceBuild": "5.6.0+244ef8938e52.e4c49142872300d3.staging",
   "sourceUrl": "https://we3d-staging-20260712--ship-review-1011-pb8x1l4l.web.app/app/",
   "landingGallery": [
@@ -30,9 +30,9 @@
       "file": "assets/gallery/5.6/world-entry.webp",
       "width": 1600,
       "height": 900,
-      "sha256": "741ec9b6b872ccaa5f78970c0c508072dcea6fc525838444ef955a837e38f29c",
+      "sha256": "7a23d5f7d4a774a4b94702edf571936d2f04cc317e44706c271726618385809b",
       "sourceBuild": "5.6.0+244ef8938e52.e4c49142872300d3.staging",
-      "capturedAt": "2026-10-12T23:20:21.781Z",
+      "capturedAt": "2026-10-12T23:50:08.355Z",
       "provenance": "Normal-input browser runtime capture; no synthetic camera or test-only scene."
     },
     {
@@ -42,9 +42,9 @@
       "file": "assets/gallery/5.6/walking.webp",
       "width": 1600,
       "height": 900,
-      "sha256": "853e6ef3be92a4ff3d5ba9923014a93867608b43bc871b9debedc8a31431bce6",
+      "sha256": "2de83beeb0072db2c258e96645e80b2e4268777db169492da5ded4c49c71c530",
       "sourceBuild": "5.6.0+244ef8938e52.e4c49142872300d3.staging",
-      "capturedAt": "2026-10-12T23:21:50.440Z",
+      "capturedAt": "2026-10-12T23:51:44.329Z",
       "provenance": "Normal-input browser runtime capture; no synthetic camera or test-only scene."
     },
     {
@@ -54,9 +54,9 @@
       "file": "assets/gallery/5.6/driving.webp",
       "width": 1600,
       "height": 900,
-      "sha256": "0410b7f29984b1535bf491c89fc56cec1a5e0fce76a8d9e8ccbaa4699142dde9",
+      "sha256": "dbe5b15d8d448549f09bc9b1f50cfb250f7c162d0ddd00231228e3162baf277f",
       "sourceBuild": "5.6.0+244ef8938e52.e4c49142872300d3.staging",
-      "capturedAt": "2026-10-12T23:21:52.963Z",
+      "capturedAt": "2026-10-12T23:51:46.766Z",
       "provenance": "Normal-input browser runtime capture; no synthetic camera or test-only scene."
     },
     {
@@ -66,9 +66,9 @@
       "file": "assets/gallery/5.6/drone.webp",
       "width": 1600,
       "height": 900,
-      "sha256": "f54417a0ba8201c9fd921cbc638e685d3c9826fbb7b6eb1520847225c0945b26",
+      "sha256": "75e4c09c5a3ad56c770411d556ae2f8f112bc4343db8169edc6d07d2ce0cca0d",
       "sourceBuild": "5.6.0+244ef8938e52.e4c49142872300d3.staging",
-      "capturedAt": "2026-10-12T23:21:58.588Z",
+      "capturedAt": "2026-10-12T23:51:51.732Z",
       "provenance": "Normal-input browser runtime capture; no synthetic camera or test-only scene."
     },
     {
@@ -78,9 +78,9 @@
       "file": "assets/gallery/5.6/flight.webp",
       "width": 1600,
       "height": 900,
-      "sha256": "187ccf43ba91c7fb2ec48071078c355d21eec33c667f297be0b99220ac6f6747",
+      "sha256": "fd3425905f0e9a5e8d5f55d69ff7eee64618c08d3224a6451a2fea959c885087",
       "sourceBuild": "5.6.0+244ef8938e52.e4c49142872300d3.staging",
-      "capturedAt": "2026-10-12T23:22:03.524Z",
+      "capturedAt": "2026-10-12T23:52:01.201Z",
       "provenance": "Normal-input browser runtime capture; no synthetic camera or test-only scene."
     },
     {
@@ -138,9 +138,9 @@
       "file": "assets/gallery/5.6/live-earth.webp",
       "width": 1600,
       "height": 900,
-      "sha256": "06100a41f37c82b69ce68d7e07469e216f9bdb8e48f9de719c30e525f487dcdc",
+      "sha256": "228513aa48b643a3bb7b88f6d266de4fd9afa0f2a82e9f243d24af2258a4304f",
       "sourceBuild": "5.6.0+244ef8938e52.e4c49142872300d3.staging",
-      "capturedAt": "2026-10-12T23:20:26.422Z",
+      "capturedAt": "2026-10-12T23:50:19.309Z",
       "provenance": "Normal-input browser runtime capture; no synthetic camera or test-only scene."
     },
     {
@@ -150,9 +150,9 @@
       "file": "assets/gallery/5.6/world-entry-phone.webp",
       "width": 390,
       "height": 844,
-      "sha256": "a2470bb12a3a1811d78d29057a5ddfdf4c47105f67b681b5f96fb7c5d2fd85c5",
+      "sha256": "7c32425471bd42b4484b93ef7501b8b7479e8736f74c7b5e5bafdeedc88c9d9c",
       "sourceBuild": "5.6.0+244ef8938e52.e4c49142872300d3.staging",
-      "capturedAt": "2026-10-12T23:20:22.211Z",
+      "capturedAt": "2026-10-12T23:50:08.978Z",
       "provenance": "Normal-input browser runtime capture; no synthetic camera or test-only scene."
     },
     {

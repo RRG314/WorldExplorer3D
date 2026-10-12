@@ -330,7 +330,24 @@ try {
     await page.waitForTimeout(500);
     await capture('drone','See the city from above','Drone view over mapped downtown Baltimore buildings and streets');
     await travel('plane','#fPlane');
-    await page.keyboard.down('KeyW');try{await page.waitForTimeout(2000);}finally{await page.keyboard.up('KeyW');}
+    // Fly above the roofline using the ordinary throttle and pitch controls.
+    // W pitches down in aircraft mode; a short W burst framed a street canyon.
+    const climbKeys=new Set(),climbDeadline=Date.now()+45000;
+    const launch=await page.evaluate(()=>marineCtx.getPlaneSnapshot());
+    try{
+      while(Date.now()<climbDeadline){
+        const flight=await page.evaluate(()=>marineCtx.getPlaneSnapshot());
+        const target=flight.y < launch.y + 180 ? .35 : .04;
+        const next=new Set(flight.throttle<.95?['Space']:[]);
+        if(flight.pitch<target-.03)next.add('ArrowDown');
+        if(flight.pitch>target+.03)next.add('ArrowUp');
+        for(const key of climbKeys)if(!next.has(key)){await page.keyboard.up(key);climbKeys.delete(key);}
+        for(const key of next)if(!climbKeys.has(key)){await page.keyboard.down(key);climbKeys.add(key);}
+        if(flight.y>launch.y+180&&Math.abs(flight.pitch)<.1){report.flight=flight;break;}
+        await page.waitForTimeout(80);
+      }
+    }finally{for(const key of climbKeys)await page.keyboard.up(key);}
+    assert.ok(report.flight?.airborne,'The gallery aircraft must climb clear of the buildings');
     await page.waitForTimeout(500);
     await capture('flight','Take flight','A player aircraft flying above Baltimore through the normal flight camera');
   } else {

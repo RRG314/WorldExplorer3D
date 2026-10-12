@@ -96,6 +96,9 @@ published versions.
 - Geocoding, map geometry, elevation, imagery, weather and live-context layers
   depend on third-party services. Rate limits, outages and regional coverage can
   delay a layer or activate a labeled fallback.
+- Weather, waves, currents and water temperature refresh independently. A
+  current or temperature feed may be unavailable while waves still appear;
+  missing measurements are not invented.
 - Live-context layers distinguish observations, predictions, models and
   reference routes. Generated or modeled content is never presented as a
   confirmed real-world observation.

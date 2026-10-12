@@ -88,6 +88,27 @@ Production remains 5.5. The production package, saved fallbacks, player data and
 Git history are intact. The final packaged/backend/ordinary connected checks
 remain outstanding. Do not relabel known pauses or incomplete acceptance as passes.
 
+## October 12 connected verification checkpoint
+
+Source and the current gallery are pushed on `steven/visual-quality`; draft PR
+99 is attached. GitHub PR checks and secret scanning pass. Production remains
+unchanged. The first complete backend run passed room admission, rules, discovery
+receipts, shared space expeditions, chat, two loaded-world multiplayer vehicle
+handoff and accounts. Current/temperature data timed out at HYCOM while weather
+and NOAA wave data succeeded; the response correctly disclosed missing guidance.
+The gate remains failed, not waived.
+
+Two harness-only failures were diagnosed: a legacy v1-only ocean save read and
+an eager-module diagnostic property hook. The verifiers now inspect all supported
+voyage records and set up their declared property fixture through the actual
+Property owner. No gameplay code was changed for those failures. The corrected
+property UI purchase/list/sale flow passes, as do the three backend checks skipped
+after the provider failure: public user count, property transactions and civic
+services. Updated shared-voyage verification and the full candidate scope remain.
+Evidence: `/tmp/we3d-connected-final-backend.log`,
+`/tmp/we3d-backend-completion-diagnostic.log`. The latest normal Earth capture
+also climbed the plane above the roofline and passed without browser errors.
+
 ## October 12 resource residency cleanup — local verification
 
 The current local changes retire the hidden furnished research vessel after

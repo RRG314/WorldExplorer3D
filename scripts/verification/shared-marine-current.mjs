@@ -3,6 +3,9 @@ import {createRequire} from 'node:module';
 import {mkdir,writeFile} from 'node:fs/promises';
 import {chromium} from 'playwright';
 import {startStaticServer} from './static-server.mjs';
+import {createOceanVoyageStore,OCEAN_VOYAGE_KEY,OCEAN_NATIVE_VOYAGE_KEY,OCEAN_STREAM_VOYAGE_KEY} from '../../app/js/ocean/voyage-store.js';
+const personalKeys=[OCEAN_VOYAGE_KEY,OCEAN_NATIVE_VOYAGE_KEY,OCEAN_STREAM_VOYAGE_KEY];
+const personalRecords=page=>page.evaluate(keys=>Object.fromEntries(keys.map(key=>[key,localStorage.getItem(key)])),personalKeys);
 const projectId='we3d-staging-20260712';
 assert.match(process.env.FIRESTORE_EMULATOR_HOST||'',/^(127\.0\.0\.1|localhost):\d+$/);
 assert.match(process.env.FIREBASE_AUTH_EMULATOR_HOST||'',/^(127\.0\.0\.1|localhost):\d+$/);
@@ -29,7 +32,10 @@ async function openClient(user){
  if(await page.locator('#analyticsConsentDenyBtn').isVisible())await page.locator('#analyticsConsentDenyBtn').click();
  await page.evaluate(async()=>{window.marineCtx=(await import('/app/js/shared-context.js?v=55')).ctx});
  await page.locator('#coralResearchStart').click();try{await page.waitForFunction(()=>marineCtx.boatDeck?.active,null,{timeout:45000});}catch(error){await page.screenshot({path:`${dir}/${user.name}-entry-failure.png`});report.entryFailure=await page.evaluate(()=>({status:document.querySelector('#globeLocationSearchStatus')?.textContent,boat:marineCtx.boatMode?.active,ocean:marineCtx.oceanMode?.active,deck:marineCtx.boatDeck?.snapshot(),environment:marineCtx.getEnv?.(),text:document.body.innerText.slice(-5000)}));throw error;}
- user.personal=await page.evaluate(()=>localStorage.getItem('we3d.ocean.voyage.v1'));
+ user.personal=await personalRecords(page);
+ const saved=createOceanVoyageStore({storage:{getItem:key=>user.personal[key]??null}}).read();
+ assert.ok(saved?.ship?.transportEntityId,'The personal vessel must be saved before joining a crew');
+ user.personalShip=saved.ship.transportEntityId;
  await page.evaluate(async({email,roomCode})=>{
   const {signInWithEmailAndPassword}=await import('https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js');
   const services=globalThis.WorldExplorerFirebase.initFirebase();
@@ -150,8 +156,8 @@ try{
  await users[1].context.close();users[1].renew=false;await room.collection('players').doc(users[1].uid).delete();await reconnect.waitForTimeout(16000);await reconnect.locator('#sharedMarineRecover').click();await waitStage(reconnect,'aboard');assert.equal((await marine.get()).data().rescues.length,1);
  await reconnect.locator('#sharedMarineHelm').click();await reconnect.locator('#sharedMarineReport').click();await waitStage(reconnect,'complete');assert.equal((await marine.get()).data().report.observations,3);report.cases.push('lost pilot rescue returns shared cargo aboard and report completes');
  await reconnect.setViewportSize({width:390,height:844});await reconnect.screenshot({path:`${dir}/phone-report.png`});
- assert.equal(await reconnect.evaluate(()=>localStorage.getItem('we3d.ocean.voyage.v1')),users[0].personal);report.cases.push('shared voyage never overwrites the personal local voyage');
- await reconnect.locator('#sharedMarineLeave').click();await reconnect.waitForFunction(()=>!marineCtx.sharedMarine&&marineCtx.boatMode.active&&!marineCtx.oceanMode.active,null,{timeout:45000});assert.equal(await reconnect.evaluate(()=>marineCtx.boatMode.transportEntityId),JSON.parse(users[0].personal).ship.transportEntityId);report.cases.push('leaving restores the original personal vessel and clears shared controls');
+ assert.deepEqual(await personalRecords(reconnect),users[0].personal);report.cases.push('shared voyage never overwrites any version of the personal local voyage');
+ await reconnect.locator('#sharedMarineLeave').click();await reconnect.waitForFunction(()=>!marineCtx.sharedMarine&&marineCtx.boatMode.active&&!marineCtx.oceanMode.active,null,{timeout:45000});assert.equal(await reconnect.evaluate(()=>marineCtx.boatMode.transportEntityId),users[0].personalShip);report.cases.push('leaving restores the original personal vessel and clears shared controls');
  assert.deepEqual(report.errors,[]);report.passed=true;
 }catch(e){report.failure=e.stack;report.clients=await Promise.all(users.filter(u=>u.page&&!u.page.isClosed()).map(u=>u.page.evaluate(()=>({error:marineCtx.sharedMarine?.snapshot().error,state:marineCtx.sharedMarine?.snapshot().state?.stage,revision:marineCtx.sharedMarine?.snapshot().state?.revision,controlRevision:marineCtx.sharedMarine?.snapshot().state?.controlRevision})).catch(()=>null)));throw e;}finally{
  if(renewal)clearInterval(renewal);await writeFile(`${dir}/report.json`,JSON.stringify(report,null,2));await browser?.close();await server?.close();await db.recursiveDelete(room);
