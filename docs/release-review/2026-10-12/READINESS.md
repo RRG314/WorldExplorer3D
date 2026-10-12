@@ -149,3 +149,22 @@ exact camera mask on exit. The initial measured view fell from 4.5 million to
 about 82,000 triangles. A profiled source run passes all existing desktop frame,
 resource and activation limits across three 10-second windows. Final combined
 failure/reload checks and the complete final release matrix remain separate.
+
+## Aquarium scope and latest local checks
+
+The owner requested aquarium integration and explicitly required museum and
+aquarium architecture to remain distinct. Research, candidate asset acquisition
+and plans are recorded in `docs/aquarium-expansion/`; the aquarium interior is
+not implemented. Local venue separation, authored floor elevations, bridge/roof
+entry eligibility and actual incomplete building-part coverage are repaired.
+The complete source chain passes 2,492 cases; the combined source museum/coverage
+journey passes 32 cases, with inspected images and zero page/GPU errors.
+
+The 14-gate f86 museum-reviewed diagnostic finished eight passes/six failures.
+Passes: product-save, planetary research, public claims, urban equipment, analytics
+lifecycle, environments, Painttown and connected journey. Failures: museum helper,
+runtime ocean resource ceilings, public-gallery inventory, sustained performance,
+artifact integrity and release identity. The source helper/inventory were repaired;
+source changed after that artifact was built. Retain the actual failed receipts.
+Ocean memory and outdoor performance still require repair and full candidate
+revalidation. No new production or GitHub publication occurred.

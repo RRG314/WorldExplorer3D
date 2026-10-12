@@ -1,5 +1,5 @@
 import {MUSEUM_CONTENT} from './museum-catalog.js';
-import {validateInteriorContent,matchInteriorBuilding} from './content-contract.js';
+import {isMuseumContent,validateInteriorContent,matchInteriorBuilding} from './content-contract.js';
 import {fitGalleryLayout,galleryExhibitPlacements} from './gallery-layout.js';
 import {captureBuildingContext} from '../reality-capture/alignment.js?v=1';
 
@@ -8,6 +8,7 @@ import {captureBuildingContext} from '../reality-capture/alignment.js?v=1';
 export function resolveCuratedInterior(ctx,support,definition,records=MUSEUM_CONTENT){
   if(!definition||definition.accessDenied||definition.communityRealityCapture||definition.mode==='mapped')return definition;
   for(const candidate of records){
+    if(!isMuseumContent(candidate))continue;
     try{
       const content=validateInteriorContent(candidate),association=matchInteriorBuilding(content,support,(lat,lon)=>ctx.geoToWorld(lat,lon),ctx.METERS_PER_WORLD_UNIT||1);
       // Other representation kinds have contract names, not an implicit

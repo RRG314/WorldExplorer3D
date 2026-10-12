@@ -2,6 +2,7 @@
 export const MUSEUM_CONTENT = [
   {
     "schemaVersion": 1,
+    "venueType": "museum",
     "id": "baltimore-natural-forms",
     "version": "1.1.0",
     "kind": "representative",

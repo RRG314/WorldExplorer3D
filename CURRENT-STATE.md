@@ -50,6 +50,42 @@ browsers/servers. Production deployment evidence is under
 `output/release-evidence/current/production-deployment.json` and
 `production-promotion.json`; acceptance gaps remain in their own receipts.
 
+## October 12 aquarium audit and venue separation
+
+The owner explicitly requires distinct museum and aquarium buildings/experiences.
+Museum content now has an enforced venue type at association, layout, fixture and
+runtime boundaries. Authored floor interaction/recovery uses physical elevations.
+Facade doors and entry share semantic/headroom eligibility: bridge structures,
+roof pieces and thin fragments no longer receive building interiors.
+
+Actual pinned Overture data revealed a coverage defect: all three Pier 3 aquarium
+outline components were discarded because one triangular child part existed.
+Parent suppression now checks actual accepted child union coverage, with bounded
+work and conservative retention. The exact public input is a regression fixture.
+The source game confirms all three sections now render. Their inferred heights
+and generic exteriors are not approved aquarium architecture.
+
+The complete source chain passes **2,492 component tests across 465 files**, zero
+skips/TODOs. The final source museum/coverage browser journey passes **32 checks**:
+ordinary museum entry, all displays, failed-display retry, Journal reload, phone
+maps, run/jump, two reentries, restored exterior/camera, zero page/GPU errors,
+restored aquarium coverage and rejected bridge/fragment entry. Images inspected.
+Evidence: `output/interior-expansion/aquarium-coverage-regression/`.
+
+Aquarium research/design/status is in `docs/aquarium-expansion/`. Two animated
+Sketchfab CC BY originals were acquired and renderer-reviewed; neither is shipped
+content. The detailed aquarium shell, compound entrance, authored vertical travel,
+glass/voids, habitats and study interactions remain **unimplemented**. Do not call
+this a completed aquarium or release. Public sources establish route topology,
+not measured construction dimensions. The brief's map.aquarium.org reference was
+Oregon Coast, not Baltimore; corrected institution sources are recorded.
+
+The previous immutable museum diagnostic finished eight passes/six failures.
+Outdoor performance and ocean resource ceilings remain genuine release failures;
+corrected source helpers/inventory do not retroactively pass the older package.
+No production deployment, GitHub push, asset substitution or player-data change.
+Preserve dist and all previously retained candidates.
+
 ## October 12 local museum implementation
 
 The owner included museums in the next release and asked for finished architecture

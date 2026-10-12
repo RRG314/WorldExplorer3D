@@ -10,6 +10,8 @@ import {
 } from "../building-entry.js?v=9";
 import { createInteriorRuntimeUiApi } from "./runtime-ui.js?v=4";
 import { elevatorFloorChoices } from './elevator-authority.js?v=1';
+import { interiorFloorElevation } from './floor-model.js?v=3';
+import { escapeHtml } from '../game/ui-utils.js?v=1';
 
 let nearbyInteriorScanPromise = null;
 let entryRevision = 0;
@@ -43,7 +45,7 @@ export function sampleInteriorWalkSurface(x, z, currentY, deps) {
     : Number.isFinite(appCtx.Walk?.state?.walker?.y)
       ? appCtx.Walk.state.walker.y - (appCtx.Walk?.CFG?.eyeHeight || 1.7)
       : NaN;
-  const activeFloorY = Number(active.floorBaseY || 0) + Number(active.activeLevel || 0) * Number(active.floorPlan?.storyHeight || 3.4);
+  const activeFloorY = Number(active.floorBaseY || 0) + interiorFloorElevation(active.floorPlan, active.activeLevel);
   let best = null;
   const consider = (candidate, priority = 0) => {
     const referenceY = Number.isFinite(walkerFeetY) ? walkerFeetY : activeFloorY;
@@ -172,7 +174,7 @@ function replaceActiveInteriorFloor(active, targetLevel, deps) {
   }
 }
 
-function nearestInteriorInteraction(active, walker) {
+export function nearestInteriorInteraction(active, walker) {
   if (!active || !walker || !Array.isArray(active.interactions)) return null;
   const feetY = walker.y - (appCtx.Walk?.CFG?.eyeHeight || 1.7);
   const traversalPriority = {
@@ -188,7 +190,7 @@ function nearestInteriorInteraction(active, walker) {
     interactionPriority: traversalPriority[interaction.kind] ?? 4,
     distance: Math.hypot(interaction.x - walker.x, interaction.z - walker.z),
     verticalDistance: Math.abs(
-      active.floorBaseY + interaction.level * active.floorPlan.storyHeight - feetY
+      active.floorBaseY + interiorFloorElevation(active.floorPlan, interaction.level) - feetY
     )
   })).filter((interaction) => interaction.distance <= interaction.radius && interaction.verticalDistance <= 1.15)
     .sort((a, b) => {
@@ -221,7 +223,7 @@ function travelByElevator(active, targetLevel, deps) {
   const eyeHeight = appCtx.Walk?.CFG?.eyeHeight || 1.7;
   walker.x = active.connector.elevator.x + active.connector.axis.x * 1.45;
   walker.z = active.connector.elevator.z + active.connector.axis.z * 1.45;
-  walker.y = active.floorBaseY + active.activeLevel * active.floorPlan.storyHeight + eyeHeight + 0.05;
+  walker.y = active.floorBaseY + interiorFloorElevation(active.floorPlan, active.activeLevel) + eyeHeight + 0.05;
   walker.vy = 0;
   walker._resolvedGroundState = null;
   active.lastValidPosition = {
@@ -244,7 +246,7 @@ function openElevatorFloorPicker(active, deps) {
   picker.setAttribute('role', 'dialog');
   picker.setAttribute('aria-label', 'Choose an elevator floor');
   picker.style.cssText = 'position:fixed;left:50%;bottom:max(92px,env(safe-area-inset-bottom));transform:translateX(-50%);z-index:10020;width:min(360px,calc(100vw - 24px));max-height:min(56vh,430px);overflow:auto;padding:14px;border:1px solid rgba(148,197,255,.65);border-radius:12px;background:rgba(8,18,28,.96);box-shadow:0 18px 50px rgba(0,0,0,.45);color:#f8fafc;font:500 13px Inter,sans-serif;';
-  picker.innerHTML = `<div style="display:flex;align-items:start;justify-content:space-between;gap:12px;margin-bottom:10px;"><div><strong style="display:block;font:700 16px Orbitron,sans-serif;">Elevator</strong><span style="display:block;margin-top:3px;color:#b8c7d9;">Choose a floor</span></div><button type="button" data-elevator-close aria-label="Close elevator controls" style="border:0;background:transparent;color:#fff;font-size:22px;line-height:1;cursor:pointer;">×</button></div><div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;">${choices.map((choice) => `<button type="button" data-elevator-level="${choice.level}" ${choice.current ? 'disabled aria-current="true"' : ''} style="min-height:46px;padding:9px 10px;border:1px solid ${choice.current ? '#64748b' : '#60a5fa'};border-radius:8px;background:${choice.current ? 'rgba(71,85,105,.55)' : 'rgba(30,64,175,.5)'};color:#fff;font:700 12px Inter,sans-serif;cursor:${choice.current ? 'default' : 'pointer'};">${choice.direction === 'up' ? '↑ ' : choice.direction === 'down' ? '↓ ' : '• '}${choice.label}${choice.current ? ' · Here' : ''}</button>`).join('')}</div>`;
+  picker.innerHTML = `<div style="display:flex;align-items:start;justify-content:space-between;gap:12px;margin-bottom:10px;"><div><strong style="display:block;font:700 16px Orbitron,sans-serif;">Elevator</strong><span style="display:block;margin-top:3px;color:#b8c7d9;">Choose a floor</span></div><button type="button" data-elevator-close aria-label="Close elevator controls" style="border:0;background:transparent;color:#fff;font-size:22px;line-height:1;cursor:pointer;">×</button></div><div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;">${choices.map((choice) => `<button type="button" data-elevator-level="${choice.level}" ${choice.current ? 'disabled aria-current="true"' : ''} style="min-height:46px;padding:9px 10px;border:1px solid ${choice.current ? '#64748b' : '#60a5fa'};border-radius:8px;background:${choice.current ? 'rgba(71,85,105,.55)' : 'rgba(30,64,175,.5)'};color:#fff;font:700 12px Inter,sans-serif;cursor:${choice.current ? 'default' : 'pointer'};">${choice.direction === 'up' ? '↑ ' : choice.direction === 'down' ? '↓ ' : '• '}${escapeHtml(choice.label)}${choice.current ? ' · Here' : ''}</button>`).join('')}</div>`;
   picker.querySelector('[data-elevator-close]')?.addEventListener('click', () => closeElevatorFloorPicker(active));
   picker.querySelectorAll('[data-elevator-level]').forEach((button) => {
     button.addEventListener('click', () => travelByElevator(active, Number(button.dataset.elevatorLevel), deps));

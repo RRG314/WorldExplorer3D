@@ -6,6 +6,13 @@ const LICENSES = new Set(['CC0-1.0', 'CC-BY-4.0', 'MIT']);
 const ID = /^[a-z0-9][a-z0-9:._-]{0,99}$/;
 const SHA = /^[a-f0-9]{64}$/;
 const fail = message => { throw new TypeError(`Interior content: ${message}`); };
+
+// Venue identity is independent of reconstruction accuracy. An interpretive
+// aquarium is still an aquarium; it must never enter the museum fit/decorator.
+// Additional venue types need their own reviewed content and scene contracts.
+export function isMuseumContent(content) {
+  return content?.venueType === 'museum';
+}
 function text(value, limit, field) {
   return typeof value === 'string' && value.trim() && value.length <= limit ? value : fail(`invalid ${field}`);
 }
@@ -21,6 +28,7 @@ function number(value, minimum, maximum, field) {
 export function validateInteriorContent(input) {
   if (input?.schemaVersion !== INTERIOR_CONTENT_VERSION) fail('unsupported manifest version');
   id(input.id); text(input.version, 40, 'content version');
+  if (!isMuseumContent(input)) fail('museum content requires an explicit museum venue type');
   if (!KINDS.has(input.kind)) fail('unsupported representation');
   text(input.title, 100, 'title'); text(input.accuracyLabel, 260, 'accuracy label');
   if(input.layoutProfile){if(input.layoutProfile!=='peale-front-ground-v1')fail('unreviewed layout profile');https(input.layoutEvidence);}
@@ -68,6 +76,7 @@ const area = ring => Math.abs(ring.reduce((sum, p, i) => {
 }, 0)) / 2;
 
 export function matchInteriorBuilding(content, support, geoToWorld, metersPerUnit = 1) {
+  if (!isMuseumContent(content)) return null;
   if (!support?.enterable || support.synthetic || !support.building || typeof geoToWorld !== 'function') return null;
   const building = support.building, provenance = building.buildingProvenance;
   if (provenance?.valid === false || (building.buildingPartKind && building.buildingPartKind !== 'full') || building.allowsPassageBelow) return null;

@@ -14,6 +14,7 @@ import {inspectInteriorGlb,validateImportSource} from '../scripts/import-interio
 import {buildAuthoredInterior} from '../app/js/interiors/authored-geometry.js';
 import {finishGalleryArchitecture,releaseGalleryTextures} from '../app/js/interiors/gallery-finishes.js';
 import {downloadBoundedModel} from '../app/js/assets/bounded-model-download.js';
+import {addGalleryFixtures} from '../app/js/interiors/gallery-scene.js';
 const content=MUSEUM_CONTENT[0],frame=earthCoordinateFrame({lat:39.29184,lon:-76.61005},100000);
 const ring=content.association.footprint.map(p=>frame.toWorld(p.lat,p.lon));
 const support=()=>({enterable:true,key:'way/336352958',entryAnchor:{x:(ring[1].x+ring[2].x)/2,z:(ring[1].z+ring[2].z)/2},building:{pts:structuredClone(ring),sourceBuildingId:'way/336352958',buildingPartKind:'full',bodyHeightMeters:8}});
@@ -28,6 +29,24 @@ test('private captures and mapped indoor plans cannot be replaced by a public ga
   for(const existing of [{accessDenied:true},{communityRealityCapture:{layout:{}}},{mode:'mapped'}])assert.equal(resolveCuratedInterior({},support(),existing),existing);
   const wrong=structuredClone(content);wrong.sources[0].license='CC-BY-NC-4.0';assert.throws(()=>validateInteriorContent(wrong),/rights/);
   wrong.sources[0].license='CC0-1.0';wrong.review.status='pending';assert.throws(()=>validateInteriorContent(wrong),/unreviewed/);
+});
+
+test('aquarium and untyped content cannot enter the museum layout, renderer or asset lifecycle',async()=>{
+  for(const venueType of ['aquarium',undefined]){
+    const other={...content,venueType};
+    assert.throws(()=>validateInteriorContent(other),/museum venue type/);
+    const existing={mode:'generated'};
+    assert.equal(resolveCuratedInterior({geoToWorld:(lat,lon)=>frame.toWorld(lat,lon)},support(),existing,[other]),existing);
+    assert.equal(matchInteriorBuilding(other,support(),(lat,lon)=>frame.toWorld(lat,lon)),null);
+    const {ctx,active}=runtime();active.definition.curatedContent=other;
+    ctx.camera=new T.PerspectiveCamera();ctx.camera.layers.enable(4);ctx.sun=new T.DirectionalLight();
+    const mask=ctx.camera.layers.mask;
+    let requests=0;
+    addGalleryFixtures(T,{group:active.group},{curatedContent:other},()=>assert.fail('Museum collision was added'));
+    await attachGallery(ctx,T,active,{load:async()=>{requests++;throw Error('Wrong venue asset request');}});
+    assert.equal(requests,0);assert.equal(active.group.children.length,0);assert.equal(active.gallery,undefined);
+    assert.equal(ctx.camera.layers.mask,mask);assert.equal(ctx.sun.visible,true);
+  }
 });
 test('concave mapped Peale supports two galleries off an entrance hall with safe exhibit placements',()=>{
   const layout=definition().authoredLayout;assert.ok(layout);assert.equal(assertPlayableLayout(layout),true);assert.equal(layout.floors[0].rooms.length,3);

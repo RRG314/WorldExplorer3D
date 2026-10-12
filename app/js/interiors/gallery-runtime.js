@@ -1,6 +1,6 @@
 import {loadModelAsset} from '../assets/model-asset-runtime.js?v=16';
 import {releaseGalleryTextures} from './gallery-finishes.js';
-import {exhibitJournalEventId} from './content-contract.js';
+import {isMuseumContent,exhibitJournalEventId} from './content-contract.js';
 import {openGalleryPanel,closeGalleryPanel} from './gallery-ui.js';
 
 // Layer 1 is reserved for the sealed, opaque gallery. Keep the loaded outdoor
@@ -10,7 +10,7 @@ const GALLERY_LAYER=1;
 function galleryLayer(root){root.traverse(object=>object.layers.set(GALLERY_LAYER));}
 
 export async function attachGallery(ctx,T,active,{load=loadModelAsset}={}){
-  const content=active.definition.curatedContent;if(!content)return;
+  const content=active.definition.curatedContent;if(!isMuseumContent(content))return;
   const controller=new AbortController(),state={controller,exhibits:new Map(),saved:new Set(),journalError:false,panel:null,furnishings:[]};active.gallery=state;
   const current=()=>!controller.signal.aborted&&ctx.activeInterior===active&&active.outsideWorldSequence===ctx._worldLoadSequence;
   state.isCurrent=current;

@@ -13,7 +13,11 @@
     "research-deck",
     "ship-interior",
     "space",
-    "live-earth"
+    "live-earth",
+    "research-vessel",
+    "research-interior",
+    "submarine",
+    "research-map"
   ],
   "images": [
     {

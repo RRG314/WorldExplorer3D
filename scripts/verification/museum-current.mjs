@@ -9,14 +9,16 @@ import {runPrescribedGameActions} from './prescribed-game-actions.mjs';
 import {requirePerformanceHost,requireHardwareGraphics} from './performance-host.mjs';
 import {beginMuseumEntryMeasurement,sampleMuseumWindow} from './museum-measurement.mjs';
 import {floorWalls,roomRing} from '../../functions/interior-layout.mjs';
+import {resolve} from 'node:path';
 const measured=process.argv.includes('--performance');
 const performanceHost=measured?requirePerformanceHost():null;
 const performanceBudgets=JSON.parse(await readFile('config/performance-budgets.json','utf8'));
-const faults=process.argv.includes('--faults')||process.env.WE3D_MUSEUM_FAULTS==='1',out=measured?'output/interior-expansion/gallery-performance':faults?'output/interior-expansion/gallery-resilience':'output/interior-expansion/finished-gallery';await mkdir(out,{recursive:true});
-const server=await startStaticServer({rootDir:process.env.WE3D_VERIFY_ROOT||process.cwd(),ports:[4496,4497]});
+const faults=process.argv.includes('--faults')||process.env.WE3D_MUSEUM_FAULTS==='1',out=process.env.WE3D_MUSEUM_OUTPUT||(measured?'output/interior-expansion/gallery-performance':faults?'output/interior-expansion/gallery-resilience':'output/interior-expansion/finished-gallery');await mkdir(out,{recursive:true});
+const servedRoot=resolve(process.env.WE3D_VERIFY_ROOT||process.cwd());
+const server=await startStaticServer({rootDir:servedRoot,ports:[4496,4497]});
 const browser=await chromium.launch({channel:'chrome',headless:true});
 const context=await browser.newContext({viewport:{width:1280,height:800},deviceScaleFactor:1});
-const page=await context.newPage(),errors=[],requests=[],report={ok:false,evidence:'Full mutable-source game; ordinary doorway and DOM keyboard fixed-step movement; licensed local assets; staging attestation. Not physical-device or production acceptance.',checks:[]};
+const page=await context.newPage(),errors=[],requests=[],report={ok:false,evidence:`Full ${servedRoot===process.cwd()?'mutable-source':'saved-package'} game; ordinary doorway and DOM keyboard fixed-step movement; licensed local assets; staging attestation. Not physical-device or production acceptance.`,checks:[]};
 collectBrowserGraphicsErrors(page,errors);
 page.on('pageerror',e=>errors.push(String(e)));page.on('request',r=>{if(r.url().includes('/interiors/museum/'))requests.push(r.url());});
 const check=(name,passed)=>{report.checks.push({name,passed});assert.ok(passed,name);};
@@ -41,9 +43,12 @@ async function pose(){return page.evaluate(()=>{const w=globalThis.museumCtx.Wal
 async function mappedTarget(){return page.evaluate(()=>{
   const ctx=globalThis.museumCtx,building=ctx.buildings.find(b=>String(b.sourceBuildingId).includes('336352958')||String(b.buildingProvenance?.metadata?.sourceFeatureId).includes('336352958'));
   if(!building)return{found:false};
-  const x=(building.minX+building.maxX)/2,z=(building.minZ+building.maxZ)/2;
-  const support=ctx.listSupportedInteriorsNear(x,z,30,8).find(s=>s.sourceBuildingId===building.sourceBuildingId);
-  return{found:!!support,key:support?.key,source:building.sourceBuildingId,metadata:building.buildingProvenance?.metadata,part:building.buildingPartKind,footprint:building.pts,approach:support?.approachTarget};
+  // Resolve this actual mapped building through the game's published owner.
+  // A nearest-eight search can omit it, and render records need not retain
+  // top-level bounds. Neither is evidence that its exterior door disappeared.
+  const support=ctx.resolveBuildingEntrySupport(building,{allowSynthetic:false});
+  const door=support?.exteriorEntrance;
+  return{found:support?.enterable===true&&!!door,key:support?.key,reason:support?.reason,source:building.sourceBuildingId,metadata:building.buildingProvenance?.metadata,part:building.buildingPartKind,footprint:building.pts,approach:door?{x:door.approachX??door.x,z:door.approachZ??door.z}:null};
 });}
 async function walkTo(point,tolerance=.6){
   let previous=Infinity,stalled=0;
@@ -70,6 +75,31 @@ try{
   await page.evaluate(async()=>{globalThis.museumCtx=(await import('/app/js/shared-context.js?v=55')).ctx;});
   if(measured){report.performance.renderer=await page.evaluate(()=>{const gl=globalThis.museumCtx.renderer.getContext(),info=gl.getExtension('WEBGL_debug_renderer_info');return gl.getParameter(info?info.UNMASKED_RENDERER_WEBGL:gl.RENDERER);});requireHardwareGraphics(report.performance.renderer);}
   check('No museum model request during unrelated Earth startup',requests.length===0);
+  if(process.argv.includes('--survey-aquarium')){
+    // Read-only admission survey of the already loaded world. This does not
+    // invent a venue, teleport the actor or grant access to a building part.
+    const geography=await page.evaluate(()=>{
+      const c=globalThis.museumCtx,origin=c.geoToWorld(39.28525,-76.6074);
+      return {scope:'Loaded exterior geometry and public entry-owner results; not aquarium interior acceptance',build:globalThis.getWorldExplorerRuntimeDiagnostics?.().build,
+        location:c.LOC,buildings:c.buildings.filter(b=>Array.isArray(b.pts)&&b.pts.some(p=>Math.hypot(p.x-origin.x,p.z-origin.z)<170)).map(b=>{
+          const s=c.resolveBuildingEntrySupport(b,{allowSynthetic:false});
+          return {sourceBuildingId:b.sourceBuildingId,buildingType:b.buildingType,label:s.label,buildingPartKind:b.buildingPartKind,provenance:b.buildingProvenance,pts:b.pts,centerX:b.centerX,centerZ:b.centerZ,height:b.height,bodyHeightMeters:b.bodyHeightMeters,levels:b.levels,entry:{enterable:s.enterable,reason:s.reason,key:s.key,anchor:s.entryAnchor,exterior:s.exteriorEntrance}};
+        })};
+    });
+    await mkdir('output/aquarium-expansion',{recursive:true});
+    await writeFile(`${out}/aquarium-geography.json`,JSON.stringify(geography,null,2));
+    check('Incomplete aquarium building parts retain all three mapped outline components',geography.buildings.filter(b=>b.sourceBuildingId==='overture:7bacec0b-326a-401f-ad9f-f3ebed72c8cf').length===3);
+    check('Aquarium bridge and thin roof fragment do not offer building interiors',geography.buildings.filter(b=>['overture:07ca0781-716d-4114-a5b4-549b9a086fd7','overture:6251be5f-364a-3ace-90f3-a2e2966e839b'].includes(b.sourceBuildingId)).every(b=>b.entry.enterable===false));
+    // An explicitly diagnostic exterior camera, not player-traversal evidence
+    // or a promotional aquarium screenshot. Never mutate the player's camera.
+    const pixels=await page.evaluate(()=>{
+      const c=globalThis.museumCtx,eye=c.geoToWorld(39.28475,-76.60975),target=c.geoToWorld(39.2851,-76.6079),camera=c.camera.clone();
+      camera.position.set(eye.x,95,eye.z);camera.lookAt(target.x,2,target.z);
+      c.renderer.render(c.scene,camera);
+      return c.renderer.domElement.toDataURL('image/png').split(',')[1];
+    });
+    await writeFile(`${out}/aquarium-exterior-diagnostic.png`,Buffer.from(pixels,'base64'));
+  }
   report.target=await mappedTarget();
   check('Actual mapped museum has a supported exterior entrance',report.target.found&&!!report.target.approach);
   console.log('[museum] mapped target',JSON.stringify(report.target));

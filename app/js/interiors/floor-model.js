@@ -75,6 +75,18 @@ function interiorFloorIdentity(floorPlan, level = 0) {
   });
 }
 
+// Authored floors can have a mezzanine or unequal heights. A floor's ordinal
+// is an identity, not a distance; only generated plans use uniform stories.
+function interiorFloorElevation(floorPlan, level = 0) {
+  const count = floorPlan?.floorCount ?? floorPlan?.floors?.length ?? 1;
+  if (!Number.isInteger(level) || level < 0 || level >= count) return NaN;
+  if (floorPlan?.authored) {
+    const elevation = floorPlan.floors?.[level]?.elevation;
+    return Number.isFinite(elevation) ? elevation : NaN;
+  }
+  return level * Math.max(0, finite(floorPlan?.storyHeight, DEFAULT_STORY_HEIGHT));
+}
+
 function nextElevatorLevel(floorPlan, activeLevel = 0) {
   const count = Math.max(1, Number(floorPlan?.floorCount) || 1);
   const active = clampInteger(activeLevel, 0, count - 1);
@@ -87,6 +99,7 @@ export {
   MAX_PUBLISHED_FLOORS,
   deriveInteriorFloorPlan,
   interiorFloorIdentity,
+  interiorFloorElevation,
   loadedInteriorLevels,
   nextElevatorLevel
 };

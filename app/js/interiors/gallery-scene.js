@@ -1,10 +1,11 @@
 import {floorWalls,roomRing,pointInRoom,layoutEntrance} from '../../../functions/interior-layout.mjs';
 import {finishGalleryArchitecture} from './gallery-finishes.js';
+import {isMuseumContent} from './content-contract.js';
 
 // Exhibition furniture shares the existing collision owner. Finish joinery
 // follows compiled door openings and never substitutes display triangles for it.
 export function addGalleryFixtures(T,sceneState,definition,createWallCollider){
-  const content=definition.curatedContent;if(!content)return;
+  const content=definition.curatedContent;if(!isMuseumContent(content))return;
   const root=sceneState.group,base=sceneState.floorBaseY,center=sceneState.center,layout=definition.authoredLayout,floor=layout.floors[0];
   finishGalleryArchitecture(T,root,layout);
   const material=new T.MeshStandardMaterial({color:0x23342f,roughness:.75});

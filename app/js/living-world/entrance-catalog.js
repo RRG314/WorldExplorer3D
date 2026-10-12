@@ -1,6 +1,4 @@
-const EXCLUDED_BUILDING_TYPES = new Set([
-  'roof', 'canopy', 'carport', 'bridge', 'bridge_guardrail', 'shed'
-]);
+import { canContainWalkableInterior } from '../interiors/entry-eligibility.js';
 
 const COMMERCIAL_BUILDING_TYPES = new Set([
   'commercial', 'retail', 'office', 'hotel', 'supermarket', 'mall', 'civic',
@@ -166,9 +164,9 @@ function nearestFacadeEdge(candidate, point) {
 
 function candidatePriority(building, index, focus) {
   const points = cleanPoints(building?.pts);
-  if (points.length < 3 || building?.collisionKind === 'barrier' || building?.collisionDisabled) return null;
+  if (points.length < 3 || !canContainWalkableInterior(building)) return null;
   const buildingType = String(building?.buildingType || 'building').trim().toLowerCase();
-  if (EXCLUDED_BUILDING_TYPES.has(buildingType)) return null;
+  if (buildingType === 'shed') return null;
   const center = polygonCentroid(points);
   const distance = Math.min(Math.hypot(center.x, center.z),
     Number.isFinite(focus?.x) && Number.isFinite(focus?.z) ? Math.hypot(center.x-focus.x,center.z-focus.z) : Infinity);

@@ -178,6 +178,7 @@ function compileBuildingProvenance(tags = {}, computed = {}) {
 
 function shouldSuppressBuildingParent(options = {}) {
   return options.coverageComplete === true &&
+    options.footprintCovered === true &&
     options.hasParts === true &&
     !!normalizedString(options.stableId) &&
     options.parentIdsWithParts?.has?.(normalizedString(options.stableId)) === true;
