@@ -27,3 +27,12 @@ export function tunnelCeilingHeight(clearance, halfWidth, lateralDistance) {
   const factor = t <= 0.76 ? 1 - t / 0.76 * 0.16 : 0.84 - (t - 0.76) / 0.24 * 0.28;
   return clearance * factor;
 }
+
+// Pure bound query shared by surface compilation and obstruction consumers.
+export function tunnelObstructionMaximumY(limits, distance) {
+  let ceiling = Infinity;
+  for (const limit of limits || []) {
+    if (distance >= limit.start - 1e-5 && distance <= limit.end + 1e-5) ceiling = Math.min(ceiling, limit.maximumSurfaceY);
+  }
+  return ceiling;
+}

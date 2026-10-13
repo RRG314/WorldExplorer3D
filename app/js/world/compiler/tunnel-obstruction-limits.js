@@ -48,13 +48,8 @@ export function compileTunnelObstructionLimits(feature, nearbyBuildings) {
   return Object.freeze(limits);
 }
 
-export function tunnelObstructionMaximumY(limits, distance) {
-  let ceiling = Infinity;
-  for (const limit of limits || []) {
-    if (distance >= limit.start - 1e-5 && distance <= limit.end + 1e-5) ceiling = Math.min(ceiling, limit.maximumSurfaceY);
-  }
-  return ceiling;
-}
+// Compatibility export: existing callers retain the same scalar query.
+export { tunnelObstructionMaximumY } from './tunnel-envelope.js';
 
 // A separate surface road is a roof obstruction even when its centreline
 // misses the tunnel centreline. Preserve the complete overlapping road width,

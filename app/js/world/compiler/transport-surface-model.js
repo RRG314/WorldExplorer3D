@@ -1,5 +1,5 @@
 import { sampleSortedProfileAtDistance } from '../../structure-semantics/profile-sampling.js';
-import {tunnelObstructionMaximumY} from './tunnel-obstruction-limits.js';
+import {tunnelObstructionMaximumY} from './tunnel-envelope.js';
 import {fitOrdinaryStreetProfile} from './ordinary-street-profile.js';
 import {roadPlacementOffsetWorld} from '../road-units.js';
 import {
