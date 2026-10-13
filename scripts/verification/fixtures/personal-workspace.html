@@ -4,6 +4,8 @@
 <aside><section id="discoveryPersonalHome" class="discoveryOpeningChapter"></section></aside><div id="hint">Controlled room · E to open the desk · arrows to walk · J to show the Journal</div>
 <script src="/app/vendor/three/build/three.min.js"></script><script src="/app/vendor/three/examples/js/loaders/GLTFLoader.js"></script>
 <script type="module">
+import {ctx as sharedCtx} from '/app/js/shared-context.js?v=55';
+import {handleInteriorAction} from '/app/js/interiors/runtime.js?v=20';
 import {createPersonalHomeRuntime} from '/app/js/campaign/personal-home-runtime.js';
 import {createIndexedDbDiscoveryProfileStore} from '/app/js/discovery/profile-store.js?v=5';
 import {createLocalBackpackStore} from '/app/js/player/backpack-store.js?v=2';
@@ -24,16 +26,16 @@ if(profile.openingChapter.phase!=='complete'){
  await store.startOpeningChapter({regionId:'test',regionLabel:'Controlled room',environment:'EARTH'},1000);
  const result=await store.recordObservation({claimId:'workspace:field',catalogId:'workspace:maple',family:'tree',activityId:'habitat-survey',name:'Maple canopy at the edge of the park',regionId:'test',regionLabel:'Controlled room',environment:'EARTH',collectedAt:2000});await store.completeOpeningChapter(result.event.eventId,3000);
 }
-let interaction,open=true,look=true;
+let open=true,look=true;
 const active={group:room,ownedHome:housing.snapshot().homes[0],center:{x:0,z:0},floorBaseY:0,activeLevel:0,entryPoint:{x:0,z:-3.5},usableFootprint:[{x:-4,z:-4},{x:4,z:-4},{x:4,z:4},{x:-4,z:4}]};
-const ctx={scene,camera,renderer,activeInterior:active,dynamicBuildingColliders:[],playerBackpackInventory:inventory,playerBackpackStore:backpack,Walk:{state:{walker},CFG:{eyeHeight:1.7}},getEnv:()=> 'EARTH',getCurrentTravelMode:()=> 'walk',getLiveGpsSnapshot:()=>({active:false}),registerContextInteraction(i){interaction=i;return()=>{interaction=null;};},showToast(t){document.querySelector('#hint').textContent=t;},openWorldDiscoverySection(){state.ui.setOpen(true);}};
+const ctx=Object.assign(sharedCtx,{scene,camera,renderer,activeInterior:active,dynamicBuildingColliders:[],playerBackpackInventory:inventory,playerBackpackStore:backpack,Walk:{state:{walker},CFG:{eyeHeight:1.7}},getEnv:()=> 'EARTH',getCurrentTravelMode:()=> 'walk',getLiveGpsSnapshot:()=>({active:false}),showToast(t){document.querySelector('#hint').textContent=t;},openWorldDiscoverySection(){state.ui.setOpen(true);}});
 const state={appCtx:ctx,profileStore:store,worldIdentityId:'test',regionLabel:'Controlled room',ui:{get open(){return open;},setOpen(v){open=v;document.querySelector('aside').hidden=!v;},refreshData:()=>runtime.refresh()}};
 const runtime=createPersonalHomeRuntime(state,{getHousing:()=>housing});
 function draw(){camera.position.set(walker.x,walker.y,walker.z);camera.lookAt(0,.7,0);runtime.update(.016);renderer.render(scene,camera);}
 function loop(){draw();requestAnimationFrame(loop);}requestAnimationFrame(loop);
 window.addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);});
-window.addEventListener('keydown',e=>{if(e.key==='e'&&interaction?.evaluate())interaction.perform();if(e.key==='j')state.ui.setOpen(true);if(e.key==='ArrowLeft')walker.x-=.12;if(e.key==='ArrowRight')walker.x+=.12;if(e.key==='ArrowUp')walker.z+=.12;if(e.key==='ArrowDown')walker.z-=.12;});
+window.addEventListener('keydown',e=>{if(e.key==='e')void handleInteriorAction({});if(e.key==='j')state.ui.setOpen(true);if(e.key==='ArrowLeft')walker.x-=.12;if(e.key==='ArrowRight')walker.x+=.12;if(e.key==='ArrowUp')walker.z+=.12;if(e.key==='ArrowDown')walker.z-=.12;});
 window.advanceTime=async ms=>{for(let i=0;i<Math.max(1,Math.round(ms/16));i++)draw();await new Promise(r=>setTimeout(r,20));};
 window.render_game_to_text=()=>JSON.stringify({evidence:'controlled furnished room',coordinateFrame:'x east, y up, z south; metres',walker,...runtime.snapshot()});
-window.fixture={ctx,state,runtime,store,housing,backpack,inventory,walker,active,interaction:()=>interaction,draw};
+window.fixture={ctx,state,runtime,store,housing,backpack,inventory,walker,active,draw};
 </script>

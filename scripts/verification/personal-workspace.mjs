@@ -14,6 +14,7 @@ try{
   await page.waitForFunction(()=>fixture.runtime.snapshot().furnitureReady);
   await page.screenshot({path:`${out}/arrange.png`});
   assert.equal(await page.evaluate(()=>fixture.ctx.dynamicBuildingColliders.length),2);
+  assert.equal(await page.evaluate(()=>fixture.active.interactions.filter(i=>i.id==='personal-workspace').length),1);
   await page.locator('[data-home-action="rotate"]').click();await page.waitForFunction(()=>fixture.runtime.snapshot().workspace.rotated&&!fixture.runtime.snapshot().busy);
   await page.locator('[data-home-action="undo"]').click();await page.waitForFunction(()=>fixture.runtime.snapshot().workspace.undone&&fixture.runtime.snapshot().furnitureReady);
   report.checks.push('actual-furniture-placed-rotated-undone-with-two-collision-envelopes');
@@ -80,6 +81,7 @@ try{
   assert.equal(await page.evaluate(async()=>!!(await fixture.store.getProfile()).homeAchievements?.maker),true);
   report.checks.push('design-export-import-and-reload-retain-arrangement-and-badge');
   await page.evaluate(()=>fixture.runtime.dispose());assert.equal(await page.evaluate(()=>fixture.ctx.dynamicBuildingColliders.length),0);
+  assert.equal(await page.evaluate(()=>fixture.active.interactions.filter(i=>i.id==='personal-workspace').length),0);
   assert.equal(await page.evaluate(()=>fixture.active.group.children.some(c=>c.name==='Personal research workspace')),false);report.checks.push('disposal-releases-furniture-and-colliders');
   assert.deepEqual(report.errors,[]);await browser.close();browser=null;
   // Prescribed game client, with the same composed-image adapter used by the

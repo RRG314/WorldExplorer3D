@@ -42,11 +42,20 @@ export async function verifyOceanEcologySwitch({page,dir,report}){
   const before=await page.evaluate(async()=>{const {ctx}=await import('/app/js/shared-context.js?v=55');return ctx.oceanMode.fishEntities.map(f=>f.mesh.uuid)});
   assert.equal(await page.evaluate(async site=>{const {ctx}=await import('/app/js/shared-context.js?v=55');return ctx.startOceanMode({launchSite:{...site,region:'Controlled geographic fixture'},entry:{...site,source:'gebco-elevation-sample',kind:'modeled-ocean',elevationMeters:-30}})},site),true);
   await page.evaluate(async()=>{window.ecologyCtx=(await import('/app/js/shared-context.js?v=55')).ctx;});
-  await page.waitForFunction(()=>ecologyCtx.oceanMode.globalBathymetryReady&&ecologyCtx.oceanMode.parentVessel?.root?.userData.visualLoaded!==false);
+  // Geographic outings now use streamed depth tiles; their readiness does not
+  // set the retained fixed-area grid flag. Wait for the active owner and its
+  // current habitat before comparing regional life and retained geometry.
+  await page.waitForFunction(()=>{
+   const m=ecologyCtx.oceanMode;
+   return m.continuous
+    ? m.stream.canNavigate(m.submarine.position.x,m.submarine.position.z)&&m.streamLifeReady&&m.habitatStreamRevision===m.stream.depth.revision
+    : m.globalBathymetryReady;
+  });
+  await page.evaluate(()=>ecologyCtx.oceanMode.fishVisualsReady);
   await page.waitForTimeout(700);
   const sample=await page.evaluate(async()=>{
    const {ctx}=await import('/app/js/shared-context.js?v=55'),m=ctx.oceanMode;
-   return {site:m.launchSite,species:m.underwaterSchoolPlan.schools.map(s=>s.speciesId),ids:m.fishEntities.map(f=>f.mesh.uuid),
+   return {site:m.launchSite,continuous:m.continuous,species:m.underwaterSchoolPlan.schools.map(s=>s.speciesId),ids:m.fishEntities.map(f=>f.mesh.uuid),
      geometry:m.renderer.info.memory.geometries,texture:m.renderer.info.memory.textures,count:m.fishEntities.length,
      sceneFish:m.scene.children.filter(o=>o.name.startsWith('Ocean fish')).length};
   });

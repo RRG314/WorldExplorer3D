@@ -4,6 +4,7 @@ import {resolveBuildingEntrySupport} from '../building-entry.js?v=9';
 import {normalizeWorkspace,findWorkspacePlacement,validateWorkspacePlacement} from './personal-workspace.js';
 import {createWorkspaceVisual} from '../interiors/personal-workspace-visual.js';
 import {disposeCuratedHomeFurnishing} from '../interiors/curated-home-furnishing.js?v=1';
+import {registerInteriorFurnishingAction} from '../interiors/runtime.js?v=20';
 const escape=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
 export function createPersonalHomeRuntime(state,dependencies={}) {
@@ -15,6 +16,7 @@ export function createPersonalHomeRuntime(state,dependencies={}) {
   let selectedPurpose='journal';
   let storageOpen=false;
   let importedDesign=null;
+  let releaseInteriorAction=null;
   const actor=()=>ctx.Walk?.state?.walker;
   const outdoors=()=>ctx.getEnv?.()==='EARTH'&&!ctx.worldLoading&&!ctx.activeInterior&&ctx.getCurrentTravelMode?.()==='walk'&&!ctx.getLiveGpsSnapshot?.().active;
   const insideHome=()=>home&&ctx.activeInterior?.ownedHome?.id===home.id&&Number(ctx.activeInterior.activeLevel||0)===0&&ctx.getCurrentTravelMode?.()==='walk';
@@ -80,7 +82,7 @@ export function createPersonalHomeRuntime(state,dependencies={}) {
       if(disposed)return;record=evidence||null;loaded=true;render();
     }catch{if(!disposed){message='Your workspace could not refresh. Reopen the Journal to retry.';render();}}
   }
-  function clearVisual(){generation++;visual?.dispose();visual=null;visualKey='';}
+  function clearVisual(){generation++;releaseInteriorAction?.();releaseInteriorAction=null;visual?.dispose();visual=null;visualKey='';}
   async function present(){
     const active=ctx.activeInterior,w=workspace();
     if(!insideHome()||!w.pose){if(visual||visualKey)clearVisual();return;}
@@ -92,7 +94,16 @@ export function createPersonalHomeRuntime(state,dependencies={}) {
     try {
       const next=await (dependencies.createVisual||createWorkspaceVisual)(ctx,active,placement.geometry,record,{signal:abort.signal,isCurrent:()=>!disposed&&generation===seq&&ctx.activeInterior===active&&active.group.parent});
       if(disposed||generation!==seq){next?.dispose();return;}
-      visual=next;if(!next)visualKey='';render();
+      visual=next;
+      if(next){
+        // The desk belongs to this room's interaction owner. Registering it
+        // only as a world context action let a nearby exit consume E first.
+        releaseInteriorAction=registerInteriorFurnishingAction(active,{id:'personal-workspace',level:0,
+          x:next.geometry.use.x,z:next.geometry.use.z,radius:1.4,label:'Open field record',
+          available:()=>!disposed&&!busy&&!state.ui?.open&&ctx.activeInterior===active&&canUse(),
+          perform:()=>act('use').then(()=>true)});
+      }else visualKey='';
+      render();
     }catch(error){if(!disposed&&generation===seq){message='The furniture did not finish loading. Your layout is saved; retry to load it again.';saveFailed=true;render();}}
   }
   async function award(kind){
@@ -203,9 +214,8 @@ export function createPersonalHomeRuntime(state,dependencies={}) {
       catch{message='That design file could not be read. Your saved arrangement is kept.';render();}
     }
   },{signal:abort.signal});
-  const unregister=ctx.registerContextInteraction?.({id:'personal_workspace',priority:96,evaluate:()=>!disposed&&!busy&&!state.ui?.open&&canUse()?{available:true,label:'Open field record',detail:'Personal workspace',distance:1}:null,perform:()=>act('use').then(()=>true)});
   void refresh();
   return {refresh,act,update(dt=.016){elapsed+=dt;if(elapsed<.3)return;elapsed=0;reloadHome();void present();void visit();render();},
     snapshot:()=>({homeId:home?.id||null,workspace:workspace(),journey:home?.journey||{},furnitureReady:!!visual,interactionReady:canUse(),offers:offers.map(o=>({id:o.id,label:o.label})),busy,saveFailed,message}),
-    dispose(){disposed=true;abort.abort();unregister?.();clearVisual();element?.replaceChildren();}};
+    dispose(){disposed=true;abort.abort();clearVisual();element?.replaceChildren();}};
 }

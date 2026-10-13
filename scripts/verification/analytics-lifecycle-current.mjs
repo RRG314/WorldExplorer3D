@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import {deployResearchSubmarineFromDeck} from './marine-entry-ui.mjs';
+import {installControlledMarineWeather} from './controlled-marine-weather.mjs';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { chromium, devices } from 'playwright';
@@ -24,6 +25,9 @@ async function createContext(options) {
   browser = await chromium.launch({ headless: true, channel: 'chrome', args: ['--js-flags=--max-old-space-size=1024'] });
   const context = await browser.newContext(options);
   await configureStagingAppCheck(context, baseUrl);
+  // Consent/event formation is independent of live weather and HYCOM latency.
+  // Use the declared environmental fixture; live providers have their own gate.
+  await installControlledMarineWeather(context);
   context.on('page', page => {
     page.verificationErrors = [];
     collectBrowserGraphicsErrors(page, page.verificationErrors);
@@ -64,7 +68,7 @@ async function analyticsSnapshot(page) {
   return page.evaluate(() => globalThis.getWorldExplorerAnalyticsSnapshot?.() || null);
 }
 
-async function saveFailure(page, name, error) {
+async function saveFailure(page, name, error, requestEvidence = {}) {
   const evidence = await page.evaluate(() => ({
     analytics: globalThis.getWorldExplorerAnalyticsSnapshot?.() || null,
     firebaseProjectId: globalThis.WORLD_EXPLORER_FIREBASE?.projectId || null,
@@ -72,7 +76,7 @@ async function saveFailure(page, name, error) {
     url: location.href
   })).catch(() => null);
   await fs.writeFile(path.join(outputDir, `${name}-failure.json`), JSON.stringify({
-    error: String(error?.stack || error), evidence, browserErrors: page.verificationErrors || []
+    error: String(error?.stack || error), evidence, browserErrors: page.verificationErrors || [], ...requestEvidence
   }, null, 2));
 }
 
@@ -98,7 +102,7 @@ async function verifyGrantedDestination(destination) {
   const collectionRequests = [];
   page.on('pageerror', (error) => browserErrors.push(String(error?.stack || error)));
   page.on('requestfailed', (request) => {
-    if (request.url().startsWith(baseUrl)) failedLocalResources.push(request.url());
+    if (request.url().startsWith(baseUrl)) failedLocalResources.push({url:request.url(),reason:request.failure()?.errorText,resourceType:request.resourceType()});
   });
   await page.route(/https:\/\/(?:www\.|region\d+\.)?(?:google-analytics\.com|analytics\.google\.com|app-measurement\.com)\/.*collect/i, async (route) => {
     const request = route.request();
@@ -177,7 +181,7 @@ async function verifyGrantedDestination(destination) {
     assert.match(collectionEvidence, /telemetry_version/);
     assert.match(collectionEvidence, /(?:tt|ep\.traffic_type)=internal/);
     assert.equal(browserErrors.length, 0, `${destination.id}: browser errors`);
-    assert.equal(failedLocalResources.length, 0, `${destination.id}: failed local resources`);
+    assert.deepEqual(failedLocalResources, [], `${destination.id}: failed local resources`);
     return {
       id: destination.id,
       ok: true,
@@ -188,7 +192,7 @@ async function verifyGrantedDestination(destination) {
       collectionRequestCount: collectionRequests.length
     };
   } catch (error) {
-    await saveFailure(page, destination.id, error);
+    await saveFailure(page, destination.id, error, {failedLocalResources});
     throw error;
   } finally {
     await context.close();
@@ -368,7 +372,7 @@ await fs.mkdir(outputDir, { recursive: true });
 const result = {
   ok: false, contract: 'default-standard-analytics-with-explicit-limited-mode',
   servedRoot, complete: requestedDestinations.size === 0,
-  evidenceMode: 'real-sdk-local-collection-fixture; early publisher uses source; destination journeys use the selected artifact', productionDeliveryVerified: false,
+  evidenceMode: 'real-sdk-local-collection-and-weather-fixture; early publisher uses source; destination journeys use the selected artifact', productionDeliveryVerified: false,
   measurementId: safeConfig.measurementId,
   storageBlocked: null, defaultStorage: null, destinations: []
 };

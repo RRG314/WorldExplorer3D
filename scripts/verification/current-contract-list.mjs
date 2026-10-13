@@ -445,6 +445,7 @@ export const currentContractTests = [
   'tests/fish-population-authority.test.mjs',
   'tests/game-facing-language.test.mjs',
   'tests/interior-stair-authority-current.test.mjs',
+  'tests/interior-furnishing-action-current.test.mjs',
   'tests/live-gps-field-session.test.mjs',
   'tests/mobile-touch-authority.test.mjs',
   'tests/planetary-build-surface-current.test.mjs',

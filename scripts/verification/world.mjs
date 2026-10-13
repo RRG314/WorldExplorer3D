@@ -7,6 +7,7 @@ import path from 'node:path';
 import { chromium } from 'playwright';
 import { startStaticServer } from './static-server.mjs';
 import { completeWorldReady } from './complete-world-readiness.mjs';
+import { closeOwnedBrowser } from './owned-browser.mjs';
 
 const root = process.cwd();
 const externalUrl = String(process.env.WE3D_VERIFY_BASE_URL || '').replace(/\/$/, '');
@@ -37,7 +38,8 @@ const server = externalUrl ? null : await startStaticServer({
   ports: [4360, 4361, 4362, 4363]
 });
 const baseUrl = externalUrl || `http://127.0.0.1:${server.port}`;
-const browser = await chromium.launch({ headless: true, channel: 'chrome' });
+const owned = await chromium.launchServer({ headless: true, channel: 'chrome' });
+const browser = await chromium.connect(owned.wsEndpoint());
 const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
 const page = await context.newPage();
 await configureStagingAppCheck(page, baseUrl);
@@ -503,7 +505,6 @@ try {
   }
   throw error;
 } finally {
-  await context.close();
-  await browser.close();
-  await server?.close();
+  try { await closeOwnedBrowser(owned); }
+  finally { await server?.close(); }
 }

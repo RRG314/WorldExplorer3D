@@ -175,6 +175,17 @@ function replaceActiveInteriorFloor(active, targetLevel, deps) {
   }
 }
 
+// Furnishings share the room's prompt, floor and proximity selection. The
+// interior owner publishes/withdraws their actions; late asset loads cannot
+// register with a room that the player has already left.
+export function registerInteriorFurnishingAction(active, definition) {
+  if (!active || active !== appCtx.activeInterior) return () => {};
+  const interactions=active.interactions||(active.interactions=[]);
+  const action={...definition,kind:'furnishing'};
+  interactions.push(action);
+  return () => {const index=interactions.indexOf(action);if(index>=0)interactions.splice(index,1);};
+}
+
 export function nearestInteriorInteraction(active, walker) {
   if (!active || !walker || !Array.isArray(active.interactions)) return null;
   const feetY = walker.y - (appCtx.Walk?.CFG?.eyeHeight || 1.7);
@@ -186,7 +197,7 @@ export function nearestInteriorInteraction(active, walker) {
     'ship-station': 4,
     'ship-crew': 5
   };
-  return active.interactions.map((interaction) => ({
+  return active.interactions.filter(interaction=>interaction.available?.()!==false).map((interaction) => ({
     ...interaction,
     interactionPriority: traversalPriority[interaction.kind] ?? 4,
     distance: Math.hypot(interaction.x - walker.x, interaction.z - walker.z),
@@ -716,6 +727,9 @@ export async function handleInteriorAction(deps) {
   if (appCtx.activeInterior) {
     const active = appCtx.activeInterior;
     const interaction = nearestInteriorInteraction(active, appCtx.Walk?.state?.walker);
+    if (interaction?.kind === 'furnishing' && typeof interaction.perform === 'function') {
+      return (await interaction.perform()) !== false;
+    }
     if (['ship-station', 'ship-exit', 'ship-door', 'ship-lift', 'ship-incident-step', 'ship-crew'].includes(interaction?.kind)) {
       return (await appCtx.handleShipInteriorInteraction?.(interaction)) !== false;
     }

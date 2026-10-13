@@ -7,6 +7,8 @@ export function styleMarinePanel(panel,kind) {
   .marine-panel{position:fixed;right:14px;top:112px;z-index:120;width:232px;max-width:calc(100vw - 28px);max-height:calc(100dvh - 226px);overflow:auto;box-sizing:border-box;padding:12px;border:1px solid var(--wx-line-soft,#52636f);border-radius:8px;background:var(--wx-panel,rgba(5,12,18,.94));color:var(--wx-text,#f4f7f9);font:12px/1.5 Inter,system-ui,sans-serif;box-shadow:0 6px 24px #0003}
   .marine-panel strong{display:block;font-size:13px;font-weight:600;letter-spacing:.02em}
   .marine-panel button,.marine-panel select{box-sizing:border-box;width:100%;min-height:40px;margin-top:6px;padding:7px 9px;border:1px solid var(--wx-line-soft,#52636f);border-radius:5px;background:var(--wx-panel-soft,#101921);color:inherit;font:inherit}
+  .marine-panel-header{display:flex;align-items:center;justify-content:space-between;gap:8px}
+  .marine-panel .marine-panel-header button{width:auto;min-width:44px;min-height:44px;margin-top:0;flex:none}
   .marine-panel button:disabled{opacity:.5}.marine-panel button:not(:disabled):hover{border-color:var(--wx-blue,#2d7dff)}
   .marine-panel summary{cursor:pointer;min-height:32px;display:flex;align-items:center;color:var(--wx-muted,#a7b6c2)}
   .marine-panel [role=status]{color:var(--wx-muted,#a7b6c2);margin-top:6px}

@@ -50,6 +50,47 @@ browsers/servers. Production deployment evidence is under
 `output/release-evidence/current/production-deployment.json` and
 `production-promotion.json`; acceptance gaps remain in their own receipts.
 
+## October 12 branch reconciliation and release follow-up
+
+`steven/visual-quality` and `steven/post-5.2-release-integration` were atomically
+synchronized at `139cd527`, preserving the integration branch's history. The
+merge changed no game files. Stable remains `33edf9ad`; production remains the
+5.5 build above. Draft PR 99 and the draft 5.6 release are not a publication.
+Historical feature branches retain their independent work.
+
+The complete 101-gate candidate run finished: 92 passed and nine failed. Its
+receipts are preserved under `output/production-readiness-20261012/baseline-7dbc-matrix/`.
+They are evidence for that package, not certification of later source changes.
+The full performance run passed retention, twelve world exits, coverage,
+movement continuity and touch regression; desktop frame-pacing, some mode
+budgets and transfer budgets remain unmet. Do not relax those results or claim
+the release is fully certified.
+
+Follow-up verification corrected obsolete fixture navigation and readiness
+conditions without changing progression or streaming rules. The full source
+coastal journey passes 23 checks. The seven post-release lifecycle groups pass.
+Ocean analytics plus consent/reload/failure cases pass with explicitly controlled
+weather and collection endpoints; live provider acceptance is separate.
+
+A full city opening journey exposed a gameplay conflict: E beside the home desk
+selected an overlapping exit before its separate world-context action. The
+desk now registers and retires with the room's own interaction list, so the
+visible interior prompt and keyboard action share proximity and floor rules.
+The furnished-room browser check and 23 focused regression checks pass. The
+complete opening/Harbor Run/photos/home/build/room/flower sequence now passes
+all 28 checks, including actual desk input and durable reload recovery, with no
+page errors or failed local requests. This sequence uses bounded actor placement
+for field targets and is not an uncoached player-navigation study.
+The source chain passes 2,528 component tests with no skips, plus dependency,
+module identity, ownership, boundary-type, runtime-name, inventory and sensitivity
+checks. Furniture actions publish through the existing interior owner.
+
+The research-deck HUD now keeps the map beside its title and removes repeated
+station text, preserving 44-pixel phone actions. Its complete coastal journey
+passes the phone layout check. Root and Pages galleries include the missing
+aquarium-overlook view. The latest corrections still require a new immutable
+package and release checks before stable/production promotion.
+
 ## October 12 ordinary player walkthroughs — release still under review
 
 Hosted staging build `5.6.0+244ef8938e52.e4c49142872300d3.staging` was
@@ -194,7 +235,7 @@ player-facing descriptions. The current hosted production and fallbacks remain
 untouched. The first backend sweep accidentally used the preserved production
 `dist`; its local protection correctly refused access. The sweep was stopped,
 its owned processes retired, and must run with an explicit staging package.
-No GitHub push or production deployment has occurred.
+At that checkpoint no GitHub push or production deployment had occurred.
 
 ## October 12 aquarium audit and venue separation
 

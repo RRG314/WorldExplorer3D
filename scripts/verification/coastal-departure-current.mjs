@@ -3,6 +3,7 @@ import {mkdir,writeFile,readFile,readdir} from 'node:fs/promises';
 import {spawn} from 'node:child_process';
 import {chromium} from 'playwright';
 import {startStaticServer} from './static-server.mjs';
+import {walkResearchStation} from './research-station-walk.mjs';
 const out=process.env.WE3D_COASTAL_OUTPUT||'output/verification/coastal-departure';await mkdir(out,{recursive:true});
 const server=await startStaticServer({rootDir:process.cwd(),ports:[4396]});let browser,page;
 const report={passed:false,scope:'Actual deck/GLTF/Journal storage, controlled wave/site/depth fixture; full voyage acceptance is separate',cases:[],errors:[]};
@@ -11,7 +12,8 @@ try{
  await page.route('https://wms.gebco.net/**',route=>route.fulfill({contentType:'text/plain',body:"value_list = '-30'"}));
  const url=`http://127.0.0.1:${server.port}/tests/fixtures/research-deck.html?survey&guide`;
  await page.goto(url);await page.waitForFunction(()=>window.ready);await page.locator('#researchDeckEnter').click();await page.waitForFunction(()=>researchTest.ctx.marineResearch.coastal.snapshot().ready);
- await page.getByLabel('Deck destination').selectOption('chart');await page.locator('#coastalDeckAction').click();await page.waitForFunction(()=>researchTest.ctx.marineResearch.coastal.snapshot().choices?.some(c=>c.allowed));
+ report.chartWalk=await walkResearchStation(page,'chart',{fixture:true});
+ await page.locator('#coastalDeckAction').click();await page.waitForFunction(()=>researchTest.ctx.marineResearch.coastal.snapshot().choices?.some(c=>c.allowed));
  await page.evaluate(()=>{window.write=IDBObjectStore.prototype.put;IDBObjectStore.prototype.put=function(...args){if(this.name==='events')throw new DOMException('Injected full storage','QuotaExceededError');return window.write.apply(this,args);};});
  await page.locator('#coastalDeckAction').click();await page.waitForFunction(()=>researchTest.ctx.marineResearch.coastal.snapshot().failure);assert.match(await page.locator('#coastalDeckChapter [role=status]').innerText(),/could not be confirmed/);assert.equal(await page.locator('#coastalDeckChapter [role=status]').isVisible(),true);assert.equal(await page.evaluate(()=>researchTest.ctx.marineResearch.coastal.snapshot().phase),'available');
  await page.screenshot({path:`${out}/failed-write.png`});

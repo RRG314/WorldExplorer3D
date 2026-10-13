@@ -18,13 +18,14 @@ export function createResearchDeckHud({enter,helm,moor,act,select,mapChanged,ret
  const researchButton=make('marineResearchLab',()=>researchAct?.()),researchInfo=document.createElement('div');researchInfo.style.cssText='margin-top:8px;border-top:1px solid #50879c;padding-top:7px';
  const reportDetails=document.createElement('details');reportDetails.id='marineResearchReport';reportDetails.style.cssText='margin-top:8px;border-top:1px solid #50879c;padding-top:6px';const reportSummary=document.createElement('summary');reportSummary.textContent='Saved survey report';const reportBody=document.createElement('div');reportDetails.append(reportSummary,reportBody);let reportSignature='';
  enterButton.textContent='Explore research vessel';helmButton.textContent='Find the bridge';
- const mapButton=make('researchShipMapButton',()=>map.open());mapButton.textContent='Ship map';
+ const mapButton=make('researchShipMapButton',()=>map.open());mapButton.textContent='Map';mapButton.setAttribute('aria-label','Ship map');
+ const header=document.createElement('div');header.className='marine-panel-header';header.append(title,mapButton);
  const provisions=document.createElement('div');provisions.hidden=true;provisions.setAttribute('aria-label','Carried galley provisions');
  const legacy=document.createElement('details'),legacyTitle=document.createElement('summary');legacyTitle.textContent='Optional reef mapping · Scanner II';legacy.append(legacyTitle);let investigating=null;
  const more=document.createElement('details'),summary=document.createElement('summary');summary.textContent='Vessel options';more.append(summary,helmButton,reportDetails,sharedButton,legacy);
  const investigation=createInvestigationControls({api:investigationApi,prefix:'coastalDeck'});
  const coastal=createCoastalDepartureControls({api:coastalApi,prefix:'coastalDeck'});
- panel.append(title,message,mapButton,choice,actionButton,enterButton,retryButton,moorButton,coastal.node,investigation.node,researchInfo,researchButton,result,provisions,more);
+ panel.append(header,message,choice,actionButton,enterButton,retryButton,moorButton,coastal.node,investigation.node,researchInfo,researchButton,result,provisions,more);
  for(const control of panel.querySelectorAll('button,select'))control.removeAttribute('style');document.body.append(panel);
  return {closeMap:()=>map.close(),hide:()=>{panel.hidden=true;map.close()},dispose:()=>{map.dispose();panel.remove()},
  provisions(items,consume){provisions.replaceChildren();provisions.hidden=false;
@@ -46,7 +47,7 @@ export function createResearchDeckHud({enter,helm,moor,act,select,mapChanged,ret
   if(signature!==reportSignature){reportSignature=signature;reportBody.replaceChildren();for(const event of research?.report||[]){const item=document.createElement('p'),title=document.createElement('strong'),detail=document.createElement('div');title.textContent=event.name;detail.textContent=event.detail;item.append(title,detail);reportBody.append(item);}}
   panel.hidden=false;panel.dataset.active=String(s.active);choice.hidden=actionButton.hidden=helmButton.hidden=!s.active;enterButton.hidden=s.active;
   enterButton.disabled=!s.canEnter;moorButton.hidden=s.active;moorButton.textContent=s.moored?'Release mooring':'Moor vessel';
-  setMarineText(message,s.failed?'The vessel could not load. Retry or use Travel; your saved voyage is kept.':s.active?`${s.room.label} · ${s.deck.label}. ${s.distance<=2.4?s.target.label:s.route?.length?`Follow the passage ${s.direction} to ${s.target.label}`:`Use Ship map to find ${s.target.label}`}${s.target.id==='dive'&&s.distance<=2.4?' · Space to enter water':''}`:s.canEnter?(s.moored?'Moored · Explore the vessel or release mooring to sail.':'Stop, moor and explore the vessel.'):s.reason);
+  setMarineText(message,s.failed?'The vessel could not load. Retry or use Travel; your saved voyage is kept.':s.active?`${s.room.label} · ${s.deck.label}.${s.distance<=2.4?'':s.route?.length?` Follow the passage ${s.direction} to ${s.target.label}`:` Use Ship map to find ${s.target.label}`}${s.target.id==='dive'&&s.distance<=2.4?' Space to enter water.':''}`:s.canEnter?(s.moored?'Moored · Explore the vessel or release mooring to sail.':'Stop, moor and explore the vessel.'):s.reason);
   setMarineText(actionButton,s.target?.action||'');actionButton.disabled=!s.active||s.distance>2.4||s.busy;
  }};
 }

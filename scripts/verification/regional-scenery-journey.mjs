@@ -72,4 +72,4 @@ const page=await browser.newPage({viewport:{width:1280,height:800}});await confi
 
  await page.reload();await page.waitForFunction(()=>globalThis.__WE3D_RUNTIME_READY__,null,{timeout:60000});assert.equal(await page.locator('#regionalSceneryToggle').isChecked(),false,'Saved fixed-view preference must survive reload');
  assert.deepEqual(report.errors,[]);report.ok=true;
-}finally{clearInterval(resourceWatch);await fs.writeFile(path.join(out,'report.json'),JSON.stringify(report,null,2));await closeOwnedBrowser(owned);await server.close();}
+}finally{clearInterval(resourceWatch);await fs.writeFile(path.join(out,'report.json'),JSON.stringify(report,null,2));try{if(owned)await closeOwnedBrowser(owned);}finally{await server.close();}}
