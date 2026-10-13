@@ -8,11 +8,11 @@ export async function verifyPersonalHome({page,out,report}) {
   assert.ok(admission.offers.length,JSON.stringify(admission));
   await page.locator('[data-home-action="route:0"]').click();
   await page.evaluate(async()=>{
-    const c=__sandboxTestContext,{getPersonalHomeCandidates}=await import('/app/js/game/property-ui.js?v=9');
+    const c=__sandboxTestContext;
     const selected=c.worldDiscoveryRuntime.personalHome.snapshot().offers[0];
-    const candidate=getPersonalHomeCandidates().find(h=>h.id===selected.id);
-    const {resolveBuildingEntrySupport}=await import('/app/js/building-entry.js?v=9');
-    const b=c.buildings.find(b=>String(b.sourceBuildingId||b.sourceFeatureId||b.id)===candidate.sourceBuildingId),support=resolveBuildingEntrySupport(b),entry=support.exteriorEntrance||support.entryAnchor;
+    const candidate=c.selectedProperty;
+    if(candidate?.id!==selected.id)throw Error('Home route did not select its offered property');
+    const b=c.buildings.find(b=>String(b.sourceBuildingId||b.sourceFeatureId||b.id)===candidate.sourceBuildingId),support=c.resolveBuildingEntrySupport(b),entry=support.exteriorEntrance||support.entryAnchor;
     if(!c.showNavigation||c.selectedProperty?.id!==candidate.id||Math.hypot(c._navigationRouteState.toX-entry.x,c._navigationRouteState.toZ-entry.z)>.01)throw Error('Workspace navigation did not keep its exterior entrance');
     window.__homeJourneyEntry={...entry};window.__homeJourneyCandidate=candidate;
     const y=c.SurfaceQuery.walkAt(entry.x,entry.z,{currentY:c.Walk.state.walker.y-1.7})?.position?.y||candidate.y;
@@ -32,10 +32,15 @@ export async function verifyPersonalHome({page,out,report}) {
   await page.waitForFunction(()=>__sandboxTestContext.worldDiscoveryRuntime.personalHome.snapshot().workspace.undone&&__sandboxTestContext.worldDiscoveryRuntime.personalHome.snapshot().furnitureReady);
   await page.screenshot({path:`${out}/home-arrangement-desktop.png`});
   report.checks.workspacePlacementRotationUndo=true;
-  await page.evaluate(async()=>{
-    const c=__sandboxTestContext,{workspaceGeometry}=await import('/app/js/campaign/personal-workspace.js');
-    const geometry=workspaceGeometry(c.activeInterior,c.worldDiscoveryRuntime.personalHome.snapshot().workspace.pose);
-    Object.assign(c.Walk.state.walker,{x:geometry.use.x,z:geometry.use.z,y:geometry.use.y+1.7,angle:Math.atan2(geometry.origin.x-geometry.use.x,geometry.origin.z-geometry.use.z),yaw:Math.atan2(geometry.origin.x-geometry.use.x,geometry.origin.z-geometry.use.z),lookYawOffset:0,pitch:-.35});
+  await page.evaluate(()=>{
+    const c=__sandboxTestContext;
+    // Read the actual published interaction and collider, not an omitted
+    // source module or a second copy of the room's placement calculation.
+    const use=c.activeInterior.interactions.find(i=>i.id==='personal-workspace');
+    const table=c.dynamicBuildingColliders.find(i=>i.sourceBuildingId==='personal-workspace'&&i.id==='workspace-table');
+    if(!use||!table)throw Error('Placed workspace has no interaction or table collider');
+    const yaw=Math.atan2(table.x-use.x,table.z-use.z);
+    Object.assign(c.Walk.state.walker,{x:use.x,z:use.z,y:table.minY+1.7,angle:yaw,yaw,lookYawOffset:0,pitch:-.35});
     c.worldDiscoveryRuntime.ui.setOpen(false);
   });
   await page.waitForFunction(()=>__sandboxTestContext.worldDiscoveryRuntime.personalHome.snapshot().interactionReady);
@@ -43,7 +48,7 @@ export async function verifyPersonalHome({page,out,report}) {
   await page.screenshot({path:`${out}/home-furniture-world.png`});
   const beforeContact=await page.evaluate(()=>({x:__sandboxTestContext.Walk.state.walker.x,z:__sandboxTestContext.Walk.state.walker.z}));
   await page.keyboard.down('w');await page.waitForTimeout(700);await page.keyboard.up('w');
-  const contact=await page.evaluate(async()=>{const c=__sandboxTestContext,{workspaceGeometry}=await import('/app/js/campaign/personal-workspace.js');const g=workspaceGeometry(c.activeInterior,c.worldDiscoveryRuntime.personalHome.snapshot().workspace.pose),w=c.Walk.state.walker;return {x:w.x,z:w.z,inside:g.parts.some(p=>w.x>p.minX&&w.x<p.maxX&&w.z>p.minZ&&w.z<p.maxZ)};});
+  const contact=await page.evaluate(()=>{const c=__sandboxTestContext,w=c.Walk.state.walker,parts=c.dynamicBuildingColliders.filter(p=>p.sourceBuildingId==='personal-workspace');return {x:w.x,z:w.z,inside:parts.some(p=>w.x>p.minX&&w.x<p.maxX&&w.z>p.minZ&&w.z<p.maxZ)};});
   report.furnitureContact={before:beforeContact,after:contact};
   assert.equal(contact.inside,false,'Walking cannot pass through the real furniture collision envelope');
   assert.ok(Math.hypot(contact.x-beforeContact.x,contact.z-beforeContact.z)>.02,'Keyboard movement must reach the desk collider');

@@ -1,6 +1,6 @@
 # Current development and release state
 
-Updated October 12, 2026. **5.5.0 is deployed to production.**
+Updated October 13, 2026. **5.5.0 is deployed to production.**
 Release: https://github.com/RRG314/WorldExplorer3D/releases/tag/v5.5.0
 Public project page: https://rrg314.github.io/WorldExplorer3D/
 
@@ -50,6 +50,61 @@ browsers/servers. Production deployment evidence is under
 `output/release-evidence/current/production-deployment.json` and
 `production-promotion.json`; acceptance gaps remain in their own receipts.
 
+## October 13 packaged verification and branch status
+
+The two active development branches, `steven/visual-quality` and
+`steven/post-5.2-release-integration`, contain the same preserved history. The
+latest game changes are in `10daf049`; the subsequent verification-only changes
+remove private source imports from packaged journey runners. They use the
+published coordinate/room owners, actual capture controls and observed fish
+positions. They do not change gameplay to satisfy the harness. Historical
+feature branches retain their independent commits.
+
+The established ship-review preview serves immutable build
+`5.6.0+10daf049a2a7.82abc92b87951707.staging`. Its remote manifests match the
+local package. Complete packaged opening and coastal journeys pass 28 and 23
+checks respectively, with no page errors or failed local resources. Coastal
+verification includes 1,440 actual fish depth/motion observations. Ship
+traversal, regional arrival, marine transitions, post-release lifecycle and all
+five analytics destinations also pass their scoped checks. Controlled analytics
+collection is not proof of production analytics delivery.
+
+The complete backend run passes all three gate groups, including all 14 backend
+stages, two-player world/account checks, shared-voyage recovery and current live
+environment feeds. Those results do not establish ordinary production App Check
+or physical-device acceptance. The aquarium's 33 functional checks and museum
+room/exhibit/return checks pass; their natural heap readings remain above the
+current limit. Diagnostic garbage collection is not used to turn those limits
+into passing results.
+
+The current sustained performance run finished twelve world exits/reloads and
+630 seconds of mixed travel. Building/road coverage, movement, storage, scene
+release and mobile-layout regression pass. Retained JavaScript memory after
+cleanup stays near 50–56 MiB; the final world retains 49,080 buildings and 18,952
+roads. No browser errors or failed local resources were captured. Desktop mode,
+frame-pacing and transfer budgets fail: recurring ground-travel pauses remain,
+and the first flight sample includes a 1.15-second pause. Average FPS alone is
+not the release decision.
+
+The subsequent source chain passes all 2,528 tests with no skips or failures,
+plus dependency, ownership, boundary, runtime-name, inventory and sensitivity
+checks. A separate instrumented keyboard route travels 211.45 world units and
+correlates slow frames with mapped-water canvas readback, scenery GPU uploads
+and shader work, a full capture-index validation scan, and garbage collection.
+This is diagnosis, not an uninstrumented improvement or a new passing result.
+Prioritize staged graphics preparation before the existing atomic regional
+handoff and bounded readback/index work, preserving coverage, cancellation and
+in-place building edits. No speculative collision or terrain changes were made.
+
+Stable remains `33edf9ad`, and production remains the 5.5 build above. PR 99 and
+the 5.6 release remain drafts. Do not promote them or describe this as a fully
+certified release. Preserve the complete old baseline separately from current
+focused receipts. The verification changes alter the acceptance fingerprint;
+a newly committed immutable package and complete current evidence are still
+required for formal finalization, together with resolution of the observed
+performance failures. Current receipts and their scope are recorded in
+`output/production-readiness-20261012/remaining-review-ledger.json`.
+
 ## October 12 branch reconciliation and release follow-up
 
 `steven/visual-quality` and `steven/post-5.2-release-integration` were atomically
@@ -88,8 +143,8 @@ checks. Furniture actions publish through the existing interior owner.
 The research-deck HUD now keeps the map beside its title and removes repeated
 station text, preserving 44-pixel phone actions. Its complete coastal journey
 passes the phone layout check. Root and Pages galleries include the missing
-aquarium-overlook view. The latest corrections still require a new immutable
-package and release checks before stable/production promotion.
+aquarium-overlook view. These corrections were subsequently packaged in the
+October 13 preview above; the remaining release failures are recorded there.
 
 ## October 12 ordinary player walkthroughs — release still under review
 

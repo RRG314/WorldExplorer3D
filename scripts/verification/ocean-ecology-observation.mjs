@@ -1,25 +1,33 @@
 import assert from 'node:assert/strict';
+import {fitFishToWater} from '../../app/js/ocean/fish-water-envelope.js';
 export async function verifyOceanEcology({page,dir,report}){
  const observed=await page.evaluate(async()=>{
   const {ctx}=await import('/app/js/shared-context.js?v=55'),mode=ctx.oceanMode;
-  const {fitFishToWater}=await import('/app/js/ocean/fish-water-envelope.js');
   const ids=mode.fishEntities.map(f=>f.mesh.uuid),before=mode.fishEntities.map(f=>f.mesh.position.clone());
-  const failures=[],seen=new Set();let samples=0,maxStep=0,last=mode.lastFrameMs;
+  const failures=[],envelopes=[],seen=new Set();let samples=0,maxStep=0,last=mode.lastFrameMs;
   let previous=before.map(p=>p.clone());
   for(let frame=0;frame<180;frame++){
    await new Promise(requestAnimationFrame);const now=mode.lastFrameMs,dt=(now-last)/1000;last=now;samples++;
    for(let i=0;i<mode.fishEntities.length;i++){
     const f=mode.fishEntities[i],p=f.mesh.position,school=mode.fishSchools[f.schoolIndex];
-    const fit=fitFishToWater({...p,radius:f.radius,water:mode.waterSurface.sample(p.x,p.z),depthBand:school.spawnDepthMeters,nearBottom:school.waterColumnPosition==='near-bottom'});
-    if(f.mesh.visible){seen.add(f.mesh.uuid);if(!fit||Math.abs(fit.y-p.y)>.02||mode.habitat?.collision(p,f.radius))failures.push({id:f.speciesId,p:p.toArray(),fit});}
+    if(f.mesh.visible){
+      seen.add(f.mesh.uuid);
+      const sample=mode.waterSurface.sample(p.x,p.z),volume=sample?.volume||sample;
+      envelopes.push({x:p.x,y:p.y,z:p.z,radius:f.radius,water:{surfaceY:volume?.surfaceY,bottomY:volume?.bottomY,metersPerWorldUnit:volume?.metersPerWorldUnit},depthBand:school.spawnDepthMeters,nearBottom:school.waterColumnPosition==='near-bottom'});
+      if(mode.habitat?.collision(p,f.radius))failures.push({id:f.speciesId,p:p.toArray(),kind:'habitat-overlap'});
+    }
     const step=p.distanceTo(previous[i]);maxStep=Math.max(maxStep,step);if(step>Math.min(.1,dt)*f.moveSpeed*1.2+.01)failures.push({kind:'teleport',step,dt});previous[i].copy(p);
    }
   }
-  return {count:ids.length,samples,visibleCount:seen.size,failures:failures.slice(0,10),maxStep,moving:mode.fishEntities.filter((f,i)=>f.mesh.position.distanceTo(before[i])>.1).length,
+  return {count:ids.length,samples,visibleCount:seen.size,failures:failures.slice(0,10),envelopes,maxStep,moving:mode.fishEntities.filter((f,i)=>f.mesh.position.distanceTo(before[i])>.1).length,
    species:[...new Set(mode.fishEntities.map(f=>f.speciesId))],authority:mode.fishPopulationContext.authorityVersion,
    geometry:mode.renderer.info.memory.geometries,texture:mode.renderer.info.memory.textures,
    livePresenceClaim:mode.underwaterSchoolPlan.livePresenceClaim};
  });
+ // The runner checks sampled water bounds outside the browser. The delivered
+ // game stays untouched and does not import private source-only helpers.
+ for(const sample of observed.envelopes){const fit=fitFishToWater(sample);assert.ok(fit&&Math.abs(fit.y-sample.y)<=.02,'Rendered fish remains inside its water and depth envelope');}
+ observed.envelopeSamples=observed.envelopes.length;delete observed.envelopes;
  assert.equal(observed.authority,'water-fish-authority-v3');assert.deepEqual(observed.species,['giant_trevally']);assert.equal(observed.livePresenceClaim,false);
  assert.equal(observed.count,8);assert.equal(observed.visibleCount,8);assert.ok(observed.moving>=6,JSON.stringify(observed));assert.deepEqual(observed.failures,[]);
  report.ecology=observed;report.cases.push({id:'actual-reef-school-regional-depth-habitat-motion-envelope-180-frames',passed:true});

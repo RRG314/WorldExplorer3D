@@ -6,41 +6,31 @@ export async function verifyThreeViews({page,out,report}){
  await page.waitForFunction(()=>globalThis.__sandboxTestContext.worldDiscoveryRuntime.threeViews.snapshot().phase==='choose');
  // Controlled camera/actor poses exercise actual loaded GIS meshes, rendering
  // and UI. They are explicitly not an uncoached walk between viewpoints.
- const poses=await page.evaluate(async()=>{
-  const ctx=globalThis.__sandboxTestContext,T=THREE;
-  const {inspectPhotoSubject}=await import('/app/js/campaign/three-views-capture.js');
-  const {validateView}=await import('/app/js/campaign/three-views.js');
+ // Repeat the reviewed Baltimore subject, using its current mapped footprint
+ // to place the camera. Shutter selection, visibility/depth validation and
+ // saving all remain the actual packaged game. This fixture does not publish
+ // private campaign modules or inject a substitute capture implementation.
+ const poses=await page.evaluate(()=>{
+  const ctx=globalThis.__sandboxTestContext;
   ctx.setTravelMode('walk');
-  const actor=ctx.Walk.state.walker,origin={x:actor.x,z:actor.z};
-  const identity={regionId:ctx.worldDiscoveryRuntime.worldIdentityId,regionLabel:ctx.worldDiscoveryRuntime.regionLabel};
-  const nearest=ctx.buildings.filter(b=>b.pts?.length>=3&&b.sourceBuildingId).map(b=>({b,x:b.pts.reduce((n,p)=>n+p.x,0)/b.pts.length,z:b.pts.reduce((n,p)=>n+p.z,0)/b.pts.length})).sort((a,b)=>Math.hypot(a.x-origin.x,a.z-origin.z)-Math.hypot(b.x-origin.x,b.z-origin.z)).slice(0,18);
-  let selected=null;
-  for(const {b,x,z} of nearest){
-   const radius=Math.max(...b.pts.map(p=>Math.hypot(p.x-x,p.z-z))),ground=Number(b.baseY??b.minY??0);
-   const target={x,y:ground+2.1,z},options=[];
-   for(const distance of [radius+12,radius+30,radius+55])for(let angle=0;angle<Math.PI*2;angle+=Math.PI/4){
-    const pose={x:x+Math.sin(angle)*distance,z:z+Math.cos(angle)*distance,y:ground+1.75,target};
-    if(ctx.checkBuildingCollision?.(pose.x,pose.z,0.4)?.collision)continue;
-    ctx.camera.position.set(pose.x,pose.y,pose.z);ctx.camera.lookAt(target.x,target.y,target.z);ctx.camera.updateMatrixWorld(true);
-    try{const hit=inspectPhotoSubject(ctx,identity,String(b.sourceBuildingId));options.push({...pose,view:hit.view,subject:hit.subject});}catch{}
-   }
-   for(const context of options.filter(p=>p.view.range>=20)){
-    const state={mode:'observation',subject:context.subject,regionId:identity.regionId,views:[{...context.view,kind:'context'}]};
-    const detail=options.find(p=>{try{validateView(state,{...p.view,kind:'detail'});return true;}catch{return false;}});if(!detail)continue;
-    state.views.push({...detail.view,kind:'detail'});
-    const setting=options.find(p=>{try{validateView(state,{...p.view,kind:'setting'});return true;}catch{return false;}});
-    if(setting){selected={context,detail,setting};break;}
-   }
-   if(selected)break;
-   await new Promise(r=>setTimeout(r,0));
-  }
-  if(!selected)throw Error(`No clear three-view subject found in ${nearest.length} loaded building candidates`);
+  const actor=ctx.Walk.state.walker;
+  const subjectId='overture:cbf3a3ad-3dfb-4b3f-9df6-59abc05771b7';
+  const b=ctx.buildings.find(b=>b.sourceBuildingId===subjectId&&b.pts?.length>=3);
+  if(!b)throw Error('The reviewed Baltimore photo subject is missing from the loaded world');
+  const x=b.pts.reduce((n,p)=>n+p.x,0)/b.pts.length,z=b.pts.reduce((n,p)=>n+p.z,0)/b.pts.length;
+  const distance=Math.max(...b.pts.map(p=>Math.hypot(p.x-x,p.z-z)))+12,ground=Number(b.baseY??b.minY??0);
+  const target={x,y:ground+2.1,z};
+  const selected=Object.fromEntries([['context',Math.PI*3/4],['detail',Math.PI/2],['setting',Math.PI*5/4]].map(([kind,angle])=>{
+   const pose={x:x+Math.sin(angle)*distance,z:z+Math.cos(angle)*distance,y:ground+1.75,target,subjectId};
+   if(ctx.checkBuildingCollision?.(pose.x,pose.z,.4)?.collision)throw Error(`Reviewed ${kind} camera pose is obstructed`);
+   return [kind,pose];
+  }));
   globalThis.__photoPoses=selected;globalThis.__photoPose=selected.context;
   globalThis.__photoRigDispose=ctx.registerRuntimeSystem({id:'verification.photo-pose',owner:'verification',phase:'camera',priority:10000,update(){
    const p=globalThis.__photoPose;ctx.camera.position.set(p.x,p.y,p.z);ctx.camera.lookAt(p.target.x,p.target.y,p.target.z);
    Object.assign(actor,{x:p.x,y:p.y-1.75,z:p.z});
   }});
-  return Object.fromEntries(Object.entries(selected).map(([k,p])=>[k,{x:p.x,y:p.y,z:p.z,subject:p.subject,view:p.view}]));
+  return selected;
  });
  report.photoPoses=poses;
  await page.waitForTimeout(300);
@@ -66,10 +56,11 @@ export async function verifyThreeViews({page,out,report}){
  const download=page.waitForEvent('download');await page.locator('[data-photo-action="export"]').click();const file=await download;await file.saveAs(`${out}/three-views.html`);
  const check=await page.evaluate(async()=>{
   const ctx=globalThis.__sandboxTestContext,store=ctx.discoveryProfileStore,backup=await store.exportData();
-  const images=backup.albums[0].photos;
+  const images=backup.albums[0].photos,record=(await store.getProfile()).threeViews;
+  if(record.subject.id!==globalThis.__photoPoses.context.subjectId)throw Error('Shutter selected a different mapped subject');
   if(new Set(images.map(p=>p.dataUrl)).size!==3)throw Error('Duplicate or missing actual scene images');
   await store.importData(backup);await ctx.worldDiscoveryRuntime.threeViews.refresh();globalThis.__photoRigDispose();
-  return {photos:images.length,bytes:images.reduce((n,p)=>n+p.dataUrl.length,0),receipts:(await store.getEventsById(['event:campaign-completed:three-views:v1'])).length};
+  return {subject:record.subject,views:record.views,photos:images.length,bytes:images.reduce((n,p)=>n+p.dataUrl.length,0),receipts:(await store.getEventsById(['event:campaign-completed:three-views:v1'])).length};
  });
  assert.equal(check.photos,3);assert.equal(check.receipts,1);report.photoAlbum=check;report.checks.threeRealViewsSavedExportedRestored=true;
  await page.setViewportSize({width:1440,height:900});

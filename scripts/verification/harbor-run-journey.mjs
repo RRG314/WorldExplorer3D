@@ -20,11 +20,10 @@ export async function verifyHarborRun({page,out,report}) {
  // actual key input and ordinary vehicle physics before bounded route traversal.
  const route=await page.evaluate(async()=>{
   const ctx=globalThis.__sandboxTestContext;ctx.setTravelMode('drive');
-  const {earthCoordinateFrame}=await import('/app/js/earth-core/coordinate-frame.js?v=1');
   const route=(await ctx.discoveryProfileStore.getProfile()).harborRun.route;
-  const f=earthCoordinateFrame(ctx.LOC,ctx.SCALE),p=f.toWorld(route.pickup.lat,route.pickup.lon),next=f.toWorld(route.points[1].lat,route.points[1].lon);
+  const p=ctx.geoToWorld(route.pickup.lat,route.pickup.lon),next=ctx.geoToWorld(route.points[1].lat,route.points[1].lon);
   Object.assign(ctx.car,{x:p.x,z:p.z,y:route.pickup.y+1.1,speed:0,vx:0,vz:0,angle:Math.atan2(next.x-p.x,next.z-p.z)});
-  const box=route.pickupCase,worldCase=f.toWorld(box.lat,box.lon);
+  const box=route.pickupCase,worldCase=ctx.geoToWorld(box.lat,box.lon);
   const closest=Math.min(...ctx.streetFurnitureMeshes.map(o=>{const q=o.userData.furniturePos||o.position;return Math.hypot(q.x-worldCase.x,q.z-worldCase.z);}));
   if(closest<3)throw Error('Case overlaps a street fixture');
   return route;
@@ -46,12 +45,12 @@ export async function verifyHarborRun({page,out,report}) {
  // in sub-metre increments. It exercises the runtime's real physical support,
  // arrival and save rules, but is not claimed as a full keyboard-driven route.
  report.harborTraversal=await page.evaluate(async()=>{
-  const ctx=globalThis.__sandboxTestContext,{earthCoordinateFrame}=await import('/app/js/earth-core/coordinate-frame.js?v=1');
-  const f=earthCoordinateFrame(ctx.LOC,ctx.SCALE),route=(await ctx.discoveryProfileStore.getProfile()).harborRun.route;
+  const ctx=globalThis.__sandboxTestContext;
+  const route=(await ctx.discoveryProfileStore.getProfile()).harborRun.route;
   const runtime=ctx.worldDiscoveryRuntime.harborRun;
   const until=performance.now()+120000;let steps=0;
   while(runtime.snapshot().phase==='driving'&&performance.now()<until){
-    const snap=runtime.snapshot(),index=snap.resumeNeeded?Math.max(0,snap.nextPoint-1):snap.nextPoint,target=route.points[index],p=f.toWorld(target.lat,target.lon);
+    const snap=runtime.snapshot(),index=snap.resumeNeeded?Math.max(0,snap.nextPoint-1):snap.nextPoint,target=route.points[index],p=ctx.geoToWorld(target.lat,target.lon);
     const dx=p.x-ctx.car.x,dz=p.z-ctx.car.z,d=Math.hypot(dx,dz),fraction=Math.min(1,1.5/Math.max(d,.001));
     const x=ctx.car.x+dx*fraction,z=ctx.car.z+dz*fraction,ground=ctx.SurfaceQuery.driveAt(x,z,{currentY:ctx.car.y,preferRoad:true});
     Object.assign(ctx.car,{x,z,y:ground.position.y+1.1,speed:0,vx:0,vz:0,angle:Math.atan2(dx,dz)});steps++;
@@ -61,8 +60,8 @@ export async function verifyHarborRun({page,out,report}) {
  });
  assert.equal(report.harborTraversal.state.phase,'unload');
  await page.evaluate(async()=>{
-  const ctx=globalThis.__sandboxTestContext,{earthCoordinateFrame}=await import('/app/js/earth-core/coordinate-frame.js?v=1');
-  const route=(await ctx.discoveryProfileStore.getProfile()).harborRun.route,p=earthCoordinateFrame(ctx.LOC,ctx.SCALE).toWorld(route.dropoff.lat,route.dropoff.lon);
+  const ctx=globalThis.__sandboxTestContext;
+  const route=(await ctx.discoveryProfileStore.getProfile()).harborRun.route,p=ctx.geoToWorld(route.dropoff.lat,route.dropoff.lon);
   Object.assign(ctx.car,{x:p.x,z:p.z,y:route.dropoff.y+1.1,speed:8});ctx.openWorldDiscoverySection('today');
  });
  await page.locator('[data-delivery-action="unload"]').click();
