@@ -35,6 +35,8 @@ async function launchBaltimore(page) {
   await page.goto(`${baseUrl}/app/?${params}`, { waitUntil: 'load', timeout: 120_000 });
   await page.evaluate(() => {
     localStorage.removeItem('world-explorer:local-commerce:v1');
+    localStorage.removeItem('world-explorer:character-backpack:v3');
+    localStorage.removeItem('world-explorer:backpack-controls:v2');
     localStorage.removeItem('world-explorer:character-backpack:v2');
   });
   await page.reload({ waitUntil: 'load', timeout: 120_000 });

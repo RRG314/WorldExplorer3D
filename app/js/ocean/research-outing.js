@@ -1,7 +1,10 @@
+import {createCoastalInvestigation} from '../campaign/coastal-investigation-runtime.js';
 import {createIndexedDbDiscoveryProfileStore} from '../discovery/profile-store.js?v=5';
 import {CORAL_SHELF_SITE} from './habitat-plan.js';
 import {researchStationDistance} from '../boat-mode/research/layout.js';
 import {earthLocalToGeographic} from '../earth-core/location-origin.js?v=1';
+import {createCoastalDeparture} from '../campaign/coastal-departure-runtime.js';
+import {createWildlifeObservation} from './wildlife-observation.js';
 export const REEF_SURVEY=Object.freeze({id:'coral-shelf-survey-v1',title:'Coral Shelf: first survey',sites:Object.freeze(['table-garden','branch-ridge','seagrass-edge']),labels:Object.freeze(['Table Garden','Branch Ridge','Seagrass Edge']),baseRange:18,upgradedRange:35});
 const eventId=part=>`${REEF_SURVEY.id}:${part}`;
 const ids=['brief',...REEF_SURVEY.sites,'report'].map(eventId);
@@ -25,10 +28,13 @@ export function ensureMarineResearch(ctx,{store:providedStore,now=()=>Date.now()
  let events=[],ready=false,busy=false,error='',message='',selected=REEF_SURVEY.sites[0],sequence=0;
  const store=()=>providedStore||(ctx.discoveryProfileStore ||= createIndexedDbDiscoveryProfileStore());
  const state=()=>reefSurveyState(events);
+ const coastal=createCoastalDeparture(ctx,{store,survey:state,now});
+ const investigation=createCoastalInvestigation(ctx,{store,coastal:()=>coastal.snapshot(),atLab,now});
+ const wildlife=createWildlifeObservation(ctx,{store,now});
  async function refresh(){const token=++sequence;try{const records=await store().getEventsById(ids);if(token===sequence){events=records;ready=true;error='';}return true;}catch{if(token===sequence){ready=false;error='Journal unavailable. Progress has not been changed; retry when storage is available.';}return false;}}
  function atLab(){
   const deck=ctx.boatDeck?.snapshot(),voyage=ctx.oceanVoyage?.current;
-  if(!deck?.active||researchStationDistance(deck.pose,'lab')>2.4||!ctx.boatMode?.active||ctx.boatMode.transportCatalogId!=='ocean-research-vessel'||ctx.boatMode.transportEntityId!==voyage?.ship.transportEntityId)return false;
+  if(!deck?.active||(ctx.boatDeck?.stationDistance?.('lab')??researchStationDistance(deck.pose,'lab'))>2.4||!ctx.boatMode?.active||ctx.boatMode.transportCatalogId!=='ocean-research-vessel'||ctx.boatMode.transportEntityId!==voyage?.ship.transportEntityId)return false;
   const geo=earthLocalToGeographic(ctx.LOC,ctx.SCALE,ctx.boat.x,ctx.boat.z);
   return !!geo&&Math.hypot((geo.lat-CORAL_SHELF_SITE.lat)*111000,(geo.lon-CORAL_SHELF_SITE.lon)*105000)<600;
  }
@@ -36,7 +42,7 @@ export function ensureMarineResearch(ctx,{store:providedStore,now=()=>Date.now()
  function target(){const s=state(),id=s.completed?selected:REEF_SURVEY.sites.find(id=>!s.scans.includes(id));return ctx.oceanMode?.habitat?.plan.landmarks.find(l=>l.id===id)||null;}
  function admission(){const mode=ctx.oceanMode,actor=mode?.diver?.active?mode.diver.navigationActor():mode?.submarine;
   return reefScanAdmission({active:!!mode?.active,paused:!!ctx.paused,ready:ready&&mode?.habitat?.group.userData.habitat.assetState==='ready',position:actor?.position,speed:actor?.speed,verticalSpeed:actor?.verticalSpeed??actor?.vy??0,target:target(),rangeMeters:state().rangeMeters,metersPerUnit:ctx.METERS_PER_WORLD_UNIT||1});}
- function record(part,name,detail,extra={}){const underwater=!!ctx.oceanMode?.active,actor=underwater?(ctx.oceanMode.diver?.active?ctx.oceanMode.diver.navigationActor().position:ctx.oceanMode.submarine.position):ctx.boat;const geo=earthLocalToGeographic(underwater?ctx.oceanMode.launchSite||CORAL_SHELF_SITE:ctx.LOC,ctx.SCALE,actor?.x||0,actor?.z||0)||CORAL_SHELF_SITE;return {eventId:eventId(part),eventType:'marine-research-recorded',sourceSystem:'marine-research',sourceId:eventId(part),activityId:REEF_SURVEY.id,pathId:'field',name,detail,occurredAt:now(),regionLabel:'Coral Shelf authored study',environment:ctx.oceanMode?.active?'OCEAN':'EARTH',locationSnapshot:{...geo,name:'Coral Shelf authored habitat'},localPosition:{x:actor?.x,y:actor?.y,z:actor?.z},projections:{journal:true,profile:false,place:false,missionProgress:false},progress:{points:0,reason:'local-marine-research'},metadata:{truthType:'authored',...extra}};}
+ function record(part,name,detail,extra={}){const underwater=!!ctx.oceanMode?.active,actor=underwater?(ctx.oceanMode.diver?.active?ctx.oceanMode.diver.navigationActor().position:ctx.oceanMode.submarine.position):ctx.boat;const geo=earthLocalToGeographic(underwater?ctx.oceanMode.frameOrigin||ctx.oceanMode.launchSite||CORAL_SHELF_SITE:ctx.LOC,ctx.SCALE,actor?.x||0,actor?.z||0)||CORAL_SHELF_SITE;return {eventId:eventId(part),eventType:'marine-research-recorded',sourceSystem:'marine-research',sourceId:eventId(part),activityId:REEF_SURVEY.id,pathId:'field',name,detail,occurredAt:now(),regionLabel:'Coral Shelf authored study',environment:ctx.oceanMode?.active?'OCEAN':'EARTH',locationSnapshot:{...geo,name:'Coral Shelf authored habitat'},localPosition:{x:actor?.x,y:actor?.y,z:actor?.z},projections:{journal:true,profile:false,place:false,missionProgress:false},progress:{points:0,reason:'local-marine-research'},metadata:{truthType:'authored',...extra}};}
  async function save(value){const result=await store().recordExplorerEvent(value);if(!result.recorded&&result.reason!=='already-recorded')throw Error('Journal rejected record');if(result.event?.sourceSystem!=='marine-research'||result.event?.activityId!==REEF_SURVEY.id||result.event?.metadata?.truthType!=='authored')throw Error('Journal ID belongs to another record');await refresh();if(!ready)throw Error('Journal confirmation unavailable');return result;}
  async function labAction(){
   if(ctx.sharedMarine?.active)return false;
@@ -65,7 +71,7 @@ export function ensureMarineResearch(ctx,{store:providedStore,now=()=>Date.now()
   else if(!ctx.oceanMode?.active)instruction=s.completed?'Scanner II installed · 35 m range. Walk to the submarine cradle for a follow-up dive.':`${s.scans.length}/3 scans saved. Walk to the submarine cradle and deploy to continue.`;
   else if(t){const actor=ctx.oceanMode.diver?.active?ctx.oceanMode.diver.navigationActor():ctx.oceanMode.submarine;const heading=((180-Math.atan2(t.x-actor.position.x,t.z-actor.position.z)*180/Math.PI)%360+360)%360;instruction=`${s.completed?'Scanner II':`${s.scans.length}/3 saved`} · ${t.label} · ${Number.isFinite(gate.distance)?Math.round(gate.distance):'—'} m · bearing ${Math.round(heading)}° · target SIM depth ${Math.round(-t.y*(ctx.METERS_PER_WORLD_UNIT||1))} m. ${gate.reason}`;}
   else instruction='Return to the Coral Shelf launch area; the next study site is outside this local scene.';
-  return {...s,report:s.completed?events.filter(e=>e.eventId!==eventId('brief')).map(({eventId,name,detail})=>({eventId,name,detail})):[],ready,busy,visible:visible(),atLab:atLab(),targetId:t?.id||null,target:t?{...t}:null,canScan:ready&&s.started&&gate.allowed,labLabel:!ready?'Retry Journal':!s.started?'Take reef survey briefing':s.stage==='report'?'Submit survey · install Scanner II':s.completed?'Review Scanner II':'Review survey progress',instruction,message:error||message,storage:store().type==='IndexedDbDiscoveryProfileStore'?'device':'session'};
+  return {...s,coastal:coastal.snapshot(),investigation:investigation.snapshot(),report:s.completed?events.filter(e=>e.eventId!==eventId('brief')).map(({eventId,name,detail})=>({eventId,name,detail})):[],ready,busy,visible:visible(),atLab:atLab(),targetId:t?.id||null,target:t?{...t}:null,canScan:ready&&s.started&&gate.allowed,labLabel:!ready?'Retry Journal':!s.started?'Take reef survey briefing':s.stage==='report'?'Submit survey · install Scanner II':s.completed?'Review Scanner II':'Review survey progress',instruction,message:error||message,storage:store().type==='IndexedDbDiscoveryProfileStore'?'device':'session'};
  }
- const api={refresh,labAction,scan,snapshot,select:id=>{if(REEF_SURVEY.sites.includes(id)){selected=id;message='';}}};ctx.marineResearch=api;void refresh();return api;
+ const api={coastal,investigation,wildlife,refresh,labAction,scan,snapshot,select:id=>{if(REEF_SURVEY.sites.includes(id)){selected=id;message='';}}};ctx.marineResearch=api;void refresh();void coastal.refresh();void investigation.refresh();return api;
 }

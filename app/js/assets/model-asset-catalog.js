@@ -1,6 +1,268 @@
 const MODEL_ASSET_SCHEMA_VERSION = 1;
 
 const MODEL_ASSET_CATALOG = Object.freeze([
+  ...[
+  {
+    "schemaVersion": 1,
+    "id": "aquarium-blacktip-reef-shark",
+    "label": "Blacktip reef shark",
+    "url": "/app/assets/models/interiors/aquarium/blacktip-reef-shark.glb",
+    "roles": [
+      "aquarium-animal"
+    ],
+    "license": "CC-BY-4.0",
+    "sourceUrl": "https://sketchfab.com/3d-models/blacktip-reef-shark-a52bb96c5a0c4157b49982471f8902b0",
+    "attribution": "Blacktip reef shark by Lais.Marques. CC BY 4.0. Parent-only centering, orientation and metre scale using sampled animated bounds; textures resized to 1K. Original bones, bind matrices, mesh topology and authored animation retained. This is a species illustration, not a scan of a National Aquarium animal.",
+    "sourceUpAxis": "y",
+    "sourceForwardAxis": "z",
+    "collisionPolicy": "validated-aquarium-habitat",
+    "instancePolicy": {
+      "geometry": "shared",
+      "materials": "shared"
+    },
+    "loadPolicy": {
+      "bounded": true,
+      "timeoutMs": 20000
+    },
+    "budgets": {
+      "bytes": 4000000,
+      "triangles": 20000,
+      "textureEdgePixels": 1024,
+      "maxInstances": 4
+    }
+  },
+  {
+    "schemaVersion": 1,
+    "id": "aquarium-green-sea-turtle",
+    "label": "Green sea turtle",
+    "url": "/app/assets/models/interiors/aquarium/green-sea-turtle.glb",
+    "roles": [
+      "aquarium-animal"
+    ],
+    "license": "CC-BY-4.0",
+    "sourceUrl": "https://sketchfab.com/3d-models/green-sea-turtle-d3dc6a6a4ff74465a59105fd7c66b32b",
+    "attribution": "Green sea turtle by jgrabo20. CC BY 4.0. Parent-only centering, orientation and metre scale using sampled animated bounds; textures resized to 1K. Original bones, bind matrices, mesh topology and authored animation retained. This is a species illustration, not a scan of a National Aquarium animal.",
+    "sourceUpAxis": "y",
+    "sourceForwardAxis": "z",
+    "collisionPolicy": "validated-aquarium-habitat",
+    "instancePolicy": {
+      "geometry": "shared",
+      "materials": "shared"
+    },
+    "loadPolicy": {
+      "bounded": true,
+      "timeoutMs": 20000
+    },
+    "budgets": {
+      "bytes": 4000000,
+      "triangles": 20000,
+      "textureEdgePixels": 1024,
+      "maxInstances": 1
+    }
+  }
+],
+  ...[
+  {
+    "schemaVersion": 1,
+    "id": "museum-smithsonian-triceratops",
+    "label": "Triceratops horridus",
+    "url": "/app/assets/models/interiors/museum/smithsonian-triceratops.glb",
+    "roles": [
+      "museum-exhibit"
+    ],
+    "license": "CC0-1.0",
+    "sourceUrl": "https://3d-api.si.edu/content/document/3d_package:d8c623be-4ebc-11ea-b77f-2e728ce88125/resources/Triceratops_horridus_Marsh_1889-150k-4096.glb",
+    "attribution": "Smithsonian Institution, National Museum of Natural History. CC0. Uniform display normalization; scan mounts retained; simplified geometry; textures resized (JPEG for opaque images, PNG for alpha). Artwork converted to a textured panel; no reproduction claims about the host museum.",
+    "sourceUpAxis": "y",
+    "collisionPolicy": "validated-gallery-display-proxy",
+    "instancePolicy": {
+      "geometry": "shared",
+      "materials": "shared"
+    },
+    "loadPolicy": {
+      "bounded": true,
+      "timeoutMs": 20000
+    },
+    "budgets": {
+      "bytes": 4500000,
+      "triangles": 50000,
+      "textureEdgePixels": 1024,
+      "maxInstances": 1
+    }
+  },
+  {
+    "schemaVersion": 1,
+    "id": "museum-smithsonian-triceratops-lod",
+    "label": "Triceratops horridus",
+    "url": "/app/assets/models/interiors/museum/smithsonian-triceratops-lod.glb",
+    "roles": [
+      "museum-exhibit"
+    ],
+    "license": "CC0-1.0",
+    "sourceUrl": "https://3d-api.si.edu/content/document/3d_package:d8c623be-4ebc-11ea-b77f-2e728ce88125/resources/Triceratops_horridus_Marsh_1889-150k-4096.glb",
+    "attribution": "Smithsonian Institution, National Museum of Natural History. CC0. Uniform display normalization; scan mounts retained; simplified geometry; textures resized (JPEG for opaque images, PNG for alpha). Artwork converted to a textured panel; no reproduction claims about the host museum.",
+    "sourceUpAxis": "y",
+    "collisionPolicy": "validated-gallery-display-proxy",
+    "instancePolicy": {
+      "geometry": "shared",
+      "materials": "shared"
+    },
+    "loadPolicy": {
+      "bounded": true,
+      "timeoutMs": 20000
+    },
+    "budgets": {
+      "bytes": 4500000,
+      "triangles": 50000,
+      "textureEdgePixels": 512,
+      "maxInstances": 1
+    }
+  },
+  {
+    "schemaVersion": 1,
+    "id": "museum-smithsonian-coral",
+    "label": "Madrepora formosa \u00b7 USNM 292",
+    "url": "/app/assets/models/interiors/museum/smithsonian-coral.glb",
+    "roles": [
+      "museum-exhibit"
+    ],
+    "license": "CC0-1.0",
+    "sourceUrl": "https://3d-api.si.edu/content/document/3d_package:03d6b38a-bf7d-4334-90c9-1f7b4c3041a9/resources/usnm_292-100k-2048_std.glb",
+    "attribution": "Smithsonian Institution, National Museum of Natural History. CC0. Uniform display normalization; scan mounts retained; simplified geometry; textures resized (JPEG for opaque images, PNG for alpha). Artwork converted to a textured panel; no reproduction claims about the host museum.",
+    "sourceUpAxis": "y",
+    "collisionPolicy": "validated-gallery-display-proxy",
+    "instancePolicy": {
+      "geometry": "shared",
+      "materials": "shared"
+    },
+    "loadPolicy": {
+      "bounded": true,
+      "timeoutMs": 20000
+    },
+    "budgets": {
+      "bytes": 4500000,
+      "triangles": 24000,
+      "textureEdgePixels": 1024,
+      "maxInstances": 1
+    }
+  },
+  {
+    "schemaVersion": 1,
+    "id": "museum-smithsonian-coral-lod",
+    "label": "Madrepora formosa \u00b7 USNM 292",
+    "url": "/app/assets/models/interiors/museum/smithsonian-coral-lod.glb",
+    "roles": [
+      "museum-exhibit"
+    ],
+    "license": "CC0-1.0",
+    "sourceUrl": "https://3d-api.si.edu/content/document/3d_package:03d6b38a-bf7d-4334-90c9-1f7b4c3041a9/resources/usnm_292-100k-2048_std.glb",
+    "attribution": "Smithsonian Institution, National Museum of Natural History. CC0. Uniform display normalization; scan mounts retained; simplified geometry; textures resized (JPEG for opaque images, PNG for alpha). Artwork converted to a textured panel; no reproduction claims about the host museum.",
+    "sourceUpAxis": "y",
+    "collisionPolicy": "validated-gallery-display-proxy",
+    "instancePolicy": {
+      "geometry": "shared",
+      "materials": "shared"
+    },
+    "loadPolicy": {
+      "bounded": true,
+      "timeoutMs": 20000
+    },
+    "budgets": {
+      "bytes": 4500000,
+      "triangles": 24000,
+      "textureEdgePixels": 512,
+      "maxInstances": 1
+    }
+  },
+  {
+    "schemaVersion": 1,
+    "id": "museum-met-cypresses",
+    "label": "Wheat Field with Cypresses",
+    "url": "/app/assets/models/interiors/museum/met-cypresses.glb",
+    "roles": [
+      "museum-exhibit"
+    ],
+    "license": "CC0-1.0",
+    "sourceUrl": "https://images.metmuseum.org/CRDImages/ep/web-large/DP-42549-001.jpg",
+    "attribution": "Vincent van Gogh / The Metropolitan Museum of Art. CC0. Uniform display normalization; scan mounts retained; simplified geometry; textures resized (JPEG for opaque images, PNG for alpha). Artwork converted to a textured panel; no reproduction claims about the host museum.",
+    "sourceUpAxis": "y",
+    "collisionPolicy": "validated-gallery-display-proxy",
+    "instancePolicy": {
+      "geometry": "shared",
+      "materials": "shared"
+    },
+    "loadPolicy": {
+      "bounded": true,
+      "timeoutMs": 20000
+    },
+    "budgets": {
+      "bytes": 4500000,
+      "triangles": 2,
+      "textureEdgePixels": 1024,
+      "maxInstances": 1
+    }
+  }
+].map(record=>Object.freeze(record)),
+  Object.freeze({
+    schemaVersion:MODEL_ASSET_SCHEMA_VERSION,id:'facility-chainlink-kit',label:'Modular Chainlink Fence · Poly Haven',
+    url:'/app/assets/models/facilities/chainlink/chainlink-kit.glb',roles:Object.freeze(['facility-boundary']),license:'CC0-1.0',
+    sourceUrl:'https://polyhaven.com/a/modular_chainlink_fence',
+    attribution:'Modular Chainlink Fence by James Ray Cock; wire material by Amal Kumar. CC0. Extracted panel and post, simplified hardware, restored wire opacity.',
+    sourceUpAxis:'y',collisionPolicy:'mapped-facility-perimeter-with-access-clearance',
+    instancePolicy:Object.freeze({geometry:'shared',materials:'shared'}),
+    budgets:Object.freeze({bytes:2200000,triangles:1500,textureEdgePixels:1024,maxInstances:256})
+  }),
+  Object.freeze({
+    schemaVersion:MODEL_ASSET_SCHEMA_VERSION,id:'marine-common-dolphin',label:'Common Dolphin · CGreature / kenchoo',
+    url:'/app/assets/models/marine/common-dolphin/common-dolphin.glb',roles:Object.freeze(['marine-fauna']),license:'CC-BY-4.0',
+    sourceUrl:'https://sketchfab.com/3d-models/common-dolphin-12c27d41204f4b92895e36072b0ba8a6',
+    attribution:'Common Dolphin by CGreature, swimming animation by kenchoo. CC BY 4.0. Parent scale/orientation and resized textures; see bundled provenance.',
+    sourceUpAxis:'y',sourceForwardAxis:'z',collisionPolicy:'regional-cetacean-water-volume-and-obstacle-envelope',
+    instancePolicy:Object.freeze({geometry:'shared',materials:'shared'}),
+    budgets:Object.freeze({bytes:1300000,triangles:19000,textureEdgePixels:1024,maxInstances:3})
+  }),
+  Object.freeze({
+    schemaVersion:MODEL_ASSET_SCHEMA_VERSION,id:'marine-barramundi',label:'Barramundi · Microsoft',
+    url:'/app/assets/models/marine/barramundi/barramundi.glb',roles:Object.freeze(['marine-fauna']),license:'CC0-1.0',
+    sourceUrl:'https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/BarramundiFish',
+    attribution:'Barramundi Fish by Microsoft, CC0. Textures resized; normalized geometry and authored swimming motion.',
+    sourceUpAxis:'y',sourceForwardAxis:'z',collisionPolicy:'regional-fish-water-volume-and-obstacle-envelope',
+    instancePolicy:Object.freeze({geometry:'shared',materials:'clone'}),
+    budgets:Object.freeze({bytes:2800000,triangles:4000,textureEdgePixels:1024,maxInstances:3})
+  }),
+  ...['','-lod'].map(suffix=>Object.freeze({
+    schemaVersion: MODEL_ASSET_SCHEMA_VERSION, id: `marine-research-vessel-rcrv${suffix}`, label: `Explorer research vessel · RCRV adaptation${suffix?' distant model':''}`,
+    url: `/app/assets/models/marine/research-vessel/rcrv${suffix||'-walkable'}.glb`, roles: Object.freeze(['research-vessel']),
+    license: 'CC-BY-4.0', sourceUrl: 'https://sketchfab.com/3d-models/rcrv-regional-class-research-vessel-11b4b97a9e60497ea91c0727e404ecf6',
+    attribution: 'RCRV by Oregon State University Extension Service / Alan Dennis; game scale, walkable interior and door/stair openings, optimized geometry.',
+    sourceUpAxis: 'y', sourceForwardAxis: 'z', collisionPolicy: 'licensed-research-vessel-triangle-navigation',
+    instancePolicy: Object.freeze({geometry:'shared',materials:'shared'}),
+    budgets: Object.freeze({bytes:suffix?1200000:7000000,triangles:suffix?35000:180000,maxInstances:suffix?4:2})
+  })),
+  ...[
+    ['workspace-table','wooden_table_02','Wooden Table 02 by Serhii Khromov',196],
+    ['workspace-chair','SchoolChair_01','School Chair 01 by Ethan Place',5072]
+  ].map(([id,source,attribution,triangles])=>Object.freeze({
+    schemaVersion:MODEL_ASSET_SCHEMA_VERSION,id,label:attribution,
+    url:`/app/assets/models/interiors/personal-workspace/${id}.glb`,roles:Object.freeze(['personal-workspace-furnishing','ship-interior-furnishing']),
+    license:'CC0-1.0',sourceUrl:`https://polyhaven.com/a/${source}`,attribution,
+    sourceUpAxis:'y',collisionPolicy:'personal-workspace-validated-furniture-envelopes',
+    instancePolicy:Object.freeze({geometry:'clone',materials:'clone'}),
+    budgets:Object.freeze({bytes:500000,triangles,textureEdgePixels:1024,maxInstances:8})
+  })),
+  Object.freeze({
+    schemaVersion: MODEL_ASSET_SCHEMA_VERSION,
+    id: 'marine-atlantic-explorer-submarine', label: 'Atlantic Explorer research submarine',
+    url: '/app/assets/models/marine/atlantic-explorer-submarine.glb',
+    roles: Object.freeze(['research-submarine']), license: 'CC-BY-4.0',
+    sourceUrl: 'https://sketchfab.com/3d-models/atlantic-explorer-submarineglb-f1645a6ec3b54e81aed7b2c105cdd6e2',
+    attribution: 'Atlantic Explorer Submarine by JosephWPugsley; simplified geometry and resized textures.',
+    sourceUpAxis: 'y', sourceForwardAxis: 'z',
+    dimensionsMeters: Object.freeze({length: 8.108, width: 3.239, height: 3.277}),
+    collisionPolicy: 'ocean-submarine-clearance-and-obstacle-envelope',
+    instancePolicy: Object.freeze({geometry: 'shared', materials: 'shared'}),
+    budgets: Object.freeze({bytes: 8600000, triangles: 69000, textureEdgePixels: 1024, maxInstances: 2})
+  }),
   ...['table-coral','branch-coral','massive-coral'].flatMap(kind=>['','-lod'].map(suffix=>Object.freeze({
     schemaVersion:MODEL_ASSET_SCHEMA_VERSION,id:`marine-${kind}${suffix}`,label:`Smithsonian ${kind.replaceAll('-',' ')}${suffix?' distant model':''}`,
     url:`/app/assets/models/marine/${kind}${suffix}.glb`,roles:Object.freeze(['marine-habitat']),license:'CC0-1.0',

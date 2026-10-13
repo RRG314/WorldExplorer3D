@@ -1,3 +1,4 @@
+import {detachSceneObject} from '../engine/scene-object-lifecycle.js';
 import { ctx as appCtx } from '../shared-context.js?v=55';
 import { AVIATION_FLEET_CATALOG, getAviationCatalogEntry } from './aviation-catalog.js?v=5';
 import { aircraftGroundOffset, createAircraftVisual, updateAircraftVisual } from './aircraft-visual-recipe.js?v=11';
@@ -648,7 +649,7 @@ function disposeAviationRuntime(runtime, reason = 'disposed') {
   runtime.vehicles.forEach((vehicle) => vehicle.visual.dispose());
   runtime.hub?.dispose?.();
   if (runtime.group.parent?.remove) runtime.group.parent.remove(runtime.group);
-  else runtime.group.removeFromParent?.();
+  else detachSceneObject(runtime.group);
   runtime.vehicles.length = 0;
   runtime.reason = String(reason);
   if (activeRuntime === runtime) activeRuntime = null;

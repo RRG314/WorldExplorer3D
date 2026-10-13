@@ -1,6 +1,7 @@
 import test from 'node:test';import assert from 'node:assert/strict';
 import {oceanDiveAdmission,resolveOceanDiverCameraPose,parentVesselExitPose} from '../app/js/ocean/diver.js';
 import {parentHullCollision} from '../app/js/ocean/parent-vessel.js';
+import {RCRV_LAYOUT,RESEARCH_EYE_HEIGHT} from '../app/js/boat-mode/research/layout.js';
 test('parent vessel hull uses catalogue draft and blocks its submerged volume at every heading',()=>{
  for(const yaw of [0,.5,Math.PI/2,Math.PI]){
   const ship={transportCatalogId:'ocean-research-vessel',yaw};
@@ -14,8 +15,8 @@ test('research-vessel water entry remains outside the hull and rotates with its 
   const ship={transportCatalogId:'ocean-research-vessel',yaw};
   const ladder=parentVesselExitPose(ship,1),jump=parentVesselExitPose(ship,1,true);
   assert.equal(parentHullCollision(ship,ladder,.4,1),false);
-  assert.ok(jump.y-ladder.y>5);assert.equal(jump.x,ladder.x);assert.equal(jump.z,ladder.z);
-  assert.ok(Math.abs(Math.hypot(ladder.x,ladder.z)-Math.hypot(9,23.4))<1e-9);
+  assert.equal(jump.y,1+RCRV_LAYOUT.floorY+RESEARCH_EYE_HEIGHT);assert.equal(jump.x,ladder.x);assert.equal(jump.z,ladder.z);
+  assert.ok(Math.abs(Math.hypot(ladder.x,ladder.z)-Math.hypot(RCRV_LAYOUT.ladder.x+1,RCRV_LAYOUT.ladder.z))<1e-9);
  }
  assert.equal(parentVesselExitPose(null,0),null);
 });
@@ -25,6 +26,12 @@ test('a diver may leave only a stopped sub at playable human depth with bottom c
  assert.equal(oceanDiveAdmission({depthMeters:40,bottomClearance:8}).allowed,false);
  assert.equal(oceanDiveAdmission({depthMeters:10,bottomClearance:1}).allowed,false);
  assert.equal(oceanDiveAdmission({depthMeters:null,bottomClearance:8}).allowed,false);
+});
+test('equipped research dives admit the current gear range without permitting abyssal exits',()=>{
+ assert.equal(oceanDiveAdmission({depthMeters:30,bottomClearance:8,maximumDiveMeters:40}).allowed,true);
+ assert.equal(oceanDiveAdmission({depthMeters:39,bottomClearance:8,maximumDiveMeters:40}).allowed,false);
+ assert.equal(oceanDiveAdmission({depthMeters:200,bottomClearance:80,maximumDiveMeters:900}).allowed,false);
+ assert.equal(oceanDiveAdmission({depthMeters:30,bottomClearance:8}).allowed,false);
 });
 
 import {ctx} from '../app/js/shared-context.js?v=55';

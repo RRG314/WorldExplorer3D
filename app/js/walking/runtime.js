@@ -168,6 +168,16 @@ function createWalkingRuntimeHelpers({
     const tunnelRoad = groundSample?.feature || null;
     const tunnelEnvelope = resolveTunnelCameraEnvelope(tunnelRoad, walker.x, walker.z, walker.y);
 
+    // Reading keeps the walking pose intact. The existing camera owner frames
+    // the actual display, then resumes normal mouse look when the panel closes.
+    const galleryTarget=appCtx.activeInterior?.gallery?.panel?.viewTarget||appCtx.activeInterior?.aquarium?.panel?.viewTarget;
+    if(galleryTarget){
+      camera.position.set(walker.x,walker.y,walker.z);
+      const narrow=typeof window!=='undefined'&&window.innerWidth<=600;
+      camera.lookAt(galleryTarget.x,galleryTarget.y-(narrow?1.0:0),galleryTarget.z);
+      return true;
+    }
+
     if (state.view === "first") {
       const y = walker.y;
       camera.position.set(walker.x, y, walker.z);

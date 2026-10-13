@@ -1,0 +1,33 @@
+<!doctype html><meta charset="utf-8"><link rel="icon" href="/favicon.svg"><meta name="viewport" content="width=device-width"><title>Three Views component verification</title>
+<link rel="stylesheet" href="/app/styles/discovery.css">
+<style>body{margin:0;background:#0b151e;color:#e2eef6;font:14px sans-serif}canvas{display:block}aside{position:absolute;right:12px;top:12px;width:340px;max-height:94vh;overflow:auto;background:#09131b;padding:10px}header{padding:8px}#hint{position:absolute;left:10px;bottom:10px;background:#09131b;padding:12px}button{margin:3px}</style>
+<aside><header>Camera component test · controlled scene</header><section id="discoveryThreeViews" class="discoveryOpeningChapter"></section></aside><div id="hint">Enter: choose or photograph · ← →: change viewpoint</div>
+<script src="/app/vendor/three/build/three.min.js"></script><script type="module">
+import {createThreeViewsRuntime} from '/app/js/campaign/three-views-runtime.js';
+import {createMemoryDiscoveryProfileStore} from '/app/js/discovery/profile-store.js';
+import {applyDisplayColorPolicy} from '/app/js/engine/display-color-policy.js';
+const T=THREE,scene=new T.Scene(),camera=new T.PerspectiveCamera(52,innerWidth/innerHeight,.1,500),renderer=new T.WebGLRenderer({antialias:true});
+renderer.setSize(innerWidth,innerHeight);applyDisplayColorPolicy(renderer,T);scene.background=new T.Color('#9fc2d0');document.body.prepend(renderer.domElement);
+scene.add(new T.HemisphereLight(0xffffff,0x607080,1.2));const light=new T.DirectionalLight(0xffffff,1.2);light.position.set(5,20,20);scene.add(light);
+const building=new T.Group();building.userData.sourceBuildingId='component-building';building.userData.buildingName='Camera verification hall';scene.add(building);
+const materials={wall:new T.MeshStandardMaterial({color:0xb88456}),glass:new T.MeshStandardMaterial({color:0x334c61,roughness:.3}),stone:new T.MeshStandardMaterial({color:0xe5dcc4}),road:new T.MeshStandardMaterial({color:0x414b50})};
+const box=(parent,x,y,z,w,h,d,material)=>{const m=new T.Mesh(new T.BoxGeometry(w,h,d),material);m.position.set(x,y,z);parent.add(m);return m;};
+box(building,0,6,0,16,12,10,materials.wall);for(let x=-6;x<=6;x+=3)for(let y=3;y<=9;y+=3)box(building,x,y,5.05,1.6,2,.1,materials.glass);
+box(building,0,12.1,0,16.6,.3,10.6,materials.stone);box(scene,0,-.15,20,140,.3,150,materials.road);
+let interaction,system,open=true,pose={x:0,y:2,z:39},fail=false,readFail=false;
+const store=createMemoryDiscoveryProfileStore();
+await store.startOpeningChapter({regionId:'test',regionLabel:'Test',environment:'EARTH'},1000);
+const initial=await store.recordObservation({claimId:'fixture:chapter',catalogId:'fixture:tree',family:'tree',activityId:'habitat-survey',name:'Fixture field record',regionId:'test',environment:'EARTH',collectedAt:2000});
+await store.completeOpeningChapter(initial.event.eventId,3000);
+const proxy={...store,async getProfile(){if(readFail)throw Error('Injected read failure');return store.getProfile();},async updateThreeViews(...args){if(fail)throw Error('Injected save failure');return store.updateThreeViews(...args);}};
+const ctx={scene,camera,renderer,gameStarted:true,LOC:{lat:39,lon:-76},SCALE:111000,buildingMeshes:[building],getEnv:()=> 'EARTH',getCurrentTravelMode:()=> 'walk',getLiveGpsSnapshot:()=>({active:false}),
+ registerRuntimeSystem(s){system=s;return()=>{system=null;};},registerContextInteraction(i){interaction=i;return()=>{interaction=null;};},
+ showToast:t=>{document.querySelector('#hint').textContent=t;},openWorldDiscoverySection(){open=true;document.querySelector('aside').hidden=false;}};
+const state={appCtx:ctx,profileStore:proxy,worldIdentityId:'test',regionLabel:'Test',ui:{get open(){return open;},setOpen(v){open=v;document.querySelector('aside').hidden=!v;},refreshData:()=>runtime.refresh()}};
+const runtime=createThreeViewsRuntime(state);
+const draw=()=>{camera.position.set(pose.x,pose.y,pose.z);camera.lookAt(pose.target?.x||0,pose.target?.y??5,pose.target?.z||0);renderer.render(scene,camera);if(system?.enabled({manualRender:true}))system.update();runtime.update();};
+function loop(){draw();requestAnimationFrame(loop);}requestAnimationFrame(loop);
+window.advanceTime=async()=>{draw();await new Promise(r=>setTimeout(r,20));};window.render_game_to_text=()=>JSON.stringify({evidence:'controlled camera component',...runtime.snapshot(),pose});
+window.addEventListener('keydown',e=>{if(e.key==='Enter'&&interaction?.evaluate())void interaction.perform();if(e.key==='ArrowLeft')pose.x-=2;if(e.key==='ArrowRight')pose.x+=2;});
+window.fixture={ctx,state,runtime,store,building,scene,pose,draw,setFail:v=>fail=v,setReadFail:v=>readFail=v,interaction:()=>interaction,system:()=>system};
+</script>

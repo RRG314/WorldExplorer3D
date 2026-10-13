@@ -24,7 +24,10 @@ async function update(file, transform) {
 }
 for (const file of ['index.html','github-pages/index.html']) await update(file, source => {
   if (!source.includes('data-gallery="')) throw new Error(`${file} is missing its public gallery.`);
-  return source.replace(/<img\b[^>]*data-gallery="([a-z-]+)"[^>]*>/g,(tag,id)=>{
+  const base = file.startsWith('github-pages/') ? 'https://rrg314.github.io/WorldExplorer3D/' : 'https://worldexplorer3d.io/';
+  return source.replace(/<meta\b[^>]*data-gallery-social="([a-z-]+)"[^>]*>/g, (tag, id) =>
+    tag.replace(/\bcontent="[^"]*"/, `content="${base}${escape(get(id).file)}"`)
+  ).replace(/<img\b[^>]*data-gallery="([a-z-]+)"[^>]*>/g,(tag,id)=>{
   const item=get(id);
   return tag.replace(/\s(?:src|alt|width|height)="[^"]*"/g,'').replace(/>$/,` src="${escape(item.file)}" width="${item.width}" height="${item.height}" alt="${escape(item.alt)}">`);
 });});
@@ -34,8 +37,8 @@ await update('README.md', source => {
   if (!block.test(source)) throw new Error('README.md is missing its public gallery markers.');
   return source.replace(block,()=>{
   const markdown = id => {const item=get(id);return `![${item.alt}](${item.file})`;};
-  const rows=[['walking','driving'],['flight','research-deck'],['diving','ship-interior'],['space','live-earth']];
-  return `<!-- public-gallery:start -->\n${markdown('drone')}\n\n*Gameplay screenshots from the released ${gallery.version} build.*\n\n` + rows.map(([a,b])=>`| ${get(a).title} | ${get(b).title} |\n| :--: | :--: |\n| ${markdown(a)} | ${markdown(b)} |`).join('\n\n')+'\n<!-- public-gallery:end -->';
+  const rows=[['walking','driving'],['flight','research-deck'],['diving','ship-interior'],['space','live-earth'],['aquarium','museum']];
+  return `<!-- public-gallery:start -->\n${markdown('drone')}\n\n*In-game views of city travel, ocean research, space and places to visit.*\n\n` + rows.map(([a,b])=>`| ${get(a).title} | ${get(b).title} |\n| :--: | :--: |\n| ${markdown(a)} | ${markdown(b)} |`).join('\n\n')+'\n<!-- public-gallery:end -->';
 });});
 await update(`RELEASE_NOTES_${version}.md`, source => {
   if (!source.includes('<!-- public-gallery:')) throw new Error('Release notes are missing their public gallery markers.');

@@ -1,6 +1,6 @@
 # World Explorer 3D
 
-[5.5 release notes](RELEASE_NOTES_5.5.0.md) · [Known limitations](KNOWN_ISSUES.md) · [Roadmap](ROADMAP.md)
+[5.6 release notes](RELEASE_NOTES_5.6.0.md) · [Known limitations](KNOWN_ISSUES.md) · [Roadmap](ROADMAP.md)
 
 [![Play in your browser](https://img.shields.io/badge/Play-in_your_browser-1677ff?style=flat-square)](https://worldexplorer3d.io/app/)
 [![Latest release](https://img.shields.io/github/v/release/RRG314/WorldExplorer3D?sort=date&style=flat-square&label=release)](https://github.com/RRG314/WorldExplorer3D/releases/latest)
@@ -12,17 +12,17 @@ Choose a location, step into a bounded playable world, and explore by land,
 water, air, or space. Discovery, vehicles, virtual property, persistent building,
 photo-based home improvements and shared rooms connect the experience.
 
-The 5.5 update brings fuller regional building and road coverage, terrain and
-buildings that follow travel, more connected bridge and tunnel approaches, and
-a research-vessel journey from deck to water and back. Public weather and marine data add context without a paid data
-subscription. Existing locations and player progress remain part of the same
-game. Dense-city pauses, uneven art quality and bounded world size remain
-[known limitations](KNOWN_ISSUES.md).
+The 5.6 update connects opening journeys, a walkable research ship, geographic
+ocean travel and a shared Journal. Explore furnished vessel rooms, deploy the
+submarine, and return with your findings. Visit the aquarium reef galleries
+or explore a museum collection from Baltimore’s streets. Distant Earth buildings keep
+more facade detail as scenery moves with you. Existing locations and progress
+remain part of the same game.
 
 <p align="center">
   <a href="https://worldexplorer3d.io/app/"><strong>Play World Explorer 3D</strong></a>
   · <a href="CONTROLS_REFERENCE.md">Controls</a>
-  · <a href="RELEASE_NOTES_5.5.0.md">5.5 release notes</a>
+  · <a href="RELEASE_NOTES_5.6.0.md">5.6 release notes</a>
   · <a href="ROADMAP.md">Roadmap</a>
 </p>
 
@@ -37,25 +37,29 @@ starting point. Detailed streets, interiors and activities remain in the selecte
 district. Turn traveling scenery on or off in Graphics settings.
 
 <!-- public-gallery:start -->
-![Drone view between downtown Baltimore buildings](assets/gallery/5.5/drone.webp)
+![Drone view over mapped downtown Baltimore buildings and streets](assets/gallery/5.6/drone.webp)
 
-*Gameplay screenshots from the released 5.5.0 build.*
+*In-game views of city travel, ocean research, space and places to visit.*
 
 | Explore on foot | Drive the city |
 | :--: | :--: |
-| ![Walking with a companion along Light Street in Baltimore](assets/gallery/5.5/walking.webp) | ![The BMW E34 on Light Street near Baltimore Inner Harbor](assets/gallery/5.5/driving.webp) |
+| ![Street exploration on foot with mapped buildings in Baltimore](assets/gallery/5.6/walking.webp) | ![The lighter BMW E34 on a mapped Baltimore street](assets/gallery/5.6/driving.webp) |
 
 | Take flight | Your research vessel |
 | :--: | :--: |
-| ![A player aircraft flying beside Baltimore Inner Harbor](assets/gallery/5.5/flight.webp) | ![Walking beside the dive platform on the research vessel](assets/gallery/5.5/research-deck.webp) |
+| ![A player aircraft flying above Baltimore through the normal flight camera](assets/gallery/5.6/flight.webp) | ![Walking on the licensed research vessel beside its enclosed laboratories](assets/gallery/5.6/research-deck.webp) |
 
 | Below the surface | Aboard Solis Reach |
 | :--: | :--: |
-| ![Scuba swimming over the seabed during the Coral Shelf research outing](assets/gallery/5.5/diving.webp) | ![Bridge instruments and a crew member on the Solis Reach command deck](assets/gallery/5.5/ship-interior.webp) |
+| ![Scuba swimming beside the research submarine at Coral Shelf](assets/gallery/5.6/diving.webp) | ![Entering the command deck through the Solis Reach pressure door](assets/gallery/5.6/ship-interior.webp) |
 
 | Beyond Earth | Live Earth |
 | :--: | :--: |
-| ![Approaching Saturn and its rings using flight assistance](assets/gallery/5.5/space.webp) | ![The Live Earth globe displaying recent observed USGS earthquakes](assets/gallery/5.5/live-earth.webp) |
+| ![Travel toward Saturn using optional flight assistance](assets/gallery/5.6/space.webp) | ![Live Earth globe and recent earthquake observations from USGS](assets/gallery/5.6/live-earth.webp) |
+
+| Below the waterline | A collection to explore |
+| :--: | :--: |
+| ![Looking through the aquarium viewing window at animated marine life and coral](assets/gallery/5.6/aquarium.webp) | ![Inside the interpretive museum gallery at The Peale in Baltimore](assets/gallery/5.6/museum.webp) |
 <!-- public-gallery:end -->
 
 ## What you can do
@@ -69,6 +73,11 @@ district. Turn traveling scenery on or off in Graphics settings.
   travel, search for destinations, or take a local sightseeing flight.
 - Search for places by familiar names, including cities, landmarks, airports,
   and other expected location searches.
+- Enter supported buildings to explore their interiors.
+- Enter the National Aquarium’s Pavilion and Blacktip Reef visitor route,
+  take the lifts between viewing levels, and record marine-life observations.
+- Visit the interpretive gallery at The Peale's mapped Baltimore building,
+  inspect Smithsonian and Met reproductions, and save collection notes.
 - Use configurable Backpack quick slots for field tools, fishing gear,
   equipment, and ranged actions.
 - Photograph, inspect, survey, identify, fish, follow tracks and signs, and
@@ -92,10 +101,19 @@ district. Turn traveling scenery on or off in Graphics settings.
 
 ## Explore the ocean
 
-Start an ocean outing aboard the research vessel. Walk to deck stations, enter
-the water, swim and scuba dive, deploy the submarine, and recover to the same
-ship. A saved aboard voyage resumes on deck. Ocean environments and wildlife
-remain limited; the larger licensed-asset and ecology upgrade is still planned.
+Start an ocean outing aboard the research vessel. Explore its enclosed wet and
+dry labs, galley, mess, quarters and bridge, using the deck map to find your way.
+Walk, run and jump aboard, enter the water, swim with automatic dive equipment,
+or deploy the submarine and recover to the same ship.
+
+Personal geographic voyages can stream nearby ocean scenery as you travel, with
+an option to keep a fixed area. Authored research outings and shared crew surveys
+remain separate. Available depth and habitat information constrain marine life;
+virtual wildlife sightings are not live reports of real animals.
+
+Follow First Bearings into fieldwork, a Harbor Run delivery, a three-view photo
+study or a personal workspace. Coastal research and lunar fieldwork connect new
+records to your existing Journal. Free roam remains available throughout.
 
 ## Beyond Earth
 
@@ -131,30 +149,18 @@ wildlife-presence, or safety service.
 
 Required map attribution: `© OpenStreetMap contributors`
 
-## Run locally
-
-Requirements: Node.js 22+, Java 21, and a browser with WebGL support.
-
-```bash
-git clone https://github.com/RRG314/WorldExplorer3D.git
-cd WorldExplorer3D
-npm install
-npm run build:hosting -- --firebase-env staging
-python3 -m http.server --directory dist 4173
-```
-
-Open `http://127.0.0.1:4173/app/`.
+## Playing in your browser
 
 Keyboard and touch controls support browser zoom, visible focus, higher
-contrast, larger text, and reduced motion.
+contrast, larger text, and reduced motion. A desktop browser is recommended
+for large city scenes. Online rooms and cloud features require sign-in;
+exploring on your own does not.
 
-Core exploration can run without production credentials. Accounts,
-multiplayer, moderation, and other online features require an authorized
-environment. Secrets are not included in the repository.
+For setup and contributions, see [Contributing](CONTRIBUTING.md).
 
 ## More about the project
 
-- [What changed in 5.5](RELEASE_NOTES_5.5.0.md)
+- [What changed in 5.6](RELEASE_NOTES_5.6.0.md)
 - [Changelog](CHANGELOG.md)
 - [Roadmap](ROADMAP.md)
 - [Controls](CONTROLS_REFERENCE.md)

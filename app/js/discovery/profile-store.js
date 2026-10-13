@@ -1,3 +1,5 @@
+import { THREE_VIEWS, normalizeThreeViews, emptyPhotoAlbum, transitionThreeViews } from '../campaign/three-views.js';
+import { homeAchievementEvent } from '../campaign/home-achievements.js';
 import {supportRecorder} from '../runtime/support-receipt.js';
 import { normalizeCameraFavorites } from '../live-earth/public-camera-directory.js';
 import { validateJournalBackup } from './backup-validation.js?v=1';
@@ -17,6 +19,8 @@ import {
 } from './explorer-events.js?v=3';
 import { createDefaultCharacterState, normalizeCharacterState } from '../character/model.js?v=1';
 import { migrateLegacyCharacterState, projectCharacterProgress } from '../character/progression.js?v=1';
+import { normalizeHarborRun, transitionHarborRun, harborRunReceipt } from '../campaign/harbor-run.js';
+import { FIRST_BEARINGS, normalizeOpeningChapter, beginOpeningChapter, projectOpeningChapter, finishOpeningChapter } from '../campaign/first-bearings.js?v=1';
 
 const DISCOVERY_DB_NAME = 'world-explorer-discovery';
 const DISCOVERY_DB_VERSION = 5;
@@ -95,6 +99,9 @@ function createDefaultProfile() {
     collectionCount: 0,
     fieldGuideCount: 0,
     explorerProgress: defaultExplorerProgress(),
+    openingChapter: normalizeOpeningChapter(),
+    harborRun: normalizeHarborRun(),
+    threeViews: normalizeThreeViews(),
     characterState: createDefaultCharacterState()
   };
 }
@@ -111,6 +118,9 @@ function normalizeProfile(profile) {
     toolMastery: { ...(profile?.toolMastery || {}) },
     companionOnboarding: normalizeCompanionOnboarding(profile?.companionOnboarding),
     explorerProgress: normalizeExplorerProgress(profile?.explorerProgress),
+    openingChapter: normalizeOpeningChapter(profile?.openingChapter),
+    harborRun: normalizeHarborRun(profile?.harborRun),
+    threeViews: normalizeThreeViews(profile?.threeViews),
     characterState: normalizeCharacterState(profile?.characterState),
     schemaVersion: DISCOVERY_DB_VERSION,
     updatedAt: Date.now()
@@ -132,6 +142,18 @@ function fieldCompanionReward(companion, event, firstIdentification) {
   return clone(firstIdentification
     ? awardCompanionXp(first.companion, { receiptId: `species:${event.eventId}`, reasonId: 'new-species' }).companion
     : first.companion);
+}
+
+function openingChapterReceipt(chapter, evidence) {
+  return createExplorerStoryEvent({
+    eventId: FIRST_BEARINGS.receiptId, eventType: 'campaign-completed',
+    sourceSystem: 'explorer-campaign', sourceId: FIRST_BEARINGS.id, pathId: 'field',
+    name: 'First Bearings complete', detail: 'First Bearings badge earned. A local discovery recorded and reviewed.',
+    occurredAt: chapter.completedAt, regionId: chapter.regionId, regionLabel: chapter.regionLabel,
+    environment: 'EARTH', locationKey: evidence.locationKey, locationSnapshot: evidence.locationSnapshot,
+    metadata: { chapterId: FIRST_BEARINGS.id, careerId: chapter.careerId, evidenceEventId: evidence.eventId },
+    projections: { profile: false, place: false }, points: 0
+  });
 }
 
 function validateReceipt(item, receipt) {
@@ -321,6 +343,105 @@ function createIndexedDbDiscoveryProfileStore(options = {}) {
     }
   }
 
+  async function startOpeningChapter(location, now = Date.now()) {
+    return saveProfile(current => ({ ...current, openingChapter: beginOpeningChapter(current.openingChapter, location, now) }));
+  }
+
+  async function completeOpeningChapter(eventId, now = Date.now()) {
+    const db = await open();
+    let transaction;
+    try {
+      await ensureCharacterMigration(db);
+      transaction = db.transaction(['profiles', 'events', JOURNAL_ORDER_STORE], 'readwrite');
+      const profiles = transaction.objectStore('profiles'), events = transaction.objectStore('events');
+      const current = normalizeProfile(await requestPromise(profiles.get(PROFILE_ID)));
+      const existing = await requestPromise(events.get(FIRST_BEARINGS.receiptId));
+      if (current.openingChapter.schemaVersion === 1 && current.openingChapter.phase === 'complete' && existing) {
+        await transactionPromise(transaction);
+        return { recorded: false, reason: 'already-recorded', event: clone(existing), profile: clone(current) };
+      }
+      const evidence = await requestPromise(events.get(String(eventId)));
+      const chapter = finishOpeningChapter(current.openingChapter, evidence, now);
+      const event = openingChapterReceipt(chapter, evidence);
+      const profile = normalizeProfile({ ...current, openingChapter: chapter });
+      events.put(event);
+      putJournalOrder(transaction, 'events', event);
+      profiles.put(profile);
+      await transactionPromise(transaction);
+      return { recorded: true, event: clone(event), profile: clone(profile) };
+    } catch (error) {
+      try { transaction?.abort(); } catch { /* Transaction already ended. */ }
+      throw error;
+    } finally { db.close(); }
+  }
+
+  async function updateHarborRun(command, now = Date.now()) {
+    const db = await open();
+    let transaction;
+    try {
+      await ensureCharacterMigration(db);
+      transaction = db.transaction(['profiles', 'events', JOURNAL_ORDER_STORE], 'readwrite');
+      const profiles = transaction.objectStore('profiles');
+      const current = normalizeProfile(await requestPromise(profiles.get(PROFILE_ID)));
+      const harborRun = transitionHarborRun(current.harborRun, command, now);
+      const profile = normalizeProfile({ ...current, harborRun });
+      if (harborRun.phase === 'complete') {
+        const event = createExplorerStoryEvent(harborRunReceipt(harborRun));
+        transaction.objectStore('events').put(event);
+        putJournalOrder(transaction, 'events', event);
+      }
+      profiles.put(profile);
+      await transactionPromise(transaction);
+      return clone(harborRun);
+    } catch (error) {
+      try { transaction?.abort(); } catch { /* Already ended. */ }
+      throw error;
+    } finally { db.close(); }
+  }
+
+  async function recordHomeAchievement(kind,home) {
+    const db=await open();let tx;
+    try {
+      await ensureCharacterMigration(db);
+      tx=db.transaction(['profiles','events',JOURNAL_ORDER_STORE],'readwrite');
+      const profiles=tx.objectStore('profiles'),profile=normalizeProfile(await requestPromise(profiles.get(PROFILE_ID)));
+      if(profile.homeAchievements?.[kind]){await transactionPromise(tx);return clone(profile.homeAchievements[kind]);}
+      const event=createExplorerStoryEvent(homeAchievementEvent(kind,home,profile));
+      profiles.put(normalizeProfile({...profile,homeAchievements:{...profile.homeAchievements,[kind]:event}}));
+      tx.objectStore('events').put(event);putJournalOrder(tx,'events',event);
+      await transactionPromise(tx);return clone(event);
+    }catch(error){try{tx?.abort();}catch{}throw error;}finally{db.close();}
+  }
+
+  // Album images live in a separate profile-owned document. Ordinary profile
+  // reads and gate updates never deserialize/rewrite image bytes. The existing
+  // store keeps media, evidence and completion in one transaction without a DB
+  // version upgrade that would prevent the released client opening old saves.
+  async function getThreeViewsAlbum() {
+    const db=await open();
+    try {
+      const tx=db.transaction(['profiles'],'readonly');
+      const album=await requestPromise(tx.objectStore('profiles').get(THREE_VIEWS.albumId));
+      await transactionPromise(tx);return clone(album||emptyPhotoAlbum());
+    } finally {db.close();}
+  }
+  async function updateThreeViews(command, now=Date.now()) {
+    const db=await open();let transaction;
+    try {
+      await ensureCharacterMigration(db);
+      transaction=db.transaction(['profiles','events',JOURNAL_ORDER_STORE],'readwrite');
+      const profiles=transaction.objectStore('profiles');
+      const [current,album]=await Promise.all([requestPromise(profiles.get(PROFILE_ID)),requestPromise(profiles.get(THREE_VIEWS.albumId))]);
+      if(command.type==='accept'&&current?.openingChapter?.phase!=='complete')throw Error('Finish First Bearings before starting this job.');
+      const result=transitionThreeViews(current?.threeViews,album,command,now);
+      profiles.put(normalizeProfile({...current,threeViews:result.state}));
+      if(result.album.photos.length)profiles.put(result.album);else profiles.delete(THREE_VIEWS.albumId);
+      if(result.event){const event=createExplorerStoryEvent(result.event);transaction.objectStore('events').put(event);putJournalOrder(transaction,'events',event);}
+      await transactionPromise(transaction);return clone(result);
+    } catch(error){try{transaction?.abort();}catch{}throw error;}
+    finally{db.close();}
+  }
+
   async function recordDiscovery(record, policy = {}) {
     if (!record?.claimId || !record?.catalogId) throw new TypeError('Discovery recording requires stable claim and catalog IDs.');
     const receiptOwnerUid = options.getReceiptOwnerUid?.() || null;
@@ -379,6 +500,7 @@ function createIndexedDbDiscoveryProfileStore(options = {}) {
         fieldGuideCount: Number(current.fieldGuideCount || 0) + (existingGuide ? 0 : 1),
         disciplineProgress: { ...current.disciplineProgress, [discipline]: disciplineProgress },
         explorerProgress: projected.progress,
+        openingChapter: record.receiptRestore ? current.openingChapter : projectOpeningChapter(current.openingChapter, event),
         characterState: characterProjection.character
       });
       if (item) {
@@ -707,9 +829,9 @@ function createIndexedDbDiscoveryProfileStore(options = {}) {
   }
 
   async function rollbackCharacterMigration() {
-    const db = await open();
+    const db = await open();let transactionToAbort;
     try {
-      const transaction = db.transaction(['profiles', 'migrationBackups'], 'readwrite');
+      const transaction = transactionToAbort = db.transaction(['profiles', 'migrationBackups'], 'readwrite');
       const backups = transaction.objectStore('migrationBackups');
       const backup = await requestPromise(backups.get(CHARACTER_MIGRATION_BACKUP_ID));
       if (!backup?.profile) {
@@ -721,12 +843,15 @@ function createIndexedDbDiscoveryProfileStore(options = {}) {
         ...createDefaultCharacterState({ now: rolledBackAt }),
         migration: { version: 1, rolledBackAt, backupAvailable: true }
       });
-      transaction.objectStore('profiles').put(normalizeProfile({ ...backup.profile, characterState }));
+      // Roll back character creation only. Newer Journal/career state and
+      // preferences do not belong to the historical character migration.
+      const current = await requestPromise(transaction.objectStore('profiles').get(PROFILE_ID));
+      transaction.objectStore('profiles').put(normalizeProfile({ ...(current || backup.profile), characterState }));
       backups.put({ ...backup, rolledBackAt });
       await transactionPromise(transaction);
       characterMigrationReady = true;
       return true;
-    } finally {
+    } catch(error) {try{transactionToAbort?.abort();}catch{}throw error;} finally {
       db.close();
     }
   }
@@ -739,7 +864,7 @@ function createIndexedDbDiscoveryProfileStore(options = {}) {
       const tx = db.transaction(names, 'readonly');
       const rows = await Promise.all(names.map(name => requestPromise(tx.objectStore(name).getAll())));
       await transactionPromise(tx);
-      return {schemaVersion:DISCOVERY_DB_VERSION, exportedAt:Date.now(), profile:rows[0].find(p=>p.id===PROFILE_ID), items:rows[1], fieldGuide:rows[2], companions:rows[3], events:rows[4]};
+      return {schemaVersion:DISCOVERY_DB_VERSION, exportedAt:Date.now(), profile:rows[0].find(p=>p.id===PROFILE_ID), albums:rows[0].filter(p=>p.id===THREE_VIEWS.albumId), items:rows[1], fieldGuide:rows[2], companions:rows[3], events:rows[4]};
     } finally { db.close(); }
   }
 
@@ -802,6 +927,7 @@ function createIndexedDbDiscoveryProfileStore(options = {}) {
             updatedAt: Date.now()
           };
       profiles.put(importedProfile);
+      for(const album of data.albums)profiles.put(clone(album));
       const items = Array.isArray(data.items) ? data.items : [];
       const companions = Array.isArray(data.companions) ? data.companions : [];
       items.forEach((item) => {
@@ -850,6 +976,12 @@ function createIndexedDbDiscoveryProfileStore(options = {}) {
     recordDiscovery,
     recordExplorerEvent,
     recordObservation,
+    startOpeningChapter,
+    completeOpeningChapter,
+    updateHarborRun,
+    recordHomeAchievement,
+    updateThreeViews,
+    getThreeViewsAlbum,
     rollbackCharacterMigration,
     rollbackLastImport,
     saveCompanion,
@@ -862,6 +994,7 @@ function createMemoryDiscoveryProfileStore(seed = {}) {
   let beforeImport = null;
   let legacyProfileBackup = seed.profile && !seed.profile.characterState ? clone(seed.profile) : null;
   let profile = normalizeProfile(seed.profile);
+  let photoAlbum = clone(seed.albums?.find(a=>a.id===THREE_VIEWS.albumId)||emptyPhotoAlbum());
   if (legacyProfileBackup) {
     profile = normalizeProfile({
       ...legacyProfileBackup,
@@ -932,6 +1065,7 @@ function createMemoryDiscoveryProfileStore(seed = {}) {
       fieldGuideCount: Number(profile.fieldGuideCount || 0) + (existingGuide ? 0 : 1),
       disciplineProgress: { ...profile.disciplineProgress, [discipline]: legacy },
       explorerProgress: projected.progress,
+      openingChapter: record.receiptRestore ? profile.openingChapter : projectOpeningChapter(profile.openingChapter, event),
       characterState: characterProjection.character
     });
     return {
@@ -966,6 +1100,45 @@ function createMemoryDiscoveryProfileStore(seed = {}) {
 
   return Object.freeze({
     type: 'MemoryDiscoveryProfileStore',
+    async recordHomeAchievement(kind,home) {
+      if(profile.homeAchievements?.[kind])return clone(profile.homeAchievements[kind]);
+      const event=createExplorerStoryEvent(homeAchievementEvent(kind,home,profile));
+      profile=normalizeProfile({...profile,homeAchievements:{...profile.homeAchievements,[kind]:event}});
+      events.set(event.eventId,event);return clone(event);
+    },
+    async startOpeningChapter(location, now = Date.now()) {
+      profile = normalizeProfile({ ...profile, openingChapter: beginOpeningChapter(profile.openingChapter, location, now) });
+      return clone(profile);
+    },
+    async completeOpeningChapter(eventId, now = Date.now()) {
+      const existing = events.get(FIRST_BEARINGS.receiptId);
+      if (profile.openingChapter.schemaVersion === 1 && profile.openingChapter.phase === 'complete' && existing) {
+        return { recorded: false, reason: 'already-recorded', event: clone(existing), profile: clone(profile) };
+      }
+      const evidence = events.get(String(eventId));
+      const chapter = finishOpeningChapter(profile.openingChapter, evidence, now);
+      const event = openingChapterReceipt(chapter, evidence);
+      profile = normalizeProfile({ ...profile, openingChapter: chapter });
+      events.set(event.eventId, event);
+      return { recorded: true, event: clone(event), profile: clone(profile) };
+    },
+    async getThreeViewsAlbum(){return clone(photoAlbum);},
+    async updateThreeViews(command,now=Date.now()){
+      if(command.type==='accept'&&profile.openingChapter?.phase!=='complete')throw Error('Finish First Bearings before starting this job.');
+      const result=transitionThreeViews(profile.threeViews,photoAlbum,command,now);
+      profile=normalizeProfile({...profile,threeViews:result.state});photoAlbum=clone(result.album);
+      if(result.event){const event=createExplorerStoryEvent(result.event);events.set(event.eventId,event);}
+      return clone(result);
+    },
+    async updateHarborRun(command, now = Date.now()) {
+      const harborRun = transitionHarborRun(profile.harborRun, command, now);
+      profile = normalizeProfile({ ...profile, harborRun });
+      if (harborRun.phase === 'complete') {
+        const event = createExplorerStoryEvent(harborRunReceipt(harborRun));
+        events.set(event.eventId, event);
+      }
+      return clone(harborRun);
+    },
     async getReceiptSyncStatus(ownerUid) { return summarizeReceiptState([...items.values()], [...outbox.values()], ownerUid); },
     async listPendingReceipts(ownerUid, now = Date.now()) { return [...outbox.values()].filter(row => row.ownerUid === ownerUid && row.status === 'pending' && row.nextAttemptAt <= now)
       .sort((a,b)=>Number(a.nextAttemptAt)-Number(b.nextAttemptAt)||(a.id<b.id?-1:a.id>b.id?1:0)).slice(0,25).map(clone); },
@@ -1041,7 +1214,7 @@ function createMemoryDiscoveryProfileStore(seed = {}) {
       if (!legacyProfileBackup) return false;
       const rolledBackAt = Date.now();
       profile = normalizeProfile({
-        ...legacyProfileBackup,
+        ...profile,
         characterState: {
           ...createDefaultCharacterState({ now: rolledBackAt }),
           migration: { version: 1, rolledBackAt, backupAvailable: true }
@@ -1053,6 +1226,7 @@ function createMemoryDiscoveryProfileStore(seed = {}) {
       return {
         schemaVersion: DISCOVERY_DB_VERSION,
         profile: clone(profile),
+        albums: photoAlbum.photos.length?[clone(photoAlbum)]:[],
         items: [...items.values()].map(clone),
         fieldGuide: [...guide.values()].map(clone),
         companions: [...companions.values()].map(clone),
@@ -1061,6 +1235,7 @@ function createMemoryDiscoveryProfileStore(seed = {}) {
     },
     async rollbackLastImport() {
       if (!beforeImport) return false;
+      photoAlbum=clone(beforeImport.photoAlbum);
       profile = clone(beforeImport.profile); legacyProfileBackup = clone(beforeImport.legacyProfileBackup);
       for (const [name,map] of Object.entries({items,guide,companions,events,claims,outbox})) {
         map.clear(); for (const [id,row] of beforeImport[name]) map.set(id,clone(row));
@@ -1069,7 +1244,7 @@ function createMemoryDiscoveryProfileStore(seed = {}) {
     },
     async importData(data = {}) {
       data = validateJournalBackup(data);
-      beforeImport = clone({profile, legacyProfileBackup, items:[...items], guide:[...guide], companions:[...companions], events:[...events], claims:[...claims], outbox:[...outbox]});
+      beforeImport = clone({profile, photoAlbum, legacyProfileBackup, items:[...items], guide:[...guide], companions:[...companions], events:[...events], claims:[...claims], outbox:[...outbox]});
       const importedByInstance = new Map(data.items.map(item=>[item.instanceId,item]));
       const importedByClaim = new Map(data.items.filter(item=>item.claimId).map(item=>[item.claimId,item]));
       for (const [id,row] of outbox) {
@@ -1088,6 +1263,7 @@ function createMemoryDiscoveryProfileStore(seed = {}) {
             backupAvailable: true
           });
       profile = normalizeProfile({ ...data.profile, characterState: importedCharacter });
+      photoAlbum=clone(data.albums.find(a=>a.id===THREE_VIEWS.albumId)||emptyPhotoAlbum());
       items.clear(); guide.clear(); companions.clear(); events.clear(); claims.clear();
       (data.items || []).filter((item) => item?.instanceId && item?.catalogId).forEach((item) => items.set(item.instanceId, clone(item)));
       for (const item of items.values()) if (item.claimId) claims.set(item.claimId,{claimId:item.claimId,item:clone(item),event:null});

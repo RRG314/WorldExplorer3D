@@ -373,6 +373,8 @@ export function buildWorldOverpassPlan({
             );out body center qt;`,
     transportFacilityQuery: `[out:json][timeout:${queryTimeoutSeconds}];(
             nwr["aeroway"~"^(aerodrome|heliport|runway|taxiway|apron|terminal|helipad|hangar|parking_position|gate|control_tower)$"]${transportFacilityBounds};
+                nwr["barrier"~"^(fence|gate|lift_gate|swing_gate|sliding_gate|kissing_gate|entrance)$"]${transportFacilityBounds};
+                way["highway"~"^(service|footway|path)$"]${transportFacilityBounds};
             nwr["leisure"="marina"]${featureBounds};
             nwr["harbour"="yes"]${featureBounds};
             nwr["landuse"~"^(port|harbour)$"]${featureBounds};
@@ -409,6 +411,8 @@ export function buildWorldOverpassPlan({
                 way["waterway"~"^(river|stream|canal|drain|ditch)$"]${featureBounds};
                 way["leisure"~"^(park|garden|nature_reserve)$"]${featureBounds};
                 nwr["aeroway"~"^(aerodrome|heliport|runway|taxiway|apron|terminal|helipad|hangar|parking_position|gate|control_tower)$"]${transportFacilityBounds};
+                nwr["barrier"~"^(fence|gate|lift_gate|swing_gate|sliding_gate|kissing_gate|entrance)$"]${transportFacilityBounds};
+                way["highway"~"^(service|footway|path)$"]${transportFacilityBounds};
                 nwr["leisure"="marina"]${featureBounds};
                 nwr["harbour"="yes"]${featureBounds};
                 nwr["landuse"~"^(port|harbour)$"]${featureBounds};

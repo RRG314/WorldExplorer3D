@@ -1,3 +1,4 @@
+import { disposeThreeViewsHome } from '../campaign/three-views-home.js';
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import {
   buildingKey,
@@ -9,8 +10,11 @@ import {
 } from "../building-entry.js?v=9";
 import { createInteriorRuntimeUiApi } from "./runtime-ui.js?v=4";
 import { elevatorFloorChoices } from './elevator-authority.js?v=1';
+import { interiorFloorElevation } from './floor-model.js?v=3';
+import { escapeHtml } from '../game/ui-utils.js?v=1';
 
 let nearbyInteriorScanPromise = null;
+let entryRevision = 0;
 let elevatorFloorPicker = null;
 let exteriorContextInteractionRegistered = false;
 const {
@@ -41,7 +45,7 @@ export function sampleInteriorWalkSurface(x, z, currentY, deps) {
     : Number.isFinite(appCtx.Walk?.state?.walker?.y)
       ? appCtx.Walk.state.walker.y - (appCtx.Walk?.CFG?.eyeHeight || 1.7)
       : NaN;
-  const activeFloorY = Number(active.floorBaseY || 0) + Number(active.activeLevel || 0) * Number(active.floorPlan?.storyHeight || 3.4);
+  const activeFloorY = Number(active.floorBaseY || 0) + interiorFloorElevation(active.floorPlan, active.activeLevel);
   let best = null;
   const consider = (candidate, priority = 0) => {
     const referenceY = Number.isFinite(walkerFeetY) ? walkerFeetY : activeFloorY;
@@ -131,6 +135,7 @@ function applyInteriorSceneState(active, sceneState) {
   active.layoutKind = sceneState.layoutKind;
   active.floorPlan = sceneState.floorPlan;
   active.authoredCeilings = sceneState.authoredCeilings;
+  active.authoredLifts = sceneState.authoredLifts;
   active.floorId = sceneState.floorId;
   active.floorLabel = sceneState.floorLabel;
   active.floorBaseY = sceneState.floorBaseY;
@@ -155,6 +160,8 @@ function replaceActiveInteriorFloor(active, targetLevel, deps) {
       floorBaseY: active.floorBaseY,
       curatedHome: !!active.ownedHome
     });
+    deps.disposeGallery?.(active);
+    disposeThreeViewsHome(active);
     deps.disposeCuratedHomeFurnishing?.(active);
     appCtx.scene.add(sceneState.group);
     appCtx.replaceWorldCollection('dynamicBuildingColliders', sceneState.dynamicColliders.slice());
@@ -168,7 +175,18 @@ function replaceActiveInteriorFloor(active, targetLevel, deps) {
   }
 }
 
-function nearestInteriorInteraction(active, walker) {
+// Furnishings share the room's prompt, floor and proximity selection. The
+// interior owner publishes/withdraws their actions; late asset loads cannot
+// register with a room that the player has already left.
+export function registerInteriorFurnishingAction(active, definition) {
+  if (!active || active !== appCtx.activeInterior) return () => {};
+  const interactions=active.interactions||(active.interactions=[]);
+  const action={...definition,kind:'furnishing'};
+  interactions.push(action);
+  return () => {const index=interactions.indexOf(action);if(index>=0)interactions.splice(index,1);};
+}
+
+export function nearestInteriorInteraction(active, walker) {
   if (!active || !walker || !Array.isArray(active.interactions)) return null;
   const feetY = walker.y - (appCtx.Walk?.CFG?.eyeHeight || 1.7);
   const traversalPriority = {
@@ -179,12 +197,12 @@ function nearestInteriorInteraction(active, walker) {
     'ship-station': 4,
     'ship-crew': 5
   };
-  return active.interactions.map((interaction) => ({
+  return active.interactions.filter(interaction=>interaction.available?.()!==false).map((interaction) => ({
     ...interaction,
     interactionPriority: traversalPriority[interaction.kind] ?? 4,
     distance: Math.hypot(interaction.x - walker.x, interaction.z - walker.z),
     verticalDistance: Math.abs(
-      active.floorBaseY + interaction.level * active.floorPlan.storyHeight - feetY
+      active.floorBaseY + interiorFloorElevation(active.floorPlan, interaction.level) - feetY
     )
   })).filter((interaction) => interaction.distance <= interaction.radius && interaction.verticalDistance <= 1.15)
     .sort((a, b) => {
@@ -203,13 +221,29 @@ function nearestInteriorInteraction(active, walker) {
 }
 
 function closeElevatorFloorPicker(active = appCtx.activeInterior) {
+  const focus=elevatorFloorPicker?._previousFocus;
+  elevatorFloorPicker?.close?.();
   elevatorFloorPicker?.remove?.();
   elevatorFloorPicker = null;
   if (active) active.elevatorPickerOpen = false;
+  appCtx.setPauseReason?.('interior_elevator',false);
+  if(focus?.isConnected)focus.focus({preventScroll:true});
 }
 
 function travelByElevator(active, targetLevel, deps) {
   if (!Number.isFinite(Number(targetLevel))) return false;
+  const authored=active.authoredLifts?.find(l=>l.id===active.selectedLiftId);
+  if(active.floorPlan?.authored){
+    const stop=authored?.stops.find(s=>s.level===Number(targetLevel)),walker=appCtx.Walk?.state?.walker;
+    if(!stop||!walker||!authored.stops.some(s=>s.level===active.activeLevel))return false;
+    closeElevatorFloorPicker(active);
+    // All authored floors are already resident. A lift changes the actor's
+    // supported level; rebuilding would lose the habitat and its asset leases.
+    active.activeLevel=stop.level;active.floorId=stop.floorId;active.floorLabel=active.floorPlan.floors[stop.level].label;
+    Object.assign(walker,{x:stop.x,z:stop.z,y:active.floorBaseY+interiorFloorElevation(active.floorPlan,stop.level)+(appCtx.Walk.CFG?.eyeHeight||1.7)+.03,vy:0,yaw:stop.yaw,angle:stop.yaw,pitch:0,lookYawOffset:0,_resolvedGroundState:null});
+    active.lastValidPosition={x:walker.x,y:walker.y,z:walker.z,yaw:walker.yaw,angle:walker.angle};
+    resetInteriorInteractionCache();return true;
+  }
   closeElevatorFloorPicker(active);
   if (!replaceActiveInteriorFloor(active, Number(targetLevel), deps)) return false;
   const walker = appCtx.Walk?.state?.walker;
@@ -217,7 +251,7 @@ function travelByElevator(active, targetLevel, deps) {
   const eyeHeight = appCtx.Walk?.CFG?.eyeHeight || 1.7;
   walker.x = active.connector.elevator.x + active.connector.axis.x * 1.45;
   walker.z = active.connector.elevator.z + active.connector.axis.z * 1.45;
-  walker.y = active.floorBaseY + active.activeLevel * active.floorPlan.storyHeight + eyeHeight + 0.05;
+  walker.y = active.floorBaseY + interiorFloorElevation(active.floorPlan, active.activeLevel) + eyeHeight + 0.05;
   walker.vy = 0;
   walker._resolvedGroundState = null;
   active.lastValidPosition = {
@@ -231,21 +265,28 @@ function travelByElevator(active, targetLevel, deps) {
   return true;
 }
 
-function openElevatorFloorPicker(active, deps) {
+function openElevatorFloorPicker(active, deps, interaction) {
   if (!active?.floorPlan || active.floorPlan.floorCount <= 1 || typeof document === 'undefined') return false;
   closeElevatorFloorPicker(active);
-  const choices = elevatorFloorChoices(active.floorPlan, active.activeLevel);
-  const picker = document.createElement('section');
+  active.selectedLiftId=interaction?.liftId;
+  const lift=active.authoredLifts?.find(l=>l.id===active.selectedLiftId);
+  const choices = elevatorFloorChoices(active.floorPlan, active.activeLevel).filter(c=>!active.floorPlan.authored||lift?.stops.some(s=>s.level===c.level));
+  if(!choices.length)return false;
+  const picker = document.createElement('dialog');
+  picker._previousFocus=document.activeElement;
   picker.id = 'interiorElevatorFloorPicker';
   picker.setAttribute('role', 'dialog');
   picker.setAttribute('aria-label', 'Choose an elevator floor');
   picker.style.cssText = 'position:fixed;left:50%;bottom:max(92px,env(safe-area-inset-bottom));transform:translateX(-50%);z-index:10020;width:min(360px,calc(100vw - 24px));max-height:min(56vh,430px);overflow:auto;padding:14px;border:1px solid rgba(148,197,255,.65);border-radius:12px;background:rgba(8,18,28,.96);box-shadow:0 18px 50px rgba(0,0,0,.45);color:#f8fafc;font:500 13px Inter,sans-serif;';
-  picker.innerHTML = `<div style="display:flex;align-items:start;justify-content:space-between;gap:12px;margin-bottom:10px;"><div><strong style="display:block;font:700 16px Orbitron,sans-serif;">Elevator</strong><span style="display:block;margin-top:3px;color:#b8c7d9;">Choose a floor</span></div><button type="button" data-elevator-close aria-label="Close elevator controls" style="border:0;background:transparent;color:#fff;font-size:22px;line-height:1;cursor:pointer;">×</button></div><div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;">${choices.map((choice) => `<button type="button" data-elevator-level="${choice.level}" ${choice.current ? 'disabled aria-current="true"' : ''} style="min-height:46px;padding:9px 10px;border:1px solid ${choice.current ? '#64748b' : '#60a5fa'};border-radius:8px;background:${choice.current ? 'rgba(71,85,105,.55)' : 'rgba(30,64,175,.5)'};color:#fff;font:700 12px Inter,sans-serif;cursor:${choice.current ? 'default' : 'pointer'};">${choice.direction === 'up' ? '↑ ' : choice.direction === 'down' ? '↓ ' : '• '}${choice.label}${choice.current ? ' · Here' : ''}</button>`).join('')}</div>`;
+  picker.innerHTML = `<div style="display:flex;align-items:start;justify-content:space-between;gap:12px;margin-bottom:10px;"><div><strong style="display:block;font:700 16px Orbitron,sans-serif;">Elevator</strong><span style="display:block;margin-top:3px;color:#b8c7d9;">Choose a floor</span></div><button type="button" data-elevator-close aria-label="Close elevator controls" style="border:0;background:transparent;color:#fff;font-size:22px;line-height:1;cursor:pointer;">×</button></div><div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;">${choices.map((choice) => `<button type="button" data-elevator-level="${choice.level}" ${choice.current ? 'disabled aria-current="true"' : ''} style="min-height:46px;padding:9px 10px;border:1px solid ${choice.current ? '#64748b' : '#60a5fa'};border-radius:8px;background:${choice.current ? 'rgba(71,85,105,.55)' : 'rgba(30,64,175,.5)'};color:#fff;font:700 12px Inter,sans-serif;cursor:${choice.current ? 'default' : 'pointer'};">${choice.direction === 'up' ? '↑ ' : choice.direction === 'down' ? '↓ ' : '• '}${escapeHtml(choice.label)}${choice.current ? ' · Here' : ''}</button>`).join('')}</div>`;
   picker.querySelector('[data-elevator-close]')?.addEventListener('click', () => closeElevatorFloorPicker(active));
   picker.querySelectorAll('[data-elevator-level]').forEach((button) => {
     button.addEventListener('click', () => travelByElevator(active, Number(button.dataset.elevatorLevel), deps));
   });
   document.body.appendChild(picker);
+  picker.addEventListener('cancel',event=>{event.preventDefault();closeElevatorFloorPicker(active);});
+  picker.addEventListener('keydown',event=>event.stopPropagation());
+  document.exitPointerLock?.();picker.showModal();appCtx.setPauseReason?.('interior_elevator',true);
   elevatorFloorPicker = picker;
   active.elevatorPickerOpen = true;
   picker.querySelector('[data-elevator-level]:not([disabled])')?.focus?.();
@@ -364,7 +405,13 @@ export async function enterInteriorForSupport(support, deps) {
     clearActiveInterior({ restorePlayer: true, preserveCache: true }, deps);
   }
 
-  const definition = await deps.resolveInteriorDefinitionForEntry(support);
+  const revision = ++entryRevision, worldSequence = appCtx._worldLoadSequence;
+  let definition;
+  try { definition = await deps.resolveInteriorDefinitionForEntry(support); }
+  catch { if(revision===entryRevision)setTransientHint('This interior could not open. Try the entrance again.',deps.INTERIOR_NOTICE_MS,deps); return false; }
+  // A pending provider/access lookup cannot reopen an old world or supersede a
+  // newer doorway request after travel, exit, or a rapid second interaction.
+  if(revision!==entryRevision||worldSequence!==appCtx._worldLoadSequence||!deps.isWalkModeActive())return false;
   if (!definition) {
     setTransientHint(`${support.label || "This building"} is not enterable right now.`, deps.INTERIOR_NOTICE_MS, deps);
     return false;
@@ -405,7 +452,7 @@ export async function enterInteriorForSupport(support, deps) {
 
   const walker = appCtx.Walk.state.walker;
   const outsideState = {
-    ...(sceneState.mode==='authored'?{cameraNear:appCtx.camera?.near}:{}),
+    ...(sceneState.mode==='authored'?{cameraNear:appCtx.camera?.near,cameraFar:appCtx.camera?.far}:{}),
     x: deps.finiteNumber(walker.x, 0),
     z: deps.finiteNumber(walker.z, 0),
     y: deps.finiteNumber(walker.y, 0),
@@ -424,6 +471,7 @@ export async function enterInteriorForSupport(support, deps) {
   walker.pitch = 0;
   walker.lookYawOffset = 0;
   walker.vy = 0;
+  walker._resolvedGroundState = null;
   if (appCtx.car) {
     appCtx.car.x = walker.x;
     appCtx.car.z = walker.z;
@@ -437,7 +485,14 @@ export async function enterInteriorForSupport(support, deps) {
   }
 
   const entryHeight = sceneState.entryPoint.y;
-  if(sceneState.mode==='authored'&&appCtx.camera){appCtx.camera.near=.04;appCtx.camera.updateProjectionMatrix();}
+  if(sceneState.mode==='authored'&&appCtx.camera){
+    const points=sceneState.usableFootprint,x=points.map(p=>p.x),z=points.map(p=>p.z),height=Math.max(...sceneState.floorPlan.floors.map(f=>f.elevation+f.height));
+    appCtx.camera.near=.04;
+    // A geographic far plane loses depth precision on millimetre-scale indoor
+    // joints. Bound this camera to its occupied enclosure, then restore on exit.
+    appCtx.camera.far=Math.max(60,Math.hypot(Math.max(...x)-Math.min(...x),Math.max(...z)-Math.min(...z),height)*1.3);
+    appCtx.camera.updateProjectionMatrix();
+  }
   appCtx.activeInterior = {
     key,
     label: definition.label,
@@ -475,7 +530,9 @@ export async function enterInteriorForSupport(support, deps) {
     floorTransitionPending: false
   };
   applyInteriorSceneState(appCtx.activeInterior, sceneState);
-  if (!definition.communityRealityCapture) void deps.attachCuratedHomeFurnishing?.(appCtx.activeInterior);
+  if (!definition.communityRealityCapture && !definition.curatedContent && !definition.aquariumContent) void deps.attachCuratedHomeFurnishing?.(appCtx.activeInterior);
+  void deps.attachGallery?.(appCtx.activeInterior);
+  void deps.attachAquarium?.(appCtx.activeInterior);
   void deps.attachCommunityInteriorRepresentation?.(appCtx.activeInterior);
   appCtx.interiorHint = {
     state: "inside",
@@ -488,8 +545,9 @@ export async function enterInteriorForSupport(support, deps) {
 }
 
 export function clearActiveInterior(options = {}, deps) {
+  entryRevision += 1;
   const active = appCtx.activeInterior;
-  if(Number.isFinite(active?.outsideState?.cameraNear)&&appCtx.camera){appCtx.camera.near=active.outsideState.cameraNear;appCtx.camera.updateProjectionMatrix();}
+  if(Number.isFinite(active?.outsideState?.cameraNear)&&appCtx.camera){appCtx.camera.near=active.outsideState.cameraNear;if(Number.isFinite(active.outsideState.cameraFar))appCtx.camera.far=active.outsideState.cameraFar;appCtx.camera.updateProjectionMatrix();}
   if (active?.environmentKind === 'expedition-ship' && options.shipInternal !== true) {
     return appCtx.exitExpeditionShipInterior?.() === true;
   }
@@ -511,6 +569,7 @@ export function clearActiveInterior(options = {}, deps) {
     walker.pitch = deps.finiteNumber(active.outsideState.pitch, 0);
     walker.lookYawOffset = deps.finiteNumber(active.outsideState.lookYawOffset, 0);
     walker.vy = 0;
+    walker._resolvedGroundState = null;
     if (appCtx.car) {
       appCtx.car.x = walker.x;
       appCtx.car.z = walker.z;
@@ -533,6 +592,9 @@ export function clearActiveInterior(options = {}, deps) {
   // fresh collection and must never inherit old district obstacles.
   appCtx.replaceWorldCollection('dynamicBuildingColliders',
     active.outsideWorldSequence === appCtx._worldLoadSequence ? (active.outsideColliders || []) : []);
+  deps.disposeGallery?.(active);
+  deps.disposeAquarium?.(active);
+  disposeThreeViewsHome(active);
   deps.disposeCuratedHomeFurnishing?.(active);
   disposeObject3D(active.group);
   appCtx.activeInterior = null;
@@ -665,6 +727,9 @@ export async function handleInteriorAction(deps) {
   if (appCtx.activeInterior) {
     const active = appCtx.activeInterior;
     const interaction = nearestInteriorInteraction(active, appCtx.Walk?.state?.walker);
+    if (interaction?.kind === 'furnishing' && typeof interaction.perform === 'function') {
+      return (await interaction.perform()) !== false;
+    }
     if (['ship-station', 'ship-exit', 'ship-door', 'ship-lift', 'ship-incident-step', 'ship-crew'].includes(interaction?.kind)) {
       return (await appCtx.handleShipInteriorInteraction?.(interaction)) !== false;
     }
@@ -673,7 +738,9 @@ export async function handleInteriorAction(deps) {
       appCtx.notifyContextInteractionCompleted?.('exit_interior', { interiorId: active.id || active.key || '' });
       return true;
     }
-    if (interaction?.kind === 'elevator') return openElevatorFloorPicker(active, deps);
+    if (interaction?.kind === 'elevator') return openElevatorFloorPicker(active, deps,interaction);
+    if (interaction?.kind?.startsWith('museum-')) return deps.handleGalleryAction?.(active,interaction) === true;
+    if (interaction?.kind?.startsWith('aquarium-')) return deps.handleAquariumAction?.(active,interaction) === true;
     return false;
   }
   const candidate = pickNearbyBuildingCandidate(true, deps);
@@ -686,6 +753,10 @@ export async function handleInteriorAction(deps) {
 export function updateInteriorInteraction(deps) {
   ensureExteriorContextInteraction(deps);
   const now = performance.now();
+
+  // Opening lift controls pauses walking. That pause must not be interpreted
+  // as leaving walk mode, or the next UI refresh closes the dialog immediately.
+  if(elevatorFloorPicker&&appCtx.activeInterior?.elevatorPickerOpen&&appCtx.Walk?.state?.mode==='walk'&&appCtx.hasPauseReason?.('interior_elevator')){clearPrompt();return;}
 
   if (!deps.isWalkModeActive()) {
     closeElevatorFloorPicker(appCtx.activeInterior);

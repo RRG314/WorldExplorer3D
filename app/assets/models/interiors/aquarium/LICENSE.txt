@@ -1,0 +1,11 @@
+Blacktip reef shark by Lais.Marques
+https://sketchfab.com/3d-models/blacktip-reef-shark-a52bb96c5a0c4157b49982471f8902b0
+CC BY 4.0 — https://creativecommons.org/licenses/by/4.0/
+Parent-only centering, orientation and metre scale using sampled animated bounds; textures resized to 1K. Original bones, bind matrices, mesh topology and authored animation retained. This is a species illustration, not a scan of a National Aquarium animal.
+No endorsement by the artist or institution is implied.
+
+Green sea turtle by jgrabo20
+https://sketchfab.com/3d-models/green-sea-turtle-d3dc6a6a4ff74465a59105fd7c66b32b
+CC BY 4.0 — https://creativecommons.org/licenses/by/4.0/
+Parent-only centering, orientation and metre scale using sampled animated bounds; textures resized to 1K. Original bones, bind matrices, mesh topology and authored animation retained. This is a species illustration, not a scan of a National Aquarium animal.
+No endorsement by the artist or institution is implied.

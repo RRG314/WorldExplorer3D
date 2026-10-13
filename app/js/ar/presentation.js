@@ -1,3 +1,4 @@
+import { applyDisplayColorPolicy } from '../engine/display-color-policy.js';
 import { animateAnimalModel, createAnimalModel } from '../discovery/animal-models.js?v=3';
 import { COMPANION_CATALOG } from '../discovery/catalog.js?v=4';
 import { createNaturalHistoryModel } from '../discovery/natural-history-models.js?v=2';
@@ -93,7 +94,7 @@ function createArPresentation(options = {}) {
   const plan = options.challengePlan || null;
   const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true, powerPreference: 'default' });
   renderer.setClearColor(0x000000, 0);
-  renderer.outputColorSpace = THREE.SRGBColorSpace || renderer.outputColorSpace;
+  applyDisplayColorPolicy(renderer, THREE);
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(42, 1, .01, 50);
   camera.position.set(0, .62, 3.4);

@@ -8,7 +8,7 @@ const journeys={
  save:['discovery-save-consistency'],
  swimming:['swimming-current','swimming-shore'],
  'swimming-earth':['swimming-earth'],
- deck:['research-deck-current'],
+ deck:['research-deck-current','research-interior-current'],
  navigation:['space-navigation-presentation-current'],
  geology:['planetary-art-current'],
  district:['earth-district-current'],

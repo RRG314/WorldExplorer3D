@@ -1,3 +1,7 @@
+import { verifyThreeViews } from './three-views-journey.mjs';
+import { verifyPersonalHome } from './personal-home-journey.mjs';
+import { captureVisualSceneAudit } from './visual-scene-audit.mjs';
+import { verifyHarborRun } from './harbor-run-journey.mjs';
 // Actual source world + field recording and Journal UI. Position placement is
 // bounded test setup, not a claim of an uncoached navigation/usability test.
 import assert from 'node:assert/strict';
@@ -25,7 +29,7 @@ try {
  browserServer=await chromium.launchServer({headless:true,channel:'chrome'});
  browser=await chromium.connect(browserServer.wsEndpoint());
  const context=await browser.newContext({viewport:{width:1440,height:900}});
- page=await context.newPage();
+ page=await context.newPage();page.setDefaultTimeout(30000);
  page.on('pageerror',e=>errors.push(String(e)));
  page.on('response',r=>{
   const url=new URL(r.url());
@@ -36,16 +40,31 @@ try {
  });
  await configureStagingAppCheck(page,base);
  const url=`${base}/app/?loc=custom&lat=39.2904&lon=-76.6122&lname=Baltimore&launch=earth&gm=free&mode=walking`;
+ let entryCount=0;
  const ready=async()=>{
   await page.waitForFunction(()=>globalThis.__WE3D_RUNTIME_READY__,null,{timeout:120000});
   if(await page.locator('#analyticsConsentDenyBtn').isVisible())await page.locator('#analyticsConsentDenyBtn').click();
-  if(await page.locator('#globeSelectorStartBtn').isVisible())await page.locator('#globeSelectorStartBtn').click();
+  if(process.env.WE3D_SANDBOX_ENTRY_SHORTCUTS==='1') {
+   const entry=entryCount++===0?'#globeGuidedStartBtn':'#globeReturnPlaceBtn';
+   await page.locator(entry).waitFor({state:'visible'});
+   await page.screenshot({path:`${out}/entry-${entryCount}-desktop.png`});
+   await page.setViewportSize({width:390,height:844});
+   await page.locator(entry).scrollIntoViewIfNeeded();
+   const box=await page.locator(entry).boundingBox();
+   assert.ok(box.width>=100&&box.height>=44&&box.x>=0&&box.x+box.width<=390,'Entry action fits the phone');
+   await page.screenshot({path:`${out}/entry-${entryCount}-phone.png`});
+   await page.setViewportSize({width:1440,height:900});
+   await page.locator(entry).click();
+  } else if(await page.locator('#globeSelectorStartBtn').isVisible())await page.locator('#globeSelectorStartBtn').click();
   await page.waitForFunction(()=>{const d=globalThis.getWorldExplorerRuntimeDiagnostics?.();return d?.gameStarted&&!d.worldLoading&&d.worldDiscovery?.active&&!document.getElementById('loading')?.classList.contains('show');},null,{timeout:180000});
   await page.evaluate(async()=>{globalThis.__sandboxTestContext=(await import('/app/js/shared-context.js?v=55')).ctx;});
  };
  await page.goto(url,{waitUntil:'domcontentloaded'});await ready();
  await page.evaluate(async()=>{const{ctx}=await import('/app/js/shared-context.js?v=55');ctx.setTimeOfDay?.('day');ctx.setWeatherMode?.('clear');});
- if(process.env.WE3D_SANDBOX_FLOWER_ONLY !== '1') {
+ if(process.env.WE3D_SANDBOX_RELOAD_ONLY === '1') {
+  await page.reload({waitUntil:'domcontentloaded'});await ready();report.checks.entryAndReturnReload=true;
+ }
+ if(process.env.WE3D_SANDBOX_FLOWER_ONLY !== '1' && process.env.WE3D_SANDBOX_RELOAD_ONLY !== '1') {
  await page.locator('#backpackBtn').click();
  await page.locator('#fBackpack').click();
  await page.locator('#urbanEquipment.show').waitFor({state:'visible'});
@@ -65,14 +84,37 @@ try {
  await page.screenshot({path:`${out}/mobile-walkthrough.png`});
  assert.equal(await page.locator('#discoveryPanel').evaluate(e=>e.scrollWidth>e.clientWidth+1),false);
  await page.setViewportSize({width:1440,height:900});
- await page.locator('#discoveryFirstJourneyBtn').click();
+ if(process.env.WE3D_SANDBOX_CHAPTER==='1') {
+  if(process.env.WE3D_SANDBOX_RESEARCH) {
+   await page.locator('#discoveryStarterChoice').selectOption(process.env.WE3D_SANDBOX_RESEARCH);
+   await page.locator('#discoveryStarterChoice').scrollIntoViewIfNeeded();
+   await page.screenshot({path:`${out}/research-choice-desktop.png`});
+   await page.setViewportSize({width:390,height:844});
+   await page.locator('#discoveryStarterChoice').scrollIntoViewIfNeeded();
+   await page.screenshot({path:`${out}/research-choice-phone.png`});
+   assert.equal(await page.locator('#discoveryPanel').evaluate(e=>e.scrollWidth>e.clientWidth+1),false);
+   await page.setViewportSize({width:1440,height:900});
+  }
+  await page.locator('[data-chapter-action="start"]').click();
+  await page.waitForFunction(()=>!document.getElementById('discoveryPanel')?.classList.contains('show'));
+ } else await page.locator('#discoveryFirstJourneyBtn').click();
  assert.equal(await page.evaluate(()=>globalThis.__sandboxTestContext.getTutorialSnapshot().completed),false);
  // Route selection uses the real field plan and entitlement checks.
- await page.evaluate(async()=>{const{ctx}=await import('/app/js/shared-context.js?v=55');ctx.openWorldDiscoverySection('today');});
- await page.locator('.discoveryTodayRoute summary').click();
- const objective=await page.locator('[data-field-objective]:not([disabled])').first().getAttribute('data-field-objective');
+ let objective;
+ if(process.env.WE3D_SANDBOX_RESEARCH) {
+  await page.waitForFunction(()=>!!__sandboxTestContext.worldDiscoveryRuntime.fieldSession.snapshot().targetId);
+  objective=await page.evaluate(()=>__sandboxTestContext.worldDiscoveryRuntime.fieldSession.snapshot().targetId);
+  const selected=await page.evaluate(async()=>(await __sandboxTestContext.discoveryProfileStore.getProfile()).openingChapter.careerId);
+  assert.equal(selected,process.env.WE3D_SANDBOX_RESEARCH);
+  await page.screenshot({path:`${out}/research-started.png`});
+ } else {
+  await page.evaluate(async()=>{const{ctx}=await import('/app/js/shared-context.js?v=55');ctx.openWorldDiscoverySection('today');});
+  await page.locator('.discoveryTodayRoute summary').click();
+  objective=await page.locator('[data-field-objective]:not([disabled])').first().getAttribute('data-field-objective');
+  await page.locator(`[data-field-objective="${objective}"]`).click();
+ }
  assert.ok(objective,'World must supply a valid field opportunity');
- await page.locator(`[data-field-objective="${objective}"]`).click();
+ if(process.env.WE3D_SANDBOX_RESEARCH) report.checks.researchChoiceAndTarget=true;
  const setup=await page.evaluate(async id=>{
   const{ctx}=await import('/app/js/shared-context.js?v=55');const state=ctx.worldDiscoveryRuntime;
   const slot=state.publication.fieldActivities.slots.find(s=>s.id===id);
@@ -82,6 +124,7 @@ try {
   return {slotId:id,activityId:slot.activityId,phase:state.fieldSession.snapshot(actor).phase};
  },objective);
  report.setup=setup;
+ if(process.env.WE3D_SANDBOX_HARBOR==='1'){report.visualAudit=await captureVisualSceneAudit(page);await writeFile(`${out}/visual-audit.json`,JSON.stringify(report.visualAudit,null,2));}
  await page.waitForFunction(()=>globalThis.getWorldExplorerRuntimeDiagnostics?.().worldDiscovery?.interaction?.phase==='revealed',null,{timeout:45000});
  await page.evaluate(async()=>{const{ctx}=await import('/app/js/shared-context.js?v=55');ctx.openWorldDiscoverySection('today');});
  await page.locator('#discoveryPrimaryBtn').click();
@@ -100,6 +143,39 @@ try {
  assert.ok((await page.locator('#discoveryJournalList').innerText()).includes(result.name));
  await page.screenshot({path:`${out}/mobile-journal.png`});
  report.checks.touchSizedResultAction=true;report.checks.actualFieldResultReviewed=true;report.checks.mobileNoPanelOverflow=true;
+ if(process.env.WE3D_SANDBOX_CHAPTER==='1') {
+  // Bounded history setup proves that a real chapter record remains reviewable
+  // after it leaves the recent page. These are not claimed gameplay actions.
+  const olderThanPage=await page.evaluate(async id=>{
+   const store=globalThis.__sandboxTestContext.discoveryProfileStore;
+   const start=Date.now();
+   for(let i=0;i<105;i++)await store.recordExplorerEvent({eventId:`verification:history:${i}`,eventType:'verification-history',sourceId:String(i),name:'History paging fixture',occurredAt:start+i,projections:{profile:false,place:false}});
+   return !(await store.listEvents(100)).some(event=>event.eventId===id);
+  },result.eventId);
+  assert.equal(olderThanPage,true);report.checks.chapterHistorySetupBeyondRecentPage=true;
+  await page.locator('[data-discovery-tab="today"]').click();
+  await page.locator('#discoveryOpeningChapter[data-chapter-phase="review"]').waitFor();
+  await page.locator('[data-chapter-action="review"]').click();
+  const finish=page.locator('[data-chapter-action="finish"]');
+  await finish.waitFor({state:'visible'});
+  const box=await finish.boundingBox();assert.ok(box.height>=44&&box.height<=70&&box.width>=200&&box.x+box.width<=390,'Chapter finish spans the Journal card and stays touch-sized');
+  await page.screenshot({path:`${out}/chapter-review-phone.png`});
+  await finish.click();
+  await page.locator('#discoveryOpeningChapter[data-chapter-phase="complete"]').waitFor();
+  await page.screenshot({path:`${out}/chapter-complete-phone.png`});
+  await page.setViewportSize({width:1440,height:900});
+  await page.screenshot({path:`${out}/chapter-complete-desktop.png`});
+  await page.locator('[data-chapter-action="profile"]').click();
+  const badges=page.locator('#discoveryProgress details').filter({has:page.locator('summary', {hasText:'Badges'})});
+  await page.locator('[data-explorer-badge="first-bearings"]').waitFor({state:'visible'});
+  assert.equal(await badges.evaluate(element=>element.open),true,'View your badge expands the actual badge');
+  assert.match(await badges.innerText(),/First Bearings/);
+  await page.screenshot({path:`${out}/chapter-badge-desktop.png`});
+  report.checks.chapterCompletedAndBadgeVisible=true;
+ }
+ if(process.env.WE3D_SANDBOX_HARBOR==='1')await verifyHarborRun({page,out,report});
+ if(process.env.WE3D_SANDBOX_PHOTOS==='1')await verifyThreeViews({page,out,report});
+ if(process.env.WE3D_SANDBOX_HOME==='1')await verifyPersonalHome({page,out,report});
  await page.locator('#discoveryCloseBtn').click();await page.locator('#realEstateFloatBtn').click();
  assert.equal(await page.locator('#fQuickBuild').isVisible(),true);
  await page.screenshot({path:`${out}/mobile-build-menu.png`});
@@ -164,6 +240,23 @@ try {
  await page.evaluate(async()=>{await globalThis.__sandboxTestContext.ensureBlockBuilderReady();});
  assert.equal(await page.evaluate(()=>globalThis.__sandboxTestContext.getBlockBuilderSnapshot().count),1,'Solo block survives reload');
  assert.deepEqual(restored,{completed:true,hasRecord:true});report.checks.savedAndReloaded=true;
+ if(process.env.WE3D_SANDBOX_CHAPTER==='1') {
+  const saved=await page.evaluate(async()=>{const store=globalThis.__sandboxTestContext.discoveryProfileStore;
+   const profile=await store.getProfile();const records=await store.getEventsById(['event:campaign-completed:first-bearings:v1']);
+   return {phase:profile.openingChapter.phase,receipts:records.length};});
+  assert.deepEqual(saved,{phase:'complete',receipts:1});report.checks.chapterSurvivesReload=true;
+  if(process.env.WE3D_SANDBOX_PHOTOS==='1'){const album=await page.evaluate(async()=>{const store=globalThis.__sandboxTestContext.discoveryProfileStore;return {phase:(await store.getProfile()).threeViews.phase,photos:(await store.getThreeViewsAlbum()).photos.length};});assert.deepEqual(album,{phase:'complete',photos:3});report.checks.albumSurvivesReload=true;}
+  if(process.env.WE3D_SANDBOX_HOME==='1'){
+   const saved=await page.evaluate(async()=>{const c=globalThis.__sandboxTestContext;const p=await c.discoveryProfileStore.getProfile();const h=c.explorerHousing.snapshot();const home=h.homes.find(h=>h.personalStarter);return {id:home?.id,pose:home?.workspace?.pose,returned:!!home?.journey?.returned,primary:h.primaryHomeId,maker:p.homeAchievements?.maker?.metadata?.homeId,home:p.homeAchievements?.home?.metadata?.homeId,receipts:(await c.discoveryProfileStore.getEventsById(['event:campaign:useful-place:v1','event:campaign:place-to-return:v1'])).length};});
+   assert.equal(saved.id,report.personalHome.homeId);assert.equal(saved.primary,saved.id);assert.equal(saved.maker,saved.id);assert.equal(saved.home,saved.id);assert.equal(saved.returned,true);assert.equal(saved.receipts,2);assert.deepEqual(saved.pose,report.personalHome.workspace.pose);report.checks.personalHomeAndTwoBadgesSurviveReload=true;
+  }
+  if(process.env.WE3D_SANDBOX_HARBOR==='1'){
+   const saved=await page.evaluate(async()=>{const store=globalThis.__sandboxTestContext.discoveryProfileStore;return {phase:(await store.getProfile()).harborRun.phase,receipts:(await store.getEventsById(['event:campaign-completed:harbor-run:v1'])).length};});
+   assert.deepEqual(saved,{phase:'complete',receipts:1});
+   const finish=await page.evaluate(async()=>({saved:(await globalThis.__sandboxTestContext.discoveryProfileStore.getProfile()).harborRun.finishId,actual:globalThis.__sandboxTestContext.carMesh.userData.curatedVehicleVisual?.userData.paintFinish}));
+   assert.deepEqual(finish,{saved:'slate',actual:'artist-slate-exterior'});report.checks.harborSurvivesReload=true;
+  }
+ }
 
  }
  report.flowerSetup=await page.evaluate(async()=>{
@@ -190,7 +283,7 @@ try {
  report.checks.flowerSprintReceipt=true;
  report.errors=errors;report.failedLocal=failedLocal;assert.deepEqual(errors,[]);assert.deepEqual(failedLocal,[]);
  report.ok=true;
-} catch(error){report.errors=errors;report.failedLocal=failedLocal;report.error=String(error.stack||error);if(page){await page.screenshot({path:`${out}/failure.png`}).catch(()=>{});report.state=await page.evaluate(()=>{const d=globalThis.getWorldExplorerRuntimeDiagnostics?.();return {worldLoading:d?.worldLoading,environment:d?.environment,interaction:d?.worldDiscovery?.interaction,loading:document.getElementById('loading')?.textContent,flower:{mode:globalThis.__sandboxTestContext?.Walk?.state?.mode,walker:{x:globalThis.__sandboxTestContext?.Walk?.state?.walker?.x,y:globalThis.__sandboxTestContext?.Walk?.state?.walker?.y,z:globalThis.__sandboxTestContext?.Walk?.state?.walker?.z},marker:globalThis.__sandboxTestContext?.scene?.getObjectByName('redFlowerChallenge')?.position,backend:globalThis.__sandboxTestContext?.getFlowerChallengeBackendStatus?.(),receipts:globalThis.__sandboxSavedResults}};}).catch(()=>null);}throw error;}
+} catch(error){report.errors=errors;report.failedLocal=failedLocal;report.error=String(error.stack||error);if(page){await page.screenshot({path:`${out}/failure.png`}).catch(()=>{});report.state=await page.evaluate(()=>{const d=globalThis.getWorldExplorerRuntimeDiagnostics?.();return {gameStarted:d?.gameStarted,worldCounts:d?.worldCounts,worldLoad:d?.worldLoad,activeActor:d?.activeActor,personalHome:globalThis.__sandboxTestContext?.worldDiscoveryRuntime?.personalHome?.snapshot?.(),photos:d?.worldDiscovery?.threeViews,harbor:d?.worldDiscovery?.harborRun,worldLoading:d?.worldLoading,environment:d?.environment,interaction:d?.worldDiscovery?.interaction,loading:document.getElementById('loading')?.textContent,flower:{mode:globalThis.__sandboxTestContext?.Walk?.state?.mode,walker:{x:globalThis.__sandboxTestContext?.Walk?.state?.walker?.x,y:globalThis.__sandboxTestContext?.Walk?.state?.walker?.y,z:globalThis.__sandboxTestContext?.Walk?.state?.walker?.z},marker:globalThis.__sandboxTestContext?.scene?.getObjectByName('redFlowerChallenge')?.position,backend:globalThis.__sandboxTestContext?.getFlowerChallengeBackendStatus?.(),receipts:globalThis.__sandboxSavedResults}};}).catch(()=>null);}throw error;}
 finally{
  await writeFile(`${out}/report.json`,JSON.stringify(report,null,2));
  try {if(browserServer)await closeOwnedBrowser(browserServer);}

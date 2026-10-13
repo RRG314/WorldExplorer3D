@@ -1,0 +1,32 @@
+{
+  "title": "Terrazzo Tiles",
+  "creator": "Amal Kumar",
+  "source": "https://polyhaven.com/a/terrazzo_tiles",
+  "license": "CC0-1.0",
+  "licenseUrl": "https://polyhaven.com/license",
+  "widthMeters": 2,
+  "changes": "Unmodified 1K JPEG color, OpenGL normal and roughness maps.",
+  "records": [
+    {
+      "file": "diffuse.jpg",
+      "source": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/terrazzo_tiles/terrazzo_tiles_diff_1k.jpg",
+      "sourceMD5": "12c27a579c2ed49de854b8a86e33647b",
+      "sha256": "462e3e719cda0472a33152523cf5ca2fc660e1c5869348be1609ba3dca12a2ef",
+      "bytes": 1166107
+    },
+    {
+      "file": "normal.jpg",
+      "source": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/terrazzo_tiles/terrazzo_tiles_nor_gl_1k.jpg",
+      "sourceMD5": "a5f6d05f27db4151227535bdbc82c048",
+      "sha256": "56bbe2d960b47ddb2dc538be2953a1ad07083b017cdada1cdc7958421a6cfcd9",
+      "bytes": 77954
+    },
+    {
+      "file": "roughness.jpg",
+      "source": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/terrazzo_tiles/terrazzo_tiles_rough_1k.jpg",
+      "sourceMD5": "e34bfd2f4fee1b2b9f310a71588aad17",
+      "sha256": "cf0cb8525674adeb7da551ed1846c8c4edfd0377a35c6fe94d5f1cb2142c6152",
+      "bytes": 459022
+    }
+  ]
+}

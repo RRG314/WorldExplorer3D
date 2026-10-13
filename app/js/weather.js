@@ -2,6 +2,7 @@ import { ctx as appCtx } from "./shared-context.js?v=55";
 import { resolveObservedEarthLocation, haversineKm } from "./earth-location.js?v=2";
 import {
   assignResolvedPlace,
+  cancelPlaceResolution,
   cleanCountry,
   fetchJsonWithTimeout,
   fetchPlaceForLocation,
@@ -39,6 +40,7 @@ let _lastWeatherVisualSignature = '';
 let _lastWeatherUiSignature = '';
 let _lastWeatherCheckMs = 0;
 let _pendingWeatherRequest = null;
+let _weatherLoadState={status:'idle',retryAfter:0,location:null};
 const weatherLifecycleScope = createLifecycleScope('weather-ui');
 
 const WEATHER_PRESETS = {
@@ -121,7 +123,7 @@ function getWeatherClockDate(active) {
 
 function getLiveClockLabel(active, options = undefined) {
   const date = getWeatherClockDate(active);
-  return formatClockTimeForDate(date, String(active?.timezoneAbbr || '').trim(), options);
+  return date?formatClockTimeForDate(date, String(active?.timezoneAbbr || '').trim(), options):`${new Date().toISOString().slice(11,19)} UTC`;
 }
 
 function windDirectionLabel(deg) {
@@ -238,7 +240,8 @@ function updateWeatherUi() {
     humidity: Number.isFinite(active?.humidityPct) ? Math.round(active.humidityPct) : null,
     cloudCover: Number.isFinite(active?.cloudCover) ? Math.round(active.cloudCover) : null,
     windMph: Number.isFinite(active?.windMph) ? Math.round(active.windMph) : null,
-    windCompass
+    windCompass,
+    loadStatus:_weatherLoadState.status
   });
   if (_lastWeatherUiSignature === signature) return;
   _lastWeatherUiSignature = signature;
@@ -273,10 +276,10 @@ function updateWeatherUi() {
   if (!active) {
     panel.style.display = 'block';
     clock.style.display = 'block';
-    line.textContent = `${display.icon} ${mode === 'live' ? 'Loading live weather' : display.label}`;
-    clock.textContent = mode === 'live' ? 'Local time loading…' : 'Manual weather active';
+    line.textContent = `${display.icon} ${mode === 'live' ? (_weatherLoadState.status==='loading'?'Loading live weather':_weatherLoadState.status==='unavailable'?'Weather unavailable':'Live weather') : display.label}`;
+    clock.textContent = localTimeLabel;
     timeLine.textContent = clock.textContent;
-    meta.textContent = mode === 'live' ? `Fetching local conditions` : `Override ready`;
+    meta.textContent = mode === 'live' ? (_weatherLoadState.status==='loading'?'Checking nearby conditions':_weatherLoadState.status==='unavailable'?'Exploration continues · retrying shortly':'Choose weather above') : 'Manual conditions';
     line.style.display = 'block';
     timeLine.style.display = 'none';
     meta.style.display = 'block';
@@ -382,7 +385,7 @@ function applyWeatherPresentation() {
       Number(skyVisual.hemiIntensity) || 0
     );
     const upperBlend = Math.max(weatherCloudFactor * 0.38, weatherFogBlend * 0.58, precipitationBoost * 1.6);
-    appCtx.hemiLight.color.setHex(mixColorHex(skyVisual.skyColor, profile.skyTint || WEATHER_FOG_COLOR, upperBlend));
+    appCtx.hemiLight.color.setHex(mixColorHex(skyVisual.hemisphereColor ?? skyVisual.skyColor, profile.skyTint || WEATHER_FOG_COLOR, upperBlend));
     if (appCtx.hemiLight.groundColor) {
       appCtx.hemiLight.groundColor.setHex(mixColorHex(skyVisual.groundColor || 0x545454, 0x59636f, Math.max(weatherCloudFactor * 0.2, weatherFogBlend * 0.46)));
     }
@@ -476,17 +479,19 @@ function syncActiveWeatherState() {
   return appCtx.weatherState;
 }
 
-async function fetchWeatherForLocation(lat, lon, { ocean = false, force = false } = {}) {
+async function fetchWeatherForLocation(lat, lon, { ocean = false, force = false, signal } = {}) {
   let lastError = null;
   for (let attempt = 0; attempt < WEATHER_MAX_ATTEMPTS; attempt++) {
+    if(signal?.aborted)throw new DOMException('Weather request cancelled','AbortError');
     try {
       const result = await operationalFeedService.weather([{ lat, lon }], {
         ocean,
-        force: force || attempt > 0
+        force: force || attempt > 0, signal
       });
       if (!result.items[0]) throw new Error('weather_payload_empty');
       return result.items[0];
     } catch (err) {
+      if(signal?.aborted)throw err;
       lastError = err;
       if (attempt < WEATHER_MAX_ATTEMPTS - 1) {
         await sleep(WEATHER_RETRY_DELAY_MS);
@@ -540,7 +545,9 @@ function isCurrentWeatherLocation(location) {
 
 async function refreshLiveWeather(force = false) {
   if (appCtx.onMoon || appCtx.travelingToMoon || !(appCtx.isEnv?.(appCtx.ENV?.EARTH) || appCtx.oceanMode?.active)) {
-    _pendingWeatherRequest = null;
+    _pendingWeatherRequest?.controller.abort();_pendingWeatherRequest = null;
+    cancelPlaceResolution();
+    _weatherLoadState={status:'idle',retryAfter:0,location:null};
     updateWeatherUi();
     return appCtx.liveWeatherState;
   }
@@ -551,7 +558,8 @@ async function refreshLiveWeather(force = false) {
     return appCtx.liveWeatherState;
   }
 
-  if (_pendingWeatherRequest && !isCurrentWeatherLocation(_pendingWeatherRequest.location)) _pendingWeatherRequest = null;
+  if (_pendingWeatherRequest && !isCurrentWeatherLocation(_pendingWeatherRequest.location)){_pendingWeatherRequest.controller.abort();_pendingWeatherRequest = null;}
+  if(!force&&_weatherLoadState.status==='unavailable'&&Date.now()<_weatherLoadState.retryAfter&&isCurrentWeatherLocation(_weatherLoadState.location)){updateWeatherUi();return appCtx.liveWeatherState;}
   const lastLive = appCtx.liveWeatherState || null;
   const now = Date.now();
   const movedKm = lastLive ? haversineKm(lastLive.lat, lastLive.lon, location.lat, location.lon) : Infinity;
@@ -576,7 +584,8 @@ async function refreshLiveWeather(force = false) {
   const cacheKey = weatherCacheKey(location.lat, location.lon);
   const cached = weatherStateService.getCachedWeather(cacheKey);
   if (!force && cached && (now - Number(cached.fetchedAtMs || 0)) < WEATHER_REFRESH_INTERVAL_MS) {
-    _pendingWeatherRequest = null;
+    _pendingWeatherRequest?.controller.abort();_pendingWeatherRequest = null;
+    _weatherLoadState={status:'ready',retryAfter:0,location};
     weatherStateService.setLiveState(cached);
     void refreshLivePlace(location, false).then(() => {
       if (!isCurrentWeatherLocation(location)) return;
@@ -604,14 +613,19 @@ async function refreshLiveWeather(force = false) {
     weatherStateService.updatePlaceLabels();
     updateWeatherUi();
   });
-  const request = { key: requestKey, location, promise: null };
-  const promise = fetchWeatherForLocation(location.lat, location.lon, { ocean, force }).then((payload) => {
+  _pendingWeatherRequest?.controller.abort();
+  const request = { key: requestKey, location, promise: null,controller:new AbortController() };
+  _weatherLoadState={status:'loading',retryAfter:0,location};updateWeatherUi();
+  const promise = fetchWeatherForLocation(location.lat, location.lon, { ocean, force, signal:request.controller.signal }).then((payload) => {
     const state = buildLiveWeatherState(location, payload);
     if (_pendingWeatherRequest === request || !weatherStateService.getCachedWeather(cacheKey)) weatherStateService.setCachedWeather(cacheKey, state);
-    if (_pendingWeatherRequest === request && isCurrentWeatherLocation(location)) weatherStateService.setLiveState(state);
+    if (_pendingWeatherRequest === request && isCurrentWeatherLocation(location)){weatherStateService.setLiveState(state);_weatherLoadState={status:'ready',retryAfter:0,location};}
     return state;
   }).catch((err) => {
-    console.warn('[weather] live weather fetch failed:', err?.message || err);
+    if(!request.controller.signal.aborted){
+      console.warn('[weather] live weather fetch failed:', err?.message || err);
+      if(_pendingWeatherRequest===request&&isCurrentWeatherLocation(location))_weatherLoadState={status:'unavailable',retryAfter:Date.now()+30000,location};
+    }
     return appCtx.liveWeatherState;
   }).finally(() => {
     if (_pendingWeatherRequest !== request) return;
@@ -681,6 +695,8 @@ function inspectWeatherDescriptor(weatherCode, cloudCover = 0, isDay = true) {
 }
 
 function disposeWeatherUi(reason = 'weather-ui-disposed') {
+  cancelPlaceResolution();
+  _pendingWeatherRequest?.controller.abort();_pendingWeatherRequest=null;
   return weatherLifecycleScope.dispose(reason);
 }
 

@@ -1,3 +1,4 @@
+import {installControlledMarineWeather} from './controlled-marine-weather.mjs';
 import {deployResearchSubmarineFromDeck} from './marine-entry-ui.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
@@ -6,7 +7,7 @@ import { startStaticServer } from './static-server.mjs';
 import { configureStagingAppCheck } from './staging-app-check.mjs';
 const server = await startStaticServer({ rootDir: process.env.WE3D_VERIFY_ROOT || process.cwd(), ports: [4396] });
 const browser = await chromium.launch({ channel: 'chrome', headless: true });
-const dir = 'output/verification/product-plan/habitat';
+const dir = process.env.WE3D_HABITAT_OUTPUT || 'output/verification/product-plan/habitat';
 await fs.mkdir(dir, { recursive: true });
 const report = { scope: 'Actual app UI and ocean renderer from selected runtime root; controlled providers. Separate source fixture for resource lifetime and asset outage.', runtimeRoot: process.env.WE3D_VERIFY_ROOT || '.', fixtureScope: 'source component only', cases: [], errors: [] };
 let page, fixtureServer;
@@ -25,6 +26,7 @@ try {
  report.attestation = await configureStagingAppCheck(page, base);
  // Preserve the declared controlled place fixture after the gateway migration.
  await page.route(`${base}/api/geospatial/reverse?**`, route => route.fulfill({json: {display_name: 'Entry check fixture', lat: '39.2898', lon: '-76.6122', address: {city: 'Entry check fixture'}}}));
+ report.environmentalFixture=await installControlledMarineWeather(page);
  report.localFailures = [];
  page.on('response', response => { if (response.url().startsWith(base + '/') && response.status() >= 400) report.localFailures.push({url: response.url(), status: response.status()}); });
  page.on('pageerror', error => report.errors.push(error.message));
@@ -82,11 +84,14 @@ try {
  report.cases.push({id:'phone-controls-fit-and-bounded-rendering',passed:true});
  fixtureServer=await startStaticServer({rootDir:process.cwd(),ports:[4397]});
  await page.goto(`http://127.0.0.1:${fixtureServer.port}/tests/fixtures/marine-habitat.html`);await page.waitForFunction(()=>window.ready===true);
- report.cycles=[];for(let i=0;i<3;i++){await page.evaluate(()=>habitatTest.rebuild());report.cycles.push(await page.evaluate(()=>({memory:{...habitatTest.renderer.info.memory},cache:habitatTest.cache()})));}
+ report.cycles=[];for(let i=0;i<3;i++){await page.evaluate(()=>habitatTest.rebuild());report.cycles.push(await page.evaluate(()=>({memory:{...habitatTest.renderer.info.memory},gpuBuffers:habitatTest.gpuBufferCount(),cache:habitatTest.cache()})));}
  assert.deepEqual(report.cycles[0].memory,report.cycles[2].memory);
- assert.ok(report.cycles.every(c=>c.cache.entries.filter(a=>a.id.startsWith('marine-')).every(a=>a.leases===1)));
+ assert.equal(report.cycles[0].gpuBuffers,report.cycles[2].gpuBuffers,'instance buffers must not accumulate across habitat replacement');
+ assert.ok(report.cycles.every(c=>c.cache.entries.filter(a=>(a.id.startsWith('marine-')||a.id==='solis-cargo-case')).every(a=>a.leases===1)));
  assert.equal(await page.evaluate(()=>habitatTest.cancel()),0);
- await page.evaluate(()=>habitatTest.dispose());assert.ok(await page.evaluate(()=>habitatTest.cache().entries.filter(a=>a.id.startsWith('marine-')).every(a=>a.leases===0)));
+ await page.evaluate(()=>habitatTest.dispose());assert.ok(await page.evaluate(()=>habitatTest.cache().entries.filter(a=>(a.id.startsWith('marine-')||a.id==='solis-cargo-case')).every(a=>a.leases===0)));
+ report.retiredGpuBuffers=await page.evaluate(()=>habitatTest.gpuBufferCount());
+ assert.equal(report.retiredGpuBuffers,4,'only the fixture seabed position, normal, UV and index buffers remain');
  report.cases.push({id:'three-rebuilds-no-resource-growth-and-late-load-cancelled',passed:true});
  await page.route('**/app/assets/models/marine/*',route=>route.abort());
  await page.reload();await page.waitForFunction(()=>window.ready===true);assert.equal(await page.evaluate(()=>habitatTest.habitat.group.userData.habitat.assetState),'unavailable');

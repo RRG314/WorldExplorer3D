@@ -1,4 +1,6 @@
 import { captureSurfaceLightPresentation } from './planetary/surface-lighting.js';
+import { activateLunarFieldwork, hideLunarFieldwork } from './planetary/lunar-fieldwork.js';
+import { getStagedSurfacePod } from './planetary/surface-pod-launch.js?v=11';
 let restoreSurfaceLights = null;
 import { setActivePlanetaryObstacles, clearActivePlanetaryObstacles } from './planetary/runtime/obstacle-authority.js?v=1';
 import { ctx as appCtx } from "./shared-context.js?v=55";
@@ -292,6 +294,7 @@ function arriveAtMoon() {
     const resumeMoon = () => {
       if (!appCtx.onMoon) return;
       positionCarOnMoon();
+      activateLunarFieldwork(appCtx);
       appCtx.refreshBlockBuilderForCurrentLocation?.();
       if (appCtx.carMesh) appCtx.carMesh.visible = true;
       appCtx.setPauseReason?.('planetary_transition', false);
@@ -339,6 +342,10 @@ function cancelPendingEarthArrival() {
 
 function returnToEarth() {
   if (!appCtx.onMoon || appCtx.travelingToMoon) return;
+  if (getStagedSurfacePod('moon')) {
+    appCtx.showToast?.('Return to Pathfinder beside the landing point. Approach its hatch and press E to launch for Solis Reach.');
+    return false;
+  }
   if (typeof appCtx.startSpaceFlightToEarth === 'function') {
     hideReturnToEarthButton();
     return appCtx.startSpaceFlightToEarth();
@@ -430,6 +437,7 @@ Object.defineProperty(appCtx, 'apollo11Flag', {
 });
 
 function suspendMoonEnvironment() {
+  hideLunarFieldwork(appCtx);
   restoreSurfaceLights?.();restoreSurfaceLights=null;
   clearActivePlanetaryObstacles('moon');
   hideReturnToEarthButton();

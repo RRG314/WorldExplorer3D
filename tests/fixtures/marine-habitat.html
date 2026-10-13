@@ -7,6 +7,10 @@ import {createOceanSoundscape} from '/app/js/ocean/soundscape.js';
 import {modelAssetCacheSnapshot} from '/app/js/assets/model-asset-runtime.js?v=16';
 const scene=new THREE.Scene();scene.background=new THREE.Color(0x123e55);scene.fog=new THREE.FogExp2(0x123e55,.009);
 const renderer=new THREE.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});renderer.setSize(innerWidth,innerHeight);renderer.outputEncoding=THREE.sRGBEncoding;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=.93;document.body.append(renderer.domElement);
+// renderer.info.memory does not count instanceMatrix/instanceColor buffers.
+const gl=renderer.getContext(),gpuBuffers=new Set(),createBuffer=gl.createBuffer.bind(gl),deleteBuffer=gl.deleteBuffer.bind(gl);
+gl.createBuffer=()=>{const buffer=createBuffer();if(buffer)gpuBuffers.add(buffer);return buffer;};
+gl.deleteBuffer=buffer=>{gpuBuffers.delete(buffer);return deleteBuffer(buffer);};
 const camera=new THREE.PerspectiveCamera(58,innerWidth/innerHeight,.1,1500);
 scene.add(new THREE.HemisphereLight(0xa8e9ff,0x143246,.5),new THREE.AmbientLight(0x84d9ef,.34));const sun=new THREE.DirectionalLight(0xb8f1ff,.86);sun.position.set(30,60,-30);scene.add(sun);
 const bed=new THREE.Mesh(new THREE.PlaneGeometry(1800,1800),new THREE.MeshStandardMaterial({color:0x677967,roughness:.95}));bed.rotation.x=-Math.PI/2;bed.position.y=-30;scene.add(bed);
@@ -18,6 +22,7 @@ function step(dt){time+=dt;const dx=(Number(held.has('ArrowRight'))-Number(held.
 window.advanceTime=async ms=>{for(let i=0;i<Math.ceil(ms/16.667);i++)step(1/60)};
 window.render_game_to_text=()=>JSON.stringify({coordinateSystem:'x east, y up, z south, controlled floor y=-30',habitat:habitat.group.userData.habitat,camera:camera.position,render:renderer.info.render,memory:renderer.info.memory,sound:sound.snapshot()});
 window.habitatTest={renderer,scene,camera,get habitat(){return habitat},cache:modelAssetCacheSnapshot,async rebuild(){scene.remove(habitat.group);disposeObject3D(habitat.group);habitat=createMarineHabitat(THREE,{site:CORAL_SHELF_SITE,sampleSeabedHeight:()=>-30});scene.add(habitat.group);await habitat.ready;step(.3)},async cancel(){const h=createMarineHabitat(THREE,{site:CORAL_SHELF_SITE,sampleSeabedHeight:()=>-30});disposeObject3D(h.group);await h.ready;return h.group.children.filter(c=>c.name.includes('coral')).length},dispose(){scene.remove(habitat.group);disposeObject3D(habitat.group);sound.dispose();step(0)}};
+window.habitatTest.gpuBufferCount=()=>gpuBuffers.size;
 window.ready=true;let last=performance.now();function frame(now){step(Math.min(.05,(now-last)/1000));last=now;requestAnimationFrame(frame)}requestAnimationFrame(frame);
 onresize=()=>{renderer.setSize(innerWidth,innerHeight);camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix()};
 </script></html>

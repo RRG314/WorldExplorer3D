@@ -1,0 +1,158 @@
+{
+  "schemaVersion": 1,
+  "records": [
+    {
+      "schemaVersion": 1,
+      "id": "aquarium-blacktip-reef-shark",
+      "title": "Blacktip reef shark",
+      "author": "Lais.Marques",
+      "license": "CC-BY-4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+      "sourceUrl": "https://sketchfab.com/3d-models/blacktip-reef-shark-a52bb96c5a0c4157b49982471f8902b0",
+      "sourceSha256": "9f30d3aef4cfc47941fa844db4dcb0f7b4799acca8bacfa7d3972d16680cac8f",
+      "sourceBytes": 5001464,
+      "sha256": "7e96f3840c1129be145b2b887ae8fc3af4e20304eeb7b28b4c61c30362202f83",
+      "bytes": 570128,
+      "file": "blacktip-reef-shark.glb",
+      "triangles": 6228,
+      "textures": [
+        {
+          "mimeType": "image/jpeg",
+          "dimensions": [
+            512,
+            512
+          ]
+        },
+        {
+          "mimeType": "image/jpeg",
+          "dimensions": [
+            512,
+            512
+          ]
+        },
+        {
+          "mimeType": "image/jpeg",
+          "dimensions": [
+            512,
+            512
+          ]
+        },
+        {
+          "mimeType": "image/jpeg",
+          "dimensions": [
+            1024,
+            1024
+          ]
+        },
+        {
+          "mimeType": "image/jpeg",
+          "dimensions": [
+            512,
+            512
+          ]
+        },
+        {
+          "mimeType": "image/jpeg",
+          "dimensions": [
+            256,
+            256
+          ]
+        }
+      ],
+      "sourcePosedBounds": {
+        "min": [
+          -8.36422232654556,
+          1.838871260169053,
+          -2.55423379971477
+        ],
+        "max": [
+          3.8644509697200293,
+          5.143141494877879,
+          1.7701596453978572
+        ]
+      },
+      "animation": "Take 001",
+      "normalization": {
+        "center": [
+          -2.2498856784127654,
+          3.491006377523466,
+          -0.39203707715845637
+        ],
+        "scale": 0.12675128057214033,
+        "rotation": [
+          0,
+          -0.7071067811865476,
+          0,
+          0.7071067811865476
+        ]
+      },
+      "modifications": "Parent-only centering, orientation and metre scale using sampled animated bounds; textures resized to 1K. Original bones, bind matrices, mesh topology and authored animation retained. This is a species illustration, not a scan of a National Aquarium animal."
+    },
+    {
+      "schemaVersion": 1,
+      "id": "aquarium-green-sea-turtle",
+      "title": "Green sea turtle",
+      "author": "jgrabo20",
+      "license": "CC-BY-4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+      "sourceUrl": "https://sketchfab.com/3d-models/green-sea-turtle-d3dc6a6a4ff74465a59105fd7c66b32b",
+      "sourceSha256": "7294581e0e7a2d2259ed343fcdb8dc9c7f8b55031bfffb282e4342b9cb63c818",
+      "sourceBytes": 4582936,
+      "sha256": "51ed52bec6472aa52929d6ee66e31a9fe60214c9d4c8a8d559dcc1f0a80d8e7c",
+      "bytes": 3758740,
+      "file": "green-sea-turtle.glb",
+      "triangles": 19678,
+      "textures": [
+        {
+          "mimeType": "image/jpeg",
+          "dimensions": [
+            1024,
+            1024
+          ]
+        },
+        {
+          "mimeType": "image/png",
+          "dimensions": [
+            1024,
+            1024
+          ]
+        },
+        {
+          "mimeType": "image/png",
+          "dimensions": [
+            1024,
+            1024
+          ]
+        }
+      ],
+      "sourcePosedBounds": {
+        "min": [
+          0.4923701018136679,
+          0.7205002967572827,
+          -0.7618575420713402
+        ],
+        "max": [
+          1.4357652066443536,
+          1.1113690476653408,
+          0.6031127891782279
+        ]
+      },
+      "animation": "Turtle_idle_2",
+      "normalization": {
+        "center": [
+          0.9640676542290108,
+          0.9159346722113118,
+          -0.07937237644655615
+        ],
+        "scale": 0.8791399875347142,
+        "rotation": [
+          0,
+          0,
+          0,
+          1
+        ]
+      },
+      "modifications": "Parent-only centering, orientation and metre scale using sampled animated bounds; textures resized to 1K. Original bones, bind matrices, mesh topology and authored animation retained. This is a species illustration, not a scan of a National Aquarium animal."
+    }
+  ]
+}

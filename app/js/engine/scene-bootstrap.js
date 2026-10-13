@@ -1,4 +1,5 @@
 import { installRenderLightUniformReuse } from './light-uniform-reuse.js';
+import { applyDisplayColorPolicy } from './display-color-policy.js';
 import { setupEngineInputHandlers } from "./input-handlers.js?v=16";
 import { createVehicleHeadlightRig } from "./night-lighting.js?v=8";
 import { attachCuratedPlayerCar } from './curated-player-car.js?v=7';
@@ -470,7 +471,7 @@ export function initEngineRuntime(ctx) {
     console.warn('Physically correct lights not supported');
   }
   try {
-    appCtx.renderer.outputEncoding = THREE.sRGBEncoding;
+    applyDisplayColorPolicy(appCtx.renderer, THREE);
   } catch {
     console.warn('sRGB encoding not supported');
   }

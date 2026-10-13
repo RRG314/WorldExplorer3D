@@ -5,7 +5,7 @@ import {
   cellInsideDetailedCoverage,
   publishedDetailedTerrainTileKeys
 } from './far-field-coverage.js?v=2';
-import { yieldToMainThread } from '../world/cooperative-scheduling.js?v=1';
+import { yieldToMainThread, yieldToWorldFrame } from '../world/cooperative-scheduling.js?v=1';
 import { createNormalizedTerrainAttribute } from './surface-material-blend.js?v=2';
 import {collectDetailBoundaryLines,detailPointsOnEdge,detailHeightAt,triangleHeightAt} from './detail-boundary.js';
 
@@ -219,6 +219,7 @@ function createFarFieldGeometryPlanner(deps = {}) {
     return sample?.status === 'available' ? Number(sample.groundElevationMeters) : NaN;
   });
 
+  const yieldForRegion=()=>appCtx.gameStarted&&!appCtx.worldLoading?yieldToWorldFrame():yieldToMainThread();
   const waterBedSamplers = new WeakMap();
   function waterBedAt(lon, lat, meters, areas) {
     if (!areas?.length) return meters;
@@ -325,10 +326,9 @@ function createFarFieldGeometryPlanner(deps = {}) {
         const x = innerBounds.minX + (innerBounds.maxX - innerBounds.minX) * fx;
         const z = innerBounds.minZ + (innerBounds.maxZ - innerBounds.minZ) * fz;
         const { lat, lon } = worldToLatLon(x, z);
-        const accepted = sampleAcceptedGroundAtLatLon(lat, lon);
+        const acceptedMeters=acceptedElevation(lat,lon);
         const source = sampleSourceMeters(lat, lon, zoom, loadedTiles);
-        const acceptedMeters = Number(accepted?.groundElevationMeters);
-        if (accepted?.status === 'available' && Number.isFinite(acceptedMeters) && Number.isFinite(source)) {
+        if (Number.isFinite(acceptedMeters) && Number.isFinite(source)) {
           offsets.push(acceptedMeters - source);
         }
       }
@@ -357,9 +357,8 @@ function createFarFieldGeometryPlanner(deps = {}) {
         const lon = Number(ring[index]?.[0]);
         const lat = Number(ring[index]?.[1]);
         if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue;
-        const accepted = sampleAcceptedGroundAtLatLon(lat, lon);
-        const acceptedMeters = Number(accepted?.groundElevationMeters);
-        if (accepted?.status === 'available' && Number.isFinite(acceptedMeters)) {
+        const acceptedMeters=acceptedElevation(lat,lon);
+        if (Number.isFinite(acceptedMeters)) {
           samples.push(acceptedMeters);
           continue;
         }
@@ -422,7 +421,8 @@ function createFarFieldGeometryPlanner(deps = {}) {
     return resolvedMeters;
   }
 
-  async function buildFarFieldGeometry(spec, loadedTiles, offsetMeters, mappedContext = null) {
+  async function buildFarFieldGeometry(spec, loadedTiles, offsetMeters, mappedContext = null, isCurrent = () => true) {
+    if (!isCurrent()) return null;
     const interval = farFieldGridIntervalMeters * Number(appCtx.WORLD_UNITS_PER_METER || 1);
     const gapFillInterval = Math.min(
       interval,
@@ -478,9 +478,11 @@ function createFarFieldGeometryPlanner(deps = {}) {
     let maxElevationMeters = -Infinity;
     const maskStats = { waterMaskedVertices: 0 };
 
+    let sliceStarted=performance.now();
     for (let row = 0; row < zValues.length; row += 1) {
       const z = zValues[row];
-      if (row > 0 && row % 12 === 0) await yieldToMainThread();
+      if (performance.now()-sliceStarted>=8){await yieldForRegion();sliceStarted=performance.now();}
+      if (!isCurrent()) return null;
       for (const x of xValues) {
         // This square clipmap owns terrain continuity only. Water is published
         // exclusively by the mapped polygon/ribbon pipeline, so the clipmap
@@ -535,6 +537,8 @@ function createFarFieldGeometryPlanner(deps = {}) {
 
     const width = xValues.length;
     for (let row = 0; row < zValues.length - 1; row += 1) {
+      if(performance.now()-sliceStarted>=8){await yieldForRegion();sliceStarted=performance.now();}
+      if (!isCurrent()) return null;
       for (let column = 0; column < xValues.length - 1; column += 1) {
         if (cellFullyInsideDetailedCoverage(
           xValues[column],

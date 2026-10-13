@@ -1,0 +1,83 @@
+{
+  "source": "rcrv.glb",
+  "sourceSha256": "e87213601da7624c95ad0c78b25ae4386e2527c9323175d766e0ce983b36e991",
+  "output": "rcrv-walkable.glb",
+  "outputSha256": "c5ae43172ff525bc4ac410d33ba01c9afb403827287b8bc95c064ef213cf6abd",
+  "license": "CC-BY-4.0",
+  "author": "Oregon State University Extension Service / Alan Dennis",
+  "adaptation": "Additional main-deck entrance, internal stair openings and enclosed science/crew/bridge spaces. Authored game arrangement, not an exact commissioned-vessel replica.",
+  "cuts": [
+    {
+      "min": [
+        -6.7,
+        1.85,
+        -17.8
+      ],
+      "max": [
+        6.7,
+        4.98,
+        17
+      ]
+    },
+    {
+      "min": [
+        -1.05,
+        1.9,
+        -19.4
+      ],
+      "max": [
+        1.05,
+        4.5,
+        -17.5
+      ]
+    },
+    {
+      "min": [
+        -2.4,
+        1.85,
+        4.95
+      ],
+      "max": [
+        2.4,
+        12.3,
+        10.8
+      ]
+    },
+    {
+      "min": [
+        -6.35,
+        8.8,
+        3.8
+      ],
+      "max": [
+        6.35,
+        11.6,
+        17.1
+      ]
+    },
+    {
+      "min": [
+        -6.5,
+        12.15,
+        3.5
+      ],
+      "max": [
+        6.5,
+        14.8,
+        10.5
+      ]
+    },
+    {
+      "min": [
+        -3.4,
+        12.15,
+        10.4
+      ],
+      "max": [
+        3.4,
+        14.8,
+        14.5
+      ]
+    }
+  ]
+}

@@ -1,3 +1,6 @@
+import {normalizeOceanWaterContext,defaultOceanWaterContext,oceanWaterContextFromCandidate} from '../ocean/water-context.js';
+import {OCEAN_DEPTH_MODEL} from '../ocean/depth-model.js';
+import {marineStudyOffset} from '../ocean/habitat-plan.js';
 import {parentVesselSubmarinePose} from '../ocean/parent-vessel.js';
 import {DEFAULT_OCEAN_SITE} from '../ocean/launch-site.js';
 import {hasOceanEntry} from '../ocean/entry-policy.js?v=1';
@@ -22,7 +25,8 @@ export function createBoatOceanTransferApi(options = {}) {
     startBoatMode,
     updateBoatMenuUi,
     updateWaterWaveVisuals,
-    restoreEarthSurfaceLayers
+    restoreEarthSurfaceLayers,
+    retireBoatVisual
   } = options;
 
 let transferPending = false;
@@ -35,14 +39,15 @@ function startSurfaceResearchVoyage(options={}) {
   // A validated saved voyage restores its existing geographic claim and
   // vessel identity. Only a new selection needs fresh coordinate admission.
   if(!saved&&options.launchSite&&!hasOceanEntry(site,options.entry))return Promise.resolve(false);
-  const voyage=saved||prepareSurfaceVoyage(site,options.waveOffset);
+  const depthProfile=!marineStudyOffset(site).featured&&Number.isFinite(options.entry?.elevationMeters)?{model:OCEAN_DEPTH_MODEL.GEOGRAPHIC,entryDepthMeters:-options.entry.elevationMeters,origin:{lat:site.lat,lon:site.lon}}:{model:OCEAN_DEPTH_MODEL.LEGACY};
+  const voyage=saved||prepareSurfaceVoyage(site,options.waveOffset,depthProfile,normalizeOceanWaterContext(options.entry?.waterContext)||defaultOceanWaterContext(site));
   if(!voyage)return Promise.resolve(false);
   // Admission and record preparation precede any environment or save mutation.
   return transferSubmarineToBoat({...options,source:saved?'ocean-exploration-resume':'ocean-exploration-start',enterDeck:true},voyage);
 }
 
 function suspendBoatModeForOceanTransfer() {
-  appCtx.boatDeck?.release();
+  appCtx.boatDeck?.release?.();
   appCtx.boatMode.active = false;
   restoreEarthSurfaceLayers?.();
   appCtx.boatMode.available = false;
@@ -76,9 +81,12 @@ async function transferBoatToSubmarine(options = {}) {
   // Capture before suspension clears the water authority. Keep rollback data
   // local to this transaction; a late load may not revive an abandoned region.
   const water = appCtx.boatMode.currentWater;
+  const waterContext=oceanWaterContextFromCandidate(water,geo);
+  if(!waterContext){showBoatPrompt('Water type could not be verified. Stay aboard and retry.','notice',promptDurationMs);return false;}
   const waveOffset = water?.source?.waveOffset || {};
   const launchWaveOffset = {x:appCtx.boat.x+(waveOffset.x||0),z:appCtx.boat.z+(waveOffset.z||0)};
   const priorTransfer = appCtx.boatMode.oceanTransferVessel;
+  const priorVisual = appCtx.boatMode.mesh;
   const origin = {lat:appCtx.LOC?.lat,lon:appCtx.LOC?.lon};
   const pose = {x:appCtx.boat.x,z:appCtx.boat.z,yaw:appCtx.boat.angle};
   const moored = !!appCtx.boatMode.moored, onDeck = !!appCtx.boatDeck?.active;
@@ -106,9 +114,13 @@ async function transferBoatToSubmarine(options = {}) {
       diverEntry: options.asDiver ? {from:'parent-vessel',jump:options.jump===true} : null,
       isTransferCurrent: canRestore,
       launchSite: {lat:geo.lat,lon:geo.lon,name:appCtx.customLoc?.name || 'Open Water',region:'Underwater'},
-      entry: {lat:geo.lat,lon:geo.lon,source:'mapped-boat-water',kind:'mapped-water-area'},
+      entry: {lat:geo.lat,lon:geo.lon,source:'mapped-boat-water',kind:'mapped-water-area',waterContext},
       submarinePose: parentVesselSubmarinePose(vessel)
     });
+    // Keep the departure vessel until admission succeeds so a failed dive can
+    // restore it immediately. Once underwater, the ocean owns the exterior;
+    // the furnished deck and docked sub must not remain hidden in Earth.
+    if (started && appCtx.oceanMode?.active && !appCtx.boatMode.active && appCtx.boatMode.mesh === priorVisual) retireBoatVisual?.();
     return started;
   } catch (error) {
     console.warn('[BoatMode] submarine launch failed', error);
@@ -149,7 +161,9 @@ async function transferSubmarineToBoat(options = {},surfaceVoyage=null) {
   const surfaceWaveOffset = voyage?.waveOffset || {x:sub.position.x+(appCtx.oceanMode?.waveOffset?.x||0),z:sub.position.z+(appCtx.oceanMode?.waveOffset?.z||0)};
   const surfaceYaw = voyage?.ship?.yaw ?? (Number.isFinite(sub.yaw)?sub.yaw:0);
   const transferVessel = surfaceVoyage?.ship || appCtx.boatMode?.oceanTransferVessel || null;
-  const candidate = buildSyntheticBoatCandidate(0,0,{waterKind:'open_ocean',surfaceY:.08,waveOffset:surfaceWaveOffset});
+  const waterContext=normalizeOceanWaterContext(voyage?.waterContext)||defaultOceanWaterContext(launchSite,{legacy:true});
+  const candidate = buildSyntheticBoatCandidate(0,0,{waterKind:waterContext.waterKind,surfaceY:.08,waveOffset:surfaceWaveOffset});
+  if(candidate?.source)candidate.source.oceanWaterContext=waterContext;
   if(!candidate){showBoatPrompt('Surface vessel unavailable. Your submarine remains here.','notice',promptDurationMs);return false;}
   const priorOrigin={...appCtx.LOC},priorSelection=appCtx.customLoc?{...appCtx.customLoc}:null;
   const priorOceanSite={...appCtx.oceanMode?.launchSite},priorVoyage=appCtx.oceanVoyage?.current;
@@ -225,7 +239,20 @@ async function transferSubmarineToBoat(options = {},surfaceVoyage=null) {
         condition: transferVessel?.condition
       });
     surfaced = resolved === 'boat' || resolved === true;
+    if(surfaced&&appCtx.boatMode.mesh?.userData?.visualReady){
+      const loaded=await appCtx.boatMode.mesh.userData.visualReady;
+      if(!current())return false;
+      if(!loaded){surfaced=false;suspendBoatModeForOceanTransfer();return false;}
+    }
     if (surfaced) {
+      // The bootstrap ground is only a land-loading placeholder. A fresh
+      // sea launch can reach this point without ever loading terrestrial tiles.
+      appCtx.suppressGroundFallbackPlaceholder?.();
+      // This accepted arrival is an independent open-water scene. Preserve the
+      // saved land visit, not the old city's hidden meshes and provider caches.
+      if (appCtx.buildings?.length || appCtx.roads?.length || appCtx.terrainTileCache?.size) {
+        appCtx.releaseEarthWorldForTitle?.({reason:'marine_surface_release',preserveWaterEvidence:true});
+      }
       appCtx.boatMode.oceanTransferVessel = null;
       appCtx.boatMode.moored = !!voyage;
       if(surfaceVoyage)ensureOceanVoyage(appCtx).beginAboard(surfaceVoyage);

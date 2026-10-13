@@ -55,13 +55,16 @@ const SKY_PRESETS = {
   },
   night: {
     skyColor: 0x111a38,
-    groundColor: 0x263142,
-    hemiIntensity: 0.58,
+    // A dark sky is a background, not the color of the light illuminating
+    // actors. Keep a cool, readable moonlit fill independently of that sky.
+    hemisphereColor: 0xa8bfdf,
+    groundColor: 0x66758c,
+    hemiIntensity: 0.7,
     sunColor: 0x6b8cff,
     sunIntensity: 0.14,
-    fillColor: 0x607ca8,
+    fillColor: 0xa2b9d8,
     fillIntensity: 0.62,
-    ambientColor: 0x8a9bb8,
+    ambientColor: 0xb9c9df,
     ambientIntensity: 0.64,
     fogColor: 0x121a34,
     fogDensity: 0.00008,
@@ -149,6 +152,7 @@ function mixSkyPreset(a, b, t, phaseLabel) {
   const blend = clamp01(t);
   return {
     skyColor: mixColorHex(a.skyColor, b.skyColor, blend),
+    hemisphereColor: mixColorHex(a.hemisphereColor ?? a.skyColor, b.hemisphereColor ?? b.skyColor, blend),
     groundColor: mixColorHex(a.groundColor, b.groundColor, blend),
     hemiIntensity: a.hemiIntensity + (b.hemiIntensity - a.hemiIntensity) * blend,
     sunColor: mixColorHex(a.sunColor, b.sunColor, blend),
@@ -188,7 +192,7 @@ function horizontalToWorldVector(azimuth, altitude) {
   ).normalize();
 }
 
-function buildVisualPresetForState(sunAltitudeDeg, rising) {
+export function buildVisualPresetForState(sunAltitudeDeg, rising) {
   if (sunAltitudeDeg >= 14) {
     return { ...SKY_PRESETS.day, phase: "day" };
   }
@@ -343,6 +347,7 @@ function applySkyVisualState(config, state) {
   const signature = [
     config.phase,
     config.skyColor,
+    config.hemisphereColor ?? config.skyColor,
     config.groundColor,
     config.sunColor,
     config.fillColor,
@@ -371,7 +376,7 @@ function applySkyVisualState(config, state) {
     appCtx.scene.background = new THREE.Color(config.skyColor);
   }
 
-  appCtx.hemiLight.color.setHex(config.skyColor);
+  appCtx.hemiLight.color.setHex(config.hemisphereColor ?? config.skyColor);
   appCtx.hemiLight.groundColor.setHex(config.groundColor);
   appCtx.hemiLight.intensity = config.hemiIntensity;
 
@@ -499,7 +504,7 @@ function applyManualTimePreset(time) {
     visual: { ...config, phase: time },
     sun: {
       visible: time !== "night",
-      daylightFactor: time === "day" ? 1 : 0.45,
+      daylightFactor: time === "day" ? 1 : time === "night" ? 0 : 0.45,
       twilightFactor: time === "sunrise" || time === "sunset" ? 1 : 0
     },
     moon: { visible: time === "night", illumination: 0.65, phase: 0.55, parallacticAngle: 0 },
@@ -542,7 +547,9 @@ export function setTimeOfDay(time, deps = {}) {
     refreshAstronomicalSky(true, deps);
     return;
   }
+  if (!SKY_PRESETS[time]) return;
   applyManualTimePreset(time);
+  if (appCtx.oceanMode?.active) appCtx.applyOceanSkyState?.(appCtx.skyState);
 }
 
 export function cycleTimeOfDay(deps = {}) {

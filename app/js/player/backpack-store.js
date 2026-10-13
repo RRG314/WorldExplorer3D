@@ -1,11 +1,15 @@
+import { localSaveSession } from './local-save-session.js';
 import {supportRecorder} from '../runtime/support-receipt.js';
-const BACKPACK_STORAGE_SCHEMA_VERSION = 2;
-const BACKPACK_STORAGE_KEY = 'world-explorer:character-backpack:v2';
-const BACKPACK_CONTROLS_KEY = 'world-explorer:backpack-controls:v1';
+const BACKPACK_STORAGE_SCHEMA_VERSION = 3;
+const BACKPACK_STORAGE_KEY = 'world-explorer:character-backpack:v3';
+const BACKPACK_CONTROLS_KEY = 'world-explorer:backpack-controls:v2';
+const LEGACY_CONTROLS_KEY = 'world-explorer:backpack-controls:v1';
 const LEGACY_BACKPACK_STORAGE_KEYS = Object.freeze([
+  'world-explorer:character-backpack:v2',
   'world-explorer:character-backpack:v1'
 ]);
-const BACKPACK_BACKUP_KEY = 'world-explorer:character-backpack:migration-backup:v1';
+const LEGACY_HOUSING_KEY = 'world-explorer:homes:v1';
+const BACKPACK_BACKUP_KEY = 'world-explorer:character-backpack:migration-backup:v3';
 
 function clone(value) {
   return value == null ? value : JSON.parse(JSON.stringify(value));
@@ -95,17 +99,27 @@ function parseStored(storage, key) {
 }
 
 function createLocalBackpackStore(storage = globalThis.localStorage) {
+  const session = localSaveSession(storage);
   let lastMigration = null;
+  let housing = null;
+  let commerce = null;
+  let loaded = false;
+  let pendingLegacy = null;
+  let blocked = false;
   let lastControls = null;
   const controls = snapshot => Object.fromEntries(['revision','equippedInstanceId','hotbar','ammo','quantities']
     .filter(key=>snapshot?.[key]!==undefined).map(key=>[key,clone(snapshot[key])]));
 
   function saveNormalized(snapshot, settings = {}) {
-    if (!storage?.setItem || !snapshot) return false;
+    if (!storage?.setItem || !snapshot || !session.writable() || blocked) return false;
+    if (!loaded) load();
+    if (blocked) return false;
     try {
+      const latest = parseStored(storage, BACKPACK_STORAGE_KEY);
+      if ((latest?.migration?.saveGeneration || '') !== (lastMigration?.saveGeneration || '')) return false;
       // A Journal projection contains items/slots but not equipment ammo. Keep
       // the latest small equipment state when replacing that full projection.
-      const normalized = normalizeBackpackState({...lastControls,...snapshot}, {
+      const normalized = normalizeBackpackState({...lastControls,...snapshot, housing: settings.housing ?? housing, commerce: settings.commerce ?? commerce}, {
         sourceVersion: settings.sourceVersion ?? snapshot.migration?.sourceVersion ?? lastMigration?.sourceVersion,
         migratedAt: settings.migratedAt ?? snapshot.migration?.migratedAt ?? lastMigration?.migratedAt,
         backupAvailable: storage.getItem?.(BACKPACK_BACKUP_KEY) != null
@@ -117,7 +131,14 @@ function createLocalBackpackStore(storage = globalThis.localStorage) {
           Number(lastMigration.duplicateEventRewardsRemoved) || 0
         );
       }
+      if (pendingLegacy && storage.getItem?.(BACKPACK_BACKUP_KEY) == null) {
+        storage.setItem(BACKPACK_BACKUP_KEY, JSON.stringify(pendingLegacy));
+        normalized.migration.backupAvailable = true;
+      }
       storage.setItem(BACKPACK_STORAGE_KEY, JSON.stringify(normalized));
+      housing = clone(normalized.housing);
+      commerce = clone(normalized.commerce);
+      pendingLegacy = null;
       lastMigration = normalized.migration;
       lastControls = controls(normalized);
       return true;
@@ -129,9 +150,22 @@ function createLocalBackpackStore(storage = globalThis.localStorage) {
 
   function load() {
     if (!storage?.getItem) return null;
-    const current = parseStored(storage, BACKPACK_STORAGE_KEY);
+    loaded = true;
+    let current;
+    try {
+      const raw = storage.getItem(BACKPACK_STORAGE_KEY);
+      current = raw == null ? null : JSON.parse(raw);
+      if (raw != null && (!current || typeof current !== 'object' || Array.isArray(current))) throw Error('Invalid Backpack save');
+      if (current && !Array.isArray(current.items)) throw Error('Missing Backpack items');
+      if (Number(current?.schemaVersion || 0) > BACKPACK_STORAGE_SCHEMA_VERSION) throw Error('Newer Backpack save');
+      const legacyHousing = storage.getItem(LEGACY_HOUSING_KEY);
+      housing = clone(current?.housing ?? (legacyHousing == null ? null : JSON.parse(legacyHousing)));
+      if (housing && (!Array.isArray(housing.homes) || Number(housing.schemaVersion || 1) > 2)) throw Error('Unsupported home save');
+      commerce = clone(current?.commerce ?? null);
+      if (commerce && (Number(commerce.schemaVersion) !== 4 || !Number.isSafeInteger(commerce.credits) || commerce.credits < 0)) throw Error('Unsupported local wallet save');
+    } catch (error) { blocked = true; supportRecorder.record({operation:'inventory-load',error}); return null; }
     if (current) {
-      const normalized = normalizeBackpackState(current, {
+      const normalized = normalizeBackpackState({...current, housing}, {
         migratedAt: current.migration?.migratedAt,
         backupAvailable: storage.getItem?.(BACKPACK_BACKUP_KEY) != null
       });
@@ -150,28 +184,36 @@ function createLocalBackpackStore(storage = globalThis.localStorage) {
     }
 
     for (const legacyKey of LEGACY_BACKPACK_STORAGE_KEYS) {
-      const legacy = parseStored(storage, legacyKey);
-      if (!legacy) continue;
+      let legacy;
       try {
-        if (storage.getItem?.(BACKPACK_BACKUP_KEY) == null) {
-          storage.setItem(BACKPACK_BACKUP_KEY, JSON.stringify({
-            sourceKey: legacyKey,
-            backedUpAt: Date.now(),
-            state: legacy
-          }));
-        }
-      } catch (_) {
-        return null;
-      }
-      const migrated = normalizeBackpackState(legacy, { backupAvailable: true });
-      if (!saveNormalized(migrated, migrated.migration)) return null;
+        const raw=storage.getItem(legacyKey);
+        if (raw == null) continue;
+        legacy=JSON.parse(raw);
+        if (!legacy || !Array.isArray(legacy.items) || Number(legacy.schemaVersion||1)>2) throw Error('Unsupported legacy Backpack save');
+      } catch (error) { blocked=true; supportRecorder.record({operation:'inventory-load',error}); return null; }
+      housing = clone(legacy.housing || housing);
+      if (housing && (!Array.isArray(housing.homes) || Number(housing.schemaVersion || 1) > 2)) { blocked=true; return null; }
+      pendingLegacy = { sourceKey: legacyKey, backedUpAt: Date.now(), state: legacy };
+      const supplement = parseStored(storage, LEGACY_CONTROLS_KEY);
+      const currentControls = supplement?.schemaVersion === 1 && supplement.saveGeneration && supplement.saveGeneration === legacy.migration?.saveGeneration ? controls(supplement) : {};
+      const migrated = normalizeBackpackState({...legacy, ...currentControls, housing}, { sourceVersion:Number(legacy.schemaVersion)||1, backupAvailable: false });
+      // Loading can precede the asynchronous Web Lock. Keep migration history
+      // for the first inventory projection, which does not export this metadata.
+      // The legacy generation belongs to a different key; v3 has no write yet.
+      migrated.migration.saveGeneration = '';
+      lastMigration = { ...migrated.migration };
+      lastControls = controls(migrated);
+      if (session.writable() && saveNormalized(migrated, migrated.migration)) migrated.migration = {...lastMigration};
       return migrated;
     }
-    return null;
+    return housing ? { schemaVersion: BACKPACK_STORAGE_SCHEMA_VERSION, items: [], housing: clone(housing) } : null;
   }
 
   function rollbackMigration() {
-    if (!storage?.getItem || !storage?.setItem || !storage?.removeItem) return false;
+    if (!storage?.getItem || !storage?.setItem || !storage?.removeItem || !session.writable() || blocked) return false;
+    // An inventory migration rollback must not erase later home ownership/items.
+    if (!loaded) load();
+    if (blocked || housing?.homes?.length || commerce) return false;
     const backup = parseStored(storage, BACKPACK_BACKUP_KEY);
     if (!backup?.sourceKey || !backup?.state) return false;
     try {
@@ -193,11 +235,29 @@ function createLocalBackpackStore(storage = globalThis.localStorage) {
     backupKey: BACKPACK_BACKUP_KEY,
     legacyKeys: LEGACY_BACKPACK_STORAGE_KEYS,
     load,
+    ready: session.ready,
+    writable: () => session.writable() && !blocked,
+    saveStatus: () => blocked ? 'unreadable-save' : session.status(),
+    loadHousing() { if (!loaded) load(); return clone(housing); },
+    loadCommerce() { if (!loaded) load(); return clone(commerce); },
+    saveCommerce(next, inventory, nextHousing, expectedHousing) {
+      if (!loaded) load();
+      if ((Number(next?.revision) || 0) !== (Number(commerce?.revision) || 0) + 1) return false;
+      if (expectedHousing!==undefined && JSON.stringify(housing)!==expectedHousing) return false;
+      return saveNormalized(inventory, {commerce:next, housing:nextHousing});
+    },
+    // The Backpack and all personal home contents commit in one atomic setItem.
+    // Legacy home bytes are retained as recovery material, not a second writer.
+    saveHousing(next, inventory, expectedHousing) {
+      if (!loaded) load();
+      if (expectedHousing!==undefined && JSON.stringify(housing)!==expectedHousing) return false;
+      return saveNormalized(inventory, {housing: next});
+    },
     migrationSnapshot() { return lastMigration ? { ...lastMigration } : null; },
     rollbackMigration,
     save(snapshot) { return saveNormalized(snapshot); },
     saveControls(snapshot) {
-      if (!storage?.setItem || !lastMigration?.saveGeneration) return false;
+      if (!storage?.setItem || !lastMigration?.saveGeneration || !session.writable() || blocked) return false;
       try {
         const latest = controls(snapshot);
         lastControls = {...lastControls,...latest};

@@ -2,6 +2,33 @@
 
 Notable user-facing changes are recorded here. Git history and GitHub releases contain the complete change record.
 
+## [5.6.0] - Unreleased
+
+### Added
+
+- A distinct National Aquarium visitor route with lifts, views above and below
+  the waterline, animated marine life, a visitor map and Journal observations.
+- An interpretive museum visit at The Peale with three collection displays.
+
+- Opening fieldwork, Harbor Run, Three Views and personal-workspace journeys,
+  followed by coastal investigation and lunar fieldwork with Journal records.
+- A licensed research vessel and submarine, furnished connected rooms, deck maps,
+  working galley and laboratory stations, and same-vessel recovery.
+- Optional geographic ocean scenery streaming, conservative regional wildlife
+  and voyage-aware Journal returns.
+
+### Improved
+
+- Research-deck running, jumping, mouse look and stair-camera continuity.
+- Regional building facades and terrain imagery that follow Earth travel.
+- Vehicle and character visibility, including the lighter authored BMW finish.
+- Mapped facility perimeters, airport transfers, provider cancellation and caches.
+- Local possessions, building edits, room ownership and compatible voyage saves.
+
+Detailed Earth road and building physics remain around the selected location.
+Broader career, facility and ecology expansions remain on the roadmap.
+[Release notes](RELEASE_NOTES_5.6.0.md).
+
 ## [5.5.0] - 2026-10-08
 
 - Updated image-processing and backend proxy dependencies for current security fixes.

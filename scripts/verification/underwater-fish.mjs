@@ -47,11 +47,22 @@ try {
     return diagnostics.environment === 'OCEAN' && diagnostics.modes?.ocean === true &&
       ocean.active === true && ocean.underwaterSchoolCount > 0 && ocean.underwaterFishCount > 0;
   }, null, { timeout: 180_000 });
-  const fishPose=()=>page.evaluate(async()=>{const {ctx}=await import('/app/js/shared-context.js?v=55');return ctx.oceanMode.fishEntities.map(f=>({id:f.mesh.uuid,x:f.mesh.position.x,y:f.mesh.position.y,z:f.mesh.position.z,tail:f.tail?.rotation.y??null}));});
-  const fishBefore=await fishPose();
-  await page.waitForTimeout(2_000);
-  const fishAfter=await fishPose();
-  const animatedFish=fishAfter.filter((f,i)=>f.id===fishBefore[i]?.id&&Math.hypot(f.x-fishBefore[i].x,f.y-fishBefore[i].y,f.z-fishBefore[i].z)>.05).length;
+  const fishPose=()=>page.evaluate(async()=>{const {ctx}=await import('/app/js/shared-context.js?v=55');return {paused:ctx.paused,hidden:document.hidden,lastFrameMs:ctx.oceanMode.lastFrameMs,now:performance.now(),fish:ctx.oceanMode.fishEntities.map(f=>({id:f.mesh.uuid,x:f.mesh.position.x,y:f.mesh.position.y,z:f.mesh.position.z,visible:f.mesh.visible,visualState:f.visualState,water:ctx.oceanMode.waterSurface?.sample(f.mesh.position.x,f.mesh.position.z)?.volume,tail:f.tail?.rotation.y??null}))};});
+  let fishBefore=await fishPose(),fishAfter,commonFish=[];
+  const fishSampling=[];
+  // Arrival can replace the entire population when a more accurate depth
+  // tile arrives. Compare actual surviving identities, never array slots or
+  // two unrelated cohorts. Retry only that replacement boundary, not a fish
+  // that was present throughout the window but failed to swim.
+  for(let attempt=0;attempt<4;attempt++){
+    await page.waitForTimeout(2_000);fishAfter=await fishPose();
+    const beforeById=new Map(fishBefore.fish.map(f=>[f.id,f]));
+    commonFish=fishAfter.fish.filter(f=>beforeById.has(f.id)).map(after=>({before:beforeById.get(after.id),after}));
+    fishSampling.push({beforeCount:fishBefore.fish.length,afterCount:fishAfter.fish.length,survivingIdentities:commonFish.length});
+    if(commonFish.length||attempt===3)break;
+    fishBefore=fishAfter;
+  }
+  const animatedFish=commonFish.filter(({before,after})=>Math.hypot(after.x-before.x,after.y-before.y,after.z-before.z)>.05).length;
   const underwater = await page.evaluate(() => ({
     diagnostics: globalThis.getWorldExplorerRuntimeDiagnostics?.() || {},
     ocean: globalThis.getOceanModeDebugState?.() || {},
@@ -79,13 +90,14 @@ try {
 
   const checks = {
     enteredOceanByNormalTouchPath: underwater.diagnostics.environment === 'OCEAN' && underwater.diagnostics.modes?.ocean === true,
-    sharedFishAuthority: underwater.ocean.fishAuthorityVersion === 'water-fish-authority-v2' &&
-      /^water-fish-authority-v2:/.test(underwater.ocean.fishPopulationContextId || ''),
+    sharedFishAuthority: underwater.ocean.fishAuthorityVersion === 'water-fish-authority-v3' &&
+      /^water-fish-authority-v3:/.test(underwater.ocean.fishPopulationContextId || ''),
     deterministicAuthorityBackedSchools: underwater.ocean.underwaterSchoolCount >= 1 &&
       underwater.ocean.underwaterSchoolCount <= 5 &&
       underwater.ocean.underwaterSpeciesIds.length === underwater.ocean.underwaterSchoolCount &&
       new Set(underwater.ocean.underwaterSpeciesIds).size === underwater.ocean.underwaterSpeciesIds.length,
     fishActuallySwim: animatedFish>0,
+    populationSettlesForObservation: commonFish.length>0,
     visibleFishUseSchoolPlan: underwater.ocean.underwaterFishCount > underwater.ocean.underwaterSchoolCount,
     honestPopulationTruth: underwater.ocean.fishPopulationEvidence === 'gameplay-model-only' &&
       underwater.ocean.fishLivePresenceClaim === false,
@@ -96,7 +108,7 @@ try {
     noBrowserErrors: browserErrors.length === 0,
     noFailedLocalResources: localFailures.length === 0
   };
-  const report = { ok: Object.values(checks).every(Boolean), contract: 'underwater-water-fish-authority-v2', checks, animatedFish, underwater, recovered, browserErrors, localFailures, providerDegradations };
+  const report = { ok: Object.values(checks).every(Boolean), contract: 'underwater-water-fish-authority-v3', checks, animatedFish, fishSampling, fishBefore, fishAfter, underwater, recovered, browserErrors, localFailures, providerDegradations };
   console.log(JSON.stringify(report, null, 2));
   assert.equal(report.ok, true, 'Underwater fish authority journey failed.');
 } finally {

@@ -1,6 +1,6 @@
 # Current development and release state
 
-Updated October 8, 2026. **5.5.0 is deployed to production.**
+Updated October 13, 2026. **5.5.0 is deployed to production.**
 Release: https://github.com/RRG314/WorldExplorer3D/releases/tag/v5.5.0
 Public project page: https://rrg314.github.io/WorldExplorer3D/
 
@@ -49,6 +49,849 @@ Run heavy tasks sequentially on this observed 8 GiB Mac and close only owned
 browsers/servers. Production deployment evidence is under
 `output/release-evidence/current/production-deployment.json` and
 `production-promotion.json`; acceptance gaps remain in their own receipts.
+
+## October 13 packaged verification and branch status
+
+The two active development branches, `steven/visual-quality` and
+`steven/post-5.2-release-integration`, contain the same preserved history. The
+latest game changes are in `10daf049`; the subsequent verification-only changes
+remove private source imports from packaged journey runners. They use the
+published coordinate/room owners, actual capture controls and observed fish
+positions. They do not change gameplay to satisfy the harness. Historical
+feature branches retain their independent commits.
+
+The established ship-review preview serves immutable build
+`5.6.0+10daf049a2a7.82abc92b87951707.staging`. Its remote manifests match the
+local package. Complete packaged opening and coastal journeys pass 28 and 23
+checks respectively, with no page errors or failed local resources. Coastal
+verification includes 1,440 actual fish depth/motion observations. Ship
+traversal, regional arrival, marine transitions, post-release lifecycle and all
+five analytics destinations also pass their scoped checks. Controlled analytics
+collection is not proof of production analytics delivery.
+
+The complete backend run passes all three gate groups, including all 14 backend
+stages, two-player world/account checks, shared-voyage recovery and current live
+environment feeds. Those results do not establish ordinary production App Check
+or physical-device acceptance. The aquarium's 33 functional checks and museum
+room/exhibit/return checks pass; their natural heap readings remain above the
+current limit. Diagnostic garbage collection is not used to turn those limits
+into passing results.
+
+The current sustained performance run finished twelve world exits/reloads and
+630 seconds of mixed travel. Building/road coverage, movement, storage, scene
+release and mobile-layout regression pass. Retained JavaScript memory after
+cleanup stays near 50–56 MiB; the final world retains 49,080 buildings and 18,952
+roads. No browser errors or failed local resources were captured. Desktop mode,
+frame-pacing and transfer budgets fail: recurring ground-travel pauses remain,
+and the first flight sample includes a 1.15-second pause. Average FPS alone is
+not the release decision.
+
+The subsequent source chain passes all 2,528 tests with no skips or failures,
+plus dependency, ownership, boundary, runtime-name, inventory and sensitivity
+checks. A separate instrumented keyboard route travels 211.45 world units and
+correlates slow frames with mapped-water canvas readback, scenery GPU uploads
+and shader work, a full capture-index validation scan, and garbage collection.
+This is diagnosis, not an uninstrumented improvement or a new passing result.
+Prioritize staged graphics preparation before the existing atomic regional
+handoff and bounded readback/index work, preserving coverage, cancellation and
+in-place building edits. No speculative collision or terrain changes were made.
+
+The owner explicitly directed integration into `stable` on October 13 after
+reviewing the reported limitations. `stable` is the repository's default branch;
+there is no separate `main` branch. PR 99 integrates the reviewed 5.6 source,
+documentation and gallery through the protected squash-merge workflow. Both
+active development branches must then incorporate that stable commit without
+rewriting their existing history. Production remains the 5.5 build above until
+a separate deployment; the 5.6 release draft is not a live publication.
+
+Source integration does not convert the observed performance failures into
+passes. Preserve the complete old baseline separately from current focused
+receipts. The verification changes alter the acceptance fingerprint; a newly
+committed immutable package and matching evidence are still required for formal
+production finalization. Do not withhold an authorized source-branch update
+solely because that separate production certification remains incomplete.
+Current receipts and their scope are recorded in
+`output/production-readiness-20261012/remaining-review-ledger.json`.
+
+## October 12 branch reconciliation and release follow-up
+
+`steven/visual-quality` and `steven/post-5.2-release-integration` were atomically
+synchronized at `139cd527`, preserving the integration branch's history. The
+merge changed no game files. Stable remains `33edf9ad`; production remains the
+5.5 build above. Draft PR 99 and the draft 5.6 release are not a publication.
+Historical feature branches retain their independent work.
+
+The complete 101-gate candidate run finished: 92 passed and nine failed. Its
+receipts are preserved under `output/production-readiness-20261012/baseline-7dbc-matrix/`.
+They are evidence for that package, not certification of later source changes.
+The full performance run passed retention, twelve world exits, coverage,
+movement continuity and touch regression; desktop frame-pacing, some mode
+budgets and transfer budgets remain unmet. Do not relax those results or claim
+the release is fully certified.
+
+Follow-up verification corrected obsolete fixture navigation and readiness
+conditions without changing progression or streaming rules. The full source
+coastal journey passes 23 checks. The seven post-release lifecycle groups pass.
+Ocean analytics plus consent/reload/failure cases pass with explicitly controlled
+weather and collection endpoints; live provider acceptance is separate.
+
+A full city opening journey exposed a gameplay conflict: E beside the home desk
+selected an overlapping exit before its separate world-context action. The
+desk now registers and retires with the room's own interaction list, so the
+visible interior prompt and keyboard action share proximity and floor rules.
+The furnished-room browser check and 23 focused regression checks pass. The
+complete opening/Harbor Run/photos/home/build/room/flower sequence now passes
+all 28 checks, including actual desk input and durable reload recovery, with no
+page errors or failed local requests. This sequence uses bounded actor placement
+for field targets and is not an uncoached player-navigation study.
+The source chain passes 2,528 component tests with no skips, plus dependency,
+module identity, ownership, boundary-type, runtime-name, inventory and sensitivity
+checks. Furniture actions publish through the existing interior owner.
+
+The research-deck HUD now keeps the map beside its title and removes repeated
+station text, preserving 44-pixel phone actions. Its complete coastal journey
+passes the phone layout check. Root and Pages galleries include the missing
+aquarium-overlook view. These corrections were subsequently packaged in the
+October 13 preview above; the remaining release failures are recorded there.
+
+## October 12 ordinary player walkthroughs — release still under review
+
+Hosted staging build `5.6.0+244ef8938e52.e4c49142872300d3.staging` was
+exercised in normal Chrome with visible controls and held keyboard/mouse input,
+without provider interception, debug attestation or moved game actors. Research
+vessel steering, 26.37 units of sailing, mooring, deck routes, galley, map and helm
+passed. The sub deployed and traveled 90.71 units to a reef under keyboard control;
+swimming and phone layout also passed, with live marine weather and no page errors.
+
+Aquarium street entry, both reef levels, lifts, exit and reentry passed. Interior
+clicks no longer select roofs through the walls. Ten-second viewing windows were
+about 59 / 59 / 54 FPS; reentry still had a 400 ms pause and fails the existing
+frame-pacing target. The profile includes garbage collection, scene traversal and
+water/render shader compilation; it does not establish another resource leak.
+The Peale street entrance and gallery walkthrough passed without page errors.
+Earth walking, driving, drone and plane controls passed with MET Norway weather
+and USGS observations. The ocean setting persisted through a normal reload in
+Graphics and no longer overflows the destination bar.
+
+The Return to Earth fix was verified on two normal Saturn/ship/return journeys:
+it releases the prior rendered journey before the existing direct-return descent.
+The latest journey also traversed the bridge pressure door using normal controls.
+Both returned to populated Earth, but a Google reCAPTCHA timeout remains captured;
+those reports are not clean overall passes. The capture route's attempt to walk
+into the captain's desk was corrected in the harness, without changing collision.
+
+All 19 public gallery images now come from this current build, with reviewed
+framing and file hashes shared by README, release notes, landing and Pages.
+The source chain passes 2,527 tests plus dependencies, ownership, boundary types,
+inventory and sensitivity. Receipts: ignored
+`output/production-readiness-20261012/*-capture/report.json` and
+`/tmp/we3d-front-back-source-final.log`. These bounded journeys and source checks
+do not certify all backend functions, multiplayer, devices or performance.
+
+Production remains 5.5. The production package, saved fallbacks, player data and
+Git history are intact. The final packaged/backend/ordinary connected checks
+remain outstanding. Do not relabel known pauses or incomplete acceptance as passes.
+
+## October 12 connected verification checkpoint
+
+Source and the current gallery are pushed on `steven/visual-quality`; draft PR
+99 is attached. GitHub PR checks and secret scanning pass. Production remains
+unchanged. The first complete backend run passed room admission, rules, discovery
+receipts, shared space expeditions, chat, two loaded-world multiplayer vehicle
+handoff and accounts. Current/temperature data timed out at HYCOM while weather
+and NOAA wave data succeeded; the response correctly disclosed missing guidance.
+The gate remains failed, not waived.
+
+Two harness-only failures were diagnosed: a legacy v1-only ocean save read and
+an eager-module diagnostic property hook. The verifiers now inspect all supported
+voyage records and set up their declared property fixture through the actual
+Property owner. No gameplay code was changed for those failures. The corrected
+property UI purchase/list/sale flow passes, as do the three backend checks skipped
+after the provider failure: public user count, property transactions and civic
+services. Updated shared-voyage verification and the full candidate scope remain.
+Evidence: `/tmp/we3d-connected-final-backend.log`,
+`/tmp/we3d-backend-completion-diagnostic.log`. The latest normal Earth capture
+also climbed the plane above the roofline and passed without browser errors.
+
+## October 12 resource residency cleanup — local verification
+
+The current local changes retire the hidden furnished research vessel after
+successful sub admission, release the Ocean scene/renderer on recovery, and
+release the previous Earth city's geometry and provider caches only after
+accepted marine entry. Failed admissions retain their prior presentation.
+The saved land selection/pose and current marine evidence retain their owners.
+Returning to land rebuilds it through the existing Earth session authority.
+
+The actual land/ocean/land check restored all 49,080 buildings, 18,952 roads,
+49 terrain tiles and the exact location/pose. Underwater counts were zero, with
+renderer geometries reduced from 1,043 to 60 and textures from 197 to 35. The
+combined verifier then stopped at an ambiguous canvas selector, now corrected;
+that partial run is not a complete gate pass. Evidence is in
+`output/production-readiness-20261012/resource-lifecycle-checked/report.json`.
+
+The final ocean-only source check passes three real deck/sub/deck cycles, preserves
+ship/sub identities, retires the hidden vessel and inactive renderer, releases
+marine leases at the menu, and retains 60,299,964 / 60,867,748 / 61,636,692 JS heap
+bytes after explicit collection. The earlier inventory comparison removed
+164,394,722 estimated actively leased template bytes without removing assets.
+These are resource/retention measurements, not measured GPU memory or frame-time
+acceptance. Final recovered-deck and underwater screenshots were inspected.
+The green loading-ground patch is now retired on successful surface arrival.
+
+The named Ocean fixture allowance now reflects its licensed submarine, corals
+and parent hull, replacing the obsolete procedural-scene ceiling. This is not a
+limit on geographic exploration or activities. Frame-time budgets remain intact.
+Compressed regional imagery has a 4 MiB/128-tile reuse cache that retires with its
+last owner; decoded bitmaps close after composition. Regional building assembly
+uses exclusive typed storage with exact attribute/index equivalence, preserving
+footprints, facades and all road/bridge/tunnel geometry. Regional edge sorting
+and coordinate frames are reused; terrain sampling avoids per-vertex metadata
+allocation. Background terrain/water work yields between rendered frames and
+stops when superseded. Temporary water-mask canvases retire on success and abort.
+Portal shaders now reuse identical programs without changing tunnel openings.
+The actual GPU terrain/pavement lifecycle fixture passes after this change.
+
+The habitat audit found a real instance-buffer leak invisible to Three's geometry
+counter: actual WebGL buffer counts grew 38/53/68/83, leaving 64 after retirement.
+Explicit InstancedMesh disposal fixes both cloned corals and base habitat meshes:
+the same check is now 38/38/38/38, leaving only the fixture seabed's four buffers.
+Both receipts and the inspected licensed-coral image are retained under
+`output/production-readiness-20261012/habitat-buffers-{before,final}`.
+
+The source continuous-ocean browser journey passes all ten cases, including
+region retirement, provider outage, reload, swimming/reboarding and recovery.
+Nine tiles remain resident across repeated 9 km traversal setups; renderer
+geometry remains at 33 and textures at 30–33. This uses controlled depth responses;
+it is not global bathymetry fidelity or an elapsed-time circumnavigation claim.
+Evidence: `output/production-readiness-20261012/ocean-stream-final/report.json`.
+
+The latest unprofiled 90-second flight averages 49.98 FPS with p99 50 ms, but
+still has 13 frames over 100 ms and two over 250 ms (worst 483.4 ms). Walk/drive
+windows have no frames over 100 ms but do not meet the FPS/heap release ceilings.
+This diagnostic is not a performance pass. CPU/allocation profiles and each
+failed comparison remain intact; no threshold was relaxed. The final full source chain
+passes all 2,524 tests after the instance-buffer correction, plus dependency,
+ownership, type, runtime-name, inventory and sensitivity checks.
+
+The local immutable resource-reviewed package is
+`5.6.0+69d5632b30b8.2ac1eef14bf650b1.staging`. Seven of nine selected gates pass:
+full land/ocean/land and three sub/recovery cycles, marine habitat, continuous
+ocean, terrain shaders, packaged world, artifact integrity and release contracts.
+The aquarium and museum complete their functional journeys but fail performance
+acceptance. Aquarium reentry includes 666.7/566.7 ms pauses as temporary city
+construction data is collected. These failures remain recorded.
+
+A subsequent terrain material refresh fix reuses private read-only mixtures
+instead of allocating two arrays at every vertex. Exact normalized-byte and
+float parity, including writable public return isolation, passes. The source
+Aquarium journey then passes all 54 checks, including three measured 10-second
+views at about 60 FPS with no frames over 50 ms. Raw heap is 1.027–1.055 GB.
+This source diagnostic requires confirmation in the next immutable package;
+it does not override the previous package's failure or certify outdoor travel.
+Evidence: `output/production-readiness-20261012/aquarium-reuse/report.json`.
+
+The owner's latest request prioritizes complete research-vessel, starship and
+street-to-aquarium player journeys plus frontend/backend review. Only observed
+gameplay defects should change gameplay; harness failures must remain distinct.
+Public README, Pages and release imagery must show the current build with plain
+player-facing descriptions. The current hosted production and fallbacks remain
+untouched. The first backend sweep accidentally used the preserved production
+`dist`; its local protection correctly refused access. The sweep was stopped,
+its owned processes retired, and must run with an explicit staging package.
+At that checkpoint no GitHub push or production deployment had occurred.
+
+## October 12 aquarium audit and venue separation
+
+The owner explicitly requires distinct museum and aquarium buildings/experiences.
+Museum content now has an enforced venue type at association, layout, fixture and
+runtime boundaries. Authored floor interaction/recovery uses physical elevations.
+Facade doors and entry share semantic/headroom eligibility: bridge structures,
+roof pieces and thin fragments no longer receive building interiors.
+
+Actual pinned Overture data revealed a coverage defect: all three Pier 3 aquarium
+outline components were discarded because one triangular child part existed.
+Parent suppression now checks actual accepted child union coverage, with bounded
+work and conservative retention. The exact public input is a regression fixture.
+The source game confirms all three sections now render. Their inferred heights
+and generic exteriors are not approved aquarium architecture.
+
+The complete source chain passes **2,492 component tests across 465 files**, zero
+skips/TODOs. The final source museum/coverage browser journey passes **32 checks**:
+ordinary museum entry, all displays, failed-display retry, Journal reload, phone
+maps, run/jump, two reentries, restored exterior/camera, zero page/GPU errors,
+restored aquarium coverage and rejected bridge/fragment entry. Images inspected.
+Evidence: `output/interior-expansion/aquarium-coverage-regression/`.
+
+Aquarium research/design/status is in `docs/aquarium-expansion/`. The current
+local branch now has a distinct Pavilion/Blacktip Reef route, optimized licensed
+animated animals, physical lift cores, Journal observations and floor maps.
+Shared authored construction supplies slabs, explicit wall thickness and clear
+framed openings for museums too. The central curved aquarium window now uses
+published 27 ft / 4 ft dimensions with four adjacent flat panes. Other geometry
+and the limited route remain estimated, not a complete institutional replica.
+
+The owner rejected the first underside surface appearance despite functional
+passes. Water now uses actual virtual-camera projections and mesh-basis normals,
+with scene-depth ray reprojection where supported and a camera-aligned fallback.
+The clipped tank edge retains transparent coverage, preventing the outdoor
+background leaking as a bright seam. Twelve above/below/rolled marker cases and
+the background-independence pixel check pass; five renderer views inspected.
+Water remains a bounded planar approximation, not exact acrylic/fluid optics.
+
+Final source chain: **2,512 tests pass**, no skips/TODOs; all dependency, ownership,
+type, runtime and test-inventory gates pass. Final actual aquarium source journey:
+**33 checks pass**, including failed asset/retry, all three notes, both phone map
+orientations, real lifts, walking/run/jump, underside mouse look, exact exterior
+return, reentry and released assets; zero page/GPU errors. Final museum lighting
+regression: **28 checks pass**, entry and all three display images inspected.
+Earlier reload evidence is kept separately. These are source/renderer/gameplay
+checks, not immutable release, physical-device or fresh performance acceptance.
+
+The actual aquarium route exposed exterior building collision inside authored
+rooms and a lower-wall tolerance reaching an upper floor. Both are repaired in
+shared contained-interior physics and vertical bounds, retaining legacy partial
+interiors. Venue lighting owns indoor camera/light layers and excludes outdoor
+PMREM while occupied; exit restores the latest outdoor environment. See
+`docs/aquarium-expansion/VERIFICATION.md` for current evidence and real remaining
+art/architecture scope: sparse habitat, blank Pavilion surroundings, upper
+institutional programme, final visual-showcase acceptance. No production/GitHub
+changes; preserve dist and all saved candidates.
+The previous immutable museum diagnostic finished eight passes/six failures.
+Outdoor performance and ocean resource ceilings remain genuine release failures;
+corrected source helpers/inventory do not retroactively pass the older package.
+No production deployment, GitHub push, asset substitution or player-data change.
+Preserve dist and all previously retained candidates.
+
+## October 12 local museum implementation
+
+The owner included museums in the next release and asked for finished architecture
+and source-supported room layouts. The local Peale-associated visit now uses a
+front hall with two adjoining galleries informed by the museum's public guide.
+Dimensions/finishes are estimated and the limited ground-floor scope is labeled.
+Timber flooring, joinery, ceiling fixtures, bounded indoor lighting, licensed
+furniture and Smithsonian/Met exhibits replace the initial bare room slice.
+Existing entry, Walk, compiled collision, asset leases and Journal remain owners.
+
+The complete source chain passes, including **2,486 component tests**, types,
+ownership, dependencies and test inventory/sensitivity. The extended museum
+source journey passes **65 checks**, including missing-display retry, all exhibits,
+Journal persistence across full reload, phone panels/maps, run/jump, exact exterior
+return, reentry, release and zero page/GPU errors. Images inspected. Two reentries
+retain 48 unique museum geometries, three furnishings and three lights; museum
+leases return to zero. The sealed gallery now uses a scoped camera layer, avoiding
+the outside city's render/shader work and restoring its exact view on exit.
+Three bounded M1 hardware frame windows pass existing budgets at 59.5–60 FPS;
+entry measures 114–171 ms. This is mutable-source evidence, not complete release
+performance or physical-phone certification. Eleven museum and 11 layout component
+checks pass. The corrected fish journey passes 12 checks with all eight observed
+fish swimming after the arrival population replacement. Missing vessel captures
+are supplied with actual per-image build identities. Broader candidate, backend,
+save/fallback and hosted gates remain open. See `docs/interior-expansion/VERIFICATION.md`
+and the October 12 release ledger. Production still d877; no push or deployment.
+
+## October 11 current continuation — ocean streaming and save safety
+
+### Latest: regional detail and ship movement repair
+
+The current review delivery is documented in
+`docs/design/POST-RELEASE-STREAMING-DELIVERY.md`. All **2,471 source tests** and the
+complete source chain pass. The furnished research-vessel browser check passes
+20 cases, including real Space jump/landing and shared mouse look, all 55 route
+connections, smooth stair camera, maps, swimming and disposal. The full Earth
+source journey passes arrival/return, moving imagery, provider failure/recovery,
+streaming toggle and regional buffer disposal.
+
+The existing preview now serves **31ab54c**:
+https://we3d-staging-20260712--ship-review-1011-pb8x1l4l.web.app/
+(expires October 18 evening, America/New_York).
+Immutable package: `output/hosting-validation/streaming-reviewed`, build
+`5.5.0+31ab54cd264b.113b39b42da96b2a.staging`. All eight selected packaged gates
+pass, including remote Earth arrival, ship traversal through all 25 rooms,
+marine journeys and artifact integrity. The separate 11-case ocean/actual
+fallback roundtrip passes against the same package. Ordinary hosted Chrome
+passes running, mouse look, jump/landing away from the ladder, galley,
+bridge/chart and desktop/phone-width map, with no captured page or HTTP errors.
+Source/component, controlled-provider and live-service evidence are separated
+in the delivery ledger. Phone-width testing is not physical-device testing.
+
+Production remains d877; no GitHub push or production deployment. The earlier
+same-payload `streaming-ready` validation package was retired after full hash
+verification; its manifests/receipt remain. Preserve production dist, all four
+saved packages, previous `research-ready`, and the current `streaming-reviewed`.
+Worldwide physical transport streaming and the larger roadmap are not claimed
+complete; their current limits are explicit in the delivery review.
+
+### Previous preview: research vessel interior
+
+The working ship now has an enclosed wet lab, galley, mess, dry lab, quarters,
+briefing room and wheelhouse, connected by actual internal stairs. Deck-level
+map tabs show the player and walking route. Stations reuse the existing Journal,
+Field Guide, Backpack/condition and voyage authorities. The licensed source hull
+is retained beside a reproducibly adapted walkable model. No production deploy.
+
+Full source chain: **2,459 tests pass** after the offshore geocoder repair.
+Furnished browser fixtures pass **11 + 18**
+checks, including all 55 connections, galley consumption/reload, map input lock,
+swimming/reboarding and complete disposal. The expanded full-app journey passes
+16 checks: survey/rewards, each room action, real chart, desktop/phone ship map,
+and surface save/reload returning to the same vessel. The final immutable package
+`5.5.0+fcb8c70305f1.83820089a4eff4ba.staging` passes seven selected gates and the
+11-case continuous-ocean/real-fallback roundtrip. Gameplay provider responses are
+controlled; whole-release acceptance remains separate. The review preview is
+https://we3d-staging-20260712--ship-review-1011-pb8x1l4l.web.app/ (October 18 expiry).
+The final hosted Chrome journey passes five cases, including live weather and
+HTTP 200 responses from reverse-place, marine and weather gateways, with no page
+errors or failed requests. Staging's exact preview hostname is now registered for
+ordinary AppCheck. Staging `getPlaceLookup` version 4 fixes expected unmapped ocean
+addresses; existing cloud configuration is unchanged. Production still needs this
+backend repair in the eventual approved release. Five focused controller-cleanup
+tests and a real-browser listener-close probe also pass. Whole-release acceptance
+and the broader roadmap remain open; this is a ship/ocean review build.
+Evidence and limitations: `docs/design/RESEARCH-VESSEL-INTERIOR-DELIVERY.md`.
+
+Ocean code is checkpointed at `b145ab83` / `4821c59b`. Its prior immutable
+`ocean-482` passed 11 continuous-ocean/fallback checks; its manifests and retirement
+receipt are retained under the current delivery evidence.
+This supersedes the older note below that continuous ocean implementation itself
+was still open. Whole-release acceptance and the broader facility/creative/career
+roadmap remain separate and incomplete. Preserve dist and the four saved packages.
+
+Continuous personal open-ocean travel is implemented locally, with a player toggle,
+geographic tiles, origin rebasing, bounded residency, truthful provider outage
+behavior and the original parent-vessel recovery. The old location dive and shared
+crew modes retain their own admission. Scenery uses stable tile identities and
+known depth; regional licensed wildlife waits for a valid streamed water volume.
+
+The audit also corrected native v2 saves replacing the released v1 key. New v2
+and v3 records use their own keys; existing records are retained and readable.
+Weather/place caches are bounded, obsolete consumers cancel, and failed weather
+shows a terminal state plus an explicitly labeled UTC fallback clock.
+
+`docs/design/OCEAN-STREAMING-DELIVERY.md` holds the implementation and evidence
+ledger. Mutable-source browser7 passes 10 checks; retained diver/local-entry
+journeys pass 13/26 checks. These use controlled provider responses, alongside
+separate two-point live GEBCO evidence. Packaging/fallback and whole-release
+acceptance are still in progress. No deployment; dist and retained packages intact.
+
+## October 11 latest local continuation — licensed wildlife and journey Journal
+
+The ocean lifecycle now owns three licensed animated common dolphins in conservative
+California Current / northwest Atlantic game ranges, gated by admitted open water,
+geographic depth and actual sampled water volume. They swim near the surface,
+avoid obstacles and release their leases/skeletons on departure. Wildlife watch
+records an in-view, stationary, unobstructed encounter through the existing Journal;
+it never claims a live sighting or awards invented survey evidence/currency.
+
+The Journal audit found a separate coherence defect: its return action treated
+all coordinates as Earth, and ocean-first players could not open the Earth-owned
+reader. Ocean and planetary sessions now share one read-only Journal/Guide shell
+with filters, saved details, failed-read retry, pause and environment cancellation.
+Earth's reader cannot overwrite that shell in the background. A saved marine
+observation carries a validated voyage; returning uses existing vessel/sub custody.
+Unsupported planetary returns are unavailable instead of loading Earth roads.
+Earth returns restore the actor/environment through the existing menu authority
+before selecting the saved location. No new inventory/profile persistence owner.
+
+**Full verify:pr: 2,417 tests pass.** Actual licensed model / ocean-game acceptance
+at `output/roadmap-20261011/ocean-journal-final/report.json`: **20 passed**, zero
+page/GPU errors. Covers independent rigs, animation/pause, four region resource
+cycles, research deck/cradle deployment, real IndexedDB observation, phone layout,
+actual Backpack → Journal → saved voyage → sub movement → vessel recovery.
+The provider's 180 m depth and observation pose are controlled test inputs, not
+live ecology or uncoached-play evidence. Screenshots were inspected.
+
+`output/roadmap-20261011/journey-journal/report.json`: **15 passed** actual DOM/CSS
+checks with controlled storage/returns, including filters, retry, late reads,
+repeated open/close, environment cancellation and phone bounds. The first game
+Journal attempt used the wrong test menu (Explore instead of Backpack); that
+failure is retained, and only the test route changed. Initial duplicate asset
+cache import and test-inventory failures were fixed before the passing source run.
+Source receipt: `/tmp/we3d-journal-full-source.log`.
+
+Disk safety: removed npm's downloaded-package cache and an inactive cached
+Playwright CLI, preserving installed dependencies and the active Firebase CLI.
+Two old generated GC traces were losslessly compressed with decompressed SHA-256
+verification; their receipt is `output/architecture-evaluation/current-travel-1007/trace-compression-20261011.json`.
+The marine verifier refused to start below its 3 GiB gate, then ran after measured
+headroom was restored; its running resource stop remained enabled. All owned
+browsers/servers closed. The owner's Chrome, saves, source history, dist and four
+retained packages are intact. No production or GitHub changes.
+
+The full roadmap is still open: continuous ocean streaming, whales/deep squid,
+broader licensed fauna/seasonal evidence, geographic creative persistence,
+terrain/farms, remaining careers/CERN, visual realism and compatible release
+roundtrip. Current ocean scenery is finite and its distant water remains basic.
+This tested addition is not a production-release certification.
+
+## October 11 previous local continuation — nearby street publication priority
+
+Actual Earth-return inspection exposed delayed pavement publication, not new
+evidence that the already repaired sidewalk polygons should be redesigned. The
+first controlled arrival filled its nearby frontage after a 67-second rebuild.
+The follow-up measured an additional architectural conflict: detail waited on
+the city overview's whole source/preparation task. Nearby work now interrupts
+that worker, retains accepted atlas cells, rejects late replies and resumes only
+unfinished cells. Roads, bridges, tunnels and sidewalk geometry rules are unchanged.
+Phase durations now distinguish source, terrain, cell, mesh, path and contact work.
+
+Full `verify:pr`: **2,405 tests pass**. `street-priority-final/report.json` passes
+**11** bounded native-worker/Three/browser checks, including held preparation,
+held cell work, return travel, render/contact parity, all **344** overview cells,
+disposal and captured Monaco/San Francisco hill scenes. Images were inspected;
+there were no page/GPU errors. Two old verification pages also used a retired
+road export; they now use the current compiler and local Three runtime.
+
+The full-city follow-up was deliberately stopped when free disk fell below
+1 GiB under memory pressure. It is **not passing** and was not rerun. The owned
+browser was closed; free disk recovered to about 4.2 GiB. Its earlier captured
+initial arrival had matching actor/pavement focus at the origin, 49,023 buildings
+and 18,952 roads. This does not certify full-city latency or memory. That verifier
+now requires 8 GiB free before starting and closes its own browser below 1.5 GiB.
+The prior failed canvas-selector run is also retained as failed evidence.
+
+Evidence: `output/roadmap-20261010/street-arrival-review/`,
+`street-arrival-phases/`, `output/roadmap-20261011/street-priority-final/`;
+source receipt `/tmp/we3d-street-priority-full-source.log`. Worldwide creative
+storage, terrain/farms, expanded oceans/fauna, remaining careers and compatible
+release fallback are still open. Production, dist, four retained packages and
+player data remain unchanged.
+
+## October 10 previous local continuation — creative room and environment isolation
+
+Creative tools now use the room's declared coordinate frame. Solo building
+removals restore visually on room entry and return on exit. Earth edits cannot
+mutate a Moon/Ocean visit; room blocks detach outside their frame and return with
+the same room identity. Geographic blocks use the existing polar/date-line frame.
+Late saves retain their original room, rejected previews use the latest accepted
+room data, and the lazy builder drains only the latest queued room and its rows.
+Room permission updates refresh mapped-building controls.
+
+Full source chain: **2,401 tests pass**. `creative-room-isolation-final/browser.json`
+passes **23** actual builder DOM/Three/storage checks in a controlled scene,
+including delayed runtime loading. Shared responses are controlled; live cloud
+room acceptance remains separate. `lunar-creative-scope-regression/report.json`
+passes **15** actual-game checks through ship/Moon/ship/Earth with the optical
+method, deliberate save/ascent failures, no GPU/page errors, and the known external
+Overpass CORS error recorded separately. Images were inspected. The Earth arrival
+capture is not general street-layout/visual certification; allow the ordinary
+publication stages to settle before diagnosing its pavement appearance.
+
+No room is automatically created during travel. Existing save formats are retained.
+This does not implement chunked worldwide creative storage, terrain/farms or
+multi-body room storage. Those finite roadmap gates and release fallback remain
+open. Production, dist, the four retained packages and player data are unchanged.
+
+## October 10 previous local continuation — creative save preservation
+
+Both existing creative stores now protect unreadable, unsupported, lossy and
+oversize records, preserve original recovery copies, reject stale writers and
+treat the primary write as the commit point. The builder provides recovery-file
+downloads. Legacy geographic blocks retain their position and remove by saved
+identity after reload. Reset building edits now resets that authority only;
+blocks use their separate Clear action, in solo play and shared rooms. This
+removes the former partial two-store reset rather than claiming atomic writes
+across independent stores.
+
+`creative-scoped-reset/browser.json` passes 15 browser checks using actual builder
+DOM, Three rendering/collision and browser storage in a controlled scene, including
+failed reset/retry and legacy deletion/reload. Room-reset scope has a component
+check; no new live shared-service acceptance is claimed. The full source chain
+passes **2,384 tests**. Images were inspected. This is preservation work, not
+worldwide creative storage, terrain editing or farming completion. Continue those
+finite gates. Production, dist, retained packages and player data are unchanged.
+
+## October 10 previous local continuation — Moon fieldwork and homecoming
+
+H10–H12 now have local implementation: physical ship briefing/preparation, saved
+observation or sample method, two native LROC surface sites, actual Backpack
+specimens for collection, partial same-pod recovery, ship analysis, Earth return
+and a saved home display. Instrument power has a 20-minute game budget and a
+visible return reserve; pause/offline time does not drain it, failed writes stop
+measurements for explicit retry, and a new ship sortie supplies a fresh charge.
+It is instrument power, not a physiological oxygen simulation.
+
+Final `lunar-resource-authority/report.json`: 15 controlled actual-game checks.
+Final `lunar-home-resource-report/report.json`: seven WebGL/DOM/storage checks in
+a controlled room using the exported actual Moon report. Source chain: 2,375 tests
+pass. Native terrain support now matches rendered triangles; independent regional
+imagery compiles without a base map. GPU shader lifecycle checks preserve tunnel
+openings and pavement. Final Earth image has ground and no stale landing prompt.
+
+An earlier Earth run functionally passed but had shader errors and invisible
+ground; it is rejected visual evidence. An initial battery test incorrectly wrote
+read-only pause state; its corrected rerun uses the real pause authority. External
+Overpass CORS failure remains separately recorded. Actor/flight setup and battery
+time are controlled/accelerated; this is not a complete uncoached campaign,
+physical-device or release certification. Moon station/rock art is still basic.
+Full roadmap, worldwide ocean/creative streaming, terrain/farms, remaining careers,
+licensed fauna, realism and compatible release fallback remain open. Production,
+dist and retained packages are unchanged.
+
+## October 10 previous local continuation — first licensed swimming fish
+
+Northern Australian coastal encounters can now use the reviewed Microsoft
+barramundi model (CC0): textured, normal-mapped geometry with authored tail motion,
+real catalogue size and regional/water/depth eligibility. It is 2.75 MB / 3,864
+triangles with shared model resources and three individuals per population.
+Loading, cancellation, region retirement and failed assets are covered; an
+unavailable licensed model is not replaced by a generic stand-in.
+
+The final marine journey passes 28 actual-game checks, including four region
+visits with the same renderer resource counts on return and zero released-region
+asset leases. Full source chain: 2,356 tests pass. Images and scope are in the
+coherence ledger. Other fish remain generated visuals; whales, dolphins, deep
+squid, global ocean streaming, terrain/farms and remaining careers are not done.
+Continue H10–H12's real Sol/Moon journey and the remaining finite gates. Production,
+dist and all four retained packages remain unchanged.
+
+## October 10 previous local continuation — mission and water custody
+
+Space scans now cancel when eligibility changes; old callbacks cannot award a
+new mission. Resuming an earlier mission is explicit. Corrupt/future mission
+saves and stale writers are protected. The scan visual stays on the planet
+instead of expanding into an obscuring wireframe. The Proxima thermal journey
+passes five actual-game checks through the physical Analysis Lab; this is not
+H10–H12 completion.
+
+Coastal water context now survives deployment, save, recovery and redeployment,
+and drives the underwater population and wave profile. Geographic depth retains
+its sample origin: moving the vessel requires fresh depth rather than reusing
+the previous location's value. The final marine journey passes 26 actual-game
+checks, including moved-vessel outage recovery and successful retry. Full source
+chain passes 2,352 tests. Receipts and scope are in the coherence/delivery ledgers.
+
+Production, dist and four retained packages remain unchanged. Continue licensed
+fauna visual integration and the remaining finite gates; the full roadmap is
+not complete. A compatible possession-v3/voyage-v2 fallback is still required.
+
+## October 10 previous local continuation — ecology and native ocean depth
+
+Marine fish authority v3 now uses coarse reviewed geographic ranges and explicit
+water-column/habitat rules. Fish stay within the shared water volume and avoid
+terrain/hulls; region rebuilds replace the population and dispose shared assets
+once. The final reef/region journey passes 15 controlled actual-game checks,
+including four region visits with a 47-geometry / 41-texture plateau.
+
+New geographic voyages use saved format-2 metre-scale depths. Version-1 voyages
+and the authored Coral Shelf preserve their layout. Submarine hull terrain checks
+reject rising ground without snapping upward. Native depth/custody acceptance
+passes 23 actual-game checks, including deep controls, diver refusal, outage,
+reload, recovery and redeployment of the same vessel/sub/profile. Source chain:
+2,343 passing tests. Exact receipts, earlier verifier failures and limits are in
+`docs/design/WORLD-COHERENCE-DELIVERY.md`.
+
+This remains a bounded ocean outing, with coarse depth data, generic fish visuals,
+no completed global ocean streaming, seasonal ecology or pressure simulation.
+Creative terrain/farming, H10–H12, broader careers/CERN and realism remain open.
+The compatible fallback must preserve both possession v3 and voyage format 2.
+Production, local dist and four retained packages are unchanged. Continue the
+mission lifecycle audit and remaining gates; do not call the full roadmap done.
+
+## October 10 previous continuation — coherent marine and saved worlds
+
+The owner’s expanded marine/creative/farming requirements are integrated in
+`docs/design/WORLD-COHERENCE-DELIVERY.md`. Vessel entry and motion share hull-fit
+admission; deployed equipment follows vessel capability. Research scuba uses a
+40 m game-depth profile. The same-sub reboarding/drive/recovery journey passes
+13 actual-game checks; the final northern coastal investigation passes 14.
+Creative storage passes seven browser checks including capacity, stale writers,
+failed writes and reload; no existing area is silently pruned. These are local,
+controlled-provider checks, not global-ocean or release certification.
+
+The final source chain passes 2,331 tests and the new 1,008-file unresolved-name
+gate. It caught a missing building-ground area helper; the existing geometry
+owner now supplies it. The first final chain caught a duplicate query-version
+import, corrected before the passing rerun. Production and retained artifacts
+remain unchanged. Next: regional ecology/placement, the documented geographic
+depth mismatch, continuous ocean and remaining career/creative/realism gates.
+
+## October 10 previous continuation — coastal investigation
+
+H07–H09 now implement physical geometry sonar, three eligible diver choices,
+partial recovery, normal same-submarine return, supported wet-lab interpretation,
+Diver / Coastal Explorer badges, repeatable Coastal watch and home-desk display.
+The case, northern reef and rock journeys pass 12, 14 and 13 controlled actual-game
+checks respectively. Home display passes seven DOM/WebGL/storage cases; habitat
+lifecycle passes seven. Phone images exposed and verified a corrected portrait
+camera offset and compact, resource-first diver controls. These are local checks,
+not a physical-phone or complete release certification.
+
+The authored seabed now uses the same geographic study frame as its reef objects,
+including alternate launches. Survey scuba reuses the existing water controller;
+ordinary swimming rules are preserved. No additional scene or storage owner was
+introduced. The final write/boarding-race repair has model evidence after those
+world runs. Full detail and exact receipts are in the delivery ledger.
+
+Continue with H10–H12, the remaining careers/mining/CERN, repeatable/GPS/connected
+work, fleet/realism and release/media gates. The compatible possession fallback
+and actual candidate/fallback roundtrip remain release prerequisites. Production,
+local dist and the four retained packages are unchanged.
+
+## October 10 previous local continuation — Harbor and Coastal Departure
+
+H02 now grants the licensed BMW's slate body finish once, with a separate
+observed-driving distinction. H06 uses the licensed OSU RCRV educational model,
+actual working-deck/stair collision, a science-van lab, a loaded submarine cradle
+and a correctly placed water-return ladder. The older procedural research visual
+and invisible flat deck are removed. Both chart choices complete through the
+existing Journal/voyage owners, including saving/reloading, failed-write retry,
+a dated bundled-depth fallback and recovery to the same ship/submarine.
+
+The primary full-game coastal journey passes twelve checks; the northern route
+passes seven including real boat-controller stepping; the final coastal DOM,
+IndexedDB and prescribed-client check passes five. Eleven vessel and eleven diver
+browser checks also pass. Harbor's finish has six controlled browser/storage
+checks and its city journey has seventeen. Images were inspected; these are
+local/controlled source checks, not physical-device or production certification.
+The full source chain passes 2,308 tests plus identity, ownership, boundary type,
+inventory and sensitivity checks. The final session-only UI disclosure has its
+subsequent five-case browser/client pass.
+Exact receipts and limits: `docs/design/EXPLORER-CAREER-DELIVERY.md`, ignored
+`output/roadmap-20261010/`. The live build and all four retained packages remain
+unchanged. No frontend build, GitHub push or deployment was made for this work.
+
+The full roadmap remains open beyond H09: H10–H12, broader specialist/mining/CERN
+campaigns, repeatable/GPS/connected work, the remaining fleet, realism gates and
+release/media acceptance. The compatible v3 possession/commerce/workspace
+fallback and actual candidate/fallback roundtrip are still release prerequisites.
+No unfinished later mission buttons have been added.
+
+## October 8 public gallery and local visual work
+
+PR 98 is merged to stable `33edf9ad5074fbaf0f7298396f180c37a0bf9735`.
+The README, 5.5 release notes and GitHub Pages use the refreshed released-build
+gallery, with public Play/release/WebGL/license badges. All twelve served Pages
+images match the reviewed hashes; live README/release text and Pages HTML match
+source. Six desktop/tablet/phone layout checks and all GitHub workflows pass.
+The root landing-page refresh is committed but has not been deployed to Firebase.
+The production game remains the d877 build identified above.
+
+Local visual work is on `steven/visual-quality`: display output and nighttime
+readability, the author's white E34 finish, and the licensed Atlantic Explorer
+submarine. The submarine retains its author materials, uses an 8.6 MB bundled
+asset, and has cancellable shared-model leases and measured vertical clearance.
+Its 38 focused component checks, prescribed model-view client, eleven controlled
+Ocean browser cases, source syntax, ownership and boundary types pass. Front and
+rear model views were inspected; the rear also has glazing, and actual camera
+coordinates confirm the correct following side. This is local evidence, not a
+full release or live-provider acceptance. The retained surface boat owns one
+legitimate docked-model lease after underwater teardown.
+
+The licensed research-vessel and sailing-boat candidates are retained for further
+integration. Replacement research-deck navigation, other fleet/ship asset work,
+and the final video/media package remain unfinished. Do not describe the twelve
+released-build gallery images as proof that those unreleased upgrades are live.
+
+## October 9 analytics and first-session work — local
+
+The audience audit led to readiness/foreground gameplay measurement, explicit
+launch outcomes and duration, first-action/five-minute milestones, bounded
+campaign handoff and tab-scoped owner-test marking. An optional guided Baltimore
+walk and Return to last place use the existing tutorial, location save and Journal.
+Completed tutorial steps no longer wait for the ambient-notification cooldown.
+Landing copy now explains the browser sandbox and device/loading expectations;
+the gallery continues to show the released 5.5 game.
+
+The controlled ten-check first-session/save/return journey passes against staging
+services. Real Firebase SDK request formation passes with a local collector,
+including failure before gameplay initialization. Desktop/touch-sized tutorial
+controller and six public-page layouts pass. Two prescribed keyboard runs reach
+walking but retain external Overpass CORS errors and stop after their first burst;
+these are degraded provider runs, not clean end-to-end passes. Screenshots were
+inspected. The final source chain passes all 2,207 tests, module ownership,
+boundary types, inventory and sensitivity checks. Limited analytics clears the
+bounded campaign cache; its regression check passes.
+
+The production GA property now has two gameplay key events (once per session,
+no monetary value), six event dimensions and a millisecond launch-duration
+metric. The existing internal-traffic filter remains in Testing. The saved
+Exclude marked tests comparison retains unmarked historical traffic; new marked
+traffic exclusion still needs post-release verification. Search Console's
+URL-prefix property exists but is unverified; its public verification tag is
+prepared in the local homepage. GA ingestion, Search Console verification and a
+complete seven-day return cohort require the frontend release and subsequent
+observation. Do not infer improved retention from registration alone.
+
+The broader source review also aligned the local submarine import with the shared
+asset-loader module version and registered its previously omitted component test.
+Production/dist and four release packages are unchanged. No promotional posts or
+finished video exports were produced. Private audit data and the small promotion
+kit are under ignored `output/analytics-review-20261009/`; only the public event
+contract belongs in `docs/analytics/README.md`.
+
+## October 9 Explorer career plan and First Bearings — local
+
+`docs/design/EXPLORER-CAREER-PLAN.md` specifies twelve authored missions, three
+optional careers, useful homes, coastal/planetary chapters, GPS/live-data variants,
+rewards, save/authority rules and finite acceptance gates. The plan preserves
+free exploration and existing progress. Later chapters are planned, not shipped.
+
+The first opening chapter is implemented in Today, Journal and Profile. Explicit
+acceptance selects a region; a new committed field record advances it; reviewing
+that exact record grants one personal badge and Journal completion receipt in a
+single transaction. No extra currency, reward store or always-open overlay was
+added. Indexed retrieval retains the result beyond the recent Journal page;
+backup validation rejects missing evidence/receipts. Newer campaign state is
+preserved without downgrade. Missing fresh field leads suppress the start offer.
+
+The full source chain passes 2,218 tests. Fifteen focused cases and fifteen actual
+IndexedDB transaction cases pass, including failed saves, concurrent completion
+and backup restore. The controlled world journey passes thirteen checks, including
+historical-record review and reload. Visual inspection corrected the phone
+completion-button grid placement. The final direct badge shortcut and full
+thirteen-check journey pass with no captured page errors or failed local resources.
+These are controlled desktop/phone-width checks, not an uncoached player study
+or physical-phone acceptance.
+The prescribed keyboard run reaches walking but stops after one burst on the
+existing external Overpass CORS failure; this remains degraded provider evidence.
+Production/dist and the four retained release packages remain unchanged.
+
+## October 10 — Harbor Run and realism architecture, local
+
+The next personal career job now supports choosing an admitted Baltimore road
+route, loading a licensed physical field case from a stopped car, driving its
+ordered gates, stopping to unload and retaining one Harbor Driver badge/receipt.
+Surface and clearance admission use existing road/terrain/collision owners.
+The job adds no currency, timer, duplicate road geometry or always-open HUD.
+Live GPS pauses the virtual job; interrupted travel retains cargo and requires
+resuming the last confirmed route point. Failed writes pause automatic retries.
+Stale UI reads resolve against current storage; deliberate backup restores still
+recover the older job and physical case. Scene/collider/model leases are released.
+
+The controlled world journey passes 16 checks, including the first chapter,
+delivery, badge, reload, building/undo, room, property and Flower Sprint. It uses
+keyboard input initially and explicit actor-stepping for full route coverage;
+it is not a complete manual drive. Nineteen actual IndexedDB cases and the final
+eight-case DOM/GLTF runtime check pass, including concurrent unload, injected
+save/read failures, deliberate restore and teardown. Coverage remains 49,023 buildings
+and 18,952 roads. Desktop/phone-width images were inspected. The separate
+prescribed world keyboard client retains its external Overpass CORS failure;
+it reached walking and one captured burst, not a clean live-provider pass.
+
+`docs/design/WORLD-REALISM-ARCHITECTURE.md` defines five finite visual gates:
+calibration, common materials/lighting, a complete street plus streamed neighbor,
+marine/space integration, and measured quality/streaming tiers. It records actual
+material/resource evidence and current primary-source research. No claim of
+spare GPU memory, universal hyperrealism or completed art work follows from it.
+The first implemented correction centralizes display color across all renderer
+constructors, repairing missing Space output and the ineffective legacy AR setting.
+Scene lighting, tone mapping/exposure and the existing composer output pass are
+preserved. Twenty-eight direct/auxiliary and 24 direct/composer pixel comparisons
+pass. Actual Space scene and day/night/storm player-asset images were inspected;
+the prescribed asset-fixture client completes both movement bursts without errors.
+These are bounded rendering checks, not physical AR-device acceptance.
+
+The final source chain passes 2,234 tests, dependency/module ownership, boundary
+types, inventory and sensitivity checks after the recovery refinements.
+
+H03/H04, the proposed additional H02 cosmetic/mastery reward, later chapters,
+research vessel/fleet/ship replacements, full visual gates and final media remain
+open. There are no placeholder mission/reward buttons for them. Full-step
+acceptance and evidence limits are in `docs/design/EXPLORER-CAREER-DELIVERY.md`.
+On October 10 production still matches the local d877 manifest; explicit project
+`worldexplorer3d-d9b83` reports 80 Functions. Production, dist, player data and the
+four retained builds are unchanged. Evidence is under ignored
+`output/harbor-realism-20261009/`; no push or deployment occurred.
 
 ## Historical preparation records
 
@@ -389,3 +1232,163 @@ now expires November 6 at 22:26:58 UTC. This exact-live copy is separate from th
 reviewed save-compatible 37a fallback.
 
 Chrome startup repair: complete source verification passes 2,147 tests plus dependency, ownership, type, inventory and sensitivity checks. Packaging and preview verification follow.
+
+
+## October 10 — Three Views and recovery checkpoint, local
+
+The photography branch now captures the actual rendered city, enforces three
+visible/distinct viewpoints, offers honest observation-only play, and saves one
+album/badge/receipt. It includes bounded image storage, export/delete, backup
+validation and a personal home-display implementation. Images are separate from
+ordinary profile metadata in the existing IndexedDB v5 database. Character
+migration rollback now preserves later campaign progress; failed primary-home
+selection leaves the previous saved home intact.
+
+Full source verification passes **2,243 tests** and the source/ownership/type/
+inventory/sensitivity chain. Twenty-four actual IndexedDB cases, fifteen
+controlled city cases and twelve WebGL/DOM camera-home cases pass. Actual city
+images and desktop/phone layouts were inspected. The prescribed action client
+passes with composed browser screenshots; its generic delayed canvas screenshot
+read a cleared drawing buffer, which was a verification-method issue. Home
+placement/cleanup is component evidence, not a full furnished-home ownership and
+return journey. The source, storage and component refinements follow the city run.
+
+The full campaign is **not finished**. H02 cosmetic/mastery, H04 arrangements,
+H05 starter homes and later ocean/space/GPS/co-op phases remain open, followed by
+the realism delivery gates. The housing audit found separate unchecked local
+home/Backpack item writes; resolve that ownership/recovery problem before H05
+storage acceptance. City capture also shows that landmark semantics and generic
+facades still need the R2 visual/data treatment; a higher-resolution texture alone
+will not correct them. See `docs/design/EXPLORER-CAREER-DELIVERY.md` for bounded
+acceptance and the remaining work. No deployment or public release change.
+
+## October 10 — research introductions, home custody and CERN reuse
+
+First Bearings now saves an optional research method and starts the matching
+available field lead/tool from its existing Today panel. Wrong-method records
+cannot complete the assignment. Observation research continues into regional
+survey goals without a mandatory specimen collection. The obsolete center-screen
+exploration popup was removed after it obscured the desktop/phone mission choices.
+This is the introductory chapter; the complete mining, scientific and other
+career campaigns are specified in `docs/design/RESEARCH-CAREERS-AND-CERN.md` and
+remain unfinished.
+
+Home contents and carried possessions now use a single v3 local save transaction,
+with an exclusive page writer, failed-write recovery, custody-aware Journal
+projection and retained legacy files. Four real browser custody/lock/reload checks
+and the 50,008-item Backpack presentation check pass. An additional source guard
+prevents replacing a read-only inventory. Local home/wallet economic transactions,
+connected storage and the complete H05 furnished-home/return journey still need
+work. Released v2 fallback artifacts retain a separate older save branch: they
+are **not compatible current-progress fallbacks** for v3. Prepare and verify a v3
+fallback before releasing this migration; never delete the retained old saves.
+
+The final controlled research/photo/build/return journey passes 16 checks without
+page errors or failed local resources. An earlier return load timed out; the
+isolated return probe and the later full journey passed, but the initial timeout
+remains an unresolved loading/performance observation. The prescribed keyboard
+client reached walking and captured its first burst, then correctly failed on
+external Overpass CORS errors. It is degraded-provider evidence, not a clean
+release pass. Desktop/phone images and the keyboard image were inspected.
+
+The owner's existing `lhc game` / Collision Lab project was inspected in place,
+without modifying its source or notebooks. Ten direct reuse checks verify its
+numerical exercises, all 100,000 recorded events, reproducible analysis receipts
+and all 18 detector files. The actual source browser opened tunnel/apparatus/CMS
+views and fit the phone layout. Those four alternative scene groups are not a
+connected walkable facility. CERN still needs site layout, circulation/collision,
+asset upgrades, station interactions and integration with World Explorer's
+renderer and Journal. No new playable CERN/mining button or duplicate engine was
+added. Detailed scope/evidence: `docs/design/EXPLORER-CAREER-DELIVERY.md` and ignored
+`output/production-readiness-20261010/`.
+
+Production identity and 80 live Functions were checked read-only this turn.
+Production, dist, retained packages and owner saves remain unchanged. This local
+work does not close the campaign, visual-quality or release gates.
+
+The final source chain after the possession replacement guard passes **2,260
+tests**, zero failed, plus dependencies/source/ownership/boundary types and test
+inventory/sensitivity. The world journey precedes that final denied-write guard;
+its explicit preservation regression is included in this final chain.
+
+## October 10 — personal workspace chapters and local transaction safety
+
+Continue in the architecture-evaluation worktree on `steven/visual-quality`.
+The local H04 Maker and H05 personal-home flow now works through the existing
+Today panel, mapped building entry, room, Backpack, Journal and badge owners.
+It includes one personal starter workspace, two licensed Poly Haven furniture
+models, placement/rotation/undo with reachable circulation, a real saved record
+at the desk, reusable design export/import, storage, a return destination and
+leave/return completion. H01 admits a practice workspace so Maker can be the
+first branch. The room's existing generic shell is still basic; this is not a
+completed whole-interior art pass or a real/shared property grant.
+
+Local wallet, stock, inventory and property purchase/sale now commit together
+in the v3 possession record, retaining legacy wallet data and rejecting corrupt
+or stale writers. Failed vehicle-upgrade writes cannot install an unpaid upgrade.
+Local services reserve a target-specific funded receipt before effects and retain
+uncertain receipts for retry. Connected transactions retain their server owners;
+these local passes do not certify all connected economic flows.
+
+The audit fixed Three r128-incompatible object removal across presentation
+cleanup, cancelled/invalid player-car asset leases, low furniture incorrectly
+being treated as walkable roofs, route updates reverting to building centers,
+and address-object crashes in the navigation HUD. Property dependencies now enter
+the new home runtime at startup without pulling account modules into ordinary
+Explorer imports. Existing roof and ship walking remain covered.
+
+Final `verify:pr` passes **2,288 tests**, zero failed, plus dependency/source,
+module ownership, boundary types, inventory and sensitivity checks. Actual
+IndexedDB verification passes 27 cases; workspace and photo/home display browser
+checks pass 6 and 12 respectively, including the prescribed action clients. Four
+possession/lock/recovery checks also pass. The final city run passes **21 checks**,
+including actual keyboard contact against the desk, storage roundtrip, both new
+badges, leaving/returning and layout/badge persistence after reload, plus earlier
+field/Build/room/property/Flower paths. No captured page errors or failed local
+resources. Actor placement is deliberate setup, not a fully walked or uncoached
+route. Desktop and phone-width images were inspected. The city run precedes only
+the cancelled/invalid-car lease repair, whose failure-path test and final full
+source chain follow it.
+
+Evidence: ignored `output/career-finish-20261010/`; final city `world-home-verified`,
+workspace `workspace-collision-final`, photo display `camera-final`, Journal
+`journal-final`, source `verify-pr-release-checkpoint.log`. Failed and interrupted
+receipts remain separate, with causes/fixes in the delivery ledger. All owned
+browsers and servers are closed after their checks. Retained builds, source/history,
+owner player data and Collision Lab source are preserved; no deployment occurred.
+
+The complete roadmap is still open: H02's promised finish/handling distinction,
+H06–H12 and the research-vessel upgrade, expanded research/mining/CERN play,
+repeatable/connected/GPS work, full realism and final release/media acceptance.
+Before any release, prepare and prove a fallback preserving commerce, workspace
+and visit fields as well as all v3 custody; a prior v3 build is not automatically
+compatible. The earlier unexplained return-load timeout and external Overpass
+CORS observation remain release observations, despite the later bounded passes.
+See `docs/design/EXPLORER-CAREER-DELIVERY.md` for precise scope and evidence.
+
+
+## October 11 local facility and navigation checkpoint
+
+Active checkout remains the architecture-evaluation worktree, branch
+`steven/visual-quality`; do not edit the older Documents checkout. The new
+[facility ledger](docs/design/FACILITIES-AND-NAVIGATION-DELIVERY.md) extends the
+world-coherence roadmap without closing unfinished stages. It documents licensed
+mapped fencing with shared collision and bounded disposal, retained gates/access
+paths/multipolygons, airport transfer failure handling, a vessel overview camera
+fix, the interactive navigation proposal and fresh marine development images.
+
+`verify:pr` passes **2,436 tests**, zero failures, and every source/ownership/type/
+inventory/sensitivity gate. **40 bounded browser checks** pass across the actual
+world-loader integration (controlled facility map), fence asset/collision, airport
+dialog/navigation prototype and landing display. The actual deck → helm → cradle
+→ submarine → diver capture has no page/graphics errors; its four images are
+reviewed and labeled unreleased. All owned browser test processes and servers are
+closed. Receipt scope and failed attempts remain in ignored
+`output/facilities-20261011/`; no complete-airport or global-coverage claim.
+
+Production checked at start: `5.5.0+d8775a392c42.88e67f97c00bb4c2.production`;
+80 Functions ACTIVE. No push or deployment. OSM/Overpass returned 429/406 during
+real-site attempts, which were stopped. Full terminal/cabin journeys, port
+gangways/berths/artwork, real launch sites, navigation adoption, the remaining
+roadmap and release/fallback acceptance are still open. Preserve current dist,
+saved candidates, player state, original source and Git history.

@@ -1,3 +1,6 @@
+import {addAquariumFixtures} from './aquarium-scene.js';
+import {addGalleryFixtures} from './gallery-scene.js';
+import {releaseGalleryTextures} from './gallery-finishes.js';
 import {isHarborWaypoint,dressHarborWaypoint} from './harbor-waypoint.js';
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import {buildAuthoredInterior} from './authored-geometry.js';
@@ -733,7 +736,13 @@ function floorDefinition(definition, level) {
 }
 
 export function buildInteriorScene(definition, options = {}) {
-  if(definition.communityRealityCapture?.layout)return buildAuthoredHomeScene(definition,options);
+  if(definition.communityRealityCapture?.layout||definition.authoredLayout){
+    const state=buildAuthoredHomeScene(definition,options);
+    try{if(definition.curatedContent)addGalleryFixtures(THREE,state,definition,createWallCollider);
+      if(definition.aquariumContent)addAquariumFixtures(THREE,state,definition,createWallCollider);}
+    catch(error){releaseGalleryTextures(state.group);disposeFailedConstruction(state.group);throw error;}
+    return state;
+  }
   const building = definition.support?.building || definition.building;
   const footprint = buildingFootprintPoints(building);
   const bounds = footprintBounds(footprint);
@@ -830,11 +839,11 @@ export function buildInteriorScene(definition, options = {}) {
 }
 
 function buildAuthoredHomeScene(definition,options){
-  const building=definition.support?.building||definition.building,context=captureBuildingContext(building),footprint=buildingFootprintPoints(building);
+  const building=definition.support?.building||definition.building,plan=definition.aquariumPlan,context=plan?{...plan.envelope,wallHeightMeters:plan.envelope.heightMeters}:captureBuildingContext(building),footprint=plan?plan.envelope.footprint.map(p=>({x:p.x+plan.origin.x,z:p.z+plan.origin.z})):buildingFootprintPoints(building);
   if(!context)throw Error('This building has no supported interior envelope.');
-  const layout=normalizeLayout(definition.communityRealityCapture.layout,{footprint:context.footprint,holes:context.holes||[],heightMeters:context.wallHeightMeters||context.height?.meters||3,revision:'runtime-building'});
+  const layout=normalizeLayout(definition.communityRealityCapture?.layout||definition.authoredLayout,{footprint:context.footprint,holes:context.holes||[],heightMeters:context.wallHeightMeters||context.height?.meters||3,revision:'runtime-building'});
   assertPlayableLayout(layout);
-  const center={x:finiteNumber(building.centerX,footprint.reduce((n,p)=>n+p.x,0)/footprint.length),z:finiteNumber(building.centerZ,footprint.reduce((n,p)=>n+p.z,0)/footprint.length)};
+  const center=plan?.origin||{x:finiteNumber(building.centerX,footprint.reduce((n,p)=>n+p.x,0)/footprint.length),z:finiteNumber(building.centerZ,footprint.reduce((n,p)=>n+p.z,0)/footprint.length)};
   const base=estimateInteriorFloorBaseY(building,footprint,center,[],null)+INTERIOR_FLOOR_OFFSET;
   const authored=buildAuthoredInterior(THREE,layout),root=authored.group;root.position.set(center.x,base,center.z);root.add(new THREE.HemisphereLight(0xffffff,0x52606a,.8));
   const world=p=>({x:p.x+center.x,z:p.z+center.z}),dynamicColliders=authored.compiled.solids.map(s=>createWallCollider(world(s.a),world(s.b),base+s.bottom,s.top-s.bottom,s.thickness,.000001)).filter(Boolean);
@@ -844,6 +853,6 @@ function buildAuthoredHomeScene(definition,options){
   for(const distance of [.65,.85,1.1,1.5]){const local={x:entrance.point.x+entrance.inward.x*distance,z:entrance.point.z+entrance.inward.z*distance},candidate=world(local);if(pointInRoom(local,ring)&&interiorSpawnIsClear(candidate,footprint,dynamicColliders)){spawn=candidate;break;}}
   if(!spawn){authored.dispose();throw Error('No clear entrance position fits in this home.');}
   const eyeHeight=appCtx.Walk?.CFG?.eyeHeight||1.7,entryPoint={...spawn,y:base+first.elevation+eyeHeight+.03},entryYaw=Math.atan2(entrance.inward.x,entrance.inward.z);
-  const floorPlan={authored:true,floorCount:layout.floors.length,storyHeight:first.height+first.slab,floors:layout.floors.map((f,i)=>({id:f.id,label:f.label,level:i,elevation:f.elevation,height:f.height})),connectorEligible:stairs.length>0};
-  return {group:root,mode:'authored',layoutKind:'authored-home',dynamicColliders,walkSurfaces,placementTargets:[],floorPlan,floorId:first.id,floorLabel:first.label,activeLevel:0,loadedLevels:layout.floors.map((_,i)=>i),connector:null,stairs,center,floorBaseY:base,floorY:base,wallHeight:first.height,entryPoint,entryYaw,lobbyEntryPoint:entryPoint,exteriorFootprint:footprint,usableFootprint:footprint,exteriorArea:ringAreaAbs(footprint),usableArea:layout.floors[0].rooms.reduce((n,r)=>n+ringAreaAbs(roomRing(first,r)),0),shellClearanceMin:.05,requiredShellClearance:.05,partitionCount:dynamicColliders.length,interactions:[{kind:'exit',level:0,x:spawn.x,z:spawn.z,radius:2.25,label:'Exit home'}],authoredCeilings:authored.compiled.surfaces.filter(s=>s.kind==='ceiling').map(s=>({y:base+s.y,polygons:s.polygons.map(p=>p.map(r=>r.map(([x,z])=>world({x,z}))))}))};
+  const floorPlan={authored:true,floorCount:layout.floors.length,storyHeight:first.height+first.slab,floors:layout.floors.map((f,i)=>({id:f.id,label:f.label,level:i,elevation:f.elevation,height:f.height})),connectorEligible:stairs.length>0||layout.lifts?.length>0};
+  return {group:root,mode:'authored',layoutKind:plan?'aquarium-visitor-route':'authored-home',authoredLifts:(layout.lifts||[]).map(lift=>({...lift,stops:lift.stops.map(stop=>({...stop,...world(stop),level:layout.floors.findIndex(f=>f.id===stop.floorId)}))})),dynamicColliders,walkSurfaces,placementTargets:[],floorPlan,floorId:first.id,floorLabel:first.label,activeLevel:0,loadedLevels:layout.floors.map((_,i)=>i),connector:null,stairs,center,floorBaseY:base,floorY:base,wallHeight:first.height,entryPoint,entryYaw,lobbyEntryPoint:entryPoint,exteriorFootprint:footprint,usableFootprint:footprint,exteriorArea:ringAreaAbs(footprint),usableArea:layout.floors[0].rooms.reduce((n,r)=>n+ringAreaAbs(roomRing(first,r)),0),shellClearanceMin:.05,requiredShellClearance:.05,partitionCount:dynamicColliders.length,interactions:[{kind:'exit',level:0,x:spawn.x,z:spawn.z,radius:2.25,label:definition.curatedContent||definition.aquariumContent?'Return to street':'Exit home'}],authoredCeilings:authored.compiled.surfaces.filter(s=>s.kind==='ceiling').map(s=>({y:base+s.y,polygons:s.polygons.map(p=>p.map(r=>r.map(([x,z])=>world({x,z}))))}))};
 }

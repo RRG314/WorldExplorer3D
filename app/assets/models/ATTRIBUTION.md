@@ -1,5 +1,31 @@
 Curated Vehicle Assets
 
+## Facility boundaries
+
+[Modular Chainlink Fence](https://polyhaven.com/a/modular_chainlink_fence) by James Ray Cock, with wire material by Amal Kumar, [CC0](https://polyhaven.com/license). The authored panel and post are optimized for instancing; original PBR maps and published wire opacity are retained. Mapped fence ways establish placement, with access openings preserved. Source checksums and modifications accompany `facilities/chainlink/chainlink-kit.glb`.
+
+
+## Research vessel
+
+[RCRV — Regional Class Research Vessel](https://sketchfab.com/3d-models/rcrv-regional-class-research-vessel-11b4b97a9e60497ea91c0727e404ecf6)
+by Oregon State University Extension Service / Alan Dennis, licensed under
+[CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
+The educational ship design is adapted for the game: uniform scale and orientation,
+paint response, science-van floor and entrance, dive opening, equipment placement,
+and optimized near and distant geometry. It is not an exact model of a current
+operational vessel. The original notice and intake checksums accompany the models
+in `marine/research-vessel/`. Deck instruments reuse the credited Michael V assets
+below; the docked submarine retains JosephWPugsley's credit.
+
+Atlantic Explorer Research Submarine
+
+- File: `marine/atlantic-explorer-submarine.glb`
+- Creator: JosephWPugsley
+- Source: https://sketchfab.com/3d-models/atlantic-explorer-submarineglb-f1645a6ec3b54e81aed7b2c105cdd6e2
+- License: [Creative Commons Attribution 4.0](https://creativecommons.org/licenses/by/4.0/).
+- Changes: geometry simplified with bounded error; opaque color maps compressed, data maps resized. Original design, cockpit and materials retained. Uniform in-game scale: 0.86.
+- Used by the playable research submarine and its docked presentation. Intake metadata records the source and bundled checksums.
+
 BMW 525i E34 Player Vehicle
 
 - File: `vehicles/bmw-525i-e34.glb`
@@ -263,3 +289,28 @@ All following sources are Creative Commons Attribution 4.0: https://creativecomm
 `nature/pine*.glb`, `nature/broadleaf*.glb`, `nature/fern.glb`, `nature/grass.glb`: [Low poly vegetation for games](https://sketchfab.com/3d-models/low-poly-vegetation-for-games-cdac82eb61ab4d83bf162b4c44b44d6d) by **denoises**, [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Downloaded September 28, 2026. Selected conifer, broadleaf, fern and grass plants; normalized placement origins, resized textures to 512px and created distant tree variants. Source and derivative checksums are recorded in `nature/asset-manifest.json`. Conversion: `scripts/build-sketchfab-vegetation-assets.mjs`.
 
 `nature/shrub.glb`: [Bush](https://sketchfab.com/3d-models/bush-844e6a315757431da97efb5f17383bb5) by **lev26**, [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Downloaded September 28, 2026. Base aligned, resized map, alpha-tested leaves. Checksums and conversion details: `nature/asset-manifest.json`.
+
+Personal Workspace Furniture
+
+- `interiors/personal-workspace/workspace-table.glb` — [Wooden Table 02](https://polyhaven.com/a/wooden_table_02) by Serhii Khromov, Poly Haven, CC0.
+- `interiors/personal-workspace/workspace-chair.glb` — [School Chair 01](https://polyhaven.com/a/SchoolChair_01) by Ethan Place, Poly Haven, CC0.
+- Repacked as self-contained GLBs with 1K JPEG material maps. Source geometry, material channels and metre scale are retained. These are real modeled assets; the in-game field record uses the player's saved Journal evidence. Per-file checksums and intake details are in the adjacent `PROVENANCE.json` and `LICENSE.txt`.
+
+### Barramundi
+
+[Barramundi Fish](https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/BarramundiFish) by Microsoft (2017), Creative Commons Zero v1.0 Universal. The game uses resized textures, normalized scale and authored swimming motion. Source hashes, rights evidence and conversion details are retained with the model. Its modeled encounters use a reviewed northern Australian subset, not live sightings or the species' entire range.
+
+## Common dolphin
+
+Common Dolphin by CGreature ([original model](https://skfb.ly/oHswH)), with swimming animation by kenchoo ([animated adaptation](https://sketchfab.com/3d-models/common-dolphin-12c27d41204f4b92895e36072b0ba8a6)). [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). World Explorer applies parent transforms for scale/orientation and resizes textures; the original rig and animation remain. See `marine/common-dolphin/PROVENANCE.json` and `LICENSE.txt`. No author endorsement is implied.
+
+## Aquarium animal illustrations
+
+[Blacktip reef shark](https://sketchfab.com/3d-models/blacktip-reef-shark-a52bb96c5a0c4157b49982471f8902b0)
+by Lais.Marques and [Green sea turtle](https://sketchfab.com/3d-models/green-sea-turtle-d3dc6a6a4ff74465a59105fd7c66b32b)
+by jgrabo20, [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
+Parent transforms normalize animated bounds to metres; textures are resized for
+the browser. Original bones, topology and swimming clips are retained. These
+illustrate species; they are not scans of named animals or an endorsement by the
+artists or National Aquarium. Source/output hashes and exact changes are in
+`interiors/aquarium/PROVENANCE.json`.

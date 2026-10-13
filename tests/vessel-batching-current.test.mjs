@@ -23,7 +23,9 @@ test('static vessel batching preserves transformed geometry, materials and indep
  material.color.setHex(0x334455);assert.equal(batch.material.color.getHex(),0x334455);
  root.position.x+=3;const moved=vertexCloud(root);for(const point of after)assert.ok(moved.some(p=>p.distanceTo(point.clone().add(new THREE.Vector3(3,0,0)))<2e-6),'Vessel parent movement was lost');
 });
-for(const entry of MARITIME_CATALOG)test(`${entry.id}: opaque parts batch while damage, smoke and lights still work`,()=>{
+// The licensed research GLTF has material batches from intake; its loaded
+// geometry, per-instance paint, light damage and disposal run in the deck browser check.
+for(const entry of MARITIME_CATALOG.filter(entry=>entry.role!=='research'))test(`${entry.id}: opaque parts batch while damage, smoke and lights still work`,()=>{
  const visual=createVesselVisual(THREE,entry);
  const stats=visual.root.userData.staticPartBatching;assert.ok(stats.savedDrawCalls>=4);
  const parts=visual.root.children,lights=parts.filter(o=>o.userData.vesselNavigationLight),panels=parts.filter(o=>o.userData.vesselDamagePanel),smoke=parts.filter(o=>o.userData.vesselDamageSmoke);

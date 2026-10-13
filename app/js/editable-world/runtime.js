@@ -1,6 +1,7 @@
 import { createLocalWorldModificationStore } from './local-store.js?v=1';
 import { worldModificationIdentityForLocation } from './model.js?v=1';
 import { createEditableWorldPresentation } from './presentation.js?v=1';
+import { creativeEnvironment, isRoomEditFrameCurrent, roomEditFrame } from './scope.js';
 
 let store = null;
 let selectedBuilding = null;
@@ -15,8 +16,30 @@ const sharedState = {
   signature: '',
   suppress: null,
   restore: null,
-  reset: null
+  reset: null,
+  frame: null,
+  generation: 0
 };
+
+function buildingEditContextAvailable(appCtx) {
+  return creativeEnvironment(appCtx) === 'earth'
+    && (!sharedState.enabled || isRoomEditFrameCurrent(appCtx, sharedState.frame));
+}
+
+async function commitSharedEdit(action, ...args) {
+  if (!sharedState.canManage || typeof sharedState[action] !== 'function') {
+    return Object.freeze({ committed: false, reason: 'room-manager-permission-required' });
+  }
+  const generation = sharedState.generation, roomId = sharedState.roomId;
+  try {
+    const count = await sharedState[action](...args);
+    return Object.freeze({ committed: true, reason: null, scope: 'room', roomId,
+      previousWorld: generation !== sharedState.generation, ...(action === 'reset' ? { count } : {}) });
+  } catch (error) {
+    return Object.freeze({ committed: false, reason: String(error?.message || error), roomId,
+      previousWorld: generation !== sharedState.generation });
+  }
+}
 
 function currentWorldId(appCtx) {
   return worldModificationIdentityForLocation(appCtx?.LOC || {});
@@ -161,12 +184,14 @@ export function isLocalBuildingSuppressed(appCtx, sourceFeatureId) {
   const id = String(sourceFeatureId || '');
   if (!id) return false;
   if (sharedState.enabled) {
+    if (!buildingEditContextAvailable(appCtx)) return false;
     return sharedState.rows.some((entry) => entry.kind === 'suppression' && entry.active === true && entry.sourceFeatureId === id);
   }
   return store?.isBuildingSuppressed(currentWorldId(appCtx), id) === true;
 }
 
 export function getSuppressedEditableBuildingIds(appCtx) {
+  if (sharedState.enabled && !buildingEditContextAvailable(appCtx)) return Object.freeze([]);
   const ids = sharedState.enabled
     ? sharedState.rows
         .filter((entry) => entry.kind === 'suppression' && entry.active === true)
@@ -176,6 +201,7 @@ export function getSuppressedEditableBuildingIds(appCtx) {
 }
 
 export function selectNearestEditableBuilding(appCtx, radius = 34) {
+  if (!buildingEditContextAvailable(appCtx)) return null;
   const position = actorPosition(appCtx);
   if (!position || !Number.isFinite(position.x) || !Number.isFinite(position.z)) return null;
   const buildings = typeof appCtx.getNearbyBuildings === 'function'
@@ -216,6 +242,7 @@ function commit(appCtx, operation) {
 }
 
 export function placeDiscoveryWorldObject(appCtx, input = {}) {
+  if (!buildingEditContextAvailable(appCtx)) return Object.freeze({ committed: false, reason: 'building-world-unavailable' });
   if (sharedState.enabled) {
     return Object.freeze({ committed: false, reason: 'use-room-editing-tools' });
   }
@@ -244,18 +271,11 @@ export function placeDiscoveryWorldObject(appCtx, input = {}) {
 }
 
 export async function suppressSelectedEditableBuilding(appCtx) {
+  if (!buildingEditContextAvailable(appCtx)) return Object.freeze({ committed: false, reason: 'building-world-unavailable' });
   const target = selectedBuilding || (lastSelectedSourceId ? { sourceFeatureId: lastSelectedSourceId, building: {} } : null);
   if (!target) return Object.freeze({ committed: false, reason: 'no-building-selected' });
   if (sharedState.enabled) {
-    if (!sharedState.canManage || typeof sharedState.suppress !== 'function') {
-      return Object.freeze({ committed: false, reason: 'room-manager-permission-required' });
-    }
-    try {
-      await sharedState.suppress(target.sourceFeatureId);
-      return Object.freeze({ committed: true, reason: null, scope: 'room' });
-    } catch (error) {
-      return Object.freeze({ committed: false, reason: String(error?.message || error) });
-    }
+    return commitSharedEdit('suppress', target.sourceFeatureId);
   }
   const result = commit(appCtx, {
     action: 'suppress_base_building',
@@ -269,18 +289,11 @@ export async function suppressSelectedEditableBuilding(appCtx) {
 }
 
 export async function restoreSelectedEditableBuilding(appCtx, explicitSourceFeatureId = '') {
+  if (!buildingEditContextAvailable(appCtx)) return Object.freeze({ committed: false, reason: 'building-world-unavailable' });
   const sourceFeatureId = String(explicitSourceFeatureId || selectedBuilding?.sourceFeatureId || lastSelectedSourceId || '').trim();
   if (!sourceFeatureId) return Object.freeze({ committed: false, reason: 'no-building-selected' });
   if (sharedState.enabled) {
-    if (!sharedState.canManage || typeof sharedState.restore !== 'function') {
-      return Object.freeze({ committed: false, reason: 'room-manager-permission-required' });
-    }
-    try {
-      await sharedState.restore(sourceFeatureId);
-      return Object.freeze({ committed: true, reason: null, scope: 'room' });
-    } catch (error) {
-      return Object.freeze({ committed: false, reason: String(error?.message || error) });
-    }
+    return commitSharedEdit('restore', sourceFeatureId);
   }
   const result = commit(appCtx, { action: 'restore_base_building', sourceFeatureId });
   if (result.committed) {
@@ -290,20 +303,14 @@ export async function restoreSelectedEditableBuilding(appCtx, explicitSourceFeat
 }
 
 export async function resetLocalEditableWorld(appCtx) {
+  if (!buildingEditContextAvailable(appCtx)) return Object.freeze({ committed: false, reason: 'building-world-unavailable' });
   if (sharedState.enabled) {
-    if (!sharedState.canManage || typeof sharedState.reset !== 'function') {
-      return Object.freeze({ committed: false, reason: 'room-manager-permission-required' });
-    }
-    try {
-      const count = await sharedState.reset();
-      return Object.freeze({ committed: true, reason: null, scope: 'room', count });
-    } catch (error) {
-      return Object.freeze({ committed: false, reason: String(error?.message || error) });
-    }
+    return commitSharedEdit('reset');
   }
   const result = commit(appCtx, { action: 'reset_world' });
   if (result.committed) {
-    appCtx.clearAllBuildBlocks?.();
+    // Reset only this authority's edits. Blocks have a separate durable owner
+    // and Clear action; two independent writes cannot promise one atomic reset.
     selectedBuilding = null;
     lastSelectedSourceId = '';
   }
@@ -313,6 +320,7 @@ export async function resetLocalEditableWorld(appCtx) {
 export function refreshEditableWorldPresentation(appCtx) {
   presentation?.dispose?.();
   presentation = null;
+  if (!buildingEditContextAvailable(appCtx)) return null;
   const snapshot = getLocalWorldModificationSnapshot(appCtx);
   const objects = sharedState.enabled
     ? sharedState.rows.filter((entry) => entry.kind === 'object' && entry.active === true).map((entry) => ({
@@ -337,10 +345,11 @@ export function disposeEditableWorldPresentation() {
 export function editableWorldRuntimeSnapshot(appCtx) {
   const snapshot = getLocalWorldModificationSnapshot(appCtx);
   return Object.freeze({
-    active: !!snapshot.worldId,
-    worldId: snapshot.worldId,
+    active: !!snapshot.worldId && buildingEditContextAvailable(appCtx),
+    worldId: sharedState.enabled ? sharedState.worldId : snapshot.worldId,
     scope: sharedState.enabled ? 'room' : 'local',
     roomId: sharedState.roomId,
+    canManage: !sharedState.enabled || sharedState.canManage,
     revision: sharedState.enabled ? Math.max(0, ...sharedState.rows.map((entry) => Number(entry.revision) || 0)) : snapshot.revision,
     suppressions: sharedState.enabled
       ? sharedState.rows.filter((entry) => entry.kind === 'suppression' && entry.active === true).length
@@ -356,26 +365,33 @@ export function editableWorldRuntimeSnapshot(appCtx) {
 }
 
 export function configureSharedEditableWorld(appCtx, config = {}) {
-  const hadActiveRoomChanges = sharedState.enabled && sharedState.rows.some((entry) => entry.active === true);
   const nextEnabled = config.enabled === true && !!config.roomId && !!config.worldId;
   const nextRoomId = nextEnabled ? String(config.roomId) : '';
   const nextWorldId = nextEnabled ? String(config.worldId) : '';
-  const scopeChanged = sharedState.enabled !== nextEnabled || sharedState.roomId !== nextRoomId || sharedState.worldId !== nextWorldId;
+  const nextFrame = nextEnabled ? roomEditFrame(config.world) : null;
+  const scopeChanged = sharedState.enabled !== nextEnabled || sharedState.roomId !== nextRoomId || sharedState.worldId !== nextWorldId
+    || JSON.stringify(sharedState.frame) !== JSON.stringify(nextFrame);
   sharedState.enabled = nextEnabled;
   sharedState.roomId = nextRoomId;
   sharedState.worldId = nextWorldId;
+  sharedState.frame = nextFrame;
   sharedState.canManage = sharedState.enabled && config.canManage === true;
   sharedState.suppress = sharedState.enabled && typeof config.suppress === 'function' ? config.suppress : null;
   sharedState.restore = sharedState.enabled && typeof config.restore === 'function' ? config.restore : null;
   sharedState.reset = sharedState.enabled && typeof config.reset === 'function' ? config.reset : null;
   if (scopeChanged) {
+    sharedState.generation++;
     sharedState.rows = [];
     sharedState.signature = '';
+    selectedBuilding = null;
+    lastSelectedSourceId = '';
   }
   refreshEditableWorldPresentation(appCtx);
-  if (scopeChanged && hadActiveRoomChanges && appCtx.initialEarthWorldReady && !appCtx.worldLoading) {
+  if (scopeChanged && appCtx.initialEarthWorldReady && !appCtx.worldLoading) {
     refreshEditableBuildingVisibility(appCtx);
+    appCtx.invalidateTraversalNetworks?.('editable_world_scope_changed');
   }
+  appCtx.syncBlockBuilderUi?.(appCtx.getBlockBuilderSnapshot?.() || {});
 }
 
 export function setSharedEditableWorldRows(appCtx, rows = []) {
@@ -400,7 +416,7 @@ export function initEditableWorldRuntime(appCtx) {
     editableWorldRuntimeSnapshot: () => editableWorldRuntimeSnapshot(appCtx),
     configureSharedEditableWorld: (config) => configureSharedEditableWorld(appCtx, config),
     disposeEditableWorldPresentation: () => disposeEditableWorldPresentation(),
-    exportLocalEditableWorld: () => store.exportWorld(currentWorldId(appCtx)),
+    exportLocalEditableWorld: options => options?.recovery === true ? store.exportRecovery() : store.exportWorld(currentWorldId(appCtx)),
     getSuppressedEditableBuildingIds: () => getSuppressedEditableBuildingIds(appCtx),
     getLocalWorldModificationSnapshot: () => getLocalWorldModificationSnapshot(appCtx),
     isLocalBuildingSuppressed: (sourceFeatureId) => isLocalBuildingSuppressed(appCtx, sourceFeatureId),

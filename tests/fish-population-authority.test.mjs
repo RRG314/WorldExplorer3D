@@ -6,6 +6,20 @@ import {
   createUnderwaterSchoolPlan,
   selectFishFromPopulation
 } from '../app/js/fishing/population-authority.js';
+import {generateFish} from '../app/js/fishing/catalog.js';
+
+test('unsupported polar and unknown water never fall back to worldwide game species',()=>{
+ for(const waterKind of ['open_ocean','lake','unresolved']){
+  const context=createFishPopulationContext({waterKind,latitude:-80,longitude:30,accessMode:'underwater'});
+  assert.equal(context.playable,false);assert.deepEqual(context.candidateSpeciesIds,[]);
+  assert.equal(generateFish({waterKind,latitude:-80}),null);
+ }
+});
+test('an authored pool cannot override water and latitude exclusions or invent species',()=>{
+ const context=createFishPopulationContext({waterKind:'lake',latitude:40,longitude:-75,accessMode:'underwater',candidateSpeciesIds:['giant_trevally','imaginary','largemouth_bass']});
+ assert.deepEqual(context.candidateSpeciesIds,['largemouth_bass']);
+ assert.equal(createFishPopulationContext({waterKind:'open_ocean',latitude:20,depthMeters:null}).environment.depthMeters,null);
+});
 
 const water = Object.freeze({
   waterbodyId: 'water:baltimore-harbor',
@@ -88,4 +102,32 @@ test('representative freshwater, estuary, coast, and open-ocean contexts stay bo
     assert.equal(context.evidence.providerOccurrenceClaim, false);
     assert.equal(context.evidence.measuredAbundanceClaim, false);
   }
+});
+
+test('marine pools separate Atlantic and Indo-Pacific species at the same latitude',()=>{
+ const at=(longitude,extra={})=>createFishPopulationContext({waterKind:'coastal',latitude:25,longitude,accessMode:'underwater',...extra});
+ const florida=at(-80),okinawa=at(128),hawaii=at(-157);
+ assert.ok(florida.candidateSpeciesIds.includes('atlantic_tarpon'));
+ assert.ok(!florida.candidateSpeciesIds.includes('giant_trevally'));
+ for(const site of [okinawa,hawaii]){
+  assert.ok(site.candidateSpeciesIds.includes('giant_trevally'));
+  assert.ok(!site.candidateSpeciesIds.includes('atlantic_tarpon'));
+  assert.ok(!site.candidateSpeciesIds.includes('summer_flounder'));
+  assert.ok(!site.candidateSpeciesIds.includes('bluefin_tuna'));
+ }
+ assert.equal(at(null).playable,false);
+ assert.equal(at(999).playable,false);
+ assert.equal(at(128,{habitat:'abyssal-bottom'}).playable,false);
+ assert.equal(at(128,{habitat:'freshwater'}).playable,false);
+ assert.deepEqual(at(128,{habitat:'coral-reef'}).candidateSpeciesIds,['giant_trevally']);
+});
+
+test('deep seafloor evidence is not the depth of a pelagic fish',()=>{
+ const context=createFishPopulationContext({waterKind:'open_ocean',latitude:20,longitude:150,depthMeters:4500,accessMode:'underwater'});
+ const plan=createUnderwaterSchoolPlan(context);
+ assert.ok(plan.schools.some(s=>s.speciesId==='yellowfin_tuna'));
+ assert.ok(plan.schools.every(s=>s.spawnDepthMeters[0]>=1&&s.spawnDepthMeters[1]<=120));
+ assert.ok(plan.schools.every(s=>s.count<=8&&s.spawnDepthTruth==='authored-game-presentation-band'));
+ const fish=selectFishFromPopulation(createFishPopulationContext({...water,waterKind:'open_ocean',candidateSpeciesIds:['bluefin_tuna']}),{random:()=>.5});
+ assert.equal(fish.speciesId,'bluefin_tuna');assert.equal(fish.species,'Atlantic Bluefin Tuna');
 });

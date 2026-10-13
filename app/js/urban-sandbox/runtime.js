@@ -1,3 +1,5 @@
+import {consumePlayerProvision} from '../player/provisions.js';
+import {detachSceneObject} from '../engine/scene-object-lifecycle.js';
 import {urbanTargetOverlapsHeight} from './vertical-contact.js';
 import { bindPlayerConditionAuthority } from './player-condition-binding.js';
 import {createServiceLightPool} from './service-light-pool.js';
@@ -713,7 +715,7 @@ function createLootPickupVisual(THREE, pickup) {
     root,
     dispose() {
       disposeCuratedEquipmentVisual(root);
-      root.removeFromParent?.();
+      detachSceneObject(root);
     }
   });
 }
@@ -940,7 +942,8 @@ function commerceFailureMessage(reason) {
     service_not_available: 'That service is not available at this mapped place.',
     service_target_unavailable: 'Bring the relevant vehicle or companion into the world before using that service.',
     service_effect_failed_refunded: 'The service could not be applied, so the Explorer Wallet charge was refunded.',
-    settlement_recovery_required: 'The service is safely recorded and will finish recovery when the Explorer Wallet reconnects.',
+    settlement_recovery_required: 'A service payment is saved but still needs to finish. Return with the same vehicle or companion and reopen this store to retry.',
+    save_failed: 'This exchange could not be saved. Nothing changed. Close other World Explorer tabs or free browser storage, then retry.',
     delivery_recovery_required: 'The wallet record is safe, but the Backpack is still syncing this item.',
     wallet_unavailable: 'Your Explorer Wallet is reconnecting. Nothing was charged.'
   }[String(reason || '')] || 'That exchange could not be completed.';
@@ -1010,6 +1013,12 @@ function openStore(state, storeId, options = {}) {
   appCtx.screenLayout?.setPanelLayer?.('store', true);
   appCtx.setPauseReason?.('urban_store', true);
   renderStore(state);
+  void state.commerce.recoverPending?.((service, receiptId, recovery) => applyPoiService(state, service, receiptId, recovery)).then(result=>{
+    if (!state.storeOpen || state.activeStoreId!==store.id) return;
+    if (result?.remaining) state.storeStatus=commerceFailureMessage('settlement_recovery_required');
+    else if (result?.recovered) state.storeStatus='Your pending service has been recovered.';
+    renderStore(state);
+  });
   return true;
 }
 
@@ -1045,10 +1054,8 @@ async function handleStoreAction(state, event) {
         : action === 'service' ? state.commerce.service(
           store,
           button.dataset.storeItem,
-          (service, receiptId) => applyPoiService(state, service, receiptId),
-          parseUpgradeServiceId(button.dataset.storeItem)
-            ? { targetId: stableVehicleIdentity(state.activeVehicle || appCtx.car) }
-            : {}
+          (service, receiptId, recovery) => applyPoiService(state, service, receiptId, recovery),
+          { targetId: poiServiceTargetId(state, button.dataset.storeItem) }
         ) : null);
   if (!result) return false;
   state.storeStatus = result.ok
@@ -1071,7 +1078,22 @@ async function handleStoreAction(state, event) {
   return true;
 }
 
-async function applyPoiService(state, service, receiptId = '') {
+function poiServiceTargetId(state, serviceId) {
+  if (parseUpgradeServiceId(serviceId) || serviceId==='vehicle-full-repair') return stableVehicleIdentity(state.activeVehicle || appCtx.car);
+  if (serviceId==='vessel-full-repair') return String(appCtx.boatMode?.transportEntityId||'');
+  if (serviceId==='companion-wellness') return String(appCtx.worldDiscoveryRuntime?.companionRuntime?.snapshot?.().activeInstanceId||'');
+  return 'local-explorer';
+}
+
+async function applyPoiService(state, service, receiptId = '', recovery = {}) {
+  if (recovery.recovery) {
+    if (!recovery.targetId || recovery.targetId!==poiServiceTargetId(state,service?.id)) return null;
+    if (service.id==='player-treatment' && Number(state.playerCondition??1)>=.999) return true;
+    if (service.id==='vehicle-full-repair' && Number((state.activeVehicle||appCtx.car)?.condition??1)>=.999) return true;
+    if (service.id==='vessel-full-repair' && Number(appCtx.boatMode?.condition??1)>=.999) return true;
+    const upgrade=parseUpgradeServiceId(service.id);
+    if (upgrade && state.vehicleUpgradeStore.levels(state.activeVehicle||appCtx.car)[upgrade.upgradeId]>=upgrade.level) return true;
+  }
   if (service?.id === 'player-treatment' && Number(state.playerCondition ?? 1) < .999) {
     state.playerCondition = 1;
     return true;
@@ -1733,7 +1755,7 @@ function mountVehicleForDriving(state, vehicle) {
   if (appCtx.carMesh?.userData?.curatedVehicleVisual) {
     appCtx.carMesh.userData.curatedVehicleVisual.visible = false;
   }
-  vehicle.visual.root.removeFromParent?.();
+  detachSceneObject(vehicle.visual.root);
   vehicle.visual.root.position.set(0, 0, 0);
   vehicle.visual.root.rotation.set(0, 0, 0);
   syncCuratedVehicleGroundPivot(vehicle.visual.root);
@@ -2787,7 +2809,7 @@ function disposeRuntime(state, reason = 'disposed') {
   state.equipmentRuntime?.dispose?.();
   state.responders?.dispose?.();
   state.serviceLighting?.dispose();
-  state.group.removeFromParent?.();
+  detachSceneObject(state.group);
   state.vehicles.length = 0;
   state.npcs.length = 0;
   state.curatedNpcAssetOwners.clear();
@@ -2909,7 +2931,7 @@ function startUrbanSandboxRuntime(options = {}) {
   }) || null;
   const commerce = connectedWallet
     ? createLocalCommerceModel({ inventory: equipment, transactionAuthority: connectedWallet })
-    : appCtx.worldEconomy || appCtx.localConvenienceStoreCommerce || createLocalCommerceModel({ inventory: equipment });
+    : appCtx.worldEconomy || appCtx.localConvenienceStoreCommerce || createLocalCommerceModel({ inventory: equipment, backpackStore });
   appCtx.worldEconomy = commerce;
   appCtx.localConvenienceStoreCommerce = commerce;
   const playerConditionAuthority = ensurePlayerConditionAuthority(appCtx);
@@ -3051,7 +3073,7 @@ function startUrbanSandboxRuntime(options = {}) {
     roomAuthorityRuntime: null
   };
   bindPlayerConditionAuthority(state);
-  void state.commerce.recoverPending?.((service, receiptId) => applyPoiService(state, service, receiptId)).then((result) => {
+  void state.commerce.recoverPending?.((service, receiptId, recovery) => applyPoiService(state, service, receiptId, recovery)).then((result) => {
     if (result?.recovered > 0 && activeWorldMatches(state)) {
       setStatus(state, `${result.recovered} Explorer Wallet service ${result.recovered === 1 ? 'receipt' : 'receipts'} recovered.`, 2600);
     }
@@ -3144,13 +3166,9 @@ function startUrbanSandboxRuntime(options = {}) {
     onNpcShot: (impact) => applyArmedNpcImpact(state, impact),
     onNpcDowned: (npc) => dropNpcLoot(state, npc),
     onConsume: (item) => {
-      const restore = Math.max(0, Number(item?.metadata?.conditionRestore || item?.conditionRestore || 0));
-      if (!restore) return Object.freeze({ ok: false, reason: 'not_consumable' });
-      if (state.playerCondition >= .999) return Object.freeze({ ok: false, reason: 'full_health' });
-      if (!state.equipment.consumeItem(item.instanceId, 1)) return Object.freeze({ ok: false, reason: 'inventory_unavailable' });
-      const result = state.playerConditionAuthority.restore(restore, `consumed:${item.catalogId}`);
-      renderEquipment(state);
-      return Object.freeze({ ok: true, condition: result.after });
+      const result=consumePlayerProvision(state.equipment,state.playerConditionAuthority,item);
+      if(result.ok)renderEquipment(state);
+      return Object.freeze(result);
     },
     setStatus: (message, duration) => setStatus(state, message, duration),
     now
@@ -3280,6 +3298,11 @@ function startUrbanSandboxRuntime(options = {}) {
   document.addEventListener('keydown', state.onStoreKeyDown);
   const controlsOnlyReasons = new Set(['ammunition-reloaded','ammunition-added','quantity-added','equipment-consumed','equipped-changed','hotbar-changed']);
   state.unsubscribeBackpack = state.equipment.subscribe(change => {
+    if (change.reason === 'possessions-committed') {
+      state.backpackSaveFailed = false;
+      if (activeWorldMatches(state)) renderEquipment(state);
+      return;
+    }
     const saved = controlsOnlyReasons.has(change.reason)
       ? backpackStore.saveControls(state.equipment.exportControls())
       : backpackStore.save(state.equipment.exportState());

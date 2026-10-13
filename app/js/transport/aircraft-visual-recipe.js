@@ -1,3 +1,4 @@
+import {detachSceneObject} from '../engine/scene-object-lifecycle.js';
 import { transportDamagePresentation } from './damage-model.js?v=1';
 
 const PALETTE = Object.freeze({
@@ -687,7 +688,7 @@ function createAircraftVisual(THREE, entry, options = {}) {
   root.add(smoke);
   const dispose = () => {
     if (root.parent?.remove) root.parent.remove(root);
-    else root.removeFromParent?.();
+    else detachSceneObject(root);
     root.traverse((object) => {
       object.geometry?.dispose?.();
       if (Array.isArray(object.material)) object.material.forEach((entryMaterial) => entryMaterial?.dispose?.());

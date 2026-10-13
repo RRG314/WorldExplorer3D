@@ -180,7 +180,7 @@ try {
   await page.waitForSelector('#tutorialHintCard:not([hidden])', { timeout: 20_000 });
   assert.equal(await page.locator('#tutorialHintCard').getAttribute('data-tutorial-stage'), 'move');
   const firstStepText = await page.locator('#tutorialHintCard').textContent();
-  assert.match(firstStepText, /First Journey.*ZASD to move.*Mouse to look/is);
+  assert.match(firstStepText, /First Journey.*ZASD to move.*(?:Mouse to look|Drag on the world.*mouse button to look)/is);
   assert.equal(await page.locator('#tutorialHintCard').evaluate((element) => element.classList.contains('compact')), true);
   await page.locator('#tutorialHintCard .tutorial-details-btn').click();
   assert.match(await page.locator('#tutorialHintCard').textContent(), /(?:right|either) mouse button.*look/i);

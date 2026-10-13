@@ -1,3 +1,6 @@
+import {openJourneyJournal,closeJourneyJournal,refreshJourneyJournal,journeyJournalIsOpen} from '../discovery/journey-journal.js';
+import { missionSurfaceBody } from '../universe/mission-navigation.js';
+import { secureLunarSample } from './lunar-samples.js';
 import { getAstronomicalBody } from '../astronomy/body-catalog.js?v=3';
 import { ctx as appCtx } from '../shared-context.js?v=55';
 import { createIndexedDbDiscoveryProfileStore } from '../discovery/profile-store.js?v=5';
@@ -12,6 +15,7 @@ const ACTIVITY_OFFSETS = Object.freeze([
 ]);
 const FIELD_PROCEDURES = Object.freeze({
   photograph: Object.freeze(['Deploy panorama stabilizers', 'Calibrate the panorama sweep', 'Capture the panorama']),
+  'geology-observe': Object.freeze(['Focus the optical scanner', 'Compare grain and fragment structure', 'Save the undisturbed-site record']),
   'geology-inspect': Object.freeze(['Scan the exposed material', 'Select a representative fragment', 'Seal the sample case']),
   'habitat-survey': Object.freeze(['Level the sampling plate', 'Calibrate the sensor mast', 'Record the environment'])
 });
@@ -74,9 +78,6 @@ let arrivalEquipment = planetarySurveyEquipment(null);
 function fieldEquipment() { return appCtx.getPlanetarySurveyEquipment?.() || arrivalEquipment; }
 let profileStore = null;
 let mapTimer = 0;
-let planetaryJournalOpen = false;
-let planetaryJournalBound = false;
-let planetaryJournalSection = 'journal';
 
 function escapeHtml(value) {
   return String(value ?? '')
@@ -87,100 +88,10 @@ function escapeHtml(value) {
     .replaceAll("'", '&#39;');
 }
 
-function selectPlanetaryJournalSection(section = 'journal') {
-  planetaryJournalSection = section === 'guide' ? 'guide' : 'journal';
-  document.querySelectorAll('[data-discovery-tab]').forEach((tab) => {
-    const selected = tab.dataset.discoveryTab === planetaryJournalSection;
-    tab.classList.toggle('active', selected);
-    tab.hidden = !['journal', 'guide'].includes(tab.dataset.discoveryTab);
-  });
-  document.querySelectorAll('[data-discovery-pane]').forEach((pane) => {
-    pane.classList.toggle('active', pane.dataset.discoveryPane === planetaryJournalSection);
-  });
-}
-
-function closePlanetaryJournal() {
-  if (!planetaryJournalOpen) return false;
-  planetaryJournalOpen = false;
-  const panel = document.getElementById('discoveryPanel');
-  panel?.classList.remove('show');
-  panel?.setAttribute('aria-hidden', 'true');
-  document.querySelectorAll('[data-discovery-tab]').forEach((tab) => {
-    tab.hidden = false;
-  });
-  document.getElementById('solidWorldPanel')?.style.removeProperty('visibility');
-  document.getElementById('solidWorldReturnBtn')?.style.removeProperty('visibility');
-  appCtx.screenLayout?.setPanelLayer?.('journal', false);
-  return true;
-}
-
-async function refreshPlanetaryJournal() {
-  if (!planetaryJournalOpen) return false;
-  profileStore ||= appCtx.discoveryProfileStore || createIndexedDbDiscoveryProfileStore();
-  appCtx.discoveryProfileStore ||= profileStore;
-  const [events, guide] = await Promise.all([
-    profileStore.listEvents?.(100).catch(() => []) || [],
-    profileStore.listFieldGuide?.(200).catch(() => []) || []
-  ]);
-  const journalList = document.getElementById('discoveryJournalList');
-  const guideList = document.getElementById('discoveryFieldGuideList');
-  const guideOverview = document.getElementById('discoveryGuideOverview');
-  const regionFilter = document.getElementById('discoveryJournalRegion');
-  const categoryFilter = document.getElementById('discoveryJournalCategory');
-  if (regionFilter) {
-    const selected = regionFilter.value || 'all';
-    const regions = [...new Map(events.filter((event) => event.regionId).map((event) => [event.regionId, event.regionLabel || event.regionId])).entries()];
-    regionFilter.innerHTML = `<option value="all">All regions</option>${regions.map(([id, label]) => `<option value="${escapeHtml(id)}">${escapeHtml(label)}</option>`).join('')}`;
-    regionFilter.value = regions.some(([id]) => id === selected) ? selected : 'all';
-  }
-  const category = categoryFilter?.value || 'all';
-  const region = regionFilter?.value || 'all';
-  const filteredEvents = events.filter((event) =>
-    (category === 'all' || (event.pathId || 'field') === category) &&
-    (region === 'all' || event.regionId === region)
-  );
-  if (journalList) journalList.innerHTML = filteredEvents.length
-    ? filteredEvents.slice(0, 24).map((event) => {
-        const when = new Date(Number(event.occurredAt || event.collectedAt) || Date.now()).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
-        return `<article class="discoveryItem discoveryJournalEvent"><span class="discoveryJournalTime">${escapeHtml(when)}</span><span class="discoveryJournalPath">Fieldwork</span><strong>${escapeHtml(event.name || 'Planetary field record')}</strong><small>${escapeHtml(event.regionLabel || event.regionId || 'Planetary surface')} · ${escapeHtml(event.activityId || 'field record')}</small><span class="discoveryJournalProgress">Saved to your Journal</span></article>`;
-      }).join('')
-    : '<div class="discoveryEmpty">No Journal records match these filters.</div>';
-  if (guideList) guideList.innerHTML = guide.length
-    ? guide.slice(0, 40).map((entry) => `<article class="discoveryItem"><strong>${escapeHtml(entry.name || entry.catalogId || 'Field Guide record')}</strong><small>${escapeHtml(entry.family || 'planetary fieldwork')} · ${Number(entry.observations || 1)} observation${Number(entry.observations || 1) === 1 ? '' : 's'}</small></article>`).join('')
-    : '<div class="discoveryEmpty">Document a field point to begin your Field Guide.</div>';
-  if (guideOverview) guideOverview.innerHTML = `<article><strong>${guide.length}</strong><span>identified</span></article><article><strong>${events.length}</strong><span>Journal records</span></article><article><strong>World</strong><span>Guide scope</span></article>`;
-  return true;
-}
-
-async function openPlanetaryJournal(section = 'journal') {
-  if (!appCtx.activePlanetaryBodyId) return false;
-  const panel = document.getElementById('discoveryPanel');
-  if (!panel) return false;
-  if (!planetaryJournalBound) {
-    planetaryJournalBound = true;
-    document.getElementById('discoveryCloseBtn')?.addEventListener('click', () => {
-      if (appCtx.activePlanetaryBodyId) closePlanetaryJournal();
-    });
-    document.getElementById('discoveryJournalCategory')?.addEventListener('change', () => void refreshPlanetaryJournal());
-    document.getElementById('discoveryJournalRegion')?.addEventListener('change', () => void refreshPlanetaryJournal());
-    document.querySelectorAll('[data-discovery-tab="journal"], [data-discovery-tab="guide"]').forEach((tab) => {
-      tab.addEventListener('click', () => {
-        if (!appCtx.activePlanetaryBodyId) return;
-        selectPlanetaryJournalSection(tab.dataset.discoveryTab);
-        void refreshPlanetaryJournal();
-      });
-    });
-  }
-  planetaryJournalOpen = true;
-  document.getElementById('discoveryPanelTitle').textContent = `${getAstronomicalBody(appCtx.activePlanetaryBodyId)?.name || 'Planetary'} Explorer`;
-  selectPlanetaryJournalSection(section);
-  panel.classList.add('show');
-  panel.setAttribute('aria-hidden', 'false');
-  document.getElementById('solidWorldPanel')?.style.setProperty('visibility', 'hidden');
-  document.getElementById('solidWorldReturnBtn')?.style.setProperty('visibility', 'hidden');
-  appCtx.screenLayout?.setPanelLayer?.('journal', true);
-  await refreshPlanetaryJournal();
-  return true;
+function closePlanetaryJournal() { return closeJourneyJournal(appCtx); }
+function refreshPlanetaryJournal() { return refreshJourneyJournal(appCtx); }
+function openPlanetaryJournal(section = 'journal') {
+  return missionSurfaceBody(appCtx) ? openJourneyJournal(appCtx, section) : Promise.resolve(false);
 }
 
 function playerPosition() {
@@ -193,7 +104,7 @@ function closestActivity(maxDistance = Infinity, admitted = false) {
   if (!active || !player) return null;
   let nearest = null;
   active.activities.forEach((activity) => {
-    const distance = Math.hypot(activity.x - Number(player.x || 0), activity.z - Number(player.z || 0));
+    const distance = Math.hypot(activity.x - Number(player.x || 0), activity.z - Number(player.z || 0), activity.y - Number(player.y || 0));
     const equipment = fieldEquipment();
     const range = admitted && activity.activityId !== 'geology-inspect' ? equipment?.remoteRangeM || INTERACTION_RADIUS : maxDistance;
     if (distance <= range && (!nearest || distance < nearest.distance)) nearest = { ...activity, distance };
@@ -259,7 +170,7 @@ function addPhotographySite(group, materials) {
   sweep.rotation.z = -Math.PI * 0.77;
 }
 
-function addGeologySite(group, materials) {
+function addGeologySite(group, materials, collect = true) {
   const rockMaterial = fieldMaterial(0x695246, { metalness: 0.04, roughness: 0.96 });
   const mineralMaterial = fieldMaterial(0xb8834d, { metalness: 0.18, roughness: 0.7 });
   const rockLayout = [
@@ -270,12 +181,14 @@ function addGeologySite(group, materials) {
     const rock = addFieldMesh(group, new THREE.DodecahedronGeometry(0.72, 1), index === 2 ? mineralMaterial : rockMaterial, `geology-outcrop-${index + 1}`, [x, y, z], [0.12 * index, turn, -0.08 * index]);
     rock.scale.set(scale * 1.3, scale * 0.72, scale);
   });
+  if (collect) {
   addFieldMesh(group, new THREE.BoxGeometry(1.7, 0.16, 1.05), materials.dark, 'sample-case-base', [0.45, 0.13, 1.45]);
   const lid = addFieldMesh(group, new THREE.BoxGeometry(1.7, 0.12, 1.05), materials.shell, 'sample-case-lid', [0.45, 0.82, 1.88], [-0.82, 0, 0]);
   lid.userData.fieldActionPart = 'sample-case-lid';
   [-0.08, 0.36, 0.8].forEach((x, index) => {
     addFieldMesh(group, new THREE.CylinderGeometry(0.16, 0.16, 0.12, 16), index === 1 ? mineralMaterial : rockMaterial, `sealed-sample-slot-${index + 1}`, [x, 0.28, 1.42]);
   });
+  }
   addFieldBrace(group, new THREE.Vector3(-1.55, 0.05, 1.22), new THREE.Vector3(-1.25, 1.42, 0.94), 0.06, materials.frame, 'sample-scanner-support-port');
   addFieldBrace(group, new THREE.Vector3(1.55, 0.05, 1.22), new THREE.Vector3(1.25, 1.42, 0.94), 0.06, materials.frame, 'sample-scanner-support-starboard');
   addFieldBrace(group, new THREE.Vector3(-1.25, 1.42, 0.94), new THREE.Vector3(1.25, 1.42, 0.94), 0.08, materials.frame, 'sample-scanner-crossbar');
@@ -328,7 +241,7 @@ function markerFor(activity) {
   addFieldMesh(group, new THREE.CylinderGeometry(0.34, 0.42, 0.18, 18), materials.frame, `${activity.activityId}-status-base`, [-2.15, 0.09, 1.85]);
   addFieldMesh(group, new THREE.CylinderGeometry(0.12, 0.18, 0.18, 18), materials.screen, `${activity.activityId}-status-light`, [-2.15, 0.28, 1.85]);
   if (activity.activityId === 'photograph') addPhotographySite(group, materials);
-  else if (activity.activityId === 'geology-inspect') addGeologySite(group, materials);
+  else if (activity.activityId.startsWith('geology-')) addGeologySite(group, materials, activity.activityId === 'geology-inspect');
   else addHabitatSite(group, materials);
   group.position.set(activity.x, activity.y + 0.08, activity.z);
   group.userData.truthClass = 'generated_game_detail';
@@ -381,13 +294,16 @@ function activatePlanetaryFieldActivities(pack, world, sampleHeight) {
   if (!world.fieldActivities) {
     world.fieldActivitySites = new Map();
     world.fieldActivities = definitions.map((definition, index) => {
-      const [label, activityId, family, description] = definition;
-      const offset = ACTIVITY_OFFSETS[index];
+      const { label, activityId, family, description, evidenceId = null, offset = ACTIVITY_OFFSETS[index] } = Array.isArray(definition)
+        ? { label: definition[0], activityId: definition[1], family: definition[2], description: definition[3] } : definition;
+      if (!offset || !FIELD_PROCEDURES[activityId]) throw new TypeError('A field station needs a supported procedure and explicit placement.');
       const x = pack.spawn.x + offset.x;
       const z = pack.spawn.z + offset.z;
       const y = pack.manifest.renderPlacement.y + sampleHeight(x, z);
       const activity = Object.freeze({
-        id: `${pack.bodyId}:${pack.manifest.regionId}:${activityId}`,
+        id: `${pack.bodyId}:${pack.manifest.regionId}:${evidenceId || activityId}`,
+        evidenceId,
+        terrainTruth: pack.manifest.truthClass || 'modeled',
         bodyId: pack.bodyId,
         regionId: pack.manifest.regionId,
         label,
@@ -410,6 +326,7 @@ function activatePlanetaryFieldActivities(pack, world, sampleHeight) {
     bodyName: pack.bodyName || getAstronomicalBody(pack.bodyId)?.name || pack.bodyId,
     regionId: pack.manifest.regionId,
     center: Object.freeze({ x: pack.spawn.x, z: pack.spawn.z }),
+    returnPoint: pack.returnPoint || null,
     activities: world.fieldActivities,
     sites: world.fieldActivitySites || new Map()
   });
@@ -424,6 +341,16 @@ function clearPlanetaryFieldActivities() {
 
 function updatePlanetaryFieldMap(dt = 0) {
   if (!active) return;
+  const power = active.bodyId === 'moon' ? appCtx.updateLunarFieldPower?.(dt) : null;
+  const powerLabel = document.getElementById('lunarFieldPower');
+  if (powerLabel && power) {
+    const minutes = Math.floor(power.remainingS / 60), seconds = Math.floor(power.remainingS % 60).toString().padStart(2, '0');
+    const message = power.saveBlocked ? 'Battery save paused · retry below. Your return route stays available.'
+      : `${minutes}:${seconds} instrument power · pod ${Math.ceil(power.distanceM || 0)} m${power.canSurvey ? ` · keep ${Math.ceil(power.reserveS / 60)} min for return` : ' · return to the pod; measurements paused'}`;
+    if (powerLabel.textContent !== message) powerLabel.textContent = message;
+    const retry = document.getElementById('lunarPowerRetry');
+    if (retry) retry.hidden = !power.saveBlocked;
+  }
   mapTimer -= Math.max(0, Number(dt) || 0);
   if (mapTimer > 0) return;
   mapTimer = 0.15;
@@ -434,7 +361,7 @@ function updatePlanetaryFieldMap(dt = 0) {
   if (!canvas || !context || !player) return;
   const width = canvas.width;
   const height = canvas.height;
-  const rangeM = 110;
+  const rangeM = Math.max(110, ...active.activities.map(activity => Math.max(Math.abs(activity.x-active.center.x), Math.abs(activity.z-active.center.z))*1.2));
   const px = (x) => width / 2 + (x - active.center.x) / rangeM * (width * 0.44);
   const py = (z) => height / 2 + (z - active.center.z) / rangeM * (height * 0.44);
   context.clearRect(0, 0, width, height);
@@ -452,6 +379,12 @@ function updatePlanetaryFieldMap(dt = 0) {
     context.fillStyle = activity.activityId === 'photograph' ? '#6fd5ff' : activity.activityId === 'geology-inspect' ? '#ffc866' : '#83e6a6';
     context.beginPath(); context.arc(px(activity.x), py(activity.z), 4, 0, Math.PI * 2); context.fill();
   });
+  if (active.returnPoint) {
+    context.strokeStyle = '#fff'; context.lineWidth = 2;
+    context.strokeRect(px(active.returnPoint.x) - 4, py(active.returnPoint.z) - 4, 8, 8);
+    context.fillStyle = '#fff'; context.font = '9px sans-serif';
+    context.fillText('POD', px(active.returnPoint.x) + 7, py(active.returnPoint.z) + 3);
+  }
   context.save();
   context.translate(px(Number(player.x) || 0), py(Number(player.z) || 0));
   context.rotate(-(Number(appCtx.car?.angle) || 0));
@@ -488,7 +421,10 @@ async function persistActivity(activity) {
     evidenceContractId: 'planetary-modeled-surface-v1',
     evidencePayload: {
       observedImageContext: true,
-      modeledLocalRelief: true,
+      modeledLocalRelief: activity.terrainTruth !== 'derived',
+      derivedTerrain: activity.terrainTruth === 'derived',
+      authoredSpecimen: activity.bodyId === 'moon',
+      evidenceId: activity.evidenceId,
       livePresenceClaim: false,
       bodyId: activity.bodyId,
       surfaceRegionId: activity.regionId
@@ -498,7 +434,7 @@ async function persistActivity(activity) {
     worldIdentity: `${activity.bodyId}:${activity.regionId}`,
     locationKey: `${activity.bodyId}:${activity.regionId}`,
     localPosition: { x: activity.x, y: activity.y, z: activity.z },
-    environment: 'PLANETARY',
+    environment: activity.bodyId === 'moon' ? 'MOON' : activity.bodyId === 'mars' ? 'MARS' : 'PLANETARY',
     description: activity.description,
     collectedAt: Date.now()
   }, { collection: false });
@@ -508,14 +444,24 @@ async function persistActivity(activity) {
     : `${activity.label.toUpperCase()} · ALREADY DOCUMENTED`;
   appCtx.showSpaceFlightMessage?.(message, result.recorded ? '#83e6a6' : '#8ab4ff');
   if (activity.activityId === 'geology-inspect') {
-    appCtx.collectExpeditionGeologySample?.(activity);
+    if (activity.bodyId === 'moon') {
+      if (!await secureLunarSample(appCtx, activity)) {
+        appCtx.showToast?.('Observation saved. Step out of the rover at this station to seal the specimen. If saving is unavailable, your earlier records are kept.');
+        return false;
+      }
+    } else appCtx.collectExpeditionGeologySample?.(activity);
   }
   globalThis.dispatchEvent?.(new CustomEvent('we3d:planetary-field-recorded', { detail: { activity, result } }));
-  if (planetaryJournalOpen) void refreshPlanetaryJournal();
+  if (journeyJournalIsOpen(appCtx)) void refreshPlanetaryJournal();
   return true;
 }
 
 async function advanceActivity(activity) {
+  const power = activity.bodyId === 'moon' ? appCtx.getLunarFieldPower?.() : null;
+  if (power && !power.canSurvey) {
+    appCtx.showToast?.(power.saveBlocked ? 'Battery progress could not be saved. Retry in the Lunar Field Book, or return to the pod.' : 'Keep the remaining power for your return. Recover to Solis Reach and relaunch with a charged kit; your records are kept.');
+    return false;
+  }
   const procedure = procedureState(activity);
   if (procedure.complete) return recordActivity(activity);
   const nextStep = procedure.step + 1;
@@ -534,7 +480,7 @@ appCtx.registerContextInteraction?.({
   id: 'planetary-field-activity',
   priority: 72,
   evaluate() {
-    if (!appCtx.activePlanetaryBodyId || appCtx.paused) return null;
+    if (!missionSurfaceBody(appCtx) || appCtx.paused) return null;
     const activity = nearestActivity();
     const procedure = activity ? procedureState(activity) : null;
     return activity ? {
@@ -547,7 +493,8 @@ appCtx.registerContextInteraction?.({
     } : null;
   },
   perform(candidate) {
-    return candidate?.data ? advanceActivity(candidate.data) : false;
+    const current = nearestActivity();
+    return current && current.id === candidate?.data?.id && active?.bodyId === missionSurfaceBody(appCtx) && !appCtx.paused ? advanceActivity(current) : false;
   }
 });
 

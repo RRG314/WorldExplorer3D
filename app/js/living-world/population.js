@@ -1,3 +1,4 @@
+import {detachSceneObject} from '../engine/scene-object-lifecycle.js';
 import { nearbyPedestrianSnapshots } from './nearby-pedestrians.js';
 import { nearbyVehicleSnapshots } from './nearby-vehicles.js';
 import {setPopulationHostVisible} from './presentation-attachment.js';
@@ -1020,7 +1021,7 @@ export function createLivingWorldPopulation(options = {}) {
     dispose() {
       if (disposed) return;
       disposed = true;
-      group.removeFromParent?.();
+      detachSceneObject(group);
       vehicles.forEach((agent) => {
         disposeCuratedTrafficVehicle(agent.visualHost);
         agent.visualHost = null;

@@ -15,8 +15,9 @@ self.onmessage=({data})=>{
    const input=data.input||stagedInput;if(!input)throw new Error('Missing street source');
    plan=prepareStreetPavement({...input,sparseOverview:true});stagedInput=null;plan.sourceCells=plan.sourceCellCount;
    plan.tiles=plan.tiles.filter(tile=>pavementTileHasWork(tile,false));
-   pending.clear();plan.tiles.forEach((_,i)=>pending.add(i));
-   self.postMessage({type:'prepared',tiles:plan.tiles.length,keys:plan.tiles.map(tile=>tile.key),sourceCells:plan.sourceCells,excludedCells:plan.sourceCells-plan.tiles.length});
+   const completed=new Set(data.completedKeys||[]),keys=plan.tiles.map(tile=>tile.key);
+   pending.clear();plan.tiles.forEach((tile,i)=>{if(completed.has(tile.key))plan.tiles[i]=null;else pending.add(i);});
+   self.postMessage({type:'prepared',tiles:plan.tiles.length,keys,sourceCells:plan.sourceCells,excludedCells:plan.sourceCells-plan.tiles.length});
   }else if(data.type==='next'&&plan){
    let selected=-1,distance=Infinity;
    for(const i of pending){const tile=plan.tiles[i],x=(tile.bounds.minX+tile.bounds.maxX)/2,z=(tile.bounds.minZ+tile.bounds.maxZ)/2,d=(x-data.focus.x)**2+(z-data.focus.z)**2;if(d<distance){distance=d;selected=i;}}

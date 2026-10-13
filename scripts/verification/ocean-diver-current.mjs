@@ -1,4 +1,5 @@
 import {deployResearchSubmarineFromDeck} from './marine-entry-ui.mjs';
+import {runPrescribedGameActions} from './prescribed-game-actions.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import { chromium } from 'playwright';
@@ -10,7 +11,7 @@ const owned = await chromium.launchServer({ channel: 'chrome', headless: false }
 const browser = await chromium.connect(owned.wsEndpoint());
 const dir = process.env.WE3D_OCEAN_DIVER_OUTPUT || 'output/verification/ocean-plan';
 await fs.mkdir(dir, { recursive: true });
-const report = { scope: 'Mutable source, actual standalone Ocean explorer/sub handoff; controlled bathymetry provider', cases: [], errors: [] };
+const report = { scope: 'Selected artifact/source, actual standalone Ocean explorer/sub handoff; controlled bathymetry provider', runtimeRoot:process.env.WE3D_VERIFY_ROOT||process.cwd(), cases: [], errors: [] };
 try {
  const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
  let elevation = 50, delay = 0;
@@ -39,9 +40,36 @@ try {
 
  elevation=-80;await select(-18.2861,147.7);await click();await deployResearchSubmarineFromDeck(page);
  await page.waitForFunction(()=>window.getOceanModeDebugState?.().active===true,null,{timeout:90000});
+ const submarine=await page.evaluate(async()=>{
+  const {ctx}=await import('/app/js/shared-context.js?v=55');
+  const mesh=ctx.oceanMode.submarine.mesh;
+  return {asset:mesh.userData.curatedMarineAssetId,loaded:mesh.userData.visualLoaded,position:{...getOceanModeDebugState().position}};
+ });
+ assert.equal(submarine.asset,'marine-atlantic-explorer-submarine');assert.equal(submarine.loaded,true);
+ await page.keyboard.down('w');
+ try { await page.waitForFunction(before=>{
+   const now=getOceanModeDebugState().position;return Math.hypot(now.x-before.x,now.z-before.z)>2;
+ },submarine.position,{timeout:12000}); } finally { await page.keyboard.up('w'); }
+ report.submarineView=await page.evaluate(()=>{
+  const {submarine:sub,camera}=__marineEntryContext.oceanMode;
+  return {yaw:sub.yaw,meshYaw:sub.mesh.rotation.y,position:sub.position.toArray(),camera:camera.position.toArray(),localCamera:sub.mesh.worldToLocal(camera.position.clone()).toArray()};
+ });
+ assert.ok(report.submarineView.localCamera[2]<-5,'The launch camera should follow behind the authored submarine');
+ await page.screenshot({path:`${dir}/submarine-underway.png`});
+ report.cases.push({id:'authored-submarine-loaded-and-keyboard-driven',passed:true});
  await page.locator('#oceanDiverToggle').waitFor({state:'visible'});
  await page.locator('#oceanDiverToggle').click();
  await page.waitForFunction(()=>window.getOceanModeDebugState?.().diver?.swimming?.equipment==='scuba',null,{timeout:30000});
+ // The time selector must update the active Ocean renderer, including manual
+ // night. This exercises the real diver scene rather than a light-only mock.
+ report.lighting=[];
+ for(const phase of ['night','day']){
+  const lighting=await page.evaluate(async phase=>{const {ctx}=await import('/app/js/shared-context.js?v=55');ctx.setTimeOfDay(phase);return {phase:ctx.skyState.phase,daylight:ctx.skyState.sun.daylightFactor,exposure:ctx.oceanMode.renderer.toneMappingExposure,ambient:ctx.oceanMode.ambientLight.intensity,hemisphere:ctx.oceanMode.hemiLight.intensity};},phase);
+  assert.equal(lighting.phase,phase);assert.equal(lighting.daylight,phase==='night'?0:1);
+  assert.ok(lighting.exposure>=.9);assert.ok(lighting.ambient>=.28);
+  report.lighting.push(lighting);await page.waitForTimeout(250);await page.screenshot({path:`${dir}/diver-${phase}.png`});
+ }
+ report.cases.push({id:'manual-day-night-updates-active-ocean-and-keeps-diver-fill',passed:true});
  const paused=await page.evaluate(async()=>{const {ctx}=await import('/app/js/shared-context.js?v=55');ctx.setPauseReason('verification_pause',true);return getOceanModeDebugState().diver});
  await page.waitForTimeout(500);const stillPaused=await page.evaluate(()=>getOceanModeDebugState().diver);assert.deepEqual(stillPaused.position,paused.position);assert.equal(stillPaused.swimming.airSeconds,paused.swimming.airSeconds);
  await page.evaluate(async()=>{const {ctx}=await import('/app/js/shared-context.js?v=55');ctx.setPauseReason('verification_pause',false)});report.cases.push({id:'pause-preserves-diver-position-and-air',passed:true});
@@ -74,14 +102,30 @@ try {
  await page.locator('#oceanDiverToggle').click();
  await page.waitForFunction(()=>getOceanModeDebugState().diver.active===false);
  assert.equal(await page.locator('#oceanSwimmingHud').count(),0);report.cases.push({id:'boarding-restores-sub-control-and-removes-dive-ui',passed:true});
+ const beforeReboardDrive=await page.evaluate(()=>({position:{...__marineEntryContext.oceanMode.submarine.position},id:__marineEntryContext.oceanMode.submarine.transportEntityId}));
+ await runPrescribedGameActions(page,dir,[{buttons:['up'],frames:90},{buttons:[],frames:60}]);
+ const afterReboardDrive=await page.evaluate(()=>({position:{...__marineEntryContext.oceanMode.submarine.position},id:__marineEntryContext.oceanMode.submarine.transportEntityId}));
+ assert.equal(afterReboardDrive.id,beforeReboardDrive.id);assert.ok(Math.hypot(afterReboardDrive.position.x-beforeReboardDrive.position.x,afterReboardDrive.position.z-beforeReboardDrive.position.z)>.5);
+ await page.screenshot({path:`${dir}/same-submarine-driven-after-reboarding.png`});await fs.writeFile(`${dir}/reboard-drive-state.json`,await page.evaluate(()=>render_game_to_text()));
+ report.cases.push({id:'same-submarine-moves-after-physical-reboarding-prescribed-keyboard-client',passed:true});
  await page.locator('#oceanDiverToggle').click();await page.waitForFunction(()=>getOceanModeDebugState().diver.active===true);
  await page.locator('#oceanSwimmingHud').getByRole('button',{name:'Recover',exact:true}).click();
  await page.waitForFunction(()=>getOceanModeDebugState().diver.active===false);report.cases.push({id:'explicit-recovery-returns-aboard',passed:true});
  await page.evaluate(async()=>{const {ctx}=await import('/app/js/shared-context.js?v=55');window.diverCtx=ctx;ctx.oceanMode.submarine.position.y=-40});
- await page.waitForFunction(()=>document.querySelector('#oceanDiverToggle').disabled===true);assert.match(await page.locator('#oceanDiverControls').innerText(),/1–16/);report.cases.push({id:'deep-sub-exit-is-blocked-with-instructions',passed:true});
+ await page.waitForFunction(()=>document.querySelector('#oceanDiverToggle').disabled===true);assert.match(await page.locator('#oceanDiverControls').innerText(),/1–38/);report.cases.push({id:'deep-sub-exit-is-blocked-with-instructions',passed:true});
+ const parentId=await page.evaluate(()=>diverCtx.oceanVoyage.current.ship.transportEntityId);
+ await page.locator('#oceanVoyageRecover').click();await page.waitForFunction(()=>diverCtx.boatDeck?.active&&!diverCtx.oceanMode.active,null,{timeout:30000});
+ assert.equal(await page.evaluate(()=>diverCtx.boatMode.transportEntityId),parentId);
+ await page.screenshot({path:`${dir}/same-research-vessel-recovered.png`});report.cases.push({id:'operated-submarine-recovers-to-same-parent-research-vessel',passed:true});
  await page.evaluate(()=>diverCtx.stopOceanMode());
+ // Inspect the running package. The unbundled asset-cache diagnostic is not a
+ // production entry point (and an unversioned source import creates a new cache).
+ report.afterExit=await page.evaluate(()=>({active:getOceanModeDebugState().active,canvasVisible:!!diverCtx.oceanMode.canvas?.getClientRects().length,diverActive:!!diverCtx.oceanMode.diver?.active,renderer:!!diverCtx.oceanMode.renderer,scene:!!diverCtx.oceanMode.scene,animation:!!diverCtx.oceanMode.animationId}));
+ // The shared canvas node is retained hidden; scene, renderer and RAF are owned
+ // by the departed session and must be released.
+ for(const value of Object.values(report.afterExit))assert.equal(value,false);
  assert.equal(await page.locator('#oceanDiverControls').count(),0);assert.equal(await page.locator('#oceanSwimmingHud').count(),0);report.cases.push({id:'environment-exit-disposes-diver-ui',passed:true});
  assert.deepEqual(report.errors,[]);report.passed=true;
 }catch(error){report.failure=String(error.stack||error);process.exitCode=1;}
-finally{await fs.writeFile(`${dir}/diver-browser.json`,JSON.stringify(report,null,2));await closeOwnedBrowser(owned);await server.close()}
+finally{await fs.writeFile(`${dir}/diver-browser.json`,JSON.stringify(report,null,2));try{await closeOwnedBrowser(owned);}finally{await server.close();}}
 console.log(JSON.stringify(report));

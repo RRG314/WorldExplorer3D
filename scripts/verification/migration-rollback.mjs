@@ -14,6 +14,9 @@ import { assertReviewedRollbackRuntime } from './rollback-runtime-contract.mjs';
 
 const root = process.cwd(), candidateRoot = process.env.WE3D_VERIFY_ROOT || 'dist';
 const fallbackRoot = process.argv.find(arg => arg.startsWith('--fallback='))?.slice(11);
+const releasedRoot = process.argv.find(arg => arg.startsWith('--released='))?.slice(11);
+assert.ok(releasedRoot?.startsWith('output/') && !releasedRoot.split('/').includes('..'), 'Select the actual released staging package with --released=output/path');
+assert.ok((await realpath(path.resolve(root, releasedRoot))).startsWith((await realpath(path.join(root, 'output'))) + path.sep));
 assert.ok(fallbackRoot?.startsWith('output/') && !fallbackRoot.split('/').includes('..'), 'Pass --fallback=output/path/to/preserved/artifact');
 assert.ok((await realpath(path.resolve(root, fallbackRoot))).startsWith((await realpath(path.join(root, 'output'))) + path.sep));
 const output = 'output/release-evidence/current/migration-rollback';
@@ -21,17 +24,19 @@ await mkdir(output, { recursive: true });
 const baseline = sourceFingerprint(root), candidate = artifactIdentity(root, candidateRoot), fallback = artifactIdentity(root, fallbackRoot);
 assert.equal(baseline.dirty, false, 'Commit inputs before immutable verification');
 assert.equal(sameArtifactIdentity(candidate, fallback), false, 'Fallback must be a distinct build');
-const manifests = await Promise.all([candidateRoot, fallbackRoot].map(dir => readFile(path.join(dir, 'build-manifest.json'), 'utf8').then(JSON.parse)));
+const released = artifactIdentity(root, releasedRoot);
+const manifests = await Promise.all([candidateRoot, fallbackRoot, releasedRoot].map(dir => readFile(path.join(dir, 'build-manifest.json'), 'utf8').then(JSON.parse)));
 assert.equal(manifests[0].sourceInputFingerprint, baseline.acceptanceFingerprint, 'Candidate must match current accepted inputs');
-assert.equal(manifests[0].firebaseProjectId, manifests[1].firebaseProjectId);
+for (const manifest of manifests) assert.equal(manifest.firebaseProjectId, manifests[0].firebaseProjectId);
+assert.equal(manifests[2].commit, 'd8775a392c4246b2552842c37f40508bd664d4c5', 'Upgrade must start from the actual released 5.5 source');
 assert.equal(manifests[0].firebaseProjectId, 'we3d-staging-20260712', 'This test cannot target production');
 
 // Pin every changed runtime file to the reviewed before/after bytes. A later
 // edit to even an already-listed path requires another compatibility review.
 const compatibility = JSON.parse(await readFile(path.join(root, 'scripts/verification/rollback-runtime-review.json'), 'utf8'));
 const changed = await assertReviewedRollbackRuntime(root, manifests[1].commit, manifests[0].commit, compatibility);
-const report = { passed: false, scope: 'Packaged IndexedDB v4→v5 upgrade, fallback owner reads/writes, candidate return, Backpack controls and unchanged pending account data; identical remaining client/backend protocol bytes. SDK authority tests remain separate.',
-  baseline, artifactIdentity: candidate, fallbackArtifactIdentity: fallback, fallbackArtifactRoot: fallbackRoot,
+const report = { passed: false, scope: 'Actual released 5.5 save owners → candidate → compatible retained preview fallback → candidate return. Journal, Backpack v2→v3, home custody/workspace, local wallet, campaign and pending account data. Owner API fixtures, not player UX; backend authority tests remain separate.',
+  baseline, artifactIdentity: candidate, fallbackArtifactIdentity: fallback, fallbackArtifactRoot: fallbackRoot, releasedArtifactIdentity: released, releasedArtifactRoot: releasedRoot,
   compatibilityContract: compatibility.id,
   runtimeDifferences: changed, stages: [], errors: [], localFailures: [], providerDegradations: [] };
 let server, browserServer, browser, page, stage = 'seed';
@@ -81,9 +86,10 @@ try {
     return { items, events, pendingReceipt, pendingCondition };
   });
   for (const [label, dir, manifest, expectedMagazine, writeMagazine] of [
-    ['candidate-upgrade', candidateRoot, manifests[0], 4, 3],
-    ['fallback-write', fallbackRoot, manifests[1], 3, 2],
-    ['candidate-return', candidateRoot, manifests[0], 2, 1]
+    ['released-write', releasedRoot, manifests[2], 4, 3],
+    ['candidate-upgrade', candidateRoot, manifests[0], 3, 2],
+    ['fallback-write', fallbackRoot, manifests[1], 2, 1],
+    ['candidate-return', candidateRoot, manifests[0], 1, 0]
   ]) {
     stage = label;
     await page.goto('about:blank'); await server.close();
@@ -98,12 +104,13 @@ try {
     await page.locator('#globeSelectorStartBtn').click();
     await page.waitForFunction(() => { const d = globalThis.getWorldExplorerRuntimeDiagnostics?.(); return d?.gameStarted && !d.worldLoading && d.worldDiscovery?.active; }, null, { timeout: 180000 });
     assert.equal(await page.evaluate(() => fetch('/build-manifest.json', { cache: 'no-store' }).then(r => r.json()).then(m => m.buildId)), manifest.buildId);
-    const result = await page.evaluate(async ({ seed, label, expectedMagazine, writeMagazine, previous }) => {
+    const result = await page.evaluate(async ({ seed, label, expectedMagazine, writeMagazine, previous, extended }) => {
       const { ctx } = await import('/app/js/shared-context.js?v=55');
       const check = (value, message) => { if (!value) throw Error(message); };
       const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
       const store = ctx.discoveryProfileStore, backpack = ctx.playerBackpackStore;
       check(store?.type === 'IndexedDbDiscoveryProfileStore' && backpack, 'Packaged save owners unavailable');
+      if (backpack.ready) check(await backpack.ready, 'Backpack writer not acquired');
       const before = await store.exportData();
       check(before.schemaVersion === 5, 'Upgraded Journal must use v5');
       check(before.profile.retainedUnknownProfileField === 'preserve-me', 'Unknown profile field lost');
@@ -113,8 +120,26 @@ try {
       check((await store.listPendingReceipts('disposable-unrelated-account')).some(row => same(row, seed.pendingReceipt)), 'Another account pending receipt changed');
       check(localStorage.getItem('world-explorer:condition-outbox:v1:disposable-unrelated-account') === seed.pendingCondition, 'Another account offline intent changed');
       check(backpack.load().ammo['pulse-sidearm'].magazine === expectedMagazine, 'Backpack controls lost across artifact switch');
-      check(!!localStorage.getItem('world-explorer:character-backpack:migration-backup:v1'), 'Legacy Backpack backup lost');
+      check(!!localStorage.getItem(backpack.backupKey), 'Legacy Backpack backup lost');
       const record = { eventId: `compat:${label}`, eventType: 'location-visit', sourceId: 'compatibility-test', name: `Save compatibility: ${label}`, occurredAt: Date.now(), points: 1, metadata: { retained: label } };
+      if (label === 'candidate-upgrade') {
+        // Valid owner-API fixtures deliberately include the new fields the
+        // released v2 Backpack cannot own. The selected fallback must keep them.
+        await store.startOpeningChapter({environment:'EARTH',regionId:'compat:baltimore',regionLabel:'Baltimore',careerId:'geology'});
+        const state = backpack.load();
+        const housing = {schemaVersion:2, homes:[{id:'compat:home',sourceBuildingId:'way:123456',locationId:'baltimore',label:'Save compatibility home',purchasedAt:1000,
+          workspace:{schemaVersion:1,revision:2,purpose:'journal',pose:{x:0,z:0,turn:1},previous:null,rotated:true,undone:false,usedAt:2000},
+          journey:{claimedAt:1000,departed:1500,returned:2000},storage:[{instanceId:'compat:stored',catalogId:'quartz',quantity:3,authority:'anonymous-local',metadata:{label:'Stored quartz'}}]}]};
+        check(backpack.saveHousing(housing,state), 'Home custody/workspace did not commit');
+        const commerce = backpack.loadCommerce() || {schemaVersion:4,revision:0,credits:1000000,purchases:{},claimedTrades:{},pendingSettlements:{},transactions:[]};
+        check(backpack.saveCommerce({...commerce,revision:commerce.revision+1,credits:commerce.credits-1},backpack.load()), 'Wallet did not commit');
+        extended = {housing:backpack.loadHousing(),commerce:backpack.loadCommerce(),openingChapter:(await store.getProfile()).openingChapter};
+      } else if (extended) {
+        check(same(backpack.loadHousing(),extended.housing),'Home custody/workspace/return progress changed across fallback');
+        check(same(backpack.loadCommerce(),extended.commerce),'Wallet changed across fallback');
+        check(same((await store.getProfile()).openingChapter,extended.openingChapter),'Campaign changed across fallback');
+      }
+      check(backpack.load().schemaVersion === (label === 'released-write' ? 2 : 3), 'Unexpected Backpack schema');
       const saved = await store.recordExplorerEvent(record);
       check(saved.recorded === true, 'New Journal write did not commit');
       check((await store.recordExplorerEvent(record)).recorded === false, 'Duplicate Journal write was credited twice');
@@ -129,8 +154,8 @@ try {
       check(equipment.exportControls().ammo['pulse-sidearm'].magazine === writeMagazine, 'Equipment owner consumption differs');
       check(backpack.load().ammo['pulse-sidearm'].magazine === writeMagazine, 'Backpack control write did not persist');
       ctx.setTimeOfDay?.('day'); ctx.openWorldDiscoverySection?.('journal');
-      return { label, schemaVersion: before.schemaVersion, retainedItems: seed.items.length, retainedEvents: seed.events.length + previous.length, event: saved.event, magazine: writeMagazine };
-    }, { seed, label, expectedMagazine, writeMagazine, previous: report.stages.map(row => row.event) });
+      return { label, schemaVersion: before.schemaVersion, retainedItems: seed.items.length, retainedEvents: seed.events.length + previous.length, event: saved.event, magazine: writeMagazine, extended };
+    }, { seed, label, expectedMagazine, writeMagazine, previous: report.stages.map(row => row.event), extended: report.stages.find(row=>row.extended)?.extended || null });
     await page.locator('#discoveryJournalList').getByText(`Save compatibility: ${label}`, { exact: false }).first().waitFor({ timeout: 10000 });
     await page.screenshot({ path: `${output}/${label}.png` });
     report.stages.push(result); console.log(`[migration-rollback] PASS ${label}`);
@@ -139,6 +164,7 @@ try {
   assert.ok(sameAcceptanceSource(baseline, sourceFingerprint(root)), 'Inputs changed during verification');
   assert.ok(sameArtifactIdentity(candidate, artifactIdentity(root, candidateRoot)));
   assert.ok(sameArtifactIdentity(fallback, artifactIdentity(root, fallbackRoot)));
+  assert.ok(sameArtifactIdentity(released, artifactIdentity(root, releasedRoot)));
   report.passed = true;
 } catch (error) {
   report.error = error.stack;
@@ -168,7 +194,7 @@ await mkdir('output/release-evidence/current/acceptance', { recursive: true });
 await writeFile('output/release-evidence/current/acceptance/migration-rollback.json', JSON.stringify({
   contract: 'world-explorer-acceptance-class-v1', evidenceClass: 'migration-rollback', result: 'passed',
   artifactIdentity: candidate, acceptanceFingerprint: baseline.acceptanceFingerprint,
-  fallbackArtifactIdentity: fallback, fallbackArtifactRoot: fallbackRoot, compatibilityContract: report.compatibilityContract,
+  fallbackArtifactIdentity: fallback, fallbackArtifactRoot: fallbackRoot, releasedArtifactIdentity: released, releasedArtifactRoot: releasedRoot, compatibilityContract: report.compatibilityContract,
   reviewer: 'Codex automated packaged save-owner verification', observedAt: new Date().toISOString(), expiresAt: new Date(Date.now() + 7 * 86400000).toISOString(),
   checks: { existingSaveUpgrade: true, compatibleFallbackReadsUpgradedSave: true, fallbackWriteAndReturn: true, backendCompatibility: true, artifactRetained: true }, evidenceFiles
 }, null, 2));

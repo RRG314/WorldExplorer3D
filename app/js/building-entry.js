@@ -1,6 +1,5 @@
 import { ctx as appCtx } from "./shared-context.js?v=55";
-
-const ENTRY_EXCLUDED_BUILDING_TYPES = new Set(['roof', 'canopy', 'carport', 'bridge', 'bridge_guardrail']);
+import { canContainWalkableInterior } from './interiors/entry-eligibility.js';
 const DEFAULT_DESTINATION_MATCH_RADIUS = 42;
 const DEFAULT_ENTRY_RADIUS = 8.5;
 const SYNTHETIC_INTERIOR_HEIGHT = 3.4;
@@ -185,11 +184,7 @@ function hasUsableBuildingFootprint(building) {
 const hasFullBuildingFootprint = hasUsableBuildingFootprint;
 
 function isEnterableBuildingCandidate(building) {
-  if (!hasUsableBuildingFootprint(building)) return false;
-  if (building?.collisionKind === 'barrier') return false;
-  const buildingType = String(building?.buildingType || '').toLowerCase();
-  if (ENTRY_EXCLUDED_BUILDING_TYPES.has(buildingType)) return false;
-  return !building.isInteriorCollider && !building.collisionDisabled;
+  return hasUsableBuildingFootprint(building) && canContainWalkableInterior(building);
 }
 
 function buildingOccupiesActorHeight(building, actorBaseY, actorHeight = 1.65, tolerance = 0.45) {
@@ -323,7 +318,8 @@ function resolveSupportRecord(building, options = {}) {
   };
   const destination = options.destination || null;
   const key = buildingKey(building);
-  const exteriorEntrance = appCtx.buildingEntranceByBuilding?.get?.(key) || null;
+  const publishedEntrance = appCtx.buildingEntranceByBuilding?.get?.(key) || null;
+  const exteriorEntrance = publishedEntrance && distanceToFootprint(publishedEntrance.x,publishedEntrance.z,building).dist<=3 ? publishedEntrance : null;
   const poiTenancies = appCtx.poiTenanciesByBuilding?.get?.(key) || [];
   const originPoint = destination && Number.isFinite(destination.x) && Number.isFinite(destination.z) ?
     { x: Number(destination.x), z: Number(destination.z) } :

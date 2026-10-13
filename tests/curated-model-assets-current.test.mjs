@@ -333,8 +333,17 @@ test('ship furnishings have local bounded GLBs and attributable sources', () => 
     const {bytes,json}=readGlbAssetMetadata(path.join(root,asset.url.replace(/^\//,'')));
     assert.ok(bytes.length<=asset.budgets.bytes,`${asset.id} download budget`);
     assert.ok(triangleCount(json)<=asset.budgets.triangles,`${asset.id} geometry budget`);
-    assert.ok(asset.sourceUrl.startsWith('https://sketchfab.com/3d-models/'));
-    assert.equal(asset.license,'CC-BY-4.0');
+    const workspaceSources={
+      'workspace-table':'https://polyhaven.com/a/wooden_table_02',
+      'workspace-chair':'https://polyhaven.com/a/SchoolChair_01'
+    };
+    if(workspaceSources[asset.id]){
+      assert.equal(asset.sourceUrl,workspaceSources[asset.id]);
+      assert.equal(asset.license,'CC0-1.0');
+    }else{
+      assert.ok(asset.sourceUrl.startsWith('https://sketchfab.com/3d-models/'));
+      assert.equal(asset.license,'CC-BY-4.0');
+    }
     assert.ok((json.images||[]).every(image=>Number.isInteger(image.bufferView)),`${asset.id} must not fetch external textures`);
   }
 });
@@ -359,4 +368,32 @@ test('tree LOD material maps are byte-identical to their primary model', async (
       }
     }
   }
+});
+
+test('licensed barramundi retains bounded textured geometry and reproducible CC0 provenance',()=>{
+ const asset=getModelAsset('marine-barramundi');
+ const {bytes,json}=readGlbAssetMetadata(path.join(root,asset.url.slice(1)));
+ const provenance=JSON.parse(fs.readFileSync(path.join(root,'app/assets/models/marine/barramundi/PROVENANCE.json'),'utf8'));
+ assert.equal(asset.license,'CC0-1.0');assert.equal(provenance.author,'Microsoft');
+ assert.equal(crypto.createHash('sha256').update(bytes).digest('hex'),provenance.sha256);
+ assert.ok(bytes.length<=asset.budgets.bytes);assert.ok(triangleCount(json)<=asset.budgets.triangles);
+ assert.equal(triangleCount(json),3864);assert.equal(json.images.length,3);
+ assert.equal(json.materials.length,1);assert.ok(json.materials[0].normalTexture);assert.ok(json.materials[0].pbrMetallicRoughness.baseColorTexture);
+ assert.ok((json.images||[]).every(image=>Number.isInteger(image.bufferView)&&!image.uri));
+ assert.ok((json.buffers||[]).every(buffer=>!buffer.uri));assert.deepEqual(json.extensionsRequired||[],[]);
+ assert.ok(provenance.textures.every(t=>t.dimensions.every(n=>n<=1024)));
+ assert.deepEqual(asset.instancePolicy,{geometry:'shared',materials:'clone'});assert.equal(asset.budgets.maxInstances,3);
+});
+
+test('common dolphin keeps the licensed authored skin and animation in a bounded self-contained asset',()=>{
+ const asset=getModelAsset('marine-common-dolphin'),{bytes,json}=readGlbAssetMetadata(path.join(root,asset.url.slice(1)));
+ const record=JSON.parse(fs.readFileSync(path.join(root,'app/assets/models/marine/common-dolphin/PROVENANCE.json'),'utf8'));
+ assert.equal(asset.license,'CC-BY-4.0');assert.match(record.author,/CGreature.*kenchoo/);
+ assert.equal(crypto.createHash('sha256').update(bytes).digest('hex'),record.sha256);
+ assert.ok(bytes.length<=asset.budgets.bytes);assert.equal(triangleCount(json),18576);assert.ok(triangleCount(json)<=asset.budgets.triangles);
+ assert.equal(json.skins.length,1);assert.equal(json.animations.length,1);assert.ok(json.animations[0].channels.length>20);
+ assert.ok(json.meshes[0].primitives.every(p=>p.attributes.JOINTS_0!==undefined&&p.attributes.WEIGHTS_0!==undefined));
+ assert.ok(json.images.every(i=>Number.isInteger(i.bufferView)&&!i.uri));assert.ok(json.buffers.every(b=>!b.uri));
+ assert.ok(record.textures.every(t=>t.dimensions.every(n=>n<=1024)));assert.ok(Math.abs(record.bounds.max[2]-record.bounds.min[2]-2.3)<1e-8);
+ assert.equal(asset.budgets.maxInstances,3);assert.deepEqual(asset.instancePolicy,{geometry:'shared',materials:'shared'});
 });

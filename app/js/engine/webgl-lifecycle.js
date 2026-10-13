@@ -1,3 +1,5 @@
+import { applyDisplayColorPolicy } from './display-color-policy.js';
+
 function disposeMaterialTextures(material) {
   if (!material || typeof material !== 'object') return;
   const textureKeys = [
@@ -80,6 +82,7 @@ export function createAuxiliaryRenderer({
         ...(canvas ? { canvas } : {}),
         ...attempts[index]
       });
+      applyDisplayColorPolicy(renderer, THREE);
       if (size && Number.isFinite(size.width) && Number.isFinite(size.height)) {
         renderer.setSize(size.width, size.height, false);
       }

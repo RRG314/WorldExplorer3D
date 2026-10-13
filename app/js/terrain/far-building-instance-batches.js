@@ -75,6 +75,9 @@ export async function buildFarBuildingInstanceBatches(THREE, buildings, material
       const localBox = geometry.boundingBox;
       const localSphere = geometry.boundingSphere;
       const bounds = new THREE.Box3().makeEmpty();
+      const styles=new Float32Array(indices.length*4),dimensions=new Float32Array(indices.length*4);
+      geometry.setAttribute('regionalStyle',new THREE.InstancedBufferAttribute(styles,4));
+      geometry.setAttribute('regionalLayout',new THREE.InstancedBufferAttribute(dimensions,4));
       const mesh = new THREE.InstancedMesh(geometry, material, indices.length);
       batches.push(mesh);
       mesh.position.set(originX, 0, originZ);
@@ -88,6 +91,8 @@ export async function buildFarBuildingInstanceBatches(THREE, buildings, material
         mesh.setMatrixAt(index, matrix);
         color.setRGB(building.color[0], building.color[1], building.color[2]);
         mesh.setColorAt(index, color);
+        styles.set(building.facadeStyle||[0,0,0,0x50565b],index*4);
+        dimensions.set([building.width,building.height,building.depth,building.roofFraction||0],index*4);
         // Bound the Float32 transform actually uploaded, including rotation.
         mesh.getMatrixAt(index, matrix);
         bounds.union(transformedBox.copy(localBox).applyMatrix4(matrix));

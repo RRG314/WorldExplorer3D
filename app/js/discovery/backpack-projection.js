@@ -27,17 +27,24 @@ function discoveryItemBackpackRecord(item) {
 function projectDiscoveryItemsToBackpack(appCtx, items = [], options = {}) {
   const inventory = appCtx.playerBackpackInventory;
   if (!inventory) return 0;
+  const consume = (...args) => (inventory.consumeItem || inventory.consume)?.apply(inventory,args);
   if (options.reconcile === true) {
     const ids = new Set(items.map(item=>item.instanceId));
     const events = new Set(items.map(item=>item.sourceEventId || item.eventId || item.claimId).filter(Boolean));
     for (const existing of inventory.snapshot().items) {
-      if ((existing.metadata?.discoveryJournalProjection || existing.provenance === 'field-discovery') && !ids.has(existing.instanceId) && !events.has(existing.sourceEventId)) inventory.consume(existing.instanceId,existing.quantity,{silent:true});
+      if ((existing.metadata?.discoveryJournalProjection || existing.provenance === 'field-discovery') && !ids.has(existing.instanceId) && !events.has(existing.sourceEventId)) consume(existing.instanceId,existing.quantity,{silent:true});
     }
   }
   let projected = 0;
   for (const item of items) {
     const record = discoveryItemBackpackRecord(item);
     if (!record) continue;
+    record.quantity = Math.max(0, record.quantity - (inventory.homeStoredQuantity?.(record) || 0));
+    if (!record.quantity) {
+      const carried = inventory.item?.(record.instanceId);
+      if (carried) consume(carried.instanceId,carried.quantity,{silent:true});
+      continue;
+    }
     inventory.upsertItem(record, {
       definition: {
         id: record.catalogId,

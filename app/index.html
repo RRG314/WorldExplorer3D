@@ -375,6 +375,11 @@ High-only SSAO contact shadows
 Load regional scenery as you travel
 </label>
 <p style="font-size:11px;margin:0 0 12px">Terrain and mapped buildings follow your journey. Roads and activities stay with your starting location. Turn off to keep the original fixed view.</p>
+<label style="display:flex;align-items:center;gap:10px;font-size:12px;margin-bottom:6px;cursor:pointer">
+<input type="checkbox" id="oceanContinuousToggle" checked aria-describedby="oceanContinuousHelp" style="width:16px;height:16px;cursor:pointer">
+Continue exploring beyond an ocean dive site
+</label>
+<p id="oceanContinuousHelp" style="font-size:11px;margin:0 0 12px">New open-ocean voyages load nearby seabed as you travel. Turn off for a fixed dive area. Saved voyages and guided study sites keep their original setting.</p>
 <div id="perfSettingsStatus" style="font-size:11px;color:#64748b;min-height:16px">
 Graphics changes apply to the current session.
 </div>
@@ -670,6 +675,11 @@ How Connected Data Is Used
 <button id="globeSelectorBackBtn" class="globe-selector-action-btn" type="button">Close</button>
 <button id="globeSelectorStartBtn" class="globe-selector-action-btn" type="button">Explore</button>
 </div>
+<section class="globe-first-journey" aria-label="Start or return">
+  <button id="globeGuidedStartBtn" type="button"><strong>Start a guided walk</strong><small>Baltimore · move, try an activity, keep a discovery</small></button>
+  <button id="globeReturnPlaceBtn" type="button" hidden><strong id="globeReturnPlaceLabel">Return to your last place</strong><small>Start at its arrival point · Journal saved on this device</small></button>
+  <span id="globeJourneyStatus" role="status" aria-live="polite"></span>
+</section>
 <div class="globe-selector-mode-tabs" role="tablist" aria-label="Globe selector mode">
 <button id="globeSelectorExploreModeBtn" class="globe-selector-mode-tab active" type="button">Choose Location</button>
 <button id="globeSelectorLiveEarthModeBtn" class="globe-selector-mode-tab" type="button">Live Earth</button>
@@ -727,7 +737,7 @@ How Connected Data Is Used
   <button id="globeSelectorMoonBtn" class="globe-selector-shortcut" type="button" title="Explore the Moon" aria-label="Explore the Moon"><span class="destination-thumb moon" aria-hidden="true"></span></button>
   <button id="globeSelectorMarsBtn" type="button" title="Explore Mars" aria-label="Explore Mars"><span class="destination-thumb mars" aria-hidden="true"></span></button>
   <button id="globeSelectorSpaceBtn" class="globe-selector-shortcut" type="button" title="Explore space" aria-label="Explore space"><span class="destination-thumb space" aria-hidden="true"></span></button>
-  <button id="globeSelectorOceanBtn" type="button" title="Explore by submarine at eligible ocean coordinates" aria-label="Explore by submarine at eligible ocean coordinates"><span class="destination-thumb ocean" aria-hidden="true"></span></button>
+  <button id="globeSelectorOceanBtn" type="button" title="Board a research vessel at eligible ocean coordinates" aria-label="Board a research vessel at eligible ocean coordinates"><span class="destination-thumb ocean" aria-hidden="true"></span></button>
 </div>
 <section id="globeHubOverlay" class="globe-hub-overlay" hidden aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="globeHubOverlayTitle" tabindex="-1">
   <header class="globe-hub-overlay-header">
@@ -799,6 +809,10 @@ How Connected Data Is Used
       <section class="discoveryPane active" data-discovery-pane="today">
         <div class="discoveryModeNote"><b>YOUR NEXT STEP</b><span>Explore, build, or play together. Choose a direction below; your Journal keeps the story of what you do.</span></div>
         <div id="discoveryResultCard" class="discoveryResultCard" hidden aria-live="polite"></div>
+        <section id="discoveryOpeningChapter" class="discoveryOpeningChapter" aria-label="First Bearings chapter" aria-live="polite"></section>
+        <section id="discoveryHarborRun" class="discoveryOpeningChapter" aria-label="Harbor Run delivery" aria-live="polite"></section>
+            <section id="discoveryThreeViews" class="discoveryOpeningChapter" aria-label="A Place in Three Views"></section>
+        <section id="discoveryPersonalHome" class="discoveryOpeningChapter" aria-label="Personal workspace and home"></section>
         <button id="discoveryFirstJourneyBtn" class="discoveryBackpackEntry" type="button"><span>⌖</span><strong id="discoveryFirstJourneyLabel">Try First Journey</strong><small id="discoveryFirstJourneyDetail">Optional · move, do something, keep a record</small></button>
         <section class="sandboxWalkthrough" aria-labelledby="sandboxWalkthroughHeading">
           <h3 id="sandboxWalkthroughHeading">What would you like to do?</h3>
@@ -1274,9 +1288,6 @@ How Connected Data Is Used
 <div id="zoomLevel" aria-live="polite">Z 14</div>
 </div>
 </div>
-<div id="explorationModeMsg" style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,0.85);border:3px solid #667eea;border-radius:16px;padding:24px 48px;color:#ffffff;font-family:'Orbitron',sans-serif;font-size:28px;font-weight:700;z-index:1000;display:none;box-shadow:0 8px 32px rgba(0,0,0,0.5);text-align:center;letter-spacing:1px;cursor:pointer;pointer-events:auto">
-Explore the area
-</div>
 <div id="navigationHud" style="position:fixed;top:100px;left:20px;background:rgba(0,255,136,0.9);border:2px solid #00ff88;border-radius:12px;padding:16px;color:#000;font-family:'Poppins',sans-serif;z-index:100;display:none;min-width:180px;box-shadow:0 4px 20px rgba(0,255,136,0.4)">
 <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;opacity:0.8">🧭 Navigation</div>
 <div id="navDestination" style="font-size:14px;font-weight:700;margin-bottom:8px">Destination</div>
@@ -1542,10 +1553,11 @@ Explore the area
   <div class="blockBuilderActions">
     <button id="blockBuilderUndo" type="button">Undo</button>
     <button id="blockBuilderClear" type="button">Clear</button>
-    <button id="editableWorldReset" type="button">Restore Base World</button>
+    <button id="editableWorldReset" type="button">Reset building edits</button>
   </div>
   <div id="blockBuilderCount"></div>
   <p id="blockBuilderSaveState" class="blockBuilderTruthNote" aria-live="polite"></p>
+  <button id="blockBuilderRecovery" type="button" hidden>Download block recovery copy</button>
   <button id="blockBuilderJournal" type="button">View building records</button>
   <section class="editableWorldBuildingTools" aria-label="Mapped building tools">
     <strong>Mapped building</strong>
@@ -1555,6 +1567,8 @@ Explore the area
       <button id="editableWorldRestoreBuilding" type="button">Restore</button>
     </div>
     <div id="editableWorldSelection" aria-live="polite">No mapped building selected.</div>
+    <p id="editableWorldSaveNotice" class="blockBuilderTruthNote" role="status" hidden></p>
+    <button id="editableWorldRecovery" type="button" hidden>Download recovery copy</button>
   </section>
   <div class="blockBuilderMapActions">
     <a id="blockBuilderOsmLink" data-osm-location-link href="https://www.openstreetmap.org" target="_blank" rel="noopener noreferrer">Improve map in OSM</a>
@@ -1672,7 +1686,9 @@ Explore the area
 • A/D - Turn left / right; arrow keys are an alternate<br>
 • Space - Ascend<br>
 • Shift/Ctrl - Descend<br>
-• Explore a bounded ocean scene by submarine; swimming and scuba are not available yet<br>
+• Choose Explore outside submarine to swim or dive; scuba equips when needed<br>
+• Recover to parent vessel brings you and your submarine back aboard<br>
+• Continuous ocean travel streams eligible geographic water; study sites use authored seabeds<br>
 • The seabed map shows gameplay contours; modeled geographic depths are labeled separately
 </div>
 </div></div>

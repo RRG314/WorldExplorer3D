@@ -1,3 +1,4 @@
+import {detachSceneObject} from '../engine/scene-object-lifecycle.js';
 import { loadModelAsset } from '../assets/model-asset-runtime.js?v=16';
 
 const RESIDENTIAL_HOME_PATTERN = /house|residential|apartments|terrace|townhouse|detached|semidetached|bungalow|dormitory|condo/i;
@@ -82,7 +83,7 @@ function prepareFurnishedHomeVisual(THREE, instance, active) {
 function disposeCuratedHomeFurnishing(active) {
   const attachment = active?.curatedHomeFurnishing;
   if (!attachment) return false;
-  attachment.visual?.removeFromParent?.();
+  detachSceneObject(attachment.visual);
   attachment.instance?.dispose?.();
   active.curatedHomeFurnishing = null;
   return true;
@@ -91,6 +92,9 @@ function disposeCuratedHomeFurnishing(active) {
 async function attachCuratedHomeFurnishing(THREE, active, options = {}) {
   if (!active?.group || !active?.ownedHome || active.curatedHomeFurnishing?.status === 'loading') return false;
   disposeCuratedHomeFurnishing(active);
+  // Personal workspaces use individual furniture with the same placement and
+  // collision owner. Do not put a second house shell inside that room.
+  if (active.ownedHome.personalStarter || active.ownedHome.workspace) return false;
   const token = {};
   active.curatedHomeFurnishing = Object.freeze({ status: 'loading', token });
   try {

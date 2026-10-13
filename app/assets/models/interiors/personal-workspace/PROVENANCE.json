@@ -1,0 +1,119 @@
+{
+  "schemaVersion": 1,
+  "assets": [
+    {
+      "id": "workspace-table",
+      "source": "wooden_table_02",
+      "sourceUrl": "https://polyhaven.com/a/wooden_table_02",
+      "author": "Serhii Khromov",
+      "license": "CC0-1.0",
+      "licenseUrl": "https://polyhaven.com/license",
+      "retrievedAt": "2026-10-10T19:49:46.114Z",
+      "conversion": "Original 1K glTF and JPEG textures bundled into GLB. Geometry, materials and scale retained.",
+      "bytes": 484392,
+      "sha256": "00118c5397d86824d06a6bb1187fa42be41fa9a8330d9b3711f8216f9ce853ef",
+      "triangles": 196,
+      "bounds": {
+        "min": [
+          -0.5672082304954529,
+          -0.00012515290291048586,
+          -0.35301241278648376
+        ],
+        "max": [
+          0.5672084093093872,
+          0.7994177341461182,
+          0.35301241278648376
+        ]
+      },
+      "sourceFiles": [
+        {
+          "path": "scene.gltf",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/wooden_table_02/wooden_table_02_1k.gltf",
+          "bytes": 2687,
+          "sha256": "bb38e301840cb629d72c43c83fdb7fb308518efe2d0bc01e1ed0e9a9e43ed9d3"
+        },
+        {
+          "path": "textures/wooden_table_02_diff_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/wooden_table_02/wooden_table_02_diff_1k.jpg",
+          "bytes": 178379,
+          "sha256": "2334ac3e23d69222322515d9bad066b4e90d7d81989fe231b8fb12f39179ad9e"
+        },
+        {
+          "path": "textures/wooden_table_02_nor_gl_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/wooden_table_02/wooden_table_02_nor_gl_1k.jpg",
+          "bytes": 122129,
+          "sha256": "9470e08e5dab4ab6a7cafab2a488a50fb54fa8f38890e9032c39dcbf7f5846d2"
+        },
+        {
+          "path": "wooden_table_02.bin",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/4k/wooden_table_02/wooden_table_02.bin",
+          "bytes": 7576,
+          "sha256": "52ed7cc67b3aa403375cf9bd18050e8cc21bcced6532a0183c1a733f0965df6d"
+        },
+        {
+          "path": "textures/wooden_table_02_arm_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/wooden_table_02/wooden_table_02_arm_1k.jpg",
+          "bytes": 174545,
+          "sha256": "b970a81e4b03f3b8a341c9eb639f112fff1782d681c846255ebc9073cd803ced"
+        }
+      ]
+    },
+    {
+      "id": "workspace-chair",
+      "source": "SchoolChair_01",
+      "sourceUrl": "https://polyhaven.com/a/SchoolChair_01",
+      "author": "Ethan Place",
+      "license": "CC0-1.0",
+      "licenseUrl": "https://polyhaven.com/license",
+      "retrievedAt": "2026-10-10T19:49:46.460Z",
+      "conversion": "Original 1K glTF and JPEG textures bundled into GLB. Geometry, materials and scale retained.",
+      "bytes": 483792,
+      "sha256": "5356c6def2ee416e6a37a7775a61547a7123f312bdb8c0d471b9dbb70f38c212",
+      "triangles": 5072,
+      "bounds": {
+        "min": [
+          -0.28292667865753174,
+          -0.001708600320853293,
+          -0.33762744069099426
+        ],
+        "max": [
+          0.28292661905288696,
+          1.0043269395828247,
+          0.33762744069099426
+        ]
+      },
+      "sourceFiles": [
+        {
+          "path": "scene.gltf",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/SchoolChair_01/SchoolChair_01_1k.gltf",
+          "bytes": 2695,
+          "sha256": "1db6aca4bf379c2d568b2068492dcfcda15d764c0c3d98a970055af25b46281e"
+        },
+        {
+          "path": "textures/SchoolChair_01_nor_gl_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/SchoolChair_01/SchoolChair_01_nor_gl_1k.jpg",
+          "bytes": 189532,
+          "sha256": "4ee930562ad26e8c98af75e8aa6577d01cb56f6d22628f4e95c385e5364f0623"
+        },
+        {
+          "path": "textures/SchoolChair_01_diff_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/SchoolChair_01/SchoolChair_01_diff_1k.jpg",
+          "bytes": 52590,
+          "sha256": "f10ae4dbddfb056ef716770ebd96e0eff0aa6f0b5ad0f263ff51c5cade6e1d8f"
+        },
+        {
+          "path": "textures/SchoolChair_01_arm_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/SchoolChair_01/SchoolChair_01_arm_1k.jpg",
+          "bytes": 104994,
+          "sha256": "ff773eb01c9d59130dc3cc0274951ac626d73fa1b2f7eee519af4ca80835568b"
+        },
+        {
+          "path": "SchoolChair_01.bin",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/4k/SchoolChair_01/SchoolChair_01.bin",
+          "bytes": 134912,
+          "sha256": "7d64d556ba88d3962778085b9a190f1adb0d84e667bca8ef032c0ae34b31a9fe"
+        }
+      ]
+    }
+  ]
+}

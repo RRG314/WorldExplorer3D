@@ -1,0 +1,189 @@
+{
+  "schemaVersion": 1,
+  "records": [
+    {
+      "id": "smithsonian-triceratops",
+      "url": "https://3d-api.si.edu/content/document/3d_package:d8c623be-4ebc-11ea-b77f-2e728ce88125/resources/Triceratops_horridus_Marsh_1889-150k-4096.glb",
+      "bytes": 14395048,
+      "sha256": "cd8525c7371d14876bcdefe3f579d216bf597db892c2de6ed597da86bf1a98b3",
+      "maxSourceBytes": 20000000,
+      "extensions": [],
+      "meshes": 1,
+      "images": 3,
+      "title": "Triceratops horridus",
+      "author": "Smithsonian Institution, National Museum of Natural History",
+      "rightsEvidence": "https://www.si.edu/openaccess/faq",
+      "license": "CC0-1.0",
+      "kind": "glb",
+      "assetId": "museum-smithsonian-triceratops",
+      "triangles": 50000,
+      "textureEdgePixels": 1024,
+      "maxOutputBytes": 4500000,
+      "review": {
+        "status": "approved",
+        "date": "2026-10-12",
+        "evidence": "docs/interior-expansion/LICENSE-REVIEW.md"
+      },
+      "sourceBytes": 14395048,
+      "normalization": "right-handed, +Y up; centered X/Z; base Y=0; maximum extent 1 unit",
+      "modifications": "Uniform display normalization; scan mounts retained; simplified geometry; textures resized (JPEG for opaque images, PNG for alpha). Artwork converted to a textured panel; no reproduction claims about the host museum.",
+      "tiers": [
+        {
+          "id": "museum-smithsonian-triceratops",
+          "file": "smithsonian-triceratops.glb",
+          "bytes": 3420376,
+          "sha256": "95b6e28bac7845e583c0a69e6c381710306e78bdc23cec87de8881d275541d8e",
+          "triangles": 49990,
+          "textureEdgePixels": 1024,
+          "bounds": {
+            "min": [
+              -0.23781424329349307,
+              0,
+              -0.5
+            ],
+            "max": [
+              0.23755488082013093,
+              0.2820514592305785,
+              0.5
+            ]
+          }
+        },
+        {
+          "id": "museum-smithsonian-triceratops-lod",
+          "file": "smithsonian-triceratops-lod.glb",
+          "bytes": 999944,
+          "sha256": "0b8b28099892e087ffd4fa6b51cc1e769d72a04883bcf479aacb270cf9e1d3c7",
+          "triangles": 10282,
+          "textureEdgePixels": 512,
+          "bounds": {
+            "min": [
+              -0.21513633567080612,
+              0.004284165036764986,
+              -0.49897970874108194
+            ],
+            "max": [
+              0.23661690244478573,
+              0.2795328934059084,
+              0.5
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "smithsonian-coral",
+      "url": "https://3d-api.si.edu/content/document/3d_package:03d6b38a-bf7d-4334-90c9-1f7b4c3041a9/resources/usnm_292-100k-2048_std.glb",
+      "bytes": 6508664,
+      "sha256": "6516992aa8c3873c09fe000326df79b9953e97c6b1023fdc7a378ce1cd863c2b",
+      "maxSourceBytes": 10000000,
+      "extensions": [],
+      "meshes": 1,
+      "images": 3,
+      "title": "Madrepora formosa · USNM 292",
+      "author": "Smithsonian Institution, National Museum of Natural History",
+      "rightsEvidence": "https://www.si.edu/openaccess/faq",
+      "license": "CC0-1.0",
+      "kind": "glb",
+      "assetId": "museum-smithsonian-coral",
+      "triangles": 24000,
+      "textureEdgePixels": 1024,
+      "maxOutputBytes": 4500000,
+      "review": {
+        "status": "approved",
+        "date": "2026-10-12",
+        "evidence": "docs/interior-expansion/LICENSE-REVIEW.md"
+      },
+      "sourceBytes": 6508664,
+      "normalization": "right-handed, +Y up; centered X/Z; base Y=0; maximum extent 1 unit",
+      "modifications": "Uniform display normalization; scan mounts retained; simplified geometry; textures resized (JPEG for opaque images, PNG for alpha). Artwork converted to a textured panel; no reproduction claims about the host museum.",
+      "tiers": [
+        {
+          "id": "museum-smithsonian-coral",
+          "file": "smithsonian-coral.glb",
+          "bytes": 2502460,
+          "sha256": "be8210294dd9c69531fd86c4bd07d30164e0c4d0a4aa20a1d900e9d466770423",
+          "triangles": 23990,
+          "textureEdgePixels": 1024,
+          "bounds": {
+            "min": [
+              -0.48182647076552126,
+              0,
+              -0.5
+            ],
+            "max": [
+              0.48182647076552126,
+              0.7229968232402046,
+              0.5
+            ]
+          }
+        },
+        {
+          "id": "museum-smithsonian-coral-lod",
+          "file": "smithsonian-coral-lod.glb",
+          "bytes": 756340,
+          "sha256": "5db973a9710d96c44a2e78c0c529ca8da67b164bae2f40ac7ef0484f91d25cd0",
+          "triangles": 5128,
+          "textureEdgePixels": 512,
+          "bounds": {
+            "min": [
+              -0.48182647076552126,
+              0.005832406981169269,
+              -0.48704939939846154
+            ],
+            "max": [
+              0.47708441882493724,
+              0.7229968232402046,
+              0.5
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "met-cypresses",
+      "url": "https://images.metmuseum.org/CRDImages/ep/web-large/DP-42549-001.jpg",
+      "bytes": 221383,
+      "sha256": "af0e3486621c210b54932d055294051b5601aa3362af4b84ab97e2831f8163bc",
+      "maxSourceBytes": 3000000,
+      "title": "Wheat Field with Cypresses",
+      "author": "Vincent van Gogh / The Metropolitan Museum of Art",
+      "rightsEvidence": "https://www.metmuseum.org/hubs/open-access",
+      "license": "CC0-1.0",
+      "kind": "image",
+      "assetId": "museum-met-cypresses",
+      "triangles": 2,
+      "textureEdgePixels": 1024,
+      "maxOutputBytes": 4500000,
+      "review": {
+        "status": "approved",
+        "date": "2026-10-12",
+        "evidence": "docs/interior-expansion/LICENSE-REVIEW.md"
+      },
+      "sourceBytes": 221383,
+      "normalization": "right-handed, +Y up; centered X/Z; base Y=0; maximum extent 1 unit",
+      "modifications": "Uniform display normalization; scan mounts retained; simplified geometry; textures resized (JPEG for opaque images, PNG for alpha). Artwork converted to a textured panel; no reproduction claims about the host museum.",
+      "tiers": [
+        {
+          "id": "museum-met-cypresses",
+          "file": "met-cypresses.glb",
+          "bytes": 214576,
+          "sha256": "4d3234f419dd6be5cfc9973395161a2e43ccff821848f162f257ab5726521e14",
+          "triangles": 2,
+          "textureEdgePixels": 1024,
+          "bounds": {
+            "min": [
+              -0.5,
+              0,
+              0
+            ],
+            "max": [
+              0.5,
+              0.7963272333145142,
+              0
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

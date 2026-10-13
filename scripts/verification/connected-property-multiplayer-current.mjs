@@ -147,10 +147,25 @@ async function joinSharedRoom(player, roomCode) {
 
 async function stageAtSameMappedProperty(player, roomCode, sourceBuildingId = '') {
   const property = await player.page.evaluate(async ({ sourceBuildingId }) => {
-    const support = globalThis.__WE3D_PROPERTY_SUPPORT__;
-    if (!support) throw new Error('Built property diagnostics support is unavailable.');
-    const property = await support.stageMappedFixture(sourceBuildingId || 'osm:way:424242');
+    // Set up the declared map fixture through the actual property owner. The
+    // production module can load before diagnostics; a test-only global is not
+    // a prerequisite for players opening and using the Property panel.
+    const {ctx}=await import('/app/js/shared-context.js?v=55');
+    ctx.selLoc='baltimore';
+    ctx.LOC={lat:39.2904,lon:-76.6122,name:'Baltimore'};
+    ctx.LOCS={...ctx.LOCS,baltimore:ctx.LOC};
+    const id=sourceBuildingId||'osm:way:424242';
+    ctx.buildings=[{sourceBuildingId:id,buildingType:'house',levels:2,baseY:0,
+      pts:[{x:-8,z:-8},{x:8,z:-8},{x:8,z:8},{x:-8,z:8}]}];
+    document.getElementById('globeSelectorScreen')?.classList.remove('show');
+    ctx.realEstateMode=true;
+    const properties=await ctx.loadPropertiesAtCurrentLocation();
+    const property=properties.find(p=>p.sharedEligible&&p.sourceBuildingId===id);
     if (!property) throw new Error('No matching mapped property was available from the controlled fixture.');
+    const actor=ctx.Walk?.state?.mode==='walk'?ctx.Walk.state.walker:ctx.droneMode?ctx.drone:ctx.car;
+    actor.position?.set?.(property.x,Number(actor.position?.y||property.y||0),property.z);
+    actor.x=property.x;actor.z=property.z;
+    ctx.updatePropertyPanel();
     return {
       id: property.id,
       worldPropertyId: property.worldPropertyId,
@@ -160,6 +175,7 @@ async function stageAtSameMappedProperty(player, roomCode, sourceBuildingId = ''
       z: property.z
     };
   }, { sourceBuildingId });
+  await player.page.locator('.propertyHubTabs [data-property-view="nearby"]').click();
   const now = Date.now();
   await adminDb.collection('rooms').doc(roomCode).collection('players').doc(player.identity.uid).set({
     uid: player.identity.uid,

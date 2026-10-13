@@ -1,16 +1,15 @@
 # Known Issues and Limitations
 
-Last reviewed: October 8, 2026, for the 5.5 update. These are known product
+Last reviewed: October 12, 2026, for the 5.6 update. These are known product
 limits, not a promise that every location or device has been validated.
 The [GitHub releases](https://github.com/RRG314/WorldExplorer3D/releases) identify
 published versions.
 
-## Release acceptance and visual coverage
+## Visual detail and device support
 
-- The owner reports that the preview works, including an earlier Android check.
-  Named-device responsiveness, battery, thermal and resume measurements remain unverified for 5.5.
-  Emulated touch layouts and software-rendered browser journeys are functional
-  evidence, not hardware frame-rate, battery or thermal measurements.
+- Phone performance is still being checked across devices. Browser touch-layout
+  checks do not establish battery life, heat or reliable resume behavior on every
+  phone. Desktop is recommended for the largest city scenes.
 - Licensed ship furnishings replace major placeholders, but galley appliances,
   hydroponics, thermal/life-support equipment, exercise/EVA fittings and parts
   of fabrication still use simpler custom geometry. Art detail is not uniform.
@@ -21,11 +20,10 @@ published versions.
   outcomes; broader experiments and expedition consequences remain planned.
 
 - Some full-game performance targets remain unmet, particularly frame pacing
-  and travel transitions. Component improvements do not establish consistent
-  responsiveness across locations and devices.
+  and travel transitions. Aquarium or museum entry can also pause after loading
+  a dense city. Smoothness varies across locations and devices.
 - Historic sites and regional vegetation are not uniformly complete. Dedicated
-  landmark geometry, mapped footprints and inferred buildings require visual
-  ownership checks; generic detail must not cover a landmark.
+  landmark geometry, mapped footprints and inferred buildings can still overlap or differ from the real location.
 
 ## Location and map coverage
 
@@ -44,11 +42,8 @@ published versions.
 - The same accepted location snapshot is deterministic. A later session can
   differ when an upstream map provider publishes newer data or a primary source
   is temporarily unavailable and the documented fallback is used.
-- Major waterfall sites are not yet represented at production quality. A future
-  waterfall pass must extend the existing water and terrain authorities with
-  reviewed crest geometry, real upper and lower elevations, flow-aligned
-  cascades, whitewater and mist, mobile detail levels, and site-specific visual
-  validation. Experimental waterfall rendering is not part of the release.
+- Major waterfalls are not yet represented reliably. Detailed cascades,
+  whitewater, mist and accurate changes in water level need further work.
 
 ## Roads and structures
 
@@ -71,21 +66,30 @@ published versions.
 
 ## Ocean exploration
 
-- Ocean entry, deck walking, swimming, automatic scuba, submarine deployment and
-  recovery share a vessel journey. The ocean scene is bounded; it is not a
-  continuously populated simulation of the entire ocean.
-- The research vessel still uses custom geometry. A licensed replacement with
-  a fully traversable layout, richer wildlife, deeper ecology and additional
-  activities remain planned. Spearfishing is not included.
-- Water support and effects are gameplay approximations. Swimmer animation,
-  vessel motion and underwater presentation still need art and tuning work.
+- Personal geographic voyages load nearby ocean scenery as you travel and
+  unload areas left behind. Research studies and shared crew voyages keep their
+  own bounded areas. This is not a densely populated simulation of every ocean.
+- The research hull, submarine and selected fauna use licensed models. The ship
+  interior adapts those assets to gameplay; it is not an exact replica of a real
+  vessel. Some furnishings and swimmer animations still need art refinement.
+- Marine species use conservative game ranges and depth rules. Coverage is
+  limited; whales, deep squid, worldwide ecology and spearfishing are not included.
+- Deck jumping has physical takeoff and landing but no dedicated authored jump
+  animation. Water support and vessel motion remain gameplay approximations.
+
+## Campaign and facility coverage
+
+- First Bearings, Harbor Run, building photo studies, Coastal Departure and
+  lunar fieldwork provide opening journeys. Full campaigns for every explorer
+  profession are not yet available.
+- CERN, fully furnished airport and port packs, and terrain-based farming remain
+  planned rather than included in the 5.6 update.
 
 ## Performance and compatibility
 
 - Dense cities, rapid aerial travel, detailed facades and large structure
-  networks can be demanding on browser and GPU memory. World teardown now
-  releases location-owned terrain, provider state and scene resources, but
-  total browser memory still varies by browser, driver and device.
+  networks can be demanding on browser and graphics memory. Areas left behind
+  are unloaded, but total memory use still varies by browser and device.
 - Quality settings control rendering cost and effects. They do not rewrite
   mapped building height or replace the selected world with a lower-detail data
   source.
@@ -100,12 +104,25 @@ published versions.
 - Geocoding, map geometry, elevation, imagery, weather and live-context layers
   depend on third-party services. Rate limits, outages and regional coverage can
   delay a layer or activate a labeled fallback.
+- Weather, waves, currents and water temperature refresh independently. A
+  current or temperature feed may be unavailable while waves still appear;
+  missing measurements are not invented.
 - Live-context layers distinguish observations, predictions, models and
   reference routes. Generated or modeled content is never presented as a
   confirmed real-world observation.
 
-## Generated content
+## Museums, aquariums and other interiors
 
+- The National Aquarium visit covers a limited Pavilion and Blacktip Reef route,
+  with upper and lower viewing areas. Other exhibitions and upper programmes
+  are not included. Layout details without published dimensions are estimated;
+  the exterior is still a mapped building rather than a custom architectural
+  replica. Habitat density and surrounding views need further art refinement.
+
+- The first museum gallery interprets The Peale's front ground floor using its
+  public room guide. Dimensions and finishes are estimated; rear and upper
+  rooms are not included. Smithsonian and Met reproductions are not The Peale's
+  collection. Other mapped museums do not yet have these curated interiors.
 - Real indoor mapping is uncommon. Eligible buildings without usable indoor
   data receive a footprint-aware generated interior that may be visually sparse.
 - Inferred entrances, facade details, vegetation, distant context and
@@ -150,9 +167,8 @@ published versions.
 
 ## Online features
 
-- Accounts, multiplayer, cloud saves, social features, moderation,
-  leaderboards and optional support flows require the production backend.
-- Local forks do not receive production credentials or administrative access.
+- Accounts, multiplayer, cloud features, leaderboards and optional support
+  flows need an internet connection and available online services.
 
 Please report reproducible problems through
 [GitHub Issues](https://github.com/RRG314/WorldExplorer3D/issues).

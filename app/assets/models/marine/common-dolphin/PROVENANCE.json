@@ -1,0 +1,46 @@
+{
+  "schemaVersion": 1,
+  "assetId": "marine-common-dolphin",
+  "title": "Common Dolphin",
+  "author": "CGreature; animated by kenchoo",
+  "license": "CC-BY-4.0",
+  "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+  "sourceUrl": "https://sketchfab.com/3d-models/common-dolphin-12c27d41204f4b92895e36072b0ba8a6",
+  "originalSourceUrl": "https://skfb.ly/oHswH",
+  "rightsEvidence": "Downloaded from the author page; its download panel identifies CC Attribution and commercial permission. Animation author credits CGreature and CC BY 4.0 in the model description.",
+  "sourceSha256": "75244420256fe0d45eebce0dcac67250d434fd829b811b4f8801dad0a337fa2a",
+  "sourceBytes": 1588936,
+  "sha256": "bfea2dc00f659159781629049ac21c0adf47ca75756c048c04a75874a9e8af7e",
+  "bytes": 770156,
+  "triangles": 18576,
+  "bounds": {
+    "min": [
+      -0.4417880352043711,
+      -0.31735764573420866,
+      -1.1500000000000001
+    ],
+    "max": [
+      0.44178803520437093,
+      0.31735764573420866,
+      1.15
+    ]
+  },
+  "textures": [
+    {
+      "mimeType": "image/jpeg",
+      "dimensions": [
+        1024,
+        512
+      ]
+    },
+    {
+      "mimeType": "image/png",
+      "dimensions": [
+        1024,
+        512
+      ]
+    }
+  ],
+  "animation": "dolphinRig|Take 001|BaseLayer",
+  "modifications": "Parent-only rotation/centering and uniform 2.3 metre length; 1K textures with JPEG color. Authored skin, bone weights, swimming animation, topology and materials retained. Runtime clones have independent skeletons and animation mixers."
+}

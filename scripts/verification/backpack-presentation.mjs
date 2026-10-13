@@ -20,6 +20,7 @@ try {
     const {ctx}=await import('/app/js/shared-context.js?v=55');
     const inventory=createEquipmentInventory();
     const store=createLocalBackpackStore();
+    if(!await store.ready)throw Error('Disposable Backpack writer unavailable');
     if(!store.save(inventory.exportState()))throw Error('Disposable base inventory did not save');
     const fullSave=localStorage.getItem(BACKPACK_STORAGE_KEY);
     inventory.registerDefinitions([{id:'specimen',category:'specimen',label:'Field specimen',verbs:['inspect']}]);

@@ -455,11 +455,6 @@ export function createGlobeSelectorScene(options = {}) {
       if (placeReadout) placeReadout.textContent = '3D globe unavailable on this device. You can still use search and coordinates.';
       return;
     }
-    if (typeof renderer.outputColorSpace !== 'undefined' && typeof THREE.SRGBColorSpace !== 'undefined') {
-      renderer.outputColorSpace = THREE.SRGBColorSpace;
-    } else if (typeof renderer.outputEncoding !== 'undefined' && typeof THREE.sRGBEncoding !== 'undefined') {
-      renderer.outputEncoding = THREE.sRGBEncoding;
-    }
     scene.add(new THREE.AmbientLight(0xffffff, 1.15));
     scene.add(new THREE.HemisphereLight(0xe7f3ff, 0x8aa6c9, 0.45));
     const sun = new THREE.DirectionalLight(0xffffff, 1.05);

@@ -1,3 +1,4 @@
+import {detachSceneObject} from '../engine/scene-object-lifecycle.js';
 import { loadModelAsset } from '../assets/model-asset-runtime.js?v=16';
 import { VEHICLE_ROOT_TO_GROUND_METERS } from '../engine/vehicle-catalog.js?v=6';
 
@@ -99,7 +100,7 @@ function disposeCuratedTrafficVehicle(host) {
   const attachment = host?.userData?.curatedTrafficVehicleAttachment;
   if (!attachment) return false;
   const assetId = attachment.instance.record.id;
-  attachment.visual.removeFromParent?.();
+  detachSceneObject(attachment.visual);
   attachment.instance.dispose();
   delete host.userData.curatedTrafficVehicleAttachment;
   delete host.userData.curatedTrafficAssetId;

@@ -1,6 +1,7 @@
 import {resolveSwimHullCamera} from '../walking/water/hull-camera.js';
 import {getMaritimeCatalogEntry} from '../transport/maritime-catalog.js?v=1';
 import {styleMarinePanel,setMarineText} from '../ocean/interface.js';
+import {RCRV_LAYOUT} from './research/layout.js';
 
 export function boatSwimAdmission({speed,coverage,depth,synthetic=false,walkingReady=true}) {
   if (!walkingReady) return {allowed:false,reason:'Explorer is still loading.'};
@@ -11,13 +12,14 @@ export function boatSwimAdmission({speed,coverage,depth,synthetic=false,walkingR
 }
 
 export function boatLadderLocalPoint(catalog) {
+  if(catalog.id==='ocean-research-vessel')return {...RCRV_LAYOUT.ladder};
   return {x:catalog.dimensions.width*.5+.18,y:0,z:-catalog.dimensions.length*.3};
 }
 
 export function addBoatSwimLadder(THREE,mesh,catalog) {
   const ladder=new THREE.Group();ladder.name='Boarding ladder';
   const p=boatLadderLocalPoint(catalog);ladder.position.set(p.x,0,p.z);
-  const top=Math.max(.7,Math.min(catalog.dimensions.height*.17,catalog.dimensions.width*.45));
+  const top=catalog.id==='ocean-research-vessel'?RCRV_LAYOUT.floorY:Math.max(.7,Math.min(catalog.dimensions.height*.17,catalog.dimensions.width*.45));
   const metal=new THREE.MeshStandardMaterial({color:0xe0c169,metalness:.65,roughness:.35});
   const tube=(radius,length,x,y,z,rotation=0)=>{
     const rung=new THREE.Mesh(new THREE.CylinderGeometry(radius,radius,length,8),metal);
@@ -25,6 +27,7 @@ export function addBoatSwimLadder(THREE,mesh,catalog) {
   };
   for (const z of [-.32,.32]) tube(.035,top+1.6,0,(top-1.6)/2,z);
   for (let y=-1.4;y<top;y+=.3) tube(.03,.64,0,y,0,Math.PI/2);
+  let disposed=false;ladder.userData.disposeVesselAttachment=()=>{if(disposed)return;disposed=true;ladder.traverse(o=>o.geometry?.dispose());metal.dispose();ladder.parent?.remove(ladder);};
   mesh.add(ladder);
   return ladder;
 }

@@ -1,3 +1,4 @@
+import {detachSceneObject} from '../engine/scene-object-lifecycle.js';
 import { roadVehicleVisualRecipe } from '../transport/road-vehicle-visual-recipe.js?v=1';
 import { transportDamagePresentation } from '../transport/damage-model.js?v=1';
 
@@ -94,7 +95,7 @@ function createUrbanVehicleVisual(THREE, definition = {}, serviceLighting = null
     },
     dispose() {
       root.userData.disposeCuratedTrafficVehicle?.();
-      root.removeFromParent?.();
+      detachSceneObject(root);
       serviceLighting?.release(serviceRed);
       serviceLighting?.release(serviceBlue);
       serviceRed?.dispose?.();

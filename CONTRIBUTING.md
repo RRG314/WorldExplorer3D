@@ -1,6 +1,6 @@
 # Contributing to World Explorer 3D
 
-Last reviewed: 2026-07-28
+Last reviewed: 2026-10-12
 
 Contribution workflow and minimum quality bars for this repository.
 
@@ -12,10 +12,14 @@ Canonical repository:
 
 Preferred branch naming:
 
-- `feature/<short-description>`
-- `fix/<short-description>`
+- `steven/<short-description>`
+- Keep unrelated changes in separate pull requests.
 
 ## 2. Local Setup
+
+Requirements: Node.js 22+, Java 21 for backend emulators, and a WebGL browser.
+Core exploration can run with staging configuration. Online services require an
+authorized environment; credentials are never committed.
 
 ```bash
 git clone https://github.com/RRG314/WorldExplorer3D.git

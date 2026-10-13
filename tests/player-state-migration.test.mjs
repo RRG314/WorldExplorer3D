@@ -38,7 +38,7 @@ test('legacy Backpack migration is versioned, idempotent, backed up, and reversi
   const first = store.load();
   const second = store.load();
 
-  assert.equal(first.schemaVersion, 2);
+  assert.equal(first.schemaVersion, 3);
   assert.equal(first.items.length, 2);
   assert.equal(first.hotbar[0], 'reward:first');
   assert.equal(first.equippedInstanceId, 'reward:first');
@@ -142,4 +142,29 @@ test('signed-in receipt reconciliation upgrades the local claim without duplicat
   assert.equal((await store.listEvents()).length, 1);
   assert.equal((await store.listFieldGuide()).length, 1);
   assert.equal((await store.getProfile()).explorerProgress.totalRecords, 1);
+});
+
+test('released v2 migration carries the latest controls without changing old-client bytes',()=>{
+ const legacyKey='world-explorer:character-backpack:v2',oldControls='world-explorer:backpack-controls:v1';
+ const legacy={schemaVersion:2,items:[{instanceId:'lamp',catalogId:'flashlight'},{instanceId:'hands',catalogId:'hands'}],hotbar:['hands'],equippedInstanceId:'hands',ammo:{tool:{magazine:8}},migration:{saveGeneration:'old-save'}};
+ const supplement={schemaVersion:1,saveGeneration:'old-save',revision:9,hotbar:['lamp'],equippedInstanceId:'lamp',ammo:{tool:{magazine:2}}};
+ const oldBytes=JSON.stringify(legacy),controlBytes=JSON.stringify(supplement);
+ const storage=memoryStorage({[legacyKey]:oldBytes,[oldControls]:controlBytes});
+ const store=createLocalBackpackStore(storage),migrated=store.load();
+ assert.equal(migrated.equippedInstanceId,'lamp');assert.equal(migrated.ammo.tool.magazine,2);
+ assert.equal(storage.getItem(legacyKey),oldBytes);assert.equal(storage.getItem(oldControls),controlBytes);
+ assert.equal(store.saveControls({ammo:{tool:{magazine:1}}}),true);
+ storage.setItem(oldControls,JSON.stringify({...supplement,ammo:{tool:{magazine:7}}}));
+ assert.equal(createLocalBackpackStore(storage).load().ammo.tool.magazine,1,'Old build control writes cannot reset the new save');
+});
+
+test('a stale released control record cannot replace the migrated Backpack',()=>{
+ const storage=memoryStorage({'world-explorer:character-backpack:v2':JSON.stringify({schemaVersion:2,items:[],ammo:{tool:{magazine:8}},migration:{saveGeneration:'newer'}}),'world-explorer:backpack-controls:v1':JSON.stringify({schemaVersion:1,saveGeneration:'older',ammo:{tool:{magazine:1}}})});
+ assert.equal(createLocalBackpackStore(storage).load().ammo.tool.magazine,8);
+});
+
+test('read-only possessions cannot replace the active item or hotbar state',()=>{
+ const inventory=createBackpackModel({canMutate:()=>false,items:[{instanceId:'kept',catalogId:'kept',quantity:2}],hotbar:['kept'],equippedInstanceId:'kept'});
+ const before=inventory.exportState();assert.equal(inventory.replaceState({items:[],hotbar:[],revision:99}),false);
+ assert.deepEqual(inventory.exportState(),before);
 });

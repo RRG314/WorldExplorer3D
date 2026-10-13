@@ -61,7 +61,7 @@ test('world reset releases derived transport models as well as scene objects',as
  const keys=['transportNetworkModel','transportStructureModel','transportStructureAssembly','transportJunctionProfile','sharedTransportSurfacePresentation','tunnelSolidCompilation','structureProfileCompilation'];
  const appCtx={resetEarthStreaming(){},replaceWorldCollection(k){this[k]=[];},clearWorldCollections(keys){for(const k of keys)this[k]=[];}};
  appCtx.Walk={state:{walker:{_walkSupportFeature:{transportConnections:[{}]}}}};
- let waterCacheResets=0;
+ let waterCacheResets=0,evidenceResets=0;appCtx.cancelWaterEnvironmentEvidence=()=>evidenceResets++;
  let groundInvalidations=0;appCtx.GroundHeight={invalidate(){groundInvalidations++;}};
  for(const key of keys)appCtx[key]={oldWorldFeature:{}};
  const context=vm.createContext({appCtx,clearWaterMeshCache(){waterCacheResets++;},resetRoadMapIndex(){},resetRoadSearchIndex(){},releaseLocationModels(){},clearBuildingExteriorMaterialPool(){},clearBuildingExteriorDetails(){}});
@@ -69,6 +69,10 @@ test('world reset releases derived transport models as well as scene objects',as
  for(const key of keys)assert.equal(appCtx[key],null,key);
  assert.equal(groundInvalidations,1);
  assert.equal(waterCacheResets,1);
+ assert.equal(evidenceResets,1,'Ordinary world reset cancels the previous place evidence');
+ context.resetWorldForReload({showLoading:false,preserveWaterEvidence:true});
+ assert.equal(waterCacheResets,2,'Marine arrival still retires old mapped water meshes');
+ assert.equal(evidenceResets,1,'Accepted marine arrival keeps its new water evidence owner');
  assert.equal(appCtx.Walk.state.walker._walkSupportFeature,null);
 });
 

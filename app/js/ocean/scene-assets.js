@@ -4,28 +4,35 @@ import {
 
 export function disposeObject3D(obj) {
   if (!obj) return;
-  const managed=[];obj.traverse(child=>{if(child.userData?.disposeOceanHabitat)managed.push(child.userData.disposeOceanHabitat)});for(const dispose of managed)dispose();
-  obj.traverse((child) => {
-    if (!child || !child.isMesh) return;
-    if (child.geometry && typeof child.geometry.dispose === "function") {
-      child.geometry.dispose();
+  const managed = [];
+  obj.traverse(child => {
+    for (const key of ['disposeOceanHabitat', 'disposeCuratedMarineVisual']) {
+      if (child.userData?.[key]) managed.push(child.userData[key]);
     }
-    const materials = Array.isArray(child.material) ? child.material : [child.material];
-    materials.forEach((material) => {
-      if (!material) return;
-      ["map", "normalMap", "roughnessMap", "metalnessMap", "emissiveMap", "alphaMap"].forEach((key) => {
-        const texture = material[key];
-        if (
-          texture &&
-          typeof texture.dispose === "function" &&
-          !(texture.userData && texture.userData.sharedOceanTexture)
-        ) {
-          texture.dispose();
-        }
-      });
-      if (typeof material.dispose === "function") material.dispose();
-    });
   });
+  // Detach leased models before visiting shared resources. A docked instance
+  // can still be using the same textures in another scene.
+  for (const dispose of managed) dispose();
+  const geometries=new Set(),materials=new Set(),textures=new Set(),targets=new Set();
+  obj.traverse((child) => {
+    if (!child) return;
+    // r128 stores instance attributes outside geometry; only the mesh's
+    // disposal event retires those GPU buffers while the renderer stays alive.
+    if (child.isInstancedMesh) child.dispose?.();
+    for (const key of ['map','mapPass']) {
+      const target=child.shadow?.[key];
+      if(target){targets.add(target);child.shadow[key]=null;}
+    }
+    if(child.geometry)geometries.add(child.geometry);
+    for(const material of [].concat(child.material||[]))materials.add(material);
+  });
+  for(const material of materials){
+    for(const value of Object.values(material))if(value?.isTexture&&!value.userData?.sharedOceanTexture)textures.add(value);
+    material.dispose?.();
+  }
+  for(const geometry of geometries)geometry.dispose?.();
+  for(const texture of textures)texture.dispose?.();
+  for(const target of targets)target.dispose?.();
 }
 
 export function createSeabedMesh(renderer = null, deps = {}) {
@@ -42,9 +49,10 @@ export function createSeabedMesh(renderer = null, deps = {}) {
     const y = deps.sampleSeabedHeight(x, z);
     pos.setY(i, y);
 
-    const reefWeight = Math.exp(-((x - 24) ** 2 + (z - 124) ** 2) / 25500);
-    const deepWeight = deps.smoothstep(55, 420, -z + 70);
-    const noise = deps.valueNoise2D(x * 0.028 + 20, z * 0.028 - 14, 31);
+    const study=deps.studyCoordinates?.(x,z)||{x,z};
+    const reefWeight = Math.exp(-((study.x - 24) ** 2 + (study.z - 124) ** 2) / 25500);
+    const deepWeight = deps.smoothstep(55, 420, -study.z + 70);
+    const noise = deps.valueNoise2D(study.x * 0.028 + 20, study.z * 0.028 - 14, 31);
 
     const sandR = 0.48 + noise * 0.08;
     const sandG = 0.49 + noise * 0.08;
@@ -122,7 +130,7 @@ export function createMarineParticles() {
   return points;
 }
 
-export function createDeepOceanBackdrop() {
+export function createDeepOceanBackdrop({includeFloor=true}={}) {
   const group = new THREE.Group();
   group.name = "OceanBackdrop";
 
@@ -137,6 +145,7 @@ export function createDeepOceanBackdrop() {
   );
   group.add(shell);
 
+  if(!includeFloor)return group;
   const farFloor = new THREE.Mesh(
     new THREE.PlaneGeometry(2800, 2800),
     new THREE.MeshBasicMaterial({

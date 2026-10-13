@@ -1,0 +1,178 @@
+{
+  "schemaVersion": 1,
+  "assetId": "marine-atlantic-explorer-submarine",
+  "sourceUrl": "https://sketchfab.com/3d-models/atlantic-explorer-submarineglb-f1645a6ec3b54e81aed7b2c105cdd6e2",
+  "attribution": "Atlantic Explorer Submarine by JosephWPugsley",
+  "license": "CC-BY-4.0",
+  "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+  "sourceSha256": "6be0aa5488c98b641efbd0e208e4f3eae5088df05ff624c1ecabf548ee0f4af0",
+  "outputSha256": "2d39707e355c5b845f6d4e5a5ccfee6caa9841d2be2af7be7bf23c03d7d1b81b",
+  "recipe": "Author 1K GLB; welded and simplified with bounded error, opaque color maps JPEG 92, alpha color retained, data maps 512px. Original dimensions, materials and source coordinates retained. No external decoder.",
+  "bytes": 8572372,
+  "triangles": 68655,
+  "primitives": 8,
+  "bounds": {
+    "min": [
+      -1.6194768357075588,
+      -1.4877535946174025,
+      -4.055057114109701
+    ],
+    "max": [
+      1.619509975890054,
+      1.7885420412104054,
+      4.052833508819646
+    ]
+  },
+  "textures": [
+    {
+      "mimeType": "image/jpeg",
+      "dimensions": [
+        1024,
+        1024
+      ]
+    },
+    {
+      "mimeType": "image/png",
+      "dimensions": [
+        512,
+        512
+      ]
+    },
+    {
+      "mimeType": "image/png",
+      "dimensions": [
+        512,
+        512
+      ]
+    },
+    {
+      "mimeType": "image/png",
+      "dimensions": [
+        256,
+        256
+      ]
+    },
+    {
+      "mimeType": "image/jpeg",
+      "dimensions": [
+        1024,
+        1024
+      ]
+    },
+    {
+      "mimeType": "image/png",
+      "dimensions": [
+        512,
+        512
+      ]
+    },
+    {
+      "mimeType": "image/png",
+      "dimensions": [
+        512,
+        512
+      ]
+    },
+    {
+      "mimeType": "image/jpeg",
+      "dimensions": [
+        1024,
+        1024
+      ]
+    },
+    {
+      "mimeType": "image/png",
+      "dimensions": [
+        512,
+        512
+      ]
+    },
+    {
+      "mimeType": "image/png",
+      "dimensions": [
+        512,
+        512
+      ]
+    },
+    {
+      "mimeType": "image/png",
+      "dimensions": [
+        1024,
+        1024
+      ]
+    },
+    {
+      "mimeType": "image/png",
+      "dimensions": [
+        512,
+        512
+      ]
+    },
+    {
+      "mimeType": "image/jpeg",
+      "dimensions": [
+        1024,
+        1024
+      ]
+    },
+    {
+      "mimeType": "image/png",
+      "dimensions": [
+        512,
+        512
+      ]
+    },
+    {
+      "mimeType": "image/png",
+      "dimensions": [
+        512,
+        512
+      ]
+    },
+    {
+      "mimeType": "image/jpeg",
+      "dimensions": [
+        1024,
+        1024
+      ]
+    },
+    {
+      "mimeType": "image/png",
+      "dimensions": [
+        512,
+        512
+      ]
+    },
+    {
+      "mimeType": "image/png",
+      "dimensions": [
+        512,
+        512
+      ]
+    },
+    {
+      "mimeType": "image/jpeg",
+      "dimensions": [
+        1024,
+        1024
+      ]
+    },
+    {
+      "mimeType": "image/png",
+      "dimensions": [
+        512,
+        512
+      ]
+    },
+    {
+      "mimeType": "image/png",
+      "dimensions": [
+        512,
+        512
+      ]
+    }
+  ],
+  "extensions": [
+    "KHR_materials_emissive_strength"
+  ]
+}

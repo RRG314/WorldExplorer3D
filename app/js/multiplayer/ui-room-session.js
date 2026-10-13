@@ -1,7 +1,6 @@
 import { listenArtifacts } from "./artifacts.js?v=57";
 import {
   clearMySharedBlocks,
-  clearRoomSharedBlocks,
   listenSharedBlocks,
   removeSharedBlock,
   upsertSharedBlock
@@ -83,33 +82,32 @@ export function createUiRoomSession({ appCtx, refs, state, renderers, helpers, r
       origin: String(originLabel || "room")
     });
     upsertOwnedRoomLocal(room);
-    if (typeof appCtx.configureSharedBuildSync === "function") {
-      appCtx.configureSharedBuildSync({
+    function configureRoomEditing(editingRoom) {
+      if (typeof appCtx.configureSharedBuildSync === "function") {
+        appCtx.configureSharedBuildSync({
+          enabled: true,
+          roomId: editingRoom.id,
+          world: editingRoom.world,
+          connected: globalThis.navigator?.onLine !== false,
+          upsert: (entry) => upsertSharedBlock(editingRoom.id, entry),
+          remove: (entry) => removeSharedBlock(editingRoom.id, entry),
+          clearMine: () => clearMySharedBlocks(editingRoom.id)
+        });
+      }
+      const editableRole = resolveEditableRoomRole(editingRoom, state.authUser?.uid || '');
+      const editablePermissions = editableRoomPermissions(editableRole);
+      appCtx.configureSharedEditableWorld?.({
         enabled: true,
-        roomId: room.id,
-        connected: globalThis.navigator?.onLine !== false,
-        upsert: (entry) => upsertSharedBlock(room.id, entry),
-        remove: (entry) => removeSharedBlock(room.id, entry),
-        clearMine: () => clearMySharedBlocks(room.id)
+        roomId: editingRoom.id,
+        worldId: roomWorldModificationIdentity(editingRoom),
+        world: editingRoom.world,
+        canManage: editablePermissions.resetWorld,
+        suppress: (sourceFeatureId) => suppressRoomBuilding(editingRoom, sourceFeatureId),
+        restore: (sourceFeatureId) => restoreRoomBuilding(editingRoom, sourceFeatureId),
+        reset: () => resetRoomWorldModifications(editingRoom)
       });
     }
-    const editableRole = resolveEditableRoomRole(room, state.authUser?.uid || '');
-    const editablePermissions = editableRoomPermissions(editableRole);
-    appCtx.configureSharedEditableWorld?.({
-      enabled: true,
-      roomId: room.id,
-      worldId: roomWorldModificationIdentity(room),
-      canManage: editablePermissions.resetWorld,
-      suppress: (sourceFeatureId) => suppressRoomBuilding(room, sourceFeatureId),
-      restore: (sourceFeatureId) => restoreRoomBuilding(room, sourceFeatureId),
-      reset: async () => {
-        const [modifications, blocks] = await Promise.all([
-          resetRoomWorldModifications(room),
-          clearRoomSharedBlocks(room.id)
-        ]);
-        return modifications + blocks;
-      }
-    });
+    configureRoomEditing(room);
     state.artifacts = [];
     state.roomActivities = [];
     state.activeRoomActivity = null;
@@ -146,6 +144,7 @@ export function createUiRoomSession({ appCtx, refs, state, renderers, helpers, r
         return;
       }
       state.currentRoom = nextRoom;
+      configureRoomEditing(nextRoom);
       applyRoomPaintMultiplayerConfig(nextRoom);
       await syncRoomWorldContext(nextRoom, false);
       if (!isCurrent()) return;

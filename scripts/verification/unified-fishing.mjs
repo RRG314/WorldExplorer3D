@@ -39,7 +39,7 @@ async function discoveryCatchRecords() {
         db.close();
         resolve({
           items: itemsRequest.result.filter((entry) => String(entry.instanceId || '').startsWith('fish-catch:')),
-          guide: guideRequest.result.filter((entry) => entry.fishingAuthorityVersion === 'water-fish-authority-v2')
+          guide: guideRequest.result.filter((entry) => entry.fishingAuthorityVersion === 'water-fish-authority-v3')
         });
       };
       transaction.onerror = () => reject(transaction.error);
@@ -186,7 +186,7 @@ try {
     mappedBoatEntry: boatEntry.started === true && boatEntry.activeActorMode === 'boat' &&
       fishing.populationContext?.waterbody?.sourceTruth === 'published-water-surface',
     boatCastFightCatch: fishing.accessMode === 'boat' && fishing.stage === 'landed' && fishing.catches >= 1,
-    sharedAuthority: fishing.populationContext?.authorityVersion === 'water-fish-authority-v2' &&
+    sharedAuthority: fishing.populationContext?.authorityVersion === 'water-fish-authority-v3' &&
       fishing.fish?.fishingAuthorityVersion === fishing.populationContext?.authorityVersion,
     mappedWaterIdentity: !!fishing.populationContext?.waterbody?.id &&
       fishing.populationContext?.waterbody?.sourceTruth === 'published-water-surface',
@@ -199,9 +199,9 @@ try {
       fishing.populationContext?.evidence?.livePresenceClaim === false &&
       fishing.fish?.livePresenceClaim === false && fishMetaVisible && /virtual catch/i.test(fishMeta || ''),
     journalAuthorityPersisted: item.evidenceContractId === 'virtual-fishing-catch' &&
-      item.evidencePayload?.fishingAuthorityVersion === 'water-fish-authority-v2' &&
+      item.evidencePayload?.fishingAuthorityVersion === 'water-fish-authority-v3' &&
       item.evidencePayload?.livePresenceClaim === false,
-    guideAuthorityPersisted: guide.fishingAuthorityVersion === 'water-fish-authority-v2' &&
+    guideAuthorityPersisted: guide.fishingAuthorityVersion === 'water-fish-authority-v3' &&
       guide.populationEvidence === 'gameplay-model-only' && guide.livePresenceClaim === false,
     regionalLifeListNotInvented: fishing.populationContext?.evidence?.regionalEcologyPackApplied === false && (
       item.regionalPackId

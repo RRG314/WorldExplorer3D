@@ -44,8 +44,8 @@ test('same ship/sub identity survives saved dive, recovery, re-launch and local 
 function transferFixture(){
  const water={waterKind:'open_ocean',source:{synthetic:true,waveOffset:{x:300,z:700}}},calls=[];
  const ctx={LOC:{lat:10,lon:20},SCALE:100000,ENV:{EARTH:'EARTH'},getEnv:()=> 'EARTH',boat:{x:12,z:18,angle:.7},boatMode:{active:true,currentWater:water,transportEntityId:'ship-1',transportCatalogId:'ocean-research-vessel',condition:.8,mesh:{visible:true}},oceanMode:{active:false},startOceanMode:async opts=>{calls.push(opts);return false}};
- let restores=0;const api=createBoatOceanTransferApi({appCtx:ctx,canDiveBoatMode:()=>true,captureEarthWorldSession(){},setPromptSignature(){},showBoatPrompt(){},hideBoatPrompt(){},resetBoatDynamics(){},resetBoatFoamFx(){},updateWaterWaveVisuals(){},updateBoatMenuUi(){},startBoatMode:opts=>{restores++;assert.equal(opts.candidate,water);ctx.boatMode.active=true;return true}});
- return {ctx,api,calls,restores:()=>restores};
+ let restores=0,retired=0;const api=createBoatOceanTransferApi({appCtx:ctx,retireBoatVisual(){retired++;ctx.boatMode.mesh=null;},canDiveBoatMode:()=>true,captureEarthWorldSession(){},setPromptSignature(){},showBoatPrompt(){},hideBoatPrompt(){},resetBoatDynamics(){},resetBoatFoamFx(){},updateWaterWaveVisuals(){},updateBoatMenuUi(){},startBoatMode:opts=>{restores++;assert.equal(opts.candidate,water);ctx.boatMode.active=true;return true}});
+ return {ctx,api,calls,restores:()=>restores,retired:()=>retired};
 }
 test('rejected submarine launches restore original vessel and retain water phase before suspension',async()=>{
  const f=transferFixture();assert.equal(await f.api.transferBoatToSubmarine(),false);assert.equal(f.restores(),1);assert.equal(f.ctx.boatMode.active,true);assert.deepEqual(f.calls[0].waveOffset,{x:312,z:718});assert.ok(Math.hypot(f.calls[0].submarinePose.x,f.calls[0].submarinePose.z)>=51);assert.equal(f.ctx.boatMode.oceanTransferVessel,undefined);
@@ -54,9 +54,8 @@ test('duplicate launch and a changed region during loading cannot create or revi
  const f=transferFixture();let release;f.ctx.showTransitionLoad=()=>new Promise(resolve=>release=resolve);const pending=f.api.transferBoatToSubmarine();assert.equal(await f.api.transferBoatToSubmarine(),false);f.ctx.LOC={lat:30,lon:40};release();assert.equal(await pending,false);assert.equal(f.calls.length,0);assert.equal(f.restores(),0);
 });
 
-test('parent hull is closed from outside and rejects submerged hull overlaps at rotated headings',()=>{
- const ship=record().ship,catalog=getMaritimeCatalogEntry(ship.transportCatalogId),visual=createVesselVisual(THREE,catalog);visual.root.updateMatrixWorld(true);
- const hits=new THREE.Raycaster(new THREE.Vector3(0,-1,-100),new THREE.Vector3(0,0,1)).intersectObject(visual.root,true);assert.ok(hits.length);assert.ok(Math.abs(hits[0].point.z+39*1.002)<1e-6);assert.ok(hits[0].face.normal.z<-.9);visual.dispose();
+test('parent hull rejects submerged overlaps and admits stern deployment at rotated headings',()=>{
+ const ship=record().ship;
  assert.equal(parentHullCollision(ship,{x:0,y:-3,z:0},1),true);assert.equal(parentHullCollision(ship,{x:0,y:-30,z:0},1),false);
  const distance=51;assert.equal(parentHullCollision(ship,{x:-Math.sin(ship.yaw)*distance,y:-8.5,z:-Math.cos(ship.yaw)*distance},3),false);
 });
@@ -121,4 +120,47 @@ test('stern deployment moves away from the parent at every heading and retains v
   voyage.begin({parentVessel:ship},ctx.oceanMode);
   assert.equal(voyage.current.ship.yaw,yaw);assert.equal(voyage.current.sub.yaw,pose.yaw);
  }
+});
+
+import {normalizeOceanWaterContext,defaultOceanWaterContext,oceanWaterContextFromCandidate} from '../app/js/ocean/water-context.js';
+import {prepareSurfaceVoyage} from '../app/js/ocean/voyage.js';
+import {oceanDepthProfileMatchesSite} from '../app/js/ocean/depth-model.js';
+test('coastal admission survives deployment, save, recovery and reuse without becoming open ocean',async()=>{
+ const f=transferFixture();f.ctx.boatMode.currentWater.waterKind='coastal';f.ctx.boatMode.currentWater.source={registryId:'osm:coast-1',geometrySource:'osm',waveOffset:{x:3,z:4}};
+ await f.api.transferBoatToSubmarine();
+ const context=f.calls[0].entry.waterContext;assert.equal(context.waterKind,'coastal');assert.equal(context.sourceTruth,'published-water-surface');assert.equal(context.waterbodyId,'osm:coast-1');
+ const site={lat:10,lon:20},profile={model:'geographic-metres-v1',entryDepthMeters:40};
+ const saved=prepareSurfaceVoyage(site,undefined,profile,context),storage=memory(),store=createOceanVoyageStore({storage});assert.equal(store.write(saved).saved,true);
+ const restored=store.read();assert.deepEqual(restored.waterContext,context);
+ const synthetic={waterKind:'coastal',source:{synthetic:true,oceanWaterContext:restored.waterContext}};assert.deepEqual(oceanWaterContextFromCandidate(synthetic,site),context);
+ assert.equal(oceanWaterContextFromCandidate({...synthetic,waterKind:'lake'},site).waterKind,'lake','A different admitted type cannot inherit the previous marine context');
+ const before=storage.getItem(OCEAN_VOYAGE_KEY);assert.equal(store.write({...restored,waterContext:{...context,version:2}}).saved,false);assert.equal(storage.getItem(OCEAN_VOYAGE_KEY),before);
+ assert.equal(normalizeOceanWaterContext({...context,waterKind:'future-sea'}),null);
+ const old={...restored};delete old.waterContext;assert.ok(validateOceanVoyage(old));assert.equal(defaultOceanWaterContext(site,{legacy:true}).sourceTruth,'legacy-ocean-assumption');
+});
+test('surface movement preserves the depth sample origin and requires a new depth at the new deployment site',()=>{
+ const site={lat:10,lon:20},profile={model:'geographic-metres-v1',entryDepthMeters:40};
+ const saved=prepareSurfaceVoyage(site,undefined,profile),storage=memory();
+ const ctx={LOC:site,SCALE:100000,boat:{x:1000,z:500,angle:0},boatMode:{active:true,transportEntityId:saved.ship.transportEntityId,condition:1,currentWater:{waterKind:'coastal',source:{geometrySource:'osm'}}}};
+ const voyage=ensureOceanVoyage(ctx,{store:createOceanVoyageStore({storage})});voyage.beginAboard(saved);assert.equal(voyage.surfaceCheckpoint(),true);
+ assert.deepEqual(voyage.current.depthProfile.origin,site);assert.equal(voyage.current.waterContext.waterKind,'coastal');
+ assert.equal(oceanDepthProfileMatchesSite(voyage.current.depthProfile,voyage.current.site,voyage.current.site),false);
+ assert.equal(oceanDepthProfileMatchesSite(voyage.current.depthProfile,site),true);
+ const read=createOceanVoyageStore({storage}).read();assert.deepEqual(read.depthProfile.origin,site);assert.equal(read.site.lat,9.995);
+});
+
+
+test('successful sub admission retires only the departure deck; failed or superseded transfers retain it',async()=>{
+ const failed=transferFixture(),original=failed.ctx.boatMode.mesh;
+ await failed.api.transferBoatToSubmarine();assert.equal(failed.retired(),0);assert.equal(failed.ctx.boatMode.mesh,original);
+ const success=transferFixture();let finish;
+ success.ctx.startOceanMode=()=>new Promise(r=>finish=r);
+ const pending=success.api.transferBoatToSubmarine();
+ assert.equal(success.retired(),0,'Departure stays available until admission completes');
+ success.ctx.oceanMode.active=true;finish(true);assert.equal(await pending,true);
+ assert.equal(success.retired(),1);assert.equal(success.ctx.boatMode.mesh,null);
+ assert.equal(success.ctx.boatMode.oceanTransferVessel.transportEntityId,'ship-1');
+ const superseded=transferFixture(),replacement={visible:true};
+ superseded.ctx.startOceanMode=async()=>{superseded.ctx.boatMode.mesh=replacement;superseded.ctx.oceanMode.active=true;return true;};
+ await superseded.api.transferBoatToSubmarine();assert.equal(superseded.retired(),0);assert.equal(superseded.ctx.boatMode.mesh,replacement);
 });

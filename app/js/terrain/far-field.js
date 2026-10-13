@@ -1,3 +1,6 @@
+import {createRegionalGeometryStorage} from './regional-geometry-storage.js';
+import {appendRegionalBuildingFootprint} from './regional-building-geometry.js';
+import {updateRegionalImageryFocus} from './regional-imagery.js';
 import { markGroundSurfaceChanged } from './surface-revision.js';
 import { createRegionalSceneryScheduler, requireCompleteTravelScenery, readRegionalSceneryPreference, writeRegionalSceneryPreference } from './regional-scenery-scheduler.js';
 import { createRegionBuild } from '../earth-core/region-build.js';
@@ -57,12 +60,13 @@ import {
   FAR_WATER_TERRAIN_MASK_SIZE,
   applyMappedWaterTerrainOwnership,
   buildFarWaterGeometry,
+  buildFarWaterGeometryCooperatively,
   publishedWaterDetailAreas,
   buildMappedWaterTerrainOwnershipMask,
   createFarWaterMesh
 } from './far-field-water.js?v=7';
 import { FIXED_REGIONAL_CONTEXT_RADIUS_METERS } from '../world/fixed-regional-context.js?v=9';
-import { yieldToMainThread } from '../world/cooperative-scheduling.js?v=1';
+import { yieldToMainThread, yieldToWorldFrame } from '../world/cooperative-scheduling.js?v=1';
 
 const FAR_FIELD_SOURCE_ZOOM_OFFSET = 3;
 const FAR_FIELD_OUTER_DISTANCE_METERS = 22000;
@@ -94,6 +98,15 @@ function createFarFieldTerrainApi(deps = {}) {
     loadWorldCover = loadWorldCoverBaseline
   } = deps;
 
+  // Numeric terrain consumers use the same accepted-ground authority without
+  // allocating a frozen provenance record for every regional building.
+  const acceptedElevation=sampleAcceptedGroundElevationAtLatLon||((lat,lon)=>{
+    const sample=sampleAcceptedGroundAtLatLon(lat,lon);
+    return sample?.status==='available'?Number(sample.groundElevationMeters):NaN;
+  });
+
+  const yieldForRegion=()=>appCtx.gameStarted&&!appCtx.worldLoading?yieldToWorldFrame():yieldToMainThread();
+
   let generation = 0;
   let activeKey = '';
   let farFieldMesh = null;
@@ -108,17 +121,21 @@ function createFarFieldTerrainApi(deps = {}) {
   let lastAppliedDetailMode = '';
   let lastAppliedFallbackMode = '';
   let locationTerrainRequest = null;
-  const scenery = createRegionalSceneryScheduler({ request: anchor => {
+  let publishedState = null;
+  const scenery = createRegionalSceneryScheduler({ request: (anchor,{signal}) => {
     if (!locationTerrainRequest) throw new Error('The starting terrain is not ready');
-    return updateFarTerrainClipmap({ ...locationTerrainRequest, anchor });
+    return updateFarTerrainClipmap({ ...locationTerrainRequest, anchor,signal });
   } });
   scenery.setEnabled(readRegionalSceneryPreference());
   function updateRegionalSceneryFocus() {
-    if (!locationTerrainRequest || !farFieldMesh || !appCtx.gameStarted || appCtx.worldLoading ||
+    if (!locationTerrainRequest || !appCtx.gameStarted || appCtx.worldLoading ||
         appCtx.onMoon || appCtx.onMars || appCtx.activePlanetaryBodyId || appCtx.activeShipInterior ||
         (appCtx.isEnv && appCtx.ENV && !appCtx.isEnv(appCtx.ENV.EARTH))) return;
     const actor = appCtx.activeEarthActorPosition?.();
-    if (actor) scenery.step(actor, Math.min(6000, Number(appCtx.farTerrainClipmapState?.contextHalfExtentWorld || 14000) * .45));
+    if(actor)updateRegionalImageryFocus(appCtx,scenery.snapshot().enabled?actor:{x:0,z:0});
+    if (actor&&(!pendingBuildPromise||scenery.snapshot().pending)) scenery.step(actor,
+      Math.min(6000, Number(appCtx.farTerrainClipmapState?.contextHalfExtentWorld || 14000) * .45),
+      {force:!farFieldMesh&&appCtx.farTerrainClipmapState?.status==='failed'});
   }
   function setRegionalSceneryEnabled(enabled) {
     scenery.setEnabled(enabled);
@@ -153,6 +170,7 @@ function createFarFieldTerrainApi(deps = {}) {
 
   function setState(next) {
     appCtx.farTerrainClipmapState = Object.freeze({ generation, key: activeKey, ...(next || {}) });
+    if(next?.status==='ready')publishedState=appCtx.farTerrainClipmapState;
   }
 
   function untrackWaterMesh(mesh) {
@@ -187,6 +205,7 @@ function createFarFieldTerrainApi(deps = {}) {
   function resetFarTerrainClipmap() {
     scenery.reset();
     locationTerrainRequest = null;
+    publishedState = null;
     appCtx.structureTerrainPortalDescriptors = [];
     const retiringBuildPromise = pendingBuildPromise;
     generation += 1;
@@ -317,6 +336,7 @@ function createFarFieldTerrainApi(deps = {}) {
     if (worldCoverResult) applyWorldCoverSurfaceMaterialMix(mesh, worldCoverResult);
     else applyTerrainProfileSurfaceMaterialMix(mesh, detailMode);
     applyMappedSurfaceTintOwnership(mesh);
+    if(spec?.anchor)mesh.userData.regionalImageryCenter=worldToLatLon(spec.anchor.x,spec.anchor.z);
     applyTerrainSemanticMaterialBlend(mesh, repeats);
     material.color.setHex(0xffffff);
     material.roughness = 0.96;
@@ -337,9 +357,8 @@ function createFarFieldTerrainApi(deps = {}) {
   }
 
   async function buildFarBuildingGeometry(spec, loadedTiles, offsetMeters, mappedContext, isCurrent=()=>true) {
-    const positions = [];
-    const colors = [];
-    const indices = [];
+    const storage=createRegionalGeometryStorage(mappedContext?.buildings?.length||0);
+    const {positions,colors,styles,layouts,indices}=storage;
     const unitsPerMeter = Number(appCtx.WORLD_UNITS_PER_METER || 1);
     const yExaggeration = Number(appCtx.TERRAIN_Y_EXAGGERATION || 1);
     let exactPublished = 0;
@@ -349,9 +368,8 @@ function createFarFieldTerrainApi(deps = {}) {
     let simplifiedFootprintFallbacks = 0;
     const rejectedBuildings = { outside: 0, missingGround: 0, implausibleMassing: 0 };
     const groundMetersAt = (latitude, longitude) => {
-      const accepted = sampleAcceptedGroundAtLatLon(latitude, longitude);
-      const acceptedMeters = Number(accepted?.groundElevationMeters);
-      if (accepted?.status === 'available' && Number.isFinite(acceptedMeters)) {
+      const acceptedMeters=acceptedElevation(latitude,longitude);
+      if (Number.isFinite(acceptedMeters)) {
         return acceptedMeters;
       }
       const sampledSourceMeters = sampleSourceMeters(
@@ -377,7 +395,7 @@ function createFarFieldTerrainApi(deps = {}) {
     for (let buildingIndex = 0; buildingIndex < mappedBuildings.length; buildingIndex += 1) {
       if ((buildingIndex & 63) === 0 && !isCurrent())throw new DOMException('Regional buildings superseded','AbortError');
       if ((buildingIndex & 63) === 0 && performance.now() - buildingSliceStarted >= 8) {
-        await yieldToMainThread();
+        await yieldForRegion();
         buildingSliceStarted = performance.now();
       }
       const building = packedDescriptors ? mappedBuildings.read(buildingIndex, descriptorScratch) : mappedBuildings[buildingIndex];
@@ -412,32 +430,10 @@ function createFarFieldTerrainApi(deps = {}) {
         if (Array.isArray(building.ring)) simplifiedFootprintFallbacks++;
         instances.append(center.x,center.z,baseY,
           Number(building.widthMeters)*unitsPerMeter,Number(building.depthMeters)*unitsPerMeter,
-          massing.heightMeters*unitsPerMeter,Number(building.rotationY)||0,massing.color,massing.roofFraction);
+          massing.heightMeters*unitsPerMeter,Number(building.rotationY)||0,massing.color,massing.roofFraction,massing.facadeStyle);
         continue;
       }
-      const { heightMeters, color } = massing;
-      const topY = baseY + heightMeters * unitsPerMeter;
-      const baseIndex = positions.length / 3;
-
-      for (const point of footprint) {
-        positions.push(point.x, baseY, point.z, point.x, topY, point.z);
-        colors.push(...color, ...color);
-      }
-      for (let i = 0; i < footprint.length; i += 1) {
-        const next = (i + 1) % footprint.length;
-        const bottomA = baseIndex + i * 2;
-        const topA = bottomA + 1;
-        const bottomB = baseIndex + next * 2;
-        const topB = bottomB + 1;
-        indices.push(bottomA, bottomB, topA, topA, bottomB, topB);
-      }
-      for (const triangle of topTriangles) {
-        indices.push(
-          baseIndex + triangle[0] * 2 + 1,
-          baseIndex + triangle[1] * 2 + 1,
-          baseIndex + triangle[2] * 2 + 1
-        );
-      }
+      appendRegionalBuildingFootprint({positions,colors,styles,layouts,indices},footprint,topTriangles,massing,baseY,unitsPerMeter);
       exactPublished += 1;
     }
 
@@ -445,9 +441,13 @@ function createFarFieldTerrainApi(deps = {}) {
     let geometry = null;
     if (exactPublished > 0) {
       geometry = new THREE.BufferGeometry();
-      geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-      geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
-      geometry.setIndex(indices);
+      geometry.setAttribute('position', new THREE.BufferAttribute(positions.finish(), 3));
+      // Facade tint is bounded RGB, like terrain tint. Normalized bytes preserve
+      // all vertices and source buildings while using one quarter of RGB floats.
+      geometry.setAttribute('color', new THREE.BufferAttribute(colors.finish(), 3, true));
+      geometry.setAttribute('regionalStyle',new THREE.BufferAttribute(styles.finish(),4));
+      geometry.setAttribute('regionalLayout',new THREE.BufferAttribute(layouts.finish(),4));
+      geometry.setIndex(new THREE.BufferAttribute(indices.finish(),1));
       geometry.computeVertexNormals();
       geometry.computeBoundingSphere();
     }
@@ -466,6 +466,7 @@ function createFarFieldTerrainApi(deps = {}) {
       buildings: exactPublished + instances.length
     };
     } catch(error) {retireDescriptors();instances.dispose();throw error;}
+    finally {storage.dispose();}
   }
 
   async function buildAndPublish(spec, requestGeneration, parentSignal) {
@@ -581,7 +582,7 @@ function createFarFieldTerrainApi(deps = {}) {
 
     setState({ status: 'building-geometry', sourceZoom: spec.sourceZoom, sourceTiles: sourceTiles.length, offsetMeters });
     const geometryBuildStartedAt = performance.now();
-    const built = await buildFarFieldGeometry(spec, loadedTiles, offsetMeters, mappedContext);
+    const built = await buildFarFieldGeometry(spec, loadedTiles, offsetMeters, mappedContext, isCurrent);
     build.own(built?.geometry);
     if (!isCurrent()) return;
     const terrainGeometryBuildMs = performance.now() - geometryBuildStartedAt;
@@ -593,10 +594,11 @@ function createFarFieldTerrainApi(deps = {}) {
     const buildingGeometryBuildMs = performance.now() - buildingBuildStartedAt;
     const waterBuildStartedAt = performance.now();
     const waterDetailReady=appCtx.detailedWaterPublicationSequence===appCtx._worldLoadSequence;
-    const builtWater = buildFarWaterGeometry(appCtx, mappedContext, null, {
+    const builtWater = await buildFarWaterGeometryCooperatively(appCtx, mappedContext, null, {
       detailedAreas:waterDetailReady ? publishedWaterDetailAreas(appCtx) : []
-    });
+    },{current:isCurrent,yieldWork:yieldForRegion});
     build.own(builtWater?.geometry);
+    if (!isCurrent()) return;
     const publishedWaterAreaIdentities = builtWater?.publishedAreaIdentities || new Set();
     const fixedRegionalStructureWaterAreas = (mappedContext?.waterAreas || [])
       .filter((area) =>
@@ -623,7 +625,8 @@ function createFarFieldTerrainApi(deps = {}) {
       appCtx,
       mappedContext,
       spec,
-      publishedWaterAreaIdentities
+      publishedWaterAreaIdentities,
+      {current:isCurrent,yieldWork:yieldForRegion}
     );
     build.own(waterTerrainMask?.texture);
     if (!isCurrent()) return;
@@ -634,6 +637,7 @@ function createFarFieldTerrainApi(deps = {}) {
       build.own(builtRoadCoverage?.mask);
     } catch (error) { roadCoverageError = String(error?.message || error); }
     if (!isCurrent()) return;
+    if (spec.travelRefresh) requireCompleteTravelScenery(mappedContext,{roadCoverageError});
     if (!built) {
       setState({ status: 'unavailable', reason: 'far-field-elevation-sampling-failed' });
       return;
@@ -721,7 +725,7 @@ function createFarFieldTerrainApi(deps = {}) {
         metalness: 0,
         side: THREE.DoubleSide,
         fog: true
-      })) : null;
+      }), {unitsPerMeter:Number(appCtx.WORLD_UNITS_PER_METER)||1}) : null;
       build.own(buildingMaterial);
       buildingContext = build.own(builtBuildings.geometry
         ? new THREE.Mesh(builtBuildings.geometry, buildingMaterial)
@@ -750,11 +754,11 @@ function createFarFieldTerrainApi(deps = {}) {
           metalness: 0,
           side: THREE.FrontSide,
           fog: true
-        }));
+        }), {unitsPerMeter:Number(appCtx.WORLD_UNITS_PER_METER)||1});
         build.own(instanceMaterial);
         const batches = await buildFarBuildingInstanceBatches(
             THREE, builtBuildings.instances, instanceMaterial, { yieldControl: async()=>{
-              await yieldToMainThread();
+              await yieldForRegion();
               if(requestGeneration!==generation||signal.aborted)throw new DOMException('Regional buildings superseded','AbortError');
             } }
           );
@@ -808,7 +812,7 @@ function createFarFieldTerrainApi(deps = {}) {
       if (detailedMesh?.userData?.isTerrainMesh !== true || detailedMesh.userData?.isFarTerrainClipmap) continue;
       if (!isCurrent()) return;
       detailedMappedSurfaceTintVertices += applyMappedSemanticVertexTints(detailedMesh, appCtx.fixedLocationMappedSurfaceContext);
-      await yieldToMainThread();
+      await yieldForRegion();
     }
     if (!isCurrent()) return;
     setState({
@@ -983,6 +987,12 @@ function createFarFieldTerrainApi(deps = {}) {
     elevationAbortController = new AbortController();
     const requestGeneration = generation;
     const generationSignal = elevationAbortController.signal;
+    const generationController=elevationAbortController;
+    const cancel=()=>{generationController.abort('regional-preference-changed');if(requestGeneration===generation){
+      activeKey='';setState(farFieldMesh&&publishedState?{...publishedState,status:'ready'}:{status:'failed',reason:'Regional request canceled'});
+    }};
+    options.signal?.addEventListener('abort',cancel,{once:true});
+    if(options.signal?.aborted)cancel();
     const inner = innerWorldBounds(z, centerX, centerY, ring);
     // A square terrain patch must extend beyond the circular camera far plane
     // even along its diagonal. Otherwise aircraft expose its hard outer edge.
@@ -1008,6 +1018,9 @@ function createFarFieldTerrainApi(deps = {}) {
       const bounds = geographicBounds(outer);
       if (![bounds.latS,bounds.latN,bounds.lonW,bounds.lonE].every(Number.isFinite) ||
           Math.max(Math.abs(bounds.latS),Math.abs(bounds.latN)) > 85 || bounds.lonE-bounds.lonW > 10) {
+        options.signal?.removeEventListener('abort',cancel);
+        generationController.abort('unsupported-region');
+        setState({status:'failed',reason:'Regional scenery reached the supported map projection boundary',previousRegionRetained:!!farFieldMesh});
         activeKey = ''; pendingBuildPromise = null;
         return Promise.reject(new Error('Regional scenery reached the supported map projection boundary'));
       }
@@ -1058,6 +1071,7 @@ function createFarFieldTerrainApi(deps = {}) {
       activeKey = '';
       throw error;
     }).finally(() => {
+      options.signal?.removeEventListener('abort',cancel);
       if (requestGeneration === generation) {
         // Compilation has finished using its source arrays. The published
         // regional grid now owns sampling; retain only the detailed working set.

@@ -6,6 +6,7 @@ import {
   overtureThemeArchiveUrl
 } from './overture-tile-source.js?v=6';
 import { shouldSuppressBuildingParent } from './building-provenance-model.js?v=1';
+import { buildingPartsCoverFootprint } from './building-part-coverage.js';
 import { runBoundedProviderBatch } from '../earth-core/bounded-provider-batch.js?v=1';
 import { throwIfWorldLoadAborted } from '../earth-core/request-cancellation.js?v=1';
 
@@ -127,6 +128,7 @@ function convertTilesToElements(tiles, bounds, options = {}) {
   const nodesByCoordinate = new Map();
   const signatures = new Set();
   const parentIdsWithParts = new Set();
+  const partsByParent = new Map();
   const candidates = [];
   let nextNodeId = -1;
   let nextWayId = -1;
@@ -164,6 +166,10 @@ function convertTilesToElements(tiles, bounds, options = {}) {
           const signature = geometrySignature(layerName, stableId, coords);
           if (signatures.has(signature)) continue;
           signatures.add(signature);
+          if (layerName === 'building_part' && parentId) {
+            if (!partsByParent.has(parentId)) partsByParent.set(parentId, []);
+            partsByParent.get(parentId).push(coords);
+          }
           candidates.push({
             coords,
             layerName,
@@ -185,7 +191,8 @@ function convertTilesToElements(tiles, bounds, options = {}) {
         coverageComplete: options.coverageComplete === true,
         hasParts,
         stableId: candidate.stableId,
-        parentIdsWithParts
+        parentIdsWithParts,
+        footprintCovered: buildingPartsCoverFootprint(candidate.coords, partsByParent.get(candidate.stableId))
       })
     ) {
       suppressedParents += 1;

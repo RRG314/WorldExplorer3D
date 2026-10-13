@@ -1,3 +1,4 @@
+import {recordedFacilityReplayQuery} from './recorded-facility-query.mjs';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import {gunzipSync} from 'node:zlib';
@@ -18,12 +19,13 @@ export async function installRecordedOverpassFixture(context, profile) {
   assert.equal(createHash('sha256').update(body).digest('hex'), meta.sha256, 'Recorded map bytes changed');
   const data = JSON.parse(body);
   assert.ok(!data.remark && data.elements?.some(e => e.type === 'way' && e.tags?.highway), 'Recorded map must be complete');
-  const expected = publicProviderFixtureRequest({method:'POST', url:meta.endpoint, body:meta.query}).key[1];
+  const expected = publicProviderFixtureRequest({method:'POST', url:meta.endpoint, body:recordedFacilityReplayQuery(meta.query)}).key[1];
   const nearbyQuery = `[out:json][timeout:8];node(around:160934,${meta.location.lat.toFixed(5)},${meta.location.lon.toFixed(5)})["place"="city"]["name"];out body 80;`;
   const nearbyExpected = publicProviderFixtureRequest({method:'POST', url:meta.endpoint, body:nearbyQuery}).key[1];
   const receipt = {profile, sha256:meta.sha256, sourceTimestamp:meta.sourceTimestamp, recordedAt:meta.recordedAt,
     hits:0, nearbyCities:{mode:'controlled-empty', hits:0},
-    evidenceScope:'recorded primary map; controlled-empty nearby-city suggestions; not live-provider availability'};
+    facilityBoundaryData:{mode:'controlled-empty', reason:'Ancillary fences and expanded access paths were not in the original recording'},
+    evidenceScope:'recorded primary map; controlled-empty ancillary facility boundaries/access paths and nearby-city suggestions; not live-provider availability or facility completeness'};
   await context.route('**/api/interpreter*', async route => {
     const request = route.request();
     const candidate = publicProviderFixtureRequest({method:request.method(),url:request.url(),body:request.postData() || ''});

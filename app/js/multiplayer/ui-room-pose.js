@@ -7,7 +7,7 @@ function readWorldContext() {
   // Explore until play begins; room pose frames then stay on the loaded world.
   const selected = appCtx.gameStarted ? null : (appCtx.resolveLocationSelection?.() ||
     (appCtx.selLoc === 'custom' ? appCtx.customLoc : appCtx.LOCS?.[appCtx.selLoc]));
-  const location = (appCtx.oceanMode?.active ? appCtx.oceanMode.launchSite : null) || (appCtx.gameStarted ? appCtx.LOC : selected) || appCtx.LOC || appCtx.customLoc;
+  const location = (appCtx.oceanMode?.active ? appCtx.oceanMode.frameOrigin||appCtx.oceanMode.launchSite : null) || (appCtx.gameStarted ? appCtx.LOC : selected) || appCtx.LOC || appCtx.customLoc;
   const lat = finiteNumber(location?.lat, 0);
   const lon = finiteNumber(location?.lon, 0);
   const locName = sanitizeText(location?.name || appCtx.selLoc || 'Custom', 80);
@@ -115,7 +115,7 @@ function readPoseSnapshot() {
   const base = createPoseSnapshotBase(world);
   if(appCtx.oceanMode?.active || appCtx.sharedMarine?.active){
     const shared=appCtx.sharedMarine?.snapshot?.().state;
-    const site=appCtx.oceanMode?.active?appCtx.oceanMode.launchSite:shared?.site;
+    const site=appCtx.oceanMode?.active?appCtx.oceanMode.frameOrigin||appCtx.oceanMode.launchSite:shared?.site;
     base.mode='ocean';base.frame={kind:'ocean',locLat:finiteNumber(site?.lat),locLon:finiteNumber(site?.lon),interiorKey:shared?`marine:${shared.id}:${shared.stage}`:'',interiorFloorId:'',interiorFloorLevel:0};
     const sub=appCtx.oceanMode?.active?appCtx.oceanMode.submarine:null;
     const actor=appCtx.oceanMode?.diver?.active?appCtx.oceanMode.diver.navigationActor():sub;

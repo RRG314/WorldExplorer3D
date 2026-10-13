@@ -2,20 +2,21 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import vm from 'node:vm';
-import { createWeatherStateService } from '../app/js/weather/state-service.js';
+import { createWeatherStateService,WEATHER_CACHE_LIMIT,PLACE_CACHE_LIMIT } from '../app/js/weather/state-service.js';
 
 async function harness(kind) {
   const appCtx = { ENV: { EARTH: 'EARTH' }, isEnv: () => true, testLocation: { lat: 39, lon: -76 }, selLoc: 'custom', customLoc: { name: 'Selected place' } };
   const service = createWeatherStateService(appCtx);
   const pending = [];
+  const nodes=new Map(['weatherPanel','hudClockDisplay','weatherLine','weatherTimeLine','weatherMetaLine'].map(id=>[id,{style:{},textContent:''}]));
   const context = vm.createContext({
-    console, Date, Intl, Math, Number, String, Promise, setTimeout, clearTimeout, AbortController,
+    console, Date, Intl, Math, Number, String, Promise, setTimeout, clearTimeout, AbortController, DOMException,
     window: { setTimeout, clearTimeout },
-    document: { getElementById: () => null, querySelector: () => null },
+    document: { getElementById: id => nodes.get(id)||null, querySelector: () => null },
     THREE: { Color: class {} },
-    fetch: url => new Promise(resolve => pending.push({ url, resolve: data => resolve({ ok: true, json: async () => data }) }))
+    fetch: (url,options) => new Promise(resolve => pending.push({ url, options, resolve: data => resolve({ ok: true, json: async () => data }) }))
   });
-  const placeExports = Object.fromEntries(['assignResolvedPlace','cleanCountry','fetchJsonWithTimeout','fetchPlaceForLocation','getActiveWeatherLocationLabel','getFallbackPlaceLabel','parseReverseAddress','placeCacheKey','refreshLivePlace','uniqueNonEmptyParts','weatherCacheKey'].map(name => [name, () => null]));
+  const placeExports = Object.fromEntries(['assignResolvedPlace','cancelPlaceResolution','cleanCountry','fetchJsonWithTimeout','fetchPlaceForLocation','getActiveWeatherLocationLabel','getFallbackPlaceLabel','parseReverseAddress','placeCacheKey','refreshLivePlace','uniqueNonEmptyParts','weatherCacheKey'].map(name => [name, () => null]));
   Object.assign(placeExports, {
     weatherCacheKey: (lat, lon) => `${lat}:${lon}`, placeCacheKey: (lat, lon) => `${lat}:${lon}`,
     refreshLivePlace: async () => null, getActiveWeatherLocationLabel: () => 'Selected place'
@@ -27,7 +28,7 @@ async function harness(kind) {
     'earth-location.js': { resolveObservedEarthLocation: () => ({ ...appCtx.testLocation }), haversineKm: (a,b,c,d) => Math.hypot(a-c,b-d)*100 },
     'place-resolver.js': placeExports,
     'catalog.js': { weatherCodeDescriptor: () => ({ label: 'Clear', icon: '', category: 'clear' }) },
-    'operational-feeds.js': { operationalFeedService: { weather: locations => new Promise(resolve => pending.push({ locations, resolve: current => resolve({ items: [{ current }] }) })) } },
+    'operational-feeds.js': { operationalFeedService: { weather: (locations,options) => new Promise((resolve,reject) => pending.push({ locations,options,reject,resolve: current => resolve({ items: [{ current }] }) })) } },
     'lifecycle-scope.js': { createLifecycleScope: () => ({ listen() {}, dispose() {} }) }
   };
   const file = kind === 'weather' ? 'app/js/weather.js' : 'app/js/weather/place-resolver.js';
@@ -38,7 +39,7 @@ async function harness(kind) {
     return new vm.SyntheticModule(Object.keys(values), function () { for (const [name,value] of Object.entries(values)) this.setExport(name,value); }, { context });
   });
   await module.evaluate();
-  return { appCtx, service, pending, api: module.namespace };
+  return { appCtx, service, pending,nodes,api: module.namespace };
 }
 
 test('an older weather reply cannot replace weather at the new location', async () => {
@@ -152,4 +153,40 @@ test('absent weather fields never appear as zero measurements',async()=>{
  h.pending[0].resolve({temperature_2m:20,apparent_temperature:null,visibility:null,relative_humidity_2m:null,weather_code:null});await request;
  for(const key of ['apparentC','apparentF','visibilityM','humidityPct','windKph','windMph','precipitationMm','snowfallCm'])assert.equal(h.appCtx.liveWeatherState[key],null,key);
  assert.equal(h.appCtx.liveWeatherState.isDay,null);
+});
+
+test('long geographic travel bounds weather/place caches and retains recently used entries',()=>{
+ const service=createWeatherStateService({});
+ for(let i=0;i<WEATHER_CACHE_LIMIT;i++)service.setCachedWeather(String(i),{i});
+ service.getCachedWeather('0');service.setCachedWeather('new',{i:999});
+ assert.equal(service.getCachedWeather('1'),null);assert.equal(service.getCachedWeather('0').i,0);
+ for(let i=0;i<1000;i++){service.setCachedWeather(`region-${i}`,{i});service.setCachedPlace(`place-${i}`,{i});}
+ assert.equal(service.snapshot().weatherCacheEntries,WEATHER_CACHE_LIMIT);assert.equal(service.snapshot().placeCacheEntries,PLACE_CACHE_LIMIT);
+});
+
+test('weather outage ends the loading message, supplies an honest UTC clock and backs off retries',async()=>{
+ const h=await harness('weather'),pending=h.api.refreshLiveWeather(true);
+ h.pending[0].reject(Error('offline'));
+ await new Promise(resolve=>setTimeout(resolve,500));assert.equal(h.pending.length,2);h.pending[1].reject(Error('offline'));await pending;
+ assert.match(h.nodes.get('weatherLine').textContent,/Weather unavailable/);
+ assert.match(h.nodes.get('hudClockDisplay').textContent,/\d\d:\d\d:\d\d UTC/);
+ assert.doesNotMatch(h.nodes.get('weatherMetaLine').textContent,/Fetching/);
+ await h.api.refreshLiveWeather(false);assert.equal(h.pending.length,2);
+ const retry=h.api.refreshLiveWeather(true);h.pending[2].resolve({temperature_2m:20});await retry;
+ assert.equal(h.appCtx.liveWeatherState.temperatureC,20);assert.doesNotMatch(h.nodes.get('weatherLine').textContent,/unavailable|Loading/);
+});
+
+test('leaving a location aborts its weather consumer without canceling the new one',async()=>{
+ const h=await harness('weather'),old=h.api.refreshLiveWeather(true);
+ h.appCtx.testLocation={lat:30,lon:-50};const next=h.api.refreshLiveWeather(true);
+ assert.equal(h.pending[0].options.signal.aborted,true);assert.equal(h.pending[1].options.signal.aborted,false);
+ h.pending[0].reject(Error('aborted'));await old;assert.match(h.nodes.get('weatherLine').textContent,/Loading/);
+ h.pending[1].resolve({temperature_2m:24});await next;assert.equal(h.appCtx.liveWeatherState.temperatureC,24);
+});
+
+test('cancelled place resolution cannot rename a departed environment',async()=>{
+ const h=await harness('place'),request=h.api.refreshLivePlace({lat:39,lon:-76},true);
+ h.api.cancelPlaceResolution();assert.equal(h.pending[0].options.signal.aborted,true);
+ h.pending[0].resolve({address:{city:'Old city'}});await request;
+ assert.equal(h.appCtx.livePlaceState,null);
 });

@@ -1,0 +1,96 @@
+import assert from 'node:assert/strict';
+export async function verifyPersonalHome({page,out,report}) {
+  const start=await page.evaluate(()=>Object.fromEntries(['x','y','z','angle','pitch','yaw'].map(k=>[k,__sandboxTestContext.Walk.state.walker[k]])));
+  await page.evaluate(()=>__sandboxTestContext.openWorldDiscoverySection('today'));
+  await page.locator('[data-home-action="find"]').click();
+  await page.waitForFunction(()=>!__sandboxTestContext.worldDiscoveryRuntime.personalHome.snapshot().busy);
+  const admission=await page.evaluate(()=>__sandboxTestContext.worldDiscoveryRuntime.personalHome.snapshot());
+  assert.ok(admission.offers.length,JSON.stringify(admission));
+  await page.locator('[data-home-action="route:0"]').click();
+  await page.evaluate(async()=>{
+    const c=__sandboxTestContext;
+    const selected=c.worldDiscoveryRuntime.personalHome.snapshot().offers[0];
+    const candidate=c.selectedProperty;
+    if(candidate?.id!==selected.id)throw Error('Home route did not select its offered property');
+    const b=c.buildings.find(b=>String(b.sourceBuildingId||b.sourceFeatureId||b.id)===candidate.sourceBuildingId),support=c.resolveBuildingEntrySupport(b),entry=support.exteriorEntrance||support.entryAnchor;
+    if(!c.showNavigation||c.selectedProperty?.id!==candidate.id||Math.hypot(c._navigationRouteState.toX-entry.x,c._navigationRouteState.toZ-entry.z)>.01)throw Error('Workspace navigation did not keep its exterior entrance');
+    window.__homeJourneyEntry={...entry};window.__homeJourneyCandidate=candidate;
+    const y=c.SurfaceQuery.walkAt(entry.x,entry.z,{currentY:c.Walk.state.walker.y-1.7})?.position?.y||candidate.y;
+    Object.assign(c.Walk.state.walker,{x:entry.x,z:entry.z,y:y+1.7});c.openWorldDiscoverySection('today');
+  });
+  await page.locator('[data-home-action="claim:0"]').click();
+  await page.waitForFunction(()=>!!__sandboxTestContext.worldDiscoveryRuntime.personalHome.snapshot().homeId);
+  report.checks.personalHomeClaimedAtMappedEntrance=true;
+  await page.locator('[data-home-action="enter"]').click();
+  await page.waitForFunction(()=>!!__sandboxTestContext.activeInterior?.ownedHome?.personalStarter,null,{timeout:30000});
+  await page.evaluate(()=>__sandboxTestContext.openWorldDiscoverySection('today'));
+  await page.locator('[data-home-action="place"]').click();
+  await page.waitForFunction(()=>__sandboxTestContext.worldDiscoveryRuntime.personalHome.snapshot().furnitureReady,null,{timeout:20000});
+  await page.locator('[data-home-action="rotate"]').click();
+  await page.waitForFunction(()=>__sandboxTestContext.worldDiscoveryRuntime.personalHome.snapshot().workspace.rotated,null,{timeout:10000});
+  await page.locator('[data-home-action="undo"]').click();
+  await page.waitForFunction(()=>__sandboxTestContext.worldDiscoveryRuntime.personalHome.snapshot().workspace.undone&&__sandboxTestContext.worldDiscoveryRuntime.personalHome.snapshot().furnitureReady);
+  await page.screenshot({path:`${out}/home-arrangement-desktop.png`});
+  report.checks.workspacePlacementRotationUndo=true;
+  await page.evaluate(()=>{
+    const c=__sandboxTestContext;
+    // Read the actual published interaction and collider, not an omitted
+    // source module or a second copy of the room's placement calculation.
+    const use=c.activeInterior.interactions.find(i=>i.id==='personal-workspace');
+    const table=c.dynamicBuildingColliders.find(i=>i.sourceBuildingId==='personal-workspace'&&i.id==='workspace-table');
+    if(!use||!table)throw Error('Placed workspace has no interaction or table collider');
+    const yaw=Math.atan2(table.x-use.x,table.z-use.z);
+    Object.assign(c.Walk.state.walker,{x:use.x,z:use.z,y:table.minY+1.7,angle:yaw,yaw,lookYawOffset:0,pitch:-.35});
+    c.worldDiscoveryRuntime.ui.setOpen(false);
+  });
+  await page.waitForFunction(()=>__sandboxTestContext.worldDiscoveryRuntime.personalHome.snapshot().interactionReady);
+  await page.waitForTimeout(500);
+  await page.screenshot({path:`${out}/home-furniture-world.png`});
+  const beforeContact=await page.evaluate(()=>({x:__sandboxTestContext.Walk.state.walker.x,z:__sandboxTestContext.Walk.state.walker.z}));
+  await page.keyboard.down('w');await page.waitForTimeout(700);await page.keyboard.up('w');
+  const contact=await page.evaluate(()=>{const c=__sandboxTestContext,w=c.Walk.state.walker,parts=c.dynamicBuildingColliders.filter(p=>p.sourceBuildingId==='personal-workspace');return {x:w.x,z:w.z,inside:parts.some(p=>w.x>p.minX&&w.x<p.maxX&&w.z>p.minZ&&w.z<p.maxZ)};});
+  report.furnitureContact={before:beforeContact,after:contact};
+  assert.equal(contact.inside,false,'Walking cannot pass through the real furniture collision envelope');
+  assert.ok(Math.hypot(contact.x-beforeContact.x,contact.z-beforeContact.z)>.02,'Keyboard movement must reach the desk collider');
+  assert.ok(Math.hypot(contact.x-beforeContact.x,contact.z-beforeContact.z)<.6,'Desk stops forward movement');
+  report.checks.furnitureBlocksActualWalking=true;
+  await page.evaluate(p=>Object.assign(__sandboxTestContext.Walk.state.walker,p),beforeContact);
+  await page.keyboard.press('e');
+  await page.locator('[data-home-action="review"]').waitFor({state:'visible'});
+  await page.locator('[data-home-action="review"]').click();
+  await page.waitForFunction(()=>!__sandboxTestContext.worldDiscoveryRuntime.personalHome.snapshot().busy&&__sandboxTestContext.worldDiscoveryRuntime.personalHome.snapshot().workspace.usedAt>0);
+  assert.ok(await page.evaluate(async()=>(await __sandboxTestContext.discoveryProfileStore.getProfile()).homeAchievements?.maker));
+  report.checks.makerPhysicalInteractionAndSavedRecord=true;
+  await page.setViewportSize({width:390,height:844});
+  await page.locator('#discoveryPersonalHome').scrollIntoViewIfNeeded();
+  assert.equal(await page.locator('#discoveryPanel').evaluate(e=>e.scrollWidth>e.clientWidth+1),false);
+  await page.screenshot({path:`${out}/home-workspace-phone.png`});await page.setViewportSize({width:1440,height:900});
+  const design=page.waitForEvent('download');await page.locator('[data-home-action="export"]').click();await (await design).saveAs(`${out}/personal-design.json`);
+  await page.locator('[data-home-import]').setInputFiles(`${out}/personal-design.json`);
+  await page.waitForFunction(()=>!__sandboxTestContext.worldDiscoveryRuntime.personalHome.snapshot().busy);
+  report.checks.reusableWorkspaceExportImport=true;
+  // A real carried supply from the already-tested local commerce owner.
+  await page.evaluate(()=>{
+    const c=__sandboxTestContext,shop={id:'fixture:home-storage',name:'Verifier supply counter',kind:'convenience'};
+    const item=c.worldEconomy.snapshot(shop).standard[0];const result=c.worldEconomy.buy(shop,item.id);if(!result.ok)throw Error(result.reason);
+    window.__homeSupplyId=`commerce:${item.id}`;
+  });
+  await page.locator('#discoveryPersonalHome details summary').click();
+  const supply=await page.evaluate(()=>__homeSupplyId);
+  await page.locator(`[data-home-action="store:${supply}"]`).click();
+  await page.locator(`[data-home-action="withdraw:${supply}"]`).waitFor({state:'visible'});
+  await page.locator(`[data-home-action="withdraw:${supply}"]`).click();
+  report.checks.homeStorageRoundtrip=true;
+  await page.evaluate(()=>{const c=__sandboxTestContext;c.worldDiscoveryRuntime.ui.setOpen(false);c.clearActiveInterior({restorePlayer:true,preserveCache:true});Object.assign(c.Walk.state.walker,{x:__homeJourneyCandidate.x+80,z:__homeJourneyCandidate.z});});
+  await page.waitForFunction(()=>!!__sandboxTestContext.worldDiscoveryRuntime.personalHome.snapshot().journey.departed);
+  await page.evaluate(()=>{const c=__sandboxTestContext;Object.assign(c.Walk.state.walker,{x:__homeJourneyEntry.x,z:__homeJourneyEntry.z});c.openWorldDiscoverySection('today');});
+  await page.locator('[data-home-action="enter"]').click();
+  await page.waitForFunction(()=>!__sandboxTestContext.worldDiscoveryRuntime.personalHome.snapshot().busy&&!!__sandboxTestContext.worldDiscoveryRuntime.personalHome.snapshot().journey.returned,null,{timeout:30000});
+  assert.ok(await page.evaluate(async()=>(await __sandboxTestContext.discoveryProfileStore.getProfile()).homeAchievements?.home));
+  report.checks.homeDepartureReturnAndBadge=true;
+  await page.evaluate(()=>{__sandboxTestContext.openWorldDiscoverySection('profile');});
+  await page.locator('[data-explorer-badge="place-to-return"]').waitFor({state:'attached'});
+  await page.screenshot({path:`${out}/home-complete.png`});
+  await page.evaluate(p=>{const c=__sandboxTestContext;c.clearActiveInterior({restorePlayer:true,preserveCache:true});Object.assign(c.Walk.state.walker,p);c.openWorldDiscoverySection('today');},start);
+  report.personalHome=await page.evaluate(()=>__sandboxTestContext.worldDiscoveryRuntime.personalHome.snapshot());
+}

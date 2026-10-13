@@ -36,9 +36,22 @@ function createEquipmentInventory(options = {}) {
     : EQUIPMENT_DEFINITIONS.filter((definition) => definition.starter !== false).map((definition) => definition.id));
   acquired.add('hands');
   const persisted = options.persistedState && typeof options.persistedState === 'object' ? options.persistedState : null;
+  let housing = persisted?.housing || null;
+  const storedItems = () => (housing?.homes || []).flatMap(home => home.storage || []);
+  const heldById = new Map(), heldByEvent = new Map();
+  function indexStoredItems() {
+    heldById.clear(); heldByEvent.clear();
+    for (const item of storedItems()) {
+      heldById.set(item.instanceId,(heldById.get(item.instanceId)||0)+(Number(item.quantity)||0));
+      if (item.sourceEventId) { const key=JSON.stringify([item.sourceEventId,item.catalogId]); heldByEvent.set(key,(heldByEvent.get(key)||0)+(Number(item.quantity)||0)); }
+    }
+  }
+  indexStoredItems();
+  const storedQuantity = item => Math.max(heldById.get(item.instanceId)||0,item.sourceEventId ? heldByEvent.get(JSON.stringify([item.sourceEventId,item.catalogId]))||0 : 0);
   const backpack = options.backpack || createBackpackModel({
+    canMutate: options.canMutate,
     definitions: EQUIPMENT_DEFINITIONS,
-    items: persisted?.items?.length ? persisted.items : EQUIPMENT_DEFINITIONS.filter((definition) => acquired.has(definition.id)).map(starterItem),
+    items: Array.isArray(persisted?.items) ? persisted.items : EQUIPMENT_DEFINITIONS.filter((definition) => acquired.has(definition.id)).map(starterItem),
     hotbar: persisted?.hotbar?.length ? persisted.hotbar : EQUIPMENT_DEFINITIONS
       .filter((definition) => Number.isInteger(definition.slot))
       .map((definition) => `starter:${definition.id}`),
@@ -47,7 +60,7 @@ function createEquipmentInventory(options = {}) {
   });
   backpack.registerDefinitions(EQUIPMENT_DEFINITIONS);
   for (const definition of EQUIPMENT_DEFINITIONS.filter((entry) => acquired.has(entry.id))) {
-    if (!backpack.has(definition.id)) backpack.upsertItem(starterItem(definition), { silent: true });
+    if (!backpack.has(definition.id) && !storedItems().some(item=>item.catalogId===definition.id)) backpack.upsertItem(starterItem(definition), { silent: true });
     if (Number.isInteger(definition.slot) && !backpack.summary().hotbar[definition.slot - 1]) {
       backpack.assignHotbar(definition.slot, definition.id, { silent: true });
     }
@@ -116,6 +129,17 @@ function createEquipmentInventory(options = {}) {
       ammo: Object.fromEntries([...ammo.entries()].map(([id, rounds]) => [id, { ...rounds }])),
       quantities: Object.fromEntries(quantities)
     }),
+    homeStoredQuantity: storedQuantity,
+    applySavedState(next) {
+      if (!backpack.replaceState(next)) return false;
+      housing = next.housing || housing;
+      indexStoredItems();
+      if(next.ammo) { ammo.clear(); for(const [id,rounds] of Object.entries(next.ammo)) ammo.set(id,{...rounds}); }
+      if(next.quantities) { quantities.clear(); for(const [id,quantity] of Object.entries(next.quantities)) quantities.set(id,quantity); }
+      catalogSource = null; availableCatalogIds = null;
+      backpack.touch('possessions-committed');
+      return true;
+    },
     subscribe: (listener) => backpack.subscribe(listener),
     registerDefinitions(definitions) { return backpack.registerDefinitions(definitions); },
     upsertItem(item, settings = {}) { return backpack.upsertItem(item, settings); },
@@ -127,7 +151,7 @@ function createEquipmentInventory(options = {}) {
     equip(id) { return backpack.equip(id); },
     equipSlot(slot) { return backpack.equipSlot(slot); },
     assignHotbar(slot, id) { return backpack.assignHotbar(slot, id); },
-    consumeItem(id, quantity = 1) { return backpack.consume(id, quantity); },
+    consumeItem(id, quantity = 1, settings = {}) { return backpack.consume(id, quantity, settings); },
     cycle(direction = 1) {
       const state = backpack.summary();
       const available = state.hotbar.filter(Boolean).map(item=>item.instanceId);
@@ -198,9 +222,19 @@ function ensurePlayerBackpackInventory(appContext, options = {}) {
   appContext.playerBackpackStore = store;
   const inventory = appContext.playerBackpackInventory || createEquipmentInventory({
     persistedState: store.load(),
+    canMutate: () => store.writable() || store.saveStatus() === 'starting',
     ...options.inventoryOptions
   });
   appContext.playerBackpackInventory = inventory;
+  if (!appContext.playerBackpackSessionReady) {
+    appContext.playerBackpackSessionReady = store.ready.then(writable => {
+      if (writable && store.writable()) store.save(inventory.exportState());
+      else appContext.showToast?.(store.saveStatus() === 'another-tab'
+        ? 'Your Backpack is open in another World Explorer tab. Close that tab, then reload here to save possessions.'
+        : 'Your Backpack save is unavailable. Existing saved data has been kept.');
+      return writable && store.writable();
+    });
+  }
   return inventory;
 }
 

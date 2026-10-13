@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import {deployResearchSubmarineFromDeck} from './marine-entry-ui.mjs';
+import {installControlledMarineWeather} from './controlled-marine-weather.mjs';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { chromium, devices } from 'playwright';
@@ -24,6 +25,9 @@ async function createContext(options) {
   browser = await chromium.launch({ headless: true, channel: 'chrome', args: ['--js-flags=--max-old-space-size=1024'] });
   const context = await browser.newContext(options);
   await configureStagingAppCheck(context, baseUrl);
+  // Consent/event formation is independent of live weather and HYCOM latency.
+  // Use the declared environmental fixture; live providers have their own gate.
+  await installControlledMarineWeather(context);
   context.on('page', page => {
     page.verificationErrors = [];
     collectBrowserGraphicsErrors(page, page.verificationErrors);
@@ -64,7 +68,7 @@ async function analyticsSnapshot(page) {
   return page.evaluate(() => globalThis.getWorldExplorerAnalyticsSnapshot?.() || null);
 }
 
-async function saveFailure(page, name, error) {
+async function saveFailure(page, name, error, requestEvidence = {}) {
   const evidence = await page.evaluate(() => ({
     analytics: globalThis.getWorldExplorerAnalyticsSnapshot?.() || null,
     firebaseProjectId: globalThis.WORLD_EXPLORER_FIREBASE?.projectId || null,
@@ -72,12 +76,12 @@ async function saveFailure(page, name, error) {
     url: location.href
   })).catch(() => null);
   await fs.writeFile(path.join(outputDir, `${name}-failure.json`), JSON.stringify({
-    error: String(error?.stack || error), evidence, browserErrors: page.verificationErrors || []
+    error: String(error?.stack || error), evidence, browserErrors: page.verificationErrors || [], ...requestEvidence
   }, null, 2));
 }
 
 async function openStartHub(page) {
-  await page.goto(`${baseUrl}/`, { waitUntil: 'load', timeout: 120_000 });
+  await page.goto(`${baseUrl}/?utm_source=reddit&utm_medium=social&utm_campaign=city_exploration&analytics_test=1`, { waitUntil: 'load', timeout: 120_000 });
   await page.locator('#landingPrimaryCta').click();
   await page.waitForFunction(() => globalThis.__WE3D_RUNTIME_READY__ === true, null, { timeout: 120_000 });
   await page.waitForSelector('#globeSelectorScreen.show', { timeout: 60_000 });
@@ -98,7 +102,7 @@ async function verifyGrantedDestination(destination) {
   const collectionRequests = [];
   page.on('pageerror', (error) => browserErrors.push(String(error?.stack || error)));
   page.on('requestfailed', (request) => {
-    if (request.url().startsWith(baseUrl)) failedLocalResources.push(request.url());
+    if (request.url().startsWith(baseUrl)) failedLocalResources.push({url:request.url(),reason:request.failure()?.errorText,resourceType:request.resourceType()});
   });
   await page.route(/https:\/\/(?:www\.|region\d+\.)?(?:google-analytics\.com|analytics\.google\.com|app-measurement\.com)\/.*collect/i, async (route) => {
     const request = route.request();
@@ -156,7 +160,7 @@ async function verifyGrantedDestination(destination) {
     }));
     for (let attempt = 0; attempt < 40; attempt += 1) {
       const evidence = collectionRequests.join('\n');
-      if (/we3d_runtime_ready/.test(evidence) && /we3d_world_session_start/.test(evidence)) break;
+      if (/we3d_runtime_ready/.test(evidence) && /we3d_world_session_start/.test(evidence) && /we3d_launch_ready/.test(evidence)) break;
       await page.waitForTimeout(250);
     }
     const collectionEvidence = collectionRequests.join('\n');
@@ -167,8 +171,17 @@ async function verifyGrantedDestination(destination) {
     assert.equal(snapshot.errors.length, 0);
     assert.match(collectionEvidence, /we3d_runtime_ready/, `${destination.id}: runtime-ready collection request was not formed`);
     assert.match(collectionEvidence, /we3d_world_session_start/, `${destination.id}: session-start collection request was not formed`);
+    assert.match(collectionEvidence, /we3d_launch_start/);
+    assert.match(collectionEvidence, /we3d_launch_ready/);
+    assert.equal((collectionEvidence.match(/en=we3d_launch_start(?:&|\r|\n|$)/g) || []).length, 1, 'one launch owner');
+    assert.ok(collectionEvidence.indexOf('en=we3d_launch_start') < collectionEvidence.indexOf('en=we3d_first_play_ready'), 'launch starts before playable readiness, even with deferred gameplay analytics');
+    assert.match(collectionEvidence, /load_duration_ms/);
+    assert.match(collectionEvidence, /(?:[?&]|%26)cs=reddit/);
+    assert.match(collectionEvidence, /city_exploration/);
+    assert.match(collectionEvidence, /telemetry_version/);
+    assert.match(collectionEvidence, /(?:tt|ep\.traffic_type)=internal/);
     assert.equal(browserErrors.length, 0, `${destination.id}: browser errors`);
-    assert.equal(failedLocalResources.length, 0, `${destination.id}: failed local resources`);
+    assert.deepEqual(failedLocalResources, [], `${destination.id}: failed local resources`);
     return {
       id: destination.id,
       ok: true,
@@ -179,7 +192,7 @@ async function verifyGrantedDestination(destination) {
       collectionRequestCount: collectionRequests.length
     };
   } catch (error) {
-    await saveFailure(page, destination.id, error);
+    await saveFailure(page, destination.id, error, {failedLocalResources});
     throw error;
   } finally {
     await context.close();
@@ -222,7 +235,7 @@ async function verifyDefaultStoredFirstEntry() {
     }, null, { timeout: 30_000 });
     for (let attempt = 0; attempt < 40; attempt += 1) {
       const evidence = collectionRequests.join('\n');
-      if (/we3d_runtime_ready/.test(evidence) && /we3d_world_session_start/.test(evidence)) break;
+      if (/we3d_runtime_ready/.test(evidence) && /we3d_world_session_start/.test(evidence) && /we3d_launch_ready/.test(evidence)) break;
       await page.waitForTimeout(250);
     }
     const snapshot = await analyticsSnapshot(page);
@@ -258,7 +271,7 @@ async function verifyDefaultStoredFirstEntry() {
     }, null, { timeout: 30_000 });
     for (let attempt = 0; attempt < 40; attempt += 1) {
       const evidence = collectionRequests.join('\n');
-      if (/we3d_runtime_ready/.test(evidence) && /we3d_world_session_start/.test(evidence)) break;
+      if (/we3d_runtime_ready/.test(evidence) && /we3d_world_session_start/.test(evidence) && /we3d_launch_ready/.test(evidence)) break;
       await page.waitForTimeout(250);
     }
     const grantedSnapshot = await analyticsSnapshot(page);
@@ -322,20 +335,54 @@ async function verifyStorageBlockedConsent() {
   }
 }
 
+async function verifyEarlyLaunchFailure() {
+  const context = await createContext({ viewport: { width: 1000, height: 700 } });
+  const page = await context.newPage();
+  const requests = [];
+  await page.route(/https:\/\/(?:www\.|region\d+\.)?(?:google-analytics\.com|analytics\.google\.com|app-measurement\.com)\/.*collect/i, route => {
+    requests.push(`${route.request().url()}&${route.request().postData() || ''}`);
+    return route.fulfill({ status: 204, body: '' });
+  });
+  // This isolated pre-game publisher check is a source component fixture.
+  // A packaged build deliberately omits private source module URLs. Keep the
+  // fixture in its own namespace; do not restore missing production URLs or
+  // substitute source in the actual destination journeys below.
+  for (const name of ['launch-telemetry', 'product-telemetry']) {
+    const body = await fs.readFile(path.join(root, 'app/js/platform', `${name}.js`), 'utf8');
+    await page.route(`${baseUrl}/verification-source/${name}.js*`, route => route.fulfill({contentType:'text/javascript', body}));
+  }
+  await page.route(`${baseUrl}/launch-failure-fixture`, route => route.fulfill({ contentType: 'text/html', body: `<!doctype html><title>Launch fixture</title><script src="/js/firebase-project-config.js"></script><script type="module" src="/js/site-analytics.js"></script>` }));
+  try {
+    await page.goto(`${baseUrl}/launch-failure-fixture`, { waitUntil: 'load' });
+    await page.evaluate(async () => {
+      const { createLaunchMeasurement } = await import('/verification-source/launch-telemetry.js');
+      createLaunchMeasurement('earth').finish('failed', 'world_not_ready');
+    });
+    for (let i = 0; i < 60 && !requests.join('\n').includes('en=we3d_launch_failed'); i++) await page.waitForTimeout(250);
+    const evidence = requests.join('\n');
+    assert.match(evidence, /en=we3d_launch_start/);
+    assert.match(evidence, /en=we3d_launch_failed/);
+    assert.doesNotMatch(evidence, /en=we3d_world_session_start/);
+    assert.equal(await page.evaluate(() => typeof globalThis.getWorldExplorerAnalyticsSnapshot), 'undefined');
+    return { ok: true, evidence: 'real packaged SDK and current source launch-publisher fixture with no gameplay services; injected failure outcome, not an artifact launch or provider outage' };
+  } finally { await context.close(); }
+}
+
 await fs.mkdir(outputDir, { recursive: true });
 const result = {
   ok: false, contract: 'default-standard-analytics-with-explicit-limited-mode',
   servedRoot, complete: requestedDestinations.size === 0,
-  evidenceMode: 'real-sdk-local-collection-fixture', productionDeliveryVerified: false,
+  evidenceMode: 'real-sdk-local-collection-and-weather-fixture; early publisher uses source; destination journeys use the selected artifact', productionDeliveryVerified: false,
   measurementId: safeConfig.measurementId,
   storageBlocked: null, defaultStorage: null, destinations: []
 };
 try {
+  result.earlyFailure = await verifyEarlyLaunchFailure();
   result.storageBlocked = await verifyStorageBlockedConsent();
   result.defaultStorage = await verifyDefaultStoredFirstEntry();
   for (const destination of destinations) result.destinations.push(await verifyGrantedDestination(destination));
   result.browserErrors = allBrowserErrors;
-  result.ok = allBrowserErrors.length === 0 && result.storageBlocked.ok && result.defaultStorage.ok && result.destinations.every((entry) => entry.ok);
+  result.ok = allBrowserErrors.length === 0 && result.earlyFailure.ok && result.storageBlocked.ok && result.defaultStorage.ok && result.destinations.every((entry) => entry.ok);
   await fs.writeFile(path.join(outputDir, 'report.json'), `${JSON.stringify(result, null, 2)}\n`, 'utf8');
   console.log(JSON.stringify(result, null, 2));
   assert.equal(result.ok, true);

@@ -3,6 +3,9 @@ import { createDestinationMissionStore, DESTINATION_MISSION_PHASE } from './miss
 import { resolveUniverseAddress } from './catalog.js?v=11';
 import { DEFAULT_CREW } from '../expedition/catalog.js?v=2';
 import { createExpeditionStore } from '../expedition/store.js?v=12';
+import { missionSurfaceBody, missionNavigationTarget, setMissionCourse } from './mission-navigation.js';
+import { lunarFieldPlan, lunarPreparationReady, atLunarPreparationStation } from '../planetary/lunar-survey.js';
+import { normalizeAstronomicalBodyId } from '../astronomy/body-catalog.js?v=3';
 
 import { canAnalyzeDestination, canResumeDestinationSurvey, planetarySurveyEquipment } from './mission-progression.js?v=1';
 
@@ -17,6 +20,8 @@ function surveyEquipment() {
 let activeContext = null;
 let missionStore = null;
 let scanTimer = 0;
+let pendingScan = null;
+let failedArrivalState = null;
 let fieldEvidenceBound = false;
 
 const SURFACE_EVIDENCE = Object.freeze(['photograph', 'geology-inspect', 'habitat-survey']);
@@ -39,6 +44,7 @@ const SURFACE_MISSION_PLANS = Object.freeze({
 });
 
 function surfaceEvidencePlan(mission) {
+  if (mission?.destinationId === 'moon') return lunarFieldPlan(missionStore?.get(mission)?.preparation?.strategy);
   const authored = SURFACE_MISSION_PLANS[mission?.destinationId];
   if (authored) return authored;
   return Object.freeze(SURFACE_EVIDENCE.map((activityId) => Object.freeze({
@@ -121,6 +127,11 @@ async function recordDestinationExplorerEvent(record) {
 }
 
 function phaseObjective(mission, state) {
+  if (mission?.destinationId === 'moon' && state.phase === DESTINATION_MISSION_PHASE.APPROACH) {
+    return lunarPreparationReady(state.preparation, activeContext?.getInterstellarExpeditionSnapshot?.()?.id)
+      ? 'Field kit prepared. Go to the Pod Bay, launch for the Moon and land at the marked site.'
+      : 'At Solis Reach’s Science Lab, choose your field method and calibrate the kit. Then launch from the Pod Bay.';
+  }
   const index = {
     [DESTINATION_MISSION_PHASE.AVAILABLE]: 0,
     [DESTINATION_MISSION_PHASE.APPROACH]: 1,
@@ -132,7 +143,7 @@ function phaseObjective(mission, state) {
 }
 
 function requiresSurfaceMission(mission) {
-  return Boolean(mission?.scope === 'planet' && mission.operation.includes('surface'));
+  return Boolean(['planet','solar-body'].includes(mission?.scope) && mission.operation.includes('surface'));
 }
 
 function orbitalEvidencePlan(mission) {
@@ -197,6 +208,9 @@ function ensureDestinationExpedition(mission) {
 
 function prepareDestinationMissionSurface(destinationId = currentDefinition()?.destinationId) {
   const mission = getDestinationMission(destinationId);
+  // Moon keeps its native, accepted LROC surface; do not replace it with a
+  // generated exoplanet or create a second surface authority.
+  if (mission?.destinationId === 'moon') return Object.freeze({ bodyId: 'moon', native: true });
   if (!requiresSurfaceMission(mission) || typeof activeContext?.registerExpeditionSolidWorld !== 'function') return null;
   const destination = resolveUniverseAddress(mission.destinationId);
   const system = resolveUniverseAddress(mission.systemId);
@@ -254,22 +268,30 @@ function ensurePanel() {
 
 function closeDestinationMission() {
   const panel = document.getElementById('destinationMissionPanel');
+  if (panel?.contains?.(document.activeElement)) document.activeElement?.blur?.();
   if (panel) panel.hidden = true;
 }
 
 function missionAtDestination(mission) {
   const universe = activeContext?.universeRuntime;
   if (!mission || !universe || universe.transition) return false;
+  const environment=activeContext?.getEnv?.();
+  if (!['SPACE_FLIGHT','MOON','MARS','PLANETARY'].includes(environment)) return false;
+  if (environment!=='SPACE_FLIGHT') return missionSurfaceBody(activeContext)===mission.destinationId;
   if (canResumeDestinationSurvey(activeContext, mission)) return true;
-  if (activeContext?.activePlanetaryBodyId === mission.destinationId) return true;
   if (mission.scope === 'system') return universe.current?.id === mission.destinationId;
+  if (mission.scope === 'solar-body') {
+    if (!activeContext.spaceFlight?.active || normalizeAstronomicalBodyId(activeContext.spaceFlight.destination) !== mission.destinationId) return false;
+    const target = missionNavigationTarget(activeContext, mission), rocket = activeContext.spaceFlight.rocket;
+    return Boolean(target && rocket && rocket.position.distanceTo(target.position) <= Math.max(180, Number(target.radius || 6) * 20));
+  }
   if (mission.scope === 'planet') {
     if (universe.current?.id !== mission.systemId || universe.course?.destination?.id !== mission.destinationId) return false;
     const target = activeContext?.getUniverseHudTarget?.();
     const rocket = activeContext?.spaceFlight?.rocket;
     return Boolean(target?.destinationId === mission.destinationId && rocket && rocket.position.distanceTo(target.position) <= Math.max(180, Number(target.radius || 6) * 20));
   }
-  return activeContext?.activePlanetaryBodyId === mission.destinationId;
+  return false;
 }
 
 function renderDestinationMission(destinationId = '') {
@@ -289,13 +311,15 @@ function renderDestinationMission(destinationId = '') {
   let action = '';
   if (state.phase === DESTINATION_MISSION_PHASE.AVAILABLE) {
     action = '<button type="button" class="universe-action primary" data-mission-begin>Begin mission</button>';
+  } else if (state.phase === DESTINATION_MISSION_PHASE.APPROACH && mission.destinationId === 'moon' && activeContext?.activeShipInterior) {
+    action = '<button type="button" class="universe-action" data-mission-close-guide>Continue aboard the ship</button>';
   } else if (state.phase === DESTINATION_MISSION_PHASE.APPROACH) {
     action = `<button type="button" class="universe-action primary" data-mission-course>${missionAtDestination(mission) ? 'Local frame acquired' : `Set course for ${mission.destinationName}`}</button>`;
   } else if (state.phase === DESTINATION_MISSION_PHASE.FIELDWORK) {
     if (requiresSurfaceMission(mission)) {
       const evidencePlan = surfaceEvidencePlan(mission);
       const evidenceCount = evidencePlan.filter((entry) => state.evidence.includes(entry.evidenceId)).length;
-      action = activeContext?.activePlanetaryBodyId === mission.destinationId
+      action = missionSurfaceBody(activeContext) === mission.destinationId
         ? `<button type="button" class="universe-action" disabled>Surface record ${evidenceCount} of ${evidencePlan.length} · use the marked field stations</button>`
         : `<button type="button" class="universe-action" disabled>${missionAtDestination(mission) ? 'Board Solis Reach and launch from the Pod Bay' : 'Reach the marked planet before launching the pod'}</button>`;
     } else if (orbitalEvidencePlan(mission)) {
@@ -332,6 +356,15 @@ function renderDestinationMission(destinationId = '') {
   } else {
     action = '<button type="button" class="universe-action" disabled>Mission recorded in the Captain’s Log</button>';
   }
+  if(![DESTINATION_MISSION_PHASE.AVAILABLE,DESTINATION_MISSION_PHASE.COMPLETE].includes(state.phase)
+    &&missionStore.load().activeMissionId!==mission.id){
+    action='<button type="button" class="universe-action primary" data-mission-resume>Resume this mission</button>';
+  }
+  const storageNotice=missionStore.status==='protected'
+    ? 'This build cannot read your saved mission progress safely. It has been kept. Use a compatible build or restore a backup before starting another mission.'
+    : missionStore.status==='conflict'?'Another tab changed your mission progress. Reload to continue with that saved progress.'
+      : missionStore.status==='unavailable'?'Browser saving is unavailable. Missions need storage to keep your progress. Free exploration remains available.':'';
+  if(storageNotice)action='<button type="button" class="universe-action" disabled>Saved progress needs attention</button>';
   const completion = state.phase === DESTINATION_MISSION_PHASE.COMPLETE && state.returnConsequence
     ? `<div class="destination-mission-current"><span>RETURN CONSEQUENCE</span><strong>${state.returnConsequence}</strong>${requiresSurfaceMission(mission) ? '<small>Field Link II installed on this device · remote stations: 30 m · samples: 18 m.</small>' : ''}${state.crewLeadId ? `<small>Analysis led by ${crewNameForId(state.crewLeadId) || 'the Solis Reach science team'}</small>` : ''}</div>`
     : '';
@@ -340,10 +373,15 @@ function renderDestinationMission(destinationId = '') {
     <p>${mission.premise}</p>${requiresSurfaceMission(mission) ? '<p>Complete the fieldwork, return in the same pod, and publish at the Analysis Lab. Your first completed surface report installs Field Link II: operate photo and environment stations within 30 m instead of 18 m on future worlds. Local device progress.</p>' : ''}${evidence}
     <div class="destination-mission-current"><span>CURRENT OBJECTIVE</span><strong>${phaseObjective(mission, state)}</strong></div>${completion}
     <ol>${stageRows}</ol>
-    <div class="destination-mission-actions">${action}</div>
+    ${storageNotice?`<p role="status">${storageNotice}</p>`:''}<div class="destination-mission-actions">${action}</div>
   </article>`;
   panel.hidden = false;
   panel.querySelector('[data-mission-close]')?.addEventListener('click', closeDestinationMission);
+  panel.querySelector('[data-mission-close-guide]')?.addEventListener('click', closeDestinationMission);
+  panel.querySelector('[data-mission-resume]')?.addEventListener('click',()=>{
+    try{missionStore.activate(mission);if(pendingScan)cancelMissionScan();renderDestinationMission(mission.destinationId);}
+    catch{activeContext?.showToast?.('Mission selection could not be saved. Your existing progress is retained.');}
+  });
   panel.querySelector('[data-mission-begin]')?.addEventListener('click', () => {
     if (!ensureDestinationExpedition(mission)) {
       closeDestinationMission();
@@ -351,14 +389,17 @@ function renderDestinationMission(destinationId = '') {
       activeContext?.openExpeditionPlanner?.();
       return;
     }
-    missionStore.activate(mission);
-    missionStore.advance(mission, 'review_briefing', { evidenceId: `${mission.id}:briefing` });
-    activeContext?.showSpaceFlightMessage?.(`MISSION READY · ${mission.title.toUpperCase()}`, '#6fe8ff');
-    renderDestinationMission(mission.destinationId);
+    try{
+      missionStore.activate(mission);
+      if(pendingScan)cancelMissionScan();
+      missionStore.advance(mission, 'review_briefing', { evidenceId: `${mission.id}:briefing` });
+      activeContext?.showSpaceFlightMessage?.(`MISSION READY · ${mission.title.toUpperCase()}`, '#6fe8ff');
+      renderDestinationMission(mission.destinationId);
+    }catch{activeContext?.showToast?.('Mission could not be saved. Existing progress is retained; reload to retry.');}
   });
   panel.querySelector('[data-mission-course]')?.addEventListener('click', () => {
     if (missionAtDestination(mission)) return renderDestinationMission(mission.destinationId);
-    const accepted = activeContext?.travelToUniverseDestination?.(mission.destinationId, { kind: 'destination-mission', routeLabel: mission.title });
+    const accepted = setMissionCourse(activeContext, mission);
     if (accepted) closeDestinationMission();
     else activeContext?.showSpaceFlightMessage?.('Finish the current flight transition before setting this mission course.', '#f59e0b');
   });
@@ -380,8 +421,10 @@ function recordSurfaceMissionEvidence(event) {
   if (!activity || !requiresSurfaceMission(mission) || activity.bodyId !== mission.destinationId) return false;
   const state = missionStore.get(mission);
   const evidencePlan = surfaceEvidencePlan(mission);
-  const objective = evidencePlan.find((entry) => entry.activityId === activity.activityId);
+  const objective = evidencePlan.find((entry) => entry.activityId === activity.activityId
+    && (mission.destinationId !== 'moon' || activity.evidenceId === entry.evidenceId));
   if (state.phase !== DESTINATION_MISSION_PHASE.FIELDWORK || !objective) return false;
+  try{
   missionStore.recordEvidence(mission, objective.evidenceId, { evidenceId: activity.id });
   const updated = missionStore.get(mission);
   const secured = evidencePlan.filter((entry) => updated.evidence.includes(entry.evidenceId));
@@ -390,8 +433,9 @@ function recordSurfaceMissionEvidence(event) {
     return true;
   }
   const result = missionStore.advance(mission, 'complete_fieldwork', { evidenceId: `${mission.id}:surface-field-package` });
-  if (result.accepted) activeContext?.showSpaceFlightMessage?.('SURFACE SURVEY COMPLETE · RETURN TO SURVEYOR ANALYSIS', '#83e6a6');
+  if (result.accepted) activeContext?.showSpaceFlightMessage?.('SURVEY COMPLETE · RETURN TO SOLIS REACH', '#83e6a6');
   return result.accepted;
+  }catch{activeContext?.showToast?.('Mission progress could not be saved. Keep the Journal record and retry the field station.');return false;}
 }
 
 function openDestinationMission(destinationId) {
@@ -400,14 +444,28 @@ function openDestinationMission(destinationId) {
 
 function markMissionArrived(mission) {
   const state = missionStore.get(mission);
-  if (state.phase !== DESTINATION_MISSION_PHASE.APPROACH) return false;
+  if (state.phase !== DESTINATION_MISSION_PHASE.APPROACH||failedArrivalState===state) return false;
+  if (mission.destinationId === 'moon' && !lunarPreparationReady(state.preparation, activeContext?.getInterstellarExpeditionSnapshot?.()?.id)) return false;
+  try{
   const result = missionStore.advance(mission, 'arrive', { evidenceId: `${mission.id}:local-frame` });
   if (!result.accepted) return false;
   activeContext?.showSpaceFlightMessage?.(`MISSION AREA ACQUIRED · ${mission.title.toUpperCase()}`, '#68d8c0');
   return true;
+  }catch{failedArrivalState=state;activeContext?.showToast?.('Arrival progress could not be saved. Existing progress is retained; reload to retry.');return false;}
+}
+
+function prepareLunarMission(strategy) {
+  const mission = currentDefinition();
+  if (mission?.destinationId !== 'moon' || !atLunarPreparationStation(activeContext)) return false;
+  const expedition = activeContext.getInterstellarExpeditionSnapshot?.();
+  if (!expedition?.id) return false;
+  try {
+    return missionStore.prepareLunar(mission, { strategy, expeditionId: expedition.id, returnBriefed: true, calibratedAtMs: Date.now() });
+  } catch { activeContext.showToast?.('The field plan could not be saved. Your earlier progress is unchanged.'); return false; }
 }
 
 function updateDestinationMissionRuntime() {
+  if(pendingScan&&!scanStillEligible(pendingScan))cancelMissionScan();
   const mission = currentDefinition();
   if (!mission || !missionStore) return;
   if (missionStore.get(mission).phase === DESTINATION_MISSION_PHASE.APPROACH && missionAtDestination(mission)) {
@@ -415,20 +473,47 @@ function updateDestinationMissionRuntime() {
   }
 }
 
+function scanStillEligible(scan) {
+  const {mission,context,store,evidence}=scan;
+  if(context!==activeContext||store!==missionStore||context.paused||context.getEnv?.()!=='SPACE_FLIGHT'
+    ||!context.spaceFlight?.active||context.activeShipInterior||requiresSurfaceMission(mission)
+    ||store.load().activeMissionId!==mission.id||store.get(mission).phase!==DESTINATION_MISSION_PHASE.FIELDWORK
+    ||!missionAtDestination(mission)||nextOrbitalEvidence(mission,store.get(mission))!==evidence)return false;
+  if(mission.operation==='thermal-orbital-survey'&&(!evidence||thermalObservationZone(mission)!==evidence))return false;
+  if(mission.operation==='transit-network-survey'&&(!evidence||!transitObservationReady(mission,evidence)))return false;
+  return true;
+}
+
+function cancelMissionScan() {
+  if(pendingScan)pendingScan.context.stopDestinationMissionScan?.(pendingScan.mission.operation==='transit-network-survey'?pendingScan.evidence:pendingScan.mission.destinationId);
+  if(scanTimer)window.clearTimeout(scanTimer);
+  scanTimer=0;pendingScan=null;
+  activeContext?.showSpaceFlightMessage?.('Survey interrupted. Return to the observation position to try again.','#f59e0b');
+  const panel=document.getElementById('destinationMissionPanel');
+  if(panel&&!panel.hidden)renderDestinationMission();
+}
+
 function performDestinationMissionFieldwork() {
   const mission = currentDefinition();
-  if (!mission || !missionStore || missionStore.get(mission).phase !== DESTINATION_MISSION_PHASE.FIELDWORK || !missionAtDestination(mission) || scanTimer) return false;
+  if (!mission || !missionStore || scanTimer || requiresSurfaceMission(mission)) return false;
   const state = missionStore.get(mission);
   const orbitEvidence = nextOrbitalEvidence(mission, state);
-  if (mission.operation === 'thermal-orbital-survey' && orbitEvidence && thermalObservationZone(mission) !== orbitEvidence) return false;
-  if (mission.operation === 'transit-network-survey' && orbitEvidence && !transitObservationReady(mission, orbitEvidence)) return false;
+  const scan={mission,context:activeContext,store:missionStore,evidence:orbitEvidence};
+  if(!scanStillEligible(scan)||typeof activeContext.playDestinationMissionScan!=='function')return false;
   const operation = orbitEvidence ? `${mission.operation}:${orbitEvidence}` : mission.operation;
   const scanDestinationId = mission.operation === 'transit-network-survey' ? orbitEvidence : mission.destinationId;
   const started = activeContext?.playDestinationMissionScan?.(scanDestinationId, operation) !== false;
   if (!started) return false;
+  pendingScan=scan;
   activeContext?.showSpaceFlightMessage?.(`SURVEY ACTIVE · ${mission.destinationName.toUpperCase()}`, '#8fe7ff');
   scanTimer = window.setTimeout(() => {
+    // A cancelled callback may already be queued. It cannot clear a newer
+    // operation or award a mission after travel, pause or a selection change.
+    if(pendingScan!==scan)return;
+    if(!scanStillEligible(scan)){cancelMissionScan();return;}
     scanTimer = 0;
+    pendingScan=null;
+    try {
     if (orbitEvidence) missionStore.recordEvidence(mission, orbitEvidence, { evidenceId: `${mission.id}:${orbitEvidence}` });
     const remainingEvidence = nextOrbitalEvidence(mission, missionStore.get(mission));
     if (remainingEvidence) {
@@ -441,6 +526,7 @@ function performDestinationMissionFieldwork() {
       activeContext?.showSpaceFlightMessage?.('SURVEY EVIDENCE SECURED · RETURN TO SURVEYOR ANALYSIS', '#83e6a6');
       if (!document.getElementById('destinationMissionPanel')?.hidden) renderDestinationMission(mission.destinationId);
     }
+    }catch{activeContext?.showToast?.('Survey could not be saved. Your earlier evidence is retained; retry at the observation position.');}
   }, orbitEvidence ? 1400 : 2200);
   renderDestinationMission(mission.destinationId);
   return true;
@@ -476,7 +562,7 @@ async function commitDestinationMissionAnalysis(outcomeId) {
     points: outcome.points,
     firstCompletion: true,
     projections: { journal: true, profile: true, place: false, fieldGuide: true },
-    metadata: { missionId: mission.id, outcomeId: outcome.id, truthType: 'authored' }
+    metadata: { missionId: mission.id, outcomeId: outcome.id, truthType: 'authored', ...(mission.destinationId === 'moon' ? { lunarVersion: 1, strategy: missionStore.get(mission).preparation?.strategy || 'samples', fieldEvidence: surfaceEvidencePlan(mission).map(entry => entry.evidenceId), expeditionId: activeContext.getInterstellarExpeditionSnapshot?.()?.id, podId: activeContext.getInterstellarExpeditionSnapshot?.()?.podJourney?.id, prepared: lunarPreparationReady(missionStore.get(mission).preparation, activeContext.getInterstellarExpeditionSnapshot?.()?.id) } : {}) }
   });
   const confirmed = saved?.event?.sourceSystem === 'destination-missions' && saved.event.eventType === 'destination-mission-complete'
     && (saved.recorded === true || saved.reason === 'already-recorded')
@@ -525,6 +611,7 @@ function destinationMissionSnapshot() {
       lifeEvidence: mission.habitability.lifeEvidence
     } : null,
     evidence: [...state.evidence],
+    preparation: state.preparation || null,
     equipment: surveyEquipment(),
     fieldRecords: requiresSurfaceMission(mission) ? surfaceEvidencePlan(mission).filter(entry => state.evidence.includes(entry.evidenceId)).map(entry => ({ label:entry.label, description:entry.description })) : [],
     outcomeId: state.outcomeId,
@@ -561,6 +648,7 @@ function initDestinationMissionRuntime(appContext) {
 }
 
 export {
+  prepareLunarMission,
   closeDestinationMission,
   completeDestinationMissionAnalysis,
   destinationMissionSnapshot,

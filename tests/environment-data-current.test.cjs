@@ -67,3 +67,42 @@ test('a wave provider outage uses the public NOAA model with its own time and no
  assert.equal(result.sources[0].sourceId,'noaa-ww3');assert.equal(result.sources[0].validAt,'2026-10-05T21:00:00.000Z');assert.equal(result.sources[1].validAt,'2026-10-05T20:00:00.000Z');assert.equal(result.current.wave_height,1.09);assert.equal(result.current.swell_wave_height,undefined);assert.equal(result.warnings.length,0);
  const {normalizeNoaaWaves}=require('../functions/environment-models');assert.throws(()=>normalizeNoaaWaves(noaa.replace('units="m"','units="ft"'),modelRequest('noaa-ww3',point,at),at),/units/);
 });
+
+
+test('HYCOM serializes distinct points across service instances while cached reads remain available',async()=>{
+ const {db,docs}=database();let release,calls=0,hold=false;
+ const config={db,now:()=>at,wait:async()=>{},fetchImpl:async url=>{
+  if(!url.includes('hycom'))throw Error('Wave fixture unavailable');
+  calls++;if(hold)await new Promise(resolve=>release=resolve);
+  const params=new URL(url).searchParams;return new Response(csv(Number(params.get('latitude')),Number(params.get('longitude'))));
+ }};
+ const one=createEnvironmentService(config),two=createEnvironmentService(config);
+ const query=longitude=>({kind:'marine',latitude:-18.5,longitude});
+ await one(query(147.5));hold=true;const active=one(query(149));
+ while(!release)await new Promise(resolve=>setImmediate(resolve));
+ await assert.rejects(two(query(150)));assert.equal(calls,2,'Different coordinates must not start concurrent HYCOM fetches');
+ assert.ok((await two(query(147.5))).current.ocean_current_velocity>0,'A cache hit does not need the upstream lock');
+ assert.equal(calls,2);release();await active;
+ assert.equal(docs.get('serviceControls/environment-hycom-espc').requestLeaseUntilMs,0);
+ hold=false;await two(query(151));assert.equal(calls,3,'Successful completion releases the shared lock');
+});
+
+test('HYCOM failure releases its reservation and a late completion cannot clear a newer owner',async()=>{
+ const {db,docs}=database();let clock=at,release,calls=0;
+ const config={db,now:()=>clock,wait:async()=>{},fetchImpl:async url=>{
+  if(!url.includes('hycom'))throw Error('Wave fixture unavailable');
+  calls++;if(calls===1)throw Error('Upstream offline');
+  if(calls===2)await new Promise(resolve=>release=resolve);
+  const params=new URL(url).searchParams;return new Response(csv(Number(params.get('latitude')),Number(params.get('longitude'))));
+ }};
+ const one=createEnvironmentService(config),two=createEnvironmentService(config),query=longitude=>({kind:'marine',latitude:-18.5,longitude});
+ await assert.rejects(one(query(147.5)));
+ assert.equal(docs.get('serviceControls/environment-hycom-espc').requestLeaseUntilMs,0);
+ const active=one(query(149));while(!release)await new Promise(resolve=>setImmediate(resolve));
+ // Simulate an expired crashed worker reservation being replaced transactionally.
+ clock+=41000;const successor={...docs.get('serviceControls/environment-hycom-espc'),requestOwner:'successor',requestLeaseUntilMs:clock+40000};
+ docs.set('serviceControls/environment-hycom-espc',successor);release();await active;
+ assert.equal(docs.get('serviceControls/environment-hycom-espc').requestOwner,'successor');
+ await assert.rejects(two(query(150)));assert.equal(calls,2);
+ clock+=41000;await two(query(151));assert.equal(calls,3,'An abandoned lock expires and permits recovery');
+});

@@ -183,14 +183,14 @@ try {
       missedBiteLoss?.rewardEligible === false && missedBiteLoss?.catchesAfter === missedBiteLoss?.catchesBefore &&
       /missed bite/i.test(missedBiteLoss?.message || '') && /try another cast/i.test(missedBiteLoss?.gesture || ''),
     mappedWaterIdentity: !!verifiedFishing.accessContext?.waterbodyId && verifiedFishing.accessContext?.sourceDataset !== 'synthetic-transition',
-    sharedPopulationAuthority: verifiedFishing.populationContext?.authorityVersion === 'water-fish-authority-v2' &&
+    sharedPopulationAuthority: verifiedFishing.populationContext?.authorityVersion === 'water-fish-authority-v3' &&
       verifiedFishing.populationContext?.waterbody?.id === verifiedFishing.accessContext?.waterbodyId &&
       verifiedFishing.populationContext?.access?.mode === 'shore',
     honestVirtualCatchModel: verifiedFishing.populationContext?.evidence?.populationTruth === 'gameplay-model-only' &&
       verifiedFishing.populationContext?.evidence?.livePresenceClaim === false &&
       verifiedFishing.fish?.populationEvidence === 'gameplay-model-only' &&
       verifiedFishing.fish?.livePresenceClaim === false,
-    shoreJournalTruthPersisted: shoreRecord?.evidencePayload?.fishingAuthorityVersion === 'water-fish-authority-v2' &&
+    shoreJournalTruthPersisted: shoreRecord?.evidencePayload?.fishingAuthorityVersion === 'water-fish-authority-v3' &&
       shoreRecord?.evidencePayload?.accessMode === 'shore' && shoreRecord?.evidencePayload?.livePresenceClaim === false &&
       shoreRecord?.evidencePayload?.locationPrecision === 'generalized-100m',
     mobileControlsAndExit: controlGeometry?.action?.width >= 80 && controlGeometry?.action?.height >= 80 &&

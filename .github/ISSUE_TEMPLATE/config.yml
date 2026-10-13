@@ -1,5 +1,5 @@
 blank_issues_enabled: false
 contact_links:
-  - name: Documentation index
-    url: https://github.com/RRG314/WorldExplorer3D#project-documents
-    about: Review the project documentation before opening an issue.
+  - name: Known limitations
+    url: https://github.com/RRG314/WorldExplorer3D/blob/stable/KNOWN_ISSUES.md
+    about: Check current limitations and supported gameplay before reporting a problem.

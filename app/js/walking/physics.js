@@ -9,6 +9,7 @@ import { getPlanetarySurfaceRegion } from '../planetary/runtime/surface-authorit
 import { resolvePlanetarySurfaceBoundary } from '../planetary/runtime/surface-boundary.js?v=1';
 import { queryPlanetaryObstacle } from '../planetary/runtime/obstacle-authority.js?v=1';
 import { resolveInteriorCeiling } from '../interiors/vertical-boundary.js?v=2';
+import { usesContainedInteriorPhysics } from '../interiors/physics-scope.js';
 import { constrainTunnelActorCeiling, resolveTunnelSpace } from '../world/compiler/tunnel-space-query.js';
 
 function wrapYaw(angle = 0) {
@@ -61,6 +62,7 @@ function createWalkingPhysicsHelpers({
 
   function buildingBlocksWalkerAtHeight(b, walkerFeetY, actorHeight = CFG.eyeHeight * 0.95, tolerance = 0.45) {
     if (!b || !Number.isFinite(walkerFeetY)) return true;
+    if(b.isInteriorCollider)tolerance=.02;
     const minY = Number.isFinite(b?.minY) ? b.minY : Number.isFinite(b?.baseY) ? b.baseY : NaN;
     const maxY = Number.isFinite(b?.maxY) ? b.maxY : Number.isFinite(minY) && Number.isFinite(b?.height) ? minY + b.height : NaN;
     if (!Number.isFinite(minY) || !Number.isFinite(maxY)) return true;
@@ -69,7 +71,7 @@ function createWalkingPhysicsHelpers({
   }
 
   function queryBuildings(x, z, radius = 100) {
-    if (appCtx.activeInterior?.environmentKind === 'expedition-ship') return appCtx.dynamicBuildingColliders || [];
+    if (usesContainedInteriorPhysics(appCtx.activeInterior)) return appCtx.dynamicBuildingColliders || [];
     if (typeof getNearbyBuildings === "function") {
       const nearby = getNearbyBuildings(x, z, radius);
       if (Array.isArray(nearby)) {
@@ -206,7 +208,7 @@ function createWalkingPhysicsHelpers({
     let effectiveGroundY = groundY;
     let onBuilding = false;
 
-    if (!isPlanetarySurface() && appCtx.activeInterior?.environmentKind !== 'expedition-ship') {
+    if (!isPlanetarySurface() && !usesContainedInteriorPhysics(appCtx.activeInterior)) {
       const roofInfo = getBuildingRoofHeight(x, z, walkerY);
       if (roofInfo && roofInfo.roofY > groundY) {
         effectiveGroundY = roofInfo.roofY;
@@ -214,7 +216,7 @@ function createWalkingPhysicsHelpers({
       }
     }
 
-    if (appCtx.activeInterior?.environmentKind !== 'expedition-ship' && typeof appCtx.getBuildTopSurfaceAtWorldXZ === "function") {
+    if (!usesContainedInteriorPhysics(appCtx.activeInterior) && typeof appCtx.getBuildTopSurfaceAtWorldXZ === "function") {
       const feetY = finiteOr(walkerY, 0) - CFG.eyeHeight;
       const topY = appCtx.getBuildTopSurfaceAtWorldXZ(x, z, feetY + CFG.blockStepHeight);
       if (Number.isFinite(topY) && topY > effectiveGroundY) {
@@ -522,7 +524,7 @@ function createWalkingPhysicsHelpers({
         ? appCtx.checkBuildingCollision
         : null;
       const checkBuildingsFallback = !isPlanetarySurface() && !sharedBuildingCollision && (getBuildingsArray || getNearbyBuildings);
-      const checkBuildBlocks = appCtx.activeInterior?.environmentKind !== 'expedition-ship' && typeof appCtx.getBuildCollisionAtWorldXZ === "function";
+      const checkBuildBlocks = !usesContainedInteriorPhysics(appCtx.activeInterior) && typeof appCtx.getBuildCollisionAtWorldXZ === "function";
       const checkPlanetaryObstacles = isPlanetarySurface();
       if (sharedBuildingCollision || checkBuildingsFallback || checkBuildBlocks || checkPlanetaryObstacles) {
         const allBuildings = checkBuildingsFallback ? queryBuildings(newX, newZ, 32) || [] : [];
@@ -571,7 +573,7 @@ function createWalkingPhysicsHelpers({
                 if (sx < b.minX || sx > b.maxX || sz < b.minZ || sz > b.maxZ) continue;
 
                 const roofY = buildingRoofYAt(b, sx, sz);
-                if (walkerFeetY >= roofY - 1.0) continue;
+                if (!b.isInteriorCollider && !b.isTransportCollider && walkerFeetY >= roofY - 1.0) continue;
 
                 const inside = isPointInPolygon && b.pts && b.pts.length > 0
                   ? isPointInPolygon(sx, sz, b.pts)
@@ -608,7 +610,7 @@ function createWalkingPhysicsHelpers({
           }
         }
       }
-      if (!isPlanetarySurface() && appCtx.activeInterior?.environmentKind !== 'expedition-ship' && typeof appCtx.resolveUrbanActorCollision === 'function') {
+      if (!isPlanetarySurface() && !usesContainedInteriorPhysics(appCtx.activeInterior) && typeof appCtx.resolveUrbanActorCollision === 'function') {
         const urbanCollision = appCtx.resolveUrbanActorCollision(
           { x: state.walker.x, z: state.walker.z },
           { x: newX, z: newZ },

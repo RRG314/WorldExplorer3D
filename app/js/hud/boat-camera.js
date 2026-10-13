@@ -78,6 +78,17 @@ function resolveBoatCameraFraming(input = {}) {
   });
 }
 
+// The overview must fit the admitted vessel, including a tall mast and a
+// portrait viewport. A fixed 42-unit camera clipped the new research ship.
+function resolveBoatOverviewFraming({length,width,height,fov=60,aspect=1}={}) {
+  const l=Math.max(1,Number(length)||1),w=Math.max(1,Number(width)||1),h=Math.max(1,Number(height)||1);
+  const vertical=Math.max(10,Math.min(100,Number(fov)||60))*Math.PI/360;
+  const horizontal=Math.atan(Math.tan(vertical)*Math.max(.2,Number(aspect)||1));
+  const radius=Math.hypot(l,w,h)*.5;
+  const distance=radius/Math.sin(Math.min(vertical,horizontal)) * 1.12;
+  return {height:distance*.92,back:distance*Math.sqrt(1-.92*.92),targetY:h*.5};
+}
+
 function ensureBoatCameraRig(forceReset = false) {
   if (!appCtx.camera?.userData) return null;
   if (forceReset || !appCtx.camera.userData.boatrig) {
@@ -221,10 +232,11 @@ function updateBoatCamera() {
     if (appCtx.boatMode.mesh) appCtx.boatMode.mesh.visible = false;
   } else {
     appCtx.camera.up.set(0, 1, 0);
-    appCtx.camera.position.set(appCtx.boat.x, boatY + 42, appCtx.boat.z + 18);
-    appCtx.camera.lookAt(appCtx.boat.x, boatY, appCtx.boat.z);
+    const framing=resolveBoatOverviewFraming({...catalog.dimensions,fov:appCtx.camera.fov,aspect:appCtx.camera.aspect});
+    appCtx.camera.position.set(appCtx.boat.x, boatY + framing.targetY + framing.height, appCtx.boat.z + framing.back);
+    appCtx.camera.lookAt(appCtx.boat.x, boatY + framing.targetY, appCtx.boat.z);
   }
 }
 
 
-export { clampValue, normalizeHeading, resolveBoatCameraFraming, updateBoatCamera };
+export { clampValue, normalizeHeading, resolveBoatCameraFraming, resolveBoatOverviewFraming, updateBoatCamera };

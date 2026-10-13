@@ -1,3 +1,4 @@
+import {mergeInteriorHomeSnapshots} from '../app/js/real-estate/housing-model.js';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -70,5 +71,13 @@ test('curated furniture remains presentation beneath functional interior authori
   assert.match(runtime, /attachCuratedHomeFurnishing/);
   assert.match(runtime, /disposeCuratedHomeFurnishing/);
   assert.match(builder, /suppressPartitions:\s*options\.curatedHome\s*===\s*true/);
-  assert.match(propertyUi, /getExplorerPropertySnapshot\s*=\s*snapshot/);
+  assert.match(propertyUi, /getExplorerPropertySnapshot\s*=\s*\(\)\s*=>/);
+  assert.match(propertyUi, /mergeInteriorHomeSnapshots\(view,personal\)/);
+});
+
+test('interior home view joins personal and connected records without creating or changing ownership',()=>{
+  const connected={homes:[{id:'a',owned:false}],credits:10},personal={homes:[{id:'a',owned:true},{id:'b',personalStarter:true}]};
+  const before=structuredClone({connected,personal});const view=mergeInteriorHomeSnapshots(connected,personal);
+  assert.deepEqual(view.homes,[connected.homes[0],personal.homes[1]]);assert.equal(view.credits,10);
+  assert.deepEqual({connected,personal},before);
 });

@@ -1,7 +1,7 @@
-import {RESEARCH_DECK} from '../boat-mode/research/layout.js';
-import {addResearchDeckVisual} from '../boat-mode/research/visual.js';
+import {detachSceneObject} from '../engine/scene-object-lifecycle.js';
 import {batchStaticVesselParts} from './batch-static-vessel-parts.js';
 import { transportDamagePresentation } from './damage-model.js?v=1';
+import { createLicensedResearchVessel } from '../boat-mode/research/licensed-visual.js';
 
 const COLORS = Object.freeze({
   hull: 0x174d55,
@@ -45,7 +45,7 @@ function hullGeometry(THREE, entry, lower = false) {
   const vertices = [];
   const indices = [];
   stations.forEach((station) => {
-    const yTop = lower ? 0 : entry.role==='research' && station.z<=.25 ? RESEARCH_DECK.y-.05 : station.top;
+    const yTop = lower ? 0 : station.top;
     const yKeel = station.keel;
     vertices.push(
       -halfWidth * station.width, yTop, length * station.z,
@@ -251,16 +251,6 @@ function addFerry(THREE, group, entry, materials, options) {
   addMast(THREE, group, 0, bridge.topY, bridge.z, entry.dimensions.height * .24, materials);
 }
 
-function addResearch(THREE, group, entry, materials, options) {
-  const deck=addResearchDeckVisual(THREE,group,materials,{detailed:options.state==='active'});
-  addMast(THREE,group,0,deck.bridgeTop,entry.dimensions.length*.2,entry.dimensions.height*.45,materials);
-  const craneBase = new THREE.Vector3(entry.dimensions.width * .23, 1.25, -entry.dimensions.length * .25);
-  const craneTop = craneBase.clone().add(new THREE.Vector3(0, entry.dimensions.height * .25, 0));
-  const craneTip = craneTop.clone().add(new THREE.Vector3(-entry.dimensions.width * .32, -.5, -entry.dimensions.length * .18));
-  group.add(cylinderBetween(THREE, craneBase, craneTop, .18, materials.dark, 10));
-  group.add(cylinderBetween(THREE, craneTop, craneTip, .15, materials.dark, 10));
-}
-
 function addCargo(THREE, group, entry, materials, options) {
   const length = entry.dimensions.length;
   const width = entry.dimensions.width;
@@ -323,6 +313,7 @@ function addCargo(THREE, group, entry, materials, options) {
 }
 
 function createVesselVisual(THREE, entry, options = {}) {
+  if(entry.id==='ocean-research-vessel')return createLicensedResearchVessel(THREE,entry,options);
   const materials = {
     hull: mat(THREE, COLORS.hull, .58, .15, { emissive: 0x031416, emissiveIntensity: .16 }),
     hullLower: mat(THREE, COLORS.hullLower, .72, .1),
@@ -350,7 +341,6 @@ function createVesselVisual(THREE, entry, options = {}) {
   else if (entry.role === 'workboat') addWorkboat(THREE, root, entry, materials, options);
   else if (entry.role === 'tug') addTug(THREE, root, entry, materials, options);
   else if (entry.role === 'ferry') addFerry(THREE, root, entry, materials, options);
-  else if (entry.role === 'research') addResearch(THREE, root, entry, materials, options);
   else addCargo(THREE, root, entry, materials, options);
 
   addNavigationLights(THREE, root, entry, Math.max(.8, entry.dimensions.height * .1), entry.dimensions.length * .34);
@@ -406,8 +396,13 @@ function createVesselVisual(THREE, entry, options = {}) {
     child.receiveShadow = true;
   });
   const dispose = () => {
+    const managed = [];
+    root.traverse(object => {
+      if (object.userData?.disposeCuratedMarineVisual) managed.push(object.userData.disposeCuratedMarineVisual);
+    });
+    for (const release of managed) release();
     if (root.parent?.remove) root.parent.remove(root);
-    else root.removeFromParent?.();
+    else detachSceneObject(root);
     root.traverse((object) => {
       object.geometry?.dispose?.();
       if(object.isSprite||object.material?.userData?.ownedLocalCanvasTexture)object.material?.map?.dispose?.();
@@ -422,7 +417,9 @@ function updateVesselVisual(visual, condition = 1) {
   if (!visual?.root) return;
   const presentation = transportDamagePresentation(condition);
   if (visual.root.userData.damageBand === presentation.band &&
-      visual.root.userData.condition === presentation.condition) return;
+      visual.root.userData.condition === presentation.condition &&
+      visual.root.userData.damageVisualState === visual.root.userData.researchVesselState) return;
+  visual.root.userData.damageVisualState=visual.root.userData.researchVesselState;
   visual.root.userData.condition = presentation.condition;
   visual.root.userData.damageBand = presentation.band;
   visual.root.userData.damagePresentation = presentation;

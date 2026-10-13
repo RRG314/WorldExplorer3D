@@ -1,4 +1,5 @@
 import { explorerProgressSnapshot } from './explorer-events.js?v=3';
+import { researchStarter } from '../campaign/research-starters.js';
 
 const RELEASED_EXPLORER_TOOLS = Object.freeze([
   'field-lens', 'field-camera', 'metal-detector', 'hand-trowel', 'fishing-rod',
@@ -51,10 +52,12 @@ function explorerGoalSnapshot({ profile = {}, guide = [], items = [], events = [
   const progress = explorerProgressSnapshot(profile.explorerProgress);
   const regionalIdentifications = guideIdentificationsInRegion(guide, regionId);
   const fieldEvents = events.filter((event) => ['discovery-recorded', 'specimen-collected'].includes(event.eventType));
+  const chosenResearch = researchStarter(profile.openingChapter?.careerId);
+  const hasFieldRecord = progress.paths.field.records > 0 || fieldEvents.length > 0;
   let goal;
-  if (!fieldEvents.length) {
+  if (!hasFieldRecord) {
     goal = { id: 'first-discovery', label: 'Make your first discovery', detail: 'Choose a nearby lead and record what you find.', current: 0, target: 1, reward: 'Start your Journal and Field Guide' };
-  } else if (!items.length) {
+  } else if (!items.length && (!chosenResearch || chosenResearch.id === 'general')) {
     goal = { id: 'first-collection', label: 'Collect your first specimen', detail: 'Use a collecting activity such as metal detecting in a suitable place.', current: 0, target: 1, reward: 'Learn Discover versus Collect' };
   } else if (regionalIdentifications < 3) {
     goal = { id: 'regional-starter', label: `Survey ${regionLabel}`, detail: 'Identify three different discoveries in this region.', current: regionalIdentifications, target: 3, reward: 'Complete your first regional goal' };

@@ -1,3 +1,4 @@
+import { missionPodLaunchReady } from '../universe/mission-navigation.js';
 import {RESEARCH_BENCHES} from './research-workbench.js';
 import {podBayCycle} from './pod-bay-cycle.js';
 import {createShipObservation} from './ship-observation.js';
@@ -1703,8 +1704,11 @@ function deriveShipGuidance(session) {
     if (mission.phase === 'analysis') {
       return stationGuidance('analysis-review', mission.currentObjective || mission.title, 'Review the returned field evidence in Analysis & Data.', 'destination-mission');
     }
-    if (mission.phase === 'fieldwork' && mission.surfaceRequired && mission.atDestination) {
+    if (missionPodLaunchReady(appCtx, mission, appCtx.getInterstellarExpeditionSnapshot?.())) {
       return stationGuidance('craft-bay-status', mission.currentObjective || mission.title, 'Board the pod at its side hatch and launch for the surface.', 'destination-mission');
+    }
+    if (mission.destinationId === 'moon' && mission.phase === 'approach') {
+      return stationGuidance('science-survey', 'Prepare the lunar field kit', 'Choose a method and calibrate the instruments at the Science Lab.', 'destination-mission');
     }
     if (mission.phase === 'approach' || mission.phase === 'available') {
       return stationGuidance('bridge-flight', mission.currentObjective || mission.title, 'Return to flight and follow the active destination course.', 'destination-mission');

@@ -52,8 +52,10 @@ function createVehicleUpgradeStore(options = {}) {
 
   function save() {
     try {
+      if (!storage?.setItem) return false;
       storage?.setItem?.(VEHICLE_UPGRADE_STORAGE_KEY, JSON.stringify({ schemaVersion: VEHICLE_UPGRADE_SCHEMA_VERSION, vehicles }));
-    } catch (_) {}
+      return true;
+    } catch (_) {return false;}
   }
 
   function levels(vehicle = {}) {
@@ -74,8 +76,12 @@ function createVehicleUpgradeStore(options = {}) {
     const parsed = parseUpgradeServiceId(serviceId);
     if (!parsed || !canApply(vehicle, serviceId)) return Object.freeze({ ok: false, reason: 'wrong_upgrade_level' });
     const vehicleId = stableVehicleIdentity(vehicle);
+    const previous=vehicles[vehicleId];
     vehicles[vehicleId] = { ...(vehicles[vehicleId] || {}), [parsed.upgradeId]: parsed.level };
-    save();
+    if (!save()) {
+      if (previous) vehicles[vehicleId]=previous;else delete vehicles[vehicleId];
+      return Object.freeze({ok:false,reason:'save_failed'});
+    }
     const change = Object.freeze({ ok: true, vehicleId, upgradeId: parsed.upgradeId, level: parsed.level, definition: parsed.definition });
     listeners.forEach((listener) => listener(change));
     return change;

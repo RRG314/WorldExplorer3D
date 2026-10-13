@@ -1,3 +1,8 @@
+import { LUNAR_STRATEGIES, atLunarPreparationStation } from '../planetary/lunar-survey.js';
+import { createLunarFieldPower, createLunarPowerController } from '../planetary/lunar-field-power.js';
+import { getDestinationMission } from '../universe/mission-catalog.js?v=3';
+import { createDestinationMissionStore } from '../universe/mission-authority.js?v=3';
+import { missionPodLaunchReady, setMissionCourse, localMoonOuting } from '../universe/mission-navigation.js';
 import {RESEARCH_BENCHES,applyResearchCommand,availableResearchSample,sampleIsMounted} from './research-workbench.js';
 import { publishMissionMarkup } from './mission-dom.js';
 import { DEFAULT_CREW, getPropulsionProfile, getShipProfile, PROPULSION_PROFILES, SHIP_PROFILES } from './catalog.js?v=2';
@@ -17,7 +22,7 @@ import { registerExpeditionDiscovery } from './contact-authority.js?v=4';
 import { createPodJourney, POD_PHASE, POD_ROUTE_KIND, transitionPodJourney } from './pod-journey-authority.js?v=2';
 import { approvedSampleTradeValue, summarizeExpeditionTransfers } from '../resources/material-catalog.js?v=2';
 import { SHIP_STATIONS } from './ship-layout.js?v=6';
-import { consumeStagedEarthPod, getStagedEarthPodSnapshot, playSurfacePodLaunch, stageEarthPod } from '../planetary/surface-pod-launch.js?v=11';
+import { consumeStagedEarthPod, getStagedSurfacePod, getStagedEarthPodSnapshot, playSurfacePodLaunch, stageEarthPod } from '../planetary/surface-pod-launch.js?v=11';
 import { SPACE_CRAFT_IDENTITY } from '../space/craft-identity.js?v=1';
 import { SPACE_TRAVEL_LOCATION, SPACE_TRAVEL_PHASE } from '../space/travel-session.js?v=1';
 import { campaignMissionDestinationId, campaignObjective, campaignPhase, completeCampaign } from './campaign.js?v=1';
@@ -43,6 +48,14 @@ let podCourseTimer = 0;
 let podRecoveryTimer = 0;
 let campaignEventsBound = false;
 let pirateMutationChain = Promise.resolve();
+const lunarPower = createLunarPowerController({
+  readJourney: () => activePodJourney,
+  commitJourney: next => setPodJourney(next),
+  isActive: () => activeContext?.getEnv?.() === 'MOON' && !activeContext.paused && !activeContext.worldLoading
+    && !activeContext.surfacePodLaunchSnapshot && !globalThis.document?.hidden && activeContext.Walk?.state?.mode === 'walk',
+  position: () => activeContext?.Walk?.state?.walker,
+  returnPoint: () => getStagedSurfacePod('moon')?.position
+});
 
 function bindRuntimeContext(appContext) {
   activeContext = appContext || activeContext;
@@ -61,6 +74,9 @@ function bindRuntimeContext(appContext) {
     markExpeditionPodDescent,
     markExpeditionPodLanded,
     markExpeditionPodSurfaceLaunch,
+    updateLunarFieldPower: lunarPower.update,
+    getLunarFieldPower: lunarPower.snapshot,
+    retryLunarFieldPower: lunarPower.retry,
     stageEarthPathfinder
   });
   bindCampaignEvents();
@@ -88,11 +104,10 @@ function prepareSolisReachSurfaceRendezvous(appContext, bodyId = 'earth') {
 }
 
 function setPodJourney(next) {
+  const expedition = activeExpedition && store ? withExpeditionChanges(activeExpedition, { podJourney: next || null }) : null;
+  if (expedition) store.save(expedition);
   activePodJourney = next || null;
-  if (activeExpedition && store) {
-    activeExpedition = withExpeditionChanges(activeExpedition, { podJourney: activePodJourney });
-    store.save(activeExpedition);
-  }
+  if (expedition) activeExpedition = expedition;
   syncSpaceSessionToPodJourney(activePodJourney);
   return activePodJourney;
 }
@@ -163,7 +178,11 @@ function ensureTransitExpedition() {
   store ||= createExpeditionStore();
   activeExpedition = store.load();
   if (!activeExpedition) {
-    activeExpedition = createExpeditionPlan({
+    if (store.status().protectedRecord) {
+      activeContext?.showToast?.('Your saved expedition is protected. This version cannot read it; no progress has been replaced.');
+      return null;
+    }
+    const planned = createExpeditionPlan({
       destinationId: 'proxima-centauri',
       shipId: 'long-range-research-vessel',
       propulsionId: 'radiant-plasma-field-drive',
@@ -171,7 +190,8 @@ function ensureTransitExpedition() {
       survival: 'forgiving',
       crew: DEFAULT_CREW
     });
-    store.save(activeExpedition);
+    try { store.save(planned); activeExpedition = planned; }
+    catch (error) { activeContext?.showToast?.(error.message); return null; }
   }
   activePodJourney = activeExpedition?.podJourney?.type === 'ExpeditionPodJourney'
     ? Object.freeze({ ...activeExpedition.podJourney })
@@ -187,13 +207,13 @@ function currentUniverseFrameId() {
 function activeCampaignMission() {
   const mission = activeContext?.getDestinationMissionSnapshot?.();
   if (!mission || !activeExpedition) return null;
-  return mission.systemId === activeExpedition.destinationId || mission.destinationId === activeExpedition.destinationId ? mission : null;
+  return localMoonOuting(activeContext, mission, activeExpedition) || mission.systemId === activeExpedition.destinationId || mission.destinationId === activeExpedition.destinationId ? mission : null;
 }
 
 function persistActiveExpedition(next) {
   if (!next || !store) return false;
+  store.save(next);
   activeExpedition = next;
-  store.save(activeExpedition);
   activeContext?.updateExpeditionShipRecord?.(activeExpedition);
   return true;
 }
@@ -510,7 +530,10 @@ async function ensureSharedAuthority() {
         sharedState = next;
         if (next?.expedition) {
           activeExpedition = next.expedition;
-          store?.save?.(activeExpedition);
+          // The server has already committed this shared state. Local storage
+          // is a cache here; a cache failure must not roll back the room.
+          try { store?.save?.(activeExpedition); }
+          catch { activeContext?.showToast?.('Shared expedition is current. A local recovery copy could not be saved.'); }
           syncExpeditionContacts(activeExpedition);
           activeContext?.updateExpeditionShipRecord?.(activeExpedition);
         }
@@ -653,7 +676,7 @@ function beginLocalContact(contactId, options = {}) {
   const returnFrameId = activeContext?.universeRuntime?.current?.id || activeExpedition.originId || 'sol';
   const previous = activeExpedition;
   const requirement = recoveryRequirement(activeExpedition);
-  activeExpedition = withExpeditionChanges(activeExpedition, {
+  const nextExpedition = withExpeditionChanges(activeExpedition, {
     voyagePhase: 'local-operation',
     activeLocalContactId: contact.id,
     localOperation: Object.freeze({
@@ -666,7 +689,7 @@ function beginLocalContact(contactId, options = {}) {
     routeContacts: updateContact(contact.id, { localOperationState: 'local-entered', status: 'local-operation' }),
     log: appendMissionLog(activeExpedition, 'local-operation', `${contact.designation} local survey began.`)
   });
-  store.save(activeExpedition);
+  persistActiveExpedition(nextExpedition);
   closeExpeditionPlanner();
   const accepted = activeContext?.travelToUniverseDestination?.(destination.id, {
     kind: options.viaPod ? 'expedition-pod-launch' : 'expedition-local-operation',
@@ -676,8 +699,7 @@ function beginLocalContact(contactId, options = {}) {
     if (options.viaPod) schedulePodPlanetCourse(contact);
     return true;
   }
-  activeExpedition = previous;
-  store.save(activeExpedition);
+  persistActiveExpedition(previous);
   openExpeditionPlanner(activeContext);
   activeContext?.showSpaceFlightMessage?.('The local route is not available from the current flight state.', '#f59e0b');
   return false;
@@ -716,7 +738,7 @@ function launchPodToContact(contactId, released = false) {
 
 function launchDestinationMissionPod(released = false) {
   const mission = activeContext?.getDestinationMissionSnapshot?.();
-  if (!activeExpedition || !mission?.surfaceRequired || mission.phase !== 'fieldwork' || !mission.atDestination) return false;
+  if (!missionPodLaunchReady(activeContext, mission, activeExpedition)) return false;
   if (!released) {
     const started=activeContext?.beginExpeditionPodLaunch?.(()=>launchDestinationMissionPod(true))===true;
     if(started)closeShipStationPanel();
@@ -740,7 +762,7 @@ function launchDestinationMissionPod(released = false) {
   }
   window.requestAnimationFrame(() => {
     if (!activePodJourney || activePodJourney.bodyId !== mission.destinationId) return;
-    if (activeContext?.universeRuntime?.course?.destination?.id !== mission.destinationId && !activeContext?.travelToUniverseDestination?.(mission.destinationId)) {
+    if (!setMissionCourse(activeContext, getDestinationMission(mission.destinationId))) {
       advancePodJourney('fail', { reason: 'destination-course-unavailable' });
       activeContext?.showToast?.('The survey course could not be restored. Set the destination in Wayfinder.');
       return;
@@ -803,14 +825,14 @@ function returnFromLocalContact() {
     return false;
   }
   const previous = activeExpedition;
-  activeExpedition = withExpeditionChanges(activeExpedition, {
+  const nextExpedition = withExpeditionChanges(activeExpedition, {
     voyagePhase: 'route-resume',
     activeLocalContactId: null,
     localOperation: null,
     routeContacts: updateContact(contact.id, { localOperationState: 'returned', status: 'surveyed' }),
     log: appendMissionLog(activeExpedition, 'local-operation', `${contact.designation} local survey ended. ${STARSHIP_NAME} resumed the voyage.`)
   });
-  store.save(activeExpedition);
+  persistActiveExpedition(nextExpedition);
   closeExpeditionPlanner();
   const accepted = activeContext?.travelToUniverseDestination?.(operation.returnFrameId || activeExpedition.originId || 'sol', {
     kind: 'expedition-route-return',
@@ -820,8 +842,7 @@ function returnFromLocalContact() {
     if (activePodJourney?.phase === POD_PHASE.RENDEZVOUS) schedulePodRecovery(operation.returnFrameId || activeExpedition.originId || 'sol');
     return true;
   }
-  activeExpedition = previous;
-  store.save(activeExpedition);
+  persistActiveExpedition(previous);
   openExpeditionPlanner(activeContext);
   activeContext?.showSpaceFlightMessage?.(`${STARSHIP_NAME} could not recover the prior route frame.`, '#f59e0b');
   return false;
@@ -866,13 +887,13 @@ function collectExpeditionGeologySample(activity) {
     });
     activeContext?.playerBackpackStore?.save?.(inventory.exportState?.());
   }
-  activeExpedition = withExpeditionChanges(activeExpedition, {
+  const nextExpedition = withExpeditionChanges(activeExpedition, {
     localOperation: Object.freeze({ ...operation, state: 'surface-sampled', sampleCatalogId: catalogId }),
     log: appendMissionLog(activeExpedition, operation.recoveryRequirement ? 'resupply' : 'science', operation.recoveryRequirement
       ? `${contact.designation} field team secured one 4 kg feedstock sample for the ${operation.recoveryRequirement.systemId.replaceAll('-', ' ')} repair.`
       : `${contact.designation} field team collected one 4 kg modeled geology sample.`)
   });
-  store.save(activeExpedition);
+  persistActiveExpedition(nextExpedition);
   activeContext?.showToast?.(`${contact.designation} sample secured in Backpack.`);
   return true;
 }
@@ -922,7 +943,7 @@ function leaveExpeditionSurface(bodyId) {
         resourceSignature: contact.resourceSignature,
         truthClass: 'modeled-game-world-material'
       });
-      activeExpedition = withExpeditionChanges(activeExpedition, {
+      const nextExpedition = withExpeditionChanges(activeExpedition, {
         scienceSamples: Object.freeze([...(activeExpedition.scienceSamples || []), sample]),
         resources: Object.freeze({
           ...activeExpedition.resources,
@@ -931,7 +952,7 @@ function leaveExpeditionSurface(bodyId) {
         localOperation: Object.freeze({ ...operation, state: 'cargo-loaded', transferredSampleId: sample.id }),
         log: appendMissionLog(activeExpedition, 'science', `Transferred one ${sample.massKg} kg ${contact.designation} sample from Backpack to ${STARSHIP_NAME} cargo.`)
       });
-      store.save(activeExpedition);
+      persistActiveExpedition(nextExpedition);
       activeContext?.updateExpeditionShipRecord?.(activeExpedition);
       return true;
     },
@@ -945,18 +966,22 @@ function leaveExpeditionSurface(bodyId) {
 }
 
 function leaveDestinationMissionSurface(bodyId) {
-  const mission = activeContext?.getDestinationMissionSnapshot?.();
-  if (!activePodJourney || activePodJourney.bodyId !== bodyId || mission?.destinationId !== bodyId) return false;
-  if (!['fieldwork', 'analysis'].includes(mission.phase)) return false;
-  if (mission.phase === 'fieldwork') activeContext?.showToast?.('Returning with a partial survey. Saved records are retained; relaunch from the Pod Bay to continue.');
+  const mission = getDestinationMission(bodyId);
+  if (!activePodJourney || activePodJourney.bodyId !== bodyId || activePodJourney.contactId !== `destination-mission:${bodyId}` || !mission) return false;
+  const state = createDestinationMissionStore().get(mission);
+  if (!['fieldwork', 'analysis', 'complete'].includes(state.phase)) return false;
+  const pod = bodyId === 'moon' ? getStagedSurfacePod('moon') : activeContext?.getActivePlanetaryReturnPod?.();
+  const actor = activeContext?.Walk?.state?.mode === 'walk' ? activeContext.Walk.state.walker : activeContext?.car;
+  if (!pod || !actor || Math.hypot(actor.x-pod.position.x, actor.z-pod.position.z, actor.y-(pod.userData.surfaceGroundY ?? pod.position.y)) > Number(pod.userData.boardingRadius || 5.5)) return false;
+  if (state.phase === 'fieldwork') activeContext?.showToast?.('Returning with a partial survey. Saved records are retained; relaunch from the Pod Bay to continue.');
   if (!markExpeditionPodSurfaceLaunch(bodyId)) return false;
   const launchVisible = playSurfacePodLaunch(activeContext, {
-    bodyId,
-    pod: activeContext?.getActivePlanetaryReturnPod?.(),
+    bodyId, pod,
     onCommit: () => {
       const departureStarted = activeContext?.startSpaceFlightFromExpeditionSurface?.({
         frameId: mission.systemId || activePodJourney.returnFrameId,
         courseDestinationId: bodyId,
+        onBeforeTransition: () => { if (bodyId === 'moon') consumeStagedEarthPod(pod); },
         onReady: () => {
           if (activePodJourney?.phase === POD_PHASE.SURFACE_LAUNCH) advancePodJourney('rendezvous');
           if (activePodJourney?.phase === POD_PHASE.RENDEZVOUS) {
@@ -965,14 +990,14 @@ function leaveDestinationMissionSurface(bodyId) {
           }
         }
       }) === true;
-      if (!departureStarted) advancePodJourney('fail', { reason: 'destination-surface-launch-unavailable' });
       return departureStarted;
+    },
+    onFailure: () => {
+      if (activePodJourney?.phase === POD_PHASE.SURFACE_LAUNCH) advancePodJourney('cancel_launch');
+      activeContext?.showToast?.('Pathfinder remained on the surface. Your field records are safe; retry the hatch.');
     }
   });
-  if (!launchVisible) {
-    advancePodJourney('fail', { reason: 'destination-surface-launch-presentation-unavailable' });
-    return false;
-  }
+  if (!launchVisible) { advancePodJourney('cancel_launch'); return false; }
   return true;
 }
 
@@ -1028,7 +1053,8 @@ function renderPlanner() {
   });
   root.querySelector('#expeditionClose').addEventListener('click', closeExpeditionPlanner);
   root.querySelector('#expeditionPlan').addEventListener('click', () => {
-    activeExpedition = createExpeditionPlan({
+    try {
+    const planned = createExpeditionPlan({
       destinationId: selectedValue('expeditionDestination', 'proxima-centauri'),
       shipId: selectedValue('expeditionShip', 'long-range-research-vessel'),
       propulsionId: selectedValue('expeditionPropulsion', 'radiant-plasma-field-drive'),
@@ -1037,8 +1063,9 @@ function renderPlanner() {
       reserveMargin: Number(selectedValue('expeditionReserveMargin', '0.15')),
       crew: DEFAULT_CREW
     });
-    store.save(activeExpedition);
+    persistActiveExpedition(planned);
     renderMission();
+    } catch (error) { activeContext?.showToast?.(error.message); }
   });
   if (activeExpedition) renderMission();
 }
@@ -1109,14 +1136,15 @@ async function applyExpeditionMutation(next, mutationKind, command = null) {
     if (!sharedParticipant()) throw new Error('Join the room crew before changing its Expedition.');
     if (!command) throw new Error('That shared Expedition action is not available yet.');
     const response = await sharedAuthority?.commit?.(command);
-    if (response?.state?.expedition) {
-      sharedState = response.state;
-      activeExpedition = response.state.expedition;
-    }
+    if (!response?.state?.expedition) return false;
+    sharedState = response.state;
+    activeExpedition = response.state.expedition;
+    try { store.save(activeExpedition); }
+    catch { activeContext?.showToast?.('Shared expedition saved to the room. The local recovery copy is unavailable.'); }
   } else {
+    store.save(next);
     activeExpedition = next;
   }
-  store.save(activeExpedition);
   activeContext?.updateExpeditionShipRecord?.(activeExpedition);
   if (activeExpedition.state === 'arrived' && previousState !== 'arrived') window.setTimeout(beginExpeditionArrivalTransfer, 0);
   return true;
@@ -1354,8 +1382,9 @@ function crewMissionAdvice(crew) {
     });
   }
   const mission = activeContext?.getDestinationMissionSnapshot?.();
+  if (mission?.destinationId === 'moon' && mission.phase === 'approach' && !missionPodLaunchReady(activeContext, mission, activeExpedition)) return Object.freeze({ stationId: 'science-survey', title: 'Prepare the lunar kit', message: 'Choose observation or sample collection at the Science Lab, then continue to the Pod Bay.' });
   if (mission?.phase === 'analysis') return Object.freeze({ stationId: 'analysis-review', title: mission.currentObjective || mission.title, message: `${crew.name} recommends taking the returned field record to Analysis & Data before continuing.` });
-  if (mission?.phase === 'fieldwork' && mission.surfaceRequired && mission.atDestination) return Object.freeze({ stationId: 'craft-bay-status', title: mission.currentObjective || mission.title, message: `${crew.name} recommends taking the lift to Engineering, boarding the pod at its side hatch, and checking the landing objective before launch.` });
+  if (missionPodLaunchReady(activeContext, mission, activeExpedition)) return Object.freeze({ stationId: 'craft-bay-status', title: mission.currentObjective || mission.title, message: `${crew.name} recommends taking the lift to Engineering, boarding the pod at its side hatch, and checking the landing objective before launch.` });
   if (mission?.phase === 'approach' || mission?.phase === 'available') return Object.freeze({ stationId: 'bridge-flight', title: mission.currentObjective || mission.title, message: `${crew.name} recommends returning to the bridge flight controls and following the selected destination course.` });
   if ((activeExpedition?.routeContacts || []).some((contact) => ['available', 'returned'].includes(contact.localOperationState))) return Object.freeze({ stationId: 'craft-bay-status', title: 'Surveyed world available', message: `${crew.name} recommends using the Pod Launch Bay for the local surface operation.` });
   if (activeExpedition?.state === 'planned') return Object.freeze({ stationId: 'bridge-flight', title: `${STARSHIP_NAME} is ready`, message: `${crew.name} recommends returning to flight controls when you are ready to depart.` });
@@ -1628,6 +1657,9 @@ function renderShipStationPanel(interaction) {
     document.body.appendChild(panel);
   }
   const view = getShipStationView(activeExpedition, interaction.id);
+  const lunarMission = activeContext?.getDestinationMissionSnapshot?.();
+  const lunarPrep = interaction.id === 'science-survey' && lunarMission?.destinationId === 'moon' && lunarMission.phase === 'approach';
+  const lunarBrief = interaction.id === 'navigation-course' && localMoonOuting(activeContext, getDestinationMission('moon'), activeExpedition);
   const voyageEvent = activeExpedition.pendingEvent?.roomId === interaction.roomId ? activeExpedition.pendingEvent : null;
   const voyageEventMarkup = voyageEvent ? `<section class="ship-voyage-response">
     <span>ACTIVE VOYAGE EVENT</span><h3>${voyageEvent.title}</h3><p>${voyageEvent.message}</p>
@@ -1637,11 +1669,24 @@ function renderShipStationPanel(interaction) {
     <header><div><span>${STARSHIP_NAME.toUpperCase()} SYSTEM</span><strong id="shipStationTitle">${view.title}</strong></div><button type="button" data-close-station aria-label="Close station">×</button></header>
     <p>${view.summary}</p>
     ${voyageEventMarkup}
+    ${lunarBrief ? '<section class="ship-station-actions"><button type="button" data-lunar-brief>Plan a Moon field survey</button><small>Two comparison sites on the LROC terrain. Launch Pathfinder from the Pod Bay; return in the same craft to review the field record here aboard Solis Reach.</small></section>' : ''}
+    ${lunarPrep ? `<section class="ship-station-actions ship-station-lunar"><strong>Prepare the lunar field kit</strong><p>Both routes compare two sites. Choose a method, then calibrate its instruments. Your choice is saved before departure. The instrument kit has 20 minutes of field power. Keep the marked return reserve; recover to the ship for a fresh charge. This is game instrument power, separate from life support.</p>${LUNAR_STRATEGIES.map(strategy => `<button type="button" data-lunar-prepare="${strategy.id}">${strategy.label}</button><small>${strategy.description}</small>`).join('')}<p>Return plan: use E at the surface pod, ascend to Solis Reach and dock. Review the records here at Analysis. To reach Earth, use Launch for Earth in the Pod Bay; your saved Earth location is retained.</p>${lunarMission.preparation ? `<small>Prepared: ${LUNAR_STRATEGIES.find(entry => entry.id === lunarMission.preparation.strategy)?.label || 'field kit'}. Continue to the Pod Bay.</small>` : ''}</section>` : ''}
     <div class="ship-station-metrics">${view.metrics.map((metric) => `<div><span>${metric.label}</span><strong>${metric.value}</strong></div>`).join('')}</div>
     ${view.actions.length ? `<div class="ship-station-actions">${view.actions.map((action) => `<button type="button" data-ship-action="${action.id}" ${action.enabled ? '' : 'disabled'}>${action.label}</button>${action.reason ? `<small>${action.reason}</small>` : ''}`).join('')}</div>` : '<small class="ship-station-readonly">This station is informational during the current voyage state.</small>'}
   </div>`;
   panel.classList.add('show');
   panel.querySelector('[data-close-station]')?.addEventListener('click', closeShipStationPanel);
+  panel.querySelectorAll('[data-lunar-prepare]').forEach(button => button.addEventListener('click', async () => {
+    if (!atLunarPreparationStation(activeContext)) return;
+    button.disabled = true;
+    const { prepareLunarMission } = await import('../universe/mission-runtime.js?v=8');
+    if (prepareLunarMission(button.dataset.lunarPrepare)) {
+      activeContext.playExpeditionShipAction?.({ actionId: 'record-baseline', message: 'Lunar field instruments calibrated', interaction });
+      activeContext.showToast?.('Field kit calibrated and return plan saved. Continue to the Pod Bay.');
+    }
+    renderShipStationPanel(interaction);
+  }));
+  panel.querySelector('[data-lunar-brief]')?.addEventListener('click', () => { closeShipStationPanel(); activeContext?.openDestinationMission?.('moon'); });
   panel.querySelectorAll('[data-ship-action]').forEach((button) => button.addEventListener('click', async () => {
     const actionId = button.dataset.shipAction;
     if (actionId === 'load-backpack-materials') {
@@ -1701,16 +1746,17 @@ function renderPodLaunchPanel(interaction) {
   }
   const contacts = podReadyContacts();
   const mission = activeContext?.getDestinationMissionSnapshot?.();
-  const missionReady = Boolean(mission?.surfaceRequired && mission.phase === 'fieldwork' && mission.atDestination);
+  const missionReady = missionPodLaunchReady(activeContext, mission, activeExpedition);
   const blockedByTransit = Boolean(activeContext?.universeRuntime?.transition);
   const earthReady = activeContext?.universeRuntime?.current?.id === 'sol';
   const targetMarkup = contacts.length || missionReady || earthReady
-    ? `<div class="ship-station-actions">${earthReady ? `<button type="button" data-pod-earth ${blockedByTransit ? 'disabled' : ''}>Launch for Earth</button><small>Manual descent · return to the saved Earth location · Pathfinder remains available for the flight back</small>` : ''}${missionReady ? `<button type="button" data-pod-mission ${blockedByTransit ? 'disabled' : ''}>Launch for ${mission.destinationId.split('-').map((word) => word ? word[0].toUpperCase() + word.slice(1) : '').join(' ')}</button><small>${mission.title} · manual approach · three surface field records · return to ${STARSHIP_NAME}</small>` : ''}${contacts.map((contact) => `<button type="button" data-pod-contact="${contact.id}" ${blockedByTransit ? 'disabled' : ''}>Launch for ${contact.designation} I</button><small>${contact.worldClass} · manual orbital and atmospheric approach · surface return pod</small>`).join('')}</div>`
+    ? `<div class="ship-station-actions">${earthReady ? `<button type="button" data-pod-earth ${blockedByTransit ? 'disabled' : ''}>Launch for Earth</button><small>Manual descent · return to the saved Earth location · Pathfinder remains available for the flight back</small>` : ''}${missionReady ? `<button type="button" data-pod-mission ${blockedByTransit ? 'disabled' : ''}>Launch for ${mission.destinationId.split('-').map((word) => word ? word[0].toUpperCase() + word.slice(1) : '').join(' ')}</button><small>${mission.title} · manual approach · ${mission.destinationId === 'moon' ? `two sites · ${mission.preparation?.strategy === 'observe' ? 'undisturbed observations' : 'returned samples'}` : 'three surface field records'} · return to ${STARSHIP_NAME}</small>` : ''}${contacts.map((contact) => `<button type="button" data-pod-contact="${contact.id}" ${blockedByTransit ? 'disabled' : ''}>Launch for ${contact.designation} I</button><small>${contact.worldClass} · manual orbital and atmospheric approach · surface return pod</small>`).join('')}</div>`
     : '<small class="ship-station-readonly">No surveyed surface target is available in this voyage chapter. Continue the Expedition until the crew identifies a local world.</small>';
   panel.innerHTML = `<div class="ship-station-card pod-launch-card" role="dialog" aria-modal="true" aria-labelledby="shipStationTitle">
     <header><div><span>${STARSHIP_NAME.toUpperCase()} FLIGHT DECK</span><strong id="shipStationTitle">Pod Launch Bay</strong></div><button type="button" data-close-station aria-label="Close pod launch">×</button></header>
-    <p>Launch Pathfinder toward the marked world. Pilot the approach, land and visit the three field stations. Return to the ship at any time; saved survey records remain available for your next visit.</p>
+    <p>Launch Pathfinder toward the marked world. Pilot the approach, land and visit the marked field stations. Return to the ship at any time; saved survey records remain available for your next visit.</p>
     <div class="ship-station-metrics"><div><span>Pod</span><strong>Sealed · fueled · surface capable</strong></div><div><span>Flight</span><strong>Manual after bay departure</strong></div><div><span>Landing</span><strong>Guided surface approach</strong></div><div><span>Return</span><strong>Board the same pod on the surface</strong></div></div>
+    ${mission?.destinationId === 'moon' && mission.phase === 'approach' && !missionReady ? '<p>Prepare the lunar kit at the Science Lab before launching this survey.</p>' : ''}
     ${targetMarkup}
   </div>`;
   panel.classList.add('show');
@@ -1771,7 +1817,13 @@ function markExpeditionPodDescent(bodyId) {
 function markExpeditionPodLanded(bodyId) {
   if (!activePodJourney || String(bodyId || '').toLowerCase() !== activePodJourney.bodyId.toLowerCase()) return false;
   if (activePodJourney.phase === POD_PHASE.LOCAL_FLIGHT) advancePodJourney('begin_descent');
-  return activePodJourney.phase === POD_PHASE.DESCENT ? advancePodJourney('surface_ready') : activePodJourney.phase === POD_PHASE.SURFACE;
+  if (activePodJourney.phase === POD_PHASE.DESCENT) return advancePodJourney('surface_ready');
+  // Existing landed sorties retain their evidence and receive the same bounded
+  // instrument budget once. A return/reload never replaces an existing budget.
+  if (activePodJourney.phase === POD_PHASE.SURFACE && bodyId === 'moon' && activePodJourney.contactId === 'destination-mission:moon' && !activePodJourney.fieldPower) {
+    setPodJourney(Object.freeze({ ...activePodJourney, fieldPower: createLunarFieldPower() }));
+  }
+  return activePodJourney.phase === POD_PHASE.SURFACE;
 }
 
 function markExpeditionPodSurfaceLaunch(bodyId) {

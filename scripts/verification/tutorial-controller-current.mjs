@@ -34,6 +34,15 @@ try {
    ctx.resolvePrimaryContextInteraction=()=>null;
    dispatchEvent(new CustomEvent('we3d:context-interaction-completed',{detail:{family:'vehicle'}}));
    const choosing=controller.getTutorialSnapshot();
+   let openedSection = '', fallbackClicks = 0;
+   const route = document.createElement('details'); route.className = 'discoveryTodayRoute'; document.body.append(route);
+   const explorer = document.createElement('button'); explorer.id = 'fWorldDiscovery'; explorer.onclick = () => fallbackClicks++; document.body.append(explorer);
+   ctx.openWorldDiscoverySection = section => { openedSection = section; return true; };
+   controller.tutorialUpdate(.1);
+   document.querySelector('.tutorial-primary').click();
+   await new Promise(requestAnimationFrame);
+   const activityEntry = { openedSection, fallbackClicks, expanded: route.open };
+
    for(const name of ['opened_explorer','opened_backpack','travel_mode_changed','build_mode_entered','entered_space'])controller.tutorialOnEvent(name);
    dispatchEvent(new CustomEvent('we3d:discovery-telemetry',{detail:{type:'activity_started'}}));
    dispatchEvent(new CustomEvent('we3d:explorer-section-opened',{detail:{section:'journal'}}));
@@ -50,7 +59,7 @@ try {
    const duplicate=controller.getTutorialSnapshot();
    ctx.worldLoading=true;controller.tutorialUpdate(.1);
    const reloading=controller.getTutorialSnapshot();
-   return {mobile,duringLoad,afterLoadingPlacement,duringHandoff,firstPlay,requestedGuide,afterMovement,choosing,browsing,recorded,persisted,wrongRecord,reviewed,duplicate,reloading};
+   return {mobile,duringLoad,afterLoadingPlacement,duringHandoff,firstPlay,requestedGuide,afterMovement,choosing,activityEntry,browsing,recorded,persisted,wrongRecord,reviewed,duplicate,reloading};
   },mobile);
   results.push(result);
   await mkdir('output/verification/tutorial-controller',{recursive:true});
@@ -63,6 +72,7 @@ try {
   assert.equal(result.afterMovement.stage,'interact','actual post-load movement must advance the guide');
   assert.equal(result.afterMovement.promptVisible,false,'nearby actions take priority after the movement step');
   assert.equal(result.choosing.stage,'explore');
+  assert.deepEqual(result.activityEntry,{openedSection:'today',fallbackClicks:0,expanded:true},'activity guidance opens the existing activity list without toggling it closed');
   assert.equal(result.browsing.completed,false,'menus, travel, activity start and world visits are not a payoff');
   assert.equal(result.browsing.stage,'explore');
   assert.equal(result.recorded.stage,'review');

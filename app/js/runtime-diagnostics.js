@@ -1,4 +1,5 @@
 import {supportRecorder} from './runtime/support-receipt.js';
+import {modelAssetCacheSnapshot} from './assets/model-asset-runtime.js?v=16';
 import {sceneResourceSnapshot,measureSceneAnimation} from './runtime/scene-resources.js';
 import {capturePresentation} from './runtime/renderer-owners.js';
 import {getSessionStatus,captureEnvironmentSession} from './session-coordinator.js?v=2';
@@ -1056,6 +1057,14 @@ function getWorldExplorerRuntimeDiagnostics() {
     fishing: appCtx.getFishingSnapshot?.() || { open: false, active: false },
     interior: activeInterior ? {
       active: true,
+      aquarium: activeInterior.aquarium ? {id:activeInterior.definition.aquariumContent.id,animals:activeInterior.aquarium.animals.length,loading:activeInterior.aquarium.loading,error:activeInterior.aquarium.error,savedObservations:[...activeInterior.aquarium.saved],panelOpen:!!activeInterior.aquarium.panel} : null,
+      gallery: activeInterior.gallery ? {
+        id: activeInterior.definition.curatedContent.id,
+        representation: activeInterior.definition.curatedContent.kind,
+        savedExhibits: [...activeInterior.gallery.saved],
+        exhibits: [...activeInterior.gallery.exhibits.values()].map(r=>({id:r.exhibit.id,status:r.status})),
+        panelOpen: !!activeInterior.gallery.panel
+      } : null,
       key: String(activeInterior.key || ''),
       mode: String(activeInterior.mode || 'generated'),
       floorId: String(activeInterior.floorId || ''),
@@ -1065,7 +1074,7 @@ function getWorldExplorerRuntimeDiagnostics() {
       floorBaseY: Number(activeInterior.floorBaseY || 0),
       storyHeight: Number(activeInterior.floorPlan?.storyHeight || 0),
       loadedLevels: Array.isArray(activeInterior.loadedLevels) ? [...activeInterior.loadedLevels] : [],
-      connectorsAvailable: activeInterior.connector != null,
+      connectorsAvailable: activeInterior.connector != null || !!activeInterior.authoredLifts?.length,
       walkSurfaceCount: Array.isArray(activeInterior.walkSurfaces) ? activeInterior.walkSurfaces.length : 0,
       colliderCount: Number(appCtx.dynamicBuildingColliders?.length || 0),
       buildingCollisionDisabled: activeInterior.building?.collisionDisabled === true,
@@ -1214,6 +1223,7 @@ function getWorldExplorerRuntimeDiagnostics() {
         }
       : null,
     renderer: rendererOwners.main,
+    modelAssets: modelAssetCacheSnapshot(),
     rendererOwners,
     accessibility: globalThis.getWorldExplorerAccessibilitySnapshot?.() || null,
     lastEarthWorldRelease: appCtx.lastEarthWorldRelease || null,
@@ -1406,13 +1416,21 @@ globalThis.render_game_to_text = () => JSON.stringify({
   marylandParcels: appCtx.marylandParcelRuntimeSnapshot?.() || { status: 'idle', parcelCount: 0 },
   interior: appCtx.activeInterior ? {
     active: true,
+    aquarium: appCtx.activeInterior.aquarium ? {id:appCtx.activeInterior.definition.aquariumContent.id,animals:appCtx.activeInterior.aquarium.animals.length,loading:appCtx.activeInterior.aquarium.loading,error:appCtx.activeInterior.aquarium.error,savedObservations:[...appCtx.activeInterior.aquarium.saved],panelOpen:!!appCtx.activeInterior.aquarium.panel} : null,
+    gallery: appCtx.activeInterior.gallery ? {
+      id: appCtx.activeInterior.definition.curatedContent.id,
+      representation: appCtx.activeInterior.definition.curatedContent.kind,
+      savedExhibits: [...appCtx.activeInterior.gallery.saved],
+      exhibits: [...appCtx.activeInterior.gallery.exhibits.values()].map(r=>({id:r.exhibit.id,status:r.status})),
+      panelOpen: !!appCtx.activeInterior.gallery.panel
+    } : null,
     key: String(appCtx.activeInterior.key || ''),
     floorId: String(appCtx.activeInterior.floorId || ''),
     floorLabel: String(appCtx.activeInterior.floorLabel || 'Lobby'),
     activeLevel: Number(appCtx.activeInterior.activeLevel || 0),
     floorCount: Number(appCtx.activeInterior.floorPlan?.floorCount || 1),
     loadedLevels: Array.isArray(appCtx.activeInterior.loadedLevels) ? [...appCtx.activeInterior.loadedLevels] : [],
-    connectorsAvailable: appCtx.activeInterior.connector != null
+    connectorsAvailable: appCtx.activeInterior.connector != null || !!appCtx.activeInterior.authoredLifts?.length
   } : { active: false },
   worldDiscovery: appCtx.worldDiscoveryRuntimeSnapshot?.() || { active: false },
   editableWorld: appCtx.editableWorldRuntimeSnapshot?.() || { active: false },

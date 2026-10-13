@@ -27,7 +27,17 @@ try {
   }
   assert.deepEqual(errors,[]);
  }
- passed=true;
+ const imagery=await page.evaluate(()=>window.verifyRegionalMaterialLifecycle());
+ for(const state of imagery){
+  assert.equal(state.glError,0,state.mode);
+  const [fallback,regional,local]=state.pixels;
+  assert.ok(fallback.slice(0,3).some((v,i)=>Math.abs(v-results[0].background[i])>20),`${state.mode}: terrain missing`);
+  assert.ok(regional[1]>regional[0]+20,`${state.mode}: regional colour missing`);
+  assert.ok(local[0]>local[1]+20,`${state.mode}: local colour missing`);
+ }
+ assert.deepEqual(imagery[1].pixels,imagery[2].pixels,'independent imagery encoding must not depend on the base-map encoding');
+ assert.deepEqual(imagery[0].pixels,imagery[3].pixels,'base-map retirement must preserve the fallback material');
+ results.push(...imagery);assert.deepEqual(errors,[]);passed=true;
 } finally {
  await writeFile(`${output}/report.json`,JSON.stringify({evidenceScope:'actual GPU shader composition and pixel lifecycle fixture',ok:passed,results,errors},null,2));
  await browser?.close();await server.close();

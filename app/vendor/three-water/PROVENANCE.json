@@ -1,0 +1,24 @@
+{
+  "release": "r128",
+  "license": "MIT",
+  "records": [
+    {
+      "source": "https://raw.githubusercontent.com/mrdoob/three.js/r128/examples/js/objects/Reflector.js",
+      "sourceSha256": "a8db19d9af1a91c07f9da9620600ce1dbf4e18299edad6da8d51f5d1188effb8",
+      "file": "Reflector.js",
+      "adaptedSha256": "f3aa589ba1058b89819969adea206ad225760ffc547657a945775320bbe75d6b"
+    },
+    {
+      "source": "https://raw.githubusercontent.com/mrdoob/three.js/r128/examples/js/objects/Refractor.js",
+      "sourceSha256": "a652c7b018914800a10d17545b384e690a53437ffbd9535c2064c5667501a390",
+      "file": "Refractor.js",
+      "adaptedSha256": "85b82d05a1e9c8a9326a08863d20ced91dda6490c6521c3bdd6e1111e21e7be7"
+    },
+    {
+      "source": "https://raw.githubusercontent.com/mrdoob/three.js/r128/examples/js/objects/Water2.js",
+      "sourceSha256": "432e9a90f3cac46ffb1b80dc29fb6744f831b7cb2b97935c2d67b15b1b30fb45",
+      "file": "Water.js",
+      "adaptedSha256": "deae52956d13a01012d732899216e7350e89b2dac1fc8b309e46c7dd442fa471"
+    }
+  ]
+}

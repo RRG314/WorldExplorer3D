@@ -82,3 +82,45 @@ test('a published sloping river ribbon excludes a coarse water ceiling over its 
  for(let i=0;i<built.geometry.attributes.normal.count;i++)assert.equal(built.geometry.attributes.normal.getY(i),1);
  built.geometry.dispose();geometry.dispose();mesh.material.dispose();
 });
+
+test('background water construction preserves geometry and stops on region cancellation',async()=>{
+ const {buildFarWaterGeometryCooperatively}=await import('../app/js/terrain/far-field-water.js');
+ const mapped={waterAreas:Array.from({length:12},(_,i)=>({identity:`lake-${i}`,surfaceMeters:i*7,outer:[[i*20,0],[i*20+10,0],[i*20+10,10],[i*20,10],[i*20,0]]}))};
+ const context={WORLD_UNITS_PER_METER:1,TERRAIN_Y_EXAGGERATION:1,geoToWorld:(lat,lon)=>({x:lon,z:lat})};
+ const sync=buildFarWaterGeometry(context,mapped);let ticks=0,yields=0;
+ const asyncResult=await buildFarWaterGeometryCooperatively(context,mapped,null,{}, {now:()=>ticks++,budgetMs:2,yieldWork:async()=>{yields++;}});
+ assert.ok(yields>=6);assert.deepEqual(asyncResult.publishedAreaIdentities,sync.publishedAreaIdentities);
+ for(const name of ['position','normal'])assert.deepEqual(asyncResult.geometry.attributes[name].array,sync.geometry.attributes[name].array);
+ assert.deepEqual(asyncResult.geometry.index.array,sync.geometry.index.array);sync.geometry.dispose();asyncResult.geometry.dispose();
+ let current=true;
+ await assert.rejects(buildFarWaterGeometryCooperatively(context,mapped,null,{}, {current:()=>current,now:()=>ticks++,budgetMs:1,yieldWork:async()=>{current=false;}}),/superseded/);
+});
+
+test('water mask keeps exact published bytes and retires its canvas on success or cancellation',async t=>{
+ const {buildMappedWaterTerrainOwnershipMask}=await import('../app/js/terrain/far-field-water.js');
+ const original=globalThis.document;t.after(()=>{globalThis.document=original;});
+ let reads=0;const canvases=[];
+ globalThis.document={createElement:()=>{
+  const canvas={width:0,height:0,getContext:()=>({
+   fillRect(){},beginPath(){},moveTo(){},lineTo(){},closePath(){},fill(){},
+   getImageData(_x,y,w,h){
+    reads++;const data=new Uint8Array(w*h*4);
+    for(let i=0;i<w*h;i++)data[i*4]=(Math.floor(i/w)+y)%251;
+    return {data};
+   }
+  })};canvases.push(canvas);return canvas;
+ }};
+ const spec={outer:{minX:-100,maxX:100,minZ:-100,maxZ:100}};
+ const mapped={waterAreas:[{identity:'lake',outer:square(50),surfaceMeters:0}]};
+ const result=await buildMappedWaterTerrainOwnershipMask(context,mapped,spec,new Set(['lake']),{yieldWork:async()=>{}});
+ assert.equal(result.size,4096);assert.equal(reads,16);
+ assert.equal(canvases[0].width,0);assert.equal(canvases[0].height,0);
+ for(let y=0;y<4096;y++)for(const x of [0,2048,4095])assert.equal(result.texture.image.data[y*4096+x],y%251);
+ result.texture.dispose();
+ reads=0;let current=true;
+ assert.equal(await buildMappedWaterTerrainOwnershipMask(context,mapped,spec,new Set(['lake']),{
+  current:()=>current,yieldWork:async()=>{current=false;}
+ }),null);
+ assert.equal(reads,1,'cancelled work never reads the remaining 15 image chunks');
+ assert.equal(canvases[1].width,0);assert.equal(canvases[1].height,0);
+});

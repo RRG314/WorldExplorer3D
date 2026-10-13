@@ -1,3 +1,6 @@
+import {oceanRenderFrame} from './stream-runtime.js';
+import {OCEAN_DEPTH_MODEL,geographicBottomY,extendPresentationDepth} from './depth-model.js';
+import {marineStudyOffset} from './habitat-plan.js';
 import {
   DEPTH_TRUTH_TYPE,
   GEBCO_WMS_ENDPOINT,
@@ -21,6 +24,45 @@ function sampleGrid(values, cols, rows, x, y) {
     || (w01 > 0 && !Number.isFinite(h01)) || (w11 > 0 && !Number.isFinite(h11))) return null;
   return (w00 ? h00 * w00 : 0) + (w10 ? h10 * w10 : 0)
     + (w01 ? h01 * w01 : 0) + (w11 ? h11 * w11 : 0);
+}
+
+export function parseLocalBathymetryGrid(payload) {
+  if (!payload || typeof payload !== 'object') return null;
+  const bounds = payload.bounds;
+  const grid = payload.grid;
+  const values = payload.elevationsMeters;
+  if (!bounds || !grid || !Array.isArray(values)) return null;
+  const rows = Number(grid.rows);
+  const cols = Number(grid.cols);
+  if (!Number.isInteger(rows) || !Number.isInteger(cols) || rows < 2 || cols < 2) return null;
+  if (values.length !== rows * cols) return null;
+  const latMin = bounds.latMin;
+  const latMax = bounds.latMax;
+  const lonMin = bounds.lonMin;
+  const lonMax = bounds.lonMax;
+  if (![latMin, latMax, lonMin, lonMax].every((v) => Number.isFinite(v))) return null;
+  if (latMax <= latMin || lonMax <= lonMin) return null;
+  return {
+    rows,
+    cols,
+    latMin,
+    latMax,
+    lonMin,
+    lonMax,
+    values,
+    source: payload.source && typeof payload.source === 'object' ? { ...payload.source } : null,
+    generatedAt: String(payload.generatedAt || '') || null,
+    spacingDegreesLat: Number.isFinite(Number(grid.spacingDegreesLat)) ? Number(grid.spacingDegreesLat) : null,
+    spacingDegreesLon: Number.isFinite(Number(grid.spacingDegreesLon)) ? Number(grid.spacingDegreesLon) : null
+  };
+}
+
+export function sampleLocalBathymetryGrid(grid,lat,lon){
+ if (!grid || !Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+ if (lat < grid.latMin || lat > grid.latMax || lon < grid.lonMin || lon > grid.lonMax) return null;
+ const x = (lon - grid.lonMin) / (grid.lonMax - grid.lonMin) * (grid.cols - 1);
+ const y = (grid.latMax - lat) / (grid.latMax - grid.latMin) * (grid.rows - 1);
+ return sampleGrid(grid.values, grid.cols, grid.rows, x, y);
 }
 
 export function createOceanBathymetryApi({
@@ -76,42 +118,9 @@ export function createOceanBathymetryApi({
   }
 
   function oceanWorldToLatLon(x, z) {
-    const lat = oceanMode.launchSite.lat - z / appCtx.SCALE;
-    const lonDenom = appCtx.SCALE * Math.cos(oceanMode.launchSite.lat * Math.PI / 180);
-    const lon = oceanMode.launchSite.lon + x / (Math.abs(lonDenom) > 0.0001 ? lonDenom : appCtx.SCALE);
-    return { lat, lon };
+    return oceanRenderFrame(oceanMode,appCtx.SCALE).toGeographic(x,z);
   }
 
-  function parseLocalBathymetryGrid(payload) {
-    if (!payload || typeof payload !== 'object') return null;
-    const bounds = payload.bounds;
-    const grid = payload.grid;
-    const values = payload.elevationsMeters;
-    if (!bounds || !grid || !Array.isArray(values)) return null;
-    const rows = Number(grid.rows);
-    const cols = Number(grid.cols);
-    if (!Number.isInteger(rows) || !Number.isInteger(cols) || rows < 2 || cols < 2) return null;
-    if (values.length !== rows * cols) return null;
-    const latMin = bounds.latMin;
-    const latMax = bounds.latMax;
-    const lonMin = bounds.lonMin;
-    const lonMax = bounds.lonMax;
-    if (![latMin, latMax, lonMin, lonMax].every((v) => Number.isFinite(v))) return null;
-    if (latMax <= latMin || lonMax <= lonMin) return null;
-    return {
-      rows,
-      cols,
-      latMin,
-      latMax,
-      lonMin,
-      lonMax,
-      values,
-      source: payload.source && typeof payload.source === 'object' ? { ...payload.source } : null,
-      generatedAt: String(payload.generatedAt || '') || null,
-      spacingDegreesLat: Number.isFinite(Number(grid.spacingDegreesLat)) ? Number(grid.spacingDegreesLat) : null,
-      spacingDegreesLon: Number.isFinite(Number(grid.spacingDegreesLon)) ? Number(grid.spacingDegreesLon) : null
-    };
-  }
 
   function primeLocalBathymetryGrid() {
     if (oceanMode.localBathymetryPromise) return oceanMode.localBathymetryPromise;
@@ -138,12 +147,7 @@ export function createOceanBathymetryApi({
   }
 
   function sampleLocalBathymetryMeters(lat, lon) {
-    const grid = oceanMode.localBathymetryGrid;
-    if (!grid || !Number.isFinite(lat) || !Number.isFinite(lon)) return null;
-    if (lat < grid.latMin || lat > grid.latMax || lon < grid.lonMin || lon > grid.lonMax) return null;
-    const x = (lon - grid.lonMin) / (grid.lonMax - grid.lonMin) * (grid.cols - 1);
-    const y = (grid.latMax - lat) / (grid.latMax - grid.latMin) * (grid.rows - 1);
-    return sampleGrid(grid.values, grid.cols, grid.rows, x, y);
+    return sampleLocalBathymetryGrid(oceanMode.localBathymetryGrid,lat,lon);
   }
 
   async function primeGlobalBathymetryGrid() {
@@ -205,6 +209,7 @@ export function createOceanBathymetryApi({
   }
 
   function sampleBathymetryEvidence(x, z) {
+    if(oceanMode.stream)return oceanMode.stream.sample(x,z);
     const { lat, lon } = oceanWorldToLatLon(x, z);
     const localMeters = sampleLocalBathymetryMeters(lat, lon);
     if (Number.isFinite(localMeters)) {
@@ -277,7 +282,9 @@ export function createOceanBathymetryApi({
     return Number.isFinite(mapped) ? mapped : null;
   }
 
-  function sampleProceduralSeabedHeight(x, z) {
+  function studyCoordinates(x,z){const offset=marineStudyOffset(oceanMode.launchSite,appCtx.SCALE);return {x:x-offset.x,z:z-offset.z};}
+  function sampleProceduralSeabedHeight(localX, localZ) {
+    const {x,z}=studyCoordinates(localX,localZ);
     const reefDx = x - 24;
     const reefDz = z - 124;
     const reefLift = Math.exp(-(reefDx * reefDx + reefDz * reefDz) / 23000) * 30;
@@ -297,13 +304,24 @@ export function createOceanBathymetryApi({
     return -58 + reefLift + shelfLift + ripples - abyssDrop;
   }
 
+  function nativeSeabed(x,z,bathymetry=sampleBathymetryEvidence(x,z)) {
+    const units=Number(appCtx.METERS_PER_WORLD_UNIT)>0?appCtx.METERS_PER_WORLD_UNIT:1.11;
+    const known=Number.isFinite(bathymetry.elevationMeters);
+    const elevation=known?bathymetry.elevationMeters:extendPresentationDepth(oceanMode.globalBathymetryGrid,x,z,oceanMode.depthProfile.entryDepthMeters);
+    return {bathymetry,presentationMode:known?'geographic-bathymetry-metres':'origin-grid-depth-extension',
+      presentationWorldY:geographicBottomY(elevation,units),bathymetryWorldY:known?geographicBottomY(elevation,units):null,
+      proceduralWorldY:null,bathymetryBlend:known?1:0,depthModel:OCEAN_DEPTH_MODEL.GEOGRAPHIC};
+  }
+
   function sampleSeabedHeight(x, z) {
+    if(oceanMode.depthProfile?.model===OCEAN_DEPTH_MODEL.GEOGRAPHIC)return nativeSeabed(x,z).presentationWorldY;
     const procedural = sampleProceduralSeabedHeight(x, z);
     const real = sampleRealSeabedHeight(x, z);
     if (!Number.isFinite(real)) return procedural;
 
-    const reefDx = x - 24;
-    const reefDz = z - 124;
+    const study=studyCoordinates(x,z);
+    const reefDx = study.x - 24;
+    const reefDz = study.z - 124;
     const reefWeight = Math.exp(-(reefDx * reefDx + reefDz * reefDz) / 25000);
 
     const baseBlend = oceanMode.bathymetryReady ? 0.52 : 0.3;
@@ -313,6 +331,7 @@ export function createOceanBathymetryApi({
 
   function sampleSeabedEvidence(x, z) {
     const bathymetry = sampleBathymetryEvidence(x, z);
+    if(oceanMode.depthProfile?.model===OCEAN_DEPTH_MODEL.GEOGRAPHIC)return Object.freeze(nativeSeabed(x,z,bathymetry));
     const proceduralWorldY = sampleProceduralSeabedHeight(x, z);
     const bathymetryWorldY = mapBathymetryMetersToWorldY(bathymetry.elevationMeters);
     if (!Number.isFinite(bathymetryWorldY)) {
@@ -325,8 +344,9 @@ export function createOceanBathymetryApi({
         bathymetryBlend: 0
       });
     }
-    const reefDx = x - 24;
-    const reefDz = z - 124;
+    const study=studyCoordinates(x,z);
+    const reefDx = study.x - 24;
+    const reefDz = study.z - 124;
     const reefWeight = Math.exp(-(reefDx * reefDx + reefDz * reefDz) / 25000);
     const bathymetryBlend = clamp01((oceanMode.bathymetryReady ? 0.52 : 0.3) * (1 - reefWeight * 0.44));
     return Object.freeze({
@@ -340,6 +360,7 @@ export function createOceanBathymetryApi({
   }
 
   function primeBathymetryTiles() {
+    if(oceanMode.continuous)return Promise.resolve(false);
     if (oceanMode.bathymetryPromise) return oceanMode.bathymetryPromise;
     oceanMode.bathymetryPromise = primeGlobalBathymetryGrid().then((globalReady) => {
       const groundActive = appCtx.getAcceptedGroundRuntimeSnapshot?.().status === 'accepted';
@@ -361,6 +382,7 @@ export function createOceanBathymetryApi({
     sampleBathymetryEvidence,
     sampleSeabedEvidence,
     sampleSeabedHeight,
+    studyCoordinates,
     smoothstep,
     valueNoise2D
   };

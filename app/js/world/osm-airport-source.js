@@ -1,3 +1,4 @@
+import { selectFacilitySourceElements } from '../transport/facility-compiler.js?v=4';
 import {
   readPersistentOverpassCache,
   writePersistentOverpassCache
@@ -7,7 +8,24 @@ const OSM_MAP_ENDPOINT = 'https://api.openstreetmap.org/api/0.6/map.json';
 const MAX_CELL_SPAN_DEGREES = .02;
 const MAX_AIRPORT_SPAN_DEGREES = .085;
 const MAX_CELL_REQUESTS = 30;
+const MAX_SOURCE_ELEMENTS = 240000;
 const memoryCache = new Map();
+const MAX_MEMORY_ENTRIES = 2;
+const MAX_MEMORY_ELEMENTS = 120000;
+function cachedElementCount() {
+  return [...memoryCache.values()].reduce((count, value) => count + value.elements.length, 0);
+}
+function rememberAirport(key, value) {
+  memoryCache.delete(key);
+  if (value.elements.length <= MAX_MEMORY_ELEMENTS) memoryCache.set(key, value);
+  while (memoryCache.size > MAX_MEMORY_ENTRIES || cachedElementCount() > MAX_MEMORY_ELEMENTS) {
+    memoryCache.delete(memoryCache.keys().next().value);
+  }
+}
+function airportSourceCacheSnapshot() {
+  return { entries: memoryCache.size, elements: cachedElementCount(), entryLimit: MAX_MEMORY_ENTRIES, elementLimit: MAX_MEMORY_ELEMENTS };
+}
+
 
 function finite(value, fallback = NaN) {
   const number = Number(value);
@@ -90,24 +108,12 @@ function cellUrl(cell) {
 
 function airportCacheKey(location, bounds) {
   return [
-    'osm-airport-map-v1', finite(location.lat).toFixed(6), finite(location.lon).toFixed(6),
+    'osm-airport-map-v2', finite(location.lat).toFixed(6), finite(location.lon).toFixed(6),
     bounds.minLat.toFixed(6), bounds.minLon.toFixed(6), bounds.maxLat.toFixed(6), bounds.maxLon.toFixed(6)
   ].join(':');
 }
 
-const AIRPORT_TYPES = new Set([
-  'aerodrome', 'heliport', 'runway', 'taxiway', 'apron', 'terminal',
-  'helipad', 'hangar', 'parking_position', 'gate', 'control_tower'
-]);
-
-function retainAirportElements(elements = []) {
-  const facilities = elements.filter((element) =>
-    AIRPORT_TYPES.has(String(element?.tags?.aeroway || '').toLowerCase()));
-  const nodeIds = new Set(facilities.flatMap((element) =>
-    Array.isArray(element.nodes) ? element.nodes.map(String) : []));
-  return elements.filter((element) => AIRPORT_TYPES.has(String(element?.tags?.aeroway || '').toLowerCase()) ||
-    (element.type === 'node' && nodeIds.has(String(element.id))));
-}
+const retainAirportElements = selectFacilitySourceElements;
 
 function externalAbortError(signal) {
   return signal?.reason instanceof Error
@@ -125,6 +131,8 @@ async function fetchCell(cell, options, depth = 0) {
   signal?.addEventListener?.('abort', relay, { once: true });
   const timeoutId = setTimeout(() => controller.abort(), Math.max(500, Math.min(options.cellTimeoutMs, timeRemaining)));
   try {
+    if (options.requestCount >= MAX_CELL_REQUESTS) throw new Error('Mapped airport request count exhausted.');
+    options.requestCount++;
     const response = await fetch(cellUrl(cell), {
       signal: controller.signal,
       cache: 'default',
@@ -142,6 +150,8 @@ async function fetchCell(cell, options, depth = 0) {
     if (!response.ok) throw new Error(`OpenStreetMap airport map request failed (${response.status}).`);
     const payload = await response.json();
     if (!Array.isArray(payload?.elements)) throw new Error('OpenStreetMap airport map response was invalid.');
+    options.elementCount += payload.elements.length;
+    if (options.elementCount > MAX_SOURCE_ELEMENTS) throw new Error('Mapped airport source size exceeds the bounded request limit.');
     return payload.elements;
   } catch (error) {
     if (signal?.aborted) throw externalAbortError(signal);
@@ -159,15 +169,17 @@ async function fetchMappedAirportData(location = {}, options = {}) {
   if (!bounds) return null;
   const key = airportCacheKey(location, bounds);
   const cached = memoryCache.get(key);
-  if (cached) return cached;
+  if (cached) { rememberAirport(key,cached); return cached; }
   const persistent = await readPersistentOverpassCache(key);
   if (persistent?.data?.elements) {
     const value = { ...persistent.data, _overpassSource: 'persistent-cache', _overpassEndpoint: OSM_MAP_ENDPOINT };
-    memoryCache.set(key, value);
+    rememberAirport(key, value);
     return value;
   }
   const timeoutMs = Math.max(5000, finite(options.timeoutMs, 28000));
   const requestOptions = {
+    requestCount: 0,
+    elementCount: 0,
     signal: options.signal || null,
     deadline: performance.now() + timeoutMs,
     cellTimeoutMs: Math.max(3000, Math.min(9000, timeoutMs * .45))
@@ -186,19 +198,21 @@ async function fetchMappedAirportData(location = {}, options = {}) {
     _airportMapBounds: bounds,
     _airportMapCellCount: cells.length
   };
-  memoryCache.set(key, value);
+  rememberAirport(key, value);
   void writePersistentOverpassCache(key, value, OSM_MAP_ENDPOINT, {
     lat: finite(location.lat), lon: finite(location.lon), roadsRadius: 0,
     featureRadius: Math.max(bounds.maxLat - bounds.minLat, bounds.maxLon - bounds.minLon),
-    poiRadius: 0, kind: 'airport-map-v1'
+    poiRadius: 0, kind: 'airport-map-v2'
   });
   return value;
 }
 
 export {
+  airportSourceCacheSnapshot,
   MAX_AIRPORT_SPAN_DEGREES,
   MAX_CELL_REQUESTS,
   MAX_CELL_SPAN_DEGREES,
+  MAX_SOURCE_ELEMENTS,
   fetchMappedAirportData,
   isAirportSelection,
   normalizeAirportBounds,

@@ -1,3 +1,4 @@
+import {marineSpeciesEligible} from './marine-species-rules.js';
 const RARITY = Object.freeze({
   common: { label: 'Common', weight: 1, score: 1 },
   uncommon: { label: 'Uncommon', weight: 0.62, score: 1.35 },
@@ -6,6 +7,12 @@ const RARITY = Object.freeze({
 });
 
 const FISH_SPECIES = Object.freeze([
+  {
+    id:'barramundi',name:'Barramundi',waterKinds:['coastal','harbor','channel','river'],
+    latitude:[-26,-10],length:[35,110],trophyLength:95,condition:1.1,
+    strength:.8,rarity:'uncommon',behavior:'surge',
+    visual:{assetId:'marine-barramundi',body:'#85917e',belly:'#d1d5ca',fin:'#5b6859',shape:'bass'}
+  },
   {
     id: 'largemouth_bass', name: 'Largemouth Bass', waterKinds: ['lake', 'river', 'channel'],
     latitude: [-48, 58], length: [24, 78], trophyLength: 61, condition: 1.08,
@@ -67,7 +74,7 @@ const FISH_SPECIES = Object.freeze([
     visual: { body: '#a9b8bd', belly: '#edf0ed', fin: '#71868d', stripe: '#52676d', scales: true, shape: 'tarpon' }
   },
   {
-    id: 'bluefin_tuna', name: 'Bluefin Tuna', waterKinds: ['open_ocean', 'coastal'],
+    id: 'bluefin_tuna', name: 'Atlantic Bluefin Tuna', waterKinds: ['open_ocean', 'coastal'],
     latitude: [-46, 64], length: [82, 284], trophyLength: 210, condition: 1.18,
     strength: 1, rarity: 'trophy', behavior: 'power-dive',
     visual: { body: '#304f65', belly: '#d7dfe0', fin: '#d4b84c', stripe: '#203746', shape: 'tuna' }
@@ -106,20 +113,19 @@ function weightedPick(entries, random = Math.random) {
   return entries[entries.length - 1]?.species || FISH_SPECIES[0];
 }
 
-function selectSpecies({ waterKind = 'coastal', latitude = 0, allowedSpeciesIds = null, random = Math.random } = {}) {
+function selectSpecies({ waterKind = 'coastal', latitude = null, longitude = null, habitat = 'unknown', allowedSpeciesIds = null, random = Math.random } = {}) {
   const normalizedWater = String(waterKind || 'coastal').toLowerCase();
-  const lat = Number.isFinite(Number(latitude)) ? Number(latitude) : 0;
+  const lat = latitude==null?NaN:Number(latitude);
+  const lon = longitude==null?NaN:Number(longitude);
   const allowed = Array.isArray(allowedSpeciesIds) ? new Set(allowedSpeciesIds.map(String)) : null;
   const eligible = FISH_SPECIES.filter((species) => !allowed || allowed.has(species.id));
   let candidates = eligible.filter((species) => (
     species.waterKinds.includes(normalizedWater) &&
     lat >= species.latitude[0] &&
-    lat <= species.latitude[1]
+    lat <= species.latitude[1] && marineSpeciesEligible(species.id,{latitude:lat,longitude:lon,habitat})
   ));
-  if (!candidates.length) {
-    candidates = eligible.filter((species) => species.waterKinds.includes(normalizedWater));
-  }
-  if (!candidates.length && !allowed) candidates = FISH_SPECIES.slice();
+  // No reviewed candidate is an empty pool, never permission to transplant a
+  // tropical or freshwater fish into an unsupported region or water type.
   if (!candidates.length) return null;
   return weightedPick(candidates.map((species) => ({
     species,

@@ -75,7 +75,7 @@ export function setupEngineInputHandlers(appCtx) {
   window.walkMouseLookActive = false;
 
   const canStartPrimaryWalkLook = (event) => {
-    if (event.target !== appCtx.renderer?.domElement || appCtx.Walk?.state?.mode !== 'walk') return false;
+    if (event.target !== appCtx.renderer?.domElement || (!appCtx.boatDeck?.active&&appCtx.Walk?.state?.mode !== 'walk')) return false;
     if (appCtx.paused || appCtx.blockBuildMode || appCtx.urbanSandboxRuntime?.equipmentOpen) return false;
     const category = appCtx.urbanSandboxRuntime?.equipment?.equipped?.()?.category;
     return category !== 'sidearm' && category !== 'explosive';
@@ -163,6 +163,8 @@ export function setupEngineInputHandlers(appCtx) {
     if (appCtx.droneMode) {
       appCtx.drone.cameraYawOffset = wrapYaw((Number(appCtx.drone.cameraYawOffset) || 0) - deltaX * sensitivity);
       appCtx.drone.cameraPitchOffset = Math.max(-1.2, Math.min(1.2, (Number(appCtx.drone.cameraPitchOffset) || 0) + deltaY * sensitivity));
+    } else if (appCtx.boatDeck?.active) {
+      appCtx.boatDeck.look?.(-deltaX*sensitivity,deltaY*sensitivity);
     } else if (appCtx.Walk && appCtx.Walk.state.mode === 'walk') {
       appCtx.Walk.state.walker.lookYawOffset = wrapYaw((Number(appCtx.Walk.state.walker.lookYawOffset) || 0) - deltaX * sensitivity);
       appCtx.Walk.state.walker.pitch += deltaY * sensitivity;

@@ -1,0 +1,24 @@
+<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width"><link rel="icon" href="/favicon.svg"><title>Research vessel admission</title>
+<style>body{margin:0;background:#152731;color:white;font:14px sans-serif}canvas{display:block}#hint{position:absolute;left:12px;bottom:12px;background:#0b171e;padding:10px}</style><div id="hint">Research vessel asset admission · W/S move, A/D turn · V overview</div>
+<script src="/app/vendor/three/build/three.min.js"></script><script src="/app/vendor/three/examples/js/loaders/GLTFLoader.js"></script>
+<script type="module">
+import {loadModelAsset} from '/app/js/assets/model-asset-runtime.js?v=16';
+import {createShipMeshNavigation} from '/app/js/boat-mode/research/mesh-navigation.js';
+import {applyDisplayColorPolicy} from '/app/js/engine/display-color-policy.js';
+const T=THREE,scene=new T.Scene(),camera=new T.PerspectiveCamera(55,innerWidth/innerHeight,.05,2000),renderer=new T.WebGLRenderer({antialias:true});
+renderer.setSize(innerWidth,innerHeight);applyDisplayColorPolicy(renderer,T);document.body.prepend(renderer.domElement);scene.background=new T.Color(0x9bb9c9);
+const sky=new T.HemisphereLight(0xffffff,0x304455,.95),sun=new T.DirectionalLight(0xfff2df,1.7);sun.position.set(30,60,-20);scene.add(sky,sun);
+const water=new T.Mesh(new T.PlaneGeometry(2000,2000),new T.MeshStandardMaterial({color:0x205d72,roughness:.25,metalness:.3}));water.rotation.x=-Math.PI/2;scene.add(water);
+const asset=await loadModelAsset(T,'marine-research-vessel-rcrv');scene.add(asset.root);
+const started=performance.now(),nav=createShipMeshNavigation(T,asset.root),navigationMs=performance.now()-started;
+const actor=new T.Mesh(new T.CylinderGeometry(.28,.28,1.7,12),new T.MeshStandardMaterial({color:0xf5b83d}));scene.add(actor);
+let pose={x:0,y:nav.support(0,-34,2,1,1),z:-34,yaw:0},overview=true;const keys=new Set();
+function update(dt){if(!overview){pose.yaw+=((keys.has('a')?1:0)-(keys.has('d')?1:0))*dt*1.8;const move=((keys.has('w')?1:0)-(keys.has('s')?1:0))*dt*2.2;pose=nav.move(pose,Math.sin(pose.yaw)*move,Math.cos(pose.yaw)*move);}actor.position.set(pose.x,pose.y+.85,pose.z);}
+function draw(){if(overview){camera.position.set(48,42,-62);camera.lookAt(0,5,0);}else{camera.position.set(pose.x-Math.sin(pose.yaw)*4,pose.y+2.5,pose.z-Math.cos(pose.yaw)*4);camera.lookAt(pose.x,pose.y+1.2,pose.z);}renderer.render(scene,camera);}
+let previous=performance.now();function loop(now){update(Math.min(.05,(now-previous)/1000));previous=now;draw();requestAnimationFrame(loop);}requestAnimationFrame(loop);
+window.addEventListener('keydown',e=>{keys.add(e.key.toLowerCase());if(e.key==='v')overview=!overview;});window.addEventListener('keyup',e=>keys.delete(e.key.toLowerCase()));
+window.addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);});
+window.advanceTime=async ms=>{for(let i=0;i<Math.round(ms/16);i++)update(.016);draw();await new Promise(r=>setTimeout(r,20));};
+window.render_game_to_text=()=>JSON.stringify({evidence:'controlled asset and triangle navigation, not ocean transfer',coordinateFrame:'metres; x port, y up, z bow',pose,overview,navigation:nav.stats});
+window.fixture={asset,nav,renderer,scene,camera,actor,navigationMs,get pose(){return pose;},set pose(v){pose={...pose,...v};},get overview(){return overview;},set overview(v){overview=v;},draw};
+</script>

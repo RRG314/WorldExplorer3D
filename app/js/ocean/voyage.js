@@ -1,13 +1,18 @@
+import {oceanParentPosition} from './stream-runtime.js';
+import {normalizeOceanWaterContext,defaultOceanWaterContext,oceanWaterContextFromCandidate} from './water-context.js';
+import {OCEAN_DEPTH_MODEL,normalizeOceanDepthProfile} from './depth-model.js';
+import {createInvestigationControls} from '../campaign/coastal-investigation-ui.js';
 import {ensureMarineResearch,REEF_SURVEY} from './research-outing.js';
 import {styleMarinePanel} from './interface.js';
 import {earthLocalToGeographic} from '../earth-core/location-origin.js?v=1';
-import {createOceanVoyageStore,validateOceanVoyage} from './voyage-store.js';
+import {createOceanVoyageStore,validateOceanVoyage,oceanStreamingPreference,OCEAN_STREAM_PREFERENCE_KEY} from './voyage-store.js';
+import {createCoastalDepartureControls} from '../campaign/coastal-departure-ui.js';
 const id=()=>globalThis.crypto?.randomUUID?.()||`voyage-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 // Preparing an aboard journey allocates data only; it must not create an
 // underwater renderer or write a save before the surface vessel is accepted.
-export function prepareSurfaceVoyage(site,waveOffset={x:0,z:0}) {
+export function prepareSurfaceVoyage(site,waveOffset={x:0,z:0},depthProfile={model:OCEAN_DEPTH_MODEL.LEGACY},waterContext=defaultOceanWaterContext(site)) {
  const voyageId=id();
- return validateOceanVoyage({version:1,id:voyageId,subId:`sub:research:${voyageId}`,stage:'aboard',revision:0,savedAt:Date.now(),
+ return validateOceanVoyage({version:2,waterContext:normalizeOceanWaterContext(waterContext),depthProfile:normalizeOceanDepthProfile(depthProfile),id:voyageId,subId:`sub:research:${voyageId}`,stage:'aboard',revision:0,savedAt:Date.now(),
   site:{...site},waveOffset:{x:Number(waveOffset.x)||0,z:Number(waveOffset.z)||0},
   ship:{transportEntityId:`research:${voyageId}`,transportCatalogId:'ocean-research-vessel',condition:1,yaw:0,anchor:{lat:site.lat,lon:site.lon}},
   sub:{x:0,y:-8.5,z:0,yaw:Math.PI,condition:1}});
@@ -26,7 +31,7 @@ export function ensureOceanVoyage(ctx,{store=createOceanVoyageStore()}={}){
    const previous=current;
    const vessel=options.parentVessel;
    const voyageId=vessel&&previous?.ship.transportEntityId===vessel.transportEntityId?previous.id:id();
-   current={version:1,id:voyageId,subId:previous?.id===voyageId?previous.subId:`sub:${vessel?.transportEntityId||voyageId}`,stage:'underwater',revision:previous?.revision||0,savedAt:Date.now(),
+   current={...(previous?.id===voyageId&&previous.version===1?{version:1}:{version:2,waterContext:normalizeOceanWaterContext(ocean.waterContext)||defaultOceanWaterContext(ocean.launchSite),depthProfile:normalizeOceanDepthProfile(ocean.depthProfile)||{model:OCEAN_DEPTH_MODEL.LEGACY}}),id:voyageId,subId:previous?.id===voyageId?previous.subId:`sub:${vessel?.transportEntityId||voyageId}`,stage:'underwater',revision:previous?.revision||0,savedAt:Date.now(),
     site:{...ocean.launchSite},waveOffset:{...ocean.waveOffset},
     ship:{transportEntityId:vessel?.transportEntityId||`research:${voyageId}`,transportCatalogId:vessel?.transportCatalogId||'ocean-research-vessel',condition:vessel?.condition??1,yaw:Number.isFinite(vessel?.yaw)?vessel.yaw:ocean.submarine.yaw,anchor:{lat:ocean.launchSite.lat,lon:ocean.launchSite.lon}},
     sub:{x:ocean.submarine.position.x,y:ocean.submarine.position.y,z:ocean.submarine.position.z,yaw:ocean.submarine.yaw,condition:previous?.id===voyageId?previous.sub.condition:1}};
@@ -39,7 +44,7 @@ export function ensureOceanVoyage(ctx,{store=createOceanVoyageStore()}={}){
  }
  function checkpoint(ocean=ctx.oceanMode){
   if(!current||!ocean?.active)return false;
-  const sub=ocean.submarine;current={...current,stage:'underwater',sub:{x:sub.position.x,y:sub.position.y,z:sub.position.z,yaw:sub.yaw,condition:Math.max(0,Math.min(1,ocean.condition??1))}};
+  const sub=ocean.submarine;current={...current,stage:'underwater',...(ocean.continuous?{version:3,frameOrigin:{...ocean.frameOrigin},frameWaveOffset:{...ocean.waveOffset},depthProfile:normalizeOceanDepthProfile(ocean.depthProfile)}:{}),sub:{x:sub.position.x,y:sub.position.y,z:sub.position.z,yaw:sub.yaw,condition:Math.max(0,Math.min(1,ocean.condition??1))}};
   return commit();
  }
  function surfaced(){if(!current)return;current={...current,stage:'aboard'};commit();}
@@ -52,7 +57,7 @@ export function ensureOceanVoyage(ctx,{store=createOceanVoyageStore()}={}){
   if(!current||current.stage!=='aboard'||!ctx.boatMode?.active||ctx.boatMode.transportEntityId!==current.ship.transportEntityId)return false;
   const anchor=earthLocalToGeographic(ctx.LOC,ctx.SCALE,ctx.boat.x,ctx.boat.z);if(!Number.isFinite(anchor?.lat)||!Number.isFinite(anchor?.lon))return false;
   const offset=ctx.boatMode.currentWater?.source?.waveOffset||{};
-  current={...current,site:{...current.site,...anchor},ship:{...current.ship,anchor,yaw:ctx.boat.angle,condition:ctx.boatMode.condition??1},waveOffset:{x:ctx.boat.x+(offset.x||0),z:ctx.boat.z+(offset.z||0)}};return commit();
+  current={...current,...(current.version>=2?{waterContext:oceanWaterContextFromCandidate(ctx.boatMode.currentWater,anchor)||current.waterContext,depthProfile:current.depthProfile.model===OCEAN_DEPTH_MODEL.GEOGRAPHIC?{...current.depthProfile,origin:current.depthProfile.origin||{lat:current.site.lat,lon:current.site.lon}}:current.depthProfile}:{}),site:{...current.site,...anchor},ship:{...current.ship,anchor,yaw:ctx.boat.angle,condition:ctx.boatMode.condition??1},waveOffset:{x:ctx.boat.x+(offset.x||0),z:ctx.boat.z+(offset.z||0)}};return commit();
  }
  function tickSurface(dt){ctx.sharedMarine?.tick(dt);elapsed+=dt;if(elapsed>=5){elapsed=0;surfaceCheckpoint();}refresh();}
  function tick(dt){elapsed+=dt;if(elapsed>=5){elapsed=0;checkpoint();}refresh();}
@@ -61,15 +66,19 @@ export function ensureOceanVoyage(ctx,{store=createOceanVoyageStore()}={}){
   ui.resume.hidden=!saved;ui.resume.style.display=saved?'':'none';setText(ui.resume,saved?.stage==='aboard'?'Return to saved research vessel':'Resume saved ocean voyage');
   ui.panel.hidden=!ctx.oceanMode?.active||!!ctx.paused||!!ctx.oceanMode?.diver?.active;
   const survey=research.snapshot();
+  ui.coastal.render(survey.coastal);ui.investigation.render(survey.investigation);
   setText(ui.title,survey.visible?'Coral Shelf survey':'Research voyage');
   setText(ui.status,survey.visible&&survey.message?survey.message:status);
   ui.scan.hidden=!survey.visible||!survey.started||survey.stage==='report';ui.scan.disabled=!survey.canScan||survey.busy;
   setText(ui.scan,`Scan ${survey.target?.label||'study site'} · ${survey.rangeMeters} m range`);
   ui.site.hidden=!survey.visible||!survey.completed;
 
+  const investigating=!!survey.investigation?.started;
+  if(ui.investigating!==investigating){ui.investigating=investigating;if(investigating)ui.reef.append(ui.site,ui.scan);else{ui.panel.insertBefore(ui.site,ui.recover);ui.panel.insertBefore(ui.scan,ui.recover);}}
+  ui.reef.hidden=!investigating;if(investigating){ui.coastal.node.hidden=true;setText(ui.title,'Coastal investigation');}
   const sub=ctx.oceanMode?.submarine;
   if(survey.visible)setText(ui.distance,survey.instruction);
-  else if(current&&sub){const metres=Math.hypot(sub.position.x,sub.position.z)*(ctx.METERS_PER_WORLD_UNIT||1);setText(ui.distance,`Parent vessel · ${Math.round(metres)} m from launch point. Recovery returns you and this submarine aboard.`);}
+  else if(current&&sub){const parent=oceanParentPosition(ctx.oceanMode,ctx.SCALE);const metres=Math.hypot(sub.position.x-parent.x,sub.position.z-parent.z)*(ctx.METERS_PER_WORLD_UNIT||1);setText(ui.distance,`Parent vessel · ${Math.round(metres)} m from launch point. Recovery returns you and this submarine aboard.`);}
   ui.recover.disabled=!!ctx.oceanMode?.diver?.active;
  }
  async function resume(sessionRecord=null){
@@ -94,6 +103,8 @@ export function ensureOceanVoyage(ctx,{store=createOceanVoyageStore()}={}){
  function mount(){
   if(ui||typeof document==='undefined')return;
   const oceanButton=document.getElementById('globeSelectorOceanBtn');if(!oceanButton)return;
+  const streamToggle=document.getElementById('oceanContinuousToggle');
+  if(streamToggle){streamToggle.checked=oceanStreamingPreference();streamToggle.onchange=()=>{try{localStorage.setItem(OCEAN_STREAM_PREFERENCE_KEY,streamToggle.checked?'on':'off');}catch{ctx.showToast?.('This browser could not save the ocean preference.');}};}
   const resumeButton=document.createElement('button');resumeButton.id='oceanVoyageResume';resumeButton.type='button';resumeButton.className='globe-selector-action-btn';resumeButton.style.cssText='margin-top:8px;width:100%;min-height:44px;font:600 12px system-ui;background:#112b3a;color:#e8f6ff;border:1px solid #5689a3;border-radius:4px;padding:10px';resumeButton.onclick=()=>void resume();(document.getElementById('globeSelectorStartBtn')||oceanButton).after(resumeButton);
   const panel=document.createElement('section');panel.id='oceanVoyageControls';panel.setAttribute('aria-label','Ocean voyage');panel.style.cssText='position:fixed;top:245px;right:12px;width:250px;max-width:calc(100vw - 24px);padding:10px;box-sizing:border-box;border-radius:10px;background:#092a3bee;color:#eefaff;font:13px/1.4 system-ui;z-index:110';
   const title=document.createElement('strong');title.textContent='Research voyage';const distance=document.createElement('div'),statusElement=document.createElement('div');statusElement.setAttribute('role','status');
@@ -104,7 +115,10 @@ export function ensureOceanVoyage(ctx,{store=createOceanVoyageStore()}={}){
   REEF_SURVEY.sites.forEach((id,index)=>{const option=document.createElement('option');option.value=id;option.textContent=REEF_SURVEY.labels[index];site.append(option)});site.onchange=()=>{research.select(site.value);site.blur();refresh()};
   styleMarinePanel(panel,'voyage');
   const more=document.createElement('details'),summary=document.createElement('summary');summary.textContent='Voyage details & crew';more.append(summary,distance,statusElement,shared);
-  panel.append(title,site,scan,recover,more);for(const control of panel.querySelectorAll('button,select'))control.removeAttribute('style');document.body.append(panel);ui={resume:resumeButton,panel,title,status:statusElement,distance,recover,scan,site};refresh();
+  const investigation=createInvestigationControls({api:()=>research.investigation,prefix:'coastalOcean'});
+  const reef=document.createElement('details'),reefTitle=document.createElement('summary');reefTitle.textContent='Optional reef mapping · Scanner II';reef.append(reefTitle);more.append(reef);
+  const coastal=createCoastalDepartureControls({api:()=>research.coastal,prefix:'coastalOcean'});
+  panel.append(title,site,scan,recover,coastal.node,investigation.node,more);for(const control of panel.querySelectorAll('button,select'))control.removeAttribute('style');document.body.append(panel);ui={resume:resumeButton,panel,title,status:statusElement,distance,recover,scan,site,coastal,investigation,reef};refresh();
  }
  const api={restorePersonal(){if(personalBeforeShared){current=personalBeforeShared.current;personalBeforeShared=null;}return current;},begin,beginAboard,checkpoint,surfaceCheckpoint,surfaced,tick,tickSurface,mount,resume,refresh,get current(){return current},get saved(){return saved},get status(){return status}};
  ctx.oceanVoyage=api;

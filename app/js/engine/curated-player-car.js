@@ -1,4 +1,5 @@
 import { loadModelAsset } from '../assets/model-asset-runtime.js?v=16';
+import { applyPlayerCarFinish } from './player-car-finish.js';
 
 function retainPrimaryE34Variant(THREE, root) {
   let triangles = 0;
@@ -55,12 +56,26 @@ function retainPrimaryE34Variant(THREE, root) {
 function prepareE34Model(THREE, source, record) {
   const oriented = new THREE.Group();
   oriented.name = `${record.label} visual`;
+  // The artist supplies a white exterior atlas on the .003 showroom variant.
+  // It has the same UV layout as the primary closed car's .001 atlas. Select
+  // that authored finish before discarding showroom geometry: a color tint
+  // cannot recover details baked into the nearly-black original body texture.
+  let whiteExteriorMap = null;
+  let slateExteriorMap = null;
+  source.traverse(object => {
+    if (object.isMesh && object.material?.name === '.003') {
+      whiteExteriorMap = object.material.map || whiteExteriorMap;
+    }
+    if (object.isMesh && object.material?.name === '.004') slateExteriorMap = object.material.map || slateExteriorMap;
+  });
+  if (!whiteExteriorMap) throw new Error('BMW white exterior atlas is missing.');
   const triangles = retainPrimaryE34Variant(THREE, source);
   // The exterior atlas includes opaque window polygons. They are outward
   // facing shell surfaces, not cabin walls; double-sided rendering blocked
   // the driver's view. Retain the separate inward-facing interior geometry.
   source.traverse(object => {
     if (object.isMesh && object.material?.name === '.001') {
+      object.material.map = whiteExteriorMap;
       object.material.side = THREE.FrontSide;
       object.material.needsUpdate = true;
     }
@@ -88,6 +103,8 @@ function prepareE34Model(THREE, source, record) {
   oriented.updateMatrix();
   oriented.updateMatrixWorld(true);
   oriented.userData.defaultPlayerVehicleVisual = true;
+  oriented.userData.paintFinish = 'artist-white-exterior';
+  oriented.userData.finishMaps = { white: whiteExteriorMap, slate: slateExteriorMap };
   oriented.userData.curatedVehicleAssetId = record.id;
   oriented.userData.collisionPolicy = record.collisionPolicy;
   oriented.userData.importDimensions = Object.freeze({
@@ -117,16 +134,19 @@ async function attachCuratedPlayerCar(THREE, appCtx) {
   carMesh.userData.curatedVehicleLoadStarted = true;
   carMesh.userData.curatedVehicleLoading = true;
   const loadPromise = (async () => {
+    let instance;
     try {
-      const instance = await loadModelAsset(THREE, 'vehicle-bmw-525i-e34');
-      if (!carMesh.parent) return false;
+      instance = await loadModelAsset(THREE, 'vehicle-bmw-525i-e34');
+      if (!carMesh.parent) { instance.dispose(); return false; }
       const visual = prepareE34Model(THREE, instance.root, instance.record);
       visual.visible = !carMesh.userData.activeUrbanVehicleId;
       carMesh.add(visual);
       carMesh.userData.curatedVehicleAssetId = instance.record.id;
       carMesh.userData.curatedVehicleVisual = visual;
+      applyPlayerCarFinish(appCtx, appCtx.playerCarFinish || 'white');
       return true;
     } catch (error) {
+      instance?.dispose();
       carMesh.userData.curatedVehicleLoadStarted = false;
       carMesh.userData.curatedVehicleLoadFailed = true;
       console.warn('Curated player car unavailable; player vehicle remains hidden.', error);

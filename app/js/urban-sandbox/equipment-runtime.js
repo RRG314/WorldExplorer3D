@@ -1,3 +1,4 @@
+import {detachSceneObject} from '../engine/scene-object-lifecycle.js';
 import { ctx as appCtx } from '../shared-context.js?v=55';
 import { applyConditionImpact, blastTargets } from './impact-model.js?v=1';
 import { applyTransportDamage } from '../transport/damage-model.js?v=1';
@@ -528,7 +529,7 @@ function createUrbanEquipmentRuntime(options = {}) {
     if (!projectile || projectile.resolved === true) return false;
     projectile.resolved = true;
     projectile.visual.root.visible = false;
-    projectile.visual.root.removeFromParent?.();
+    detachSceneObject(projectile.visual.root);
     projectile.visual.geometries.forEach((geometry) => geometry.dispose?.());
     projectile.visual.materials.forEach((material) => material.dispose?.());
     return true;
@@ -1065,7 +1066,7 @@ function createUrbanEquipmentRuntime(options = {}) {
       effect.root.scale.setScalar(effect.blast ? .2 + effect.radius * t : 1 + t * 1.8);
       effect.materials.forEach((material, materialIndex) => { material.opacity = effect.opacities[materialIndex] * Math.max(0, 1 - t); });
       if (t < 1) continue;
-      effect.root.removeFromParent?.();
+      detachSceneObject(effect.root);
       effect.geometries.forEach((geometry) => geometry.dispose());
       effect.materials.forEach((material) => material.dispose());
       effects.splice(index, 1);
@@ -1085,7 +1086,7 @@ function createUrbanEquipmentRuntime(options = {}) {
     projectiles.slice().forEach(disposeProjectile);
     projectiles.length = 0;
     effects.forEach((effect) => {
-      effect.root.removeFromParent?.();
+      detachSceneObject(effect.root);
       effect.geometries.forEach((geometry) => geometry.dispose());
       effect.materials.forEach((material) => material.dispose());
     });

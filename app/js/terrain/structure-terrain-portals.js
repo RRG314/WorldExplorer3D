@@ -161,7 +161,7 @@ function installPortalMaskShader(material, masks) {
     };
     material.customProgramCacheKey = () => [
       previousProgramCacheKey?.() || '',
-      `structure-terrain-portals-v5:${state.count}:${state.maxCount}`
+      `structure-terrain-portals-v6:${state.count>0?1:0}:${state.maxCount}`
     ].join(':');
     material.addEventListener('dispose', () => {
       state.uniform.value?.dispose();
@@ -202,7 +202,9 @@ function installPortalMaskShader(material, masks) {
   state.uniform.value = texture;
   material.userData.structurePortalTexture = texture;
   material.userData.structurePortalMaskCount = masks.length;
-  if (previousCount !== state.count || previousMaxCount !== state.maxCount) material.needsUpdate = true;
+  // Descriptor count lives in texture offsets, not shader source. Only the
+  // enabled branch and loop bound change the compiled program.
+  if ((previousCount>0)!==(state.count>0) || previousMaxCount !== state.maxCount) material.needsUpdate = true;
   material.userData.structurePortalMaxCellCandidates = grid.maxCount;
   return masks.length > 0;
 }

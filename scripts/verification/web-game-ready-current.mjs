@@ -5,6 +5,7 @@ import {createHash} from 'node:crypto';
 import path from 'node:path';
 import {planRoadRoute} from './travel-road-route.mjs';
 import {spawn} from 'node:child_process';
+const worldWait = Math.max(45000, Math.min(240000, Number(process.env.WE3D_ACTION_LOAD_TIMEOUT_MS) || 90000));
 const client=process.env.WE3D_GAME_CLIENT || new URL('./vendor/web-game-playwright-client.js', import.meta.url);
 let source=await readFile(client,'utf8');
 // Keep the resource identity: a generic 404 cannot distinguish a missing
@@ -43,7 +44,7 @@ source = source.replace('await page.click(args.clickSelector, { timeout: 5000 })
 const patches=[
  ['await page.waitForTimeout(500);', `await page.waitForFunction(() => window.__WE3D_RUNTIME_READY__, null, {timeout:45000});`],
  ['await page.click(args.clickSelector, { timeout: 5000 });', 'await page.click(args.clickSelector, { timeout: 15000 });'],
- ['await page.waitForTimeout(250);', `try { await page.waitForFunction(() => { const s=window.getWorldExplorerRuntimeDiagnostics?.(); return s?.gameStarted && !s.worldLoading && !document.getElementById('loading')?.classList.contains('show'); }, null, {timeout:90000}); }
+ ['await page.waitForTimeout(250);', `try { await page.waitForFunction(() => { const s=window.getWorldExplorerRuntimeDiagnostics?.(); return s?.gameStarted && !s.worldLoading && !document.getElementById('loading')?.classList.contains('show'); }, null, {timeout:${worldWait}}); }
  catch(error) { fs.mkdirSync(args.screenshotDir,{recursive:true});
  await page.screenshot({path:path.join(args.screenshotDir,'load-failure.png')});
  fs.writeFileSync(path.join(args.screenshotDir,'load-failure.json'),JSON.stringify(await page.evaluate(()=>({diagnostics:window.getWorldExplorerRuntimeDiagnostics?.(),loading:document.getElementById('loading')?.textContent})),null,2));
@@ -215,6 +216,6 @@ const closeIndex=source.lastIndexOf('await browser.close();');
 if(closeIndex<0)throw Error('Prescribed client browser cleanup changed');
 source=source.slice(0,closeIndex)+'} finally { await browser.close(); }'+source.slice(closeIndex+'await browser.close();'.length);
 const child=spawn(process.execPath,['--input-type=module','-',...process.argv.slice(2)],{stdio:['pipe','inherit','inherit']});
-const deadline=setTimeout(()=>child.kill('SIGTERM'),150000);
+const deadline=setTimeout(()=>child.kill('SIGTERM'),Math.max(150000,worldWait+60000));
 child.stdin.end(source);
 child.on('exit',code=>{clearTimeout(deadline);process.exitCode=code ?? 1;});

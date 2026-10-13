@@ -1,0 +1,42 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><link rel="icon" href="/favicon.svg"><title>Marine model review</title>
+<style>body{margin:0;background:#101c29;color:white;font:14px system-ui}canvas{display:block}header{position:absolute;top:12px;left:12px}button{padding:8px;margin:4px}</style>
+<header>Marine model review · author materials <button id="front" disabled>+Z</button><button id="back" disabled>−Z</button><button id="side" disabled>+X</button></header>
+<script src="/app/vendor/three/build/three.min.js"></script><script src="/app/vendor/three/examples/js/loaders/GLTFLoader.js"></script>
+<script type="module">
+import {registerMaterialCompatibility} from '/app/js/assets/gltf-material-compatibility.js';
+import {createSubmarineMesh} from '/app/js/ocean/submarine-visual.js';
+const renderer=new THREE.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});renderer.setSize(innerWidth,innerHeight);renderer.setPixelRatio(1);renderer.outputEncoding=THREE.sRGBEncoding;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1;document.body.append(renderer.domElement);
+const scene=new THREE.Scene();scene.background=new THREE.Color(0x526d7c);const camera=new THREE.PerspectiveCamera(40,innerWidth/innerHeight,.1,1000);
+scene.add(new THREE.HemisphereLight(0xd5e9ff,0x576274,1));const sun=new THREE.DirectionalLight(0xffeddb,2);sun.position.set(10,18,10);scene.add(sun);
+const path=new URLSearchParams(location.search).get('asset')||'/app/assets/models/marine/atlantic-explorer-submarine.glb';
+let model,mixer=null,animations=[];
+if(new URLSearchParams(location.search).has('asset')) {const gltf=await registerMaterialCompatibility(new THREE.GLTFLoader()).loadAsync(path);model=gltf.scene;animations=gltf.animations;
+ if(animations.length){mixer=new THREE.AnimationMixer(model);mixer.clipAction(animations[0]).play();mixer.update(0);}}
+else {model=createSubmarineMesh();if(!await model.userData.visualReady)throw new Error(model.userData.visualError);model.traverse(o=>{if(o.isLight)o.intensity=0;});}
+scene.add(model);
+model.updateMatrixWorld(true);
+const restBox=new THREE.Box3().setFromObject(model),box=restBox.clone();
+// r128's Box3 uses the unskinned vertex buffer. Some imported rigs bind that
+// buffer at a different scale/offset, so a rest-bound camera can miss the model
+// completely. Inspect actual posed vertices through the pinned skinning API.
+if(mixer){
+ box.makeEmpty();const point=new THREE.Vector3();
+ for(let sample=0;sample<24;sample++){
+  mixer.setTime(animations[0].duration*sample/24);model.updateMatrixWorld(true);
+  model.traverse(mesh=>{if(!mesh.isMesh)return;const positions=mesh.geometry.attributes.position;
+   if(mesh.isSkinnedMesh)mesh.frustumCulled=false;
+   for(let i=0;i<positions.count;i++){point.fromBufferAttribute(positions,i);if(mesh.isSkinnedMesh)mesh.boneTransform(i,point);point.applyMatrix4(mesh.matrixWorld);box.expandByPoint(point);}
+  });
+ }
+ mixer.setTime(0);model.updateMatrixWorld(true);
+}
+const size=box.getSize(new THREE.Vector3()),center=box.getCenter(new THREE.Vector3());
+const ground=new THREE.Mesh(new THREE.PlaneGeometry(300,300),new THREE.MeshStandardMaterial({color:0x344d5a,roughness:1}));ground.rotation.x=-Math.PI/2;ground.position.y=box.min.y-.03;scene.add(ground);
+const radius=size.length()*.95;
+function view(x,z){camera.position.copy(center).add(new THREE.Vector3(x*radius,radius*.28,z*radius));camera.lookAt(center);renderer.render(scene,camera);}
+document.getElementById('front').onclick=()=>view(.5,1);document.getElementById('back').onclick=()=>view(-.5,-1);document.getElementById('side').onclick=()=>view(1,0);view(.5,1);
+window.advanceTime=ms=>{mixer?.update(ms/1000);renderer.render(scene,camera);};
+window.render_game_to_text=()=>JSON.stringify({asset:path,ready:!!model,animations:animations.map(a=>({name:a.name,duration:a.duration})),bounds:{min:box.min.toArray(),max:box.max.toArray()},restBounds:{min:restBox.min.toArray(),max:restBox.max.toArray()},boundsEvidence:mixer?'24 sampled poses from the authored clip; not a mathematical envelope guarantee':'static geometry',draws:renderer.info.render.calls,triangles:renderer.info.render.triangles});window.__fixtureReady=true;
+document.querySelectorAll('button').forEach(button=>{button.disabled=false;});
+addEventListener('pagehide',()=>model.userData.disposeCuratedMarineVisual?.(),{once:true});
+</script></html>

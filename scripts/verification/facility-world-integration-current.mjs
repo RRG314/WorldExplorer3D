@@ -1,0 +1,60 @@
+import assert from 'node:assert/strict';
+import {mkdir,writeFile,statfs} from 'node:fs/promises';
+import {chromium} from 'playwright';
+import {startStaticServer} from './static-server.mjs';
+import {perimeterSource} from '../../tests/fixtures/facility-perimeter-data.js';
+import {runPrescribedGameActions} from './prescribed-game-actions.mjs';
+import {collectBrowserGraphicsErrors} from './browser-graphics-errors.mjs';
+const out='output/facilities-20261011/world-integration';
+await mkdir(out,{recursive:true});
+const disk=await statfs('.');assert.ok(disk.bavail*disk.bsize>3*1024**3);
+const location={lat:42.08,lon:-93.87};
+const report={ok:false,scope:'Actual app startup and world loader; explicitly controlled facility map response at Iowa coordinates. Actor repositioning is deliberate test setup. This does not verify real Iowa facilities, live airport coverage or a complete airport journey.',cases:[],errors:[],mapRequests:0};
+let server,browser,page,timer;
+const check=(name,pass)=>{report.cases.push({name,passed:!!pass});assert.ok(pass,name);};
+try {
+  server=await startStaticServer({rootDir:process.cwd(),ports:[4397]});
+  browser=await chromium.launch({channel:'chrome',headless:false,args:['--js-flags=--max-old-space-size=1024']});
+  page=await browser.newPage({viewport:{width:1280,height:800}});
+  page.on('pageerror',e=>report.errors.push(e.message));collectBrowserGraphicsErrors(page,report.errors);
+  timer=setInterval(async()=>{const d=await statfs('.');if(d.bavail*d.bsize<1.5*1024**3){report.resourceStop=true;await browser.close();}},10000);
+  await page.route('**/api/interpreter*',async route=>{
+    const request=route.request(),url=new URL(request.url());
+    const query=request.postData()||url.searchParams.get('data')||'';
+    const primary=query.includes('aeroway')&&query.includes('barrier');
+    if(primary)report.mapRequests++;
+    await route.fulfill({status:200,contentType:'application/json',headers:{'access-control-allow-origin':'*'},body:JSON.stringify(primary?perimeterSource(location):{elements:[]})});
+  });
+  const base=`http://127.0.0.1:${server.port}`;
+  await page.goto(`${base}/app/?launch=earth&gm=free&loc=custom&lat=${location.lat}&lon=${location.lon}&lname=Facility%20verification&mode=walking&diagnostics=1`);
+  await page.waitForFunction(()=>globalThis.__WE3D_RUNTIME_READY__,null,{timeout:90000});
+  await page.evaluate(async()=>{window.facilityCtx=(await import('/app/js/shared-context.js?v=55')).ctx;});
+  if(await page.locator('#analyticsConsentDenyBtn').isVisible())await page.locator('#analyticsConsentDenyBtn').click();
+  await page.getByRole('button',{name:'Explore',exact:true}).click();
+  await page.waitForFunction(()=>facilityCtx.gameStarted&&!facilityCtx.worldLoading&&facilityCtx.transportFacilityVisual?.perimeter?.snapshot().status==='ready',null,{timeout:150000});
+  await page.waitForTimeout(600);
+  check('actual map intake reaches the shared compiler and renderer',report.mapRequests>0&&await page.evaluate(()=>facilityCtx.transportFacilityGraph.byDomain.site.some(r=>r.type==='fence')));
+  report.initial=await page.evaluate(()=>({actor:facilityCtx.activeEarthActorPosition(),perimeter:facilityCtx.transportFacilityVisual.perimeter.snapshot(),graph:facilityCtx.transportFacilityGraph.diagnostics}));
+  await page.evaluate(()=>{const p=facilityCtx.Walk.state.walker;p.x=-35;p.z=6;p.yaw=Math.PI;p.lookYawOffset=0;p.y=facilityCtx.elevationWorldYAtWorldXZ(p.x,p.z)+1;});
+  await page.waitForFunction(()=>facilityCtx.transportFacilityVisual.perimeter.snapshot().visibleBays>0,null,{timeout:10000});
+  check('world loader supplies actor and matching collision ownership',await page.evaluate(()=>{const s=facilityCtx.transportFacilityVisual.perimeter.snapshot();return s.visibleBays>0&&s.colliderCount===facilityCtx.dynamicBuildingColliders.filter(c=>c.facilityPerimeterOwner).length;}));
+  await page.evaluate(()=>facilityCtx.renderer.domElement.dataset.facilityWorldCheck='');
+  await runPrescribedGameActions(page,out,[{buttons:[],frames:6}],'canvas[data-facility-world-check]');
+  await page.screenshot({path:`${out}/actual-app.png`});
+  await page.evaluate(()=>{const p=facilityCtx.Walk.state.walker;p.x=2000;p.z=2000;});
+  await page.waitForFunction(()=>facilityCtx.transportFacilityVisual.perimeter.snapshot().visibleBays===0,null,{timeout:10000});
+  check('simulation retires detail and collision when the active actor leaves',await page.evaluate(()=>!facilityCtx.dynamicBuildingColliders.some(c=>c.facilityPerimeterOwner)));
+  await page.evaluate(()=>{const p=facilityCtx.Walk.state.walker;p.x=-35;p.z=6;});
+  await page.waitForFunction(()=>facilityCtx.transportFacilityVisual.perimeter.snapshot().visibleBays>0,null,{timeout:10000});
+  check('return restores one bounded matching set',await page.evaluate(()=>{const s=facilityCtx.transportFacilityVisual.perimeter.snapshot();return s.visibleBays<=256&&s.colliderCount===facilityCtx.dynamicBuildingColliders.filter(c=>c.facilityPerimeterOwner).length;}));
+  report.final=await page.evaluate(()=>facilityCtx.transportFacilityVisual.perimeter.snapshot());
+  check('no page or graphics errors',report.errors.length===0);
+  report.ok=true;
+} catch(error) {
+  report.failure=String(error.stack||error).split('\nBrowser logs:')[0];process.exitCode=1;
+  report.state=await page?.evaluate(()=>({text:window.render_game_to_text?.(),world:window.facilityCtx?.worldLoadRuntimeState?.status,perimeter:window.facilityCtx?.transportFacilityVisual?.perimeter?.snapshot()})).catch(()=>null);
+  await page?.screenshot({path:`${out}/failure.png`}).catch(()=>{});
+} finally {
+  clearInterval(timer);await writeFile(`${out}/report.json`,JSON.stringify(report,null,2));await browser?.close();await server?.close();
+}
+console.log(JSON.stringify(report));

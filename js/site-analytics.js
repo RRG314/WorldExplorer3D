@@ -1,4 +1,4 @@
-import { analyticsPageContext, getAnalyticsTools } from './analytics-service.js?v=1';
+import { analyticsEventContext, analyticsPageContext, getAnalyticsTools } from './analytics-service.js?v=2';
 import { analyticsStorageAllowed, writeAnalyticsConsent } from './analytics-consent.js?v=3';
 
 // One page owner; gameplay retains ownership of its existing world-session events.
@@ -19,12 +19,12 @@ async function flush() {
     }
     state.sdkReady = true;
     if (!state.pageQueued) {
-      tools.logEvent(tools.analytics, 'page_view', analyticsPageContext());
+      tools.logEvent(tools.analytics, 'page_view', { ...analyticsPageContext(), ...analyticsEventContext() });
       state.pageQueued = true;
     }
     while (queue.length) {
       const event = queue.shift();
-      tools.logEvent(tools.analytics, event.name, { ...analyticsPageContext(), ...event.params });
+      tools.logEvent(tools.analytics, event.name, { ...analyticsPageContext(), ...analyticsEventContext(), ...event.params });
       state.queuedEvents++;
     }
   } catch (_) {
@@ -46,8 +46,29 @@ document.addEventListener('click', event => {
   const destinations = { globeSelectorStartBtn: 'earth', globeSelectorMoonBtn: 'moon', globeSelectorMarsBtn: 'mars', globeSelectorSpaceBtn: 'space', globeSelectorOceanBtn: 'ocean' };
   record(element.id === 'landingPrimaryCta' ? 'we3d_play_click' : 'we3d_destination_select', { destination: destinations[element.id] || 'start_menu' });
 }, { capture: true });
+// Launches must be observable before lazy gameplay services start. A failed
+// world may never start those services at all. This page owner handles them once.
+const launchEvents = new Set(['we3d_launch_start', 'we3d_launch_ready', 'we3d_launch_failed', 'we3d_launch_abandoned']);
+function recordLaunch(detail) {
+  if (!launchEvents.has(detail?.name)) return;
+  const p = detail.params || {};
+  record(detail.name, {
+    environment: ['earth', 'ocean', 'moon', 'mars', 'space'].includes(p.environment) ? p.environment : 'unknown',
+    launch_index: Math.max(1, Math.floor(Number(p.launch_index) || 1)),
+    ...(Number.isFinite(p.load_duration_ms) ? { load_duration_ms: Math.max(0, Math.min(1800000, Math.round(p.load_duration_ms))) } : {}),
+    ...(['launch_failed', 'world_not_ready', 'page_hidden', 'page_closed'].includes(p.failure_reason) ? { failure_reason: p.failure_reason } : {})
+  });
+}
+globalThis.addEventListener('we3d:product-telemetry', event => recordLaunch(event.detail));
+for (const detail of globalThis.__WE3D_PRODUCT_TELEMETRY_QUEUE__ || []) recordLaunch(detail);
 globalThis.addEventListener('we3d:runtime-ready', () => record('we3d_menu_ready'), { once: true });
-globalThis.addEventListener('we3d:first-play-ready', () => record('we3d_first_play_ready'), { once: true });
+globalThis.addEventListener('we3d:first-play-ready', event => {
+  const duration = Number(event.detail?.loadDurationMs);
+  record('we3d_first_play_ready', {
+    environment: ['earth', 'ocean', 'moon', 'mars', 'space'].includes(event.detail?.environment) ? event.detail.environment : 'unknown',
+    ...(Number.isFinite(duration) ? { load_duration_ms: Math.max(0, Math.min(1800000, Math.round(duration))) } : {})
+  });
+}, { once: true });
 function addPreferenceControl() {
   if (document.getElementById('analyticsConsentManageBtn')) return;
   const button = document.createElement('button');

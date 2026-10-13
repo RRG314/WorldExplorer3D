@@ -526,3 +526,9 @@ footer a:hover { color: var(--ink); }
   html { scroll-behavior: auto; }
   *, *::before, *::after { transition-duration: 0.01ms !important; }
 }
+
+/* New-build marine images remain separate from the released gallery. */
+.marine-preview-more { margin-top:24px; }
+.marine-preview-more > summary { cursor:pointer; color:var(--ink); padding:12px 0; min-height:44px; }
+.marine-preview-more > summary:focus-visible { outline:2px solid currentColor; outline-offset:4px; }
+.marine-preview-more[open] > .gallery { margin-top:16px; }

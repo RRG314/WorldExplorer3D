@@ -60,6 +60,8 @@ test('travel cannot replace a complete region with missing map tiles or a trunca
  const {requireCompleteTravelScenery}=await import('../app/js/terrain/regional-scenery-scheduler.js');
  const good={sourceCoverageComplete:true,buildingBudgetExceeded:false,waterTilesLoaded:4,waterTilesRequested:4};
  assert.doesNotThrow(()=>requireCompleteTravelScenery(good));
+ assert.throws(()=>requireCompleteTravelScenery(good,{roadCoverageError:'worker layout mismatch'}),/road coverage.*retaining/);
+ assert.doesNotThrow(()=>requireCompleteTravelScenery(good,{roadCoverageError:null}));
  for(const changed of [{sourceCoverageComplete:false},{buildingBudgetExceeded:true},{waterTilesLoaded:3}])assert.throws(()=>requireCompleteTravelScenery({...good,...changed}),/retaining/);
 });
 
@@ -79,4 +81,20 @@ test('scenery preference survives a menu choice made before lazy Earth startup a
  write(true,storage);assert.equal(read(storage),true);
  const denied={getItem(){throw Error('denied');},setItem(){throw Error('denied');}};
  assert.equal(read(denied),true);assert.doesNotThrow(()=>write(false,denied));
+});
+
+test('toggle aborts an unfinished destination and a late completion cannot move the published anchor',async()=>{
+ const job=deferred();let signal;
+ const s=createRegionalSceneryScheduler({request:(p,options)=>{signal=options.signal;return job.promise;}});
+ const old=s.step({x:16000,z:0});await Promise.resolve();s.setEnabled(false);
+ assert.equal(signal.aborted,true);job.resolve();await old;
+ assert.deepEqual(s.snapshot().anchor,{x:0,z:0});assert.equal(s.snapshot().pending,false);
+ assert.equal(s.step({x:16000,z:0}),null);
+});
+
+test('failed initial coverage can retry at its unchanged origin with the same bounded backoff',async()=>{
+ let attempts=0,time=0;const s=createRegionalSceneryScheduler({now:()=>time,request:()=>{if(++attempts===1)throw Error('provider unavailable');}});
+ await s.step({x:0,z:0},6000,{force:true});assert.equal(attempts,1);
+ s.step({x:0,z:0},6000,{force:true});assert.equal(attempts,1);
+ time=15001;await s.step({x:0,z:0},6000,{force:true});assert.equal(attempts,2);assert.equal(s.snapshot().error,'');
 });

@@ -7,6 +7,7 @@ import path from 'node:path';
 import { chromium } from 'playwright';
 import { startStaticServer } from './static-server.mjs';
 import { completeWorldReady } from './complete-world-readiness.mjs';
+import { closeOwnedBrowser } from './owned-browser.mjs';
 
 const root = process.cwd();
 const externalUrl = String(process.env.WE3D_VERIFY_BASE_URL || '').replace(/\/$/, '');
@@ -37,7 +38,8 @@ const server = externalUrl ? null : await startStaticServer({
   ports: [4360, 4361, 4362, 4363]
 });
 const baseUrl = externalUrl || `http://127.0.0.1:${server.port}`;
-const browser = await chromium.launch({ headless: true, channel: 'chrome' });
+const owned = await chromium.launchServer({ headless: true, channel: 'chrome' });
+const browser = await chromium.connect(owned.wsEndpoint());
 const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
 const page = await context.newPage();
 await configureStagingAppCheck(page, baseUrl);
@@ -244,7 +246,12 @@ try {
   const platformSurfaces = await verifyPlatformSurfaces();
   await page.goto(`${baseUrl}/`, { waitUntil: 'load', timeout: 120000 });
   const landingHero = String(await page.locator('.hero-frame img').getAttribute('src') || '').replace(/^\.\//, '');
-  await page.locator('.gallery').scrollIntoViewIfNeeded();
+  // Every published gallery participates in provenance checks, including
+  // optional sections whose lazy images are behind a native disclosure.
+  for (const details of await page.locator('details').filter({has:page.locator('.gallery')}).all()) {
+    if (!await details.evaluate(element=>element.open)) await details.locator(':scope > summary').click();
+  }
+  for (const image of await page.locator('.gallery img').all()) await image.scrollIntoViewIfNeeded();
   await page.locator('.gallery img').evaluateAll((images) => Promise.all(images.map((image) => image.decode())));
   const landingGallery = await page.locator('.gallery img').evaluateAll((images) => images.map((image) => ({
     src: String(image.getAttribute('src') || '').replace(/^\.\//, ''),
@@ -498,7 +505,6 @@ try {
   }
   throw error;
 } finally {
-  await context.close();
-  await browser.close();
-  await server?.close();
+  try { await closeOwnedBrowser(owned); }
+  finally { await server?.close(); }
 }

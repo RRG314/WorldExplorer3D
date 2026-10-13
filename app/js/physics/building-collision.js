@@ -1,13 +1,14 @@
 import {pointInPolygonXZ} from '../structure-semantics/geometry.js?v=2';
 import { nearbyVegetationObstacles } from '../world/vegetation-obstacle-index.js';
 import {createCollisionCandidates,appendCollisionCandidate,releaseCollisionCandidates} from './collision-candidates.js';
+import {usesContainedInteriorPhysics} from '../interiors/physics-scope.js';
 
 function buildingVerticalRangeOverlap(building, actorBaseY, actorHeight, tolerance = 0.45) {
   if (!Number.isFinite(actorBaseY)) return true;
   // Compiled transport boundaries are published with their visible geometry.
   // Inflating their tops like approximate building heights makes a lower
   // retaining wall obstruct people and vehicles on the separate road above.
-  if (building?.geometrySource === 'compiled_transport_structures') tolerance = .02;
+  if (building?.isInteriorCollider || building?.geometrySource === 'compiled_transport_structures') tolerance = .02;
   const actorTopY = actorBaseY + (Number.isFinite(actorHeight) ? Math.max(0.5, actorHeight) : 1.8);
   const minY = Number.isFinite(building?.minY) ? building.minY : Number.isFinite(building?.baseY) ? building.baseY : NaN;
   const maxY = Number.isFinite(building?.maxY) ? building.maxY : Number.isFinite(minY) && Number.isFinite(building?.height) ? minY + building.height : NaN;
@@ -22,8 +23,8 @@ function createBuildingCollisionQuery(appCtx) {
     // the outer query is overwritten, including when that callback throws.
     const buffer=available.pop() || createCollisionCandidates();
     try {
-    const localShip = appCtx.activeInterior?.environmentKind === 'expedition-ship';
-    if(!localShip)nearbyVegetationObstacles(appCtx, x, z, carRadius + 1,buffer);
+    const localInterior = usesContainedInteriorPhysics(appCtx.activeInterior);
+    if(!localInterior)nearbyVegetationObstacles(appCtx, x, z, carRadius + 1,buffer);
     if(!(Array.isArray(appCtx.buildings)&&appCtx.buildings.length) &&
       !(Array.isArray(appCtx.dynamicBuildingColliders)&&appCtx.dynamicBuildingColliders.length) &&
       !appCtx.transportStructureColliders?.length && !buffer.count)return {collision:false};
@@ -32,7 +33,7 @@ function createBuildingCollisionQuery(appCtx) {
     const acceptCollision = typeof options?.acceptCollision === 'function'
       ? options.acceptCollision
       : null;
-    if(!localShip){
+    if(!localInterior){
       if(typeof appCtx.getNearbyBuildings === 'function'){
         const indexed=appCtx.getNearbyBuildings(x,z,carRadius+8,buffer);
         // Compatibility with injected or legacy queries returning arrays.

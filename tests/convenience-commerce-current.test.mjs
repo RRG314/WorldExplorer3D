@@ -136,7 +136,7 @@ test('buy, sell, daily rare trade, and Explorer Credits persist locally', () => 
   assert.equal(commerce.trade(store).reason, 'already_traded_today');
   assert.ok(inventory.snapshot().items.some((item) => item.catalogId === rare.itemId));
 
-  const persisted = JSON.parse(storage.getItem(COMMERCE_STORAGE_KEY));
+  const persisted = commerce.localBackpackStore.loadCommerce();
   const reloaded = createLocalCommerceModel({ storage, inventory, now });
   assert.equal(reloaded.snapshot(store).credits, persisted.credits);
   assert.equal(reloaded.snapshot(store).rare.claimed, true);

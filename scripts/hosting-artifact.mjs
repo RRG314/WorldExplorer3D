@@ -2,6 +2,7 @@
 
 import { firebaseProjectScript, firebaseInitJson, generatedFirebaseFiles } from './lib/firebase-artifact-config.mjs';
 import crypto from 'node:crypto';
+import {resolveHostingOutput} from './lib/hosting-output.mjs';
 import {assertModelAssetRevisions} from './update-model-asset-revisions.mjs';
 import { canonicalBundledModule, rewritePackagedModuleReference } from './lib/runtime-module-identity.mjs';
 import { readReleaseSourceIdentity, assertCompatibleReleaseSourceIdentity } from './lib/release-source-identity.mjs';
@@ -11,7 +12,10 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 
 const ROOT = process.cwd();
-const OUTPUT_DIR = path.join(ROOT, 'dist');
+const command = String(process.argv[2] || 'build').toLowerCase();
+const OUTPUT_DIR = command==='verify'&&process.env.WE3D_VERIFY_ROOT&&!readFlag('--output-dir')
+  ? path.resolve(ROOT,process.env.WE3D_VERIFY_ROOT)
+  : await resolveHostingOutput(ROOT,readFlag('--output-dir'),{building:command==='build'});
 const ASSET_MANIFEST = 'asset-manifest.json';
 const BUILD_MANIFEST = 'build-manifest.json';
 const SOURCE_ENTRIES = SHIPPED_SOURCE_ENTRIES;
@@ -538,14 +542,13 @@ async function verifyArtifact() {
   return result;
 }
 
-const command = String(process.argv[2] || 'build').toLowerCase();
 try {
   if (command === 'build') {
     await buildArtifact(String(readFlag('--firebase-env', process.env.WE3D_FIREBASE_ENV || 'staging')).toLowerCase());
   } else if (command === 'verify') {
     await verifyArtifact();
   } else {
-    throw new Error('Usage: node scripts/hosting-artifact.mjs <build|verify> [--firebase-env staging|production]');
+    throw new Error('Usage: node scripts/hosting-artifact.mjs <build|verify> [--firebase-env staging|production] [--output-dir output/hosting-validation/<name>]');
   }
 } catch (error) {
   console.error('[hosting-artifact] Failed:', error?.stack || error?.message || String(error));

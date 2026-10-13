@@ -1,4 +1,5 @@
 import { createSurfaceDressing } from '../planetary/surface-dressing.js';
+import { activateLunarFieldwork } from '../planetary/lunar-fieldwork.js';
 import { addSurfaceMaterialDetail } from '../planetary/surface-material-detail.js';
 import { setActivePlanetaryObstacles } from '../planetary/runtime/obstacle-authority.js?v=1';
 import { APOLLO11_TERRAIN, loadApollo11Terrain } from './moon-lroc-terrain.js?v=1';
@@ -67,6 +68,7 @@ function finishMoonEntry(appCtx, createApollo11LandingSite, positionCarOnMoon) {
   if (!appCtx.onMoon) return;
   createApollo11LandingSite();
   positionCarOnMoon();
+  activateLunarFieldwork(appCtx);
   appCtx.refreshBlockBuilderForCurrentLocation?.();
   if (appCtx.carMesh) appCtx.carMesh.visible = true;
   if (appCtx.camera) {

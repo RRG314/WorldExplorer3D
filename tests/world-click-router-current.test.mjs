@@ -71,3 +71,31 @@ test('PaintTown owns world clicks without also opening a world selection', () =>
     assert.equal(selections, 1, 'Ordinary exploration still selects objects.');
   } finally { globalThis.THREE = priorThree; }
 });
+
+test('a venue or starship visit cannot select retained outdoor objects; exit restores picking', () => {
+  const priorThree = globalThis.THREE;
+  const outdoor = { isObject3D: true, uuid: 'outdoor', userData: { worldClickTarget: { kind: 'living-vehicle', id: 'outside' } } };
+  const canvas = { getBoundingClientRect: () => ({ left: 0, top: 0, width: 100, height: 100 }) };
+  let casts = 0, selections = 0;
+  globalThis.THREE = {
+    Vector2: class {},
+    Raycaster: class { setFromCamera() {} intersectObjects() { casts++; return [{ object: outdoor }]; } }
+  };
+  const ctx = { renderer: { domElement: canvas }, gameStarted: true,
+    livingWorldRuntime: { population: { pickableRoots: () => [outdoor] } },
+    handleLivingWorldSelection() { selections++; return true; }
+  };
+  const click = { button: 0, target: canvas, clientX: 50, clientY: 50 };
+  try {
+    for (const venue of [{ aquarium: {} }, { gallery: {} }]) {
+      ctx.activeInterior = venue;
+      assert.equal(handleWorldCanvasClick(ctx, click), true);
+    }
+    ctx.activeInterior = null; ctx.activeShipInterior = true;
+    assert.equal(handleWorldCanvasClick(ctx, click), true);
+    assert.equal(casts, 0); assert.equal(selections, 0);
+    ctx.activeShipInterior = false;
+    assert.equal(handleWorldCanvasClick(ctx, click), true);
+    assert.equal(casts, 1); assert.equal(selections, 1);
+  } finally { globalThis.THREE = priorThree; }
+});

@@ -511,8 +511,7 @@ export function applyMappedSemanticVertexTints(
       continue;
     }
     if (!buckets?.get || contextZoom <= 0) continue;
-    let geographic;
-    let tile;
+    let latitude,longitude,tileX,tileY;
     if (separableLocalProjection) {
       let longitudeTile = longitudeTileByWorldX.get(worldX);
       if (!longitudeTile) {
@@ -532,35 +531,29 @@ export function applyMappedSemanticVertexTints(
         };
         latitudeTileByWorldZ.set(worldZ, latitudeTile);
       }
-      geographic = { lat: latitudeTile.latitude, lon: longitudeTile.longitude };
-      tile = { x: longitudeTile.tileX, y: latitudeTile.tileY };
+      latitude=latitudeTile.latitude;longitude=longitudeTile.longitude;
+      tileX=longitudeTile.tileX;tileY=latitudeTile.tileY;
     } else {
-      geographic = appCtx.worldToLatLon(worldX, worldZ);
-      tile = latLonToTileXY(geographic.lat, geographic.lon, contextZoom);
+      const geographic=appCtx.worldToLatLon(worldX,worldZ);
+      latitude=geographic.lat;longitude=geographic.lon;
+      const tile=latLonToTileXY(latitude,longitude,contextZoom);tileX=tile.x;tileY=tile.y;
     }
-    const bucketKey = `${contextZoom}/${tile.x}/${tile.y}`;
-    let bucket = buckets.get(bucketKey) || [];
+    const bucketKey = `${contextZoom}/${tileX}/${tileY}`;
+    let bucket = buckets.get(bucketKey);
     const spatial = spatialBuckets?.get?.(bucketKey);
     if (spatial) {
       const { bounds, latSpan, lonSpan, size } = spatial;
-      if (
-        geographic.lon < bounds.minLon || geographic.lon > bounds.maxLon ||
-        geographic.lat < bounds.minLat || geographic.lat > bounds.maxLat
-      ) {
-        bucket = [];
-      } else {
-        const cellX = Math.max(0, Math.min(size - 1,
-          Math.floor((geographic.lon - bounds.minLon) / lonSpan * size)));
-        const cellY = Math.max(0, Math.min(size - 1,
-          Math.floor((geographic.lat - bounds.minLat) / latSpan * size)));
-        bucket = spatial.cells[cellY * size + cellX] || [];
-      }
+      if (longitude < bounds.minLon || longitude > bounds.maxLon ||
+          latitude < bounds.minLat || latitude > bounds.maxLat) continue;
+      const cellX = Math.max(0, Math.min(size - 1,
+        Math.floor((longitude - bounds.minLon) / lonSpan * size)));
+      const cellY = Math.max(0, Math.min(size - 1,
+        Math.floor((latitude - bounds.minLat) / latSpan * size)));
+      bucket = spatial.cells[cellY * size + cellX];
     }
-    const owner = bucket.find((area) => pointInMappedLandArea(
-      geographic.lon,
-      geographic.lat,
-      area
-    ));
+    if(!bucket?.length)continue;
+    let owner;
+    for(const area of bucket)if(pointInMappedLandArea(longitude,latitude,area)){owner=area;break;}
     if (!Array.isArray(owner?.tint) || owner.tint.length < 3) continue;
     setNormalizedTerrainAttribute(colors, index, owner.tint);
     setTerrainSurfaceMaterialMixAt(materialMix, index, owner.mode || owner.kind);

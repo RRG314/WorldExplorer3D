@@ -7,7 +7,8 @@ import {createPavementTerrainMask,createPavementMaterialBinding} from './pavemen
 // cannot bury this distant layer because it is part of the terrain itself.
 export function createStreetOverview(appCtx,{onComplete=()=>{}}={}){
  const sequence=appCtx._worldLoadSequence,startedAt=performance.now();
- let worker=null,pending=null,active=null,disposed=false,sources=[],prepared=false,mask=null,stagedMask=null,completedBounds=null;
+ let worker=null,pending=null,active=null,disposed=false,sources=[],prepared=false,coveragePrepared=false,mask=null,stagedMask=null,completedBounds=null,generation=0;
+ const completedKeys=new Set();
  const materialBinding=createPavementMaterialBinding(appCtx);
  // Install one stable shader interface before the first playable render. Cell
  // data and replacement atlases change uniforms, never the terrain program.
@@ -24,34 +25,40 @@ export function createStreetOverview(appCtx,{onComplete=()=>{}}={}){
    try{worker.postMessage(data);}catch(error){pending.reject(error);}
  });
  function setDetailBounds(bounds){mask?.setDetailBounds(bounds);stagedMask?.setDetailBounds(bounds);}
- async function advance(focus){
+ async function advance(focus,run){
+   const current=()=>valid()&&run===generation&&sourcesMatch();
    if(!worker){
      const workerUrl=globalThis.__WORLD_EXPLORER_PRODUCTION__?.streetOverviewWorkerUrl ||
        new URL('./compiler/street-overview-worker.js',import.meta.url);
      worker=new Worker(workerUrl,{type:'module'});stats.workerActive=true;
-     worker.onmessage=event=>event.data.type==='error'?pending?.reject(new Error(event.data.message)):pending?.resolve(event.data);
-     worker.onerror=event=>pending?.reject(new Error(event.message));
+     const instance=worker;
+     worker.onmessage=event=>{if(worker===instance)event.data.type==='error'?pending?.reject(new Error(event.data.message)):pending?.resolve(event.data);};
+     worker.onerror=event=>{if(worker===instance)pending?.reject(new Error(event.message));};
    }
    if(!prepared||!sourcesMatch()){
+     const newSources=!coveragePrepared||!sourcesMatch();
+     if(newSources){completedKeys.clear();coveragePrepared=false;}
      sources=sourceLists().map(list=>({list,length:list?.length||0}));
-     const current=()=>valid()&&sourcesMatch();
      const schedule={current,yieldWork:yieldToWorldFrame,budgetMs:2};
      const input=await streetSourceInputCooperatively(appCtx,()=>true,schedule);
      await sendStreetSourceInChunks(input,request,schedule);
      if(!current())return;
-     const plan=await request({type:'prepare'});if(!current())return;
-     stagedMask?.dispose();stagedMask=createPavementTerrainMask(appCtx,plan.keys,{materialBinding});
-     if(stats.totalCells===null){mask.dispose();mask=stagedMask;stagedMask=null;mask.activate();}
-     setDetailBounds(appCtx.streetPavement?.coverageBounds);
-     Object.assign(stats,{totalCells:plan.tiles,sourceCells:plan.sourceCells,excludedCells:plan.excludedCells,completedCells:0,nonemptyCells:0,coveredSquareWorldUnits:0,
-       retainedBytes:(stagedMask||mask).bytes,maskResolution:(stagedMask||mask).layout.resolution,worldUnitsPerTexel:64/(stagedMask||mask).layout.resolution});
+     const plan=await request({type:'prepare',completedKeys:[...completedKeys]});if(!current())return;
+     if(!coveragePrepared){
+       stagedMask?.dispose();stagedMask=createPavementTerrainMask(appCtx,plan.keys,{materialBinding});
+       if(stats.totalCells===null){mask.dispose();mask=stagedMask;stagedMask=null;mask.activate();}
+       setDetailBounds(appCtx.streetPavement?.coverageBounds);
+       Object.assign(stats,{totalCells:plan.tiles,sourceCells:plan.sourceCells,excludedCells:plan.excludedCells,completedCells:0,nonemptyCells:0,coveredSquareWorldUnits:0,
+         retainedBytes:(stagedMask||mask).bytes,maskResolution:(stagedMask||mask).layout.resolution,worldUnitsPerTexel:64/(stagedMask||mask).layout.resolution});
+       coveragePrepared=true;
+     }
      prepared=true;
    }
    const target=stagedMask||mask;
    const packet=await request({type:'next',focus,resolution:target.layout.resolution});
-   if(!valid()||!sourcesMatch())return;
+   if(!current())return;
    if(packet.type==='complete'){await complete();return;}
-   target.publish(packet.key,packet.mask);stats.completedCells++;stats.uploads={...target.uploadStats};
+   target.publish(packet.key,packet.mask);completedKeys.add(packet.key);stats.completedCells++;stats.uploads={...target.uploadStats};
    if(packet.coveredSquareWorldUnits>0)stats.nonemptyCells++;
    stats.coveredSquareWorldUnits+=packet.coveredSquareWorldUnits||0;
    if(!packet.remaining)await complete();
@@ -77,8 +84,21 @@ export function createStreetOverview(appCtx,{onComplete=()=>{}}={}){
    const coordinate=value=>Number.isFinite(Number(value))?Number(value):0;
    const point={x:coordinate(focus?.x),z:coordinate(focus?.z)};
    // At most one acknowledged cell per rendered frame, never an 80 ms burst.
-   active=advance(point).catch(error=>{if(valid()){stats.status='failed';stats.error=String(error.message);worker?.terminate();worker=null;stats.workerActive=false;}}).finally(()=>{active=null;});
+   const run=++generation;
+   active=advance(point,run).catch(error=>{if(valid()&&run===generation){stats.status='failed';stats.error=String(error.message);worker?.terminate();worker=null;stats.workerActive=false;}}).finally(()=>{if(run===generation)active=null;});
  }
- function dispose(){disposed=true;worker?.terminate();pending?.reject(new Error('Overview disposed'));mask?.dispose();stagedMask?.dispose();mask=stagedMask=null;materialBinding.dispose();stats.status='disposed';stats.retainedBytes=0;stats.workerActive=false;}
- return {stats,step,setDetailBounds,get completedBounds(){return completedBounds;},pause:()=>active||Promise.resolve(),dispose};
+ function suspendForDetail(){
+   // A source scan/worker preparation is not a single cell. Waiting for that
+   // whole task lets distant work block a new arrival and retains its full
+   // plan alongside the detail compiler. Retire only unaccepted work. The
+   // published atlas and completed cell identities survive and resume later.
+   if(stats.status==='complete')return active||Promise.resolve();
+   generation++;worker?.terminate();worker=null;
+   pending?.reject(new Error('Overview yielded to nearby detail'));
+   active=null;prepared=false;stats.workerActive=false;
+   if(valid())stats.status='suspended';
+   return Promise.resolve();
+ }
+ function dispose(){disposed=true;generation++;worker?.terminate();pending?.reject(new Error('Overview disposed'));completedKeys.clear();mask?.dispose();stagedMask?.dispose();mask=stagedMask=null;materialBinding.dispose();stats.status='disposed';stats.retainedBytes=0;stats.workerActive=false;}
+ return {stats,step,setDetailBounds,get completedBounds(){return completedBounds;},pause:()=>active||Promise.resolve(),suspendForDetail,dispose};
 }

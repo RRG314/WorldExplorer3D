@@ -43,7 +43,10 @@ function writeAnalyticsConsent(value) {
     // The runtime still applies the in-memory consent signal when storage is blocked.
   }
   globalThis.__WE3D_ANALYTICS_CONSENT__ = normalized;
-  if (normalized === CONSENT_DENIED) clearAnalyticsCookies();
+  if (normalized === CONSENT_DENIED) {
+    clearAnalyticsCookies();
+    try { globalThis.sessionStorage?.removeItem('we3d.analyticsCampaign'); } catch {}
+  }
   globalThis.dispatchEvent?.(new CustomEvent('we3d:analytics-consent', { detail: { value: normalized } }));
   return normalized;
 }

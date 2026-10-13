@@ -9,7 +9,7 @@ import {startStaticServer} from './static-server.mjs';
 import {configureStagingAppCheck} from './staging-app-check.mjs';
 import {closeOwnedBrowser} from './owned-browser.mjs';
 const controlsOnly=process.env.WE3D_SHIP_SCOPE==='controls';
-const out=controlsOnly?'output/verification/ship-controls':'output/verification/ship-traversal';
+const out=process.env.WE3D_SHIP_OUTPUT||(controlsOnly?'output/verification/ship-controls':'output/verification/ship-traversal');
 await mkdir(out,{recursive:true});
 const report={ok:false,runtimeRoot:process.env.WE3D_VERIFY_ROOT||'.',errors:[],decks:[]};
 let browser,server,page,owned;
@@ -75,6 +75,10 @@ try{
  report.liftBefore=await pose();await page.keyboard.down('ArrowUp');await page.waitForTimeout(1000);await page.keyboard.up('ArrowUp');report.liftAfter=await pose();
  await page.screenshot({path:`${out}/lift-before.png`});
  assert.ok(Math.hypot(report.liftAfter.x-report.liftBefore.x,report.liftAfter.z-report.liftBefore.z)>.5,'Walking stalled after the deck picker closed');
+ const jumpBase=await pose();await page.keyboard.down('Space');await page.waitForTimeout(150);await page.keyboard.up('Space');
+ report.jump={before:jumpBase,airborne:await pose()};assert.ok(report.jump.airborne.y>jumpBase.y+.1,'Space did not jump inside the spaceship');
+ await page.screenshot({path:`${out}/ship-jump.png`});await page.waitForTimeout(1600);report.jump.landed=await pose();
+ assert.ok(Math.abs(report.jump.landed.y-jumpBase.y)<.06,'Spaceship jump did not land on the same deck');
  await page.locator('#shipViewsButton').click();await page.locator('#shipObservationPanel.show').waitFor();
  report.observation=[];
  for(const id of await page.locator('#shipObservationView option').evaluateAll(options=>options.map(o=>o.value))){

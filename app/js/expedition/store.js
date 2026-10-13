@@ -1,3 +1,5 @@
+import { POD_PHASE, POD_ROUTE_KIND } from './pod-journey-authority.js?v=2';
+import { validLunarFieldPower } from '../planetary/lunar-field-power.js';
 import { EXPEDITION_SCHEMA_VERSION } from './model.js?v=12';
 import { DEFAULT_CREW } from './catalog.js?v=2';
 import { normalizeVoyageDirector, VOYAGE_SLOTS } from './voyage-director.js?v=2';
@@ -7,13 +9,28 @@ import { SPACE_CRAFT_IDENTITY } from '../space/craft-identity.js?v=1';
 
 const EXPEDITION_STORAGE_KEY = 'world-explorer:interstellar-expedition:v1';
 const EXPEDITION_BACKUP_KEY = 'world-explorer:interstellar-expedition:backup:v1';
+const MAX_RECORD_CHARS = 2_000_000;
+const EXPEDITION_STATES = new Set(['planned', 'traveling', 'paused', 'arrived', 'completed', 'failed']);
 
 function parseRecord(value) {
-  if (!value) return null;
+  if (!value || value.length > MAX_RECORD_CHARS) return null;
   try {
     const record = JSON.parse(value);
     if (record?.type !== 'InterstellarExpedition') return null;
-    if (Number(record.schemaVersion) !== EXPEDITION_SCHEMA_VERSION) return null;
+    if (record.schemaVersion !== EXPEDITION_SCHEMA_VERSION
+      || typeof record.id !== 'string' || !record.id || typeof record.destinationId !== 'string'
+      || !EXPEDITION_STATES.has(record.state) || !record.ship?.id || !record.ship?.profileId
+      || !Array.isArray(record.crew) || !record.resources || !record.calculation || !record.readiness
+      || !Number.isFinite(record.createdAtMs) || !Number.isFinite(record.updatedAtMs)) return null;
+    if (record.podJourney != null) {
+      const pod = record.podJourney;
+      if (pod.type !== 'ExpeditionPodJourney' || ![1, 2].includes(pod.schemaVersion)
+        || pod.expeditionId !== record.id || !Object.values(POD_PHASE).includes(pod.phase)
+        || !['id', 'contactId', 'bodyId', 'returnFrameId'].every(key => typeof pod[key] === 'string' && pod[key])
+        || !Number.isFinite(pod.startedAtMs) || !Number.isFinite(pod.updatedAtMs)
+        || pod.schemaVersion === 2 && !Object.values(POD_ROUTE_KIND).includes(pod.routeKind)
+        || pod.fieldPower != null && (pod.bodyId !== 'moon' || pod.contactId !== 'destination-mission:moon' || !validLunarFieldPower(pod.fieldPower))) return null;
+    }
     const defaultsById = new Map(DEFAULT_CREW.map((member) => [member.id, member]));
     record.crew = (record.crew || []).map((member) => {
       const defaults = defaultsById.get(member?.id) || {};
@@ -72,41 +89,69 @@ function parseRecord(value) {
 
 function createExpeditionStore(storage = globalThis.localStorage) {
   const archive = createExpeditionArchive(storage);
+  let expectedRaw = null, observed = false, protectedRecord = false, warning = null;
   function load() {
-    return parseRecord(storage?.getItem?.(EXPEDITION_STORAGE_KEY));
-  }
-
-  function save(expedition) {
-    if (!expedition || expedition.type !== 'InterstellarExpedition' || expedition.schemaVersion !== EXPEDITION_SCHEMA_VERSION) {
-      throw new TypeError('Only a supported Expedition record can be saved.');
+    observed = true;
+    try {
+      if (typeof storage?.getItem !== 'function') throw new Error('Storage unavailable');
+      expectedRaw = storage.getItem(EXPEDITION_STORAGE_KEY);
+      const record = parseRecord(expectedRaw);
+      protectedRecord = expectedRaw !== null && !record;
+      return record;
+    } catch {
+      protectedRecord = true;
+      return null;
     }
-    const existing = storage?.getItem?.(EXPEDITION_STORAGE_KEY);
-    if (existing) storage.setItem(EXPEDITION_BACKUP_KEY, existing);
-    storage.setItem(EXPEDITION_STORAGE_KEY, JSON.stringify(expedition));
-    archive.mergeExpedition(expedition);
+  }
+  function writable() {
+    if (!observed) load();
+    if (protectedRecord) throw new Error('Existing expedition progress cannot be read by this version and has been preserved.');
+    if (typeof storage?.setItem !== 'function' || typeof storage?.getItem !== 'function') throw new Error('Expedition storage is unavailable.');
+    if (storage.getItem(EXPEDITION_STORAGE_KEY) !== expectedRaw) throw new Error('Another tab changed the expedition. Reload to resume its saved state.');
+    return expectedRaw;
+  }
+  function archiveCommitted(expedition) {
+    try { archive.mergeExpedition(expedition); }
+    catch { warning = 'Expedition saved. The separate discovery archive could not be updated.'; }
+  }
+  function save(expedition) {
+    const raw = JSON.stringify(expedition);
+    if (!parseRecord(raw)) throw new TypeError('Only a complete supported Expedition record can be saved.');
+    const previous = writable();
+    // The primary record is the commit point. A redundant-copy failure cannot
+    // turn a successful commit into an apparent failure that a player retries.
+    storage.setItem(EXPEDITION_STORAGE_KEY, raw);
+    expectedRaw = raw;
+    warning = null;
+    if (previous) {
+      try { storage.setItem(EXPEDITION_BACKUP_KEY, previous); }
+      catch { warning = 'Expedition saved. The previous-state backup could not be refreshed.'; }
+    }
+    archiveCommitted(expedition);
     return expedition;
   }
-
   function restoreBackup() {
-    const backup = storage?.getItem?.(EXPEDITION_BACKUP_KEY);
+    writable();
+    const backup = storage.getItem(EXPEDITION_BACKUP_KEY);
     const record = parseRecord(backup);
     if (!record) return null;
     storage.setItem(EXPEDITION_STORAGE_KEY, backup);
+    expectedRaw = backup;
+    warning = null;
+    archiveCommitted(record);
     return record;
   }
-
   function clear() {
-    const existing = storage?.getItem?.(EXPEDITION_STORAGE_KEY);
-    if (existing) storage.setItem(EXPEDITION_BACKUP_KEY, existing);
+    const previous = writable();
+    if (typeof storage?.removeItem !== 'function') throw new Error('Expedition storage is unavailable.');
+    // Destructive clear requires a durable recovery copy before deletion.
+    if (previous) storage.setItem(EXPEDITION_BACKUP_KEY, previous);
     storage.removeItem(EXPEDITION_STORAGE_KEY);
+    expectedRaw = null;
   }
-
   return Object.freeze({
-    backupKey: EXPEDITION_BACKUP_KEY,
-    clear,
-    load,
-    restoreBackup,
-    save,
+    backupKey: EXPEDITION_BACKUP_KEY, clear, load, restoreBackup, save,
+    status: () => Object.freeze({ protectedRecord, warning }),
     storageKey: EXPEDITION_STORAGE_KEY
   });
 }

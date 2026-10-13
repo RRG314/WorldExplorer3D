@@ -25,8 +25,106 @@
     "scope": "Measured scene references, not GPU residency or phone capacity. Independent frame-time, full-coverage and 12-reload retention gates remain required and unchanged."
   },
   "scenes": {
-    "earth": {"fixture": "Baltimore 39.2904,-76.6122 walking spawn", "maximum": {"materials": 3300, "geometries": 5600, "textures": 260, "skeletons": 80, "geometrySourceBytes": 419430400, "textureSourceBytes": 335544320, "unknownTextures": 0, "drawCalls": 1800, "triangles": 4950000, "programs": 128}, "colliders": {"mappedBuildings": 60000, "transportStructures": 12000, "dynamic": 32}, "maximumAnimationTimeRatio": 0.12},
-    "space": {"fixture": "Initial Space flight, Moon course", "maximum": {"materials": 350, "geometries": 330, "textures": 70, "skeletons": 0, "geometrySourceBytes": 4194304, "textureSourceBytes": 402653184, "unknownTextures": 0, "drawCalls": 150, "triangles": 80000, "programs": 24}, "maximumAnimationTimeRatio": 0.02},
-    "ocean": {"fixture": "Coral Shelf -18.2861,147.7, submarine, controlled GEBCO -80 m", "maximum": {"materials": 64, "geometries": 80, "textures": 32, "skeletons": 0, "geometrySourceBytes": 6291456, "textureSourceBytes": 33554432, "unknownTextures": 0, "drawCalls": 300, "triangles": 900000, "programs": 24}, "maximumAnimationTimeRatio": 0.02}
+    "earth": {
+      "fixture": "Baltimore 39.2904,-76.6122 walking spawn",
+      "maximum": {
+        "materials": 3300,
+        "geometries": 5600,
+        "textures": 260,
+        "skeletons": 80,
+        "geometrySourceBytes": 419430400,
+        "textureSourceBytes": 335544320,
+        "unknownTextures": 0,
+        "drawCalls": 1800,
+        "triangles": 4950000,
+        "programs": 128
+      },
+      "colliders": {
+        "mappedBuildings": 60000,
+        "transportStructures": 12000,
+        "dynamic": 32
+      },
+      "maximumAnimationTimeRatio": 0.12
+    },
+    "space": {
+      "fixture": "Initial Space flight, Moon course",
+      "maximum": {
+        "materials": 350,
+        "geometries": 330,
+        "textures": 70,
+        "skeletons": 0,
+        "geometrySourceBytes": 4194304,
+        "textureSourceBytes": 402653184,
+        "unknownTextures": 0,
+        "drawCalls": 150,
+        "triangles": 80000,
+        "programs": 24
+      },
+      "maximumAnimationTimeRatio": 0.02
+    },
+    "ocean": {
+      "fixture": "Coral Shelf -18.2861,147.7, submarine, controlled GEBCO -80 m",
+      "maximum": {
+        "materials": 64,
+        "geometries": 80,
+        "textures": 64,
+        "skeletons": 0,
+        "geometrySourceBytes": 12582912,
+        "textureSourceBytes": 100663296,
+        "unknownTextures": 0,
+        "drawCalls": 300,
+        "triangles": 900000,
+        "programs": 24
+      },
+      "maximumAnimationTimeRatio": 0.02
+    }
+  },
+  "oceanBaselineChange": {
+    "date": "2026-10-12",
+    "reason": "Named Coral Shelf fixture now includes licensed Atlantic Explorer, near/far scanned coral meshes and the parent research hull. Its older procedural-scene ceiling is not a gameplay content limit. Audit removed the hidden furnished surface vessel instead of lowering visual quality.",
+    "previousMaximum": {
+      "materials": 64,
+      "geometries": 80,
+      "textures": 32,
+      "skeletons": 0,
+      "geometrySourceBytes": 6291456,
+      "textureSourceBytes": 33554432,
+      "unknownTextures": 0,
+      "drawCalls": 300,
+      "triangles": 900000,
+      "programs": 24
+    },
+    "measuredScene": {
+      "schemaVersion": 1,
+      "scope": "scene-referenced resources, including hidden children; excludes detached caches and compositor targets; texture bytes are source-format estimates, not GPU residency",
+      "objects": 152,
+      "meshes": 98,
+      "instances": 698,
+      "geometries": 42,
+      "materials": 38,
+      "textures": 43,
+      "skeletons": 0,
+      "geometrySourceBytes": 8778820,
+      "textureSourceBytes": 68332138,
+      "unknownTextures": 0,
+      "drawCalls": 22,
+      "triangles": 499002,
+      "programs": 14,
+      "colliders": null,
+      "animation": null
+    },
+    "evidenceSha256": "63cce91cb5bdfaa28188b8d298e554e45af264f2efb58394b31a22f5456d6810",
+    "cleanupEvidence": {
+      "actualDeckSubDeckCycles": 3,
+      "retainedHeapBytes": [
+        59985880,
+        60922436,
+        61488544
+      ],
+      "surfaceVesselRetiresOnDive": true,
+      "oceanRendererRetiresOnRecovery": true,
+      "finalVesselLeases": 0
+    },
+    "scope": "Scene-reference regression allowance, not GPU residency, physical-phone certification or a limit on future ocean content. Frame-time gates stay unchanged; lifecycle checks are mandatory."
   }
 }

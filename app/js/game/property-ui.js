@@ -2,7 +2,7 @@ import {earthCoordinateFrame} from '../earth-core/coordinate-frame.js?v=1';
 import { ctx as appCtx } from '../shared-context.js?v=55';
 import { ensurePlayerBackpackInventory } from '../urban-sandbox/equipment-model.js?v=10';
 import { createLocalCommerceModel } from '../urban-sandbox/commerce-model.js?v=5';
-import { createHousingModel, makeHomeCandidates } from '../real-estate/housing-model.js?v=2';
+import { createHousingModel, makeHomeCandidates, mergeInteriorHomeSnapshots } from '../real-estate/housing-model.js?v=2';
 import { createConnectedPropertyAuthority } from '../real-estate/connected-property-authority.js?v=3';
 import { createConnectedExplorerWallet } from '../economy/connected-wallet-authority.js?v=2';
 import { getCurrentUser } from '../../../js/auth-ui.js?v=56';
@@ -94,10 +94,11 @@ function surfaceYAt(x, z) {
 }
 
 function ensureHousing() {
+  if (housing) return housing;
   const inventory = ensurePlayerBackpackInventory(appCtx);
-  const economy = appCtx.worldEconomy || appCtx.localConvenienceStoreCommerce || createLocalCommerceModel({ inventory });
-  appCtx.worldEconomy = economy;
-  appCtx.localConvenienceStoreCommerce = economy;
+  const current=appCtx.worldEconomy || appCtx.localConvenienceStoreCommerce;
+  const economy = current?.localBackpackStore ? current : createLocalCommerceModel({ inventory, backpackStore:appCtx.playerBackpackStore });
+  if (!current) {appCtx.worldEconomy = economy;appCtx.localConvenienceStoreCommerce = economy;}
   if (!housing) {
     housing = createHousingModel({
       economy,
@@ -105,7 +106,7 @@ function ensureHousing() {
       getActorPosition: actorPosition,
       getActiveLocationId: () => runtimeLocation().id,
       storageAccessRadius: 45,
-      saveInventory: () => appCtx.playerBackpackStore?.save?.(inventory.exportState?.())
+      backpackStore: appCtx.playerBackpackStore
     });
     appCtx.explorerHousing = housing;
   }
@@ -157,7 +158,25 @@ function snapshot() {
 
 // Interiors consume only this read-only ownership view. The furnishing layer
 // never grants, transfers, or mutates a property deed.
-appCtx.getExplorerPropertySnapshot = snapshot;
+appCtx.getExplorerPropertySnapshot = () => {
+  const view=snapshot(),personal=ensureHousing().snapshot();
+  return mergeInteriorHomeSnapshots(view,personal);
+};
+export function getPersonalHousing() {return ensureHousing();}
+export function getPersonalHomeCandidates() {
+  const location=runtimeLocation();
+  return makeHomeCandidates((appCtx.buildings||[]).filter(b=>/house|residential|apartments|terrace|townhouse|detached|bungalow|dormitory/i.test(b.buildingType||'')),{
+    actor:actorPosition(),locationId:location.id,locationLabel:location.label,worldToGeo,radius:1800,limit:80
+  });
+}
+export function routeToPersonalHome(home) {
+  if (!home || home.locationId!==runtimeLocation().id) return false;
+  const actor=actorPosition(),target=getNavigationTargetForDestination(home);
+  if (!target.support?.enterable) return false;
+  appCtx.selectedProperty=home;appCtx.showNavigation=true;
+  createNavigationRoute(Number(actor.x||0),Number(actor.z||0),target.x,target.z,true);
+  return true;
+}
 appCtx.marylandParcelRuntimeSnapshot = () => Object.freeze({ ...parcelRuntime, provider: marylandParcelProviderSnapshot() });
 
 appCtx.canPlaceQuickBuildAt = ({ x, z } = {}) => {
@@ -326,13 +345,13 @@ function renderStorage(view) {
   const home = view.primaryHome || view.homes[0];
   if (!home) return `<section class="propertyEmptyState"><span class="propertyEmptyIcon">▣</span><h3>Home storage needs a home</h3><p>Choose a nearby property first. Connected home storage will open after account-backed Backpack transfers are ready.</p><button type="button" data-property-view="nearby">See Properties Nearby</button></section>`;
   if (view.shared) return `<section class="propertyEmptyState"><span class="propertyEmptyIcon">▣</span><h3>Home storage is being connected</h3><p>Your Backpack remains available, but moving items into a connected home will open only when every transfer can be saved safely to your account.</p><button type="button" data-property-view="home">Back to My Properties</button></section>`;
-  const carried = appCtx.playerBackpackInventory?.snapshot?.().items?.filter((item) => item.catalogId !== 'hands' && item.equipped !== true) || [];
+  const carried = appCtx.playerBackpackInventory?.snapshot?.().items?.filter((item) => item.catalogId !== 'hands' && item.equipped !== true && !item.verbs?.includes('equip') && item.category !== 'field-tool') || [];
   const used = home.storage.reduce((sum, item) => sum + Number(item.quantity || 0), 0);
   if (!home.storageAccessible) {
     const samePlace = home.locationId === runtimeLocation().id;
     return `<section class="propertyEmptyState"><span class="propertyEmptyIcon">⌂</span><h3>Storage is at your home</h3><p>${samePlace ? `${escapeHtml(home.label)} is ${distance(home.distance)} away. Set a route and go there to move items.` : `Return to ${escapeHtml(home.locationLabel)} to use storage at ${escapeHtml(home.label)}.`}</p>${samePlace ? `<button type="button" data-property-action="navigate" data-property-id="${escapeHtml(home.id)}">Set Route Home</button>` : ''}</section>`;
   }
-  return `<button class="propertyBackAction" type="button" data-property-view="home">← My Properties</button><section class="propertySectionIntro"><span>HOME STORAGE</span><strong>${escapeHtml(home.label)}</strong><p>${used} of ${home.storageCapacity} spaces used. Equip a different item before storing the one in your hands.</p></section>
+  return `<button class="propertyBackAction" type="button" data-property-view="home">← My Properties</button><section class="propertySectionIntro"><span>HOME STORAGE</span><strong>${escapeHtml(home.label)}</strong><p>${used} of ${home.storageCapacity} spaces used. Store supplies and specimens here. Worn gear and field tools stay in your Backpack.</p></section>
     <div class="propertyStorageColumns"><section><h3>At Home</h3>${home.storage.length ? home.storage.map((item) => storageItem(item, home.id, false)).join('') : '<p class="propertyMuted">Nothing stored here yet.</p>'}</section>
     <section><h3>In Your Backpack</h3>${carried.length ? carried.map((item) => storageItem(item, home.id, true)).join('') : '<p class="propertyMuted">No available Backpack items.</p>'}</section></div>`;
 }
@@ -617,11 +636,13 @@ function reasonMessage(reason) {
     not_enough_credits: 'You need more money in your Explorer wallet for this property.',
     storage_not_empty: 'Move everything out of this home before selling it.',
     storage_full: 'This home is out of storage space.',
+    item_attached: 'Keep worn gear and field tools in your Backpack. Supplies and specimens can be stored here.',
     item_equipped: 'Equip something else before storing that item.',
     item_unavailable: 'That item is no longer available.',
     not_owned: 'This home is not in your portfolio.',
     home_too_far: 'Go to your home before moving items in or out of storage.',
     home_in_another_place: 'Return to that home’s location before using its storage.',
+    save_in_another_tab: 'Your possessions are open in another World Explorer tab. Close it, then reload here before changing home storage.',
     save_failed: 'The change could not be saved on this device.',
     wallet_unavailable: 'Your Explorer wallet is unavailable right now.',
     offered_property_unavailable: 'The property you offered is no longer available to trade.',

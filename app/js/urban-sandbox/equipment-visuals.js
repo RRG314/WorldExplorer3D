@@ -1,3 +1,4 @@
+import {detachSceneObject} from '../engine/scene-object-lifecycle.js';
 import {
   attachCuratedEquipmentVisual,
   curatedEquipmentAssetForId,
@@ -319,10 +320,10 @@ function createEquipmentVisuals(THREE, characterMesh) {
       items.forEach((group) => disposeCuratedEquipmentVisual(group));
       characterMesh.userData.heldEquipmentId = '';
       characterMesh.userData.weaponPose = 'unarmed';
-      root.removeFromParent?.();
-      parachutePack.removeFromParent?.();
+      detachSceneObject(root);
+      detachSceneObject(parachutePack);
       disposeCuratedParachuteVisual(parachuteCanopy);
-      parachuteCanopy.removeFromParent?.();
+      detachSceneObject(parachuteCanopy);
       geometries.forEach((geometry) => geometry.dispose?.());
       materials.forEach((material) => material.dispose?.());
     }

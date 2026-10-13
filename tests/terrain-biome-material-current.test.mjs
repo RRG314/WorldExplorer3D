@@ -12,6 +12,21 @@ test('flat polar fallback is snow; alpine mixed material retains snow', () => {
   assert.deepEqual(terrainSurfaceMixForProfile('snowRock').mixB,[.35,.65]);
 });
 
+test('mapped terrain refresh preserves profile bytes without sharing writable public mixtures',async()=>{
+ const {setTerrainSurfaceMaterialMixAt}=await import('../app/js/terrain/surface-material-blend.js');
+ const modes=['urban','built','sand','forest','soil','agriculture','rock','bare','snow','wetland','moss','grass','snowRock','SNOWROCK',undefined,null,'unknown'];
+ for(const normalized of [true,false]){
+  const Type=normalized?Uint8Array:Float32Array;
+  const attributes={mixA:{array:new Type(modes.length*4),itemSize:4,normalized},mixB:{array:new Type(modes.length*2),itemSize:2,normalized}};
+  for(let pass=0;pass<2;pass++)for(const [i,mode]of modes.entries()){
+   const expected=terrainSurfaceMixForProfile(mode);
+   assert.equal(setTerrainSurfaceMaterialMixAt(attributes,i,mode),true);
+   for(const key of ['mixA','mixB'])for(let c=0;c<expected[key].length;c++)assert.equal(attributes[key].array[i*attributes[key].itemSize+c],normalized?Math.round(expected[key][c]*255):Math.fround(expected[key][c]));
+   expected.mixA.fill(99);expected.mixB.fill(99);
+  }
+ }
+});
+
 test('every mapped land-cover family has finite normalized material weights', () => {
   for (const name of ['built','tree','mangrove','crop','bare','snow','moss','wetland','grass','shrub']) {
     const mix=terrainSurfaceMixForClass(terrainSurfaceClassForWorldCover(name,39));

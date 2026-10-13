@@ -1,3 +1,4 @@
+import {detachSceneObject} from '../engine/scene-object-lifecycle.js';
 import {
   attachCuratedEquipmentVisual,
   disposeCuratedEquipmentVisual
@@ -95,7 +96,7 @@ function createUrbanNpcVisual(THREE, definition = {}) {
     dispose() {
       if (heldEquipment) disposeCuratedEquipmentVisual(heldEquipment);
       root.userData.disposeCuratedCharacter?.();
-      root.removeFromParent?.();
+      detachSceneObject(root);
     }
   });
 }

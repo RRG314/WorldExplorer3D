@@ -1,4 +1,6 @@
 import { APOLLO11_SURFACE_REGION } from '../planetary/runtime/surface-authority.js?v=5';
+import { createRenderedHeightGrid } from '../planetary/runtime/rendered-height-grid.js';
+import { configureColorTexture } from '../planetary/catalog.js?v=1';
 
 const heightAsset = APOLLO11_SURFACE_REGION.assets.find((asset) => asset.role === 'height');
 const albedoAsset = APOLLO11_SURFACE_REGION.assets.find((asset) => asset.role === 'albedo');
@@ -91,7 +93,7 @@ function applyMeasuredRelief(geometry, sampleHeight) {
 
 function configureAlbedoTexture(THREE, image, renderer) {
   const texture = new THREE.Texture(image);
-  texture.colorSpace = THREE.SRGBColorSpace;
+  configureColorTexture(texture, renderer);
   texture.wrapS = THREE.ClampToEdgeWrapping;
   texture.wrapT = THREE.ClampToEdgeWrapping;
   texture.anisotropy = Math.min(8, renderer?.capabilities?.getMaxAnisotropy?.() || 1);
@@ -110,7 +112,7 @@ async function loadApollo11Terrain(THREE, renderer, geometry) {
     albedo: configureAlbedoTexture(THREE, albedoImage, renderer),
     landingLocal,
     metadata: APOLLO11_TERRAIN,
-    sampleHeight
+    sampleHeight: createRenderedHeightGrid(geometry)
   };
 }
 

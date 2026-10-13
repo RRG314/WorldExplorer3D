@@ -93,6 +93,9 @@ function identitySet(snapshotValue) {
 let report = null;
 try {
   await page.addInitScript(() => {
+    localStorage.removeItem('world-explorer:character-backpack:v3');
+    localStorage.removeItem('world-explorer:backpack-controls:v2');
+    localStorage.removeItem('world-explorer:character-backpack:migration-backup:v3');
     localStorage.removeItem('world-explorer:character-backpack:v2');
     localStorage.removeItem('world-explorer:character-backpack:migration-backup:v1');
     localStorage.setItem('world-explorer:character-backpack:v1', JSON.stringify({
@@ -128,10 +131,10 @@ try {
   await page.waitForTimeout(500);
 
   const ready = await snapshot();
-  const migratedStorage = await page.evaluate(() => ({
-    current: JSON.parse(localStorage.getItem('world-explorer:character-backpack:v2') || 'null'),
-    backup: JSON.parse(localStorage.getItem('world-explorer:character-backpack:migration-backup:v1') || 'null')
-  }));
+  const migratedStorage = await page.evaluate(async () => {
+    const {ctx}=await import('/app/js/shared-context.js?v=55');
+    return {current:ctx.playerBackpackStore.load(),backup:JSON.parse(localStorage.getItem(ctx.playerBackpackStore.backupKey)||'null')};
+  });
   const readyItems = ready.equipment?.items || [];
   const expectedStarterEquipment = [
     'hands', 'flashlight', 'baton', 'pulse-sidearm',
@@ -216,7 +219,7 @@ try {
       finalItems.length === readyItems.length &&
       [...identitySet(ready)].every((instanceId) => identitySet(closed).has(instanceId)),
     legacyMigrationIsIdempotentAndBackedUp:
-      ready.backpackMigration?.version === 2 && ready.backpackMigration?.sourceVersion === 1 &&
+      ready.backpackMigration?.version === migratedStorage.current?.schemaVersion && ready.backpackMigration?.sourceVersion === 1 &&
       ready.backpackMigration?.duplicateEventRewardsRemoved === 1 && ready.backpackMigration?.backupAvailable === true &&
       migratedStorage.current?.items?.filter((entry) => entry.sourceEventId === 'event:starter:flashlight').length === 1 &&
       migratedStorage.backup?.state?.items?.length === 2,

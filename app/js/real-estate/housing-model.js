@@ -1,3 +1,5 @@
+import { createLocalBackpackStore } from '../player/backpack-store.js?v=2';
+import { normalizeWorkspace, transitionWorkspace } from '../campaign/personal-workspace.js';
 const HOUSING_SCHEMA_VERSION = 2;
 const HOUSING_STORAGE_KEY = 'world-explorer:homes:v1';
 
@@ -210,13 +212,15 @@ function normalizeHome(home = {}) {
     currentValue: Math.max(1, Math.round(finite(home.currentValue || home.price || home.purchasePrice, 1))),
     storageCapacity: Math.max(12, Math.round(finite(home.storageCapacity, 12))),
     purchasedAt: Math.max(1, finite(home.purchasedAt, Date.now())),
+    personalStarter: home.personalStarter === true,
+    workspace: home.workspace ? normalizeWorkspace(home.workspace) : null,
+    journey: home.journey && typeof home.journey==='object' ? {...home.journey} : {},
     storage: (Array.isArray(home.storage) ? home.storage : []).map(normalizeStoredItem).filter((item) => item.instanceId && item.catalogId)
   };
 }
 
-function parseState(storage) {
+function parseState(parsed) {
   try {
-    const parsed = JSON.parse(storage?.getItem?.(HOUSING_STORAGE_KEY) || 'null');
     if (!parsed || typeof parsed !== 'object') return null;
     const legacy = Number(parsed.schemaVersion || 1) < HOUSING_SCHEMA_VERSION;
     const homes = (Array.isArray(parsed.homes) ? parsed.homes : []).map((home) => {
@@ -227,6 +231,7 @@ function parseState(storage) {
     return {
       schemaVersion: HOUSING_SCHEMA_VERSION,
       primaryHomeId: homes.some((home) => home.id === parsed.primaryHomeId) ? parsed.primaryHomeId : homes[0]?.id || '',
+      starterHomeId: clean(parsed.starterHomeId,homes.find(home=>home.personalStarter)?.id||''),
       homes,
       transactions: Array.isArray(parsed.transactions) ? parsed.transactions.slice(-80) : []
     };
@@ -235,27 +240,34 @@ function parseState(storage) {
   }
 }
 
+export function mergeInteriorHomeSnapshots(connected={},personal={}) {
+  const ids=new Set((connected.homes||[]).map(home=>home.id));
+  return {...connected,homes:[...(connected.homes||[]),...(personal.homes||[]).filter(home=>!ids.has(home.id))]};
+}
+
 function createHousingModel(options = {}) {
   const storage = options.storage || globalThis.localStorage;
   const economy = options.economy;
   const inventory = options.inventory;
   const now = options.now || (() => Date.now());
-  let state = parseState(storage) || { schemaVersion: HOUSING_SCHEMA_VERSION, primaryHomeId: '', homes: [], transactions: [] };
+  const backpackStore = options.backpackStore || economy?.localBackpackStore || createLocalBackpackStore(storage);
+  let state = parseState(backpackStore.loadHousing()) || { schemaVersion: HOUSING_SCHEMA_VERSION, primaryHomeId: '', homes: [], transactions: [] };
+  let savedHousing = JSON.stringify(backpackStore.loadHousing());
+
+  function persist(next,raw) {
+    if (!backpackStore.saveHousing(next,raw,savedHousing)) return false;
+    savedHousing=JSON.stringify(backpackStore.loadHousing());return true;
+  }
 
   function save() {
-    try {
-      storage?.setItem?.(HOUSING_STORAGE_KEY, JSON.stringify(state));
-      return true;
-    } catch (_) {
-      return false;
-    }
+    return persist(state, inventory?.exportState?.() || backpackStore.load() || {items:[]});
   }
 
   function notify(action, home, detail = {}) {
     const event = { action, homeId: home?.id || '', label: home?.label || '', at: Number(now()) || Date.now(), ...detail };
-    state.transactions.push(event);
-    state.transactions = state.transactions.slice(-80);
-    save();
+    const previousTransactions = state.transactions;
+    state.transactions = [...previousTransactions.slice(-79), event];
+    if (!save()) { state.transactions = previousTransactions; return null; }
     if (typeof globalThis.CustomEvent === 'function') {
       globalThis.dispatchEvent?.(new CustomEvent('we3d:property-change', { detail: event }));
     }
@@ -279,53 +291,97 @@ function createHousingModel(options = {}) {
     return { available, distance, reason: available ? '' : 'home_too_far' };
   }
 
+  function mutationFailure() {
+    if (backpackStore.writable()) return null;
+    return Object.freeze({ok:false,reason:backpackStore.saveStatus()==='another-tab'?'save_in_another_tab':'save_failed'});
+  }
+
   function buy(candidate) {
+    const blocked=mutationFailure(); if (blocked) return blocked;
     if (!candidate?.id) return Object.freeze({ ok: false, reason: 'home_unavailable' });
     if (findHome(candidate.id)) return Object.freeze({ ok: false, reason: 'already_owned' });
-    const charge = economy?.debit?.(candidate.price, { type: 'home-purchase', homeId: candidate.id });
-    if (!charge?.ok) return Object.freeze({ ok: false, reason: charge?.reason || 'wallet_unavailable', credits: charge?.credits });
+    if (!Number.isSafeInteger(candidate.price) || candidate.price < 1) return Object.freeze({ok:false,reason:'invalid_amount'});
+    if (!economy?.commitHomeChange || economy.localBackpackStore!==backpackStore) return Object.freeze({ok:false,reason:'wallet_unavailable'});
     const home = normalizeHome({ ...candidate, purchasePrice: candidate.price, currentValue: candidate.price, purchasedAt: now(), storage: [] });
-    state.homes.push(home);
-    if (!state.primaryHomeId) state.primaryHomeId = home.id;
-    if (!save()) {
-      state.homes = state.homes.filter((entry) => entry.id !== home.id);
-      if (state.primaryHomeId === home.id) state.primaryHomeId = state.homes[0]?.id || '';
-      economy?.credit?.(candidate.price, { type: 'home-purchase-refund', homeId: candidate.id });
-      return Object.freeze({ ok: false, reason: 'save_failed' });
-    }
-    notify('bought', home, { credits: candidate.price });
-    return Object.freeze({ ok: true, home: { ...home }, credits: economy.wallet?.().credits ?? charge.credits });
+    const event={action:'bought',homeId:home.id,label:home.label,at:Number(now()),credits:candidate.price};
+    const next={...state,homes:[...state.homes,home],primaryHomeId:state.primaryHomeId||home.id,transactions:[...state.transactions.slice(-79),event]};
+    const charge=economy.commitHomeChange(-candidate.price,next,{type:'home-purchase',homeId:home.id},savedHousing);
+    if (!charge.ok) return charge;
+    savedHousing=JSON.stringify(backpackStore.loadHousing());
+    state=next;dispatch(event);
+    return Object.freeze({ok:true,home:{...home},credits:charge.credits});
   }
 
   function sell(homeId) {
+    const blocked=mutationFailure(); if (blocked) return blocked;
     const home = findHome(homeId);
     if (!home) return Object.freeze({ ok: false, reason: 'not_owned' });
+    if (home.personalStarter) return Object.freeze({ok:false,reason:'personal_home_not_for_sale'});
     if (home.storage.length) return Object.freeze({ ok: false, reason: 'storage_not_empty' });
     const salePrice = Math.max(1, Math.floor(Math.min(home.purchasePrice, home.currentValue) * 0.85));
-    const priorIndex = state.homes.indexOf(home);
-    state.homes.splice(priorIndex, 1);
-    if (state.primaryHomeId === home.id) state.primaryHomeId = state.homes[0]?.id || '';
-    if (!save()) {
-      state.homes.splice(priorIndex, 0, home);
-      if (!state.primaryHomeId) state.primaryHomeId = home.id;
-      return Object.freeze({ ok: false, reason: 'save_failed' });
-    }
-    const payment = economy?.credit?.(salePrice, { type: 'home-sale', homeId: home.id });
-    if (!payment?.ok) {
-      state.homes.splice(priorIndex, 0, home);
-      if (!state.primaryHomeId) state.primaryHomeId = home.id;
-      save();
-      return Object.freeze({ ok: false, reason: payment?.reason || 'wallet_unavailable' });
-    }
-    notify('sold', home, { credits: salePrice });
+    if (!economy?.commitHomeChange || economy.localBackpackStore!==backpackStore) return Object.freeze({ok:false,reason:'wallet_unavailable'});
+    const homes=state.homes.filter(entry=>entry.id!==home.id);
+    const event={action:'sold',homeId:home.id,label:home.label,at:Number(now()),credits:salePrice};
+    const next={...state,homes,primaryHomeId:state.primaryHomeId===home.id?homes[0]?.id||'':state.primaryHomeId,transactions:[...state.transactions.slice(-79),event]};
+    const payment=economy.commitHomeChange(salePrice,next,{type:'home-sale',homeId:home.id},savedHousing);
+    if (!payment.ok) return payment;
+    savedHousing=JSON.stringify(backpackStore.loadHousing());
+    state=next;dispatch(event);
     return Object.freeze({ ok: true, home: { ...home }, salePrice, credits: payment.credits });
   }
 
+  function dispatch(event) {
+    if (typeof globalThis.CustomEvent === 'function') globalThis.dispatchEvent?.(new CustomEvent('we3d:property-change',{detail:event}));
+  }
+
+  function commitHomeState(next,action,home) {
+    const event={action,homeId:home.id,label:home.label,at:Number(now())};
+    next.transactions=[...next.transactions.slice(-79),event];
+    if (!persist(next,inventory?.exportState?.()||backpackStore.load()||{items:[]})) return Object.freeze({ok:false,reason:'save_failed'});
+    state=next;dispatch(event);return Object.freeze({ok:true,home:structuredClone(home)});
+  }
+
+  function claimStarter(candidate) {
+    const blocked=mutationFailure();if(blocked)return blocked;
+    if (state.starterHomeId) return Object.freeze({ok:false,reason:'starter_already_claimed',home:findHome(state.starterHomeId)});
+    if (!candidate?.mappedResidential || !candidate.sharedEligible || !candidate.id || findHome(candidate.id)) return Object.freeze({ok:false,reason:'home_unavailable'});
+    const home=normalizeHome({...candidate,personalStarter:true,purchasedAt:now(),storage:[],journey:{claimedAt:Number(now())}});
+    const access=accessFor(home);if(!access.available)return Object.freeze({ok:false,reason:access.reason});
+    const next={...state,homes:[...state.homes,home],starterHomeId:home.id,primaryHomeId:state.primaryHomeId||home.id};
+    return commitHomeState(next,'personal-home-claimed',home);
+  }
+
+  function updateWorkspace(homeId,command) {
+    const blocked=mutationFailure();if(blocked)return blocked;
+    const home=findHome(homeId);if(!home)return Object.freeze({ok:false,reason:'not_owned'});
+    if(!accessFor(home).available)return Object.freeze({ok:false,reason:accessFor(home).reason});
+    let workspace;
+    try{workspace=transitionWorkspace(home.workspace,command,now());}catch(error){return Object.freeze({ok:false,reason:'workspace_invalid',message:error.message});}
+    const next=structuredClone(state),updated=next.homes.find(h=>h.id===home.id);updated.workspace=workspace;
+    return commitHomeState(next,'workspace-updated',updated);
+  }
+
+  function recordHomeVisit(homeId,action) {
+    const blocked=mutationFailure();if(blocked)return blocked;
+    const home=findHome(homeId);if(!home)return Object.freeze({ok:false,reason:'not_owned'});
+    if(!['entered','displayed','departed','returned'].includes(action))return Object.freeze({ok:false,reason:'invalid_action'});
+    if(action!=='departed'&&!accessFor(home).available)return Object.freeze({ok:false,reason:accessFor(home).reason});
+    if(home.journey[action])return Object.freeze({ok:true,home:structuredClone(home)});
+    if(action==='returned'&&(!home.journey.departed||state.primaryHomeId!==home.id))return Object.freeze({ok:false,reason:'return_not_ready'});
+    const next=structuredClone(state),updated=next.homes.find(h=>h.id===home.id);updated.journey[action]=Number(now())||1;
+    return commitHomeState(next,'home-'+action,updated);
+  }
+
   function setPrimary(homeId) {
+    const blocked=mutationFailure(); if (blocked) return blocked;
     const home = findHome(homeId);
     if (!home) return Object.freeze({ ok: false, reason: 'not_owned' });
+    const previous = state.primaryHomeId;
     state.primaryHomeId = home.id;
-    notify('primary-set', home);
+    if (!notify('primary-set', home)) {
+      state.primaryHomeId = previous;
+      return Object.freeze({ ok: false, reason: 'save_failed' });
+    }
     return Object.freeze({ ok: true, home: { ...home } });
   }
 
@@ -334,6 +390,7 @@ function createHousingModel(options = {}) {
   }
 
   function storeItem(homeId, instanceId, quantity = 1) {
+    const blocked=mutationFailure(); if (blocked) return blocked;
     const home = findHome(homeId);
     const item = inventory?.snapshot?.().items?.find((entry) => entry.instanceId === String(instanceId || ''));
     const amount = Math.max(1, Math.floor(finite(quantity, 1)));
@@ -344,52 +401,71 @@ function createHousingModel(options = {}) {
     if (item.equipped) return Object.freeze({ ok: false, reason: 'item_equipped' });
     if (item.quantity < amount) return Object.freeze({ ok: false, reason: 'item_unavailable' });
     if (storedUnits(home) + amount > home.storageCapacity) return Object.freeze({ ok: false, reason: 'storage_full' });
-    const existing = home.storage.find((entry) => entry.instanceId === item.instanceId);
+    // Items with separate ammunition/equipment state remain in the Backpack.
+    // Plain supplies and specimens can move without creating a second authority.
+    const raw = inventory?.exportState?.();
+    const carried = raw?.items?.find(entry => entry.instanceId === item.instanceId);
+    if (!carried || carried.quantity < amount) return Object.freeze({ok:false, reason:'item_unavailable'});
+    if (item.verbs?.includes('equip') || item.category === 'field-tool') return Object.freeze({ok:false, reason:'item_attached'});
+    const next = JSON.parse(JSON.stringify(state));
+    const nextHome = next.homes.find(entry => entry.id === home.id);
+    const existing = nextHome.storage.find(entry => entry.instanceId === item.instanceId);
     if (existing) existing.quantity += amount;
-    else home.storage.push(normalizeStoredItem({ ...item, quantity: amount }));
-    if (!inventory.consumeItem?.(item.instanceId, amount)) {
-      if (existing) existing.quantity -= amount;
-      else home.storage = home.storage.filter((entry) => entry.instanceId !== item.instanceId);
-      return Object.freeze({ ok: false, reason: 'inventory_unavailable' });
-    }
-    options.saveInventory?.();
-    notify('stored', home, { catalogId: item.catalogId, quantity: amount });
-    return Object.freeze({ ok: true, home: { ...home }, item: normalizeStoredItem(item) });
+    else nextHome.storage.push(normalizeStoredItem({...item, quantity: amount}));
+    const remaining = carried.quantity - amount;
+    const nextInventory = {...raw, revision:raw.revision+1,
+      items:raw.items.flatMap(entry => entry.instanceId === item.instanceId ? remaining ? [{...entry, quantity:remaining}] : [] : [entry]),
+      hotbar:raw.hotbar.map(id=>!remaining && id===item.instanceId ? null : id)};
+    return commitTransfer('stored', next, nextHome, nextInventory, item, amount);
+  }
+
+  function commitTransfer(action, next, home, nextInventory, item, amount) {
+    if (!inventory?.applySavedState) return Object.freeze({ok:false, reason:'inventory_unavailable'});
+    const event = {action, homeId:home.id, label:home.label, at:Number(now()) || Date.now(), catalogId:item.catalogId, quantity:amount};
+    next.transactions = [...next.transactions.slice(-79), event];
+    // No inventory mutation or listener runs before the single durable commit.
+    if (!persist(next, nextInventory)) return Object.freeze({ok:false, reason:'save_failed'});
+    state = next;
+    inventory.applySavedState({...nextInventory, housing:next});
+    if (typeof globalThis.CustomEvent === 'function') globalThis.dispatchEvent?.(new CustomEvent('we3d:property-change', {detail:event}));
+    return Object.freeze({ok:true, home:{...home}, item:normalizeStoredItem({...item,quantity:amount})});
   }
 
   function withdrawItem(homeId, instanceId, quantity = 1) {
+    const blocked=mutationFailure(); if (blocked) return blocked;
     const home = findHome(homeId);
-    const stored = home?.storage.find((entry) => entry.instanceId === String(instanceId || ''));
+    const stored = home?.storage.find(entry => entry.instanceId === String(instanceId || ''));
     const amount = Math.max(1, Math.floor(finite(quantity, 1)));
-    if (!home) return Object.freeze({ ok: false, reason: 'not_owned' });
+    if (!home) return Object.freeze({ok:false, reason:'not_owned'});
     const access = accessFor(home);
-    if (!access.available) return Object.freeze({ ok: false, reason: access.reason, distance: access.distance });
-    if (!stored || stored.quantity < amount) return Object.freeze({ ok: false, reason: 'item_unavailable' });
-    const carried = inventory?.snapshot?.().items?.find((entry) => entry.instanceId === stored.instanceId);
-    inventory?.registerDefinitions?.([{ id: stored.catalogId, label: stored.label, category: stored.category, icon: stored.icon, verbs: stored.verbs }]);
-    const restoredId = inventory?.upsertItem?.({
-      ...stored,
-      quantity: Math.max(0, Number(carried?.quantity) || 0) + amount,
-      provenance: stored.provenance || 'home-storage'
-    });
-    if (!restoredId) return Object.freeze({ ok: false, reason: 'inventory_unavailable' });
-    stored.quantity -= amount;
-    if (stored.quantity <= 0) home.storage = home.storage.filter((entry) => entry !== stored);
-    options.saveInventory?.();
-    notify('withdrew', home, { catalogId: stored.catalogId, quantity: amount });
-    return Object.freeze({ ok: true, home: { ...home }, item: { ...stored } });
+    if (!access.available) return Object.freeze({ok:false, reason:access.reason, distance:access.distance});
+    if (!stored || stored.quantity < amount) return Object.freeze({ok:false, reason:'item_unavailable'});
+    const raw = inventory?.exportState?.();
+    if (!raw) return Object.freeze({ok:false, reason:'inventory_unavailable'});
+    const carried = raw.items.find(entry => entry.instanceId === stored.instanceId ||
+      (stored.sourceEventId && entry.sourceEventId === stored.sourceEventId && entry.catalogId === stored.catalogId));
+    const nextInventory = {...raw, revision:raw.revision+1, items:raw.items.filter(entry=>entry!==carried)};
+    nextInventory.items.push({...stored, instanceId:carried?.instanceId || stored.instanceId, quantity:(carried?.quantity || 0)+amount});
+    const next = JSON.parse(JSON.stringify(state));
+    const nextHome = next.homes.find(entry => entry.id === home.id);
+    nextHome.storage = nextHome.storage.flatMap(entry => entry.instanceId !== stored.instanceId ? [entry]
+      : entry.quantity > amount ? [{...entry,quantity:entry.quantity-amount}] : []);
+    const result = commitTransfer('withdrew', next, nextHome, nextInventory, stored, amount);
+    if (result.ok) inventory.registerDefinitions?.([{id:stored.catalogId,label:stored.label,category:stored.category,icon:stored.icon,verbs:stored.verbs}]);
+    return result;
   }
 
   function snapshot(candidates = []) {
     const homes = state.homes.map((home) => {
       const access = accessFor(home);
-      return Object.freeze({ ...home, distance: access.distance, storageAccessible: access.available, accessReason: access.reason, storage: Object.freeze(home.storage.map((item) => Object.freeze({ ...item }))) });
+      return Object.freeze({ ...home, workspace: home.workspace ? structuredClone(home.workspace) : null, journey: {...home.journey}, distance: access.distance, storageAccessible: access.available, accessReason: access.reason, storage: Object.freeze(home.storage.map((item) => Object.freeze({ ...item }))) });
     });
     return Object.freeze({
       type: 'ExplorerHousing',
       schemaVersion: HOUSING_SCHEMA_VERSION,
       credits: economy?.wallet?.().credits ?? 0,
       primaryHomeId: state.primaryHomeId,
+      starterHomeId: state.starterHomeId || '',
       primaryHome: homes.find((home) => home.id === state.primaryHomeId) || null,
       homes: Object.freeze(homes),
       candidates: Object.freeze((Array.isArray(candidates) ? candidates : []).map((candidate) => Object.freeze({ ...candidate, owned: !!findHome(candidate.id) }))),
@@ -397,8 +473,7 @@ function createHousingModel(options = {}) {
     });
   }
 
-  save();
-  return Object.freeze({ buy, sell, setPrimary, snapshot, storeItem, withdrawItem });
+  return Object.freeze({ buy, sell, setPrimary, snapshot, storeItem, withdrawItem,claimStarter,updateWorkspace,recordHomeVisit });
 }
 
 export {
