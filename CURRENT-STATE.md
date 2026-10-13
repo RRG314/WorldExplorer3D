@@ -96,13 +96,21 @@ Prioritize staged graphics preparation before the existing atomic regional
 handoff and bounded readback/index work, preserving coverage, cancellation and
 in-place building edits. No speculative collision or terrain changes were made.
 
-Stable remains `33edf9ad`, and production remains the 5.5 build above. PR 99 and
-the 5.6 release remain drafts. Do not promote them or describe this as a fully
-certified release. Preserve the complete old baseline separately from current
-focused receipts. The verification changes alter the acceptance fingerprint;
-a newly committed immutable package and complete current evidence are still
-required for formal finalization, together with resolution of the observed
-performance failures. Current receipts and their scope are recorded in
+The owner explicitly directed integration into `stable` on October 13 after
+reviewing the reported limitations. `stable` is the repository's default branch;
+there is no separate `main` branch. PR 99 integrates the reviewed 5.6 source,
+documentation and gallery through the protected squash-merge workflow. Both
+active development branches must then incorporate that stable commit without
+rewriting their existing history. Production remains the 5.5 build above until
+a separate deployment; the 5.6 release draft is not a live publication.
+
+Source integration does not convert the observed performance failures into
+passes. Preserve the complete old baseline separately from current focused
+receipts. The verification changes alter the acceptance fingerprint; a newly
+committed immutable package and matching evidence are still required for formal
+production finalization. Do not withhold an authorized source-branch update
+solely because that separate production certification remains incomplete.
+Current receipts and their scope are recorded in
 `output/production-readiness-20261012/remaining-review-ledger.json`.
 
 ## October 12 branch reconciliation and release follow-up
