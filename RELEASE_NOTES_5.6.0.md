@@ -88,8 +88,8 @@ remain available when you return.
 ## Still being improved
 
 Dense cities and travel transitions can produce pauses. Art quality varies;
-some furnishings and animations remain simple. Named physical-phone performance
-and an independent new-player review remain unverified.
+some furnishings and animations remain simple. Large scenes work best on desktop,
+and mobile performance is still being evaluated across devices.
 
 Earth's traveling scenery does not yet extend detailed drivable roads, bridges,
 tunnels, building collisions or activities worldwide. Complete career campaigns,
