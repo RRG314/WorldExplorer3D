@@ -17,8 +17,7 @@ ocean travel and a shared Journal. Explore furnished vessel rooms, deploy the
 submarine, and return with your findings. Visit the aquarium reef galleries
 or explore a museum collection from Baltimore’s streets. Distant Earth buildings keep
 more facade detail as scenery moves with you. Existing locations and progress
-remain part of the same game; dense-city pauses and uneven art quality remain
-[known limitations](KNOWN_ISSUES.md).
+remain part of the same game.
 
 <p align="center">
   <a href="https://worldexplorer3d.io/app/"><strong>Play World Explorer 3D</strong></a>

@@ -13,8 +13,8 @@ Journal records and distinctions; free roam remains available.
 
 Coastal research links a voyage plan, sonar contacts, diving and a report aboard
 your vessel. Lunar fieldwork lets you prepare a method, deploy Pathfinder, work
-on the surface and bring your results back. These are specific playable journeys,
-not a claim that every proposed career campaign is complete.
+on the surface and bring your results back. Your findings become part of the
+same Journal as your discoveries on Earth.
 
 ## Life aboard the research vessel
 
@@ -66,11 +66,6 @@ A separate museum visit opens at The Peale’s mapped building. Its entrance hal
 and two galleries contain Smithsonian specimen models and a Met artwork to
 inspect, with collection notes saved to the same Journal.
 
-These are limited, independent interpretations. The aquarium route covers the
-Pavilion and Blacktip Reef area; the museum rooms and collection are an
-interpretive study. Neither recreates the entire institution, and dimensions
-and finishes are estimated where published information is unavailable.
-
 <!-- public-gallery:museum -->
 ![Inside the interpretive museum gallery at The Peale in Baltimore](assets/gallery/5.6/museum.webp)
 
@@ -85,17 +80,6 @@ lighting improve character and vehicle visibility. Supported facilities retain
 mapped fences, gates and transfer behavior. Your local building edits, shared-room creations, possessions and saved voyages
 remain available when you return.
 
-## Still being improved
-
-Dense cities and travel transitions can produce pauses. Art quality varies;
-some furnishings and animations remain simple. Large scenes work best on desktop,
-and mobile performance is still being evaluated across devices.
-
-Earth's traveling scenery does not yet extend detailed drivable roads, bridges,
-tunnels, building collisions or activities worldwide. Complete career campaigns,
-CERN, fully furnished airport and port packs, terrain farming, worldwide marine
-ecology and spearfishing remain outside this update. Interstellar Expeditions
-remain Alpha.
-
 Existing progress and recovery copies are retained when you update. See the
-[known limitations](KNOWN_ISSUES.md) and [roadmap](ROADMAP.md).
+[known issues and limitations](KNOWN_ISSUES.md) for current coverage and
+compatibility, or the [roadmap](ROADMAP.md) for what comes next.

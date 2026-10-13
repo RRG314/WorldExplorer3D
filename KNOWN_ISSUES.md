@@ -77,6 +77,14 @@ published versions.
 - Deck jumping has physical takeoff and landing but no dedicated authored jump
   animation. Water support and vessel motion remain gameplay approximations.
 
+## Campaign and facility coverage
+
+- First Bearings, Harbor Run, building photo studies, Coastal Departure and
+  lunar fieldwork provide opening journeys. Full campaigns for every explorer
+  profession are not yet available.
+- CERN, fully furnished airport and port packs, and terrain-based farming remain
+  planned rather than included in the 5.6 update.
+
 ## Performance and compatibility
 
 - Dense cities, rapid aerial travel, detailed facades and large structure
