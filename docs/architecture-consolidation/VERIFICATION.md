@@ -38,3 +38,17 @@ The source suite includes server/revision/permission components; no new Firestor
 5. At the next release milestone, build a separate permitted immutable candidate and run risk-weighted preservation, backend/private-data and device classes. Never overwrite the preserved production package as a shortcut.
 
 Final source commit: `a028e65e`. The final focused reruns pass 56 and 42 checks (`account-final.tap`, `transport-final.tap`). The production build/asset manifest hashes exactly match baseline. `checkpoint.json` records code identity, evidence hashes and preservation decisions.
+
+
+### C5 connected commerce recovery follow-up
+
+`node --experimental-vm-modules --test --test-concurrency=1 tests/commerce-recovery-current.test.mjs tests/account-request-lifetime-current.test.mjs tests/convenience-commerce-current.test.mjs tests/local-economy-transaction.test.mjs tests/economy-authority-current.test.cjs`
+passes 56/56. Before-change failures are retained as `commerce-model-before.tap`
+and `commerce-recovery-before.tap`. Fixtures were updated to supply real contract
+fields (UID, original request ID, item quantity) and Storage.removeItem; assertions
+were not weakened. `node scripts/verification/commerce-recovery-current.mjs` passes
+four Chrome checks using actual domain modules, native storage/locks, prescribed
+skill mouse choreography, a page reload and a competing tab. Screenshot and state
+inspected; no page errors. HTTP/Auth/persistence boundaries are controlled and
+must not be described as a live account purchase. `npm run verify:pr` passes 2,559
+component tests and the full structural chain (`source-chain-recovery.log`).

@@ -20,7 +20,7 @@ Run focused tests before/after each slice; run the full source chain once integr
 
 ## Subsequent high-risk work (separate measured slices)
 
-1. Characterize lost commerce acknowledgments through the actual model/server receipt boundary; the caller currently collapses unknown outcomes to unavailable and allocates a new ID on a new attempt. Design durable account-bound recovery with reload/duplicate-effect tests before changing storage.
+1. C5 implemented and locally verified: durable account-bound commerce intent, atomic item-delivery marker, same-request recovery and service target retention. Live service acceptance and older unowned legacy receipts remain separate verification/migration work; see the ledger.
 2. Profile and remove full capture-index validation from active travel without missing in-place building edits; compare ordinary route frames and unchanged coverage.
 3. Stage regional GPU uploads/shaders before atomic handoff; cancellation must retain the old complete region and release rejected work.
 4. Trace remaining shared-context writers by semantic owner (actor, camera, environment), migrating only demonstrated conflicts.

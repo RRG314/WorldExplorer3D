@@ -186,6 +186,7 @@ export const currentContractTests = [
   'tests/capture-session-current.test.mjs',
   'tests/chase-camera-ground-clearance-current.test.mjs',
   'tests/convenience-commerce-current.test.mjs',
+  'tests/commerce-recovery-current.test.mjs',
   'tests/curated-equipment-current.test.mjs',
   'tests/curated-home-interior-current.test.mjs',
   'tests/curated-model-assets-current.test.mjs',

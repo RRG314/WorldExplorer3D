@@ -942,6 +942,7 @@ function commerceFailureMessage(reason) {
     service_not_available: 'That service is not available at this mapped place.',
     service_target_unavailable: 'Bring the relevant vehicle or companion into the world before using that service.',
     service_effect_failed_refunded: 'The service could not be applied, so the Explorer Wallet charge was refunded.',
+    commerce_recovery_required: 'Your purchase is saved for recovery. Reopen this store when connected before trying another purchase.',
     settlement_recovery_required: 'A service payment is saved but still needs to finish. Return with the same vehicle or companion and reopen this store to retry.',
     save_failed: 'This exchange could not be saved. Nothing changed. Close other World Explorer tabs or free browser storage, then retry.',
     delivery_recovery_required: 'The wallet record is safe, but the Backpack is still syncing this item.',
@@ -1016,7 +1017,7 @@ function openStore(state, storeId, options = {}) {
   void state.commerce.recoverPending?.((service, receiptId, recovery) => applyPoiService(state, service, receiptId, recovery)).then(result=>{
     if (!state.storeOpen || state.activeStoreId!==store.id) return;
     if (result?.remaining) state.storeStatus=commerceFailureMessage('settlement_recovery_required');
-    else if (result?.recovered) state.storeStatus='Your pending service has been recovered.';
+    else if (result?.recovered) state.storeStatus='Your pending purchase has been recovered.';
     renderStore(state);
   });
   return true;
@@ -2930,7 +2931,7 @@ function startUrbanSandboxRuntime(options = {}) {
     if (appCtx.urbanSandboxRuntime.storeOpen) renderStore(appCtx.urbanSandboxRuntime);
   }) || null;
   const commerce = connectedWallet
-    ? createLocalCommerceModel({ inventory: equipment, transactionAuthority: connectedWallet })
+    ? createLocalCommerceModel({ inventory: equipment, backpackStore, transactionAuthority: connectedWallet })
     : appCtx.worldEconomy || appCtx.localConvenienceStoreCommerce || createLocalCommerceModel({ inventory: equipment, backpackStore });
   appCtx.worldEconomy = commerce;
   appCtx.localConvenienceStoreCommerce = commerce;

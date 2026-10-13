@@ -23,6 +23,7 @@ function createConnectedExplorerWallet(options = {}) {
   return Object.freeze({
     type: 'ConnectedExplorerWallet',
     uid: user.uid,
+    isCurrent,
     snapshot: () => state,
     subscribe(listener) {
       if (typeof listener !== 'function' || !isCurrent()) return () => {};
@@ -32,7 +33,7 @@ function createConnectedExplorerWallet(options = {}) {
     },
     async transact(action, store, catalogId, fields = {}) {
       if (!isCurrent()) return Object.freeze({ accepted: false, reason: 'wallet_unavailable', credits: state.credits });
-      const requestId = `commerce:${user.uid.slice(0, 18)}:${Date.now().toString(36)}:${Math.random().toString(36).slice(2, 9)}`;
+      const requestId = fields.requestId || `commerce:${user.uid.slice(0, 18)}:${Date.now().toString(36)}:${Math.random().toString(36).slice(2, 9)}`;
       return commitExplorerCommerceAction({
         action, requestId, storeId: store.id, catalogId, expectedUserId: user.uid,
         targetId: String(fields.targetId || ''),

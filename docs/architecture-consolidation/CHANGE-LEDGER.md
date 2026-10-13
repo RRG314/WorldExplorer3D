@@ -40,3 +40,33 @@ Before boundary/structure characterization passed. After **42/42** focused tests
 ## Remaining risk
 
 Full source chain passes **2,547 tests in 470 files**, with dependency/ownership/boundary/name/inventory/sensitivity checks. The ordinary local driving run loads and moves but is **incomplete/failed** on App Check and provider errors. Its screenshot is retained, including pavement detail requiring matched-data review. No current full-game performance improvement, immutable candidate acceptance, physical-device acceptance or broad account/capture workflow certification is claimed.
+
+
+## C5 — Durable connected commerce recovery
+
+Characterization reproduced lost buy/service acknowledgments and absent durable
+reservation. Server characterization also failed next-day receipt replay and
+command/receipt identity binding. New account-bound journal saves the request
+before dispatch; the existing possessions Web Lock plus a same-page guard
+prevents parallel charges. Shop and service recovery retain the original ID,
+store, day and target. Backpack delivery and the receipt marker commit together;
+ordinary saves retain that marker, so recovery does not resurrect consumed items.
+The server returns the original item identity on duplicate receipts and checks
+that immutable command fields match, including across midnight.
+
+Files: `economy/connected-commerce-recovery.js`, connected wallet,
+`player/backpack-store.js`, commerce model/runtime, `functions/economy-authority.js`.
+No balances or existing save keys are deleted. New account-specific shop state
+and pending journal are additive. Old global service records lacked trustworthy
+account attribution; those bytes remain untouched, not automatically applied to
+the currently signed-in account. Retrospective recovery of those legacy records
+still requires an authenticated server lookup/migration decision.
+
+Verification: 56 focused tests pass; native Chrome uses actual client/server
+modules with controlled Firebase boundaries, real localStorage/Web Locks,
+reload and two tabs. Four browser checks pass; image/state inspected, no page
+errors. Full source chain passes 2,559 tests. This is not live Firebase commerce
+acceptance. The frontend and backend changes must be released together; the
+existing production backend cannot recover an old-day receipt. Evidence:
+`output/architecture-consolidation/2026-10-13/commerce-*` and
+`source-chain-recovery.log`.
