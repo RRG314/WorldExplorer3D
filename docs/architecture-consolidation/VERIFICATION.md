@@ -52,3 +52,14 @@ skill mouse choreography, a page reload and a competing tab. Screenshot and stat
 inspected; no page errors. HTTP/Auth/persistence boundaries are controlled and
 must not be described as a live account purchase. `npm run verify:pr` passes 2,559
 component tests and the full structural chain (`source-chain-recovery.log`).
+
+
+### C6 mapped-water readback
+
+`node --test --test-concurrency=1 tests/canvas-red-mask-current.test.mjs tests/water-lod-ownership-current.test.mjs`
+passes 17/17. `node scripts/verification/water-mask-readback-profile.mjs a64f92b2`
+compares the saved pre-change module with the actual worker implementation in one
+native headed Chrome session. All 16,777,216 bytes match. First/warm worst-frame
+values and construction latency are recorded in the ledger; do not generalize
+this mechanism test into full-world frame certification. `npm run verify:pr`
+passes the complete source chain (`source-chain-water.log`).

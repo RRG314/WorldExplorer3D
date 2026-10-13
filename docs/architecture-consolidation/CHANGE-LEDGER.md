@@ -70,3 +70,26 @@ acceptance. The frontend and backend changes must be released together; the
 existing production backend cannot recover an old-day receipt. Evidence:
 `output/architecture-consolidation/2026-10-13/commerce-*` and
 `source-chain-recovery.log`.
+
+
+## C6 — Preserve water-mask pixels while moving readback off the render thread
+
+Measured the existing 4096² canvas mask in native headed Chrome. A CPU canvas
+hint was rejected: 23,248 bytes and 3,104 threshold classifications changed.
+An asynchronous bitmap followed by worker extraction preserved all 16,777,216
+bytes. Production implementation keeps the original GPU canvas rasterization;
+only its bitmap readback/red-channel conversion runs in a disposable worker.
+Worker failure or missing support retains the existing cooperative path. All
+completion/error/timeout/cancellation paths retire owned worker/bitmap resources;
+no scene ownership or geometry handoff changed. The worker has a hashed runtime
+entry in the existing Hosting packager.
+
+Actual implementation comparison: baseline maximum frames 116.7/66.1/66.7 ms;
+candidate 50.0/16.7/17.2 ms. Candidate total construction 234–373 ms versus
+125–282 ms baseline: this trades background latency for responsive frames.
+These are matched mechanism measurements, not whole-world performance acceptance.
+Seventeen focused ownership/readback tests pass; full source chain passes.
+The actual browser worker preserves every pixel; preview inspected. Evidence:
+`water-mask-implemented-profile/report.json`, `water-mask-component.tap`,
+`source-chain-water.log`. Rejected experiments remain under the same dated output
+folder. No experimental canvas hint was applied to game source.
