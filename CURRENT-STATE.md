@@ -50,6 +50,22 @@ browsers/servers. Production deployment evidence is under
 `output/release-evidence/current/production-deployment.json` and
 `production-promotion.json`; acceptance gaps remain in their own receipts.
 
+## October 13 consolidation checkpoint (local only)
+
+GitHub source integration is complete: stable `437e06cb`, both active development
+branches `64bab776`, identical content. Protected checks and Pages passed; all 19
+public gallery images were verified. Production remains the 5.5 build above.
+
+The owner's consolidation brief now starts a separate local assignment. Baseline
+rollback ref: `steven/consolidation-baseline-20261013`. See
+`docs/architecture-consolidation/BASELINE.md`, `REFACTOR-PLAN.md` and
+`VERIFICATION.md`. Current bounded repairs fence protected requests and
+wallet/property subscriptions to their initiating account, share the wallet
+projection, and remove the transport import cycle without changing geometry.
+No save migration, asset deletion, GitHub push or production deployment is
+included. The broad inventory is a first-pass map, not certification of every
+feature; known performance and hosted/device gaps remain explicit.
+
 ## October 13 packaged verification and branch status
 
 The two active development branches, `steven/visual-quality` and
