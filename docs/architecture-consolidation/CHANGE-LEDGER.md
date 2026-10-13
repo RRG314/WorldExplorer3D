@@ -93,3 +93,14 @@ The actual browser worker preserves every pixel; preview inspected. Evidence:
 `water-mask-implemented-profile/report.json`, `water-mask-component.tap`,
 `source-chain-water.log`. Rejected experiments remain under the same dated output
 folder. No experimental canvas hint was applied to game source.
+
+
+## C7 — Make commerce HTTP concurrency part of the backend gate
+
+Added `scripts/verification/commerce-backend-current.mjs` to the existing isolated
+backend sequence and updated the exact stage inventory from 14 to 15. This runs
+actual emulator transactions and authentication, including two requests for one
+receipt, a different account trying to sell/refund goods, next-day replay, and
+concurrent refunds. It never targets production accounts. Eleven selected backend
+stages pass; no permission/rule changes were needed. Initial Java PATH failure
+was diagnosed by locating the existing JDK, not by altering app code or tests.

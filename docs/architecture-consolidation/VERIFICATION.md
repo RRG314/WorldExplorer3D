@@ -63,3 +63,21 @@ native headed Chrome session. All 16,777,216 bytes match. First/warm worst-frame
 values and construction latency are recorded in the ledger; do not generalize
 this mechanism test into full-world frame certification. `npm run verify:pr`
 passes the complete source chain (`source-chain-water.log`).
+
+
+### C7 backend authority and permissions
+
+The first attempt stopped before tests because Java was absent from PATH; no
+app defect was inferred. The installed JDK 21 was then used explicitly:
+
+`JAVA_HOME=/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home PATH=/opt/homebrew/opt/openjdk@21/bin:$PATH node scripts/verification/backend-isolated.mjs --stages=room-admission-http,room-admission,storage-rules,firestore-rules,discovery-receipts,environment-data,public-user-count,connected-property-backend,commerce-backend,urban-civic-backend,account-backend`
+
+All eleven selected stages pass in two isolated emulator groups (62.5 seconds
+and 27.1 seconds). Actual Functions/Auth/Firestore commerce tests cover concurrent
+retries, account separation, cross-day recovery, and concurrent refund settlement.
+Existing room/security/storage/private-capture rules, discovery receipts, live
+weather/ocean provider responses, property/civic and account/billing fixture
+checks also pass. This is a diagnostic subset, not the remaining four full
+multiplayer browser journeys or production App Check. Logs:
+`backend-followup.log` (failed environment) and `backend-followup-java.log`
+(passing checks). Temporary fixture records and emulator processes are retired.
