@@ -1,10 +1,46 @@
 # Current development and release state
 
-Updated October 13, 2026. **5.5.0 is deployed to production.**
-Release: https://github.com/RRG314/WorldExplorer3D/releases/tag/v5.5.0
+Updated October 13, 2026. **5.5.1 is deployed to production.**
+Release: https://github.com/RRG314/WorldExplorer3D/releases/tag/v5.5.1
 Public project page: https://rrg314.github.io/WorldExplorer3D/
 
-## Current release
+## October 14 production road continuity hotfix
+
+Production is now **5.5.1**, build
+`5.5.1+012e5c85582b.eb0d7eddf0f75035.production`, source
+`012e5c85582b78a7808656545bf4143a31a18652`, Hosting version
+`0a6f60dd9f3488f6`. [Release](https://github.com/RRG314/WorldExplorer3D/releases/tag/v5.5.1).
+It was isolated from actual production d8775a39, not built from unreleased 5.6.
+The hotfix branch is `steven/road-continuity-hotfix`. Its immutable production
+package is in the road-continuity-hotfix worktree's `dist`; architecture-evaluation
+`dist` still preserves the previous 5.5.0 package. Live manifests match on both
+domains; prior Hosting version `1036aacf01a2b97d` remains the rollback.
+
+An engineered at-grade approach was already in the pinned contact index but was
+incorrectly required in a moving road packet. The resulting assertion killed the
+worker and offered a world reload. The audit now checks both legitimate contact
+owners with the original precision limit. Compiler recovery is local and bounded;
+no return to Main Menu or world reload is part of road recovery. Location-based
+Earth is the default; explicit saved regional scenery choices remain respected.
+Regional scenery is not full continuous driving. Geometry/source owners for roads,
+bridges and tunnels, save handling, backend and session code are unchanged.
+
+All 2,186 production-baseline source tests and its structural chain pass; all 29
+immutable world checks pass with staging backend attestation. The exact package
+passes eleven controlled east/west/return road arrivals and a one-time real-worker
+interruption/recovery. Ordinary production repeats all eleven arrivals without
+road errors, reloads, notice or page errors. This is bounded hotfix verification,
+not complete worldwide driving, physical-device or performance certification.
+A rough existing engineered terrain join at Middleborough/South Marlyn remains a
+separate visual/contact-quality follow-up; the keyboard segment does not prove
+that junction can be crossed. First local world check lacked its Functions proxy
+and had 503 responses; its failed receipt remains alongside the later passing run.
+
+The same repair is preserved in ongoing local 5.6 at `2a9a7cc3`; no museum, aquarium,
+ship, consolidation or player progress was rolled back. Source/preview integration
+of the isolated 5.6 correction is tracked in `docs/road-continuity/EVIDENCE.md`.
+
+## Previous 5.5.0 release evidence
 
 - Production: https://worldexplorer3d.io/app/
 - Build: `5.5.0+d8775a392c42.88e67f97c00bb4c2.production`

@@ -48,7 +48,7 @@ Earth travel is not ready. Preserve ongoing 5.6 work and saved progress.
   an overhead bridge or genuinely missing surface still fails. Failed road jobs
   restore only their compiler, retain accepted meshes/contact and retry twice
   with backoff. Manual retry remains local. No location/menu/save reload.
-- Production-only hotfix preparation pending. Existing known release limitations
+- Production 5.5.1 deployed from isolated source 012e5c85. All 2,186 source checks and structural chain, all 29 staged package world checks, all eleven packaged and live road arrivals passed. Source/preview 5.6 integration remains in progress. Existing known release limitations
   and provider warnings are not reclassified by these scoped passes.
 
 ## Plan and acceptance
@@ -62,3 +62,12 @@ Earth travel is not ready. Preserve ongoing 5.6 work and saved progress.
 4. Prepare an isolated production hotfix from its actual source; preserve all
    unrelated 5.6 changes. Verify artifact identity, scope and rollback before
    deploying. Carry the same repair into development.
+
+
+## Physical quality follow-up kept separate
+
+The exact Middleborough/South Marlyn junction is no longer falsely rejected by
+regional publication. Its existing terrain/engineered join still shows a vertical
+edge; the 54 m keyboard approach did not establish successful crossing. Neither
+its geometry nor the grade solver was changed in this urgent reload hotfix. This
+is a concrete follow-up, not a passing worldwide drivability claim.
