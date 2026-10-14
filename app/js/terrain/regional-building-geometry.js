@@ -15,9 +15,12 @@ export function appendRegionalBuildingFootprint({positions,colors,styles,layouts
         vertex(a,topY,0,width);vertex(b,topY,width,width);
         indices.push(at,at+1,at+2,at+2,at+1,at+3);
       }
-      for(const triangle of topTriangles){
+      // The roof has its own vertices, separate from every wall, but its
+      // coplanar triangles can share those vertices. Repeating three complete
+      // attribute records per triangle retained redundant city-wide buffers.
+      if(topTriangles.length){
         const at=positions.length/3;
-        for(const i of triangle)vertex(footprint[i],topY,0,0);
-        indices.push(at,at+1,at+2);
+        for(const point of footprint)vertex(point,topY,0,0);
+        for(const triangle of topTriangles)indices.push(at+triangle[0],at+triangle[1],at+triangle[2]);
       }
 }
