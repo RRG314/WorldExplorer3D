@@ -104,3 +104,24 @@ receipt, a different account trying to sell/refund goods, next-day replay, and
 concurrent refunds. It never targets production accounts. Eleven selected backend
 stages pass; no permission/rule changes were needed. Initial Java PATH failure
 was diagnosed by locating the existing JDK, not by altering app code or tests.
+
+## C8 — Keep delayed services and care bound to their original target
+
+The actual runtime functions reproduced six failing cases: replacement car,
+vessel or companion receiving the first delayed service response; care XP going
+to a newly selected companion; failed save reported as success; and missing care
+still awarding progress. The original target is now checked for every receipt,
+not only recovery. Companion care updates the latest persisted row atomically,
+and XP accepts an explicit recipient while retaining the active-companion default
+for other callers. Already-applied receipts return their idempotent result;
+failed XP saves leave the funded service pending for recovery.
+
+Affected callers: urban POI services and the ordinary Profile care control.
+`tests/poi-service-target-current.test.mjs` executes the actual runtime functions
+and owner; seven cases pass, including concurrent selection/progression. The full
+source chain passes 2,575 tests. A native Chrome/IndexedDB integration fixture
+passes four delayed-save/reload/replay/failure checks; image and text inspected,
+no page errors. `companion-service-target-current.mjs` and
+`consolidation-gameplay-current.mjs` retain explicit evidence scope; the latter is
+the separate immutable full-world preservation runner. No control, geometry or
+stored companion identity changed. No old data was deleted.

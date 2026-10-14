@@ -81,3 +81,29 @@ checks also pass. This is a diagnostic subset, not the remaining four full
 multiplayer browser journeys or production App Check. Logs:
 `backend-followup.log` (failed environment) and `backend-followup-java.log`
 (passing checks). Temporary fixture records and emulator processes are retired.
+
+### C7 complete backend stage coverage
+
+The remaining four browser stages also pass under isolated emulators:
+`shared-expedition`, `connected-property-multiplayer`, `room-chat-gameplay`, and
+`multiplayer`. Together with the eleven stages above, all fifteen are covered in
+two selected runs; this is not a single complete-gate invocation. Their immutable
+artifact is `5.6.0+016ab8736455.a4f0ad0323bd9567.staging` at
+`output/hosting-validation/consolidation-20261013`. Shared crew recovery, property
+purchase/network failure/retry/sale, mobile-to-desktop chat and restored input,
+and two full Earth worlds with shared object/vehicle control/release/handoff
+pass with no captured browser errors. Images inspected. Evidence:
+`backend-packaged-browser.log` and the four `output/verification/*/report.json`
+files. This package precedes C8; it does not certify the later companion changes.
+
+### C8 service targets and companion persistence
+
+`node --test --test-concurrency=1 tests/poi-service-target-current.test.mjs`
+passes seven tests after six initial reproductions failed. Actual runtime
+functions are executed with controlled state; the actual companion owner is also
+exercised. `npm run verify:pr` passes 2,575 tests, zero failures/skips/TODOs,
+plus the structural chain (`source-chain-service.log`).
+`node scripts/verification/companion-service-target-current.mjs` passes four
+native IndexedDB browser checks, with inspected screenshot/state and no page
+errors (`companion-service-browser/`). This fixture controls delays and failures;
+it is not a rendered-world or hosted veterinary-service acceptance claim.

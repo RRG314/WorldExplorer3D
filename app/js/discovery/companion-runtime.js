@@ -315,7 +315,7 @@ async function createCompanionRuntime(appCtx, options = {}) {
   async function care(instanceId, interaction = 'pet') {
     const current = companions.find((entry) => entry.instanceId === String(instanceId));
     if (!current) return false;
-    await profileStore.saveCompanion(careForCompanion(current, interaction));
+    await profileStore.saveCompanion(current, latest => careForCompanion(latest, interaction));
     await refresh();
     if (presentation) {
       presentation.activity = interaction === 'feed' ? 'eat' : 'idle';
@@ -324,8 +324,7 @@ async function createCompanionRuntime(appCtx, options = {}) {
     return true;
   }
 
-  function queueAward(award = {}) {
-    const instanceId = active?.instanceId;
+  function queueAward(award = {}, instanceId = active?.instanceId) {
     if (!instanceId) return progressWrites;
     progressWrites = progressWrites.then(async () => {
       const current = companions.find((entry) => entry.instanceId === instanceId);
@@ -335,7 +334,7 @@ async function createCompanionRuntime(appCtx, options = {}) {
         result = awardCompanionXp(latest, award);
         return result.companion;
       });
-      if (!result.awarded) return false;
+      if (!result.awarded) return result;
       companions = companions.map((entry) => entry.instanceId === instanceId ? next : entry);
       if (active?.instanceId === instanceId) active = next;
       options.onXpAward?.(next, result);
@@ -349,9 +348,9 @@ async function createCompanionRuntime(appCtx, options = {}) {
     return progressWrites;
   }
 
-  function awardXp(award = {}) {
-    if (!active) return Promise.resolve(false);
-    return queueAward(award);
+  function awardXp(award = {}, instanceId = active?.instanceId) {
+    if (!instanceId) return Promise.resolve(false);
+    return queueAward(award, instanceId);
   }
 
   function update(actor, dt, mode = 'walk', environment = 'EARTH') {

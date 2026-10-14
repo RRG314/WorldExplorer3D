@@ -1940,7 +1940,7 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
       await state.companionRuntime.care(instanceId, companion.speciesArchetype === 'bird' ? 'groom' : 'pet');
       const day = new Date().toISOString().slice(0, 10);
       if (companion.progression?.totalXp > 0) {
-        await state.companionRuntime.awardXp({ receiptId: `care:${companion.instanceId}:${day}`, reasonId: 'care-after-outing' });
+        await state.companionRuntime.awardXp({ receiptId: `care:${companion.instanceId}:${day}`, reasonId: 'care-after-outing' }, companion.instanceId);
       }
       appCtx.showToast?.(`${companion.name} enjoyed the attention.`);
     }

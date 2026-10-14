@@ -1087,6 +1087,9 @@ function poiServiceTargetId(state, serviceId) {
 }
 
 async function applyPoiService(state, service, receiptId = '', recovery = {}) {
+  // A first reply can be delayed just like recovery. Keep the funded service
+  // attached to its original vehicle, vessel or companion.
+  if (recovery.targetId && recovery.targetId !== poiServiceTargetId(state, service?.id)) return null;
   if (recovery.recovery) {
     if (!recovery.targetId || recovery.targetId!==poiServiceTargetId(state,service?.id)) return null;
     if (service.id==='player-treatment' && Number(state.playerCondition??1)>=.999) return true;
@@ -1115,9 +1118,11 @@ async function applyPoiService(state, service, receiptId = '', recovery = {}) {
     const runtime = appCtx.worldDiscoveryRuntime?.companionRuntime;
     const activeId = runtime?.snapshot?.().activeInstanceId;
     if (!runtime || !activeId) return false;
-    await runtime.care(activeId, 'feed');
-    await runtime.awardXp({ receiptId: `poi-care:${receiptId || Date.now()}`, reasonId: 'care-after-outing' });
-    return true;
+    if (await runtime.care(activeId, 'feed') !== true) return false;
+    const award = await runtime.awardXp({ receiptId: `poi-care:${receiptId || Date.now()}`, reasonId: 'care-after-outing' }, activeId);
+    // Care may already be saved when progress fails. Keep the receipt pending
+    // instead of refunding a partially applied effect or claiming success.
+    return award?.awarded === true || award?.reason === 'already-awarded' ? true : null;
   }
   if (parseUpgradeServiceId(service?.id)) {
     const target = state.activeVehicle || appCtx.car;
