@@ -73,3 +73,21 @@ test('captured London terminal stays within input plus intersection rounding, no
   assert.ok(contacts.nearestSurfaceAt(x,z,roadSourceCoordinateTolerance(x,z,0.001)));
   contacts.dispose();
 });
+
+
+import {roadJunctionContact} from '../app/js/terrain/published-road-integrity.js';
+test('Middleborough approach junction accepts its pinned at-grade owner without accepting a bridge or a real gap',()=>{
+  // Production failure captured October 14: the regional packet ended 2.81 m
+  // from this junction, while its engineered approach was already published.
+  const x=12157.67978620618,z=1464.8472047390726;
+  const contact=(dx,y,mode)=>createRoadContactIndex([{geometry:{attributes:{position:{array:Float32Array.from([
+    x-4+dx,y,z-4,x-4+dx,y,z+4,x+4+dx,y,z-4,x+4+dx,y,z-4,x-4+dx,y,z+4,x+4+dx,y,z+4])}}},userData:{terrainMode:mode}}]);
+  const regional=contact(10,2.31,'at_grade'),pinned=contact(0,-.5307066,'at_grade'),bridge=contact(0,12,'bridge');
+  const tolerance=roadSourceCoordinateTolerance(x,z,.001);
+  assert.equal(roadJunctionContact([regional],x,z,tolerance),null);
+  assert.equal(roadJunctionContact([regional,bridge],x,z,tolerance),null,'overhead bridge does not fill a surface gap');
+  const accepted=roadJunctionContact([regional,pinned],x,z,tolerance);
+  assert.equal(accepted.distance,0);assert.ok(Math.abs(accepted.y+.5307066)<1e-6);
+  assert.equal(roadJunctionContact([regional,pinned],x,z+5,tolerance),null,'do not widen tolerance to conceal missing road');
+  regional.dispose();pinned.dispose();bridge.dispose();
+});
