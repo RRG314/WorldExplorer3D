@@ -36,9 +36,17 @@ separate visual/contact-quality follow-up; the keyboard segment does not prove
 that junction can be crossed. First local world check lacked its Functions proxy
 and had 503 responses; its failed receipt remains alongside the later passing run.
 
-The same repair is preserved in ongoing local 5.6 at `2a9a7cc3`; no museum, aquarium,
-ship, consolidation or player progress was rolled back. Source/preview integration
-of the isolated 5.6 correction is tracked in `docs/road-continuity/EVIDENCE.md`.
+The same repair is now in `stable` through PR #101 (`6e2c8300`) and both active
+published development branches through `6cf5cf29`. All 2,531 published 5.6 source
+tests and its structural checks pass. The existing ship-review-1011 preview now
+serves `5.6.0+5faa0d9b5eeb.feff82860c144189.staging`, whose exact package passed the
+same eleven arrivals and local worker-recovery check; remote manifests match.
+This does not promote 5.6 to production or certify worldwide streaming.
+
+Ongoing local 5.6 work retains the original fix at `2a9a7cc3` and merges published
+history at `027336a7`, without changing its pre-merge source tree. No museum,
+aquarium, ship, consolidation or player progress was rolled back. Full deployment
+and integration evidence is recorded in `docs/road-continuity/EVIDENCE.md`.
 
 ## Previous 5.5.0 release evidence
 

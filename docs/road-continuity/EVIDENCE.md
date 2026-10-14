@@ -48,7 +48,7 @@ Earth travel is not ready. Preserve ongoing 5.6 work and saved progress.
   an overhead bridge or genuinely missing surface still fails. Failed road jobs
   restore only their compiler, retain accepted meshes/contact and retry twice
   with backoff. Manual retry remains local. No location/menu/save reload.
-- Production 5.5.1 deployed from isolated source 012e5c85. All 2,186 source checks and structural chain, all 29 staged package world checks, all eleven packaged and live road arrivals passed. Source/preview 5.6 integration remains in progress. Existing known release limitations
+- Production 5.5.1 deployed from isolated source 012e5c85. All 2,186 source checks and structural chain, all 29 staged package world checks, all eleven packaged and live road arrivals passed. The matching 5.6 source and preview correction is published; see the integration receipt below. Existing known release limitations
   and provider warnings are not reclassified by these scoped passes.
 
 ## Plan and acceptance
@@ -71,3 +71,37 @@ regional publication. Its existing terrain/engineered join still shows a vertica
 edge; the 54 m keyboard approach did not establish successful crossing. Neither
 its geometry nor the grade solver was changed in this urgent reload hotfix. This
 is a concrete follow-up, not a passing worldwide drivability claim.
+
+
+## Completed 5.6 integration — October 14
+
+- Published stable source received the same runtime fix through PR #101, merge
+  `6e2c8300d7e650b4fb5a7d283cd6fd316ed48eae`. All required GitHub checks passed
+  before the normal protected merge. The active visual-quality and
+  post-5.2-release-integration branches both received history-preserving merge
+  `6cf5cf29c69e99469b83448753ed0c9e4cacb136` by one atomic fast-forward push.
+  There is no separate remote main branch. No force push or source reset occurred.
+- The exact published 5.6 package is
+  `5.6.0+5faa0d9b5eeb.feff82860c144189.staging`; its asset manifest SHA-256 is
+  `a4663a53b12c5d62f7f873c8bb1039acbdfc1a8f5aa38cb2274bdde02da0422d`.
+  All 2,531 source tests and structural checks pass. The immutable package passes
+  all eleven controlled arrivals, 69 evictions, one interrupted real worker and
+  local recovery, with generation 1 throughout, at most 16 moving regions, no
+  road error/reload prompt or page errors. This is the road-recovery scope, not a
+  new complete-world, hosted backend, device or worldwide travel certification.
+  Provider/App Check warnings remain in the actual local-package report.
+- The established preview was updated in the staging project only:
+  https://we3d-staging-20260712--ship-review-1011-pb8x1l4l.web.app/app/
+  Remote build and asset manifests match the tested local bytes. Production
+  remains the separately verified 5.5.1 package; no 5.6 package was promoted.
+- Evidence is in the attached road-continuity-hotfix worktree under
+  `output/road-continuity/packaged-56/` and `preview-56-deployed.json`. Its
+  `dist` preserves 5.5.1 production, and both tested staging packages remain in
+  `output/hosting-validation/`. The original architecture-evaluation `dist` and
+  the ongoing venue/consolidation candidate remain untouched.
+- Ongoing local venue work was merged with the published repair at `027336a7`.
+  Its entire tree is byte-identical to pre-merge local `ebc0c2a8`: no museum,
+  aquarium, harbor, launch-site or consolidation work was lost or released by
+  this synchronization. A date-only documentation conflict was resolved.
+- The physical terrain join described above is still open. Its exact-junction
+  keyboard check moved 54.2 m but did not establish crossing the vertical edge.
