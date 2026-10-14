@@ -121,6 +121,7 @@ export const currentContractTests = [
   'tests/light-uniform-reuse-current.test.mjs',
   'tests/profile-scratch-storage-current.test.mjs',
   'tests/transport-model-buffer-current.test.mjs',
+  'tests/numeric-scratch-current.test.mjs',
   'tests/transport-profile-buffer-current.test.mjs',
   'tests/camera-road-surface-current.test.mjs',
   'tests/nearby-vehicle-query-current.test.mjs',

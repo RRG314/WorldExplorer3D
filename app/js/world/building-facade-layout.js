@@ -1,3 +1,4 @@
+import {allocatePrivateBuildingStorage} from './retired-building-buffers.js';
 // Per-wall architecture, computed before world transforms and preserved by batching.
 // The footprint and collision mesh are never changed by facade decoration.
 export function facadeFloorPlan(height, options = {}) {
@@ -19,9 +20,9 @@ export function attachBuildingFacadeLayout(geometry, options = {}) {
   // corners; shared smooth wall vertices cannot represent independent wall bays.
   // These attributes share a geometry lifetime, but their values must never
   // overlap. Keep one backing store for the two independent ranges.
-  const storage = new ArrayBuffer(p.count * 8 * Float32Array.BYTES_PER_ELEMENT);
-  const layout = new Float32Array(storage, 0, p.count * 4);
-  const openings = new Float32Array(storage, p.count * 4 * 4, p.count * 4);
+  const {buffer: storage, byteOffset} = allocatePrivateBuildingStorage(geometry, p.count * 8 * Float32Array.BYTES_PER_ELEMENT);
+  const layout = new Float32Array(storage, byteOffset, p.count * 4);
+  const openings = new Float32Array(storage, byteOffset + p.count * 4 * 4, p.count * 4);
   let minimumY = Infinity, maximumY = -Infinity;
   for (let i=0;i<p.count;i++) { minimumY=Math.min(minimumY,p.getY(i)); maximumY=Math.max(maximumY,p.getY(i)); }
   const plan = facadeFloorPlan(maximumY-minimumY, options);

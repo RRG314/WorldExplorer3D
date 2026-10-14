@@ -50,20 +50,20 @@ and integration evidence is recorded in `docs/road-continuity/EVIDENCE.md`.
 
 ## Current complete candidate — October 14
 
-The complete local candidate is 3a43e124: all 2,628 source checks and the
-structural chain pass. A terrain consumer's short deadline previously cancelled
-a shared download needed by other consumers. Subscription and source lifetimes
-are now separate; the real delayed-image case and two-player Logan world pass.
-The reviewed b21 package remains the modern-save fallback.
+The terrain recovery and bounded construction-storage source passes all 2,633
+checks and the complete structural chain. Temporary compiler scratch is reused
+within explicit synchronous scopes. Building source attributes retire without
+invalidating neighboring geometry; standalone buildings retain only their own
+exact attribute storage. Final packaged acceptance is being rebuilt and rerun.
+The preserved b21 candidate remains the modern-save fallback.
 
-The current package is `output/hosting-validation/release-561-3a43e124`, build
-`5.6.1+3a43e124ba0b.9b9a6c894c5ac5c7.staging`. Canonical staging still serves
-1f37 at https://we3d-staging-20260712.web.app/app/. Neither this package nor 5.6
-is deployed to production. Native frame pauses, complete matching acceptance,
-ordinary hosted voyage/save and the four-stage save roundtrip remain open.
-The small cache-ownership experiment was rejected after its native flight still
-failed pacing; its patch and evidence are retained without changing runtime.
-See docs/RELEASE_SOURCE_OF_TRUTH.md and the October 14 READINESS ledger.
+Native frame pauses remain unresolved. Focused functional results do not make
+this a production-ready release. Complete matching candidate/backend acceptance,
+four-stage saves, ordinary hosted voyage/save and current-image review remain
+required. Canonical staging still serves 1f37 at
+https://we3d-staging-20260712.web.app/app/. Production is unchanged at 5.5.1.
+Use docs/RELEASE_SOURCE_OF_TRUTH.md and the October 14 READINESS ledger; historical
+package identities below are not current acceptance.
 
 ## Previous 5.5.0 release evidence
 

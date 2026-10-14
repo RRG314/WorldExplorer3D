@@ -1,3 +1,4 @@
+import {copyNumericArray} from '../../structure-semantics/numeric-scratch.js';
 import { smoothstep01 } from '../../structure-semantics/geometry.js?v=2';
 import { tunnelMinimumDepth } from './tunnel-envelope.js';
 
@@ -53,7 +54,7 @@ function tangentAtDistance(points, pathDistances, distance) {
   };
 }
 
-function createSampleDistances(totalDistance, sampleStep, exactDistances = [], auxiliaryDistances = []) {
+function createSampleDistances(totalDistance, sampleStep, exactDistances = [], auxiliaryDistances = [], allocate = copyNumericArray) {
   const total = Math.max(0, finiteNumber(totalDistance));
   const step = Math.max(0.5, finiteNumber(sampleStep, DEFAULT_SAMPLE_STEP));
   const segmentCount = Math.max(1, Math.ceil(total / step));
@@ -100,7 +101,7 @@ function createSampleDistances(totalDistance, sampleStep, exactDistances = [], a
   // collapse to a sub-millimetre interval when coerced to Float32, which in
   // turn reports a physically meaningless vertical spike at an otherwise
   // continuous graph node.
-  return Float64Array.from(unique);
+  return allocate(Float64Array, unique);
 }
 
 function normalizeAnchors(feature, semantics, totalDistance) {
@@ -245,7 +246,8 @@ function applyEndpointTieIns(
   endpointGroundStart,
   endpointGroundEnd,
   surfaceBias,
-  maximumGrade
+  maximumGrade,
+  allocate = copyNumericArray
 ) {
   const anchors = Array.isArray(feature?.structureTransitionAnchors)
     ? feature.structureTransitionAnchors.filter((anchor) =>
@@ -292,7 +294,7 @@ function applyEndpointTieIns(
       }
     }
   }
-  const corrected = new Float64Array(heights);
+  const corrected = allocate(Float64Array, heights);
   for (const anchor of anchors) {
     const atStart = anchor.endpoint === 'start';
     const endpointIndex = atStart ? 0 : corrected.length - 1;
@@ -360,7 +362,7 @@ function applyEndpointTieIns(
   }
   if (hasFixedStart) corrected[0] = startDesired;
   if (hasFixedEnd) corrected[lastIndex] = endDesired;
-  return new Float32Array(corrected);
+  return allocate(Float32Array, corrected);
 }
 
 // Exact joins and obstruction edges add nonuniform sample spacing. An
@@ -377,7 +379,8 @@ function reconcileExactGraphNodeConstraints(
   heights,
   distances,
   lowerBounds,
-  maximumGrade
+  maximumGrade,
+  allocate = copyNumericArray
 ) {
   const anchors = Array.isArray(feature?.structureTransitionAnchors)
     ? feature.structureTransitionAnchors.filter((anchor) =>
@@ -456,8 +459,8 @@ function reconcileExactGraphNodeConstraints(
     }
   }
 
-  const effectiveLowerBounds = new Float64Array(heights.length);
-  const effectiveUpperBounds = new Float64Array(heights.length);
+  const effectiveLowerBounds = allocate(Float64Array, heights.length);
+  const effectiveUpperBounds = allocate(Float64Array, heights.length);
   for (let index = 0; index < heights.length; index += 1) {
     let lower = finiteNumber(lowerBounds?.[index], Number.NEGATIVE_INFINITY);
     let upper = Number.POSITIVE_INFINITY;
@@ -488,7 +491,7 @@ function reconcileExactGraphNodeConstraints(
     effectiveUpperBounds[index] = upper;
   }
 
-  const corrected = new Float64Array(heights);
+  const corrected = allocate(Float64Array, heights);
   const clampToBounds = (index, value) => clamp(
     value,
     effectiveLowerBounds[index],
@@ -518,7 +521,7 @@ function reconcileExactGraphNodeConstraints(
 
   for (let pass = 0; pass < 8; pass += 1) enforceConstrainedGrade();
   for (let pass = 0; pass < 6; pass += 1) {
-    const next = new Float64Array(corrected);
+    const next = allocate(Float64Array, corrected);
     for (let index = 1; index < corrected.length - 1; index += 1) {
       if (fixedTargets.has(index)) continue;
       next[index] = clampToBounds(
@@ -529,7 +532,7 @@ function reconcileExactGraphNodeConstraints(
     corrected.set(next);
     enforceConstrainedGrade();
   }
-  return new Float32Array(corrected);
+  return allocate(Float32Array, corrected);
 }
 
 function enforceMaximumGrade(heights, lowerBounds, distances, maximumGrade) {
@@ -554,11 +557,11 @@ function enforceMaximumGrade(heights, lowerBounds, distances, maximumGrade) {
   }
 }
 
-function smoothGradeLimitedProfile(initialHeights, lowerBounds, distances, maximumGrade) {
-  const heights = new Float64Array(initialHeights);
+function smoothGradeLimitedProfile(initialHeights, lowerBounds, distances, maximumGrade, allocate = copyNumericArray) {
+  const heights = allocate(Float64Array, initialHeights);
   enforceMaximumGrade(heights, lowerBounds, distances, maximumGrade);
   for (let pass = 0; pass < 6; pass += 1) {
-    const next = new Float64Array(heights);
+    const next = allocate(Float64Array, heights);
     for (let index = 1; index < heights.length - 1; index += 1) {
       const neighborAverage = neighborProfileHeight(heights, distances, index);
       next[index] = Math.max(
@@ -569,7 +572,7 @@ function smoothGradeLimitedProfile(initialHeights, lowerBounds, distances, maxim
     heights.set(next);
     enforceMaximumGrade(heights, lowerBounds, distances, maximumGrade);
   }
-  return new Float32Array(heights);
+  return allocate(Float32Array, heights);
 }
 
 function smoothSignedCutFillProfile(
@@ -578,10 +581,11 @@ function smoothSignedCutFillProfile(
   upperBounds,
   distances,
   maximumGrade,
-  fitRadius
+  fitRadius,
+  allocate = copyNumericArray
 ) {
   const radius = Math.max(4, finiteNumber(fitRadius, DEFAULT_VERTICAL_FIT_RADIUS));
-  const heights = new Float64Array(terrainEnvelope.length);
+  const heights = allocate(Float64Array, terrainEnvelope.length);
   for (let index = 0; index < terrainEnvelope.length; index += 1) {
     let weightedSum = 0;
     let weightTotal = 0;
@@ -630,7 +634,7 @@ function smoothSignedCutFillProfile(
       previous = current;
     }
   }
-  return new Float32Array(heights);
+  return allocate(Float32Array, heights);
 }
 
 function profileStats(distances, heights, terrainSamples = null, surfaceBias = 0) {

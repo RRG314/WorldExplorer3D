@@ -13,7 +13,7 @@ production changes. A version label or preview URL alone does not identify code.
 | Production Firebase project | `worldexplorer3d-d9b83` |
 | Canonical staging frontend | `5.6.1+1f37e893ccae.3e39c25a98b5a66f.staging` |
 | Staging Firebase project | `we3d-staging-20260712` |
-| Current local candidate | `5.6.1+3a43e124ba0b.9b9a6c894c5ac5c7.staging` |
+| Current local candidate | Construction-storage source; final package verification in progress |
 | Preserved road-safe fallback | `5.6.1+b21b7f12fdfa.31ed9b1212c5002c.staging` |
 | Release branch | `stable` (default; no `main` branch) |
 | Active development branches | `steven/visual-quality`, `steven/post-5.2-release-integration` |
@@ -44,7 +44,7 @@ Its complete twelve-cycle performance run passes cleanup and touch emulation,
 but still fails desktop frame-rate/hitch limits. A new, narrowly scoped collision
 allocation repair is pushed to both active branches but still reproduces native
 flight pauses. Generated building attributes now use fewer native backing buffers
-with identical values; all 2,628 source checks pass. The complete packaged twelve-cycle run preserves coverage, cleanup, memory
+with identical values; all 2,633 source checks pass. The complete packaged twelve-cycle run preserves coverage, cleanup, memory
 retention and touch behavior, but still fails desktop pacing. Profiling links
 the largest pauses to collection; a numeric-uniform cache experiment increased
 allocation and was rejected without changing the game. Complete acceptance remains

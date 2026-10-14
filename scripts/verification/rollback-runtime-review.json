@@ -49,16 +49,16 @@
     "app/js/world/building-body-geometry.js": {
       "before": "c5c6f0c5fb53883c7dbc96f5d4637a8b3397c3172a7993d7bb7cf6c380f44040",
       "beforeMode": "100644",
-      "after": "6d021c68737f5b3449d78fb2401d903022844a1b4fc6c695b5ef807b1eceaeb1",
+      "after": "abc5f70cacebc3079261d20511fedc60622722eeb572e334f2f912e7c47feb6f",
       "afterMode": "100644",
-      "review": "Packs position, UV and normal arrays into disjoint views of one exclusively owned backing buffer. Preserves geometry bytes, transform behavior, editing and retirement. No saved data or protocol change."
+      "review": "Uses optional bounded private construction storage with disjoint attribute views. Exact geometry bytes, normals, UVs, transforms, footprint data, clones and edit behavior are preserved. No saved data."
     },
     "app/js/world/building-facade-layout.js": {
       "before": "d83926ed6d0b383ef9ec3ff284c35a0d3008f363ca2cb8f1e41824941f8e69cf",
       "beforeMode": "100644",
-      "after": "1a899df2afee673abb9737c89168c70d1df4fb6bc76565b78a4f9005f6c1b6ed",
+      "after": "23caee32377ffffa0701326859f0e0548f3da51e7de6700b69195f88d9ee2f4f",
       "afterMode": "100644",
-      "review": "Packs facade layout and opening attributes into disjoint views with the same values and lifetime. No facade appearance, building identity, persistence or backend change."
+      "review": "Uses the geometry-owned construction allocator when available, preserving separate ranges, all facade values, and independently owned standalone publication. No visual, persistent or backend schema changes."
     },
     "config/performance-budgets.json": {
       "before": "7553af8ea49ea8f6d3e67e48d70148c0953b669e10a46c49b8a383e67a5b8b6a",
@@ -87,6 +87,62 @@
       "after": "8d61f6ea57bd069aca2f6138b52116b1711ee86ee52ce1a80ae9ac21fecf4b4e",
       "afterMode": "100644",
       "review": "Comment clarifies the shared terrain owner; publication order and ten-second wait are unchanged. No persisted data or geometry change."
+    },
+    "app/js/structure-semantics/numeric-scratch.js": {
+      "before": null,
+      "beforeMode": null,
+      "after": "d6905369bbbd99b0ff6dac796b696cbf0875473e5a50549849ba3d60d6ed7c16",
+      "afterMode": "100644",
+      "review": "Bounded, explicitly borrowed numeric scratch pages for synchronous compilation. Nested calls have separate pages; completed profiles use independent publication buffers. At most one MiB is retained by each compiler pool. No saved data or network change."
+    },
+    "app/js/structure-semantics/geometry.js": {
+      "before": "f87dfd35174c8f2d7ab2a9e059db1908da826905409825c1fd941cadb32b1371",
+      "beforeMode": "100644",
+      "after": "b5ba2fdc4932e4a69e0ecbde69d644eb1d5da4fffc051b15fe39e9398ba7cbfa",
+      "afterMode": "100644",
+      "review": "Polyline distance arithmetic and Float32 rounding are unchanged. The caller can explicitly provide temporary storage; ordinary callers retain independent arrays. No geometry or persistence semantics change."
+    },
+    "app/js/world/compiler/ordinary-street-profile.js": {
+      "before": "8b9978a3b421dff5fba95fb9f4b4a1173a2392d6ed4d0c2b1358465b755d8401",
+      "beforeMode": "100644",
+      "after": "815f5dcc144a5ce3eab5e3fe814928b098102ddbef5d7354bc99fa2709f6f957",
+      "afterMode": "100644",
+      "review": "The same ordinary-street alignment solver receives an explicit optional storage allocator. Exact Float32/Float64 values and grade rules remain unchanged; no persistent fields change."
+    },
+    "app/js/world/compiler/transport-surface-profile.js": {
+      "before": "da2076cd898f41bdfbbde602fe8a6a22bab90c4d9cac7788eb6f67bcb9549873",
+      "beforeMode": "100644",
+      "after": "234941976690389a396c83b18b4bbb03f9b80967301844a6a7590e8fdc25aa28",
+      "afterMode": "100644",
+      "review": "The same surface, bridge and tunnel solvers receive explicit scratch allocation. Computation order and numeric precision are unchanged; published output is copied before scratch reuse. No persistence change."
+    },
+    "app/js/world/compiler/transport-surface-model.js": {
+      "before": "f2d575773a84b397198c954eebf02c830e393220af5e53452bc25401c034e2f3",
+      "beforeMode": "100644",
+      "after": "10b136c94eef32c23e38c0d9255cb6ed1393f0b903b7a46006a6debade5b52c4",
+      "afterMode": "100644",
+      "review": "Scopes temporary profile storage to one synchronous compilation and copies all accepted numeric fields into independently owned publication buffers. Reentrant terrain queries are isolated. Exact surface/metadata, road grade and tunnel containment regressions pass. No saved-field or protocol change."
+    },
+    "app/js/world/retired-building-buffers.js": {
+      "before": "05610e0943b074c71405480ae611c59aaf474cfba557e621fdf3b1e0f5a2431f",
+      "beforeMode": "100644",
+      "after": "da5e6aacac744737caa4121da4f5758e9a6d52c74fda3134e8854b102d993268",
+      "afterMode": "100644",
+      "review": "Private construction ranges share bounded pages until their geometry owners retire. Unbatched survivors copy exact attribute bytes into independent storage, preventing page pinning; final batches, clones and neighboring geometry remain valid. No persistence or building identity changes."
+    },
+    "app/js/world/load-building-pass.js": {
+      "before": "e8f6cce9b7e9c7bb76aa9cadeb4b76481d09b936830f47dffbe4e1d28a2a219e",
+      "beforeMode": "100644",
+      "after": "1aaf5a52dda670ceb752ec3175a89af959307d8b411699068cec7a61f4948c30",
+      "afterMode": "100644",
+      "review": "Owns separate near/mid construction arenas, closes them on success or failure, and finalizes standalone attributes after batching. Complete world coverage, semantic rules, building identities and saved data remain unchanged."
+    },
+    "app/js/world/load-geometry.js": {
+      "before": "568c39a1b897602cf07ebce2f4e4b4ed85dca00088f655da848136f8f3805adb",
+      "beforeMode": "100644",
+      "after": "95b2ac08f3bc6d86d9fb1e1b526fdf4f501c2662af0714f4bb83c537c162245d",
+      "afterMode": "100644",
+      "review": "Passes the optional construction arena into generated mid-LOD bodies and their existing fallback. It does not change geometry, material selection, location identity or saved state."
     }
   }
 }

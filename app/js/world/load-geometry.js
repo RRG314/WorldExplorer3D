@@ -105,7 +105,7 @@ function fallbackMidLodBuildingMesh(pts, height, avgElevation, colorHex = '#7f8c
 
   const geo = createBuildingBodyGeometry(THREE, [
     {x:minX,z:minZ},{x:maxX,z:minZ},{x:maxX,z:maxZ},{x:minX,z:maxZ}
-  ], h);
+  ], h, options.constructionArena);
   const facade = midFacadeMaterial(
     options.buildingType || 'yes',
     options.buildingSeed || 0,
@@ -181,7 +181,7 @@ export function createMidLodBuildingMesh(pts, height, avgElevation, options = {}
   const renderPts = midLodRenderFootprint(pts);
 
   try {
-    const geo = createBuildingBodyGeometry(THREE, renderPts, h);
+    const geo = createBuildingBodyGeometry(THREE, renderPts, h, options.constructionArena);
     if (!geometryHasFinitePositions(geo)) {
       geo.dispose();
       releaseRetiredBuildingCpuBuffers(geo);

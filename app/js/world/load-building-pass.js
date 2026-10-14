@@ -1,3 +1,4 @@
+import {createBuildingConstructionArena, allocatePrivateBuildingStorage, releaseRetiredBuildingCpuBuffers, finishPrivateBuildingStorage} from './retired-building-buffers.js';
 import {createBuildingBodyGeometry} from './building-body-geometry.js';
 import {prepareLaunchPadBuildingWays} from './launch-pad-facility.js';
 import {prepareKennedyBuildingWays} from './kennedy-facility.js';
@@ -44,6 +45,12 @@ export function requiresLoadedRoadCoverageForBuilding(tags = {}) {
 }
 
 export async function buildBuildingGeometryPass(options = {}) {
+  const arenas = { near: createBuildingConstructionArena(), mid: createBuildingConstructionArena() };
+  try { return await buildBuildingGeometryWithStorage(options, arenas); }
+  finally { arenas.near.close(); arenas.mid.close(); }
+}
+
+async function buildBuildingGeometryWithStorage(options, arenas) {
   const kennedy=prepareKennedyBuildingWays(appCtx,Array.isArray(options.buildingWays)?options.buildingWays:[],options.nodes||{},options.lodThresholds?.farVisible);
   const buildingWays = prepareLaunchPadBuildingWays(appCtx,kennedy.ways,kennedy.nodes,options.lodThresholds?.farVisible);
   const nodes = kennedy.nodes;
@@ -523,6 +530,7 @@ export async function buildBuildingGeometryPass(options = {}) {
     if (lodTier === 'mid') {
       mesh = measureBuildingPhase('meshCreation', () => createMidLodBuildingMesh(pts, bodyHeight, baseElevation, {
         colorHex: baseColor,
+        constructionArena: arenas.mid,
         buildingSeed: bSeed,
         buildingType: bt,
         denseUrban: denseUrbanContext,
@@ -540,9 +548,10 @@ export async function buildBuildingGeometryPass(options = {}) {
       }));
     } else {
       const meshCreationStartedAt = now();
-      const geo = createBuildingBodyGeometry(THREE, pts, bodyHeight);
+      const geo = createBuildingBodyGeometry(THREE, pts, bodyHeight, arenas.near);
       if (!geometryHasFinitePositions(geo)) {
         geo.dispose();
+        releaseRetiredBuildingCpuBuffers(geo);
         continue;
       }
       const materialOptions = {
@@ -631,7 +640,9 @@ export async function buildBuildingGeometryPass(options = {}) {
     attachBuildingFacadeLayout(mesh.geometry, { ...mesh.userData.exteriorProfile, levels: Math.max(1, resolvedLevels - (Number(buildingSemantics.buildingMinLevel) || 0)), foundation: terrainFoundationRise });
     if (lodTier === 'mid' && mesh.material?.userData?.buildingExterior) {
       const color = new THREE.Color(mesh.userData.exteriorPresentation?.wallColor ?? baseColor);
-      const colors = new Float32Array(mesh.geometry.attributes.position.count * 3);
+      const count = mesh.geometry.attributes.position.count * 3;
+      const storage = allocatePrivateBuildingStorage(mesh.geometry, count * 4);
+      const colors = new Float32Array(storage.buffer, storage.byteOffset, count);
       for(let i=0;i<colors.length;i+=3) colors.set([color.r,color.g,color.b],i);
       mesh.geometry.setAttribute('color',new THREE.BufferAttribute(colors,3));
     }
@@ -835,6 +846,12 @@ export async function buildBuildingGeometryPass(options = {}) {
   if (batchedMidCount > 0) loadMetrics.lod.midBatched = batchedMidCount;
   if (appCtx._lastBuildingBatchStats) {
     loadMetrics.buildingBatching = { ...appCtx._lastBuildingBatchStats };
+  }
+  // Keep exact standalone attributes, but release construction pages shared
+  // with neighbors already copied into render batches.
+  for (let index = 0; index < appCtx.buildingMeshes.length; index++) {
+    finishPrivateBuildingStorage(appCtx.buildingMeshes[index].geometry);
+    if ((index + 1) % 32 === 0) await yieldToMainThread();
   }
   appCtx.refreshEditableBuildingVisibility?.();
   endLoadPhase('batchBuildingGeometry');

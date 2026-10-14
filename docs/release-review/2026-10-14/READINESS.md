@@ -6,7 +6,31 @@ this release. Moving scenery is optional and must not be represented as complete
 worldwide road, collision or activity streaming. Preserve the ongoing 5.6 venue,
 harbor, NASA, ocean and consolidation work; do not roll it back to the hotfix.
 
-## Latest status — October 14, 22:34 UTC
+## Current construction-storage candidate
+
+All 2,633 source checks and the complete structural chain pass. Terrain request
+ownership remains repaired. Temporary transport profiles now use explicit,
+bounded scratch scopes; published surfaces retain independent numeric storage.
+Generated building construction uses small pages, then moves unbatched survivors
+into their own exact attribute storage. This prevents standalone buildings from
+pinning their retired neighbors' construction data. Geometry, facade, clone,
+neighbor, nested-compilation and real batching regressions pass.
+
+The source junction journey passes approach, turn and departure in one world
+session, with no road or page errors; its prescribed-client screenshot was
+inspected. That journey preceded the final standalone-storage refinement; the
+complete final packaged matrix remains necessary. Earlier storage timing failed
+with pauses over one second. After the refinement, GC-only flight records 633.4
+and 549.9 ms intervals, with 292 ms in buffer sweeping. Those are failures, not a
+native performance pass or complete release certification. No budget was relaxed.
+
+The candidate is being frozen for complete backend, save/rollback and 107-gate
+acceptance. Ordinary hosted account/voyage/save and current-image review remain
+separate requirements. Production remains 5.5.1 and canonical staging remains
+1f37. Both active branches retain the verified terrain fix and rollback review.
+
+## Earlier status — October 14, 22:34 UTC
+
 
 The a9e15 source chain passes all 2,625 tests and GitHub code/secret checks.
 Its backend environmental check now passes with explicit partial availability;
