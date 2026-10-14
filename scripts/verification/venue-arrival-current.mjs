@@ -29,6 +29,21 @@ if(!process.env.FIREBASE_AUTH_EMULATOR_HOST){
     const browser=await chromium.connect(owned.wsEndpoint());page=await browser.newPage({viewport:{width:1280,height:800}});
     page.on('pageerror',e=>report.errors.push(String(e)));report.warnings=[];page.on('console',m=>{if(['warning','error'].includes(m.type())&&report.warnings.length<50)report.warnings.push(m.text().slice(0,600));});
     const base=`http://127.0.0.1:${server.port}`;report.failedLocalAssets=[];page.on('response',response=>{const url=new URL(response.url());if(url.origin===base&&response.status()>=400&&/\.(js|css|glb|jpg|png|webp)$/.test(url.pathname))report.failedLocalAssets.push({path:url.pathname,status:response.status()});});await configureIsolatedWorldBackend(page,base);
+    const requestTimes=new WeakMap();report.loadingRequests=[];
+    page.on('request',request=>requestTimes.set(request,performance.now()));
+    const recordRequest=(request,failed)=>{
+      const url=new URL(request.url()),elapsedMs=Math.round(performance.now()-(requestTimes.get(request)||performance.now()));
+      if(report.loadingRequests.length<180&&(url.pathname.includes('/terrarium/')||url.pathname.includes('/textures/')||url.pathname.endsWith('/CopyShader.js')))
+        report.loadingRequests.push({path:url.origin+url.pathname,elapsedMs,failed:failed?request.failure()?.errorText:null});
+    };
+    page.on('requestfinished',request=>recordRequest(request,false));page.on('requestfailed',request=>recordRequest(request,true));
+    if(process.env.WE3D_TERRAIN_FAULT==='once'){
+      report.controlledTerrainFailure={path:'/terrarium/15/9045/13669.png',aborted:0};
+      await page.route('https://s3.amazonaws.com/elevation-tiles-prod/terrarium/15/9045/13669.png',async route=>{
+        if(!report.controlledTerrainFailure.aborted){report.controlledTerrainFailure.aborted++;await route.abort('failed');}
+        else await route.continue();
+      });
+    }
     const start=venue==='launchpad'?'lat=28.62374&lon=-80.62055&lname=Launch%20Pad%2039B':venue==='kennedy'?'lat=28.58684&lon=-80.65121&lname=Kennedy%20Space%20Center':process.env.WE3D_VENUE_START==='district'?'lat=39.3098&lon=-76.6147&lname=Baltimore':venue==='museum'?'lat=39.29184&lon=-76.61036&lname=The%20Peale':'lat=39.28551&lon=-76.60860&lname=National%20Aquarium';
     await page.goto(`${base}/app/?launch=earth&gm=free&loc=custom&${start}&mode=walking&diagnostics=1`,{waitUntil:'domcontentloaded'});
     await page.waitForFunction(()=>globalThis.__WE3D_RUNTIME_READY__,null,{timeout:120000});
@@ -101,7 +116,7 @@ if(!process.env.FIREBASE_AUTH_EMULATOR_HOST){
     await page.waitForFunction(()=>!venueCtx.activeInterior,null,{timeout:10000});
     report.checks.push('Leave through the interior exit using normal controls');
     if(process.env.WE3D_CHECK_HARBOR==='1'){report.harbor=await verifyHarborQuayJourney(page,out);report.checks.push('Harbor passenger launch moves, stops outside the quay and reverses away');}
-    assert.deepEqual(report.errors,[]);assert.deepEqual(report.failedLocalAssets,[]);report.ok=true;}
+    assert.deepEqual(report.errors,[]);assert.deepEqual(report.failedLocalAssets,[]);if(report.controlledTerrainFailure)assert.equal(report.controlledTerrainFailure.aborted,1);report.ok=true;}
   }catch(error){report.error=String(error.stack||error);if(page){report.failure=await page.evaluate(()=>{const d=globalThis.getWorldExplorerRuntimeDiagnostics?.();return {actor:d?.activeActor,gameStarted:d?.gameStarted,loading:d?.worldLoading,hint:document.getElementById('interiorPrompt')?.innerText};}).catch(()=>null);await page.screenshot({path:out+'/failure.png'}).catch(()=>{});}process.exitCode=1;}
   finally{await writeFile(out+'/report.json',JSON.stringify(report,null,2));console.log(JSON.stringify({ok:report.ok,checks:report.checks,error:report.error}));if(page)await page.unrouteAll({behavior:'ignoreErrors'});if(owned)await closeOwnedBrowser(owned);await server?.close();}
 }

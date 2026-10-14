@@ -180,3 +180,28 @@ arrival, portrait diver and submarine were inspected. The ship's open-water
 surface remains visible. Controlled GEBCO entry and desktop portrait emulation
 are not live bathymetry or physical-phone certification. Local App Check/default
 provider failures are recorded separately from these gameplay results.
+
+
+## Terrain recovery found by final Kennedy acceptance — 14 October
+
+The b17 immutable package passes `accepted-ocean` (seven connected cases),
+`accepted-aquarium` (admission and harbor) and `accepted-museum` (distant district).
+`accepted-kennedy` and `accepted-kennedy-retry` both fail before gameplay. Nine
+material sets and an optional local rendering script time out; a detailed terrain
+image fails, the map loader retries a larger query, and the transport height-parity
+check rejects the inconsistent surface. No safety threshold was removed.
+`kennedy-network-diagnostic` subsequently passes the complete visit on the exact
+same bytes. That success does not erase the two earlier failures or establish the
+cause of the broader local asset delay. Direct local script delivery took 20 ms;
+the failed terrain URL returned HTTP 200 in 255 ms in a separate read-only probe.
+
+Code inspection of the reproduced failure identifies two recovery defects:
+near-terrain publication awaited only one image attempt, bypassing the tile
+owner's bounded retry policy; and a regional-terrain rejection was treated as a
+map-query failure. Publication now joins the existing bounded tile owner and
+rechecks its generation before attachment. Exhaustion remains a terminal surface
+failure; it cannot enlarge the map query or publish transport against incomplete
+near terrain. Source regressions cover recovery, exhaustion, terminal error
+classification and prevention of road compilation on failed terrain. The
+instrumented journey retains request timings and supports a clearly labeled
+single-request terrain fault followed by real-provider recovery.

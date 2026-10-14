@@ -1,4 +1,5 @@
 import {retireCoveredRegionalRoads} from './vector-resolution-ownership.js';
+import {SurfacePublicationError} from './surface-publication-error.js';
 // The mapped context must cover the fixed location visible from the map and
 // aerial modes. Eight kilometres ended before northern Manhattan and exposed
 // terrain-only sectors in nearby New Jersey even though the 22 km terrain LOD
@@ -290,6 +291,11 @@ export async function waitForFixedRegionalGround(
     loadMetrics.regionalGroundReady = await appCtx.waitForFarTerrainClipmap(timeoutMs);
     loadMetrics.regionalGroundWaitTimeoutMs = timeoutMs;
     return loadMetrics.regionalGroundReady;
+  } catch (error) {
+    if(error?.name==='AbortError')throw error;
+    // A failed surface cannot recover by increasing the map query radius.
+    // Keep the original cause and retire the load before transport compilation.
+    throw new SurfacePublicationError('regional-terrain',error);
   } finally {
     endLoadPhase('waitForFixedRegionalGround');
   }

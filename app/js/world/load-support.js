@@ -62,9 +62,9 @@ export async function finalizeLoadedWorld(options = {}) {
   if (appCtx.terrainEnabled && !appCtx.onMoon && typeof appCtx.publishLocationTerrain === 'function') {
     runFinalStep('publishLocationTerrain', () => appCtx.publishLocationTerrain());
     await yieldToMainThread();
-    // Roadless locations need the same physical-surface publication barrier
-    // that the transport compiler enforces in cities, before player spawn.
-    if (!appCtx.roads?.length && typeof appCtx.waitForLocationTerrainPublication === 'function') {
+    // Every world needs the published near surface before transport snapshots
+    // or player spawn, including retries after an interrupted terrain source.
+    if (typeof appCtx.waitForLocationTerrainPublication === 'function') {
       startLoadPhase('waitForLocationTerrainPublication');
       try { await appCtx.waitForLocationTerrainPublication(); }
       catch (error) { throw new SurfacePublicationError('terrain', error); }

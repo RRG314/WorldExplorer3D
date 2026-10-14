@@ -441,6 +441,7 @@ const {
   getTerrainMeshKey,
   terrainTileMeshKey,
   getOrLoadTerrainTile,
+  waitForTerrainTileReadyAtZoom,
   pruneTerrainTileCache,
   terrainTileCacheSnapshot,
   clearTerrainHeightCache,
