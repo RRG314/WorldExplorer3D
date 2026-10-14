@@ -55,6 +55,22 @@ try{
   history.push({stage:'deadline-and-recovery',elapsedMs:Math.round(elapsed),attempts:retry.attempts});
   clearTerrainTileCache();await load();
  }
+ if(new URLSearchParams(location.search).has('shared')){
+  clearTerrainTileCache();const normalUrl=ctx.TERRAIN_TILE_URL;
+  ctx.TERRAIN_TILE_URL=()=>{requests++;return '/we3d-delayed-terrain.png';};
+  const started=performance.now(),abort=new AbortController();
+  const patient=waitForTerrainTileReadyAtZoom(15,center.x,center.y,8000);
+  const departing=waitForTerrainTileReadyAtZoom(15,center.x,center.y,8000,{}, {signal:abort.signal});
+  const short=waitForTerrainTileReadyAtZoom(15,center.x,center.y,50);
+  const tile=getOrLoadTerrainTile(15,center.x,center.y);
+  abort.abort();assert(await departing===false,'Cancelled consumer did not settle');
+  assert(await short===false,'Short consumer did not expire');
+  assert(tile.loading&&!tile.failed&&!tile.evicted,'A consumer cancelled the shared image');
+  assert(await patient===true&&tile.loaded,'Patient consumer lost the slow image');
+  assert(tile.attempts===1,'Slow source consumed retries without an owner failure');
+  history.push({stage:'shared-deadline-and-abort',elapsedMs:Math.round(performance.now()-started),attempts:tile.attempts});
+  ctx.TERRAIN_TILE_URL=normalUrl;clearTerrainTileCache();await load();
+ }
  draw();window.fixtureReady=true;
  document.addEventListener('keydown',event=>{if(event.key==='ArrowLeft'||event.key==='ArrowRight')operation=operation.then(()=>event.key==='ArrowLeft'?load():retire()).then(draw).catch(error=>{window.fixtureError=String(error.stack||error);throw error;});});
  window.advanceTime=async()=>{await operation;draw();};

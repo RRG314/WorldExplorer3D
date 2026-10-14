@@ -140,3 +140,43 @@ test('successful decode retires its deadline and cannot fail after publication',
     assert.equal(tile.loaded,true);assert.equal(tile.failed,false);assert.equal(terrainTileCacheSnapshot().failures,failures);
   }finally{clearTerrainTileCache();if(priorDocument===undefined)delete globalThis.document;else globalThis.document=priorDocument;}
 });
+
+test('a short terrain consumer deadline cannot cancel the source needed by another consumer',async t=>{
+  setup();t.after(()=>clearTerrainTileCache());
+  const tile=getOrLoadTerrainTile(15,9466,12518),image=tile.img;
+  const failures=terrainTileCacheSnapshot().failures;
+  const patient=waitForTerrainTileReadyAtZoom(15,9466,12518,1000);
+  const impatient=waitForTerrainTileReadyAtZoom(15,9466,12518,20);
+  assert.equal(await impatient,false);
+  assert.equal(tile.loading,true,'A waiter deadline must leave the shared source running');
+  assert.equal(tile.img,image);assert.equal(tile.attempts,1);
+  assert.equal(terrainTileCacheSnapshot().failures,failures);
+  tile.loaded=true;tile.loading=false;tile.resolveReady(true);tile.resolveReady=null;
+  assert.equal(await patient,true);
+});
+
+test('aborting one regional consumer leaves another consumer of the same terrain source intact',async t=>{
+  setup();t.after(()=>clearTerrainTileCache());
+  const controller=new AbortController();
+  const patient=waitForTerrainTileReadyAtZoom(15,9466,12518,1000);
+  const departing=waitForTerrainTileReadyAtZoom(15,9466,12518,1000,{}, {signal:controller.signal});
+  const tile=ctx.terrainTileCache.get('15/9466/12518');
+  controller.abort();assert.equal(await departing,false);
+  assert.equal(tile.loading,true,'Consumer cancellation must not evict a shared source');
+  assert.equal(tile.evicted,false);assert.equal(ctx.terrainTileCache.get(tile.key),tile);
+  tile.loaded=true;tile.loading=false;tile.resolveReady(true);tile.resolveReady=null;
+  assert.equal(await patient,true);
+});
+
+test('actual source failures still share the original three-attempt retry ceiling',async t=>{
+  setup();t.after(()=>clearTerrainTileCache());
+  const wait=waitForTerrainTileReadyAtZoom(15,9466,12518,1000);
+  const tile=ctx.terrainTileCache.get('15/9466/12518');
+  for(let attempt=1;attempt<=3;attempt++){
+    assert.equal(tile.attempts,attempt);assert.equal(tile.loading,true);
+    tile.img.onerror();tile.nextRetryAt=0;
+    if(attempt<3)await new Promise(resolve=>setTimeout(resolve,10));
+  }
+  assert.equal(await wait,false);assert.equal(tile.failed,true);assert.equal(tile.attempts,3);
+  assert.equal(images.length,3);assert.equal(tile.attemptTimer,null);
+});

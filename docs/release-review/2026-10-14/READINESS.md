@@ -6,7 +6,26 @@ this release. Moving scenery is optional and must not be represented as complete
 worldwide road, collision or activity streaming. Preserve the ongoing 5.6 venue,
 harbor, NASA, ocean and consolidation work; do not roll it back to the hotfix.
 
-## Latest status — October 14, 22:08 UTC
+## Latest status — October 14, 22:34 UTC
+
+The a9e15 source chain passes all 2,625 tests and GitHub code/secret checks.
+Its backend environmental check now passes with explicit partial availability;
+shared marine and place authority also pass. The full backend is blocked by an
+actual Logan terrain-publication failure in multiplayer, not room authority.
+The a9e15 candidate passes aquarium/harbor, museum, Kennedy and launch-pad
+journeys. The matrix was deliberately interrupted during road traversal before
+changing terrain ownership; remaining gates are unrun for this artifact.
+
+Two focused regressions reproduce a short terrain consumer cancelling another
+consumer's shared image, both through timeout and AbortSignal. The local repair
+makes these subscriptions independent: only the cache owns source cancellation,
+its existing 10-second deadline, three retries, and world-generation teardown.
+No terrain accuracy, road geometry, source coverage or reload policy is relaxed.
+A real Chrome fixture decodes a source delayed over three seconds on its first
+attempt while a short waiter expires and another cancels. Current complete
+world/backend acceptance and final production preparation remain pending.
+
+## Earlier iteration — October 14, 22:08 UTC
 
 Canonical staging serves `5.6.1+1f37e893ccae.3e39c25a98b5a66f.staging` and both
 remote manifests match local bytes. Its current prescribed junction and full

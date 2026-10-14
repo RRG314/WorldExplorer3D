@@ -59,9 +59,8 @@ function createLocationTerrainApi(deps = {}) {
           if (request.requiresSourceTile) {
             let tile=getOrLoadTerrainTile?.(request.z,request.tx,request.ty,terrainTileDeps);
             if(!tile?.loaded){
-              // Other consumers can time out the shared first image attempt.
-              // Publication must use the tile owner's bounded recovery too,
-              // rather than permanently rejecting an otherwise recoverable tile.
+              // Publication observes the shared tile owner's bounded retries.
+              // Its own deadline never cancels a source another consumer needs.
               if(typeof waitForTerrainTileReadyAtZoom==='function'){
                 await waitForTerrainTileReadyAtZoom(request.z,request.tx,request.ty,10000,terrainTileDeps);
                 if(request.generation!==publicationGeneration)return;
