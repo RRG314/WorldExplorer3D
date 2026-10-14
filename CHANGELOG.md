@@ -2,7 +2,13 @@
 
 Notable user-facing changes are recorded here. Git history and GitHub releases contain the complete change record.
 
-## [5.5.0] - Unreleased
+## [5.5.1] - 2026-10-14
+
+- Fixed distant road loading incorrectly rejecting an existing engineered approach.
+- Road-loading recovery now keeps the current world and player progress in place.
+- Restored location-based Earth as the default, preserving explicit scenery preferences.
+
+## [5.5.0] - 2026-10-08
 
 - Updated image-processing and backend proxy dependencies for current security fixes.
 

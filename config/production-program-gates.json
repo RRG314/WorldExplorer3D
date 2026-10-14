@@ -1,7 +1,7 @@
 {
   "schemaVersion": 5,
   "programId": "world-explorer-5.5-release-2026-10-07",
-  "targetVersion": "5.5.0",
+  "targetVersion": "5.5.1",
   "productionBaseline": {
     "version": "5.4.0",
     "releaseCommit": "1532bdfbb5c11e002d278b058d1ebdba88384f60"

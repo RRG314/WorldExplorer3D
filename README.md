@@ -1,6 +1,6 @@
 # World Explorer 3D
 
-[5.5 release notes](RELEASE_NOTES_5.5.0.md) · [Known limitations](KNOWN_ISSUES.md) · [Roadmap](ROADMAP.md)
+[5.5.1 release notes](RELEASE_NOTES_5.5.1.md) · [Known limitations](KNOWN_ISSUES.md) · [Roadmap](ROADMAP.md)
 
 [![Code and package checks](https://github.com/RRG314/WorldExplorer3D/actions/workflows/runtime-verify.yml/badge.svg?branch=stable)](https://github.com/RRG314/WorldExplorer3D/actions/workflows/runtime-verify.yml)
 [![Secret Scan](https://github.com/RRG314/WorldExplorer3D/actions/workflows/secret-scan.yml/badge.svg?branch=stable)](https://github.com/RRG314/WorldExplorer3D/actions/workflows/secret-scan.yml)
@@ -23,7 +23,7 @@ game. Dense-city pauses, uneven art quality and bounded world size remain
 <p align="center">
   <a href="https://worldexplorer3d.io/app/"><strong>Play World Explorer 3D</strong></a>
   · <a href="CONTROLS_REFERENCE.md">Controls</a>
-  · <a href="RELEASE_NOTES_5.5.0.md">5.5 release notes</a>
+  · <a href="RELEASE_NOTES_5.5.1.md">5.5.1 release notes</a>
   · <a href="ROADMAP.md">Roadmap</a>
 </p>
 
