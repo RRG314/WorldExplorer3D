@@ -12,6 +12,7 @@ import {attachAquarium,disposeAquarium,updateAquarium,aquariumSwimPose,aquariumO
 import {buildAuthoredInterior} from '../app/js/interiors/authored-geometry.js';
 import {compileEntranceCatalog} from '../app/js/living-world/entrance-catalog.js';
 import {createAquariumWater,aquariumTransmittance,aquariumWaterPath} from '../app/js/interiors/aquarium-water.js';
+import {habitatPopulation,habitatSwimPose,aquariumHabitatQuality} from '../app/js/interiors/aquarium-habitat.js';
 const frame=earthCoordinateFrame({lat:39.28551,lon:-76.6086},100000),geo=(lat,lon)=>frame.toWorld(lat,lon),plan=()=>createAquariumLayout(geo,1.11);
 function support(){const p=geo(GEO.entrance.lat,GEO.entrance.lon);return {enterable:true,key:GEO.sourceId,exteriorEntrance:{x:p.x-.75*5.5,z:p.z-.66*5.5},building:{sourceBuildingId:GEO.sourceId,buildingPartKind:'full',bodyHeightMeters:9,pts:GEO.component.map(p=>geo(p.lat,p.lon))}};}
 const ctxGeo={geoToWorld:geo,METERS_PER_WORLD_UNIT:1.11};
@@ -97,6 +98,32 @@ test('habitat uses independent leases, simulation time, journal identity, and re
 test('late models cannot attach after exit, and network failure remains retryable',async()=>{
  const {ctx,active}=runtime();let resolve;const waiting=attachAquarium(ctx,T,active,{load:()=>new Promise(r=>{resolve=r;})});disposeAquarium(ctx,active);ctx.activeInterior=null;const late=instance();resolve(late);await waiting;assert.equal(late.disposed,1);assert.equal(active.group.children.length,0);
  const next=runtime();let failed=true;await attachAquarium(next.ctx,T,next.active,{load:async()=>{if(failed)throw Error('offline');return instance();}});assert.equal(next.active.aquarium.error,true);failed=false;await next.active.aquarium.load();assert.equal(next.active.aquarium.error,false);assert.equal(next.active.aquarium.animals.length,4);disposeAquarium(next.ctx,next.active);
+});
+test('habitat records reuse motion with a different coordinate frame and retain species provenance',()=>{
+ const h=structuredClone(AQUARIUM_CONTENT.habitat),members=habitatPopulation(h),p=plan();
+ assert.equal(members.length,4);assert.equal(members[3].species.scientificName,'Chelonia mydas');
+ const translated={...p,local:(u,v)=>{const q=p.local(u,v);return{x:q.x+100,z:q.z-80};}};
+ for(const member of members){const a=habitatSwimPose(p,member,21),b=habitatSwimPose(translated,member,21);assert.ok(Math.abs(b.x-a.x-100)<1e-8);assert.ok(Math.abs(b.z-a.z+80)<1e-8);assert.ok(Math.abs(b.yaw-a.yaw)<1e-8);}
+ const before=habitatSwimPose(p,members[0],21);h.species[0].route.u+=12;assert.notEqual(habitatSwimPose(p,habitatPopulation(h)[0],21).x,before.x);
+ assert.equal(AQUARIUM_CONTENT.habitat.species[0].route.u,-39);
+ h.species[0].population=33;assert.throws(()=>habitatPopulation(h),/bounds/);
+ h.species[0].population=3;h.species[0].route.radiusVStep=NaN;assert.throws(()=>habitatPopulation(h),/finite/);
+});
+test('viewing-floor changes reuse one population and low quality keeps educational species',async()=>{
+ const {ctx,active}=runtime(),leases=[];ctx.renderQualityLevel='low';await attachAquarium(ctx,T,active,{load:async()=>{const i=instance();leases.push(i);return i;}});
+ assert.equal(active.aquarium.furnishings.length,9);assert.equal(active.aquarium.animals.length,4);
+ assert.equal(active.aquarium.water.mesh.getRenderTargets()[0].width,256);assert.equal(aquariumHabitatQuality('high').waterTargetSize,768);
+ const s=active.aquarium;active.activeLevel=0;updateAquarium(active,.1);assert.equal(s.clock,0);
+ for(const level of [1,2,1,2]){active.activeLevel=level;updateAquarium(active,.1);assert.equal(active.aquarium,s);assert.equal(leases.length,13);}
+ assert.ok(s.clock>0);ctx.paused=true;const clock=s.clock;updateAquarium(active,.1);assert.equal(s.clock,clock);
+ const event=await s.save('turtle-observation');assert.equal(event.metadata.habitatId,'blacktip-reef');assert.equal(event.metadata.floorId,'reef-m');assert.equal(event.metadata.reconstructionConfidence,'INFERRED');assert.equal(event.projections.fieldGuide,false);
+ disposeAquarium(ctx,active);assert.ok(leases.every(i=>i.disposed===1));
+});
+test('malformed animal animation releases its lease before a successful retry',async()=>{
+ const {ctx,active}=runtime(),bad=instance();bad.animations=[];let fail=true;
+ await attachAquarium(ctx,T,active,{load:async()=>fail?bad:instance()});
+ assert.equal(bad.disposed,1);assert.equal(bad.root.parent,null);assert.equal(active.aquarium.animals.length,0);assert.equal(active.aquarium.error,true);
+ fail=false;await active.aquarium.load();assert.equal(active.aquarium.animals.length,4);assert.equal(active.aquarium.error,false);disposeAquarium(ctx,active);assert.equal(bad.disposed,1);
 });
 test('bundled animal bytes retain attribution, animation and reviewed budget records',async()=>{
  const manifest=JSON.parse(await readFile('app/assets/models/interiors/aquarium/PROVENANCE.json','utf8'));

@@ -1,7 +1,39 @@
 # Aquarium integration design
 
-October 12, 2026. Design pending implementation/verification unless explicitly
+Updated October 13, 2026. Design pending implementation/verification unless explicitly
 marked otherwise in VERIFICATION.md. Extend existing owners; no separate app.
+
+## Current implemented boundary
+
+The shell/void, three floors, two lifts, contained water, habitat leases,
+three study interactions and native map already existed. This continuation adds
+a declarative `AQUARIUM_CONTENT.habitat` and pure `aquarium-habitat.js` functions
+to the same runtime. A new institution can author a different route, species
+record and coordinate frame without copying the swimming loop. Translation-aware
+heading calculation works when its `local` transform includes an origin.
+Model IDs still resolve through the existing shared asset catalog.
+
+One current habitat spans two viewing floors. Its existing interior instance owns
+one population and clock; floor switches do not reload animals. Simulation runs
+only on declared viewing floors, stops on game pause, clamps large deltas and
+retires through `disposeAquarium`. Low quality uses nine decorative corals and
+256-pixel water targets; default uses 18 and 512; high uses 18 and 768. Both
+documented species remain at every tier. Missing animations are rejected and
+their leases released before publication/retry. Stale loads retain the existing
+abort/current-world fence. No ocean mode, fishing population or new save owner
+is introduced.
+
+This is reusable configuration for **one active tank per admitted visit**.
+Multiple simultaneously active habitat volumes, demand eviction across a large
+campus, and room-level streaming of many tanks are still design work below.
+The bounded reef loads lazily on aquarium admission using local cached assets;
+the public shell and exits remain independent of animal success. Do not advertise
+a complete generic multi-tank streaming engine based on this one section.
+
+Geographic admission, wall/collision compilation, lift authority, camera,
+standard input, UI/pause, source licensing and Journal remain in their existing
+owners. `aquariumSwimPose` is retained as a compatibility adapter for existing
+verification callers; runtime motion uses the admitted record directly.
 
 ## Representation and circulation
 
