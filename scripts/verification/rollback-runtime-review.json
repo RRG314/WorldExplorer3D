@@ -66,6 +66,27 @@
       "after": "b46fd6b7f752988f6d464274cbd81dc77cba5c8860e01d5a9962f28fbee9b626",
       "afterMode": "100644",
       "review": "Documented acceptance-policy revision: desktop average floor30FPS replaces the dated43.65 snapshot, consistent with the owner priority. All frame-time/hitch, coverage, memory and rendering budgets unchanged. Verification configuration only, no runtime/save/backend change."
+    },
+    "app/js/terrain/tile-request-lifecycle.js": {
+      "before": "ad3da0c0f172eaf34dd56a339911a516602c20c2b6bd23b9db005d30d92493d7",
+      "beforeMode": "100644",
+      "after": "93bb4b6cd25f44a6163e888716acdab5f0c4c25ec6f323b53c14780bd6927b93",
+      "afterMode": "100644",
+      "review": "Consumer deadlines and AbortSignals retire only their own subscriptions. The existing cache owner retains actual source timeout, retry, eviction and world teardown. Transient loading behavior only; no saved fields or network protocol changes."
+    },
+    "app/js/terrain/tiles.js": {
+      "before": "567d42a9997b1681fad060417b00cfbcc8b066f8365de4607c65830f2405a9f5",
+      "beforeMode": "100644",
+      "after": "59c33ce05b40984286ea861bccce4ad20af004e2cde78ec97c08555e326ba37d",
+      "afterMode": "100644",
+      "review": "Uses the subscription-only waiter and removes the conflicting 2.4-second consumer failure authority. Actual source deadline, three-attempt retry ceiling, cache limit and generation teardown stay unchanged. No saved data."
+    },
+    "app/js/terrain/location-world.js": {
+      "before": "531157368dc359dc05eed0fb5035cc7bc1e57627b680c77caef041229a216386",
+      "beforeMode": "100644",
+      "after": "8d61f6ea57bd069aca2f6138b52116b1711ee86ee52ce1a80ae9ac21fecf4b4e",
+      "afterMode": "100644",
+      "review": "Comment clarifies the shared terrain owner; publication order and ten-second wait are unchanged. No persisted data or geometry change."
     }
   }
 }

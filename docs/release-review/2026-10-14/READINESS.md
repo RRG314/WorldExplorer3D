@@ -313,3 +313,23 @@ Evidence: output/release-review/561-33d5-performance, 561-33d5-connected,
 561-33d5-resource-lifecycle, 561-33d5-flight-trace and collision-allocation-*.json.
 The connected archive separates older leftover failure files from this run's
 passing stdout report and current numbered screenshots.
+
+
+## Shared terrain ownership and current release candidate
+
+Candidate 3a43e124 passes all 2,628 source checks and the structural chain. Its
+immutable 753-file package builds and verifies. The actual Logan multiplayer
+journey passes eleven checks, including two loaded worlds, presence, shared
+artifact and vehicle handoff; its screenshot was inspected. Consumer timeout and
+abort now release only their subscriptions, preserving the source owner's bounded
+retry, deadline and teardown. The delayed real-image fixture passes first-attempt
+decoding, independent consumer cancellation and exit/reload.
+
+The cache-ownership experiment still failed native pacing (350 ms worst flight
+interval) and was removed; its patch and failed evidence remain available. An
+earlier instrumented trace's largest weak-processing event occurred after the
+window during profiler shutdown. It must not be cited as an active-play pause.
+Active-play major-collection pauses remain real; a GC-event-only capture separates
+those from CPU/allocation-profiler overhead. Complete matching backend/candidate,
+four-stage saves, ordinary hosted voyage/save and frame pacing remain open.
+Production and stable have not been promoted.

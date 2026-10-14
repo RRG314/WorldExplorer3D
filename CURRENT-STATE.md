@@ -50,20 +50,20 @@ and integration evidence is recorded in `docs/road-continuity/EVIDENCE.md`.
 
 ## Current complete candidate — October 14
 
-The b21 road-repaired candidate passes native Monaco assembly and Baltimore
-keyboard junction driving and is preserved as the modern-save fallback. The b965
-pavement scheduler removed the reproduced long path-builder blocks but still
-failed desktop timing. Current refinements divide nearby-capture index work
-across frames and cull smaller regional instance cells without removing buildings.
-The collision allocation fix is pushed to both active branches. Building attributes
-now share backing storage with unchanged values; all 2,625 source checks pass.
-Native performance and complete final acceptance remain open. The production
-rollback package and released 5.5.1 save-test package are verified; no 5.6 candidate
-is deployed to production.
-Canonical staging now serves exact 1f37 at https://we3d-staging-20260712.web.app/app/.
-Its live private-layout/photo/purchase persistence check passed with owned test
-records removed. See docs/RELEASE_SOURCE_OF_TRUTH.md and the October 14 READINESS
-ledger for current identities and the remaining finite release sequence.
+The complete local candidate is 3a43e124: all 2,628 source checks and the
+structural chain pass. A terrain consumer's short deadline previously cancelled
+a shared download needed by other consumers. Subscription and source lifetimes
+are now separate; the real delayed-image case and two-player Logan world pass.
+The reviewed b21 package remains the modern-save fallback.
+
+The current package is `output/hosting-validation/release-561-3a43e124`, build
+`5.6.1+3a43e124ba0b.9b9a6c894c5ac5c7.staging`. Canonical staging still serves
+1f37 at https://we3d-staging-20260712.web.app/app/. Neither this package nor 5.6
+is deployed to production. Native frame pauses, complete matching acceptance,
+ordinary hosted voyage/save and the four-stage save roundtrip remain open.
+The small cache-ownership experiment was rejected after its native flight still
+failed pacing; its patch and evidence are retained without changing runtime.
+See docs/RELEASE_SOURCE_OF_TRUTH.md and the October 14 READINESS ledger.
 
 ## Previous 5.5.0 release evidence
 
