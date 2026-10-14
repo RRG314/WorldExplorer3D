@@ -38,6 +38,13 @@
       "after": "55bcbd46ff0561cc6aa70f6f574fecd5456fc9818f1c8e0a2182e885589a3d29",
       "afterMode": "100644",
       "review": "Evidence-backed named Baltimore collider baseline for authored quay/venue fixtures and repaired approaches. No runtime or save protocol change; timing, coverage and retention gates remain unchanged."
+    },
+    "app/js/physics/building-collision.js": {
+      "before": "d8df3b726b6833c605a20844dd4236b6ce9ff55d9cc2f82dfdab69fb83342c26",
+      "beforeMode": "100644",
+      "after": "210410711781a98f42fc57d20c49a18a98088bb8e2a2e003123f712686641b70",
+      "afterMode": "100644",
+      "review": "Identical horizontal and vertical predicates, candidate order and collision responses. Rejects geographically distant colliders before evaluating vertical properties, reducing measured temporary allocation. No collision data, geometry, persistence or backend protocol changes."
     }
   }
 }

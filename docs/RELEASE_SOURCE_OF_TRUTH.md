@@ -37,8 +37,11 @@ matrix or its performance, hosted-account and save-compatibility requirements.
 The subsequent pavement-scheduling build removed the reproduced long path-builder
 blocks but still failed sustained desktop timing. It was not promoted. The next
 refinement divides nearby-capture index work across frames and culls smaller
-regional instance cells without dropping buildings. All 2,623 source checks pass;
-its native timing, resource and complete final matrix remain required.
+regional instance cells without dropping buildings. The 33d5 package passes native resource/lifecycle and connected tutorial checks.
+Its complete twelve-cycle performance run passes cleanup and touch emulation,
+but still fails desktop frame-rate/hitch limits. A new, narrowly scoped collision
+allocation repair passes all 2,624 source checks; rebuilt native and final complete
+acceptance remain required.
 
 All three 376 backend gates passed. Six changed Functions were deployed only to
 staging with existing configuration preserved. Live staging purchases, private

@@ -228,3 +228,30 @@ with multiple FPS/hitch failures; teardown was interrupted after two logged
 cycles once the remaining synchronous capture-index stall was isolated. It is
 not a passing retention receipt. Its output/interruption record is retained at
 output/release-review/561-b965-performance.
+
+### Complete 33d5 measurements and collision allocation repair — 20:25 UTC
+
+The 33d5 package passes actual Earth/space/ocean resource checks, land–ocean–land
+coverage/pose restoration and three submarine/deck round trips. The registered
+connected tutorial gate passes with readable location labels and no browser or
+local-resource errors. The full desktop performance run completed all seven
+sustained windows and twelve teardown/reload cycles; all retention, coverage,
+transfer and error checks pass, as does its touch-emulation profile. Desktop
+frame-rate and active-play hitch budgets fail, including a 550 ms flight frame.
+No timing target or memory/coverage ceiling was changed.
+
+A separate instrumented flight reproduced major collection during the pause:
+heap fell from 1.49 GB to 616 MB, with array-buffer sweeping prominent. Allocation
+sampling attributed about 1.1 GiB of temporary storage to collision queries in
+90 seconds. A controlled 40,000-query airborne probe reproduced about 268 MB
+allocated without any collision hits. Reordering the same horizontal and vertical
+predicates rejects distant obstacles before their height evaluation; the same
+probe uses about 14 MB. Candidate order, actual near collisions, dynamic updates
+and height rules remain unchanged. Loop and interval-object experiments did not
+help and were removed. All 33 focused checks and 2,624 complete source checks pass.
+Native rebuilt flight and complete final acceptance remain required.
+
+Evidence: output/release-review/561-33d5-performance, 561-33d5-connected,
+561-33d5-resource-lifecycle, 561-33d5-flight-trace and collision-allocation-*.json.
+The connected archive separates older leftover failure files from this run's
+passing stdout report and current numbered screenshots.

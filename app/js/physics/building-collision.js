@@ -55,9 +55,12 @@ function createBuildingCollisionQuery(appCtx) {
     for (let i = 0; i < buffer.count; i += 1) {
       const building = candidates[i];
       if (!building || building.collisionDisabled || building.collisionReplacedByVenue) continue;
-      if (!buildingVerticalRangeOverlap(building, actorBaseY, actorHeight)) continue;
+      // Reject distant records before reading their vertical profile. A swept
+      // aircraft tests this query repeatedly; evaluating every authored quay
+      // and venue height here creates substantial transient numeric storage.
       if (x < building.minX - carRadius || x > building.maxX + carRadius ||
         z < building.minZ - carRadius || z > building.maxZ + carRadius) continue;
+      if (!buildingVerticalRangeOverlap(building, actorBaseY, actorHeight)) continue;
 
       const hasPolygon = Array.isArray(building.pts) && building.pts.length >= 3;
       const isInside = hasPolygon
