@@ -268,3 +268,19 @@ selection, preserving their footprint, admission, authored detail and all ordina
 neighboring building candidates. The browser receipt explicitly checks that the
 venue has no overlapping generic mapped sign. This is a cosmetic ownership fix;
 no terrain, vessel, doorway collision or NASA activity logic changed.
+
+
+`995665b4/museum` correctly fails the new duplicate-sign assertion. The detail
+cache retained the Overture ID but omitted the stable metadata mapping used to
+recognize the Peale's OSM identity. The correction now resolves the reviewed
+venue while the complete source metadata exists and stores only that small
+classification in the travelling cache. `facade-owner-source` passes distant
+walking, entry and exit with zero duplicate generic venue signs; the doorway image
+was inspected and shows the one authored nameplate. No name-based matching or
+neighbor deletion was introduced.
+
+This run also captures the delayed local PBR resources: image responses can take
+about 13 seconds, exceeding the existing four-second procedural fallback. This
+helps explain why material fidelity differs between otherwise passing runs.
+Material-loading/late-upgrade polish remains an explicit limitation; this follow-up
+does not claim to have resolved the entire graphics loading pipeline.

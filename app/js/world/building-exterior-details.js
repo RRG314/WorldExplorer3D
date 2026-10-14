@@ -376,7 +376,7 @@ export function selectExteriorDetailSources(sources, {focus, districtFocus, radi
     );
     // Reviewed architecture already owns its trim, doorway and nameplate.
     // Generic decoration must not draw a second facade/sign over that work.
-    if (distance <= radius && !reviewedVenueForBuilding(mesh.userData)) candidates.push({mesh, distance});
+    if (distance <= radius && !mesh.reviewedVenue && !reviewedVenueForBuilding(mesh.userData)) candidates.push({mesh, distance});
   }
   candidates.sort((a,b)=>a.distance-b.distance||String(a.mesh.userData.sourceBuildingId).localeCompare(String(b.mesh.userData.sourceBuildingId)));
   if (candidates.length > limit) candidates.length = limit;
@@ -547,7 +547,7 @@ export function publishBuildingExteriorDetails(appCtx,options={}){
   clearBuildingExteriorDetails(appCtx);
   // Keep lightweight records before the base buildings are merged. No mesh,
   // geometry or material is retained by the travelling detail cache.
-  const sources=(appCtx.buildingMeshes||[]).filter(m=>['near','mid'].includes(m.userData?.lodTier)&&m.material?.userData?.buildingExterior&&m.userData.exteriorProfile&&!m.userData.isRoofDetail).map(m=>({position:{y:m.position.y},detailCenter:footprintCenter(m.userData.buildingFootprint),userData:Object.fromEntries(['buildingName','buildingFootprint','exteriorProfile','sourceBuildingId','bodyHeightMeters','heightMeters','buildingSeed','levels','buildingSemantics','terrainFoundationRise'].map(k=>[k,m.userData[k]]))}));
+  const sources=(appCtx.buildingMeshes||[]).filter(m=>['near','mid'].includes(m.userData?.lodTier)&&m.material?.userData?.buildingExterior&&m.userData.exteriorProfile&&!m.userData.isRoofDetail).map(m=>({reviewedVenue:reviewedVenueForBuilding(m.userData),position:{y:m.position.y},detailCenter:footprintCenter(m.userData.buildingFootprint),userData:Object.fromEntries(['buildingName','buildingFootprint','exteriorProfile','sourceBuildingId','bodyHeightMeters','heightMeters','buildingSeed','levels','buildingSemantics','terrainFoundationRise'].map(k=>[k,m.userData[k]]))}));
   const state={sources,focus:{x:0,z:0},sequence:appCtx._worldLoadSequence,pending:null};detailStates.set(appCtx,state);
   const job=buildDetails(appCtx,{...options,sources});let result;do{result=job.next();}while(!result.done);return result.value;
 }
