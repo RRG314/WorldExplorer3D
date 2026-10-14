@@ -21,7 +21,7 @@ export function prepareTransportDetailPlan({roads,focus={x:0,z:0},radius,maxText
   return {tiles,keys,layout,masks,plan};
 }
 
-export function createTransportDetailCompiler({roads,terrain,focus={x:0,z:0},radius,maxTextureSize=4096,includeOverview=true,heightProbes=[],preparedPlan=null}) {
+export function createTransportDetailCompiler({roads,terrain,focus={x:0,z:0},radius,maxTextureSize=4096,includeOverview=true,heightProbes=[],preparedPlan=null,deferInitial=false}) {
   const restored=restoreTransportTerrain(terrain);
   const heightParity={samples:heightProbes.length,maximumDifference:0};
   for(const point of heightProbes){
@@ -46,7 +46,7 @@ export function createTransportDetailCompiler({roads,terrain,focus={x:0,z:0},rad
       roadIndices:[...new Set(region.tiles.flatMap(tile=>[...tile.segments,...tile.joins].map(item=>item.road.auditIndex)))],
       batches:builder.batches.map(batch=>({positions:Float32Array.from(batch.verts),indices:Uint32Array.from(batch.indices)}))};
   }
-  const initial=plan.initial.map(compile);
+  const initial=deferInitial?[]:plan.initial.map(compile);
   return {
     initial:{keys,layout,masks,heightParity,regions:initial,pending:plan.pending.map(({key,bounds})=>({key,bounds})),totalCells:tiles.length},
     compile(key){
