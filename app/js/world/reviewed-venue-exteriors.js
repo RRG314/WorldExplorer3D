@@ -10,6 +10,7 @@ import {replaceVenueCollision,venueComponentCollider} from './venue-collision.js
 const inside=(p,ring)=>{let hit=false;for(let i=0,j=ring.length-1;i<ring.length;j=i++){
  const a=ring[i],b=ring[j];if((a.z>p.z)!==(b.z>p.z)&&p.x<(b.x-a.x)*(p.z-a.z)/(b.z-a.z)+a.x)hit=!hit;
 }return hit;};
+const onBoundary=(p,ring)=>ring.some((a,i)=>{const b=ring[(i+1)%ring.length],dx=b.x-a.x,dz=b.z-a.z,t=Math.max(0,Math.min(1,((p.x-a.x)*dx+(p.z-a.z)*dz)/(dx*dx+dz*dz||1)));return Math.hypot(p.x-a.x-t*dx,p.z-a.z-t*dz)<.02;});
 const center=pts=>pts.reduce((p,v)=>({x:p.x+v.x/pts.length,z:p.z+v.z/pts.length}),{x:0,z:0});
 function material(THREE,color,roughness=.8,metalness=0){const m=new THREE.MeshStandardMaterial({color,roughness,metalness,side:THREE.DoubleSide});m.color.convertSRGBToLinear();return m;}
 function box(THREE,root,mat,w,h,d,x,y,z){const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat);m.position.set(x,y,z);m.castShadow=true;m.receiveShadow=true;root.add(m);return m;}
@@ -62,7 +63,7 @@ function glassWall(THREE,root,glass,frame,a,b,topA,topB,base=0){
 function aquarium(THREE,ctx,baseY,door){
  const root=new THREE.Group();root.name='National Aquarium — mapped Pier 3 architecture';root.position.y=baseY;
  root.userData={sourceBuildingId:AQUARIUM_GEOGRAPHY.sourceId,reviewedVenueExterior:true,sourceClaim:'OSM outlines and mapped heights; public-photo facade interpretation'};
- const concrete=material(THREE,0xaaa99e,.9),frame=material(THREE,0x829799,.38,.45),glass=material(THREE,0x427984,.2,.45),blue=material(THREE,0x144b69,.55,.15);
+ const concrete=material(THREE,0xd6d5ce,.9),frame=material(THREE,0x829799,.38,.45),glass=material(THREE,0x427984,.2,.45),blue=material(THREE,0x144b69,.55,.15);
  const parts=new Map(AQUARIUM_EXTERIOR_PARTS.map(p=>[p.id,{...p,pts:p.points.slice(0,-1).map(p=>ctx.geoToWorld(p.lat,p.lon))}]));
  const pavilion=parts.get('1061954708'),main=parts.get('178328374');
  const shell=createBuildingBodyGeometry(THREE,main.pts,18);
@@ -70,7 +71,9 @@ function aquarium(THREE,ctx,baseY,door){
  // both would reproduce the covered-door conflict at the architectural level.
  const p=shell.attributes.position,kept=[];
  for(let i=0;i<p.count;i+=3){let y=0,x=0,z=0;for(let j=0;j<3;j++){x+=p.getX(i+j)/3;y+=p.getY(i+j)/3;z+=p.getZ(i+j)/3;}
-  if(y>0&&y<18&&inside({x,z},pavilion.pts))continue;
+  // Shared perimeter faces are part of the replacement too. A strict polygon
+  // interior test leaves coplanar concrete over the lower glass pavilion.
+  if(y>0&&y<18&&(inside({x,z},pavilion.pts)||onBoundary({x,z},pavilion.pts)))continue;
   for(let j=0;j<3;j++)kept.push(p.getX(i+j),p.getY(i+j),p.getZ(i+j));
  }
  shell.dispose();const body=new THREE.BufferGeometry();body.setAttribute('position',new THREE.Float32BufferAttribute(kept,3));body.computeVertexNormals();const bodyMesh=new THREE.Mesh(body,concrete);bodyMesh.castShadow=bodyMesh.receiveShadow=true;root.add(bodyMesh);

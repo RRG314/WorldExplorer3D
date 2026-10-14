@@ -141,3 +141,16 @@ excessive dark albedo tint and improves indirect light. Its five component tests
 and native Chrome `kennedy-lighting-final` full tour pass; entry-floor and crawler
 screenshots were inspected. This was a visible arrival problem, not a changed
 test threshold. Final immutable package journeys remain to be recorded below.
+
+The second package, `venue-harbor-kennedy-final-20261013`, fixes the overland water:
+`final-aquarium-harbor` passes normal admission, quay contact/reverse, hidden local
+patch and 124 compiled mapped-wave surfaces. The quay remains dry in its inspected
+image. `final-museum` passes distant-district Peale admission/return with zero page
+errors or failed local assets. The photo comparison nevertheless exposed coplanar
+concrete over two lower aquarium pavilion faces. A raycast reproduced concrete
+and glass at the same depth: the strict polygon test excluded shared boundaries.
+The replacement now includes perimeter points within 0.02 world
+units. Raycasts across all six pavilion edges require glazing without concrete;
+five focused exterior/admission tests pass. Concrete tint is also lighter to
+avoid darkening an already weathered diffuse map twice. This keeps the same
+footprint, collision owner, entrance and neighboring coverage.
