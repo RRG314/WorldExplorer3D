@@ -90,6 +90,9 @@ published versions.
 - Dense cities, rapid aerial travel, detailed facades and large structure
   networks can be demanding on browser and graphics memory. Areas left behind
   are unloaded, but total memory use still varies by browser and device.
+- Temporary JavaScript allocation can exceed 1 GB before the browser collects
+  unused data. Retained-data checks are separate from peak browser and graphics
+  memory; they do not establish low-memory phone support.
 - Quality settings control rendering cost and effects. They do not rewrite
   mapped building height or replace the selected world with a lower-detail data
   source.
@@ -116,8 +119,8 @@ published versions.
 - The National Aquarium visit covers a limited Pavilion and Blacktip Reef route,
   with upper and lower viewing areas. Other exhibitions and upper programmes
   are not included. Layout details without published dimensions are estimated;
-  the exterior is still a mapped building rather than a custom architectural
-  replica. Habitat density and surrounding views need further art refinement.
+  exterior forms combine mapped footprints with reconstructed features rather
+  than surveyed dimensions. Habitat density and surrounding views need further art refinement.
 
 - The first museum gallery interprets The Peale's front ground floor using its
   public room guide. Dimensions and finishes are estimated; rear and upper

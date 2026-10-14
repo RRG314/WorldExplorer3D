@@ -110,9 +110,42 @@ collection turns the packaged raw-heap failure into a pass. No memory budget
 has been increased, and no forced collection was used in these timing runs.
 Diagnostic evidence: `output/release-review/561-aquarium-allocation-profile/`.
 
-The complete 107-gate candidate matrix is now running sequentially against
-the saved 258988d8 package. Individual results are not a complete release
+The complete 107-gate candidate matrix was interrupted after nine completed
+gates against the saved 258988d8 package; city switching was interrupted. Individual results are not a complete release
 approval. Backend, save/fallback round-trip and ordinary hosted acceptance
 must still match the final candidate. A read-only production Functions
 inventory confirms active Node.js 22 functions; that inventory does not prove
 the four changed backend files have been deployed or tested live.
+
+
+## Separated timing and retention review
+
+The 258988d8 matrix passed the four venue/harbor/Kennedy arrivals and both road
+gates. Aquarium and museum raw-heap checks failed; museum also recorded a
+100.1 ms cold-entry frame. Regional scenery stopped at its 8 GiB disk guard,
+before gameplay. City switching was interrupted deliberately while investigating
+measurement overhead. These reports remain failures or incomplete, not passes.
+
+Full diagnostics were allocating whole-city inventories while polling loading.
+Readiness now reads the same scalar conditions directly. The explicit memory
+policy change is documented in [MEMORY-MEASUREMENT.md](MEMORY-MEASUREMENT.md):
+all timing runs without forced collection, raw heap remains visible, and a
+separate occupied-world retention phase uses the existing 1 GiB numeric limit.
+This does not mean the former raw-heap criterion passed.
+
+Fresh packaged checks using that protocol pass: museum 66 assertions, aquarium
+57 assertions. All six timing windows show approximately 59.5–60 FPS and
+16.8 ms p99. Occupied retained heap is approximately 603 MiB for the museum and
+568–569 MiB for the aquarium; raw readings still reach 1.55–1.77 GB. Five aquarium
+admissions remain bounded, and the museum Journal survives a full reload.
+Screenshots were inspected. Evidence is under
+`output/release-review/561-museum-separated-measurement/` and
+`output/release-review/561-aquarium-separated-performance/`.
+
+Only generated September diagnostic screenshots were removed for disk space;
+old reports, source, current captures, public assets and rollback packages remain.
+Additional old text reports were losslessly compressed and hash-verified.
+Cleanup receipts are in `output/release-evidence/`.
+
+The final clean candidate, complete matrix/backend, save round-trip and ordinary
+hosted review remain outstanding. Production has not changed.

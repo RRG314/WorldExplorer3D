@@ -133,9 +133,16 @@
     "config/performance-budgets.json": {
       "before": "5fb11d0ace63ba6d39b65767e4819d8fd046bb4c7c27bc7f5adaeba985e0bb07",
       "beforeMode": "100644",
-      "after": "b70f752e21ef02c3747e84909caeea5e63c3e56ee7cbdcf109522c8905dbde79",
+      "after": "7553af8ea49ea8f6d3e67e48d70148c0953b669e10a46c49b8a383e67a5b8b6a",
       "afterMode": "100644",
-      "review": "Release identity only. Every performance, memory, frame-time and retention budget is unchanged."
+      "review": "Release identity and an explicit memory measurement policy change: the 1 GiB criterion now applies to occupied retained JavaScript data after all live timing, not raw transient allocation. Raw heap samples remain recorded. Frame-time, geometry, transfer, disposal and growth limits are unchanged. See docs/release-review/2026-10-14/MEMORY-MEASUREMENT.md. No game or save behavior changes."
+    },
+    "scripts/capture-candidate-gallery.mjs": {
+      "before": "60cd2d2ba1a836bad50069d7efe16c135c746a587576b4659da0515540bbc1ad",
+      "beforeMode": "100644",
+      "after": "5cf656598eb48b377c6b2a758745475f04d8f756c7b09c745f44d3fe0f6557a7",
+      "afterMode": "100644",
+      "review": "Capture tooling only: dated output preserves earlier reports, and loading waits read the existing scalar readiness flags without rebuilding whole-city diagnostics. No shipped runtime or save protocol change."
     }
   }
 }

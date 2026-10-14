@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import {measureRetainedHeap} from './retained-heap.mjs';
 import {mkdir,writeFile,readFile} from 'node:fs/promises';
 import {chromium} from 'playwright';
 import {startStaticServer} from './static-server.mjs';
@@ -69,10 +70,10 @@ try{
   await configureStagingAppCheck(page,server.url||`http://127.0.0.1:${server.port}`);
   await page.goto(`http://127.0.0.1:${server.port}/app/?launch=earth&gm=free&loc=custom&lat=39.29184&lon=-76.61036&lname=The%20Peale&mode=walking`,{waitUntil:'domcontentloaded'});
   await page.waitForFunction(()=>globalThis.__WE3D_RUNTIME_READY__,null,{timeout:120000});
+  await page.evaluate(async()=>{globalThis.museumCtx=(await import('/app/js/shared-context.js?v=55')).ctx;});
   if(await page.locator('#analyticsConsentDenyBtn').isVisible())await page.locator('#analyticsConsentDenyBtn').click();
   if(await page.locator('#globeSelectorStartBtn').isVisible())await page.locator('#globeSelectorStartBtn').click();
-  await page.waitForFunction(()=>{const d=globalThis.getWorldExplorerRuntimeDiagnostics?.();return d?.gameStarted&&!d.worldLoading&&!document.getElementById('loading')?.classList.contains('show');},null,{timeout:300000});
-  await page.evaluate(async()=>{globalThis.museumCtx=(await import('/app/js/shared-context.js?v=55')).ctx;});
+  await page.waitForFunction(()=>museumCtx.gameStarted&&!museumCtx.worldLoading&&!document.getElementById('loading')?.classList.contains('show'),null,{timeout:300000});
   if(measured){report.performance.renderer=await page.evaluate(()=>{const gl=globalThis.museumCtx.renderer.getContext(),info=gl.getExtension('WEBGL_debug_renderer_info');return gl.getParameter(info?info.UNMASKED_RENDERER_WEBGL:gl.RENDERER);});requireHardwareGraphics(report.performance.renderer);}
   check('No museum model request during unrelated Earth startup',requests.length===0);
   if(process.argv.includes('--survey-aquarium')){
@@ -143,6 +144,7 @@ try{
   report.resourceCycles=[];
   for(let i=0;i<2;i++){
     await enterMeasured(`warm-${i+1}`);
+    if(measured&&i===1)report.performance.retention=[await measureRetainedHeap(cdp,{timingComplete:report.performance.entries.length===3,label:'occupied second reentry'})];
     const geometry=await page.evaluate(()=>{const a=globalThis.museumCtx.activeInterior,g=new Set();a.group.traverse(o=>{if(o.geometry)g.add(o.geometry);});return{geometries:g.size,furnishings:a.gallery.furnishings.length,lights:[...a.group.children].filter(o=>o.isLight).length};});report.resourceCycles.push(geometry);
     check(`Reentry ${i+1} restores Journal`,await page.evaluate(()=>globalThis.museumCtx.activeInterior.gallery.saved.size===3));
     await mkdir(`${out}/prescribed-${i}`,{recursive:true});
@@ -162,9 +164,9 @@ try{
   if(process.argv.includes('--reload')){
     await page.reload({waitUntil:'domcontentloaded'});
     await page.waitForFunction(()=>globalThis.__WE3D_RUNTIME_READY__,null,{timeout:120000});
-    if(await page.locator('#globeSelectorStartBtn').isVisible())await page.locator('#globeSelectorStartBtn').click();
-    await page.waitForFunction(()=>{const d=globalThis.getWorldExplorerRuntimeDiagnostics?.();return d?.gameStarted&&!d.worldLoading&&!document.getElementById('loading')?.classList.contains('show');},null,{timeout:300000});
     await page.evaluate(async()=>{globalThis.museumCtx=(await import('/app/js/shared-context.js?v=55')).ctx;});
+    if(await page.locator('#globeSelectorStartBtn').isVisible())await page.locator('#globeSelectorStartBtn').click();
+    await page.waitForFunction(()=>museumCtx.gameStarted&&!museumCtx.worldLoading&&!document.getElementById('loading')?.classList.contains('show'),null,{timeout:300000});
     const {approach}=await mappedTarget();
     await walkTo(approach,2);await page.locator('#interiorPrompt.show').waitFor();await interact();
     await page.waitForFunction(()=>globalThis.museumCtx.activeInterior?.gallery?.saved.size===3,null,{timeout:20000});
@@ -176,7 +178,10 @@ try{
     check('Reloaded gallery exits with the outdoor camera restored',await page.evaluate(()=>globalThis.museumCtx.camera.layers.mask===1&&globalThis.museumCtx.sun.visible===true));
   }
   check('No page errors',errors.length===0);
+  if(measured)report.performance.retention.push(await measureRetainedHeap(cdp,{timingComplete:report.performance.entries.length===3,label:'exterior after visits and reload'}));
   if(measured)for(const entry of report.performance.entries)for(const [metric,passed]of Object.entries(entry.checks))check(`${entry.label}: ${metric}`,passed);
+  if(measured)for(const sample of report.performance.retention)check(`${sample.label}: retained heap`,sample.retainedBytes<=performanceBudgets.desktopTier.budgets.maximumRetainedJsHeapBytes);
+  if(measured)check('Repeated museum visits retain bounded memory',report.performance.retention[1].retainedBytes-report.performance.retention[0].retainedBytes<=performanceBudgets.retention.maximumHeapGrowthBytes);
   report.ok=true;
 }catch(error){report.error=String(error.stack||error);await page.screenshot({path:`${out}/failure.png`}).catch(()=>{});throw error;}
 finally{report.errors=errors;report.requests=requests;await writeFile(`${out}/report.json`,JSON.stringify(report,null,2));await browser.close();await server.close();}

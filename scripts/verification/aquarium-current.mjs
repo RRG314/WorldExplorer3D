@@ -12,6 +12,7 @@ import {requirePerformanceHost,requireHardwareGraphics} from './performance-host
 import {sampleFrameWindow} from './frame-window.mjs';
 import {frameHitches} from './frame-hitches.mjs';
 import {closeOwnedBrowser} from './owned-browser.mjs';
+import {measureRetainedHeap} from './retained-heap.mjs';
 const measured=process.argv.includes('--performance'),performanceHost=measured?requirePerformanceHost():null;
 const performanceBudgets=JSON.parse(await readFile('config/performance-budgets.json','utf8'));
 const servedRoot=resolve(process.env.WE3D_VERIFY_ROOT||process.cwd());
@@ -32,11 +33,13 @@ async function measureVenue(label){
  await page.evaluate(()=>{globalThis.__aquariumMeasuredActor=venueCtx.Walk.state.walker;});
  let sample;await page.keyboard.down('ArrowLeft');try{sample=await page.evaluate(sampleFrameWindow,{durationMs:10000,actorKey:'__aquariumMeasuredActor',collectDiagnostics:false});}finally{await page.keyboard.up('ArrowLeft');}
  if(profile){const {profile:cpu}=await cdp.send('Profiler.stop');await cdp.send('Profiler.disable');await writeFile(`${out}/${label}.cpuprofile`,JSON.stringify(cpu));report.performance.profiled=true;report.performance.profiles=(report.performance.profiles||[]).concat({label,samples:cpu.samples?.length,top:cpu.nodes.filter(n=>n.hitCount>0).sort((a,b)=>b.hitCount-a.hitCount).slice(0,30).map(n=>({function:n.callFrame.functionName,file:n.callFrame.url.split('?')[0].split('/').at(-1),hits:n.hitCount}))});}
- const resources=await page.evaluate(()=>{delete globalThis.__aquariumMeasuredActor;return getWorldExplorerRuntimeDiagnostics().renderer;});
+ // Full diagnostics rebuild mapped-building and structure inventories. Keep
+ // that allocation out of timed journeys; read the same renderer counters.
+ const resources=await page.evaluate(()=>{delete globalThis.__aquariumMeasuredActor;const i=venueCtx.renderer.info;return {calls:i.render.calls,triangles:i.render.triangles,programs:i.programs.length,geometries:i.memory.geometries,textures:i.memory.textures};});
  const metrics=await cdp.send('Performance.getMetrics'),heapBytes=metrics.metrics.find(m=>m.name==='JSHeapUsedSize')?.value||0,b=performanceBudgets.desktopTier.budgets;
  const ordered=[...sample.deltas].sort((a,b)=>a-b),p=q=>ordered[Math.min(ordered.length-1,Math.ceil(ordered.length*q)-1)]||0;
  const w={label,rendererName,heapBytes,resources,averageFps:sample.deltas.length/(sample.elapsedMs/1000),p95FrameMs:p(.95),p99FrameMs:p(.99),hitches:frameHitches(sample.deltas,performanceBudgets.desktopTier.hitches)};
- w.checks={averageFps:w.averageFps>=b.minimumAverageFps,p95:w.p95FrameMs<=b.maximumP95FrameMs,p99:w.p99FrameMs<=b.maximumP99FrameMs,hitches:w.hitches.passed,heap:heapBytes<=b.maximumJsHeapUsedBytes,drawCalls:resources.calls<=b.maximumDrawCalls,triangles:resources.triangles<=b.maximumTriangles};
+ w.checks={averageFps:w.averageFps>=b.minimumAverageFps,p95:w.p95FrameMs<=b.maximumP95FrameMs,p99:w.p99FrameMs<=b.maximumP99FrameMs,hitches:w.hitches.passed,drawCalls:resources.calls<=b.maximumDrawCalls,triangles:resources.triangles<=b.maximumTriangles};
  report.performance.windows.push(w);
  if(allocationProfile){const {profile}=await cdp.send('HeapProfiler.getSamplingProfile');await writeFile(`${out}/${label}.heap-sampling.json`,JSON.stringify(profile));report.performance.allocationProfiled=true;}
 }
@@ -68,9 +71,9 @@ try{
  else await configureStagingAppCheck(page,server.url||`http://127.0.0.1:${server.port}`);
  await page.goto(`http://127.0.0.1:${server.port}/app/?launch=earth&gm=free&loc=custom&lat=39.28551&lon=-76.60860&lname=National%20Aquarium&mode=walking`,{waitUntil:'domcontentloaded'});
  await page.waitForFunction(()=>globalThis.__WE3D_RUNTIME_READY__,null,{timeout:120000});
- if(await page.locator('#analyticsConsentDenyBtn').isVisible())await page.locator('#analyticsConsentDenyBtn').click();if(await page.locator('#globeSelectorStartBtn').isVisible())await page.locator('#globeSelectorStartBtn').click();
- await page.waitForFunction(()=>{const d=globalThis.getWorldExplorerRuntimeDiagnostics?.();return d?.gameStarted&&!d.worldLoading&&!document.getElementById('loading')?.classList.contains('show');},null,{timeout:300000});
  await page.evaluate(async()=>{globalThis.venueCtx=(await import('/app/js/shared-context.js?v=55')).ctx;});
+ if(await page.locator('#analyticsConsentDenyBtn').isVisible())await page.locator('#analyticsConsentDenyBtn').click();if(await page.locator('#globeSelectorStartBtn').isVisible())await page.locator('#globeSelectorStartBtn').click();
+ await page.waitForFunction(()=>venueCtx.gameStarted&&!venueCtx.worldLoading&&!document.getElementById('loading')?.classList.contains('show'),null,{timeout:300000});
  const targets=await page.evaluate(()=>{const c=globalThis.venueCtx;return c.buildings.filter(b=>b.sourceBuildingId==='overture:7bacec0b-326a-401f-ad9f-f3ebed72c8cf').map(b=>{const s=c.resolveBuildingEntrySupport(b,{allowSynthetic:false});return {key:s.key,baseY:b.baseY,minY:b.minY,bodyHeight:b.bodyHeightMeters,ground:c.GroundHeight?.walkSurfaceY?.(b.centerX,b.centerZ),pts:b.pts,center:{x:b.centerX,z:b.centerZ},door:s.exteriorEntrance,enterable:s.enterable};});});report.targets=targets;
  report.entranceDiagnostic=await page.evaluate(()=>globalThis.venueCtx.buildingEntranceCatalog?.diagnostics);
  const target=targets.find(t=>t.door);check('Aquarium has one actual published public entrance',targets.filter(t=>t.door).length===1);
@@ -114,14 +117,16 @@ try{
  const outside=await pose();check('Harbor position restores exactly',Math.hypot(outside.x-report.savedOutside.x,outside.y-report.savedOutside.y,outside.z-report.savedOutside.z)<.12);
  check('Water targets and outdoor camera restore on exit',await page.evaluate(()=>globalThis.oldAquariumWater.snapshot().renderTargets===0&&globalThis.venueCtx.camera.layers.mask===1));
  await interact();await page.waitForFunction(()=>globalThis.venueCtx.activeInterior?.aquarium?.saved.size===3);await page.evaluate(()=>globalThis.venueCtx.activeInterior.aquarium.ready);check('Reentry restores all Journal notes',true);await measureVenue('reentry');
+ if(measured)report.performance.retention=[await measureRetainedHeap(cdp,{timingComplete:report.performance.windows.length===3,label:'occupied reentry'})];
  check('Reentry creates only two water targets',await page.evaluate(()=>globalThis.venueCtx.activeInterior.aquarium.water.snapshot().renderTargets===2));
  await walkTo(await page.evaluate(()=>globalThis.venueCtx.activeInterior.interactions.find(i=>i.kind==='exit')));await interact();await page.waitForFunction(()=>!globalThis.venueCtx.activeInterior);
- // Five admissions exercise the same entry/lifecycle authority. No actor or
- // camera assignment, forced garbage collection, or population reset shortcut.
+ // Five admissions exercise the same entry/lifecycle authority. All timing is
+ // finished; collect only for the separately identified retention measurements.
  for(let cycle=3;cycle<=5;cycle++){
   await interact();await page.waitForFunction(()=>globalThis.venueCtx.activeInterior?.aquarium?.saved.size===3);await page.evaluate(()=>globalThis.venueCtx.activeInterior.aquarium.ready);
   const resident=await page.evaluate(()=>{const s=venueCtx.activeInterior.aquarium;return {animals:s.animals.length,corals:s.furnishings.length,waterTargets:s.water.snapshot().renderTargets};});
   check(`Cycle ${cycle} restores notes and one bounded habitat`,resident.animals===4&&resident.waterTargets===2);
+  if(measured&&cycle===5)report.performance.retention.push(await measureRetainedHeap(cdp,{timingComplete:report.performance.windows.length===3,label:'occupied fifth admission'}));
   await walkTo(await page.evaluate(()=>venueCtx.activeInterior.interactions.find(i=>i.kind==='exit')));await interact();await page.waitForFunction(()=>!venueCtx.activeInterior);
   report.cycles.push({cycle,resident,renderer:await page.evaluate(()=>getWorldExplorerRuntimeDiagnostics().renderer)});
  }
@@ -129,6 +134,7 @@ try{
  report.transfer=await page.evaluate(()=>{const rows=performance.getEntriesByType('resource').filter(r=>new URL(r.name).origin===location.origin);return {scope:'same-origin browser ResourceTiming; cache hits may report zero transfer bytes',requests:rows.length,transferBytes:rows.reduce((n,r)=>n+r.transferSize,0),encodedBytes:rows.reduce((n,r)=>n+r.encodedBodySize,0)};});
  check('No page or GPU errors',errors.length===0);
  if(measured)for(const w of report.performance.windows)for(const [id,passed]of Object.entries(w.checks))check(`${w.label} performance: ${id}`,passed);
+ if(measured){for(const sample of report.performance.retention)check(`${sample.label}: retained heap`,sample.retainedBytes<=performanceBudgets.desktopTier.budgets.maximumRetainedJsHeapBytes);check('Repeated occupied visits retain bounded memory',report.performance.retention[1].retainedBytes-report.performance.retention[0].retainedBytes<=performanceBudgets.retention.maximumHeapGrowthBytes);}
  report.ok=true;
 }catch(error){report.failure=String(error.stack||error);await page.screenshot({path:`${out}/failure.png`}).catch(()=>{});throw error;}
 finally{report.errors=errors;await writeFile(`${out}/report.json`,JSON.stringify(report,null,2));try{await closeOwnedBrowser(ownedBrowser);}finally{await server.close();}}

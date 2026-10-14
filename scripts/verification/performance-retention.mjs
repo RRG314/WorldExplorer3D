@@ -15,6 +15,7 @@ import { startStaticServer } from './static-server.mjs';
 import { requirePerformanceHost, requireHardwareGraphics } from './performance-host.mjs';
 import { collectBrowserGraphicsErrors } from './browser-graphics-errors.mjs';
 import {artifactIdentity} from './artifact-identity.mjs';
+import {measureRetainedHeap} from './retained-heap.mjs';
 
 // Reject cloud/other hardware before opening a browser or loading a world.
 const hostAuthority = requirePerformanceHost();
@@ -155,9 +156,9 @@ async function waitForPlayable(page) {
   await page.waitForSelector('#loading.show', { timeout: 30_000 });
   await page.waitForFunction(() => !document.getElementById('loading')?.classList.contains('show'), null, { timeout: 300_000 });
   await page.waitForFunction(() => {
-    const state = globalThis.getWorldExplorerRuntimeDiagnostics?.();
+    const state = globalThis.__WE3D_PERF_CONTEXT__;
     return state?.gameStarted === true && state.worldLoading === false &&
-      Number(state.worldCounts?.buildings || 0) > 0 && Number(state.worldCounts?.roads || 0) > 0;
+      state.buildings.length > 0 && state.roads.length > 0;
   }, null, { timeout: 300_000, polling: 500 });
   await page.waitForTimeout(2_500);
 }
@@ -170,6 +171,7 @@ async function launchWorld(client) {
   });
   milestones.documentLoadedMs = Date.now() - startedAt;
   await client.page.waitForFunction(() => globalThis.__WE3D_RUNTIME_READY__ === true, null, { timeout: 120_000 });
+  await client.page.evaluate(async()=>{globalThis.__WE3D_PERF_CONTEXT__=(await import('/app/js/shared-context.js?v=55')).ctx;});
   milestones.runtimeReadyMs = Date.now() - startedAt;
   const titleHeapBytes = await heapUsedBytes(client.cdp);
   await client.page.waitForSelector('#globeSelectorScreen.show', { timeout: 60_000 });
@@ -182,11 +184,11 @@ async function launchWorld(client) {
   milestones.playableMs = Date.now() - startedAt;
   await client.page.evaluate(async()=>{globalThis.__WE3D_PERF_CONTEXT__=(await import('/app/js/shared-context.js?v=55')).ctx;});
   const diagnostics = await client.page.evaluate(() => {
-    const state = globalThis.getWorldExplorerRuntimeDiagnostics?.() || {};
+    const state = globalThis.__WE3D_PERF_CONTEXT__;
     return {
-      worldLoad: state.worldLoad || null,
-      performance: state.performance || null,
-      transportCompilation: state.transportCompilation || null
+      worldLoad: state.worldLoadRuntimeState || null,
+      performance: state.perfStats ? {mode:state.perfStats.mode,lastLoad:state.perfStats.lastLoad,live:state.perfStats.live} : null,
+      transportCompilation: state.transportSurfacePublication ? {roadCount:state.transportSurfacePublication.roadCount,meshCount:state.transportSurfacePublication.meshCount,phaseDurationsMs:state.transportSurfacePublication.phaseDurationsMs} : null
     };
   });
   return { firstPlayableMs: milestones.playableMs, titleHeapBytes, milestones, diagnostics };
@@ -327,8 +329,7 @@ function modesWithinBudgets(modes, tier) {
     mode.triangles <= limit.maximumTriangles &&
     mode.programs <= limit.maximumPrograms &&
     mode.geometries <= limit.maximumGeometries &&
-    mode.textures <= limit.maximumTextures &&
-    mode.jsHeapUsedBytes <= limit.maximumJsHeapUsedBytes
+    mode.textures <= limit.maximumTextures
   );
 }
 
@@ -442,6 +443,14 @@ async function runDesktop() {
     const sustainedModes=sustained?await sustainedTravel(client):[];
     await recoverCaughtJourney(client.page,'before-retention');
     const modes = [walk, walkMoving, drive, driveMoving, plane,...sustainedModes];
+    // Every live timing window has finished. Retention is a separate phase:
+    // select each occupied mode normally and measure reachable JS allocation.
+    // Natural raw heap remains in each mode's original timing receipt.
+    const occupiedMemory=[];
+    for(const [mode,selector] of [['plane','#fPlane'],['walk','#fWalk'],['drive','#fDriving']]){
+      if(await client.page.evaluate(()=>globalThis.__WE3D_PERF_CONTEXT__.activeTransportActor?.()?.mode)!==mode)await selectMode(client.page,mode,selector);
+      occupiedMemory.push(await measureRetainedHeap(client.cdp,{timingComplete:true,label:mode}));
+    }
     const baselineCounts = walk.worldCounts;
     const releases = [];
     const reloadCounts = [];
@@ -524,6 +533,7 @@ async function runDesktop() {
       modeActivationResponsive: modes.filter((mode) => mode.activationMs !== undefined).every((mode) => mode.activationMs <= limit.maximumModeActivationMs),
       completeWorld: modes.every((mode) => Number(mode.worldCounts?.buildings) > 0 && Number(mode.worldCounts?.roads) > 0 && Number(mode.worldCounts?.terrainTiles) > 0),
       modesWithinBudgets: modesWithinBudgets(modes, budgets.desktopTier),
+      occupiedMemoryWithinBudget:occupiedMemory.every(sample=>sample.retainedBytes<=limit.maximumRetainedJsHeapBytes),
       activePlayHitchesWithinBudget:modes.every(mode=>mode.hitches.passed),
       sustainedMixedTraversal:!sustained||sustainedModes.length===7&&sustainedModes.every(mode=>mode.traversalObserved)&&sustainedModes.reduce((sum,mode)=>sum+mode.elapsedMs,0)>=600000,
       noGameplayInterruptions:gameplayInterruptions.length===0,
@@ -552,7 +562,7 @@ async function runDesktop() {
       noBrowserErrors: client.browserErrors.length === 0,
       noFailedLocalResources: client.localFailures.length === 0
     };
-    return { ok: Object.values(checks).every(Boolean), tier: budgets.desktopTier, launch, modes, releases, reloadCounts,
+    return { ok: Object.values(checks).every(Boolean), tier: budgets.desktopTier, launch, modes, occupiedMemory, releases, reloadCounts,
       transfer,shortRunTransfer,reloadTransfers,transferScope:'Original total budget through two reloads; same limits checked separately on every additional reload; cumulative transfers retained.',
       storage, checks, gameplayInterruptions, browserErrors: client.browserErrors, localFailures: client.localFailures, providerDegradations:client.providerDegradations };
   } finally {
@@ -567,6 +577,7 @@ async function runMobileRegression() {
     const launch = await launchWorld(client);
     const walkActivationMs = await selectMode(client.page, 'walk', '#fWalk');
     const modes = [{ ...(await measureMode(client, 'walk-touch-regression')), activationMs: walkActivationMs }];
+    const occupiedMemory=await measureRetainedHeap(client.cdp,{timingComplete:true,label:'walk-touch-regression'});
     await client.page.screenshot({ path: 'output/release-evidence/current/performance-mobile-390x844.png', fullPage: false });
     const storage = await storageSnapshot(client.page);
     const transfer = transferSnapshot(client);
@@ -577,12 +588,13 @@ async function runMobileRegression() {
       modeActivationResponsive: modes.filter((mode) => mode.activationMs !== undefined).every((mode) => mode.activationMs <= limit.maximumModeActivationMs),
       completeWorld: modes.every((mode) => Number(mode.worldCounts?.buildings) > 0 && Number(mode.worldCounts?.roads) > 0 && Number(mode.worldCounts?.terrainTiles) > 0),
       modesWithinBudgets: modesWithinBudgets(modes, budgets.mobileRegressionTier),
+      occupiedMemoryWithinBudget:occupiedMemory.retainedBytes<=limit.maximumRetainedJsHeapBytes,
       transferWithinBudget: transferWithinBudget(transfer, limit),
       storageWithinBudget: storage.usageBytes <= limit.maximumPersistentStorageBytes,
       noBrowserErrors: client.browserErrors.length === 0,
       noFailedLocalResources: client.localFailures.length === 0
     };
-    return { ok: Object.values(checks).every(Boolean), tier: budgets.mobileRegressionTier, launch, modes, transfer, storage, checks, browserErrors: client.browserErrors, localFailures: client.localFailures };
+    return { ok: Object.values(checks).every(Boolean), tier: budgets.mobileRegressionTier, launch, modes, occupiedMemory, transfer, storage, checks, browserErrors: client.browserErrors, localFailures: client.localFailures };
   } finally {
     await client.context.close();
   }

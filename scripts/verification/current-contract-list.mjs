@@ -29,6 +29,7 @@ export const currentContractTests = [
   'tests/earth-return-action-current.test.mjs',
   'tests/retained-earth-transform-current.test.mjs',
   'tests/venue-world-ownership-current.test.mjs',
+  'tests/retained-heap-current.test.mjs',
   'tests/world-load-lifecycle-current.test.mjs',
   'tests/world-load-consumers-current.test.mjs',
   'tests/terrain-source-ownership-current.test.mjs',

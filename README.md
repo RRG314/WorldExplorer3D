@@ -22,7 +22,7 @@ remain part of the same game.
 <p align="center">
   <a href="https://worldexplorer3d.io/app/"><strong>Play World Explorer 3D</strong></a>
   · <a href="CONTROLS_REFERENCE.md">Controls</a>
-  · <a href="RELEASE_NOTES_5.6.0.md">5.6 release notes</a>
+  · <a href="RELEASE_NOTES_5.6.1.md">5.6.1 release notes</a>
   · <a href="ROADMAP.md">Roadmap</a>
 </p>
 

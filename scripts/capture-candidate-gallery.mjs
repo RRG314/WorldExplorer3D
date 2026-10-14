@@ -18,7 +18,8 @@ const { version } = JSON.parse(await readFile('package.json'));
 const assets = `assets/gallery/${version.split('.').slice(0, 2).join('.')}`;
 const earthOnly = process.argv.includes('--earth');
 const mode = ['aquarium', 'museum', 'space'].find(name => process.argv.includes(`--${name}`)) || (earthOnly ? 'earth' : 'marine');
-const out = `output/production-readiness-20261012/${mode}-capture`;
+const captureDate = new Date().toISOString().slice(0, 10).replaceAll('-', '');
+const out = `output/production-readiness-${captureDate}/${mode}-capture`;
 await mkdir(out, { recursive: true });
 await mkdir(assets, { recursive: true });
 const disk = await statfs('.');
@@ -75,8 +76,7 @@ async function finishJourneyFrames() {
 async function enterEarth() {
   await page.locator('#globeSelectorStartBtn').click();
   await page.waitForFunction(() => {
-    const d = getWorldExplorerRuntimeDiagnostics();
-    return d.gameStarted && !d.worldLoading && d.worldCounts?.buildings > 0 && !document.getElementById('loading')?.classList.contains('show');
+    return marineCtx.gameStarted && !marineCtx.worldLoading && marineCtx.buildings.length > 0 && !document.getElementById('loading')?.classList.contains('show');
   }, null, { timeout: 300000 });
   await daytime();
   const skip = page.getByRole('button', { name: 'Skip guide', exact: true });
