@@ -160,37 +160,65 @@ test('ground readiness protects landing and driving without pausing water or hig
  assert.equal(actorRequestsRoadDetail({source:'boat'},0),false);
 });
 
-test('failed road readiness retains collision protection and an owned retry with wait accounting',async t=>{
+test('failed road worker retries locally, retains accepted regions, and ignores retired worker messages',async t=>{
  const prior={Worker:globalThis.Worker,THREE:globalThis.THREE,document:globalThis.document};
- globalThis.THREE=await import('three');
- const elements=[];
- globalThis.document={createElement(tag){const element={tag,style:{},dataset:{},children:[],setAttribute(){},append(child){this.children.push(child);},remove(){this.removed=true;}};elements.push(element);return element;},body:{appendChild(){}}};
+ globalThis.THREE=await import('three');const workers=[],elements=[];
+ globalThis.document={createElement(tag){const e={tag,style:{},dataset:{},children:[],setAttribute(){},append(child){this.children.push(child);},remove(){this.removed=true;}};elements.push(e);return e;},body:{appendChild(){}}};
+ let fail=true,releaseRestore;
  globalThis.Worker=class {
-  postMessage(message){queueMicrotask(()=>this.onmessage?.({data:message.type==='prepare'?
-   {type:'prepared',keys:[],layout:{resolution:64},masks:new Uint8Array(),regions:[],pending:[{key:'2:0',bounds:{}}]}:
-   {type:'error',message:'Controlled worker failure'}}));}
-  terminate(){}
+  constructor(){workers.push(this);}
+  postMessage(message){
+   const send=data=>queueMicrotask(()=>this.onmessage?.({data}));
+   if(message.type==='prepare'){
+    if(message.input.deferInitial){releaseRestore=()=>send({type:'prepared'});return;}
+    send({type:'prepared',keys:[],layout:{resolution:64},masks:new Uint8Array(),regions:[],pending:[{key:'2:0'},{key:'3:0'}]});
+   }else if(fail&&message.key==='3:0'){fail=false;send({type:'error',message:'Controlled worker failure'});}
+   else send({type:'region',key:message.key,keys:[],batches:[]});
+  }
+  terminate(){this.terminated=true;}
  };
  t.after(()=>Object.assign(globalThis,prior));
  const {prepareTransportDetail}=await import('../app/js/terrain/transport-detail-runtime.js');
- let reloads=0,current=true,rejectRetry;
+ let current=true;const publications=[],retired=[];
  const ctx={terrainGroup:{children:[]},renderer:{capabilities:{maxTextureSize:4096}},terrainMeshHeightAt:()=>0};
- const detail=await prepareTransportDetail(ctx,[],{isCurrent:()=>current,retryWorldLoad:()=>{
-  reloads++;return new Promise((_resolve,reject)=>{rejectRetry=reject;});
- }});t.after(()=>detail.dispose());
- detail.attach(()=>{});assert.equal(detail.readyAt({x:2500,z:300},0),false);
- const button=elements.find(e=>e.tag==='button');assert.equal(button.hidden,true);
- detail.step({x:2500,z:300});await new Promise(r=>setTimeout(r,5));
- assert.equal(detail.readyAt({x:2500,z:300},0),false);assert.equal(button.hidden,false);
- assert.equal(detail.stats.blockedCount,1);assert.equal(detail.stats.status,'failed');
- const retry=button.onclick();assert.equal(reloads,1);assert.equal(button.disabled,true);
- await button.onclick();assert.equal(reloads,1,'a repeated retry must not replace the in-flight load');
- rejectRetry(Error('Controlled retry failure'));await retry;assert.equal(button.disabled,false);
- assert.equal(detail.readyAt({x:0,z:0},0),true);assert.ok(detail.stats.blockedTotalMs>0);assert.equal(detail.stats.blockedAtMs,null);
- current=false;await button.onclick();assert.equal(reloads,1);detail.dispose();
- assert.equal(elements.find(e=>e.tag==='div').removed,true);
+ const detail=await prepareTransportDetail(ctx,[],{isCurrent:()=>current});t.after(()=>detail.dispose());
+ detail.attach(packet=>publications.push(packet.key),()=>{},key=>retired.push(key));
+ const tick=()=>new Promise(r=>setTimeout(r,0)),point={x:2900,z:300};
+ detail.step(point);await tick();assert.deepEqual(publications,['2:0']);
+ detail.step(point);await tick();assert.equal(detail.stats.status,'failed');assert.equal(workers[0].terminated,true);
+ assert.equal(detail.readyAt(point),false);const button=elements.find(e=>e.tag==='button');assert.equal(button.hidden,false);
+ assert.equal(button.onclick(),true);assert.equal(button.onclick(),false,'one retry job only');
+ assert.equal(workers.length,2);assert.deepEqual(retired,[],'accepted region survives recovery');
+ workers[0].onmessage({data:{type:'error',message:'Late abandoned response'}});
+ assert.equal(detail.stats.status,'recovering');releaseRestore();await tick();
+ detail.step(point);await tick();assert.equal(detail.readyAt(point),true);assert.deepEqual(publications,['2:0','3:0']);
+ assert.equal(detail.stats.recoveries,1);assert.equal(detail.stats.blockedCount,1);assert.ok(detail.stats.blockedTotalMs>0);
+ assert.ok(!elements.some(e=>/Main Menu|reload/.test(e.textContent||'')));
+ current=false;assert.equal(detail.retry(),false);detail.dispose();assert.equal(workers[1].terminated,true);
+ assert.deepEqual(retired,['2:0','3:0']);
 });
 
+test('automatic local recovery is bounded and cancellation cannot revive the old compiler',async t=>{
+ const prior={Worker:globalThis.Worker,THREE:globalThis.THREE};globalThis.THREE=await import('three');
+ let now=0; t.mock.method(performance,'now',()=>now);const workers=[];
+ globalThis.Worker=class {
+  constructor(){workers.push(this);}
+  postMessage(message){queueMicrotask(()=>this.onmessage?.({data:message.type==='prepare'&&!message.input.deferInitial?
+    {type:'prepared',keys:[],layout:{resolution:64},masks:new Uint8Array(),regions:[],pending:[{key:'2:0'}]}:
+    {type:'error',message:'Still unavailable'}}));}
+  terminate(){this.terminated=true;}
+ };
+ t.after(()=>Object.assign(globalThis,prior));
+ const {prepareTransportDetail}=await import('../app/js/terrain/transport-detail-runtime.js');
+ const ctx={terrainGroup:{children:[]},renderer:{capabilities:{maxTextureSize:4096}},terrainMeshHeightAt:()=>0};
+ const detail=await prepareTransportDetail(ctx,[],{isCurrent:()=>true});detail.attach(()=>{});
+ const tick=()=>new Promise(r=>setTimeout(r,0)),point={x:2500,z:300};
+ detail.step(point);await tick();
+ for(let n=0;n<6;n++){now+=30000;detail.step(point);await tick();}
+ assert.equal(detail.stats.recoveryAttempts,2);assert.equal(workers.length,3);assert.equal(detail.readyAt(point,0),false);
+ assert.equal(detail.retry(),true);detail.dispose();await tick();
+ assert.equal(detail.stats.status,'disposed');assert.ok(workers.every(w=>w.terminated));
+});
 
 test('plan-ahead transport produces byte-identical masks and complete geometry from the final terrain',()=>{
  const serial=createTransportDetailCompiler({roads,terrain:terrain(),radius:1024});
@@ -329,4 +357,15 @@ test('regional contact retirement removes only its own deck and permits a clean 
  assert.equal(remote.stats().triangles,0);assert.equal(index.sampleAt(2049,1),null);assert.equal(index.sampleAt(1,1),20);
  assert.equal(index.remove('2:0'),false);index.add('2:0',createRoadContactIndex(meshes([batch(2048,3)])));
  assert.equal(index.sampleAt(2049,1),3);index.dispose();
+});
+
+
+test('compiler-only restoration rebuilds evicted regions with identical geometry and no duplicate initial meshes',()=>{
+ const input={roads,terrain:terrain(),radius:1024,includeOverview:false};
+ const original=createTransportDetailCompiler(input),restored=createTransportDetailCompiler({...input,deferInitial:true});
+ assert.equal(restored.initial.regions.length,0);assert.equal(restored.initial.masks.length,0);
+ for(const {key} of [...original.initial.regions,...original.initial.pending]){
+  assert.equal(triangles(restored.compile(key).batches),triangles(original.compile(key).batches));
+ }
+ original.dispose();restored.dispose();
 });

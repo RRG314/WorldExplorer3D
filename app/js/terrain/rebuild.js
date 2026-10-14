@@ -1,10 +1,9 @@
 import {prepareTransportDetail} from './transport-detail-runtime.js';
 import {createPortalSurfaceClipper} from './portal-surface-clip.js';
-import {captureEarthWorldSession,reloadEarthWorldSession} from '../earth-session.js?v=17';
 import {createRegionalRoadContact} from './regional-road-contact.js';
 import {transportRegionKey} from './transport-detail-plan.js';
 import { STREET_POLYGON_GRID_WORLD } from '../world/compiler/street-polygon-kernel.js';
-import { measurePublishedRoadTriangles, roadSourceCoordinateTolerance } from './published-road-integrity.js';
+import { measurePublishedRoadTriangles, roadSourceCoordinateTolerance, roadJunctionContact } from './published-road-integrity.js';
 import {emitLocalLoadTrace} from '../world/load-trace.js';
 import {prepareCarriagewayTiles} from '../world/compiler/street-carriageway.js';
 import {meshCarriagewayTile} from '../world/compiler/street-carriageway-mesh.js';
@@ -453,10 +452,7 @@ export async function publishCompiledTransportMeshes(deps = {}) {
       if(renderRoad.structureSemantics?.terrainMode==='at_grade'&&renderRoad.transportSurfaceModel?.engineeredApproach!==true&&renderRoad.pts?.length>=2)planRoads.push(renderRoad);
     }
     const terrainReady=new Promise(resolve=>releaseTerrain=resolve);
-    preparingDetail=prepareTransportDetail(appCtx,planRoads,{isCurrent,terrainReady,retryWorldLoad:()=>{
-      captureEarthWorldSession();
-      return reloadEarthWorldSession({transitionDurationMs:0});
-    }});
+    preparingDetail=prepareTransportDetail(appCtx,planRoads,{isCurrent,terrainReady});
     // The final publication awaits this same promise. Handle early rejection
     // while terrain is still compiling, so cancellation never leaks a worker.
     preparingDetail.catch(()=>{});
@@ -920,12 +916,19 @@ export async function publishCompiledTransportMeshes(deps = {}) {
           maximumJunctionCoordinateTolerance:0,maximumJunctionContactDistance:0};
         for(const junction of junctionsByRegion.get(packet.key)||[]){
           junctionStats.junctionSamples++;
-          if(Number.isFinite(contact.sampleAt(junction.x,junction.z,NaN,'at_grade')))continue;
-          junctionStats.junctionExactContactMisses++;
+          // Engineered approaches remain in the pinned index even outside the
+          // starting neighbourhood. Validate their existing physical surface as
+          // well as this packet; the moving worker deliberately excludes them.
           const tolerance=roadSourceCoordinateTolerance(junction.x,junction.z,STREET_POLYGON_GRID_WORLD);
+          const nearest=roadJunctionContact([contact,stagedRoadContact],junction.x,junction.z,tolerance);
+          if(nearest?.distance===0)continue;
+          junctionStats.junctionExactContactMisses++;
           junctionStats.maximumJunctionCoordinateTolerance=Math.max(junctionStats.maximumJunctionCoordinateTolerance,tolerance);
-          const nearest=contact.nearestSurfaceAt(junction.x,junction.z,tolerance,'at_grade');
-          if(!nearest)throw new Error(`Missing road contact in region ${packet.key}`);
+          if(!nearest){
+            const error=new Error(`Missing road contact in region ${packet.key}`);
+            error.detail={region:packet.key,x:junction.x,z:junction.z,tolerance};
+            throw error;
+          }
           junctionStats.junctionPrecisionContacts++;
           junctionStats.maximumJunctionContactDistance=Math.max(junctionStats.maximumJunctionContactDistance,nearest.distance);
         }

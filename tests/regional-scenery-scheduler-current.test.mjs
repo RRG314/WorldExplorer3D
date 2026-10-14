@@ -77,10 +77,10 @@ test('small high-latitude windows move before the actor can cross their coverage
 test('scenery preference survives a menu choice made before lazy Earth startup and tolerates unavailable storage',async()=>{
  const {readRegionalSceneryPreference:read,writeRegionalSceneryPreference:write}=await import('../app/js/terrain/regional-scenery-scheduler.js');
  const entries=new Map(),storage={getItem:key=>entries.get(key),setItem:(key,value)=>entries.set(key,value)};
- assert.equal(read(storage),true);write(false,storage);assert.equal(read(storage),false);
+ assert.equal(read(storage),false);write(false,storage);assert.equal(read(storage),false);
  write(true,storage);assert.equal(read(storage),true);
  const denied={getItem(){throw Error('denied');},setItem(){throw Error('denied');}};
- assert.equal(read(denied),true);assert.doesNotThrow(()=>write(false,denied));
+ assert.equal(read(denied),false);assert.doesNotThrow(()=>write(false,denied));
 });
 
 test('toggle aborts an unfinished destination and a late completion cannot move the published anchor',async()=>{

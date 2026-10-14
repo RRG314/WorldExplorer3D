@@ -47,8 +47,8 @@ export function requireCompleteTravelScenery(context, {roadCoverageError=null}={
 // Settings are available before the Earth runtime is loaded. Keep this preference
 // independent of that lazy runtime so a menu choice also governs the first region.
 export function readRegionalSceneryPreference(storage) {
-  try { return (storage ?? globalThis.localStorage)?.getItem('we3d.regionalScenery') !== 'off'; }
-  catch { return true; }
+  try { return (storage ?? globalThis.localStorage)?.getItem('we3d.regionalScenery') === 'on'; }
+  catch { return false; }
 }
 export function writeRegionalSceneryPreference(enabled, storage) {
   try { (storage ?? globalThis.localStorage)?.setItem('we3d.regionalScenery', enabled ? 'on' : 'off'); }

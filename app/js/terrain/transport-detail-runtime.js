@@ -5,9 +5,9 @@ import {TRANSPORT_REGION_SIZE,actorNeedsRoadDetail,actorRequestsRoadDetail,
   transportRegionBounds,transportRegionInWindow,transportRegionDistanceSquared,nearestPendingTransportRegion,
   TRANSPORT_DETAIL_RADIUS,TRANSPORT_RETENTION_RADIUS,MAX_MOVING_TRANSPORT_REGIONS} from './transport-detail-plan.js';
 
-export async function prepareTransportDetail(appCtx,roads,{isCurrent,focus={x:0,z:0},terrainReady=null,retryWorldLoad=null}) {
+export async function prepareTransportDetail(appCtx,roads,{isCurrent,focus={x:0,z:0},terrainReady=null}) {
   const url=globalThis.__WORLD_EXPLORER_PRODUCTION__?.transportDetailWorkerUrl||new URL('./transport-detail-worker.js',import.meta.url);
-  const worker=new Worker(url,{type:'module'});
+  let worker=null,recoveryInput=null,retryAt=0,retryAttempts=0;
   let pending=null,disposed=false,active=null,publish=null,complete=null,retire=null,mask=null,notice=null,noticeText=null,retryButton=null,lastSync=0;
   const remaining=new Map(),resident=new Map(),latestFocus={x:focus.x,z:focus.z};
   let requestsDetail=true;
@@ -15,7 +15,7 @@ export async function prepareTransportDetail(appCtx,roads,{isCurrent,focus={x:0,
   const stats={status:'preparing',sourceRoads:roads.length,completedRegions:0,pendingRegions:0,
     pinnedRegions:0,residentMovingRegions:0,maxMovingRegions:MAX_MOVING_TRANSPORT_REGIONS,
     activeJobs:0,evictedRegions:0,cancelledRegions:0,
-    blocked:false,blockedAtMs:null,blockedTotalMs:0,blockedCount:0,error:null};
+    blocked:false,blockedAtMs:null,blockedTotalMs:0,blockedCount:0,error:null,recoveryAttempts:0,recoveries:0};
   const refreshCounts=()=>{
     stats.residentMovingRegions=resident.size;
     stats.completedRegions=stats.pinnedRegions+resident.size;
@@ -31,10 +31,41 @@ export async function prepareTransportDetail(appCtx,roads,{isCurrent,focus={x:0,
     pending={resolve:value=>{clearTimeout(timeout);pending=null;resolve(value);},reject:error=>{clearTimeout(timeout);pending=null;reject(error);}};
     try{worker.postMessage(data);}catch(error){pending.reject(error);}
   });
-  worker.onmessage=({data})=>data.type==='error'?pending?.reject(new Error(data.message)):pending?.resolve(data);
-  worker.onerror=event=>pending?.reject(new Error(event.message));
+  function startWorker(){
+    worker?.terminate();
+    const current=new Worker(url,{type:'module'});worker=current;
+    current.onmessage=({data})=>{
+      if(current!==worker||disposed)return;
+      if(data.type==='error')pending?.reject(new Error(data.message));else pending?.resolve(data);
+    };
+    current.onerror=event=>{if(current===worker&&!disposed)pending?.reject(new Error(event.message));};
+  }
+  startWorker();
+  function failed(error){
+    if(disposed)return;
+    if(error?.name==='AbortError'){stats.cancelledRegions++;return;}
+    stats.status='failed';stats.error=String(error.message);stats.errorDetail=error.detail||null;
+    worker?.terminate();worker=null;
+    retryAt=performance.now()+(retryAttempts<2?2000*4**retryAttempts:Infinity);
+    console.error('[TransportDetail]',error);
+  }
+  function retry(){
+    if(disposed||!isCurrent()||active||!stats.error)return false;
+    retryAttempts=0;retryAt=0;recover();return true;
+  }
+  function recover(){
+    stats.status='recovering';stats.activeJobs=1;stats.recoveryAttempts++;retryAttempts++;
+    // Recreate only the compiler from this world's original immutable terrain.
+    // Keep every accepted mesh/contact, actor, location and save in place.
+    active=(async()=>{
+      startWorker();
+      await request({type:'prepare',input:recoveryInput});
+      if(disposed||!isCurrent())return;
+      stats.error=null;stats.errorDetail=null;stats.recoveries++;stats.status='near-ready';
+    })().catch(failed).finally(()=>{active=null;stats.activeJobs=0;});
+  }
   function dispose(){
-    if(disposed)return;disposed=true;worker.terminate();
+    if(disposed)return;disposed=true;worker?.terminate();worker=null;recoveryInput=null;
     if(appCtx._cancelTransportPreparation===dispose)appCtx._cancelTransportPreparation=null;pending?.reject(new DOMException('Transport detail cancelled','AbortError'));
     for(const key of resident.keys())retire?.(key);
     resident.clear();mask?.dispose();mask=null;notice?.remove();notice=noticeText=retryButton=null;remaining.clear();publish=complete=retire=null;
@@ -49,16 +80,14 @@ export async function prepareTransportDetail(appCtx,roads,{isCurrent,focus={x:0,
       notice=document.createElement('div');notice.setAttribute('role','status');notice.dataset.transportReadiness='true';
       notice.style.cssText='position:fixed;bottom:100px;left:50%;transform:translateX(-50%);z-index:2000;padding:8px 14px;background:#10202ee8;color:white;border-radius:8px;font:14px sans-serif';
       noticeText=document.createElement('span');notice.append(noticeText);
-      if(typeof retryWorldLoad==='function'){
-        retryButton=document.createElement('button');retryButton.textContent='Retry roads';retryButton.style.cssText='margin-left:10px;min-height:44px';
-        retryButton.onclick=async()=>{if(disposed||!isCurrent()||retryButton?.disabled)return;retryButton.disabled=true;try{await retryWorldLoad();}catch{/* Keep the failed readiness notice available for another attempt. */}finally{if(retryButton&&!disposed)retryButton.disabled=false;}};
-        notice.append(retryButton);
-      }
+      retryButton=document.createElement('button');retryButton.textContent='Retry roads';retryButton.style.cssText='margin-left:10px;min-height:44px';
+      retryButton.onclick=retry;
+      notice.append(retryButton);
       document.body.appendChild(notice);
     }
-    const message=stats.error?'Nearby road detail could not load. Retry here or from Main Menu.':'Preparing nearby road detail…';
+    const message=stats.error?(Number.isFinite(retryAt)?'Roads ahead are taking longer. Retrying here…':'Roads ahead could not load. Retry here to continue.'):'Preparing roads ahead…';
     if(noticeText&&noticeText.textContent!==message)noticeText.textContent=message;
-    if(retryButton)retryButton.hidden=!stats.error;
+    if(retryButton){retryButton.hidden=!stats.error;retryButton.disabled=!!active;}
   }
   appCtx._cancelTransportPreparation?.();
   appCtx._cancelTransportPreparation=dispose;
@@ -81,8 +110,9 @@ export async function prepareTransportDetail(appCtx,roads,{isCurrent,focus={x:0,
       const y=appCtx.terrainMeshHeightAt(point.x,point.z)+.18;
       heightProbes.push({x:point.x,z:point.z,y});
     }
-    const initial=await request({type:'prepare',input:{...(terrainReady?{}:planInput),
-      terrain:captureTransportTerrain(appCtx),heightProbes}});
+    const terrain=captureTransportTerrain(appCtx);
+    recoveryInput={...planInput,terrain,heightProbes,includeOverview:false,deferInitial:true};
+    const initial=await request({type:'prepare',input:{...(terrainReady?{}:planInput),terrain,heightProbes}});
 
     if(!isCurrent())throw new DOMException('Transport detail superseded','AbortError');
     if(includeOverview){
@@ -99,7 +129,9 @@ export async function prepareTransportDetail(appCtx,roads,{isCurrent,focus={x:0,
     // contact/render eviction; it never needs to be rebuilt during travel.
     stats.heightParity=initial.heightParity;stats.pinnedRegions=initial.regions.length;refreshCounts();stats.status='near-ready';
     initial.masks=null;
-    const controller={stats,initial,dispose,refreshMaterials:()=>mask?.syncMaterials(),
+    const controller={stats,initial,dispose,
+      retry,
+      refreshMaterials:()=>mask?.syncMaterials(),
       attach(callback,onComplete=()=>{},onRetire=null){publish=callback;complete=onComplete;retire=onRetire;},
       readyForActor(point,terrainY){
         if(!actorNeedsRoadDetail(point,terrainY)){updateNotice(false);return true;}
@@ -122,7 +154,8 @@ export async function prepareTransportDetail(appCtx,roads,{isCurrent,focus={x:0,
         // Retire only outside the overlap. Resident and staged work have
         // independent bounds: one packet can be in flight, never an open queue.
         for(const [key,bounds] of resident)if(!transportRegionInWindow(bounds,latestFocus,TRANSPORT_RETENTION_RADIUS))evict(key);
-        if(active||stats.error)return;
+        if(active)return;
+        if(stats.error){if(requestsDetail&&performance.now()>=retryAt)recover();return;}
         if(!requestsDetail){stats.status='dormant';return;}
         const key=nearestPendingTransportRegion(remaining,latestFocus);
         if(key===null){
@@ -151,12 +184,8 @@ export async function prepareTransportDetail(appCtx,roads,{isCurrent,focus={x:0,
           if(!publicationCurrent()){stats.cancelledRegions++;return;}
           await publish(packet,{isCurrent:publicationCurrent});
           if(disposed||!isCurrent())return;
-          remaining.delete(key);resident.set(key,bounds);refreshCounts();
-        })().catch(error=>{
-          if(disposed)return;
-          if(error?.name==='AbortError'){stats.cancelledRegions++;return;}
-          stats.status='failed';stats.error=String(error.message);worker.terminate();console.error('[TransportDetail]',error);
-        }).finally(()=>{active=null;stats.activeJobs=0;});
+          remaining.delete(key);resident.set(key,bounds);retryAttempts=0;refreshCounts();
+        })().catch(failed).finally(()=>{active=null;stats.activeJobs=0;});
       }
     };
     if(appCtx._cancelTransportPreparation===dispose)appCtx._cancelTransportPreparation=null;
