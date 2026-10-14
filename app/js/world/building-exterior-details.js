@@ -1,4 +1,5 @@
 import {createFrontageSigns,mappedFrontageLabel} from './storefront-signs.js';
+import {reviewedVenueForBuilding} from '../interiors/venue-exterior-policy.js';
 import {storefrontLayout} from './storefront-layout.js';
 import {harborDistrictFocus} from './harbor-district.js';
 import { facadeFloorPlan } from './building-facade-layout.js?v=3';
@@ -373,7 +374,9 @@ export function selectExteriorDetailSources(sources, {focus, districtFocus, radi
       Math.abs(dx) <= radius && Math.abs(dz) <= radius ? Math.hypot(dx, dz) : Infinity,
       Math.abs(districtX) <= radius && Math.abs(districtZ) <= radius ? Math.hypot(districtX, districtZ) : Infinity
     );
-    if (distance <= radius) candidates.push({mesh, distance});
+    // Reviewed architecture already owns its trim, doorway and nameplate.
+    // Generic decoration must not draw a second facade/sign over that work.
+    if (distance <= radius && !reviewedVenueForBuilding(mesh.userData)) candidates.push({mesh, distance});
   }
   candidates.sort((a,b)=>a.distance-b.distance||String(a.mesh.userData.sourceBuildingId).localeCompare(String(b.mesh.userData.sourceBuildingId)));
   if (candidates.length > limit) candidates.length = limit;

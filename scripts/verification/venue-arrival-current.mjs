@@ -103,6 +103,8 @@ if(!process.env.FIREBASE_AUTH_EMULATOR_HOST){
       const target=new THREE.Vector3(door.x,door.y+1.4,door.z),camera=venueCtx.camera.position.clone();
       return {camera:camera.toArray(),blockedView:new THREE.Raycaster(camera,target.clone().sub(camera).normalize(),0,30).intersectObjects(venueCtx.buildingMeshes,true).slice(0,8).map(hitInfo),nearby:venueCtx.buildings.filter(b=>Math.hypot(b.centerX-door.x,b.centerZ-door.z)<120).map(b=>({id:b.sourceBuildingId,type:b.buildingType,height:b.height,body:b.bodyHeightMeters,base:b.baseY,pts:b.pts,semantics:b.buildingSemantics})),quays:venueCtx.streetFurnitureMeshes.filter(m=>m.userData.furnitureKind==='waterfront').map(m=>({name:m.name,children:m.children.length}))};
     },target.door);
+    report.genericVenueSigns=await page.evaluate(id=>(venueCtx.buildingExteriorDetailPublication?.mappedSigns||[]).filter(sign=>sign.sourceBuildingId===id),target.door.buildingSourceId);
+    assert.equal(report.genericVenueSigns.length,0,'Reviewed venue must own its facade without an overlapping generated sign');
     await page.screenshot({path:out+'/door.png'});
     await page.keyboard.press('KeyE');
     await page.waitForFunction(venue=>venue==='kennedy'?!!venueCtx.activeInterior?.facility:venue==='museum'?!!venueCtx.activeInterior?.gallery:!!venueCtx.activeInterior?.aquarium,venue,{timeout:25000});

@@ -9,7 +9,7 @@ Work is local on the architecture-evaluation checkout. Existing production and t
 - Player and ambient vessel movement checked water containment but omitted building collision, allowing over-water structures to be crossed.
 - Water bed shaping applies a soft bank to engineered shorelines too. Existing quay/pier presentation does not supply a vertical retaining face.
 
-## Verification so far
+## Initial verification (historical)
 
 `output/venue-harbor-repair/aquarium-district-baseline` records the failed entrance. `aquarium-district-fixed` records successful normal walking and E entry after diagnostic placement outside the far district's door. This is not a continuous 2 km journey. `museum-district-fixed` records successful gameplay but a verifier routing-cleanup failure; the process itself is not a passing gate. Seven focused entry/obstacle regression tests pass. Full build/release/device acceptance has not run for these edits.
 
@@ -30,7 +30,7 @@ Retain source footprint, collision and admission as one authority. Reviewed venu
 
 Public photos guide reconstruction; they are not redistributed as material textures. NASA assets are factual facility representations with source credits, never an endorsement. Historic shuttle gantry models must not be passed off as current Artemis launch facilities.
 
-## Remaining acceptance
+## Initial acceptance checklist (historical)
 
 Visible and usable doors from near and distant starts; exterior reference comparison; harbor bank/collision and boat scale inspection; vessel control and safe clearance; authentic launch-site implementation with enterable public-reference interior; lifecycle cleanup; focused source, browser and packaged-build checks. No check is complete merely because a model or test exists.
 
@@ -44,7 +44,7 @@ The passenger-launch journey drives into a real Inner Harbor bank through normal
 
 Quay terrain relief now uses the existing bounded structure-cut shader, raycast and support owner, composed with existing tunnel masks rather than replacing them. Wet-side bed strips remove the coarse DEM's interpolated beach while dry land remains unchanged. Fourteen quay/portal parity tests pass. Wall tops now sample the published terrain; this latest alignment correction still needs browser inspection.
 
-## NASA implementation scope in progress
+## NASA scope recorded during implementation
 
 Kennedy's Vehicle Assembly Building and Launch Complex 39B are the first named NASA facilities. Official NASA GLBs are being prepared as locally owned assets. The VAB ground-floor circulation follows the published high-bay / transfer-aisle / low-bay organization. No current operational control, exact full campus survey, partnership or current movable-equipment state is claimed. The historic Shuttle gantry reference is not used as an Artemis structure. Facility entry must use the existing building/scene movement, support, interaction and exit owners; a separate locomotion system is not acceptable.
 
@@ -205,3 +205,66 @@ near terrain. Source regressions cover recovery, exhaustion, terminal error
 classification and prevention of road compilation on failed terrain. The
 instrumented journey retains request timings and supports a clearly labeled
 single-request terrain fault followed by real-provider recovery.
+
+
+## Final source and immutable build — 14 October
+
+`npm run verify:pr` passes **2,607 tests, zero failures/skips**, plus the complete
+architecture/source chain. The exact log is preserved at
+`output/venue-harbor-repair/final-source-validation.log`.
+
+Runtime commit: `2d96261cf456`; candidate:
+`output/hosting-validation/venue-harbor-ready-20261014`.
+Build: `5.6.0+2d96261cf456.bc6a5c36dfa8b2c8.staging`.
+734 packaged files; asset manifest SHA-256:
+`f19f7bcbab148089789e7017ccee2b9fdd538689a63946e7258a5b8929744ce8`.
+Build and package verification pass, with clean source at build time. The
+production package, saved consolidation package and four recognized rollback
+packages remain intact. Three superseded task packages were removed after their
+manifest identities were checked and copied to
+`output/venue-harbor-repair/superseded-package-manifests/`; their source commits,
+images and failed/passing reports remain. This recovered approximately 900 MB.
+
+`ready-kennedy-recovery` passes exterior walking, E entry, all four stations,
+assembly sequence and normal exit on this final package. The controlled request
+`15/9045/13669` fails once (`net::ERR_FAILED`) and then successfully downloads in
+131 ms. No terrain is fabricated and no height-parity threshold is relaxed.
+`ready-launchpad` passes the continuous south approach through five intermediate
+positions, rising from world Y 6.43 to 15.23. Both have zero page errors and
+failed local assets; the intentional external terrain fault is recorded separately.
+VAB interior/station and LC39B overview/walking images were inspected.
+
+### Scope and remaining release limitations
+
+These changes cover the National Aquarium's reviewed Pier 3 forms and entry,
+The Peale's exterior/entry, the engineered Inner Harbor shore and passenger launch,
+and Kennedy's VAB ground-floor visit plus LC39B. They do not reconstruct every
+museum, NASA campus or restricted operational interior. Upper VAB levels are not
+playable. The Peale gallery content remains interpretive; it is not a reproduction
+of the Peale's current collection. The reviewed exteriors replace generic building
+forms, but material fidelity, surrounding utility buildings and landscape detail
+are still simplified and should not be advertised as photoreal or survey-exact.
+The quay bed cut is a bounded presentation/contact model, not a depth survey.
+
+Provider outages, ordinary hosted App Check, physical-device behavior, sustained
+frame pacing and the previously recorded aquarium performance gap remain distinct
+release concerns. Functional fixed-step desktop checks do not certify those.
+The two earlier VAB startup failures remain in their original receipts. The
+bounded recovery defect is fixed and tested; the wider transient local texture
+and optional-script timeouts were not reproduced by the successful diagnostic
+run, and their cause is not proven. No GitHub publication or production deployment
+has occurred in this follow-up.
+
+
+## Final facade ownership correction
+
+All five `ready-*` journeys pass on 2d96261c, including aquarium/harbor contact
+(center clearance 8.94; reverse 18.23; 124 mapped wave surfaces), distant Peale
+entry/return and all seven Ocean connected cases. Final image inspection catches
+one additional visual conflict in `ready-museum/door.png`: the moving generic
+frontage-detail owner adds a second nameplate and trim above the authored Peale
+surround. Reviewed venue identities are now excluded from generic decoration
+selection, preserving their footprint, admission, authored detail and all ordinary
+neighboring building candidates. The browser receipt explicitly checks that the
+venue has no overlapping generic mapped sign. This is a cosmetic ownership fix;
+no terrain, vessel, doorway collision or NASA activity logic changed.
