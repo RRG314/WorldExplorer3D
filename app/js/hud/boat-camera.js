@@ -60,8 +60,8 @@ function resolveBoatCameraFraming(input = {}) {
       });
     }
     return Object.freeze({
-      chaseDistance: Math.max(9.2, Math.min(36, classLength * .46)) + speedNorm * Math.min(4.8, classLength * .035) + waveIntensity * .45,
-      chaseHeight: Math.max(4.8, Math.min(17, classHeight * .66)) + waveIntensity * .55,
+      chaseDistance: Math.max(9.2, Math.min(46, classLength * .95)) + speedNorm * Math.min(4.8, classLength * .035) + waveIntensity * .45,
+      chaseHeight: Math.max(4.8, Math.min(20, classHeight * 1.15),Math.min(17,classLength*.3)) + waveIntensity * .55,
       lookAhead: Math.max(10, Math.min(52, classLength * .28)) + speedNorm * Math.min(12, classLength * .08),
       classLength,
       classHeight,
@@ -69,8 +69,8 @@ function resolveBoatCameraFraming(input = {}) {
     });
   }
   return Object.freeze({
-    chaseDistance: Math.max(10.8, classLength * .68) + speedNorm * Math.max(4.2, classLength * .08) + waveIntensity * 1.15,
-    chaseHeight: Math.max(4.25, classHeight * .72) + waveIntensity * .82,
+    chaseDistance: Math.max(10.8, classLength * (classLength < 32 ? 1 : .68)) + speedNorm * Math.max(4.2, classLength * .08) + waveIntensity * 1.15,
+    chaseHeight: Math.max(4.25, classHeight * (classLength < 32 ? 1.15 : .72),Math.min(10,classLength*.3)) + waveIntensity * .82,
     lookAhead: Math.max(7.4, classLength * .34) + speedNorm * Math.max(12, classLength * .1) + waveIntensity * 2,
     classLength,
     classHeight,

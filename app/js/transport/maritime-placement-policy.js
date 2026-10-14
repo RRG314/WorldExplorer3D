@@ -6,6 +6,7 @@ const ROLES = Object.freeze({
   workboat: ['pier', 'quay', 'dock', 'port', 'harbour'],
   tug: ['port', 'dock'],
   ferry: ['ferry_terminal', 'ferry_route'],
+  harbor_launch: ['ferry_terminal', 'ferry_route'],
   research: ['port', 'dock'],
   cargo: ['port']
 });
@@ -13,6 +14,12 @@ const ROLES = Object.freeze({
 export function maritimeFacilitySupportsVessel(record, catalog) {
   if (!ROLES[catalog?.role]?.includes(record?.type)) return false;
   if (['no', 'private', 'military'].includes(String(record.access).toLowerCase())) return false;
+  // A ferry stop only establishes a passenger service. Small city water taxis
+  // must not acquire an 85 m ship merely because OSM calls their stop a terminal.
+  const smallService = /water[ -]?taxi|waterbus|harbou?r (?:trolley|connector)/i.test(`${record.name || ''} ${record.attributes?.operator || ''} ${record.attributes?.ferryService || ''}`);
+  const vehicleService = !smallService && (record.attributes?.vehicleFerry === true || record.attributes?.ferryService === 'car_ferry');
+  if (catalog.role === 'ferry' && !vehicleService) return false;
+  if (catalog.role === 'harbor_launch' && vehicleService) return false;
   // A bounding-box centre/generalized feature must not authorize a 210 m ship.
   if (catalog.role === 'cargo') return record.exactPhysicalGeometry === true;
   return true;

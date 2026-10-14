@@ -50,6 +50,27 @@ browsers/servers. Production deployment evidence is under
 `output/release-evidence/current/production-deployment.json` and
 `production-promotion.json`; acceptance gaps remain in their own receipts.
 
+## October 13 venue, harbor and Kennedy follow-up (local only)
+
+Aquarium and Peale street admission, photo/mapped exteriors, engineered Inner
+Harbor banks, small passenger launch selection and hull/building collision are
+repaired locally. The NASA VAB now has the official exterior/crawler assets, a
+contained ground-floor visit, four working stations and a normal walking exit.
+LC39B has mapped lattice masts, water tower, graded hardstand, embankment and
+flame trench with one shared render/contact owner. These are the first two
+named NASA locations, not complete reconstructions of every space facility.
+
+All 2,600 source tests and the complete structural chain pass. Native Chrome
+entry/exit, distant Peale admission, harbor collision/reverse, complete VAB tour
+and continuous LC39B ramp checks pass; screenshots inspected. The evidence ledger
+`docs/venue-harbor-repair/EVIDENCE.md` retains earlier failed approaches, diagnosed
+rendering conflicts, live provider errors and scope limits. It also distinguishes
+functional fixed-step input from real-time performance certification. Existing
+aquarium habitat work is preserved separately with its recorded performance gap.
+
+The production build and preserved consolidation package above are unchanged.
+A separate immutable local package is being verified; no push or deployment.
+
 ## October 13 consolidation follow-up (local only)
 
 GitHub source integration completed before this assignment: stable `437e06cb`,

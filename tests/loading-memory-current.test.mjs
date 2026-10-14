@@ -7,6 +7,10 @@ import {publishHarborDistrict,harborDistrictFocus} from '../app/js/world/harbor-
 import {packTraversalAdjacency,traversalSourceInterval} from '../app/js/world/traversal-graph-storage.js';
 import {ctx} from '../app/js/shared-context.js?v=55';
 import {initWorldTraversal,buildTraversalNetworks,invalidateTraversalNetworks,findTraversalRoute} from '../app/js/world/traversal.js';
+import {publishLaunchPad} from '../app/js/world/launch-pad-visual.js';
+import {clearFacilitySurface} from '../app/js/world/facility-surface-owner.js';
+import {publishWaterfrontWalls} from '../app/js/world/waterfront-visual.js';
+import {publishEngineeredWaterfront,clearEngineeredWaterfront,engineeredWaterfrontFor} from '../app/js/world/engineered-waterfront.js';
 
 test('packed adjacency preserves directed edge order and double-precision weights',()=>{
  const segments=[{fromId:0,toId:1,length:Math.PI,penalty:1.08,direction:'both'},
@@ -44,8 +48,8 @@ test('real route search retains one-way restrictions, walking and disconnected l
 
 test('furniture publication releases its road index on success, failure and reset',async()=>{
  const source=(await readFile(new URL('../app/js/world/furniture.js',import.meta.url),'utf8')).replace(/^import[\s\S]*?from\s+['"][^'"]+['"];?\s*/gm,'').replaceAll('export function','function');
- const appCtx={roads:[],pois:[]};
- const context=vm.createContext({appCtx,THREE,performance,publishHarborDistrict,harborDistrictFocus,registerStreetLamp:()=>{},collectWorldVegetationPlacements:()=>[],buildWorldVegetationInstancing:()=>0,disposeVegetationBatch(){},createRoadsidePlacementResolver:roads=>({roads}),resetStreetLampFixtures(){}});
+ const appCtx={roads:[],pois:[],geoToWorld:()=>({x:10000,z:10000})};
+ const context=vm.createContext({appCtx,THREE,performance,publishLaunchPad,publishHarborDistrict,harborDistrictFocus,publishWaterfrontWalls,registerStreetLamp:()=>{},collectWorldVegetationPlacements:()=>[],buildWorldVegetationInstancing:()=>0,disposeVegetationBatch(){},createRoadsidePlacementResolver:roads=>({roads}),resetStreetLampFixtures(){}});
  vm.runInContext(source,context);
  context.generateStreetFurniture();assert.equal(vm.runInContext('roadsideResolver',context),null);
  appCtx.pois={forEach(){throw new Error('publication failed');}};
@@ -64,8 +68,10 @@ test('world reset releases derived transport models as well as scene objects',as
  let waterCacheResets=0,evidenceResets=0;appCtx.cancelWaterEnvironmentEvidence=()=>evidenceResets++;
  let groundInvalidations=0;appCtx.GroundHeight={invalidate(){groundInvalidations++;}};
  for(const key of keys)appCtx[key]={oldWorldFeature:{}};
- const context=vm.createContext({appCtx,clearWaterMeshCache(){waterCacheResets++;},resetRoadMapIndex(){},resetRoadSearchIndex(){},releaseLocationModels(){},clearBuildingExteriorMaterialPool(){},clearBuildingExteriorDetails(){}});
+ appCtx.waterAreas=[];publishEngineeredWaterfront(appCtx);assert.ok(engineeredWaterfrontFor(appCtx));
+ const context=vm.createContext({appCtx,clearFacilitySurface,clearEngineeredWaterfront,clearWaterMeshCache(){waterCacheResets++;},resetRoadMapIndex(){},resetRoadSearchIndex(){},releaseLocationModels(){},clearBuildingExteriorMaterialPool(){},clearBuildingExteriorDetails(){}});
  vm.runInContext(source,context);context.resetWorldForReload({showLoading:false});
+ assert.equal(engineeredWaterfrontFor(appCtx),null,'World reset retires its actual waterfront owner');
  for(const key of keys)assert.equal(appCtx[key],null,key);
  assert.equal(groundInvalidations,1);
  assert.equal(waterCacheResets,1);

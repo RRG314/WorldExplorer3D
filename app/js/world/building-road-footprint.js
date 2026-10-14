@@ -279,6 +279,12 @@ export async function createBuildingRoadFootprintGuards(options = {}) {
     if (options.allowsPassageBelow === true) {
       return Object.freeze({ action: 'passage_preserved', constrainedRoads: 0 });
     }
+    // Reviewed industrial facilities can enclose a real mapped service aisle.
+    // This does not open the exterior collider or grant a road-height surface;
+    // it prevents the aisle from erasing its own surrounding building.
+    if (options.enclosedFacilityAccess === true) {
+      return Object.freeze({ action: 'enclosed_access_preserved', constrainedRoads: 0 });
+    }
 
     const bounds = footprintBounds(points);
     const constraints = new Map();

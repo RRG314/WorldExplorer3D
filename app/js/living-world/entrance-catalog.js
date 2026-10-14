@@ -162,7 +162,7 @@ function nearestFacadeEdge(candidate, point) {
   return best;
 }
 
-function candidatePriority(building, index, focus) {
+function candidatePriority(building, index, focus, priorityIds) {
   const points = cleanPoints(building?.pts);
   if (points.length < 3 || !canContainWalkableInterior(building)) return null;
   const buildingType = String(building?.buildingType || 'building').trim().toLowerCase();
@@ -170,7 +170,8 @@ function candidatePriority(building, index, focus) {
   const center = polygonCentroid(points);
   const distance = Math.min(Math.hypot(center.x, center.z),
     Number.isFinite(focus?.x) && Number.isFinite(focus?.z) ? Math.hypot(center.x-focus.x,center.z-focus.z) : Infinity);
-  if (distance > 520) return null;
+  const priority = priorityIds?.has(stableBuildingId(building, index)) === true;
+  if (distance > 520 && !priority) return null;
   const commercial = COMMERCIAL_BUILDING_TYPES.has(buildingType);
   return {
     building,
@@ -180,7 +181,7 @@ function candidatePriority(building, index, focus) {
     distance,
     points,
     commercial,
-    score: distance - (commercial ? 95 : 0)
+    score: distance - (commercial ? 95 : 0) - (priority ? 100000 : 0)
   };
 }
 
@@ -321,7 +322,7 @@ export function compileEntranceCatalog(options = {}) {
     if (buildingId && !mappedByBuilding.has(buildingId)) mappedByBuilding.set(buildingId, mapped);
   }
   const candidates = (Array.isArray(options.buildings) ? options.buildings : [])
-    .map((building,index)=>candidatePriority(building,index,options.focus))
+    .map((building,index)=>candidatePriority(building,index,options.focus,options.priorityBuildingIds))
     .filter(Boolean)
     .sort((a, b) => a.score - b.score || a.buildingId.localeCompare(b.buildingId))
     .slice(0, limit);

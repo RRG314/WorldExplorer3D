@@ -196,6 +196,16 @@ function computeBuildingBaseOffset(tags = {}, options = {}) {
   if (partKind === 'roof' && Number.isFinite(level)) return Math.max(0, level) * levelHeight;
   if (partKind === 'balcony' && Number.isFinite(level)) return Math.max(0, level - 1) * levelHeight;
   if (Number.isFinite(level) && level > 0) return level * levelHeight;
+  // height is the top above ground, not the thickness of an open roof.
+  // Extruding a 4 m canopy from ground created an opaque wall across doors.
+  if (partKind === 'roof' || partKind === 'canopy') {
+    const top = parseLinearMetersTag(tags?.height, NaN);
+    const levels = parseNumericTag(tags?.['building:levels'], NaN);
+    const thickness = Math.max(.2, parseLinearMetersTag(tags?.['roof:height'], .35));
+    if (Number.isFinite(top)) return Math.max(0, top - thickness);
+    if (Number.isFinite(levels)) return Math.max(0, levels * levelHeight - thickness);
+    if (!normalizedTagValue(tags?.['building:part'])) return levelHeight;
+  }
   return 0;
 }
 
@@ -211,6 +221,9 @@ function computeBuildingHeight(tags = {}, options = {}) {
     return Math.max(0.2, explicitHeight - baseOffsetMeters);
   }
   if (Number.isFinite(buildingLevels)) {
+    if (partKind === 'roof' || partKind === 'canopy') {
+      return Math.max(.2, buildingLevels * levelHeight - baseOffsetMeters);
+    }
     const effectiveLevels = Number.isFinite(buildingMinLevel) ?
       Math.max(0.0625, buildingLevels - buildingMinLevel) :
       buildingLevels;

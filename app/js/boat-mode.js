@@ -1,4 +1,5 @@
 import {vesselWaterAdmission} from './transport/maritime-admission.js';
+import {vesselObstacleAdmission} from './transport/vessel-obstacles.js';
 import {detachSceneObject} from './engine/scene-object-lifecycle.js';
 import {ensureOceanVoyage} from './ocean/voyage.js';
 import {resolveBoatEntryReference,boatExitActorHeights} from './boat-mode/entry-reference.js';
@@ -421,6 +422,9 @@ function startBoatMode(options = {}) {
     metersPerUnit:appCtx.METERS_PER_WORLD_UNIT||1,contains:(x,z,opts)=>
       candidate.synthetic||candidate.source?.synthetic ? isPointInsideBoatCandidate(candidate,x,z) : isPointInsideWaterFootprint(x,z,opts)});
   if (!admission.allowed) {showBoatPrompt(admission.reason,'notice',BOAT_PROMPT_DURATION_MS);return false;}
+  const clearance=vesselObstacleAdmission(appCtx,catalog,spawnPoint.x,spawnPoint.z,startAngle,
+    waterSurfaceYAt(spawnPoint.x,spawnPoint.z) ?? activeCandidate.surfaceY);
+  if(!clearance.allowed){showBoatPrompt(clearance.reason,'notice',BOAT_PROMPT_DURATION_MS);return false;}
 
   const requestedEntryMode = options.entryMode === 'drive' ? 'drive' : options.entryMode === 'walk' ? 'walk' : null;
   appCtx.boatMode.lastEntryMode = requestedEntryMode || (ref.mode === 'drive' ? 'drive' : 'walk');
@@ -504,6 +508,9 @@ function enterBoatAtWorldPoint(worldX, worldZ, options = {}) {
       x:spawnPoint.x,z:spawnPoint.z,yaw,metersPerUnit:appCtx.METERS_PER_WORLD_UNIT||1,
       contains:(x,z,opts)=>candidate.synthetic||candidate.source?.synthetic?isPointInsideBoatCandidate(candidate,x,z):isPointInsideWaterFootprint(x,z,opts)});
     if(!admission.allowed){showBoatPrompt(admission.reason,'notice',BOAT_PROMPT_DURATION_MS);return false;}
+    const clearance=vesselObstacleAdmission(appCtx,getMaritimeCatalogEntry(appCtx.boatMode.transportCatalogId),spawnPoint.x,spawnPoint.z,yaw,
+      waterSurfaceYAt(spawnPoint.x,spawnPoint.z) ?? activeCandidate.surfaceY);
+    if(!clearance.allowed){showBoatPrompt(clearance.reason,'notice',BOAT_PROMPT_DURATION_MS);return false;}
     appCtx.boatMode.currentWater = activeCandidate;
     appCtx.boatMode.waterKind = activeCandidate?.waterKind || candidate.waterKind;
     appCtx.boatMode.shorelineDistance = activeCandidate?.shorelineDistance || 0;

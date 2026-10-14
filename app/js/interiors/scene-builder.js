@@ -736,6 +736,7 @@ function floorDefinition(definition, level) {
 }
 
 export function buildInteriorScene(definition, options = {}) {
+  if(definition.facilityContent?.id==='kennedy-vab')return buildKennedyInterior(THREE,appCtx,definition);
   if(definition.communityRealityCapture?.layout||definition.authoredLayout){
     const state=buildAuthoredHomeScene(definition,options);
     try{if(definition.curatedContent)addGalleryFixtures(THREE,state,definition,createWallCollider);
@@ -856,3 +857,4 @@ function buildAuthoredHomeScene(definition,options){
   const floorPlan={authored:true,floorCount:layout.floors.length,storyHeight:first.height+first.slab,floors:layout.floors.map((f,i)=>({id:f.id,label:f.label,level:i,elevation:f.elevation,height:f.height})),connectorEligible:stairs.length>0||layout.lifts?.length>0};
   return {group:root,mode:'authored',layoutKind:plan?'aquarium-visitor-route':'authored-home',authoredLifts:(layout.lifts||[]).map(lift=>({...lift,stops:lift.stops.map(stop=>({...stop,...world(stop),level:layout.floors.findIndex(f=>f.id===stop.floorId)}))})),dynamicColliders,walkSurfaces,placementTargets:[],floorPlan,floorId:first.id,floorLabel:first.label,activeLevel:0,loadedLevels:layout.floors.map((_,i)=>i),connector:null,stairs,center,floorBaseY:base,floorY:base,wallHeight:first.height,entryPoint,entryYaw,lobbyEntryPoint:entryPoint,exteriorFootprint:footprint,usableFootprint:footprint,exteriorArea:ringAreaAbs(footprint),usableArea:layout.floors[0].rooms.reduce((n,r)=>n+ringAreaAbs(roomRing(first,r)),0),shellClearanceMin:.05,requiredShellClearance:.05,partitionCount:dynamicColliders.length,interactions:[{kind:'exit',level:0,x:spawn.x,z:spawn.z,radius:2.25,label:definition.curatedContent||definition.aquariumContent?'Return to street':'Exit home'}],authoredCeilings:authored.compiled.surfaces.filter(s=>s.kind==='ceiling').map(s=>({y:base+s.y,polygons:s.polygons.map(p=>p.map(r=>r.map(([x,z])=>world({x,z}))))}))};
 }
+import {buildKennedyInterior} from './kennedy-scene.js';

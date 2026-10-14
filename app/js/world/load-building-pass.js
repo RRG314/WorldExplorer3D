@@ -1,4 +1,9 @@
 import {createBuildingBodyGeometry} from './building-body-geometry.js';
+import {prepareLaunchPadBuildingWays} from './launch-pad-facility.js';
+import {prepareKennedyBuildingWays} from './kennedy-facility.js';
+import {publishKennedyExterior} from './kennedy-exterior.js';
+import {reviewedVenueForBuilding} from '../interiors/venue-exterior-policy.js';
+import {publishReviewedVenueExteriors} from './reviewed-venue-exteriors.js';
 import {resolveBuildingFoundation} from './building-foundation.js';
 import { attachBuildingFacadeLayout } from './building-facade-layout.js?v=3';
 import { ctx as appCtx } from "../shared-context.js?v=55";
@@ -39,8 +44,9 @@ export function requiresLoadedRoadCoverageForBuilding(tags = {}) {
 }
 
 export async function buildBuildingGeometryPass(options = {}) {
-  const buildingWays = Array.isArray(options.buildingWays) ? options.buildingWays : [];
-  const nodes = options.nodes || {};
+  const kennedy=prepareKennedyBuildingWays(appCtx,Array.isArray(options.buildingWays)?options.buildingWays:[],options.nodes||{},options.lodThresholds?.farVisible);
+  const buildingWays = prepareLaunchPadBuildingWays(appCtx,kennedy.ways,kennedy.nodes,options.lodThresholds?.farVisible);
+  const nodes = kennedy.nodes;
   const buildingGeometryGuards = options.buildingGeometryGuards || {};
   const lodThresholds = options.lodThresholds || {};
   const loadMetrics = options.loadMetrics || {};
@@ -264,7 +270,11 @@ export async function buildBuildingGeometryPass(options = {}) {
       loadMetrics.buildingWater.explicitOverwaterStructures += 1;
     }
     const centerDist = Math.hypot(centerX, centerZ);
-    const lodTier = centerDist <= buildingDetailDist ? 'near' : centerDist <= lodThresholds.farVisible ? 'mid' : 'far';
+    // These few reviewed visitor venues retain their visible doorway contract
+    // within the loaded district. Mid batches intentionally omit door attributes.
+    const reviewedVenue=reviewedVenueForBuilding({sourceBuildingId:knownSourceBuildingId,tags:way.tags});
+    const lodTier = centerDist <= buildingDetailDist || reviewedVenue && centerDist <= lodThresholds.farVisible
+      ? 'near' : centerDist <= lodThresholds.farVisible ? 'mid' : 'far';
     if (lodTier === 'far') {
       loadMetrics.lod.farSkipped += 1;
       loadMetrics.buildingPublication.farLod += 1;
@@ -289,6 +299,14 @@ export async function buildBuildingGeometryPass(options = {}) {
       footprintWidth,
       footprintDepth
     });
+    // The provider's 6.27 m estimate contradicts the photographed three-storey
+    // facade. Preserve it as source evidence, not as a surveyed constraint.
+    if (reviewedVenue==='peale-baltimore') {
+      buildingSemantics.providerHeightMeters=buildingSemantics.heightMeters;
+      if(buildingSemantics.heightMeters<10||buildingSemantics.heightMeters>15)buildingSemantics.heightMeters=11.4;
+      buildingSemantics.topOffsetMeters=buildingSemantics.baseOffsetMeters+buildingSemantics.heightMeters;
+      buildingSemantics.heightSource='reviewed_facade_estimate';
+    }
     const height = buildingSemantics.heightMeters;
     if (isImplausibleTallBuildingFootprint({
       heightMeters: height,
@@ -303,7 +321,7 @@ export async function buildBuildingGeometryPass(options = {}) {
       continue;
     }
     const buildingLevels = Number.parseFloat(way.tags['building:levels']);
-    const resolvedLevels = Number.isFinite(buildingLevels) ?
+    const resolvedLevels = buildingSemantics.heightSource==='reviewed_facade_estimate' ? 3 : Number.isFinite(buildingLevels) ?
       Math.max(1, Math.round(buildingLevels)) :
       Math.max(1, Math.min(120, Math.round(height / Math.max(2.8, buildingSemantics.levelHeightMeters || 3.2))));
     const levelsSource = Number.isFinite(buildingLevels) ?
@@ -350,6 +368,7 @@ export async function buildBuildingGeometryPass(options = {}) {
     const roadAuthority = measureBuildingPhase('roadEligibility', () =>
       resolveFootprintTransportAuthority(pts, {
         allowsPassageBelow: buildingSemantics.allowsPassageBelow === true,
+        enclosedFacilityAccess: reviewedVenue === 'kennedy-vab',
         inferredFootprint: way.tags._geometrySource === 'inferred_road_frontage',
         sourceBuildingId
       })
@@ -801,6 +820,8 @@ export async function buildBuildingGeometryPass(options = {}) {
   const facadeEntrances = publishBuildingFacadeEntrances(appCtx);
   loadMetrics.buildingFacadeEntrances = { ...facadeEntrances.diagnostics };
   endLoadPhase('publishBuildingFacadeEntrances');
+  loadMetrics.reviewedVenueExteriors=publishReviewedVenueExteriors(appCtx,THREE);
+  await publishKennedyExterior(appCtx,THREE);
   startLoadPhase('publishBuildingExteriorDetails');
   loadMetrics.buildingExteriors = publishBuildingExteriorDetails(appCtx);
   endLoadPhase('publishBuildingExteriorDetails');

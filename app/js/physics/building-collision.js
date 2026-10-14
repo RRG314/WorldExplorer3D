@@ -54,7 +54,7 @@ function createBuildingCollisionQuery(appCtx) {
 
     for (let i = 0; i < buffer.count; i += 1) {
       const building = candidates[i];
-      if (!building || building.collisionDisabled) continue;
+      if (!building || building.collisionDisabled || building.collisionReplacedByVenue) continue;
       if (!buildingVerticalRangeOverlap(building, actorBaseY, actorHeight)) continue;
       if (x < building.minX - carRadius || x > building.maxX + carRadius ||
         z < building.minZ - carRadius || z > building.maxZ + carRadius) continue;

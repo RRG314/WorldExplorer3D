@@ -1,4 +1,6 @@
 import {resolveAquariumInterior} from './interiors/aquarium-content.js';
+import {resolveKennedyInterior} from './interiors/kennedy-content.js';
+import {attachKennedy,disposeKennedy,handleKennedyAction} from './interiors/kennedy-runtime.js';
 import {attachAquarium,disposeAquarium,updateAquarium,handleAquariumAction} from './interiors/aquarium-runtime.js';
 import {resolveCuratedInterior} from './interiors/content-resolver.js';
 import {attachGallery,disposeGallery,handleGalleryAction} from './interiors/gallery-runtime.js';
@@ -49,6 +51,9 @@ const interiorRuntimeDeps = {
   INTERIOR_INTERACTION_REFRESH_MS,
   INTERIOR_NOTICE_MS,
   buildInteriorScene,
+  attachKennedy: active => attachKennedy(appCtx,THREE,active),
+  disposeKennedy: active => disposeKennedy(appCtx,active),
+  handleKennedyAction: (active,interaction) => handleKennedyAction(appCtx,active,interaction),
   attachAquarium: active => attachAquarium(appCtx,THREE,active),
   disposeAquarium: active => disposeAquarium(appCtx,active),
   handleAquariumAction: (active,interaction) => handleAquariumAction(appCtx,active,interaction),
@@ -74,7 +79,7 @@ const interiorRuntimeDeps = {
     const definition = await resolveCommunityInteriorDefinition(appCtx, support,
       candidate => resolveInteriorDefinitionForEntry(candidate, interiorCache, mappedInteriorWarmPromises));
     if (findOwnedHomeForInteriorSupport(support, appCtx.getExplorerPropertySnapshot?.())) return definition;
-    return resolveAquariumInterior(appCtx,support,resolveCuratedInterior(appCtx, support, definition));
+    return resolveKennedyInterior(support,resolveAquariumInterior(appCtx,support,resolveCuratedInterior(appCtx, support, definition)));
   },
   sampleSurfaceY,
   warmMappedInteriorDefinition: (support) =>

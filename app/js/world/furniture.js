@@ -1,4 +1,6 @@
 import {publishHarborDistrict,harborDistrictFocus} from './harbor-district.js';
+import {publishWaterfrontWalls} from './waterfront-visual.js';
+import {publishLaunchPad} from './launch-pad-visual.js';
 import {yieldToWorldFrame} from './cooperative-scheduling.js?v=1';
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import {disposeVegetationBatch,renderVegetationModelsCooperatively} from './vegetation-models.js';
@@ -268,8 +270,9 @@ export function updateStreetFurnitureVisibility(reference = activeFurnitureRefer
     const threshold = STREET_FURNITURE_VISIBILITY[object.userData?.furnitureKind] || STREET_FURNITURE_VISIBILITY.default;
     const wasVisible = object.userData?.furnitureLodVisible !== false;
     const radius = wasVisible ? threshold.exit : threshold.enter;
-    const dx = Number(object.position?.x) - Number(reference.x);
-    const dz = Number(object.position?.z) - Number(reference.z);
+    const bounds=object.userData?.furnitureWorldBounds;
+    const dx = bounds ? Math.max(bounds.minX-reference.x,0,reference.x-bounds.maxX) : Number(object.position?.x) - Number(reference.x);
+    const dz = bounds ? Math.max(bounds.minZ-reference.z,0,reference.z-bounds.maxZ) : Number(object.position?.z) - Number(reference.z);
     const lodVisible = Number.isFinite(dx) && Number.isFinite(dz) && dx * dx + dz * dz <= radius * radius;
     object.userData.furnitureLodVisible = lodVisible;
     object.visible = lodVisible;
@@ -499,7 +502,7 @@ function trafficControlPlacements(mappedFurnitureNodes = [], roads = appCtx.road
 }
 
 export function generateStreetFurniture(options = {}) {
-  try { const result=publishStreetFurniture(options); publishHarborDistrict(appCtx,{THREE,registerLamp:registerStreetLamp}); return result; }
+  try { const result=publishStreetFurniture(options); publishHarborDistrict(appCtx,{THREE,registerLamp:registerStreetLamp}); publishWaterfrontWalls(appCtx,THREE); publishLaunchPad(appCtx,THREE); return result; }
   finally { roadsideResolver = null; }
 }
 

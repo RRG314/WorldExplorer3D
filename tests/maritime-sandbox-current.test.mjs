@@ -4,12 +4,13 @@ import { readFile } from 'node:fs/promises';
 import { MARITIME_CATALOG } from '../app/js/transport/maritime-catalog.js';
 import { createBoatOceanTransferApi } from '../app/js/boat-mode/ocean-transfer.js';
 
-test('all seven vessel classes use the shared playable transport contract', () => {
+test('all vessel classes use the shared playable transport contract', () => {
   assert.deepEqual(MARITIME_CATALOG.map(({ id }) => id), [
     'marina-runabout',
     'cruising-sailboat',
     'coastal-workboat',
     'harbor-tug',
+    'harbor-passenger-launch',
     'passenger-ferry',
     'ocean-research-vessel',
     'container-cargo-ship'

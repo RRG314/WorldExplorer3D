@@ -1,5 +1,6 @@
 import {createRegionalGeometryStorage} from './regional-geometry-storage.js';
 import {appendRegionalBuildingFootprint} from './regional-building-geometry.js';
+import {detailedBuildingExclusionWindow} from './detailed-building-domain.js';
 import {updateRegionalImageryFocus} from './regional-imagery.js';
 import { markGroundSurfaceChanged } from './surface-revision.js';
 import { createRegionalSceneryScheduler, requireCompleteTravelScenery, readRegionalSceneryPreference, writeRegionalSceneryPreference } from './regional-scenery-scheduler.js';
@@ -1028,16 +1029,7 @@ function createFarFieldTerrainApi(deps = {}) {
         contextHalfExtent *= .9;
     }
     const contextOuter = windowAt(contextHalfExtent);
-    const plannedDetailRadius = Math.max(
-      800,
-      Number(appCtx.plannedEarthDetailRadiusWorld || appCtx.initialEarthDetailRadius || 0)
-    );
-    const detailExclusion = {
-      minX: -plannedDetailRadius,
-      maxX: plannedDetailRadius,
-      minZ: -plannedDetailRadius,
-      maxZ: plannedDetailRadius
-    };
+    const detailExclusion = detailedBuildingExclusionWindow(appCtx);
     const geographic = geographicBounds(outer);
     const preferredSourceZoom = Math.max(0, z - FAR_FIELD_SOURCE_ZOOM_OFFSET);
     const sourceZoom = sourceZoomForTileBudget(geographic, preferredSourceZoom);
@@ -1051,7 +1043,7 @@ function createFarFieldTerrainApi(deps = {}) {
         inner,
         detailedCoverage: [],
         detailedCoverageRequest: { z, centerX, centerY, ring },
-        detailExclusionGeographic: geographicBounds(detailExclusion),
+        detailExclusionGeographic: detailExclusion ? geographicBounds(detailExclusion) : null,
         outer,
         geographic,
         contextOuter,

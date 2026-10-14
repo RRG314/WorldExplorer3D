@@ -1,4 +1,6 @@
 import {buildPortalSpatialGrid} from './portal-spatial-grid.js';
+import {engineeredWaterfrontFor} from '../world/engineered-waterfront.js';
+import {facilitySurfaceFor} from '../world/facility-surface-owner.js';
 // Texture-backed descriptors avoid the former silent 32-opening truncation.
 const MAX_PORTAL_MASKS_PER_TERRAIN_MESH = Infinity;
 // The aperture must remove terrain at the pavement too. Leaving twelve
@@ -210,6 +212,9 @@ function installPortalMaskShader(material, masks) {
 }
 
 export function applyTerrainPortalMasksForContext(appCtx, masks = []) {
+  // Each publisher keeps its own descriptors. A tunnel rebuild or later far
+  // terrain tile must not silently remove the independently published quays.
+  masks=[...masks.filter(mask=>!['quay','facility'].includes(mask.kind)),...(engineeredWaterfrontFor(appCtx)?.terrainCuts||[]),...(facilitySurfaceFor(appCtx)?.cuts||[])];
   prepareTerrainPortalMasks(masks);
   appCtx.structureTerrainPortalDescriptors = masks;
   const terrainMeshes = (appCtx?.terrainGroup?.children || []).filter(

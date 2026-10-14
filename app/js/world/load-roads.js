@@ -4,6 +4,7 @@ import {isSurfacePublicationError,finishFailedSurfaceLoad} from './surface-publi
 import {finishFailedWorldLoad} from './load-failure.js';
 import { createLinearFeatureRuntime } from "./load-linear-runtime.js?v=11";
 import { createWorldLandusePass } from "./load-landuse-pass.js?v=40";
+import {publishEngineeredWaterfront} from './engineered-waterfront.js';
 import { createWorldRoadLoaderSupport } from "./load-roads-support.js?v=9";
 import { findNearestBoatCandidate, isPointInsideWaterFootprint } from "../boat-mode/water-query.js?v=21";
 import {
@@ -899,6 +900,7 @@ export function createWorldRoadLoader(deps = {}) {
           waterwayWays: normalizedSelection.waterwayWays,
           worldSurfaceProfile
         });
+        loadMetrics.engineeredWaterfront=publishEngineeredWaterfront(appCtx);
         buildImmediateLinearFeatureDataPass({
           cyclewayWays: normalizedSelection.cyclewayWays,
           endLoadPhase,

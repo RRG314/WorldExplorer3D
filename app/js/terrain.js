@@ -71,6 +71,7 @@ import { buildPolarCryosphereSurface } from "./terrain/polar-cryosphere-surface.
 import { createFarFieldTerrainApi } from "./terrain/far-field.js?v=74";
 import { reconcileActorsAfterSurfaceRebuild } from "./terrain/actor-reprojection.js?v=2";
 import { waterTerrainBedY } from "./terrain/water-terrain-mask.js?v=1";
+import {engineeredWaterfrontFor} from './world/engineered-waterfront.js';
 import { sampleWaterwaySurfaceProfile } from "./water-dynamics.js?v=9";
 import {
   distanceToWaterBoundary,
@@ -243,7 +244,8 @@ function resolveWaterTerrainY(x, z, terrainY, candidates = null) {
     // smoothly. A fixed cut makes an opaque water polygon read as a floating
     // slab at quays and beaches.
     const shorelineDistance = distanceToWaterBoundary(area, x, z);
-    resolvedY = Math.min(resolvedY,waterTerrainBedY(area,x,z,terrainY,shorelineDistance,sampleWaterwaySurfaceProfile));
+    resolvedY = Math.min(resolvedY,waterTerrainBedY(area,x,z,terrainY,shorelineDistance,sampleWaterwaySurfaceProfile,
+      engineeredWaterfrontFor(appCtx)?.bedDepthAt(area,x,z)||0));
   }
   return resolvedY;
 }

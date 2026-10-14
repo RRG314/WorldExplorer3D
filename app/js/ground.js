@@ -1,4 +1,5 @@
 import { ctx as appCtx } from "./shared-context.js?v=55"; // ============================================================================
+import {sampleFacilitySurface} from './world/facility-surface-owner.js';
 import {
   isRoadSurfaceReachable,
   sampleFeatureSurfaceY
@@ -322,6 +323,7 @@ const GroundHeight = {
       };
     }
 
+    const facility=sampleFacilitySurface(appCtx,x,z,currentY);if(facility)return facility;
     const pavementY = appCtx.streetPavement?.sampleAt(x, z);
     if (Number.isFinite(pavementY) && (!Number.isFinite(currentY) || Math.abs(currentY - pavementY) < 2)) {
       return { y: pavementY, source: 'sidewalk', feature: null, dist: 0, pt: { x, z } };
@@ -422,6 +424,7 @@ const GroundHeight = {
 
   // Ground used for driving, including the selected feature and provenance input.
   driveSurfaceInfo(x, z, preferRoad = true, currentY = NaN, options = {}) {
+    const facility=sampleFacilitySurface(appCtx,x,z,currentY);if(facility)return facility;
     const terrainY = this.terrainY(x, z);
     let nearestRoad = null;
     if (preferRoad) {
