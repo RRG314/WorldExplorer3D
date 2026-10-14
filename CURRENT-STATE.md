@@ -1,6 +1,6 @@
 # Current development and release state
 
-Updated October 13, 2026. **5.5.0 is deployed to production.**
+Updated October 14, 2026. **5.5.0 is deployed to production.**
 Release: https://github.com/RRG314/WorldExplorer3D/releases/tag/v5.5.0
 Public project page: https://rrg314.github.io/WorldExplorer3D/
 
@@ -50,26 +50,41 @@ browsers/servers. Production deployment evidence is under
 `output/release-evidence/current/production-deployment.json` and
 `production-promotion.json`; acceptance gaps remain in their own receipts.
 
-## October 13 venue, harbor and Kennedy follow-up (local only)
+## October 13–14 venue, harbor and Kennedy follow-up (local only)
 
 Aquarium and Peale street admission, photo/mapped exteriors, engineered Inner
-Harbor banks, small passenger launch selection and hull/building collision are
-repaired locally. The NASA VAB now has the official exterior/crawler assets, a
-contained ground-floor visit, four working stations and a normal walking exit.
-LC39B has mapped lattice masts, water tower, graded hardstand, embankment and
-flame trench with one shared render/contact owner. These are the first two
-named NASA locations, not complete reconstructions of every space facility.
+Harbor banks, smaller passenger launch selection and hull/building collision are
+repaired locally. Reviewed landmark identities survive the travelling detail
+cache, so generic signs and trim no longer cover the authored facades. The VAB
+uses official NASA exterior/crawler assets, a contained ground-floor visit, four
+working stations and normal walking exit. LC39B has mapped lattice masts, water
+tower, graded hardstand, embankment and flame trench with shared render/contact
+ownership. These cover two named NASA sites, not every space facility.
 
-All 2,600 source tests and the complete structural chain pass. Native Chrome
-entry/exit, distant Peale admission, harbor collision/reverse, complete VAB tour
-and continuous LC39B ramp checks pass; screenshots inspected. The evidence ledger
-`docs/venue-harbor-repair/EVIDENCE.md` retains earlier failed approaches, diagnosed
-rendering conflicts, live provider errors and scope limits. It also distinguishes
-functional fixed-step input from real-time performance certification. Existing
-aquarium habitat work is preserved separately with its recorded performance gap.
+Verification also found and fixed fresh Ocean admission using the outgoing water
+candidate, portrait diver framing after hull camera avoidance, single-attempt
+terrain publication and incorrect map retries after terminal terrain failure.
+Near terrain now uses the existing bounded tile recovery; incomplete surfaces
+cannot proceed to transport compilation or player spawn.
 
-The production build and preserved consolidation package above are unchanged.
-A separate immutable local package is being verified; no push or deployment.
+All 2,607 source tests and the complete structural chain pass. The final immutable
+package is `output/hosting-validation/venue-harbor-current-20261014`, built from
+`4ec78f8edf11`: `5.6.0+4ec78f8edf11.77d16adb2c05e5b6.staging`.
+Its build/verification pass. All five native Chrome package journeys pass:
+distant Peale entry/return, aquarium entry/return plus harbor contact/reverse,
+VAB complete tour with a deliberately failed terrain request recovered, continuous
+LC39B ramp walking, and seven connected Ocean/deck/diver/submarine/resume cases.
+Screenshots were inspected. Receipts: `output/venue-harbor-repair/4ec78f8e/` and
+`CURRENT-ACCEPTANCE.json`; explanations in `docs/venue-harbor-repair/EVIDENCE.md`.
+
+This is functional local acceptance, not a complete production release
+certification. Exterior materials and surrounding scenery remain simplified;
+slow local textures can still trigger procedural fallback. Prior aquarium/frame
+performance gaps, ordinary hosted/provider and physical-device checks remain
+explicit. Original failed runs are preserved. Production dist, the consolidation
+candidate, four recognized rollback packages and all source/history/player data
+remain intact. Superseded task-only package payloads were removed after retaining
+their manifests and evidence. No push, preview publication or production deploy.
 
 ## October 13 consolidation follow-up (local only)
 

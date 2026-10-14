@@ -1,6 +1,18 @@
-# Venue access, waterfront and space-site repair — 13 October 2026
+# Venue access, waterfront and space-site repair — 13–14 October 2026
 
 Work is local on the architecture-evaluation checkout. Existing production and the saved consolidation candidate are preserved. This is a repair ledger, not a release announcement.
+
+## Current accepted local candidate
+
+`5.6.0+4ec78f8edf11.77d16adb2c05e5b6.staging`, runtime `4ec78f8edf11`,
+`output/hosting-validation/venue-harbor-current-20261014` is the retained candidate.
+All 2,607 source tests, structural checks, build and package verification pass.
+All five final-package journeys under `output/venue-harbor-repair/4ec78f8e/` pass:
+Peale, aquarium/harbor, VAB with controlled terrain recovery, LC39B and connected
+Ocean. Current images were inspected. Compact receipt: `CURRENT-ACCEPTANCE.json`
+in that evidence root. These checks establish the scoped local behavior below,
+not a photoreal complete-campus reconstruction or full release certification.
+The following sections retain the earlier findings and failed candidates.
 
 ## Reproduced defects
 
@@ -207,7 +219,7 @@ instrumented journey retains request timings and supports a clearly labeled
 single-request terrain fault followed by real-provider recovery.
 
 
-## Final source and immutable build — 14 October
+## Pre-facade source and immutable build — 14 October
 
 `npm run verify:pr` passes **2,607 tests, zero failures/skips**, plus the complete
 architecture/source chain. The exact log is preserved at
@@ -284,3 +296,20 @@ about 13 seconds, exceeding the existing four-second procedural fallback. This
 helps explain why material fidelity differs between otherwise passing runs.
 Material-loading/late-upgrade polish remains an explicit limitation; this follow-up
 does not claim to have resolved the entire graphics loading pipeline.
+
+
+## Final package closeout
+
+The final package contains 734 files and asset manifest SHA-256
+`34e1a40baa9e90ebe831abf6ba55d2dbe9f5246886d38875e9ff5080f4de1d1c`.
+Its first verification attempt could not read Git identity within the existing
+deadline; direct clean-status/HEAD reads then succeeded and unchanged verification
+passed. The guard was not bypassed. The exact source/build/verification logs are
+`current-source-validation.log`, `current-package-build.log`,
+`current-package-verification-first.log` and `current-package-verification.log`
+under the evidence root. All final venue reports have zero page errors and failed
+local assets; external provider warnings and the injected terrain failure remain
+separately visible. Ocean has seven passing cases and zero captured page errors.
+The final Peale, aquarium exterior/quay, VAB interior, launch-pad walking and
+portrait diver/submarine images were inspected. Generated test processes closed;
+no production/GitHub mutation or player-data cleanup occurred.
