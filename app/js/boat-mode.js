@@ -422,8 +422,11 @@ function startBoatMode(options = {}) {
     metersPerUnit:appCtx.METERS_PER_WORLD_UNIT||1,contains:(x,z,opts)=>
       candidate.synthetic||candidate.source?.synthetic ? isPointInsideBoatCandidate(candidate,x,z) : isPointInsideWaterFootprint(x,z,opts)});
   if (!admission.allowed) {showBoatPrompt(admission.reason,'notice',BOAT_PROMPT_DURATION_MS);return false;}
-  const clearance=vesselObstacleAdmission(appCtx,catalog,spawnPoint.x,spawnPoint.z,startAngle,
-    waterSurfaceYAt(spawnPoint.x,spawnPoint.z) ?? activeCandidate.surfaceY);
+  // resolveBoatEntryReference already validates an explicit surface arrival
+  // against the committed geographic frame. Its old Earth structures belong
+  // to the saved land visit and retire after successful vessel admission.
+  const clearance=options.surfaceArrival ? {allowed:true} : vesselObstacleAdmission(appCtx,catalog,spawnPoint.x,spawnPoint.z,startAngle,
+    waterSurfaceYAt(spawnPoint.x,spawnPoint.z,activeCandidate));
   if(!clearance.allowed){showBoatPrompt(clearance.reason,'notice',BOAT_PROMPT_DURATION_MS);return false;}
 
   const requestedEntryMode = options.entryMode === 'drive' ? 'drive' : options.entryMode === 'walk' ? 'walk' : null;
@@ -509,7 +512,7 @@ function enterBoatAtWorldPoint(worldX, worldZ, options = {}) {
       contains:(x,z,opts)=>candidate.synthetic||candidate.source?.synthetic?isPointInsideBoatCandidate(candidate,x,z):isPointInsideWaterFootprint(x,z,opts)});
     if(!admission.allowed){showBoatPrompt(admission.reason,'notice',BOAT_PROMPT_DURATION_MS);return false;}
     const clearance=vesselObstacleAdmission(appCtx,getMaritimeCatalogEntry(appCtx.boatMode.transportCatalogId),spawnPoint.x,spawnPoint.z,yaw,
-      waterSurfaceYAt(spawnPoint.x,spawnPoint.z) ?? activeCandidate.surfaceY);
+      waterSurfaceYAt(spawnPoint.x,spawnPoint.z,activeCandidate));
     if(!clearance.allowed){showBoatPrompt(clearance.reason,'notice',BOAT_PROMPT_DURATION_MS);return false;}
     appCtx.boatMode.currentWater = activeCandidate;
     appCtx.boatMode.waterKind = activeCandidate?.waterKind || candidate.waterKind;

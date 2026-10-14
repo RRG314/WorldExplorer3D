@@ -154,3 +154,29 @@ units. Raycasts across all six pavilion edges require glazing without concrete;
 five focused exterior/admission tests pass. Concrete tint is also lighter to
 avoid darkening an already weathered diffuse map twice. This keeps the same
 footprint, collision owner, entrance and neighboring coverage.
+
+## Ocean regression found before promotion — 14 October
+
+`venue-harbor-kennedy-reviewed-20261013` passes all four named venue journeys with
+zero page errors and failed local assets. Its additional Ocean check fails before
+gameplay: `reviewed-ocean` and `reviewed-ocean-ready` retain the rejected launch.
+Waiting for selector readiness did not fix it. The actual new clearance check
+sampled the previously active water without supplying the incoming candidate;
+fresh Ocean entry returned NaN, which `??` does not replace. Start, reposition and
+movement now sample the explicit incoming candidate. A validated independent
+surface arrival cannot collide with the outgoing Earth frame; its prior land
+visit is preserved and its meshes retire through the existing transfer owner.
+Regular mapped-water hull/building collision remains required.
+
+`ocean-admission-fixed` then passes fresh/airborne arrival and scuba, but exposes a
+real portrait framing defect: hull avoidance can reverse the camera bearing while
+the old HUD offset still follows the swimmer's heading. The diver's head is hidden
+by the control panel. `frameOceanDiverLookTarget` now derives screen-right from the
+resolved camera and scales framing by distance/FOV/aspect. Projection tests cover
+five bearings, three distances and two portrait sizes without changing collision.
+`ocean-framing-fixed` passes the complete seven-case connected journey, including
+deck recovery, submarine deployment, menu exit and saved-voyage resume. Images of
+arrival, portrait diver and submarine were inspected. The ship's open-water
+surface remains visible. Controlled GEBCO entry and desktop portrait emulation
+are not live bathymetry or physical-phone certification. Local App Check/default
+provider failures are recorded separately from these gameplay results.

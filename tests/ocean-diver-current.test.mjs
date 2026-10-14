@@ -1,5 +1,5 @@
 import test from 'node:test';import assert from 'node:assert/strict';
-import {oceanDiveAdmission,resolveOceanDiverCameraPose,parentVesselExitPose} from '../app/js/ocean/diver.js';
+import {oceanDiveAdmission,resolveOceanDiverCameraPose,parentVesselExitPose,frameOceanDiverLookTarget} from '../app/js/ocean/diver.js';
 import {parentHullCollision} from '../app/js/ocean/parent-vessel.js';
 import {RCRV_LAYOUT,RESEARCH_EYE_HEIGHT} from '../app/js/boat-mode/research/layout.js';
 test('parent vessel hull uses catalogue draft and blocks its submerged volume at every heading',()=>{
@@ -57,4 +57,17 @@ test('hull clearance keeps the camera out of the explorer body',()=>{
  const anchor={x:3,y:-8,z:0};
  const camera=resolveOceanDiverCameraPose({anchor,target:{x:-2,y:-7,z:0},submarinePosition:{x:0,y:-8,z:0},checkBuildingCollision:(x,z,r)=>({collision:x<2+r&&x>-2-r&&Math.abs(z)<4+r})});
  assert.ok(camera.x>anchor.x+2);assert.ok(Math.hypot(camera.x-anchor.x,camera.y-anchor.y,camera.z-anchor.z)>2);
+});
+
+test('portrait framing keeps the swimmer left of the HUD after hull avoidance changes the camera bearing',async()=>{
+ const T=await import('three'),anchor=new T.Vector3(3,-8,2);
+ for(const aspect of [390/844,.65])for(const radius of [2.1,5,7.25])for(const angle of [0,.7,Math.PI/2,Math.PI,4.8]){
+  const camera=new T.PerspectiveCamera(55,aspect,.1,1000);
+  camera.position.set(anchor.x+Math.sin(angle)*radius,anchor.y+1,anchor.z+Math.cos(angle)*radius);
+  camera.lookAt(frameOceanDiverLookTarget(anchor.clone(),camera));camera.updateMatrixWorld(true);
+  const head=anchor.clone().add(new T.Vector3(0,.4,0)).project(camera);
+  assert.ok(head.x<-.15&&head.x>-.85,`Swimmer must remain visible left of the HUD: ${head.x}`);
+ }
+ const wide=new T.PerspectiveCamera(55,16/9,.1,1000),target=anchor.clone();
+ assert.deepEqual(frameOceanDiverLookTarget(target,wide),anchor);
 });

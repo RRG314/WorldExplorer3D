@@ -97,6 +97,18 @@ test('direct Ocean launch can create its bounded surface boat without Earth terr
  assert.ok(candidate);assert.equal(candidate.surfaceY,.08);assert.equal(candidate.synthetic,true);
 });
 
+test('vessel clearance samples the incoming water before publication and ignores the outgoing datum',async()=>{
+ const {buildSyntheticBoatCandidate,waterSurfaceYAt}=await import('../app/js/boat-mode/water-query.js');
+ ctx.boatMode={active:false};ctx.waterAreas=[];ctx.waterways=[];
+ const ocean=buildSyntheticBoatCandidate(0,0,{waterKind:'open_ocean',surfaceY:.08});
+ assert.ok(Number.isNaN(waterSurfaceYAt(0,0)),'No active water has been published yet');
+ assert.ok(Number.isFinite(waterSurfaceYAt(0,0,ocean)));
+ const lake={waterKind:'lake',source:normalizeWaterBody({pts:ring(100),surfaceY:1500,kindHint:'lake'})};
+ ctx.boatMode={active:true,currentWater:lake};ctx.waterAreas=[lake.source];
+ assert.ok(waterSurfaceYAt(0,0)>1499);
+ assert.ok(Math.abs(waterSurfaceYAt(0,0,ocean))<2,'The admitted destination supplies its own surface height');
+});
+
 test('accepted marine and terrain origins use one validated coordinate commit',async()=>{
  const {commitEarthLocationOrigin}=await import('../app/js/earth-core/location-origin.js');
  const ctx={LOC:{lat:39,lon:-76}},location={lat:0,lon:-140};commitEarthLocationOrigin(ctx,location);

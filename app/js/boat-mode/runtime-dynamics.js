@@ -175,7 +175,7 @@ export function createBoatRuntimeDynamics(deps = {}) {
     let obstacleBlocked=false;
     if(nextCandidate){
       const clearance=vesselObstacleAdmission(appCtx,catalog,nextX,nextZ,appCtx.boat.angle,
-        appCtx.waterSurfaceYAt?.(nextX,nextZ) ?? nextCandidate.surfaceY ?? appCtx.boat.y);
+        appCtx.waterSurfaceYAt?.(nextX,nextZ,nextCandidate) ?? nextCandidate.surfaceY ?? appCtx.boat.y);
       if(!clearance.allowed){nextCandidate=null;obstacleBlocked=true;}
     }
     if (!nextCandidate) {
