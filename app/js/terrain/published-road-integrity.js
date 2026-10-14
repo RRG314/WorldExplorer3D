@@ -68,3 +68,18 @@ export function roadSourceCoordinateTolerance(x, z, grid) {
   const roundingBound = value => 2 ** (Math.floor(Math.log2(Math.abs(value)+1))-24);
   return Math.hypot(grid+roundingBound(x), grid+roundingBound(z));
 }
+
+// Both permanent engineered approaches and a staged region own real at-grade
+// contacts. A bridge overhead cannot satisfy a missing junction below it.
+export function roadJunctionContact(indices,x,z,tolerance) {
+  for(const index of indices){
+    const y=index.sampleAt(x,z,NaN,'at_grade');
+    if(Number.isFinite(y))return {x,z,y,distance:0};
+  }
+  let best=null;
+  for(const index of indices){
+    const candidate=index.nearestSurfaceAt(x,z,tolerance,'at_grade');
+    if(candidate&&(!best||candidate.distance<best.distance))best=candidate;
+  }
+  return best;
+}
