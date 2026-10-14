@@ -86,3 +86,33 @@ all file bytes and paths intact. Only downloaded Chrome HTTP/compiled-code
 cache entries older than 24 hours were removed. Source, user browser profile,
 player storage, current dist and four saved historical packages are intact.
 Cleanup receipts are in `output/release-evidence/`.
+
+## Candidate 258988d8: current verification
+
+The complete source chain passes 2,613 tests, including the registered venue
+scene-ownership regression. Immutable staging package
+`output/hosting-validation/release-561-258988d8` has asset manifest SHA-256
+`a89ab6fcd9b0ce03ad6b92c5dedfac532509d586c827bff15f68eab73e9c785d`.
+The opt-in allocation diagnostic was subsequently committed at `b6c4dc2d`;
+it does not change the shipped game.
+
+Ordinary-memory packaged aquarium testing completes the full visit and five
+admissions. All three timing windows are approximately 60 FPS with 16.8 ms
+p99 and no measured frame hitches. It still fails the existing 1 GiB raw
+JavaScript heap limit: samples are 1.56–1.59 GB. The failed report is retained
+in `output/release-review/561-aquarium-package-memory/`.
+
+A separate source allocation diagnostic estimates about 546 MiB of live
+sampled allocation. Its raw heap falls naturally from 1.41 GB in Pavilion to
+638 MB in the lower gallery and 640 MB on reentry. This distinguishes live
+allocation from not-yet-collected garbage, but neither sampling nor a later
+collection turns the packaged raw-heap failure into a pass. No memory budget
+has been increased, and no forced collection was used in these timing runs.
+Diagnostic evidence: `output/release-review/561-aquarium-allocation-profile/`.
+
+The complete 107-gate candidate matrix is now running sequentially against
+the saved 258988d8 package. Individual results are not a complete release
+approval. Backend, save/fallback round-trip and ordinary hosted acceptance
+must still match the final candidate. A read-only production Functions
+inventory confirms active Node.js 22 functions; that inventory does not prove
+the four changed backend files have been deployed or tested live.
