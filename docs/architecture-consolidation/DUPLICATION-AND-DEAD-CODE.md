@@ -16,3 +16,20 @@
 | Models, textures, deployment artifacts | Dynamic catalog strings, runtime quality tiers, rollback builds and external attribution matter. | NO DELETION. No asset rights/reachability proof established. Four retained packages and current production dist preserved. |
 
 Zero gameplay modules, assets, backups, compatibility save readers or external capabilities were deleted. This is intentional: static unreferenced exports are candidates, not proof. A future deletion requires import/require, dynamic string, HTML, worker, catalog, feature-flag, test fixture, migration and external-consumer checks plus parity on the real user journey.
+
+## Follow-up decisions
+
+- Commerce's superseded unreachable local grant/reconcile helpers were removed
+  only after their callers migrated to one delivery/recovery path. Wallet and
+  inventory remain separate authorities; no old save readers were removed.
+- The water-mask CPU-canvas experiment was rejected after pixel differences.
+  The original rasterizer remains the owner; the worker only reads its bitmap.
+- The proposed capture-index shortcut is not safe yet: current contracts allow
+  in-place coordinate/footprint/identity edits. Reusing bounds solely by array
+  identity or world generation would miss those edits. Aircraft colliders live
+  in a separate dynamic list, so movement there is not evidence to change this
+  index. No query, capture or collision capability was removed.
+- Regional GPU uploads remain tied to the pinned Three.js 0.128 renderer. It has
+  no `compileAsync`; a modern API call or blanket background prewarm is not a
+  verified solution. Establish a measured upload budget and cancellation parity
+  before changing its publication lifecycle.

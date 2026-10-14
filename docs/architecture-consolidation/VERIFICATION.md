@@ -29,7 +29,7 @@ No matched before/after full-world performance run was performed for these owner
 
 The source suite includes server/revision/permission components; no new Firestore/Storage policy or server schema was changed. Existing emulator runs remain dated prior evidence. Ordinary multi-account property/service gameplay, private capture grant/revoke, sign-in, App Check and recovery must be checked together on a new immutable candidate. Full release matrix, physical Android/iOS, hardware GPS/AR, every campaign/catalog and assistive-technology review were **not run here**.
 
-## Exact next work
+## C1–C3 next work at that checkpoint (subsequently advanced below)
 
 1. Start with `BASELINE.md` and `REFACTOR-PLAN.md`; inspect `git status --short` and `CURRENT-STATE.md`. Do not touch the older Documents checkout or production dist.
 2. `node scripts/verification/account-request-lifetime-current.mjs` reproduces this slice's controlled browser acceptance. The regression tests are part of `npm run verify:pr`.
@@ -37,7 +37,7 @@ The source suite includes server/revision/permission components; no new Firestor
 4. Use the retained `rdt-building-index.matches` and regional graphics profile leads for one measured performance repair. Preserve in-place capture edits, old complete scenery, cancellation and unchanged map coverage.
 5. At the next release milestone, build a separate permitted immutable candidate and run risk-weighted preservation, backend/private-data and device classes. Never overwrite the preserved production package as a shortcut.
 
-Final source commit: `a028e65e`. The final focused reruns pass 56 and 42 checks (`account-final.tap`, `transport-final.tap`). The production build/asset manifest hashes exactly match baseline. `checkpoint.json` records code identity, evidence hashes and preservation decisions.
+C1–C3 source commit: `a028e65e`. The final focused reruns pass 56 and 42 checks (`account-final.tap`, `transport-final.tap`). The production build/asset manifest hashes exactly match baseline. `checkpoint.json` records code identity, evidence hashes and preservation decisions.
 
 
 ### C5 connected commerce recovery follow-up
@@ -107,3 +107,34 @@ plus the structural chain (`source-chain-service.log`).
 native IndexedDB browser checks, with inspected screenshot/state and no page
 errors (`companion-service-browser/`). This fixture controls delays and failures;
 it is not a rendered-world or hosted veterinary-service acceptance claim.
+
+### C8 immutable full-world preservation
+
+`JAVA_HOME=/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home PATH=/opt/homebrew/opt/openjdk@21/bin:$PATH WE3D_VERIFY_ROOT=output/hosting-validation/consolidation-final-20261013 node scripts/verification/consolidation-gameplay-current.mjs`
+
+Five checks pass on `5.6.0+2313152b4378.d443b411e27365f4.staging`: fresh world and
+starter companion; Profile naming/care and once-only daily XP; restored walking
+input; full-reload persistence; narrow profile layout. Real Chrome GPU and
+IndexedDB, isolated emulators, normal visible UI and prescribed walking actions.
+One diagnostic owner command seeds XP eligibility; this does not certify a whole
+progression campaign. Both 1280×800 and 390×844 viewports use a touch-capable
+context, not a physical phone. No page errors or failed local assets. Inspected
+profile, walking and narrow-layout images. Final run: 156.8 seconds.
+
+The first two attempts are retained under `final-gameplay/attempt-1` and
+`attempt-2`: the raw scripted click was below the scroll panel, then an element
+handle was retired by the normal progress refresh. Reacquiring the locator with
+Playwright's normal scrolling/retry fixed the runner; no game code or assertion
+changed. The pass is `final-gameplay-3.log` / `final-gameplay/report.json`.
+
+The follow-up artifact verifier initially could not obtain Git status within its
+10-second identity deadline. The final clean checkpoint must rerun identity and
+package verification after committing the runner correction; an old successful
+build is not a substitute for that gate.
+
+### Final inventory
+
+`node scripts/architecture-evaluation/system-review.mjs --out output/architecture-consolidation/2026-10-13/completed-inventory`
+passes: 1,110 modules, 227,966 lines, 66 census groups, zero resolved static cycles,
+121 direct writer modules. Existing dynamic/aliased writers remain tracked; no
+inference that a static graph certifies lifetime or performance.

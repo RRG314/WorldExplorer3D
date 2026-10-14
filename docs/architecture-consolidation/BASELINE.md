@@ -35,3 +35,12 @@ All commands and expanded definitions are preserved in `output/architecture-cons
 The October 13 source-equivalent baseline has 2,528 passing component tests and passing protected CI. Prior packaged journeys cover opening (28 checks), coastal (23), vessel traversal (27 routes), aquarium (33 functional checks), museum, location reload, marine/space returns and backend groups. Their exact package and limitations remain in `output/production-readiness-20261012/remaining-review-ledger.json`. They are inherited evidence, not new runs for this task.
 
 Known failures retained: ground/transition stalls; active heap/transfer budgets; incomplete physical-device and ordinary hosted acceptance. Coverage and post-exit retention passed their prior scoped tests. This consolidation must not hide those failures, thin the world or change thresholds.
+
+## Follow-up identity
+
+This file preserves the initial baseline. Subsequent implementation commits and
+source/test counts are in CHANGE-LEDGER and VERIFICATION. C5 adds an account-bound
+intent record and Backpack delivery marker without transforming existing player
+records. C6 adds a packaged worker. C8 binds services/care to stable recipients.
+The final local staging candidate is separate from production; none of these
+changes has been pushed or deployed as part of this consolidation assignment.

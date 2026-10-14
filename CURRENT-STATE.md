@@ -50,23 +50,41 @@ browsers/servers. Production deployment evidence is under
 `output/release-evidence/current/production-deployment.json` and
 `production-promotion.json`; acceptance gaps remain in their own receipts.
 
-## October 13 consolidation checkpoint (local only)
+## October 13 consolidation follow-up (local only)
 
-GitHub source integration is complete: stable `437e06cb`, both active development
-branches `64bab776`, identical content. Protected checks and Pages passed; all 19
-public gallery images were verified. Production remains the 5.5 build above.
+GitHub source integration completed before this assignment: stable `437e06cb`,
+both active development branches `64bab776`, identical content. Protected checks
+and Pages passed; all 19 public gallery images were verified. The subsequent
+consolidation commits remain local. Production remains the 5.5 build above.
 
-The owner's consolidation brief now starts a separate local assignment. Baseline
-rollback ref: `steven/consolidation-baseline-20261013`. See
-`docs/architecture-consolidation/BASELINE.md`, `REFACTOR-PLAN.md` and
-`VERIFICATION.md`. Current bounded repairs fence protected requests and
-wallet/property subscriptions to their initiating account, share the wallet
-projection, and remove the transport import cycle without changing geometry.
-No save migration, asset deletion, GitHub push or production deployment is
-included. The broad inventory is a first-pass map, not certification of every
-feature; known performance and hosted/device gaps remain explicit.
+Baseline rollback ref: `steven/consolidation-baseline-20261013`. The authoritative
+review is `docs/architecture-consolidation/FINAL-REPORT.md`, with ten supporting
+baseline/inventory/authority/preservation/change/verification documents.
 
-## October 13 packaged verification and branch status
+C1–C3 fence protected requests and wallet/property listeners to their initiating
+account, share wallet projection and remove a transport import cycle without
+changing geometry. C5 adds durable account-bound purchase/service recovery and
+atomic Backpack delivery markers. C6 moves mapped-water bitmap readback to an
+owned worker, preserving every mask pixel. C7 adds real emulator commerce
+concurrency tests. C8 binds delayed service effects and care XP to their original
+target and applies care to the latest persisted companion row.
+
+All 2,575 source tests and the structural chain pass. All fifteen backend stages
+pass across two isolated selected runs, including two actual Earth worlds,
+shared vehicle handoff, property/network recovery, room chat and shared voyage.
+Native browser delayed-account, purchase recovery and IndexedDB companion checks
+pass. Exact package/browser results are in VERIFICATION; emulator/controlled
+checks do not establish ordinary hosted App Check or physical-device acceptance.
+
+The final local test package is
+`output/hosting-validation/consolidation-final-20261013`, built from `2313152b`:
+`5.6.0+2313152b4378.d443b411e27365f4.staging`. Production `dist`, four rollback
+packages, source/history and player data remain preserved. No push/deploy,
+paid provider, cloud credential creation or destructive migration occurred.
+Broader frame/venue/transfer failures, legacy unowned service receipts and
+hosted/device gaps remain explicit. This is not a complete release certification.
+
+## Earlier October 13 packaged verification and branch status
 
 The two active development branches, `steven/visual-quality` and
 `steven/post-5.2-release-integration`, contain the same preserved history. The

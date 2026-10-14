@@ -1,50 +1,109 @@
-# Consolidation checkpoint — October 13, 2026
+# Architecture consolidation — October 13, 2026
 
-The first implementation checkpoint is complete; **the repository-wide assignment is not fully verified**. The source now has stronger account-lifetime boundaries, one wallet projection and an acyclic literal transport import graph. Existing functionality, schemas, assets, production files and history are preserved. Broader gameplay/performance acceptance remains explicit.
+The local consolidation includes implemented, tested repairs through C8 and a
+repository-wide inventory with explicit dispositions. **This is not a claim that
+every gameplay feature or release gate is complete.** Production remains 5.5;
+these changes have not been pushed or deployed. Source, history, player data,
+production dist and rollback packages are preserved.
 
 ## VERIFIED COMPLETE
 
-- The protected-request account-switch defect is reproduced and repaired with actual-module and native-browser controlled-service evidence. Same-account success, legacy balances and unknown-outcome/non-replay semantics are retained.
-- The transport import cycle is removed with unchanged scalar geometry calculations and a compatible export. Forty-two focused transport checks pass.
-- Full source chain: 2,547 passing tests in 470 files; related structural/dependency checks pass.
+- Protected requests, wallet/property subscriptions and fallback dispatch retain
+  their initiating account. Actual-module failure cases and native-browser
+  account-switch/reconnect cases pass.
+- Connected purchases/services now retain durable account-bound intent and the
+  same server receipt through lost responses, reload and midnight. Backpack
+  delivery and its marker commit together. Authenticated emulator concurrency,
+  account separation and refund tests pass; native browser locks/reload/two-tab
+  checks pass.
+- Delayed services retain their original vehicle/vessel/companion. Care updates
+  the latest saved row; XP goes to the treated companion, survives reload and is
+  not duplicated. Failed saves leave service recovery pending. Seven focused
+  actual-module cases and four native IndexedDB/browser checks pass.
+- The water-mask readback worker preserves all 16,777,216 mask bytes. Matching
+  native Chrome mechanism tests improved maximum frames from
+  116.7/66.1/66.7 ms to 50.0/16.7/17.2 ms; background construction takes longer.
+  This is a measured local mechanism improvement, not whole-world smoothness.
+- All 2,575 source tests and structural checks pass. All fifteen backend stages
+  pass across two isolated selected runs, including actual two-world shared
+  objects/vehicle handoff, room chat/input restoration, property/network recovery
+  and shared expedition recovery. The final immutable-world care/profile/reload check also passes five steps
+  with no page errors or failed local assets; see [VERIFICATION](VERIFICATION.md).
 
-Evidence: [change ledger](CHANGE-LEDGER.md), [verification](VERIFICATION.md), regression files `tests/account-request-lifetime-current.test.mjs` and `tests/tunnel-boundary-authority-current.test.mjs`.
+Evidence and exact modified files: [change ledger](CHANGE-LEDGER.md),
+[verification record](VERIFICATION.md),
+[service target tests](../../tests/poi-service-target-current.test.mjs),
+[HTTP commerce checks](../../scripts/verification/commerce-backend-current.mjs).
 
 ## IMPLEMENTED BUT UNVERIFIED
 
-A fresh cross-product inventory and 40 action/operation preservation groups exist. This is not exhaustive end-to-end acceptance of all catalog actions, platforms or backend paths. Real multi-account hosted service/property flows, physical sensors/devices and whole-product permission/lifecycle behavior remain unverified in this checkpoint. See [system inventory](SYSTEM-INVENTORY.md) and [preservation matrix](FEATURE-PRESERVATION-MATRIX.md).
+Supported product routes remain inventoried in the [system inventory](SYSTEM-INVENTORY.md)
+and forty action/operation groups in the [preservation matrix](FEATURE-PRESERVATION-MATRIX.md).
+The census is not a manual line-by-line review or exhaustive acceptance of every
+catalog item. Ordinary hosted multi-account/private-capture flows, complete
+sustained-world/venue performance and named-device/GPS/AR/assistive-technology
+acceptance remain unverified on this candidate. Emulator or controlled browser
+results do not close those classes.
 
 ## PARTIAL OR BROKEN
 
-Continuous Earth gameplay remains district-bound despite traveling scenery. Venues, careers, marine wildlife, space art and cross-device progress retain documented limits. Active-frame/entry pauses remain. The local world smoke is incomplete on App Check/provider errors and has a pavement presentation finding; no passing production claim is made. See [incomplete features](INCOMPLETE-FEATURES.md).
+Traveling scenery extends beyond the selected Earth district, but detailed
+road/collision/interior/activity gameplay remains district-bound. Venues,
+careers, marine wildlife and cross-device progress retain the limits in
+[INCOMPLETE-FEATURES](INCOMPLETE-FEATURES.md). Full-world frame/transfer and venue
+heap/entry failures remain unresolved. Historical service records without trusted
+account attribution are preserved; automatic reconciliation is not safe yet.
 
 ## CONSOLIDATED
 
-- Request identity policy in the existing Function transport, with captured-account domain options.
-- Wallet normalization shared by shop and property projections; stale subscription callbacks fenced.
-- Tunnel roof-bound query under the existing envelope owner, with old caller export preserved.
-- Older architecture indexes explicitly marked historical, with this checkpoint as the current evidence entry.
-
-See [authority map](AUTHORITY-MAP.md). The 121 direct shared-context writer modules are not claimed to be consolidated.
+Critical boundaries now have named owners: protected-request identity, shared
+wallet projection, durable pending-commerce intent, Backpack receipt delivery,
+stable companion-care recipient and water readback lifetime. The unchanged tunnel
+roof query lives under the existing envelope owner with a compatible reexport;
+the resolved static import cycle is removed. See [AUTHORITY-MAP](AUTHORITY-MAP.md).
+The remaining direct/injected shared-context writers are tracked, not claimed to
+be fully consolidated. No wholesale rewrite, world thinning or geometry redesign.
 
 ## DEFERRED
 
-Measured capture-index and regional GPU preparation improvements; remaining dynamic authority traces; broad hosted/account/capture recovery journeys; immutable release/device acceptance; new scope such as full CERN/careers, whales/spearfishing and worldwide detailed-road gameplay. Each has an exit condition in [the plan](REFACTOR-PLAN.md). No code was deleted without proof; see [duplication decisions](DUPLICATION-AND-DEAD-CODE.md).
+Capture-index revision ownership, bounded regional GPU preparation, remaining
+actor/camera/environment writer migrations and broader venue/content work have
+specific authority and acceptance dependencies in [REFACTOR-PLAN](REFACTOR-PLAN.md).
+Array-identity-only capture caching would miss supported in-place edits and was
+not applied. Three.js 0.128 has no `compileAsync`; an unmeasured renderer upgrade
+or prewarm is not a completed repair. Unsupported deletion candidates, old save
+readers and rollback artifacts remain protected by the [cleanup decisions](DUPLICATION-AND-DEAD-CODE.md).
 
 ## BLOCKED
 
-A clean ordinary local-world browser result was blocked by reCAPTCHA/App Check/provider availability. This is a verification/environment blocker, not proof that these source changes break production. The next run needs a correctly configured authorized staging/hosted context. No new credentials, paid services, production rule changes or production deployment were attempted. Other safe work completed independently.
+Ordinary hosted verification needs a valid existing staging App Check context;
+a temporary staging credential was requested but not created without approval.
+The assignment brief explicitly stops affected changes requiring “new credentials
+… not already authorized.” Physical-device acceptance also requires actual
+named hardware. Local emulator and independent source/browser work proceeded.
+Production deployment is outside this consolidation assignment; no security
+restriction or release failure was bypassed.
 
 ## REGRESSIONS
 
-No failing component regression after the implemented changes; all 2,547 selected tests pass. No matched complete browser/performance comparison exists, so absence of all gameplay regressions is **not established**. The failed driving receipt and existing performance failures remain visible. Save/artifact preservation is checked separately from gameplay smoothness.
+No component regression was observed in the passing source chain, and the
+completed backend/browser journeys retain their scoped behavior. Production
+manifest preservation and final package integrity are separate checks in
+VERIFICATION. Absence of every gameplay/performance regression is not established.
+The original App Check/provider driving failure, existing performance failures,
+and diagnosed verification-runner mistakes remain in the evidence ledger.
+No failing assertion or budget was weakened to obtain a pass.
 
 ## NEXT ACTIONS
 
-1. Characterize and repair uncertain commerce receipt recovery, then complete account/property/service and failed-load recovery on a correctly configured immutable staging candidate.
-2. Profile one current capture-index/graphics hitch path and implement only a measured parity-preserving repair.
-3. Close remaining privacy/room/lifecycle and broad preservation classes, then named-device and release acceptance.
+1. For release, finish ordinary hosted/account/capture acceptance with authorized
+   attestation and named physical devices. Release the commerce frontend/backend
+   changes together; the deployed older backend lacks the next-day recovery fix.
+2. Give capture edits an explicit revision authority before removing the full
+   validation scan; measure GPU preparation/cancellation before changing scenery
+   publication. Repeat matched routes and exact coverage/retention checks.
+3. Reconcile historical unowned service receipts only after authenticated ownership
+   and effect state are proven. Preserve old bytes until then.
 
-Start from the local checkpoint and [baseline](BASELINE.md); preserve `steven/consolidation-baseline-20261013`, the production dist and four rollback packages. No GitHub push or production deploy is included in this assignment.
-
-Source boundaries: [request transport](../../js/function-api.js), [wallet projection](../../app/js/economy/wallet-snapshot.js), [tunnel envelope](../../app/js/world/compiler/tunnel-envelope.js). Regression evidence: [account tests](../../tests/account-request-lifetime-current.test.mjs), [tunnel tests](../../tests/tunnel-boundary-authority-current.test.mjs), [verification record](VERIFICATION.md).
+Continue from the preserved local commits and [baseline](BASELINE.md). These are
+concrete remaining dependencies; they have not been relabeled completed work.

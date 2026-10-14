@@ -37,7 +37,7 @@ Before boundary/structure characterization passed. After **42/42** focused tests
 - `scripts/verification/account-request-lifetime-current.mjs`: bounded native Chrome fixture, actual ESM imports, controlled SDK/HTTP, disposable state, owned cleanup, stored failures and explicit evidence tier.
 - Ten files under `docs/architecture-consolidation/`: first-pass system/feature/authority inventory, ordered work and honest evidence. `CURRENT-STATE.md` and `progress.md` record the local checkpoint; three older system/architecture indexes now identify their historical scope and link the current review.
 
-## Remaining risk
+## C1–C3 checkpoint risk (historical; follow-ups below)
 
 Full source chain passes **2,547 tests in 470 files**, with dependency/ownership/boundary/name/inventory/sensitivity checks. The ordinary local driving run loads and moves but is **incomplete/failed** on App Check and provider errors. Its screenshot is retained, including pavement detail requiring matched-data review. No current full-game performance improvement, immutable candidate acceptance, physical-device acceptance or broad account/capture workflow certification is claimed.
 

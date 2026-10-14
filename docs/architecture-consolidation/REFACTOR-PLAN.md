@@ -18,13 +18,63 @@ Fresh graph cycle: structure semantics → transport surface compiler → tunnel
 
 Run focused tests before/after each slice; run the full source chain once integrated. Execute a bounded real-browser driving journey and account-race browser fixture, inspect state/images and errors. Record full-runtime performance as unverified unless matching measured runs establish it. Update every required audit document with explicit evidence levels. Commit a clean local checkpoint; no deployment or deletion.
 
-## Subsequent high-risk work (separate measured slices)
+## C5 — Durable purchase and service recovery — verified locally
 
-1. C5 implemented and locally verified: durable account-bound commerce intent, atomic item-delivery marker, same-request recovery and service target retention. Live service acceptance and older unowned legacy receipts remain separate verification/migration work; see the ledger.
-2. Profile and remove full capture-index validation from active travel without missing in-place building edits; compare ordinary route frames and unchanged coverage.
-3. Stage regional GPU uploads/shaders before atomic handoff; cancellation must retain the old complete region and release rejected work.
-4. Trace remaining shared-context writers by semantic owner (actor, camera, environment), migrating only demonstrated conflicts.
-5. Finish adversarial account/room/capture subscription and permission tests in emulator/browser; include logout, reconnect and stale completion.
-6. Complete broad preservation matrix on one immutable candidate and physical-device classes. No claim of repository-wide verification before these close.
+Implemented in `a64f92b2`. Persist account-bound command before dispatch; preserve
+receipt identity across reload/midnight; store delivery with its receipt marker;
+retain original service target. Native browser, actual transaction modules and
+HTTP/emulator concurrency tests pass. Existing global unowned service entries
+are preserved, awaiting authenticated legacy reconciliation. No guessed UID.
 
-No deletion or wholesale rewrite is justified by the present evidence. Untraced callers or failed parity stop the affected slice, not independent review.
+## C6 — Measured mapped-water readback repair — verified locally
+
+Implemented in `940caf4c`. Original rasterization plus transferable bitmap and
+owned worker preserves every pixel. A different canvas hint failed parity and
+was rejected. Native Chrome measurements improve this mechanism's frame stalls;
+whole-world performance is not certified. Worker failure/cancellation retain
+fallback and old complete scenery. No geometry or coverage changes.
+
+## C7 — Backend/permission preservation — verified on emulators
+
+Implemented in `016ab873`. Commerce retry/account/cross-day/refund checks are now
+part of the fifteen-stage gate. All fifteen stages pass across two explicit
+isolated runs, including actual two-world vehicle/control/chat/property/shared
+expedition journeys. No security policy or production records changed. Ordinary
+hosted App Check remains a separate acceptance class.
+
+## C8 — Delayed service targets and durable companion care — verified locally
+
+Implemented in `2313152b`. Every reply retains its original target, care applies
+to the latest persisted companion, and XP accepts an explicit recipient. Failed
+save leaves a funded service pending; duplicate award receipts do not add XP.
+Seven actual-module cases and four native IndexedDB/browser cases pass; the full
+source chain passes 2,575 tests. The final immutable-world run is recorded in
+VERIFICATION, with its exact result and build identity.
+
+## Final checkpoint requirements
+
+- Reconcile the complete discovered module census, action preservation matrix,
+  authorities, incomplete feature dispositions and evidence with final source.
+- Validate a separate immutable package; preserve production dist and the four
+  rollback packages. Hash rather than infer artifact preservation.
+- Record actual source/browser/backend outcomes and unresolved classes. Commit
+  source and authoritative documentation locally; do not push or deploy.
+
+## Remaining product and release dependencies
+
+These are bounded unresolved work, not completed functionality or indefinite
+new phases. The consolidation brief permits explicit disposition; it does not
+permit risky implementation without established parity.
+
+| Priority | Work / authority | Required next evidence and stop boundary |
+| --- | --- | --- |
+| P1 | Capture index validation (`rdt-building-index.js`) | Prior profile attributes 57 ms of a 116.7 ms frame to `matches`. Preserve in-place footprint/identity edits. Introduce explicit publication/mutation revision only after all real writers are traced; compare a matched route and exact nearest ordering. Array-identity caching alone is invalid. Aircraft colliders use a separate list and do not justify an index change. |
+| P1 | Regional GPU preparation (`terrain/far-field.js`) | Pinned Three.js 0.128 lacks `compileAsync`. Measure bounded texture/geometry/shader preparation before atomic handoff; cancel/release rejected work while retaining the old region. No blanket prewarm or renderer upgrade without baseline parity. |
+| P1 | Historical commerce (`economy` + server receipts) | Unowned old global records cannot safely be assigned to the current account. Authenticated reconciliation must prove receipt ownership and effect state before import/refund. Preserve bytes until then. |
+| P1 | Hosted/physical release acceptance | Use existing authorized staging attestation or explicitly approved temporary credentials; then ordinary account/capture/privacy and travel acceptance on one candidate. Named Android/iPhone/GPS/AR require real hardware. Emulator results do not close these gates. |
+| P2 | Remaining context writers | Census includes direct and known injected writers. Trace each proposed migration by lifetime/units; only migrate reproduced conflicts. No broad ECS conversion or camera/actor rewrite. |
+| P2 | Venue and full-world performance | Aquarium/museum functional routes remain, but heap/entry and frame/transfer budgets need matched fresh measurement. Preserve failed receipts; no threshold relaxation. |
+| P2 | Gameplay/content breadth | Worldwide detailed roads, full CERN/careers/farming, new ocean species/spearfishing, and additional venue floors need their own complete supported journeys, licensed assets and budgets. Existing bounded features remain available. |
+
+No deletion or wholesale rewrite is justified by the present evidence. Untraced
+callers or failed parity stop the affected slice, not independent review.

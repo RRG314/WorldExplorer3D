@@ -54,6 +54,7 @@ if(!process.env.FIREBASE_AUTH_EMULATOR_HOST){
    const skip=page.getByRole('button',{name:'Skip guide',exact:true});if(await skip.isVisible())await skip.click();
   };
   await ready();
+  console.log('[consolidation-gameplay] World ready; checking companion controls');
   const snapshot=()=>page.evaluate(()=>__WE3D_COMPANION_SUPPORT__.snapshot());
   const starter=(await snapshot()).companions.find(c=>c.isStarterCompanion);assert.ok(starter?.active);
   report.checks.push('Fresh immutable world loads with an active starter companion');
@@ -66,7 +67,9 @@ if(!process.env.FIREBASE_AUTH_EMULATOR_HOST){
   // the care reward is eligible; neither IndexedDB nor private modules are patched.
   await page.evaluate(()=>__WE3D_COMPANION_SUPPORT__.awardXp('consolidation:outing','care-after-outing'));
   const before=(await snapshot()).companions.find(c=>c.active).progression.totalXp;
-  await runPrescribedGameActions(page,out,[{buttons:['left_mouse_button'],frames:1,mouse_x:20,mouse_y:10},{buttons:[],frames:3}],`[data-companion-action="care"][data-companion-id="${starter.instanceId}"]`);
+  // Locator click reacquires the button after the XP event refreshes the panel
+  // and scrolls it into view. The skill choreography below checks actual walking.
+  await card.locator('[data-companion-action="care"]').click();
   await page.waitForFunction(before=>__WE3D_COMPANION_SUPPORT__.snapshot().companions.find(c=>c.active).progression.totalXp>before,before);
   const after=(await snapshot()).companions.find(c=>c.active).progression.totalXp;
   assert.equal(after,before+5);
@@ -74,6 +77,7 @@ if(!process.env.FIREBASE_AUTH_EMULATOR_HOST){
   await page.waitForTimeout(500);assert.equal((await snapshot()).companions.find(c=>c.active).progression.totalXp,after);
   await page.screenshot({path:out+'/companion-profile.png'});
   report.checks.push('Current Backpack/Profile controls name and care for the companion; daily care XP is once-only');
+  console.log('[consolidation-gameplay] Care persisted; checking walking and reload');
   await page.locator('#discoveryCloseBtn').click();
   const pose=()=>page.evaluate(()=>getWorldExplorerRuntimeDiagnostics().activeActor.position);
   const beforeWalk=await pose();
@@ -82,6 +86,7 @@ if(!process.env.FIREBASE_AUTH_EMULATOR_HOST){
   report.checks.push('Closing the profile restores walking input');
   await page.screenshot({path:out+'/walking-world.png'});
   await page.reload();await ready();
+  console.log('[consolidation-gameplay] Reload ready; checking saved state and narrow layout');
   assert.equal((await snapshot()).activeName,'Copper');assert.equal((await snapshot()).companions.find(c=>c.active).progression.totalXp,after);
   report.checks.push('Returning player retains name, active selection and exact XP after a full world reload');
   await page.setViewportSize({width:390,height:844});await openProfile();
@@ -90,6 +95,6 @@ if(!process.env.FIREBASE_AUTH_EMULATOR_HOST){
   await page.screenshot({path:out+'/companion-touch.png'});report.checks.push('Narrow touch layout exposes the same profile without horizontal overflow');
   report.state=await page.evaluate(()=>JSON.parse(render_game_to_text()));
   assert.deepEqual(report.errors,[]);assert.deepEqual(report.localFailures,[]);report.ok=true;
- }catch(error){report.error=String(error.stack||error);if(page)await page.screenshot({path:out+'/failure.png'}).catch(()=>{});process.exitCode=1;}
+ }catch(error){report.error=String(error.stack||error);if(page){report.failureState=await page.evaluate(()=>{const s=window.getWorldExplorerRuntimeDiagnostics?.()||{};return{runtime:{gameStarted:s.gameStarted,worldLoading:s.worldLoading,environment:s.environment,activeActor:s.activeActor},companion:window.__WE3D_COMPANION_SUPPORT__?.snapshot()};}).catch(()=>null);await page.screenshot({path:out+'/failure.png'}).catch(()=>{});}process.exitCode=1;}
  finally{await writeFile(out+'/report.json',JSON.stringify(report,null,2)+'\n');console.log(JSON.stringify({ok:report.ok,buildId:report.buildId,checks:report.checks,error:report.error}));if(owned)await closeOwnedBrowser(owned);await server?.close();}
 }
