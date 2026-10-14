@@ -40,7 +40,7 @@ water, swim or dive with the appropriate equipment, deploy the submarine and
 recover to the same parent ship.
 
 <!-- public-gallery:research-interior -->
-![Inside the research vessel galley with carried provisions available](assets/gallery/5.6/research-interior.webp)
+![Inside the research vessel galley with Backpack provision controls](assets/gallery/5.6/research-interior-cf113dcb5303.webp)
 
 ## Explore farther
 
@@ -60,7 +60,7 @@ animal sightings. The Journal and Field Guide remain available across ocean and
 planetary journeys, with supported return actions for saved voyages.
 
 <!-- public-gallery:submarine -->
-![The Atlantic Explorer submarine deployed from its research vessel](assets/gallery/5.6/submarine.webp)
+![The Atlantic Explorer submarine deployed from its research vessel](assets/gallery/5.6/submarine-7a6f4eab54d5.webp)
 
 ## Step inside
 
@@ -71,14 +71,14 @@ water, and save observations in your Journal. The visitor map helps you find
 another level and return outside.
 
 <!-- public-gallery:aquarium -->
-![Looking through the aquarium viewing window at animated marine life and coral](assets/gallery/5.6/aquarium.webp)
+![Looking through the aquarium viewing window at animated marine life and coral](assets/gallery/5.6/aquarium-2481f37f6e78.webp)
 
 A separate museum visit opens at The Peale’s mapped building. Its entrance hall
 and two galleries contain Smithsonian specimen models and a Met artwork to
 inspect, with collection notes saved to the same Journal.
 
 <!-- public-gallery:museum -->
-![Inside the interpretive museum gallery at The Peale in Baltimore](assets/gallery/5.6/museum.webp)
+![Inside the interpretive museum gallery at The Peale in Baltimore](assets/gallery/5.6/museum-ec196f05eadc.webp)
 
 ## Clearer presentation and progress
 

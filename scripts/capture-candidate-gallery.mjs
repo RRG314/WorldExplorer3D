@@ -28,13 +28,17 @@ const report = { ok: false, capturedAt: new Date().toISOString(), sourceUrl: url
   scope: 'Ordinary hosted Chrome, live providers, visible UI and keyboard/mouse controls. No debug attestation, provider interception, synthetic camera, controller stepping or test-only scene.', images: [], errors: [] };
 let owned, browser, page, reentryProfiler;
 async function capture(id, title, alt) {
-  const file = `${assets}/${id}.webp`;
   await page.mouse.move(2, 2);
   await page.waitForTimeout(150);
-  await sharp(await page.screenshot()).webp({ quality: 90 }).toFile(file);
-  const bytes = await readFile(file), size = page.viewportSize();
+  const bytes = await sharp(await page.screenshot()).webp({ quality: 90 }).toBuffer();
+  const sha256 = createHash('sha256').update(bytes).digest('hex');
+  // Hosting caches images for a year. New pixels require a new URL, including
+  // another capture within the same release; preserve old release image URLs.
+  const file = `${assets}/${id}-${sha256.slice(0, 12)}.webp`;
+  await writeFile(file, bytes);
+  const size = page.viewportSize();
   report.images.push({ id, title, alt, file, ...size,
-    sha256: createHash('sha256').update(bytes).digest('hex'), sourceBuild: report.sourceBuild,
+    sha256, sourceBuild: report.sourceBuild,
     capturedAt: new Date().toISOString(),
     provenance: 'Normal-input browser runtime capture; no synthetic camera or test-only scene.' });
   console.log(`[gallery] ${id}`);
@@ -56,8 +60,10 @@ async function measureWalkingView(label) {
 }
 async function watchJourneyFrames() {
   await page.evaluate(() => {
-    const sample = globalThis.captureJourneyFrames = { deltas: [], frame: 0, last: performance.now() };
-    const record = now => { sample.deltas.push(now - sample.last); sample.last = now; sample.frame = requestAnimationFrame(record); };
+    const sample = globalThis.captureJourneyFrames = { deltas: [], frame: 0, last: null };
+    // RAF timestamps precede callbacks. Establish the baseline on the first
+    // RAF instead of subtracting a later performance.now() from that frame.
+    const record = now => { if (sample.last !== null) sample.deltas.push(now - sample.last); sample.last = now; sample.frame = requestAnimationFrame(record); };
     sample.frame = requestAnimationFrame(record);
   });
 }
@@ -70,7 +76,8 @@ async function finishJourneyFrames() {
   });
   if (deltas) {
     const budgets = JSON.parse(await readFile('config/performance-budgets.json', 'utf8'));
-    report.journeyFrameTiming = { scope: 'Whole ordinary-input journey after exterior loading, including entry, lifts and reentry', hitches: frameHitches(deltas, budgets.desktopTier.hitches) };
+    report.journeyFrameTiming = { scope: 'Whole route including entry, lifts, reentry and screenshot readback; diagnostic timing, not an uninterrupted gameplay window', rawFrameMs: deltas };
+    report.journeyFrameTiming.hitches = frameHitches(deltas, budgets.desktopTier.hitches);
   }
 }
 async function enterEarth() {
@@ -307,7 +314,7 @@ try {
     await page.locator('#globeSelectorExploreModeBtn').click();
     await page.locator('#globeSelectorStartBtn').click();
     await page.waitForFunction(()=>{
-      const d=getWorldExplorerRuntimeDiagnostics();return d.gameStarted&&!d.worldLoading&&d.worldCounts?.buildings>0&&d.worldCounts?.roads>0&&!document.getElementById('loading')?.classList.contains('show');
+      return marineCtx.gameStarted&&!marineCtx.worldLoading&&marineCtx.buildings.length>0&&marineCtx.roads.length>0&&!document.getElementById('loading')?.classList.contains('show');
     },null,{timeout:240000});
     const time=page.locator('#quickTimeOfDay');
     for(let i=0;i<5&&await time.getAttribute('data-mode')!=='day';i++)await time.click();
@@ -362,7 +369,7 @@ try {
   report.walks.push(await walkResearchStationWithInput(page, 'galley'));
   await page.locator('#researchDeckAction').click();
   await page.getByLabel('Carried galley provisions').waitFor();
-  await capture('research-interior', 'Life aboard', 'Inside the research vessel galley with carried provisions available');
+  await capture('research-interior', 'Life aboard', 'Inside the research vessel galley with Backpack provision controls');
   // Selecting a destination closes the station panel through its normal UI.
   report.walks.push(await walkResearchStationWithInput(page, 'chart'));
   await page.locator('#researchShipMapButton').click();

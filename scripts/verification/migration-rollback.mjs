@@ -11,6 +11,7 @@ import { startStaticServer } from './static-server.mjs';
 import { configureStagingAppCheck } from './staging-app-check.mjs';
 import { closeOwnedBrowser } from './owned-browser.mjs';
 import { assertReviewedRollbackRuntime } from './rollback-runtime-contract.mjs';
+import { readExecutionEvidence, compareEvidenceToBaseline, evidencePath } from './execution-evidence.mjs';
 
 const root = process.cwd(), candidateRoot = process.env.WE3D_VERIFY_ROOT || 'dist';
 const fallbackRoot = process.argv.find(arg => arg.startsWith('--fallback='))?.slice(11);
@@ -31,6 +32,11 @@ for (const manifest of manifests) assert.equal(manifest.firebaseProjectId, manif
 const releaseProgram = JSON.parse(await readFile(path.join(root, 'config/production-program-gates.json'), 'utf8'));
 assert.equal(manifests[2].commit, releaseProgram.productionBaseline.releaseCommit, 'Upgrade must start from the declared current production source');
 assert.equal(manifests[0].firebaseProjectId, 'we3d-staging-20260712', 'This test cannot target production');
+// A save-owner browser round-trip cannot establish backend compatibility on
+// its own. Require the complete backend run for these exact accepted inputs.
+const backendEvidence = readExecutionEvidence(root, 'backend');
+assert.deepEqual(compareEvidenceToBaseline(backendEvidence, baseline, 'backend', candidate), [],
+  'Complete current backend verification before accepting save/rollback compatibility');
 
 // Pin every changed runtime file to the reviewed before/after bytes. A later
 // edit to even an already-listed path requires another compatibility review.
@@ -166,6 +172,7 @@ try {
   assert.ok(sameArtifactIdentity(candidate, artifactIdentity(root, candidateRoot)));
   assert.ok(sameArtifactIdentity(fallback, artifactIdentity(root, fallbackRoot)));
   assert.ok(sameArtifactIdentity(released, artifactIdentity(root, releasedRoot)));
+  assert.deepEqual(compareEvidenceToBaseline(readExecutionEvidence(root, 'backend'), baseline, 'backend', candidate), []);
   report.passed = true;
 } catch (error) {
   report.error = error.stack;
@@ -187,6 +194,8 @@ finally {
   finally { await server?.close(); }
 }
 const evidenceFiles = [];
+const backendEvidenceFile = path.relative(root, evidencePath(root, 'backend'));
+evidenceFiles.push({ path: backendEvidenceFile, sha256: createHash('sha256').update(await readFile(backendEvidenceFile)).digest('hex') });
 for (const file of ['report.json', ...report.stages.map(row => `${row.label}.png`)]) {
   const relative = `${output}/${file}`;
   evidenceFiles.push({ path: relative, sha256: createHash('sha256').update(await readFile(relative)).digest('hex') });

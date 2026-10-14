@@ -90,9 +90,8 @@ published versions.
 - Dense cities, rapid aerial travel, detailed facades and large structure
   networks can be demanding on browser and graphics memory. Areas left behind
   are unloaded, but total memory use still varies by browser and device.
-- Temporary JavaScript allocation can exceed 1 GB before the browser collects
-  unused data. Retained-data checks are separate from peak browser and graphics
-  memory; they do not establish low-memory phone support.
+- Large scenes can temporarily use more than 1 GB of JavaScript memory, in
+  addition to graphics memory. Low-memory phone support is not established.
 - Quality settings control rendering cost and effects. They do not rewrite
   mapped building height or replace the selected world with a lower-detail data
   source.

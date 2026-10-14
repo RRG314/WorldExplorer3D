@@ -149,3 +149,33 @@ Cleanup receipts are in `output/release-evidence/`.
 
 The final clean candidate, complete matrix/backend, save round-trip and ordinary
 hosted review remain outstanding. Production has not changed.
+
+
+## Current hosted capture and public presentation
+
+The staging preview now serves clean source `2d1cd2c8`, build
+`5.6.1+2d1cd2c82bbb.bc28b7fd5f3f8789.staging`. Both remote manifests match the
+saved package. Production is unchanged.
+
+Ordinary hosted capture passes Earth walking/driving/drone/flight, vessel room
+routes/helm/26 m sailing/steering/submarine/scuba, Saturn/starship command deck and
+return to Earth, aquarium street entry/lifts/exit/reentry, and museum street entry.
+All five reports contain zero captured page errors. Evidence is in
+`output/production-readiness-20261014/`. These are functional capture journeys,
+not the separate signed-in shared-voyage acceptance or the complete matrix.
+
+The first aquarium capture completed gameplay but its whole-route clock mixed a
+performance.now baseline with a preceding RAF timestamp. The report failed and is
+preserved in `output/release-review/561-gallery-initial-clock-failure/`. The clock
+now starts on its first RAF. A repeat passes the functional route. Three separate
+10-second in-venue windows run near 60 FPS. Whole-route raw timing also records
+loading, floor/scene transitions and screenshot readbacks, including a 2.12 s
+worst interval; this is not an uninterrupted gameplay benchmark or a passing
+whole-route hitch result. No frame values or thresholds were discarded.
+
+Nineteen fresh images now use content hashes in their filenames because Hosting
+marks images immutable for a year. Old image URLs retain their original bytes;
+the current landing page, Pages, README and release notes reference the new URLs.
+Both public surfaces pass desktop/tablet/phone layout and image-decoding checks
+without overflow or page errors. Current artwork remains stylized, with the
+limitations described in KNOWN_ISSUES; these images do not imply photorealism.

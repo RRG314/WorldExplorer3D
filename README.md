@@ -37,29 +37,29 @@ starting point. Detailed streets, interiors and activities remain in the selecte
 district. Turn traveling scenery on or off in Graphics settings.
 
 <!-- public-gallery:start -->
-![Drone view over mapped downtown Baltimore buildings and streets](assets/gallery/5.6/drone.webp)
+![Drone view over mapped downtown Baltimore buildings and streets](assets/gallery/5.6/drone-cf7691b9c943.webp)
 
 *In-game views of city travel, ocean research, space and places to visit.*
 
 | Explore on foot | Drive the city |
 | :--: | :--: |
-| ![Street exploration on foot with mapped buildings in Baltimore](assets/gallery/5.6/walking.webp) | ![The lighter BMW E34 on a mapped Baltimore street](assets/gallery/5.6/driving.webp) |
+| ![Street exploration on foot with mapped buildings in Baltimore](assets/gallery/5.6/walking-a8119ad855de.webp) | ![The lighter BMW E34 on a mapped Baltimore street](assets/gallery/5.6/driving-1b41f3116f83.webp) |
 
 | Take flight | Your research vessel |
 | :--: | :--: |
-| ![A player aircraft flying above Baltimore through the normal flight camera](assets/gallery/5.6/flight.webp) | ![Walking on the licensed research vessel beside its enclosed laboratories](assets/gallery/5.6/research-deck.webp) |
+| ![A player aircraft flying above Baltimore through the normal flight camera](assets/gallery/5.6/flight-f22b1898aa92.webp) | ![Walking on the licensed research vessel beside its enclosed laboratories](assets/gallery/5.6/research-deck-40e79f50319d.webp) |
 
 | Below the surface | Aboard Solis Reach |
 | :--: | :--: |
-| ![Scuba swimming beside the research submarine at Coral Shelf](assets/gallery/5.6/diving.webp) | ![Entering the command deck through the Solis Reach pressure door](assets/gallery/5.6/ship-interior.webp) |
+| ![Scuba swimming beside the research submarine at Coral Shelf](assets/gallery/5.6/diving-e47bc4881b7d.webp) | ![Entering the command deck through the Solis Reach pressure door](assets/gallery/5.6/ship-interior-2070577970ce.webp) |
 
 | Beyond Earth | Live Earth |
 | :--: | :--: |
-| ![Travel toward Saturn using optional flight assistance](assets/gallery/5.6/space.webp) | ![Live Earth globe and recent earthquake observations from USGS](assets/gallery/5.6/live-earth.webp) |
+| ![Travel toward Saturn using optional flight assistance](assets/gallery/5.6/space-fd854981b14d.webp) | ![Live Earth globe and recent earthquake observations from USGS](assets/gallery/5.6/live-earth-7326f212d1de.webp) |
 
 | Below the waterline | A collection to explore |
 | :--: | :--: |
-| ![Looking through the aquarium viewing window at animated marine life and coral](assets/gallery/5.6/aquarium.webp) | ![Inside the interpretive museum gallery at The Peale in Baltimore](assets/gallery/5.6/museum.webp) |
+| ![Looking through the aquarium viewing window at animated marine life and coral](assets/gallery/5.6/aquarium-2481f37f6e78.webp) | ![Inside the interpretive museum gallery at The Peale in Baltimore](assets/gallery/5.6/museum-ec196f05eadc.webp) |
 <!-- public-gallery:end -->
 
 ## What you can do
