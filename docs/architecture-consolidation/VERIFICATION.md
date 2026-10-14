@@ -127,8 +127,8 @@ handle was retired by the normal progress refresh. Reacquiring the locator with
 Playwright's normal scrolling/retry fixed the runner; no game code or assertion
 changed. The pass is `final-gameplay-3.log` / `final-gameplay/report.json`.
 
-The follow-up artifact verifier initially could not obtain Git status within its
-10-second identity deadline. The final clean checkpoint must rerun identity and
+The follow-up artifact verifier initially could not establish Git identity (that guard has a
+10-second deadline). The final clean checkpoint must rerun identity and
 package verification after committing the runner correction; an old successful
 build is not a substitute for that gate.
 
@@ -138,3 +138,45 @@ build is not a substitute for that gate.
 passes: 1,110 modules, 227,966 lines, 66 census groups, zero resolved static cycles,
 121 direct writer modules. Existing dynamic/aliased writers remain tracked; no
 inference that a static graph certifies lifetime or performance.
+
+### Final clean checkpoint
+
+- Clean implementation/verification commit: `8c4a8f1b73cb4a1515b9e81fbe099fca8c7dc4bf`.
+  Local package: `output/hosting-validation/consolidation-final-20261013`;
+  build `5.6.0+8c4a8f1b73cb.d443b411e27365f4.staging`. Source input fingerprint
+  `d07ffc4337bd35a26a6e9a387683fddf69f20ebf5933fa0051401c2f70cf030b`.
+- Clean build and subsequent `hosting-artifact.mjs verify` both pass: 727 files,
+  221 runtime bundle files, hashed water worker present. Asset-manifest hash
+  `c763dbdfce8b86786ee4366b9c82753e837419dd01226d9fdf0268d5c0627524`.
+  Delivered content is byte-identical to the C8 package; corrected runner inputs
+  are now committed and included in the new source fingerprint.
+- The full-world runner passes all five checks again on this final build in
+  115.2 seconds (`final-gameplay-clean.log`, `final-gameplay/report.json`).
+  Page errors and failed local resources: zero. Place/weather/marine routes
+  return 200. This is the isolated emulator route, not production App Check.
+- `GIT_OPTIONAL_LOCKS=0 npm run verify:pr` passes **2,575 tests**, zero failures,
+  skips or TODOs, plus the complete structural chain (`source-chain-final.log`).
+  The environment avoids optional Git index refresh writes during read-only
+  identity checks; it does not alter dirty-state detection or gate assertions.
+- Root and Functions `npm audit --omit=dev --json` each report zero known
+  advisories. This covers their locked production npm dependencies, not a new
+  independent security certification of browser-vendored code or every service.
+- Ten required documents, all relative Markdown links, forty distinct action
+  groups and all eight required final headings pass consistency checks.
+- Production still serves `5.5.0+d8775a392c42.88e67f97c00bb4c2.production`.
+  Both local production-manifest SHA-256 values match the initial baseline.
+  Remote stable/development refs remain at their pre-consolidation commits.
+- Two superseded generated validation payloads (585,682,384 bytes) were retired
+  only after every file/hash and absence of unknown files/symlinks were checked.
+  Source, complete manifests and verification receipts remain. Current `dist`,
+  four rollback packages, other checkouts and player data were not removed.
+- Owned browsers/emulators have closed and their ports are no longer listening.
+  The pre-existing October 7 emulator parameter file was preserved unchanged;
+  no real service credential or player account was created or deleted.
+
+A transient Git index-write timeout interrupted one documentation commit. No
+lock was deleted; inspection confirmed no surviving owner lock and the retry
+committed the complete staged change. The final evidence index is
+`output/architecture-consolidation/2026-10-13/completed-checkpoint.json`.
+This closes the local consolidation checkpoint, not the unrun hosted/device and
+remaining performance release gates.

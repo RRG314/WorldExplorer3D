@@ -125,3 +125,14 @@ no page errors. `companion-service-target-current.mjs` and
 `consolidation-gameplay-current.mjs` retain explicit evidence scope; the latter is
 the separate immutable full-world preservation runner. No control, geometry or
 stored companion identity changed. No old data was deleted.
+
+## Final preservation and handoff
+
+C8 source is committed in `2313152b`; the consolidated audit and corrected
+full-world runner are committed in `8c4a8f1b`. A separate immutable package from
+that clean commit passes all five full-world care/reload/layout checks, packaging
+integrity and the final 2,575-test source chain. Root and Functions production
+dependency audits report zero advisories. Full evidence, failures and remaining
+release limits are retained in VERIFICATION. Only two hash-verified superseded
+local validation payloads were removed; their manifests/receipts and source
+remain. No production, GitHub, player data, geometry or renderer-version change.

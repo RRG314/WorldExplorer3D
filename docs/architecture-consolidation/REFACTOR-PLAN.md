@@ -78,3 +78,12 @@ permit risky implementation without established parity.
 
 No deletion or wholesale rewrite is justified by the present evidence. Untraced
 callers or failed parity stop the affected slice, not independent review.
+
+## Checkpoint close
+
+Baseline/preservation, discovered-system census/disposition, C1–C8 implementation
+and applicable verification, immutable package integrity, documentation/link
+consistency and local commit preservation are complete at this checkpoint.
+The five final packaged-world checks and all 2,575 source tests pass. The table
+above remains actionable unfinished product/release work; it is not relabeled
+complete because local consolidation passed.

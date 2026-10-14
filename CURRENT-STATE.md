@@ -77,8 +77,8 @@ pass. Exact package/browser results are in VERIFICATION; emulator/controlled
 checks do not establish ordinary hosted App Check or physical-device acceptance.
 
 The final local test package is
-`output/hosting-validation/consolidation-final-20261013`, built from `2313152b`:
-`5.6.0+2313152b4378.d443b411e27365f4.staging`. Production `dist`, four rollback
+`output/hosting-validation/consolidation-final-20261013`, built from `8c4a8f1b`:
+`5.6.0+8c4a8f1b73cb.d443b411e27365f4.staging`. Production `dist`, four rollback
 packages, source/history and player data remain preserved. No push/deploy,
 paid provider, cloud credential creation or destructive migration occurred.
 Broader frame/venue/transfer failures, legacy unowned service receipts and
