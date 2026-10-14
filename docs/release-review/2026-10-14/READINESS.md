@@ -49,3 +49,40 @@ harbor, NASA, ocean and consolidation work; do not roll it back to the hotfix.
   substitutes for this candidate's results.
 
 Reports and inspected screenshots are under `output/road-continuity/junction-*`.
+
+## Complete candidate iteration 9586566b
+
+Immutable package `release-561-9586566b` builds and its source chain passes
+2,611 tests. Both registered road gates pass on its exact bytes: real T-junction
+turn/departure and eleven controlled arrivals with one injected worker failure,
+one local recovery, one world generation and 69 region evictions. Screenshots
+were inspected.
+
+The aquarium completes street entry, model failure/retry, all lifts and
+observations, map orientations, run/jump, exit and five reentries with bounded
+water-target/model leases. Its first lower-reef sample fails p99/hitch budgets
+(55.7 FPS average, 66.6 ms p99, one 100.1 ms frame). The matrix was deliberately
+stopped to investigate; its started museum gate is interrupted, not passing.
+A capped-heap diagnostic repeat passes frame budgets but does not erase the
+first failure. It reveals substantial transform work under the hidden city.
+
+The camera/light lease now hides the retained exterior root while an exclusive
+venue owns the camera layer, and restores it on exit. Road readiness uses an
+interior actor policy so outside compiler recovery cannot stop an occupied
+floor. Two regressions fail before repair; all 41 focused owner/controller
+checks pass after it. Source-native profiling with ordinary Chrome memory
+settings shows 60 FPS and 16.8 ms p99 in all three windows, but still fails the
+1 GiB heap budget (about 2 GiB before a natural collection; 637 MB on reentry).
+This is diagnostic evidence, not final packaged performance acceptance.
+
+Additional native venue/harbor/Kennedy gates are now required, making 107
+candidate gates. The compatible fallback is the preserved `4ec78f8e` venue
+package: it retains modern Backpack/campaign fields. Its pre-hotfix road
+behavior is a documented emergency fallback limitation. Current 5.5.1 is the
+upgrade starting point. Actual package/save/backend checks remain required.
+
+Generated-package copy-on-write deduplication and transparent compression keep
+all file bytes and paths intact. Only downloaded Chrome HTTP/compiled-code
+cache entries older than 24 hours were removed. Source, user browser profile,
+player storage, current dist and four saved historical packages are intact.
+Cleanup receipts are in `output/release-evidence/`.

@@ -84,9 +84,9 @@
     "config/system-release-gates.json": {
       "before": "6538c8954e3e2b16d18d5e23910dfaec31a09f137c0c15fac4cb2de14fae223c",
       "beforeMode": "100644",
-      "after": "d795f8726015e37b654ac6f37688349442c74003549bff53e73fbfa618d5061a",
+      "after": "402e6179f17fd0437b21e91ff8cc796f10cdbdf88e6fcc70ff091616ed8202f2",
       "afterMode": "100644",
-      "review": "Adds native junction-driving and fault-recovery requirements; no game data or security changes."
+      "review": "Requires native junction driving, local road recovery, mapped aquarium/harbor and distant museum admission, VAB tour/terrain recovery and LC39B walking. No runtime player data changes."
     },
     "package-lock.json": {
       "before": "9b6aaebc846b19cc8ea85ab03f8f52c50d26076200bb5b80291fdb8df64db795",
@@ -101,6 +101,41 @@
       "after": "c7fcb1bfa36d9d3cb57461b6c50f032a2c0322f9a1fd1c421a1408d46f5e8978",
       "afterMode": "100644",
       "review": "Release version only; scripts and dependency declarations unchanged."
+    },
+    "app/js/interiors/venue-lighting.js": {
+      "before": "3b1edc34d98aa1742205e3060c04edf3e0d26e3798c93e13c4e4f4e1b0d366d6",
+      "beforeMode": "100644",
+      "after": "2cd9b7326fd8e19e129e89527e811d6e10ad13c65f33d7a6c79d1f70aad297f5",
+      "afterMode": "100644",
+      "review": "The existing camera/light lease immediately updates retained-world visibility on entry and release. Does not detach or dispose the city and changes no stored state."
+    },
+    "app/js/planetary/scene-ownership.js": {
+      "before": "face163f17d4161f040eee4ca1ae19b11e80a8a127e6110d1bc9da3db25c6d3e",
+      "beforeMode": "100644",
+      "after": "b7163a6e6cb91841bb174a8b182009b69a6045e42f438f0bf0e7b1ef7be61bc4",
+      "afterMode": "100644",
+      "review": "The exterior root follows the existing main-camera layer mask, suppressing invisible transform traversal in exclusive visitor venues. Same object identities and explicit contact queries remain; visible return resumes transforms. No persistence changes."
+    },
+    "app/js/runtime/core-frame-systems.js": {
+      "before": "dff3b2811328f946164edf5544b68a1a686e0bab95f123e1eec93daf4f1aefed",
+      "beforeMode": "100644",
+      "after": "ac0810e87cfbd17d29e4cdde431679eaea40a0209d3acd56ecf2bcea171d764e",
+      "afterMode": "100644",
+      "review": "Occupied interior floors bypass exterior road readiness through the existing actor-policy path. Road compiler and accepted contacts remain retained and resume for exterior actors. No saved coordinates or schemas are changed."
+    },
+    "app/js/terrain/transport-detail-plan.js": {
+      "before": "b11cebbe096ba647e77c0d86edd13081894a0928b67996c277928b1fc18b3e46",
+      "beforeMode": "100644",
+      "after": "7381eb6d1014dabda6faa8f5f9b92eaea2717191e3862ae31b6af48c79008e18",
+      "afterMode": "100644",
+      "review": "Interior actors, like boats, do not request or depend on outdoor road detail. Pending exterior regions remain owned by the existing controller; this is a transient frame policy, not a world/save migration."
+    },
+    "config/performance-budgets.json": {
+      "before": "5fb11d0ace63ba6d39b65767e4819d8fd046bb4c7c27bc7f5adaeba985e0bb07",
+      "beforeMode": "100644",
+      "after": "b70f752e21ef02c3747e84909caeea5e63c3e56ee7cbdcf109522c8905dbde79",
+      "afterMode": "100644",
+      "review": "Release identity only. Every performance, memory, frame-time and retention budget is unchanged."
     }
   }
 }

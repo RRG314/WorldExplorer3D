@@ -46,7 +46,10 @@ function createCoreFrameSystems(appCtx, hooks = {}) {
           (!appCtx.isEnv||!appCtx.ENV||appCtx.isEnv(appCtx.ENV.EARTH));
         const detail=earthActive?appCtx.transportDetail:null;
         if(detail){
-          const point=appCtx.activeEarthActorPosition?.()||{x:0,z:0};
+          const actor=appCtx.activeEarthActorPosition?.()||{x:0,z:0};
+          // An occupied floor owns its contact; outdoor road recovery cannot
+          // block walking, lifts or exit. Keep the road controller for return.
+          const point=appCtx.activeInterior?{...actor,source:'interior'}:actor;
           const terrainY=['plane','drone'].includes(point.source)?appCtx.terrainMeshHeightAt?.(point.x,point.z):NaN;
           detail.step(point,terrainY);
           if(!detail.readyForActor(point,terrainY))frame.flags.simulationBlocked=true;

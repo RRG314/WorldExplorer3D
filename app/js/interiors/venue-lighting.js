@@ -10,7 +10,8 @@ export function acquireVenueLighting(ctx,root,layer=1){
  };
  const apply=object=>{object.traverse(o=>o.layers.set(layer));refreshShadows();};
  apply(root);camera?.layers?.set(layer);lights.forEach(({light})=>{light.visible=false;});
+ ctx.enforceEnvironmentSceneOwnership?.();
  // The engine disables automatic shadow updates. Publish the occupied venue
  // on entry and after a model attaches, then publish the outdoor view on exit.
- let released=false;return {apply,refreshShadows,release(){if(released)return;released=true;if(camera?.layers&&Number.isInteger(mask))camera.layers.mask=mask;lights.forEach(({light,visible})=>{light.visible=visible;});if(scene)scene.environment=Object.hasOwn(ctx,'earthEnvironmentMap')?ctx.earthEnvironmentMap:environment;if(ctx.renderer?.shadowMap)ctx.renderer.shadowMap.needsUpdate=true;}};
+ let released=false;return {apply,refreshShadows,release(){if(released)return;released=true;if(camera?.layers&&Number.isInteger(mask))camera.layers.mask=mask;ctx.enforceEnvironmentSceneOwnership?.();lights.forEach(({light,visible})=>{light.visible=visible;});if(scene)scene.environment=Object.hasOwn(ctx,'earthEnvironmentMap')?ctx.earthEnvironmentMap:environment;if(ctx.renderer?.shadowMap)ctx.renderer.shadowMap.needsUpdate=true;}};
 }

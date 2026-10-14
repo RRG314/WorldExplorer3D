@@ -1,4 +1,4 @@
-// Run one mutable-source browser check with a disposable staging identity.
+// Run one source or selected immutable browser check with a disposable staging identity.
 // No production configuration, artifact or service is changed.
 import {mkdtemp,writeFile,rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
@@ -12,6 +12,6 @@ try{
  identity=await stagingCaptureAttestation();
  const credential=path.join(directory,'attestation.json');
  await writeFile(credential,JSON.stringify({projectId:'we3d-staging-20260712',appId:'1:524178734996:web:f59acbc9014f0e26f51981',expiresAt:new Date(Date.now()+3600000).toISOString(),token:identity.token}),{mode:0o600});
- const child=spawn(process.execPath,[entry,...process.argv.slice(3)],{stdio:'inherit',env:{...process.env,WE3D_VERIFY_ROOT:process.cwd(),WE3D_STAGING_APP_CHECK_FILE:credential,WE3D_VERIFY_HOSTED_PLACE_LOOKUP:'1'}});
+ const child=spawn(process.execPath,[entry,...process.argv.slice(3)],{stdio:'inherit',env:{...process.env,WE3D_VERIFY_ROOT:process.env.WE3D_VERIFY_ROOT||process.cwd(),WE3D_STAGING_APP_CHECK_FILE:credential,WE3D_VERIFY_HOSTED_PLACE_LOOKUP:'1'}});
  process.exitCode=await new Promise((resolve,reject)=>{child.once('error',reject);child.once('exit',(code,signal)=>resolve(code??(signal?1:0)));});
 }finally{try{await identity?.cleanup();}finally{await rm(directory,{recursive:true,force:true});}}
