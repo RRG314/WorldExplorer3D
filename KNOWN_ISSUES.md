@@ -1,6 +1,6 @@
 # Known Issues and Limitations
 
-Last reviewed: October 12, 2026, for the 5.6 update. These are known product
+Last reviewed: October 14, 2026, for the 5.6.1 candidate. These are known product
 limits, not a promise that every location or device has been validated.
 The [GitHub releases](https://github.com/RRG314/WorldExplorer3D/releases) identify
 published versions.

@@ -42,6 +42,12 @@ function maximumGradeFor(feature) {
 
 function hasEngineeredGraphConstraintAt(feature, side) {
   if (feature?.structureSemantics?.terrainMode !== 'at_grade') return false;
+  // A compiled approach owns the elevation of the entire polyline. Every
+  // mapped junction along it must return to the adjoining street's surface,
+  // even when the original bridge/tunnel constraint is at another station.
+  // Testing only the anchor station left side streets above excavated roads
+  // and omitted those physical discontinuities from the audit as well.
+  if (feature.transportSurfaceModel?.engineeredApproach === true) return true;
   const distance = finite(side?.distanceAlong);
   return (feature?.structureTransitionAnchors || []).some((anchor) =>
     anchor?.source === 'transport_graph_node' &&

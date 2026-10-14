@@ -73,3 +73,19 @@ test('a same-level branch keeps an interior graph station at a through-route ver
  const side=connection.left.featureId==='through'?connection.left:connection.right;
  assert.equal(side.endpoint,'interior');assert.equal(side.distanceAlong,40);
 });
+
+test('a side street along a graded approach cannot escape continuity auditing',()=>{
+ const f=fixture();
+ for(const r of f.features)r.structureSemantics.terrainMode='at_grade';
+ f.features[0].transportSurfaceModel={engineeredApproach:true};
+ // The approach is constrained at its start; this mapped branch is 206 m
+ // further along, where its compiled profile is still below the surface road.
+ f.features[0].structureTransitionAnchors=[{source:'transport_graph_node',distance:0,
+  engineeredApproach:true,ownerFeatureId:'road-1',targetSurfaceY:0}];
+ f.network.connections[0].left.distanceAlong=206.578;
+ f.features[0].height=-.5307;f.features[1].height=2.3979;
+ const result=f.audit();
+ assert.equal(result.auditedConnectionCount,1);
+ assert.equal(result.discontinuityCount,1);
+ assert.ok(result.maximumVerticalDeltaMeters>2.9);
+});

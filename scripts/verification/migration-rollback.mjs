@@ -28,14 +28,15 @@ const released = artifactIdentity(root, releasedRoot);
 const manifests = await Promise.all([candidateRoot, fallbackRoot, releasedRoot].map(dir => readFile(path.join(dir, 'build-manifest.json'), 'utf8').then(JSON.parse)));
 assert.equal(manifests[0].sourceInputFingerprint, baseline.acceptanceFingerprint, 'Candidate must match current accepted inputs');
 for (const manifest of manifests) assert.equal(manifest.firebaseProjectId, manifests[0].firebaseProjectId);
-assert.equal(manifests[2].commit, 'd8775a392c4246b2552842c37f40508bd664d4c5', 'Upgrade must start from the actual released 5.5 source');
+const releaseProgram = JSON.parse(await readFile(path.join(root, 'config/production-program-gates.json'), 'utf8'));
+assert.equal(manifests[2].commit, releaseProgram.productionBaseline.releaseCommit, 'Upgrade must start from the declared current production source');
 assert.equal(manifests[0].firebaseProjectId, 'we3d-staging-20260712', 'This test cannot target production');
 
 // Pin every changed runtime file to the reviewed before/after bytes. A later
 // edit to even an already-listed path requires another compatibility review.
 const compatibility = JSON.parse(await readFile(path.join(root, 'scripts/verification/rollback-runtime-review.json'), 'utf8'));
 const changed = await assertReviewedRollbackRuntime(root, manifests[1].commit, manifests[0].commit, compatibility);
-const report = { passed: false, scope: 'Actual released 5.5 save owners → candidate → compatible retained preview fallback → candidate return. Journal, Backpack v2→v3, home custody/workspace, local wallet, campaign and pending account data. Owner API fixtures, not player UX; backend authority tests remain separate.',
+const report = { passed: false, scope: 'Actual released 5.5.1 save owners → candidate → compatible retained preview fallback → candidate return. Journal, Backpack v2→v3, home custody/workspace, local wallet, campaign and pending account data. Owner API fixtures, not player UX; backend authority tests remain separate.',
   baseline, artifactIdentity: candidate, fallbackArtifactIdentity: fallback, fallbackArtifactRoot: fallbackRoot, releasedArtifactIdentity: released, releasedArtifactRoot: releasedRoot,
   compatibilityContract: compatibility.id,
   runtimeDifferences: changed, stages: [], errors: [], localFailures: [], providerDegradations: [] };

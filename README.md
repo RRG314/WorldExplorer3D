@@ -1,6 +1,6 @@
 # World Explorer 3D
 
-[5.6 release notes](RELEASE_NOTES_5.6.0.md) · [Known limitations](KNOWN_ISSUES.md) · [Roadmap](ROADMAP.md)
+[5.6.1 release notes](RELEASE_NOTES_5.6.1.md) · [Known limitations](KNOWN_ISSUES.md) · [Roadmap](ROADMAP.md)
 
 [![Play in your browser](https://img.shields.io/badge/Play-in_your_browser-1677ff?style=flat-square)](https://worldexplorer3d.io/app/)
 [![Latest release](https://img.shields.io/github/v/release/RRG314/WorldExplorer3D?sort=date&style=flat-square&label=release)](https://github.com/RRG314/WorldExplorer3D/releases/latest)
@@ -160,7 +160,7 @@ For setup and contributions, see [Contributing](CONTRIBUTING.md).
 
 ## More about the project
 
-- [What changed in 5.6](RELEASE_NOTES_5.6.0.md)
+- [What changed in 5.6](RELEASE_NOTES_5.6.1.md)
 - [Changelog](CHANGELOG.md)
 - [Roadmap](ROADMAP.md)
 - [Controls](CONTROLS_REFERENCE.md)

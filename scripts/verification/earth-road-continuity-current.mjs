@@ -3,9 +3,10 @@ import {mkdir,writeFile} from 'node:fs/promises';
 import {chromium} from 'playwright';
 import {startStaticServer} from './static-server.mjs';
 import {closeOwnedBrowser} from './owned-browser.mjs';
+import {configureStagingAppCheck} from './staging-app-check.mjs';
 import {runPrescribedGameActions} from './prescribed-game-actions.mjs';
 
-const out=process.env.WE3D_CONTINUITY_OUTPUT||'output/road-continuity/baseline';
+const out=process.env.WE3D_CONTINUITY_OUTPUT||'output/road-continuity/local-recovery-current';
 await mkdir(out,{recursive:true});
 let server,owned,page;
 const report={ok:false,scope:'Controlled long-distance road arrivals with actual render/contact publication; keyboard motion checked separately. No claim of an uninterrupted worldwide route.',errors:[],warnings:[],arrivals:[]};
@@ -15,6 +16,7 @@ try{
   report.base=base;report.build=await(await fetch(base+'/build-manifest.json')).json();
   owned=await chromium.launchServer({channel:'chrome',headless:false,args:['--js-flags=--max-old-space-size=1536']});
   const browser=await chromium.connect(owned.wsEndpoint());page=await browser.newPage({viewport:{width:1280,height:800}});
+  await configureStagingAppCheck(page,base);
   page.on('pageerror',error=>report.errors.push(String(error)));
   if(process.env.WE3D_ROAD_FAULT==='once'){
     report.controlledFault='One worker compile response interrupted; actual replacement worker must recover without navigation.';
