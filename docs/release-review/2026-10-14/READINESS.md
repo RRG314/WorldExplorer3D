@@ -6,7 +6,43 @@ this release. Moving scenery is optional and must not be represented as complete
 worldwide road, collision or activity streaming. Preserve the ongoing 5.6 venue,
 harbor, NASA, ocean and consolidation work; do not roll it back to the hotfix.
 
-## Latest status — October 14, 20:56 UTC
+## Latest status — October 14, 22:08 UTC
+
+Canonical staging serves `5.6.1+1f37e893ccae.3e39c25a98b5a66f.staging` and both
+remote manifests match local bytes. Its current prescribed junction and full
+resource/lifecycle checks pass. The full performance run finishes twelve reload
+cycles: no lost world coverage, gameplay interruption, browser/local resource
+error, retained-world growth or mobile-regression failure. Desktop p99 and hitch
+checks still fail, including an approximately one-second first-flight pause.
+Failed receipts remain in `output/release-review/561-1f37-performance`.
+
+Instrumented driving follows 397 m with ordinary keyboard controls and zero
+errors. The major pauses correlate with collector work. A numeric-uniform cache
+experiment increases sampled allocation and is rejected; it is not in the game.
+A separate load-only diagnostic observes 1.58 GB used heap before collection and
+617 MB afterward. Its explicit diagnostic collection is not acceptance evidence.
+
+The current backend run passes shared marine, place authority, security, shared
+expeditions, property synchronization, chat, multiplayer and account checks. Its
+environmental stage receives waves but no HYCOM current/temperature values; the
+legacy assertion incorrectly requires both live feeds despite the implemented
+partial-availability contract. The corrected check requires real provenance,
+validity times, available measurements and explicit missing-data warnings, and
+records incomplete live coverage separately. No provider, security or game code
+is changed. The eleven existing deterministic environmental contracts pass.
+
+The full ordinary hosted automation signs in but reCAPTCHA rejects its token.
+Read-only inspection confirms matching App Check configuration and allowed host;
+ordinary installed Chrome successfully returns Baltimore through visible search.
+This establishes ordinary search only, not the complete shared-voyage/save path.
+Both disposable automated accounts were removed. No security bypass was added.
+
+Remaining: complete current backend and candidate evidence; four-stage save
+roundtrip; ordinary hosted voyage/save path; native pacing resolution; final
+provider receipt, production configuration package and current-image approval.
+Production remains 5.5.1. No final readiness or deployment claim is made.
+
+## Earlier iteration — October 14, 20:56 UTC
 
 Production remains 5.5.1. The latest committed e498 collision repair is on both
 active development branches and passes GitHub code and secret checks. Its

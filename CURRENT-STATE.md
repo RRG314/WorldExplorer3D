@@ -60,7 +60,7 @@ now share backing storage with unchanged values; all 2,625 source checks pass.
 Native performance and complete final acceptance remain open. The production
 rollback package and released 5.5.1 save-test package are verified; no 5.6 candidate
 is deployed to production.
-Canonical staging now serves exact 376 at https://we3d-staging-20260712.web.app/app/.
+Canonical staging now serves exact 1f37 at https://we3d-staging-20260712.web.app/app/.
 Its live private-layout/photo/purchase persistence check passed with owned test
 records removed. See docs/RELEASE_SOURCE_OF_TRUTH.md and the October 14 READINESS
 ledger for current identities and the remaining finite release sequence.

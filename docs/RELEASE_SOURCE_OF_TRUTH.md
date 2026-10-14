@@ -11,7 +11,7 @@ production changes. A version label or preview URL alone does not identify code.
 | Production frontend | `5.5.1+012e5c85582b.eb0d7eddf0f75035.production` |
 | Production source | `012e5c85582b78a7808656545bf4143a31a18652` |
 | Production Firebase project | `worldexplorer3d-d9b83` |
-| Canonical staging frontend | `5.6.1+376c7e55784c.9f1d43b3d9871d58.staging` |
+| Canonical staging frontend | `5.6.1+1f37e893ccae.3e39c25a98b5a66f.staging` |
 | Staging Firebase project | `we3d-staging-20260712` |
 | Preserved road-safe fallback | `5.6.1+b21b7f12fdfa.31ed9b1212c5002c.staging` |
 | Release branch | `stable` (default; no `main` branch) |
@@ -21,9 +21,10 @@ production changes. A version label or preview URL alone does not identify code.
 [Staging](https://we3d-staging-20260712.web.app/app/) ·
 [Release preparation PR](https://github.com/RRG314/WorldExplorer3D/pull/103)
 
-The canonical staging address replaced an unauthorized preview origin for live
-account checks. Its package is an exact Hosting clone of the reviewed preview;
-production and backend origin restrictions were not changed.
+Canonical staging now serves the 1f37 package; both hosted manifests match local
+bytes. Production and backend origin restrictions were not changed. Ordinary
+Chrome successfully searches Baltimore. A clean automated browser is rejected
+by reCAPTCHA, so its complete shared-voyage/save-recovery check remains open.
 
 ## Verification and rollback
 
@@ -42,8 +43,11 @@ Its complete twelve-cycle performance run passes cleanup and touch emulation,
 but still fails desktop frame-rate/hitch limits. A new, narrowly scoped collision
 allocation repair is pushed to both active branches but still reproduces native
 flight pauses. Generated building attributes now use fewer native backing buffers
-with identical values; all 2,625 source checks pass. Final packaged native timing
-and complete acceptance remain required.
+with identical values; all 2,625 source checks pass. The complete packaged twelve-cycle run preserves coverage, cleanup, memory
+retention and touch behavior, but still fails desktop pacing. Profiling links
+the largest pauses to collection; a numeric-uniform cache experiment increased
+allocation and was rejected without changing the game. Complete acceptance remains
+required.
 
 All three 376 backend gates passed. Six changed Functions were deployed only to
 staging with existing configuration preserved. Live staging purchases, private
