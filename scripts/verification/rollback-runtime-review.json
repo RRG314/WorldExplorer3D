@@ -1,309 +1,43 @@
 {
   "schema": "we3d-reviewed-rollback-runtime-v1",
-  "id": "journal-v5-backpack-v3-5.6.1-candidate-20261014",
-  "fallbackCommit": "4ec78f8edf110d02c63c777410db7e080721c729",
-  "scope": "Use the separately preserved, native-journey-verified 5.6 venue candidate as the compatible save fallback. It already owns the new campaign, workspace, vessel and Backpack fields; production 5.5.1 is the upgrade starting point, not an assumed safe writer of newer progress. This fallback retains the pre-hotfix road behavior and is an emergency compatibility package, not the primary release. Before any production promotion its environment must be configured and verified for production. Exact source differences are pinned below; actual upgrade/fallback/write/return is required.",
+  "id": "journal-v5-backpack-v3-road-safe-5.6.1-20261014",
+  "fallbackCommit": "b21b7f12fdfab0f2adf82eca01faefb55ae64748",
+  "scope": "The preserved b21 complete candidate owns the same modern Backpack/campaign/workspace/vessel fields as the current candidate and includes local road recovery and the jointly solved approaches. It passes 2618 source checks, complete Monaco assembly and native Baltimore junction driving. It remains an emergency save-compatible fallback with known desktop performance limitations, not a substitute for final candidate acceptance. Production 5.5.1 is the upgrade starting point. Before promotion, build and verify this exact fallback with production configuration and complete the released/candidate/fallback-write/candidate-return save roundtrip.",
   "files": {
-    "app/index.html": {
-      "before": "1f41ec80c708762d53b4402b4b3e148e84044b52497e2d9cb1d1c453a93197eb",
+    "app/js/reality-capture/rdt-building-index.js": {
+      "before": "52688047fb24374219649f9ef799b23449c7b3e87c9706817c2e97c4b83d8b53",
       "beforeMode": "100644",
-      "after": "c4bdf992bf4a901227f26cb560eb19f37756242432917f966d190758a1cd357b",
+      "after": "f0768df0e24e80b044c8211a2f88a84eda551063c483d9905b7850cc61de69f2",
       "afterMode": "100644",
-      "review": "Opt-in scenery UI and copy; same preference key; no player schema change."
+      "review": "Cooperative construction/validation of a transient nearest-building index. Preserves identity/coordinate edit detection, nearest ordering and cancellation. No saved data."
     },
-    "app/js/terrain/published-road-integrity.js": {
-      "before": "dc53dba65b3a225d0e6106911870d54a8243d8e3549369eb721c0c70e84b4272",
+    "app/js/reality-capture/runtime.js": {
+      "before": "db462110ced5dca0cc7d913a975068fc679346195eefb0ce77ef26e1c062c8a4",
       "beforeMode": "100644",
-      "after": "53da851d7e39afbb7397b7b0bddd7545f47ecc5a4d65fc89e772717dc1a96663",
+      "after": "e1ace82ec3da2b3e8f9df63a6399c79a5074fe9443ab114f91bae2b619203565",
       "afterMode": "100644",
-      "review": "Checks at-grade contact across staged and pinned owners with unchanged precision. No persistent data."
+      "review": "Awaits bounded capture selection under world/refresh/list identity guards. Same approved-representation endpoint and publication contract; no persistence changes."
     },
-    "app/js/terrain/rebuild.js": {
-      "before": "eaaed1ebe8f83665c75e18cf5aca3869d1d0b86263a65dc90aea1ec3d30960ea",
+    "app/js/terrain/far-field.js": {
+      "before": "50d713d7c2fa40a54e456e24456c4c36794a9be930d3e4ddd56db2f4131dd44e",
       "beforeMode": "100644",
-      "after": "6b841f48d99f57212b261853debda746a152473b638ee5410a520f11c45ed30c",
+      "after": "9c4fb9459eeacc1cd45f528b09af766a41cf9623607941fbcc024a0cf3e163ee",
       "afterMode": "100644",
-      "review": "Removes whole-world recovery callback and accepts the pinned engineered contact owner. No save fields or player identity changes."
+      "review": "Smaller frustum-culling cells for the same complete regional instance population. No geometry source, collision, identifier or save changes."
     },
-    "app/js/terrain/regional-scenery-scheduler.js": {
-      "before": "b7d15e56c822866a3f9a960c140f3ba63a74137c8b3e8eb8a928f31392ce89d9",
+    "app/js/world/linear-feature-presentation.js": {
+      "before": "7054ab7cf605448ee22af591ebed6ac86271da68a9d871607e61b605cdcf8c62",
       "beforeMode": "100644",
-      "after": "858fe078c1bb8f74619931e6ff93477efe55678eb8b7d87bce5f6e64f1113192",
+      "after": "739b18b350addd364d1ed18d11ff597652c0159d6b124e8d810cbe8f83507911",
       "afterMode": "100644",
-      "review": "Absent preference now means fixed location; explicit on/off values remain unchanged. No other keys affected."
+      "review": "Yields between individually clipped paths and bounded numeric copy loops. Same complete rendered geometry and terrain/road authority; transient scheduling only."
     },
-    "app/js/terrain/transport-detail-compiler.js": {
-      "before": "a98bf6137c66b25068689d5b2f5ea580fa218d1f89e24995aeffb4ee66015478",
+    "config/scene-resource-budgets.json": {
+      "before": "1d8d58c8a40a1824b2f088d4821a888e2f8d7cd6a8b881746c780f5be7d43a4e",
       "beforeMode": "100644",
-      "after": "a09490943e83019a3e206b70acbb2e761f65a65b3b07bd65d4cd214bdb28266a",
+      "after": "55bcbd46ff0561cc6aa70f6f574fecd5456fc9818f1c8e0a2182e885589a3d29",
       "afterMode": "100644",
-      "review": "Allows a reconstructed worker to defer its initial packets. Pure transient compiler state."
-    },
-    "app/js/terrain/transport-detail-runtime.js": {
-      "before": "aa9e28117a63fd9142b102d4db1f7f2393d8af309a2841090cabcc9e3c13e7e3",
-      "beforeMode": "100644",
-      "after": "5f2af042584f5ebd9bf4bdcbf3b827a34643f21c6c83e9c145f4e64051afb57f",
-      "afterMode": "100644",
-      "review": "Bounded local worker retry preserves accepted meshes, actor, world and save state. No stored schemas."
-    },
-    "app/js/world/compiler/transport-junction-profile.js": {
-      "before": "aae7202a6ba326a2e5e71c3b9276c9776255feace7e48713b7d8c7bb7cbe3804",
-      "beforeMode": "100644",
-      "after": "894464895de05b92c3663efdc49f20c4bc97b9c2f982227ab7066739dbfd3c38",
-      "afterMode": "100644",
-      "review": "Includes all graph junctions on an already-engineered approach in existing grade constraints and audits. Derived terrain/road state only."
-    },
-    "config/production-program-gates.json": {
-      "before": "9cf0667101c2a8c2165a5dc735a28fcb0cfd7015ad681c652ccf3bbca37b89b8",
-      "beforeMode": "100644",
-      "after": "0e8748ff7d855ceaaf25e30bdb3429176c40b73ae8cf3e27dcec44b7b883f61a",
-      "afterMode": "100644",
-      "review": "Updates candidate identity, current production baseline and acceptance document; no runtime player data."
-    },
-    "config/public-feature-claims.json": {
-      "before": "dc31dbb1c81c7873f9846cb6149aefb954a5c784dd0cfdb5386558f50e1e4b9b",
-      "beforeMode": "100644",
-      "after": "3d5c925e6d8ebf90cc8f325340a7eb3c833d05776954a1dd7fb4878e6de169ac",
-      "afterMode": "100644",
-      "review": "Candidate version only; public claims unchanged."
-    },
-    "config/public-gallery.json": {
-      "before": "76ba9e2b59e5a9db3262c5ce0c155e75128d589b628ae2e9668916ca3f41d3c3",
-      "beforeMode": "100644",
-      "after": "76958c8f06c3d92deb3fedee197925e890cbff64e1d24fca121802467efda9b3",
-      "afterMode": "100644",
-      "review": "Current hosted image inventory and public presentation reference inspected content-addressed images. Player-facing content only; no game/save protocol change."
-    },
-    "config/runtime-dependencies.json": {
-      "before": "2a39e04a9814d42a5ae576c5d92097b1d3511b324b87fdf8203d04ed545e2d04",
-      "beforeMode": "100644",
-      "after": "181c0caef68f3ed094be5de1a9dbc22145d4c884df45e2eef94855647b6fc9a8",
-      "afterMode": "100644",
-      "review": "Pins the version-only package-lock update; dependency versions/integrities unchanged."
-    },
-    "config/system-release-gates.json": {
-      "before": "6538c8954e3e2b16d18d5e23910dfaec31a09f137c0c15fac4cb2de14fae223c",
-      "beforeMode": "100644",
-      "after": "402e6179f17fd0437b21e91ff8cc796f10cdbdf88e6fcc70ff091616ed8202f2",
-      "afterMode": "100644",
-      "review": "Requires native junction driving, local road recovery, mapped aquarium/harbor and distant museum admission, VAB tour/terrain recovery and LC39B walking. No runtime player data changes."
-    },
-    "package-lock.json": {
-      "before": "9b6aaebc846b19cc8ea85ab03f8f52c50d26076200bb5b80291fdb8df64db795",
-      "beforeMode": "100644",
-      "after": "4ba8f778891107cf048e0a69e3168e2ad4bcb52b0d02c9748c5335ee7ba57fd4",
-      "afterMode": "100644",
-      "review": "Root release version only; dependency graph unchanged."
-    },
-    "package.json": {
-      "before": "50e9eda254a26d84a3dba479a09c633d44726a9502d24396b8c0f3a420607274",
-      "beforeMode": "100644",
-      "after": "c7fcb1bfa36d9d3cb57461b6c50f032a2c0322f9a1fd1c421a1408d46f5e8978",
-      "afterMode": "100644",
-      "review": "Release version only; scripts and dependency declarations unchanged."
-    },
-    "app/js/interiors/venue-lighting.js": {
-      "before": "3b1edc34d98aa1742205e3060c04edf3e0d26e3798c93e13c4e4f4e1b0d366d6",
-      "beforeMode": "100644",
-      "after": "2cd9b7326fd8e19e129e89527e811d6e10ad13c65f33d7a6c79d1f70aad297f5",
-      "afterMode": "100644",
-      "review": "The existing camera/light lease immediately updates retained-world visibility on entry and release. Does not detach or dispose the city and changes no stored state."
-    },
-    "app/js/planetary/scene-ownership.js": {
-      "before": "face163f17d4161f040eee4ca1ae19b11e80a8a127e6110d1bc9da3db25c6d3e",
-      "beforeMode": "100644",
-      "after": "b7163a6e6cb91841bb174a8b182009b69a6045e42f438f0bf0e7b1ef7be61bc4",
-      "afterMode": "100644",
-      "review": "The exterior root follows the existing main-camera layer mask, suppressing invisible transform traversal in exclusive visitor venues. Same object identities and explicit contact queries remain; visible return resumes transforms. No persistence changes."
-    },
-    "app/js/runtime/core-frame-systems.js": {
-      "before": "dff3b2811328f946164edf5544b68a1a686e0bab95f123e1eec93daf4f1aefed",
-      "beforeMode": "100644",
-      "after": "ac0810e87cfbd17d29e4cdde431679eaea40a0209d3acd56ecf2bcea171d764e",
-      "afterMode": "100644",
-      "review": "Occupied interior floors bypass exterior road readiness through the existing actor-policy path. Road compiler and accepted contacts remain retained and resume for exterior actors. No saved coordinates or schemas are changed."
-    },
-    "app/js/terrain/transport-detail-plan.js": {
-      "before": "b11cebbe096ba647e77c0d86edd13081894a0928b67996c277928b1fc18b3e46",
-      "beforeMode": "100644",
-      "after": "7381eb6d1014dabda6faa8f5f9b92eaea2717191e3862ae31b6af48c79008e18",
-      "afterMode": "100644",
-      "review": "Interior actors, like boats, do not request or depend on outdoor road detail. Pending exterior regions remain owned by the existing controller; this is a transient frame policy, not a world/save migration."
-    },
-    "config/performance-budgets.json": {
-      "before": "5fb11d0ace63ba6d39b65767e4819d8fd046bb4c7c27bc7f5adaeba985e0bb07",
-      "beforeMode": "100644",
-      "after": "7553af8ea49ea8f6d3e67e48d70148c0953b669e10a46c49b8a383e67a5b8b6a",
-      "afterMode": "100644",
-      "review": "Release identity and an explicit memory measurement policy change: the 1 GiB criterion now applies to occupied retained JavaScript data after all live timing, not raw transient allocation. Raw heap samples remain recorded. Frame-time, geometry, transfer, disposal and growth limits are unchanged. See docs/release-review/2026-10-14/MEMORY-MEASUREMENT.md. No game or save behavior changes."
-    },
-    "scripts/capture-candidate-gallery.mjs": {
-      "before": "60cd2d2ba1a836bad50069d7efe16c135c746a587576b4659da0515540bbc1ad",
-      "beforeMode": "100644",
-      "after": "1ceaa937a5fd051b78545624c89f8d9b21cbd1d10e2788e62501756ef20db384",
-      "afterMode": "100644",
-      "review": "Capture tooling uses scalar readiness, first-RAF clock origin, explicit screenshot-overhead timing scope, accurate galley caption and immutable image URLs; no gameplay mutation."
-    },
-    "assets/gallery/5.6/aquarium-2481f37f6e78.webp": {
-      "before": null,
-      "beforeMode": null,
-      "after": "2481f37f6e786e5aebae97e6f81083270edb047a8aeab133b538ea1aec0ce1f0",
-      "afterMode": "100644",
-      "review": "Inspected current hosted gameplay capture with content-addressed filename; original image URLs preserved. No save/runtime behavior."
-    },
-    "assets/gallery/5.6/aquarium-overlook-7211b3915690.webp": {
-      "before": null,
-      "beforeMode": null,
-      "after": "7211b39156904c7fd0e51b79f67310d80ccb5b7a02db34dfd60bcfa2f2627a38",
-      "afterMode": "100644",
-      "review": "Inspected current hosted gameplay capture with content-addressed filename; original image URLs preserved. No save/runtime behavior."
-    },
-    "assets/gallery/5.6/diver-phone-b0416e195c08.webp": {
-      "before": null,
-      "beforeMode": null,
-      "after": "b0416e195c087054a72a24cb54b38ca310af1c889a03e305f0ff738bbe8c2aea",
-      "afterMode": "100644",
-      "review": "Inspected current hosted gameplay capture with content-addressed filename; original image URLs preserved. No save/runtime behavior."
-    },
-    "assets/gallery/5.6/diving-e47bc4881b7d.webp": {
-      "before": null,
-      "beforeMode": null,
-      "after": "e47bc4881b7d4c6f0d5d6570919b35d1deb0e8b46d221b151a74b1ce164d976b",
-      "afterMode": "100644",
-      "review": "Inspected current hosted gameplay capture with content-addressed filename; original image URLs preserved. No save/runtime behavior."
-    },
-    "assets/gallery/5.6/driving-1b41f3116f83.webp": {
-      "before": null,
-      "beforeMode": null,
-      "after": "1b41f3116f8336a3924916873d2de3eb17bf0fba89b4a9ac79e2670bda0a6afb",
-      "afterMode": "100644",
-      "review": "Inspected current hosted gameplay capture with content-addressed filename; original image URLs preserved. No save/runtime behavior."
-    },
-    "assets/gallery/5.6/drone-cf7691b9c943.webp": {
-      "before": null,
-      "beforeMode": null,
-      "after": "cf7691b9c9438974259964d5632cd9a3563dec13b7471162a26a2737077ad9ba",
-      "afterMode": "100644",
-      "review": "Inspected current hosted gameplay capture with content-addressed filename; original image URLs preserved. No save/runtime behavior."
-    },
-    "assets/gallery/5.6/flight-f22b1898aa92.webp": {
-      "before": null,
-      "beforeMode": null,
-      "after": "f22b1898aa927c4334ca214fd889ce0fc9367ebce3c467ee877c6421bfb4346e",
-      "afterMode": "100644",
-      "review": "Inspected current hosted gameplay capture with content-addressed filename; original image URLs preserved. No save/runtime behavior."
-    },
-    "assets/gallery/5.6/live-earth-7326f212d1de.webp": {
-      "before": null,
-      "beforeMode": null,
-      "after": "7326f212d1de746fa990de700a8c426d6bb5bc7b9e58979aabec14e8446f626b",
-      "afterMode": "100644",
-      "review": "Inspected current hosted gameplay capture with content-addressed filename; original image URLs preserved. No save/runtime behavior."
-    },
-    "assets/gallery/5.6/museum-ec196f05eadc.webp": {
-      "before": null,
-      "beforeMode": null,
-      "after": "ec196f05eadc07953700c63b56dc05e83743bf7c146a0342946ba4f810c7ef51",
-      "afterMode": "100644",
-      "review": "Inspected current hosted gameplay capture with content-addressed filename; original image URLs preserved. No save/runtime behavior."
-    },
-    "assets/gallery/5.6/research-deck-40e79f50319d.webp": {
-      "before": null,
-      "beforeMode": null,
-      "after": "40e79f50319d9f6cbb765bac2f3cbc502986d2ab23cc4846b76e91dcfbf4ee35",
-      "afterMode": "100644",
-      "review": "Inspected current hosted gameplay capture with content-addressed filename; original image URLs preserved. No save/runtime behavior."
-    },
-    "assets/gallery/5.6/research-interior-cf113dcb5303.webp": {
-      "before": null,
-      "beforeMode": null,
-      "after": "cf113dcb53039d555e1e4dab37e8c2bf73e11a7e52dbbbd546f31f4f65917bcb",
-      "afterMode": "100644",
-      "review": "Inspected current hosted gameplay capture with content-addressed filename; original image URLs preserved. No save/runtime behavior."
-    },
-    "assets/gallery/5.6/research-map-76bc4c68afc2.webp": {
-      "before": null,
-      "beforeMode": null,
-      "after": "76bc4c68afc2a97196fabe1dc4352bd3735e01dc23dde308b87b19aeb2e987ea",
-      "afterMode": "100644",
-      "review": "Inspected current hosted gameplay capture with content-addressed filename; original image URLs preserved. No save/runtime behavior."
-    },
-    "assets/gallery/5.6/research-vessel-4d75a6902221.webp": {
-      "before": null,
-      "beforeMode": null,
-      "after": "4d75a690222122d7cf281b4e6c3132743ced9972c426de8bdf9330b3c90200be",
-      "afterMode": "100644",
-      "review": "Inspected current hosted gameplay capture with content-addressed filename; original image URLs preserved. No save/runtime behavior."
-    },
-    "assets/gallery/5.6/ship-interior-2070577970ce.webp": {
-      "before": null,
-      "beforeMode": null,
-      "after": "2070577970ce7a7621cbe639cdb6c934e2fefb8baad50085e43ff46c2efb19a0",
-      "afterMode": "100644",
-      "review": "Inspected current hosted gameplay capture with content-addressed filename; original image URLs preserved. No save/runtime behavior."
-    },
-    "assets/gallery/5.6/space-fd854981b14d.webp": {
-      "before": null,
-      "beforeMode": null,
-      "after": "fd854981b14d30187aef6c4353c5cd06b84b82f810d33c051ccfc8fcd8396513",
-      "afterMode": "100644",
-      "review": "Inspected current hosted gameplay capture with content-addressed filename; original image URLs preserved. No save/runtime behavior."
-    },
-    "assets/gallery/5.6/submarine-7a6f4eab54d5.webp": {
-      "before": null,
-      "beforeMode": null,
-      "after": "7a6f4eab54d5c1d1daa642b7bc66560d43c677816f87d99a63edb48eeb69ddac",
-      "afterMode": "100644",
-      "review": "Inspected current hosted gameplay capture with content-addressed filename; original image URLs preserved. No save/runtime behavior."
-    },
-    "assets/gallery/5.6/walking-a8119ad855de.webp": {
-      "before": null,
-      "beforeMode": null,
-      "after": "a8119ad855de5604ef191a3c38010c0d46210fda21c4354c2104c291953a1801",
-      "afterMode": "100644",
-      "review": "Inspected current hosted gameplay capture with content-addressed filename; original image URLs preserved. No save/runtime behavior."
-    },
-    "assets/gallery/5.6/world-entry-7a23d5f7d4a7.webp": {
-      "before": null,
-      "beforeMode": null,
-      "after": "7a23d5f7d4a774a4b94702edf571936d2f04cc317e44706c271726618385809b",
-      "afterMode": "100644",
-      "review": "Inspected current hosted gameplay capture with content-addressed filename; original image URLs preserved. No save/runtime behavior."
-    },
-    "assets/gallery/5.6/world-entry-phone-7c32425471bd.webp": {
-      "before": null,
-      "beforeMode": null,
-      "after": "7c32425471bd42b4484b93ef7501b8b7479e8736f74c7b5e5bafdeedc88c9d9c",
-      "afterMode": "100644",
-      "review": "Inspected current hosted gameplay capture with content-addressed filename; original image URLs preserved. No save/runtime behavior."
-    },
-    "github-pages/index.html": {
-      "before": "8cdbe8c9c59d09c7f2a8a60153de474a743f8e9e73919143bd45974d6775cd00",
-      "beforeMode": "100644",
-      "after": "68c9a938e2c153226beaf59d01bde893d2414798cd5d0cff3af6db5e583067ec",
-      "afterMode": "100644",
-      "review": "Current hosted image inventory and public presentation reference inspected content-addressed images. Player-facing content only; no game/save protocol change."
-    },
-    "github-pages/styles.css": {
-      "before": "b36ffeba93dde93376c02fcc74e6a8cb51cdf888d54daedd47f2343257b8f571",
-      "beforeMode": "100644",
-      "after": "a5f29660b03c5d72802c308bc02270eaf174221ac4edbe0e4b806b2d0ee1430e",
-      "afterMode": "100644",
-      "review": "Current hosted image inventory and public presentation reference inspected content-addressed images. Player-facing content only; no game/save protocol change."
-    },
-    "index.html": {
-      "before": "d59ace28d908a5bdcf405b824beadbb9c8c5e53e1dae73d6485110ad9a6c48b6",
-      "beforeMode": "100644",
-      "after": "d6db216a505e582b598e92368a41aa93a869e24e9f13d96ad128068e81af94a2",
-      "afterMode": "100644",
-      "review": "Current hosted image inventory and public presentation reference inspected content-addressed images. Player-facing content only; no game/save protocol change."
-    },
-    "scripts/sync-public-gallery.mjs": {
-      "before": "5ca99ad4fc5c0639487c9a3d614c475658bce52be249ca45eac84c3347e713e8",
-      "beforeMode": "100644",
-      "after": "99a3ca633b1f542a5064739963b444cb333a32f4316fe86b913dc17559ea6492",
-      "afterMode": "100644",
-      "review": "Public gallery synchronization requires content-addressed paths matching the verified image digest, preventing immutable-cache reuse of changed images. No game/save behavior."
+      "review": "Evidence-backed named Baltimore collider baseline for authored quay/venue fixtures and repaired approaches. No runtime or save protocol change; timing, coverage and retention gates remain unchanged."
     }
   }
 }

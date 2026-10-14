@@ -50,10 +50,13 @@ and integration evidence is recorded in `docs/road-continuity/EVIDENCE.md`.
 
 ## Current complete candidate — October 14
 
-Local candidate `5.6.1+b21b7f12fdfa.31ed9b1212c5002c.staging` follows the complete
-376 matrix (101/107). It passes 2,618 source checks, native Monaco road assembly
-and the Baltimore keyboard junction journey. Performance/resource investigation
-and complete final acceptance remain open; it is not deployed to production.
+The b21 road-repaired candidate passes native Monaco assembly and Baltimore
+keyboard junction driving and is preserved as the modern-save fallback. The b965
+pavement scheduler removed the reproduced long path-builder blocks but still
+failed desktop timing. Current refinements divide nearby-capture index work
+across frames and cull smaller regional instance cells without removing buildings.
+All 2,623 source checks pass. Native performance/resource and complete final
+acceptance remain open; no 5.6 candidate is deployed to production.
 Canonical staging now serves exact 376 at https://we3d-staging-20260712.web.app/app/.
 Its live private-layout/photo/purchase persistence check passed with owned test
 records removed. See docs/RELEASE_SOURCE_OF_TRUTH.md and the October 14 READINESS

@@ -22,6 +22,40 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 import {buildingCenter,nearestCaptureBuildingIds,createNearestCaptureSelection} from './nearby-buildings.js';
+import {drainCooperatively} from '../world/cooperative-scheduling.js?v=1';
+
+function finishSynchronously(steps){for(;;){const result=steps.next();if(result.done)return result.value;}}
+
+function* buildIndexSteps(buildings){
+ const data={buildings,length:buildings.length,points:[],identities:[],nodes:0},ids=[];
+ for(let i=0;i<buildings.length;i++){
+  if((i&127)===0)yield;
+  data.points.push(buildingCenter(buildings[i]));data.identities.push(buildings[i]?.sourceBuildingId);
+  if(buildings[i]?.sourceBuildingId)ids.push(i);
+ }
+ function* make(ids,depth){
+  let minX=Infinity,maxX=-Infinity,minZ=Infinity,maxZ=-Infinity;
+  for(let i=0;i<ids.length;i++){
+   if((i&127)===0)yield;
+   const p=data.points[ids[i]];minX=Math.min(minX,p.x);maxX=Math.max(maxX,p.x);minZ=Math.min(minZ,p.z);maxZ=Math.max(maxZ,p.z);
+  }
+  const node={minX,maxX,minZ,maxZ,ids,children:null};data.nodes++;
+  if(ids.length<=128||depth>=12||(minX===maxX&&minZ===maxZ))return node;
+  const grid=Math.min(8,Math.max(2,Math.floor(Math.log(ids.length+1)**1.5))),cells=new Map();
+  for(let i=0;i<ids.length;i++){
+   if((i&127)===0)yield;
+   const id=ids[i],p=data.points[id];
+   const x=maxX===minX?0:Math.min(grid-1,Math.floor((p.x-minX)/(maxX-minX)*grid));
+   const z=maxZ===minZ?0:Math.min(grid-1,Math.floor((p.z-minZ)/(maxZ-minZ)*grid));
+   const key=z*grid+x;if(!cells.has(key))cells.set(key,[]);cells.get(key).push(id);
+  }
+  if(cells.size<=1)return node;
+  node.ids=null;node.children=[];
+  for(const childIds of cells.values())node.children.push(yield* make(childIds,depth+1));
+  return node;
+ }
+ data.root=yield* make(ids,0);return data;
+}
 
 // Browser adaptation of RRG314/rdt-spatial-index's occupancy-driven grid
 // partition (packages/rdt-spatial-index/src/index.cjs, MIT). See the provenance
@@ -29,33 +63,17 @@ import {buildingCenter,nearestCaptureBuildingIds,createNearestCaptureSelection} 
 // the building list or its render/collision authority.
 export class RdtBuildingIndex {
   constructor(buildings) {
-    this.buildings=buildings;
-    this.length=buildings.length;
-    this.points=buildings.map(buildingCenter);
-    this.identities=buildings.map(b=>b?.sourceBuildingId);
-    this.nodes=0;
-    const make=(ids,depth)=>{
-      let minX=Infinity,maxX=-Infinity,minZ=Infinity,maxZ=-Infinity;
-      for(const id of ids){const p=this.points[id];minX=Math.min(minX,p.x);maxX=Math.max(maxX,p.x);minZ=Math.min(minZ,p.z);maxZ=Math.max(maxZ,p.z);}
-      const node={minX,maxX,minZ,maxZ,ids,children:null};this.nodes++;
-      if(ids.length<=128 || depth>=12 || (minX===maxX && minZ===maxZ))return node;
-      const grid=Math.min(8,Math.max(2,Math.floor(Math.log(ids.length+1)**1.5)));
-      const cells=new Map();
-      for(const id of ids){const p=this.points[id];
-        const x=maxX===minX?0:Math.min(grid-1,Math.floor((p.x-minX)/(maxX-minX)*grid));
-        const z=maxZ===minZ?0:Math.min(grid-1,Math.floor((p.z-minZ)/(maxZ-minZ)*grid));
-        const key=z*grid+x;if(!cells.has(key))cells.set(key,[]);cells.get(key).push(id);
-      }
-      if(cells.size<=1)return node;
-      node.ids=null;node.children=[...cells.values()].map(ids=>make(ids,depth+1));return node;
-    };
-    this.root=make(buildings.flatMap((b,i)=>b?.sourceBuildingId?[i]:[]),0);
+    Object.assign(this,finishSynchronously(buildIndexSteps(buildings)));
   }
   matches(buildings) {
+    return finishSynchronously(this.matchesSteps(buildings));
+  }
+  *matchesSteps(buildings) {
     if(this.buildings!==buildings||this.length!==buildings.length)return false;
     // Capture edits and surface publications may mutate the resident list in
     // place. Validate coordinates/identity before using retained spatial bounds.
     for(let i=0;i<buildings.length;i++){
+      if((i&127)===0)yield;
       const b=buildings[i],old=this.points[i];
       if(b?.sourceBuildingId!==this.identities[i])return false;
       if(Number.isFinite(b?.centerX)&&Number.isFinite(b?.centerZ)){
@@ -112,9 +130,10 @@ export class RdtBuildingIndex {
 }
 
 export function createRdtCaptureSelector(){
-  let index=null,sequence=null;
+  let index=null,sequence=null,generation=0;
   return {
     select(buildings,actor,worldSequence,limit=60){
+      generation++;
       let rebuilt=false;
       if(!index||!index.matches(buildings)||sequence!==worldSequence){
         index?.dispose();index=new RdtBuildingIndex(buildings);sequence=worldSequence;rebuilt=true;
@@ -122,6 +141,19 @@ export function createRdtCaptureSelector(){
       const ids=index.nearest(actor,limit);
       return {ids,stats:{algorithm:'rdt-spatial',rebuilt,nodes:index.nodes,candidates:index.lastCandidates||0}};
     },
-    clear(){index?.dispose();index=null;sequence=null;}
+    async selectCooperatively(buildings,actor,worldSequence,limit=60,schedule={}){
+      const run=++generation,current=()=>run===generation&&(schedule.current?.()??true),options={...schedule,current};
+      let rebuilt=false;
+      if(!index||sequence!==worldSequence||!await drainCooperatively(index.matchesSteps(buildings),options)){
+        const data=await drainCooperatively(buildIndexSteps(buildings),options);
+        if(!current())throw new Error('Capture selection superseded');
+        const next=Object.assign(Object.create(RdtBuildingIndex.prototype),data);
+        index?.dispose();index=next;sequence=worldSequence;rebuilt=true;
+      }
+      if(!current())throw new Error('Capture selection superseded');
+      const ids=index.nearest(actor,limit);
+      return {ids,stats:{algorithm:'rdt-spatial',rebuilt,nodes:index.nodes,candidates:index.lastCandidates||0}};
+    },
+    clear(){generation++;index?.dispose();index=null;sequence=null;}
   };
 }

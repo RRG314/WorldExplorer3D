@@ -30,6 +30,17 @@ roundtrip, production-configured fallback, final source/public documents and
 reviewed-image-bound production promotion. Earlier iteration notes below are
 historical evidence, not the latest release decision.
 
+## Road-safe fallback selection — October 14, 19:23 UTC
+
+The compatible fallback is now the preserved b21 candidate, replacing 4ec in
+the current rollback plan. It retains the same modern save owners and includes
+the local road-recovery and connected-approach fixes verified in Monaco and
+Baltimore. The older 4ec references below describe the previous fallback plan.
+Only five runtime/environment files differ from b21 in the next candidate;
+none changes player persistence or backend protocols. Their complete hashes and
+individual review are pinned in rollback-runtime-review.json. Production
+configuration and the actual four-stage save roundtrip are still pending.
+
 ## Release sequence
 
 1. Repair the observed Middleborough/South Marlyn physical junction. Require
@@ -203,3 +214,17 @@ the current landing page, Pages, README and release notes reference the new URLs
 Both public surfaces pass desktop/tablet/phone layout and image-decoding checks
 without overflow or page errors. Current artwork remains stylized, with the
 limitations described in KNOWN_ISSUES; these images do not imply photorealism.
+
+### Bounded refinement source validation
+
+All 2,623 source checks and the complete verify:pr chain pass. Focused checks
+prove bounded capture-index construction/validation, cancelled publication,
+in-place edit detection and unchanged nearest results. Smaller regional instance
+cells retain every source building and transform while excluding more offscreen
+instances. Native resource/timing acceptance is still pending.
+
+The b965 sustained run is preserved as failed: seven movement windows completed,
+with multiple FPS/hitch failures; teardown was interrupted after two logged
+cycles once the remaining synchronous capture-index stall was isolated. It is
+not a passing retention receipt. Its output/interruption record is retained at
+output/release-review/561-b965-performance.

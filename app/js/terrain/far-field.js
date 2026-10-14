@@ -758,7 +758,10 @@ function createFarFieldTerrainApi(deps = {}) {
         }), {unitsPerMeter:Number(appCtx.WORLD_UNITS_PER_METER)||1});
         build.own(instanceMaterial);
         const batches = await buildFarBuildingInstanceBatches(
-            THREE, builtBuildings.instances, instanceMaterial, { yieldControl: async()=>{
+            // Keep full coverage, but cull smaller city blocks at street level.
+            // A 2 km bounding sphere submitted thousands of off-screen homes
+            // whenever its edge intersected the camera frustum.
+            THREE, builtBuildings.instances, instanceMaterial, { cellSize:1024, yieldControl: async()=>{
               await yieldForRegion();
               if(requestGeneration!==generation||signal.aborted)throw new DOMException('Regional buildings superseded','AbortError');
             } }

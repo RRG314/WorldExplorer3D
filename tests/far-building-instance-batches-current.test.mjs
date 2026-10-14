@@ -22,6 +22,33 @@ function reference(material) {
 }
 function cleanup(meshes,material){meshes.forEach(m=>m.geometry.dispose());material.dispose();}
 
+test('smaller rendering cells preserve every building and reject more off-screen geometry',async()=>{
+ const material=new THREE.MeshBasicMaterial();
+ const source=Array.from({length:1600},(_,i)=>({x:(i%40)*100,z:Math.floor(i/40)*100,baseY:0,width:20,height:25,depth:20,rotationY:.2,color:[.4,.5,.6]}));
+ const coarse=await buildFarBuildingInstanceBatches(THREE,source,material,{cellSize:2048});
+ const fine=await buildFarBuildingInstanceBatches(THREE,source,material,{cellSize:1024});
+ try{
+  for(const batches of [coarse,fine]){
+   assert.equal(batches.reduce((n,m)=>n+m.count,0),source.length);
+   for(const mesh of batches)mesh.updateMatrixWorld(true);
+   const byKey=partitionFarBuildingInstances(source,batches===fine?1024:2048),matrix=new THREE.Matrix4();
+   for(const mesh of batches)for(let i=0;i<mesh.count;i++){
+    mesh.getMatrixAt(i,matrix);const expected=source[byKey.get(mesh.userData.spatialBatchKey)[i]];
+    assert.ok(Math.abs(matrix.elements[12]+mesh.position.x-expected.x)<.00013);
+    assert.ok(Math.abs(matrix.elements[14]+mesh.position.z-expected.z)<.00013);
+   }
+  }
+  const camera=new THREE.PerspectiveCamera(60,1,.1,800);camera.position.set(1100,15,1100);camera.lookAt(1100,15,1500);camera.updateMatrixWorld(true);
+  const frustum=new THREE.Frustum().setFromProjectionMatrix(new THREE.Matrix4().multiplyMatrices(camera.projectionMatrix,camera.matrixWorldInverse));
+  const visibleCount=batches=>batches.filter(mesh=>frustum.intersectsObject(mesh)).reduce((n,m)=>n+m.count,0);
+  assert.ok(visibleCount(fine)<visibleCount(coarse),'off-screen buildings should stay loaded without being submitted for drawing');
+  for(const b of source.filter(b=>b.x===1100&&b.z>=1100&&b.z<=1600)){
+   const ray=new THREE.Raycaster(new THREE.Vector3(b.x,100,b.z),new THREE.Vector3(0,-1,0));
+   assert.equal(ray.intersectObjects(fine)[0].sourceInstanceId,ray.intersectObjects(coarse)[0].sourceInstanceId);
+  }
+ }finally{for(const mesh of [...coarse,...fine])mesh.dispose();cleanup([...coarse,...fine],material);}
+});
+
 test('spatial building cells preserve coverage/colors and bound every rotated vertex in local coordinates',async()=>{
   assert.equal(THREE.REVISION,'128','Use the same Three revision as the shipped runtime');
   const material=new THREE.MeshBasicMaterial(),baseline=reference(material);
