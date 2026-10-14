@@ -5,6 +5,30 @@ import {sampleDynamicWaterAt, resolveWaterSampleCandidate} from '../app/js/boat-
 import {normalizeWaterBody} from '../app/js/world/water-body-contract.js';
 import {createSurfaceQuery} from '../app/js/world/surface-contract.js';
 const ring=(r)=>[{x:-r,z:-r},{x:r,z:-r},{x:r,z:r},{x:-r,z:r}];
+test('mapped boating cannot allocate or retain a circular surface over quays and islands; Ocean retains its surface',async()=>{
+ const {updateBoatWaterPatch}=await import('../app/js/boat-mode/surface-effects.js');
+ const {buildSyntheticBoatCandidate}=await import('../app/js/boat-mode/water-query.js');
+ const THREE=await import('three');const previousThree=globalThis.THREE;
+ const previous={boatMode:ctx.boatMode,boat:ctx.boat,scene:ctx.scene,waterWaveVisuals:ctx.waterWaveVisuals};
+ try {
+  globalThis.THREE=THREE;ctx.scene=new THREE.Scene();ctx.boat={x:2,z:3};ctx.waterWaveVisuals=[];
+  ctx.boatMode={active:true};
+  const mapped=waterKind=>({waterKind,source:normalizeWaterBody({pts:ring(100),holes:[ring(10)],surfaceY:.08,kindHint:waterKind})});
+  for(const kind of ['harbor','channel','lake','coastal','open_ocean']){
+   ctx.boatMode.currentWater=mapped(kind);assert.equal(updateBoatWaterPatch(),false);
+   assert.equal(ctx.boatMode.waterPatch,undefined);assert.equal(ctx.scene.children.length,0);
+  }
+  ctx.boatMode.currentWater=buildSyntheticBoatCandidate(2,3,{waterKind:'open_ocean',surfaceY:.08});
+  assert.equal(updateBoatWaterPatch(),true);const patch=ctx.boatMode.waterPatch;
+  assert.equal(patch.visible,true);assert.equal(patch.geometry.userData.waterPatchRadius,14000);
+  assert.equal(patch.position.x,2);assert.equal(patch.position.z,3);assert.ok(Math.abs(patch.position.y-.083)<1e-10);
+  ctx.boatMode.currentWater=mapped('harbor');assert.equal(updateBoatWaterPatch(),false);assert.equal(patch.visible,false);
+  ctx.boatMode.currentWater=buildSyntheticBoatCandidate(2,3,{waterKind:'open_ocean',surfaceY:.08});
+  assert.equal(updateBoatWaterPatch(),true);assert.equal(ctx.boatMode.waterPatch,patch);
+  ctx.boatMode.active=false;assert.equal(updateBoatWaterPatch(),false);assert.equal(patch.visible,false);
+  patch.geometry.dispose();patch.material.dispose();
+ } finally {globalThis.THREE=previousThree;Object.assign(ctx,previous);}
+});
 test('shore water queries use small non-navigable lake datum instead of sea-level fallback',()=>{
  ctx.boatMode={};ctx.waterways=[];ctx.waterAreas=[normalizeWaterBody({pts:ring(10),surfaceY:1500,kindHint:'lake',navigable:false})];
  const sample=sampleDynamicWaterAt(0,0,null,{time:4});assert.equal(sample.baseY,1500);assert.equal(sample.profile.waterKind,'lake');

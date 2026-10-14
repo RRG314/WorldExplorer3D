@@ -11,7 +11,7 @@ export function buildKennedyInterior(T,ctx,definition){
  const root=new T.Group();root.name='VAB ground-floor visit';root.position.set(f.center.x,base,f.center.z);root.rotation.y=-Math.atan2(f.uz,f.ux);root.scale.setScalar(f.k);
  const materials=new Map(),colliders=[];
  const mat=(color,roughness=.75)=>{if(!materials.has(color)){const m=new T.MeshStandardMaterial({color,roughness,side:T.DoubleSide});m.color.convertSRGBToLinear();m.fog=false;materials.set(color,m);}return materials.get(color);};
- const wall=mat(0xb2b9b7),steel=mat(0x777f82,.5),concrete=mat(0x90968e),yellow=mat(0xd8b230),dark=mat(0x263b42),white=mat(0xe6e6d9);
+ const wall=mat(0xfafaf8),steel=mat(0x777f82,.5),concrete=mat(0xf5f5f0),yellow=mat(0xd8b230),dark=mat(0x263b42),white=mat(0xe6e6d9);
  const box=(m,x,y,z,w,h,d,solid=false)=>{const mesh=new T.Mesh(new T.BoxGeometry(w,h,d),m);mesh.position.set(x,y,z);mesh.castShadow=mesh.receiveShadow=true;root.add(mesh);if(solid)colliders.push(createWallCollider(f.world(x-w/2,z),f.world(x+w/2,z),base+(y-h/2)*f.k,h*f.k,d*f.k,.000001));return mesh;};
  const beam=(a,b,w=.45,m=steel)=>{const d=new T.Vector3().subVectors(b,a),mesh=new T.Mesh(new T.BoxGeometry(w,d.length(),w),m);mesh.position.copy(a).add(b).multiplyScalar(.5);mesh.quaternion.setFromUnitVectors(new T.Vector3(0,1,0),d.normalize());root.add(mesh);};
  const floorShape=new T.Shape(ring.map(p=>new T.Vector2(p.x,-p.z))),floor=new T.Mesh(new T.ShapeGeometry(floorShape),concrete);floor.rotation.x=-Math.PI/2;floor.receiveShadow=true;root.add(floor);
@@ -67,7 +67,7 @@ export function buildKennedyInterior(T,ctx,definition){
  // The asset's measured 40 x 32.81 m ground envelope shares this scene's
  // collision owner. It is an exhibit, so no second vehicle controller exists.
  colliders.push(createWallCollider(f.world(-66,-25),f.world(-26,-25),base,7.75*f.k,32.81*f.k,.000001));
- root.add(new T.HemisphereLight(0xf0f5ff,0x707b84,.65));const light=new T.DirectionalLight(0xfff3dc,.85);light.position.set(-15,110,-35);light.target.position.set(-35,0,-10);light.castShadow=true;light.shadow.mapSize.set(1024,1024);Object.assign(light.shadow.camera,{left:-95,right:95,top:95,bottom:-95,near:1,far:220});light.shadow.bias=-.0001;light.shadow.normalBias=.04;root.add(light,light.target);
+ root.add(new T.HemisphereLight(0xf0f5ff,0x929a9e,.95));const light=new T.DirectionalLight(0xfff3dc,.7);light.position.set(-15,110,-35);light.target.position.set(-35,0,-10);light.castShadow=true;light.shadow.mapSize.set(1024,1024);Object.assign(light.shadow.camera,{left:-95,right:95,top:95,bottom:-95,near:1,far:220});light.shadow.bias=-.0001;light.shadow.normalBias=.04;root.add(light,light.target);
  const spawn=f.world(0,-64),entry={...spawn,y:base+(ctx.Walk?.CFG?.eyeHeight||1.7)+.03};
  interactions.push({kind:'exit',level:0,...spawn,radius:2.4*f.k,label:'Return outside'});
  const floorPlan={authored:true,floorCount:1,storyHeight:160*f.k,floors:[{id:'vab-ground',label:'Assembly floor',level:0,elevation:0,height:160*f.k}],connectorEligible:false};

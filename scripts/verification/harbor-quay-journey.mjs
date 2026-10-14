@@ -17,10 +17,14 @@ export async function verifyHarborQuayJourney(page,out){
  assert.ok(start,'A small passenger vessel must be admitted in the mapped harbor water');
  await page.screenshot({path:out+'/harbor-launch.png'});
  for(let i=0;i<5;i++)await stepGameplayKeys(page,'ArrowUp',6000);
- const finish=await page.evaluate(()=>({x:venueCtx.boat.x,z:venueCtx.boat.z,speed:venueCtx.boat.speed,label:venueCtx.boatMode.vesselLabel}));
+ const finish=await page.evaluate(()=>({x:venueCtx.boat.x,z:venueCtx.boat.z,speed:venueCtx.boat.speed,label:venueCtx.boatMode.vesselLabel,
+  localWaterPatchVisible:venueCtx.boatMode.waterPatch?.visible===true,
+  mappedWaveSurfaces:venueCtx.waterWaveVisuals.filter(m=>m.userData?.weWaterWaveConfig?.waterBody&&m.userData?.weWaterWaveShader).length}));
  const distanceFromWall=-(finish.x-start.edge.x)*start.edge.nx-(finish.z-start.edge.z)*start.edge.nz;
  assert.ok(Math.hypot(finish.x-start.x,finish.z-start.z)>5,'Throttle must move the launch');
  assert.ok(distanceFromWall>=8,`The bow must stay outside the quay, got ${distanceFromWall}`);
+ assert.equal(finish.localWaterPatchVisible,false,'Mapped harbor waves must use the clipped water footprint, not a circle over dry land');
+ assert.ok(finish.mappedWaveSurfaces>0,'Mapped harbor surfaces must keep their animated water shaders');
  await page.screenshot({path:out+'/quay-stop.png'});
  await stepGameplayKeys(page,'ArrowDown',6000);
  const reversed=await page.evaluate(()=>({x:venueCtx.boat.x,z:venueCtx.boat.z}));

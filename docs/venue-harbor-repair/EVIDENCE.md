@@ -118,6 +118,26 @@ NASA runs. Fallback world loading and the reconstructed visits worked; those
 provider failures are not deleted or presented as a clean live-service pass.
 Production, hosted/device acceptance and the full release matrix are separate.
 
-Final source validation: `npm run verify:pr` PASS, 2,600 tests, zero failures/skips,
+Source validation before the packaged review: `npm run verify:pr` PASS, 2,600 tests, zero failures/skips,
 plus dependency/module identity, context ownership, boundary types, runtime names,
 inventory and sensitivity checks. Log: `/tmp/we3d-venue-pr-final.log`.
+
+## Packaged visual findings and final corrections
+
+The first immutable package, `venue-harbor-kennedy-20261013`, passed normal aquarium
+admission, harbor contact/reverse and the complete VAB tour, with no page errors
+or failed local assets. It did **not** pass visual acceptance: the moving circular
+`BoatWaterPatch` bypassed the mapped shoreline and appeared over the promenade.
+Its `packaged-aquarium-harbor/quay-stop.png` retains that failure. Mapped boating now
+uses the already-animated mapped surface; only an explicit synthetic Ocean or
+transition candidate can activate the separate patch. A component regression
+checks no allocation over five mapped water kinds, synthetic Ocean activation,
+return to harbor, reuse and deactivation. The harbor journey now also requires
+mapped wave shaders to remain compiled and the overland patch to be hidden.
+
+The full source chain passes again: **2,601 tests, no failures/skips** in
+`/tmp/we3d-venue-pr-shoreline.log`. A subsequent VAB finish adjustment removes the
+excessive dark albedo tint and improves indirect light. Its five component tests
+and native Chrome `kennedy-lighting-final` full tour pass; entry-floor and crawler
+screenshots were inspected. This was a visible arrival problem, not a changed
+test threshold. Final immutable package journeys remain to be recorded below.
