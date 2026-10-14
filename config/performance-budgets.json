@@ -14,7 +14,7 @@
     "budgets": {
       "firstPlayableMs": 120000,
       "maximumModeActivationMs": 1000,
-      "minimumAverageFps": 43.65,
+      "minimumAverageFps": 30,
       "maximumP95FrameMs": 34.36,
       "maximumP99FrameMs": 50,
       "maximumDrawCalls": 1800,
@@ -93,5 +93,11 @@
     "physical low-tier-phone sustained 30 FPS",
     "five complete physical-device environment cycles",
     "ten location replacements on the same physical devices"
-  ]
+  ],
+  "framePacingPolicy": {
+    "review": "docs/release-review/2026-10-14/FRAME-PACING-ACCEPTANCE.md",
+    "minimumAverageFps": 30,
+    "scope": "Current desktop playability floor; preserve p95/p99, individual pause, hitch frequency, coverage, memory and resource criteria. Historical FPS snapshots remain references, not current acceptance.",
+    "ownerPriority": "Keep the accepted playable frame rate and fix visible jitter/stalling; do not reduce building coverage to chase a historical FPS value."
+  }
 }

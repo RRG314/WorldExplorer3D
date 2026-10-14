@@ -55,8 +55,11 @@ keyboard junction driving and is preserved as the modern-save fallback. The b965
 pavement scheduler removed the reproduced long path-builder blocks but still
 failed desktop timing. Current refinements divide nearby-capture index work
 across frames and cull smaller regional instance cells without removing buildings.
-All 2,623 source checks pass. Native performance/resource and complete final
-acceptance remain open; no 5.6 candidate is deployed to production.
+The collision allocation fix is pushed to both active branches. Building attributes
+now share backing storage with unchanged values; all 2,625 source checks pass.
+Native performance and complete final acceptance remain open. The production
+rollback package and released 5.5.1 save-test package are verified; no 5.6 candidate
+is deployed to production.
 Canonical staging now serves exact 376 at https://we3d-staging-20260712.web.app/app/.
 Its live private-layout/photo/purchase persistence check passed with owned test
 records removed. See docs/RELEASE_SOURCE_OF_TRUTH.md and the October 14 READINESS

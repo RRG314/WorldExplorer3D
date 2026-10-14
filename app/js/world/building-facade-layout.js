@@ -17,8 +17,11 @@ export function attachBuildingFacadeLayout(geometry, options = {}) {
   if (!p || !n) return null;
   // Extruded walls have split face vertices. Indexed input must also have hard
   // corners; shared smooth wall vertices cannot represent independent wall bays.
-  const layout = new Float32Array(p.count * 4);
-  const openings = new Float32Array(p.count * 4);
+  // These attributes share a geometry lifetime, but their values must never
+  // overlap. Keep one backing store for the two independent ranges.
+  const storage = new ArrayBuffer(p.count * 8 * Float32Array.BYTES_PER_ELEMENT);
+  const layout = new Float32Array(storage, 0, p.count * 4);
+  const openings = new Float32Array(storage, p.count * 4 * 4, p.count * 4);
   let minimumY = Infinity, maximumY = -Infinity;
   for (let i=0;i<p.count;i++) { minimumY=Math.min(minimumY,p.getY(i)); maximumY=Math.max(maximumY,p.getY(i)); }
   const plan = facadeFloorPlan(maximumY-minimumY, options);

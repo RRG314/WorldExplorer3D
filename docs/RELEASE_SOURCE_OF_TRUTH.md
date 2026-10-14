@@ -40,8 +40,10 @@ refinement divides nearby-capture index work across frames and culls smaller
 regional instance cells without dropping buildings. The 33d5 package passes native resource/lifecycle and connected tutorial checks.
 Its complete twelve-cycle performance run passes cleanup and touch emulation,
 but still fails desktop frame-rate/hitch limits. A new, narrowly scoped collision
-allocation repair passes all 2,624 source checks; rebuilt native and final complete
-acceptance remain required.
+allocation repair is pushed to both active branches but still reproduces native
+flight pauses. Generated building attributes now use fewer native backing buffers
+with identical values; all 2,625 source checks pass. Final packaged native timing
+and complete acceptance remain required.
 
 All three 376 backend gates passed. Six changed Functions were deployed only to
 staging with existing configuration preserved. Live staging purchases, private
@@ -51,7 +53,8 @@ source-bound acceptance remain separate requirements.
 
 The released 5.5.1 package is the save-upgrade starting point. The retained
 `b21b7f12` road-repaired package is the candidate's modern-save fallback, subject to the
-actual four-stage save roundtrip and a production-configured fallback build.
+actual four-stage save roundtrip. Its production-configured package is built and
+verified; the only differences are the three approved Firebase configuration assets.
 Do not use the old 5.5.1 frontend as a writer for new 5.6 progress. Its isolated
 road-recovery deployment remains valid independently of the new release.
 

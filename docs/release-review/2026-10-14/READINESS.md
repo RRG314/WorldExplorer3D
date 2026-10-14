@@ -6,29 +6,32 @@ this release. Moving scenery is optional and must not be represented as complete
 worldwide road, collision or activity streaming. Preserve the ongoing 5.6 venue,
 harbor, NASA, ocean and consolidation work; do not roll it back to the hotfix.
 
-## Latest status — October 14, 18:59 UTC
+## Latest status — October 14, 20:56 UTC
 
-Production remains 5.5.1. The complete 376 matrix finished 101/107; failed
-receipts are archived, not replaced by focused passes. Candidate b21 passes
-2,618 source checks, full native Monaco assembly (zero audited gaps and design
-grade violations), and keyboard travel through the Baltimore regression junction
-(70.97 m, departure target within 4.54 m, one world generation, no page/road errors).
-The driving screenshot was inspected. The graph solve now reaches affected
-continuations before publishing profiles; remote ordinary streets retain their
-terrain authority. Roof triangles reuse corner attributes with original geometry.
+Production remains 5.5.1. The latest committed e498 collision repair is on both
+active development branches and passes GitHub code and secret checks. Its
+uninstrumented flight check still reproduces a 0.8-second pause, so it is not
+production-ready. Instrumented allocation improved substantially; that result
+is not treated as a performance pass.
 
-Canonical staging serves exact 376; the preview host was rejected by backend
-CORS, so live account verification moved to the project's authorized staging
-address without weakening origin checks. Purchases/idempotency, private floor
-layouts, three photo uploads, save/reload, CPU submission and continued editing
-passed there. All owned test users/uploads were removed. This registered staging
-attestation check is distinct from ordinary hosted acceptance.
+The next storage repair gives generated building position, UV and normal data
+one backing buffer, and facade layout/opening data another. The arrays remain
+separate, non-overlapping views with unchanged values. All 2,625 source checks
+and the complete structural chain pass, including 984 exact building comparisons,
+cloning/edit isolation and source retirement. A source flight run has zero
+browser/local-resource errors and 33.4 ms p99, but three major pauses including
+366.7 ms. Final packaged performance and the complete matrix remain required.
 
-Remaining: performance/resource investigation, the final complete matrix,
-ordinary hosted voyage/save recovery, four-stage release/candidate/fallback/save
-roundtrip, production-configured fallback, final source/public documents and
-reviewed-image-bound production promotion. Earlier iteration notes below are
-historical evidence, not the latest release decision.
+The road-safe b21 fallback has now been rebuilt and verified with production
+configuration; only the three approved Firebase configuration assets differ.
+The actual released 5.5.1 staging package is byte-verified inside the workspace
+for the four-stage save test. Neither operation changes production or player data.
+
+Remaining: final package verification and full matrix/backend run, ordinary
+hosted voyage/save recovery, actual released/candidate/fallback-write/return
+save roundtrip, final provider receipt, configuration-only production package,
+and current-image-bound promotion. Original failures and interrupted runs remain
+preserved. Earlier iteration notes below are historical evidence.
 
 ## Road-safe fallback selection — October 14, 19:23 UTC
 

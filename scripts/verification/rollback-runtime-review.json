@@ -45,6 +45,27 @@
       "after": "210410711781a98f42fc57d20c49a18a98088bb8e2a2e003123f712686641b70",
       "afterMode": "100644",
       "review": "Identical horizontal and vertical predicates, candidate order and collision responses. Rejects geographically distant colliders before evaluating vertical properties, reducing measured temporary allocation. No collision data, geometry, persistence or backend protocol changes."
+    },
+    "app/js/world/building-body-geometry.js": {
+      "before": "c5c6f0c5fb53883c7dbc96f5d4637a8b3397c3172a7993d7bb7cf6c380f44040",
+      "beforeMode": "100644",
+      "after": "6d021c68737f5b3449d78fb2401d903022844a1b4fc6c695b5ef807b1eceaeb1",
+      "afterMode": "100644",
+      "review": "Packs position, UV and normal arrays into disjoint views of one exclusively owned backing buffer. Preserves geometry bytes, transform behavior, editing and retirement. No saved data or protocol change."
+    },
+    "app/js/world/building-facade-layout.js": {
+      "before": "d83926ed6d0b383ef9ec3ff284c35a0d3008f363ca2cb8f1e41824941f8e69cf",
+      "beforeMode": "100644",
+      "after": "1a899df2afee673abb9737c89168c70d1df4fb6bc76565b78a4f9005f6c1b6ed",
+      "afterMode": "100644",
+      "review": "Packs facade layout and opening attributes into disjoint views with the same values and lifetime. No facade appearance, building identity, persistence or backend change."
+    },
+    "config/performance-budgets.json": {
+      "before": "7553af8ea49ea8f6d3e67e48d70148c0953b669e10a46c49b8a383e67a5b8b6a",
+      "beforeMode": "100644",
+      "after": "b46fd6b7f752988f6d464274cbd81dc77cba5c8860e01d5a9962f28fbee9b626",
+      "afterMode": "100644",
+      "review": "Documented acceptance-policy revision: desktop average floor30FPS replaces the dated43.65 snapshot, consistent with the owner priority. All frame-time/hitch, coverage, memory and rendering budgets unchanged. Verification configuration only, no runtime/save/backend change."
     }
   }
 }

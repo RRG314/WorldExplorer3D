@@ -25,8 +25,13 @@ export function createBuildingBodyGeometry(THREE, footprint, height) {
   const triangles = THREE.ShapeUtils.triangulateShape(contour, []);
   const lidVertices = triangles.length * 6;
   const vertexCount = lidVertices + contour.length * 6;
-  const positions = new Float32Array(vertexCount * 3);
-  const uvs = new Float32Array(vertexCount * 2);
+  // All three attributes belong to this one private geometry and retire
+  // together after batching. Separate, non-overlapping views avoid three
+  // native backing stores per building without changing attribute bytes.
+  const storage = new ArrayBuffer(vertexCount * 8 * Float32Array.BYTES_PER_ELEMENT);
+  const positions = new Float32Array(storage, 0, vertexCount * 3);
+  const uvs = new Float32Array(storage, vertexCount * 3 * 4, vertexCount * 2);
+  const normals = new Float32Array(storage, vertexCount * 5 * 4, vertexCount * 3);
   let cursor = 0;
   function vertex(index, depth, u, v) {
     const point = contour[index], at = cursor * 3, uv = cursor * 2;
@@ -53,6 +58,7 @@ export function createBuildingBodyGeometry(THREE, footprint, height) {
   const geometry = markPrivateBuildingGeometry(new THREE.BufferGeometry());
   geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
   geometry.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
+  geometry.setAttribute('normal', new THREE.BufferAttribute(normals, 3));
   geometry.addGroup(0, lidVertices, 0);
   geometry.addGroup(lidVertices, vertexCount - lidVertices, 1);
   geometry.computeVertexNormals();
