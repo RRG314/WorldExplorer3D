@@ -1,79 +1,55 @@
 # Release source identities
 
-## Current observation — October 8, 2026
+## Current observation — October 14, 2026
 
-The production frontend remains **5.4.0+1532bdfbb5c1.319d215f60318297.production**,
-source **1532bdfbb5c11e002d278b058d1ebdba88384f60**. The next compatible release is
-5.5.0 on `steven/visual-quality`. Stable, Pages and the public release remain unpromoted.
+Production is **5.5.1**, verified from its live build manifest. The complete
+**5.6.1** candidate remains under verification; its local improvements are not
+production changes. A version label or preview URL alone does not identify code.
 
-The hosted preview and local dist are `5.5.0+4413d5d9b2ce.d69c6d4fb5e9fe9c.staging`,
-source `4413d5d9b2ce01369a5bf8bde7a2d584c68bd243`. The source passes 2,158 tests;
-the immutable package passes all 29 normal world checks and the added regional
-arrival/return/failure/recovery/retirement/settings journey. Four prescribed
-source keyboard-flight bursts pass. Hosted build and asset manifests match local
-bytes. Ordinary Chrome verification is blocked by the locked Mac, so the earlier
-016537ce ordinary-startup result does not certify this new artifact.
-
-The release gate rejects promotion because complete matching execution and external
-acceptance evidence are still missing. Production remains 5.4; stable, public
-Pages and the v5.5.0 release have not been promoted. The 016537ce package, compatible
-37a fallback, live production and unique 0e snapshot remain retained. Only the
-verified, pushed, superseded 7099 generated payload was removed; its manifests and
-cleanup receipt remain saved.
-
-Production has 80 ACTIVE Functions. Place/environmental data version 1 and
-aircraft version 5 were deployed first, preserving all 11 existing parameters.
-An audit of the actual downloaded production source then identified 77 older
-packages. Those have now been updated; all 80 deployed packages match all 36
-tracked backend code/configuration files. The tested Firestore ocean-presence
-additions are live; Storage rules are unchanged. Two IAM lookup errors reported
-by the CLI were reconciled against already-correct live permissions.
-
-Actual production protocol checks pass for shared marine authority, ocean
-presence, condition-save idempotency and legacy compatibility, discovery receipts
-and account isolation. Their temporary accounts and private fixtures were removed
-and verified absent. This is hosted HTTP/rules evidence, not an ordinary complete
-player journey. Staging aircraft version 6 is ACTIVE. Provider-cache expiration
-policies are ACTIVE as of 22:06 UTC. The exact live frontend's preserved
-`release-54-1532` channel retains Hosting version `f8a50a498fe78123` through
-November 6 at 22:26:58 UTC; both manifest bytes match live. This is separate
-from the reviewed save-compatible 37a fallback.
-
-The earlier accepted package's three-stage save/fallback/return and packaged live weather
-and ocean UI checks pass. Public-use rights, deployed provider-source identity and
-attribution are reviewed. The earlier 91-gate candidate run completed with 83 passes and eight failures.
-The source now includes an additional regional-arrival gate. Matching full release
-verification and ordinary-hosted, physical-device and fresh-player evidence remain
-open; targeted scenery checks are not whole-release acceptance.
-
-See [current state](../CURRENT-STATE.md) and
-[finite release gates](product-audit/2026-10-01/RELEASE-ACCEPTANCE.md).
-
-## Historical September 28 receipt
-
-Verified September 28, 2026 from hosted manifests and deployment results.
-A version label or URL parameter alone does not identify deployed code.
-
-| Reference | Identity |
+| Reference | Build or source |
 | --- | --- |
-| Live production source | `2839df5d6bbed9f8dfa4b89e379ba2e026cab438` |
-| Live production build | `5.3.0+2839df5d6bbe.114f3c83341f2200.production` |
-| Tested staging build | `5.3.0+2839df5d6bbe.7492cbb92de5e631.staging` |
-| Previous live source | `bbe6502228e369fe2a15dc6a177f5d83948584c3` |
-| Previous live build | `5.3.0+bbe6502228e3.8044052b36c00b4a.production` |
-| Production project | `worldexplorer3d-d9b83` |
-| Preserved frontend rollback channel | `rollback-bbe65022` |
-| Integration branch | `steven/architecture-evaluation` |
-| Release branch | `stable` |
+| Production frontend | `5.5.1+012e5c85582b.eb0d7eddf0f75035.production` |
+| Production source | `012e5c85582b78a7808656545bf4143a31a18652` |
+| Production Firebase project | `worldexplorer3d-d9b83` |
+| Canonical staging frontend | `5.6.1+376c7e55784c.9f1d43b3d9871d58.staging` |
+| Staging Firebase project | `we3d-staging-20260712` |
+| Local road-repair candidate | `5.6.1+b21b7f12fdfa.31ed9b1212c5002c.staging` |
+| Release branch | `stable` (default; no `main` branch) |
+| Active development branches | `steven/visual-quality`, `steven/post-5.2-release-integration` |
 
-Production and staging use identical game assets. Only their three generated
-Firebase configuration files differ. The `commitUrbanImpacts` backend source
-update preserved existing runtime configuration and access permissions.
-Release documentation can advance after the runtime commit; rebuilding a later
-commit is a new candidate and requires its own relevant verification.
+[Production](https://worldexplorer3d.io/app/) ·
+[Staging](https://we3d-staging-20260712.web.app/app/) ·
+[Release preparation PR](https://github.com/RRG314/WorldExplorer3D/pull/103)
 
-The 5.3 notes compare against the preceding published 5.2 update. The September
-28 optimization notes separately compare against the already-live 5.3 source,
-so earlier ship and space changes are not counted as new optimization work.
+The canonical staging address replaced an unauthorized preview origin for live
+account checks. Its package is an exact Hosting clone of the reviewed preview;
+production and backend origin restrictions were not changed.
 
-[Release comparison](RELEASE_COMPARISON_5.3.md) · [Release status](RELEASE_INTEGRATION_STATUS.md)
+## Verification and rollback
+
+The complete 376 candidate matrix finished **101 of 107 gates passing**. Its
+failed receipts remain preserved. The local b21 candidate fixes the reproduced
+Monaco road discontinuities and reuses roof vertices without removing buildings.
+All 2,618 source checks, native Monaco assembly and the Baltimore keyboard
+junction journey pass. These focused results do not replace the final complete
+matrix or its performance, hosted-account and save-compatibility requirements.
+
+All three 376 backend gates passed. Six changed Functions were deployed only to
+staging with existing configuration preserved. Live staging purchases, private
+home layouts, photo uploads, CPU submissions and continuation checks passed;
+their disposable records were removed. The full ordinary hosted voyage and final
+source-bound acceptance remain separate requirements.
+
+The released 5.5.1 package is the save-upgrade starting point. The retained
+`4ec78f8e` venue package is the candidate's modern-save fallback, subject to the
+actual four-stage save roundtrip and a production-configured fallback build.
+Do not use the old 5.5.1 frontend as a writer for new 5.6 progress. Its isolated
+road-recovery deployment remains valid independently of the new release.
+
+Production promotion must use the verified staging game payload, changing only
+the three reviewed Firebase configuration assets. Commit identities, manifests,
+backend deployment evidence and the rollback plan must agree before promotion.
+
+[Current state](../CURRENT-STATE.md) ·
+[Release status](RELEASE_INTEGRATION_STATUS.md) ·
+[Candidate evidence](release-review/2026-10-14/READINESS.md)

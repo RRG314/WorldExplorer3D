@@ -1,51 +1,47 @@
 # Release status
 
-Updated October 7, 2026. The 5.5.0 update is being prepared for release.
-The production frontend remains on 5.4 until a verified promotion is recorded here.
+Updated October 14, 2026. **5.5.1 is live; 5.6.1 is being verified.** Production,
+the default branch and the next release must be promoted together after the
+remaining checks. The owner has authorized publication; authorization does not
+turn missing or failed checks into passes.
 
-The owner has authorized the GitHub update, versioned release, public project
-page and production deployment. Authorization is recorded separately from
-verification: it does not turn missing device checks or failed performance
-measurements into passing results.
-
-The public overview is [5.5 release notes](../RELEASE_NOTES_5.5.0.md).
-[Known limitations](../KNOWN_ISSUES.md) describe the remaining product work.
-Exact build identities and acceptance evidence belong in
-[release source of truth](RELEASE_SOURCE_OF_TRUTH.md) and the internal evidence
-ledger, rather than the public release body.
+The public overview is [5.6.1 release notes](../RELEASE_NOTES_5.6.1.md).
+[Known limitations](../KNOWN_ISSUES.md) describe the product's actual scope.
+Exact package identities are in [release source identities](RELEASE_SOURCE_OF_TRUTH.md).
 
 ## Remaining acceptance
 
-The current package and hosted preview are `4dd2e37c`, with the same 615 delivered
-file hashes as the owner-tested `135e3895` preview. Source checks pass 2,109 tests;
-world preflight passes 29 checks. All three current backend gates pass, including
-14 general backend stages and the complete two-client shared research voyage.
+The complete 376 matrix finished 101/107. The six failed gates concerned a disk
+preflight, scene resource ceilings, two Monaco road assemblies, sustained desktop
+performance, and an optional location-label provider rejection in an otherwise
+completed tutorial journey. Each failed receipt is preserved; none is relabeled.
 
-All 80 production Functions now contain the tested backend source, verified by
-downloading the actual deployed archives. All 11 existing parameters are preserved.
-Firestore accepts the tested ocean-presence values; Storage rules are unchanged.
-Live protocol probes pass for voyage authority, save retry and legacy compatibility,
-receipt ownership and isolation. All temporary fixtures and accounts were removed
-and checked absent. Both provider-cache expiration policies are ACTIVE as of
-22:06 UTC. The exact live frontend is retained through November 6, independently
-verified against its Hosting version and both manifests. The public frontend
-remains on 5.4.
+The b21 repair closes Monaco's audited road gaps and approach-grade violations.
+The Baltimore junction passes real keyboard approach, turn and departure without
+a world reload. Its screenshot was inspected. All 2,618 source checks pass.
+Performance and resource measurements are in progress; the final complete matrix
+must run against the final package.
 
-The full frozen 91-gate candidate matrix is running. The current 4dd2 save upgrade,
-fallback write and candidate return pass, retaining existing records and unrelated
-pending account data. Public weather/marine rights, deployed-source identity and
-packaged UI attribution are reviewed; no paid data subscription is required.
-Sustained movement on this game payload still has visible pauses; its retention
-run was interrupted when disk space became critically low. The original failed
-matrix and resource measurements are preserved. No performance threshold was
-relaxed or building coverage removed.
+The 376 backend matrix passed. Six changed Functions are deployed to staging,
+with the existing runtime configuration preserved. Live account checks confirm
+purchase retry/idempotency, private layout save/reload, three photo uploads,
+CPU submission and continued editing. Temporary users and uploads were removed.
+Ordinary hosted room/voyage controls, the actual release/save/fallback roundtrip,
+final free-data evidence, production fallback packaging and exact reviewed images
+remain required before promotion. Production backend publication is coordinated
+with the new frontend.
 
-The owner reports that the 135 preview works on Android. This is smoke feedback,
-not measured thermal/memory, iOS, uncoached-player or ordinary hosted acceptance.
-Those remaining checks are kept explicit. Owner-authorized cleanup preserved
-source history, compact evidence, production and the reviewed rollback artifact.
+The owner previously reported a working Android test. That feedback is retained
+with its original scope; it is not a physical-device measurement for this newer
+package. Any deferred manual checks must remain explicit.
 
-The research vessel still uses its existing custom model. The licensed vessel,
-broader wildlife and ocean activities, spearfishing, and unrestricted continuous
-world travel are not included in 5.5. These are explicit scope limits, not
-features certified by the release checks.
+## Release behavior
+
+Earth starts in location-based mode. Optional moving scenery does not claim
+worldwide physical-road or activity streaming. Travel recovery must remain local,
+without forcing Main Menu or a world reload. The candidate retains the museums,
+aquarium, research vessel, space, harbor, launch-site and consolidation work.
+
+Current public gallery images and release notes are prepared. Final branch,
+release and project-page publication must use the same reviewed source and
+package, preserving existing history and player progress.

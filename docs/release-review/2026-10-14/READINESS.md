@@ -6,6 +6,30 @@ this release. Moving scenery is optional and must not be represented as complete
 worldwide road, collision or activity streaming. Preserve the ongoing 5.6 venue,
 harbor, NASA, ocean and consolidation work; do not roll it back to the hotfix.
 
+## Latest status — October 14, 18:59 UTC
+
+Production remains 5.5.1. The complete 376 matrix finished 101/107; failed
+receipts are archived, not replaced by focused passes. Candidate b21 passes
+2,618 source checks, full native Monaco assembly (zero audited gaps and design
+grade violations), and keyboard travel through the Baltimore regression junction
+(70.97 m, departure target within 4.54 m, one world generation, no page/road errors).
+The driving screenshot was inspected. The graph solve now reaches affected
+continuations before publishing profiles; remote ordinary streets retain their
+terrain authority. Roof triangles reuse corner attributes with original geometry.
+
+Canonical staging serves exact 376; the preview host was rejected by backend
+CORS, so live account verification moved to the project's authorized staging
+address without weakening origin checks. Purchases/idempotency, private floor
+layouts, three photo uploads, save/reload, CPU submission and continued editing
+passed there. All owned test users/uploads were removed. This registered staging
+attestation check is distinct from ordinary hosted acceptance.
+
+Remaining: performance/resource investigation, the final complete matrix,
+ordinary hosted voyage/save recovery, four-stage release/candidate/fallback/save
+roundtrip, production-configured fallback, final source/public documents and
+reviewed-image-bound production promotion. Earlier iteration notes below are
+historical evidence, not the latest release decision.
+
 ## Release sequence
 
 1. Repair the observed Middleborough/South Marlyn physical junction. Require

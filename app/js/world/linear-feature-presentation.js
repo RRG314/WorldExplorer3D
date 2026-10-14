@@ -14,9 +14,8 @@ const FEATURE_COLORS = Object.freeze({
 
 // Keep coarse mapped paths outside the resident pavement coverage. The detailed area owner
 // replaces their interiors, including incorrectly duplicated path strips through roadways.
-function outsidePaths(feature, bounds) {
-  if (!bounds || !isPavementFootway(feature)) return [feature.pts];
-  const paths = [];
+function* outsidePaths(feature, bounds) {
+  if (!bounds || !isPavementFootway(feature)) { yield feature.pts; return; }
   for (let i=1;i<feature.pts.length;i++) {
     const a=feature.pts[i-1], b=feature.pts[i], dx=b.x-a.x, dz=b.z-a.z;
     let lo=0,hi=1, hit=true;
@@ -25,10 +24,9 @@ function outsidePaths(feature, bounds) {
       const t=q/p; if(p<0)lo=Math.max(lo,t);else hi=Math.min(hi,t);
     }
     const at=t=>({x:a.x+dx*t,z:a.z+dz*t});
-    if(!hit || lo>=hi) paths.push([a,b]);
-    else {if(lo>0)paths.push([a,at(lo)]);if(hi<1)paths.push([at(hi),b]);}
+    if(!hit || lo>=hi) yield [a,b];
+    else {if(lo>0)yield [a,at(lo)];if(hi<1)yield [at(hi),b];}
   }
-  return paths;
 }
 
 function* buildBatchGeometry(features, buildFeatureRibbonEdges, worldBaseTerrainY, pavementBounds, clipSurface, clipPavement, metersPerWorldUnit) {
@@ -41,6 +39,10 @@ function* buildBatchGeometry(features, buildFeatureRibbonEdges, worldBaseTerrain
     if (feature.subtype === 'crossing' && !feature.structureSemantics?.gradeSeparated) continue;
     const halfWidth = Math.max(0.25, Number(feature.width || 1) * 0.5);
     for (const points of outsidePaths(feature, pavementBounds)) {
+    // A mapped feature can contain thousands of independently clipped paths.
+    // Yield before each one, not only between source features. Otherwise one
+    // cooperative step still monopolizes the frame during a resident rebuild.
+    yield;
     const edges = buildFeatureRibbonEdges(
       feature,
       linearRibbonStations(feature, points),
@@ -55,8 +57,14 @@ function* buildBatchGeometry(features, buildFeatureRibbonEdges, worldBaseTerrain
       let cut=clipSurface?clipSurface(positions,triangles):{positions,indices:triangles};
       if(pavementCut)cut=clipPavement(cut.positions,cut.indices);
       const base=vertices.length/3;
-      for(const value of cut.positions)vertices.push(value);
-      for(const value of cut.indices)indices.push(base+value);
+      for(let i=0;i<cut.positions.length;i++){
+        vertices.push(cut.positions[i]);
+        if((i+1)%3072===0)yield;
+      }
+      for(let i=0;i<cut.indices.length;i++){
+        indices.push(base+cut.indices[i]);
+        if((i+1)%3072===0)yield;
+      }
     } else appendUpwardRibbonGeometry(
       edges.leftEdge,
       edges.rightEdge,

@@ -48,6 +48,17 @@ history at `027336a7`, without changing its pre-merge source tree. No museum,
 aquarium, ship, consolidation or player progress was rolled back. Full deployment
 and integration evidence is recorded in `docs/road-continuity/EVIDENCE.md`.
 
+## Current complete candidate — October 14
+
+Local candidate `5.6.1+b21b7f12fdfa.31ed9b1212c5002c.staging` follows the complete
+376 matrix (101/107). It passes 2,618 source checks, native Monaco road assembly
+and the Baltimore keyboard junction journey. Performance/resource investigation
+and complete final acceptance remain open; it is not deployed to production.
+Canonical staging now serves exact 376 at https://we3d-staging-20260712.web.app/app/.
+Its live private-layout/photo/purchase persistence check passed with owned test
+records removed. See docs/RELEASE_SOURCE_OF_TRUTH.md and the October 14 READINESS
+ledger for current identities and the remaining finite release sequence.
+
 ## Previous 5.5.0 release evidence
 
 - Production: https://worldexplorer3d.io/app/
