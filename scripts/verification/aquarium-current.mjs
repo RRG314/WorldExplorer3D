@@ -21,6 +21,8 @@ const server=await startStaticServer({rootDir:servedRoot,ports:[4496,4497]});con
 collectBrowserGraphicsErrors(page,errors);page.on('pageerror',e=>errors.push(String(e)));page.on('console',m=>{if(m.type()==='warning'&&/Interior|aquarium/i.test(m.text()))report.warnings=(report.warnings||[]).concat(m.text());});
 const check=(name,value)=>{report.checks.push({name,passed:!!value});console.log('[aquarium]',name,value?'PASS':'FAIL');assert.ok(value,name);};
 const cdp=measured?await context.newCDPSession(page):null;if(cdp)await cdp.send('Performance.enable');
+const allocationProfile=measured&&process.argv.includes('--profile-allocations');
+if(allocationProfile)await cdp.send('HeapProfiler.startSampling',{samplingInterval:131072});
 report.performance=measured?{host:performanceHost,scope:'Three 10-second live RAF turning windows in Pavilion, lower reef gallery and reentry with ordinary Chrome memory settings; not sustained outdoor or physical-phone evidence.',windows:[]}:null;
 async function measureVenue(label){
  if(!measured)return;
@@ -36,6 +38,7 @@ async function measureVenue(label){
  const w={label,rendererName,heapBytes,resources,averageFps:sample.deltas.length/(sample.elapsedMs/1000),p95FrameMs:p(.95),p99FrameMs:p(.99),hitches:frameHitches(sample.deltas,performanceBudgets.desktopTier.hitches)};
  w.checks={averageFps:w.averageFps>=b.minimumAverageFps,p95:w.p95FrameMs<=b.maximumP95FrameMs,p99:w.p99FrameMs<=b.maximumP99FrameMs,hitches:w.hitches.passed,heap:heapBytes<=b.maximumJsHeapUsedBytes,drawCalls:resources.calls<=b.maximumDrawCalls,triangles:resources.triangles<=b.maximumTriangles};
  report.performance.windows.push(w);
+ if(allocationProfile){const {profile}=await cdp.send('HeapProfiler.getSamplingProfile');await writeFile(`${out}/${label}.heap-sampling.json`,JSON.stringify(profile));report.performance.allocationProfiled=true;}
 }
 async function pose(){return page.evaluate(()=>{const w=globalThis.venueCtx.Walk.state.walker;return{x:w.x,y:w.y,z:w.z,yaw:w.yaw||w.angle};});}
 async function walkTo(point,tolerance=.55){let previous=Infinity,stalled=0;for(let i=0;i<190;i++){const p=await pose(),distance=Math.hypot(point.x-p.x,point.z-p.z);if(distance<tolerance)return;const target=Math.atan2(point.x-p.x,point.z-p.z),delta=Math.atan2(Math.sin(target-p.yaw),Math.cos(target-p.yaw));if(Math.abs(delta)>.09){await stepGameplayKeys(page,delta>0?'ArrowLeft':'ArrowRight',Math.max(16,Math.min(450,Math.abs(delta)/2.6*800)));continue;}await stepGameplayKeys(page,'ArrowUp',Math.max(30,Math.min(450,(distance-tolerance+.1)/2.8*800)));if(distance>previous-.01)stalled++;else stalled=0;previous=distance;assert.ok(stalled<12,`Walking blocked: ${JSON.stringify({point,p,distance})}`);}throw Error(`Walking timed out: ${JSON.stringify(point)}`);}
