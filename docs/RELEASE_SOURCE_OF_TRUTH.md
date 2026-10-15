@@ -11,9 +11,9 @@ production changes. A version label or preview URL alone does not identify code.
 | Production frontend | `5.5.1+012e5c85582b.eb0d7eddf0f75035.production` |
 | Production source | `012e5c85582b78a7808656545bf4143a31a18652` |
 | Production Firebase project | `worldexplorer3d-d9b83` |
-| Canonical staging frontend | `5.6.1+1f37e893ccae.3e39c25a98b5a66f.staging` |
+| Canonical staging frontend | `5.6.1+a0e20c35eab7.aa4dd9dce23502b0.staging` |
 | Staging Firebase project | `we3d-staging-20260712` |
-| Current frozen candidate | `5.6.1+fb24de036fdd.ccf8c64b77a22df7.staging` |
+| Current frozen candidate | `5.6.1+a0e20c35eab7.aa4dd9dce23502b0.staging` |
 | Preserved road-safe fallback | `5.6.1+b21b7f12fdfa.31ed9b1212c5002c.staging` |
 | Release branch | `stable` (default; no `main` branch) |
 | Active development branches | `steven/visual-quality`, `steven/post-5.2-release-integration` |
@@ -22,14 +22,34 @@ production changes. A version label or preview URL alone does not identify code.
 [Staging](https://we3d-staging-20260712.web.app/app/) ·
 [Release preparation PR](https://github.com/RRG314/WorldExplorer3D/pull/103)
 
-Canonical staging now serves the 1f37 package; both hosted manifests match local
-bytes. Production and backend origin restrictions were not changed. Ordinary
-Chrome successfully searches Baltimore. A clean automated browser is rejected
-by reCAPTCHA, so its complete shared-voyage/save-recovery check remains open.
+Canonical staging now serves the a0e20c35 package; both hosted manifests match
+local bytes. Production and backend origin restrictions were not changed.
+Ordinary Chrome opens the menu, enters guided Baltimore, displays live weather
+and starts field photography. This is not complete account/shared-voyage/save
+acceptance. The earlier clean automated browser's reCAPTCHA rejection was not
+bypassed; that separate hosted journey remains open.
 
 ## Verification and rollback
 
-The fb24 source is pushed to both active development branches. PR #103 remains
+The a0e20c35 source is pushed to both active development branches. PR #103 remains
+draft and stable is unchanged. Current GitHub code/package and secret checks pass.
+All 754 package files pass integrity verification. All 2,653 source tests and the
+structural chain pass. All three exact-candidate backend gates and the four-stage
+released 5.5.1 → candidate → compatible b21 fallback → candidate save journey
+pass. The 107-gate candidate matrix is running sequentially; its current receipts
+do not yet certify the complete scope.
+
+The source diagnostics pass continuous road contact across the repaired Monaco
+junction and regional arrival, provider recovery, return and saved scenery
+controls. Ordinary Chrome entry also passes the limited journey described above.
+Native flight still pauses (700 and 2649.9 ms in the latest diagnostic), and
+steep mountain approaches can still have unrealistic earthworks. A visible
+sidewalk-corner fragment needs review. Complete gameplay/performance acceptance,
+ordinary hosted account/voyage/save, and final current-image review remain open.
+
+### Earlier fb24 candidate (historical)
+
+The fb24 source was pushed to both active development branches. PR #103 remained
 draft and stable is unchanged. Current GitHub code/package and secret checks pass.
 Its package is frozen and passes integrity verification with 753 files.
 All 2,637 source tests and the structural chain pass. It includes the verified

@@ -48,7 +48,43 @@ history at `027336a7`, without changing its pre-merge source tree. No museum,
 aquarium, ship, consolidation or player progress was rolled back. Full deployment
 and integration evidence is recorded in `docs/road-continuity/EVIDENCE.md`.
 
-## October 15 continuation — fb24 candidate, release still blocked
+## October 15 current candidate — a0e20c35, release verification in progress
+
+Canonical staging serves `5.6.1+a0e20c35eab7.aa4dd9dce23502b0.staging`, source
+`a0e20c35eab7463385738738e4cc0c6a208d87ea`, from
+`output/hosting-validation/release-561-a0e20c35`. All 754 packaged files verify;
+both hosted manifests exactly match local bytes. Both active development
+branches contain this source. PR #103 remains draft; stable and production
+remain unchanged. The production build is still the 5.5.1 identity above.
+
+All 2,653 source tests and the structural chain pass. The exact candidate now
+passes all three backend gates and the full released 5.5.1 → candidate →
+compatible b21 fallback → candidate save journey. The 107-gate candidate matrix
+is running sequentially; an unrun gate is not a pass. Current receipts are under
+`output/release-evidence/current`; sequence status is recorded in
+`output/release-review/reviewed-corridor-final-verification-sequence.json`.
+
+Ordinary Chrome opens the hosted menu, enters guided Baltimore, displays live
+weather and starts the Photograph activity through visible controls. This is not
+the separate account/shared-voyage/save acceptance. Nighttime character visibility
+was inspected; triangular sidewalk fragments at the intersection still need
+review. Only the agent-owned tab was closed; the owner's Chrome remains open.
+
+Current source checks also pass the repaired physical Monaco junction and regional
+arrival/recovery/return with building detail and bounded scenery retention.
+Long native flight pauses remain a confirmed blocker: the latest diagnostic
+recorded 700 and 2649.9 ms intervals. It is not a performance acceptance pass.
+Steep mountain approaches still have unrealistic earthworks, and final current
+image review remains open. Do not call the candidate production ready yet.
+
+The superseded 90d515 backend checks passed, but its save check correctly refused
+unreviewed runtime differences before any save test. The review now pins all 42
+semantically reviewed before/after runtime files; eleven focused contract tests
+pass. The partial 90d515 candidate run and interrupted receipts were preserved,
+its owned processes closed, and only its verified generated package retired.
+They are historical evidence, not current acceptance.
+
+## Earlier October 15 continuation — historical fb24 candidate
 
 The frozen current package is `5.6.1+fb24de036fdd.ccf8c64b77a22df7.staging`,
 source `fb24de036fdd809be11f4df3708b5a5d33df7d69`, under
@@ -81,7 +117,7 @@ The superseded generated f3ac package was retired only after verifying every
 file and preserving its manifests and original evidence. The actual production,
 previous dist and compatible b21 rollback packages remain preserved.
 
-## October 15 current source repairs — final artifact still pending
+## Earlier October 15 source repairs — historical intermediate status
 
 The full current source/structural chain passes **2,653 tests**. An initial run
 caught a second URL identity for the shared DOM helper; the discovery import
