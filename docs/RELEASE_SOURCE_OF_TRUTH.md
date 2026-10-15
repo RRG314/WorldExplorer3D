@@ -13,7 +13,7 @@ production changes. A version label or preview URL alone does not identify code.
 | Production Firebase project | `worldexplorer3d-d9b83` |
 | Canonical staging frontend | `5.6.1+a0e20c35eab7.aa4dd9dce23502b0.staging` |
 | Staging Firebase project | `we3d-staging-20260712` |
-| Current frozen candidate | `5.6.1+a0e20c35eab7.aa4dd9dce23502b0.staging` |
+| Current frozen candidate | `5.6.1+296fb8a6dcf9.de50589d9d91a0d4.staging` |
 | Preserved road-safe fallback | `5.6.1+b21b7f12fdfa.31ed9b1212c5002c.staging` |
 | Release branch | `stable` (default; no `main` branch) |
 | Active development branches | `steven/visual-quality`, `steven/post-5.2-release-integration` |
@@ -30,6 +30,23 @@ acceptance. The earlier clean automated browser's reCAPTCHA rejection was not
 bypassed; that separate hosted journey remains open.
 
 ## Verification and rollback
+
+Subsequent local geometry-storage repairs pass 2,687 source tests and exact
+clipping comparisons. Their native long-walk window passes, while flight and a
+short walking frame-time window still fail. Recent live map inputs differ, so
+these runs are not presented as a controlled performance comparison. This source
+is not yet part of the frozen 296fb8a6 artifact or hosted staging.
+
+The current 296fb8a6 package includes the traversal, graphics-preparation and
+pavement-lifetime repairs. Both active development branches contain its source;
+all 754 delivered files verify, 2,683 source tests pass and the 63-file rollback
+review matches. Native packaged pacing still fails three windows, despite the
+initial flight and five sustained windows passing. All twelve reload/cleanup
+cycles, retained memory, coverage, transfer, loading and touch checks pass.
+The remaining exact-package/backend/save/hosted acceptance is open.
+Production and stable have not been promoted.
+
+### Earlier a0e20c35 candidate (historical)
 
 The a0e20c35 package is pushed to both active development branches. Its 754
 files verify, all three backend gates pass, and the released 5.5.1 → candidate

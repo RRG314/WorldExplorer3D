@@ -34,16 +34,26 @@ export async function conformPavementMeshCooperatively(mesh, sampleBase, sampleT
   if (typeof options.partitionSurface.steps !== 'function') throw new TypeError('Cooperative pavement requires resumable terrain partitioning');
   const curbVertices=[];
   let started=now();
-  const checkpoint=async()=>{
+  // Fast checkpoints stay synchronous. Creating and awaiting a Promise for
+  // each triangle adds garbage without giving input or painting a turn.
+  // Only an exhausted slice schedules asynchronous work.
+  const checkpoint=()=>{
     if (!current()) throw new Error('Pavement construction superseded');
     const elapsed=now()-started;
-    if(elapsed>=budgetMs){onSlice(elapsed);await yieldWork();started=now();}
+    if(elapsed>=budgetMs){
+      onSlice(elapsed);
+      return Promise.resolve(yieldWork()).then(()=>{
+        started=now();
+        if (!current()) throw new Error('Pavement construction superseded');
+      });
+    }
     if (!current()) throw new Error('Pavement construction superseded');
+    return null;
   };
   const steps=options.partitionSurface.steps(mesh.vertices,sampleTop);
   let result;
   try {
-    do {result=steps.next();if(!result.done)await checkpoint();}while(!result.done);
+    do {result=steps.next();if(!result.done){const pause=checkpoint();if(pause)await pause;}}while(!result.done);
   } finally {steps.return();}
   const vertices=result.value;
   if (!vertices) throw new Error(`Pavement has incomplete or overlapping terrain support: ${JSON.stringify(options.partitionSurface.lastCoverage || {})}`);
@@ -51,7 +61,7 @@ export async function conformPavementMeshCooperatively(mesh, sampleBase, sampleT
     const piece={vertices:[],curbVertices:mesh.curbVertices.slice(offset,offset+144)};
     conformPavementMesh(piece,sampleBase,sampleTop,{...options,partitionSurface:()=>[]});
     for(const value of piece.curbVertices)curbVertices.push(value);
-    await checkpoint();
+    const pause=checkpoint();if(pause)await pause;
   }
   onSlice(now()-started);
   const added=vertices.length/9-mesh.vertices.length/9;

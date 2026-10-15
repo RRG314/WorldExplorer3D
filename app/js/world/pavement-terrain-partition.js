@@ -98,7 +98,7 @@ export function createPavementTerrainPartition(meshes = [], {includeFarTerrain =
     const complete=Math.abs(coveredArea-sourceArea)<=Math.max(1e-5,sourceArea*1e-6);
     if(!complete&&worstTriangle){
       const contributions=[];
-      for(const g of grids){const clipped=clipGrid(worstTriangle.source,g,workspace);if(clipped)contributions.push({kind:"near",vertices:clipped.slice()});}
+      for(const g of grids){const clipped=clipGrid(worstTriangle.source,g,workspace);if(clipped)contributions.push({kind:"near",vertices:Array.from(clipped)});}
       if(farIndex)contributions.push({kind:"far",vertices:farIndex.projectTriangle(worstTriangle.source,0)});
       partition.lastCoverage.worstTriangle={...worstTriangle,contributions};
     }

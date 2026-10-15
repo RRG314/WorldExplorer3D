@@ -413,16 +413,16 @@
     "app/js/terrain/surface-decal-projection.js": {
       "before": "48cc550b5322df6e10fe43a07de75d938ea4ac1cca46c8e298482796fee5671d",
       "beforeMode": "100644",
-      "after": "44df8ff5a1e97b8806cd0080d6dc0f05d15d21e1acc1de53099d2628475d0457",
+      "after": "0fb0abb50546eaeb505622c8b17687fb2522de494cdca10783a7d77d5f882636",
       "afterMode": "100644",
-      "review": "Optional per-caller clipping workspace reuses temporary arrays. Default independent result ownership, exact clipping predicates, vertex order and geometry precision remain unchanged; no persistence changes."
+      "review": "Same clipping math, ordering and tolerances. Logical scratch lengths retain capacity; explicit workspaces borrow reusable Float64 storage while ordinary callers keep independent arrays. 1000 before/after geometry cases match exactly and sampled temporary allocation falls 90.9 percent in the isolated clipper. No saved data or physical surface policy changes."
     },
     "app/js/world/pavement-terrain-partition.js": {
       "before": "54f97ac254b242df1d22270449bbc6677a9dd0bc8b038088ffc5f8b467452d2f",
       "beforeMode": "100644",
-      "after": "dc2e3658cc67f1610172ff2471d7929489dd4c5d09db0d731c56cdcbdd0f05bc",
+      "after": "481a81fc53f1b89dcd6b8ed50a87ad48ed036132166b1daace584e4d330c3614",
       "afterMode": "100644",
-      "review": "Per-iterator temporary clipping workspace and deferred failure diagnostics avoid repeated allocations. Eighteen before/after translated-grid complete/missing-support cases preserve exact geometry and coverage diagnostics. No persistent fields or terrain authority changes."
+      "review": "One clipping workspace per iterator; copies borrowed coordinates into published output and ordinary arrays for failure diagnostics. Interleaved iterators and retained diagnostics remain independent. No geometry, coverage tolerance or saved-field changes."
     },
     "app/js/world/street-packet-cache.js": {
       "before": "5f1e16b667711486b3d93aa1ddaff4f53a64d33ee7d0a1d9f976e58ca2e14013",
@@ -444,6 +444,13 @@
       "after": "e028a8041bad4d71be76a3ad5d0601da38b283589a9ee886191a62246f443887",
       "afterMode": "100644",
       "review": "Release verification only: read-only Git invocations disable optional index refresh locks and preloadIndex to avoid filesystem contention. Strict dirty/untracked/commit identity comparisons and the original 10-second timeout remain. This helper does not ship in the browser or alter saved data, runtime schemas or service protocols. It is conservatively included because unknown script inputs are classified as runtime."
+    },
+    "app/js/world/pavement-terrain-conformance.js": {
+      "before": "c35daf1aacfe607037e58797691c987398cc83a13332f8b672570151be0b131a",
+      "beforeMode": "100644",
+      "afterMode": "100644",
+      "after": "3ef7d9dfa334dbd5753ba55e232885b172fea387635a18958e66eb2465bf38ea",
+      "review": "Fast checkpoints remain synchronous until their existing work budget is exhausted. Exact geometry and cancellation remain unchanged; the isolated 5000-triangle comparison reduces Promise creation from 10005 to two. No persistence or backend fields change. Browser pacing remains separately required."
     }
   }
 }

@@ -1,5 +1,52 @@
 # October 14 production candidate
 
+## October 15 — subsequent geometry allocation repair
+
+The next source checkpoint passes all **2,687 source tests** and the full
+structural, ownership, type, inventory and sensitivity chain. Fast pavement
+checkpoints create a Promise only when their existing work slice yields.
+Clipping retains scratch capacity and uses borrowed Float64 workspace storage;
+ordinary callers and retained failure diagnostics keep independent arrays.
+All 1,000 direct before/after geometry cases match; the isolated clipping sample
+allocates about 91% less temporary memory. These measurements describe the
+component, not an accepted whole-game performance improvement.
+
+The subsequent native source walking window passes the pause limit (one 133 ms
+interval in 90 seconds), but flight still fails with 600/283 ms intervals and a
+short moving-walk p99 also fails. The live map inputs differ between recent
+runs, so their frame rates are not a controlled comparison. No renderer ordering
+change was adopted: standard ordering slowed ground rendering and still paused.
+A completed 30-second CPU diagnostic identifies collector work during pavement
+finalization. The longer CPU/collector trace stopped at the disk guard and is
+not a pass. Frozen candidate 296fb8a6 and hosted releases below remain unchanged.
+
+## October 15 — frozen 296fb8a6 candidate
+
+Both active development branches contain source
+`296fb8a6dcf9a621357574de416e2a8ea7e04194`. Its immutable package is
+`5.6.1+296fb8a6dcf9.de50589d9d91a0d4.staging`; all 754 delivered files verify.
+The full source chain passes 2,683 tests, the focused pavement and lifetime
+suite passes 60 tests, and all 63 rollback-review file identities match.
+Canonical staging still serves a0e20c35; production remains 5.5.1.
+
+The exact packaged performance run completes all seven 90-second travel windows.
+The initial flight and five sustained windows pass pacing; short moving driving,
+the first sustained walk and one sustained flight still fail. The largest
+sustained interval is 250 ms, with a clustered walking pause. This is **not** a
+performance pass. All twelve release/reload cycles pass, including coverage,
+retired-owner cleanup, transfer and resource limits. Settled heap is 50.8–58.3 MiB;
+occupied retained heap is 445.6–449.6 MiB. Desktop starts in 114.5 seconds and
+touch regression starts in 41.7 seconds and passes every check. The only failed
+desktop category is active-play hitches. Native images were inspected. No timing,
+coverage or resource criterion was relaxed. The next focused comparison checks
+standard renderer ordering against the existing depth-first ordering, retaining
+world content. Backend/save acceptance, the remaining current-package matrix,
+ordinary hosted account/voyage checks and current-image review remain open.
+
+Evidence: `output/release-review/561-296fb8a6-performance/` and
+`output/verification/performance-retention/`. The earlier sections below record
+historical checkpoints; they do not override this candidate's current status.
+
 ## October 15 — local traversal repair checkpoint
 
 The subsequent full source chain passes **2,683 tests**. A separate actual-module
