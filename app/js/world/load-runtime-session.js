@@ -19,6 +19,7 @@ import { publishWorldPublicationSnapshot } from './world-snapshot-adapter.js?v=4
 import { compilePoiLifecycle } from '../poi/lifecycle.js?v=1';
 import {worldLoadAbortError} from '../earth-core/request-cancellation.js?v=1';
 import {finishFailedWorldLoad} from './load-failure.js';
+import {ensureLoadedMuseumRuntime} from '../interiors/museum-program-preparation.js';
 
 export function createWorldLoadRuntimeSession(options = {}) {
   const {
@@ -628,6 +629,16 @@ export async function finishWorldLoadRuntimeSession(session = {}) {
   if (worldSession?.isActive?.() === false) {
     disposeGameplayRuntimesForPublication(appCtx, publication, 'superseded-gameplay-startup');
     return finishSupersededWorldLoadRuntimeSession(session, 'superseded-during-gameplay-runtime-startup');
+  }
+  try {
+    await ensureLoadedMuseumRuntime(appCtx, startupIsCurrent);
+  } catch (error) {
+    // Optional rendering preparation may retry at the normal entry point.
+    console.warn('[Interior] Rendering preparation deferred to entry:', error);
+  }
+  if (!startupIsCurrent()) {
+    disposeGameplayRuntimesForPublication(appCtx, publication, 'superseded-venue-preparation');
+    return finishSupersededWorldLoadRuntimeSession(session, 'superseded-venue-preparation');
   }
   appCtx.worldLoading = false;
   appCtx.enforceEnvironmentSceneOwnership?.();

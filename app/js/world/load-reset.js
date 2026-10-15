@@ -138,6 +138,8 @@ export function resetWorldForReload(options = {}) {
   if (typeof appCtx.clearActiveInterior === 'function') {
     appCtx.clearActiveInterior({ restorePlayer: false, preserveCache: true });
   }
+  appCtx.disposePreparedVenuePrograms?.();
+  appCtx.museumProgramPreparation = null;
 
   appCtx.transportDetail?.dispose();
   appCtx.transportDetail=null;

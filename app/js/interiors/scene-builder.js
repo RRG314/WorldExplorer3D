@@ -95,6 +95,8 @@ export function chooseClearInteriorSpawn(desired, center, footprint, colliders) 
   return null;
 }
 
+export { disposeFailedConstruction as disposeInteriorSceneResources };
+
 function disposeFailedConstruction(group) {
   const resources = new Set();
   group.traverse((object) => {

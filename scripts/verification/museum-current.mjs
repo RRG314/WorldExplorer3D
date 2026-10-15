@@ -106,7 +106,10 @@ try{
   console.log('[museum] mapped target',JSON.stringify(report.target));
   const approach=report.target.approach;
   await walkTo(approach,2);await page.locator('#interiorPrompt.show').waitFor({timeout:10000});
-  report.beforeEntry=await pose();await enterMeasured('cold');
+  report.beforeEntry=await pose();
+  report.renderPreparation=await page.evaluate(()=>globalThis.museumCtx.museumProgramPreparation||null);
+  check('The mapped museum prepares its material programs before admission',report.renderPreparation?.status==='prepared');
+  await enterMeasured('cold');
   check('The real entry resolver selects the reviewed museum',await page.evaluate(()=>globalThis.museumCtx.activeInterior.definition.curatedContent?.id==='baltimore-natural-forms'));
   report.savedOutside=await page.evaluate(()=>({...globalThis.museumCtx.activeInterior.outsideState}));
   check('Entrance hall, two connected galleries and three licensed displays',await page.evaluate(()=>{const a=globalThis.museumCtx.activeInterior;return a.definition.authoredLayout.floors[0].rooms.length===3&&[...a.gallery.exhibits.values()].every(r=>r.status==='ready'||r.exhibit.id==='branching-coral'&&r.status==='unavailable');}));

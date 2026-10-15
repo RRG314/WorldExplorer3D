@@ -16,6 +16,7 @@ import { requirePerformanceHost, requireHardwareGraphics } from './performance-h
 import { collectBrowserGraphicsErrors } from './browser-graphics-errors.mjs';
 import {artifactIdentity} from './artifact-identity.mjs';
 import {measureRetainedHeap} from './retained-heap.mjs';
+import {performanceLaunchSummary} from './performance-launch-summary.mjs';
 
 // Reject cloud/other hardware before opening a browser or loading a world.
 const hostAuthority = requirePerformanceHost();
@@ -183,14 +184,7 @@ async function launchWorld(client) {
   await waitForPlayable(client.page);
   milestones.playableMs = Date.now() - startedAt;
   await client.page.evaluate(async()=>{globalThis.__WE3D_PERF_CONTEXT__=(await import('/app/js/shared-context.js?v=55')).ctx;});
-  const diagnostics = await client.page.evaluate(() => {
-    const state = globalThis.__WE3D_PERF_CONTEXT__;
-    return {
-      worldLoad: state.worldLoadRuntimeState || null,
-      performance: state.perfStats ? {mode:state.perfStats.mode,lastLoad:state.perfStats.lastLoad,live:state.perfStats.live} : null,
-      transportCompilation: state.transportSurfacePublication ? {roadCount:state.transportSurfacePublication.roadCount,meshCount:state.transportSurfacePublication.meshCount,phaseDurationsMs:state.transportSurfacePublication.phaseDurationsMs} : null
-    };
-  });
+  const diagnostics = await client.page.evaluate(performanceLaunchSummary);
   return { firstPlayableMs: milestones.playableMs, titleHeapBytes, milestones, diagnostics };
 }
 

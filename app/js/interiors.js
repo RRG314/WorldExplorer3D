@@ -2,10 +2,13 @@ import {resolveAquariumInterior} from './interiors/aquarium-content.js';
 import {resolveKennedyInterior} from './interiors/kennedy-content.js';
 import {attachKennedy,disposeKennedy,handleKennedyAction} from './interiors/kennedy-runtime.js';
 import {attachAquarium,disposeAquarium,updateAquarium,handleAquariumAction} from './interiors/aquarium-runtime.js';
+import {isLoadedMuseumBuilding} from './interiors/museum-program-preparation.js';
+import {createVenueProgramPreparation} from './interiors/venue-program-preparation.js';
+import {releaseGalleryTextures} from './interiors/gallery-finishes.js';
 import {resolveCuratedInterior} from './interiors/content-resolver.js';
 import {attachGallery,disposeGallery,handleGalleryAction} from './interiors/gallery-runtime.js';
 import { ctx as appCtx } from "./shared-context.js?v=55";
-import { buildInteriorScene, canPublishInteriorConnector } from "./interiors/scene-builder.js?v=13";
+import { buildInteriorScene, canPublishInteriorConnector, disposeInteriorSceneResources } from "./interiors/scene-builder.js?v=13";
 import {
   INTERIOR_ENTRY_RADIUS,
   INTERIOR_INTERACTION_MOVE_EPSILON,
@@ -44,6 +47,25 @@ import {
 
 const interiorCache = new Map();
 const mappedInteriorWarmPromises = new Map();
+
+// Prepare rendering only. Admission still resolves permissions, mapped rooms,
+// captures and current player ownership through the normal entry authority.
+let museumPrograms;
+function preparedMuseumPrograms() {
+  return museumPrograms ||= createVenueProgramPreparation(appCtx, THREE, {
+  matches: isLoadedMuseumBuilding,
+  resolve(building) {
+    const support = appCtx.resolveBuildingEntrySupport?.(building, { allowSynthetic: false });
+    if (!support?.enterable || findOwnedHomeForInteriorSupport(support, appCtx.getExplorerPropertySnapshot?.())) return null;
+    return resolveCuratedInterior(appCtx, support, { key: support.key, support, mode: 'generated' });
+  },
+  build: buildInteriorScene,
+  dispose(group) {
+    releaseGalleryTextures(group);
+    disposeInteriorSceneResources(group);
+  }
+  });
+}
 
 const interiorRuntimeDeps = {
   INTERIOR_ENTRY_RADIUS,
@@ -119,6 +141,8 @@ function updateInteriorInteraction(dt=0) {
 }
 
 Object.assign(appCtx, {
+  prepareLoadedMuseumPrograms: () => preparedMuseumPrograms().prepare(),
+  disposePreparedVenuePrograms: () => museumPrograms?.dispose(),
   clearActiveInterior,
   enterInteriorForSupport,
   handleInteriorAction,

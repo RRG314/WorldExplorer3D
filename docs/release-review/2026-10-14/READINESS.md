@@ -1,5 +1,103 @@
 # October 14 production candidate
 
+## October 15 — verified preparation repairs after the a0 matrix
+
+New source prepares resident GPU buffers and textures under the loading cover,
+using the normal Three r128 renderer with all viewport, culling, visibility and
+shadow state restored. This addresses measured first-use uploads, not a presumed
+shader-only delay. In the owned upload diagnostic, first driving uploads fell
+from 97,934,352 bytes / 625.8 ms to 222,956 bytes / 1.1 ms. A separate native
+flight run measured driving activation at 220 ms (52.8 ms input-to-frame).
+Resident resources remain inside the existing limits. No coverage was removed.
+
+The mapped museum now initializes its actual lazy runtime before the first
+playable frame, retains one bounded material lease and prepares exhibit uploads
+before display readiness. Unfinished outdoor pavement work suspends while an
+interior owns the view; accepted scenery remains available on return. The full
+source museum journey passes **67 of 67 checks**, including ordinary entrance,
+running/jumping, failed-display retry, Journal saves, exit/reentry, reload and
+three native turning windows. Cold entry is 66 ms; cold worst interval 50.1 ms;
+both warm turning windows peak at 16.8 ms. Desktop and phone-width images were
+inspected. Evidence: `output/release-review/561-museum-resident-prepared`.
+
+The native 90-second flight still has 716.8 ms and 383.3 ms intervals. This is
+not a performance pass. Earlier controls confirmed that neither compact report
+metadata nor suspending unfinished overview preparation alone eliminates the
+pauses. No heap cap, forced collection during timing, coverage reduction or
+budget relaxation is adopted. The release verifier now copies scalar load
+results instead of the retained facility graph; this is measurement cleanup,
+not a claimed runtime fix. Original failed receipts remain preserved.
+
+The a0 staged package below does not contain these source repairs. Production
+remains 5.5.1. Final immutable verification, ordinary hosted account/voyage/save
+acceptance and current image review remain open.
+
+## October 15 — current a0e20c35 verification
+
+Canonical staging serves `5.6.1+a0e20c35eab7.aa4dd9dce23502b0.staging`.
+Both hosted manifests match the immutable local package. Production remains
+5.5.1; PR #103 remains draft. All three current backend gates and the complete
+released 5.5.1 → candidate → compatible b21 fallback → candidate save journey
+pass. The complete 107-gate candidate run finished with **103 passes and four
+failed checks** under the original budgets: museum-gallery, performance,
+regional-scenery-arrival (prelaunch disk refusal), and artifact-integrity (Git
+identity read failed; the immediately following release-identity check passed).
+The complete original receipts and compressed performance report are preserved
+under `output/release-review/561-a0e20c35-matrix-failures/final-preservation.json`.
+No incomplete check is promoted to a pass.
+
+The performance run completed all seven sustained 90-second traversal windows
+and twelve environment exits/reloads. Occupied retained heap, teardown, settled
+retention, coverage, browser errors and local-resource checks pass. Native flight
+still contains a 2,199.9 ms pause; sustained play also fails pacing. Driving
+activation measured 1,606 ms and the stationary driving sample rendered
+5,114,656 triangles against the unchanged 4,950,000 limit. Short-run external
+transfer was 85,089,013 bytes against 67,108,864. This is not release acceptance.
+Mobile load-time verification after the failed performance command is unrun.
+
+A separate harness review found that pre-timing load diagnostics serialize
+20,769,969 JSON bytes of facility geometry. A bounded-metadata comparison and
+actual input-event-to-frame witness are being measured separately. They do not
+waive real pauses or change the original limits.
+
+The current assembled-worlds gate passes all seven locations, but Monaco
+loaded fallback transport after both optional OSM requests failed. It has zero
+authoritative-source junction samples. This is not mixed-provider acceptance;
+`561-a0e20c35-matrix-failures/monaco-provider-scope.json` preserves that distinction.
+A controlled published-source replay against the immutable runtime is prepared
+and has not run.
+
+Current museum functionality completes, but cold admission takes 1,332 ms
+against the 1,000 ms limit. A 10-second turning window also contains a 116.7 ms
+interval. Earlier CPU evidence places most cold-entry time in synchronous
+shader linking; outdoor street-source preparation also continues inside the
+occupied gallery. The next repair will prepare the actual gallery's material
+variants under the existing loading cover and retire unfinished outdoor street
+work while an interior owns the view. These changes are drafted outside the
+checkout and have five focused lifecycle checks; they are **not implemented
+in this candidate**, and there is no browser performance pass for them yet.
+
+Regional arrival refused to start when free disk fell below its 8 GiB guard.
+This is unrun gameplay, not a failed regional journey. The already recorded
+source roundtrip is not substituted for immutable candidate acceptance.
+No current budget or disk guard has been relaxed.
+
+The existing native GC trace also shows a newly started worker reaching about
+388 MB of used heap. Its last minor collection leaves about 354 MB, which is
+not a retained-memory measurement: old-generation garbage may still be present.
+Worker timing aligns with overview preparation, but named-worker attribution and
+causation still need confirmation. The main thread separately exceeds one second
+in collector work. Aggregate evidence is in
+`output/release-review/561-overview-memory-audit.json`; no raw private heap was
+captured or published for this analysis. Do not claim a pacing repair from it.
+
+Current aquarium, museum, Kennedy and launch-pad images have been inspected.
+Ordinary hosted Chrome opens and enters guided Baltimore; account/shared-voyage
+and save acceptance through that ordinary hosted UI remains separate and open.
+Final current-image review, native pacing, and repair/reverification of the failed checks must finish
+before promotion. The sections below are historical evidence, not the current
+candidate's release status.
+
 ## October 15 — constructor-counter identity limitation
 
 The older global typed-array Proxy counters alter `array.constructor === Type`.

@@ -1,3 +1,4 @@
+import {suspendStreetPreparationForInterior} from './street-interior-suspension.js';
 import {publishReferenceBlockDressing} from './reference-block-dressing.js';
 import {createPortalSurfaceClipper} from '../terrain/portal-surface-clip.js';
 import {createPavementTerrainPartitionCooperatively} from './pavement-terrain-partition.js';
@@ -412,6 +413,7 @@ export async function publishStreetPavement(appCtx, options = {}) {
 }
 
 export function updateStreetPavementFocus(appCtx) {
+  if (suspendStreetPreparationForInterior(appCtx)) return;
   if (appCtx.worldLoading || appCtx.onMoon || (!appCtx.streetPavement && !appCtx._streetPavementDirty) || appCtx._streetPavementUpdating || performance.now() < (appCtx._streetPavementRetryAt || 0)) return;
   const p = focusActor(appCtx);
   if (!p) return;
@@ -448,6 +450,7 @@ export function updateStreetPavementFocus(appCtx) {
 // One existing worker, one acknowledged cell in flight. Let it advance with
 // rendered frames instead of waiting for the 5 Hz visibility-maintenance tick.
 export function updateStreetOverviewFrame(appCtx) {
+  if (suspendStreetPreparationForInterior(appCtx)) return;
   if(!appCtx.gameStarted||appCtx.worldLoading||appCtx.onMoon||appCtx._streetPavementUpdating||appCtx._cancelStreetPavementBuild)return;
   const point=focusActor(appCtx);
   if(point)appCtx.streetOverview?.step(point);

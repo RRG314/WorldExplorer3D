@@ -1,0 +1,16 @@
+export function suspendStreetPreparationForInterior(ctx) {
+  if (!ctx.activeInterior && !ctx.activeShipInterior) return false;
+  // Accepted pavement and its coverage atlas remain owned by this Earth world.
+  // Only unfinished preparation is retired while an interior owns the view.
+  const overview = ctx.streetOverview;
+  if (overview && !['suspended', 'complete', 'disposed'].includes(overview.stats?.status)) {
+    void overview.suspendForDetail();
+  }
+  if (ctx._cancelStreetPavementBuild) {
+    const cancel = ctx._cancelStreetPavementBuild;
+    ctx._cancelStreetPavementBuild = null;
+    cancel();
+    ctx._streetPavementDirty = true;
+  }
+  return true;
+}

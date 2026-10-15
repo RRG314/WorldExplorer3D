@@ -48,7 +48,25 @@ history at `027336a7`, without changing its pre-merge source tree. No museum,
 aquarium, ship, consolidation or player progress was rolled back. Full deployment
 and integration evidence is recorded in `docs/road-continuity/EVIDENCE.md`.
 
-## October 15 current candidate — a0e20c35, release verification in progress
+## October 15 current source — preparation repairs verified, pacing still open
+
+All **2,666 source tests** and the complete structural/ownership/type/inventory/
+sensitivity chain pass. New resident GPU preparation removes measured first-use
+driving upload stalls without reducing coverage. The source museum fault/reload/
+performance journey passes **67/67**; cold entry is 66 ms and all three turning
+windows pass. Current desktop and phone-width images were inspected. Evidence:
+`output/release-review/561-museum-resident-prepared` and the October 14 READINESS
+ledger. These changes are not yet in the frozen a0 staging package below.
+
+The complete a0 matrix finished **103/107**, with museum/performance failures,
+a regional prelaunch disk refusal and a Git identity timeout. Backend and the
+released 5.5.1 → candidate → compatible b21 fallback → candidate save roundtrip
+pass. Original receipts remain preserved. New source native flight still has
+716.8/383.3 ms intervals, so performance acceptance remains open. Neither the
+overview ablation nor compact reporting alone solved those pauses. No budget or
+coverage limits have changed. Production remains 5.5.1; stable is unchanged.
+
+## October 15 staged a0e20c35 candidate — original acceptance record
 
 Canonical staging serves `5.6.1+a0e20c35eab7.aa4dd9dce23502b0.staging`, source
 `a0e20c35eab7463385738738e4cc0c6a208d87ea`, from
@@ -60,7 +78,7 @@ remain unchanged. The production build is still the 5.5.1 identity above.
 All 2,653 source tests and the structural chain pass. The exact candidate now
 passes all three backend gates and the full released 5.5.1 → candidate →
 compatible b21 fallback → candidate save journey. The 107-gate candidate matrix
-is running sequentially; an unrun gate is not a pass. Current receipts are under
+finished with the four failures recorded above; an unrun gate is not a pass. Receipts are under
 `output/release-evidence/current`; sequence status is recorded in
 `output/release-review/reviewed-corridor-final-verification-sequence.json`.
 
