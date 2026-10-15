@@ -31,21 +31,30 @@ bypassed; that separate hosted journey remains open.
 
 ## Verification and rollback
 
-The a0e20c35 source is pushed to both active development branches. PR #103 remains
-draft and stable is unchanged. Current GitHub code/package and secret checks pass.
-All 754 package files pass integrity verification. All 2,653 source tests and the
-structural chain pass. All three exact-candidate backend gates and the four-stage
-released 5.5.1 → candidate → compatible b21 fallback → candidate save journey
-pass. The 107-gate candidate matrix is running sequentially; its current receipts
-do not yet certify the complete scope.
+The a0e20c35 package is pushed to both active development branches. Its 754
+files verify, all three backend gates pass, and the released 5.5.1 → candidate
+→ compatible b21 fallback → candidate save journey passes. Its complete matrix
+finished **103/107**: museum performance, general performance, a regional-travel
+prelaunch disk refusal, and a Git identity timeout remain in the original record.
+The later release-identity gate passed. These failures are not relabeled as passes.
 
-The source diagnostics pass continuous road contact across the repaired Monaco
-junction and regional arrival, provider recovery, return and saved scenery
-controls. Ordinary Chrome entry also passes the limited journey described above.
-Native flight still pauses (700 and 2649.9 ms in the latest diagnostic), and
-steep mountain approaches can still have unrealistic earthworks. A visible
-sidewalk-corner fragment needs review. Complete gameplay/performance acceptance,
-ordinary hosted account/voyage/save, and final current-image review remain open.
+Subsequent source work prepares resident graphics and the museum before first
+use, finishes initial street coverage under the loading cover, yields nearby
+source selection during travel and validates storefront approaches locally.
+The source museum journey passes 67 checks. The current full source chain passes
+**2,681 tests** plus structural, ownership, type, inventory and sensitivity checks.
+Repeated native 90-second flight windows now peak at 50.1 ms. The full native mixed journey completed with preserved coverage and no
+interruptions; both sustained walks and the later drive still have pauses up to
+300.1 ms. Terrain-fitted reuse is confirmed within the original 16 MiB budget,
+but is not a complete pacing fix. That source is not in the frozen staging package above.
+
+The repaired mixed-provider Monaco junction passes controlled keyboard driving,
+and source regional arrival/recovery/return checks pass. Complete immutable
+acceptance, ordinary hosted account/voyage/save acceptance and final current-image
+review remain open. Steep mountain approaches and some sidewalk-corner fragments
+remain separate visual limitations. Production is still 5.5.1; PR #103 remains
+draft and stable has not been promoted. See the October 14 READINESS ledger for
+individual receipts and their exact scope.
 
 ### Earlier fb24 candidate (historical)
 

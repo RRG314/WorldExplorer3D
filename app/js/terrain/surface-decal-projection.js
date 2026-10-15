@@ -1,12 +1,15 @@
 // Clip a convex marking polygon to published road triangles before assigning height.
 // Every output face is coplanar with its support, including terrain folds.
-export function projectDecalPolygon(points, supports, lift = .012) {
-  const output=[];
+export function projectDecalPolygon(points, supports, lift = .012, workspace) {
+  // An optional caller-owned workspace avoids allocating three arrays for
+  // every source triangle. Results are borrowed only when explicitly supplied.
+  const output=workspace?.output || [];
+  output.length=0;
   let minX=Infinity,maxX=-Infinity,minZ=Infinity,maxZ=-Infinity;
   for(const point of points){minX=Math.min(minX,point.x);maxX=Math.max(maxX,point.x);minZ=Math.min(minZ,point.z);maxZ=Math.max(maxZ,point.z);}
   // Scratch storage belongs to this call. Reuse it across supporting triangles;
   // returned vertices never alias it, and nested/concurrent callers share nothing.
-  let poly=[],next=[];
+  let poly=workspace?.poly || [],next=workspace?.next || [];
   for(const t of supports){
     const p=t.positions;
     const ax=p[t.a],az=p[t.a+2],bx=p[t.b],bz=p[t.b+2],cx=p[t.c],cz=p[t.c+2];

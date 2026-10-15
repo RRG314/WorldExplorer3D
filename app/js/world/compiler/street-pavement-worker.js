@@ -5,6 +5,10 @@ self.onmessage = async ({ data }) => {
   try {
     if (data.type === 'prepare') {
       debug = data.debug === true; cached=data.cached||{};plan = prepareStreetPavement(data.input); cursor = 0;
+      // Consume retained cells before misses can evict them from the bounded
+      // cache. A sequential scan larger than the cache otherwise misses every
+      // cell on every window, despite substantial geographic overlap.
+      plan.tiles.sort((a,b)=>Number(!!cached[b.key])-Number(!!cached[a.key]));
       self.postMessage({ type: 'prepared', tiles: plan.tiles.length });
     } else if ((data.type === 'next'||data.type==='retry') && plan) {
       const tile = data.type==='retry'?plan.tiles[cursor-1]:plan.tiles[cursor++];
@@ -28,9 +32,9 @@ self.onmessage = async ({ data }) => {
       for(const name of ['vertices','curbVertices','markingVertices']){mesh[name]=new Float64Array(mesh[name]||[]);transfer.push(mesh[name].buffer);}
       // A single acknowledged chunk is in flight. No unbounded mesh message queue.
       self.postMessage({ type: 'tile', key: tile.key, fingerprint, bounds: tile.bounds,
-        // Boolean ownership masks are compile-only. The height sampler needs
-        // the segment and road index, not repeated copies of a street's masks.
-        segments: tile.segments.map(({road,sidewalkMasks,...s}) => ({ ...s, roadIndex: road.auditIndex })),
+        // Only height-sampling inputs cross the worker boundary. Frontage
+        // sections, masks and compiler bounds have already served their owner.
+        segments: tile.segments.map(({road,a,b,wa,wb,offset}) => ({a,b,wa,wb,offset,roadIndex:road.auditIndex})),
         inferredFrontages: result.inferredFrontages, ramps:result.ramps, rampCount:result.ramps?.length || 0, mesh, completed: cursor, total: plan.tiles.length,
         durationMs: Math.round(performance.now() - started) }, transfer);
     }

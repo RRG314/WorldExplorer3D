@@ -297,6 +297,146 @@
       "before": "cf03f61192a73068c962c2a7e3a497cbe63199abe3b407e29ad305246cfe0910",
       "afterMode": "100644",
       "after": "23b16c90d1978b24ec179b162ddb5ee4768256de7573df4c9c42d1e6de4468f6"
+    },
+    "app/js/interiors.js": {
+      "review": "Prepares one detached museum material lease through the existing support and permission resolver. Admission, owned-home exclusions, player state and saved interior records keep their existing authorities. No save or service schema changes.",
+      "before": "17f08dc03610fc028778ef8df443fa4421db8333bac9e83a53e7eba21e8fa79a",
+      "beforeMode": "100644",
+      "after": "c69bd2e54e28b4cd2fd7782a8a39b5f54a88f7315303979df6468f8dedb58b43",
+      "afterMode": "100644"
+    },
+    "app/js/interiors/gallery-runtime.js": {
+      "review": "Awaits normal renderer buffer/texture preparation after exhibits and furniture settle. Added render timing belongs only to the live gallery state; Journal and exhibit save handling are unchanged.",
+      "before": "789adcfbc114601f7cf48ec8caa095e20759efda2816f17c67471d36ac0c5743",
+      "beforeMode": "100644",
+      "after": "35eed37f0a06c4952f34331252680911149440b89c820417e4e71aead3d57dac",
+      "afterMode": "100644"
+    },
+    "app/js/interiors/museum-program-preparation.js": {
+      "review": "Recognizes existing catalog source IDs and awaits the existing lazy interior module under the current publication guard. No new destination, access permission, persistence or backend protocol.",
+      "before": null,
+      "beforeMode": null,
+      "after": "b4cd5cbf22d22feb241cfea2338a5609d69b7dd697e56b7a660e5e6020786709",
+      "afterMode": "100644"
+    },
+    "app/js/interiors/scene-builder.js": {
+      "review": "Exports the existing failed-construction resource disposer for the detached program lease. Room geometry, doors, collisions and serialized content remain unchanged.",
+      "before": "9c051fdad3aec0d7261004177fe6cef2284a0fa639078658c051fc2915b05dda",
+      "beforeMode": "100644",
+      "after": "06a01ba442b50eb2a8080548867307ffad3cbbd5979256c85ad9ff9f68ba2cab",
+      "afterMode": "100644"
+    },
+    "app/js/interiors/venue-program-preparation.js": {
+      "review": "New bounded transient renderer-program lease per world sequence. Cloned camera and detached lighting scene preserve outdoor ownership; reset disposes resources. No saved state.",
+      "before": null,
+      "beforeMode": null,
+      "after": "267ec613e05e91cee18144c2ff2ddf7f9a55be64e467f92803a718142be8ec76",
+      "afterMode": "100644"
+    },
+    "app/js/runtime/core-frame-systems.js": {
+      "review": "Prepares resident renderer resources and the supported museum before first play; suspends unfinished outdoor preparation in interiors. Restores renderer target and preserves published geometry, input, movement and save ownership.",
+      "before": "ac0810e87cfbd17d29e4cdde431679eaea40a0209d3acd56ecf2bcea171d764e",
+      "beforeMode": "100644",
+      "after": "1c56cfcadc3b154174a12b33e4035433b7a394c1d69e31469c170b35696a8e45",
+      "afterMode": "100644"
+    },
+    "app/js/runtime/resident-presentation-preparation.js": {
+      "review": "New normal-renderer one-pixel upload preparation. Restores viewport, scissor, visibility, culling and shadow flags in finally. No private renderer changes, gameplay data or persistence.",
+      "before": null,
+      "beforeMode": null,
+      "after": "2624382e13ff98bb40c011b3acf8e94d91ef6be9954d193acf5c3e2d1dfd8238",
+      "afterMode": "100644"
+    },
+    "app/js/ui/loading-progress.js": {
+      "review": "Reallocates player-facing loading progress to actual initial scenery completion. Rotating tips, location selection and saved settings are unchanged; no save schema.",
+      "before": "68192a8b668e6adf0cf3692976d34ddc4863df9dd1654affc5692baf7d5677c7",
+      "beforeMode": "100644",
+      "after": "727101343f4c3f59b7ce44e51718ca1f278eff261528dd8a659baf93ab70aa6a",
+      "afterMode": "100644"
+    },
+    "app/js/world/load-reset.js": {
+      "review": "Disposes the transient museum program lease and clears its diagnostic result at world replacement. Existing player/save reset responsibilities are unchanged.",
+      "before": "3d8f145b7a131ed438e90e7fbdc810d125070d00aa01187fe22506b04531374d",
+      "beforeMode": "100644",
+      "after": "aa81566ebe26413be90437109b25fa3f3bde977f23592a3e510098b5e5da5070",
+      "afterMode": "100644"
+    },
+    "app/js/world/load-runtime-session.js": {
+      "review": "Awaits initial street coverage and lazy museum rendering readiness before admitting gameplay, with publication/session cancellation and normal failure handling. Does not alter saved location, travel, inventory or backend formats.",
+      "before": "f0fd0376c51c2ca25d35e3a46d57e87e9e035976e707d40bc3cc9b670b9846fa",
+      "beforeMode": "100644",
+      "after": "b81702bee35dd0efa36a3ff004ce39018859a6040ecdbb03593349b5376e5938",
+      "afterMode": "100644"
+    },
+    "app/js/world/street-interior-suspension.js": {
+      "review": "Cancels unfinished ground-detail work while retaining accepted contact and coverage. Dirty state permits resumption on return or descent. Runtime-only scheduling, no persisted world edits.",
+      "before": null,
+      "beforeMode": null,
+      "after": "61884b26b335e66bf1eed47488621274c0f79259cdb380e1d10f3ab758132b0e",
+      "afterMode": "100644"
+    },
+    "app/js/world/street-overview.js": {
+      "review": "Same complete source domain and masks; initial loading awaits all cells and mapped-path completion, while travel retains incremental scheduling. Cancellation and source identities remain guarded. No persistent data or source coverage reduction.",
+      "before": "fdc07d01fa7bbae11283f97fa1aa7ff05a5f74206221059acbe122dfc4dee128",
+      "beforeMode": "100644",
+      "after": "562e84496fe27a3bb5d7d8eecf3536aaace835cd2d46f5f9511849e7cda86e67",
+      "afterMode": "100644"
+    },
+    "app/js/world/street-pavement-runtime.js": {
+      "review": "Reuses finished cells only under exact physical ownership, rebuilds combined contact atomically, and preserves canonical face ordering even when retained cells are prepared first. Cached publication avoids cloning unused compiler arrays. Missing or invalid cells use the existing full compiler/sampler/partition path. No coverage, geometry authority, persistence or backend changes.",
+      "before": "28675ab27c199f0224e8c6ea01df825c658feb9bae0112b5eaeed91b548c854c",
+      "beforeMode": "100644",
+      "after": "f99111f08b878db618112de1fd3f65c78c2bfe5eb90e2e0143e58f409d9e9dd7",
+      "afterMode": "100644"
+    },
+    "config/context-write-allowlist.json": {
+      "review": "Registers only the reviewed transient renderer-preparation and street-suspension ownership keys. No runtime data, permissions, service rules or persistence schema.",
+      "before": "908b9ce4cb8d5f73436be53afa10bbd451ccb0ee7302af7d610c27f6b6acf234",
+      "beforeMode": "100644",
+      "after": "743644a6b42658c67e1d157891d29f9ede6cfe5dd7699a30a39b08d96c8e9508",
+      "afterMode": "100644"
+    },
+    "app/js/world/spawn.js": {
+      "before": "7653da3d9f3512d211547f432812911b9de5d1f00675114d11c2c75f71395b28",
+      "beforeMode": "100644",
+      "after": "c3ba95cce9a15ea6765a4b910d9a4cbbda53d761e64fb415ac32935642b658cb",
+      "afterMode": "100644",
+      "review": "Exact-point walking validation can reject an unsafe local interaction without searching for a remote arrival. Ordinary arrival fallback, drive/bridge/tunnel support, actor/save formats and persisted poses are unchanged."
+    },
+    "app/js/urban-sandbox/runtime.js": {
+      "before": "9792fc9a073c7abe9721b53bd50581c629ca27047d68b497d47a243a06bcd735",
+      "beforeMode": "100644",
+      "after": "5e0e27cc86d71d5d2722539e0c5e814a7f31b4cbf4c194c755097a646313f8d8",
+      "afterMode": "100644",
+      "review": "Mapped storefront approach checks request exact-point walking validation and continue their existing local candidate search instead of resolving to another street. Store stock, wallet, Backpack, commerce transactions and saved state are unchanged."
+    },
+    "app/js/terrain/surface-decal-projection.js": {
+      "before": "48cc550b5322df6e10fe43a07de75d938ea4ac1cca46c8e298482796fee5671d",
+      "beforeMode": "100644",
+      "after": "44df8ff5a1e97b8806cd0080d6dc0f05d15d21e1acc1de53099d2628475d0457",
+      "afterMode": "100644",
+      "review": "Optional per-caller clipping workspace reuses temporary arrays. Default independent result ownership, exact clipping predicates, vertex order and geometry precision remain unchanged; no persistence changes."
+    },
+    "app/js/world/pavement-terrain-partition.js": {
+      "before": "54f97ac254b242df1d22270449bbc6677a9dd0bc8b038088ffc5f8b467452d2f",
+      "beforeMode": "100644",
+      "after": "dc2e3658cc67f1610172ff2471d7929489dd4c5d09db0d731c56cdcbdd0f05bc",
+      "afterMode": "100644",
+      "review": "Per-iterator temporary clipping workspace and deferred failure diagnostics avoid repeated allocations. Eighteen before/after translated-grid complete/missing-support cases preserve exact geometry and coverage diagnostics. No persistent fields or terrain authority changes."
+    },
+    "app/js/world/street-packet-cache.js": {
+      "before": "5f1e16b667711486b3d93aa1ddaff4f53a64d33ee7d0a1d9f976e58ca2e14013",
+      "beforeMode": "100644",
+      "after": "5d788bec4f899cf0776994a80eef95e7a043a3078bd5d2204b3e34cba7690345",
+      "afterMode": "100644",
+      "review": "The existing 16 MiB cache retains a compiler packet only until its finished Float32 surface is available, then retires the unused construction buffers. Finished cells require the same input fingerprint and exact ground/contact/portal/terrain owners, use copied output, and are removed on owner changes. Raw unfinished packets remain reusable. LRU eviction and teardown are bounded; no saved data or gameplay geometry changes."
+    },
+    "app/js/world/compiler/street-pavement-worker.js": {
+      "before": "5a53641777a2ce3f5ab805ef5422bc74f914585db73e3ccf71059455e28e45c1",
+      "beforeMode": "100644",
+      "after": "cc286d979b4df54fc55bba2713d92ab427cfb61ce6c4c48e7f6e0c284ed61ad5",
+      "afterMode": "100644",
+      "review": "Consumes retained fingerprint keys before misses to avoid scan eviction, while retaining exact SHA-256 validation. Worker packets include only the road index, segment endpoints, widths and offset used by the physical height sampler; compiler-only frontage/mask/bounds metadata stays in the worker. Actual-worker tests verify identical mesh/fingerprints and sampled heights. No source selection, surface precision or persisted schema changes."
     }
   }
 }

@@ -120,3 +120,16 @@ test('bounded cooperative support matches full partition and cancels during the 
  let active=true;
  await assert.rejects(createPavementTerrainPartitionCooperatively([far],{...options,current:()=>active,yieldWork:async()=>{active=false;}}),/superseded/);
 });
+
+test('interleaved pavement iterators cannot overwrite one another or a completed publication',()=>{
+ const partition=supportFor((x,z)=>x*.4-z*.1,8);
+ const first=meshFor(()=>0).vertices,second=first.map((v,i)=>i%3===0?v*.75:v);
+ const heightA=(x,z)=>x*.4-z*.1+.12,heightB=(x,z)=>x*.4-z*.1+.25;
+ const expectedA=partition(first,heightA),expectedB=partition(second,heightB);
+ const a=partition.steps(first,heightA),b=partition.steps(second,heightB);let left,right;
+ do{if(!left?.done)left=a.next();if(!right?.done)right=b.next();}while(!left.done||!right.done);
+ assert.deepEqual(left.value,expectedA);assert.deepEqual(right.value,expectedB);
+ partition(first,()=>100);
+ assert.deepEqual(left.value,expectedA);assert.deepEqual(right.value,expectedB);
+ partition.dispose();
+});

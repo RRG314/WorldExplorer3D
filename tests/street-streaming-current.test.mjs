@@ -4,6 +4,8 @@ import {Worker as NodeWorker} from 'node:worker_threads';
 import {StreetPacketCache} from '../app/js/world/street-packet-cache.js';
 import {updateStreetOverviewFrame,updateStreetPavementFocus,prepareInitialStreetCoverage} from '../app/js/world/street-pavement-runtime.js';
 import {createStreetOverview} from '../app/js/world/street-overview.js';
+import {prepareStreetPavement} from '../app/js/world/compiler/street-pavement.js';
+import {createPavementBaseSampler} from '../app/js/world/pavement-height-sampler.js';
 
 test('packet cache is bounded, rejects changed inputs and never returns mutable retained arrays',()=>{
  const cache=new StreetPacketCache(1200);
@@ -13,6 +15,81 @@ test('packet cache is bounded, rejects changed inputs and never returns mutable 
  for(let i=0;i<30;i++)cache.put(packet(String(i),'value'));
  assert.ok(cache.bytes<=1200);assert.equal(cache.get('a','first'),null);
  cache.clear();assert.equal(cache.bytes,0);assert.deepEqual(cache.manifest(),{});
+});
+
+test('actual detail worker consumes retained cells before a larger scan evicts them',{timeout:30000},async t=>{
+ const url=new URL('../app/js/world/compiler/street-pavement-worker.js',import.meta.url).href;
+ const code=`const {parentPort}=require('node:worker_threads');globalThis.self={postMessage:(m,transfer)=>parentPort.postMessage(m,transfer)};import(${JSON.stringify(url)}).then(()=>parentPort.on('message',data=>self.onmessage({data})));`;
+ const worker=new NodeWorker(code,{eval:true});t.after(()=>worker.terminate());
+ const request=data=>new Promise((resolve,reject)=>{worker.once('message',resolve);worker.once('error',reject);worker.postMessage(data);}).finally(()=>worker.removeAllListeners('error'));
+ const input={roads:[{auditIndex:0,type:'residential',width:8,pts:[{x:-160,z:0},{x:160,z:0}],transportRecord:{sourceTags:{highway:'residential',sidewalk:'both'}}}],metersPerWorldUnit:1};
+ const first=await request({type:'prepare',input}),packets=[];
+ for(;;){const packet=await request({type:'next'});if(packet.type==='complete')break;assert.equal(packet.type,'tile');packets.push(packet);}
+ assert.ok(packets.length>3);assert.equal(packets.length,first.tiles);
+ const plan=prepareStreetPavement(input);
+ for(const packet of packets){
+  for(const s of packet.segments)assert.deepEqual(Object.keys(s).sort(),['a','b','offset','roadIndex','wa','wb']);
+  const original=plan.tiles.find(tile=>tile.key===packet.key);
+  const common={ground:(x,z)=>x*.07-z*.03,roadContactIndex:{sampleAt:(x,z,base)=>base+.2+Math.abs(z)*.001}};
+  const before=createPavementBaseSampler({...common,segments:original.segments});
+  const after=createPavementBaseSampler({...common,segments:packet.segments.map(s=>({...s,road:input.roads[s.roadIndex]}))});
+  for(let i=0;i<packet.mesh.vertices.length;i+=9)assert.equal(after(packet.mesh.vertices[i],packet.mesh.vertices[i+2]),before(packet.mesh.vertices[i],packet.mesh.vertices[i+2]));
+ }
+ const retained=packets.slice(-2),cached=Object.fromEntries(retained.map(p=>[p.key,p.fingerprint]));
+ assert.deepEqual(await request({type:'prepare',input,cached}),first);
+ for(const expected of retained){const packet=await request({type:'next'});assert.equal(packet.type,'cached');assert.equal(packet.key,expected.key);assert.equal(packet.fingerprint,expected.fingerprint);}
+ for(const expected of packets.slice(0,-2)){
+  const packet=await request({type:'next'});assert.equal(packet.type,'tile');assert.equal(packet.key,expected.key);
+  assert.equal(packet.fingerprint,expected.fingerprint);assert.deepEqual(packet.mesh,expected.mesh);
+ }
+ assert.equal((await request({type:'next'})).type,'complete');
+});
+
+test('terrain-fitted cache uses the original byte limit and rejects retired physical owners',()=>{
+ const cache=new StreetPacketCache(1800);
+ const packet=key=>({key,fingerprint:key,segments:[],mesh:{vertices:[0,0,0,0,0,1,1,0,0],curbVertices:[]}});
+ const fields={revision:1,contact:{},portals:[],terrain:{}};
+ const owner=cache.setSurfaceOwner(fields),surface={vertices:new Float32Array([0,2,0,0,2,1,1,2,0]),curbVertices:new Float32Array(),markingVertices:new Float32Array(),addedTriangles:2,baseTriangles:1};
+ cache.put(packet('a'));assert.equal(cache.putSurface('a','a',owner,surface),true);
+ assert.equal(cache.get('a','a'),null,'a finished cell must retire its unused construction buffer');
+ assert.deepEqual(cache.manifest(),{a:'a'});
+ surface.vertices[1]=99;const read=cache.getSurface('a','a',owner);assert.equal(read.vertices[1],2);
+ read.vertices[1]=77;assert.equal(cache.getSurface('a','a',owner).vertices[1],2);
+ assert.equal(cache.setSurfaceOwner({...fields}),owner);assert.equal(cache.getSurface('a','changed',owner),null);
+ for(const field of ['revision','contact','portals','terrain']){
+  const old=cache.surfaceOwner,changed={...fields,[field]:field==='revision'?2:{}};
+  cache.setSurfaceOwner(changed);assert.equal(cache.getSurface('a','a',old),null);
+  assert.equal(cache.putSurface('a','a',old,surface),false);
+  assert.equal(cache.getSurface('a','a',cache.surfaceOwner),null);
+  assert.equal(cache.getPublication('a','a',cache.surfaceOwner),null);
+  assert.deepEqual(cache.manifest(),{},'changed owners require worker recompilation of finished cells');
+  cache.put(packet('a'));
+  cache.putSurface('a','a',cache.surfaceOwner,surface);
+ }
+ for(let i=0;i<30;i++){const key=String(i);cache.put(packet(key));cache.putSurface(key,key,cache.surfaceOwner,surface);assert.ok(cache.bytes<=1800);}
+ assert.equal(cache.get('a','a'),null);cache.clear();assert.equal(cache.bytes,0);assert.equal(cache.surfaceOwner,null);
+});
+
+test('finished cache cells retain only one geometry representation within the same budget',()=>{
+ const cache=new StreetPacketCache(1800),owner=cache.setSurfaceOwner({revision:0});
+ const surface={vertices:new Float32Array(90).fill(4),curbVertices:new Float32Array(),markingVertices:new Float32Array(),addedTriangles:0,baseTriangles:10};
+ for(const key of ['a','b']){
+  cache.put({key,fingerprint:key,segments:[],mesh:{vertices:new Float64Array(90),curbVertices:[]}});
+  assert.equal(cache.putSurface(key,key,owner,surface),true);
+ }
+ assert.deepEqual(cache.manifest(),{a:'a',b:'b'});
+ assert.ok(cache.bytes<=1800);
+ const publication=cache.getPublication('a','a',owner);
+ assert.equal(publication.packet.mesh,undefined);
+ publication.surface.vertices[0]=99;
+ assert.equal(cache.getPublication('a','a',owner).surface.vertices[0],4);
+ assert.equal(cache.getPublication('a','wrong-input',owner),null);
+ assert.equal(cache.getPublication('a','a',{}),null);
+ cache.put({key:'raw',fingerprint:'raw',segments:[],mesh:{vertices:[0,0,0],curbVertices:[]}});
+ cache.setSurfaceOwner({revision:1});
+ assert.deepEqual(cache.manifest(),{raw:'raw'},'unfitted packets remain valid across terrain changes');
+ assert.equal(cache.getPublication('raw','raw',cache.surfaceOwner).surface,null);
+ cache.clear();assert.equal(cache.bytes,0);
 });
 
 function harness(t,{holdType,keys=['0:0','16:0']}={}){

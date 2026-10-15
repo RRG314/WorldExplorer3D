@@ -894,7 +894,7 @@ function resolveStoreApproach(state, store) {
       mode: 'walk',
       feetY: groundY,
       source: 'mapped_commerce_place_approach',
-      maxGroundRadius: 2
+      allowRelocation: false
     });
     if (resolved?.valid === false) continue;
     return Object.freeze({ ...store, interactionX: Number(resolved?.x ?? candidate.x), interactionZ: Number(resolved?.z ?? candidate.z) });

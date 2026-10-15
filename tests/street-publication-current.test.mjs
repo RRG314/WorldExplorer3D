@@ -27,10 +27,11 @@ function harness(t, mode='success') {
     postMessage(data){if(mode==='clone-error')throw new Error('cannot clone source');if(data.type==='prepare')this.prepare=data.input;queueMicrotask(()=>{
       if(mode==='pending') return;
       if(mode==='failure') return this.onmessage({data:{type:'error',message:'invalid source polygon'}});
-      if(data.type==='prepare') {if(mode==='stale')ctx._worldLoadSequence++;return this.onmessage({data:{type:'prepared',tiles:1}});}
+      if(data.type==='prepare') {this.cached=data.cached;if(mode==='stale')ctx._worldLoadSequence++;return this.onmessage({data:{type:'prepared',tiles:1}});}
       if(this.next++) return this.onmessage({data:{type:'complete'}});
+      if(mode==='cache'&&this.cached['0:0']==='same-cell')return this.onmessage({data:{type:'cached',key:'0:0',fingerprint:'same-cell',completed:1,total:1}});
       const ps=[{x:0,y:.12/1.11,z:3},{x:0,y:.12/1.11,z:4},{x:1,y:.12/1.11,z:3}];
-      this.onmessage({data:{type:'tile',key:'0:0',completed:1,total:1,inferredFrontages:0,
+      this.onmessage({data:{type:'tile',key:'0:0',fingerprint:mode==='cache'?'same-cell':undefined,completed:1,total:1,inferredFrontages:0,
         segments:[{roadIndex:0,index:0,t0:0,t1:1,a:{x:0,z:0},b:{x:10,z:0},wa:4,wb:4}],
         mesh:{vertices:ps.flatMap(p=>[p.x,p.y,p.z]),curbVertices:[],triangles:[ps]}}});
     });}
@@ -50,6 +51,21 @@ test('published contact interpolates the same elevated triangles used by the mes
   assert.ok(Math.abs(y-expected)<1e-5);
   assert.equal(p.sampleAt(20,20),null); assert.equal(h.worker.terminated,true);
   p.dispose(); assert.ok(h.resources.every(r=>r.disposed));
+});
+
+test('unchanged cells reuse exact fitted geometry and contact, then rebuild when terrain changes',async t=>{
+ const h=harness(t,'cache');let samples=0,height=10;
+ h.ctx.terrainMeshHeightAt=()=>{samples++;return height;};
+ await publishStreetPavement(h.ctx);assert.ok(samples>0);
+ const first=h.ctx.streetPavement,positions=first.meshes[0].geometry.attributes.position.array.slice(),y=first.sampleAt(.2,3.2);
+ samples=0;await publishStreetPavement(h.ctx);
+ assert.equal(samples,0);assert.equal(h.ctx.streetPavement.stats.reusedSurfaceCells,1);
+ assert.deepEqual(h.ctx.streetPavement.meshes[0].geometry.attributes.position.array,positions);
+ assert.equal(h.ctx.streetPavement.sampleAt(.2,3.2),y);assert.equal(first.sampleAt(.2,3.2),null);
+ height=14;markGroundSurfaceChanged(h.ctx);await publishStreetPavement(h.ctx);
+ assert.ok(samples>0);assert.equal(h.ctx.streetPavement.stats.reusedSurfaceCells,undefined);
+ assert.ok(Math.abs(h.ctx.streetPavement.sampleAt(.2,3.2)-y-4)<1e-5);
+ h.ctx.streetPavement.dispose();h.ctx._streetPavementCache.clear();
 });
 test('failed compilation retains the previously accepted render and contact publication',async t=>{
   const h=harness(t,'failure');let removed=false;

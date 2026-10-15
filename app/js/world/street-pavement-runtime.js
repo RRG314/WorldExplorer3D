@@ -63,6 +63,8 @@ export async function publishStreetPavement(appCtx, options = {}) {
   const previous = appCtx.streetPavement;
   const replaceMappedLines=!appCtx.streetOverview?.completedBounds;
   const groundRevision = appCtx._groundSurfaceRevision || 0;
+  const surfaceOwner=packetCache.setSurfaceOwner({revision:groundRevision,contact:appCtx.roadContactIndex,
+    portals:appCtx.structureTerrainPortalDescriptors,terrain:appCtx.terrainGroup});
   const generation = appCtx._streetPavementGeneration = (appCtx._streetPavementGeneration || 0) + 1;
   const reference = options.focus || focusActor(appCtx) || { x: 0, z: 0 };
   const focus = { x: Math.round((reference.x || 0)/64)*64, z: Math.round((reference.z || 0)/64)*64 };
@@ -263,21 +265,28 @@ export async function publishStreetPavement(appCtx, options = {}) {
       if (!current()) { disposeStaged(); return null; }
       let packet = await request({ type: 'next' });
       if (packet.type === 'complete') break;
+      let cachedSurface=null;
       if(packet.type==='cached'){
-        const reused=packetCache.get(packet.key,packet.fingerprint);
-        if(reused){packet={...reused,completed:packet.completed,total:packet.total};stats.reusedCells=(stats.reusedCells||0)+1;}
+        const reused=packetCache.getPublication(packet.key,packet.fingerprint,surfaceOwner);
+        if(reused){cachedSurface=reused.surface;packet={...reused.packet,completed:packet.completed,total:packet.total};stats.reusedCells=(stats.reusedCells||0)+1;}
         else {packet=await request({type:'retry'});packetCache.put(packet);}
       }else packetCache.put(packet);
       if(packet.completed%16===0)trace('cell',{completed:packet.completed,total:packet.total});
-      const tile = { ...packet, segments: packet.segments.map(s => ({ ...s, road: appCtx.roads[s.roadIndex] })) };
       const inferredFrontages = packet.inferredFrontages;
       const diagnostics = document.querySelector('#streetSurfaceDiagnostics pre');
       if (diagnostics) diagnostics.textContent = JSON.stringify({...stats,completedTiles:packet.completed,plannedTiles:packet.total},null,2);
       if (appCtx.worldLoading && current()) appCtx.showLoad?.('', { phase: 'publishStreetPavement', completed: packet.completed, total: packet.total });
       stats.workerMs += Number(packet.durationMs) || 0;
-      if (!packet.mesh.vertices.length && !packet.mesh.markingVertices?.length) continue;
-      const mesh = packet.mesh;
-      const sample = await createPavementBaseSamplerCooperatively({segments:tile.segments,ground,roadContactIndex:appCtx.roadContactIndex,profileCache,groundRevision},schedule);
+      const mesh = cachedSurface || packet.mesh;
+      if (!mesh.vertices.length && !mesh.markingVertices?.length) continue;
+      let markingVertices=cachedSurface?.markingVertices || [];
+      let addedTriangles=cachedSurface?.addedTriangles || 0;
+      const baseTriangles=cachedSurface?.baseTriangles ?? mesh.vertices.length/9;
+      if(cachedSurface){
+        stats.reusedSurfaceCells=(stats.reusedSurfaceCells||0)+1;
+      }else{
+      const segments=packet.segments.map(s=>({...s,road:appCtx.roads[s.roadIndex]}));
+      const sample = await createPavementBaseSamplerCooperatively({segments,ground,roadContactIndex:appCtx.roadContactIndex,profileCache,groundRevision},schedule);
       let sampleYieldAt=performance.now();
       for (const positions of [mesh.vertices, mesh.curbVertices]) for(let i=0;i<positions.length;i+=3) {
         positions[i+1] += sample(positions[i],positions[i+2]);
@@ -287,11 +296,9 @@ export async function publishStreetPavement(appCtx, options = {}) {
         }
       }
 
-      const addedTriangles = await conformPavementMeshCooperatively(mesh, sample,
+      addedTriangles = await conformPavementMeshCooperatively(mesh, sample,
         (x, z) => sample(x, z) + (.12 / metersPerWorldUnit) * rampCurbScale(x, z, packet.ramps || []),
         {partitionSurface,yieldWork:yieldConstruction,budgetMs:sliceBudgetMs,current:schedule.current,onSlice:ms=>{stats.maxConformanceSliceMs=Math.max(stats.maxConformanceSliceMs||0,ms);}});
-      if(addedTriangles>(stats.highestRefinement?.addedTriangles||0))stats.highestRefinement={cell:packet.key,bounds:packet.bounds,addedTriangles,baseTriangles:mesh.vertices.length/9-addedTriangles};
-      stats.terrainRefinementTriangles = (stats.terrainRefinementTriangles || 0) + addedTriangles;
       await yieldConstruction();
       if (!current()) { disposeStaged(); return null; }
       // Retire the cut from render and walk-contact geometry together. Keep
@@ -299,7 +306,6 @@ export async function publishStreetPavement(appCtx, options = {}) {
       // down a tunnel's excavation wall just because its floor is lower.
       mesh.vertices=clipGroundSurface(mesh.vertices).positions;
       mesh.curbVertices=clipGroundSurface(mesh.curbVertices).positions;
-      let markingVertices=[];
       let markingYieldAt=performance.now();
       for(let i=0;i<(mesh.markingVertices?.length || 0);i+=9) {
         const points=[];
@@ -312,6 +318,17 @@ export async function publishStreetPavement(appCtx, options = {}) {
         }
       }
       markingVertices=clipGroundSurface(markingVertices).positions;
+      // Reuse the final render-precision cell only under the same physical
+      // owners. The next window still rebuilds its combined contact index and
+      // publishes atomically; cached arrays are copied, never shared mutably.
+      mesh.vertices=new Float32Array(mesh.vertices);
+      mesh.curbVertices=new Float32Array(mesh.curbVertices);
+      markingVertices=new Float32Array(markingVertices);
+      if(current())packetCache.putSurface(packet.key,packet.fingerprint,surfaceOwner,
+        {vertices:mesh.vertices,curbVertices:mesh.curbVertices,markingVertices,addedTriangles,baseTriangles});
+      }
+      if(addedTriangles>(stats.highestRefinement?.addedTriangles||0))stats.highestRefinement={cell:packet.key,bounds:packet.bounds,addedTriangles,baseTriangles};
+      stats.terrainRefinementTriangles=(stats.terrainRefinementTriangles||0)+addedTriangles;
       stats.markingTriangles+=markingVertices.length/9; stats.ramps+=packet.rampCount || 0;
       stats.tiles++; stats.triangles += mesh.vertices.length / 9; stats.curbTriangles += mesh.curbVertices.length / 9; stats.inferredFrontages += inferredFrontages;
       const [ix,iz]=packet.key.split(':').map(Number);
@@ -319,7 +336,7 @@ export async function publishStreetPavement(appCtx, options = {}) {
         const key=`${Math.floor(ix/2)}:${Math.floor(iz/2)}:${kind}`;
         if(!batches.has(key)) batches.set(key,{chunks:[],length:0,mat,kind});
         const target=batches.get(key);
-        target.chunks.push(new Float32Array(positions));target.length+=positions.length;
+        target.chunks.push({positions,ix,iz});target.length+=positions.length;
       }
       await yieldConstruction();
     }
@@ -328,7 +345,9 @@ export async function publishStreetPavement(appCtx, options = {}) {
     for (const [key,batch] of batches) {
       const {chunks,length,mat,kind}=batch;
       const positions=new Float32Array(length);let offset=0;
-      for(const chunk of chunks){positions.set(chunk,offset);offset+=chunk.length;}
+      // Cache admission may change preparation order, never final face order.
+      chunks.sort((a,b)=>a.ix-b.ix||a.iz-b.iz);
+      for(const {positions:chunk} of chunks){positions.set(chunk,offset);offset+=chunk.length;}
       chunks.length=0;batches.delete(key);
       if(!current()) {disposeStaged();return null;}
       if(!positions.length) continue;

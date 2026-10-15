@@ -39,37 +39,44 @@ export function createPavementTerrainPartition(meshes = [], {includeFarTerrain =
     if(!(maxX>minX&&maxZ>minZ))continue;
     grids.push({p,segments,stride,ox,oz,minX,maxX,minZ,maxZ,dx:(maxX-minX)/segments,dz:(maxZ-minZ)/segments});
   }
+  function clipGrid(world,g,workspace) {
+    const points=workspace.points;
+    for(let i=0;i<3;i++){points[i].x=world[i].x-g.ox;points[i].z=world[i].z-g.oz;}
+    const minX=Math.min(points[0].x,points[1].x,points[2].x),maxX=Math.max(points[0].x,points[1].x,points[2].x);
+    const minZ=Math.min(points[0].z,points[1].z,points[2].z),maxZ=Math.max(points[0].z,points[1].z,points[2].z);
+    if(maxX<=g.minX||minX>=g.maxX||maxZ<=g.minZ||minZ>=g.maxZ)return null;
+    const col0=terrainGridInterval(g.p.array,g.segments,3,0,minX),col1=terrainGridInterval(g.p.array,g.segments,3,0,maxX);
+    const row0=terrainGridInterval(g.p.array,g.segments,g.stride*3,2,minZ),row1=terrainGridInterval(g.p.array,g.segments,g.stride*3,2,maxZ);
+    function* supports(){
+      const p=g.p.array,support=workspace.support;support.positions=p;
+      for(let row=row0;row<=row1;row++)for(let col=col0;col<=col1;col++){
+        const a=(row*g.stride+col)*3,b=a+3,c=a+g.stride*3,d=c+3;
+        if(!triangleMayOverlapCell(points,p[a],p[b],p[a+2],p[c+2]))continue;
+        support.a=a;support.b=c;support.c=b;
+        support.denominator=(p[c+2]-p[b+2])*(p[a]-p[b])+(p[b]-p[c])*(p[a+2]-p[b+2]);
+        yield support;
+        support.a=b;support.b=c;support.c=d;
+        support.denominator=(p[c+2]-p[d+2])*(p[b]-p[d])+(p[d]-p[c])*(p[b+2]-p[d+2]);
+        yield support;
+      }
+    }
+    return projectDecalTriangle(points,supports(),0,workspace);
+  }
   function* partitionSteps(vertices,sampleTop){
-    const output=[];let sourceArea=0,coveredArea=0,worstTriangle=null;
+    const output=[],world=[{x:0,z:0},{x:0,z:0},{x:0,z:0}];
+    // One workspace per iterator, including concurrent/cooperative callers.
+    // Clipped coordinates are consumed before its next use; published output
+    // and failure diagnostics never reference borrowed storage.
+    const workspace={output:[],poly:[],next:[],points:[{x:0,z:0},{x:0,z:0},{x:0,z:0}],support:{}};
+    let sourceArea=0,coveredArea=0,worstTriangle=null;
     for(let i=0;i<vertices.length;i+=9){
-      const world=[0,3,6].map(j=>({x:vertices[i+j],z:vertices[i+j+2]}));
+      for(let j=0;j<3;j++){world[j].x=vertices[i+j*3];world[j].z=vertices[i+j*3+2];}
       const area=Math.abs((world[1].x-world[0].x)*(world[2].z-world[0].z)-(world[1].z-world[0].z)*(world[2].x-world[0].x))/2;
       sourceArea+=area;if(area<1e-9)continue;
-      const areaBefore=coveredArea;const contributions=[];
-      const minX=Math.min(...world.map(p=>p.x)),maxX=Math.max(...world.map(p=>p.x)),minZ=Math.min(...world.map(p=>p.z)),maxZ=Math.max(...world.map(p=>p.z));
+      const areaBefore=coveredArea;
       for(const g of grids){
-        if(maxX<=g.minX+g.ox||minX>=g.maxX+g.ox||maxZ<=g.minZ+g.oz||minZ>=g.maxZ+g.oz)continue;
-        const points=world.map(p=>({x:p.x-g.ox,z:p.z-g.oz}));
-        const col0=terrainGridInterval(g.p.array,g.segments,3,0,minX-g.ox),col1=terrainGridInterval(g.p.array,g.segments,3,0,maxX-g.ox);
-        const row0=terrainGridInterval(g.p.array,g.segments,g.stride*3,2,minZ-g.oz),row1=terrainGridInterval(g.p.array,g.segments,g.stride*3,2,maxZ-g.oz);
-        // Clipping consumes each support synchronously. Reuse one descriptor
-        // instead of materializing two objects plus index arrays for every
-        // terrain cell touched by every road triangle.
-        function* supports(){
-          const p=g.p.array,support={positions:p,a:0,b:0,c:0,denominator:0};
-          for(let row=row0;row<=row1;row++)for(let col=col0;col<=col1;col++){
-            const a=(row*g.stride+col)*3,b=a+3,c=a+g.stride*3,d=c+3;
-            if(!triangleMayOverlapCell(points,p[a],p[b],p[a+2],p[c+2]))continue;
-            support.a=a;support.b=c;support.c=b;
-            support.denominator=(p[c+2]-p[b+2])*(p[a]-p[b])+(p[b]-p[c])*(p[a+2]-p[b+2]);
-            yield support;
-            support.a=b;support.b=c;support.c=d;
-            support.denominator=(p[c+2]-p[d+2])*(p[b]-p[d])+(p[d]-p[c])*(p[b+2]-p[d+2]);
-            yield support;
-          }
-        }
-        const clipped=projectDecalTriangle(points,supports(),0);
-        contributions.push({kind:"near",vertices:clipped});
+        const clipped=clipGrid(world,g,workspace);
+        if(!clipped)continue;
         for(let j=0;j<clipped.length;j+=9){
           coveredArea+=Math.abs((clipped[j+3]-clipped[j])*(clipped[j+8]-clipped[j+2])-(clipped[j+5]-clipped[j+2])*(clipped[j+6]-clipped[j]))/2;
           for(let k=j;k<j+9;k+=3){const x=clipped[k]+g.ox,z=clipped[k+2]+g.oz;output.push(x,sampleTop(x,z),z);}
@@ -77,20 +84,25 @@ export function createPavementTerrainPartition(meshes = [], {includeFarTerrain =
       }
       if(farIndex) {
         const clipped=farIndex.projectTriangle(world,0);
-        contributions.push({kind:"far",vertices:clipped});
         for(let j=0;j<clipped.length;j+=9) {
           coveredArea+=Math.abs((clipped[j+3]-clipped[j])*(clipped[j+8]-clipped[j+2])-(clipped[j+5]-clipped[j+2])*(clipped[j+6]-clipped[j]))/2;
           for(let k=j;k<j+9;k+=3)output.push(clipped[k],sampleTop(clipped[k],clipped[k+2]),clipped[k+2]);
         }
       }
       const difference=coveredArea-areaBefore-area;
-      if(Math.abs(difference)>Math.abs(worstTriangle?.difference || 0))worstTriangle={source:world,area,difference,contributions};
+      if(Math.abs(difference)>Math.abs(worstTriangle?.difference || 0))worstTriangle={source:world.map(p=>({...p})),area,difference};
       yield;
     }
     // Do not delete pavement outside the detailed grid or over a missing tile.
     partition.lastCoverage={sourceArea,coveredArea,difference:coveredArea-sourceArea};
-    if(Math.abs(coveredArea-sourceArea)>Math.max(1e-5,sourceArea*1e-6))partition.lastCoverage.worstTriangle=worstTriangle;
-    return Math.abs(coveredArea-sourceArea)<=Math.max(1e-5,sourceArea*1e-6) ? output : null;
+    const complete=Math.abs(coveredArea-sourceArea)<=Math.max(1e-5,sourceArea*1e-6);
+    if(!complete&&worstTriangle){
+      const contributions=[];
+      for(const g of grids){const clipped=clipGrid(worstTriangle.source,g,workspace);if(clipped)contributions.push({kind:"near",vertices:clipped.slice()});}
+      if(farIndex)contributions.push({kind:"far",vertices:farIndex.projectTriangle(worstTriangle.source,0)});
+      partition.lastCoverage.worstTriangle={...worstTriangle,contributions};
+    }
+    return complete ? output : null;
   };
   const partition=(vertices,sampleTop)=>{
     const steps=partitionSteps(vertices,sampleTop);let step;

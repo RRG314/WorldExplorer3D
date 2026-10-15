@@ -500,6 +500,12 @@ function resolveSafeWorldSpawn(targetX, targetZ, options = {}) {
     });
     if (direct.valid && (!isSubgradeArrival(direct) || preservesOccupiedTunnel(direct, options))) return direct;
 
+    // A local interaction is validating this exact doorway, not choosing a
+    // different arrival somewhere in the city. Keep the normal arrival search
+    // for callers that permit relocation.
+    if (options.allowRelocation === false) return direct.valid ?
+      { valid: false, reason: "subgrade_arrival" } : direct;
+
     // Explore the selected terrain before moving a walking arrival to a road.
     const groundFallback = searchNearestSafeGroundSpawn(x, z, {
       angle,

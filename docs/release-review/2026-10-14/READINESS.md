@@ -1,5 +1,31 @@
 # October 14 production candidate
 
+## October 15 — local traversal repair checkpoint
+
+The full source chain passes **2,681 tests**, including structural, ownership,
+type, inventory and sensitivity checks. Exact local shop-entrance validation
+avoids a measured citywide fallback search during walking. Pavement clipping
+reuses private temporary storage; 18 before/after geometry cases match exactly.
+Terrain-fitted cells share the existing 16 MiB cache and are reused only with
+the same input fingerprint and ground/contact/portal owners. Retained cells
+are processed first to avoid sequential cache eviction; final face order stays
+canonical. These repairs do not reduce buildings, roads or accepted scenery.
+
+The native `561-cache-order-native-mixed` journey completed its initial flight
+and all seven 90-second travel windows without reloads, gameplay interruption,
+browser errors or failed local resources. All 49,080 buildings and 18,952 roads
+remain. The first sustained drive and all flight windows pass the hitch limits;
+both sustained walks and the later drive still fail, with pauses up to 300.1 ms.
+Occupied retained heap is 448–452 MiB. Diagnostic-only skipped reload checks are
+not acceptance passes. The current screenshot was inspected.
+
+A real traffic collision explains the test driver's civic response; no police
+rules were changed. The follow-up walking CPU/collection profile stopped at the 2 GiB disk
+safety floor; its interrupted window is not a pass. The latest local source is
+not yet packaged or hosted. Production remains 5.5.1, staging remains a0e20c35,
+and stable is unchanged. Final immutable acceptance, hosted account/voyage/save
+checks and exact-current image review remain required.
+
 ## October 15 — initial scenery and street readiness repairs
 
 Source now completes the actual surrounding-pavement worker and mapped-path
@@ -13,8 +39,13 @@ The integrated native source diagnostic loads in 113.3 seconds with all 49,080
 buildings, 18,952 roads and 6,009 scenery cells. Its 90-second flight has a
 50.1 ms worst interval and no intervals over 100 ms. A 166.7 ms driving hitch
 led to a separate CPU profile confirming a synchronous source scan; that scan
-is now cooperative. Longer native traversal of this final correction remains
-pending. No pacing, coverage or resource budget changed.
+is now cooperative. The subsequent seven-window native mixed journey completed
+with preserved coverage and bounded memory, but still recorded 183–333 ms pauses.
+A walking profile attributes one pause to a citywide shop-entrance fallback
+search and another cluster to collection during pavement preparation. Local
+entrance validation and reusable clipping storage are now under verification.
+One later walking window entered custody and is not uninterrupted traversal
+proof. No pacing, coverage or resource budget changed.
 
 Mobile regression with the fallback transport provider passes all measured
 checks in 38.4 seconds: 26,829 buildings, 1,063 roads and all 1,403 surrounding
