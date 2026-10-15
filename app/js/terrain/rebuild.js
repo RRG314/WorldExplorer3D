@@ -581,7 +581,15 @@ export async function publishCompiledTransportMeshes(deps = {}) {
       const pts = basePts;
       if (!Array.isArray(pts) || pts.length < 2) continue;
       if(renderRoad.structureSemantics?.terrainMode==='at_grade'&&renderRoad.transportSurfaceModel?.engineeredApproach!==true) {
-        atGradeRoads.push({road:renderRoad,points:pts,widths:sharedSurface ? null : mapPublishedPointsToCrossSectionWidths(road,pts,publicationStorage)});
+        // Regional road indices refer to every carriageway, but only roads
+        // with center paint need these dense temporary marking samples after
+        // construction. Retaining them for unmarked residential/service roads
+        // kept their entire subdivision alive through the publication callback.
+        const hasCenterMarkings = shouldRenderRoadCenterMarkings(renderRoad);
+        atGradeRoads.push({road:renderRoad,
+          points:hasCenterMarkings ? pts : null,
+          widths:hasCenterMarkings && !sharedSurface
+            ? mapPublishedPointsToCrossSectionWidths(road,pts,publicationStorage) : null});
         // Keep the independent profile audit after retiring per-road meshes.
         // Sample each source's cross-section; agreement among rendered layers
         // must not hide departure from the intended transport profile.

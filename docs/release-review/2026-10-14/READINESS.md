@@ -609,3 +609,23 @@ retained: frontage edges, building provenance, subdivided road points, collision
 records and traversal topology are the largest owners. Unlike the earlier
 26.1 GiB startup allocation total, this sample excludes already-collected objects.
 Profiling/collection results are diagnostics, never timed acceptance.
+
+
+### October 15 regional roundtrip and unmarked-road retention
+
+Source regional arrival now passes, including real provider publication, failed
+provider retention/recovery, return to origin, and persisted off/on controls.
+The same region returns to 357,104 mapped buildings and 70,194,324 regional bytes,
+with 18 terrain children before and after. The arrival view was inspected and
+has facade colors/detail beyond the origin. This uses controlled actor arrivals,
+not an assertion of worldwide physical gameplay. Source evidence is preserved at
+`output/release-review/561-source-regional-arrival/report.json`.
+
+Unmarked roads no longer retain dense center-marking sample arrays through the
+regional publication callback. Their canonical geometry, indices, collision and
+coverage remain unchanged. Four focused suites and the full 2,653-test source
+chain pass. Native occupied heap is about 464 MiB after collection versus 478 MiB
+in the preceding diagnostic; there is no pacing pass. The latest native flight
+still pauses for 700 and 2649.9 ms, and driving activation takes 1022 ms. These
+failed results remain in `561-road-marking-retention-native`; they must not be
+relabelled or hidden by later successful functional checks.
