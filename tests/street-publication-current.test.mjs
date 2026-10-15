@@ -1,6 +1,8 @@
 import { assessStreetQuality } from '../app/js/world/street-quality-assessment.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {execFileSync} from 'node:child_process';
+import {fileURLToPath} from 'node:url';
 import { createRoadContactIndex } from '../app/js/terrain/road-contact-index.js?v=1';
 import { markGroundSurfaceChanged } from '../app/js/terrain/surface-revision.js';
 import { publishStreetPavement, updateStreetPavementFocus, ensureInitialStreetPavement } from '../app/js/world/street-pavement-runtime.js';
@@ -133,6 +135,24 @@ test('repeated replacements release old contact and owned GPU resources',async t
     previous=h.ctx.streetPavement;
   }
   previous.dispose();assert.ok(h.resources.every(r=>r.disposed));
+});
+
+test('retired pavement publications become unreachable after replacement',async t=>{
+  if(typeof globalThis.gc!=='function'){
+    // Collection is confined to this ownership test's isolated process. It is
+    // never injected into gameplay or a native frame-pacing measurement.
+    execFileSync(process.execPath,['--expose-gc','--test','--test-name-pattern=^retired pavement publications become unreachable after replacement$',fileURLToPath(import.meta.url)],{timeout:15000,stdio:'pipe'});
+    return;
+  }
+  const h=harness(t),weak=[];
+  for(let i=0;i<12;i++){
+    await publishStreetPavement(h.ctx);
+    weak.push(new WeakRef(h.ctx.streetPavement));
+  }
+  for(let i=0;i<6;i++){await new Promise(resolve=>setImmediate(resolve));globalThis.gc();}
+  assert.equal(weak.slice(0,-1).filter(ref=>ref.deref()).length,0);
+  assert.equal(weak.at(-1).deref(),h.ctx.streetPavement);
+  h.ctx.streetPavement.dispose();
 });
 
 test('curb clearance samples changing road-edge elevation between segment endpoints',async t=>{

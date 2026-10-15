@@ -2,6 +2,15 @@
 
 ## October 15 — local traversal repair checkpoint
 
+The subsequent full source chain passes **2,683 tests**. A separate actual-module
+ownership check reproduced eleven retained old pavement publications after twelve
+replacements. Isolating published callbacks from construction scope reduces that
+to zero while keeping the current publication and its contact alive. All 60
+focused geometry, worker, invalidation and cleanup checks pass. This is a verified
+cleanup repair; its native pacing result is still pending. The preceding final-
+surface cache diagnostic still had a 266.6 ms walking pause, so it is not accepted
+as a complete performance fix. No acceptance thresholds changed.
+
 The full source chain passes **2,681 tests**, including structural, ownership,
 type, inventory and sensitivity checks. Exact local shop-entrance validation
 avoids a measured citywide fallback search during walking. Pavement clipping

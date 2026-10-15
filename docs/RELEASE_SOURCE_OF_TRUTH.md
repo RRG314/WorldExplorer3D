@@ -42,11 +42,13 @@ Subsequent source work prepares resident graphics and the museum before first
 use, finishes initial street coverage under the loading cover, yields nearby
 source selection during travel and validates storefront approaches locally.
 The source museum journey passes 67 checks. The current full source chain passes
-**2,681 tests** plus structural, ownership, type, inventory and sensitivity checks.
+**2,683 tests** plus structural, ownership, type, inventory and sensitivity checks.
 Repeated native 90-second flight windows now peak at 50.1 ms. The full native mixed journey completed with preserved coverage and no
 interruptions; both sustained walks and the later drive still have pauses up to
 300.1 ms. Terrain-fitted reuse is confirmed within the original 16 MiB budget,
-but is not a complete pacing fix. That source is not in the frozen staging package above.
+but is not a complete pacing fix. An additional publication-lifetime repair
+passes the twelve-replacement collection test: zero old publications remain
+reachable, compared with eleven before. Native pacing validation remains open. That source is not in the frozen staging package above.
 
 The repaired mixed-provider Monaco junction passes controlled keyboard driving,
 and source regional arrival/recovery/return checks pass. Complete immutable

@@ -383,10 +383,10 @@
       "afterMode": "100644"
     },
     "app/js/world/street-pavement-runtime.js": {
-      "review": "Reuses finished cells only under exact physical ownership, rebuilds combined contact atomically, and preserves canonical face ordering even when retained cells are prepared first. Cached publication avoids cloning unused compiler arrays. Missing or invalid cells use the existing full compiler/sampler/partition path. No coverage, geometry authority, persistence or backend changes.",
+      "review": "Reuses finished cells only under exact physical ownership, rebuilds combined contact atomically, and preserves canonical face ordering even when retained cells are prepared first. Cached publication avoids cloning unused compiler arrays. Missing or invalid cells use the existing full compiler/sampler/partition path. No coverage, geometry authority, persistence or backend changes. Published sampling/disposal callbacks are constructed in an isolated scope owning only the current publication, eliminating the reproduced chain of retired windows. A twelve-replacement actual-module collection check changes from eleven retained retired publications to zero. GPU/material/contact disposal remains idempotent and keeps shared materials untouched.",
       "before": "28675ab27c199f0224e8c6ea01df825c658feb9bae0112b5eaeed91b548c854c",
       "beforeMode": "100644",
-      "after": "f99111f08b878db618112de1fd3f65c78c2bfe5eb90e2e0143e58f409d9e9dd7",
+      "after": "91ab3e5b0ea6b1f0f30bcd05c74cbca0c46dca1498f55382e41c935a2dea646f",
       "afterMode": "100644"
     },
     "config/context-write-allowlist.json": {

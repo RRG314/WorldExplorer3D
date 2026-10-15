@@ -27,6 +27,27 @@ function focusActor(appCtx) {
   return appCtx.planeMode?.active ? appCtx.planeMode : appCtx.droneMode ? appCtx.drone : appCtx.Walk?.state?.mode === 'walk' ? appCtx.Walk.state.walker : appCtx.car;
 }
 
+// Published callbacks must not close over the asynchronous construction scope.
+// That scope also contains the previous publication and worker input; retaining
+// it links every retired window together even after GPU disposal.
+function createStreetPublication({stats,focus,groundRevision,coverageBounds,meshes,contactIndex,texture,materials,layout}) {
+  let disposed=false;
+  const publication={stats,focus,groundRevision,coverageBounds,meshes,
+    sampleAt:(x,z)=>disposed?null:contactIndex.sampleAt(x,z),
+    dispose(){
+      if(disposed)return;disposed=true;
+      contactIndex.dispose();contactIndex=null;
+      for(const mesh of meshes){mesh.parent?.remove(mesh);mesh.geometry.dispose();}
+      meshes.length=0;
+      texture?.dispose();texture=null;
+      for(const material of materials)material.dispose();
+      materials.length=0;layout=null;
+    }
+  };
+  if(layout)publication.exportLayout=()=>JSON.stringify(layout);
+  return publication;
+}
+
 async function refreshMappedPaths(appCtx,pavementBounds){
   const meshes=[],sequence=appCtx._worldLoadSequence,features=appCtx.linearFeatures;
   const current=()=>sequence===appCtx._worldLoadSequence&&features===appCtx.linearFeatures&&!appCtx.onMoon;
@@ -390,9 +411,9 @@ export async function publishStreetPavement(appCtx, options = {}) {
     batches.clear();
     stats.indexBytes=staged.reduce((sum,mesh)=>sum+(mesh.geometry.index?.array.byteLength||0),0);
     stats.positionBytes = staged.reduce((sum, mesh) => sum + mesh.geometry.attributes.position.array.byteLength, 0);
-    const publication = { stats, focus, groundRevision, coverageBounds, meshes: staged,
-      sampleAt: (x, z) => contactIndex.sampleAt(x, z), dispose: disposeStaged };
-    if(new URLSearchParams(location.search).has('streetDiagnostics')) publication.exportLayout=()=>JSON.stringify(input);
+    const publication = createStreetPublication({stats,focus,groundRevision,coverageBounds,meshes:staged,
+      contactIndex,texture,materials:[material,curbMaterial,markingMaterial],
+      layout:new URLSearchParams(location.search).has('streetDiagnostics')?input:null});
     for (const mesh of staged) { appCtx.addEarthWorldObject(mesh); appCtx.urbanSurfaceMeshes.push(mesh); }
     stats.durationMs = Math.round(performance.now() - startedAt);
     for (const mesh of stagedLines) appCtx.addEarthWorldObject(mesh);
