@@ -1,6 +1,6 @@
 {
   "schema": "we3d-reviewed-rollback-runtime-v1",
-  "id": "journal-v5-backpack-v3-road-safe-5.6.1-20261014",
+  "id": "journal-v5-backpack-v3-physical-corridors-5.6.1-20261015",
   "fallbackCommit": "b21b7f12fdfab0f2adf82eca01faefb55ae64748",
   "scope": "The preserved b21 complete candidate owns the same modern Backpack/campaign/workspace/vessel fields as the current candidate and includes local road recovery and the jointly solved approaches. It passes 2618 source checks, complete Monaco assembly and native Baltimore junction driving. It remains an emergency save-compatible fallback with known desktop performance limitations, not a substitute for final candidate acceptance. Production 5.5.1 is the upgrade starting point. Before promotion, build and verify this exact fallback with production configuration and complete the released/candidate/fallback-write/candidate-return save roundtrip.",
   "files": {
@@ -54,11 +54,11 @@
       "review": "Uses optional bounded private construction storage with disjoint attribute views. Exact geometry bytes, normals, UVs, transforms, footprint data, clones and edit behavior are preserved. No saved data."
     },
     "app/js/world/building-facade-layout.js": {
-      "before": "d83926ed6d0b383ef9ec3ff284c35a0d3008f363ca2cb8f1e41824941f8e69cf",
+      "review": "Uses the geometry-owned construction allocator when available, preserving separate ranges, all facade values, and independently owned standalone publication. No visual, persistent or backend schema changes. Facade attribute writes now avoid per-triangle/per-vertex temporary arrays; 24 captured before/after byte fixtures preserve geometry attributes and facade plans exactly.",
       "beforeMode": "100644",
-      "after": "23caee32377ffffa0701326859f0e0548f3da51e7de6700b69195f88d9ee2f4f",
+      "before": "d83926ed6d0b383ef9ec3ff284c35a0d3008f363ca2cb8f1e41824941f8e69cf",
       "afterMode": "100644",
-      "review": "Uses the geometry-owned construction allocator when available, preserving separate ranges, all facade values, and independently owned standalone publication. No visual, persistent or backend schema changes."
+      "after": "a09f38810a9571ad0470d241555707c3e2cb7d585db028f8511c06ef15e56188"
     },
     "config/performance-budgets.json": {
       "before": "7553af8ea49ea8f6d3e67e48d70148c0953b669e10a46c49b8a383e67a5b8b6a",
@@ -250,11 +250,53 @@
       "review": "Each loaded land/water context owns bounded append-only pages for immutable ring acceleration data. Release drops only allocator references; retained views are never recycled or detached. Geometry, holes, land classification and coverage unchanged."
     },
     "app/js/terrain/rebuild.js": {
-      "before": "6b841f48d99f57212b261853debda746a152473b638ee5410a520f11c45ed30c",
+      "review": "Published Float32 road-width samples use bounded append-only pages scoped to terrain publication and preserved through later region arrivals. Width calculation, rounding, rendered/physical road surfaces and region retirement unchanged. Unmarked ground roads additionally release temporary dense lane-marking samples; canonical roads, road-index ordering, rendered surfaces and collision coverage remain unchanged.",
       "beforeMode": "100644",
-      "after": "62083f4637df1d48f9772527426084cca5c8982ae227320d2e1a4d212aef09f1",
+      "before": "6b841f48d99f57212b261853debda746a152473b638ee5410a520f11c45ed30c",
       "afterMode": "100644",
-      "review": "Published Float32 road-width samples use bounded append-only pages scoped to terrain publication and preserved through later region arrivals. Width calculation, rounding, rendered/physical road surfaces and region retirement unchanged."
+      "after": "2ac475022f9609ddf67e5449f10ee0b200e1e5783fb27221378f2a57b16cd5b1"
+    },
+    "app/js/discovery/runtime.js": {
+      "review": "Guards unchanged text and three owned HTML sections using UI-instance state. Does not change finding/mission receipt writers, Journal, Backpack, campaign or account persistence. Same controls and changed-message updates verified by the first-session journey.",
+      "beforeMode": "100644",
+      "before": "0bc4e0ae6ff5967f53fa0d015713e227f15427b738f51e93c2429a1c9ec3a2f4",
+      "afterMode": "100644",
+      "after": "33d6a46408317c3474e7900ad194e4e284c31f930e04768262fa7f28283a83c7"
+    },
+    "app/js/world/compiler/accepted-ground-selection.js": {
+      "review": "Reconciles accepted complete overlapping transport geometry across roads and pedestrian/connector collections after ground selection. Only transient world publication ownership changes; missing, partial and rejected sources retain fallback coverage. No saved schema or transaction changes.",
+      "beforeMode": "100644",
+      "before": "d8fd465eaf55e2f2c2d68e9eae66e0ad8ebb33143c061a0fffb7b77e63263c3e",
+      "afterMode": "100644",
+      "after": "2b166807a5c74a3e1bd4c232ced4a85fd5ff2ded5d297b399628f3522a1c6532"
+    },
+    "app/js/world/compiler/transport-junction-profile.js": {
+      "review": "Uses the accepted physical connection graph for shared road heights across source providers. Rejects missing, incomplete or unconnected height owners. Runtime world surfaces rebuild per location; persisted player records and save versioning are unchanged. Rolling back restores the earlier road geometry and its known limitations.",
+      "beforeMode": "100644",
+      "before": "32224a6a765da53d7998ad7bf266432f12c40bdfd40a4a690aad07a30a9fbfd9",
+      "afterMode": "100644",
+      "after": "11974f393ccb8f6a2880ddc5ff0c079e76b40d1ef6f497bb0aa602730468e2cb"
+    },
+    "app/js/world/compiler/transport-network-model.js": {
+      "review": "Prevents the expanded mixed-source endpoint match from connecting explicitly different at-grade levels. Transient topology only; same source identifiers and saved-data owners.",
+      "beforeMode": "100644",
+      "before": "9b0fecf1ecfab475a9d3b3d8457e9e2bf58b01bce56fb731d29b01c51a4d517f",
+      "afterMode": "100644",
+      "after": "b69b61c933965f6daa0c0b30cae02248ef81878b9ad1e9cfe8ec65e9ceabdec0"
+    },
+    "app/js/world/fixed-regional-structures.js": {
+      "review": "Retires generalized transport geometry only when complete accepted exact coverage is proven, including curved approaches and pedestrian structures. Explicit layers, incomplete/parallel geometry and missing-source fallbacks remain. No player data mutation or migration.",
+      "beforeMode": "100644",
+      "before": "5cd43b391250fd031ba4464c64fddf90cde637305ef181c50eaac3c20bc2c9b0",
+      "afterMode": "100644",
+      "after": "18980782ec46641de9e9c4eb447c3f501e0f295d43f177ee8a6594460c81d2f5"
+    },
+    "app/js/world/vector-resolution-ownership.js": {
+      "review": "Adds an opt-in curved-segment coverage proof for fixed regional conflation. Default ordinary vector-road matching is unchanged. Pure geometry ownership; no save fields.",
+      "beforeMode": "100644",
+      "before": "cf03f61192a73068c962c2a7e3a497cbe63199abe3b407e29ad305246cfe0910",
+      "afterMode": "100644",
+      "after": "23b16c90d1978b24ec179b162ddb5ee4768256de7573df4c9c42d1e6de4468f6"
     }
   }
 }
