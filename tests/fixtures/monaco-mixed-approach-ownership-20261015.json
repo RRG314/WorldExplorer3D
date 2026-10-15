@@ -1,0 +1,638 @@
+{
+  "source": {
+    "scope": "Monaco accepted geometry from controlled published-OSM replay: complete fallback approach and two simplified bridge curves. OSM ODbL.",
+    "origin": {
+      "lat": 43.7384,
+      "lon": 7.4246
+    },
+    "sourceUrls": [
+      "https://download.geofabrik.de/europe/france/provence-alpes-cote-d-azur.html"
+    ]
+  },
+  "elements": [
+    {
+      "type": "node",
+      "id": -9000001,
+      "lat": 43.78362778532042,
+      "lon": 7.4529361724852965
+    },
+    {
+      "type": "node",
+      "id": -9000002,
+      "lat": 43.78325598726249,
+      "lon": 7.452163696289007
+    },
+    {
+      "type": "way",
+      "id": -159347,
+      "nodes": [
+        -9000001,
+        -9000002
+      ],
+      "tags": {
+        "_nameProvenance": "spatial-label-association",
+        "_regionalContext": "fixed-location",
+        "_sourceCompleteness": "generalized",
+        "_sourceFeatureId": "shortbread:streets:13:4265:2985:14:0",
+        "access": "",
+        "bicycle": "",
+        "bridge": "",
+        "covered": "",
+        "crossing": "",
+        "crossing:markings": "",
+        "cutting": "",
+        "destination": "",
+        "embankment": "",
+        "foot": "",
+        "footway": "",
+        "highway": "motorway",
+        "horse": "",
+        "incline": "",
+        "junction": "",
+        "kerb": "",
+        "lanes": "",
+        "layer": "",
+        "level": "",
+        "location": "",
+        "maxheight": "",
+        "name": "La Proven\u00e7ale",
+        "oneway": "",
+        "parking:both": "",
+        "parking:both:orientation": "",
+        "parking:both:width": "",
+        "parking:lane:both": "",
+        "parking:lane:both:diagonal": "",
+        "parking:lane:both:parallel": "",
+        "parking:lane:both:perpendicular": "",
+        "parking:lane:left": "",
+        "parking:lane:left:diagonal": "",
+        "parking:lane:left:parallel": "",
+        "parking:lane:left:perpendicular": "",
+        "parking:lane:right": "",
+        "parking:lane:right:diagonal": "",
+        "parking:lane:right:parallel": "",
+        "parking:lane:right:perpendicular": "",
+        "parking:left": "",
+        "parking:left:orientation": "",
+        "parking:left:width": "",
+        "parking:right": "",
+        "parking:right:orientation": "",
+        "parking:right:width": "",
+        "placement": "",
+        "service": "",
+        "sidewalk": "",
+        "sidewalk:both": "",
+        "sidewalk:both:width": "",
+        "sidewalk:left": "",
+        "sidewalk:left:width": "",
+        "sidewalk:right": "",
+        "sidewalk:right:width": "",
+        "sidewalk:width": "",
+        "surface": "",
+        "tactile_paving": "",
+        "tracktype": "yes",
+        "tunnel": "",
+        "width": "",
+        "width:carriageway": ""
+      }
+    },
+    {
+      "type": "node",
+      "id": -9000003,
+      "lat": 43.7836352,
+      "lon": 7.452944799999945
+    },
+    {
+      "type": "node",
+      "id": -9000004,
+      "lat": 43.7834867,
+      "lon": 7.452637299999945
+    },
+    {
+      "type": "node",
+      "id": -9000005,
+      "lat": 43.7833566,
+      "lon": 7.452372099999945
+    },
+    {
+      "type": "node",
+      "id": -9000006,
+      "lat": 43.7832511,
+      "lon": 7.452161799999945
+    },
+    {
+      "type": "way",
+      "id": 155081332,
+      "nodes": [
+        -9000003,
+        -9000004,
+        -9000005,
+        -9000006
+      ],
+      "tags": {
+        "_fixedRegionalStructureConnector": "exact",
+        "_regionalContext": "fixed-location",
+        "_sourceCompleteness": "lossless",
+        "_sourceFeatureId": "osm:way:155081332",
+        "highway": "motorway",
+        "int_ref": "E 74;E 80",
+        "lanes": "2",
+        "lit": "no",
+        "maxspeed": "110",
+        "name": "La Proven\u00e7ale",
+        "oneway": "yes",
+        "ref": "A 8",
+        "surface": "asphalt",
+        "toll": "no"
+      }
+    },
+    {
+      "type": "node",
+      "id": -9100001,
+      "lat": 43.784898077904984,
+      "lon": 7.457313537597601
+    },
+    {
+      "type": "node",
+      "id": -9100002,
+      "lat": 43.78474316562034,
+      "lon": 7.456283569335882
+    },
+    {
+      "type": "node",
+      "id": -9100003,
+      "lat": 43.78447981381515,
+      "lon": 7.455167770385687
+    },
+    {
+      "type": "node",
+      "id": -9100004,
+      "lat": 43.78416998667666,
+      "lon": 7.454223632812445
+    },
+    {
+      "type": "node",
+      "id": -9100005,
+      "lat": 43.78362778532042,
+      "lon": 7.4529361724852965
+    },
+    {
+      "type": "way",
+      "id": -159335,
+      "nodes": [
+        -9100001,
+        -9100002,
+        -9100003,
+        -9100004,
+        -9100005
+      ],
+      "tags": {
+        "_nameProvenance": "spatial-label-association",
+        "_regionalContext": "fixed-location",
+        "_sourceCompleteness": "generalized",
+        "_sourceFeatureId": "shortbread:streets:13:4265:2985:2:0",
+        "access": "",
+        "bicycle": "",
+        "bridge": "yes",
+        "covered": "",
+        "crossing": "",
+        "crossing:markings": "",
+        "cutting": "",
+        "destination": "",
+        "embankment": "",
+        "foot": "",
+        "footway": "",
+        "highway": "motorway",
+        "horse": "",
+        "incline": "",
+        "junction": "",
+        "kerb": "",
+        "lanes": "",
+        "layer": "",
+        "level": "",
+        "location": "",
+        "maxheight": "",
+        "name": "La Proven\u00e7ale",
+        "oneway": "",
+        "parking:both": "",
+        "parking:both:orientation": "",
+        "parking:both:width": "",
+        "parking:lane:both": "",
+        "parking:lane:both:diagonal": "",
+        "parking:lane:both:parallel": "",
+        "parking:lane:both:perpendicular": "",
+        "parking:lane:left": "",
+        "parking:lane:left:diagonal": "",
+        "parking:lane:left:parallel": "",
+        "parking:lane:left:perpendicular": "",
+        "parking:lane:right": "",
+        "parking:lane:right:diagonal": "",
+        "parking:lane:right:parallel": "",
+        "parking:lane:right:perpendicular": "",
+        "parking:left": "",
+        "parking:left:orientation": "",
+        "parking:left:width": "",
+        "parking:right": "",
+        "parking:right:orientation": "",
+        "parking:right:width": "",
+        "placement": "",
+        "service": "",
+        "sidewalk": "",
+        "sidewalk:both": "",
+        "sidewalk:both:width": "",
+        "sidewalk:left": "",
+        "sidewalk:left:width": "",
+        "sidewalk:right": "",
+        "sidewalk:right:width": "",
+        "sidewalk:width": "",
+        "surface": "",
+        "tactile_paving": "",
+        "tracktype": "yes",
+        "tunnel": "",
+        "width": "",
+        "width:carriageway": ""
+      }
+    },
+    {
+      "type": "node",
+      "id": -9100006,
+      "lat": 43.78355032758236,
+      "lon": 7.452979087829535
+    },
+    {
+      "type": "node",
+      "id": -9100007,
+      "lat": 43.78395310672428,
+      "lon": 7.453923225402777
+    },
+    {
+      "type": "node",
+      "id": -9100008,
+      "lat": 43.78437137449933,
+      "lon": 7.455124855041449
+    },
+    {
+      "type": "node",
+      "id": -9100009,
+      "lat": 43.78466570932747,
+      "lon": 7.456326484680121
+    },
+    {
+      "type": "node",
+      "id": -9100010,
+      "lat": 43.784805130582384,
+      "lon": 7.457184791564886
+    },
+    {
+      "type": "way",
+      "id": -159336,
+      "nodes": [
+        -9100006,
+        -9100007,
+        -9100008,
+        -9100009,
+        -9100010
+      ],
+      "tags": {
+        "_nameProvenance": "spatial-label-association",
+        "_regionalContext": "fixed-location",
+        "_sourceCompleteness": "generalized",
+        "_sourceFeatureId": "shortbread:streets:13:4265:2985:3:0",
+        "access": "",
+        "bicycle": "",
+        "bridge": "yes",
+        "covered": "",
+        "crossing": "",
+        "crossing:markings": "",
+        "cutting": "",
+        "destination": "",
+        "embankment": "",
+        "foot": "",
+        "footway": "",
+        "highway": "motorway",
+        "horse": "",
+        "incline": "",
+        "junction": "",
+        "kerb": "",
+        "lanes": "",
+        "layer": "",
+        "level": "",
+        "location": "",
+        "maxheight": "",
+        "name": "La Proven\u00e7ale",
+        "oneway": "",
+        "parking:both": "",
+        "parking:both:orientation": "",
+        "parking:both:width": "",
+        "parking:lane:both": "",
+        "parking:lane:both:diagonal": "",
+        "parking:lane:both:parallel": "",
+        "parking:lane:both:perpendicular": "",
+        "parking:lane:left": "",
+        "parking:lane:left:diagonal": "",
+        "parking:lane:left:parallel": "",
+        "parking:lane:left:perpendicular": "",
+        "parking:lane:right": "",
+        "parking:lane:right:diagonal": "",
+        "parking:lane:right:parallel": "",
+        "parking:lane:right:perpendicular": "",
+        "parking:left": "",
+        "parking:left:orientation": "",
+        "parking:left:width": "",
+        "parking:right": "",
+        "parking:right:orientation": "",
+        "parking:right:width": "",
+        "placement": "",
+        "service": "",
+        "sidewalk": "",
+        "sidewalk:both": "",
+        "sidewalk:both:width": "",
+        "sidewalk:left": "",
+        "sidewalk:left:width": "",
+        "sidewalk:right": "",
+        "sidewalk:right:width": "",
+        "sidewalk:width": "",
+        "surface": "",
+        "tactile_paving": "",
+        "tracktype": "yes",
+        "tunnel": "",
+        "width": "",
+        "width:carriageway": ""
+      }
+    },
+    {
+      "type": "node",
+      "id": -9100011,
+      "lat": 43.7835503,
+      "lon": 7.452982899999945
+    },
+    {
+      "type": "node",
+      "id": -9100012,
+      "lat": 43.7836999,
+      "lon": 7.453307399999945
+    },
+    {
+      "type": "node",
+      "id": -9100013,
+      "lat": 43.7838479,
+      "lon": 7.453646599999945
+    },
+    {
+      "type": "node",
+      "id": -9100014,
+      "lat": 43.7839593,
+      "lon": 7.453918599999945
+    },
+    {
+      "type": "node",
+      "id": -9100015,
+      "lat": 43.7840702,
+      "lon": 7.454208999999945
+    },
+    {
+      "type": "node",
+      "id": -9100016,
+      "lat": 43.7841747,
+      "lon": 7.454501499999945
+    },
+    {
+      "type": "node",
+      "id": -9100017,
+      "lat": 43.7842734,
+      "lon": 7.454798899999945
+    },
+    {
+      "type": "node",
+      "id": -9100018,
+      "lat": 43.7843732,
+      "lon": 7.455124099999945
+    },
+    {
+      "type": "node",
+      "id": -9100019,
+      "lat": 43.7844566,
+      "lon": 7.455420499999945
+    },
+    {
+      "type": "node",
+      "id": -9100020,
+      "lat": 43.7845383,
+      "lon": 7.455744099999945
+    },
+    {
+      "type": "node",
+      "id": -9100021,
+      "lat": 43.7846057,
+      "lon": 7.456044299999945
+    },
+    {
+      "type": "node",
+      "id": -9100022,
+      "lat": 43.7846632,
+      "lon": 7.456321799999945
+    },
+    {
+      "type": "node",
+      "id": -9100023,
+      "lat": 43.7847137,
+      "lon": 7.456600799999945
+    },
+    {
+      "type": "node",
+      "id": -9100024,
+      "lat": 43.7847607,
+      "lon": 7.456898199999945
+    },
+    {
+      "type": "node",
+      "id": -9100025,
+      "lat": 43.7848002,
+      "lon": 7.457193499999945
+    },
+    {
+      "type": "way",
+      "id": 155081358,
+      "nodes": [
+        -9100011,
+        -9100012,
+        -9100013,
+        -9100014,
+        -9100015,
+        -9100016,
+        -9100017,
+        -9100018,
+        -9100019,
+        -9100020,
+        -9100021,
+        -9100022,
+        -9100023,
+        -9100024,
+        -9100025
+      ],
+      "tags": {
+        "_fixedRegionalStructure": "exact",
+        "_regionalContext": "fixed-location",
+        "_sourceCompleteness": "lossless",
+        "_sourceFeatureId": "osm:way:155081358",
+        "bridge": "yes",
+        "bridge:name": "Viaduc du Rank",
+        "highway": "motorway",
+        "int_ref": "E 74;E 80",
+        "lanes": "2",
+        "layer": "1",
+        "lit": "no",
+        "maxspeed": "110",
+        "name": "La Proven\u00e7ale",
+        "oneway": "yes",
+        "ref": "A 8",
+        "surface": "asphalt",
+        "toll": "no"
+      }
+    },
+    {
+      "type": "node",
+      "id": -9100026,
+      "lat": 43.7849015,
+      "lon": 7.457320799999945
+    },
+    {
+      "type": "node",
+      "id": -9100027,
+      "lat": 43.7848671,
+      "lon": 7.457045399999945
+    },
+    {
+      "type": "node",
+      "id": -9100028,
+      "lat": 43.7848259,
+      "lon": 7.456764299999945
+    },
+    {
+      "type": "node",
+      "id": -9100029,
+      "lat": 43.7847846,
+      "lon": 7.456514599999945
+    },
+    {
+      "type": "node",
+      "id": -9100030,
+      "lat": 43.78474,
+      "lon": 7.456274499999945
+    },
+    {
+      "type": "node",
+      "id": -9100031,
+      "lat": 43.7846807,
+      "lon": 7.455986199999945
+    },
+    {
+      "type": "node",
+      "id": -9100032,
+      "lat": 43.7846149,
+      "lon": 7.455690999999945
+    },
+    {
+      "type": "node",
+      "id": -9100033,
+      "lat": 43.7845407,
+      "lon": 7.4554048999999445
+    },
+    {
+      "type": "node",
+      "id": -9100034,
+      "lat": 43.7844746,
+      "lon": 7.455163099999945
+    },
+    {
+      "type": "node",
+      "id": -9100035,
+      "lat": 43.7843802,
+      "lon": 7.454846099999945
+    },
+    {
+      "type": "node",
+      "id": -9100036,
+      "lat": 43.7842744,
+      "lon": 7.454520399999945
+    },
+    {
+      "type": "node",
+      "id": -9100037,
+      "lat": 43.7841663,
+      "lon": 7.454214599999945
+    },
+    {
+      "type": "node",
+      "id": -9100038,
+      "lat": 43.7840743,
+      "lon": 7.453972799999945
+    },
+    {
+      "type": "node",
+      "id": -9100039,
+      "lat": 43.7839965,
+      "lon": 7.453777099999945
+    },
+    {
+      "type": "node",
+      "id": -9100040,
+      "lat": 43.7838902,
+      "lon": 7.453517399999945
+    },
+    {
+      "type": "node",
+      "id": -9100041,
+      "lat": 43.7837588,
+      "lon": 7.453218699999945
+    },
+    {
+      "type": "node",
+      "id": -9100042,
+      "lat": 43.7836352,
+      "lon": 7.452944799999945
+    },
+    {
+      "type": "way",
+      "id": 155081360,
+      "nodes": [
+        -9100026,
+        -9100027,
+        -9100028,
+        -9100029,
+        -9100030,
+        -9100031,
+        -9100032,
+        -9100033,
+        -9100034,
+        -9100035,
+        -9100036,
+        -9100037,
+        -9100038,
+        -9100039,
+        -9100040,
+        -9100041,
+        -9100042
+      ],
+      "tags": {
+        "_fixedRegionalStructure": "exact",
+        "_regionalContext": "fixed-location",
+        "_sourceCompleteness": "lossless",
+        "_sourceFeatureId": "osm:way:155081360",
+        "bridge": "yes",
+        "bridge:name": "Viaduc du Rank",
+        "highway": "motorway",
+        "int_ref": "E 74;E 80",
+        "lanes": "2",
+        "layer": "1",
+        "lit": "no",
+        "maxspeed": "110",
+        "name": "La Proven\u00e7ale",
+        "oneway": "yes",
+        "ref": "A 8",
+        "surface": "asphalt",
+        "toll": "no"
+      }
+    }
+  ]
+}

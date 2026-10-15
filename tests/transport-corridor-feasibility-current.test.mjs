@@ -36,6 +36,21 @@ test('incomplete routes cannot become a constraint authority',()=>{
  assert.equal(f.solve().anchorsByFeature.size,0);
 });
 
+test('a mixed-provider physical junction solves both surfaces and the complete adjoining corridor', () => {
+ const f=fixture(), exact={...f.features[0], sourceFeatureId:'exact-nearby',
+  transportGraphRef:{featureId:'exact-nearby'},
+  transportRecord:{...f.features[0].transportRecord,completeness:'lossless'}};
+ f.features.push(exact);
+ f.network.connections.push({id:'mixed-snap',left:f.network.connections[0].left,
+  right:{...f.network.connections[0].left,featureId:'exact-nearby'}});
+ const result=f.solve();
+ assert.equal(result.anchorsByFeature.has(exact),true);
+ const audit=auditTransportJunctionContinuity(f.features,f.network,sampleFeatureSurfaceY);
+ assert.equal(audit.discontinuityCount,0);
+ assert.equal(audit.invalidVerticalAnchorCount,0);
+ for(const road of f.features) assert.ok(road.transportSurfaceModel.stats.maximumGrade<=.08501);
+});
+
 test('nearby terrain and obstruction samples cannot displace exact shared road nodes',()=>{
  // Actual Baltimore failure: a surface crossing 4.9 mm before the Central
  // Avenue approach node replaced its station during sample deduplication.

@@ -1,6 +1,6 @@
 # Release source identities
 
-## Current observation — October 14, 2026
+## Current observation — October 15, 2026
 
 Production is **5.5.1**, verified from its live build manifest. The complete
 **5.6.1** candidate remains under verification; its local improvements are not
@@ -13,7 +13,7 @@ production changes. A version label or preview URL alone does not identify code.
 | Production Firebase project | `worldexplorer3d-d9b83` |
 | Canonical staging frontend | `5.6.1+1f37e893ccae.3e39c25a98b5a66f.staging` |
 | Staging Firebase project | `we3d-staging-20260712` |
-| Current local candidate | `5.6.1+f3ac508d2bd9.a76b6be179dcf332.staging` |
+| Current frozen candidate | `5.6.1+fb24de036fdd.ccf8c64b77a22df7.staging` |
 | Preserved road-safe fallback | `5.6.1+b21b7f12fdfa.31ed9b1212c5002c.staging` |
 | Release branch | `stable` (default; no `main` branch) |
 | Active development branches | `steven/visual-quality`, `steven/post-5.2-release-integration` |
@@ -29,7 +29,23 @@ by reCAPTCHA, so its complete shared-voyage/save-recovery check remains open.
 
 ## Verification and rollback
 
-Current f3ac package: all three backend gates and the four-stage actual released
+The fb24 source is pushed to both active development branches. PR #103 remains
+draft and stable is unchanged. Current GitHub code/package and secret checks pass.
+Its package is frozen and passes integrity verification with 753 files.
+All 2,637 source tests and the structural chain pass. It includes the verified
+parking-entry/main-street repair, bounded regional numeric storage, and the
+facility callback repair that releases about 128 MB of load-source retention.
+Its native 90-second flight still records 916.6 and 466.7 ms intervals. Short
+walking passes; moving driving still fails pacing. Coverage, activation,
+occupied memory and browser/local-resource checks pass. This is diagnostic
+coverage, not complete candidate acceptance. The full matrix, backend/save
+roundtrip, ordinary hosted voyage and final review remain open for fb24. The
+in-progress complete run has already passed current city switching, district
+activities, connected ocean streaming, submarine/diver/vessel interactions,
+runtime cleanup, aquarium/harbor entry and the road junction. The previous f3ac
+failures below are historical evidence, not the status of those fb24 checks.
+
+Previous f3ac package: all three backend gates and the four-stage actual released
 5.5.1/candidate/compatible b21 rollback/candidate save journey pass. The complete
 candidate run finished at 03:11 UTC October 15 with **103 of 107 gates passing**.
 Regional arrival was blocked before launch by its disk guard; city-switch

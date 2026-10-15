@@ -27,7 +27,7 @@ test('exact source identity and unavailable contact remain distinguishable',()=>
  assert.equal(missing.generalizedConnectionCount,0);
 });
 
-test('modeled approaches keep a finite complete owner in their own source family',()=>{
+test('modeled approaches require a finite complete owner in the connected physical corridor',()=>{
  const f=fixture();
  f.features[1].transportSurfaceModel={engineeredApproach:true};
  const anchor={source:'transport_graph_node',ownerFeatureId:'road-0',targetSurfaceY:21.64};
@@ -36,7 +36,10 @@ test('modeled approaches keep a finite complete owner in their own source family
  assert.equal(f.audit().generalizedEngineeredApproachCount,1);
  assert.equal(f.audit().invalidVerticalAnchorCount,0);
  f.features[0].transportRecord.completeness='lossless';
- assert.equal(f.audit().invalidVerticalAnchors[0].reason,'mixed_vertical_source_family');
+ assert.equal(f.audit().invalidVerticalAnchorCount,0,'source fidelity is not a separate height system');
+ const connection=f.network.connections.pop();
+ assert.equal(f.audit().invalidVerticalAnchors[0].reason,'unconnected_vertical_owner');
+ f.network.connections.push(connection);
  f.features[0].transportRecord.completeness='generalized';
  f.features[0].transportRecord.routeState='incomplete';
  assert.equal(f.audit().invalidVerticalAnchors[0].reason,'incomplete_vertical_owner');
@@ -49,6 +52,14 @@ test('modeled approaches keep a finite complete owner in their own source family
  assert.equal(f.audit().invalidVerticalAnchors[0].reason,'engineered_approach_without_graph_anchor');
  const disconnected=auditTransportJunctionContinuity(f.features,null,()=>0);
  assert.equal(disconnected.invalidVerticalAnchorCount,1,'no network cannot hide orphaned approaches');
+});
+
+test('same-provider but disconnected roads cannot authorize a vertical constraint',()=>{
+ const f=fixture();
+ const unrelated={...f.features[0],transportGraphRef:{featureId:'unrelated'}};
+ f.features.push(unrelated);
+ f.features[1].structureTransitionAnchors=[{source:'transport_graph_node',ownerFeatureId:'unrelated',targetSurfaceY:10}];
+ assert.equal(f.audit().invalidVerticalAnchors[0].reason,'unconnected_vertical_owner');
 });
 
 function route(id,points,mode,type='primary') {
@@ -72,6 +83,16 @@ test('a same-level branch keeps an interior graph station at a through-route ver
  const connection=network.connections[0];assert.equal(connection.kind,'endpoint-interior');
  const side=connection.left.featureId==='through'?connection.left:connection.right;
  assert.equal(side.endpoint,'interior');assert.equal(side.distanceAlong,40);
+});
+
+test('cross-provider endpoint tolerance cannot override an explicit at-grade level separation',()=>{
+ const left=route('exact',[[-40,0],[0,0]],'at_grade');
+ left.transportRecord.completeness='lossless';
+ const right=route('fallback',[[.5,0],[40,0]],'at_grade');
+ left.structureSemantics.verticalOrder=1;
+ assert.equal(compileTransportNetworkModel([left,right]).connections.length,0);
+ left.structureSemantics.verticalOrder=0;
+ assert.ok(compileTransportNetworkModel([left,right]).connections.length>0,'a genuine same-level provider seam remains connected');
 });
 
 test('a side street along a graded approach cannot escape continuity auditing',()=>{

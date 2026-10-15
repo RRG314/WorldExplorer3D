@@ -32,9 +32,12 @@ export function attachBuildingFacadeLayout(geometry, options = {}) {
   const targetBay=glass ? 2.35 : Math.max(1.8,Number(style.bayWidth)||3.4);
   const glazing=glass ? -1 : Math.max(0,Number(options.storefront?.glazing)||0);
   const count=geometry.index?.count ?? p.count;
+  const ids=[0,0,0];
+  const openingWidth=Number(style.width)||0.55,openingHeight=Number(style.height)||0.56;
+  const floorFrame=plan.floors+(Number(style.frame)||0.05);
   for(let offset=0;offset<count;offset+=3) {
-    const ids=[0,1,2].map(k=>geometry.index ? geometry.index.getX(offset+k) : offset+k);
-    if(ids.some(i=>Math.abs(n.getY(i))>0.2)) continue;
+    for(let k=0;k<3;k++)ids[k]=geometry.index ? geometry.index.getX(offset+k) : offset+k;
+    if(Math.abs(n.getY(ids[0]))>0.2||Math.abs(n.getY(ids[1]))>0.2||Math.abs(n.getY(ids[2]))>0.2) continue;
     // Each side triangle spans the two endpoints of its extrusion wall. Derive
     // that exact segment, rather than dominant-axis or whole-building UVs.
     let a=ids[0],b=ids[1],squared=-1;
@@ -43,18 +46,22 @@ export function attachBuildingFacadeLayout(geometry, options = {}) {
       if(d>squared){squared=d;a=ids[j];b=ids[k];}
     }
     if(squared<1e-10)continue;
-    if(p.getX(a)>p.getX(b) || (p.getX(a)===p.getX(b)&&p.getZ(a)>p.getZ(b)))[a,b]=[b,a];
+    if(p.getX(a)>p.getX(b) || (p.getX(a)===p.getX(b)&&p.getZ(a)>p.getZ(b))){const swap=a;a=b;b=swap;}
     const width=Math.sqrt(squared), dx=(p.getX(b)-p.getX(a))/width, dz=(p.getZ(b)-p.getZ(a))/width;
     const bays=width<1.4 ? 0 : Math.max(1,Math.round(width/targetBay));
     for(const i of ids){
       const along=(p.getX(i)-p.getX(a))*dx+(p.getZ(i)-p.getZ(a))*dz;
       const y=p.getY(i)-minimumY-plan.foundation;
-      layout.set([bays ? along/width*bays : -1,plan.floors ? y/plan.floorHeight : -1,along,y],i*4);
+      const start=i*4;
+      layout[start]=bays ? along/width*bays : -1;
+      layout[start+1]=plan.floors ? y/plan.floorHeight : -1;
+      layout[start+2]=along;layout[start+3]=y;
       // Floors end below the cornice: encode a blank band above the last floor.
       // The interpolated floor coordinate remains linear. The last floor is
       // complete because the .3 m top strip contains no opening center.
       // Integer part stores the last complete floor; fraction stores frame width.
-      openings.set([Number(style.width)||0.55,Number(style.height)||0.56,plan.floors+(Number(style.frame)||0.05),glazing],i*4);
+      openings[start]=openingWidth;openings[start+1]=openingHeight;
+      openings[start+2]=floorFrame;openings[start+3]=glazing;
     }
   }
   geometry.setAttribute('facadeLayout',new THREE.BufferAttribute(layout,4));

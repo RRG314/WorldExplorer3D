@@ -30,3 +30,13 @@ test('source adapter retires only proved redundant generalized road records and 
  assert.equal(retireCoveredRegionalRoads(directed,[node(1,0),node(2,.001),way(3,13,{oneway:'no'})]).retiredRoadCount,0);
  assert.equal(retireCoveredRegionalRoads(directed,[node(1,0),way(3,13)]).retiredRoadCount,0,'incomplete input cannot prove coverage');
 });
+
+test('curved structure coverage still rejects crossings, excursions and reversed directed ways',()=>{
+ const options={allowCurvedSegments:true};
+ const primary=[road('exact',[[0,0],[8,0],[10,1]])];
+ assert.equal(findCoveredCoarseRoadIds(primary,[road('chord',[[0,0],[10,0]],13)],options).size,1);
+ assert.equal(findCoveredCoarseRoadIds(primary,[road('excursion',[[0,0],[5,5],[10,0]],13)],options).size,0);
+ assert.equal(findCoveredCoarseRoadIds(primary,[road('crossing',[[4,-.5],[4,.5]],13)],options).size,0);
+ assert.equal(findCoveredCoarseRoadIds(primary,[road('opposing',[[10,0],[0,0]],13,'bridge',true)],options).size,0);
+ assert.equal(findCoveredCoarseRoadIds(primary,[road('partial',[[0,0],[15,0]],13)],options).size,0);
+});

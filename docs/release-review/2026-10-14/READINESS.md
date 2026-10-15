@@ -1,5 +1,65 @@
 # October 14 production candidate
 
+## October 15 — constructor-counter identity limitation
+
+The older global typed-array Proxy counters alter `array.constructor === Type`.
+Three r128's `AnimationUtils.convertArray` uses exactly that identity to reuse
+track arrays; under the counter it instead allocates copies. A minimal evaluation
+of the actual converter predicate confirms native reuse, proxy copying, and
+reuse when constructor identity is preserved. The GLB character assets already
+share all animation accessors through one buffer view, so repacking them again
+would not address a missing asset optimization.
+
+Do not use the total buffer counts or heap totals from the f3ac/parking constructor
+runs as native browser baselines. They remain instrumented source/call-site leads.
+This does not invalidate the separate uninstrumented pacing failures or the
+facility callback comparison, which used allocation sampling rather than global
+constructor replacements. The prepared network/ribbon scratch diagnostic is not
+implemented in runtime and must earn its own evidence before adoption.
+Details: `output/release-review/561-buffer-counter-identity-audit.json`.
+
+## October 15 — frozen fb24 acceptance in progress
+
+The immutable 753-file fb24 package passes integrity verification; all 2,637
+source tests and structural checks pass. Production remains the verified 5.5.1
+build and canonical staging remains 1f37. The exact fb24 native flight still
+records 916.6 and 466.7 ms intervals; moving driving also fails pacing. It uses
+no heap cap, CPU/allocation profiler or forced collection during timing.
+
+The complete 107-gate run started at 04:29:47 UTC. Aquarium/harbor street entry,
+museum street entry, Kennedy tour, launch-pad walking, the actual road junction,
+local worker recovery and aquarium repeated-visit/performance checks pass so far.
+Current venue and road images were inspected. The museum's complete interaction,
+fault/retry and save/reload journey completed, but its cold entry measured
+1,022.5 ms against the unchanged 1,000 ms limit. Regional arrival was refused
+before launch by its 8 GiB disk guard during temporary swap growth. These are
+failed checks, preserved under `output/release-review/561-fb24-first-matrix-failures`.
+The run was deliberately stopped during gate 76 after 71 passes and four failures
+to repair the confirmed blockers. Urban-sandbox is interrupted and the later gates
+are unrun. No complete acceptance claim is made. The owned process tree was closed
+and the wrapper cleaned up its temporary staging identity; owner Chrome remained
+open. Receipt: `output/release-review/561-fb24-matrix-interruption.json`.
+
+The same run now also exposes a mixed-provider Monaco failure: 20 road junction
+height differences, reaching 67.63 m, with exact OSM structures available. All
+seven fallback-only assembled locations pass, including Monaco. The historical
+b21 Monaco pass had no exact regional OSM and does not cover this combination.
+The current failing report and gate receipt are preserved beside the earlier
+failures. Diagnose duplicate physical ownership and captured connection groups
+before changing profile fitting or tolerances. A bounded current-geometry and
+keyboard-driving diagnostic is prepared but has not run.
+
+The Earth swimming check produced no mapped depth samples. Its startup wait can
+also resolve on a failed world, while its error check omits the generic runtime
+error. The cause is not yet established; the prepared startup diagnostic records
+that error and world publication state before attempting water sampling.
+
+Old generated text evidence was losslessly compressed with byte/hash verification.
+Superseded pre-October-10 diagnostic images were pruned only in three named
+verification folders, preserving the newest image per directory, failure and
+diagnostic folders, all reports, source/history, player data and retained builds.
+Cleanup receipts are in `output/release-evidence/*20261015*.json`.
+
 ## October 15 — remaining collector work and regional numeric storage
 
 The facility-scope repair remains a confirmed retention improvement, not a
@@ -462,3 +522,90 @@ Active-play major-collection pauses remain real; a GC-event-only capture separat
 those from CPU/allocation-profiler overhead. Complete matching backend/candidate,
 four-stage saves, ordinary hosted voyage/save and frame pacing remain open.
 Production and stable have not been promoted.
+
+## October 15 — verified discovery-panel allocation repair
+
+The source first-session check passes with the unchanged-frame discovery DOM
+repair. It exercises actual habitat recording, Journal review, chapter badge,
+phone controls, block placement/undo, room and property entry, reload persistence,
+and the Flower Sprint receipt. There were no captured browser errors or failed
+local resources. Desktop result and phone Journal screenshots were inspected.
+Evidence: `output/release-review/561-dom-first-session-visible-action/report.json`.
+
+The direct occupied-world regression observes zero child/text mutations over
+120 unchanged renders, retains reference-link focus, and verifies immediate live
+message changes. The earlier missed-click attempt is preserved; its button was
+below the panel fold. The verifier now scrolls and verifies hit testing before
+using the prescribed mouse action. No runtime workaround was added for that miss.
+This functional result does not supersede the open native-pacing failure or
+constitute immutable final acceptance.
+
+
+## October 15 — actual Earth swimming diagnostic
+
+The focused source journey passes startup with 69 mapped water areas, 49,080
+buildings and 18,952 roads. Surface swimming, automatic scuba on submersion,
+mode cleanup, the same vessel's ladder roundtrip and recovery pass without
+browser errors. Both underwater and ladder screenshots were visually inspected.
+An optional Overpass request failed, but the accepted fallback world published.
+Evidence: `output/release-review/561-swimming-startup-diagnostic/swimming-earth.json`.
+
+The original matrix failure did not reproduce and is preserved, not declared
+fixed. The canonical verifier now records compact startup ownership and checks
+the generic terminal load error before water sampling, so a rejected world cannot
+masquerade as an empty-water failure. Swimming runtime was not changed. Final
+candidate verification still must pass this journey.
+
+
+### October 15 physical transport ownership investigation
+
+Controlled published-OSM Monaco replay (real roads, explicitly absent ancillary
+primary records) found 1,430 discontinuities in fb24. Full accepted-geometry
+conflation for missing layer metadata, curved structures, surface approaches and
+pedestrian collections reduces duplicate owners without dropping partial coverage.
+Source-family edge grouping removes fallback-only failures, but 346 mixed-provider
+physical joins still fail. Treating provider fidelity as a separate vertical
+coordinate system is the remaining architectural error, not a measured elevation.
+
+The ignored unified-junction experiment has zero discontinuities across all 3,150
+sampled joins, maximum 0.24805 m under the unchanged 0.25 m tolerance, and no grade
+violations. Its 648 old source-family audit errors were preserved. Current source
+replaces that provenance rule with complete-owner reachability through the physical
+road graph: an unrelated same-provider road is now rejected, and a proven physical
+provider seam shares one constrained height. Explicit at-grade level separation
+also cannot bypass the topology filter through the wider provider snap tolerance.
+This source repair is undergoing the real fixed-route drive and full regression
+review; it is not final package acceptance. No production promotion has occurred.
+
+Source semantics references: [OSM layer](https://wiki.openstreetmap.org/wiki/Key:layer)
+is crossing order, not absolute elevation; [OSM elevation](https://wiki.openstreetmap.org/wiki/Key:ele)
+is a separate measured datum. Geometry source fidelity remains unchanged.
+
+The museum admission diagnostic completed all 66 checks, cold admission 920.5 ms,
+with bounded occupied/exterior retention and no browser errors. Its CPU profile
+identifies shader-link waiting as the dominant cold-entry work. The earlier
+1022.5 ms failure remains preserved; final unprofiled immutable acceptance is open.
+The native shared-building-store experiment did not demonstrate pacing benefit
+and was reverted. The verified discovery DOM repair remains. Native pacing remains
+an unresolved release blocker.
+
+
+### October 15 current source route and native allocation results
+
+The actual keyboard-driven route through the previous mixed-provider failure
+completed 79.55 m of 84.21 m, with 69 contact samples, zero airborne samples and
+no browser errors. Both start/end images were inspected. This confirms the
+connection is drivable; it does not certify mountain scenery realism. The same
+exact road already had 48.72 m maximum modeled fill in fb24. The strict 8.5%
+approach rule can lift a steeper existing hillside road above its terrain; that
+separate limitation remains visible and is not waived by the continuity audit.
+Evidence: `output/release-review/561-source-physical-corridor-drive/report.json`.
+
+The facade allocation cleanup preserves all 24 pre-change byte fixtures, but
+native flight still records 666.7 and 1100 ms intervals. Walking/driving windows
+improve in this run; this is not a repeated controlled performance comparison.
+No pacing pass is claimed. Native retained-allocation sampling estimates 446 MiB
+retained: frontage edges, building provenance, subdivided road points, collision
+records and traversal topology are the largest owners. Unlike the earlier
+26.1 GiB startup allocation total, this sample excludes already-collected objects.
+Profiling/collection results are diagnostics, never timed acceptance.

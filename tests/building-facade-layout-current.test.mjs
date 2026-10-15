@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
+import {readFileSync} from 'node:fs';
+import {createHash} from 'node:crypto';
 import {attachBuildingFacadeLayout,facadeFloorPlan} from '../app/js/world/building-facade-layout.js';
 import {appendGeometryWithTransform,buildMergedGeometry} from '../app/js/world/geometry-batching.js';
 import {attachEntranceAttribute} from '../app/js/world/building-facade-entrances.js';
@@ -10,6 +12,20 @@ function building(points,height=10.7){
  return new THREE.ExtrudeGeometry(shape,{depth:height,bevelEnabled:false,steps:1}).rotateX(-Math.PI/2);
 }
 const profile={levels:3,window:{bayWidth:3.05,floorHeight:3.15,width:.46,height:.58,frame:.055}};
+test('allocation reduction preserves every facade attribute byte for indexed, rotated, concave and varied-style geometry',()=>{
+ const fixture=JSON.parse(readFileSync(new URL('./fixtures/building-facade-byte-parity-20261015.json',import.meta.url)));
+ for(const record of fixture.records){
+  const g=building(record.points);
+  if(record.indexed)g.setIndex(Array.from({length:g.attributes.position.count},(_,i)=>i));
+  assert.deepEqual(attachBuildingFacadeLayout(g,record.options),record.plan);
+  const hash=createHash('sha256');
+  for(const name of ['facadeLayout','facadeOpening']){
+   const a=g.attributes[name].array;hash.update(Buffer.from(a.buffer,a.byteOffset,a.byteLength));
+  }
+  assert.equal(hash.digest('hex'),record.sha256,'Existing facade vertex bytes changed');
+  g.dispose();
+ }
+});
 test('complete bays on narrow, rotated and concave walls retain footprint and triangle count',()=>{
  for(const points of [[[0,0],[7.3,0],[7.3,5],[0,5]],[[0,0],[5,5],[2,8],[-3,3]],[[0,0],[8,0],[8,2],[3,2],[3,7],[0,7]],[[0,0],[1,0],[1,5],[0,5]]]){
   const g=building(points),original=g.attributes.position.array.slice();attachBuildingFacadeLayout(g,profile);

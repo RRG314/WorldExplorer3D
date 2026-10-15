@@ -113,6 +113,44 @@ export function connectedSideGroups(connections = []) {
   return [...groups.values()];
 }
 
+function completePhysicalSideGroups(connections, featureById) {
+  // Source fidelity selects geometry, not a separate vertical coordinate
+  // system. The accepted physical graph owns junctions across provider seams.
+  // Neither a missing route nor a rejected source can become a height owner.
+  return connectedSideGroups(connections.filter(connection => {
+    const left = featureById.get(String(connection?.left?.featureId || ''));
+    const right = featureById.get(String(connection?.right?.featureId || ''));
+    return left && right &&
+      left.transportRecord?.routeState !== 'incomplete' &&
+      right.transportRecord?.routeState !== 'incomplete';
+  }));
+}
+
+function physicalCorridorRoots(connections, featureById) {
+  const parent = new Map();
+  const root = id => {
+    let current = parent.get(id);
+    if (current === undefined) return undefined;
+    while (current !== parent.get(current)) current = parent.get(current);
+    let cursor = id;
+    while (parent.get(cursor) !== current) {
+      const next = parent.get(cursor); parent.set(cursor, current); cursor = next;
+    }
+    return current;
+  };
+  for (const connection of connections) {
+    const leftId = String(connection?.left?.featureId || '');
+    const rightId = String(connection?.right?.featureId || '');
+    const left = featureById.get(leftId), right = featureById.get(rightId);
+    if (!left || !right || left.transportRecord?.routeState === 'incomplete' ||
+        right.transportRecord?.routeState === 'incomplete') continue;
+    if (!parent.has(leftId)) parent.set(leftId, leftId);
+    if (!parent.has(rightId)) parent.set(rightId, rightId);
+    parent.set(root(rightId), root(leftId));
+  }
+  return new Map([...parent.keys()].map(id => [id, root(id)]));
+}
+
 export function auditTransportJunctionContinuity(
   features = [],
   transportNetworkModel = null,
@@ -129,9 +167,11 @@ export function auditTransportJunctionContinuity(
     feature?.transportSurfaceModel?.engineeredApproach === true &&
     feature?.transportRecord?.completeness !== 'lossless'
   );
-  // Generalized routes may need graded approaches to remain drivable. Their
-  // modeled heights must stay in that source family, with an actual published
-  // owner; an exact bridge's elevation cannot leak into a fallback duplicate.
+  // Both providers supply plan geometry. OSM layer describes crossing order,
+  // not surveyed elevation. Require a complete published owner in the same
+  // connected physical corridor, including a genuine cross-provider seam.
+  // Merely sharing a provider is no authority to move an unrelated road.
+  const corridorRoots = physicalCorridorRoots(transportNetworkModel?.connections || [], featureById);
   const invalidVerticalAnchors = [];
   let auditedVerticalAnchorCount = 0;
   for (const feature of features) {
@@ -146,10 +186,13 @@ export function auditTransportJunctionContinuity(
     for (const anchor of anchors) {
       auditedVerticalAnchorCount += 1;
       const owner = featureById.get(String(anchor.ownerFeatureId || ''));
-      const family = feature?.transportRecord?.completeness;
+      const featureId = String(feature?.transportGraphRef?.featureId || '');
+      const ownerId = String(anchor.ownerFeatureId || '');
+      const connectedOwner = corridorRoots.has(featureId) &&
+        corridorRoots.get(featureId) === corridorRoots.get(ownerId);
       const reason = !owner ? 'missing_vertical_owner'
         : owner.transportRecord?.routeState === 'incomplete' ? 'incomplete_vertical_owner'
-        : owner.transportRecord?.completeness !== family ? 'mixed_vertical_source_family'
+        : !connectedOwner ? 'unconnected_vertical_owner'
         : !Number.isFinite(anchor.targetSurfaceY) ? 'nonfinite_vertical_target' : null;
       if (reason) invalidVerticalAnchors.push(Object.freeze({
         featureId: String(feature?.transportGraphRef?.featureId || ''),
@@ -301,20 +344,19 @@ export function buildTransportContinuityRepairAnchors(
     const featureId = String(feature?.transportGraphRef?.featureId || '');
     if (featureId) featureById.set(featureId, feature);
   }
-  const groups = connectedSideGroups(transportNetworkModel.connections).map((sides, index) => {
+  const groups = completePhysicalSideGroups(transportNetworkModel.connections, featureById).map((sides, index) => {
     const complete = sides.map((side) => ({
       side,
       feature: featureById.get(String(side.featureId || ''))
     })).filter(({ feature }) =>
       feature?.transportRecord && feature.transportRecord.routeState !== 'incomplete');
-    const exact = complete.filter(({feature}) => feature.transportRecord.completeness === 'lossless');
     // Once a complete generalized route is published as a physical road, its
     // shared junction and along-route grade constraints are just as binding.
     // Previously only the initial per-node pass handled these roads; each
     // independent profile then rejected incompatible nodes and left a step.
-    // Preserve exact-source ownership in a mixed group: source conflation,
-    // not a vertical solver, must retire a lower-detail duplicate there.
-    return {id:index,sides:exact.length?exact:complete};
+    // Conflation retires duplicate geometry before this pass. Every surviving
+    // physical join shares one feasible height, regardless of source provider.
+    return {id:index,sides:complete};
   });
   const membershipsByFeature = new Map();
   const targetByGroup = new Map();
@@ -1105,7 +1147,7 @@ export function buildTransportJunctionProfileAnchors(
   }
   const anchorsByFeature = new Map();
   let nodeCount = 0;
-  for (const group of connectedSideGroups(transportNetworkModel.connections)) {
+  for (const group of completePhysicalSideGroups(transportNetworkModel.connections, featureById)) {
     const connectedCandidates = group
       .map((side) => ({ side, feature: featureById.get(String(side.featureId || '')) }))
       .filter((entry) => entry.feature?.transportRecord?.routeState !== 'incomplete');
@@ -1118,30 +1160,7 @@ export function buildTransportJunctionProfileAnchors(
     if (!connectedCandidates.some(({ feature }) =>
       feature?.structureSemantics?.terrainMode !== 'at_grade'
     )) continue;
-    const bridgeCandidates = connectedCandidates.filter(({ feature }) =>
-      feature?.structureSemantics?.terrainMode === 'elevated' &&
-      feature?.structureSemantics?.isBridge === true &&
-      feature?.structureSemantics?.rampCandidate !== true &&
-      !/_link$/i.test(String(feature?.type || ''))
-    );
-    // Exact OSM and generalized regional vectors can be conflated at their
-    // endpoints for route continuity, but they are not interchangeable
-    // vertical-survey records. Carrying an exact bridge elevation into a
-    // generalized road can lift a duplicate regional route tens of metres
-    // above its DEM terrain. Compile each junction profile inside the most
-    // authoritative bridge's own source-resolution family instead.
-    const controllingBridge = [...bridgeCandidates].sort((left, right) =>
-      (right.feature?.transportRecord?.completeness === 'lossless' ? 1 : 0) -
-      (left.feature?.transportRecord?.completeness === 'lossless' ? 1 : 0)
-    )[0] || null;
-    const controllingCompleteness = String(
-      controllingBridge?.feature?.transportRecord?.completeness ||
-      (connectedCandidates.some(({ feature }) => feature?.transportRecord?.completeness === 'lossless')
-        ? 'lossless' : 'generalized')
-    );
-    const candidates = connectedCandidates.filter(({ feature }) =>
-      String(feature?.transportRecord?.completeness || 'generalized') === controllingCompleteness
-    );
+    const candidates = connectedCandidates;
     if (candidates.length < 2) continue;
     candidates.sort((left, right) =>
       ownerScore(right.side, right.feature) - ownerScore(left.side, left.feature)

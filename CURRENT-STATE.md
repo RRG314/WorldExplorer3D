@@ -1,6 +1,6 @@
 # Current development and release state
 
-Updated October 14, 2026. **5.5.1 is deployed to production.**
+Updated October 15, 2026. **5.5.1 is deployed to production.**
 Release: https://github.com/RRG314/WorldExplorer3D/releases/tag/v5.5.1
 Public project page: https://rrg314.github.io/WorldExplorer3D/
 
@@ -48,20 +48,68 @@ history at `027336a7`, without changing its pre-merge source tree. No museum,
 aquarium, ship, consolidation or player progress was rolled back. Full deployment
 and integration evidence is recorded in `docs/road-continuity/EVIDENCE.md`.
 
-## October 15 continuation — local repairs, release still blocked
+## October 15 continuation — fb24 candidate, release still blocked
 
-The verified local parking-passage roof/clearance repair removes the fabricated
-Light Street trench. Append-only numeric publication and temporary route/wheel
-storage reduce native buffer churn without reducing coverage. All 2,637 source
-tests and structural checks pass; source-world screenshots and movement pass.
-A facility callback no longer retains its loading context (about 128 MB in the
-retention diagnostic). Regional ring/road-width buffers now use bounded append-only
-storage. These latest changes are not yet frozen, pushed or deployed. The last
-native flight, before the regional storage change, still records a 966.6 ms
-pause. Collector tracing identifies GC in the delayed window but is diagnostic only. Complete artifact acceptance and
-ordinary hosted voyage/save remain required. Production is still 5.5.1.
+The frozen current package is `5.6.1+fb24de036fdd.ccf8c64b77a22df7.staging`,
+source `fb24de036fdd809be11f4df3708b5a5d33df7d69`, under
+`output/hosting-validation/release-561-fb24de03`. All 753 files pass package
+integrity checks. All 2,637 source tests and structural checks pass.
 
-## Current complete candidate — October 14
+The verified parking-passage roof/clearance repair removes the fabricated
+Light Street trench. A persistent facility callback no longer retains the load
+context (about 128 MB in sequential retained-allocation diagnostics). Numeric
+publication, regional ring and road-width storage now use bounded append-only
+pages; temporary route/wheel storage avoids native backing-store churn. Coverage,
+source truth and geometry precision are preserved.
+
+The new immutable native flight diagnostic still fails: 916.6 and 466.7 ms
+intervals. Moving driving also fails pacing. Activation, coverage, occupied memory
+and browser/local-resource checks pass. This is not complete release acceptance.
+Steady-state allocation is being profiled separately. The current 107-gate
+candidate matrix was stopped after 71 passes and four failures to repair the
+confirmed blockers before final acceptance; urban-sandbox was interrupted and
+later gates were not run. It found 20 mixed-provider Monaco road junction
+height discontinuities (up to 67.63 m); fallback-only Monaco and all seven fallback
+locations pass. Historical b21 Monaco evidence had no exact regional OSM and did
+not cover this combination. Museum cold admission timing, a swimming startup
+failure and a regional-arrival disk-guard refusal also remain open. Full artifact
+acceptance, backend/save roundtrip and ordinary hosted voyage/save remain open.
+
+Production is still 5.5.1; canonical staging is still 1f37. fb24 is now pushed
+to both active development branches; PR #103 remains draft and stable unchanged.
+The superseded generated f3ac package was retired only after verifying every
+file and preserving its manifests and original evidence. The actual production,
+previous dist and compatible b21 rollback packages remain preserved.
+
+## October 15 current source repairs — final artifact still pending
+
+The full current source/structural chain passes **2,653 tests**. An initial run
+caught a second URL identity for the shared DOM helper; the discovery import
+now uses the existing `v=1` identity. Museum/source functional diagnostics pass
+66 checks, and Earth swimming and the full first-session/Journal journey pass.
+These are not substitutes for final immutable acceptance.
+
+Controlled published-OSM Monaco data reproduce 1,430 junction discontinuities
+in fb24. Current source has **zero discontinuities and zero invalid vertical
+owners across 3,150 sampled connections**, with the unchanged 0.25 m continuity
+limit and no grade violations. Geometry ownership retires only proven complete
+fallback overlaps, including surface approaches and pedestrian collections.
+Connected roads share a physical height solution across provider boundaries;
+source fidelity no longer creates separate height systems. A vertical owner
+must exist, be complete and belong to the same connected physical corridor.
+An unrelated road from the same source cannot authorize a height constraint.
+
+The follow-up keyboard route crosses the repaired Monaco junction: 79.55 m of
+an 84.21 m route, 69 contact samples, no airborne samples, and no browser errors.
+The screenshots also expose high approach fill already present in fb24 (48.72 m
+on the same exact through-road); this is a distinct terrain/grade limitation, not
+proof of realistic mountain road presentation. Other assembled locations and the
+full final package matrix remain to be verified. Native flight after the
+byte-identical facade cleanup still has 666.7 and 1100 ms intervals, so pacing
+remains blocked. The earlier shared-building-store experiment was rejected and
+restored. Production, stable and canonical staging have not changed.
+
+## Previous f3ac candidate — historical October 14 results
 
 The frozen package is `5.6.1+f3ac508d2bd9.a76b6be179dcf332.staging`, under
 `output/hosting-validation/release-561-f3ac508d`. All 2,633 source checks and the

@@ -51,3 +51,24 @@ Transient allocation above 1 GiB remains a disclosed resource limitation.
 Final current-package timing, retention, complete candidate/backend execution
 and ordinary hosted checks are still required. The diagnostic is not release
 approval.
+
+## October 15 diagnostic correction
+
+Earlier allocation probes replaced global typed-array constructors with proxies.
+That changes `array.constructor === Type`: Three.js r128's animation conversion
+then copies arrays that normal gameplay shares. Those constructor-probe totals
+and heaps are perturbed observations, not native allocation or retention
+baselines. Original reports remain preserved. Call sites from those probes are
+investigation leads only; they cannot establish the benefit of a repair.
+
+The minimal identity reproduction is recorded in
+`output/release-review/561-buffer-counter-identity-audit.json`. Subsequent
+comparisons must preserve native constructors and use read-only browser metrics
+or bounded inventories after timing. The uninstrumented flight pauses remain
+real failures. The separate facility-closure retention comparison used heap
+sampling without constructor proxies and is not invalidated by this correction.
+
+Host pressure is recorded separately from game ownership. The existing owner
+Chrome session and Codex have substantial compressed memory on this 8 GiB host;
+they were preserved. This observation does not prove the cause of a game pause
+or turn a failing measurement into a pass.
