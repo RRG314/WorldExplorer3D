@@ -437,6 +437,13 @@
       "after": "cc286d979b4df54fc55bba2713d92ab427cfb61ce6c4c48e7f6e0c284ed61ad5",
       "afterMode": "100644",
       "review": "Consumes retained fingerprint keys before misses to avoid scan eviction, while retaining exact SHA-256 validation. Worker packets include only the road index, segment endpoints, widths and offset used by the physical height sampler; compiler-only frontage/mask/bounds metadata stays in the worker. Actual-worker tests verify identical mesh/fingerprints and sampled heights. No source selection, surface precision or persisted schema changes."
+    },
+    "scripts/lib/release-source-identity.mjs": {
+      "before": "3de2e2e30623636cab980650309d7a5b8f122409b854f00dae53ea12b6318570",
+      "beforeMode": "100644",
+      "after": "e028a8041bad4d71be76a3ad5d0601da38b283589a9ee886191a62246f443887",
+      "afterMode": "100644",
+      "review": "Release verification only: read-only Git invocations disable optional index refresh locks and preloadIndex to avoid filesystem contention. Strict dirty/untracked/commit identity comparisons and the original 10-second timeout remain. This helper does not ship in the browser or alter saved data, runtime schemas or service protocols. It is conservatively included because unknown script inputs are classified as runtime."
     }
   }
 }
