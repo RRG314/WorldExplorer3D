@@ -1,4 +1,4 @@
-import {yieldToWorldFrame} from './cooperative-scheduling.js?v=1';
+import {yieldToMainThread,yieldToWorldFrame} from './cooperative-scheduling.js?v=1';
 import {streetSourceInputCooperatively,sendStreetSourceInChunks} from './street-source-input.js';
 import {createPavementTerrainMask,createPavementMaterialBinding} from './pavement-terrain-mask.js';
 
@@ -39,7 +39,7 @@ export function createStreetOverview(appCtx,{onComplete=()=>{}}={}){
      const newSources=!coveragePrepared||!sourcesMatch();
      if(newSources){completedKeys.clear();coveragePrepared=false;}
      sources=sourceLists().map(list=>({list,length:list?.length||0}));
-     const schedule={current,yieldWork:yieldToWorldFrame,budgetMs:2};
+     const schedule={current,yieldWork:()=>appCtx.worldLoading?yieldToMainThread():yieldToWorldFrame(),budgetMs:2};
      const input=await streetSourceInputCooperatively(appCtx,()=>true,schedule);
      await sendStreetSourceInChunks(input,request,schedule);
      if(!current())return;
@@ -57,20 +57,21 @@ export function createStreetOverview(appCtx,{onComplete=()=>{}}={}){
    const target=stagedMask||mask;
    const packet=await request({type:'next',focus,resolution:target.layout.resolution});
    if(!current())return;
-   if(packet.type==='complete'){await complete();return;}
+   if(packet.type==='complete'){await complete(current);return;}
    target.publish(packet.key,packet.mask);completedKeys.add(packet.key);stats.completedCells++;stats.uploads={...target.uploadStats};
    if(packet.coveredSquareWorldUnits>0)stats.nonemptyCells++;
    stats.coveredSquareWorldUnits+=packet.coveredSquareWorldUnits||0;
-   if(!packet.remaining)await complete();
+   if(!packet.remaining)await complete(current);
  }
- async function complete(){
+ async function complete(current){
    if(stats.completedCells!==stats.totalCells)throw new Error('Location pavement ended before every planned cell was published');
    if(stagedMask){mask?.dispose();mask=stagedMask;stagedMask=null;mask.activate();}
    const l=mask.layout;
    completedBounds=stats.totalCells?{minX:l.minX*64,maxX:(l.minX+l.lookupWidth)*64,minZ:l.minZ*64,maxZ:(l.minZ+l.lookupHeight)*64}:null;
-   stats.status='complete';stats.coverageBounds=completedBounds;stats.durationMs=Math.round(performance.now()-startedAt);
+   stats.status='finishing';stats.coverageBounds=completedBounds;
    worker?.terminate();worker=null;prepared=false;stats.workerActive=false;
    stats.materials=mask.syncMaterials();await onComplete(completedBounds);
+   if(current()){stats.status='complete';stats.durationMs=Math.round(performance.now()-startedAt);}
  }
  function step(focus){
    setDetailBounds(appCtx.streetPavement?.coverageBounds);
@@ -99,6 +100,18 @@ export function createStreetOverview(appCtx,{onComplete=()=>{}}={}){
    if(valid())stats.status='suspended';
    return Promise.resolve();
  }
+ async function prepareInitialCoverage(focus,{current=()=>true,onProgress=()=>{}}={}){
+   // Initial coverage belongs to the loading session. During play, the same
+   // owner still advances one cell per frame as regional sources change.
+   if(!appCtx.worldLoading)throw new Error('Initial pavement preparation requires the loading cover');
+   while(valid()&&current()){
+     if(stats.status==='failed')throw new Error(stats.error||'Location pavement preparation failed');
+     if(stats.status==='complete'&&sourcesMatch())return true;
+     step(focus);await (active||Promise.resolve());
+     if(valid()&&current())onProgress({completed:stats.completedCells,total:stats.totalCells});
+   }
+   return false;
+ }
  function dispose(){disposed=true;generation++;worker?.terminate();pending?.reject(new Error('Overview disposed'));completedKeys.clear();mask?.dispose();stagedMask?.dispose();mask=stagedMask=null;materialBinding.dispose();stats.status='disposed';stats.retainedBytes=0;stats.workerActive=false;}
- return {stats,step,setDetailBounds,get completedBounds(){return completedBounds;},pause:()=>active||Promise.resolve(),suspendForDetail,dispose};
+ return {stats,step,prepareInitialCoverage,setDetailBounds,get completedBounds(){return completedBounds;},pause:()=>active||Promise.resolve(),suspendForDetail,dispose};
 }

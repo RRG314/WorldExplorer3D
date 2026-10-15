@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {Worker as NodeWorker} from 'node:worker_threads';
 import {StreetPacketCache} from '../app/js/world/street-packet-cache.js';
-import {updateStreetOverviewFrame,updateStreetPavementFocus} from '../app/js/world/street-pavement-runtime.js';
+import {updateStreetOverviewFrame,updateStreetPavementFocus,prepareInitialStreetCoverage} from '../app/js/world/street-pavement-runtime.js';
 import {createStreetOverview} from '../app/js/world/street-overview.js';
 
 test('packet cache is bounded, rejects changed inputs and never returns mutable retained arrays',()=>{
@@ -15,7 +15,7 @@ test('packet cache is bounded, rejects changed inputs and never returns mutable 
  cache.clear();assert.equal(cache.bytes,0);assert.deepEqual(cache.manifest(),{});
 });
 
-function harness(t,{holdType}={}){
+function harness(t,{holdType,keys=['0:0','16:0']}={}){
  const oldThree=globalThis.THREE,oldWorker=globalThis.Worker,resources=[];
  class Texture{constructor(data,width,height){this.image={data,width,height};resources.push(this);}dispose(){this.disposed=true;}}
  class Vector4{constructor(...v){this.set(...v);}set(...v){this.values=v;}}
@@ -31,7 +31,7 @@ function harness(t,{holdType}={}){
    structuredClone(data);calls++;const deliver=()=>{
     if(this.terminated)return;
     if(data.type==='source-begin'||data.type==='source-chunk'){this.onmessage({data:{type:'source-ready'}});return;}
-    if(data.type==='prepare'){this.keys=['0:0','16:0'].filter(key=>!data.completedKeys?.includes(key));this.resumeKeys=data.completedKeys;this.onmessage({data:{type:'prepared',tiles:2,keys:['0:0','16:0'],sourceCells:2,excludedCells:0}});return;}
+    if(data.type==='prepare'){this.keys=keys.filter(key=>!data.completedKeys?.includes(key));this.resumeKeys=data.completedKeys;this.onmessage({data:{type:'prepared',tiles:keys.length,keys,sourceCells:keys.length,excludedCells:0}});return;}
     const key=this.keys.shift();
     this.onmessage({data:key===undefined?{type:'complete'}:{type:'tile',key,mask:new Uint8Array(data.resolution**2).fill(255),coveredSquareWorldUnits:4096,remaining:this.keys.length}});
    };
@@ -42,6 +42,58 @@ function harness(t,{holdType}={}){
  t.after(()=>{globalThis.THREE=oldThree;globalThis.Worker=oldWorker;});
  return {ctx,resources,material,originalCompile,get calls(){return calls;},get worker(){return worker;}};
 }
+
+test('initial coverage finishes every cell and awaits mapped path publication before readiness',async t=>{
+ const h=harness(t);h.ctx.worldLoading=true;
+ let finishPaths,ready=false,callbacks=0;const progress=[];
+ const overview=createStreetOverview(h.ctx,{onComplete:()=>{callbacks++;return new Promise(resolve=>{finishPaths=resolve;});}});
+ const pending=overview.prepareInitialCoverage({x:0,z:0},{onProgress:p=>progress.push(p)}).then(value=>{ready=value;});
+ for(let i=0;i<20&&!finishPaths;i++)await new Promise(resolve=>setImmediate(resolve));
+ assert.equal(overview.stats.completedCells,2);assert.equal(overview.stats.status,'finishing');
+ assert.equal(ready,false);assert.equal(h.worker.terminated,true);
+ finishPaths();await pending;assert.equal(ready,true);assert.equal(overview.stats.status,'complete');
+ assert.deepEqual(progress.at(-1),{completed:2,total:2});
+ assert.equal(await overview.prepareInitialCoverage({x:0,z:0}),true);assert.equal(callbacks,1);
+ h.ctx.roads=[];const repeat=overview.prepareInitialCoverage({x:0,z:0});
+ for(let i=0;i<20&&callbacks<2;i++)await new Promise(resolve=>setImmediate(resolve));
+ finishPaths();assert.equal(await repeat,true);assert.equal(callbacks,2);
+ overview.dispose();
+});
+
+test('initial coverage accepts an empty plan without inventing cells',async t=>{
+ const h=harness(t,{keys:[]});h.ctx.worldLoading=true;let bounds='unset';
+ const overview=createStreetOverview(h.ctx,{onComplete:value=>{bounds=value;}});
+ assert.equal(await overview.prepareInitialCoverage({x:0,z:0}),true);
+ assert.equal(overview.stats.totalCells,0);assert.equal(overview.stats.completedCells,0);assert.equal(bounds,null);
+ overview.dispose();
+});
+
+test('cancelled initial coverage cannot advance a new loading screen or restart a retired worker',async t=>{
+ const h=harness(t,{holdType:'prepare'});h.ctx.worldLoading=true;
+ let current=true,progress=0;const overview=createStreetOverview(h.ctx);
+ const pending=overview.prepareInitialCoverage({x:0,z:0},{current:()=>current,onProgress:()=>progress++});
+ for(let i=0;i<20&&!h.worker?.held;i++)await new Promise(resolve=>setImmediate(resolve));
+ current=false;overview.dispose();assert.equal(await pending,false);
+ assert.equal(h.worker.terminated,true);assert.equal(progress,0);assert.equal(overview.stats.status,'disposed');
+});
+
+test('initial coverage reports publication failure and cannot run as a gameplay loading workaround',async t=>{
+ const h=harness(t);const overview=createStreetOverview(h.ctx,{onComplete:()=>{throw Error('mapped path publication failed');}});
+ await assert.rejects(overview.prepareInitialCoverage({x:0,z:0}),/loading cover/);assert.equal(h.calls,0);
+ h.ctx.worldLoading=true;
+ await assert.rejects(overview.prepareInitialCoverage({x:0,z:0}),/mapped path publication failed/);
+ assert.equal(overview.stats.status,'failed');assert.equal(overview.stats.workerActive,false);overview.dispose();
+});
+
+test('initial preparation skips worlds without pavement and reports measured coverage through the existing loader',async t=>{
+ assert.equal(await prepareInitialStreetCoverage({},()=>false),false);
+ assert.equal(await prepareInitialStreetCoverage({},()=>true),true);
+ const h=harness(t),messages=[];Object.assign(h.ctx,{worldLoading:true,car:{x:3,z:5},streetPavement:{},linearFeatureMeshes:[],showLoad:(_text,options)=>messages.push(options)});
+ assert.equal(await prepareInitialStreetCoverage(h.ctx,()=>true),true);
+ assert.equal(h.ctx.streetOverview.stats.status,'complete');
+ assert.deepEqual(messages.at(-1),{phase:'prepareLocationScenery',completed:2,total:2});
+ h.ctx.streetOverview.dispose();
+});
 
 test('terrain coverage survives movement and terrain revisions without rebuilding geometry',async t=>{
  const h=harness(t),overview=createStreetOverview(h.ctx);

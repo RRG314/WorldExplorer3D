@@ -3,7 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createRoadContactIndex } from '../app/js/terrain/road-contact-index.js?v=1';
 import { markGroundSurfaceChanged } from '../app/js/terrain/surface-revision.js';
-import { publishStreetPavement, updateStreetPavementFocus } from '../app/js/world/street-pavement-runtime.js';
+import { publishStreetPavement, updateStreetPavementFocus, ensureInitialStreetPavement } from '../app/js/world/street-pavement-runtime.js';
 
 function harness(t, mode='success') {
   const resources=[];
@@ -220,4 +220,69 @@ test('approaching the detail boundary still schedules replacement',async t=>{
  h.ctx._cancelStreetPavementBuild();
  for(let i=0;i<10 && h.ctx._streetPavementUpdating;i++)await new Promise(r=>setTimeout(r,1));
  assert.equal(h.ctx._streetPavementUpdating,false);assert.equal(h.worker.terminated,true);
+});
+
+test('takeoff cancels an in-flight ground detail job, retains accepted contact and allows a descent retry',async t=>{
+ const h=harness(t,'pending');
+ const accepted={focus:{x:0,z:0},coverageBounds:{minX:-384,maxX:384,minZ:-384,maxZ:384},sampleAt:()=>10.3,dispose(){this.disposed=true;}};
+ h.ctx.streetPavement=accepted;h.ctx.gameStarted=true;h.ctx.car.x=257;
+ let overviewSteps=0;
+ h.ctx.streetOverview={stats:{status:'suspended'},suspendForDetail:()=>Promise.resolve(),step(){overviewSteps++;}};
+ updateStreetPavementFocus(h.ctx);
+ await Promise.resolve();
+ assert.equal(h.ctx._streetPavementUpdating,true);
+ const firstWorker=h.worker;
+ h.ctx.planeMode={active:true,airborne:true,x:257,y:300,z:0};
+ updateStreetPavementFocus(h.ctx);
+ for(let i=0;i<20 && h.ctx._streetPavementUpdating;i++)await new Promise(r=>setTimeout(r,1));
+ assert.equal(firstWorker.terminated,true);assert.equal(h.ctx._streetPavementUpdating,false);
+ assert.equal(h.ctx.streetPavement,accepted);assert.equal(accepted.sampleAt(),10.3);assert.equal(accepted.disposed,undefined);
+ assert.equal(h.ctx._streetPavementDirty,true);
+ updateStreetPavementFocus(h.ctx);assert.equal(overviewSteps,1);
+ assert.equal(h.worker,firstWorker,'High flight must not restart a detail worker');
+ h.ctx.planeMode.y=30;
+ updateStreetPavementFocus(h.ctx);await Promise.resolve();
+ assert.notEqual(h.worker,firstWorker,'Near-ground arrival resumes the same detail owner');
+ assert.equal(h.ctx._streetPavementUpdating,true);
+ h.ctx._cancelStreetPavementBuild();
+ for(let i=0;i<20 && h.ctx._streetPavementUpdating;i++)await new Promise(r=>setTimeout(r,1));
+ assert.equal(h.ctx.streetPavement,accepted);assert.equal(accepted.disposed,undefined);
+ assert.ok(h.resources.every(r=>r.disposed));
+});
+
+test('source selection yields and cancels before scanning the whole location or replacing accepted contact',async t=>{
+  const h=harness(t),previous={meshes:[],sampleAt:()=>12,dispose(){throw Error('accepted contact must survive');}};
+  h.ctx.streetPavement=previous;h.ctx.worldLoading=true;
+  const saved=new Map(['performance','scheduler'].map(key=>[key,Object.getOwnPropertyDescriptor(globalThis,key)]));
+  t.after(()=>{for(const [key,descriptor]of saved)descriptor?Object.defineProperty(globalThis,key,descriptor):delete globalThis[key];});
+  let clock=0,reads=0,yields=0;
+  Object.defineProperty(globalThis,'performance',{configurable:true,value:{now:()=>clock+=2}});
+  Object.defineProperty(globalThis,'scheduler',{configurable:true,value:{yield:async()=>{yields++;h.ctx._cancelStreetPavementBuild();}}});
+  h.ctx.buildings=Array.from({length:40},()=>({get pts(){reads++;return [{x:5000,z:5000},{x:5010,z:5000},{x:5000,z:5010}];}}));
+  assert.equal(await publishStreetPavement(h.ctx),null);
+  assert.ok(yields>0);assert.ok(reads<40,'cancelled selection must stop before visiting every feature');
+  assert.equal(h.worker.prepare,undefined);assert.equal(h.worker.terminated,true);
+  assert.equal(h.ctx.streetPavement,previous);assert.equal(previous.sampleAt(),12);
+  assert.equal(h.ctx._cancelStreetPavementBuild,null);assert.ok(h.resources.every(r=>r.disposed));
+});
+
+test('initial readiness retries retired terrain work before exposing gameplay',async t=>{
+ const h=harness(t);h.ctx.worldLoading=true;let changes=0;
+ h.ctx.terrainMeshHeightAt=()=>{if(!changes++){markGroundSurfaceChanged(h.ctx);}return 14;};
+ assert.equal(await ensureInitialStreetPavement(h.ctx,()=>true),true);
+ assert.equal(h.ctx.streetPavement.groundRevision,h.ctx._groundSurfaceRevision);
+ assert.ok(h.ctx.streetPavement.sampleAt(.2,3.2)>14);assert.equal(h.ctx._streetPavementDirty,false);
+ const resources=h.resources.length;assert.equal(await ensureInitialStreetPavement(h.ctx,()=>true),true);
+ assert.equal(h.resources.length,resources,'accepted initial coverage is reused');h.ctx.streetPavement.dispose();
+});
+
+test('initial readiness does not retry a superseded world or claim endlessly changing terrain is ready',async t=>{
+ const h=harness(t);h.ctx.worldLoading=true;let current=true;
+ h.ctx.terrainMeshHeightAt=()=>{current=false;markGroundSurfaceChanged(h.ctx);return 14;};
+ assert.equal(await ensureInitialStreetPavement(h.ctx,()=>current),false);
+ assert.equal(h.ctx.streetPavement,undefined);assert.ok(h.resources.every(r=>r.disposed));
+ current=true;let attempts=0;
+ const terrains=new Set();h.ctx.terrainMeshHeightAt=()=>{if(!terrains.has(h.worker)){terrains.add(h.worker);attempts++;markGroundSurfaceChanged(h.ctx);}return 14;};
+ await assert.rejects(ensureInitialStreetPavement(h.ctx,()=>current),/could not settle/);
+ assert.equal(attempts,3);assert.equal(h.ctx.streetPavement,undefined);assert.ok(h.resources.every(r=>r.disposed));
 });

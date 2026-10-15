@@ -48,6 +48,34 @@ history at `027336a7`, without changing its pre-merge source tree. No museum,
 aquarium, ship, consolidation or player progress was rolled back. Full deployment
 and integration evidence is recorded in `docs/road-continuity/EVIDENCE.md`.
 
+## October 15 — initial scenery and street readiness repairs
+
+Source now completes the actual surrounding-pavement worker and mapped-path
+publication under the loading cover. Its progress is measured from accepted
+cells. Late terrain invalidation cannot count as a completed initial sidewalk
+build; bounded retries settle current terrain before play. During travel,
+source selection yields in small slices, and takeoff cancels unfinished ground
+detail while retaining accepted contact and permitting descent recovery.
+
+The integrated native source diagnostic loads in 113.3 seconds with all 49,080
+buildings, 18,952 roads and 6,009 scenery cells. Its 90-second flight has a
+50.1 ms worst interval and no intervals over 100 ms. A 166.7 ms driving hitch
+led to a separate CPU profile confirming a synchronous source scan; that scan
+is now cooperative. Longer native traversal of this final correction remains
+pending. No pacing, coverage or resource budget changed.
+
+Mobile regression with the fallback transport provider passes all measured
+checks in 38.4 seconds: 26,829 buildings, 1,063 roads and all 1,403 surrounding
+cells, with no active street worker or dirty publication at first play. Its
+five-second sample peaks at 16.8 ms. The current portrait image was inspected;
+this is browser touch emulation, not physical-phone certification. Evidence:
+`output/release-review/561-settled-streets-mobile`.
+
+The refreshed full source chain passes all 2,676 tests and the complete
+structural, ownership, type, inventory and sensitivity checks. Source work is
+not in the a0 staging artifact. Production remains 5.5.1; no new deployment or stable merge
+has happened. Final immutable acceptance and current image approval stay open.
+
 ## October 15 current source — preparation repairs verified, pacing still open
 
 All **2,666 source tests** and the complete structural/ownership/type/inventory/

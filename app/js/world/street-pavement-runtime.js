@@ -1,11 +1,10 @@
-import {suspendStreetPreparationForInterior} from './street-interior-suspension.js';
+import {cancelUnfinishedStreetDetail,suspendStreetPreparationForInterior} from './street-interior-suspension.js';
 import {publishReferenceBlockDressing} from './reference-block-dressing.js';
 import {createPortalSurfaceClipper} from '../terrain/portal-surface-clip.js';
 import {createPavementTerrainPartitionCooperatively} from './pavement-terrain-partition.js';
 import { captureStreetSurfaceGeometry,serializeStreetSurfaceCapture } from './street-surface-capture.js';
 import { createRoadMarkingMaterial } from '../road-render.js?v=4';
-import { streetSourceInput } from './street-source-input.js';
-import {isPavementFootway,isPavementCrossing} from './compiler/pavement-footway-policy.js';
+import { streetSourceInputCooperatively } from './street-source-input.js';
 import { indexPavementPositionsCooperatively } from './pavement-indexed-mesh.js';
 import { createPavementBaseSamplerCooperatively } from './pavement-height-sampler.js';
 import { assessStreetQuality } from './street-quality-assessment.js';
@@ -80,7 +79,6 @@ export async function publishStreetPavement(appCtx, options = {}) {
   };
   const current = () => sequence === appCtx._worldLoadSequence && generation === appCtx._streetPavementGeneration && groundRevision === (appCtx._groundSurfaceRevision || 0) && !appCtx.onMoon && !cancelled;
   const metersPerWorldUnit = appCtx.METERS_PER_WORLD_UNIT || 1.11;
-  const managedPaths = (appCtx.linearFeatures || []).filter(f => nearby(f) && (isPavementFootway(f) || isPavementCrossing(f)));
   const workerUrl = globalThis.__WORLD_EXPLORER_PRODUCTION__?.streetPavementWorkerUrl ||
     new URL('./compiler/street-pavement-worker.js', import.meta.url);
   const worker = new Worker(workerUrl, { type: 'module' });
@@ -108,8 +106,7 @@ export async function publishStreetPavement(appCtx, options = {}) {
     worker.onerror = event => { cleanup(); reject(new Error(event.message)); };
     try { worker.postMessage(data); } catch (error) { cleanup(); reject(error); }
   });
-  const source=streetSourceInput(appCtx,nearby),roadRecords=source.roads;
-  const input={...source,coverageBounds};
+  let input=null;
   let committed = false;
   const stagedLines = [];
   const batches = new Map();
@@ -125,7 +122,7 @@ export async function publishStreetPavement(appCtx, options = {}) {
     return Number.isFinite(y) ? y : appCtx.elevationWorldYAtWorldXZ?.(x, z);
   };
   const clipGroundSurface=createPortalSurfaceClipper(appCtx.structureTerrainPortalDescriptors);
-  const stats = { tiles: 0, triangles: 0, curbTriangles: 0, markingTriangles:0, ramps:0, workerMs: 0, inferredFrontages: 0, managedPaths: managedPaths.length, residentRoads:roadRecords.length, residentBuildings:input.buildings.length, roads: appCtx.roads.length, roadMeshes: appCtx.roadMeshes.length, buildings: appCtx.buildings.length, worldLoadSequence: sequence };
+  const stats = { tiles: 0, triangles: 0, curbTriangles: 0, markingTriangles:0, ramps:0, workerMs: 0, inferredFrontages: 0, managedPaths: 0, residentRoads:0, residentBuildings:0, roads: appCtx.roads.length, roadMeshes: appCtx.roadMeshes.length, buildings: appCtx.buildings.length, worldLoadSequence: sequence };
   const phaseTimes=stats.phaseDurationsMs={};
   let phaseStart=performance.now();
   const finishPhase=name=>{const now=performance.now();phaseTimes[name]=Math.round(now-phaseStart);phaseStart=now;trace(name,{durationMs:phaseTimes[name]});};
@@ -248,12 +245,20 @@ export async function publishStreetPavement(appCtx, options = {}) {
       panel.querySelector('pre').textContent = JSON.stringify(stats, null, 2);
     }
   try {
+    // Filtering a full location is itself substantial work, even though only
+    // nearby records go to the worker. Share the publication's cancellation
+    // and slice budget so starting a new sidewalk window cannot stop driving.
+    const source=await streetSourceInputCooperatively(appCtx,nearby,schedule);
+    input={...source,coverageBounds};
+    stats.managedPaths=source.linearFeatures.length;
+    stats.residentRoads=source.roads.length;stats.residentBuildings=source.buildings.length;
+    finishPhase('source-snapshot');
     partitionSurface = await createPavementTerrainPartitionCooperatively(appCtx.terrainGroup?.children, {includeFarTerrain:true,bounds:coverageBounds,...schedule});
     finishPhase('terrain-support');
     const prepared = await request({ type: 'prepare', input, cached:packetCache.manifest(), debug: new URLSearchParams(location.search).has('streetDiagnostics') });
     stats.plannedTiles = prepared.tiles;
     finishPhase('source-prepare');
-    trace('prepared',{tiles:prepared.tiles,paths:managedPaths.length});
+    trace('prepared',{tiles:prepared.tiles,paths:stats.managedPaths});
     for (;;) {
       if (!current()) { disposeStaged(); return null; }
       let packet = await request({ type: 'next' });
@@ -414,7 +419,7 @@ export async function publishStreetPavement(appCtx, options = {}) {
 
 export function updateStreetPavementFocus(appCtx) {
   if (suspendStreetPreparationForInterior(appCtx)) return;
-  if (appCtx.worldLoading || appCtx.onMoon || (!appCtx.streetPavement && !appCtx._streetPavementDirty) || appCtx._streetPavementUpdating || performance.now() < (appCtx._streetPavementRetryAt || 0)) return;
+  if (appCtx.worldLoading || appCtx.onMoon || (!appCtx.streetPavement && !appCtx._streetPavementDirty)) return;
   const p = focusActor(appCtx);
   if (!p) return;
   appCtx._streetMotion=streetMotion(appCtx._streetMotion,p,performance.now(),appCtx._worldLoadSequence);
@@ -428,9 +433,16 @@ export function updateStreetPavementFocus(appCtx) {
   const aerial=appCtx.planeMode?.active||appCtx.droneMode;
   const awayFromGround=Number.isFinite(ground)?p.y-ground>80:appCtx.planeMode?.airborne||appCtx.droneMode;
   if(appCtx.gameStarted&&aerial&&awayFromGround){
+    // A detail job may have started on the ground just before takeoff. Checking
+    // _streetPavementUpdating first let that obsolete job finish conformance
+    // and rebuild every mapped path while the aircraft was already high above
+    // it. Keep the accepted publication and resume nearby detail on descent.
+    cancelUnfinishedStreetDetail(appCtx);
+    if (appCtx._streetPavementUpdating) return;
     appCtx.streetOverview ||= createStreetOverview(appCtx,{onComplete:bounds=>refreshMappedPaths(appCtx,bounds)});
     appCtx.streetOverview.step(p);return;
   }
+  if (appCtx._streetPavementUpdating || performance.now() < (appCtx._streetPavementRetryAt || 0)) return;
   // Keep accepted detail until approaching its boundary. The old radial
   // 128-unit trigger replaced a 768-unit square even while the actor remained
   // deep inside it. Predict a bounded forward window from movement and the
@@ -457,9 +469,44 @@ export function updateStreetOverviewFrame(appCtx) {
 }
 
 // Set up the distant coverage material while the loading cover is still shown.
-// Source compilation stays deferred; no location data are awaited here.
+// The first-play owner awaits source compilation separately; rendering can
+// also call this synchronously to bind the stable material interface.
 export function prepareStreetOverviewMaterials(appCtx) {
   if(!appCtx.streetPavement||appCtx.onMoon||appCtx.onMars||appCtx.activePlanetaryBodyId||appCtx.activeShipInterior)return;
   if(appCtx.isEnv&&appCtx.ENV&&!appCtx.isEnv(appCtx.ENV.EARTH))return;
   appCtx.streetOverview ||= createStreetOverview(appCtx,{onComplete:bounds=>refreshMappedPaths(appCtx,bounds)});
+}
+
+export async function ensureInitialStreetPavement(appCtx,current) {
+  if(!current())return false;
+  if(!appCtx.terrainEnabled||!appCtx.scene||appCtx.onMoon||appCtx.onMars||appCtx.activePlanetaryBodyId||appCtx.activeShipInterior)return true;
+  if(appCtx.isEnv&&appCtx.ENV&&!appCtx.isEnv(appCtx.ENV.EARTH))return true;
+  if(!appCtx.worldLoading)throw new Error('Initial street preparation requires the loading cover');
+  // Late accepted terrain can retire the first pavement job. A null result is
+  // cancellation, not completion: settle it here rather than exposing an empty
+  // first frame and launching the whole construction job during movement.
+  for(let attempt=0;attempt<3;attempt++){
+    if(!current())return false;
+    const pavement=appCtx.streetPavement;
+    if(pavement&&!appCtx._streetPavementDirty&&pavement.groundRevision===(appCtx._groundSurfaceRevision||0))return true;
+    await publishStreetPavement(appCtx);
+  }
+  if(!current())return false;
+  if(appCtx.streetPavement&&!appCtx._streetPavementDirty&&appCtx.streetPavement.groundRevision===(appCtx._groundSurfaceRevision||0))return true;
+  throw new Error('Initial street surfaces could not settle on the accepted terrain');
+}
+
+export async function prepareInitialStreetCoverage(appCtx,current) {
+  if(!current())return false;
+  if(!await ensureInitialStreetPavement(appCtx,current))return false;
+  prepareStreetOverviewMaterials(appCtx);
+  if(!appCtx.streetOverview)return true;
+  let reported=-1;
+  const complete=await appCtx.streetOverview.prepareInitialCoverage(focusActor(appCtx),{current,onProgress:({completed,total})=>{
+    const percent=total>0?Math.floor(100*completed/total):0;
+    if(percent===reported)return;
+    reported=percent;
+    appCtx.showLoad?.('',{phase:'prepareLocationScenery',completed,total});
+  }});
+  return complete&&await ensureInitialStreetPavement(appCtx,current);
 }
