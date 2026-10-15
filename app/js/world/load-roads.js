@@ -131,6 +131,9 @@ export function createWorldRoadLoader(deps = {}) {
     worldBaseTerrainY,
     worldLinePointsFromLonLat
   } = deps;
+  // Facilities outlive the load. Create their callback in the loader's stable
+  // scope, so it cannot retain the per-load source/node compilation context.
+  const sampleFacilityGround = (x, z) => appCtx.elevationWorldYAtWorldXZ?.(x, z);
   const cancellationSlot = createWorldLoadCancellationSlot();
   const classifyLinearFeatureTags = (tags = {}, options = {}) => {
     const classification = classifyLinearFeatureTagsBase(tags, {
@@ -746,7 +749,7 @@ export function createWorldRoadLoader(deps = {}) {
           Number(globalThis.navigator?.maxTouchPoints || 0) > 0;
         appCtx.transportFacilityVisual = createTransportFacilityVisuals(globalThis.THREE, transportFacilityGraph, {
           appCtx,
-          sampleGround: (x, z) => appCtx.elevationWorldYAtWorldXZ?.(x, z),
+          sampleGround: sampleFacilityGround,
           location: worldSession?.request?.selection || appCtx.resolveLocationSelection?.() || appCtx.LOC,
           mobile: mobileTransportClient
         });

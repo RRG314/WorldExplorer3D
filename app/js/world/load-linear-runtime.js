@@ -3,6 +3,7 @@ import {
 } from './linear-feature-presentation.js?v=1';
 import {normalizeTransportSource} from './compiler/transport-source-normalizer.js?v=4';
 import {publishedRoadSourceTopology} from './road-source-topology.js';
+import {createNumericPublicationStore} from '../structure-semantics/numeric-publication.js';
 
 export function shouldOmitUnmatchedElevatedPedestrianFeature(
   classification,
@@ -112,7 +113,9 @@ export function createLinearFeatureRuntime(options = {}) {
       (feature?.structureSemantics?.gradeSeparated || feature?.structureSemantics?.skywalk === true);
     if (runtimeOptions.force === true && !feature.isStructureConnector) return false;
 
-    updateFeatureSurfaceProfile(feature, worldBaseTerrainY, { surfaceBias: spec.bias });
+    updateFeatureSurfaceProfile(feature, worldBaseTerrainY, {
+      publicationStorage: runtimeOptions.publicationStorage, surfaceBias: spec.bias
+    });
     appCtx.linearFeatures.push(feature);
 
     // This record feeds navigation and the resident pavement area compiler.
@@ -147,6 +150,7 @@ export function createLinearFeatureRuntime(options = {}) {
       { ways: structureConnectorWays, force: true, alwaysVisible: true }
     ];
 
+    const publicationStorage = createNumericPublicationStore();
     const publishedWays=new Set();
     linearFeatureGroups.forEach((group) => {
       const featureWays = group.ways;
@@ -160,6 +164,7 @@ export function createLinearFeatureRuntime(options = {}) {
         const pts = sanitizeWorldPathPoints(rawPts, geometryGuards);
         if (pts.length < 2) return;
         const added=addLinearFeatureRecord(pts, { ...(way.tags || {}), sourceFeatureId: identity }, {
+          publicationStorage,
           sourceNodes,sourcePoints:rawPts,incomplete:sourceNodes.length!==way.nodes.length,
           crossingNodes: way.nodes.map(id => nodes[id]).filter(n => n?.tags?.kerb || n?.tags?.highway === 'crossing').map(n => ({ ...appCtx.geoToWorld(n.lat,n.lon), kerb:n.tags.kerb, tags:{...n.tags} })),
           force: group.force === true,
@@ -169,6 +174,7 @@ export function createLinearFeatureRuntime(options = {}) {
       });
     });
 
+    publicationStorage.release();
     publishLinearFeaturePresentation({
       appCtx,
       buildFeatureRibbonEdges,

@@ -142,7 +142,9 @@ function buildTraversalGraph(mode = 'walk') {
     const stations = Array.isArray(feature?.transportGraphRef?.stations)
       ? feature.transportGraphRef.stations
       : [];
-    const distances = new Float64Array(points.length);
+    // Temporary doubles, consumed before the next feature. These do not need
+    // native backing stores (two per road for the walk/drive graph builds).
+    const distances = new Array(points.length).fill(0);
     for (let index = 1; index < points.length; index += 1) {
       distances[index] = distances[index - 1] +
         Math.hypot(points[index].x - points[index - 1].x, points[index].z - points[index - 1].z);

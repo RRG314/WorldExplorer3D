@@ -4,6 +4,7 @@ import {FAR_CONTEXT_MAX_BUILDINGS,FAR_CONTEXT_BUILDING_COVERAGE_TARGET,FAR_CONTE
 import {createRegionalBuildingWorker} from './regional-building-runtime.js';
 import { createRegionalRoadCoveragePlan } from './regional-road-coverage.js';
 import {createGeographicRingIndex} from './geographic-ring-index.js';
+import {createNumericPublicationStore} from '../structure-semantics/numeric-publication.js';
 import {
   fetchShortbreadTile,
   vectorTileRangeForBounds
@@ -60,7 +61,7 @@ function ringSpanMeters(ring) {
 
 const geographicRingIndexes=new WeakMap();
 
-function retainFarWaterRing(ring) {
+function retainFarWaterRing(ring, publicationStorage = null) {
   const source = (ring || []).filter((coordinate) => (
     Number.isFinite(Number(coordinate?.[0])) &&
     Number.isFinite(Number(coordinate?.[1]))
@@ -70,7 +71,7 @@ function retainFarWaterRing(ring) {
   const last = source.at(-1);
   const closed=first[0]===last[0]&&first[1]===last[1]?source:[...source,first];
   const retained=Object.freeze(closed.map(point=>Object.freeze([...point])));
-  geographicRingIndexes.set(retained,createGeographicRingIndex(retained));
+  geographicRingIndexes.set(retained,createGeographicRingIndex(retained, publicationStorage));
   return retained;
 }
 
@@ -249,7 +250,9 @@ async function loadFarMappedWaterContext(bounds, options = {}) {
   );
   const tiles = waterBatch.values;
   const waterAreas = [];
+  const publicationStorage = createNumericPublicationStore();
 
+  try {
   for (let tileIndex = 0; tileIndex < tiles.length; tileIndex += 1) {
     const tileRecord = tiles[tileIndex];
     for (const layerName of ['ocean', 'water_polygons']) {
@@ -274,13 +277,13 @@ async function loadFarMappedWaterContext(bounds, options = {}) {
           // Deleting every Nth vertex can make a concave coastline cross
           // itself, producing giant triangles and depth stripes. Preserve the
           // mapped topology; the 200 m feature filter owns the far-LOD budget.
-          const retainedOuter = retainFarWaterRing(outer);
+          const retainedOuter = retainFarWaterRing(outer, publicationStorage);
           if (retainedOuter.length < 4) continue;
           waterAreas.push({
             outer: retainedOuter,
             holes: (rings || []).slice(1)
               .filter((ring) => Array.isArray(ring) && ring.length >= 4)
-              .map(retainFarWaterRing)
+              .map(ring => retainFarWaterRing(ring, publicationStorage))
               .filter((ring) => ring.length >= 4),
             bounds: ringBounds(retainedOuter),
             kind,
@@ -292,6 +295,7 @@ async function loadFarMappedWaterContext(bounds, options = {}) {
     }
   }
 
+  } finally { publicationStorage.release(); }
   return {
     waterAreas,
     waterTilesLoaded: tiles.length,
@@ -343,6 +347,7 @@ async function loadFarMappedContext(bounds, excludedBounds = null, waterBounds =
   let invalidBuildings = 0;
   let outsideBuildings = 0;
   let sliceStarted = performance.now();
+  const publicationStorage = createNumericPublicationStore();
 
   try {
   for (let tileIndex = 0; tileIndex < tiles.length; tileIndex += 1) {
@@ -364,11 +369,11 @@ async function loadFarMappedContext(bounds, excludedBounds = null, waterBounds =
         const profile = mappedLandSurfaceProfile(geojson?.properties?.kind, geojson?.properties);
         if (!profile) continue;
         for (const rings of polygonAreas(geojson?.geometry)) {
-          const outer = retainFarWaterRing(rings?.[0]);
+          const outer = retainFarWaterRing(rings?.[0], publicationStorage);
           if (outer.length < 4) continue;
           landBucket.push({
             outer,
-            holes: (rings || []).slice(1).map(retainFarWaterRing).filter((ring) => ring.length >= 4),
+            holes: (rings || []).slice(1).map(ring => retainFarWaterRing(ring, publicationStorage)).filter((ring) => ring.length >= 4),
             bounds: ringBounds(outer),
             tint: profile.tint,
             mode: profile.mode,
@@ -498,7 +503,7 @@ async function loadFarMappedContext(bounds, excludedBounds = null, waterBounds =
   } catch (error) {
     roadCoveragePlan?.dispose();
     throw error;
-  } finally { buildingWorker?.dispose(); }
+  } finally { publicationStorage.release(); buildingWorker?.dispose(); }
 }
 
 export {

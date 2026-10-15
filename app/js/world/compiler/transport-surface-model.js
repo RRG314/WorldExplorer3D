@@ -1,6 +1,6 @@
 import {copyNumericArray, createNumericScratchPool} from '../../structure-semantics/numeric-scratch.js';
 import { sampleSortedProfileAtDistance } from '../../structure-semantics/profile-sampling.js';
-import {tunnelObstructionMaximumY} from './tunnel-envelope.js';
+import {tunnelObstructionMaximumY, tunnelRoofHalfWidth} from './tunnel-envelope.js';
 import {fitOrdinaryStreetProfile} from './ordinary-street-profile.js';
 import {roadPlacementOffsetWorld} from '../road-units.js';
 import {
@@ -239,9 +239,12 @@ function compileTransportSurfaceWithScratch(feature, sampleTerrainY, options, al
   const sampleCount = sourceSampleDistances.length;
   const stationBytes = sampleCount * 8;
   const pathBytes = sourcePathDistances.byteLength;
-  const publishedStorage = new ArrayBuffer(stationBytes + pathBytes + sampleCount * 7 * 4);
-  const sampleDistances = new Float64Array(publishedStorage, 0, sampleCount);
-  const pathDistances = new Float32Array(publishedStorage, stationBytes, sourcePathDistances.length);
+  const publishedBytes = stationBytes + pathBytes + sampleCount * 7 * 4;
+  const publication = options.publicationStorage?.allocate(publishedBytes) ||
+    {buffer: new ArrayBuffer(publishedBytes), byteOffset: 0};
+  const publishedStorage = publication.buffer, publishedOffset = publication.byteOffset;
+  const sampleDistances = new Float64Array(publishedStorage, publishedOffset, sampleCount);
+  const pathDistances = new Float32Array(publishedStorage, publishedOffset + stationBytes, sourcePathDistances.length);
   sampleDistances.set(sourceSampleDistances);
   pathDistances.set(sourcePathDistances);
   // Sources are borrowed scratch; published fields own the copy above.
@@ -272,13 +275,13 @@ function compileTransportSurfaceWithScratch(feature, sampleTerrainY, options, al
   // Tunnel containment must sample the SAME outer roof extent as its shell
   // compiler, not just the carriageway edges on a steep cross-slope.
   const groundProbeHalfWidth = semantics.terrainMode === 'subgrade' && semantics.isTunnel
-    ? Math.max(3.4, compiledWidth) * 0.5 + 0.95
+    ? tunnelRoofHalfWidth(compiledWidth)
     : halfWidth;
   const corridorCenterOffset = roadPlacementOffsetWorld(feature);
   const anchors = normalizeAnchors(feature, semantics, total);
   // These four published profiles share a lifetime, but never overlap. One
   // backing allocation avoids four native buffers per compiled road.
-  const groundStorage = new Float32Array(publishedStorage, stationBytes + pathBytes, sampleCount * 4);
+  const groundStorage = new Float32Array(publishedStorage, publishedOffset + stationBytes + pathBytes, sampleCount * 4);
   const groundHeights = groundStorage.subarray(0, sampleCount);
   const offsets = groundStorage.subarray(sampleCount, sampleCount * 2);
   const leftGround = groundStorage.subarray(sampleCount * 2, sampleCount * 3);
@@ -547,10 +550,10 @@ function compileTransportSurfaceWithScratch(feature, sampleTerrainY, options, al
   // sidewalks, and visuals then query one planar deck instead of recreating
   // incompatible lateral terrain folds.
   const solvedHeights = centerHeights;
-  centerHeights = new Float32Array(publishedStorage, stationBytes + pathBytes + sampleCount * 4 * 4, sampleCount);
+  centerHeights = new Float32Array(publishedStorage, publishedOffset + stationBytes + pathBytes + sampleCount * 4 * 4, sampleCount);
   centerHeights.set(solvedHeights);
   // The scratch scope is returned only after every accepted field is copied.
-  const edgeStorage = new Float32Array(publishedStorage, stationBytes + pathBytes + sampleCount * 5 * 4, sampleCount * 2);
+  const edgeStorage = new Float32Array(publishedStorage, publishedOffset + stationBytes + pathBytes + sampleCount * 5 * 4, sampleCount * 2);
   const leftHeights = edgeStorage.subarray(0, centerHeights.length);
   const rightHeights = edgeStorage.subarray(centerHeights.length);
   leftHeights.set(centerHeights);

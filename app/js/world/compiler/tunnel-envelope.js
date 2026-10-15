@@ -13,7 +13,18 @@ export function canPublishTunnelGeometry(feature) {
 }
 
 export function tunnelClearance(semantics = {}) {
+  // Parking aisles carry passenger vehicles, not the full-size road envelope.
+  // Keep a conservative walkable enclosure when no measured headroom exists.
+  // Cut depth describes burial and must not enlarge this vehicle clearance.
+  if (semantics.parkingAccess === true) return 3.2;
   return Math.max(3.2, Math.min(5.2, (Number(semantics.cutDepth) || 4.6) - 0.25));
+}
+
+export function tunnelRoofHalfWidth(width) {
+  // Match the published shell/portal and collider outside face exactly:
+  // carriageway half-width, 2 cm lining offset, then the 35 cm outer rim.
+  // The old extra 95 cm swept adjacent buildings into the tunnel ceiling.
+  return Math.max(3.4, Number(width) || 6) * .5 + .02 + Math.max(.35, TUNNEL_ROOF_THICKNESS);
 }
 
 export function tunnelMinimumDepth(semantics = {}) {

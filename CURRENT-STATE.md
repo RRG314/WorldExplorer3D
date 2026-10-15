@@ -48,19 +48,42 @@ history at `027336a7`, without changing its pre-merge source tree. No museum,
 aquarium, ship, consolidation or player progress was rolled back. Full deployment
 and integration evidence is recorded in `docs/road-continuity/EVIDENCE.md`.
 
+## October 15 continuation — local repairs, release still blocked
+
+The verified local parking-passage roof/clearance repair removes the fabricated
+Light Street trench. Append-only numeric publication and temporary route/wheel
+storage reduce native buffer churn without reducing coverage. All 2,637 source
+tests and structural checks pass; source-world screenshots and movement pass.
+A facility callback no longer retains its loading context (about 128 MB in the
+retention diagnostic). Regional ring/road-width buffers now use bounded append-only
+storage. These latest changes are not yet frozen, pushed or deployed. The last
+native flight, before the regional storage change, still records a 966.6 ms
+pause. Collector tracing identifies GC in the delayed window but is diagnostic only. Complete artifact acceptance and
+ordinary hosted voyage/save remain required. Production is still 5.5.1.
+
 ## Current complete candidate — October 14
 
-The terrain recovery and bounded construction-storage source passes all 2,633
-checks and the complete structural chain. Temporary compiler scratch is reused
-within explicit synchronous scopes. Building source attributes retire without
-invalidating neighboring geometry; standalone buildings retain only their own
-exact attribute storage. Final packaged acceptance is being rebuilt and rerun.
-The preserved b21 candidate remains the modern-save fallback.
+The frozen package is `5.6.1+f3ac508d2bd9.a76b6be179dcf332.staging`, under
+`output/hosting-validation/release-561-f3ac508d`. All 2,633 source checks and the
+structural chain pass. All three backend gates and the actual released
+5.5.1 → candidate → compatible b21 rollback → candidate save roundtrip pass.
+The complete candidate run finished at 03:11 UTC October 15 (October 14 local):
+**103 of 107 gates passed**. Original failures remain preserved.
 
-Native frame pauses remain unresolved. Focused functional results do not make
-this a production-ready release. Complete matching candidate/backend acceptance,
-four-stage saves, ordinary hosted voyage/save and current-image review remain
-required. Canonical staging still serves 1f37 at
+Open checks: regional arrival was refused before launch by its disk guard;
+city-switch requests need cancellation accounting verified; the district
+activity button timed out; native desktop frame pacing and one mode activation
+failed. Twelve reload cycles, retained memory, coverage and touch regression
+passed. One timed walking segment entered custody and is not uninterrupted
+traversal evidence. The worst initial-flight interval was 1.3 seconds.
+
+A separate source screenshot shows an abnormal downtown road cut despite a
+passing street test. Exact packaged road/terrain/sidewalk provenance is being
+captured before choosing a repair. Do not remove genuine bridge/tunnel cuts or
+apply the already-disabled residual street-propagation repair again.
+
+This is **not production ready**. Ordinary hosted voyage/save and current-image
+review also remain open. Canonical staging still serves 1f37 at
 https://we3d-staging-20260712.web.app/app/. Production is unchanged at 5.5.1.
 Use docs/RELEASE_SOURCE_OF_TRUTH.md and the October 14 READINESS ledger; historical
 package identities below are not current acceptance.

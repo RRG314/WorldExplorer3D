@@ -1,4 +1,5 @@
 import {prepareTransportDetail} from './transport-detail-runtime.js';
+import {createNumericPublicationStore} from '../structure-semantics/numeric-publication.js';
 import {createPortalSurfaceClipper} from './portal-surface-clip.js';
 import {createRegionalRoadContact} from './regional-road-contact.js';
 import {transportRegionKey} from './transport-detail-plan.js';
@@ -345,12 +346,13 @@ export function finalizeRoadTerrainConformanceAudit(audit) {
   });
 }
 
-function mapPublishedPointsToCrossSectionWidths(feature, publishedPoints) {
+function mapPublishedPointsToCrossSectionWidths(feature, publishedPoints, publicationStorage) {
   const sourcePoints = feature?.pts;
   if (!Array.isArray(sourcePoints) || sourcePoints.length < 2 || !Array.isArray(publishedPoints)) {
     return null;
   }
-  const widths = new Float32Array(publishedPoints.length);
+  const {buffer, byteOffset} = publicationStorage.allocate(publishedPoints.length * Float32Array.BYTES_PER_ELEMENT);
+  const widths = new Float32Array(buffer, byteOffset, publishedPoints.length);
   let sourceSegmentIndex = 0;
   for (let index = 0; index < publishedPoints.length; index += 1) {
     const point = publishedPoints[index];
@@ -549,6 +551,10 @@ export async function publishCompiledTransportMeshes(deps = {}) {
   let detail=null;
   const initialRegionKeys=new Set();
   await measureAsync('buildStructureRibbons', async () => {
+    // These immutable width views belong to one terrain publication, including
+    // its later region arrivals. No region recycles its neighbors' storage.
+    const publicationStorage = createNumericPublicationStore();
+    try {
     let sliceStartedAt = now();
     const publishedSharedSurfaces = new Set();
     for (let roadIndex = 0; roadIndex < baseRoads.length; roadIndex += 1) {
@@ -575,7 +581,7 @@ export async function publishCompiledTransportMeshes(deps = {}) {
       const pts = basePts;
       if (!Array.isArray(pts) || pts.length < 2) continue;
       if(renderRoad.structureSemantics?.terrainMode==='at_grade'&&renderRoad.transportSurfaceModel?.engineeredApproach!==true) {
-        atGradeRoads.push({road:renderRoad,points:pts,widths:sharedSurface ? null : mapPublishedPointsToCrossSectionWidths(road,pts)});
+        atGradeRoads.push({road:renderRoad,points:pts,widths:sharedSurface ? null : mapPublishedPointsToCrossSectionWidths(road,pts,publicationStorage)});
         // Keep the independent profile audit after retiring per-road meshes.
         // Sample each source's cross-section; agreement among rendered layers
         // must not hide departure from the intended transport profile.
@@ -646,6 +652,7 @@ export async function publishCompiledTransportMeshes(deps = {}) {
         sliceStartedAt = now();
       }
     }
+    } finally { publicationStorage.release(); }
   });
   await yieldToMainThread();
 

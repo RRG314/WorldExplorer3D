@@ -13,7 +13,7 @@ production changes. A version label or preview URL alone does not identify code.
 | Production Firebase project | `worldexplorer3d-d9b83` |
 | Canonical staging frontend | `5.6.1+1f37e893ccae.3e39c25a98b5a66f.staging` |
 | Staging Firebase project | `we3d-staging-20260712` |
-| Current local candidate | Construction-storage source; final package verification in progress |
+| Current local candidate | `5.6.1+f3ac508d2bd9.a76b6be179dcf332.staging` |
 | Preserved road-safe fallback | `5.6.1+b21b7f12fdfa.31ed9b1212c5002c.staging` |
 | Release branch | `stable` (default; no `main` branch) |
 | Active development branches | `steven/visual-quality`, `steven/post-5.2-release-integration` |
@@ -28,6 +28,19 @@ Chrome successfully searches Baltimore. A clean automated browser is rejected
 by reCAPTCHA, so its complete shared-voyage/save-recovery check remains open.
 
 ## Verification and rollback
+
+Current f3ac package: all three backend gates and the four-stage actual released
+5.5.1/candidate/compatible b21 rollback/candidate save journey pass. The complete
+candidate run finished at 03:11 UTC October 15 with **103 of 107 gates passing**.
+Regional arrival was blocked before launch by its disk guard; city-switch
+cancellation accounting and district activity admission require diagnosis;
+native desktop timing fails, including a 1.3-second first-flight interval.
+Twelve reloads, cleanup, coverage and touch regression pass. A separate downtown
+street image also needs correction after exact packaged-scene reproduction.
+These are not production-ready results. See the current READINESS section for
+the preserved receipts and remaining hosted/review requirements.
+
+### Historical comparison (not current acceptance)
 
 The complete 376 candidate matrix finished **101 of 107 gates passing**. Its
 failed receipts remain preserved. The preserved b21 candidate fixes the reproduced

@@ -1,6 +1,6 @@
 import { vehicleWheelContactLayout } from './vehicle-catalog.js?v=6';
 
-// Sampling metadata is immutable; each solve keeps its own height buffer so a
+// Sampling metadata is immutable; each solve keeps its own height values so a
 // surface callback can safely invoke another contact solve.
 const WHEEL_CONTACTS = Object.freeze([
   Object.freeze({front: -1, side: -1}), Object.freeze({front: -1, side: 1}),
@@ -45,7 +45,10 @@ function resolveVehicleRoadContactPose(options = {}) {
   // Wheel positions change in X/Z when the chassis pitches and rolls. Sampling
   // the unrotated footprint then rotating only Y made long vehicles float on
   // grades even when the published road was a perfectly planar surface.
-  const heights = new Float64Array(4);
+  // Four local JS numbers retain double precision and reentrant ownership.
+  // A native ArrayBuffer here created one sweepable backing store per NPC
+  // per frame, even though these values never leave this synchronous solve.
+  const heights = [0, 0, 0, 0];
   const footprint = (pitch, roll) => {
     let valid = true;
     for (let index = 0; index < 4; index += 1) {

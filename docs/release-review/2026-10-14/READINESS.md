@@ -1,12 +1,117 @@
 # October 14 production candidate
 
+## October 15 — remaining collector work and regional numeric storage
+
+The facility-scope repair remains a confirmed retention improvement, not a
+frame-pacing fix by itself. Its native source flight still recorded 966.6 ms
+and 633.3 ms intervals; walking/driving also exceeded short-window timing limits.
+Coverage, activation, occupied memory and browser/local resource checks passed.
+The flight used no CPU/heap/collector profiler or forced collection during timing.
+
+The constructor evidence also identifies per-ring geographic index buffers and
+per-road published width arrays. These now use separate per-publication bounded
+append-only stores. They preserve Float64 geographic coordinates, Float32 road
+width rounding, holes, crossings, all features and ownership on cancellation.
+A new regression exercises concavity, malformed edges, flat-scan fallback,
+source retirement and later generations against the original crossing predicate.
+All 41 focused checks and all 2,637 source tests plus the full structural chain
+pass. Frozen artifact checks and pacing remain unverified. Production has not changed.
+
+## October 15 — facility callback released the load context
+
+One persistent facility terrain callback was created inside the per-load block.
+It now lives in the stable loader scope, retaining the same dynamic terrain
+method/receiver while no longer retaining that block's source maps. In sequential
+current-source allocation diagnostics, explicit post-load collection falls from
+615,743,540 to 488,054,072 bytes. Sampled retained regional source copies, node
+lookup and Overture conversion allocations disappear. This is diagnostic
+retention evidence, not a native pacing pass; provider variation is possible.
+The separate uninstrumented 90-second flight completed with the failures recorded
+above. No profiling or forced collection ran during its timed gameplay.
+
+Evidence: `output/release-review/561-current-source-retained-allocation/`,
+`output/release-review/561-facility-scope-retained-allocation/comparison.json`.
+V8 documents shared closure environments at https://v8.dev/features/weak-references;
+that mechanism informed the investigation, while the app profile confirms the
+actual retained allocation difference. No feature or coverage was removed.
+
+## October 14 late continuation — demonstrated street and allocation repairs
+
+The original f3ac failures remain below and are not acceptance for these edits.
+The exact f3ac downtown capture reproduced a 4.17-unit cut in the main street,
+with 231 retaining-wall pieces. A tagged parking aisle contributed an oversized
+foundation roof constraint, which propagated through its connected approach.
+The obstruction/terrain sweep used a 95 cm lateral extension even though the
+published lining/portal outside extent is 37 cm. It now shares that physical
+extent, and explicit parking aisles use conservative 3.2-unit inferred headroom
+rather than deriving vehicle clearance from burial depth. This is representative
+parking geometry, not a surveyed reconstruction. Genuine road tunnel defaults,
+source tags, coverage, graph joins and foundation constraints remain in place.
+
+The source-world reproduction now has ordinary terrain-fitted Light Street,
+East Wine Court, Mercer Street and Redwood Street, no fabricated cut walls,
+and 0.254-unit maximum ordinary fitting cut on the main street. The prescribed
+keyboard movement completed; both before/after movement images were inspected;
+no page errors occurred. This is a controlled arrival plus short real input,
+not a whole-city or released-artifact certification.
+
+Constructor evidence also found intermediate profile publications, temporary
+walk/drive path distances, and per-NPC four-wheel height buffers. Compilation
+now passes bounded append-only publication storage explicitly through initial
+and reconciliation passes. Scratch and publication remain separate; no published
+range is reused/detached, and final profiles remain packed. Temporary route and
+wheel heights use ordinary double-precision numbers, avoiding native backing-store
+finalizers while retaining reentrant ownership and exact arithmetic.
+
+127 focused road/storage checks and all 2,636 source checks plus structural
+checks pass. The final source street capture and movement are visually verified.
+The 90-second native flight diagnostic still fails: its worst interval is
+1,333.3 ms, with seven intervals over 100 ms and two over 250 ms. Mode activation,
+coverage and retained-memory checks pass, but this is not release acceptance.
+A separate instrumented CPU/collector trace correlates the later flight pause
+with garbage collection; instrumentation changes timing and its collector log
+is truncated. It does not replace the native failure. Immutable packaging,
+matching full matrix, save rollback and hosted ordinary voyage remain pending.
+No runtime timing budget was changed. Production remains 5.5.1.
+Evidence: `output/release-review/561-parking-publication-source/`,
+`/tmp/we3d-transport-fix-tests.log`,
+`/tmp/we3d-parking-publication-final-pr.log`.
+
 The owner requested completion and production readiness after the isolated 5.5.1
 road-recovery deployment. Use the authorized location-based Earth fallback for
 this release. Moving scenery is optional and must not be represented as complete
 worldwide road, collision or activity streaming. Preserve the ongoing 5.6 venue,
 harbor, NASA, ocean and consolidation work; do not roll it back to the hotfix.
 
-## Current construction-storage candidate
+## Complete f3ac candidate run — October 15, 03:11 UTC
+
+Immutable build: `5.6.1+f3ac508d2bd9.a76b6be179dcf332.staging`.
+All three backend gates and the four-stage actual-release/candidate/compatible
+rollback/candidate save journey pass. The complete candidate run is **103/107**.
+The failed regional arrival check did not launch because disk headroom was below
+its unchanged guard. City-switch gameplay passed but two outgoing location
+requests aborted; their lifecycle accounting needs diagnosis. District activity
+admission timed out and still needs reproduction. Desktop performance failed.
+
+Native performance: 12 reload cycles preserve coverage and clear world owners;
+retained occupied memory and touch regression pass, with no browser/local
+resource errors. Desktop activation, percentiles and hitch criteria fail; the
+initial flight's worst interval is 1,300 ms. A sustained walking segment entered
+custody, so that traversal is explicitly failed as well. Host swap rose during
+the run; this observation alone does not identify the pause's cause.
+
+A green source street check nevertheless captured an abnormal downtown road
+cut. Packaged scene and exact source/terrain/profile evidence must establish the
+cause before altering shared bridge/tunnel rules. The unused residual surface
+propagation pass is already disabled; do not redo that historical repair.
+
+Preserved failures: `output/release-review/561-f3ac-first-matrix-failures/`.
+Sequence receipt: `output/release-review/construction-final-verification-sequence.json`.
+Focused diagnostics are separate from acceptance. Ordinary hosted voyage/save,
+repaired current-source acceptance and current-image review remain open.
+Production is still 5.5.1; staging is still 1f37. No promotion occurred.
+
+## Construction-storage implementation before the complete run
 
 All 2,633 source checks and the complete structural chain pass. Terrain request
 ownership remains repaired. Temporary transport profiles now use explicit,

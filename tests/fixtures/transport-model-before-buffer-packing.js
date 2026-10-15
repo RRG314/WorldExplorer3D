@@ -183,7 +183,9 @@ function compileTransportSurfaceModel(feature, sampleTerrainY, options = {}) {
   // Tunnel containment must sample the SAME outer roof extent as its shell
   // compiler, not just the carriageway edges on a steep cross-slope.
   const groundProbeHalfWidth = semantics.terrainMode === 'subgrade' && semantics.isTunnel
-    ? Math.max(3.4, compiledWidth) * 0.5 + 0.95
+    // Physical roof footprint correction also applies to this unpacked
+    // allocation oracle. Keep storage/precision independent of production.
+    ? Math.max(3.4, compiledWidth) * 0.5 + 0.37
     : halfWidth;
   const corridorCenterOffset = roadPlacementOffsetWorld(feature);
   const anchors = normalizeAnchors(feature, semantics, total);

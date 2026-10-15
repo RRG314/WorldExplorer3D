@@ -119,9 +119,9 @@
     "app/js/world/compiler/transport-surface-model.js": {
       "before": "f2d575773a84b397198c954eebf02c830e393220af5e53452bc25401c034e2f3",
       "beforeMode": "100644",
-      "after": "10b136c94eef32c23e38c0d9255cb6ed1393f0b903b7a46006a6debade5b52c4",
+      "after": "b8b15bca3748aa31f1641339664218738cbfe1655ff05fa649c06eb6f4bc5f22",
       "afterMode": "100644",
-      "review": "Scopes temporary profile storage to one synchronous compilation and copies all accepted numeric fields into independently owned publication buffers. Reentrant terrain queries are isolated. Exact surface/metadata, road grade and tunnel containment regressions pass. No saved-field or protocol change."
+      "review": "Temporary solver storage remains scoped scratch; initial and reconciled published profiles can use bounded append-only pages without aliasing or detaching. Final packed profiles retain all numeric fields. Tunnel terrain probes use the corrected shared physical roof footprint. No saved data or protocol changes."
     },
     "app/js/world/retired-building-buffers.js": {
       "before": "05610e0943b074c71405480ae611c59aaf474cfba557e621fdf3b1e0f5a2431f",
@@ -143,6 +143,118 @@
       "after": "95b2ac08f3bc6d86d9fb1e1b526fdf4f501c2662af0714f4bb83c537c162245d",
       "afterMode": "100644",
       "review": "Passes the optional construction arena into generated mid-LOD bodies and their existing fallback. It does not change geometry, material selection, location identity or saved state."
+    },
+    "app/js/structure-semantics/numeric-publication.js": {
+      "before": null,
+      "beforeMode": null,
+      "after": "9725af3f4d61dd9aa73e678bbd5bb52421e93cf932ae573832fe1e7f7f57910a",
+      "afterMode": "100644",
+      "review": "Append-only bounded publication pages owned by a compilation. Published views are disjoint and never recycled or detached; only the current page is held by the allocator. No persisted fields or transport topology change."
+    },
+    "app/js/structure-semantics.js": {
+      "before": "5d7cfdf6c7a9473cc8dc0394d528ee1787b5fe1b9ab1604775f00a72acf93338",
+      "beforeMode": "100644",
+      "after": "1165d2482015cff7836d7d0a5b10170bcbdae1c6830f8f5f6efc67cf439a17c1",
+      "afterMode": "100644",
+      "review": "Passes explicit optional compilation storage through to the existing canonical profile compiler. Standalone callers retain independent storage. No saved fields or protocol change."
+    },
+    "app/js/structure-semantics/classification.js": {
+      "before": "6006093439bf083840f6c2997933038d4ec8f782eacfaff60a99459af53a0ac6",
+      "beforeMode": "100644",
+      "after": "813a6c53d60701c74f45b225f0ef225db6b287d2cc4569d60f4cff89dd5efed4",
+      "afterMode": "100644",
+      "review": "Preserves an explicit service=parking_aisle distinction in derived structure semantics. Does not alter source tags, tunnel classification, topology or persisted fields."
+    },
+    "app/js/world/compiler/tunnel-envelope.js": {
+      "before": "7697f7474a5c9b17997d6f0926a11aeaea8df16b57173cebd4ddbb7decfa0869",
+      "beforeMode": "100644",
+      "after": "bae3aa2ae715eb68534686e353c4703b568e25f115c35af56f06429281b266a9",
+      "afterMode": "100644",
+      "review": "Parking passages use the existing minimum walkable clearance independently of burial depth. Roof sweep width now matches the actual 2 cm lining offset plus 35 cm portal rim, instead of a fictitious 95 cm envelope. No source data or saved fields change."
+    },
+    "app/js/world/compiler/tunnel-obstruction-limits.js": {
+      "before": "06934cfb370ecc910cb9a85556582a09851c824889e58304072642756be3f925",
+      "beforeMode": "100644",
+      "after": "eaf529b180f3ee6853cbccbcfc3a0885ea78e180bf4e6cdff1c15275c847ee3e",
+      "afterMode": "100644",
+      "review": "Foundation and overhead-road overlap use the shared physical roof envelope. Buildings actually touched by the shell retain hard clearance bounds; adjacent buildings outside it no longer depress connected streets. No persisted fields change."
+    },
+    "app/js/world/compiler/tunnel-system-model.js": {
+      "before": "d97b81ffdf623ed212b0faa44c9ef92e69667ac0de1a9707fd95255256a159ca",
+      "beforeMode": "100644",
+      "after": "22ace19703103c850ae0dc97cf5a7813479f01d73f8442c73345709afb8d897d",
+      "afterMode": "100644",
+      "review": "Containment and portal placement use the same corrected roof extent as obstruction and profile compilation. Existing shell/portal authority and data ownership remain intact; no persistence change."
+    },
+    "app/js/world/compiler/transport-structure-model.js": {
+      "before": "0b7bf2f07eeb4ded6a855776098bfbc52f21b13ae7d21aa5bc65f69513e7bcb9",
+      "beforeMode": "100644",
+      "after": "353142dbf0f6964c5a496016c1653bc8c38b120d79a8f5cfe4783ea8bbc5555c",
+      "afterMode": "100644",
+      "review": "Parking tunnel specification reads the canonical parking clearance. Other road/bridge specifications are unchanged. Derived model only; no persistence or backend changes."
+    },
+    "app/js/world/structure-aware.js": {
+      "before": "341ac181411259e570251f6be0b03cb29e0403f817431eb8f3e8afe0b5597ee2",
+      "beforeMode": "100644",
+      "after": "2b009daffff77af60731729bf6ae7985fede3e5790bdba02cbd3e6770f19bb05",
+      "afterMode": "100644",
+      "review": "One explicit append-only publication store per structure compilation, shared across provisional reconciliation passes and released after final packing. No global allocation owner or terrain/topology policy changes. No persistence changes."
+    },
+    "app/js/world/load-road-pass.js": {
+      "before": "f546dbd40226a800f8fabe27148531c53c4408f5147daedbcddbcda6f0de863e",
+      "beforeMode": "100644",
+      "after": "41bf7f2a30c4ec072a1349a0360fe5d43b0d0daa0d3791b9e541f8d09efd0188",
+      "afterMode": "100644",
+      "review": "Initial road compilation uses a pass-owned bounded publication store across cooperative yields. All accepted profiles and source coverage are retained; no player data or road identity changes."
+    },
+    "app/js/world/load-linear-runtime.js": {
+      "before": "dfa3c3b064fdb2853e060b4f9424d918d30e469eca5e41b96f615bc7072614f2",
+      "beforeMode": "100644",
+      "after": "847e5d1eb72f0562e51550c5aba62700c609b099d648af18986b4a054868a4aa",
+      "afterMode": "100644",
+      "review": "Immediate linear-feature compilation passes a bounded publication store explicitly to each record. Standalone additions remain independently allocated. All feature identity/access/topology and saved data are unchanged."
+    },
+    "app/js/world/traversal.js": {
+      "before": "188c32ddeae2499ad5592946faee62c31ff6467d7ec2694752e1c9dc1793d94d",
+      "beforeMode": "100644",
+      "after": "cf34041192dbb6a6a08189033a1a8565bc3e521fb195dba34f89ca93894e9c29",
+      "afterMode": "100644",
+      "review": "Temporary per-feature path distances use ordinary double-precision JS numbers rather than native backing buffers. Node positions, source intervals, one-way edges, weights and published route graphs are unchanged. No saved data."
+    },
+    "app/js/engine/vehicle-road-attitude.js": {
+      "before": "7ebccc535ebfc94b1ccde1f714c2ddb203bb440351e79c2e45a3346269bec54e",
+      "beforeMode": "100644",
+      "after": "1825d7c00285443aa48becc095ffc031b644422f2253cb77b1efe2576ae75bcd",
+      "afterMode": "100644",
+      "review": "Four private double-precision JS height values replace one native buffer per NPC contact solve per frame. Sampling order, iterative contact math, reentrant callbacks, final pose and anomaly records are unchanged. No persistence change."
+    },
+    "app/js/world/load-roads.js": {
+      "before": "c5595d7b4ef2fe0d86ce0d5a55237cdfe07fede35f4794c1c975752eb8df6d32",
+      "beforeMode": "100644",
+      "after": "7d64e97cf008617fcd74df57616bd1b757f47a8fee6ec0ce665c1041ed616ceb",
+      "afterMode": "100644",
+      "review": "Creates the retained facility terrain callback in the stable loader scope instead of the per-load source context. Same dynamic terrain method, arguments, receiver and return value. Current-source retained-allocation comparison releases about 128 MB including raw regional and building-provider records. No geometry, coverage, persisted state or backend contract changes; native pacing still requires verification."
+    },
+    "app/js/terrain/geographic-ring-index.js": {
+      "before": "d9f0d56adb7dde56afa27adcadb7b00047958f7d5acea90d940a7c85432975f9",
+      "beforeMode": "100644",
+      "after": "01785da05210933b2294d7322b99f7654cdc699d747ab8f46211c106b8852792",
+      "afterMode": "100644",
+      "review": "Optional append-only publication storage for the same Float64 geographic edges and Uint32 bins. Exact crossing expressions and fallback order preserved; immutable edge count avoids retaining the input ring. No data/coverage/save changes."
+    },
+    "app/js/terrain/far-field-mapped-context.js": {
+      "before": "87303f45c4f093a4d9c5204c3599631064efeb00e9551dc5e81fd2ab15dd7e2a",
+      "beforeMode": "100644",
+      "after": "2a97bced3ad99c22a72bd626711a96eb385178ff463ff04b60849122cdd3c4a1",
+      "afterMode": "100644",
+      "review": "Each loaded land/water context owns bounded append-only pages for immutable ring acceleration data. Release drops only allocator references; retained views are never recycled or detached. Geometry, holes, land classification and coverage unchanged."
+    },
+    "app/js/terrain/rebuild.js": {
+      "before": "6b841f48d99f57212b261853debda746a152473b638ee5410a520f11c45ed30c",
+      "beforeMode": "100644",
+      "after": "62083f4637df1d48f9772527426084cca5c8982ae227320d2e1a4d212aef09f1",
+      "afterMode": "100644",
+      "review": "Published Float32 road-width samples use bounded append-only pages scoped to terrain publication and preserved through later region arrivals. Width calculation, rounding, rendered/physical road surfaces and region retirement unchanged."
     }
   }
 }

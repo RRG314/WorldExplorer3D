@@ -6,6 +6,8 @@ import {attachCompiledTransportSurface} from '../app/js/world/compiler/transport
 import {buildTransportContinuityRepairAnchors,auditTransportJunctionContinuity} from '../app/js/world/compiler/transport-junction-profile.js';
 import {sampleFeatureSurfaceY} from '../app/js/structure-semantics.js';
 import {smoothGradeLimitedProfile,reconcileExactGraphNodeConstraints} from '../app/js/world/compiler/transport-surface-profile.js';
+import {classifyStructureSemantics} from '../app/js/structure-semantics/classification.js';
+import {tunnelRoofHalfWidth, tunnelClearance} from '../app/js/world/compiler/tunnel-envelope.js';
 
 const box = (x0, x1, z0, z1, minY = 38.2082) => ({minY, pts: [{x:x0,z:z0},{x:x1,z:z0},{x:x1,z:z1},{x:x0,z:z1}]});
 const road = () => ({pts:[{x:0,z:0},{x:200,z:0}], width:6, type:'primary',
@@ -23,7 +25,7 @@ test('inserting closely spaced graph stations cannot turn a straight grade into 
 
 test('foundation footprint, including the roof edge, owns tunnel clearance without clipping neighboring buildings', () => {
   const feature = road();
-  const limits = compileTunnelObstructionLimits(feature, () => [box(90,110,-10,10),box(50,60,3.8,8,42),box(20,30,5,9,10)]);
+  const limits = compileTunnelObstructionLimits(feature, () => [box(90,110,-10,10),box(50,60,3.3,8,42),box(20,30,3.8,9,10)]);
   assert.equal(limits.length,2);
   assert.ok(Math.abs(tunnelObstructionMaximumY(limits,100)-32.7882)<1e-6);
   assert.ok(Number.isFinite(tunnelObstructionMaximumY(limits,55)),'outer shell must also clear the building');
@@ -31,6 +33,40 @@ test('foundation footprint, including the roof edge, owns tunnel clearance witho
   assert.equal(tunnelObstructionMaximumY(limits,150),Infinity);
   assert.equal(compileTunnelObstructionLimits({...feature,structureSemantics:{terrainMode:'at_grade'}},()=>[box(0,200,-10,10)]).length,0);
   assert.equal(compileTunnelObstructionLimits({...feature,transportRecord:{routeState:'incomplete'}},()=>[box(0,200,-10,10)]).length,0);
+});
+
+test('a narrow parking entry preserves its public street instead of excavating a neighboring block', () => {
+  const tunnel={...road(),pts:[{x:13,z:0},{x:43,z:0}],width:2.7,
+    structureSemantics:classifyStructureSemantics({highway:'service',service:'parking_aisle',tunnel:'yes'})};
+  assert.equal(tunnelClearance(tunnel.structureSemantics),3.2);
+  assert.equal(tunnelClearance(road().structureSemantics),4.35,'ordinary road tunnels retain their vehicle envelope');
+  assert.ok(Math.abs(tunnelRoofHalfWidth(tunnel.width)-2.07)<1e-9);
+  tunnel.tunnelObstructionLimits=compileTunnelObstructionLimits(tunnel,()=>[
+    box(13,38,2.1,12,5),box(38,43,2,12,5)]);
+  assert.equal(tunnel.tunnelObstructionLimits.length,1,'adjacent building outside the real shell is not a roof');
+  assert.equal(tunnel.tunnelObstructionLimits[0].start,25);
+  const street={...road(),pts:[{x:0,z:-100},{x:0,z:100}],structureSemantics:{terrainMode:'at_grade'},width:7};
+  const entry={...street,pts:[{x:0,z:0},{x:13,z:0}],type:'service',width:2.7};
+  const features=[street,entry,tunnel],ground=()=>5;
+  for(const [index,f] of features.entries()) {f.sourceFeatureId=`parking-${index}`;f.transportGraphRef={featureId:f.sourceFeatureId};f.structureTransitionAnchors=[];}
+  const compile=f=>attachCompiledTransportSurface(f,compileTransportSurfaceModel(f,ground,{sampleStep:2}));
+  features.forEach(compile);
+  const side=(f,d,endpoint,p)=>({featureId:f.sourceFeatureId,distanceAlong:d,endpoint,point:p,segmentIndex:0,segmentT:d/(f===street?200:f===entry?13:30)});
+  const network={connections:[
+    {id:'street',left:side(street,100,'interior',{x:0,z:0}),right:side(entry,0,'start',entry.pts[0])},
+    {id:'portal',left:side(entry,13,'end',entry.pts[1]),right:side(tunnel,0,'start',tunnel.pts[0])}]};
+  const original=[...street.transportSurfaceModel.centerHeights];
+  for(let pass=0;pass<4;pass++) {
+    const result=buildTransportContinuityRepairAnchors(features,network,sampleFeatureSurfaceY,{sampleTerrainY:ground});
+    for(const [f,anchors] of result.anchorsByFeature) {
+      const distances=new Set(anchors.map(a=>a.distance));
+      f.structureTransitionAnchors=f.structureTransitionAnchors.filter(a=>!distances.has(a.distance)).concat(anchors);compile(f);
+    }
+  }
+  assert.deepEqual([...street.transportSurfaceModel.centerHeights],original,'private access must not sink the through street');
+  assert.equal(auditTransportJunctionContinuity(features,network,sampleFeatureSurfaceY).discontinuityCount,0);
+  assert.ok(entry.transportSurfaceModel.stats.maximumGrade<=.08501);
+  for(let d=25;d<=30;d+=.1) assert.ok(sampleTransportSurfaceAtDistance(tunnel.transportSurfaceModel,d,0)<=.73001);
 });
 
 test('sloping tunnel remains below the whole foundation with a grade-limited entry and exit', () => {

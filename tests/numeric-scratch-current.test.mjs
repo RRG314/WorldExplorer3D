@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createNumericScratchPool} from '../app/js/structure-semantics/numeric-scratch.js';
+import {createNumericPublicationStore} from '../app/js/structure-semantics/numeric-publication.js';
 import {compileTransportSurfaceModel as compile} from '../app/js/world/compiler/transport-surface-model.js';
 import {compileTransportSurfaceModel as reference} from './fixtures/transport-model-before-buffer-packing.js';
 
@@ -52,4 +53,33 @@ test('roads, bridges and tunnels keep exact published profiles across scratch re
     assert.throws(()=>compile(feature,()=>{throw Error('missing terrain');}),/missing terrain/);
   }
   for(const {actual,copy} of published)assert.deepEqual(actual,copy,'Later compilations cannot overwrite a published surface');
+});
+
+test('compilation publication pages preserve every road across retries, yields and retirement', async () => {
+  const publicationStorage=createNumericPublicationStore({pageBytes:4096}), published=[], buffers=new Set();
+  for(let i=0;i<200;i++) {
+    const feature={id:`page-${i}`,width:6,pts:[{x:0,z:0},{x:20+i%7,z:2}],
+      structureSemantics:{terrainMode:['at_grade','elevated','subgrade'][i%3]},structureTransitionAnchors:[]};
+    const ground=(x,z)=>13+x*.01+z*.02;
+    const actual=compile(feature,ground,{publicationStorage});
+    assert.deepEqual(actual,reference(feature,ground));
+    published.push({actual,copy:structuredClone(actual)});buffers.add(actual.distances.buffer);
+    assert.throws(()=>compile(feature,()=>{throw Error('aborted');},{publicationStorage}),/aborted/);
+    if(i%10===0)await Promise.resolve();
+  }
+  assert.ok(buffers.size<80,'intermediate profiles must share bounded native storage');
+  for(const buffer of buffers)assert.equal(buffer.byteLength,4096);
+  publicationStorage.release();
+  const next=publicationStorage.allocate(4000);new Uint8Array(next.buffer,next.byteOffset,4000).fill(255);
+  for(const {actual,copy} of published)assert.deepEqual(actual,copy,'retirement/retry cannot overwrite old publications');
+});
+
+test('oversized publications have independent storage and never pin a growing city arena', () => {
+  const storage=createNumericPublicationStore({pageBytes:64});
+  const a=storage.allocate(12),large=storage.allocate(10000),b=storage.allocate(24);
+  assert.equal(a.buffer,b.buffer);assert.equal(b.byteOffset,16);
+  assert.notEqual(a.buffer,large.buffer);assert.equal(large.buffer.byteLength,10000);
+  assert.throws(()=>storage.allocate(-1),/Invalid/);
+  assert.throws(()=>storage.allocate(1.5),/Invalid/);
+  assert.throws(()=>createNumericPublicationStore({pageBytes:7}),/Invalid/);
 });

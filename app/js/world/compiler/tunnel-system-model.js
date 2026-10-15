@@ -3,7 +3,7 @@ import {
   segmentIntersection2D
 } from '../../structure-semantics/geometry.js?v=2';
 import { sampleTransportSurfaceAtDistance } from './transport-surface-model.js?v=25';
-import { tunnelClearance, TUNNEL_ROOF_THICKNESS, MINIMUM_TUNNEL_ROOF_COVER } from './tunnel-envelope.js';
+import { tunnelClearance, tunnelRoofHalfWidth, TUNNEL_ROOF_THICKNESS, MINIMUM_TUNNEL_ROOF_COVER } from './tunnel-envelope.js';
 import { compileTunnelWallOpenings } from './tunnel-junction-openings.js';
 
 // A shell roof that merely touches the sampled terrain is visibly exposed by
@@ -292,7 +292,7 @@ export function compileTunnelSystemModel(feature, sampleTerrainY, options = {}) 
   const roofThickness = TUNNEL_ROOF_THICKNESS;
   // Include the outside face of the published wall, not merely the interior
   // roof edge, so a shell cannot escape from a steep downhill cross-slope.
-  const roofHalfWidth = width * 0.5 + 0.95;
+  const roofHalfWidth = tunnelRoofHalfWidth(width);
   const stationStep = Math.max(1.5, Math.min(4, width * 0.42));
   const stationCount = Math.max(2, Math.ceil(total / stationStep));
   const samples = [];
