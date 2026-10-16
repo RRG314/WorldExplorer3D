@@ -1,10 +1,13 @@
 # Release source identities
 
-## Current observation — October 15, 2026
+## Current observation — October 16, 2026
 
-Production is **5.5.1**, verified from its live build manifest. The complete
-**5.6.1** candidate remains under verification; its local improvements are not
-production changes. A version label or preview URL alone does not identify code.
+Production remains **5.5.1**, confirmed by the live Hosting release API. Both
+production URLs now return HTTP 509 `Quota Exceeded`, so their manifests are
+currently inaccessible. Account configuration is under owner review; private
+account details are excluded from tracked release records. No account mutation or new
+production deployment has occurred. The complete **5.6.1** candidate remains
+under verification. A version label or preview URL alone does not identify code.
 
 | Reference | Build or source |
 | --- | --- |
@@ -13,7 +16,7 @@ production changes. A version label or preview URL alone does not identify code.
 | Production Firebase project | `worldexplorer3d-d9b83` |
 | Canonical staging frontend | `5.6.1+a0e20c35eab7.aa4dd9dce23502b0.staging` |
 | Staging Firebase project | `we3d-staging-20260712` |
-| Current frozen candidate | `5.6.1+296fb8a6dcf9.de50589d9d91a0d4.staging` |
+| Current frozen candidate | `5.6.1+b272ed7a58c1.a128f12ee0cbf660.staging` |
 | Preserved road-safe fallback | `5.6.1+b21b7f12fdfa.31ed9b1212c5002c.staging` |
 | Release branch | `stable` (default; no `main` branch) |
 | Active development branches | `steven/visual-quality`, `steven/post-5.2-release-integration` |
@@ -24,12 +27,34 @@ production changes. A version label or preview URL alone does not identify code.
 
 Canonical staging now serves the a0e20c35 package; both hosted manifests match
 local bytes. Production and backend origin restrictions were not changed.
-Ordinary Chrome opens the menu, enters guided Baltimore, displays live weather
-and starts field photography. This is not complete account/shared-voyage/save
+Before the billing incident, ordinary Chrome opened the menu, entered guided
+Baltimore, displayed live weather and started field photography. This is not complete account/shared-voyage/save
 acceptance. The earlier clean automated browser's reCAPTCHA rejection was not
 bypassed; that separate hosted journey remains open.
 
 ## Verification and rollback
+
+The b272ed7a package verifies 754 files and its exact 64-file rollback review.
+Both active development branches contain the source. Its complete performance
+run passes all twelve reload cycles, memory/coverage/resource limits and touch
+regression, but fails desktop ground pacing and uninterrupted traversal. All
+flight windows pass; a 550 ms walking interval and a later traffic/custody
+interruption remain in the failed record. The 31 original receipt files are
+preserved with verified hashes. No production promotion is permitted by these
+results.
+
+Subsequent source moves the existing exact Float32 pavement indexing into the
+existing worker, transferring private construction buffers. It passes 76 focused
+checks and all 2,691 source tests. Native short walking/driving and a 90-second
+flight pass; the 90-second walk still has a 117–150 ms pause cluster. No browser
+exception or gameplay interruption occurs, but live service errors remain.
+The current image and prescribed keyboard action were reviewed. This focused
+diagnostic does not include complete mixed-route/reload acceptance.
+It is not in the frozen package or hosted staging. Account resolution also
+blocks current live-service acceptance. The remaining complete-candidate,
+backend/save and hosted checks must use the final candidate's exact identity.
+
+### Earlier geometry repair checkpoints (historical)
 
 Subsequent local geometry-storage repairs pass 2,687 source tests and exact
 clipping comparisons. Their native long-walk window passes, while flight and a

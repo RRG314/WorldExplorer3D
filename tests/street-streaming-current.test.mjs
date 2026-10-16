@@ -6,6 +6,29 @@ import {updateStreetOverviewFrame,updateStreetPavementFocus,prepareInitialStreet
 import {createStreetOverview} from '../app/js/world/street-overview.js';
 import {prepareStreetPavement} from '../app/js/world/compiler/street-pavement.js';
 import {createPavementBaseSampler} from '../app/js/world/pavement-height-sampler.js';
+import {indexPavementPositions} from '../app/js/world/pavement-indexed-mesh.js';
+
+test('actual pavement worker transfers exact final indexes and recovers after invalid input',{timeout:30000},async t=>{
+ const url=new URL('../app/js/world/compiler/street-pavement-worker.js',import.meta.url).href;
+ const code=`const {parentPort}=require('node:worker_threads');globalThis.self={postMessage:(m,transfer)=>parentPort.postMessage(m,transfer)};import(${JSON.stringify(url)}).then(()=>parentPort.on('message',data=>self.onmessage({data})));`;
+ const worker=new NodeWorker(code,{eval:true});t.after(()=>worker.terminate());
+ const request=(data,transfer=[])=>new Promise((resolve,reject)=>{worker.once('message',resolve);worker.once('error',reject);worker.postMessage(data,transfer);}).finally(()=>worker.removeAllListeners('error'));
+ const invalid=await request({type:'index',positions:new Float64Array(9)});
+ assert.equal(invalid.type,'error');assert.match(invalid.message,/Float32/);
+ const malformed=await request({type:'index',positions:new Float32Array(4)});
+ assert.equal(malformed.type,'error');assert.match(malformed.message,/triangle/);
+ for(const triangles of [0,200,23000]){
+  const source=new Float32Array(triangles*9);
+  for(let i=0;i<triangles;i++)source.set([i*2,0,0,i*2,.25,1,i*2+1,-0,0],i*9);
+  const expected=indexPavementPositions(source),snapshot=source.slice();
+  const pending=request({type:'index',positions:source},[source.buffer]);
+  assert.equal(source.byteLength,0,'Sender relinquishes the private construction buffer');
+  const result=await pending;assert.equal(result.type,'indexed');
+  assert.deepEqual(result.positions,expected.positions);assert.deepEqual(result.indices,expected.indices);
+  assert.equal(result.collapsedTriangles,expected.collapsedTriangles);
+  for(let i=0;i<result.indices.length;i++)for(let axis=0;axis<3;axis++)assert.equal(result.positions[result.indices[i]*3+axis],snapshot[i*3+axis]);
+ }
+});
 
 test('packet cache is bounded, rejects changed inputs and never returns mutable retained arrays',()=>{
  const cache=new StreetPacketCache(1200);

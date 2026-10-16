@@ -1,5 +1,38 @@
 # October 14 production candidate
 
+## October 16 — current blockers
+
+Production still points to the October 14 **5.5.1** road-continuity hotfix,
+Hosting version `0a6f60dd9f3488f6`. Both live domains now return HTTP 509
+`Quota Exceeded`; the Hosting API is enabled. Account configuration is under
+owner review. Private account details are excluded from tracked release records,
+and no account or deployment mutation was made.
+Reverting to 5.5.0 would remove the hotfix without resolving the quota condition.
+
+Frozen candidate `5.6.1+b272ed7a58c1.a128f12ee0cbf660.staging` verifies all 754
+files. Its complete packaged performance run finished in 36 minutes without a
+resource or timeout stop. All twelve reload cycles, resource/cleanup/coverage
+limits and touch regression pass. Desktop ground pacing still fails, including
+a 550 ms walking interval; a later ordinary traffic/custody interruption is also
+recorded as a failure. All flight windows pass. The 31 original receipt files
+are preserved with verified hashes under
+`output/release-review/561-b272ed7a-performance-preserved/`.
+
+The subsequent worker-indexing source change preserves exact geometry and moves
+index construction scratch off the UI thread. Actual-worker transfers and
+publication cancellation/failure checks pass; the full source chain passes
+**2,691 tests**. Native source travel loads in 105.9 seconds. Short walking/driving
+and the 90-second flight pass; sustained walking still has a cluster of three
+117–150 ms intervals. There are no browser exceptions or gameplay interruptions.
+The prescribed keyboard action and image were inspected. Weather/marine/place
+requests return 500/503 during the Hosting incident. Unrun reload/mixed-route
+checks in this focused diagnostic are not passes. Evidence:
+`output/release-review/561-worker-index-native-walk/`.
+This is not a claim that all gameplay pauses are fixed. The package, complete 107-gate matrix, backend/save
+acceptance and ordinary hosted account/voyage checks must be refreshed after the
+repair is verified. Account resolution currently blocks live-service acceptance.
+The older entries below are historical evidence, not current passing status.
+
 ## October 15 — subsequent geometry allocation repair
 
 The next source checkpoint passes all **2,687 source tests** and the full

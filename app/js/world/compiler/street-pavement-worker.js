@@ -1,9 +1,16 @@
 import { prepareStreetPavement, compilePavementTile, meshPavementTile } from './street-pavement.js';
 import { serializeStreetPavementFingerprint } from './street-pavement-fingerprint.js';
+import { indexPavementPositions } from '../pavement-indexed-mesh.js';
 let plan = null, cursor = 0, debug = false, cached={};
 self.onmessage = async ({ data }) => {
   try {
-    if (data.type === 'prepare') {
+    if (data.type === 'index') {
+      // Final batches have one owner. Transfer their storage back after exact
+      // render-precision indexing; compilation scratch stays off the UI thread.
+      if (!(data.positions instanceof Float32Array)) throw new TypeError('Pavement indexing requires Float32 positions');
+      const indexed = indexPavementPositions(data.positions);
+      self.postMessage({type:'indexed',...indexed},[indexed.positions.buffer,indexed.indices.buffer]);
+    } else if (data.type === 'prepare') {
       debug = data.debug === true; cached=data.cached||{};plan = prepareStreetPavement(data.input); cursor = 0;
       // Consume retained cells before misses can evict them from the bounded
       // cache. A sequential scan larger than the cache otherwise misses every

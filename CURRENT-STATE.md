@@ -1,8 +1,42 @@
 # Current development and release state
 
-Updated October 15, 2026. **5.5.1 is deployed to production.**
+Updated October 16, 2026. **5.5.1 is the production release; live access is blocked by a Hosting quota error.**
 Release: https://github.com/RRG314/WorldExplorer3D/releases/tag/v5.5.1
 Public project page: https://rrg314.github.io/WorldExplorer3D/
+
+## October 16 — authoritative current status
+
+Both production domains return HTTP 509, `Quota Exceeded`. Read-only Hosting
+inspection confirms the October 14 hotfix is still the live release, version
+`0a6f60dd9f3488f6`; no 5.6 candidate has replaced it. The Hosting API remains
+enabled. Account configuration is under owner review; private account details
+are excluded from tracked release records. Reverting frontend files would not
+reset the transfer quota and would remove the already deployed road-recovery
+fix. No account change or further deployment has been made. Local evidence:
+`output/release-review/561-production-availability-20261016/observation.json`.
+
+The current frozen candidate is
+`5.6.1+b272ed7a58c1.a128f12ee0cbf660.staging`, with all 754 files verified.
+Its full packaged performance run finished without a resource or timeout stop.
+Twelve reload/cleanup cycles, memory, coverage, transfer and touch checks pass;
+desktop ground traversal still pauses, including a 550 ms walking interval.
+A later traffic/custody interruption also prevents uninterrupted-traversal
+acceptance. All flight windows pass. The failed run is preserved in
+`output/release-review/561-b272ed7a-performance-preserved/`; it is not a release
+pass. Both development branches contain b272ed7a; canonical staging remains a0.
+
+A subsequent source change moves exact pavement indexing into the existing
+owned worker using transferred private buffers. It retains the accepted surface
+on failure, cancellation or supersession. All 76 focused checks and the full
+2,691-test source chain pass. Native source travel loads in 105.9 seconds; short
+walking/driving and a 90-second flight pass, but the 90-second walk has a cluster
+of 117–150 ms intervals. No browser exception or gameplay interruption occurs.
+Live weather/marine/place services return 500/503 errors during the Hosting
+incident. The prescribed keyboard action and current image were reviewed.
+This focused run omits reload/mixed-route acceptance and is not a release pass.
+The change is not in the frozen package or hosted releases. Final packaged performance,
+backend/save and complete-candidate acceptance remain open. The dated sections
+below are historical checkpoints and do not override this status.
 
 ## October 14 production road continuity hotfix
 
@@ -13,8 +47,8 @@ Production is now **5.5.1**, build
 It was isolated from actual production d8775a39, not built from unreleased 5.6.
 The hotfix branch is `steven/road-continuity-hotfix`. Its immutable production
 package is in the road-continuity-hotfix worktree's `dist`; architecture-evaluation
-`dist` still preserves the previous 5.5.0 package. Live manifests match on both
-domains; prior Hosting version `1036aacf01a2b97d` remains the rollback.
+`dist` still preserves the previous 5.5.0 package. At deployment, live manifests
+matched on both domains; prior Hosting version `1036aacf01a2b97d` remains available.
 
 An engineered at-grade approach was already in the pinned contact index but was
 incorrectly required in a moving road packet. The resulting assertion killed the

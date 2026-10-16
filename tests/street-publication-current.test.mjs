@@ -5,6 +5,7 @@ import {execFileSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import { createRoadContactIndex } from '../app/js/terrain/road-contact-index.js?v=1';
 import { markGroundSurfaceChanged } from '../app/js/terrain/surface-revision.js';
+import { indexPavementPositions } from '../app/js/world/pavement-indexed-mesh.js';
 import { publishStreetPavement, updateStreetPavementFocus, ensureInitialStreetPavement } from '../app/js/world/street-pavement-runtime.js';
 
 function harness(t, mode='success') {
@@ -29,6 +30,12 @@ function harness(t, mode='success') {
     postMessage(data){if(mode==='clone-error')throw new Error('cannot clone source');if(data.type==='prepare')this.prepare=data.input;queueMicrotask(()=>{
       if(mode==='pending') return;
       if(mode==='failure') return this.onmessage({data:{type:'error',message:'invalid source polygon'}});
+      if(data.type==='index') {
+        if(mode==='cancel-index'){ctx._cancelStreetPavementBuild();return;}
+        if(mode==='stale-index')ctx._worldLoadSequence++;
+        if(mode==='failed-index')return this.onmessage({data:{type:'error',message:'indexing failed'}});
+        return this.onmessage({data:{type:'indexed',...indexPavementPositions(data.positions)}});
+      }
       if(data.type==='prepare') {this.cached=data.cached;if(mode==='stale')ctx._worldLoadSequence++;return this.onmessage({data:{type:'prepared',tiles:1}});}
       if(this.next++) return this.onmessage({data:{type:'complete'}});
       if(mode==='cache'&&this.cached['0:0']==='same-cell')return this.onmessage({data:{type:'cached',key:'0:0',fingerprint:'same-cell',completed:1,total:1}});
@@ -75,6 +82,17 @@ test('failed compilation retains the previously accepted render and contact publ
   await assert.rejects(publishStreetPavement(h.ctx),/invalid source polygon/);
   assert.equal(h.ctx.streetPavement,previous);assert.equal(removed,false);
   assert.equal(h.worker.terminated,true);assert.ok(h.resources.every(r=>r.disposed));
+});
+for(const mode of ['stale-index','cancel-index','failed-index'])test(`${mode} retains accepted pavement and releases unfinished indexing`,async t=>{
+  const h=harness(t,mode);let disposed=false;
+  const previous={meshes:[],sampleAt:()=>12,dispose(){disposed=true;}};
+  h.ctx.streetPavement=previous;
+  if(mode==='failed-index')await assert.rejects(publishStreetPavement(h.ctx),/indexing failed/);
+  else assert.equal(await publishStreetPavement(h.ctx),null);
+  assert.equal(h.ctx.streetPavement,previous);assert.equal(previous.sampleAt(0,0),12);
+  assert.equal(disposed,false);assert.equal(h.ctx.urbanSurfaceMeshes.length,0);
+  assert.equal(h.worker.terminated,true);assert.equal(h.ctx._cancelStreetPavementBuild,null);
+  assert.ok(h.resources.every(r=>r.disposed));
 });
 test('a superseded world cannot publish surfaces and releases its compilation resources',async t=>{
   const h=harness(t,'stale');assert.equal(await publishStreetPavement(h.ctx),null);

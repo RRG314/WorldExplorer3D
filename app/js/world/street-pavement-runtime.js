@@ -5,7 +5,6 @@ import {createPavementTerrainPartitionCooperatively} from './pavement-terrain-pa
 import { captureStreetSurfaceGeometry,serializeStreetSurfaceCapture } from './street-surface-capture.js';
 import { createRoadMarkingMaterial } from '../road-render.js?v=4';
 import { streetSourceInputCooperatively } from './street-source-input.js';
-import { indexPavementPositionsCooperatively } from './pavement-indexed-mesh.js';
 import { createPavementBaseSamplerCooperatively } from './pavement-height-sampler.js';
 import { assessStreetQuality } from './street-quality-assessment.js';
 import { auditStreetCoverage } from './street-coverage.js';
@@ -114,7 +113,7 @@ export async function publishStreetPavement(appCtx, options = {}) {
     worker.onmessage=null;worker.onerror=null;
   };
   appCtx._cancelStreetPavementBuild = cancelBuild;
-  const request = data => new Promise((resolve, reject) => {
+  const request = (data, transfer = []) => new Promise((resolve, reject) => {
     if (cancelled) { reject(new Error('Street compilation superseded')); return; }
     const cleanup = () => { clearTimeout(timeout); pendingRequest = null; worker.onmessage = null; worker.onerror = null; };
     pendingRequest = () => { cleanup(); reject(new Error('Street compilation superseded')); };
@@ -127,7 +126,7 @@ export async function publishStreetPavement(appCtx, options = {}) {
       }
       cleanup(); event.data.type === 'error' ? reject(new Error(event.data.message)) : resolve(event.data); };
     worker.onerror = event => { cleanup(); reject(new Error(event.message)); };
-    try { worker.postMessage(data); } catch (error) { cleanup(); reject(error); }
+    try { worker.postMessage(data, transfer); } catch (error) { cleanup(); reject(error); }
   });
   let input=null;
   let committed = false;
@@ -372,7 +371,10 @@ export async function publishStreetPavement(appCtx, options = {}) {
       chunks.length=0;batches.delete(key);
       if(!current()) {disposeStaged();return null;}
       if(!positions.length) continue;
-      const indexed=await indexPavementPositionsCooperatively(positions,schedule);
+      const indexed=await request({type:'index',positions},[positions.buffer]);
+      if(!current()) {disposeStaged();return null;}
+      if(indexed.type!=='indexed' || !(indexed.positions instanceof Float32Array) ||
+        !(indexed.indices instanceof Uint16Array || indexed.indices instanceof Uint32Array))throw new Error('Invalid indexed pavement response');
       const geometry=new THREE.BufferGeometry();
       geometry.setAttribute('position',new THREE.BufferAttribute(indexed.positions,3));
       geometry.setIndex(new THREE.BufferAttribute(indexed.indices,1));
