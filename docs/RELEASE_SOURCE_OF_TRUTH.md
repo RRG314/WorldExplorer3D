@@ -16,7 +16,7 @@ under verification. A version label or preview URL alone does not identify code.
 | Production Firebase project | `worldexplorer3d-d9b83` |
 | Canonical staging frontend | `5.6.1+a0e20c35eab7.aa4dd9dce23502b0.staging` |
 | Staging Firebase project | `we3d-staging-20260712` |
-| Current frozen candidate | `5.6.1+614b452a57ae.dde9743f81c8b8ef.staging` |
+| Current frozen candidate | `5.6.1+26e04920a669.dde9743f81c8b8ef.staging` |
 | Preserved road-safe fallback | `5.6.1+b21b7f12fdfa.31ed9b1212c5002c.staging` |
 | Release branch | `stable` (default; no `main` branch) |
 | Active development branches | `steven/visual-quality`, `steven/post-5.2-release-integration` |
@@ -35,15 +35,35 @@ and no security controls were bypassed.
 
 ## Verification and rollback
 
-Current checkpoint `614b452a` is on both active development branches. Its new
-immutable package verifies 755 files; 2,695 source tests and the exact 65-file
-rollback review pass. Lossless compression recovered 6.49 GiB, with original
-paths and decoded contents preserved; free space reached 10.37 GiB before
-packaging. Native package validation passes short ground movement and flight,
-but sustained walking has a 150–217 ms pause cluster. Collector tracing confirms
-memory-collection work in the cluster. No browser/local-service errors or gameplay
-interruptions occurred; this is not a pacing pass. Full release acceptance remains
-open; neither production nor canonical staging has been updated.
+Checkpoint `26e04920` is on both active development branches. All 755 immutable
+files verify; its gameplay payload matches 614b452a exactly. All three backend
+gates pass for 26, including shared ocean voyages, place lookup and the complete
+15-stage backend suite. Browser checks now honor the explicitly selected local
+emulator ports instead of touching an unrelated project's default port.
+
+Lossless compression recovered 6.49 GiB, retaining original paths and decoded
+contents. Native package validation passes short ground movement and flight,
+but sustained walking has a 150–217 ms pause cluster tied to memory collection.
+This remains failed pacing evidence; production and canonical staging are unchanged.
+
+The formal save check timed out while repeatedly requesting full city diagnostics
+during loading. A diagnostic with lightweight polling, the same timeout and all
+original save assertions passes released 5.5.1 → candidate → b21 fallback →
+candidate return. It is not a formal acceptance receipt. The verifier repair
+passes four focused tests and the complete 2,699-test source chain; its updated
+inputs must be packaged and formally checked. Full candidate, performance and
+ordinary hosted acceptance remain open.
+
+The subsequent pavement resource repair keeps one material/texture lease across
+same-world replacements, preserving linked renderer programs during handover.
+Failed staging leaves the accepted surface intact; final ownership release disposes
+all owned resources. All 78 focused checks and 2,702 source tests pass. Native
+source loads in 105.5 seconds and passes short ground travel and 90-second flight.
+The long walk still has three clustered 133–183 ms intervals, so pacing remains
+open. The before/after material IDs and shader program IDs match across a real
+coverage change. Current imagery and prescribed input were inspected. Neither
+30 FPS drawing experiment was adopted; gameplay remains uncapped.
+Evidence: `output/release-review/561-material-ownership-native/`.
 
 ### Earlier b272 and source diagnostics (historical)
 

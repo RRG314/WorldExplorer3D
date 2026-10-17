@@ -383,10 +383,10 @@
       "afterMode": "100644"
     },
     "app/js/world/street-pavement-runtime.js": {
-      "review": "Reuses finished cells only under exact physical ownership, rebuilds combined contact atomically, and preserves canonical face ordering even when retained cells are prepared first. Cached publication avoids cloning unused compiler arrays. Missing or invalid cells use the existing full compiler/sampler/partition path. No coverage, geometry authority, persistence or backend changes. Published sampling/disposal callbacks are constructed in an isolated scope owning only the current publication, eliminating the reproduced chain of retired windows. A twelve-replacement actual-module collection check changes from eleven retained retired publications to zero. GPU/material/contact disposal remains idempotent and keeps shared materials untouched. Final index construction uses the existing owned worker and transfers only the private combined array, never cached cell storage. Existing timeout and cancellation terminate it. Current-owner checks precede publication; failure, cancellation and supersession retain the accepted render/contact surface. Source and actual-worker checks verify these paths.",
+      "review": "Reuses finished cells only under exact physical ownership, rebuilds combined contact atomically, and preserves canonical face ordering even when retained cells are prepared first. Cached publication avoids cloning unused compiler arrays. Missing or invalid cells use the existing full compiler/sampler/partition path. No coverage, geometry authority, persistence or backend changes. Published sampling/disposal callbacks are constructed in an isolated scope owning only the current publication, eliminating the reproduced chain of retired windows. A twelve-replacement actual-module collection check changes from eleven retained retired publications to zero. GPU/material/contact disposal remains idempotent and keeps shared materials untouched. Final index construction uses the existing owned worker and transfers only the private combined array, never cached cell storage. Existing timeout and cancellation terminate it. Current-owner checks precede publication; failure, cancellation and supersession retain the accepted render/contact surface. Source and actual-worker checks verify these paths. Material resources now use a lease shared by overlapping publications in the same world with identical borrowed maps. The previous publication releases its own lease after the replacement owns one, preserving renderer program identity. Failed staging retires only its lease; geometry/contact ownership and all sampled positions are unchanged. Material acquisition is covered by construction cleanup.",
       "before": "28675ab27c199f0224e8c6ea01df825c658feb9bae0112b5eaeed91b548c854c",
       "beforeMode": "100644",
-      "after": "952c418b4672274678280ac66d13b3e0ffefe9db95ef5abb6646456d26d4e4b4",
+      "after": "ce7a58fae08d0bf23b99ad0dce2430487ee7cffa8f2d02db056d8aeac8cf0785",
       "afterMode": "100644"
     },
     "config/context-write-allowlist.json": {
@@ -458,6 +458,13 @@
       "after": "da805d1afeac11da448d17d181fd2d75ee572225855be4d2cf15fa44bb3c0d1b",
       "afterMode": "100644",
       "review": "Walking camera shares one synchronous candidate region across its unchanged sample positions. Every sample retains the existing height, footprint, guardrail and clearance rules. Fallback collision providers keep the prior point-query path. Exact comparisons cover mapped cell boundaries, elevated floors, open/closed doors and vegetation/interior isolation. No persistence, scene coverage or backend change."
+    },
+    "app/js/world/pavement-materials.js": {
+      "before": null,
+      "beforeMode": null,
+      "after": "439c0aa30d7ea932f6141f9918b3b335edc6b14d9b806fed71b86b7356c9df6b",
+      "afterMode": "100644",
+      "review": "Transient, per-world pavement material ownership. Same three material parameters and concrete texture bytes; one shared set during overlapping construction/publication, idempotent per-lease release and final-owner disposal. World sequence or borrowed-map identity changes create a distinct set; external normal/roughness textures are never disposed here. Partial construction releases its own resources. No saved fields, permissions, data migration or backend protocol changes."
     }
   }
 }

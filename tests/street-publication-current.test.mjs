@@ -11,7 +11,7 @@ import { publishStreetPavement, updateStreetPavementFocus, ensureInitialStreetPa
 function harness(t, mode='success') {
   const resources=[];
   const install=(name,descriptor)=>{const prior=Object.getOwnPropertyDescriptor(globalThis,name);Object.defineProperty(globalThis,name,descriptor);t.after(()=>{if(prior)Object.defineProperty(globalThis,name,prior);else delete globalThis[name];});};
-  class Resource { constructor(){resources.push(this);} dispose(){this.disposed=true;} }
+  class Resource { constructor(){resources.push(this);} dispose(){this.disposed=true;this.disposeCount=(this.disposeCount||0)+1;} }
   class Geometry extends Resource {setAttribute(name,value){(this.attributes ||= {})[name]=value;}setIndex(index){this.index=index;}getIndex(){return this.index;}computeVertexNormals(){}computeBoundingSphere(){}}
   class Attribute {constructor(values){this.array=new Float32Array(values);}}
   class Mesh {constructor(geometry,material){this.geometry=geometry;this.material=material;this.userData={};}}
@@ -46,7 +46,7 @@ function harness(t, mode='success') {
     });}
   }
   install('Worker',{value:Worker,configurable:true});
-  return {ctx,resources,get worker(){return worker;}};
+  return {ctx,resources,setMode(value){mode=value;},get worker(){return worker;}};
 }
 
 test('published contact interpolates the same elevated triangles used by the mesh',async t=>{
@@ -143,16 +143,57 @@ test('an active worker cancels immediately without waiting for the 15 second tim
   assert.ok(h.resources.every(r=>r.disposed));
 });
 
-test('repeated replacements release old contact and owned GPU resources',async t=>{
-  const h=harness(t);let previous;
+test('repeated replacements release old geometry but retain the active material programs',async t=>{
+  const h=harness(t);let previous,material;
   for(let i=0;i<8;i++){
-    const boundary=h.resources.length;await publishStreetPavement(h.ctx);
-    if(previous){assert.equal(previous.sampleAt(.2,3.2),null);assert.equal(previous.meshes.length,0);}
-    assert.ok(h.resources.slice(0,boundary).every(r=>r.disposed));
+    const previousGeometry=previous?.meshes[0].geometry;
+    await publishStreetPavement(h.ctx);
+    material ||= h.ctx.streetPavement.meshes[0].material;
+    if(previous){assert.equal(previous.sampleAt(.2,3.2),null);assert.equal(previous.meshes.length,0);assert.equal(previousGeometry.disposed,true);}
+    assert.equal(h.ctx.streetPavement.meshes[0].material,material);
+    assert.equal(material.disposed,undefined,'a handover must not retire the still-active renderer program');
+    assert.equal(h.resources.length,5+i,'only the new geometry is allocated on subsequent replacements');
+    assert.equal(h.resources.filter(r=>!r.disposed).length,5,'one texture, three materials and the current geometry remain');
     assert.equal(h.ctx.urbanSurfaceMeshes.length,1);
     previous=h.ctx.streetPavement;
   }
-  previous.dispose();assert.ok(h.resources.every(r=>r.disposed));
+  previous.dispose();previous.dispose();assert.ok(h.resources.every(r=>r.disposeCount===1));
+});
+
+test('failed replacement releases its material lease without damaging accepted pavement',async t=>{
+  const h=harness(t);await publishStreetPavement(h.ctx);
+  const accepted=h.ctx.streetPavement,material=accepted.meshes[0].material,height=accepted.sampleAt(.2,3.2);
+  h.setMode('failure');
+  await assert.rejects(publishStreetPavement(h.ctx),/invalid source polygon/);
+  assert.equal(h.ctx.streetPavement,accepted);
+  assert.equal(accepted.sampleAt(.2,3.2),height);
+  assert.equal(material.disposed,undefined);
+  assert.equal(h.resources.length,5,'failed staging reuses the existing material resources');
+  accepted.dispose();assert.ok(h.resources.every(r=>r.disposeCount===1));
+});
+
+test('new world and changed surface maps receive separate material ownership',async t=>{
+  const h=harness(t);await publishStreetPavement(h.ctx);
+  let material=h.ctx.streetPavement.meshes[0].material;
+  for(const change of [()=>h.ctx._worldLoadSequence++,()=>{h.ctx.pavementNormal={dispose(){throw Error('borrowed texture must not be disposed');}};}]){
+    change();await publishStreetPavement(h.ctx);
+    assert.notEqual(h.ctx.streetPavement.meshes[0].material,material);
+    assert.equal(material.disposeCount,1);
+    material=h.ctx.streetPavement.meshes[0].material;
+  }
+  h.ctx.streetPavement.dispose();assert.ok(h.resources.every(r=>r.disposeCount===1));
+});
+
+test('partial material construction failure retires its texture and worker without touching the active owner',async t=>{
+  const h=harness(t);await publishStreetPavement(h.ctx);
+  const accepted=h.ctx.streetPavement,material=accepted.meshes[0].material;
+  h.ctx.pavementNormal={};
+  THREE.MeshStandardMaterial=class {constructor(){throw Error('material allocation failed');}};
+  await assert.rejects(publishStreetPavement(h.ctx),/material allocation failed/);
+  assert.equal(h.ctx.streetPavement,accepted);assert.equal(material.disposed,undefined);
+  assert.equal(h.worker.terminated,true);assert.equal(h.ctx._cancelStreetPavementBuild,null);
+  assert.equal(h.resources.at(-1).disposeCount,1);
+  accepted.dispose();assert.ok(h.resources.every(r=>r.disposeCount===1));
 });
 
 test('retired pavement publications become unreachable after replacement',async t=>{

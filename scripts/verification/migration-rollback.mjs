@@ -12,6 +12,7 @@ import { configureStagingAppCheck } from './staging-app-check.mjs';
 import { closeOwnedBrowser } from './owned-browser.mjs';
 import { assertReviewedRollbackRuntime } from './rollback-runtime-contract.mjs';
 import { readExecutionEvidence, compareEvidenceToBaseline, evidencePath } from './execution-evidence.mjs';
+import { discoveryWorldReady } from './complete-world-readiness.mjs';
 
 const root = process.cwd(), candidateRoot = process.env.WE3D_VERIFY_ROOT || 'dist';
 const fallbackRoot = process.argv.find(arg => arg.startsWith('--fallback='))?.slice(11);
@@ -109,7 +110,7 @@ try {
     // isVisible check can skip Start entirely on a warm artifact replacement.
     await page.locator('#globeSelectorStartBtn').waitFor({state: 'visible', timeout: 60000});
     await page.locator('#globeSelectorStartBtn').click();
-    await page.waitForFunction(() => { const d = globalThis.getWorldExplorerRuntimeDiagnostics?.(); return d?.gameStarted && !d.worldLoading && d.worldDiscovery?.active; }, null, { timeout: 180000 });
+    await page.waitForFunction(discoveryWorldReady, null, { timeout: 180000, polling: 500 });
     assert.equal(await page.evaluate(() => fetch('/build-manifest.json', { cache: 'no-store' }).then(r => r.json()).then(m => m.buildId)), manifest.buildId);
     const result = await page.evaluate(async ({ seed, label, expectedMagazine, writeMagazine, previous, extended }) => {
       const { ctx } = await import('/app/js/shared-context.js?v=55');
@@ -181,7 +182,13 @@ try {
       const state = globalThis.getWorldExplorerRuntimeDiagnostics?.() || {};
       return {runtimeReady: globalThis.__WE3D_RUNTIME_READY__, gameStarted: state.gameStarted,
         worldLoading: state.worldLoading, titleVisible: state.titleVisible,
-        worldLoad: state.worldLoad, discoveryActive: state.worldDiscovery?.active,
+        worldLoad: state.worldLoad ? {
+          sequence: state.worldLoad.sequence, status: state.worldLoad.status,
+          activePhases: state.worldLoad.activePhases,
+          lastCompletedPhase: state.worldLoad.lastCompletedPhase,
+          geometryReady: state.worldLoad.geometryReady,
+          gameplayRuntimesReady: state.worldLoad.gameplayRuntimesReady
+        } : null, discoveryActive: state.worldDiscovery?.active,
         loadingText: document.getElementById('loading')?.textContent?.trim().slice(0, 500)};
     }).catch(() => null);
     await page.screenshot({path: `${output}/${stage}-failed.png`}).catch(() => {});

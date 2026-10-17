@@ -2,21 +2,43 @@
 
 ## October 17 — current candidate
 
-The current immutable candidate is
-`5.6.1+614b452a57ae.dde9743f81c8b8ef.staging`, with all 755 files verified.
-Source checkpoint `614b452a` is on both active development branches; 2,695 source
-tests and its exact 65-file rollback review pass. Lossless compression recovered
-6.49 GiB without deleting source, chats, saves or assets, leaving 10.37 GiB free
-before packaging. The native package loads in 116.9 seconds; short ground
-movement and 90-second flight pass, while the 90-second walk has four clustered
-150–217 ms pauses. There are no browser/local resource errors or gameplay
-interruptions. Collector tracing attributes the cluster to memory collection;
-images and prescribed input were inspected. This remains failed pacing evidence.
-Local backend setup also exposed an unrelated project on the default database
-port; browser verification must follow its own selected emulator endpoint.
-Earlier failed receipts remain valid failures. Final candidate/backend,
-save and ordinary hosted acceptance are still required. Production remains 5.5.1;
-canonical staging remains a0e20c35, both checked today. No promotion has occurred.
+The frozen candidate is `5.6.1+26e04920a669.dde9743f81c8b8ef.staging`, with all
+755 files verified and gameplay bytes identical to 614b452a. Both development
+branches contain 26e04920. Its complete backend scope passes: shared marine
+voyages, place lookup and all 15 backend stages, including security, purchases,
+property transactions, space expeditions, chat, vehicles and accounts.
+Evidence: `output/release-review/561-26e04920-backend/` and the source-bound
+backend manifest under `output/release-evidence/current/`.
+
+Lossless compression recovered 6.49 GiB without deleting source, chats, saves,
+assets or fallback builds. Native 614 loads in 116.9 seconds and passes short
+ground movement and a 90-second flight. Sustained walking still pauses in a
+150–217 ms cluster tied to memory collection. No timing or coverage limit changed.
+The numeric-uniform experiment was rejected because it did not fix pacing.
+
+The formal 26 save test timed out during candidate loading. Its full diagnostic
+poll ran on every animation frame; one candidate call took 1,016 ms. A separate
+lightweight-poll diagnostic passes all four released/upgrade/fallback/return
+stages under the original timeout and save assertions. Original failed evidence
+is retained. This diagnostic does not create formal release acceptance.
+Evidence: `output/release-review/561-26e04920-migration-light-poll/`.
+The verifier repair passes four focused checks and all 2,699 source tests. Its
+updated inputs still need packaging and formal save acceptance.
+
+The subsequent pavement resource repair keeps one material/texture lease across
+same-world replacements, preserving linked renderer programs during handover.
+Failed staging leaves the accepted surface intact; final ownership release disposes
+all owned resources. All 78 focused checks and 2,702 source tests pass. Native
+source loads in 105.5 seconds and passes short ground travel and 90-second flight.
+The long walk still has three clustered 133–183 ms intervals, so pacing remains
+open. The before/after material IDs and shader program IDs match across a real
+coverage change. Current imagery and prescribed input were inspected. Neither
+30 FPS drawing experiment was adopted; gameplay remains uncapped.
+Evidence: `output/release-review/561-material-ownership-native/`.
+
+Production remains 5.5.1; canonical staging remains a0e20c35, both checked today.
+Final pacing, complete candidate and ordinary hosted acceptance remain open.
+No Hosting, production Functions or stable promotion has occurred.
 
 ## October 16 — previous blockers and evidence
 

@@ -3,7 +3,7 @@ import {publishReferenceBlockDressing} from './reference-block-dressing.js';
 import {createPortalSurfaceClipper} from '../terrain/portal-surface-clip.js';
 import {createPavementTerrainPartitionCooperatively} from './pavement-terrain-partition.js';
 import { captureStreetSurfaceGeometry,serializeStreetSurfaceCapture } from './street-surface-capture.js';
-import { createRoadMarkingMaterial } from '../road-render.js?v=4';
+import { acquirePavementMaterials } from './pavement-materials.js';
 import { streetSourceInputCooperatively } from './street-source-input.js';
 import { createPavementBaseSamplerCooperatively } from './pavement-height-sampler.js';
 import { assessStreetQuality } from './street-quality-assessment.js';
@@ -12,7 +12,6 @@ import { createStreetOverview } from './street-overview.js';
 import { StreetPacketCache } from './street-packet-cache.js';
 import { streetMotion, streetPrefetch } from './street-prefetch.js';
 import { getWorkloadPolicySnapshot } from '../runtime/workload-policy.js?v=1';
-import {createConcretePavementTexture} from './pavement-texture.js';
 import {mappedPavementContactSources} from './mapped-pavement-contact.js';
 import { conformPavementMeshCooperatively } from './pavement-terrain-conformance.js';
 import { rampCurbScale } from './compiler/street-crossings.js';
@@ -29,7 +28,7 @@ function focusActor(appCtx) {
 // Published callbacks must not close over the asynchronous construction scope.
 // That scope also contains the previous publication and worker input; retaining
 // it links every retired window together even after GPU disposal.
-function createStreetPublication({stats,focus,groundRevision,coverageBounds,meshes,contactIndex,texture,materials,layout}) {
+function createStreetPublication({stats,focus,groundRevision,coverageBounds,meshes,contactIndex,releaseMaterials,layout}) {
   let disposed=false;
   const publication={stats,focus,groundRevision,coverageBounds,meshes,
     sampleAt:(x,z)=>disposed?null:contactIndex.sampleAt(x,z),
@@ -38,9 +37,7 @@ function createStreetPublication({stats,focus,groundRevision,coverageBounds,mesh
       contactIndex.dispose();contactIndex=null;
       for(const mesh of meshes){mesh.parent?.remove(mesh);mesh.geometry.dispose();}
       meshes.length=0;
-      texture?.dispose();texture=null;
-      for(const material of materials)material.dispose();
-      materials.length=0;layout=null;
+      releaseMaterials?.();releaseMaterials=null;layout=null;
     }
   };
   if(layout)publication.exportLayout=()=>JSON.stringify(layout);
@@ -132,13 +129,9 @@ export async function publishStreetPavement(appCtx, options = {}) {
   let committed = false;
   const stagedLines = [];
   const batches = new Map();
-  const staged = [], texture = createConcretePavementTexture(THREE);
+  const staged = [];
   let contactIndex = null, stagedWalkContactIndex = null;
-  const material = new THREE.MeshStandardMaterial({ color: 0xffffff, map: texture,
-    normalMap: appCtx.pavementNormal || null, roughnessMap: appCtx.pavementRoughness || null, roughness: 0.96, metalness: 0 });
-  material.normalScale?.set(0.12, 0.12);
-  const markingMaterial = createRoadMarkingMaterial({color:0xeee9df,roughness:.9,emissive:0,emissiveIntensity:0});
-  const curbMaterial = new THREE.MeshStandardMaterial({ color: 0x99978f, roughness: 0.96, side: THREE.DoubleSide });
+  let materialLease=null,material,markingMaterial,curbMaterial;
   const ground = (x, z) => {
     const y = appCtx.terrainMeshHeightAt?.(x, z, {ignorePortalCuts:true});
     return Number.isFinite(y) ? y : appCtx.elevationWorldYAtWorldXZ?.(x, z);
@@ -152,7 +145,7 @@ export async function publishStreetPavement(appCtx, options = {}) {
   const sliceBudgetMs=appCtx.gameStarted&&!appCtx.worldLoading?2:8;
   const schedule={current:()=>current()&&!cancelled,yieldWork:yieldConstruction,budgetMs:sliceBudgetMs,onSlice:ms=>{stats.maxPublicationSliceMs=Math.max(stats.maxPublicationSliceMs||0,ms);}};
   const disposeLines = () => { for (const mesh of stagedLines) { mesh.parent?.remove(mesh); mesh.geometry.dispose(); mesh.material.dispose(); } };
-  const disposeStaged = () => { worker.terminate(); contactIndex?.dispose(); stagedWalkContactIndex?.dispose(); batches.clear(); for (const mesh of staged) { mesh.parent?.remove(mesh); mesh.geometry.dispose(); } texture?.dispose(); material.dispose(); curbMaterial.dispose(); markingMaterial.dispose(); staged.length = 0; };
+  const disposeStaged = () => { worker.terminate(); contactIndex?.dispose(); stagedWalkContactIndex?.dispose(); batches.clear(); for (const mesh of staged) { mesh.parent?.remove(mesh); mesh.geometry.dispose(); } materialLease?.release(); staged.length = 0; };
     if (new URLSearchParams(location.search).has('streetDiagnostics')) {
       let panel = document.getElementById('streetSurfaceDiagnostics');
       if (!panel) {
@@ -267,6 +260,8 @@ export async function publishStreetPavement(appCtx, options = {}) {
       panel.querySelector('pre').textContent = JSON.stringify(stats, null, 2);
     }
   try {
+    materialLease=acquirePavementMaterials(appCtx);
+    ({material,markingMaterial,curbMaterial}=materialLease);
     // Filtering a full location is itself substantial work, even though only
     // nearby records go to the worker. Share the publication's cancellation
     // and slice budget so starting a new sidewalk window cannot stop driving.
@@ -414,7 +409,7 @@ export async function publishStreetPavement(appCtx, options = {}) {
     stats.indexBytes=staged.reduce((sum,mesh)=>sum+(mesh.geometry.index?.array.byteLength||0),0);
     stats.positionBytes = staged.reduce((sum, mesh) => sum + mesh.geometry.attributes.position.array.byteLength, 0);
     const publication = createStreetPublication({stats,focus,groundRevision,coverageBounds,meshes:staged,
-      contactIndex,texture,materials:[material,curbMaterial,markingMaterial],
+      contactIndex,releaseMaterials:materialLease.release,
       layout:new URLSearchParams(location.search).has('streetDiagnostics')?input:null});
     for (const mesh of staged) { appCtx.addEarthWorldObject(mesh); appCtx.urbanSurfaceMeshes.push(mesh); }
     stats.durationMs = Math.round(performance.now() - startedAt);

@@ -6,36 +6,52 @@ Public project page: https://rrg314.github.io/WorldExplorer3D/
 
 ## October 17 — authoritative current status
 
-Both active development branches contain runtime checkpoint `614b452a`.
-The current immutable candidate is
-`5.6.1+614b452a57ae.dde9743f81c8b8ef.staging`; all 755 files verify. Its source
-passes 2,695 tests and the exact 65-file rollback review. The superseded b272
-payload was verified before retirement; its manifests and failed evidence remain.
-The preserved fallback and actual released packages were not removed.
+Both active development branches contain checkpoint `26e04920`. The current
+immutable candidate is `5.6.1+26e04920a669.dde9743f81c8b8ef.staging`; all 755
+files verify. Its gameplay payload is byte-identical to 614b452a; the change fixes
+browser verification's selected local emulator ports. All three current-package
+backend gates pass, including the complete 15-stage backend suite, shared ocean
+voyages and place lookup. The unrelated project's emulator remains untouched.
 
-Verified lossless filesystem compression recovered 6.49 GiB from inactive
-diagnostics and closed logs. Decoded contents and original paths were retained;
-source, saves, chats and assets were not deleted. Free space reached 10.37 GiB
-before packaging. The new native package journey loads in 116.9 seconds and
-passes short ground movement and a 90-second flight. Sustained walking still has
-a cluster of four 150–217 ms intervals, so pacing fails. No browser errors,
-local failures or gameplay interruptions occurred. CPU/collector tracing links
-the cluster to memory collection; its image and prescribed input were reviewed.
-Source tests and recovered disk space do not establish release readiness.
+Lossless filesystem compression recovered 6.49 GiB from inactive diagnostics
+and closed logs, preserving decoded contents and original paths. Source, saves,
+chats, assets, history and fallback builds were not deleted. Free space reached
+10.37 GiB before packaging and remains above the verification safety floor.
 
-Backend verification exposed a local harness conflict: an unrelated project owns
-port 8080. Its process remains untouched. Browser test configuration now follows
-the explicitly selected local emulator endpoint instead of silently using 8080.
-All nine focused backend-configuration checks and the complete 2,697-test source
-chain pass. Failed setup receipts are retained; the backend scope has not passed.
-A uniform-cache experiment preserved identical pixels but still paused, so it was
-rejected without changing the runtime. The full backend scope is next.
+The 614 native package loads in 116.9 seconds and passes short ground movement
+and a 90-second flight. Sustained walking still has four clustered 150–217 ms
+intervals. CPU/collector tracing links the cluster to memory collection. There
+were no browser errors, local failures or gameplay interruptions. A numeric
+uniform-cache experiment kept identical pixels but still paused and was rejected.
+No acceptance threshold, coverage or resource requirement was relaxed.
+
+The formal 26e04920 save roundtrip timed out while loading the candidate. Its
+verifier requested full city diagnostics on every animation frame. Individual
+calls measured 174 ms on 5.5.1 and up to 1,016 ms on the candidate. With lightweight
+polling and the same 180-second timeout, all four diagnostic stages pass:
+released 5.5.1 → candidate → preserved modern-save fallback → candidate. Inventory,
+Journal, home custody/workspace, wallet, campaign and pending-account checks pass.
+The failed formal receipt is retained; the diagnostic does not mint acceptance.
+The verifier repair retains its original gameplay/discovery assertions and bounds
+failure output. Four focused tests and the complete 2,699-test source chain pass.
+Repackaging and formal acceptance of these updated inputs are next.
+
+The subsequent pavement resource repair keeps one material/texture lease across
+same-world replacements, preserving linked renderer programs during handover.
+Failed staging leaves the accepted surface intact; final ownership release disposes
+all owned resources. All 78 focused checks and 2,702 source tests pass. Native
+source loads in 105.5 seconds and passes short ground travel and 90-second flight.
+The long walk still has three clustered 133–183 ms intervals, so pacing remains
+open. The before/after material IDs and shader program IDs match across a real
+coverage change. Current imagery and prescribed input were inspected. Neither
+30 FPS drawing experiment was adopted; gameplay remains uncapped.
+Evidence: `output/release-review/561-material-ownership-native/`.
 
 Production still serves the exact 5.5.1 hotfix and canonical staging still serves
-a0e20c35; both were independently checked today. Final performance, the complete
-candidate/backend matrix, save roundtrip and ordinary hosted acceptance remain
-required. No new Hosting deployment or stable promotion has occurred. Older
-entries below describe historical checkpoints, not this package's acceptance.
+a0e20c35, independently checked today. Final performance, the complete candidate
+matrix, formal save roundtrip and ordinary hosted acceptance remain required.
+No new Hosting deployment, production Functions update or stable promotion has
+occurred. Older entries below are historical checkpoints, not current acceptance.
 
 ## October 16 — previous checkpoint
 
