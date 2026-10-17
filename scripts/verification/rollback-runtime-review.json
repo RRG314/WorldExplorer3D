@@ -42,9 +42,9 @@
     "app/js/physics/building-collision.js": {
       "before": "d8df3b726b6833c605a20844dd4236b6ce9ff55d9cc2f82dfdab69fb83342c26",
       "beforeMode": "100644",
-      "after": "210410711781a98f42fc57d20c49a18a98088bb8e2a2e003123f712686641b70",
+      "after": "8918702678b2cdf6115d7585a72b5ef5ab300950ddb35ba20e23a00ec8bc5028",
       "afterMode": "100644",
-      "review": "Identical horizontal and vertical predicates, candidate order and collision responses. Rejects geographically distant colliders before evaluating vertical properties, reducing measured temporary allocation. No collision data, geometry, persistence or backend protocol changes."
+      "review": "Identical horizontal and vertical predicates, candidate order and collision responses. Rejects geographically distant colliders before evaluating vertical properties, reducing measured temporary allocation. No collision data, geometry, persistence or backend protocol changes. Exposes a synchronous region lease for camera probes while retaining the same narrow-phase solver. Out-of-range probes use ordinary queries; nested leases and exceptions release every scene reference. Expired probe callbacks reject use; large scratch arrays are not retained. Region state is private to one synchronous callback and never persists across frames."
     },
     "app/js/world/building-body-geometry.js": {
       "before": "c5c6f0c5fb53883c7dbc96f5d4637a8b3397c3172a7993d7bb7cf6c380f44040",
@@ -451,6 +451,13 @@
       "afterMode": "100644",
       "after": "3ef7d9dfa334dbd5753ba55e232885b172fea387635a18958e66eb2465bf38ea",
       "review": "Fast checkpoints remain synchronous until their existing work budget is exhausted. Exact geometry and cancellation remain unchanged; the isolated 5000-triangle comparison reduces Promise creation from 10005 to two. No persistence or backend fields change. Browser pacing remains separately required."
+    },
+    "app/js/walking/camera-collision.js": {
+      "before": "2850e74329fa2c62ac9b3228a9f3db93f6eb3ccbb0405eca30785d21dd8297f5",
+      "beforeMode": "100644",
+      "after": "da805d1afeac11da448d17d181fd2d75ee572225855be4d2cf15fa44bb3c0d1b",
+      "afterMode": "100644",
+      "review": "Walking camera shares one synchronous candidate region across its unchanged sample positions. Every sample retains the existing height, footprint, guardrail and clearance rules. Fallback collision providers keep the prior point-query path. Exact comparisons cover mapped cell boundaries, elevated floors, open/closed doors and vegetation/interior isolation. No persistence, scene coverage or backend change."
     }
   }
 }

@@ -1,19 +1,26 @@
 # Current development and release state
 
-Updated October 16, 2026. **5.5.1 is the production release; live access is blocked by a Hosting quota error.**
+Updated October 16, 2026. **5.5.1 is deployed and production access has recovered.**
 Release: https://github.com/RRG314/WorldExplorer3D/releases/tag/v5.5.1
 Public project page: https://rrg314.github.io/WorldExplorer3D/
 
 ## October 16 — authoritative current status
 
-Both production domains return HTTP 509, `Quota Exceeded`. Read-only Hosting
-inspection confirms the October 14 hotfix is still the live release, version
-`0a6f60dd9f3488f6`; no 5.6 candidate has replaced it. The Hosting API remains
-enabled. Account configuration is under owner review; private account details
-are excluded from tracked release records. Reverting frontend files would not
-reset the transfer quota and would remove the already deployed road-recovery
-fix. No account change or further deployment has been made. Local evidence:
-`output/release-review/561-production-availability-20261016/observation.json`.
+At 10:10 p.m. EDT, both production manifests again return HTTP 200 and identify
+`5.5.1+012e5c85582b.eb0d7eddf0f75035.production`. The owner resolved the account
+issue; no code rollback, account mutation or redeployment was performed here.
+Read-only Hosting inspection still identifies version `0a6f60dd9f3488f6`.
+All 80 functions in each project report active first-generation deployments.
+Hosting and Functions APIs are enabled; the unused Cloud Run API remains
+unchanged. Private account details are excluded from tracked release records.
+Recovery evidence is in
+`output/release-review/561-production-availability-20261016/recovery.json`.
+Ordinary Chrome subsequently returned live search results, loaded Baltimore and
+displayed current weather on 5.5.1. The temporary review tab was closed. A fresh
+automated browser loaded the world but received protected-service 401 responses;
+its failed receipt is retained. This recovery smoke check is not complete
+account, shared-voyage or save acceptance. The separate ordinary-browser record
+is `output/release-review/561-production-availability-20261016/ordinary-chrome.json`.
 
 The current frozen candidate is
 `5.6.1+b272ed7a58c1.a128f12ee0cbf660.staging`, with all 754 files verified.
@@ -23,7 +30,8 @@ desktop ground traversal still pauses, including a 550 ms walking interval.
 A later traffic/custody interruption also prevents uninterrupted-traversal
 acceptance. All flight windows pass. The failed run is preserved in
 `output/release-review/561-b272ed7a-performance-preserved/`; it is not a release
-pass. Both development branches contain b272ed7a; canonical staging remains a0.
+pass. Both development branches contain the worker-indexing checkpoint `815e32ad`;
+the following camera change is the next source checkpoint. Canonical staging remains a0.
 
 A subsequent source change moves exact pavement indexing into the existing
 owned worker using transferred private buffers. It retains the accepted surface
@@ -37,6 +45,24 @@ This focused run omits reload/mixed-route acceptance and is not a release pass.
 The change is not in the frozen package or hosted releases. Final packaged performance,
 backend/save and complete-candidate acceptance remain open. The dated sections
 below are historical checkpoints and do not override this status.
+
+The camera now gathers nearby collision candidates once per synchronous camera
+pass while preserving every original probe, footprint, height and door rule.
+Buffers release scene references even when a caller throws. All nine focused
+checks and the complete **2,695-test** source chain pass, including 84 exact
+camera comparisons. A clear 12-unit camera sweep uses one neighborhood lookup
+instead of 27. This is a component improvement, not a whole-game pacing claim.
+
+The unprofiled source journey loads in 114.4 seconds and passes the 90-second
+flight. The 90-second walk completes but has a 266–317 ms pause cluster; short
+moving walking and stationary driving also miss their frame percentile limits.
+There are no browser errors, failed local requests, reloads or gameplay
+interruptions. The current image and prescribed keyboard action were reviewed.
+Evidence: `output/release-review/561-camera-region-native-walk/`.
+The failed result is retained and no acceptance limits changed. Free disk space
+is about 2.7 GiB after the check, below the 3 GiB bounded-test launch guard and
+the 8 GiB regional-test requirement. Source, saves, history and fallback packages
+are preserved. No new package or production promotion has been made.
 
 ## October 14 production road continuity hotfix
 

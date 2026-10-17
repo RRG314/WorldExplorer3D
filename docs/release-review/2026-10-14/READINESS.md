@@ -3,11 +3,17 @@
 ## October 16 — current blockers
 
 Production still points to the October 14 **5.5.1** road-continuity hotfix,
-Hosting version `0a6f60dd9f3488f6`. Both live domains now return HTTP 509
-`Quota Exceeded`; the Hosting API is enabled. Account configuration is under
-owner review. Private account details are excluded from tracked release records,
-and no account or deployment mutation was made.
-Reverting to 5.5.0 would remove the hotfix without resolving the quota condition.
+Hosting version `0a6f60dd9f3488f6`. Following the owner's account repair, both
+live manifests return HTTP 200 at 10:10 p.m. EDT and match the 5.5.1 hotfix.
+All 80 first-generation functions in each project report ACTIVE. No rollback,
+account mutation or redeployment was performed here. Private account details
+are excluded from tracked release records. Recovery evidence is preserved in
+`output/release-review/561-production-availability-20261016/recovery.json`.
+Ordinary Chrome also returned live search results, loaded Baltimore and showed
+current weather on 5.5.1. A separate fresh automated browser loaded the world
+but received protected-service 401 responses; that failed receipt is preserved.
+The ordinary-browser result establishes recovery, not complete account,
+shared-voyage or save acceptance.
 
 Frozen candidate `5.6.1+b272ed7a58c1.a128f12ee0cbf660.staging` verifies all 754
 files. Its complete packaged performance run finished in 36 minutes without a
@@ -30,8 +36,24 @@ checks in this focused diagnostic are not passes. Evidence:
 `output/release-review/561-worker-index-native-walk/`.
 This is not a claim that all gameplay pauses are fixed. The package, complete 107-gate matrix, backend/save
 acceptance and ordinary hosted account/voyage checks must be refreshed after the
-repair is verified. Account resolution currently blocks live-service acceptance.
+repair is verified. The ordinary Chrome recovery smoke check above does not
+replace those complete hosted journeys.
 The older entries below are historical evidence, not current passing status.
+
+The subsequent camera change shares one synchronous neighborhood query across
+the original collision probes. It preserves doors, height, polygon and interior
+rules and releases all leased references. Nine focused checks and the complete
+**2,695-test** source chain pass; 84 before/after camera results match exactly.
+The representative clear sweep performs one neighborhood query instead of 27.
+Native source loads in 114.4 seconds and passes the 90-second flight, but the
+90-second walk still has a 266–317 ms pause cluster. Short moving walking and
+stationary driving miss frame percentile limits. No browser errors, failed
+local resources, reloads or gameplay interruptions occur. The current image and
+prescribed keyboard action were inspected. This remains a failed pacing result,
+not complete release acceptance. Evidence:
+`output/release-review/561-camera-region-native-walk/`.
+The Mac has about 2.7 GiB free, below the 3 GiB bounded-check launch guard and
+8 GiB regional preflight. No new package was frozen or promoted.
 
 ## October 15 — subsequent geometry allocation repair
 

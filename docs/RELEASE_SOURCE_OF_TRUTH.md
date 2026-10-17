@@ -2,11 +2,11 @@
 
 ## Current observation — October 16, 2026
 
-Production remains **5.5.1**, confirmed by the live Hosting release API. Both
-production URLs now return HTTP 509 `Quota Exceeded`, so their manifests are
-currently inaccessible. Account configuration is under owner review; private
-account details are excluded from tracked release records. No account mutation or new
-production deployment has occurred. The complete **5.6.1** candidate remains
+Production remains **5.5.1**, confirmed by the live Hosting release API and both
+live manifests. After the owner's account repair, the manifests return HTTP 200
+at 10:10 p.m. EDT and match the hotfix identity below. No account mutation,
+rollback or new production deployment was performed here. Private account
+details are excluded from tracked release records. The complete **5.6.1** candidate remains
 under verification. A version label or preview URL alone does not identify code.
 
 | Reference | Build or source |
@@ -27,10 +27,11 @@ under verification. A version label or preview URL alone does not identify code.
 
 Canonical staging now serves the a0e20c35 package; both hosted manifests match
 local bytes. Production and backend origin restrictions were not changed.
-Before the billing incident, ordinary Chrome opened the menu, entered guided
-Baltimore, displayed live weather and started field photography. This is not complete account/shared-voyage/save
-acceptance. The earlier clean automated browser's reCAPTCHA rejection was not
-bypassed; that separate hosted journey remains open.
+After production recovered, ordinary Chrome returned live search results,
+loaded Baltimore and displayed current weather on 5.5.1. This is not complete
+account/shared-voyage/save acceptance. A fresh automated browser loaded the
+world but received protected-service 401 responses; its failure was preserved
+and no security controls were bypassed.
 
 ## Verification and rollback
 
@@ -47,12 +48,23 @@ Subsequent source moves the existing exact Float32 pavement indexing into the
 existing worker, transferring private construction buffers. It passes 76 focused
 checks and all 2,691 source tests. Native short walking/driving and a 90-second
 flight pass; the 90-second walk still has a 117–150 ms pause cluster. No browser
-exception or gameplay interruption occurs, but live service errors remain.
+exception or gameplay interruption occurs. That run recorded live service errors
+during the Hosting incident; the later ordinary Chrome recovery is recorded above.
 The current image and prescribed keyboard action were reviewed. This focused
 diagnostic does not include complete mixed-route/reload acceptance.
-It is not in the frozen package or hosted staging. Account resolution also
-blocks current live-service acceptance. The remaining complete-candidate,
+It is not in the frozen package or hosted staging. The remaining complete-candidate,
 backend/save and hosted checks must use the final candidate's exact identity.
+
+The next source change reuses a synchronous collision region for walking camera
+probes. Its nine focused checks and complete 2,695-test source chain pass,
+including 84 exact before/after camera results. Native source loads in 114.4
+seconds and passes the 90-second flight, but sustained walking still records
+266–317 ms pauses. Short ground percentile failures remain. No browser errors,
+failed local resources or gameplay interruptions occur. Images and prescribed
+keyboard input were reviewed. This source is not in the frozen candidate or
+hosted releases. About 2.7 GiB free disk also prevents further checks that require
+3 GiB to launch, and the regional check still requires 8 GiB. No pacing or
+resource requirement was relaxed.
 
 ### Earlier geometry repair checkpoints (historical)
 

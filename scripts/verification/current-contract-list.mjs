@@ -58,6 +58,7 @@ export const currentContractTests = [
   'tests/runtime-dependencies-current.test.mjs',
   'tests/water-boundary-clearance-current.test.mjs',
   'tests/collision-candidates-current.test.mjs',
+  'tests/camera-collision-region-current.test.mjs',
   'tests/water-profile-cache-current.test.mjs',
   'tests/frame-hitches-current.test.mjs',
   'tests/sustained-traversal-contract-current.test.mjs',
