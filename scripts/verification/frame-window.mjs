@@ -43,7 +43,12 @@ export async function sampleFrameWindow(durationMs) {
         backgroundAt = now;
         const overview = backgroundContext.streetOverview?.stats;
         const transport = backgroundContext.transportDetail?.stats;
+        const pavement = backgroundContext.streetPavement;
         background.push({elapsedMs:now-startedAt,
+          pavement:pavement ? {active:!!backgroundContext._streetPavementUpdating,
+            generation:backgroundContext._streetPavementGeneration,
+            focus:pavement.focus ? {x:pavement.focus.x,z:pavement.focus.z} : null,
+            reused:pavement.stats?.reusedTiles,renderBatches:pavement.stats?.reusedRenderBatches} : null,
           overview:overview ? {status:overview.status,completedCells:overview.completedCells,totalCells:overview.totalCells,workerActive:overview.workerActive} : null,
           transport:transport ? {status:transport.status,completedRegions:transport.completedRegions,pendingRegions:transport.pendingRegions,blocked:transport.blocked} : null});
       }

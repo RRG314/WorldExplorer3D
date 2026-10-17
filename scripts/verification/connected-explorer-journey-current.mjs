@@ -20,13 +20,19 @@ const context = await browser.newContext({ viewport: { width: 1440, height: 900 
 const page = await context.newPage();
 const browserErrors = [];
 const failedLocalResources = [];
+const providerDegradations = [];
 collectBrowserGraphicsErrors(page, browserErrors);
 await installBrowserGraphicsProbe(page, 'output/verification/connected-explorer-journey/graphics-failure.json');
 
 page.on('pageerror', (error) => browserErrors.push(String(error?.stack || error)));
 page.on('response', (response) => {
   if (response.url().startsWith(baseUrl) && response.status() >= 400) {
-    failedLocalResources.push({ status: response.status(), url: response.url() });
+    const item={status:response.status(),url:response.url()};
+    // Automatic place naming has a selected-location fallback. A temporary
+    // upstream outage must not masquerade as a broken tutorial or game asset.
+    // Authentication, searches, other endpoints and missing assets still fail.
+    if(new URL(response.url()).pathname==='/api/geospatial/reverse'&&[429,502,503,504].includes(response.status()))providerDegradations.push(item);
+    else failedLocalResources.push(item);
   }
 });
 
@@ -147,6 +153,7 @@ async function approachNearbyAction() {
 
 try {
   await configureStagingAppCheck(page, baseUrl);
+  if(process.env.WE3D_VERIFY_REVERSE_OUTAGE==='1')await page.route(baseUrl+'/api/geospatial/reverse?**',route=>route.fulfill({status:429,contentType:'application/json',body:JSON.stringify({error:'Controlled automatic place-name outage'})}));
   await mkdir(evidenceDir, { recursive: true });
   await page.goto(`${baseUrl}/app/`, { waitUntil: 'load', timeout: 120_000 });
   await page.waitForFunction(() => globalThis.__WE3D_RUNTIME_READY__ === true, null, { timeout: 120_000 });
@@ -250,6 +257,7 @@ try {
   await page.screenshot({ path: `${evidenceDir}/04-mobile-world-layout.png` });
 
   const finalState = await tutorialState();
+  const locationLabel=await page.locator('#locationLine').innerText();
   const report = {
     inputTiming: 'runtime-fixed-step; not rendering performance',
     renderQuality: process.env.CI ? 'low (normal Settings UI); functional tutorial only' : 'default',
@@ -267,13 +275,16 @@ try {
       mobileTutorialWithinViewport: touchLayout.tutorialWithinViewport,
       mobileTutorialClearsTouchControls: touchLayout.tutorialClearsTouchControls,
       noBrowserErrors: browserErrors.length === 0,
+      automaticPlaceNameFallbackReadable: locationLabel.trim().length>0 && !/undefined|null|error|loading/i.test(locationLabel),
       noFailedLocalResources: failedLocalResources.length === 0
     },
     statusSemantics,
     approachedAction,
     touchLayout,
     browserErrors,
-    failedLocalResources
+    failedLocalResources,
+    providerDegradations,
+    locationLabel
   };
   report.ok = report.ok && Object.values(report.checks).every(Boolean);
   console.log(JSON.stringify(report, null, 2));

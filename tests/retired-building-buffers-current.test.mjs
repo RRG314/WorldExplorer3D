@@ -3,7 +3,63 @@ import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import {ctx} from '../app/js/shared-context.js?v=55';
 import {batchMidLodBuildingMeshes} from '../app/js/world/building-batching.js';
-import {markPrivateBuildingGeometry, releaseRetiredBuildingCpuBuffers} from '../app/js/world/retired-building-buffers.js';
+import {markPrivateBuildingGeometry, releaseRetiredBuildingCpuBuffers, createBuildingConstructionArena, allocatePrivateBuildingStorage, finishPrivateBuildingStorage} from '../app/js/world/retired-building-buffers.js';
+import {createBuildingBodyGeometry} from '../app/js/world/building-body-geometry.js';
+import {attachBuildingFacadeLayout} from '../app/js/world/building-facade-layout.js';
+
+test('construction pages preserve neighbors, clones and final batches until the last private owner retires', async () => {
+  const arena=createBuildingConstructionArena();
+  const material=new THREE.MeshStandardMaterial();material.userData.buildingExterior=true;material.userData.sharedRuntimeMaterial=true;
+  const footprint=[{x:0,z:0},{x:7,z:0},{x:7,z:5},{x:0,z:5}];
+  const bytes=g=>Object.fromEntries(Object.entries(g.attributes).map(([k,a])=>[k,Buffer.from(a.array.buffer,a.array.byteOffset,a.array.byteLength).toString('hex')]));
+  const sources=Array.from({length:3},(_,i)=>{
+    const geometry=createBuildingBodyGeometry(THREE,footprint,10+i,arena);
+    attachBuildingFacadeLayout(geometry,{levels:3});
+    const reference=createBuildingBodyGeometry(THREE,footprint,10+i);
+    attachBuildingFacadeLayout(reference,{levels:3});assert.deepEqual(bytes(geometry),bytes(reference));
+    reference.dispose();releaseRetiredBuildingCpuBuffers(reference);
+    const mesh=new THREE.Mesh(geometry,material);mesh.position.set(i===2?4000:20+i*13,0,20);
+    mesh.userData={lodTier:'mid',sourceBuildingId:`page-${i}`};return mesh;
+  });
+  const shared=sources[0].geometry.attributes.position.array.buffer;
+  assert.ok(sources.every(m=>m.geometry.attributes.position.array.buffer===shared));
+  const singletonBefore=bytes(sources[2].geometry),clone=sources[0].geometry.clone(),cloneBefore=bytes(clone);
+  arena.close();arena.close();assert.equal(arena.snapshot().buffers,1);
+  ctx.buildingMeshes=sources.slice();ctx.addEarthWorldObject=()=>{};ctx.replaceWorldCollection=(name,rows)=>{ctx[name]=rows;};
+  let merged;
+  try{
+    assert.equal(await batchMidLodBuildingMeshes({yieldToMainThread:async()=>{}}),2);
+    merged=ctx.buildingMeshes.find(m=>m.userData.isBuildingBatch);assert.ok(merged);
+    const finalBefore=bytes(merged.geometry);
+    assert.equal(shared.byteLength,64*1024,'Retained singleton keeps its own source page alive');
+    assert.deepEqual(bytes(sources[2].geometry),singletonBefore);
+    assert.equal(releaseRetiredBuildingCpuBuffers(sources[0].geometry),0,'Retirement is idempotent');
+    assert.equal(finishPrivateBuildingStorage(sources[2].geometry),true);
+    assert.equal(finishPrivateBuildingStorage(sources[2].geometry),false);
+    assert.deepEqual(bytes(sources[2].geometry),singletonBefore);
+    assert.ok(sources[2].geometry.attributes.position.array.buffer.byteLength<64*1024);
+    assert.equal(shared.byteLength,0);assert.deepEqual(bytes(clone),cloneBefore);assert.deepEqual(bytes(merged.geometry),finalBefore);
+  }finally{
+    for(const mesh of [...sources,...(merged?[merged]:[])])mesh.geometry.dispose();clone.dispose();material.dispose();merged?.material.dispose();
+    for(const key of ['buildingMeshes','addEarthWorldObject','replaceWorldCollection','_lastBuildingBatchStats'])delete ctx[key];
+  }
+});
+
+test('construction storage bounds retained pages and permits later independent attribute edits', () => {
+  const arena=createBuildingConstructionArena(128);
+  const first=markPrivateBuildingGeometry(new THREE.BufferGeometry(),arena);
+  const a=allocatePrivateBuildingStorage(first,80);first.setAttribute('position',new THREE.BufferAttribute(new Float32Array(a.buffer,a.byteOffset,20),1));
+  first.attributes.position.array.fill(7);
+  const second=markPrivateBuildingGeometry(new THREE.BufferGeometry(),arena);
+  const b=allocatePrivateBuildingStorage(second,320);second.setAttribute('position',new THREE.BufferAttribute(new Float32Array(b.buffer,b.byteOffset,80),1));
+  assert.notEqual(a.buffer,b.buffer);assert.equal(b.buffer.byteLength,320);
+  assert.equal(releaseRetiredBuildingCpuBuffers(first),128);assert.equal(b.buffer.byteLength,320);
+  arena.close();
+  const later=allocatePrivateBuildingStorage(second,16);assert.notEqual(later.buffer,b.buffer);assert.equal(later.buffer.byteLength,16);
+  second.setAttribute('updated',new THREE.BufferAttribute(new Float32Array(later.buffer),1));
+  assert.equal(releaseRetiredBuildingCpuBuffers(second),336);assert.equal(b.buffer.byteLength,0);
+  first.dispose();second.dispose();
+});
 globalThis.THREE = THREE;
 
 test('unmarked geometry remains reusable; private backing stores release exactly once', () => {

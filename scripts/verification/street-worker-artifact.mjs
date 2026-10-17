@@ -28,7 +28,7 @@ for(const [entry,configKey] of [['street-pavement-worker','streetPavementWorkerU
   });
   worker.on('message',message=>message.type==='error'?pending?.reject(new Error(message.message)):pending?.resolve(message));
   worker.on('error',error=>pending?.reject(error));
-  const request=async data=>{const response=receive();worker.postMessage(data);return response;};
+  const request=async (data,transfer=[])=>{const response=receive();worker.postMessage(data,transfer);return response;};
   try{
     assert.equal((await receive()).type,'ready');
     const prepared=await request({type:'prepare',input});
@@ -47,6 +47,12 @@ for(const [entry,configKey] of [['street-pavement-worker','streetPavementWorkerU
     }
     assert.equal(tiles,prepared.tiles);assert.ok(nonempty>0,`${entry} must generate pavement`);
     if(entry==='street-pavement-worker'){
+      const positions=new Float32Array([0,0,0,0,.25,1,1,0,0]);
+      const indexed=await request({type:'index',positions},[positions.buffer]);
+      assert.equal(positions.byteLength,0);
+      assert.equal(indexed.type,'indexed');
+      assert.deepEqual(indexed.positions,new Float32Array([0,0,0,0,.25,1,1,0,0]));
+      assert.deepEqual(indexed.indices,new Uint16Array([0,1,2]));
       const cached=Object.fromEntries([...packets].map(([key,packet])=>[key,packet.fingerprint]));
       await request({type:'prepare',input,cached});
       for(let i=0;i<tiles;i++){

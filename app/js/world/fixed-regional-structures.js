@@ -218,16 +218,54 @@ function hasOnlyAssociatedStructureName(way) {
       .some(value => String(value || '').trim());
 }
 
+function isTransportWay(way) {
+  return way?.type === 'way' && !!way.tags?.highway &&
+    Array.isArray(way.nodes) && way.nodes.length >= 2 && way.tags.area !== 'yes';
+}
+
+function findCoveredStructureIds(exact, generalized) {
+  const options = {allowCurvedSegments: true};
+  const covered = findCoveredCoarseRoadIds(exact, generalized, options);
+  const byKey = new Map();
+  for (const road of exact) {
+    if (!byKey.has(road.key)) byKey.set(road.key, []);
+    byKey.get(road.key).push(road);
+  }
+  const sameEndpoint = (a, b) => Math.hypot(a.x - b.x, a.z - b.z) <= 1.5;
+  for (const road of generalized) {
+    if (covered.has(road.id)) continue;
+    for (const source of byKey.get(road.key) || []) {
+      // A simplified short bridge can cut a shallow curve between the same
+      // two abutments. Require BOTH complete endpoints to match within the
+      // 1.5 m source coverage envelope before using the 2.25 m conflation
+      // corridor. A partial route, offset parallel span or crossing does not
+      // qualify. Every point still needs coverage by this one exact source.
+      const forward = sameEndpoint(road.points[0], source.points[0]) &&
+        sameEndpoint(road.points.at(-1), source.points.at(-1));
+      const reverse = !road.directed && sameEndpoint(road.points[0], source.points.at(-1)) &&
+        sameEndpoint(road.points.at(-1), source.points[0]);
+      if (!forward && !reverse) continue;
+      if (findCoveredCoarseRoadIds([source], [road], {...options, tolerance: 2.25}).has(road.id)) {
+        covered.add(road.id);
+        break;
+      }
+    }
+  }
+  return covered;
+}
+
 function fullyCoveredAssociatedStructures(exactWays, generalizedWays, nodes, originLatitude) {
   const records = (ways, level) => ways.flatMap(way => {
     if (way.tags?._sourceTruncated === 'yes') return [];
     const points = way.nodes.map(id => projectedStructurePoint(nodes.get(id), originLatitude));
     if (points.some(point => !point)) return [];
-    const layer = Number(way.tags?.layer || 0);
-    if (!Number.isFinite(layer)) return [];
+    const rawLayer = String(way.tags?.layer ?? '').trim();
+    const layer = level === 1 && rawLayer === '' ? null : Number(rawLayer || 0);
+    if (layer !== null && !Number.isFinite(layer)) return [];
+    const family = `${structureFamily(way.tags)}:${way.tags.highway}`;
     return [{
-      id: way.id, level,
-      key: `${structureFamily(way.tags)}:${way.tags.highway}:${layer}`,
+      id: way.id, level, family, layer,
+      key: `${family}:${layer}`,
       oneway: way.tags.oneway || '',
       directed: ['yes', '1', 'true', '-1'].includes(String(way.tags.oneway || '')),
       points: points.map(point => ({x: point.x, z: point.y}))
@@ -235,19 +273,34 @@ function fullyCoveredAssociatedStructures(exactWays, generalizedWays, nodes, ori
   });
   // A nearby map label cannot identify a structure. Ignore that label only
   // when every segment is covered within 1.5 m by accepted exact geometry of
-  // the same class and layer. Partial overlaps and neighboring corridors keep
-  // their fallback. In particular, exact building_passage remains at grade.
-  return findCoveredCoarseRoadIds(records(exactWays, 2), records(generalizedWays, 1));
+  // the same class and a compatible layer. Shortbread's absent layer is
+  // unknown, not an assertion of layer zero. Match an unknown layer only when
+  // one exact vertical level covers the entire route. Explicit other levels,
+  // ambiguous stacked corridors and partial coverage retain their fallback.
+  const exact = records(exactWays, 2);
+  const generalized = records(generalizedWays, 1);
+  const covered = findCoveredStructureIds(exact, generalized.filter(road => road.layer !== null));
+  const unknown = generalized.filter(road => road.layer === null);
+  const matches = new Map();
+  for (const layer of new Set(exact.map(road => road.layer))) {
+    const candidates = unknown.map(road => ({...road, key: `${road.family}:${layer}`}));
+    for (const id of findCoveredStructureIds(exact, candidates)) {
+      matches.set(id, (matches.get(id) || 0) + 1);
+    }
+  }
+  for (const [id, count] of matches) if (count === 1) covered.add(id);
+  return covered;
 }
 
 export function pruneSupersededGeneralizedStructures(ways = [], nodes = {}) {
   const worldWays = Array.isArray(ways) ? ways : [];
   const nodeMap = structureNodeMapFromLookup(nodes);
-  const exactWays = worldWays.filter((way) =>
-    isDriveableStructureWay(way) &&
+  const exactTransport = worldWays.filter((way) =>
+    isTransportWay(way) &&
     String(way.tags?._sourceCompleteness || '') !== 'generalized'
   );
-  if (exactWays.length === 0) {
+  const exactWays = exactTransport.filter(isDriveableStructureWay);
+  if (exactTransport.length === 0) {
     return Object.freeze({
       ways: worldWays,
       exactStructures: 0,
@@ -260,21 +313,27 @@ export function pruneSupersededGeneralizedStructures(ways = [], nodes = {}) {
     nodeMap,
     originLatitude
   );
-  const associatedWays = worldWays.filter(way => isDriveableStructureWay(way) &&
-    way.tags?._sourceCompleteness === 'generalized' && hasOnlyAssociatedStructureName(way));
-  const fullyCovered = fullyCoveredAssociatedStructures(exactWays, associatedWays, nodeMap, originLatitude);
+  // Exact bridge/tunnel imports also include their surface approaches. Leaving
+  // the lower-resolution copy of an approach creates two physical heights at
+  // the very same abutment. Pedestrian tunnels have the same ownership rule.
+  // Apply the complete geometric proof to all transport collections, only
+  // after ground acceptance. Inferred map labels cannot veto that proof.
+  const associatedWays = worldWays.filter(way => isTransportWay(way) &&
+    way.tags?._sourceCompleteness === 'generalized' &&
+    (hasOnlyAssociatedStructureName(way) || !normalizedStructureName(way.tags)));
+  const fullyCovered = fullyCoveredAssociatedStructures(exactTransport, associatedWays, nodeMap, originLatitude);
   let supersededGeneralizedStructures = 0;
   const retained = worldWays.filter((way) => {
-    if (!isDriveableStructureWay(way) ||
+    if (!isTransportWay(way) ||
         String(way.tags?._sourceCompleteness || '') !== 'generalized') return true;
-    const spatialDuplicate = hasOnlyAssociatedStructureName(way)
-      ? fullyCovered.has(way.id)
-      : generalizedStructureDuplicatesExact(
+    const spatialDuplicate = fullyCovered.has(way.id) ||
+      (isDriveableStructureWay(way) && !hasOnlyAssociatedStructureName(way) &&
+      generalizedStructureDuplicatesExact(
       way,
       nodeMap,
       originLatitude,
       exactSpatialIndex
-    );
+    ));
     // A structure name identifies a corridor, not a physical surface extent.
     // Current mapped ways can split one named bridge into deck and approach
     // fragments. Only proven same-family segment overlap may retire the

@@ -70,3 +70,21 @@ test('the spatial index keeps public snapshots independent and observes suppress
     initial.length=0;assert.deepEqual(getNearbyBuildings(0,0,20),[b]);
   }finally{clearBuildingSpatialIndex();Object.assign(ctx,saved);}
 });
+
+
+test('distant collider profiles are not evaluated, while nearby height and live movement still govern contact',()=>{
+  let verticalReads=0;
+  const distant=Array.from({length:199},(_,i)=>({...box(`remote-${i}`,1000+i*50),
+    get minY(){verticalReads++;return .1;},get maxY(){verticalReads++;return 4.1;}}));
+  const near={...box('near'),minY:8.1,maxY:12.1};
+  const query=createBuildingCollisionQuery({buildings:[near],dynamicBuildingColliders:distant});
+  assert.equal(query(0,0,.4,{actorBaseY:100.2,actorHeight:1.9}).collision,false);
+  assert.equal(verticalReads,0,'Unrelated geographic obstacles must not evaluate vertical profiles');
+  assert.equal(query(0,0,.4,{actorBaseY:9.1,actorHeight:1.9}).building,near);
+  assert.equal(verticalReads,0);
+  // Moving a dynamic obstacle into range must be visible immediately; no
+  // new index or height cache may hide current bounds or authoring edits.
+  Object.assign(distant[0],{minX:-1,maxX:1});
+  assert.equal(query(0,0,.4,{actorBaseY:1.1,actorHeight:1.9}).building,distant[0]);
+  assert.ok(verticalReads>0);
+});

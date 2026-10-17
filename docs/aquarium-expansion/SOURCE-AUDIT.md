@@ -1,7 +1,53 @@
 # Aquarium integration audit
 
-October 12, 2026. Working source: `steven/visual-quality`, museum checkpoint
+Updated October 13, 2026. Current working source: `steven/visual-quality` in the
+architecture-evaluation worktree, confirmed by CURRENT-STATE.md. Initial museum checkpoint
 `f86c16513b95`. This is an implementation ledger, not a release certification.
+
+## October 13 continuation
+
+The attached brief was read in a different, unrelated math checkout. Read-only
+discovery found older Documents and Developer checkouts; CURRENT-STATE.md in
+the newer worktree explicitly resolves current repository/branch authority.
+No older checkout was edited. Existing uncommitted waterfront, exterior and
+transport repairs were preserved; they are separate work with their own ledger.
+
+Re-read the actual aquarium content, layout, construction, optics, runtime,
+native panel and verifier alongside the existing interior expansion and reality
+capture records. Admission remains in `building-entry.js` / `interiors.js`; shell
+and collision remain in the shared compiler. Source IDs plus footprint plus
+mapped door remain required. A partial tank configuration was already present,
+so this continuation extends it rather than building another aquarium engine.
+
+`aquarium-content.js` now contains a reusable habitat record with scientific
+species identity, source IDs, geographic building, viewing floors, model IDs,
+bounded game populations, placement/geometry confidence and Journal policy.
+`aquarium-habitat.js` is a pure authoring/motion helper; it owns no renderer,
+RAF, player state, assets or publication. `aquarium-runtime.js` remains the single
+population/clock/disposal owner. Existing static `aquariumSwimPose` callers remain
+compatible. The existing content record version advances while event IDs remain
+stable, preserving saved observations.
+
+Fresh public GitHub and OSM metadata is pinned in
+[source-refresh evidence](evidence/2026-10-13-source-refresh.json). All five
+candidate heads and the Pier 3/Pier 4 revisions match the earlier review. The
+entrance node still has only `entrance=yes`; no main/member/exit role is implied.
+No sufficiently licensed exact interior asset has been established.
+
+Additional inspected owners: `world/featured-arrivals.js` and the existing
+featured-landmark data retain discovery/search responsibility; a new duplicate
+POI registry is unnecessary. `poi/semantic-authority.js` does not authorize
+named-venue geometry. `assets/model-asset-runtime.js` retains bounded downloads,
+rig clones, shared templates and explicit instance retirement. Native aquarium
+UI reuses `screen-layout.js` and the existing gallery style tokens. Journal
+events use `discovery/profile-store.js`; no wild Field Guide or mission reward
+is issued. `functions/community-reality-capture.js` retains explicit property
+permission, private access, review and publication gates. No Firebase rules,
+cloud data, credentials or production package were changed by this continuation.
+
+The table and findings below document the original audit; missing capabilities
+there are superseded only by the implementation and current verification above
+and in [VERIFICATION](VERIFICATION.md).
 
 ## Corrections to the supplied brief
 

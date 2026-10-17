@@ -11,6 +11,8 @@ import { startStaticServer } from './static-server.mjs';
 import { configureStagingAppCheck } from './staging-app-check.mjs';
 import { closeOwnedBrowser } from './owned-browser.mjs';
 import { assertReviewedRollbackRuntime } from './rollback-runtime-contract.mjs';
+import { readExecutionEvidence, compareEvidenceToBaseline, evidencePath } from './execution-evidence.mjs';
+import { discoveryWorldReady } from './complete-world-readiness.mjs';
 
 const root = process.cwd(), candidateRoot = process.env.WE3D_VERIFY_ROOT || 'dist';
 const fallbackRoot = process.argv.find(arg => arg.startsWith('--fallback='))?.slice(11);
@@ -28,14 +30,20 @@ const released = artifactIdentity(root, releasedRoot);
 const manifests = await Promise.all([candidateRoot, fallbackRoot, releasedRoot].map(dir => readFile(path.join(dir, 'build-manifest.json'), 'utf8').then(JSON.parse)));
 assert.equal(manifests[0].sourceInputFingerprint, baseline.acceptanceFingerprint, 'Candidate must match current accepted inputs');
 for (const manifest of manifests) assert.equal(manifest.firebaseProjectId, manifests[0].firebaseProjectId);
-assert.equal(manifests[2].commit, 'd8775a392c4246b2552842c37f40508bd664d4c5', 'Upgrade must start from the actual released 5.5 source');
+const releaseProgram = JSON.parse(await readFile(path.join(root, 'config/production-program-gates.json'), 'utf8'));
+assert.equal(manifests[2].commit, releaseProgram.productionBaseline.releaseCommit, 'Upgrade must start from the declared current production source');
 assert.equal(manifests[0].firebaseProjectId, 'we3d-staging-20260712', 'This test cannot target production');
+// A save-owner browser round-trip cannot establish backend compatibility on
+// its own. Require the complete backend run for these exact accepted inputs.
+const backendEvidence = readExecutionEvidence(root, 'backend');
+assert.deepEqual(compareEvidenceToBaseline(backendEvidence, baseline, 'backend', candidate), [],
+  'Complete current backend verification before accepting save/rollback compatibility');
 
 // Pin every changed runtime file to the reviewed before/after bytes. A later
 // edit to even an already-listed path requires another compatibility review.
 const compatibility = JSON.parse(await readFile(path.join(root, 'scripts/verification/rollback-runtime-review.json'), 'utf8'));
 const changed = await assertReviewedRollbackRuntime(root, manifests[1].commit, manifests[0].commit, compatibility);
-const report = { passed: false, scope: 'Actual released 5.5 save owners → candidate → compatible retained preview fallback → candidate return. Journal, Backpack v2→v3, home custody/workspace, local wallet, campaign and pending account data. Owner API fixtures, not player UX; backend authority tests remain separate.',
+const report = { passed: false, scope: 'Actual released 5.5.1 save owners → candidate → compatible retained preview fallback → candidate return. Journal, Backpack v2→v3, home custody/workspace, local wallet, campaign and pending account data. Owner API fixtures, not player UX; backend authority tests remain separate.',
   baseline, artifactIdentity: candidate, fallbackArtifactIdentity: fallback, fallbackArtifactRoot: fallbackRoot, releasedArtifactIdentity: released, releasedArtifactRoot: releasedRoot,
   compatibilityContract: compatibility.id,
   runtimeDifferences: changed, stages: [], errors: [], localFailures: [], providerDegradations: [] };
@@ -102,7 +110,7 @@ try {
     // isVisible check can skip Start entirely on a warm artifact replacement.
     await page.locator('#globeSelectorStartBtn').waitFor({state: 'visible', timeout: 60000});
     await page.locator('#globeSelectorStartBtn').click();
-    await page.waitForFunction(() => { const d = globalThis.getWorldExplorerRuntimeDiagnostics?.(); return d?.gameStarted && !d.worldLoading && d.worldDiscovery?.active; }, null, { timeout: 180000 });
+    await page.waitForFunction(discoveryWorldReady, null, { timeout: 180000, polling: 500 });
     assert.equal(await page.evaluate(() => fetch('/build-manifest.json', { cache: 'no-store' }).then(r => r.json()).then(m => m.buildId)), manifest.buildId);
     const result = await page.evaluate(async ({ seed, label, expectedMagazine, writeMagazine, previous, extended }) => {
       const { ctx } = await import('/app/js/shared-context.js?v=55');
@@ -165,6 +173,7 @@ try {
   assert.ok(sameArtifactIdentity(candidate, artifactIdentity(root, candidateRoot)));
   assert.ok(sameArtifactIdentity(fallback, artifactIdentity(root, fallbackRoot)));
   assert.ok(sameArtifactIdentity(released, artifactIdentity(root, releasedRoot)));
+  assert.deepEqual(compareEvidenceToBaseline(readExecutionEvidence(root, 'backend'), baseline, 'backend', candidate), []);
   report.passed = true;
 } catch (error) {
   report.error = error.stack;
@@ -173,7 +182,13 @@ try {
       const state = globalThis.getWorldExplorerRuntimeDiagnostics?.() || {};
       return {runtimeReady: globalThis.__WE3D_RUNTIME_READY__, gameStarted: state.gameStarted,
         worldLoading: state.worldLoading, titleVisible: state.titleVisible,
-        worldLoad: state.worldLoad, discoveryActive: state.worldDiscovery?.active,
+        worldLoad: state.worldLoad ? {
+          sequence: state.worldLoad.sequence, status: state.worldLoad.status,
+          activePhases: state.worldLoad.activePhases,
+          lastCompletedPhase: state.worldLoad.lastCompletedPhase,
+          geometryReady: state.worldLoad.geometryReady,
+          gameplayRuntimesReady: state.worldLoad.gameplayRuntimesReady
+        } : null, discoveryActive: state.worldDiscovery?.active,
         loadingText: document.getElementById('loading')?.textContent?.trim().slice(0, 500)};
     }).catch(() => null);
     await page.screenshot({path: `${output}/${stage}-failed.png`}).catch(() => {});
@@ -186,6 +201,8 @@ finally {
   finally { await server?.close(); }
 }
 const evidenceFiles = [];
+const backendEvidenceFile = path.relative(root, evidencePath(root, 'backend'));
+evidenceFiles.push({ path: backendEvidenceFile, sha256: createHash('sha256').update(await readFile(backendEvidenceFile)).digest('hex') });
 for (const file of ['report.json', ...report.stages.map(row => `${row.label}.png`)]) {
   const relative = `${output}/${file}`;
   evidenceFiles.push({ path: relative, sha256: createHash('sha256').update(await readFile(relative)).digest('hex') });

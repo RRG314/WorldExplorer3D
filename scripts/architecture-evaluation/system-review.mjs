@@ -1,4 +1,4 @@
-// Read-only runtime source inventory for the October 4 system review.
+// Read-only runtime source inventory. Pass --out to preserve earlier audits.
 // AST counts describe syntax and coupling, not runtime cost or proof of a defect.
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -6,16 +6,16 @@ import {execFileSync} from 'node:child_process';
 import {pathToFileURL} from 'node:url';
 import {createHash} from 'node:crypto';
 
-const tooling = path.resolve('output/architecture-evaluation/tooling/node_modules');
+const tooling = path.resolve(process.env.WE3D_ANALYSIS_TOOLS || 'output/architecture-evaluation/tooling/node_modules');
 const {parse} = await import(pathToFileURL(`${tooling}/@babel/parser/lib/index.js`));
 const {default: traverse} = await import(pathToFileURL(`${tooling}/@babel/traverse/lib/index.js`));
-const files = execFileSync('git', ['ls-files', 'app/js', 'js', 'functions'], {encoding:'utf8'})
+const files = execFileSync('git', ['ls-files', '--cached', '--others', '--exclude-standard', 'app/js', 'js', 'functions', 'account'], {encoding:'utf8'})
   .trim().split('\n').filter(file => /\.(?:m?js|cjs)$/.test(file) && !file.includes('/vendor/'));
 const rows=[];
 for (const file of files) {
   const source=await fs.readFile(file,'utf8');
   const ast=parse(source,{sourceType:'unambiguous'});
-  const ctxBindings=new Set(), access=[], imports=[], signals={}, emptyCatches=[];
+  const ctxBindings=new Set(), access=[], imports=[], signals={}, emptyCatches=[], events=[], persistence=[];
   const count=name=>{signals[name]=(signals[name]||0)+1;};
   const key=n=>n.computed ? (n.property.value ?? '[computed]') : n.property.name;
   function contextMember(p) {
@@ -53,7 +53,13 @@ for (const file of files) {
       const n=p.node.callee;
       const name=n.type==='Identifier'?n.name:(n.type==='MemberExpression'||n.type==='OptionalMemberExpression')?String(key(n)):'';
       if(['requestAnimationFrame','setInterval','setTimeout','addEventListener','removeEventListener','getBoundingClientRect','getComputedStyle','fixedUpdate','registerRuntimeSystem','createLifecycleScope'].includes(name))count(name);
+      if(['onSnapshot','onAuthStateChanged','subscribe','fetch','postProtectedFunction','runTransaction','openDB'].includes(name))count(name);
+      if(['addEventListener','removeEventListener','dispatchEvent','subscribe','onSnapshot'].includes(name))events.push({operation:name,event:p.node.arguments[0]?.type==='StringLiteral'?p.node.arguments[0].value:null,line:p.node.loc.start.line});
       if(n.object?.name==='localStorage'||n.object?.name==='sessionStorage')count(`${n.object.name}.${name}`);
+      if(['localStorage','sessionStorage','indexedDB'].includes(n.object?.name) || ['collection','doc','objectStore','createObjectStore','runTransaction','setDoc','updateDoc','deleteDoc'].includes(name)) {
+        persistence.push({operation:n.object?.name?`${n.object.name}.${name}`:name,line:p.node.loc.start.line,
+          literalArguments:p.node.arguments.filter(arg=>arg.type==='StringLiteral').map(arg=>arg.value)});
+      }
       if(n.object?.name==='Object'&&['assign','defineProperty','defineProperties'].includes(name)){
         const root=contextMember(p.get('arguments.0'));
         if(root){const arg=p.node.arguments[1];
@@ -64,7 +70,7 @@ for (const file of files) {
       if(name==='require'&&p.node.arguments[0]?.type==='StringLiteral')dependency(p.node.arguments[0].value,'require',p.node.loc.start.line);
     }
   });
-  rows.push({file,lines:source.split('\n').length,bytes:Buffer.byteLength(source),sha256:createHash('sha256').update(source).digest('hex'),contextImport:ctxBindings.size>0,imports,access,signals,emptyCatches});
+  rows.push({file,lines:source.split('\n').length,bytes:Buffer.byteLength(source),sha256:createHash('sha256').update(source).digest('hex'),contextImport:ctxBindings.size>0,imports,access,signals,events,persistence,emptyCatches});
 }
 const map=new Map(rows.map(r=>[r.file,r]));
 for(const r of rows)r.importedBy=rows.filter(other=>other.imports.some(i=>i.target===r.file)).map(other=>other.file);
@@ -80,13 +86,15 @@ for(const file of files)if(!index.has(file))visit(file);
 const roots=new Map();for(const r of rows)for(const a of r.access){const root=a.member.split('.')[1];if(!roots.has(root))roots.set(root,{root,readers:new Set(),writers:new Set(),calls:0});const v=roots.get(root);v[a.kind==='write'||a.kind==='delete'?'writers':'readers'].add(r.file);if(a.kind==='call')v.calls++;}
 const contextRoots=[...roots.values()].map(r=>({...r,readers:[...r.readers],writers:[...r.writers]})).sort((a,b)=>b.writers.length-a.writers.length);
 const summary={files:rows.length,lines:rows.reduce((a,r)=>a+r.lines,0),bytes:rows.reduce((a,r)=>a+r.bytes,0),contextModules:rows.filter(r=>r.contextImport).length,contextMembers:contextRoots.length,contextWriterModules:rows.filter(r=>r.access.some(a=>a.kind==='write')).length,staticCycles:cycles.length,
-  domains:Object.fromEntries(['app/js','js','functions'].map(prefix=>[prefix,{files:rows.filter(r=>r.file.startsWith(prefix+'/')).length,lines:rows.filter(r=>r.file.startsWith(prefix+'/')).reduce((a,r)=>a+r.lines,0)}])),
+  domains:Object.fromEntries(['app/js','js','functions','account'].map(prefix=>[prefix,{files:rows.filter(r=>r.file.startsWith(prefix+'/')).length,lines:rows.filter(r=>r.file.startsWith(prefix+'/')).reduce((a,r)=>a+r.lines,0)}])),
   signals:rows.reduce((sum,r)=>{for(const [key,value]of Object.entries(r.signals))sum[key]=(sum[key]||0)+value;return sum;},{}),
   largeFiles:rows.filter(r=>r.lines>1000).length,
   largest:rows.slice().sort((a,b)=>b.lines-a.lines).slice(0,20).map(({file,lines,bytes})=>({file,lines,bytes})),
   widest:rows.slice().sort((a,b)=>b.importedBy.length-a.importedBy.length).slice(0,15).map(r=>({file:r.file,importers:r.importedBy.length})),
   multiwriter:contextRoots.slice(0,18).map(r=>({root:r.root,writers:r.writers.length,readers:r.readers.length}))};
-const out='docs/system-review/2026-10-04';await fs.mkdir(out,{recursive:true});
+const outIndex=process.argv.indexOf('--out');
+if(outIndex!==-1&&!process.argv[outIndex+1])throw new Error('--out requires a directory');
+const out=outIndex===-1?'docs/system-review/2026-10-04':process.argv[outIndex+1];await fs.mkdir(out,{recursive:true});
 const metadata={source:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),method:'Fresh Babel AST of tracked runtime JS excluding vendor. Direct binding-aware imported-context accesses and literal dependencies; alias/transitive/reflective writes are not counted. Syntax counts are not performance, defect or coverage metrics.',summary,cycles};
 // One record per source file avoids an unwieldy multi-ten-thousand-line diff.
 await fs.writeFile(`${out}/inventory.json`,JSON.stringify(metadata,null,2).slice(0,-1)+',\n"contextRoots":[\n'+contextRoots.map(r=>JSON.stringify(r)).join(',\n')+'\n],\n"rows":[\n'+rows.map(r=>JSON.stringify(r)).join(',\n')+'\n]}\n');

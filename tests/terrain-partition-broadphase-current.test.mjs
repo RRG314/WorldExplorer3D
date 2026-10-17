@@ -15,3 +15,21 @@ test('cell rejection never discards clipped terrain support for diagonal, revers
  }
  assert.ok(rejected>500);
 });
+
+
+test('borrowed clipping storage grows once and never publishes stale vertices after shorter or empty clips',()=>{
+ const p=new Float32Array([0,0,0,1,2,0,0,-1,1,1,1,1]);
+ const pair=[{positions:p,a:0,b:6,c:3,denominator:-1},{positions:p,a:3,b:6,c:9,denominator:-1}];
+ const supports=Array.from({length:200},()=>pair).flat(),points=[{x:0,z:0},{x:0,z:1},{x:1,z:0}];
+ const workspace={output:new Float64Array(0),poly:[],next:[]};
+ const expected=projectDecalTriangle(points,supports,.012),saved=expected.slice();
+ const large=projectDecalTriangle(points,supports,.012,workspace);
+ assert.ok(large instanceof Float64Array);assert.deepEqual(Array.from(large),expected);
+ const storage=large.buffer;
+ assert.equal(projectDecalTriangle(points,[],.012,workspace).length,0);
+ const small=projectDecalTriangle(points,pair,.012,workspace);
+ assert.equal(small.buffer,storage);assert.deepEqual(Array.from(small),projectDecalTriangle(points,pair,.012));
+ assert.deepEqual(expected,saved,'standalone results retain independent storage');
+ const other=projectDecalTriangle(points,pair,.012,{output:[],poly:[],next:[]});
+ assert.notEqual(other.buffer,storage);
+});

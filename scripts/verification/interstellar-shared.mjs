@@ -1,3 +1,4 @@
+import {browserEmulatorSettings} from './backend-environment.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -20,14 +21,12 @@ const failures = [];
 
 async function createPlayer(label, viewport) {
   const context = await browser.newContext({ viewport, hasTouch: viewport.width < 600 });
-  await context.addInitScript(({ functionsOrigin, firebaseConfig }) => {
+  await context.addInitScript(({ functionsOrigin, firebaseConfig, emulators }) => {
     globalThis.WORLD_EXPLORER_FIREBASE = Object.freeze({ ...firebaseConfig });
     globalThis.WORLD_EXPLORER_FIREBASE_ENV = 'staging';
-    globalThis.WORLD_EXPLORER_FIREBASE_EMULATORS = Object.freeze({
-      enabled: true, host: '127.0.0.1', authPort: 9099, firestorePort: 8080
-    });
+    globalThis.WORLD_EXPLORER_FIREBASE_EMULATORS = Object.freeze(emulators);
     globalThis.WORLD_EXPLORER_FUNCTIONS_ORIGIN = functionsOrigin;
-  }, { functionsOrigin, firebaseConfig });
+  }, { functionsOrigin, firebaseConfig, emulators:browserEmulatorSettings() });
   const page = await context.newPage();
   page.on('pageerror', (error) => failures.push(`${label}: ${error.stack || error}`));
   await page.goto(`${baseUrl}/app/?launch=space`, { waitUntil: 'load', timeout: 120_000 });

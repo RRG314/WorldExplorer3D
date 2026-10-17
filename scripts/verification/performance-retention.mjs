@@ -4,7 +4,8 @@ import { sampleFrameWindow } from './frame-window.mjs';
 import { frameHitches } from './frame-hitches.mjs';
 import {planRoadRoute,followRoadRoute} from './travel-road-route.mjs';
 import {followFlightOrbit} from './travel-flight-orbit.mjs';
-import {sustainedTraversalObserved} from './sustained-traversal-contract.mjs';
+import {sustainedTraversalObserved,streetDetailTurnovers} from './sustained-traversal-contract.mjs';
+import {installTravelTestPlacement} from './travel-test-placement.mjs';
 import { mkdir, readFile, writeFile, mkdtemp } from 'node:fs/promises';
 import {createWriteStream} from 'node:fs';
 import {finished} from 'node:stream/promises';
@@ -15,6 +16,8 @@ import { startStaticServer } from './static-server.mjs';
 import { requirePerformanceHost, requireHardwareGraphics } from './performance-host.mjs';
 import { collectBrowserGraphicsErrors } from './browser-graphics-errors.mjs';
 import {artifactIdentity} from './artifact-identity.mjs';
+import {measureRetainedHeap} from './retained-heap.mjs';
+import {performanceLaunchSummary} from './performance-launch-summary.mjs';
 
 // Reject cloud/other hardware before opening a browser or loading a world.
 const hostAuthority = requirePerformanceHost();
@@ -155,9 +158,9 @@ async function waitForPlayable(page) {
   await page.waitForSelector('#loading.show', { timeout: 30_000 });
   await page.waitForFunction(() => !document.getElementById('loading')?.classList.contains('show'), null, { timeout: 300_000 });
   await page.waitForFunction(() => {
-    const state = globalThis.getWorldExplorerRuntimeDiagnostics?.();
+    const state = globalThis.__WE3D_PERF_CONTEXT__;
     return state?.gameStarted === true && state.worldLoading === false &&
-      Number(state.worldCounts?.buildings || 0) > 0 && Number(state.worldCounts?.roads || 0) > 0;
+      state.buildings.length > 0 && state.roads.length > 0;
   }, null, { timeout: 300_000, polling: 500 });
   await page.waitForTimeout(2_500);
 }
@@ -170,6 +173,7 @@ async function launchWorld(client) {
   });
   milestones.documentLoadedMs = Date.now() - startedAt;
   await client.page.waitForFunction(() => globalThis.__WE3D_RUNTIME_READY__ === true, null, { timeout: 120_000 });
+  await client.page.evaluate(async()=>{globalThis.__WE3D_PERF_CONTEXT__=(await import('/app/js/shared-context.js?v=55')).ctx;});
   milestones.runtimeReadyMs = Date.now() - startedAt;
   const titleHeapBytes = await heapUsedBytes(client.cdp);
   await client.page.waitForSelector('#globeSelectorScreen.show', { timeout: 60_000 });
@@ -181,14 +185,7 @@ async function launchWorld(client) {
   await waitForPlayable(client.page);
   milestones.playableMs = Date.now() - startedAt;
   await client.page.evaluate(async()=>{globalThis.__WE3D_PERF_CONTEXT__=(await import('/app/js/shared-context.js?v=55')).ctx;});
-  const diagnostics = await client.page.evaluate(() => {
-    const state = globalThis.getWorldExplorerRuntimeDiagnostics?.() || {};
-    return {
-      worldLoad: state.worldLoad || null,
-      performance: state.performance || null,
-      transportCompilation: state.transportCompilation || null
-    };
-  });
+  const diagnostics = await client.page.evaluate(performanceLaunchSummary);
   return { firstPlayableMs: milestones.playableMs, titleHeapBytes, milestones, diagnostics };
 }
 
@@ -294,6 +291,7 @@ async function measureMode(client, id, sampleMs = 5_000, movementKey = null) {
     elapsedMs: raw.elapsedMs,
     distanceTraveled:raw.distanceTraveled,
     movingMs:raw.movingMs,
+    streetTurnovers:streetDetailTurnovers(raw.background),
     distanceWorldUnits: raw.startPosition && raw.endPosition
       ? Math.hypot(raw.endPosition.x-raw.startPosition.x,raw.endPosition.z-raw.startPosition.z) : null,
     frames: deltas.length,
@@ -327,8 +325,7 @@ function modesWithinBudgets(modes, tier) {
     mode.triangles <= limit.maximumTriangles &&
     mode.programs <= limit.maximumPrograms &&
     mode.geometries <= limit.maximumGeometries &&
-    mode.textures <= limit.maximumTextures &&
-    mode.jsHeapUsedBytes <= limit.maximumJsHeapUsedBytes
+    mode.textures <= limit.maximumTextures
   );
 }
 
@@ -350,29 +347,32 @@ async function sustainedTravel(client){
   const route=await page.evaluate(`(${planRoadRoute.toString()})(globalThis.__WE3D_PERF_CONTEXT__.roads)`);
   await writeFile(`${evidenceDirectory}/sustained-road-route.json`,JSON.stringify(route));
   const samples=[];
-  // 630 seconds of active traversal. Initial placement is explicit test setup;
-  // after that each driver only observes actors and sends real keyboard input.
-  for(const [index,mode] of ['walk','drive','plane','walk','drive','plane','plane'].entries()){
-    await selectMode(page,mode,{walk:'#fWalk',drive:'#fDriving',plane:'#fPlane'}[mode]);
-    await page.locator('#travelBtn').blur();
-    await page.evaluate(({mode,route})=>{
-      const c=globalThis.__WE3D_PERF_CONTEXT__,actor=mode==='walk'?c.Walk.state.walker:mode==='drive'?c.car:c.planeMode;
-      const p=mode==='plane'?{x:750,z:0}:route.points[0],next=route.points[1];
-      const yaw=mode==='plane'?0:Math.atan2(next.x-p.x,next.z-p.z);
-      Object.assign(actor,{x:p.x,z:p.z,yaw,angle:yaw,pitch:0,roll:0,pitchRate:0,rollRate:0,yawRate:0,lookYawOffset:0,cameraYaw:0,cameraPitch:0,cameraLookTimer:0});
-      if(mode==='plane')Object.assign(actor,{y:220,speed:80,horizontalSpeed:80,vx:0,vy:0,vz:80,throttle:1,airborne:true,stalled:false,flightPathAngle:0,climbRate:0,turnRate:0,angleOfAttack:0,barrelRollActive:false});
-      else Object.assign(actor,{y:mode==='walk'?c.GroundHeight.walkSurfaceY(p.x,p.z)+1.7:c.GroundHeight.carCenterY(p.x,p.z),speed:0,vFwd:0,vLat:0,vx:0,vy:0,vz:0,onGround:true,isAirborne:false});
-      globalThis.__WE3D_TRAVEL_ACTOR__=actor;
-    },{mode,route});
+  // 930 seconds of active traversal. The first four-minute ground windows
+  // must complete real street turnover. Later windows retain mixed-mode checks.
+  const windows=[['walk',240000],['drive',240000],['plane',90000],['walk',90000],['drive',90000],['plane',90000],['plane',90000]];
+  for(const [index,[mode,durationMs]] of windows.entries()){
+    await recoverCaughtJourney(page,`before-placement-${mode}`);
+    const selector={walk:'#fWalk',drive:'#fDriving',plane:'#fPlane'}[mode];
+    const placement=await page.evaluateHandle(installTravelTestPlacement,{mode,selector,route});
+    try {
+      await selectMode(page,mode,selector);
+      await page.locator('#travelBtn').blur();
+      const receipt=await placement.evaluate(w=>({before:w.before,after:w.after,error:w.error}));
+      await writeFile(`${evidenceDirectory}/${mode}-${index}-setup.json`,JSON.stringify(receipt,null,2));
+      assert.equal(receipt.error,null);assert.ok(receipt.before&&receipt.after);
+      assert.deepEqual(receipt.after.pavementFocus,receipt.before.pavementFocus,'Click setup must retain accepted coverage');
+      assert.equal(receipt.after.pavementGeneration,receipt.before.pavementGeneration,'Click setup must not admit an intermediate street build');
+    } finally {await placement.evaluate(w=>w.dispose());await placement.dispose();}
     await page.waitForTimeout(1200);
     const signal={stopped:false};let driverFailure=null;
     const driver=(mode==='plane'?followFlightOrbit(page,signal):followRoadRoute(page,route,signal,{mode})).catch(error=>{driverFailure=error;return {failure:error.message};});
     let sample,progress;
-    try{sample=await measureMode(client,`${mode}-sustained-${index}`,90000);}
+    try{sample=await measureMode(client,`${mode}-sustained-${index}`,durationMs);}
     finally{signal.stopped=true;progress=await driver;await writeFile(`${evidenceDirectory}/${mode}-sustained-${index}-input.json`,JSON.stringify(progress));}
     if(driverFailure)throw driverFailure;
     sample.gameplayInterrupted=await recoverCaughtJourney(page,`after-${mode}-sustained-${index}`);
-    sample.traversalObserved=sustainedTraversalObserved(mode,sample,sample.gameplayInterrupted);
+    sample.traversalObserved=sustainedTraversalObserved(mode,sample,sample.gameplayInterrupted,durationMs);
+    sample.streetTurnoverRequired=index<2;
     sample.scenario='sustained-keyboard-route';sample.initialPlacement='Test setup only; no physics/pose writes during the window';
     samples.push(sample);console.log('[performance-retention] sustained',JSON.stringify({id:sample.id,fps:sample.averageFps,p99:sample.p99FrameMs,hitches:sample.hitches,distance:sample.distanceTraveled}));
   }
@@ -442,6 +442,14 @@ async function runDesktop() {
     const sustainedModes=sustained?await sustainedTravel(client):[];
     await recoverCaughtJourney(client.page,'before-retention');
     const modes = [walk, walkMoving, drive, driveMoving, plane,...sustainedModes];
+    // Every live timing window has finished. Retention is a separate phase:
+    // select each occupied mode normally and measure reachable JS allocation.
+    // Natural raw heap remains in each mode's original timing receipt.
+    const occupiedMemory=[];
+    for(const [mode,selector] of [['plane','#fPlane'],['walk','#fWalk'],['drive','#fDriving']]){
+      if(await client.page.evaluate(()=>globalThis.__WE3D_PERF_CONTEXT__.activeTransportActor?.()?.mode)!==mode)await selectMode(client.page,mode,selector);
+      occupiedMemory.push(await measureRetainedHeap(client.cdp,{timingComplete:true,label:mode}));
+    }
     const baselineCounts = walk.worldCounts;
     const releases = [];
     const reloadCounts = [];
@@ -524,8 +532,10 @@ async function runDesktop() {
       modeActivationResponsive: modes.filter((mode) => mode.activationMs !== undefined).every((mode) => mode.activationMs <= limit.maximumModeActivationMs),
       completeWorld: modes.every((mode) => Number(mode.worldCounts?.buildings) > 0 && Number(mode.worldCounts?.roads) > 0 && Number(mode.worldCounts?.terrainTiles) > 0),
       modesWithinBudgets: modesWithinBudgets(modes, budgets.desktopTier),
+      occupiedMemoryWithinBudget:occupiedMemory.every(sample=>sample.retainedBytes<=limit.maximumRetainedJsHeapBytes),
       activePlayHitchesWithinBudget:modes.every(mode=>mode.hitches.passed),
-      sustainedMixedTraversal:!sustained||sustainedModes.length===7&&sustainedModes.every(mode=>mode.traversalObserved)&&sustainedModes.reduce((sum,mode)=>sum+mode.elapsedMs,0)>=600000,
+      sustainedMixedTraversal:!sustained||sustainedModes.length===7&&sustainedModes.every(mode=>mode.traversalObserved)&&sustainedModes.reduce((sum,mode)=>sum+mode.elapsedMs,0)>=930000,
+      groundStreetTurnoverObserved:!sustained||sustainedModes.length>=2&&sustainedModes.filter(mode=>mode.streetTurnoverRequired).length===2&&sustainedModes.filter(mode=>mode.streetTurnoverRequired).every(mode=>mode.streetTurnovers>=1),
       noGameplayInterruptions:gameplayInterruptions.length===0,
       settledRetentionPlateau:!sustained||releases.length>=12&&releases.slice(2).every(entry=>{
         const baseline=releases[2];return Math.abs(entry.after.rendererGeometries-baseline.after.rendererGeometries)<=16&&
@@ -552,7 +562,7 @@ async function runDesktop() {
       noBrowserErrors: client.browserErrors.length === 0,
       noFailedLocalResources: client.localFailures.length === 0
     };
-    return { ok: Object.values(checks).every(Boolean), tier: budgets.desktopTier, launch, modes, releases, reloadCounts,
+    return { ok: Object.values(checks).every(Boolean), tier: budgets.desktopTier, launch, modes, occupiedMemory, releases, reloadCounts,
       transfer,shortRunTransfer,reloadTransfers,transferScope:'Original total budget through two reloads; same limits checked separately on every additional reload; cumulative transfers retained.',
       storage, checks, gameplayInterruptions, browserErrors: client.browserErrors, localFailures: client.localFailures, providerDegradations:client.providerDegradations };
   } finally {
@@ -567,6 +577,7 @@ async function runMobileRegression() {
     const launch = await launchWorld(client);
     const walkActivationMs = await selectMode(client.page, 'walk', '#fWalk');
     const modes = [{ ...(await measureMode(client, 'walk-touch-regression')), activationMs: walkActivationMs }];
+    const occupiedMemory=await measureRetainedHeap(client.cdp,{timingComplete:true,label:'walk-touch-regression'});
     await client.page.screenshot({ path: 'output/release-evidence/current/performance-mobile-390x844.png', fullPage: false });
     const storage = await storageSnapshot(client.page);
     const transfer = transferSnapshot(client);
@@ -577,12 +588,13 @@ async function runMobileRegression() {
       modeActivationResponsive: modes.filter((mode) => mode.activationMs !== undefined).every((mode) => mode.activationMs <= limit.maximumModeActivationMs),
       completeWorld: modes.every((mode) => Number(mode.worldCounts?.buildings) > 0 && Number(mode.worldCounts?.roads) > 0 && Number(mode.worldCounts?.terrainTiles) > 0),
       modesWithinBudgets: modesWithinBudgets(modes, budgets.mobileRegressionTier),
+      occupiedMemoryWithinBudget:occupiedMemory.retainedBytes<=limit.maximumRetainedJsHeapBytes,
       transferWithinBudget: transferWithinBudget(transfer, limit),
       storageWithinBudget: storage.usageBytes <= limit.maximumPersistentStorageBytes,
       noBrowserErrors: client.browserErrors.length === 0,
       noFailedLocalResources: client.localFailures.length === 0
     };
-    return { ok: Object.values(checks).every(Boolean), tier: budgets.mobileRegressionTier, launch, modes, transfer, storage, checks, browserErrors: client.browserErrors, localFailures: client.localFailures };
+    return { ok: Object.values(checks).every(Boolean), tier: budgets.mobileRegressionTier, launch, modes, occupiedMemory, transfer, storage, checks, browserErrors: client.browserErrors, localFailures: client.localFailures };
   } finally {
     await client.context.close();
   }

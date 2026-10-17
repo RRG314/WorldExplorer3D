@@ -147,8 +147,14 @@ function earthMeshVisibility(listName, mesh, visible) {
   return true;
 }
 
+// Closed visitor venues use a separate camera layer. Retain the exterior city
+// for exit, but do not traverse its transforms in main or water render passes.
+function cameraPresentsEarth() {
+  return ((appCtx.camera?.layers?.mask ?? 1) & 1) !== 0;
+}
+
 function setEarthSceneVisible(visible) {
-  const shouldShow = !!visible && stagedWorldLoadSequence === null && appCtx.worldLoading !== true;
+  const shouldShow = !!visible && cameraPresentsEarth() && stagedWorldLoadSequence === null && appCtx.worldLoading !== true;
   const root = ensureEarthSceneRoot();
   if (!root) return false;
   const signature = sceneOwnershipSignature();
@@ -242,7 +248,7 @@ function getEarthScenePublicationState() {
 
 function enforceEnvironmentSceneOwnership() {
   const env = appCtx.getEnv?.();
-  const earthVisible = env === appCtx.ENV?.EARTH && (
+  const earthVisible = env === appCtx.ENV?.EARTH && cameraPresentsEarth() && (
     appCtx.earthResumePending !== true || appCtx.earthResumeRenderReady === true
   ) && stagedWorldLoadSequence === null && appCtx.worldLoading !== true;
   const signature = sceneOwnershipSignature();

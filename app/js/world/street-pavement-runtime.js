@@ -1,11 +1,11 @@
+import {cancelUnfinishedStreetDetail,suspendStreetPreparationForInterior} from './street-interior-suspension.js';
 import {publishReferenceBlockDressing} from './reference-block-dressing.js';
 import {createPortalSurfaceClipper} from '../terrain/portal-surface-clip.js';
 import {createPavementTerrainPartitionCooperatively} from './pavement-terrain-partition.js';
 import { captureStreetSurfaceGeometry,serializeStreetSurfaceCapture } from './street-surface-capture.js';
-import { createRoadMarkingMaterial } from '../road-render.js?v=4';
-import { streetSourceInput } from './street-source-input.js';
-import {isPavementFootway,isPavementCrossing} from './compiler/pavement-footway-policy.js';
-import { indexPavementPositionsCooperatively } from './pavement-indexed-mesh.js';
+import { acquirePavementMaterials } from './pavement-materials.js';
+import {createPavementBatch,createPavementBatchContacts} from './pavement-batch-ownership.js';
+import { streetSourceInputCooperatively } from './street-source-input.js';
 import { createPavementBaseSamplerCooperatively } from './pavement-height-sampler.js';
 import { assessStreetQuality } from './street-quality-assessment.js';
 import { auditStreetCoverage } from './street-coverage.js';
@@ -13,7 +13,6 @@ import { createStreetOverview } from './street-overview.js';
 import { StreetPacketCache } from './street-packet-cache.js';
 import { streetMotion, streetPrefetch } from './street-prefetch.js';
 import { getWorkloadPolicySnapshot } from '../runtime/workload-policy.js?v=1';
-import {createConcretePavementTexture} from './pavement-texture.js';
 import {mappedPavementContactSources} from './mapped-pavement-contact.js';
 import { conformPavementMeshCooperatively } from './pavement-terrain-conformance.js';
 import { rampCurbScale } from './compiler/street-crossings.js';
@@ -25,6 +24,26 @@ import { yieldToMainThread, yieldToWorldFrame } from './cooperative-scheduling.j
 
 function focusActor(appCtx) {
   return appCtx.planeMode?.active ? appCtx.planeMode : appCtx.droneMode ? appCtx.drone : appCtx.Walk?.state?.mode === 'walk' ? appCtx.Walk.state.walker : appCtx.car;
+}
+
+// Published callbacks must not close over the asynchronous construction scope.
+// That scope also contains the previous publication and worker input; retaining
+// it links every retired window together even after GPU disposal.
+function createStreetPublication({stats,focus,groundRevision,coverageBounds,meshes,batches,contactIndex,releaseMaterials,layout}) {
+  let disposed=false;
+  const publication={stats,focus,groundRevision,coverageBounds,meshes,
+    sampleAt:(x,z)=>disposed?null:contactIndex.sampleAt(x,z),
+    retainBatch:(key,signature,owner,material)=>disposed?null:batches.get(key)?.retain(signature,owner,material),
+    dispose(){
+      if(disposed)return;disposed=true;
+      contactIndex.dispose();contactIndex=null;
+      for(const batch of batches.values())batch.release();batches.clear();
+      meshes.length=0;
+      releaseMaterials?.();releaseMaterials=null;layout=null;
+    }
+  };
+  if(layout)publication.exportLayout=()=>JSON.stringify(layout);
+  return publication;
 }
 
 async function refreshMappedPaths(appCtx,pavementBounds){
@@ -63,6 +82,9 @@ export async function publishStreetPavement(appCtx, options = {}) {
   const previous = appCtx.streetPavement;
   const replaceMappedLines=!appCtx.streetOverview?.completedBounds;
   const groundRevision = appCtx._groundSurfaceRevision || 0;
+  const sourceRevision = appCtx._streetSourceRevision || 0;
+  const surfaceOwner=packetCache.setSurfaceOwner({revision:groundRevision,contact:appCtx.roadContactIndex,
+    portals:appCtx.structureTerrainPortalDescriptors,terrain:appCtx.terrainGroup});
   const generation = appCtx._streetPavementGeneration = (appCtx._streetPavementGeneration || 0) + 1;
   const reference = options.focus || focusActor(appCtx) || { x: 0, z: 0 };
   const focus = { x: Math.round((reference.x || 0)/64)*64, z: Math.round((reference.z || 0)/64)*64 };
@@ -77,9 +99,8 @@ export async function publishStreetPavement(appCtx, options = {}) {
     }
     return bounds.minX<=coverageBounds.maxX+48 && bounds.maxX>=coverageBounds.minX-48 && bounds.minZ<=coverageBounds.maxZ+48 && bounds.maxZ>=coverageBounds.minZ-48;
   };
-  const current = () => sequence === appCtx._worldLoadSequence && generation === appCtx._streetPavementGeneration && groundRevision === (appCtx._groundSurfaceRevision || 0) && !appCtx.onMoon && !cancelled;
+  const current = () => sequence === appCtx._worldLoadSequence && generation === appCtx._streetPavementGeneration && groundRevision === (appCtx._groundSurfaceRevision || 0) && sourceRevision === (appCtx._streetSourceRevision || 0) && !appCtx.onMoon && !cancelled;
   const metersPerWorldUnit = appCtx.METERS_PER_WORLD_UNIT || 1.11;
-  const managedPaths = (appCtx.linearFeatures || []).filter(f => nearby(f) && (isPavementFootway(f) || isPavementCrossing(f)));
   const workerUrl = globalThis.__WORLD_EXPLORER_PRODUCTION__?.streetPavementWorkerUrl ||
     new URL('./compiler/street-pavement-worker.js', import.meta.url);
   const worker = new Worker(workerUrl, { type: 'module' });
@@ -92,7 +113,7 @@ export async function publishStreetPavement(appCtx, options = {}) {
     worker.onmessage=null;worker.onerror=null;
   };
   appCtx._cancelStreetPavementBuild = cancelBuild;
-  const request = data => new Promise((resolve, reject) => {
+  const request = (data, transfer = []) => new Promise((resolve, reject) => {
     if (cancelled) { reject(new Error('Street compilation superseded')); return; }
     const cleanup = () => { clearTimeout(timeout); pendingRequest = null; worker.onmessage = null; worker.onerror = null; };
     pendingRequest = () => { cleanup(); reject(new Error('Street compilation superseded')); };
@@ -105,26 +126,22 @@ export async function publishStreetPavement(appCtx, options = {}) {
       }
       cleanup(); event.data.type === 'error' ? reject(new Error(event.data.message)) : resolve(event.data); };
     worker.onerror = event => { cleanup(); reject(new Error(event.message)); };
-    try { worker.postMessage(data); } catch (error) { cleanup(); reject(error); }
+    try { worker.postMessage(data, transfer); } catch (error) { cleanup(); reject(error); }
   });
-  const source=streetSourceInput(appCtx,nearby),roadRecords=source.roads;
-  const input={...source,coverageBounds};
+  let input=null;
   let committed = false;
   const stagedLines = [];
   const batches = new Map();
-  const staged = [], texture = createConcretePavementTexture(THREE);
+  const stagedBatches = new Map();
+  const staged = [];
   let contactIndex = null, stagedWalkContactIndex = null;
-  const material = new THREE.MeshStandardMaterial({ color: 0xffffff, map: texture,
-    normalMap: appCtx.pavementNormal || null, roughnessMap: appCtx.pavementRoughness || null, roughness: 0.96, metalness: 0 });
-  material.normalScale?.set(0.12, 0.12);
-  const markingMaterial = createRoadMarkingMaterial({color:0xeee9df,roughness:.9,emissive:0,emissiveIntensity:0});
-  const curbMaterial = new THREE.MeshStandardMaterial({ color: 0x99978f, roughness: 0.96, side: THREE.DoubleSide });
+  let materialLease=null,material,markingMaterial,curbMaterial;
   const ground = (x, z) => {
     const y = appCtx.terrainMeshHeightAt?.(x, z, {ignorePortalCuts:true});
     return Number.isFinite(y) ? y : appCtx.elevationWorldYAtWorldXZ?.(x, z);
   };
   const clipGroundSurface=createPortalSurfaceClipper(appCtx.structureTerrainPortalDescriptors);
-  const stats = { tiles: 0, triangles: 0, curbTriangles: 0, markingTriangles:0, ramps:0, workerMs: 0, inferredFrontages: 0, managedPaths: managedPaths.length, residentRoads:roadRecords.length, residentBuildings:input.buildings.length, roads: appCtx.roads.length, roadMeshes: appCtx.roadMeshes.length, buildings: appCtx.buildings.length, worldLoadSequence: sequence };
+  const stats = { tiles: 0, triangles: 0, curbTriangles: 0, markingTriangles:0, ramps:0, workerMs: 0, inferredFrontages: 0, managedPaths: 0, residentRoads:0, residentBuildings:0, roads: appCtx.roads.length, roadMeshes: appCtx.roadMeshes.length, buildings: appCtx.buildings.length, worldLoadSequence: sequence };
   const phaseTimes=stats.phaseDurationsMs={};
   let phaseStart=performance.now();
   const finishPhase=name=>{const now=performance.now();phaseTimes[name]=Math.round(now-phaseStart);phaseStart=now;trace(name,{durationMs:phaseTimes[name]});};
@@ -132,7 +149,7 @@ export async function publishStreetPavement(appCtx, options = {}) {
   const sliceBudgetMs=appCtx.gameStarted&&!appCtx.worldLoading?2:8;
   const schedule={current:()=>current()&&!cancelled,yieldWork:yieldConstruction,budgetMs:sliceBudgetMs,onSlice:ms=>{stats.maxPublicationSliceMs=Math.max(stats.maxPublicationSliceMs||0,ms);}};
   const disposeLines = () => { for (const mesh of stagedLines) { mesh.parent?.remove(mesh); mesh.geometry.dispose(); mesh.material.dispose(); } };
-  const disposeStaged = () => { worker.terminate(); contactIndex?.dispose(); stagedWalkContactIndex?.dispose(); batches.clear(); for (const mesh of staged) { mesh.parent?.remove(mesh); mesh.geometry.dispose(); } texture?.dispose(); material.dispose(); curbMaterial.dispose(); markingMaterial.dispose(); staged.length = 0; };
+  const disposeStaged = () => { worker.terminate(); contactIndex?.dispose(); stagedWalkContactIndex?.dispose(); batches.clear(); for(const batch of stagedBatches.values())batch.release();stagedBatches.clear();materialLease?.release(); staged.length = 0; };
     if (new URLSearchParams(location.search).has('streetDiagnostics')) {
       let panel = document.getElementById('streetSurfaceDiagnostics');
       if (!panel) {
@@ -247,31 +264,51 @@ export async function publishStreetPavement(appCtx, options = {}) {
       panel.querySelector('pre').textContent = JSON.stringify(stats, null, 2);
     }
   try {
+    materialLease=acquirePavementMaterials(appCtx);
+    ({material,markingMaterial,curbMaterial}=materialLease);
+    // Filtering a full location is itself substantial work, even though only
+    // nearby records go to the worker. Share the publication's cancellation
+    // and slice budget so starting a new sidewalk window cannot stop driving.
+    const source=await streetSourceInputCooperatively(appCtx,nearby,schedule);
+    input={...source,coverageBounds};
+    stats.managedPaths=source.linearFeatures.length;
+    stats.residentRoads=source.roads.length;stats.residentBuildings=source.buildings.length;
+    finishPhase('source-snapshot');
     partitionSurface = await createPavementTerrainPartitionCooperatively(appCtx.terrainGroup?.children, {includeFarTerrain:true,bounds:coverageBounds,...schedule});
     finishPhase('terrain-support');
-    const prepared = await request({ type: 'prepare', input, cached:packetCache.manifest(), debug: new URLSearchParams(location.search).has('streetDiagnostics') });
+    const prepared = await request({ type: 'prepare', input, cached:packetCache.manifest(), surfaces:packetCache.surfaceManifest(surfaceOwner), debug: new URLSearchParams(location.search).has('streetDiagnostics') });
     stats.plannedTiles = prepared.tiles;
     finishPhase('source-prepare');
-    trace('prepared',{tiles:prepared.tiles,paths:managedPaths.length});
+    trace('prepared',{tiles:prepared.tiles,paths:stats.managedPaths});
     for (;;) {
       if (!current()) { disposeStaged(); return null; }
       let packet = await request({ type: 'next' });
       if (packet.type === 'complete') break;
+      let cachedSurface=null;
       if(packet.type==='cached'){
-        const reused=packetCache.get(packet.key,packet.fingerprint);
-        if(reused){packet={...reused,completed:packet.completed,total:packet.total};stats.reusedCells=(stats.reusedCells||0)+1;}
+        const validationDuration=Number(packet.durationMs)||0;
+        const revalidated=!packet.reuseFingerprint||packetCache.revalidateSurface(packet,surfaceOwner);
+        const reused=revalidated?packetCache.getPublication(packet.key,packet.fingerprint,surfaceOwner):null;
+        if(reused&&packet.reuseFingerprint)stats.revalidatedSurfaceCells=(stats.revalidatedSurfaceCells||0)+1;
+        if(reused){cachedSurface=reused.surface;packet={...reused.packet,durationMs:validationDuration,completed:packet.completed,total:packet.total};stats.reusedCells=(stats.reusedCells||0)+1;}
         else {packet=await request({type:'retry'});packetCache.put(packet);}
       }else packetCache.put(packet);
       if(packet.completed%16===0)trace('cell',{completed:packet.completed,total:packet.total});
-      const tile = { ...packet, segments: packet.segments.map(s => ({ ...s, road: appCtx.roads[s.roadIndex] })) };
       const inferredFrontages = packet.inferredFrontages;
       const diagnostics = document.querySelector('#streetSurfaceDiagnostics pre');
       if (diagnostics) diagnostics.textContent = JSON.stringify({...stats,completedTiles:packet.completed,plannedTiles:packet.total},null,2);
       if (appCtx.worldLoading && current()) appCtx.showLoad?.('', { phase: 'publishStreetPavement', completed: packet.completed, total: packet.total });
       stats.workerMs += Number(packet.durationMs) || 0;
-      if (!packet.mesh.vertices.length && !packet.mesh.markingVertices?.length) continue;
-      const mesh = packet.mesh;
-      const sample = await createPavementBaseSamplerCooperatively({segments:tile.segments,ground,roadContactIndex:appCtx.roadContactIndex,profileCache,groundRevision},schedule);
+      const mesh = cachedSurface || packet.mesh;
+      if (!mesh.vertices.length && !mesh.markingVertices?.length) continue;
+      let markingVertices=cachedSurface?.markingVertices || [];
+      let addedTriangles=cachedSurface?.addedTriangles || 0;
+      const baseTriangles=cachedSurface?.baseTriangles ?? mesh.vertices.length/9;
+      if(cachedSurface){
+        stats.reusedSurfaceCells=(stats.reusedSurfaceCells||0)+1;
+      }else{
+      const segments=packet.segments.map(s=>({...s,road:appCtx.roads[s.roadIndex]}));
+      const sample = await createPavementBaseSamplerCooperatively({segments,ground,roadContactIndex:appCtx.roadContactIndex,profileCache,groundRevision},schedule);
       let sampleYieldAt=performance.now();
       for (const positions of [mesh.vertices, mesh.curbVertices]) for(let i=0;i<positions.length;i+=3) {
         positions[i+1] += sample(positions[i],positions[i+2]);
@@ -281,11 +318,9 @@ export async function publishStreetPavement(appCtx, options = {}) {
         }
       }
 
-      const addedTriangles = await conformPavementMeshCooperatively(mesh, sample,
+      addedTriangles = await conformPavementMeshCooperatively(mesh, sample,
         (x, z) => sample(x, z) + (.12 / metersPerWorldUnit) * rampCurbScale(x, z, packet.ramps || []),
         {partitionSurface,yieldWork:yieldConstruction,budgetMs:sliceBudgetMs,current:schedule.current,onSlice:ms=>{stats.maxConformanceSliceMs=Math.max(stats.maxConformanceSliceMs||0,ms);}});
-      if(addedTriangles>(stats.highestRefinement?.addedTriangles||0))stats.highestRefinement={cell:packet.key,bounds:packet.bounds,addedTriangles,baseTriangles:mesh.vertices.length/9-addedTriangles};
-      stats.terrainRefinementTriangles = (stats.terrainRefinementTriangles || 0) + addedTriangles;
       await yieldConstruction();
       if (!current()) { disposeStaged(); return null; }
       // Retire the cut from render and walk-contact geometry together. Keep
@@ -293,7 +328,6 @@ export async function publishStreetPavement(appCtx, options = {}) {
       // down a tunnel's excavation wall just because its floor is lower.
       mesh.vertices=clipGroundSurface(mesh.vertices).positions;
       mesh.curbVertices=clipGroundSurface(mesh.curbVertices).positions;
-      let markingVertices=[];
       let markingYieldAt=performance.now();
       for(let i=0;i<(mesh.markingVertices?.length || 0);i+=9) {
         const points=[];
@@ -306,6 +340,17 @@ export async function publishStreetPavement(appCtx, options = {}) {
         }
       }
       markingVertices=clipGroundSurface(markingVertices).positions;
+      // Reuse the final render-precision cell only under the same physical
+      // owners. Unchanged render/contact batches retain their existing lease;
+      // changed batches consume private copies of these fitted cell arrays.
+      mesh.vertices=new Float32Array(mesh.vertices);
+      mesh.curbVertices=new Float32Array(mesh.curbVertices);
+      markingVertices=new Float32Array(markingVertices);
+      if(current())packetCache.putSurface(packet.key,packet.fingerprint,surfaceOwner,
+        {vertices:mesh.vertices,curbVertices:mesh.curbVertices,markingVertices,addedTriangles,baseTriangles});
+      }
+      if(addedTriangles>(stats.highestRefinement?.addedTriangles||0))stats.highestRefinement={cell:packet.key,bounds:packet.bounds,addedTriangles,baseTriangles};
+      stats.terrainRefinementTriangles=(stats.terrainRefinementTriangles||0)+addedTriangles;
       stats.markingTriangles+=markingVertices.length/9; stats.ramps+=packet.rampCount || 0;
       stats.tiles++; stats.triangles += mesh.vertices.length / 9; stats.curbTriangles += mesh.curbVertices.length / 9; stats.inferredFrontages += inferredFrontages;
       const [ix,iz]=packet.key.split(':').map(Number);
@@ -313,7 +358,7 @@ export async function publishStreetPavement(appCtx, options = {}) {
         const key=`${Math.floor(ix/2)}:${Math.floor(iz/2)}:${kind}`;
         if(!batches.has(key)) batches.set(key,{chunks:[],length:0,mat,kind});
         const target=batches.get(key);
-        target.chunks.push(new Float32Array(positions));target.length+=positions.length;
+        target.chunks.push({positions,ix,iz,identity:packet.surfaceFingerprint||packet.fingerprint});target.length+=positions.length;
       }
       await yieldConstruction();
     }
@@ -321,12 +366,24 @@ export async function publishStreetPavement(appCtx, options = {}) {
     finishPhase('cell-surfaces');
     for (const [key,batch] of batches) {
       const {chunks,length,mat,kind}=batch;
+      // Cache admission may change preparation order, never final face order.
+      chunks.sort((a,b)=>a.ix-b.ix||a.iz-b.iz);
+      const signature=chunks.every(chunk=>chunk.identity)?JSON.stringify(chunks.map(({ix,iz,identity})=>[ix,iz,identity])):null;
+      const retained=previous?.retainBatch?.(key,signature,surfaceOwner,mat);
+      if(retained){
+        stagedBatches.set(key,retained);staged.push(retained.mesh);
+        chunks.length=0;batches.delete(key);stats.reusedRenderBatches=(stats.reusedRenderBatches||0)+1;
+        await yieldConstruction();continue;
+      }
       const positions=new Float32Array(length);let offset=0;
-      for(const chunk of chunks){positions.set(chunk,offset);offset+=chunk.length;}
+      for(const {positions:chunk} of chunks){positions.set(chunk,offset);offset+=chunk.length;}
       chunks.length=0;batches.delete(key);
       if(!current()) {disposeStaged();return null;}
       if(!positions.length) continue;
-      const indexed=await indexPavementPositionsCooperatively(positions,schedule);
+      const indexed=await request({type:'index',positions},[positions.buffer]);
+      if(!current()) {disposeStaged();return null;}
+      if(indexed.type!=='indexed' || !(indexed.positions instanceof Float32Array) ||
+        !(indexed.indices instanceof Uint16Array || indexed.indices instanceof Uint32Array))throw new Error('Invalid indexed pavement response');
       const geometry=new THREE.BufferGeometry();
       geometry.setAttribute('position',new THREE.BufferAttribute(indexed.positions,3));
       geometry.setIndex(new THREE.BufferAttribute(indexed.indices,1));
@@ -335,6 +392,11 @@ export async function publishStreetPavement(appCtx, options = {}) {
       geometry.setAttribute('uv',new THREE.BufferAttribute(uv,2));geometry.computeVertexNormals();geometry.computeBoundingSphere();
       const object=new THREE.Mesh(geometry,mat);object.receiveShadow=true;
       object.userData={streetPavement:true,sharedUrbanSurfaceMaterial:true,kind,worldLoadSequence:sequence};
+      let batchContact=null;
+      try {
+        if(kind==='sidewalk')batchContact=await createRoadContactIndexCooperatively([object],4,schedule);
+      } catch(error){geometry.dispose();throw error;}
+      stagedBatches.set(key,createPavementBatch({key,signature,surfaceOwner,mesh:object,contactIndex:batchContact}));
       staged.push(object);
       await yieldConstruction();
     }
@@ -355,7 +417,8 @@ export async function publishStreetPavement(appCtx, options = {}) {
     trace('mapped-paths-complete',{batches:stagedLines.length});
     // Publish all surfaces and contact data together. Old coverage is retained until this point.
     const mappedContacts=await mappedPavementContactSources(appCtx.landuseMeshes,schedule);
-    contactIndex = await createRoadContactIndexCooperatively([...staged.filter(mesh => mesh.userData.kind === 'sidewalk'),...mappedContacts], 4,{...schedule,bounds:coverageBounds});
+    const mappedContactIndex=await createRoadContactIndexCooperatively(mappedContacts,4,{...schedule,bounds:coverageBounds});
+    contactIndex=createPavementBatchContacts(stagedBatches,mappedContactIndex);
     if(replaceMappedLines){
       const nextLines=[...appCtx.linearFeatureMeshes.filter(m=>!m.userData?.isLinearFeatureBatch),...stagedLines];
       stagedWalkContactIndex=await createRoadContactIndexCooperatively(selectLinearWalkContactMeshes(nextLines),16,schedule);
@@ -365,10 +428,12 @@ export async function publishStreetPavement(appCtx, options = {}) {
     batches.clear();
     stats.indexBytes=staged.reduce((sum,mesh)=>sum+(mesh.geometry.index?.array.byteLength||0),0);
     stats.positionBytes = staged.reduce((sum, mesh) => sum + mesh.geometry.attributes.position.array.byteLength, 0);
-    const publication = { stats, focus, groundRevision, coverageBounds, meshes: staged,
-      sampleAt: (x, z) => contactIndex.sampleAt(x, z), dispose: disposeStaged };
-    if(new URLSearchParams(location.search).has('streetDiagnostics')) publication.exportLayout=()=>JSON.stringify(input);
-    for (const mesh of staged) { appCtx.addEarthWorldObject(mesh); appCtx.urbanSurfaceMeshes.push(mesh); }
+    const publication = createStreetPublication({stats,focus,groundRevision,coverageBounds,meshes:staged,batches:stagedBatches,
+      contactIndex,releaseMaterials:materialLease.release,
+      layout:new URLSearchParams(location.search).has('streetDiagnostics')?input:null});
+    for (const mesh of staged) if(!previous?.meshes.includes(mesh))appCtx.addEarthWorldObject(mesh);
+    const previousMeshes=new Set(previous?.meshes||[]);
+    appCtx.urbanSurfaceMeshes.splice(0,appCtx.urbanSurfaceMeshes.length,...appCtx.urbanSurfaceMeshes.filter(mesh=>!previousMeshes.has(mesh)),...staged);
     stats.durationMs = Math.round(performance.now() - startedAt);
     for (const mesh of stagedLines) appCtx.addEarthWorldObject(mesh);
     appCtx.streetPavement = publication;
@@ -376,7 +441,6 @@ export async function publishStreetPavement(appCtx, options = {}) {
     appCtx._streetPavementDirty = false;
     committed = true;
     if (previous) {
-      appCtx.urbanSurfaceMeshes.splice(0, appCtx.urbanSurfaceMeshes.length, ...appCtx.urbanSurfaceMeshes.filter(m => !previous.meshes.includes(m)));
       previous.dispose();
     }
     // Rebuild mapped-line presentation once, excluding only sidewalks now owned by the area compiler.
@@ -412,7 +476,8 @@ export async function publishStreetPavement(appCtx, options = {}) {
 }
 
 export function updateStreetPavementFocus(appCtx) {
-  if (appCtx.worldLoading || appCtx.onMoon || (!appCtx.streetPavement && !appCtx._streetPavementDirty) || appCtx._streetPavementUpdating || performance.now() < (appCtx._streetPavementRetryAt || 0)) return;
+  if (suspendStreetPreparationForInterior(appCtx)) return;
+  if (appCtx.worldLoading || appCtx.onMoon || (!appCtx.streetPavement && !appCtx._streetPavementDirty)) return;
   const p = focusActor(appCtx);
   if (!p) return;
   appCtx._streetMotion=streetMotion(appCtx._streetMotion,p,performance.now(),appCtx._worldLoadSequence);
@@ -426,9 +491,16 @@ export function updateStreetPavementFocus(appCtx) {
   const aerial=appCtx.planeMode?.active||appCtx.droneMode;
   const awayFromGround=Number.isFinite(ground)?p.y-ground>80:appCtx.planeMode?.airborne||appCtx.droneMode;
   if(appCtx.gameStarted&&aerial&&awayFromGround){
+    // A detail job may have started on the ground just before takeoff. Checking
+    // _streetPavementUpdating first let that obsolete job finish conformance
+    // and rebuild every mapped path while the aircraft was already high above
+    // it. Keep the accepted publication and resume nearby detail on descent.
+    cancelUnfinishedStreetDetail(appCtx);
+    if (appCtx._streetPavementUpdating) return;
     appCtx.streetOverview ||= createStreetOverview(appCtx,{onComplete:bounds=>refreshMappedPaths(appCtx,bounds)});
     appCtx.streetOverview.step(p);return;
   }
+  if (appCtx._streetPavementUpdating || performance.now() < (appCtx._streetPavementRetryAt || 0)) return;
   // Keep accepted detail until approaching its boundary. The old radial
   // 128-unit trigger replaced a 768-unit square even while the actor remained
   // deep inside it. Predict a bounded forward window from movement and the
@@ -439,7 +511,8 @@ export function updateStreetPavementFocus(appCtx) {
     if(appCtx.gameStarted){appCtx.streetOverview ||= createStreetOverview(appCtx,{onComplete:bounds=>refreshMappedPaths(appCtx,bounds)});appCtx.streetOverview.step(p);}
     return;
   }
-  appCtx._streetPavementDirty = false;
+  // Invalidation belongs to the accepted publication, not the pending job.
+  // Keep it until a current replacement commits, including across cancellation.
   appCtx._streetPavementUpdating = true;
   publishStreetPavement(appCtx,{focus:prefetch.focus}).catch(error => { appCtx._streetPavementRetryAt=performance.now()+30000; appCtx._streetPavementDirty=true; console.warn('[StreetPavement] Retaining accepted surfaces:',error); })
     .finally(()=>{appCtx._streetPavementUpdating=false;});
@@ -448,15 +521,51 @@ export function updateStreetPavementFocus(appCtx) {
 // One existing worker, one acknowledged cell in flight. Let it advance with
 // rendered frames instead of waiting for the 5 Hz visibility-maintenance tick.
 export function updateStreetOverviewFrame(appCtx) {
+  if (suspendStreetPreparationForInterior(appCtx)) return;
   if(!appCtx.gameStarted||appCtx.worldLoading||appCtx.onMoon||appCtx._streetPavementUpdating||appCtx._cancelStreetPavementBuild)return;
   const point=focusActor(appCtx);
   if(point)appCtx.streetOverview?.step(point);
 }
 
 // Set up the distant coverage material while the loading cover is still shown.
-// Source compilation stays deferred; no location data are awaited here.
+// The first-play owner awaits source compilation separately; rendering can
+// also call this synchronously to bind the stable material interface.
 export function prepareStreetOverviewMaterials(appCtx) {
   if(!appCtx.streetPavement||appCtx.onMoon||appCtx.onMars||appCtx.activePlanetaryBodyId||appCtx.activeShipInterior)return;
   if(appCtx.isEnv&&appCtx.ENV&&!appCtx.isEnv(appCtx.ENV.EARTH))return;
   appCtx.streetOverview ||= createStreetOverview(appCtx,{onComplete:bounds=>refreshMappedPaths(appCtx,bounds)});
+}
+
+export async function ensureInitialStreetPavement(appCtx,current) {
+  if(!current())return false;
+  if(!appCtx.terrainEnabled||!appCtx.scene||appCtx.onMoon||appCtx.onMars||appCtx.activePlanetaryBodyId||appCtx.activeShipInterior)return true;
+  if(appCtx.isEnv&&appCtx.ENV&&!appCtx.isEnv(appCtx.ENV.EARTH))return true;
+  if(!appCtx.worldLoading)throw new Error('Initial street preparation requires the loading cover');
+  // Late accepted terrain can retire the first pavement job. A null result is
+  // cancellation, not completion: settle it here rather than exposing an empty
+  // first frame and launching the whole construction job during movement.
+  for(let attempt=0;attempt<3;attempt++){
+    if(!current())return false;
+    const pavement=appCtx.streetPavement;
+    if(pavement&&!appCtx._streetPavementDirty&&pavement.groundRevision===(appCtx._groundSurfaceRevision||0))return true;
+    await publishStreetPavement(appCtx);
+  }
+  if(!current())return false;
+  if(appCtx.streetPavement&&!appCtx._streetPavementDirty&&appCtx.streetPavement.groundRevision===(appCtx._groundSurfaceRevision||0))return true;
+  throw new Error('Initial street surfaces could not settle on the accepted terrain');
+}
+
+export async function prepareInitialStreetCoverage(appCtx,current) {
+  if(!current())return false;
+  if(!await ensureInitialStreetPavement(appCtx,current))return false;
+  prepareStreetOverviewMaterials(appCtx);
+  if(!appCtx.streetOverview)return true;
+  let reported=-1;
+  const complete=await appCtx.streetOverview.prepareInitialCoverage(focusActor(appCtx),{current,onProgress:({completed,total})=>{
+    const percent=total>0?Math.floor(100*completed/total):0;
+    if(percent===reported)return;
+    reported=percent;
+    appCtx.showLoad?.('',{phase:'prepareLocationScenery',completed,total});
+  }});
+  return complete&&await ensureInitialStreetPavement(appCtx,current);
 }

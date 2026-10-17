@@ -50,6 +50,7 @@ export async function attachGallery(ctx,T,active,{load=loadModelAsset}={}){
         lighting.apply(instance.root);
       }catch{if(current())state.furnitureUnavailable=true;}
     }
+    if(current())state.renderPreparation=ctx.prepareResidentPresentation?.(active.group)||null;
   })();
   await state.ready;
 }

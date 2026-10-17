@@ -126,7 +126,26 @@ test('a wholly generalized tunnel junction receives the same canonical height co
   assert.ok(Math.abs(sampleFeatureSurfaceY(south, 0, 0) - sampleFeatureSurfaceY(north, 0, 0)) < 0.01);
   north.transportRecord.completeness = 'lossless';
   const mixed = buildTransportJunctionProfileAnchors([south, north], graph, () => 20, sampleFeatureSurfaceY);
-  assert.equal(mixed.anchorsByFeature.has(south), false, 'never carry exact elevations into a generalized duplicate');
+  assert.equal(mixed.constrainedFeatureCount, 2, 'a real physical junction must meet across providers');
+  assert.equal(mixed.anchorsByFeature.get(south)[0].targetSurfaceY, mixed.anchorsByFeature.get(north)[0].targetSurfaceY);
+});
+
+test('all connected tunnel branches retain their physical junction across provider boundaries', () => {
+ const {south,north,east}=junction();
+ south.transportRecord.completeness=north.transportRecord.completeness='generalized';
+ for(const f of [south,north,east]) f.transportGraphRef={featureId:f.sourceFeatureId};
+ const a={featureId:'south',endpoint:'end',distanceAlong:60,point:{x:0,z:0},segmentIndex:0,segmentT:1};
+ const b={featureId:'north',endpoint:'start',distanceAlong:0,point:{x:0,z:0},segmentIndex:0,segmentT:0};
+ const c={...b,featureId:'east'};
+ const graph={connections:[{left:a,right:b},{left:a,right:c}]};
+ const result=buildTransportJunctionProfileAnchors([south,north,east],graph,()=>20,sampleFeatureSurfaceY);
+ assert.equal(result.constrainedFeatureCount,3);
+ const heights=[...result.anchorsByFeature.values()].map(anchors=>anchors[0].targetSurfaceY);
+ assert.equal(new Set(heights).size,1);
+ graph.connections=[{left:a,right:c}];
+ const isolated=buildTransportJunctionProfileAnchors([south,north,east],graph,()=>20,sampleFeatureSurfaceY);
+ assert.equal(isolated.constrainedFeatureCount,2);
+ assert.equal(isolated.anchorsByFeature.has(north),false,'an unconnected branch remains independent');
 });
 
 

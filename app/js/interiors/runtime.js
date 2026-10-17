@@ -530,7 +530,8 @@ export async function enterInteriorForSupport(support, deps) {
     floorTransitionPending: false
   };
   applyInteriorSceneState(appCtx.activeInterior, sceneState);
-  if (!definition.communityRealityCapture && !definition.curatedContent && !definition.aquariumContent) void deps.attachCuratedHomeFurnishing?.(appCtx.activeInterior);
+  if (!definition.communityRealityCapture && !definition.curatedContent && !definition.aquariumContent && !definition.facilityContent) void deps.attachCuratedHomeFurnishing?.(appCtx.activeInterior);
+  void deps.attachKennedy?.(appCtx.activeInterior);
   void deps.attachGallery?.(appCtx.activeInterior);
   void deps.attachAquarium?.(appCtx.activeInterior);
   void deps.attachCommunityInteriorRepresentation?.(appCtx.activeInterior);
@@ -594,6 +595,7 @@ export function clearActiveInterior(options = {}, deps) {
     active.outsideWorldSequence === appCtx._worldLoadSequence ? (active.outsideColliders || []) : []);
   deps.disposeGallery?.(active);
   deps.disposeAquarium?.(active);
+  deps.disposeKennedy?.(active);
   disposeThreeViewsHome(active);
   deps.disposeCuratedHomeFurnishing?.(active);
   disposeObject3D(active.group);
@@ -741,6 +743,7 @@ export async function handleInteriorAction(deps) {
     if (interaction?.kind === 'elevator') return openElevatorFloorPicker(active, deps,interaction);
     if (interaction?.kind?.startsWith('museum-')) return deps.handleGalleryAction?.(active,interaction) === true;
     if (interaction?.kind?.startsWith('aquarium-')) return deps.handleAquariumAction?.(active,interaction) === true;
+    if (interaction?.kind === 'facility-station') return deps.handleKennedyAction?.(active,interaction) === true;
     return false;
   }
   const candidate = pickNearbyBuildingCandidate(true, deps);

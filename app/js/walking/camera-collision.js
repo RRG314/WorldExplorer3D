@@ -15,27 +15,38 @@ function resolveThirdPersonCameraCollision({
   if (!(distance > 0.5)) return { ...target, collided: false, ratio: 1 };
 
   const probes = Math.max(8, Math.ceil(distance / Math.max(0.2, Number(probeSpacing) || 0.45)));
-  for (let probe = 1; probe <= probes; probe += 1) {
-    const ratio = probe / probes;
-    const x = Number(anchor.x) + deltaX * ratio;
-    const y = Number(anchor.y) + deltaY * ratio;
-    const z = Number(anchor.z) + deltaZ * ratio;
-    const collision = checkBuildingCollision(x, z, 0.28, {
-      actorBaseY: y - 0.28,
-      actorHeight: 0.56,
-      acceptCollision: (candidate) => candidate?.building?.buildingType !== 'bridge_guardrail'
-    });
-    if (collision?.collision !== true) continue;
-    const safeRatio = Math.max(0.08, ratio - Math.max(0.04, Number(clearance) / distance));
-    return {
-      x: Number(anchor.x) + deltaX * safeRatio,
-      y: Number(anchor.y) + deltaY * safeRatio,
-      z: Number(anchor.z) + deltaZ * safeRatio,
-      collided: true,
-      ratio: safeRatio
-    };
+  const sample = query => {
+    for (let probe = 1; probe <= probes; probe += 1) {
+      const ratio = probe / probes;
+      const x = Number(anchor.x) + deltaX * ratio;
+      const y = Number(anchor.y) + deltaY * ratio;
+      const z = Number(anchor.z) + deltaZ * ratio;
+      const collision = query(x, z, 0.28, {
+        actorBaseY: y - 0.28,
+        actorHeight: 0.56,
+        acceptCollision: (candidate) => candidate?.building?.buildingType !== 'bridge_guardrail'
+      });
+      if (collision?.collision !== true) continue;
+      const safeRatio = Math.max(0.08, ratio - Math.max(0.04, Number(clearance) / distance));
+      return {
+        x: Number(anchor.x) + deltaX * safeRatio,
+        y: Number(anchor.y) + deltaY * safeRatio,
+        z: Number(anchor.z) + deltaZ * safeRatio,
+        collided: true,
+        ratio: safeRatio
+      };
+    }
+    return { ...target, collided: false, ratio: 1 };
+  };
+  if(typeof checkBuildingCollision.withRegion==='function') {
+    return checkBuildingCollision.withRegion(
+      (Number(anchor.x)+Number(target.x))/2,
+      (Number(anchor.z)+Number(target.z))/2,
+      Math.hypot(deltaX,deltaZ)/2+.28,
+      sample
+    );
   }
-  return { ...target, collided: false, ratio: 1 };
+  return sample(checkBuildingCollision);
 }
 
 export { resolveThirdPersonCameraCollision };

@@ -1,7 +1,30 @@
 # Exhibit and learning evidence
 
-Research date: October 12, 2026. Records below are authoring requirements, not
+Research refreshed October 13, 2026. Records below are authoring requirements, not
 an inventory of playable exhibits. No invented animal counts or live-feed claims.
+
+## Implemented reef record
+
+`AQUARIUM_CONTENT.habitat` is the runtime record, reviewed October 13. It binds
+Blacktip Reef to the existing Overture/OSM building association and to the shared
+Pavilion-1 / Reef-M viewing floors. `type`, building/gallery, source IDs, species
+scientific names, local model IDs, placement/geometry/animal confidence, water
+and lighting profiles, decorative attribution, population policy and three
+stable Journal observation IDs are explicit. Scientific identity is
+`Carcharhinus melanopterus` and `Chelonia mydas`; both associations are supported
+by the [current reef page](https://aqua.org/explore/exhibits/blacktip-reef).
+No additional animal is admitted from a vague common-name match.
+
+Three sharks and one turtle are deliberately bounded **game** instances. Routes,
+depths and coral arrangement are inferred/representative art. They are not real
+counts or individual placement. `habitatPopulation` rejects missing evidence,
+nonfinite routes and excessive counts. The same four rigs and one clock serve
+both viewing levels. Low quality preserves the educational species.
+
+Journal saves retain the existing stable event ID, add habitat, building, floor
+and INFERRED geometry provenance, and explicitly disable Field Guide, collection,
+profile and mission rewards. Prior study notes therefore remain compatible.
+Runtime/component/browser evidence is recorded separately in VERIFICATION.md.
 
 | Exhibit | Primary source | Supported content | Interaction design |
 |---|---|---|---|

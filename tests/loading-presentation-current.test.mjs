@@ -26,13 +26,23 @@ test('pipeline progress cannot retreat, invent time-based progress, or finish ea
   assert.equal(nextLoadingProgress(state,{phase:'fetchOverpass'}),state);
   assert.equal(nextLoadingProgress(state,{phase:'unknown',progress:100}),state);
   state=nextLoadingProgress(state,{phase:'publishStreetPavement',completed:50,total:100});
-  assert.equal(state.value,79.5);
-  for(const completed of [100,200]) assert.equal(nextLoadingProgress(state,{phase:'publishStreetPavement',completed,total:100}).value,87);
-  assert.equal(nextLoadingProgress(state,{phase:'worldDiscovery'}).value,99);
+  assert.equal(state.value,70);
+  for(const completed of [100,200]) assert.equal(nextLoadingProgress(state,{phase:'publishStreetPavement',completed,total:100}).value,74);
+  assert.equal(nextLoadingProgress(state,{phase:'worldDiscovery'}).value,82);
   for(const [completed,total] of [[NaN,10],[10,Infinity],[10,0],[-10,20]]) {
     assert.equal(nextLoadingProgress(state,{phase:'publishStreetPavement',completed,total}),state);
   }
   assert.equal(nextLoadingProgress(state,{restart:true}).value,3);
+});
+
+test('surrounding scenery progress follows accepted coverage and reserves final presentation',()=>{
+ let state=nextLoadingProgress(null,{phase:'worldDiscovery'});
+ state=nextLoadingProgress(state,{phase:'prepareLocationScenery'});assert.equal(state.value,83);
+ state=nextLoadingProgress(state,{phase:'prepareLocationScenery',completed:50,total:100});assert.equal(state.value,90);
+ assert.equal(nextLoadingProgress(state,{phase:'prepareLocationScenery',completed:0,total:100}),state);
+ assert.equal(nextLoadingProgress(state,{phase:'prepareLocationScenery',completed:100,total:100}).value,97);
+ assert.equal(nextLoadingProgress(state,{phase:'prepareLocationScenery',completed:0,total:0}),state);
+ assert.equal(nextLoadingProgress(state,{phase:'prepareWorldPresentation'}).value,99);
 });
 
 test('short transitions and other worlds do not claim measured Earth progress',()=>{

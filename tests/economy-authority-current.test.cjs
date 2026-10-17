@@ -122,3 +122,22 @@ test('commerce receipts are idempotent and a sale requires wallet-recorded inven
   assert.equal(rejected.reason, 'item_not_owned');
   assert.equal(state.store.get('users/u/economy/wallet').credits, STARTING_CREDITS - 2);
 });
+
+
+test('a lost purchase reply can be recovered after midnight with its original item identity', async () => {
+  const state = stateStore(), first = options(state, 'buy', 'lost-reply');
+  const committed = await settleCommerceTransaction(first);
+  const replay = await settleCommerceTransaction({...first, nowMs: 86401000});
+  assert.equal(replay.duplicate, true);
+  assert.equal(replay.itemId, committed.itemId);
+  assert.equal(replay.credits, committed.credits);
+  assert.equal(state.store.get('users/u/commerceItems/trail-water').quantity, 1);
+});
+
+test('receipt identity cannot be reused for a different commerce command', async () => {
+  const state = stateStore(), first = options(state, 'buy', 'bound-receipt');
+  await settleCommerceTransaction(first);
+  for (const change of [{action:'sell'}, {storeId:'another-store'}, {catalogId:'route-snack'}, {targetId:'another-target'}, {dayKey:'1970-01-02'}]) {
+    await assert.rejects(settleCommerceTransaction({...first, input:{...first.input,...change}}), /invalid_commerce_transaction/);
+  }
+});

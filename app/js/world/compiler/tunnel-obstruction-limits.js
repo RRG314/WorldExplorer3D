@@ -1,5 +1,5 @@
 import {polylineDistances} from '../../structure-semantics/geometry.js?v=2';
-import {tunnelClearance, TUNNEL_ROOF_THICKNESS, MINIMUM_TUNNEL_ROOF_COVER} from './tunnel-envelope.js';
+import {tunnelClearance, tunnelRoofHalfWidth, TUNNEL_ROOF_THICKNESS, MINIMUM_TUNNEL_ROOF_COVER} from './tunnel-envelope.js';
 import {sampleFeatureSurfaceY} from '../../structure-semantics.js?v=63';
 
 // Clip an actual foundation footprint into the tunnel's roof corridor. Keep
@@ -25,7 +25,7 @@ export function compileTunnelObstructionLimits(feature, nearbyBuildings) {
       feature?.transportRecord?.routeState !== 'complete' ||
       typeof nearbyBuildings !== 'function') return Object.freeze([]);
   const pts = feature.pts || [], path = polylineDistances(pts), limits = [];
-  const halfWidth = Math.max(3.4, Number(feature.width) || 6) * .5 + .95;
+  const halfWidth = tunnelRoofHalfWidth(feature.width);
   const height = tunnelClearance(feature.structureSemantics) + TUNNEL_ROOF_THICKNESS + MINIMUM_TUNNEL_ROOF_COVER;
   for (let i = 1; i < pts.length; i++) {
     const a = pts[i - 1], b = pts[i], length = Math.hypot(b.x - a.x, b.z - a.z);
@@ -48,13 +48,8 @@ export function compileTunnelObstructionLimits(feature, nearbyBuildings) {
   return Object.freeze(limits);
 }
 
-export function tunnelObstructionMaximumY(limits, distance) {
-  let ceiling = Infinity;
-  for (const limit of limits || []) {
-    if (distance >= limit.start - 1e-5 && distance <= limit.end + 1e-5) ceiling = Math.min(ceiling, limit.maximumSurfaceY);
-  }
-  return ceiling;
-}
+// Compatibility export: existing callers retain the same scalar query.
+export { tunnelObstructionMaximumY } from './tunnel-envelope.js';
 
 // A separate surface road is a roof obstruction even when its centreline
 // misses the tunnel centreline. Preserve the complete overlapping road width,
@@ -73,7 +68,7 @@ export function compileTunnelRoadObstructionLimits(feature, roads, sampleTerrain
 // This reports the upper terrain height; each consumer owns its clearance.
 export function compileSurfaceRoadOverlapRanges(feature, roads, sampleTerrain, connected, {includeElevated=false}={}) {
   const pts = feature.pts || [], path = polylineDistances(pts), limits = [];
-  const halfWidth = Math.max(3.4, Number(feature.width) || 6) * .5 + .95;
+  const halfWidth = tunnelRoofHalfWidth(feature.width);
   for (const road of roads || []) {
     const elevated=includeElevated && road?.structureSemantics?.terrainMode==='elevated' && !!road.transportSurfaceModel;
     if (road === feature || (!elevated && road?.structureSemantics?.terrainMode !== 'at_grade') ||

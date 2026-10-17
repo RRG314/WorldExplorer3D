@@ -1,4 +1,6 @@
 import { verifyThreeViews } from './three-views-journey.mjs';
+import { verifyDiscoveryDomStability } from './discovery-dom-stability.mjs';
+import { runPrescribedGameActions } from './prescribed-game-actions.mjs';
 import { verifyPersonalHome } from './personal-home-journey.mjs';
 import { captureVisualSceneAudit } from './visual-scene-audit.mjs';
 import { verifyHarborRun } from './harbor-run-journey.mjs';
@@ -127,7 +129,19 @@ try {
  if(process.env.WE3D_SANDBOX_HARBOR==='1'){report.visualAudit=await captureVisualSceneAudit(page);await writeFile(`${out}/visual-audit.json`,JSON.stringify(report.visualAudit,null,2));}
  await page.waitForFunction(()=>globalThis.getWorldExplorerRuntimeDiagnostics?.().worldDiscovery?.interaction?.phase==='revealed',null,{timeout:45000});
  await page.evaluate(async()=>{const{ctx}=await import('/app/js/shared-context.js?v=55');ctx.openWorldDiscoverySection('today');});
- await page.locator('#discoveryPrimaryBtn').click();
+ report.discoveryDomStability=await verifyDiscoveryDomStability(page);
+ await page.locator('#discoveryPrimaryBtn').scrollIntoViewIfNeeded();
+ const primaryBox=await page.locator('#discoveryPrimaryBtn').boundingBox();
+ const canvasBox=await page.locator('body > canvas:not([id])').boundingBox();
+ assert.ok(primaryBox&&canvasBox,'The field action and gameplay canvas must be visible');
+ assert.equal(await page.locator('#discoveryPrimaryBtn').evaluate(button=>{
+  const box=button.getBoundingClientRect();
+  return button.contains(document.elementFromPoint(box.x+box.width/2,box.y+box.height/2));
+ }),true,'The prescribed click must reach the visible field action');
+ await runPrescribedGameActions(page,out,[{buttons:['left_mouse_button'],frames:1,
+  mouse_x:primaryBox.x+primaryBox.width/2-canvasBox.x,
+  mouse_y:primaryBox.y+primaryBox.height/2-canvasBox.y},{buttons:[],frames:3}],
+  'body > canvas:not([id])');
  await page.waitForFunction(()=>globalThis.__sandboxTestContext.getTutorialSnapshot()?.stage==='review',null,{timeout:20000});
  const result=await page.evaluate(async()=>{const{ctx}=await import('/app/js/shared-context.js?v=55');return ctx.getTutorialSnapshot().result;});
  report.tutorial=await page.evaluate(async()=>{const{ctx}=await import('/app/js/shared-context.js?v=55');return {snapshot:ctx.getTutorialSnapshot(),saved:JSON.parse(localStorage.getItem('worldExplorer3D.tutorialState.v6')||'null'),resultText:document.getElementById('discoveryResultCard')?.textContent};});

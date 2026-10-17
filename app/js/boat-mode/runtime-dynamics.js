@@ -1,4 +1,5 @@
 import {vesselWaterAdmission} from '../transport/maritime-admission.js';
+import {vesselObstacleAdmission} from '../transport/vessel-obstacles.js';
 import { clamp, normalizeAngle } from "./dynamics.js?v=1";
 import { getMaritimeCatalogEntry } from '../transport/maritime-catalog.js?v=1';
 import { resolveVesselHandling, vesselYawRateTarget } from './vessel-handling.js?v=1';
@@ -171,13 +172,19 @@ export function createBoatRuntimeDynamics(deps = {}) {
         contains:(x,z,options)=>synthetic ? appCtx.isPointInsideBoatCandidate?.(nextCandidate,x,z) === true : appCtx.isPointInsideWaterFootprint?.(x,z,options) === true});
       if (!admission.allowed) nextCandidate = null;
     }
+    let obstacleBlocked=false;
+    if(nextCandidate){
+      const clearance=vesselObstacleAdmission(appCtx,catalog,nextX,nextZ,appCtx.boat.angle,
+        appCtx.waterSurfaceYAt?.(nextX,nextZ,nextCandidate) ?? nextCandidate.surfaceY ?? appCtx.boat.y);
+      if(!clearance.allowed){nextCandidate=null;obstacleBlocked=true;}
+    }
     if (!nextCandidate) {
       // A rejected translation must also reject the rotation that put the bow
       // ashore. Retaining that rotation slowly swept large hulls through land.
       appCtx.boat.angle=previousYaw;
       appCtx.boat.turnRate*=.42;
       const impactSpeed = Math.hypot(Number(appCtx.boat.vx) || 0, Number(appCtx.boat.vz) || 0);
-      if (impactSpeed > 1.8) onBoatImpact?.(impactSpeed, { catalog, reason: 'shoreline' });
+      if (impactSpeed > 1.8) onBoatImpact?.(impactSpeed, { catalog, reason: obstacleBlocked?'structure':'shoreline' });
       appCtx.boat.speed *= 0.45;
       appCtx.boat.forwardSpeed *= 0.45;
       appCtx.boat.lateralSpeed *= 0.42;

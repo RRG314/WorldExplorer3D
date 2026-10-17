@@ -1,3 +1,4 @@
+import {createNumericPublicationStore} from '../structure-semantics/numeric-publication.js';
 import { compileEngineeredApproachExcavation } from './compiler/engineered-approach-excavation.js';
 import {createFeatureProjectionIndex} from '../terrain/feature-projection-index.js';
 import {compileTunnelObstructionLimits, compileTunnelRoadObstructionLimits, compileSurfaceRoadOverlapRanges} from './compiler/tunnel-obstruction-limits.js';
@@ -326,6 +327,7 @@ function* compileStructureAwareFeatureProfileSteps() {
       phaseDurationsMs[name] = Number((now() - startedAt).toFixed(2));
     }
   };
+  const publicationStorage = createNumericPublicationStore();
   const roadFeatures = Array.isArray(appCtx.roads) ? appCtx.roads : [];
   const connectorFeatures = structureAwareLinearFeatures();
   const transportFeatures = roadFeatures.concat(connectorFeatures);
@@ -410,7 +412,7 @@ function* compileStructureAwareFeatureProfileSteps() {
       if (!feature) continue;
       feature.structureTransitionAnchors = [];
       updateFeatureSurfaceProfile(feature, worldBaseTerrainY, {
-        surfaceBias: Number.isFinite(feature.surfaceBias) ? feature.surfaceBias : 0.08
+        publicationStorage, surfaceBias: Number.isFinite(feature.surfaceBias) ? feature.surfaceBias : 0.08
       });
     }
   });
@@ -433,7 +435,7 @@ function* compileStructureAwareFeatureProfileSteps() {
       for (let i = 0; i < structureFeatures.length; i++) {
         const feature = structureFeatures[i];
         updateFeatureSurfaceProfile(feature, worldBaseTerrainY, {
-          surfaceBias: Number.isFinite(feature.surfaceBias) ? feature.surfaceBias : 0.08
+          publicationStorage, surfaceBias: Number.isFinite(feature.surfaceBias) ? feature.surfaceBias : 0.08
         });
       }
     } finally {
@@ -491,7 +493,7 @@ function* compileStructureAwareFeatureProfileSteps() {
           feature,
           worldBaseTerrainY,
           {
-          surfaceBias: Number.isFinite(feature.surfaceBias) ? feature.surfaceBias : 0.08
+          publicationStorage, surfaceBias: Number.isFinite(feature.surfaceBias) ? feature.surfaceBias : 0.08
           }
         );
       }
@@ -513,7 +515,7 @@ function* compileStructureAwareFeatureProfileSteps() {
       updateFeatureSurfaceProfile(
         feature,
         worldBaseTerrainY,
-        { surfaceBias: Number.isFinite(feature.surfaceBias) ? feature.surfaceBias : 0.08 }
+        { publicationStorage, surfaceBias: Number.isFinite(feature.surfaceBias) ? feature.surfaceBias : 0.08 }
       );
     }
 
@@ -536,7 +538,7 @@ function* compileStructureAwareFeatureProfileSteps() {
         );
         feature.structureTransitionAnchors.push(...replacements.values());
         updateFeatureSurfaceProfile(feature, worldBaseTerrainY, {
-          surfaceBias: Number.isFinite(feature.surfaceBias) ? feature.surfaceBias : 0.08
+          publicationStorage, surfaceBias: Number.isFinite(feature.surfaceBias) ? feature.surfaceBias : 0.08
         });
       }
     }
@@ -563,7 +565,7 @@ function* compileStructureAwareFeatureProfileSteps() {
         updateFeatureSurfaceProfile(
           feature,
           worldBaseTerrainY,
-          { surfaceBias: Number.isFinite(feature.surfaceBias) ? feature.surfaceBias : 0.08 }
+          { publicationStorage, surfaceBias: Number.isFinite(feature.surfaceBias) ? feature.surfaceBias : 0.08 }
         );
       }
     }
@@ -588,7 +590,7 @@ function* compileStructureAwareFeatureProfileSteps() {
         updateFeatureSurfaceProfile(
           feature,
           worldBaseTerrainY,
-          { surfaceBias: Number.isFinite(feature.surfaceBias) ? feature.surfaceBias : 0.08 }
+          { publicationStorage, surfaceBias: Number.isFinite(feature.surfaceBias) ? feature.surfaceBias : 0.08 }
         );
       }
     }
@@ -645,6 +647,7 @@ function* compileStructureAwareFeatureProfileSteps() {
   yield;
 
   const profileStorage = measure('packFinalProfiles', () => packCompiledTransportSurfaces(transportFeatures));
+  publicationStorage.release();
   yield;
   measure('compileTunnels', () => compileTunnelSystemModels(transportFeatures, worldBaseTerrainY));
   yield;

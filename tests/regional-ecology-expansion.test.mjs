@@ -15,6 +15,10 @@ const EXPECTED_PRESET_PACKS = Object.freeze({
   hollywood: 'us-ca-urban-coast',
   newyork: 'us-nyc-northeast-urban',
   miami: 'us-fl-south-florida-coast',
+  // Merritt Island is outside the reviewed South Florida pack. Keep generic
+  // field leads until a source-bounded local ecology pack is actually authored.
+  kennedy: null,
+  kennedy39b: null,
   tokyo: 'jp-kanto-urban-nature',
   monaco: 'mc-ligurian-mediterranean',
   nurburgring: 'eu-atlantic-urban-nature',
@@ -72,7 +76,7 @@ test('every built-in Earth destination resolves by coordinates to its intended r
   assert.deepEqual(Object.keys(LOCS).sort(), Object.keys(EXPECTED_PRESET_PACKS).sort(),
     'new presets must receive an explicit reviewed-pack decision');
   for (const [presetId, location] of Object.entries(LOCS)) {
-    assert.equal(resolveRegionalEcologyPack(location)?.id, EXPECTED_PRESET_PACKS[presetId], presetId);
+    assert.equal(resolveRegionalEcologyPack(location)?.id ?? null, EXPECTED_PRESET_PACKS[presetId], presetId);
   }
   assert.equal(resolveRegionalEcologyPack({ lat: -33.8688, lon: 151.2093 }), null,
     'unsupported places must retain the honest global field-guide fallback');
@@ -84,11 +88,16 @@ test('each built-in destination produces regional field leads through the shared
     const plan = compileFieldActivityPlan(environment, photographEligibility(environment), { slotsPerCell: 3 });
     const expectedPackId = EXPECTED_PRESET_PACKS[presetId];
     assert.equal(plan.diagnostics.regionalEcologyPackId, expectedPackId, presetId);
-    assert.ok(plan.diagnostics.regionalTaxonCount >= 12, presetId);
+    if (expectedPackId) assert.ok(plan.diagnostics.regionalTaxonCount >= 12, presetId);
+    else assert.equal(plan.diagnostics.regionalTaxonCount, 0, presetId);
     assert.equal(plan.slots.length, 3, presetId);
     assert.ok(plan.slots.every((slot) => slot.regionalPackId === expectedPackId), presetId);
-    assert.ok(plan.slots.every((slot) => slot.supportingEvidence.includes('no-live-presence-claim')), presetId);
-    assert.ok(plan.slots.every((slot) => slot.sourceRefs.length === 2), presetId);
+    if (expectedPackId) {
+      assert.ok(plan.slots.every((slot) => slot.supportingEvidence.includes('no-live-presence-claim')), presetId);
+      assert.ok(plan.slots.every((slot) => slot.sourceRefs.length === 2), presetId);
+    } else {
+      assert.ok(plan.slots.every((slot) => slot.supportingEvidence.includes('habitat-plausible')), presetId);
+    }
   }
 });
 

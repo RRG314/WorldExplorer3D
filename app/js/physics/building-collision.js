@@ -18,21 +18,12 @@ function buildingVerticalRangeOverlap(building, actorBaseY, actorHeight, toleran
 
 function createBuildingCollisionQuery(appCtx) {
   const available=[];
-  return function checkBuildingCollision(x, z, carRadius = 2, options = {}) {
-    // A nested acceptCollision callback leases another buffer. Nothing from
-    // the outer query is overwritten, including when that callback throws.
-    const buffer=available.pop() || createCollisionCandidates();
-    try {
+  function collectCandidates(buffer, x, z, carRadius) {
     const localInterior = usesContainedInteriorPhysics(appCtx.activeInterior);
     if(!localInterior)nearbyVegetationObstacles(appCtx, x, z, carRadius + 1,buffer);
     if(!(Array.isArray(appCtx.buildings)&&appCtx.buildings.length) &&
       !(Array.isArray(appCtx.dynamicBuildingColliders)&&appCtx.dynamicBuildingColliders.length) &&
-      !appCtx.transportStructureColliders?.length && !buffer.count)return {collision:false};
-    const actorBaseY = Number.isFinite(options?.actorBaseY) ? Number(options.actorBaseY) : NaN;
-    const actorHeight = Number.isFinite(options?.actorHeight) ? Number(options.actorHeight) : 1.9;
-    const acceptCollision = typeof options?.acceptCollision === 'function'
-      ? options.acceptCollision
-      : null;
+      !appCtx.transportStructureColliders?.length && !buffer.count)return;
     if(!localInterior){
       if(typeof appCtx.getNearbyBuildings === 'function'){
         const indexed=appCtx.getNearbyBuildings(x,z,carRadius+8,buffer);
@@ -50,14 +41,25 @@ function createBuildingCollisionQuery(appCtx) {
     // context; falling back to only appCtx.buildings made every ship wall and
     // closed pressure door non-solid even though their colliders existed.
     if(Array.isArray(appCtx.dynamicBuildingColliders))for(const candidate of appCtx.dynamicBuildingColliders)appendCollisionCandidate(buffer,candidate);
+  }
+
+  function collide(buffer, x, z, carRadius, options) {
+    const actorBaseY = Number.isFinite(options?.actorBaseY) ? Number(options.actorBaseY) : NaN;
+    const actorHeight = Number.isFinite(options?.actorHeight) ? Number(options.actorHeight) : 1.9;
+    const acceptCollision = typeof options?.acceptCollision === 'function'
+      ? options.acceptCollision
+      : null;
     const candidates=buffer.items;
 
     for (let i = 0; i < buffer.count; i += 1) {
       const building = candidates[i];
-      if (!building || building.collisionDisabled) continue;
-      if (!buildingVerticalRangeOverlap(building, actorBaseY, actorHeight)) continue;
+      if (!building || building.collisionDisabled || building.collisionReplacedByVenue) continue;
+      // Reject distant records before reading their vertical profile. A swept
+      // aircraft tests this query repeatedly; evaluating every authored quay
+      // and venue height here creates substantial transient numeric storage.
       if (x < building.minX - carRadius || x > building.maxX + carRadius ||
         z < building.minZ - carRadius || z > building.maxZ + carRadius) continue;
+      if (!buildingVerticalRangeOverlap(building, actorBaseY, actorHeight)) continue;
 
       const hasPolygon = Array.isArray(building.pts) && building.pts.length >= 3;
       const isInside = hasPolygon
@@ -135,13 +137,43 @@ function createBuildingCollisionQuery(appCtx) {
       }
     }
     return { collision: false };
-    } finally {
-      releaseCollisionCandidates(buffer);
-      // A fallback query against a whole unindexed world must not leave a
-      // large backing array permanently attached to the movement authority.
-      if(available.length<4 && buffer.items.length<=4096)available.push(buffer);
-    }
+  }
+
+  function release(buffer) {
+    releaseCollisionCandidates(buffer);
+    // An unindexed world must not leave a large scratch array attached to
+    // movement. Every strong scene reference is cleared before reuse.
+    if(available.length<4 && buffer.items.length<=4096)available.push(buffer);
+  }
+
+  function checkBuildingCollision(x, z, carRadius = 2, options = {}) {
+    const buffer=available.pop() || createCollisionCandidates();
+    try {
+      collectCandidates(buffer,x,z,carRadius);
+      return collide(buffer,x,z,carRadius,options);
+    } finally { release(buffer); }
+  }
+
+  // Camera probes share one synchronous broad-phase region. Narrow-phase
+  // height, footprint and acceptance rules still run at each original point.
+  // The visitor must not publish a different world while it owns this region.
+  checkBuildingCollision.withRegion = (x,z,radius,visit) => {
+    if(!Number.isFinite(x)||!Number.isFinite(z)||!Number.isFinite(radius)||radius<0||radius>255)
+      return visit(checkBuildingCollision);
+    const buffer=available.pop() || createCollisionCandidates();
+    let active=true;
+    try {
+      collectCandidates(buffer,x,z,radius);
+      return visit((px,pz,probeRadius=2,options={})=>{
+        if(!active)throw new Error('Collision region has been released');
+        if(!Number.isFinite(probeRadius)||probeRadius<0||
+          Math.hypot(px-x,pz-z)+probeRadius>radius+1e-9)
+          return checkBuildingCollision(px,pz,probeRadius,options);
+        return collide(buffer,px,pz,probeRadius,options);
+      });
+    } finally { active=false;release(buffer); }
   };
+  return checkBuildingCollision;
 }
 
 export { createBuildingCollisionQuery };

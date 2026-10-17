@@ -45,3 +45,14 @@ test('building:part roof semantics remain compatible', () => {
   assert.equal(semantics.baseOffsetMeters, 8);
   assert.equal(semantics.heightMeters, 0.35);
 });
+
+test('a mapped 4 m aquarium entrance canopy leaves an open route underneath',()=>{
+ const s=interpretBuildingSemantics({building:'roof',height:'4','building:levels':'1','roof:shape':'flat'});
+ assert.equal(s.baseOffsetMeters,3.65);
+ assert.ok(Math.abs(s.heightMeters-.35)<1e-9);
+ assert.equal(s.topOffsetMeters,4);
+ const explicit=interpretBuildingSemantics({building:'roof',height:'4',min_height:'3.5'});
+ assert.equal(explicit.baseOffsetMeters,3.5);assert.equal(explicit.heightMeters,.5);
+ const roof=interpretBuildingSemantics({building:'roof','building:levels':'1'});
+ assert.ok(roof.baseOffsetMeters>2);assert.ok(roof.heightMeters<.5);
+});

@@ -41,16 +41,18 @@ const PHASES = Object.freeze({
   publishLocationTerrain: [57, 'Joining the landscape together'],
   waitForLocationTerrainPublication: [58, 'Joining the landscape together'],
   publishCompiledTransportMeshes: [62, 'Connecting roads, bridges and tunnels'],
-  refreshTerrainSurfaceProfiles: [70, 'Connecting roads, bridges and tunnels'],
-  publishStreetPavement: [72, 'Finishing streets and sidewalks'],
-  buildTraversalNetworks: [89, 'Preparing routes through the world'],
-  spawnPlayer: [91, 'Getting ready for your arrival'],
-  gameplay: [93, 'Getting ready for your arrival'],
-  livingWorld: [94, 'Getting ready for your arrival'],
-  urbanSandbox: [95, 'Getting ready for your arrival'],
-  aviation: [96, 'Getting ready for your arrival'],
-  maritime: [97, 'Getting ready for your arrival'],
-  worldDiscovery: [99, 'Getting ready for your arrival']
+  refreshTerrainSurfaceProfiles: [64, 'Connecting roads, bridges and tunnels'],
+  publishStreetPavement: [66, 'Finishing streets and sidewalks'],
+  buildTraversalNetworks: [75, 'Preparing routes through the world'],
+  spawnPlayer: [76, 'Getting ready for your arrival'],
+  gameplay: [77, 'Getting ready for your arrival'],
+  livingWorld: [78, 'Getting ready for your arrival'],
+  urbanSandbox: [79, 'Getting ready for your arrival'],
+  aviation: [80, 'Getting ready for your arrival'],
+  maritime: [81, 'Getting ready for your arrival'],
+  worldDiscovery: [82, 'Getting ready for your arrival'],
+  prepareLocationScenery: [83, 'Finishing the surrounding streets'],
+  prepareWorldPresentation: [99, 'Getting ready for your arrival']
 });
 const MODE_LABELS = Object.freeze({ earth: 'Preparing your location', ocean: 'Preparing your ocean outing', space: 'Preparing your space journey', moon: 'Preparing your Moon visit', mars: 'Preparing your Mars visit' });
 
@@ -62,8 +64,9 @@ export function nextLoadingProgress(previous, options = {}) {
   const phase = PHASES[options.phase];
   if (!phase) return state;
   let value = phase[0];
-  if (options.phase === 'publishStreetPavement' && Number.isFinite(options.completed) && Number.isFinite(options.total) && options.total > 0) {
-    value += 15 * Math.max(0, Math.min(1, options.completed / options.total));
+  const measuredSpan=({publishStreetPavement:8,prepareLocationScenery:14})[options.phase];
+  if (measuredSpan && Number.isFinite(options.completed) && Number.isFinite(options.total) && options.total > 0) {
+    value += measuredSpan * Math.max(0, Math.min(1, options.completed / options.total));
   }
   // Late parallel phases cannot move the bar or its description backwards.
   // 100% is never inferred from time, bytes, a worker tile, or a failed task.

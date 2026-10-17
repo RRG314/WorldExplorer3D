@@ -23,12 +23,12 @@ function waterGameplayBedProfile(area) {
   return {maximumDepth,featherDistance:Math.max(6,maximumDepth*5),truthType:'simulation'};
 }
 
-function waterTerrainBedY(area,x,z,terrainY,shorelineDistance,sampleWaterwayProfile) {
+function waterTerrainBedY(area,x,z,terrainY,shorelineDistance,sampleWaterwayProfile,engineeredDepth=0) {
   const surfaceY=resolveWaterBodySurfaceY(area,x,z,{
     sampleWaterwayProfile,terrainHeightAt:()=>terrainY
   });
   return Number.isFinite(surfaceY)
-    ? Math.min(terrainY,surfaceY-waterBedDepthAtShorelineDistance(shorelineDistance,waterGameplayBedProfile(area)))
+    ? Math.min(terrainY,surfaceY-Math.max(engineeredDepth,waterBedDepthAtShorelineDistance(shorelineDistance,waterGameplayBedProfile(area))))
     : terrainY;
 }
 

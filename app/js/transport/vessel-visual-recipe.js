@@ -237,6 +237,20 @@ function addTug(THREE, group, entry, materials, options) {
   }
 }
 
+function addHarborLaunch(THREE, group, entry, materials, options) {
+  const {width,length}=entry.dimensions;
+  addWheelhouse(THREE,group,entry,materials,{widthScale:.48,lengthScale:.16,height:1.9,baseY:.85,z:length*.28,mobile:options.mobile});
+  const roof=new THREE.Mesh(new THREE.BoxGeometry(width*.89,.12,length*.68),materials.accent);
+  roof.position.set(0,3.12,-length*.08);group.add(roof);
+  for(const side of [-1,1])for(const along of [-.38,-.18,.04,.22])group.add(cylinderBetween(THREE,new THREE.Vector3(side*width*.4,.78,length*along),new THREE.Vector3(side*width*.4,3.08,length*along),.045,materials.metal));
+  for(const side of [-1,1])for(let row=0;row<6;row++){
+    const z=-length*.32+row*1.24;
+    const seat=new THREE.Mesh(new THREE.BoxGeometry(width*.3,.12,.55),materials.canvas);seat.position.set(side*width*.24,1.25,z);group.add(seat);
+    const back=new THREE.Mesh(new THREE.BoxGeometry(width*.3,.5,.085),materials.canvas);back.position.set(side*width*.24,1.52,z-.24);group.add(back);
+  }
+  addRail(THREE,group,entry,materials,-.43,.4);
+}
+
 function addFerry(THREE, group, entry, materials, options) {
   const deckCount = options.mobile ? 2 : 3;
   const deckHeight = entry.dimensions.height * .1;
@@ -328,6 +342,7 @@ function createVesselVisual(THREE, entry, options = {}) {
     containerC: mat(THREE, COLORS.containerC, .74, .08)
   };
   const root = new THREE.Group();
+  if(entry.role==='harbor_launch')for(const material of Object.values(materials))material.color.convertSRGBToLinear();
   const hull = new THREE.Mesh(hullGeometry(THREE, entry), materials.hull);
   const lower = new THREE.Mesh(hullGeometry(THREE, entry, true), materials.hullLower);
   lower.scale.set(1.002, 1, 1.002);
@@ -340,6 +355,7 @@ function createVesselVisual(THREE, entry, options = {}) {
   else if (entry.role === 'sailboat') addSailboat(THREE, root, entry, materials);
   else if (entry.role === 'workboat') addWorkboat(THREE, root, entry, materials, options);
   else if (entry.role === 'tug') addTug(THREE, root, entry, materials, options);
+  else if (entry.role === 'harbor_launch') addHarborLaunch(THREE, root, entry, materials, options);
   else if (entry.role === 'ferry') addFerry(THREE, root, entry, materials, options);
   else addCargo(THREE, root, entry, materials, options);
 

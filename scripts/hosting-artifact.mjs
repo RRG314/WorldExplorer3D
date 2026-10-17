@@ -39,7 +39,8 @@ const GAME_RUNTIME_ENTRYPOINTS = Object.freeze({
   'street-pavement-worker': 'app/js/world/compiler/street-pavement-worker.js',
   'street-overview-worker': 'app/js/world/compiler/street-overview-worker.js',
   'transport-detail-worker': 'app/js/terrain/transport-detail-worker.js',
-  'regional-building-worker': 'app/js/terrain/regional-building-worker.js'
+  'regional-building-worker': 'app/js/terrain/regional-building-worker.js',
+  'canvas-red-mask-worker': 'app/js/terrain/canvas-red-mask-worker.js'
 });
 const ROOT_SHARED_MODULE_DIR = path.join(ROOT, 'js');
 const GAME_SHARED_CONTEXT_MODULE = 'app/js/shared-context.js';
@@ -230,6 +231,7 @@ async function rewriteGameHtml(runtime, groundData) {
     streetOverviewWorkerUrl: `/app/${runtime.entries['street-overview-worker']}`,
     transportDetailWorkerUrl: `/app/${runtime.entries['transport-detail-worker']}`,
     regionalBuildingWorkerUrl: `/app/${runtime.entries['regional-building-worker']}`,
+    canvasRedMaskWorkerUrl: `/app/${runtime.entries['canvas-red-mask-worker']}`,
     groundCatalogUrl: groundData.catalogUrl,
     groundReleaseId: groundData.releaseId
   }).trim();

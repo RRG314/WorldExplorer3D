@@ -1,8 +1,168 @@
 # Current development and release state
 
-Updated October 14, 2026. **5.5.1 is deployed to production.**
+Updated October 17, 2026. **5.5.1 is deployed and production access has recovered.**
 Release: https://github.com/RRG314/WorldExplorer3D/releases/tag/v5.5.1
 Public project page: https://rrg314.github.io/WorldExplorer3D/
+
+## October 17 — authoritative current status
+
+**5.6.1 is not release ready. Production remains recovered 5.5.1.**
+No stable, production Hosting or production Functions promotion occurred in this
+investigation. Fresh public checks identify production build
+`5.5.1+012e5c85582b.eb0d7eddf0f75035.production`; canonical staging remains a0e20c35.
+The current immutable candidate is `5.6.1+32b30ce57ce6.e2fdccf854a89ce8.staging`
+(755 verified files). Both active development branches contain 32b30ce5.
+
+The root-cause audit established excessive street invalidation: 72 of 96
+overlapping cell keys changed, although 69 produced identical geometry and
+51 retained identical ordered height inputs. The repair compares exact compiled
+products under the existing terrain/contact/portal owners, and retains unchanged
+render batches and walking contacts through publication leases. Changed products
+still rebuild, failed staging keeps the accepted world, and the cache stays at
+16 MiB. Coverage, bridge/tunnel rules, save format and acceptance limits are intact.
+
+The complete source chain passed 2,707 tests, plus two subsequent ownership
+regressions. The exact package nevertheless failed its mixed performance gate;
+the earlier focused source pass did not establish release readiness. Tracing
+also exposed a verifier artifact: flight, mode selection and a scripted 12 km
+relocation produced non-overlapping street windows. Zero batch reuse there is
+correct, not a resource-lease failure. The canonical failed result is preserved.
+
+Separate ordinary ground journeys on the immutable package clarify actual play:
+- Four-minute walking: 576.94 units, 41.63 FPS, worst frame 66.7 ms, no pauses
+  over 100 ms. Actual street turnover reuses 77 fitted cells and 28 render batches.
+- Four-minute driving: 1,085.88 units, 42.56 FPS, p99 33.4 ms, but a real cluster
+  of 133–150 ms frames during the second street preparation. No browser errors,
+  failed local requests or gameplay interruptions. This pacing result fails.
+- A separate driving CPU/GC trace reproduces that cluster. Main-thread collection
+  dominates it; sending the worker preparation message takes 10.3 ms, not 150 ms.
+  The profile samples 10,603 MiB of cumulative allocation over four minutes,
+  including reclaimed objects. This is not resident or total tab memory.
+
+A confirmed gameplay defect used the inactive walker's position for civic
+incidents while the starter car was being driven. The local repair selects the
+actual ground mode or occupied vehicle. A real 90-second driving check observes
+six collisions at the moving car, with no browser/local failures or interruptions.
+Image and state were reviewed. This repair is not in the frozen package.
+
+The inactive-light CPU experiment preserves pixels but still produces clustered
+216.6/116.7 ms pauses. It stays out of shipping code. Recovery of an optional map
+provider changed its route and scene; its FPS increase is not causal evidence.
+
+The nearest-road selector constructed discarded winner records while scanning
+long roads. Keeping the winner in scalar locals reduces these records from
+52,894 to 8,298 across 1,560 exact selector comparisons. A controlled four-minute
+driving profile preserves the previous route and passes its measured pacing
+limits with one 116.7 ms pause, no errors or interruptions. Sampled road-candidate
+allocation falls from 1,325.6 to 173.5 MiB; total sampled allocation falls from
+10,603 to 8,805 MiB. These are cumulative allocations including reclaimed objects,
+not resident memory. A separate unprofiled live-provider drive completes four
+minutes and 1,088.67 units at 42.09 FPS, p99 33.4 ms, with one 150.1 ms pause and
+no cluster. Image and prescribed skill input were reviewed.
+
+The repaired test setup now applies the existing scripted pose in the real mode
+button's click task, preventing an artificial intermediate distant street window.
+It never changes game scheduling or pause state. Its browser setup passes, but
+the following four-minute walk still fails: 183.3/133.4/199.9 ms pauses cluster
+at 18.5 seconds, with another 166.7 ms pause later. This is a runtime failure.
+
+Auditing every street invalidation writer identifies conflicting responsibilities:
+retiring speculative preparation invalidated otherwise current accepted streets,
+while starting a replacement consumed actual invalidation before it committed.
+Building edits made during preparation also lacked a source revision guard.
+The pre-change takeoff/return regression reproduces the defect. The local repair
+preserves accepted coverage on cancellation, retains true invalidation until
+publication, and rejects builds superseded by newer source edits. The repeated
+native flight/return check confirms no immediate replacement: the next street
+build starts only at the real boundary, 213 seconds into walking, and reuses
+77 fitted cells and 28 render batches. The full source chain passes 2,723 tests
+and its subsequent guards.
+
+Steady-play pacing remains a production blocker. The latest four-minute walk
+averages 41.81 FPS with p99 33.4 ms, but two 233.3/150 ms frames cluster at 115.6
+seconds while no street build is active. There are no errors or gameplay
+interruptions. Image and prescribed input reviewed. The current-source walking trace reproduces the cluster and attributes most of
+its long frames to main-thread collection: 82.57 ms marking startup and 104.46 ms
+major collection, with no street work active. Four minutes produce approximately
+10,025 MiB of sampled cumulative allocation, split across renderer and app code;
+this includes reclaimed objects, not resident memory. Retained occupied heap is
+about 470 MB. The remaining repair must address ordinary-frame query allocation
+and data lifetime across these owners. No renderer workaround is included.
+
+The canonical performance gate now extends its first walking/driving windows
+to four minutes each and requires completed street turnover; all seven mode
+windows remain, with unchanged performance limits. Full exact-package acceptance
+is still open. These runtime and verifier changes are not in the frozen package.
+
+Evidence: `output/release-review/561-root-cause-audit.md` and the focused
+`561-32b30ce5-natural-ground`, `561-32b30ce5-natural-driving`,
+`561-32b30ce5-natural-driving-attribution`, `561-civic-position-observed` records.
+The final package still needs complete performance, backend, formal save
+roundtrip, complete-candidate and hosted acceptance before promotion.
+
+Lossless filesystem compression recovered 6.49 GiB from verified inactive
+artifacts. Source, saves, chats, assets, history, fallback builds and unrelated
+processes were preserved. Current free disk is approximately 9.5 GiB.
+
+## October 16 — previous checkpoint
+
+At 10:10 p.m. EDT, both production manifests again return HTTP 200 and identify
+`5.5.1+012e5c85582b.eb0d7eddf0f75035.production`. The owner resolved the account
+issue; no code rollback, account mutation or redeployment was performed here.
+Read-only Hosting inspection still identifies version `0a6f60dd9f3488f6`.
+All 80 functions in each project report active first-generation deployments.
+Hosting and Functions APIs are enabled; the unused Cloud Run API remains
+unchanged. Private account details are excluded from tracked release records.
+Recovery evidence is in
+`output/release-review/561-production-availability-20261016/recovery.json`.
+Ordinary Chrome subsequently returned live search results, loaded Baltimore and
+displayed current weather on 5.5.1. The temporary review tab was closed. A fresh
+automated browser loaded the world but received protected-service 401 responses;
+its failed receipt is retained. This recovery smoke check is not complete
+account, shared-voyage or save acceptance. The separate ordinary-browser record
+is `output/release-review/561-production-availability-20261016/ordinary-chrome.json`.
+
+The current frozen candidate is
+`5.6.1+b272ed7a58c1.a128f12ee0cbf660.staging`, with all 754 files verified.
+Its full packaged performance run finished without a resource or timeout stop.
+Twelve reload/cleanup cycles, memory, coverage, transfer and touch checks pass;
+desktop ground traversal still pauses, including a 550 ms walking interval.
+A later traffic/custody interruption also prevents uninterrupted-traversal
+acceptance. All flight windows pass. The failed run is preserved in
+`output/release-review/561-b272ed7a-performance-preserved/`; it is not a release
+pass. Both development branches contain the worker-indexing checkpoint `815e32ad`;
+the following camera change is the next source checkpoint. Canonical staging remains a0.
+
+A subsequent source change moves exact pavement indexing into the existing
+owned worker using transferred private buffers. It retains the accepted surface
+on failure, cancellation or supersession. All 76 focused checks and the full
+2,691-test source chain pass. Native source travel loads in 105.9 seconds; short
+walking/driving and a 90-second flight pass, but the 90-second walk has a cluster
+of 117–150 ms intervals. No browser exception or gameplay interruption occurs.
+Live weather/marine/place services return 500/503 errors during the Hosting
+incident. The prescribed keyboard action and current image were reviewed.
+This focused run omits reload/mixed-route acceptance and is not a release pass.
+The change is not in the frozen package or hosted releases. Final packaged performance,
+backend/save and complete-candidate acceptance remain open. The dated sections
+below are historical checkpoints and do not override this status.
+
+The camera now gathers nearby collision candidates once per synchronous camera
+pass while preserving every original probe, footprint, height and door rule.
+Buffers release scene references even when a caller throws. All nine focused
+checks and the complete **2,695-test** source chain pass, including 84 exact
+camera comparisons. A clear 12-unit camera sweep uses one neighborhood lookup
+instead of 27. This is a component improvement, not a whole-game pacing claim.
+
+The unprofiled source journey loads in 114.4 seconds and passes the 90-second
+flight. The 90-second walk completes but has a 266–317 ms pause cluster; short
+moving walking and stationary driving also miss their frame percentile limits.
+There are no browser errors, failed local requests, reloads or gameplay
+interruptions. The current image and prescribed keyboard action were reviewed.
+Evidence: `output/release-review/561-camera-region-native-walk/`.
+The failed result is retained and no acceptance limits changed. Free disk space
+is about 2.7 GiB after the check, below the 3 GiB bounded-test launch guard and
+the 8 GiB regional-test requirement. Source, saves, history and fallback packages
+are preserved. No new package or production promotion has been made.
 
 ## October 14 production road continuity hotfix
 
@@ -13,8 +173,8 @@ Production is now **5.5.1**, build
 It was isolated from actual production d8775a39, not built from unreleased 5.6.
 The hotfix branch is `steven/road-continuity-hotfix`. Its immutable production
 package is in the road-continuity-hotfix worktree's `dist`; architecture-evaluation
-`dist` still preserves the previous 5.5.0 package. Live manifests match on both
-domains; prior Hosting version `1036aacf01a2b97d` remains the rollback.
+`dist` still preserves the previous 5.5.0 package. At deployment, live manifests
+matched on both domains; prior Hosting version `1036aacf01a2b97d` remains available.
 
 An engineered at-grade approach was already in the pinned contact index but was
 incorrectly required in a moving road packet. The resulting assertion killed the
@@ -47,6 +207,263 @@ Ongoing local 5.6 work retains the original fix at `2a9a7cc3` and merges publish
 history at `027336a7`, without changing its pre-merge source tree. No museum,
 aquarium, ship, consolidation or player progress was rolled back. Full deployment
 and integration evidence is recorded in `docs/road-continuity/EVIDENCE.md`.
+
+## October 15 — subsequent geometry allocation repair
+
+The next source checkpoint passes all **2,687 source tests** and the full
+structural, ownership, type, inventory and sensitivity chain. Fast pavement
+checkpoints create a Promise only when their existing work slice yields.
+Clipping retains scratch capacity and uses borrowed Float64 workspace storage;
+ordinary callers and retained failure diagnostics keep independent arrays.
+All 1,000 direct before/after geometry cases match; the isolated clipping sample
+allocates about 91% less temporary memory. These measurements describe the
+component, not an accepted whole-game performance improvement.
+
+The subsequent native source walking window passes the pause limit (one 133 ms
+interval in 90 seconds), but flight still fails with 600/283 ms intervals and a
+short moving-walk p99 also fails. The live map inputs differ between recent
+runs, so their frame rates are not a controlled comparison. No renderer ordering
+change was adopted: standard ordering slowed ground rendering and still paused.
+A completed 30-second CPU diagnostic identifies collector work during pavement
+finalization. The longer CPU/collector trace stopped at the disk guard and is
+not a pass. Frozen candidate 296fb8a6 and hosted releases below remain unchanged.
+
+## October 15 — frozen 296fb8a6 candidate
+
+Both active development branches contain source
+`296fb8a6dcf9a621357574de416e2a8ea7e04194`. Its immutable package is
+`5.6.1+296fb8a6dcf9.de50589d9d91a0d4.staging`; all 754 delivered files verify.
+The full source chain passes 2,683 tests, the focused pavement and lifetime
+suite passes 60 tests, and all 63 rollback-review file identities match.
+Canonical staging still serves a0e20c35; production remains 5.5.1.
+
+The exact packaged performance run completes all seven 90-second travel windows.
+The initial flight and five sustained windows pass pacing; short moving driving,
+the first sustained walk and one sustained flight still fail. The largest
+sustained interval is 250 ms, with a clustered walking pause. This is **not** a
+performance pass. All twelve release/reload cycles pass, including coverage,
+retired-owner cleanup, transfer and resource limits. Settled heap is 50.8–58.3 MiB;
+occupied retained heap is 445.6–449.6 MiB. Desktop starts in 114.5 seconds and
+touch regression starts in 41.7 seconds and passes every check. The only failed
+desktop category is active-play hitches. Native images were inspected. No timing,
+coverage or resource criterion was relaxed. The next focused comparison checks
+standard renderer ordering against the existing depth-first ordering, retaining
+world content. Backend/save acceptance, the remaining current-package matrix,
+ordinary hosted account/voyage checks and current-image review remain open.
+
+Evidence: `output/release-review/561-296fb8a6-performance/` and
+`output/verification/performance-retention/`. The earlier sections below record
+historical checkpoints; they do not override this candidate's current status.
+
+## October 15 — local traversal repair checkpoint
+
+The subsequent full source chain passes **2,683 tests**. A separate actual-module
+ownership check reproduced eleven retained old pavement publications after twelve
+replacements. Isolating published callbacks from construction scope reduces that
+to zero while keeping the current publication and its contact alive. All 60
+focused geometry, worker, invalidation and cleanup checks pass. This is a verified
+cleanup repair; its native pacing result is still pending. The preceding final-
+surface cache diagnostic still had a 266.6 ms walking pause, so it is not accepted
+as a complete performance fix. No acceptance thresholds changed.
+
+The full source chain passes **2,681 tests**, including structural, ownership,
+type, inventory and sensitivity checks. Exact local shop-entrance validation
+avoids a measured citywide fallback search during walking. Pavement clipping
+reuses private temporary storage; 18 before/after geometry cases match exactly.
+Terrain-fitted cells share the existing 16 MiB cache and are reused only with
+the same input fingerprint and ground/contact/portal owners. Retained cells
+are processed first to avoid sequential cache eviction; final face order stays
+canonical. These repairs do not reduce buildings, roads or accepted scenery.
+
+The native `561-cache-order-native-mixed` journey completed its initial flight
+and all seven 90-second travel windows without reloads, gameplay interruption,
+browser errors or failed local resources. All 49,080 buildings and 18,952 roads
+remain. The first sustained drive and all flight windows pass the hitch limits;
+both sustained walks and the later drive still fail, with pauses up to 300.1 ms.
+Occupied retained heap is 448–452 MiB. Diagnostic-only skipped reload checks are
+not acceptance passes. The current screenshot was inspected.
+
+A real traffic collision explains the test driver's civic response; no police
+rules were changed. The follow-up walking CPU/collection profile stopped at the 2 GiB disk
+safety floor; its interrupted window is not a pass. The latest local source is
+not yet packaged or hosted. Production remains 5.5.1, staging remains a0e20c35,
+and stable is unchanged. Final immutable acceptance, hosted account/voyage/save
+checks and exact-current image review remain required.
+
+## October 15 — initial scenery and street readiness repairs
+
+Source now completes the actual surrounding-pavement worker and mapped-path
+publication under the loading cover. Its progress is measured from accepted
+cells. Late terrain invalidation cannot count as a completed initial sidewalk
+build; bounded retries settle current terrain before play. During travel,
+source selection yields in small slices, and takeoff cancels unfinished ground
+detail while retaining accepted contact and permitting descent recovery.
+
+The integrated native source diagnostic loads in 113.3 seconds with all 49,080
+buildings, 18,952 roads and 6,009 scenery cells. Its 90-second flight has a
+50.1 ms worst interval and no intervals over 100 ms. A 166.7 ms driving hitch
+led to a separate CPU profile confirming a synchronous source scan; that scan
+is now cooperative. The subsequent seven-window native mixed journey completed
+with preserved coverage and bounded memory, but still recorded 183–333 ms pauses.
+A walking profile attributes one pause to a citywide shop-entrance fallback
+search and another cluster to collection during pavement preparation. Local
+entrance validation and reusable clipping storage are now under verification.
+One later walking window entered custody and is not uninterrupted traversal
+proof. No pacing, coverage or resource budget changed.
+
+Mobile regression with the fallback transport provider passes all measured
+checks in 38.4 seconds: 26,829 buildings, 1,063 roads and all 1,403 surrounding
+cells, with no active street worker or dirty publication at first play. Its
+five-second sample peaks at 16.8 ms. The current portrait image was inspected;
+this is browser touch emulation, not physical-phone certification. Evidence:
+`output/release-review/561-settled-streets-mobile`.
+
+The refreshed full source chain passes all 2,676 tests and the complete
+structural, ownership, type, inventory and sensitivity checks. Source work is
+not in the a0 staging artifact. Production remains 5.5.1; no new deployment or stable merge
+has happened. Final immutable acceptance and current image approval stay open.
+
+## October 15 current source — preparation repairs verified, pacing still open
+
+All **2,666 source tests** and the complete structural/ownership/type/inventory/
+sensitivity chain pass. New resident GPU preparation removes measured first-use
+driving upload stalls without reducing coverage. The source museum fault/reload/
+performance journey passes **67/67**; cold entry is 66 ms and all three turning
+windows pass. Current desktop and phone-width images were inspected. Evidence:
+`output/release-review/561-museum-resident-prepared` and the October 14 READINESS
+ledger. These changes are not yet in the frozen a0 staging package below.
+
+The complete a0 matrix finished **103/107**, with museum/performance failures,
+a regional prelaunch disk refusal and a Git identity timeout. Backend and the
+released 5.5.1 → candidate → compatible b21 fallback → candidate save roundtrip
+pass. Original receipts remain preserved. New source native flight still has
+716.8/383.3 ms intervals, so performance acceptance remains open. Neither the
+overview ablation nor compact reporting alone solved those pauses. No budget or
+coverage limits have changed. Production remains 5.5.1; stable is unchanged.
+
+## October 15 staged a0e20c35 candidate — original acceptance record
+
+Canonical staging serves `5.6.1+a0e20c35eab7.aa4dd9dce23502b0.staging`, source
+`a0e20c35eab7463385738738e4cc0c6a208d87ea`, from
+`output/hosting-validation/release-561-a0e20c35`. All 754 packaged files verify;
+both hosted manifests exactly match local bytes. Both active development
+branches contain this source. PR #103 remains draft; stable and production
+remain unchanged. The production build is still the 5.5.1 identity above.
+
+All 2,653 source tests and the structural chain pass. The exact candidate now
+passes all three backend gates and the full released 5.5.1 → candidate →
+compatible b21 fallback → candidate save journey. The 107-gate candidate matrix
+finished with the four failures recorded above; an unrun gate is not a pass. Receipts are under
+`output/release-evidence/current`; sequence status is recorded in
+`output/release-review/reviewed-corridor-final-verification-sequence.json`.
+
+Ordinary Chrome opens the hosted menu, enters guided Baltimore, displays live
+weather and starts the Photograph activity through visible controls. This is not
+the separate account/shared-voyage/save acceptance. Nighttime character visibility
+was inspected; triangular sidewalk fragments at the intersection still need
+review. Only the agent-owned tab was closed; the owner's Chrome remains open.
+
+Current source checks also pass the repaired physical Monaco junction and regional
+arrival/recovery/return with building detail and bounded scenery retention.
+Long native flight pauses remain a confirmed blocker: the latest diagnostic
+recorded 700 and 2649.9 ms intervals. It is not a performance acceptance pass.
+Steep mountain approaches still have unrealistic earthworks, and final current
+image review remains open. Do not call the candidate production ready yet.
+
+The superseded 90d515 backend checks passed, but its save check correctly refused
+unreviewed runtime differences before any save test. The review now pins all 42
+semantically reviewed before/after runtime files; eleven focused contract tests
+pass. The partial 90d515 candidate run and interrupted receipts were preserved,
+its owned processes closed, and only its verified generated package retired.
+They are historical evidence, not current acceptance.
+
+## Earlier October 15 continuation — historical fb24 candidate
+
+The frozen current package is `5.6.1+fb24de036fdd.ccf8c64b77a22df7.staging`,
+source `fb24de036fdd809be11f4df3708b5a5d33df7d69`, under
+`output/hosting-validation/release-561-fb24de03`. All 753 files pass package
+integrity checks. All 2,637 source tests and structural checks pass.
+
+The verified parking-passage roof/clearance repair removes the fabricated
+Light Street trench. A persistent facility callback no longer retains the load
+context (about 128 MB in sequential retained-allocation diagnostics). Numeric
+publication, regional ring and road-width storage now use bounded append-only
+pages; temporary route/wheel storage avoids native backing-store churn. Coverage,
+source truth and geometry precision are preserved.
+
+The new immutable native flight diagnostic still fails: 916.6 and 466.7 ms
+intervals. Moving driving also fails pacing. Activation, coverage, occupied memory
+and browser/local-resource checks pass. This is not complete release acceptance.
+Steady-state allocation is being profiled separately. The current 107-gate
+candidate matrix was stopped after 71 passes and four failures to repair the
+confirmed blockers before final acceptance; urban-sandbox was interrupted and
+later gates were not run. It found 20 mixed-provider Monaco road junction
+height discontinuities (up to 67.63 m); fallback-only Monaco and all seven fallback
+locations pass. Historical b21 Monaco evidence had no exact regional OSM and did
+not cover this combination. Museum cold admission timing, a swimming startup
+failure and a regional-arrival disk-guard refusal also remain open. Full artifact
+acceptance, backend/save roundtrip and ordinary hosted voyage/save remain open.
+
+Production is still 5.5.1; canonical staging is still 1f37. fb24 is now pushed
+to both active development branches; PR #103 remains draft and stable unchanged.
+The superseded generated f3ac package was retired only after verifying every
+file and preserving its manifests and original evidence. The actual production,
+previous dist and compatible b21 rollback packages remain preserved.
+
+## Earlier October 15 source repairs — historical intermediate status
+
+The full current source/structural chain passes **2,653 tests**. An initial run
+caught a second URL identity for the shared DOM helper; the discovery import
+now uses the existing `v=1` identity. Museum/source functional diagnostics pass
+66 checks, and Earth swimming and the full first-session/Journal journey pass.
+These are not substitutes for final immutable acceptance.
+
+Controlled published-OSM Monaco data reproduce 1,430 junction discontinuities
+in fb24. Current source has **zero discontinuities and zero invalid vertical
+owners across 3,150 sampled connections**, with the unchanged 0.25 m continuity
+limit and no grade violations. Geometry ownership retires only proven complete
+fallback overlaps, including surface approaches and pedestrian collections.
+Connected roads share a physical height solution across provider boundaries;
+source fidelity no longer creates separate height systems. A vertical owner
+must exist, be complete and belong to the same connected physical corridor.
+An unrelated road from the same source cannot authorize a height constraint.
+
+The follow-up keyboard route crosses the repaired Monaco junction: 79.55 m of
+an 84.21 m route, 69 contact samples, no airborne samples, and no browser errors.
+The screenshots also expose high approach fill already present in fb24 (48.72 m
+on the same exact through-road); this is a distinct terrain/grade limitation, not
+proof of realistic mountain road presentation. Other assembled locations and the
+full final package matrix remain to be verified. Native flight after the
+byte-identical facade cleanup still has 666.7 and 1100 ms intervals, so pacing
+remains blocked. The earlier shared-building-store experiment was rejected and
+restored. Production, stable and canonical staging have not changed.
+
+## Previous f3ac candidate — historical October 14 results
+
+The frozen package is `5.6.1+f3ac508d2bd9.a76b6be179dcf332.staging`, under
+`output/hosting-validation/release-561-f3ac508d`. All 2,633 source checks and the
+structural chain pass. All three backend gates and the actual released
+5.5.1 → candidate → compatible b21 rollback → candidate save roundtrip pass.
+The complete candidate run finished at 03:11 UTC October 15 (October 14 local):
+**103 of 107 gates passed**. Original failures remain preserved.
+
+Open checks: regional arrival was refused before launch by its disk guard;
+city-switch requests need cancellation accounting verified; the district
+activity button timed out; native desktop frame pacing and one mode activation
+failed. Twelve reload cycles, retained memory, coverage and touch regression
+passed. One timed walking segment entered custody and is not uninterrupted
+traversal evidence. The worst initial-flight interval was 1.3 seconds.
+
+A separate source screenshot shows an abnormal downtown road cut despite a
+passing street test. Exact packaged road/terrain/sidewalk provenance is being
+captured before choosing a repair. Do not remove genuine bridge/tunnel cuts or
+apply the already-disabled residual street-propagation repair again.
+
+This is **not production ready**. Ordinary hosted voyage/save and current-image
+review also remain open. Canonical staging still serves 1f37 at
+https://we3d-staging-20260712.web.app/app/. Production is unchanged at 5.5.1.
+Use docs/RELEASE_SOURCE_OF_TRUTH.md and the October 14 READINESS ledger; historical
+package identities below are not current acceptance.
 
 ## Previous 5.5.0 release evidence
 
@@ -94,7 +511,77 @@ browsers/servers. Production deployment evidence is under
 `output/release-evidence/current/production-deployment.json` and
 `production-promotion.json`; acceptance gaps remain in their own receipts.
 
-## October 13 packaged verification and branch status
+## October 13–14 venue, harbor and Kennedy follow-up (local only)
+
+Aquarium and Peale street admission, photo/mapped exteriors, engineered Inner
+Harbor banks, smaller passenger launch selection and hull/building collision are
+repaired locally. Reviewed landmark identities survive the travelling detail
+cache, so generic signs and trim no longer cover the authored facades. The VAB
+uses official NASA exterior/crawler assets, a contained ground-floor visit, four
+working stations and normal walking exit. LC39B has mapped lattice masts, water
+tower, graded hardstand, embankment and flame trench with shared render/contact
+ownership. These cover two named NASA sites, not every space facility.
+
+Verification also found and fixed fresh Ocean admission using the outgoing water
+candidate, portrait diver framing after hull camera avoidance, single-attempt
+terrain publication and incorrect map retries after terminal terrain failure.
+Near terrain now uses the existing bounded tile recovery; incomplete surfaces
+cannot proceed to transport compilation or player spawn.
+
+All 2,607 source tests and the complete structural chain pass. The final immutable
+package is `output/hosting-validation/venue-harbor-current-20261014`, built from
+`4ec78f8edf11`: `5.6.0+4ec78f8edf11.77d16adb2c05e5b6.staging`.
+Its build/verification pass. All five native Chrome package journeys pass:
+distant Peale entry/return, aquarium entry/return plus harbor contact/reverse,
+VAB complete tour with a deliberately failed terrain request recovered, continuous
+LC39B ramp walking, and seven connected Ocean/deck/diver/submarine/resume cases.
+Screenshots were inspected. Receipts: `output/venue-harbor-repair/4ec78f8e/` and
+`CURRENT-ACCEPTANCE.json`; explanations in `docs/venue-harbor-repair/EVIDENCE.md`.
+
+This is functional local acceptance, not a complete production release
+certification. Exterior materials and surrounding scenery remain simplified;
+slow local textures can still trigger procedural fallback. Prior aquarium/frame
+performance gaps, ordinary hosted/provider and physical-device checks remain
+explicit. Original failed runs are preserved. Production dist, the consolidation
+candidate, four recognized rollback packages and all source/history/player data
+remain intact. Superseded task-only package payloads were removed after retaining
+their manifests and evidence. No push, preview publication or production deploy.
+
+## October 13 consolidation follow-up (local only)
+
+GitHub source integration completed before this assignment: stable `437e06cb`,
+both active development branches `64bab776`, identical content. Protected checks
+and Pages passed; all 19 public gallery images were verified. The subsequent
+consolidation commits remain local. Production remains the 5.5 build above.
+
+Baseline rollback ref: `steven/consolidation-baseline-20261013`. The authoritative
+review is `docs/architecture-consolidation/FINAL-REPORT.md`, with ten supporting
+baseline/inventory/authority/preservation/change/verification documents.
+
+C1–C3 fence protected requests and wallet/property listeners to their initiating
+account, share wallet projection and remove a transport import cycle without
+changing geometry. C5 adds durable account-bound purchase/service recovery and
+atomic Backpack delivery markers. C6 moves mapped-water bitmap readback to an
+owned worker, preserving every mask pixel. C7 adds real emulator commerce
+concurrency tests. C8 binds delayed service effects and care XP to their original
+target and applies care to the latest persisted companion row.
+
+All 2,575 source tests and the structural chain pass. All fifteen backend stages
+pass across two isolated selected runs, including two actual Earth worlds,
+shared vehicle handoff, property/network recovery, room chat and shared voyage.
+Native browser delayed-account, purchase recovery and IndexedDB companion checks
+pass. Exact package/browser results are in VERIFICATION; emulator/controlled
+checks do not establish ordinary hosted App Check or physical-device acceptance.
+
+The final local test package is
+`output/hosting-validation/consolidation-final-20261013`, built from `8c4a8f1b`:
+`5.6.0+8c4a8f1b73cb.d443b411e27365f4.staging`. Production `dist`, four rollback
+packages, source/history and player data remain preserved. No push/deploy,
+paid provider, cloud credential creation or destructive migration occurred.
+Broader frame/venue/transfer failures, legacy unowned service receipts and
+hosted/device gaps remain explicit. This is not a complete release certification.
+
+## Earlier October 13 packaged verification and branch status
 
 The two active development branches, `steven/visual-quality` and
 `steven/post-5.2-release-integration`, contain the same preserved history. The

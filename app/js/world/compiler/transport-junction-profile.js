@@ -42,6 +42,12 @@ function maximumGradeFor(feature) {
 
 function hasEngineeredGraphConstraintAt(feature, side) {
   if (feature?.structureSemantics?.terrainMode !== 'at_grade') return false;
+  // A compiled approach owns the elevation of the entire polyline. Every
+  // mapped junction along it must return to the adjoining street's surface,
+  // even when the original bridge/tunnel constraint is at another station.
+  // Testing only the anchor station left side streets above excavated roads
+  // and omitted those physical discontinuities from the audit as well.
+  if (feature.transportSurfaceModel?.engineeredApproach === true) return true;
   const distance = finite(side?.distanceAlong);
   return (feature?.structureTransitionAnchors || []).some((anchor) =>
     anchor?.source === 'transport_graph_node' &&
@@ -107,6 +113,44 @@ export function connectedSideGroups(connections = []) {
   return [...groups.values()];
 }
 
+function completePhysicalSideGroups(connections, featureById) {
+  // Source fidelity selects geometry, not a separate vertical coordinate
+  // system. The accepted physical graph owns junctions across provider seams.
+  // Neither a missing route nor a rejected source can become a height owner.
+  return connectedSideGroups(connections.filter(connection => {
+    const left = featureById.get(String(connection?.left?.featureId || ''));
+    const right = featureById.get(String(connection?.right?.featureId || ''));
+    return left && right &&
+      left.transportRecord?.routeState !== 'incomplete' &&
+      right.transportRecord?.routeState !== 'incomplete';
+  }));
+}
+
+function physicalCorridorRoots(connections, featureById) {
+  const parent = new Map();
+  const root = id => {
+    let current = parent.get(id);
+    if (current === undefined) return undefined;
+    while (current !== parent.get(current)) current = parent.get(current);
+    let cursor = id;
+    while (parent.get(cursor) !== current) {
+      const next = parent.get(cursor); parent.set(cursor, current); cursor = next;
+    }
+    return current;
+  };
+  for (const connection of connections) {
+    const leftId = String(connection?.left?.featureId || '');
+    const rightId = String(connection?.right?.featureId || '');
+    const left = featureById.get(leftId), right = featureById.get(rightId);
+    if (!left || !right || left.transportRecord?.routeState === 'incomplete' ||
+        right.transportRecord?.routeState === 'incomplete') continue;
+    if (!parent.has(leftId)) parent.set(leftId, leftId);
+    if (!parent.has(rightId)) parent.set(rightId, rightId);
+    parent.set(root(rightId), root(leftId));
+  }
+  return new Map([...parent.keys()].map(id => [id, root(id)]));
+}
+
 export function auditTransportJunctionContinuity(
   features = [],
   transportNetworkModel = null,
@@ -123,9 +167,11 @@ export function auditTransportJunctionContinuity(
     feature?.transportSurfaceModel?.engineeredApproach === true &&
     feature?.transportRecord?.completeness !== 'lossless'
   );
-  // Generalized routes may need graded approaches to remain drivable. Their
-  // modeled heights must stay in that source family, with an actual published
-  // owner; an exact bridge's elevation cannot leak into a fallback duplicate.
+  // Both providers supply plan geometry. OSM layer describes crossing order,
+  // not surveyed elevation. Require a complete published owner in the same
+  // connected physical corridor, including a genuine cross-provider seam.
+  // Merely sharing a provider is no authority to move an unrelated road.
+  const corridorRoots = physicalCorridorRoots(transportNetworkModel?.connections || [], featureById);
   const invalidVerticalAnchors = [];
   let auditedVerticalAnchorCount = 0;
   for (const feature of features) {
@@ -140,10 +186,13 @@ export function auditTransportJunctionContinuity(
     for (const anchor of anchors) {
       auditedVerticalAnchorCount += 1;
       const owner = featureById.get(String(anchor.ownerFeatureId || ''));
-      const family = feature?.transportRecord?.completeness;
+      const featureId = String(feature?.transportGraphRef?.featureId || '');
+      const ownerId = String(anchor.ownerFeatureId || '');
+      const connectedOwner = corridorRoots.has(featureId) &&
+        corridorRoots.get(featureId) === corridorRoots.get(ownerId);
       const reason = !owner ? 'missing_vertical_owner'
         : owner.transportRecord?.routeState === 'incomplete' ? 'incomplete_vertical_owner'
-        : owner.transportRecord?.completeness !== family ? 'mixed_vertical_source_family'
+        : !connectedOwner ? 'unconnected_vertical_owner'
         : !Number.isFinite(anchor.targetSurfaceY) ? 'nonfinite_vertical_target' : null;
       if (reason) invalidVerticalAnchors.push(Object.freeze({
         featureId: String(feature?.transportGraphRef?.featureId || ''),
@@ -295,20 +344,19 @@ export function buildTransportContinuityRepairAnchors(
     const featureId = String(feature?.transportGraphRef?.featureId || '');
     if (featureId) featureById.set(featureId, feature);
   }
-  const groups = connectedSideGroups(transportNetworkModel.connections).map((sides, index) => {
+  const groups = completePhysicalSideGroups(transportNetworkModel.connections, featureById).map((sides, index) => {
     const complete = sides.map((side) => ({
       side,
       feature: featureById.get(String(side.featureId || ''))
     })).filter(({ feature }) =>
       feature?.transportRecord && feature.transportRecord.routeState !== 'incomplete');
-    const exact = complete.filter(({feature}) => feature.transportRecord.completeness === 'lossless');
     // Once a complete generalized route is published as a physical road, its
     // shared junction and along-route grade constraints are just as binding.
     // Previously only the initial per-node pass handled these roads; each
     // independent profile then rejected incompatible nodes and left a step.
-    // Preserve exact-source ownership in a mixed group: source conflation,
-    // not a vertical solver, must retire a lower-detail duplicate there.
-    return {id:index,sides:exact.length?exact:complete};
+    // Conflation retires duplicate geometry before this pass. Every surviving
+    // physical join shares one feasible height, regardless of source provider.
+    return {id:index,sides:complete};
   });
   const membershipsByFeature = new Map();
   const targetByGroup = new Map();
@@ -541,87 +589,98 @@ export function buildTransportContinuityRepairAnchors(
     }
   }
 
-  // A short bridge/tunnel fragment can have two terrain-owned endpoints whose
-  // DEM elevations exceed its feasible grade cone. Raise only the lower node
-  // enough to make that exact structure fragment feasible. Propagation is
-  // restricted to the mapped structure itself; ordinary roads are handled
-  // later only when they physically share the adjusted node.
-  for (let pass = 0; pass < 48; pass += 1) {
-    let changed = false;
-    for (const [feature, memberships] of membershipsByFeature) {
-      const terrainMode = feature?.structureSemantics?.terrainMode || 'at_grade';
-      // Once an exact at-grade road has been promoted to an engineered
-      // approach, its two graph nodes are part of the same vertical-alignment
-      // problem as the bridge/tunnel they connect to. Skipping it here left
-      // mutually infeasible endpoint targets in place; the per-feature
-      // compiler then made both nodes exact by publishing a near-vertical
-      // ramp between them. Ordinary terrain-fitted roads remain excluded so
-      // bridge elevations cannot propagate through the city street graph.
-      if (
-        terrainMode === 'at_grade' &&
-        feature?.transportSurfaceModel?.engineeredApproach !== true
-      ) continue;
-      const grade = maximumGradeFor(feature);
-      const constrained = memberships
-        .map((membership) => ({ membership, target: targetByGroup.get(membership.group.id) }))
-        .filter((entry) => Number.isFinite(entry.target));
-
-      // Crossing/clearance stations are part of the same vertical alignment
-      // problem as graph nodes. If they are considered only by the later
-      // per-feature profile compiler, that compiler has to reject an otherwise
-      // shared endpoint and the rendered decks separate again. Project each
-      // mapped hard station's grade cone onto every incident graph node before
-      // anchors are published so the graph and profile solvers receive one
-      // feasible set of constraints.
-      const stations = Array.isArray(feature?.structureStations)
-        ? feature.structureStations
-        : [];
-      if (feature?.structureSemantics?.terrainMode === 'elevated') {
-        for (const entry of constrained) {
-          let requiredTarget = entry.target;
-          for (const station of stations) {
-            const stationDistance = Math.max(0, Math.min(
-              featureLength(feature),
-              finite(station?.distance)
-            ));
-            const stationSurfaceY = compiledSurfaceAtDistance(feature, stationDistance);
-            if (!Number.isFinite(stationSurfaceY)) continue;
-            const run = Math.abs(
-              stationDistance - finite(entry.membership.side?.distanceAlong)
-            );
-            requiredTarget = Math.max(requiredTarget, stationSurfaceY - grade * run);
-          }
-          if (requiredTarget <= entry.target + 1e-6) continue;
-          targetByGroup.set(entry.membership.group.id, requiredTarget);
-          entry.target = requiredTarget;
-          changed = true;
-        }
+  // Solve the affected corridor to closure before publishing any profile.
+  // A fixed number of compile/repair passes left a different road end open
+  // after each newly adjusted approach. Activate an ordinary continuation only
+  // when a shared node actually moves; its other nodes then participate in the
+  // same solve. Descending height propagation with non-negative grade costs
+  // terminates on this finite graph, independent of how OSM split the route.
+  const activeFeatures = new Set();
+  const gradeAdjacency = new Map();
+  const heap = [];
+  const pushHeight = (id, height) => {
+    let index = heap.length;
+    heap.push({id,height});
+    while (index > 0) {
+      const parent = (index - 1) >> 1;
+      if (heap[parent].height >= height) break;
+      heap[index] = heap[parent]; index = parent;
+    }
+    heap[index] = {id,height};
+  };
+  const popHeight = () => {
+    const first = heap[0], last = heap.pop();
+    if (heap.length) {
+      let index = 0;
+      while (index * 2 + 1 < heap.length) {
+        let child = index * 2 + 1;
+        if (child + 1 < heap.length && heap[child + 1].height > heap[child].height) child++;
+        if (last.height >= heap[child].height) break;
+        heap[index] = heap[child]; index = child;
       }
-      for (let leftIndex = 0; leftIndex < constrained.length; leftIndex += 1) {
-        for (let rightIndex = leftIndex + 1; rightIndex < constrained.length; rightIndex += 1) {
-          const left = constrained[leftIndex];
-          const right = constrained[rightIndex];
-          const run = Math.abs(
-            finite(right.membership.side?.distanceAlong) -
-            finite(left.membership.side?.distanceAlong)
-          );
-          const maximumDelta = grade * run;
-          if (Math.abs(right.target - left.target) <= maximumDelta + 1e-6) continue;
-          const lower = left.target < right.target ? left : right;
-          const higher = lower === left ? right : left;
-          const feasibleLower = higher.target - maximumDelta;
-          if (feasibleLower <= lower.target + 1e-6) continue;
-          targetByGroup.set(lower.membership.group.id, feasibleLower);
-          ownerByGroup.set(
-            lower.membership.group.id,
-            ownerByGroup.get(higher.membership.group.id) || higher.membership
-          );
-          lower.target = feasibleLower;
-          changed = true;
-        }
+      heap[index] = last;
+    }
+    return first;
+  };
+  const raiseNode = (id, height, owner) => {
+    if (!Number.isFinite(height) || height <= (targetByGroup.get(id) ?? -Infinity) + 1e-6) return;
+    targetByGroup.set(id,height);
+    if (owner) ownerByGroup.set(id,owner);
+    pushHeight(id,height);
+  };
+  const ensureNode = membership => {
+    const {group} = membership;
+    if (targetByGroup.has(group.id)) return;
+    const candidates = group.sides.map(entry => {
+      const point = entry.side.point;
+      const terrain = Number(options.sampleTerrainY?.(finite(point?.x),finite(point?.z)));
+      const bias = Number.isFinite(entry.feature.surfaceBias) ? entry.feature.surfaceBias : .08;
+      return {entry,height:Number.isFinite(terrain) ? terrain + bias : surfaceFor(entry)};
+    }).filter(row => Number.isFinite(row.height)).sort((a,b) => b.height-a.height);
+    if (candidates.length) raiseNode(group.id,candidates[0].height,candidates[0].entry);
+  };
+  const activate = feature => {
+    if (activeFeatures.has(feature)) return;
+    activeFeatures.add(feature);
+    const ordered = [...(membershipsByFeature.get(feature)||[])]
+      .sort((a,b) => finite(a.side.distanceAlong)-finite(b.side.distanceAlong));
+    const grade = maximumGradeFor(feature);
+    for (const member of ordered) ensureNode(member);
+    for (let index=1; index<ordered.length; index++) {
+      const left=ordered[index-1],right=ordered[index];
+      if (left.group.id===right.group.id) continue;
+      const cost=grade*Math.abs(finite(right.side.distanceAlong)-finite(left.side.distanceAlong));
+      for (const [from,to] of [[left,right],[right,left]]) {
+        if (!gradeAdjacency.has(from.group.id)) gradeAdjacency.set(from.group.id,[]);
+        gradeAdjacency.get(from.group.id).push({id:to.group.id,cost});
       }
     }
-    if (!changed) break;
+    for (const member of ordered) {
+      // A modeled crossing clearance is also a hard vertical constraint. Its
+      // grade cone must reach graph nodes before either adjoining deck builds.
+      if (feature.structureSemantics?.terrainMode === 'elevated') {
+        for (const station of feature.structureStations||[]) {
+          const distance=Math.max(0,Math.min(featureLength(feature),finite(station.distance)));
+          const height=compiledSurfaceAtDistance(feature,distance);
+          raiseNode(member.group.id,height-grade*Math.abs(distance-finite(member.side.distanceAlong)),member);
+        }
+      }
+      const height=targetByGroup.get(member.group.id);
+      if (Number.isFinite(height)) pushHeight(member.group.id,height);
+    }
+  };
+  for (const feature of membershipsByFeature.keys()) {
+    if (feature.structureSemantics?.terrainMode !== 'at_grade' || feature.transportSurfaceModel?.engineeredApproach) activate(feature);
+  }
+  while (heap.length) {
+    const {id,height}=popHeight();
+    if (height < targetByGroup.get(id)-1e-6) continue;
+    for (const entry of groups[id].sides) {
+      if (activeFeatures.has(entry.feature)) continue;
+      const current=surfaceFor(entry);
+      if (Number.isFinite(current) && Math.abs(height-current)>toleranceMeters) activate(entry.feature);
+    }
+    for (const edge of gradeAdjacency.get(id)||[]) raiseNode(edge.id,height-edge.cost,ownerByGroup.get(id));
   }
 
   // Foundations are hard upper bounds, unlike adjustable terrain cover at a
@@ -705,8 +764,11 @@ export function buildTransportContinuityRepairAnchors(
       // rendered endpoint to the feasible grade cone. In both cases the solved
       // graph constraint must be published; otherwise the next compile reads
       // the stale target and restores the original metre-scale discontinuity.
-      const requiredForGradeFeasibility = constrainedMembershipCount > 1 &&
-        (targetDelta > 1e-5 || conflictingPublishedTarget);
+      const hasPublishedNode = (feature.structureTransitionAnchors || []).some(anchor =>
+        anchor?.source === 'transport_graph_node' &&
+        Math.abs(finite(anchor.distance)-finite(side.distanceAlong)) <= .02);
+      const requiredForGradeFeasibility = activeFeatures.has(feature) &&
+        (constrainedMembershipCount > 1 && (targetDelta > 1e-5 || conflictingPublishedTarget) || !hasPublishedNode);
       const reconcilingAtGrade = terrainMode === 'at_grade' &&
         (targetDelta > toleranceMeters || requiredForGradeFeasibility) &&
         (targetSurfaceY >= terrainY + surfaceBias - 0.02 || foundationAffectedGroups.has(group.id));
@@ -1085,7 +1147,7 @@ export function buildTransportJunctionProfileAnchors(
   }
   const anchorsByFeature = new Map();
   let nodeCount = 0;
-  for (const group of connectedSideGroups(transportNetworkModel.connections)) {
+  for (const group of completePhysicalSideGroups(transportNetworkModel.connections, featureById)) {
     const connectedCandidates = group
       .map((side) => ({ side, feature: featureById.get(String(side.featureId || '')) }))
       .filter((entry) => entry.feature?.transportRecord?.routeState !== 'incomplete');
@@ -1098,30 +1160,7 @@ export function buildTransportJunctionProfileAnchors(
     if (!connectedCandidates.some(({ feature }) =>
       feature?.structureSemantics?.terrainMode !== 'at_grade'
     )) continue;
-    const bridgeCandidates = connectedCandidates.filter(({ feature }) =>
-      feature?.structureSemantics?.terrainMode === 'elevated' &&
-      feature?.structureSemantics?.isBridge === true &&
-      feature?.structureSemantics?.rampCandidate !== true &&
-      !/_link$/i.test(String(feature?.type || ''))
-    );
-    // Exact OSM and generalized regional vectors can be conflated at their
-    // endpoints for route continuity, but they are not interchangeable
-    // vertical-survey records. Carrying an exact bridge elevation into a
-    // generalized road can lift a duplicate regional route tens of metres
-    // above its DEM terrain. Compile each junction profile inside the most
-    // authoritative bridge's own source-resolution family instead.
-    const controllingBridge = [...bridgeCandidates].sort((left, right) =>
-      (right.feature?.transportRecord?.completeness === 'lossless' ? 1 : 0) -
-      (left.feature?.transportRecord?.completeness === 'lossless' ? 1 : 0)
-    )[0] || null;
-    const controllingCompleteness = String(
-      controllingBridge?.feature?.transportRecord?.completeness ||
-      (connectedCandidates.some(({ feature }) => feature?.transportRecord?.completeness === 'lossless')
-        ? 'lossless' : 'generalized')
-    );
-    const candidates = connectedCandidates.filter(({ feature }) =>
-      String(feature?.transportRecord?.completeness || 'generalized') === controllingCompleteness
-    );
+    const candidates = connectedCandidates;
     if (candidates.length < 2) continue;
     candidates.sort((left, right) =>
       ownerScore(right.side, right.feature) - ownerScore(left.side, left.feature)

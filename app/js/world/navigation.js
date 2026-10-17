@@ -317,7 +317,13 @@ function evaluateNearestRoadCandidate(road, x, z, targetY, maxVerticalDelta, pre
   );
   const continuityAccess = !!preferredRoad && (sameRoad || runtime.areRoadsConnected(preferredRoad, road));
   const continuityDiscount = !preferredRoad ? 0 : sameRoad ? 3.4 : connectedRoad ? 2.25 : 0;
-  let best = null;
+  // Keep only the winning scalars while scanning. A long road can improve its
+  // candidate many times; discarded result objects otherwise become per-frame
+  // garbage even though the caller only needs the final projection.
+  let found = false;
+  let bestWeighted = Infinity;
+  let bestDist, bestX, bestZ, bestY, bestSegment, bestT, bestVertical;
+  let bestAlong, bestEndpoint, bestTransition;
   let cumulativeDistance = 0;
   for (let i = 0; i < pts.length - 1; i++) {
     const p1 = pts[i];
@@ -335,7 +341,7 @@ function evaluateNearestRoadCandidate(road, x, z, targetY, maxVerticalDelta, pre
     // Height and grade penalties cannot improve this lower bound. Avoid
     // sampling surfaces for segments that cannot replace the current winner.
     const endpointDiscount = preferredRoad && (sameRoad || connectedRoad) && (t < 0.08 || t > 0.92) ? 0.55 : 0;
-    if (d - continuityDiscount - endpointDiscount > Math.min(bestScore, best?.weightedDist ?? Infinity) + 1e-9) {
+    if (d - continuityDiscount - endpointDiscount > Math.min(bestScore, bestWeighted) + 1e-9) {
       cumulativeDistance += segLen;
       continue;
     }
@@ -386,24 +392,35 @@ function evaluateNearestRoadCandidate(road, x, z, targetY, maxVerticalDelta, pre
         weightedDist += 5.5 + Math.min(10, verticalDelta * 1.8);
       }
     }
-    if (!best || weightedDist < best.weightedDist) {
-      best = {
-        road,
-        dist: d,
-        pt: { x: nx, z: nz },
-        y: roadY,
-        segIndex: i,
-        t,
-        verticalDelta,
-        weightedDist,
-        distanceAlong,
-        distanceToEndpoint,
-        distanceToTransitionZone
-      };
+    if (!found || weightedDist < bestWeighted) {
+      found = true;
+      bestWeighted = weightedDist;
+      bestDist = d;
+      bestX = nx;
+      bestZ = nz;
+      bestY = roadY;
+      bestSegment = i;
+      bestT = t;
+      bestVertical = verticalDelta;
+      bestAlong = distanceAlong;
+      bestEndpoint = distanceToEndpoint;
+      bestTransition = distanceToTransitionZone;
     }
     cumulativeDistance += segLen;
   }
-  return best;
+  return found ? {
+    road,
+    dist: bestDist,
+    pt: { x: bestX, z: bestZ },
+    y: bestY,
+    segIndex: bestSegment,
+    t: bestT,
+    verticalDelta: bestVertical,
+    weightedDist: bestWeighted,
+    distanceAlong: bestAlong,
+    distanceToEndpoint: bestEndpoint,
+    distanceToTransitionZone: bestTransition
+  } : null;
 }
 
 // Camera probes reuse the road-search index and compiled surface/width. This is

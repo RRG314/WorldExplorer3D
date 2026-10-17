@@ -1,13 +1,13 @@
 {
   "schemaVersion": 5,
-  "programId": "world-explorer-5.6-release-2026-10-12",
-  "targetVersion": "5.6.0",
+  "programId": "world-explorer-5.6.1-release-2026-10-14",
+  "targetVersion": "5.6.1",
   "productionBaseline": {
-    "version": "5.5.0",
-    "releaseCommit": "d8775a392c4246b2552842c37f40508bd664d4c5"
+    "version": "5.5.1",
+    "releaseCommit": "012e5c85582b78a7808656545bf4143a31a18652"
   },
   "roadmap": "ROADMAP.md",
-  "acceptanceContract": "RELEASE_NOTES_5.6.0.md",
+  "acceptanceContract": "RELEASE_NOTES_5.6.1.md",
   "deploymentRequiresExplicitUserApproval": true,
   "statusAuthority": "current-execution-evidence",
   "requiredExecutionScopes": ["candidate", "backend"],

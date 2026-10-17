@@ -50,3 +50,26 @@ test('polar latitude alone does not freeze every mapped water body', async () =>
   assert.equal(classifyWaterSurfaceProfile({bounds,worldSurfaceProfile:{waterModeHint:'water'}}).mode,'water');
   assert.equal(classifyWaterSurfaceProfile({bounds,worldSurfaceProfile:{waterModeHint:'ice'}}).mode,'ice');
 });
+
+test('a local doorway check rejects blocked space without searching or relocating to another street', () => {
+  const previous = { ...initWorldSpawning() }, surface = ctx.SurfaceQuery, collision = ctx.checkBuildingCollision;
+  let surfaceQueries = 0, roadSearches = 0;
+  try {
+    ctx.SurfaceQuery = {
+      terrainAt: () => { surfaceQueries++; return { position: { y: 0 } }; },
+      walkAt: () => ({ position: { y: 0 } })
+    };
+    ctx.checkBuildingCollision = () => ({ collision: false });
+    initWorldSpawning({ findNearestRoad: () => null, isInsideWaterArea: () => false,
+      buildingContainingPoint: x => x === 0 ? { baseY: 0, height: 10 } : null,
+      traversableFeaturesForMode: () => { roadSearches++; return []; } });
+    const blocked = resolveSafeWorldSpawn(0, 0, { mode: 'walk', allowRelocation: false });
+    assert.equal(blocked.valid, false); assert.equal(blocked.reason, 'inside_building');
+    assert.equal(surfaceQueries, 1); assert.equal(roadSearches, 0);
+    const doorway = resolveSafeWorldSpawn(3, 4, { mode: 'walk', allowRelocation: false });
+    assert.equal(doorway.valid, true); assert.equal(doorway.x, 3); assert.equal(doorway.z, 4);
+    assert.equal(roadSearches, 0);
+    const arrival = resolveSafeWorldSpawn(0, 0, { mode: 'walk' });
+    assert.equal(arrival.valid, true); assert.ok(Math.hypot(arrival.x, arrival.z) > 0);
+  } finally { ctx.SurfaceQuery = surface; ctx.checkBuildingCollision = collision; initWorldSpawning(previous); }
+});

@@ -10,10 +10,9 @@ import { getCurrentUser } from '../../../js/auth-ui.js?v=56';
 import { initFirebase } from '../../../js/firebase-init.js?v=58';
 import { commitWorldPropertyAction, commitWorldPropertyTradeAction } from '../../../js/property-api.js?v=3';
 
+import { projectExplorerWallet } from '../economy/wallet-snapshot.js';
+
 const LOCATION_PROPERTY_LIMIT = 320;
-const STARTING_WALLET_DOLLARS = 1000000;
-const CURRENCY_VERSION = 2;
-const LEGACY_CURRENCY_SCALE = 2000;
 
 function finite(value, fallback = 0) {
   const number = Number(value);
@@ -78,14 +77,11 @@ function createConnectedPropertyAuthority(options = {}) {
   const services = initFirebase();
   if (!worldSeed || !locationId || !user?.uid || !services?.db) return null;
   let disposed = false;
+  const isCurrent = () => !disposed && getCurrentUser()?.uid === user.uid;
+  const onError = (error) => { if (isCurrent()) options.onError?.(error); };
   const walletAuthority = options.walletAuthority || null;
   const initialWallet = walletAuthority?.snapshot?.() || {};
-  let wallet = Object.freeze({
-    credits: Math.max(0, finite(initialWallet.credits, STARTING_WALLET_DOLLARS)),
-    pending: initialWallet.pending !== false,
-    revision: Math.max(0, finite(initialWallet.revision)),
-    currencyVersion: CURRENCY_VERSION
-  });
+  let wallet = projectExplorerWallet(initialWallet, { pending: initialWallet.pending !== false });
   let records = new Map();
   let portfolioRecords = new Map();
   let rentalRecords = new Map();
@@ -95,58 +91,47 @@ function createConnectedPropertyAuthority(options = {}) {
   const emit = () => options.onChange?.();
   const propertyQuery = query(collection(services.db, 'worldProperties'), where('locationId', '==', locationId), limit(LOCATION_PROPERTY_LIMIT));
   const stopProperties = onSnapshot(propertyQuery, (snapshot) => {
-    if (disposed) return;
+    if (!isCurrent()) return;
     records = new Map(snapshot.docs.map(normalizeRecord).filter(Boolean).map((record) => [record.propertyId, record]));
     emit();
-  }, (error) => options.onError?.(error));
+  }, onError);
   const stopPortfolio = onSnapshot(query(collection(services.db, 'worldProperties'), where('ownerUid', '==', user.uid), limit(160)), (snapshot) => {
-    if (disposed) return;
+    if (!isCurrent()) return;
     portfolioRecords = new Map(snapshot.docs.map(normalizeRecord).filter(Boolean).map((record) => [record.propertyId, record]));
     emit();
-  }, (error) => options.onError?.(error));
+  }, onError);
   const stopRentals = onSnapshot(query(collection(services.db, 'worldProperties'), where('tenantUid', '==', user.uid), limit(80)), (snapshot) => {
-    if (disposed) return;
+    if (!isCurrent()) return;
     rentalRecords = new Map(snapshot.docs.map(normalizeRecord).filter((record) => record && record.leaseEndsAtMs > Date.now()).map((record) => [record.propertyId, record]));
     emit();
-  }, (error) => options.onError?.(error));
+  }, onError);
   const stopWallet = walletAuthority?.subscribe
     ? walletAuthority.subscribe((next) => {
-      if (disposed) return;
-      wallet = Object.freeze({
-        credits: Math.max(0, finite(next?.credits, STARTING_WALLET_DOLLARS)),
-        pending: next?.pending === true,
-        revision: Math.max(0, finite(next?.revision)),
-        currencyVersion: CURRENCY_VERSION
-      });
+      if (!isCurrent()) return;
+      wallet = projectExplorerWallet(next, { pending: next?.pending === true });
       emit();
     })
     : onSnapshot(doc(services.db, 'users', user.uid, 'economy', 'wallet'), (snapshot) => {
-      if (disposed) return;
+      if (!isCurrent()) return;
       const data = snapshot.exists() ? snapshot.data() : {};
-      const scale = snapshot.exists() && finite(data.currencyVersion) < CURRENCY_VERSION ? LEGACY_CURRENCY_SCALE : 1;
-      wallet = Object.freeze({
-        credits: Math.max(0, finite(data.credits, STARTING_WALLET_DOLLARS) * scale),
-        pending: false,
-        revision: Math.max(0, finite(data.revision)),
-        currencyVersion: CURRENCY_VERSION
-      });
+      wallet = projectExplorerWallet(data, { exists: snapshot.exists() });
       emit();
-    }, (error) => options.onError?.(error));
+    }, onError);
   const stopStarter = onSnapshot(doc(services.db, 'users', user.uid, 'propertyEntitlements', 'starter'), (snapshot) => {
-    if (disposed) return;
+    if (!isCurrent()) return;
     starterAvailable = !snapshot.exists() || snapshot.data()?.claimed !== true;
     emit();
-  }, (error) => options.onError?.(error));
+  }, onError);
   const stopIncomingTrades = onSnapshot(query(collection(services.db, 'propertyTradeOffers'), where('recipientUid', '==', user.uid), limit(80)), (snapshot) => {
-    if (disposed) return;
+    if (!isCurrent()) return;
     incomingTrades = new Map(snapshot.docs.map(normalizeTrade).filter(Boolean).map((offer) => [offer.offerId, offer]));
     emit();
-  }, (error) => options.onError?.(error));
+  }, onError);
   const stopOutgoingTrades = onSnapshot(query(collection(services.db, 'propertyTradeOffers'), where('proposerUid', '==', user.uid), limit(80)), (snapshot) => {
-    if (disposed) return;
+    if (!isCurrent()) return;
     outgoingTrades = new Map(snapshot.docs.map(normalizeTrade).filter(Boolean).map((offer) => [offer.offerId, offer]));
     emit();
-  }, (error) => options.onError?.(error));
+  }, onError);
 
   function joinCandidates(candidates = []) {
     return candidates.map((candidate) => {
@@ -203,17 +188,17 @@ function createConnectedPropertyAuthority(options = {}) {
   }
 
   async function act(action, property, fields = {}) {
-    if (disposed) return Object.freeze({ accepted: false, reason: 'disposed' });
+    if (!isCurrent()) return Object.freeze({ accepted: false, reason: disposed ? 'disposed' : 'account_changed' });
     const requestId = `${action}:${user.uid.slice(0, 18)}:${Date.now().toString(36)}:${Math.random().toString(36).slice(2, 8)}`;
     const actor = options.getActorPosition?.() || null;
     const actorPose = actor ? { x: finite(actor.x), z: finite(actor.z) } : null;
-    return commitWorldPropertyAction({ roomCode, worldSeed, action, requestId, property, actorPose, ...fields });
+    return commitWorldPropertyAction({ roomCode, worldSeed, action, requestId, property, actorPose, ...fields, expectedUserId: user.uid });
   }
 
   async function actTrade(action, fields = {}) {
-    if (disposed) return Object.freeze({ accepted: false, reason: 'disposed' });
+    if (!isCurrent()) return Object.freeze({ accepted: false, reason: disposed ? 'disposed' : 'account_changed' });
     const requestId = `${action}:${user.uid.slice(0, 18)}:${Date.now().toString(36)}:${Math.random().toString(36).slice(2, 8)}`;
-    return commitWorldPropertyTradeAction({ roomCode, worldSeed, action, requestId, ...fields });
+    return commitWorldPropertyTradeAction({ roomCode, worldSeed, action, requestId, ...fields, expectedUserId: user.uid });
   }
 
   return Object.freeze({

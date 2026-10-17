@@ -105,20 +105,33 @@ async function withRequestDeadline(options, operation) {
 }
 
 async function requestFunction(path, body, options, authenticated) {
+  // The initiating account owns this operation throughout authentication,
+  // safe routing fallback and response delivery. Domain owners may pin an
+  // earlier captured account; never put that identity in the trusted payload.
+  const expectedUserId = options.expectedUserId || (authenticated ? getCurrentUser()?.uid : null);
+  const assertAccount = (response = null) => {
+    if (!expectedUserId || getCurrentUser()?.uid === expectedUserId) return;
+    const error = interruptedError('account-changed', 'Account changed before the request could be confirmed.');
+    if (response) {
+      error.status = response.status;
+      error.outcomeUnknown = response.ok || response.status >= 500;
+    }
+    throw error;
+  };
   let dispatched = false;
   try {
     return await withRequestDeadline(options, async signal => {
+      assertAccount();
       const token = authenticated ? await getCurrentUserToken(options.forceRefreshToken !== false) : null;
       const appCheckToken = await getFirebaseAppCheckToken();
       if (signal.aborted) throw signal.reason;
-      if(options.expectedUserId && getCurrentUser()?.uid!==options.expectedUserId) {
-        throw interruptedError('account-changed','Account changed before the request could be sent.');
-      }
+      assertAccount();
       const serializedBody = JSON.stringify(body);
       const candidates = buildFunctionCandidates(path);
       const attempts = [];
       for (let i = 0; i < candidates.length; i += 1) {
         if (signal.aborted) throw signal.reason;
+        assertAccount();
         const url = candidates[i];
         dispatched = true;
         const res = await fetch(url, {
@@ -144,6 +157,7 @@ async function requestFunction(path, body, options, authenticated) {
           dispatched = false;
           continue;
         }
+        assertAccount(res);
         if (!json || (res.ok && (!payload || typeof payload !== 'object'))) {
           const error = unavailableFunctionError(path, attempts, String(options.label || 'API'));
           error.status = res.status;

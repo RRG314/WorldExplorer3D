@@ -7,6 +7,7 @@ export const backendSteps = [
   { id: 'environment-data', command: [process.execPath, 'scripts/verification/environment-data-current.mjs'] },
   { id: 'public-user-count', command: [process.execPath, 'scripts/verification/public-user-count-backend-current.mjs'] },
   { id: 'connected-property-backend', command: [process.execPath, 'scripts/verification/connected-property-backend-current.mjs'] },
+  { id: 'commerce-backend', command: [process.execPath, 'scripts/verification/commerce-backend-current.mjs'] },
   { id: 'urban-civic-backend', command: [process.execPath, 'scripts/verification/urban-civic-backend-current.mjs'] },
   { id: 'shared-expedition', command: [process.execPath, 'scripts/verification/interstellar-shared.mjs'] },
   { id: 'connected-property-multiplayer', command: [process.execPath, 'scripts/verification/connected-property-multiplayer-current.mjs'] },
@@ -15,7 +16,7 @@ export const backendSteps = [
   { id: 'account-backend', command: [process.execPath, 'scripts/verification/account-backend-current.mjs'] },
 ];
 
-export const backendGroups = [backendSteps.slice(0, 9), ...backendSteps.slice(9).map(step => [step])];
+export const backendGroups = [backendSteps.slice(0, 10), ...backendSteps.slice(10).map(step => [step])];
 
 // Both wrappers use these deadlines. CI compiles two complete Earth worlds
 // serially before exercising shared vehicles; emulator startup/teardown must

@@ -1,0 +1,182 @@
+{
+  "reviewDate": "2026-10-13",
+  "checkout": "/Users/stevenreid/.codex/worktrees/architecture-evaluation/WorldExplorer3D-live-deployed-20260320",
+  "head": "283646e04e2cd654a25a700b659700ba79427be3",
+  "branch": "steven/visual-quality",
+  "repositories": [
+    {
+      "repository": "jamisonhill/aquarium",
+      "url": "https://github.com/jamisonhill/aquarium",
+      "head": "2a6e16ce5df82b858183c02624d2ac5e605faec5",
+      "defaultBranch": "main",
+      "pushedAt": "2026-07-26T04:48:37Z",
+      "archived": false,
+      "metadataLicense": null,
+      "rootLicenseFiles": [
+        "LICENSES.md"
+      ]
+    },
+    {
+      "repository": "unclemattmakes/polyfish",
+      "url": "https://github.com/unclemattmakes/polyfish",
+      "head": "2223904b7c3935984f52570c2dc109cf98fc42f6",
+      "defaultBranch": "main",
+      "pushedAt": "2026-09-10T03:33:31Z",
+      "archived": false,
+      "metadataLicense": "MIT",
+      "rootLicenseFiles": [
+        "LICENSE"
+      ]
+    },
+    {
+      "repository": "Nihdao/three-aquarium-challenge",
+      "url": "https://github.com/Nihdao/three-aquarium-challenge",
+      "head": "aafa3bf67421a267f743ea68e364d5ca8234bc28",
+      "defaultBranch": "main",
+      "pushedAt": "2025-09-09T11:12:17Z",
+      "archived": false,
+      "metadataLicense": null,
+      "rootLicenseFiles": []
+    },
+    {
+      "repository": "KaleabBantayehu/threejs-virtual-aquarium",
+      "url": "https://github.com/KaleabBantayehu/threejs-virtual-aquarium",
+      "head": "7cdec73ff44f4dc0e2ae2acddfd34a0d7087b5cb",
+      "defaultBranch": "main",
+      "pushedAt": "2026-06-13T14:21:07Z",
+      "archived": false,
+      "metadataLicense": null,
+      "rootLicenseFiles": []
+    },
+    {
+      "repository": "meghprkh/webgl-aquarium",
+      "url": "https://github.com/meghprkh/webgl-aquarium",
+      "head": "758b0b6742f10381e427b0e4adffd7a253e47941",
+      "defaultBranch": "master",
+      "pushedAt": "2020-11-23T21:10:58Z",
+      "archived": false,
+      "metadataLicense": null,
+      "rootLicenseFiles": []
+    }
+  ],
+  "mapping": [
+    {
+      "url": "https://api.openstreetmap.org/api/0.6/relation/14162263.json",
+      "type": "relation",
+      "id": 14162263,
+      "version": 4,
+      "lat": null,
+      "lon": null,
+      "tags": {
+        "addr:city": "Baltimore",
+        "addr:country": "US",
+        "addr:housenumber": "501",
+        "addr:postcode": "21202",
+        "addr:state": "MD",
+        "addr:street": "East Pratt Street",
+        "alt_name": "Blue Wonders",
+        "building": "yes",
+        "check_date": "2024-04-14",
+        "ele": "1",
+        "layer": "1",
+        "name": "National Aquarium",
+        "name:en": "National Aquarium",
+        "official_name": "Pier 3 Pavilion",
+        "operator": "National Aquarium",
+        "payment:cash": "yes",
+        "payment:credit_cards": "yes",
+        "payment:debit_cards": "yes",
+        "source": "USGS Geonames",
+        "tourism": "aquarium",
+        "type": "multipolygon",
+        "wheelchair": "yes"
+      },
+      "members": [
+        {
+          "type": "way",
+          "ref": 1061954706,
+          "role": "outer"
+        },
+        {
+          "type": "way",
+          "ref": 1061954708,
+          "role": "outer"
+        },
+        {
+          "type": "way",
+          "ref": 1061954705,
+          "role": "outer"
+        },
+        {
+          "type": "way",
+          "ref": 440962468,
+          "role": "outer"
+        },
+        {
+          "type": "way",
+          "ref": 440962471,
+          "role": "outer"
+        },
+        {
+          "type": "way",
+          "ref": 178328374,
+          "role": "outer"
+        }
+      ]
+    },
+    {
+      "url": "https://api.openstreetmap.org/api/0.6/relation/14162358.json",
+      "type": "relation",
+      "id": 14162358,
+      "version": 3,
+      "lat": null,
+      "lon": null,
+      "tags": {
+        "addr:city": "Baltimore",
+        "addr:housenumber": "500",
+        "addr:place": "Dugan's Wharf",
+        "addr:postcode": "21202",
+        "addr:state": "MD",
+        "attraction": "animal",
+        "building": "yes",
+        "building:colour": "grey",
+        "building:levels": "3",
+        "content": "dolphins",
+        "height": "12",
+        "name": "Marine Mammal Pavilion",
+        "official_name": "Pier 4 Pavilion",
+        "operator": "National Aquarium",
+        "roof:shape": "many",
+        "species": "Tursiops truncatus",
+        "species:en": "Atlantic bottlenose dolphin",
+        "species:wikidata": "Q174199",
+        "tourism": "aquarium",
+        "type": "multipolygon"
+      },
+      "members": [
+        {
+          "type": "way",
+          "ref": 441501016,
+          "role": "outer"
+        },
+        {
+          "type": "way",
+          "ref": 1061954707,
+          "role": "inner"
+        }
+      ]
+    },
+    {
+      "url": "https://api.openstreetmap.org/api/0.6/node/4390760200.json",
+      "type": "node",
+      "id": 4390760200,
+      "version": 2,
+      "lat": 39.2854979,
+      "lon": -76.608518,
+      "tags": {
+        "entrance": "yes"
+      },
+      "members": []
+    }
+  ]
+}

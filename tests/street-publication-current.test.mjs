@@ -1,14 +1,19 @@
 import { assessStreetQuality } from '../app/js/world/street-quality-assessment.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {execFileSync} from 'node:child_process';
+import {fileURLToPath} from 'node:url';
 import { createRoadContactIndex } from '../app/js/terrain/road-contact-index.js?v=1';
 import { markGroundSurfaceChanged } from '../app/js/terrain/surface-revision.js';
-import { publishStreetPavement, updateStreetPavementFocus } from '../app/js/world/street-pavement-runtime.js';
+import { cancelUnfinishedStreetDetail } from '../app/js/world/street-interior-suspension.js';
+import { markStreetSourceChanged } from '../app/js/world/street-source-revision.js';
+import { indexPavementPositions } from '../app/js/world/pavement-indexed-mesh.js';
+import { publishStreetPavement, updateStreetPavementFocus, ensureInitialStreetPavement } from '../app/js/world/street-pavement-runtime.js';
 
 function harness(t, mode='success') {
   const resources=[];
   const install=(name,descriptor)=>{const prior=Object.getOwnPropertyDescriptor(globalThis,name);Object.defineProperty(globalThis,name,descriptor);t.after(()=>{if(prior)Object.defineProperty(globalThis,name,prior);else delete globalThis[name];});};
-  class Resource { constructor(){resources.push(this);} dispose(){this.disposed=true;} }
+  class Resource { constructor(){resources.push(this);} dispose(){this.disposed=true;this.disposeCount=(this.disposeCount||0)+1;} }
   class Geometry extends Resource {setAttribute(name,value){(this.attributes ||= {})[name]=value;}setIndex(index){this.index=index;}getIndex(){return this.index;}computeVertexNormals(){}computeBoundingSphere(){}}
   class Attribute {constructor(values){this.array=new Float32Array(values);}}
   class Mesh {constructor(geometry,material){this.geometry=geometry;this.material=material;this.userData={};}}
@@ -27,16 +32,23 @@ function harness(t, mode='success') {
     postMessage(data){if(mode==='clone-error')throw new Error('cannot clone source');if(data.type==='prepare')this.prepare=data.input;queueMicrotask(()=>{
       if(mode==='pending') return;
       if(mode==='failure') return this.onmessage({data:{type:'error',message:'invalid source polygon'}});
-      if(data.type==='prepare') {if(mode==='stale')ctx._worldLoadSequence++;return this.onmessage({data:{type:'prepared',tiles:1}});}
-      if(this.next++) return this.onmessage({data:{type:'complete'}});
+      if(data.type==='index') {
+        if(mode==='cancel-index'){ctx._cancelStreetPavementBuild();return;}
+        if(mode==='stale-index')ctx._worldLoadSequence++;
+        if(mode==='failed-index')return this.onmessage({data:{type:'error',message:'indexing failed'}});
+        return this.onmessage({data:{type:'indexed',...indexPavementPositions(data.positions)}});
+      }
+      if(data.type==='prepare') {this.cached=data.cached;if(mode==='stale')ctx._worldLoadSequence++;return this.onmessage({data:{type:'prepared',tiles:1}});}
+      if(this.next++) return this.onmessage({data:mode==='failure-after-cache'?{type:'error',message:'later cell failed'}:{type:'complete'}});
+      if(['cache','failure-after-cache'].includes(mode)&&this.cached['0:0']==='same-cell')return this.onmessage({data:{type:'cached',key:'0:0',fingerprint:'same-cell',completed:1,total:1}});
       const ps=[{x:0,y:.12/1.11,z:3},{x:0,y:.12/1.11,z:4},{x:1,y:.12/1.11,z:3}];
-      this.onmessage({data:{type:'tile',key:'0:0',completed:1,total:1,inferredFrontages:0,
+      this.onmessage({data:{type:'tile',key:'0:0',fingerprint:mode==='cache'?'same-cell':undefined,completed:1,total:1,inferredFrontages:0,
         segments:[{roadIndex:0,index:0,t0:0,t1:1,a:{x:0,z:0},b:{x:10,z:0},wa:4,wb:4}],
         mesh:{vertices:ps.flatMap(p=>[p.x,p.y,p.z]),curbVertices:[],triangles:[ps]}}});
     });}
   }
   install('Worker',{value:Worker,configurable:true});
-  return {ctx,resources,get worker(){return worker;}};
+  return {ctx,resources,setMode(value){mode=value;},get worker(){return worker;}};
 }
 
 test('published contact interpolates the same elevated triangles used by the mesh',async t=>{
@@ -51,12 +63,63 @@ test('published contact interpolates the same elevated triangles used by the mes
   assert.equal(p.sampleAt(20,20),null); assert.equal(h.worker.terminated,true);
   p.dispose(); assert.ok(h.resources.every(r=>r.disposed));
 });
+
+test('unchanged cells reuse exact fitted geometry and contact, then rebuild when terrain changes',async t=>{
+ const h=harness(t,'cache');let samples=0,height=10;
+ h.ctx.terrainMeshHeightAt=()=>{samples++;return height;};
+ await publishStreetPavement(h.ctx);assert.ok(samples>0);
+ const first=h.ctx.streetPavement,mesh=first.meshes[0],positions=mesh.geometry.attributes.position.array.slice(),y=first.sampleAt(.2,3.2);
+ samples=0;await publishStreetPavement(h.ctx);
+ assert.equal(samples,0);assert.equal(h.ctx.streetPavement.stats.reusedSurfaceCells,1);
+ assert.equal(h.ctx.streetPavement.meshes[0],mesh,'unchanged geometry retains its GPU resource');
+ assert.equal(h.ctx.streetPavement.stats.reusedRenderBatches,1);assert.equal(mesh.geometry.disposed,undefined);
+ assert.deepEqual(h.ctx.urbanSurfaceMeshes,[mesh],'handover must not duplicate or drop the retained batch');
+ assert.deepEqual(h.ctx.streetPavement.meshes[0].geometry.attributes.position.array,positions);
+ assert.equal(h.ctx.streetPavement.sampleAt(.2,3.2),y);assert.equal(first.sampleAt(.2,3.2),null);
+ height=14;markGroundSurfaceChanged(h.ctx);await publishStreetPavement(h.ctx);
+ assert.ok(samples>0);assert.equal(h.ctx.streetPavement.stats.reusedSurfaceCells,undefined);
+ assert.ok(Math.abs(h.ctx.streetPavement.sampleAt(.2,3.2)-y-4)<1e-5);
+ h.ctx.streetPavement.dispose();h.ctx._streetPavementCache.clear();
+});
+test('failure after fitting reuse preserves the accepted batch and contact',async t=>{
+ const h=harness(t,'cache');await publishStreetPavement(h.ctx);
+ const accepted=h.ctx.streetPavement,mesh=accepted.meshes[0],y=accepted.sampleAt(.2,3.2);
+ h.setMode('failure-after-cache');await assert.rejects(publishStreetPavement(h.ctx),/later cell failed/);
+ assert.equal(h.ctx.streetPavement,accepted);assert.equal(accepted.sampleAt(.2,3.2),y);assert.equal(mesh.geometry.disposed,undefined);
+ assert.deepEqual(h.ctx.urbanSurfaceMeshes,[mesh]);accepted.dispose();assert.ok(h.resources.every(r=>r.disposeCount===1));
+});
+for(const outcome of ['failure','cancel'])test(`${outcome} after a render-batch lease is acquired preserves the accepted publication`,async t=>{
+ const h=harness(t,'cache');await publishStreetPavement(h.ctx);
+ const accepted=h.ctx.streetPavement,mesh=accepted.meshes[0],y=accepted.sampleAt(.2,3.2);
+ let reached=false;
+ Object.defineProperty(h.ctx,'landuseMeshes',{get(){
+  reached=true;
+  if(outcome==='failure')throw Error('mapped contact preparation failed');
+  h.ctx._cancelStreetPavementBuild();return [];
+ }});
+ if(outcome==='failure')await assert.rejects(publishStreetPavement(h.ctx),/mapped contact preparation failed/);
+ else assert.equal(await publishStreetPavement(h.ctx),null);
+ assert.equal(reached,true);assert.equal(h.ctx.streetPavement,accepted);
+ assert.equal(accepted.sampleAt(.2,3.2),y);assert.equal(mesh.geometry.disposed,undefined);
+ assert.deepEqual(h.ctx.urbanSurfaceMeshes,[mesh]);accepted.dispose();assert.ok(h.resources.every(r=>r.disposeCount===1));
+});
 test('failed compilation retains the previously accepted render and contact publication',async t=>{
   const h=harness(t,'failure');let removed=false;
   const previous={meshes:[],dispose(){removed=true;},sampleAt(){return 12;}};h.ctx.streetPavement=previous;
   await assert.rejects(publishStreetPavement(h.ctx),/invalid source polygon/);
   assert.equal(h.ctx.streetPavement,previous);assert.equal(removed,false);
   assert.equal(h.worker.terminated,true);assert.ok(h.resources.every(r=>r.disposed));
+});
+for(const mode of ['stale-index','cancel-index','failed-index'])test(`${mode} retains accepted pavement and releases unfinished indexing`,async t=>{
+  const h=harness(t,mode);let disposed=false;
+  const previous={meshes:[],sampleAt:()=>12,dispose(){disposed=true;}};
+  h.ctx.streetPavement=previous;
+  if(mode==='failed-index')await assert.rejects(publishStreetPavement(h.ctx),/indexing failed/);
+  else assert.equal(await publishStreetPavement(h.ctx),null);
+  assert.equal(h.ctx.streetPavement,previous);assert.equal(previous.sampleAt(0,0),12);
+  assert.equal(disposed,false);assert.equal(h.ctx.urbanSurfaceMeshes.length,0);
+  assert.equal(h.worker.terminated,true);assert.equal(h.ctx._cancelStreetPavementBuild,null);
+  assert.ok(h.resources.every(r=>r.disposed));
 });
 test('a superseded world cannot publish surfaces and releases its compilation resources',async t=>{
   const h=harness(t,'stale');assert.equal(await publishStreetPavement(h.ctx),null);
@@ -107,16 +170,75 @@ test('an active worker cancels immediately without waiting for the 15 second tim
   assert.ok(h.resources.every(r=>r.disposed));
 });
 
-test('repeated replacements release old contact and owned GPU resources',async t=>{
-  const h=harness(t);let previous;
+test('repeated replacements release old geometry but retain the active material programs',async t=>{
+  const h=harness(t);let previous,material;
   for(let i=0;i<8;i++){
-    const boundary=h.resources.length;await publishStreetPavement(h.ctx);
-    if(previous){assert.equal(previous.sampleAt(.2,3.2),null);assert.equal(previous.meshes.length,0);}
-    assert.ok(h.resources.slice(0,boundary).every(r=>r.disposed));
+    const previousGeometry=previous?.meshes[0].geometry;
+    await publishStreetPavement(h.ctx);
+    material ||= h.ctx.streetPavement.meshes[0].material;
+    if(previous){assert.equal(previous.sampleAt(.2,3.2),null);assert.equal(previous.meshes.length,0);assert.equal(previousGeometry.disposed,true);}
+    assert.equal(h.ctx.streetPavement.meshes[0].material,material);
+    assert.equal(material.disposed,undefined,'a handover must not retire the still-active renderer program');
+    assert.equal(h.resources.length,5+i,'only the new geometry is allocated on subsequent replacements');
+    assert.equal(h.resources.filter(r=>!r.disposed).length,5,'one texture, three materials and the current geometry remain');
     assert.equal(h.ctx.urbanSurfaceMeshes.length,1);
     previous=h.ctx.streetPavement;
   }
-  previous.dispose();assert.ok(h.resources.every(r=>r.disposed));
+  previous.dispose();previous.dispose();assert.ok(h.resources.every(r=>r.disposeCount===1));
+});
+
+test('failed replacement releases its material lease without damaging accepted pavement',async t=>{
+  const h=harness(t);await publishStreetPavement(h.ctx);
+  const accepted=h.ctx.streetPavement,material=accepted.meshes[0].material,height=accepted.sampleAt(.2,3.2);
+  h.setMode('failure');
+  await assert.rejects(publishStreetPavement(h.ctx),/invalid source polygon/);
+  assert.equal(h.ctx.streetPavement,accepted);
+  assert.equal(accepted.sampleAt(.2,3.2),height);
+  assert.equal(material.disposed,undefined);
+  assert.equal(h.resources.length,5,'failed staging reuses the existing material resources');
+  accepted.dispose();assert.ok(h.resources.every(r=>r.disposeCount===1));
+});
+
+test('new world and changed surface maps receive separate material ownership',async t=>{
+  const h=harness(t);await publishStreetPavement(h.ctx);
+  let material=h.ctx.streetPavement.meshes[0].material;
+  for(const change of [()=>h.ctx._worldLoadSequence++,()=>{h.ctx.pavementNormal={dispose(){throw Error('borrowed texture must not be disposed');}};}]){
+    change();await publishStreetPavement(h.ctx);
+    assert.notEqual(h.ctx.streetPavement.meshes[0].material,material);
+    assert.equal(material.disposeCount,1);
+    material=h.ctx.streetPavement.meshes[0].material;
+  }
+  h.ctx.streetPavement.dispose();assert.ok(h.resources.every(r=>r.disposeCount===1));
+});
+
+test('partial material construction failure retires its texture and worker without touching the active owner',async t=>{
+  const h=harness(t);await publishStreetPavement(h.ctx);
+  const accepted=h.ctx.streetPavement,material=accepted.meshes[0].material;
+  h.ctx.pavementNormal={};
+  THREE.MeshStandardMaterial=class {constructor(){throw Error('material allocation failed');}};
+  await assert.rejects(publishStreetPavement(h.ctx),/material allocation failed/);
+  assert.equal(h.ctx.streetPavement,accepted);assert.equal(material.disposed,undefined);
+  assert.equal(h.worker.terminated,true);assert.equal(h.ctx._cancelStreetPavementBuild,null);
+  assert.equal(h.resources.at(-1).disposeCount,1);
+  accepted.dispose();assert.ok(h.resources.every(r=>r.disposeCount===1));
+});
+
+test('retired pavement publications become unreachable after replacement',async t=>{
+  if(typeof globalThis.gc!=='function'){
+    // Collection is confined to this ownership test's isolated process. It is
+    // never injected into gameplay or a native frame-pacing measurement.
+    execFileSync(process.execPath,['--expose-gc','--test','--test-name-pattern=^retired pavement publications become unreachable after replacement$',fileURLToPath(import.meta.url)],{timeout:15000,stdio:'pipe'});
+    return;
+  }
+  const h=harness(t,'cache'),weak=[];
+  for(let i=0;i<12;i++){
+    await publishStreetPavement(h.ctx);
+    weak.push(new WeakRef(h.ctx.streetPavement));
+  }
+  for(let i=0;i<6;i++){await new Promise(resolve=>setImmediate(resolve));globalThis.gc();}
+  assert.equal(weak.slice(0,-1).filter(ref=>ref.deref()).length,0);
+  assert.equal(weak.at(-1).deref(),h.ctx.streetPavement);
+  h.ctx.streetPavement.dispose();
 });
 
 test('curb clearance samples changing road-edge elevation between segment endpoints',async t=>{
@@ -220,4 +342,111 @@ test('approaching the detail boundary still schedules replacement',async t=>{
  h.ctx._cancelStreetPavementBuild();
  for(let i=0;i<10 && h.ctx._streetPavementUpdating;i++)await new Promise(r=>setTimeout(r,1));
  assert.equal(h.ctx._streetPavementUpdating,false);assert.equal(h.worker.terminated,true);
+});
+
+test('takeoff cancels speculative detail, reuses valid coverage on return and rebuilds at its boundary',async t=>{
+ const h=harness(t,'pending');
+ const accepted={focus:{x:0,z:0},coverageBounds:{minX:-384,maxX:384,minZ:-384,maxZ:384},sampleAt:()=>10.3,dispose(){this.disposed=true;}};
+ h.ctx.streetPavement=accepted;h.ctx.gameStarted=true;h.ctx.car.x=257;
+ let overviewSteps=0;
+ h.ctx.streetOverview={stats:{status:'suspended'},suspendForDetail:()=>Promise.resolve(),step(){overviewSteps++;}};
+ updateStreetPavementFocus(h.ctx);
+ await Promise.resolve();
+ assert.equal(h.ctx._streetPavementUpdating,true);
+ const firstWorker=h.worker;
+ h.ctx.planeMode={active:true,airborne:true,x:257,y:300,z:0};
+ updateStreetPavementFocus(h.ctx);
+ for(let i=0;i<20 && h.ctx._streetPavementUpdating;i++)await new Promise(r=>setTimeout(r,1));
+ assert.equal(firstWorker.terminated,true);assert.equal(h.ctx._streetPavementUpdating,false);
+ assert.equal(h.ctx.streetPavement,accepted);assert.equal(accepted.sampleAt(),10.3);assert.equal(accepted.disposed,undefined);
+ assert.notEqual(h.ctx._streetPavementDirty,true,'cancelling preparation does not invalidate accepted streets');
+ updateStreetPavementFocus(h.ctx);assert.equal(overviewSteps,1);
+ assert.equal(h.worker,firstWorker,'High flight must not restart a detail worker');
+ h.ctx.planeMode.y=30;h.ctx.planeMode.x=0;
+ updateStreetPavementFocus(h.ctx);await Promise.resolve();
+ assert.equal(h.worker,firstWorker,'Returning inside accepted coverage needs no replacement');
+ assert.equal(h.ctx._streetPavementUpdating,false);
+ h.ctx.planeMode.x=257;
+ updateStreetPavementFocus(h.ctx);await Promise.resolve();
+ assert.notEqual(h.worker,firstWorker,'Near-ground arrival resumes the same detail owner');
+ assert.equal(h.ctx._streetPavementUpdating,true);
+ h.ctx._cancelStreetPavementBuild();
+ for(let i=0;i<20 && h.ctx._streetPavementUpdating;i++)await new Promise(r=>setTimeout(r,1));
+ assert.equal(h.ctx.streetPavement,accepted);assert.equal(accepted.disposed,undefined);
+ assert.ok(h.resources.every(r=>r.disposed));
+});
+
+for(const invalidate of [markGroundSurfaceChanged,markStreetSourceChanged])test(`cancelling ${invalidate.name} replacement preserves its retry until publication`,async t=>{
+ const h=harness(t);await publishStreetPavement(h.ctx);
+ const accepted=h.ctx.streetPavement;invalidate(h.ctx);h.setMode('pending');
+ updateStreetPavementFocus(h.ctx);
+ assert.equal(h.ctx._streetPavementUpdating,true);
+ assert.equal(h.ctx._streetPavementDirty,true,'starting work cannot consume accepted-world invalidation');
+ cancelUnfinishedStreetDetail(h.ctx);
+ for(let i=0;i<20&&h.ctx._streetPavementUpdating;i++)await new Promise(r=>setTimeout(r,1));
+ assert.equal(h.ctx.streetPavement,accepted);assert.equal(h.ctx._streetPavementDirty,true);
+ h.setMode('success');updateStreetPavementFocus(h.ctx);
+ for(let i=0;i<100&&h.ctx._streetPavementUpdating;i++)await new Promise(r=>setTimeout(r,5));
+ assert.notEqual(h.ctx.streetPavement,accepted);assert.equal(h.ctx._streetPavementDirty,false);
+ h.ctx.streetPavement.dispose();assert.ok(h.resources.every(r=>r.disposed));
+});
+
+test('source edits during compilation reject stale publication and remain pending for the next build',async t=>{
+ const h=harness(t);await publishStreetPavement(h.ctx);const accepted=h.ctx.streetPavement;
+ let changed=false;
+ h.ctx.terrainMeshHeightAt=()=>{if(!changed){changed=true;markStreetSourceChanged(h.ctx);}return 10;};
+ assert.equal(await publishStreetPavement(h.ctx),null);
+ assert.equal(h.ctx.streetPavement,accepted);assert.equal(h.ctx._streetPavementDirty,true);
+ assert.equal(h.ctx._groundSurfaceRevision,undefined,'frontage edits do not fake a physical ground revision');
+ assert.equal(accepted.sampleAt(.2,3.2)>10,true);
+ await publishStreetPavement(h.ctx);assert.notEqual(h.ctx.streetPavement,accepted);
+ assert.equal(h.ctx._streetPavementDirty,false);h.ctx.streetPavement.dispose();
+ assert.ok(h.resources.every(r=>r.disposed));
+});
+
+test('cancelled initial preparation remains retryable without accepted coverage',async t=>{
+ const h=harness(t,'pending');const job=publishStreetPavement(h.ctx);
+ cancelUnfinishedStreetDetail(h.ctx);assert.equal(await job,null);
+ assert.equal(h.ctx._streetPavementDirty,true);h.setMode('success');
+ updateStreetPavementFocus(h.ctx);
+ for(let i=0;i<100&&h.ctx._streetPavementUpdating;i++)await new Promise(r=>setTimeout(r,5));
+ assert.ok(h.ctx.streetPavement);assert.equal(h.ctx._streetPavementDirty,false);
+ h.ctx.streetPavement.dispose();assert.ok(h.resources.every(r=>r.disposed));
+});
+
+test('source selection yields and cancels before scanning the whole location or replacing accepted contact',async t=>{
+  const h=harness(t),previous={meshes:[],sampleAt:()=>12,dispose(){throw Error('accepted contact must survive');}};
+  h.ctx.streetPavement=previous;h.ctx.worldLoading=true;
+  const saved=new Map(['performance','scheduler'].map(key=>[key,Object.getOwnPropertyDescriptor(globalThis,key)]));
+  t.after(()=>{for(const [key,descriptor]of saved)descriptor?Object.defineProperty(globalThis,key,descriptor):delete globalThis[key];});
+  let clock=0,reads=0,yields=0;
+  Object.defineProperty(globalThis,'performance',{configurable:true,value:{now:()=>clock+=2}});
+  Object.defineProperty(globalThis,'scheduler',{configurable:true,value:{yield:async()=>{yields++;h.ctx._cancelStreetPavementBuild();}}});
+  h.ctx.buildings=Array.from({length:40},()=>({get pts(){reads++;return [{x:5000,z:5000},{x:5010,z:5000},{x:5000,z:5010}];}}));
+  assert.equal(await publishStreetPavement(h.ctx),null);
+  assert.ok(yields>0);assert.ok(reads<40,'cancelled selection must stop before visiting every feature');
+  assert.equal(h.worker.prepare,undefined);assert.equal(h.worker.terminated,true);
+  assert.equal(h.ctx.streetPavement,previous);assert.equal(previous.sampleAt(),12);
+  assert.equal(h.ctx._cancelStreetPavementBuild,null);assert.ok(h.resources.every(r=>r.disposed));
+});
+
+test('initial readiness retries retired terrain work before exposing gameplay',async t=>{
+ const h=harness(t);h.ctx.worldLoading=true;let changes=0;
+ h.ctx.terrainMeshHeightAt=()=>{if(!changes++){markGroundSurfaceChanged(h.ctx);}return 14;};
+ assert.equal(await ensureInitialStreetPavement(h.ctx,()=>true),true);
+ assert.equal(h.ctx.streetPavement.groundRevision,h.ctx._groundSurfaceRevision);
+ assert.ok(h.ctx.streetPavement.sampleAt(.2,3.2)>14);assert.equal(h.ctx._streetPavementDirty,false);
+ const resources=h.resources.length;assert.equal(await ensureInitialStreetPavement(h.ctx,()=>true),true);
+ assert.equal(h.resources.length,resources,'accepted initial coverage is reused');h.ctx.streetPavement.dispose();
+});
+
+test('initial readiness does not retry a superseded world or claim endlessly changing terrain is ready',async t=>{
+ const h=harness(t);h.ctx.worldLoading=true;let current=true;
+ h.ctx.terrainMeshHeightAt=()=>{current=false;markGroundSurfaceChanged(h.ctx);return 14;};
+ assert.equal(await ensureInitialStreetPavement(h.ctx,()=>current),false);
+ assert.equal(h.ctx.streetPavement,undefined);assert.ok(h.resources.every(r=>r.disposed));
+ current=true;let attempts=0;
+ const terrains=new Set();h.ctx.terrainMeshHeightAt=()=>{if(!terrains.has(h.worker)){terrains.add(h.worker);attempts++;markGroundSurfaceChanged(h.ctx);}return 14;};
+ await assert.rejects(ensureInitialStreetPavement(h.ctx,()=>current),/could not settle/);
+ assert.equal(attempts,3);assert.equal(h.ctx.streetPavement,undefined);assert.ok(h.resources.every(r=>r.disposed));
 });

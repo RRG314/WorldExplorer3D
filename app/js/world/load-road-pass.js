@@ -1,4 +1,5 @@
 import {publishedRoadSourceTopology} from './road-source-topology.js';
+import {createNumericPublicationStore} from '../structure-semantics/numeric-publication.js';
 import {roadDimensionsFromSource} from './road-units.js';
 import {streetScaleForWorld} from './compiler/street-frontage-policy.js';
 import { ctx as appCtx } from "../shared-context.js?v=55";
@@ -15,6 +16,7 @@ const ROAD_SURFACE_BIAS = 0.18;
 // intentionally deferred until accepted terrain and structure profiles are
 // ready, when the final terrain authority creates the sole road mesh set.
 export async function buildRoadGeometryPass(options = {}) {
+  const publicationStorage = createNumericPublicationStore();
   const roadWays = Array.isArray(options.roadWays) ? options.roadWays : [];
   const normalizeTransportSource = createTransportSourceNormalizer();
   const nodes = options.nodes || {};
@@ -152,7 +154,7 @@ export async function buildRoadGeometryPass(options = {}) {
       bounds: polylineBounds(sourceRoadPts, width * 0.5 + 18)
     };
     appCtx.roads.push(roadFeature);
-    updateFeatureSurfaceProfile(roadFeature, worldBaseTerrainY, { surfaceBias: ROAD_SURFACE_BIAS });
+    updateFeatureSurfaceProfile(roadFeature, worldBaseTerrainY, { publicationStorage, surfaceBias: ROAD_SURFACE_BIAS });
     loadMetrics.roads.sourcePoints += pts.length;
     loadMetrics.roads.decimatedPoints += sourceRoadPts.length;
     } finally {
@@ -163,6 +165,7 @@ export async function buildRoadGeometryPass(options = {}) {
     }
   }
 
+  publicationStorage.release();
   loadMetrics.roads.initialMeshPublications = 0;
   loadMetrics.roads.featureCompilationYieldCount = yieldCount;
   loadMetrics.roads.featureCompilationChunkSize = yieldEveryRoads;

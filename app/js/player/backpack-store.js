@@ -103,6 +103,7 @@ function createLocalBackpackStore(storage = globalThis.localStorage) {
   let lastMigration = null;
   let housing = null;
   let commerce = null;
+  let commerceDeliveries = {};
   let loaded = false;
   let pendingLegacy = null;
   let blocked = false;
@@ -119,7 +120,7 @@ function createLocalBackpackStore(storage = globalThis.localStorage) {
       if ((latest?.migration?.saveGeneration || '') !== (lastMigration?.saveGeneration || '')) return false;
       // A Journal projection contains items/slots but not equipment ammo. Keep
       // the latest small equipment state when replacing that full projection.
-      const normalized = normalizeBackpackState({...lastControls,...snapshot, housing: settings.housing ?? housing, commerce: settings.commerce ?? commerce}, {
+      const normalized = normalizeBackpackState({...lastControls,...snapshot, housing: settings.housing ?? housing, commerce: settings.commerce ?? commerce, commerceDeliveries: settings.commerceDeliveries ?? commerceDeliveries}, {
         sourceVersion: settings.sourceVersion ?? snapshot.migration?.sourceVersion ?? lastMigration?.sourceVersion,
         migratedAt: settings.migratedAt ?? snapshot.migration?.migratedAt ?? lastMigration?.migratedAt,
         backupAvailable: storage.getItem?.(BACKPACK_BACKUP_KEY) != null
@@ -138,6 +139,7 @@ function createLocalBackpackStore(storage = globalThis.localStorage) {
       storage.setItem(BACKPACK_STORAGE_KEY, JSON.stringify(normalized));
       housing = clone(normalized.housing);
       commerce = clone(normalized.commerce);
+      commerceDeliveries = clone(normalized.commerceDeliveries || {});
       pendingLegacy = null;
       lastMigration = normalized.migration;
       lastControls = controls(normalized);
@@ -162,6 +164,8 @@ function createLocalBackpackStore(storage = globalThis.localStorage) {
       housing = clone(current?.housing ?? (legacyHousing == null ? null : JSON.parse(legacyHousing)));
       if (housing && (!Array.isArray(housing.homes) || Number(housing.schemaVersion || 1) > 2)) throw Error('Unsupported home save');
       commerce = clone(current?.commerce ?? null);
+      commerceDeliveries = clone(current?.commerceDeliveries || {});
+      if (typeof commerceDeliveries !== 'object' || Array.isArray(commerceDeliveries)) throw Error('Invalid commerce delivery records');
       if (commerce && (Number(commerce.schemaVersion) !== 4 || !Number.isSafeInteger(commerce.credits) || commerce.credits < 0)) throw Error('Unsupported local wallet save');
     } catch (error) { blocked = true; supportRecorder.record({operation:'inventory-load',error}); return null; }
     if (current) {
@@ -213,7 +217,7 @@ function createLocalBackpackStore(storage = globalThis.localStorage) {
     if (!storage?.getItem || !storage?.setItem || !storage?.removeItem || !session.writable() || blocked) return false;
     // An inventory migration rollback must not erase later home ownership/items.
     if (!loaded) load();
-    if (blocked || housing?.homes?.length || commerce) return false;
+    if (blocked || housing?.homes?.length || commerce || Object.keys(commerceDeliveries).length) return false;
     const backup = parseStored(storage, BACKPACK_BACKUP_KEY);
     if (!backup?.sourceKey || !backup?.state) return false;
     try {
@@ -240,6 +244,17 @@ function createLocalBackpackStore(storage = globalThis.localStorage) {
     saveStatus: () => blocked ? 'unreadable-save' : session.status(),
     loadHousing() { if (!loaded) load(); return clone(housing); },
     loadCommerce() { if (!loaded) load(); return clone(commerce); },
+    hasCommerceDelivery(uid, requestId) {
+      if (!loaded) load();
+      return commerceDeliveries[uid] === requestId;
+    },
+    saveCommerceDelivery(uid, requestId, inventory) {
+      if (!uid || !requestId) return false;
+      if (!loaded) load();
+      // One outstanding connected command per account. The receipt marker and
+      // possessions commit together; ordinary Backpack saves retain the marker.
+      return saveNormalized(inventory, {commerceDeliveries:{...commerceDeliveries,[uid]:requestId}});
+    },
     saveCommerce(next, inventory, nextHousing, expectedHousing) {
       if (!loaded) load();
       if ((Number(next?.revision) || 0) !== (Number(commerce?.revision) || 0) + 1) return false;

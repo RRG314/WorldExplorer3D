@@ -19,7 +19,9 @@ const LOCS = {
   sanfrancisco: { name: 'San Francisco', lat: 37.7749, lon: -122.4194, countryCode: 'US' },
   losangeles: { name: 'Los Angeles', lat: 34.0522, lon: -118.2437, countryCode: 'US' },
   chicago: { name: 'Chicago', lat: 41.8781, lon: -87.6298, countryCode: 'US' },
-  seattle: { name: 'Seattle', lat: 47.6062, lon: -122.3321, countryCode: 'US' }
+  seattle: { name: 'Seattle', lat: 47.6062, lon: -122.3321, countryCode: 'US' },
+  kennedy: { name: 'Kennedy Space Center · VAB', lat: 28.58684, lon: -80.65121, countryCode: 'US' },
+  kennedy39b: { name: 'Kennedy Space Center · Launch Pad 39B', lat: 28.62374, lon: -80.62082, countryCode: 'US' }
 };
 const locKeys = Object.keys(LOCS);
 const SCALE = 100000;

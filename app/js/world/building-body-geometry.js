@@ -1,11 +1,11 @@
-import { markPrivateBuildingGeometry } from './retired-building-buffers.js';
+import { markPrivateBuildingGeometry, allocatePrivateBuildingStorage } from './retired-building-buffers.js';
 
 // Buildings use straight footprint edges, one vertical step and no bevels.
 // Write that exact extrusion directly into its final attribute allocations.
 // Unlike general-purpose ExtrudeGeometry this retains no Shape/Curve graph,
 // bevel vectors, boxed vertex arrays or per-triangle UV objects per building.
 // Triangle order and r128 UV/normal conventions intentionally remain unchanged.
-export function createBuildingBodyGeometry(THREE, footprint, height) {
+export function createBuildingBodyGeometry(THREE, footprint, height, arena = null) {
   if (!Array.isArray(footprint) || footprint.length < 3 || !Number.isFinite(height) || height <= 0) {
     throw new TypeError('A building body needs a finite footprint and positive height');
   }
@@ -25,8 +25,14 @@ export function createBuildingBodyGeometry(THREE, footprint, height) {
   const triangles = THREE.ShapeUtils.triangulateShape(contour, []);
   const lidVertices = triangles.length * 6;
   const vertexCount = lidVertices + contour.length * 6;
-  const positions = new Float32Array(vertexCount * 3);
-  const uvs = new Float32Array(vertexCount * 2);
+  // All three attributes belong to this one private geometry and retire
+  // together after batching. Separate, non-overlapping views avoid three
+  // native backing stores per building without changing attribute bytes.
+  const geometry = markPrivateBuildingGeometry(new THREE.BufferGeometry(), arena);
+  const {buffer: storage, byteOffset} = allocatePrivateBuildingStorage(geometry, vertexCount * 8 * Float32Array.BYTES_PER_ELEMENT);
+  const positions = new Float32Array(storage, byteOffset, vertexCount * 3);
+  const uvs = new Float32Array(storage, byteOffset + vertexCount * 3 * 4, vertexCount * 2);
+  const normals = new Float32Array(storage, byteOffset + vertexCount * 5 * 4, vertexCount * 3);
   let cursor = 0;
   function vertex(index, depth, u, v) {
     const point = contour[index], at = cursor * 3, uv = cursor * 2;
@@ -50,9 +56,9 @@ export function createBuildingBodyGeometry(THREE, footprint, height) {
     vertex(a, 0, au, 1); vertex(b, 0, bu, 1); vertex(a, height, au, 1 - height);
     vertex(b, 0, bu, 1); vertex(b, height, bu, 1 - height); vertex(a, height, au, 1 - height);
   }
-  const geometry = markPrivateBuildingGeometry(new THREE.BufferGeometry());
   geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
   geometry.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
+  geometry.setAttribute('normal', new THREE.BufferAttribute(normals, 3));
   geometry.addGroup(0, lidVertices, 0);
   geometry.addGroup(lidVertices, vertexCount - lidVertices, 1);
   geometry.computeVertexNormals();

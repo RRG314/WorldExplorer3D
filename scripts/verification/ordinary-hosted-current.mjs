@@ -13,7 +13,7 @@ import { closeOwnedBrowser } from './owned-browser.mjs';
 // two disposable staging identities; it never grants admission or edits saves.
 const project = 'we3d-staging-20260712';
 const base = new URL(process.argv[2]).origin;
-assert.match(new URL(base).hostname, /^we3d-staging-20260712--[a-z0-9-]+\.web\.app$/);
+assert.match(new URL(base).hostname, /^we3d-staging-20260712(?:--[a-z0-9-]+)?\.web\.app$/);
 assert.equal(new URL(base).protocol, 'https:');
 assert.ok(!process.env.WE3D_STAGING_APP_CHECK_FILE, 'Ordinary acceptance must not use debug attestation');
 const diagnostic = process.argv.includes('--diagnostic');

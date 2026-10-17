@@ -1,79 +1,222 @@
 # Release source identities
 
-## Current observation — October 8, 2026
+## Current observation — October 17, 2026
 
-The production frontend remains **5.4.0+1532bdfbb5c1.319d215f60318297.production**,
-source **1532bdfbb5c11e002d278b058d1ebdba88384f60**. The next compatible release is
-5.5.0 on `steven/visual-quality`. Stable, Pages and the public release remain unpromoted.
+Production remains **5.5.1**, confirmed by the live Hosting release API and both
+live manifests. After the owner's account repair, the manifests return HTTP 200
+at 10:10 p.m. EDT and match the hotfix identity below. No account mutation,
+rollback or new production deployment was performed here. Private account
+details are excluded from tracked release records. The complete **5.6.1** candidate remains
+under verification. A version label or preview URL alone does not identify code.
 
-The hosted preview and local dist are `5.5.0+4413d5d9b2ce.d69c6d4fb5e9fe9c.staging`,
-source `4413d5d9b2ce01369a5bf8bde7a2d584c68bd243`. The source passes 2,158 tests;
-the immutable package passes all 29 normal world checks and the added regional
-arrival/return/failure/recovery/retirement/settings journey. Four prescribed
-source keyboard-flight bursts pass. Hosted build and asset manifests match local
-bytes. Ordinary Chrome verification is blocked by the locked Mac, so the earlier
-016537ce ordinary-startup result does not certify this new artifact.
-
-The release gate rejects promotion because complete matching execution and external
-acceptance evidence are still missing. Production remains 5.4; stable, public
-Pages and the v5.5.0 release have not been promoted. The 016537ce package, compatible
-37a fallback, live production and unique 0e snapshot remain retained. Only the
-verified, pushed, superseded 7099 generated payload was removed; its manifests and
-cleanup receipt remain saved.
-
-Production has 80 ACTIVE Functions. Place/environmental data version 1 and
-aircraft version 5 were deployed first, preserving all 11 existing parameters.
-An audit of the actual downloaded production source then identified 77 older
-packages. Those have now been updated; all 80 deployed packages match all 36
-tracked backend code/configuration files. The tested Firestore ocean-presence
-additions are live; Storage rules are unchanged. Two IAM lookup errors reported
-by the CLI were reconciled against already-correct live permissions.
-
-Actual production protocol checks pass for shared marine authority, ocean
-presence, condition-save idempotency and legacy compatibility, discovery receipts
-and account isolation. Their temporary accounts and private fixtures were removed
-and verified absent. This is hosted HTTP/rules evidence, not an ordinary complete
-player journey. Staging aircraft version 6 is ACTIVE. Provider-cache expiration
-policies are ACTIVE as of 22:06 UTC. The exact live frontend's preserved
-`release-54-1532` channel retains Hosting version `f8a50a498fe78123` through
-November 6 at 22:26:58 UTC; both manifest bytes match live. This is separate
-from the reviewed save-compatible 37a fallback.
-
-The earlier accepted package's three-stage save/fallback/return and packaged live weather
-and ocean UI checks pass. Public-use rights, deployed provider-source identity and
-attribution are reviewed. The earlier 91-gate candidate run completed with 83 passes and eight failures.
-The source now includes an additional regional-arrival gate. Matching full release
-verification and ordinary-hosted, physical-device and fresh-player evidence remain
-open; targeted scenery checks are not whole-release acceptance.
-
-See [current state](../CURRENT-STATE.md) and
-[finite release gates](product-audit/2026-10-01/RELEASE-ACCEPTANCE.md).
-
-## Historical September 28 receipt
-
-Verified September 28, 2026 from hosted manifests and deployment results.
-A version label or URL parameter alone does not identify deployed code.
-
-| Reference | Identity |
+| Reference | Build or source |
 | --- | --- |
-| Live production source | `2839df5d6bbed9f8dfa4b89e379ba2e026cab438` |
-| Live production build | `5.3.0+2839df5d6bbe.114f3c83341f2200.production` |
-| Tested staging build | `5.3.0+2839df5d6bbe.7492cbb92de5e631.staging` |
-| Previous live source | `bbe6502228e369fe2a15dc6a177f5d83948584c3` |
-| Previous live build | `5.3.0+bbe6502228e3.8044052b36c00b4a.production` |
-| Production project | `worldexplorer3d-d9b83` |
-| Preserved frontend rollback channel | `rollback-bbe65022` |
-| Integration branch | `steven/architecture-evaluation` |
-| Release branch | `stable` |
+| Production frontend | `5.5.1+012e5c85582b.eb0d7eddf0f75035.production` |
+| Production source | `012e5c85582b78a7808656545bf4143a31a18652` |
+| Production Firebase project | `worldexplorer3d-d9b83` |
+| Canonical staging frontend | `5.6.1+a0e20c35eab7.aa4dd9dce23502b0.staging` |
+| Staging Firebase project | `we3d-staging-20260712` |
+| Current frozen candidate | `5.6.1+26e04920a669.dde9743f81c8b8ef.staging` |
+| Preserved road-safe fallback | `5.6.1+b21b7f12fdfa.31ed9b1212c5002c.staging` |
+| Release branch | `stable` (default; no `main` branch) |
+| Active development branches | `steven/visual-quality`, `steven/post-5.2-release-integration` |
 
-Production and staging use identical game assets. Only their three generated
-Firebase configuration files differ. The `commitUrbanImpacts` backend source
-update preserved existing runtime configuration and access permissions.
-Release documentation can advance after the runtime commit; rebuilding a later
-commit is a new candidate and requires its own relevant verification.
+[Production](https://worldexplorer3d.io/app/) ·
+[Staging](https://we3d-staging-20260712.web.app/app/) ·
+[Release preparation PR](https://github.com/RRG314/WorldExplorer3D/pull/103)
 
-The 5.3 notes compare against the preceding published 5.2 update. The September
-28 optimization notes separately compare against the already-live 5.3 source,
-so earlier ship and space changes are not counted as new optimization work.
+Canonical staging now serves the a0e20c35 package; both hosted manifests match
+local bytes. Production and backend origin restrictions were not changed.
+After production recovered, ordinary Chrome returned live search results,
+loaded Baltimore and displayed current weather on 5.5.1. This is not complete
+account/shared-voyage/save acceptance. A fresh automated browser loaded the
+world but received protected-service 401 responses; its failure was preserved
+and no security controls were bypassed.
 
-[Release comparison](RELEASE_COMPARISON_5.3.md) · [Release status](RELEASE_INTEGRATION_STATUS.md)
+## Verification and rollback
+
+Checkpoint `26e04920` is on both active development branches. All 755 immutable
+files verify; its gameplay payload matches 614b452a exactly. All three backend
+gates pass for 26, including shared ocean voyages, place lookup and the complete
+15-stage backend suite. Browser checks now honor the explicitly selected local
+emulator ports instead of touching an unrelated project's default port.
+
+Lossless compression recovered 6.49 GiB, retaining original paths and decoded
+contents. Native package validation passes short ground movement and flight,
+but sustained walking has a 150–217 ms pause cluster tied to memory collection.
+This remains failed pacing evidence; production and canonical staging are unchanged.
+
+The formal save check timed out while repeatedly requesting full city diagnostics
+during loading. A diagnostic with lightweight polling, the same timeout and all
+original save assertions passes released 5.5.1 → candidate → b21 fallback →
+candidate return. It is not a formal acceptance receipt. The verifier repair
+passes four focused tests and the complete 2,699-test source chain; its updated
+inputs must be packaged and formally checked. Full candidate, performance and
+ordinary hosted acceptance remain open.
+
+The subsequent pavement resource repair keeps one material/texture lease across
+same-world replacements, preserving linked renderer programs during handover.
+Failed staging leaves the accepted surface intact; final ownership release disposes
+all owned resources. All 78 focused checks and 2,702 source tests pass. Native
+source loads in 105.5 seconds and passes short ground travel and 90-second flight.
+The long walk still has three clustered 133–183 ms intervals, so pacing remains
+open. The before/after material IDs and shader program IDs match across a real
+coverage change. Current imagery and prescribed input were inspected. Neither
+30 FPS drawing experiment was adopted; gameplay remains uncapped.
+Evidence: `output/release-review/561-material-ownership-native/`.
+
+### Earlier b272 and source diagnostics (historical)
+
+The b272ed7a package verifies 754 files and its exact 64-file rollback review.
+Both active development branches contain the source. Its complete performance
+run passes all twelve reload cycles, memory/coverage/resource limits and touch
+regression, but fails desktop ground pacing and uninterrupted traversal. All
+flight windows pass; a 550 ms walking interval and a later traffic/custody
+interruption remain in the failed record. The 31 original receipt files are
+preserved with verified hashes. No production promotion is permitted by these
+results.
+
+Subsequent source moves the existing exact Float32 pavement indexing into the
+existing worker, transferring private construction buffers. It passes 76 focused
+checks and all 2,691 source tests. Native short walking/driving and a 90-second
+flight pass; the 90-second walk still has a 117–150 ms pause cluster. No browser
+exception or gameplay interruption occurs. That run recorded live service errors
+during the Hosting incident; the later ordinary Chrome recovery is recorded above.
+The current image and prescribed keyboard action were reviewed. This focused
+diagnostic does not include complete mixed-route/reload acceptance.
+It is not in the frozen package or hosted staging. The remaining complete-candidate,
+backend/save and hosted checks must use the final candidate's exact identity.
+
+The next source change reuses a synchronous collision region for walking camera
+probes. Its nine focused checks and complete 2,695-test source chain pass,
+including 84 exact before/after camera results. Native source loads in 114.4
+seconds and passes the 90-second flight, but sustained walking still records
+266–317 ms pauses. Short ground percentile failures remain. No browser errors,
+failed local resources or gameplay interruptions occur. Images and prescribed
+keyboard input were reviewed. This source is not in the frozen candidate or
+hosted releases. About 2.7 GiB free disk also prevents further checks that require
+3 GiB to launch, and the regional check still requires 8 GiB. No pacing or
+resource requirement was relaxed.
+
+### Earlier geometry repair checkpoints (historical)
+
+Subsequent local geometry-storage repairs pass 2,687 source tests and exact
+clipping comparisons. Their native long-walk window passes, while flight and a
+short walking frame-time window still fail. Recent live map inputs differ, so
+these runs are not presented as a controlled performance comparison. This source
+is not yet part of the frozen 296fb8a6 artifact or hosted staging.
+
+The current 296fb8a6 package includes the traversal, graphics-preparation and
+pavement-lifetime repairs. Both active development branches contain its source;
+all 754 delivered files verify, 2,683 source tests pass and the 63-file rollback
+review matches. Native packaged pacing still fails three windows, despite the
+initial flight and five sustained windows passing. All twelve reload/cleanup
+cycles, retained memory, coverage, transfer, loading and touch checks pass.
+The remaining exact-package/backend/save/hosted acceptance is open.
+Production and stable have not been promoted.
+
+### Earlier a0e20c35 candidate (historical)
+
+The a0e20c35 package is pushed to both active development branches. Its 754
+files verify, all three backend gates pass, and the released 5.5.1 → candidate
+→ compatible b21 fallback → candidate save journey passes. Its complete matrix
+finished **103/107**: museum performance, general performance, a regional-travel
+prelaunch disk refusal, and a Git identity timeout remain in the original record.
+The later release-identity gate passed. These failures are not relabeled as passes.
+
+Subsequent source work prepares resident graphics and the museum before first
+use, finishes initial street coverage under the loading cover, yields nearby
+source selection during travel and validates storefront approaches locally.
+The source museum journey passes 67 checks. The current full source chain passes
+**2,683 tests** plus structural, ownership, type, inventory and sensitivity checks.
+Repeated native 90-second flight windows now peak at 50.1 ms. The full native mixed journey completed with preserved coverage and no
+interruptions; both sustained walks and the later drive still have pauses up to
+300.1 ms. Terrain-fitted reuse is confirmed within the original 16 MiB budget,
+but is not a complete pacing fix. An additional publication-lifetime repair
+passes the twelve-replacement collection test: zero old publications remain
+reachable, compared with eleven before. Native pacing validation remains open. That source is not in the frozen staging package above.
+
+The repaired mixed-provider Monaco junction passes controlled keyboard driving,
+and source regional arrival/recovery/return checks pass. Complete immutable
+acceptance, ordinary hosted account/voyage/save acceptance and final current-image
+review remain open. Steep mountain approaches and some sidewalk-corner fragments
+remain separate visual limitations. Production is still 5.5.1; PR #103 remains
+draft and stable has not been promoted. See the October 14 READINESS ledger for
+individual receipts and their exact scope.
+
+### Earlier fb24 candidate (historical)
+
+The fb24 source was pushed to both active development branches. PR #103 remained
+draft and stable is unchanged. Current GitHub code/package and secret checks pass.
+Its package is frozen and passes integrity verification with 753 files.
+All 2,637 source tests and the structural chain pass. It includes the verified
+parking-entry/main-street repair, bounded regional numeric storage, and the
+facility callback repair that releases about 128 MB of load-source retention.
+Its native 90-second flight still records 916.6 and 466.7 ms intervals. Short
+walking passes; moving driving still fails pacing. Coverage, activation,
+occupied memory and browser/local-resource checks pass. This is diagnostic
+coverage, not complete candidate acceptance. The full matrix, backend/save
+roundtrip, ordinary hosted voyage and final review remain open for fb24. The
+in-progress complete run has already passed current city switching, district
+activities, connected ocean streaming, submarine/diver/vessel interactions,
+runtime cleanup, aquarium/harbor entry and the road junction. The previous f3ac
+failures below are historical evidence, not the status of those fb24 checks.
+
+Previous f3ac package: all three backend gates and the four-stage actual released
+5.5.1/candidate/compatible b21 rollback/candidate save journey pass. The complete
+candidate run finished at 03:11 UTC October 15 with **103 of 107 gates passing**.
+Regional arrival was blocked before launch by its disk guard; city-switch
+cancellation accounting and district activity admission require diagnosis;
+native desktop timing fails, including a 1.3-second first-flight interval.
+Twelve reloads, cleanup, coverage and touch regression pass. A separate downtown
+street image also needs correction after exact packaged-scene reproduction.
+These are not production-ready results. See the current READINESS section for
+the preserved receipts and remaining hosted/review requirements.
+
+### Historical comparison (not current acceptance)
+
+The complete 376 candidate matrix finished **101 of 107 gates passing**. Its
+failed receipts remain preserved. The preserved b21 candidate fixes the reproduced
+Monaco road discontinuities and reuses roof vertices without removing buildings.
+All 2,618 source checks, native Monaco assembly and the Baltimore keyboard
+junction journey pass. These focused results do not replace the final complete
+matrix or its performance, hosted-account and save-compatibility requirements.
+
+The subsequent pavement-scheduling build removed the reproduced long path-builder
+blocks but still failed sustained desktop timing. It was not promoted. The next
+refinement divides nearby-capture index work across frames and culls smaller
+regional instance cells without dropping buildings. The 33d5 package passes native resource/lifecycle and connected tutorial checks.
+Its complete twelve-cycle performance run passes cleanup and touch emulation,
+but still fails desktop frame-rate/hitch limits. A new, narrowly scoped collision
+allocation repair is pushed to both active branches but still reproduces native
+flight pauses. Generated building attributes now use fewer native backing buffers
+with identical values; all 2,633 source checks pass. The complete packaged twelve-cycle run preserves coverage, cleanup, memory
+retention and touch behavior, but still fails desktop pacing. Profiling links
+the largest pauses to collection; a numeric-uniform cache experiment increased
+allocation and was rejected without changing the game. Complete acceptance remains
+required.
+
+The latest shared-terrain repair separates consumer expiry from source cancellation.
+Its delayed real-image regression and actual two-player Logan world pass. Those
+focused results are not a complete current backend receipt.
+
+All three 376 backend gates passed. Six changed Functions were deployed only to
+staging with existing configuration preserved. Live staging purchases, private
+home layouts, photo uploads, CPU submissions and continuation checks passed;
+their disposable records were removed. The full ordinary hosted voyage and final
+source-bound acceptance remain separate requirements.
+
+The released 5.5.1 package is the save-upgrade starting point. The retained
+`b21b7f12` road-repaired package is the candidate's modern-save fallback, subject to the
+actual four-stage save roundtrip. Its production-configured package is built and
+verified; the only differences are the three approved Firebase configuration assets.
+Do not use the old 5.5.1 frontend as a writer for new 5.6 progress. Its isolated
+road-recovery deployment remains valid independently of the new release.
+
+Production promotion must use the verified staging game payload, changing only
+the three reviewed Firebase configuration assets. Commit identities, manifests,
+backend deployment evidence and the rollback plan must agree before promotion.
+
+[Current state](../CURRENT-STATE.md) ·
+[Release status](RELEASE_INTEGRATION_STATUS.md) ·
+[Candidate evidence](release-review/2026-10-14/READINESS.md)

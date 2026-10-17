@@ -1,6 +1,31 @@
 # Aquarium asset and software review
 
-Reviewed October 12, 2026. Candidate is not the same as imported/approved.
+Reviewed October 12; refreshed October 13, 2026. Candidate is not the same as imported/approved.
+
+## Current intake status
+
+The two animal GLBs **are registered in the local runtime catalog**, contrary to
+the historical pre-intake paragraphs below. Their author/license/source and
+optimized output hashes remain pinned in
+`app/assets/models/interiors/aquarium/PROVENANCE.json`; the focused actual-byte
+test verifies both files, animation, embedded textures and size limits.
+The acquired art remains a species illustration with the documented shark
+detail limitation. No artist file, source texture or animation was replaced in
+this continuation, and no aquarium building model was approved.
+
+[Fresh GitHub metadata](evidence/2026-10-13-source-refresh.json) confirms all five
+reviewed heads/push dates below are unchanged. Explicit repository license files
+were rechecked: jamisonhill's LICENSES.md states MIT, polyfish's LICENSE states
+MIT, and no root code-license grant was established for the other three.
+Their applications were not executed for comparative benchmarks; performance
+claims in their READMEs remain unverified here. Compatibility assessments are
+source/dependency inspections, not measured comparative performance. No third
+party source code, audio, texture or candidate app is copied or installed.
+
+The runtime already supplies local rig cloning/leases, bounded model downloads,
+coral scans and contained water optics. Future kelp/jelly/tunnel systems require
+separate author/asset license intake and actual rendering budgets. Neither a
+generic domestic aquarium nor a reef demo provides real venue architecture.
 
 ## Sketchfab candidates
 

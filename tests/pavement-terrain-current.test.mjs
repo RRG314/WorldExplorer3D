@@ -1,4 +1,5 @@
 import test from 'node:test';
+import {createHook} from 'node:async_hooks';
 import assert from 'node:assert/strict';
 import { conformPavementMesh, conformPavementMeshCooperatively } from '../app/js/world/pavement-terrain-conformance.js';
 import { createPavementTerrainPartition } from '../app/js/world/pavement-terrain-partition.js';
@@ -119,4 +120,55 @@ test('bounded cooperative support matches full partition and cancels during the 
  assert.deepEqual(part(vertices,()=>.12),full(vertices,()=>.12));part.dispose();full.dispose();
  let active=true;
  await assert.rejects(createPavementTerrainPartitionCooperatively([far],{...options,current:()=>active,yieldWork:async()=>{active=false;}}),/superseded/);
+});
+
+test('interleaved pavement iterators cannot overwrite one another or a completed publication',()=>{
+ const partition=supportFor((x,z)=>x*.4-z*.1,8);
+ const first=meshFor(()=>0).vertices,second=first.map((v,i)=>i%3===0?v*.75:v);
+ const heightA=(x,z)=>x*.4-z*.1+.12,heightB=(x,z)=>x*.4-z*.1+.25;
+ const expectedA=partition(first,heightA),expectedB=partition(second,heightB);
+ const a=partition.steps(first,heightA),b=partition.steps(second,heightB);let left,right;
+ do{if(!left?.done)left=a.next();if(!right?.done)right=b.next();}while(!left.done||!right.done);
+ assert.deepEqual(left.value,expectedA);assert.deepEqual(right.value,expectedB);
+ partition(first,()=>100);
+ assert.deepEqual(left.value,expectedA);assert.deepEqual(right.value,expectedB);
+ partition.dispose();
+});
+
+
+test('dense conformance schedules promises only when a construction slice yields',async()=>{
+ const mesh=meshFor(()=>0),partitionSurface=supportFor(()=>0,1);
+ mesh.vertices=Array.from({length:2500},()=>mesh.vertices).flat();
+ let promises=0,yields=0;
+ const hook=createHook({init(_id,type){if(type==='PROMISE')promises++;}});
+ hook.enable();
+ try {
+  await conformPavementMeshCooperatively(mesh,()=>0,()=>.12,{
+   partitionSurface,now:()=>0,budgetMs:8,yieldWork:()=>{yields++;}
+  });
+ } finally {hook.disable();partitionSurface.dispose();}
+ assert.equal(yields,0);assert.ok(promises<32,`Fast checkpoints created ${promises} promises`);
+ assert.equal(mesh.vertices.length,90000);
+});
+
+test('cooperative conformance accepts a synchronous scheduler and still cancels atomically',async()=>{
+ const mesh=meshFor(()=>0),before=structuredClone(mesh),partitionSurface=supportFor(()=>0);
+ let active=true,yields=0;
+ await assert.rejects(conformPavementMeshCooperatively(mesh,()=>0,()=>.12,{
+  partitionSurface,budgetMs:0,current:()=>active,yieldWork:()=>{yields++;active=false;}
+ }),/superseded/);
+ assert.equal(yields,1);assert.deepEqual(mesh,before);partitionSurface.dispose();
+});
+
+
+test('failed terrain coverage retains independent array diagnostics with borrowed clipping storage',()=>{
+ const mesh={visible:true,userData:{isTerrainMesh:true},position:{x:0,y:0,z:0},geometry:{parameters:{widthSegments:1},attributes:{position:{array:new Float32Array([0,0,0,4,0,0,0,0,4,4,0,4])}}}};
+ const partition=createPavementTerrainPartition([mesh,mesh]);
+ assert.equal(partition(meshFor(()=>0).vertices,()=>.12),null);
+ const diagnostics=partition.lastCoverage.worstTriangle;
+ assert.ok(diagnostics.contributions.length>0);
+ assert.ok(diagnostics.contributions.every(item=>Array.isArray(item.vertices)));
+ const saved=structuredClone(diagnostics);
+ partition([0,0,0,0,0,1,1,0,0],()=>2);
+ assert.deepEqual(diagnostics,saved);partition.dispose();
 });

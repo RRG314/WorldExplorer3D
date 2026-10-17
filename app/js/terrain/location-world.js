@@ -11,6 +11,7 @@ function createLocationTerrainApi(deps = {}) {
     getTerrainMeshKey,
     terrainTileMeshKey,
     getOrLoadTerrainTile,
+    waitForTerrainTileReadyAtZoom,
     pruneTerrainTileCache,
     terrainTileCacheSnapshot,
     clearTerrainHeightCache,
@@ -56,8 +57,16 @@ function createLocationTerrainApi(deps = {}) {
           // Wait for its source before fixing the far mesh's ownership holes;
           // otherwise a late image decode can introduce an overlapping tile.
           if (request.requiresSourceTile) {
-            const tile=getOrLoadTerrainTile?.(request.z,request.tx,request.ty,terrainTileDeps);
-            if(!tile?.loaded)await tile?.ready;
+            let tile=getOrLoadTerrainTile?.(request.z,request.tx,request.ty,terrainTileDeps);
+            if(!tile?.loaded){
+              // Publication observes the shared tile owner's bounded retries.
+              // Its own deadline never cancels a source another consumer needs.
+              if(typeof waitForTerrainTileReadyAtZoom==='function'){
+                await waitForTerrainTileReadyAtZoom(request.z,request.tx,request.ty,10000,terrainTileDeps);
+                if(request.generation!==publicationGeneration)return;
+                tile=getOrLoadTerrainTile?.(request.z,request.tx,request.ty,terrainTileDeps);
+              }else await tile?.ready;
+            }
             if(request.generation!==publicationGeneration)return;
             if(!tile?.loaded)throw new Error(`Terrain source ${key} did not become ready for publication`);
           }

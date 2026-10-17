@@ -36,6 +36,21 @@ test('incomplete routes cannot become a constraint authority',()=>{
  assert.equal(f.solve().anchorsByFeature.size,0);
 });
 
+test('a mixed-provider physical junction solves both surfaces and the complete adjoining corridor', () => {
+ const f=fixture(), exact={...f.features[0], sourceFeatureId:'exact-nearby',
+  transportGraphRef:{featureId:'exact-nearby'},
+  transportRecord:{...f.features[0].transportRecord,completeness:'lossless'}};
+ f.features.push(exact);
+ f.network.connections.push({id:'mixed-snap',left:f.network.connections[0].left,
+  right:{...f.network.connections[0].left,featureId:'exact-nearby'}});
+ const result=f.solve();
+ assert.equal(result.anchorsByFeature.has(exact),true);
+ const audit=auditTransportJunctionContinuity(f.features,f.network,sampleFeatureSurfaceY);
+ assert.equal(audit.discontinuityCount,0);
+ assert.equal(audit.invalidVerticalAnchorCount,0);
+ for(const road of f.features) assert.ok(road.transportSurfaceModel.stats.maximumGrade<=.08501);
+});
+
 test('nearby terrain and obstruction samples cannot displace exact shared road nodes',()=>{
  // Actual Baltimore failure: a surface crossing 4.9 mm before the Central
  // Avenue approach node replaced its station during sample deduplication.
@@ -58,4 +73,36 @@ test('nearby terrain and obstruction samples cannot displace exact shared road n
   }
   assert.ok(model.stats.maximumGrade<=.08501,'the shared height must not introduce a vertical cliff');
  }
+});
+
+test('a raised approach reaches a feasible ground return across arbitrarily split mapped streets in one solve',()=>{
+ // The Monaco replay exposed a fixed-pass dependency: each repair promoted
+ // one next street, leaving a new open end. These 32 short mapped fragments
+ // need one shared grade solution, with the distant ordinary roads unchanged.
+ const bias=.18,ground=x=>x<=0?20:Math.max(0,20-x*2);
+ const make=(id,a,b,mode='at_grade')=>({sourceFeatureId:id,type:'residential',width:6,surfaceBias:bias,
+  pts:[{x:a,z:0},{x:b,z:0}],structureSemantics:{terrainMode:mode,isBridge:mode==='elevated',deckClearance:0},
+  transportRecord:{identity:id,completeness:'generalized',routeState:'complete',sourceTags:{highway:'residential'}},
+  transportGraphRef:{featureId:id},structureTransitionAnchors:[],ordinaryStreetAnchors:[]});
+ const bridge=make('bridge',-40,0,'elevated');
+ const roads=Array.from({length:32},(_,i)=>make(`street-${i}`,i*20,(i+1)*20));
+ const features=[bridge,...roads];
+ roads[0].structureTransitionAnchors=[{distance:0,endpoint:'start',targetSurfaceY:20+bias,targetOffset:0,span:20,source:'transport_graph_node',engineeredApproach:true,ownerFeatureId:'bridge'}];
+ const compile=f=>attachCompiledTransportSurface(f,compileTransportSurfaceModel(f,ground,{sampleStep:2}));
+ features.forEach(compile);
+ const side=(f,end)=>({featureId:f.sourceFeatureId,point:f.pts[end?1:0],segmentIndex:0,segmentT:end?1:0,distanceAlong:end?f.pts[1].x-f.pts[0].x:0,endpoint:end?'end':'start'});
+ const network={connections:features.slice(1).map((f,i)=>({id:`join-${i}`,left:side(features[i],true),right:side(f,false)}))};
+ const untouched=roads.slice(16).map(f=>[...f.transportSurfaceModel.centerHeights]);
+ const result=buildTransportContinuityRepairAnchors(features,network,sampleFeatureSurfaceY,{sampleTerrainY:ground});
+ for(const[f,anchors]of result.anchorsByFeature){const keys=new Set(anchors.map(a=>a.distance));f.structureTransitionAnchors=f.structureTransitionAnchors.filter(a=>!keys.has(a.distance)).concat(anchors);compile(f);}
+ const audit=auditTransportJunctionContinuity(features,network,sampleFeatureSurfaceY);
+ assert.equal(audit.discontinuityCount,0,JSON.stringify(audit.discontinuities));
+ for(const road of roads.filter(f=>f.transportSurfaceModel.engineeredApproach))assert.ok(road.transportSurfaceModel.stats.maximumGrade<=.08502,road.sourceFeatureId);
+ assert.ok(roads[0].transportSurfaceModel.engineeredApproach);
+ assert.ok(!roads.at(-1).transportSurfaceModel.engineeredApproach,'ordinary streets beyond the actual grade run retain their authority');
+ assert.deepEqual(roads.slice(16).map(f=>[...f.transportSurfaceModel.centerHeights]),untouched);
+ const before=features.map(f=>[...f.transportSurfaceModel.centerHeights]);
+ const again=buildTransportContinuityRepairAnchors(features,network,sampleFeatureSurfaceY,{sampleTerrainY:ground});
+ for(const[f,anchors]of again.anchorsByFeature){const keys=new Set(anchors.map(a=>a.distance));f.structureTransitionAnchors=f.structureTransitionAnchors.filter(a=>!keys.has(a.distance)).concat(anchors);compile(f);}
+ assert.deepEqual(features.map(f=>[...f.transportSurfaceModel.centerHeights]),before,'repeated publication cannot keep raising the corridor');
 });

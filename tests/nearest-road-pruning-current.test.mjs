@@ -24,3 +24,27 @@ test('road pruning preserves winners, heights and transition locks across curved
  }
  assert.ok(newSamples<oldSamples*.25,`${newSamples}/${oldSamples} expensive height samples`);
 });
+
+test('road selection retains profile endpoints and independent returned projections',()=>{
+ const runtime={
+  sampleFeatureSurfaceY:(r,_x,_z,p)=>r.surfaceHeights[p.segIndex]+(r.surfaceHeights[p.segIndex+1]-r.surfaceHeights[p.segIndex])*p.t,
+  areRoadsConnected:(a,b)=>[...a.connectedFeatures.start,...a.connectedFeatures.end].some(e=>e.feature===b)
+ };
+ const select=Function('runtime','isNumericProfileArray',source.slice(start,end)+';return evaluateNearestRoadCandidate;')(runtime,typed);
+ for(const Profile of [Float32Array,Float64Array])for(const terrainMode of ['surface','elevated','subgrade']){
+  const road={pts:[{x:0,z:0},{x:0,z:0},{x:5,z:0},{x:10,z:5},{x:20,z:5}],
+   surfaceDistances:new Profile([0,0,5,5+Math.sqrt(50),15+Math.sqrt(50)]),
+   surfaceHeights:new Profile([0,0,1.25,4,4]),
+   structureSemantics:{terrainMode,gradeSeparated:terrainMode!=='surface'},
+   structureTransitionAnchors:[{distance:5,span:1},{distance:NaN,span:3}],
+   connectedFeatures:{start:[],end:[]}};
+  const connecting={connectedFeatures:{start:[],end:[{feature:road}]}};
+  for(const preferred of [null,road,connecting])for(const y of [NaN,0,1.25,1.85,4,40])for(const x of [-5,0,2.5,5,10,20,25]){
+   const expected=reference(road,x,2,y,8,preferred,runtime,typed);
+   const actual=select(road,x,2,y,8,preferred);
+   assert.deepEqual(actual,expected);
+   if(actual){const point={...actual.pt};select(road,100,100,NaN,Infinity,null);assert.deepEqual(actual.pt,point);}
+  }
+ }
+ assert.equal(select({pts:[{x:0,z:0}]},0,0,NaN,Infinity,null),null);
+});

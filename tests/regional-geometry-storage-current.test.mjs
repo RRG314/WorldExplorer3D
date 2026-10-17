@@ -30,3 +30,27 @@ test('cancelled regional construction releases exclusive buffers and cannot publ
  if(typeof ArrayBuffer.prototype.transfer==='function')assert.equal(owned.byteLength,0);
  assert.throws(()=>buffer.finish(),/retired/);
 });
+
+test('concave roof indexing preserves every triangle and facade attribute with fewer retained vertices',()=>{
+ const ring=[{x:10,z:20},{x:28,z:20},{x:28,z:26},{x:18,z:26},{x:18,z:35},{x:10,z:35}];
+ const triangles=THREE.ShapeUtils.triangulateShape(ring.map(p=>new THREE.Vector2(p.x,p.z)),[]);
+ const out={positions:[],colors:[],styles:[],layouts:[],indices:[]};
+ const massing={heightMeters:26.5,color:[.27,.52,.78],facadeStyle:[3,2,1,0x50565b]},baseY=4.5,scale=.9;
+ appendRegionalBuildingFootprint(out,ring,triangles,massing,baseY,scale);
+ const wallVertices=ring.length*4,roofIndices=out.indices.slice(ring.length*6);
+ assert.equal(out.positions.length/3,wallVertices+ring.length);
+ assert.ok(ring.length<triangles.length*3,'The concave fixture must exercise roof vertex reuse');
+ assert.deepEqual(roofIndices.map(i=>out.positions.slice(i*3,i*3+3)),triangles.flat().map(i=>[ring[i].x,baseY+massing.heightMeters*scale,ring[i].z]));
+ for(const i of roofIndices){
+  assert.ok(i>=wallVertices,'Roof normals and bays cannot share wall vertices');
+  assert.deepEqual(out.colors.slice(i*3,i*3+3),massing.color);
+  assert.deepEqual(out.styles.slice(i*4,i*4+4),massing.facadeStyle);
+  const layout=out.layouts.slice(i*4,i*4+4);
+  assert.equal(layout[0],0);assert.equal(layout[2],0);assert.equal(layout[3],massing.heightMeters);
+ }
+ const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.Float32BufferAttribute(out.positions,3));geometry.setIndex(out.indices);geometry.computeVertexNormals();
+ const [a,b,c]=triangles[0].map(i=>ring[i]);
+ const originalNormalY=Math.sign((b.z-a.z)*(c.x-a.x)-(b.x-a.x)*(c.z-a.z));
+ for(let i=wallVertices;i<out.positions.length/3;i++)assert.ok(geometry.attributes.normal.getY(i)*originalNormalY>.999,'Every roof vertex must preserve the original winding and planar normal');
+ geometry.dispose();
+});

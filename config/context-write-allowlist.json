@@ -283,7 +283,6 @@
       "loadingScreenMode"
     ],
     "app/js/editable-world/runtime.js": [
-      "_streetPavementDirty",
       "configureSharedEditableWorld",
       "disposeEditableWorldPresentation",
       "editableWorldRuntimeSnapshot",
@@ -663,9 +662,11 @@
     ],
     "app/js/interiors.js": [
       "clearActiveInterior",
+      "disposePreparedVenuePrograms",
       "enterInteriorForSupport",
       "handleInteriorAction",
       "listSupportedInteriorsNear",
+      "prepareLoadedMuseumPrograms",
       "sampleInteriorWalkSurface",
       "scanNearbyInteriorSupport",
       "updateInteriorInteraction"
@@ -1107,7 +1108,9 @@
     "app/js/runtime/core-frame-systems.js": [
       "graphicsCallEvidence",
       "lastTime",
+      "museumProgramPreparation",
       "prepareFirstWorldRender",
+      "prepareResidentPresentation",
       "presentationPose"
     ],
     "app/js/runtime/on-demand-block-builder.js": [
@@ -2031,6 +2034,7 @@
       "initialEarthDetailRadius",
       "linearWalkContactIndex",
       "mappedLandmarkMetrics",
+      "museumProgramPreparation",
       "navigationRouteDistance",
       "navigationRoutePoints",
       "osmTreeNodes",
@@ -2199,6 +2203,17 @@
       "camera",
       "renderer",
       "scene"
+    ],
+    "app/js/runtime/resident-presentation-preparation.js": [
+      "renderer"
+    ],
+    "app/js/world/street-interior-suspension.js": [
+      "_cancelStreetPavementBuild",
+      "_streetPavementDirty"
+    ],
+    "app/js/world/street-source-revision.js": [
+      "_streetPavementDirty",
+      "_streetSourceRevision"
     ]
   }
 }

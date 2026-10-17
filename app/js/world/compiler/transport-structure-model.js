@@ -1,3 +1,4 @@
+import {tunnelClearance as compiledTunnelClearance} from './tunnel-envelope.js';
 const STRUCTURE_MODEL_SCHEMA_VERSION = 1;
 
 function stableHash(value = '') {
@@ -111,7 +112,7 @@ function structureSpecification(entry) {
     ? Math.max(0.45, Math.min(1.6, width * 0.1))
     : Math.max(0.32, Math.min(0.8, width * 0.12));
   const minimumClearance = vehicle ? 5.5 : 4.2;
-  const tunnelClearance = Math.max(
+  const tunnelClearance = semantics.parkingAccess === true ? compiledTunnelClearance(semantics) : Math.max(
     vehicle ? 4.2 : 3.0,
     Math.min(vehicle ? 5.2 : 4.2, Number(semantics.cutDepth || 4.6) - 0.25)
   );

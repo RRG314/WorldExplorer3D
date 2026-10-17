@@ -3,56 +3,48 @@ import { getCurrentUser } from '../../../js/auth-ui.js?v=56';
 import { initFirebase } from '../../../js/firebase-init.js?v=58';
 import { commitExplorerCommerceAction, settleExplorerCommerceOutcome } from '../../../js/economy-api.js?v=3';
 
-const STARTING_CREDITS = 1_000_000;
-const CURRENCY_VERSION = 2;
-const LEGACY_CURRENCY_SCALE = 2000;
+import { projectExplorerWallet } from './wallet-snapshot.js';
 
 function createConnectedExplorerWallet(options = {}) {
   const user = getCurrentUser();
   const services = initFirebase();
   if (!user?.uid || !services?.db) return null;
   let disposed = false;
+  const isCurrent = () => !disposed && getCurrentUser()?.uid === user.uid;
   const listeners = new Set();
   if (typeof options.onChange === 'function') listeners.add(options.onChange);
-  let state = Object.freeze({ authority: 'explorer-wallet-v2', credits: STARTING_CREDITS, pending: true, revision: 0, currencyVersion: CURRENCY_VERSION });
+  let state = projectExplorerWallet({}, { pending: true });
   const stop = onSnapshot(doc(services.db, 'users', user.uid, 'economy', 'wallet'), (snapshot) => {
-    if (disposed) return;
-    const data = snapshot.exists() ? snapshot.data() : {};
-    const scale = snapshot.exists() && Number(data.currencyVersion || 0) < CURRENCY_VERSION ? LEGACY_CURRENCY_SCALE : 1;
-    state = Object.freeze({
-      authority: 'explorer-wallet-v2',
-      credits: Math.max(0, Number(data.credits ?? STARTING_CREDITS) * scale),
-      pending: false,
-      revision: Math.max(0, Number(data.revision || 0)),
-      currencyVersion: CURRENCY_VERSION
-    });
+    if (!isCurrent()) return;
+    state = projectExplorerWallet(snapshot.exists() ? snapshot.data() : {}, { exists: snapshot.exists() });
     listeners.forEach((listener) => listener(state));
-  }, (error) => options.onError?.(error));
+  }, (error) => { if (isCurrent()) options.onError?.(error); });
 
   return Object.freeze({
     type: 'ConnectedExplorerWallet',
     uid: user.uid,
+    isCurrent,
     snapshot: () => state,
     subscribe(listener) {
-      if (typeof listener !== 'function' || disposed) return () => {};
+      if (typeof listener !== 'function' || !isCurrent()) return () => {};
       listeners.add(listener);
       listener(state);
       return () => listeners.delete(listener);
     },
     async transact(action, store, catalogId, fields = {}) {
-      if (disposed) return Object.freeze({ accepted: false, reason: 'wallet_unavailable', credits: state.credits });
-      const requestId = `commerce:${user.uid.slice(0, 18)}:${Date.now().toString(36)}:${Math.random().toString(36).slice(2, 9)}`;
+      if (!isCurrent()) return Object.freeze({ accepted: false, reason: 'wallet_unavailable', credits: state.credits });
+      const requestId = fields.requestId || `commerce:${user.uid.slice(0, 18)}:${Date.now().toString(36)}:${Math.random().toString(36).slice(2, 9)}`;
       return commitExplorerCommerceAction({
-        action, requestId, storeId: store.id, catalogId,
+        action, requestId, storeId: store.id, catalogId, expectedUserId: user.uid,
         targetId: String(fields.targetId || ''),
         dayKey: String(fields.dayKey || new Date().toISOString().slice(0, 10))
       });
     },
     async settle(receipt, outcome, reason = '') {
-      if (disposed || !receipt?.requestId) {
+      if (!isCurrent() || !receipt?.requestId) {
         return Object.freeze({ settlementStatus: 'pending_recovery', credits: state.credits });
       }
-      return settleExplorerCommerceOutcome({ requestId: receipt.requestId, outcome, reason });
+      return settleExplorerCommerceOutcome({ requestId: receipt.requestId, outcome, reason, expectedUserId: user.uid });
     },
     dispose() { if (!disposed) { disposed = true; listeners.clear(); stop(); } }
   });
