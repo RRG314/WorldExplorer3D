@@ -369,10 +369,10 @@
       "afterMode": "100644"
     },
     "app/js/world/street-interior-suspension.js": {
-      "review": "Cancels unfinished ground-detail work while retaining accepted contact and coverage. Dirty state permits resumption on return or descent. Runtime-only scheduling, no persisted world edits.",
+      "review": "Cancels only unfinished preparation while retaining accepted contact and coverage. Cancellation preserves existing source/terrain invalidation without inventing invalidation of valid accepted detail; missing first coverage stays retryable. No persistent data.",
       "before": null,
       "beforeMode": null,
-      "after": "61884b26b335e66bf1eed47488621274c0f79259cdb380e1d10f3ab758132b0e",
+      "after": "e837f04c779daa501cb202b01ae7effeabdd1df2dbbc4b79758ed409cb848bb9",
       "afterMode": "100644"
     },
     "app/js/world/street-overview.js": {
@@ -385,15 +385,15 @@
     "app/js/world/street-pavement-runtime.js": {
       "before": "28675ab27c199f0224e8c6ea01df825c658feb9bae0112b5eaeed91b548c854c",
       "beforeMode": "100644",
-      "after": "f1639933d7b47de47467305a503bf5fe568a1fc1f105672f80e9084c6fcc0dfd",
+      "after": "3d44726b26772154db8cb353362563ad1a17af6985490ad59025434677e6e7e7",
       "afterMode": "100644",
-      "review": "Retains generation/revision cancellation, exact terrain/portal fitting, canonical face order and atomic publication. Validates changed-source reuse against the worker product identity and existing physical owners. Unchanged 128-unit render batches retain geometry and their exact walking-contact index through publication leases. Changed batches rebuild through the existing worker indexer; mapped ground keeps its bounded index. Composite sampling preserves maximum height and boundary tolerance. Failure or cancellation releases only staged leases; the old publication remains usable. Material leases and isolated publication callbacks preserve program lifetime without retaining old publications. No road/bridge/tunnel authority, coverage, save or backend change."
+      "review": "Retains generation/revision cancellation, exact terrain/portal fitting, canonical face order and atomic publication. Validates changed-source reuse against the worker product identity and existing physical owners. Unchanged 128-unit render batches retain geometry and their exact walking-contact index through publication leases. Changed batches rebuild through the existing worker indexer; mapped ground keeps its bounded index. Composite sampling preserves maximum height and boundary tolerance. Failure or cancellation releases only staged leases; the old publication remains usable. Material leases and isolated publication callbacks preserve program lifetime without retaining old publications. No road/bridge/tunnel authority, coverage, save or backend change. Invalidation now survives pending/cancelled work until a current publication commits; editable source revision joins ground/world/generation guards to reject stale source edits."
     },
     "config/context-write-allowlist.json": {
-      "review": "Registers only the reviewed transient renderer-preparation and street-suspension ownership keys. No runtime data, permissions, service rules or persistence schema.",
+      "review": "Registers the reviewed transient renderer and street owners. Moves editable frontage invalidation writes to the explicit street-source revision owner; no permission, service rule or persisted schema change.",
       "before": "908b9ce4cb8d5f73436be53afa10bbd451ccb0ee7302af7d610c27f6b6acf234",
       "beforeMode": "100644",
-      "after": "743644a6b42658c67e1d157891d29f9ede6cfe5dd7699a30a39b08d96c8e9508",
+      "after": "65c8d30fdf265a97cb4ce5acd9967c8876a84c01bfe56cef20b87e398ca30803",
       "afterMode": "100644"
     },
     "app/js/world/spawn.js": {
@@ -406,9 +406,9 @@
     "app/js/urban-sandbox/runtime.js": {
       "before": "9792fc9a073c7abe9721b53bd50581c629ca27047d68b497d47a243a06bcd735",
       "beforeMode": "100644",
-      "after": "5e0e27cc86d71d5d2722539e0c5e814a7f31b4cbf4c194c755097a646313f8d8",
+      "after": "5d6a59c2292742df52e569e69d4bcf8f2df241c1ec99208e9d47ab32017dfbfd",
       "afterMode": "100644",
-      "review": "Mapped storefront approach checks request exact-point walking validation and continue their existing local candidate search instead of resolving to another street. Store stock, wallet, Backpack, commerce transactions and saved state are unchanged."
+      "review": "Mapped storefront approach checks request exact-point walking validation and continue their existing local candidate search instead of resolving to another street. Store stock, wallet, Backpack, commerce transactions and saved state are unchanged. Civic incidents, witnesses and pursuit now follow the active ground-player owner; the inactive walker cannot substitute for the moving starter car. Occupied-vehicle authority and saved formats are unchanged."
     },
     "app/js/terrain/surface-decal-projection.js": {
       "before": "48cc550b5322df6e10fe43a07de75d938ea4ac1cca46c8e298482796fee5671d",
@@ -485,7 +485,35 @@
       "beforeMode": null,
       "after": "9867558528f8ecfe4893db7d55126281f2cd7cb4c41f7e1025fd534e57a5413b",
       "afterMode": "100644",
-      "review": "New bounded active-publication ownership helper. A batch geometry and exact contact index share an idempotent reference-counted lease across an atomic handover. Last release disposes both; cancellation cannot dispose another publication’s resources. Numeric spatial lookup checks neighboring batches for original Float32 boundary tolerance and chooses the same highest contact as the original combined index. Does not retain prior publication objects or create a persistent cache."
+      "review": "New bounded active-publication ownership helper. A batch geometry and exact contact index share an idempotent reference-counted lease across an atomic handover. Last release disposes both; cancellation cannot dispose another publication\u2019s resources. Numeric spatial lookup checks neighboring batches for original Float32 boundary tolerance and chooses the same highest contact as the original combined index. Does not retain prior publication objects or create a persistent cache."
+    },
+    "app/js/world/navigation.js": {
+      "before": "eb352679858389a6a08da7d4119c83decdfbbb660c28681f3d8c8824d8733cf2",
+      "beforeMode": "100644",
+      "after": "d6b302965d16b81c494f5cc9d9afcd26deb678a6d40873950cd81a76c16cbdbc",
+      "afterMode": "100644",
+      "review": "Keep nearest-road winner scalars until the scan completes instead of allocating discarded intermediate results. Same projection, height, continuity and bridge/tunnel transition rules, final result shape and search bounds. No geometry, identifiers or persisted state changes."
+    },
+    "app/js/urban-sandbox/player-position.js": {
+      "before": null,
+      "beforeMode": null,
+      "after": "cc4e0fda6aaae80367ba33ff0aa099afb9eb98e794cac4bc69553b32a3ba3a38",
+      "afterMode": "100644",
+      "review": "Resolve the ground player from the occupied vehicle or selected walk/drive mode, rather than the existence of an inactive allocated walker. Preserves startup car fallback and distinguishes remote camera focus from the physical body. No saved schema or migration change."
+    },
+    "app/js/world/street-source-revision.js": {
+      "before": null,
+      "beforeMode": null,
+      "after": "0cc351b93f3ab04983de4a83f470dc1bfccb1638213ed2a2650edd68db2e8309",
+      "afterMode": "100644",
+      "review": "Versions editable frontage/source mutations independently from physical terrain changes so cooperative street construction cannot publish over a newer edit. In-memory ownership only; no saved format or authority change."
+    },
+    "app/js/editable-world/runtime.js": {
+      "before": "5bedec1c3b2f8bca93dbf63342c02b0013621e3ff26e58efeb43806df69c6be8",
+      "beforeMode": "100644",
+      "after": "56d6671b0692c73f1f9222fecafe8f57896dd39401eefb82bab2148c84268987",
+      "afterMode": "100644",
+      "review": "Keeps the existing local/shared edit behavior and persistence formats. Routes street-source invalidation through a revision owner so edits during asynchronous compilation remain pending and stale products are rejected."
     }
   }
 }

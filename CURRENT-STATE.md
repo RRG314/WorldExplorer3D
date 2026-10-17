@@ -6,55 +6,103 @@ Public project page: https://rrg314.github.io/WorldExplorer3D/
 
 ## October 17 — authoritative current status
 
-**5.6.1 release acceptance is still open. Production remains the recovered 5.5.1
-hotfix.** No stable, production Hosting or production Functions promotion occurred
-in this investigation. Canonical staging last verified a0e20c35; the most recent
-verified packaging checkpoint before the repair below is
-`5.6.1+a35154104a70.8ca68f44c491d77e.staging` (755 verified files).
+**5.6.1 is not release ready. Production remains recovered 5.5.1.**
+No stable, production Hosting or production Functions promotion occurred in this
+investigation. Fresh public checks identify production build
+`5.5.1+012e5c85582b.eb0d7eddf0f75035.production`; canonical staging remains a0e20c35.
+The current immutable candidate is `5.6.1+32b30ce57ce6.e2fdccf854a89ce8.staging`
+(755 verified files). Both active development branches contain 32b30ce5.
 
-The current root-cause audit reproduces excessive street invalidation. Moving the
-local window changes 72 of 96 overlapping cell keys, although 69 produce exactly
-the same pavement, markings and ramps; 51 also retain the same ordered height
-inputs. All 144 initial fingerprints reproduced inside Chrome match the actual
-worker cache. The earlier cross-process export did not reproduce those keys and
-was rejected as evidence. The allocation and causal evidence is recorded in
-`output/release-review/561-root-cause-audit.md`.
+The root-cause audit established excessive street invalidation: 72 of 96
+overlapping cell keys changed, although 69 produced identical geometry and
+51 retained identical ordered height inputs. The repair compares exact compiled
+products under the existing terrain/contact/portal owners, and retains unchanged
+render batches and walking contacts through publication leases. Changed products
+still rebuild, failed staging keeps the accepted world, and the cache stays at
+16 MiB. Coverage, bridge/tunnel rules, save format and acceptance limits are intact.
 
-The local repair compares exact compiled products before repeating terrain fitting,
-while retaining the conservative source key and all terrain/contact/portal owner
-checks. Unchanged render batches and their walking-contact indexes now share a
-lease through atomic replacement. Changed geometry rebuilds; cancellation keeps
-the accepted world intact. The same bounded 16 MiB cache remains. No coverage,
-geometry precision, bridge/tunnel rules, save format or acceptance limit changed.
-The previous worker partition/clipping experiment still stalled and was removed.
+The complete source chain passed 2,707 tests, plus two subsequent ownership
+regressions. The exact package nevertheless failed its mixed performance gate;
+the earlier focused source pass did not establish release readiness. Tracing
+also exposed a verifier artifact: flight, mode selection and a scripted 12 km
+relocation produced non-overlapping street windows. Zero batch reuse there is
+correct, not a resource-lease failure. The canonical failed result is preserved.
 
-The repair passes 101 focused checks and the final 2,707-test source chain. Two
-additional integration checks pass for failure/cancellation after a reused batch
-lease has been acquired.
-The ordinary native journey loads in 105.3 seconds, passes short ground movement
-and 90-second flight, and completes the sustained walk at 39.61 FPS, p99 33.4 ms.
-It reuses 72 fitted cells (previously 23), retaining the same 140,849 pavement
-triangles. One 166.7 ms interval remains, within the existing pause budget;
-the prior three-pause cluster was absent. This is improvement, not a claim of
-zero stalls. No browser errors, local failures or interruptions occurred.
-Coverage remains 49,080 buildings, 18,951 roads and all 6,009 overview cells.
-Retained occupied managed JS is 474–475 MB; this is not total tab/GPU memory.
-The image and prescribed input state were inspected. Evidence:
-`output/release-review/561-street-product-ownership-native/`.
+Separate ordinary ground journeys on the immutable package clarify actual play:
+- Four-minute walking: 576.94 units, 41.63 FPS, worst frame 66.7 ms, no pauses
+  over 100 ms. Actual street turnover reuses 77 fitted cells and 28 render batches.
+- Four-minute driving: 1,085.88 units, 42.56 FPS, p99 33.4 ms, but a real cluster
+  of 133–150 ms frames during the second street preparation. No browser errors,
+  failed local requests or gameplay interruptions. This pacing result fails.
+- A separate driving CPU/GC trace reproduces that cluster. Main-thread collection
+  dominates it; sending the worker preparation message takes 10.3 ms, not 150 ms.
+  The profile samples 10,603 MiB of cumulative allocation over four minutes,
+  including reclaimed objects. This is not resident or total tab memory.
 
-That focused journey omits the full mixed route and twelve reload cycles. Its
-aggregate release result is deliberately not passing. Final immutable packaging, complete performance/candidate checks, backend acceptance,
-formal save roundtrip and hosted verification must complete before promotion.
+A confirmed gameplay defect used the inactive walker's position for civic
+incidents while the starter car was being driven. The local repair selects the
+actual ground mode or occupied vehicle. A real 90-second driving check observes
+six collisions at the moving car, with no browser/local failures or interruptions.
+Image and state were reviewed. This repair is not in the frozen package.
 
-The prior 26e04920 package passed all three backend gates, including the complete
-15-stage backend suite. A save diagnostic passed released 5.5.1 → candidate →
-preserved modern-save fallback → candidate after replacing expensive full-city
-polling with lightweight readiness guards; original assertions and the 180-second
-timeout were retained. This diagnostic is not formal final-package acceptance.
+The inactive-light CPU experiment preserves pixels but still produces clustered
+216.6/116.7 ms pauses. It stays out of shipping code. Recovery of an optional map
+provider changed its route and scene; its FPS increase is not causal evidence.
 
-Lossless filesystem compression recovered 6.49 GiB from inactive diagnostics and
-closed logs. Decoded contents and original paths were verified. Source, saves,
-chats, assets, history, fallback builds and unrelated processes were preserved.
+The nearest-road selector constructed discarded winner records while scanning
+long roads. Keeping the winner in scalar locals reduces these records from
+52,894 to 8,298 across 1,560 exact selector comparisons. A controlled four-minute
+driving profile preserves the previous route and passes its measured pacing
+limits with one 116.7 ms pause, no errors or interruptions. Sampled road-candidate
+allocation falls from 1,325.6 to 173.5 MiB; total sampled allocation falls from
+10,603 to 8,805 MiB. These are cumulative allocations including reclaimed objects,
+not resident memory. A separate unprofiled live-provider drive completes four
+minutes and 1,088.67 units at 42.09 FPS, p99 33.4 ms, with one 150.1 ms pause and
+no cluster. Image and prescribed skill input were reviewed.
+
+The repaired test setup now applies the existing scripted pose in the real mode
+button's click task, preventing an artificial intermediate distant street window.
+It never changes game scheduling or pause state. Its browser setup passes, but
+the following four-minute walk still fails: 183.3/133.4/199.9 ms pauses cluster
+at 18.5 seconds, with another 166.7 ms pause later. This is a runtime failure.
+
+Auditing every street invalidation writer identifies conflicting responsibilities:
+retiring speculative preparation invalidated otherwise current accepted streets,
+while starting a replacement consumed actual invalidation before it committed.
+Building edits made during preparation also lacked a source revision guard.
+The pre-change takeoff/return regression reproduces the defect. The local repair
+preserves accepted coverage on cancellation, retains true invalidation until
+publication, and rejects builds superseded by newer source edits. The repeated
+native flight/return check confirms no immediate replacement: the next street
+build starts only at the real boundary, 213 seconds into walking, and reuses
+77 fitted cells and 28 render batches. The full source chain passes 2,723 tests
+and its subsequent guards.
+
+Steady-play pacing remains a production blocker. The latest four-minute walk
+averages 41.81 FPS with p99 33.4 ms, but two 233.3/150 ms frames cluster at 115.6
+seconds while no street build is active. There are no errors or gameplay
+interruptions. Image and prescribed input reviewed. The current-source walking trace reproduces the cluster and attributes most of
+its long frames to main-thread collection: 82.57 ms marking startup and 104.46 ms
+major collection, with no street work active. Four minutes produce approximately
+10,025 MiB of sampled cumulative allocation, split across renderer and app code;
+this includes reclaimed objects, not resident memory. Retained occupied heap is
+about 470 MB. The remaining repair must address ordinary-frame query allocation
+and data lifetime across these owners. No renderer workaround is included.
+
+The canonical performance gate now extends its first walking/driving windows
+to four minutes each and requires completed street turnover; all seven mode
+windows remain, with unchanged performance limits. Full exact-package acceptance
+is still open. These runtime and verifier changes are not in the frozen package.
+
+Evidence: `output/release-review/561-root-cause-audit.md` and the focused
+`561-32b30ce5-natural-ground`, `561-32b30ce5-natural-driving`,
+`561-32b30ce5-natural-driving-attribution`, `561-civic-position-observed` records.
+The final package still needs complete performance, backend, formal save
+roundtrip, complete-candidate and hosted acceptance before promotion.
+
+Lossless filesystem compression recovered 6.49 GiB from verified inactive
+artifacts. Source, saves, chats, assets, history, fallback builds and unrelated
+processes were preserved. Current free disk is approximately 9.5 GiB.
 
 ## October 16 — previous checkpoint
 

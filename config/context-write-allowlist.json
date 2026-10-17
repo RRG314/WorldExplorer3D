@@ -283,7 +283,6 @@
       "loadingScreenMode"
     ],
     "app/js/editable-world/runtime.js": [
-      "_streetPavementDirty",
       "configureSharedEditableWorld",
       "disposeEditableWorldPresentation",
       "editableWorldRuntimeSnapshot",
@@ -2211,6 +2210,10 @@
     "app/js/world/street-interior-suspension.js": [
       "_cancelStreetPavementBuild",
       "_streetPavementDirty"
+    ],
+    "app/js/world/street-source-revision.js": [
+      "_streetPavementDirty",
+      "_streetSourceRevision"
     ]
   }
 }

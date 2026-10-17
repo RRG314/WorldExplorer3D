@@ -16,15 +16,15 @@ test('ship presentation does not run retained Earth map, detail or activity work
  kernel.dispose();
 });
 
-test('ship entry cancels unfinished street work while retaining accepted return coverage',()=>{
+for(const dirty of [false,true])test(`ship entry preserves accepted coverage and its actual invalidation (${dirty})`,()=>{
  let cancelled=0,suspended=0;
  const coverage={coverageBounds:{minX:-384,maxX:384}},atlas={};
  const overview={atlas,stats:{status:'building'},suspendForDetail(){suspended++;this.stats.status='suspended';},step(){}};
- const app={gameStarted:true,activeShipInterior:true,streetPavement:coverage,streetOverview:overview,
+ const app={gameStarted:true,activeShipInterior:true,streetPavement:coverage,streetOverview:overview,_streetPavementDirty:dirty,
    _cancelStreetPavementBuild:()=>cancelled++,updateHUD(){},drawMinimap(){}};
  const presentation=createCoreFrameSystems(app).find(s=>s.id==='core.presentation');
  for(let i=0;i<10;i++)presentation.update({dt:.016,flags:{}});
- assert.equal(cancelled,1);assert.equal(suspended,1);assert.equal(app._streetPavementDirty,true);
+ assert.equal(cancelled,1);assert.equal(suspended,1);assert.equal(app._streetPavementDirty,dirty);
  assert.equal(app.streetPavement,coverage);assert.equal(app.streetOverview.atlas,atlas);
  app.activeShipInterior=false;
  presentation.update({dt:.016,flags:{}});

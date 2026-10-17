@@ -3,7 +3,10 @@ export function cancelUnfinishedStreetDetail(ctx) {
   const cancel = ctx._cancelStreetPavementBuild;
   ctx._cancelStreetPavementBuild = null;
   cancel();
-  ctx._streetPavementDirty = true;
+  // Retiring speculative work does not invalidate the accepted publication.
+  // Real source/ground invalidation stays pending until a replacement commits.
+  // With no accepted surface, cancellation must still allow the first retry.
+  if (!ctx.streetPavement) ctx._streetPavementDirty = true;
   return true;
 }
 

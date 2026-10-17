@@ -4,7 +4,8 @@ import { sampleFrameWindow } from './frame-window.mjs';
 import { frameHitches } from './frame-hitches.mjs';
 import {planRoadRoute,followRoadRoute} from './travel-road-route.mjs';
 import {followFlightOrbit} from './travel-flight-orbit.mjs';
-import {sustainedTraversalObserved} from './sustained-traversal-contract.mjs';
+import {sustainedTraversalObserved,streetDetailTurnovers} from './sustained-traversal-contract.mjs';
+import {installTravelTestPlacement} from './travel-test-placement.mjs';
 import { mkdir, readFile, writeFile, mkdtemp } from 'node:fs/promises';
 import {createWriteStream} from 'node:fs';
 import {finished} from 'node:stream/promises';
@@ -290,6 +291,7 @@ async function measureMode(client, id, sampleMs = 5_000, movementKey = null) {
     elapsedMs: raw.elapsedMs,
     distanceTraveled:raw.distanceTraveled,
     movingMs:raw.movingMs,
+    streetTurnovers:streetDetailTurnovers(raw.background),
     distanceWorldUnits: raw.startPosition && raw.endPosition
       ? Math.hypot(raw.endPosition.x-raw.startPosition.x,raw.endPosition.z-raw.startPosition.z) : null,
     frames: deltas.length,
@@ -345,29 +347,32 @@ async function sustainedTravel(client){
   const route=await page.evaluate(`(${planRoadRoute.toString()})(globalThis.__WE3D_PERF_CONTEXT__.roads)`);
   await writeFile(`${evidenceDirectory}/sustained-road-route.json`,JSON.stringify(route));
   const samples=[];
-  // 630 seconds of active traversal. Initial placement is explicit test setup;
-  // after that each driver only observes actors and sends real keyboard input.
-  for(const [index,mode] of ['walk','drive','plane','walk','drive','plane','plane'].entries()){
-    await selectMode(page,mode,{walk:'#fWalk',drive:'#fDriving',plane:'#fPlane'}[mode]);
-    await page.locator('#travelBtn').blur();
-    await page.evaluate(({mode,route})=>{
-      const c=globalThis.__WE3D_PERF_CONTEXT__,actor=mode==='walk'?c.Walk.state.walker:mode==='drive'?c.car:c.planeMode;
-      const p=mode==='plane'?{x:750,z:0}:route.points[0],next=route.points[1];
-      const yaw=mode==='plane'?0:Math.atan2(next.x-p.x,next.z-p.z);
-      Object.assign(actor,{x:p.x,z:p.z,yaw,angle:yaw,pitch:0,roll:0,pitchRate:0,rollRate:0,yawRate:0,lookYawOffset:0,cameraYaw:0,cameraPitch:0,cameraLookTimer:0});
-      if(mode==='plane')Object.assign(actor,{y:220,speed:80,horizontalSpeed:80,vx:0,vy:0,vz:80,throttle:1,airborne:true,stalled:false,flightPathAngle:0,climbRate:0,turnRate:0,angleOfAttack:0,barrelRollActive:false});
-      else Object.assign(actor,{y:mode==='walk'?c.GroundHeight.walkSurfaceY(p.x,p.z)+1.7:c.GroundHeight.carCenterY(p.x,p.z),speed:0,vFwd:0,vLat:0,vx:0,vy:0,vz:0,onGround:true,isAirborne:false});
-      globalThis.__WE3D_TRAVEL_ACTOR__=actor;
-    },{mode,route});
+  // 930 seconds of active traversal. The first four-minute ground windows
+  // must complete real street turnover. Later windows retain mixed-mode checks.
+  const windows=[['walk',240000],['drive',240000],['plane',90000],['walk',90000],['drive',90000],['plane',90000],['plane',90000]];
+  for(const [index,[mode,durationMs]] of windows.entries()){
+    await recoverCaughtJourney(page,`before-placement-${mode}`);
+    const selector={walk:'#fWalk',drive:'#fDriving',plane:'#fPlane'}[mode];
+    const placement=await page.evaluateHandle(installTravelTestPlacement,{mode,selector,route});
+    try {
+      await selectMode(page,mode,selector);
+      await page.locator('#travelBtn').blur();
+      const receipt=await placement.evaluate(w=>({before:w.before,after:w.after,error:w.error}));
+      await writeFile(`${evidenceDirectory}/${mode}-${index}-setup.json`,JSON.stringify(receipt,null,2));
+      assert.equal(receipt.error,null);assert.ok(receipt.before&&receipt.after);
+      assert.deepEqual(receipt.after.pavementFocus,receipt.before.pavementFocus,'Click setup must retain accepted coverage');
+      assert.equal(receipt.after.pavementGeneration,receipt.before.pavementGeneration,'Click setup must not admit an intermediate street build');
+    } finally {await placement.evaluate(w=>w.dispose());await placement.dispose();}
     await page.waitForTimeout(1200);
     const signal={stopped:false};let driverFailure=null;
     const driver=(mode==='plane'?followFlightOrbit(page,signal):followRoadRoute(page,route,signal,{mode})).catch(error=>{driverFailure=error;return {failure:error.message};});
     let sample,progress;
-    try{sample=await measureMode(client,`${mode}-sustained-${index}`,90000);}
+    try{sample=await measureMode(client,`${mode}-sustained-${index}`,durationMs);}
     finally{signal.stopped=true;progress=await driver;await writeFile(`${evidenceDirectory}/${mode}-sustained-${index}-input.json`,JSON.stringify(progress));}
     if(driverFailure)throw driverFailure;
     sample.gameplayInterrupted=await recoverCaughtJourney(page,`after-${mode}-sustained-${index}`);
-    sample.traversalObserved=sustainedTraversalObserved(mode,sample,sample.gameplayInterrupted);
+    sample.traversalObserved=sustainedTraversalObserved(mode,sample,sample.gameplayInterrupted,durationMs);
+    sample.streetTurnoverRequired=index<2;
     sample.scenario='sustained-keyboard-route';sample.initialPlacement='Test setup only; no physics/pose writes during the window';
     samples.push(sample);console.log('[performance-retention] sustained',JSON.stringify({id:sample.id,fps:sample.averageFps,p99:sample.p99FrameMs,hitches:sample.hitches,distance:sample.distanceTraveled}));
   }
@@ -529,7 +534,8 @@ async function runDesktop() {
       modesWithinBudgets: modesWithinBudgets(modes, budgets.desktopTier),
       occupiedMemoryWithinBudget:occupiedMemory.every(sample=>sample.retainedBytes<=limit.maximumRetainedJsHeapBytes),
       activePlayHitchesWithinBudget:modes.every(mode=>mode.hitches.passed),
-      sustainedMixedTraversal:!sustained||sustainedModes.length===7&&sustainedModes.every(mode=>mode.traversalObserved)&&sustainedModes.reduce((sum,mode)=>sum+mode.elapsedMs,0)>=600000,
+      sustainedMixedTraversal:!sustained||sustainedModes.length===7&&sustainedModes.every(mode=>mode.traversalObserved)&&sustainedModes.reduce((sum,mode)=>sum+mode.elapsedMs,0)>=930000,
+      groundStreetTurnoverObserved:!sustained||sustainedModes.length>=2&&sustainedModes.filter(mode=>mode.streetTurnoverRequired).length===2&&sustainedModes.filter(mode=>mode.streetTurnoverRequired).every(mode=>mode.streetTurnovers>=1),
       noGameplayInterruptions:gameplayInterruptions.length===0,
       settledRetentionPlateau:!sustained||releases.length>=12&&releases.slice(2).every(entry=>{
         const baseline=releases[2];return Math.abs(entry.after.rendererGeometries-baseline.after.rendererGeometries)<=16&&

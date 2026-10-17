@@ -5,6 +5,8 @@ import {execFileSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import { createRoadContactIndex } from '../app/js/terrain/road-contact-index.js?v=1';
 import { markGroundSurfaceChanged } from '../app/js/terrain/surface-revision.js';
+import { cancelUnfinishedStreetDetail } from '../app/js/world/street-interior-suspension.js';
+import { markStreetSourceChanged } from '../app/js/world/street-source-revision.js';
 import { indexPavementPositions } from '../app/js/world/pavement-indexed-mesh.js';
 import { publishStreetPavement, updateStreetPavementFocus, ensureInitialStreetPavement } from '../app/js/world/street-pavement-runtime.js';
 
@@ -342,7 +344,7 @@ test('approaching the detail boundary still schedules replacement',async t=>{
  assert.equal(h.ctx._streetPavementUpdating,false);assert.equal(h.worker.terminated,true);
 });
 
-test('takeoff cancels an in-flight ground detail job, retains accepted contact and allows a descent retry',async t=>{
+test('takeoff cancels speculative detail, reuses valid coverage on return and rebuilds at its boundary',async t=>{
  const h=harness(t,'pending');
  const accepted={focus:{x:0,z:0},coverageBounds:{minX:-384,maxX:384,minZ:-384,maxZ:384},sampleAt:()=>10.3,dispose(){this.disposed=true;}};
  h.ctx.streetPavement=accepted;h.ctx.gameStarted=true;h.ctx.car.x=257;
@@ -357,10 +359,14 @@ test('takeoff cancels an in-flight ground detail job, retains accepted contact a
  for(let i=0;i<20 && h.ctx._streetPavementUpdating;i++)await new Promise(r=>setTimeout(r,1));
  assert.equal(firstWorker.terminated,true);assert.equal(h.ctx._streetPavementUpdating,false);
  assert.equal(h.ctx.streetPavement,accepted);assert.equal(accepted.sampleAt(),10.3);assert.equal(accepted.disposed,undefined);
- assert.equal(h.ctx._streetPavementDirty,true);
+ assert.notEqual(h.ctx._streetPavementDirty,true,'cancelling preparation does not invalidate accepted streets');
  updateStreetPavementFocus(h.ctx);assert.equal(overviewSteps,1);
  assert.equal(h.worker,firstWorker,'High flight must not restart a detail worker');
- h.ctx.planeMode.y=30;
+ h.ctx.planeMode.y=30;h.ctx.planeMode.x=0;
+ updateStreetPavementFocus(h.ctx);await Promise.resolve();
+ assert.equal(h.worker,firstWorker,'Returning inside accepted coverage needs no replacement');
+ assert.equal(h.ctx._streetPavementUpdating,false);
+ h.ctx.planeMode.x=257;
  updateStreetPavementFocus(h.ctx);await Promise.resolve();
  assert.notEqual(h.worker,firstWorker,'Near-ground arrival resumes the same detail owner');
  assert.equal(h.ctx._streetPavementUpdating,true);
@@ -368,6 +374,44 @@ test('takeoff cancels an in-flight ground detail job, retains accepted contact a
  for(let i=0;i<20 && h.ctx._streetPavementUpdating;i++)await new Promise(r=>setTimeout(r,1));
  assert.equal(h.ctx.streetPavement,accepted);assert.equal(accepted.disposed,undefined);
  assert.ok(h.resources.every(r=>r.disposed));
+});
+
+for(const invalidate of [markGroundSurfaceChanged,markStreetSourceChanged])test(`cancelling ${invalidate.name} replacement preserves its retry until publication`,async t=>{
+ const h=harness(t);await publishStreetPavement(h.ctx);
+ const accepted=h.ctx.streetPavement;invalidate(h.ctx);h.setMode('pending');
+ updateStreetPavementFocus(h.ctx);
+ assert.equal(h.ctx._streetPavementUpdating,true);
+ assert.equal(h.ctx._streetPavementDirty,true,'starting work cannot consume accepted-world invalidation');
+ cancelUnfinishedStreetDetail(h.ctx);
+ for(let i=0;i<20&&h.ctx._streetPavementUpdating;i++)await new Promise(r=>setTimeout(r,1));
+ assert.equal(h.ctx.streetPavement,accepted);assert.equal(h.ctx._streetPavementDirty,true);
+ h.setMode('success');updateStreetPavementFocus(h.ctx);
+ for(let i=0;i<100&&h.ctx._streetPavementUpdating;i++)await new Promise(r=>setTimeout(r,5));
+ assert.notEqual(h.ctx.streetPavement,accepted);assert.equal(h.ctx._streetPavementDirty,false);
+ h.ctx.streetPavement.dispose();assert.ok(h.resources.every(r=>r.disposed));
+});
+
+test('source edits during compilation reject stale publication and remain pending for the next build',async t=>{
+ const h=harness(t);await publishStreetPavement(h.ctx);const accepted=h.ctx.streetPavement;
+ let changed=false;
+ h.ctx.terrainMeshHeightAt=()=>{if(!changed){changed=true;markStreetSourceChanged(h.ctx);}return 10;};
+ assert.equal(await publishStreetPavement(h.ctx),null);
+ assert.equal(h.ctx.streetPavement,accepted);assert.equal(h.ctx._streetPavementDirty,true);
+ assert.equal(h.ctx._groundSurfaceRevision,undefined,'frontage edits do not fake a physical ground revision');
+ assert.equal(accepted.sampleAt(.2,3.2)>10,true);
+ await publishStreetPavement(h.ctx);assert.notEqual(h.ctx.streetPavement,accepted);
+ assert.equal(h.ctx._streetPavementDirty,false);h.ctx.streetPavement.dispose();
+ assert.ok(h.resources.every(r=>r.disposed));
+});
+
+test('cancelled initial preparation remains retryable without accepted coverage',async t=>{
+ const h=harness(t,'pending');const job=publishStreetPavement(h.ctx);
+ cancelUnfinishedStreetDetail(h.ctx);assert.equal(await job,null);
+ assert.equal(h.ctx._streetPavementDirty,true);h.setMode('success');
+ updateStreetPavementFocus(h.ctx);
+ for(let i=0;i<100&&h.ctx._streetPavementUpdating;i++)await new Promise(r=>setTimeout(r,5));
+ assert.ok(h.ctx.streetPavement);assert.equal(h.ctx._streetPavementDirty,false);
+ h.ctx.streetPavement.dispose();assert.ok(h.resources.every(r=>r.disposed));
 });
 
 test('source selection yields and cancels before scanning the whole location or replacing accepted contact',async t=>{

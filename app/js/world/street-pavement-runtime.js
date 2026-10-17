@@ -82,6 +82,7 @@ export async function publishStreetPavement(appCtx, options = {}) {
   const previous = appCtx.streetPavement;
   const replaceMappedLines=!appCtx.streetOverview?.completedBounds;
   const groundRevision = appCtx._groundSurfaceRevision || 0;
+  const sourceRevision = appCtx._streetSourceRevision || 0;
   const surfaceOwner=packetCache.setSurfaceOwner({revision:groundRevision,contact:appCtx.roadContactIndex,
     portals:appCtx.structureTerrainPortalDescriptors,terrain:appCtx.terrainGroup});
   const generation = appCtx._streetPavementGeneration = (appCtx._streetPavementGeneration || 0) + 1;
@@ -98,7 +99,7 @@ export async function publishStreetPavement(appCtx, options = {}) {
     }
     return bounds.minX<=coverageBounds.maxX+48 && bounds.maxX>=coverageBounds.minX-48 && bounds.minZ<=coverageBounds.maxZ+48 && bounds.maxZ>=coverageBounds.minZ-48;
   };
-  const current = () => sequence === appCtx._worldLoadSequence && generation === appCtx._streetPavementGeneration && groundRevision === (appCtx._groundSurfaceRevision || 0) && !appCtx.onMoon && !cancelled;
+  const current = () => sequence === appCtx._worldLoadSequence && generation === appCtx._streetPavementGeneration && groundRevision === (appCtx._groundSurfaceRevision || 0) && sourceRevision === (appCtx._streetSourceRevision || 0) && !appCtx.onMoon && !cancelled;
   const metersPerWorldUnit = appCtx.METERS_PER_WORLD_UNIT || 1.11;
   const workerUrl = globalThis.__WORLD_EXPLORER_PRODUCTION__?.streetPavementWorkerUrl ||
     new URL('./compiler/street-pavement-worker.js', import.meta.url);
@@ -510,7 +511,8 @@ export function updateStreetPavementFocus(appCtx) {
     if(appCtx.gameStarted){appCtx.streetOverview ||= createStreetOverview(appCtx,{onComplete:bounds=>refreshMappedPaths(appCtx,bounds)});appCtx.streetOverview.step(p);}
     return;
   }
-  appCtx._streetPavementDirty = false;
+  // Invalidation belongs to the accepted publication, not the pending job.
+  // Keep it until a current replacement commits, including across cancellation.
   appCtx._streetPavementUpdating = true;
   publishStreetPavement(appCtx,{focus:prefetch.focus}).catch(error => { appCtx._streetPavementRetryAt=performance.now()+30000; appCtx._streetPavementDirty=true; console.warn('[StreetPavement] Retaining accepted surfaces:',error); })
     .finally(()=>{appCtx._streetPavementUpdating=false;});

@@ -12,6 +12,7 @@ import { applyTransportDamage } from '../transport/damage-model.js?v=1';
 import { createCivicResponseModel } from './civic-response-model.js?v=3';
 import { ensurePlayerBackpackInventory } from './equipment-model.js?v=10';
 import { createUrbanEquipmentRuntime } from './equipment-runtime.js?v=24';
+import {urbanGroundPlayerPosition} from './player-position.js';
 import { createEquipmentVisuals } from './equipment-visuals.js?v=10';
 import {
   attachCuratedEquipmentVisual,
@@ -1911,8 +1912,8 @@ function beginExit(state) {
 }
 
 function civicActorPosition(state) {
-  if (state.activeVehicle) return vehiclePose(state.activeVehicle);
-  return appCtx.Walk?.state?.walker || appCtx.car || null;
+  return urbanGroundPlayerPosition(appCtx.Walk?.state, appCtx.car,
+    state.activeVehicle ? vehiclePose(state.activeVehicle) : null);
 }
 
 function mappedFacilitySpawnFor(state, type, origin = civicActorPosition(state)) {

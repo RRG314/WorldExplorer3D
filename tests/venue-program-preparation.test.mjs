@@ -58,7 +58,7 @@ test('interior ownership retires only unfinished street work and permits resumpt
   let suspended=0,cancelled=0;const accepted={coverageBounds:{minX:1}},atlas={};
   const ctx={activeInterior:{},streetPavement:accepted,streetOverview:{atlas,stats:{status:'building'},suspendForDetail(){suspended++;this.stats.status='suspended';}},_cancelStreetPavementBuild:()=>cancelled++};
   assert.equal(suspendStreetPreparationForInterior(ctx),true);assert.equal(suspendStreetPreparationForInterior(ctx),true);
-  assert.equal(suspended,1);assert.equal(cancelled,1);assert.equal(ctx._streetPavementDirty,true);
+  assert.equal(suspended,1);assert.equal(cancelled,1);assert.notEqual(ctx._streetPavementDirty,true);
   assert.equal(ctx.streetPavement,accepted);assert.equal(ctx.streetOverview.atlas,atlas);
   ctx.activeInterior=null;assert.equal(suspendStreetPreparationForInterior(ctx),false);
   ctx.activeInterior={};ctx.streetOverview.stats.status='complete';suspendStreetPreparationForInterior(ctx);assert.equal(suspended,1);

@@ -2,6 +2,7 @@ import { createLocalWorldModificationStore } from './local-store.js?v=1';
 import { worldModificationIdentityForLocation } from './model.js?v=1';
 import { createEditableWorldPresentation } from './presentation.js?v=1';
 import { creativeEnvironment, isRoomEditFrameCurrent, roomEditFrame } from './scope.js';
+import { markStreetSourceChanged } from '../world/street-source-revision.js';
 
 let store = null;
 let selectedBuilding = null;
@@ -59,7 +60,7 @@ function distanceToBuilding(position, building) {
 }
 
 function emitChange(appCtx, detail) {
-  appCtx._streetPavementDirty = true;
+  markStreetSourceChanged(appCtx);
   globalThis.dispatchEvent?.(new CustomEvent('we3d:editable-world-change', { detail }));
   appCtx?.invalidateTraversalNetworks?.('editable_world_change');
 }
