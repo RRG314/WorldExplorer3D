@@ -1,10 +1,43 @@
 # Current development and release state
 
-Updated October 16, 2026. **5.5.1 is deployed and production access has recovered.**
+Updated October 17, 2026. **5.5.1 is deployed and production access has recovered.**
 Release: https://github.com/RRG314/WorldExplorer3D/releases/tag/v5.5.1
 Public project page: https://rrg314.github.io/WorldExplorer3D/
 
-## October 16 — authoritative current status
+## October 17 — authoritative current status
+
+Both active development branches contain runtime checkpoint `614b452a`.
+The current immutable candidate is
+`5.6.1+614b452a57ae.dde9743f81c8b8ef.staging`; all 755 files verify. Its source
+passes 2,695 tests and the exact 65-file rollback review. The superseded b272
+payload was verified before retirement; its manifests and failed evidence remain.
+The preserved fallback and actual released packages were not removed.
+
+Verified lossless filesystem compression recovered 6.49 GiB from inactive
+diagnostics and closed logs. Decoded contents and original paths were retained;
+source, saves, chats and assets were not deleted. Free space reached 10.37 GiB
+before packaging. The new native package journey loads in 116.9 seconds and
+passes short ground movement and a 90-second flight. Sustained walking still has
+a cluster of four 150–217 ms intervals, so pacing fails. No browser errors,
+local failures or gameplay interruptions occurred. CPU/collector tracing links
+the cluster to memory collection; its image and prescribed input were reviewed.
+Source tests and recovered disk space do not establish release readiness.
+
+Backend verification exposed a local harness conflict: an unrelated project owns
+port 8080. Its process remains untouched. Browser test configuration now follows
+the explicitly selected local emulator endpoint instead of silently using 8080.
+All nine focused backend-configuration checks and the complete 2,697-test source
+chain pass. Failed setup receipts are retained; the backend scope has not passed.
+A uniform-cache experiment preserved identical pixels but still paused, so it was
+rejected without changing the runtime. The full backend scope is next.
+
+Production still serves the exact 5.5.1 hotfix and canonical staging still serves
+a0e20c35; both were independently checked today. Final performance, the complete
+candidate/backend matrix, save roundtrip and ordinary hosted acceptance remain
+required. No new Hosting deployment or stable promotion has occurred. Older
+entries below describe historical checkpoints, not this package's acceptance.
+
+## October 16 — previous checkpoint
 
 At 10:10 p.m. EDT, both production manifests again return HTTP 200 and identify
 `5.5.1+012e5c85582b.eb0d7eddf0f75035.production`. The owner resolved the account

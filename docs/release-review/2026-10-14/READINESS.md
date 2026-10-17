@@ -1,6 +1,24 @@
 # October 14 production candidate
 
-## October 16 — current blockers
+## October 17 — current candidate
+
+The current immutable candidate is
+`5.6.1+614b452a57ae.dde9743f81c8b8ef.staging`, with all 755 files verified.
+Source checkpoint `614b452a` is on both active development branches; 2,695 source
+tests and its exact 65-file rollback review pass. Lossless compression recovered
+6.49 GiB without deleting source, chats, saves or assets, leaving 10.37 GiB free
+before packaging. The native package loads in 116.9 seconds; short ground
+movement and 90-second flight pass, while the 90-second walk has four clustered
+150–217 ms pauses. There are no browser/local resource errors or gameplay
+interruptions. Collector tracing attributes the cluster to memory collection;
+images and prescribed input were inspected. This remains failed pacing evidence.
+Local backend setup also exposed an unrelated project on the default database
+port; browser verification must follow its own selected emulator endpoint.
+Earlier failed receipts remain valid failures. Final candidate/backend,
+save and ordinary hosted acceptance are still required. Production remains 5.5.1;
+canonical staging remains a0e20c35, both checked today. No promotion has occurred.
+
+## October 16 — previous blockers and evidence
 
 Production still points to the October 14 **5.5.1** road-continuity hotfix,
 Hosting version `0a6f60dd9f3488f6`. Following the owner's account repair, both

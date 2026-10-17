@@ -1,3 +1,4 @@
+import {browserEmulatorSettings} from './backend-environment.mjs';
 // Bounded preservation check on an immutable candidate and isolated emulators.
 // Real menus, companion care, reload and movement; no hosted/device acceptance.
 import assert from 'node:assert/strict';
@@ -32,11 +33,11 @@ if(!process.env.FIREBASE_AUTH_EMULATOR_HOST){
   server=await startStaticServer({rootDir:root,ports:[4593,4594]});
   owned=await chromium.launchServer({channel:'chrome',headless:false,args:['--js-flags=--max-old-space-size=1536']});
   const browser=await chromium.connect(owned.wsEndpoint()),context=await browser.newContext({viewport:{width:1280,height:800},hasTouch:true});
-  await context.addInitScript(config=>{
+  await context.addInitScript(({config,emulators})=>{
    globalThis.WORLD_EXPLORER_FIREBASE=config;globalThis.WORLD_EXPLORER_FIREBASE_ENV='staging';
-   globalThis.WORLD_EXPLORER_FIREBASE_EMULATORS={enabled:true,host:'127.0.0.1',authPort:9099,firestorePort:8080};
+   globalThis.WORLD_EXPLORER_FIREBASE_EMULATORS=emulators;
    globalThis.WORLD_EXPLORER_FUNCTIONS_ORIGIN=`http://127.0.0.1:5001/${config.projectId}/us-central1`;
-  },config);
+  },{config,emulators:browserEmulatorSettings()});
   page=await context.newPage();page.on('pageerror',e=>report.errors.push(String(e)));
   const base=`http://127.0.0.1:${server.port}`;
   const rewrites={'/api/geospatial/search':'getPlaceLookup','/api/geospatial/reverse':'getPlaceLookup','/api/geospatial/weather':'getEnvironmentalData','/api/geospatial/marine':'getEnvironmentalData','/api/geospatial/aircraft':'getAircraftStates'};

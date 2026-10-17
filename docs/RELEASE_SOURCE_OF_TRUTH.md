@@ -1,6 +1,6 @@
 # Release source identities
 
-## Current observation — October 16, 2026
+## Current observation — October 17, 2026
 
 Production remains **5.5.1**, confirmed by the live Hosting release API and both
 live manifests. After the owner's account repair, the manifests return HTTP 200
@@ -16,7 +16,7 @@ under verification. A version label or preview URL alone does not identify code.
 | Production Firebase project | `worldexplorer3d-d9b83` |
 | Canonical staging frontend | `5.6.1+a0e20c35eab7.aa4dd9dce23502b0.staging` |
 | Staging Firebase project | `we3d-staging-20260712` |
-| Current frozen candidate | `5.6.1+b272ed7a58c1.a128f12ee0cbf660.staging` |
+| Current frozen candidate | `5.6.1+614b452a57ae.dde9743f81c8b8ef.staging` |
 | Preserved road-safe fallback | `5.6.1+b21b7f12fdfa.31ed9b1212c5002c.staging` |
 | Release branch | `stable` (default; no `main` branch) |
 | Active development branches | `steven/visual-quality`, `steven/post-5.2-release-integration` |
@@ -34,6 +34,18 @@ world but received protected-service 401 responses; its failure was preserved
 and no security controls were bypassed.
 
 ## Verification and rollback
+
+Current checkpoint `614b452a` is on both active development branches. Its new
+immutable package verifies 755 files; 2,695 source tests and the exact 65-file
+rollback review pass. Lossless compression recovered 6.49 GiB, with original
+paths and decoded contents preserved; free space reached 10.37 GiB before
+packaging. Native package validation passes short ground movement and flight,
+but sustained walking has a 150–217 ms pause cluster. Collector tracing confirms
+memory-collection work in the cluster. No browser/local-service errors or gameplay
+interruptions occurred; this is not a pacing pass. Full release acceptance remains
+open; neither production nor canonical staging has been updated.
+
+### Earlier b272 and source diagnostics (historical)
 
 The b272ed7a package verifies 754 files and its exact 64-file rollback review.
 Both active development branches contain the source. Its complete performance

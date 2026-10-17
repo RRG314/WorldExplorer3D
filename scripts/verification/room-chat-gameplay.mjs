@@ -1,3 +1,4 @@
+import {browserEmulatorSettings} from './backend-environment.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -26,12 +27,12 @@ async function boot(label, mobile) {
   const browser = await chromium.launch({ channel: 'chrome', headless: true, args: ['--js-flags=--max-old-space-size=1024'] });
   browsers.push(browser);
   const context = await browser.newContext({ viewport: mobile ? { width: 412, height: 915 } : { width: 1100, height: 760 }, isMobile: mobile, hasTouch: mobile, deviceScaleFactor: report.browserBudget.deviceScaleFactor });
-  await context.addInitScript(config => {
+  await context.addInitScript(({config,emulators}) => {
     globalThis.WORLD_EXPLORER_FIREBASE = config;
     globalThis.WORLD_EXPLORER_FIREBASE_ENV = 'staging';
-    globalThis.WORLD_EXPLORER_FIREBASE_EMULATORS = { enabled: true, host: '127.0.0.1', authPort: 9099, firestorePort: 8080 };
+    globalThis.WORLD_EXPLORER_FIREBASE_EMULATORS=emulators;
     globalThis.WORLD_EXPLORER_FUNCTIONS_ORIGIN = `http://127.0.0.1:5001/${config.projectId}/us-central1`;
-  }, config);
+  }, {config,emulators:browserEmulatorSettings()});
   const page = await context.newPage(); pages.push(page);
   page.on('pageerror', error => report.errors.push(String(error)));
   collectBrowserGraphicsErrors(page, report.errors);

@@ -1,8 +1,18 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { backendVerificationCommand } from '../scripts/verification/backend-environment.mjs';
+import { backendVerificationCommand, browserEmulatorSettings } from '../scripts/verification/backend-environment.mjs';
 import { selectBackendGroups, backendGroups, backendSteps, backendStageTimeoutMs, backendGroupTimeoutMs } from '../scripts/verification/backend-steps.mjs';
 import {readFileSync} from 'node:fs';
+test('browser clients follow the selected emulator ports without mutating the environment', () => {
+ const environment=Object.freeze({FIREBASE_AUTH_EMULATOR_HOST:'localhost:9099',FIRESTORE_EMULATOR_HOST:'127.0.0.1:8084',FIREBASE_STORAGE_EMULATOR_HOST:'127.0.0.1:9198'});
+ assert.deepEqual(browserEmulatorSettings(environment),{enabled:true,host:'127.0.0.1',authPort:9099,firestorePort:8084,storagePort:9198});
+ assert.deepEqual(browserEmulatorSettings({FIREBASE_AUTH_EMULATOR_HOST:'127.0.0.1:9099',FIRESTORE_EMULATOR_HOST:'localhost:8080'}),{enabled:true,host:'127.0.0.1',authPort:9099,firestorePort:8080});
+});
+test('browser emulator configuration rejects missing, remote and malformed endpoints', () => {
+ const base={FIREBASE_AUTH_EMULATOR_HOST:'127.0.0.1:9099',FIRESTORE_EMULATOR_HOST:'127.0.0.1:8084'};
+ for(const key of ['FIREBASE_AUTH_EMULATOR_HOST','FIRESTORE_EMULATOR_HOST'])for(const value of ['', 'example.com:8080','127.0.0.1:0','127.0.0.1:65536','127.0.0.1:8080/path','http://localhost:8080'])assert.throws(()=>browserEmulatorSettings({...base,[key]:value}),/selected local emulator endpoint/);
+ assert.throws(()=>browserEmulatorSettings({...base,FIREBASE_STORAGE_EMULATOR_HOST:'example.com:9199'}),/selected local emulator endpoint/);
+});
 test('nested backend deadlines leave CI multiplayer time for both worlds and emulator cleanup',()=>{
  const group=backendGroups.find(group=>group.some(step=>step.id==='multiplayer'));
  assert.equal(backendStageTimeoutMs(group[0],{}),600_000);
