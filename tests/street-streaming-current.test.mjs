@@ -7,6 +7,70 @@ import {createStreetOverview} from '../app/js/world/street-overview.js';
 import {prepareStreetPavement} from '../app/js/world/compiler/street-pavement.js';
 import {createPavementBaseSampler} from '../app/js/world/pavement-height-sampler.js';
 import {indexPavementPositions} from '../app/js/world/pavement-indexed-mesh.js';
+import {createPavementBatch,createPavementBatchContacts} from '../app/js/world/pavement-batch-ownership.js';
+import {createRoadContactIndex} from '../app/js/terrain/road-contact-index.js?v=1';
+
+test('batch leases retain geometry and walking contact together through cancellation and handover',()=>{
+ const counts={geometry:0,contact:0,removed:0},material={},surfaceOwner={};
+ const mesh={material,geometry:{dispose(){counts.geometry++;}},parent:{remove(){counts.removed++;}}};
+ const contactIndex={sampleAt:()=>12,dispose(){counts.contact++;}};
+ const first=createPavementBatch({key:'0:0:sidewalk',signature:'shape',surfaceOwner,mesh,contactIndex});
+ assert.equal(first.retain('changed',surfaceOwner,material),null);assert.equal(first.retain('shape',{},material),null);assert.equal(first.retain('shape',surfaceOwner,{}),null);
+ const cancelled=first.retain('shape',surfaceOwner,material);cancelled.release();cancelled.release();assert.deepEqual(counts,{geometry:0,contact:0,removed:0});
+ const next=first.retain('shape',surfaceOwner,material);first.release();assert.equal(next.mesh,mesh);assert.equal(next.contactIndex.sampleAt(0,0),12);assert.equal(first.retain('shape',surfaceOwner,material),null);
+ next.release();next.release();assert.deepEqual(counts,{geometry:1,contact:1,removed:1});assert.equal(next.mesh,null);assert.equal(next.contactIndex,null);
+});
+
+test('retained batch contact exactly matches the combined index at slopes, negative coordinates and shared boundaries',()=>{
+ const meshes=[],batches=new Map(),owner={};
+ for(let ix=-1;ix<=1;ix++)for(let iz=-1;iz<=1;iz++){
+  const x=ix*128,z=iz*128,y=(x,z)=>x*.13+z*.07+(ix===0?.2:0);
+  const points=[[x,z],[x,z+128],[x+128,z],[x+128,z],[x,z+128],[x+128,z+128]];
+  const mesh={userData:{},material:{},geometry:{attributes:{position:{array:new Float32Array(points.flatMap(([x,z])=>[x,y(x,z),z]))}},dispose(){}}};
+  meshes.push(mesh);
+  const key=`${ix}:${iz}:sidewalk`;batches.set(key,createPavementBatch({key,signature:key,surfaceOwner:owner,mesh,contactIndex:createRoadContactIndex([mesh],4)}));
+ }
+ const mapped={userData:{},geometry:{attributes:{position:{array:new Float32Array([0,90,0,0,90,5,5,90,0])}}}};
+ const combined=createRoadContactIndex([...meshes,mapped],4),partitioned=createPavementBatchContacts(batches,createRoadContactIndex([mapped],4));
+ const values=[-128,-.000001,0,.000001,1,128-.000001,128,128+.000001,256];
+ for(let x=-132;x<=260;x+=7.3)for(let z=-132;z<=260;z+=9.7)assert.equal(partitioned.sampleAt(x,z),combined.sampleAt(x,z));
+ for(const x of values)for(const z of values)assert.equal(partitioned.sampleAt(x,z),combined.sampleAt(x,z));
+ partitioned.dispose();assert.equal(partitioned.sampleAt(1,1),null);
+ assert.ok(batches.get('0:0:sidewalk').contactIndex.sampleAt(1,1)>0,'retiring the lookup must not retire another publication’s leases');
+ for(const batch of batches.values())batch.release();combined.dispose();
+});
+
+test('changed remote sidewalk context reuses an identical fitted product, while real height and geometry changes rebuild',{timeout:30000},async t=>{
+ const url=new URL('../app/js/world/compiler/street-pavement-worker.js',import.meta.url).href;
+ const code=`const {parentPort}=require('node:worker_threads');globalThis.self={postMessage:(m,transfer)=>parentPort.postMessage(m,transfer)};import(${JSON.stringify(url)}).then(()=>parentPort.on('message',data=>self.onmessage({data})));`;
+ const worker=new NodeWorker(code,{eval:true});t.after(()=>worker.terminate());
+ const request=data=>new Promise((resolve,reject)=>{worker.once('message',resolve);worker.once('error',reject);worker.postMessage(data);}).finally(()=>worker.removeAllListeners('error'));
+ const road={auditIndex:0,type:'residential',width:8,metersPerWorldUnit:1,surfaceBias:.18,pts:[{x:-400,z:20},{x:400,z:20}],tags:{sidewalk:'both'}};
+ const input={roads:[road],metersPerWorldUnit:1,coverageBounds:{minX:0,maxX:64,minZ:0,maxZ:64}};
+ assert.equal((await request({type:'prepare',input})).tiles,1);
+ const first=await request({type:'next'});assert.equal(first.type,'tile');assert.ok(first.mesh.vertices.length>0);
+ const cache=new StreetPacketCache(),owner=cache.setSurfaceOwner({revision:1,terrain:{},contact:{},portals:[]});
+ cache.put(first);cache.putSurface(first.key,first.fingerprint,owner,{vertices:new Float32Array(first.mesh.vertices),curbVertices:new Float32Array(first.mesh.curbVertices),markingVertices:new Float32Array(first.mesh.markingVertices),addedTriangles:0,baseTriangles:first.mesh.vertices.length/9});
+ const changed={...input,linearFeatures:[{kind:'footway',subtype:'sidewalk',width:2,pts:[{x:300,z:26},{x:350,z:26}]}]};
+ await request({type:'prepare',input:changed,cached:cache.manifest(),surfaces:cache.surfaceManifest(owner)});
+ const reused=await request({type:'next'});assert.equal(reused.type,'cached');
+ assert.notEqual(reused.fingerprint,first.fingerprint,'the conservative source context really changed');
+ assert.equal(reused.reuseFingerprint,first.fingerprint);assert.equal(reused.surfaceFingerprint,first.surfaceFingerprint);
+ assert.equal(cache.revalidateSurface(reused,{}),false,'a retired physical owner cannot authorize reuse');
+ assert.equal(cache.revalidateSurface({...reused,surfaceFingerprint:'wrong product'},owner),false);
+ assert.equal(cache.revalidateSurface({...reused,reuseFingerprint:'wrong source'},owner),false);
+ assert.equal(cache.revalidateSurface(reused,owner),true);assert.equal(cache.getPublication(first.key,first.fingerprint,owner),null);
+ assert.deepEqual(cache.getPublication(reused.key,reused.fingerprint,owner).surface.vertices,new Float32Array(first.mesh.vertices));
+ assert.ok(cache.bytes<=cache.maxBytes);assert.equal(cache.bytes,[...cache.entries.values()].reduce((n,e)=>n+e.bytes,0));
+ const retry=await request({type:'retry'});assert.equal(retry.type,'tile');assert.deepEqual(retry.mesh,first.mesh,'an evicted fitted product can always be reconstructed exactly');
+ for(const mutation of [v=>v.roads[0].surfaceBias=.4,v=>v.roads[0].metersPerWorldUnit=2,v=>v.roads[0].width=10,v=>v.buildings=[{pts:[{x:10,z:24},{x:20,z:24},{x:20,z:30},{x:10,z:30}]}]]){
+  const next=structuredClone(changed);mutation(next);
+  await request({type:'prepare',input:next,cached:cache.manifest(),surfaces:cache.surfaceManifest(owner)});
+  const rebuilt=await request({type:'next'});assert.equal(rebuilt.type,'tile');assert.notEqual(rebuilt.surfaceFingerprint,reused.surfaceFingerprint);
+ }
+ cache.setSurfaceOwner({revision:2});assert.deepEqual(cache.surfaceManifest(owner),{});assert.equal(cache.revalidateSurface(reused,owner),false);
+ cache.clear();assert.equal(cache.bytes,0);
+});
 
 test('actual pavement worker transfers exact final indexes and recovers after invalid input',{timeout:30000},async t=>{
  const url=new URL('../app/js/world/compiler/street-pavement-worker.js',import.meta.url).href;

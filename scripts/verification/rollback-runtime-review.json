@@ -383,11 +383,11 @@
       "afterMode": "100644"
     },
     "app/js/world/street-pavement-runtime.js": {
-      "review": "Reuses finished cells only under exact physical ownership, rebuilds combined contact atomically, and preserves canonical face ordering even when retained cells are prepared first. Cached publication avoids cloning unused compiler arrays. Missing or invalid cells use the existing full compiler/sampler/partition path. No coverage, geometry authority, persistence or backend changes. Published sampling/disposal callbacks are constructed in an isolated scope owning only the current publication, eliminating the reproduced chain of retired windows. A twelve-replacement actual-module collection check changes from eleven retained retired publications to zero. GPU/material/contact disposal remains idempotent and keeps shared materials untouched. Final index construction uses the existing owned worker and transfers only the private combined array, never cached cell storage. Existing timeout and cancellation terminate it. Current-owner checks precede publication; failure, cancellation and supersession retain the accepted render/contact surface. Source and actual-worker checks verify these paths. Material resources now use a lease shared by overlapping publications in the same world with identical borrowed maps. The previous publication releases its own lease after the replacement owns one, preserving renderer program identity. Failed staging retires only its lease; geometry/contact ownership and all sampled positions are unchanged. Material acquisition is covered by construction cleanup.",
       "before": "28675ab27c199f0224e8c6ea01df825c658feb9bae0112b5eaeed91b548c854c",
       "beforeMode": "100644",
-      "after": "ce7a58fae08d0bf23b99ad0dce2430487ee7cffa8f2d02db056d8aeac8cf0785",
-      "afterMode": "100644"
+      "after": "f1639933d7b47de47467305a503bf5fe568a1fc1f105672f80e9084c6fcc0dfd",
+      "afterMode": "100644",
+      "review": "Retains generation/revision cancellation, exact terrain/portal fitting, canonical face order and atomic publication. Validates changed-source reuse against the worker product identity and existing physical owners. Unchanged 128-unit render batches retain geometry and their exact walking-contact index through publication leases. Changed batches rebuild through the existing worker indexer; mapped ground keeps its bounded index. Composite sampling preserves maximum height and boundary tolerance. Failure or cancellation releases only staged leases; the old publication remains usable. Material leases and isolated publication callbacks preserve program lifetime without retaining old publications. No road/bridge/tunnel authority, coverage, save or backend change."
     },
     "config/context-write-allowlist.json": {
       "review": "Registers only the reviewed transient renderer-preparation and street-suspension ownership keys. No runtime data, permissions, service rules or persistence schema.",
@@ -427,16 +427,16 @@
     "app/js/world/street-packet-cache.js": {
       "before": "5f1e16b667711486b3d93aa1ddaff4f53a64d33ee7d0a1d9f976e58ca2e14013",
       "beforeMode": "100644",
-      "after": "5d788bec4f899cf0776994a80eef95e7a043a3078bd5d2204b3e34cba7690345",
+      "after": "6ca441381fcda62c78ad86d09d35316b97ecb286e7bfe8a3f1684e02771f2039",
       "afterMode": "100644",
-      "review": "The existing 16 MiB cache retains a compiler packet only until its finished Float32 surface is available, then retires the unused construction buffers. Finished cells require the same input fingerprint and exact ground/contact/portal/terrain owners, use copied output, and are removed on owner changes. Raw unfinished packets remain reusable. LRU eviction and teardown are bounded; no saved data or gameplay geometry changes."
+      "review": "Retains one bounded 16 MiB cache with private arrays and exact physical owner checks. Revalidates an existing fitted surface only when both its previous source key and exact product identity match under the current owner. Updates metadata and byte accounting atomically; eviction and owner changes force reconstruction. No second geometry cache or persistent format."
     },
     "app/js/world/compiler/street-pavement-worker.js": {
       "before": "5a53641777a2ce3f5ab805ef5422bc74f914585db73e3ccf71059455e28e45c1",
       "beforeMode": "100644",
-      "after": "5fb720ecbffce251c8f58912edd5358fcdc1de77eaa0e69f2b48e949cf4be4f4",
+      "after": "69c25b179f0d8a3cd50250e82f0c4a7ddb127be4f9280ec74f8f9bbb8e7880da",
       "afterMode": "100644",
-      "review": "Consumes retained fingerprint keys before misses to avoid scan eviction, while retaining exact SHA-256 validation. Worker packets include only the road index, segment endpoints, widths and offset used by the physical height sampler; compiler-only frontage/mask/bounds metadata stays in the worker. Actual-worker tests verify identical mesh/fingerprints and sampled heights. No source selection, surface precision or persisted schema changes. Exact existing Float32 indexing now runs in this same worker. Private combined geometry transfers into it; final position/index buffers transfer back. Real-worker tests verify sender detachment, empty and 16/32-bit output equality, and recovery after invalid input. No persistent data or schema changes."
+      "review": "Retains exact compilation, transferred numeric indexing and cached-first ordering. On a changed source key, compares the exact compiled surface product before repeating meshing/fitting. Only a matching product advertises a previously fitted surface; rejected or evicted reuse reconstructs through the original compiler. Compact metadata includes the complete height inputs and current diagnostic counts. No saved or backend data change."
     },
     "scripts/lib/release-source-identity.mjs": {
       "before": "3de2e2e30623636cab980650309d7a5b8f122409b854f00dae53ea12b6318570",
@@ -465,6 +465,27 @@
       "after": "439c0aa30d7ea932f6141f9918b3b335edc6b14d9b806fed71b86b7356c9df6b",
       "afterMode": "100644",
       "review": "Transient, per-world pavement material ownership. Same three material parameters and concrete texture bytes; one shared set during overlapping construction/publication, idempotent per-lease release and final-owner disposal. World sequence or borrowed-map identity changes create a distinct set; external normal/roughness textures are never disposed here. Partial construction releases its own resources. No saved fields, permissions, data migration or backend protocol changes."
+    },
+    "app/js/world/compiler/street-pavement-fingerprint.js": {
+      "before": "29d694b79ef70e75da6f94799c90f3e08fd0ff4246770826bb0781b1d36b19fd",
+      "beforeMode": "100644",
+      "after": "227d5e0bb4a6eb33405446bed23a248b9b93e812bc4ccceb17fc2b710e8afb3f",
+      "afterMode": "100644",
+      "review": "Retains the conservative source identity and adds exact compiled-product identity including cell bounds, units, curb packaging, polygons, markings, ramps and every ordered terrain-fitting segment input. Remote source context may change only when the actual product is equal; real geometry or height inputs invalidate reuse. No source-selection or persisted-schema change."
+    },
+    "app/js/world/street-source-input.js": {
+      "before": "8d9a2e0d859d2050f0f37e30c2f376a151fc3464cd723da233326e6e3c8b6267",
+      "beforeMode": "100644",
+      "after": "0306d24ab6174ad730bed2b9e858f2dad4bf9c54be8008bc1e114ba2ac59d4c7",
+      "afterMode": "100644",
+      "review": "Includes the existing road surfaceBias in the compact worker snapshot because it is consumed by the terrain height sampler and therefore must participate in cache invalidation. Source selection, global road identities and all gameplay/save data are unchanged."
+    },
+    "app/js/world/pavement-batch-ownership.js": {
+      "before": null,
+      "beforeMode": null,
+      "after": "9867558528f8ecfe4893db7d55126281f2cd7cb4c41f7e1025fd534e57a5413b",
+      "afterMode": "100644",
+      "review": "New bounded active-publication ownership helper. A batch geometry and exact contact index share an idempotent reference-counted lease across an atomic handover. Last release disposes both; cancellation cannot dispose another publication’s resources. Numeric spatial lookup checks neighboring batches for original Float32 boundary tolerance and chooses the same highest contact as the original combined index. Does not retain prior publication objects or create a persistent cache."
     }
   }
 }

@@ -37,8 +37,8 @@ function harness(t, mode='success') {
         return this.onmessage({data:{type:'indexed',...indexPavementPositions(data.positions)}});
       }
       if(data.type==='prepare') {this.cached=data.cached;if(mode==='stale')ctx._worldLoadSequence++;return this.onmessage({data:{type:'prepared',tiles:1}});}
-      if(this.next++) return this.onmessage({data:{type:'complete'}});
-      if(mode==='cache'&&this.cached['0:0']==='same-cell')return this.onmessage({data:{type:'cached',key:'0:0',fingerprint:'same-cell',completed:1,total:1}});
+      if(this.next++) return this.onmessage({data:mode==='failure-after-cache'?{type:'error',message:'later cell failed'}:{type:'complete'}});
+      if(['cache','failure-after-cache'].includes(mode)&&this.cached['0:0']==='same-cell')return this.onmessage({data:{type:'cached',key:'0:0',fingerprint:'same-cell',completed:1,total:1}});
       const ps=[{x:0,y:.12/1.11,z:3},{x:0,y:.12/1.11,z:4},{x:1,y:.12/1.11,z:3}];
       this.onmessage({data:{type:'tile',key:'0:0',fingerprint:mode==='cache'?'same-cell':undefined,completed:1,total:1,inferredFrontages:0,
         segments:[{roadIndex:0,index:0,t0:0,t1:1,a:{x:0,z:0},b:{x:10,z:0},wa:4,wb:4}],
@@ -66,15 +66,40 @@ test('unchanged cells reuse exact fitted geometry and contact, then rebuild when
  const h=harness(t,'cache');let samples=0,height=10;
  h.ctx.terrainMeshHeightAt=()=>{samples++;return height;};
  await publishStreetPavement(h.ctx);assert.ok(samples>0);
- const first=h.ctx.streetPavement,positions=first.meshes[0].geometry.attributes.position.array.slice(),y=first.sampleAt(.2,3.2);
+ const first=h.ctx.streetPavement,mesh=first.meshes[0],positions=mesh.geometry.attributes.position.array.slice(),y=first.sampleAt(.2,3.2);
  samples=0;await publishStreetPavement(h.ctx);
  assert.equal(samples,0);assert.equal(h.ctx.streetPavement.stats.reusedSurfaceCells,1);
+ assert.equal(h.ctx.streetPavement.meshes[0],mesh,'unchanged geometry retains its GPU resource');
+ assert.equal(h.ctx.streetPavement.stats.reusedRenderBatches,1);assert.equal(mesh.geometry.disposed,undefined);
+ assert.deepEqual(h.ctx.urbanSurfaceMeshes,[mesh],'handover must not duplicate or drop the retained batch');
  assert.deepEqual(h.ctx.streetPavement.meshes[0].geometry.attributes.position.array,positions);
  assert.equal(h.ctx.streetPavement.sampleAt(.2,3.2),y);assert.equal(first.sampleAt(.2,3.2),null);
  height=14;markGroundSurfaceChanged(h.ctx);await publishStreetPavement(h.ctx);
  assert.ok(samples>0);assert.equal(h.ctx.streetPavement.stats.reusedSurfaceCells,undefined);
  assert.ok(Math.abs(h.ctx.streetPavement.sampleAt(.2,3.2)-y-4)<1e-5);
  h.ctx.streetPavement.dispose();h.ctx._streetPavementCache.clear();
+});
+test('failure after fitting reuse preserves the accepted batch and contact',async t=>{
+ const h=harness(t,'cache');await publishStreetPavement(h.ctx);
+ const accepted=h.ctx.streetPavement,mesh=accepted.meshes[0],y=accepted.sampleAt(.2,3.2);
+ h.setMode('failure-after-cache');await assert.rejects(publishStreetPavement(h.ctx),/later cell failed/);
+ assert.equal(h.ctx.streetPavement,accepted);assert.equal(accepted.sampleAt(.2,3.2),y);assert.equal(mesh.geometry.disposed,undefined);
+ assert.deepEqual(h.ctx.urbanSurfaceMeshes,[mesh]);accepted.dispose();assert.ok(h.resources.every(r=>r.disposeCount===1));
+});
+for(const outcome of ['failure','cancel'])test(`${outcome} after a render-batch lease is acquired preserves the accepted publication`,async t=>{
+ const h=harness(t,'cache');await publishStreetPavement(h.ctx);
+ const accepted=h.ctx.streetPavement,mesh=accepted.meshes[0],y=accepted.sampleAt(.2,3.2);
+ let reached=false;
+ Object.defineProperty(h.ctx,'landuseMeshes',{get(){
+  reached=true;
+  if(outcome==='failure')throw Error('mapped contact preparation failed');
+  h.ctx._cancelStreetPavementBuild();return [];
+ }});
+ if(outcome==='failure')await assert.rejects(publishStreetPavement(h.ctx),/mapped contact preparation failed/);
+ else assert.equal(await publishStreetPavement(h.ctx),null);
+ assert.equal(reached,true);assert.equal(h.ctx.streetPavement,accepted);
+ assert.equal(accepted.sampleAt(.2,3.2),y);assert.equal(mesh.geometry.disposed,undefined);
+ assert.deepEqual(h.ctx.urbanSurfaceMeshes,[mesh]);accepted.dispose();assert.ok(h.resources.every(r=>r.disposeCount===1));
 });
 test('failed compilation retains the previously accepted render and contact publication',async t=>{
   const h=harness(t,'failure');let removed=false;
@@ -203,7 +228,7 @@ test('retired pavement publications become unreachable after replacement',async 
     execFileSync(process.execPath,['--expose-gc','--test','--test-name-pattern=^retired pavement publications become unreachable after replacement$',fileURLToPath(import.meta.url)],{timeout:15000,stdio:'pipe'});
     return;
   }
-  const h=harness(t),weak=[];
+  const h=harness(t,'cache'),weak=[];
   for(let i=0;i<12;i++){
     await publishStreetPavement(h.ctx);
     weak.push(new WeakRef(h.ctx.streetPavement));

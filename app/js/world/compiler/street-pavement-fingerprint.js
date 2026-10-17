@@ -1,3 +1,5 @@
+import {roadMetersPerWorldUnit} from '../road-units.js';
+
 // A cell may reference the same long road from hundreds of segments, joins and
 // visibility edges. JSON has no shared references: expanding each one makes a
 // cache lookup allocate far more data than the cell it is meant to cache.
@@ -18,4 +20,16 @@ export function serializeStreetPavementFingerprint(tile, metersPerWorldUnit) {
     return { roadIndex: indexes.get(value) };
   });
   return `{"version":3,"metersPerWorldUnit":${JSON.stringify(metersPerWorldUnit)},"tile":${serializedTile},"roads":${JSON.stringify(roads)},"masks":${JSON.stringify(masks)}}`;
+}
+
+// Source context can change outside this cell without changing its surface.
+// Keep the source key conservative, but compare the compiler's actual product
+// before repeating terrain fitting. Include every input consumed by fitting;
+// equal horizontal polygons alone do not authorize reusing their heights.
+export function serializePavementSurfaceFingerprint(tile, result, metersPerWorldUnit) {
+  return JSON.stringify({version:1,metersPerWorldUnit,bounds:tile.bounds,combineRegionCurbs:tile.designRegions?.length>1,
+    polygons:result.polygons,markingPolygons:result.markingPolygons,ramps:result.ramps,
+    heightSegments:tile.segments.map(({a,b,wa,wb,offset,road})=>({a,b,wa,wb,
+      offset:Number(offset)||0,metersPerWorldUnit:roadMetersPerWorldUnit(road),
+      surfaceBias:Number.isFinite(road.surfaceBias)?road.surfaceBias:.18}))});
 }

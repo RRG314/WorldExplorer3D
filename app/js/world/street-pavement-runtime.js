@@ -4,6 +4,7 @@ import {createPortalSurfaceClipper} from '../terrain/portal-surface-clip.js';
 import {createPavementTerrainPartitionCooperatively} from './pavement-terrain-partition.js';
 import { captureStreetSurfaceGeometry,serializeStreetSurfaceCapture } from './street-surface-capture.js';
 import { acquirePavementMaterials } from './pavement-materials.js';
+import {createPavementBatch,createPavementBatchContacts} from './pavement-batch-ownership.js';
 import { streetSourceInputCooperatively } from './street-source-input.js';
 import { createPavementBaseSamplerCooperatively } from './pavement-height-sampler.js';
 import { assessStreetQuality } from './street-quality-assessment.js';
@@ -28,14 +29,15 @@ function focusActor(appCtx) {
 // Published callbacks must not close over the asynchronous construction scope.
 // That scope also contains the previous publication and worker input; retaining
 // it links every retired window together even after GPU disposal.
-function createStreetPublication({stats,focus,groundRevision,coverageBounds,meshes,contactIndex,releaseMaterials,layout}) {
+function createStreetPublication({stats,focus,groundRevision,coverageBounds,meshes,batches,contactIndex,releaseMaterials,layout}) {
   let disposed=false;
   const publication={stats,focus,groundRevision,coverageBounds,meshes,
     sampleAt:(x,z)=>disposed?null:contactIndex.sampleAt(x,z),
+    retainBatch:(key,signature,owner,material)=>disposed?null:batches.get(key)?.retain(signature,owner,material),
     dispose(){
       if(disposed)return;disposed=true;
       contactIndex.dispose();contactIndex=null;
-      for(const mesh of meshes){mesh.parent?.remove(mesh);mesh.geometry.dispose();}
+      for(const batch of batches.values())batch.release();batches.clear();
       meshes.length=0;
       releaseMaterials?.();releaseMaterials=null;layout=null;
     }
@@ -129,6 +131,7 @@ export async function publishStreetPavement(appCtx, options = {}) {
   let committed = false;
   const stagedLines = [];
   const batches = new Map();
+  const stagedBatches = new Map();
   const staged = [];
   let contactIndex = null, stagedWalkContactIndex = null;
   let materialLease=null,material,markingMaterial,curbMaterial;
@@ -145,7 +148,7 @@ export async function publishStreetPavement(appCtx, options = {}) {
   const sliceBudgetMs=appCtx.gameStarted&&!appCtx.worldLoading?2:8;
   const schedule={current:()=>current()&&!cancelled,yieldWork:yieldConstruction,budgetMs:sliceBudgetMs,onSlice:ms=>{stats.maxPublicationSliceMs=Math.max(stats.maxPublicationSliceMs||0,ms);}};
   const disposeLines = () => { for (const mesh of stagedLines) { mesh.parent?.remove(mesh); mesh.geometry.dispose(); mesh.material.dispose(); } };
-  const disposeStaged = () => { worker.terminate(); contactIndex?.dispose(); stagedWalkContactIndex?.dispose(); batches.clear(); for (const mesh of staged) { mesh.parent?.remove(mesh); mesh.geometry.dispose(); } materialLease?.release(); staged.length = 0; };
+  const disposeStaged = () => { worker.terminate(); contactIndex?.dispose(); stagedWalkContactIndex?.dispose(); batches.clear(); for(const batch of stagedBatches.values())batch.release();stagedBatches.clear();materialLease?.release(); staged.length = 0; };
     if (new URLSearchParams(location.search).has('streetDiagnostics')) {
       let panel = document.getElementById('streetSurfaceDiagnostics');
       if (!panel) {
@@ -272,7 +275,7 @@ export async function publishStreetPavement(appCtx, options = {}) {
     finishPhase('source-snapshot');
     partitionSurface = await createPavementTerrainPartitionCooperatively(appCtx.terrainGroup?.children, {includeFarTerrain:true,bounds:coverageBounds,...schedule});
     finishPhase('terrain-support');
-    const prepared = await request({ type: 'prepare', input, cached:packetCache.manifest(), debug: new URLSearchParams(location.search).has('streetDiagnostics') });
+    const prepared = await request({ type: 'prepare', input, cached:packetCache.manifest(), surfaces:packetCache.surfaceManifest(surfaceOwner), debug: new URLSearchParams(location.search).has('streetDiagnostics') });
     stats.plannedTiles = prepared.tiles;
     finishPhase('source-prepare');
     trace('prepared',{tiles:prepared.tiles,paths:stats.managedPaths});
@@ -282,8 +285,11 @@ export async function publishStreetPavement(appCtx, options = {}) {
       if (packet.type === 'complete') break;
       let cachedSurface=null;
       if(packet.type==='cached'){
-        const reused=packetCache.getPublication(packet.key,packet.fingerprint,surfaceOwner);
-        if(reused){cachedSurface=reused.surface;packet={...reused.packet,completed:packet.completed,total:packet.total};stats.reusedCells=(stats.reusedCells||0)+1;}
+        const validationDuration=Number(packet.durationMs)||0;
+        const revalidated=!packet.reuseFingerprint||packetCache.revalidateSurface(packet,surfaceOwner);
+        const reused=revalidated?packetCache.getPublication(packet.key,packet.fingerprint,surfaceOwner):null;
+        if(reused&&packet.reuseFingerprint)stats.revalidatedSurfaceCells=(stats.revalidatedSurfaceCells||0)+1;
+        if(reused){cachedSurface=reused.surface;packet={...reused.packet,durationMs:validationDuration,completed:packet.completed,total:packet.total};stats.reusedCells=(stats.reusedCells||0)+1;}
         else {packet=await request({type:'retry'});packetCache.put(packet);}
       }else packetCache.put(packet);
       if(packet.completed%16===0)trace('cell',{completed:packet.completed,total:packet.total});
@@ -334,8 +340,8 @@ export async function publishStreetPavement(appCtx, options = {}) {
       }
       markingVertices=clipGroundSurface(markingVertices).positions;
       // Reuse the final render-precision cell only under the same physical
-      // owners. The next window still rebuilds its combined contact index and
-      // publishes atomically; cached arrays are copied, never shared mutably.
+      // owners. Unchanged render/contact batches retain their existing lease;
+      // changed batches consume private copies of these fitted cell arrays.
       mesh.vertices=new Float32Array(mesh.vertices);
       mesh.curbVertices=new Float32Array(mesh.curbVertices);
       markingVertices=new Float32Array(markingVertices);
@@ -351,7 +357,7 @@ export async function publishStreetPavement(appCtx, options = {}) {
         const key=`${Math.floor(ix/2)}:${Math.floor(iz/2)}:${kind}`;
         if(!batches.has(key)) batches.set(key,{chunks:[],length:0,mat,kind});
         const target=batches.get(key);
-        target.chunks.push({positions,ix,iz});target.length+=positions.length;
+        target.chunks.push({positions,ix,iz,identity:packet.surfaceFingerprint||packet.fingerprint});target.length+=positions.length;
       }
       await yieldConstruction();
     }
@@ -359,9 +365,16 @@ export async function publishStreetPavement(appCtx, options = {}) {
     finishPhase('cell-surfaces');
     for (const [key,batch] of batches) {
       const {chunks,length,mat,kind}=batch;
-      const positions=new Float32Array(length);let offset=0;
       // Cache admission may change preparation order, never final face order.
       chunks.sort((a,b)=>a.ix-b.ix||a.iz-b.iz);
+      const signature=chunks.every(chunk=>chunk.identity)?JSON.stringify(chunks.map(({ix,iz,identity})=>[ix,iz,identity])):null;
+      const retained=previous?.retainBatch?.(key,signature,surfaceOwner,mat);
+      if(retained){
+        stagedBatches.set(key,retained);staged.push(retained.mesh);
+        chunks.length=0;batches.delete(key);stats.reusedRenderBatches=(stats.reusedRenderBatches||0)+1;
+        await yieldConstruction();continue;
+      }
+      const positions=new Float32Array(length);let offset=0;
       for(const {positions:chunk} of chunks){positions.set(chunk,offset);offset+=chunk.length;}
       chunks.length=0;batches.delete(key);
       if(!current()) {disposeStaged();return null;}
@@ -378,6 +391,11 @@ export async function publishStreetPavement(appCtx, options = {}) {
       geometry.setAttribute('uv',new THREE.BufferAttribute(uv,2));geometry.computeVertexNormals();geometry.computeBoundingSphere();
       const object=new THREE.Mesh(geometry,mat);object.receiveShadow=true;
       object.userData={streetPavement:true,sharedUrbanSurfaceMaterial:true,kind,worldLoadSequence:sequence};
+      let batchContact=null;
+      try {
+        if(kind==='sidewalk')batchContact=await createRoadContactIndexCooperatively([object],4,schedule);
+      } catch(error){geometry.dispose();throw error;}
+      stagedBatches.set(key,createPavementBatch({key,signature,surfaceOwner,mesh:object,contactIndex:batchContact}));
       staged.push(object);
       await yieldConstruction();
     }
@@ -398,7 +416,8 @@ export async function publishStreetPavement(appCtx, options = {}) {
     trace('mapped-paths-complete',{batches:stagedLines.length});
     // Publish all surfaces and contact data together. Old coverage is retained until this point.
     const mappedContacts=await mappedPavementContactSources(appCtx.landuseMeshes,schedule);
-    contactIndex = await createRoadContactIndexCooperatively([...staged.filter(mesh => mesh.userData.kind === 'sidewalk'),...mappedContacts], 4,{...schedule,bounds:coverageBounds});
+    const mappedContactIndex=await createRoadContactIndexCooperatively(mappedContacts,4,{...schedule,bounds:coverageBounds});
+    contactIndex=createPavementBatchContacts(stagedBatches,mappedContactIndex);
     if(replaceMappedLines){
       const nextLines=[...appCtx.linearFeatureMeshes.filter(m=>!m.userData?.isLinearFeatureBatch),...stagedLines];
       stagedWalkContactIndex=await createRoadContactIndexCooperatively(selectLinearWalkContactMeshes(nextLines),16,schedule);
@@ -408,10 +427,12 @@ export async function publishStreetPavement(appCtx, options = {}) {
     batches.clear();
     stats.indexBytes=staged.reduce((sum,mesh)=>sum+(mesh.geometry.index?.array.byteLength||0),0);
     stats.positionBytes = staged.reduce((sum, mesh) => sum + mesh.geometry.attributes.position.array.byteLength, 0);
-    const publication = createStreetPublication({stats,focus,groundRevision,coverageBounds,meshes:staged,
+    const publication = createStreetPublication({stats,focus,groundRevision,coverageBounds,meshes:staged,batches:stagedBatches,
       contactIndex,releaseMaterials:materialLease.release,
       layout:new URLSearchParams(location.search).has('streetDiagnostics')?input:null});
-    for (const mesh of staged) { appCtx.addEarthWorldObject(mesh); appCtx.urbanSurfaceMeshes.push(mesh); }
+    for (const mesh of staged) if(!previous?.meshes.includes(mesh))appCtx.addEarthWorldObject(mesh);
+    const previousMeshes=new Set(previous?.meshes||[]);
+    appCtx.urbanSurfaceMeshes.splice(0,appCtx.urbanSurfaceMeshes.length,...appCtx.urbanSurfaceMeshes.filter(mesh=>!previousMeshes.has(mesh)),...staged);
     stats.durationMs = Math.round(performance.now() - startedAt);
     for (const mesh of stagedLines) appCtx.addEarthWorldObject(mesh);
     appCtx.streetPavement = publication;
@@ -419,7 +440,6 @@ export async function publishStreetPavement(appCtx, options = {}) {
     appCtx._streetPavementDirty = false;
     committed = true;
     if (previous) {
-      appCtx.urbanSurfaceMeshes.splice(0, appCtx.urbanSurfaceMeshes.length, ...appCtx.urbanSurfaceMeshes.filter(m => !previous.meshes.includes(m)));
       previous.dispose();
     }
     // Rebuild mapped-line presentation once, excluding only sidewalks now owned by the area compiler.

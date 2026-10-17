@@ -6,52 +6,55 @@ Public project page: https://rrg314.github.io/WorldExplorer3D/
 
 ## October 17 — authoritative current status
 
-Both active development branches contain checkpoint `26e04920`. The current
-immutable candidate is `5.6.1+26e04920a669.dde9743f81c8b8ef.staging`; all 755
-files verify. Its gameplay payload is byte-identical to 614b452a; the change fixes
-browser verification's selected local emulator ports. All three current-package
-backend gates pass, including the complete 15-stage backend suite, shared ocean
-voyages and place lookup. The unrelated project's emulator remains untouched.
+**5.6.1 release acceptance is still open. Production remains the recovered 5.5.1
+hotfix.** No stable, production Hosting or production Functions promotion occurred
+in this investigation. Canonical staging last verified a0e20c35; the most recent
+verified packaging checkpoint before the repair below is
+`5.6.1+a35154104a70.8ca68f44c491d77e.staging` (755 verified files).
 
-Lossless filesystem compression recovered 6.49 GiB from inactive diagnostics
-and closed logs, preserving decoded contents and original paths. Source, saves,
-chats, assets, history and fallback builds were not deleted. Free space reached
-10.37 GiB before packaging and remains above the verification safety floor.
+The current root-cause audit reproduces excessive street invalidation. Moving the
+local window changes 72 of 96 overlapping cell keys, although 69 produce exactly
+the same pavement, markings and ramps; 51 also retain the same ordered height
+inputs. All 144 initial fingerprints reproduced inside Chrome match the actual
+worker cache. The earlier cross-process export did not reproduce those keys and
+was rejected as evidence. The allocation and causal evidence is recorded in
+`output/release-review/561-root-cause-audit.md`.
 
-The 614 native package loads in 116.9 seconds and passes short ground movement
-and a 90-second flight. Sustained walking still has four clustered 150–217 ms
-intervals. CPU/collector tracing links the cluster to memory collection. There
-were no browser errors, local failures or gameplay interruptions. A numeric
-uniform-cache experiment kept identical pixels but still paused and was rejected.
-No acceptance threshold, coverage or resource requirement was relaxed.
+The local repair compares exact compiled products before repeating terrain fitting,
+while retaining the conservative source key and all terrain/contact/portal owner
+checks. Unchanged render batches and their walking-contact indexes now share a
+lease through atomic replacement. Changed geometry rebuilds; cancellation keeps
+the accepted world intact. The same bounded 16 MiB cache remains. No coverage,
+geometry precision, bridge/tunnel rules, save format or acceptance limit changed.
+The previous worker partition/clipping experiment still stalled and was removed.
 
-The formal 26e04920 save roundtrip timed out while loading the candidate. Its
-verifier requested full city diagnostics on every animation frame. Individual
-calls measured 174 ms on 5.5.1 and up to 1,016 ms on the candidate. With lightweight
-polling and the same 180-second timeout, all four diagnostic stages pass:
-released 5.5.1 → candidate → preserved modern-save fallback → candidate. Inventory,
-Journal, home custody/workspace, wallet, campaign and pending-account checks pass.
-The failed formal receipt is retained; the diagnostic does not mint acceptance.
-The verifier repair retains its original gameplay/discovery assertions and bounds
-failure output. Four focused tests and the complete 2,699-test source chain pass.
-Repackaging and formal acceptance of these updated inputs are next.
+The repair passes 101 focused checks and the final 2,707-test source chain. Two
+additional integration checks pass for failure/cancellation after a reused batch
+lease has been acquired.
+The ordinary native journey loads in 105.3 seconds, passes short ground movement
+and 90-second flight, and completes the sustained walk at 39.61 FPS, p99 33.4 ms.
+It reuses 72 fitted cells (previously 23), retaining the same 140,849 pavement
+triangles. One 166.7 ms interval remains, within the existing pause budget;
+the prior three-pause cluster was absent. This is improvement, not a claim of
+zero stalls. No browser errors, local failures or interruptions occurred.
+Coverage remains 49,080 buildings, 18,951 roads and all 6,009 overview cells.
+Retained occupied managed JS is 474–475 MB; this is not total tab/GPU memory.
+The image and prescribed input state were inspected. Evidence:
+`output/release-review/561-street-product-ownership-native/`.
 
-The subsequent pavement resource repair keeps one material/texture lease across
-same-world replacements, preserving linked renderer programs during handover.
-Failed staging leaves the accepted surface intact; final ownership release disposes
-all owned resources. All 78 focused checks and 2,702 source tests pass. Native
-source loads in 105.5 seconds and passes short ground travel and 90-second flight.
-The long walk still has three clustered 133–183 ms intervals, so pacing remains
-open. The before/after material IDs and shader program IDs match across a real
-coverage change. Current imagery and prescribed input were inspected. Neither
-30 FPS drawing experiment was adopted; gameplay remains uncapped.
-Evidence: `output/release-review/561-material-ownership-native/`.
+That focused journey omits the full mixed route and twelve reload cycles. Its
+aggregate release result is deliberately not passing. Final immutable packaging, complete performance/candidate checks, backend acceptance,
+formal save roundtrip and hosted verification must complete before promotion.
 
-Production still serves the exact 5.5.1 hotfix and canonical staging still serves
-a0e20c35, independently checked today. Final performance, the complete candidate
-matrix, formal save roundtrip and ordinary hosted acceptance remain required.
-No new Hosting deployment, production Functions update or stable promotion has
-occurred. Older entries below are historical checkpoints, not current acceptance.
+The prior 26e04920 package passed all three backend gates, including the complete
+15-stage backend suite. A save diagnostic passed released 5.5.1 → candidate →
+preserved modern-save fallback → candidate after replacing expensive full-city
+polling with lightweight readiness guards; original assertions and the 180-second
+timeout were retained. This diagnostic is not formal final-package acceptance.
+
+Lossless filesystem compression recovered 6.49 GiB from inactive diagnostics and
+closed logs. Decoded contents and original paths were verified. Source, saves,
+chats, assets, history, fallback builds and unrelated processes were preserved.
 
 ## October 16 — previous checkpoint
 

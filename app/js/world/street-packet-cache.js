@@ -4,6 +4,23 @@
 export class StreetPacketCache {
   constructor(maxBytes=16*1024*1024){this.maxBytes=maxBytes;this.bytes=0;this.entries=new Map();}
   manifest(){return Object.fromEntries([...this.entries].map(([key,value])=>[key,value.packet.fingerprint]));}
+  surfaceManifest(owner){
+    if(!owner||owner!==this.surfaceOwner)return {};
+    return Object.fromEntries([...this.entries].filter(([,item])=>item.surface&&item.packet.surfaceFingerprint)
+      .map(([key,{packet}])=>[key,{fingerprint:packet.fingerprint,surfaceFingerprint:packet.surfaceFingerprint}]));
+  }
+  revalidateSurface(packet,owner){
+    const item=this.entries.get(packet.key);
+    if(!owner||owner!==this.surfaceOwner||!item?.surface||!packet.surfaceFingerprint||
+      item.packet.fingerprint!==packet.reuseFingerprint||item.packet.surfaceFingerprint!==packet.surfaceFingerprint)return false;
+    const {reuseFingerprint,type,...metadata}=packet;
+    const next={...item.packet,...metadata,type:'tile'};
+    const metadataBytes=JSON.stringify(next).length*2;
+    if(this.bytes+metadataBytes-item.metadataBytes>this.maxBytes)return false;
+    this.bytes+=metadataBytes-item.metadataBytes;item.bytes+=metadataBytes-item.metadataBytes;
+    item.metadataBytes=metadataBytes;item.packet=next;
+    return true;
+  }
   put(packet){
     if(!packet.fingerprint)return;
     const mesh={};let bytes=0;
