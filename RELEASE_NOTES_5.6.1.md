@@ -10,6 +10,9 @@ Road detail recovers where you are, without sending you back to Main Menu.
 Side streets join graded approaches at a shared driving height. Earth opens
 with the selected location; extending scenery beyond it is an optional setting.
 
+Memory handling and scene cleanup have been improved for repeated travel and
+location changes. Existing mapped coverage and player progress are preserved.
+
 Baltimore’s aquarium and The Peale have repaired street entrances and more
 recognizable exteriors. Harbor walls contain the waterfront, and a smaller
 passenger launch fits the harbor. At Kennedy Space Center, explore the VAB

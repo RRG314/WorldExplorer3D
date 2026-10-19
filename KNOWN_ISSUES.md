@@ -1,6 +1,6 @@
 # Known Issues and Limitations
 
-Last reviewed: October 15, 2026, for the 5.6.1 candidate. These are known product
+Last reviewed: October 19, 2026, for 5.6.1. These are known product
 limits, not a promise that every location or device has been validated.
 The [GitHub releases](https://github.com/RRG314/WorldExplorer3D/releases) identify
 published versions.
@@ -19,9 +19,10 @@ published versions.
 - Research currently offers a limited set of measurements and fabrication
   outcomes; broader experiments and expedition consequences remain planned.
 
-- Some full-game performance targets remain unmet, particularly frame pacing
-  and travel transitions. Aquarium or museum entry can also pause after loading
-  a dense city. Smoothness varies across locations and devices.
+- Dense locations can take several minutes to load. Travel transitions and
+  entry into detailed venues can still pause, especially on lower-memory
+  devices. Sustained desktop checks do not establish smoothness at every
+  location or on every device.
 - Historic sites and regional vegetation are not uniformly complete. Dedicated
   landmark geometry, mapped footprints and inferred buildings can still overlap or differ from the real location.
 

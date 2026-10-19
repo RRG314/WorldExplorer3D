@@ -1,11 +1,11 @@
 # World Explorer 3D Roadmap
 
-Updated October 12, 2026.
+Updated October 19, 2026.
 
 World Explorer is growing into a connected world sandbox: choose a real place,
 travel, discover, create and return with progress that matters. The priority is
 to improve the systems already here, with clear controls and reliable journeys.
-See the [5.6 candidate](RELEASE_NOTES_5.6.0.md) and
+See the [5.6.1 release notes](RELEASE_NOTES_5.6.1.md) and
 [known limitations](KNOWN_ISSUES.md) for the current scope.
 
 ## First: reliable exploration

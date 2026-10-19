@@ -2,9 +2,10 @@
 
 Notable user-facing changes are recorded here. Git history and GitHub releases contain the complete change record.
 
-## [5.6.1] - Unreleased
+## [5.6.1] - 2026-10-19
 
 - Local road-detail recovery keeps the selected world and player in place.
+- Reduced retained navigation memory and unnecessary pavement work while preserving mapped coverage.
 - Side streets connect to engineered approaches at a shared driving height.
 - Location-based Earth is the default; extending scenery remains optional.
 - Repaired aquarium and museum entry, recognizable Baltimore exteriors, harbor
