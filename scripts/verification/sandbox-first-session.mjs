@@ -1,3 +1,4 @@
+import {afterWorldLoad} from './complete-world-readiness.mjs';
 import { verifyThreeViews } from './three-views-journey.mjs';
 import { verifyDiscoveryDomStability } from './discovery-dom-stability.mjs';
 import { runPrescribedGameActions } from './prescribed-game-actions.mjs';
@@ -58,7 +59,7 @@ try {
    await page.setViewportSize({width:1440,height:900});
    await page.locator(entry).click();
   } else if(await page.locator('#globeSelectorStartBtn').isVisible())await page.locator('#globeSelectorStartBtn').click();
-  await page.waitForFunction(()=>{const d=globalThis.getWorldExplorerRuntimeDiagnostics?.();return d?.gameStarted&&!d.worldLoading&&d.worldDiscovery?.active&&!document.getElementById('loading')?.classList.contains('show');},null,{timeout:180000});
+  await page.waitForFunction(afterWorldLoad(()=>{const d=globalThis.getWorldExplorerRuntimeDiagnostics?.();return d?.gameStarted&&!d.worldLoading&&d.worldDiscovery?.active&&!document.getElementById('loading')?.classList.contains('show');}),null,{timeout:180000});
   await page.evaluate(async()=>{globalThis.__sandboxTestContext=(await import('/app/js/shared-context.js?v=55')).ctx;});
  };
  await page.goto(url,{waitUntil:'domcontentloaded'});await ready();

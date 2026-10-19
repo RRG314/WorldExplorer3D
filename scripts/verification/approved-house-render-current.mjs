@@ -1,3 +1,4 @@
+import {afterWorldLoad} from './complete-world-readiness.mjs';
 // Rendering integration only: uses the byte-verified approved public derivative.
 // Does not simulate App Check success or claim to verify hosted asset delivery.
 import {chromium} from 'playwright';
@@ -19,7 +20,7 @@ try {
  await page.goto('http://127.0.0.1:4195/app/?loc=custom&lat=39.6572&lon=-76.8875&mode=walking');
  await page.waitForFunction(()=>window.__WE3D_RUNTIME_READY__,null,{timeout:45000});
  await page.locator('#globeSelectorStartBtn').click();
- await page.waitForFunction(()=>{const s=window.getWorldExplorerRuntimeDiagnostics?.();return s?.gameStarted&&!s.worldLoading&&!document.querySelector('#loading')?.classList.contains('show');},null,{timeout:100000});
+ await page.waitForFunction(afterWorldLoad(()=>{const s=window.getWorldExplorerRuntimeDiagnostics?.();return s?.gameStarted&&!s.worldLoading&&!document.querySelector('#loading')?.classList.contains('show');}),null,{timeout:100000});
  const result=await page.evaluate(async()=>{
   const {ctx}=await import('/app/js/shared-context.js?v=55');
   ctx.setTimeOfDay('day');

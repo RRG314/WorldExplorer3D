@@ -1,3 +1,4 @@
+import {afterWorldLoad} from './complete-world-readiness.mjs';
 import {deployResearchSubmarineFromDeck} from './marine-entry-ui.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
@@ -92,7 +93,7 @@ try{
  await page.locator('.flowerChallengeToggleBtn').click();
  await page.locator('#globeHubOverlayCloseBtn').click();
  await page.locator('#globeSelectorStartBtn').click();
- await page.waitForFunction(()=>{const d=getWorldExplorerRuntimeDiagnostics();return d.gameStarted&&!d.worldLoading&&d.worldDiscovery?.active&&!document.getElementById('loading')?.classList.contains('show');},null,{timeout:180000});
+ await page.waitForFunction(afterWorldLoad(()=>{const d=getWorldExplorerRuntimeDiagnostics();return d.gameStarted&&!d.worldLoading&&d.worldDiscovery?.active&&!document.getElementById('loading')?.classList.contains('show');}),null,{timeout:180000});
  await measure('earth','main');
  if(process.argv.includes('--lifecycle')){
   const inspectEarth=()=>page.evaluate(async()=>{

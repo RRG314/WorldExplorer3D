@@ -1,3 +1,4 @@
+import {afterWorldLoad} from './complete-world-readiness.mjs';
 import {browserEmulatorSettings} from './backend-environment.mjs';
 // Bounded preservation check on an immutable candidate and isolated emulators.
 // Real menus, companion care, reload and movement; no hosted/device acceptance.
@@ -51,7 +52,7 @@ if(!process.env.FIREBASE_AUTH_EMULATOR_HOST){
    await page.waitForFunction(()=>window.__WE3D_RUNTIME_READY__,null,{timeout:120000});
    if(await page.locator('#analyticsConsentDenyBtn').isVisible())await page.locator('#analyticsConsentDenyBtn').click();
    await page.getByRole('button',{name:'Explore',exact:true}).click();
-   await page.waitForFunction(()=>{const s=window.getWorldExplorerRuntimeDiagnostics?.();return s?.gameStarted&&!s.worldLoading&&!!window.__WE3D_COMPANION_SUPPORT__;},null,{timeout:240000});
+   await page.waitForFunction(afterWorldLoad(()=>{const s=window.getWorldExplorerRuntimeDiagnostics?.();return s?.gameStarted&&!s.worldLoading&&!!window.__WE3D_COMPANION_SUPPORT__;}),null,{timeout:240000});
    const skip=page.getByRole('button',{name:'Skip guide',exact:true});if(await skip.isVisible())await skip.click();
   };
   await ready();

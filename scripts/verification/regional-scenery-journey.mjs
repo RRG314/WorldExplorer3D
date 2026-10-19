@@ -1,3 +1,4 @@
+import {afterWorldLoad} from './complete-world-readiness.mjs';
 import fs from 'node:fs/promises';import path from 'node:path';import assert from 'node:assert/strict';
 import {chromium} from 'playwright';
 import {startStaticServer} from './static-server.mjs';
@@ -18,7 +19,7 @@ const page=await browser.newPage({viewport:{width:1280,height:800}});await confi
  await page.evaluate(()=>{const t=document.getElementById('regionalSceneryToggle');t.checked=false;t.dispatchEvent(new Event('change',{bubbles:true}));});
  assert.equal(await page.evaluate(()=>localStorage.getItem('we3d.regionalScenery')),'off');
  await page.evaluate(()=>{const t=document.getElementById('regionalSceneryToggle');t.checked=true;t.dispatchEvent(new Event('change',{bubbles:true}));});
- await page.locator('#globeSelectorStartBtn').click();await page.waitForFunction(()=>{const s=globalThis.getWorldExplorerRuntimeDiagnostics?.();return s?.gameStarted&&!s.worldLoading&&s.farTerrainClipmap?.status==='ready';},null,{timeout:300000,polling:1000});
+ await page.locator('#globeSelectorStartBtn').click();await page.waitForFunction(afterWorldLoad(()=>{const s=globalThis.getWorldExplorerRuntimeDiagnostics?.();return s?.gameStarted&&!s.worldLoading&&s.farTerrainClipmap?.status==='ready';}),null,{timeout:300000,polling:1000});
  assert.equal(await page.evaluate(async()=>typeof (await import('/app/js/shared-context.js?v=55')).ctx.getRegionalSceneryState),'function','The served build must include regional scenery scheduling');
  await page.evaluate(async()=>{globalThis.__regionCtx=(await import('/app/js/shared-context.js?v=55')).ctx;
  // Inspect the actual published material owners. Internal source modules are

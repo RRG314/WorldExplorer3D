@@ -1,3 +1,4 @@
+import {afterWorldLoad} from './complete-world-readiness.mjs';
 import {chromium} from 'playwright';
 import {mkdir,writeFile} from 'node:fs/promises';
 const base=process.env.WE3D_VERIFY_BASE_URL || 'http://127.0.0.1:4195';
@@ -16,7 +17,7 @@ try {
  await page.waitForFunction(()=>window.__WE3D_RUNTIME_READY__,null,{timeout:45000});
  await page.locator('#globeSelectorStartBtn').click();
  const ready=()=>{const s=window.getWorldExplorerRuntimeDiagnostics?.();return s?.gameStarted&&!s.worldLoading&&!document.getElementById('loading')?.classList.contains('show');};
- await page.waitForFunction(ready,null,{timeout:90000});
+ await page.waitForFunction(afterWorldLoad(ready),null,{timeout:90000});
  report.before=await page.evaluate(async()=>{
   const {ctx}=await import('/app/js/shared-context.js?v=55');window.transitionContext=ctx;
   const value={location:ctx.LOC,roads:ctx.roads.length,cuts:ctx.structureTerrainCuts?.length,sequence:ctx._worldLoadSequence};
@@ -29,7 +30,7 @@ try {
  await page.locator('#globeCustomLon').press('Enter');
  await page.locator('#globeSelectorStartBtn').click();
  await page.waitForFunction(sequence=>window.transitionContext._worldLoadSequence>sequence,report.before.sequence,{timeout:20000});
- await page.waitForFunction(ready,null,{timeout:70000});
+ await page.waitForFunction(afterWorldLoad(ready),null,{timeout:70000});
  report.after=await page.evaluate(()=>{
   const ctx=window.transitionContext,lines=[];
   ctx.setTimeOfDay('day');

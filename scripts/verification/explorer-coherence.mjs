@@ -1,3 +1,4 @@
+import {afterWorldLoad} from './complete-world-readiness.mjs';
 import { softwareCompositorArgs } from './software-compositor.mjs';
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
@@ -58,12 +59,12 @@ try {
   await page.waitForFunction(() => globalThis.__WE3D_RUNTIME_READY__ === true, null, { timeout: 120_000 });
   await page.waitForSelector('#globeSelectorScreen.show', { timeout: 60_000 });
   await page.locator('#globeSelectorStartBtn').click();
-  await page.waitForFunction(() => {
+  await page.waitForFunction(afterWorldLoad(() => {
     const diagnostics = globalThis.getWorldExplorerRuntimeDiagnostics?.();
     return diagnostics?.gameStarted === true && diagnostics.worldLoading === false &&
       diagnostics.environment === 'EARTH' && diagnostics.worldDiscovery?.active === true &&
       diagnostics.urbanSandbox?.active === true && Number(diagnostics.worldCounts?.roads || 0) > 0;
-  }, null, { timeout: 360_000 });
+  }), null, { timeout: 360_000 });
   await page.waitForTimeout(750);
 
   await openExplorer();

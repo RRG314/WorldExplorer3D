@@ -1,3 +1,4 @@
+import {afterWorldLoad} from './complete-world-readiness.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import { chromium } from 'playwright';
@@ -43,11 +44,11 @@ try {
   await page.waitForFunction(() => globalThis.__WE3D_RUNTIME_READY__ === true, null, { timeout: 120_000 });
   await page.waitForFunction(() => document.getElementById('startBtn')?.disabled === false, null, { timeout: 120_000 });
   await page.getByRole('button', { name: 'Explore', exact: true }).click();
-  await page.waitForFunction(() => {
+  await page.waitForFunction(afterWorldLoad(() => {
     const diagnostics = globalThis.getWorldExplorerRuntimeDiagnostics?.();
     return diagnostics?.gameStarted && !diagnostics.worldLoading && diagnostics.aviation?.fleetCount >= 14 &&
       diagnostics.aviation?.airportLayoutAuthority === 'compiled-airport-operational-layout';
-  }, null, { timeout: 360_000 });
+  }), null, { timeout: 360_000 });
   const later = page.getByRole('button', { name: 'Later', exact: true }).first();
   if (await later.isVisible().catch(() => false)) await later.click();
 
@@ -89,10 +90,10 @@ try {
   await page.locator('.airport-hub__result').first().click();
   await page.screenshot({ path: `${outputDir}/airport-destination-selected.png`, fullPage: true });
   await page.locator('.airport-hub__travel').click();
-  await page.waitForFunction(() => {
+  await page.waitForFunction(afterWorldLoad(() => {
     const diagnostics = globalThis.getWorldExplorerRuntimeDiagnostics?.();
     return diagnostics?.modes?.plane === true && diagnostics.flightDynamics?.passengerMode === true && !diagnostics.worldLoading;
-  }, null, { timeout: 30_000 });
+  }), null, { timeout: 30_000 });
   const passenger = await page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics?.());
   await page.waitForTimeout(1200);
   await page.screenshot({ path: `${outputDir}/passenger-tour.png`, fullPage: true });

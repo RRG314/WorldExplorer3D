@@ -1,3 +1,4 @@
+import {afterWorldLoad} from './complete-world-readiness.mjs';
 import assert from 'node:assert/strict';
 import { mkdir } from 'node:fs/promises';
 import path from 'node:path';
@@ -100,10 +101,10 @@ try {
   });
   await page.waitForSelector('#globeSelectorScreen.show', { timeout: 60_000 });
   await page.locator('#globeSelectorStartBtn').click();
-  await page.waitForFunction(() => {
+  await page.waitForFunction(afterWorldLoad(() => {
     const state = globalThis.getWorldExplorerRuntimeDiagnostics?.();
     return state?.gameStarted === true && state.worldLoading === false && state.worldDiscovery?.active === true;
-  }, null, { timeout: 240_000 });
+  }), null, { timeout: 240_000 });
   await page.locator('#exploreBtn').click();
   await page.waitForSelector('#exploreMenu.open');
   await page.locator('#fWorldDiscovery').click();

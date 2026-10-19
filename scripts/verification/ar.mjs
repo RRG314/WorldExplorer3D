@@ -1,3 +1,4 @@
+import {afterWorldLoad} from './complete-world-readiness.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -110,10 +111,10 @@ try {
   await page.waitForFunction(() => globalThis.__WE3D_RUNTIME_READY__ === true, null, { timeout: 120_000 });
   await page.waitForSelector('#globeSelectorScreen.show', { timeout: 60_000 });
   await page.locator('#globeSelectorStartBtn').click();
-  await page.waitForFunction(() => {
+  await page.waitForFunction(afterWorldLoad(() => {
     const state = globalThis.getWorldExplorerRuntimeDiagnostics?.();
     return state?.gameStarted === true && state.worldLoading === false && state.worldDiscovery?.active === true;
-  }, null, { timeout: 240_000 });
+  }), null, { timeout: 240_000 });
   await dismissTutorials();
 
   // The same visible Journal action must not offer AR while the player is still driving.

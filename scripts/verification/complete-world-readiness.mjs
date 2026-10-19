@@ -1,3 +1,17 @@
+// Playwright serializes this function. Keep each journey's original
+// condition and argument intact, but never run its full-city diagnostic while
+// the loading cover is visible. This guard is evaluated on every poll, including
+// a later location transition; a separate one-time wait is insufficient.
+export function afterWorldLoad(predicate) {
+  if (typeof predicate !== 'function') throw new TypeError('Expected a readiness predicate');
+  // A string containing an arrow function is just a truthy expression to
+  // waitForFunction. Return a real callable; only trusted test source is used.
+  return new Function('argument', `
+    if (globalThis.__WE3D_RUNTIME_READY__ !== true || document.querySelector('#loading.show')) return false;
+    return (${predicate.toString()})(argument);
+  `);
+}
+
 // Serialized by Playwright into the page. Avoid whole-city diagnostic scans
 // while startup is still running; retain the complete acceptance predicate.
 export function completeWorldReady() {

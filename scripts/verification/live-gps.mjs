@@ -1,3 +1,4 @@
+import {afterWorldLoad} from './complete-world-readiness.mjs';
 import { installGpsSensorFixture } from './gps-sensor-fixture.mjs';
 import { softwareCompositorArgs } from './software-compositor.mjs';
 import { waitForGpsFieldReveal, createGpsFixStream } from './gps-fix-stream.mjs';
@@ -91,11 +92,11 @@ try {
   await liveGpsEntry.click();
   await page.waitForSelector('#liveGpsPermissionPanel.show', { timeout: 30_000 });
   await page.locator('#liveGpsPermissionContinue').click();
-  await page.waitForFunction(() => {
+  await page.waitForFunction(afterWorldLoad(() => {
     const diagnostics = globalThis.getWorldExplorerRuntimeDiagnostics?.() || {};
     return diagnostics.worldLoading === false && diagnostics.liveGps?.active === true &&
       diagnostics.activeActor?.mode === 'walk';
-  }, null, { timeout: 240_000 });
+  }), null, { timeout: 240_000 });
   await page.waitForTimeout(1_200);
 
   const initial = await snapshot();

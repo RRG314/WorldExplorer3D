@@ -1,3 +1,4 @@
+import {afterWorldLoad} from './complete-world-readiness.mjs';
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
 import fs from 'node:fs/promises';
@@ -177,7 +178,7 @@ try {
   await page.goto(`${baseUrl}/app/?${params}`, { waitUntil: 'load', timeout: 120000 });
   await page.waitForFunction(() => globalThis.__WE3D_RUNTIME_READY__ === true, null, { timeout: 120000 });
   await page.getByRole('button', { name: 'Explore', exact: true }).click();
-  await page.waitForFunction(() => {
+  await page.waitForFunction(afterWorldLoad(() => {
     const state = JSON.parse(globalThis.render_game_to_text?.() || '{}');
     const diagnostics = globalThis.getWorldExplorerRuntimeDiagnostics?.() || {};
     return state.gameStarted === true && state.worldLoading === false &&
@@ -186,7 +187,7 @@ try {
       Number(diagnostics.worldCounts?.roads || 0) > 0 &&
       Number(diagnostics.transportStructures?.publishedBodies || 0) > 0 &&
       diagnostics.livingWorld?.active === true && diagnostics.urbanSandbox?.active === true;
-  }, null, { timeout: 240000 });
+  }), null, { timeout: 240000 });
   await page.waitForTimeout(5000);
 
   const exactStructureSample = await page.evaluate(() => {
@@ -209,7 +210,7 @@ try {
   await page.goto(`${baseUrl}/app/?${params}`, { waitUntil: 'load', timeout: 120000 });
   await page.waitForFunction(() => globalThis.__WE3D_RUNTIME_READY__ === true, null, { timeout: 120000 });
   await page.getByRole('button', { name: 'Explore', exact: true }).click();
-  await page.waitForFunction(() => {
+  await page.waitForFunction(afterWorldLoad(() => {
     const state = JSON.parse(globalThis.render_game_to_text?.() || '{}');
     const diagnostics = globalThis.getWorldExplorerRuntimeDiagnostics?.() || {};
     return state.gameStarted === true && state.worldLoading === false &&
@@ -218,7 +219,7 @@ try {
       Number(diagnostics.worldCounts?.roads || 0) > 0 &&
       Number(diagnostics.transportStructures?.publishedBodies || 0) > 0 &&
       diagnostics.livingWorld?.active === true && diagnostics.urbanSandbox?.active === true;
-  }, null, { timeout: 240000 });
+  }), null, { timeout: 240000 });
   await page.waitForTimeout(5000);
 
   // The product correctly excludes walkers from motorway carriageways. The

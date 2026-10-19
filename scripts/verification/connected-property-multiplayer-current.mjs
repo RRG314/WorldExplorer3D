@@ -1,3 +1,4 @@
+import {afterWorldLoad} from './complete-world-readiness.mjs';
 import {browserEmulatorSettings} from './backend-environment.mjs';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
@@ -108,10 +109,10 @@ async function createPlayer(label, viewport) {
   }, { label, email: `${label.toLowerCase().replace(/\s+/g, '-')}-${runId}@example.test` });
   if (useRealWorld) {
     await page.locator('#globeSelectorStartBtn').click();
-    await page.waitForFunction(() => {
+    await page.waitForFunction(afterWorldLoad(() => {
       const diagnostics = globalThis.getWorldExplorerRuntimeDiagnostics?.();
       return diagnostics?.gameStarted === true && diagnostics.worldLoading === false;
-    }, null, { timeout: 360_000 });
+    }), null, { timeout: 360_000 });
   }
   diagnostics.stage = 'ready';
   return { context, page, identity,

@@ -1,3 +1,4 @@
+import {afterWorldLoad} from './complete-world-readiness.mjs';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs/promises';
@@ -174,11 +175,15 @@ async function startBaltimoreWorld(page) {
     await page.locator('#loading.show').waitFor({ state: 'visible', timeout: 30_000 });
   }
   await page.locator('#loading').waitFor({ state: 'hidden', timeout: 300_000 });
-  await page.waitForFunction(() => {
+  await page.waitForFunction(afterWorldLoad(() => {
     const state = globalThis.getWorldExplorerRuntimeDiagnostics?.() || {};
     return state.gameStarted === true && state.worldLoading === false && state.modes?.walking === true;
-  }, null, { timeout: 300_000 });
+  }), null, { timeout: 300_000 });
   await page.waitForFunction(() => {
+    if (globalThis.__WE3D_RUNTIME_READY__ !== true || document.querySelector('#loading.show')) {
+      globalThis.__WE3D_STABLE_WALKING_READY_SINCE__ = 0;
+      return false;
+    }
     const state = globalThis.getWorldExplorerRuntimeDiagnostics?.() || {};
     const loadingVisible = document.getElementById('loading')?.classList.contains('show') === true;
     const ready = state.gameStarted === true && state.worldLoading === false && state.modes?.walking === true && !loadingVisible;
@@ -437,11 +442,11 @@ async function switchToDrivingThroughVisibleUi(page) {
   await page.locator('#exploreBtn').click();
   await page.locator('#exploreMenu.open #fDriving').waitFor({ state: 'visible', timeout: 10_000 });
   await page.locator('#fDriving').click();
-  await page.waitForFunction(() => {
+  await page.waitForFunction(afterWorldLoad(() => {
     const state = globalThis.getWorldExplorerRuntimeDiagnostics?.() || {};
     return state.gameStarted === true && state.worldLoading === false && state.modes?.walking === false &&
       document.getElementById('fDriving')?.classList.contains('on') === true;
-  }, null, { timeout: 30_000 });
+  }), null, { timeout: 30_000 });
 }
 
 async function runVehicleBlockJourney(page, shape, bypassBlockAuthority = false) {
@@ -746,10 +751,10 @@ async function executeMobileJourney() {
   await explorer.page.locator('#blockBuilderUndo').tap();
   const afterUndo = await waitForBlockCount(explorer.page, 0, false);
   await explorer.page.locator('#blockBuilderClose').tap();
-  await explorer.page.waitForFunction(() => {
+  await explorer.page.waitForFunction(afterWorldLoad(() => {
     const state = globalThis.getWorldExplorerRuntimeDiagnostics?.() || {};
     return state.gameStarted === true && state.worldLoading === false && state.blockBuilder?.enabled === false;
-  }, null, { timeout: 30_000 });
+  }), null, { timeout: 30_000 });
   return { explorer, placed, afterCompatibilityWindow, afterUndo };
 }
 

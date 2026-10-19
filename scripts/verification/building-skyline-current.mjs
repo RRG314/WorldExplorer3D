@@ -1,3 +1,4 @@
+import {afterWorldLoad} from './complete-world-readiness.mjs';
 import { chromium } from 'playwright';
 import { mkdir, writeFile } from 'node:fs/promises';
 const base = process.env.WE3D_VERIFY_BASE_URL || 'http://127.0.0.1:4195';
@@ -20,7 +21,7 @@ try {
  await page.locator('#globeCustomLon').fill(String(lon));
  await page.locator('#globeCustomLon').press('Enter');
  await page.locator('#globeSelectorStartBtn').click();
- await page.waitForFunction(()=>{const s=globalThis.getWorldExplorerRuntimeDiagnostics?.();return s?.gameStarted&&!s.worldLoading&&!document.getElementById('loading')?.classList.contains('show');},null,{timeout:90000});
+ await page.waitForFunction(afterWorldLoad(()=>{const s=globalThis.getWorldExplorerRuntimeDiagnostics?.();return s?.gameStarted&&!s.worldLoading&&!document.getElementById('loading')?.classList.contains('show');}),null,{timeout:90000});
  const result = await page.evaluate(async()=>{
   const {ctx}=await import('/app/js/shared-context.js?v=55');
   ctx.setTimeOfDay?.('day');

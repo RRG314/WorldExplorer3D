@@ -1,3 +1,4 @@
+import {afterWorldLoad} from './complete-world-readiness.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -31,10 +32,10 @@ try {
   await page.waitForFunction(() => window.__WE3D_RUNTIME_READY__, null, { timeout: 60000 });
   if (await page.locator('#analyticsConsentDenyBtn').isVisible()) await page.locator('#analyticsConsentDenyBtn').click();
   await page.locator('#globeSelectorMoonBtn').click();
-  await page.waitForFunction(() => {
+  await page.waitForFunction(afterWorldLoad(() => {
     const state = window.getWorldExplorerRuntimeDiagnostics?.();
     return state?.gameStarted && !state.worldLoading && state.environment === 'MOON';
-  }, null, { timeout: 180000 });
+  }), null, { timeout: 180000 });
   for (const [index, bodyId] of ['mercury', 'venus', 'io', 'europa', 'titan', 'enceladus', 'triton', 'ceres', 'vesta', 'pluto', 'mercury'].entries()) {
     const state = await page.evaluate(async bodyId => {
       const { ctx } = await import('/app/js/shared-context.js?v=55');

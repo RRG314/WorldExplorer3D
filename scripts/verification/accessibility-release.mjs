@@ -1,3 +1,4 @@
+import {afterWorldLoad} from './complete-world-readiness.mjs';
 import { advanceGameplay } from './gameplay-simulation.mjs';
 import { softwareCompositorArgs } from './software-compositor.mjs';
 import { collectBrowserGraphicsErrors } from './browser-graphics-errors.mjs';
@@ -115,10 +116,10 @@ async function runDesktop() {
     const startTarget = await keyboardReach(page, (focused) => focused.id === 'globeSelectorStartBtn');
     assert.ok(startTarget, 'Keyboard Tab must reach Explore.');
     await page.keyboard.press('Enter');
-    await page.waitForFunction(() => {
+    await page.waitForFunction(afterWorldLoad(() => {
       const state = globalThis.getWorldExplorerRuntimeDiagnostics?.() || {};
       return state.gameStarted === true && state.worldLoading === false && Number(state.worldCounts?.buildings || 0) > 0 && Number(state.worldCounts?.roads || 0) > 0;
-    }, null, { timeout: 300_000 });
+    }), null, { timeout: 300_000 });
     await page.waitForTimeout(2_000);
 
     const beforeWalk = await page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().activeActor?.position || null);
@@ -195,10 +196,10 @@ async function runMobile() {
     await page.waitForSelector('#globeSelectorScreen.show', { timeout: 60_000 });
     const liveGpsUnderActivities = await page.evaluate(() => document.getElementById('tab-games')?.contains(document.querySelector('[data-mode="livegps"]')) === true);
     await page.locator('#globeSelectorStartBtn').tap();
-    await page.waitForFunction(() => {
+    await page.waitForFunction(afterWorldLoad(() => {
       const state = globalThis.getWorldExplorerRuntimeDiagnostics?.() || {};
       return state.gameStarted === true && state.worldLoading === false && Number(state.worldCounts?.buildings || 0) > 0 && Number(state.worldCounts?.roads || 0) > 0;
-    }, null, { timeout: 300_000 });
+    }), null, { timeout: 300_000 });
     await page.waitForTimeout(2_000);
     await page.locator('#controlsBarBtn').tap();
     await page.waitForSelector('#controlsTab.bar-open #accessibilitySettings', { timeout: 10_000 });

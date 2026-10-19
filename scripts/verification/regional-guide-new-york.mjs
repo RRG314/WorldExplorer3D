@@ -1,3 +1,4 @@
+import {afterWorldLoad} from './complete-world-readiness.mjs';
 import assert from 'node:assert/strict';
 import { mkdir } from 'node:fs/promises';
 import { chromium } from 'playwright';
@@ -23,12 +24,12 @@ try {
   await page.getByRole('button', { name: 'Featured Cities' }).click();
   await page.locator('#globeCityList').getByText('New York', { exact: true }).click();
   await page.getByRole('button', { name: 'Explore', exact: true }).click();
-  await page.waitForFunction(() => {
+  await page.waitForFunction(afterWorldLoad(() => {
     const diagnostics = globalThis.getWorldExplorerRuntimeDiagnostics?.();
     return diagnostics?.gameStarted === true && diagnostics.worldLoading === false &&
       diagnostics.environment === 'EARTH' && diagnostics.worldDiscovery?.active === true &&
       Number(diagnostics.worldCounts?.roads || 0) > 0;
-  }, null, { timeout: 360_000 });
+  }), null, { timeout: 360_000 });
 
   await page.locator('#exploreBtn').click();
   await page.waitForSelector('#exploreMenu.open');

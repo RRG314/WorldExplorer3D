@@ -1,3 +1,4 @@
+import {afterWorldLoad} from './complete-world-readiness.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -55,11 +56,11 @@ async function startEarth(page, label) {
     await page.getByRole('button', { name: 'Explore', exact: true }).click();
   }
   await page.locator('#loading.show').waitFor({ state: 'hidden', timeout: 240_000 }).catch(() => {});
-  await page.waitForFunction(() => {
+  await page.waitForFunction(afterWorldLoad(() => {
     const diagnostics = globalThis.getWorldExplorerRuntimeDiagnostics?.() || {};
     return diagnostics.gameStarted === true && diagnostics.worldLoading === false &&
       !!globalThis.__WE3D_COMPANION_SUPPORT__ && !!globalThis.__WE3D_URBAN_CRASH_SUPPORT__;
-  }, null, { timeout: 360_000 });
+  }), null, { timeout: 360_000 });
   const turnOffTips = page.getByRole('button', { name: 'Turn off tips', exact: true });
   if (await turnOffTips.isVisible().catch(() => false)) {
     await turnOffTips.click({ timeout: 2_000 }).catch(() => {});

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
-import { completeWorldReady, discoveryWorldReady } from '../scripts/verification/complete-world-readiness.mjs';
+import { completeWorldReady, discoveryWorldReady, afterWorldLoad } from '../scripts/verification/complete-world-readiness.mjs';
 
 function fixture() {
   let snapshots = 0;
@@ -23,6 +23,36 @@ function fixture() {
   return { diagnostics, state, context, snapshots: () => snapshots,
     ready: (predicate = completeWorldReady) => vm.runInContext(`(${predicate.toString()})()`, context) };
 }
+
+test('journey predicates retain their arguments and conditions without scanning under the loading cover', () => {
+  const f = fixture();
+  const predicate = afterWorldLoad(expectedRoads => {
+    const state = getWorldExplorerRuntimeDiagnostics();
+    return state.gameStarted === true && state.worldLoading === false &&
+      state.worldCounts.roads === expectedRoads && state.worldDiscovery.active;
+  });
+  assert.equal(typeof predicate, 'function', 'Playwright must invoke the predicate, not accept a truthy string expression');
+  const ready = count => vm.runInContext(`(${predicate})(${count})`, f.context);
+  f.context.__WE3D_RUNTIME_READY__ = false;
+  assert.equal(ready(3), false);
+  f.context.__WE3D_RUNTIME_READY__ = true;
+  f.context.document.querySelector = () => ({});
+  for (let i = 0; i < 120; i++) assert.equal(ready(3), false);
+  assert.equal(f.snapshots(), 0);
+  f.context.document.querySelector = () => null;
+  assert.equal(ready(2), false);
+  assert.equal(ready(3), true);
+  f.diagnostics.worldDiscovery.active = false;
+  assert.equal(ready(3), false);
+  f.diagnostics.worldDiscovery.active = true;
+  f.diagnostics.worldLoading = true;
+  assert.equal(ready(3), false);
+  // Re-entering loading must suspend diagnostics again, not reuse readiness.
+  const before = f.snapshots();
+  f.context.document.querySelector = () => ({});
+  assert.equal(ready(3), false);
+  assert.equal(f.snapshots(), before);
+});
 
 test('readiness polling does not scan city diagnostics during startup or under a visible loading cover', () => {
   const f = fixture();

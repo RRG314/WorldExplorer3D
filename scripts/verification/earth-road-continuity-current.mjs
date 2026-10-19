@@ -1,3 +1,4 @@
+import {afterWorldLoad} from './complete-world-readiness.mjs';
 import assert from 'node:assert/strict';
 import {mkdir,writeFile} from 'node:fs/promises';
 import {chromium} from 'playwright';
@@ -34,7 +35,7 @@ try{
   await page.waitForFunction(()=>globalThis.__WE3D_RUNTIME_READY__,null,{timeout:120000});
   if(await page.locator('#analyticsConsentDenyBtn').isVisible())await page.locator('#analyticsConsentDenyBtn').click();
   await page.locator('#globeSelectorStartBtn').click();
-  await page.waitForFunction(()=>{const d=getWorldExplorerRuntimeDiagnostics();return d.gameStarted&&!d.worldLoading&&d.transportDetail?.pinnedRegions>0&&!document.getElementById('loading')?.classList.contains('show');},null,{timeout:300000});
+  await page.waitForFunction(afterWorldLoad(()=>{const d=getWorldExplorerRuntimeDiagnostics();return d.gameStarted&&!d.worldLoading&&d.transportDetail?.pinnedRegions>0&&!document.getElementById('loading')?.classList.contains('show');}),null,{timeout:300000});
   const skip=page.getByRole('button',{name:'Skip guide',exact:true});if(await skip.isVisible())await skip.click();
   await page.evaluate(async()=>{globalThis.roadCtx=(await import('/app/js/shared-context.js?v=55')).ctx;roadCtx.setTimeOfDay('day');});
   report.origin=await page.evaluate(()=>({sequence:roadCtx._worldLoadSequence,roads:roadCtx.roads.length,buildings:roadCtx.buildings.length,stats:{...roadCtx.transportDetail?.stats}}));

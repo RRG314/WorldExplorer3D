@@ -1,3 +1,4 @@
+import {afterWorldLoad} from './complete-world-readiness.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import { chromium } from 'playwright';
@@ -35,10 +36,10 @@ try {
   await page.waitForSelector('#globeSelectorScreen.show', { timeout: 60_000 });
   await page.getByRole('button', { name: 'Explore', exact: true }).click();
   console.log(`[maritime] loading ${journey.name} world`);
-  await page.waitForFunction(() => {
+  await page.waitForFunction(afterWorldLoad(() => {
     const diagnostics = globalThis.getWorldExplorerRuntimeDiagnostics?.();
     return diagnostics?.gameStarted && !diagnostics.worldLoading && diagnostics.maritime?.fleetCount > 0;
-  }, null, { timeout: 360_000 });
+  }), null, { timeout: 360_000 });
   console.log(`[maritime] ${journey.name} world ready`);
 
   const initial = await page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics?.());

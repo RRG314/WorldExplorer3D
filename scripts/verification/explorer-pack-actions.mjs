@@ -1,3 +1,4 @@
+import {afterWorldLoad} from './complete-world-readiness.mjs';
 import assert from 'node:assert/strict';
 import { mkdir } from 'node:fs/promises';
 import { chromium, devices } from 'playwright';
@@ -44,7 +45,7 @@ try {
     return current?.gameStarted === true && current?.environment === 'EARTH' &&
       current?.worldDiscovery?.active === true && current?.urbanSandbox?.active === true;
   }, null, { timeout: 180_000 });
-  await page.waitForFunction(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().worldLoading === false, null, { timeout: 120_000 });
+  await page.waitForFunction(afterWorldLoad(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().worldLoading === false), null, { timeout: 120_000 });
 
   await openExploreMenu();
   await page.locator('#fWalk').click();

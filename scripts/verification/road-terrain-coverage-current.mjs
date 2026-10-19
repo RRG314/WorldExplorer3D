@@ -1,3 +1,4 @@
+import {afterWorldLoad} from './complete-world-readiness.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -59,14 +60,14 @@ try {
     await page.goto(`${baseUrl}/app/?${params}`, { waitUntil: 'load', timeout: 120_000 });
     await page.waitForFunction(() => globalThis.__WE3D_RUNTIME_READY__ === true, null, { timeout: 120_000 });
     await page.getByRole('button', { name: 'Explore', exact: true }).click();
-    await page.waitForFunction(() => {
+    await page.waitForFunction(afterWorldLoad(() => {
       const diagnostics = globalThis.getWorldExplorerRuntimeDiagnostics?.() || {};
       const conformance = diagnostics.transportStructures?.roadTerrainConformance;
       return diagnostics.gameStarted === true && diagnostics.worldLoading === false &&
         Number(diagnostics.worldCounts?.roads || 0) > 0 &&
         diagnostics.farTerrainClipmap?.status === 'ready' &&
         Number(conformance?.totalSamples || 0) > 0;
-    }, null, { timeout: 420_000 });
+    }), null, { timeout: 420_000 });
 
     await page.keyboard.down('ArrowUp');
     await page.waitForTimeout(1800);

@@ -21,20 +21,38 @@ The previous immutable 9b56760d package failed walking with a 133.4/100.3 ms
 pause cluster. Its completed driving window passed; subsequent stages were not
 run. Preserve that failure. An earlier focused source pass was not acceptance.
 
-The audit traced the remaining pauses to main-thread collection of the retained
-world graph. Private heap analysis identified approximately 282,000 navigation
+Earlier profiles found main-thread collection of the retained world graph.
+Private heap analysis identified approximately 282,000 navigation
 node/segment records beyond the underlying road endpoints and features. The
 current repair packs their numeric facts into exact Float64/Uint32 storage.
 Endpoint and feature references retain their existing authority. Queries reuse
 one local row view; pedestrian and traffic compilers use temporary rows and
 retain their existing output graphs. Routing, one-way/access rules, ordering,
 levels, road/bridge/tunnel geometry, coverage and save formats are unchanged.
+Two unprofiled b582 long-play runs still failed their pause-cluster limits.
+Read-only host observations found heavy memory compression around one cluster;
+this is a correlation, not a performance pass or grounds to waive the limit.
 
-All 54 focused checks pass. All 2,738 component tests and the source syntax,
+All 54 focused traversal checks pass. All 2,739 component tests and the source syntax,
 ownership, boundary, inventory and sensitivity checks pass. The first full source
 chain correctly rejected an unregistered new test file; its registration was
 fixed and the complete component/inventory/sensitivity remainder passed. Browser
-pacing and final release acceptance for this repair remain unverified.
+pacing and final release acceptance for this repair remain unverified. The b582
+backend suite and released551 → candidate → b21 fallback-write → candidate save
+round trip passed. Subsequent test-source changes require fresh release evidence.
+
+The first broad browser gate exposed a verification defect. Its readiness poll
+called the full city diagnostic every animation frame while loading. A controlled
+comparison of the same packaged aquarium location completed in 107 seconds with
+light observation, versus 307 seconds with the original diagnostic polling.
+The latter made 5,186 full snapshots consuming 242 seconds. No game code changed
+between those runs. The shared verification guard now suspends these expensive
+predicates under the loading cover, preserving their arguments, conditions and
+timeouts. Timer-based stability checks still reset during loading. Five unit
+checks and actual Chrome serialization checks pass. The corrected aquarium
+exterior entry, interior exit and harbor quay-stop/reverse journey passed in
+149 seconds against unchanged b582 game bytes, with no JS or local asset errors.
+The full release sequence still requires current evidence on the frozen revision.
 
 The provenance-storage experiments are excluded. The isolated Node benchmark
 suggested a large saving, but actual Chrome building records saved only about
@@ -67,11 +85,15 @@ release packages were preserved. Detailed diagnostic receipts are under
    save/fallback roundtrip and all candidate gates on that exact package.
 2. Deploy that package to canonical staging and complete ordinary hosted-client
    acceptance and the current free-provider receipt. Inspect current images.
-3. Require current release-scope and public-claim readiness. Prepare the linked
-   production configuration without rebuilding gameplay bytes. Deploy only the
-   six reviewed Functions, then preview/promote the exact Hosting package.
-4. Verify the live identity, fast-forward stable and both active development
-   branches without force, publish v5.6.1 and verify Pages. Do not invent main.
+3. Require current release-scope and public-claim readiness. Stable requires a
+   squash-only PR merge with passing pull-request and gitleaks checks; no bypass
+   actors exist. Merge the accepted PR, verify its entire tree matches, and use
+   that stable commit for production configuration promotion. Every gameplay
+   asset must remain byte-identical to the accepted staging package.
+4. Deploy only the six reviewed Functions, preview/promote the exact Hosting
+   package, and verify live identity. Tag that production commit, publish v5.6.1
+   and verify Pages. Merge stable back into both development branches without
+   force. Do not invent main or direct-push the protected stable branch.
 
 The known modern-save fallback is b21b7f12fdfab0f2adf82eca01faefb55ae64748.
 Both its staging and production packages remain. Production 5.5.1 is the upgrade

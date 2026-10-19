@@ -1,3 +1,4 @@
+import {afterWorldLoad} from './complete-world-readiness.mjs';
 import {chromium} from 'playwright';
 import fs from 'node:fs/promises';
 import assert from 'node:assert/strict';
@@ -31,7 +32,7 @@ try{for(const [id,lat,lon] of locations.filter(l=>!selected.length||selected.inc
  await page.waitForFunction(()=>globalThis.__WE3D_RUNTIME_READY__,null,{timeout:120000});
  const consent=page.locator('#analyticsConsentDenyBtn');if(await consent.isVisible())await consent.click();
  await page.getByRole('button',{name:'Explore',exact:true}).click();
- await page.waitForFunction(()=>{const s=JSON.parse(globalThis.render_game_to_text?.()||'{}'),d=globalThis.getWorldExplorerRuntimeDiagnostics?.();return s.gameStarted&&!s.worldLoading&&!document.querySelector('#loading.show')&&Number.isFinite(d?.surfaceChain?.surfaces?.terrain?.y);},null,{timeout:360000});
+ await page.waitForFunction(afterWorldLoad(()=>{const s=JSON.parse(globalThis.render_game_to_text?.()||'{}'),d=globalThis.getWorldExplorerRuntimeDiagnostics?.();return s.gameStarted&&!s.worldLoading&&!document.querySelector('#loading.show')&&Number.isFinite(d?.surfaceChain?.surfaces?.terrain?.y);}),null,{timeout:360000});
  result.firstPlayableMs=performance.now()-start;
  await page.evaluate(async()=>{const{ctx}=await import('/app/js/shared-context.js?v=55');ctx.setTimeOfDay?.('day');ctx.setWeatherMode?.('clear');});
  await page.waitForTimeout(3500);

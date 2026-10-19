@@ -1,3 +1,4 @@
+import {afterWorldLoad} from './complete-world-readiness.mjs';
 // Actual installed-Chrome Earth coverage. Fixed diagnostic cameras/time presets
 // are explicit visual test setup; gameplay controls run separately below.
 import assert from 'node:assert/strict';
@@ -40,7 +41,7 @@ try{
  await page.waitForFunction(()=>globalThis.__WE3D_RUNTIME_READY__,null,{timeout:90000});
  if(await page.locator('#analyticsConsentDenyBtn').isVisible())await page.locator('#analyticsConsentDenyBtn').click();
  await page.getByRole('button',{name:'Explore',exact:true}).click();
- await page.waitForFunction(()=>{const s=globalThis.getWorldExplorerRuntimeDiagnostics?.();return s?.gameStarted&&!s.worldLoading&&s.farTerrainClipmap?.status==='ready'&&!document.getElementById('loading')?.classList.contains('show');},null,{timeout:360000,polling:500});
+ await page.waitForFunction(afterWorldLoad(()=>{const s=globalThis.getWorldExplorerRuntimeDiagnostics?.();return s?.gameStarted&&!s.worldLoading&&s.farTerrainClipmap?.status==='ready'&&!document.getElementById('loading')?.classList.contains('show');}),null,{timeout:360000,polling:500});
  report.loadMs=Date.now()-start;
  if(loadProfiler){
   report.loadedHeap=await loadProfiler.send('Runtime.getHeapUsage');

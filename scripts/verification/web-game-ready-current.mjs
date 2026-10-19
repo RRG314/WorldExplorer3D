@@ -44,7 +44,7 @@ source = source.replace('await page.click(args.clickSelector, { timeout: 5000 })
 const patches=[
  ['await page.waitForTimeout(500);', `await page.waitForFunction(() => window.__WE3D_RUNTIME_READY__, null, {timeout:45000});`],
  ['await page.click(args.clickSelector, { timeout: 5000 });', 'await page.click(args.clickSelector, { timeout: 15000 });'],
- ['await page.waitForTimeout(250);', `try { await page.waitForFunction(() => { const s=window.getWorldExplorerRuntimeDiagnostics?.(); return s?.gameStarted && !s.worldLoading && !document.getElementById('loading')?.classList.contains('show'); }, null, {timeout:${worldWait}}); }
+ ['await page.waitForTimeout(250);', `try { await page.waitForFunction(() => { if (!window.__WE3D_RUNTIME_READY__ || document.querySelector('#loading.show')) return false; const s=window.getWorldExplorerRuntimeDiagnostics?.(); return s?.gameStarted && !s.worldLoading && !document.getElementById('loading')?.classList.contains('show'); }, null, {timeout:${worldWait}}); }
  catch(error) { fs.mkdirSync(args.screenshotDir,{recursive:true});
  await page.screenshot({path:path.join(args.screenshotDir,'load-failure.png')});
  fs.writeFileSync(path.join(args.screenshotDir,'load-failure.json'),JSON.stringify(await page.evaluate(()=>({diagnostics:window.getWorldExplorerRuntimeDiagnostics?.(),loading:document.getElementById('loading')?.textContent})),null,2));

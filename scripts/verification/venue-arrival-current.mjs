@@ -1,3 +1,4 @@
+import {afterWorldLoad} from './complete-world-readiness.mjs';
 import {verifyKennedyTour,verifyLaunchPad} from './kennedy-journey.mjs';
 import assert from 'node:assert/strict';
 import {mkdir,writeFile} from 'node:fs/promises';
@@ -49,7 +50,7 @@ if(!process.env.FIREBASE_AUTH_EMULATOR_HOST){
     await page.waitForFunction(()=>globalThis.__WE3D_RUNTIME_READY__,null,{timeout:120000});
     if(await page.locator('#analyticsConsentDenyBtn').isVisible())await page.locator('#analyticsConsentDenyBtn').click();
     if(await page.locator('#globeSelectorStartBtn').isVisible())await page.locator('#globeSelectorStartBtn').click();
-    await page.waitForFunction(()=>{const d=getWorldExplorerRuntimeDiagnostics();return d.gameStarted&&!d.worldLoading&&!document.getElementById('loading')?.classList.contains('show');},null,{timeout:300000});
+    await page.waitForFunction(afterWorldLoad(()=>{const d=getWorldExplorerRuntimeDiagnostics();return d.gameStarted&&!d.worldLoading&&!document.getElementById('loading')?.classList.contains('show');}),null,{timeout:300000});
     const skip=page.getByRole('button',{name:'Skip guide',exact:true});if(await skip.isVisible())await skip.click();
     await page.evaluate(async()=>{globalThis.venueCtx=(await import('/app/js/shared-context.js?v=55')).ctx;});
     console.log('[venue] World ready; inspecting published doors');
