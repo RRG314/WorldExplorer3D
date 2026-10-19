@@ -4,6 +4,23 @@ Updated October 18, 2026. **5.5.1 remains live; 5.6.1 is entering final acceptan
 The owner explicitly authorized completing the repairs and deploying production.
 Do not ask for the same deployment authorization again or promote a failing package.
 
+## October 18 late — final interactive acceptance pending
+
+The ae6c75a2 package corrects an arbitrary verifier sky click that opened a star
+panel. Its full headless performance attempt then failed an actual 266.6/200 ms
+walking pause cluster; it is not accepted. A same-package visible Chrome check
+passes four-minute walking and driving, a 90-second flight, coverage and errors.
+The primary performance runner now explicitly measures visible Chrome on this
+physical host, with all existing budgets and complete routes/reloads unchanged.
+This is not proof that headless presentation caused the earlier failure.
+
+Freeze the new test/documentation commit and complete formal performance, backend,
+save/fallback, full candidate and ordinary hosted acceptance before production.
+No gameplay bytes changed after 1134ec6d. Preserve the failed and diagnostic
+receipts separately. Current package identity is in current-final-candidate.json.
+The prior source/ownership summary below remains valid; its focused pass is not
+a completed release.
+
 ## Current checkpoint
 
 - Worktree: `/Users/stevenreid/.codex/worktrees/architecture-evaluation/WorldExplorer3D-live-deployed-20260320`, branch `steven/visual-quality`. Do not edit the stale Documents checkout.

@@ -30,7 +30,9 @@ const server = await startStaticServer({ rootDir: verifyRoot, ports: [4421, 4422
 const baseUrl = `http://127.0.0.1:${server.port}`;
 // Match ordinary browser allocation behavior. A test-only heap cap changes GC
 // frequency and can disguise the allocation footprint users experience.
-const browserOptions = { headless: true, channel: 'chrome', args: [] };
+// Measure the declared interactive desktop presentation. Headless diagnostic
+// receipts remain separate; no frame limits or sampling rules change here.
+const browserOptions = { headless: false, channel: 'chrome', args: [] };
 let browser = await chromium.launch(browserOptions);
 let graphicsAuthority = null;
 const requestedProfile = String(process.env.WE3D_VERIFY_PROFILE || 'all').trim().toLowerCase();
@@ -52,6 +54,7 @@ function metricValue(metrics, name) {
 async function createMeasuredClient(contextOptions) {
   const context = await browser.newContext(contextOptions);
   const page = await context.newPage();
+  await page.bringToFront();
   await configureStagingAppCheck(page, baseUrl);
   const cdp = await context.newCDPSession(page);
   await cdp.send('Network.enable');
@@ -654,6 +657,7 @@ try {
     hostAuthority,
     graphicsAuthority,
     browserVersion: browser.version(),
+    presentationScope: 'visible owned Chrome window on the declared M1 hardware',
     desktop,
     mobileRegression,
     physicalPhoneEvidence: {

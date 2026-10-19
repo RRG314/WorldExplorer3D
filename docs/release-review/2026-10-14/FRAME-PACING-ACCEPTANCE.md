@@ -14,7 +14,7 @@ behavior or physics frequency is reduced by this change.
 The existing independent criteria remain unchanged: p95 ≤ 34.36 ms, p99 ≤ 50 ms,
 no individual interval above 250 ms (apart from the existing 0.05 ms rounding
 tolerance), at most one interval above 100 ms per minute, and at least 10 seconds
-between those hitches. The 630-second keyboard route, occupied-world retained
+between those hitches. The 930-second keyboard route, occupied-world retained
 memory, twelve release/reload cycles, coverage and resource checks remain required.
 Those checks still reject the measured cold-flight pauses. A passing average FPS
 must never substitute for a passing pacing result.
@@ -32,3 +32,27 @@ result. Packaging, prescribed gameplay, complete matrix and source-bound release
 acceptance remain required. Evidence:
 `output/release-review/551-current-host-native-flight/` and
 `output/release-review/561-building-storage-native-flight/`.
+
+## October 18 — interactive presentation and current evidence
+
+The primary physical desktop run now opens a visible Chrome window and brings
+the measured page to the front. The previous runner used headless Chrome on the
+same physical GPU. Both are real browser executions, but only the former checks
+the declared interactive presentation. Receipts identify this presentation;
+headless/profiled checks remain diagnostic evidence, with failures preserved.
+This does not establish that headless rendering caused a particular pause.
+
+On immutable ae6c75a2, the visible comparison loads in 107.6 seconds. Four-minute
+walking covers 577.08 units at 40.63 FPS (one 133.3 ms interval). Four-minute driving
+covers 1,100.43 units at 40.27 FPS (three 133.3–150 ms intervals, at least 86.8
+seconds apart). Both pass the existing pacing limits; coverage remains 49,080
+buildings and 18,951 roads, with no browser/local errors or interruption. The
+image and prescribed input were inspected. This limited comparison is not full
+acceptance: seven mixed routes, actual ground turnover, twelve reloads, occupied
+memory, and mobile regression still have to pass together on the final package.
+
+The earlier headless four-minute walk failed with 266.6/200 ms clustered pauses;
+that receipt remains failed. No sampling exclusions, timing thresholds, feature
+reductions, forced collection during play, or gameplay changes accompany this
+presentation change. Evidence: `output/release-review/561-ae6c75a2-visible-chrome`
+and `output/release-review/561-ae6c75a2-performance`.
