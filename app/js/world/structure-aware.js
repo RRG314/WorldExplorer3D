@@ -734,7 +734,11 @@ export async function refreshStructureAwareFeatureProfilesCooperatively() {
   return result.value;
 }
 
-export async function refreshTransportStructureAssembliesForPublishedTerrain() {
+export async function refreshTransportStructureAssembliesForPublishedTerrain({current=()=>true}={}) {
+  const sequence=appCtx._worldLoadSequence,roads=appCtx.roads,groundRelease=appCtx.lastEarthStreamingRelease;
+  const isCurrent=()=>current()&&sequence===appCtx._worldLoadSequence&&roads===appCtx.roads&&groundRelease===appCtx.lastEarthStreamingRelease;
+  const assertCurrent=()=>{if(!isCurrent())throw new DOMException('Transport structure publication superseded','AbortError');};
+  assertCurrent();
   const roadFeatures = Array.isArray(appCtx.roads) ? appCtx.roads : [];
   const transportFeatures = roadFeatures.concat(structureAwareLinearFeatures());
   const structureWaterAreas = []
@@ -749,7 +753,9 @@ export async function refreshTransportStructureAssembliesForPublishedTerrain() {
   // the mesh adapter sees, after road grading and both terrain LODs publish.
   // The road floor remains owned by its already compiled transport profile.
   compileTunnelSystemModels(transportFeatures, samplePublishedTerrainY);
-  appCtx.tunnelSolidCompilation = await compileTunnelSolidBoundaries(transportFeatures);
+  const tunnelSolids=await compileTunnelSolidBoundaries(transportFeatures,{current:isCurrent});
+  assertCurrent();
+  appCtx.tunnelSolidCompilation = tunnelSolids;
   const supportRoadIndex = createDriveableRoadConflictIndex(roadFeatures);
   appCtx.transportStructureAssembly = compileTransportStructureAssemblies(
     transportFeatures,

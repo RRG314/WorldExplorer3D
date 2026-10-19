@@ -401,6 +401,7 @@ export async function publishCompiledTransportMeshes(deps = {}) {
   const sequence = appCtx._worldLoadSequence;
   const generation = appCtx._roadMeshGeneration = (appCtx._roadMeshGeneration || 0) + 1;
   const isCurrent = () => sequence === appCtx._worldLoadSequence && generation === appCtx._roadMeshGeneration && !appCtx.onMoon;
+  const assertCurrent=()=>{if(!isCurrent())throw new DOMException('Road publication superseded','AbortError');};
   const baseRoads = appCtx.roads;
   if (baseRoads.length === 0) return;
   const now = () => globalThis.performance?.now?.() ?? Date.now();
@@ -429,7 +430,7 @@ export async function publishCompiledTransportMeshes(deps = {}) {
     }
   };
 
-  let preparingDetail=null,cancelPreparation=null,releaseTerrain=()=>{},detailAdopted=false;
+  let preparingDetail=null,cancelPreparation=null,releaseTerrain=()=>{},detail=null,detailAdopted=false;
   try {
   if (typeof disableRoadDebugMode === "function") {
     disableRoadDebugMode();
@@ -445,6 +446,7 @@ export async function publishCompiledTransportMeshes(deps = {}) {
     measure('refreshStructureProfiles', () => appCtx.refreshStructureAwareFeatureProfiles());
     await yieldToMainThread();
   }
+  assertCurrent();
   if(typeof Worker==='function') {
     const seen=new Set(),planRoads=[];
     for(const road of baseRoads){
@@ -469,13 +471,14 @@ export async function publishCompiledTransportMeshes(deps = {}) {
       // publication after the complete transport height rebuild.
       deferVisualProfile: true
     }));
-    if(!isCurrent())return;
+    assertCurrent();
     appCtx.streetFrontageGrading?.clearSamples?.();
     if (typeof repositionBuildingsWithTerrain === 'function') {
       measure('reprojectGroundAttachedWorld', () => repositionBuildingsWithTerrain());
     }
     await yieldToMainThread();
   }
+  assertCurrent();
   // Water masks and compiled cut/fill corridors change the physical terrain
   // beneath bridge ends. Refresh support geometry against that final surface
   // before publishing meshes so a road cannot become unsupported only after
@@ -483,7 +486,7 @@ export async function publishCompiledTransportMeshes(deps = {}) {
   if (typeof appCtx.refreshTransportStructureAssembliesForPublishedTerrain === 'function') {
     await measureAsync(
       'refreshPublishedTerrainStructureAssemblies',
-      () => appCtx.refreshTransportStructureAssembliesForPublishedTerrain()
+      () => appCtx.refreshTransportStructureAssembliesForPublishedTerrain({current:isCurrent})
     );
     await yieldToMainThread();
   }
@@ -492,19 +495,20 @@ export async function publishCompiledTransportMeshes(deps = {}) {
   // The road worker and fallback compiler must receive the final cuts before
   // either snapshots terrain or builds contacts. Otherwise asphalt survives
   // suspended over the terrain that the portal shader removes afterwards.
-  if(!isCurrent())return;
+  assertCurrent();
   await measureAsync('rebuildStructureVisuals', () => (
     typeof rebuildStructureVisualMeshesCooperatively === 'function'
       ? rebuildStructureVisualMeshesCooperatively
       : rebuildStructureVisualMeshes
   )({boundsIntersect:boundsIntersectLocal,cachedTerrainHeight,pointAlongPolyline,polylineCurvatureMetric,current:isCurrent}));
-  if(!isCurrent())return;
+  assertCurrent();
   clearTerrainHeightCache?.();
   const clipGroundSurface=createPortalSurfaceClipper(appCtx.structureTerrainPortalDescriptors);
   const uncutRoadTop=(x,z)=>appCtx.terrainMeshHeightAt(x,z,{ignorePortalCuts:true})+ROAD_SURFACE_BIAS;
 
   const intersections = measure('detectIntersections', () => detectRoadIntersections(baseRoads));
   await yieldToMainThread();
+  assertCurrent();
   // Junction footprints are resolved by the same planar union as road
   // segments. No stacked circular cap is published over the intersection.
   for (const road of baseRoads) road.junctionTransitions = [];
@@ -549,7 +553,6 @@ export async function publishCompiledTransportMeshes(deps = {}) {
   const skirtMat = sharedRoadMaterials.skirtMat;
   const markMat = sharedRoadMaterials.markMat;
   const atGradeRoads=[];
-  let detail=null;
   const initialRegionKeys=new Set();
   await measureAsync('buildStructureRibbons', async () => {
     // These immutable width views belong to one terrain publication, including
@@ -607,7 +610,7 @@ export async function publishCompiledTransportMeshes(deps = {}) {
         }
         recordAtGradeRoadTerrainConformance(roadTerrainAudit,renderRoad,auditVertices,cachedTerrainHeight,worldToLatLon);
         if(now()-sliceStartedAt>=24) {await yieldToMainThread();sliceStartedAt=now();}
-        if(!isCurrent())return;
+        assertCurrent();
         continue;
       }
 
@@ -660,18 +663,18 @@ export async function publishCompiledTransportMeshes(deps = {}) {
         await yieldToMainThread();
         sliceStartedAt = now();
       }
+      assertCurrent();
     }
     } finally { publicationStorage.release(); }
   });
   await yieldToMainThread();
 
-  if(!isCurrent())return;
+  assertCurrent();
   await measureAsync('buildCarriagewayRegions',async()=>{
     if(typeof Worker==='function') {
       releaseTerrain();
       detail=await preparingDetail;
-      detailAdopted=true;
-      appCtx.transportDetail=detail;
+      assertCurrent();
       for(const region of detail.initial.regions){
         initialRegionKeys.add(region.key);
         for(const batch of region.batches)appendRoadMainGeometry(batch.positions,batch.indices,'at_grade');
@@ -688,7 +691,7 @@ export async function publishCompiledTransportMeshes(deps = {}) {
       trace('indexCarriageways:end',{tiles:tiles.length});
       let sliceStartedAt=now();
       for(const [tileIndex,tile] of tiles.entries()) {
-        if(!isCurrent())return;
+        assertCurrent();
         if(tileIndex%128===0)trace('meshCarriageway:progress',{completed:tileIndex,total:tiles.length,key:tile.key});
         const mesh=meshCarriagewayTile(tile,uncutRoadTop,partition);
         if(mesh.indices.length) {
@@ -702,13 +705,13 @@ export async function publishCompiledTransportMeshes(deps = {}) {
     } finally {partition.dispose();}
     roadBatchBuilder.finish();
   });
-  if(!isCurrent())return;
+  assertCurrent();
   await measureAsync('projectGroundRoadMarkings',async()=>{
     const support=createRoadContactIndex(roadMainBatches.map(batch=>({geometry:{attributes:{position:{array:batch.verts}},getIndex:()=>({array:batch.indices})},userData:{surfaceRanges:batch.ranges}})));
     try {
       let sliceStartedAt=now();
       for(const {road,points,widths} of atGradeRoads) {
-        if(!isCurrent())return;
+        assertCurrent();
         if(shouldRenderRoadCenterMarkings(road)) {
           const groundSupport={sampleAt:(x,z)=>support.sampleAt(x,z,NaN,'at_grade'),projectTriangle:(points,lift)=>support.projectTriangle(points,lift,'at_grade'),projectPolygon:(points,lift)=>support.projectPolygon(points,lift,'at_grade')};
           appendMarkings(road,points,widths,groundSupport.sampleAt,groundSupport);
@@ -718,7 +721,7 @@ export async function publishCompiledTransportMeshes(deps = {}) {
     } finally {support.dispose();}
   });
 
-  if (!isCurrent()) return;
+  assertCurrent();
   roadSkirtBuilder.finish();
   roadMarkBuilder.finish();
   const allRoadBatches = [...roadMainBatches, ...roadSkirtBuilder.batches, ...roadMarkBuilder.batches];
@@ -789,7 +792,7 @@ export async function publishCompiledTransportMeshes(deps = {}) {
       const measured = measurePublishedRoadTriangles(mesh.geometry?.attributes?.position?.array, mesh.geometry?.getIndex?.()?.array);
       for (const [key, value] of Object.entries(measured)) roadSurfaceIntegrity[key] += value;
       if (now() - sliceStartedAt >= 24) { await yieldToMainThread(); sliceStartedAt = now(); }
-      if (!isCurrent()) return;
+      assertCurrent();
     }
     for (const intersection of intersections) {
       if (intersection.hasGradeSeparatedRoad || (detail&&!initialRegionKeys.has(transportRegionKey(intersection.x,intersection.z)))) continue;
@@ -818,17 +821,20 @@ export async function publishCompiledTransportMeshes(deps = {}) {
         }
       }
       if (now() - sliceStartedAt >= 24) { await yieldToMainThread(); sliceStartedAt = now(); }
-      if (!isCurrent()) return;
+      assertCurrent();
     }
   });
-  if(!isCurrent())throw new Error('Road publication superseded');
+  assertCurrent();
   } catch (error) {
     stagedRoadContact?.dispose();
     for (const mesh of stagedRoadMeshes) mesh.geometry?.dispose();
     throw error;
   }
+  const roadTerrainConformance = finalizeRoadTerrainConformanceAudit(roadTerrainAudit);
   // No asynchronous boundary inside the publication: old roads stay visible
   // throughout compilation and are released only after every replacement exists.
+  // The summary and worker callbacks belong to this same handoff. A yield here
+  // would let a world reset replace the contact owner before callbacks capture it.
   const previousRoadMeshes = [...appCtx.roadMeshes];
   for (const mesh of stagedRoadMeshes) appCtx.addEarthWorldObject(mesh);
   appCtx.replaceWorldCollection('roadMeshes', stagedRoadMeshes);
@@ -845,8 +851,6 @@ export async function publishCompiledTransportMeshes(deps = {}) {
   // The pavement owner keeps its render and collision meshes together until its
   // own replacement is ready; road rebuilds must never dispose only the render half.
   markGroundSurfaceChanged(appCtx);
-  await yieldToMainThread();
-  const roadTerrainConformance = finalizeRoadTerrainConformanceAudit(roadTerrainAudit);
 
   appCtx.transportSurfacePublication = Object.freeze({
     authority: "compiled_transport_surface",
@@ -989,9 +993,15 @@ export async function publishCompiledTransportMeshes(deps = {}) {
       updateSummary(false);
     });
   }
+  appCtx.transportDetail=detail;
+  detailAdopted=true;
   return appCtx.transportSurfacePublication;
   } finally {
     releaseTerrain();
-    if(preparingDetail&&!detailAdopted)cancelPreparation?.();
+    if(!detailAdopted){
+      // Preparation may already have resolved and released its cancellation
+      // slot. The local controller still owns its worker/overview until commit.
+      if(detail)detail.dispose();else cancelPreparation?.();
+    }
   }
 }

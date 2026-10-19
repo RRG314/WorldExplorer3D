@@ -1,0 +1,72 @@
+<!doctype html><meta charset="utf-8"><title>Transport publication handoff</title><link rel="icon" href="data:,"><style>body{margin:0;background:#a5c5d8}canvas{display:block}pre{position:absolute;left:16px;top:8px;background:#ffffffed;padding:12px;font:15px monospace}</style>
+<pre id="status">Checking road publication and cancellation…</pre>
+<script src="/app/vendor/three/build/three.min.js"></script>
+<script>window.addEventListener('error',e=>window.fixtureError=e.message);window.addEventListener('unhandledrejection',e=>window.fixtureError=String(e.reason));</script>
+<script type="module">
+import {ctx} from '/app/js/shared-context.js?v=55';
+import {publishCompiledTransportMeshes} from '/app/js/terrain/rebuild.js';
+const check=(value,message)=>{if(!value)throw Error(message);};
+const renderer=new THREE.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});renderer.setSize(1000,700);document.body.append(renderer.domElement);
+const scene=new THREE.Scene();scene.background=new THREE.Color(0xa5c5d8);scene.add(new THREE.HemisphereLight(0xffffff,0x68684e,1.2));
+const camera=new THREE.PerspectiveCamera(45,1000/700,.1,20000);camera.position.set(180,210,280);camera.lookAt(0,0,0);
+const terrainGroup=new THREE.Group();scene.add(terrainGroup);
+const groundGeometry=new THREE.PlaneGeometry(8192,8192);groundGeometry.rotateX(-Math.PI/2);
+const ground=new THREE.Mesh(groundGeometry,new THREE.MeshStandardMaterial({color:0x8f9d72}));ground.userData={isFarTerrainClipmap:true,isFixedLocationTerrainLod:true};terrainGroup.add(ground);
+const roadMaterial=new THREE.MeshStandardMaterial({color:0x2a2f33});
+const workers=new Set(),geometries=new Set();let cancelOnGeometry=false,height=0;
+const NativeWorker=window.Worker;
+window.Worker=class extends NativeWorker {constructor(...args){super(...args);workers.add(this);}terminate(){super.terminate();workers.delete(this);}};
+const OriginalGeometry=THREE.BufferGeometry;
+THREE.BufferGeometry=class extends OriginalGeometry {constructor(){super();geometries.add(this);this.addEventListener('dispose',()=>geometries.delete(this));
+  if(cancelOnGeometry){cancelOnGeometry=false;queueMicrotask(()=>{
+    ctx._worldLoadSequence++;ctx._roadMeshGeneration++;ctx._cancelTransportPreparation?.();ctx.transportDetail?.dispose();ctx.transportDetail=null;
+    ctx.transportSurfacePublication=replacement;
+  });}
+}};
+Object.assign(ctx,{terrainEnabled:true,onMoon:false,_worldLoadSequence:0,_roadMeshGeneration:0,roads:[],roadMeshes:[],terrainGroup,renderer,
+  terrainMeshHeightAt:()=>height,getFarTerrainSurfaceSnapshot:()=>({grid:{xValues:[-4096,4096],zValues:[-4096,4096],worldYs:[height,height,height,height]},portals:[]}),
+  addEarthWorldObject:mesh=>scene.add(mesh),replaceWorldCollection:(key,values)=>{ctx[key]=values;}});
+const deps={getSharedRoadMaterials:()=>({roadMat:roadMaterial,skirtMat:roadMaterial,markMat:roadMaterial}),cachedTerrainHeight:()=>height,
+  cachedBaseTerrainHeight:()=>height,subdivideRoadPoints:points=>points,rebuildStructureVisualMeshes:()=>{}};
+const draw=()=>renderer.render(scene,camera);draw();const baseline={...renderer.info.memory},cases=[];
+const reset=()=>{
+  ctx._worldLoadSequence++;ctx._roadMeshGeneration++;ctx._cancelTransportPreparation?.();ctx.transportDetail?.dispose();ctx.transportDetail=null;
+  ctx.roadContactIndex?.dispose();ctx.roadContactIndex=null;
+  for(const mesh of ctx.roadMeshes){mesh.parent?.remove(mesh);mesh.geometry.dispose();}ctx.roadMeshes=[];ctx.transportSurfacePublication=null;
+};
+const prepare=y=>{
+  height=y;ground.position.y=y;
+  ctx.roads=[{type:'residential',pts:[{x:-3500,z:0},{x:3500,z:0}],width:12,metersPerWorldUnit:1,structureSemantics:{terrainMode:'at_grade'}},
+    {type:'residential',pts:[{x:0,z:-3500},{x:0,z:3500}],width:12,metersPerWorldUnit:1,structureSemantics:{terrainMode:'at_grade'}}];
+};
+const released=()=>{draw();check(workers.size===0,'Road worker survived release');check(geometries.size===0,'Staged road geometry retained');
+  check(renderer.info.memory.geometries===baseline.geometries,'GPU geometry retained');check(renderer.info.memory.textures===baseline.textures,'Coverage textures retained');};
+const replacement=Object.freeze({identity:'replacement-world'});
+try{
+  reset();prepare(0);await publishCompiledTransportMeshes(deps);draw();
+  check(Math.abs(ctx.roadContactIndex.sampleAt(20,0)-.18)<1e-5,'First road contact missing');
+  check(workers.size===1&&ctx.transportSurfacePublication.worldLoadSequence===ctx._worldLoadSequence,'Initial handoff mismatched');
+  reset();released();cases.push({id:'initial-world-release',memory:{...renderer.info.memory}});
+  prepare(4);cancelOnGeometry=true;
+  let cancelled=false;try{await publishCompiledTransportMeshes(deps);}catch(error){check(/superseded/i.test(error.message),error.message);cancelled=true;}
+  check(cancelled,'Staging cancellation did not run');check(ctx.transportSurfacePublication===replacement,'Old summary replaced new world');
+  check(ctx.transportDetail===null&&ctx.roadContactIndex===null&&ctx.roadMeshes.length===0,'Partial road owner escaped');
+  released();cases.push({id:'cancelled-staging-release',memory:{...renderer.info.memory}});
+  reset();prepare(8);await publishCompiledTransportMeshes(deps);draw();
+  const actor={x:2400,z:0,source:'drive'},deadline=performance.now()+20000;
+  do{ctx.transportDetail.step(actor,8);draw();await new Promise(r=>setTimeout(r,16));
+    check(!ctx.transportDetail.stats.error,ctx.transportDetail.stats.error);check(performance.now()<deadline,'Replacement region did not arrive');
+  }while(!ctx.transportDetail.readyAt(actor));
+  check(Math.abs(ctx.roadContactIndex.sampleAt(2400,0)-8.18)<1e-4,'Replacement contact used the old terrain');
+  check(ctx.transportSurfacePublication.worldLoadSequence===ctx._worldLoadSequence&&workers.size===1,'Replacement ownership mismatch');
+  cases.push({id:'replacement-worker-publishes-on-new-terrain',roadHeight:ctx.roadContactIndex.sampleAt(2400,0),sequence:ctx._worldLoadSequence});
+  camera.position.set(2580,218,280);camera.lookAt(2400,8,0);draw();
+  let pan=0;window.addEventListener('keydown',e=>{if(e.code==='ArrowRight')pan+=10;if(e.code==='ArrowLeft')pan-=10;camera.position.x=2580+pan;camera.lookAt(2400,8,0);draw();});
+  window.advanceTime=draw;
+  window.render_game_to_text=()=>JSON.stringify({ok:true,cases,baseline,workers:workers.size,roadMeshes:ctx.roadMeshes.length,pan,
+    scope:'Actual road publisher, worker, geometry, contact and GPU lifetime; controlled terrain, not full-world acceptance'});
+  window.releaseFixture=()=>{reset();released();return {...renderer.info.memory};};
+  document.querySelector('#status').textContent='Road publication, cancellation and replacement passed\nCancelled geometry, worker and coverage textures released\nNew region uses replacement terrain at8.18\nArrow keys: pan this verification view';
+  window.fixtureReady=true;
+}catch(error){reset();document.querySelector('#status').textContent=error.stack;throw error;}
+</script>

@@ -36,6 +36,65 @@ Evidence lives under ignored `output/research/browser-foundation-implementation-
 
 No broad release sweep, production deployment or Godot client is part of this local checkpoint.
 
+## Bounded follow-up: transport publication handoff
+
+Starting from `d9159cc8`, this checkpoint audited the full road rebuild and its
+tunnel/support refresh during cancellation and world replacement. It stopped
+after reproducing and repairing the ownership gaps, checking their resource
+release, and saving a local commit. This is separate from the earlier moving
+region retirement repair.
+
+The prepared road worker was assigned to the shared context before mesh/contact
+staging succeeded. A staging failure could therefore leave a compiler and
+coverage texture owner alive. The commit also yielded after replacing the meshes
+and contacts but before recording their summary and attaching regional callbacks.
+A replacement world could intervene and have its state overwritten. Finally,
+the tunnel/support refresh assigned results after a worker await without checking
+the source world's identity.
+
+The road builder now owns preparation until the complete mesh/contact/summary/
+controller handoff. Its failure path disposes that preparation whether the worker
+promise is still pending or has already resolved. The commit has no asynchronous
+boundary. Generation checks reject obsolete work before it can start preparation
+or resume publication; explicit cancellation checks throw `AbortError` rather
+than returning as a successful empty build. Tunnel/support publication checks
+the load sequence, road source, ground release and caller generation before
+writing shared facts. Late tunnel results are rejected and the worker is
+terminated in its existing `finally`; synchronous message failure also clears
+its deadline timer.
+
+Evidence under ignored `output/research/transport-handoff-2026-10-19/`:
+
+- Four original road regressions failed before repair (`before.tap`). A fifth
+  reproduced obsolete structure refresh (`structure-before.tap`). Both retained.
+- Six new behavioral checks exercise the actual road publisher/compiler/contact
+  code with controlled scheduling and message delivery. Together with existing
+  transport, surface-failure and tunnel geometry checks, 40 distinct cases passed
+  (`focused.tap`). After completing cancellation propagation, the 11 affected
+  lifecycle/failure cases passed again (`cancellation-final.tap`); these overlap
+  the 40, not 11 additional cases.
+- Actual browser worker and full road publisher: initial publication/release,
+  cancellation during geometry staging, and replacement publication followed by
+  a distant region all passed. Road contact used the replacement terrain height
+  (8.1800003), with matching generation and one active worker. After release,
+  there were zero road workers, no retained staged geometry, and GPU resources
+  returned to one terrain geometry and zero textures. No page or console errors.
+- The prescribed web-game client also passed its short input/observation burst.
+  Both final screenshots were inspected. The fixture is deliberately controlled
+  terrain; it does not claim real-location graphics or frame-pacing acceptance.
+- The first passing browser receipt is retained under `browser-initial`; the
+  final source receipt is `browser/receipt.json`. Context ownership, syntax and
+  diff checks passed. Owned browsers and the temporary local server were closed.
+
+**Stopping point reached.** No full-city rerun, release matrix, backend test,
+hosting build, GitHub push or production deployment was performed. Tunnel
+worker cancellation rejects an obsolete result at its existing response/deadline
+boundary (at most the existing ten-second compilation budget); this does not add
+an immediate interrupt for that worker. Coordinated geographic residency,
+activation/spawn/return command ownership, visual policy and Godot remain the
+separate packages below. Do not reopen this checkpoint's passing checks unless
+their inputs change or new evidence identifies a regression.
+
 ## Remaining architectural work
 
 This removes competing interpretations in the named consumer paths; it does not yet remove all direct actor writers. The next migration must classify and move actual activation, spawn and world-return commands into the existing transport/session owners, retaining their domain-specific admission rules. Do not replace aircraft, maritime and walking entry rules with an unrestricted generic position setter.

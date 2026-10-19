@@ -4,6 +4,8 @@
 
 The [local implementation ledger](2026-10-19-BROWSER-FOUNDATION-IMPLEMENTATION.md) records the actor/control consolidation, vehicle handoff and road-publication lifetime repairs, including current checks and unfinished broader migration work.
 
+Its bounded transport-handoff follow-up is complete locally: cancelled road and tunnel work cannot adopt the replacement world's publication, and prepared road resources are released on failure. The ledger records the stopping point and separates this from the remaining geographic-residency and Godot work.
+
 The measured runtime improvements from this investigation shipped September 28,
 2026, at source commit `2839df5d6bbed9f8dfa4b89e379ba2e026cab438`.
 Earlier documents describe the local investigation at their stated dates;
