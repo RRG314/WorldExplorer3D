@@ -427,7 +427,8 @@ async function runDesktop() {
     // Exercise the actual throttle and climb controls. An idle aircraft spawned
     // from a city street can hit the next block; that is not sustained-flight
     // performance evidence. Do not teleport, disable collisions, or inject speed.
-    await client.page.mouse.click(720, 400);
+    // Release the menu's keyboard focus without selecting a sky object.
+    await client.page.locator('#travelBtn').blur();
     const flightBefore = await client.page.evaluate(async () => (await import('/app/js/shared-context.js?v=55')).ctx.getPlaneSnapshot());
     await client.page.keyboard.down('Space');
     await client.page.keyboard.down('s');
