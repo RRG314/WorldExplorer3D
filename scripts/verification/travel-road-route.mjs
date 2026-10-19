@@ -30,6 +30,26 @@ export function planRoadRoute(roads) {
   return best;
 }
 
+// Continue forward from the actual mode handoff; never steer back to the fixture
+// origin or write the actor's pose. Exact ties keep the first matching segment.
+export function remainingRoadRoute(route,position) {
+  if (!route?.points || route.points.length < 2 || ![position?.x,position?.z].every(Number.isFinite)) {
+    throw new Error('A connected route and finite handoff position are required');
+  }
+  let best = -1, distance = Infinity;
+  for (let i = 0; i < route.points.length - 1; i++) {
+    const a = route.points[i], b = route.points[i+1], dx = b.x-a.x, dz = b.z-a.z;
+    const lengthSquared = dx*dx+dz*dz;
+    if (!Number.isFinite(lengthSquared) || lengthSquared === 0) continue;
+    const t = Math.max(0,Math.min(1,((position.x-a.x)*dx+(position.z-a.z)*dz)/lengthSquared));
+    const candidateDistance = Math.hypot(position.x-a.x-t*dx,position.z-a.z-t*dz);
+    if (candidateDistance < distance) { best = i; distance = candidateDistance; }
+  }
+  if (best < 0 || distance >= 30) throw new Error('Ordinary driving handoff must remain near the walked road');
+  const points = route.points.slice(best);
+  return {points,length:points.slice(1).reduce((sum,p,i)=>sum+Math.hypot(p.x-points[i].x,p.z-points[i].z),0)};
+}
+
 export async function followRoadRoute(page,route,signal,{mode='drive'}={}) {
   const points=route.points,held=new Set(),samples=[];let segment=0,progress=0,completedLength=0;
   const setKey=async(key,down)=>{if(down===held.has(key))return;if(down){await page.keyboard.down(key);held.add(key);}else{await page.keyboard.up(key);held.delete(key);}};

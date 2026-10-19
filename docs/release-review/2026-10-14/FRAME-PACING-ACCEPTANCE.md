@@ -56,3 +56,27 @@ that receipt remains failed. No sampling exclusions, timing thresholds, feature
 reductions, forced collection during play, or gameplay changes accompany this
 presentation change. Evidence: `output/release-review/561-ae6c75a2-visible-chrome`
 and `output/release-review/561-ae6c75a2-performance`.
+
+## October 19 runner deadline correction
+
+The visible 075a87bb run completed all 930 seconds of sustained traversal and
+eleven reload cycles before its 40-minute process deadline. Its driving cluster
+remains a failure; mobile checks did not run. The suite now has a bounded
+60-minute deadline to allow twelve full reloads and independent mobile checks.
+Per-frame, first-playable, coverage and retention budgets are unchanged.
+
+## October 19 ordinary ground handoff correction
+
+The previous fixture reset the car to the route origin after each walking window.
+This differs from the actual Travel action, which starts driving at the walker,
+and unnecessarily invalidated the freshly accepted street region. The canonical
+suite now observes that action without writing pose/velocity and continues forward
+on the walked route. Both handoffs retain before/after position, generation and
+actor-write receipts. Explicit initial/aircraft fixtures and every timed window,
+sample and budget remain; earlier failed reset runs remain failed.
+
+The source comparison covers four minutes walking (40.43 FPS, maximum 83.3 ms)
+and four minutes driving (47.29 FPS, one 100.1 ms interval). It loads in 103.1 s,
+retains coverage across new streets, and reports no errors or interruption. This
+supports scenario fidelity and does not replace final immutable acceptance.
+Evidence: `output/release-review/561-compact-land-ordinary-handoff`.

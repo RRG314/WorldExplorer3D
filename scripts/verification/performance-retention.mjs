@@ -2,7 +2,7 @@ import { configureStagingAppCheck } from './staging-app-check.mjs';
 import assert from 'node:assert/strict';
 import { sampleFrameWindow } from './frame-window.mjs';
 import { frameHitches } from './frame-hitches.mjs';
-import {planRoadRoute,followRoadRoute} from './travel-road-route.mjs';
+import {planRoadRoute,followRoadRoute,remainingRoadRoute} from './travel-road-route.mjs';
 import {followFlightOrbit} from './travel-flight-orbit.mjs';
 import {sustainedTraversalObserved,streetDetailTurnovers} from './sustained-traversal-contract.mjs';
 import {installTravelTestPlacement} from './travel-test-placement.mjs';
@@ -356,19 +356,25 @@ async function sustainedTravel(client){
   for(const [index,[mode,durationMs]] of windows.entries()){
     await recoverCaughtJourney(page,`before-placement-${mode}`);
     const selector={walk:'#fWalk',drive:'#fDriving',plane:'#fPlane'}[mode];
-    const placement=await page.evaluateHandle(installTravelTestPlacement,{mode,selector,route});
+    const ordinaryHandoff=mode==='drive'&&windows[index-1]?.[0]==='walk';
+    let selectedRoute=route;
+    const placement=await page.evaluateHandle(installTravelTestPlacement,{mode,selector,route,placeActor:!ordinaryHandoff});
     try {
       await selectMode(page,mode,selector);
       await page.locator('#travelBtn').blur();
-      const receipt=await placement.evaluate(w=>({before:w.before,after:w.after,error:w.error}));
+      const receipt=await placement.evaluate(w=>({before:w.before,after:w.after,error:w.error,actorWrites:w.actorWrites}));
       await writeFile(`${evidenceDirectory}/${mode}-${index}-setup.json`,JSON.stringify(receipt,null,2));
       assert.equal(receipt.error,null);assert.ok(receipt.before&&receipt.after);
       assert.deepEqual(receipt.after.pavementFocus,receipt.before.pavementFocus,'Click setup must retain accepted coverage');
       assert.equal(receipt.after.pavementGeneration,receipt.before.pavementGeneration,'Click setup must not admit an intermediate street build');
+      if(ordinaryHandoff){
+        assert.ok(Math.hypot(receipt.after.position.x-receipt.before.position.x,receipt.after.position.z-receipt.before.position.z)<30,'Driving must begin at the walker, allowing ordinary safe-spawn adjustment');
+        selectedRoute=remainingRoadRoute(route,receipt.after.position);
+      }
     } finally {await placement.evaluate(w=>w.dispose());await placement.dispose();}
     await page.waitForTimeout(1200);
     const signal={stopped:false};let driverFailure=null;
-    const driver=(mode==='plane'?followFlightOrbit(page,signal):followRoadRoute(page,route,signal,{mode})).catch(error=>{driverFailure=error;return {failure:error.message};});
+    const driver=(mode==='plane'?followFlightOrbit(page,signal):followRoadRoute(page,selectedRoute,signal,{mode})).catch(error=>{driverFailure=error;return {failure:error.message};});
     let sample,progress;
     try{sample=await measureMode(client,`${mode}-sustained-${index}`,durationMs);}
     finally{signal.stopped=true;progress=await driver;await writeFile(`${evidenceDirectory}/${mode}-sustained-${index}-input.json`,JSON.stringify(progress));}
@@ -376,7 +382,7 @@ async function sustainedTravel(client){
     sample.gameplayInterrupted=await recoverCaughtJourney(page,`after-${mode}-sustained-${index}`);
     sample.traversalObserved=sustainedTraversalObserved(mode,sample,sample.gameplayInterrupted,durationMs);
     sample.streetTurnoverRequired=index<2;
-    sample.scenario='sustained-keyboard-route';sample.initialPlacement='Test setup only; no physics/pose writes during the window';
+    sample.scenario='sustained-keyboard-route';sample.initialPlacement=ordinaryHandoff?'Ordinary Travel action; no pose or physics writes during handoff or movement':'Test setup only; no physics/pose writes during the window';
     samples.push(sample);console.log('[performance-retention] sustained',JSON.stringify({id:sample.id,fps:sample.averageFps,p99:sample.p99FrameMs,hitches:sample.hitches,distance:sample.distanceTraveled}));
   }
   return samples;

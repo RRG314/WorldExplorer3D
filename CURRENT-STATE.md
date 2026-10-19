@@ -4,6 +4,52 @@ Updated October 18, 2026. **5.5.1 remains live; 5.6.1 is entering final acceptan
 The owner explicitly authorized completing the repairs and deploying production.
 Do not ask for the same deployment authorization again or promote a failing package.
 
+## October 19 — corrected ordinary handoff, final package pending
+
+The compact-land repair and ordinary handoff verifier pass all 2,735 source checks and reduces retained land
+memory by 9.64 MiB with exact geometry preserved. The native diagnostic using the
+old fixture reset still fails a driving pause cluster and remains failed. A CPU
+trace attributes its smaller reproduced pauses to garbage collection; it is not
+an acceptance receipt.
+
+The sustained test reset driving to the route origin after the player walked
+about 580 units. Actual gameplay starts the car where the player is. A source
+comparison using the ordinary Travel button preserves that position/generation
+and passes four minutes walking (40.43 FPS, no >100 ms frames) then four minutes
+driving (47.29 FPS, one 100.1 ms frame), crossing new pavement regions. Browser,
+resource and gameplay errors are absent; the image and state were inspected.
+This remains a bounded diagnostic, not the complete release check.
+
+The canonical test now observes both walk-to-drive handoffs without actor writes
+and continues the remaining route. Its other explicit fixtures, all seven windows,
+930 seconds, twelve reloads, mobile checks and timing limits remain. Three added
+tests cover observer ownership, late/invalid transitions and forward route selection.
+Freeze this source and complete performance, backend, save/fallback, full candidate
+and ordinary hosted acceptance before the already authorized production/GitHub work.
+
+## October 19 — regional geometry ownership repair under verification
+
+The full visible 075a87bb run completed all seven sustained movement windows.
+Walking and six of seven windows passed timing; the first driving window had
+three clustered 100–183 ms frames at 1.4–1.7 seconds and is not accepted.
+Eleven reloads preserved coverage and settled at 53–57 MiB after the first
+cycle, but the 40-minute runner deadline interrupted the last reload before
+mobile verification. The complete timing samples and partial result are retained
+under `output/release-review/561-075a87bb-performance`.
+
+A load-allocation profile identified about 12 MiB of duplicate regional land
+point objects alongside the numeric ring index. Land now keeps the exact indexed
+coordinates and only materializes immutable coordinate views when inspected.
+Seven focused geometry tests pass. A fresh source browser profile loads without
+errors and retains 407.43 MiB versus 417.07 MiB before; the duplicate point
+allocation is absent. Its screenshot is reviewed. This is ownership evidence,
+not proof of frame pacing or a release pass. Water and transport rules are intact.
+
+The full performance suite deadline is now 60 minutes to accommodate 930 seconds
+of traversal, twelve full reloads and independent mobile checks. Frame, loading,
+coverage and retention limits are unchanged. Finish source and real-input checks,
+freeze the candidate, then complete all release gates and authorized deployment.
+
 ## October 18 late — final interactive acceptance pending
 
 The ae6c75a2 package corrects an arbitrary verifier sky click that opened a star

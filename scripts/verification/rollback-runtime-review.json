@@ -238,16 +238,16 @@
     "app/js/terrain/geographic-ring-index.js": {
       "before": "d9f0d56adb7dde56afa27adcadb7b00047958f7d5acea90d940a7c85432975f9",
       "beforeMode": "100644",
-      "after": "01785da05210933b2294d7322b99f7654cdc699d747ab8f46211c106b8852792",
+      "after": "1e4d7f7fffcec11326b239b08286d7637dfd5bcde55b614680bca4e521cbb3c0",
       "afterMode": "100644",
-      "review": "Optional append-only publication storage for the same Float64 geographic edges and Uint32 bins. Exact crossing expressions and fallback order preserved; immutable edge count avoids retaining the input ring. No data/coverage/save changes."
+      "review": "Optional append-only publication storage for the same Float64 geographic edges and Uint32 bins. Exact crossing expressions and fallback order preserved; immutable edge count avoids retaining the input ring. No data/coverage/save changes. Optional coordinate inspection reconstructs frozen numeric pairs from the same Float64 endpoints; it does not retain provider/source arrays. Default water and legacy callers remain unchanged, including degenerate rings and publication lifetime."
     },
     "app/js/terrain/far-field-mapped-context.js": {
       "before": "87303f45c4f093a4d9c5204c3599631064efeb00e9551dc5e81fd2ab15dd7e2a",
       "beforeMode": "100644",
-      "after": "2a97bced3ad99c22a72bd626711a96eb385178ff463ff04b60849122cdd3c4a1",
+      "after": "bc37df244fc1128fd7a36e7bbbc651eb7dfed6d19223c55d598df24074e5d4eb",
       "afterMode": "100644",
-      "review": "Each loaded land/water context owns bounded append-only pages for immutable ring acceleration data. Release drops only allocator references; retained views are never recycled or detached. Geometry, holes, land classification and coverage unchanged."
+      "review": "Each loaded land/water context owns bounded append-only pages for immutable ring acceleration data. Release drops only allocator references; retained views are never recycled or detached. Geometry, holes, land classification and coverage unchanged. Normal regional land now uses its indexed Float64 coordinates as the sole stored polygon representation. Optional frozen outer/hole views preserve exact coordinates and inspection/serialization; queries preserve holes, bounds, ordering, explicit replacements and malformed-source fallback. Water, roads, structures, persistence and server contracts are unchanged."
     },
     "app/js/terrain/rebuild.js": {
       "review": "Published Float32 road-width samples use bounded append-only pages scoped to terrain publication and preserved through later region arrivals. Width calculation, rounding, rendered/physical road surfaces and region retirement unchanged. Unmarked ground roads additionally release temporary dense lane-marking samples; canonical roads, road-index ordering, rendered surfaces and collision coverage remain unchanged.",
@@ -542,6 +542,13 @@
       "afterMode": "100644",
       "after": "2e2e3e961dc7a995bd81ac12c17155f732afac6e979bdf83de7beb391b9d3a21",
       "review": "Exact Float64 frontage endpoint pages and numeric bucket IDs replace terrain-only retained edge/bounds object graphs. Geometry consumers retain stable objects; full materialization releases alternate buffers. Shared query order, roundoff tolerance, exclusions and section semantics verified across scales, translations and publication lifetimes. No new save fields or backend protocol."
+    },
+    "config/system-release-gates.json": {
+      "before": "402e6179f17fd0437b21e91ff8cc796f10cdbdf88e6fcc70ff091616ed8202f2",
+      "beforeMode": "100644",
+      "after": "a1e5312f2f34cb5d82694c1e75ff81c899851e36ddcfd046fbb3c426d3c12fdb",
+      "afterMode": "100644",
+      "review": "Extends only the complete performance process deadline from 40 to 60 minutes to accommodate 930 seconds of movement, twelve full reloads and mobile checks. Individual timing, coverage, retention and loading criteria are unchanged. Verification scheduling only; no runtime, backend or save format change."
     }
   }
 }

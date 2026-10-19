@@ -1,24 +1,37 @@
 // Browser evaluator for explicit test setup, never imported by gameplay.
 // Observe the real mode button, then place the actor in that same event task.
 // No frame may see the temporary distant position produced by mode switching.
-export function installTravelTestPlacement({mode, selector, route}) {
+export function installTravelTestPlacement({mode, selector, route, placeActor = true}) {
   const ctx = globalThis.__WE3D_PERF_CONTEXT__;
   const button = document.querySelector(selector);
   if (!button || !['walk', 'drive', 'plane'].includes(mode) || route.points.length < 2) {
     throw new Error('A visible mode action and a complete test route are required');
   }
+  if (!placeActor && (mode !== 'drive' || ctx.activeTransportActor()?.mode !== 'walk')) {
+    throw new Error('An ordinary driving handoff must start with the active walker');
+  }
   const snapshot = () => ({
     mode: ctx.activeTransportActor()?.mode,
     paused: ctx.paused,
     pavementGeneration: ctx._streetPavementGeneration,
-    pavementFocus: ctx.streetPavement?.focus ? {...ctx.streetPavement.focus} : null
+    pavementFocus: ctx.streetPavement?.focus ? {...ctx.streetPavement.focus} : null,
+    position: (() => {
+      const activeMode = ctx.activeTransportActor()?.mode;
+      const actor = activeMode === 'walk' ? ctx.Walk.state.walker : activeMode === 'drive' ? ctx.car : ctx.planeMode;
+      return {x:actor.x,y:actor.y,z:actor.z};
+    })()
   });
-  const witness = {before: null, after: null, error: null};
+  const witness = {before: null, after: null, error: null, actorWrites: placeActor ? 'Explicit fixture placement' : 'None; ordinary Travel action'};
   const capture = () => { witness.before = snapshot(); };
   const place = () => {
     try {
       if (ctx.activeTransportActor()?.mode !== mode) throw new Error('Mode did not activate within its click task');
       const actor = mode === 'walk' ? ctx.Walk.state.walker : mode === 'drive' ? ctx.car : ctx.planeMode;
+      if (!placeActor) {
+        globalThis.__WE3D_TRAVEL_ACTOR__ = actor;
+        witness.after = snapshot();
+        return;
+      }
       const p = mode === 'plane' ? {x:750,z:0} : route.points[0], next = route.points[1];
       const yaw = mode === 'plane' ? 0 : Math.atan2(next.x-p.x, next.z-p.z);
       Object.assign(actor,{x:p.x,z:p.z,yaw,angle:yaw,pitch:0,roll:0,pitchRate:0,rollRate:0,yawRate:0,lookYawOffset:0,cameraYaw:0,cameraPitch:0,cameraLookTimer:0});

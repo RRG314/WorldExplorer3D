@@ -1,6 +1,20 @@
 // Immutable provider rings are queried at every terrain vertex. Store numeric
 // edges once and prune by latitude; retain the exact ray-crossing expression.
-export function createGeographicRingIndex(ring, publicationStorage = null) {
+// Optional inspection reuses the exact indexed endpoints. Ordinary terrain
+// containment keeps no second array-of-points graph alive.
+function attachCoordinateView(query, edges) {
+  let coordinates = null;
+  Object.defineProperty(query, 'coordinates', { value() {
+    if (!coordinates) {
+      coordinates = Object.freeze(Array.from({ length: edges.length / 4 }, (_, i) =>
+        Object.freeze([edges[i * 4], edges[i * 4 + 1]])));
+    }
+    return coordinates;
+  }});
+  return query;
+}
+
+export function createGeographicRingIndex(ring, publicationStorage = null, coordinateView = false) {
   const allocate = (Type, length) => {
     if (!publicationStorage) return new Type(length);
     const {buffer, byteOffset} = publicationStorage.allocate(length * Type.BYTES_PER_ELEMENT);
@@ -14,7 +28,7 @@ export function createGeographicRingIndex(ring, publicationStorage = null) {
     edges[at]=xi;edges[at+1]=yi;edges[at+2]=xj;edges[at+3]=yj;
     if(Number.isFinite(xi)&&Number.isFinite(yi)&&Number.isFinite(xj)&&Number.isFinite(yj)){min=Math.min(min,yi,yj);max=Math.max(max,yi,yj);}
   }
-  if(!(max>min))return ()=>false;
+  if(!(max>min)){const empty=()=>false;return coordinateView?attachCoordinateView(empty,edges):empty;}
   const count=Math.min(64,Math.max(1,Math.ceil(Math.sqrt(ring.length))));
   const bin=y=>Math.max(0,Math.min(count-1,Math.floor((y-min)/(max-min)*count)));
   let lists=Array.from({length:count},()=>[]),references=0;
@@ -29,7 +43,7 @@ export function createGeographicRingIndex(ring, publicationStorage = null) {
   const offsets=lists?allocate(Uint32Array,count+1):null;
   const indices=lists?allocate(Uint32Array,references):null;
   if(lists){let cursor=0;for(let b=0;b<count;b++){offsets[b]=cursor;indices.set(lists[b],cursor);cursor+=lists[b].length;}offsets[count]=cursor;}
-  return (lon,lat)=>{
+  const contains = (lon,lat)=>{
     if(lat<min||lat>max)return false;
     let inside=false;
     const b=bin(lat),start=offsets?offsets[b]:0,end=offsets?offsets[b+1]:edgeCount;
@@ -42,4 +56,5 @@ export function createGeographicRingIndex(ring, publicationStorage = null) {
     }
     return inside;
   };
+  return coordinateView ? attachCoordinateView(contains, edges) : contains;
 }
