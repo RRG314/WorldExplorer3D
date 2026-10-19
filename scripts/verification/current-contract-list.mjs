@@ -402,6 +402,7 @@ export const currentContractTests = [
   'tests/published-road-integrity-current.test.mjs',
   'tests/spatial-road-batches-current.test.mjs',
   'tests/traversal-segment-index-current.test.mjs',
+  'tests/traversal-packed-records-current.test.mjs',
   'tests/planetary-sky-frame-current.test.mjs',
   'tests/hidden-debug-overlay-layout-current.test.mjs',
   'tests/hidden-map-network-current.test.mjs',

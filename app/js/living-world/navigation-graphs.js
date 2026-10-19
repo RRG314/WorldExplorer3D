@@ -1,3 +1,4 @@
+import {materializeTraversalSegments} from '../world/traversal-graph-storage.js';
 import {roadPlacementOffsetWorld,roadMetersPerWorldUnit} from '../world/road-units.js';
 import { resolveStreetSection } from '../world/compiler/street-section.js';
 import { directedSurfacePitch } from '../engine/vehicle-road-attitude.js?v=3';
@@ -220,7 +221,7 @@ export function prioritizePedestrianNeighborhoods(segments, focuses=[]) {
 export function compilePedestrianGraph(options = {}) {
   const tier = String(options.tier || 'balanced').toLowerCase();
   const budget = GRAPH_BUDGET_BY_TIER[tier] || GRAPH_BUDGET_BY_TIER.balanced;
-  const traversalSegments = Array.isArray(options.traversal?.segments) ? options.traversal.segments : [];
+  const traversalSegments = materializeTraversalSegments(options.traversal?.segments);
   const sourceSegments = prioritizePedestrianNeighborhoods(traversalSegments
     .filter((segment) => segment?.p1 && segment?.p2 && pedestrianSegmentAllowed(segment) && segmentPriority(segment) <= 900)
     .sort((a, b) => segmentPriority(a) - segmentPriority(b)),options.neighborhoodFocuses);
@@ -373,7 +374,7 @@ export function compilePedestrianGraph(options = {}) {
 export function compileTrafficGraph(options = {}) {
   const tier = String(options.tier || 'balanced').toLowerCase();
   const budget = GRAPH_BUDGET_BY_TIER[tier] || GRAPH_BUDGET_BY_TIER.balanced;
-  const sourceSegments = (Array.isArray(options.traversal?.segments) ? options.traversal.segments : [])
+  const sourceSegments = materializeTraversalSegments(options.traversal?.segments)
     .filter((segment) =>
       segment?.p1 && segment?.p2 &&
       segmentPriority(segment) <= 1200 &&
