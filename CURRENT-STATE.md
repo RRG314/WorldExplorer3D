@@ -1,10 +1,53 @@
 # Current development and release state
 
-Updated October 17, 2026. **5.5.1 is deployed and production access has recovered.**
-Release: https://github.com/RRG314/WorldExplorer3D/releases/tag/v5.5.1
-Public project page: https://rrg314.github.io/WorldExplorer3D/
+Updated October 18, 2026. **5.5.1 remains live; 5.6.1 is entering final acceptance.**
+The owner explicitly authorized completing the repairs and deploying production.
+Do not ask for the same deployment authorization again or promote a failing package.
 
-## October 17 — authoritative current status
+## Current checkpoint
+
+- Worktree: `/Users/stevenreid/.codex/worktrees/architecture-evaluation/WorldExplorer3D-live-deployed-20260320`, branch `steven/visual-quality`. Do not edit the stale Documents checkout.
+- Production: `5.5.1+012e5c85582b.eb0d7eddf0f75035.production` (fresh HTTP 200).
+- Canonical staging: `5.6.1+a0e20c35eab7.aa4dd9dce23502b0.staging` (fresh HTTP 200).
+- Both projects report 80 active first-generation Functions. No cloud mutation in this repair.
+- `stable` is the default release branch; no `main` branch exists. PR #103 is the release preparation PR.
+
+The source repairs retain unchanged street products through movement, distinguish
+cancelled preparation from invalid accepted coverage, and reject superseded edits.
+Civic events follow the actual ground player. Nearest-road and nearby-object
+queries keep selected results instead of temporary whole-scene lists. Map and
+building-entry queries preserve exact results using local scratch storage.
+
+Terrain's frontage index now stores exact Float64 endpoints and numeric bucket
+IDs instead of retaining an edge/bounds object graph for the entire city. It uses
+the existing frontage policy; pavement compilation retains its stable geometry
+identities. Coverage, terrain/bridge/tunnel rules and save formats are unchanged.
+
+All **2,729 source tests** and the syntax, ownership, inventory and sensitivity
+checks pass. The latest native source journey loads in 115.2 seconds; short ground
+movement, 90-second flight and a four-minute walk all pass their timing limits.
+The walk travels 575.03 units at 41.12 FPS, p99 33.4 ms, with one 133.2 ms pause
+and no cluster. Retained occupied JS falls from about 467 MB to 438 MB. Coverage
+remains 49,080 buildings and 18,951 roads. Real street turnover reuses 77 fitted
+cells and 28 render batches. No errors, failed local resources or interruptions;
+image and prescribed input reviewed. This focused diagnostic is **not** full
+release acceptance. Its omitted mixed-route/reload/mobile stages remain unrun.
+
+The preceding ordinary-query-only run still failed (166.6/100.1 ms cluster);
+that failed evidence is preserved. The old frozen 32b30ce5 package also failed
+and must never be relabeled as the new source. Freeze the current source, verify
+all runtime bytes against the save-compatible b21 fallback, then run complete
+performance, backend, formal released/save/fallback roundtrip, full candidate and
+hosted gates before coordinated production and GitHub publication.
+
+Evidence: `output/release-review/561-root-cause-audit.md`,
+`561-ordinary-query-native`, and `561-compact-frontage-native`.
+The exact new package identity belongs in `output/release-review/current-final-candidate.json`.
+Preserve production artifacts, the b21 fallback, source/history and user data.
+Run one heavy task at a time, keep at most four saved candidates, and close only
+owned processes. About 10 GiB free disk remains after the native check.
+
+## October 17 — previous checkpoint
 
 **5.6.1 is not release ready. Production remains recovered 5.5.1.**
 No stable, production Hosting or production Functions promotion occurred in this

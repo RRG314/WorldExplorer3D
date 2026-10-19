@@ -54,6 +54,7 @@ export const currentContractTests = [
   'tests/scene-resources-current.test.mjs',
   'tests/box-instance-batch-current.test.mjs',
   'tests/map-projection-storage-current.test.mjs',
+  'tests/ordinary-query-storage-current.test.mjs',
   'tests/provider-services-current.test.mjs',
   'tests/runtime-dependencies-current.test.mjs',
   'tests/water-boundary-clearance-current.test.mjs',

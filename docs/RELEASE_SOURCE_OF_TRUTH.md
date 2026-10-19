@@ -1,13 +1,10 @@
 # Release source identities
 
-## Current observation — October 17, 2026
+## Current observation — October 18, 2026
 
-Production remains **5.5.1**, confirmed by the live Hosting release API and both
-live manifests. After the owner's account repair, the manifests return HTTP 200
-at 10:10 p.m. EDT and match the hotfix identity below. No account mutation,
-rollback or new production deployment was performed here. Private account
-details are excluded from tracked release records. The complete **5.6.1** candidate remains
-under verification. A version label or preview URL alone does not identify code.
+Production remains **5.5.1**. Both public build manifests return HTTP 200;
+both Firebase projects report 80 active first-generation Functions. The current
+5.6.1 source is entering final acceptance. A version label alone is not build identity.
 
 | Reference | Build or source |
 | --- | --- |
@@ -16,8 +13,8 @@ under verification. A version label or preview URL alone does not identify code.
 | Production Firebase project | `worldexplorer3d-d9b83` |
 | Canonical staging frontend | `5.6.1+a0e20c35eab7.aa4dd9dce23502b0.staging` |
 | Staging Firebase project | `we3d-staging-20260712` |
-| Current frozen candidate | `5.6.1+26e04920a669.dde9743f81c8b8ef.staging` |
-| Preserved road-safe fallback | `5.6.1+b21b7f12fdfa.31ed9b1212c5002c.staging` |
+| Superseded frozen candidate; failed pacing | `5.6.1+32b30ce57ce6.e2fdccf854a89ce8.staging` |
+| Preserved save-compatible fallback | `5.6.1+b21b7f12fdfa.31ed9b1212c5002c.staging` |
 | Release branch | `stable` (default; no `main` branch) |
 | Active development branches | `steven/visual-quality`, `steven/post-5.2-release-integration` |
 
@@ -25,45 +22,24 @@ under verification. A version label or preview URL alone does not identify code.
 [Staging](https://we3d-staging-20260712.web.app/app/) ·
 [Release preparation PR](https://github.com/RRG314/WorldExplorer3D/pull/103)
 
-Canonical staging now serves the a0e20c35 package; both hosted manifests match
-local bytes. Production and backend origin restrictions were not changed.
-After production recovered, ordinary Chrome returned live search results,
-loaded Baltimore and displayed current weather on 5.5.1. This is not complete
-account/shared-voyage/save acceptance. A fresh automated browser loaded the
-world but received protected-service 401 responses; its failure was preserved
-and no security controls were bypassed.
-
 ## Verification and rollback
 
-Checkpoint `26e04920` is on both active development branches. All 755 immutable
-files verify; its gameplay payload matches 614b452a exactly. All three backend
-gates pass for 26, including shared ocean voyages, place lookup and the complete
-15-stage backend suite. Browser checks now honor the explicitly selected local
-emulator ports instead of touching an unrelated project's default port.
+The current source passes all 2,729 tests and structural checks. Its focused native
+flight/ground journey passes, including a four-minute walk and real street-detail
+turnover. Retained occupied JavaScript falls from about 467 MB to 438 MB with the
+same 49,080 buildings and 18,951 roads. Complete immutable performance, backend,
+save roundtrip, candidate and hosted acceptance remain required before promotion.
+The new frozen identity is recorded in its build manifest and the local candidate
+receipt; the failed 32b30ce5 package must not borrow these source results.
 
-Lossless compression recovered 6.49 GiB, retaining original paths and decoded
-contents. Native package validation passes short ground movement and flight,
-but sustained walking has a 150–217 ms pause cluster tied to memory collection.
-This remains failed pacing evidence; production and canonical staging are unchanged.
+The preserved b21 fallback supports the same modern Journal, Backpack, campaign,
+workspace and vessel fields. It is an emergency fallback with known performance
+limitations, not final acceptance. Formal upgrade/fallback checks must begin at
+released 5.5.1, write through the candidate and fallback, and return without losing
+old or newer records. Source/history, saved production artifacts and player data
+remain preserved.
 
-The formal save check timed out while repeatedly requesting full city diagnostics
-during loading. A diagnostic with lightweight polling, the same timeout and all
-original save assertions passes released 5.5.1 → candidate → b21 fallback →
-candidate return. It is not a formal acceptance receipt. The verifier repair
-passes four focused tests and the complete 2,699-test source chain; its updated
-inputs must be packaged and formally checked. Full candidate, performance and
-ordinary hosted acceptance remain open.
-
-The subsequent pavement resource repair keeps one material/texture lease across
-same-world replacements, preserving linked renderer programs during handover.
-Failed staging leaves the accepted surface intact; final ownership release disposes
-all owned resources. All 78 focused checks and 2,702 source tests pass. Native
-source loads in 105.5 seconds and passes short ground travel and 90-second flight.
-The long walk still has three clustered 133–183 ms intervals, so pacing remains
-open. The before/after material IDs and shader program IDs match across a real
-coverage change. Current imagery and prescribed input were inspected. Neither
-30 FPS drawing experiment was adopted; gameplay remains uncapped.
-Evidence: `output/release-review/561-material-ownership-native/`.
+The dated entries below are historical evidence, not current release approval.
 
 ### Earlier b272 and source diagnostics (historical)
 

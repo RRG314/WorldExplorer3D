@@ -10,18 +10,22 @@ function finiteNumber(value, fallback = 0) {
   return Number.isFinite(n) ? n : fallback;
 }
 
-function pointToSegmentDistance(x, z, p1, p2) {
+function pointToSegmentDistance(x, z, p1, p2, result = {}) {
   const dx = p2.x - p1.x;
   const dz = p2.z - p1.z;
   const len2 = dx * dx + dz * dz;
   if (len2 <= 1e-9) {
-    return { dist: Math.hypot(x - p1.x, z - p1.z), x: p1.x, z: p1.z, t: 0 };
+    result.dist = Math.hypot(x - p1.x, z - p1.z);
+    result.x = p1.x; result.z = p1.z; result.t = 0;
+    return result;
   }
   let t = ((x - p1.x) * dx + (z - p1.z) * dz) / len2;
   t = Math.max(0, Math.min(1, t));
   const px = p1.x + dx * t;
   const pz = p1.z + dz * t;
-  return { dist: Math.hypot(x - px, z - pz), x: px, z: pz, t };
+  result.dist = Math.hypot(x - px, z - pz);
+  result.x = px; result.z = pz; result.t = t;
+  return result;
 }
 
 function polygonCentroid(points) {
@@ -98,17 +102,20 @@ function pointInPolygonSafe(x, z, polygon) {
 function distanceToFootprint(x, z, buildingLike) {
   if (!buildingLike) return { dist: Infinity, point: null, inside: false };
   if (Array.isArray(buildingLike.pts) && buildingLike.pts.length >= 3) {
-    let best = null;
+    let bestDistance = Infinity, bestX, bestZ;
+    const hit = {};
     for (let i = 0; i < buildingLike.pts.length; i++) {
       const p1 = buildingLike.pts[i];
       const p2 = buildingLike.pts[(i + 1) % buildingLike.pts.length];
-      const hit = pointToSegmentDistance(x, z, p1, p2);
-      if (!best || hit.dist < best.dist) best = hit;
+      pointToSegmentDistance(x, z, p1, p2, hit);
+      if (i === 0 || hit.dist < bestDistance) {
+        bestDistance = hit.dist; bestX = hit.x; bestZ = hit.z;
+      }
     }
     const inside = pointInPolygonSafe(x, z, buildingLike.pts);
     return {
-      dist: inside ? 0 : (best?.dist ?? Infinity),
-      point: best ? { x: best.x, z: best.z } : null,
+      dist: inside ? 0 : bestDistance,
+      point: { x: bestX, z: bestZ },
       inside
     };
   }
@@ -170,15 +177,25 @@ function buildingFootprintPoints(buildingLike) {
 
 function hasUsableBuildingFootprint(building) {
   if (!building) return false;
-  const footprint = buildingFootprintPoints(building);
-  if (footprint.length < 3) return false;
-  const bounds = footprintBounds(footprint);
-  if (bounds.width < 2.4 || bounds.depth < 2.4) return false;
-  let area = 0;
-  for (let i = 0, j = footprint.length - 1; i < footprint.length; j = i++) {
-    area += footprint[j].x * footprint[i].z - footprint[i].x * footprint[j].z;
+  // Eligibility reads the current footprint; it does not own a copy. Preserve
+  // cloneFootprint's finite-point filtering and the original area summation
+  // order (closing edge first), including malformed and concave footprints.
+  const points = Array.isArray(building.pts) && building.pts.length >= 3
+    ? building.pts : buildingFootprintPoints(building);
+  let last = null, count = 0;
+  for (const point of points) {
+    if (point && Number.isFinite(point.x) && Number.isFinite(point.z)) { last = point; count++; }
   }
-  return Math.abs(area * 0.5) >= 12;
+  if (count < 3) return false;
+  let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity, area = 0;
+  for (const point of points) {
+    if (!point || !Number.isFinite(point.x) || !Number.isFinite(point.z)) continue;
+    minX = Math.min(minX, point.x); maxX = Math.max(maxX, point.x);
+    minZ = Math.min(minZ, point.z); maxZ = Math.max(maxZ, point.z);
+    area += last.x * point.z - point.x * last.z;
+    last = point;
+  }
+  return maxX - minX >= 2.4 && maxZ - minZ >= 2.4 && Math.abs(area * 0.5) >= 12;
 }
 
 const hasFullBuildingFootprint = hasUsableBuildingFootprint;

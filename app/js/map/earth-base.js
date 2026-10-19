@@ -205,6 +205,7 @@ function drawWaterLayers(ctx, w, h, isLarge, worldToScreen, mx, my) {
 function drawLinearFeatureLayers(ctx, w, h, isLarge, worldToScreen, mx, my) {
   if (!(appCtx.showPathOverlays && appCtx.linearFeatures.length > 0)) return;
 
+  const projected = {};
   ctx.save();
   ctx.lineCap = "round";
   ctx.lineJoin = "round";
@@ -235,7 +236,7 @@ function drawLinearFeatureLayers(ctx, w, h, isLarge, worldToScreen, mx, my) {
 
     let inView = false;
     feature.pts.forEach((pt, i) => {
-      const pos = worldToScreen(pt.x, pt.z);
+      const pos = worldToScreen(pt.x, pt.z, projected);
       if (Math.abs(pos.x - mx) < w && Math.abs(pos.y - my) < h) {
         inView = true;
       }
@@ -254,6 +255,7 @@ function drawLinearFeatureLayers(ctx, w, h, isLarge, worldToScreen, mx, my) {
 function drawRoadLayers(ctx, w, h, isLarge, view, worldToScreen) {
   if (!(appCtx.showRoads && appCtx.roads.length > 0)) return;
 
+  const projected = {};
   visibleRoadMapCandidates(appCtx.roads, view, w, h).forEach((road) => {
     if (!road.pts || road.pts.length < 2) return;
 
@@ -287,7 +289,7 @@ function drawRoadLayers(ctx, w, h, isLarge, view, worldToScreen) {
     ctx.globalAlpha = 0.8;
     ctx.beginPath();
     road.pts.forEach((pt, i) => {
-      const pos = worldToScreen(pt.x, pt.z);
+      const pos = worldToScreen(pt.x, pt.z, projected);
       if (i === 0) ctx.moveTo(pos.x, pos.y);
       else ctx.lineTo(pos.x, pos.y);
     });
@@ -297,7 +299,7 @@ function drawRoadLayers(ctx, w, h, isLarge, view, worldToScreen) {
     ctx.lineWidth = roadWidth;
     ctx.beginPath();
     road.pts.forEach((pt, i) => {
-      const pos = worldToScreen(pt.x, pt.z);
+      const pos = worldToScreen(pt.x, pt.z, projected);
       if (i === 0) ctx.moveTo(pos.x, pos.y);
       else ctx.lineTo(pos.x, pos.y);
     });

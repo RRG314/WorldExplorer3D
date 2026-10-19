@@ -680,11 +680,19 @@ function nearestFurnitureCandidate(state, radius = 3.2) {
   if (!activeWorldMatches(state) || appCtx.Walk?.state?.mode !== 'walk') return null;
   const walker = appCtx.Walk?.state?.walker;
   if (!walker) return null;
-  return (appCtx.streetFurnitureMeshes || []).map((object) => ({
-    object,
-    distance: Math.hypot(object.position.x - walker.x, object.position.z - walker.z)
-  })).filter((entry) => entry.object?.userData?.interactiveWorldObject && entry.distance <= radius)
-    .sort((a, b) => a.distance - b.distance)[0] || null;
+  let nearest = null;
+  let distance = Infinity;
+  for (const object of appCtx.streetFurnitureMeshes || []) {
+    if (!object?.userData?.interactiveWorldObject) continue;
+    const candidateDistance = Math.hypot(object.position.x - walker.x, object.position.z - walker.z);
+    // Keep source order for ties, just like the stable sorted query. Only the
+    // selected object escapes this synchronous search; no scene-sized array.
+    if (candidateDistance <= radius && (!nearest || candidateDistance < distance)) {
+      nearest = object;
+      distance = candidateDistance;
+    }
+  }
+  return nearest ? { object: nearest, distance } : null;
 }
 
 function nearestResponderLootCandidate(state, radius = 3.2) {
@@ -2487,7 +2495,10 @@ function updatePrompt(state) {
     setDomAttribute(prompt.root, 'aria-hidden', 'true');
     return;
   }
-  const candidate = appCtx.resolvePrimaryContextInteraction?.() || interactionCandidate(state);
+  // A registered router returning null has already searched this provider.
+  // The direct query is only the bootstrap fallback before routing is installed.
+  const candidate = typeof appCtx.resolvePrimaryContextInteraction === 'function'
+    ? appCtx.resolvePrimaryContextInteraction() : interactionCandidate(state);
   const transientStatus = state.statusUntil > now() ? state.statusMessage : '';
   if (!candidate && !transientStatus) {
     setDomClass(prompt.root, 'familiar', false);
@@ -3237,7 +3248,8 @@ function startUrbanSandboxRuntime(options = {}) {
   };
   state.onSecondaryClick = () => useEquipped(state);
   state.onTakeClick = () => {
-    const candidate = appCtx.resolvePrimaryContextInteraction?.() || interactionCandidate(state);
+    const candidate = typeof appCtx.resolvePrimaryContextInteraction === 'function'
+      ? appCtx.resolvePrimaryContextInteraction() : interactionCandidate(state);
     if (candidate?.action === 'loot_responder') performResponderLoot(state, candidate);
     else if (candidate?.action === 'talk_npc' || candidate?.action === 'loot_npc') performNpcTake(state, candidate);
   };

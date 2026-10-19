@@ -59,8 +59,23 @@ function segmentWithinReach(a,b,c,d,reach) {
     Math.abs(squared-limit)<=32*Number.EPSILON*Math.max(1,squared,limit))return segmentDistance(a,b,c,d)<=reach;
   return squared<limit;
 }
-export function createStreetFrontagePolicy(buildings = [], metersPerWorldUnit = 1.11) {
-  const scale=streetScale(metersPerWorldUnit), edges=[], buckets=new Map();
+export function createStreetFrontagePolicy(buildings = [], metersPerWorldUnit = 1.11, { retainEdges = true } = {}) {
+  const scale=streetScale(metersPerWorldUnit), buckets=new Map();
+  // Terrain owns a compiled snapshot, not a second object graph of every city
+  // facade. The pavement compiler can still retain stable geometry identities.
+  let edges=retainEdges ? [] : null, edgeCount=0;
+  const pages=[], pageSize=4096;
+  const scratchEdge=()=>({a:{x:0,z:0},b:{x:0,z:0},bounds:{minX:0,maxX:0,minZ:0,maxZ:0},facadeEligible:false});
+  function readEdge(id,result) {
+    if(edges)return edges[id];
+    const page=pages[Math.floor(id/pageSize)],offset=id%pageSize,p=page.points,i=offset*4;
+    result.a.x=p[i];result.a.z=p[i+1];result.b.x=p[i+2];result.b.z=p[i+3];
+    result.bounds.minX=Math.min(p[i],p[i+2]);result.bounds.maxX=Math.max(p[i],p[i+2]);
+    result.bounds.minZ=Math.min(p[i+1],p[i+3]);result.bounds.maxZ=Math.max(p[i+1],p[i+3]);
+    result.facadeEligible=!!page.eligible[offset];
+    return result;
+  }
+  const copyEdge=edge=>({a:{...edge.a},b:{...edge.b},bounds:{...edge.bounds},facadeEligible:edge.facadeEligible});
   let sections=new WeakMap();
   const candidateRegions=new Map(),sectionValues=new Map();
   const rings=buildings.map(streetFootprint);
@@ -72,14 +87,21 @@ export function createStreetFrontagePolicy(buildings = [], metersPerWorldUnit = 
       if(length<1e-8)continue;
       // Shared building vertices describe buildings, not public paving rights.
       // A plaza beyond the bounded street frontage needs a mapped area.
-      const edge={a,b,bounds:bounds(a,b),facadeEligible:length>=FRONTAGE_RULES.minimumFacade-1e-8};edges.push(edge);
-      const box=edge.bounds;
+      const id=edgeCount++,box=bounds(a,b),facadeEligible=length>=FRONTAGE_RULES.minimumFacade-1e-8;
+      if(edges)edges.push({a,b,bounds:box,facadeEligible});
+      else {
+        const offset=id%pageSize;
+        if(offset===0)pages.push({points:new Float64Array(pageSize*4),eligible:new Uint8Array(pageSize)});
+        const page=pages[pages.length-1],i=offset*4;
+        page.points[i]=a.x;page.points[i+1]=a.z;page.points[i+2]=b.x;page.points[i+3]=b.z;
+        page.eligible[offset]=facadeEligible ? 1 : 0;
+      }
       for(let x=Math.floor(box.minX/cell);x<=Math.floor(box.maxX/cell);x++)for(let z=Math.floor(box.minZ/cell);z<=Math.floor(box.maxZ/cell);z++){
-        const k=`${x}:${z}`;if(!buckets.has(k))buckets.set(k,[]);buckets.get(k).push(edge);
+        const k=`${x}:${z}`;if(!buckets.has(k))buckets.set(k,[]);buckets.get(k).push(id);
       }
     }
   }
-  function query(a,b=a,pad=0){
+  function query(a,b=a,pad=0,facadeOnly=false){
     const box=bounds(a,b);
     const x0=Math.floor((box.minX-pad)/cell),x1=Math.floor((box.maxX+pad)/cell);
     const z0=Math.floor((box.minZ-pad)/cell),z1=Math.floor((box.maxZ+pad)/cell);
@@ -87,7 +109,7 @@ export function createStreetFrontagePolicy(buildings = [], metersPerWorldUnit = 
     let candidates=candidateRegions.get(key);
     if(!candidates){
       const seen=new Set();
-      for(let x=x0;x<=x1;x++)for(let z=z0;z<=z1;z++)for(const edge of buckets.get(`${x}:${z}`)||[])seen.add(edge);
+      for(let x=x0;x<=x1;x++)for(let z=z0;z<=z1;z++)for(const id of buckets.get(`${x}:${z}`)||[])seen.add(id);
       candidates=[...seen];
       // Neighboring terrain samples revisit the same buckets. Cache only
       // their ordered candidates, never an approximate distance/result.
@@ -97,23 +119,34 @@ export function createStreetFrontagePolicy(buildings = [], metersPerWorldUnit = 
         candidateRegions.set(key,candidates);
       }
     }
-    const result=[];
+    const result=facadeOnly ? null : [],scratch=edges ? null : scratchEdge();
     // Bucket overlap is only a coarse candidate test. Reject disjoint edge
     // bounds before the exact projections, retaining a conservative roundoff
     // margin for translated coordinates and the existing distance tolerance.
     const reach=pad+1e-8+8*Number.EPSILON*Math.max(1,Math.abs(box.minX),Math.abs(box.maxX),Math.abs(box.minZ),Math.abs(box.maxZ),Math.abs(pad));
-    for(const edge of candidates){
-      const eb=edge.bounds;
+    for(const id of candidates){
+      const edge=readEdge(id,scratch),eb=edge.bounds;
       if(eb.maxX<box.minX-reach || eb.minX>box.maxX+reach || eb.maxZ<box.minZ-reach || eb.minZ>box.maxZ+reach)continue;
-      if(segmentWithinReach(a,b,edge.a,edge.b,pad+1e-8))result.push(edge);
+      if(segmentWithinReach(a,b,edge.a,edge.b,pad+1e-8)){
+        if(facadeOnly){if(edge.facadeEligible)return true;}
+        else result.push(edges ? edge : copyEdge(edge));
+      }
     }
-    return result;
+    return facadeOnly ? false : result;
   }
-  return { edges, query,
+  return {
+    get edges(){
+      // Geometry consumers opt in by asking for the full view. Terrain never
+      // does; once materialized, identities are stable for compiler deduping.
+      if(!edges){const all=[],scratch=scratchEdge();for(let id=0;id<edgeCount;id++)all.push(copyEdge(readEdge(id,scratch)));edges=all;pages.length=0;}
+      return edges;
+    },
+    query,
+    stats(){return {edgeCount,retainedEdgeObjects:edges?.length||0,numericBytes:pages.reduce((n,p)=>n+p.points.byteLength+p.eligible.byteLength,0)};},
     section(road,index=0){
       let cache=sections.get(road);if(!cache){cache=new Map();sections.set(road,cache);}if(cache.has(index))return cache.get(index);
       const a=road.pts?.[index],b=road.pts?.[index+1]||a;
-      const urban=!!a && query(a,b,FRONTAGE_RULES.urbanReach/scale).some(edge=>edge.facadeEligible);
+      const urban=!!a && query(a,b,FRONTAGE_RULES.urbanReach/scale,true);
       const tags=road.transportRecord?.sourceTags||road.tags||{};
       let section=resolveStreetSection({...tags,highway:tags.highway||road.type},{urban});
       if (!isGroundStreet(road)) section=Object.freeze({...section,
@@ -130,6 +163,6 @@ export function createStreetFrontagePolicy(buildings = [], metersPerWorldUnit = 
       }
       cache.set(index,section);return section;
     },
-    dispose(){edges.length=0;buckets.clear();candidateRegions.clear();sectionValues.clear();sections=new WeakMap();}
+    dispose(){if(edges)edges.length=0;pages.length=0;edgeCount=0;buckets.clear();candidateRegions.clear();sectionValues.clear();sections=new WeakMap();}
   };
 }

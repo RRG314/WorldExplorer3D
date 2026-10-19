@@ -160,3 +160,39 @@ test('semantic section pool eviction preserves widths and inferred-versus-mapped
   assert.notEqual(inferred,mapped);
   policy.dispose();
 });
+
+test('compact terrain frontage preserves exact ordered edges, sections and private query results',()=>{
+ let seed=7139;const random=()=>((seed=Math.imul(seed,1664525)+1013904223>>>0)/2**32);
+ for(const scale of [.5,1,1.11,2])for(const shift of [-1e9,0,1e9]){
+  const buildings=Array.from({length:80},()=>rect(shift+random()*200,shift+random()*200,.2+random()*15,.2+random()*15));
+  const reference=createStreetFrontagePolicy(buildings,scale),compact=createStreetFrontagePolicy(buildings,scale,{retainEdges:false});
+  for(let i=0;i<200;i++){
+   const a={x:shift+random()*200,z:shift+random()*200},b=i%2?a:{x:shift+random()*200,z:shift+random()*200},reach=random()*40;
+   const expected=reference.query(a,b,reach),actual=compact.query(a,b,reach);
+   assert.deepEqual(actual,expected);
+   const previous=structuredClone(actual);compact.query({x:shift+200,z:shift+200},undefined,40);assert.deepEqual(actual,previous);
+   const road={type:'residential',pts:[a,b],tags:i%3?{}:{sidewalk:'left'}};
+   assert.deepEqual(compact.section(road),reference.section(road));
+  }
+  assert.equal(compact.stats().edgeCount,320);assert.equal(compact.stats().retainedEdgeObjects,0);
+  assert.equal(compact.stats().numericBytes,4096*33);
+  assert.deepEqual(compact.edges,reference.edges);assert.equal(compact.stats().numericBytes,0,'full geometry ownership replaces, never duplicates, numeric storage');
+  const near={x:shift+100,z:shift+100};for(const edge of compact.query(near,undefined,100))assert.ok(compact.edges.includes(edge));
+  compact.dispose();reference.dispose();assert.deepEqual(compact.stats(),{edgeCount:0,retainedEdgeObjects:0,numericBytes:0});assert.deepEqual(compact.query(near,undefined,100),[]);
+ }
+});
+
+test('terrain frontage pages cross capacity boundaries and replace source publications without retaining edge graphs',()=>{
+ const buildings=Array.from({length:5000},(_,i)=>rect(i*12,0,8,8));
+ const policy=createStreetFrontagePolicy(buildings,1,{retainEdges:false});
+ assert.deepEqual(policy.stats(),{edgeCount:20000,retainedEdgeObjects:0,numericBytes:5*4096*33});
+ for(const i of [0,1023,1024,2048,4999])assert.equal(policy.query({x:i*12+4,z:-1},undefined,1).length,1);
+ const prior=policy.query({x:4,z:-1},undefined,1);
+ // A compiled terrain publication has its own exact footprint snapshot. The
+ // source editor publishes a replacement instead of mutating an old index.
+ buildings[0].pts.forEach(p=>p.z+=100);
+ assert.deepEqual(policy.query({x:4,z:-1},undefined,1),prior);
+ const replacement=createStreetFrontagePolicy(buildings,1,{retainEdges:false});
+ assert.deepEqual(replacement.query({x:4,z:-1},undefined,1),[]);
+ policy.dispose();assert.equal(replacement.query({x:4,z:99},undefined,1).length,1);replacement.dispose();
+});

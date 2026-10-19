@@ -406,9 +406,9 @@
     "app/js/urban-sandbox/runtime.js": {
       "before": "9792fc9a073c7abe9721b53bd50581c629ca27047d68b497d47a243a06bcd735",
       "beforeMode": "100644",
-      "after": "5d6a59c2292742df52e569e69d4bcf8f2df241c1ec99208e9d47ab32017dfbfd",
+      "after": "74a3b90ed628cf9d179dbf4db2fa1f14f8af2bb3c394fc3e7162f66d6434bc72",
       "afterMode": "100644",
-      "review": "Mapped storefront approach checks request exact-point walking validation and continue their existing local candidate search instead of resolving to another street. Store stock, wallet, Backpack, commerce transactions and saved state are unchanged. Civic incidents, witnesses and pursuit now follow the active ground-player owner; the inactive walker cannot substitute for the moving starter car. Occupied-vehicle authority and saved formats are unchanged."
+      "review": "Mapped storefront approach checks request exact-point walking validation and continue their existing local candidate search instead of resolving to another street. Store stock, wallet, Backpack, commerce transactions and saved state are unchanged. Civic incidents, witnesses and pursuit now follow the active ground-player owner; the inactive walker cannot substitute for the moving starter car. Occupied-vehicle authority and saved formats are unchanged. Scalar nearest-furniture selection preserves ties, radius and current eligibility; an installed interaction router owns its null result, avoiding a duplicate provider search. No persistence changes."
     },
     "app/js/terrain/surface-decal-projection.js": {
       "before": "48cc550b5322df6e10fe43a07de75d938ea4ac1cca46c8e298482796fee5671d",
@@ -514,6 +514,34 @@
       "after": "56d6671b0692c73f1f9222fecafe8f57896dd39401eefb82bab2148c84268987",
       "afterMode": "100644",
       "review": "Keeps the existing local/shared edit behavior and persistence formats. Routes street-source invalidation through a revision owner so edits during asynchronous compilation remain pending and stale products are rejected."
+    },
+    "app/js/building-entry.js": {
+      "before": "331a57d41768294860e9fa76f1bc9139a85fbb8bef30768c94cce050e748b915",
+      "beforeMode": "100644",
+      "afterMode": "100644",
+      "after": "e9fd2a008546968529118113d40b2141b2bc2d532aed571b3a4a0c2a0d7f76df",
+      "review": "Caller-owned scratch within footprint distance queries and scalar eligibility scanning. Preserves exact segment math, finite-point filtering, concave area order, bounds fallback, current edits and independent public results. No persistence or backend changes."
+    },
+    "app/js/map/earth-base.js": {
+      "before": "c6a9a27f8bac75469618ac7eb0d00310bb4fbf8e9ebf7752ceccac76317239c0",
+      "beforeMode": "100644",
+      "afterMode": "100644",
+      "after": "18ba0ee9b316300aa3547e87fe3676099126bdace53f01aabd58b6f76ce95702",
+      "review": "One private projection output per synchronous road/path painting pass. Exact canvas-command parity on small and large maps; no changes to visibility, colors, road data, imagery, coverage or saved settings."
+    },
+    "app/js/terrain/street-frontage-grading.js": {
+      "before": "783439249a7ccca44820f0c6926e4046e50bb8b0648c1fb0accfc029c0beb53f",
+      "beforeMode": "100644",
+      "afterMode": "100644",
+      "after": "4a9d944fcf064404df9e05394c134719bad388b8d20d81dfe324f94e84eb26a2",
+      "review": "Terrain opts into the shared frontage policy numeric snapshot. Existing outer-distance, ray occlusion, sampling, publication replacement and disposal rules remain authoritative. No road geometry, terrain datum, persistence or backend changes."
+    },
+    "app/js/world/compiler/street-frontage-policy.js": {
+      "before": "5005591da82810d4790cfaa3cd6a63f4c4ed816d4b712d5de3d6a4631c9b0da3",
+      "beforeMode": "100644",
+      "afterMode": "100644",
+      "after": "2e2e3e961dc7a995bd81ac12c17155f732afac6e979bdf83de7beb391b9d3a21",
+      "review": "Exact Float64 frontage endpoint pages and numeric bucket IDs replace terrain-only retained edge/bounds object graphs. Geometry consumers retain stable objects; full materialization releases alternate buffers. Shared query order, roundoff tolerance, exclusions and section semantics verified across scales, translations and publication lifetimes. No new save fields or backend protocol."
     }
   }
 }
