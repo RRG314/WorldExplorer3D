@@ -41,8 +41,8 @@
       },
       "colliders": {
         "mappedBuildings": 60000,
-        "transportStructures": 12000,
-        "dynamic": 32
+        "transportStructures": 15000,
+        "dynamic": 256
       },
       "maximumAnimationTimeRatio": 0.12
     },
@@ -126,5 +126,34 @@
       "finalVesselLeases": 0
     },
     "scope": "Scene-reference regression allowance, not GPU residency, physical-phone certification or a limit on future ocean content. Frame-time gates stay unchanged; lifecycle checks are mandatory."
+  },
+  "earthBaselineChange": {
+    "date": "2026-10-14",
+    "reason": "Completed waterfront collision and jointly solved bridge/tunnel approaches add real surface constraints to the named Baltimore scene. The collection called dynamic also holds authored static facility colliders; its old 32-object ceiling predated the quay and venue work.",
+    "evidence": "output/release-review/561-b21-baltimore-motion/inventory.json",
+    "evidenceSha256": "61f019c7e6a22f1a70a2ffcc855b01d042d061a235658a0ecabba8f40ec9b3e1",
+    "observed": {
+      "mappedBuildings": 49080,
+      "transportStructures": 13068,
+      "approachRetainingWalls": 8543,
+      "tunnelSideWalls": 4525,
+      "authoredStaticFacilityColliders": 199,
+      "uniqueAuthoredStaticColliderObjects": 199,
+      "duplicateAuthoredStaticShapes": 0,
+      "geometrySourceBytes": 407580650
+    },
+    "authoredStaticBreakdown": {
+      "waterfrontQuay": 174,
+      "harborBenches": 6,
+      "aquariumBuildingParts": 6,
+      "CalvertStreetFixtures": 10,
+      "CalvertStreetMasts": 3
+    },
+    "previousColliderMaximum": {
+      "mappedBuildings": 60000,
+      "transportStructures": 12000,
+      "dynamic": 32
+    },
+    "scope": "Named-content regression allowance only. No change to geometry/texture memory, frame-time, hitch, coverage or teardown/retention gates. Completed land-ocean-land and three vessel/submarine lifecycle checks are retained separately; final exact-artifact lifecycle acceptance is still required."
   }
 }

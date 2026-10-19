@@ -1,1352 +1,596 @@
 {
   "schema": "we3d-reviewed-rollback-runtime-v1",
-  "id": "journal-v5-backpack-v2-5.5-release-20261008",
-  "fallbackCommit": "37a12d117111446a128888384df67ac52445d972",
-  "scope": "Existing fixed-location coverage/resource work plus current request admission, provider ownership, terminal failure, readiness and deferred-work repair. Save/migration, equipment, account, room, backend and Firebase configuration owners are unchanged. Failed loads cannot restore or stamp a world; valid location and player schemas remain. Exact reviewed differences are pinned; actual packaged upgrade/fallback/write/return remains required. Does not certify worldwide streaming or performance. Marine/space transition, directed vector ownership, graph endpoint and occupied tunnel spawn repairs are additionally reviewed below. Voyage v1 remains compatible; packaged upgrade/fallback/return is required. October 7: generalized structure ownership, foundation-constrained grades and excavations, finite-height contacts, direct admitted surface entry and pedestrian snapshot filtering are reviewed. Physical traversal/visual/performance release acceptance remains independent. Final October 7 cuts are shared by terrain, ordinary ground surfaces and contacts before worker publication; saved aboard voyages resume directly through the existing voyage authority. No save schema or key changes. Actual packaged rollback remains required.",
+  "id": "journal-v5-backpack-v3-physical-corridors-5.6.1-20261015",
+  "fallbackCommit": "b21b7f12fdfab0f2adf82eca01faefb55ae64748",
+  "scope": "The preserved b21 complete candidate owns the same modern Backpack/campaign/workspace/vessel fields as the current candidate and includes local road recovery and the jointly solved approaches. It passes 2618 source checks, complete Monaco assembly and native Baltimore junction driving. It remains an emergency save-compatible fallback with known desktop performance limitations, not a substitute for final candidate acceptance. Production 5.5.1 is the upgrade starting point. Before promotion, build and verify this exact fallback with production configuration and complete the released/candidate/fallback-write/candidate-return save roundtrip.",
   "files": {
-    ".github/workflows/deploy-pages-public.yml": {
-      "before": "d75a74e99ae8cb2230af40fefd3c2f744854050a26e646f7058d861997b684b9",
+    "app/js/building-entry.js": {
+      "before": "331a57d41768294860e9fa76f1bc9139a85fbb8bef30768c94cce050e748b915",
       "beforeMode": "100644",
-      "after": "fe5dfbb6426170090919404c2f4712d2494ce3ff141fe120734d2866d3f997ed",
       "afterMode": "100644",
-      "review": "Publishes only the curated public site and selected screenshot assets; no internal evidence or tests in Pages output."
-    },
-    "app/index.html": {
-      "before": "94bdb7f627e930e09c6e1946aacd6dbbd447c6b332e4629b9dc1153660659ec2",
-      "beforeMode": "100644",
-      "after": "4571ea8c6504f5dc785d0fa3cd8823de3aae027648d44bb996289ad51616f976",
-      "afterMode": "100644",
-      "review": "Map search accessibility and existing layer classification; preference keys and selected layers are unchanged. No persistence or server protocol writes introduced. Follow-up review: Static startup cover and reload recovery, compact loading markup, regional-scenery preference control and corrected stable-branch attribution links. No player save schema or backend protocol changes."
-    },
-    "app/js/activity-discovery/catalog.js": {
-      "before": "6763f7ff5f4d5c5f2be9b76b59674cc29f98e7723acb04ec203e0574358d853a",
-      "beforeMode": "100644",
-      "after": "31d818e4ae489a7b136658edff1f7a1151030ee69d3a12826299d329cc9c8410",
-      "afterMode": "100644",
-      "review": "Centralizes existing location-relative conversion and corrects wrapped longitude/polar consumers. No origin rebase, session migration or save-key change. Existing location identity and records remain under unchanged persistence owners; actual return and save roundtrips required."
-    },
-    "app/js/app-entry.js": {
-      "before": "704b5ed4def37d6dcb1cf2c7384bc2a1e63eed56b3b32cf180591003a4be1260",
-      "beforeMode": "100644",
-      "after": "5d28e1dc7d66af96f471b492bb3fcb7a4888f3e8d409c5247c50558c2dc36ff8",
-      "afterMode": "100644",
-      "review": "Advances the main-module version for loading presentation; existing profile, Journal and Backpack authorities unchanged."
-    },
-    "app/js/app-shell-fragments.js": {
-      "before": "d802d18c2cb4c7d17ae1254432025ae091d05327d398446fc366a79817c2e638",
-      "beforeMode": "100644",
-      "after": "70dfb1bdcd6f496a14d808862bea9ed251e81d2c0a0fc950fdf67f78308de050",
-      "afterMode": "100644",
-      "review": "Moves the one loading screen to static HTML so module failure cannot leave a blank page. Other shell controls and persistence remain unchanged."
-    },
-    "app/js/boat-mode.js": {
-      "before": "d1b0f271f9529e2ea7e971f02a9f1a077a9fd464016fae266c386c64556a0981",
-      "beforeMode": "100644",
-      "after": "043c29866c05d1df691040fd5c4230f4307ac0d438be9aee80c858a6794fa9e6",
-      "afterMode": "100644",
-      "review": "An admitted ocean surface arrival uses its committed geographic frame and synthetic-water reference instead of outgoing airborne or tunnel reachability. Normal nearby boarding still uses the current actor. Sea-first teardown no longer requires unloaded terrestrial elevation functions; transient walker poses include eye height. Ordinary Exit Vessel no longer bypasses the existing shoreline policy. No save schema/key, inventory, account, backend or shared protocol changes; guarded voyage v1 persistence and rollback remain required."
-    },
-    "app/js/boat-mode/entry-reference.js": {
-      "before": null,
-      "beforeMode": null,
-      "after": "25a453688f80a20aeba0042243c8d876df6eb874d680f96e7af9661d37be6534",
-      "afterMode": "100644",
-      "review": "An admitted ocean surface arrival uses its committed geographic frame and synthetic-water reference instead of outgoing airborne or tunnel reachability. Normal nearby boarding still uses the current actor. Sea-first teardown no longer requires unloaded terrestrial elevation functions; transient walker poses include eye height. Ordinary Exit Vessel no longer bypasses the existing shoreline policy. No save schema/key, inventory, account, backend or shared protocol changes; guarded voyage v1 persistence and rollback remain required."
-    },
-    "app/js/boat-mode/ocean-transfer.js": {
-      "before": "3e58a2c17b9d78e4b17fceb9d26afd18da1b94dfea43cc478c05ca459215ac8d",
-      "beforeMode": "100644",
-      "after": "0c768a1651d48247bc487f28779d048fb0a276d7dd5f7f49b6f90e72a6ed8234",
-      "afterMode": "100644",
-      "review": "Saved aboard voyages use the guarded surface transaction directly, preserving existing voyage v1 identity, ship/sub condition, anchor, wave frame and optimistic revision owner. Saved underwater journeys retain their renderer. Invalid/future records remain rejected and failures retain the save. No persistence schema/key or account/shared protocol changes. Packaged candidate/fallback/write/return is required."
-    },
-    "app/js/boat-mode/prompt-ui.js": {
-      "before": "d41c780e615d7d004009e23832dbb722aeb940ecd35350a01fe78849fa32942e",
-      "beforeMode": "100644",
-      "after": "f0de96b805fa4f96614156696016a07dfd8199f98a63e8a9f0f4ac04d093c6fc",
-      "afterMode": "100644",
-      "review": "Connected marine entry, deck/swim/submarine handoffs and compact UI. Existing voyage v1 identity, geographic anchor, stage, condition, save key, revision and conflict owner remain. Parent yaw stays independent of submarine yaw; no account/backpack or shared protocol change. New-session admission still requires checked water; saved underwater and aboard records retain their resume path."
-    },
-    "app/js/boat-mode/research/runtime.js": {
-      "before": "0b458d0ea76b2c0bca12b25fe9a0c3f469dad422ac2b34f8d8d6a297d90b6c9a",
-      "beforeMode": "100644",
-      "after": "ffe1863f6726f7282dccd2a998201aee03ef5cea47d2e958b428a436ad23c496",
-      "afterMode": "100644",
-      "review": "Connected marine entry, deck/swim/submarine handoffs and compact UI. Existing voyage v1 identity, geographic anchor, stage, condition, save key, revision and conflict owner remain. Parent yaw stays independent of submarine yaw; no account/backpack or shared protocol change. New-session admission still requires checked water; saved underwater and aboard records retain their resume path."
-    },
-    "app/js/boat-mode/research/ui.js": {
-      "before": "b88d5a3b6db96710e71b5c3ca20c1ded3ac7e0ce0076ef02b614bedbe0593cc3",
-      "beforeMode": "100644",
-      "after": "59520ee19f21a81898c25ed8f1d578118184b4a903bf769a60d14568829b7992",
-      "afterMode": "100644",
-      "review": "Connected marine entry, deck/swim/submarine handoffs and compact UI. Existing voyage v1 identity, geographic anchor, stage, condition, save key, revision and conflict owner remain. Parent yaw stays independent of submarine yaw; no account/backpack or shared protocol change. New-session admission still requires checked water; saved underwater and aboard records retain their resume path."
-    },
-    "app/js/boat-mode/swimming.js": {
-      "before": "36c9f480149652ce14d15b904a2c2b5ff98d1dfe426370c0d6bf0a47c296c68a",
-      "beforeMode": "100644",
-      "after": "38730febe137a938d637d17be0e3064d8bcaa8d4b1ba7fdad22a368f94a8f1ac",
-      "afterMode": "100644",
-      "review": "Connected marine entry, deck/swim/submarine handoffs and compact UI. Existing voyage v1 identity, geographic anchor, stage, condition, save key, revision and conflict owner remain. Parent yaw stays independent of submarine yaw; no account/backpack or shared protocol change. New-session admission still requires checked water; saved underwater and aboard records retain their resume path."
-    },
-    "app/js/boat-mode/water-geometry.js": {
-      "before": "df2ea7ae9ab707ab5e190c70d4341583d8b4e0a26b3fa130c7445a9a053c7d12",
-      "beforeMode": "100644",
-      "after": "d1b2d911e391c793c4af40b77ab6e2526a9f693f0e88c1095295e04fb5633f6b",
-      "afterMode": "100644",
-      "review": "Nearest shoreline selection retains source order and exact coordinates while allocating only the winning result; no persistence or transport command change."
-    },
-    "app/js/bootstrap.js": {
-      "before": "79454111dffbf528d68dc59d4aacec966b6bdf7eea0ebc0e7540278a75fa2d1f",
-      "beforeMode": "100644",
-      "after": "e5f78bceee73c6eafa2ab286326f5360e6bf1f3dc7e224cc5fbd4e9dd48816c3",
-      "afterMode": "100644",
-      "review": "Orders shell initialization before boot and dispatches visible startup failure; no saved data transformations."
-    },
-    "app/js/character/capability-resolver.js": {
-      "before": "bda4bd18bdd8adf47f508e33d704277efd2f30decb741ad07f493d657b7d8a19",
-      "beforeMode": "100644",
-      "after": "bdf98fc148f175ac3981f81e3576a7173d2038de34e60ba227379dca7b8d63c1",
-      "afterMode": "100644",
-      "review": "Read-only immutable capability projection and semantic cache invalidation; persisted complete character records and version remain owned by the existing profile store."
-    },
-    "app/js/config.js": {
-      "before": "1193b1bcb3b54fa72c8ecb21277186c3614a96c34172db09791fe2b08b699365",
-      "beforeMode": "100644",
-      "after": "126af1c21e595da311ec6f8e357a23d99e446ec8a85b6345d22c7b8eb59648a2",
-      "afterMode": "100644",
-      "review": "Centralizes existing location-relative conversion and corrects wrapped longitude/polar consumers. No origin rebase, session migration or save-key change. Existing location identity and records remain under unchanged persistence owners; actual return and save roundtrips required."
+      "after": "e9fd2a008546968529118113d40b2141b2bc2d532aed571b3a4a0c2a0d7f76df",
+      "review": "Caller-owned scratch within footprint distance queries and scalar eligibility scanning. Preserves exact segment math, finite-point filtering, concave area order, bounds fallback, current edits and independent public results. No persistence or backend changes."
     },
     "app/js/discovery/runtime.js": {
-      "before": "7b94a5c733f0aa6150af951e40303e0848a0c7aab905491cd0a6263c81073dd0",
+      "review": "Guards unchanged text and three owned HTML sections using UI-instance state. Does not change finding/mission receipt writers, Journal, Backpack, campaign or account persistence. Same controls and changed-message updates verified by the first-session journey.",
       "beforeMode": "100644",
-      "after": "cb2ec8a50d699c35c6e9fa1a9e36a523b31dc5f175b916c4d83815f6fca4519d",
+      "before": "0bc4e0ae6ff5967f53fa0d015713e227f15427b738f51e93c2429a1c9ec3a2f4",
       "afterMode": "100644",
-      "review": "Single-flight Earth return awaits ready publication; hidden retained-Earth work is suspended while the separate ship interior owns play. Runtime-only ownership and presentation; retained location, player saves, schemas and server protocol remain unchanged. Follow-up review: Capability projection refreshed with character publication; inventory membership uses its adapter. Full progression, Journal, save format and synchronization owners unchanged by this follow-up."
+      "after": "33d6a46408317c3474e7900ad194e4e284c31f930e04768262fa7f28283a83c7"
     },
-    "app/js/earth-core/coordinate-frame.js": {
+    "app/js/editable-world/runtime.js": {
+      "before": "5bedec1c3b2f8bca93dbf63342c02b0013621e3ff26e58efeb43806df69c6be8",
+      "beforeMode": "100644",
+      "after": "56d6671b0692c73f1f9222fecafe8f57896dd39401eefb82bab2148c84268987",
+      "afterMode": "100644",
+      "review": "Keeps the existing local/shared edit behavior and persistence formats. Routes street-source invalidation through a revision owner so edits during asynchronous compilation remain pending and stale products are rejected."
+    },
+    "app/js/engine/vehicle-road-attitude.js": {
+      "before": "7ebccc535ebfc94b1ccde1f714c2ddb203bb440351e79c2e45a3346269bec54e",
+      "beforeMode": "100644",
+      "after": "1825d7c00285443aa48becc095ffc031b644422f2253cb77b1efe2576ae75bcd",
+      "afterMode": "100644",
+      "review": "Four private double-precision JS height values replace one native buffer per NPC contact solve per frame. Sampling order, iterative contact math, reentrant callbacks, final pose and anomaly records are unchanged. No persistence change."
+    },
+    "app/js/interiors.js": {
+      "review": "Prepares one detached museum material lease through the existing support and permission resolver. Admission, owned-home exclusions, player state and saved interior records keep their existing authorities. No save or service schema changes.",
+      "before": "17f08dc03610fc028778ef8df443fa4421db8333bac9e83a53e7eba21e8fa79a",
+      "beforeMode": "100644",
+      "after": "c69bd2e54e28b4cd2fd7782a8a39b5f54a88f7315303979df6468f8dedb58b43",
+      "afterMode": "100644"
+    },
+    "app/js/interiors/gallery-runtime.js": {
+      "review": "Awaits normal renderer buffer/texture preparation after exhibits and furniture settle. Added render timing belongs only to the live gallery state; Journal and exhibit save handling are unchanged.",
+      "before": "789adcfbc114601f7cf48ec8caa095e20759efda2816f17c67471d36ac0c5743",
+      "beforeMode": "100644",
+      "after": "35eed37f0a06c4952f34331252680911149440b89c820417e4e71aead3d57dac",
+      "afterMode": "100644"
+    },
+    "app/js/interiors/museum-program-preparation.js": {
+      "review": "Recognizes existing catalog source IDs and awaits the existing lazy interior module under the current publication guard. No new destination, access permission, persistence or backend protocol.",
       "before": null,
       "beforeMode": null,
-      "after": "17701713af4c66800eb5e5ff170bb866f7aab6e91421f21af05927aec6b7912a",
-      "afterMode": "100644",
-      "review": "Centralizes existing location-relative conversion and corrects wrapped longitude/polar consumers. No origin rebase, session migration or save-key change. Existing location identity and records remain under unchanged persistence owners; actual return and save roundtrips required."
+      "after": "b4cd5cbf22d22feb241cfea2338a5609d69b7dd697e56b7a660e5e6020786709",
+      "afterMode": "100644"
     },
-    "app/js/earth-core/location-origin.js": {
-      "before": "f893fb4a3c2fc37580fbfac8b2cb2996e7c452bea89a1240984629694c5c8370",
+    "app/js/interiors/scene-builder.js": {
+      "review": "Exports the existing failed-construction resource disposer for the detached program lease. Room geometry, doors, collisions and serialized content remain unchanged.",
+      "before": "9c051fdad3aec0d7261004177fe6cef2284a0fa639078658c051fc2915b05dda",
       "beforeMode": "100644",
-      "after": "21e83c1286c673abec6a46b571c3455be3919d7bbf6095e911320694238cdf33",
-      "afterMode": "100644",
-      "review": "Centralizes existing location-relative conversion and corrects wrapped longitude/polar consumers. No origin rebase, session migration or save-key change. Existing location identity and records remain under unchanged persistence owners; actual return and save roundtrips required."
+      "after": "06a01ba442b50eb2a8080548867307ffad3cbbd5979256c85ad9ff9f68ba2cab",
+      "afterMode": "100644"
     },
-    "app/js/earth-core/region-build.js": {
+    "app/js/interiors/venue-program-preparation.js": {
+      "review": "New bounded transient renderer-program lease per world sequence. Cloned camera and detached lighting scene preserve outdoor ownership; reset disposes resources. No saved state.",
       "before": null,
       "beforeMode": null,
-      "after": "246695973e20f863c8a796615262b27eeb619c8ce7cf704c0ae873e4bbf098af",
-      "afterMode": "100644",
-      "review": "Fixed-location regional compilation, staged publication and cancellation/resource retirement. Does not initiate movement-based source windows or write a durable world/player record. Existing coverage and lifecycle acceptance required."
+      "after": "267ec613e05e91cee18144c2ff2ddf7f9a55be64e467f92803a718142be8ec76",
+      "afterMode": "100644"
     },
-    "app/js/earth-core/world-load-request.js": {
-      "before": "4b71110fc475c2a0b90c860bc1bdbac7c48f271c7937d37a50b89d0f469f281d",
+    "app/js/living-world/navigation-graphs.js": {
+      "before": "bdb8902c6b1c15247dd99686dc7021a7bb67fb1f4e8ae373edc7aa91b76542d3",
       "beforeMode": "100644",
-      "after": "0e958a2a427bd8b0c166a6314b31a69b2615a9f7ea5910fb7592b2c70baf2077",
+      "after": "d5a22c5146a301fd82ffb3644fdde1a4531b538112dad2bd79277bfe1517bd62",
       "afterMode": "100644",
-      "review": "Rejects absent/blank coordinates before admitting a load. No saved location schema, coordinates of valid records or persistence owner changes."
+      "review": "Pedestrian and traffic compilation materialize temporary candidate rows from packed traversal storage. Existing access rules, sorting, budgets and published population graphs remain identical; only selected source features survive compilation."
     },
-    "app/js/earth-core/world-readiness.js": {
-      "before": null,
-      "beforeMode": null,
-      "after": "0cc0acbaf19989f01dbd00053e505f6ac59246c5d49cf74058c604e6771a107e",
-      "afterMode": "100644",
-      "review": "Shared admission for the exact ready publication and completed request identity; rejects failed, superseded and older successful outcomes before pose/spawn changes. No persistent schema or protocol changes."
-    },
-    "app/js/earth-session.js": {
-      "before": "3406a7dac638ad2e2d22c2ebbb4127f4cb432d7bdce002ccc2ee88b62b92cf3d",
+    "app/js/map/earth-base.js": {
+      "before": "c6a9a27f8bac75469618ac7eb0d00310bb4fbf8e9ebf7752ceccac76317239c0",
       "beforeMode": "100644",
-      "after": "4de5a4973066872f5b161dc832268832b5fee5db56959d1d5cf929b04525046e",
       "afterMode": "100644",
-      "review": "Resume and reload reject unsuccessful world publications before restoring pose or stamping the loaded selection; successful pose restoration and existing save owners are retained. Actual failure/retry and packaged save roundtrip required."
-    },
-    "app/js/engine/building-facade-materials.js": {
-      "before": "cb740f60cfaff53fcce15bb53313243660014614c50f0f19137984a7c612d04d",
-      "beforeMode": "100644",
-      "after": "fff635e03e21230dbe63e6077e60f0fb8843556ebcb2369eeb16a7d18a3c0a5e",
-      "afterMode": "100644",
-      "review": "Facade shading and parallax uniforms only; no persistent world or player state."
-    },
-    "app/js/engine/night-lighting.js": {
-      "before": "37f9d64048ea99e9712e5651ded4b0ccc526b16528b3a5df1019d6964c91fa39",
-      "beforeMode": "100644",
-      "after": "d7a70e2a6a13664ed953a715d5f8a5eeec50138d6a0b860cbc5d97fa371ec098",
-      "afterMode": "100644",
-      "review": "Transient window emission and bounded light intensity under existing lighting owner; no saved settings format changes."
-    },
-    "app/js/engine/opaque-order.js": {
-      "before": "25fb33a050990cf55f527451970e368570364f8ed0460cc4a0b5878f16463001",
-      "beforeMode": "100644",
-      "after": "a82956235377468fe2c0c5be1e88873934cc0063ab7d59f4d969951dd278c9e1",
-      "afterMode": "100644",
-      "review": "Integer depth comparator preserves authored groups and tie ordering; rendering only, no saved representation."
-    },
-    "app/js/engine/procedural-textures.js": {
-      "before": "3980f393f7104ed25886ab0096036689d31f6a6514995bb8646a828e034f6d33",
-      "beforeMode": "100644",
-      "after": "35dacd8aad9a88a2080eb630d03eb7b7a28bdbc781be1f5424aa0389dfb1ed01",
-      "afterMode": "100644",
-      "review": "Generated pavement/asphalt material texture bytes only; no persistence or network protocol."
-    },
-    "app/js/game.js": {
-      "before": "079f490410b51527c2d8e20fd419f333377b9007da44841e962de091bfe86915",
-      "beforeMode": "100644",
-      "after": "70817a4d70f5590c234dffbdad6eb5d89bd8d2601d98dda000bd18a02551d6bc",
-      "afterMode": "100644",
-      "review": "Map search accessibility and existing layer classification; preference keys and selected layers are unchanged. No persistence or server protocol writes introduced."
-    },
-    "app/js/game/poi-map-visibility.js": {
-      "before": null,
-      "beforeMode": null,
-      "after": "101f0462130c20c9640eccc6e6f8160f1ca14bdd085faff54409c4de7b526a38",
-      "afterMode": "100644",
-      "review": "Map search accessibility and existing layer classification; preference keys and selected layers are unchanged. No persistence or server protocol writes introduced."
-    },
-    "app/js/game/property-ui.js": {
-      "before": "ac4574e435118cf55a4f7c594f6d875b7e22e98edc2b504709c69c69feac415c",
-      "beforeMode": "100644",
-      "after": "ea2fcaa72071aa27f4b88bacca4a3e2293c30480b141b76165a612e863fc9b80",
-      "afterMode": "100644",
-      "review": "Centralizes existing location-relative conversion and corrects wrapped longitude/polar consumers. No origin rebase, session migration or save-key change. Existing location identity and records remain under unchanged persistence owners; actual return and save roundtrips required."
-    },
-    "app/js/geospatial/aircraft.js": {
-      "before": "12eee6cc478b99e4007a1e0207cbccc640f1c52e88b75bcb5a90b5af3ef617a4",
-      "beforeMode": "100644",
-      "after": "830818f3fb9ab27152111ff321fa662605e41c1eb18faf871b9bbbf6d040bd05",
-      "afterMode": "100644",
-      "review": "Client deadline expands from10to20seconds around the bounded gateway; response normalization, provider provenance, cache keys and persisted state are unchanged."
-    },
-    "app/js/ground.js": {
-      "before": "f8587d359c87fd4c5f807a38ab843bb59830b21fb6853e20eefbba29fe869ad5",
-      "beforeMode": "100644",
-      "after": "dfa30264c9441f7317a00f83cbc826052ddb1a5751dd8d50c15ab1145ad44a3f",
-      "afterMode": "100644",
-      "review": "Recompiles transient transport geometry and contacts from existing source records. Preserves higher-resolution ownership, retained road coverage, layer/access/direction and published foundation authority; connected grades, cuts, enclosures and finite actor-height contacts now agree. No persistent geography, player pose schema, inventory, account or server writes. Existing fixed-location loads rebuild this derived state; packaged movement and retained-save roundtrip remain required."
-    },
-    "app/js/hud.js": {
-      "before": "2acd81d07f8f3be0f1c86684ba351a1f15157129d83171fafd20dac1f24b7710",
-      "beforeMode": "100644",
-      "after": "a290592fec026ddf7ef8b841ad5bbfa900f57ea684e5a18792cff3bb7bfa00d6",
-      "afterMode": "100644",
-      "review": "Camera clearance uses the retained chase near plane while automatic cabin mode is active, removing a self-induced radius feedback. Roof clearance looks ahead along the road. Camera transforms only; no inventory, location or persistence changes."
-    },
-    "app/js/hud/vehicle-camera-body.js": {
-      "before": "e1e63f5ed9f6b7582911efd83c889468abb216414861e34fd294837a24dd6e05",
-      "beforeMode": "100644",
-      "after": "c0ec8263625da3968edaf7ddcfa6b71add66692226d9cdee8b765f529a017d02",
-      "afterMode": "100644",
-      "review": "Camera clearance uses the retained chase near plane while automatic cabin mode is active, removing a self-induced radius feedback. Roof clearance looks ahead along the road. Camera transforms only; no inventory, location or persistence changes."
-    },
-    "app/js/input.js": {
-      "before": "d55e7f3dbf95bffc20ed28e82b0f0c30e5553bd74b90ddf4af98ed8e96c736c6",
-      "beforeMode": "100644",
-      "after": "91f24e865e06b860795a586071b543e2c320bac8298a7609c4ea5d551cbde034",
-      "afterMode": "100644",
-      "review": "Map-search travel requires the current ready publication before applying a spawn. Existing coordinate parsing, location persistence and valid-arrival behavior remain; failed/retried actual consumer test required."
-    },
-    "app/js/interiors/core.js": {
-      "before": "44fbe2e15d0727b5be8eec8dcfc01cf2e141940a13f7f72c9a6f163be0b69a2b",
-      "beforeMode": "100644",
-      "after": "1af43166dc242bbf3e1d9a0921446f943ef88c0f07b6835c5406491647072c8f",
-      "afterMode": "100644",
-      "review": "Centralizes existing location-relative conversion and corrects wrapped longitude/polar consumers. No origin rebase, session migration or save-key change. Existing location identity and records remain under unchanged persistence owners; actual return and save roundtrips required."
-    },
-    "app/js/live-gps/runtime.js": {
-      "before": "8f729333677c29a94259f006b4d284c1cb9b4f159a8c8f435fe85e5ecd9a87e5",
-      "beforeMode": "100644",
-      "after": "fea3f995412fa20dc19fcdedf5d59052745afc25d31a39e85e58584a80741429",
-      "afterMode": "100644",
-      "review": "GPS recenter holds following paused and retains its origin when world publication fails. Existing GPS permission, transient location policy, field-credit and persistence owners remain. Actual controller failure/retry tested with a simulated sensor."
-    },
-    "app/js/living-world/nearby-pedestrians.js": {
-      "before": null,
-      "beforeMode": null,
-      "after": "90480d20157827ffbbd5757e1e0641c49111b109465cc365ad90b1f4daa9c76d",
-      "afterMode": "100644",
-      "review": "Filters full pedestrian snapshots using the identical live path pose/visibility/radius before allocation; exact returned actors and stable ordering are covered by equivalence tests. Population persistence and promoted actor identity are unchanged. No player/account/inventory schema or data writes."
-    },
-    "app/js/living-world/population.js": {
-      "before": "02a26d467623fbf6bc5e024d7f9a96ab06551451ee9d7b1272d50663618815ff",
-      "beforeMode": "100644",
-      "after": "9a66b5fec969845018bcac66c2f91da2c0dc5b27789b8bad141d5708b978689d",
-      "afterMode": "100644",
-      "review": "Filters full pedestrian snapshots using the identical live path pose/visibility/radius before allocation; exact returned actors and stable ordering are covered by equivalence tests. Population persistence and promoted actor identity are unchanged. No player/account/inventory schema or data writes."
-    },
-    "app/js/main.js": {
-      "before": "a90e8533831489de22dcc13493545926f4b30cdc0821651b7a7fc4cf9a654aa0",
-      "beforeMode": "100644",
-      "after": "b7c7b936043da3b4032d9003da2527d9962cf5cfe259f248c20a48408ef3e822",
-      "afterMode": "100644",
-      "review": "Owns the loading presentation lifecycle and progress events; existing runtime, movement and persistence owners remain."
-    },
-    "app/js/multiplayer/ui-room-runtime.js": {
-      "before": "00b4e097b3c70ce6ca9f1c7a9aaac8e295226205a68ecc91e6971baad0035b5c",
-      "beforeMode": "100644",
-      "after": "38b9e3ebca9b95b2e19be3bf942d030f45f2f1863db7bfec726103a37ddaf87f",
-      "afterMode": "100644",
-      "review": "Room sync waits for successful Earth publication/title launch before respawn, removes pre-load duplicate spawn and clears a failed transient signature for retry. Room schema, membership, authority, entitlements and server writes unchanged. Actual controller tested with remote boundaries replaced; hosted room acceptance remains separate."
-    },
-    "app/js/ocean.js": {
-      "before": "db31c767e1f5964ac3808c32bfd9e46b788df670aa5fe8a35a548c09cc74486d",
-      "beforeMode": "100644",
-      "after": "8b4db5f57b91d01adfe3844d635ce8d190f53eb8faf0d3e544ae4670c5e22ad2",
-      "afterMode": "100644",
-      "review": "Direct admitted surface entry reuses the existing boat handoff without creating an underwater scene. Voyage v1 fields, save key, validation, revision/conflict owner and fallback resume remain compatible; only successful vessel publication writes an aboard record. Future/malformed records are retained. Existing underwater/resume/parent-ship paths are preserved. No inventory, account, room or server schema changes."
-    },
-    "app/js/ocean/diver.js": {
-      "before": "2a7e436bae51319a9e875815b6ca26bef48f40ff66b00fa711fdf3166d954ed1",
-      "beforeMode": "100644",
-      "after": "473ae929dc99bdf5500db98a57d99f8fd1151108615b262ee39e97fc5e274f30",
-      "afterMode": "100644",
-      "review": "Connected marine entry, deck/swim/submarine handoffs and compact UI. Existing voyage v1 identity, geographic anchor, stage, condition, save key, revision and conflict owner remain. Parent yaw stays independent of submarine yaw; no account/backpack or shared protocol change. New-session admission still requires checked water; saved underwater and aboard records retain their resume path. Portrait optical framing keeps the diver clear of the HUD; collision anchors and saved pose remain unchanged. Marine swim controls inherit the compact shared type scale."
-    },
-    "app/js/ocean/interface.js": {
-      "before": null,
-      "beforeMode": null,
-      "after": "94494308b86d2fbe9bd36b514e48f4c2c3084493fd0111e8e03e33753996ea8d",
-      "afterMode": "100644",
-      "review": "Connected marine entry, deck/swim/submarine handoffs and compact UI. Existing voyage v1 identity, geographic anchor, stage, condition, save key, revision and conflict owner remain. Parent yaw stays independent of submarine yaw; no account/backpack or shared protocol change. New-session admission still requires checked water; saved underwater and aboard records retain their resume path. Portrait optical framing keeps the diver clear of the HUD; collision anchors and saved pose remain unchanged. Marine swim controls inherit the compact shared type scale."
-    },
-    "app/js/ocean/launch-site.js": {
-      "before": null,
-      "beforeMode": null,
-      "after": "78558097dfc9408368fe757d2022f06108454f685fc20eecdde0090be7d5f098",
-      "afterMode": "100644",
-      "review": "Direct admitted surface entry reuses the existing boat handoff without creating an underwater scene. Voyage v1 fields, save key, validation, revision/conflict owner and fallback resume remain compatible; only successful vessel publication writes an aboard record. Future/malformed records are retained. Existing underwater/resume/parent-ship paths are preserved. No inventory, account, room or server schema changes."
-    },
-    "app/js/ocean/parent-vessel.js": {
-      "before": "84a2cde22d65d335b85b09bde2f5979e7e6868b60e8e0969b2b354c79a023211",
-      "beforeMode": "100644",
-      "after": "314810c299cde8745b6b35a5e87e7ccfd3f555bbd55fed7eab7b5d6281b3423f",
-      "afterMode": "100644",
-      "review": "Connected marine entry, deck/swim/submarine handoffs and compact UI. Existing voyage v1 identity, geographic anchor, stage, condition, save key, revision and conflict owner remain. Parent yaw stays independent of submarine yaw; no account/backpack or shared protocol change. New-session admission still requires checked water; saved underwater and aboard records retain their resume path. Retained parent presentation now uses the same seven-point vessel water fit and damped pitch/roll/heave. No persisted wave state or voyage schema changes."
-    },
-    "app/js/ocean/start-exploration.js": {
-      "before": null,
-      "beforeMode": null,
-      "after": "5a3b27b6449d2bdbb55d2dea6897d6c667372c50cc064a1ae46572c7a37469b1",
-      "afterMode": "100644",
-      "review": "Saved aboard voyages use the guarded surface transaction directly, preserving existing voyage v1 identity, ship/sub condition, anchor, wave frame and optimistic revision owner. Saved underwater journeys retain their renderer. Invalid/future records remain rejected and failures retain the save. No persistence schema/key or account/shared protocol changes. Packaged candidate/fallback/write/return is required."
-    },
-    "app/js/ocean/voyage.js": {
-      "before": "76df3fdea7d21ea745018f742091d5ab55a561dd929284738efb2a39e6118ba7",
-      "beforeMode": "100644",
-      "after": "67f19b5f477ae27e3c9cc28c0ab97f59b7644201de8443e14bb7bf93cc3d28f7",
-      "afterMode": "100644",
-      "review": "Saved aboard voyages use the guarded surface transaction directly, preserving existing voyage v1 identity, ship/sub condition, anchor, wave frame and optimistic revision owner. Saved underwater journeys retain their renderer. Invalid/future records remain rejected and failures retain the save. No persistence schema/key or account/shared protocol changes. Packaged candidate/fallback/write/return is required."
-    },
-    "app/js/physics.js": {
-      "before": "39e0b88474178cfc089c56e7d3cec2cc1ef950560cc1255b4ee1842823e321df",
-      "beforeMode": "100644",
-      "after": "fbd151b74ef23b203c31afb820a49d9b827e3c4b37fec26cc575704f699dd581",
-      "afterMode": "100644",
-      "review": "Recompiles transient transport geometry and contacts from existing source records. Preserves higher-resolution ownership, retained road coverage, layer/access/direction and published foundation authority; connected grades, cuts, enclosures and finite actor-height contacts now agree. No persistent geography, player pose schema, inventory, account or server writes. Existing fixed-location loads rebuild this derived state; packaged movement and retained-save roundtrip remain required."
+      "after": "18ba0ee9b316300aa3547e87fe3676099126bdace53f01aabd58b6f76ce95702",
+      "review": "One private projection output per synchronous road/path painting pass. Exact canvas-command parity on small and large maps; no changes to visibility, colors, road data, imagery, coverage or saved settings."
     },
     "app/js/physics/building-collision.js": {
-      "before": "446b77f7461d97f9b11a685a48a2d67bcaf61b442dbd1b4a216dd6688ef107ea",
+      "before": "d8df3b726b6833c605a20844dd4236b6ce9ff55d9cc2f82dfdab69fb83342c26",
       "beforeMode": "100644",
-      "after": "ee9a5d428e31c481c95b27dce3ceec49a6c7d9289db3d949ada9023c0abc32a9",
+      "after": "8918702678b2cdf6115d7585a72b5ef5ab300950ddb35ba20e23a00ec8bc5028",
       "afterMode": "100644",
-      "review": "Uses tight vertical tolerance only for compiled transport walls to avoid blocking the separate road above. No saved geometry or player-record schema change."
+      "review": "Identical horizontal and vertical predicates, candidate order and collision responses. Rejects geographically distant colliders before evaluating vertical properties, reducing measured temporary allocation. No collision data, geometry, persistence or backend protocol changes. Exposes a synchronous region lease for camera probes while retaining the same narrow-phase solver. Out-of-range probes use ordinary queries; nested leases and exceptions release every scene reference. Expired probe callbacks reject use; large scratch arrays are not retained. Region state is private to one synchronous callback and never persists across frames."
     },
-    "app/js/planetary/scene-ownership.js": {
-      "before": "c07e32a4db37af48efe5f8bdc34e530ac953b5313f25feded79a788af47485bb",
+    "app/js/reality-capture/rdt-building-index.js": {
+      "before": "52688047fb24374219649f9ef799b23449c7b3e87c9706817c2e97c4b83d8b53",
       "beforeMode": "100644",
-      "after": "face163f17d4161f040eee4ca1ae19b11e80a8a127e6110d1bc9da3db25c6d3e",
+      "after": "f0768df0e24e80b044c8211a2f88a84eda551063c483d9905b7850cc61de69f2",
       "afterMode": "100644",
-      "review": "Single-flight Earth return awaits ready publication; hidden retained-Earth work is suspended while the separate ship interior owns play. Runtime-only ownership and presentation; retained location, player saves, schemas and server protocol remain unchanged."
+      "review": "Cooperative construction/validation of a transient nearest-building index. Preserves identity/coordinate edit detection, nearest ordering and cancellation. No saved data."
     },
-    "app/js/player/backpack-model.js": {
-      "before": "24f381815f05505f45c74c876b4b87f619e8011623fddb26b6ba95d058583fd0",
+    "app/js/reality-capture/runtime.js": {
+      "before": "db462110ced5dca0cc7d913a975068fc679346195eefb0ce77ef26e1c062c8a4",
       "beforeMode": "100644",
-      "after": "5dcdcd7f76b7c7493dcd542dca8d477fb06289f48cf4e406b68ed9328559a576",
+      "after": "e1ace82ec3da2b3e8f9df63a6399c79a5074fe9443ab114f91bae2b619203565",
       "afterMode": "100644",
-      "review": "Cached immutable owned-catalog view invalidates on every mutation including silent changes. Existing item records, snapshots and storage format are preserved."
-    },
-    "app/js/product/capabilities.js": {
-      "before": "f10ed3d4aa361aa8873cb50e4788b7b831951c786fca325526a41fe41e45a94f",
-      "beforeMode": "100644",
-      "after": "feef13c3ce3dfefb8a0d19f409f76d6533ba00d5841e9f73fbf0a912c2d1b2bb",
-      "afterMode": "100644",
-      "review": "Public capability copy distinguishes regional scenery from detailed starting-location simulation. No persistence changes."
+      "review": "Awaits bounded capture selection under world/refresh/list identity guards. Same approved-representation endpoint and publication contract; no persistence changes."
     },
     "app/js/runtime/core-frame-systems.js": {
-      "before": "dbde26a81cfc7e3737a846cde219ea78334ad0c2030d39b120ed5f91f214f3fe",
+      "review": "Prepares resident renderer resources and the supported museum before first play; suspends unfinished outdoor preparation in interiors. Restores renderer target and preserves published geometry, input, movement and save ownership.",
+      "before": "ac0810e87cfbd17d29e4cdde431679eaea40a0209d3acd56ecf2bcea171d764e",
       "beforeMode": "100644",
-      "after": "dff3b2811328f946164edf5544b68a1a686e0bab95f123e1eec93daf4f1aefed",
-      "afterMode": "100644",
-      "review": "Bounded road render/contact residency within the existing fixed source catalog and shared road-mask ownership. Existing retry calls the existing session capture/reload authority. No new save schema, geographic migration, room authority or persistent write protocol. Single-flight Earth return awaits ready publication; hidden retained-Earth work is suspended while the separate ship interior owns play. Runtime-only ownership and presentation; retained location, player saves, schemas and server protocol remain unchanged. Follow-up review: Schedules Earth scenery focus at one-second intervals, after environment guards. No save ownership or simulation time changes."
+      "after": "1c56cfcadc3b154174a12b33e4035433b7a394c1d69e31469c170b35696a8e45",
+      "afterMode": "100644"
     },
-    "app/js/runtime/workload-policy.js": {
-      "before": "906650cb92037aa8437f9dac05c2c0209ccd28dfdd2513e165c8a5ceedf0e003",
-      "beforeMode": "100644",
-      "after": "f2a3c6b8529632b34f6cfba629f6cb324e3dbee08726eae9bc1722cec35b6ebd",
-      "afterMode": "100644",
-      "review": "Transient deferred-task freshness and completion retention only; no persisted task format or account state."
-    },
-    "app/js/solar-system/info-panel.js": {
-      "before": "eb0e630e2aee4926ec61a7244e1b2d9333560e082904ad2a042558772bd3af25",
-      "beforeMode": "100644",
-      "after": "a5e3046a74684655860d528add08632d90b1145b64efc8ecb90df1cc55a5d11a",
-      "afterMode": "100644",
-      "review": "Single-flight Earth return awaits ready publication; hidden retained-Earth work is suspended while the separate ship interior owns play. Runtime-only ownership and presentation; retained location, player saves, schemas and server protocol remain unchanged."
+    "app/js/runtime/resident-presentation-preparation.js": {
+      "review": "New normal-renderer one-pixel upload preparation. Restores viewport, scissor, visibility, culling and shadow flags in finally. No private renderer changes, gameplay data or persistence.",
+      "before": null,
+      "beforeMode": null,
+      "after": "2624382e13ff98bb40c011b3acf8e94d91ef6be9954d193acf5c3e2d1dfd8238",
+      "afterMode": "100644"
     },
     "app/js/structure-semantics.js": {
-      "before": "2c0d7d08499edd987dcc610253011c44ba03d5b72382e743918ea37318177501",
+      "before": "5d7cfdf6c7a9473cc8dc0394d528ee1787b5fe1b9ab1604775f00a72acf93338",
       "beforeMode": "100644",
-      "after": "5d7cfdf6c7a9473cc8dc0394d528ee1787b5fe1b9ab1604775f00a72acf93338",
+      "after": "1165d2482015cff7836d7d0a5b10170bcbdae1c6830f8f5f6efc67cf439a17c1",
       "afterMode": "100644",
-      "review": "Recompiles transient transport geometry and contacts from existing source records. Preserves higher-resolution ownership, retained road coverage, layer/access/direction and published foundation authority; connected grades, cuts, enclosures and finite actor-height contacts now agree. No persistent geography, player pose schema, inventory, account or server writes. Existing fixed-location loads rebuild this derived state; packaged movement and retained-save roundtrip remain required."
+      "review": "Passes explicit optional compilation storage through to the existing canonical profile compiler. Standalone callers retain independent storage. No saved fields or protocol change."
     },
-    "app/js/surface-rules.js": {
-      "before": "ea104bd9fdf47651542a6e4832f4946e5181df36a91c94a2b8da18a1900949e7",
+    "app/js/structure-semantics/classification.js": {
+      "before": "6006093439bf083840f6c2997933038d4ec8f782eacfaff60a99459af53a0ac6",
       "beforeMode": "100644",
-      "after": "e03d4f0d6e55ebb55a452e3b99107a86e0f75d72fa84fa6a82beaa8133a7804b",
+      "after": "813a6c53d60701c74f45b225f0ef225db6b287d2cc4569d60f4cff89dd5efed4",
       "afterMode": "100644",
-      "review": "Restores coverage and land-purpose/physical-cover classification with bounded source caches. Location presets, source IDs, saved map preferences and schema owners are preserved; current real-city coverage must be tested."
+      "review": "Preserves an explicit service=parking_aisle distinction in derived structure semantics. Does not alter source tags, tunnel classification, topology or persisted fields."
     },
-    "app/js/terrain.js": {
-      "before": "52ecf77f1c3858a14ed70ffe258ba7bc188b3fd47e831fa8389f18636d23f741",
+    "app/js/structure-semantics/geometry.js": {
+      "before": "f87dfd35174c8f2d7ab2a9e059db1908da826905409825c1fd941cadb32b1371",
       "beforeMode": "100644",
-      "after": "e02007b872e1b012687a2b2fbdf42e8e31efc2dd5ff8de63b2903b6357997c11",
+      "after": "b5ba2fdc4932e4a69e0ecbde69d644eb1d5da4fffc051b15fe39e9398ba7cbfa",
       "afterMode": "100644",
-      "review": "Terrain source cache, sampled surface and land-cover lookup lifetime changes. No durable schema or provider credential changes; memory bounds and location replacement must be verified against the package. Follow-up review: Exports regional scenery controls through the existing terrain runtime; no saved world or actor identity change."
+      "review": "Polyline distance arithmetic and Float32 rounding are unchanged. The caller can explicitly provide temporary storage; ordinary callers retain independent arrays. No geometry or persistence semantics change."
     },
-    "app/js/terrain/far-building-facade-material.js": {
-      "before": "f6b49f25df2a208b6633982bfcc6ff18654e478a3954d0b14f1e63aa3ef57232",
-      "beforeMode": "100644",
-      "after": "ab25f031c1925bab91a691873a32dfd46fbc72f055457cd65f907bc28b96de80",
-      "afterMode": "100644",
-      "review": "Regional source selection and worker-owned packed/render data retain source-identified majors and coverage. Cell-relative GPU coordinates do not migrate the gameplay origin. Regional representations are transient; persistent building identity owners unchanged. Follow-up review: Adjusts wall-normal masking, palette tint, antialiasing and shader cache key for regional building rendering. No saved state."
-    },
-    "app/js/terrain/far-building-instance-batches.js": {
-      "before": "c63b45ee47327894c5ac82e80cfd72e64399f91fc08af454b5eba23a705793e2",
-      "beforeMode": "100644",
-      "after": "990b690cd803317f900ecb2050285ce9edccbecf57af7b968256f1e50acfcc2e",
-      "afterMode": "100644",
-      "review": "Regional source selection and worker-owned packed/render data retain source-identified majors and coverage. Cell-relative GPU coordinates do not migrate the gameplay origin. Regional representations are transient; persistent building identity owners unchanged. Follow-up review: Batches supported gable proportions into shared extruded geometry while retaining instance picking and bounds. Transient geometry only."
-    },
-    "app/js/terrain/far-building-instance-storage.js": {
+    "app/js/structure-semantics/numeric-publication.js": {
       "before": null,
       "beforeMode": null,
-      "after": "95914926bf5023aa181e78965e38fea6aac237cc89612dda33f6d855e70a9951",
+      "after": "9725af3f4d61dd9aa73e678bbd5bb52421e93cf932ae573832fe1e7f7f57910a",
       "afterMode": "100644",
-      "review": "Regional source selection and worker-owned packed/render data retain source-identified majors and coverage. Cell-relative GPU coordinates do not migrate the gameplay origin. Regional representations are transient; persistent building identity owners unchanged. Follow-up review: Adds roof proportion to exclusively owned, disposable runtime instance arrays; not persisted to player stores."
+      "review": "Append-only bounded publication pages owned by a compilation. Published views are disjoint and never recycled or detached; only the current page is held by the allocator. No persisted fields or transport topology change."
     },
-    "app/js/terrain/far-building-massing.js": {
-      "before": "d5ceecfc31bd911a99c1478a914985be24ebc55d00d21ac31686ebd04b10b855",
-      "beforeMode": "100644",
-      "after": "69c41551f7cdba7d1834d4df4a5bfd505f658ae77b19996e7db2a6ebd2791b70",
-      "afterMode": "100644",
-      "review": "Regional source selection and worker-owned packed/render data retain source-identified majors and coverage. Cell-relative GPU coordinates do not migrate the gameplay origin. Regional representations are transient; persistent building identity owners unchanged. Follow-up review: Uses the shared exterior catalog and source-supported low-rise roof rules; geographic identity and saved player data unchanged."
-    },
-    "app/js/terrain/far-building-selection.js": {
+    "app/js/structure-semantics/numeric-scratch.js": {
       "before": null,
       "beforeMode": null,
-      "after": "fbfd13d01e8d96f46c8d8743386d5ae7539a4fec354da36f5587948821f05ec9",
+      "after": "d6905369bbbd99b0ff6dac796b696cbf0875473e5a50549849ba3d60d6ed7c16",
       "afterMode": "100644",
-      "review": "Regional source selection and worker-owned packed/render data retain source-identified majors and coverage. Cell-relative GPU coordinates do not migrate the gameplay origin. Regional representations are transient; persistent building identity owners unchanged."
-    },
-    "app/js/terrain/far-field-geometry.js": {
-      "before": "0c33119461996a7254a33338a6b40f675ba01e7454316a6b643c2e9daa7402a9",
-      "beforeMode": "100644",
-      "after": "b63688e2625c016f3cd79060862a293becfa6f7e7f63595a9469893a0772d4c2",
-      "afterMode": "100644",
-      "review": "Fixed-location regional compilation, staged publication and cancellation/resource retirement. Does not initiate movement-based source windows or write a durable world/player record. Existing coverage and lifecycle acceptance required. Follow-up review: Clamps detailed seam coordinates inside the moving outer terrain window to keep its geometry bounded. Runtime terrain only."
+      "review": "Bounded, explicitly borrowed numeric scratch pages for synchronous compilation. Nested calls have separate pages; completed profiles use independent publication buffers. At most one MiB is retained by each compiler pool. No saved data or network change."
     },
     "app/js/terrain/far-field-mapped-context.js": {
-      "before": "290a29bfb45c893d181da705d189c0597bc30532d7888c7851f363e9e2672d19",
+      "before": "87303f45c4f093a4d9c5204c3599631064efeb00e9551dc5e81fd2ab15dd7e2a",
       "beforeMode": "100644",
-      "after": "87303f45c4f093a4d9c5204c3599631064efeb00e9551dc5e81fd2ab15dd7e2a",
+      "after": "bc37df244fc1128fd7a36e7bbbc651eb7dfed6d19223c55d598df24074e5d4eb",
       "afterMode": "100644",
-      "review": "Regional source selection and worker-owned packed/render data retain source-identified majors and coverage. Cell-relative GPU coordinates do not migrate the gameplay origin. Regional representations are transient; persistent building identity owners unchanged. Follow-up review: Allows lower bounded tile concurrency for travel refresh and exposes tile counting; provider schema and persistent player stores unchanged."
-    },
-    "app/js/terrain/far-field-water.js": {
-      "before": "18036fd05f118ef2596ce4f9fdc047028a0bc37cff056930c3131a4592c8f891",
-      "beforeMode": "100644",
-      "after": "a06a77eda387ce2ad13a704354295d6ab91158fcae1865cfd843fe04aa4f0bdb",
-      "afterMode": "100644",
-      "review": "Fixed-location regional compilation, staged publication and cancellation/resource retirement. Does not initiate movement-based source windows or write a durable world/player record. Existing coverage and lifecycle acceptance required."
+      "review": "Each loaded land/water context owns bounded append-only pages for immutable ring acceleration data. Release drops only allocator references; retained views are never recycled or detached. Geometry, holes, land classification and coverage unchanged. Normal regional land now uses its indexed Float64 coordinates as the sole stored polygon representation. Optional frozen outer/hole views preserve exact coordinates and inspection/serialization; queries preserve holes, bounds, ordering, explicit replacements and malformed-source fallback. Water, roads, structures, persistence and server contracts are unchanged."
     },
     "app/js/terrain/far-field.js": {
-      "before": "27203a342331cb5a0dffe2537969c10bea29d564b5fafb101cfba501f69a9d77",
+      "before": "50d713d7c2fa40a54e456e24456c4c36794a9be930d3e4ddd56db2f4131dd44e",
       "beforeMode": "100644",
-      "after": "c56bcbbb2d282f12e9a021fa1bdf0e45ec3dcae2ad192b252e15acfcc36d162f",
+      "after": "9c4fb9459eeacc1cd45f528b09af766a41cf9623607941fbcc024a0cf3e163ee",
       "afterMode": "100644",
-      "review": "Fixed-location regional compilation, staged publication and cancellation/resource retirement. Does not initiate movement-based source windows or write a durable world/player record. Existing coverage and lifecycle acceptance required. Follow-up review: Replaces one regional terrain/building publication atomically as Earth actor travels, retains complete previous scenery on failure and retires old resources. Original detailed district and player stores keep their existing owners."
+      "review": "Smaller frustum-culling cells for the same complete regional instance population. No geometry source, collision, identifier or save changes."
     },
-    "app/js/terrain/height-sampling.js": {
-      "before": "5b5bd32fbf25519367d5027105a87e03d3850ceaff09511be7900a48ef3ff458",
+    "app/js/terrain/geographic-ring-index.js": {
+      "before": "d9f0d56adb7dde56afa27adcadb7b00047958f7d5acea90d940a7c85432975f9",
       "beforeMode": "100644",
-      "after": "d31ed05e6ba653e32f38460df660306a0eb32a2b1df8aa374e70d9b4adc76386",
+      "after": "1e4d7f7fffcec11326b239b08286d7637dfd5bcde55b614680bca4e521cbb3c0",
       "afterMode": "100644",
-      "review": "Depressed engineered approaches use their explicit excavation owner instead of depressing neighboring terrain. No persistence schema change."
+      "review": "Optional append-only publication storage for the same Float64 geographic edges and Uint32 bins. Exact crossing expressions and fallback order preserved; immutable edge count avoids retaining the input ring. No data/coverage/save changes. Optional coordinate inspection reconstructs frozen numeric pairs from the same Float64 endpoints; it does not retain provider/source arrays. Default water and legacy callers remain unchanged, including degenerate rings and publication lifetime."
     },
-    "app/js/terrain/mapped-ground-evidence.js": {
-      "before": "faae13b0082c17fe3d2df1ea5abb28a90c73621c84f21054445252222299cb4e",
+    "app/js/terrain/location-world.js": {
+      "before": "531157368dc359dc05eed0fb5035cc7bc1e57627b680c77caef041229a216386",
       "beforeMode": "100644",
-      "after": "ae627d912c9a54df1709803f5ae7f14b4e16a7a8a16fed7446cd130bd3429709",
+      "after": "8d61f6ea57bd069aca2f6138b52116b1711ee86ee52ce1a80ae9ac21fecf4b4e",
       "afterMode": "100644",
-      "review": "Terrain source cache, sampled surface and land-cover lookup lifetime changes. No durable schema or provider credential changes; memory bounds and location replacement must be verified against the package."
-    },
-    "app/js/terrain/portal-surface-clip.js": {
-      "before": null,
-      "beforeMode": null,
-      "after": "8956c77e9e4e56a2ddbeceba725a6f2fc1a793f24d76a50bf9de2ae9c4c421c4",
-      "afterMode": "100644",
-      "review": "Finite tunnel cuts publish before road terrain snapshots and contacts. Ordinary roads, paths and pavements subtract the same finite excavation while engineered approaches and bridges retain independent grades. Sparse linear ribbons sample intervening terrain. Cooperative publication rejects superseded sessions. Geometry and contact data are derived; no source-feature, location, account, save schema/key or backend changes. Physical and visual acceptance remains independent. Follow-up review: Rejects nonintersecting source triangles before allocation while retaining clipping order and shared indices. Transient geometry optimization only."
+      "review": "Comment clarifies the shared terrain owner; publication order and ten-second wait are unchanged. No persisted data or geometry change."
     },
     "app/js/terrain/rebuild.js": {
-      "before": "18c3dcfa8980bf654481eb46e26b93f3b0db56de529782baac08402f51ca6276",
+      "review": "Published Float32 road-width samples use bounded append-only pages scoped to terrain publication and preserved through later region arrivals. Width calculation, rounding, rendered/physical road surfaces and region retirement unchanged. Unmarked ground roads additionally release temporary dense lane-marking samples; canonical roads, road-index ordering, rendered surfaces and collision coverage remain unchanged.",
       "beforeMode": "100644",
-      "after": "eaaed1ebe8f83665c75e18cf5aca3869d1d0b86263a65dc90aea1ec3d30960ea",
+      "before": "6b841f48d99f57212b261853debda746a152473b638ee5410a520f11c45ed30c",
       "afterMode": "100644",
-      "review": "Finite tunnel cuts publish before road terrain snapshots and contacts. Ordinary roads, paths and pavements subtract the same finite excavation while engineered approaches and bridges retain independent grades. Sparse linear ribbons sample intervening terrain. Cooperative publication rejects superseded sessions. Geometry and contact data are derived; no source-feature, location, account, save schema/key or backend changes. Physical and visual acceptance remains independent."
-    },
-    "app/js/terrain/regional-building-compiler.js": {
-      "before": null,
-      "beforeMode": null,
-      "after": "4f19e5cf00f2d0bb79ba736d11a95f92750727de4e81978e8cf7fb467bb6e834",
-      "afterMode": "100644",
-      "review": "Regional source selection and worker-owned packed/render data retain source-identified majors and coverage. Cell-relative GPU coordinates do not migrate the gameplay origin. Regional representations are transient; persistent building identity owners unchanged."
-    },
-    "app/js/terrain/regional-building-descriptors.js": {
-      "before": null,
-      "beforeMode": null,
-      "after": "6ee438e8ad6c52efe9d6e1e99b452269cff5d519553ab789d618cb88062411f2",
-      "afterMode": "100644",
-      "review": "Regional source selection and worker-owned packed/render data retain source-identified majors and coverage. Cell-relative GPU coordinates do not migrate the gameplay origin. Regional representations are transient; persistent building identity owners unchanged. Follow-up review: Adds roof fraction to worker construction descriptors, whose writer and reader advance together in the same package. No persisted records use this array format."
-    },
-    "app/js/terrain/regional-building-runtime.js": {
-      "before": null,
-      "beforeMode": null,
-      "after": "efe18772a955b0f5539abd314d7def911c64ebedf24cfb80b9651f57ce70fa78",
-      "afterMode": "100644",
-      "review": "Regional source selection and worker-owned packed/render data retain source-identified majors and coverage. Cell-relative GPU coordinates do not migrate the gameplay origin. Regional representations are transient; persistent building identity owners unchanged."
-    },
-    "app/js/terrain/regional-building-worker.js": {
-      "before": null,
-      "beforeMode": null,
-      "after": "f8395dae3374edb4e41790f10a9590527d8f31e310528cbafe1f2013782ab2be",
-      "afterMode": "100644",
-      "review": "Regional source selection and worker-owned packed/render data retain source-identified majors and coverage. Cell-relative GPU coordinates do not migrate the gameplay origin. Regional representations are transient; persistent building identity owners unchanged."
-    },
-    "app/js/terrain/regional-road-contact.js": {
-      "before": "61afdf13194444add0d85ceab2a2027d8f4aeb130ef33f911cdae5230835742d",
-      "beforeMode": "100644",
-      "after": "62dd62bad765a00d5ac845558dc759ec24a862c3d264040919f4eac791ec4f94",
-      "afterMode": "100644",
-      "review": "Bounded road render/contact residency within the existing fixed source catalog and shared road-mask ownership. Existing retry calls the existing session capture/reload authority. No new save schema, geographic migration, room authority or persistent write protocol."
-    },
-    "app/js/terrain/regional-road-coverage.js": {
-      "before": null,
-      "beforeMode": null,
-      "after": "9149b949125995b9c4d5a3349f681f9e2a87cf1ede42963fc3d06a0ebb6e4549",
-      "afterMode": "100644",
-      "review": "Bounded road render/contact residency within the existing fixed source catalog and shared road-mask ownership. Existing retry calls the existing session capture/reload authority. No new save schema, geographic migration, room authority or persistent write protocol."
-    },
-    "app/js/terrain/regional-road-raster.js": {
-      "before": null,
-      "beforeMode": null,
-      "after": "57a8ec24ccd91c9d5ea17d00f6afd2f5e4fcbdd040ee73d8dbe267c461bddc46",
-      "afterMode": "100644",
-      "review": "Bounded road render/contact residency within the existing fixed source catalog and shared road-mask ownership. Existing retry calls the existing session capture/reload authority. No new save schema, geographic migration, room authority or persistent write protocol."
-    },
-    "app/js/terrain/regional-scenery-scheduler.js": {
-      "before": null,
-      "beforeMode": null,
-      "after": "950462ae0cc483c6d4c61a2dc86da4099091c84464469714d1be327838f009ea",
-      "afterMode": "100644",
-      "review": "Bounded single-request scenery scheduler with generation invalidation, retry and complete-data admission. Adds only independent we3d.regionalScenery preference; older fallback ignores it without deleting it."
-    },
-    "app/js/terrain/road-overview-owner.js": {
-      "before": null,
-      "beforeMode": null,
-      "after": "9661464b6116cb99f28d10de0839a79934f942465796e2de6294b9db065294c7",
-      "afterMode": "100644",
-      "review": "Bounded road render/contact residency within the existing fixed source catalog and shared road-mask ownership. Existing retry calls the existing session capture/reload authority. No new save schema, geographic migration, room authority or persistent write protocol."
+      "after": "2ac475022f9609ddf67e5449f10ee0b200e1e5783fb27221378f2a57b16cd5b1"
     },
     "app/js/terrain/street-frontage-grading.js": {
-      "before": "e931706df5becc7ca7dd2dae4c3dd5cc96ebf8674b60dfebea77a3ad9483c891",
+      "before": "783439249a7ccca44820f0c6926e4046e50bb8b0648c1fb0accfc029c0beb53f",
       "beforeMode": "100644",
-      "after": "783439249a7ccca44820f0c6926e4046e50bb8b0648c1fb0accfc029c0beb53f",
       "afterMode": "100644",
-      "review": "Bounds inferred frontage influence to ordinary reach or explicit sidewalk width; building adjacency no longer expands paving. No saved schema change."
+      "after": "4a9d944fcf064404df9e05394c134719bad388b8d20d81dfe324f94e84eb26a2",
+      "review": "Terrain opts into the shared frontage policy numeric snapshot. Existing outer-distance, ray occlusion, sampling, publication replacement and disposal rules remain authoritative. No road geometry, terrain datum, persistence or backend changes."
     },
-    "app/js/terrain/structure-terrain-portals.js": {
-      "before": "e054bed114cd7c37e795ab211ac5ea618425c255ba0c9ad41a43930a75a01dae",
+    "app/js/terrain/surface-decal-projection.js": {
+      "before": "48cc550b5322df6e10fe43a07de75d938ea4ac1cca46c8e298482796fee5671d",
       "beforeMode": "100644",
-      "after": "7ff5ba66c435981a9924c06411a8e5af76596c62dd505841fe153d5f35f0afc0",
+      "after": "0fb0abb50546eaeb505622c8b17687fb2522de494cdca10783a7d77d5f882636",
       "afterMode": "100644",
-      "review": "Finite tunnel cuts publish before road terrain snapshots and contacts. Ordinary roads, paths and pavements subtract the same finite excavation while engineered approaches and bridges retain independent grades. Sparse linear ribbons sample intervening terrain. Cooperative publication rejects superseded sessions. Geometry and contact data are derived; no source-feature, location, account, save schema/key or backend changes. Physical and visual acceptance remains independent."
-    },
-    "app/js/terrain/structure-tunnel-visuals.js": {
-      "before": "67b994583859432361446dfabf5ba4c2f1d7f094b8c0d6dda206cbc012d842db",
-      "beforeMode": "100644",
-      "after": "f1db124f70d16146c67efc0359c311606d75cced4d645554ad6ecd6461c73747",
-      "afterMode": "100644",
-      "review": "Recompiles transient transport geometry and contacts from existing source records. Preserves higher-resolution ownership, retained road coverage, layer/access/direction and published foundation authority; connected grades, cuts, enclosures and finite actor-height contacts now agree. No persistent geography, player pose schema, inventory, account or server writes. Existing fixed-location loads rebuild this derived state; packaged movement and retained-save roundtrip remain required."
-    },
-    "app/js/terrain/structure-visual-meshes.js": {
-      "before": "57c6fa50843932b4050ef1d29b81506a504fbf9c90266e76299f6588853509e7",
-      "beforeMode": "100644",
-      "after": "7c54829cdfff2b61c4a24b66886bb117c56799235cda592587ecbe19c0db14d4",
-      "afterMode": "100644",
-      "review": "Recompiles transient transport geometry and contacts from existing source records. Preserves higher-resolution ownership, retained road coverage, layer/access/direction and published foundation authority; connected grades, cuts, enclosures and finite actor-height contacts now agree. No persistent geography, player pose schema, inventory, account or server writes. Existing fixed-location loads rebuild this derived state; packaged movement and retained-save roundtrip remain required."
-    },
-    "app/js/terrain/structure-visuals.js": {
-      "before": "5bef945d32bbe3bd3ddd35e2bb26f0ace6d69f699103a2be2f53badc6cb95850",
-      "beforeMode": "100644",
-      "after": "e5db10e5ab168af1b536adcc3c04dde251a532d77c043b9a57b78848ff96cd25",
-      "afterMode": "100644",
-      "review": "Finite tunnel cuts publish before road terrain snapshots and contacts. Ordinary roads, paths and pavements subtract the same finite excavation while engineered approaches and bridges retain independent grades. Sparse linear ribbons sample intervening terrain. Cooperative publication rejects superseded sessions. Geometry and contact data are derived; no source-feature, location, account, save schema/key or backend changes. Physical and visual acceptance remains independent."
-    },
-    "app/js/terrain/surface-profiles.js": {
-      "before": "ce4693e0b90eba7a393bdb9ea949aa80e1c3bba5268aa436db32ebfa0f6ad1a8",
-      "beforeMode": "100644",
-      "after": "ea7e9044fe2e867c94729dfdf272ce77dff92bb463946bda070938d6f9ccf94a",
-      "afterMode": "100644",
-      "review": "Terrain source cache, sampled surface and land-cover lookup lifetime changes. No durable schema or provider credential changes; memory bounds and location replacement must be verified against the package."
+      "review": "Same clipping math, ordering and tolerances. Logical scratch lengths retain capacity; explicit workspaces borrow reusable Float64 storage while ordinary callers keep independent arrays. 1000 before/after geometry cases match exactly and sampled temporary allocation falls 90.9 percent in the isolated clipper. No saved data or physical surface policy changes."
     },
     "app/js/terrain/tile-request-lifecycle.js": {
-      "before": "1477f220ecef5bcb7db5f82e0ed5dc5b4ab2d412aadaedc19a2fb5a807bddad3",
+      "before": "ad3da0c0f172eaf34dd56a339911a516602c20c2b6bd23b9db005d30d92493d7",
       "beforeMode": "100644",
-      "after": "ad3da0c0f172eaf34dd56a339911a516602c20c2b6bd23b9db005d30d92493d7",
+      "after": "93bb4b6cd25f44a6163e888716acdab5f0c4c25ec6f323b53c14780bd6927b93",
       "afterMode": "100644",
-      "review": "Terrain source cache, sampled surface and land-cover lookup lifetime changes. No durable schema or provider credential changes; memory bounds and location replacement must be verified against the package."
+      "review": "Consumer deadlines and AbortSignals retire only their own subscriptions. The existing cache owner retains actual source timeout, retry, eviction and world teardown. Transient loading behavior only; no saved fields or network protocol changes."
     },
     "app/js/terrain/tiles.js": {
-      "before": "04fdfd30594b96170ff7bc3d2c64ea83ddd9d9a8b55c98abccdf0735201bd4ab",
+      "before": "567d42a9997b1681fad060417b00cfbcc8b066f8365de4607c65830f2405a9f5",
       "beforeMode": "100644",
-      "after": "567d42a9997b1681fad060417b00cfbcc8b066f8365de4607c65830f2405a9f5",
+      "after": "59c33ce05b40984286ea861bccce4ad20af004e2cde78ec97c08555e326ba37d",
       "afterMode": "100644",
-      "review": "Terrain source cache, sampled surface and land-cover lookup lifetime changes. No durable schema or provider credential changes; memory bounds and location replacement must be verified against the package."
-    },
-    "app/js/terrain/transport-detail-compiler.js": {
-      "before": "34540c2f26bf0f8a20d21abfe692f94a431f186fb27e55947c7318c4829e23ff",
-      "beforeMode": "100644",
-      "after": "a98bf6137c66b25068689d5b2f5ea580fa218d1f89e24995aeffb4ee66015478",
-      "afterMode": "100644",
-      "review": "Finite tunnel cuts publish before road terrain snapshots and contacts. Ordinary roads, paths and pavements subtract the same finite excavation while engineered approaches and bridges retain independent grades. Sparse linear ribbons sample intervening terrain. Cooperative publication rejects superseded sessions. Geometry and contact data are derived; no source-feature, location, account, save schema/key or backend changes. Physical and visual acceptance remains independent."
-    },
-    "app/js/terrain/transport-detail-plan.js": {
-      "before": "5438b4a2bf90be4f0e4a5b56ad26ffe1f6cc27948b506d768a4621fdce46f39f",
-      "beforeMode": "100644",
-      "after": "b11cebbe096ba647e77c0d86edd13081894a0928b67996c277928b1fc18b3e46",
-      "afterMode": "100644",
-      "review": "Bounded road render/contact residency within the existing fixed source catalog and shared road-mask ownership. Existing retry calls the existing session capture/reload authority. No new save schema, geographic migration, room authority or persistent write protocol. Follow-up review: Grid lookup preserves the former nearest-region distance and queue-order ties, including signed boundaries; runtime scheduling only."
-    },
-    "app/js/terrain/transport-detail-runtime.js": {
-      "before": "9b839e6e6348061704fc89cb50592aab56d847f20966fe66461abe68c701a66c",
-      "beforeMode": "100644",
-      "after": "aa9e28117a63fd9142b102d4db1f7f2393d8af309a2841090cabcc9e3c13e7e3",
-      "afterMode": "100644",
-      "review": "Bounded road render/contact residency within the existing fixed source catalog and shared road-mask ownership. Existing retry calls the existing session capture/reload authority. No new save schema, geographic migration, room authority or persistent write protocol. The October 6 repair passes an explicit recovery callback from the terrain builder to the existing Earth-session capture/reload exports. It replaces an unregistered context method; retry duplication and stale/disposed callbacks are guarded. No new persistence owner or schema. Follow-up review: Preserves queue ordering during retirement/reinsertion and uses bounded lookup; no change to retained world identities or save fields."
-    },
-    "app/js/terrain/transport-detail-worker.js": {
-      "before": "9c25ef70e9cbd2a2d4190dc252c2c312f65acbfea1df903257299dc010854e6e",
-      "beforeMode": "100644",
-      "after": "d04a560efbbbe649cd2cf7a2142c560f5b65490be0910b4efae5cff542c10753",
-      "afterMode": "100644",
-      "review": "Bounded road render/contact residency within the existing fixed source catalog and shared road-mask ownership. Existing retry calls the existing session capture/reload authority. No new save schema, geographic migration, room authority or persistent write protocol."
-    },
-    "app/js/terrain/transport-terrain-snapshot.js": {
-      "before": "36b1259506d4ef4d19fb8b68ca42639edcda1aa2058a3f44388f9dd6bbe578af",
-      "beforeMode": "100644",
-      "after": "3c9125caaf6dc965eba0e78a0c0616ffe7b8c8dbbee5d616ac30a7cedc0c738b",
-      "afterMode": "100644",
-      "review": "Finite tunnel cuts publish before road terrain snapshots and contacts. Ordinary roads, paths and pavements subtract the same finite excavation while engineered approaches and bridges retain independent grades. Sparse linear ribbons sample intervening terrain. Cooperative publication rejects superseded sessions. Geometry and contact data are derived; no source-feature, location, account, save schema/key or backend changes. Physical and visual acceptance remains independent."
-    },
-    "app/js/travel-mode.js": {
-      "before": "38dbb7260a048cda3fedaef55eb59d2d36dd81a71887fbbc7437ee9d3410ab24",
-      "beforeMode": "100644",
-      "after": "2fa2cc91167d43635ea4ee3366b9bfdefea1d47d19a512cced2aab2960a539b7",
-      "afterMode": "100644",
-      "review": "An admitted ocean surface arrival uses its committed geographic frame and synthetic-water reference instead of outgoing airborne or tunnel reachability. Normal nearby boarding still uses the current actor. Sea-first teardown no longer requires unloaded terrestrial elevation functions; transient walker poses include eye height. Ordinary Exit Vessel no longer bypasses the existing shoreline policy. No save schema/key, inventory, account, backend or shared protocol changes; guarded voyage v1 persistence and rollback remain required."
-    },
-    "app/js/travel/earth-return.js": {
-      "before": null,
-      "beforeMode": null,
-      "after": "2cc8af1a30f6a74296f402b2db99d97ddcad09bfdf83ed7101300ac22c40cfea",
-      "afterMode": "100644",
-      "review": "Single-flight Earth return awaits ready publication; hidden retained-Earth work is suspended while the separate ship interior owns play. Runtime-only ownership and presentation; retained location, player saves, schemas and server protocol remain unchanged."
-    },
-    "app/js/ui.js": {
-      "before": "df6c423d280c894f3370c7094098bf74478cce1702b56289d788b30f5dfb4b17",
-      "beforeMode": "100644",
-      "after": "575511daeb56cd8499bf158be1cd9c93cd1e48828be15fef4e6373c95d442797",
-      "afterMode": "100644",
-      "review": "Single-flight Earth return awaits ready publication; hidden retained-Earth work is suspended while the separate ship interior owns play. Runtime-only ownership and presentation; retained location, player saves, schemas and server protocol remain unchanged."
-    },
-    "app/js/ui/globe-selector.js": {
-      "before": "92ce09a2d4d312522989f6e7f9d9aa182cbfd1be42afdb741fc7f6468690e802",
-      "beforeMode": "100644",
-      "after": "5b728cc2b1533a03ccf5df0ee148b5daf944d2fa15c6b30a034db27397d304e4",
-      "afterMode": "100644",
-      "review": "Connected marine entry, deck/swim/submarine handoffs and compact UI. Existing voyage v1 identity, geographic anchor, stage, condition, save key, revision and conflict owner remain. Parent yaw stays independent of submarine yaw; no account/backpack or shared protocol change. New-session admission still requires checked water; saved underwater and aboard records retain their resume path."
+      "review": "Uses the subscription-only waiter and removes the conflicting 2.4-second consumer failure authority. Actual source deadline, three-attempt retry ceiling, cache limit and generation teardown stay unchanged. No saved data."
     },
     "app/js/ui/loading-progress.js": {
+      "review": "Reallocates player-facing loading progress to actual initial scenery completion. Rotating tips, location selection and saved settings are unchanged; no save schema.",
+      "before": "68192a8b668e6adf0cf3692976d34ddc4863df9dd1654affc5692baf7d5677c7",
+      "beforeMode": "100644",
+      "after": "727101343f4c3f59b7ce44e51718ca1f278eff261528dd8a659baf93ab70aa6a",
+      "afterMode": "100644"
+    },
+    "app/js/urban-sandbox/player-position.js": {
       "before": null,
       "beforeMode": null,
-      "after": "68192a8b668e6adf0cf3692976d34ddc4863df9dd1654affc5692baf7d5677c7",
+      "after": "cc4e0fda6aaae80367ba33ff0aa099afb9eb98e794cac4bc69553b32a3ba3a38",
       "afterMode": "100644",
-      "review": "Maps actual load phases to monotonic progress and rotates manually browsable feature tips; stops timers on completion. No save or backend writes."
-    },
-    "app/js/ui/settings.js": {
-      "before": "4f036a07b43e47f34cafb1e1f243b1528a04772ee16a460ae89765e8359ef98c",
-      "beforeMode": "100644",
-      "after": "386422c954677790ea3da6bd8266e2865b65aeb52f8b760da7ae66ca09b8695d",
-      "afterMode": "100644",
-      "review": "Stores the independent regional scenery preference before lazy Earth runtime exists. Existing graphics and player records unchanged; fallback can ignore the new preference."
-    },
-    "app/js/ui/title-screen.js": {
-      "before": "0a874820611be2ff3381dfd18fe59ee428e0197a3aa777582ae1b60b4f53bb64",
-      "beforeMode": "100644",
-      "after": "043714e35823ae868e54ef10f6113d4a5f348c8561e5b3ce3183249e3dd6b7bc",
-      "afterMode": "100644",
-      "review": "Requires the same ready-world predicate before spawning or stamping a selected location. Failed entry restores the visible selector. Existing saved selections and title controls remain. Exploration prompt begins only after successful entry; timed dismissal releases its listener. Connected marine entry, deck/swim/submarine handoffs and compact UI. Existing voyage v1 identity, geographic anchor, stage, condition, save key, revision and conflict owner remain. Parent yaw stays independent of submarine yaw; no account/backpack or shared protocol change. New-session admission still requires checked water; saved underwater and aboard records retain their resume path. Follow-up review: Restarts loading presentation on a new launch; no persistent player-state or launch-parameter schema changes."
-    },
-    "app/js/urban-sandbox/equipment-model.js": {
-      "before": "d51776bfbe73f1f89267b5872751678bf95598670c57cab29b1ae3d4b2bf69d2",
-      "beforeMode": "100644",
-      "after": "1246d2e1ab13588b08ade7e343a5939d385b54fa34feb02d9d3ab911bdf4f9b4",
-      "afterMode": "100644",
-      "review": "Read-only inventory membership merges actual consumable quantities and invalidates after use or grant; no inventory schema or backend command changes."
+      "review": "Resolve the ground player from the occupied vehicle or selected walk/drive mode, rather than the existence of an inactive allocated walker. Preserves startup car fallback and distinguishes remote camera focus from the physical body. No saved schema or migration change."
     },
     "app/js/urban-sandbox/runtime.js": {
-      "before": "96784d4915c897ae9ac063b9ed0b4bdc1a925075ab3c8f0935ae88f3f00ad341",
+      "before": "9792fc9a073c7abe9721b53bd50581c629ca27047d68b497d47a243a06bcd735",
       "beforeMode": "100644",
-      "after": "1f8120ae15cb5cbe5074ce5dba166ce837f47f2380c8ba00a5408c4034d28eb8",
+      "after": "74a3b90ed628cf9d179dbf4db2fa1f14f8af2bb3c394fc3e7162f66d6434bc72",
       "afterMode": "100644",
-      "review": "Recompiles transient transport geometry and contacts from existing source records. Preserves higher-resolution ownership, retained road coverage, layer/access/direction and published foundation authority; connected grades, cuts, enclosures and finite actor-height contacts now agree. No persistent geography, player pose schema, inventory, account or server writes. Existing fixed-location loads rebuild this derived state; packaged movement and retained-save roundtrip remain required."
+      "review": "Mapped storefront approach checks request exact-point walking validation and continue their existing local candidate search instead of resolving to another street. Store stock, wallet, Backpack, commerce transactions and saved state are unchanged. Civic incidents, witnesses and pursuit now follow the active ground-player owner; the inactive walker cannot substitute for the moving starter car. Occupied-vehicle authority and saved formats are unchanged. Scalar nearest-furniture selection preserves ties, radius and current eligibility; an installed interaction router owns its null result, avoiding a duplicate provider search. No persistence changes."
     },
-    "app/js/urban-sandbox/vertical-contact.js": {
-      "before": null,
-      "beforeMode": null,
-      "after": "d10a45b782eb161599c72dd7a801615d16b799ada0f854b405860f7d75dcb155",
-      "afterMode": "100644",
-      "review": "Recompiles transient transport geometry and contacts from existing source records. Preserves higher-resolution ownership, retained road coverage, layer/access/direction and published foundation authority; connected grades, cuts, enclosures and finite actor-height contacts now agree. No persistent geography, player pose schema, inventory, account or server writes. Existing fixed-location loads rebuild this derived state; packaged movement and retained-save roundtrip remain required."
-    },
-    "app/js/walking/physics.js": {
-      "before": "e77d2f5de87b1ca9715e421538c1025d5006044b857082fe628e393ee0b92fed",
+    "app/js/walking/camera-collision.js": {
+      "before": "2850e74329fa2c62ac9b3228a9f3db93f6eb3ccbb0405eca30785d21dd8297f5",
       "beforeMode": "100644",
-      "after": "78afbb6bbf23d881cdf0c0d80801ac78c223e7b99e5ba03c5ba33a1276c7b1cb",
+      "after": "da805d1afeac11da448d17d181fd2d75ee572225855be4d2cf15fa44bb3c0d1b",
       "afterMode": "100644",
-      "review": "Recompiles transient transport geometry and contacts from existing source records. Preserves higher-resolution ownership, retained road coverage, layer/access/direction and published foundation authority; connected grades, cuts, enclosures and finite actor-height contacts now agree. No persistent geography, player pose schema, inventory, account or server writes. Existing fixed-location loads rebuild this derived state; packaged movement and retained-save roundtrip remain required."
-    },
-    "app/js/walking/water/ui.js": {
-      "before": "0a4e0e78bdb3510679402973e8ace87fc1c4a779223151989d74360661030cc1",
-      "beforeMode": "100644",
-      "after": "d3409688babc125657b370ae3e5d173082a653773c20f90b6290ffa87e5640cb",
-      "afterMode": "100644",
-      "review": "Connected marine entry, deck/swim/submarine handoffs and compact UI. Existing voyage v1 identity, geographic anchor, stage, condition, save key, revision and conflict owner remain. Parent yaw stays independent of submarine yaw; no account/backpack or shared protocol change. New-session admission still requires checked water; saved underwater and aboard records retain their resume path."
-    },
-    "app/js/world/budgets.js": {
-      "before": "823757a17a17833c31c012691bc6f202289f0d6fd38532b7feff6244540d2ecb",
-      "beforeMode": "100644",
-      "after": "7c3e72b05b4aa2a9e1a029adb74472f93e7a735cfff512643d8d3a8534ba5ced",
-      "afterMode": "100644",
-      "review": "Restores coverage and land-purpose/physical-cover classification with bounded source caches. Location presets, source IDs, saved map preferences and schema owners are preserved; current real-city coverage must be tested."
-    },
-    "app/js/world/building-batching.js": {
-      "before": "9b0fc9cfdb7ea37881cdcf8395a97a750a91c4b741c93dd447abd2e3bcbdff33",
-      "beforeMode": "100644",
-      "after": "335c1c33db5418c845ad300d97f21406cd226a846e8b2ec901bbb66327a4d12a",
-      "afterMode": "100644",
-      "review": "Building geometry and private temporary-buffer lifetime only. Tests require unchanged final triangle attributes, source-building edit boundaries and retained shared buffers. No persistent data writes or identity migration."
+      "review": "Walking camera shares one synchronous candidate region across its unchanged sample positions. Every sample retains the existing height, footprint, guardrail and clearance rules. Fallback collision providers keep the prior point-query path. Exact comparisons cover mapped cell boundaries, elevated floors, open/closed doors and vegetation/interior isolation. No persistence, scene coverage or backend change."
     },
     "app/js/world/building-body-geometry.js": {
-      "before": null,
-      "beforeMode": null,
-      "after": "c5c6f0c5fb53883c7dbc96f5d4637a8b3397c3172a7993d7bb7cf6c380f44040",
-      "afterMode": "100644",
-      "review": "Building geometry and private temporary-buffer lifetime only. Tests require unchanged final triangle attributes, source-building edit boundaries and retained shared buffers. No persistent data writes or identity migration."
-    },
-    "app/js/world/building-exterior-details.js": {
-      "before": "5b11eacffdb8e1188627a6180e85fcc32ff6388aba82222a83342b2107bc557c",
+      "before": "c5c6f0c5fb53883c7dbc96f5d4637a8b3397c3172a7993d7bb7cf6c380f44040",
       "beforeMode": "100644",
-      "after": "2f5562cae409d45a889e10dfb561b9ad6eeaa39220e184cbd268db9a33c2ba09",
+      "after": "abc5f70cacebc3079261d20511fedc60622722eeb572e334f2f912e7c47feb6f",
       "afterMode": "100644",
-      "review": "Transient facade trim and awning geometry under existing disposal owner; no durable records."
+      "review": "Uses optional bounded private construction storage with disjoint attribute views. Exact geometry bytes, normals, UVs, transforms, footprint data, clones and edit behavior are preserved. No saved data."
     },
     "app/js/world/building-facade-layout.js": {
-      "before": "e79b7e4a9e33315202c12608f8df1c432fb16c8954d88466e7d09d130f7e5929",
+      "review": "Uses the geometry-owned construction allocator when available, preserving separate ranges, all facade values, and independently owned standalone publication. No visual, persistent or backend schema changes. Facade attribute writes now avoid per-triangle/per-vertex temporary arrays; 24 captured before/after byte fixtures preserve geometry attributes and facade plans exactly.",
       "beforeMode": "100644",
-      "after": "d83926ed6d0b383ef9ec3ff284c35a0d3008f363ca2cb8f1e41824941f8e69cf",
+      "before": "d83926ed6d0b383ef9ec3ff284c35a0d3008f363ca2cb8f1e41824941f8e69cf",
       "afterMode": "100644",
-      "review": "Pure facade layout and near/mid rendering profile; no save or provider format changes."
+      "after": "a09f38810a9571ad0470d241555707c3e2cb7d585db028f8511c06ef15e56188"
     },
-    "app/js/world/building-vertex-storage.js": {
-      "before": "e15df4a7c7ace092ca6106f2a434e1ec94a7c8967fb50c77729e7ac456b98356",
+    "app/js/world/compiler/accepted-ground-selection.js": {
+      "review": "Reconciles accepted complete overlapping transport geometry across roads and pedestrian/connector collections after ground selection. Only transient world publication ownership changes; missing, partial and rejected sources retain fallback coverage. No saved schema or transaction changes.",
       "beforeMode": "100644",
-      "after": "0237168a831b657abfdae843e4fe8c24ff4477411bf39ed85b84afc282267fb7",
+      "before": "d8fd465eaf55e2f2c2d68e9eae66e0ad8ebb33143c061a0fffb7b77e63263c3e",
       "afterMode": "100644",
-      "review": "Building geometry and private temporary-buffer lifetime only. Tests require unchanged final triangle attributes, source-building edit boundaries and retained shared buffers. No persistent data writes or identity migration."
-    },
-    "app/js/world/compiler/engineered-approach-excavation.js": {
-      "before": null,
-      "beforeMode": null,
-      "after": "db0c6a4edb6b72dd3b7fd972266460c897ddce90eb0c52a339cf7881fa856e38",
-      "afterMode": "100644",
-      "review": "Recompiles transient transport geometry and contacts from existing source records. Preserves higher-resolution ownership, retained road coverage, layer/access/direction and published foundation authority; connected grades, cuts, enclosures and finite actor-height contacts now agree. No persistent geography, player pose schema, inventory, account or server writes. Existing fixed-location loads rebuild this derived state; packaged movement and retained-save roundtrip remain required. Follow-up review: Caps excavation and retaining walls under a separate upper road using shared footprint ranges. Transient compiled surface authority; save format unchanged."
+      "after": "2b166807a5c74a3e1bd4c232ced4a85fd5ff2ded5d297b399628f3522a1c6532"
     },
     "app/js/world/compiler/ordinary-street-profile.js": {
-      "before": "d3527b63605f1df45bfe8a503a5706569a9c41818be09dd17f8f8f1395fde9ec",
+      "before": "8b9978a3b421dff5fba95fb9f4b4a1173a2392d6ed4d0c2b1358465b755d8401",
       "beforeMode": "100644",
-      "after": "8b9978a3b421dff5fba95fb9f4b4a1173a2392d6ed4d0c2b1358465b755d8401",
+      "after": "815f5dcc144a5ce3eab5e3fe814928b098102ddbef5d7354bc99fa2709f6f957",
       "afterMode": "100644",
-      "review": "Adds generalized surface intersection anchors after exact graph constraints. Source topology, structure semantics and saved identity remain unchanged."
-    },
-    "app/js/world/compiler/pavement-footway-policy.js": {
-      "before": null,
-      "beforeMode": null,
-      "after": "c6f459b7c09d838b66ae039e0ddb0f3ccbc263dea6097f2de22941bb54bf2a19",
-      "afterMode": "100644",
-      "review": "Shared classification of paved ground paths, crossings and mapped plazas; excludes structures, trails and explicit unpaved surfaces. No persistence writes."
-    },
-    "app/js/world/compiler/street-frontage-corners.js": {
-      "before": "ec43ba7865c9f601bc9ed9a824f9a0681ede45a1f8b73880a8ee8a591f35db6b",
-      "beforeMode": "100644",
-      "after": "12c67ad55a139b2e0feb677b95ac8027e963d67c0499d930a936ba35feb41714",
-      "afterMode": "100644",
-      "review": "Limits corner fill to ordinary frontage reach; mapped plazas keep their own geometry. No player state changes."
-    },
-    "app/js/world/compiler/street-frontage-geometry.js": {
-      "before": "96ad47b0c882521c1a5ba6d34ab8d626ebaf040e1b5367603b33c4bc0eb0befb",
-      "beforeMode": "100644",
-      "after": "3009ef7a5cd864ec336c351c610d8a18bcc8a2d021405ece5a8e39c6100cb20a",
-      "afterMode": "100644",
-      "review": "Removes attached-building extension from ray and interval frontage calculations. Transient geometry only."
+      "review": "The same ordinary-street alignment solver receives an explicit optional storage allocator. Exact Float32/Float64 values and grade rules remain unchanged; no persistent fields change."
     },
     "app/js/world/compiler/street-frontage-policy.js": {
-      "before": "7de3bcebfcde09ef74ee87652d725a08b63dbb92b9ce7d51acf8f4fa0e8e9ae6",
+      "before": "5005591da82810d4790cfaa3cd6a63f4c4ed816d4b712d5de3d6a4631c9b0da3",
       "beforeMode": "100644",
-      "after": "5005591da82810d4790cfaa3cd6a63f4c4ed816d4b712d5de3d6a4631c9b0da3",
       "afterMode": "100644",
-      "review": "Releases construction-only corner records and bounds sharing of immutable semantic sections. Exact attachment geometry and mutable-source lookup behavior remain covered. Follow-up review: Removes unsupported 24-metre paving from shared building vertices while preserving explicit street sections and bounded frontage. No saved schema change."
+      "after": "2e2e3e961dc7a995bd81ac12c17155f732afac6e979bdf83de7beb391b9d3a21",
+      "review": "Exact Float64 frontage endpoint pages and numeric bucket IDs replace terrain-only retained edge/bounds object graphs. Geometry consumers retain stable objects; full materialization releases alternate buffers. Shared query order, roundoff tolerance, exclusions and section semantics verified across scales, translations and publication lifetimes. No new save fields or backend protocol."
     },
     "app/js/world/compiler/street-pavement-fingerprint.js": {
-      "before": "421199f2923a20f9900610cf9a5832dc9ee4737886d02adbea452e0447d2a69d",
+      "before": "29d694b79ef70e75da6f94799c90f3e08fd0ff4246770826bb0781b1d36b19fd",
       "beforeMode": "100644",
-      "after": "29d694b79ef70e75da6f94799c90f3e08fd0ff4246770826bb0781b1d36b19fd",
+      "after": "227d5e0bb4a6eb33405446bed23a248b9b93e812bc4ccceb17fc2b710e8afb3f",
       "afterMode": "100644",
-      "review": "Versioned compile-cache fingerprint deduplicates sidewalk masks while including their actual values. Cache keys change intentionally; player progress is not stored here."
+      "review": "Retains the conservative source identity and adds exact compiled-product identity including cell bounds, units, curb packaging, polygons, markings, ramps and every ordered terrain-fitting segment input. Remote source context may change only when the actual product is equal; real geometry or height inputs invalidate reuse. No source-selection or persisted-schema change."
     },
     "app/js/world/compiler/street-pavement-worker.js": {
-      "before": "f9dd05b27891626fa66e43cd5bb0339189f076af4c8ad4db135805a6ebe6749a",
+      "before": "5a53641777a2ce3f5ab805ef5422bc74f914585db73e3ccf71059455e28e45c1",
       "beforeMode": "100644",
-      "after": "5a53641777a2ce3f5ab805ef5422bc74f914585db73e3ccf71059455e28e45c1",
+      "after": "69c25b179f0d8a3cd50250e82f0c4a7ddb127be4f9280ec74f8f9bbb8e7880da",
       "afterMode": "100644",
-      "review": "Excludes construction-only sidewalk masks from published tile messages; height/contact inputs retained. Same immutable package owns worker and consumer."
-    },
-    "app/js/world/compiler/street-pavement.js": {
-      "before": "2ca5fb25251a9bf5dd9e815435143cfce3561d26662bf3fd9f2743aea10ceb7c",
-      "beforeMode": "100644",
-      "after": "243b928153235bf54d6ad32136f3baa83d795918f3f8a7533d47ea2e48d8c551",
-      "afterMode": "100644",
-      "review": "Reconciles inferred sidewalks with mapped paths and preserves mapped plaza ownership and explicit paths through planting. Original road geometry and player-store formats unchanged."
-    },
-    "app/js/world/compiler/street-sidewalk-ownership.js": {
-      "before": null,
-      "beforeMode": null,
-      "after": "e1393e6736a6600cf3fbd689c9a790dc0a52fe83fb1c0656685d46d891681fba",
-      "afterMode": "100644",
-      "review": "Associates overlapping parallel ground paths with a road side, suppresses that inferred duplicate and bounds curb/frontage connections. No source geometry mutation or persistent state."
-    },
-    "app/js/world/compiler/surface-street-junctions.js": {
-      "before": null,
-      "beforeMode": null,
-      "after": "6f1c85b9fa6ba184b2d61580b803b0b5c70001cd53f2d6f629143e781566be6b",
-      "afterMode": "100644",
-      "review": "Adds terrain-owned heights at generalized interior surface intersections only; excludes bridges, tunnels and highway approaches and does not invent navigation edges. No saved topology changes."
+      "review": "Retains exact compilation, transferred numeric indexing and cached-first ordering. On a changed source key, compares the exact compiled surface product before repeating meshing/fitting. Only a matching product advertises a previously fitted surface; rejected or evicted reuse reconstructs through the original compiler. Compact metadata includes the complete height inputs and current diagnostic counts. No saved or backend data change."
     },
     "app/js/world/compiler/transport-junction-profile.js": {
-      "before": "d8c6edd657bdb719a3cf8790c03a73f21ee4d2524486a04b8d850b62ea67b994",
+      "review": "Uses the accepted physical connection graph for shared road heights across source providers. Rejects missing, incomplete or unconnected height owners. Runtime world surfaces rebuild per location; persisted player records and save versioning are unchanged. Rolling back restores the earlier road geometry and its known limitations.",
       "beforeMode": "100644",
-      "after": "aae7202a6ba326a2e5e71c3b9276c9776255feace7e48713b7d8c7bb7cbe3804",
+      "before": "32224a6a765da53d7998ad7bf266432f12c40bdfd40a4a690aad07a30a9fbfd9",
       "afterMode": "100644",
-      "review": "Recompiles transient transport geometry and contacts from existing source records. Preserves higher-resolution ownership, retained road coverage, layer/access/direction and published foundation authority; connected grades, cuts, enclosures and finite actor-height contacts now agree. No persistent geography, player pose schema, inventory, account or server writes. Existing fixed-location loads rebuild this derived state; packaged movement and retained-save roundtrip remain required. Follow-up review: Adds explicit valid-owner/finite-height audit for vertical anchors. The prior reviewed physical profile repair remains; this follow-up adds diagnostics only."
+      "after": "11974f393ccb8f6a2880ddc5ff0c079e76b40d1ef6f497bb0aa602730468e2cb"
     },
     "app/js/world/compiler/transport-network-model.js": {
-      "before": "051a2d57ffd7c5f5f9bb02a124ea96cff6598f640999d23609d69cbe22782fac",
+      "review": "Prevents the expanded mixed-source endpoint match from connecting explicitly different at-grade levels. Transient topology only; same source identifiers and saved-data owners.",
       "beforeMode": "100644",
-      "after": "9b0fecf1ecfab475a9d3b3d8457e9e2bf58b01bce56fb731d29b01c51a4d517f",
+      "before": "9b0fecf1ecfab475a9d3b3d8457e9e2bf58b01bce56fb731d29b01c51a4d517f",
       "afterMode": "100644",
-      "review": "Vector buffer clipping/stitching preserves geographic road coverage, directed semantics and stacked layers while retiring duplicate geometry. Whole-route graph endpoint classification prevents false underground joins. Continuity audit now covers generalized sources. Compiled runtime identities may consolidate duplicate source fragments; location coordinates and durable player/item schemas are unchanged. No worldwide streaming or completed alignment claim."
+      "after": "b69b61c933965f6daa0c0b30cae02248ef81878b9ad1e9cfe8ec65e9ceabdec0"
     },
-    "app/js/world/compiler/transport-source-normalizer.js": {
-      "before": "7807fc7c5f4340c9e8bae18f61d7a85cf08db2779e3c10d38acd1ae0665b78ff",
+    "app/js/world/compiler/transport-structure-model.js": {
+      "before": "0b7bf2f07eeb4ded6a855776098bfbc52f21b13ae7d21aa5bc65f69513e7bcb9",
       "beforeMode": "100644",
-      "after": "fdff8b0e119cb0a58212fcb41940961d30720d1d91318f65b6a5e5cfc3ae1e26",
+      "after": "353142dbf0f6964c5a496016c1653bc8c38b120d79a8f5cfe4783ea8bbc5555c",
       "afterMode": "100644",
-      "review": "Bounded road render/contact residency within the existing fixed source catalog and shared road-mask ownership. Existing retry calls the existing session capture/reload authority. No new save schema, geographic migration, room authority or persistent write protocol."
+      "review": "Parking tunnel specification reads the canonical parking clearance. Other road/bridge specifications are unchanged. Derived model only; no persistence or backend changes."
     },
     "app/js/world/compiler/transport-surface-model.js": {
-      "before": "e4e3d0832c7e22e0a4db6716e5c280b93650456bc4d6e471b3e3574ecf240930",
+      "before": "f2d575773a84b397198c954eebf02c830e393220af5e53452bc25401c034e2f3",
       "beforeMode": "100644",
-      "after": "d8af4025ed2ee8469a3a05f0b99173e0bba46e53ec9e80d628bfcef03a7e0403",
+      "after": "b8b15bca3748aa31f1641339664218738cbfe1655ff05fa649c06eb6f4bc5f22",
       "afterMode": "100644",
-      "review": "Recompiles transient transport geometry and contacts from existing source records. Preserves higher-resolution ownership, retained road coverage, layer/access/direction and published foundation authority; connected grades, cuts, enclosures and finite actor-height contacts now agree. No persistent geography, player pose schema, inventory, account or server writes. Existing fixed-location loads rebuild this derived state; packaged movement and retained-save roundtrip remain required. Follow-up review: Separates hard graph stations from auxiliary sampling distances to preserve exact node constraints. Runtime compiler only."
+      "review": "Temporary solver storage remains scoped scratch; initial and reconciled published profiles can use bounded append-only pages without aliasing or detaching. Final packed profiles retain all numeric fields. Tunnel terrain probes use the corrected shared physical roof footprint. No saved data or protocol changes."
     },
     "app/js/world/compiler/transport-surface-profile.js": {
-      "before": "c0b4d0ab16668bd3099be0a19d2eaa081424c044ba47edfa61fc65f87e58f70a",
+      "before": "da2076cd898f41bdfbbde602fe8a6a22bab90c4d9cac7788eb6f67bcb9549873",
       "beforeMode": "100644",
-      "after": "da2076cd898f41bdfbbde602fe8a6a22bab90c4d9cac7788eb6f67bcb9549873",
+      "after": "234941976690389a396c83b18b4bbb03f9b80967301844a6a7590e8fdc25aa28",
       "afterMode": "100644",
-      "review": "Recompiles transient transport geometry and contacts from existing source records. Preserves higher-resolution ownership, retained road coverage, layer/access/direction and published foundation authority; connected grades, cuts, enclosures and finite actor-height contacts now agree. No persistent geography, player pose schema, inventory, account or server writes. Existing fixed-location loads rebuild this derived state; packaged movement and retained-save roundtrip remain required. Follow-up review: Keeps exact graph stations when an auxiliary roof or surface sample lies within one centimetre. No persisted road profiles or player state."
+      "review": "The same surface, bridge and tunnel solvers receive explicit scratch allocation. Computation order and numeric precision are unchanged; published output is copied before scratch reuse. No persistence change."
     },
-    "app/js/world/compiler/tunnel-junction-openings.js": {
-      "before": "a5a289d91d0ce04e3e1141077807bf94153e8720065449b055c5c47d45de6101",
+    "app/js/world/compiler/tunnel-envelope.js": {
+      "before": "7697f7474a5c9b17997d6f0926a11aeaea8df16b57173cebd4ddbb7decfa0869",
       "beforeMode": "100644",
-      "after": "1a9d66eccde66733fcaf5072f204fca6d925652a0a5df3704204184e63e9c2a1",
+      "after": "bae3aa2ae715eb68534686e353c4703b568e25f115c35af56f06429281b266a9",
       "afterMode": "100644",
-      "review": "Recompiles transient transport geometry and contacts from existing source records. Preserves higher-resolution ownership, retained road coverage, layer/access/direction and published foundation authority; connected grades, cuts, enclosures and finite actor-height contacts now agree. No persistent geography, player pose schema, inventory, account or server writes. Existing fixed-location loads rebuild this derived state; packaged movement and retained-save roundtrip remain required."
+      "review": "Parking passages use the existing minimum walkable clearance independently of burial depth. Roof sweep width now matches the actual 2 cm lining offset plus 35 cm portal rim, instead of a fictitious 95 cm envelope. No source data or saved fields change."
     },
     "app/js/world/compiler/tunnel-obstruction-limits.js": {
-      "before": null,
-      "beforeMode": null,
-      "after": "baabd1c02ab9bf7e105bf28c0f605dfca1f17e8c96852a230914aeb7c88fe9b6",
-      "afterMode": "100644",
-      "review": "Recompiles transient transport geometry and contacts from existing source records. Preserves higher-resolution ownership, retained road coverage, layer/access/direction and published foundation authority; connected grades, cuts, enclosures and finite actor-height contacts now agree. No persistent geography, player pose schema, inventory, account or server writes. Existing fixed-location loads rebuild this derived state; packaged movement and retained-save roundtrip remain required. Follow-up review: Mapped surface-road carriageway overlap adds hard roof-clearance intervals to the existing foundation/grade solver. Connected approaches remain openings. Geometry compilation only; no saved schema, geographic identity or shared protocol change. Follow-up review: Shares actual upper-road footprint overlap between tunnel roof and approach-cut consumers, with consumer-owned clearance. No saved schemas or network messages change."
-    },
-    "app/js/world/compiler/tunnel-solid-model.js": {
-      "before": "d1a0f616e93d333c4b1d7198fdc5bd5ac9e54208551cfac7bbdba4c17ea106a7",
+      "before": "06934cfb370ecc910cb9a85556582a09851c824889e58304072642756be3f925",
       "beforeMode": "100644",
-      "after": "85ee85a7f9765ec7e8588dd5503556c84c2890159d8575f3e6517b5c331db0c5",
+      "after": "eaf529b180f3ee6853cbccbcfc3a0885ea78e180bf4e6cdff1c15275c847ee3e",
       "afterMode": "100644",
-      "review": "Recompiles transient transport geometry and contacts from existing source records. Preserves higher-resolution ownership, retained road coverage, layer/access/direction and published foundation authority; connected grades, cuts, enclosures and finite actor-height contacts now agree. No persistent geography, player pose schema, inventory, account or server writes. Existing fixed-location loads rebuild this derived state; packaged movement and retained-save roundtrip remain required."
+      "review": "Foundation and overhead-road overlap use the shared physical roof envelope. Buildings actually touched by the shell retain hard clearance bounds; adjacent buildings outside it no longer depress connected streets. No persisted fields change."
     },
     "app/js/world/compiler/tunnel-system-model.js": {
-      "before": "fa95946898078dc15907214ff0a7e94f3042d1b9c4df0907e9242aa10a682f38",
+      "before": "d97b81ffdf623ed212b0faa44c9ef92e69667ac0de1a9707fd95255256a159ca",
       "beforeMode": "100644",
-      "after": "d97b81ffdf623ed212b0faa44c9ef92e69667ac0de1a9707fd95255256a159ca",
+      "after": "22ace19703103c850ae0dc97cf5a7813479f01d73f8442c73345709afb8d897d",
       "afterMode": "100644",
-      "review": "Keeps feasible existing tunnel cover under a separate mapped road and merges contained roof ranges without shortening the bore. No save changes."
-    },
-    "app/js/world/facade-lighting.js": {
-      "before": null,
-      "beforeMode": null,
-      "after": "ef84dff2091aab5772065992157a158b0c79f413a5b4af0a0fe91ea46c0f68cc",
-      "afterMode": "100644",
-      "review": "New shared transient shader uniform; no persistent or protocol owner."
-    },
-    "app/js/world/fixed-regional-context.js": {
-      "before": "8b4fcdc176d98d1db0423d1a1e2e757b49492ba4cbb4ba9d074e51983ab44ba3",
-      "beforeMode": "100644",
-      "after": "3ec41442e43dc6a17a3cab12650c7fbebc92b0382a1275ffe9cf4f410005df50",
-      "afterMode": "100644",
-      "review": "Recompiles transient transport geometry and contacts from existing source records. Preserves higher-resolution ownership, retained road coverage, layer/access/direction and published foundation authority; connected grades, cuts, enclosures and finite actor-height contacts now agree. No persistent geography, player pose schema, inventory, account or server writes. Existing fixed-location loads rebuild this derived state; packaged movement and retained-save roundtrip remain required."
+      "review": "Containment and portal placement use the same corrected roof extent as obstruction and profile compilation. Existing shell/portal authority and data ownership remain intact; no persistence change."
     },
     "app/js/world/fixed-regional-structures.js": {
-      "before": "4e86006c1a7b7444dee9f80d379637c304eda6ef7d726746f10437651b54eba7",
+      "review": "Retires generalized transport geometry only when complete accepted exact coverage is proven, including curved approaches and pedestrian structures. Explicit layers, incomplete/parallel geometry and missing-source fallbacks remain. No player data mutation or migration.",
       "beforeMode": "100644",
-      "after": "5cd43b391250fd031ba4464c64fddf90cde637305ef181c50eaac3c20bc2c9b0",
+      "before": "5cd43b391250fd031ba4464c64fddf90cde637305ef181c50eaac3c20bc2c9b0",
       "afterMode": "100644",
-      "review": "For an inferred nearby label, retires generalized structures only with full same-class/layer accepted exact coverage within 1.5 metres. Keeps the exact covered-passage authority, separate roads and fallback on incomplete data; no save or backend changes."
-    },
-    "app/js/world/geometry-batch-storage.js": {
-      "before": "a1855eb90df65309f4077620d8e155dcad62547d84f955029b3201cce9d1d060",
-      "beforeMode": "100644",
-      "after": "a61658f7761af887bbde523e1692b8a9f29b38c9b1639341e2e0334031f81c59",
-      "afterMode": "100644",
-      "review": "Building geometry and private temporary-buffer lifetime only. Tests require unchanged final triangle attributes, source-building edit boundaries and retained shared buffers. No persistent data writes or identity migration."
-    },
-    "app/js/world/landuse-batching.js": {
-      "before": "e84f67e9832c3c94bb37c4f35f4e198b6cbbbf76fd9a20d5ea59bf72fb66d636",
-      "beforeMode": "100644",
-      "after": "98c3ee5f236f02e40ccb4271150d1ce9e882620759e0a3f97149fa549b9076a0",
-      "afterMode": "100644",
-      "review": "Separates mapped pedestrian surfaces in material batching, preserves their contact marker and enables shadows. Runtime geometry only."
+      "after": "18980782ec46641de9e9c4eb447c3f501e0f295d43f177ee8a6594460c81d2f5"
     },
     "app/js/world/linear-feature-presentation.js": {
-      "before": "db700762e66599f1e68af1a0f0322c3a0a3d1ec0112d72f526f29e7c78300313",
+      "before": "7054ab7cf605448ee22af591ebed6ac86271da68a9d871607e61b605cdcf8c62",
       "beforeMode": "100644",
-      "after": "7054ab7cf605448ee22af591ebed6ac86271da68a9d871607e61b605cdcf8c62",
+      "after": "739b18b350addd364d1ed18d11ff597652c0159d6b124e8d810cbe8f83507911",
       "afterMode": "100644",
-      "review": "Finite tunnel cuts publish before road terrain snapshots and contacts. Ordinary roads, paths and pavements subtract the same finite excavation while engineered approaches and bridges retain independent grades. Sparse linear ribbons sample intervening terrain. Cooperative publication rejects superseded sessions. Geometry and contact data are derived; no source-feature, location, account, save schema/key or backend changes. Physical and visual acceptance remains independent. Follow-up review: Uses shared pavement classification, plaza clipping and world-scaled concrete texture for fallback paths; texture disposal follows its owning batch. Player stores unchanged."
-    },
-    "app/js/world/linear-ribbon-stations.js": {
-      "before": null,
-      "beforeMode": null,
-      "after": "b4216904c61e3410895f6e7447441a5b09bc3be3464555eea04e5ae10bba20d1",
-      "afterMode": "100644",
-      "review": "Finite tunnel cuts publish before road terrain snapshots and contacts. Ordinary roads, paths and pavements subtract the same finite excavation while engineered approaches and bridges retain independent grades. Sparse linear ribbons sample intervening terrain. Cooperative publication rejects superseded sessions. Geometry and contact data are derived; no source-feature, location, account, save schema/key or backend changes. Physical and visual acceptance remains independent."
-    },
-    "app/js/world/load-budgeting.js": {
-      "before": "0d6f54f43dc62c878264b7b9c076b8ff43d5563bfad11a27a7886f7ea6cde5a9",
-      "beforeMode": "100644",
-      "after": "654c4c4584fc6aa70dd77f69cbc51b6233e46703d31c79b0698cb0cbfbe3a715",
-      "afterMode": "100644",
-      "review": "Restores coverage and land-purpose/physical-cover classification with bounded source caches. Location presets, source IDs, saved map preferences and schema owners are preserved; current real-city coverage must be tested."
-    },
-    "app/js/world/load-building-detail.js": {
-      "before": "c648181e768d7462aebe5dac9f58811e1583ff9533a6ffa9958b6dbb7bbd5915",
-      "beforeMode": "100644",
-      "after": "b873640f53b930f963680a4b05ac946176d41ee4d97272c365ee265d4c164f5f",
-      "afterMode": "100644",
-      "review": "Restores coverage and land-purpose/physical-cover classification with bounded source caches. Location presets, source IDs, saved map preferences and schema owners are preserved; current real-city coverage must be tested."
+      "review": "Yields between individually clipped paths and bounded numeric copy loops. Same complete rendered geometry and terrain/road authority; transient scheduling only."
     },
     "app/js/world/load-building-pass.js": {
-      "before": "89b97dc69f27c0b0ec54784900ce4be304086e162dc85295adde4c749a7a4735",
+      "before": "e8f6cce9b7e9c7bb76aa9cadeb4b76481d09b936830f47dffbe4e1d28a2a219e",
       "beforeMode": "100644",
-      "after": "d89631d7fdd47f578f4704d4e2e484bbb3c1eb20cd8b8afad56f1f871ccf94aa",
+      "after": "1aaf5a52dda670ceb752ec3175a89af959307d8b411699068cec7a61f4948c30",
       "afterMode": "100644",
-      "review": "Building geometry and private temporary-buffer lifetime only. Tests require unchanged final triangle attributes, source-building edit boundaries and retained shared buffers. No persistent data writes or identity migration."
-    },
-    "app/js/world/load-failure.js": {
-      "before": null,
-      "beforeMode": null,
-      "after": "96bf5ac63c48bfc2c229ebb1a1fa7ecf686ca55c7871910a43b43b9190b46787",
-      "afterMode": "100644",
-      "review": "Centralizes rejected-world resource retirement under current runtime identity; does not delete player records, favorites, account data or saved sessions. Uses the existing globe selector status surface to expose a recoverable failure for every caller."
+      "review": "Owns separate near/mid construction arenas, closes them on success or failure, and finalizes standalone attributes after batching. Complete world coverage, semantic rules, building identities and saved data remain unchanged."
     },
     "app/js/world/load-geometry.js": {
-      "before": "31f452f553af96784ea0e3d2cc7df939c169d676b9ad9494a7c64d40f3bfb3fa",
+      "before": "568c39a1b897602cf07ebce2f4e4b4ed85dca00088f655da848136f8f3805adb",
       "beforeMode": "100644",
-      "after": "568c39a1b897602cf07ebce2f4e4b4ed85dca00088f655da848136f8f3805adb",
+      "after": "95b2ac08f3bc6d86d9fb1e1b526fdf4f501c2662af0714f4bb83c537c162245d",
       "afterMode": "100644",
-      "review": "Building geometry and private temporary-buffer lifetime only. Tests require unchanged final triangle attributes, source-building edit boundaries and retained shared buffers. No persistent data writes or identity migration."
-    },
-    "app/js/world/load-landuse-pass.js": {
-      "before": "7fbf1b8a5884c9e83a955c38eb453018b399bb68dc7ff0a8e74a7c6f1f01e507",
-      "beforeMode": "100644",
-      "after": "82778f446b0503edb90577a004e542dd4d7ed8ce91fd3591a09e25cfb2753177",
-      "afterMode": "100644",
-      "review": "Resolves actual brick/concrete texture handles and marks mapped pedestrian surfaces for shared contact ownership. Provider tags and saved player data unchanged."
+      "review": "Passes the optional construction arena into generated mid-LOD bodies and their existing fallback. It does not change geometry, material selection, location identity or saved state."
     },
     "app/js/world/load-linear-runtime.js": {
-      "before": "73ccc468d9aee39e609224e71ea17d10d0ad3af35b95a06b76e12c05e582ee83",
+      "before": "dfa3c3b064fdb2853e060b4f9424d918d30e469eca5e41b96f615bc7072614f2",
       "beforeMode": "100644",
-      "after": "dfa3c3b064fdb2853e060b4f9424d918d30e469eca5e41b96f615bc7072614f2",
+      "after": "847e5d1eb72f0562e51550c5aba62700c609b099d648af18986b4a054868a4aa",
       "afterMode": "100644",
-      "review": "Recompiles transient transport geometry and contacts from existing source records. Preserves higher-resolution ownership, retained road coverage, layer/access/direction and published foundation authority; connected grades, cuts, enclosures and finite actor-height contacts now agree. No persistent geography, player pose schema, inventory, account or server writes. Existing fixed-location loads rebuild this derived state; packaged movement and retained-save roundtrip remain required."
+      "review": "Immediate linear-feature compilation passes a bounded publication store explicitly to each record. Standalone additions remain independently allocated. All feature identity/access/topology and saved data are unchanged."
     },
     "app/js/world/load-reset.js": {
-      "before": "dfbf4c1e070a046c235cfb7fa6c89008068599389c24c6a806c91a31d4e60fcd",
+      "review": "Disposes the transient museum program lease and clears its diagnostic result at world replacement. Existing player/save reset responsibilities are unchanged.",
+      "before": "3d8f145b7a131ed438e90e7fbdc810d125070d00aa01187fe22506b04531374d",
       "beforeMode": "100644",
-      "after": "9c7b1cddfb579e02451e17d6d2c3e88a81ad9447b4019f013e0827d4a5939ae8",
+      "after": "aa81566ebe26413be90437109b25fa3f3bde977f23592a3e510098b5e5da5070",
+      "afterMode": "100644"
+    },
+    "app/js/world/load-road-pass.js": {
+      "before": "f546dbd40226a800f8fabe27148531c53c4408f5147daedbcddbcda6f0de863e",
+      "beforeMode": "100644",
+      "after": "41bf7f2a30c4ec072a1349a0360fe5d43b0d0daa0d3791b9e541f8d09efd0188",
       "afterMode": "100644",
-      "review": "Resets loading presentation with the existing world reset; does not add new reset of player stores."
+      "review": "Initial road compilation uses a pass-owned bounded publication store across cooperative yields. All accepted profiles and source coverage are retained; no player data or road identity changes."
     },
     "app/js/world/load-roads.js": {
-      "before": "161cfd5773b61056e927975487d954fc594fed53e908ef7b1943be8d082c983e",
+      "before": "c5595d7b4ef2fe0d86ce0d5a55237cdfe07fede35f4794c1c975752eb8df6d32",
       "beforeMode": "100644",
-      "after": "088b2b3fd30ee2c91571bc4c874a0b98b778ddef84b97147468ba20c69a05180",
+      "after": "7d64e97cf008617fcd74df57616bd1b757f47a8fee6ec0ce665c1041ed616ceb",
       "afterMode": "100644",
-      "review": "Admits valid selection before reset, drains request-owned providers, awaits finalization and routes exceptions through guarded cleanup. Existing location and persistent source authorities remain."
+      "review": "Creates the retained facility terrain callback in the stable loader scope instead of the per-load source context. Same dynamic terrain method, arguments, receiver and return value. Current-source retained-allocation comparison releases about 128 MB including raw regional and building-provider records. No geometry, coverage, persisted state or backend contract changes; native pacing still requires verification."
     },
     "app/js/world/load-runtime-session.js": {
-      "before": "561afb54eda9cc0a739312b40d798c13815a542294be84b80eb05f977cbcf26b",
+      "review": "Awaits initial street coverage and lazy museum rendering readiness before admitting gameplay, with publication/session cancellation and normal failure handling. Does not alter saved location, travel, inventory or backend formats.",
+      "before": "f0fd0376c51c2ca25d35e3a46d57e87e9e035976e707d40bc3cc9b670b9846fa",
       "beforeMode": "100644",
-      "after": "f0fd0376c51c2ca25d35e3a46d57e87e9e035976e707d40bc3cc9b670b9846fa",
-      "afterMode": "100644",
-      "review": "Moves request validation before destructive reset, owns provider admission/drain, and guards publication-specific ambient work. The established successful world publication and save owners remain. Follow-up review: Publishes progress only from the active loading session and successful active gameplay startup. No persistence ownership change."
+      "after": "b81702bee35dd0efa36a3ff004ce39018859a6040ecdbb03593349b5376e5938",
+      "afterMode": "100644"
     },
-    "app/js/world/load-support.js": {
-      "before": "64ff5e26231f1c0599b9357cc0c31848bb66678b2c9b4f130050ef072f285f49",
+    "app/js/world/navigation.js": {
+      "before": "eb352679858389a6a08da7d4119c83decdfbbb660c28681f3d8c8824d8733cf2",
       "beforeMode": "100644",
-      "after": "206a12bb52e7583e61831bfbda088af66191a9ed96a24c4c7de3f76909ed5642",
+      "after": "d6b302965d16b81c494f5cc9d9afcd26deb678a6d40873950cd81a76c16cbdbc",
       "afterMode": "100644",
-      "review": "Tracks pavement publication as a real loading phase; error recovery and stored player data unchanged."
+      "review": "Keep nearest-road winner scalars until the scan completes instead of allocating discarded intermediate results. Same projection, height, continuity and bridge/tunnel transition rules, final result shape and search bounds. No geometry, identifiers or persisted state changes."
     },
-    "app/js/world/mapped-pavement-clip.js": {
+    "app/js/world/pavement-batch-ownership.js": {
       "before": null,
       "beforeMode": null,
-      "after": "efb9e734f7be5a0d0b7d88ccd710c6d0c0ac8ce7221fe51788bc2c273cb568d1",
+      "after": "9867558528f8ecfe4893db7d55126281f2cd7cb4c41f7e1025fd534e57a5413b",
       "afterMode": "100644",
-      "review": "Subtracts mapped plazas from transient path triangles, retaining polygon holes and source triangle height planes. No saved content mutation."
+      "review": "New bounded active-publication ownership helper. A batch geometry and exact contact index share an idempotent reference-counted lease across an atomic handover. Last release disposes both; cancellation cannot dispose another publication\u2019s resources. Numeric spatial lookup checks neighboring batches for original Float32 boundary tolerance and chooses the same highest contact as the original combined index. Does not retain prior publication objects or create a persistent cache."
     },
-    "app/js/world/mapped-pavement-contact.js": {
+    "app/js/world/pavement-materials.js": {
       "before": null,
       "beforeMode": null,
-      "after": "0af53eae09634a2ea7a27dbb82f76def8124cefaa3c7f6020d575c6cb9408955",
+      "after": "439c0aa30d7ea932f6141f9918b3b335edc6b14d9b806fed71b86b7356c9df6b",
       "afterMode": "100644",
-      "review": "Transforms accepted plaza mesh vertices for the existing pavement contact index; generation cancellation retained. Transient contact data only."
+      "review": "Transient, per-world pavement material ownership. Same three material parameters and concrete texture bytes; one shared set during overlapping construction/publication, idempotent per-lease release and final-owner disposal. World sequence or borrowed-map identity changes create a distinct set; external normal/roughness textures are never disposed here. Partial construction releases its own resources. No saved fields, permissions, data migration or backend protocol changes."
     },
-    "app/js/world/pavement-terrain-mask.js": {
-      "before": "15327bb63fc26f4f81b6a486d73442b4d2b1cb07107e4d2da1b0ac1f234e171e",
+    "app/js/world/pavement-terrain-conformance.js": {
+      "before": "c35daf1aacfe607037e58797691c987398cc83a13332f8b672570151be0b131a",
       "beforeMode": "100644",
-      "after": "aab2db3e84ef44f5ed1de4a65f350c93977d27c2a68bdcee9a275ebe27ff3a8e",
       "afterMode": "100644",
-      "review": "Bounded road render/contact residency within the existing fixed source catalog and shared road-mask ownership. Existing retry calls the existing session capture/reload authority. No new save schema, geographic migration, room authority or persistent write protocol."
+      "after": "3ef7d9dfa334dbd5753ba55e232885b172fea387635a18958e66eb2465bf38ea",
+      "review": "Fast checkpoints remain synchronous until their existing work budget is exhausted. Exact geometry and cancellation remain unchanged; the isolated 5000-triangle comparison reduces Promise creation from 10005 to two. No persistence or backend fields change. Browser pacing remains separately required."
     },
-    "app/js/world/pavement-texture.js": {
-      "before": null,
-      "beforeMode": null,
-      "after": "e2579d5db511effd3d083762906a22152863a90291644a990beee7090e672557",
-      "afterMode": "100644",
-      "review": "Shared deterministic concrete DataTexture with mipmaps and world scale; presentation only."
-    },
-    "app/js/world/reference-block-dressing.js": {
-      "before": null,
-      "beforeMode": null,
-      "after": "d91eb8e3337cc2e40c986100325d1464166d7472195198c83a14629c6154de55",
-      "afterMode": "100644",
-      "review": "Authored ephemeral street furniture placement, collision and lamp registration; never writes player/world saves."
-    },
-    "app/js/world/shortbread-source.js": {
-      "before": "c45eb20adf5e2d4a5262dfc0b7ca67bfc0a29789f8d26d7b4db28da8fe2293f4",
+    "app/js/world/pavement-terrain-partition.js": {
+      "before": "54f97ac254b242df1d22270449bbc6677a9dd0bc8b038088ffc5f8b467452d2f",
       "beforeMode": "100644",
-      "after": "3444a074752b89316e5e1dceb79ce6dcfcf4a76e842875b958bad631e2b0cbd6",
+      "after": "481a81fc53f1b89dcd6b8ed50a87ad48ed036132166b1daace584e4d330c3614",
       "afterMode": "100644",
-      "review": "Restores coverage and land-purpose/physical-cover classification with bounded source caches. Location presets, source IDs, saved map preferences and schema owners are preserved; current real-city coverage must be tested. Vector buffer clipping/stitching preserves geographic road coverage, directed semantics and stacked layers while retiring duplicate geometry. Whole-route graph endpoint classification prevents false underground joins. Continuity audit now covers generalized sources. Compiled runtime identities may consolidate duplicate source fragments; location coordinates and durable player/item schemas are unchanged. No worldwide streaming or completed alignment claim."
+      "review": "One clipping workspace per iterator; copies borrowed coordinates into published output and ordinary arrays for failure diagnostics. Interleaved iterators and retained diagnostics remain independent. No geometry, coverage tolerance or saved-field changes."
     },
-    "app/js/world/spawn-surface.js": {
-      "before": "257b1b4ba9952761546e673dd941aa3dadc873eb3ace0caebe1484157bc54efc",
+    "app/js/world/retired-building-buffers.js": {
+      "before": "05610e0943b074c71405480ae611c59aaf474cfba557e621fdf3b1e0f5a2431f",
       "beforeMode": "100644",
-      "after": "93a55dc16d642b8971ecfcc3880fa76f3e6d1584cb24a72952508e4e55a82ebb",
+      "after": "da5e6aacac744737caa4121da4f5758e9a6d52c74fda3134e8854b102d993268",
       "afterMode": "100644",
-      "review": "Occupied tunnel mode handoff validates the same floor and a centered car with physical clearance. Fresh geographic arrivals still exclude tunnels. Only transient spawn resolution/collision probes change; no save schema, actor identity or backend protocol change."
+      "review": "Private construction ranges share bounded pages until their geometry owners retire. Unbatched survivors copy exact attribute bytes into independent storage, preventing page pinning; final batches, clones and neighboring geometry remain valid. No persistence or building identity changes."
     },
     "app/js/world/spawn.js": {
-      "before": "51c45341f470e82cdafe85ebfeb7395a8a6d620658498c39b3ef85d8f67587d9",
+      "before": "7653da3d9f3512d211547f432812911b9de5d1f00675114d11c2c75f71395b28",
       "beforeMode": "100644",
-      "after": "7653da3d9f3512d211547f432812911b9de5d1f00675114d11c2c75f71395b28",
+      "after": "c3ba95cce9a15ea6765a4b910d9a4cbbda53d761e64fb415ac32935642b658cb",
       "afterMode": "100644",
-      "review": "Occupied tunnel mode handoff validates the same floor and a centered car with physical clearance. Fresh geographic arrivals still exclude tunnels. Only transient spawn resolution/collision probes change; no save schema, actor identity or backend protocol change."
+      "review": "Exact-point walking validation can reject an unsafe local interaction without searching for a remote arrival. Ordinary arrival fallback, drive/bridge/tunnel support, actor/save formats and persisted poses are unchanged."
     },
-    "app/js/world/storefront-layout.js": {
-      "before": "4c0dc37055d9822b92c4c0fc678514f9f617cf01b3d87b841fc7d9b71ef9a1ee",
-      "beforeMode": "100644",
-      "after": "a4f382eb5e3c1e046e7b4f7d5a2c66141d186caf69469aca0560e8b8b650da0f",
-      "afterMode": "100644",
-      "review": "Storefront sign height in transient facade geometry only; shop and equipment models unchanged."
+    "app/js/world/street-interior-suspension.js": {
+      "review": "Cancels only unfinished preparation while retaining accepted contact and coverage. Cancellation preserves existing source/terrain invalidation without inventing invalidation of valid accepted detail; missing first coverage stays retryable. No persistent data.",
+      "before": null,
+      "beforeMode": null,
+      "after": "e837f04c779daa501cb202b01ae7effeabdd1df2dbbc4b79758ed409cb848bb9",
+      "afterMode": "100644"
     },
-    "app/js/world/storefront-signs.js": {
-      "before": "44f6778a53dfd4dc62680229c0d3532e8193d6b8af049d56c7b270f34a914100",
+    "app/js/world/street-overview.js": {
+      "review": "Same complete source domain and masks; initial loading awaits all cells and mapped-path completion, while travel retains incremental scheduling. Cancellation and source identities remain guarded. No persistent data or source coverage reduction.",
+      "before": "fdc07d01fa7bbae11283f97fa1aa7ff05a5f74206221059acbe122dfc4dee128",
       "beforeMode": "100644",
-      "after": "ac6ae4074fff54659e8fa2d22ce6d7f2c85325d9b5507aa530e9095db3201f62",
-      "afterMode": "100644",
-      "review": "Sign mesh placement only; no business identity or persistent changes."
+      "after": "562e84496fe27a3bb5d7d8eecf3536aaace835cd2d46f5f9511849e7cda86e67",
+      "afterMode": "100644"
     },
-    "app/js/world/street-coverage.js": {
-      "before": "dcf60decfc9e0e2618b7c6ae1f638aa5fb9473ca10a98aca6ba475b3cb3dd067",
+    "app/js/world/street-packet-cache.js": {
+      "before": "5f1e16b667711486b3d93aa1ddaff4f53a64d33ee7d0a1d9f976e58ca2e14013",
       "beforeMode": "100644",
-      "after": "e2313f63fb779804b1d6f0ed1c3f04f321fdfbb13358af99a9c52b2994b2db07",
+      "after": "6ca441381fcda62c78ad86d09d35316b97ecb286e7bfe8a3f1684e02771f2039",
       "afterMode": "100644",
-      "review": "Audits mapped paved footways with the shared policy. Coverage diagnostic only; saved data unchanged."
+      "review": "Retains one bounded 16 MiB cache with private arrays and exact physical owner checks. Revalidates an existing fitted surface only when both its previous source key and exact product identity match under the current owner. Updates metadata and byte accounting atomically; eviction and owner changes force reconstruction. No second geometry cache or persistent format."
     },
     "app/js/world/street-pavement-runtime.js": {
-      "before": "e58e6722d03337009a5477ba26c5d17eaff12356fefa766990d2736457d8b25c",
+      "before": "28675ab27c199f0224e8c6ea01df825c658feb9bae0112b5eaeed91b548c854c",
       "beforeMode": "100644",
-      "after": "85f323b16520b2b0950610331ac5094ed9f006e0818efe453e79cc4a6137ef7a",
+      "after": "3d44726b26772154db8cb353362563ad1a17af6985490ad59025434677e6e7e7",
       "afterMode": "100644",
-      "review": "Finite tunnel cuts publish before road terrain snapshots and contacts. Ordinary roads, paths and pavements subtract the same finite excavation while engineered approaches and bridges retain independent grades. Sparse linear ribbons sample intervening terrain. Cooperative publication rejects superseded sessions. Geometry and contact data are derived; no source-feature, location, account, save schema/key or backend changes. Physical and visual acceptance remains independent. Follow-up review: Atomically publishes the shared sidewalk/plaza contact index, manages fallback paths and loading progress, and keeps texture ownership bounded. No player-save schema change."
+      "review": "Retains generation/revision cancellation, exact terrain/portal fitting, canonical face order and atomic publication. Validates changed-source reuse against the worker product identity and existing physical owners. Unchanged 128-unit render batches retain geometry and their exact walking-contact index through publication leases. Changed batches rebuild through the existing worker indexer; mapped ground keeps its bounded index. Composite sampling preserves maximum height and boundary tolerance. Failure or cancellation releases only staged leases; the old publication remains usable. Material leases and isolated publication callbacks preserve program lifetime without retaining old publications. No road/bridge/tunnel authority, coverage, save or backend change. Invalidation now survives pending/cancelled work until a current publication commits; editable source revision joins ground/world/generation guards to reject stale source edits."
     },
     "app/js/world/street-source-input.js": {
-      "before": "d066bc3664c11e9a68ce254ab1ea0f9a956fd50fe96b4d162202034b74e3b78d",
+      "before": "8d9a2e0d859d2050f0f37e30c2f376a151fc3464cd723da233326e6e3c8b6267",
       "beforeMode": "100644",
-      "after": "8d9a2e0d859d2050f0f37e30c2f376a151fc3464cd723da233326e6e3c8b6267",
+      "after": "0306d24ab6174ad730bed2b9e858f2dad4bf9c54be8008bc1e114ba2ac59d4c7",
       "afterMode": "100644",
-      "review": "Transfers mapped-surface ownership and common paved-path classification into worker source snapshots. No persisted worker format or player data."
+      "review": "Includes the existing road surfaceBias in the compact worker snapshot because it is consumed by the terrain height sampler and therefore must participate in cache invalidation. Source selection, global road identities and all gameplay/save data are unchanged."
+    },
+    "app/js/world/street-source-revision.js": {
+      "before": null,
+      "beforeMode": null,
+      "after": "0cc351b93f3ab04983de4a83f470dc1bfccb1638213ed2a2650edd68db2e8309",
+      "afterMode": "100644",
+      "review": "Versions editable frontage/source mutations independently from physical terrain changes so cooperative street construction cannot publish over a newer edit. In-memory ownership only; no saved format or authority change."
     },
     "app/js/world/structure-aware.js": {
-      "before": "def099cc97990cfd74cd1a3a2fd6110a9fac28fbe2c85459ddf477e65f30b92e",
+      "before": "341ac181411259e570251f6be0b03cb29e0403f817431eb8f3e8afe0b5597ee2",
       "beforeMode": "100644",
-      "after": "341ac181411259e570251f6be0b03cb29e0403f817431eb8f3e8afe0b5597ee2",
+      "after": "2b009daffff77af60731729bf6ae7985fede3e5790bdba02cbd3e6770f19bb05",
       "afterMode": "100644",
-      "review": "Recompiles transient transport geometry and contacts from existing source records. Preserves higher-resolution ownership, retained road coverage, layer/access/direction and published foundation authority; connected grades, cuts, enclosures and finite actor-height contacts now agree. No persistent geography, player pose schema, inventory, account or server writes. Existing fixed-location loads rebuild this derived state; packaged movement and retained-save roundtrip remain required. Follow-up review: Publishes mapped-road roof constraints after topology assignment and before initial profiles so graph reconciliation and per-feature compilation share them. Existing save and backend authorities are unchanged. Source Monaco zero-gap/zero-discontinuity and actual tunnel traversal pass; final package validation remains required. Follow-up review: Compiles approach cuts against nearby separate upper-road surfaces after terrain publication; saved records remain under existing owners."
+      "review": "One explicit append-only publication store per structure compilation, shared across provisional reconciliation passes and released after final packing. No global allocation owner or terrain/topology policy changes. No persistence changes."
     },
-    "app/js/world/structure-colliders.js": {
-      "before": "25e6df83a06c02713c29632c74f66d35f179dedf700720d35bbee1030d45e1cf",
+    "app/js/world/traversal-graph-storage.js": {
+      "before": "4816830e7a342ea3d06ecd9d810601430ce6918af49bfb8cb9c534149d2cbc13",
       "beforeMode": "100644",
-      "after": "347a0965f8579aa78f31b2af589920faf76e24760ad43dc45eefc0771db65e8d",
+      "after": "64119cba4af852f54bf7f0bb9afe2e87dd51d87bb7142f105f30dbe718247950",
       "afterMode": "100644",
-      "review": "Recompiles transient transport geometry and contacts from existing source records. Preserves higher-resolution ownership, retained road coverage, layer/access/direction and published foundation authority; connected grades, cuts, enclosures and finite actor-height contacts now agree. No persistent geography, player pose schema, inventory, account or server writes. Existing fixed-location loads rebuild this derived state; packaged movement and retained-save roundtrip remain required."
+      "review": "New packed storage for published navigation nodes and segments uses Float64 values and Uint32 IDs. Endpoint and feature references retain their existing owners. Temporary row views are limited to queries or pedestrian/traffic compilation; no persistent graph/save format migration."
     },
-    "app/js/world/surface-publication-error.js": {
-      "before": "fba8d3f757faf4e04c74ef50a18fa6c06df67660ef0ce8926d96d8769417891a",
+    "app/js/world/traversal-segment-index.js": {
+      "before": "91d7882c21278682c4d98398e0f4649c46d898ef44623297bf262a4d3991ed89",
       "beforeMode": "100644",
-      "after": "3284ecc61382dca950c05bfb01be31a19e5ff5b9c5c535c81a721582de546973",
+      "after": "00a573d3b9ead187687c09984b44220ef927e8656df99cb9c8171bc482b36829",
       "afterMode": "100644",
-      "review": "Existing compiler error delegates to common request-identity-guarded cleanup; no save or migration changes."
+      "review": "The same broad phase reads either packed published segments or explicit row fixtures. Cell membership, broad segments, sorted original IDs, limits and cache invalidation remain unchanged."
     },
-    "app/js/world/vector-line-ownership.js": {
-      "before": null,
-      "beforeMode": null,
-      "after": "4fc9baf51aaf823649789d4c23db4a9977f06193dcf0ab533f3170cff2c3e36b",
+    "app/js/world/traversal.js": {
+      "before": "188c32ddeae2499ad5592946faee62c31ff6467d7ec2694752e1c9dc1793d94d",
+      "beforeMode": "100644",
+      "after": "24ab9eaf8e38872e1a512e8a8f54ecd60b6904cf3801c21bed373f8872031929",
       "afterMode": "100644",
-      "review": "Vector buffer clipping/stitching preserves geographic road coverage, directed semantics and stacked layers while retiring duplicate geometry. Whole-route graph endpoint classification prevents false underground joins. Continuity audit now covers generalized sources. Compiled runtime identities may consolidate duplicate source fragments; location coordinates and durable player/item schemas are unchanged. No worldwide streaming or completed alignment claim."
+      "review": "Navigation compilation retains exact Float64 node coordinates and packed segment facts. Route search and nearest-feature selection preserve source references, ordering, costs, direction/access and graph invalidation. No saved data changes."
     },
     "app/js/world/vector-resolution-ownership.js": {
-      "before": null,
-      "beforeMode": null,
-      "after": "cf03f61192a73068c962c2a7e3a497cbe63199abe3b407e29ad305246cfe0910",
-      "afterMode": "100644",
-      "review": "Recompiles transient transport geometry and contacts from existing source records. Preserves higher-resolution ownership, retained road coverage, layer/access/direction and published foundation authority; connected grades, cuts, enclosures and finite actor-height contacts now agree. No persistent geography, player pose schema, inventory, account or server writes. Existing fixed-location loads rebuild this derived state; packaged movement and retained-save roundtrip remain required."
-    },
-    "app/js/world/vegetation.js": {
-      "before": "6cadc778abba8a909bb5e6d7df8dd6bb51213a4ba5d303a109b36f8f0c1f20f4",
+      "review": "Adds an opt-in curved-segment coverage proof for fixed regional conflation. Default ordinary vector-road matching is unchanged. Pure geometry ownership; no save fields.",
       "beforeMode": "100644",
-      "after": "80e8159120b3a7c2cee2dc5398d8c27dc6c1c6ad86ccf376e7895e978a2a5b9c",
+      "before": "cf03f61192a73068c962c2a7e3a497cbe63199abe3b407e29ad305246cfe0910",
       "afterMode": "100644",
-      "review": "Recompiles transient transport geometry and contacts from existing source records. Preserves higher-resolution ownership, retained road coverage, layer/access/direction and published foundation authority; connected grades, cuts, enclosures and finite actor-height contacts now agree. No persistent geography, player pose schema, inventory, account or server writes. Existing fixed-location loads rebuild this derived state; packaged movement and retained-save roundtrip remain required."
-    },
-    "app/js/world/world-load-coordinator.js": {
-      "before": "41b82ed2b8efab6091428297fb22a8822fc34b241c5120fd5136c7fccd1081a9",
-      "beforeMode": "100644",
-      "after": "30d4d446201a47d2070804504f77f0289be55212615aafc51c7a6dcb3eecd23c",
-      "afterMode": "100644",
-      "review": "Rejects invalid requests before cancelling in-flight work; existing request coalescing and ordered replacement retained."
-    },
-    "app/styles/interface-v4.css": {
-      "before": "8f91986b6dd84adb0e89b7ccb6fe4de2e538aaca0ab88c60287a5f69dcc1ccce",
-      "beforeMode": "100644",
-      "after": "aa6a6dc9d795680fb973c3ecebc4598b2a7ace02027c7a251f38d8f4bf8326fe",
-      "afterMode": "100644",
-      "review": "Collapsed desktop HUD hides decorative labels and clock; phone layout remains visible on viewport changes. No player persistence changes."
-    },
-    "app/styles/runtime-shell.css": {
-      "before": "fd3e95e0b582da93a8d691b0381a4e69b87ecc26b96d7229cca3574accc8b06a",
-      "beforeMode": "100644",
-      "after": "695fc5fe41c2ada45ea8a1f653c5fe9b43ad2c7013a8d6e8e55c8c6949ad308c",
-      "afterMode": "100644",
-      "review": "Connected marine entry, deck/swim/submarine handoffs and compact UI. Existing voyage v1 identity, geographic anchor, stage, condition, save key, revision and conflict owner remain. Parent yaw stays independent of submarine yaw; no account/backpack or shared protocol change. New-session admission still requires checked water; saved underwater and aboard records retain their resume path. Follow-up review: Compact loading panel matches the existing interface, with accessible progress, touch controls and reduced motion. Presentation only."
-    },
-    "assets/readme/baltimore-coverage-5.5.png": {
-      "before": null,
-      "beforeMode": null,
-      "after": "e356263d33b8db9771bf621868fc2d62ac077bb24aa4fb5d88b9da12d30486f9",
-      "afterMode": "100644",
-      "review": "Unedited actual browser gameplay screenshot for the public 5.5 gallery; no persistence or runtime behavior change."
-    },
-    "assets/readme/research-deck-5.5.png": {
-      "before": null,
-      "beforeMode": null,
-      "after": "bff8bb35bd93f989c097e9d148b6ed1d264acb3143158da58c2e738341ea7ec0",
-      "afterMode": "100644",
-      "review": "Unedited actual browser gameplay screenshot for the public 5.5 gallery; no persistence or runtime behavior change."
-    },
-    "assets/readme/research-dive-5.5.png": {
-      "before": null,
-      "beforeMode": null,
-      "after": "84da929b80b91a519d71c580591d2ce1804b4a8afee64acb1242f3cdefec4be0",
-      "afterMode": "100644",
-      "review": "Unedited actual browser gameplay screenshot for the public 5.5 gallery; no persistence or runtime behavior change."
+      "after": "23b16c90d1978b24ec179b162ddb5ee4768256de7573df4c9c42d1e6de4468f6"
     },
     "config/context-write-allowlist.json": {
-      "before": "80d58ce0305e25b6358ed606db89ac88da6f0eb1773cd36fb0c303290ef0acb2",
+      "review": "Registers the reviewed transient renderer and street owners. Moves editable frontage invalidation writes to the explicit street-source revision owner; no permission, service rule or persisted schema change.",
+      "before": "908b9ce4cb8d5f73436be53afa10bbd451ccb0ee7302af7d610c27f6b6acf234",
       "beforeMode": "100644",
-      "after": "85a20ebcb6809b8031b0e8f910ec39660aa76f8c09c6a76e1ed5e57cdd0c3140",
-      "afterMode": "100644",
-      "review": "Adds the existing boat authority as the sole root-context publisher of startSurfaceResearchVoyage. This is a static ownership check, not a production rule, secret or backend protocol change. Follow-up review: Registers the three regional scenery controls under their existing terrain owner; no new persistent context authority."
+      "after": "65c8d30fdf265a97cb4ce5acd9967c8876a84c01bfe56cef20b87e398ca30803",
+      "afterMode": "100644"
     },
     "config/performance-budgets.json": {
-      "before": "84a2d943ee56208eb034b2ec643288dc612823817747803cd947d7990fbbf945",
+      "before": "7553af8ea49ea8f6d3e67e48d70148c0953b669e10a46c49b8a383e67a5b8b6a",
       "beforeMode": "100644",
-      "after": "ee51f80265a36e908b39dab181add1dfb93f5fe35f7d8bd18f8530e13152ebae",
+      "after": "a9d50aec88adf727e19ab93316815fefad7ac1a6ab7afc26b3698acbefaa07be",
       "afterMode": "100644",
-      "review": "Release version label advances to 5.5.0. Numeric performance and memory thresholds remain unchanged."
-    },
-    "config/production-program-gates.json": {
-      "before": "1bc076e81d99e858b317b25381ea2864d711c955330e25a94f49a4574e939520",
-      "beforeMode": "100644",
-      "after": "01d0a245d45a430f2f9d52b8924d83396fb8686da1ba39a90e3ffc62e5dc3f17",
-      "afterMode": "100644",
-      "review": "5.5 release identity and public notes; same required acceptance classes and checkpoint requirements. Follow-up review: Owner-authorized 5.5 scope retains all automated gates and mandatory ordinary-hosted, public-data and rollback checks. Named-device and independent new-player receipts remain explicitly unverified and deferred, never marked passed. No player runtime or save changes."
-    },
-    "config/public-feature-claims.json": {
-      "before": "f98db78f72a7a0f35b344ee6ec309ac9eaadcb2b25344db757e59440ec9ab723",
-      "beforeMode": "100644",
-      "after": "f2422181f6a4291ddfee8cae0935ba1e5df63dc60161af78f8ccfe5ecdbea1ef",
-      "afterMode": "100644",
-      "review": "5.5 target version with existing public claim contract retained."
-    },
-    "config/runtime-dependencies.json": {
-      "before": "8a4326a32df9b80049c3e43e46c5f887f1cc93a6b96d1860bebf62e575bb1b10",
-      "beforeMode": "100644",
-      "after": "8a7a274e3dcc8242d339f2a877879dfc5c7fad38541c3049aeae0b20ef7fc088",
-      "afterMode": "100644",
-      "review": "Refreshes the reviewed root lock hash for version-only edits; all dependency versions and integrity pins remain unchanged. Follow-up review: Reviews both locks after targeted sharp 0.35.5 and proxy-addr 2.0.8 fixes, including the matching sharp integrity pin; other direct versions and vendor bytes remain unchanged."
+      "review": "Reviewed verification policy only: 30FPS floor,35ms p95 scheduling allowance and existing50ms p99/individual-pause/hitch limits. Existing byte/request caps apply per cold load,bounded travel,each reload and finalization with complete cumulative accounting. This configuration is not shipped and changes no runtime/save/backend format. The explicit policy change and retained failed evidence are documented in docs/release-review/2026-10-19/VERIFICATION-MEASUREMENT-SCOPE.md."
     },
     "config/scene-resource-budgets.json": {
-      "before": "7826e747ab9feeb8b637eca88af84ab054fcb54dc1e1f747c94d537a30d6e638",
+      "before": "1d8d58c8a40a1824b2f088d4821a888e2f8d7cd6a8b881746c780f5be7d43a4e",
       "beforeMode": "100644",
-      "after": "11df67f664381ba5be71fdd2df2514fc66aeede73061de211af52418b549db1d",
+      "after": "55bcbd46ff0561cc6aa70f6f574fecd5456fc9818f1c8e0a2182e885589a3d29",
       "afterMode": "100644",
-      "review": "Updates measured Earth collider/source-geometry ceilings for restored building coverage with baseline evidence. Independent frame-time, coverage and retention checks remain mandatory."
+      "review": "Evidence-backed named Baltimore collider baseline for authored quay/venue fixtures and repaired approaches. No runtime or save protocol change; timing, coverage and retention gates remain unchanged."
     },
     "config/system-release-gates.json": {
-      "before": "d5184bd18f6b116f90c94820c9b6581750722fdb82217ad44fb0d5a5f752fbae",
+      "before": "402e6179f17fd0437b21e91ff8cc796f10cdbdf88e6fcc70ff091616ed8202f2",
       "beforeMode": "100644",
-      "after": "8efad235367604ca8e8ad03ddb9affeb8eb68ab87a3f47b5c42671954941d088",
+      "after": "a1e5312f2f34cb5d82694c1e75ff81c899851e36ddcfd046fbb3c426d3c12fdb",
       "afterMode": "100644",
-      "review": "Adds the actual packaged city-switch preservation gate and its Earth-compilation assertion. Existing release gate commands, limits and approval requirements remain unchanged. This release configuration has no client persistence or backend protocol behavior. Follow-up review: 5.5 target version; previous reviewed gate additions and existing acceptance requirements retained. Follow-up review: Adds the regional scenery arrival, retirement, provider failure and settings regression to the full candidate matrix; existing gates retained."
-    },
-    "docs/system-review/2026-10-06/inventory-summary.json": {
-      "before": null,
-      "beforeMode": null,
-      "after": "cc545151be841117aa19e073cb19a75c66686f6841197eb4b34e56f2fa1add56",
-      "afterMode": "100644",
-      "review": "Audit metadata classified fail-closed as runtime by fingerprint tool; not shipped or imported by gameplay. Contains source inventory counts, not player data."
-    },
-    "functions/geospatial.js": {
-      "before": "73cc09c9669ba6d9666a6c399e0e5500087b110aadbcd2c4e966ba87aa57a983",
-      "beforeMode": "100644",
-      "after": "c4ae45df5e73a404148d2eb7966bd35c15dc147bb45a65e2479687acced797c9",
-      "afterMode": "100644",
-      "review": "IPv4 upstream is bounded through DNS/connect/body by one9second deadline and UTF8 byte cap, with settle-once completion and aborted-body rejection. Existing aircraft JSON contract, authorization and cache schema remain unchanged."
-    },
-    "functions/package-lock.json": {
-      "before": "0c3add62f22c741bdccb438c7b15fea4619549c286b73518e28b607df186f9e2",
-      "beforeMode": "100644",
-      "after": "361e666b1a0f449fc19a9827749eb4a8ad35357e74719a5be4de2655f8176ab5",
-      "afterMode": "100644",
-      "review": "Sharp/native/libvips patch plus proxy-addr 2.0.8 trust-subnet correction; no unrelated packages changed. Capture decoder and backend authorization checks verify compatibility."
-    },
-    "functions/package.json": {
-      "before": "073161fa367108603dbee47e9a99ef4fd46b3421afdf9d49a8ef00e06a744f4c",
-      "beforeMode": "100644",
-      "after": "4794b4d8338b23455ec6d56f51b8afd1ed45de71f9bb9f79fe250dd88fa624f2",
-      "afterMode": "100644",
-      "review": "Pins sharp 0.35.5 for the upstream librsvg security patch; photo admission rules, saved schemas and HTTP contracts unchanged."
-    },
-    "github-pages/index.html": {
-      "before": "b8b3fe53410032da5665abafaca6841fea2d7a3a45ff262df8f1b3a3877a11fe",
-      "beforeMode": "100644",
-      "after": "5cb2a3f639d36e71f2d746c0ef05eaa6751dc395da2d183d9d2f2bfc116e9e30",
-      "afterMode": "100644",
-      "review": "Public project presentation and screenshots; no application state or backend access."
-    },
-    "github-pages/styles.css": {
-      "before": "4a64677942389580950c247e263cfcd9f48c9a8fa092fcfc67e202ab07348813",
-      "beforeMode": "100644",
-      "after": "8bce66552ffb6b59692ad84f4513dda25205ff36af0f5cbe07f91b6e566ab599",
-      "afterMode": "100644",
-      "review": "Public gallery background image reference only; no player state or runtime command changes."
-    },
-    "package-lock.json": {
-      "before": "5e574f939a5aa4443301b32b0edd7f854ae4c3dea6c50002037caee06eb9531c",
-      "beforeMode": "100644",
-      "after": "72be3152746aa26e945253a3f57220c6b944ca97aa96a395cd6901f551356a69",
-      "afterMode": "100644",
-      "review": "Only the product and root package version change to 5.5.0; dependencies and integrity unchanged. Follow-up review: Product version 5.5.0 plus sharp 0.35.5 and its matching native/libvips packages; no unrelated dependency changes. Build-time image decoding patch, no save format."
-    },
-    "package.json": {
-      "before": "75010bfd649267cc55e8ad5509e964f07bc481352df4c0c9f07a18d172011a14",
-      "beforeMode": "100644",
-      "after": "fd5c0b021725ed994b21179c0bbaf7f54cf24bb197ef9ca6f2752b32561a554e",
-      "afterMode": "100644",
-      "review": "Product version advances to compatible minor 5.5.0; existing runtime dependencies and save protocols retained. Follow-up review: Adds the regional scenery verification command; package remains compatible version 5.5.0 and no runtime dependency or player schema changes."
-    },
-    "scripts/hosting-artifact.mjs": {
-      "before": "1ebfedce6aac9d44fe62d9496c1d48063669a948ee35de4642ee717d9f0fae20",
-      "beforeMode": "100644",
-      "after": "b45de06389f89c7c0b665c68c8f31e21ceada5aebefb6a5de5ae2a5133d72d0a",
-      "afterMode": "100644",
-      "review": "Adds the regional worker entry and its bundled URL to the immutable artifact. Environment config, existing save modules and backend bytes unchanged. Follow-up review: Preserves startup-critical script markers in the immutable package and verifies the expected source script layout. Artifact build only."
+      "review": "Extends only the complete performance process deadline from 40 to 60 minutes to accommodate 930 seconds of movement, twelve full reloads and mobile checks. Individual timing, coverage, retention and loading criteria are unchanged. Verification scheduling only; no runtime, backend or save format change."
     },
     "scripts/lib/release-source-identity.mjs": {
-      "before": "67b6e623f66d0ea7142c8ff1cc527c4b380940265fd6185a15cd8a37b59f7422",
+      "before": "3de2e2e30623636cab980650309d7a5b8f122409b854f00dae53ea12b6318570",
       "beforeMode": "100644",
-      "after": "3de2e2e30623636cab980650309d7a5b8f122409b854f00dae53ea12b6318570",
+      "after": "e028a8041bad4d71be76a3ad5d0601da38b283589a9ee886191a62246f443887",
       "afterMode": "100644",
-      "review": "Release source checks disable stale Git filesystem caches per invocation; no player runtime or save format change."
+      "review": "Release verification only: read-only Git invocations disable optional index refresh locks and preloadIndex to avoid filesystem contention. Strict dirty/untracked/commit identity comparisons and the original 10-second timeout remain. This helper does not ship in the browser or alter saved data, runtime schemas or service protocols. It is conservatively included because unknown script inputs are classified as runtime."
+    },
+    "app/js/world/compiler/street-frontage-corners.js": {
+      "before": "12c67ad55a139b2e0feb677b95ac8027e963d67c0499d930a936ba35feb41714",
+      "beforeMode": "100644",
+      "after": "b9e9259f112a1e84c7c089bdb5cc6b76c908e0080ee78022e795218a553a1013",
+      "afterMode": "100644",
+      "review": "Precomputes exterior polygon bounds before the unchanged even/odd containment test. Focused equivalence tests preserve concavity, holes, boundaries, translated coordinates and actual corner geometry. No save, backend, road or contact changes."
+    },
+    "scripts/release-finalize.mjs": {
+      "before": "5e41a039564523fdf1fcdd0f2201556a016eb592050097bcb91b534c8c670bc3",
+      "beforeMode": "100644",
+      "after": "6b42c75d0ed97b6b6f7ebeab9d680974d6983774bc803f976ce7bc0b48539239",
+      "afterMode": "100644",
+      "review": "Adds owner-requested explicit targeted admission using a source/artifact/evidence-bound review. Preserves original full-matrix path, reviewed images, production identity and exact staging promotion. No game runtime or persistence changes."
+    },
+    "scripts/prepare-production-artifact.mjs": {
+      "before": "071dc4b24adc1d3fd9eb3a259938cb8fabf0fb3ffb2ee048564531b6ff474667",
+      "beforeMode": "100644",
+      "after": "c89736f7e6c0ab3241bd1e13e810f62badb2a55ad9801041dc017a3ac7c9cf28",
+      "afterMode": "100644",
+      "review": "Accepts the same explicit targeted review before configuration-only promotion. Complete package and non-environment asset equivalence still required. No game runtime or persistence changes."
     }
   }
 }

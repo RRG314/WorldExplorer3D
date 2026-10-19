@@ -6,7 +6,7 @@ import { createStreetFrontagePolicy, streetScale, streetSideEdge, FRONTAGE_RULES
 // Retain building references in spatial buckets, not a duplicate city mesh.
 export function createStreetFrontageGrading(buildings = [], metersPerWorldUnit = 1, roads = []) {
   const scale = streetScale(metersPerWorldUnit);
-  const policy = createStreetFrontagePolicy(buildings, scale);
+  const policy = createStreetFrontagePolicy(buildings, scale, {retainEdges:false});
   const barriers=createStreetCarriagewayBarriers(roads);
   const cache=new Map();
   let sampleCount=0;

@@ -13,7 +13,18 @@ export function canPublishTunnelGeometry(feature) {
 }
 
 export function tunnelClearance(semantics = {}) {
+  // Parking aisles carry passenger vehicles, not the full-size road envelope.
+  // Keep a conservative walkable enclosure when no measured headroom exists.
+  // Cut depth describes burial and must not enlarge this vehicle clearance.
+  if (semantics.parkingAccess === true) return 3.2;
   return Math.max(3.2, Math.min(5.2, (Number(semantics.cutDepth) || 4.6) - 0.25));
+}
+
+export function tunnelRoofHalfWidth(width) {
+  // Match the published shell/portal and collider outside face exactly:
+  // carriageway half-width, 2 cm lining offset, then the 35 cm outer rim.
+  // The old extra 95 cm swept adjacent buildings into the tunnel ceiling.
+  return Math.max(3.4, Number(width) || 6) * .5 + .02 + Math.max(.35, TUNNEL_ROOF_THICKNESS);
 }
 
 export function tunnelMinimumDepth(semantics = {}) {
@@ -26,4 +37,13 @@ export function tunnelCeilingHeight(clearance, halfWidth, lateralDistance) {
   const t = Math.min(1, Math.max(0, Math.abs(lateralDistance) / halfWidth));
   const factor = t <= 0.76 ? 1 - t / 0.76 * 0.16 : 0.84 - (t - 0.76) / 0.24 * 0.28;
   return clearance * factor;
+}
+
+// Pure bound query shared by surface compilation and obstruction consumers.
+export function tunnelObstructionMaximumY(limits, distance) {
+  let ceiling = Infinity;
+  for (const limit of limits || []) {
+    if (distance >= limit.start - 1e-5 && distance <= limit.end + 1e-5) ceiling = Math.min(ceiling, limit.maximumSurfaceY);
+  }
+  return ceiling;
 }

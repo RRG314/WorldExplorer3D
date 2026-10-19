@@ -18,7 +18,8 @@ function memoryStorage() {
   const values = new Map();
   return {
     getItem(key) { return values.has(key) ? values.get(key) : null; },
-    setItem(key, value) { values.set(key, String(value)); }
+    setItem(key, value) { values.set(key, String(value)); },
+    removeItem(key) { values.delete(key); }
   };
 }
 
@@ -147,13 +148,14 @@ test('signed-in commerce reads and writes the shared Explorer Wallet authority',
   const inventory = createEquipmentInventory();
   let credits = STARTING_EXPLORER_CREDITS;
   const authority = {
+    uid: 'fixture-account',
     snapshot: () => ({ authority: 'explorer-wallet-v2', credits, pending: false, revision: 1 }),
     async transact(action, selectedStore, catalogId, fields) {
       assert.equal(fields.dayKey, '2026-08-27');
       const item = stockForStore(selectedStore, '2026-08-27').standard.find((entry) => entry.id === catalogId);
       const amount = action === 'buy' ? item.buyPrice : item.sellPrice;
       credits += action === 'buy' ? -amount : amount;
-      return { accepted: true, action, requestId: `${action}-receipt`, itemId: `wallet:${catalogId}`, credits, storePurchased: 1 };
+      return { accepted: true, action, requestId: fields.requestId, itemId: `wallet:${catalogId}`, itemQuantity: action === 'buy' ? 1 : 0, credits, storePurchased: 1 };
     },
     async settle(receipt, outcome) {
       return { ...receipt, credits, settlementStatus: outcome === 'applied' ? 'complete' : 'compensated' };
@@ -181,6 +183,7 @@ test('veterinary service uses the same connected wallet transaction path', async
     tags: { amenity: 'veterinary' }
   }]);
   const authority = {
+    uid: 'fixture-account',
     snapshot: () => ({ authority: 'explorer-wallet-v2', credits, pending: false, revision: 1 }),
     async transact(action, selectedStore, catalogId, fields) {
       assert.equal(action, 'service');
@@ -188,7 +191,7 @@ test('veterinary service uses the same connected wallet transaction path', async
       assert.equal(catalogId, 'companion-wellness');
       assert.equal(fields.dayKey, '2026-08-27');
       credits -= 180;
-      return { accepted: true, action, requestId: 'service-receipt', credits, settlementStatus: 'effect_pending' };
+      return { accepted: true, action, requestId: fields.requestId, credits, settlementStatus: 'effect_pending' };
     },
     async settle(receipt, outcome) {
       return { ...receipt, credits, settlementStatus: outcome === 'applied' ? 'complete' : 'compensated' };

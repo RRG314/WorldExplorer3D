@@ -4,6 +4,7 @@ import {isSurfacePublicationError,finishFailedSurfaceLoad} from './surface-publi
 import {finishFailedWorldLoad} from './load-failure.js';
 import { createLinearFeatureRuntime } from "./load-linear-runtime.js?v=11";
 import { createWorldLandusePass } from "./load-landuse-pass.js?v=40";
+import {publishEngineeredWaterfront} from './engineered-waterfront.js';
 import { createWorldRoadLoaderSupport } from "./load-roads-support.js?v=9";
 import { findNearestBoatCandidate, isPointInsideWaterFootprint } from "../boat-mode/water-query.js?v=21";
 import {
@@ -130,6 +131,9 @@ export function createWorldRoadLoader(deps = {}) {
     worldBaseTerrainY,
     worldLinePointsFromLonLat
   } = deps;
+  // Facilities outlive the load. Create their callback in the loader's stable
+  // scope, so it cannot retain the per-load source/node compilation context.
+  const sampleFacilityGround = (x, z) => appCtx.elevationWorldYAtWorldXZ?.(x, z);
   const cancellationSlot = createWorldLoadCancellationSlot();
   const classifyLinearFeatureTags = (tags = {}, options = {}) => {
     const classification = classifyLinearFeatureTagsBase(tags, {
@@ -745,7 +749,7 @@ export function createWorldRoadLoader(deps = {}) {
           Number(globalThis.navigator?.maxTouchPoints || 0) > 0;
         appCtx.transportFacilityVisual = createTransportFacilityVisuals(globalThis.THREE, transportFacilityGraph, {
           appCtx,
-          sampleGround: (x, z) => appCtx.elevationWorldYAtWorldXZ?.(x, z),
+          sampleGround: sampleFacilityGround,
           location: worldSession?.request?.selection || appCtx.resolveLocationSelection?.() || appCtx.LOC,
           mobile: mobileTransportClient
         });
@@ -899,6 +903,7 @@ export function createWorldRoadLoader(deps = {}) {
           waterwayWays: normalizedSelection.waterwayWays,
           worldSurfaceProfile
         });
+        loadMetrics.engineeredWaterfront=publishEngineeredWaterfront(appCtx);
         buildImmediateLinearFeatureDataPass({
           cyclewayWays: normalizedSelection.cyclewayWays,
           endLoadPhase,

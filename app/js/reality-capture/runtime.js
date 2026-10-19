@@ -7,6 +7,7 @@ import { setBuildingPresentationSuppressed } from '../editable-world/runtime.js?
 import { runtimePublicationState } from './runtime-contract.js?v=2';
 import { applyCaptureAlignment, photoWallVerticalScale } from './alignment.js?v=1';
 import { createNearbyCaptureRefresh } from './nearby-refresh.js?v=1';
+import {yieldToMainThread,yieldToWorldFrame} from '../world/cooperative-scheduling.js?v=1';
 
 const MAX_RUNTIME_VERTICES = 1_500_000;
 const instances = new Map();
@@ -162,7 +163,13 @@ export async function refreshCommunityRealityCapturePresentation(appCtx) {
     }
     const actor=appCtx.activeTransportActor?.()?.position||appCtx.Walk?.state?.walker||appCtx.car||{x:0,z:0};
     const selectionStarted=performance.now();
-    const selection=captureSelector.select(appCtx.buildings || [],actor,appCtx._worldLoadSequence);
+    const buildings=appCtx.buildings || [];
+    const buildingCount=buildings.length;
+    const selection=await captureSelector.selectCooperatively(buildings,actor,sequence,60,{
+      budgetMs:2,
+      current:()=>serial===refreshSerial&&sequence===appCtx._worldLoadSequence&&buildings===appCtx.buildings&&buildingCount===buildings.length,
+      yieldWork:()=>appCtx.gameStarted&&!appCtx.worldLoading?yieldToWorldFrame():yieldToMainThread()
+    });
     const nearby=selection.ids;
     appCtx.captureNearbySelection={durationMs:performance.now()-selectionStarted,
       buildings:appCtx.buildings?.length || 0,selected:nearby.length,...selection.stats};

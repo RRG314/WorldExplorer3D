@@ -4,6 +4,43 @@ import {readFileSync} from 'node:fs';
 import {createRoadContactIndex,createRoadContactIndexCooperatively} from '../app/js/terrain/road-contact-index.js';
 import {indexPavementPositions,indexPavementPositionsCooperatively} from '../app/js/world/pavement-indexed-mesh.js';
 import {publishLinearFeaturePresentation,publishLinearFeaturePresentationCooperatively} from '../app/js/world/linear-feature-presentation.js';
+import * as THREE from 'three';
+import {buildFeatureRibbonEdges} from '../app/js/structure-semantics.js?v=63';
+
+test('one long mapped feature yields between clipped paths and preserves its full mesh',async t=>{
+ const prior=globalThis.THREE;globalThis.THREE=THREE;t.after(()=>{globalThis.THREE=prior;});
+ const context=()=>({scene:new THREE.Scene(),linearFeatureMeshes:[],addEarthWorldObject(mesh){this.scene.add(mesh);}});
+ const feature={kind:'footway',subtype:'sidewalk',width:2,surfaceBias:.08,structureSemantics:{terrainMode:'at_grade'},
+  pts:Array.from({length:4001},(_,i)=>({x:i*3,z:Math.sin(i/10)*2}))};
+ const options={features:[feature],pavementBounds:{minX:10,maxX:30,minZ:-5,maxZ:5},worldBaseTerrainY:x=>x*.001,buildFeatureRibbonEdges};
+ const sync=context(),scheduled=context();
+ publishLinearFeaturePresentation({...options,appCtx:sync});
+ let paths=0,slicePaths=0,maximumPaths=0;
+ await publishLinearFeaturePresentationCooperatively({...options,appCtx:scheduled,buildFeatureRibbonEdges:(...args)=>{
+  paths++;slicePaths++;return buildFeatureRibbonEdges(...args);
+ }},{budgetMs:0,yieldWork:async()=>{maximumPaths=Math.max(maximumPaths,slicePaths);slicePaths=0;}});
+ assert.ok(paths>3900,'the entire mapped feature stays present');
+ assert.equal(maximumPaths,1,'a single feature cannot monopolize an entire construction slice');
+ assert.equal(scheduled.linearFeatureMeshes.length,sync.linearFeatureMeshes.length);
+ for(let i=0;i<sync.linearFeatureMeshes.length;i++){
+  const a=sync.linearFeatureMeshes[i].geometry,b=scheduled.linearFeatureMeshes[i].geometry;
+  assert.deepEqual(b.index.array,a.index.array);
+  for(const key of ['position','normal','uv'])assert.deepEqual(b.attributes[key].array,a.attributes[key].array);
+ }
+ for(const ctx of [sync,scheduled])for(const mesh of ctx.linearFeatureMeshes){mesh.geometry.dispose();mesh.material.dispose();}
+});
+
+test('a superseded long mapped feature stops between paths without publishing partial geometry',async t=>{
+ const prior=globalThis.THREE;globalThis.THREE=THREE;t.after(()=>{globalThis.THREE=prior;});
+ const ctx={scene:new THREE.Scene(),linearFeatureMeshes:[],addEarthWorldObject(mesh){this.scene.add(mesh);}};
+ let current=true,paths=0;
+ await assert.rejects(publishLinearFeaturePresentationCooperatively({appCtx:ctx,
+  features:[{kind:'footway',subtype:'sidewalk',width:2,pts:Array.from({length:1000},(_,i)=>({x:i,z:0}))}],
+  pavementBounds:{minX:-20,maxX:-10,minZ:-1,maxZ:1},worldBaseTerrainY:()=>0,
+  buildFeatureRibbonEdges:(...args)=>{paths++;return buildFeatureRibbonEdges(...args);}
+ },{budgetMs:0,current:()=>current,yieldWork:async()=>{if(paths)current=false;}}),/superseded/);
+ assert.equal(paths,1);assert.equal(ctx.linearFeatureMeshes.length,0);assert.equal(ctx.scene.children.length,0);
+});
 
 for(const city of ['monaco','sf'])test(`${city}: scheduled indexing preserves captured geometry and contact`,async()=>{
  const capture=JSON.parse(readFileSync(new URL(`../docs/streets/audit-2026-09-13/${city}-unioned-roads-surfaces.json`,import.meta.url)));

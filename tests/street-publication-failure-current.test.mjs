@@ -8,6 +8,25 @@ globalThis.THREE={Vector3:class {}};
 const {finalizeLoadedWorld}=await import('../app/js/world/load-support.js');
 if(previousThree===undefined)delete globalThis.THREE;else globalThis.THREE=previousThree;
 import {SurfacePublicationError,isSurfacePublicationError,finishFailedSurfaceLoad} from '../app/js/world/surface-publication-error.js';
+import {waitForFixedRegionalGround} from '../app/js/world/fixed-regional-context.js';
+
+test('regional terrain failure cannot fall through to a larger map query',async()=>{
+ const cause=new Error('Terrain source did not become ready'),phases=[];
+ await assert.rejects(waitForFixedRegionalGround({fixedRegionalContextRadiusWorld:14000,
+   waitForFarTerrainClipmap:async()=>{throw cause;}},{},()=>phases.push('start'),()=>phases.push('end')),
+   error=>isSurfacePublicationError(error)&&error.cause===cause&&error.stage==='regional-terrain');
+ assert.deepEqual(phases,['start','end']);
+});
+
+test('road compilation cannot begin against a failed near-terrain publication',async t=>{
+ const saved={...ctx};t.after(()=>{for(const key of Object.keys(ctx))delete ctx[key];Object.assign(ctx,saved);});
+ let compiled=false,spawned=false;
+ Object.assign(ctx,{terrainEnabled:true,onMoon:false,roads:[{}],publishLocationTerrain:()=>true,
+   waitForLocationTerrainPublication:async()=>{throw Error('missing near tile');},
+   publishCompiledTransportMeshes:async()=>{compiled=true;}});
+ await assert.rejects(finalizeLoadedWorld({spawnPlayer:()=>{spawned=true;}}),error=>isSurfacePublicationError(error)&&error.stage==='terrain');
+ assert.equal(compiled,false);assert.equal(spawned,false);
+});
 
 test('a failed road publication never marks a partial world playable',async t=>{
   const saved={...ctx};t.after(()=>{for(const key of Object.keys(ctx))delete ctx[key];Object.assign(ctx,saved);});

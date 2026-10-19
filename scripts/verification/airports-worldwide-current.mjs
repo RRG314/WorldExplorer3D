@@ -1,3 +1,4 @@
+import {afterWorldLoad} from './complete-world-readiness.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import { chromium } from 'playwright';
@@ -74,11 +75,11 @@ try {
       await searchResult.waitFor({ state: 'visible', timeout: 30_000 });
       await searchResult.click();
       await page.locator('#globeSelectorStartBtn').click();
-      await page.waitForFunction(() => {
+      await page.waitForFunction(afterWorldLoad(() => {
         const diagnostics = globalThis.getWorldExplorerRuntimeDiagnostics?.();
         return diagnostics?.gameStarted && !diagnostics.worldLoading &&
           diagnostics?.worldLoad?.status === 'ready';
-      }, null, { timeout: 180_000 });
+      }), null, { timeout: 180_000 });
       const later = page.getByRole('button', { name: 'Later', exact: true }).first();
       if (await later.isVisible().catch(() => false)) await later.click();
 

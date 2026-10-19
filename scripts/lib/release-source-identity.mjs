@@ -5,8 +5,11 @@ import { sourceFingerprint } from '../verification/source-fingerprint.mjs';
 // A missing repository or failed status command must never imply clean source.
 export function readReleaseSourceIdentity(root = process.cwd()) {
   const git = (args) => execFileSync('git', ['-c','core.fsmonitor=false','-c','core.untrackedCache=false',
-    '-c','core.ignoreStat=false','-c','core.trustctime=true',...args], {
+    '-c','core.preloadIndex=false','-c','core.ignoreStat=false','-c','core.trustctime=true',...args], {
     cwd: root, encoding: 'utf8', timeout: 10000,
+    // Identity verification must not contend for an optional index refresh
+    // lock or mutate the checkout it is measuring.
+    env: { ...process.env, GIT_OPTIONAL_LOCKS: '0' },
     stdio: ['ignore', 'pipe', 'pipe']
   }).trim();
   try {

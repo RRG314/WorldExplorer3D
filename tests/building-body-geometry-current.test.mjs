@@ -36,3 +36,21 @@ test('private body storage retires once without mutating mapped footprint data',
  body.dispose();assert.equal(releaseRetiredBuildingCpuBuffers(body),size);assert.equal(releaseRetiredBuildingCpuBuffers(body),0);assert.deepEqual(points,snapshot);
  assert.throws(()=>createBuildingBodyGeometry(THREE,points,NaN));assert.throws(()=>createBuildingBodyGeometry(THREE,[{x:NaN,z:0},...points],10));
 });
+
+test('packed building attributes stay independent through editing, cloning and retirement',()=>{
+ const points=[{x:0,z:0},{x:9,z:0},{x:9,z:7},{x:0,z:7}];
+ const body=createBuildingBodyGeometry(THREE,points,12);
+ attachBuildingFacadeLayout(body,{levels:3});
+ const attributes=Object.values(body.attributes);
+ assert.equal(new Set(attributes.map(a=>a.array.buffer)).size,2,'body and facade each own one native backing store');
+ const before=Object.fromEntries(Object.entries(body.attributes).map(([name,a])=>[name,Array.from(a.array)]));
+ body.attributes.position.setX(0,123);
+ body.attributes.facadeLayout.setX(0,456);
+ for(const name of ['normal','uv','facadeOpening'])assert.deepEqual(Array.from(body.attributes[name].array),before[name],name);
+ const copy=body.clone();
+ const snapshot=Object.fromEntries(Object.entries(copy.attributes).map(([name,a])=>[name,Array.from(a.array)]));
+ body.dispose();releaseRetiredBuildingCpuBuffers(body);
+ assert.ok(attributes.every(a=>a.array.byteLength===0));
+ for(const [name,a] of Object.entries(copy.attributes))assert.deepEqual(Array.from(a.array),snapshot[name],name+' clone survives source retirement');
+ copy.dispose();
+});

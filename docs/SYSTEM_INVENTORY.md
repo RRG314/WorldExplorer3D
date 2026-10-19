@@ -1,8 +1,10 @@
 # World Explorer 3D System Inventory
 
+> Historical September 2026 snapshot. For the October 13 source audit, current boundaries and verification limits, see [architecture consolidation](architecture-consolidation/SYSTEM-INVENTORY.md). Dated findings below are retained as evidence and are not a current blocker list.
+
 Updated September 10, 2026 · Version 5.2.0 · Source baseline `53452516c16eb93ae7828a642156d24528a88ca9`.
 
-This is the current system inventory. It replaces the dated patch-note sequence formerly at the top of this document. Historical implementation records remain in Git and the linked specialist documents. A capability listed here exists in the inspected source; it is not automatically certified on every device or deployed to production.
+This is the September 10 system inventory. It replaces the dated patch-note sequence formerly at the top of this document. Historical implementation records remain in Git and the linked specialist documents. A capability listed here exists in the inspected source; it is not automatically certified on every device or deployed to production.
 
 [Project description](PROJECT_DESCRIPTION.md) · [Architecture](ARCHITECTURE_MAP.md) · [Complete source reference](SYSTEM_INVENTORY_REFERENCE.md) · [Audit findings](audits/2026-09-10/README.md) · [Test evidence](audits/2026-09-10/tests-and-evidence.md) · [Repair plan](audits/2026-09-10/repair-plan.md)
 

@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import {deployResearchSubmarineFromDeck} from './marine-entry-ui.mjs';
+import {runPrescribedGameActions} from './prescribed-game-actions.mjs';
 import {mkdir,writeFile} from 'node:fs/promises';
 import {chromium} from 'playwright';
 import {startStaticServer} from './static-server.mjs';
@@ -7,7 +8,7 @@ import {configureStagingAppCheck} from './staging-app-check.mjs';
 import {closeOwnedBrowser} from './owned-browser.mjs';
 const out=process.env.WE3D_VERIFY_OUTPUT_DIR||'output/verification/marine-connected';
 await mkdir(out,{recursive:true});
-const report={scope:'Actual source UI/renderers, deck and swim physics; controlled GEBCO entry sample, real local voyage storage',errors:[],cases:[]};
+const report={scope:'Actual selected artifact UI/renderers, deck and swim physics; controlled GEBCO entry sample, real local voyage storage',packageRoot:process.env.WE3D_VERIFY_ROOT||null,errors:[],warnings:[],cases:[]};
 const server=await startStaticServer({rootDir:process.env.WE3D_VERIFY_ROOT||process.cwd(),ports:[4558]});let owned,page;
 try{
  owned=await chromium.launchServer({headless:false,channel:'chrome'});
@@ -15,8 +16,10 @@ try{
  await configureStagingAppCheck(page,`http://127.0.0.1:${server.port}`);
  await page.route('https://wms.gebco.net/**',route=>route.fulfill({status:200,contentType:'text/plain',body:"value_list = '-80'"}));
  page.on('pageerror',e=>report.errors.push(e.message));
+ page.on('console',m=>{if(['warning','error'].includes(m.type())&&report.warnings.length<40)report.warnings.push(m.text().slice(0,400));});
  await page.goto(`http://127.0.0.1:${server.port}/app/?launch=earth&loc=custom&lat=-18.2861&lon=147.7&lname=Coral%20Shelf&diagnostics=1`);
  await page.waitForFunction(()=>globalThis.__WE3D_RUNTIME_READY__,null,{timeout:90000});
+ await page.waitForSelector('#globeSelectorScreen.show',{timeout:30000});
  await page.evaluate(async()=>{globalThis.marineCtx=(await import('/app/js/shared-context.js?v=55')).ctx;});
  await page.evaluate(()=>{globalThis.marineOceanStarts=0;const start=marineCtx.startOceanMode;marineCtx.startOceanMode=(...args)=>{marineOceanStarts++;return start(...args);};});
  if(await page.locator('#analyticsConsentDenyBtn').isVisible())await page.locator('#analyticsConsentDenyBtn').click();
@@ -56,6 +59,7 @@ try{
  report.phoneExplorer=await page.evaluate(()=>{const m=marineCtx.oceanMode,p=m.diver.snapshot().position,head=new THREE.Vector3(p.x,p.y,p.z).project(m.camera);return {x:(head.x+1)*195,y:(1-head.y)*422};});
  assert.ok(report.phoneExplorer.x>10&&report.phoneExplorer.x<380&&report.phoneExplorer.y>80&&report.phoneExplorer.y<760,'Explorer head remains on-screen');
  assert.ok(report.phoneExplorer.x<report.phone.x||report.phoneExplorer.x>report.phone.x+report.phone.width||report.phoneExplorer.y<report.phone.y||report.phoneExplorer.y>report.phone.y+report.phone.height,'Diver panel covers explorer head');
+ await runPrescribedGameActions(page,out,[{buttons:['up'],frames:12},{buttons:[],frames:4}]);
  await page.getByRole('button',{name:'Recover',exact:true}).click();
  await page.waitForFunction(()=>marineCtx.boatDeck?.active&&!marineCtx.oceanMode.active,null,{timeout:60000});
  assert.equal(await page.locator('#boatWaveDock').isVisible(),false);

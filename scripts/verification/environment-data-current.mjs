@@ -25,7 +25,35 @@ try{
  for(const [kind,lat,lon] of [['weather',39.29,-76.61],['marine',-18.5,147.5]]){
   const response=await fetch(`${base}?kind=${kind}&latitude=${lat}&longitude=${lon}`,{signal:AbortSignal.timeout(55000)});assert.equal(response.status,200,`${kind} HTTP`);const data=await response.json();report.live.push({kind,data});await writeFile(`${out}/report.json`,JSON.stringify(report,null,2));
   if(kind==='weather'){assert.ok(Number.isFinite(data[0]?.current?.temperature_2m));assert.equal(data[0].sourceId,'met-norway');assert.equal(data[0].current.apparent_temperature,null);}
-  else{assert.ok(Number.isFinite(data.current?.wave_height));assert.ok(Number.isFinite(data.current?.ocean_current_velocity));assert.ok(Number.isFinite(data.current?.sea_surface_temperature));assert.ok(['pacioos-ww3','noaa-ww3'].includes(data.sources[0].sourceId));assert.equal(data.sources[1].sourceId,'hycom-espc');}
+  else{
+   // Live models are independent. An empty HYCOM cell must not invalidate
+   // valid wave guidance or be replaced by an invented zero measurement.
+   // Full normalization, units and missing-cell behavior are also exercised
+   // by the deterministic environment-data source contracts.
+   assert.equal(data.sourceId,'public-marine');
+   assert.ok(Array.isArray(data.sources)&&data.sources.length>0);
+   const waves=data.sources.find(source=>['pacioos-ww3','noaa-ww3'].includes(source.sourceId));
+   const currents=data.sources.find(source=>source.sourceId==='hycom-espc');
+   assert.equal(data.sources.length,Number(!!waves)+Number(!!currents),'Unexpected or duplicate model provenance');
+   for(const source of data.sources){
+    assert.ok(Number.isFinite(Date.parse(source.validAt)),'Model needs its actual valid time');
+    assert.ok(Number.isFinite(source.latitude)&&Number.isFinite(source.longitude),'Model needs its actual grid coordinates');
+   }
+   if(waves)assert.ok(Number.isFinite(data.current?.wave_height),'Available wave model must provide a measurement at the open-water fixture');
+   else{
+    assert.ok(data.warnings?.includes('Wave guidance is temporarily unavailable.'));
+    assert.equal(data.current?.wave_height,undefined,'Missing waves must not become a fabricated measurement');
+   }
+   if(currents){
+    assert.ok(Number.isFinite(data.current?.ocean_current_velocity));
+    assert.ok(Number.isFinite(data.current?.sea_surface_temperature));
+   }else{
+    assert.ok(data.warnings?.includes('Current and temperature guidance is temporarily unavailable.'));
+    for(const field of ['ocean_current_velocity','ocean_current_direction','sea_surface_temperature'])assert.equal(data.current?.[field],undefined,'Missing current model must not become a fabricated measurement');
+   }
+   report.liveMarineCoverage={waves:!!waves,currents:!!currents,complete:!!waves&&!!currents};
+  }
  }
- report.passed=true;await writeFile(`${out}/report.json`,JSON.stringify(report,null,2));console.log(JSON.stringify({passed:true,cases:report.cases,live:report.live.map(v=>v.kind)}));
+ report.cases.push('live models retain available guidance and explicitly identify unavailable independent feeds; complete live coverage is recorded separately');
+ report.passed=true;await writeFile(`${out}/report.json`,JSON.stringify(report,null,2));console.log(JSON.stringify({passed:true,cases:report.cases,live:report.live.map(v=>v.kind),liveMarineCoverage:report.liveMarineCoverage}));
 }finally{await db.terminate();}

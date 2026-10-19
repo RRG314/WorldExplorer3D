@@ -1,0 +1,82 @@
+# Desktop frame pacing acceptance — October 14, 2026
+
+The owner explicitly prioritizes fixing jitter and pauses over reaching a perfect
+average frame rate. The previous 43.65 FPS minimum came from an August 23 capture;
+it was neither a current product requirement nor a guarantee of smooth motion.
+Do not use old notes or 5.2 parity as acceptance.
+
+The current desktop floor is **30 FPS**. This is an explicit change in the release
+criterion, not a claim that the former 43.65 FPS requirement passed. Historical
+reference values remain in the configuration and every earlier failed receipt is
+preserved. No drawing resolution, building/road coverage, world detail, simulation
+behavior or physics frequency is reduced by this change.
+
+The existing independent criteria remain unchanged: p95 ≤ 34.36 ms, p99 ≤ 50 ms,
+no individual interval above 250 ms (apart from the existing 0.05 ms rounding
+tolerance), at most one interval above 100 ms per minute, and at least 10 seconds
+between those hitches. The 930-second keyboard route, occupied-world retained
+memory, twelve release/reload cycles, coverage and resource checks remain required.
+Those checks still reject the measured cold-flight pauses. A passing average FPS
+must never substitute for a passing pacing result.
+
+The actual 5.5.1 staging artifact was byte-verified from the released source and
+measured on the same M1 / 8 GiB / Chrome host with the same native-memory harness.
+Short stationary walk/drive windows were 43.33 / 40.22 FPS; moving ground windows
+were 43.06 / 42.46 FPS, with 33.4–33.5 ms p99. Its 90-second flight averaged 53.17 FPS
+but paused for 1049.9 and 883.3 ms. These are bounded diagnostics, not sustained
+baseline certification or permission to accept inherited defects.
+
+The next building-storage source diagnostic has 52.40 FPS flight, 33.4 ms p99,
+and 366.7 / 150 / 299.9 ms pauses. This is an improvement and still a failed hitch
+result. Packaging, prescribed gameplay, complete matrix and source-bound release
+acceptance remain required. Evidence:
+`output/release-review/551-current-host-native-flight/` and
+`output/release-review/561-building-storage-native-flight/`.
+
+## October 18 — interactive presentation and current evidence
+
+The primary physical desktop run now opens a visible Chrome window and brings
+the measured page to the front. The previous runner used headless Chrome on the
+same physical GPU. Both are real browser executions, but only the former checks
+the declared interactive presentation. Receipts identify this presentation;
+headless/profiled checks remain diagnostic evidence, with failures preserved.
+This does not establish that headless rendering caused a particular pause.
+
+On immutable ae6c75a2, the visible comparison loads in 107.6 seconds. Four-minute
+walking covers 577.08 units at 40.63 FPS (one 133.3 ms interval). Four-minute driving
+covers 1,100.43 units at 40.27 FPS (three 133.3–150 ms intervals, at least 86.8
+seconds apart). Both pass the existing pacing limits; coverage remains 49,080
+buildings and 18,951 roads, with no browser/local errors or interruption. The
+image and prescribed input were inspected. This limited comparison is not full
+acceptance: seven mixed routes, actual ground turnover, twelve reloads, occupied
+memory, and mobile regression still have to pass together on the final package.
+
+The earlier headless four-minute walk failed with 266.6/200 ms clustered pauses;
+that receipt remains failed. No sampling exclusions, timing thresholds, feature
+reductions, forced collection during play, or gameplay changes accompany this
+presentation change. Evidence: `output/release-review/561-ae6c75a2-visible-chrome`
+and `output/release-review/561-ae6c75a2-performance`.
+
+## October 19 runner deadline correction
+
+The visible 075a87bb run completed all 930 seconds of sustained traversal and
+eleven reload cycles before its 40-minute process deadline. Its driving cluster
+remains a failure; mobile checks did not run. The suite now has a bounded
+60-minute deadline to allow twelve full reloads and independent mobile checks.
+Per-frame, first-playable, coverage and retention budgets are unchanged.
+
+## October 19 ordinary ground handoff correction
+
+The previous fixture reset the car to the route origin after each walking window.
+This differs from the actual Travel action, which starts driving at the walker,
+and unnecessarily invalidated the freshly accepted street region. The canonical
+suite now observes that action without writing pose/velocity and continues forward
+on the walked route. Both handoffs retain before/after position, generation and
+actor-write receipts. Explicit initial/aircraft fixtures and every timed window,
+sample and budget remain; earlier failed reset runs remain failed.
+
+The source comparison covers four minutes walking (40.43 FPS, maximum 83.3 ms)
+and four minutes driving (47.29 FPS, one 100.1 ms interval). It loads in 103.1 s,
+retains coverage across new streets, and reports no errors or interruption. This
+supports scenario fidelity and does not replace final immutable acceptance.
+Evidence: `output/release-review/561-compact-land-ordinary-handoff`.

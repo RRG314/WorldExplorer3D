@@ -1,94 +1,49 @@
-export function cancelTerrainTileRequest(cache, z, x, y) {
-  const key = `${z}/${x}/${y}`;
-  const tile = cache?.get?.(key);
-  if (!tile || !tile.loading) return false;
-  cache.delete(key);
-  tile.evicted = true;
-  clearTimeout(tile.attemptTimer);tile.attemptTimer=null;
-  tile.loading = false;
-  tile.polarAbort?.abort();
-  if (tile.img) {
-    tile.img.onload = null;
-    tile.img.onerror = null;
-    tile.img.src = '';
-  }
-  tile.img = null;
-  tile.resolveReady?.(false);
-  tile.resolveReady = null;
-  return true;
-}
+const TIMED_OUT = Symbol('terrain-wait-timeout');
+const ABORTED = Symbol('terrain-wait-aborted');
 
-function delayUntil(ms, signal) {
-  if (ms <= 0) return Promise.resolve(true);
+// The cache owns the shared image request and its deadline. A consumer owns
+// only this subscription, including its timer and abort listener.
+function waitForSettlement(ready, timeoutMs, signal) {
   return new Promise((resolve) => {
-    const timeoutId = setTimeout(() => {
-      signal?.removeEventListener?.('abort', abort);
-      resolve(true);
-    }, ms);
-    const abort = () => {
-      clearTimeout(timeoutId);
-      signal?.removeEventListener?.('abort', abort);
-      resolve(false);
+    let settled = false;
+    let timer = null;
+    const finish = (result) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      signal?.removeEventListener('abort', abort);
+      resolve(result);
     };
-    signal?.addEventListener?.('abort', abort, { once: true });
+    const abort = () => finish(ABORTED);
+    if (signal?.aborted) { finish(ABORTED); return; }
+    signal?.addEventListener('abort', abort, { once: true });
+    timer = setTimeout(() => finish(TIMED_OUT), Math.max(0, timeoutMs));
+    ready?.then(finish, () => finish(false));
   });
 }
 
 export async function waitForTerrainTileRequest(options = {}) {
   const {
     z, x, y, deadline, deps, signal, isActive = () => true,
-    getOrLoadTerrainTile, failTerrainTileAttempt, terrainNow,
-    cancelTile, maxAttempts, attemptTimeoutMs
+    getOrLoadTerrainTile, terrainNow, maxAttempts
   } = options;
   while (terrainNow() < deadline) {
-    if (!isActive()) return false;
-    if (signal?.aborted) {
-      cancelTile(z, x, y);
-      return false;
-    }
+    if (!isActive() || signal?.aborted) return false;
     const tile = getOrLoadTerrainTile(z, x, y, deps);
     if (tile.loaded) return isActive();
     if (tile.failed) {
       if (tile.attempts >= maxAttempts) return false;
       const delay = Math.min(Math.max(0, tile.nextRetryAt - terrainNow()), deadline - terrainNow());
-      if (!await delayUntil(delay, signal)) {
-        if (isActive()) cancelTile(z, x, y);
-        return false;
-      }
+      if (await waitForSettlement(null, delay, signal) === ABORTED) return false;
       continue;
     }
     if (!(tile.ready instanceof Promise)) return false;
-    const remaining = Math.max(0, deadline - terrainNow());
-    const attemptTimeout = Math.min(attemptTimeoutMs, remaining);
-    const timedOut = Symbol('terrain-timeout');
-    const aborted = Symbol('terrain-aborted');
-    let abortListener = null;
-    const abortPromise = signal
-      ? new Promise((resolve) => {
-          abortListener = () => resolve(aborted);
-          signal.addEventListener('abort', abortListener, { once: true });
-        })
-      : new Promise(() => {});
-    const result = await Promise.race([
-      tile.ready,
-      delayUntil(attemptTimeout).then(() => timedOut),
-      abortPromise
-    ]);
-    if (abortListener) signal.removeEventListener('abort', abortListener);
-    if (!isActive()) return false;
+    const result = await waitForSettlement(tile.ready, deadline - terrainNow(), signal);
+    if (!isActive() || signal?.aborted) return false;
     if (result === true) return true;
-    if (result === aborted) {
-      cancelTile(z, x, y);
-      return false;
-    }
-    if (result === timedOut) {
-      if (tile.img) {
-        tile.img.onload = null;
-        tile.img.onerror = null;
-        tile.img.src = '';
-      }
-      failTerrainTileAttempt(tile, `terrain tile request timed out after ${Math.round(attemptTimeout)}ms`);
-    }
+    if (result === ABORTED || result === TIMED_OUT) return false;
+    // Only a source failure can consume an attempt. getOrLoadTerrainTile owns
+    // retry admission/backoff; all consumers observe that same bounded state.
   }
   return false;
 }

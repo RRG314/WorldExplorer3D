@@ -1,3 +1,5 @@
+import {afterWorldLoad} from './complete-world-readiness.mjs';
+import {browserEmulatorSettings} from './backend-environment.mjs';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import fs from 'node:fs/promises';
@@ -35,14 +37,12 @@ async function createPlayer(label, viewport) {
     body: ''
   }));
   await context.route(/https:\/\/server\.arcgisonline\.com\//, (route) => route.fulfill({ status: 204, body: '' }));
-  await context.addInitScript(({ functionsOrigin, firebaseConfig }) => {
+  await context.addInitScript(({ functionsOrigin, firebaseConfig, emulators }) => {
     globalThis.WORLD_EXPLORER_FIREBASE = Object.freeze({ ...firebaseConfig });
     globalThis.WORLD_EXPLORER_FIREBASE_ENV = 'staging';
-    globalThis.WORLD_EXPLORER_FIREBASE_EMULATORS = Object.freeze({
-      enabled: true, host: '127.0.0.1', authPort: 9099, firestorePort: 8080
-    });
+    globalThis.WORLD_EXPLORER_FIREBASE_EMULATORS = Object.freeze(emulators);
     globalThis.WORLD_EXPLORER_FUNCTIONS_ORIGIN = functionsOrigin;
-  }, { functionsOrigin, firebaseConfig });
+  }, { functionsOrigin, firebaseConfig, emulators:browserEmulatorSettings() });
   const pendingParcelRoutes = new Set();
   let holdParcelRefresh = false;
   if (!useRealWorld) await context.route('https://mdgeodata.md.gov/imap/**', async route => {
@@ -109,10 +109,10 @@ async function createPlayer(label, viewport) {
   }, { label, email: `${label.toLowerCase().replace(/\s+/g, '-')}-${runId}@example.test` });
   if (useRealWorld) {
     await page.locator('#globeSelectorStartBtn').click();
-    await page.waitForFunction(() => {
+    await page.waitForFunction(afterWorldLoad(() => {
       const diagnostics = globalThis.getWorldExplorerRuntimeDiagnostics?.();
       return diagnostics?.gameStarted === true && diagnostics.worldLoading === false;
-    }, null, { timeout: 360_000 });
+    }), null, { timeout: 360_000 });
   }
   diagnostics.stage = 'ready';
   return { context, page, identity,

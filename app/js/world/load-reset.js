@@ -5,6 +5,8 @@ import { releaseLocationModels } from './release-location-models.js';
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { clearBuildingExteriorMaterialPool } from "../engine/building-facade-materials.js?v=19";
 import { clearBuildingExteriorDetails } from './building-exterior-details.js?v=2';
+import { clearEngineeredWaterfront } from './engineered-waterfront.js';
+import {clearFacilitySurface} from './facility-surface-owner.js';
 
 const MATERIAL_TEXTURE_KEYS = Object.freeze([
   'map', 'alphaMap', 'aoMap', 'bumpMap', 'displacementMap', 'emissiveMap',
@@ -104,6 +106,8 @@ export function resetWorldForReload(options = {}) {
   appCtx.transportFacilityGraph = null;
   releaseLocationModels(appCtx);
   clearWaterMeshCache();
+  clearEngineeredWaterfront(appCtx);
+  clearFacilitySurface(appCtx);
   if (!options.preserveWaterEvidence) appCtx.cancelWaterEnvironmentEvidence?.(true);
 
   if (typeof appCtx.resetEarthStreaming !== 'function') {
@@ -134,6 +138,8 @@ export function resetWorldForReload(options = {}) {
   if (typeof appCtx.clearActiveInterior === 'function') {
     appCtx.clearActiveInterior({ restorePlayer: false, preserveCache: true });
   }
+  appCtx.disposePreparedVenuePrograms?.();
+  appCtx.museumProgramPreparation = null;
 
   appCtx.transportDetail?.dispose();
   appCtx.transportDetail=null;

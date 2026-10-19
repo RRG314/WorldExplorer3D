@@ -1,3 +1,4 @@
+import {afterWorldLoad} from './complete-world-readiness.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import { chromium, devices } from 'playwright';
@@ -25,10 +26,10 @@ try {
   await page.waitForFunction(() => globalThis.__WE3D_RUNTIME_READY__ === true, null, { timeout: 120_000 });
   await page.waitForFunction(() => document.getElementById('startBtn')?.disabled === false, null, { timeout: 120_000 });
   await page.getByRole('button', { name: 'Explore', exact: true }).click();
-  await page.waitForFunction(() => {
+  await page.waitForFunction(afterWorldLoad(() => {
     const diagnostics = globalThis.getWorldExplorerRuntimeDiagnostics?.();
     return diagnostics?.gameStarted && !diagnostics.worldLoading && diagnostics.aviation?.fleetCount >= 7;
-  }, null, { timeout: 360_000 });
+  }), null, { timeout: 360_000 });
   const later = page.getByRole('button', { name: 'Later', exact: true }).first();
   if (await later.isVisible().catch(() => false)) await later.click();
 

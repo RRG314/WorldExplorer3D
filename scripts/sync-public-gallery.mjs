@@ -11,7 +11,8 @@ const items = new Map(gallery.images.map(image => [image.id,image]));
 if (items.size !== gallery.images.length) throw new Error('Duplicate public gallery image IDs.');
 const escape = value => String(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 for (const item of items.values()) {
-  if (!/^assets\/gallery\/[0-9]+\.[0-9]+\/[a-z-]+\.webp$/.test(item.file)) throw new Error(`Unexpected image path: ${item.file}`);
+  const expectedFile = `assets/gallery/${version.split('.').slice(0, 2).join('.')}/${item.id}-${item.sha256.slice(0, 12)}.webp`;
+  if (!/^[a-z-]+$/.test(item.id) || !/^[a-f0-9]{64}$/.test(item.sha256) || item.file !== expectedFile) throw new Error(`Gallery image needs its content-addressed URL: ${item.id}`);
   const bytes = await fs.readFile(item.file);
   if (createHash('sha256').update(bytes).digest('hex') !== item.sha256) throw new Error(`Unreviewed image change: ${item.id}`);
 }

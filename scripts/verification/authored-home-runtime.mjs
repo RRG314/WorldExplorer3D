@@ -1,3 +1,4 @@
+import {afterWorldLoad} from './complete-world-readiness.mjs';
 import assert from 'node:assert/strict';
 import {mkdir,writeFile} from 'node:fs/promises';
 import {chromium} from 'playwright';
@@ -10,7 +11,7 @@ try{
   await page.waitForFunction(()=>globalThis.__WE3D_RUNTIME_READY__,null,{timeout:120000});
   if(await page.locator('#analyticsConsentDenyBtn').isVisible())await page.locator('#analyticsConsentDenyBtn').click();
   if(await page.locator('#globeSelectorStartBtn').isVisible())await page.locator('#globeSelectorStartBtn').click();
-  await page.waitForFunction(()=>{const d=globalThis.getWorldExplorerRuntimeDiagnostics?.();return d?.gameStarted&&!d.worldLoading&&d.modes?.walking&&!document.getElementById('loading')?.classList.contains('show');},null,{timeout:120000});
+  await page.waitForFunction(afterWorldLoad(()=>{const d=globalThis.getWorldExplorerRuntimeDiagnostics?.();return d?.gameStarted&&!d.worldLoading&&d.modes?.walking&&!document.getElementById('loading')?.classList.contains('show');}),null,{timeout:120000});
   const entry=await page.evaluate(async()=>{
     const {ctx}=await import('/app/js/shared-context.js?v=55'),core=await import('/app/js/interiors/core.js?v=4'),runtime=await import('/app/js/interiors/runtime.js?v=20'),{buildInteriorScene}=await import('/app/js/interiors/scene-builder.js?v=13'),{makeStarterLayout}=await import('/functions/interior-layout.mjs');
     const x=ctx.Walk.state.walker.x,z=ctx.Walk.state.walker.z;

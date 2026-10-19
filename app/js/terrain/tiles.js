@@ -24,7 +24,6 @@ import {
 } from "./surface-profiles.js?v=54";
 import { stitchTerrainMeshEdges } from "./seams.js?v=2";
 import {
-  cancelTerrainTileRequest as cancelTileRequest,
   waitForTerrainTileRequest
 } from './tile-request-lifecycle.js?v=1';
 
@@ -37,7 +36,6 @@ const TERRAIN_BOUNDS_REQUEST_CONCURRENCY = 8;
 let terrainCacheGeneration = 0;
 const TERRAIN_TILE_MAX_ATTEMPTS = 3;
 const TERRAIN_TILE_RETRY_BASE_MS = 300;
-const TERRAIN_TILE_ATTEMPT_TIMEOUT_MS = 2400;
 // Direct mesh loaders also await tile.ready, without the retry-wait wrapper.
 // Every admitted source must settle even if Image dispatches neither event.
 const TERRAIN_TILE_SOURCE_TIMEOUT_MS = 10000;
@@ -359,10 +357,8 @@ function waitForTerrainTileReady(z, x, y, deadline, deps, options = {}) {
   return waitForTerrainTileRequest({
     z, x, y, deadline, deps, signal: options.signal,
     isActive: () => generation === terrainCacheGeneration,
-    getOrLoadTerrainTile, failTerrainTileAttempt, terrainNow,
-    cancelTile: (tileZ, tileX, tileY) => cancelTileRequest(appCtx.terrainTileCache, tileZ, tileX, tileY),
-    maxAttempts: TERRAIN_TILE_MAX_ATTEMPTS,
-    attemptTimeoutMs: isPolarElevationTile(z, x, y) ? 11000 : TERRAIN_TILE_ATTEMPT_TIMEOUT_MS
+    getOrLoadTerrainTile, terrainNow,
+    maxAttempts: TERRAIN_TILE_MAX_ATTEMPTS
   });
 }
 

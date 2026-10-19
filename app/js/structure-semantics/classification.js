@@ -187,6 +187,8 @@ function classifyStructureSemantics(tags = {}, options = {}) {
     covered: isCovered,
     indoor: isIndoor,
     buildingPassage,
+    ...(highway === 'service' && normalizedTagValue(tags?.service) === 'parking_aisle'
+      ? {parkingAccess: true} : {}),
     underground,
     cutting,
     embankment,

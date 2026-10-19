@@ -1,6 +1,9 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { roadSegmentIsDriveable } from './road-cross-section-profile.js?v=1';
-import {packTraversalAdjacency, traversalSourceInterval} from './traversal-graph-storage.js';
+import {
+  packTraversalAdjacency, packTraversalNodes, packTraversalSegments,
+  readTraversalSegment, traversalSegmentCount, traversalSourceInterval
+} from './traversal-graph-storage.js';
 import { createTraversalSegmentIndex } from './traversal-segment-index.js';
 
 const TRAVERSAL_NODE_GRID = 2.5;
@@ -142,7 +145,9 @@ function buildTraversalGraph(mode = 'walk') {
     const stations = Array.isArray(feature?.transportGraphRef?.stations)
       ? feature.transportGraphRef.stations
       : [];
-    const distances = new Float64Array(points.length);
+    // Temporary doubles, consumed before the next feature. These do not need
+    // native backing stores (two per road for the walk/drive graph builds).
+    const distances = new Array(points.length).fill(0);
     for (let index = 1; index < points.length; index += 1) {
       distances[index] = distances[index - 1] +
         Math.hypot(points[index].x - points[index - 1].x, points[index].z - points[index - 1].z);
@@ -246,9 +251,9 @@ function buildTraversalGraph(mode = 'walk') {
     mode,
     authority: appCtx.transportNetworkModel?.authority || 'legacy_traversal_graph',
     transportGraphId: appCtx.transportNetworkModel?.id || null,
-    nodes: nodes.map((node) => ({ x: node.x, z: node.z })),
+    nodes: packTraversalNodes(nodes),
     adjacency: packTraversalAdjacency(nodes.length, segments),
-    segments,
+    segments: packTraversalSegments(segments),
     featureKinds,
     featureCount: features.length,
     nodeCount: nodes.length,
@@ -283,7 +288,7 @@ export function buildTraversalNetworks() {
 function traversalGraphForMode(mode = 'walk') {
   const resolvedMode = mode === 'drive' ? 'drive' : 'walk';
   const graph = appCtx.traversalNetworks?.[resolvedMode];
-  if (graph && Array.isArray(graph.segments) && graph.segments.length > 0) return graph;
+  if (graph && traversalSegmentCount(graph.segments) > 0) return graph;
   return buildTraversalNetworks()?.[resolvedMode] || null;
 }
 
@@ -323,20 +328,22 @@ function findNearestTraversalFeatures(x, z, options = {}) {
   const mode = options.mode === 'drive' ? 'drive' : 'walk';
   const excludeRoads = options.excludeRoads === true;
   const graph = traversalGraphForMode(mode);
-  const segments = Array.isArray(graph?.segments) ? graph.segments : [];
+  const segments = graph?.segments || [];
+  const segmentCount = traversalSegmentCount(segments);
   const maxDistance = Number.isFinite(options.maxDistance) ?
     Math.max(4, options.maxDistance) :
     TRAVERSAL_MAX_ANCHOR_DISTANCE[mode];
   const maximumCandidates = Math.max(1, Math.min(8, Number(options.maximumCandidates) || 4));
   let index = traversalSegmentIndexes.get(segments);
-  if (!index || index.segmentCount !== segments.length) {
-    index = { segmentCount: segments.length, lookup: createTraversalSegmentIndex(segments) };
+  if (!index || index.segmentCount !== segmentCount) {
+    index = { segmentCount, lookup: createTraversalSegmentIndex(segments) };
     traversalSegmentIndexes.set(segments, index);
   }
 
   const candidates = [];
+  const scratchSegment = {};
   for (const id of index.lookup.query(x, z, maxDistance)) {
-    const segment = segments[id];
+    const segment = readTraversalSegment(segments, id, scratchSegment);
     if (excludeRoads && traversalFeatureKind(segment.feature) === 'road') continue;
     const projected = projectPointToSegment(x, z, segment.p1, segment.p2);
     if (!Number.isFinite(projected.dist) || projected.dist > maxDistance) continue;
@@ -425,11 +432,12 @@ export function measureRemainingPolylineDistance(x, z, points) {
 }
 
 function aStarTraversalPath(graph, startId, endId) {
-  if (!graph || !Array.isArray(graph.nodes) || !graph.adjacency?.offsets) return null;
+  const packedNodes = graph?.nodes instanceof Float64Array;
+  if (!graph || (!packedNodes && !Array.isArray(graph.nodes)) || !graph.adjacency?.offsets) return null;
   if (!Number.isInteger(startId) || !Number.isInteger(endId)) return null;
   if (startId === endId) return { nodeIds: [startId], cost: 0 };
 
-  const nodeCount = graph.nodes.length;
+  const nodeCount = packedNodes ? graph.nodes.length / 2 : graph.nodes.length;
   const gScore = new Float64Array(nodeCount);
   const fScore = new Float64Array(nodeCount);
   const cameFrom = new Int32Array(nodeCount);
@@ -442,6 +450,10 @@ function aStarTraversalPath(graph, startId, endId) {
   }
 
   const heuristic = (aId, bId) => {
+    if (packedNodes) return Math.hypot(
+      graph.nodes[bId * 2] - graph.nodes[aId * 2],
+      graph.nodes[bId * 2 + 1] - graph.nodes[aId * 2 + 1]
+    );
     const a = graph.nodes[aId];
     const b = graph.nodes[bId];
     return Math.hypot(b.x - a.x, b.z - a.z);
@@ -556,7 +568,7 @@ function buildTraversalConnectorOptions(anchor, originX, originZ, role = 'start'
 export function findTraversalRoute(fromX, fromZ, toX, toZ, options = {}) {
   const mode = options.mode === 'drive' ? 'drive' : 'walk';
   const graph = traversalGraphForMode(mode);
-  if (!graph || !Array.isArray(graph.segments) || graph.segments.length === 0) return null;
+  if (!graph || traversalSegmentCount(graph.segments) === 0) return null;
 
   const startAnchors = findNearestTraversalFeatures(fromX, fromZ, {
     mode,
@@ -626,8 +638,15 @@ export function findTraversalRoute(fromX, fromZ, toX, toZ, options = {}) {
 
   const routePoints = [{ x: fromX, z: fromZ }, best.startAnchor.pt];
   for (let i = 0; i < best.nodeIds.length; i++) {
-    const node = graph.nodes[best.nodeIds[i]];
-    if (node) routePoints.push({ x: node.x, z: node.z });
+    const id = best.nodeIds[i];
+    if (graph.nodes instanceof Float64Array) {
+      if (id >= 0 && id * 2 + 1 < graph.nodes.length) {
+        routePoints.push({x: graph.nodes[id * 2], z: graph.nodes[id * 2 + 1]});
+      }
+    } else {
+      const node = graph.nodes[id];
+      if (node) routePoints.push({ x: node.x, z: node.z });
+    }
   }
   routePoints.push(best.endAnchor.pt, { x: toX, z: toZ });
 

@@ -7,6 +7,7 @@ import { getSeaStateConfig, getWaveIntensity, surfaceNormalFromMotion } from "..
 import { getWaterPalette } from "../water-palette.js?v=2";
 import {
   getBoatWaveProfile,
+  isSyntheticBoatCandidate,
   sampleDynamicWaterAt,
   waterSurfaceBaseYAt,
   waterSurfaceYAt
@@ -75,12 +76,16 @@ function ensureBoatWaterPatch() {
 }
 
 function updateBoatWaterPatch(candidate = null) {
-  const patch = ensureBoatWaterPatch();
-  if (!patch) return false;
-  if (!appCtx.boatMode?.active) {
-    patch.visible = false;
+  candidate ||= appCtx.boatMode?.currentWater || null;
+  // Mapped water already owns its shoreline and animated surface. A circular
+  // overlay follows the boat onto quays, islands and streets, bypassing that
+  // footprint. Only an explicit synthetic transition needs a local surface.
+  if (!appCtx.boatMode?.active || !isSyntheticBoatCandidate(candidate)) {
+    if (appCtx.boatMode?.waterPatch) appCtx.boatMode.waterPatch.visible = false;
     return false;
   }
+  const patch = ensureBoatWaterPatch();
+  if (!patch) return false;
   const waterKind = String(candidate?.waterKind || appCtx.boatMode?.waterKind || 'coastal').toLowerCase();
   const palette = getWaterPalette(waterKind);
   const radius =

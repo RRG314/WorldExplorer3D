@@ -1,3 +1,4 @@
+import {afterWorldLoad} from './complete-world-readiness.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -64,7 +65,7 @@ try {
   if (await consent.isVisible()) await consent.click();
   await page.getByRole('button', { name: 'Explore', exact: true }).click();
   console.log('[bridge-endpoints] Explore selected');
-  await page.waitForFunction(() => {
+  await page.waitForFunction(afterWorldLoad(() => {
     const state = JSON.parse(globalThis.render_game_to_text?.() || '{}');
     const diagnostics = globalThis.getWorldExplorerRuntimeDiagnostics?.() || {};
     return state.gameStarted === true &&
@@ -73,7 +74,7 @@ try {
       Number(diagnostics.transportStructures?.publishedBodies || 0) > 0 &&
       diagnostics.transportStructures?.generalizedEndpointIntegrity?.authority ===
         'compiled-generalized-structure-endpoints';
-  }, null, { timeout: 240_000 });
+  }), null, { timeout: 240_000 });
   console.log('[bridge-endpoints] compiled bridge authority published');
   await page.waitForTimeout(3000);
 

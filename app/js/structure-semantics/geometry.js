@@ -1,11 +1,12 @@
+import {copyNumericArray} from './numeric-scratch.js';
 import { sampleProfileAtDistance } from './profile-sampling.js';
 function smoothstep01(value) {
   const t = Math.max(0, Math.min(1, Number(value) || 0));
   return t * t * (3 - 2 * t);
 }
 
-function polylineDistances(points = []) {
-  const distances = new Float32Array(points.length);
+function polylineDistances(points = [], allocate = copyNumericArray) {
+  const distances = allocate(Float32Array, points.length);
   let total = 0;
   for (let i = 1; i < points.length; i++) {
     total += Math.hypot(points[i].x - points[i - 1].x, points[i].z - points[i - 1].z);

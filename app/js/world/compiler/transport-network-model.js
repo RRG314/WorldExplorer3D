@@ -107,6 +107,9 @@ function endpointDirection(descriptor, endpoint) {
 function crossProviderEndpointCompatible(leftDescriptor, leftEndpoint, rightDescriptor, rightEndpoint) {
   if (!crossProviderPair(leftDescriptor?.feature, rightDescriptor?.feature)) return false;
   if (rightEndpoint !== 'start' && rightEndpoint !== 'end') return false;
+  if (leftDescriptor.feature.structureSemantics?.terrainMode === 'at_grade' &&
+      rightDescriptor.feature.structureSemantics?.terrainMode === 'at_grade' &&
+      !verticalCompatible(leftDescriptor.feature, rightDescriptor.feature)) return false;
   const leftFamily = roadFamily(leftDescriptor?.feature);
   const rightFamily = roadFamily(rightDescriptor?.feature);
   if (leftFamily !== rightFamily && !featureIsLink(leftDescriptor?.feature) && !featureIsLink(rightDescriptor?.feature)) {

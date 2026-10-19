@@ -10,6 +10,17 @@ import {getPlayerCharacterGender} from '../../../js/player-character-preference.
 import {createWalkingWaterRuntime} from '../walking/water/runtime.js';
 import {resolveSwimHullCamera} from '../walking/water/hull-camera.js';
 export const resolveOceanDiverCameraPose=options=>resolveSwimHullCamera({...options,vesselPosition:options.submarinePosition});
+export function frameOceanDiverLookTarget(target,camera){
+ if(!(camera.aspect>0&&camera.aspect<.8))return target;
+ const dx=target.x-camera.position.x,dz=target.z-camera.position.z,horizontal=Math.hypot(dx,dz);
+ if(horizontal<.001)return target;
+ // Hull clearance can move the camera ahead of the swimmer. Screen right
+ // must follow that resolved view, not the swimmer's original heading.
+ const distance=Math.hypot(horizontal,target.y-camera.position.y);
+ const offset=Math.min(1.05,distance*Math.tan((camera.fov||55)*Math.PI/360)*camera.aspect*.55);
+ target.x-=dz/horizontal*offset;target.z+=dx/horizontal*offset;
+ return target;
+}
 import {createSwimmingHud} from '../walking/water/ui.js';
 import {resolveWalkingMoveVector} from '../walking/physics.js?v=32';
 import {createPlayerCharacterHost} from '../walking/player-character-host.js';
@@ -135,7 +146,7 @@ export function createOceanDiver(ctx,mode,{sampleSeabedHeight,worldRadius=1200})
     mode.camera.position.set(cameraPose.x,cameraPose.y,cameraPose.z);
     // On a portrait display, keep the explorer left of the compact right HUD.
     // Collision stays anchored to the actual body; only optical framing shifts.
-    if(mode.camera.aspect<.8){lookTarget.x-=Math.cos(yaw)*1.05;lookTarget.z+=Math.sin(yaw)*1.05;}
+    frameOceanDiverLookTarget(lookTarget,mode.camera);
     mode.camera.lookAt(lookTarget);
     button.textContent=`${returnTarget==='vessel'?'Board vessel':'Board submarine'} · ${Math.round(boardingDistance())} m`;button.disabled=falling||boardingDistance()>8;
     return true;

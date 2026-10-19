@@ -1,3 +1,4 @@
+import {afterWorldLoad} from './complete-world-readiness.mjs';
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { chromium } from 'playwright';
@@ -84,10 +85,10 @@ try {
   const deny = page.locator('#analyticsConsentDenyBtn');
   if (await deny.isVisible()) await deny.click();
   await page.getByRole('button', { name: 'Explore', exact: true }).click();
-  await page.waitForFunction(() => {
+  await page.waitForFunction(afterWorldLoad(() => {
     const d = window.getWorldExplorerRuntimeDiagnostics?.();
     return d?.gameStarted && !d.worldLoading && d.worldCounts.roads > 0;
-  }, null, { timeout: 240_000 });
+  }), null, { timeout: 240_000 });
   await page.evaluate(async () => {
     const { ctx } = await import('/app/js/shared-context.js?v=55');
     window.testTunnel = ctx.roads.find(r => r.name === 'Fort McHenry Tunnel (Bore 2)' && r.tunnelSystemModel?.shellRanges.length);

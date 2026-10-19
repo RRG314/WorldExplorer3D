@@ -1,3 +1,4 @@
+import {afterWorldLoad} from './complete-world-readiness.mjs';
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { chromium } from 'playwright';
@@ -119,13 +120,13 @@ async function runViewport({ id, width, height, mobile = false, exerciseActions 
       });
 
       await page.locator('#globeSelectorLocateBtn').click();
-      await page.waitForFunction(() => {
+      await page.waitForFunction(afterWorldLoad(() => {
         const diagnostics = globalThis.getWorldExplorerRuntimeDiagnostics?.() || {};
         return diagnostics.gameStarted === true && diagnostics.worldLoading === false &&
           document.getElementById('loading')?.classList.contains('show') !== true &&
           Number(diagnostics.worldCounts?.roads || 0) > 0 &&
           Number(diagnostics.worldCounts?.buildings || 0) > 0;
-      }, null, { timeout: 180_000 });
+      }), null, { timeout: 180_000 });
       actions.currentLocation = await page.evaluate(() => {
         const diagnostics = globalThis.getWorldExplorerRuntimeDiagnostics?.() || {};
         return {

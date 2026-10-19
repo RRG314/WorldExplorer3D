@@ -2,6 +2,7 @@ import {streetPolygonKernel} from '../world/compiler/street-polygon-kernel.js';
 import { resolveWaterSurfaceVisualProfile } from '../world/load-geometry.js?v=28';
 import { registerWaterWaveMaterial } from '../world/water-materials.js?v=5';
 import { yieldToMainThread, drainCooperatively } from '../world/cooperative-scheduling.js?v=1';
+import { readCanvasRedMask } from './canvas-red-mask.js';
 
 const FAR_WATER_SURFACE_CLEARANCE_WORLD = 0.04;
 const FAR_WATER_TERRAIN_MASK_SIZE = 4096;
@@ -213,19 +214,8 @@ async function buildMappedWaterTerrainOwnershipMask(appCtx, mappedContext, spec,
     // Read bounded scanline windows instead of materializing the full 64 MiB
     // RGBA canvas buffer. The shader consumes only red, so the persistent texture
     // is a 16 MiB single-channel mask and conversion yields between chunks.
-    const red = new Uint8Array(canvas.width * canvas.height);
-    const rowsPerChunk = 256;
-    for (let y = 0; y < canvas.height; y += rowsPerChunk) {
-      if (!current()) return null;
-      const height = Math.min(rowsPerChunk, canvas.height - y);
-      const rgba = context.getImageData(0, y, canvas.width, height).data;
-      let destination = y * canvas.width;
-      for (let source = 0; source < rgba.length; source += 4) {
-        red[destination] = rgba[source];
-        destination += 1;
-      }
-      if (y + height < canvas.height) await yieldWork();
-    }
+    const red = await readCanvasRedMask(canvas, context, {current, yieldWork});
+    if (!red || !current()) return null;
     const texture = new THREE.DataTexture(red, canvas.width, canvas.height, THREE.RedFormat, THREE.UnsignedByteType);
     texture.name = 'FarMappedWaterTerrainOwnershipMask';
     texture.wrapS = texture.wrapT = THREE.ClampToEdgeWrapping;

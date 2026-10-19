@@ -1,3 +1,4 @@
+import {afterWorldLoad} from './complete-world-readiness.mjs';
 import {chromium} from 'playwright';
 import {mkdir,writeFile} from 'node:fs/promises';
 const out='output/verification/vegetation-player-current';await mkdir(out,{recursive:true});
@@ -11,7 +12,7 @@ try {
  await page.goto('http://127.0.0.1:4195/app/?loc=custom&lat=37.74&lon=-119.59&mode=walking');
  await page.waitForFunction(()=>window.__WE3D_RUNTIME_READY__,null,{timeout:45000});
  await page.locator('#globeSelectorStartBtn').click();
- await page.waitForFunction(()=>{const s=window.getWorldExplorerRuntimeDiagnostics?.();return s?.gameStarted&&!s.worldLoading&&s.environmentEvidence?.vegetationCount>0;},null,{timeout:90000});
+ await page.waitForFunction(afterWorldLoad(()=>{const s=window.getWorldExplorerRuntimeDiagnostics?.();return s?.gameStarted&&!s.worldLoading&&s.environmentEvidence?.vegetationCount>0;}),null,{timeout:90000});
  report.tree=await page.evaluate(async()=>{
   const {ctx}=await import('/app/js/shared-context.js?v=55');
   const focus=ctx.activeTransportActor().position;

@@ -8,7 +8,7 @@ function* streetSourceInputSteps(appCtx, select) {
   for(const [auditIndex,road] of (appCtx.roads||[]).entries()){
     yield;
     if(select(road))roads.push({
-      auditIndex,metersPerWorldUnit:road.metersPerWorldUnit,pts:road.pts,width:road.width,type:road.type,tags:road.tags,isStructureConnector:road.isStructureConnector,resolvedCrossSection:road.resolvedCrossSection,
+      auditIndex,metersPerWorldUnit:road.metersPerWorldUnit,surfaceBias:road.surfaceBias,pts:road.pts,width:road.width,type:road.type,tags:road.tags,isStructureConnector:road.isStructureConnector,resolvedCrossSection:road.resolvedCrossSection,
       structureSemantics:road.structureSemantics,transportRecord:{sourceTags:road.transportRecord?.sourceTags,crossSection:road.transportRecord?.crossSection}
     });
   }

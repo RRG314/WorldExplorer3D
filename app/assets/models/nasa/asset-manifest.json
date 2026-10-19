@@ -1,0 +1,54 @@
+{
+  "retrieved": "2026-10-13",
+  "rights": "NASA media usage guidance; no endorsement. NASA identifiers remain only as part of the factual facility representation.",
+  "rightsEvidence": "https://www.nasa.gov/nasa-brand-center/images-and-media/",
+  "modifications": "Decoded Draco, flattened static nodes, merged matching primitives, removed duplicate legacy texture fallbacks, retained image maps; adapted opaque Lambert surfaces to rough painted materials. Dimensions, placement and interior tour geometry are game adaptations.",
+  "assets": [
+    {
+      "id": "vehicle-assembly-building",
+      "author": "NASA",
+      "source": "https://github.com/nasa/NASA-3D-Resources/tree/master/3D%20Models/Vehicle%20Assembly%20Building%20(VAB)",
+      "sourceFile": "Vehicle Assembly Building (VAB).glb",
+      "sourceSha256": "3d027f588d3b9752efc69189cc48a6fda62aa6504fa42976fcd0b3a1f039c6f4",
+      "sha256": "17e2d7f4c65fcc9c6915a70b724c9633110a9a440bd114877002584c7fa17fa4",
+      "bytes": 217116,
+      "triangles": 6458,
+      "primitives": 8,
+      "bounds": {
+        "min": [
+          -4.6144280433654785,
+          -2.9312032275569546,
+          -6.784227651192439
+        ],
+        "max": [
+          10.398282051086426,
+          10.767737917661634,
+          14.556653987840532
+        ]
+      }
+    },
+    {
+      "id": "crawler",
+      "author": "NASA",
+      "source": "https://github.com/nasa/NASA-3D-Resources/tree/master/3D%20Models/Crawler",
+      "sourceFile": "Crawler.glb",
+      "sourceSha256": "655f9adff798c18d8f6bdd467f30e055094e1fc817b2abea52310b2dc6df4ff2",
+      "sha256": "126a605a2d043c5b8776f8696922b7e442dfde3dcd245740eafc18340afee551",
+      "bytes": 6732248,
+      "triangles": 145309,
+      "primitives": 6,
+      "bounds": {
+        "min": [
+          -4.14489750398144,
+          -0.22400565749598206,
+          -3.652694869714934
+        ],
+        "max": [
+          4.627540399892894,
+          1.474390018331844,
+          3.5422587824831955
+        ]
+      }
+    }
+  ]
+}

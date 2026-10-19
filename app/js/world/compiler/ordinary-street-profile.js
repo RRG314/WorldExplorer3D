@@ -1,3 +1,4 @@
+import {copyNumericArray} from '../../structure-semantics/numeric-scratch.js';
 import {connectedSideGroups} from './transport-junction-profile.js?v=21';
 import {assignSurfaceStreetJunctions} from './surface-street-junctions.js';
 
@@ -31,8 +32,8 @@ export function assignOrdinaryStreetJunctions(features,network,sampleTerrain) {
 // ceiling cannot connect the endpoints of a genuinely steeper street. Use
 // the minimum feasible grade for its measured nodes and keep those nodes
 // fixed, without moving elevations through the rest of the road network.
-export function fitOrdinaryStreetProfile(distances,heights,anchors,minimumGrade=.12) {
-  if(!distances.length)return {heights:new Float32Array(heights),maximumGrade:minimumGrade};
+export function fitOrdinaryStreetProfile(distances,heights,anchors,minimumGrade=.12,allocate=copyNumericArray) {
+  if(!distances.length)return {heights:allocate(Float32Array,heights),maximumGrade:minimumGrade};
   const fixed=new Map();
   for(const anchor of anchors){
     if(!Number.isFinite(anchor.distance)||!Number.isFinite(anchor.targetSurfaceY))continue;
@@ -41,8 +42,8 @@ export function fitOrdinaryStreetProfile(distances,heights,anchors,minimumGrade=
     fixed.set(nearest,anchor.targetSurfaceY);
   }
   const stations=[...fixed.entries()].sort((a,b)=>a[0]-b[0]);
-  if(stations.length<2)return {heights:new Float32Array(heights),maximumGrade:minimumGrade};
-  const result=new Float64Array(heights);
+  if(stations.length<2)return {heights:allocate(Float32Array,heights),maximumGrade:minimumGrade};
+  const result=allocate(Float64Array,heights);
   let maximumGrade=minimumGrade;
   for(let n=1;n<stations.length;n++){
     const [start,first]=stations[n-1],[end,last]=stations[n],run=distances[end]-distances[start];
@@ -64,5 +65,5 @@ export function fitOrdinaryStreetProfile(distances,heights,anchors,minimumGrade=
       result[i]=Math.max(result[i+1]-delta,Math.min(result[i+1]+delta,result[i]));
     }
   }
-  return {heights:Float32Array.from(result),maximumGrade};
+  return {heights:allocate(Float32Array,result),maximumGrade};
 }

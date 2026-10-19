@@ -117,11 +117,14 @@ export function filterSelectionToAcceptedGround(
       return accepted;
     });
   }
+  const transportKeys = ['roadWays', 'footwayWays', 'cyclewayWays', 'structureConnectorWays'];
   const structureAuthority = pruneSupersededGeneralizedStructures(
-    filtered.roadWays,
-    nodes
+    [...new Set(transportKeys.flatMap(key => filtered[key] || []))], nodes
   );
-  filtered.roadWays = structureAuthority.ways;
+  const retainedTransport = new Set(structureAuthority.ways);
+  for (const key of transportKeys) {
+    if (Array.isArray(filtered[key])) filtered[key] = filtered[key].filter(way => retainedTransport.has(way));
+  }
   for (const key of NODE_COLLECTION_KEYS) {
     if (!Array.isArray(selection[key])) continue;
     filtered[key] = selection[key].filter((node) => {

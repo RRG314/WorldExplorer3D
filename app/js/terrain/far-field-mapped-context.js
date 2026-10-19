@@ -4,6 +4,7 @@ import {FAR_CONTEXT_MAX_BUILDINGS,FAR_CONTEXT_BUILDING_COVERAGE_TARGET,FAR_CONTE
 import {createRegionalBuildingWorker} from './regional-building-runtime.js';
 import { createRegionalRoadCoveragePlan } from './regional-road-coverage.js';
 import {createGeographicRingIndex} from './geographic-ring-index.js';
+import {createNumericPublicationStore} from '../structure-semantics/numeric-publication.js';
 import {
   fetchShortbreadTile,
   vectorTileRangeForBounds
@@ -60,18 +61,84 @@ function ringSpanMeters(ring) {
 
 const geographicRingIndexes=new WeakMap();
 
-function retainFarWaterRing(ring) {
+function closedFarRingSource(ring) {
   const source = (ring || []).filter((coordinate) => (
     Number.isFinite(Number(coordinate?.[0])) &&
     Number.isFinite(Number(coordinate?.[1]))
   ));
   if (source.length < 3) return [];
-  const first = source[0];
-  const last = source.at(-1);
-  const closed=first[0]===last[0]&&first[1]===last[1]?source:[...source,first];
-  const retained=Object.freeze(closed.map(point=>Object.freeze([...point])));
-  geographicRingIndexes.set(retained,createGeographicRingIndex(retained));
+  const first = source[0], last = source.at(-1);
+  return first[0] === last[0] && first[1] === last[1] ? source : [...source, first];
+}
+
+function retainFarWaterRing(ring, publicationStorage = null) {
+  const closed = closedFarRingSource(ring);
+  if (!closed.length) return [];
+  const retained = Object.freeze(closed.map(point => Object.freeze([...point])));
+  geographicRingIndexes.set(retained, createGeographicRingIndex(retained, publicationStorage));
   return retained;
+}
+
+// Land geometry is queried by the terrain and surface-profile owners. Its
+// indexed Float64 endpoints are also the source for optional coordinate views.
+// Shared accessors cannot retain a provider tile, load session or source ring.
+const indexedLandAreas = new WeakMap();
+function indexedRingView(index) {
+  const ring = index.coordinates();
+  geographicRingIndexes.set(ring, index);
+  return ring;
+}
+function readLandOuter() {
+  const state = indexedLandAreas.get(this);
+  if (!state.outerRead) { state.outerValue = indexedRingView(state.outer); state.outerRead = true; }
+  return state.outerValue;
+}
+function writeLandOuter(value) {
+  if (Object.isFrozen(this)) throw new TypeError('Cannot replace frozen land geometry');
+  const state = indexedLandAreas.get(this);
+  state.outer = null; state.outerValue = value; state.outerRead = true;
+}
+function readLandHoles() {
+  const state = indexedLandAreas.get(this);
+  if (!state.holesRead) {
+    state.holesValue = state.holes.map(indexedRingView); state.holesRead = true;
+    // Exposed hole lists retain their existing mutable-array behavior. Future
+    // queries read that list, including holes added or removed by a caller.
+    state.holes = null;
+  }
+  return state.holesValue;
+}
+function writeLandHoles(value) {
+  if (Object.isFrozen(this)) throw new TypeError('Cannot replace frozen land geometry');
+  const state = indexedLandAreas.get(this);
+  state.holes = null; state.holesValue = value; state.holesRead = true;
+}
+const landGeometryProperties = Object.freeze({
+  outer: Object.freeze({ enumerable: true, configurable: true, get: readLandOuter, set: writeLandOuter }),
+  holes: Object.freeze({ enumerable: true, configurable: true, get: readLandHoles, set: writeLandHoles })
+});
+function retainMappedLandArea(rings, properties = {}, publicationStorage = null) {
+  const outer = closedFarRingSource(rings?.[0]);
+  if (outer.length < 4) return null;
+  const holes = (rings || []).slice(1).map(closedFarRingSource).filter(ring => ring.length >= 4);
+  const bounds = ringBounds(outer);
+  // Preserve nonstandard coordinate types and extra dimensions verbatim using
+  // the existing immutable ring representation. Normal provider coordinates
+  // are two finite numbers and can be recovered exactly from Float64 edges.
+  const numericPairs = ring => ring.every(point => Array.isArray(point) && point.length === 2 &&
+    typeof point[0] === 'number' && typeof point[1] === 'number');
+  if (![outer, ...holes].every(numericPairs)) {
+    return { outer: retainFarWaterRing(outer, publicationStorage),
+      holes: holes.map(ring => retainFarWaterRing(ring, publicationStorage)), bounds, ...properties };
+  }
+  const area = Object.defineProperties({}, landGeometryProperties);
+  indexedLandAreas.set(area, {
+    outer: createGeographicRingIndex(outer, publicationStorage, true),
+    holes: holes.map(ring => createGeographicRingIndex(ring, publicationStorage, true)),
+    outerRead: false, outerValue: undefined, holesRead: false, holesValue: undefined
+  });
+  area.bounds = bounds;
+  return Object.assign(area, properties);
 }
 
 function pointInLonLatRing(lon, lat, ring) {
@@ -111,9 +178,14 @@ function pointInMappedLandArea(lon, lat, area) {
     bounds &&
     (lon < bounds.minLon || lon > bounds.maxLon || lat < bounds.minLat || lat > bounds.maxLat)
   ) return false;
-  if (!pointInLonLatRing(lon, lat, area?.outer || [])) return false;
-  for (const hole of area?.holes || []) {
-    if (pointInLonLatRing(lon, lat, hole)) return false;
+  const indexed = indexedLandAreas.get(area);
+  if (indexed?.outer) {
+    if (!indexed.outer(lon, lat)) return false;
+  } else if (!pointInLonLatRing(lon, lat, area?.outer || [])) return false;
+  if (indexed?.holes) {
+    for (const contains of indexed.holes) if (contains(lon, lat)) return false;
+  } else {
+    for (const hole of area?.holes || []) if (pointInLonLatRing(lon, lat, hole)) return false;
   }
   return true;
 }
@@ -249,7 +321,9 @@ async function loadFarMappedWaterContext(bounds, options = {}) {
   );
   const tiles = waterBatch.values;
   const waterAreas = [];
+  const publicationStorage = createNumericPublicationStore();
 
+  try {
   for (let tileIndex = 0; tileIndex < tiles.length; tileIndex += 1) {
     const tileRecord = tiles[tileIndex];
     for (const layerName of ['ocean', 'water_polygons']) {
@@ -274,13 +348,13 @@ async function loadFarMappedWaterContext(bounds, options = {}) {
           // Deleting every Nth vertex can make a concave coastline cross
           // itself, producing giant triangles and depth stripes. Preserve the
           // mapped topology; the 200 m feature filter owns the far-LOD budget.
-          const retainedOuter = retainFarWaterRing(outer);
+          const retainedOuter = retainFarWaterRing(outer, publicationStorage);
           if (retainedOuter.length < 4) continue;
           waterAreas.push({
             outer: retainedOuter,
             holes: (rings || []).slice(1)
               .filter((ring) => Array.isArray(ring) && ring.length >= 4)
-              .map(retainFarWaterRing)
+              .map(ring => retainFarWaterRing(ring, publicationStorage))
               .filter((ring) => ring.length >= 4),
             bounds: ringBounds(retainedOuter),
             kind,
@@ -292,6 +366,7 @@ async function loadFarMappedWaterContext(bounds, options = {}) {
     }
   }
 
+  } finally { publicationStorage.release(); }
   return {
     waterAreas,
     waterTilesLoaded: tiles.length,
@@ -343,6 +418,7 @@ async function loadFarMappedContext(bounds, excludedBounds = null, waterBounds =
   let invalidBuildings = 0;
   let outsideBuildings = 0;
   let sliceStarted = performance.now();
+  const publicationStorage = createNumericPublicationStore();
 
   try {
   for (let tileIndex = 0; tileIndex < tiles.length; tileIndex += 1) {
@@ -364,19 +440,15 @@ async function loadFarMappedContext(bounds, excludedBounds = null, waterBounds =
         const profile = mappedLandSurfaceProfile(geojson?.properties?.kind, geojson?.properties);
         if (!profile) continue;
         for (const rings of polygonAreas(geojson?.geometry)) {
-          const outer = retainFarWaterRing(rings?.[0]);
-          if (outer.length < 4) continue;
-          landBucket.push({
-            outer,
-            holes: (rings || []).slice(1).map(retainFarWaterRing).filter((ring) => ring.length >= 4),
-            bounds: ringBounds(outer),
+          const area = retainMappedLandArea(rings, {
             tint: profile.tint,
             mode: profile.mode,
             priority: profile.priority,
             evidence: profile.evidence,
             sourceFeatureId: `shortbread:${layerName}:${tileRecord.z}:${tileRecord.x}:${tileRecord.y}:${feature.id ?? index}`,
             kind: String(geojson?.properties?.kind || '')
-          });
+          }, publicationStorage);
+          if (area) landBucket.push(area);
         }
       }
     }
@@ -498,7 +570,7 @@ async function loadFarMappedContext(bounds, excludedBounds = null, waterBounds =
   } catch (error) {
     roadCoveragePlan?.dispose();
     throw error;
-  } finally { buildingWorker?.dispose(); }
+  } finally { publicationStorage.release(); buildingWorker?.dispose(); }
 }
 
 export {
@@ -520,6 +592,7 @@ export {
   pointInMappedLandArea,
   pointInMappedWaterArea,
   retainFarWaterRing,
+  retainMappedLandArea,
   roundRobinSelect,
   selectSpatiallyDistributedBuildings,
   selectContextZoomForTileBudget,

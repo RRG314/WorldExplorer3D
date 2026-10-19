@@ -1,3 +1,4 @@
+import {afterWorldLoad} from './complete-world-readiness.mjs';
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
@@ -45,11 +46,11 @@ async function launch(page, { reset = true } = {}) {
   }
   await page.waitForFunction(() => globalThis.__WE3D_RUNTIME_READY__ === true, null, { timeout: 120_000 });
   await page.getByRole('button', { name: 'Explore', exact: true }).click();
-  await page.waitForFunction(() => {
+  await page.waitForFunction(afterWorldLoad(() => {
     const runtime = globalThis.getWorldExplorerRuntimeDiagnostics?.() || {};
     return runtime.gameStarted === true && runtime.worldLoading === false &&
       !!globalThis.__WE3D_COMPANION_SUPPORT__ && !!globalThis.__WE3D_URBAN_CRASH_SUPPORT__;
-  }, null, { timeout: 360_000 });
+  }), null, { timeout: 360_000 });
   const skip = page.getByRole('button', { name: 'Skip guide', exact: true });
   if (await skip.isVisible().catch(() => false)) await skip.click();
 }

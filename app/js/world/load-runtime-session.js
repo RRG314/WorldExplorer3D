@@ -19,6 +19,8 @@ import { publishWorldPublicationSnapshot } from './world-snapshot-adapter.js?v=4
 import { compilePoiLifecycle } from '../poi/lifecycle.js?v=1';
 import {worldLoadAbortError} from '../earth-core/request-cancellation.js?v=1';
 import {finishFailedWorldLoad} from './load-failure.js';
+import {ensureLoadedMuseumRuntime} from '../interiors/museum-program-preparation.js';
+import {prepareInitialStreetCoverage} from './street-pavement-runtime.js';
 
 export function createWorldLoadRuntimeSession(options = {}) {
   const {
@@ -629,9 +631,30 @@ export async function finishWorldLoadRuntimeSession(session = {}) {
     disposeGameplayRuntimesForPublication(appCtx, publication, 'superseded-gameplay-startup');
     return finishSupersededWorldLoadRuntimeSession(session, 'superseded-during-gameplay-runtime-startup');
   }
+  try {
+    appCtx.showLoad?.('',{phase:'prepareLocationScenery'});
+    if(!await prepareInitialStreetCoverage(appCtx,startupIsCurrent)){
+      disposeGameplayRuntimesForPublication(appCtx,publication,'superseded-scenery-preparation');
+      return finishSupersededWorldLoadRuntimeSession(session,'superseded-scenery-preparation');
+    }
+  } catch(error) {
+    disposeGameplayRuntimesForPublication(appCtx,publication,'scenery-preparation-failed');
+    return finishFailedWorldLoad(session,error,{reason:'scenery-preparation-failed'});
+  }
+  try {
+    await ensureLoadedMuseumRuntime(appCtx, startupIsCurrent);
+  } catch (error) {
+    // Optional rendering preparation may retry at the normal entry point.
+    console.warn('[Interior] Rendering preparation deferred to entry:', error);
+  }
+  if (!startupIsCurrent()) {
+    disposeGameplayRuntimesForPublication(appCtx, publication, 'superseded-venue-preparation');
+    return finishSupersededWorldLoadRuntimeSession(session, 'superseded-venue-preparation');
+  }
   appCtx.worldLoading = false;
   appCtx.enforceEnvironmentSceneOwnership?.();
   try {
+    appCtx.showLoad?.('',{phase:'prepareWorldPresentation'});
     const firstRender=appCtx.prepareFirstWorldRender?.();
     if(runtimeState)runtimeState.firstRender=firstRender || null;
   } catch(error) {

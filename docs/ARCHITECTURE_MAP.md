@@ -1,10 +1,12 @@
 # World Explorer 3D Architecture Map
 
+> Historical September 2026 snapshot. For the October 13 source audit, current boundaries and verification limits, see [architecture consolidation](architecture-consolidation/AUTHORITY-MAP.md). Dated findings below are retained as evidence and are not a current blocker list.
+
 Updated September 10, 2026 · Source baseline `53452516` · Version 5.2.0.
 
 September 15 performance audit supplement: [current ownership and scheduling](audits/2026-09-15-performance/architecture-and-ownership.md), [verified release/test findings and remaining measurements](audits/2026-09-15-performance/README.md). The dated findings below are historical unless reverified in that report.
 
-This map describes current responsibilities and data flow. It replaces accumulated dated rollout notes; earlier detail remains in Git and specialist documents. An architecture boundary describes where responsibility belongs, not proof that every path enforces it correctly. See [system inventory](SYSTEM_INVENTORY.md), [source reference](SYSTEM_INVENTORY_REFERENCE.md) and [confirmed audit findings](audits/2026-09-10/README.md).
+This map records the September 10 responsibilities and data flow. It replaces accumulated dated rollout notes; earlier detail remains in Git and specialist documents. An architecture boundary describes where responsibility belongs, not proof that every path enforces it correctly. See [system inventory](SYSTEM_INVENTORY.md), [source reference](SYSTEM_INVENTORY_REFERENCE.md) and [confirmed audit findings](audits/2026-09-10/README.md).
 
 ## Application overview
 

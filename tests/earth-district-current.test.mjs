@@ -10,7 +10,10 @@ test('a visitor pier cannot authorize every vessel class',()=>{
  const pier={type:'pier',access:'yes'};
  assert.deepEqual(MARITIME_CATALOG.filter(c=>maritimeFacilitySupportsVessel(pier,c)).map(c=>c.role),['runabout','workboat']);
  assert.equal(selectMaritimeAnchor([pier],role('cargo')),null);
- assert.equal(maritimeFacilitySupportsVessel({type:'ferry_terminal'},role('ferry')),true);
+ assert.equal(maritimeFacilitySupportsVessel({type:'ferry_terminal'},role('ferry')),false);
+ assert.equal(maritimeFacilitySupportsVessel({type:'ferry_terminal'},role('harbor_launch')),true);
+ assert.equal(maritimeFacilitySupportsVessel({type:'ferry_terminal',attributes:{vehicleFerry:true}},role('ferry')),true);
+ assert.equal(maritimeFacilitySupportsVessel({type:'ferry_terminal',name:'Baltimore Water Taxi',attributes:{vehicleFerry:true}},role('ferry')),false);
  assert.equal(maritimeFacilitySupportsVessel({type:'marina'},role('sailboat')),true);
 });
 test('large cargo needs mapped port geometry and restricted facilities do not spawn activities',()=>{

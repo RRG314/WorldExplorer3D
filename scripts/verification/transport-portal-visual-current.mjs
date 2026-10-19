@@ -1,3 +1,4 @@
+import {afterWorldLoad} from './complete-world-readiness.mjs';
 // Visual evidence, not a visual-quality assertion. Uses actual loaded transport
 // models and moves the test player to their portals; never changes world geometry.
 import assert from 'node:assert/strict';
@@ -21,7 +22,7 @@ try{
   await page.waitForFunction(()=>window.__WE3D_RUNTIME_READY__,null,{timeout:30000});
   const consent=page.locator('#analyticsConsentDenyBtn');if(await consent.isVisible())await consent.click();
   await page.getByRole('button',{name:'Explore',exact:true}).click();
-  await page.waitForFunction(()=>{const d=window.getWorldExplorerRuntimeDiagnostics?.();return d?.gameStarted&&!d.worldLoading&&d.worldCounts.roads>0;},null,{timeout:240000});
+  await page.waitForFunction(afterWorldLoad(()=>{const d=window.getWorldExplorerRuntimeDiagnostics?.();return d?.gameStarted&&!d.worldLoading&&d.worldCounts.roads>0;}),null,{timeout:240000});
   console.log('Monaco loaded');
   const inventory=await page.evaluate(async()=>{
     const {ctx}=await import('/app/js/shared-context.js?v=55');

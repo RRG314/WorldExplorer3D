@@ -2,7 +2,20 @@
 
 Notable user-facing changes are recorded here. Git history and GitHub releases contain the complete change record.
 
-## [5.6.0] - Unreleased
+## [5.6.1] - 2026-10-19
+
+- Local road-detail recovery keeps the selected world and player in place.
+- Reduced retained navigation memory and unnecessary pavement work while preserving mapped coverage.
+- Side streets connect to engineered approaches at a shared driving height.
+- Location-based Earth is the default; extending scenery remains optional.
+- Repaired aquarium and museum entry, recognizable Baltimore exteriors, harbor
+  banks, vessel selection and contact.
+- Explorable VAB ground floor and mapped LC39B launch-pad surroundings.
+- Ocean entry, diver framing, terrain recovery and account-state ownership fixes.
+
+[Release notes](RELEASE_NOTES_5.6.1.md).
+
+## [5.6.0] - 2026-10-13
 
 ### Added
 
@@ -28,6 +41,11 @@ Notable user-facing changes are recorded here. Git history and GitHub releases c
 Detailed Earth road and building physics remain around the selected location.
 Broader career, facility and ecology expansions remain on the roadmap.
 [Release notes](RELEASE_NOTES_5.6.0.md).
+
+## [5.5.1] - 2026-10-14
+
+- Road-detail loading recovers locally without a world reload or Main Menu trip.
+- Restored location-based Earth as the default while retaining saved preferences.
 
 ## [5.5.0] - 2026-10-08
 

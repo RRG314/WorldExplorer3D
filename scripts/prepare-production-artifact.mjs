@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { currentBaseline, currentArtifactIdentity } from './verification/execution-evidence.mjs';
 import { PROMOTION_RECEIPT, promotedEvidenceIdentity } from './verification/production-promotion.mjs';
+import {readTargetedReleaseDecision} from './verification/targeted-release-decision.mjs';
 
 function run(script, args = []) {
   const result = spawnSync(process.execPath, [script, ...args], { stdio: 'inherit',
@@ -14,8 +15,14 @@ assert.equal(baseline.dirty, false, 'Production preparation requires clean sourc
 const stagingBuildJson = fs.readFileSync('dist/build-manifest.json', 'utf8');
 assert.equal(JSON.parse(stagingBuildJson).firebaseEnvironment, 'staging', 'Verify the staging-configured package first');
 run('scripts/hosting-artifact.mjs', ['verify']);
-run('scripts/verification/release-scope.mjs', ['--require-ready']);
-run('scripts/verification/public-feature-claims.mjs', ['--require-ready']);
+const targetedReview=String(process.env.WE3D_TARGETED_RELEASE_DECISION || '').trim();
+if(targetedReview){
+  console.log(JSON.stringify(readTargetedReleaseDecision(process.cwd(),targetedReview,{baseline,artifact:currentArtifactIdentity(process.cwd(),'dist')})));
+  run('scripts/verification/public-feature-claims.mjs');
+}else{
+  run('scripts/verification/release-scope.mjs', ['--require-ready']);
+  run('scripts/verification/public-feature-claims.mjs', ['--require-ready']);
+}
 const stagingAssetsJson = fs.readFileSync('dist/asset-manifest.json', 'utf8');
 const stagingIdentity = currentArtifactIdentity(process.cwd(), 'dist');
 // Retain the tested manifests/evidence, not another full project or world copy.

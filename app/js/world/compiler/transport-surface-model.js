@@ -1,5 +1,6 @@
+import {copyNumericArray, createNumericScratchPool} from '../../structure-semantics/numeric-scratch.js';
 import { sampleSortedProfileAtDistance } from '../../structure-semantics/profile-sampling.js';
-import {tunnelObstructionMaximumY} from './tunnel-obstruction-limits.js';
+import {tunnelObstructionMaximumY, tunnelRoofHalfWidth} from './tunnel-envelope.js';
 import {fitOrdinaryStreetProfile} from './ordinary-street-profile.js';
 import {roadPlacementOffsetWorld} from '../road-units.js';
 import {
@@ -30,6 +31,7 @@ import {
   tangentAtDistance
 } from './transport-surface-profile.js?v=12';
 
+const transportScratch = createNumericScratchPool();
 const TRANSPORT_SURFACE_SCHEMA_VERSION = 1;
 // Weak ownership, not a cache of external/mutable profiles. Compilation creates
 // sorted station distances; later reconciliation updates heights, not stations.
@@ -114,21 +116,28 @@ function engineeredMaximumGrade(feature, semantics = feature?.structureSemantics
   return 0.085;
 }
 
-function smoothUpperBoundedGradeProfile(initialHeights, upperBounds, distances, maximumGrade) {
+function mirroredScratch(Type, source, allocate) {
+  const result = allocate(Type, source.length);
+  for (let index = 0; index < source.length; index++) result[index] = -source[index];
+  return result;
+}
+
+function smoothUpperBoundedGradeProfile(initialHeights, upperBounds, distances, maximumGrade, allocate = copyNumericArray) {
   // The shared smoother is lower-bounded because bridge clearance is a
   // minimum. Tunnels have the inverse physical invariant: their surface must
   // not rise above the local subgrade ceiling. Mirroring the profile lets the
   // same deterministic grade solver enforce that upper bound without a
   // second, divergent alignment algorithm.
-  const mirroredInitial = Float64Array.from(initialHeights, (height) => -height);
-  const mirroredLowerBounds = Float64Array.from(upperBounds, (height) => -height);
+  const mirroredInitial = mirroredScratch(Float64Array, initialHeights, allocate);
+  const mirroredLowerBounds = mirroredScratch(Float64Array, upperBounds, allocate);
   const mirrored = smoothGradeLimitedProfile(
     mirroredInitial,
     mirroredLowerBounds,
     distances,
-    maximumGrade
+    maximumGrade,
+    allocate
   );
-  return Float32Array.from(mirrored, (height) => -height);
+  return mirroredScratch(Float32Array, mirrored, allocate);
 }
 
 function reconcileExactSubgradeGraphNodeConstraints(
@@ -136,7 +145,8 @@ function reconcileExactSubgradeGraphNodeConstraints(
   heights,
   upperBounds,
   distances,
-  maximumGrade
+  maximumGrade,
+  allocate = copyNumericArray
 ) {
   const transitionAnchors = Array.isArray(feature?.structureTransitionAnchors)
     ? feature.structureTransitionAnchors
@@ -177,19 +187,24 @@ function reconcileExactSubgradeGraphNodeConstraints(
         : anchor?.targetSurfaceY
     }))
   };
-  const mirroredHeights = Float32Array.from(heights, (height) => -height);
-  const mirroredLowerBounds = Float64Array.from(upperBounds, (height) => -height);
+  const mirroredHeights = mirroredScratch(Float32Array, heights, allocate);
+  const mirroredLowerBounds = mirroredScratch(Float64Array, upperBounds, allocate);
   const reconciled = reconcileExactGraphNodeConstraints(
     mirroredFeature,
     mirroredHeights,
     distances,
     mirroredLowerBounds,
-    maximumGrade
+    maximumGrade,
+    allocate
   );
-  return Float32Array.from(reconciled, (height) => -height);
+  return mirroredScratch(Float32Array, reconciled, allocate);
 }
 
 function compileTransportSurfaceModel(feature, sampleTerrainY, options = {}) {
+  return transportScratch.withScratch(allocate => compileTransportSurfaceWithScratch(feature, sampleTerrainY, options, allocate));
+}
+
+function compileTransportSurfaceWithScratch(feature, sampleTerrainY, options, allocate) {
   if (!feature || !Array.isArray(feature.pts) || feature.pts.length < 2) {
     throw new Error('Transport surface compilation requires a polyline with at least two points');
   }
@@ -199,7 +214,7 @@ function compileTransportSurfaceModel(feature, sampleTerrainY, options = {}) {
 
   const points = feature.pts;
   const semantics = feature.structureSemantics || { terrainMode: 'at_grade' };
-  const { distances: sourcePathDistances, total } = polylineDistances(points);
+  const { distances: sourcePathDistances, total } = polylineDistances(points, allocate);
   const exactGraphNodeDistances = (Array.isArray(feature?.structureTransitionAnchors)
     ? feature.structureTransitionAnchors
     : [])
@@ -215,7 +230,8 @@ function compileTransportSurfaceModel(feature, sampleTerrainY, options = {}) {
     options.sampleStep,
     exactGraphNodeDistances,
     (feature.ordinaryStreetAnchors||[]).map(a=>a.distance).concat(
-      (feature.tunnelObstructionLimits || []).flatMap(limit => [limit.start, limit.end]))
+      (feature.tunnelObstructionLimits || []).flatMap(limit => [limit.start, limit.end])),
+    allocate
   );
   // All nine published numeric fields have the model's lifetime. Use one
   // backing store with disjoint views rather than five native buffers per
@@ -223,15 +239,15 @@ function compileTransportSurfaceModel(feature, sampleTerrainY, options = {}) {
   const sampleCount = sourceSampleDistances.length;
   const stationBytes = sampleCount * 8;
   const pathBytes = sourcePathDistances.byteLength;
-  const publishedStorage = new ArrayBuffer(stationBytes + pathBytes + sampleCount * 7 * 4);
-  const sampleDistances = new Float64Array(publishedStorage, 0, sampleCount);
-  const pathDistances = new Float32Array(publishedStorage, stationBytes, sourcePathDistances.length);
+  const publishedBytes = stationBytes + pathBytes + sampleCount * 7 * 4;
+  const publication = options.publicationStorage?.allocate(publishedBytes) ||
+    {buffer: new ArrayBuffer(publishedBytes), byteOffset: 0};
+  const publishedStorage = publication.buffer, publishedOffset = publication.byteOffset;
+  const sampleDistances = new Float64Array(publishedStorage, publishedOffset, sampleCount);
+  const pathDistances = new Float32Array(publishedStorage, publishedOffset + stationBytes, sourcePathDistances.length);
   sampleDistances.set(sourceSampleDistances);
   pathDistances.set(sourcePathDistances);
-  // Both sources were allocated exclusively by this call, before publication.
-  // Older browsers simply retain their normal GC behavior.
-  sourceSampleDistances.buffer.transfer?.(0);
-  sourcePathDistances.buffer.transfer?.(0);
+  // Sources are borrowed scratch; published fields own the copy above.
   const surfaceBias = Number.isFinite(options.surfaceBias)
     ? Number(options.surfaceBias)
     : Number.isFinite(feature.surfaceBias)
@@ -259,24 +275,23 @@ function compileTransportSurfaceModel(feature, sampleTerrainY, options = {}) {
   // Tunnel containment must sample the SAME outer roof extent as its shell
   // compiler, not just the carriageway edges on a steep cross-slope.
   const groundProbeHalfWidth = semantics.terrainMode === 'subgrade' && semantics.isTunnel
-    ? Math.max(3.4, compiledWidth) * 0.5 + 0.95
+    ? tunnelRoofHalfWidth(compiledWidth)
     : halfWidth;
   const corridorCenterOffset = roadPlacementOffsetWorld(feature);
   const anchors = normalizeAnchors(feature, semantics, total);
   // These four published profiles share a lifetime, but never overlap. One
   // backing allocation avoids four native buffers per compiled road.
-  const groundStorage = new Float32Array(publishedStorage, stationBytes + pathBytes, sampleCount * 4);
+  const groundStorage = new Float32Array(publishedStorage, publishedOffset + stationBytes + pathBytes, sampleCount * 4);
   const groundHeights = groundStorage.subarray(0, sampleCount);
   const offsets = groundStorage.subarray(sampleCount, sampleCount * 2);
   const leftGround = groundStorage.subarray(sampleCount * 2, sampleCount * 3);
   const rightGround = groundStorage.subarray(sampleCount * 3);
   // Compiler-only work must not keep storage alive through the published model.
   // Preserve each field's original Float64/Float32 rounding and zero fill.
-  const scratch = new ArrayBuffer(sampleCount * 28);
-  const centerInitial = new Float64Array(scratch, 0, sampleCount);
-  const centerLowerBounds = new Float64Array(scratch, sampleCount * 8, sampleCount);
-  const centerUpperBounds = new Float64Array(scratch, sampleCount * 16, sampleCount);
-  const terrainEnvelope = new Float32Array(scratch, sampleCount * 24, sampleCount);
+  const centerInitial = allocate(Float64Array, sampleCount);
+  const centerLowerBounds = allocate(Float64Array, sampleCount);
+  const centerUpperBounds = allocate(Float64Array, sampleCount);
+  const terrainEnvelope = allocate(Float32Array, sampleCount);
   const mode = semantics?.terrainMode || 'at_grade';
   const minimumStructureSurfaceY = Number(feature.minimumStructureSurfaceY);
   const maximumAtGradeCut = Math.max(
@@ -412,27 +427,30 @@ function compileTransportSurfaceModel(feature, sampleTerrainY, options = {}) {
         centerUpperBounds,
         sampleDistances,
         maximumGrade,
-        options.verticalFitRadius
+        options.verticalFitRadius,
+        allocate
       )
     : mode === 'subgrade'
       ? smoothUpperBoundedGradeProfile(
           centerInitial,
           centerUpperBounds,
           sampleDistances,
-          maximumGrade
+          maximumGrade,
+          allocate
         )
       : smoothGradeLimitedProfile(
         centerInitial,
         centerLowerBounds,
         sampleDistances,
-        maximumGrade
+        maximumGrade,
+        allocate
       );
   if(mode==='at_grade'&&!engineeredApproach){
     const ordinaryFit=fitOrdinaryStreetProfile(sampleDistances,centerHeights,[
       {distance:0,targetSurfaceY:endpointGroundStart+surfaceBias},
       {distance:total,targetSurfaceY:endpointGroundEnd+surfaceBias},
       ...(feature.ordinaryStreetAnchors||[])
-    ],maximumGrade);
+    ],maximumGrade,allocate);
     centerHeights=ordinaryFit.heights;
     maximumGrade=ordinaryFit.maximumGrade;
   }
@@ -445,7 +463,8 @@ function compileTransportSurfaceModel(feature, sampleTerrainY, options = {}) {
       centerHeights,
       sampleDistances,
       centerLowerBounds,
-      approachMaximumGrade
+      approachMaximumGrade,
+      allocate
     );
     // The constrained solver above owns both graph identity and design grade.
     // Re-pinning nodes after it runs can recreate an infeasible one-sample
@@ -459,7 +478,8 @@ function compileTransportSurfaceModel(feature, sampleTerrainY, options = {}) {
       endpointGroundStart,
       endpointGroundEnd,
       surfaceBias,
-      maximumGrade
+      maximumGrade,
+      allocate
     );
     const tiedProfileMaximumGrade = profileStats(sampleDistances, centerHeights).maximumGrade;
     const hasConnectedEndpointTieIn = Array.isArray(feature?.structureTransitionAnchors) &&
@@ -473,7 +493,8 @@ function compileTransportSurfaceModel(feature, sampleTerrainY, options = {}) {
         centerHeights,
         centerLowerBounds,
         sampleDistances,
-        maximumGrade
+        maximumGrade,
+        allocate
       );
     }
     if (mode === 'elevated') {
@@ -482,7 +503,8 @@ function compileTransportSurfaceModel(feature, sampleTerrainY, options = {}) {
         centerHeights,
         sampleDistances,
         centerLowerBounds,
-        maximumGrade
+        maximumGrade,
+        allocate
       );
     }
     if (mode === 'subgrade') {
@@ -493,7 +515,8 @@ function compileTransportSurfaceModel(feature, sampleTerrainY, options = {}) {
         centerHeights,
         centerUpperBounds,
         sampleDistances,
-        maximumGrade
+        maximumGrade,
+        allocate
       );
       // Tunnel containment is the mirrored bridge problem: the terrain cover
       // is an upper bound, but a feasible graph-owned portal still has to meet
@@ -504,7 +527,8 @@ function compileTransportSurfaceModel(feature, sampleTerrainY, options = {}) {
         centerHeights,
         centerUpperBounds,
         sampleDistances,
-        maximumGrade
+        maximumGrade,
+        allocate
       );
       if (feature.tunnelObstructionLimits?.length) {
         // A portal can relax modeled terrain cover, but it cannot move through
@@ -514,7 +538,7 @@ function compileTransportSurfaceModel(feature, sampleTerrainY, options = {}) {
         const obstructionBounds = Float64Array.from(sampleDistances, distance =>
           tunnelObstructionMaximumY(feature.tunnelObstructionLimits, distance));
         if (centerHeights.some((height,index) => height > obstructionBounds[index] + 1e-5)) {
-          centerHeights = smoothUpperBoundedGradeProfile(centerHeights, obstructionBounds, sampleDistances, maximumGrade);
+          centerHeights = smoothUpperBoundedGradeProfile(centerHeights, obstructionBounds, sampleDistances, maximumGrade, allocate);
         }
       }
       // The mirrored constrained solver is the final tunnel authority. A
@@ -526,11 +550,10 @@ function compileTransportSurfaceModel(feature, sampleTerrainY, options = {}) {
   // sidewalks, and visuals then query one planar deck instead of recreating
   // incompatible lateral terrain folds.
   const solvedHeights = centerHeights;
-  centerHeights = new Float32Array(publishedStorage, stationBytes + pathBytes + sampleCount * 4 * 4, sampleCount);
+  centerHeights = new Float32Array(publishedStorage, publishedOffset + stationBytes + pathBytes + sampleCount * 4 * 4, sampleCount);
   centerHeights.set(solvedHeights);
-  solvedHeights.buffer.transfer?.(0);
-  scratch.transfer?.(0);
-  const edgeStorage = new Float32Array(publishedStorage, stationBytes + pathBytes + sampleCount * 5 * 4, sampleCount * 2);
+  // The scratch scope is returned only after every accepted field is copied.
+  const edgeStorage = new Float32Array(publishedStorage, publishedOffset + stationBytes + pathBytes + sampleCount * 5 * 4, sampleCount * 2);
   const leftHeights = edgeStorage.subarray(0, centerHeights.length);
   const rightHeights = edgeStorage.subarray(centerHeights.length);
   leftHeights.set(centerHeights);

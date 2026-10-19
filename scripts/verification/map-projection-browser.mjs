@@ -1,3 +1,4 @@
+import {afterWorldLoad} from './complete-world-readiness.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import {chromium} from 'playwright';
@@ -16,7 +17,7 @@ try{
  await page.waitForFunction(()=>globalThis.__WE3D_RUNTIME_READY__,null,{timeout:120000});
  if(await page.locator('#analyticsConsentDenyBtn').isVisible())await page.locator('#analyticsConsentDenyBtn').click();
  await page.locator('#globeSelectorStartBtn').click();
- await page.waitForFunction(()=>{const d=getWorldExplorerRuntimeDiagnostics();return d.gameStarted&&!d.worldLoading&&d.worldDiscovery?.active&&!document.getElementById('loading')?.classList.contains('show');},null,{timeout:180000});
+ await page.waitForFunction(afterWorldLoad(()=>{const d=getWorldExplorerRuntimeDiagnostics();return d.gameStarted&&!d.worldLoading&&d.worldDiscovery?.active&&!document.getElementById('loading')?.classList.contains('show');}),null,{timeout:180000});
  await page.evaluate(async()=>{globalThis.__mapContext=(await import('/app/js/shared-context.js?v=55')).ctx;});
  const mini=await page.locator('#minimapZoomLevel').textContent();await page.locator('#minimapZoomIn').click();assert.notEqual(await page.locator('#minimapZoomLevel').textContent(),mini);await page.locator('#minimapZoomOut').click();
  for(const [id,viewport] of [['desktop',{width:1440,height:900}],['phone',{width:390,height:844}]]){

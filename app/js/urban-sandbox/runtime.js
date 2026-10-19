@@ -12,6 +12,7 @@ import { applyTransportDamage } from '../transport/damage-model.js?v=1';
 import { createCivicResponseModel } from './civic-response-model.js?v=3';
 import { ensurePlayerBackpackInventory } from './equipment-model.js?v=10';
 import { createUrbanEquipmentRuntime } from './equipment-runtime.js?v=24';
+import {urbanGroundPlayerPosition} from './player-position.js';
 import { createEquipmentVisuals } from './equipment-visuals.js?v=10';
 import {
   attachCuratedEquipmentVisual,
@@ -679,11 +680,19 @@ function nearestFurnitureCandidate(state, radius = 3.2) {
   if (!activeWorldMatches(state) || appCtx.Walk?.state?.mode !== 'walk') return null;
   const walker = appCtx.Walk?.state?.walker;
   if (!walker) return null;
-  return (appCtx.streetFurnitureMeshes || []).map((object) => ({
-    object,
-    distance: Math.hypot(object.position.x - walker.x, object.position.z - walker.z)
-  })).filter((entry) => entry.object?.userData?.interactiveWorldObject && entry.distance <= radius)
-    .sort((a, b) => a.distance - b.distance)[0] || null;
+  let nearest = null;
+  let distance = Infinity;
+  for (const object of appCtx.streetFurnitureMeshes || []) {
+    if (!object?.userData?.interactiveWorldObject) continue;
+    const candidateDistance = Math.hypot(object.position.x - walker.x, object.position.z - walker.z);
+    // Keep source order for ties, just like the stable sorted query. Only the
+    // selected object escapes this synchronous search; no scene-sized array.
+    if (candidateDistance <= radius && (!nearest || candidateDistance < distance)) {
+      nearest = object;
+      distance = candidateDistance;
+    }
+  }
+  return nearest ? { object: nearest, distance } : null;
 }
 
 function nearestResponderLootCandidate(state, radius = 3.2) {
@@ -894,7 +903,7 @@ function resolveStoreApproach(state, store) {
       mode: 'walk',
       feetY: groundY,
       source: 'mapped_commerce_place_approach',
-      maxGroundRadius: 2
+      allowRelocation: false
     });
     if (resolved?.valid === false) continue;
     return Object.freeze({ ...store, interactionX: Number(resolved?.x ?? candidate.x), interactionZ: Number(resolved?.z ?? candidate.z) });
@@ -942,6 +951,7 @@ function commerceFailureMessage(reason) {
     service_not_available: 'That service is not available at this mapped place.',
     service_target_unavailable: 'Bring the relevant vehicle or companion into the world before using that service.',
     service_effect_failed_refunded: 'The service could not be applied, so the Explorer Wallet charge was refunded.',
+    commerce_recovery_required: 'Your purchase is saved for recovery. Reopen this store when connected before trying another purchase.',
     settlement_recovery_required: 'A service payment is saved but still needs to finish. Return with the same vehicle or companion and reopen this store to retry.',
     save_failed: 'This exchange could not be saved. Nothing changed. Close other World Explorer tabs or free browser storage, then retry.',
     delivery_recovery_required: 'The wallet record is safe, but the Backpack is still syncing this item.',
@@ -1016,7 +1026,7 @@ function openStore(state, storeId, options = {}) {
   void state.commerce.recoverPending?.((service, receiptId, recovery) => applyPoiService(state, service, receiptId, recovery)).then(result=>{
     if (!state.storeOpen || state.activeStoreId!==store.id) return;
     if (result?.remaining) state.storeStatus=commerceFailureMessage('settlement_recovery_required');
-    else if (result?.recovered) state.storeStatus='Your pending service has been recovered.';
+    else if (result?.recovered) state.storeStatus='Your pending purchase has been recovered.';
     renderStore(state);
   });
   return true;
@@ -1086,6 +1096,9 @@ function poiServiceTargetId(state, serviceId) {
 }
 
 async function applyPoiService(state, service, receiptId = '', recovery = {}) {
+  // A first reply can be delayed just like recovery. Keep the funded service
+  // attached to its original vehicle, vessel or companion.
+  if (recovery.targetId && recovery.targetId !== poiServiceTargetId(state, service?.id)) return null;
   if (recovery.recovery) {
     if (!recovery.targetId || recovery.targetId!==poiServiceTargetId(state,service?.id)) return null;
     if (service.id==='player-treatment' && Number(state.playerCondition??1)>=.999) return true;
@@ -1114,9 +1127,11 @@ async function applyPoiService(state, service, receiptId = '', recovery = {}) {
     const runtime = appCtx.worldDiscoveryRuntime?.companionRuntime;
     const activeId = runtime?.snapshot?.().activeInstanceId;
     if (!runtime || !activeId) return false;
-    await runtime.care(activeId, 'feed');
-    await runtime.awardXp({ receiptId: `poi-care:${receiptId || Date.now()}`, reasonId: 'care-after-outing' });
-    return true;
+    if (await runtime.care(activeId, 'feed') !== true) return false;
+    const award = await runtime.awardXp({ receiptId: `poi-care:${receiptId || Date.now()}`, reasonId: 'care-after-outing' }, activeId);
+    // Care may already be saved when progress fails. Keep the receipt pending
+    // instead of refunding a partially applied effect or claiming success.
+    return award?.awarded === true || award?.reason === 'already-awarded' ? true : null;
   }
   if (parseUpgradeServiceId(service?.id)) {
     const target = state.activeVehicle || appCtx.car;
@@ -1905,8 +1920,8 @@ function beginExit(state) {
 }
 
 function civicActorPosition(state) {
-  if (state.activeVehicle) return vehiclePose(state.activeVehicle);
-  return appCtx.Walk?.state?.walker || appCtx.car || null;
+  return urbanGroundPlayerPosition(appCtx.Walk?.state, appCtx.car,
+    state.activeVehicle ? vehiclePose(state.activeVehicle) : null);
 }
 
 function mappedFacilitySpawnFor(state, type, origin = civicActorPosition(state)) {
@@ -2480,7 +2495,10 @@ function updatePrompt(state) {
     setDomAttribute(prompt.root, 'aria-hidden', 'true');
     return;
   }
-  const candidate = appCtx.resolvePrimaryContextInteraction?.() || interactionCandidate(state);
+  // A registered router returning null has already searched this provider.
+  // The direct query is only the bootstrap fallback before routing is installed.
+  const candidate = typeof appCtx.resolvePrimaryContextInteraction === 'function'
+    ? appCtx.resolvePrimaryContextInteraction() : interactionCandidate(state);
   const transientStatus = state.statusUntil > now() ? state.statusMessage : '';
   if (!candidate && !transientStatus) {
     setDomClass(prompt.root, 'familiar', false);
@@ -2930,7 +2948,7 @@ function startUrbanSandboxRuntime(options = {}) {
     if (appCtx.urbanSandboxRuntime.storeOpen) renderStore(appCtx.urbanSandboxRuntime);
   }) || null;
   const commerce = connectedWallet
-    ? createLocalCommerceModel({ inventory: equipment, transactionAuthority: connectedWallet })
+    ? createLocalCommerceModel({ inventory: equipment, backpackStore, transactionAuthority: connectedWallet })
     : appCtx.worldEconomy || appCtx.localConvenienceStoreCommerce || createLocalCommerceModel({ inventory: equipment, backpackStore });
   appCtx.worldEconomy = commerce;
   appCtx.localConvenienceStoreCommerce = commerce;
@@ -3230,7 +3248,8 @@ function startUrbanSandboxRuntime(options = {}) {
   };
   state.onSecondaryClick = () => useEquipped(state);
   state.onTakeClick = () => {
-    const candidate = appCtx.resolvePrimaryContextInteraction?.() || interactionCandidate(state);
+    const candidate = typeof appCtx.resolvePrimaryContextInteraction === 'function'
+      ? appCtx.resolvePrimaryContextInteraction() : interactionCandidate(state);
     if (candidate?.action === 'loot_responder') performResponderLoot(state, candidate);
     else if (candidate?.action === 'talk_npc' || candidate?.action === 'loot_npc') performNpcTake(state, candidate);
   };

@@ -8,7 +8,7 @@ async function commitExplorerCommerceAction(input = {}) {
     catalogId: String(input.catalogId || '').slice(0, 100),
     targetId: String(input.targetId || '').slice(0, 180),
     dayKey: String(input.dayKey || '').slice(0, 10)
-  }, { label: 'Explorer Wallet', forceRefreshToken: false });
+  }, { label: 'Explorer Wallet', forceRefreshToken: false, expectedUserId: input.expectedUserId });
 }
 
 async function settleExplorerCommerceOutcome(input = {}) {
@@ -16,7 +16,7 @@ async function settleExplorerCommerceOutcome(input = {}) {
     requestId: String(input.requestId || '').slice(0, 120),
     outcome: String(input.outcome || '').slice(0, 24),
     reason: String(input.reason || '').slice(0, 120)
-  }, { label: 'Explorer Wallet', forceRefreshToken: false });
+  }, { label: 'Explorer Wallet', forceRefreshToken: false, expectedUserId: input.expectedUserId });
 }
 
 export { commitExplorerCommerceAction, settleExplorerCommerceOutcome };

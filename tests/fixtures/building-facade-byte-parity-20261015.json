@@ -1,0 +1,903 @@
+{
+  "source": "fb24 facade behavior before temporary-array reduction; generated with Three geometry",
+  "records": [
+    {
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          7.3,
+          0
+        ],
+        [
+          7.3,
+          5
+        ],
+        [
+          0,
+          5
+        ]
+      ],
+      "options": {},
+      "indexed": false,
+      "plan": {
+        "foundation": 0,
+        "floors": 3,
+        "floorHeight": 3.466666603088379,
+        "available": 10.399999809265136,
+        "attributeBytes": 1152
+      },
+      "sha256": "569bc933280eaa4573f399919efa87448a7178b26eccb4d4a592f055dcf57c8d"
+    },
+    {
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          7.3,
+          0
+        ],
+        [
+          7.3,
+          5
+        ],
+        [
+          0,
+          5
+        ]
+      ],
+      "options": {},
+      "indexed": true,
+      "plan": {
+        "foundation": 0,
+        "floors": 3,
+        "floorHeight": 3.466666603088379,
+        "available": 10.399999809265136,
+        "attributeBytes": 1152
+      },
+      "sha256": "569bc933280eaa4573f399919efa87448a7178b26eccb4d4a592f055dcf57c8d"
+    },
+    {
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          7.3,
+          0
+        ],
+        [
+          7.3,
+          5
+        ],
+        [
+          0,
+          5
+        ]
+      ],
+      "options": {
+        "levels": 3,
+        "foundation": 1.2,
+        "window": {
+          "bayWidth": 3.05,
+          "floorHeight": 3.15,
+          "width": 0.46,
+          "height": 0.58,
+          "frame": 0.055
+        }
+      },
+      "indexed": false,
+      "plan": {
+        "foundation": 1.2,
+        "floors": 3,
+        "floorHeight": 3.066666603088379,
+        "available": 9.199999809265137,
+        "attributeBytes": 1152
+      },
+      "sha256": "1a38263c13e6578caa9f05d94eb563834a27f9429b809b47d574962f202d8d44"
+    },
+    {
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          7.3,
+          0
+        ],
+        [
+          7.3,
+          5
+        ],
+        [
+          0,
+          5
+        ]
+      ],
+      "options": {
+        "levels": 3,
+        "foundation": 1.2,
+        "window": {
+          "bayWidth": 3.05,
+          "floorHeight": 3.15,
+          "width": 0.46,
+          "height": 0.58,
+          "frame": 0.055
+        }
+      },
+      "indexed": true,
+      "plan": {
+        "foundation": 1.2,
+        "floors": 3,
+        "floorHeight": 3.066666603088379,
+        "available": 9.199999809265137,
+        "attributeBytes": 1152
+      },
+      "sha256": "1a38263c13e6578caa9f05d94eb563834a27f9429b809b47d574962f202d8d44"
+    },
+    {
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          7.3,
+          0
+        ],
+        [
+          7.3,
+          5
+        ],
+        [
+          0,
+          5
+        ]
+      ],
+      "options": {
+        "material": {
+          "surfacePattern": "glass"
+        },
+        "storefront": {
+          "glazing": 0.8
+        }
+      },
+      "indexed": false,
+      "plan": {
+        "foundation": 0,
+        "floors": 3,
+        "floorHeight": 3.466666603088379,
+        "available": 10.399999809265136,
+        "attributeBytes": 1152
+      },
+      "sha256": "3106a9f3cab5e30224bb09cde65578b1d881e60874ed6a4a09059981f5d971f4"
+    },
+    {
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          7.3,
+          0
+        ],
+        [
+          7.3,
+          5
+        ],
+        [
+          0,
+          5
+        ]
+      ],
+      "options": {
+        "material": {
+          "surfacePattern": "glass"
+        },
+        "storefront": {
+          "glazing": 0.8
+        }
+      },
+      "indexed": true,
+      "plan": {
+        "foundation": 0,
+        "floors": 3,
+        "floorHeight": 3.466666603088379,
+        "available": 10.399999809265136,
+        "attributeBytes": 1152
+      },
+      "sha256": "3106a9f3cab5e30224bb09cde65578b1d881e60874ed6a4a09059981f5d971f4"
+    },
+    {
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          7.3,
+          0
+        ],
+        [
+          7.3,
+          5
+        ],
+        [
+          0,
+          5
+        ]
+      ],
+      "options": {
+        "openings": false
+      },
+      "indexed": false,
+      "plan": {
+        "foundation": 0,
+        "floors": 0,
+        "floorHeight": 3.466666603088379,
+        "available": 10.399999809265136,
+        "attributeBytes": 1152
+      },
+      "sha256": "96ea198cb551b7709e2a8fe06899b5cc1e6c9eaec3b0f76eb44731fbcf20dccf"
+    },
+    {
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          7.3,
+          0
+        ],
+        [
+          7.3,
+          5
+        ],
+        [
+          0,
+          5
+        ]
+      ],
+      "options": {
+        "openings": false
+      },
+      "indexed": true,
+      "plan": {
+        "foundation": 0,
+        "floors": 0,
+        "floorHeight": 3.466666603088379,
+        "available": 10.399999809265136,
+        "attributeBytes": 1152
+      },
+      "sha256": "96ea198cb551b7709e2a8fe06899b5cc1e6c9eaec3b0f76eb44731fbcf20dccf"
+    },
+    {
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          5,
+          5
+        ],
+        [
+          2,
+          8
+        ],
+        [
+          -3,
+          3
+        ]
+      ],
+      "options": {},
+      "indexed": false,
+      "plan": {
+        "foundation": 0,
+        "floors": 3,
+        "floorHeight": 3.466666603088379,
+        "available": 10.399999809265136,
+        "attributeBytes": 1152
+      },
+      "sha256": "f97e4215d468e3cbb65e486b0e5a861b3ea4b704d29949dcd9c817c988cbe415"
+    },
+    {
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          5,
+          5
+        ],
+        [
+          2,
+          8
+        ],
+        [
+          -3,
+          3
+        ]
+      ],
+      "options": {},
+      "indexed": true,
+      "plan": {
+        "foundation": 0,
+        "floors": 3,
+        "floorHeight": 3.466666603088379,
+        "available": 10.399999809265136,
+        "attributeBytes": 1152
+      },
+      "sha256": "f97e4215d468e3cbb65e486b0e5a861b3ea4b704d29949dcd9c817c988cbe415"
+    },
+    {
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          5,
+          5
+        ],
+        [
+          2,
+          8
+        ],
+        [
+          -3,
+          3
+        ]
+      ],
+      "options": {
+        "levels": 3,
+        "foundation": 1.2,
+        "window": {
+          "bayWidth": 3.05,
+          "floorHeight": 3.15,
+          "width": 0.46,
+          "height": 0.58,
+          "frame": 0.055
+        }
+      },
+      "indexed": false,
+      "plan": {
+        "foundation": 1.2,
+        "floors": 3,
+        "floorHeight": 3.066666603088379,
+        "available": 9.199999809265137,
+        "attributeBytes": 1152
+      },
+      "sha256": "d24caf4fbb044372771a8664e3d8aa6608e55ef73cf01b5fc7de47027452efc4"
+    },
+    {
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          5,
+          5
+        ],
+        [
+          2,
+          8
+        ],
+        [
+          -3,
+          3
+        ]
+      ],
+      "options": {
+        "levels": 3,
+        "foundation": 1.2,
+        "window": {
+          "bayWidth": 3.05,
+          "floorHeight": 3.15,
+          "width": 0.46,
+          "height": 0.58,
+          "frame": 0.055
+        }
+      },
+      "indexed": true,
+      "plan": {
+        "foundation": 1.2,
+        "floors": 3,
+        "floorHeight": 3.066666603088379,
+        "available": 9.199999809265137,
+        "attributeBytes": 1152
+      },
+      "sha256": "d24caf4fbb044372771a8664e3d8aa6608e55ef73cf01b5fc7de47027452efc4"
+    },
+    {
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          5,
+          5
+        ],
+        [
+          2,
+          8
+        ],
+        [
+          -3,
+          3
+        ]
+      ],
+      "options": {
+        "material": {
+          "surfacePattern": "glass"
+        },
+        "storefront": {
+          "glazing": 0.8
+        }
+      },
+      "indexed": false,
+      "plan": {
+        "foundation": 0,
+        "floors": 3,
+        "floorHeight": 3.466666603088379,
+        "available": 10.399999809265136,
+        "attributeBytes": 1152
+      },
+      "sha256": "40e58aa82232fcdb78272687c1e521b23928a35e695f4d9eca70b31475c766d2"
+    },
+    {
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          5,
+          5
+        ],
+        [
+          2,
+          8
+        ],
+        [
+          -3,
+          3
+        ]
+      ],
+      "options": {
+        "material": {
+          "surfacePattern": "glass"
+        },
+        "storefront": {
+          "glazing": 0.8
+        }
+      },
+      "indexed": true,
+      "plan": {
+        "foundation": 0,
+        "floors": 3,
+        "floorHeight": 3.466666603088379,
+        "available": 10.399999809265136,
+        "attributeBytes": 1152
+      },
+      "sha256": "40e58aa82232fcdb78272687c1e521b23928a35e695f4d9eca70b31475c766d2"
+    },
+    {
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          5,
+          5
+        ],
+        [
+          2,
+          8
+        ],
+        [
+          -3,
+          3
+        ]
+      ],
+      "options": {
+        "openings": false
+      },
+      "indexed": false,
+      "plan": {
+        "foundation": 0,
+        "floors": 0,
+        "floorHeight": 3.466666603088379,
+        "available": 10.399999809265136,
+        "attributeBytes": 1152
+      },
+      "sha256": "7854e1b41a3ab411990ef3754285f8553b26746f1345ae89c76f6341bfe5fb18"
+    },
+    {
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          5,
+          5
+        ],
+        [
+          2,
+          8
+        ],
+        [
+          -3,
+          3
+        ]
+      ],
+      "options": {
+        "openings": false
+      },
+      "indexed": true,
+      "plan": {
+        "foundation": 0,
+        "floors": 0,
+        "floorHeight": 3.466666603088379,
+        "available": 10.399999809265136,
+        "attributeBytes": 1152
+      },
+      "sha256": "7854e1b41a3ab411990ef3754285f8553b26746f1345ae89c76f6341bfe5fb18"
+    },
+    {
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          8,
+          0
+        ],
+        [
+          8,
+          2
+        ],
+        [
+          3,
+          2
+        ],
+        [
+          3,
+          7
+        ],
+        [
+          0,
+          7
+        ]
+      ],
+      "options": {},
+      "indexed": false,
+      "plan": {
+        "foundation": 0,
+        "floors": 3,
+        "floorHeight": 3.466666603088379,
+        "available": 10.399999809265136,
+        "attributeBytes": 1920
+      },
+      "sha256": "ab32ae51be51a0ba648ca64b48e0944231a7fdaf6ed16f99b9a4ce533582c380"
+    },
+    {
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          8,
+          0
+        ],
+        [
+          8,
+          2
+        ],
+        [
+          3,
+          2
+        ],
+        [
+          3,
+          7
+        ],
+        [
+          0,
+          7
+        ]
+      ],
+      "options": {},
+      "indexed": true,
+      "plan": {
+        "foundation": 0,
+        "floors": 3,
+        "floorHeight": 3.466666603088379,
+        "available": 10.399999809265136,
+        "attributeBytes": 1920
+      },
+      "sha256": "ab32ae51be51a0ba648ca64b48e0944231a7fdaf6ed16f99b9a4ce533582c380"
+    },
+    {
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          8,
+          0
+        ],
+        [
+          8,
+          2
+        ],
+        [
+          3,
+          2
+        ],
+        [
+          3,
+          7
+        ],
+        [
+          0,
+          7
+        ]
+      ],
+      "options": {
+        "levels": 3,
+        "foundation": 1.2,
+        "window": {
+          "bayWidth": 3.05,
+          "floorHeight": 3.15,
+          "width": 0.46,
+          "height": 0.58,
+          "frame": 0.055
+        }
+      },
+      "indexed": false,
+      "plan": {
+        "foundation": 1.2,
+        "floors": 3,
+        "floorHeight": 3.066666603088379,
+        "available": 9.199999809265137,
+        "attributeBytes": 1920
+      },
+      "sha256": "b6659a0ea97b6782abee0c599c56d37fcd13654d3f3a5cd642f5a7c6a189e828"
+    },
+    {
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          8,
+          0
+        ],
+        [
+          8,
+          2
+        ],
+        [
+          3,
+          2
+        ],
+        [
+          3,
+          7
+        ],
+        [
+          0,
+          7
+        ]
+      ],
+      "options": {
+        "levels": 3,
+        "foundation": 1.2,
+        "window": {
+          "bayWidth": 3.05,
+          "floorHeight": 3.15,
+          "width": 0.46,
+          "height": 0.58,
+          "frame": 0.055
+        }
+      },
+      "indexed": true,
+      "plan": {
+        "foundation": 1.2,
+        "floors": 3,
+        "floorHeight": 3.066666603088379,
+        "available": 9.199999809265137,
+        "attributeBytes": 1920
+      },
+      "sha256": "b6659a0ea97b6782abee0c599c56d37fcd13654d3f3a5cd642f5a7c6a189e828"
+    },
+    {
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          8,
+          0
+        ],
+        [
+          8,
+          2
+        ],
+        [
+          3,
+          2
+        ],
+        [
+          3,
+          7
+        ],
+        [
+          0,
+          7
+        ]
+      ],
+      "options": {
+        "material": {
+          "surfacePattern": "glass"
+        },
+        "storefront": {
+          "glazing": 0.8
+        }
+      },
+      "indexed": false,
+      "plan": {
+        "foundation": 0,
+        "floors": 3,
+        "floorHeight": 3.466666603088379,
+        "available": 10.399999809265136,
+        "attributeBytes": 1920
+      },
+      "sha256": "97069b1cb1cb79744d3d96e153e4787d33595d0fc1cbf3fdddf97a7f60512c69"
+    },
+    {
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          8,
+          0
+        ],
+        [
+          8,
+          2
+        ],
+        [
+          3,
+          2
+        ],
+        [
+          3,
+          7
+        ],
+        [
+          0,
+          7
+        ]
+      ],
+      "options": {
+        "material": {
+          "surfacePattern": "glass"
+        },
+        "storefront": {
+          "glazing": 0.8
+        }
+      },
+      "indexed": true,
+      "plan": {
+        "foundation": 0,
+        "floors": 3,
+        "floorHeight": 3.466666603088379,
+        "available": 10.399999809265136,
+        "attributeBytes": 1920
+      },
+      "sha256": "97069b1cb1cb79744d3d96e153e4787d33595d0fc1cbf3fdddf97a7f60512c69"
+    },
+    {
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          8,
+          0
+        ],
+        [
+          8,
+          2
+        ],
+        [
+          3,
+          2
+        ],
+        [
+          3,
+          7
+        ],
+        [
+          0,
+          7
+        ]
+      ],
+      "options": {
+        "openings": false
+      },
+      "indexed": false,
+      "plan": {
+        "foundation": 0,
+        "floors": 0,
+        "floorHeight": 3.466666603088379,
+        "available": 10.399999809265136,
+        "attributeBytes": 1920
+      },
+      "sha256": "c7ea36ca030493b777b1ef9a25780149cb6226abf882d9804cbfb9c3093d18fd"
+    },
+    {
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          8,
+          0
+        ],
+        [
+          8,
+          2
+        ],
+        [
+          3,
+          2
+        ],
+        [
+          3,
+          7
+        ],
+        [
+          0,
+          7
+        ]
+      ],
+      "options": {
+        "openings": false
+      },
+      "indexed": true,
+      "plan": {
+        "foundation": 0,
+        "floors": 0,
+        "floorHeight": 3.466666603088379,
+        "available": 10.399999809265136,
+        "attributeBytes": 1920
+      },
+      "sha256": "c7ea36ca030493b777b1ef9a25780149cb6226abf882d9804cbfb9c3093d18fd"
+    }
+  ]
+}

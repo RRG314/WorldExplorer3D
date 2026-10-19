@@ -1,3 +1,4 @@
+import {setDomText} from '../ui/dom-state.js?v=1';
 import {journalReturnDestination,returnToJournalRecord} from './journal-return.js';
 import {closeJourneyJournal} from './journey-journal.js';
 import { harborJourneyEventIds, lunarCampaignBadges } from '../campaign/lunar-homecoming.js';
@@ -222,6 +223,14 @@ function publishExplorerResult(event, profileStore) {
 }
 
 function createDiscoveryUi(state) {
+  // These live sections have one DOM owner for this UI's lifetime.
+  const liveMarkup = new WeakMap();
+  function setLiveMarkup(element, markup) {
+    if (!element || liveMarkup.get(element) === markup) return;
+    element.innerHTML = markup;
+    liveMarkup.set(element, markup);
+  }
+
   const byId = (id) => document.getElementById(id);
   const elements = {
     saveStatus: byId('discoverySaveStatus'),
@@ -895,9 +904,9 @@ function createDiscoveryUi(state) {
   function render(actions, snapshot, activityId = 'metal-detect') {
     if(elements.panel?.dataset.journeyJournalOwner)return;
     const liveGps = state.appCtx.getLiveGpsSnapshot?.() || { active: false };
-    if (elements.expeditionMode) elements.expeditionMode.textContent = liveGps.active
+    if (elements.expeditionMode) setDomText(elements.expeditionMode, liveGps.active
       ? 'THREE GPS WALKING STOPS'
-      : 'THREE NEARBY FIELD STOPS';
+      : 'THREE NEARBY FIELD STOPS');
     const expedition = state.fieldExpedition?.snapshot?.(
       playerPosition(state.appCtx),
       liveGps.active ? (target) => state.evaluateFieldTarget?.(target) : null
@@ -907,7 +916,7 @@ function createDiscoveryUi(state) {
       if (liveGps.active) {
         const field = liveGps.fieldSession || {};
         const status = field.pauseReason ? displayDiscoveryLabel(field.pauseReason, 'Held') : 'Eligible walking session';
-        elements.fieldSession.innerHTML = `<div><span>LIVE GPS WALK</span><strong>${escapeHtml(status)}</strong><small>${Math.round(Number(field.trustedDistanceMeters || 0))} m trusted walking · raw route not saved</small></div><b>${expedition?.completedCount || 0}/${expedition?.objectiveCount || 0}</b>`;
+        setLiveMarkup(elements.fieldSession, `<div><span>LIVE GPS WALK</span><strong>${escapeHtml(status)}</strong><small>${Math.round(Number(field.trustedDistanceMeters || 0))} m trusted walking · raw route not saved</small></div><b>${expedition?.completedCount || 0}/${expedition?.objectiveCount || 0}</b>`);
         elements.fieldSession.dataset.state = field.pauseReason ? 'held' : 'eligible';
       }
     }
@@ -932,9 +941,9 @@ function createDiscoveryUi(state) {
       const available = encounterLead?.available === true && !operationActive;
       elements.encounterLead.hidden = !available;
       elements.encounterLead.disabled = !available;
-      if (elements.encounterLeadDetail) elements.encounterLeadDetail.textContent = available
+      if (elements.encounterLeadDetail) setDomText(elements.encounterLeadDetail, available
         ? `${encounterLead.leadLabel} · ${Math.ceil(Number(encounterLead.distanceMeters || 0))} m ${compactCompassDirection(encounterLead.bearingDegrees)} · field lead`
-        : '';
+        : '');
     }
     // A world-space action within reach (observe wildlife, enter a vehicle,
     // inspect an object) is more urgent than a broader walking lead. The lead
@@ -953,12 +962,12 @@ function createDiscoveryUi(state) {
       elements.prompt.dataset.tone = encounterLead?.tone || 'field';
       elements.prompt.dataset.mode = encounterLead?.mode || 'free-roam';
     }
-    if (elements.promptText) elements.promptText.textContent = showEncounterLead
+    if (elements.promptText) setDomText(elements.promptText, showEncounterLead
       ? `${encounterLead.leadLabel} · ${Math.ceil(Number(encounterLead.distanceMeters || 0))} m ${compactCompassDirection(encounterLead.bearingDegrees)} · field lead`
       : actions.length
         ? `${actions.slice(0, 3).map((action) => action.label).join(' · ')} available here`
-        : 'Inspect the current area.';
-    if (elements.promptOpen) elements.promptOpen.textContent = showEncounterLead ? 'Track Lead' : 'Explore';
+        : 'Inspect the current area.');
+    if (elements.promptOpen) setDomText(elements.promptOpen, showEncounterLead ? 'Track Lead' : 'Explore');
     const nextSignature = `${activityId}|${actions.map((action) => action.id).join('|')}`;
     if (elements.actions && nextSignature !== actionSignature) {
       actionSignature = nextSignature;
@@ -972,30 +981,30 @@ function createDiscoveryUi(state) {
     const activeAction = actions.find((action) => action.id === activityId);
     const arEligibility = state.getArChallengeEligibility?.();
     if (elements.arChallenge) elements.arChallenge.hidden = !arEligibility?.allowed;
-    if (elements.title && activeTab === 'today') elements.title.textContent = 'Today';
-    if (elements.quickLabel) elements.quickLabel.textContent = snapshot?.phase === 'revealed'
+    if (elements.title && activeTab === 'today') setDomText(elements.title, 'Today');
+    if (elements.quickLabel) setDomText(elements.quickLabel, snapshot?.phase === 'revealed'
       ? `Record ${snapshot.targetName || activeAction?.label || 'your finding'}`
-      : `Resume ${activeAction?.label || 'Field Activity'}`;
+      : `Resume ${activeAction?.label || 'Field Activity'}`);
     if (!snapshot) return;
     if (elements.inspection) {
       const catalog = BUILTIN_DISCOVERY_CATALOGS.fieldDiscoveries.find((entry) => entry.id === snapshot.targetCatalogId);
       const visual = visualForCatalogId(snapshot.targetCatalogId);
       const visible = !!(visual && catalog && ['revealed', 'recorded'].includes(snapshot.phase));
       elements.inspection.hidden = !visible;
-      if (visible) elements.inspection.innerHTML = `<img src="${escapeHtml(visual.image)}" alt="${escapeHtml(visual.alt)}"><div class="discoveryInspectionBody"><span class="discoveryEvidence">Identification reference</span><b>${escapeHtml(catalog.names.common)}</b><em>${escapeHtml(catalog.names.scientific || visual.scientificName)}</em><p>${escapeHtml(catalog.description)}</p><a href="${escapeHtml(visual.sourceUrl)}" target="_blank" rel="noopener noreferrer">Photo: ${escapeHtml(visual.author)} · ${escapeHtml(visual.license)}</a></div>`;
+      if (visible) setLiveMarkup(elements.inspection, `<img src="${escapeHtml(visual.image)}" alt="${escapeHtml(visual.alt)}"><div class="discoveryInspectionBody"><span class="discoveryEvidence">Identification reference</span><b>${escapeHtml(catalog.names.common)}</b><em>${escapeHtml(catalog.names.scientific || visual.scientificName)}</em><p>${escapeHtml(catalog.description)}</p><a href="${escapeHtml(visual.sourceUrl)}" target="_blank" rel="noopener noreferrer">Photo: ${escapeHtml(visual.author)} · ${escapeHtml(visual.license)}</a></div>`);
     }
-    if (elements.phase) elements.phase.textContent = snapshot.phase.replaceAll('-', ' ').replace(/^./, (value) => value.toUpperCase());
+    if (elements.phase) setDomText(elements.phase, snapshot.phase.replaceAll('-', ' ').replace(/^./, (value) => value.toUpperCase()));
     const isDetector = activityId === 'metal-detect';
-    if (elements.bearing) elements.bearing.textContent = isDetector
+    if (elements.bearing) setDomText(elements.bearing, isDetector
       ? snapshot.bearingDegrees == null ? 'No signal' : `${Math.round(snapshot.bearingDegrees)}° bearing`
-      : snapshot.bearingDegrees == null ? snapshot.evidenceClass ? 'Virtual field record' : 'Current survey area' : `${Math.round(snapshot.bearingDegrees)}° field bearing`;
+      : snapshot.bearingDegrees == null ? snapshot.evidenceClass ? 'Virtual field record' : 'Current survey area' : `${Math.round(snapshot.bearingDegrees)}° field bearing`);
     if (elements.fill) elements.fill.style.width = `${isDetector ? Math.round(Number(snapshot.signalStrength || 0) * 100) : snapshot.phase === 'seeking' ? 18 : snapshot.phase === 'observing' ? 62 : ['revealed', 'recorded'].includes(snapshot.phase) ? 100 : 0}%`;
-    if (elements.distance) elements.distance.textContent = isDetector
+    if (elements.distance) setDomText(elements.distance, isDetector
       ? snapshot.distanceMeters == null ? '—' : `${snapshot.distanceMeters.toFixed(1)} m`
-      : snapshot.distanceMeters == null ? 'Local cell' : `${snapshot.distanceMeters.toFixed(1)} m`;
-    if (elements.classification) elements.classification.textContent = snapshot.targetName || snapshot.signalClass?.replaceAll('-', ' ') || snapshot.depthBand || (isDetector ? 'Unknown' : 'Pending');
+      : snapshot.distanceMeters == null ? 'Local cell' : `${snapshot.distanceMeters.toFixed(1)} m`);
+    if (elements.classification) setDomText(elements.classification, snapshot.targetName || snapshot.signalClass?.replaceAll('-', ' ') || snapshot.depthBand || (isDetector ? 'Unknown' : 'Pending'));
     if (elements.message) {
-      elements.message.textContent = snapshot.error || snapshot.message;
+      setDomText(elements.message, snapshot.error || snapshot.message);
       elements.message.classList.toggle('error', !!snapshot.error);
     }
     if (elements.characterAssist) {
@@ -1005,10 +1014,10 @@ function createDiscoveryUi(state) {
         const detail = assistance.type === 'DetectorCharacterAssistance'
           ? `${assistance.informationTier} cues · focus ${Math.round(assistance.focusRadiusMeters)} m · reveal ${Number(assistance.excavationSeconds).toFixed(1)} s`
           : `${assistance.informationTier} cues · observation range ${Math.round(assistance.observationRadiusMeters)} m · steady range ${Math.round(assistance.steadyRangeMeters)} m`;
-        elements.characterAssist.innerHTML = `<strong>${escapeHtml(assistance.label)}</strong><span>${escapeHtml(detail)}</span>`;
+        setLiveMarkup(elements.characterAssist, `<strong>${escapeHtml(assistance.label)}</strong><span>${escapeHtml(detail)}</span>`);
       }
     }
-    if (elements.quickSignal) elements.quickSignal.textContent = isDetector && snapshot.signalStrength > 0.7 ? 'Strong' : isDetector && snapshot.signalStrength > 0.25 ? 'Signal' : isDetector ? 'Sweeping' : snapshot.phase === 'seeking' && snapshot.distanceMeters != null ? `${Math.ceil(snapshot.distanceMeters)} m · ${Math.round(snapshot.bearingDegrees)}°` : snapshot.phase === 'revealed' ? 'Result ready' : 'Observing';
+    if (elements.quickSignal) setDomText(elements.quickSignal, isDetector && snapshot.signalStrength > 0.7 ? 'Strong' : isDetector && snapshot.signalStrength > 0.25 ? 'Signal' : isDetector ? 'Sweeping' : snapshot.phase === 'seeking' && snapshot.distanceMeters != null ? `${Math.ceil(snapshot.distanceMeters)} m · ${Math.round(snapshot.bearingDegrees)}°` : snapshot.phase === 'revealed' ? 'Result ready' : 'Observing');
     const detectorControls = {
       idle: ['Start Sweep', 'Close'], complete: ['Search Again', 'Close'], sweeping: ['Refine Signal', 'Close'],
       signal: ['Refine Signal', 'Close'], classified: ['Excavate', 'Leave'], excavating: ['Excavating…', 'Close'],
@@ -1020,10 +1029,10 @@ function createDiscoveryUi(state) {
     };
     const controls = (isDetector ? detectorControls : fieldControls)[snapshot.phase] || ['Begin', 'Close'];
     if (elements.primary) {
-      elements.primary.textContent = state.activitySelectionPending ? 'Preparing tool…' : controls[0];
+      setDomText(elements.primary, state.activitySelectionPending ? 'Preparing tool…' : controls[0]);
       elements.primary.disabled = state.activitySelectionPending === true || snapshot.phase === 'excavating' || snapshot.phase === 'observing' || snapshot.phase === 'seeking';
     }
-    if (elements.secondary) elements.secondary.textContent = controls[1];
+    if (elements.secondary) setDomText(elements.secondary, controls[1]);
   }
 
   function showTutorial(tutorial) {
@@ -1940,7 +1949,7 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
       await state.companionRuntime.care(instanceId, companion.speciesArchetype === 'bird' ? 'groom' : 'pet');
       const day = new Date().toISOString().slice(0, 10);
       if (companion.progression?.totalXp > 0) {
-        await state.companionRuntime.awardXp({ receiptId: `care:${companion.instanceId}:${day}`, reasonId: 'care-after-outing' });
+        await state.companionRuntime.awardXp({ receiptId: `care:${companion.instanceId}:${day}`, reasonId: 'care-after-outing' }, companion.instanceId);
       }
       appCtx.showToast?.(`${companion.name} enjoyed the attention.`);
     }

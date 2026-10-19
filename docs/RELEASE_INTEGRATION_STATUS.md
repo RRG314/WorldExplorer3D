@@ -1,51 +1,37 @@
 # Release status
 
-Updated October 7, 2026. The 5.5.0 update is being prepared for release.
-The production frontend remains on 5.4 until a verified promotion is recorded here.
+Updated October 18, 2026. **5.5.1 is live; 5.6.1 is entering final acceptance.**
+The owner has authorized publication. Production, the default branch and release
+must use the tested candidate; failed or missing checks are not passes.
 
-The owner has authorized the GitHub update, versioned release, public project
-page and production deployment. Authorization is recorded separately from
-verification: it does not turn missing device checks or failed performance
-measurements into passing results.
+The public overview is [5.6.1 release notes](../RELEASE_NOTES_5.6.1.md).
+[Known limitations](../KNOWN_ISSUES.md) describe the product's scope.
+Exact deployed identities are in [release source identities](RELEASE_SOURCE_OF_TRUTH.md).
 
-The public overview is [5.5 release notes](../RELEASE_NOTES_5.5.0.md).
-[Known limitations](../KNOWN_ISSUES.md) describe the remaining product work.
-Exact build identities and acceptance evidence belong in
-[release source of truth](RELEASE_SOURCE_OF_TRUTH.md) and the internal evidence
-ledger, rather than the public release body.
+## Current verification
 
-## Remaining acceptance
+All 2,729 source tests and the structural checks pass. The current native journey
+passes short ground movement, 90-second flight and a four-minute walking window,
+including a real street-detail handover. Retained JavaScript memory is about
+29 MB lower after compacting the derived frontage index. Buildings, roads and
+terrain coverage remain intact; no browser errors or gameplay interruptions occur.
+This is focused source evidence, not complete immutable release acceptance.
 
-The current package and hosted preview are `4dd2e37c`, with the same 615 delivered
-file hashes as the owner-tested `135e3895` preview. Source checks pass 2,109 tests;
-world preflight passes 29 checks. All three current backend gates pass, including
-14 general backend stages and the complete two-client shared research voyage.
+Complete performance, backend, save/fallback roundtrip, candidate and hosted
+checks still need the new frozen package. Previous failed package receipts remain
+failed. The b21 package remains a modern-save-compatible emergency fallback with
+known performance limitations; actual production 5.5.1 is the upgrade starting point.
 
-All 80 production Functions now contain the tested backend source, verified by
-downloading the actual deployed archives. All 11 existing parameters are preserved.
-Firestore accepts the tested ocean-presence values; Storage rules are unchanged.
-Live protocol probes pass for voyage authority, save retry and legacy compatibility,
-receipt ownership and isolation. All temporary fixtures and accounts were removed
-and checked absent. Both provider-cache expiration policies are ACTIVE as of
-22:06 UTC. The exact live frontend is retained through November 6, independently
-verified against its Hosting version and both manifests. The public frontend
-remains on 5.4.
+The owner's earlier Android feedback retains its original scope. Emulated touch
+checks are not physical-device, battery or thermal measurements. Deferred manual
+coverage remains explicit in the release evidence.
 
-The full frozen 91-gate candidate matrix is running. The current 4dd2 save upgrade,
-fallback write and candidate return pass, retaining existing records and unrelated
-pending account data. Public weather/marine rights, deployed-source identity and
-packaged UI attribution are reviewed; no paid data subscription is required.
-Sustained movement on this game payload still has visible pauses; its retention
-run was interrupted when disk space became critically low. The original failed
-matrix and resource measurements are preserved. No performance threshold was
-relaxed or building coverage removed.
+## Release behavior
 
-The owner reports that the 135 preview works on Android. This is smoke feedback,
-not measured thermal/memory, iOS, uncoached-player or ordinary hosted acceptance.
-Those remaining checks are kept explicit. Owner-authorized cleanup preserved
-source history, compact evidence, production and the reviewed rollback artifact.
+Earth starts in location-based mode. Optional moving scenery does not claim
+worldwide physical-road or activity streaming. Travel recovery stays local,
+without forcing Main Menu or a world reload. This release retains the museums,
+aquarium, research vessel, space, harbor, launch-site and consolidation work.
 
-The research vessel still uses its existing custom model. The licensed vessel,
-broader wildlife and ocean activities, spearfishing, and unrestricted continuous
-world travel are not included in 5.5. These are explicit scope limits, not
-features certified by the release checks.
+Public gallery images and feature notes are prepared. Final publication must
+preserve existing history and player progress and identify the deployed build.

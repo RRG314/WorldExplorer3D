@@ -1,4 +1,6 @@
 import {aquariumMappedEntrance} from '../interiors/aquarium-geography.js';
+import {kennedyMappedEntrances} from './kennedy-facility.js';
+import {reviewedVenueForBuilding} from '../interiors/venue-exterior-policy.js';
 import {harborDistrictFocus} from './harbor-district.js';
 import { compileEntranceCatalog } from '../living-world/entrance-catalog.js?v=6';
 
@@ -131,6 +133,8 @@ export function attachEntranceAttribute(mesh, entrance) {
  */
 export function publishBuildingFacadeEntrances(appCtx, options = {}) {
   const tier = String(options.tier || tierForContext(appCtx));
+  const priorityBuildingIds = new Set((appCtx.buildings || []).filter(reviewedVenueForBuilding)
+    .map(building => String(building.sourceBuildingId || building.id || '')));
   const focus = harborDistrictFocus(appCtx);
   const inDistrict = mesh => {
     const p=mesh?.userData?.buildingFootprint;
@@ -140,7 +144,8 @@ export function publishBuildingFacadeEntrances(appCtx, options = {}) {
   };
   const nearFacadeMeshes = (Array.isArray(appCtx?.buildingMeshes) ? appCtx.buildingMeshes : []).filter((mesh) =>
     !mesh?.userData?.buildingSemantics?.historicMasonry &&
-    (mesh?.userData?.lodTier === 'near' || mesh?.userData?.lodTier === 'mid' && inDistrict(mesh)) &&
+    (mesh?.userData?.lodTier === 'near' || mesh?.userData?.lodTier === 'mid' &&
+      (inDistrict(mesh) || priorityBuildingIds.has(String(mesh.userData?.sourceBuildingId || '')))) &&
     !mesh?.userData?.isRoofDetail &&
     mesh?.material?.userData?.buildingExterior === true
   );
@@ -152,7 +157,8 @@ export function publishBuildingFacadeEntrances(appCtx, options = {}) {
       nearBuildingIds.has(String(building?.sourceBuildingId || building?.id || ''))
     ),
     focus,
-    mappedEntrances: [...aquariumMappedEntrance(appCtx),...(appCtx?.mappedBuildingEntrances||[])],
+    priorityBuildingIds,
+    mappedEntrances: [...aquariumMappedEntrance(appCtx),...kennedyMappedEntrances(appCtx),...(appCtx?.mappedBuildingEntrances||[])],
     nearestRoad: appCtx?.findNearestRoad,
     sampleGround: (x, z) => appCtx?.GroundHeight?.walkSurfaceY?.(x, z) ?? appCtx?.elevationWorldYAtWorldXZ?.(x, z),
     tier

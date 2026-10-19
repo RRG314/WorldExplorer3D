@@ -1,5 +1,6 @@
 import { resolveRegionalBuildingStyle } from './regional-building-style.js';
 import { isRuinedBuilding } from './historic-building-semantics.js';
+import {reviewedVenueForBuilding} from '../interiors/venue-exterior-policy.js';
 const BUILDING_EXTERIOR_GENERATOR_VERSION = 'building-exterior-v2';
 
 const MATERIAL_VARIANTS = Object.freeze({
@@ -95,6 +96,8 @@ function family(definition) {
 }
 
 const BUILDING_EXTERIOR_FAMILIES = Object.freeze({
+  aquarium_glass_pavilion: family({category:'institutional',materials:['glass_blue'],windows:['curtain_panel'],doors:['commercial_double'],details:['modern_parapet']}),
+  peale_federal_museum: family({category:'institutional',materials:['red_brick'],windows:['historic_tall'],doors:['civic_transom'],details:['masonry_cornice']}),
   historic_ruin: family({ category: 'historic', materials: ['weathered_stone'], windows: [], doors: [], details: [] }),
   narrow_urban_rowhouse: family({ category: 'residential', materials: ['red_brick', 'warm_red_brick', 'brown_brick', 'painted_brick_light', 'painted_brick_dark', 'stucco_white', 'concrete_light'], windows: ['townhouse_narrow', 'sash_single', 'bay_window'], doors: ['townhouse_panel', 'residential_glass'], details: ['entry_step', 'townhouse_stoop', 'stoop_railing', 'masonry_cornice'] }),
   wide_urban_townhouse: family({ category: 'residential', materials: ['red_brick', 'brown_brick', 'tan_brick', 'limestone', 'stucco_cream', 'stucco_white', 'concrete_light'], windows: ['sash_double', 'historic_tall', 'bay_window'], doors: ['townhouse_panel', 'residential_double'], details: ['townhouse_stoop', 'stoop_railing', 'small_porch', 'masonry_cornice'] }),
@@ -160,6 +163,7 @@ function inferFamilyId(context, seed) {
   const { buildingType: type, usage, height, levels, width, depth, area, denseUrban, tags } = context;
   if (/hospital|clinic|doctors|medical|healthcare/.test(usage)) return 'hospital_medical';
   if (/school|college|university|kindergarten|education/.test(usage)) return 'school';
+  if (/museum|aquarium|exhibition|arts_centre/.test(usage)) return 'civic_government';
   if (/church|cathedral|chapel|mosque|synagogue|temple|religious/.test(usage)) return 'religious';
   if (/government|civic|public|courthouse|townhall|library|fire_station|police/.test(usage)) return 'civic_government';
   if (/hotel|motel|hostel|guest_house/.test(usage)) return 'hotel';
@@ -243,11 +247,14 @@ function selectBuildingExteriorProfile(options = {}) {
   const districtSeed = stableStringHash(districtKey);
   const ruined = isRuinedBuilding({...options.tags, building: options.buildingType || options.tags?.building});
   const historicMasonry = ruined || options.tags?._landmarkRole === 'fortification_tower' || options.tags?.historic === 'citywalls';
-  const familyId = historicMasonry ? 'historic_ruin' : inferFamilyId(context, buildingSeed ^ districtSeed);
+  const venue = reviewedVenueForBuilding(options);
+  const familyId = historicMasonry ? 'historic_ruin' : venue === 'national-aquarium-baltimore'
+    ? 'aquarium_glass_pavilion' : venue === 'peale-baltimore' ? 'peale_federal_museum'
+    : inferFamilyId(context, buildingSeed ^ districtSeed);
   const definition = BUILDING_EXTERIOR_FAMILIES[familyId] || BUILDING_EXTERIOR_FAMILIES.generic_unknown;
-  const regionalStyle = historicMasonry ? null : resolveRegionalBuildingStyle(options);
+  const regionalStyle = historicMasonry || venue ? null : resolveRegionalBuildingStyle(options);
   const namedArchitecture = options.tags?.['building:architecture'] || options.tags?.architecture || options.tags?.architectural_style;
-  const regional = regionalStyle?.materials || (namedArchitecture ? [] : compatibleRegionalMaterials(definition, options.location || {}));
+  const regional = venue ? [] : regionalStyle?.materials || (namedArchitecture ? [] : compatibleRegionalMaterials(definition, options.location || {}));
   const materials = regionalStyle ? regional : regional.length > 0 && ((buildingSeed >>> 3) % 4 !== 0)
     ? [...regional, ...definition.materials]
     : definition.materials;

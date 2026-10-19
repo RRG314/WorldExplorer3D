@@ -1,3 +1,4 @@
+import {afterWorldLoad} from './complete-world-readiness.mjs';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { chromium, devices } from 'playwright';
 
@@ -58,12 +59,12 @@ const launchStartedAt = performance.now();
 await page.locator('#globeSelectorStartBtn').click();
 await page.waitForTimeout(3_000);
 await page.screenshot({ path: `${outputDir}/loading-3s.png` });
-await page.waitForFunction(() => {
+await page.waitForFunction(afterWorldLoad(() => {
   const state = globalThis.getWorldExplorerRuntimeDiagnostics?.() || {};
   return state.gameStarted === true && state.worldLoading === false &&
     document.getElementById('loading')?.classList.contains('show') !== true &&
     Number(state.worldCounts?.roads || 0) > 0 && Number(state.worldCounts?.buildings || 0) > 0;
-}, null, { timeout: 180_000 });
+}), null, { timeout: 180_000 });
 const firstPlayableMs = Math.round(performance.now() - launchStartedAt);
 await page.screenshot({ path: `${outputDir}/playable.png` });
 
@@ -110,12 +111,12 @@ if (auditRevisit) {
   const revisitTitleReadyMs = Math.round(performance.now() - revisitNavigationStartedAt);
   const revisitLaunchStartedAt = performance.now();
   await page.locator('#globeSelectorStartBtn').click();
-  await page.waitForFunction(() => {
+  await page.waitForFunction(afterWorldLoad(() => {
     const state = globalThis.getWorldExplorerRuntimeDiagnostics?.() || {};
     return state.gameStarted === true && state.worldLoading === false &&
       document.getElementById('loading')?.classList.contains('show') !== true &&
       Number(state.worldCounts?.roads || 0) > 0 && Number(state.worldCounts?.buildings || 0) > 0;
-  }, null, { timeout: 180_000 });
+  }), null, { timeout: 180_000 });
   const diagnostics = await page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics?.() || {});
   revisit = {
     titleReadyMs: revisitTitleReadyMs,

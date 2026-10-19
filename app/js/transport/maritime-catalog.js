@@ -36,6 +36,13 @@ const definitions = [
     damageZones: ['bow-fenders', 'hull', 'wheelhouse', 'tow-deck', 'propulsion']
   },
   {
+    id: 'harbor-passenger-launch', label: 'Harbor passenger launch', vesselKind: 'power', role: 'harbor_launch',
+    width: 5.4, height: 4.3, length: 16.8, draft: .8, massKg: 18000,
+    topSpeedMph: 15, performance: { topSpeed: 15, topSpeedUnit: 'knots', accelerationScale: .85, steeringScale: 1.1, gripScale: 1.2, brakeScale: 1.2, turningRadius: 12 },
+    seatCount: 50, boardingPoints: ['port-aft', 'starboard-aft'], resistance: 260,
+    damageZones: ['bow', 'hull', 'passenger-deck', 'wheelhouse', 'propulsion']
+  },
+  {
     id: 'passenger-ferry', label: 'Passenger ferry', vesselKind: 'power', role: 'ferry',
     width: 18, height: 24, length: 85, draft: 4.2, massKg: 6800000,
     topSpeedMph: 23, performance: { topSpeed: 23, topSpeedUnit: 'knots', accelerationScale: .48, steeringScale: .6, gripScale: 1.4, brakeScale: 1.22, turningRadius: 62 },

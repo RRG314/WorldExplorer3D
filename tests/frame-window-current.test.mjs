@@ -77,13 +77,15 @@ test('lightweight travel windows never allocate the full diagnostic snapshot',as
 test('background counters are bounded scalar snapshots and preserve frame timing',async()=>{
  let timestamp=100;const actor={x:0,z:0};
  const stats={status:'building',completedCells:0,totalCells:200,workerActive:true,privatePayload:'not captured'};
- const context=vm.createContext({actor,ctx:{streetOverview:{stats}},performance:{now:()=>100},
-  requestAnimationFrame(callback){queueMicrotask(()=>{stats.completedCells++;callback(timestamp+=20);});},
+ const pavement={focus:{x:0,z:0},stats:{reusedTiles:3,reusedRenderBatches:1,privatePayload:'not captured'}};
+ const context=vm.createContext({actor,ctx:{streetOverview:{stats},streetPavement:pavement},performance:{now:()=>100},
+  requestAnimationFrame(callback){queueMicrotask(()=>{stats.completedCells++;pavement.focus.x++;callback(timestamp+=20);});},
   getWorldExplorerRuntimeDiagnostics(){throw Error('Heavy diagnostics inside timing window');}
  });
  const result=await vm.runInContext(`(${sampleFrameWindow.toString()})({durationMs:2100,actorKey:'actor',backgroundContextKey:'ctx',collectDiagnostics:false})`,context);
  assert.equal(result.background.length,3);assert.equal(result.elapsedMs,2100);
  assert.deepEqual(Array.from(result.background,entry=>entry.overview.completedCells),[1,51,101]);
- assert.ok(result.background.every(entry=>!('privatePayload' in entry.overview)));
+ assert.ok(result.background.every(entry=>!('privatePayload' in entry.overview)&&!('privatePayload' in entry.pavement)));
+ assert.deepEqual(Array.from(result.background,entry=>entry.pavement.focus.x),[1,51,101],'Published focus snapshots must not retain a mutable world reference');
  assert.equal(result.deltas.reduce((sum,delta)=>sum+delta,0),2100);
 });

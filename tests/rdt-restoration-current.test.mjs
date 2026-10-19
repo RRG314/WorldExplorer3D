@@ -65,3 +65,35 @@ test('far flight visits only nearby leaf candidates instead of repeatedly scanni
  }
  index.dispose();
 });
+
+test('cooperative capture selection bounds city validation and preserves same-array edit detection',async()=>{
+ let reads=0,sliceReads=0,maximumReads=0,yields=0;
+ const buildings=Array.from({length:49000},(_,i)=>({sourceBuildingId:'b'+i,centerZ:Math.floor(i/200)*10,
+  get centerX(){reads++;sliceReads++;return (i%200)*10;}}));
+ const selector=createRdtCaptureSelector(),actor={x:100,z:100};
+ const schedule={budgetMs:0,yieldWork:async()=>{yields++;maximumReads=Math.max(maximumReads,sliceReads);sliceReads=0;}};
+ const first=await selector.selectCooperatively(buildings,actor,1,60,schedule);
+ assert.equal(first.stats.rebuilt,true);assert.ok(yields>100);assert.ok(maximumReads<=1024,'index construction must not read the entire city in one slice');
+ assert.deepEqual(first.ids,fullSortNearest(buildings,actor,60));
+ reads=0;sliceReads=0;maximumReads=0;yields=0;
+ const second=await selector.selectCooperatively(buildings,actor,1,60,schedule);
+ assert.equal(second.stats.rebuilt,false);assert.ok(reads>=buildings.length,'all entries remain validated');assert.ok(yields>100);assert.ok(maximumReads<=1024);
+ assert.deepEqual(second.ids,first.ids);
+ buildings[0]={sourceBuildingId:'edited',centerX:100,centerZ:100};
+ const changed=await selector.selectCooperatively(buildings,actor,1,60,schedule);
+ assert.equal(changed.stats.rebuilt,true);assert.deepEqual(changed.ids,fullSortNearest(buildings,actor,60));
+ selector.clear();
+});
+
+test('clearing or replacing a pending capture selection cannot publish a retired index',async()=>{
+ const selector=createRdtCaptureSelector(),buildings=Array.from({length:1000},(_,i)=>({sourceBuildingId:'b'+i,centerX:i,centerZ:0}));
+ let yields=0;
+ await assert.rejects(selector.selectCooperatively(buildings,{x:0,z:0},1,60,{budgetMs:0,yieldWork:async()=>{if(++yields===2)selector.clear();}}),/superseded/);
+ const next=selector.select([{sourceBuildingId:'new',centerX:0,centerZ:0}],{x:0,z:0},2);
+ assert.equal(next.stats.rebuilt,true);assert.deepEqual(next.ids,['new']);
+ let refreshed=false;
+ await assert.rejects(selector.selectCooperatively(buildings,{x:0,z:0},1,60,{budgetMs:0,yieldWork:async()=>{
+  if(!refreshed){refreshed=true;selector.select([{sourceBuildingId:'latest',centerX:0,centerZ:0}],{x:0,z:0},3);}
+ }}),/superseded/);
+ selector.clear();
+});

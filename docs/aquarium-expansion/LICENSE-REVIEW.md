@@ -1,7 +1,35 @@
 # Aquarium rights and source-use ledger
 
-October 12, 2026. This records observed grants and implementation decisions,
+Refreshed October 13, 2026. This records observed grants and implementation decisions,
 not an assertion of institutional authorization.
+
+## Current restrictions and affected stop conditions
+
+The [National Aquarium terms](https://aqua.org/terms-of-use), dated August 7,
+2026 on the reviewed page, limit access to informational purposes and restrict
+derivative Site use and automated data gathering. They do **not** establish a
+redistribution/model-training/photogrammetry grant. No new institutional imagery,
+PDF, tour mesh, texture atlas, branded sign art or source dataset is bundled.
+Do not automate further institution-site extraction. Public exhibit facts in
+independently written educational records and prior factual route observations
+are kept distinct from reproducing protected source expression; this is a
+conservative project intake decision, not institutional permission or legal
+clearance for an exact model. Exact imagery/plan-derived reconstruction is
+stopped pending a specific reuse grant. No outreach was authorized or sent.
+
+The original architect, structural designer and glazing contractor pages are
+factual architectural references only; no image/model redistribution license
+was established. Their published component dimensions cannot license their
+photos or solve the rest of the building. OSM is separately licensed and fresh
+revisions are pinned in evidence/2026-10-13-source-refresh.json.
+
+The already imported shark/turtle files have independent CC BY 4.0 credits and
+transformation records. Current source uses them; historical statements about
+unregistered candidates below describe the earlier intake stage. This review
+does not certify undisclosed rights in their creators' source material. Existing
+coral and surface credits retain the original project manifests. No paid asset,
+account credential, cloud publication or production deployment is required for
+these local changes.
 
 | Material | Evidence | Permitted project use / current decision |
 |---|---|---|

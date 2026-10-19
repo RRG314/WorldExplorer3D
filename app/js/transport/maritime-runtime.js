@@ -1,5 +1,6 @@
 import {detachSceneObject} from '../engine/scene-object-lifecycle.js';
 import {selectMaritimeAnchor} from './maritime-placement-policy.js';
+import {vesselObstacleAdmission} from './vessel-obstacles.js';
 import { ctx as appCtx } from '../shared-context.js?v=55';
 import { MARITIME_CATALOG } from './maritime-catalog.js?v=1';
 import { createVesselVisual, updateVesselVisual } from './vessel-visual-recipe.js?v=8';
@@ -60,6 +61,7 @@ function maritimeAnchors(graph) {
 
 function vesselFootprintFitsWater(x, z, yaw, catalog, candidate = null) {
   if (vesselPlacementConflictsWithMappedShip(x, z, catalog)) return false;
+  if(!vesselObstacleAdmission(appCtx,catalog,x,z,yaw,waterYAt(x,z)).allowed)return false;
   const halfLength = catalog.dimensions.length * .44;
   const halfWidth = catalog.dimensions.width * .44;
   const forwardX = Math.sin(yaw);
@@ -269,7 +271,7 @@ function routeFitsWater(points, vessel) {
 }
 
 function createVesselTrafficMotion(vessel, index = 0) {
-  if (!['runabout', 'workboat', 'ferry', 'research'].includes(vessel.catalog.role)) return null;
+  if (!['runabout', 'workboat', 'harbor_launch', 'ferry', 'research'].includes(vessel.catalog.role)) return null;
   if (vessel.mobile && vessel.catalog.role !== 'runabout') return null;
   const home = vessel.home;
   const length = vessel.catalog.dimensions.length;
@@ -318,7 +320,13 @@ function createVesselTrafficMotion(vessel, index = 0) {
 function updateAmbientVessel(vessel, dt) {
   const motion = vessel?.ambientMotion;
   if (!motion || vessel.condition <= .05) return false;
+  const previous={x:vessel.x,z:vessel.z,yaw:vessel.yaw,targetIndex:motion.targetIndex,laps:motion.laps};
   advanceAmbientRouteMotion(vessel, motion, dt);
+  if(!vesselFootprintFitsWater(vessel.x,vessel.z,vessel.yaw,vessel.catalog)){
+    vessel.x=previous.x;vessel.z=previous.z;vessel.yaw=previous.yaw;
+    motion.targetIndex=previous.targetIndex;motion.laps=previous.laps;
+    motion.speed=0;motion.dwellRemaining=1;motion.state='blocked';
+  }
   vessel.available = motion.state === 'docked';
   vessel.y = waterYAt(vessel.x, vessel.z);
   vessel.visual.root.position.set(vessel.x, vessel.y, vessel.z);

@@ -1,3 +1,4 @@
+import {browserEmulatorSettings} from './backend-environment.mjs';
 import { softwareCompositorArgs } from './software-compositor.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
@@ -79,20 +80,15 @@ async function createPlayer(label) {
     deviceScaleFactor, isMobile: mobile, hasTouch: mobile
   });
   const providerFixture = await installRecordedOverpassFixture(context, mobile ? 'mobile' : 'desktop');
-  await context.addInitScript(({ functionsBase, firebaseConfig }) => {
+  await context.addInitScript(({ functionsBase, firebaseConfig, emulators }) => {
     // Firestore emulator data is namespaced by the Firebase app project ID.
     // Match the Functions emulator project so browser writes and Admin SDK
     // reads exercise the same isolated database rather than two empty projects.
     globalThis.WORLD_EXPLORER_FIREBASE = Object.freeze({ ...firebaseConfig });
     globalThis.WORLD_EXPLORER_FIREBASE_ENV = 'staging';
-    globalThis.WORLD_EXPLORER_FIREBASE_EMULATORS = Object.freeze({
-      enabled: true,
-      host: '127.0.0.1',
-      authPort: 9099,
-      firestorePort: 8080
-    });
+    globalThis.WORLD_EXPLORER_FIREBASE_EMULATORS = Object.freeze(emulators);
     globalThis.WORLD_EXPLORER_FUNCTIONS_ORIGIN = functionsBase;
-  }, { functionsBase: functionsOrigin, firebaseConfig: emulatorFirebaseConfig });
+  }, { functionsBase: functionsOrigin, firebaseConfig: emulatorFirebaseConfig, emulators:browserEmulatorSettings() });
   const page = await context.newPage();
   // Two stable frames on a software GPU can exceed Playwright's 30s default.
   if (process.env.CI) page.setDefaultTimeout(120_000);

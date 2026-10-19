@@ -142,6 +142,9 @@ function compileTransportFacilityGraph(data = {}, options = {}) {
       surface: tags.surface == null ? 'unknown' : String(tags.surface),
       attributes: Object.freeze({
         ref: String(tags.ref || '').trim(),
+        operator: String(tags.operator || '').trim(),
+        ferryService: String(tags.ferry || tags['ferry:type'] || '').trim().toLowerCase(),
+        vehicleFerry: ['yes','designated'].includes(String(tags.motor_vehicle || tags.motorcar || '').toLowerCase()),
         iata: String(tags.iata || '').trim().toUpperCase(),
         icao: String(tags.icao || '').trim().toUpperCase(),
         width: Number.isFinite(Number(tags.width)) ? Number(tags.width) : null,

@@ -82,7 +82,7 @@ async function settleCommerceTransaction(options = {}) {
   const dayKey = clean(input.dayKey, 10);
   const definition = COMMERCE_CATALOG[catalogId];
   const expectedDayKey = new Date(nowMs).toISOString().slice(0, 10);
-  if (!['buy', 'sell', 'service'].includes(action) || !requestId || !storeId || !definition || dayKey !== expectedDayKey || (action === 'service') !== Number.isFinite(definition.service)) {
+  if (!['buy', 'sell', 'service'].includes(action) || !requestId || !storeId || !definition || !/^\d{4}-\d{2}-\d{2}$/.test(dayKey) || (action === 'service') !== Number.isFinite(definition.service)) {
     throw new Error('invalid_commerce_transaction');
   }
   return runTransaction(async (transaction) => {
@@ -90,7 +90,15 @@ async function settleCommerceTransaction(options = {}) {
       transaction.get(receiptRef), transaction.get(walletRef), transaction.get(itemRef), transaction.get(stockRef)
     ]);
     const prior = snapshotData(receiptSnapshot);
-    if (prior) return Object.freeze({ ...prior, duplicate: true });
+    if (prior) {
+      if (['action', 'storeId', 'catalogId', 'targetId', 'dayKey'].some(key => String(prior[key] || '') !== String({action, storeId, catalogId, targetId, dayKey}[key] || ''))) {
+        throw new Error('invalid_commerce_transaction');
+      }
+      return Object.freeze({ ...prior, itemId: action === 'service' ? '' : itemRef.id || '', duplicate: true });
+    }
+    // An existing receipt remains recoverable across midnight; a new command
+    // may only consume the current day's stock.
+    if (dayKey !== expectedDayKey) throw new Error('invalid_commerce_transaction');
     const wallet = walletData(snapshotData(walletSnapshot) || {});
     const item = snapshotData(itemSnapshot) || { catalogId, quantity: 0 };
     const quantity = integer(item.quantity, 0, 100000, 0);
@@ -116,7 +124,7 @@ async function settleCommerceTransaction(options = {}) {
     };
     const receipt = {
       accepted: true, authority: 'explorer-wallet-v2', requestId, action, storeId, catalogId, targetId, dayKey,
-      amount, credits: nextWallet.credits, itemQuantity: action === 'service' ? null : nextItem.quantity,
+      amount, itemId: action === 'service' ? '' : itemRef.id || '', credits: nextWallet.credits, itemQuantity: action === 'service' ? null : nextItem.quantity,
       storePurchased: action === 'buy' ? purchased + 1 : purchased,
       settlementStatus: action === 'service' ? 'effect_pending' : 'complete',
       createdAt: timestampFromMs(nowMs)

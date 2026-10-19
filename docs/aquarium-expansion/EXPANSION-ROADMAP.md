@@ -1,8 +1,41 @@
 # Aquarium delivery roadmap
 
-October 12, 2026. Museums and aquariums have separate architectural profiles and
+Updated October 13, 2026. Museums and aquariums have separate architectural profiles and
 visitor experiences. The following are bounded completion gates, not a promise
 that all listed venues already exist in the game.
+
+## Evidence refresh and comparative ranking
+
+Reopened New York and Monterey map pages and five additional institution pages:
+New England, Oregon Coast, Georgia, Shedd and Tennessee. Aquarium of the Pacific's
+two attempted guide/map paths returned retrieval errors in this pass; retain its
+earlier lead as UNVERIFIED_CURRENT rather than inventing a fresh success.
+The table below is an authoring prioritization, **not a licensing or GIS approval**.
+High/medium describe source availability, not measured accuracy. Unknown means
+not independently established. No further aquarium is published.
+
+| Priority | Candidate / primary reference | Mapping completeness | Architectural documentation | Compatible 3D content | Reuse license | Exhibit evidence | Geographic identity | Difficulty / expected fidelity |
+|---|---|---|---|---|---|---|---|---|
+| 1 | [Monterey Bay](https://www.montereybayaquarium.org/visit/aquarium-maps) | High visitor map: first/second floors, kelp both levels | Medium public maps/virtual-tour link; no measured plan acquired | Unknown complete building; separate kelp/jelly fauna needed | Map/tour redistribution grant unknown | High institution catalogue | 886 Cannery Row documented; specific GIS match not audited | High; recognizable two-level topology, dimensions inferred |
+| 2 | [New England](https://www.neaq.org/visit/aquarium-map-and-daily-presentations/) | Public Aquarium map/presentation page | Central multilevel tank is a good circulation test; measured ramp data pending | No approved venue scan established | Institutional art grant unknown | Strong public descriptions; exact population pending | Boston venue clear; specific footprint/doors pending | High; central volume potentially recognizable, exact shell unverified |
+| 3 | [New York](https://nyaquarium.com/map) | Campus map and downloadable map image | Medium campus layout; individual interior plans pending | Unknown venue assets | WCS photos explicitly copyrighted; no plan grant established | Public animal/exhibit catalogue | Coney Island campus clear; individual entrances pending | High; outdoor campus topology recognizable, interior fidelity uncertain |
+| 4 | [Oregon Coast](https://aquarium.org/map/) | High public interactive map | Medium public exhibit relations; tunnel dimensions pending | No licensed institutional shell established | Viewer/map redistribution unknown | Strong named habitats/tunnels | Newport identity; supplied map is this venue, not Baltimore | High; useful tunnel slice, inferred metric details |
+| 5 | [Tennessee](https://tnaqua.org/visit/) | Visitor page and clearly separate River/Ocean journeys | Medium two-building public programme; level-by-level plan review pending | No approved complete shell established | Institutional art grant unknown | Strong freshwater/marine distinction | Chattanooga identity; two GIS matches pending | High; recognizable dual-building narrative, dimensions uncertain |
+| 6 | [Shedd](https://www.sheddaquarium.org/plan-a-visit) | Visitor page links downloadable Aquarium map and app | Medium public map; renovation dates/layout require reconciliation | No approved whole interior established | Map/photo redistribution unknown | Strong public activity catalogue | Main entrance approach described; GIS door still pending | Very high; historic shell plus Oceanarium, current fidelity uncertain |
+| 7 | [Georgia](https://www.georgiaaquarium.org/aquarium-map/) | High official map page | Medium public hub/gallery diagram; large-volume measurements pending | Unknown institutional models; correct large fauna assets needed | Map/photo redistribution unknown | Strong public gallery catalogue | Atlanta identity; GIS footprint/entry not audited | Very high; recognizable hub, demanding giant habitats |
+| Hold | [Aquarium of the Pacific](https://www.aquariumofpacific.org/visit/visitors_guide) | Earlier guide lead; current retrieval failed | Requires renewed primary-source review | Unknown | Unknown | Earlier catalogue lead only | Long Beach identity; GIS not audited | Unranked until current source retrieval succeeds |
+
+Priority differs from the historical table below because a smaller, clearly
+connected multilevel route is preferable to immediate campus proliferation.
+All candidates lack approved exact interior assets and a completed license/GIS
+intake. Species art can be reused only where the real exhibit's current evidence
+supports the species; a downloadable model cannot establish exhibit presence.
+
+Baltimore's next gate is sustained entry/reentry performance and remaining visual
+quality, then rights-backed architectural evidence. Do not expand into additional
+Baltimore wings or other venues to compensate for an incomplete first route.
+Physical-phone testing, approved scans/plans and institution-specific facts
+remain separate dependencies; no contacts or production publications are made.
 
 ## Baltimore sequence
 

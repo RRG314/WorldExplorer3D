@@ -21,6 +21,12 @@ test('artifact receipts validate real bytes, file set and symlinks as well as bo
   const baseline = { contract: 'world-explorer-source-fingerprint-v2', acceptanceFingerprint: hash('source') };
   const evidence = { contract: 'world-explorer-execution-evidence-v2', scope: 'candidate', ok: true, baseline, artifactIdentity: original };
   assert.deepEqual(compareEvidenceToBaseline(evidence, baseline, 'candidate', original), []);
+  assert.match(compareEvidenceToBaseline(null, baseline, 'backend', original).join(), /missing/);
+  assert.match(compareEvidenceToBaseline(evidence, baseline, 'backend', original).join(), /complete backend scope/);
+  const backendEvidence = { ...evidence, scope: 'backend' };
+  assert.match(compareEvidenceToBaseline({ ...backendEvidence, ok: false }, baseline, 'backend', original).join(), /did not pass/);
+  assert.match(compareEvidenceToBaseline({ ...backendEvidence, baseline: { ...baseline, acceptanceFingerprint: hash('old backend') } }, baseline, 'backend', original).join(), /does not match current/);
+  assert.deepEqual(compareEvidenceToBaseline(backendEvidence, baseline, 'backend', original), []);
   assert.match(compareEvidenceToBaseline({ ...evidence, contract: 'world-explorer-execution-evidence-v1' }, baseline, 'candidate', original).join(), /contract/);
   const priorStat = statSync(path.join(dist, 'index.html'));
   write('index.html', 'content-b'); // same length, unchanged manifests

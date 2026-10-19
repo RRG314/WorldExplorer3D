@@ -566,6 +566,7 @@ function updateFeatureSurfaceProfile(feature, sampleTerrainY, options = {}) {
   const compiledFeature = attachCompiledTransportSurface(
     feature,
     compileTransportSurfaceModel(feature, sampleTerrainY, {
+      publicationStorage: options.publicationStorage,
       surfaceBias,
       width: Number.isFinite(options.width) ? Number(options.width) : undefined,
       sampleStep: surfaceSampleStep

@@ -1,3 +1,4 @@
+import {afterWorldLoad} from './complete-world-readiness.mjs';
 // Actual Earth boarding, held-key ship walking, lift and observation controls.
 import assert from 'node:assert/strict';
 import {mkdtemp, mkdir, writeFile, rm} from 'node:fs/promises';
@@ -33,7 +34,7 @@ try {
   await page.waitForFunction(()=>globalThis.__WE3D_RUNTIME_READY__,null,{timeout:120000});
   if(await page.locator('#analyticsConsentDenyBtn').isVisible())await page.locator('#analyticsConsentDenyBtn').click();
   if(await page.locator('#globeSelectorStartBtn').isVisible())await page.locator('#globeSelectorStartBtn').click();
-  await page.waitForFunction(()=>{const d=globalThis.getWorldExplorerRuntimeDiagnostics?.();return d?.gameStarted&&!d.worldLoading&&d.worldDiscovery?.active&&!document.getElementById('loading')?.classList.contains('show');},null,{timeout:180000});
+  await page.waitForFunction(afterWorldLoad(()=>{const d=globalThis.getWorldExplorerRuntimeDiagnostics?.();return d?.gameStarted&&!d.worldLoading&&d.worldDiscovery?.active&&!document.getElementById('loading')?.classList.contains('show');}),null,{timeout:180000});
   await page.evaluate(async()=>{globalThis.__sandboxTestContext=(await import('/app/js/shared-context.js?v=55')).ctx;});
  };
  await page.goto(url,{waitUntil:'domcontentloaded'});await ready();

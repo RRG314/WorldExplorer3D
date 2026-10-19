@@ -1,3 +1,4 @@
+import {afterWorldLoad} from './complete-world-readiness.mjs';
 import assert from 'node:assert/strict';
 import { mkdir } from 'node:fs/promises';
 import path from 'node:path';
@@ -43,10 +44,10 @@ try {
   await page.locator('#globeSelectorLiveGpsBtn').click();
   await page.waitForSelector('#liveGpsPermissionPanel.show', { timeout: 30_000 });
   await page.locator('#liveGpsPermissionContinue').click();
-  await page.waitForFunction(() => {
+  await page.waitForFunction(afterWorldLoad(() => {
     const diagnostics = globalThis.getWorldExplorerRuntimeDiagnostics?.() || {};
     return diagnostics.worldLoading === false && diagnostics.liveGps?.active === true && diagnostics.activeActor?.mode === 'walk';
-  }, null, { timeout: 240_000 });
+  }), null, { timeout: 240_000 });
   await page.locator('#gameBtn').click();
   await page.waitForSelector('#gameMenu.open #fFishing', { timeout: 30_000 });
   await page.locator('#fFishing').click();

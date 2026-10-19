@@ -1,0 +1,10 @@
+NASA 3D Resources
+NASA media usage guidance; no endorsement. NASA identifiers remain only as part of the factual facility representation.
+https://www.nasa.gov/nasa-brand-center/images-and-media/
+Decoded Draco, flattened static nodes, merged matching primitives, removed duplicate legacy texture fallbacks, retained image maps; adapted opaque Lambert surfaces to rough painted materials. Dimensions, placement and interior tour geometry are game adaptations.
+
+vehicle-assembly-building
+https://github.com/nasa/NASA-3D-Resources/tree/master/3D%20Models/Vehicle%20Assembly%20Building%20(VAB)
+
+crawler
+https://github.com/nasa/NASA-3D-Resources/tree/master/3D%20Models/Crawler

@@ -1,3 +1,4 @@
+import {afterWorldLoad} from './complete-world-readiness.mjs';
 import { softwareCompositorArgs } from './software-compositor.mjs';
 import { collectBrowserGraphicsErrors } from './browser-graphics-errors.mjs';
 import { configureStagingAppCheck } from './staging-app-check.mjs';
@@ -50,11 +51,11 @@ try {
   await page.goto(`${baseUrl}/app/?${params}`, { waitUntil: 'load', timeout: 120_000 });
   await page.waitForFunction(() => globalThis.__WE3D_RUNTIME_READY__ === true, null, { timeout: 120_000 });
   await page.getByRole('button', { name: 'Explore', exact: true }).click();
-  await page.waitForFunction(() => {
+  await page.waitForFunction(afterWorldLoad(() => {
     const diagnostics = globalThis.getWorldExplorerRuntimeDiagnostics?.() || {};
     return diagnostics.gameStarted === true && diagnostics.worldLoading === false && diagnostics.worldDiscovery?.active === true &&
       Number(diagnostics.visualOwners?.water?.surfaceCount || 0) > 0;
-  }, null, { timeout: 300_000 });
+  }), null, { timeout: 300_000 });
   await page.waitForTimeout(4_000);
 
   await page.locator('#travelBtn').click();

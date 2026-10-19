@@ -1,0 +1,516 @@
+{
+  "source": {
+    "scope": "Actual generalized geometry captured in the fb24 replay and exact OSM from Geofabrik published extracts; original source layers retained",
+    "attribution": "OpenStreetMap contributors, Geofabrik",
+    "license": "ODbL-1.0",
+    "urls": [
+      "https://download.geofabrik.de/europe/france/provence-alpes-cote-d-azur-261013.osm.pbf",
+      "https://download.geofabrik.de/europe/monaco-261014.osm.pbf"
+    ]
+  },
+  "pairs": [
+    {
+      "exactId": 155081312,
+      "generalizedId": -1000008,
+      "sourceId": "shortbread:streets:13:4265:2986:14:0"
+    },
+    {
+      "exactId": 155081313,
+      "generalizedId": -1000016,
+      "sourceId": "shortbread:streets:13:4265:2986:15:0"
+    },
+    {
+      "exactId": 120632771,
+      "generalizedId": -1000019,
+      "sourceId": "shortbread:streets:13:4265:2986:79:0"
+    }
+  ],
+  "elements": [
+    {
+      "type": "way",
+      "id": 155081312,
+      "nodes": [
+        26948471,
+        1352179713,
+        382413378,
+        1352179692,
+        378476384,
+        1352179663,
+        1352179577,
+        1352179581,
+        245400196,
+        1352179623,
+        382413376,
+        8909693745,
+        1352179661,
+        378476435,
+        245400192
+      ],
+      "tags": {
+        "highway": "motorway",
+        "int_ref": "E 74;E 80",
+        "lanes": "2",
+        "layer": "-1",
+        "lit": "24/7",
+        "maxspeed": "110",
+        "name": "La Provençale",
+        "oneway": "yes",
+        "operator": "ESCOTA",
+        "ref": "A 8",
+        "surface": "asphalt",
+        "toll": "yes",
+        "tunnel": "yes",
+        "tunnel:name": "Tunnel de L'Arme"
+      }
+    },
+    {
+      "type": "node",
+      "id": 26948471,
+      "lat": 43.7567812,
+      "lon": 7.4237686
+    },
+    {
+      "type": "node",
+      "id": 245400192,
+      "lat": 43.7587784,
+      "lon": 7.43697
+    },
+    {
+      "type": "node",
+      "id": 245400196,
+      "lat": 43.7585544,
+      "lon": 7.4292684
+    },
+    {
+      "type": "node",
+      "id": 378476384,
+      "lat": 43.7578474,
+      "lon": 7.4261534
+    },
+    {
+      "type": "node",
+      "id": 378476435,
+      "lat": 43.7587992,
+      "lon": 7.4350383
+    },
+    {
+      "type": "node",
+      "id": 382413376,
+      "lat": 43.7587355,
+      "lon": 7.4314796
+    },
+    {
+      "type": "node",
+      "id": 382413378,
+      "lat": 43.7573444,
+      "lon": 7.4248529
+    },
+    {
+      "type": "node",
+      "id": 1352179577,
+      "lat": 43.7583108,
+      "lon": 7.4277462
+    },
+    {
+      "type": "node",
+      "id": 1352179581,
+      "lat": 43.7584461,
+      "lon": 7.4285187
+    },
+    {
+      "type": "node",
+      "id": 1352179623,
+      "lat": 43.758646,
+      "lon": 7.4300757
+    },
+    {
+      "type": "node",
+      "id": 1352179661,
+      "lat": 43.7587979,
+      "lon": 7.4332261
+    },
+    {
+      "type": "node",
+      "id": 1352179663,
+      "lat": 43.7580662,
+      "lon": 7.4268252
+    },
+    {
+      "type": "node",
+      "id": 1352179692,
+      "lat": 43.757621,
+      "lon": 7.4255118
+    },
+    {
+      "type": "node",
+      "id": 1352179713,
+      "lat": 43.7570808,
+      "lon": 7.4243319
+    },
+    {
+      "type": "node",
+      "id": 8909693745,
+      "lat": 43.7587768,
+      "lon": 7.4322733
+    },
+    {
+      "type": "node",
+      "id": -1000000,
+      "lat": 43.75803926008078,
+      "lon": 7.426757812499945
+    },
+    {
+      "type": "node",
+      "id": -1000001,
+      "lat": 43.75806128378761,
+      "lon": 7.426822185516302
+    },
+    {
+      "type": "node",
+      "id": -1000002,
+      "lat": 43.758309253853184,
+      "lon": 7.427744865417425
+    },
+    {
+      "type": "node",
+      "id": -1000003,
+      "lat": 43.75844873656345,
+      "lon": 7.4285173416137145
+    },
+    {
+      "type": "node",
+      "id": -1000004,
+      "lat": 43.75865021101538,
+      "lon": 7.430083751678412
+    },
+    {
+      "type": "node",
+      "id": -1000005,
+      "lat": 43.75877419495629,
+      "lon": 7.432272434234564
+    },
+    {
+      "type": "node",
+      "id": -1000006,
+      "lat": 43.75880519090137,
+      "lon": 7.435040473937933
+    },
+    {
+      "type": "node",
+      "id": -1000007,
+      "lat": 43.75877419495629,
+      "lon": 7.436971664428656
+    },
+    {
+      "type": "way",
+      "id": -1000008,
+      "nodes": [
+        -1000000,
+        -1000001,
+        -1000002,
+        -1000003,
+        -1000004,
+        -1000005,
+        -1000006,
+        -1000007
+      ],
+      "tags": {
+        "_nameProvenance": "spatial-label-association",
+        "_sourceCompleteness": "generalized",
+        "_sourceFeatureId": "shortbread:streets:13:4265:2986:14:0",
+        "bridge": "",
+        "highway": "motorway",
+        "layer": "",
+        "name": "La Provençale",
+        "oneway": "",
+        "tunnel": "yes"
+      }
+    },
+    {
+      "type": "way",
+      "id": 155081313,
+      "nodes": [
+        245400190,
+        378476405,
+        378476391,
+        1352179600,
+        1352179585,
+        382413368,
+        1352179721,
+        245400195,
+        1352179579,
+        1352179659,
+        378476375,
+        1352179724,
+        382413380,
+        1352179658,
+        26948824
+      ],
+      "tags": {
+        "highway": "motorway",
+        "int_ref": "E 74;E 80",
+        "lanes": "3",
+        "layer": "-1",
+        "lit": "24/7",
+        "maxspeed": "110",
+        "name": "La Provençale",
+        "oneway": "yes",
+        "operator": "ESCOTA",
+        "overtaking:hgv": "no",
+        "ref": "A 8",
+        "surface": "asphalt",
+        "toll": "yes",
+        "tunnel": "yes",
+        "tunnel:name": "Tunnel de L'Arme"
+      }
+    },
+    {
+      "type": "node",
+      "id": 26948824,
+      "lat": 43.7570647,
+      "lon": 7.4238208
+    },
+    {
+      "type": "node",
+      "id": 245400190,
+      "lat": 43.7589802,
+      "lon": 7.4370632
+    },
+    {
+      "type": "node",
+      "id": 245400195,
+      "lat": 43.7586005,
+      "lon": 7.4278598
+    },
+    {
+      "type": "node",
+      "id": 378476375,
+      "lat": 43.7580233,
+      "lon": 7.4257836
+    },
+    {
+      "type": "node",
+      "id": 378476391,
+      "lat": 43.7590205,
+      "lon": 7.4325534
+    },
+    {
+      "type": "node",
+      "id": 378476405,
+      "lat": 43.7590058,
+      "lon": 7.4350758
+    },
+    {
+      "type": "node",
+      "id": 382413368,
+      "lat": 43.7588586,
+      "lon": 7.4296738
+    },
+    {
+      "type": "node",
+      "id": 382413380,
+      "lat": 43.7575241,
+      "lon": 7.4246646
+    },
+    {
+      "type": "node",
+      "id": 1352179579,
+      "lat": 43.7583535,
+      "lon": 7.4268331
+    },
+    {
+      "type": "node",
+      "id": 1352179585,
+      "lat": 43.7589557,
+      "lon": 7.4308397
+    },
+    {
+      "type": "node",
+      "id": 1352179600,
+      "lat": 43.7589906,
+      "lon": 7.4315454
+    },
+    {
+      "type": "node",
+      "id": 1352179658,
+      "lat": 43.757262,
+      "lon": 7.4241686
+    },
+    {
+      "type": "node",
+      "id": 1352179659,
+      "lat": 43.7581924,
+      "lon": 7.4262878
+    },
+    {
+      "type": "node",
+      "id": 1352179721,
+      "lat": 43.7587668,
+      "lon": 7.4288305
+    },
+    {
+      "type": "node",
+      "id": 1352179724,
+      "lat": 43.7577831,
+      "lon": 7.4252128
+    },
+    {
+      "type": "node",
+      "id": -1000009,
+      "lat": 43.7589756683123,
+      "lon": 7.437057495117132
+    },
+    {
+      "type": "node",
+      "id": -1000010,
+      "lat": 43.75902216206734,
+      "lon": 7.432551383972113
+    },
+    {
+      "type": "node",
+      "id": -1000011,
+      "lat": 43.75896017038593,
+      "lon": 7.430834770202582
+    },
+    {
+      "type": "node",
+      "id": -1000012,
+      "lat": 43.75877419495629,
+      "lon": 7.428839206695502
+    },
+    {
+      "type": "node",
+      "id": -1000013,
+      "lat": 43.758603716971294,
+      "lon": 7.427852153778021
+    },
+    {
+      "type": "node",
+      "id": -1000014,
+      "lat": 43.758355748126064,
+      "lon": 7.4268436431884215
+    },
+    {
+      "type": "node",
+      "id": -1000015,
+      "lat": 43.75832785156667,
+      "lon": 7.426757812499945
+    },
+    {
+      "type": "way",
+      "id": -1000016,
+      "nodes": [
+        -1000009,
+        -1000010,
+        -1000011,
+        -1000012,
+        -1000013,
+        -1000014,
+        -1000015
+      ],
+      "tags": {
+        "_nameProvenance": "spatial-label-association",
+        "_sourceCompleteness": "generalized",
+        "_sourceFeatureId": "shortbread:streets:13:4265:2986:15:0",
+        "bridge": "",
+        "highway": "motorway",
+        "layer": "",
+        "name": "La Provençale",
+        "oneway": "",
+        "tunnel": "yes"
+      }
+    },
+    {
+      "type": "way",
+      "id": 120632771,
+      "nodes": [
+        1352179608,
+        12572277039,
+        245400233,
+        12572277038,
+        1352179718,
+        1352179732
+      ],
+      "tags": {
+        "bridge": "yes",
+        "highway": "secondary",
+        "lanes": "2",
+        "layer": "1",
+        "lit": "no",
+        "maxspeed": "80",
+        "maxweight:signed": "no",
+        "name": "Route de la Turbie",
+        "old_ref": "N 7",
+        "ref": "D 2564",
+        "surface": "asphalt"
+      }
+    },
+    {
+      "type": "node",
+      "id": 245400233,
+      "lat": 43.7578193,
+      "lon": 7.4336234
+    },
+    {
+      "type": "node",
+      "id": 1352179608,
+      "lat": 43.7578465,
+      "lon": 7.4337266
+    },
+    {
+      "type": "node",
+      "id": 1352179718,
+      "lat": 43.7577749,
+      "lon": 7.4335376
+    },
+    {
+      "type": "node",
+      "id": 1352179732,
+      "lat": 43.757752,
+      "lon": 7.4335043
+    },
+    {
+      "type": "node",
+      "id": 12572277038,
+      "lat": 43.7577992,
+      "lon": 7.4335824
+    },
+    {
+      "type": "node",
+      "id": 12572277039,
+      "lat": 43.7578353,
+      "lon": 7.4336795
+    },
+    {
+      "type": "node",
+      "id": -1000017,
+      "lat": 43.757844309137255,
+      "lon": 7.433731555938666
+    },
+    {
+      "type": "node",
+      "id": -1000018,
+      "lat": 43.7577513197605,
+      "lon": 7.433495521545355
+    },
+    {
+      "type": "way",
+      "id": -1000019,
+      "nodes": [
+        -1000017,
+        -1000018
+      ],
+      "tags": {
+        "_nameProvenance": "spatial-label-association",
+        "_sourceCompleteness": "generalized",
+        "_sourceFeatureId": "shortbread:streets:13:4265:2986:79:0",
+        "bridge": "yes",
+        "highway": "secondary",
+        "layer": "",
+        "name": "Route de la Turbie",
+        "oneway": "",
+        "tunnel": ""
+      }
+    }
+  ]
+}

@@ -1,12 +1,32 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {frontageCornerRegions} from '../app/js/world/compiler/street-frontage-corners.js';
+import {frontageCornerRegions,pavementCoverageQuery} from '../app/js/world/compiler/street-frontage-corners.js';
 import {pavementPartitionDifference} from '../scripts/verification/street-layout-replay.mjs';
 const rect=(x,z,w,h)=>[[[x,z],[x+w,z],[x+w,z+h],[x,z+h],[x,z]]];
 const wall=rect(-20,-20,20,20);
 const paving=[rect(-20,0,20,5),rect(0,-20,5,20)];
 const curbs=[{a:{x:-25,z:5},b:{x:15,z:5}},{a:{x:5,z:-25},b:{x:5,z:15}}];
 const area=polys=>polys.reduce((sum,p)=>sum+Math.abs(p[0].slice(1).reduce((s,v,i)=>s+p[0][i][0]*v[1]-v[0]*p[0][i][1],0))/2,0);
+test('bounded pavement probes preserve concave rings, holes, edges and translated coordinates',()=>{
+ const inRing=(x,z,ring)=>{let inside=false;for(let i=0,j=ring.length-1;i<ring.length;j=i++){const [ax,az]=ring[i],[bx,bz]=ring[j];if((az>z)!==(bz>z)&&x<(bx-ax)*(z-az)/(bz-az)+ax)inside=!inside;}return inside;};
+ for(const offset of [0,1e7,-1e7]){
+  const polygons=[rect(-5,-5,10,10).concat(rect(-2,-2,4,4)),[[[8,-4],[14,-4],[14,4],[11,0],[8,4],[8,-4]]],rect(30,30,3,3)]
+   .map(p=>p.map(r=>r.map(([x,z])=>[x+offset,z-offset])));
+  const query=pavementCoverageQuery(polygons);
+  for(let x=-7;x<=35;x+=.5)for(let z=-7;z<=35;z+=.5){
+   const point={x:x+offset,z:z-offset};
+   const expected=polygons.some(p=>inRing(point.x,point.z,p[0])&&!p.slice(1).some(r=>inRing(point.x,point.z,r)));
+   assert.equal(query(point),expected,`coverage at ${point.x},${point.z}`);
+  }
+ }
+});
+test('distant polygon rings are not rescanned for every corner probe',()=>{
+ let reads=0;
+ const ring=rect(100,100,10,10)[0].map(([x,z])=>Object.defineProperties([],{0:{get(){reads++;return x;}},1:{get(){reads++;return z;}}}));
+ const query=pavementCoverageQuery([[ring]]);reads=0;
+ for(let i=0;i<1000;i++)assert.equal(query({x:i%10,z:i%7}),false);
+ assert.equal(reads,0);
+});
 test('a corner joins two supported facades to their actual curbs',()=>{
  const corners=frontageCornerRegions([wall],paving,curbs,1);
  assert.equal(corners.length,1);assert.equal(area(corners),25);

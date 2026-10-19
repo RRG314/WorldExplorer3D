@@ -1,3 +1,4 @@
+import {afterWorldLoad} from './complete-world-readiness.mjs';
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { chromium } from 'playwright';
@@ -103,7 +104,7 @@ async function runtimeSnapshot(label) {
 }
 
 async function waitForWorld(latitude, longitude, afterSequence = -1, timeout = 300_000) {
-  await page.waitForFunction(({ lat, lon, afterSequence }) => {
+  await page.waitForFunction(afterWorldLoad(({ lat, lon, afterSequence }) => {
     const runtime = globalThis.getWorldExplorerRuntimeDiagnostics?.() || {};
     const origin = runtime.earthOrigin || {};
     return runtime.gameStarted === true && runtime.worldLoading === false &&
@@ -112,7 +113,7 @@ async function waitForWorld(latitude, longitude, afterSequence = -1, timeout = 3
       Math.abs(Number(origin.lat) - lat) < 0.001 &&
       Math.abs(Number(origin.lon) - lon) < 0.001 &&
       Number(runtime.worldCounts?.roads || 0) > 0;
-  }, { lat: latitude, lon: longitude, afterSequence }, { timeout });
+  }), { lat: latitude, lon: longitude, afterSequence }, { timeout });
   await page.waitForTimeout(1500);
 }
 

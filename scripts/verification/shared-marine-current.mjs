@@ -1,3 +1,4 @@
+import {browserEmulatorSettings} from './backend-environment.mjs';
 import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
 import {mkdir,writeFile} from 'node:fs/promises';
@@ -21,7 +22,7 @@ const post=async(user,command)=>{const r=await fetch(`http://127.0.0.1:5001/${pr
 const command=(type,revision=0,extra={})=>({type,revision,requestId:crypto.randomUUID(),...extra});
 async function openClient(user){
  const context=await browser.newContext({viewport:{width:1280,height:800}});user.context=context;
- await context.addInitScript(({projectId})=>{globalThis.WORLD_EXPLORER_FIREBASE_EMULATORS={enabled:true,host:'127.0.0.1',authPort:9099,firestorePort:8080,storagePort:9199};globalThis.WORLD_EXPLORER_FUNCTIONS_ORIGIN=`http://127.0.0.1:5001/${projectId}/us-central1`;},{projectId});
+ await context.addInitScript(({projectId,emulators})=>{globalThis.WORLD_EXPLORER_FIREBASE_EMULATORS=emulators;globalThis.WORLD_EXPLORER_FUNCTIONS_ORIGIN=`http://127.0.0.1:5001/${projectId}/us-central1`;},{projectId,emulators:browserEmulatorSettings()});
  await context.route('**/api/geospatial/reverse?**',r=>r.fulfill({status:503,json:{error:'Controlled naming outage'}}));
  await context.route('https://wms.gebco.net/**',r=>r.fulfill({status:200,contentType:'text/plain',body:"value_list = '-30'"}));
  const page=await context.newPage();user.page=page;

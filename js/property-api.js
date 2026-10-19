@@ -62,7 +62,7 @@ async function commitWorldPropertyAction(input = {}) {
       z: Number(input.actorPose.z || 0)
     } : null,
     property: propertyPayload(input.property)
-  }, { label: 'Shared property', forceRefreshToken: false });
+  }, { label: 'Shared property', forceRefreshToken: false, expectedUserId: input.expectedUserId });
 }
 
 async function commitWorldPropertyTradeAction(input = {}) {
@@ -75,7 +75,7 @@ async function commitWorldPropertyTradeAction(input = {}) {
   };
   if (input.offeredProperty) payload.offeredProperty = propertyPayload(input.offeredProperty);
   if (input.requestedProperty) payload.requestedProperty = propertyPayload(input.requestedProperty);
-  return postProtectedFunction('/commitWorldPropertyAction', payload, { label: 'Property trade', forceRefreshToken: false });
+  return postProtectedFunction('/commitWorldPropertyAction', payload, { label: 'Property trade', forceRefreshToken: false, expectedUserId: input.expectedUserId });
 }
 
 export { commitWorldPropertyAction, commitWorldPropertyTradeAction };

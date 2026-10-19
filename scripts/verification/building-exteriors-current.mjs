@@ -1,3 +1,4 @@
+import {afterWorldLoad} from './complete-world-readiness.mjs';
 import { configureStagingAppCheck } from './staging-app-check.mjs';
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
@@ -51,12 +52,12 @@ async function launchPilot(pilot) {
     await page.locator('#globeCustomLon').press('Enter');
     await page.waitForFunction(() => document.getElementById('globeSelectorStartBtn')?.disabled === false, null, { timeout: 120_000 });
     await page.locator('#globeSelectorStartBtn').click();
-    await page.waitForFunction((allowBaseline) => {
+    await page.waitForFunction(afterWorldLoad((allowBaseline) => {
       const state = globalThis.getWorldExplorerRuntimeDiagnostics?.();
       return state?.gameStarted === true && state?.worldLoading === false &&
         (allowBaseline || state?.buildingExteriors?.catalog?.familyCount >= 20) &&
         document.getElementById('loading')?.classList.contains('show') !== true;
-    }, baselineMode, { timeout: 300_000 });
+    }), baselineMode, { timeout: 300_000 });
     await page.evaluate(() => {
       const skip = [...document.querySelectorAll('button')].find((button) => /skip/i.test(button.textContent || '') && button.offsetParent);
       skip?.click();

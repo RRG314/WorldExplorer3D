@@ -69,3 +69,24 @@ test('map POI visibility follows current layer toggles without caching stale pla
  assert.equal(isPoiMapLayerVisible('unknown=unmapped',layers),false);
  assert.equal(isPoiMapLayerVisible('amenity=cafe',{}),undefined);
 });
+
+
+test('road outlines and path overlays retain all canvas commands with one output per paint pass',()=>{
+ const image=globalThis.Image;globalThis.Image=class{set src(_) {}};
+ const saved={...ctx};
+ try{
+  Object.assign(ctx,{LOC:{lat:39.2904,lon:-76.6122},car:{x:0,z:0},minimapZoom:15,largeMapZoom:14,mapLayers:{interiors:false},
+   waterAreas:[],waterways:[],showRoads:true,showPathOverlays:true,
+   roads:['motorway','primary','tertiary','residential'].map((type,i)=>({type,pts:[{x:-40+i,z:-20},{x:i,z:30},{x:70+i,z:20}]})),
+   linearFeatures:['railway','cycleway','path'].map((kind,i)=>({kind,pts:[{x:-30,z:i},{x:40,z:i+10}]}))});
+  for(const isLarge of [false,true]){
+   const size=isLarge?800:150,view=resolveMapView(size,size,isLarge),destinations=new Set();let reused=0;
+   const paint=reuse=>{
+    const commands=[],canvas=new Proxy({}, {get:(_,key)=>(...args)=>commands.push([key,...args]),set:(_,key,value)=>{commands.push(['set',key,value]);return true;}});
+    const project=(x,z,out)=>{if(reuse&&out){destinations.add(out);reused++;return view.worldToScreen(x,z,out);}return view.worldToScreen(x,z);};
+    drawEarthBaseLayers(canvas,size,size,isLarge,{...view,worldToScreen:project});return commands;
+   };
+   assert.deepEqual(paint(true),paint(false));assert.equal(reused,30);assert.equal(destinations.size,2);
+  }
+ }finally{Object.assign(ctx,saved);globalThis.Image=image;}
+});

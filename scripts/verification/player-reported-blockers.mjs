@@ -58,6 +58,10 @@ async function selectBaltimore(page) {
 
 async function waitForInteractiveWorld(page) {
   await page.waitForFunction(() => {
+    if (globalThis.__WE3D_RUNTIME_READY__ !== true || document.querySelector('#loading.show')) {
+      globalThis.__WE3D_PLAYER_REPORT_READY_SINCE__ = 0;
+      return false;
+    }
     const state = globalThis.getWorldExplorerRuntimeDiagnostics?.();
     const loadingVisible = document.getElementById('loading')?.classList.contains('show') === true;
     const titleVisible = !document.getElementById('titleScreen')?.classList.contains('hidden');

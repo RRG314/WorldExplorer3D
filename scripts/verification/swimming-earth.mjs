@@ -29,13 +29,29 @@ try {
   if(await page.locator('#analyticsConsentDenyBtn').isVisible())await page.locator('#analyticsConsentDenyBtn').click();
   await page.locator('#globeSelectorStartBtn').click();
   await page.evaluate(async()=>{window.swimCtx=(await import('/app/js/shared-context.js?v=55')).ctx;});
-  try {await page.waitForFunction(()=> (swimCtx.gameStarted===true && swimCtx.worldLoading===false && !!swimCtx.Walk?.state?.characterMesh && swimCtx.initialEarthWorldReady===true && swimCtx.worldLoadRuntimeState?.gameplayRuntimesReady===true) || swimCtx.worldLoadRuntimeState?.status==='failed',null,{timeout:90000});}
+  // This source fixture verifies swimming after a complete world load. Use the
+  // bounded loading window from the packaged functional journeys; the separate
+  // packaged performance gate still enforces the actual first-playable budget.
+  const startupStarted=performance.now();
+  try {await page.waitForFunction(()=> (swimCtx.gameStarted===true && swimCtx.worldLoading===false && !!swimCtx.Walk?.state?.characterMesh && swimCtx.initialEarthWorldReady===true && swimCtx.worldLoadRuntimeState?.gameplayRuntimesReady===true) || swimCtx.worldLoadRuntimeState?.status==='failed',null,{timeout:300000});}
   catch(error){
    report.startup=await page.evaluate(()=>({gameStarted:swimCtx.gameStarted,worldLoading:swimCtx.worldLoading,ready:swimCtx.initialEarthWorldReady,environment:swimCtx.getEnv?.(),publication:!!swimCtx.worldPublication,loadingText:document.getElementById('loading')?.innerText}));
    await page.screenshot({path:`${dir}/swimming-startup-failure.png`});throw error;
+  }finally{report.startupWaitMs=Math.round(performance.now()-startupStarted);}
+  report.startup=await page.evaluate(()=>{
+   const c=swimCtx,r=c.worldLoadRuntimeState;
+   return {gameStarted:c.gameStarted,worldLoading:c.worldLoading,ready:c.initialEarthWorldReady,
+    publication:!!c.worldPublication,waterAreas:c.waterAreas?.length,roads:c.roads?.length,
+    buildings:c.buildings?.length,runtime:{status:r?.status,error:r?.error,
+     geometryReady:r?.geometryReady,gameplayRuntimesReady:r?.gameplayRuntimesReady}};
+  });
+  const startupFailure=await page.evaluate(()=>swimCtx.worldLoadRuntimeState?.error ||
+   swimCtx.worldLoadRuntimeState?.gameplayRuntimeError || swimCtx.worldLoadRuntimeState?.firstRenderError ||
+   (swimCtx.worldLoadRuntimeState?.status==='failed'?'Unspecified rejected world load':null));
+  if(startupFailure){
+   await page.screenshot({path:`${dir}/swimming-startup-failure.png`});
+   throw Error(`Earth startup failed: ${startupFailure}`);
   }
-  const startupFailure=await page.evaluate(()=>swimCtx.worldLoadRuntimeState?.gameplayRuntimeError || swimCtx.worldLoadRuntimeState?.firstRenderError || null);
-  if(startupFailure)throw Error(`Earth startup failed: ${startupFailure}`);
 
  }
  await page.goto(`http://127.0.0.1:${server.port}/app/?loc=custom&lat=39.2904&lon=-76.6122&lname=Baltimore&launch=earth&gm=free&mode=walking`,{waitUntil:'load'});

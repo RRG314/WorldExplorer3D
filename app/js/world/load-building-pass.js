@@ -1,4 +1,10 @@
+import {createBuildingConstructionArena, allocatePrivateBuildingStorage, releaseRetiredBuildingCpuBuffers, finishPrivateBuildingStorage} from './retired-building-buffers.js';
 import {createBuildingBodyGeometry} from './building-body-geometry.js';
+import {prepareLaunchPadBuildingWays} from './launch-pad-facility.js';
+import {prepareKennedyBuildingWays} from './kennedy-facility.js';
+import {publishKennedyExterior} from './kennedy-exterior.js';
+import {reviewedVenueForBuilding} from '../interiors/venue-exterior-policy.js';
+import {publishReviewedVenueExteriors} from './reviewed-venue-exteriors.js';
 import {resolveBuildingFoundation} from './building-foundation.js';
 import { attachBuildingFacadeLayout } from './building-facade-layout.js?v=3';
 import { ctx as appCtx } from "../shared-context.js?v=55";
@@ -39,8 +45,15 @@ export function requiresLoadedRoadCoverageForBuilding(tags = {}) {
 }
 
 export async function buildBuildingGeometryPass(options = {}) {
-  const buildingWays = Array.isArray(options.buildingWays) ? options.buildingWays : [];
-  const nodes = options.nodes || {};
+  const arenas = { near: createBuildingConstructionArena(), mid: createBuildingConstructionArena() };
+  try { return await buildBuildingGeometryWithStorage(options, arenas); }
+  finally { arenas.near.close(); arenas.mid.close(); }
+}
+
+async function buildBuildingGeometryWithStorage(options, arenas) {
+  const kennedy=prepareKennedyBuildingWays(appCtx,Array.isArray(options.buildingWays)?options.buildingWays:[],options.nodes||{},options.lodThresholds?.farVisible);
+  const buildingWays = prepareLaunchPadBuildingWays(appCtx,kennedy.ways,kennedy.nodes,options.lodThresholds?.farVisible);
+  const nodes = kennedy.nodes;
   const buildingGeometryGuards = options.buildingGeometryGuards || {};
   const lodThresholds = options.lodThresholds || {};
   const loadMetrics = options.loadMetrics || {};
@@ -264,7 +277,11 @@ export async function buildBuildingGeometryPass(options = {}) {
       loadMetrics.buildingWater.explicitOverwaterStructures += 1;
     }
     const centerDist = Math.hypot(centerX, centerZ);
-    const lodTier = centerDist <= buildingDetailDist ? 'near' : centerDist <= lodThresholds.farVisible ? 'mid' : 'far';
+    // These few reviewed visitor venues retain their visible doorway contract
+    // within the loaded district. Mid batches intentionally omit door attributes.
+    const reviewedVenue=reviewedVenueForBuilding({sourceBuildingId:knownSourceBuildingId,tags:way.tags});
+    const lodTier = centerDist <= buildingDetailDist || reviewedVenue && centerDist <= lodThresholds.farVisible
+      ? 'near' : centerDist <= lodThresholds.farVisible ? 'mid' : 'far';
     if (lodTier === 'far') {
       loadMetrics.lod.farSkipped += 1;
       loadMetrics.buildingPublication.farLod += 1;
@@ -289,6 +306,14 @@ export async function buildBuildingGeometryPass(options = {}) {
       footprintWidth,
       footprintDepth
     });
+    // The provider's 6.27 m estimate contradicts the photographed three-storey
+    // facade. Preserve it as source evidence, not as a surveyed constraint.
+    if (reviewedVenue==='peale-baltimore') {
+      buildingSemantics.providerHeightMeters=buildingSemantics.heightMeters;
+      if(buildingSemantics.heightMeters<10||buildingSemantics.heightMeters>15)buildingSemantics.heightMeters=11.4;
+      buildingSemantics.topOffsetMeters=buildingSemantics.baseOffsetMeters+buildingSemantics.heightMeters;
+      buildingSemantics.heightSource='reviewed_facade_estimate';
+    }
     const height = buildingSemantics.heightMeters;
     if (isImplausibleTallBuildingFootprint({
       heightMeters: height,
@@ -303,7 +328,7 @@ export async function buildBuildingGeometryPass(options = {}) {
       continue;
     }
     const buildingLevels = Number.parseFloat(way.tags['building:levels']);
-    const resolvedLevels = Number.isFinite(buildingLevels) ?
+    const resolvedLevels = buildingSemantics.heightSource==='reviewed_facade_estimate' ? 3 : Number.isFinite(buildingLevels) ?
       Math.max(1, Math.round(buildingLevels)) :
       Math.max(1, Math.min(120, Math.round(height / Math.max(2.8, buildingSemantics.levelHeightMeters || 3.2))));
     const levelsSource = Number.isFinite(buildingLevels) ?
@@ -350,6 +375,7 @@ export async function buildBuildingGeometryPass(options = {}) {
     const roadAuthority = measureBuildingPhase('roadEligibility', () =>
       resolveFootprintTransportAuthority(pts, {
         allowsPassageBelow: buildingSemantics.allowsPassageBelow === true,
+        enclosedFacilityAccess: reviewedVenue === 'kennedy-vab',
         inferredFootprint: way.tags._geometrySource === 'inferred_road_frontage',
         sourceBuildingId
       })
@@ -504,6 +530,7 @@ export async function buildBuildingGeometryPass(options = {}) {
     if (lodTier === 'mid') {
       mesh = measureBuildingPhase('meshCreation', () => createMidLodBuildingMesh(pts, bodyHeight, baseElevation, {
         colorHex: baseColor,
+        constructionArena: arenas.mid,
         buildingSeed: bSeed,
         buildingType: bt,
         denseUrban: denseUrbanContext,
@@ -521,9 +548,10 @@ export async function buildBuildingGeometryPass(options = {}) {
       }));
     } else {
       const meshCreationStartedAt = now();
-      const geo = createBuildingBodyGeometry(THREE, pts, bodyHeight);
+      const geo = createBuildingBodyGeometry(THREE, pts, bodyHeight, arenas.near);
       if (!geometryHasFinitePositions(geo)) {
         geo.dispose();
+        releaseRetiredBuildingCpuBuffers(geo);
         continue;
       }
       const materialOptions = {
@@ -612,7 +640,9 @@ export async function buildBuildingGeometryPass(options = {}) {
     attachBuildingFacadeLayout(mesh.geometry, { ...mesh.userData.exteriorProfile, levels: Math.max(1, resolvedLevels - (Number(buildingSemantics.buildingMinLevel) || 0)), foundation: terrainFoundationRise });
     if (lodTier === 'mid' && mesh.material?.userData?.buildingExterior) {
       const color = new THREE.Color(mesh.userData.exteriorPresentation?.wallColor ?? baseColor);
-      const colors = new Float32Array(mesh.geometry.attributes.position.count * 3);
+      const count = mesh.geometry.attributes.position.count * 3;
+      const storage = allocatePrivateBuildingStorage(mesh.geometry, count * 4);
+      const colors = new Float32Array(storage.buffer, storage.byteOffset, count);
       for(let i=0;i<colors.length;i+=3) colors.set([color.r,color.g,color.b],i);
       mesh.geometry.setAttribute('color',new THREE.BufferAttribute(colors,3));
     }
@@ -801,6 +831,8 @@ export async function buildBuildingGeometryPass(options = {}) {
   const facadeEntrances = publishBuildingFacadeEntrances(appCtx);
   loadMetrics.buildingFacadeEntrances = { ...facadeEntrances.diagnostics };
   endLoadPhase('publishBuildingFacadeEntrances');
+  loadMetrics.reviewedVenueExteriors=publishReviewedVenueExteriors(appCtx,THREE);
+  await publishKennedyExterior(appCtx,THREE);
   startLoadPhase('publishBuildingExteriorDetails');
   loadMetrics.buildingExteriors = publishBuildingExteriorDetails(appCtx);
   endLoadPhase('publishBuildingExteriorDetails');
@@ -814,6 +846,12 @@ export async function buildBuildingGeometryPass(options = {}) {
   if (batchedMidCount > 0) loadMetrics.lod.midBatched = batchedMidCount;
   if (appCtx._lastBuildingBatchStats) {
     loadMetrics.buildingBatching = { ...appCtx._lastBuildingBatchStats };
+  }
+  // Keep exact standalone attributes, but release construction pages shared
+  // with neighbors already copied into render batches.
+  for (let index = 0; index < appCtx.buildingMeshes.length; index++) {
+    finishPrivateBuildingStorage(appCtx.buildingMeshes[index].geometry);
+    if ((index + 1) % 32 === 0) await yieldToMainThread();
   }
   appCtx.refreshEditableBuildingVisibility?.();
   endLoadPhase('batchBuildingGeometry');

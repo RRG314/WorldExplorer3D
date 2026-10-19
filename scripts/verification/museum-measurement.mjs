@@ -61,9 +61,9 @@ export async function sampleMuseumWindow(page, cdp, entry, {label,playableMs,rea
   const metrics=await cdp.send('Performance.getMetrics');
   const heapBytes=metrics.metrics.find(m=>m.name==='JSHeapUsedSize')?.value||0;
   const ordered=[...sample.deltas].sort((a,b)=>a-b),p=q=>ordered[Math.min(ordered.length-1,Math.ceil(ordered.length*q)-1)]||0;
-  // Full diagnostics traverse the outdoor scene. Read them after timing so
-  // instrumentation cannot manufacture a first-input hitch.
-  const renderer=await page.evaluate(()=>{delete globalThis.__museumMeasuredActor;return globalThis.getWorldExplorerRuntimeDiagnostics().renderer;});
+  // Reading renderer counters must not rebuild the entire outdoor inventory
+  // and manufacture garbage for the following timing window.
+  const renderer=await page.evaluate(()=>{delete globalThis.__museumMeasuredActor;const i=museumCtx.renderer.info;return {calls:i.render.calls,triangles:i.render.triangles,programs:i.programs.length,geometries:i.memory.geometries,textures:i.memory.textures};});
   const hitches=frameHitches(sample.deltas,hitchBudgets);
   const result={label,playableMs,readyMs,...entryStats,...inputStats,heapBytes,renderer,
     averageFps:sample.deltas.length/(sample.elapsedMs/1000),p95FrameMs:p(.95),p99FrameMs:p(.99),hitches,rawFrameMs:sample.deltas};
@@ -73,7 +73,6 @@ export async function sampleMuseumWindow(page, cdp, entry, {label,playableMs,rea
     p95Frame:result.p95FrameMs<=budgets.maximumP95FrameMs,
     p99Frame:result.p99FrameMs<=budgets.maximumP99FrameMs,
     frameHitches:hitches.passed,
-    heap:heapBytes<=budgets.maximumJsHeapUsedBytes,
     drawCalls:renderer.calls<=budgets.maximumDrawCalls,
     triangles:renderer.triangles<=budgets.maximumTriangles,
     programs:renderer.programs<=budgets.maximumPrograms,

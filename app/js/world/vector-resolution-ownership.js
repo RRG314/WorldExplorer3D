@@ -31,7 +31,7 @@ function capsuleIntervals(a,b,segment,tolerance){
  }
  return ranges;
 }
-export function findCoveredCoarseRoadIds(primary,regional,{tolerance=TOLERANCE}={}){
+export function findCoveredCoarseRoadIds(primary,regional,{tolerance=TOLERANCE,allowCurvedSegments=false}={}){
  const grid=new Map();
  for(const road of primary){
   if(!Number.isFinite(road.level))continue;
@@ -51,18 +51,25 @@ export function findCoveredCoarseRoadIds(primary,regional,{tolerance=TOLERANCE}=
    if(!(length>EPSILON))continue;
    nondegenerate=true;
    const candidates=new Set();cells(a,b,0,key=>{for(const segment of grid.get(key)||[])candidates.add(segment)});
-   const intervals=[];
+   const intervals=[];let alignedCoverage=false;
    for(const segment of candidates){
     if(segment.road.level<=road.level||segment.road.key!==road.key)continue;
     if(road.oneway&&road.oneway!==segment.road.oneway)continue;
     const dot=((b.x-a.x)*segment.ux+(b.z-a.z)*segment.uz)/length;
-    if((road.directed?dot:Math.abs(dot))<.98)continue;
-    intervals.push(...capsuleIntervals(a,b,segment,tolerance));
+    const aligned=(road.directed?dot:Math.abs(dot))>=.98;
+    if(!aligned&&(!allowCurvedSegments||(road.directed&&dot<=0)))continue;
+    const covered=capsuleIntervals(a,b,segment,tolerance);
+    if(aligned&&covered.some(([lo,hi])=>hi-lo>EPSILON))alignedCoverage=true;
+    intervals.push(...covered);
    }
    intervals.sort((a,b)=>a[0]-b[0]);
    let end=0;
    for(const interval of intervals){if(interval[0]>end+EPSILON)break;end=Math.max(end,interval[1]);if(end>=1-EPSILON)break;}
-   if(end<1-EPSILON)complete=false;
+   // A curved exact structure can leave the coarse chord's tangent at its
+   // end while remaining inside the same narrow corridor. It still needs an
+   // aligned overlap AND full coverage; a tiny perpendicular crossing is not
+   // a duplicate even when the complete short segment fits inside a capsule.
+   if(end<1-EPSILON||!alignedCoverage)complete=false;
   }
   if(complete&&nondegenerate)covered.add(road.id);
  }

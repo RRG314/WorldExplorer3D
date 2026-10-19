@@ -3,6 +3,8 @@ import {beginSwimmingRender} from '../walking/water/presentation.js';
 import {createGraphicsCallEvidence} from './graphics-call-evidence.js';
 import {activePresentationOwner} from './renderer-owners.js';
 import { updateStreetPavementFocus, updateStreetOverviewFrame, prepareStreetOverviewMaterials } from '../world/street-pavement-runtime.js';
+import { suspendStreetPreparationForInterior } from '../world/street-interior-suspension.js';
+import { prepareResidentPresentation } from './resident-presentation-preparation.js';
 function createCoreFrameSystems(appCtx, hooks = {}) {
   appCtx.presentationPose = null;
   let hudTimer = 0;
@@ -46,7 +48,10 @@ function createCoreFrameSystems(appCtx, hooks = {}) {
           (!appCtx.isEnv||!appCtx.ENV||appCtx.isEnv(appCtx.ENV.EARTH));
         const detail=earthActive?appCtx.transportDetail:null;
         if(detail){
-          const point=appCtx.activeEarthActorPosition?.()||{x:0,z:0};
+          const actor=appCtx.activeEarthActorPosition?.()||{x:0,z:0};
+          // An occupied floor owns its contact; outdoor road recovery cannot
+          // block walking, lifts or exit. Keep the road controller for return.
+          const point=appCtx.activeInterior?{...actor,source:'interior'}:actor;
           const terrainY=['plane','drone'].includes(point.source)?appCtx.terrainMeshHeightAt?.(point.x,point.z):NaN;
           detail.step(point,terrainY);
           if(!detail.readyForActor(point,terrainY))frame.flags.simulationBlocked=true;
@@ -136,7 +141,10 @@ function createCoreFrameSystems(appCtx, hooks = {}) {
       update(frame) {
         // The ship owns its HUD, maps and visual detail. Retaining the city for
         // return does not give its hidden map/LOD systems an interior frame.
-        if (appCtx.activeShipInterior) return;
+        if (appCtx.activeShipInterior) {
+          suspendStreetPreparationForInterior(appCtx);
+          return;
+        }
         weatherUiTimer += frame.dt;
         if (weatherUiTimer >= 1) {
           weatherUiTimer %= 1;
@@ -180,6 +188,15 @@ function createCoreRenderSystem(appCtx, shouldUseComposer) {
   const graphicsEvidence=typeof location!=='undefined' && new URLSearchParams(location.search).get('graphicsDiagnostics')==='1'
     ? createGraphicsCallEvidence(appCtx.renderer.getContext()) : null;
   appCtx.graphicsCallEvidence=graphicsEvidence;
+  appCtx.prepareResidentPresentation = (root, visibleRoots = []) => {
+    // Three r128 has no isWebGLRenderer marker. Use its actual public API.
+    if (!globalThis.THREE || typeof appCtx.renderer.getViewport !== 'function') return null;
+    return prepareResidentPresentation(appCtx, globalThis.THREE, {
+      root: root || appCtx.scene,
+      visibleRoots,
+      target: shouldUseComposer() ? appCtx.composer.readBuffer : null
+    });
+  };
   const draw = () => {
     graphicsEvidence?.begin();
     const restoreWaterPresentation=beginSwimmingRender(appCtx);
@@ -205,12 +222,19 @@ function createCoreRenderSystem(appCtx, shouldUseComposer) {
       try {
         appCtx.renderer.setRenderTarget(shouldUseComposer() ? appCtx.composer.readBuffer : null);
         appCtx.renderer.compile(appCtx.scene, appCtx.camera);
+        try {
+          appCtx.museumProgramPreparation = appCtx.prepareLoadedMuseumPrograms?.() || null;
+        } catch (error) {
+          appCtx.museumProgramPreparation = { status: 'failed' };
+          console.warn('[Interior] Rendering preparation deferred to entry:', error);
+        }
       } finally {
         appCtx.renderer.setRenderTarget(previousTarget);
       }
     }
+    const residentPreparation = appCtx.prepareResidentPresentation(appCtx.scene, [appCtx.carMesh, appCtx.Walk?.state?.characterMesh]);
     draw();
-    return {durationMs:performance.now()-started,programs:appCtx.renderer?.info?.programs?.length || 0};
+    return {durationMs:performance.now()-started,programs:appCtx.renderer?.info?.programs?.length || 0,residentPreparation};
   };
   return {
     id: 'core.renderer',

@@ -2,7 +2,21 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {indexPavementPositions} from '../app/js/world/pavement-indexed-mesh.js';
 import {createPavementBaseSampler} from '../app/js/world/pavement-height-sampler.js';
-import {serializeStreetPavementFingerprint} from '../app/js/world/compiler/street-pavement-fingerprint.js';
+import {serializeStreetPavementFingerprint,serializePavementSurfaceFingerprint} from '../app/js/world/compiler/street-pavement-fingerprint.js';
+
+test('fitted product identity includes all geometry and height-sampler inputs, independent of remote source metadata',()=>{
+ const tile={bounds:{minX:0,maxX:64,minZ:0,maxZ:64},segments:[{a:{x:0,z:20},b:{x:64,z:20},wa:8,wb:9,offset:1,road:{metersPerWorldUnit:1,surfaceBias:.18,tags:{name:'Before'}}}]};
+ const result={polygons:[[[[0,0],[2,0],[0,2],[0,0]]]],markingPolygons:[],ramps:[]};
+ const initial=serializePavementSurfaceFingerprint(tile,result,1);
+ const metadata=structuredClone(tile);metadata.segments[0].road.tags.name='After';
+ assert.equal(serializePavementSurfaceFingerprint(metadata,result,1),initial);
+ for(const mutate of [t=>t.bounds.maxX=65,t=>t.segments.reverse().push(structuredClone(t.segments[0])),t=>t.segments[0].a.x++,t=>t.segments[0].b.z++,t=>t.segments[0].wa++,t=>t.segments[0].wb++,t=>t.segments[0].offset++,t=>t.segments[0].road.metersPerWorldUnit=2,t=>t.segments[0].road.surfaceBias=.3]){
+  const next=structuredClone(tile);mutate(next);assert.notEqual(serializePavementSurfaceFingerprint(next,result,1),initial);
+ }
+ for(const field of ['polygons','markingPolygons','ramps']){const next=structuredClone(result);next[field].push([1,2]);assert.notEqual(serializePavementSurfaceFingerprint(tile,next,1),initial);}
+ assert.notEqual(serializePavementSurfaceFingerprint(tile,result,2),initial);
+ assert.notEqual(serializePavementSurfaceFingerprint({...tile,designRegions:[{},{}]},result,1),initial);
+});
 
 test('sidewalk ownership masks are hashed once without losing cache invalidation',()=>{
  const masks=Array.from({length:100},(_,i)=>[[[i,0],[i+1,0],[i+1,8],[i,8],[i,0]]]);

@@ -1,6 +1,6 @@
 # Known Issues and Limitations
 
-Last reviewed: October 12, 2026, for the 5.6 update. These are known product
+Last reviewed: October 19, 2026, for 5.6.1. These are known product
 limits, not a promise that every location or device has been validated.
 The [GitHub releases](https://github.com/RRG314/WorldExplorer3D/releases) identify
 published versions.
@@ -19,9 +19,10 @@ published versions.
 - Research currently offers a limited set of measurements and fabrication
   outcomes; broader experiments and expedition consequences remain planned.
 
-- Some full-game performance targets remain unmet, particularly frame pacing
-  and travel transitions. Aquarium or museum entry can also pause after loading
-  a dense city. Smoothness varies across locations and devices.
+- Dense locations can take several minutes to load. Travel transitions and
+  entry into detailed venues can still pause, especially on lower-memory
+  devices. Sustained desktop checks do not establish smoothness at every
+  location or on every device.
 - Historic sites and regional vegetation are not uniformly complete. Dedicated
   landmark geometry, mapped footprints and inferred buildings can still overlap or differ from the real location.
 
@@ -60,6 +61,9 @@ published versions.
   visual quality for every bridge and tunnel.
 - Very narrow service roads and unusually complex multi-level junctions can
   leave limited clearance for larger vehicles.
+- On steep terrain, some road approaches sit too high above the hillside.
+  Connected driving surfaces can still have unrealistic earthworks or exposed
+  edges; mountain road reconstruction needs further refinement.
 - Airport runways, aprons, terminals, gates, and towers use available map data.
   The shared airport experience fills missing playable details, but its shape
   and scale may differ from the real airport when mapping is incomplete.
@@ -90,6 +94,8 @@ published versions.
 - Dense cities, rapid aerial travel, detailed facades and large structure
   networks can be demanding on browser and graphics memory. Areas left behind
   are unloaded, but total memory use still varies by browser and device.
+- Large scenes can temporarily use more than 1 GB of JavaScript memory, in
+  addition to graphics memory. Low-memory phone support is not established.
 - Quality settings control rendering cost and effects. They do not rewrite
   mapped building height or replace the selected world with a lower-detail data
   source.
@@ -116,8 +122,8 @@ published versions.
 - The National Aquarium visit covers a limited Pavilion and Blacktip Reef route,
   with upper and lower viewing areas. Other exhibitions and upper programmes
   are not included. Layout details without published dimensions are estimated;
-  the exterior is still a mapped building rather than a custom architectural
-  replica. Habitat density and surrounding views need further art refinement.
+  exterior forms combine mapped footprints with reconstructed features rather
+  than surveyed dimensions. Habitat density and surrounding views need further art refinement.
 
 - The first museum gallery interprets The Peale's front ground floor using its
   public room guide. Dimensions and finishes are estimated; rear and upper
