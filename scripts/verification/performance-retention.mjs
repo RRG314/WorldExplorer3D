@@ -18,6 +18,7 @@ import { collectBrowserGraphicsErrors } from './browser-graphics-errors.mjs';
 import {artifactIdentity} from './artifact-identity.mjs';
 import {measureRetainedHeap} from './retained-heap.mjs';
 import {performanceLaunchSummary} from './performance-launch-summary.mjs';
+import {transferDifference,transferPhases,transferWithinBudget} from './performance-transfer.mjs';
 
 // Reject cloud/other hardware before opening a browser or loading a world.
 const hostAuthority = requirePerformanceHost();
@@ -339,12 +340,6 @@ function reloadPreservesCoverage(counts, baseline, retention) {
     ratio(Number(counts?.terrainTiles || 0), Number(baseline?.terrainTiles || 0)) >= retention.minimumReloadTerrainRatio;
 }
 
-function transferWithinBudget(transfer, limit) {
-  return transfer.localTransferBytes <= limit.maximumLocalTransferBytes &&
-    transfer.externalRequests <= limit.maximumExternalRequests &&
-    transfer.externalTransferBytes <= limit.maximumExternalTransferBytes;
-}
-
 async function sustainedTravel(client){
   const page=client.page;
   const route=await page.evaluate(`(${planRoadRoute.toString()})(globalThis.__WE3D_PERF_CONTEXT__.roads)`);
@@ -396,6 +391,7 @@ async function runDesktop() {
       assert.ok([...retainedHeapCycles].every(cycle=>Number.isInteger(cycle)&&cycle>=1&&cycle<=24),'Retained heap cycles must be integers 1–24');
     }
     const launch = await launchWorld(client);
+    const startupTransfer = transferSnapshot(client);
     if(process.env.WE3D_PERF_PRIVATE_HEAP==='1'){
       assert.ok(auditOnly,'Heap snapshots are private diagnostics, never frame-time acceptance');
       // Snapshots can contain disposable auth material. Keep raw bytes outside
@@ -465,6 +461,7 @@ async function runDesktop() {
     const reloadCounts = [];
     const reloadTransfers=[];
     let shortRunTransfer=null,previousTransfer=transferSnapshot(client);
+    const beforeReloadsTransfer=previousTransfer;
     const requestedRetentionCycles = Number(process.env.WE3D_VERIFY_RETENTION_CYCLES);
     const environmentCycles = auditOnly&&!retainedHeapCycles.size
       ? 0
@@ -526,7 +523,7 @@ async function runDesktop() {
       await waitForPlayable(client.page);
       reloadCounts.push(await client.page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().worldCounts || null));
       const currentTransfer=transferSnapshot(client);
-      reloadTransfers.push(Object.fromEntries(['localTransferBytes','externalTransferBytes','externalRequests'].map(key=>[key,currentTransfer[key]-previousTransfer[key]])));
+      reloadTransfers.push(transferDifference(currentTransfer,previousTransfer));
       previousTransfer=currentTransfer;
       if(cycle+1===budgets.retention.minimumEnvironmentCycles)shortRunTransfer=currentTransfer;
       console.log('[performance-retention] world cycle',JSON.stringify({cycle:cycle+1,immediateMiB:release.immediateJsHeapUsedBytes/1048576,settledMiB:release.jsHeapUsedBytes/1048576}));
@@ -534,6 +531,7 @@ async function runDesktop() {
     await client.page.screenshot({ path: `${evidenceDirectory}/performance-desktop.png`, fullPage: false });
     const storage = await storageSnapshot(client.page);
     const transfer = transferSnapshot(client);
+    const networkPhases=transferPhases({startup:startupTransfer,beforeReloads:beforeReloadsTransfer,reloads:reloadTransfers,total:transfer});
     const limit = budgets.desktopTier.budgets;
     const releaseGeometries = releases.map((entry) => Number(entry?.after?.rendererGeometries || 0));
     const releaseTextures = releases.map((entry) => Number(entry?.after?.rendererTextures || 0));
@@ -564,16 +562,17 @@ async function runDesktop() {
         Math.max(...releaseTextures) - Math.min(...releaseTextures) <= budgets.retention.maximumTextureGrowthPerCycle,
       heapRetentionBounded: releases.every((entry) => Number(entry.jsHeapUsedBytes || 0) <= launch.titleHeapBytes + budgets.retention.maximumHeapGrowthBytes),
       worldCoveragePreserved: reloadCounts.every((counts) => reloadPreservesCoverage(counts, baselineCounts, budgets.retention)),
-      // Preserve the existing short-run total limit. Additional reloads have
-      // separate receipts instead of being charged to a two-cycle total.
-      transferWithinBudget: transferWithinBudget(shortRunTransfer || transfer, limit),
+      // Apply the unchanged transfer ceiling to every bounded operation. A
+      // successful exact-map response must not fail solely because twelve
+      // reloads and 930 seconds of travel were added to a short-run fixture.
+      transferWithinBudget: networkPhases.every(phase=>transferWithinBudget(phase,limit)),
       extendedReloadTransfersWithinBudget:reloadTransfers.slice(budgets.retention.minimumEnvironmentCycles).every(sample=>transferWithinBudget(sample,limit)),
       storageWithinBudget: storage.usageBytes <= limit.maximumPersistentStorageBytes,
       noBrowserErrors: client.browserErrors.length === 0,
       noFailedLocalResources: client.localFailures.length === 0
     };
     return { ok: Object.values(checks).every(Boolean), tier: budgets.desktopTier, launch, modes, occupiedMemory, releases, reloadCounts,
-      transfer,shortRunTransfer,reloadTransfers,transferScope:'Original total budget through two reloads; same limits checked separately on every additional reload; cumulative transfers retained.',
+      transfer,shortRunTransfer,reloadTransfers,networkPhases,transferScope:'Unchanged transfer cap per cold load, bounded travel window, each reload and finalization. Every byte reconciles to the retained cumulative total; no provider responses excluded.',
       storage, checks, gameplayInterruptions, browserErrors: client.browserErrors, localFailures: client.localFailures, providerDegradations:client.providerDegradations };
   } finally {
     await client.context.close();

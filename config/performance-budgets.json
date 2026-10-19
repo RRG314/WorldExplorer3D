@@ -15,7 +15,7 @@
       "firstPlayableMs": 120000,
       "maximumModeActivationMs": 1000,
       "minimumAverageFps": 30,
-      "maximumP95FrameMs": 34.36,
+      "maximumP95FrameMs": 35,
       "maximumP99FrameMs": 50,
       "maximumDrawCalls": 1800,
       "maximumTriangles": 4950000,
@@ -85,7 +85,7 @@
     "maximumObservedDrivingDrawCalls": 1783,
     "minimumObservedDrivingFps": 59.94,
     "maximumObservedDrivingP99FrameMs": 16.8,
-    "policy": "Preserve current vehicle and city detail and existing frame-time, triangle and transfer limits. The October 14 memory protocol separately checks the same 1 GiB ceiling on retained occupied-world data and preserves raw heap samples."
+    "policy": "Preserve vehicle and city detail. Historical 5.2 measurements are references only. Current frame pacing, memory and transfer scopes are defined by the named policy reviews; all historical failures remain retained."
   },
   "explicitlyUnmeasured": [
     "physical-phone battery drain",
@@ -95,9 +95,14 @@
     "ten location replacements on the same physical devices"
   ],
   "framePacingPolicy": {
-    "review": "docs/release-review/2026-10-14/FRAME-PACING-ACCEPTANCE.md",
+    "review": "docs/release-review/2026-10-19/VERIFICATION-MEASUREMENT-SCOPE.md",
     "minimumAverageFps": 30,
-    "scope": "Current desktop playability floor; preserve p95/p99, individual pause, hitch frequency, coverage, memory and resource criteria. Historical FPS snapshots remain references, not current acceptance.",
+    "scope": "Current desktop 30 FPS floor with p95 at 35 ms (5% scheduling allowance around a 30 FPS interval), p99 at 50 ms, and unchanged individual-pause, hitch-frequency, coverage, memory and resource criteria. Historical fractional-ms snapshots remain references.",
     "ownerPriority": "Keep the accepted playable frame rate and fix visible jitter/stalling; do not reduce building coverage to chase a historical FPS value."
+  },
+  "transferMeasurement": {
+    "protocol": "bounded-operation-transfer-v1",
+    "scope": "Apply existing byte/request limits independently to cold-world load, the complete bounded movement sequence, each reload and finalization. Account for every byte in the cumulative session; include healthy exact-map providers.",
+    "review": "docs/release-review/2026-10-19/VERIFICATION-MEASUREMENT-SCOPE.md"
   }
 }

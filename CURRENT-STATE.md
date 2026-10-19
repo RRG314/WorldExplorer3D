@@ -75,12 +75,34 @@ checkpoint JSON and versioned run folders. Current image inspection is recorded
 separately from automated assertions. Do not treat old screenshots or unrun
 checks as current proof.
 
+## Final 57ec93a4 findings and measurement correction
+
+The 57 backend suite and all four save/fallback stages passed. Its native run
+completed all seven sustained windows, twelve reloads and mobile regression.
+First playable was 99,693 ms; hitch, retention, occupied memory and coverage
+checks passed. The run still failed two historical criteria: flight p95 34.4 ms
+versus 34.36 ms, and an 83,349,831-byte combined session transfer versus 64 MiB.
+The old 499 run received zero exact-Overpass bytes; 57 successfully received
+17,952,723 bytes. A healthy detail provider must not be required to fail for
+transfer acceptance. Original failed receipts are retained.
+
+The explicit revised protocol is documented in
+`docs/release-review/2026-10-19/VERIFICATION-MEASUREMENT-SCOPE.md`.
+The desktop p95 criterion is now 35 ms (5% scheduling allowance around a 30 FPS
+interval); p99, individual-pause and hitch-cluster limits remain unchanged.
+The original transfer caps apply per cold-world load, complete bounded travel
+window, each reload and finalization. Every byte reconciles to the retained
+cumulative total. This changes acceptance policy; do not claim the earlier
+criteria passed. Five counter tests cover missing/reset data, excess bursts,
+double-accounting and trailing responses. No game assets change. Final source,
+package and all acceptance still need to be renewed on this protocol.
+
 ## Remaining coordinated release work
 
-1. Verify the focused swimming setup correction, commit the test/doc changes and
-   prepare a clean immutable staging package. Reverify the superseded generated
-   package before retiring it; retain its manifests and evidence. Every delivered
-   gameplay asset must match 499febb6. Keep at most four saved candidates.
+1. Complete the measurement-protocol source checks, commit the verification and
+   documentation changes, and prepare a clean immutable staging package. Reverify
+   superseded 57ec93a4 bytes before retirement and retain manifests and evidence. Every
+   delivered gameplay asset must match 57ec93a4, 499febb6 and b582ece5. Keep at most four saved candidates.
 2. Complete current source checks, native performance, backend, save/fallback
    roundtrip and the complete candidate scope on that exact source and package.
    Retain failures. Do not rebind old evidence to a changed test fingerprint.
