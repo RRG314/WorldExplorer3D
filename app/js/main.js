@@ -3,6 +3,7 @@ import { createCoreFrameSystems, createCoreRenderSystem } from './runtime/core-f
 import { createDebugPresentationSystem } from './runtime/debug-presentation.js?v=3';
 import { createRuntimeKernel } from './runtime/kernel.js?v=3';
 import { createLoadingPresentation } from './ui/loading-progress.js?v=1';
+import { dedicatedPresentationActive } from './runtime/renderer-owners.js';
 
 let loadingPresentation = null;
 
@@ -84,13 +85,7 @@ function shouldUseComposer() {
 }
 
 function dedicatedRendererActive() {
-  return !!(
-    appCtx.worldLoading ||
-    appCtx.arSessionActive ||
-    (appCtx.isEnv?.(appCtx.ENV?.SPACE_FLIGHT) && appCtx.activeShipInterior !== true) ||
-    appCtx.spaceFlight?.active ||
-    appCtx.oceanMode?.active
-  );
+  return dedicatedPresentationActive(appCtx);
 }
 
 const runtimeKernel = createRuntimeKernel({

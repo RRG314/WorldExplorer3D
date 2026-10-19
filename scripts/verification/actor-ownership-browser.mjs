@@ -1,0 +1,45 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs/promises';
+import {spawn} from 'node:child_process';
+import {chromium} from 'playwright';
+import {closeOwnedBrowser} from './owned-browser.mjs';
+import {startStaticServer} from './static-server.mjs';
+import {walkResearchStation} from './research-station-walk.mjs';
+const dir='output/research/browser-foundation-implementation-2026-10-19/browser';
+await fs.mkdir(dir,{recursive:true});
+const server=await startStaticServer({rootDir:process.cwd(),ports:[4396]});
+let owned=await chromium.launchServer({channel:'chrome',headless:true});
+const browser=await chromium.connect(owned.wsEndpoint());
+const report={scope:'Actual licensed vessel, deck/swim controllers and actor contract; controlled water, not full-world timing',cases:[],errors:[]};
+try {
+ const page=await browser.newPage({viewport:{width:1280,height:800}});page.on('pageerror',e=>report.errors.push(e.message));
+ await page.goto(`http://127.0.0.1:${server.port}/tests/fixtures/research-deck.html`);
+ await page.waitForFunction(()=>window.ready===true,{},{timeout:30000});
+ const actor=()=>page.evaluate(()=>JSON.parse(render_game_to_text()).actor);
+ assert.equal((await actor()).locomotion,'boat');
+ await page.locator('#researchDeckEnter').click();
+ let a=await actor();assert.equal(a.locomotion,'walk');assert.equal(a.controller,'boat');assert.equal(a.camera,'research-deck');
+ report.cases.push({id:'helm-to-deck-person-and-controller-ownership',passed:true});
+ await walkResearchStation(page,'helm',{fixture:true});
+ a=await actor();assert.ok(a.position.y>12);assert.equal(a.occupancy,'vessel-deck');
+ await page.screenshot({path:`${dir}/upper-deck.png`});
+ await walkResearchStation(page,'dive',{fixture:true});
+ report.cases.push({id:'walk-upstairs-and-back-to-dive-platform',passed:true});
+ await page.locator('#researchDeckAction').click();
+ await page.waitForFunction(()=>researchTest.ctx.boatSwimming.active&&!!researchTest.ctx.Walk.state.walker.swimming);
+ a=await actor();assert.equal(a.locomotion,'swim');assert.equal(a.controller,'walk');assert.equal(a.camera,'walk');
+ await page.screenshot({path:`${dir}/swimming.png`});
+ await page.locator('#boatSwimmingToggle').click();await page.waitForFunction(()=>researchTest.ctx.boatDeck.active&&!researchTest.ctx.boatSwimming.active);
+ a=await actor();assert.equal(a.locomotion,'walk');assert.equal(a.occupancy,'vessel-deck');
+ report.cases.push({id:'ladder-swim-return-to-same-deck',passed:true});
+ assert.deepEqual(report.errors,[]);
+ await closeOwnedBrowser(owned);owned=null;
+ const child=spawn(process.execPath,[`${process.env.HOME}/.codex/skills/develop-web-game/scripts/web_game_playwright_client.js`,'--url',`http://127.0.0.1:${server.port}/tests/fixtures/research-deck.html`,'--click-selector','#researchDeckEnter','--actions-json','{"steps":[{"buttons":["up"],"frames":8},{"buttons":["left"],"frames":4},{"buttons":[],"frames":8}]}','--iterations','1','--pause-ms','100','--screenshot-dir',`${dir}/skill-client`],{stdio:'inherit'});
+ const timer=setTimeout(()=>child.kill('SIGTERM'),45000);
+ try{assert.equal(await new Promise(resolve=>child.once('exit',resolve)),0);}finally{clearTimeout(timer);}
+ const state=JSON.parse(await fs.readFile(`${dir}/skill-client/state-0.json`,'utf8'));
+ assert.equal(state.actor.locomotion,'walk');assert.equal(state.actor.camera,'research-deck');
+ assert.ok(!(await fs.readdir(`${dir}/skill-client`)).some(f=>f.startsWith('errors-')));
+ report.cases.push({id:'prescribed-keyboard-walk-turn-and-observe',passed:true});report.passed=true;
+} finally {await fs.writeFile(`${dir}/receipt.json`,JSON.stringify(report,null,2));if(owned)await closeOwnedBrowser(owned);await server.close();}
+console.log(JSON.stringify(report));

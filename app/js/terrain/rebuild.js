@@ -1,3 +1,4 @@
+import {createRoadRegionLease} from './road-region-lease.js';
 import {prepareTransportDetail} from './transport-detail-runtime.js';
 import {createNumericPublicationStore} from '../structure-semantics/numeric-publication.js';
 import {createPortalSurfaceClipper} from './portal-surface-clip.js';
@@ -956,7 +957,8 @@ export async function publishCompiledTransportMeshes(deps = {}) {
         let vertices=0,triangles=0;
         for(const mesh of meshes){vertices+=mesh.geometry.attributes.position?.count||0;triangles+=(mesh.geometry.getIndex()?.count||0)/3;}
         detailVertices+=vertices;detailTriangles+=triangles;
-        residentRegions.set(packet.key,{meshes,vertices,triangles,measurements,junctionStats,cells:packet.keys.length});
+        residentRegions.set(packet.key,{meshes,vertices,triangles,measurements,junctionStats,cells:packet.keys.length,
+          lease:createRoadRegionLease(meshes,regionalContact,packet.key)});
         committed=true;
         roadSurfaceIntegrity.carriagewayRegions+=packet.keys.length;
         for(const [key,value] of Object.entries(junctionStats))roadSurfaceIntegrity[key]=key.startsWith('maximum')
@@ -972,13 +974,12 @@ export async function publishCompiledTransportMeshes(deps = {}) {
     },()=>updateSummary(true),key=>{
       const region=residentRegions.get(key);if(!region)return;
       residentRegions.delete(key);
-      // A reset can retire the controller after another world became current;
-      // that world's collections must never be edited by this generation.
+      // Release this generation's resources even after another world takes
+      // ownership. Only the current generation may edit shared collections.
+      region.lease.dispose();
       if(!isCurrent())return;
-      regionalContact.remove(key);
       const retired=new Set(region.meshes);
       appCtx.replaceWorldCollection('roadMeshes',appCtx.roadMeshes.filter(mesh=>!retired.has(mesh)));
-      for(const mesh of region.meshes){mesh.parent?.remove(mesh);mesh.geometry?.dispose();}
       detailVertices-=region.vertices;detailTriangles-=region.triangles;
       roadSurfaceIntegrity.carriagewayRegions-=region.cells;
       for(const [name,value] of Object.entries(region.measurements))roadSurfaceIntegrity[name]-=value;

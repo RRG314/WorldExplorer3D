@@ -1,3 +1,4 @@
+import {activeActorPose} from './transport/actor-contract.js?v=6';
 import { cameraFollowHistory, smoothMovingCameraTarget } from './hud/moving-camera-target.js';
 import { ctx as appCtx } from './shared-context.js?v=55';
 import { aircraftBankTurnFactor, aircraftChaseOffset, aircraftForwardVector, integrateAerobaticAttitude } from './controls/traversal-control-policy.js?v=8';
@@ -86,11 +87,12 @@ function planeGroundOffset(catalog = getAviationCatalogEntry(state.transportCata
 }
 
 function createPlaneMesh(catalog) {
-  state.visual?.dispose?.();
+  const previous = state.visual;
   const visual = createAircraftVisual(globalThis.THREE, catalog, { mobile: appCtx.isTouchPreferredClient === true, state: 'active' });
   visual.root.visible = false;
   appCtx.scene.add(visual.root);
   state.visual = visual;
+  previous?.dispose?.();
   state.mesh = visual.root;
   return visual.root;
 }
@@ -263,12 +265,13 @@ function samplePlaneSurface(dt = 0, force = false) {
 }
 
 function referencePosition() {
-  if (appCtx.droneMode && appCtx.drone) return appCtx.drone;
-  if (appCtx.Walk?.state?.mode === 'walk') return appCtx.Walk.state.walker;
-  return appCtx.car || { x: 0, z: 0, angle: 0 };
+  const outside = appCtx.activeInterior?.outsideState;
+  if (outside) return {...outside, angle:outside.angle ?? outside.yaw};
+  const pose = activeActorPose(appCtx);
+  return {...pose, angle:pose.yaw};
 }
 
-function startPlaneMode(options = {}) {
+function preparePlaneMode(options = {}) {
   if (
     appCtx.onMoon ||
     appCtx.onMars ||
@@ -277,10 +280,18 @@ function startPlaneMode(options = {}) {
     appCtx.worldLoading ||
     (appCtx.earthResumePending && options.allowDuringEarthResume !== true)
   ) return false;
+  const reference = referencePosition();
+  if (!Number.isFinite(reference.x) || !Number.isFinite(reference.z)) return false;
   const catalog = getAviationCatalogEntry(options.transportCatalogId);
   const mesh = ensurePlaneMesh(catalog);
   if (!mesh) return false;
-  const reference = referencePosition();
+  return {catalog, mesh, reference};
+}
+
+function startPlaneMode(options = {}, prepared = null) {
+  const entry = prepared || preparePlaneMode(options);
+  if (!entry) return false;
+  const {catalog, mesh, reference} = entry;
   state.transportEntityId = String(options.transportEntityId || `direct-flight:${catalog.id}`);
   state.transportCatalogId = catalog.id;
   state.durabilityPolicy = catalog.damage.durabilityPolicy;
@@ -848,10 +859,11 @@ Object.assign(appCtx, {
   applyPlaneCamera,
   getPlaneSnapshot,
   preparePlaneModeVisual,
+  preparePlaneMode,
   startPlaneMode,
   stopPlaneMode,
   updatePlane
 });
 
-export { applyPlaneCamera, getPlaneSnapshot, preparePlaneModeVisual, startPlaneMode, stopPlaneMode, updatePlane };
+export { applyPlaneCamera, getPlaneSnapshot, preparePlaneModeVisual, preparePlaneMode, startPlaneMode, stopPlaneMode, updatePlane };
 export { PLANE_MAX_SPEED_MPS };

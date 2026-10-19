@@ -205,11 +205,12 @@ function disposeBoatMesh() {
 function createBoatMesh(catalogId = appCtx.boatMode?.transportCatalogId) {
   const catalog = getMaritimeCatalogEntry(catalogId);
   const currentId = String(appCtx.boatMode?.mesh?.userData?.transportCatalogId || '');
-  if (_boatMeshReady && currentId === catalog.id) return;
-  if (_boatMeshReady || appCtx.boatMode?.mesh) disposeBoatMesh();
-  if (typeof THREE === 'undefined' || !appCtx.scene) return;
+  if (_boatMeshReady && currentId === catalog.id) return appCtx.boatMode.mesh;
+  if (typeof THREE === 'undefined' || !appCtx.scene) return null;
   const group = createBoatModeMesh(catalog, { mobile: isTouchClient(), state: 'active' });
   addBoatSwimLadder(THREE,group,catalog);
+  group.visible = false;
+  if (_boatMeshReady || appCtx.boatMode?.mesh) disposeBoatMesh();
   appCtx.scene.add(group);
   if (typeof THREE.Box3 === 'function') {
     group.updateMatrixWorld(true);
@@ -220,6 +221,7 @@ function createBoatMesh(catalogId = appCtx.boatMode?.transportCatalogId) {
   }
   appCtx.boatMode.mesh = group;
   _boatMeshReady = true;
+  return group;
 }
 
 function updateBoatMesh() {
@@ -384,9 +386,7 @@ const boatOceanTransferApi = createBoatOceanTransferApi({
 });
 const { suspendBoatModeForOceanTransfer, transferBoatToSubmarine, transferSubmarineToBoat, startSurfaceResearchVoyage } = boatOceanTransferApi;
 
-function startBoatMode(options = {}) {
-  if (boatSwimming.active) return boatSwimming.board();
-  if (appCtx.boatMode?.active) return true;
+function prepareBoatMode(options = {}) {
   if (appCtx.oceanMode?.active || appCtx.onMoon || appCtx.travelingToMoon) return false;
   const baseRef = resolveBoatEntryReference(getReferencePosition(),options,appCtx.LOC);
   if (!baseRef) return false;
@@ -428,7 +428,17 @@ function startBoatMode(options = {}) {
   const clearance=options.surfaceArrival ? {allowed:true} : vesselObstacleAdmission(appCtx,catalog,spawnPoint.x,spawnPoint.z,startAngle,
     waterSurfaceYAt(spawnPoint.x,spawnPoint.z,activeCandidate));
   if(!clearance.allowed){showBoatPrompt(clearance.reason,'notice',BOAT_PROMPT_DURATION_MS);return false;}
+  if (!createBoatMesh(catalog.id)) return false;
 
+  return {ref, candidate, transferVessel, catalog, startAngle, spawnPoint, activeCandidate};
+}
+
+function startBoatMode(options = {}, prepared = null) {
+  if (boatSwimming.active) return boatSwimming.board();
+  if (appCtx.boatMode?.active) return true;
+  const entry = prepared || prepareBoatMode(options);
+  if (!entry) return false;
+  const {ref, candidate, transferVessel, catalog, startAngle, spawnPoint, activeCandidate} = entry;
   const requestedEntryMode = options.entryMode === 'drive' ? 'drive' : options.entryMode === 'walk' ? 'walk' : null;
   appCtx.boatMode.lastEntryMode = requestedEntryMode || (ref.mode === 'drive' ? 'drive' : 'walk');
   appCtx.boatMode.entryPosition = {
@@ -821,6 +831,7 @@ Object.assign(appCtx, {
   transferBoatToSubmarine,
   transferSubmarineToBoat,
   startSurfaceResearchVoyage,
+  prepareBoatMode,
   startBoatMode,
   stopBoatMode,
   waterSurfaceYAt,
@@ -850,6 +861,7 @@ export {
   transferBoatToSubmarine,
   transferSubmarineToBoat,
   startSurfaceResearchVoyage,
+  prepareBoatMode,
   startBoatMode,
   stopBoatMode,
   waterSurfaceYAt,

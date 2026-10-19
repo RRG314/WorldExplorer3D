@@ -1,3 +1,4 @@
+import {resolveControlState} from './transport/control-state.js';
 import { ctx as appCtx } from "./shared-context.js?v=55";
 import { nextPrimaryTravelMode } from "./controls/traversal-control-policy.js?v=8";
 import { planetarySurfaceYAtRenderXZ } from './planetary/runtime/surface-query.js?v=3';
@@ -9,13 +10,7 @@ import { resolveTravelMenuState } from './travel/menu-state.js?v=2';
 
 let lastTravelUiSignature = '';
 
-function getCurrentTravelMode() {
-  if (appCtx.boatMode?.active) return 'boat';
-  if (appCtx.planeMode?.active) return 'plane';
-  if (appCtx.droneMode) return 'drone';
-  if (appCtx.Walk?.state?.mode === 'walk') return 'walk';
-  return 'drive';
-}
+function getCurrentTravelMode() { return resolveControlState(appCtx).mode; }
 
 function setDroneModeActive(active) {
   appCtx.droneMode = active === true;
@@ -275,14 +270,14 @@ function handoffAirPositionToGround(reference, targetMode) {
 }
 
 function setTravelMode(mode, options = {}) {
-  const targetMode = mode === 'walk' || mode === 'drone' || mode === 'boat' || mode === 'plane' ? mode : 'drive';
+  if (!['walk', 'drive', 'drone', 'boat', 'plane'].includes(mode)) return getCurrentTravelMode();
+  const targetMode = mode;
   const currentMode = getCurrentTravelMode();
   const planetaryCapabilities = resolvePlanetaryTravelCapabilities(appCtx);
   if (planetaryCapabilities && planetaryCapabilities[targetMode] !== true) {
     return syncTravelModeButtons();
   }
-  const modeReference = captureActiveModeReference(currentMode);
-  if (targetMode !== currentMode) clearControllerLocalState(targetMode);
+  let modeReference = captureActiveModeReference(currentMode);
 
   if (targetMode === 'boat' && appCtx.oceanMode?.active && typeof appCtx.transferSubmarineToBoat === 'function') {
     void appCtx.transferSubmarineToBoat({
@@ -292,11 +287,13 @@ function setTravelMode(mode, options = {}) {
     return syncTravelModeButtons();
   }
 
-  if (targetMode !== 'walk' && appCtx.activeInterior && typeof appCtx.clearActiveInterior === 'function') {
-    appCtx.clearActiveInterior({ restorePlayer: true, preserveCache: true });
+  // Dedicated environments own their controllers until their explicit exit.
+  if (resolveControlState(appCtx).frame !== 'surface') return currentMode;
+  if (targetMode === 'boat' && appCtx.boatSwimming?.active) {
+    appCtx.startBoatMode?.(options);
+    return syncTravelModeButtons();
   }
-
-  if (targetMode !== 'boat' && appCtx.boatMode?.active && typeof appCtx.stopBoatMode === 'function') {
+  if (targetMode !== 'boat' && appCtx.boatMode?.active) {
     if (options.force !== true && typeof appCtx.canExitBoatMode === 'function' && !appCtx.canExitBoatMode(targetMode, {
       showNotice: true,
       source: options.source || 'runtime_switch'
@@ -307,19 +304,39 @@ function setTravelMode(mode, options = {}) {
       }
       return resolvedMode;
     }
+  }
+  // Admission and required visual preparation happen before releasing a live
+  // controller. A denied boat/plane start must leave the current actor intact.
+  let prepared = null;
+  if (targetMode === 'boat' && currentMode !== 'boat') {
+    prepared = appCtx.prepareBoatMode?.(options);
+    if (!prepared) return syncTravelModeButtons();
+  } else if (targetMode === 'plane') {
+    prepared = appCtx.preparePlaneMode?.(options);
+    if (!prepared) return syncTravelModeButtons();
+  }
+
+  if (targetMode !== 'walk' && appCtx.activeInterior && typeof appCtx.clearActiveInterior === 'function') {
+    appCtx.clearActiveInterior({ restorePlayer: true, preserveCache: true });
+    modeReference = captureActiveModeReference(currentMode);
+  }
+
+  if (targetMode !== 'boat' && appCtx.boatMode?.active && typeof appCtx.stopBoatMode === 'function') {
+    if (targetMode !== currentMode) clearControllerLocalState(targetMode);
     appCtx.stopBoatMode({
       targetMode,
       source: options.source || 'runtime_switch'
     });
   }
 
+  if (targetMode !== currentMode && currentMode !== 'boat') clearControllerLocalState(targetMode);
   let planeExitState = null;
   if (targetMode !== 'plane' && appCtx.planeMode?.active) {
     planeExitState = appCtx.stopPlaneMode?.({ targetMode }) || null;
   }
 
   if (targetMode === 'plane') {
-    if (isPlanetarySurfaceActive(appCtx) || !appCtx.startPlaneMode?.(options)) {
+    if (isPlanetarySurfaceActive(appCtx) || !appCtx.startPlaneMode?.(options, prepared)) {
       return syncTravelModeButtons();
     }
     setDroneModeActive(false);
@@ -343,7 +360,7 @@ function setTravelMode(mode, options = {}) {
       appCtx.Walk.setModeDrive();
     }
     syncDronePositionFromReference({
-      reference: planeExitState || undefined,
+      reference: planeExitState || modeReference || undefined,
       preserveAltitude: !!planeExitState
     });
     resetCameraForDroneMode();
@@ -363,7 +380,7 @@ function setTravelMode(mode, options = {}) {
         transportEntityId: options.transportEntityId || undefined,
         transportCatalogId: options.transportCatalogId || undefined,
         condition: Number.isFinite(options.condition) ? options.condition : undefined
-      });
+      }, prepared);
       if (!started) {
         return syncTravelModeButtons();
       }

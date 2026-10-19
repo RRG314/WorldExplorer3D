@@ -1,3 +1,5 @@
+import {resolveControlState} from '../transport/control-state.js';
+import {activeActorPose} from '../transport/actor-contract.js?v=6';
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { escapeHtml, escapeJsString, formatPrice, toFiniteNumber } from "./ui-utils.js?v=1";
 
@@ -269,16 +271,10 @@ export function clearNavigation(owner = null) {
   return true;
 }
 
-function currentNavigationMode() {
-  if (appCtx.droneMode) return 'drone';
-  if (appCtx.Walk && appCtx.Walk.state.mode === 'walk') return 'walk';
-  return 'drive';
-}
-
+function currentNavigationMode() { return resolveControlState(appCtx).locomotion; }
 function currentNavigationActor() {
-  if (appCtx.droneMode) return appCtx.drone;
-  if (appCtx.Walk?.state?.mode === 'walk') return appCtx.Walk.state.walker;
-  return appCtx.car;
+  const actor = activeActorPose(appCtx);
+  return actor.frame === 'surface' ? actor : null;
 }
 
 function navigationRouteNeedsRebuild(fromX, fromZ, toX, toZ, mode) {
@@ -320,7 +316,7 @@ function rebuildNavigationRoute(fromX, fromZ, toX, toZ, forceRebuild = false) {
   if (!shouldRebuild) return;
 
   let routeData = null;
-  if (navMode !== 'drone' && typeof appCtx.findTraversalRoute === 'function') {
+  if (['walk', 'drive'].includes(navMode) && typeof appCtx.findTraversalRoute === 'function') {
     routeData = appCtx.findTraversalRoute(fromX, fromZ, toX, toZ, { mode: navMode });
   }
   if (!routeData || !Array.isArray(routeData.points) || routeData.points.length < 2) {

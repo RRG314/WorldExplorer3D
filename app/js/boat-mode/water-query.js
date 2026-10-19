@@ -354,7 +354,7 @@ function getReferencePosition() {
     };
   }
   if (appCtx.Walk?.state?.mode === 'walk' && appCtx.Walk.state.walker) {
-    const walker = appCtx.Walk.state.walker;
+    const walker = appCtx.activeInterior?.outsideState || appCtx.Walk.state.walker;
     const resolvedSurfaceY = Number(walker._resolvedGroundState?.effectiveGroundY);
     return {
       x: walker.x,

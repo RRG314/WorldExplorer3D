@@ -182,8 +182,13 @@ export async function prepareTransportDetail(appCtx,roads,{isCurrent,focus={x:0,
           if(disposed||!isCurrent())return;
           if(packet.type!=='region'||packet.key!==key)throw new Error('Transport worker returned an unowned region');
           if(!publicationCurrent()){stats.cancelledRegions++;return;}
+          // Publication may finish after disposal cleared the controller's
+          // callbacks. Keep its own retire authority until adoption completes.
+          const retirePublication=retire;
           await publish(packet,{isCurrent:publicationCurrent});
-          if(disposed||!isCurrent())return;
+          if(!publicationCurrent()){
+            retirePublication?.(key);stats.cancelledRegions++;return;
+          }
           remaining.delete(key);resident.set(key,bounds);retryAttempts=0;refreshCounts();
         })().catch(failed).finally(()=>{active=null;stats.activeJobs=0;});
       }

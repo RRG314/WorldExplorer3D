@@ -1,26 +1,8 @@
+import {activeEarthActorPosition} from './transport/actor-contract.js?v=6';
 import {earthLocalToGeographic} from './earth-core/location-origin.js?v=1';
 import { ctx as appCtx } from "./shared-context.js?v=55";
 
-function currentActorWorldPosition() {
-  const contracted = appCtx.activeEarthActorPosition?.();
-  if (contracted) return contracted;
-  if (appCtx.boatMode?.active && Number.isFinite(appCtx.boat?.x) && Number.isFinite(appCtx.boat?.z)) {
-    return { x: appCtx.boat.x, z: appCtx.boat.z, source: 'boat' };
-  }
-  if (appCtx.planeMode?.active && Number.isFinite(appCtx.planeMode?.x) && Number.isFinite(appCtx.planeMode?.z)) {
-    return { x: appCtx.planeMode.x, z: appCtx.planeMode.z, source: 'plane' };
-  }
-  if (appCtx.droneMode && Number.isFinite(appCtx.drone?.x) && Number.isFinite(appCtx.drone?.z)) {
-    return { x: appCtx.drone.x, z: appCtx.drone.z, source: 'drone' };
-  }
-  if (appCtx.Walk?.state?.mode === 'walk' && Number.isFinite(appCtx.Walk.state.walker?.x) && Number.isFinite(appCtx.Walk.state.walker?.z)) {
-    return { x: appCtx.Walk.state.walker.x, z: appCtx.Walk.state.walker.z, source: 'walk' };
-  }
-  if (Number.isFinite(appCtx.car?.x) && Number.isFinite(appCtx.car?.z)) {
-    return { x: appCtx.car.x, z: appCtx.car.z, source: 'drive' };
-  }
-  return null;
-}
+function currentActorWorldPosition() { return activeEarthActorPosition(); }
 
 function resolveObservedEarthLocation() {
   if (appCtx.oceanMode?.active) {

@@ -1,3 +1,4 @@
+import {activeActorPose} from '../transport/actor-contract.js?v=6';
 import { queryPlanetaryObstacle } from '../planetary/runtime/obstacle-authority.js?v=1';
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { resolveTunnelCameraEnvelope } from '../hud/tunnel-camera-envelope.js?v=6';
@@ -272,11 +273,9 @@ function createWalkingRuntimeHelpers({
     return true;
   }
 
-  function getMapRefPosition(droneMode, drone) {
-    if (appCtx.planeMode?.active) return { x: appCtx.planeMode.x, z: appCtx.planeMode.z };
-    if (droneMode) return { x: drone.x, z: drone.z };
-    if (state.mode === "walk") return { x: state.walker.x, z: state.walker.z };
-    return { x: car.x, z: car.z };
+  function getMapRefPosition() {
+    const pose = activeActorPose(appCtx);
+    return {x:pose.x, z:pose.z};
   }
 
   return {
