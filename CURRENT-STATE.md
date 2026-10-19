@@ -105,42 +105,29 @@ before opening a browser because this reviewed configuration hash was stale;
 the exact reviewed hash is now updated. This was not a save failure. Revalidate
 the rollback review before packaging and run the final source-bound checks.
 
-## Remaining coordinated release work
+## Owner correction: targeted completion, no broad reruns
 
-1. Complete the measurement-protocol source checks, commit the verification and
-   documentation changes, and prepare a clean immutable staging package. Reverify
-   superseded 57ec93a4 bytes before retirement and retain manifests and evidence. Every
-   delivered gameplay asset must match 57ec93a4, 499febb6 and b582ece5. Keep at most four saved candidates.
-2. Complete current source checks, native performance, backend, save/fallback
-   roundtrip and the complete candidate scope on that exact source and package.
-   Retain failures. Do not rebind old evidence to a changed test fingerprint.
-3. Deploy the accepted package to canonical staging. Complete ordinary hosted
-   acceptance without debug attestation and the current free-provider receipt.
-   Inspect current images and verify the deployed backend source.
-4. Require release-scope and public-claim readiness, then merge PR #103 through
-   protected stable. Verify the resulting tree before preparing production.
-   Use the stable commit and change only the reviewed environment configuration;
-   every other delivered asset must remain identical to accepted staging.
-5. Deploy only the six reviewed Functions, preserving the other 74 and all
-   configured values. Finalize, preview and promote the exact Hosting package.
-   Verify live identity and availability before publishing the release.
-6. Tag the production commit as v5.6.1, publish the prepared feature-led release
-   and verify Pages. Merge stable back into both active development branches
-   without force. Update final documentation without rebuilding accepted gameplay.
+On October 19 the owner explicitly stopped repeated broad testing. The exact
+owned sweep tree is stopped; passing, failed and interrupted receipts are
+preserved. Do not restart the 106/107-gate matrix or 42-minute performance
+sequence. The plan in
+`docs/release-review/2026-10-19/TARGETED-RELEASE-PLAN.md` supersedes the earlier
+blanket acceptance-renewal instructions above.
 
-The modern-save fallback is b21b7f12fdfab0f2adf82eca01faefb55ae64748; both staging
-and production packages remain. Production 5.5.1 is the upgrade starting point.
-Fallback validation must include a write and return to the candidate. The reviewed
-rollback contract is `scripts/verification/rollback-runtime-review.json`.
+The one Tokyo diagnostic completed in 331,601 ms. A worker CPU profile identifies
+irrelevant pavement ring searches during the 5,845-cell initial street overview.
+The local repair adds bounds rejection before the identical point-in-ring rule.
+57 focused geometry checks pass. The targeted release admission tests also pass;
+this is not evidence that the new package has been played or released.
 
-## Resource and evidence rules
+Remaining: validate the changed dense-city loading path and Kennedy recovery,
+verify exact package integrity and ordinary hosted startup, then complete the
+already authorized protected stable merge, reviewed backend/Hosting deployment,
+release publication and development-branch synchronization. Retain prior backend,
+save and mobile evidence with a source-delta review. Never relabel the stopped
+matrix as passing or silently discard a known failure.
 
-One heavy job at a time on this observed 8 GiB Mac. Preserve ordinary Chrome,
-unrelated emulators, current dist, actual production, both b21 fallbacks,
-source/history and player records. Close only owned processes. Do not print raw
-credentials, cloud environment maps or private heaps. The completed 1.60 GB raw
-heap was retired after aggregate analysis; its aggregate evidence remains.
-
-Existing owner-authorized physical-device and fresh-player deferrals remain.
-Do not claim new physical-phone tests or human image review. Record the owner's
-explicit delegated deployment authorization and Codex image inspection truthfully.
+Production remains 5.5.1 until live identity verification proves otherwise.
+Preserve the b21 staging/production fallbacks, original released551 artifact,
+source/history, current dist and player data. One heavy process at a time; keep
+ordinary Chrome and unrelated emulators running. No raw credentials in evidence.

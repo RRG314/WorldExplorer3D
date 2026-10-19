@@ -2,6 +2,9 @@ import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
+import {currentBaseline} from './verification/execution-evidence.mjs';
+import {promotedEvidenceIdentity} from './verification/production-promotion.mjs';
+import {readTargetedReleaseDecision} from './verification/targeted-release-decision.mjs';
 
 const root = process.cwd();
 const approvalPath = String(process.env.WE3D_RELEASE_APPROVAL_FILE || '').trim();
@@ -44,10 +47,20 @@ for (const image of approval.images) {
 
 run('scripts/verification/source.mjs');
 run('scripts/hosting-artifact.mjs', ['verify']);
-// A reviewed screenshot is not a substitute for complete, current candidate
-// and backend execution evidence. Fail before launching another world check.
-run('scripts/verification/release-scope.mjs', ['--require-ready', '--promoted-production']);
-run('scripts/verification/public-feature-claims.mjs', ['--require-ready', '--promoted-production']);
+// Admission requires either the full matrix or an explicit, evidence-bound
+// maintenance review. A screenshot alone never establishes readiness.
+const targetedReview=String(process.env.WE3D_TARGETED_RELEASE_DECISION || '').trim();
+if(targetedReview){
+  // Owner-requested targeted admission: preserve original results, inspect the
+  // source delta and require current changed-path and hosted evidence. Never
+  // start another full-world sweep as a side effect of finalization.
+  const review=readTargetedReleaseDecision(root,targetedReview,{baseline:currentBaseline(root),artifact:promotedEvidenceIdentity()});
+  console.log(JSON.stringify(review));
+  run('scripts/verification/public-feature-claims.mjs');
+}else{
+  run('scripts/verification/release-scope.mjs', ['--require-ready', '--promoted-production']);
+  run('scripts/verification/public-feature-claims.mjs', ['--require-ready', '--promoted-production']);
+}
 // Browser journeys ran against the linked staging package. Local production
 // Firebase is deliberately forbidden; do not bypass that isolation policy.
 

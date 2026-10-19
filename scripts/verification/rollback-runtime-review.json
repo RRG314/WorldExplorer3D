@@ -570,6 +570,27 @@
       "after": "e028a8041bad4d71be76a3ad5d0601da38b283589a9ee886191a62246f443887",
       "afterMode": "100644",
       "review": "Release verification only: read-only Git invocations disable optional index refresh locks and preloadIndex to avoid filesystem contention. Strict dirty/untracked/commit identity comparisons and the original 10-second timeout remain. This helper does not ship in the browser or alter saved data, runtime schemas or service protocols. It is conservatively included because unknown script inputs are classified as runtime."
+    },
+    "app/js/world/compiler/street-frontage-corners.js": {
+      "before": "12c67ad55a139b2e0feb677b95ac8027e963d67c0499d930a936ba35feb41714",
+      "beforeMode": "100644",
+      "after": "b9e9259f112a1e84c7c089bdb5cc6b76c908e0080ee78022e795218a553a1013",
+      "afterMode": "100644",
+      "review": "Precomputes exterior polygon bounds before the unchanged even/odd containment test. Focused equivalence tests preserve concavity, holes, boundaries, translated coordinates and actual corner geometry. No save, backend, road or contact changes."
+    },
+    "scripts/release-finalize.mjs": {
+      "before": "5e41a039564523fdf1fcdd0f2201556a016eb592050097bcb91b534c8c670bc3",
+      "beforeMode": "100644",
+      "after": "a9f523d766849a7e57b044823845c1932372f0d74bc836968268a4117531d78d",
+      "afterMode": "100644",
+      "review": "Adds owner-requested explicit targeted admission using a source/artifact/evidence-bound review. Preserves original full-matrix path, reviewed images, production identity and exact staging promotion. No game runtime or persistence changes."
+    },
+    "scripts/prepare-production-artifact.mjs": {
+      "before": "071dc4b24adc1d3fd9eb3a259938cb8fabf0fb3ffb2ee048564531b6ff474667",
+      "beforeMode": "100644",
+      "after": "c89736f7e6c0ab3241bd1e13e810f62badb2a55ad9801041dc017a3ac7c9cf28",
+      "afterMode": "100644",
+      "review": "Accepts the same explicit targeted review before configuration-only promotion. Complete package and non-environment asset equivalence still required. No game runtime or persistence changes."
     }
   }
 }
