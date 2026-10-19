@@ -29,11 +29,15 @@ try {
   if(await page.locator('#analyticsConsentDenyBtn').isVisible())await page.locator('#analyticsConsentDenyBtn').click();
   await page.locator('#globeSelectorStartBtn').click();
   await page.evaluate(async()=>{window.swimCtx=(await import('/app/js/shared-context.js?v=55')).ctx;});
-  try {await page.waitForFunction(()=> (swimCtx.gameStarted===true && swimCtx.worldLoading===false && !!swimCtx.Walk?.state?.characterMesh && swimCtx.initialEarthWorldReady===true && swimCtx.worldLoadRuntimeState?.gameplayRuntimesReady===true) || swimCtx.worldLoadRuntimeState?.status==='failed',null,{timeout:90000});}
+  // This source fixture verifies swimming after a complete world load. Use the
+  // bounded loading window from the packaged functional journeys; the separate
+  // packaged performance gate still enforces the actual first-playable budget.
+  const startupStarted=performance.now();
+  try {await page.waitForFunction(()=> (swimCtx.gameStarted===true && swimCtx.worldLoading===false && !!swimCtx.Walk?.state?.characterMesh && swimCtx.initialEarthWorldReady===true && swimCtx.worldLoadRuntimeState?.gameplayRuntimesReady===true) || swimCtx.worldLoadRuntimeState?.status==='failed',null,{timeout:300000});}
   catch(error){
    report.startup=await page.evaluate(()=>({gameStarted:swimCtx.gameStarted,worldLoading:swimCtx.worldLoading,ready:swimCtx.initialEarthWorldReady,environment:swimCtx.getEnv?.(),publication:!!swimCtx.worldPublication,loadingText:document.getElementById('loading')?.innerText}));
    await page.screenshot({path:`${dir}/swimming-startup-failure.png`});throw error;
-  }
+  }finally{report.startupWaitMs=Math.round(performance.now()-startupStarted);}
   report.startup=await page.evaluate(()=>{
    const c=swimCtx,r=c.worldLoadRuntimeState;
    return {gameStarted:c.gameStarted,worldLoading:c.worldLoading,ready:c.initialEarthWorldReady,
