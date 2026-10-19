@@ -581,7 +581,7 @@
     "scripts/release-finalize.mjs": {
       "before": "5e41a039564523fdf1fcdd0f2201556a016eb592050097bcb91b534c8c670bc3",
       "beforeMode": "100644",
-      "after": "a9f523d766849a7e57b044823845c1932372f0d74bc836968268a4117531d78d",
+      "after": "6b42c75d0ed97b6b6f7ebeab9d680974d6983774bc803f976ce7bc0b48539239",
       "afterMode": "100644",
       "review": "Adds owner-requested explicit targeted admission using a source/artifact/evidence-bound review. Preserves original full-matrix path, reviewed images, production identity and exact staging promotion. No game runtime or persistence changes."
     },

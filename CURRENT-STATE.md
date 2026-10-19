@@ -1,133 +1,79 @@
 # Current development and release state
 
-Updated October 19, 2026. **5.6.1 is not released or accepted yet.**
-The owner explicitly authorized completing the repairs and deploying production,
-including stable, both active development branches, the release and project page.
-Do not ask again or promote a failing package.
+Updated October 19, 2026 for the 5.6.1 release. The live build manifest at
+https://worldexplorer3d.io/build-manifest.json and the GitHub release are the
+production identity authorities; check them before starting new release work.
+The owner has explicitly authorized production, protected stable, both active
+development branches and the release. Do not ask again.
 
-## Correct workspace and deployed state
+## Workspace and branch authority
 
-- Worktree: `/Users/stevenreid/.codex/worktrees/architecture-evaluation/WorldExplorer3D-live-deployed-20260320`, branch `steven/visual-quality`.
-- Do not edit the stale Documents checkout or follow the obsolete path in AGENTS.md.
-- Last verified production: `5.5.1+012e5c85582b.eb0d7eddf0f75035.production`.
-- Last verified canonical staging: `5.6.1+a0e20c35eab7.aa4dd9dce23502b0.staging`.
-- Both Firebase projects have 80 active first-generation Functions. No production promotion occurred during this investigation.
-- `stable` is the default release branch; no `main` branch exists. Release PR #103 requires a squash merge with passing pull-request and gitleaks checks; no bypass actors exist.
-- The latest immutable package is recorded in `output/release-review/current-final-candidate.json`. A pointer does not establish acceptance.
+Work in `/Users/stevenreid/.codex/worktrees/architecture-evaluation/WorldExplorer3D-live-deployed-20260320`,
+branch `steven/visual-quality`. The Documents checkout and the old AGENTS path
+are stale. `stable` is the default release branch; there is no `main` branch.
+Use protected PR merges and preserve both active development branches without
+force pushes. The package pointer is `output/release-review/current-final-candidate.json`.
 
-## Repairs and measured evidence
+## Owner-directed testing scope
 
-The retained navigation graph contained about 282,000 additional node/segment
-objects. Its numeric facts now use exact Float64/Uint32 storage. Feature and
-endpoint references, route order, costs, access/one-way rules, road geometry,
-coverage and save formats are preserved. All 54 focused traversal checks and
-2,739 component tests passed. Source syntax, ownership, dependency, boundary,
-inventory and sensitivity checks also passed.
+The owner stopped the repeated broad matrix on October 19. Do not restart the
+106/107-gate sweep or 42-minute native sequence for an unchanged game package.
+The exact owned process tree was stopped and its receipts archived. The obsolete
+local full-sweep automation is disabled. Preserve failed/interrupted results.
+See `docs/release-review/2026-10-19/TARGETED-RELEASE-PLAN.md`.
 
-Other retained repairs give unchanged street products publication leases, bound
-the compiler cache at 16 MiB, reject superseded edits and preserve accepted
-coverage after failed or cancelled preparation. Ground queries follow the actual
-actor and avoid discarded intermediate lists. Regional land stores exact indexed
-coordinates once. Provenance-storage prototypes are excluded.
+Verification-only changes had invalidated every gate despite 756 identical game
+assets. The explicit targeted release decision now distinguishes executed checks
+from reviewed retained evidence and binds source, artifact and evidence hashes.
+It does not claim the full matrix passed. Original full-matrix commands remain
+available for separately justified broad regression work.
 
-A second root cause was verification overhead: a full-city diagnostic was polled
-every animation frame during loading. The same packaged aquarium scene loaded
-in 107 seconds with light observation, versus 307 seconds with the old poll;
-5,186 snapshots consumed 242 seconds. The shared callable guard now waits until
-the loading cover clears before evaluating expensive readiness predicates.
-Conditions, arguments and timer resets are preserved. Unit and actual Chrome
-serialization checks passed. No game code changed for that correction.
+## Repairs and completed focused evidence
 
-On frozen revision 499febb6, the complete native performance gate passed in
-42 minutes: seven sustained movement windows and twelve reload/cleanup cycles,
-plus mobile layout/load regression. Desktop first playable was 104,454 ms against
-the unchanged 120,000 ms limit. Walking, driving, flight, pause clustering,
-coverage, old-region cleanup and memory retention checks passed on this M1 Mac.
-Earlier failed native runs remain archived; this is not a universal device claim.
-All 756 delivered assets matched the preceding b582 package byte for byte.
+- Packed navigation facts remove roughly 282,000 additional node/segment objects
+  while preserving exact coordinates, feature identities, costs and access rules.
+- Street publication leases, bounded caches, stale-job rejection and actor-owned
+  ground queries preserve accepted coverage and release superseded resources.
+- Heavy full-city diagnostic polling was guarded during loading; the former
+  per-frame readiness poll itself added hundreds of seconds to some tests.
+- Dense pavement corner probes now reject polygons outside their exact bounds
+  before the unchanged ring/hole predicate. 57 focused geometry checks passed.
+- Current packaged Tokyo fallback passed all geometry, contact and coverage
+  assertions. Same 93,175 buildings, 18,265 roads and 5,845 pavement cells; street
+  preparation 193,476 ms → 108,005 ms, complete journey 331,601 ms → 243,727 ms.
+- Current Kennedy recovery passed in about 61 seconds: controlled elevation
+  request failure, mapped approach, entry, four tour stations and exit.
+- Ordinary canonical-staging Chrome loaded the complete Baltimore world and
+  accepted normal walking input with no JavaScript errors. No debug attestation.
+- Current backend and all four save/fallback stages passed before the containment
+  change. Backend, save, account and mobile inputs are unchanged and retained
+  with an explicit delta review. No additional physical-phone review is claimed.
 
-The full 499febb6 candidate sweep completed with 105 of 107 checks passing.
-This included normal and fallback map providers, regional travel, ships, venues,
-vehicles, controls, campaigns, interiors, activities, economy and release-file
-integrity. Its two failures were investigated before further changes:
+The original 499 candidate completed 105/107 gates; e8 completed 88 with 83 passes
+before interruption. Native timing passed on 499 and varied on later identical
+assets under host pressure. Preserve both outcomes and the published device
+performance limitation. HYCOM and ArcGIS availability failures remain recorded;
+missing provider observations must stay unavailable rather than invented.
 
-- The supplemental source swimming fixture stopped loading at 90 seconds. A
-  bounded diagnostic of the same source loaded in 97,125 ms and passed surface
-  swimming, automatic scuba, mode cleanup, the boat ladder round trip and vessel
-  recovery with no JavaScript errors. Its functional setup now uses the existing
-  five-minute complete-world window and records the actual wait. Readiness and
-  swimming assertions are unchanged. The separate packaged performance limit
-  remains 120 seconds. This does not change gameplay or make the diagnostic a
-  release pass; current acceptance must be renewed after the test-source change.
-- Live HYCOM current/temperature guidance timed out while NOAA waves remained
-  available. A later unchanged request returned valid data in 1.3 seconds. The
-  backend suite separately hit a MET Norway connection timeout before HTTP; the
-  same request later returned valid data in 1.9 seconds. Original failures are
-  preserved. Full provider/UI and backend checks must pass on the final candidate.
+## Promotion procedure and recovery
 
-The 499 save-migration check correctly refused to run because backend acceptance
-had failed. It did not exercise or modify saves. Earlier b582 backend and
-released551 → candidate → b21 fallback-write → candidate checks passed, but are
-historical evidence rather than acceptance of the final source revision.
+Use the hash-bound targeted review for this maintenance release. A documentation
+or release-script fix does not require replaying worlds whose delivered bytes
+remain identical; record the exact package equivalence instead. GitHub required
+checks and exact staging-to-production asset equivalence still apply.
 
-Detailed records are in `output/release-review/561-root-cause-audit.md`, the
-checkpoint JSON and versioned run folders. Current image inspection is recorded
-separately from automated assertions. Do not treat old screenshots or unrun
-checks as current proof.
+Only six reviewed Functions may change: commitExplorerCommerceAction,
+getEnvironmentalData,getPlaceLookup,createRealityCaptureDraft,
+saveRealityCaptureHybridPreview,submitRealityCaptureHybrid. Preserve the other 74
+and every configured value. No rule, account or database-data change is included.
 
-## Final 57ec93a4 findings and measurement correction
+The modern-save fallback is b21b7f12fdfab0f2adf82eca01faefb55ae64748; retain both
+staging/production packages. The original released 551 package remains in the
+road-continuity-hotfix worktree. Its duplicate was removed only after all bytes
+were reverified and the four migration stages had passed.
 
-The 57 backend suite and all four save/fallback stages passed. Its native run
-completed all seven sustained windows, twelve reloads and mobile regression.
-First playable was 99,693 ms; hitch, retention, occupied memory and coverage
-checks passed. The run still failed two historical criteria: flight p95 34.4 ms
-versus 34.36 ms, and an 83,349,831-byte combined session transfer versus 64 MiB.
-The old 499 run received zero exact-Overpass bytes; 57 successfully received
-17,952,723 bytes. A healthy detail provider must not be required to fail for
-transfer acceptance. Original failed receipts are retained.
-
-The explicit revised protocol is documented in
-`docs/release-review/2026-10-19/VERIFICATION-MEASUREMENT-SCOPE.md`.
-The desktop p95 criterion is now 35 ms (5% scheduling allowance around a 30 FPS
-interval); p99, individual-pause and hitch-cluster limits remain unchanged.
-The original transfer caps apply per cold-world load, complete bounded travel
-window, each reload and finalization. Every byte reconciles to the retained
-cumulative total. This changes acceptance policy; do not claim the earlier
-criteria passed. Five counter tests cover missing/reset data, excess bursts,
-double-accounting and trailing responses. No game assets change. Final source,
-package and all acceptance still need to be renewed on this protocol.
-
-The bfdd1b28 backend passed. Its native run passed cleanup,coverage,transfer
-accounting and mobile checks, but failed short driving p99 and three sustained
-pause windows under increased host swapping. The optional quiet-window request
-is pending; continue functional work without waiting. Its save check stopped
-before opening a browser because this reviewed configuration hash was stale;
-the exact reviewed hash is now updated. This was not a save failure. Revalidate
-the rollback review before packaging and run the final source-bound checks.
-
-## Owner correction: targeted completion, no broad reruns
-
-On October 19 the owner explicitly stopped repeated broad testing. The exact
-owned sweep tree is stopped; passing, failed and interrupted receipts are
-preserved. Do not restart the 106/107-gate matrix or 42-minute performance
-sequence. The plan in
-`docs/release-review/2026-10-19/TARGETED-RELEASE-PLAN.md` supersedes the earlier
-blanket acceptance-renewal instructions above.
-
-The one Tokyo diagnostic completed in 331,601 ms. A worker CPU profile identifies
-irrelevant pavement ring searches during the 5,845-cell initial street overview.
-The local repair adds bounds rejection before the identical point-in-ring rule.
-57 focused geometry checks pass. The targeted release admission tests also pass;
-this is not evidence that the new package has been played or released.
-
-Remaining: validate the changed dense-city loading path and Kennedy recovery,
-verify exact package integrity and ordinary hosted startup, then complete the
-already authorized protected stable merge, reviewed backend/Hosting deployment,
-release publication and development-branch synchronization. Retain prior backend,
-save and mobile evidence with a source-delta review. Never relabel the stopped
-matrix as passing or silently discard a known failure.
-
-Production remains 5.5.1 until live identity verification proves otherwise.
-Preserve the b21 staging/production fallbacks, original released551 artifact,
-source/history, current dist and player data. One heavy process at a time; keep
-ordinary Chrome and unrelated emulators running. No raw credentials in evidence.
+One heavy process at a time on this 8 GiB Mac. Preserve current dist, distinct
+fallbacks, source/history, player data, ordinary Chrome and unrelated emulators.
+At most four saved candidates. Never print raw cloud configuration or credentials.
+Detailed current execution/deployment records belong under ignored
+`output/release-review` and `output/release-evidence`, not in public release notes.

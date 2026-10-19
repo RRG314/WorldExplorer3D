@@ -2,9 +2,6 @@ import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import {currentBaseline} from './verification/execution-evidence.mjs';
-import {promotedEvidenceIdentity} from './verification/production-promotion.mjs';
-import {readTargetedReleaseDecision} from './verification/targeted-release-decision.mjs';
 
 const root = process.cwd();
 const approvalPath = String(process.env.WE3D_RELEASE_APPROVAL_FILE || '').trim();
@@ -51,6 +48,9 @@ run('scripts/hosting-artifact.mjs', ['verify']);
 // maintenance review. A screenshot alone never establishes readiness.
 const targetedReview=String(process.env.WE3D_TARGETED_RELEASE_DECISION || '').trim();
 if(targetedReview){
+  const {currentBaseline}=await import('./verification/execution-evidence.mjs');
+  const {promotedEvidenceIdentity}=await import('./verification/production-promotion.mjs');
+  const {readTargetedReleaseDecision}=await import('./verification/targeted-release-decision.mjs');
   // Owner-requested targeted admission: preserve original results, inspect the
   // source delta and require current changed-path and hosted evidence. Never
   // start another full-world sweep as a side effect of finalization.
