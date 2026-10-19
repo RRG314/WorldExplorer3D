@@ -97,6 +97,14 @@ criteria passed. Five counter tests cover missing/reset data, excess bursts,
 double-accounting and trailing responses. No game assets change. Final source,
 package and all acceptance still need to be renewed on this protocol.
 
+The bfdd1b28 backend passed. Its native run passed cleanup,coverage,transfer
+accounting and mobile checks, but failed short driving p99 and three sustained
+pause windows under increased host swapping. The optional quiet-window request
+is pending; continue functional work without waiting. Its save check stopped
+before opening a browser because this reviewed configuration hash was stale;
+the exact reviewed hash is now updated. This was not a save failure. Revalidate
+the rollback review before packaging and run the final source-bound checks.
+
 ## Remaining coordinated release work
 
 1. Complete the measurement-protocol source checks, commit the verification and

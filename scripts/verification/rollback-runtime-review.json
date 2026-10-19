@@ -546,9 +546,9 @@
     "config/performance-budgets.json": {
       "before": "7553af8ea49ea8f6d3e67e48d70148c0953b669e10a46c49b8a383e67a5b8b6a",
       "beforeMode": "100644",
-      "after": "b46fd6b7f752988f6d464274cbd81dc77cba5c8860e01d5a9962f28fbee9b626",
+      "after": "a9d50aec88adf727e19ab93316815fefad7ac1a6ab7afc26b3698acbefaa07be",
       "afterMode": "100644",
-      "review": "Documented acceptance-policy revision: desktop average floor30FPS replaces the dated43.65 snapshot, consistent with the owner priority. All frame-time/hitch, coverage, memory and rendering budgets unchanged. Verification configuration only, no runtime/save/backend change."
+      "review": "Reviewed verification policy only: 30FPS floor,35ms p95 scheduling allowance and existing50ms p99/individual-pause/hitch limits. Existing byte/request caps apply per cold load,bounded travel,each reload and finalization with complete cumulative accounting. This configuration is not shipped and changes no runtime/save/backend format. The explicit policy change and retained failed evidence are documented in docs/release-review/2026-10-19/VERIFICATION-MEASUREMENT-SCOPE.md."
     },
     "config/scene-resource-budgets.json": {
       "before": "1d8d58c8a40a1824b2f088d4821a888e2f8d7cd6a8b881746c780f5be7d43a4e",
