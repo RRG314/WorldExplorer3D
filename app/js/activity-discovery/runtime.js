@@ -160,8 +160,7 @@ function navigateToActivityStart(activity = {}) {
   if (!start) return false;
   if (typeof appCtx.createNavigationRoute === 'function') {
     const pose = currentPose();
-    appCtx.showNavigation = true;
-    appCtx.createNavigationRoute(pose.x, pose.z, start.x, start.z, true);
+    appCtx.createNavigationRoute(pose.x, pose.z, start.x, start.z, true, {label: start.label || activity.title || 'Activity start', owner: 'activity'});
     return true;
   }
   return false;
@@ -237,14 +236,7 @@ function applySpawnForActivity(activity = {}) {
 }
 
 function clearRuntimeNavigation() {
-  if (typeof appCtx.clearNavigation === 'function') {
-    appCtx.clearNavigation();
-    return;
-  }
-  appCtx.showNavigation = false;
-  appCtx.navigationRoute = null;
-  appCtx.navigationRoutePoints = [];
-  appCtx.navigationRouteDistance = 0;
+  appCtx.clearNavigation?.('activity');
 }
 
 async function joinRoomActivity(activity = {}) {
@@ -281,8 +273,8 @@ function beginActivityRuntime(activity = {}) {
   clearRuntimeNavigation();
   if (sequence[initialTargetIndex] && typeof appCtx.createNavigationRoute === 'function') {
     const pose = state.lastPose || currentPose();
-    appCtx.showNavigation = true;
-    appCtx.createNavigationRoute(pose.x, pose.z, sequence[initialTargetIndex].x, sequence[initialTargetIndex].z, true);
+    const target = sequence[initialTargetIndex];
+    appCtx.createNavigationRoute(pose.x, pose.z, target.x, target.z, true, {label: target.label, owner: 'activity'});
   }
   return true;
 }
@@ -386,8 +378,7 @@ function updateActivityRuntime(dt = 1/60) {
     state.message = next ? `Checkpoint reached. Next: ${next.label}.` : 'Activity complete.';
     state.lastMessage = state.message;
     if (next && typeof appCtx.createNavigationRoute === 'function') {
-      appCtx.showNavigation = true;
-      appCtx.createNavigationRoute(pose.x, pose.z, next.x, next.z, true);
+      appCtx.createNavigationRoute(pose.x, pose.z, next.x, next.z, true, {label: next.label, owner: 'activity'});
     }
   }
   state.lastPose = pose;

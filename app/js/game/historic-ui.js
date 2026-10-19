@@ -1,5 +1,5 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
-import { clearNavigation, createNavigationRoute, describeDestinationEntrySupport, getNavigationTargetForDestination } from "./navigation-ui.js?v=2";
+import { createNavigationRoute, describeDestinationEntrySupport, getNavigationTargetForDestination, navigationDestinationSnapshot } from "./navigation-ui.js?v=2";
 import { escapeHtml, escapeJsString, toFiniteNumber } from "./ui-utils.js?v=1";
 import { closeModal, updatePropertyPanel } from "./property-ui.js?v=9";
 
@@ -29,7 +29,8 @@ export function updateHistoricPanel() {
 export function createHistoricCard(site) {
   const distance = Math.round(toFiniteNumber(site.distance, 0));
   const distanceText = distance > 1000 ? (distance / 1000).toFixed(1) + 'km' : distance + 'm';
-  const isSelected = appCtx.selectedHistoric && appCtx.selectedHistoric.name === site.name;
+  const destination = navigationDestinationSnapshot();
+  const isSelected = destination?.owner === 'historic' && destination.label === site.name;
   const safeName = escapeHtml(site.name || 'Historic Site');
   const safeNameJs = escapeJsString(site.name || 'Historic Site');
   const safeCategory = escapeHtml(site.category || 'Historic');
@@ -79,7 +80,8 @@ export async function openHistoricModal(siteName) {
 
   const distance = Math.round(toFiniteNumber(site.distance, 0));
   const distanceText = distance > 1000 ? (distance / 1000).toFixed(1) + 'km' : distance + 'm';
-  const isSelected = appCtx.selectedHistoric && appCtx.selectedHistoric.name === site.name;
+  const destination = navigationDestinationSnapshot();
+  const isSelected = destination?.owner === 'historic' && destination.label === site.name;
   const entrySupportText = describeDestinationEntrySupport(site);
   const wikiSlug = typeof site.wikipedia === 'string' ? site.wikipedia.trim().replace(/\s+/g, '_') : '';
   const wikiUrl = wikiSlug ? `https://wikipedia.org/wiki/${encodeURIComponent(wikiSlug)}` : '';
@@ -114,11 +116,10 @@ export function navigateToHistoric(siteName) {
 
   appCtx.selectedHistoric = site;
   appCtx.selectedProperty = null;
-  appCtx.showNavigation = true;
 
   const ref = appCtx.Walk ? appCtx.Walk.getMapRefPosition(appCtx.droneMode, appCtx.drone) : { x: appCtx.car.x, z: appCtx.car.z };
   const target = getNavigationTargetForDestination(site);
-  createNavigationRoute(ref.x, ref.z, target.x, target.z, true);
+  createNavigationRoute(ref.x, ref.z, target.x, target.z, true, {label: site.name, owner: 'historic'});
   updateHistoricPanel();
   closeModal();
 }

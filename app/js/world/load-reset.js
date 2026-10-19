@@ -195,8 +195,6 @@ export function resetWorldForReload(options = {}) {
   appCtx.replaceWorldCollection('urbanSurfaceMeshes');
   invalidateTraversalNetworks('world_reload_reset');
   appCtx.clearNavigation?.();
-  appCtx.navigationRoutePoints = [];
-  appCtx.navigationRouteDistance = 0;
 
   disposeSceneMeshes(appCtx.buildingMeshes);
   appCtx.clearWorldCollections(['buildingMeshes', 'buildings', 'dynamicBuildingColliders']);

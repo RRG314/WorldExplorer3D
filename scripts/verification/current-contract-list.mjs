@@ -235,6 +235,7 @@ export const currentContractTests = [
   'tests/local-economy-transaction.test.mjs',
   'tests/personal-workspace-current.test.mjs',
   'tests/personal-home-navigation-current.test.mjs',
+  'tests/navigation-ownership-current.test.mjs',
   'tests/scene-object-lifecycle-current.test.mjs',
   'tests/interstellar-expedition-current.test.mjs',
   'tests/living-world-demand-current.test.mjs',

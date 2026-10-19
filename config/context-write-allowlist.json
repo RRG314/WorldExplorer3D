@@ -13,11 +13,7 @@
     "app/js/activity-discovery/runtime.js": [
       "Walk",
       "car",
-      "drone",
-      "navigationRoute",
-      "navigationRouteDistance",
-      "navigationRoutePoints",
-      "showNavigation"
+      "drone"
     ],
     "app/js/activity-discovery/session.js": [
       "activityDiscoveryCatalog",
@@ -546,8 +542,7 @@
       "PropertyUI",
       "historicMode",
       "selectedHistoric",
-      "selectedProperty",
-      "showNavigation"
+      "selectedProperty"
     ],
     "app/js/game/modes.js": [
       "checkpoints",
@@ -614,7 +609,6 @@
       "realEstateMode",
       "selLoc",
       "selectedProperty",
-      "showNavigation",
       "worldEconomy"
     ],
     "app/js/ground.js": [
@@ -2035,8 +2029,6 @@
       "linearWalkContactIndex",
       "mappedLandmarkMetrics",
       "museumProgramPreparation",
-      "navigationRouteDistance",
-      "navigationRoutePoints",
       "osmTreeNodes",
       "osmTreeRows",
       "pendingPublishedTransportSurfaceControls",
@@ -2102,8 +2094,6 @@
       "worldSeed"
     ],
     "app/js/world/load-support.js": [
-      "navigationRouteDistance",
-      "navigationRoutePoints",
       "streetPavementError",
       "urbanSurfaceStats"
     ],
