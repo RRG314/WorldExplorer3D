@@ -12,8 +12,7 @@
     ],
     "app/js/activity-discovery/runtime.js": [
       "Walk",
-      "car",
-      "drone"
+      "car"
     ],
     "app/js/activity-discovery/session.js": [
       "activityDiscoveryCatalog",
@@ -271,7 +270,6 @@
       "LOC"
     ],
     "app/js/earth-session.js": [
-      "drone",
       "earthResumeDiagnostics",
       "earthResumePending",
       "earthResumeRenderReady",
@@ -1671,6 +1669,7 @@
       "startMaritimeRuntime"
     ],
     "app/js/travel-mode.js": [
+      "activateDroneAtWorldPose",
       "Walk",
       "camera",
       "car",
@@ -1754,7 +1753,6 @@
       "boat",
       "car",
       "carMesh",
-      "drone",
       "pendingExperienceState"
     ],
     "app/js/ui/title-screen.js": [

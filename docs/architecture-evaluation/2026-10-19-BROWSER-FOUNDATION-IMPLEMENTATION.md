@@ -95,9 +95,72 @@ activation/spawn/return command ownership, visual policy and Godot remain the
 separate packages below. Do not reopen this checkpoint's passing checks unless
 their inputs change or new evidence identifies a regression.
 
+## Bounded follow-up: drone activation commands
+
+Starting from `cbad386d`, this checkpoint migrates one command group: explicit
+drone activation and pose restoration for activity starts, shared links and Earth
+session resume. Source inspection also found map teleportation, world/planetary
+initialization and other vehicle/interior returns; those remain separate work.
+
+The three migrated callers previously activated a mode and then wrote the drone
+pose directly. Shared links and activity starts could bypass launch clearance,
+and could alter the inactive drone after a refused transition. Their requested
+poses now go through `activateDroneAtWorldPose` in the existing travel owner. The
+command validates finite coordinates and optional orientation, returns whether
+it actually committed, and shares preparation and commitment with ordinary drone
+activation. It does not expose forced admission. Mode-only drone links also
+honor vessel-exit admission, without inventing a target position.
+
+Drone preparation resolves the complete pose and existing ground/roof clearance
+before retiring controls. A valid higher saved altitude and requested orientation
+survive; a lower altitude is raised to the existing launch minimum. Shared-link
+missing-altitude and activity height defaults are retained. Ordinary aircraft
+handoff preserves altitude and pitch, and an interior departure prepares from
+the saved exterior while retaining the interior owner's cleanup. The existing
+environment session rejects a world replacement during preparation. Earth resume
+retains its own asynchronous cancellation checks. No new store, scheduler or
+generic actor position setter was introduced. The three obsolete `drone` write
+permissions were removed; only the command export was registered.
+
+Evidence under ignored `output/research/drone-command-ownership-2026-10-19/`:
+
+- `before.tap`: four existing shared-link/activity behavior regressions failed
+  against the baseline. Six additional failures assert the then-missing command
+  contract; these are not six separately reproduced existing defects.
+- Fifteen command checks and eleven affected existing actor, vehicle-admission,
+  activity and session checks passed (`focused-final.tap`, 26 distinct cases).
+  They cover malformed requests, failed preparation, replacement during staging,
+  dedicated environments, blocked vessel exits, interior/aircraft departure,
+  actual caller paths, movement and superseded Earth resume.
+- The first after-run compared Three.js Euler callback internals rather than
+  camera values. The assertion was corrected to compare rotation values; its
+  failed receipt remains `first-after.tap`.
+- The controlled browser uses the actual travel command, walking retirement,
+  world-spawn helpers, share UI, activity runtime, Earth resume, drone physics,
+  engine input and HUD camera. All five cases passed (`browser/receipt.json`):
+  shared roof clearance, prescribed keyboard movement with matching camera,
+  activity start, saved flight restored without reloading the world, and refused
+  vessel exit without drone mutation. Screenshots were opened and inspected;
+  there were no page or console errors on the passing run.
+- `browser-attempt-1` and `browser-attempt-2` retain failed fixture setup:
+  missing click/boat-pose defaults, then the HUD marker collection. The first
+  four functional cases passed in both attempts, but neither overall receipt
+  is accepted as passing. The final fixture supplies the missing defaults.
+- Context ownership, touched-module syntax and diff checks passed. Source and
+  test hashes are recorded in `verification-summary.json`. Owned browsers and
+  the temporary server were closed; ordinary Chrome was preserved.
+
+**Stopping point reached.** This migration is complete locally, with controlled component
+integration, not a full-city performance measurement, ordinary full-world
+gameplay acceptance or live-service/release verification. No push, deployment,
+hosting build or Godot work is included. Exceptions after controller commitment
+still have the existing transition semantics; this does not claim general
+transactional recovery. The next separate command checkpoint is shared-link
+ground, boat and plane restoration through their existing owners.
+
 ## Remaining architectural work
 
-This removes competing interpretations in the named consumer paths; it does not yet remove all direct actor writers. The next migration must classify and move actual activation, spawn and world-return commands into the existing transport/session owners, retaining their domain-specific admission rules. Do not replace aircraft, maritime and walking entry rules with an unrestricted generic position setter.
+Reader consolidation and the explicit drone command migration do not remove all direct actor writers. Shared-link ground/boat/plane restoration, other activity starts, map teleportation, world/planetary initialization and other world/interior returns still need bounded migrations into the existing transport/session owners, retaining their domain-specific admission rules. Do not replace aircraft, maritime and walking entry rules with an unrestricted generic position setter.
 
 Regional scenery, detailed roads, structures, entrances and POIs still have distinct publication lifetimes. The next world-residency package must bind their identities and retirement explicitly, prove bridge/tunnel and landing continuity across neighboring cells, preserve edits and the location-based option, and measure retention on a repeat route. The road release repair here is a prerequisite, not completion of that package.
 

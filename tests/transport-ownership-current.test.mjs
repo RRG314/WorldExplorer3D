@@ -38,11 +38,11 @@ test('physics, actor and camera agree when legacy activation flags overlap',()=>
 
 function setup(t){
  const saved=new Map(Object.keys(ctx).map(key=>[key,Object.getOwnPropertyDescriptor(ctx,key)]));
- for(const key of Object.keys(ctx))delete ctx[key];
+ for(const key of Object.keys(ctx))if(Object.getOwnPropertyDescriptor(ctx,key).configurable)delete ctx[key];
  const oldDocument=globalThis.document;globalThis.document={getElementById:()=>null};
  const calls=[];
- Object.assign(ctx,{car:actor(),boat:actor(100),boatMode:{active:true},planeMode:{...actor(200),active:false},Walk:{state:{mode:'drive'},setModeDrive(){this.state.mode='drive'}},getEnv:()=> 'EARTH',ENV:{EARTH:'EARTH'},canExitBoatMode:()=>true,clearControlInputState:()=>calls.push('clear'),stopBoatMode(){calls.push('exit-boat');ctx.boatMode.active=false},stopPlaneMode(){calls.push('exit-plane');ctx.planeMode.active=false},setCameraMode(){}});
- t.after(()=>{for(const key of Object.keys(ctx))delete ctx[key];for(const [key,d]of saved)Object.defineProperty(ctx,key,d);globalThis.document=oldDocument;});
+ Object.assign(ctx,{car:actor(),boat:actor(100),boatMode:{active:true},planeMode:{...actor(200),active:false},Walk:{state:{mode:'drive'},setModeDrive(){this.state.mode='drive'}},getEnv:()=> 'EARTH',canExitBoatMode:()=>true,clearControlInputState:()=>calls.push('clear'),stopBoatMode(){calls.push('exit-boat');ctx.boatMode.active=false},stopPlaneMode(){calls.push('exit-plane');ctx.planeMode.active=false},setCameraMode(){}});
+ t.after(()=>{for(const key of Object.keys(ctx))if(Object.getOwnPropertyDescriptor(ctx,key).configurable)delete ctx[key];for(const [key,d]of saved)if(d.configurable)Object.defineProperty(ctx,key,d);globalThis.document=oldDocument;});
  return calls;
 }
 test('denied or failed vehicle preparation preserves the current controller and inputs',t=>{

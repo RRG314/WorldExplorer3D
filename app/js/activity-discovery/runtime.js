@@ -177,17 +177,11 @@ function applySpawnForActivity(activity = {}) {
     return false;
   }
   if (mode === 'drone') {
-    if (typeof appCtx.setTravelMode === 'function') {
-      appCtx.setTravelMode('drone', { source: 'activity_runtime', force: true });
-    }
-    if (appCtx.drone) {
-      appCtx.drone.x = start.x;
-      appCtx.drone.z = start.z;
-      appCtx.drone.y = Math.max(start.y + 12, finiteNumber(start.baseY, start.y) + 12);
-      appCtx.drone.yaw = finiteNumber(start.yaw, 0);
-      return true;
-    }
-    return false;
+    return appCtx.activateDroneAtWorldPose?.({
+      x: start.x, z: start.z,
+      y: Math.max(start.y + 12, finiteNumber(start.baseY, start.y) + 12),
+      yaw: finiteNumber(start.yaw, 0)
+    }, { source: 'activity_runtime' }) === true;
   }
   if (mode === 'walk') {
     if (typeof appCtx.setTravelMode === 'function') {

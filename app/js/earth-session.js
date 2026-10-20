@@ -190,15 +190,16 @@ function restorePoseFromSession() {
       modeOptions.throttle = Number.isFinite(pose?.planeThrottle) ? pose.planeThrottle : 0;
       modeOptions.airborne = pose?.planeAirborne === true;
     }
-    appCtx.setTravelMode(resumeMode, modeOptions);
-    if (resumeMode === 'drone' && appCtx.drone) {
-      appCtx.drone.x = Number.isFinite(pose?.x) ? pose.x : appCtx.drone.x;
-      appCtx.drone.z = Number.isFinite(pose?.z) ? pose.z : appCtx.drone.z;
-      if (Number.isFinite(pose?.droneY)) appCtx.drone.y = pose.droneY;
-      if (Number.isFinite(pose?.angle)) appCtx.drone.yaw = pose.angle;
-      if (Number.isFinite(pose?.dronePitch)) appCtx.drone.pitch = pose.dronePitch;
-      if (Number.isFinite(pose?.droneRoll)) appCtx.drone.roll = pose.droneRoll;
-    }
+    if (resumeMode === 'drone') {
+      appCtx.activateDroneAtWorldPose?.({
+        x: Number.isFinite(pose?.x) ? pose.x : resolved?.x,
+        z: Number.isFinite(pose?.z) ? pose.z : resolved?.z,
+        y: Number.isFinite(pose?.droneY) ? pose.droneY : undefined,
+        yaw: Number.isFinite(pose?.angle) ? pose.angle : targetAngle,
+        pitch: Number.isFinite(pose?.dronePitch) ? pose.dronePitch : undefined,
+        roll: Number.isFinite(pose?.droneRoll) ? pose.droneRoll : undefined
+      }, {source: 'earth_resume', emitTutorial: false});
+    } else appCtx.setTravelMode(resumeMode, modeOptions);
   }
 
   if (typeof appCtx.invalidateRoadCache === 'function') appCtx.invalidateRoadCache();

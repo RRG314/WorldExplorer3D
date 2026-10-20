@@ -110,12 +110,12 @@ function initShareUi({ bindTouchFriendlyPress, closeAllFloatMenus, getTitleLaunc
       drone: 'drone',
       plane: 'plane'
     }[pending.travelMode];
-    if (runtimeMode && typeof appCtx.setTravelMode === 'function') {
+    if (runtimeMode && !(runtimeMode === 'drone' && hasSharedPosition) && typeof appCtx.setTravelMode === 'function') {
       const groundY = runtimeMode === 'plane' ? terrainYAt(x || 0, z || 0) : null;
       appCtx.setTravelMode(runtimeMode, {
         source: 'shared_state',
         emitTutorial: false,
-        force: true,
+        force: runtimeMode !== 'drone',
         x: hasSharedPosition ? x : undefined,
         y: Number.isFinite(y) ? y : undefined,
         z: hasSharedPosition ? z : undefined,
@@ -132,11 +132,11 @@ function initShareUi({ bindTouchFriendlyPress, closeAllFloatMenus, getTitleLaunc
       // published world. Only restore a pose when the link actually contains a
       // complete local position.
       if (hasSharedPosition) {
-        appCtx.drone.x = x;
-        appCtx.drone.z = z;
-        appCtx.drone.y = Number.isFinite(y) ? y : terrainYAt(x, z) + 45;
-        if (Number.isFinite(yaw)) appCtx.drone.yaw = yaw;
-        if (Number.isFinite(pitch)) appCtx.drone.pitch = pitch;
+        appCtx.activateDroneAtWorldPose?.({
+          x, z, y: Number.isFinite(y) ? y : terrainYAt(x, z) + 45,
+          yaw: Number.isFinite(yaw) ? yaw : undefined,
+          pitch: Number.isFinite(pitch) ? pitch : undefined
+        }, { source: 'shared_state', emitTutorial: false });
       }
     } else if (mode === 'walking' && appCtx.Walk?.state?.walker) {
       const walker = appCtx.Walk.state.walker;
