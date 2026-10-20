@@ -426,9 +426,51 @@ world loader has already published its final arrival; those are the last externa
 placement remain domain-owned code, not permission for arbitrary geographic
 setters.
 
+## October 20 follow-up: published-world arrival acknowledgement
+
+Starting from `64328665`, Journal return and room synchronization no longer run a
+second road spawn after `loadRoads`. Source inspection confirms
+`finalizeLoadedWorld` already calls the world owner's final arrival, including
+custom-location bridge/land/vessel admission. The duplicate caller spawns could
+overwrite that accepted arrival. Low-level road-spawn calls are now confined to
+initial world publication and the spawn owner itself.
+
+Journal success now requires the exact ready publication, a current environment
+session and unchanged location intent. Selecting a preset alone is insufficient
+for an already-exploring result. Journal and room callers acknowledge loaded
+selection through the existing location owner only after publication succeeds.
+Raw world loading does not itself make that selection acknowledgement; tests
+cover the actual location-selection owner rather than assuming a previous stamp
+proves a new arrival.
+
+Earth room handoff now awaits the same return owner used by the Earth menu,
+including Ocean/Mars/space, then selects the room destination. Restoring the prior
+Earth session can no longer overwrite a room selection made prematurely. Existing
+room generations and exact publication identity reject superseded/failed loads;
+a newer location intent cannot be stamped as the old publication's destination.
+Moon/space room admission and marine Journal voyage authority remain distinct.
+
+Evidence: ignored `output/research/published-arrival-ownership-2026-10-20/`.
+Forty-five distinct focused checks passed (`focused.tap`), covering both callers,
+actual selection acknowledgement, refused/superseded handoff, preserved vessel
+arrival, affected room lifecycle, recovery, location and session behavior. Room
+cloud dependencies are controlled in the existing VM-test pattern. The first
+21-case run overlaps the final set and is not added. Syntax, ownership and diff
+checks passed; fingerprints are in `verification-summary.json`. No additional
+browser or live multiplayer/cloud run was performed for this asynchronous caller
+change; transport/controller browser evidence is recorded in the preceding
+packages. No new store, scheduler, reload-travel policy or generic setter.
+
 ## Remaining architectural work
 
-Reader consolidation, activity/shared/map commands and Earth-session restoration do not remove all direct actor writers. World/planetary initialization and other world/interior returns still need bounded migrations into the existing transport/session owners, retaining their domain-specific admission rules. Do not replace aircraft, maritime and walking entry rules with an unrestricted generic position setter.
+Activity/shared/map commands, saved Earth restoration, explicit recovery and
+post-load arrivals now use the existing transport/session/publication owners.
+Remaining direct actor writes in world reset/initialization, planetary surfaces
+and contained-ship entry/return are domain-frame code and need a separate review
+against those owners' contracts. They must not be replaced with geographic
+setters or lose aircraft, maritime, walking or interior admission. This package
+does not claim those frame-specific commands or transactional rollback are
+finished.
 
 Regional scenery, detailed roads, structures, entrances and POIs still have distinct publication lifetimes. The next world-residency package must bind their identities and retirement explicitly, prove bridge/tunnel and landing continuity across neighboring cells, preserve edits and the location-based option, and measure retention on a repeat route. The road release repair here is a prerequisite, not completion of that package.
 

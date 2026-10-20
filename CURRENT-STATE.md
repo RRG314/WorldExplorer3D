@@ -81,8 +81,9 @@ Detailed current execution/deployment records belong under ignored
 ## Local architecture work (October 20, 2026)
 
 The browser command-ownership cleanup continues locally on `steven/visual-quality`.
-Activity starts, map travel and Earth-session restoration now use existing
-transport/session owners; current details and bounded evidence are in
+Activity starts, map travel, Earth-session restoration and explicit recovery use existing
+transport/session owners. Journal and room arrivals retain the world publication
+owner; current details and bounded evidence are in
 `docs/architecture-evaluation/2026-10-19-BROWSER-FOUNDATION-IMPLEMENTATION.md`.
 The owner has authorized continuing across local checkpoints without asking
 for confirmation. This does not authorize pushing, deployment, release-branch

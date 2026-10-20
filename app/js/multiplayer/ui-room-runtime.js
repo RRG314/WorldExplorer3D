@@ -206,15 +206,11 @@ export function createUiRoomRuntime({ appCtx, refs, state, renderers, helpers })
       return false;
     }
 
-    if (appCtx.spaceFlight?.active && typeof appCtx.arriveAtEarth === "function") {
+    const environment = appCtx.getEnv?.();
+    if (environment && environment !== (appCtx.ENV?.EARTH || 'EARTH')) {
       setStatus(`Returning to Earth for room ${room.code}...`);
-      await appCtx.arriveAtEarth();
-      return true;
-    }
-    if (appCtx.onMoon && typeof appCtx.arriveAtEarth === "function") {
-      setStatus(`Returning to Earth for room ${room.code}...`);
-      await appCtx.arriveAtEarth();
-      return true;
+      if (typeof appCtx.returnToEarthFromMenu !== 'function') return false;
+      return await appCtx.returnToEarthFromMenu() === true && appCtx.getEnv?.() === (appCtx.ENV?.EARTH || 'EARTH');
     }
 
     // Earth arrival belongs to the successful load below, not this environment check.
@@ -247,11 +243,8 @@ export function createUiRoomRuntime({ appCtx, refs, state, renderers, helpers })
     const lon = finiteNumber(world.lon, null);
     const kind = String(world.kind || "earth").toLowerCase();
 
-    if (kind === "earth" && Number.isFinite(lat) && Number.isFinite(lon)) {
-      setRoomEarthSelection(room, lat, lon);
-    }
-
     if (!appCtx.gameStarted) {
+      if (kind === 'earth' && Number.isFinite(lat) && Number.isFinite(lon)) setRoomEarthSelection(room,lat,lon);
       setStatus(`Opening room ${room.code}...`);
       setTitleLaunchMode(kind);
       appCtx.pendingCustomLaunchBypass = true;
@@ -290,14 +283,16 @@ export function createUiRoomRuntime({ appCtx, refs, state, renderers, helpers })
 
     if (!Number.isFinite(lat) || !Number.isFinite(lon) || typeof appCtx.loadRoads !== "function") return;
 
+    // Earth restoration may restore its prior selection. Select the room only
+    // after that owner has finished, then let publication own the one arrival.
+    setRoomEarthSelection(room,lat,lon);
+    const selectionSignature = appCtx.getLocationSelectionSignature?.();
     setStatus(`Syncing room world ${room.code} (seed ${roomSeed})...`);
     try {
       const loaded = await appCtx.loadRoads();
       if (!isCurrent()) return;
-      if (!isEarthWorldUsable(appCtx, loaded)) throw new Error('The room location did not finish loading.');
-      if (respawn && typeof appCtx.spawnOnRoad === "function") {
-        appCtx.spawnOnRoad();
-      }
+      if ((appCtx.getEnv && appCtx.getEnv() !== (appCtx.ENV?.EARTH || 'EARTH')) || !isEarthWorldUsable(appCtx, loaded) || (selectionSignature !== undefined && selectionSignature !== appCtx.getLocationSelectionSignature?.())) throw new Error('The room location did not finish loading.');
+      appCtx.markLocationSelectionLoaded?.();
       clearPendingRoomWorldRetry();
     } catch (err) {
       failSync(err);
