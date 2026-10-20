@@ -10,10 +10,6 @@
       "textAlign",
       "textBaseline"
     ],
-    "app/js/activity-discovery/runtime.js": [
-      "Walk",
-      "car"
-    ],
     "app/js/activity-discovery/session.js": [
       "activityDiscoveryCatalog",
       "activityDiscoveryMapMarkers",
@@ -1669,6 +1665,7 @@
       "startMaritimeRuntime"
     ],
     "app/js/travel-mode.js": [
+      "activateSurfaceActivity",
       "restoreSurfaceTravelPose",
       "activateDroneAtWorldPose",
       "Walk",

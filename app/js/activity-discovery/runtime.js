@@ -159,23 +159,6 @@ function applySpawnForActivity(activity = {}) {
   const start = activity.startPoint || resolveSequence(activity)[0] || null;
   if (!start) return false;
   const mode = sanitizeText(activity.traversalMode || 'drive', 32).toLowerCase();
-  if (mode === 'boat') {
-    if (typeof appCtx.setTravelMode === 'function') {
-      const candidate = typeof appCtx.inspectBoatCandidate === 'function'
-        ? appCtx.inspectBoatCandidate(start.x, start.z, 420, { allowSynthetic: true, waterKind: 'coastal' })
-        : null;
-      appCtx.setTravelMode('boat', {
-        source: 'activity_runtime',
-        force: true,
-        spawnX: start.x,
-        spawnZ: start.z,
-        yaw: finiteNumber(start.yaw, 0),
-        candidate: candidate || undefined
-      });
-      return true;
-    }
-    return false;
-  }
   if (mode === 'drone') {
     return appCtx.activateDroneAtWorldPose?.({
       x: start.x, z: start.z,
@@ -183,39 +166,7 @@ function applySpawnForActivity(activity = {}) {
       yaw: finiteNumber(start.yaw, 0)
     }, { source: 'activity_runtime' }) === true;
   }
-  if (mode === 'walk') {
-    if (typeof appCtx.setTravelMode === 'function') {
-      appCtx.setTravelMode('walk', { source: 'activity_runtime', force: true });
-    }
-    if (appCtx.Walk?.state?.walker) {
-      const walker = appCtx.Walk.state.walker;
-      walker.x = start.x;
-      walker.z = start.z;
-      walker.y = start.y + 1.7;
-      walker.yaw = finiteNumber(start.yaw, 0);
-      walker.angle = walker.yaw;
-      return true;
-    }
-    return false;
-  }
-  if (typeof appCtx.setTravelMode === 'function') {
-    appCtx.setTravelMode('drive', { source: 'activity_runtime', force: true });
-  }
-  if (typeof appCtx.resolveSafeWorldSpawn === 'function' && typeof appCtx.applyResolvedWorldSpawn === 'function') {
-    const resolved = appCtx.resolveSafeWorldSpawn(start.x, start.z, { mode: 'drive', angle: finiteNumber(start.yaw, 0), source: 'activity_runtime' });
-    if (resolved) {
-      appCtx.applyResolvedWorldSpawn(resolved, { mode: 'drive' });
-      return true;
-    }
-  }
-  if (appCtx.car) {
-    appCtx.car.x = start.x;
-    appCtx.car.z = start.z;
-    appCtx.car.y = start.y + 1.2;
-    appCtx.car.angle = finiteNumber(start.yaw, 0);
-    return true;
-  }
-  return false;
+  return appCtx.activateSurfaceActivity?.(mode, start, {maxDistance: anchorCaptureDistance(start)}) === true;
 }
 
 function clearRuntimeNavigation() {

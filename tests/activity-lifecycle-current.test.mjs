@@ -5,6 +5,7 @@ import {createGameplayPluginRegistry} from '../app/js/gameplay/plugin-registry.j
 const disk=new Map();globalThis.localStorage={getItem:k=>disk.get(k),setItem:(k,v)=>disk.set(k,v)};
 let mode='walk',environment='EARTH',records=[];
 Object.assign(ctx,{_worldLoadSequence:1,paused:false,worldLoading:false,getEnv:()=>environment,getCurrentTravelMode:()=>mode,setTravelMode:m=>{mode=m;ctx.Walk.state.mode=m;return true},Walk:{state:{mode:'walk',walker:{x:0,y:1.7,z:0}}},car:{x:0,y:1,z:0},recordExplorerEvent:async event=>{records.push(event);return {recorded:true,event}}});
+ctx.activateSurfaceActivity=(m,start)=>{mode=m;ctx.Walk.state.mode=m;Object.assign(ctx.Walk.state.walker,{x:start.x,y:start.y+1.7,z:start.z});return true;};
 const route=id=>({id,title:id,traversalMode:'walk',requiresNearbyStart:false,anchors:[{id:'a',typeId:'start',x:0,y:0,z:0},{id:'b',typeId:'checkpoint',label:'View',x:0,y:0,z:50},{id:'c',typeId:'finish',label:'Finish',x:0,y:0,z:100}]});
 test('route mode, pause and world ownership prevent invalid completion; legitimate completion records once',async()=>{
  assert.equal(startActivity(route('lifecycle-route')),true);updateActivityRuntime(.05);const elapsed=getRuntimeSnapshot().elapsedMs;

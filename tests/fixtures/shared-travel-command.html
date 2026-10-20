@@ -45,7 +45,7 @@ Object.assign(ctx,{scene,renderer,camera,keys,car,carMesh,gameStarted:true,terra
 initWorldSpawning({buildingContainingPoint:()=>null,isInsideWaterArea:(x,z)=>x>300&&x<700&&Math.abs(z)<200,
   findNearestRoad:(x,z)=>onBridge(x,z)?{road,dist:Math.abs(z),y:22,pt:{x,z:0},segIndex:0}:null,
   isVehicleRoad:r=>r===road,sampleFeatureSurfaceY:()=>22,traversableFeaturesForMode:()=>[road]});
-ctx.Walk=createWalkingModule({THREE,scene,camera,keys,car,carMesh,getBuildingsArray:()=>[],getNearbyBuildings:()=>[]});
+ctx.Walk=createWalkingModule({THREE,scene,camera,keys,car,carMesh,getBuildingsArray:()=>ctx.buildings,getNearbyBuildings:()=>ctx.buildings});
 ctx.Walk.state.characterMesh=characterMesh;setTravelMode('walk',{emitTutorial:false});
 const input=setupEngineInputHandlers(ctx),share=initShareUi({bindTouchFriendlyPress(){},closeAllFloatMenus(){},getTitleLaunchMode:()=> 'earth'});
 function draw(){updateCamera();renderer.render(scene,camera);const a=resolveTransportActor(ctx);document.getElementById('status').textContent=`${a?.mode} · ${a?.position.x.toFixed(1)}, ${a?.position.y.toFixed(1)}, ${a?.position.z.toFixed(1)}`;}

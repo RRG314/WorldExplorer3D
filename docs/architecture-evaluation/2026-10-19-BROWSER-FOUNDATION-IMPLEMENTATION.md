@@ -228,9 +228,59 @@ after controller commitment retain their existing semantics; this does not claim
 general transactional rollback. The next separate command checkpoint is the
 remaining walking/driving/vessel activity starts.
 
+## October 20 follow-up: activity start commands
+
+The owner has authorized continuing across local checkpoints without stopping
+for confirmation. Release, residency, visual and Godot work remain outside this
+command-ownership package.
+
+Starting from `5df435ed`, walking, driving and vessel activity starts now submit
+`activateSurfaceActivity` to the existing travel owner. The activity runtime no
+longer writes ground actors or forces transport admission; its remaining actor
+write permissions were removed. Refusal cannot publish activity progress or a
+route. Nearby-start guidance remains unchanged.
+
+Fresh ground entry stages through the existing safe-spawn resolver, retains the
+accepted bridge/road contact and heading, checks distance from the authored
+anchor, and requires verified support for elevated walking. Activities opt into
+strict candidate admission: the resolver's emergency fallback cannot represent
+a successfully admitted start. Save and arrival fallback behavior is unchanged.
+Verified roofs remain walkable; unsupported floating anchors are refused.
+Vessel activities require actual mapped water, hull/depth and obstacle admission,
+and a same-mode refused relocation cannot count as success. Offshore exits,
+dedicated frames, contained interiors and replacement worlds retain their
+existing ownership boundaries. No new store, scheduler or generic setter.
+
+Evidence: ignored `output/research/activity-command-ownership-2026-10-20/`.
+
+- `before.tap`: ten failures and one pass reproduced the old activity behavior.
+  `first-after.tap` retains the strict-candidate gap found during repair.
+- Thirty-nine distinct focused checks passed (`focused.tap`), covering the new
+  commands plus affected activity, navigation, shared restoration and walking
+  pose checks. Earlier overlapping runs are not added to that total.
+- Seven controlled browser cases passed (`browser/receipt.json`) using actual
+  activity, travel, spawn, complete walking and vessel owners, input and HUD.
+  Bridge walking retained eye height 23.7 under prescribed input; driving kept
+  height 23.2. A verified roof retained height 31.7 after walking physics. Floating
+  anchors, land vessel starts and offshore walking exits were refused. The real
+  vessel responded to throttle. No page or console errors; all three final
+  screenshots were opened and inspected.
+- `browser-attempt-1` retains a fixture failure: its walking building callbacks
+  returned permanently empty arrays despite a roof being added to the scene.
+  The fixture now supplies its current building collection to the full walking
+  module. No game repair was inferred from that setup failure.
+- Context ownership, touched-module syntax and diff checks passed. Source and
+  verification identities are recorded in `verification-summary.json`. Owned
+  browser and temporary server cleanup completed; ordinary Chrome was preserved.
+
+This is controlled component integration, not full-world gameplay, performance,
+live-service or release acceptance. Exceptions after controller commitment retain
+existing semantics. Continue with map travel through the active transport owner;
+world and interior returns require their own domain-specific review.
+
 ## Remaining architectural work
 
-Reader consolidation, explicit drone commands and shared-link surface restoration do not remove all direct actor writers. Remaining walking/driving/vessel activity starts, map teleportation, world/planetary initialization and other world/interior returns still need bounded migrations into the existing transport/session owners, retaining their domain-specific admission rules. Do not replace aircraft, maritime and walking entry rules with an unrestricted generic position setter.
+Reader consolidation, explicit drone commands and shared-link surface restoration do not remove all direct actor writers. Map teleportation, world/planetary initialization and other world/interior returns still need bounded migrations into the existing transport/session owners, retaining their domain-specific admission rules. Do not replace aircraft, maritime and walking entry rules with an unrestricted generic position setter.
 
 Regional scenery, detailed roads, structures, entrances and POIs still have distinct publication lifetimes. The next world-residency package must bind their identities and retirement explicitly, prove bridge/tunnel and landing continuity across neighboring cells, preserve edits and the location-based option, and measure retention on a repeat route. The road release repair here is a prerequisite, not completion of that package.
 

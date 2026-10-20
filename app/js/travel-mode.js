@@ -334,9 +334,12 @@ function transitionTravelMode(mode, options = {}, dronePose = null, restoration 
         feetY: pose.y === undefined ? undefined : pose.y - (targetMode === 'walk' ? 1.7 : 1.2),
         preserveElevatedSurface: targetMode === 'walk' && pose.y !== undefined,
         preferRoad: targetMode === 'drive', preferredRoad,
-        restorePose: targetMode === 'walk', source: targetMode === 'walk' ? 'shared_walk_pose' : 'shared_drive_pose'
+        restorePose: targetMode === 'walk', source: targetMode === 'walk' ? 'shared_walk_pose' : 'shared_drive_pose',
+        ...restoration.spawnOptions
       });
       if (groundSpawn?.valid !== true || !['x','z','walkY','carY','angle'].every(key => Number.isFinite(groundSpawn[key]))) return rejected();
+      if (Number.isFinite(restoration.maxDistance) && Math.hypot(groundSpawn.x - pose.x, groundSpawn.z - pose.z) > restoration.maxDistance) return rejected();
+      if (Number.isFinite(restoration.expectedFeetY) && Math.abs((targetMode === 'walk' ? groundSpawn.walkY - 1.7 : groundSpawn.carY - 1.2) - restoration.expectedFeetY) > 1.2) return rejected();
     }
   } catch (error) {
     if (restoration) return rejected();
@@ -496,7 +499,7 @@ function activateDroneAtWorldPose(pose, options = {}) {
 
 // Restore only the supported surface controllers, through their own admission
 // policies. A mode-only request carries no geographic position authority.
-function restoreSurfaceTravelPose(mode, pose = {}, options = {}) {
+function requestSurfaceTravelPose(mode, pose = {}, options = {}, admission = {}) {
   if (!['walk','drive','boat','plane'].includes(mode) || !pose || typeof pose !== 'object' || appCtx.worldLoading || resolveControlState(appCtx).frame !== 'surface') return false;
   const requested = {};
   for (const key of ['x','z','y','yaw','pitch']) {
@@ -524,7 +527,28 @@ function restoreSurfaceTravelPose(mode, pose = {}, options = {}) {
     Object.assign(modeOptions, {spawnX: requested.x, spawnZ: requested.z, yaw: requested.yaw, candidate});
   }
   if (mode === 'plane') Object.assign(modeOptions, requested);
-  return transitionTravelMode(mode, modeOptions, null, {pose: requested, roadId: options.roadId}).applied;
+  return transitionTravelMode(mode, modeOptions, null, {pose: requested, roadId: options.roadId, ...admission}).applied;
+}
+
+function restoreSurfaceTravelPose(mode, pose = {}, options = {}) {
+  return requestSurfaceTravelPose(mode, pose, options);
+}
+
+// Activity anchors describe feet/surface height. Fresh entry must remain near
+// that start and prove elevated support, rather than inheriting save margins.
+function activateSurfaceActivity(mode, start, options = {}) {
+  if (!['walk','drive','boat'].includes(mode) || !start || ![start.x,start.y,start.z].every(Number.isFinite)) return false;
+  const maxDistance = Number.isFinite(options.maxDistance) && options.maxDistance >= 0 ? options.maxDistance : 12;
+  return requestSurfaceTravelPose(mode, {
+    x: start.x, y: start.y + (mode === 'walk' ? 1.7 : 1.2), z: start.z,
+    yaw: Number.isFinite(start.yaw) ? start.yaw : 0
+  }, {source: 'activity_runtime'}, {
+    maxDistance, expectedFeetY: start.y,
+    spawnOptions: {source: 'activity_runtime', restorePose: false, preferRoad: false,
+      preserveElevatedSurface: mode === 'walk', allowBuildingRoof: mode === 'walk',
+      requireVerifiedElevatedSurface: true, requireSafeCandidate: true, maxGroundRadius: Math.min(maxDistance,48),
+      maxRoadDistance: maxDistance, fastLocalFallback: true}
+  });
 }
 
 function toggleWalkDriveMode(options = {}) {
@@ -558,6 +582,7 @@ function toggleBoatMode(options = {}) {
 }
 
 Object.assign(appCtx, {
+  activateSurfaceActivity,
   activateDroneAtWorldPose,
   restoreSurfaceTravelPose,
   getCurrentTravelMode,
@@ -572,6 +597,7 @@ Object.assign(appCtx, {
 });
 
 export {
+  activateSurfaceActivity,
   activateDroneAtWorldPose,
   restoreSurfaceTravelPose,
   cyclePrimaryTravelMode,

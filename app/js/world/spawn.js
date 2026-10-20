@@ -87,6 +87,7 @@ function evaluateWalkSpawnCandidate(x, z, options = {}) {
     return { valid: false, reason: "building_clearance", terrainY, buildingCheck };
   }
   if (options.preserveElevatedSurface === true && hasExplicitFeetY && actorFeetY > surfaceY + 1) {
+    if (options.requireVerifiedElevatedSurface === true && !standingOnRoof) return {valid:false,reason:'unsupported_elevated_surface',terrainY};
     surfaceY = actorFeetY;
   }
   if (walkBuildBlockCollision(x, z, terrainY)?.blocked) return { valid: false, reason: "build_block", terrainY };
@@ -494,6 +495,7 @@ function resolveSafeWorldSpawn(targetX, targetZ, options = {}) {
       restorePose: options.restorePose === true,
       feetY: options.feetY,
       preserveElevatedSurface: options.preserveElevatedSurface,
+      requireVerifiedElevatedSurface: options.requireVerifiedElevatedSurface,
       preferredRoad: options.preferredRoad || null,
       allowBuildingRoof: options.allowBuildingRoof,
       source: options.source || "direct"
@@ -520,6 +522,7 @@ function resolveSafeWorldSpawn(targetX, targetZ, options = {}) {
     });
     if (surfaceFallback) return surfaceFallback;
 
+    if (options.requireSafeCandidate === true) return {valid:false,reason:'no_safe_walk_spawn'};
     return fallbackResolvedSpawn("walk", { x, z, angle, source: "walk_fallback" });
   }
 
@@ -568,6 +571,7 @@ function resolveSafeWorldSpawn(targetX, targetZ, options = {}) {
     };
   }
 
+  if (options.requireSafeCandidate === true) return {valid:false,reason:'no_safe_drive_spawn'};
   return fallbackResolvedSpawn("drive", { x, z, angle, source: "drive_fallback" });
 }
 

@@ -22,6 +22,7 @@ test('activity, map inspection and walking POI routes have independent intent an
   const elements=new Map(),frames=new Map();let frameId=0;
   Object.assign(globalThis,{THREE:sandbox.THREE,document:{getElementById:id=>{if(!elements.has(id))elements.set(id,{style:{},textContent:''});return elements.get(id);}},requestAnimationFrame:fn=>{frames.set(++frameId,fn);return frameId},cancelAnimationFrame:id=>frames.delete(id)});
   Object.assign(ctx,{scene:new THREE.Scene(),car:{x:0,z:0},Walk:{state:{mode:'walk',walker:{x:30,y:1.7,z:10,yaw:0}}},_worldLoadSequence:1,getEnv:()=> 'EARTH',getCurrentTravelMode:()=> 'walk',createNavigationRoute,clearNavigation});
+  ctx.activateSurfaceActivity=(_mode,start)=>{Object.assign(ctx.Walk.state.walker,{x:start.x,y:start.y+1.7,z:start.z});return true;};
   try {
     createNavigationRoute(30,10,100,100,true,{label:'Home',owner:'property'});
     ctx.selectedProperty={x:100,z:100,label:'Home'};
