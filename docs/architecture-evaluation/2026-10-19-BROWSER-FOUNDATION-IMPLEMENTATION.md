@@ -158,9 +158,79 @@ still have the existing transition semantics; this does not claim general
 transactional recovery. The next separate command checkpoint is shared-link
 ground, boat and plane restoration through their existing owners.
 
+## October 20 bounded follow-up: shared-link surface restoration
+
+Starting from `946f20de`, this checkpoint removes the remaining actor writes
+from shared-link restoration: walking, driving, vessel and aircraft requests.
+The share UI now submits commands and consumes an applied/refused result. It no
+longer writes walkers, cars, vessels or meshes, calls the low-level vessel start,
+or forces an exit. Its four remaining actor/mesh write permissions were removed.
+The previous drone command remains in use.
+
+`restoreSurfaceTravelPose` belongs to the existing travel owner and accepts only
+the supported surface controllers. Ground requests stage through the existing
+safe-spawn resolver, retaining doorway restoration clearance, road identity,
+bridge height and the resolver's accepted heading. The existing spawn owner
+publishes actors, meshes and contact after controller retirement in the same
+synchronous transition. Mode-only/partial-coordinate links retain the current
+arrival, heading-only requests go through the owner, and camera-only links do not
+restart a vehicle. A refused travel request does not apply the requested camera
+mode. Unsupported or dedicated-world requests cannot write parked Earth actors.
+
+Aircraft still prepare their own visual/admission before releasing controls.
+Vessel starts use the existing candidate, hull/depth, obstacle and preparation
+authorities; active-vessel relocation uses `enterBoatAtWorldPoint`. A shared Y
+cannot override the vessel's water contact. Geographic vessel restoration cannot
+move a deck passenger or swimmer. Existing session captures now reject world
+replacement during vehicle/ground preparation and active-vessel clearance.
+
+Mapped-interior outdoor placement uses the interior cleanup owner. A mode-only
+walking link preserves the occupied interior. Authored/contained interiors have
+isolated collision queries, so geographic placement is refused until their normal
+exit rather than validating an outdoor position against indoor-only obstacles.
+This is an explicit admission boundary, not a new generic position setter or
+temporary mutation of collision context. No new store or scheduler was added.
+
+Evidence: ignored `output/research/shared-travel-command-2026-10-20/`.
+
+- `before.tap` retains baseline failures including bypassed vessel exit,
+  premature boat writes, unchecked boat altitude, retained interior ownership,
+  obsolete ground/aircraft publication, preparation exceptions and dedicated-world
+  actor writes. Its then-missing command assertion is not an additional existing
+  defect. The initial shallow-water fixture also lacked a qualified source ID;
+  the subsequent failure in `first-after.tap` was corrected by supplying test
+  evidence with a source, preserving the app's unknown-depth policy.
+- `contained-interior-before.tap` separately reproduces the authored-interior
+  admission gap identified during final source review.
+- Forty-seven distinct focused checks passed: 43 in `focused-complete.tap` plus
+  four affected existing vehicle-admission cases in `admission-complete.tap`.
+  Earlier overlapping runs are retained but not added to this total.
+- Seven browser cases passed on final source (`browser/receipt.json`), using
+  the actual complete walking controller, safe-spawn helpers, shared UI,
+  travel, aircraft and vessel owners, engine input and HUD camera. A bridge
+  walker kept height 23.7 through prescribed keyboard movement; the car kept
+  height 23.2 and the bridge identity. Aircraft restored at `(40,80,-120)` and
+  remained under its flight owner. Vessel start/relocation sampled water rather
+  than shared altitude, accepted real throttle input, and refused an offshore
+  walking request without changing the vessel, parked actor or camera mode.
+- All four final screenshots were opened and inspected; no page or console
+  errors. Earlier passing browser snapshots are retained in `browser-initial`
+  and `browser-before-contained-guard`. Owned browser cleanup completed, the
+  temporary server closed, and ordinary Chrome was not targeted.
+- Touched-module syntax, context ownership and diff checks passed. Source,
+  verification and evidence identities are recorded in `verification-summary.json`.
+
+**Stopping point reached.** This is controlled component integration, not a
+full-city performance result, ordinary full-world gameplay acceptance, backend
+or live-service verification. No hosting build, release sweep, push, deployment
+or Godot work was performed. Existing safe-spawn fallback rules and exceptions
+after controller commitment retain their existing semantics; this does not claim
+general transactional rollback. The next separate command checkpoint is the
+remaining walking/driving/vessel activity starts.
+
 ## Remaining architectural work
 
-Reader consolidation and the explicit drone command migration do not remove all direct actor writers. Shared-link ground/boat/plane restoration, other activity starts, map teleportation, world/planetary initialization and other world/interior returns still need bounded migrations into the existing transport/session owners, retaining their domain-specific admission rules. Do not replace aircraft, maritime and walking entry rules with an unrestricted generic position setter.
+Reader consolidation, explicit drone commands and shared-link surface restoration do not remove all direct actor writers. Remaining walking/driving/vessel activity starts, map teleportation, world/planetary initialization and other world/interior returns still need bounded migrations into the existing transport/session owners, retaining their domain-specific admission rules. Do not replace aircraft, maritime and walking entry rules with an unrestricted generic position setter.
 
 Regional scenery, detailed roads, structures, entrances and POIs still have distinct publication lifetimes. The next world-residency package must bind their identities and retirement explicitly, prove bridge/tunnel and landing continuity across neighboring cells, preserve edits and the location-based option, and measure retention on a repeat route. The road release repair here is a prerequisite, not completion of that package.
 

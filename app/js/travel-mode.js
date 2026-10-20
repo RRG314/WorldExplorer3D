@@ -8,6 +8,7 @@ import {
 } from './planetary/traversal-capabilities.js?v=1';
 import { resolveTravelMenuState } from './travel/menu-state.js?v=2';
 import { captureEnvironmentSession } from './session-coordinator.js?v=2';
+import { usesContainedInteriorPhysics } from './interiors/physics-scope.js';
 
 let lastTravelUiSignature = '';
 
@@ -270,7 +271,7 @@ function handoffAirPositionToGround(reference, targetMode) {
   return true;
 }
 
-function transitionTravelMode(mode, options = {}, dronePose = null) {
+function transitionTravelMode(mode, options = {}, dronePose = null, restoration = null) {
   const rejected = () => ({mode: getCurrentTravelMode(), applied: false});
   if (!['walk', 'drive', 'drone', 'boat', 'plane'].includes(mode)) return rejected();
   const targetMode = mode;
@@ -293,6 +294,7 @@ function transitionTravelMode(mode, options = {}, dronePose = null) {
 
   // Dedicated environments own their controllers until their explicit exit.
   if (resolveControlState(appCtx).frame !== 'surface') return rejected();
+  const session = captureEnvironmentSession();
   if (targetMode === 'boat' && appCtx.boatSwimming?.active) {
     appCtx.startBoatMode?.(options);
     return {mode: syncTravelModeButtons(), applied: getCurrentTravelMode() === targetMode};
@@ -312,17 +314,37 @@ function transitionTravelMode(mode, options = {}, dronePose = null) {
   // Admission and required visual preparation happen before releasing a live
   // controller. A denied boat/plane start must leave the current actor intact.
   let prepared = null;
-  if (targetMode === 'boat' && currentMode !== 'boat') {
-    prepared = appCtx.prepareBoatMode?.(options);
-    if (!prepared) return {mode: syncTravelModeButtons(), applied: false};
-  } else if (targetMode === 'plane') {
-    prepared = appCtx.preparePlaneMode?.(options);
-    if (!prepared) return {mode: syncTravelModeButtons(), applied: false};
+  let groundSpawn = null;
+  try {
+    if (restoration && (targetMode !== 'walk' || restoration.pose.x !== undefined) && appCtx.activeInterior && typeof appCtx.clearActiveInterior !== 'function') return rejected();
+    if (targetMode === 'boat' && currentMode !== 'boat') {
+      prepared = appCtx.prepareBoatMode?.(options);
+      if (!prepared) return {mode: syncTravelModeButtons(), applied: false};
+    } else if (targetMode === 'plane') {
+      prepared = appCtx.preparePlaneMode?.(options);
+      if (!prepared) return {mode: syncTravelModeButtons(), applied: false};
+    }
+    if (restoration?.pose.x !== undefined && (targetMode === 'walk' || targetMode === 'drive')) {
+      if (typeof appCtx.resolveSafeWorldSpawn !== 'function' || typeof appCtx.applyResolvedWorldSpawn !== 'function') return rejected();
+      const pose = restoration.pose;
+      const preferredRoad = restoration.roadId ? (appCtx.roads || []).find(road =>
+        String(road.sourceFeatureId || road.transportRecord?.identity || road.id || '') === restoration.roadId) || null : null;
+      groundSpawn = appCtx.resolveSafeWorldSpawn(pose.x, pose.z, {
+        mode: targetMode, angle: pose.yaw ?? modeReference?.angle ?? appCtx.car?.angle ?? 0,
+        feetY: pose.y === undefined ? undefined : pose.y - (targetMode === 'walk' ? 1.7 : 1.2),
+        preserveElevatedSurface: targetMode === 'walk' && pose.y !== undefined,
+        preferRoad: targetMode === 'drive', preferredRoad,
+        restorePose: targetMode === 'walk', source: targetMode === 'walk' ? 'shared_walk_pose' : 'shared_drive_pose'
+      });
+      if (groundSpawn?.valid !== true || !['x','z','walkY','carY','angle'].every(key => Number.isFinite(groundSpawn[key]))) return rejected();
+    }
+  } catch (error) {
+    if (restoration) return rejected();
+    throw error;
   }
 
   // Stage the entire drone pose before releasing controls. In particular, an
   // interior's local walker coordinates must never become an outdoor launch.
-  const session = targetMode === 'drone' ? captureEnvironmentSession() : null;
   let droneEntry = null;
   if (targetMode === 'drone') {
     if (appCtx.activeInterior && typeof appCtx.clearActiveInterior !== 'function') return rejected();
@@ -341,9 +363,9 @@ function transitionTravelMode(mode, options = {}, dronePose = null) {
       throw error;
     }
   }
-  if (targetMode === 'drone' && (!droneEntry || !session.isCurrent())) return rejected();
+  if (!session.isCurrent() || (targetMode === 'drone' && !droneEntry)) return rejected();
 
-  if (targetMode !== 'walk' && appCtx.activeInterior && typeof appCtx.clearActiveInterior === 'function') {
+  if ((targetMode !== 'walk' || groundSpawn) && appCtx.activeInterior && typeof appCtx.clearActiveInterior === 'function') {
     appCtx.clearActiveInterior({ restorePlayer: true, preserveCache: true });
     modeReference = captureActiveModeReference(currentMode);
   }
@@ -372,11 +394,11 @@ function transitionTravelMode(mode, options = {}, dronePose = null) {
     if (appCtx.carMesh) appCtx.carMesh.visible = false;
   } else if (targetMode === 'walk') {
     setDroneModeActive(false);
-    const preservedCurrentPosition = handoffAirPositionToGround(modeReference, 'walk');
+    const preservedCurrentPosition = !!groundSpawn || handoffAirPositionToGround(modeReference, 'walk');
     if (appCtx.Walk && appCtx.Walk.state?.mode !== 'walk') {
       appCtx.Walk.setModeWalk({
         preserveResolvedSpawn: !!planeExitState || preservedCurrentPosition,
-        preserveResolvedSurface: planeExitState?.landedOnRoof === true,
+        preserveResolvedSurface: !!groundSpawn || planeExitState?.landedOnRoof === true,
         deferWorldSync: !!planeExitState || preservedCurrentPosition
       });
     }
@@ -413,7 +435,7 @@ function transitionTravelMode(mode, options = {}, dronePose = null) {
     }
   } else {
     setDroneModeActive(false);
-    const preservedCurrentPosition = handoffAirPositionToGround(modeReference, 'drive');
+    const preservedCurrentPosition = !!groundSpawn || handoffAirPositionToGround(modeReference, 'drive');
     if (appCtx.Walk?.state?.mode === 'walk') {
       appCtx.Walk.setModeDrive({ preserveResolvedSpawn: preservedCurrentPosition });
     }
@@ -421,6 +443,20 @@ function transitionTravelMode(mode, options = {}, dronePose = null) {
     if (appCtx.camera?.userData) appCtx.camera.userData.carLook = { yaw: 0, pitch: 0 };
     if (appCtx.carMesh) appCtx.carMesh.visible = true;
     void appCtx.ensureCuratedPlayerCar?.();
+  }
+
+  // Publish the admitted ground pose after controller retirement, before UI or
+  // tutorial readers can observe it. The spawn owner also updates meshes/contact.
+  if (groundSpawn) appCtx.applyResolvedWorldSpawn(groundSpawn, {mode: targetMode, syncCar: true, syncWalker: true});
+  else if (restoration && Number.isFinite(restoration.pose.yaw) && (targetMode === 'walk' || targetMode === 'drive')) {
+    const yaw = restoration.pose.yaw;
+    if (targetMode === 'walk') {
+      Object.assign(appCtx.Walk.state.walker, {yaw, angle: yaw});
+      if (appCtx.Walk.state.characterMesh) appCtx.Walk.state.characterMesh.rotation.y = yaw;
+    } else {
+      appCtx.car.angle = yaw;
+      if (appCtx.carMesh) appCtx.carMesh.rotation.y = yaw;
+    }
   }
 
   if (typeof appCtx.clearStarSelection === 'function') {
@@ -458,6 +494,39 @@ function activateDroneAtWorldPose(pose, options = {}) {
   }, requested).applied;
 }
 
+// Restore only the supported surface controllers, through their own admission
+// policies. A mode-only request carries no geographic position authority.
+function restoreSurfaceTravelPose(mode, pose = {}, options = {}) {
+  if (!['walk','drive','boat','plane'].includes(mode) || !pose || typeof pose !== 'object' || appCtx.worldLoading || resolveControlState(appCtx).frame !== 'surface') return false;
+  const requested = {};
+  for (const key of ['x','z','y','yaw','pitch']) {
+    if (pose[key] === undefined) continue;
+    if (!Number.isFinite(pose[key])) return false;
+    requested[key] = pose[key];
+  }
+  const hasPosition = requested.x !== undefined || requested.z !== undefined;
+  if (hasPosition && (requested.x === undefined || requested.z === undefined)) return false;
+  // An authored room's queries intentionally exclude the geographic world.
+  // Leave it through its normal exit before requesting an exterior arrival.
+  if (hasPosition && usesContainedInteriorPhysics(appCtx.activeInterior)) return false;
+  if ((mode === 'walk' && !appCtx.Walk?.state?.walker) || (mode === 'drive' && !appCtx.car)) return false;
+  const modeOptions = {source: options.source || 'shared_state', emitTutorial: options.emitTutorial !== false};
+  if (mode === 'boat') modeOptions.yaw = requested.yaw;
+  if (mode === 'boat' && (hasPosition || (appCtx.boatMode?.active && requested.yaw !== undefined))) {
+    if (appCtx.boatDeck?.active || appCtx.boatSwimming?.active) return false;
+    if (appCtx.boatMode?.active) return appCtx.enterBoatAtWorldPoint?.(requested.x ?? appCtx.boat?.x, requested.z ?? appCtx.boat?.z,
+      {...modeOptions, yaw: requested.yaw}) === true;
+    const session = captureEnvironmentSession();
+    let candidate;
+    try { candidate = appCtx.inspectBoatCandidate?.(requested.x, requested.z); }
+    catch { return false; }
+    if (!candidate || !session.isCurrent()) return false;
+    Object.assign(modeOptions, {spawnX: requested.x, spawnZ: requested.z, yaw: requested.yaw, candidate});
+  }
+  if (mode === 'plane') Object.assign(modeOptions, requested);
+  return transitionTravelMode(mode, modeOptions, null, {pose: requested, roadId: options.roadId}).applied;
+}
+
 function toggleWalkDriveMode(options = {}) {
   const nextMode = getCurrentTravelMode() === 'walk' ? 'drive' : 'walk';
   return setTravelMode(nextMode, options);
@@ -490,6 +559,7 @@ function toggleBoatMode(options = {}) {
 
 Object.assign(appCtx, {
   activateDroneAtWorldPose,
+  restoreSurfaceTravelPose,
   getCurrentTravelMode,
   cyclePrimaryTravelMode,
   setDroneModeActive,
@@ -503,6 +573,7 @@ Object.assign(appCtx, {
 
 export {
   activateDroneAtWorldPose,
+  restoreSurfaceTravelPose,
   cyclePrimaryTravelMode,
   getCurrentTravelMode,
   setDroneModeActive,

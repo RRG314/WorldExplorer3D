@@ -1669,6 +1669,7 @@
       "startMaritimeRuntime"
     ],
     "app/js/travel-mode.js": [
+      "restoreSurfaceTravelPose",
       "activateDroneAtWorldPose",
       "Walk",
       "camera",
@@ -1749,10 +1750,6 @@
       "ssaoEnabled"
     ],
     "app/js/ui/share-links.js": [
-      "Walk",
-      "boat",
-      "car",
-      "carMesh",
       "pendingExperienceState"
     ],
     "app/js/ui/title-screen.js": [

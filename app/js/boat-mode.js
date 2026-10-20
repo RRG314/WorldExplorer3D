@@ -499,6 +499,7 @@ function startBoatMode(options = {}, prepared = null) {
 
 function enterBoatAtWorldPoint(worldX, worldZ, options = {}) {
   if (!Number.isFinite(worldX) || !Number.isFinite(worldZ)) return false;
+  const session = captureEnvironmentSession();
   const candidate =
     options.candidate ||
     findNearestBoatCandidate(
@@ -507,7 +508,7 @@ function enterBoatAtWorldPoint(worldX, worldZ, options = {}) {
       Number.isFinite(options.maxDistance) ? options.maxDistance : BOAT_MAX_CANDIDATE_DISTANCE * 1.9,
       { allowSynthetic: options.allowSynthetic === true, waterKind: options.waterKind || 'open_ocean' }
     );
-  if (!candidate) return false;
+  if (!candidate || !session.isCurrent()) return false;
 
   if (appCtx.boatMode?.active) {
     const yaw = Number.isFinite(options.yaw) ? options.yaw : resolveBoatHeading(candidate, appCtx.boat.angle || 0);
@@ -524,6 +525,7 @@ function enterBoatAtWorldPoint(worldX, worldZ, options = {}) {
     const clearance=vesselObstacleAdmission(appCtx,getMaritimeCatalogEntry(appCtx.boatMode.transportCatalogId),spawnPoint.x,spawnPoint.z,yaw,
       waterSurfaceYAt(spawnPoint.x,spawnPoint.z,activeCandidate));
     if(!clearance.allowed){showBoatPrompt(clearance.reason,'notice',BOAT_PROMPT_DURATION_MS);return false;}
+    if (!session.isCurrent()) return false;
     appCtx.boatMode.currentWater = activeCandidate;
     appCtx.boatMode.waterKind = activeCandidate?.waterKind || candidate.waterKind;
     appCtx.boatMode.shorelineDistance = activeCandidate?.shorelineDistance || 0;

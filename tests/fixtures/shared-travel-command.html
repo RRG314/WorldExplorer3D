@@ -1,0 +1,59 @@
+<!doctype html><meta charset="utf-8"><title>Shared travel ownership</title><link rel="icon" href="data:,">
+<style>body{margin:0;font:15px system-ui}canvas{display:block}header{position:absolute;left:12px;top:12px;background:#fffef0ed;padding:12px;border-radius:5px}button{margin:8px 8px 0 0}</style>
+<header>Shared travel commands · controlled bridge, surface and lake<br><button id="walk">Walk bridge</button><button id="drive">Drive bridge</button><button id="plane">Restore flight</button><button id="boat">Restore vessel</button><div id="status"></div></header>
+<script src="/app/vendor/three/build/three.min.js"></script>
+<script>addEventListener('error',e=>window.fixtureError=e.message);addEventListener('unhandledrejection',e=>window.fixtureError=String(e.reason));</script>
+<script type="module">
+import {ctx} from '/app/js/shared-context.js?v=55';
+import {setTravelMode} from '/app/js/travel-mode.js';
+import {createWalkingModule} from '/app/js/walking.js';
+import {resolveTransportActor} from '/app/js/transport/actor-contract.js?v=6';
+import {resolveControlState} from '/app/js/transport/control-state.js';
+import {initWorldSpawning,resolveSafeWorldSpawn,applyResolvedWorldSpawn} from '/app/js/world/spawn.js';
+import {initShareUi} from '/app/js/ui/share-links.js';
+import {normalizeWaterBody} from '/app/js/world/water-body-contract.js?v=4';
+import {updatePlane} from '/app/js/plane-mode.js';
+import {updateBoatMode} from '/app/js/boat-mode.js';
+import {updateCamera} from '/app/js/hud.js';
+import {keyboardControlActions} from '/app/js/controls/action-input.js';
+import {setupEngineInputHandlers} from '/app/js/engine/input-handlers.js';
+import {commitEnvironment} from '/app/js/session-coordinator.js?v=2';
+commitEnvironment('EARTH');
+const renderer=new THREE.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});renderer.setSize(1000,700);renderer.outputEncoding=THREE.sRGBEncoding;document.body.append(renderer.domElement);
+const scene=new THREE.Scene();scene.background=new THREE.Color(0x9dc7db);scene.fog=new THREE.Fog(0x9dc7db,600,1300);
+scene.add(new THREE.HemisphereLight(0xcce7f0,0x677851,.7));const sun=new THREE.DirectionalLight(0xffe6c4,.9);sun.position.set(80,180,70);scene.add(sun);
+const camera=new THREE.PerspectiveCamera(60,1000/700,.1,1800),keys={},car={x:-40,y:1.2,z:70,angle:0,speed:0};
+const mesh=(geo,color,x,y,z)=>{const m=new THREE.Mesh(geo,new THREE.MeshStandardMaterial({color,roughness:.8}));m.position.set(x,y,z);scene.add(m);return m;};
+const ground=mesh(new THREE.PlaneGeometry(2000,2000),0x7f9c65,0,-.02,0);ground.rotation.x=-Math.PI/2;
+const lake=mesh(new THREE.PlaneGeometry(400,400),0x247f9b,500,.03,0);lake.rotation.x=-Math.PI/2;
+const bridge=mesh(new THREE.BoxGeometry(200,.8,12),0x676d71,0,21.6,0);
+for(const x of [-80,80])mesh(new THREE.BoxGeometry(4,22,8),0x949c9b,x,11,0);
+const grid=new THREE.GridHelper(1600,40,0x657364,0x81947a);grid.position.y=.01;scene.add(grid);
+const carMesh=mesh(new THREE.BoxGeometry(2,1.6,4),0xcf7849,car.x,car.y,car.z),characterMesh=mesh(new THREE.CylinderGeometry(.35,.35,1.7),0x246e81,car.x,0,car.z);
+const road={sourceFeatureId:'fixture:bridge',width:12,pts:[{x:-100,z:0},{x:100,z:0}],structureSemantics:{terrainMode:'elevated',structureKind:'bridge'}};
+const onBridge=(x,z)=>Math.abs(x)<100&&Math.abs(z)<6;
+const surface=(x,z)=>({position:{x,y:onBridge(x,z)?22:0,z},feature:onBridge(x,z)?road:null});
+Object.assign(ctx,{scene,renderer,camera,keys,car,carMesh,gameStarted:true,terrainEnabled:true,_worldLoadSequence:1,camMode:0,
+  boat:{x:0,y:0,z:0,angle:0,speed:0},boatMode:{active:false,transportCatalogId:'marina-runabout'},
+  oceanMode:{active:false},spaceFlight:{active:false},drone:{x:0,y:20,z:0,yaw:0,pitch:0},droneMode:false,
+  roads:[road],buildings:[],dynamicBuildingColliders:[],propMarkers:[],waterways:[],METERS_PER_WORLD_UNIT:1,LOC:{lat:39,lon:-76},
+  waterAreas:[normalizeWaterBody({shape:'area',type:'water',water:'lake',pts:[{x:300,z:-200},{x:700,z:-200},{x:700,z:200},{x:300,z:200}],surfaceY:0})],
+  SurfaceQuery:{terrainAt:(x,z)=>({position:{x,y:0,z}}),walkAt:surface,driveAt:surface},terrainMeshHeightAt:()=>0,elevationWorldYAtWorldXZ:()=>0,
+  setCameraMode(m){ctx.camMode=m;},resolveSafeWorldSpawn,applyResolvedWorldSpawn,activeTransportActor:()=>resolveTransportActor(ctx),
+  readControlActions:mode=>keyboardControlActions(keys,mode),clearControlInputState(){for(const key of Object.keys(keys))delete keys[key];},
+  onKey(){},checkMoonClick:()=>false,checkStarClick:()=>false,checkBuildingCollision:()=>({collision:false}),updateCamera});
+initWorldSpawning({buildingContainingPoint:()=>null,isInsideWaterArea:(x,z)=>x>300&&x<700&&Math.abs(z)<200,
+  findNearestRoad:(x,z)=>onBridge(x,z)?{road,dist:Math.abs(z),y:22,pt:{x,z:0},segIndex:0}:null,
+  isVehicleRoad:r=>r===road,sampleFeatureSurfaceY:()=>22,traversableFeaturesForMode:()=>[road]});
+ctx.Walk=createWalkingModule({THREE,scene,camera,keys,car,carMesh,getBuildingsArray:()=>[],getNearbyBuildings:()=>[]});
+ctx.Walk.state.characterMesh=characterMesh;setTravelMode('walk',{emitTutorial:false});
+const input=setupEngineInputHandlers(ctx),share=initShareUi({bindTouchFriendlyPress(){},closeAllFloatMenus(){},getTitleLaunchMode:()=> 'earth'});
+function draw(){updateCamera();renderer.render(scene,camera);const a=resolveTransportActor(ctx);document.getElementById('status').textContent=`${a?.mode} · ${a?.position.x.toFixed(1)}, ${a?.position.y.toFixed(1)}, ${a?.position.z.toFixed(1)}`;}
+function apply(pending){ctx.pendingExperienceState=pending;share.applySharedRuntimeState();draw();}
+for(const mode of ['walk','drive'])document.getElementById(mode).onclick=()=>apply({travelMode:mode==='walk'?'walking':'driving',refX:10,refY:mode==='walk'?23.7:23.2,refZ:0,refRoadId:road.sourceFeatureId,yaw:Math.PI/2});
+document.getElementById('plane').onclick=()=>apply({travelMode:'plane',refX:40,refY:80,refZ:-120,yaw:.3,pitch:.05});
+document.getElementById('boat').onclick=()=>{if(ctx.planeMode.active)setTravelMode('walk',{emitTutorial:false});apply({travelMode:'boat',refX:500,refY:100,refZ:0,yaw:.4});};
+window.advanceTime=ms=>{for(let left=ms/1000;left>1e-8;left-=1/60){const dt=Math.min(1/60,left),c=resolveControlState(ctx);if(c.mode==='walk')ctx.Walk.update(dt);if(c.mode==='plane')updatePlane(dt);if(c.mode==='boat')updateBoatMode(dt);}draw();};
+window.render_game_to_text=()=>JSON.stringify({coordinateSystem:'x east, y up, z south; controlled bridge deck y=22, terrain/lake y=0',actor:resolveTransportActor(ctx),control:resolveControlState(ctx),camera:{x:camera.position.x,y:camera.position.y,z:camera.position.z},car:{x:car.x,y:car.y,z:car.z,roadId:car.road?.sourceFeatureId},walker:ctx.Walk.state.walker,boat:{...ctx.boat},plane:ctx.getPlaneSnapshot(),pending:ctx.pendingExperienceState});
+window.sharedFixture={ctx,apply,input,draw};draw();window.fixtureReady=true;
+</script>

@@ -99,100 +99,28 @@ function initShareUi({ bindTouchFriendlyPress, closeAllFloatMenus, getTitleLaunc
     const yaw = Number.isFinite(pending.yaw) ? pending.yaw : null;
     const pitch = Number.isFinite(pending.pitch) ? pending.pitch : null;
     const hasSharedPosition = Number.isFinite(x) && Number.isFinite(z);
-    const preferredRoad = pending.refRoadId
-      ? (appCtx.roads || []).find((road) => roadIdentity(road) === pending.refRoadId) || null
-      : null;
-    const terrainYAt = (tx, tz) => typeof appCtx.terrainMeshHeightAt === 'function' ? appCtx.terrainMeshHeightAt(tx, tz) : appCtx.elevationWorldYAtWorldXZ(tx, tz);
-
-    const runtimeMode = {
-      driving: 'drive',
-      walking: 'walk',
-      drone: 'drone',
-      plane: 'plane'
-    }[pending.travelMode];
-    if (runtimeMode && !(runtimeMode === 'drone' && hasSharedPosition) && typeof appCtx.setTravelMode === 'function') {
-      const groundY = runtimeMode === 'plane' ? terrainYAt(x || 0, z || 0) : null;
-      appCtx.setTravelMode(runtimeMode, {
-        source: 'shared_state',
-        emitTutorial: false,
-        force: runtimeMode !== 'drone',
-        x: hasSharedPosition ? x : undefined,
-        y: Number.isFinite(y) ? y : undefined,
-        z: hasSharedPosition ? z : undefined,
-        yaw: Number.isFinite(yaw) ? yaw : undefined,
-        pitch: Number.isFinite(pitch) ? pitch : undefined,
-        airborne: runtimeMode === 'plane' && Number.isFinite(y) && y > groundY + 1.4
-      });
-    }
-
-    if (mode === 'plane') {
-      // Plane placement is applied atomically by setTravelMode above.
-    } else if (mode === 'drone') {
-      // A mode-only share has no authority over the arrival selected by the
-      // published world. Only restore a pose when the link actually contains a
-      // complete local position.
+    const runtimeMode = {driving:'drive', walking:'walk', boat:'boat', plane:'plane', drone:'drone'}[mode];
+    const hasTravelRequest = !!pending.travelMode || hasSharedPosition || Number.isFinite(yaw) || Number.isFinite(pitch);
+    let applied = !hasTravelRequest;
+    if (hasTravelRequest && runtimeMode === 'drone') {
       if (hasSharedPosition) {
-        appCtx.activateDroneAtWorldPose?.({
-          x, z, y: Number.isFinite(y) ? y : terrainYAt(x, z) + 45,
+        const terrainY = Number.isFinite(y) ? null : typeof appCtx.terrainMeshHeightAt === 'function'
+          ? appCtx.terrainMeshHeightAt(x, z) : appCtx.elevationWorldYAtWorldXZ(x, z);
+        applied = appCtx.activateDroneAtWorldPose?.({
+          x, z, y: Number.isFinite(y) ? y : terrainY + 45,
           yaw: Number.isFinite(yaw) ? yaw : undefined,
           pitch: Number.isFinite(pitch) ? pitch : undefined
-        }, { source: 'shared_state', emitTutorial: false });
-      }
-    } else if (mode === 'walking' && appCtx.Walk?.state?.walker) {
-      const walker = appCtx.Walk.state.walker;
-      if (hasSharedPosition && typeof appCtx.resolveSafeWorldSpawn === 'function' && typeof appCtx.applyResolvedWorldSpawn === 'function') {
-        const restored = appCtx.resolveSafeWorldSpawn(x, z, {
-          mode: 'walk',
-          angle: Number.isFinite(yaw) ? yaw : walker.angle,
-          feetY: Number.isFinite(y) ? y - 1.7 : undefined,
-          preserveElevatedSurface: Number.isFinite(y),
-          preferredRoad,
-          source: 'shared_walk_pose',
-          restorePose: true
-        });
-        appCtx.applyResolvedWorldSpawn(restored, { mode: 'walk', syncCar: true, syncWalker: true });
-      }
-      if (Number.isFinite(yaw)) {
-        walker.yaw = yaw;
-        walker.angle = yaw;
-      }
-      if (hasSharedPosition && appCtx.Walk.state.characterMesh) {
-        appCtx.Walk.state.characterMesh.position.set(walker.x, walker.y - 1.7, walker.z);
-        appCtx.Walk.state.characterMesh.rotation.y = Number.isFinite(yaw) ? yaw : appCtx.Walk.state.characterMesh.rotation.y;
-      }
-    } else if (mode === 'boat') {
-      if (Number.isFinite(x)) appCtx.boat.x = x;
-      if (Number.isFinite(z)) appCtx.boat.z = z;
-      if (Number.isFinite(y)) appCtx.boat.y = y;
-      if (Number.isFinite(yaw)) appCtx.boat.angle = yaw;
-      if (typeof appCtx.startBoatMode === 'function') {
-        appCtx.startBoatMode({
-          source: 'shared_state',
-          spawnX: Number.isFinite(x) ? x : undefined,
-          spawnZ: Number.isFinite(z) ? z : undefined,
-          yaw: Number.isFinite(yaw) ? yaw : undefined
-        });
-      }
-    } else {
-      if (hasSharedPosition && typeof appCtx.resolveSafeWorldSpawn === 'function' && typeof appCtx.applyResolvedWorldSpawn === 'function') {
-        const restored = appCtx.resolveSafeWorldSpawn(x, z, {
-          mode: 'drive',
-          angle: Number.isFinite(yaw) ? yaw : appCtx.car.angle,
-          feetY: Number.isFinite(y) ? y - 1.2 : undefined,
-          preferRoad: true,
-          preferredRoad,
-          source: 'shared_drive_pose'
-        });
-        appCtx.applyResolvedWorldSpawn(restored, { mode: 'drive', syncCar: true, syncWalker: true });
-      }
-      if (Number.isFinite(yaw)) appCtx.car.angle = yaw;
-      if (hasSharedPosition && appCtx.carMesh) {
-        appCtx.carMesh.position.set(appCtx.car.x, appCtx.car.y, appCtx.car.z);
-        appCtx.carMesh.rotation.y = appCtx.car.angle;
-      }
+        }, {source:'shared_state', emitTutorial:false}) === true;
+      } else applied = appCtx.setTravelMode?.('drone', {source:'shared_state', emitTutorial:false}) === 'drone';
+    } else if (hasTravelRequest && runtimeMode) {
+      applied = appCtx.restoreSurfaceTravelPose?.(runtimeMode, {
+        x: hasSharedPosition ? x : undefined, z: hasSharedPosition ? z : undefined,
+        y: Number.isFinite(y) ? y : undefined,
+        yaw: Number.isFinite(yaw) ? yaw : undefined, pitch: Number.isFinite(pitch) ? pitch : undefined
+      }, {source:'shared_state', emitTutorial:false, roadId:pending.refRoadId}) === true;
     }
 
-    if (Number.isFinite(pending.camMode)) appCtx.setCameraMode(pending.camMode);
+    if (applied && Number.isFinite(pending.camMode)) appCtx.setCameraMode(pending.camMode);
     if (typeof appCtx.updateControlsModeUI === 'function') appCtx.updateControlsModeUI();
     if (typeof appCtx.updateCamera === 'function') appCtx.updateCamera();
     appCtx.pendingExperienceState = null;
