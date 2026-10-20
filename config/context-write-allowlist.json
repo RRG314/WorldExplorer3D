@@ -1665,6 +1665,7 @@
       "startMaritimeRuntime"
     ],
     "app/js/travel-mode.js": [
+      "restoreEarthTravelSession",
       "travelToWorldPoint",
       "activateSurfaceActivity",
       "restoreSurfaceTravelPose",

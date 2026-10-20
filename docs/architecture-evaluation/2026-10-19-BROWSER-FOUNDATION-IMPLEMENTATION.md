@@ -328,9 +328,64 @@ performance, live-service or release acceptance. Existing post-commit exceptions
 retain their semantics. Continue with Earth-session restoration before the
 remaining recovery and domain-specific world/interior initialization commands.
 
+## October 20 follow-up: Earth-session transport restoration
+
+Starting from `533a7c2b`, Earth resume/reload now submits a saved transport command
+to the travel owner instead of publishing a ground pose first and forcing a
+mode afterward. All five supported surface modes report admission. Failed
+preparation cannot stamp/render a successful resume. The session coordinator
+captures the world generation before pose staging and rejects replacement before
+finalization; a superseded invocation cannot dismiss a newer loading cover.
+
+Ground snapshots now retain height and accepted road identity. Vessel snapshots
+read the helm's heading and preserve hull/entity/condition; aircraft snapshots
+also retain vehicle identity/condition alongside flight settings. Old ground
+snapshots without height retain safe-arrival compatibility. Ground returns use
+the existing spawn owner with safe-candidate and verified-roof admission. The
+redundant Moon-return car velocity writes were removed; accepted ground/vehicle
+owners reset their own dynamics. The existing drone command remains in use.
+
+Actual browser restoration exposed a genuine maritime reference gap: ordinary
+boat preparation correctly refuses an airborne boarding reference, but that
+reference belongs to the retiring controller during a saved-vessel Earth return.
+The boat entry owner now accepts a separate, checked Earth-session arrival. It
+requires the current published/usable world, matching origin, pending resume and
+current environment-session lease. It still runs hull/depth and obstacle
+admission; ordinary airborne boarding is unchanged. Qualified ocean domains keep
+their existing bounded water authority. No unrestricted setter, new state store
+or competing scheduler was added.
+
+Evidence: ignored `output/research/earth-return-command-2026-10-20/`.
+
+- Eleven baseline behavioral failures are retained in `before.tap`.
+  `first-after.tap` retains the older reload test's mock-boundary mismatch; its
+  successful-retry fixture now mocks the session command it is testing around.
+- Ninety-two distinct focused checks passed (`focused.tap`), covering Earth
+  command/return/session behavior, existing drone/shared/map commands, and the
+  affected ocean entry and maritime admission rules. Counts from earlier
+  overlapping runs are not added.
+- Seven controlled browser cases passed (`browser/receipt.json`): bridge and
+  roof walking returns with actual input/physics, aircraft identity/settings,
+  saved vessel entry and throttle, drone clearance, refused preparation without
+  ground mutation/success stamp, and replacement during staging. No forced world
+  reload occurred. All four screenshots were inspected; no page/console errors.
+- `browser-before-vessel-reference` retains the failing real-owner reproduction,
+  after its first three cases passed. This was not dismissed as a fixture issue.
+- Syntax, context ownership and diff checks passed. Source/verification hashes
+  are in `verification-summary.json`. Owned browser/server cleanup completed;
+  ordinary Chrome was preserved.
+
+The departure world and actor-asset callbacks are controlled in this browser
+fixture; this is not a complete Moon/Ocean journey, full-world gameplay,
+performance, live-service or release acceptance. Rejected restoration uses the
+existing caller error/retry path; general rollback after controller commitment
+is not claimed. Remaining recovery buttons and caller-driven spawns still need
+migration. Dedicated planetary initialization and contained-interior placement
+must retain their frame owners.
+
 ## Remaining architectural work
 
-Reader consolidation, explicit drone commands and shared-link surface restoration do not remove all direct actor writers. World/planetary initialization and other world/interior returns still need bounded migrations into the existing transport/session owners, retaining their domain-specific admission rules. Do not replace aircraft, maritime and walking entry rules with an unrestricted generic position setter.
+Reader consolidation, activity/shared/map commands and Earth-session restoration do not remove all direct actor writers. World/planetary initialization and other world/interior returns still need bounded migrations into the existing transport/session owners, retaining their domain-specific admission rules. Do not replace aircraft, maritime and walking entry rules with an unrestricted generic position setter.
 
 Regional scenery, detailed roads, structures, entrances and POIs still have distinct publication lifetimes. The next world-residency package must bind their identities and retirement explicitly, prove bridge/tunnel and landing continuity across neighboring cells, preserve edits and the location-based option, and measure retention on a repeat route. The road release repair here is a prerequisite, not completion of that package.
 

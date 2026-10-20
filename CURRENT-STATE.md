@@ -77,3 +77,15 @@ fallbacks, source/history, player data, ordinary Chrome and unrelated emulators.
 At most four saved candidates. Never print raw cloud configuration or credentials.
 Detailed current execution/deployment records belong under ignored
 `output/release-review` and `output/release-evidence`, not in public release notes.
+
+## Local architecture work (October 20, 2026)
+
+The browser command-ownership cleanup continues locally on `steven/visual-quality`.
+Activity starts, map travel and Earth-session restoration now use existing
+transport/session owners; current details and bounded evidence are in
+`docs/architecture-evaluation/2026-10-19-BROWSER-FOUNDATION-IMPLEMENTATION.md`.
+The owner has authorized continuing across local checkpoints without asking
+for confirmation. This does not authorize pushing, deployment, release-branch
+changes, broad historical acceptance sweeps or starting the Godot port.
+Production remains released 5.6.1 at source
+`233a5a7f813fef97da3d75a76eb87996321fda2f`.

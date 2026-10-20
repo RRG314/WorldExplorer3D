@@ -388,7 +388,7 @@ const { suspendBoatModeForOceanTransfer, transferBoatToSubmarine, transferSubmar
 
 function prepareBoatMode(options = {}) {
   if (appCtx.oceanMode?.active || appCtx.onMoon || appCtx.travelingToMoon) return false;
-  const baseRef = resolveBoatEntryReference(getReferencePosition(),options,appCtx.LOC);
+  const baseRef = resolveBoatEntryReference(getReferencePosition(),options,appCtx.LOC,appCtx);
   if (!baseRef) return false;
   if (baseRef.structureTerrainMode === 'subgrade') return false;
   const ref = {

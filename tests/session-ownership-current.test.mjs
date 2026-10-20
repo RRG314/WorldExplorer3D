@@ -42,7 +42,7 @@ test('failed Earth reload cannot restore, render or stamp a location; a later va
   initialEarthWorldReady:false,worldLoadRuntimeState:{status:'failed'},loadRoads:async()=>({state:'failed'}),
   earthSessionState:{pose:{mode:'walk',x:4,z:5}},car:{x:4,z:5},resolveSafeWorldSpawn:()=>({valid:true,x:4,z:5})};
  let poses=0,renders=0,stamps=0;
- Object.assign(replacements,{applyResolvedWorldSpawn:()=>poses++,prepareFirstWorldRender:()=>renders++,
+ Object.assign(replacements,{restoreEarthTravelSession:()=>{poses++;return true;},prepareFirstWorldRender:()=>renders++,
   markLocationSelectionLoaded:()=>stamps++,setTravelMode(){}});
  const savedKeys=new Set([...Object.keys(replacements),'_worldLoadSequence','worldPublication','worldLoading',
   'earthResumeDiagnostics','earthResumePending','earthResumeRenderReady']);

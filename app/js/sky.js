@@ -411,12 +411,6 @@ async function arriveAtEarth(expectedSessionId = null) {
   // expose the Earth-only actions without a second DOM writer.
   appCtx.syncTravelModeButtons?.();
 
-  if (appCtx.car) {
-    appCtx.car.vx = 0;
-    appCtx.car.vz = 0;
-    appCtx.car.vy = 0;
-  }
-
   try {
     await resumeEarthWorldSession({
       switchEnv: false,

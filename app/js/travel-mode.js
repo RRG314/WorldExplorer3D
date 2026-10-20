@@ -515,7 +515,7 @@ function requestSurfaceTravelPose(mode, pose = {}, options = {}, admission = {})
   if (hasPosition && usesContainedInteriorPhysics(appCtx.activeInterior)) return false;
   if ((mode === 'walk' && !appCtx.Walk?.state?.walker) || (mode === 'drive' && !appCtx.car)) return false;
   const modeOptions = {source: options.source || 'shared_state', emitTutorial: options.emitTutorial !== false};
-  if (mode === 'boat') modeOptions.yaw = requested.yaw;
+  if (mode === 'boat') Object.assign(modeOptions,admission.boatOptions,{yaw:requested.yaw});
   if (mode === 'boat' && (hasPosition || (appCtx.boatMode?.active && requested.yaw !== undefined))) {
     if (appCtx.boatDeck?.active || appCtx.boatSwimming?.active) return false;
     if (appCtx.boatMode?.active) return appCtx.enterBoatAtWorldPoint?.(requested.x ?? appCtx.boat?.x, requested.z ?? appCtx.boat?.z,
@@ -550,6 +550,49 @@ function activateSurfaceActivity(mode, start, options = {}) {
       requireVerifiedElevatedSurface: true, requireSafeCandidate: true, maxGroundRadius: Math.min(maxDistance,48),
       maxRoadDistance: maxDistance, fastLocalFallback: true}
   });
+}
+
+// Only the Earth session coordinator may request saved controller restoration.
+// It has already restored the Earth frame and actor assets; transport admission
+// still stages before controller retirement and never grants a forced exit.
+function restoreEarthTravelSession(saved) {
+  if (!appCtx.earthResumePending || appCtx.getEnv?.() !== appCtx.ENV.EARTH || !saved ||
+      !['walk','drive','boat','plane','drone'].includes(saved.mode) ||
+      ![saved.x,saved.z].every(Number.isFinite)) return false;
+  const options = {source:'earth_resume',emitTutorial:false};
+  const pose = {x:saved.x,z:saved.z,yaw:saved.angle};
+  if (saved.mode === 'drone') return activateDroneAtWorldPose({...pose,
+    y:saved.droneY,pitch:saved.dronePitch,roll:saved.droneRoll},options);
+  if (saved.mode === 'plane') {
+    const planeOptions = {allowDuringEarthResume:true,transportEntityId:saved.planeEntityId,
+      transportCatalogId:saved.planeCatalogId,airborne:saved.planeAirborne === true};
+    for (const [field,key] of [['speed','planeSpeed'],['throttle','planeThrottle'],['roll','planeRoll'],['condition','planeCondition']]) {
+      if (saved[key] === undefined) continue;
+      if (!Number.isFinite(saved[key])) return false;
+      planeOptions[field] = saved[key];
+    }
+    return requestSurfaceTravelPose('plane',{...pose,y:saved.planeY,pitch:saved.planePitch},options,{planeOptions});
+  }
+  if (saved.mode === 'boat') {
+    if (saved.boatCondition !== undefined && !Number.isFinite(saved.boatCondition)) return false;
+    // Reuse the qualified domain's existing bounded water authority only. A
+    // saved maritime mode is not permission to invent a lake on ordinary land.
+    const session = captureEnvironmentSession();
+    const domain = appCtx.worldLoadRuntimeState?.surfaceDomain;
+    let candidate;
+    try { candidate = appCtx.inspectBoatCandidate?.(saved.x,saved.z,undefined,{
+      allowSynthetic:domain?.kind === 'ocean',waterKind:domain?.subtype || 'open_ocean'
+    }); } catch { return false; }
+    if (!candidate || !session.isCurrent() || domain?.kind === 'cryosphere') return false;
+    if (appCtx.boatMode?.active && saved.boatCatalogId && saved.boatCatalogId !== appCtx.boatMode.transportCatalogId) return false;
+    return requestSurfaceTravelPose('boat',pose,options,{boatCandidate:candidate,entryMode:'walk',boatOptions:{
+      transportEntityId:saved.boatEntityId,transportCatalogId:saved.boatCatalogId,condition:saved.boatCondition,
+      earthSessionArrival:{session,publication:appCtx.worldPublication,lat:appCtx.LOC.lat,lon:appCtx.LOC.lon}
+    }});
+  }
+  return requestSurfaceTravelPose(saved.mode,{...pose,y:saved.y},{...options,roadId:saved.roadId},{spawnOptions:{
+    source:'earth_resume',requireSafeCandidate:true,allowBuildingRoof:saved.mode === 'walk',requireVerifiedElevatedSurface:true
+  }});
 }
 
 // A geographic map command belongs to the currently controlled transport.
@@ -641,6 +684,7 @@ function toggleBoatMode(options = {}) {
 }
 
 Object.assign(appCtx, {
+  restoreEarthTravelSession,
   travelToWorldPoint,
   activateSurfaceActivity,
   activateDroneAtWorldPose,
@@ -657,6 +701,7 @@ Object.assign(appCtx, {
 });
 
 export {
+  restoreEarthTravelSession,
   travelToWorldPoint,
   activateSurfaceActivity,
   activateDroneAtWorldPose,
