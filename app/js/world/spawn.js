@@ -690,43 +690,33 @@ function applyCustomLocationSpawn(mode = "walk", options = {}) {
   }, mode, options);
 }
 
-function spawnOnRoad(options = {}) {
-  const opts = options && typeof options === "object" ? options : {};
-
+// Resolve without publishing so recovery can admit the target before releasing
+// the currently controlled actor. Initial world publication retains its wrapper.
+function resolveRoadSpawn(options = {}) {
+  const opts = options && typeof options === 'object' ? options : {};
+  const mode = opts.mode === 'walk' ? 'walk' : 'drive';
+  const angle = Number.isFinite(opts.angle) ? opts.angle : appCtx.car?.angle;
   if (!appCtx.roads || appCtx.roads.length === 0) {
-    return applySpawnTarget(0, 0, {
-      mode: "drive",
-      source: "no_roads_fallback"
-    });
+    return resolveSafeWorldSpawn(0,0,{mode,angle,source:opts.source || 'no_roads_fallback',requireSafeCandidate:opts.requireSafeCandidate});
   }
-
   if (opts.random === true) {
-    const randomRoad = appCtx.roads[Math.floor(Math.random() * appCtx.roads.length)];
-    if (randomRoad?.pts?.length) {
-      const point = randomRoad.pts[Math.floor(Math.random() * randomRoad.pts.length)];
-      const randomSpawn = searchNearestSafeRoadSpawn(point.x, point.z, {
-        mode: "drive",
-        angle: appCtx.car?.angle,
-        maxDistance: 180
-      });
-      if (randomSpawn) return applyResolvedWorldSpawn(randomSpawn, { mode: "drive" });
+    const road = appCtx.roads[Math.floor(Math.random()*appCtx.roads.length)];
+    if (road?.pts?.length) {
+      const point = road.pts[Math.floor(Math.random()*road.pts.length)];
+      const randomSpawn = searchNearestSafeRoadSpawn(point.x,point.z,{mode,angle,maxDistance:180});
+      if (randomSpawn) return randomSpawn;
     }
   }
-
-  const originX = finiteNumberOr(opts.x, 0);
-  const originZ = finiteNumberOr(opts.z, 0);
-  const bestRoadSpawn = searchNearestSafeRoadSpawn(originX, originZ, {
-    mode: "drive",
-    angle: appCtx.car?.angle,
-    maxDistance: 320
-  });
-  if (bestRoadSpawn) return applyResolvedWorldSpawn(bestRoadSpawn, { mode: "drive" });
-
-  return applySpawnTarget(originX, originZ, {
-    mode: "drive",
-    source: "spawn_on_road_fallback"
-  });
+  const x = finiteNumberOr(opts.x,0), z = finiteNumberOr(opts.z,0);
+  const roadSpawn = searchNearestSafeRoadSpawn(x,z,{mode,angle,maxDistance:320});
+  if (roadSpawn) return roadSpawn;
+  return resolveSafeWorldSpawn(x,z,{mode,angle,source:opts.source || 'spawn_on_road_fallback',requireSafeCandidate:opts.requireSafeCandidate});
 }
+
+function spawnOnRoad(options = {}) {
+  return applyResolvedWorldSpawn(resolveRoadSpawn({...options,mode:'drive'}),{mode:'drive'});
+}
+
 export {
   applyCustomLocationSpawn,
   applyResolvedWorldSpawn,
@@ -734,6 +724,7 @@ export {
   initWorldSpawning,
   resolveSafeWorldSpawn,
   spawnOnRoad,
+  resolveRoadSpawn,
   terrainYAtWorld,
   tryAutoEnterBoatAt
 };

@@ -153,7 +153,7 @@ function pointInPolygon(x, z, polygon) {
   return inside;
 }
 
-function reprojectActorOutsideLandmarks(meshes) {
+export function reprojectActorOutsideLandmarks(meshes) {
   const mode = appCtx.getCurrentTravelMode?.() || (appCtx.Walk?.state?.mode === 'walk' ? 'walk' : 'drive');
   if (mode !== 'walk' && mode !== 'drive') return false;
   const actor = mode === 'walk' ? appCtx.Walk?.state?.walker : appCtx.car;
@@ -164,13 +164,8 @@ function reprojectActorOutsideLandmarks(meshes) {
     const footprint = mesh?.userData?.footprint;
     return Array.isArray(footprint) && footprint.length >= 3 && pointInPolygon(x, z, footprint);
   });
-  if (!enclosed || typeof appCtx.applySpawnTarget !== 'function') return false;
-  appCtx.applySpawnTarget(x, z, {
-    mode,
-    preferRoad: mode === 'drive',
-    source: 'publication_landmark_clearance'
-  });
-  return true;
+  if (!enclosed) return false;
+  return !!appCtx.travelToWorldPoint?.(x,z,{source:'publication_landmark_clearance'});
 }
 
 function createWallMesh(way, nodes, material, registerBuildingCollision) {

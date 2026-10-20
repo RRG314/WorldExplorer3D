@@ -22,6 +22,7 @@ import {
   applyResolvedWorldSpawn,
   applySpawnTarget,
   initWorldSpawning,
+  resolveRoadSpawn,
   resolveSafeWorldSpawn,
   spawnOnRoad,
   terrainYAtWorld
@@ -460,6 +461,7 @@ Object.assign(appCtx, {
   refreshTransportStructureAssembliesForPublishedTerrain,
   refreshAuthoritativeMapData,
   releaseEarthWorldForTitle,
+  resolveRoadSpawn,
   resolveSafeWorldSpawn,
   sampleFeatureSurfaceY,
   syncLinearFeatureOverlayVisibility,
@@ -494,6 +496,7 @@ export {
   refreshStructureAwareFeatureProfilesCooperatively,
   refreshTransportStructureAssembliesForPublishedTerrain,
   refreshAuthoritativeMapData,
+  resolveRoadSpawn,
   resolveSafeWorldSpawn,
   sampleFeatureSurfaceY,
   syncLinearFeatureOverlayVisibility,

@@ -1665,6 +1665,7 @@
       "startMaritimeRuntime"
     ],
     "app/js/travel-mode.js": [
+      "recoverSurfaceTravel",
       "restoreEarthTravelSession",
       "travelToWorldPoint",
       "activateSurfaceActivity",
@@ -1860,6 +1861,7 @@
       "updateWeatherUi"
     ],
     "app/js/world.js": [
+      "resolveRoadSpawn",
       "applyCustomLocationSpawn",
       "applyResolvedWorldSpawn",
       "applySpawnTarget",

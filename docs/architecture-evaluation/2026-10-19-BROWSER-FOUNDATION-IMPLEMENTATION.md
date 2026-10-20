@@ -383,6 +383,49 @@ is not claimed. Remaining recovery buttons and caller-driven spawns still need
 migration. Dedicated planetary initialization and contained-interior placement
 must retain their frame owners.
 
+## October 20 follow-up: explicit ground recovery and landmark clearance
+
+Starting from `1e5090f5`, Safe Ground, Random Respawn and the custody fallback
+submit `recoverSurfaceTravel` to the travel owner. Button bindings only send
+intent. The previous safe-ground handler cleared interiors and forced a mode
+before it had a spawn; random/custody paths could move inactive ground actors.
+`resolveRoadSpawn` now resolves a candidate without publishing. The existing
+world-publication `spawnOnRoad` wrapper retains its driving arrival behavior.
+
+Recovery stages safe candidates inside the existing transition/session capture,
+retains walking/driving ownership, and publishes accepted position, road contact,
+heading and meshes after flight retirement. Refused, malformed, throwing or
+obsolete preparation cannot retire controls. Offshore exit rules and isolated
+interior/planetary/dedicated frames remain enforced. Ordinary mapped-interior
+cleanup happens only after staging succeeds. Landmark publication clearance
+also submits to the active travel owner and reports actual applied/refused status
+rather than unconditionally counting a low-level spawn as success.
+
+Evidence: ignored `output/research/ground-recovery-command-2026-10-20/`.
+
+- Fifty-nine distinct focused checks passed (`focused.tap`): command/button
+  behavior, actual resolver/wrapper compatibility, landmark clearance, affected
+  interior/location/shared/Earth and landmark-lifetime cases. The earlier 55-case
+  run overlaps this set; it is not added to the total. No pre-change browser
+  reproduction was performed; the old caller behavior is source inspection.
+- Six controlled browser cases passed (`browser/receipt.json`), using actual
+  button bindings, travel/spawn owners, complete walking/aircraft/vessel
+  controllers, prescribed input and HUD. Drone/aircraft recovery retained bridge
+  support, driving retained contact, both buttons refused an offshore vessel
+  exit, and refused/replaced staging preserved the live aircraft and parked
+  actors. All three screenshots were inspected; no page or console errors.
+- Syntax, ownership and diff checks passed; fingerprints are in
+  `verification-summary.json`. Owned browser/server cleanup completed. No ordinary
+  Chrome, assets, dist, saves, backend or release state were changed.
+
+This is controlled component integration, not a complete custody journey,
+full-world gameplay/performance or live-service/release acceptance. The separate
+Journal and room callers still perform redundant low-level road spawns after a
+world loader has already published its final arrival; those are the last external
+`spawnOnRoad` callers to remove. Initial world/planetary and contained-interior
+placement remain domain-owned code, not permission for arbitrary geographic
+setters.
+
 ## Remaining architectural work
 
 Reader consolidation, activity/shared/map commands and Earth-session restoration do not remove all direct actor writers. World/planetary initialization and other world/interior returns still need bounded migrations into the existing transport/session owners, retaining their domain-specific admission rules. Do not replace aircraft, maritime and walking entry rules with an unrestricted generic position setter.

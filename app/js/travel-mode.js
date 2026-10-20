@@ -330,7 +330,7 @@ function transitionTravelMode(mode, options = {}, dronePose = null, restoration 
       const pose = restoration.pose;
       const preferredRoad = restoration.roadId ? (appCtx.roads || []).find(road =>
         String(road.sourceFeatureId || road.transportRecord?.identity || road.id || '') === restoration.roadId) || null : null;
-      groundSpawn = appCtx.resolveSafeWorldSpawn(pose.x, pose.z, {
+      groundSpawn = restoration.resolveGroundSpawn ? restoration.resolveGroundSpawn() : appCtx.resolveSafeWorldSpawn(pose.x, pose.z, {
         mode: targetMode, angle: pose.yaw ?? modeReference?.angle ?? appCtx.car?.angle ?? 0,
         feetY: pose.y === undefined ? undefined : pose.y - (targetMode === 'walk' ? 1.7 : 1.2),
         preserveElevatedSurface: targetMode === 'walk' && pose.y !== undefined,
@@ -552,6 +552,21 @@ function activateSurfaceActivity(mode, start, options = {}) {
   });
 }
 
+// Explicit ground recovery prepares through the spawn owner before retiring
+// flight/interior controls. It carries no forced vessel-exit authority.
+function recoverSurfaceTravel(options = {}) {
+  if (!options || typeof options !== 'object' || ['x','z'].some(key => options[key] !== undefined && !Number.isFinite(options[key]))) return false;
+  const control = resolveControlState(appCtx);
+  if (control.frame !== 'surface' || isPlanetarySurfaceActive(appCtx) || appCtx.worldLoading ||
+      typeof appCtx.resolveRoadSpawn !== 'function') return false;
+  const mode = control.mode === 'drive' ? 'drive' : 'walk';
+  const reference = activeActorPose(appCtx);
+  const x = options.x ?? 0, z = options.z ?? 0;
+  return requestSurfaceTravelPose(mode,{x,z,yaw:reference.yaw},{source:options.source || 'safe_ground_recovery'},
+    {resolveGroundSpawn:()=>appCtx.resolveRoadSpawn({mode,x,z,angle:reference.yaw,
+      random:options.random === true,requireSafeCandidate:true,source:options.source || 'safe_ground_recovery'})});
+}
+
 // Only the Earth session coordinator may request saved controller restoration.
 // It has already restored the Earth frame and actor assets; transport admission
 // still stages before controller retirement and never grants a forced exit.
@@ -684,6 +699,7 @@ function toggleBoatMode(options = {}) {
 }
 
 Object.assign(appCtx, {
+  recoverSurfaceTravel,
   restoreEarthTravelSession,
   travelToWorldPoint,
   activateSurfaceActivity,
@@ -701,6 +717,7 @@ Object.assign(appCtx, {
 });
 
 export {
+  recoverSurfaceTravel,
   restoreEarthTravelSession,
   travelToWorldPoint,
   activateSurfaceActivity,
