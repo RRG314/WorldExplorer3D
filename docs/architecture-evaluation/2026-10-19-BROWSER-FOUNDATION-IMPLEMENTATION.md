@@ -278,9 +278,59 @@ live-service or release acceptance. Exceptions after controller commitment retai
 existing semantics. Continue with map travel through the active transport owner;
 world and interior returns require their own domain-specific review.
 
+## October 20 follow-up: map travel commands
+
+Starting from `dd769bbb`, both map context-menu paths now delegate geographic
+travel to `travelToWorldPoint` in the existing transport owner. Navigation no
+longer chooses from parked walking/driving state or directly writes the drone;
+its actor write permission and obsolete spawn injections were removed.
+
+The active controller determines admission. Ground arrivals resolve fresh safe
+support and preserve accepted bridge/contact/heading. Drones prepare destination
+roof clearance. Aircraft retain altitude, orientation, flight input settings and
+vehicle identity through their preparation owner, without relocating parked
+ground actors. Vessels retain actual hull/water/obstacle admission and refuse
+land destinations. Deck passengers and vessel swimmers cannot be moved through
+geographic helm commands. Contained interiors, loading/replaced worlds and
+dedicated environments refuse geographic requests. Ordinary mapped interiors
+leave through their cleanup owner before a ground arrival is published.
+
+Water preference uses actual mapped containment and destination support, rather
+than a departing roof height or a lake-bed terrain estimate. Qualified ocean
+surface domains retain their existing bounded synthetic-water authority;
+arbitrary caller flags cannot invent water on land. Cryosphere rules remain.
+This does not add worldwide transport streaming or another state/scheduler.
+
+Evidence: ignored `output/research/map-command-ownership-2026-10-20/`.
+
+- `before.tap`: eleven failures, two passes. The support-height example already
+  passed and is not claimed as a newly reproduced defect. `first-after.tap`
+  retains a fixture inconsistency: an allegedly active plane still had a walking
+  ground controller. The fixture now matches actual aircraft ownership.
+- Fifty-one distinct focused checks passed (`focused.tap`): map commands plus
+  affected shared/activity restoration, camera road and vehicle admission.
+- Eight controlled browser cases passed (`browser/receipt.json`), exercising
+  actual large-map/minimap DOM bindings with a controlled coordinate projection,
+  actual complete walking, aircraft, vessel and drone owners, physics, input
+  and HUD. Bridge height/contact, aircraft relocation, drone roof clearance and
+  movement, vessel start/relocation/throttle and refused land targets passed.
+  Four final screenshots were inspected; no page or console errors.
+- `browser-attempt-1` retains a test setup failure: the map stayed open and
+  correctly blocked movement input. The runner closes it before movement checks.
+  `browser-before-water-review` retains the earlier passing source receipt;
+  the final receipt includes the lake-bed/selected-support review.
+- Ownership guard passes with 219 writer files. Syntax/diff checks and source
+  fingerprints are in `verification-summary.json`. Owned browser and temporary
+  server cleanup completed; ordinary Chrome was preserved.
+
+This is controlled component integration, not cartography/full-world gameplay,
+performance, live-service or release acceptance. Existing post-commit exceptions
+retain their semantics. Continue with Earth-session restoration before the
+remaining recovery and domain-specific world/interior initialization commands.
+
 ## Remaining architectural work
 
-Reader consolidation, explicit drone commands and shared-link surface restoration do not remove all direct actor writers. Map teleportation, world/planetary initialization and other world/interior returns still need bounded migrations into the existing transport/session owners, retaining their domain-specific admission rules. Do not replace aircraft, maritime and walking entry rules with an unrestricted generic position setter.
+Reader consolidation, explicit drone commands and shared-link surface restoration do not remove all direct actor writers. World/planetary initialization and other world/interior returns still need bounded migrations into the existing transport/session owners, retaining their domain-specific admission rules. Do not replace aircraft, maritime and walking entry rules with an unrestricted generic position setter.
 
 Regional scenery, detailed roads, structures, entrances and POIs still have distinct publication lifetimes. The next world-residency package must bind their identities and retirement explicitly, prove bridge/tunnel and landing continuity across neighboring cells, preserve edits and the location-based option, and measure retention on a repeat route. The road release repair here is a prerequisite, not completion of that package.
 

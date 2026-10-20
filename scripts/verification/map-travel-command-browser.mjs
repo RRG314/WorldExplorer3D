@@ -1,0 +1,37 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs/promises';
+import {chromium} from 'playwright';
+import {startStaticServer} from './static-server.mjs';
+import {closeOwnedBrowser} from './owned-browser.mjs';
+import {runPrescribedGameActions} from './prescribed-game-actions.mjs';
+const output=process.env.WE3D_MAP_COMMAND_OUTPUT||'output/research/map-command-ownership-2026-10-20/browser';
+await fs.mkdir(output,{recursive:true});const server=await startStaticServer({rootDir:process.cwd(),ports:[4399]});
+let owned,page;const report={scope:'Actual large-map/minimap DOM command bindings with controlled coordinate projection; actual transport, spawn, complete walking, aircraft, vessel and drone physics, input and HUD. Not cartography, full-world or live-service acceptance.',passed:false,cases:[],errors:[]};
+const state=()=>page.evaluate(()=>JSON.parse(render_game_to_text()));
+const mapTo=async(x,z,canvas='largeMapCanvas')=>{
+ await page.evaluate(({x,z,canvas})=>{window.mapTarget={x,z};sharedFixture.ctx.showLargeMap=true;document.getElementById(canvas).style.display='block';},{x,z,canvas});
+ await page.locator(`#${canvas}`).click({button:'right',position:{x:70,y:70}});
+ return page.evaluate(canvas=>{document.getElementById(canvas).style.display='none';sharedFixture.ctx.closeLargeMap();sharedFixture.draw();return window.lastArrival;},canvas);
+};
+try{
+ owned=await chromium.launchServer({channel:'chrome',headless:true});const browser=await chromium.connect(owned.wsEndpoint());page=await browser.newPage({viewport:{width:1000,height:700}});
+ page.on('pageerror',e=>report.errors.push(e.message));page.on('console',m=>{if(m.type()==='error')report.errors.push(m.text());});
+ await page.goto(`http://127.0.0.1:${server.port}/tests/fixtures/shared-travel-command.html`);await page.waitForFunction(()=>window.fixtureReady||window.fixtureError,null,{timeout:25000});assert.equal(await page.evaluate(()=>window.fixtureError??null),null);
+ await page.evaluate(async()=>{
+  const nav=await import('/app/js/world/navigation.js');const {initMapInteractions}=await import('/app/js/ui/map-interactions.js');const {updateDrone}=await import('/app/js/physics/drone-flight.js');
+  const ctx=sharedFixture.ctx;for(const id of ['largeMapCanvas','minimap']){const c=document.createElement('canvas');c.id=id;c.width=c.height=150;c.style.cssText='position:fixed;right:20px;top:20px;width:150px;height:150px;background:#e7edda;z-index:30;display:none';document.body.append(c);}
+  ctx.largeMapScreenToWorld=ctx.minimapScreenToWorld=()=>window.mapTarget;
+  ctx.teleportToLocation=(...args)=>window.lastArrival=nav.teleportToLocation(...args);initMapInteractions();
+  ctx.drone.speed=35;const advance=window.advanceTime;window.advanceTime=ms=>{if(ctx.droneMode){for(let left=ms/1000;left>1e-8;left-=1/60)updateDrone(Math.min(left,1/60));sharedFixture.draw();}else advance(ms);};
+  const roof={minX:-40,maxX:0,minZ:60,maxZ:100,baseY:0,height:90};ctx.buildings=[roof];const mesh=new THREE.Mesh(new THREE.BoxGeometry(40,90,40),new THREE.MeshStandardMaterial({color:0x9c8a77}));mesh.position.set(-20,45,80);ctx.scene.add(mesh);
+ });
+ assert.equal((await mapTo(10,0)).mode,'walk');let s=await state();assert.equal(s.actor.position.y,23.7);const start=s.actor.position.x;await page.locator('body > canvas').first().click({position:{x:850,y:600}});await runPrescribedGameActions(page,output,[{buttons:['up'],frames:12},{buttons:[],frames:2}],'body > canvas:first-of-type');s=await state();assert.ok(Math.hypot(s.actor.position.x-start,s.actor.position.z)>0);assert.equal(s.actor.position.y,23.7);report.cases.push('large-map bridge walking keeps support through prescribed input');await page.screenshot({path:`${output}/map-bridge.png`});
+ await page.evaluate(()=>sharedFixture.ctx.setTravelMode('drive',{emitTutorial:false}));assert.equal((await mapTo(20,0,'minimap')).mode,'drive');s=await state();assert.equal(s.car.y,23.2);assert.equal(s.car.roadId,'fixture:bridge');report.cases.push('minimap driving publishes accepted bridge contact');
+ await page.locator('#plane').click();const parked=await page.evaluate(()=>({car:JSON.stringify(sharedFixture.ctx.car),walker:JSON.stringify(sharedFixture.ctx.Walk.state.walker)}));assert.equal((await mapTo(80,-100)).mode,'plane');s=await state();assert.deepEqual(s.actor.position,{x:80,y:80,z:-100});assert.deepEqual(await page.evaluate(()=>({car:JSON.stringify(sharedFixture.ctx.car),walker:JSON.stringify(sharedFixture.ctx.Walk.state.walker)})),parked);await page.evaluate(()=>advanceTime(180));s=await state();assert.ok(s.actor.position.y>70);assert.equal(s.control.camera,'plane');report.cases.push('map relocation moves the actual aircraft and leaves parked ground actors intact');await page.screenshot({path:`${output}/map-plane.png`});
+ assert.equal(await page.evaluate(()=>sharedFixture.ctx.activateDroneAtWorldPose({x:0,y:40,z:0,yaw:0,pitch:-.3})),true);const beforeDrone=await page.evaluate(()=>JSON.stringify(sharedFixture.ctx.car));assert.equal((await mapTo(-20,80,'minimap')).mode,'drone');s=await state();assert.equal(s.actor.position.y,98);const z=s.actor.position.z;await page.locator('body > canvas').first().click({position:{x:850,y:600}});await runPrescribedGameActions(page,output,[{buttons:['up'],frames:12},{buttons:[],frames:2}],'body > canvas:first-of-type');s=await state();assert.notEqual(s.actor.position.z,z);assert.equal(await page.evaluate(()=>JSON.stringify(sharedFixture.ctx.car)),beforeDrone);report.cases.push('minimap drone relocation clears the target roof and retains real drone movement');await page.screenshot({path:`${output}/map-drone.png`});
+ assert.equal(await page.evaluate(()=>sharedFixture.ctx.restoreSurfaceTravelPose('walk',{x:10,z:0})),true);assert.equal((await mapTo(500,0,'minimap')).mode,'boat');s=await state();assert.equal(s.actor.position.x,500);assert.ok(Math.abs(s.actor.position.y)<2);report.cases.push('map water preference starts the actual vessel through its owner');assert.equal((await mapTo(530,20)).mode,'boat');s=await state();assert.equal(s.actor.position.x,530);assert.equal(s.actor.position.z,20);report.cases.push('active vessel map relocation retains water contact');
+ const boatStart=s.actor.position;await page.locator('body > canvas').first().click({position:{x:850,y:600}});await runPrescribedGameActions(page,output,[{buttons:['up'],frames:18},{buttons:[],frames:2}],'body > canvas:first-of-type');s=await state();assert.ok(Math.hypot(s.actor.position.x-boatStart.x,s.actor.position.z-boatStart.z)>0);report.cases.push('relocated vessel responds to actual throttle');await page.screenshot({path:`${output}/map-vessel.png`});const boat=s.actor.position,car=s.car;assert.equal(await mapTo(0,80),null);s=await state();assert.deepEqual(s.actor.position,boat);assert.deepEqual(s.car,car);report.cases.push('land map target cannot move an offshore vessel or its ground proxy');
+ assert.deepEqual(report.errors,[]);report.final=await state();await page.evaluate(()=>{sharedFixture.input.dispose();sharedFixture.ctx.Walk.disposeWater();});report.passed=true;
+}catch(error){report.failure=error.stack;report.state=await state().catch(()=>null);await page?.screenshot({path:`${output}/failure.png`}).catch(()=>{});throw error;}
+finally{try{if(owned)await closeOwnedBrowser(owned);}finally{await server.close();await fs.writeFile(`${output}/receipt.json`,JSON.stringify(report,null,2));}}
+console.log(JSON.stringify({passed:report.passed,cases:report.cases,errors:report.errors}));

@@ -1665,6 +1665,7 @@
       "startMaritimeRuntime"
     ],
     "app/js/travel-mode.js": [
+      "travelToWorldPoint",
       "activateSurfaceActivity",
       "restoreSurfaceTravelPose",
       "activateDroneAtWorldPose",
@@ -2090,9 +2091,6 @@
     "app/js/world/load-support.js": [
       "streetPavementError",
       "urbanSurfaceStats"
-    ],
-    "app/js/world/navigation.js": [
-      "drone"
     ],
     "app/js/world/release-location-models.js": [
       "*",

@@ -1,4 +1,5 @@
 import {resolveControlState} from './transport/control-state.js';
+import {activeActorPose} from './transport/actor-contract.js?v=6';
 import { ctx as appCtx } from "./shared-context.js?v=55";
 import { nextPrimaryTravelMode } from "./controls/traversal-control-policy.js?v=8";
 import { planetarySurfaceYAtRenderXZ } from './planetary/runtime/surface-query.js?v=3';
@@ -518,15 +519,15 @@ function requestSurfaceTravelPose(mode, pose = {}, options = {}, admission = {})
   if (mode === 'boat' && (hasPosition || (appCtx.boatMode?.active && requested.yaw !== undefined))) {
     if (appCtx.boatDeck?.active || appCtx.boatSwimming?.active) return false;
     if (appCtx.boatMode?.active) return appCtx.enterBoatAtWorldPoint?.(requested.x ?? appCtx.boat?.x, requested.z ?? appCtx.boat?.z,
-      {...modeOptions, yaw: requested.yaw}) === true;
+      {...modeOptions, yaw: requested.yaw, candidate: admission.boatCandidate}) === true;
     const session = captureEnvironmentSession();
     let candidate;
-    try { candidate = appCtx.inspectBoatCandidate?.(requested.x, requested.z); }
+    try { candidate = admission.boatCandidate || appCtx.inspectBoatCandidate?.(requested.x, requested.z); }
     catch { return false; }
     if (!candidate || !session.isCurrent()) return false;
-    Object.assign(modeOptions, {spawnX: requested.x, spawnZ: requested.z, yaw: requested.yaw, candidate});
+    Object.assign(modeOptions, {spawnX: requested.x, spawnZ: requested.z, yaw: requested.yaw, candidate, entryMode: admission.entryMode});
   }
-  if (mode === 'plane') Object.assign(modeOptions, requested);
+  if (mode === 'plane') Object.assign(modeOptions, admission.planeOptions, requested);
   return transitionTravelMode(mode, modeOptions, null, {pose: requested, roadId: options.roadId, ...admission}).applied;
 }
 
@@ -549,6 +550,64 @@ function activateSurfaceActivity(mode, start, options = {}) {
       requireVerifiedElevatedSurface: true, requireSafeCandidate: true, maxGroundRadius: Math.min(maxDistance,48),
       maxRoadDistance: maxDistance, fastLocalFallback: true}
   });
+}
+
+// A geographic map command belongs to the currently controlled transport.
+// Only this owner selects domain-specific preparation and publication.
+function travelToWorldPoint(x, z, options = {}) {
+  const control = resolveControlState(appCtx);
+  if (![x,z].every(Number.isFinite) || appCtx.worldLoading || control.frame !== 'surface' ||
+      isPlanetarySurfaceActive(appCtx) || usesContainedInteriorPhysics(appCtx.activeInterior) ||
+      appCtx.boatDeck?.active || appCtx.boatSwimming?.active) return null;
+  const session = captureEnvironmentSession();
+  const reference = activeActorPose(appCtx);
+  if (reference.mode === 'unavailable') return null;
+  const source = options.source || 'map_travel';
+  const pose = {x, z, yaw: reference.yaw};
+  let mode = control.mode;
+  let candidate = null;
+  try {
+    if (mode === 'boat' || ((mode === 'walk' || mode === 'drive') && options.preferBoatIfWater === true)) {
+      const domain = appCtx.worldLoadRuntimeState?.surfaceDomain;
+      if (domain?.kind !== 'cryosphere') {
+        // A bridge's occupied surface is above the water underneath it. Use
+        // destination support, never the departing actor's height, for reachability.
+        const surface = mode === 'walk' ? appCtx.SurfaceQuery?.walkAt?.(x,z) :
+          mode === 'drive' ? appCtx.SurfaceQuery?.driveAt?.(x,z) : null;
+        const supported = surface?.feature && surface.kind !== 'terrain';
+        candidate = appCtx.inspectBoatCandidate?.(x,z,undefined,{
+          referenceY: supported ? surface.position?.y : undefined,
+          allowSynthetic: domain?.kind === 'ocean' && !supported, waterKind: domain?.subtype || 'open_ocean'
+        }) || null;
+      }
+    }
+  } catch { return null; }
+  if (!session.isCurrent() || (mode === 'boat' && !candidate)) return null;
+  let applied = false;
+  if (candidate) {
+    applied = requestSurfaceTravelPose('boat',pose,{source},{boatCandidate:candidate,entryMode:mode});
+    mode = 'boat';
+  } else if (mode === 'drone') {
+    applied = activateDroneAtWorldPose({...pose,y:reference.y,pitch:appCtx.drone.pitch,roll:appCtx.drone.roll},{source});
+  } else if (mode === 'plane') {
+    const plane = appCtx.planeMode;
+    applied = requestSurfaceTravelPose('plane',{...pose,y:reference.y,pitch:plane.pitch},{source},{planeOptions:{
+      transportEntityId:plane.transportEntityId,transportCatalogId:plane.transportCatalogId,
+      condition:plane.condition,speed:plane.speed,throttle:plane.throttle,roll:plane.roll,airborne:plane.airborne
+    }});
+  } else {
+    applied = requestSurfaceTravelPose(mode,pose,{source},{spawnOptions:{
+      source,restorePose:false,preserveElevatedSurface:false,requireSafeCandidate:true,
+      maxGroundRadius:96,maxRoadDistance:mode === 'drive' ? 220 : 160,fastLocalFallback:true
+    }});
+  }
+  if (!applied) return null;
+  const arrival = activeActorPose(appCtx);
+  const ground = mode === 'walk' || mode === 'drive';
+  return {valid:true,mode,x:arrival.x,y:arrival.y,z:arrival.z,angle:arrival.yaw,
+    onRoad:ground && !!appCtx.car?.onRoad,road:ground ? appCtx.car?.road : null,
+    walkY:ground ? appCtx.Walk?.state?.walker?.y : undefined,
+    carY:ground ? appCtx.car?.y : undefined,source};
 }
 
 function toggleWalkDriveMode(options = {}) {
@@ -582,6 +641,7 @@ function toggleBoatMode(options = {}) {
 }
 
 Object.assign(appCtx, {
+  travelToWorldPoint,
   activateSurfaceActivity,
   activateDroneAtWorldPose,
   restoreSurfaceTravelPose,
@@ -597,6 +657,7 @@ Object.assign(appCtx, {
 });
 
 export {
+  travelToWorldPoint,
   activateSurfaceActivity,
   activateDroneAtWorldPose,
   restoreSurfaceTravelPose,
