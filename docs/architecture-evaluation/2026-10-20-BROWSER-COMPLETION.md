@@ -67,12 +67,23 @@ resource leases and snapshot authority remain the owners.
 
 ## Added owner request: tester invitation
 
-Include a small, dismissible invitation on the start hub for the new app in
-development. Use the already published site contact address for a native email
-draft, with accurate interest-only wording and no automatic signup claim. Keep
-dismissal on the device, avoid interrupting gameplay/analytics preference, and
-verify keyboard closing, mobile layout and persistence in ordinary packaged
-startup. No message is sent by automation and no backend collection is added.
+Include a small, dismissible invitation on the start hub for the new app. The
+owner subsequently identified the existing Resend setup. The invitation expands
+only on request, requires an explicit email/consent choice, and sends a one-hour
+confirmation via the existing server-only Resend integration. A fragment-token
+landing page requires a second button press before creating a private Firestore
+interest record. No newsletter audience subscription, account/GPS/progress data,
+or automatic email from verification is included. Persistent dismissal, keyboard
+closing, mobile fit, failure/retry and pending-versus-confirmed states are checked.
+
+New bounded backend scope: one additive `registerAppTester` Function, one Hosting
+rewrite and TTL policies for temporary confirmation/rate-limit records. All 80
+existing Functions, access rules and their values remain intact. Rollout must use
+the already deployed Resend key/sender configuration for the new Function and
+apply the two additive TTL policies. The local emulator env is not a production
+credential authority. October 20 read-only production configuration plus Resend
+domain API verified the existing sender; no message or contact was created.
+Controlled handler/UI checks are not proof of live delivery of the new endpoint.
 
 ## Execution ledger
 

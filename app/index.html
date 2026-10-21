@@ -627,8 +627,15 @@ How Connected Data Is Used
   <p class="tester-invitation-label">HELP SHAPE WHAT’S NEXT</p>
   <h2 id="testerInvitationTitle">Want to be an early tester?</h2>
   <p>We’re developing a new World Explorer app. Interested in trying an early version and sharing feedback?</p>
-  <a id="testerInvitationEmail" class="tester-invitation-email" href="mailto:mail@worldexplorer3d.io?subject=World%20Explorer%20app%20%E2%80%94%20tester%20interest&amp;body=Hi%2C%20I%E2%80%99m%20interested%20in%20testing%20the%20new%20World%20Explorer%20app.%0A%0AMy%20device%20or%20platform%20(optional)%3A%0A%0APlease%20send%20me%20details%20when%20testing%20is%20available.">Email to register interest</a>
-  <small>Opens your email app. Testing invitations depend on availability.</small>
+  <button id="testerInvitationOpen" class="tester-invitation-email" type="button" aria-expanded="false" aria-controls="testerInvitationForm">I’m interested</button>
+  <form id="testerInvitationForm" hidden>
+    <label for="testerInvitationAddress">Email address</label>
+    <input id="testerInvitationAddress" type="email" autocomplete="email" maxlength="254" required>
+    <label class="tester-invitation-consent"><input id="testerInvitationConsent" type="checkbox" required> Email me about testing the new World Explorer app.</label>
+    <button id="testerInvitationSubmit" class="tester-invitation-email" type="submit">Send confirmation email</button>
+  </form>
+  <p id="testerInvitationStatus" role="status" aria-live="polite" hidden></p>
+  <small>Confirm your email to register interest. Invitations depend on availability. No newsletter signup. <a href="../legal/privacy#app-testing" target="_blank" rel="noopener">Privacy</a></small>
 </aside>
 <div class="globe-selector-shell">
 <div class="globe-selector-brand" aria-label="World Explorer 3D"><span class="globe-brand-mark" aria-hidden="true">◎</span>WORLD EXPLORER <strong>3D</strong></div>

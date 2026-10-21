@@ -102,6 +102,10 @@
       }
     ],
     "rewrites": [
+      {
+        "source": "/registerAppTester",
+        "function": "registerAppTester"
+      },
       {"source":"/api/geospatial/weather","function":"getEnvironmentalData"},
       {"source":"/api/geospatial/marine","function":"getEnvironmentalData"},
       {"source":"/api/geospatial/search","function":"getPlaceLookup"},

@@ -2789,3 +2789,4 @@ exports.sealRealityCaptureOriginal=functions.storage.object().onFinalize(async o
 
 // Free public weather and ocean models share bounded, authenticated cache authority.
 exports.getEnvironmentalData = require('./environment-data').buildEnvironmentDataExport({functions, db, setCors, verifyAppCheck});
+exports.registerAppTester = require('./tester-interest').buildTesterInterestExport({functions, db, setCors, verifyAppCheck, config:contributionNotificationConfig});

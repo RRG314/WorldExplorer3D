@@ -180,6 +180,8 @@
     }
   ],
   "fieldOverrides": [
+    {"collectionGroup":"appTesterConfirmations","fieldPath":"expiresAt","ttl":true,"indexes":[]},
+    {"collectionGroup":"appTesterRequestLimits","fieldPath":"expiresAt","ttl":true,"indexes":[]},
     {
       "collectionGroup": "members",
       "fieldPath": "uid",

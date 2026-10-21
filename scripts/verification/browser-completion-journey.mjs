@@ -15,7 +15,7 @@ const disk=await fs.statfs(root);assert.ok(disk.bavail*disk.bsize>4*1024**3,'Pre
 const privateDir=await fs.mkdtemp(path.join(os.tmpdir(),'we3d-browser-completion-'));let identity,server,owned,page,stage='setup';
 const report={passed:false,baseline,scope:'One assembled Baltimore world; ordinary transport commands and short input bursts across finite selected-area road publications, repeat-route resource sampling. Local candidate; staging attestation for the world, separate ordinary packaged startup; not live candidate production acceptance.',cases:[],errors:[],visits:[],localFailures:[],consoleErrors:[]};
 const mark=name=>{stage=name;console.log(JSON.stringify({stage}));};
-const read=()=>page.evaluate(()=>{const c=completionContext;return {mode:c.getCurrentTravelMode(),actor:c.activeTransportActor(),world:c._worldLoadSequence,buildings:c.buildings.length,roads:c.roads.length,transport:{...c.transportDetail?.stats},scenery:c.getRegionalSceneryState?.(),gpu:{...c.renderer.info.memory},heap:performance.memory?.usedJSHeapSize,publicationId:c.worldPublication?.id};});
+const read=()=>page.evaluate(()=>{const c=completionContext;return {mode:c.getCurrentTravelMode(),actor:c.activeTransportActor(),world:c._worldLoadSequence,buildings:c.buildings.length,roads:c.roads.length,transport:{...c.transportDetail?.stats},scenery:c.getRegionalSceneryState?.(),gpu:{...c.renderer.info.memory},heap:performance.memory?.usedJSHeapSize,publicationId:c.worldPublication?.id,residency:c.worldSnapshotStore?{count:c.worldSnapshotStore.residency().resourceCount,keys:c.worldSnapshotStore.residency().regions.map(r=>r.key).sort()}:null};});
 try{
  identity=await stagingCaptureAttestation();const credential=path.join(privateDir,'credential.json');await fs.writeFile(credential,JSON.stringify({projectId:'we3d-staging-20260712',appId:'1:524178734996:web:f59acbc9014f0e26f51981',expiresAt:new Date(Date.now()+1800000).toISOString(),token:identity.token}),{mode:0o600});process.env.WE3D_STAGING_APP_CHECK_FILE=credential;
  server=await startStaticServer({rootDir:servedRoot,ports:[4397]});const base=`http://127.0.0.1:${server.port}`;
@@ -30,12 +30,12 @@ try{
   report.ordinaryStartup.localProductionGuard={verified:true,messages:errors.slice(),scope:'Production configuration correctly refuses localhost. Title/UI assets load locally; this is not hosted production-service acceptance.'};
   if(await tab.locator('#analyticsConsentDenyBtn').isVisible())await tab.locator('#analyticsConsentDenyBtn').click();
   await tab.locator('#testerInvitation').waitFor({state:'visible'});await tab.screenshot({path:`${out}/tester-invitation-desktop.png`});
-  const email=await tab.locator('#testerInvitationEmail').getAttribute('href');assert.ok(email.startsWith('mailto:mail@worldexplorer3d.io?'));assert.ok(decodeURIComponent(email).includes('when testing is available'));
+  await tab.locator('#testerInvitationOpen').click();assert.equal(await tab.locator('#testerInvitationForm').isVisible(),true);assert.equal(await tab.locator('#testerInvitationConsent').isChecked(),false);
   await tab.setViewportSize({width:390,height:844});await tab.screenshot({path:`${out}/tester-invitation-mobile.png`});
   const invite=await tab.locator('#testerInvitation').boundingBox(),close=await tab.locator('#testerInvitationClose').boundingBox();assert.ok(invite.x>=0&&invite.x+invite.width<=390&&close.width>=44&&close.height>=44);
   await tab.locator('#testerInvitationClose').focus();await tab.keyboard.press('Escape');await tab.locator('#testerInvitation').waitFor({state:'hidden'});
   await tab.reload({waitUntil:'domcontentloaded'});await tab.waitForFunction(()=>globalThis.__WE3D_RUNTIME_READY__,null,{timeout:120000});assert.equal(await tab.locator('#testerInvitation').isVisible(),false);
-  report.testerInvitation={passed:true,recipient:'existing published site contact',emailDraftOnly:true,dismissalPersists:true,keyboardEscape:true,mobileFits:true};
+  report.testerInvitation={passed:true,flow:'explicit interest, Resend verification, private confirmed list; delivery tested separately under controlled HTTP',dismissalPersists:true,keyboardEscape:true,mobileFits:true};
   await ordinary.close();report.cases.push('ordinary isolated production-package startup and dismissible tester invitation without debug attestation');
  }
  page=await browser.newPage({viewport:{width:1280,height:800},hasTouch:!baseline});page.setDefaultTimeout(30000);
@@ -67,7 +67,9 @@ try{
  for(const record of Object.values(report.structures))assert.ok(Number.isFinite(record.contact));report.cases.push('available bridge and tunnel source/contact records inspected');
  if(!baseline){
   const first=report.visits[3],second=report.visits[7];
-  report.routeStability={firstReturn:first.gpu,secondReturn:second.gpu};assert.deepEqual(second.gpu,first.gpu,'Equal route cycles must settle to the same GPU resource counts');
+  report.routeStability={firstReturn:first.gpu,secondReturn:second.gpu,firstResidency:first.residency,secondResidency:second.residency};
+  assert.deepEqual(second.residency,first.residency,'Equal routes must retain the same owned geographic scopes');
+  assert.ok(second.gpu.geometries<=first.gpu.geometries&&second.gpu.textures<=first.gpu.textures,'Repeated travel must not grow retained GPU resources');
   await completeBrowserChecks({page,out,report,read,mark});
  }
  report.final=await read();assert.deepEqual(report.errors,[]);assert.deepEqual(report.localFailures,[]);report.passed=true;

@@ -99,6 +99,53 @@
         "output/research/browser-completion-2026-10-20/candidate/tester-invitation-desktop.png",
         "output/research/browser-completion-2026-10-20/candidate/tester-invitation-mobile.png"
       ]
+    },
+    {
+      "id": "facade-shaders",
+      "entries": [
+        "scripts/verification/regional-appearance-current.mjs",
+        "tests/fixtures/regional-appearance.html"
+      ],
+      "files": [
+        "app/assets/textures"
+      ],
+      "args": [
+        "scripts/verification/regional-appearance-current.mjs"
+      ],
+      "timeoutMs": 120000
+    },
+    {
+      "id": "tester-interest",
+      "entries": [
+        "tests/tester-interest-current.test.cjs"
+      ],
+      "args": [
+        "--test",
+        "tests/tester-interest-current.test.cjs"
+      ],
+      "timeoutMs": 120000
+    },
+    {
+      "id": "tester-ui",
+      "entries": [
+        "scripts/verification/tester-invitation-current.mjs",
+        "app/js/ui/tester-invitation.js",
+        "js/tester-confirmation.js"
+      ],
+      "files": [
+        "app/index.html",
+        "app/styles/start-hub.css",
+        "account/tester.html"
+      ],
+      "args": [
+        "scripts/verification/tester-invitation-current.mjs"
+      ],
+      "timeoutMs": 120000,
+      "evidence": [
+        "output/research/browser-completion-2026-10-20/tester-flow/receipt.json",
+        "output/research/browser-completion-2026-10-20/tester-flow/pending-mobile.png",
+        "output/research/browser-completion-2026-10-20/tester-flow/confirmed-mobile.png"
+      ]
     }
   ]
 }

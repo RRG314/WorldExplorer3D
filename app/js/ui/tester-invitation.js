@@ -7,7 +7,8 @@ let dismissedThisSession = false;
 export function mountTesterInvitation({
   readStorage = key => globalThis.localStorage.getItem(key),
   writeStorage = (key, value) => globalThis.localStorage.setItem(key, value),
-  document = globalThis.document
+  document = globalThis.document,
+  submitInterest = async (body, signal) => (await import('../../../js/function-api.js?v=3')).postAppCheckedFunction('/registerAppTester', body, {signal, timeoutMs:20000, label:'Tester signup'})
 } = {}) {
   lifetime?.dispose('remount');
   const root = document.getElementById('testerInvitation');
@@ -25,9 +26,33 @@ export function mountTesterInvitation({
     if (hadFocus) document.getElementById('globeSelectorStartBtn')?.focus({ preventScroll: true });
   };
   scope.listen(document.getElementById('testerInvitationClose'), 'click', () => dismiss('dismissed'));
-  // This is a native mailto link. Opening a draft does not claim a submitted
-  // registration, and no email/account/device details are sent by this view.
-  scope.listen(document.getElementById('testerInvitationEmail'), 'click', () => dismiss('interested'));
+  const open = document.getElementById('testerInvitationOpen');
+  const form = document.getElementById('testerInvitationForm');
+  const status = document.getElementById('testerInvitationStatus');
+  const submit = document.getElementById('testerInvitationSubmit');
+  let pending = false;
+  const request = new AbortController();
+  scope.defer(() => request.abort(), 'request');
+  scope.listen(open, 'click', () => {
+    open.hidden = true; open.setAttribute('aria-expanded', 'true'); form.hidden = false;
+    document.getElementById('testerInvitationAddress').focus();
+  });
+  scope.listen(form, 'submit', async event => {
+    event.preventDefault();
+    if (pending || !form.reportValidity()) return;
+    pending = true; submit.disabled = true; status.hidden = false; status.textContent = 'Sending your confirmation email…';
+    try {
+      const result = await submitInterest({action:'request', email:document.getElementById('testerInvitationAddress').value.trim(), consent:true, consentVersion:'app-testing-v1'}, request.signal);
+      if (request.signal.aborted) return;
+      if (!result?.pending) throw new Error('Could not confirm your request. Please try again.');
+      form.hidden = true;
+      status.textContent = 'Check your inbox. Open our email and confirm your interest within one hour.';
+      // Pending is not confirmed consent; keep success visible until dismissal.
+    } catch (_) {
+      if (request.signal.aborted) return;
+      status.textContent = 'We couldn’t confirm your request. If an email arrives, use its confirmation link. Otherwise, wait a few minutes and try again.';
+    } finally { pending = false; submit.disabled = false; }
+  });
   scope.listen(root, 'keydown', event => {
     if (event.key !== 'Escape') return;
     event.preventDefault(); event.stopPropagation(); dismiss('dismissed');
