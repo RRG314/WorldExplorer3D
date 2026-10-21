@@ -97,3 +97,13 @@ The concrete endpoint and nonduplicative verification policy are
 `docs/architecture-evaluation/2026-10-20-BROWSER-COMPLETION.md`. This supersedes
 older per-commit stopping points. The Godot consumer and actual deployment remain
 outside the run.
+
+
+The defined October 20 browser completion is implemented and locally reviewed.
+See the completion document for final source/package identities, retained and
+executed evidence, metadata-only wrapper exception and rollout requirements.
+Local pointer: `output/release-review/browser-cleanup-candidate.json`; preserve
+the existing released-candidate pointer and all rollback packages. Tester signup
+adds one new Function plus two TTL policies and reuses the deployed Resend sender.
+This additive owner-requested scope does not authorize changing the existing 80
+Functions, their values or rules. No deployment or Godot work occurred.

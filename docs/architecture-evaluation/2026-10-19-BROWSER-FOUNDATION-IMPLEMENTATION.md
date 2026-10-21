@@ -564,3 +564,35 @@ storage helpers were not exposed to UI. The invitation now uses its own small
 dismissal preference through guarded localStorage access, retaining session
 dismissal if storage is unavailable. The failed title-only receipt and captures
 are retained in candidate-invitation-persistence-failure; no city was loaded.
+
+
+## October 20 completion evidence and tester signup
+
+The browser completion contract is now implemented locally. Final verification
+source is e0e411ef; final game content is identical to runtime commit 5958db63.
+The complete scope, current route/renderer measurements, failed harness receipts,
+reviewed metadata-only acceptance exception and rollout prerequisites are in
+`2026-10-20-BROWSER-COMPLETION.md` and ignored
+`output/release-evidence/browser-cleanup-2026-10-20/readiness.json`.
+
+Actual accepted cells, road/regional ownership, overlay preservation, near/far
+facade shaders, touch movement, authored ship walking, ship/flight/Earth return,
+Moon/Earth return and geographic release were checked. Selected district coverage
+remained 49,080 buildings / 18,951 roads; equal route returns were 2,489 GPU
+geometries / 251 textures. Surface controls and the original world publication
+were restored; final geographic leases and road/building meshes were zero.
+Earlier pending notes above describe their commit-time status, not unfinished
+work after this completion. Current scoped cache behavior has five passing cases.
+
+Merged-mid batches were the missing third consumer of shared facade emission;
+all four real shader adapters now compile. The small start-hub tester invitation
+uses the existing server Resend sender, explicit consent and one-hour email
+confirmation, with private verified interest records. It adds one Function and
+two temporary-record TTL policies; existing 80 Functions and access rules are
+unchanged. Six handler cases and controlled real UI checks passed. Read-only
+production Resend authentication/domain verification passed; no email/contact was
+sent during verification. Hosted delivery and rollout remain separate actions.
+
+No later browser package remains in this run. Future work is deployment under the
+existing protected release workflow and then a separately scoped Godot consumer
+of the reusable facts/rules. Transport still uses a finite selected-area source.
