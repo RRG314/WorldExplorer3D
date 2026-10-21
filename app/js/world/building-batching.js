@@ -1,4 +1,5 @@
 import { facadeNightUniform, FACADE_EMISSION_GLSL } from './facade-lighting.js';
+import {FACADE_PRESENTATION,FACADE_PRESENTATION_GLSL} from './facade-presentation.js';
 import {GeometryBatchStorage, batchStorageView, releaseGeometryBatchScratch} from './geometry-batch-storage.js';
 import {compactBuildingVertices} from './building-vertex-storage.js';
 import {releaseRetiredBuildingCpuBuffers} from './retired-building-buffers.js';
@@ -57,6 +58,7 @@ export function createMidFacadeBatchMaterial(sourceMaterial, batchKey) {
   material.vertexColors = true;
   material.onBeforeCompile = (shader) => {
     shader.uniforms.facadeNight = facadeNightUniform;
+    shader.uniforms.facadeUnitsPerMeter = {value:Number(appCtx.WORLD_UNITS_PER_METER)||1};
     // Facades use wall-local coordinates; remove the unused standard map UV
     // varying so merged buildings stay within eight vertex attribute slots.
     shader.vertexShader = shader.vertexShader.replace('#include <uv_vertex>', '');
@@ -89,7 +91,9 @@ export function createMidFacadeBatchMaterial(sourceMaterial, batchKey) {
     shader.fragmentShader = [
       'varying vec4 vFacadeLayout; varying vec4 vFacadeOpening;',
       FACADE_OPENINGS_GLSL,
+      FACADE_PRESENTATION_GLSL,
       'uniform float facadeNight;',
+      'uniform float facadeUnitsPerMeter;',
       'varying vec4 vBuildingFacadeParams;',
       'varying vec4 vBuildingRoofAParams;',
       'varying vec4 vBuildingRoofColorB;',
@@ -120,9 +124,9 @@ export function createMidFacadeBatchMaterial(sourceMaterial, batchKey) {
         '  float buildingRoofGrain = buildingMidRoofNoise(vBuildingRoofPosition * vBuildingRoofAParams.w);',
         '  vec3 buildingRoofSurface = mix(vBuildingRoofAParams.rgb, vBuildingRoofColorB.rgb, 0.18 + buildingRoofGrain * 0.64);',
         '  diffuseColor.rgb = mix(buildingRoofSurface, facadeWallSurface(diffuseColor.rgb * vColor.rgb, buildingFacadeTexel.rgb), vBuildingWallMask);',
-        '  float facadeBuildingSeed=dot(floor(vColor.rgb*16.0+.001),vec3(17.0,3.0,7.0));',
+        '  float facadeSeed=facadeBuildingSeed(vColor.rgb);',
         '  vec4 facadeSurface=vec4(diffuseColor.rgb,0.0);',
-        '  if (vBuildingWallMask > 0.5) facadeSurface=facadeOpenings(diffuseColor.rgb, vFacadeLayout, vFacadeOpening, facadeViewRay(vViewPosition,vFacadeLayout.zw),facadeBuildingSeed);',
+        '  if (vBuildingWallMask > 0.5) facadeSurface=facadeOpenings(diffuseColor.rgb, vFacadeLayout, vFacadeOpening, facadeViewRay(vViewPosition,vFacadeLayout.zw),facadeSeed);',
         '  diffuseColor.rgb=facadeSurface.rgb;',
         '  diffuseColor.a *= mix(1.0, buildingFacadeTexel.a, vBuildingWallMask);',
         '#endif'
@@ -130,12 +134,13 @@ export function createMidFacadeBatchMaterial(sourceMaterial, batchKey) {
     );
     shader.fragmentShader = shader.fragmentShader
       .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n' + FACADE_EMISSION_GLSL)
-      .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\nroughnessFactor=mix(roughnessFactor,.22,facadeSurface.a);')
-      .replace('#include <normal_fragment_maps>', '#include <normal_fragment_maps>\nnormal=facadeGrainNormal(normal,vViewPosition,dot(buildingFacadeTexel.rgb,vec3(.2126,.7152,.0722)),.018*vBuildingWallMask*(1.0-facadeSurface.a));');
+      .replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>\nroughnessFactor=mix(roughnessFactor,${FACADE_PRESENTATION.glassRoughness},facadeSurface.a);`)
+      .replace('#include <normal_fragment_maps>', '#include <normal_fragment_maps>\nnormal=facadeGrainNormal(normal,vViewPosition,dot(buildingFacadeTexel.rgb,vec3(.2126,.7152,.0722)),.018*vBuildingWallMask*(1.0-facadeSurface.a)*facadeDetailWeight(length(vViewPosition)/facadeUnitsPerMeter));');
   };
-  material.customProgramCacheKey = () => 'building-mid-facade-batch-v8-room-depth';
+  material.customProgramCacheKey = () => `building-mid-facade-batch-v9:${FACADE_PRESENTATION.version}`;
   material.userData = {
     ...(material.userData || {}),
+    facadePresentationVersion:FACADE_PRESENTATION.version,
     buildingMidFacadeBatch: true,
     buildingBatchKey: batchKey
   };

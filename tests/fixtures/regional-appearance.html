@@ -8,6 +8,9 @@ import {createNormalizedTerrainAttribute} from '/app/js/terrain/surface-material
 import {sharedRegionalFacadeAtlas} from '/app/js/terrain/regional-facade-atlas.js';
 import {facadeNightUniform} from '/app/js/world/facade-lighting.js';
 import {disposeFarFieldMesh} from '/app/js/terrain/far-field-geometry.js';
+import {getBuildingMaterial} from '/app/js/engine/building-facade-materials.js';
+import {attachBuildingFacadeLayout} from '/app/js/world/building-facade-layout.js';
+import {createMidFacadeBatchMaterial,appendMidFacadeAttributes} from '/app/js/world/building-batching.js';
 const renderer=new THREE.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});renderer.setSize(1280,800);renderer.outputEncoding=THREE.sRGBEncoding;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=.85;document.body.append(renderer.domElement);
 const scene=new THREE.Scene();scene.background=new THREE.Color(0xa0bfd0);scene.add(new THREE.HemisphereLight(0xffffff,0x777366,.9));const sun=new THREE.DirectionalLight(0xffffff,2);sun.position.set(10,80,-40);scene.add(sun);
 const camera=new THREE.PerspectiveCamera(52,1.6,.1,30000);camera.position.set(60,35,-90);camera.lookAt(0,12,0);
@@ -24,12 +27,23 @@ for(const mesh of await buildFarBuildingInstanceBatches(THREE,instances,applyFar
 const geometry=new THREE.BufferGeometry();for(const [name,data,size] of [['position',buffers.positions,3],['regionalStyle',buffers.styles,4],['regionalLayout',buffers.layouts,4]])geometry.setAttribute(name,new THREE.Float32BufferAttribute(data,size));geometry.setAttribute('color',createNormalizedTerrainAttribute(buffers.colors,3));geometry.setIndex(buffers.indices);geometry.computeVertexNormals();
 const tint=geometry.attributes.color,colorStorage={normalized:tint.normalized,bytes:tint.array.byteLength,floatBytes:buffers.colors.length*4,maxError:Math.max(...buffers.colors.map((value,index)=>Math.abs(value-tint.array[index]/255)))};
 group.add(new THREE.Mesh(geometry,applyFarBuildingFacadeDetail(new THREE.MeshStandardMaterial({vertexColors:true,flatShading:true,side:THREE.DoubleSide}))));scene.add(group);
+// Compile the actual detailed and merged-mid adapters too. They share the
+// lighting contract while supplying different geometry attributes.
+const nearMaterial=getBuildingMaterial({WORLD_UNITS_PER_METER:1},'house',17,0xa87f65,{lodTier:'near',tags:{building:'house','building:levels':'3'}});
+const nearGeometry=new THREE.BoxGeometry(14,9,18);nearGeometry.translate(0,4.5,0);
+attachBuildingFacadeLayout(nearGeometry,{levels:3,window:{bayWidth:3.05,floorHeight:3.15,width:.46,height:.58,frame:.055}});
+nearGeometry.setAttribute('facadeEntrance',new THREE.Float32BufferAttribute(new Float32Array(nearGeometry.attributes.position.count*4),4));
+const nearMesh=new THREE.Mesh(nearGeometry,nearMaterial);nearMesh.position.set(-82,0,-30);group.add(nearMesh);
+const midGeometry=nearGeometry.clone(),midAttributes={normals:Array.from(midGeometry.attributes.normal.array),colors:[],facadeParams:[],roofAParams:[],roofColorsB:[]};
+appendMidFacadeAttributes(midAttributes,nearMaterial,null,0,midGeometry.attributes.position.count);
+for(const [name,values,size]of [['color',midAttributes.colors,3],['buildingFacadeParams',midAttributes.facadeParams,4],['buildingRoofAParams',midAttributes.roofAParams,4],['buildingRoofColorB',midAttributes.roofColorsB,4]])midGeometry.setAttribute(name,new THREE.Float32BufferAttribute(values,size));
+const midMesh=new THREE.Mesh(midGeometry,createMidFacadeBatchMaterial(nearMaterial,'fixture-mid'));midMesh.position.set(-62,0,-30);group.add(midMesh);
 const ground=new THREE.Mesh(new THREE.PlaneGeometry(800,800),new THREE.MeshStandardMaterial({color:0x737869}));ground.rotation.x=-Math.PI/2;ground.position.y=-.01;scene.add(ground);
 const atlas=await sharedRegionalFacadeAtlas().ready;
 const render=()=>renderer.render(scene,camera);
 window.setNight=night=>{facadeNightUniform.value=night?1:0;sun.intensity=night?.12:2;render();};
 window.setView=(x,y,z,tx=0,ty=10,tz=0)=>{camera.position.set(x,y,z);camera.lookAt(tx,ty,tz);render();};
-window.advanceTime=render;window.render_game_to_text=()=>JSON.stringify({buildings:12,atlas,colorStorage,geometries:renderer.info.memory.geometries,calls:renderer.info.render.calls,errors:renderer.info.programs.filter(p=>p.diagnostics?.runnable===false).length});
+window.advanceTime=render;window.render_game_to_text=()=>JSON.stringify({buildings:14,adapters:['detailed','merged-mid','regional-footprint','regional-instanced'],atlas,colorStorage,geometries:renderer.info.memory.geometries,calls:renderer.info.render.calls,errors:renderer.info.programs.filter(p=>p.diagnostics?.runnable===false).length});
 window.retire=()=>{scene.remove(group);disposeFarFieldMesh(group);render();return renderer.info.memory.geometries;};
 window.fixtureReady=true;render();
 </script>
