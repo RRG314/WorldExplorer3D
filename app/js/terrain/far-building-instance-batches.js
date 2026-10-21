@@ -79,11 +79,13 @@ export async function buildFarBuildingInstanceBatches(THREE, buildings, material
       geometry.setAttribute('regionalStyle',new THREE.InstancedBufferAttribute(styles,4));
       geometry.setAttribute('regionalLayout',new THREE.InstancedBufferAttribute(dimensions,4));
       const mesh = new THREE.InstancedMesh(geometry, material, indices.length);
+      mesh.userData.sourceBuildingIds=[];
       batches.push(mesh);
       mesh.position.set(originX, 0, originZ);
       mesh.instanceMatrix.setUsage(THREE.StaticDrawUsage);
       for (let index = 0; index < indices.length; index++) {
         const building = buildings.read ? buildings.read(indices[index],scratch) : buildings[indices[index]];
+        mesh.userData.sourceBuildingIds.push(building.identity||null);
         position.set(building.x - originX, building.baseY, building.z - originZ);
         rotation.setFromAxisAngle(up, building.rotationY);
         scale.set(building.width, building.height, building.depth);

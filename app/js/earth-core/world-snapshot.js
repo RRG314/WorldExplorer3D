@@ -1,3 +1,6 @@
+import { createLifecycleScope } from '../runtime/lifecycle-scope.js';
+import { encodeWorldCellFacts } from './world-cell-facts.js';
+
 export const WORLD_SNAPSHOT_LAYERS = Object.freeze([
   'terrain',
   'hydrology',
@@ -85,20 +88,69 @@ export function createWorldSnapshotStore(options = {}) {
   const dispose = typeof options.dispose === 'function' ? options.dispose : () => {};
   let current = null;
   let revision = 0;
+  let requestId = null, lifetime = null, readCell = null;
+  let initialized = false;
+  const regions = new Map();
+
+  // The snapshot authority also owns residency. Schedulers still choose when
+  // to prepare work; these leases choose which accepted generation may live.
+  function begin(request) {
+    if (!Object.isFrozen(request) || !request?.id) throw new TypeError('Residency requires an immutable world request.');
+    if (requestId === request.id && lifetime?.isActive()) return false;
+    clear('world-replaced');
+    initialized = true;
+    requestId = request.id;
+    lifetime = createLifecycleScope(`world-publication:${requestId}`);
+    return true;
+  }
+
+  function ownRegion({ key, layers, bounds = null, facts = null, retire, expectedRequestId = requestId }) {
+    if (!lifetime?.isActive() || expectedRequestId !== requestId) {
+      retire?.();
+      throw new DOMException('World region superseded', 'AbortError');
+    }
+    if (!key || !Array.isArray(layers) || !layers.length || typeof retire !== 'function') {
+      throw new TypeError('Region publication requires a key, layers and resource retirement.');
+    }
+    const metadata = immutableValue({ key, layers, bounds });
+    let active = true, release;
+    const lease = Object.freeze({
+      metadata, facts,
+      dispose() {
+        if (!active) return false;
+        active = false;
+        if (regions.get(key) === lease) regions.delete(key);
+        // Release this exact registration before executing external cleanup.
+        release?.();
+        retire();
+        return true;
+      }
+    });
+    const previous = regions.get(key);
+    regions.set(key, lease);
+    release = lifetime.defer(() => lease.dispose(), 'geographic-region');
+    previous?.dispose();
+    return lease;
+  }
 
   const publish = (snapshot, publishOptions = {}) => {
     if (snapshot?.type !== 'WorldSnapshot' || !Object.isFrozen(snapshot)) {
       throw new TypeError('Only an immutable WorldSnapshot can be published.');
     }
     const expectedRequestId = String(publishOptions.expectedRequestId || snapshot.requestId);
-    if (snapshot.requestId !== expectedRequestId) {
+    if (initialized && !requestId) {
+      return Object.freeze({ published: false, reason: 'world-inactive', revision, current });
+    }
+    if (snapshot.requestId !== expectedRequestId || (requestId && snapshot.requestId !== requestId)) {
       return Object.freeze({ published: false, reason: 'request-mismatch', revision, current });
     }
     if (current === snapshot) {
       return Object.freeze({ published: true, reason: 'already-current', revision, current, previous: current });
     }
     const previous = current;
+    if (!requestId) begin(snapshot.request);
     current = snapshot;
+    readCell = typeof publishOptions.readCell === 'function' ? publishOptions.readCell : null;
     revision += 1;
     let disposeError = null;
     if (previous) {
@@ -111,9 +163,14 @@ export function createWorldSnapshotStore(options = {}) {
     return Object.freeze({ published: true, reason: null, revision, current, previous, disposeError });
   };
 
-  const clear = (reason = 'cleared') => {
+  function clear(reason = 'cleared') {
     const previous = current;
     current = null;
+    requestId = null;
+    readCell = null;
+    lifetime?.dispose(reason);
+    lifetime = null;
+    regions.clear();
     let disposeError = null;
     if (previous) {
       try {
@@ -123,11 +180,23 @@ export function createWorldSnapshotStore(options = {}) {
       }
     }
     return Object.freeze({ cleared: !!previous, reason: String(reason), revision, previous, disposeError });
-  };
+  }
 
   return Object.freeze({
     clear,
+    begin,
+    ownRegion,
     publish,
+    readCell: (cell) => current && readCell ? readCell(cell) : null,
+    exportCell: cell => {
+      const facts = current && readCell ? readCell(cell) : null;
+      return facts ? encodeWorldCellFacts(facts) : null;
+    },
+    regionFactsAt: bounds => [...regions.values()].filter(lease => lease.facts && (!lease.metadata.bounds ||
+      lease.metadata.bounds.minX <= bounds.maxX && lease.metadata.bounds.maxX >= bounds.minX &&
+      lease.metadata.bounds.minZ <= bounds.maxZ && lease.metadata.bounds.maxZ >= bounds.minZ)).map(lease => lease.facts),
+    residency: () => Object.freeze({ requestId, regions: Object.freeze([...regions.values()].map(lease => lease.metadata)),
+      resourceCount: lifetime?.snapshot().resourceCount || 0 }),
     snapshot: () => Object.freeze({ current, revision })
   });
 }

@@ -15,12 +15,13 @@ import {
 import { createWorldLoadSession } from '../earth-core/world-load-session.js?v=1';
 import { WORLD_COLLECTION_NAMES } from './collection-registry.js?v=1';
 import { compileWorldLayerProducts } from './compiler/world-layer-products.js?v=4';
-import { publishWorldPublicationSnapshot } from './world-snapshot-adapter.js?v=4';
+import { beginWorldPublication, publishWorldPublicationSnapshot } from './world-snapshot-adapter.js?v=4';
 import { compilePoiLifecycle } from '../poi/lifecycle.js?v=1';
 import {worldLoadAbortError} from '../earth-core/request-cancellation.js?v=1';
 import {finishFailedWorldLoad} from './load-failure.js';
 import {ensureLoadedMuseumRuntime} from '../interiors/museum-program-preparation.js';
 import {prepareInitialStreetCoverage} from './street-pavement-runtime.js';
+import { ownPublishedDistrict, portablePoiInputs } from './world-cell-adapter.js';
 
 export function createWorldLoadRuntimeSession(options = {}) {
   const {
@@ -174,6 +175,7 @@ export function createWorldLoadRuntimeSession(options = {}) {
     }
   };
   const loadSequence = appCtx._worldLoadSequence = loadRequest.sequence;
+  beginWorldPublication(appCtx, loadRequest);
   runtimeState = appCtx.worldLoadRuntimeState = {
     sequence: loadSequence,
     status: 'loading',
@@ -446,7 +448,7 @@ export async function finishWorldLoadRuntimeSession(session = {}) {
   appCtx.waterSurfaceRegistrySnapshot =
     appCtx.waterSurfaceRegistry?.snapshot?.() || null;
   appCtx.reconcileActorsAfterSurfaceRebuild?.();
-  appCtx.poiLifecycle = compilePoiLifecycle(appCtx.pois, appCtx.buildings, {
+  appCtx.poiLifecycle = compilePoiLifecycle(portablePoiInputs(appCtx.pois), appCtx.buildings, {
     entranceByBuilding: appCtx.buildingEntranceByBuilding,
     actor: appCtx.Walk?.state?.walker || appCtx.car || { x: 0, z: 0 },
     activation: { radiusMeters: 240, limit: 12 }
@@ -483,6 +485,7 @@ export async function finishWorldLoadRuntimeSession(session = {}) {
     layerProducts,
     createdAt: performance.now()
   });
+  ownPublishedDistrict(appCtx, publication);
   // Publish the completed scene while it is still hidden by worldLoading. The
   // living-world, interaction, and Explorer runtimes all compile against this
   // immutable publication and are required for a playable Earth session. They

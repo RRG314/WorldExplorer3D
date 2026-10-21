@@ -5,6 +5,9 @@ import {terrainHeightWithPortalCuts} from './structure-terrain-portals.js?v=2';
 // This snapshot contains geometry and source coordinates only. No scene,
 // renderer, cache or mutable world object crosses the worker boundary.
 export function captureTransportTerrain(appCtx) {
+  const sourceFar=appCtx.getFarTerrainSurfaceSnapshot?.()||null;
+  const far=sourceFar ? {...sourceFar,grid:{...sourceFar.grid,
+    boundaryTriangles:sourceFar.grid?.boundaryTriangles instanceof Map ? [...sourceFar.grid.boundaryTriangles] : sourceFar.grid?.boundaryTriangles}} : null;
   const meshes=(appCtx.terrainGroup?.children||[]).filter(mesh=>mesh.visible!==false&&
     !mesh.userData?.pendingTerrainTile&&(mesh.userData?.isTerrainMesh||mesh.userData?.isFarTerrainClipmap)).map(mesh=>({
       position:{x:mesh.position.x,y:mesh.position.y,z:mesh.position.z},
@@ -12,13 +15,16 @@ export function captureTransportTerrain(appCtx) {
       indices:mesh.geometry.getIndex()?.array||null,
       segments:mesh.geometry.parameters?.widthSegments,
       userData:{isTerrainMesh:mesh.userData.isTerrainMesh,isFarTerrainClipmap:mesh.userData.isFarTerrainClipmap,
-        terrainTile:mesh.userData.terrainTile?true:undefined,
+        terrainTile:mesh.userData.terrainTile ? { ...mesh.userData.terrainTile } : undefined,
+        renderProvenance:mesh.userData.renderProvenance,
         structureTerrainPortalDescriptors:mesh.userData.structureTerrainPortalDescriptors}
     }));
-  return {meshes,segments:appCtx.TERRAIN_SEGMENTS,far:appCtx.getFarTerrainSurfaceSnapshot?.()||null,
+  return {meshes,segments:appCtx.TERRAIN_SEGMENTS,far,
     portalMasks:appCtx.structureTerrainPortalDescriptors||[]};
 }
 export function restoreTransportTerrain(snapshot) {
+  const grid=snapshot.far?.grid ? {...snapshot.far.grid,boundaryTriangles:Array.isArray(snapshot.far.grid.boundaryTriangles)
+    ? new Map(snapshot.far.grid.boundaryTriangles) : snapshot.far.grid.boundaryTriangles} : null;
   const meshes=snapshot.meshes.map(item=>{
     const a=item.positions;
     return {visible:true,position:item.position,userData:item.userData,geometry:{
@@ -28,7 +34,7 @@ export function restoreTransportTerrain(snapshot) {
   });
   const api=createTerrainHeightSamplingApi({appCtx:{terrainGroup:{children:meshes},TERRAIN_SEGMENTS:snapshot.segments,
     sampleFarTerrainWorldYAt:(x,z,options={})=>{
-      const y=sampleFarFieldGridWorldY(x,z,snapshot.far?.grid);
+      const y=sampleFarFieldGridWorldY(x,z,grid);
       return options.ignorePortalCuts?y:terrainHeightWithPortalCuts(snapshot.far?.portals,x,z,y);
     }},elevationWorldYAtWorldXZ:()=>NaN});
   return {meshes,sampleTop:(x,z)=>api.cachedTerrainHeight(x,z)+.18,

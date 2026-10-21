@@ -7,18 +7,38 @@ import {startStaticServer} from './static-server.mjs';
 import {configureStagingAppCheck} from './staging-app-check.mjs';
 import {stagingCaptureAttestation} from './staging-capture-attestation.mjs';
 import {closeOwnedBrowser} from './owned-browser.mjs';
+import {completeBrowserChecks} from './browser-completion-checks.mjs';
+import {collectBrowserGraphicsErrors} from './browser-graphics-errors.mjs';
 const baseline=process.argv.includes('--baseline'),root=process.cwd(),servedRoot=path.resolve(process.env.WE3D_VERIFY_ROOT||'.');
 const out=process.env.WE3D_COMPLETION_OUTPUT||`output/research/browser-completion-2026-10-20/${baseline?'baseline':'candidate'}`;
 const disk=await fs.statfs(root);assert.ok(disk.bavail*disk.bsize>4*1024**3,'Preserve 4 GiB free disk while verifying');await fs.mkdir(out,{recursive:true});
 const privateDir=await fs.mkdtemp(path.join(os.tmpdir(),'we3d-browser-completion-'));let identity,server,owned,page,stage='setup';
-const report={passed:false,baseline,scope:'One assembled Baltimore world; ordinary transport commands and short input bursts across finite selected-area road publications, repeat-route resource sampling. Staging attestation; not a controls-only intercity drive or live production acceptance.',cases:[],errors:[],visits:[]};
+const report={passed:false,baseline,scope:'One assembled Baltimore world; ordinary transport commands and short input bursts across finite selected-area road publications, repeat-route resource sampling. Local candidate; staging attestation for the world, separate ordinary packaged startup; not live candidate production acceptance.',cases:[],errors:[],visits:[],localFailures:[],consoleErrors:[]};
 const mark=name=>{stage=name;console.log(JSON.stringify({stage}));};
 const read=()=>page.evaluate(()=>{const c=completionContext;return {mode:c.getCurrentTravelMode(),actor:c.activeTransportActor(),world:c._worldLoadSequence,buildings:c.buildings.length,roads:c.roads.length,transport:{...c.transportDetail?.stats},scenery:c.getRegionalSceneryState?.(),gpu:{...c.renderer.info.memory},heap:performance.memory?.usedJSHeapSize,publicationId:c.worldPublication?.id};});
 try{
  identity=await stagingCaptureAttestation();const credential=path.join(privateDir,'credential.json');await fs.writeFile(credential,JSON.stringify({projectId:'we3d-staging-20260712',appId:'1:524178734996:web:f59acbc9014f0e26f51981',expiresAt:new Date(Date.now()+1800000).toISOString(),token:identity.token}),{mode:0o600});process.env.WE3D_STAGING_APP_CHECK_FILE=credential;
  server=await startStaticServer({rootDir:servedRoot,ports:[4397]});const base=`http://127.0.0.1:${server.port}`;
- owned=await chromium.launchServer({channel:'chrome',headless:true,args:['--js-flags=--max-old-space-size=2048']});const browser=await chromium.connect(owned.wsEndpoint());page=await browser.newPage({viewport:{width:1280,height:800}});page.setDefaultTimeout(30000);
+ owned=await chromium.launchServer({channel:'chrome',headless:true,args:['--js-flags=--max-old-space-size=2048']});const browser=await chromium.connect(owned.wsEndpoint());
+ if(!baseline){
+  mark('ordinary-packaged-startup');const ordinary=await browser.newContext({viewport:{width:1280,height:800}}),tab=await ordinary.newPage();const errors=[];tab.on('pageerror',e=>errors.push(e.message));collectBrowserGraphicsErrors(tab,errors);
+  await tab.goto(`${base}/app/`,{waitUntil:'domcontentloaded'});await tab.waitForFunction(()=>globalThis.__WE3D_RUNTIME_READY__,null,{timeout:120000});
+  report.ordinaryStartup=await tab.evaluate(async()=>({debug:!!globalThis.FIREBASE_APPCHECK_DEBUG_TOKEN,build:await fetch('/build-manifest.json').then(r=>r.json()),startVisible:!!document.getElementById('globeSelectorStartBtn')}));
+  assert.equal(report.ordinaryStartup.debug,false);assert.equal(report.ordinaryStartup.build.sourceDirty,false);assert.equal(report.ordinaryStartup.startVisible,true);assert.deepEqual(errors,[]);
+  if(await tab.locator('#analyticsConsentDenyBtn').isVisible())await tab.locator('#analyticsConsentDenyBtn').click();
+  await tab.locator('#testerInvitation').waitFor({state:'visible'});await tab.screenshot({path:`${out}/tester-invitation-desktop.png`});
+  const email=await tab.locator('#testerInvitationEmail').getAttribute('href');assert.ok(email.startsWith('mailto:mail@worldexplorer3d.io?'));assert.ok(decodeURIComponent(email).includes('when testing is available'));
+  await tab.setViewportSize({width:390,height:844});await tab.screenshot({path:`${out}/tester-invitation-mobile.png`});
+  const invite=await tab.locator('#testerInvitation').boundingBox(),close=await tab.locator('#testerInvitationClose').boundingBox();assert.ok(invite.x>=0&&invite.x+invite.width<=390&&close.width>=44&&close.height>=44);
+  await tab.locator('#testerInvitationClose').focus();await tab.keyboard.press('Escape');await tab.locator('#testerInvitation').waitFor({state:'hidden'});
+  await tab.reload({waitUntil:'domcontentloaded'});await tab.waitForFunction(()=>globalThis.__WE3D_RUNTIME_READY__,null,{timeout:120000});assert.equal(await tab.locator('#testerInvitation').isVisible(),false);
+  report.testerInvitation={passed:true,recipient:'existing published site contact',emailDraftOnly:true,dismissalPersists:true,keyboardEscape:true,mobileFits:true};
+  await ordinary.close();report.cases.push('ordinary isolated production-package startup and dismissible tester invitation without debug attestation');
+ }
+ page=await browser.newPage({viewport:{width:1280,height:800},hasTouch:!baseline});page.setDefaultTimeout(30000);
  await configureStagingAppCheck(page,base);page.on('pageerror',e=>report.errors.push({stage,message:e.message}));
+ collectBrowserGraphicsErrors(page,report.errors);page.on('console',m=>{if(m.type()==='error'&&report.consoleErrors.length<40)report.consoleErrors.push({stage,message:m.text().slice(0,1600)});});
+ page.on('response',r=>{if(r.url().startsWith(base)&&r.status()>=400&&!new URL(r.url()).pathname.startsWith('/api/'))report.localFailures.push({stage,path:new URL(r.url()).pathname,status:r.status()});});
  mark('load-one-Baltimore-world');const start=Date.now();await page.goto(`${base}/app/?loc=custom&lat=39.2904&lon=-76.6122&lname=Baltimore&launch=earth&gm=free&mode=driving`,{waitUntil:'domcontentloaded'});await page.waitForFunction(()=>globalThis.__WE3D_RUNTIME_READY__,null,{timeout:120000});
  if(await page.locator('#analyticsConsentDenyBtn').isVisible())await page.locator('#analyticsConsentDenyBtn').click();
  await page.evaluate(async()=>{window.completionContext=(await import('/app/js/shared-context.js?v=55')).ctx;window.completionFrames=[];let previous=performance.now();const sample=now=>{completionFrames.push(now-previous);if(completionFrames.length>600)completionFrames.shift();previous=now;window.completionFrameHandle=requestAnimationFrame(sample);};window.completionFrameHandle=requestAnimationFrame(sample);});
@@ -42,6 +62,11 @@ try{
  report.cases.push('finite selected-area route and return repeated without world reload or coverage loss');report.cases.push('actual moving-road publications retain contact and a bounded resource window');
  mark('bridge-tunnel-contact');report.structures=await page.evaluate(()=>{const c=completionContext,result={};for(const r of c.roads){const mode=r.structureSemantics?.terrainMode;if(!['elevated','subgrade'].includes(mode)||result[mode])continue;const i=Math.floor((r.pts?.length||0)/2),a=r.pts?.[Math.max(0,i-1)],b=r.pts?.[i];if(!a||!b)continue;const x=(a.x+b.x)/2,z=(a.z+b.z)/2,expected=c.sampleFeatureSurfaceY(r,x,z);result[mode]={id:r.sourceFeatureId,x,z,expected,contact:c.roadContactIndex.sampleAt(x,z,expected,mode)};}return result;});
  for(const record of Object.values(report.structures))assert.ok(Number.isFinite(record.contact));report.cases.push('available bridge and tunnel source/contact records inspected');
- report.final=await read();assert.deepEqual(report.errors,[]);report.passed=true;
+ if(!baseline){
+  const first=report.visits[3],second=report.visits[7];
+  report.routeStability={firstReturn:first.gpu,secondReturn:second.gpu};assert.deepEqual(second.gpu,first.gpu,'Equal route cycles must settle to the same GPU resource counts');
+  await completeBrowserChecks({page,out,report,read,mark});
+ }
+ report.final=await read();assert.deepEqual(report.errors,[]);assert.deepEqual(report.localFailures,[]);report.passed=true;
 }catch(error){report.failure={stage,message:String(error)};process.exitCode=1;await page?.screenshot({path:`${out}/failure.png`}).catch(()=>{});}
 finally{try{await page?.evaluate(()=>cancelAnimationFrame(window.completionFrameHandle)).catch(()=>{});if(owned)await closeOwnedBrowser(owned);}finally{await server?.close();try{await identity?.cleanup();}finally{await fs.rm(privateDir,{recursive:true,force:true});await fs.writeFile(`${out}/receipt.json`,JSON.stringify(report,null,2));}}console.log(JSON.stringify({passed:report.passed,cases:report.cases,failure:report.failure,errors:report.errors}));}

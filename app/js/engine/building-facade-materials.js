@@ -1,5 +1,6 @@
 import { FACADE_TEXTURES } from '../world/building-surface-catalog.js';
 import { facadeNightUniform, FACADE_EMISSION_GLSL } from '../world/facade-lighting.js';
+import { FACADE_PRESENTATION, FACADE_PRESENTATION_GLSL } from '../world/facade-presentation.js';
 import { createHistoricWallMaterial } from '../world/historic-wall-material.js';
 import { FACADE_OPENINGS_GLSL } from '../world/building-facade-layout.js?v=3';
 import {
@@ -338,7 +339,7 @@ function facadeEntranceAtlas(appCtx) {
   return texture;
 }
 
-function applyWallOnlyFacadeMap(material, roof, entranceAtlas, exteriorProfile) {
+function applyWallOnlyFacadeMap(material, roof, entranceAtlas, exteriorProfile, unitsPerMeter=1) {
   material.extensions = { ...material.extensions, derivatives: true };
   const facadeProjection = new THREE.Vector4(...material.userData.facadeProjection);
   const roofA = new THREE.Color(roof.colorA); roofA.convertSRGBToLinear?.();
@@ -346,6 +347,7 @@ function applyWallOnlyFacadeMap(material, roof, entranceAtlas, exteriorProfile) 
   const grainScale = Number(roof.grainScale || 0.6);
   material.onBeforeCompile = (shader) => {
     shader.uniforms.facadeNight = facadeNightUniform;
+    shader.uniforms.facadeUnitsPerMeter = {value:unitsPerMeter};
     // Facades use wall-local coordinates; remove the unused standard map UV
     // varying so merged buildings stay within eight vertex attribute slots.
     shader.vertexShader = shader.vertexShader.replace('#include <uv_vertex>', '');
@@ -375,7 +377,9 @@ function applyWallOnlyFacadeMap(material, roof, entranceAtlas, exteriorProfile) 
       'varying vec4 vFacadeEntrance;',
       'varying vec4 vFacadeLayout; varying vec4 vFacadeOpening;',
       FACADE_OPENINGS_GLSL,
+      FACADE_PRESENTATION_GLSL,
       'uniform float facadeNight;',
+      'uniform float facadeUnitsPerMeter;',
       'uniform sampler2D facadeEntranceAtlas;',
       'uniform vec4 facadeProjection;',
       'uniform vec3 facadeRoofA;',
@@ -419,9 +423,9 @@ function applyWallOnlyFacadeMap(material, roof, entranceAtlas, exteriorProfile) 
         '  float entranceTangentSign = mix(-1.0, 1.0, step(1.5, vFacadeEntrance.y));',
         '  float bayCenterFromDoor = vFacadeEntrance.x - entranceTangentSign * (fract(vFacadeLayout.x) - 0.5) * fittedBayWidth;',
         '  if (vFacadeEntrance.y > 0.5 && vFacadeLayout.y >= 0.0 && vFacadeLayout.y < 1.0 && abs(bayCenterFromDoor) < fittedBayWidth * vFacadeOpening.x * 0.5 + 1.2) openingLayout.x = -1.0;',
-        '  float facadeBuildingSeed=dot(floor(facadeBase*16.0+.001),vec3(17.0,3.0,7.0));',
+        '  float facadeSeed=facadeBuildingSeed(facadeBase);',
         '  vec4 facadeSurface = vec4(diffuseColor.rgb,0.0);',
-        '  if (vFacadeWallMask > 0.5) facadeSurface = facadeOpenings(diffuseColor.rgb, openingLayout, vFacadeOpening, facadeViewRay(vViewPosition,vFacadeLayout.zw),facadeBuildingSeed);',
+        '  if (vFacadeWallMask > 0.5) facadeSurface = facadeOpenings(diffuseColor.rgb, openingLayout, vFacadeOpening, facadeViewRay(vViewPosition,vFacadeLayout.zw),facadeSeed);',
         '  diffuseColor.rgb = facadeSurface.rgb;',
         '  float entranceActive = step(0.5, vFacadeEntrance.y) * vFacadeWallMask;',
         '  if (entranceActive > 0.0) {',
@@ -450,10 +454,10 @@ function applyWallOnlyFacadeMap(material, roof, entranceAtlas, exteriorProfile) 
     );
     shader.fragmentShader = shader.fragmentShader
       .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n' + FACADE_EMISSION_GLSL)
-      .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\nroughnessFactor=mix(roughnessFactor,.22,facadeSurface.a);')
-      .replace('#include <normal_fragment_maps>', '#include <normal_fragment_maps>\nnormal=facadeGrainNormal(normal,vViewPosition,dot(facadeTexel.rgb,vec3(.2126,.7152,.0722)),.018*vFacadeWallMask*(1.0-facadeSurface.a));');
+      .replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>\nroughnessFactor=mix(roughnessFactor,${FACADE_PRESENTATION.glassRoughness},facadeSurface.a);`)
+      .replace('#include <normal_fragment_maps>', '#include <normal_fragment_maps>\nnormal=facadeGrainNormal(normal,vViewPosition,dot(facadeTexel.rgb,vec3(.2126,.7152,.0722)),.018*vFacadeWallMask*(1.0-facadeSurface.a)*facadeDetailWeight(length(vViewPosition)/facadeUnitsPerMeter));');
   };
-  material.customProgramCacheKey = () => 'building-facade-local-layout-v12-room-depth';
+  material.customProgramCacheKey = () => `building-facade-local-layout-v13:${FACADE_PRESENTATION.version}`;
 }
 
 export function buildingRoofSurface(appCtx, materialName = '') {
@@ -606,9 +610,10 @@ export function getBuildingMaterial(engineContext, buildingType, buildingSeed, b
   });
   const projection=facadeTextureProjection(lodTextureId,textureProjectionStyle,facadeVariant,lodTier);
   material.userData = { facadeVariant,facadeProjection:projection };
-  applyWallOnlyFacadeMap(material, roof, entranceAtlas, exteriorProfile);
+  applyWallOnlyFacadeMap(material, roof, entranceAtlas, exteriorProfile,Number(appCtx?.WORLD_UNITS_PER_METER)||1);
   material.name = `building-exterior:${key}`;
   material.userData = {
+    facadePresentationVersion:FACADE_PRESENTATION.version,
     facadeProjection: projection,
     buildingBatchKey: `building-exterior:${key}`,
     buildingExterior: true,

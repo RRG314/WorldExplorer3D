@@ -43,8 +43,8 @@ export async function createRegionalBuildingWorker(options, { signal, workerFact
     async finish() {
       try {
         const packet = await request({ type: 'finish' });
-        const { data, rings, roadPacket, ...stats } = packet;
-        return { ...stats, buildings: new RegionalBuildingDescriptors({ data, rings }),
+        const { data, rings, identities, roadPacket, ...stats } = packet;
+        return { ...stats, buildings: new RegionalBuildingDescriptors({ data, rings, identities }),
           roadCoveragePlan: roadPacket ? ownRegionalRoadPacket(roadPacket) : null };
       } finally { dispose(); }
     }

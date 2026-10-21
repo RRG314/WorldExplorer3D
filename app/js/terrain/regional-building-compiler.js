@@ -75,7 +75,7 @@ export function createRegionalBuildingCompiler(options) {
       }
     }
     stats.availableBuildings += descriptors.length;
-    buckets.push({ data, exact, length: descriptors.length, cursor: majorCount });
+    buckets.push({ data, exact, identities:descriptors.map(b=>b.identity), length: descriptors.length, cursor: majorCount });
     return { tileAvailableBuildings };
   }
   function finish() {
@@ -84,11 +84,12 @@ export function createRegionalBuildingCompiler(options) {
     const limit = Math.max(0, Math.min(FAR_CONTEXT_MAX_BUILDING_INSTANCES,
       Math.floor(options.maxInstances ?? FAR_CONTEXT_MAX_BUILDING_INSTANCES)));
     const target = Math.min(limit, Math.max(major.length, Math.ceil(stats.availableBuildings * FAR_CONTEXT_BUILDING_COVERAGE_TARGET)));
-    const data = new Float64Array(target * DESCRIPTOR_STRIDE), candidates = [];
+    const data = new Float64Array(target * DESCRIPTOR_STRIDE), candidates = [], identities=[];
     let count = 0;
     function append(bucketIndex, index) {
       const bucket = buckets[bucketIndex], at = index * DESCRIPTOR_STRIDE;
       data.set(bucket.data.subarray(at, at + DESCRIPTOR_STRIDE), count * DESCRIPTOR_STRIDE);
+      identities.push(bucket.identities[index]);
       const exact = bucket.exact.get(index);
       if (exact) candidates.push({ ...exact, outputIndex: count });
       count++;
@@ -110,7 +111,7 @@ export function createRegionalBuildingCompiler(options) {
     let roadPacket = null;
     if (roadPlan) try { roadPacket = rasterizeRegionalRoadPlan(roadPlan, roadFrame.maxTextureSize); }
     catch (error) { roadPacket = { keys:[],masks:new Uint8Array(0),stats:{...roadPlan.stats},error:String(error.message) }; }
-    return { data, rings, ...stats, selectedBuildingTarget: target,
+    return { data, rings, identities, ...stats, selectedBuildingTarget: target,
       roadPacket,
       majorBuildingsAvailable: major.length, majorBuildingsSelected: Math.min(major.length, target),
       buildingBudgetExceeded: Math.ceil(stats.availableBuildings * FAR_CONTEXT_BUILDING_COVERAGE_TARGET) > limit,

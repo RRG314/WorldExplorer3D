@@ -85,6 +85,8 @@ export function resetWorldForReload(options = {}) {
   const resetWorldFurnitureCaches = typeof options.resetWorldFurnitureCaches === 'function' ? options.resetWorldFurnitureCaches : () => {};
 
   appCtx._roadMeshGeneration=(appCtx._roadMeshGeneration||0)+1;
+  appCtx.worldSnapshotStore?.clear?.(options.reason || 'world_reload');
+  appCtx.worldPublication = null;
   appCtx._cancelTransportPreparation?.();
   appCtx._cancelTransportPreparation=null;
   appCtx.transportDetail?.dispose();

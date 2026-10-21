@@ -500,3 +500,51 @@ match; notes and unrelated case definitions do not invalidate them. Four cache
 invariant checks passed. The 35-case frame receipt was adopted and then reused,
 not executed again. Existing historical suites remain available; they are not
 the production-candidate execution queue.
+
+## October 20: geographic publication scopes, portable cells and presentation
+
+The owner requested continuing through a production-ready local candidate; the
+completion contract is in `2026-10-20-BROWSER-COMPLETION.md`. The previous frame
+commands and evidence reuse commit is `5e9050b5`. No release branch or deployment
+is changed.
+
+- Existing WorldSnapshotStore now begins a request lifetime before compilation,
+  owns accepted geographic leases through the existing lifecycle scope, rejects
+  obsolete publications, and retires regions on reset/title release. There is no
+  new scheduler or independent mutable world database. The regional window owns
+  terrain, buildings, water and road overview together. Moving road cells own
+  exact mesh/contact leases. Interactive building/structure coverage and its
+  entrance/POI identities stay pinned to the selected district; local/room edits
+  retain their existing separate durable owners. Old retirement cannot clear a
+  replacement catalog, window or road geometry.
+- Versioned WorldCellFacts and an explicit JSON/typed-buffer codec retain exact
+  published precision, geographic frame/units, terrain geometry/grid/portals and
+  provenance, building footprints/height semantics, transport source identities
+  and surfaces, entrances, POIs and land use. Exports include whole cross-cell
+  features. They describe accepted published data; regional inferred buildings
+  remain presentation only. Original provider bytes are not falsely claimed to
+  survive a compiler that already discarded them. No coarse resampled terrain
+  replaces original geometry. Browser road rendering/contact consumes the same
+  portable packet, and POI lifecycle compilation consumes canonical inputs.
+- Regional packing now carries every selected source building identity through
+  to instance batches and exact geometry ranges. It retains compact identity
+  tables and renderer buffers, without another expanded city object graph.
+- Near/regional facades share one presentation contract for glass, occupied
+  rooms, emission and metre-based detail fade. Existing catalogs, licensed
+  textures, night-light owner, geometry coverage and interior lighting remain
+  authoritative. No new lights/textures/scheduler are introduced.
+
+The one-world Baltimore baseline passed two finite-area road routes and returns,
+with 49,080 building colliders and 18,951 road records preserved. Returns settled
+to 2,489 GPU geometries and 251 textures in both cycles; bridge and tunnel contact
+matched the published surfaces. This is controlled local integration, not a new
+production or universal-performance pass.
+
+Focused case groups cover replacement/retirement, full-precision interchange,
+cross-cell IDs/contact, POI and overlay ownership, worker packing and the existing
+frame/admission boundaries. Shared shader fixture initially failed on a reserved
+GLSL parameter, then on a missing fragment uniform. Both failed receipts remain
+under output/research/browser-completion-2026-10-20. The corrected fixture passed
+with zero graphics errors; day/close/night images were inspected and retirement
+returned to its one-ground-geometry baseline. Final packaged integration and
+source/package/evidence delta review remain pending at this commit.

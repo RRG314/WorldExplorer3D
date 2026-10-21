@@ -1,4 +1,6 @@
 import {createRoadRegionLease} from './road-region-lease.js';
+import {createTransportCellFacts,transportFromCellFacts} from '../earth-core/world-cell-facts.js';
+import {worldFactFrame} from '../world/world-cell-adapter.js';
 import {prepareTransportDetail} from './transport-detail-runtime.js';
 import {createNumericPublicationStore} from '../structure-semantics/numeric-publication.js';
 import {createPortalSurfaceClipper} from './portal-surface-clip.js';
@@ -899,8 +901,13 @@ export async function publishCompiledTransportMeshes(deps = {}) {
         triangles:detailTriangles,
         roadSurfaceIntegrity:Object.freeze({...roadSurfaceIntegrity})});
     };
-    detail.attach(async (packet,{isCurrent:publicationCurrent=isCurrent}={})=>{
+    const publicationStore=appCtx.worldSnapshotStore,requestId=publicationStore?.residency().requestId;
+    detail.attach(async (sourcePacket,{isCurrent:publicationCurrent=isCurrent}={})=>{
       if(!isCurrent())throw new DOMException('Transport region superseded','AbortError');
+      // Rendering and contact consume this same versioned, portable geometry.
+      const facts=createTransportCellFacts(sourcePacket,{requestId:requestId||`world-load:${sequence}`,
+        frame:worldFactFrame(appCtx),roads:atGradeRoads});
+      const packet=transportFromCellFacts(facts);
       const group=new THREE.Group(),meshes=[];
       let contact=null,committed=false;
       const schedule={current:publicationCurrent,yieldWork:yieldToWorldFrame,budgetMs:2};
@@ -962,7 +969,12 @@ export async function publishCompiledTransportMeshes(deps = {}) {
         for(const mesh of meshes){vertices+=mesh.geometry.attributes.position?.count||0;triangles+=(mesh.geometry.getIndex()?.count||0)/3;}
         detailVertices+=vertices;detailTriangles+=triangles;
         residentRegions.set(packet.key,{meshes,vertices,triangles,measurements,junctionStats,cells:packet.keys.length,
-          lease:createRoadRegionLease(meshes,regionalContact,packet.key)});
+          lease:createRoadRegionLease(meshes,regionalContact,packet.key,{store:publicationStore,
+            requestId,bounds:packet.bounds,facts,onRetire(){
+              const retired=new Set(meshes);
+              if(appCtx.roadMeshes.some(mesh=>retired.has(mesh)))
+                appCtx.replaceWorldCollection('roadMeshes',appCtx.roadMeshes.filter(mesh=>!retired.has(mesh)));
+            }})});
         committed=true;
         roadSurfaceIntegrity.carriagewayRegions+=packet.keys.length;
         for(const [key,value] of Object.entries(junctionStats))roadSurfaceIntegrity[key]=key.startsWith('maximum')

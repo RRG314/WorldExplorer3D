@@ -2042,6 +2042,7 @@
       "tunnelSolidCompilation",
       "urbanSurfaceStats",
       "worldLoading",
+      "worldPublication",
       "worldSurfaceProfile",
       "worldTraversalRadiusWorld"
     ],
@@ -2188,6 +2189,16 @@
     "app/js/world/street-source-revision.js": [
       "_streetPavementDirty",
       "_streetSourceRevision"
+    ],
+    "app/js/world/world-cell-adapter.js": [
+      "activeFunctionalPois",
+      "buildingEntranceByBuilding",
+      "buildingEntranceCatalog",
+      "buildingFacadeEntrances",
+      "functionalPoiRecords",
+      "poiLifecycle",
+      "poiTenanciesByBuilding",
+      "refreshActiveFunctionalPois"
     ]
   }
 }

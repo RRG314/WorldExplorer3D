@@ -114,6 +114,7 @@ function createFarFieldTerrainApi(deps = {}) {
   let farContextMesh = null;
   let farWaterMesh = null;
   let regionalRoadCoverage = null;
+  let publicationLease = null;
   let pendingFarWaterContext = null;
   let pendingBuildPromise = null;
   let elevationAbortController = null;
@@ -180,6 +181,8 @@ function createFarFieldTerrainApi(deps = {}) {
   }
 
   function removeCurrentMesh() {
+    publicationLease?.dispose();
+    publicationLease = null;
     regionalRoadCoverage?.mask.dispose();regionalRoadCoverage=null;
     appCtx.fixedRegionalStructureWaterAreas = [];
     if (farFieldMesh) {
@@ -391,6 +394,7 @@ function createFarFieldTerrainApi(deps = {}) {
     const centerScratch = {};
     const retireDescriptors = () => packedDescriptors ? mappedBuildings.dispose() : (mappedBuildings.length = 0);
     const instances=new FarBuildingInstanceStorage(mappedBuildings.length);
+    const buildingRanges=[];
     let buildingSliceStarted = performance.now();
     try {
     for (let buildingIndex = 0; buildingIndex < mappedBuildings.length; buildingIndex += 1) {
@@ -431,10 +435,15 @@ function createFarFieldTerrainApi(deps = {}) {
         if (Array.isArray(building.ring)) simplifiedFootprintFallbacks++;
         instances.append(center.x,center.z,baseY,
           Number(building.widthMeters)*unitsPerMeter,Number(building.depthMeters)*unitsPerMeter,
-          massing.heightMeters*unitsPerMeter,Number(building.rotationY)||0,massing.color,massing.roofFraction,massing.facadeStyle);
+          massing.heightMeters*unitsPerMeter,Number(building.rotationY)||0,massing.color,massing.roofFraction,massing.facadeStyle,building.identity);
         continue;
       }
+      const vertexStart=positions.length/3,indexStart=indices.length;
       appendRegionalBuildingFootprint({positions,colors,styles,layouts,indices},footprint,topTriangles,massing,baseY,unitsPerMeter);
+      buildingRanges.push({id:building.identity,vertexStart,vertexCount:positions.length/3-vertexStart,
+        indexStart,indexCount:indices.length-indexStart,bounds:footprint.reduce((b,p)=>({minX:Math.min(b.minX,p.x),
+          maxX:Math.max(b.maxX,p.x),minZ:Math.min(b.minZ,p.z),maxZ:Math.max(b.maxZ,p.z)}),
+          {minX:Infinity,maxX:-Infinity,minZ:Infinity,maxZ:-Infinity})});
       exactPublished += 1;
     }
 
@@ -442,6 +451,7 @@ function createFarFieldTerrainApi(deps = {}) {
     let geometry = null;
     if (exactPublished > 0) {
       geometry = new THREE.BufferGeometry();
+      geometry.userData.regionalBuildingRanges=buildingRanges;
       geometry.setAttribute('position', new THREE.BufferAttribute(positions.finish(), 3));
       // Facade tint is bounded RGB, like terrain tint. Normalized bytes preserve
       // all vertices and source buildings while using one quarter of RGB floats.
@@ -471,6 +481,7 @@ function createFarFieldTerrainApi(deps = {}) {
   }
 
   async function buildAndPublish(spec, requestGeneration, parentSignal) {
+    const publicationStore=appCtx.worldSnapshotStore,publicationRequestId=publicationStore?.residency().requestId;
     const build = createRegionBuild(parentSignal);
     const signal = build.signal;
     const isCurrent = () => requestGeneration === generation && !signal.aborted;
@@ -811,6 +822,31 @@ function createFarFieldTerrainApi(deps = {}) {
       landAreaSpatialByTile: mappedContext.landAreaSpatialByTile,
       surfaceFallbackByTile: mappedContext.surfaceFallbackByTile
     });
+    // Terrain, regional buildings, water and overview share the accepted
+    // window's world lifetime. The scheduler still selects/loads one window.
+    const ownedTerrain=farFieldMesh,ownedBuildings=farContextMesh,ownedWater=farWaterMesh;
+    const ownedCoverage=regionalRoadCoverage,ownedSurface=farFieldSurfaceState;
+    const ownedMappedContext=appCtx.fixedLocationMappedSurfaceContext;
+    const ownedWaterAreas=appCtx.fixedRegionalStructureWaterAreas;
+    publicationLease=publicationStore?.ownRegion({key:'regional-window',expectedRequestId:publicationRequestId,
+      layers:['terrain','buildings','hydrology','transport-overview'],
+      bounds:{minX:spec.anchor.x-spec.contextHalfExtentWorld,maxX:spec.anchor.x+spec.contextHalfExtentWorld,
+        minZ:spec.anchor.z-spec.contextHalfExtentWorld,maxZ:spec.anchor.z+spec.contextHalfExtentWorld},
+      retire(){
+        ownedCoverage?.mask.dispose();
+        for(const retired of [ownedTerrain,ownedBuildings,ownedWater]){
+          if(!retired)continue;
+          if(retired===ownedWater)untrackWaterMesh(retired);
+          retired.parent?.remove?.(retired);disposeFarFieldMesh(retired);
+        }
+        if(farFieldMesh===ownedTerrain)farFieldMesh=null;
+        if(farContextMesh===ownedBuildings)farContextMesh=null;
+        if(farWaterMesh===ownedWater)farWaterMesh=null;
+        if(regionalRoadCoverage===ownedCoverage)regionalRoadCoverage=null;
+        if(farFieldSurfaceState===ownedSurface)farFieldSurfaceState=null;
+        if(appCtx.fixedLocationMappedSurfaceContext===ownedMappedContext)appCtx.fixedLocationMappedSurfaceContext=null;
+        if(appCtx.fixedRegionalStructureWaterAreas===ownedWaterAreas)appCtx.fixedRegionalStructureWaterAreas=[];
+      }});
     let detailedMappedSurfaceTintVertices = 0;
     for (const detailedMesh of appCtx.terrainGroup?.children || []) {
       if (detailedMesh?.userData?.isTerrainMesh !== true || detailedMesh.userData?.isFarTerrainClipmap) continue;

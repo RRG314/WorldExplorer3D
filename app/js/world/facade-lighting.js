@@ -3,8 +3,6 @@
 export const facadeNightUniform = { value: 0 };
 
 export const FACADE_EMISSION_GLSL = `
-  float occupiedRoom=facadeRoomSeed(vFacadeLayout.xy,facadeBuildingSeed);
-  float retailRoom=step(.01,vFacadeOpening.w)*(1.0-step(1.0,vFacadeLayout.y));
-  float roomOn=max(retailRoom,step(.62,occupiedRoom));
-  totalEmissiveRadiance += facadeSurface.rgb*vec3(2.8,2.15,1.35)*facadeSurface.a*roomOn*facadeNight;
+  totalEmissiveRadiance += facadeRoomEmission(facadeSurface.rgb,vFacadeLayout.xy,
+    facadeSeed,vFacadeOpening.w,facadeNight)*facadeSurface.a;
 `;
