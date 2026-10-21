@@ -90,3 +90,10 @@ for confirmation. This does not authorize pushing, deployment, release-branch
 changes, broad historical acceptance sweeps or starting the Godot port.
 Production remains released 5.6.1 at source
 `233a5a7f813fef97da3d75a76eb87996321fda2f`.
+
+The October 20 owner instruction now requires completing the remaining browser
+cleanup through deployment-candidate readiness without pausing at checkpoints.
+The concrete endpoint and nonduplicative verification policy are
+`docs/architecture-evaluation/2026-10-20-BROWSER-COMPLETION.md`. This supersedes
+older per-commit stopping points. The Godot consumer and actual deployment remain
+outside the run.

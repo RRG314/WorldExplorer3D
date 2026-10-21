@@ -10,7 +10,7 @@ import {isEarthWorldUsable} from '../app/js/earth-core/world-readiness.js';
 
 const selection={key:'custom',lat:39.29,lon:-76.61,name:'Baltimore'};
 function setup(overrides={}) {
-  const ctx={car:{},hashGeoToInt:()=>42,resolveLocationSelection:()=>selection,showLoad(){},...overrides};
+  const ctx={car:{},initializeWorldLoadActors:()=>true,hashGeoToInt:()=>42,resolveLocationSelection:()=>selection,showLoad(){},...overrides};
   const deps={appCtx:ctx,resetWorldForReload(){ctx.worldLoading=true;},getAdaptiveLoadProfile,getWorldLodThresholds,
     getRuntimeDynamicBudget:()=>({deviceClass:'desktop',budgetScale:1,lodScale:1}),earthSceneSuppressed:()=>false};
   return {ctx,deps};

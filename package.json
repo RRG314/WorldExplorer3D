@@ -178,7 +178,8 @@
     "preview:promote": "node scripts/firebase-hosting-promote.mjs",
     "verify:streets": "node scripts/verification/streets.mjs",
     "verify:ownership": "node scripts/verification/context-ownership.mjs",
-    "verify:runtime-diagnostics": "node scripts/verification/runtime-diagnostics-browser.mjs"
+    "verify:runtime-diagnostics": "node scripts/verification/runtime-diagnostics-browser.mjs",
+    "verify:browser-foundation": "node scripts/verification/browser-foundation-acceptance.mjs"
   },
   "repository": {
     "type": "git",

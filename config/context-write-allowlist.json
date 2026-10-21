@@ -954,15 +954,12 @@
       "updatePlanetaryFieldMap"
     ],
     "app/js/planetary/mars-world.js": [
-      "Walk",
       "ambientLight",
       "arriveAtMars",
       "camera",
       "cancelPendingMarsTransition",
-      "car",
       "carMesh",
       "directTravelToMars",
-      "drone",
       "fillLight",
       "hemiLight",
       "marsObjects",
@@ -1016,9 +1013,7 @@
       "arriveAtSolidWorld",
       "camera",
       "canLandSolidWorld",
-      "car",
       "carMesh",
-      "drone",
       "fillLight",
       "getActivePlanetaryReturnPod",
       "getPlanetaryWorldCacheSnapshot",
@@ -1258,11 +1253,6 @@
       "sun",
       "sunSphere",
       "timeOfDay"
-    ],
-    "app/js/sky/moon-landing-ui.js": [
-      "Walk",
-      "car",
-      "drone"
     ],
     "app/js/sky/moon-surface.js": [
       "camera",
@@ -1665,6 +1655,8 @@
       "startMaritimeRuntime"
     ],
     "app/js/travel-mode.js": [
+      "initializePlanetaryArrival",
+      "initializeWorldLoadActors",
       "recoverSurfaceTravel",
       "restoreEarthTravelSession",
       "travelToWorldPoint",
@@ -2062,7 +2054,6 @@
       "worldTraversalRadiusWorld"
     ],
     "app/js/world/load-runtime-session.js": [
-      "Walk",
       "_lastBuildingBatchStats",
       "_lastLanduseBatchStats",
       "_worldLoadSequence",
@@ -2070,8 +2061,6 @@
       "buildingProvenanceFeatureIds",
       "buildingProvenanceModel",
       "buildingProvenanceRecords",
-      "car",
-      "drone",
       "dynamicBudgetScale",
       "dynamicLodScale",
       "functionalPoiRecords",

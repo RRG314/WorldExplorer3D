@@ -1,3 +1,4 @@
+import {createWalkingFrameCommands} from './walking/frame-commands.js';
 import { ctx as appCtx } from "./shared-context.js?v=55";
 import { createWalkingCharacterHelpers } from "./walking/character.js?v=7";
 import { createWalkingGeometryHelpers } from "./walking/geometry.js?v=1";
@@ -105,6 +106,7 @@ function createWalkingModule(opts) {
   syncWalkerFromCar();
 
   return {
+    ...createWalkingFrameCommands({context:appCtx,state,car,carMesh,eyeHeight:CFG.eyeHeight,pointInPolygon:pointInPolygonSafe}),
     state,
     CFG,
     deactivateWater,

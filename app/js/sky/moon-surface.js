@@ -1,3 +1,4 @@
+import {captureEnvironmentSession} from '../session-coordinator.js?v=2';
 import { createSurfaceDressing } from '../planetary/surface-dressing.js';
 import { activateLunarFieldwork } from '../planetary/lunar-fieldwork.js';
 import { addSurfaceMaterialDetail } from '../planetary/surface-material-detail.js';
@@ -64,10 +65,14 @@ function addScaleRocks(appCtx, surface, sampleHeight) {
   window._moonObjects.push(rocks);
 }
 
-function finishMoonEntry(appCtx, createApollo11LandingSite, positionCarOnMoon) {
-  if (!appCtx.onMoon) return;
+function finishMoonEntry(appCtx, createApollo11LandingSite, positionCarOnMoon, session) {
+  if (!appCtx.onMoon || !session.isCurrent()) return;
   createApollo11LandingSite();
-  positionCarOnMoon();
+  if (!positionCarOnMoon()) {
+    appCtx.showToast?.('The lunar surface is unavailable. Returning to Earth.');
+    void appCtx.returnToEarthFromMenu?.();
+    return false;
+  }
   activateLunarFieldwork(appCtx);
   appCtx.refreshBlockBuilderForCurrentLocation?.();
   if (appCtx.carMesh) appCtx.carMesh.visible = true;
@@ -86,6 +91,7 @@ export function activateMoonSurface(appCtx) {
 
 export function createMoonSurface(options = {}) {
   const { appCtx, createApollo11LandingSite, positionCarOnMoon } = options;
+  const session=captureEnvironmentSession();
   const surface = createMeasuredSurface(appCtx);
   const surfaceAuthority = ensurePlanetarySurfaceAuthority(appCtx);
   appCtx.moonSurface = surface;
@@ -108,7 +114,7 @@ export function createMoonSurface(options = {}) {
       surface.userData.surfacePublication = publication;
       if (!accepted) {
         console.error('LROC lunar terrain failed acceptance.', publication.reason);
-        finishMoonEntry(appCtx, createApollo11LandingSite, positionCarOnMoon);
+        finishMoonEntry(appCtx, createApollo11LandingSite, positionCarOnMoon, session);
         return surface;
       }
       const sampleHeight = (localX, localZ) => {
@@ -119,13 +125,13 @@ export function createMoonSurface(options = {}) {
         return sample.status === 'available' ? sample.local.y : 0;
       };
       addScaleRocks(appCtx, surface, sampleHeight);
-      finishMoonEntry(appCtx, createApollo11LandingSite, positionCarOnMoon);
+      finishMoonEntry(appCtx, createApollo11LandingSite, positionCarOnMoon, session);
       return surface;
     })
     .catch((error) => {
       console.error('LROC lunar terrain failed to load.', error);
       surface.userData.ready = false;
-      finishMoonEntry(appCtx, createApollo11LandingSite, positionCarOnMoon);
+      finishMoonEntry(appCtx, createApollo11LandingSite, positionCarOnMoon, session);
       return surface;
     });
   return surface;

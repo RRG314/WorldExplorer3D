@@ -267,32 +267,8 @@ function createMarsAtmosphericDust() {
 }
 
 function positionPlayerOnMars() {
-  const groundY = MARS_SURFACE_Y + sampleMarsLocalHeight(MARS_SPAWN.x, MARS_SPAWN.z);
-  Object.assign(appCtx.car, {
-    x: MARS_SPAWN.x,
-    z: MARS_SPAWN.z,
-    y: groundY + 1.2,
-    angle: MARS_SPAWN.angle,
-    vx: 0,
-    vz: 0,
-    vy: 0,
-    vFwd: 0,
-    vLat: 0,
-    yawRate: 0,
-    rearSlip: 0,
-    steerSm: 0,
-    throttleSm: 0,
-    speed: 0,
-    isAirborne: false,
-    _lastSurfaceY: null
-  });
-  if (appCtx.drone) {
-    Object.assign(appCtx.drone, { x: MARS_SPAWN.x, z: MARS_SPAWN.z, y: groundY + 12, yaw: MARS_SPAWN.angle, pitch: -0.24, roll: 0 });
-  }
-  const walker = appCtx.Walk?.state?.walker;
-  if (walker) Object.assign(walker, { x: MARS_SPAWN.x, z: MARS_SPAWN.z, y: groundY + 1.7, vy: 0, yaw: MARS_SPAWN.angle });
-  appCtx.carMesh?.position.set(MARS_SPAWN.x, groundY + 1.2, MARS_SPAWN.z);
-  if (appCtx.carMesh) appCtx.carMesh.rotation.y = MARS_SPAWN.angle;
+  if (appCtx.initializePlanetaryArrival?.('mars',MARS_SPAWN,{mode:'drive',source:'mars_arrival'}) !== true) return false;
+  const groundY = appCtx.car.y - 1.2;
   if (appCtx.camera) {
     appCtx.camera.position.set(MARS_SPAWN.x + 16, groundY + 9, MARS_SPAWN.z + 18);
     appCtx.camera.lookAt(0, MARS_SURFACE_Y + 900, 0);
@@ -337,11 +313,6 @@ function setMarsInterfaceActive(active) {
   appCtx.updateWeatherUi?.();
 }
 
-function enterMarsDriveMode() {
-  appCtx.setDroneModeActive(false);
-  if (appCtx.Walk?.state?.mode === 'walk') appCtx.Walk.setModeDrive();
-  appCtx.setTravelMode?.('drive', { source: 'mars_arrival', emitTutorial: false });
-}
 
 async function arriveAtMars(expectedSessionId = null) {
   const sessionId = expectedSessionId ?? ++marsTransitionSessionId;
@@ -368,15 +339,15 @@ async function arriveAtMars(expectedSessionId = null) {
 
   await createMarsSurface();
   if (!retainMarsTransitionOwnership(sessionId)) return false;
+  if (!commitEnvironment(ENV.MARS, { source: 'mars_arrival' })) return false;
   appCtx.refreshBlockBuilderForCurrentLocation?.();
   setMarsObjectsVisible(true);
   setActivePlanetaryObstacles('mars',appCtx.marsSurface?.userData.obstacles || []);
-  enterMarsDriveMode();
-  positionPlayerOnMars();
+  if (positionPlayerOnMars() === false) throw new Error('The accepted Mars arrival is unavailable.');
   void appCtx.setPlanetaryVehicle?.('mars');
   if (!retainMarsTransitionOwnership(sessionId)) return false;
   appCtx.setPlanetaryCharacter?.('mars');
-  positionPlayerOnMars();
+  if (positionPlayerOnMars() === false) throw new Error('The accepted Mars arrival is unavailable.');
   if (appCtx.carMesh) appCtx.carMesh.visible = true;
 
   if(appCtx.hemiLight)appCtx.hemiLight.visible=false;
@@ -390,7 +361,6 @@ async function arriveAtMars(expectedSessionId = null) {
   if (appCtx.ambientLight) appCtx.ambientLight.intensity = 0.7;
   if (appCtx.fillLight) appCtx.fillLight.intensity = 0.55;
   if (!retainMarsTransitionOwnership(sessionId)) return false;
-  if (!commitEnvironment(ENV.MARS, { source: 'mars_arrival' })) return false;
   appCtx.setPlanetarySky?.('mars', new Date(), { starOpacity: .015 });
   setMarsInterfaceActive(true);
   showMarsReturnButton();

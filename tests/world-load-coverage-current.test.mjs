@@ -14,7 +14,7 @@ function loadWithQuality(context, quality) {
   });
 }
 function context() {
-  return {car:{},hashGeoToInt:()=>42,
+  return {car:{},initializeWorldLoadActors:()=>true,hashGeoToInt:()=>42,
     resolveLocationSelection:()=>({key:'custom',lat:39.2904,lon:-76.6122,name:'Baltimore'})};
 }
 

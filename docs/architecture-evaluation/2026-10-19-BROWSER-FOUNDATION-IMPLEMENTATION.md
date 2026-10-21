@@ -475,3 +475,28 @@ finished.
 Regional scenery, detailed roads, structures, entrances and POIs still have distinct publication lifetimes. The next world-residency package must bind their identities and retirement explicitly, prove bridge/tunnel and landing continuity across neighboring cells, preserve edits and the location-based option, and measure retention on a repeat route. The road release repair here is a prerequisite, not completion of that package.
 
 The model/presentation boundary, common near/far visual policy and first Godot consumer remain later packages. No global rewrite, copied Open-Planet implementation or native-only renderer dependency was introduced.
+
+## October 20 continuous completion: frame owners and acceptance reuse
+
+The owner now requires completing browser packages 2–5 through a production-ready
+candidate without pausing at commits. The concrete endpoint is
+`2026-10-20-BROWSER-COMPLETION.md`. World-loading reset and planetary arrival now
+submit frame-specific travel commands. Planetary placement samples only the
+active accepted surface/body and actual obstacle authority. Moon completion and
+resume are session-scoped; unavailable surfaces retain the existing Earth-return
+owner. Ship entry/return uses walking frame commands. Late ship disposal retires
+its own scene without restoring old colliders, actor/camera or lighting into a
+replacement session. Existing intra-frame ship simulation remains ship-owned.
+
+Thirty-five focused boundary cases passed, including eight new frame cases;
+source identities and the failed incomplete vessel-cleanup test fixture are
+retained in output/research/frame-ownership-2026-10-20. Context ownership passes
+with 218 writer files. Real-world frame acceptance remains in the integrated
+journey, rather than another city load per boundary test.
+
+The new input-scoped acceptance runner hashes transitive runtime/worker inputs
+and evidence. It reuses completed passing cases whose relevant inputs still
+match; notes and unrelated case definitions do not invalidate them. Four cache
+invariant checks passed. The 35-case frame receipt was adopted and then reused,
+not executed again. Existing historical suites remain available; they are not
+the production-candidate execution queue.

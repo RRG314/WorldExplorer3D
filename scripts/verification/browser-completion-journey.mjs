@@ -1,0 +1,47 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import os from 'node:os';
+import {chromium} from 'playwright';
+import {startStaticServer} from './static-server.mjs';
+import {configureStagingAppCheck} from './staging-app-check.mjs';
+import {stagingCaptureAttestation} from './staging-capture-attestation.mjs';
+import {closeOwnedBrowser} from './owned-browser.mjs';
+const baseline=process.argv.includes('--baseline'),root=process.cwd(),servedRoot=path.resolve(process.env.WE3D_VERIFY_ROOT||'.');
+const out=process.env.WE3D_COMPLETION_OUTPUT||`output/research/browser-completion-2026-10-20/${baseline?'baseline':'candidate'}`;
+const disk=await fs.statfs(root);assert.ok(disk.bavail*disk.bsize>4*1024**3,'Preserve 4 GiB free disk while verifying');await fs.mkdir(out,{recursive:true});
+const privateDir=await fs.mkdtemp(path.join(os.tmpdir(),'we3d-browser-completion-'));let identity,server,owned,page,stage='setup';
+const report={passed:false,baseline,scope:'One assembled Baltimore world; ordinary transport commands and short input bursts across finite selected-area road publications, repeat-route resource sampling. Staging attestation; not a controls-only intercity drive or live production acceptance.',cases:[],errors:[],visits:[]};
+const mark=name=>{stage=name;console.log(JSON.stringify({stage}));};
+const read=()=>page.evaluate(()=>{const c=completionContext;return {mode:c.getCurrentTravelMode(),actor:c.activeTransportActor(),world:c._worldLoadSequence,buildings:c.buildings.length,roads:c.roads.length,transport:{...c.transportDetail?.stats},scenery:c.getRegionalSceneryState?.(),gpu:{...c.renderer.info.memory},heap:performance.memory?.usedJSHeapSize,publicationId:c.worldPublication?.id};});
+try{
+ identity=await stagingCaptureAttestation();const credential=path.join(privateDir,'credential.json');await fs.writeFile(credential,JSON.stringify({projectId:'we3d-staging-20260712',appId:'1:524178734996:web:f59acbc9014f0e26f51981',expiresAt:new Date(Date.now()+1800000).toISOString(),token:identity.token}),{mode:0o600});process.env.WE3D_STAGING_APP_CHECK_FILE=credential;
+ server=await startStaticServer({rootDir:servedRoot,ports:[4397]});const base=`http://127.0.0.1:${server.port}`;
+ owned=await chromium.launchServer({channel:'chrome',headless:true,args:['--js-flags=--max-old-space-size=2048']});const browser=await chromium.connect(owned.wsEndpoint());page=await browser.newPage({viewport:{width:1280,height:800}});page.setDefaultTimeout(30000);
+ await configureStagingAppCheck(page,base);page.on('pageerror',e=>report.errors.push({stage,message:e.message}));
+ mark('load-one-Baltimore-world');const start=Date.now();await page.goto(`${base}/app/?loc=custom&lat=39.2904&lon=-76.6122&lname=Baltimore&launch=earth&gm=free&mode=driving`,{waitUntil:'domcontentloaded'});await page.waitForFunction(()=>globalThis.__WE3D_RUNTIME_READY__,null,{timeout:120000});
+ if(await page.locator('#analyticsConsentDenyBtn').isVisible())await page.locator('#analyticsConsentDenyBtn').click();
+ await page.evaluate(async()=>{window.completionContext=(await import('/app/js/shared-context.js?v=55')).ctx;window.completionFrames=[];let previous=performance.now();const sample=now=>{completionFrames.push(now-previous);if(completionFrames.length>600)completionFrames.shift();previous=now;window.completionFrameHandle=requestAnimationFrame(sample);};window.completionFrameHandle=requestAnimationFrame(sample);});
+ if(await page.locator('#globeSelectorStartBtn').isVisible())await page.locator('#globeSelectorStartBtn').click();
+ await page.waitForFunction(()=>{const c=completionContext;return c?.gameStarted&&!c.worldLoading&&!c.titleLaunchPending&&!c.earthResumePending&&c.worldLoadRuntimeState?.status==='ready'&&c.worldLoadRuntimeState?.gameplayRuntimesReady&&c.buildings?.length&&c.roads?.length;},null,{timeout:300000,polling:1000});
+ report.loadMs=Date.now()-start;report.initial=await read();
+ // Keep the location-based setting for equal coverage and a bounded source. The
+ // residency test below does not silently enable unlimited geographic fetching.
+ report.locationBased=await page.evaluate(()=>{const c=completionContext;c.setRegionalSceneryEnabled?.(false);return c.getRegionalSceneryState?.();});
+ const samples=await page.evaluate(()=>{const c=completionContext;return [3500,5000,7000].map(target=>{let selected=null,best=Infinity;for(const r of c.roads){if(r.structureSemantics?.terrainMode!=='at_grade')continue;const a=r.pts?.[0],b=r.pts?.[1];if(!a||!b)continue;const x=(a.x+b.x)/2,z=(a.z+b.z)/2,d=Math.hypot(x-target,z);if(d<best){best=d;selected={x,z,id:String(r.sourceFeatureId||r.id),distance:d};}}return selected;});});
+ assert.ok(samples.every(p=>p&&p.distance<1500),'Finite mapped source does not cover the selected route');report.route=samples;
+ for(let cycle=0;cycle<2;cycle++)for(const [index,target]of [...samples,samples[0]].entries()){
+  mark(`route-${cycle+1}-publication-${index+1}`);
+  assert.equal(await page.evaluate(p=>completionContext.travelToWorldPoint(p.x,p.z,{source:'large_map_context'})?.valid===true,target),true);
+  await page.waitForFunction(()=>{const d=completionContext.transportDetail?.stats;if(d?.error)throw Error(d.error);return d&&!d.activeJobs&&['window-ready','complete'].includes(d.status);},null,{timeout:90000,polling:250});
+  await page.waitForTimeout(500);if(index===0){await page.locator('#viewport').click({position:{x:1100,y:700}}).catch(()=>{});await page.keyboard.down('ArrowUp');try{await page.waitForTimeout(350);}finally{await page.keyboard.up('ArrowUp');}await page.waitForTimeout(350);}
+  const sample=await read();sample.cycle=cycle;sample.target=target;sample.contact=await page.evaluate(p=>completionContext.roadContactIndex.sampleAt(p.x,p.z,NaN,'at_grade'),target);sample.frames=await page.evaluate(()=>{const a=completionFrames.slice().sort((a,b)=>a-b);return {count:a.length,p50:a[Math.floor(a.length*.5)],p95:a[Math.floor(a.length*.95)],max:a.at(-1)};});
+  assert.equal(sample.world,report.initial.world);assert.equal(sample.buildings,report.initial.buildings);assert.equal(sample.roads,report.initial.roads);assert.ok(Number.isFinite(sample.contact));assert.ok(sample.transport.residentMovingRegions<=sample.transport.maxMovingRegions);report.visits.push(sample);
+  if(index===3)await page.screenshot({path:`${out}/return-cycle-${cycle+1}.png`});
+ }
+ report.cases.push('finite selected-area route and return repeated without world reload or coverage loss');report.cases.push('actual moving-road publications retain contact and a bounded resource window');
+ mark('bridge-tunnel-contact');report.structures=await page.evaluate(()=>{const c=completionContext,result={};for(const r of c.roads){const mode=r.structureSemantics?.terrainMode;if(!['elevated','subgrade'].includes(mode)||result[mode])continue;const i=Math.floor((r.pts?.length||0)/2),a=r.pts?.[Math.max(0,i-1)],b=r.pts?.[i];if(!a||!b)continue;const x=(a.x+b.x)/2,z=(a.z+b.z)/2,expected=c.sampleFeatureSurfaceY(r,x,z);result[mode]={id:r.sourceFeatureId,x,z,expected,contact:c.roadContactIndex.sampleAt(x,z,expected,mode)};}return result;});
+ for(const record of Object.values(report.structures))assert.ok(Number.isFinite(record.contact));report.cases.push('available bridge and tunnel source/contact records inspected');
+ report.final=await read();assert.deepEqual(report.errors,[]);report.passed=true;
+}catch(error){report.failure={stage,message:String(error)};process.exitCode=1;await page?.screenshot({path:`${out}/failure.png`}).catch(()=>{});}
+finally{try{await page?.evaluate(()=>cancelAnimationFrame(window.completionFrameHandle)).catch(()=>{});if(owned)await closeOwnedBrowser(owned);}finally{await server?.close();try{await identity?.cleanup();}finally{await fs.rm(privateDir,{recursive:true,force:true});await fs.writeFile(`${out}/receipt.json`,JSON.stringify(report,null,2));}}console.log(JSON.stringify({passed:report.passed,cases:report.cases,failure:report.failure,errors:report.errors}));}

@@ -9,6 +9,8 @@ import {
 } from './planetary/traversal-capabilities.js?v=1';
 import { resolveTravelMenuState } from './travel/menu-state.js?v=2';
 import { captureEnvironmentSession } from './session-coordinator.js?v=2';
+import {queryPlanetaryObstacle} from './planetary/runtime/obstacle-authority.js?v=1';
+import {isWorldLoadRequestActive} from './earth-core/world-load-request.js?v=1';
 import { usesContainedInteriorPhysics } from './interiors/physics-scope.js';
 
 let lastTravelUiSignature = '';
@@ -552,6 +554,44 @@ function activateSurfaceActivity(mode, start, options = {}) {
   });
 }
 
+// A planetary arrival is sampled from the active accepted body, never Earth
+// road queries or a caller-supplied altitude. Dedicated/contained frames retain
+// their own exit, and unavailable or obstructed ground cannot publish a pose.
+function initializePlanetaryArrival(bodyId,point,options={}) {
+  const actual=appCtx.onMoon?'moon':appCtx.onMars?'mars':appCtx.activePlanetaryBodyId;
+  if(!bodyId||bodyId!==actual||!point||![point.x,point.z].every(Number.isFinite)||
+    (point.angle!==undefined&&!Number.isFinite(point.angle))||appCtx.worldLoading||resolveControlState(appCtx).frame!=='surface'||usesContainedInteriorPhysics(appCtx.activeInterior))return false;
+  const mode=options.mode||'drive';
+  if(!['walk','drive'].includes(mode)||resolvePlanetaryTravelCapabilities(appCtx)?.[mode]!==true)return false;
+  const session=captureEnvironmentSession();
+  let ground;
+  try { ground=planetarySurfaceYAtRenderXZ(appCtx,point.x,point.z,{bodyId}); } catch { return false; }
+  if(!Number.isFinite(ground)||queryPlanetaryObstacle(point.x,point.z,mode==='walk'?.35:1.5,bodyId,{minY:ground,maxY:ground+2})||!session.isCurrent())return false;
+  const angle=point.angle??0;
+  const spawn={valid:true,mode,x:point.x,z:point.z,angle,walkY:ground+1.7,carY:ground+1.2,terrainY:ground,onRoad:false,road:null};
+  const applied=transitionTravelMode(mode,{source:options.source||'planetary_arrival',emitTutorial:false},null,
+    {pose:{x:point.x,z:point.z,yaw:angle},resolveGroundSpawn:()=>spawn}).applied;
+  if(!session.isCurrent())return false;
+  if(applied&&appCtx.drone)Object.assign(appCtx.drone,{x:point.x,y:ground+(bodyId==='moon'?10:12),z:point.z,yaw:angle,
+    pitch:bodyId==='mars'?-.24:-.2,roll:0,vx:0,vy:0,vz:0,cameraYawOffset:0,cameraPitchOffset:0,cameraLookTimer:0});
+  return applied;
+}
+
+// World replacement owns a loading-only reset. A stale request or an isolated
+// environment cannot reset the live surface proxies.
+function initializeWorldLoadActors(request) {
+  if(!appCtx.worldLoading||appCtx.getEnv?.()!==appCtx.ENV.EARTH||resolveControlState(appCtx).frame!=='surface'||
+    !isWorldLoadRequestActive(request,{activeSequence:appCtx._worldLoadSequence,activeLocation:appCtx.LOC}))return false;
+  const session=captureEnvironmentSession();
+  transitionTravelMode('walk',{source:'location_load',force:true,emitTutorial:false});
+  if(!session.isCurrent())return false;
+  Object.assign(appCtx.car,{x:0,z:0,vx:0,vy:0,vz:0,speed:0});
+  if(appCtx.drone)Object.assign(appCtx.drone,{x:0,z:0,vx:0,vy:0,vz:0});
+  if(appCtx.Walk?.state?.walker)Object.assign(appCtx.Walk.state.walker,{x:0,z:0,vx:0,vy:0,vz:0,_resolvedGroundState:null,_walkSupportFeature:null});
+  appCtx.clearControlInputState?.('world-load-reset');
+  return true;
+}
+
 // Explicit ground recovery prepares through the spawn owner before retiring
 // flight/interior controls. It carries no forced vessel-exit authority.
 function recoverSurfaceTravel(options = {}) {
@@ -699,6 +739,8 @@ function toggleBoatMode(options = {}) {
 }
 
 Object.assign(appCtx, {
+  initializePlanetaryArrival,
+  initializeWorldLoadActors,
   recoverSurfaceTravel,
   restoreEarthTravelSession,
   travelToWorldPoint,
@@ -717,6 +759,8 @@ Object.assign(appCtx, {
 });
 
 export {
+  initializePlanetaryArrival,
+  initializeWorldLoadActors,
   recoverSurfaceTravel,
   restoreEarthTravelSession,
   travelToWorldPoint,

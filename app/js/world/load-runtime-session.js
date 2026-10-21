@@ -158,11 +158,7 @@ export function createWorldLoadRuntimeSession(options = {}) {
   if (loadRequest.selection.key === 'custom') {
     appCtx.setCustomLocation?.(loadRequest.selection, { syncInputs: false });
   }
-  appCtx.setTravelMode?.('walk', {
-    source: 'location_load',
-    force: true,
-    emitTutorial: false
-  });
+
 
   const loadLocation = loadRequest.location;
   const worldSession = createWorldLoadSession(loadRequest, { now: () => performance.now() });
@@ -252,20 +248,7 @@ export function createWorldLoadRuntimeSession(options = {}) {
       })
     : () => {};
 
-  appCtx.car.x = 0;
-  appCtx.car.z = 0;
-  appCtx.car.vx = 0;
-  appCtx.car.vz = 0;
-  appCtx.car.vy = 0;
-  if (appCtx.drone) {
-    appCtx.drone.x = 0;
-    appCtx.drone.z = 0;
-  }
-  if (appCtx.Walk && appCtx.Walk.state && appCtx.Walk.state.walker) {
-    appCtx.Walk.state.walker.x = 0;
-    appCtx.Walk.state.walker.z = 0;
-    appCtx.Walk.state.walker.vy = 0;
-  }
+  if (appCtx.initializeWorldLoadActors?.(loadRequest) !== true) throw worldLoadAbortError(null,'World actor reset superseded');
 
   appCtx.worldSeed = appCtx.hashGeoToInt(
     appCtx.LOC.lat,

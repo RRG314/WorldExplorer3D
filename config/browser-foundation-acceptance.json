@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "purpose": "One owner per changed behavior; local deployment-candidate acceptance, not the historical release matrix.",
+  "cases": [
+    {
+      "id": "frame-owners",
+      "entries": [
+        "tests/frame-owner-commands-current.test.mjs",
+        "tests/world-load-lifecycle-current.test.mjs",
+        "tests/world-load-coverage-current.test.mjs",
+        "tests/ship-traversal-current.test.mjs",
+        "tests/planetary-surface-authority-current.test.mjs"
+      ],
+      "args": [
+        "--test",
+        "tests/frame-owner-commands-current.test.mjs",
+        "tests/world-load-lifecycle-current.test.mjs",
+        "tests/world-load-coverage-current.test.mjs",
+        "tests/ship-traversal-current.test.mjs",
+        "tests/planetary-surface-authority-current.test.mjs"
+      ],
+      "timeoutMs": 120000
+    },
+    {
+      "id": "acceptance-cache",
+      "entries": [
+        "tests/acceptance-inputs-current.test.mjs"
+      ],
+      "args": [
+        "--test",
+        "tests/acceptance-inputs-current.test.mjs"
+      ],
+      "timeoutMs": 120000
+    }
+  ]
+}
