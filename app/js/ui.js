@@ -13,6 +13,7 @@ import { initTitleScreenUi } from "./ui/title-screen.js?v=120";
 import { captureEnvironmentSession, exitCurrentEnvironmentSync } from './session-coordinator.js?v=2';
 import { createEarthReturnAction } from './travel/earth-return.js';
 import {bindSurfaceRecoveryControls} from './ui/recovery-controls.js';
+import {mountTesterInvitation} from './ui/tester-invitation.js';
 
 function emitTutorialEvent(eventName, payload = {}) {
   if (typeof appCtx.tutorialOnEvent === 'function') {
@@ -21,6 +22,7 @@ function emitTutorialEvent(eventName, payload = {}) {
 }
 
 function setupUI() {
+  mountTesterInvitation({readStorage:appCtx.readStorage,writeStorage:appCtx.writeStorage});
   mountCapabilityGuide();
   const LAST_LOCATION_STORAGE_KEY = 'worldExplorer3D.lastLocation.v1';
   const bindTouchFriendlyPress = (el, handler) => {

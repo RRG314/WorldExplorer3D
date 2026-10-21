@@ -28,7 +28,7 @@ if (location.protocol === 'file:') document.documentElement.classList.add('unsup
 <link rel="stylesheet" href="styles/universe.css?v=9">
 <link rel="stylesheet" href="styles/fishing-game.css?v=6">
 <link rel="stylesheet" href="styles/interface-v4.css?v=33">
-<link rel="stylesheet" href="styles/start-hub.css?v=20">
+<link rel="stylesheet" href="styles/start-hub.css?v=21">
 <link rel="stylesheet" href="styles/discovery.css?v=19">
 <link rel="stylesheet" href="styles/tutorial.css?v=15">
 <link rel="stylesheet" href="styles/ar.css?v=1">
@@ -622,6 +622,14 @@ How Connected Data Is Used
   </div>
 </aside>
 <div id="globeSelectorScreen" aria-hidden="true">
+<aside id="testerInvitation" class="tester-invitation" hidden aria-labelledby="testerInvitationTitle">
+  <button id="testerInvitationClose" class="tester-invitation-close" type="button" aria-label="Dismiss tester invitation">×</button>
+  <p class="tester-invitation-label">HELP SHAPE WHAT’S NEXT</p>
+  <h2 id="testerInvitationTitle">Want to be an early tester?</h2>
+  <p>We’re developing a new World Explorer app. Interested in trying an early version and sharing feedback?</p>
+  <a id="testerInvitationEmail" class="tester-invitation-email" href="mailto:mail@worldexplorer3d.io?subject=World%20Explorer%20app%20%E2%80%94%20tester%20interest&amp;body=Hi%2C%20I%E2%80%99m%20interested%20in%20testing%20the%20new%20World%20Explorer%20app.%0A%0AMy%20device%20or%20platform%20(optional)%3A%0A%0APlease%20send%20me%20details%20when%20testing%20is%20available.">Email to register interest</a>
+  <small>Opens your email app. Testing invitations depend on availability.</small>
+</aside>
 <div class="globe-selector-shell">
 <div class="globe-selector-brand" aria-label="World Explorer 3D"><span class="globe-brand-mark" aria-hidden="true">◎</span>WORLD EXPLORER <strong>3D</strong></div>
 <nav class="globe-app-rail" aria-label="Main sections">
