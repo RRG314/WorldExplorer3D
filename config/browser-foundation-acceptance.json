@@ -169,6 +169,25 @@
         "output/research/browser-completion-2026-10-20/remaining/interior-night.png",
         "output/research/browser-completion-2026-10-20/remaining/moon-arrival.png"
       ]
+    },
+    {
+      "id": "candidate-frames",
+      "entries": [
+        "scripts/verification/browser-completion-journey.mjs",
+        "app/index.html"
+      ],
+      "artifact": true,
+      "args": [
+        "scripts/verification/browser-completion-journey.mjs",
+        "--frames-only"
+      ],
+      "timeoutMs": 900000,
+      "evidence": [
+        "output/research/browser-completion-2026-10-20/frames/receipt.json",
+        "output/research/browser-completion-2026-10-20/frames/interior-day.png",
+        "output/research/browser-completion-2026-10-20/frames/interior-night.png",
+        "output/research/browser-completion-2026-10-20/frames/moon-arrival.png"
+      ]
     }
   ]
 }

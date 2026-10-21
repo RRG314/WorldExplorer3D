@@ -2,10 +2,10 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import {runPrescribedGameActions} from './prescribed-game-actions.mjs';
 
-export async function completeBrowserChecks({page,out,report,read,mark,remainingOnly=false}){
+export async function completeBrowserChecks({page,out,report,read,mark,remainingOnly=false,framesOnly=false}){
  await page.evaluate(()=>completionContext.renderer.domElement.dataset.completionCanvas='main');
  const travel=async id=>{await page.locator('#travelBtn').click();await page.locator(id).click();};
- const ready=()=>page.waitForFunction(()=>{const c=completionContext;return c.gameStarted&&!c.worldLoading&&!c.earthResumePending&&!c.titleLaunchPending&&c.worldLoadRuntimeState?.status==='ready';},null,{timeout:180000,polling:500});
+ const ready=()=>page.waitForFunction(()=>{const c=completionContext;return c.getEnv?.()==='EARTH'&&!c.spaceFlight?.active&&!c.activeShipInterior&&!c.onMoon&&!c.onMars&&c.activeTransportActor?.().frame==='surface'&&c.gameStarted&&!c.worldLoading&&!c.earthResumePending&&!c.titleLaunchPending&&c.worldLoadRuntimeState?.status==='ready';},null,{timeout:180000,polling:500});
  const capture=async name=>{await page.waitForTimeout(350);await page.screenshot({path:`${out}/${name}.png`});};
  const overlay=()=>page.evaluate(()=>completionContext.exportLocalEditableWorld());
  if(!remainingOnly){
@@ -51,6 +51,7 @@ export async function completeBrowserChecks({page,out,report,read,mark,remaining
   assert.equal(await page.evaluate(()=>completionContext.placeDiscoveryWorldObject({id:'completion-local-sign',type:'sign',position:{x:45,y:15,z:45}}).committed),true);
   report.overlayBefore=await overlay();
  }
+ if(!framesOnly){
  mark('harbor-city-presentation');await travel('#fWalk');
  report.harbor=await page.evaluate(()=>{
   const c=completionContext,p=c.geoToWorld(39.285,-76.6098);let nearest=null,best=Infinity;
@@ -81,6 +82,7 @@ export async function completeBrowserChecks({page,out,report,read,mark,remaining
  const mobileAfter=await read();report.mobile={distance:Math.hypot(mobileAfter.actor.position.x-mobileBefore.actor.position.x,mobileAfter.actor.position.z-mobileBefore.actor.position.z),scope:'Chrome touch emulation, same accepted world; not physical-device performance'};
  assert.ok(report.mobile.distance>.1);await capture('mobile-walking');await page.setViewportSize({width:1280,height:800});await cdp.send('Emulation.setTouchEmulationEnabled',{enabled:false});await cdp.detach();
  report.cases.push('harbor day/night, regional facades, character and mobile walking input');
+ }
  mark('ship-frame-entry-return');await travel('#fBoardSolisReach');await page.waitForFunction(()=>completionContext.activeShipInterior===true,null,{timeout:90000});
  const ship=await read();assert.equal(ship.actor.frame,'ship-interior');
  await runPrescribedGameActions(page,out,[{buttons:['down'],frames:24},{buttons:[],frames:3}],'canvas[data-completion-canvas="main"]');
@@ -94,7 +96,7 @@ export async function completeBrowserChecks({page,out,report,read,mark,remaining
  mark('planetary-command-integration');await page.evaluate(()=>completionContext.arriveAtMoon());
  await page.waitForFunction(()=>{const c=completionContext;return c.onMoon&&c.moonSurface&&!c.paused&&c.getCurrentTravelMode()==='drive';},null,{timeout:120000});
  report.moon=await read();assert.ok(Number.isFinite(report.moon.actor.position.y));await capture('moon-arrival');
- await page.evaluate(()=>completionContext.returnToEarth());await ready();assert.equal((await read()).world,report.initial.world);
+ assert.equal(await page.evaluate(async()=>await completionContext.returnToEarthFromMenu()===true),true);await ready();assert.equal((await read()).world,report.initial.world);
  assert.deepEqual(await overlay(),report.overlayBefore);report.cases.push('actual Moon surface admission and return reuse the accepted Earth world');
  mark('owned-world-release');report.preRelease=await read();
  report.release=await page.evaluate(()=>{const c=completionContext;const result=c.releaseEarthWorldForTitle({reason:'completion-owned-browser-check'});return {result,residency:c.worldSnapshotStore.residency(),roads:c.roadMeshes.length,buildings:c.buildingMeshes.length,gpu:{...c.renderer.info.memory},overlay:c.exportLocalEditableWorld()};});
