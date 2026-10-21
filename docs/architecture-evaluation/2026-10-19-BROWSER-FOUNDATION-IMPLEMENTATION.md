@@ -548,3 +548,12 @@ under output/research/browser-completion-2026-10-20. The corrected fixture passe
 with zero graphics errors; day/close/night images were inspected and retirement
 returned to its one-ground-geometry baseline. Final packaged integration and
 source/package/evidence delta review remain pending at this commit.
+
+The first production-package local run correctly hit the existing Firebase
+production-host guard. The harness initially misclassified its two expected
+initialization errors. Preserve candidate-initial-production-guard and its failed
+receipt. The harness now verifies the exact guard, ordinary local title assets
+and invitation behavior, while the assembled world uses explicit staging debug
+routing. This is not ordinary hosted candidate or live production verification.
+Selected-cell source metadata is retained explicitly for each layer and regional
+batch, alongside original transport source records.

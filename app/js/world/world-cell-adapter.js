@@ -26,12 +26,12 @@ function regionalBuildingFacts(appCtx, bounds) {
         const box=geometry.boundingBox;
         if(!box||!intersects({minX:box.min.x+position.x,maxX:box.max.x+position.x,
           minZ:box.min.z+position.z,maxZ:box.max.z+position.z},bounds))return;
-        records.push({kind:'regional-instances',sourceIds:mesh.userData.sourceBuildingIds,position,
+        records.push({kind:'regional-instances',source:root.userData.renderProvenance,sourceIds:mesh.userData.sourceBuildingIds,position,
           attributes:attributes(0,geometry.attributes.position.count),indices:geometry.getIndex()?.array||null,
           transforms:mesh.instanceMatrix.array,colors:mesh.instanceColor?.array||null});
       }else for(const range of geometry.userData.regionalBuildingRanges||[]){
         if(!intersects(range.bounds,bounds))continue;
-        records.push({kind:'regional-footprint',id:range.id,position,
+        records.push({kind:'regional-footprint',source:root.userData.renderProvenance,id:range.id,position,
           attributes:attributes(range.vertexStart,range.vertexCount),
           indices:geometry.getIndex().array.slice(range.indexStart,range.indexStart+range.indexCount).map(i=>i-range.vertexStart)});
       }
@@ -84,6 +84,8 @@ export function capturePublishedCell(appCtx, publication, key) {
     return intersects({ minX, maxX, minZ, maxZ }, bounds);
   });
   return createWorldCellFacts({ requestId: publication.requestId, key, frame: worldFactFrame(appCtx),
+    sources:Object.fromEntries(Object.entries(publication.layers).map(([name,layer])=>[name,
+      {authority:layer.authority,source:layer.source,coverage:layer.coverage,completeness:layer.completeness}])),
     coverage: { source: 'accepted-selected-area', terrain: 'original-published-buffers-and-grid',
       interactive: 'pinned-selected-district', regionalBuildings: 'presentation-only',
       completeness: 'published-data-only' },

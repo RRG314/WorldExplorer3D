@@ -24,7 +24,10 @@ try{
   mark('ordinary-packaged-startup');const ordinary=await browser.newContext({viewport:{width:1280,height:800}}),tab=await ordinary.newPage();const errors=[];tab.on('pageerror',e=>errors.push(e.message));collectBrowserGraphicsErrors(tab,errors);
   await tab.goto(`${base}/app/`,{waitUntil:'domcontentloaded'});await tab.waitForFunction(()=>globalThis.__WE3D_RUNTIME_READY__,null,{timeout:120000});
   report.ordinaryStartup=await tab.evaluate(async()=>({debug:!!globalThis.FIREBASE_APPCHECK_DEBUG_TOKEN,build:await fetch('/build-manifest.json').then(r=>r.json()),startVisible:!!document.getElementById('globeSelectorStartBtn')}));
-  assert.equal(report.ordinaryStartup.debug,false);assert.equal(report.ordinaryStartup.build.sourceDirty,false);assert.equal(report.ordinaryStartup.startVisible,true);assert.deepEqual(errors,[]);
+  assert.equal(report.ordinaryStartup.debug,false);assert.equal(report.ordinaryStartup.build.sourceDirty,false);assert.equal(report.ordinaryStartup.startVisible,true);
+  const expectedGuard='Production Firebase is blocked outside the live site. Use staging or emulators for testing.';
+  assert.ok(errors.length>0&&errors.every(message=>message===expectedGuard));
+  report.ordinaryStartup.localProductionGuard={verified:true,messages:errors.slice(),scope:'Production configuration correctly refuses localhost. Title/UI assets load locally; this is not hosted production-service acceptance.'};
   if(await tab.locator('#analyticsConsentDenyBtn').isVisible())await tab.locator('#analyticsConsentDenyBtn').click();
   await tab.locator('#testerInvitation').waitFor({state:'visible'});await tab.screenshot({path:`${out}/tester-invitation-desktop.png`});
   const email=await tab.locator('#testerInvitationEmail').getAttribute('href');assert.ok(email.startsWith('mailto:mail@worldexplorer3d.io?'));assert.ok(decodeURIComponent(email).includes('when testing is available'));

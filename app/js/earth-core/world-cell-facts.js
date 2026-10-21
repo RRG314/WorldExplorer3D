@@ -26,10 +26,10 @@ export function worldCellBounds(key) {
     minZ: z * WORLD_CELL_SIZE, maxZ: (z + 1) * WORLD_CELL_SIZE });
 }
 
-export function createWorldCellFacts({ requestId, key, frame, layers, coverage = {} }) {
+export function createWorldCellFacts({ requestId, key, frame, layers, coverage = {}, sources = {} }) {
   if (!requestId || !frame || !layers) throw new TypeError('World cell requires request, frame and layers.');
   return canonicalFact({ type: 'WorldCellFacts', schemaVersion: 1, requestId, key,
-    bounds: worldCellBounds(key), frame, coverage, layers });
+    bounds: worldCellBounds(key), frame, coverage, sources, layers });
 }
 
 export function encodeWorldCellFacts(facts) {
@@ -66,6 +66,10 @@ export function createTransportCellFacts(packet, { requestId, frame, roads = [] 
       sourceIds: packet.roadIndices.map(index => {
         const road = roads[index]?.road || roads[index];
         return String(road?.sourceFeatureId || road?.id || '');
+      }),sources:packet.roadIndices.map(index=>{
+        const road=roads[index]?.road||roads[index];
+        return {id:String(road?.sourceFeatureId||road?.id||''),source:road?.transportRecord,
+          structure:road?.structureSemantics};
       }) } } });
 }
 
