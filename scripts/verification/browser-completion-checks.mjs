@@ -46,7 +46,18 @@ export async function completeBrowserChecks({page,out,report,read,mark}){
  await page.waitForFunction(()=>{const c=completionContext,s=c.getRegionalSceneryState();if(s.error)throw Error(s.error);return !s.pending&&s.anchor.x===0&&s.anchor.z===0&&c.farTerrainClipmapState?.status==='ready';},null,{timeout:180000,polling:500});
  assert.deepEqual(await overlay(),report.overlayBefore);report.cases.push('regional option replaces one complete scoped window, preserves pinned district and local edits, returns to fixed-location play');
  mark('harbor-city-presentation');await travel('#fWalk');
- report.harbor=await page.evaluate(()=>{const c=completionContext,p=c.geoToWorld(39.285,-76.6098);return c.travelToWorldPoint(p.x,p.z,{source:'large_map_context'});});assert.equal(report.harbor.valid,true);
+ report.harbor=await page.evaluate(()=>{
+  const c=completionContext,p=c.geoToWorld(39.285,-76.6098);let nearest=null,best=Infinity;
+  for(const road of c.roads){
+   if(road.walkable===false||road.structureSemantics?.terrainMode!=='at_grade')continue;
+   for(let i=1;i<(road.pts?.length||0);i++){
+    const a=road.pts[i-1],b=road.pts[i],x=(a.x+b.x)/2,z=(a.z+b.z)/2,d=Math.hypot(x-p.x,z-p.z);
+    if(d<best){best=d;nearest={x,z,id:road.sourceFeatureId};}
+   }
+  }
+  if(!nearest||best>500)throw Error('No accepted mapped harbor approach');
+  return {source:nearest,distance:best,arrival:c.travelToWorldPoint(nearest.x,nearest.z,{source:'large_map_context'})};
+ });assert.equal(report.harbor.arrival?.valid,true);
  await page.evaluate(()=>completionContext.setTimeOfDay('day'));await capture('harbor-day');
  await page.evaluate(()=>completionContext.setTimeOfDay('night'));await capture('harbor-night');
  await travel('#fDrone');await capture('harbor-regional-night');await travel('#fWalk');
