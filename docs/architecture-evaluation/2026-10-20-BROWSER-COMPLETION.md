@@ -105,7 +105,7 @@ pressure or an unrun plan. Completion means every required box is satisfied.
 Candidate runtime source is `5958db63`; the final verification-source commit is
 `e0e411ef`. The final isolated artifact is
 `output/hosting-validation/browser-cleanup-20261020-production-ready`, build
-`5.6.1+e0e411ef257b.1553c530495f8473.production`. Its 758 delivered content files
+`5.6.1+e0e411ef257b.1553c530495f8473.production`. Its 760 delivered content files
 are byte-identical to the earlier clean 5958 candidate. Runtime packaging verifies
 229 bundles, 84 ground files and the two added tester pages/modules. Original
 dist and all distinct rollback packages remain intact.
