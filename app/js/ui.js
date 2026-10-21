@@ -22,7 +22,7 @@ function emitTutorialEvent(eventName, payload = {}) {
 }
 
 function setupUI() {
-  mountTesterInvitation({readStorage:appCtx.readStorage,writeStorage:appCtx.writeStorage});
+  mountTesterInvitation();
   mountCapabilityGuide();
   const LAST_LOCATION_STORAGE_KEY = 'worldExplorer3D.lastLocation.v1';
   const bindTouchFriendlyPress = (el, handler) => {

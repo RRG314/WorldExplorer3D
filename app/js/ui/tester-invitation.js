@@ -4,7 +4,11 @@ const DISMISSAL_KEY = 'we3d.tester-invitation.v1';
 let lifetime = null;
 let dismissedThisSession = false;
 
-export function mountTesterInvitation({ readStorage, writeStorage, document = globalThis.document } = {}) {
+export function mountTesterInvitation({
+  readStorage = key => globalThis.localStorage.getItem(key),
+  writeStorage = (key, value) => globalThis.localStorage.setItem(key, value),
+  document = globalThis.document
+} = {}) {
   lifetime?.dispose('remount');
   const root = document.getElementById('testerInvitation');
   if (!root) return null;

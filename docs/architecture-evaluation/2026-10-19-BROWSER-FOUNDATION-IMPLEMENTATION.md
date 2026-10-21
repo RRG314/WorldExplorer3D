@@ -557,3 +557,10 @@ and invitation behavior, while the assembled world uses explicit staging debug
 routing. This is not ordinary hosted candidate or live production verification.
 Selected-cell source metadata is retained explicitly for each layer and regional
 batch, alongside original transport source records.
+
+Tester invitation screenshots passed visual inspection at desktop and 390px
+mobile width. Keyboard dismissal worked, but reload exposed that engine-private
+storage helpers were not exposed to UI. The invitation now uses its own small
+dismissal preference through guarded localStorage access, retaining session
+dismissal if storage is unavailable. The failed title-only receipt and captures
+are retained in candidate-invitation-persistence-failure; no city was loaded.
