@@ -146,6 +146,29 @@
         "output/research/browser-completion-2026-10-20/tester-flow/pending-mobile.png",
         "output/research/browser-completion-2026-10-20/tester-flow/confirmed-mobile.png"
       ]
+    },
+    {
+      "id": "candidate-remaining",
+      "entries": [
+        "scripts/verification/browser-completion-journey.mjs",
+        "app/index.html"
+      ],
+      "artifact": true,
+      "args": [
+        "scripts/verification/browser-completion-journey.mjs",
+        "--remaining"
+      ],
+      "timeoutMs": 900000,
+      "evidence": [
+        "output/research/browser-completion-2026-10-20/remaining/receipt.json",
+        "output/research/browser-completion-2026-10-20/remaining/harbor-day.png",
+        "output/research/browser-completion-2026-10-20/remaining/harbor-night.png",
+        "output/research/browser-completion-2026-10-20/remaining/harbor-regional-night.png",
+        "output/research/browser-completion-2026-10-20/remaining/mobile-walking.png",
+        "output/research/browser-completion-2026-10-20/remaining/interior-day.png",
+        "output/research/browser-completion-2026-10-20/remaining/interior-night.png",
+        "output/research/browser-completion-2026-10-20/remaining/moon-arrival.png"
+      ]
     }
   ]
 }

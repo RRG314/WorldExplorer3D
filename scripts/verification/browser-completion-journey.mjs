@@ -9,18 +9,18 @@ import {stagingCaptureAttestation} from './staging-capture-attestation.mjs';
 import {closeOwnedBrowser} from './owned-browser.mjs';
 import {completeBrowserChecks} from './browser-completion-checks.mjs';
 import {collectBrowserGraphicsErrors} from './browser-graphics-errors.mjs';
-const baseline=process.argv.includes('--baseline'),root=process.cwd(),servedRoot=path.resolve(process.env.WE3D_VERIFY_ROOT||'.');
-const out=process.env.WE3D_COMPLETION_OUTPUT||`output/research/browser-completion-2026-10-20/${baseline?'baseline':'candidate'}`;
+const remaining=process.argv.includes('--remaining'),baseline=process.argv.includes('--baseline'),root=process.cwd(),servedRoot=path.resolve(process.env.WE3D_VERIFY_ROOT||'.');
+const out=process.env.WE3D_COMPLETION_OUTPUT||`output/research/browser-completion-2026-10-20/${remaining?'remaining':baseline?'baseline':'candidate'}`;
 const disk=await fs.statfs(root);assert.ok(disk.bavail*disk.bsize>4*1024**3,'Preserve 4 GiB free disk while verifying');await fs.mkdir(out,{recursive:true});
 const privateDir=await fs.mkdtemp(path.join(os.tmpdir(),'we3d-browser-completion-'));let identity,server,owned,page,stage='setup';
-const report={passed:false,baseline,scope:'One assembled Baltimore world; ordinary transport commands and short input bursts across finite selected-area road publications, repeat-route resource sampling. Local candidate; staging attestation for the world, separate ordinary packaged startup; not live candidate production acceptance.',cases:[],errors:[],visits:[],localFailures:[],consoleErrors:[]};
+const report={passed:false,baseline,remainingOnly:remaining,scope:'One assembled Baltimore world; ordinary transport commands and short input bursts across finite selected-area road publications, repeat-route resource sampling. Local candidate; staging attestation for the world, separate ordinary packaged startup; not live candidate production acceptance.',cases:[],errors:[],visits:[],localFailures:[],consoleErrors:[]};
 const mark=name=>{stage=name;console.log(JSON.stringify({stage}));};
 const read=()=>page.evaluate(()=>{const c=completionContext;return {mode:c.getCurrentTravelMode(),actor:c.activeTransportActor(),world:c._worldLoadSequence,buildings:c.buildings.length,roads:c.roads.length,transport:{...c.transportDetail?.stats},scenery:c.getRegionalSceneryState?.(),gpu:{...c.renderer.info.memory},heap:performance.memory?.usedJSHeapSize,publicationId:c.worldPublication?.id,residency:c.worldSnapshotStore?{count:c.worldSnapshotStore.residency().resourceCount,keys:c.worldSnapshotStore.residency().regions.map(r=>r.key).sort()}:null};});
 try{
  identity=await stagingCaptureAttestation();const credential=path.join(privateDir,'credential.json');await fs.writeFile(credential,JSON.stringify({projectId:'we3d-staging-20260712',appId:'1:524178734996:web:f59acbc9014f0e26f51981',expiresAt:new Date(Date.now()+1800000).toISOString(),token:identity.token}),{mode:0o600});process.env.WE3D_STAGING_APP_CHECK_FILE=credential;
  server=await startStaticServer({rootDir:servedRoot,ports:[4397]});const base=`http://127.0.0.1:${server.port}`;
  owned=await chromium.launchServer({channel:'chrome',headless:true,args:['--js-flags=--max-old-space-size=2048']});const browser=await chromium.connect(owned.wsEndpoint());
- if(!baseline){
+ if(!baseline&&!remaining){
   mark('ordinary-packaged-startup');const ordinary=await browser.newContext({viewport:{width:1280,height:800}}),tab=await ordinary.newPage();const errors=[];tab.on('pageerror',e=>errors.push(e.message));collectBrowserGraphicsErrors(tab,errors);
   await tab.goto(`${base}/app/`,{waitUntil:'domcontentloaded'});await tab.waitForFunction(()=>globalThis.__WE3D_RUNTIME_READY__,null,{timeout:120000});
   report.ordinaryStartup=await tab.evaluate(async()=>({debug:!!globalThis.FIREBASE_APPCHECK_DEBUG_TOKEN,build:await fetch('/build-manifest.json').then(r=>r.json()),startVisible:!!document.getElementById('globeSelectorStartBtn')}));
@@ -51,6 +51,7 @@ try{
  // Keep the location-based setting for equal coverage and a bounded source. The
  // residency test below does not silently enable unlimited geographic fetching.
  report.locationBased=await page.evaluate(()=>{const c=completionContext;c.setRegionalSceneryEnabled?.(false);return c.getRegionalSceneryState?.();});
+ if(remaining){await completeBrowserChecks({page,out,report,read,mark,remainingOnly:true});}else{
  const samples=await page.evaluate(()=>{const c=completionContext;return [3500,5000,7000].map(target=>{let selected=null,best=Infinity;for(const r of c.roads){if(r.structureSemantics?.terrainMode!=='at_grade')continue;const a=r.pts?.[0],b=r.pts?.[1];if(!a||!b)continue;const x=(a.x+b.x)/2,z=(a.z+b.z)/2,d=Math.hypot(x-target,z);if(d<best){best=d;selected={x,z,id:String(r.sourceFeatureId||r.id),distance:d};}}return selected;});});
  assert.ok(samples.every(p=>p&&p.distance<1500),'Finite mapped source does not cover the selected route');report.route=samples;
  for(let cycle=0;cycle<2;cycle++)for(const [index,target]of [...samples,samples[0]].entries()){
@@ -71,6 +72,7 @@ try{
   assert.deepEqual(second.residency,first.residency,'Equal routes must retain the same owned geographic scopes');
   assert.ok(second.gpu.geometries<=first.gpu.geometries&&second.gpu.textures<=first.gpu.textures,'Repeated travel must not grow retained GPU resources');
   await completeBrowserChecks({page,out,report,read,mark});
+ }
  }
  report.final=await read();assert.deepEqual(report.errors,[]);assert.deepEqual(report.localFailures,[]);report.passed=true;
 }catch(error){report.failure={stage,message:String(error)};process.exitCode=1;await page?.screenshot({path:`${out}/failure.png`}).catch(()=>{});}

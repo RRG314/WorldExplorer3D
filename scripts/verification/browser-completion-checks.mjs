@@ -2,11 +2,13 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import {runPrescribedGameActions} from './prescribed-game-actions.mjs';
 
-export async function completeBrowserChecks({page,out,report,read,mark}){
+export async function completeBrowserChecks({page,out,report,read,mark,remainingOnly=false}){
  await page.evaluate(()=>completionContext.renderer.domElement.dataset.completionCanvas='main');
  const travel=async id=>{await page.locator('#travelBtn').click();await page.locator(id).click();};
  const ready=()=>page.waitForFunction(()=>{const c=completionContext;return c.gameStarted&&!c.worldLoading&&!c.earthResumePending&&!c.titleLaunchPending&&c.worldLoadRuntimeState?.status==='ready';},null,{timeout:180000,polling:500});
  const capture=async name=>{await page.waitForTimeout(350);await page.screenshot({path:`${out}/${name}.png`});};
+ const overlay=()=>page.evaluate(()=>completionContext.exportLocalEditableWorld());
+ if(!remainingOnly){
  mark('portable-accepted-cells');
  report.cells=await page.evaluate(()=>{
   const c=completionContext,result=[];
@@ -26,7 +28,7 @@ export async function completeBrowserChecks({page,out,report,read,mark}){
  report.cases.push('actual selected cells export original terrain, source identities and accepted transport geometry');
  mark('persistent-local-overlay');
  assert.equal(await page.evaluate(()=>completionContext.placeDiscoveryWorldObject({id:'completion-local-sign',type:'sign',position:{x:45,y:15,z:45}}).committed),true);
- const overlay=()=>page.evaluate(()=>completionContext.exportLocalEditableWorld());report.overlayBefore=await overlay();
+ report.overlayBefore=await overlay();
  mark('surface-input-handoffs');await travel('#fWalk');const beforeWalk=await read();
  await runPrescribedGameActions(page,out,[{buttons:['up'],frames:24},{buttons:[],frames:3}],'canvas[data-completion-canvas="main"]');
  const walked=await read();assert.equal(walked.mode,'walk');assert.ok(Math.hypot(walked.actor.position.x-beforeWalk.actor.position.x,walked.actor.position.z-beforeWalk.actor.position.z)>.05);
@@ -45,6 +47,10 @@ export async function completeBrowserChecks({page,out,report,read,mark}){
  await page.evaluate(()=>completionContext.setRegionalSceneryEnabled(false));
  await page.waitForFunction(()=>{const c=completionContext,s=c.getRegionalSceneryState();if(s.error)throw Error(s.error);return !s.pending&&s.anchor.x===0&&s.anchor.z===0&&c.farTerrainClipmapState?.status==='ready';},null,{timeout:180000,polling:500});
  assert.deepEqual(await overlay(),report.overlayBefore);report.cases.push('regional option replaces one complete scoped window, preserves pinned district and local edits, returns to fixed-location play');
+ }else{
+  assert.equal(await page.evaluate(()=>completionContext.placeDiscoveryWorldObject({id:'completion-local-sign',type:'sign',position:{x:45,y:15,z:45}}).committed),true);
+  report.overlayBefore=await overlay();
+ }
  mark('harbor-city-presentation');await travel('#fWalk');
  report.harbor=await page.evaluate(()=>{
   const c=completionContext,p=c.geoToWorld(39.285,-76.6098);let nearest=null,best=Infinity;
@@ -56,7 +62,8 @@ export async function completeBrowserChecks({page,out,report,read,mark}){
    }
   }
   if(!nearest||best>500)throw Error('No accepted mapped harbor approach');
-  return {source:nearest,distance:best,arrival:c.travelToWorldPoint(nearest.x,nearest.z,{source:'large_map_context'})};
+  const arrival=c.travelToWorldPoint(nearest.x,nearest.z,{source:'large_map_context'});
+  return {source:nearest,distance:best,arrival:{valid:arrival?.valid===true}};
  });assert.equal(report.harbor.arrival?.valid,true);
  await page.evaluate(()=>completionContext.setTimeOfDay('day'));await capture('harbor-day');
  await page.evaluate(()=>completionContext.setTimeOfDay('night'));await capture('harbor-night');
