@@ -120,3 +120,15 @@ verification evidence and concrete activation requirements. The earlier browser
 candidate/readiness pointer is retained as historical evidence; it does not
 cover the new mail/admin changes. No production email, DNS change, push or
 deployment occurred in this follow-up.
+
+## October 22 tester verification scope
+
+The owner requested a real end-to-end email/signup test and matching, simple UI.
+Use isolated `we3d-staging-20260712` plus the connected owner Gmail inbox. This
+authorizes the additive staging test setup needed for that journey, preserving
+production, existing Functions/configuration, DNS, rules, release branches and
+player data. Restrict staging sends/receiving to the owner test addresses and
+mark emails [TEST]. See the October 22 section of the tester email document and
+`output/research/tester-live-e2e-2026-10-22/` for current evidence. Do not describe
+the local simulated preview as real delivery or the staging test as production
+release approval.

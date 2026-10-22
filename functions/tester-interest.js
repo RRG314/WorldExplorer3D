@@ -26,6 +26,7 @@ function buildTesterInterestExport({functions, db, setCors, verifyAppCheck, conf
       const cfg = config();
       if (!cfg.resendApiKey || !cfg.emailFrom || !cfg.adminNotificationEmail) return res.status(503).json({error:'Tester signup is temporarily unavailable. Please try again later.'});
       const email = body.email.trim().toLowerCase(), token = randomToken();
+      if(cfg.testRecipients?.length && !cfg.testRecipients.includes(email)) return res.status(403).json({error:'This staging form accepts only the configured test email address.'});
       const ref = db.collection('appTesterConfirmations').doc(hash(token));
       // Distributed quotas survive instance replacement. Raw IPs never persist.
       const bucket = Math.floor(time / HOUR);

@@ -57,12 +57,22 @@ test('verified inbound replies forward once, with a safe sender and original rep
  const event={type:'email.received',data:{email_id:'incoming-1234',to:['testers@mail.worldexplorer3d.io']}};
  await f.program.webhook(event);await f.program.webhook(event);assert.equal(f.jobs().length,1);const job=f.jobs()[0];assert.equal(job.message.reply_to,'person@example.com');assert.match(job.message.text,/Attachments are available/);assert.ok(!job.message.html.includes('<img src=x>'));await f.deliver(job.id);assert.deepEqual(f.requests.at(-1).body.to,['owner@example.com']);
 });
-test('inbound aliases, automated responses and own-mailbox replies do not create loops',async()=>{
- const f=fixture();f.setIncoming({from:'Owner <owner@example.com>',text:'reply'});await f.program.webhook({type:'email.received',data:{email_id:'incoming-1111',to:['testers@mail.worldexplorer3d.io']}});
+test('inbound aliases, automated responses and forwarded notifications do not create loops',async()=>{
+ const f=fixture();f.setIncoming({from:'System <testers@mail.worldexplorer3d.io>',text:'forwarded notification'});await f.program.webhook({type:'email.received',data:{email_id:'incoming-1111',to:['testers@mail.worldexplorer3d.io']}});
  f.setIncoming({from:'sender@example.com',headers:{'auto-submitted':'auto-replied'}});await f.program.webhook({type:'email.received',data:{email_id:'incoming-2222',to:['support@mail.worldexplorer3d.io']}});
  await f.program.webhook({type:'email.received',data:{email_id:'incoming-3333',to:['unknown@mail.worldexplorer3d.io']}});assert.equal(f.jobs().length,0);
 });
 test('access links validate HTTPS and email templates escape user controlled content',()=>{
  for(const value of ['javascript:alert(1)','http://example.com','https://name:secret@example.com','not a url'])assert.throws(()=>accessUrl(value));
  const result=template('reply',{from:'a@example.com',subject:'<script>x</script>',text:'<img src=x onerror=alert(1)>'});assert.ok(!result.html.includes('<script>'));assert.ok(!result.html.includes('<img src=x'));assert.ok(result.text.includes('<img src=x'));
+});
+
+test('manual owner messages are forwarded while marked forwards and unowned staging traffic are ignored',async()=>{
+ const f=fixture();f.setIncoming({from:'owner@example.com',text:'Manual support test'});await f.program.webhook({type:'email.received',data:{email_id:'incoming-owner-1',from:'owner@example.com',to:['support@mail.worldexplorer3d.io']}});assert.equal(f.jobs().length,1);
+ f.setIncoming({from:'owner@example.com',headers:{'X-WE3D-Forwarded':'tester-program-v1'},text:'Loop'});await f.program.webhook({type:'email.received',data:{email_id:'incoming-owner-2',from:'owner@example.com',to:['support@mail.worldexplorer3d.io']}});assert.equal(f.jobs().length,1);
+ f.cfg.inboundEnabled=false;f.cfg.inboundTestSender='owner@example.com';await f.program.webhook({type:'email.received',data:{email_id:'incoming-other-1',from:'someone@example.com',to:['support@mail.worldexplorer3d.io']}});assert.equal(f.jobs().length,1);assert.equal(f.jobs()[0].message.headers['X-WE3D-Forwarded'],'tester-program-v1');
+});
+
+test('restricted staging signup cannot send verification to another recipient',async()=>{
+ const f=fixture();f.cfg.testRecipients=['tester@example.com'];const result=await f.call(f.publicHandler,{action:'request',email:'someone@example.com',consent:true,consentVersion:'app-testing-v1'});assert.equal(result.code,403);assert.equal(f.requests.length,0);assert.equal(f.db.records.size,0);assert.equal((await f.call(f.publicHandler,{action:'request',email:'tester@example.com',consent:true,consentVersion:'app-testing-v1'})).code,200);assert.equal(f.requests.length,1);
 });

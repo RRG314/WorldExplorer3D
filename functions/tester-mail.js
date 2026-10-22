@@ -17,7 +17,8 @@ function accessUrl(value) {
 }
 function template(kind, data) {
   const titles={verification:'Confirm your World Explorer tester interest',receipt:'Your World Explorer tester application is confirmed',owner:'A new World Explorer tester is ready for review',invitation:'You’re invited to test the new World Explorer app',accepted:'A tester accepted your World Explorer invitation',reply:'New message for World Explorer'};
-  const title=titles[kind];if(!title)throw Error('Unknown tester email kind');
+  const stage=process.env.GCLOUD_PROJECT==='we3d-staging-20260712';
+  const title=(stage?'[TEST] ':'')+titles[kind];if(!titles[kind])throw Error('Unknown tester email kind');
   const paragraphs={
     verification:['You asked to hear about testing the new World Explorer app. Confirm your email within one hour.','This confirms your application, not a testing place. We’ll review it and email you separately if you’re selected.','If you didn’t request this, ignore this email.'],
     receipt:['Your email is confirmed and your application is waiting for review.','You don’t need to do anything else yet. We’ll email you if a suitable test is available. This is not a newsletter subscription.'],
@@ -27,15 +28,16 @@ function template(kind, data) {
     reply:[`From: ${data.from || ''}`,`Subject: ${clean(data.subject,160)}`,clean(data.text,16000)||'(No plain-text message. Open Resend to read the original.)',data.hasAttachments?'Attachments are available in the original message in Resend. No attachments were forwarded automatically.':'']
   }[kind].filter(Boolean);
   const action=kind==='verification'?['Confirm my email',data.verifyUrl]:kind==='invitation'?['Review invitation',data.inviteUrl]:['owner','accepted'].includes(kind)?['Review testers',data.adminUrl]:null;
-  const footer=[`Reply to ${REPLY_ADDRESS} with testing questions.`,data.manageUrl?`Stop testing invitations: ${data.manageUrl}`:'',kind==='verification'?'Testing invitations depend on availability.':''].filter(Boolean);
+  const footer=[stage?'Staging verification only. This is not a production tester invitation.':'',`Reply to ${REPLY_ADDRESS} with testing questions.`,data.manageUrl?`Stop testing invitations: ${data.manageUrl}`:'',kind==='verification'?'Testing invitations depend on availability.':''].filter(Boolean);
   const text=[title,'',...paragraphs.flatMap(p=>[p,'']),...(action?[`${action[0]}: ${action[1]}`,'']:[]),...footer].join('\n');
-  const html=`<!doctype html><html><body style="margin:0;background:#f2f5fa;color:#17283b;font:16px/1.6 Arial,sans-serif"><div style="max-width:560px;margin:24px auto;padding:28px;background:white;border-radius:12px"><p style="font-size:12px;letter-spacing:2px;color:#52677e">WORLD EXPLORER</p><h1 style="font-size:24px;line-height:1.3">${escape(title)}</h1>${paragraphs.map(p=>`<p style="white-space:pre-wrap">${escape(p)}</p>`).join('')}${action?`<p><a href="${escape(action[1])}" style="display:inline-block;padding:12px 18px;background:#155fc4;color:white;border-radius:8px;text-decoration:none">${escape(action[0])}</a></p>`:''}<hr style="border:0;border-top:1px solid #d8e1eb"><p style="font-size:12px;color:#52677e">${footer.map(escape).join('<br>')}</p>${data.manageUrl?`<p><a href="${escape(data.manageUrl)}">Stop testing invitations</a></p>`:''}</div></body></html>`;
+  const html=`<!doctype html><html><body style="margin:0;background:#f2f5fa;color:#17283b;font:16px/1.6 Arial,sans-serif"><div style="max-width:560px;margin:24px auto;padding:28px;background:white;border-radius:12px"><p style="font-size:12px;letter-spacing:2px;color:#52677e">WORLD EXPLORER 3D</p><h1 style="font-size:24px;line-height:1.3">${escape(title)}</h1>${paragraphs.map(p=>`<p style="white-space:pre-wrap">${escape(p)}</p>`).join('')}${action?`<p><a href="${escape(action[1])}" style="display:inline-block;padding:12px 18px;background:#d8a84e;color:#171106;border-radius:2px;text-decoration:none">${escape(action[0])}</a></p>`:''}<hr style="border:0;border-top:1px solid #d8e1eb"><p style="font-size:12px;color:#52677e">${footer.map(escape).join('<br>')}</p>${data.manageUrl?`<p><a href="${escape(data.manageUrl)}">Stop testing invitations</a></p>`:''}</div></body></html>`;
   return {subject:title,text,html};
 }
 function mailJob({kind,applicationId='',data={},recipient,from,revision=0,createdAtMs}) {
   const id=hash(`${kind}/${applicationId}/${revision}`);
   const message={from,to:[recipient],reply_to:['owner','accepted'].includes(kind)?data.email:kind==='reply'?data.from:REPLY_ADDRESS,...template(kind,data),tags:[{name:'we3d_flow',value:'tester'},{name:'we3d_job',value:id}]};
   if(data.manageUrl)message.headers={'List-Unsubscribe':`<${data.manageUrl}>`};
+  if(kind==='reply')message.headers={...message.headers,'X-WE3D-Forwarded':'tester-program-v1'};
   return {id,kind,applicationId,revision,createdAtMs,status:'queued',attempts:0,retryRevision:0,message,expiresAt:new Date(createdAtMs+30*24*HOUR)};
 }
 const deliveryState = (current,next) => ({complained:5,bounced:4,failed:4,delivered:3,accepted:2,queued:1}[next]||0)>=({complained:5,bounced:4,failed:4,delivered:3,accepted:2,queued:1}[current]||0)?next:current;

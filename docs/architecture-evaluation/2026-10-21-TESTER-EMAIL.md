@@ -54,8 +54,9 @@ Svix v2 verifier returns no parsed event: JSON is parsed only after successful
 verification. Incoming forwarding accepts only the two owned aliases, uses the
 configured sender with original Reply-To, escapes content, deduplicates by
 provider ID and limits forwarding to 30/hour. Original incoming mail remains in
-Resend if forwarding needs to retry. Own-mailbox and automated replies are
-ignored to avoid loops. No attachment is automatically relayed.
+Resend if forwarding needs to retry. Messages from the configured system sender, marked forwarded messages and
+automated replies are ignored to avoid loops. Manual messages from the owner
+mailbox remain deliverable. No attachment is automatically relayed.
 
 Temporary confirmations expire in one hour and are scheduled for deletion after
 one day. Mail/provider-receipt records use 30-day TTLs. Expired invitation
@@ -133,3 +134,31 @@ sending and receiving. There was no receiving webhook; the previously advertised
 root-domain mailbox had no MX records. Public contact links now use the verified
 subdomain; no DNS or live service setting was changed during this implementation.
 The new flow is local until the coordinated activation and real-email check.
+
+## October 22 — owner-requested real end-to-end test and UI alignment
+
+The owner explicitly requested an actual email/signup journey, then asked for UI
+consistency and a clean workflow. This follow-up uses isolated staging with real
+Resend delivery to the connected owner Gmail mailbox (and its test plus alias),
+not a production release. Production Hosting, existing 80 Functions, DNS, rules,
+release branches and player data remain unchanged. No push is needed for this
+staging test. The earlier blanket no-deployment statement describes the first
+local implementation, not this subsequent owner-requested staging verification.
+
+Public application/confirmation pages reuse the existing landing header, logo,
+type and button styles. The private component uses existing admin button/card
+classes and theme variables; applications stay visible above collapsed setup,
+and approval/send move to their resulting status. Email activity is collapsed
+except for delivery problems. The private settings show where owner alerts go.
+
+Staging outbound mail is restricted to the configured owner addresses and gets
+a clear [TEST] subject/footer. Staging inbound processing accepts only the
+explicit owner test sender; production owns ordinary inbound traffic. This
+prevents a temporary staging webhook from forwarding unrelated customer mail.
+The prior own-mailbox blanket filter was too broad: a legitimate manual support
+message from the notification address was discarded. Loop protection now uses
+the exact system sender, Auto-Submitted and an X-WE3D-Forwarded marker instead.
+
+Current execution evidence and test boundaries are recorded under
+`output/research/tester-live-e2e-2026-10-22/`. Production activation is still a
+separate approval/release action; a staging pass does not claim it occurred.

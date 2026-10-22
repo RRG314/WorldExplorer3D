@@ -12,7 +12,7 @@ function createTesterProgram({db,config,now=Date.now,randomToken=token,fetchImpl
  const settingRef=db.collection('appTesterProgram').doc('current');
  const queue=(tx,job)=>{const {id,...record}=job;tx.create(db.collection('appTesterMail').doc(id),record);return id;};
  const audit=(tx,moderator,action,id,time)=>tx.create(db.collection('adminActivity').doc(crypto.randomUUID()),{actionType:`testers.${action}`,targetType:'tester_application',targetId:id,title:`Tester ${action}`,summary:'Tester program action',actorUid:moderator.auth.uid,actorName:moderator.displayName,createdAtMs:time});
- const settings=async()=>{const value=(await settingRef.get()).data()||{};const cfg=config();return {buildUrl:value.buildUrl||'',instructions:value.instructions||'',revision:value.revision||0,replyAddress:REPLY_ADDRESS,supportAddress:SUPPORT_ADDRESS,ownerNotificationConfigured:!!cfg.adminNotificationEmail,emailConfigured:!!(cfg.emailFrom&&cfg.resendApiKey),webhookConfigured:value.webhookEnabled===true};};
+ const settings=async()=>{const value=(await settingRef.get()).data()||{};const cfg=config();return {buildUrl:value.buildUrl||'',instructions:value.instructions||'',revision:value.revision||0,replyAddress:REPLY_ADDRESS,supportAddress:SUPPORT_ADDRESS,ownerNotificationConfigured:!!cfg.adminNotificationEmail,ownerNotificationAddress:cfg.adminNotificationEmail||'',emailConfigured:!!(cfg.emailFrom&&cfg.resendApiKey),webhookConfigured:value.webhookEnabled===true};};
  async function confirm(value){
   if(!ID.test(value||''))throw fail(400,'This confirmation link is invalid or expired.');
   const time=now(),origin=siteOrigin(),cfg=config(),manageToken=randomToken();
@@ -126,16 +126,19 @@ function createTesterProgram({db,config,now=Date.now,randomToken=token,fetchImpl
   if(event.type==='email.received'){
    const recipients=Array.isArray(data.to)?data.to:[];
    if(!recipients.some(v=>[REPLY_ADDRESS,SUPPORT_ADDRESS].includes(String(v).toLowerCase())))return;
-   const cfg=config();if(!cfg.resendApiKey||!cfg.adminNotificationEmail||!cfg.emailFrom)throw fail(503,'Incoming email forwarding unavailable.');
+   const cfg=config();const eventFrom=String(data.from||'').match(/(?:<)?([^\s<>]+@[^\s<>]+)(?:>)?$/)?.[1]?.toLowerCase();
+   if(!cfg.inboundEnabled&&(!cfg.inboundTestSender||eventFrom!==cfg.inboundTestSender.toLowerCase()))return;
+   if(!cfg.resendApiKey||!cfg.adminNotificationEmail||!cfg.emailFrom)throw fail(503,'Incoming email forwarding unavailable.');
    if([REPLY_ADDRESS,SUPPORT_ADDRESS].includes(cfg.adminNotificationEmail.toLowerCase()))throw fail(503,'Forwarding destination must be a separate mailbox.');
    const key=hash(`reply//${data.email_id}`),mailRef=db.collection('appTesterMail').doc(key);
    if((await mailRef.get()).exists)return;
    const response=await fetchImpl(`https://api.resend.com/emails/receiving/${encodeURIComponent(data.email_id)}`,{headers:{Authorization:`Bearer ${cfg.resendApiKey}`},signal:AbortSignal.timeout(10000)});
    if(!response.ok)throw fail(503,'Incoming message retrieval unavailable.');
    const received=await response.json(),from=String(received.from||'').match(/(?:<)?([^\s<>]+@[^\s<>]+)(?:>)?$/)?.[1]?.toLowerCase();
-   if(!from||from===cfg.adminNotificationEmail.toLowerCase()||from.endsWith('@mail.worldexplorer3d.io'))return;
+   const systemFrom=String(cfg.emailFrom).match(/(?:<)?([^\s<>]+@[^\s<>]+)(?:>)?$/)?.[1]?.toLowerCase();
+   if(!from||from===systemFrom||(!cfg.inboundEnabled&&from!==cfg.inboundTestSender.toLowerCase()))return;
    const headers=received.headers||{},auto=String(headers['auto-submitted']||headers['Auto-Submitted']||'no').toLowerCase();
-   if(auto!=='no')return;
+   if(auto!=='no'||Object.keys(headers).some(name=>name.toLowerCase()==='x-we3d-forwarded'))return;
    const job=mailJob({kind:'reply',data:{from,subject:received.subject,text:received.text,hasAttachments:(received.attachments||[]).length>0},recipient:cfg.adminNotificationEmail,from:cfg.emailFrom,revision:data.email_id,createdAtMs:time});
    await db.runTransaction(async tx=>{
     const quota=db.collection('appTesterRequestLimits').doc('incoming'),[exists,limit]=await Promise.all([tx.get(mailRef),tx.get(quota)]);
