@@ -102,6 +102,8 @@
       }
     ],
     "rewrites": [
+      {"source":"/manageAppTesters","function":"manageAppTesters"},
+      {"source":"/appTesterEmailWebhook","function":"appTesterEmailWebhook"},
       {
         "source": "/registerAppTester",
         "function": "registerAppTester"

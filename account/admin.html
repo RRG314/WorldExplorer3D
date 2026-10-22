@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="../styles/tester-program.css">
   <title>Administration · World Explorer Account Center</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1043,6 +1044,7 @@
             <div><strong>Moderation</strong><span>Overlay and contribution queues</span></div>
             <span class="nav-badge" id="navModerationBadge">0</span>
           </button>
+          <button type="button" class="nav-btn" data-view="testers"><div><strong>Testers</strong><span>Applications, invitations & email status</span></div></button>
           <button type="button" class="nav-btn" data-view="users">
             <div><strong>Users</strong><span>Accounts, roles, and submissions</span></div>
             <span class="nav-badge" id="navUsersBadge">0</span>
@@ -1150,6 +1152,7 @@
           </div>
         </section>
 
+        <section class="view-panel" data-view-panel="testers" hidden><div id="adminTesterProgram"></div></section>
         <section class="view-panel" data-view-panel="moderation" hidden>
           <div class="view-head">
             <div>

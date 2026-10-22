@@ -107,3 +107,16 @@ the existing released-candidate pointer and all rollback packages. Tester signup
 adds one new Function plus two TTL policies and reuses the deployed Resend sender.
 This additive owner-requested scope does not authorize changing the existing 80
 Functions, their values or rules. No deployment or Godot work occurred.
+
+## Tester email follow-up (October 21, 2026)
+
+The owner requested a complete application/approval/invitation/reply flow. The
+local implementation now replaces the initial interest-only scope with four
+additive Functions, two composite indexes and six tester TTL policies. Existing
+80 Functions, their configured values, account/game rules and player data remain
+outside this change. Read
+`docs/architecture-evaluation/2026-10-21-TESTER-EMAIL.md` for the owner workflow,
+verification evidence and concrete activation requirements. The earlier browser
+candidate/readiness pointer is retained as historical evidence; it does not
+cover the new mail/admin changes. No production email, DNS change, push or
+deployment occurred in this follow-up.

@@ -3,7 +3,7 @@ import fs from 'node:fs/promises';
 import {chromium} from 'playwright';
 import {startStaticServer} from './static-server.mjs';
 import {closeOwnedBrowser} from './owned-browser.mjs';
-const out='output/research/browser-completion-2026-10-20/tester-flow';
+const out='output/research/tester-program-2026-10-21/popup';
 await fs.mkdir(out,{recursive:true});
 const html=await fs.readFile('app/index.html','utf8'), invitation=html.slice(html.indexOf('<aside id="testerInvitation"'),html.indexOf('</aside>',html.indexOf('<aside id="testerInvitation"'))+8);
 const report={passed:false,scope:'Actual invitation markup/component and confirmation page; controlled HTTP outcomes, no email sent or production contact created',errors:[]};
@@ -28,7 +28,7 @@ try {
   await page.screenshot({path:`${out}/pending-mobile.png`});
   await page.goto(`http://127.0.0.1:${server.port}/account/tester.html#${'a'.repeat(64)}`);
   assert.equal(new URL(page.url()).hash,'');assert.equal(await page.locator('#confirmTester').isEnabled(),true);
-  await page.locator('#confirmTester').click();await page.getByText('You’re on the tester interest list.',{exact:false}).waitFor();
+  await page.locator('#confirmTester').click();await page.getByText('Your email is confirmed',{exact:false}).waitFor();
   assert.equal(await page.evaluate(()=>localStorage.getItem('we3d.tester-invitation.v1')),'interested');
   await page.screenshot({path:`${out}/confirmed-mobile.png`});
   await page.goto(`http://127.0.0.1:${server.port}/tester-fixture`);assert.equal(await page.locator('#testerInvitation').isVisible(),false);

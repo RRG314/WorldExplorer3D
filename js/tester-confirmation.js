@@ -1,24 +1,40 @@
-const token = location.hash.slice(1);
-// Token stays out of request URLs, analytics and later navigation history.
-history.replaceState(null, '', location.pathname);
-const button = document.getElementById('confirmTester');
-const status = document.getElementById('testerStatus');
-if (!/^[a-f0-9]{64}$/.test(token)) {
-  button.hidden = true; status.textContent = 'This link is invalid. Request a new confirmation email from the game.';
+const button=document.getElementById('confirmTester'),status=document.getElementById('testerStatus');
+const heading=document.querySelector('h1'),description=heading.nextElementSibling;
+const access=document.getElementById('testerAccessLink'),instructions=document.getElementById('testerInstructions');
+let kind,token,epoch=0,pending;
+function readLink(){
+ pending?.abort();pending=null;epoch++;
+ const fragment=location.hash.slice(1),parts=fragment.split('.');
+ kind=parts.length===1?'verify':parts[0];token=parts.length===1?parts[0]:parts[1];
+ history.replaceState(null,'',location.pathname);
+ access.hidden=true;access.removeAttribute('href');instructions.hidden=true;instructions.textContent='';status.textContent='';button.disabled=false;button.hidden=false;
+ const copy={
+  verify:['Confirm your tester interest','Confirm that you’d like emails about testing the new World Explorer app. Invitations depend on availability.','Confirm interest'],
+  invite:['You’re invited to test World Explorer','Accept this invitation to see the test build and getting-started instructions.','Accept invitation'],
+  manage:['Manage testing invitations','Stop future World Explorer testing invitations for this email address. You can apply again later if you change your mind.','Stop testing invitations']
+ }[kind];
+ if(!copy||parts.length>2||!/^[a-f0-9]{64}$/.test(token||'')){button.hidden=true;status.textContent='This link is invalid. Use the application page below to request a new confirmation email.';return;}
+ [heading.textContent,description.textContent,button.textContent]=copy;
 }
-button.addEventListener('click', async () => {
-  button.disabled = true; status.textContent = 'Confirming…';
-  try {
-    // The one-use emailed capability authorizes confirmation. No sign-in or
-    // CAPTCHA initialization is needed on an email-link landing page.
-    const response = await fetch('/registerAppTester', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({action:'confirm',token}), signal:AbortSignal.timeout(20000)});
-    const result = response.ok ? await response.json() : null;
-    if (!result?.confirmed) throw new Error('Unconfirmed');
-    try { localStorage.setItem('we3d.tester-invitation.v1','interested'); } catch { /* Optional device preference. */ }
-    button.hidden = true;
-    status.textContent = 'You’re on the tester interest list. We’ll email you when a suitable test is available. To remove your interest, email mail@worldexplorer3d.io.';
-  } catch (_) {
-    status.textContent = 'We couldn’t confirm this link. It may have expired. Try again, or request a new email from the game.';
-    button.disabled = false;
+readLink();window.addEventListener('hashchange',readLink);
+button.addEventListener('click',async()=>{
+ const own=epoch,action={verify:'confirm',invite:'invitation',manage:'withdraw'}[kind];
+ if(!action||button.disabled)return;
+ pending=new AbortController();const controller=pending,deadline=setTimeout(()=>controller.abort(),20000);
+ button.disabled=true;status.textContent=kind==='manage'?'Stopping invitations…':'Confirming…';
+ try{
+  const response=await fetch('/registerAppTester',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action,token}),signal:controller.signal});
+  const result=response.ok?await response.json():null;if(own!==epoch)return;
+  if(!result||(!result.confirmed&&!result.accepted&&!result.withdrawn))throw Error('Not confirmed');
+  try{localStorage.setItem('we3d.tester-invitation.v1',result.withdrawn?'dismissed':'interested');}catch{/* Optional device preference. */}
+  button.hidden=true;
+  if(kind==='verify')status.textContent='Your email is confirmed and your tester application is waiting for review. We’ll email you separately if you’re selected. You’ll also receive an application receipt with a link to stop invitations.';
+  if(kind==='manage')status.textContent='Testing invitations have been stopped. You can apply again using the link below.';
+  if(kind==='invite'){
+   const url=new URL(result.buildUrl);if(url.protocol!=='https:')throw Error('Invalid access link');
+   access.href=url.href;access.hidden=false;instructions.textContent=result.instructions;instructions.hidden=false;
+   status.textContent='Invitation accepted. Use the link and instructions below to get started. Reply to your invitation email whenever you have questions or feedback.';
   }
+ }catch(_){if(own!==epoch)return;status.textContent='We couldn’t confirm this link. It may have expired or been replaced. Try again, or use the application page below to request a new email.';button.disabled=false;button.hidden=false;}
+ finally{clearTimeout(deadline);if(pending===controller)pending=null;}
 });
