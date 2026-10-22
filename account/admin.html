@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" href="../favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="../styles/tester-program.css">
   <title>Administration · World Explorer Account Center</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -952,6 +953,18 @@
 
       .topbar {
         padding: 16px;
+        flex-direction: column;
+      }
+
+      .topbar > div,
+      .topbar-actions {
+        min-width: 0;
+        max-width: 100%;
+      }
+
+      .identity-pill {
+        max-width: 100%;
+        overflow-wrap: anywhere;
       }
 
       .gate-grid,

@@ -191,3 +191,15 @@ or bypass the worker. The rejected configuration patch and initial test-fixture
 errors are retained. A used confirmation now reports an existing withdrawal
 truthfully; only a fresh confirmation reapplies. Invitation errors direct people
 to request a replacement by replying to their invitation.
+
+Real staging delivery recovered through the existing trigger retries, including
+the original queued owner alert and receipt. Preview/send produced one delivered
+invitation. A manual Gmail reply reached the owned testing alias and forwarded
+back into Gmail Inbox with its original sender, subject and test body intact.
+The full authenticated admin shell exposed a mobile overflow missed by the
+isolated component fixture. The small-screen header now stacks and its identity
+wraps; actual shell bounds pass at 320, 390, 720 and 1360 pixels. This is a layout
+repair, not a change to permissions. A favicon reference prevents the shell's
+implicit missing icon request. Invitation acceptance/withdrawal resume from the
+existing sent invitation; do not resend it. The same-document navigation driver
+must await fragment consumption before asserting URL privacy.
