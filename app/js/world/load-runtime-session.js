@@ -49,6 +49,7 @@ export function createWorldLoadRuntimeSession(options = {}) {
     appCtx.showToast?.('Choose a valid location. The current world has been kept.');
     return {aborted: true, reason: 'invalid_location_selection'};
   }
+  appCtx.prepareRoomWorldChange?.(loadRequest.location);
   if (appCtx.boatMode?.active) appCtx.stopBoatMode?.({targetMode: 'walk'});
   const locName = loadRequest?.name || 'Unknown location';
   const perfModeNow = 'baseline';

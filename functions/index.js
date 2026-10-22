@@ -1768,6 +1768,7 @@ exports.joinRoom = functions.region('us-central1').runWith({ invoker: 'public' }
   if (!auth) return;
   try {
     const result = await admitRoomPlayer({ db, uid: auth.uid,
+      weekly: req.body?.weekly === true,
       roomCode: String(req.body?.roomCode || '').trim().toUpperCase(),
       displayName: req.body?.displayName || auth.name || 'Explorer' });
     res.status(200).json(result);

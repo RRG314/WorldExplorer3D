@@ -1,3 +1,4 @@
+import { leavesRoomForEarthLocation } from './room-world-policy.js';
 import { ensureEntitlements } from "../../../js/entitlements.js?v=71";
 import {isEarthWorldUsable} from '../earth-core/world-readiness.js';
 import { createGhostManager } from "./ghosts.js?v=58";
@@ -99,7 +100,7 @@ export function createUiRoomRuntime({ appCtx, refs, state, renderers, helpers })
     const seed = String(world.seed || "").trim();
     const lat = finiteNumber(world.lat, 0).toFixed(6);
     const lon = finiteNumber(world.lon, 0).toFixed(6);
-    return `${kind}|${seed}|${lat}|${lon}`;
+    return `${kind}|${seed}|${lat}|${lon}|${deriveRoomDeterministicSeed(room)}`;
   }
 
   function applyRoomPaintMultiplayerConfig(room) {
@@ -218,23 +219,26 @@ export function createUiRoomRuntime({ appCtx, refs, state, renderers, helpers })
   }
 
   async function syncRoomWorldContext(room, force = false, respawn = false) {
-    if (!room || !room.world || state.currentRoom?.id !== room.id) return;
+    if (!room || !room.world || state.currentRoom?.id !== room.id) return false;
     const generation = state.roomSessionGeneration;
     const isCurrent = () => state.roomSessionGeneration === generation && state.currentRoom?.id === room.id;
     const failSync = (error) => {
-      if (!isCurrent()) return;
+      if (!isCurrent()) return false;
       state.activeRoomWorldSignature = '';
       clearPendingRoomWorldRetry();
       setStatus('The room location could not load. Retry from the location menu.', true);
       console.warn('[multiplayer][ui] room world sync failed:', error);
+      return false;
     };
 
     const signature = roomWorldSignature(room);
-    if (!force && signature && state.activeRoomWorldSignature === signature) return;
+    if (!force && signature && state.activeRoomWorldSignature === signature) return !appCtx.worldLoading;
     state.activeRoomWorldSignature = signature;
 
     const world = room.world || {};
     const roomSeed = deriveRoomDeterministicSeed(room);
+    state.roomSeedLease ||= {previous:appCtx.sharedSeedOverride};
+    state.roomSeedLease.value=roomSeed;
     appCtx.sharedSeedOverride = roomSeed;
     applyRoomPaintMultiplayerConfig(room);
     installPaintClaimPublisher();
@@ -256,7 +260,8 @@ export function createUiRoomRuntime({ appCtx, refs, state, renderers, helpers })
             throw new Error('The room location did not finish loading.');
           }
           clearPendingRoomWorldRetry();
-        } catch (error) { failSync(error); }
+          return true;
+        } catch (error) { return failSync(error); }
       } else {
         const startBtn = document.getElementById("startBtn");
         if (startBtn instanceof HTMLButtonElement) startBtn.click();
@@ -266,19 +271,19 @@ export function createUiRoomRuntime({ appCtx, refs, state, renderers, helpers })
 
     if (appCtx.gameStarted && appCtx.worldLoading) {
       scheduleRoomWorldRetry(room, respawn);
-      return;
+      return false;
     }
 
     const environmentReady = await ensureRoomEnvironment(kind, room, respawn);
     if (!isCurrent()) return;
     if (!environmentReady) {
       scheduleRoomWorldRetry(room, respawn, 700);
-      return;
+      return false;
     }
 
     if (kind !== "earth") {
       clearPendingRoomWorldRetry();
-      return;
+      return true;
     }
 
     if (!Number.isFinite(lat) || !Number.isFinite(lon) || typeof appCtx.loadRoads !== "function") return;
@@ -294,13 +299,26 @@ export function createUiRoomRuntime({ appCtx, refs, state, renderers, helpers })
       if ((appCtx.getEnv && appCtx.getEnv() !== (appCtx.ENV?.EARTH || 'EARTH')) || !isEarthWorldUsable(appCtx, loaded) || (selectionSignature !== undefined && selectionSignature !== appCtx.getLocationSelectionSignature?.())) throw new Error('The room location did not finish loading.');
       appCtx.markLocationSelectionLoaded?.();
       clearPendingRoomWorldRetry();
+      return true;
     } catch (err) {
-      failSync(err);
+      return failSync(err);
     }
+  }
+
+  function prepareRoomWorldChange(location) {
+    if(!leavesRoomForEarthLocation(state.currentRoom,location))return false;
+    const code=state.currentRoom.code;
+    // deactivateRoom detaches subscriptions, edits and presence synchronously,
+    // before awaiting its captured network lease cleanup. Offline travel stays usable.
+    void deactivateRoom(false).catch(error=>console.warn('[multiplayer] room travel cleanup:',error));
+    appCtx.showToast?.(`Left room ${code}. Multiplayer rooms stay at one location; you can rejoin with the room code.`);
+    return true;
   }
 
   async function deactivateRoom(localOnly = false) {
     clearSubscriptions();
+    const seedLease=state.roomSeedLease;state.roomSeedLease=null;
+    if(seedLease&&appCtx.sharedSeedOverride===seedLease.value)appCtx.sharedSeedOverride=seedLease.previous;
     clearPendingRoomWorldRetry();
     if (typeof appCtx.configureSharedBuildSync === "function") {
       appCtx.configureSharedBuildSync({ enabled: false });
@@ -509,6 +527,7 @@ export function createUiRoomRuntime({ appCtx, refs, state, renderers, helpers })
     clearSubscriptions,
     currentRoomName,
     deactivateRoom,
+    prepareRoomWorldChange,
     ensureAccessOrWarn,
     ensureGhostManager,
     ensureGhostTicker,

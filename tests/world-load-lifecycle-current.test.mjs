@@ -120,3 +120,9 @@ test('an old successful result cannot authorize entry into a newer ready publica
     {state:'published'}
   ]) assert.equal(isEarthWorldUsable(ctx,result),false);
 });
+
+test('the room owner is notified after valid admission but before any world reset',()=>{
+ const events=[];const {deps}=setup({prepareRoomWorldChange:point=>{assert.deepEqual(point,{lat:selection.lat,lon:selection.lon});events.push('room-detach');}});
+ deps.resetWorldForReload=()=>events.push('world-reset');createWorldLoadRuntimeSession(deps);assert.deepEqual(events,['room-detach','world-reset']);
+ const invalid=setup({resolveLocationSelection:()=>null,prepareRoomWorldChange:()=>events.push('invalid-detach')});createWorldLoadRuntimeSession(invalid.deps);assert.equal(events.includes('invalid-detach'),false);
+});

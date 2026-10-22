@@ -206,8 +206,9 @@ function resolveRoomCreatePolicy(profile, hasAdminTokenClaim) {
 function randomCode() {
   let out = '';
   for (let i = 0; i < ROOM_CODE_LENGTH; i++) {
-    const idx = Math.floor(Math.random() * ROOM_CODE_ALPHABET.length);
-    out += ROOM_CODE_ALPHABET[idx];
+    const alphabet=i===0?ROOM_CODE_ALPHABET.replace('W',''):ROOM_CODE_ALPHABET;
+    const idx = Math.floor(Math.random() * alphabet.length);
+    out += alphabet[idx];
   }
   return out;
 }
@@ -332,6 +333,8 @@ function toRoomObject(roomSnap) {
     name: String(data.name || ''),
     visibility: normalizeVisibility(data.visibility),
     featured: normalizeFeatured(data.featured),
+    systemKind: data.systemKind==='weekly'?'weekly':'',
+    weekKey: String(data.weekKey||''),
     maxPlayers: normalizeMaxPlayers(data.maxPlayers),
     ownerUid: String(data.ownerUid || ''),
     mods: data.mods && typeof data.mods === 'object' ? { ...data.mods } : {},

@@ -52,6 +52,7 @@ export function createUiRoomRoomActionsApi({
     findPublicRoomsByCity,
     getCurrentUser,
     joinRoomByCode,
+    joinWeeklyFeaturedRoom,
     sendMessage
   } = deps;
 
@@ -144,6 +145,7 @@ export function createUiRoomRoomActionsApi({
       return null;
     } finally {
       state.roomJoinBusy = false;
+      renderFeaturedRooms?.();
     }
   }
 
@@ -302,70 +304,30 @@ export function createUiRoomRoomActionsApi({
   }
 
   async function handleJoinWeeklyFeaturedRoom() {
-    const weekly = getWeeklyCitySelection();
-    const roomCode = buildWeeklyFeaturedRoomCode(weekly);
-    const world = resolveWeeklyFeaturedWorld(weekly);
-    const roomName = `Weekly City • ${weekly.city} (Week ${weekly.week})`;
-
-    async function finalizeJoin(room, originLabel) {
-      if (!await activateRoom(room, originLabel)) return null;
+    if (state.roomJoinBusy) return null;
+    state.roomJoinBusy = true;
+    renderFeaturedRooms?.();
+    setStatus('Opening the public weekly room…');
+    try {
+      const room = await joinWeeklyFeaturedRoom();
+      const user = getCurrentUser();
+      if (user) callbacks.setAuthUser?.(user);
+      if (!await activateRoom(room, 'weekly city room')) return null;
       await bumpExplorerLeaderboard({ roomsJoined: 1 }).catch(() => {});
-      emitProductTelemetry('room_join', {
-        source: 'weekly_city',
-        visibility: room.visibility || 'public',
-        world_kind: room.world?.kind || 'earth',
-        max_players: Number(room.maxPlayers || 0)
-      });
       await refreshFeaturedRooms(true);
-      renderFeaturedRooms();
       closeRoomPanel();
       setInputCode(refs, room.code);
-      setStatus(`Weekly featured room active: ${weekly.city} (${room.code}).`);
-      return room;
-    }
-
-    try {
-      const existing = await joinRoomByCode(roomCode);
-      if (!state.authUser) {
-        const authed = getCurrentUser();
-        if (authed) callbacks.setAuthUser?.(authed);
-      }
-      return await finalizeJoin(existing, "weekly featured room");
-    } catch (joinErr) {
-      const joinMessage = String(joinErr?.message || "");
-      if (!/Room not found/i.test(joinMessage)) {
-        setStatus(joinMessage || "Could not join weekly featured room.", true);
-        return null;
-      }
-    }
-
-    try {
-      if (!(await ensureAccessOrWarn("creating the weekly featured city room"))) return null;
-      const cap = getRecommendedRoomCap();
-      const created = await createRoom({
-        code: roomCode,
-        name: roomName,
-        visibility: "public",
-        featured: false,
-        maxPlayers: cap,
-        world,
-        locationName: weekly.city,
-        locationTag: { label: `Weekly City: ${weekly.city}`, city: weekly.city, kind: "earth" }
+      setStatus(`Weekly room ready: ${room.name}. Rooms stay at their selected location.`);
+      emitProductTelemetry('room_join', {
+        source: 'weekly_city', visibility: 'public', world_kind: 'earth', max_players: Number(room.maxPlayers)
       });
-      return await finalizeJoin(created, "weekly featured room");
-    } catch (createErr) {
-      const createMessage = String(createErr?.message || "");
-      if (/unavailable|already|denied/i.test(createMessage)) {
-        try {
-          const raceWinner = await joinRoomByCode(roomCode);
-          return await finalizeJoin(raceWinner, "weekly featured room");
-        } catch (retryErr) {
-          setStatus(String(retryErr?.message || retryErr || "Could not join weekly featured room."), true);
-          return null;
-        }
-      }
-      setStatus(createMessage || "Could not open weekly featured room.", true);
+      return room;
+    } catch (error) {
+      setStatus(error?.message || 'Could not open the weekly room. Try again.', true);
       return null;
+    } finally {
+      state.roomJoinBusy = false;
+      renderFeaturedRooms?.();
     }
   }
 

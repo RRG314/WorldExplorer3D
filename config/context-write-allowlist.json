@@ -825,6 +825,7 @@
       "sharedSeedOverride"
     ],
     "app/js/multiplayer/ui-room.js": [
+      "prepareRoomWorldChange",
       "publishPaintTownClaim"
     ],
     "app/js/ocean.js": [

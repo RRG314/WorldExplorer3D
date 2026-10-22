@@ -69,17 +69,17 @@ test('actual room sync cannot respawn before publication or mark a failed room s
     deps:{appCtx,state,refs:{},renderers:{setStatus:(...args)=>messages.push(args)},
       helpers:{finiteNumber:(n,f)=>Number.isFinite(n)?n:f,normalizePaintRules:()=>({}),sanitizeText:String}}});
   vm.runInContext(source+'\nglobalThis.controller=createUiRoomRuntime(deps);',context);
-  await context.controller.syncRoomWorldContext(room,true,true);
+  assert.equal(await context.controller.syncRoomWorldContext(room,true,true),false);
   assert.equal(spawns,0);assert.equal(state.activeRoomWorldSignature,'');
   assert.match(messages.at(-1)[0],/could not load/);assert.equal(messages.at(-1)[1],true);
   appCtx.loadRoads=async()=>({state:'published',...appCtx.worldPublication});
-  await context.controller.syncRoomWorldContext(room,false,true);
-  assert.equal(spawns,1);assert.notEqual(state.activeRoomWorldSignature,'');
+  assert.equal(await context.controller.syncRoomWorldContext(room,false,true),true);
+  assert.equal(spawns,0);assert.notEqual(state.activeRoomWorldSignature,'');
   appCtx.gameStarted=false;
   appCtx.triggerTitleStart=async()=>false;
-  await context.controller.syncRoomWorldContext(room,true,true);
-  assert.equal(state.activeRoomWorldSignature,'');assert.equal(spawns,1);
+  assert.equal(await context.controller.syncRoomWorldContext(room,true,true),false);
+  assert.equal(state.activeRoomWorldSignature,'');assert.equal(spawns,0);
   appCtx.triggerTitleStart=async()=>{throw Error('launch rejected');};
-  await context.controller.syncRoomWorldContext(room,true,true);
-  assert.equal(state.activeRoomWorldSignature,'');assert.equal(spawns,1);
+  assert.equal(await context.controller.syncRoomWorldContext(room,true,true),false);
+  assert.equal(state.activeRoomWorldSignature,'');assert.equal(spawns,0);
 });

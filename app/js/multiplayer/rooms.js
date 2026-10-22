@@ -371,38 +371,32 @@ async function joinRoomByCode(codeInput, options = {}) {
   const generation = ++roomRequestGeneration;
   const startingUid = getCurrentUser()?.uid;
   const { db } = getServices();
-  const code = normalizeCode(codeInput);
-  if (code.length !== ROOM_CODE_LENGTH) {
-    throw new Error('Enter a valid 6-character room code.');
+  const weekly=options.weekly===true;
+  let code=normalizeCode(codeInput),room;
+  if(!weekly){
+    if(code.length!==ROOM_CODE_LENGTH)throw new Error('Enter a valid 6-character room code.');
+    const snap=await getDoc(doc(db,ROOM_COLLECTION,code));
+    if(!snap.exists())throw new Error('Room not found. Check the invite code and try again.');
+    room=toRoomObject(snap);
+    if(!room)throw new Error('Could not read room details.');
   }
-
-  const roomRef = doc(db, ROOM_COLLECTION, code);
-  const roomSnap = await getDoc(roomRef);
-  if (!roomSnap.exists()) {
-    throw new Error('Room not found. Check the invite code and try again.');
+  assertCurrentRoomRequest(generation,startingUid);
+  let user=getCurrentUser();
+  if(!user?.uid){
+    if(!weekly&&room.visibility!=='public')throw new Error('Sign in is required to join private rooms.');
+    user=await ensureGuestSession();
   }
-
-  const room = toRoomObject(roomSnap);
-  if (!room) {
-    throw new Error('Could not read room details.');
+  if(!user?.uid)throw new Error('Sign in is required before joining this room.');
+  assertCurrentRoomRequest(generation,user.uid);
+  const result=await postProtectedFunction('/joinRoom',{...(weekly?{weekly:true}:{roomCode:code}),displayName:resolveDisplayName(user,options.displayName)},{label:'Room admission'});
+  assertCurrentRoomRequest(generation,user.uid);
+  if(weekly){
+    code=normalizeCode(result.roomCode);
+    const snap=await getDoc(doc(db,ROOM_COLLECTION,code));
+    if(!snap.exists())throw new Error('The weekly room could not be read. Try again.');
+    room=toRoomObject(snap);
+    assertCurrentRoomRequest(generation,user.uid);
   }
-
-  assertCurrentRoomRequest(generation, startingUid);
-  let user = getCurrentUser();
-  if (!user || !user.uid) {
-    if (room.visibility !== 'public') {
-      throw new Error('Sign in is required to join private rooms.');
-    }
-    user = await ensureGuestSession();
-  }
-  if (!user || !user.uid) {
-    throw new Error('Sign in is required before joining this room.');
-  }
-
-  const displayName = resolveDisplayName(user, options.displayName);
-  assertCurrentRoomRequest(generation, user.uid);
-  await postProtectedFunction('/joinRoom', { roomCode: code, displayName }, { label: 'Room admission' });
-  assertCurrentRoomRequest(generation, user.uid);
   setCurrentRoom(room);
   try {
     const role = room && room.ownerUid === user.uid ? 'owner' : 'member';
@@ -413,6 +407,8 @@ async function joinRoomByCode(codeInput, options = {}) {
   assertCurrentRoomRequest(generation, user.uid);
   return room;
 }
+
+async function joinWeeklyFeaturedRoom(){return joinRoomByCode('',{weekly:true});}
 
 async function leaveRoom() {
   roomRequestGeneration += 1;
@@ -573,6 +569,7 @@ export {
   findFeaturedPublicRooms,
   getCurrentRoom,
   joinRoomByCode,
+  joinWeeklyFeaturedRoom,
   leaveRoom,
   listOwnedRooms,
   listenMyRooms,

@@ -1,12 +1,11 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
-import { getWeeklyFeaturedCity } from './featured-city-model.js?v=1';
+import { getWeeklyFeaturedCity, weeklyRoomCode } from './featured-city-model.js?v=1';
 import { normalizeCityKey, normalizeCode } from './rooms.js?v=67';
 
 const MAX_PLAN_DISPLAY_NAME_LEN = 48;
 const RELATIVE_MINUTE_MS = 60 * 1000;
 const RELATIVE_HOUR_MS = 60 * RELATIVE_MINUTE_MS;
 const RELATIVE_DAY_MS = 24 * RELATIVE_HOUR_MS;
-const WEEKLY_ROOM_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const BASE_ROOM_CAP_MOBILE = 8;
 const BASE_ROOM_CAP_DESKTOP = 10;
 const HIGH_END_ROOM_CAP_DESKTOP = 12;
@@ -86,32 +85,11 @@ function hashStringToUint32(input) {
 }
 
 function getWeeklyCitySelection(date = new Date()) {
-  const weekly = getWeeklyFeaturedCity(date);
-  const week = Math.max(1, Math.floor(Number(weekly?.week || 1)));
-  const city = sanitizeText(weekly?.city || 'Baltimore', 48) || 'Baltimore';
-  return {
-    week,
-    city,
-    cityKey: normalizeCityKey(city),
-    kind: 'earth'
-  };
+  return getWeeklyFeaturedCity(date);
 }
 
 function buildWeeklyFeaturedRoomCode(selection) {
-  const week = Math.max(1, Math.floor(Number(selection?.week || 1)));
-  const cityKey = normalizeCityKey(selection?.cityKey || selection?.city || 'baltimore');
-  const seed = hashStringToUint32(`weekly-room-v1:${week}:${cityKey}`);
-  let value = seed || 1;
-  let code = 'W';
-  for (let i = 0; i < 5; i++) {
-    code += WEEKLY_ROOM_ALPHABET[value % WEEKLY_ROOM_ALPHABET.length];
-    value = Math.floor(value / WEEKLY_ROOM_ALPHABET.length);
-    if (value <= 0) {
-      value = ((seed >>> ((i + 1) * 3)) ^ (seed << ((i + 1) * 2))) >>> 0;
-      if (!value) value = i + 7;
-    }
-  }
-  return normalizeCode(code).slice(0, 6);
+  return weeklyRoomCode(selection);
 }
 
 function formatRelativeTime(value) {

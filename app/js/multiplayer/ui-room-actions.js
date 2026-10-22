@@ -10,6 +10,7 @@ import {
   deleteOwnedRoom,
   findPublicRoomsByCity,
   joinRoomByCode,
+  joinWeeklyFeaturedRoom,
   updateRoomSettings
 } from "./rooms.js?v=67";
 import {
@@ -97,6 +98,7 @@ export function createUiRoomActions({ appCtx, refs, state, renderers, helpers, c
       findPublicRoomsByCity,
       getCurrentUser,
       joinRoomByCode,
+      joinWeeklyFeaturedRoom,
       sendMessage
     },
     helpers,
@@ -411,6 +413,7 @@ export function createUiRoomActions({ appCtx, refs, state, renderers, helpers, c
     clearSubscriptions,
     currentRoomName,
     deactivateRoom,
+    prepareRoomWorldChange: runtime.prepareRoomWorldChange,
     ensureAccessOrWarn,
     ensureGhostManager,
     ensureGhostTicker,

@@ -96,16 +96,14 @@ export function createUiRoomRenderers({ appCtx, refs, state, helpers }) {
     const inWeeklyRoom = normalizeCode(state.currentRoom?.code || "") === roomCode;
 
     if (refs.titleFeaturedWeeklyBtn) {
-      refs.titleFeaturedWeeklyBtn.disabled = !state.authUser;
+      refs.titleFeaturedWeeklyBtn.disabled = state.roomJoinBusy === true;
       refs.titleFeaturedWeeklyBtn.textContent = inWeeklyRoom
         ? `In Weekly Room • ${weekly.city}`
         : `Join Weekly City • ${weekly.city}`;
     }
 
     if (refs.titleFeaturedWeeklyMeta) {
-      refs.titleFeaturedWeeklyMeta.textContent = state.authUser
-        ? `Week ${weekly.week}: ${weekly.city}. Public room code ${roomCode}.`
-        : "Weekly city room rotates each week. Sign in to join.";
+      refs.titleFeaturedWeeklyMeta.textContent = `Week ${weekly.week}: ${weekly.city}. Open to everyone, including guests. Up to 32 players; resets to a new room each Monday (UTC).`;
       refs.titleFeaturedWeeklyMeta.style.color = "#64748b";
     }
   }

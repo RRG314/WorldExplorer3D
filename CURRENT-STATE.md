@@ -154,3 +154,28 @@ configurations were verified unchanged. Production still runs released source
 `233a5a7f813fef97da3d75a76eb87996321fda2f`, has no tester Functions and was not
 deployed. The implementation/testing endpoint is complete; coordinated protected
 production activation is the next separately authorized action.
+
+## October 22 multiplayer follow-up
+
+Owner requested personal rooms, the public weekly room and a safe geographic
+streaming boundary. Local implementation and focused evidence are in
+`docs/architecture-evaluation/2026-10-22-MULTIPLAYER-READINESS.md`. Weekly admission
+now uses the existing server owner/transaction, UTC canonical city facts and a
+32-player ceiling with guest access and no personal quota charge. Each Earth room
+stays at one selected origin; detail streams within it, and selecting another
+origin releases the room before solo replacement. This is a finite selected-area
+source, not global multiplayer streaming. Room world preparation precedes
+subscriptions/connected status, leases renew without wrong-world poses, and seed
+ownership is restored on leave. Existing actor/admission rules remain in force.
+
+Two actual clients passed personal public create/join/chat/walking/reconnect and
+travel cleanup; the full current weekly city passed signed-out guest entry,
+walking and leave. Current isolated backend rules/admission and focused lifecycle
+cases passed. No 32-client performance/load acceptance is claimed. Optional local
+weather/marine/reverse services were unavailable and are recorded separately.
+Failed test setups and their diagnoses are retained; no broad release sweep was
+restarted. Multiplayer adds a scoped change to existing joinRoom plus one room-
+creation rule; this supersedes the prior mail-only no-existing-Function-change
+scope for that one Function. Preserve other Functions/configuration/data.
+Production and staging were not changed in this follow-up. Coordinated protected
+backend/rules/frontend activation remains separate from local candidate readiness.
