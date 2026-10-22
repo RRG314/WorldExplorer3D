@@ -179,3 +179,14 @@ creation rule; this supersedes the prior mail-only no-existing-Function-change
 scope for that one Function. Preserve other Functions/configuration/data.
 Production and staging were not changed in this follow-up. Coordinated protected
 backend/rules/frontend activation remains separate from local candidate readiness.
+
+Multiplayer code commits: `f85edbc0dca1` and guest copy `c337d144261e`.
+Final local build: `5.6.1+c337d144261e.4f05c779ef91aac2.production` under
+`output/hosting-validation/multiplayer-20261022-production-ready`.
+Pointer: `output/release-review/multiplayer-candidate.json`. Packaged UI/module
+smoke passed at 320/390/1100 pixels. Earlier tester staging and first multiplayer
+packages have complete, hash-verified basis/overlay recovery records under
+`output/hosting-validation/superseded-manifests/`; current dist, tester production
+and all released rollback packages remain preserved. Final docs do not change
+verified acceptance inputs. Local endpoint complete; coordinated hosted activation
+and protected production promotion remain separate, with no 32-client load claim.

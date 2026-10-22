@@ -188,3 +188,37 @@ protected production promotion with a bounded hosted multiplayer smoke remain
 release actions. No push/deploy, release branch change, cloud setting change or
 Godot work is included. The older tester package/pointer remains historical,
 with a recoverable staging package if its generated candidate slot is retired.
+
+## Final local package
+
+Implementation commit `f85edbc0dca1`; guest-guidance clarification
+`c337d144261e`. Final clean-source production candidate:
+`output/hosting-validation/multiplayer-20261022-production-ready`, build
+`5.6.1+c337d144261e.4f05c779ef91aac2.production`, content SHA-256
+`4f05c779ef91aac20f195bb231b7ea3740b3933fc096292e876630f14b84be04`.
+Current pointer: `output/release-review/multiplayer-candidate.json`; hash-bound
+readiness and executed receipt references: evidence root `readiness.json`.
+Documentation-only commits after that source retain the same acceptance inputs.
+
+The compiled room UI passed at 320, 390 and 1100 pixels, with no page/console
+errors; screenshots were inspected. Its actual packaged multiplayer entry exports
+both weekly admission and personal creation. The signed-out weekly control is
+enabled, and initial/auth status guidance explicitly permits weekly guests.
+This was a small packaged UI/module smoke with isolated demo SDK configuration,
+not a repeat of the city gameplay journeys or a production backend write.
+
+Final context ownership, syntax and diff checks passed. The exact temporary
+emulator config was preserved then removed; owned browsers/static servers and
+emulators stopped through their owners. Ordinary Chrome and the unrelated
+long-lived emulator were preserved. `dist`, released/fallback packages, assets,
+player data and historical pointers were retained. To stay within four current
+saved candidates, the verified older tester staging artifact and first multiplayer
+artifact were archived as fully reverified basis-plus-overlay recovery packages
+under `output/hosting-validation/superseded-manifests/` (not discarded). The final
+multiplayer package and older tester production package remain directly available.
+
+Local implementation/candidate endpoint is complete. Next separate checkpoint:
+protected coordinated staging activation of the reviewed joinRoom/rule/frontend
+delta and its bounded hosted create/join/weekly smoke, then protected promotion.
+The 32-player performance/cost question remains an explicitly separate measurement
+before raising capacity. No production or staging deployment occurred in this run.
