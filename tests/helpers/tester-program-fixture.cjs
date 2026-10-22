@@ -22,7 +22,7 @@ function memoryDatabase(){
 const functions={region:()=>({runWith:()=>({https:{onRequest:fn=>fn},firestore:{document:()=>({onWrite:fn=>fn})}})})};
 function fixture(){
  const db=memoryDatabase(),requests=[],delivered=new Map();let time=Date.now(),serial=0,failStatus=0,ambiguous=false,incoming={};
- const cfg={inboundEnabled:true,resendApiKey:'test-key',emailFrom:'World Explorer <testers@mail.worldexplorer3d.io>',adminNotificationEmail:'owner@example.com',webhookSecret:'whsec_'+Buffer.alloc(32,4).toString('base64')};
+ const cfg={projectId:'we3d-staging-20260712',inboundEnabled:true,resendApiKey:'test-key',emailFrom:'World Explorer <testers@mail.worldexplorer3d.io>',adminNotificationEmail:'owner@example.com',webhookSecret:'whsec_'+Buffer.alloc(32,4).toString('base64')};
  const fetchImpl=async(url,options)=>{
   if(options.method!=='POST')return {ok:true,json:async()=>incoming};
   const key=options.headers['Idempotency-Key'],body=JSON.parse(options.body);requests.push({key,body});

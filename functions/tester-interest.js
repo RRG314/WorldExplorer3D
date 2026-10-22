@@ -25,7 +25,7 @@ function buildTesterInterestExport({functions, db, setCors, verifyAppCheck, conf
       if (!await verifyAppCheck(req, res)) return;
       const cfg = config();
       if (!cfg.resendApiKey || !cfg.emailFrom || !cfg.adminNotificationEmail) return res.status(503).json({error:'Tester signup is temporarily unavailable. Please try again later.'});
-      const email = body.email.trim().toLowerCase(), token = randomToken();
+      const email = body.email.trim().toLowerCase(), token = randomToken(), origin=siteOrigin(cfg.projectId);
       if(cfg.testRecipients?.length && !cfg.testRecipients.includes(email)) return res.status(403).json({error:'This staging form accepts only the configured test email address.'});
       const ref = db.collection('appTesterConfirmations').doc(hash(token));
       // Distributed quotas survive instance replacement. Raw IPs never persist.
@@ -45,7 +45,7 @@ function buildTesterInterestExport({functions, db, setCors, verifyAppCheck, conf
       });
       if (!admitted) return res.status(429).json({error:'Please wait before requesting another confirmation email.'});
       // Fixed destination, fragment-only token, no redirect supplied by caller.
-      const link = `${siteOrigin()}/account/tester.html#${token}`;
+      const link = `${origin}/account/tester.html#${token}`;
       const response = await fetchImpl('https://api.resend.com/emails', {
         method:'POST', signal:AbortSignal.timeout(10000),
         headers:{Authorization:`Bearer ${cfg.resendApiKey}`, 'Content-Type':'application/json', 'Idempotency-Key':`tester/${hash(token)}`},

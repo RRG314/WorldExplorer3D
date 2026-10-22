@@ -2789,4 +2789,10 @@ exports.sealRealityCaptureOriginal=functions.storage.object().onFinalize(async o
 
 // Free public weather and ocean models share bounded, authenticated cache authority.
 exports.getEnvironmentalData = require('./environment-data').buildEnvironmentDataExport({functions, db, setCors, verifyAppCheck});
-Object.assign(exports, require('./tester-program').buildTesterProgramExports({functions, db, setCors, verifyAppCheck, requireModerator, config:()=>({...contributionNotificationConfig(),webhookSecret:process.env.WE3D_TESTER_RESEND_WEBHOOK_SECRET||'',inboundEnabled:process.env.GCLOUD_PROJECT==='worldexplorer3d-d9b83',inboundTestSender:process.env.GCLOUD_PROJECT==='we3d-staging-20260712'?(process.env.WE3D_TESTER_INBOUND_TEST_SENDER||''):'',testRecipients:process.env.GCLOUD_PROJECT==='we3d-staging-20260712'?(process.env.WE3D_TESTER_TEST_RECIPIENTS||'').split(',').map(v=>v.trim().toLowerCase()).filter(Boolean):[]})}));
+function testerProgramConfig(){
+  const projectId=require('./tester-mail').runtimeProject(),staging=projectId==='we3d-staging-20260712';
+  return {...contributionNotificationConfig(),projectId,webhookSecret:process.env.WE3D_TESTER_RESEND_WEBHOOK_SECRET||'',
+    inboundEnabled:projectId==='worldexplorer3d-d9b83',inboundTestSender:staging?(process.env.WE3D_TESTER_INBOUND_TEST_SENDER||''):'',
+    testRecipients:staging?(process.env.WE3D_TESTER_TEST_RECIPIENTS||'').split(',').map(v=>v.trim().toLowerCase()).filter(Boolean):[]};
+}
+Object.assign(exports, require('./tester-program').buildTesterProgramExports({functions, db, setCors, verifyAppCheck, requireModerator, config:testerProgramConfig}));

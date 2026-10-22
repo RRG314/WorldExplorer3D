@@ -15,7 +15,7 @@ function createTesterProgram({db,config,now=Date.now,randomToken=token,fetchImpl
  const settings=async()=>{const value=(await settingRef.get()).data()||{};const cfg=config();return {buildUrl:value.buildUrl||'',instructions:value.instructions||'',revision:value.revision||0,replyAddress:REPLY_ADDRESS,supportAddress:SUPPORT_ADDRESS,ownerNotificationConfigured:!!cfg.adminNotificationEmail,ownerNotificationAddress:cfg.adminNotificationEmail||'',emailConfigured:!!(cfg.emailFrom&&cfg.resendApiKey),webhookConfigured:value.webhookEnabled===true};};
  async function confirm(value){
   if(!ID.test(value||''))throw fail(400,'This confirmation link is invalid or expired.');
-  const time=now(),origin=siteOrigin(),cfg=config(),manageToken=randomToken();
+  const time=now(),cfg=config(),origin=siteOrigin(cfg.projectId),manageToken=randomToken();
   if(!cfg.emailFrom||!cfg.adminNotificationEmail)throw fail(503,'Tester confirmation is temporarily unavailable. Please try again later.');
   const confirmation=db.collection('appTesterConfirmations').doc(hash(value));
   return db.runTransaction(async tx=>{
@@ -55,7 +55,7 @@ function createTesterProgram({db,config,now=Date.now,randomToken=token,fetchImpl
    if(cap.purpose!=='invite'||cap.version!==app.invitationVersion||!['invited','accepted'].includes(app.status))throw fail(400,'This invitation was replaced or is no longer available.');
    if(app.status!=='accepted'){
     tx.update(application,{status:'accepted',acceptedAtMs:time,updatedAtMs:time,revision:app.revision+1});
-    if(cfg.adminNotificationEmail)queue(tx,mailJob({kind:'accepted',applicationId:cap.applicationId,data:{email:app.email,adminUrl:`${siteOrigin()}/account/admin.html?view=testers`},recipient:cfg.adminNotificationEmail,from:cfg.emailFrom,revision:cap.version,createdAtMs:time}));
+    if(cfg.adminNotificationEmail)queue(tx,mailJob({kind:'accepted',applicationId:cap.applicationId,data:{email:app.email,adminUrl:`${siteOrigin(config().projectId)}/account/admin.html?view=testers`},recipient:cfg.adminNotificationEmail,from:cfg.emailFrom,revision:cap.version,createdAtMs:time}));
    }
    return {accepted:true,buildUrl:app.invitation.buildUrl,instructions:app.invitation.instructions,replyAddress:REPLY_ADDRESS};
   });
@@ -115,7 +115,7 @@ function createTesterProgram({db,config,now=Date.now,randomToken=token,fetchImpl
     tx.create(capRef(inviteToken),{applicationId:body.id,purpose:'invite',version,expiresAtMs,expiresAt:new Date(expiresAtMs+24*HOUR)});
     tx.create(capRef(manageToken),{applicationId:body.id,purpose:'manage'});
     // Each replacement invitation also contains a working withdrawal capability.
-    queue(tx,mailJob({kind:'invitation',applicationId:body.id,data:{inviteUrl:`${siteOrigin()}/account/tester.html#invite.${inviteToken}`,manageUrl:`${siteOrigin()}/account/tester.html#manage.${manageToken}`},recipient:app.email,from:cfg.emailFrom,revision:version,createdAtMs:time}));
+    queue(tx,mailJob({kind:'invitation',applicationId:body.id,data:{inviteUrl:`${siteOrigin(config().projectId)}/account/tester.html#invite.${inviteToken}`,manageUrl:`${siteOrigin(config().projectId)}/account/tester.html#manage.${manageToken}`},recipient:app.email,from:cfg.emailFrom,revision:version,createdAtMs:time}));
    }
    tx.update(ref,next);audit(tx,moderator,action,body.id,time);return {updated:true,status:next.status,revision:next.revision,queued:action==='invite'};
   });

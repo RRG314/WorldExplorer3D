@@ -6,8 +6,16 @@ const REPLY_ADDRESS = 'testers@mail.worldexplorer3d.io';
 const SUPPORT_ADDRESS = 'support@mail.worldexplorer3d.io';
 const clean = (value, max=1000) => String(value || '').replace(/\r\n?/g,'\n').trim().slice(0,max);
 const escape = value => String(value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-function siteOrigin(project=process.env.GCLOUD_PROJECT) {
-  return project === 'worldexplorer3d-d9b83' ? 'https://worldexplorer3d.io' : 'https://we3d-staging-20260712.web.app';
+function runtimeProject(env=process.env) {
+  let firebaseProject='';try{firebaseProject=JSON.parse(env.FIREBASE_CONFIG||'{}').projectId||'';}catch{/* An explicit cloud project may accompany a config file path. */}
+  const projects=[env.GCLOUD_PROJECT,env.GOOGLE_CLOUD_PROJECT,env.GCP_PROJECT,firebaseProject].filter(Boolean);
+  if(new Set(projects).size>1)throw Object.assign(Error('Tester email environment is inconsistent.'),{status:503});
+  return projects[0]||'';
+}
+function siteOrigin(project=runtimeProject()) {
+  if(project==='worldexplorer3d-d9b83')return 'https://worldexplorer3d.io';
+  if(project==='we3d-staging-20260712')return 'https://we3d-staging-20260712.web.app';
+  throw Object.assign(Error('Tester email environment is not configured.'),{status:503});
 }
 function accessUrl(value) {
   if (!value) return '';
@@ -17,7 +25,7 @@ function accessUrl(value) {
 }
 function template(kind, data) {
   const titles={verification:'Confirm your World Explorer tester interest',receipt:'Your World Explorer tester application is confirmed',owner:'A new World Explorer tester is ready for review',invitation:'You’re invited to test the new World Explorer app',accepted:'A tester accepted your World Explorer invitation',reply:'New message for World Explorer'};
-  const stage=process.env.GCLOUD_PROJECT==='we3d-staging-20260712';
+  const stage=runtimeProject()==='we3d-staging-20260712';
   const title=(stage?'[TEST] ':'')+titles[kind];if(!titles[kind])throw Error('Unknown tester email kind');
   const paragraphs={
     verification:['You asked to hear about testing the new World Explorer app. Confirm your email within one hour.','This confirms your application, not a testing place. We’ll review it and email you separately if you’re selected.','If you didn’t request this, ignore this email.'],
@@ -71,4 +79,4 @@ async function deliverTesterMail({db,jobId,config,fetchImpl=fetch,now=Date.now})
     if(job.applicationId&&['bounced','complained'].includes(receipt.data()?.status)&&['receipt','invitation'].includes(job.kind))tx.update(db.collection('appTesterInterests').doc(job.applicationId),{status:'suppressed',consentState:'suppressed',updatedAtMs:time});
   });
 }
-module.exports={HOUR,hash,clean,REPLY_ADDRESS,SUPPORT_ADDRESS,siteOrigin,accessUrl,template,mailJob,deliveryState,deliverTesterMail};
+module.exports={HOUR,hash,clean,REPLY_ADDRESS,SUPPORT_ADDRESS,runtimeProject,siteOrigin,accessUrl,template,mailJob,deliveryState,deliverTesterMail};

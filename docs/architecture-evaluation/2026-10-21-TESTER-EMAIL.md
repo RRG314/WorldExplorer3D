@@ -162,3 +162,14 @@ the exact system sender, Auto-Submitted and an X-WE3D-Forwarded marker instead.
 Current execution evidence and test boundaries are recorded under
 `output/research/tester-live-e2e-2026-10-22/`. Production activation is still a
 separate approval/release action; a staging pass does not claim it occurred.
+
+The first real send reached Gmail Inbox but lacked [TEST]. The native Functions
+API deployment exposed FIREBASE_CONFIG without GCLOUD_PROJECT. This also bypassed
+the intended staging recipient filter. Signup was paused and the temporary
+webhook disabled before proceeding. Tester runtime identity now resolves the
+existing Firebase configuration and supported cloud project variables, rejects
+conflicts, and fails closed for unknown email origins before quota admission or
+sending. The resumed test must verify the marked subject and recipient boundary;
+the original successful delivery and configuration failure remain separate
+evidence. This also prevents an unrecognized production runtime from silently
+generating staging confirmation links.

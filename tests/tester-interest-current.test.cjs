@@ -12,7 +12,7 @@ function fixture({allowed=true, sendOk=true, configured=true}={}) {
   }};
   const functions={region:()=>({runWith:()=>({https:{onRequest:fn=>fn}})})};
   const handler=buildTesterInterestExport({functions,db,setCors:()=>false,verifyAppCheck:async(_req,res)=>{appChecks++;if(!allowed)res.status(401).json({error:'App Check required'});return allowed;},
-    config:()=>configured?{resendApiKey:'server-only-test-key',adminNotificationEmail:'owner@example.com',emailFrom:'World Explorer <test@mail.worldexplorer3d.io>'}:{},
+    config:()=>configured?{projectId:'we3d-staging-20260712',resendApiKey:'server-only-test-key',adminNotificationEmail:'owner@example.com',emailFrom:'World Explorer <test@mail.worldexplorer3d.io>'}:{},
     now:()=>time,randomToken:()=> (++serial).toString(16).padStart(64,'0'),fetchImpl:async(url,init)=>{sent.push({url,...init,body:JSON.parse(init.body)});return {ok:sendOk};}});
   const call=async(body,method='POST')=>{const res={code:200,set(){},status(code){this.code=code;return this},json(value){this.body=value;return this}};await handler({body,method,ip:'127.0.0.2'},res);return res};
   return {call,records,sent,appChecks:()=>appChecks,advance:ms=>time+=ms};

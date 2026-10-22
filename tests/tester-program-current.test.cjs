@@ -76,3 +76,10 @@ test('manual owner messages are forwarded while marked forwards and unowned stag
 test('restricted staging signup cannot send verification to another recipient',async()=>{
  const f=fixture();f.cfg.testRecipients=['tester@example.com'];const result=await f.call(f.publicHandler,{action:'request',email:'someone@example.com',consent:true,consentVersion:'app-testing-v1'});assert.equal(result.code,403);assert.equal(f.requests.length,0);assert.equal(f.db.records.size,0);assert.equal((await f.call(f.publicHandler,{action:'request',email:'tester@example.com',consent:true,consentVersion:'app-testing-v1'})).code,200);assert.equal(f.requests.length,1);
 });
+
+test('project identity falls back to Firebase config and rejects conflicting or unknown environments',()=>{
+ const {runtimeProject,siteOrigin}=require('../functions/tester-mail');const stage='we3d-staging-20260712';assert.equal(runtimeProject({FIREBASE_CONFIG:JSON.stringify({projectId:stage})}),stage);assert.equal(siteOrigin(runtimeProject({FIREBASE_CONFIG:JSON.stringify({projectId:stage})})),'https://'+stage+'.web.app');assert.throws(()=>runtimeProject({GCLOUD_PROJECT:'worldexplorer3d-d9b83',FIREBASE_CONFIG:JSON.stringify({projectId:stage})}),/inconsistent/);assert.throws(()=>siteOrigin(''),/not configured/);
+});
+test('unknown sender environment fails before admission or email delivery',async()=>{
+ const f=fixture();f.cfg.projectId='unknown-project';const result=await f.call(f.publicHandler,{action:'request',email:'tester@example.com',consent:true,consentVersion:'app-testing-v1'});assert.equal(result.code,503);assert.equal(f.requests.length,0);assert.equal(f.db.records.size,0);
+});
