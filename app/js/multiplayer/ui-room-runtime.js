@@ -496,7 +496,7 @@ export function createUiRoomRuntime({ appCtx, refs, state, renderers, helpers })
       if (state.pendingRoomCode) {
         setStatus(`Invite detected for room ${state.pendingRoomCode}. Sign in to continue.`);
       } else {
-        setStatus("Sign in to create or join multiplayer rooms.");
+        setStatus("Join Weekly City as a guest, or sign in to create a room.");
       }
       setBrowseStatus("Public rooms are viewable. Sign in to join or create rooms.");
       if (refs.titleFriendsStatus) refs.titleFriendsStatus.textContent = "Sign in to build your social graph.";
