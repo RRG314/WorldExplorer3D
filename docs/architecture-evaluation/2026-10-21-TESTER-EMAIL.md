@@ -203,3 +203,60 @@ repair, not a change to permissions. A favicon reference prevents the shell's
 implicit missing icon request. Invitation acceptance/withdrawal resume from the
 existing sent invitation; do not resend it. The same-document navigation driver
 must await fragment consumption before asserting URL privacy.
+
+### Completed October 22 evidence and release candidate
+
+The actual hosted staging journey is complete. Real Resend emails for the
+24-hour confirmation, applicant receipt, owner review alert, invitation,
+acceptance alert and forwarded manual reply were delivered and read in the
+connected Gmail **Inbox**. The confirmation, invitation and management link
+hashes matched the provider's original content before actual browser use.
+Authenticated approval sent no invitation; preview sent nothing; explicit Send
+created exactly one invitation. Anonymous acceptance revealed the saved safe
+staging test URL. Withdrawal succeeded and the refreshed dashboard offered no
+approval/invitation controls. The test build URL/instructions were cleared.
+
+The final resumed browser had no page or console errors. Preserve the earlier
+mobile overflow failure and its fix. Two driver assertions also raced normal
+same-document fragment consumption and the asynchronous filter refresh; they
+were diagnosed without resending signup or invitation. Acceptance resumed after
+waiting for fragment consumption; the idempotent withdrawal was checked again
+after the row refreshed. These failures remain in the receipts and are not
+reported as product passes. Initial SDK-adapter fixture import/event-shape errors
+are also preserved. No broad game/release matrix was restarted.
+
+Current evidence comprises 28 distinct focused request/program/security cases,
+eight controlled browser component journeys, five popup cases and actual admin
+shell bounds at 320/390/720/1360 pixels. The unchanged schema/rules' earlier six
+real Firestore-emulator cases are retained. The expiry boundary is checked with
+a controlled clock, not a 24-hour wall-clock wait. The real journey used disposable
+App Check debug attestation and an admin-claimed staging identity; it does not
+claim ordinary CAPTCHA or Google OAuth acceptance. A safe test URL verifies
+access handoff, not delivery of the new app binary. Inbox placement is observed
+for this Gmail mailbox, not every mail provider.
+
+The temporary admin and App Check credential were removed, owned browsers
+closed, application withdrawn, and temporary Resend webhook disabled after the
+test. Existing 80 staging Function configurations compare deeply equal to the
+pre-test inventory. Production still has its original 80 Functions, no tester
+Functions, and source `233a5a7f813fef97da3d75a76eb87996321fda2f`. No DNS/rule change,
+push, release-branch operation or production deployment occurred.
+
+Final Hosting source: `1481e55b5334`; staging build
+`5.6.1+1481e55b5334.2b22c1bb9a31d2e0.staging`; production candidate
+`5.6.1+1481e55b5334.7bbed4d5befaf6c4.production`. Both packages verify. Their 762
+shared delivered files match exactly; only the three Firebase project config
+files differ. Staging Functions run `e2716ba3`, whose backend bytes remain
+identical at the Hosting source. The game source delta from the previously
+reviewed browser candidate is only the popup's 24-hour success copy; other game
+acceptance is retained. Superseded generated packages remain reconstructable
+from a byte-verified preserved basis plus their complete overlays/manifests.
+
+Current readiness and candidate pointer:
+`output/research/tester-live-e2e-2026-10-22/readiness.json` and
+`output/release-review/tester-program-candidate.json`. The original released and
+browser-cleanup pointers remain preserved. Local implementation and the requested
+real test are finished. The next separate action is the coordinated protected
+production release/activation checklist above; it must enable a production
+webhook and keep the temporary staging webhook disabled. No additional game
+roadmap or Godot work is included.

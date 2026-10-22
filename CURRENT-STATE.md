@@ -132,3 +132,25 @@ mark emails [TEST]. See the October 22 section of the tester email document and
 `output/research/tester-live-e2e-2026-10-22/` for current evidence. Do not describe
 the local simulated preview as real delivery or the staging test as production
 release approval.
+
+## Completed October 22 tester verification
+
+Tester confirmation links now last 24 hours, with cleanup scheduled after 48
+hours; email, public form, popup and privacy wording agree. The actual hosted
+staging journey completed through owner approval, invitation, acceptance, manual
+reply forwarding and withdrawal. All six system-message types were received and
+read in Gmail Inbox. Full admin mobile header overflow was fixed. See the final
+October 22 section of `docs/architecture-evaluation/2026-10-21-TESTER-EMAIL.md` for
+precise evidence, retained failures, test-attestation limitations and cleanup.
+
+Current candidate pointer: `output/release-review/tester-program-candidate.json`.
+Verified production candidate source `1481e55b5334`, build
+`5.6.1+1481e55b5334.7bbed4d5befaf6c4.production`; staging differs only in its three
+Firebase project config files. Subsequent documentation-only commits do not
+change those verified inputs. Temporary admin/debug credentials and owned test
+browsers were cleaned up; the test application is withdrawn, test build details
+cleared and temporary Resend webhook disabled. Existing 80 staging Function
+configurations were verified unchanged. Production still runs released source
+`233a5a7f813fef97da3d75a76eb87996321fda2f`, has no tester Functions and was not
+deployed. The implementation/testing endpoint is complete; coordinated protected
+production activation is the next separately authorized action.
