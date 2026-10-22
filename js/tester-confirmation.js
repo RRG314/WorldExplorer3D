@@ -28,11 +28,11 @@ button.addEventListener('click',async()=>{
   if(!result||(!result.confirmed&&!result.accepted&&!result.withdrawn))throw Error('Not confirmed');
   try{localStorage.setItem('we3d.tester-invitation.v1',result.withdrawn?'dismissed':'interested');}catch{/* Optional device preference. */}
   button.hidden=true;
-  if(kind==='verify')status.textContent='Your email is confirmed and your tester application is waiting for review. We’ll email you separately if you’re selected. You’ll also receive an application receipt with a link to stop invitations.';
-  if(kind==='manage')status.textContent='Testing invitations have been stopped. You can apply again using the link below.';
+  if(kind==='verify'){heading.textContent='Email confirmed';description.textContent=result.status&&result.status!=='pending'?'We already have your application. Your current approval or invitation remains in place.':'Your application is ready for review.';status.textContent='Your email is confirmed and your tester application is waiting for review. We’ll email you separately if you’re selected. You’ll also receive an application receipt with a link to stop invitations.';if(result.status&&result.status!=='pending')status.textContent='Use your latest invitation email if you’ve already been invited. Otherwise, we’ll email you when a suitable test is available.';}
+  if(kind==='manage'){heading.textContent='Invitations stopped';description.textContent='You won’t receive further testing invitations for this email address.';status.textContent='Testing invitations have been stopped. You can apply again using the link below.';}
   if(kind==='invite'){
    const url=new URL(result.buildUrl);if(url.protocol!=='https:')throw Error('Invalid access link');
-   access.href=url.href;access.hidden=false;instructions.textContent=result.instructions;instructions.hidden=false;
+   heading.textContent='Invitation accepted';description.textContent='Your test build and getting-started instructions are below.';access.href=url.href;access.hidden=false;instructions.textContent=result.instructions;instructions.hidden=false;
    status.textContent='Invitation accepted. Use the link and instructions below to get started. Reply to your invitation email whenever you have questions or feedback.';
   }
  }catch(_){if(own!==epoch)return;status.textContent='We couldn’t confirm this link. It may have expired or been replaced. Try again, or use the application page below to request a new email.';button.disabled=false;button.hidden=false;}
