@@ -12,6 +12,14 @@ function runtimeProject(env=process.env) {
   if(new Set(projects).size>1)throw Object.assign(Error('Tester email environment is inconsistent.'),{status:503});
   return projects[0]||'';
 }
+function initializeRuntimeProject(env=process.env) {
+  const project=runtimeProject(env);
+  // Firebase's v1 Firestore adapter still reads GCLOUD_PROJECT before invoking
+  // the handler. Newer runtimes may provide only FIREBASE_CONFIG; the Cloud API
+  // reserves GCLOUD_PROJECT and refuses to accept it as a deployed user value.
+  if(project&&!env.GCLOUD_PROJECT)env.GCLOUD_PROJECT=project;
+  return project;
+}
 function siteOrigin(project=runtimeProject()) {
   if(project==='worldexplorer3d-d9b83')return 'https://worldexplorer3d.io';
   if(project==='we3d-staging-20260712')return 'https://we3d-staging-20260712.web.app';
@@ -28,7 +36,7 @@ function template(kind, data) {
   const stage=runtimeProject()==='we3d-staging-20260712';
   const title=(stage?'[TEST] ':'')+titles[kind];if(!titles[kind])throw Error('Unknown tester email kind');
   const paragraphs={
-    verification:['You asked to hear about testing the new World Explorer app. Confirm your email within one hour.','This confirms your application, not a testing place. We’ll review it and email you separately if you’re selected.','If you didn’t request this, ignore this email.'],
+    verification:['You asked to hear about testing the new World Explorer app. This confirmation link is valid for 24 hours.','This confirms your application, not a testing place. We’ll review it and email you separately if you’re selected.','If you didn’t request this, ignore this email.'],
     receipt:['Your email is confirmed and your application is waiting for review.','You don’t need to do anything else yet. We’ll email you if a suitable test is available. This is not a newsletter subscription.'],
     owner:[`A person confirmed their tester application: ${data.email || ''}`,'Open your private Testers dashboard to approve them. Approval does not send an invitation until you choose Send invitation.'],
     invitation:['You’ve been selected to test the new World Explorer app.','Accept this invitation within 14 days to see the access link and getting-started instructions. Early versions may have bugs; your feedback will help us improve them.'],
@@ -79,4 +87,4 @@ async function deliverTesterMail({db,jobId,config,fetchImpl=fetch,now=Date.now})
     if(job.applicationId&&['bounced','complained'].includes(receipt.data()?.status)&&['receipt','invitation'].includes(job.kind))tx.update(db.collection('appTesterInterests').doc(job.applicationId),{status:'suppressed',consentState:'suppressed',updatedAtMs:time});
   });
 }
-module.exports={HOUR,hash,clean,REPLY_ADDRESS,SUPPORT_ADDRESS,runtimeProject,siteOrigin,accessUrl,template,mailJob,deliveryState,deliverTesterMail};
+module.exports={HOUR,hash,clean,REPLY_ADDRESS,SUPPORT_ADDRESS,runtimeProject,initializeRuntimeProject,siteOrigin,accessUrl,template,mailJob,deliveryState,deliverTesterMail};

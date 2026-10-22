@@ -40,7 +40,7 @@ function buildTesterInterestExport({functions, db, setCors, verifyAppCheck, conf
         const counts = snapshots.map(s => s.data()?.bucket === bucket ? s.data().count : 0);
         if (counts.some((count,i) => count >= counters[i].max)) return false;
         counters.forEach((c,i) => tx.set(c.ref, {bucket, count:counts[i]+1, expiresAt:new Date(time+2*HOUR)}));
-        tx.create(ref, {email, consentVersion:CONSENT, requestedAtMs:time, expiresAtMs:time+HOUR, expiresAt:new Date(time+24*HOUR)});
+        tx.create(ref, {email, consentVersion:CONSENT, requestedAtMs:time, expiresAtMs:time+24*HOUR, expiresAt:new Date(time+48*HOUR)});
         return true;
       });
       if (!admitted) return res.status(429).json({error:'Please wait before requesting another confirmation email.'});

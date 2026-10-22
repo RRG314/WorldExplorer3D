@@ -28,13 +28,24 @@ button.addEventListener('click',async()=>{
   if(!result||(!result.confirmed&&!result.accepted&&!result.withdrawn))throw Error('Not confirmed');
   try{localStorage.setItem('we3d.tester-invitation.v1',result.withdrawn?'dismissed':'interested');}catch{/* Optional device preference. */}
   button.hidden=true;
-  if(kind==='verify'){heading.textContent='Email confirmed';description.textContent=result.status&&result.status!=='pending'?'We already have your application. Your current approval or invitation remains in place.':'Your application is ready for review.';status.textContent='Your email is confirmed and your tester application is waiting for review. We’ll email you separately if you’re selected. You’ll also receive an application receipt with a link to stop invitations.';if(result.status&&result.status!=='pending')status.textContent='Use your latest invitation email if you’ve already been invited. Otherwise, we’ll email you when a suitable test is available.';}
+  if(kind==='verify'){
+   heading.textContent='Email confirmed';
+   const copy={
+    pending:['Your application is ready for review.','We’ll email you separately if you’re selected. Your application receipt includes a link to stop invitations.'],
+    approved:['Your application is approved.','We’ll email you an invitation when a suitable test is available.'],
+    invited:['Your invitation is ready.','Use your latest invitation email to see the test build and instructions. Reply to that email if you need a replacement link.'],
+    accepted:['You’ve already accepted your invitation.','Use your latest invitation email to open the test build and instructions.'],
+    withdrawn:['Your testing invitations are still stopped.','This previously used confirmation link does not sign you up again. Apply again below if you change your mind.'],
+    declined:['Your application is closed.','Reply to your application receipt if you have questions.']
+   }[result.status||'pending']||['We already have your application.','Reply to your application receipt if you have questions.'];
+   [description.textContent,status.textContent]=copy;
+  }
   if(kind==='manage'){heading.textContent='Invitations stopped';description.textContent='You won’t receive further testing invitations for this email address.';status.textContent='Testing invitations have been stopped. You can apply again using the link below.';}
   if(kind==='invite'){
    const url=new URL(result.buildUrl);if(url.protocol!=='https:')throw Error('Invalid access link');
    heading.textContent='Invitation accepted';description.textContent='Your test build and getting-started instructions are below.';access.href=url.href;access.hidden=false;instructions.textContent=result.instructions;instructions.hidden=false;
    status.textContent='Invitation accepted. Use the link and instructions below to get started. Reply to your invitation email whenever you have questions or feedback.';
   }
- }catch(_){if(own!==epoch)return;status.textContent='We couldn’t confirm this link. It may have expired or been replaced. Try again, or use the application page below to request a new email.';button.disabled=false;button.hidden=false;}
+ }catch(_){if(own!==epoch)return;status.textContent=kind==='invite'?'We couldn’t open this invitation. It may have expired or been replaced. Try again, or reply to your invitation email to ask for a replacement link.':kind==='manage'?'We couldn’t stop invitations just now. Try again, or reply to your email and ask us to stop invitations.':'We couldn’t confirm this link. It may have expired or been replaced. Try again, or use the application page below to request a new email.';button.disabled=false;button.hidden=false;}
  finally{clearTimeout(deadline);if(pending===controller)pending=null;}
 });

@@ -2789,6 +2789,7 @@ exports.sealRealityCaptureOriginal=functions.storage.object().onFinalize(async o
 
 // Free public weather and ocean models share bounded, authenticated cache authority.
 exports.getEnvironmentalData = require('./environment-data').buildEnvironmentDataExport({functions, db, setCors, verifyAppCheck});
+require('./tester-mail').initializeRuntimeProject();
 function testerProgramConfig(){
   const projectId=require('./tester-mail').runtimeProject(),staging=projectId==='we3d-staging-20260712';
   return {...contributionNotificationConfig(),projectId,webhookSecret:process.env.WE3D_TESTER_RESEND_WEBHOOK_SECRET||'',

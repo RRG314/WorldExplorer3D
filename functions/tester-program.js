@@ -23,7 +23,8 @@ function createTesterProgram({db,config,now=Date.now,randomToken=token,fetchImpl
    if(!record||record.expiresAtMs<=time)throw fail(400,'This confirmation link is invalid or expired. Request a new one from the game.');
    const id=hash(record.email),ref=appRef(id),existing=(await tx.get(ref)).data();
    if(existing?.consentState==='suppressed')throw fail(400,'This address cannot currently receive testing invitations. Contact support for help.');
-   if(!record.confirmedAtMs&&(!existing||existing.status==='withdrawn')){
+   const activates=!record.confirmedAtMs&&(!existing||existing.status==='withdrawn');
+   if(activates){
     const revision=(existing?.revision||0)+1;
     const data={...existing,email:record.email,status:'pending',consentState:'active',consentVersion:'app-testing-v1',source:'start-hub',confirmedAtMs:time,updatedAtMs:time,revision,invitationVersion:(existing?.invitationVersion||0)+1,invitation:null,manageTokenHash:hash(manageToken)};
     tx.set(ref,data);tx.set(capRef(manageToken),{applicationId:id,purpose:'manage'});
@@ -33,7 +34,7 @@ function createTesterProgram({db,config,now=Date.now,randomToken=token,fetchImpl
     if(cfg.adminNotificationEmail)queue(tx,mailJob({kind:'owner',applicationId:id,data:{email:record.email,adminUrl:`${origin}/account/admin.html?view=testers`},recipient:cfg.adminNotificationEmail,from:cfg.emailFrom,revision,createdAtMs:time}));
    }
    tx.update(confirmation,{confirmedAtMs:record.confirmedAtMs||time});
-   return {confirmed:true,status:existing?.status==='withdrawn'?'pending':existing?.status||'pending'};
+   return {confirmed:true,status:activates?'pending':existing?.status||'pending'};
   });
  }
  async function publicAction(body){

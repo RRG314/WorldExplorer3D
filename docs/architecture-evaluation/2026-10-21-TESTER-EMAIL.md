@@ -9,7 +9,7 @@ included: the owner’s earlier instruction ends at deployment readiness.
 ## Owner workflow
 
 - Share `/account/testers.html`, or let players use the dismissible game popup.
-  An applicant must request and explicitly confirm their email within one hour.
+  An applicant must request and explicitly confirm their email within 24 hours.
 - A confirmed application emails the existing private notification mailbox and
   sends the applicant a receipt. Open **Admin → Testers** from the notification.
 - Choose **Approve**. This saves approval and sends no invitation. Leave the
@@ -58,8 +58,8 @@ Resend if forwarding needs to retry. Messages from the configured system sender,
 automated replies are ignored to avoid loops. Manual messages from the owner
 mailbox remain deliverable. No attachment is automatically relayed.
 
-Temporary confirmations expire in one hour and are scheduled for deletion after
-one day. Mail/provider-receipt records use 30-day TTLs. Expired invitation
+Temporary confirmations expire after 24 hours and are scheduled for deletion after
+two days. Mail/provider-receipt records use 30-day TTLs. Expired invitation
 capabilities have a TTL; management capabilities and private application/consent
 state remain to honor withdrawals. Deletion requests go to support. Provider and
 owner-mailbox retention are their own settings, not the Firestore TTL.
@@ -173,3 +173,21 @@ sending. The resumed test must verify the marked subject and recipient boundary;
 the original successful delivery and configuration failure remain separate
 evidence. This also prevents an unrecognized production runtime from silently
 generating staging confirmation links.
+
+The October 22 owner correction extends newly requested confirmation links to
+24 hours. Confirmation cleanup is scheduled after 48 hours so TTL cannot remove
+a still-valid link. Hourly abuse quotas and 14-day invitation expiry are separate
+and unchanged. Existing already-sent links retain their original expiry. Email,
+public form, game popup and privacy wording agree. Clock-controlled checks cover
+one millisecond before expiry and the exact expiry boundary.
+
+The resumed real worker exposed an additional runtime issue before our handler:
+the Firebase v1 adapter requires GCLOUD_PROJECT, but this runtime supplies only
+FIREBASE_CONFIG and the API rejects setting the reserved variable. At tester
+export initialization, normalize the validated, consistent configured project
+into the SDK's required environment key only when absent. A real SDK adapter
+check covers this boundary. Existing queued events retry; do not recreate jobs
+or bypass the worker. The rejected configuration patch and initial test-fixture
+errors are retained. A used confirmation now reports an existing withdrawal
+truthfully; only a fresh confirmation reapplies. Invitation errors direct people
+to request a replacement by replying to their invitation.

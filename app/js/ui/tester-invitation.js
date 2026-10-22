@@ -46,7 +46,7 @@ export function mountTesterInvitation({
       if (request.signal.aborted) return;
       if (!result?.pending) throw new Error('Could not confirm your request. Please try again.');
       form.hidden = true;
-      status.textContent = 'Check your inbox. Open our email and confirm your interest within one hour.';
+      status.textContent = 'Check your inbox. Your confirmation link is valid for 24 hours. Open our email to confirm your interest.';
       // Pending is not confirmed consent; keep success visible until dismissal.
     } catch (_) {
       if (request.signal.aborted) return;

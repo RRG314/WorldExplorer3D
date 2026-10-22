@@ -83,3 +83,33 @@ test('project identity falls back to Firebase config and rejects conflicting or 
 test('unknown sender environment fails before admission or email delivery',async()=>{
  const f=fixture();f.cfg.projectId='unknown-project';const result=await f.call(f.publicHandler,{action:'request',email:'tester@example.com',consent:true,consentVersion:'app-testing-v1'});assert.equal(result.code,503);assert.equal(f.requests.length,0);assert.equal(f.db.records.size,0);
 });
+
+// Exercise the real v1 wrapper: its project lookup occurs before our handler.
+test('Firebase-config-only runtime initializes the project before the v1 Firestore adapter',()=>{
+ const {spawnSync}=require('node:child_process');
+ const script=`
+  const assert=require('node:assert/strict');
+  for(const key of ['GCLOUD_PROJECT','GOOGLE_CLOUD_PROJECT','GCP_PROJECT'])delete process.env[key];
+  process.env.FIREBASE_CONFIG=JSON.stringify({projectId:'we3d-staging-20260712'});
+  const {initializeRuntimeProject}=require('./functions/tester-mail');
+  assert.equal(initializeRuntimeProject(),'we3d-staging-20260712');
+  assert.equal(process.env.GCLOUD_PROJECT,'we3d-staging-20260712');
+  const env={GCLOUD_PROJECT:'worldexplorer3d-d9b83',FIREBASE_CONFIG:process.env.FIREBASE_CONFIG};
+  assert.throws(()=>initializeRuntimeProject(env),/inconsistent/);
+  assert.equal(env.GCLOUD_PROJECT,'worldexplorer3d-d9b83');
+  const empty={};assert.equal(initializeRuntimeProject(empty),'');assert.deepEqual(empty,{});
+  let called=false;
+  const functions=require('node:module').createRequire(require('node:path').resolve('functions/package.json'))('firebase-functions/v1');
+  const trigger=functions.firestore.document('appTesterMail/{jobId}').onWrite((change,context)=>{called=true;assert.equal(context.params.jobId,'test-job');});
+  Promise.resolve(trigger({value:{},oldValue:{}},{eventType:'providers/cloud.firestore/eventTypes/document.write',resource:'projects/we3d-staging-20260712/databases/(default)/documents/appTesterMail/test-job'})).then(()=>assert.equal(called,true)).catch(e=>{console.error(e.message);process.exitCode=1;});
+ `;
+ const result=spawnSync(process.execPath,['-e',script],{encoding:'utf8'});assert.equal(result.status,0,result.stderr||result.stdout);
+});
+
+test('reusing a confirmed link after withdrawal reports withdrawal; only a fresh confirmation reapplies',async()=>{
+ const f=fixture(),token=await f.request();await f.program.confirm(token);
+ const receipt=f.jobs().find(j=>j.kind==='receipt'),manage=receipt.message.text.match(/#manage\.([a-f0-9]{64})/)[1];
+ await f.program.publicAction({action:'withdraw',token:manage});
+ assert.equal((await f.program.confirm(token)).status,'withdrawn');assert.equal(f.jobs().length,2);
+ assert.equal((await f.program.confirm(await f.request())).status,'pending');assert.equal(f.jobs().length,4);
+});

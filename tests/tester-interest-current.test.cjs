@@ -33,8 +33,17 @@ test('consent, input and App Check failures never send mail',async()=>{
   const f=fixture();for(const invalid of [{...request,consent:false},{...request,consentVersion:'wrong'},{...request,email:'a\r\nb@x.com'}])assert.equal((await f.call(invalid)).code,400);
   assert.equal(f.sent.length,0);const denied=fixture({allowed:false});assert.equal((await denied.call(request)).code,401);assert.equal(denied.sent.length,0);
 });
-test('expired and fabricated capabilities never create verified records',async()=>{
-  const f=fixture();await f.call(request);f.advance(3600001);
+test('confirmation remains valid just before 24 hours; cleanup is scheduled after 48 hours',async()=>{
+  const f=fixture();await f.call(request);
+  const record=[...f.records].find(([key])=>key.startsWith('appTesterConfirmations/'))[1];
+  assert.equal(record.expiresAtMs-record.requestedAtMs,24*3600000);
+  assert.equal(record.expiresAt.getTime()-record.requestedAtMs,48*3600000);
+  assert.match(f.sent[0].body.text,/valid for 24 hours/);assert.match(f.sent[0].body.html,/valid for 24 hours/);
+  f.advance(24*3600000-1);
+  assert.equal((await f.call({action:'confirm',token:'1'.padStart(64,'0')})).body.confirmed,true);
+});
+test('at the 24-hour boundary, expired and fabricated capabilities never create verified records',async()=>{
+  const f=fixture();await f.call(request);f.advance(24*3600000);
   for(const token of ['1'.padStart(64,'0'),'a'.repeat(64),'bad'])assert.equal((await f.call({action:'confirm',token})).code,400);
   assert.equal([...f.records.keys()].filter(k=>k.startsWith('appTesterInterests/')).length,0);
 });
