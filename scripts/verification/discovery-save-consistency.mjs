@@ -1,10 +1,12 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import {chromium} from 'playwright';
+import {closeOwnedBrowser} from './owned-browser.mjs';
 import {startStaticServer} from './static-server.mjs';
 const server=await startStaticServer({rootDir:process.cwd(),ports:[4396]});
-const browser=await chromium.launch({channel:'chrome',headless:true});
-const dir='output/verification/product-plan';const report={scope:'Real IndexedDB transactions in two isolated-test-profile tabs; controlled discovery records; no authenticated account service',errors:[]};
+const owned=await chromium.launchServer({channel:'chrome',headless:true});
+const browser=await chromium.connect(owned.wsEndpoint());
+const dir=process.env.WE3D_QA_OUTPUT||'output/verification/product-plan';await fs.mkdir(dir,{recursive:true});const report={scope:'Real IndexedDB transactions in two isolated-test-profile tabs; controlled discovery records; no authenticated account service',errors:[]};
 try{
  const context=await browser.newContext();const pages=[await context.newPage(),await context.newPage()];
  for(const page of pages){page.on('pageerror',e=>report.errors.push(e.message));await page.goto(`http://127.0.0.1:${server.port}/tests/fixtures/discovery-save.html`);await page.waitForFunction(()=>window.ready);}
@@ -87,5 +89,5 @@ try{
  assert.deepEqual(report.backpackRecovery,{failed:true,saved:true,count:125});
  await pages[0].evaluate(()=>refresh());await pages[0].screenshot({path:`${dir}/save-reload.png`});
  assert.deepEqual(report.errors,[]);report.passed=true;
-}finally{await fs.writeFile(`${dir}/save-browser.json`,JSON.stringify(report,null,2));await browser.close();await server.close();}
+}finally{try{await closeOwnedBrowser(owned);report.ownedBrowserClosed=true;}finally{await server.close();await fs.writeFile(`${dir}/save-browser.json`,JSON.stringify(report,null,2));}}
 console.log(JSON.stringify(report));

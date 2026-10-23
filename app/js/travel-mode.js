@@ -1,3 +1,4 @@
+import {publishResolvedSurfaceSpawn} from './world/spawn-publication.js';
 import {resolveControlState} from './transport/control-state.js';
 import {activeActorPose} from './transport/actor-contract.js?v=6';
 import { ctx as appCtx } from "./shared-context.js?v=55";
@@ -328,7 +329,8 @@ function transitionTravelMode(mode, options = {}, dronePose = null, restoration 
       if (!prepared) return {mode: syncTravelModeButtons(), applied: false};
     }
     if (restoration?.pose.x !== undefined && (targetMode === 'walk' || targetMode === 'drive')) {
-      if (typeof appCtx.resolveSafeWorldSpawn !== 'function' || typeof appCtx.applyResolvedWorldSpawn !== 'function') return rejected();
+      if ((!restoration.resolveGroundSpawn && typeof appCtx.resolveSafeWorldSpawn !== 'function') ||
+        typeof (restoration.publishGroundSpawn || appCtx.applyResolvedWorldSpawn) !== 'function') return rejected();
       const pose = restoration.pose;
       const preferredRoad = restoration.roadId ? (appCtx.roads || []).find(road =>
         String(road.sourceFeatureId || road.transportRecord?.identity || road.id || '') === restoration.roadId) || null : null;
@@ -453,7 +455,7 @@ function transitionTravelMode(mode, options = {}, dronePose = null, restoration 
 
   // Publish the admitted ground pose after controller retirement, before UI or
   // tutorial readers can observe it. The spawn owner also updates meshes/contact.
-  if (groundSpawn) appCtx.applyResolvedWorldSpawn(groundSpawn, {mode: targetMode, syncCar: true, syncWalker: true});
+  if (groundSpawn) (restoration?.publishGroundSpawn || appCtx.applyResolvedWorldSpawn)(groundSpawn, {mode: targetMode, syncCar: true, syncWalker: true});
   else if (restoration && Number.isFinite(restoration.pose.yaw) && (targetMode === 'walk' || targetMode === 'drive')) {
     const yaw = restoration.pose.yaw;
     if (targetMode === 'walk') {
@@ -570,7 +572,8 @@ function initializePlanetaryArrival(bodyId,point,options={}) {
   const angle=point.angle??0;
   const spawn={valid:true,mode,x:point.x,z:point.z,angle,walkY:ground+1.7,carY:ground+1.2,terrainY:ground,onRoad:false,road:null};
   const applied=transitionTravelMode(mode,{source:options.source||'planetary_arrival',emitTutorial:false},null,
-    {pose:{x:point.x,z:point.z,yaw:angle},resolveGroundSpawn:()=>spawn}).applied;
+    {pose:{x:point.x,z:point.z,yaw:angle},resolveGroundSpawn:()=>spawn,
+      publishGroundSpawn:(resolved, publicationOptions)=>publishResolvedSurfaceSpawn(appCtx,resolved,publicationOptions)}).applied;
   if(!session.isCurrent())return false;
   if(applied&&appCtx.drone)Object.assign(appCtx.drone,{x:point.x,y:ground+(bodyId==='moon'?10:12),z:point.z,yaw:angle,
     pitch:bodyId==='mars'?-.24:-.2,roll:0,vx:0,vy:0,vz:0,cameraYawOffset:0,cameraPitchOffset:0,cameraLookTimer:0});

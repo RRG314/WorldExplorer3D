@@ -2093,10 +2093,7 @@
       "poiTenanciesByBuilding"
     ],
     "app/js/world/spawn.js": [
-      "Walk",
-      "_lastCustomStructureProbe",
-      "car",
-      "carMesh"
+      "_lastCustomStructureProbe"
     ],
     "app/js/world/street-pavement-runtime.js": [
       "_cancelStreetPavementBuild",
@@ -2200,6 +2197,11 @@
       "poiLifecycle",
       "poiTenanciesByBuilding",
       "refreshActiveFunctionalPois"
+    ],
+    "app/js/world/spawn-publication.js": [
+      "Walk",
+      "car",
+      "carMesh"
     ]
   }
 }

@@ -1,0 +1,271 @@
+{
+  "schemaVersion": 1,
+  "purpose": "Current player-facing QA, independent resumable cases; no historical release matrix or automatic city replay.",
+  "target": "staging",
+  "groups": [
+    {
+      "id": "core-contracts",
+      "kind": "unit",
+      "tests": [
+        "tests/frame-owner-commands-current.test.mjs",
+        "tests/entry-journey-current.test.mjs",
+        "tests/tutorial-controls-interaction-current.test.mjs",
+        "tests/player-state-migration.test.mjs",
+        "tests/character-progression-current.test.mjs",
+        "tests/live-gps-field-session.test.mjs"
+      ],
+      "files": []
+    },
+    {
+      "id": "play-contracts",
+      "kind": "unit",
+      "tests": [
+        "tests/ship-traversal-current.test.mjs",
+        "tests/maritime-admission-current.test.mjs",
+        "tests/ocean-entry-current.test.mjs",
+        "tests/ocean-diver-current.test.mjs",
+        "tests/spacecraft-authority-current.test.mjs",
+        "tests/world-economy-current.test.mjs",
+        "tests/block-local-store-current.test.mjs",
+        "tests/home-backpack-transaction.test.mjs",
+        "tests/capture-session-current.test.mjs"
+      ],
+      "files": [
+        "functions/package-lock.json"
+      ]
+    },
+    {
+      "id": "shell",
+      "kind": "browser",
+      "module": "scripts/verification/gameplay-qa/shell.mjs",
+      "checks": [
+        "shell-desktop",
+        "shell-touch",
+        "shell-settings-persist"
+      ],
+      "files": [
+        "app/index.html",
+        "app/styles",
+        "app/js/ui/settings.js",
+        "app/js/ui/globe-selector.js"
+      ]
+    },
+    {
+      "id": "earth",
+      "kind": "browser",
+      "module": "scripts/verification/gameplay-qa/earth.mjs",
+      "timeoutMs": 720000,
+      "checks": [
+        "earth-load",
+        "earth-walking-camera",
+        "earth-map-pause",
+        "earth-driving",
+        "earth-backpack-journal",
+        "earth-air-handoffs",
+        "earth-native-performance",
+        "earth-ship-and-return",
+        "earth-moon-and-return"
+      ],
+      "files": [
+        "app/js/controls",
+        "app/js/engine",
+        "app/js/runtime",
+        "app/js/input.js",
+        "app/js/ui/mobile-controls.js",
+        "app/js/walking",
+        "app/js/space",
+        "app/js/transport",
+        "app/index.html",
+        "config/performance-budgets.json",
+        "app/js/world",
+        "app/js/terrain",
+        "app/js/earth-core",
+        "app/js/living-world",
+        "app/js/interiors",
+        "app/js/geospatial"
+      ],
+      "checkFiles": {
+        "earth-backpack-journal": [
+          "app/js/discovery",
+          "app/js/player"
+        ]
+      }
+    },
+    {
+      "id": "mobile",
+      "kind": "browser",
+      "module": "scripts/verification/gameplay-qa/mobile.mjs",
+      "checks": [
+        "mobile-load",
+        "mobile-walk-look",
+        "mobile-drive-rotate",
+        "mobile-native-proxy-performance"
+      ],
+      "timeoutMs": 420000,
+      "files": [
+        "app/js/runtime",
+        "app/js/controls",
+        "app/js/ui/mobile-controls.js",
+        "app/styles",
+        "app/js/walking",
+        "app/js/engine",
+        "app/index.html",
+        "config/performance-budgets.json",
+        "app/js/world",
+        "app/js/terrain",
+        "app/js/earth-core",
+        "app/js/living-world",
+        "app/js/interiors",
+        "app/js/geospatial"
+      ]
+    },
+    {
+      "id": "ocean",
+      "kind": "browser",
+      "module": "scripts/verification/gameplay-qa/ocean.mjs",
+      "checks": [
+        "ocean-deck",
+        "ocean-submarine",
+        "ocean-diver-recovery",
+        "ocean-performance-return"
+      ],
+      "timeoutMs": 360000,
+      "files": [
+        "app/js/ocean.js",
+        "app/js/ocean",
+        "app/js/boat-mode",
+        "app/js/controls",
+        "app/index.html",
+        "config/performance-budgets.json"
+      ]
+    },
+    {
+      "id": "activity-creation-contracts",
+      "kind": "unit",
+      "tests": [
+        "tests/shore-fishing-authority.test.mjs",
+        "tests/activity-command-ownership-current.test.mjs",
+        "tests/activity-lifecycle-current.test.mjs",
+        "tests/activity-completion-current.test.mjs",
+        "tests/interior-layout-current.test.mjs",
+        "tests/interior-layout-photos-current.test.mjs",
+        "tests/home-property-current.test.mjs",
+        "tests/companion-progression-current.test.mjs",
+        "tests/starter-companion-current.test.mjs",
+        "tests/research-locomotion-current.test.mjs"
+      ],
+      "files": [
+        "functions/package-lock.json"
+      ]
+    },
+    {
+      "id": "native-saves",
+      "kind": "script",
+      "module": "scripts/verification/discovery-save-consistency.mjs",
+      "timeoutMs": 90000,
+      "files": [
+        "tests/fixtures/discovery-save.html",
+        "app/js/discovery/profile-store.js",
+        "app/js/player/backpack-store.js"
+      ],
+      "evidence": [
+        "save-browser.json",
+        "save-reload.png"
+      ]
+    },
+    {
+      "id": "interior-editor",
+      "kind": "script",
+      "module": "scripts/verification/interior-layout-ui.mjs",
+      "timeoutMs": 150000,
+      "files": [
+        "app/js/reality-capture",
+        "functions/package-lock.json"
+      ],
+      "evidence": [
+        "1100-plan.png",
+        "412-plan.png",
+        "1100-inside.png",
+        "412-inside.png"
+      ]
+    },
+    {
+      "id": "gps-sensor",
+      "kind": "script",
+      "module": "scripts/verification/gps-sensor-fixture-current.mjs",
+      "timeoutMs": 30000,
+      "evidence": [
+        "report.json"
+      ]
+    },
+    {
+      "id": "ar-lifecycle",
+      "kind": "script",
+      "module": "scripts/verification/ar-lifecycle-current.mjs",
+      "timeoutMs": 90000,
+      "files": [
+        "app/index.html",
+        "app/js/ar",
+        "app/js/reality-capture/runtime-contract.js"
+      ],
+      "evidence": [
+        "report.json"
+      ]
+    },
+    {
+      "id": "qa-input-contracts",
+      "kind": "unit",
+      "tests": [
+        "tests/gameplay-qa-inputs-current.test.mjs",
+        "tests/acceptance-inputs-current.test.mjs"
+      ]
+    },
+    {
+      "id": "controller-camera-contracts",
+      "kind": "unit",
+      "tests": [
+        "tests/gameplay-qa-controls-current.test.mjs"
+      ]
+    },
+    {
+      "id": "space",
+      "kind": "browser",
+      "module": "scripts/verification/gameplay-qa/space.mjs",
+      "checks": [
+        "space-current-start-course",
+        "space-assist-manual",
+        "mars-new-session-surface",
+        "moon-new-session-surface"
+      ],
+      "timeoutMs": 210000,
+      "files": [
+        "app/js/space",
+        "app/js/planetary",
+        "app/js/expedition",
+        "app/js/universe",
+        "app/js/ui/space-actions.js",
+        "app/index.html",
+        "app/js/space.js"
+      ]
+    },
+    {
+      "id": "world-domain-contracts",
+      "kind": "unit",
+      "tests": [
+        "tests/space-destination-completeness-current.test.mjs",
+        "tests/planetary-physical-environment-current.test.mjs",
+        "tests/planetary-surface-authority-current.test.mjs",
+        "tests/world-cell-residency-current.test.mjs",
+        "tests/world-load-lifecycle-current.test.mjs",
+        "tests/regional-scenery-scheduler-current.test.mjs"
+      ],
+      "files": [
+        "app/js/space",
+        "app/js/planetary",
+        "app/js/world",
+        "app/js/terrain",
+        "app/js/runtime"
+      ]
+    }
+  ]
+}

@@ -1,15 +1,17 @@
 import assert from 'node:assert/strict';
 import {mkdir} from 'node:fs/promises';
 import {chromium} from 'playwright';
+import {closeOwnedBrowser} from './owned-browser.mjs';
 import {startStaticServer} from './static-server.mjs';
 import {createRequire} from 'node:module';
 import {createHash} from 'node:crypto';
 const require=createRequire(import.meta.url),{normalizeHybridPreview,footprintSignature}=require('../../functions/reality-capture-hybrid');
 const {createPatchGlb}=require('../../functions/reality-capture-patch-derivative'),sharp=require('../../functions/node_modules/sharp');
 const photoBytes=await sharp({create:{width:320,height:240,channels:3,background:{r:45,g:125,b:170}}}).jpeg().toBuffer(),photoId='a'.repeat(32);
-const output='output/verification/interior-layout';await mkdir(output,{recursive:true});
+const output=process.env.WE3D_QA_OUTPUT||'output/verification/interior-layout';await mkdir(output,{recursive:true});
 const server=await startStaticServer({rootDir:process.cwd(),ports:[4494,4495]});
-const browser=await chromium.launch({channel:'chrome',headless:true});
+const owned=await chromium.launchServer({channel:'chrome',headless:true});
+const browser=await chromium.connect(owned.wsEndpoint());
 try{
   for(const width of [1100,412]){
     const context=await browser.newContext({viewport:{width,height:900},hasTouch:width<700,isMobile:width<700});
@@ -82,4 +84,4 @@ try{
     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
     assert.deepEqual(errors,[]);await context.close();console.log(`${width}: plan, crop/place/save, protected GLB generation, private submission, reopen and 3D passed (mock HTTP, actual normalizer and derivative builder).`);
   }
-}finally{await browser.close();await server.close();}
+}finally{try{await closeOwnedBrowser(owned);}finally{await server.close();}}

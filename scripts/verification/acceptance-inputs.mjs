@@ -7,13 +7,15 @@ const digest=bytes=>createHash('sha256').update(bytes).digest('hex');
 const literal=node=>node?.type==='StringLiteral'?node.value:node?.type==='Literal'&&typeof node.value==='string'?node.value:null;
 function references(source){
  const output=[];
+ const add=(value,commonJS=false,directoryUrl=false)=>output.push({value,commonJS,directoryUrl});
  const ast=parse(source,{sourceType:'unambiguous',allowAwaitOutsideFunction:true,plugins:['importAttributes']});
  const visit=node=>{
   if(!node||typeof node!=='object')return;
-  if(['ImportDeclaration','ExportNamedDeclaration','ExportAllDeclaration'].includes(node.type)&&literal(node.source))output.push(literal(node.source));
-  if(node.type==='ImportExpression'&&literal(node.source))output.push(literal(node.source));
-  if(node.type==='CallExpression'&&node.callee?.type==='Import'&&literal(node.arguments?.[0]))output.push(literal(node.arguments[0]));
-  if(node.type==='NewExpression'&&node.callee?.name==='URL'&&literal(node.arguments?.[0]))output.push(literal(node.arguments[0]));
+  if(['ImportDeclaration','ExportNamedDeclaration','ExportAllDeclaration'].includes(node.type)&&literal(node.source))add(literal(node.source));
+  if(node.type==='ImportExpression'&&literal(node.source))add(literal(node.source));
+  if(node.type==='CallExpression'&&node.callee?.type==='Import'&&literal(node.arguments?.[0]))add(literal(node.arguments[0]));
+  if(node.type==='CallExpression'&&node.callee?.name==='require'&&literal(node.arguments?.[0]))add(literal(node.arguments[0]),true);
+  if(node.type==='NewExpression'&&node.callee?.name==='URL'&&literal(node.arguments?.[0]))add(literal(node.arguments[0]),false,true);
   for(const [key,value]of Object.entries(node))if(!['loc','start','end','extra','comments','tokens'].includes(key)){
    if(Array.isArray(value))value.forEach(visit);else if(value&&typeof value==='object')visit(value);
   }
@@ -32,15 +34,25 @@ export async function acceptanceInputs(root,definition,{artifactRoot=null}={}){
   if(/\.(?:m?js|cjs)$/.test(relative))refs=references(bytes.toString());
   if(/\.html$/.test(relative)){
    const text=bytes.toString();for(const match of text.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)){
-    const src=match[1].match(/\bsrc=["']([^"']+)["']/i);if(src)refs.push(src[1]);else if(/\btype=["']module["']/i.test(match[1]))refs.push(...references(match[2]));
+    const src=match[1].match(/\bsrc=["']([^"']+)["']/i);if(src)refs.push({value:src[1],commonJS:false});else if(/\btype=["']module["']/i.test(match[1]))refs.push(...references(match[2]));
    }
   }
-  for(const ref of refs){
+  for(const {value:ref,commonJS,directoryUrl} of refs){
    if(!ref.startsWith('.')&&!ref.startsWith('/'))continue;
-   const target=ref.startsWith('/')?ref.slice(1).split(/[?#]/)[0]:path.join(path.dirname(relative),ref.split(/[?#]/)[0]);
+   let target=ref.startsWith('/')?ref.slice(1).split(/[?#]/)[0]:path.join(path.dirname(relative),ref.split(/[?#]/)[0]);
    // Missing local module inputs are a real acceptance failure. Nonmodule URL
    // assets can be served externally; explicit asset coverage belongs to package integrity.
-   try{await fs.stat(path.resolve(root,target));}catch(error){if(/\.(?:m?js|cjs|json)$/.test(target))throw error;continue;}
+   try{await fs.stat(path.resolve(root,target));}catch(error){
+    if(commonJS){
+     let resolved=null;
+     for(const candidate of [target+'.js',target+'.json',path.join(target,'index.js')])if(await fs.stat(path.resolve(root,candidate)).catch(()=>null)){resolved=candidate;break;}
+     if(!resolved)throw error;target=resolved;
+   }else{if(/\.(?:m?js|cjs|json)$/.test(target))throw error;continue;}
+   }
+   // new URL('../', import.meta.url) is often a filesystem base, not an
+   // instruction to scan the entire repository and its private/generated files.
+   // Asset directories must be explicitly declared in the case's files list.
+   if(directoryUrl&&(await fs.stat(path.resolve(root,target))).isDirectory())continue;
    await add(target,true);
   }
  };

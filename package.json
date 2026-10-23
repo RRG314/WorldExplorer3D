@@ -182,7 +182,10 @@
     "verify:streets": "node scripts/verification/streets.mjs",
     "verify:ownership": "node scripts/verification/context-ownership.mjs",
     "verify:runtime-diagnostics": "node scripts/verification/runtime-diagnostics-browser.mjs",
-    "verify:browser-foundation": "node scripts/verification/browser-foundation-acceptance.mjs"
+    "verify:browser-foundation": "node scripts/verification/browser-foundation-acceptance.mjs",
+    "qa:gameplay": "node scripts/verification/gameplay-qa.mjs",
+    "qa:gameplay:plan": "node scripts/verification/gameplay-qa.mjs --plan",
+    "qa:gameplay:report": "node scripts/verification/gameplay-qa/report.mjs"
   },
   "repository": {
     "type": "git",

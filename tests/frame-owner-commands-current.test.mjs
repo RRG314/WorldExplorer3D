@@ -62,6 +62,18 @@ test('planetary arrivals reject missing/wrong-body surfaces, malformed targets a
 test('Mars and another accepted solid body retain frame-specific walk/drive and altitude rules',async t=>{
  setup(t);for(const [body,mode]of [[OLYMPUS_MONS_SURFACE_REGION,'drive'],[CALORIS_PLANITIA_SURFACE_REGION,'walk']]){await accepted(body);ctx.onMars=body.bodyId==='mars';ctx.onMoon=false;ctx.activePlanetaryBodyId=body.bodyId;assert.equal(travel.initializePlanetaryArrival(body.bodyId,{x:body.renderPlacement.x,z:body.renderPlacement.z},{mode}),true);assert.equal(ctx.Walk.state.mode,mode);assert.equal(ctx.car.y-1.2,ctx.Walk.state.walker.y-1.7);}
 });
+test('fresh Moon and Mars arrivals publish without initializing Earth spawn queries',async t=>{
+ setup(t);delete ctx.resolveSafeWorldSpawn;delete ctx.applyResolvedWorldSpawn;
+ for(const [body,point]of [[APOLLO11_SURFACE_REGION,{x:200,z:-950,angle:.4}],[OLYMPUS_MONS_SURFACE_REGION,{x:3200,z:1900,angle:-2.08}]]){
+  await accepted(body);commitEnvironment(body.bodyId==='moon'?'MOON':'MARS');
+  assert.equal(travel.initializePlanetaryArrival(body.bodyId,point,{mode:'drive'}),true);
+  assert.equal(ctx.Walk.state.mode,'drive');assert.equal(ctx.car.x,point.x);assert.equal(ctx.Walk.state.walker.z,point.z);
+  assert.equal(ctx.car.y-1.2,ctx.Walk.state.walker.y-1.7);assert.equal(ctx.carMesh.position.x,point.x);assert.equal(ctx.car.road,null);
+  const before=bodies();assert.equal(travel.initializePlanetaryArrival(body.bodyId,{x:1e7,z:0}),false);assert.deepEqual(bodies(),before);
+  setActivePlanetaryObstacles(body.bodyId,[{id:'hull',...point,radius:10}]);
+  assert.equal(travel.initializePlanetaryArrival(body.bodyId,point),false);assert.deepEqual(bodies(),before);clearActivePlanetaryObstacles();
+ }
+});
 test('world actor reset accepts only the active immutable load request in the loading Earth frame',t=>{
  setup(t);const request=createWorldLoadRequest({key:'custom',lat:39,lon:-76},2),before=bodies();assert.equal(travel.initializeWorldLoadActors(request),false);assert.deepEqual(bodies(),before);ctx.worldLoading=true;ctx._worldLoadSequence=2;assert.equal(travel.initializeWorldLoadActors(request),true);assert.equal(ctx.car.x,0);assert.equal(ctx.Walk.state.walker.z,0);Object.assign(ctx.car,{x:90,z:90});ctx._worldLoadSequence=3;assert.equal(travel.initializeWorldLoadActors(request),false);assert.equal(ctx.car.x,90);
 });
