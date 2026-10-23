@@ -9,13 +9,15 @@ await fs.mkdir(out,{recursive:true});
 const html=await fs.readFile('app/index.html','utf8');
 const server=await startStaticServer({rootDir:process.cwd(),ports:[0]});
 let owned;
-const errors=[],checks=[];
+const errors=[],checks=[],failedResponses=[];
 try {
   owned=await chromium.launchServer({headless:true,...(process.env.CI?{}:{channel:'chrome'})});
   const browser=await chromium.connect(owned.wsEndpoint());
   const page=await browser.newPage({viewport:{width:460,height:900}});
   page.on('pageerror',error=>errors.push(error.message));
-  await page.goto(`http://127.0.0.1:${server.port}/404.html`);
+  page.on('console',message=>{if(message.type()==='error')errors.push(message.text());});
+  page.on('response',response=>{if(response.status()>=400)failedResponses.push({path:new URL(response.url()).pathname,status:response.status()});});
+  await page.goto(`http://127.0.0.1:${server.port}/tests/fixtures/provider-credentials.html`);
   await page.evaluate(()=>{
     localStorage.setItem('attomApiKey','synthetic-legacy-attom');
     localStorage.setItem('rentcastApiKey','synthetic-legacy-rentcast');
@@ -56,7 +58,7 @@ try {
   await page.screenshot({path:out+'/settings.png'});
   await page.reload();state=await mount();assert.equal(state.attom,false);assert.equal(state.rentcast,false);assert.equal(state.legacyStored,false);assert.equal(state.playerMarker,'preserve');checks.push('reload clears keys and preserves unrelated player storage');
   await page.locator('#attomKeyInput').fill('synthetic-clear-attom');await page.locator('#saveApiKey').click();await page.locator('#attomKeyInput').fill('');await page.locator('#saveApiKey').click();state=JSON.parse(await page.evaluate(()=>render_game_to_text()));assert.equal(state.attom,false);checks.push('clearing the existing input releases its credential');
-  assert.deepEqual(errors,[]);
+  assert.deepEqual(errors,[],JSON.stringify(failedResponses));
   await fs.writeFile(out+'/report.json',JSON.stringify({passed:true,checks,errors,state,scope:'Actual Settings markup and module, existing provider owner and reader; synthetic keys, no live provider or player data'},null,2));
   console.log(JSON.stringify({passed:true,checks:checks.length,errors:errors.length}));
 } finally {if(owned)await closeOwnedBrowser(owned);await server.close();}
