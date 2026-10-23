@@ -3,19 +3,46 @@ title = "WorldExplorer Secret Scan Config"
 [extend]
 useDefault = true
 
-[allowlist]
-description = "Firebase web config key paths (public client key expected)"
+[[allowlists]]
+description = "Only public Firebase browser keys in the expected client configuration files"
+targetRules = ["generic-api-key", "gcp-api-key"]
+condition = "AND"
 paths = [
   '''config/firebase\.(production|staging)\.json''',
   '''js/firebase-project-config\.js''',
   '''public/js/firebase-project-config\.js''',
   '''public/__/firebase/init\.(js|json)'''
 ]
+regexTarget = "secret"
+regexes = [
+  '''^AIzaSyCJHCzRq6xwV1NbZ5NIRXfYA8XuL0Jvbz4$''',
+  '''^AIzaSyDu\-IXMWLU5UExjtPWfJ3BEHXg4xxvE3UU$''',
+]
+
+[[allowlists]]
+description = "Exact public reCAPTCHA site keys in the reviewed browser configuration"
+targetRules = ["generic-api-key"]
+condition = "AND"
+paths = [
+  '''config/firebase\.(production|staging)\.json''',
+  '''js/firebase-project-config\.js''',
+  '''public/js/firebase-project-config\.js'''
+]
+regexTarget = "secret"
+regexes = [
+  '''^6LcUo7AtAAAAAMs_v11Y6xxSA2l1SR8bejoSKRhO$''',
+  '''^6LepRq4tAAAAAHyE_MVJfWdAKZ9HJs9qFkKHAMM0$''',
+]
+
+[[allowlists]]
+description = "Exact device-local preference names and documented fake credentials"
+regexTarget = "secret"
 regexes = [
   # Exact device-local save/settings names; they grant no authentication or access.
   '''^we3d\.ocean\.voyage\.v1$''',
   '''^we3d\.ocean\.voyage\.v2$''',
   '''^we3d\.ocean\.continuous\.v1$''',
+  '''^we3d\.tester-invitation\.v1$''',
   '''sk_(live|test)_\.\.\.''',
   '''whsec_\.\.\.''',
   '''price_\.\.\.'''
