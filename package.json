@@ -3,6 +3,9 @@
   "version": "5.6.1",
   "description": "Browser-based 3D geospatial exploration app using OpenStreetMap-derived data for Earth and destination-mode exploration.",
   "private": true,
+  "engines": {
+    "node": ">=22.23.4 <23"
+  },
   "type": "module",
   "main": "three.js",
   "scripts": {

@@ -1,0 +1,19 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directories:
+      - /
+      - /functions
+    schedule:
+      interval: weekly
+    # Disable general version-upgrade PRs; advisory-driven security PRs remain enabled.
+    open-pull-requests-limit: 0
+    groups:
+      security-patches:
+        applies-to: security-updates
+        patterns: ['*']
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 0

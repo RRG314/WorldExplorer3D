@@ -1,4 +1,5 @@
 import { readRegionalSceneryPreference, writeRegionalSceneryPreference } from '../terrain/regional-scenery-scheduler.js';
+import { prepareProviderCredentials, setProviderCredential } from '../real-estate/provider-credentials.js';
 
 export function setupSettingsUi(appCtx) {
   document.getElementById('copySupportReceiptBtn')?.addEventListener('click', async () => {
@@ -59,71 +60,24 @@ export function setupSettingsUi(appCtx) {
     });
   }
 
-  // Load saved API keys from localStorage
-  const savedRentcast = localStorage.getItem('rentcastApiKey');
-  const savedAttom = localStorage.getItem('attomApiKey');
-  const savedEstated = localStorage.getItem('estatedApiKey');
-
-  if (savedRentcast) {
-    appCtx.apiConfig.rentcast = savedRentcast;
-    if (rentcastKeyInput) rentcastKeyInput.value = savedRentcast;
-  }
-  if (savedAttom) {
-    appCtx.apiConfig.attom = savedAttom;
-    if (attomKeyInput) attomKeyInput.value = savedAttom;
-  }
-  if (savedEstated) {
-    appCtx.apiConfig.estated = savedEstated;
-    if (estatedKeyInput) estatedKeyInput.value = savedEstated;
+  // Migrate former saved keys into this visit and remove their persisted copy.
+  prepareProviderCredentials(appCtx.apiConfig);
+  const providerInputs = {estated:estatedKeyInput, attom:attomKeyInput, rentcast:rentcastKeyInput};
+  for (const [provider, input] of Object.entries(providerInputs)) {
+    if (input) input.value = appCtx.apiConfig[provider] || '';
   }
 
-  // Save API keys
+  // Keep optional private keys only in the existing in-memory configuration.
   if (saveApiKeyBtn) {
     saveApiKeyBtn.addEventListener('click', () => {
       let savedCount = 0;
-
-      // Save Estated
-      if (estatedKeyInput) {
-        const key = estatedKeyInput.value.trim();
-        if (key) {
-          appCtx.apiConfig.estated = key;
-          localStorage.setItem('estatedApiKey', key);
-          savedCount++;
-        } else {
-          appCtx.apiConfig.estated = null;
-          localStorage.removeItem('estatedApiKey');
-        }
-      }
-
-      // Save ATTOM
-      if (attomKeyInput) {
-        const key = attomKeyInput.value.trim();
-        if (key) {
-          appCtx.apiConfig.attom = key;
-          localStorage.setItem('attomApiKey', key);
-          savedCount++;
-        } else {
-          appCtx.apiConfig.attom = null;
-          localStorage.removeItem('attomApiKey');
-        }
-      }
-
-      // Save RentCast
-      if (rentcastKeyInput) {
-        const key = rentcastKeyInput.value.trim();
-        if (key) {
-          appCtx.apiConfig.rentcast = key;
-          localStorage.setItem('rentcastApiKey', key);
-          savedCount++;
-        } else {
-          appCtx.apiConfig.rentcast = null;
-          localStorage.removeItem('rentcastApiKey');
-        }
+      for (const [provider, input] of Object.entries(providerInputs)) {
+        if (input && setProviderCredential(appCtx.apiConfig, provider, input.value)) savedCount++;
       }
 
       // Show feedback
       if (savedCount > 0) {
-        saveApiKeyBtn.textContent = `✓ Saved ${savedCount} API Key${savedCount > 1 ? 's' : ''}!`;
+        saveApiKeyBtn.textContent = `✓ ${savedCount} Key${savedCount > 1 ? 's' : ''} Ready for This Visit`;
         saveApiKeyBtn.style.background = '#10b981';
       } else {
         saveApiKeyBtn.textContent = '✓ All Keys Cleared!';
@@ -131,7 +85,7 @@ export function setupSettingsUi(appCtx) {
       }
 
       setTimeout(() => {
-        saveApiKeyBtn.textContent = '💾 Save All API Keys';
+        saveApiKeyBtn.textContent = 'Use Keys for This Visit';
         saveApiKeyBtn.style.background = '#667eea';
       }, 2000);
     });

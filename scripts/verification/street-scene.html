@@ -2,7 +2,7 @@
 <html lang="en"><meta charset="utf-8"><title>Street geometry verification</title>
 <style>body{margin:0;background:#202830;color:#eee;font:14px system-ui}#controls{position:fixed;top:12px;left:12px;background:#202830dd;padding:12px;max-width:340px}button{margin:4px;padding:8px}pre{white-space:pre-wrap}</style>
 <div id="controls"><strong>Controlled street geometry test</strong><p>Real pavement worker and renderer. Synthetic source geometry, not a real location.</p><label>Terrain <select id="terrain"><option value="flat">Flat</option><option value="uphill">Uphill</option><option value="downhill">Downhill</option><option value="cross">Cross slope</option><option value="rolling">Rolling terrain</option><option value="overpass">Overpass beside ground street</option><option value="high">High elevation</option></select></label><button id="overview">Overview</button><button id="ramp">Curb ramp</button><button id="rebuild">Rebuild paving five times</button><button id="reject">Test missing surface rejection</button><pre id="result">Compiling…</pre></div>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="/app/vendor/three/build/three.min.js"></script>
 <script type="module">
 import {prepareCarriagewayTiles} from '../../app/js/world/compiler/street-carriageway.js';
 import {meshCarriagewayTile} from '../../app/js/world/compiler/street-carriageway-mesh.js';

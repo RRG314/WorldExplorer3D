@@ -1,0 +1,16 @@
+# Refresh the deployed immutable worker without copying a new worker revision.
+# SOURCE_IMAGE must be the reviewed deployed image@sha256 digest.
+ARG SOURCE_IMAGE
+FROM ${SOURCE_IMAGE}
+ARG WORKER_USER=10001
+USER root
+COPY scripts/reality-capture/install-container-node.sh /tmp/we3d-install-node.sh
+RUN find /worker /opt/meshroom -type f -exec sha256sum {} + | sort > /tmp/we3d-worker-before.sha256 \
+ && apt-get update \
+ && DEBIAN_FRONTEND=noninteractive apt-get upgrade -y --no-install-recommends \
+ && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ca-certificates curl xz-utils \
+ && sh /tmp/we3d-install-node.sh \
+ && sha256sum --check --status /tmp/we3d-worker-before.sha256 \
+ && rm -f /tmp/we3d-worker-before.sha256 /tmp/we3d-install-node.sh \
+ && rm -rf /var/lib/apt/lists/*
+USER ${WORKER_USER}

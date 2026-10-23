@@ -363,7 +363,7 @@
   "locks": [
     {
       "path": "package-lock.json",
-      "sha256": "4ba8f778891107cf048e0a69e3168e2ad4bcb52b0d02c9748c5335ee7ba57fd4",
+      "sha256": "b24c8d9874a4ebe62415dfaae7160a8fd683e453c456325c379cca485a413d0a",
       "direct": [
         {
           "package": "@babel/parser",
@@ -449,7 +449,7 @@
     },
     {
       "path": "functions/package-lock.json",
-      "sha256": "361e666b1a0f449fc19a9827749eb4a8ad35357e74719a5be4de2655f8176ab5",
+      "sha256": "098b469dcb15afee59edeeecd351ea7ca6a264da6fd5421bc656b5bbefb43cfc",
       "direct": [
         {
           "package": "firebase-admin",
@@ -475,6 +475,11 @@
           "package": "stripe",
           "version": "17.7.0",
           "integrity": "sha512-aT2BU9KkizY9SATf14WhhYVv2uOapBWX0OFWF4xvcj1mPaNotlSc2CsxpS4DS46ZueSppmCF5BX1sNYBtwBvfw=="
+        },
+        {
+          "package": "svix",
+          "version": "2.8.0",
+          "integrity": "sha512-3bvu4FoVP9szUn5WBXUXUs97lLVC+Jyr0+jm+Q+DVcPMLXmeoZepbmbCzJVqGDNf9i00P7WLAH6m0q9HrzH1+g=="
         }
       ]
     }

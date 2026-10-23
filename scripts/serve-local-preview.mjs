@@ -4,6 +4,7 @@ import http from 'node:http';
 import path from 'node:path';
 import geospatial from '../functions/geospatial.js';
 import { serveMutableSourceManifest } from './source-preview-manifest.mjs';
+import { assertPreviewRequest, resolvePreviewFile } from './lib/local-preview-security.mjs';
 
 const sourceRootDir = process.cwd();
 const rootDir = path.resolve(process.env.WE3D_PREVIEW_ROOT || sourceRootDir);
@@ -45,21 +46,15 @@ const mime = new Map([
   ['.wasm', 'application/wasm']
 ]);
 
-async function exists(filePath) {
-  try {
-    await fs.access(filePath);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 const server = http.createServer(async (req, res) => {
   try {
-    const reqUrl = new URL(req.url || '/', `http://${host}:${port}`);
+    const actualPort = server.address().port;
+    assertPreviewRequest(req, actualPort, host);
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    const reqUrl = new URL(req.url || '/', `http://${host}:${actualPort}`);
     if(await servePlaceLookupPreview(req,res,reqUrl))return;
     if(reqUrl.pathname==='/__preview/load-trace' && req.method==='POST' && !candidateId) {
-      if(req.headers.origin!==`http://${host}:${port}` && req.headers.origin!==`http://localhost:${port}`) {res.writeHead(403);res.end();return;}
+      if(req.headers.origin!==`http://${host}:${actualPort}` && req.headers.origin!==`http://localhost:${actualPort}`) {res.writeHead(403);res.end();return;}
       let body='';
       for await(const chunk of req) {body+=chunk;if(body.length>2048){res.writeHead(413);res.end();return;}}
       try {
@@ -156,26 +151,8 @@ const server = http.createServer(async (req, res) => {
       }
       return;
     }
-    let relPath = decodeURIComponent(reqUrl.pathname || '/');
-    if (relPath === '/') relPath = '/index.html';
-
-    const resolved = path.resolve(path.join(rootDir, relPath));
-    if (!resolved.startsWith(rootDir)) {
-      res.writeHead(403, { 'Content-Type': 'text/plain; charset=utf-8' });
-      res.end('forbidden');
-      return;
-    }
-
-    let filePath = resolved;
-    let stat = null;
-    try {
-      stat = await fs.stat(filePath);
-    } catch {
-      stat = null;
-    }
-
-    if (stat?.isDirectory()) filePath = path.join(filePath, 'index.html');
-    if (!(await exists(filePath))) {
+    const filePath = await resolvePreviewFile(rootDir, reqUrl.pathname || '/');
+    if (!filePath) {
       res.writeHead(404, {
         'Content-Type': 'text/plain; charset=utf-8',
         'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
@@ -200,21 +177,21 @@ const server = http.createServer(async (req, res) => {
     });
     res.end(body);
   } catch (error) {
-    res.writeHead(500, {
+    res.writeHead([400,403].includes(error.statusCode) ? error.statusCode : 500, {
       'Content-Type': 'text/plain; charset=utf-8',
       'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
       Pragma: 'no-cache',
       Expires: '0'
     });
-    res.end(String(error?.stack || error?.message || error));
+    res.end(error.statusCode === 403 ? 'forbidden' : error.statusCode === 400 ? 'invalid request' : 'preview request failed');
   }
 });
 
 server.listen(port, host, () => {
   if (candidateId) {
     console.log(`Immutable candidate ${candidateId}`);
-    console.log(`http://${host}:${port}/app/?candidate=${encodeURIComponent(candidateId)}`);
+    console.log(`http://${host}:${server.address().port}/app/?candidate=${encodeURIComponent(candidateId)}`);
   } else {
-    console.log(`Mutable source preview running at http://${host}:${port}/`);
+    console.log(`Mutable source preview running at http://${host}:${server.address().port}/`);
   }
 });

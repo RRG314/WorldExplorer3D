@@ -1,10 +1,39 @@
 # Current development and release state
 
-Updated October 19, 2026 for the 5.6.1 release. The live build manifest at
+Updated October 23, 2026 for 5.6.1 security maintenance. The live build manifest at
 https://worldexplorer3d.io/build-manifest.json and the GitHub release are the
 production identity authorities; check them before starting new release work.
 The owner has explicitly authorized production, protected stable, both active
 development branches and the release. Do not ask again.
+
+## October 23 security authority and current production
+
+The owner's security instruction authorizes necessary security fixes and their
+protected activation, superseding the earlier local-only restriction for this
+scope. Production now serves security build
+`5.6.1+a82ff0abef27.b225efbf098a35bb.production`, source
+`a82ff0abef278e20f78b82cdeba24a97decec3f1`, Hosting version
+`34fff00d671d0a0b`. Released source `233a5a7f...` and its previous Hosting
+version `d4516200e86c480f` are retained recovery anchors. Protected PRs 104 and
+114 contain runtime/scanning/preview hardening and visit-only private provider
+keys. No unreleased architecture, tester or multiplayer feature was promoted to
+production; backend Functions, Auth, rules and player data remain unchanged.
+
+Both managed Node22 probes reported 22.23.4 and were deleted; all original 80
+production and 84 staging Function resources were preserved. The main staging
+site's existing feature build is receiving the same private-key fix separately.
+Details, limitations and failed evidence are private local records under
+`output/research/security-response-2026-10-23/`. Use its final readiness and
+security candidate pointer once finalized; older release/local-only statements
+below describe their dated checkpoints.
+
+Four current package slots are retained. The earlier browser and tester
+production candidates are now fully recoverable from verified basis/overlay
+archives; their pointers contain recovery instructions. Every dependent archive
+was reverified. Preserve the multiplayer production basis, current `dist`, and
+all released rollback packages. Do not deploy an older feature candidate without
+bringing in these security fixes. The Godot work and broader roadmap are outside
+this security response.
 
 ## Workspace and branch authority
 
