@@ -179,7 +179,7 @@ test('finished cache cells retain only one geometry representation within the sa
  cache.clear();assert.equal(cache.bytes,0);
 });
 
-function harness(t,{holdType,keys=['0:0','16:0']}={}){
+function harness(t,{holdType,keys=['0:0','16:0'],batch=false}={}){
  const oldThree=globalThis.THREE,oldWorker=globalThis.Worker,resources=[];
  class Texture{constructor(data,width,height){this.image={data,width,height};resources.push(this);}dispose(){this.disposed=true;}}
  class Vector4{constructor(...v){this.set(...v);}set(...v){this.values=v;}}
@@ -196,6 +196,7 @@ function harness(t,{holdType,keys=['0:0','16:0']}={}){
     if(this.terminated)return;
     if(data.type==='source-begin'||data.type==='source-chunk'){this.onmessage({data:{type:'source-ready'}});return;}
     if(data.type==='prepare'){this.keys=keys.filter(key=>!data.completedKeys?.includes(key));this.resumeKeys=data.completedKeys;this.onmessage({data:{type:'prepared',tiles:keys.length,keys,sourceCells:keys.length,excludedCells:0}});return;}
+    if(batch&&data.batchSize){const tiles=this.keys.splice(0,data.batchSize).map((key,i,all)=>({type:'tile',key,mask:new Uint8Array(data.resolution**2).fill(255),coveredSquareWorldUnits:4096,remaining:this.keys.length+all.length-i-1}));this.onmessage({data:{type:'tiles',tiles,remaining:this.keys.length,workMs:1}});return;}
     const key=this.keys.shift();
     this.onmessage({data:key===undefined?{type:'complete'}:{type:'tile',key,mask:new Uint8Array(data.resolution**2).fill(255),coveredSquareWorldUnits:4096,remaining:this.keys.length}});
    };
@@ -349,11 +350,18 @@ test('actual overview worker covers a multi-kilometre network beyond the old 144
  const stagedPlan=await request({type:'prepare'});
  assert.deepEqual(stagedPlan,plan,'staged worker transfer must preserve complete coverage');
  assert.ok(plan.tiles>144);
- let count=0,near=0,far=0;
+ let count=0,near=0,far=0;const expected=[];
  for(;;){const packet=await request({type:'next',focus:{x:0,z:0}});if(packet.type==='complete')break;assert.equal(packet.type,'tile');count++;
-  assert.ok(packet.mask instanceof Uint8Array);if(packet.mask.some(value=>value>0)){if(packet.bounds.minX<384&&packet.bounds.maxX>-384)near++;if(packet.bounds.maxX>1400||packet.bounds.minX<-1400)far++;}
+  expected.push(packet);assert.ok(packet.mask instanceof Uint8Array);if(packet.mask.some(value=>value>0)){if(packet.bounds.minX<384&&packet.bounds.maxX>-384)near++;if(packet.bounds.maxX>1400||packet.bounds.minX<-1400)far++;}
  }
  assert.equal(count,plan.tiles);assert.ok(near>0);assert.ok(far>0,'far pavement must exist, not only source inventory');
+ await request({type:'prepare',input:{roads,metersPerWorldUnit:1}});
+ const batched=[];let packets=0;
+ for(;;){const packet=await request({type:'next',focus:{x:0,z:0},batchSize:999});if(packet.type==='complete')break;
+  assert.equal(packet.type,'tiles');assert.ok(packet.tiles.length>0&&packet.tiles.length<=32);assert.ok(packet.workMs>=0);packets++;batched.push(...packet.tiles);
+ }
+ assert.deepEqual(batched,expected,'loading batches preserve every mask byte, nearest-first order and remaining count');
+ assert.ok(packets<count,'loading must avoid a round trip for every cell');
  const resumed=await request({type:'prepare',input:{roads,metersPerWorldUnit:1},completedKeys:plan.keys.slice(1)});
  assert.deepEqual(resumed,plan,'resumed plans retain the complete coverage inventory');
  const remaining=await request({type:'next',focus:{x:0,z:0}});
@@ -415,6 +423,21 @@ test('early initial coverage coalesces its worker and keeps path publication beh
  finishPaths();assert.equal(await published,true);assert.equal(overview.stats.status,'complete');
  assert.equal(overview.initialPreparationPending,false);assert.equal(await overview.publishPreparedCoverage(),true);assert.equal(callbacks,1);
  overview.dispose();
+});
+
+test('loading accepts a bounded mask batch atomically and discards it after world replacement',async t=>{
+ const h=harness(t,{holdType:'next',batch:true});h.ctx.worldLoading=true;
+ const overview=createStreetOverview(h.ctx,{deferPresentation:true});
+ const pending=overview.prepareInitialCoverage({x:0,z:0});
+ for(let i=0;i<20&&!h.worker?.held;i++)await new Promise(resolve=>setImmediate(resolve));
+ assert.equal(h.worker.held.data.batchSize,32);h.worker.held.deliver();await pending;
+ assert.equal(overview.stats.completedCells,2);assert.equal(overview.stats.workerPackets,1);assert.equal(overview.stats.status,'prepared');
+ assert.equal(overview.stats.coveredSquareWorldUnits,8192);overview.dispose();
+ const replacement=createStreetOverview(h.ctx,{deferPresentation:true});
+ const obsolete=replacement.prepareInitialCoverage({x:0,z:0});
+ for(let i=0;i<20&&!h.worker?.held;i++)await new Promise(resolve=>setImmediate(resolve));
+ h.ctx._worldLoadSequence++;h.worker.held.deliver();assert.equal(await obsolete,false);
+ assert.equal(replacement.stats.completedCells,0);replacement.dispose();
 });
 test('retired prepared coverage cannot publish mapped paths into a replacement world',async t=>{
  const h=harness(t);h.ctx.worldLoading=true;let calls=0;

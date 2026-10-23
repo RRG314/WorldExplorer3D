@@ -24,6 +24,18 @@ Focused ownership/geometry equivalence tests accompany that repair. Earlier
 valid gameplay, room, save and24-hour mail evidence stays retained; no broad
 historical sweep is authorized or required merely by verification edits.
 
+The first compiled overlap pilot retained all6,009cells, the exact covered area,
+49,080buildings and18,951roads, but first playable87.27s still failed60s.
+Touch input/native60FPS, checkpoint/flower replay and trial success/failure
+passed in that same world. Paint's expanded phone palette was blocked by the
+minimap; its bounded, scrollable overlay now sits above the map and below the
+main menu. Loading coverage now acknowledges bounded32cell/32ms worker batches;
+normal gameplay retains single-cell scheduling. Actual-worker tests compare
+every mask byte/order/count with single-cell output; cancellation rejects late
+batches. The next compiled pilot must measure this change before promotion.
+Evidence: `output/research/production-release-2026-10-23/pilot/` and focused
+`batched-coverage-contracts.log` / `batched-cancellation.log`. No production change.
+
 ## October 23 practical gameplay QA authority
 
 Use `docs/verification/GAMEPLAY-QA.md` and the resumable `qa:gameplay:plan` /

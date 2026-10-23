@@ -49,19 +49,23 @@ export function createStreetOverview(appCtx,{onComplete=()=>{},deferPresentation
        stagedMask?.dispose();stagedMask=createPavementTerrainMask(appCtx,plan.keys,{materialBinding,deferUpload:appCtx.worldLoading===true});
        if(stats.totalCells===null){mask.dispose();mask=stagedMask;stagedMask=null;mask.activate();}
        setDetailBounds(appCtx.streetPavement?.coverageBounds);
-       Object.assign(stats,{totalCells:plan.tiles,sourceCells:plan.sourceCells,excludedCells:plan.excludedCells,completedCells:0,nonemptyCells:0,coveredSquareWorldUnits:0,
+       Object.assign(stats,{totalCells:plan.tiles,sourceCells:plan.sourceCells,excludedCells:plan.excludedCells,completedCells:0,nonemptyCells:0,coveredSquareWorldUnits:0,workerPackets:0,workerMs:0,
          retainedBytes:(stagedMask||mask).bytes,maskResolution:(stagedMask||mask).layout.resolution,worldUnitsPerTexel:64/(stagedMask||mask).layout.resolution});
        coveragePrepared=true;
      }
      prepared=true;
    }
    const target=stagedMask||mask;
-   const packet=await request({type:'next',focus,resolution:target.layout.resolution});
+   const packet=await request({type:'next',focus,resolution:target.layout.resolution,...(appCtx.worldLoading?{batchSize:32}:{})});
    if(!current())return;
    if(packet.type==='complete'){await complete(current);return;}
-   target.publish(packet.key,packet.mask);completedKeys.add(packet.key);stats.completedCells++;stats.uploads={...target.uploadStats};
-   if(packet.coveredSquareWorldUnits>0)stats.nonemptyCells++;
-   stats.coveredSquareWorldUnits+=packet.coveredSquareWorldUnits||0;
+   for(const cell of packet.type==='tiles'?packet.tiles:[packet]){
+     target.publish(cell.key,cell.mask);completedKeys.add(cell.key);stats.completedCells++;
+     if(cell.coveredSquareWorldUnits>0)stats.nonemptyCells++;
+     stats.coveredSquareWorldUnits+=cell.coveredSquareWorldUnits||0;
+   }
+   stats.uploads={...target.uploadStats};
+   stats.workerPackets=(stats.workerPackets||0)+1;stats.workerMs=(stats.workerMs||0)+(packet.workMs||0);
    if(!packet.remaining)await complete(current);
  }
  async function complete(current){

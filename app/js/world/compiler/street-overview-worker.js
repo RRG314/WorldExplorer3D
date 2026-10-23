@@ -19,9 +19,12 @@ self.onmessage=({data})=>{
    pending.clear();plan.tiles.forEach((tile,i)=>{if(completed.has(tile.key))plan.tiles[i]=null;else pending.add(i);});
    self.postMessage({type:'prepared',tiles:plan.tiles.length,keys,sourceCells:plan.sourceCells,excludedCells:plan.sourceCells-plan.tiles.length});
   }else if(data.type==='next'&&plan){
+   const batchSize=Math.max(1,Math.min(32,Math.floor(Number(data.batchSize)||1)));
+   const packets=[],startedAt=performance.now();
+   do{
    let selected=-1,distance=Infinity;
    for(const i of pending){const tile=plan.tiles[i],x=(tile.bounds.minX+tile.bounds.maxX)/2,z=(tile.bounds.minZ+tile.bounds.maxZ)/2,d=(x-data.focus.x)**2+(z-data.focus.z)**2;if(d<distance){distance=d;selected=i;}}
-   if(selected<0){self.postMessage({type:'complete'});return;}
+   if(selected<0)break;
    const tile=plan.tiles[selected];pending.delete(selected);
    const result=compilePavementTile(tile,plan.metersPerWorldUnit,{includeMarkings:false});
    const resolution=data.resolution||64,mask=rasterizePavementMask(result.polygons,tile.bounds,resolution);
@@ -29,7 +32,13 @@ self.onmessage=({data})=>{
    // arrays as soon as its mask exists, rather than retaining every finished cell.
    plan.tiles[selected]=null;
    const coveredSquareWorldUnits=mask.reduce((sum,n)=>sum+n/255,0)*(64/resolution)**2;
-   self.postMessage({type:'tile',key:tile.key,bounds:tile.bounds,mask,coveredSquareWorldUnits,remaining:pending.size},[mask.buffer]);
+   packets.push({type:'tile',key:tile.key,bounds:tile.bounds,mask,coveredSquareWorldUnits,remaining:pending.size});
+   // Only loading requests batch cells. Keep acknowledgement/cancellation
+   // boundaries bounded even when a dense cell costs more than the budget.
+   }while(pending.size&&packets.length<batchSize&&performance.now()-startedAt<32);
+   if(!packets.length){self.postMessage({type:'complete'});return;}
+   if(batchSize===1)self.postMessage(packets[0],[packets[0].mask.buffer]);
+   else self.postMessage({type:'tiles',tiles:packets,remaining:pending.size,workMs:performance.now()-startedAt},packets.map(p=>p.mask.buffer));
   }
  }catch(error){self.postMessage({type:'error',message:String(error?.message||error)});}
 };
