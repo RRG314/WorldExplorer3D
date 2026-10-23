@@ -43,7 +43,7 @@ jobs:
 
       - name: Preserve component test inventory and sensitivity evidence
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: component-test-evidence
           path: output/verification/current-contracts/
@@ -68,15 +68,21 @@ jobs:
           cache: npm
 
       - name: Setup Python
-        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: '3.13'
+          check-latest: true
 
       - name: Install dependencies
         run: npm ci
 
       - name: Install backend dependencies
         run: npm ci --prefix functions
+
+      - name: Verify patched Python and pip
+        run: |
+          python -c "import sys; assert (3, 13, 17) <= sys.version_info[:3] < (3, 14, 0), 'Patched Python 3.13.17 or later 3.13 required'"
+          python -c "import pip; assert tuple(map(int, pip.__version__.split('.'))) >= (26, 2, 2), 'Patched pip 26.2.2 or later required'"
 
       - name: Install datum normalizer
         run: python -m pip install -r scripts/ground-datum-requirements.txt
