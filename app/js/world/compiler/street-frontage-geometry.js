@@ -1,17 +1,16 @@
-import {frontageRayMayReach} from './frontage-ray-bounds.js';
 // Visibility is resolved before eligibility. A short or close wall must still
 // occlude a rear facade; facade angle is not a proxy for public-space ownership.
 export function frontageHit(point, nx, nz, edges, minimum, maximum) {
   let best = null;
   for (const edge of edges) {
     const { a, b } = edge;
-    if (!frontageRayMayReach(point, nx, nz, Math.max(maximum, minimum), a, b)) continue;
     const dx = b.x - a.x, dz = b.z - a.z;
     const den = nx * dz - nz * dx;
     if (Math.abs(den) < 1e-8) continue;
     const ax = a.x - point.x, az = a.z - point.z;
-    const distance = (ax * dz - az * dx) / den;
     const t = (ax * nz - az * nx) / den;
+    if (!(t >= -1e-7 && t <= 1 + 1e-7)) continue;
+    const distance = (ax * dz - az * dx) / den;
     if (t >= -1e-7 && t <= 1 + 1e-7 && distance >= -1e-7 && (!best || distance < best.distance))
       best = { edge, distance:Math.max(0,distance), maximum: Math.max(maximum, minimum) };
   }

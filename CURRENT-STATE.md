@@ -36,6 +36,18 @@ batches. The next compiled pilot must measure this change before promotion.
 Evidence: `output/research/production-release-2026-10-23/pilot/` and focused
 `batched-coverage-contracts.log` / `batched-cancellation.log`. No production change.
 
+The batched pilot still failed loading at89.551s; Paint's portrait/landscape UI,
+native60FPS and prescribed input passed. Exact input replay isolated overhead
+from the new per-edge bounds test, which is removed. Worker snapshots now omit
+unused provider/structure metadata and empty tags, preserving source facts in
+their existing owners and all compiler-consumed width/placement/ground evidence.
+The captured payload fell74,883,998→29,258,601bytes. Plan-owned road mask unions
+are compiled once across cells and excluded from source fingerprints. All6,009
+mask hashes/order/area match the original; diagnostic compilation42.6→25.6s.
+Source/width/geometry/ownership checks and the next compiled browser measurement
+remain the promotion criteria; these offline timings are not browser acceptance.
+Keep the JSON typed-array capture failure and its corrected producer-based replay.
+
 ## October 23 practical gameplay QA authority
 
 Use `docs/verification/GAMEPLAY-QA.md` and the resumable `qa:gameplay:plan` /

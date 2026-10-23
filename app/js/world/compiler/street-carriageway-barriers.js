@@ -1,4 +1,3 @@
-import {frontageRayMayReach} from './frontage-ray-bounds.js';
 import {isGroundStreet} from './street-frontage-policy.js';
 import {streetRoadSegments,carriagewaySegmentPolygon,carriagewayJoinPolygons} from './street-carriageway.js';
 import {roadWidthAtSegment} from '../road-cross-section-profile.js?v=1';
@@ -75,14 +74,15 @@ function edgeBlocksRay(point,nx,nz,distance,ax,az,bx,bz){
   const dx=bx-ax,dz=bz-az,den=nx*dz-nz*dx;
   if(Math.abs(den)<1e-10)return false;
   const x=ax-point.x,z=az-point.z;
-  const ray=(x*dz-z*dx)/den,t=(x*nz-z*nx)/den;
+  const t=(x*nz-z*nx)/den;
+  if(!(t>=-1e-7&&t<=1+1e-7))return false;
+  const ray=(x*dz-z*dx)/den;
   return ray>1e-6&&ray<distance-1e-6&&t>=-1e-7&&t<=1+1e-7;
 }
 
 export function frontageBlocked(point,nx,nz,distance,barriers,exclude){
   for(const {a,b,road} of barriers){
     if(exclude && road===exclude)continue;
-    if(!frontageRayMayReach(point,nx,nz,distance,a,b))continue;
     if(edgeBlocksRay(point,nx,nz,distance,a.x,a.z,b.x,b.z))return true;
   }
   return false;
