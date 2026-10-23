@@ -10,6 +10,20 @@ import {
 import { reviewedMappedVesselDataNear } from './reviewed-mapped-vessels.js?v=1';
 import { completeBuildingPublicationGroups } from './building-publication-groups.js';
 
+// One prepared request per loading session. The caller supplies its existing
+// provider coordinator; this closure neither publishes nor owns cancellation.
+export function createPreferredBuildingRequest({request,isCurrent}) {
+  let pending=null;
+  return ()=>{
+    if(!isCurrent())return null;
+    if(!pending){
+      try{pending=Promise.resolve(request()).then(data=>({data}),error=>({error}));}
+      catch(error){pending=Promise.resolve({error});}
+    }
+    return pending;
+  };
+}
+
 function mappedBuildingHeightMeters(tags = {}) {
   const explicitHeight = Number.parseFloat(tags.height);
   if (Number.isFinite(explicitHeight)) return explicitHeight;

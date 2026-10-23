@@ -59,6 +59,14 @@ Normal-browser staging Akureyri search returned two places with no errors;
 Cloud Function logs confirm HTTP200 with App Check not explicitly disabled.
 Protected-service evidence: `normal-browser-place-search.json` in the active ledger.
 
+An independent building download can now start from the already-requested
+facility response when the existing most-restrictive settlement rule proves
+eligibility and roads exist. Early/final callers share one request under the
+existing world-session provider coordinator; final normalization/publication,
+sparse-scene policy, fallback and cancellation remain authoritative.12focused
+prefetch/provider cases pass. The combined next compiled run covers this
+download overlap and loading-only source transfer, with full coverage required.
+
 ## October 23 practical gameplay QA authority
 
 Use `docs/verification/GAMEPLAY-QA.md` and the resumable `qa:gameplay:plan` /
