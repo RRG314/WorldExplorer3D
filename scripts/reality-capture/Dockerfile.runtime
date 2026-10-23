@@ -1,5 +1,5 @@
-# Reuse the tested, immutable toolchain; only the scoped worker code changes.
-FROM us-central1-docker.pkg.dev/we3d-staging-20260712/capture-processing/meshroom@sha256:c891a72ba300ed6675ba4b6b9a8a26827011415beb13ab5cc5384b01e38a79c4
+# Reuse the security-refreshed immutable toolchain (Node 22.23.4).
+FROM us-central1-docker.pkg.dev/we3d-staging-20260712/capture-processing/meshroom@sha256:7fa30a943f988f22128b154e8339402af5b21cb4471ee1f53dd4ebf44c8e5092
 USER root
 RUN apt-get update && apt-get install -y --no-install-recommends python3-numpy blender-data && rm -rf /var/lib/apt/lists/*
 USER 10001
