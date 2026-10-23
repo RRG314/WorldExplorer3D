@@ -14,21 +14,36 @@ scope. Production now serves security build
 `5.6.1+a82ff0abef27.b225efbf098a35bb.production`, source
 `a82ff0abef278e20f78b82cdeba24a97decec3f1`, Hosting version
 `34fff00d671d0a0b`. Released source `233a5a7f...` and its previous Hosting
-version `d4516200e86c480f` are retained recovery anchors. Protected PRs 104 and
-114 contain runtime/scanning/preview hardening and visit-only private provider
-keys. No unreleased architecture, tester or multiplayer feature was promoted to
+version `d4516200e86c480f` are retained recovery anchors. Protected PRs 104, 114,
+115 and 116 contain runtime/scanning/preview hardening, visit-only private provider
+keys and the capture-worker runtime refresh. No unreleased architecture, tester or multiplayer feature was promoted to
 production; backend Functions, Auth, rules and player data remain unchanged.
 
 Both managed Node22 probes reported 22.23.4 and were deleted; all original 80
-production and 84 staging Function resources were preserved. The main staging
-site's existing feature build is receiving the same private-key fix separately.
-Details, limitations and failed evidence are private local records under
+production and 84 staging Function resources were preserved. Main staging now
+serves its existing feature build plus the same three-file private-key fix:
+`5.6.1+2b0c1a892345.8300f082fe3d1282.staging`, Hosting version
+`48506cb8e8154c41`. The former staging package remains byte-for-byte recoverable.
+The private staging capture job now pins security image digest
+`7fa30a943f988f22128b154e8339402af5b21cb4471ee1f53dd4ebf44c8e5092`;
+its original worker/Meshroom files, UID, processing settings and IAM were
+preserved. Container/Blender export checks passed; no GPU capture was executed.
+Details, limitations and failed evidence are local operational records under
 `output/research/security-response-2026-10-23/`. Use its final readiness and
-security candidate pointer once finalized; older release/local-only statements
+`output/release-review/security-candidate.json`; older release/local-only statements
 below describe their dated checkpoints.
 
-Four current package slots are retained. The earlier browser and tester
-production candidates are now fully recoverable from verified basis/overlay
+Local Node is 22.23.4; default Python is 3.14.9 with pip 26.2.2 and updated CA
+trust. The installed desktop app separately bundles Node 24.21.0; its official
+updater reported busy twice, so vendor patch/backport status remains unverified.
+Do not replace signed application binaries manually. The credential-only staging
+preview retained automated CAPTCHA errors; this response did not relax App Check
+or establish ordinary CAPTCHA acceptance. Do not repeat prior world/multiplayer
+or email journeys for these unchanged source paths. No compromise was confirmed
+by the scoped checks; they are not a whole-device forensic examination.
+
+Four current package slots are retained. The earlier browser/tester production
+and former multiplayer staging candidates are fully recoverable from verified basis/overlay
 archives; their pointers contain recovery instructions. Every dependent archive
 was reverified. Preserve the multiplayer production basis, current `dist`, and
 all released rollback packages. Do not deploy an older feature candidate without
