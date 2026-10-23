@@ -32,6 +32,13 @@ Dependabot changes require review and the protected branch's checks; they do not
 automatically merge or deploy. Audit results identify known advisories and do
 not establish that software is free of vulnerabilities.
 
+Python tooling requires patched Python 3.13.17 or later 3.13.x, or Python 3.14.9
+or later 3.14.x, with pip 26.2.2 or later and certifi 2026.10.19 or later when
+installed. CI checks the Python/pip floor before installing projection tools.
+General dependency version-update PRs are disabled; advisory-driven security
+updates remain enabled and require protected review/checks. Official JavaScript
+actions use their supported Node.js 24 runtime.
+
 Local preview servers accept their configured local Host and Origin only. They
 deny hidden files, dependency directories, operational output and symlinks that
 escape the selected root or reach protected files. Error responses contain no

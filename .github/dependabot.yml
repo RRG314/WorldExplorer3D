@@ -6,7 +6,8 @@ updates:
       - /functions
     schedule:
       interval: weekly
-    open-pull-requests-limit: 5
+    # Disable general version-upgrade PRs; advisory-driven security PRs remain enabled.
+    open-pull-requests-limit: 0
     groups:
       security-patches:
         applies-to: security-updates
@@ -15,4 +16,4 @@ updates:
     directory: /
     schedule:
       interval: weekly
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 0
