@@ -190,3 +190,41 @@ packages have complete, hash-verified basis/overlay recovery records under
 and all released rollback packages remain preserved. Final docs do not change
 verified acceptance inputs. Local endpoint complete; coordinated hosted activation
 and protected production promotion remain separate, with no 32-client load claim.
+
+## October 23 staging multiplayer activation
+
+The owner's go-ahead continued into dedicated staging activation and bounded
+hosted verification. Read
+`docs/architecture-evaluation/2026-10-23-MULTIPLAYER-STAGING.md` before further
+release work. Staging now runs build
+`5.6.1+459272d8b13b.78676db82e5509eb.staging`, paired with the preserved multiplayer
+production candidate (762 identical delivered files, three expected Firebase
+config differences). Only existing joinRoom source, the reviewed weekly-prefix
+creation rule and Hosting changed. Existing other 83 staging Function resources,
+joinRoom configuration/secrets/IAM and all other live rule text were preserved.
+
+Actual hosted private create/join, two full client worlds, chat, walking and
+public discovery completed. Weekly guest entry initially exposed disabled
+Anonymous auth. Staging now enables that one provider switch; full GET comparison
+proves all other Auth fields unchanged. Production also currently has Anonymous
+disabled and must enable it during the coordinated release. Weekly guest UI then
+loaded the real canonical city; its later strict decimal assertion failed on
+normal longitude rounding. Actual policy tolerance accepts the observed value;
+the failed receipt stays failed. The remaining two-guest SDK/admission/lease/
+ownership/leave checks passed without another city replay. Earlier full local
+weekly guest walking/leave remains retained, not relabelled as new hosted work.
+
+Some automated browser contexts received App Check exchange 403 and protected
+lookup/environment/exterior requests 401 despite matching staging provider key
+and allowed canonical domain. No debug attestation or policy relaxation was used;
+normal CAPTCHA acceptance is not established by this run. Keep that observation
+separate from completed room functionality and review it for production.
+
+Final preservation audit passed: all 80 production Functions, Auth, rule release
+and Hosting remain unchanged at released source 233a5a7f. Five disposable staging
+accounts and their own data/memberships were cleaned up; the system weekly room
+is retained with zero membership documents. Source unchanged; no broad suite,
+city replay for the float assertion, email replay, push or production deployment.
+Current readiness pointer remains `output/release-review/multiplayer-candidate.json`
+with the newer hash-bound staging decision. Production promotion is still the
+protected, coordinated release boundary, including the tester activation needs.
