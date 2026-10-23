@@ -363,7 +363,7 @@
   "locks": [
     {
       "path": "package-lock.json",
-      "sha256": "4ba8f778891107cf048e0a69e3168e2ad4bcb52b0d02c9748c5335ee7ba57fd4",
+      "sha256": "b24c8d9874a4ebe62415dfaae7160a8fd683e453c456325c379cca485a413d0a",
       "direct": [
         {
           "package": "@babel/parser",

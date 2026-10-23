@@ -1,4 +1,4 @@
-<!doctype html><html><head><meta charset="utf-8"><title>Harbor waypoint presentation</title><style>body{margin:0}canvas{display:block}</style></head><body><script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script><script type="module">
+<!doctype html><html><head><meta charset="utf-8"><title>Harbor waypoint presentation</title><style>body{margin:0}canvas{display:block}</style></head><body><script src="/app/vendor/three/build/three.min.js"></script><script type="module">
 import {dressHarborWaypoint} from '/app/js/interiors/harbor-waypoint.js';
 const scene=new THREE.Scene(),group=new THREE.Group();scene.add(group);scene.background=new THREE.Color(0xd9d6cd);scene.add(new THREE.HemisphereLight(0xffffff,0x7e7a67,1));
 const materials=Object.fromEntries(['roomMaterial','corridorMaterial','wallMaterial','accentWallMaterial'].map(k=>[k,new THREE.MeshStandardMaterial()]));
