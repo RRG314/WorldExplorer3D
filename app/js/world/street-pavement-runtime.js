@@ -72,7 +72,7 @@ export async function publishStreetPavement(appCtx, options = {}) {
   let partitionSurface = null;
   const profileCache=new Map();
   if (appCtx.onMoon || !appCtx.scene || !appCtx.terrainEnabled) return null;
-  if(appCtx.streetOverview){const sequence=appCtx._worldLoadSequence;await appCtx.streetOverview.suspendForDetail();if(sequence!==appCtx._worldLoadSequence)return null;}
+  if(appCtx.streetOverview&&!(appCtx.worldLoading&&appCtx.streetOverview.initialPreparationPending)){const sequence=appCtx._worldLoadSequence;await appCtx.streetOverview.suspendForDetail();if(sequence!==appCtx._worldLoadSequence)return null;}
   appCtx._cancelStreetPavementBuild?.();
   const startedAt = performance.now();
   const trace = (phase, detail={}) => { if(new URLSearchParams(location.search).has('streetDiagnostics')) console.info('[StreetPavement]', phase, JSON.stringify(detail)); };
@@ -536,6 +536,19 @@ export function prepareStreetOverviewMaterials(appCtx) {
   appCtx.streetOverview ||= createStreetOverview(appCtx,{onComplete:bounds=>refreshMappedPaths(appCtx,bounds)});
 }
 
+// Building-constrained widths and structure classification are now final, but
+// vertical terrain/mesh construction can continue independently. The existing
+// overview owns its worker and mask; mapped-path contacts still wait for the
+// normal final loading handoff below.
+export function beginInitialStreetCoverage(appCtx,current) {
+  if(!current()||!appCtx.worldLoading||!appCtx.terrainEnabled||!appCtx.scene)return null;
+  if(appCtx.onMoon||appCtx.onMars||appCtx.activePlanetaryBodyId||appCtx.activeShipInterior)return null;
+  appCtx.streetOverview ||= createStreetOverview(appCtx,{deferPresentation:true,onComplete:bounds=>refreshMappedPaths(appCtx,bounds)});
+  const pending=appCtx.streetOverview.prepareInitialCoverage(focusActor(appCtx),{current});
+  pending.catch(()=>{}); // Final preparation observes the owner's failed state.
+  return pending;
+}
+
 export async function ensureInitialStreetPavement(appCtx,current) {
   if(!current())return false;
   if(!appCtx.terrainEnabled||!appCtx.scene||appCtx.onMoon||appCtx.onMars||appCtx.activePlanetaryBodyId||appCtx.activeShipInterior)return true;
@@ -567,5 +580,5 @@ export async function prepareInitialStreetCoverage(appCtx,current) {
     reported=percent;
     appCtx.showLoad?.('',{phase:'prepareLocationScenery',completed,total});
   }});
-  return complete&&await ensureInitialStreetPavement(appCtx,current);
+  return complete&&await appCtx.streetOverview.publishPreparedCoverage({current})&&await ensureInitialStreetPavement(appCtx,current);
 }

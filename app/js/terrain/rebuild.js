@@ -442,10 +442,11 @@ export async function publishCompiledTransportMeshes(deps = {}) {
   if (typeof appCtx.refreshStructureAwareFeatureProfilesCooperatively === "function") {
     await measureAsync(
       'refreshStructureProfiles',
-      () => appCtx.refreshStructureAwareFeatureProfilesCooperatively()
+      () => appCtx.refreshStructureAwareFeatureProfilesCooperatively({onSurfaceFactsReady:deps.onSurfaceFactsReady})
     );
   } else if (typeof appCtx.refreshStructureAwareFeatureProfiles === "function") {
     measure('refreshStructureProfiles', () => appCtx.refreshStructureAwareFeatureProfiles());
+    deps.onSurfaceFactsReady?.();
     await yieldToMainThread();
   }
   assertCurrent();

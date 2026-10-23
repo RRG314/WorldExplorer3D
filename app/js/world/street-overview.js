@@ -5,10 +5,11 @@ import {createPavementTerrainMask,createPavementMaterialBinding} from './pavemen
 // Complete source coverage lives in the terrain material. Raised geometry and
 // walking contact are published separately near the player. Terrain movement
 // cannot bury this distant layer because it is part of the terrain itself.
-export function createStreetOverview(appCtx,{onComplete=()=>{}}={}){
+export function createStreetOverview(appCtx,{onComplete=()=>{},deferPresentation=false}={}){
  const sequence=appCtx._worldLoadSequence,startedAt=performance.now();
  let worker=null,pending=null,active=null,disposed=false,sources=[],prepared=false,coveragePrepared=false,mask=null,stagedMask=null,completedBounds=null,generation=0;
  const completedKeys=new Set();
+ let coverageReady=false,preparedBounds=null,initialTask=null,initialProgress=()=>{},completionTask=null;
  const materialBinding=createPavementMaterialBinding(appCtx);
  // Install one stable shader interface before the first playable render. Cell
  // data and replacement atlases change uniforms, never the terrain program.
@@ -37,7 +38,7 @@ export function createStreetOverview(appCtx,{onComplete=()=>{}}={}){
    }
    if(!prepared||!sourcesMatch()){
      const newSources=!coveragePrepared||!sourcesMatch();
-     if(newSources){completedKeys.clear();coveragePrepared=false;}
+     if(newSources){completedKeys.clear();coveragePrepared=false;coverageReady=false;}
      sources=sourceLists().map(list=>({list,length:list?.length||0}));
      const schedule={current,yieldWork:()=>appCtx.worldLoading?yieldToMainThread():yieldToWorldFrame(),budgetMs:2};
      const input=await streetSourceInputCooperatively(appCtx,()=>true,schedule);
@@ -45,7 +46,7 @@ export function createStreetOverview(appCtx,{onComplete=()=>{}}={}){
      if(!current())return;
      const plan=await request({type:'prepare',completedKeys:[...completedKeys]});if(!current())return;
      if(!coveragePrepared){
-       stagedMask?.dispose();stagedMask=createPavementTerrainMask(appCtx,plan.keys,{materialBinding});
+       stagedMask?.dispose();stagedMask=createPavementTerrainMask(appCtx,plan.keys,{materialBinding,deferUpload:appCtx.worldLoading===true});
        if(stats.totalCells===null){mask.dispose();mask=stagedMask;stagedMask=null;mask.activate();}
        setDetailBounds(appCtx.streetPavement?.coverageBounds);
        Object.assign(stats,{totalCells:plan.tiles,sourceCells:plan.sourceCells,excludedCells:plan.excludedCells,completedCells:0,nonemptyCells:0,coveredSquareWorldUnits:0,
@@ -67,11 +68,23 @@ export function createStreetOverview(appCtx,{onComplete=()=>{}}={}){
    if(stats.completedCells!==stats.totalCells)throw new Error('Location pavement ended before every planned cell was published');
    if(stagedMask){mask?.dispose();mask=stagedMask;stagedMask=null;mask.activate();}
    const l=mask.layout;
-   completedBounds=stats.totalCells?{minX:l.minX*64,maxX:(l.minX+l.lookupWidth)*64,minZ:l.minZ*64,maxZ:(l.minZ+l.lookupHeight)*64}:null;
-   stats.status='finishing';stats.coverageBounds=completedBounds;
+   preparedBounds=stats.totalCells?{minX:l.minX*64,maxX:(l.minX+l.lookupWidth)*64,minZ:l.minZ*64,maxZ:(l.minZ+l.lookupHeight)*64}:null;
    worker?.terminate();worker=null;prepared=false;stats.workerActive=false;
-   stats.materials=mask.syncMaterials();await onComplete(completedBounds);
-   if(current()){stats.status='complete';stats.durationMs=Math.round(performance.now()-startedAt);}
+   mask.finishBulkUpload();coverageReady=true;stats.status='prepared';
+   if(!deferPresentation)await publishPreparedCoverage({current});
+ }
+ async function publishPreparedCoverage({current=()=>true}={}){
+   if(!valid()||!current()||!coverageReady||!sourcesMatch())return false;
+   if(stats.status==='complete')return true;
+   if(completionTask)return completionTask;
+   deferPresentation=false;
+   completionTask=(async()=>{
+     stats.status='finishing';completedBounds=preparedBounds;stats.coverageBounds=completedBounds;
+     stats.materials=mask.syncMaterials();await onComplete(completedBounds);
+     if(!valid()||!current())return false;
+     stats.status='complete';stats.durationMs=Math.round(performance.now()-startedAt);return true;
+   })().finally(()=>{completionTask=null;});
+   return completionTask;
  }
  function step(focus){
    setDetailBounds(appCtx.streetPavement?.coverageBounds);
@@ -79,6 +92,7 @@ export function createStreetOverview(appCtx,{onComplete=()=>{}}={}){
    const now=performance.now();
    if(mask&&now-materialSyncAt>=500){stats.materials=mask.syncMaterials();materialSyncAt=now;}
    if(active)return;
+   if(coverageReady&&sourcesMatch())return;
    if((stats.status==='failed'||stats.status==='complete')&&sourcesMatch())return;
    if(stats.status==='failed'){prepared=false;stats.error=null;}
    stats.status='building';
@@ -104,14 +118,17 @@ export function createStreetOverview(appCtx,{onComplete=()=>{}}={}){
    // Initial coverage belongs to the loading session. During play, the same
    // owner still advances one cell per frame as regional sources change.
    if(!appCtx.worldLoading)throw new Error('Initial pavement preparation requires the loading cover');
-   while(valid()&&current()){
+   initialProgress=onProgress;
+   if(initialTask)return initialTask;
+   initialTask=(async()=>{while(valid()&&current()){
      if(stats.status==='failed')throw new Error(stats.error||'Location pavement preparation failed');
-     if(stats.status==='complete'&&sourcesMatch())return true;
+     if(coverageReady&&sourcesMatch())return true;
      step(focus);await (active||Promise.resolve());
-     if(valid()&&current())onProgress({completed:stats.completedCells,total:stats.totalCells});
+     if(valid()&&current())initialProgress({completed:stats.completedCells,total:stats.totalCells});
    }
-   return false;
+   return false;})().finally(()=>{initialTask=null;});
+   return initialTask;
  }
  function dispose(){disposed=true;generation++;worker?.terminate();pending?.reject(new Error('Overview disposed'));completedKeys.clear();mask?.dispose();stagedMask?.dispose();mask=stagedMask=null;materialBinding.dispose();stats.status='disposed';stats.retainedBytes=0;stats.workerActive=false;}
- return {stats,step,prepareInitialCoverage,setDetailBounds,get completedBounds(){return completedBounds;},pause:()=>active||Promise.resolve(),suspendForDetail,dispose};
+ return {stats,step,prepareInitialCoverage,publishPreparedCoverage,setDetailBounds,get initialPreparationPending(){return deferPresentation;},get completedBounds(){return completedBounds;},pause:()=>active||Promise.resolve(),suspendForDetail,dispose};
 }

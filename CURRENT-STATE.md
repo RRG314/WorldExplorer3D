@@ -6,6 +6,24 @@ production identity authorities; check them before starting new release work.
 The owner has explicitly authorized production, protected stable, both active
 development branches and the release. Do not ask again.
 
+## October 23 authorized coordinated production release (in progress)
+
+The owner now explicitly authorizes deployment once the app's features work.
+This supersedes the prior no-production/push boundary for the coordinated
+release. Preserve protected GitHub checks, existing data/configuration, all
+rollback bytes and evidence. Do not ask again for already-authorized steps.
+
+Start from clean28a4ff64. Production remains security a82ff0ab until the current
+loading/coverage gaps and scoped backend prerequisites are resolved. The active
+execution ledger is `output/research/production-release-2026-10-23/PLAN.md`.
+The cold-start profile retains the complete Baltimore world; its far pavement
+owner compiled all6,009cells in about33seconds. Initial coverage can overlap
+vertical terrain preparation after building constraints and structure semantics
+are final; path/contact publication must still await the normal final handoff.
+Focused ownership/geometry equivalence tests accompany that repair. Earlier
+valid gameplay, room, save and24-hour mail evidence stays retained; no broad
+historical sweep is authorized or required merely by verification edits.
+
 ## October 23 practical gameplay QA authority
 
 Use `docs/verification/GAMEPLAY-QA.md` and the resumable `qa:gameplay:plan` /

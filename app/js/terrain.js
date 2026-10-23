@@ -586,8 +586,8 @@ function validateRoadTerrainConformance() {
   return validateRoadTerrainConformanceInternal({ terrainMeshHeightAt, worldToLatLon });
 }
 
-function publishCompiledTransportMeshesRuntime() {
-  return publishCompiledTransportMeshes(transportPublicationDeps);
+function publishCompiledTransportMeshesRuntime(options = {}) {
+  return publishCompiledTransportMeshes({...transportPublicationDeps,onSurfaceFactsReady:options.onSurfaceFactsReady});
 }
 
 // =====================

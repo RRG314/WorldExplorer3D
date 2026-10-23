@@ -1,6 +1,6 @@
 import {SurfacePublicationError} from './surface-publication-error.js';
 import {selectedPolarSurfaceReady} from './load-terrain-readiness.js?v=2';
-import { publishStreetPavement } from './street-pavement-runtime.js';
+import { publishStreetPavement,beginInitialStreetCoverage } from './street-pavement-runtime.js';
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { appendUpwardRibbonGeometry } from "../road-render.js?v=4";
 import { generateStreetFurniture } from "./furniture.js?v=22";
@@ -87,10 +87,13 @@ export async function finalizeLoadedWorld(options = {}) {
     loadMetrics.waterTerrainMaskDeferredToTransport = true;
   }
   let transportPublication = null;
+  const loadSequence=appCtx._worldLoadSequence;
+  const current=()=>loadSequence===appCtx._worldLoadSequence&&appCtx.worldLoading&&!appCtx.onMoon&&!appCtx.onMars&&
+    (!appCtx.getEnv||!appCtx.ENV||appCtx.getEnv()===appCtx.ENV.EARTH);
   if (appCtx.terrainEnabled && !appCtx.onMoon && typeof appCtx.publishCompiledTransportMeshes === 'function') {
     startLoadPhase('publishCompiledTransportMeshes');
     try {
-      transportPublication = await appCtx.publishCompiledTransportMeshes();
+      transportPublication = await appCtx.publishCompiledTransportMeshes({onSurfaceFactsReady:()=>beginInitialStreetCoverage(appCtx,current)});
     } catch (error) {
       recordWorldLoadWarning(loadMetrics, 'publishCompiledTransportMeshes', error);
       if(error?.name==='AbortError')throw error;

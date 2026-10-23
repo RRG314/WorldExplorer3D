@@ -402,3 +402,24 @@ test('high flight outside the near terrain retains accepted pavement without sta
  ctx.elevationWorldYAtWorldXZ=()=>NaN;updateStreetPavementFocus(ctx);
  assert.equal(ctx.streetPavement,accepted);assert.equal(ctx._streetPavementUpdating,undefined);assert.equal(overviewSteps,2);
 });
+
+test('early initial coverage coalesces its worker and keeps path publication behind the final handoff',async t=>{
+ const h=harness(t);h.ctx.worldLoading=true;let callbacks=0,finishPaths;
+ const overview=createStreetOverview(h.ctx,{deferPresentation:true,onComplete:()=>{callbacks++;return new Promise(resolve=>{finishPaths=resolve;});}});
+ const first=overview.prepareInitialCoverage({x:0,z:0}),second=overview.prepareInitialCoverage({x:0,z:0});
+ assert.equal(await first,true);assert.equal(await second,true);
+ assert.equal(overview.stats.status,'prepared');assert.equal(overview.stats.completedCells,overview.stats.totalCells);
+ assert.equal(callbacks,0);assert.equal(overview.completedBounds,null);assert.equal(h.worker.terminated,true);
+ const published=overview.publishPreparedCoverage();
+ assert.equal(callbacks,1);assert.equal(overview.stats.status,'finishing');
+ finishPaths();assert.equal(await published,true);assert.equal(overview.stats.status,'complete');
+ assert.equal(overview.initialPreparationPending,false);assert.equal(await overview.publishPreparedCoverage(),true);assert.equal(callbacks,1);
+ overview.dispose();
+});
+test('retired prepared coverage cannot publish mapped paths into a replacement world',async t=>{
+ const h=harness(t);h.ctx.worldLoading=true;let calls=0;
+ const overview=createStreetOverview(h.ctx,{deferPresentation:true,onComplete:()=>calls++});
+ await overview.prepareInitialCoverage({x:0,z:0});overview.dispose();
+ assert.equal(await overview.publishPreparedCoverage(),false);assert.equal(calls,0);
+ assert.equal(h.worker.terminated,true);assert.equal(overview.stats.workerActive,false);
+});

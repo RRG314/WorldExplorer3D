@@ -315,7 +315,7 @@ export function applyBuildingContextSemanticsToFeature(feature) {
   if (feature.isStructureConnector === true) feature.isStructureConnector = false;
 }
 
-function* compileStructureAwareFeatureProfileSteps() {
+function* compileStructureAwareFeatureProfileSteps(options = {}) {
   const now = () => globalThis.performance?.now?.() ?? Date.now();
   const compilationStartedAt = now();
   const phaseDurationsMs = Object.create(null);
@@ -339,6 +339,7 @@ function* compileStructureAwareFeatureProfileSteps() {
       transportFeatures[i].tunnelObstructionLimits = compileTunnelObstructionLimits(transportFeatures[i], runtime.getNearbyBuildings);
     }
   });
+  options.onSurfaceFactsReady?.();
   yield;
 
   if (Array.isArray(appCtx.linearFeatureMeshes)) {
@@ -717,11 +718,11 @@ export function refreshStructureAwareFeatureProfiles() {
   return result.value;
 }
 
-export async function refreshStructureAwareFeatureProfilesCooperatively() {
+export async function refreshStructureAwareFeatureProfilesCooperatively(options = {}) {
   const sequence = appCtx._worldLoadSequence;
   const roads = appCtx.roads;
   const groundRelease = appCtx.lastEarthStreamingRelease;
-  const steps = compileStructureAwareFeatureProfileSteps();
+  const steps = compileStructureAwareFeatureProfileSteps(options);
   let result = steps.next();
   while (!result.done) {
     await yieldToMainThread();
