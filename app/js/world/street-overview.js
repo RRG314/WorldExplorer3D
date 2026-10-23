@@ -40,11 +40,19 @@ export function createStreetOverview(appCtx,{onComplete=()=>{},deferPresentation
      const newSources=!coveragePrepared||!sourcesMatch();
      if(newSources){completedKeys.clear();coveragePrepared=false;coverageReady=false;}
      sources=sourceLists().map(list=>({list,length:list?.length||0}));
-     const schedule={current,yieldWork:()=>appCtx.worldLoading?yieldToMainThread():yieldToWorldFrame(),budgetMs:2};
+     const loading=appCtx.worldLoading===true;
+     const schedule={current,yieldWork:()=>loading?yieldToMainThread():yieldToWorldFrame(),budgetMs:loading?8:2};
+     let phaseStarted=performance.now();
      const input=await streetSourceInputCooperatively(appCtx,()=>true,schedule);
-     await sendStreetSourceInChunks(input,request,schedule);
+     stats.sourceSnapshotMs=performance.now()-phaseStarted;phaseStarted=performance.now();
+     // Each acknowledged message already ends the sending task. Under the
+     // loading cover, another scheduler yield lets terrain's continuation run
+     // ahead of every source chunk. Play retains its frame-aware handoff.
+     await sendStreetSourceInChunks(input,request,loading?{current,chunkSize:512}:schedule);
+     stats.sourceTransferMs=performance.now()-phaseStarted;phaseStarted=performance.now();
      if(!current())return;
      const plan=await request({type:'prepare',completedKeys:[...completedKeys]});if(!current())return;
+     stats.sourcePlanMs=performance.now()-phaseStarted;
      if(!coveragePrepared){
        stagedMask?.dispose();stagedMask=createPavementTerrainMask(appCtx,plan.keys,{materialBinding,deferUpload:appCtx.worldLoading===true});
        if(stats.totalCells===null){mask.dispose();mask=stagedMask;stagedMask=null;mask.activate();}

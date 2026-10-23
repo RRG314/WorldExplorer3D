@@ -48,6 +48,17 @@ Source/width/geometry/ownership checks and the next compiled browser measurement
 remain the promotion criteria; these offline timings are not browser acceptance.
 Keep the JSON typed-array capture failure and its corrected producer-based replay.
 
+Compiled03cd9545 retains full coverage and loads in78.652s; it still fails60s.
+Native touch-proxy render59.95FPS and prescribed input pass. Loading source
+transfer now uses acknowledged512-item chunks without a redundant scheduler
+yield; source scans use the existing8ms loading budget, while play retains2ms
+frame-aware scanning and256-item transfers. Cancellation at the final chunk is
+checked before preparation.32focused transfer/owner cases pass; new phase
+counters separate snapshot, transfer and worker planning in the next measurement.
+Normal-browser staging Akureyri search returned two places with no errors;
+Cloud Function logs confirm HTTP200 with App Check not explicitly disabled.
+Protected-service evidence: `normal-browser-place-search.json` in the active ledger.
+
 ## October 23 practical gameplay QA authority
 
 Use `docs/verification/GAMEPLAY-QA.md` and the resumable `qa:gameplay:plan` /

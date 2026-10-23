@@ -55,6 +55,7 @@ export async function sendStreetSourceInChunks(input,request,{current=()=>true,y
     for(let offset=0;offset<input[field].length;offset+=chunkSize){
       if(!current())throw new Error('Street source superseded');
       await request({type:'source-chunk',field,items:input[field].slice(offset,offset+chunkSize)});
+      if(!current())throw new Error('Street source superseded');
       await yieldWork?.();
     }
   }

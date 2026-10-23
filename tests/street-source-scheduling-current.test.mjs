@@ -36,3 +36,14 @@ test('superseded source transfer stops sending without preparing partial coverag
  await assert.rejects(sendStreetSourceInChunks(input,async packet=>{packets.push(packet);},{chunkSize:1,current:()=>current,yieldWork:async()=>{current=false;}}),/superseded/);
  assert.deepEqual(packets.map(p=>p.type),['source-begin','source-chunk']);
 });
+
+test('loading transfer remains acknowledged and rejects cancellation during the final chunk',async()=>{
+ const input={roads:Array.from({length:1025},(_,i)=>({id:i})),buildings:[],landuses:[],linearFeatures:[],metersPerWorldUnit:1};
+ const sizes=[];let current=true,inFlight=false;
+ await assert.rejects(sendStreetSourceInChunks(input,async packet=>{
+  assert.equal(inFlight,false);inFlight=true;await Promise.resolve();
+  if(packet.type==='source-chunk'){sizes.push(packet.items.length);if(sizes.length===3)current=false;}
+  inFlight=false;
+ },{chunkSize:512,current:()=>current}),/superseded/);
+ assert.deepEqual(sizes,[512,512,1]);
+});
