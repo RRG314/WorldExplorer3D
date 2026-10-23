@@ -1,3 +1,4 @@
+import {observationCurrent} from './gameplay-qa/freshness.mjs';
 import fs from 'node:fs/promises';
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
@@ -39,7 +40,7 @@ for(const group of groups){
     const identity=await identityFor(group,id);identities.set(id,identity);
     const receipt=await fs.readFile(output+'/receipts/'+id+'.json','utf8').then(JSON.parse,()=>null);
     const forced=retry&&id===selectedCheck;
-    if(!forced&&await reusableAcceptance(root,receipt,identity)){
+    if(!forced&&observationCurrent(receipt,group.kind)&&await reusableAcceptance(root,receipt,identity)){
       results.push({id,status:'retained',observedAt:receipt.observedAt,evidence:receipt.evidence});
     }else if(!forced&&['failed','blocked'].includes(receipt?.status)&&await reusableAcceptance(root,{...receipt,status:'passed'},identity)){
       // Preserve a diagnosed failure. An unchanged failed check must not keep

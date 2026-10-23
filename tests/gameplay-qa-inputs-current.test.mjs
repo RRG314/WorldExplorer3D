@@ -1,3 +1,4 @@
+import {observationCurrent} from '../scripts/verification/gameplay-qa/freshness.mjs';
 import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs/promises';import os from 'node:os';import path from 'node:path';
 import {gameplayQaInputs} from '../scripts/verification/gameplay-qa/inputs.mjs';
 import {acceptanceInputs,reusableAcceptance,evidenceReference} from '../scripts/verification/acceptance-inputs.mjs';
@@ -10,3 +11,12 @@ test('failed or tampered evidence cannot be reused while an unrelated completed 
 test('CommonJS dependencies, including extensionless nested imports, are part of the actual test inputs',()=>fixture(async root=>{await fs.writeFile(root+'/check.cjs',"require('./owner.cjs');");await fs.writeFile(root+'/owner.cjs',"module.exports=require('./rules');");await fs.writeFile(root+'/rules.js','module.exports=1;');const definition={entries:['check.cjs']},before=await acceptanceInputs(root,definition);assert.ok(before.inputs['rules.js']);await fs.writeFile(root+'/rules.js','module.exports=2;');assert.notEqual((await acceptanceInputs(root,definition)).fingerprint,before.fingerprint);}));
 
 test('directory URL bases do not scan private repository files; explicit declared owners still invalidate results',()=>fixture(async root=>{await fs.writeFile(root+'/check.mjs',"const root=new URL('./',import.meta.url);");await fs.writeFile(root+'/.env','fixture-private');await fs.writeFile(root+'/owner.mjs','export const version=1;');const definition={entries:['check.mjs'],files:['owner.mjs']},before=await acceptanceInputs(root,definition);assert.equal(before.inputs['.env'],undefined);await fs.writeFile(root+'/owner.mjs','export const version=2;');assert.notEqual((await acceptanceInputs(root,definition)).fingerprint,before.fingerprint);}));
+
+test('browser successes expire after a week while source-bound component results and diagnosed failures remain retained',()=>{
+ const now=Date.parse('2026-10-23T12:00:00Z'),at=age=>new Date(now-age*86400000).toISOString();
+ assert.equal(observationCurrent({status:'passed',observedAt:at(1)},'browser',now),true);
+ assert.equal(observationCurrent({status:'passed',observedAt:at(8)},'browser',now),false);
+ assert.equal(observationCurrent({status:'passed',observedAt:'invalid'},'browser',now),false);
+ assert.equal(observationCurrent({status:'failed',observedAt:at(8)},'browser',now),true);
+ assert.equal(observationCurrent({status:'passed',observedAt:at(8)},'unit',now),true);
+});

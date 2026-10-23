@@ -1,10 +1,41 @@
 # Current development and release state
 
-Updated October 23, 2026 for 5.6.1 security maintenance. The live build manifest at
+Updated October 23, 2026 for gameplay QA and 5.6.1 security maintenance. The live build manifest at
 https://worldexplorer3d.io/build-manifest.json and the GitHub release are the
 production identity authorities; check them before starting new release work.
 The owner has explicitly authorized production, protected stable, both active
 development branches and the release. Do not ask again.
+
+## October 23 practical gameplay QA authority
+
+Use `docs/verification/GAMEPLAY-QA.md` and the resumable `qa:gameplay:plan` /
+`qa:gameplay:report` commands for routine gameplay checks. Do not restart the
+historical full release matrix for unrelated edits. Detailed current results:
+`docs/verification/2026-10-23-GAMEPLAY-QA.md`; operational receipts and retained
+failures: `output/research/gameplay-qa-2026-10-23/`.
+
+Fresh Moon/Mars entry no longer depends on first loading Earth. Runtime fix
+`a674b568a395` is active on existing staging as
+`5.6.1+a674b568a395.e9acda64f8514624.staging`, Hosting `b26fd8f4ca5e3d66`.
+Production remains the security build below. The staging package is
+`output/hosting-validation/gameplay-qa-20261023-staging`; no production features,
+backend, rules, Auth or player data were changed by this QA task.
+
+Desktop street gameplay measured 45.8 FPS; desktop touch proxy and ocean 60 FPS.
+Mobile proxy cold startup was 90.6 seconds against the existing 60-second target
+and remains a failed receipt. Physical phones/Safari and fresh protected-service
+attestation remain unqualified. This is not blanket mobile/production sign-off.
+The next separate performance work is cold-start profiling and the affected
+loading-path improvement, followed by that case and physical-device checks.
+
+The unchanged default QA command retains completed work and the known failure
+without opening another world. Retained source/evidence reviews distinguish
+actual hosted gameplay, controlled browser components and earlier unchanged
+multiplayer/email journeys. Four package slots remain: the redundant isolated
+security staging pair is recoverable from
+`output/hosting-validation/superseded-manifests/gameplay-qa-security-pair-20261023/recovery.json`.
+Preserve its security production basis, the multiplayer basis, current dist and
+all released rollback packages.
 
 ## October 23 security authority and current production
 

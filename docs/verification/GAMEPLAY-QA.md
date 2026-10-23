@@ -12,6 +12,8 @@ npm run qa:gameplay -- --group earth --check earth-driving
 
 `config/gameplay-qa.json` declares the current feature groups. A run retains matching evidence and starts only missing or changed cases. Browser journeys share setup within their group, then execute only selected pending assertions. Earth setup is a real city load; an isolated settings, ocean, planetary, save or sensor check does not load a city. Component groups are small, sequential Node tests.
 
+Successful browser observations expire after seven days even when source is unchanged. Source-bound component results remain reusable; this does not automatically refresh or certify live-service data.
+
 Failures are retained too. Diagnose the saved log/state/screenshot first, then explicitly retry one failed check:
 
 ```sh

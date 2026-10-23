@@ -1,3 +1,4 @@
+import {observationCurrent} from './freshness.mjs';
 import fs from 'node:fs/promises';
 import {createHash} from 'node:crypto';
 import {execFileSync} from 'node:child_process';
@@ -18,7 +19,7 @@ for(const group of manifest.groups){
    identity.fingerprint=createHash('sha256').update(JSON.stringify({source:identity.fingerprint,environment:identity.environment})).digest('hex');
   }
   const valid=await reusableAcceptance(root,{...receipt,status:'passed'},identity);
-  cases.push({id,status:valid?receipt.status:'stale-evidence',observedAt:receipt.observedAt,
+  cases.push({id,status:valid?(observationCurrent(receipt,group.kind)?receipt.status:'expired-evidence'):'stale-evidence',observedAt:receipt.observedAt,
    failure:receipt.failure,details:receipt.details,evidence:receipt.evidence,
    targetObserved:receipt.targetObserved,retentionReview:receipt.retentionReview});
  }
