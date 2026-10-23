@@ -1,7 +1,7 @@
 <!doctype html><html lang="en"><meta charset="utf-8"><title>Street marking depth verification</title>
 <style>body{background:#15202b;color:white;font:14px system-ui}pre{white-space:pre-wrap}</style>
 <h1>Street marking depth verification</h1><p>Actual road and crossing materials, road-triangle projection, and low-to-high camera angles.</p><pre id="result">Running</pre>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script><script type="module">
+<script src="/app/vendor/three/build/three.min.js"></script><script type="module">
 import {createRoadSurfaceMaterials,createRoadMarkingMaterial} from '../../app/js/road-render.js?v=4';
 import {createRoadContactIndex} from '../../app/js/terrain/road-contact-index.js?v=1';
 const renderer=new THREE.WebGLRenderer({antialias:false});renderer.setSize(256,256);renderer.setPixelRatio(1);document.body.append(renderer.domElement);

@@ -31,3 +31,9 @@ public Firebase configuration exceptions from hiding private credentials.
 Dependabot changes require review and the protected branch's checks; they do not
 automatically merge or deploy. Audit results identify known advisories and do
 not establish that software is free of vulnerabilities.
+
+Local preview servers accept their configured local Host and Origin only. They
+deny hidden files, dependency directories, operational output and symlinks that
+escape the selected root or reach protected files. Error responses contain no
+stack traces. Their HTTP regression checks use synthetic files and own their
+server processes.

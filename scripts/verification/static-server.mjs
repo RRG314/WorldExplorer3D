@@ -4,6 +4,7 @@ import http from 'node:http';
 import net from 'node:net';
 import path from 'node:path';
 import { serveMutableSourceManifest } from '../source-preview-manifest.mjs';
+import { assertPreviewRequest, resolvePreviewFile } from '../lib/local-preview-security.mjs';
 
 const MIME = Object.freeze({
   '.css': 'text/css; charset=utf-8',
@@ -20,15 +21,12 @@ const MIME = Object.freeze({
   '.webp': 'image/webp'
 });
 
-function containedBy(root, candidate) {
-  const relative = path.relative(root, candidate);
-  return relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative));
-}
-
 async function listen(rootDir, host, port) {
   const sockets = new Set();
   const server = http.createServer(async (request, response) => {
     try {
+      assertPreviewRequest(request, server.address().port, host);
+      response.setHeader('X-Content-Type-Options', 'nosniff');
       const requestUrl = new URL(request.url || '/', `http://${host}:${port}`);
       if(await servePlaceLookupPreview(request,response,requestUrl))return;
       // Match the local preview's read-only backend route. A static 404 here
@@ -55,16 +53,8 @@ async function listen(rootDir, host, port) {
         rootDir,
         response
       })) return;
-      const pathname = decodeURIComponent(requestUrl.pathname === '/' ? '/index.html' : requestUrl.pathname);
-      let filePath = path.resolve(rootDir, `.${pathname}`);
-      if (!containedBy(rootDir, filePath)) {
-        response.writeHead(403).end('forbidden');
-        return;
-      }
-      const initialStat = await fs.stat(filePath).catch(() => null);
-      if (initialStat?.isDirectory()) filePath = path.join(filePath, 'index.html');
-      const stat = await fs.stat(filePath).catch(() => null);
-      if (!stat?.isFile()) {
+      const filePath = await resolvePreviewFile(rootDir, requestUrl.pathname);
+      if (!filePath) {
         response.writeHead(404).end('not found');
         return;
       }
@@ -73,7 +63,8 @@ async function listen(rootDir, host, port) {
       });
       response.end(await fs.readFile(filePath));
     } catch (error) {
-      response.writeHead(500).end(String(error?.message || error));
+      response.writeHead([400,403].includes(error.statusCode) ? error.statusCode : 500)
+        .end(error.statusCode === 403 ? 'forbidden' : error.statusCode === 400 ? 'invalid request' : 'preview request failed');
     }
   });
   server.on('connection', (socket) => {
@@ -85,7 +76,7 @@ async function listen(rootDir, host, port) {
     server.listen(port, host, resolve);
   });
   return {
-    port,
+    port: server.address().port,
     close: () => new Promise((resolve) => {
       for (const socket of sockets) if (socket instanceof net.Socket) socket.destroy();
       server.closeIdleConnections?.();

@@ -1,7 +1,7 @@
 <!doctype html><html lang="en"><meta charset="utf-8"><title>Pavement terrain pixel verification</title>
 <style>body{background:#15202b;color:#fff;font:14px system-ui}pre{white-space:pre-wrap}canvas{width:384px;height:384px;image-rendering:pixelated}</style>
 <h1>Pavement terrain pixel verification</h1><p>Checks rendered footprint edges, a courtyard hole, detail-window masking, terrain movement and material cleanup.</p><pre id="result">Running</pre>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script><script type="module">
+<script src="/app/vendor/three/build/three.min.js"></script><script type="module">
 import {createPavementTerrainMask} from '../../app/js/world/pavement-terrain-mask.js';
 import {rasterizePavementMask} from '../../app/js/world/compiler/pavement-mask.js';
 const renderer=new THREE.WebGLRenderer({antialias:false});renderer.setSize(64,64);renderer.setPixelRatio(1);renderer.outputEncoding=THREE.LinearEncoding;document.body.append(renderer.domElement);

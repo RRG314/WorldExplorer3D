@@ -1,7 +1,7 @@
 <!doctype html><html lang="en"><meta charset="utf-8"><title>Street layer visibility check</title>
 <style>body{margin:0;background:#202830;color:white;font:14px system-ui}#report{position:absolute;left:8px;top:8px;background:#101921dd;padding:12px;max-width:410px;max-height:90vh;overflow:auto;white-space:pre-wrap}button{padding:8px}</style>
 <div id="report"><button id="run">Run camera sweep</button><pre id="result">Ready</pre></div>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script><script type="module">
+<script src="/app/vendor/three/build/three.min.js"></script><script type="module">
 import {hardscapeMaterialOptions} from '../../app/js/world/load-landuse-pass.js';
 import {surfaceComposition} from '../../app/js/world/surface-contract.js?v=16';
 const renderer=new THREE.WebGLRenderer({antialias:false,preserveDrawingBuffer:true});renderer.setSize(800,600);document.body.append(renderer.domElement);
