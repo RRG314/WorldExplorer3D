@@ -440,6 +440,14 @@ test('initial readiness retries retired terrain work before exposing gameplay',a
  assert.equal(h.resources.length,resources,'accepted initial coverage is reused');h.ctx.streetPavement.dispose();
 });
 
+test('initial readiness replaces an accepted window when the admitted arrival lies outside it',async t=>{
+ const h=harness(t);h.ctx.worldLoading=true;
+ assert.equal(await ensureInitialStreetPavement(h.ctx,()=>true),true);const previous=h.ctx.streetPavement;
+ h.ctx.car.x=1024;
+ assert.equal(await ensureInitialStreetPavement(h.ctx,()=>true),true);assert.notEqual(h.ctx.streetPavement,previous);
+ const bounds=h.ctx.streetPavement.coverageBounds;assert.ok(h.ctx.car.x>=bounds.minX+128&&h.ctx.car.x<=bounds.maxX-128);h.ctx.streetPavement.dispose();
+});
+
 test('initial readiness does not retry a superseded world or claim endlessly changing terrain is ready',async t=>{
  const h=harness(t);h.ctx.worldLoading=true;let current=true;
  h.ctx.terrainMeshHeightAt=()=>{current=false;markGroundSurfaceChanged(h.ctx);return 14;};

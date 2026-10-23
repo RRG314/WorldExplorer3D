@@ -10,6 +10,7 @@ export function createStreetOverview(appCtx,{onComplete=()=>{},deferPresentation
  let worker=null,pending=null,active=null,disposed=false,sources=[],prepared=false,coveragePrepared=false,mask=null,stagedMask=null,completedBounds=null,generation=0;
  const completedKeys=new Set();
  let coverageReady=false,preparedBounds=null,initialTask=null,initialProgress=()=>{},completionTask=null;
+ let plannedKeys=[],initialKeys=[],initialBounds=null,initialFocus={x:0,z:0};
  const materialBinding=createPavementMaterialBinding(appCtx);
  // Install one stable shader interface before the first playable render. Cell
  // data and replacement atlases change uniforms, never the terrain program.
@@ -20,6 +21,16 @@ export function createStreetOverview(appCtx,{onComplete=()=>{},deferPresentation
  const valid=()=>!disposed&&sequence===appCtx._worldLoadSequence&&!appCtx.onMoon;
  const stats={status:'waiting',representation:'terrain material coverage',completedCells:0,totalCells:null,nonemptyCells:0,coveredSquareWorldUnits:0,
    positionBytes:0,retainedBytes:0,drawCalls:0,workerActive:false,sourceScope:'complete loaded location',error:null};
+ function selectInitialKeys(){
+   initialKeys=initialBounds?plannedKeys.filter(key=>{const[x,z]=key.split(':').map(Number);return x*64<initialBounds.maxX&&(x+1)*64>initialBounds.minX&&z*64<initialBounds.maxZ&&(z+1)*64>initialBounds.minZ;}):plannedKeys;
+ }
+ function initialStatus(){
+   const total=stats.totalCells===null?null:initialBounds?initialKeys.length:stats.totalCells;
+   const completed=initialBounds?initialKeys.reduce((n,key)=>n+Number(completedKeys.has(key)),0):stats.completedCells;
+   Object.assign(stats,{initialTotalCells:total,initialCompletedCells:completed,initialScope:initialBounds?'nearby detail and border':'complete loaded location'});
+   return {completed,total};
+ }
+ function initialSufficient(){const p=initialStatus();return coveragePrepared&&sourcesMatch()&&p.total!==null&&p.completed===p.total;}
  const request=data=>new Promise((resolve,reject)=>{
    const timer=setTimeout(()=>{pending=null;reject(new Error('Overview cell exceeded 15 seconds'));},15000);
    pending={resolve:value=>{clearTimeout(timer);pending=null;resolve(value);},reject:error=>{clearTimeout(timer);pending=null;reject(error);}};
@@ -53,6 +64,7 @@ export function createStreetOverview(appCtx,{onComplete=()=>{},deferPresentation
      if(!current())return;
      const plan=await request({type:'prepare',completedKeys:[...completedKeys]});if(!current())return;
      stats.sourcePlanMs=performance.now()-phaseStarted;
+     plannedKeys=plan.keys;selectInitialKeys();
      if(!coveragePrepared){
        stagedMask?.dispose();stagedMask=createPavementTerrainMask(appCtx,plan.keys,{materialBinding,deferUpload:appCtx.worldLoading===true});
        if(stats.totalCells===null){mask.dispose();mask=stagedMask;stagedMask=null;mask.activate();}
@@ -74,6 +86,7 @@ export function createStreetOverview(appCtx,{onComplete=()=>{},deferPresentation
    }
    stats.uploads={...target.uploadStats};
    stats.workerPackets=(stats.workerPackets||0)+1;stats.workerMs=(stats.workerMs||0)+(packet.workMs||0);
+   initialStatus();
    if(!packet.remaining)await complete(current);
  }
  async function complete(current){
@@ -92,11 +105,24 @@ export function createStreetOverview(appCtx,{onComplete=()=>{},deferPresentation
    deferPresentation=false;
    completionTask=(async()=>{
      stats.status='finishing';completedBounds=preparedBounds;stats.coverageBounds=completedBounds;
-     stats.materials=mask.syncMaterials();await onComplete(completedBounds);
+     stats.materials=mask.syncMaterials();
+     try{await onComplete(completedBounds,{current:()=>valid()&&current()});}
+     catch(error){if(!valid()||!current())return false;throw error;}
      if(!valid()||!current())return false;
      stats.status='complete';stats.durationMs=Math.round(performance.now()-startedAt);return true;
    })().finally(()=>{completionTask=null;});
    return completionTask;
+ }
+ async function publishInitialCoverage({current=()=>true}={}){
+   if(!appCtx.worldLoading)throw new Error('Initial coverage publication requires the loading cover');
+   if(!valid()||!current()||stats.status==='failed'||!initialSufficient())return false;
+   if(stagedMask){mask?.dispose();mask=stagedMask;stagedMask=null;mask.activate();completedBounds=null;stats.coverageBounds=null;}
+   mask.finishBulkUpload();stats.materials=mask.syncMaterials();deferPresentation=false;
+   stats.initialReady=true;stats.initialBounds=initialBounds;
+   return coverageReady?publishPreparedCoverage({current}):true;
+ }
+ function runOwned(task,run){
+   active=task().catch(error=>{if(valid()&&run===generation){stats.status='failed';stats.error=String(error.message);worker?.terminate();worker=null;stats.workerActive=false;}}).finally(()=>{if(run===generation)active=null;});
  }
  function step(focus){
    setDetailBounds(appCtx.streetPavement?.coverageBounds);
@@ -104,7 +130,10 @@ export function createStreetOverview(appCtx,{onComplete=()=>{},deferPresentation
    const now=performance.now();
    if(mask&&now-materialSyncAt>=500){stats.materials=mask.syncMaterials();materialSyncAt=now;}
    if(active)return;
-   if(coverageReady&&sourcesMatch())return;
+   if(coverageReady&&sourcesMatch()){
+     if(!deferPresentation&&stats.status!=='complete'){const run=++generation;runOwned(()=>publishPreparedCoverage({current:()=>valid()&&run===generation&&sourcesMatch()}),run);}
+     return;
+   }
    if((stats.status==='failed'||stats.status==='complete')&&sourcesMatch())return;
    if(stats.status==='failed'){prepared=false;stats.error=null;}
    stats.status='building';
@@ -112,7 +141,7 @@ export function createStreetOverview(appCtx,{onComplete=()=>{},deferPresentation
    const point={x:coordinate(focus?.x),z:coordinate(focus?.z)};
    // At most one acknowledged cell per rendered frame, never an 80 ms burst.
    const run=++generation;
-   active=advance(point,run).catch(error=>{if(valid()&&run===generation){stats.status='failed';stats.error=String(error.message);worker?.terminate();worker=null;stats.workerActive=false;}}).finally(()=>{if(run===generation)active=null;});
+   runOwned(()=>advance(point,run),run);
  }
  function suspendForDetail(){
    // A source scan/worker preparation is not a single cell. Waiting for that
@@ -126,21 +155,26 @@ export function createStreetOverview(appCtx,{onComplete=()=>{},deferPresentation
    if(valid())stats.status='suspended';
    return Promise.resolve();
  }
- async function prepareInitialCoverage(focus,{current=()=>true,onProgress=()=>{}}={}){
+ async function prepareInitialCoverage(focus,{current=()=>true,onProgress=()=>{},requiredBounds}={}){
    // Initial coverage belongs to the loading session. During play, the same
    // owner still advances one cell per frame as regional sources change.
    if(!appCtx.worldLoading)throw new Error('Initial pavement preparation requires the loading cover');
+   if(requiredBounds!==undefined){
+     if(requiredBounds!==null&&(!['minX','maxX','minZ','maxZ'].every(key=>Number.isFinite(requiredBounds[key]))||requiredBounds.minX>=requiredBounds.maxX||requiredBounds.minZ>=requiredBounds.maxZ))throw new RangeError('Initial coverage requires finite ordered bounds');
+     initialBounds=requiredBounds===null?null:{...requiredBounds};selectInitialKeys();
+   }
+   initialFocus={x:Number.isFinite(focus?.x)?focus.x:0,z:Number.isFinite(focus?.z)?focus.z:0};
    initialProgress=onProgress;
    if(initialTask)return initialTask;
    initialTask=(async()=>{while(valid()&&current()){
      if(stats.status==='failed')throw new Error(stats.error||'Location pavement preparation failed');
-     if(coverageReady&&sourcesMatch())return true;
-     step(focus);await (active||Promise.resolve());
-     if(valid()&&current())initialProgress({completed:stats.completedCells,total:stats.totalCells});
+     if(initialSufficient())return true;
+     step(initialFocus);await (active||Promise.resolve());
+     if(valid()&&current())initialProgress(initialStatus());
    }
    return false;})().finally(()=>{initialTask=null;});
    return initialTask;
  }
- function dispose(){disposed=true;generation++;worker?.terminate();pending?.reject(new Error('Overview disposed'));completedKeys.clear();mask?.dispose();stagedMask?.dispose();mask=stagedMask=null;materialBinding.dispose();stats.status='disposed';stats.retainedBytes=0;stats.workerActive=false;}
- return {stats,step,prepareInitialCoverage,publishPreparedCoverage,setDetailBounds,get initialPreparationPending(){return deferPresentation;},get completedBounds(){return completedBounds;},pause:()=>active||Promise.resolve(),suspendForDetail,dispose};
+ function dispose(){disposed=true;generation++;worker?.terminate();pending?.reject(new Error('Overview disposed'));completedKeys.clear();plannedKeys=[];initialKeys=[];mask?.dispose();stagedMask?.dispose();mask=stagedMask=null;materialBinding.dispose();stats.status='disposed';stats.retainedBytes=0;stats.workerActive=false;}
+ return {stats,step,prepareInitialCoverage,publishInitialCoverage,publishPreparedCoverage,setDetailBounds,get initialPreparationPending(){return deferPresentation;},get completedBounds(){return completedBounds;},pause:()=>active||Promise.resolve(),suspendForDetail,dispose};
 }

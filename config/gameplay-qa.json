@@ -97,9 +97,11 @@
       "module": "scripts/verification/gameplay-qa/mobile.mjs",
       "checks": [
         "mobile-load",
+        "mobile-background-world-return",
         "mobile-walk-look",
         "mobile-drive-rotate",
-        "mobile-native-proxy-performance"
+        "mobile-native-proxy-performance",
+        "mobile-regional-coverage"
       ],
       "timeoutMs": 420000,
       "files": [
@@ -117,7 +119,10 @@
         "app/js/living-world",
         "app/js/interiors",
         "app/js/geospatial"
-      ]
+      ],
+      "checkFiles": {
+        "mobile-background-world-return": ["app/js/session-coordinator.js", "app/js/earth-session.js", "app/js/sky.js", "app/js/planetary"]
+      }
     },
     {
       "id": "ocean",

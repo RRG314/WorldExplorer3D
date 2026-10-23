@@ -9,6 +9,9 @@ import {createPavementBaseSampler} from '../app/js/world/pavement-height-sampler
 import {indexPavementPositions} from '../app/js/world/pavement-indexed-mesh.js';
 import {createPavementBatch,createPavementBatchContacts} from '../app/js/world/pavement-batch-ownership.js';
 import {createRoadContactIndex} from '../app/js/terrain/road-contact-index.js?v=1';
+import{ctx as sessionContext}from'../app/js/shared-context.js?v=55';
+import{ENV,getEnv}from'../app/js/env.js?v=58';
+import{beginEnvironmentTransition,cancelEnvironmentTransition,commitEnvironment}from'../app/js/session-coordinator.js?v=2';
 
 test('batch leases retain geometry and walking contact together through cancellation and handover',()=>{
  const counts={geometry:0,contact:0,removed:0},material={},surfaceOwner={};
@@ -231,6 +234,36 @@ test('initial coverage accepts an empty plan without inventing cells',async t=>{
  assert.equal(await overview.prepareInitialCoverage({x:0,z:0}),true);
  assert.equal(overview.stats.totalCells,0);assert.equal(overview.stats.completedCells,0);assert.equal(bounds,null);
  overview.dispose();
+});
+
+test('nearby startup publishes an initial domain and completes the unchanged regional plan through frames',async t=>{
+ const h=harness(t);h.ctx.worldLoading=true;let callbacks=0;
+ const overview=createStreetOverview(h.ctx,{deferPresentation:true,onComplete:()=>{callbacks++;}});
+ assert.equal(await overview.prepareInitialCoverage({x:0,z:0},{requiredBounds:{minX:0,minZ:0,maxX:64,maxZ:64}}),true);
+ assert.equal(overview.stats.completedCells,1);assert.equal(overview.stats.totalCells,2);assert.equal(overview.stats.workerActive,true);assert.equal(callbacks,0);
+ assert.equal(await overview.publishPreparedCoverage(),false,'partial coverage cannot claim the full publication');
+ assert.equal(await overview.publishInitialCoverage(),true);assert.equal(overview.stats.initialReady,true);assert.equal(overview.completedBounds,null);assert.equal(overview.initialPreparationPending,false);
+ h.ctx.worldLoading=false;overview.step({x:1024,z:0});await overview.pause();
+ assert.equal(overview.stats.status,'complete');assert.equal(overview.stats.completedCells,2);assert.equal(overview.stats.coveredSquareWorldUnits,8192);assert.equal(callbacks,1);assert.equal(overview.stats.workerActive,false);assert.equal(overview.stats.uploads.cells,1,'post-startup cells resume incremental GPU uploads');overview.dispose();
+});
+
+test('suspending final path publication resumes that handoff without recompiling accepted cells',async t=>{
+ const h=harness(t);h.ctx.worldLoading=true;let finish,callbacks=0,ownership;
+ const overview=createStreetOverview(h.ctx,{deferPresentation:true,onComplete:async(_bounds,{current})=>{callbacks++;ownership=current;if(callbacks===1){await new Promise(resolve=>{finish=resolve;});if(!current())throw Error('Path construction superseded');}}});
+ await overview.prepareInitialCoverage({x:0,z:0},{requiredBounds:{minX:0,minZ:0,maxX:64,maxZ:64}});await overview.publishInitialCoverage();h.ctx.worldLoading=false;
+ overview.step({x:1024,z:0});const pending=overview.pause();for(let i=0;i<20&&!finish;i++)await new Promise(resolve=>setImmediate(resolve));
+ assert.equal(overview.stats.status,'finishing');await overview.suspendForDetail();assert.equal(ownership(),false);finish();await pending;
+ const calls=h.calls;assert.equal(overview.stats.status,'suspended');overview.step({x:0,z:0});await overview.pause();
+ assert.equal(overview.stats.status,'complete');assert.equal(callbacks,2);assert.equal(h.calls,calls,'only the cancelled final handoff is repeated');assert.equal(overview.stats.completedCells,2);overview.dispose();
+});
+
+test('environment requests retire unfinished Earth work before preparing another view',()=>{
+ commitEnvironment(ENV.EARTH,{source:'street_owner_setup'});
+ assert.equal(getEnv(),ENV.EARTH);let stopped=0,cancelled=0;
+ const names=['streetOverview','streetPavement','_cancelStreetPavementBuild','worldLoading'],saved=new Map(names.map(k=>[k,Object.getOwnPropertyDescriptor(sessionContext,k)]));
+ const accepted={};sessionContext.worldLoading=false;sessionContext.streetPavement=accepted;sessionContext.streetOverview={stats:{status:'building'},suspendForDetail(){stopped++;this.stats.status='suspended';return Promise.resolve();}};sessionContext._cancelStreetPavementBuild=()=>{cancelled++;};
+ try{const token=beginEnvironmentTransition(ENV.MOON,{source:'street_owner_test'});assert.equal(stopped,1);assert.equal(cancelled,1);assert.equal(sessionContext.streetPavement,accepted);cancelEnvironmentTransition(token,'test-complete');}
+ finally{for(const[k,d]of saved)if(d)Object.defineProperty(sessionContext,k,d);else delete sessionContext[k];}
 });
 
 test('cancelled initial coverage cannot advance a new loading screen or restart a retired worker',async t=>{

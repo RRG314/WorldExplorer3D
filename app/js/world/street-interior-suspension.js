@@ -10,8 +10,7 @@ export function cancelUnfinishedStreetDetail(ctx) {
   return true;
 }
 
-export function suspendStreetPreparationForInterior(ctx) {
-  if (!ctx.activeInterior && !ctx.activeShipInterior) return false;
+export function suspendEarthStreetPreparation(ctx) {
   // Accepted pavement and its coverage atlas remain owned by this Earth world.
   // Only unfinished preparation is retired while an interior owns the view.
   const overview = ctx.streetOverview;
@@ -19,5 +18,10 @@ export function suspendStreetPreparationForInterior(ctx) {
     void overview.suspendForDetail();
   }
   cancelUnfinishedStreetDetail(ctx);
+}
+
+export function suspendStreetPreparationForInterior(ctx) {
+  if (!ctx.activeInterior && !ctx.activeShipInterior) return false;
+  suspendEarthStreetPreparation(ctx);
   return true;
 }

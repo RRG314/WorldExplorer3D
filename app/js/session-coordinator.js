@@ -2,6 +2,7 @@ import { clearEarthInteractionPresentation } from './interaction/earth-presentat
 import { ctx as appCtx } from './shared-context.js?v=55';
 import { ENV, getEnv, switchEnv } from './env.js?v=58';
 import { createLifecycleScope, getLifecycleRegistrySnapshot } from './runtime/lifecycle-scope.js?v=2';
+import {suspendEarthStreetPreparation} from './world/street-interior-suspension.js';
 
 const environmentAdapters = new Map();
 let transitionSequence = 0;
@@ -53,6 +54,9 @@ function cancelEnvironmentTransition(token = activeTransition, reason = 'superse
 
 function beginEnvironmentTransition(target, options = {}) {
   if (!validEnvironment(target)) throw new Error(`Unknown environment: ${target}`);
+  // Initial construction retains its loading-session cancellation. Once play
+  // is admitted, retire background Earth work before another view prepares.
+  if(getEnv()===ENV.EARTH&&target!==ENV.EARTH&&!appCtx.worldLoading)suspendEarthStreetPreparation(appCtx);
   if (activeTransition) cancelEnvironmentTransition(activeTransition, 'superseded');
   sessionAbort.abort('environment-requested');
   appCtx.cancelWaterEnvironmentEvidence?.();

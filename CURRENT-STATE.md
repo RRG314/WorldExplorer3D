@@ -8,6 +8,23 @@ development branches and the release. Do not ask again.
 
 ## October 23 authorized coordinated production release (in progress)
 
+Current in-progress change: starting-area readiness replaces the full distant
+pavement gate. Accepted terrain/roads and nearby contacts plus their mask border
+remain required before play. Full selected-area coverage continues through the
+existing frame owner; full publication has a separate completion state. Earth
+environment requests retire unfinished source work and preserve accepted cells;
+cancelled mapped-path handoff resumes without recompiling them. Initial near
+coverage must contain the admitted actor.78of79first owner checks passed; the
+remaining test incorrectly assumed an initialized environment. After correcting
+that fixture, all4focused new domain/arrival/suspension cases passed. Failures are
+retained. Next: the updated single-session mobile check, including Moon return
+and complete regional coverage. This change is not yet browser-qualified.
+
+The earlier9ed7ce8d full-region-gated pilot loaded in86.179s, including13.9s
+regional-ground wait; native frames/input passed. The updated QA contract records
+the original60s whole-start target, enforces45s post-data preparation/90s whole
+startup, then verifies all6,009 regional cells separately. See current QA docs.
+
 The owner now explicitly authorizes deployment once the app's features work.
 This supersedes the prior no-production/push boundary for the coordinated
 release. Preserve protected GitHub checks, existing data/configuration, all

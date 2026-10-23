@@ -31,6 +31,7 @@ Each attempt has its own directory, command, log, source identity and result. `r
 - Shell, responsive settings and preference persistence.
 - Earth walking/camera, map/pause input release, driving/braking, Backpack/Journal, drone/aircraft, ship and Moon return.
 - Touch walking/look/driving, rotation/layout and native renderer-frame timing.
+- Starting-area publication, unfinished Earth work across Moon return, and eventual complete selected-area pavement in that same session.
 - Ocean guided research entry, deck walking/map, submarine, scuba and recovery.
 - Current visible Space shortcut, course selection, assist/manual control and fresh Mars entry.
 - Native IndexedDB saves across tabs/reload/failure/undo; interior editor desktop/phone layout and actual 3D output.
@@ -39,5 +40,9 @@ Each attempt has its own directory, command, log, source identity and result. `r
 Use existing proven multiplayer and 24-hour tester-email service evidence while their code/configuration remains unchanged. Do not send another series of real emails or create more accounts merely to rerun unrelated movement checks. Record their source/build and any limits separately. Mini-game component contracts and older UI evidence do not imply newly tested complete mini-game gameplay after shared controller changes.
 
 Performance counts changes to the actual renderer frame counter, not every browser animation callback. Existing gameplay budgets remain authoritative: desktop at least 30 FPS with p95 <=35 ms and p99 <=50 ms; mobile proxy at least 30 FPS with p95 <=50 ms and p99 <=100 ms; no >250 ms stalls in the sampled window. Keep loading time separate. A short desktop touch-emulation sample is not physical-phone, Safari, thermal/battery, memory-limit or multiplayer-capacity certification. Synthetic controller input is not a physical-controller test. Synthetic GPS/AR input is not a field test.
+
+Startup now gates play on accepted terrain/roads, current nearby pavement contacts and their terrain-mask border. The complete finite source inventory remains loaded; its distant pavement presentation continues through the existing frame owner. `initialReady` does not mean that the regional representation is complete. The mobile regional case waits for all6,009 Baltimore cells and the original covered area, with no worker remaining. The world-return case verifies retirement before Moon preparation and reuse of the same Earth owner/publication on return.
+
+Record whole cold startup and its60s target even when missed. Required public data can vary independently: the retained pipeline run waited13.9s for regional ground after other fetches settled. Current mobile startup acceptance additionally requires at most45s from the session's `compiling` transition to first rendered readiness, and at most90s whole startup. This separates provider wait from application construction; it does not relabel the earlier full-region-before-play failures as passing. Regional completion has a separate180s wait after the preceding checks. Controls and native frame budgets apply while background work is active. Keep every failed attempt and identify which readiness contract it measured.
 
 Inspect screenshots and saved state together. Preserve console/page errors, including service-attestation failures; do not relax App Check or production policies to obtain a green result. Use `closeOwnedBrowser` for owned browser servers only. Keep measured source unchanged throughout every run.
