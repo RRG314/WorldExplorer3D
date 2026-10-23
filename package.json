@@ -210,7 +210,7 @@
     "@babel/parser": "8.0.6",
     "@firebase/rules-unit-testing": "^5.0.0",
     "@gltf-transform/core": "4.5.0",
-    "@gltf-transform/extensions": "4.5.0",
+    "@gltf-transform/extensions": "4.5.1",
     "@gltf-transform/functions": "4.5.0",
     "esbuild": "^0.25.12",
     "exifr": "7.1.3",
