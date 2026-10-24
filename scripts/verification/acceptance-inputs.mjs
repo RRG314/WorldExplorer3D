@@ -33,7 +33,9 @@ export async function acceptanceInputs(root,definition,{artifactRoot=null}={}){
   let refs=[];
   if(/\.(?:m?js|cjs)$/.test(relative))refs=references(bytes.toString());
   if(/\.html$/.test(relative)){
-   const text=bytes.toString();for(const match of text.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)){
+   // Extract repository module inputs, including valid whitespace before an
+   // end tag's closing bracket. This is dependency discovery, not sanitization.
+   const text=bytes.toString();for(const match of text.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script\s*>/gi)){
     const src=match[1].match(/\bsrc=["']([^"']+)["']/i);if(src)refs.push({value:src[1],commonJS:false});else if(/\btype=["']module["']/i.test(match[1]))refs.push(...references(match[2]));
    }
   }

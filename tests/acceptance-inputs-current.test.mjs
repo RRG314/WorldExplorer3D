@@ -20,6 +20,10 @@ test('HTML module paths are bound and missing local modules fail instead of sile
  const {root,write}=await setup(t);await write('fixture.html','<script type="module">import "./runtime.js?v=3";</script>');await write('runtime.js','export const value=2;');const first=await acceptanceInputs(root,{entries:['fixture.html']});assert.ok(first.inputs['runtime.js']);await fs.unlink(path.join(root,'runtime.js'));await assert.rejects(acceptanceInputs(root,{entries:['fixture.html']}),/ENOENT/);
 });
 
+test('HTML module discovery accepts whitespace and mixed case in script end tags',async t=>{
+ const {root,write}=await setup(t);await write('fixture.html','<script type="module">import "./first.js";</SCRIPT \n><script src="./second.js"></script\t>');await write('first.js','export const first=1;');await write('second.js','export const second=2;');const result=await acceptanceInputs(root,{entries:['fixture.html']});assert.ok(result.inputs['first.js']);assert.ok(result.inputs['second.js']);await write('second.js','export const second=3;');assert.notEqual((await acceptanceInputs(root,{entries:['fixture.html']})).fingerprint,result.fingerprint);
+});
+
 test('the acceptance CLI binds declared result evidence and refuses a success with a missing result',async t=>{
  const {root,write}=await setup(t);await fs.mkdir(path.join(root,'config'));
  await write('case.mjs',"import fs from 'node:fs';fs.appendFileSync('calls.txt','x');fs.writeFileSync('result.json',JSON.stringify({passed:true}));");

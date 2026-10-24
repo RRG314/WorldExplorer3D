@@ -3,6 +3,8 @@ import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import * as THREE from 'three';
 import { clearBuildingExteriorDetails, selectExteriorDetailSources } from '../app/js/world/building-exterior-details.js';
+import { getBuildingMaterial, clearBuildingExteriorMaterialPool } from '../app/js/engine/building-facade-materials.js';
+import { FACADE_PRESENTATION } from '../app/js/world/facade-presentation.js';
 
 const root = new URL('../', import.meta.url);
 const read = (path) => readFile(new URL(path, root), 'utf8');
@@ -95,14 +97,24 @@ test('detail geometry has an independent lifecycle and cannot replace mapped aut
   assert.match(reset, /clearBuildingExteriorDetails\(appCtx\)/);
 });
 
-test('facade material selection preserves mapped tags and uses bounded shared textures', async () => {
-  const material = await read('app/js/engine/building-facade-materials.js');
-  assert.match(material, /mappedMaterialChoices/);
-  assert.match(material, /materialClaim: mappedFamily \? 'mapped'/);
-  assert.match(material, /colorClaim: mappedColor \? 'mapped'/);
-  assert.match(material, /sharedRuntimeTexture: true/);
-  assert.match(material, /building-facade-local-layout-v12-room-depth/);
-  assert.doesNotMatch(material, /new THREE\.TextureLoader\(\).*forEach/);
+test('facade material selection preserves mapped tags and uses bounded shared textures', t => {
+  const previous=globalThis.THREE;let textureLoads=0;
+  globalThis.THREE={...THREE,TextureLoader:class {load(){textureLoads++;return new THREE.Texture();}}};
+  clearBuildingExteriorMaterialPool();
+  t.after(()=>{clearBuildingExteriorMaterialPool();globalThis.THREE=previous;});
+  const options={facadeMaterial:'brick',facadeColorMapped:true},context={};
+  const material=getBuildingMaterial(context,'office',7,'#805040',options);
+  assert.equal(material.userData.materialClaim,'mapped');
+  assert.equal(material.userData.colorClaim,'mapped');
+  assert.equal(material.map.userData.sharedRuntimeTexture,true);
+  const loads=textureLoads;
+  for(let i=0;i<20;i++)assert.equal(getBuildingMaterial(context,'office',7,'#805040',options),material);
+  assert.equal(textureLoads,loads,'Repeated buildings must share the accepted material and GPU images');
+  const shader={vertexShader:THREE.ShaderLib.standard.vertexShader,fragmentShader:THREE.ShaderLib.standard.fragmentShader,uniforms:{}};
+  material.onBeforeCompile(shader);
+  assert.ok(material.customProgramCacheKey().includes(FACADE_PRESENTATION.version));
+  assert.equal(material.userData.facadePresentationVersion,FACADE_PRESENTATION.version);
+  assert.match(shader.fragmentShader,/facadeRoomEmission/);
 });
 
 test('open-ocean and world-reset transitions include exterior details', async () => {
