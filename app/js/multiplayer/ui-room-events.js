@@ -1,3 +1,4 @@
+import { distributionUrl } from '../../../js/distribution.js?v=1';
 import { CHAT_MAX_LENGTH, reportMessage } from './chat.js?v=56';
 import {
   dismissInvite,
@@ -208,7 +209,7 @@ function createUiRoomEventsApi(context) {
         setStatus('Sign in first to use multiplayer rooms.');
         return;
       }
-      window.location.assign('../account/');
+      window.location.assign(distributionUrl('../account/'));
     };
 
     refs.titleTrialBtn?.addEventListener('click', openAccountCenter);

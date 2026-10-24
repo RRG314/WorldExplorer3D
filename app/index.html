@@ -1,5 +1,7 @@
 <!DOCTYPE html>
 <html lang="en"><head>
+  <script src="../js/distribution-context.js?v=1"></script>
+  <link rel="stylesheet" href="../styles/distribution.css?v=1">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="mobile-web-app-capable" content="yes">
@@ -150,11 +152,11 @@ if (location.protocol === 'file:') document.documentElement.classList.add('unsup
 </aside>
 <aside id="proAccessPanel" class="pro-access-panel" hidden>
   <div class="pro-access-head">
-    <div class="pro-access-title">OPTIONAL DONATIONS</div>
+    <div class="pro-access-title"><span data-web-purchase>OPTIONAL DONATIONS</span><span data-play-only>ACCOUNT BENEFITS</span></div>
     <div id="proAccessState" class="pro-access-state">Open Access</div>
   </div>
-  <div class="pro-access-note">Core play, map access, and signed-in multiplayer stay free. Donations only support development and account recognition.</div>
-  <button id="upgradeFromAppBtn" class="pro-access-btn" type="button">Account & Donations</button>
+  <div class="pro-access-note">Core play, map access, and signed-in multiplayer stay free. <span data-web-purchase>Donations only support development and account recognition.</span><span data-play-only>Existing account benefits remain available.</span></div>
+  <button id="upgradeFromAppBtn" class="pro-access-btn" type="button"><span data-web-purchase>Account &amp; Donations</span><span data-play-only>Account</span></button>
   <div id="proAccessStatus"></div>
 </aside>
 <div id="titleScreen">

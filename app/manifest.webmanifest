@@ -1,7 +1,7 @@
 {
   "id": "/app/",
   "name": "World Explorer 3D",
-  "short_name": "World Explorer",
+  "short_name": "World Explorer 3D",
   "description": "Explore real-world places on foot, by air and at sea. Internet connection required.",
   "start_url": "/app/",
   "scope": "/app/",

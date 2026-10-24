@@ -1,6 +1,8 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <script src="../js/distribution-context.js?v=1"></script>
+  <link rel="stylesheet" href="../styles/distribution.css?v=1">
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Account Center · World Explorer</title>
@@ -697,8 +699,8 @@
     .links { border-top-color: var(--line); }
 
     @media (max-width: 980px) {
-      .account-shell { grid-template-columns: 1fr; }
-      .account-rail { position: static; align-self: start; height: auto; padding: 14px; border-right: 0; border-bottom: 1px solid var(--line); }
+      .account-shell { grid-template-columns: minmax(0, 1fr); }
+      .account-rail { position: static; align-self: start; min-width: 0; height: auto; padding: 14px; border-right: 0; border-bottom: 1px solid var(--line); }
       .account-brand small, .account-back { display: none; }
       .account-brand { padding: 2px 4px 12px; }
       .account-brand strong { font-size: 17px; }
@@ -733,7 +735,7 @@
         <button type="button" data-account-target="contributions"><strong>My contributions</strong><span>Saved buildings and status</span></button>
         <button type="button" data-account-target="profile"><strong>Profile</strong><span>Identity and creator card</span></button>
         <button type="button" data-account-target="social"><strong>Friends & Rooms</strong><span>Friends and invitations</span></button>
-        <button type="button" data-account-target="support"><strong>Support & Receipts</strong><span>Donations and billing history</span></button>
+        <button type="button" data-account-target="support"><strong data-web-purchase>Support &amp; Receipts</strong><strong data-play-only>Receipts</strong><span>Account history</span></button>
         <button type="button" data-account-target="security"><strong>Security & Privacy</strong><span>Sign-in details and account controls</span></button>
         <button id="moderationPanelLink" class="account-nav-admin" data-account-target="review" hidden><strong>Review improvements</strong><span>Approve or request changes</span></button>
       </nav>
@@ -751,7 +753,7 @@
       </div>
 
     <section class="panel" id="authPrompt">
-      <p class="hint">Sign in to manage account details, optional donations, and multiplayer identity.</p>
+      <p class="hint">Sign in to manage account details<span data-web-purchase>, optional donations</span>, and multiplayer identity.</p>
       <div class="actions">
         <button id="signInBtn" class="btn-primary" type="button">Sign In</button>
       </div>
@@ -920,7 +922,7 @@
       </section>
 
       <section class="account-view" data-account-view="support" hidden>
-      <h2 class="section-title">Donations & Receipts</h2>
+      <h2 class="section-title"><span data-web-purchase>Donations &amp; </span>Receipts</h2>
       <div class="identity-grid">
         <article class="identity-card">
           <span class="label">Donation Status</span>
@@ -937,7 +939,7 @@
         </article>
       </div>
 
-      <div class="plans">
+      <div class="plans" data-web-purchase>
         <article class="plan">
           <h2>Supporter</h2>
           <p>$1/month</p>
@@ -958,7 +960,7 @@
         </article>
       </div>
 
-      <div class="actions">
+      <div class="actions" data-web-purchase>
         <button id="upgradeSupporterBtn" class="btn-supporter" type="button">Donate as Supporter ($1/mo)</button>
         <button id="upgradeProBtn" class="btn-pro" type="button">Donate as Pro ($5/mo)</button>
         <button id="manageBillingBtn" class="btn-ghost" type="button">Manage Donations</button>
@@ -1011,7 +1013,8 @@
       redirectToPortal,
       updateAccountProfile,
       deleteAccount
-    } from '../js/billing.js?v=58';
+    } from '../js/billing.js?v=59';
+    import { isGooglePlay, distributionUrl } from '../js/distribution.js?v=1';
     import {
       ensureOwnCreatorProfile,
       getCreatorProfile
@@ -1583,13 +1586,13 @@
       if (state.isAdmin === true || state.subscriptionStatus === 'admin') {
         planDetail.textContent = 'Admin test access active with full multiplayer and elevated room quota.';
       } else if (state.plan === 'pro') {
-        planDetail.textContent = 'Pro donation recognition active. Core gameplay, map access, and multiplayer remain open to everyone.';
+        planDetail.textContent = 'Pro account benefits active. Core gameplay, map access, and multiplayer remain open to everyone.';
       } else if (state.plan === 'supporter') {
-        planDetail.textContent = 'Supporter donation recognition active. Core gameplay, map access, and multiplayer remain open to everyone.';
+        planDetail.textContent = 'Supporter account benefits active. Core gameplay, map access, and multiplayer remain open to everyone.';
       } else if (state.plan === 'trial') {
         planDetail.textContent = 'Legacy trial state detected. Multiplayer is open while signed in.';
       } else {
-        planDetail.textContent = 'Free plan: full gameplay, M map access, and multiplayer access while signed in. Donations are optional.';
+        planDetail.textContent = 'Free plan: full gameplay, M map access, and multiplayer access while signed in.' + (isGooglePlay ? '' : ' Donations are optional.');
       }
 
       if (state.isAdmin === true || state.subscriptionStatus === 'admin' || state.plan === 'pro') {
@@ -1597,7 +1600,7 @@
         extrasDetail.textContent = 'Upcoming demo coming soon: Mars Rover. This card is informational only and does not gate core features.';
       } else if (state.plan === 'supporter' || state.plan === 'trial') {
         extrasLabel.textContent = 'Roadmap';
-        extrasDetail.textContent = 'Upcoming demo coming soon: Mars Rover. Donations do not gate normal gameplay or map access.';
+        extrasDetail.textContent = 'Upcoming demo coming soon: Mars Rover. Normal gameplay and map access remain available.';
       } else {
         extrasLabel.textContent = 'Open';
         extrasDetail.textContent = 'Upcoming demo coming soon: Mars Rover. Core gameplay and map access are free for everyone.';
@@ -1769,7 +1772,7 @@
         renderSignedOutState();
         setStatus('Account deleted. Redirecting to home...', 'ok');
         globalThis.setTimeout(() => {
-          globalThis.location.assign('../');
+          globalThis.location.assign(distributionUrl('../'));
         }, 1200);
       } catch (err) {
         console.error('[account] delete account failed:', err);
@@ -1920,7 +1923,7 @@
         if (!inviteId || !roomCode) return;
         try {
           await markInviteSeen(inviteId, true);
-          window.location.assign(inviteJoinUrl(roomCode));
+          window.location.assign(distributionUrl(inviteJoinUrl(roomCode)));
         } catch (err) {
           setSocialStatus(err?.message || 'Could not open invite.', 'warn');
         }

@@ -1,3 +1,4 @@
+import { isGooglePlay, distributionUrl } from '../../js/distribution.js?v=1';
 import { hasFirebaseConfig } from '../../js/firebase-init.js?v=58';
 import {
   observeAuth,
@@ -136,17 +137,17 @@ function renderState(state, user) {
 
   const isPro = adminMode || plan === 'pro';
   hideProAccessPanel();
-  proAccessState.textContent = isPro ? 'Donation Recognition' : 'Open Access';
+  proAccessState.textContent = isPro ? 'Account Benefits' : 'Open Access';
   upgradeFromAppBtn.style.display = isPro ? 'none' : 'inline-flex';
 
   if (adminMode) {
     setProStatus('Admin test mode active. Core play, map access, and multiplayer remain open to everyone.');
   } else if (isPro) {
-    setProStatus('Pro donation recognition active. Core play, map access, and multiplayer remain open to everyone.');
+    setProStatus('Pro account benefits active. Core play, map access, and multiplayer remain open to everyone.');
   } else if (plan === 'supporter') {
-    setProStatus('Supporter donation recognition active. Core play, map access, and multiplayer remain open to everyone.');
+    setProStatus('Supporter account benefits active. Core play, map access, and multiplayer remain open to everyone.');
   } else {
-    setProStatus('All core play, M map access, and signed-in multiplayer are free. Donations are optional.');
+    setProStatus('All core play, M map access, and signed-in multiplayer are free.' + (isGooglePlay ? '' : ' Donations are optional.'));
   }
 
   updateAuthOverlayVisibility();
@@ -276,11 +277,11 @@ authSignOutBtn.addEventListener('click', async () => {
 });
 
 authAccountBtn.addEventListener('click', () => {
-  window.location.assign('../account/');
+  window.location.assign(distributionUrl('../account/'));
 });
 
 upgradeFromAppBtn.addEventListener('click', () => {
-  window.location.assign('../account/');
+  window.location.assign(distributionUrl('../account/'));
 });
 
 if (!hasFirebaseConfig()) {
@@ -290,8 +291,8 @@ if (!hasFirebaseConfig()) {
 
 if (new URLSearchParams(window.location.search).get('startTrial') === '1') {
   const cleanUrl = `${window.location.pathname}${window.location.hash || ''}`;
-  window.history.replaceState({}, '', cleanUrl);
-  setAuthStatus('Sign in to use multiplayer. Donations are optional in Account.');
+  window.history.replaceState({}, '', distributionUrl(cleanUrl));
+  setAuthStatus('Sign in to use multiplayer.' + (isGooglePlay ? '' : ' Donations are optional in Account.'));
 }
 
 observeAuth(async (user) => {

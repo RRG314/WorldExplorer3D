@@ -16,7 +16,7 @@
         <activity
             android:name=".GameLauncherActivity"
             android:exported="true">
-            <meta-data android:name="android.support.customtabs.trusted.DEFAULT_URL" android:value="https://worldexplorer3d.io/app/" />
+            <meta-data android:name="android.support.customtabs.trusted.DEFAULT_URL" android:value="https://worldexplorer3d.io/app/?distribution=google-play" />
             <meta-data android:name="android.support.customtabs.trusted.DISPLAY_MODE" android:value="immersive" />
             <meta-data android:name="android.support.customtabs.trusted.STATUS_BAR_COLOR" android:resource="@color/brand_background" />
             <meta-data android:name="android.support.customtabs.trusted.NAVIGATION_BAR_COLOR" android:resource="@color/brand_background" />

@@ -5,7 +5,9 @@
     review: ['Review improvements', 'Inspect a submitted version, make a decision, then test it in the world.'],
     profile: ['Profile', 'Private identity and the public creator card are kept clearly separated.'],
     social: ['Friends & Rooms', 'Manage friends and room invitations without mixing them into account security.'],
-    support: ['Support & Receipts', 'Optional donations, billing controls, and receipt history.'],
+    support: globalThis.WorldExplorerDistribution?.isGooglePlay
+      ? ['Receipts', 'Your existing account and receipt history.']
+      : ['Support & Receipts', 'Optional donations, billing controls, and receipt history.'],
     security: ['Security & Privacy', 'Review sign-in details and use sensitive account actions deliberately.']
   });
 
