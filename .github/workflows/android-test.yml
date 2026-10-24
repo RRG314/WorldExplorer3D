@@ -26,7 +26,7 @@ jobs:
           distribution: temurin
           java-version: '21'
       - name: Install the targeted Android platform
-        run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+        run: '"${ANDROID_HOME:?}/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "build-tools;36.0.0"'
       - name: Build and lint unsigned packages
         working-directory: android
         run: ./gradlew --no-daemon --max-workers=2 :app:lintRelease :app:bundleRelease :app:assembleRelease --write-locks --write-verification-metadata sha256
