@@ -1,0 +1,26 @@
+plugins { id 'com.android.application' }
+
+android {
+    namespace 'io.worldexplorer3d.app'
+    compileSdk 36
+    defaultConfig {
+        applicationId 'io.worldexplorer3d.app'
+        minSdk 24
+        targetSdk 36
+        versionCode 1
+        versionName '5.6.1-test.1'
+        resValue 'string', 'provider_authority', 'io.worldexplorer3d.app.fileprovider'
+    }
+    buildTypes {
+        release {
+            // Signing is deliberately local. CI never receives the upload key.
+            minifyEnabled false
+        }
+    }
+    lint { abortOnError true; checkReleaseBuilds true }
+    dependencyLocking { lockAllConfigurations() }
+}
+
+dependencies {
+    implementation 'com.google.androidbrowserhelper:androidbrowserhelper:2.7.4'
+}

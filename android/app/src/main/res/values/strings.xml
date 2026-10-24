@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">World Explorer 3D</string>
+    <string name="asset_statements" translatable="false">[{\"relation\":[\"delegate_permission/common.handle_all_urls\"],\"target\":{\"namespace\":\"web\",\"site\":\"https://worldexplorer3d.io\"}}]</string>
+    <color name="brand_background">#1a1a2e</color>
+</resources>
