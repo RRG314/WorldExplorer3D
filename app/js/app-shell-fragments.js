@@ -68,7 +68,7 @@ const APP_SHELL_FRAGMENT_HTML = `
         <button id="roomChatToggleBtn" class="mp-btn secondary" type="button" disabled>Room Chat</button>
         <button id="roomPanelInviteBtn" class="mp-btn secondary" type="button">Invite Link</button>
         <button id="roomPanelLeaveBtn" class="mp-btn secondary" type="button">Leave Room</button>
-        <button id="roomPanelTrialBtn" class="mp-btn warn" type="button">Account / Donations</button>
+        <button id="roomPanelTrialBtn" class="mp-btn warn" type="button"><span data-web-purchase>Account / Donations</span><span data-play-only>Account</span></button>
       </div>
       <div class="room-player-head">
         <span>Players Live</span>

@@ -1,0 +1,3 @@
+[data-play-only] { display: none !important; }
+html[data-distribution="google-play"] [data-web-purchase] { display: none !important; }
+html[data-distribution="google-play"] [data-play-only] { display: revert !important; }

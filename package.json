@@ -188,7 +188,8 @@
     "qa:gameplay:plan": "node scripts/verification/gameplay-qa.mjs --plan",
     "qa:gameplay:report": "node scripts/verification/gameplay-qa/report.mjs",
     "verify:android-web-support": "node --test tests/android-web-support.test.mjs",
-    "verify:android-install-browser": "node scripts/verification/android-install-support.mjs"
+    "verify:android-install-browser": "node scripts/verification/android-install-support.mjs",
+    "verify:play-distribution": "node --experimental-vm-modules --test tests/play-distribution-current.test.mjs"
   },
   "repository": {
     "type": "git",

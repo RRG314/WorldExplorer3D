@@ -1,6 +1,8 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <script src="./js/distribution-context.js?v=1"></script>
+  <link rel="stylesheet" href="./styles/distribution.css?v=1">
   <meta name="google-site-verification" content="shLyPQ38xkcLHOYNLJr-1u-UXOYnO8XTZrXiW-HmeJw" />
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -242,7 +244,7 @@
           <span class="section-kicker">Open access</span>
           <h2>Explore first. Decide what matters later.</h2>
         </div>
-        <p>The world is available without a payment decision at the door. An account keeps multiplayer and persistent progress together. Donations are optional and support hosting and continued development.</p>
+        <p>The world is available without a payment decision at the door. An account keeps multiplayer and persistent progress together. <span data-web-purchase>Donations are optional and support hosting and continued development.</span></p>
       </div>
       <div class="support-grid">
         <article class="support-card">
@@ -255,7 +257,7 @@
             <li>Live Earth and world systems</li>
           </ul>
         </article>
-        <article class="support-card">
+        <article class="support-card" data-web-purchase>
           <h3>Support the world</h3>
           <p>If World Explorer becomes a place you value, you can help keep it online. Support never gates the core experience.</p>
           <div class="support-options">
@@ -303,6 +305,7 @@
     <a href="./legal/privacy">Privacy</a>
     <a href="./legal/terms">Terms</a>
     <a href="mailto:support@mail.worldexplorer3d.io">Contact</a>
+    <a href="account/">Account</a>
     <a href="account/testers.html">Become a tester</a>
     <a href="https://github.com/RRG314/WorldExplorer3D" target="_blank" rel="noreferrer">GitHub</a>
     <span>OpenStreetMap data © OpenStreetMap contributors (ODbL)</span>
@@ -348,7 +351,7 @@
       try {
         if (!hasFirebaseConfig()) {
           setStatus('Opening the world in free mode. Multiplayer will be available after Firebase is configured.', true);
-          window.location.assign('./app/?tab=multiplayer');
+          window.location.assign(WorldExplorerDistribution.url('./app/?tab=multiplayer'));
           return;
         }
 
@@ -360,7 +363,7 @@
         }
 
         setStatus('Opening multiplayer…');
-        window.location.assign('./app/?tab=multiplayer');
+        window.location.assign(WorldExplorerDistribution.url('./app/?tab=multiplayer'));
       } catch (err) {
         console.error('[landing] Multiplayer sign-in failed:', err);
         setStatus(err?.message || 'Multiplayer could not open right now.', true);
@@ -377,7 +380,7 @@
       try {
         if (!hasFirebaseConfig()) {
           setStatus('Open Account to complete a donation after Firebase is configured.', true);
-          window.location.assign('./account/');
+          window.location.assign(WorldExplorerDistribution.url('./account/'));
           return;
         }
 
@@ -388,7 +391,7 @@
           return;
         }
 
-        const { redirectToCheckout } = await import('./js/billing.js?v=58');
+        const { redirectToCheckout } = await import('./js/billing.js?v=59');
         await redirectToCheckout(plan);
       } catch (err) {
         console.error('[landing] Donation checkout failed:', err);

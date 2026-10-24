@@ -1,6 +1,8 @@
 import { getReturnUrlBase, postProtectedFunction } from './function-api.js?v=3';
+import { assertWebPurchasesAvailable } from './distribution.js?v=1';
 
 export async function createCheckoutSession(plan) {
+  assertWebPurchasesAvailable();
   const payload = await postProtectedFunction(
     '/createCheckoutSession',
     { plan, returnUrlBase: getReturnUrlBase() },
@@ -13,6 +15,7 @@ export async function createCheckoutSession(plan) {
 }
 
 export async function createPortalSession() {
+  assertWebPurchasesAvailable();
   const payload = await postProtectedFunction(
     '/createPortalSession',
     { returnUrlBase: getReturnUrlBase() },

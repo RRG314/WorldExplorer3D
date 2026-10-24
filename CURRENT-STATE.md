@@ -7,6 +7,26 @@ production/protected-source work; do not ask again for that existing scope.
 
 ## October 24 Android internal test — available; wider release incomplete
 
+The public name is **World Explorer 3D** in the saved Play listing, native label
+and browser install manifest (including the short name). The package identifier
+is unchanged. Google's unreviewed internal-test label remains controlled by its
+first-review process; do not create a duplicate app or promise its immediate removal.
+
+A version-code-3 consumption-only candidate is being prepared. It marks both
+launcher and deep-link URLs using the existing Android Browser Helper hooks,
+preserves browser context across account navigation/reloads/new-tab links, hides
+purchase offers and blocks checkout/upgrade-capable portal calls before network
+access. Existing entitlements and receipt reads remain available; normal website
+checkout remains available. The mobile Account Center grid now fits its viewport
+with horizontally scrolling tabs, and the landing footer exposes Account on mobile.
+Six focused component tests passed. Source-browser public navigation and controlled
+account layout checks passed; protected panels were revealed only for layout
+inspection, not as sign-in evidence. Local CAPTCHA errors and failed test
+preconditions/overflow reproduction are retained in
+`output/research/play-completion-2026-10-24/`. Compilation, protected publication
+and installed-phone acceptance of this candidate are still pending. Version 2
+below remains the published internal package until explicitly superseded.
+
 The existing Google Play app (4972969608428854795), package
 `io.worldexplorer3d.app`, now has **version code 2 / 5.6.1-test.2 published on the
 active internal track** 4701521177239633849. Only the fresh World Explorer list
@@ -35,7 +55,7 @@ claim. Human violence, rare medical-drug use/reference, digital purchases,
 interaction and location sharing are disclosed. Unsupported war setting and
 user-blocking answers were removed. Reporting/moderation and optional private
 invited rooms remain disclosed. These ratings do not mean Google app review
-has passed. The final target-audience form has not been submitted.
+has passed. The target audience is now saved as 16–17 and 18 and over.
 
 Free download, Game/Adventure, HTTPS public contact/privacy and No ads,
 government, health or financial features remain saved. Advertising ID is now
@@ -51,10 +71,10 @@ A dedicated empty reviewer account has been created with complimentary,
 non-expiring Pro access, normal user permissions and no Stripe customer/admin
 privileges. Normal email/password sign-in and own-profile read passed. This is
 live-service evidence, not Android UI or App Check qualification. Credentials
-are owner-only outside the repository and have NOT been shared with Google;
-a specific owner approval question remains pending. English reviewer instructions
-are prepared. Google blocks the audience questionnaire until reviewer access
-is completed; do not falsely declare all app features unrestricted.
+remain owner-only outside the repository and were entered into Google's reviewer
+access form after the owner's continuation instruction. The saved instructions
+need no trial, OTP or purchase; optional partner/device-feedback sharing is off.
+Dashboard now shows 10 of 13 setup tasks complete. No app-review pass is claimed.
 
 Concrete pre-closed/public work:
 - Resolve the existing Stripe checkout for digital Pro room/feature benefits

@@ -9,7 +9,8 @@ world play.
 
 ## Build and signing
 
-- Package: `io.worldexplorer3d.app`; current test code `2`, name `5.6.1-test.2`.
+- Package: `io.worldexplorer3d.app`; published internal code `2`, name `5.6.1-test.2`.
+  The next candidate is code `3`, name `5.6.1-test.3`, pending build/publication.
   The first undistributed internal upload, code `1`, remains in Play's history.
 - Minimum Android API 29 (Android 10), matching current Chrome support;
   compile/target API 36, as currently required for new
@@ -34,6 +35,17 @@ world play.
   billing, analytics or notification SDK and no JavaScript/native bridge.
 
 ## Recovery and data
+
+The Play candidate opens with `distribution=google-play`, including deep links
+handled by the existing Browser Helper. A small browser presentation context
+persists through same-tab navigation, reloads and same-origin new-tab links;
+storage denial preserves it in URLs. This context never grants account benefits.
+The edition consumes existing entitlements and receipts, hides external purchase
+offers and rejects checkout/upgrade-capable portal calls before a request.
+Ordinary web commerce retains its existing protected API. Do not add a purchase
+button to the Play edition without implementing applicable Play payment policy.
+`npm run verify:play-distribution` covers that boundary and the consistent public
+name **World Explorer 3D**. The package identifier remains unchanged.
 
 The native launcher handles a first launch without connectivity. The game's
 scoped navigation worker handles later offline/server-failure navigations with
@@ -106,7 +118,7 @@ The corrected IARC questionnaire is Completed: ESRB Teen, PEGI16, USK16,
 generic/Russia16+, Brazil14+, South Korea15+, TaiwanPG12, AustraliaPG and Saudi
 Arabia18. It accurately includes rare field medicine, human violence, interaction,
 location sharing and digital purchases. No unsupported war or user-blocking
-claim remains. Target audience is still unsubmitted, pending reviewer access.
+claim remains. Target audience is saved as 16–17 and 18 and over.
 
 Store text, icon and feature graphic are saved as a draft. Required genuine app
 screenshots remain outstanding. Data safety retains its 16-category/security/
@@ -116,8 +128,9 @@ complete opt-out. No false No-data or independent-security-review badge was used
 
 A dedicated empty, non-admin reviewer account with complimentary Pro access has
 passed normal password sign-in and its own-profile read. Credentials are private
-outside source/evidence and await the owner's explicit approval before sharing
-with Google. Prepared English instructions require no owner login, purchase,
+outside source/evidence. The owner authorized continuation after the specific
+reviewer-access question; access and instructions are now saved with Google.
+Optional partner/device-feedback sharing is off. Instructions require no owner login, purchase,
 expiring trial or OTP. This is not Android UI or App Check qualification.
 
 Before wider distribution, resolve two source-confirmed policy gaps. Existing
