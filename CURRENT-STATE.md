@@ -1,10 +1,85 @@
 # Current development and release state
 
-Updated October 23, 2026 for gameplay QA and 5.6.1 security maintenance. The live build manifest at
+Updated October 23, 2026 for Android internal-test setup. The live build manifest at
 https://worldexplorer3d.io/build-manifest.json and the GitHub release are the
 production identity authorities; check them before starting new release work.
 The owner has explicitly authorized production, protected stable, both active
 development branches and the release. Do not ask again.
+
+## October 23 Android internal-test setup — in progress
+
+This section supersedes older production identities below. The owner requested
+Google Play testing and confirmed a free download with accurate violence/age
+classification. The Android app uses the existing browser game through Google's
+Trusted Web Activity; the Godot port has not begun.
+
+Production now serves `5.6.1+dd51952e203c.05cc68649e170e60.production`, compiled
+source `dd51952e203ca5eafeb1f1158ea1b3b288a81597`, Hosting `b82e6df7154cb0dc`,
+asset manifest SHA-256 `4dc1591da727f9026e01c0e8872678f1f34278ef8f3a7d29d53cd4b2471450db`.
+Staging is `5.6.1+dd51952e203c.83f86edf7cd6aea7.staging`, Hosting
+`106adff9123eda53`. PR118, PR119 and PR121 were protected merges; PR121 merged
+as `9f960018ce38d9a886a0548783ecee2dd7dfe103`. Required checks and its merged
+runtime/package check passed. The compiled head and merge have identical trees.
+
+Website changes add the install manifest/icons, scoped network-only recovery,
+Android privacy/account-deletion instructions and canonical certificate file.
+All 763 unchanged original production files retain their bytes; qualified
+staging/production differ only in the three expected Firebase config outputs.
+Five focused components and four actual owned-browser recovery checks passed;
+there was no broad city/gameplay replay. Both Google Digital Asset Links checks
+now return linked=true for the Play and local-upload certificates. Initial
+negative propagation and failed Firebase rewrite/hidden-directory selector
+attempts are retained. The static canonical file fixes Firebase AUTO precedence;
+automatic association mode and other Hosting configuration remain preserved.
+No Functions, rules, Auth, Resend or player-data change occurred in this task.
+
+Android package `io.worldexplorer3d.app`, code 2, `5.6.1-test.2`, requires Android
+10/API29 and targets API36. Runner build/lint 40053369082 succeeded at native
+source `65949abc2cefca5c7df470223e235272b44bde25`; signed AAB/APK and receipts are
+under `output/research/android-testing-2026-10-23/build-65949abc/`.
+The valid v3 signature passed the official verifier; an unsigned APK failed.
+Native source is unchanged by the later website fix: do not rebuild it solely
+for documentation or certificate-site publication.
+
+Existing Play app 4972969608428854795 has internal version 1 published with zero
+testers. Do not enable that superseded version. Version 2 is signed but NOT
+uploaded: the Mac is locked, blocking native file selection. Keyboard Console navigation and text entry work.
+Free pricing, Game/Adventure, HTTPS public contact/privacy, No ads/government/
+health/financial features were saved. Listing descriptions were saved as a Console draft; the icon/feature graphic
+are prepared but not uploaded. Data safety has saved security/account-deletion
+facts and 16 source-backed data categories; handling/purposes and final preview
+remain incomplete and have not been submitted for review. The IARC Game category and support contact are prepared,
+but its explicit legal agreement remains unchecked pending owner action-time
+approval. Do not infer approval from the general setup request. Combat includes
+human NPC/civilian/responder targets, lasers/sidearms/melee/grenades and hit/downed
+reactions; disclose violence, chat and user uploads. No regional rating or final
+target audience has been assigned. Do not select nonviolent/all-young-children.
+
+Next: resume the existing Console tabs after the owner unlocks the Mac; upload
+version 2, complete IARC after explicit terms approval, configure the first real
+tester and feedback/opt-in access, then finish accurate app-access, Data safety,
+audience and listing forms. Review existing web support checkout against Play
+payment policy before wider distribution. Physical Play-installed phone launch,
+controls/orientation, resume, auth/App Check, loading/performance, progress and
+rooms remain unqualified. Closed/public eligibility still requires the account's
+12 genuine continuous closed testers for 14 days and Google's review; internal
+testing does not bypass it. No public Android production rollout occurred.
+
+Read `docs/android/TEST-RELEASE.md`. All operational/failed evidence is retained
+under `output/research/android-testing-2026-10-23/`. Four raw package slots remain;
+prior Android staging and failed unactivated production packages have verified
+basis/overlay recovery archives. Preserve the original final-production basis,
+multiplayer/security bases, dist, keys and rollback anchors. The failed prepared
+Hosting version `22076af685d820ba` is explicitly forbidden from activation.
+
+The canonical worktree remains the architecture-evaluation path below. Original
+shared Git index/metadata in Documents became iCloud-dataless and could not be
+read; do not reset, delete or rewrite it. Workfiles were verified clean against
+pushed source with a small metadata-only bare snapshot in the ignored Android
+evidence folder (no source copies). Commits/PRs used the existing authenticated
+GitHub API without force updates; the primary local HEAD remains 91bc5c37 until
+metadata hydrates and can be synchronized safely. The subsequent checkpoint-doc
+edits are intentional. No original .git pointer or history was replaced.
 
 ## October 23 coordinated production release — complete
 
@@ -54,8 +129,8 @@ regenerable uploaded gzip bytes were removed. Prior production Hosting
 `34fff00d671d0a0b` and released `d4516200e86c480f` remain. Recovery must retain
 additive tester pages/services for already-issued links and private consent.
 
-The sections below retain dated checkpoint history. This completed-release
-section takes precedence for production identity and deployment status. The
+The sections below retain dated checkpoint history. The newest Android section above takes precedence for production identity and
+deployment status; this completed-release section retains its acceptance evidence. The
 browser release endpoint is complete; Godot and later architecture/visual
 packages have not begun. Use the resumable current QA plan/report and justify
 any new execution by actual source/feature changes. Do not restart old sweeps.
