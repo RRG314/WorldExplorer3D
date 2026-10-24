@@ -12,10 +12,14 @@ try{
  await scan('local-preference','app/js/ui/tester-invitation.js',"const DISMISSAL_KEY = 'we3d.tester-invitation.v1';\n",0);
  // Synthetic, deliberately invalid credentials never sent to any service.
  const fake='sk_live_'+crypto.randomBytes(24).toString('hex');
+ // Hex randomness can occasionally fall below the scanner's entropy floor.
+ // Use one deterministic, high-entropy synthetic value so a policy check does
+ // not pass or fail according to the random fixture drawn for this run.
+ const genericFake=crypto.createHash('sha256').update('World Explorer synthetic scanner fixture, no service account').digest('base64url');
  await scan('private-secret-in-public-config','config/firebase.production.json',JSON.stringify({...firebase,stripe_secret:fake},null,2)+'\n',1);
  await scan('public-key-outside-approved-config','unexpected-secret.js',`const apiKey = '${firebase.apiKey}';\nconst secret = '${fake}';\n`,1);
  await scan('private-secret-next-to-site-key','config/firebase.staging.json',`appCheckSiteKey: '${firebase.appCheckSiteKey}', secret: '${fake}'\n`,1);
- await scan('generic-secret-in-public-config','config/firebase.production.json',JSON.stringify({...firebase,internal_secret:crypto.randomBytes(32).toString('hex')},null,2)+'\n',1);
- await scan('unreviewed-key-in-public-config','config/firebase.production.json',JSON.stringify({...firebase,another_api_key:'6L'+crypto.randomBytes(19).toString('hex')},null,2)+'\n',1);
+ await scan('generic-secret-in-public-config','config/firebase.production.json',JSON.stringify({...firebase,internal_secret:genericFake},null,2)+'\n',1);
+ await scan('unreviewed-key-in-public-config','config/firebase.production.json',JSON.stringify({...firebase,another_api_key:'6L'+genericFake.slice(0,38)},null,2)+'\n',1);
  await fs.writeFile('output/verification/security/secret-policy.json',JSON.stringify({passed:true,cases},null,2));console.log(JSON.stringify(cases));
 }finally{await fs.rm(temp,{recursive:true,force:true});}

@@ -6,89 +6,59 @@ production identity authorities; check them before starting new release work.
 The owner has explicitly authorized production, protected stable, both active
 development branches and the release. Do not ask again.
 
-## October 23 authorized coordinated production release (in progress)
+## October 23 coordinated production release — complete
 
-The starting-area change is now browser-qualified at clean d02814a9. All six
-current mobile checks passed in one compiled Baltimore session: safe admitted
-nearby surfaces, touch walking/look, driving/rotation/release, native frame
-pacing, unfinished Earth work retired across Moon return, and complete regional
-coverage. First playable62.854s (the60s target remains missed), required-data
-wait15.980s and post-data preparation42.909s. Native mobile-layout proxy52.61FPS,
-p95/p9933.4ms, max50.1ms. All6,009cells/4,552nonempty and exact original covered
-area completed; worker retired.49,080buildings and18,951roads retained. Screenshots
-were inspected; no page errors. This is Mac touch emulation, not physical-phone
-qualification. Original failures remain in the ledger. Evidence:
-`output/research/gameplay-qa-2026-10-23/attempts/mobile-1792800838694/`.
+Production now serves `5.6.1+18c99008241a.80b42d96ae618efc.production`, compiled
+source `18c99008241a86cc9f1cf855f792702ecefb6f91`, Hosting `f89779954d69534e`.
+Protected PR117 merged as `0d58d98941e48d8197c821119596a2e5c7a99b39` from approved
+head `962c8c0914d795be9684cb2b856506b25a8e2fc8`. Later verification-only changes
+leave shipped app/Functions inputs unchanged; the measured final game assets
+remain byte-identical. Required PR checks, CodeQL and stable checks passed.
 
-Protected stable security maintenance is being merged without changing delivered
-game inputs. Next: protected PR checks, paired final packages, coordinated scoped
-production backend/Hosting activation and bounded production acceptance. The
-read-only cloud baseline and private rollback material are retained; production
-has not yet changed in this coordinated release.
+Read `docs/verification/2026-10-23-PRODUCTION-RELEASE.md` for executed/retained
+acceptance, limits and recovery. The ten-check targeted decision passed, without
+claiming the historical full matrix. Current mobile loading/control/performance,
+Moon return and exact complete6,009-cell coverage passed in one compiled city
+session. First playable 62.854 s still misses 60 s target; post-data 42.909 s and
+native mobile-layout 52.61 FPS passed current floors. Physical phones/Safari,
+thermal behavior and higher concurrency remain unqualified.
 
-The earlier9ed7ce8d full-region-gated pilot loaded in86.179s, including13.9s
-regional-ground wait; native frames/input passed. The updated QA contract records
-the original60s whole-start target, enforces45s post-data preparation/90s whole
-startup, then verifies all6,009 regional cells separately. See current QA docs.
+Actual production weekly guest entry loaded Nürburgring, published native
+walking poses and left through the UI. Two normal accounts created/joined/left
+a private personal room through the packaged SDK; earlier full two-client
+UI/chat evidence is retained. Production normal Chrome completed real tester
+signup→24-hour confirmation→admin approval/preview/send→acceptance→manual reply
+forwarding→withdrawal. Six messages reached owner Gmail Inbox with SPF/DKIM/DMARC
+passing. Temporary build settings are blank again; disposable admin/room test
+accounts and private room were cleaned up. No new app download is advertised.
+Owner portal: https://worldexplorer3d.io/account/admin.html?view=testers .
 
-The owner now explicitly authorizes deployment once the app's features work.
-This supersedes the prior no-production/push boundary for the coordinated
-release. Preserve protected GitHub checks, existing data/configuration, all
-rollback bytes and evidence. Do not ask again for already-authorized steps.
+Production has 84 Functions. Four tester Functions and source-only joinRoom are
+active, both tester indexes READY and six TTL policies ACTIVE. Anonymous auth
+and the single weekly-prefix rule are active. All 79 unrelated original
+Functions, joinRoom configuration/IAM, other Auth fields, project IAM and all 84
+staging Functions matched snapshots. Hosting retained prior configuration plus
+three tester rewrites. Existing Resend webhooks and DNS were preserved; the new
+production signed receiver is enabled with scoped secret access.
 
-Start from clean28a4ff64. Production remains security a82ff0ab until the current
-loading/coverage gaps and scoped backend prerequisites are resolved. The active
-execution ledger is `output/research/production-release-2026-10-23/PLAN.md`.
-The cold-start profile retains the complete Baltimore world; its far pavement
-owner compiled all6,009cells in about33seconds. Initial coverage can overlap
-vertical terrain preparation after building constraints and structure semantics
-are final; path/contact publication must still await the normal final handoff.
-Focused ownership/geometry equivalence tests accompany that repair. Earlier
-valid gameplay, room, save and24-hour mail evidence stays retained; no broad
-historical sweep is authorized or required merely by verification edits.
+Normal hosted lookup/weather acceptance has fresh HTTP200 proof; production
+Chrome showed Bergen's real forecast without console errors. A Codex in-app
+browser signup had an attestation network error; unchanged ordinary Chrome
+passed. No protection was relaxed. CelesTrak was unavailable on this network;
+that status remains honest. No physical-device or all-provider guarantee.
 
-The first compiled overlap pilot retained all6,009cells, the exact covered area,
-49,080buildings and18,951roads, but first playable87.27s still failed60s.
-Touch input/native60FPS, checkpoint/flower replay and trial success/failure
-passed in that same world. Paint's expanded phone palette was blocked by the
-minimap; its bounded, scrollable overlay now sits above the map and below the
-main menu. Loading coverage now acknowledges bounded32cell/32ms worker batches;
-normal gameplay retains single-cell scheduling. Actual-worker tests compare
-every mask byte/order/count with single-cell output; cancellation rejects late
-batches. The next compiled pilot must measure this change before promotion.
-Evidence: `output/research/production-release-2026-10-23/pilot/` and focused
-`batched-coverage-contracts.log` / `batched-cancellation.log`. No production change.
+Evidence/failures: `output/research/production-release-2026-10-23/`. Preserve
+current dist, both raw archive bases, final paired packages and all rollback
+anchors. Superseded pilots are byte-verified basis/overlay archives; only owned,
+regenerable uploaded gzip bytes were removed. Prior production Hosting
+`34fff00d671d0a0b` and released `d4516200e86c480f` remain. Recovery must retain
+additive tester pages/services for already-issued links and private consent.
 
-The batched pilot still failed loading at89.551s; Paint's portrait/landscape UI,
-native60FPS and prescribed input passed. Exact input replay isolated overhead
-from the new per-edge bounds test, which is removed. Worker snapshots now omit
-unused provider/structure metadata and empty tags, preserving source facts in
-their existing owners and all compiler-consumed width/placement/ground evidence.
-The captured payload fell74,883,998→29,258,601bytes. Plan-owned road mask unions
-are compiled once across cells and excluded from source fingerprints. All6,009
-mask hashes/order/area match the original; diagnostic compilation42.6→25.6s.
-Source/width/geometry/ownership checks and the next compiled browser measurement
-remain the promotion criteria; these offline timings are not browser acceptance.
-Keep the JSON typed-array capture failure and its corrected producer-based replay.
-
-Compiled03cd9545 retains full coverage and loads in78.652s; it still fails60s.
-Native touch-proxy render59.95FPS and prescribed input pass. Loading source
-transfer now uses acknowledged512-item chunks without a redundant scheduler
-yield; source scans use the existing8ms loading budget, while play retains2ms
-frame-aware scanning and256-item transfers. Cancellation at the final chunk is
-checked before preparation.32focused transfer/owner cases pass; new phase
-counters separate snapshot, transfer and worker planning in the next measurement.
-Normal-browser staging Akureyri search returned two places with no errors;
-Cloud Function logs confirm HTTP200 with App Check not explicitly disabled.
-Protected-service evidence: `normal-browser-place-search.json` in the active ledger.
-
-An independent building download can now start from the already-requested
-facility response when the existing most-restrictive settlement rule proves
-eligibility and roads exist. Early/final callers share one request under the
-existing world-session provider coordinator; final normalization/publication,
-sparse-scene policy, fallback and cancellation remain authoritative.12focused
-prefetch/provider cases pass. The combined next compiled run covers this
-download overlap and loading-only source transfer, with full coverage required.
+The sections below retain dated checkpoint history. This completed-release
+section takes precedence for production identity and deployment status. The
+browser release endpoint is complete; Godot and later architecture/visual
+packages have not begun. Use the resumable current QA plan/report and justify
+any new execution by actual source/feature changes. Do not restart old sweeps.
 
 ## October 23 practical gameplay QA authority
 
@@ -121,7 +91,7 @@ security staging pair is recoverable from
 Preserve its security production basis, the multiplayer basis, current dist and
 all released rollback packages.
 
-## October 23 security authority and current production
+## October 23 security checkpoint (prior production)
 
 The owner's security instruction authorizes necessary security fixes and their
 protected activation, superseding the earlier local-only restriction for this

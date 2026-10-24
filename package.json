@@ -186,7 +186,9 @@
     "verify:browser-foundation": "node scripts/verification/browser-foundation-acceptance.mjs",
     "qa:gameplay": "node scripts/verification/gameplay-qa.mjs",
     "qa:gameplay:plan": "node scripts/verification/gameplay-qa.mjs --plan",
-    "qa:gameplay:report": "node scripts/verification/gameplay-qa/report.mjs"
+    "qa:gameplay:report": "node scripts/verification/gameplay-qa/report.mjs",
+    "verify:android-web-support": "node --test tests/android-web-support.test.mjs",
+    "verify:android-install-browser": "node scripts/verification/android-install-support.mjs"
   },
   "repository": {
     "type": "git",

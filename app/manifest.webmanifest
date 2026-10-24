@@ -1,0 +1,37 @@
+{
+  "id": "/app/",
+  "name": "World Explorer 3D",
+  "short_name": "World Explorer",
+  "description": "Explore real-world places on foot, by air and at sea. Internet connection required.",
+  "start_url": "/app/",
+  "scope": "/app/",
+  "display": "fullscreen",
+  "orientation": "any",
+  "background_color": "#1a1a2e",
+  "theme_color": "#1a1a2e",
+  "lang": "en-US",
+  "categories": [
+    "games",
+    "travel"
+  ],
+  "icons": [
+    {
+      "src": "assets/icons/app-192-v1.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "assets/icons/app-512-v1.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "assets/icons/app-maskable-512-v1.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
