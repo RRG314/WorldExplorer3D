@@ -41,6 +41,10 @@ const signingEnv={WE3D_ANDROID_STORE_PASSWORD:credential.password};
 const cert=execFileSync(javaTool('keytool'),['-exportcert','-keystore',keyPath,
   '-alias',credential.alias,'-storepass:env','WE3D_ANDROID_STORE_PASSWORD'],{env:{...process.env,...signingEnv}});
 const fingerprint=createHash('sha256').update(cert).digest('hex').toUpperCase().match(/../g).join(':');
+if(input==='--certificate-only') {
+  console.log(JSON.stringify({packageName:'io.worldexplorer3d.app',uploadCertificateSha256:fingerprint}));
+  process.exit(0);
+}
 const output=path.join(source,'signed');
 await fs.mkdir(output,{recursive:true});
 const bundle=path.join(output,'world-explorer-5.6.1-test.1.aab');

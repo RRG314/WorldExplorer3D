@@ -1,5 +1,8 @@
 <resources>
     <string name="app_name">World Explorer 3D</string>
+    <string name="offline_title">Connect to explore</string>
+    <string name="offline_message">World Explorer needs an internet connection to load places and multiplayer. Connect to Wi-Fi or mobile data, then try again. Reconnecting does not clear your saved progress.</string>
+    <string name="retry_connection">Try again</string>
     <string name="asset_statements" translatable="false">[{\"relation\":[\"delegate_permission/common.handle_all_urls\"],\"target\":{\"namespace\":\"web\",\"site\":\"https://worldexplorer3d.io\"}}]</string>
     <color name="brand_background">#1a1a2e</color>
 </resources>
