@@ -1,0 +1,15 @@
+[
+  {
+    "relation": [
+      "delegate_permission/common.handle_all_urls"
+    ],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "io.worldexplorer3d.app",
+      "sha256_cert_fingerprints": [
+        "EF:30:3E:8B:FB:1E:41:F5:31:FA:B2:67:8E:AA:8C:BE:11:82:F6:15:3F:DE:36:8C:8F:35:CD:5C:9F:6B:4F:48",
+        "AB:22:91:E9:40:24:DF:7C:40:A6:CC:2C:EB:CC:B0:4B:B9:F9:68:AF:07:70:ED:49:82:BE:1A:5E:28:7F:27:10"
+      ]
+    }
+  }
+]

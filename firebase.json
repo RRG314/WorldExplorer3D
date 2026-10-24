@@ -7,6 +7,8 @@
       "**/node_modules/**"
     ],
     "headers": [
+      { "source": "/.well-known/assetlinks.json", "headers": [{ "key": "Content-Type", "value": "application/json" }, { "key": "Cache-Control", "value": "public, max-age=300" }] },
+      { "source": "/app/manifest.webmanifest", "headers": [{ "key": "Content-Type", "value": "application/manifest+json" }, { "key": "Cache-Control", "value": "public, max-age=0, must-revalidate" }] },
       {
         "source": "**",
         "headers": [
@@ -102,6 +104,7 @@
       }
     ],
     "rewrites": [
+      { "source": "/.well-known/assetlinks.json", "destination": "/app/assetlinks.json" },
       {"source":"/manageAppTesters","function":"manageAppTesters"},
       {"source":"/appTesterEmailWebhook","function":"appTesterEmailWebhook"},
       {
