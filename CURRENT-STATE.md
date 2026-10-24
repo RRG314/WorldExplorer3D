@@ -8,17 +8,23 @@ development branches and the release. Do not ask again.
 
 ## October 23 authorized coordinated production release (in progress)
 
-Current in-progress change: starting-area readiness replaces the full distant
-pavement gate. Accepted terrain/roads and nearby contacts plus their mask border
-remain required before play. Full selected-area coverage continues through the
-existing frame owner; full publication has a separate completion state. Earth
-environment requests retire unfinished source work and preserve accepted cells;
-cancelled mapped-path handoff resumes without recompiling them. Initial near
-coverage must contain the admitted actor.78of79first owner checks passed; the
-remaining test incorrectly assumed an initialized environment. After correcting
-that fixture, all4focused new domain/arrival/suspension cases passed. Failures are
-retained. Next: the updated single-session mobile check, including Moon return
-and complete regional coverage. This change is not yet browser-qualified.
+The starting-area change is now browser-qualified at clean d02814a9. All six
+current mobile checks passed in one compiled Baltimore session: safe admitted
+nearby surfaces, touch walking/look, driving/rotation/release, native frame
+pacing, unfinished Earth work retired across Moon return, and complete regional
+coverage. First playable62.854s (the60s target remains missed), required-data
+wait15.980s and post-data preparation42.909s. Native mobile-layout proxy52.61FPS,
+p95/p9933.4ms, max50.1ms. All6,009cells/4,552nonempty and exact original covered
+area completed; worker retired.49,080buildings and18,951roads retained. Screenshots
+were inspected; no page errors. This is Mac touch emulation, not physical-phone
+qualification. Original failures remain in the ledger. Evidence:
+`output/research/gameplay-qa-2026-10-23/attempts/mobile-1792800838694/`.
+
+Protected stable security maintenance is being merged without changing delivered
+game inputs. Next: protected PR checks, paired final packages, coordinated scoped
+production backend/Hosting activation and bounded production acceptance. The
+read-only cloud baseline and private rollback material are retained; production
+has not yet changed in this coordinated release.
 
 The earlier9ed7ce8d full-region-gated pilot loaded in86.179s, including13.9s
 regional-ground wait; native frames/input passed. The updated QA contract records

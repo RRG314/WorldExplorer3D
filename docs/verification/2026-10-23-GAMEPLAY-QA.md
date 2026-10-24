@@ -55,3 +55,34 @@ Use `docs/verification/GAMEPLAY-QA.md` and `npm run qa:gameplay:plan`, `qa:gamep
 Failed evidence remains: initial obsolete canvas selector, camera-cycle cleanup assertion, rejected shallow ocean coordinate, missing fixture declaration, early Space readiness assertion, original real Mars failure and initial staging-upload cache prerequisite. These were diagnosed separately; no interrupted or failed observation was overwritten as passing. Later corrections have their own attempts.
 
 All owned browser servers and ephemeral static servers closed. The ordinary Chrome profile/tab inventory, unrelated emulator, current dist, assets, history, production package and rollback packages were preserved. One redundant isolated security staging package was archived byte-for-byte against its retained production basis plus five-file overlay to keep four package slots; recovery proof is recorded. Operational evidence and hashes are under `output/research/gameplay-qa-2026-10-23/`, including coverage, retained-source/service reviews, visual inspection, resume proof and final readiness.
+
+
+## Authorized production follow-through: starting-area qualification
+
+Clean d02814a9 passed the six current mobile checks in one compiled Baltimore
+session. Startup62.854s includes15.980s required-data wait and42.909s after data.
+The60s whole-start target remains missed; the separately documented safe-start
+contract passed. Nearby detail plus its mask border gates play. Distant pavement
+continues through the existing frame owner and has a separate completion state.
+This replaces the full-region-before-play barrier, preserving its failed
+90.6/87.270/89.551/78.652/86.179s receipts without relabelling them.
+
+Actual touch walking/look, driving, portrait/landscape layouts and released input
+passed. During background coverage, the native Apple M1 mobile-layout sample
+averaged52.61FPS; p95/p9933.4ms, max50.1ms, no100ms stalls. Moon departure retired
+unfinished work; Earth returned to the same accepted world/publication and
+resumed. All6,009cells/4,552nonempty completed with the exact original area
+1,883,722.2901960826,49,080buildings and18,951roads; worker retired. Six checks
+completed in roughly four minutes without replaying unrelated worlds. Images
+were inspected and no page errors occurred. Physical-phone/Safari/thermal and
+high-concurrency limitations above remain.
+
+Fresh ordinary in-app-browser Akureyri search also returned expected places;
+server logs confirm getPlaceLookup HTTP200 without a debug-attestation bypass.
+The earlier headless403/401 observations stay retained. Email, save, account,
+room, ocean and planetary evidence is retained with changed-input review rather
+than repeated for unchanged behavior. Coordinated production activation and its
+bounded smoke remain required before declaring this deployed.
+
+Operational evidence: `output/research/production-release-2026-10-23/` and
+`output/research/gameplay-qa-2026-10-23/attempts/mobile-1792800838694/`.
