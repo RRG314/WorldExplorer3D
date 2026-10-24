@@ -9,8 +9,10 @@ world play.
 
 ## Build and signing
 
-- Package: `io.worldexplorer3d.app`; first version code `1`, name `5.6.1-test.1`.
-- Minimum Android API 24; compile/target API 36, as currently required for new
+- Package: `io.worldexplorer3d.app`; current test code `2`, name `5.6.1-test.2`.
+  The first undistributed internal upload, code `1`, remains in Play's history.
+- Minimum Android API 29 (Android 10), matching current Chrome support;
+  compile/target API 36, as currently required for new
   phone/tablet submissions. No native renderer or bundled world copy.
 - `android-test.yml` builds/lints unsigned APK/AAB on the existing GitHub runner.
   Resolved dependencies and SHA-256 verification metadata are checked in; the

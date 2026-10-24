@@ -5,10 +5,12 @@ android {
     compileSdk 36
     defaultConfig {
         applicationId 'io.worldexplorer3d.app'
-        minSdk 24
+        // Current Chrome requires Android 10+. Do not offer a new TWA to
+        // systems whose browser can no longer receive current releases.
+        minSdk 29
         targetSdk 36
-        versionCode 1
-        versionName '5.6.1-test.1'
+        versionCode 2
+        versionName '5.6.1-test.2'
         resValue 'string', 'provider_authority', 'io.worldexplorer3d.app.fileprovider'
     }
     buildTypes {

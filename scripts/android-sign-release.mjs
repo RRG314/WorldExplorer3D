@@ -47,8 +47,18 @@ if(input==='--certificate-only') {
 }
 const output=path.join(source,'signed');
 await fs.mkdir(output,{recursive:true});
-const bundle=path.join(output,'world-explorer-5.6.1-test.1.aab');
-const apk=path.join(output,'world-explorer-5.6.1-test.1.apk');
+const badging=await fs.readFile(path.join(source,'package-badging.txt'),'utf8');
+const identity=/^package: name='([^']+)' versionCode='(\d+)' versionName='([^']+)'/.exec(badging);
+if(!identity || identity[1]!=='io.worldexplorer3d.app' || !/^[A-Za-z0-9._-]+$/.test(identity[3])) throw new Error('Unexpected Android package identity');
+const [,packageName,code,versionName]=identity,versionCode=Number(code);
+const checksums=new Map((await fs.readFile(path.join(source,'SHA256SUMS'),'utf8')).trim().split('\n').map(line=>{
+  const match=/^([a-f0-9]{64})\s+\*?(.+)$/.exec(line);if(!match)throw new Error('Invalid artifact checksum record');return [match[2],match[1]];
+}));
+for(const file of ['app-release.aab','app-release-unsigned.apk','apksigner.jar']) {
+  if(createHash('sha256').update(await fs.readFile(path.join(source,file))).digest('hex')!==checksums.get(file)) throw new Error('Android artifact checksum mismatch: '+file);
+}
+const bundle=path.join(output,`world-explorer-${versionName}.aab`);
+const apk=path.join(output,`world-explorer-${versionName}.apk`);
 // The bundle signature is the upload signature. Google Play uses its own app-signing key.
 await fs.copyFile(path.join(source,'app-release.aab'),bundle);
 run('jarsigner',['-keystore',keyPath,'-storepass:env','WE3D_ANDROID_STORE_PASSWORD',
@@ -65,7 +75,7 @@ for(const file of [bundle,apk]) {
   artifacts.push({file:path.basename(file),bytes:data.length,sha256:createHash('sha256').update(data).digest('hex')});
 }
 await fs.writeFile(path.join(output,'upload-certificate.der'),cert);
-const receipt={packageName:'io.worldexplorer3d.app',versionCode:1,versionName:'5.6.1-test.1',
+const receipt={packageName,versionCode,versionName,
   uploadCertificateSha256:fingerprint,sourceCommit:(await fs.readFile(path.join(source,'source-commit.txt'),'utf8')).trim(),
   artifacts,apkVerification,appSigningCertificate:'Obtain separately from Google Play; upload signature is not the Play app signature'};
 await fs.writeFile(path.join(output,'signing-receipt.json'),JSON.stringify(receipt,null,2)+'\n');
