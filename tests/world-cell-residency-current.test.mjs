@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { createWorldLoadRequest } from '../app/js/earth-core/world-load-request.js';
 import { createWorldSnapshot, createWorldSnapshotStore } from '../app/js/earth-core/world-snapshot.js';
-import { getLifecycleRegistrySnapshot } from '../app/js/runtime/lifecycle-scope.js';
+import { getLifecycleRegistrySnapshot } from '../app/js/runtime/lifecycle-scope.js?v=2';
 import { createWorldCellFacts, createTransportCellFacts, transportFromCellFacts,
   encodeWorldCellFacts, decodeWorldCellFacts } from '../app/js/earth-core/world-cell-facts.js';
 import { createRoadRegionLease } from '../app/js/terrain/road-region-lease.js';

@@ -1,4 +1,4 @@
-import { createLifecycleScope } from '../runtime/lifecycle-scope.js';
+import { createLifecycleScope } from '../runtime/lifecycle-scope.js?v=2';
 
 const DISMISSAL_KEY = 'we3d.tester-invitation.v1';
 let lifetime = null;

@@ -1,4 +1,4 @@
-import { createLifecycleScope } from '../runtime/lifecycle-scope.js';
+import { createLifecycleScope } from '../runtime/lifecycle-scope.js?v=2';
 import { encodeWorldCellFacts } from './world-cell-facts.js';
 
 export const WORLD_SNAPSHOT_LAYERS = Object.freeze([
