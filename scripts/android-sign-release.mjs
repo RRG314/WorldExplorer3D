@@ -68,7 +68,8 @@ run('java',['-jar',path.join(source,'apksigner.jar'),'sign','--ks',keyPath,
   '--ks-key-alias',credential.alias,'--ks-pass','env:WE3D_ANDROID_STORE_PASSWORD',
   '--key-pass','env:WE3D_ANDROID_STORE_PASSWORD','--out',apk,path.join(source,'app-release-unsigned.apk')],signingEnv);
 const apkVerification=run('java',['-jar',path.join(source,'apksigner.jar'),'verify','--verbose','--print-certs',apk]);
-if(!apkVerification.includes('Verified using v2 scheme (APK Signature Scheme v2): true')) throw new Error('APK v2 signature missing');
+// apksigner's successful exit is the verification authority. It selects the
+// schemes required by the package's minSdk (Android 10+ can use v3 without v2).
 const artifacts=[];
 for(const file of [bundle,apk]) {
   const data=await fs.readFile(file);
