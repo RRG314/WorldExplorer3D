@@ -43,10 +43,12 @@ for documentation or certificate-site publication.
 
 Existing Play app 4972969608428854795 has internal version 1 published with zero
 testers. Do not enable that superseded version. Version 2 is signed but NOT
-uploaded: the Mac is locked, blocking native file selection and Console input.
+uploaded: the Mac is locked, blocking native file selection. Keyboard Console navigation and text entry work.
 Free pricing, Game/Adventure, HTTPS public contact/privacy, No ads/government/
-health/financial features were saved. Listing text/icon/feature graphic are
-prepared, not uploaded. The IARC Game category and support contact are prepared,
+health/financial features were saved. Listing descriptions were saved as a Console draft; the icon/feature graphic
+are prepared but not uploaded. Data safety has saved security/account-deletion
+facts and 16 source-backed data categories; handling/purposes and final preview
+remain incomplete and have not been submitted for review. The IARC Game category and support contact are prepared,
 but its explicit legal agreement remains unchecked pending owner action-time
 approval. Do not infer approval from the general setup request. Combat includes
 human NPC/civilian/responder targets, lasers/sidearms/melee/grenades and hit/downed

@@ -105,8 +105,10 @@ packages differ only in their three environment config outputs. Existing game
 payload acceptance is retained by byte equivalence. Initial rewrite, hidden-file
 selector, comparison-expectation and propagation failures remain in the ledger.
 
-The Mac is currently locked. Owner unlock is needed for Console input and native
-file selection. The explicit IARC terms checkbox also requires owner approval
+The Mac is currently locked. Owner unlock is needed for native file selection; keyboard
+Console navigation and text entry still work. Listing descriptions and the
+source-backed Data safety categories/security/deletion facts were saved as drafts.
+Data handling/purposes and final review remain incomplete. The explicit IARC terms checkbox also requires owner approval
 before proceeding; no age rating has been assigned or invented. Actual Android
 installation/gameplay remains a separate pending check, followed by complete
 closed-track forms and the real tester period before public production access.
