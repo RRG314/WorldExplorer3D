@@ -21,10 +21,10 @@ source, and each multiplayer room retains one selected origin.
 
 | Area | Evidence and scope |
 | --- | --- |
-| Changed loading/publication | Focused lifecycle, cancellation, terrain/contact, worker and geometry checks; all6,009 original mask hashes/order/area match. Compiled one-session mobile checks all passed, including complete regional coverage and worker retirement after Moon return. |
-| Gameplay/performance | Actual touch walking/look, driving, rotation/input release and Paint palette checks passed. Native Mac mobile-layout proxy52.61FPS, p95/p9933.4ms, max50.1ms during background coverage. Earlier actual desktop45.8FPS and ocean60FPS are retained. First playable62.854s, including15.980s required-data wait and42.909s post-data preparation. The60s target remains missed. |
-| Production rooms | A signed-out guest entered the actual Nürburgring weekly world, with1,427buildings/5,727roads, walked3.64 world units through native keyboard input and published valid poses, then left through the UI. Weekly roomWMX8DA remained. Two normal accounts created/joined/left a private personal room through the packaged SDK, preserving owner/quota. This adds no second production city replay or32-client load claim. Prior full two-client UI/chat/discovery/reconnect evidence is retained. |
-| Production email | One owner-only application through ordinary Chrome and real App Check; actual24-hour email confirmation, pending review, authenticated approval without sending, preview without sending, explicit invitation, real acceptance, manual Gmail reply through Resend's signed webhook, and withdrawal. Six system messages were read in Gmail Inbox with SPF/DKIM/DMARC passing. The invitation used Inbox Promotions; other messages used Updates. No all-provider or Primary-tab claim. |
+| Changed loading/publication | Focused lifecycle, cancellation, terrain/contact, worker and geometry checks; all 6,009 original mask hashes/order/area match. Compiled one-session mobile checks all passed, including complete regional coverage and worker retirement after Moon return. |
+| Gameplay/performance | Actual touch walking/look, driving, rotation/input release and Paint palette checks passed. Native Mac mobile-layout proxy 52.61 FPS, p95/p99 33.4 ms, max 50.1 ms during background coverage. Earlier actual desktop45.8FPS and ocean60FPS are retained. First playable 62.854 s, including 15.980 s required-data wait and 42.909 s post-data preparation. The60s target remains missed. |
+| Production rooms | A signed-out guest entered the actual Nürburgring weekly world, with1,427 buildings and 5,727 roads, walked 3.64 world units through native keyboard input and published valid poses, then left through the UI. Weekly room WMX8DA remained. Two normal accounts created/joined/left a private personal room through the packaged SDK, preserving owner/quota. This adds no second production city replay or32-client load claim. Prior full two-client UI/chat/discovery/reconnect evidence is retained. |
+| Production email | One owner-only application through ordinary Chrome and real App Check; actual 24-hour email confirmation, pending review, authenticated approval without sending, preview without sending, explicit invitation, real acceptance, manual Gmail reply through Resend's signed webhook, and withdrawal. Six system messages were read in Gmail Inbox with SPF/DKIM/DMARC passing. The invitation used Inbox Promotions; other messages used Updates. No all-provider or Primary-tab claim. |
 | Normal services | Fresh ordinary staging lookup and weather HTTP200; production Chrome displayed Bergen's forecast and Cloud Function logs confirmed fresh HTTP200. No debug attestation or weaker policy. |
 | Other current features | Retain reviewed actual desktop controls/camera/map/pause, activities and creation, ship/deck/sub/scuba/recovery, lunar/Mars/space journeys, interior admission, native IndexedDB/reload/cross-tab/migration/backup failures, and controlled GPS/AR lifecycle/fallback evidence. Controlled activity end positions/timers and sensor inputs do not certify competitive routes, remote leaderboards or physical sensors. |
 
@@ -39,10 +39,10 @@ fixtures retain their explicit command and required isolated environment.
 
 ## Activation and preservation
 
-Production now has84 Functions: four additive tester Functions and a source-only
-update to existing joinRoom. All79 unrelated original Function resources,
+Production now has 84 Functions: four additive tester Functions and a source-only
+update to existing joinRoom. All 79 unrelated original Function resources,
 joinRoom configuration/IAM, and project IAM matched their private pre-release
-snapshots. All84 staging Function resources were preserved. Both new tester
+snapshots. All 84 staging Function resources were preserved. Both new tester
 indexes are READY and all six TTL policies ACTIVE. The only Auth change is
 Anonymous sign-in; the only rule change reserves the weekly room prefix.
 Hosting preserved all prior configuration and added three tester rewrites.
@@ -60,10 +60,10 @@ access details when available; approval is separate from sending invitations.
 
 Physical phones, Safari, thermal/battery behavior, hardware controllers and
 higher multiplayer concurrency remain unqualified. The Mac touch proxy is not
-a phone performance certificate. The first60s cold-start target remains missed,
+a phone performance certificate. The first 60 s cold-start target remains missed,
 although safe-start and frame floors passed. CelesTrak was unavailable on this
 network in both the normal browser and direct provider check; the requested
-endpoint matches the provider's documented GP API. Its unavailable state stays
+endpoint matches the provider's [documented GP API](https://celestrak.org/NORAD/documentation/gp-data-formats.php). Its unavailable state stays
 visible, and no orbital observation is invented. Other live services remain
 provider-dependent. An initial Codex in-app-browser production signup had an
 App Check network error; the unchanged normal Chrome path passed. Production
@@ -89,4 +89,4 @@ under `output/research/production-release-2026-10-23/`; the targeted decision is
 `output/release-evidence/current/coordinated-20261023/release-decision.json`.
 This completed rollout supersedes older local-only/staging-only checkpoint
 statuses. Future work should target an actual changed feature or missing device
-qualification; do not restart the old106/107-gate or42-minute sweeps.
+qualification; do not restart the old 106/107-gate or 42-minute sweeps.

@@ -19,8 +19,8 @@ Read `docs/verification/2026-10-23-PRODUCTION-RELEASE.md` for executed/retained
 acceptance, limits and recovery. The ten-check targeted decision passed, without
 claiming the historical full matrix. Current mobile loading/control/performance,
 Moon return and exact complete6,009-cell coverage passed in one compiled city
-session. First playable62.854s still misses60s target; post-data42.909s and
-native mobile-layout52.61FPS passed current floors. Physical phones/Safari,
+session. First playable 62.854 s still misses 60 s target; post-data 42.909 s and
+native mobile-layout 52.61 FPS passed current floors. Physical phones/Safari,
 thermal behavior and higher concurrency remain unqualified.
 
 Actual production weekly guest entry loaded Nürburgring, published native
@@ -33,10 +33,10 @@ passing. Temporary build settings are blank again; disposable admin/room test
 accounts and private room were cleaned up. No new app download is advertised.
 Owner portal: https://worldexplorer3d.io/account/admin.html?view=testers .
 
-Production has84 Functions. Four tester Functions and source-only joinRoom are
+Production has 84 Functions. Four tester Functions and source-only joinRoom are
 active, both tester indexes READY and six TTL policies ACTIVE. Anonymous auth
-and the single weekly-prefix rule are active. All79 unrelated original
-Functions, joinRoom configuration/IAM, other Auth fields, project IAM and all84
+and the single weekly-prefix rule are active. All 79 unrelated original
+Functions, joinRoom configuration/IAM, other Auth fields, project IAM and all 84
 staging Functions matched snapshots. Hosting retained prior configuration plus
 three tester rewrites. Existing Resend webhooks and DNS were preserved; the new
 production signed receiver is enabled with scoped secret access.
