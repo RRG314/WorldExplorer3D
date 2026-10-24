@@ -14,6 +14,15 @@ const all = (await fs.readdir('tests')).filter(name => /\.test\.(?:mjs|cjs|js)$/
 const externalOwners = new Map(backendSteps.flatMap(step => step.command.filter(arg => all.includes(arg))
   .map(file => [file, `backend:${step.id}`])));
 const packageJson = JSON.parse(await fs.readFile('package.json', 'utf8'));
+// Named Node test commands can own isolated emulator fixtures without putting
+// their cloud/port prerequisites in the component-only PR process.
+for (const [name, command] of Object.entries(packageJson.scripts)) {
+  const args = String(command).split(/\s+/);
+  if (args[0] !== 'node' || !args.includes('--test')) continue;
+  for (const file of all) if (args.includes(file) && !externalOwners.has(file)) {
+    externalOwners.set(file, `package:${name}`);
+  }
+}
 if (String(packageJson.scripts['verify:painttown'] || '').split(/\s*&&\s*/).includes('node tests/painttown.integration.test.mjs')) {
   externalOwners.set('tests/painttown.integration.test.mjs', 'candidate:painttown');
 }
