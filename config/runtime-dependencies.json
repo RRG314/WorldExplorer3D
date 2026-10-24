@@ -363,7 +363,7 @@
   "locks": [
     {
       "path": "package-lock.json",
-      "sha256": "b24c8d9874a4ebe62415dfaae7160a8fd683e453c456325c379cca485a413d0a",
+      "sha256": "2be25738132c3c5e13a45f8fb9acdde27589dc9b39fc797350aaa1e7ec233f97",
       "direct": [
         {
           "package": "@babel/parser",
@@ -444,6 +444,11 @@
           "package": "sharp",
           "version": "0.35.5",
           "integrity": "sha512-Ywn4OnzGukp7CDMrp08RQ50YKmuwG47brZgIVPTvBaaAfQlRlygrRqSrxdCiL9M+LlzLBiJ68IR1QqvzHyjC7g=="
+        },
+        {
+          "package": "parse5",
+          "version": "8.0.1",
+          "integrity": "sha512-z1e/HMG90obSGeidlli3hj7cbocou0/wa5HacvI3ASx34PecNjNQeaHNo5WIZpWofN9kgkqV1q5YvXe3F0FoPw=="
         }
       ]
     },

@@ -24,6 +24,10 @@ test('HTML module discovery accepts whitespace and mixed case in script end tags
  const {root,write}=await setup(t);await write('fixture.html','<script type="module">import "./first.js";</SCRIPT \n><script src="./second.js"></script\t>');await write('first.js','export const first=1;');await write('second.js','export const second=2;');const result=await acceptanceInputs(root,{entries:['fixture.html']});assert.ok(result.inputs['first.js']);assert.ok(result.inputs['second.js']);await write('second.js','export const second=3;');assert.notEqual((await acceptanceInputs(root,{entries:['fixture.html']})).fingerprint,result.fingerprint);
 });
 
+test('HTML parsing follows recovered script end tags and spaced attributes while ignoring comments',async t=>{
+ const {root,write}=await setup(t);await write('fixture.html','<!-- <script type="module">import "./comment-only.js";</script> --><script type = "module">import "./first.js";</script\t\n bar><script src = "./second.js"></script>');await write('first.js','export const first=1;');await write('second.js','export const second=2;');const result=await acceptanceInputs(root,{entries:['fixture.html']});assert.ok(result.inputs['first.js']);assert.ok(result.inputs['second.js']);assert.equal(result.inputs['comment-only.js'],undefined);
+});
+
 test('the acceptance CLI binds declared result evidence and refuses a success with a missing result',async t=>{
  const {root,write}=await setup(t);await fs.mkdir(path.join(root,'config'));
  await write('case.mjs',"import fs from 'node:fs';fs.appendFileSync('calls.txt','x');fs.writeFileSync('result.json',JSON.stringify({passed:true}));");

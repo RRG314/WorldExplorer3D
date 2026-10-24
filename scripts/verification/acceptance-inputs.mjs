@@ -2,6 +2,7 @@ import {createHash} from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import {parse} from '@babel/parser';
+import {parse as parseHtml} from 'parse5';
 
 const digest=bytes=>createHash('sha256').update(bytes).digest('hex');
 const literal=node=>node?.type==='StringLiteral'?node.value:node?.type==='Literal'&&typeof node.value==='string'?node.value:null;
@@ -33,11 +34,17 @@ export async function acceptanceInputs(root,definition,{artifactRoot=null}={}){
   let refs=[];
   if(/\.(?:m?js|cjs)$/.test(relative))refs=references(bytes.toString());
   if(/\.html$/.test(relative)){
-   // Extract repository module inputs, including valid whitespace before an
-   // end tag's closing bracket. This is dependency discovery, not sanitization.
-   const text=bytes.toString();for(const match of text.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script\s*>/gi)){
-    const src=match[1].match(/\bsrc=["']([^"']+)["']/i);if(src)refs.push({value:src[1],commonJS:false});else if(/\btype=["']module["']/i.test(match[1]))refs.push(...references(match[2]));
-   }
+   // Follow actual script elements. HTML syntax, comments and end-tag recovery
+   // belong to the parser; dependency discovery must not approximate sanitizing.
+   const visit=node=>{
+    if(node.tagName==='script'){
+     const attrs=Object.fromEntries((node.attrs||[]).map(a=>[a.name,a.value]));
+     if(attrs.src)refs.push({value:attrs.src,commonJS:false});
+     else if(attrs.type?.trim().toLowerCase()==='module')refs.push(...references((node.childNodes||[]).map(n=>n.value||'').join('')));
+    }
+    for(const child of node.childNodes||[])visit(child);
+   };
+   visit(parseHtml(bytes.toString()));
   }
   for(const {value:ref,commonJS,directoryUrl} of refs){
    if(!ref.startsWith('.')&&!ref.startsWith('/'))continue;
