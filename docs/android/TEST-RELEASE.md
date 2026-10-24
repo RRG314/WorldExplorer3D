@@ -90,3 +90,25 @@ physical frame time/loading/thermal limits honestly instead of relabeling the
 Mac's mobile-layout measurements as phone performance.
 
 Operational evidence and failed attempts: `output/research/android-testing-2026-10-23/`.
+
+## October 23 observed status
+
+Protected PRs 118, 119 and 121 are merged. Native build/lint 40053369082 and
+official signed-package verification passed for code 2; it is awaiting upload.
+The earlier internal code 1 has no selected testers. Free pricing and the basic
+non-rating declarations were saved; this does not imply review acceptance.
+
+Production install support is live at compiled source `dd51952e203c`, Hosting
+`b82e6df7154cb0dc`. Both official Digital Asset Links queries return linked=true.
+The canonical static file matches the authored declaration; staged and production
+packages differ only in their three environment config outputs. Existing game
+payload acceptance is retained by byte equivalence. Initial rewrite, hidden-file
+selector, comparison-expectation and propagation failures remain in the ledger.
+
+The Mac is currently locked. Owner unlock is needed for Console input and native
+file selection. The explicit IARC terms checkbox also requires owner approval
+before proceeding; no age rating has been assigned or invented. Actual Android
+installation/gameplay remains a separate pending check, followed by complete
+closed-track forms and the real tester period before public production access.
+Use the newest CURRENT-STATE section and operational receipts to resume without
+repeating the completed native builds or browser gameplay checks.
