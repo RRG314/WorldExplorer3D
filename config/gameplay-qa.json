@@ -97,10 +97,10 @@
       "module": "scripts/verification/gameplay-qa/mobile.mjs",
       "checks": [
         "mobile-load",
-        "mobile-background-world-return",
         "mobile-walk-look",
         "mobile-drive-rotate",
         "mobile-native-proxy-performance",
+        "mobile-background-world-return",
         "mobile-regional-coverage"
       ],
       "timeoutMs": 420000,
