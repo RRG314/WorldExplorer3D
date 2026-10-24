@@ -9,8 +9,8 @@ world play.
 
 ## Build and signing
 
-- Package: `io.worldexplorer3d.app`; published internal code `2`, name `5.6.1-test.2`.
-  The next candidate is code `3`, name `5.6.1-test.3`, pending build/publication.
+- Package: `io.worldexplorer3d.app`; published internal code `3`, name `5.6.1-test.3`.
+  Codes `1` and `2` remain in history and are excluded from the new release.
   The first undistributed internal upload, code `1`, remains in Play's history.
 - Minimum Android API 29 (Android 10), matching current Chrome support;
   compile/target API 36, as currently required for new
@@ -105,57 +105,78 @@ Operational evidence and failed attempts: `output/research/android-testing-2026-
 
 ## October 24 observed status
 
-Version 2 has been uploaded, validated and published to the active internal
-track. Only a fresh owner-only World Explorer tester list is selected. The
-owner-eligible opt-in page is
-https://play.google.com/apps/internaltest/4701521177239633849 . Testers must use
-the Google account selected for that list. Google displays the temporary package
-name until app review; this is not public Play production approval. Code 1 is
-excluded. The native package has not changed or been rebuilt.
+Version 3 was uploaded, validated and published October 24 at 4:36 PM to active
+internal track 4701521177239633849. Only the owner-only World Explorer list is
+selected; the unrelated RGE256 list is unselected. The invitation remains
+https://play.google.com/apps/internaltest/4701521177239633849 . Acceptance and
+installation remain the owner's actions. Google still displays its temporary
+unreviewed package label. The saved public name is **World Explorer 3D**.
+
+The upload AAB was rehashed before Console upload: SHA-256
+`dfca113d6a2322679e1092e8b5c68831ca62f05982dc0d14e9830c0f9b98c651`.
+Build/lint 40129219761 and signature verification passed. Native inputs are from
+`3c02db8335d26bc0e56e494363439444846f2506`; the subsequent b48 correction changes
+only two web billing imports. Durable signing material was reused and remains
+outside the repository. No new key, native bridge, permission or billing SDK.
+
+The consumption-only web presentation and mobile Account fixes are live:
+
+- Production `5.6.1+b48f27561a9c.b114089627016e66.production`, Hosting
+  `513b12b8f2df377c`.
+- Staging `5.6.1+b48f27561a9c.414b57dc65f2c2f5.staging`, Hosting
+  `81cd842af05a2be9`.
+- Compiled source `b48f27561a9c751405e0b2b4437391c23763dd8b`; PR125 merged as
+  `0bb18f3e1108de89237070f542448a62294337c1`, identical source trees.
+
+Six distribution component tests, ownership and unresolved-name checks,
+source-browser navigation/layout and compiled account-gate/room-option checks
+passed. Required checks, security scans and all four post-merge workflows passed.
+Staging/production differ only in three expected Firebase configuration files;
+741 preceding assets remain byte-identical. Exact changed live bytes were checked.
+World data, features, coverage, transport admission, existing progress and services
+were preserved. Failed CI/import/precondition/overflow attempts and local CAPTCHA/
+Firestore errors remain evidence, not new Android or live-auth qualification.
 
 Free pricing and basic declarations are saved, including No advertising ID.
-The corrected IARC questionnaire is Completed: ESRB Teen, PEGI16, USK16,
-generic/Russia16+, Brazil14+, South Korea15+, TaiwanPG12, AustraliaPG and Saudi
-Arabia18. It accurately includes rare field medicine, human violence, interaction,
-location sharing and digital purchases. No unsupported war or user-blocking
-claim remains. Target audience is saved as 16–17 and 18 and over.
+IARC remains Completed: ESRB Teen, PEGI16, USK16, generic/Russia16+, Brazil14+,
+South Korea15+, TaiwanPG12, AustraliaPG and Saudi Arabia18. Target audience is
+16–17 and 18 and over. Retain the existing truthful violence/medicine/interaction/
+location answers; these ratings are not Google app-review approval.
 
-Store text, icon and feature graphic are saved as a draft. Required genuine app
-screenshots remain outstanding. Data safety retains its 16-category/security/
-account-deletion draft; per-type handling/purposes and provider/analytics sharing
-still require final review. Limited analytics is cookieless measurement, not a
-complete opt-out. No false No-data or independent-security-review badge was used.
+The dedicated empty non-admin reviewer account has complimentary nonexpiring
+Pro access. Normal password sign-in/own-profile read passed. Credentials and
+reusable instructions are saved with Google; optional partner/device-feedback
+sharing is off. There is no purchase, OTP or trial requirement. Private credentials
+remain owner-only outside source and evidence. No physical-phone claim.
 
-A dedicated empty, non-admin reviewer account with complimentary Pro access has
-passed normal password sign-in and its own-profile read. Credentials are private
-outside source/evidence. The owner authorized continuation after the specific
-reviewer-access question; access and instructions are now saved with Google.
-Optional partner/device-feedback sharing is off. Instructions require no owner login, purchase,
-expiring trial or OTP. This is not Android UI or App Check qualification.
+Store text, icon, feature graphic and two real compiled-app UI screenshots were
+saved; Console marked the listing Ready to send for review. Icon/feature graphic
+AI assistance was declared. The owner requested gameplay replacement. Prepared
+unedited 1920×1080 gameplay PNGs and per-file hashes are in
+`output/research/play-gameplay-screenshots-2026-10-24/selected/` and `selection.json`.
+That receipt records the latest upload status; prepared images are not proof of
+a Console upload. These are Mac Chrome landscape touch-layout captures of compiled
+staging b48 through ordinary controls, not physical Android screenshots, render
+fixtures or AI images. Failed locations/unresponsive/resource-limited attempts
+are retained. No full historical acceptance suite was restarted for photography.
 
-Before wider distribution, resolve two source-confirmed policy gaps. Existing
-Stripe Pro checkout grants digital room/feature benefits, so it cannot be assumed
-to qualify as a pure tip. A consumption-only Android experience can retain web
-commerce and existing benefits; native billing/approved program enrollment is a
-separate alternative. Public chat has reporting/moderation but no user blocking.
-Implement effective blocking through existing social/session owners and verify
-pre-UGC terms acceptance for guest/public chat and uploads. Do not remove core
-features or label reporting as blocking. Reference current Google policies:
-https://support.google.com/googleplay/android-developer/answer/10281818?hl=en
-and https://support.google.com/googleplay/android-developer/answer/9876937?hl=en .
+Data safety retains its 16-category/security/account-deletion draft. Per-type
+handling/purposes and provider/analytics sharing still require completion; limited
+cookieless measurement is not a complete opt-out or proof all collection is optional.
+Do not submit unsupported No-data or independent-security-review claims.
 
-PR123's two-page GPS disclosure is live on production at compiled source
-`e80d473f17b2`, Hosting `d41966c1156b4857`. It explains real-location visibility
-through multiplayer avatars in the existing consent panel and privacy page;
-pausing GPS does not erase a position already shared. No GPS/room control rule
-changed. All 773 other assets match the preceding qualified release and the
-staging/production pair differs only in the three Firebase config outputs.
-Desktop/mobile-layout consent/cancel checks and served-byte probes passed;
-local CAPTCHA errors were retained, not relabeled as new auth qualification.
-Required protected checks and post-merge workflows passed. No Android rebuild,
-repeated city tests, provider sweep or full release matrix was run.
+Before wider distribution, implement effective player blocking through existing
+social/session owners and verify pre-UGC terms acceptance for guest/public chat
+and uploads. Reporting/moderation is not persistent blocking. Preserve account
+removal cleanup. The implemented consumption-only presentation is not a Google
+policy approval. Actual Play-installed phone checks, final accurate forms and
+12 genuine continuously opted-in closed testers for 14 days remain outstanding.
 
-Actual Play-installed phone gameplay remains pending. The internal test is
-available now; public production still requires complete policy/forms/device
-qualification, the genuine closed-test period and Google's approval. Resume
-from current evidence without retaking ratings or rebuilding the same package.
+Operational evidence and failed attempts:
+`output/research/play-completion-2026-10-24/` and
+`output/research/play-gameplay-screenshots-2026-10-24/`.
+The preceding GPS disclosure remains in the current release. Original dist,
+rollback bases, assets, history, player data and all evidence remain preserved;
+identical bytes now share APFS copy-on-write storage with hash receipts. Do not
+repeat builds for documentation-only changes or relabel Mac evidence as phone
+performance. No public Android production rollout or broad tester mailing occurred.
