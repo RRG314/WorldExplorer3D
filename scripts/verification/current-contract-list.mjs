@@ -516,5 +516,6 @@ export const currentContractTests = [
   'tests/roof-orientation-current.test.mjs',
   'tests/regional-building-style-current.test.mjs',
   'tests/earth-district-current.test.mjs',
-  'tests/weapon-reticle-current.test.mjs'
+  'tests/weapon-reticle-current.test.mjs',
+  'tests/android-web-support.test.mjs'
 ];
