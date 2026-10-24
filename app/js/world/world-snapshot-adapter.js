@@ -4,6 +4,13 @@ import {
   WORLD_SNAPSHOT_LAYERS
 } from '../earth-core/world-snapshot.js?v=2';
 import { worldLayerProductCounts } from './compiler/world-layer-products.js?v=4';
+import { capturePublishedCell } from './world-cell-adapter.js';
+
+export function beginWorldPublication(appCtx, request) {
+  appCtx.worldSnapshotStore ||= createWorldSnapshotStore();
+  appCtx.worldSnapshotStore.begin(request);
+  appCtx.worldPublication = null;
+}
 
 function snapshotLayerFromProduct(product, request, name) {
   if (
@@ -48,7 +55,8 @@ export function publishWorldPublicationSnapshot(appCtx, options = {}) {
   }
   const snapshot = createWorldPublicationSnapshot(options);
   const publication = appCtx.worldSnapshotStore.publish(snapshot, {
-    expectedRequestId: options.request.id
+    expectedRequestId: options.request.id,
+    readCell: key => capturePublishedCell(appCtx, snapshot, key)
   });
   if (!publication.published) {
     throw new Error(`WorldSnapshot publication rejected: ${publication.reason || 'unknown'}`);

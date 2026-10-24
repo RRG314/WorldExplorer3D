@@ -1,0 +1,42 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs/promises';
+import {createRequire} from 'node:module';
+import {initializeTestEnvironment,assertFails} from '@firebase/rules-unit-testing';
+import {doc,getDoc,setDoc} from 'firebase/firestore';
+const require=createRequire(import.meta.url),backendRequire=createRequire(new URL('../../functions/package.json',import.meta.url)),{initializeApp,deleteApp}=backendRequire('firebase-admin/app'),{getFirestore}=backendRequire('firebase-admin/firestore');
+const {fixture}=require('../../tests/helpers/tester-program-fixture.cjs'),{createTesterProgram}=require('../../functions/tester-program'),{buildTesterInterestExport}=require('../../functions/tester-interest'),{deliverTesterMail,hash}=require('../../functions/tester-mail');
+const output='output/research/tester-program-2026-10-21/emulator.json';
+assert.ok(process.env.FIRESTORE_EMULATOR_HOST,'Emulator required; never use a live project');
+const projectId='demo-we3d-testers',app=initializeApp({projectId}),db=getFirestore(app),f=fixture();
+const options={db,config:()=>f.cfg,now:f.now,fetchImpl:f.fetchImpl},program=createTesterProgram(options);
+const publicHandler=buildTesterInterestExport({...options,functions:f.functions,setCors:()=>false,verifyAppCheck:async()=>true,program});
+const report={passed:false,scope:'Real isolated Firestore emulator, current rules and actual SDK transactions; simulated email provider. No live writes or email.',cases:[]};let rules;
+try{
+ const requested=await f.call(publicHandler,{action:'request',email:'tester@example.com',consent:true,consentVersion:'app-testing-v1'});assert.equal(requested.code,200);
+ const confirmation=f.requests.at(-1).body.text.match(/#([a-f0-9]{64})/)[1];
+ await program.confirm(confirmation);await program.confirm(confirmation);
+ let jobs=await db.collection('appTesterMail').get();assert.equal(jobs.size,2);report.cases.push('confirmation transaction creates one application, owner alert and receipt despite repeat confirmation');
+ const id=hash('tester@example.com'),ref=db.collection('appTesterInterests').doc(id),revision=(await ref.get()).data().revision;
+ const approvals=await Promise.allSettled([1,2].map(()=>program.adminAction({action:'approve',id,expectedRevision:revision},f.moderator)));
+ assert.equal(approvals.filter(r=>r.status==='fulfilled').length,1);report.cases.push('real transaction contention permits one approval with the expected revision');
+ await program.adminAction({action:'settings',buildUrl:'https://example.com/test-build',instructions:'Open the app and reply with feedback.',expectedRevision:0},f.moderator);
+ const current=(await ref.get()).data(),preview=await program.adminAction({action:'preview',id,expectedRevision:current.revision},f.moderator);
+ await program.adminAction({action:'invite',id,expectedRevision:current.revision,settingsRevision:preview.settingsRevision},f.moderator);
+ jobs=await db.collection('appTesterMail').get();const invite=jobs.docs.find(d=>d.data().kind==='invitation');
+ await deliverTesterMail({...options,jobId:invite.id});assert.equal((await invite.ref.get()).data().status,'accepted');
+ const providerId=(await invite.ref.get()).data().providerId;
+ await program.webhook({type:'email.delivered',data:{email_id:providerId}});assert.equal((await invite.ref.get()).data().status,'delivered');
+ const value=invite.data().message.text.match(/#invite\.([a-f0-9]{64})/)[1];
+ assert.equal((await program.publicAction({action:'invitation',token:value})).buildUrl,'https://example.com/test-build');
+ await program.publicAction({action:'invitation',token:value});
+ assert.equal((await db.collection('appTesterMail').where('kind','==','accepted').get()).size,1);report.cases.push('invitation/outbox/provider mapping/delivery and idempotent acceptance use real SDK data');
+ const management=invite.data().message.text.match(/#manage\.([a-f0-9]{64})/)[1];await program.publicAction({action:'withdraw',token:management});
+ await assert.rejects(()=>program.publicAction({action:'invitation',token:value}),/stopped/);report.cases.push('withdrawal prevents further access through the invitation capability');
+ const batch=db.batch();for(let i=0;i<32;i++)batch.set(db.collection('appTesterInterests').doc(hash(`fixture-${i}`)),{email:`fixture-${i}@example.com`,status:'pending',revision:1,consentState:'active',confirmedAtMs:f.now(),updatedAtMs:f.now()+i});await batch.commit();
+ const first=await program.adminAction({action:'list'},f.moderator),second=await program.adminAction({action:'list',cursor:first.nextCursor},f.moderator);assert.equal(first.items.length,30);assert.equal(second.items.length,2);assert.equal(new Set([...first.items,...second.items].map(v=>v.id)).size,32);report.cases.push('real query cursors return distinct application pages');
+ rules=await initializeTestEnvironment({projectId,firestore:{host:process.env.FIRESTORE_EMULATOR_HOST.split(':')[0],port:Number(process.env.FIRESTORE_EMULATOR_HOST.split(':')[1]),rules:await fs.readFile('firestore.rules','utf8')}});
+ const collections=['appTesterInterests','appTesterConfirmations','appTesterCapabilities','appTesterProgram','appTesterMail','appTesterMailReceipts','appTesterMailProvider','appTesterRequestLimits'];
+ for(const client of [rules.unauthenticatedContext().firestore(),rules.authenticatedContext('ordinary-user').firestore(),rules.authenticatedContext('claimed-admin',{admin:true}).firestore()])for(const name of collections){await assertFails(getDoc(doc(client,name,'private')));await assertFails(setDoc(doc(client,name,'private'),{email:'forged@example.com'}));}
+ report.cases.push('current rules deny direct reads and writes to all eight private collections for anonymous, ordinary and admin-claimed clients');report.passed=true;
+}catch(error){report.failure=error.stack;process.exitCode=1;}finally{await rules?.cleanup();await db.terminate();await deleteApp(app);await fs.writeFile(output,JSON.stringify(report,null,2));}
+console.log(JSON.stringify(report));

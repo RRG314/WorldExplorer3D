@@ -1,8 +1,17 @@
+import {resolveControlState} from '../transport/control-state.js';
 // Presentation ownership only; does not change or dispose renderer resources.
 export function activePresentationOwner(context) {
-  if(context.spaceFlight?.active)return 'space';
-  if(context.oceanMode?.active)return 'ocean';
+  const control=resolveControlState(context);
+  if(control.frame==='space')return 'space';
+  if(control.frame==='ocean')return 'ocean';
   return context.gameStarted?'main':null;
+}
+
+export function dedicatedPresentationActive(context) {
+  const frame=resolveControlState(context).frame;
+  return !!(context.worldLoading || context.arSessionActive ||
+    frame==='space' || frame==='ocean' ||
+    (frame!=='ship-interior' && context.isEnv?.(context.ENV?.SPACE_FLIGHT)));
 }
 
 export function capturePresentation(context) {

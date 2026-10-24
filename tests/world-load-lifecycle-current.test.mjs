@@ -10,7 +10,7 @@ import {isEarthWorldUsable} from '../app/js/earth-core/world-readiness.js';
 
 const selection={key:'custom',lat:39.29,lon:-76.61,name:'Baltimore'};
 function setup(overrides={}) {
-  const ctx={car:{},hashGeoToInt:()=>42,resolveLocationSelection:()=>selection,showLoad(){},...overrides};
+  const ctx={car:{},initializeWorldLoadActors:()=>true,hashGeoToInt:()=>42,resolveLocationSelection:()=>selection,showLoad(){},...overrides};
   const deps={appCtx:ctx,resetWorldForReload(){ctx.worldLoading=true;},getAdaptiveLoadProfile,getWorldLodThresholds,
     getRuntimeDynamicBudget:()=>({deviceClass:'desktop',budgetScale:1,lodScale:1}),earthSceneSuppressed:()=>false};
   return {ctx,deps};
@@ -119,4 +119,10 @@ test('an old successful result cannot authorize entry into a newer ready publica
     {state:'published',sequence:2,requestId:'third'},
     {state:'published'}
   ]) assert.equal(isEarthWorldUsable(ctx,result),false);
+});
+
+test('the room owner is notified after valid admission but before any world reset',()=>{
+ const events=[];const {deps}=setup({prepareRoomWorldChange:point=>{assert.deepEqual(point,{lat:selection.lat,lon:selection.lon});events.push('room-detach');}});
+ deps.resetWorldForReload=()=>events.push('world-reset');createWorldLoadRuntimeSession(deps);assert.deepEqual(events,['room-detach','world-reset']);
+ const invalid=setup({resolveLocationSelection:()=>null,prepareRoomWorldChange:()=>events.push('invalid-detach')});createWorldLoadRuntimeSession(invalid.deps);assert.equal(events.includes('invalid-detach'),false);
 });

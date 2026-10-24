@@ -315,7 +315,7 @@ export function applyBuildingContextSemanticsToFeature(feature) {
   if (feature.isStructureConnector === true) feature.isStructureConnector = false;
 }
 
-function* compileStructureAwareFeatureProfileSteps() {
+function* compileStructureAwareFeatureProfileSteps(options = {}) {
   const now = () => globalThis.performance?.now?.() ?? Date.now();
   const compilationStartedAt = now();
   const phaseDurationsMs = Object.create(null);
@@ -339,6 +339,7 @@ function* compileStructureAwareFeatureProfileSteps() {
       transportFeatures[i].tunnelObstructionLimits = compileTunnelObstructionLimits(transportFeatures[i], runtime.getNearbyBuildings);
     }
   });
+  options.onSurfaceFactsReady?.();
   yield;
 
   if (Array.isArray(appCtx.linearFeatureMeshes)) {
@@ -717,11 +718,11 @@ export function refreshStructureAwareFeatureProfiles() {
   return result.value;
 }
 
-export async function refreshStructureAwareFeatureProfilesCooperatively() {
+export async function refreshStructureAwareFeatureProfilesCooperatively(options = {}) {
   const sequence = appCtx._worldLoadSequence;
   const roads = appCtx.roads;
   const groundRelease = appCtx.lastEarthStreamingRelease;
-  const steps = compileStructureAwareFeatureProfileSteps();
+  const steps = compileStructureAwareFeatureProfileSteps(options);
   let result = steps.next();
   while (!result.done) {
     await yieldToMainThread();
@@ -734,7 +735,11 @@ export async function refreshStructureAwareFeatureProfilesCooperatively() {
   return result.value;
 }
 
-export async function refreshTransportStructureAssembliesForPublishedTerrain() {
+export async function refreshTransportStructureAssembliesForPublishedTerrain({current=()=>true}={}) {
+  const sequence=appCtx._worldLoadSequence,roads=appCtx.roads,groundRelease=appCtx.lastEarthStreamingRelease;
+  const isCurrent=()=>current()&&sequence===appCtx._worldLoadSequence&&roads===appCtx.roads&&groundRelease===appCtx.lastEarthStreamingRelease;
+  const assertCurrent=()=>{if(!isCurrent())throw new DOMException('Transport structure publication superseded','AbortError');};
+  assertCurrent();
   const roadFeatures = Array.isArray(appCtx.roads) ? appCtx.roads : [];
   const transportFeatures = roadFeatures.concat(structureAwareLinearFeatures());
   const structureWaterAreas = []
@@ -749,7 +754,9 @@ export async function refreshTransportStructureAssembliesForPublishedTerrain() {
   // the mesh adapter sees, after road grading and both terrain LODs publish.
   // The road floor remains owned by its already compiled transport profile.
   compileTunnelSystemModels(transportFeatures, samplePublishedTerrainY);
-  appCtx.tunnelSolidCompilation = await compileTunnelSolidBoundaries(transportFeatures);
+  const tunnelSolids=await compileTunnelSolidBoundaries(transportFeatures,{current:isCurrent});
+  assertCurrent();
+  appCtx.tunnelSolidCompilation = tunnelSolids;
   const supportRoadIndex = createDriveableRoadConflictIndex(roadFeatures);
   appCtx.transportStructureAssembly = compileTransportStructureAssemblies(
     transportFeatures,

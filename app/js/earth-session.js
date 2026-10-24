@@ -1,5 +1,5 @@
 import { ctx as appCtx } from "./shared-context.js?v=55";
-import { currentActorWorldPosition } from "./earth-location.js?v=2";
+import {activeActorPose} from './transport/actor-contract.js?v=6';
 import { captureEnvironmentSession, commitEnvironment, registerEnvironmentLifecycle } from './session-coordinator.js?v=2';
 import {isEarthWorldUsable} from './earth-core/world-readiness.js';
 
@@ -83,19 +83,21 @@ async function restoreEarthActorOwnership(isCurrent) {
 
 function captureCurrentPose() {
   const state = getEarthSessionState();
-  const actor = currentActorWorldPosition();
+  const actor = activeActorPose(appCtx);
   const travelMode = typeof appCtx.getCurrentTravelMode === 'function' ? appCtx.getCurrentTravelMode() : 'drive';
-  if (!actor) return state.pose;
+  if (actor.frame !== 'surface' || actor.mode === 'unavailable') return state.pose;
 
   const nextPose = {
     mode: travelMode,
     x: Number(actor.x) || 0,
     z: Number(actor.z) || 0,
-    angle: Number(appCtx.car?.angle) || 0
+    angle: actor.yaw
   };
 
-  if (travelMode === 'walk' && appCtx.Walk?.state?.walker) {
-    nextPose.angle = Number(appCtx.Walk.state.walker.yaw ?? appCtx.Walk.state.walker.angle ?? nextPose.angle) || 0;
+  if (travelMode === 'walk' || travelMode === 'drive') {
+    nextPose.y = actor.y;
+    const road = appCtx.car?.road;
+    nextPose.roadId = String(road?.sourceFeatureId || road?.transportRecord?.identity || road?.id || '');
   } else if (travelMode === 'drone' && appCtx.drone) {
     nextPose.angle = Number(appCtx.drone.yaw ?? nextPose.angle) || 0;
     nextPose.droneY = Number(appCtx.drone.y);
@@ -109,6 +111,16 @@ function captureCurrentPose() {
     nextPose.planeSpeed = Number(appCtx.planeMode.speed);
     nextPose.planeThrottle = Number(appCtx.planeMode.throttle);
     nextPose.planeAirborne = !!appCtx.planeMode.airborne;
+    nextPose.planeCatalogId = appCtx.planeMode.transportCatalogId;
+    nextPose.planeEntityId = appCtx.planeMode.transportEntityId;
+    nextPose.planeCondition = appCtx.planeMode.condition;
+  } else if (travelMode === 'boat') {
+    nextPose.x = appCtx.boat.x;
+    nextPose.z = appCtx.boat.z;
+    nextPose.angle = appCtx.boat.angle;
+    nextPose.boatCatalogId = appCtx.boatMode.transportCatalogId;
+    nextPose.boatEntityId = appCtx.boatMode.transportEntityId;
+    nextPose.boatCondition = appCtx.boatMode.condition;
   }
 
   state.pose = nextPose;
@@ -132,77 +144,13 @@ function restoreSelectionFromState() {
 }
 
 function restorePoseFromSession() {
-  const state = getEarthSessionState();
-  const pose = state.pose || null;
-  const fallbackAngle = Number(appCtx.earthPosition?.angle) || 0;
-  const targetX = Number(pose?.x ?? appCtx.earthPosition?.x);
-  const targetZ = Number(pose?.z ?? appCtx.earthPosition?.z);
-  const targetMode = pose?.mode === 'walk' ? 'walk' : 'drive';
-  const targetAngle = Number(pose?.angle ?? fallbackAngle) || 0;
-
-  const resolved = typeof appCtx.resolveSafeWorldSpawn === 'function' ?
-    appCtx.resolveSafeWorldSpawn(targetX, targetZ, {
-      mode: targetMode,
-      angle: targetAngle,
-      source: 'earth_resume',
-      restorePose: targetMode === 'walk' && !!pose
-    }) :
-    {
-      valid: true,
-      mode: targetMode,
-      x: Number.isFinite(targetX) ? targetX : 0,
-      z: Number.isFinite(targetZ) ? targetZ : 0,
-      angle: targetAngle,
-      carY: Number(appCtx.car?.y) || 0,
-      walkY: Number(appCtx.Walk?.state?.walker?.y) || 1.7,
-      onRoad: false,
-      road: null
-    };
-
-  if (typeof appCtx.applyResolvedWorldSpawn === 'function') {
-    appCtx.applyResolvedWorldSpawn(resolved, { mode: targetMode });
-  }
-
-  if (typeof appCtx.setTravelMode === 'function') {
-    const resumeMode =
-      pose?.mode === 'walk' || pose?.mode === 'drone' || pose?.mode === 'boat' || pose?.mode === 'plane' ?
-        pose.mode :
-        'drive';
-    const modeOptions = {
-      source: 'earth_resume',
-      force: true,
-      emitTutorial: false,
-      allowDuringEarthResume: true
-    };
-    if (resumeMode === 'boat') {
-      modeOptions.spawnX = Number.isFinite(pose?.x) ? pose.x : resolved?.x;
-      modeOptions.spawnZ = Number.isFinite(pose?.z) ? pose.z : resolved?.z;
-      modeOptions.yaw = Number.isFinite(pose?.angle) ? pose.angle : targetAngle;
-      modeOptions.entryMode = 'walk';
-    } else if (resumeMode === 'plane') {
-      modeOptions.x = Number.isFinite(pose?.x) ? pose.x : resolved?.x;
-      modeOptions.z = Number.isFinite(pose?.z) ? pose.z : resolved?.z;
-      modeOptions.y = Number.isFinite(pose?.planeY) ? pose.planeY : undefined;
-      modeOptions.yaw = Number.isFinite(pose?.angle) ? pose.angle : targetAngle;
-      modeOptions.pitch = Number.isFinite(pose?.planePitch) ? pose.planePitch : 0;
-      modeOptions.roll = Number.isFinite(pose?.planeRoll) ? pose.planeRoll : 0;
-      modeOptions.speed = Number.isFinite(pose?.planeSpeed) ? pose.planeSpeed : 0;
-      modeOptions.throttle = Number.isFinite(pose?.planeThrottle) ? pose.planeThrottle : 0;
-      modeOptions.airborne = pose?.planeAirborne === true;
-    }
-    appCtx.setTravelMode(resumeMode, modeOptions);
-    if (resumeMode === 'drone' && appCtx.drone) {
-      appCtx.drone.x = Number.isFinite(pose?.x) ? pose.x : appCtx.drone.x;
-      appCtx.drone.z = Number.isFinite(pose?.z) ? pose.z : appCtx.drone.z;
-      if (Number.isFinite(pose?.droneY)) appCtx.drone.y = pose.droneY;
-      if (Number.isFinite(pose?.angle)) appCtx.drone.yaw = pose.angle;
-      if (Number.isFinite(pose?.dronePitch)) appCtx.drone.pitch = pose.dronePitch;
-      if (Number.isFinite(pose?.droneRoll)) appCtx.drone.roll = pose.droneRoll;
-    }
-  }
-
-  if (typeof appCtx.invalidateRoadCache === 'function') appCtx.invalidateRoadCache();
-  return resolved;
+  const pose = getEarthSessionState().pose || {
+    mode:'drive',
+    x:Number.isFinite(appCtx.earthPosition?.x) ? appCtx.earthPosition.x : 0,
+    z:Number.isFinite(appCtx.earthPosition?.z) ? appCtx.earthPosition.z : 0,
+    angle:Number.isFinite(appCtx.earthPosition?.angle) ? appCtx.earthPosition.angle : 0
+  };
+  return appCtx.restoreEarthTravelSession?.(pose) === true;
 }
 
 async function finalizeEarthResume(resolved, isCurrent = () => true, options = {}) {
@@ -278,7 +226,10 @@ export async function reloadEarthWorldSession(options = {}) {
       markEarthResumePhase('failed');
       throw new Error('The Earth location did not finish loading. Return to the location menu and try again.');
     }
+    session=captureEnvironmentSession();
     const resolved = restorePoseFromSession();
+    if (!isCurrent()) return {aborted:true,resumed:false};
+    if (!resolved) throw new Error('The saved Earth travel state could not be restored safely.');
     markEarthResumePhase('reload_finalize');
     if (!await finalizeEarthResume(resolved, isCurrent, { syncSurface: true })) {
       return { aborted: true, resumed: false };
@@ -331,7 +282,10 @@ export async function resumeEarthWorldSession(options = {}) {
     }
     if (!isCurrent()) return { aborted: true, resumed: false };
 
+    session=captureEnvironmentSession();
     const resolved = restorePoseFromSession();
+    if (!isCurrent()) return {aborted:true,resumed:false};
+    if (!resolved) throw new Error('The saved Earth travel state could not be restored safely.');
     markEarthResumePhase('resume_finalize');
     if (!await finalizeEarthResume(resolved, isCurrent, { syncSurface: false })) {
       return { aborted: true, resumed: false };

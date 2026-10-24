@@ -1,0 +1,598 @@
+# Browser foundation implementation
+
+October 19, 2026. Local changes following the [comparison and cleanup sequence](2026-10-19-BROWSER-FOUNDATION-REVIEW.md), starting from `3353d5f1`. Production remains 5.6.1. This is an implementation ledger, not a whole-application completion or release certificate.
+
+## Decisions implemented
+
+The existing actor contract now reads one engine-independent control policy. That policy distinguishes transport mode, the player's locomotion, the controller responsible for simulation, the camera, occupancy and coordinate frame. It returns immutable profiles; it does not create another mutable gameplay store. Physics dispatch, camera selection, renderer suspension, travel controls, map focus, Earth location, route guidance and activity position now share this interpretation.
+
+A research-deck passenger is a person walking on a vessel; the vessel controller continues to own its deck simulation. A swimmer has water contact and does not wait for outdoor road preparation. A spaceship interior uses its walking controller and main renderer while preserving its separate coordinate frame. Walking inside the ship cannot contribute Earth coordinates to regional streaming. Legacy transport mode names remain available to existing save/vehicle consumers.
+
+The position-only API avoids building damage, bounds, catalog and interaction reports on map/activity updates. Detailed diagnostic snapshots still use the full actor contract. Existing controllers, shaders, saves, the frame queue and session coordinator remain in place.
+
+Boat and plane entry perform admission and initial visual construction before releasing the current controller. A refused vessel exit is checked before constructing the replacement. Invalid mode names leave the current mode unchanged. A denied or synchronously failed preparation leaves the original controller and input state intact. This does not assert transactional recovery from every possible exception after commitment or every later asynchronous model download; those remain separate asset-lifetime concerns.
+
+Departure positions survive controller retirement: walking-to-drone uses the departing person's position, aircraft launch reads the active actor, and leaving a building uses its saved exterior position. Research-deck entry establishes the person's world pose immediately, before the first simulation frame.
+
+Each moving road publication now owns a release lease over its exact geometry and regional contact entry. Retirement always releases those resources, including after a different world takes ownership. Only the current generation may change shared world collections and counts. Materials remain owned by the world pool. The lease retains the contact owner and a primitive region key, not the worker packet. A reproduced cancellation case also exposed a late-commit gap: a publication finishing after disposal was never registered for retirement. The controller now retains that publication's retire callback until adoption and releases it if cancellation or movement makes the result obsolete. This closes a cleanup gap; it does not turn the existing finite transport source into unlimited geographic streaming.
+
+## Scope and evidence
+
+Evidence lives under ignored `output/research/browser-foundation-implementation-2026-10-19/`.
+
+- Focused actor, navigation, activity, diver, deck, session and renderer checks: 45 passed (`final-focused.tap`).
+- Final transport ownership, detailed-road lifecycle, boat camera and boat surface checks: 32 passed (`transport-final.tap`). The ownership cases overlap the preceding run; these are not 77 distinct cases.
+- Existing context-write guard passed with 221 writer files. Only the two vehicle preparation exports were added to the allowlist. No blanket permission regeneration.
+- Actual licensed research-vessel model, deck/swim controllers and actor contract in a controlled-water browser scene: helm → deck → upper deck → dive platform → swim → ladder return passed. The prescribed web-game keyboard client also passed. Screenshots were inspected. This is component integration, not full-ocean or hardware performance evidence.
+- Two initial activity checks failed because their fixture changed a private test variable without updating the actual walking state. The fixture now models the real state transition; the original activity assertions were preserved. The failed first run is not recorded as a pass.
+- A real Baltimore source-browser run retained all 49,080 building records and 18,951 roads through five controlled positions and a return. It retired 36 detailed road regions; moving residency stayed at 9–12, below the cap of 16; the world generation stayed unchanged and physical road contact was restored. Driving → walking → drone → plane → driving passed, as did held-key ship walking and exit to flight. This is functional coverage and residency evidence, not a frame-pacing benchmark or a global coverage percentage.
+- The first full-world driver waited for a nonexistent field; its timeout is retained under `world-attempt-1-harness`. The next run reached ship exit but incorrectly expected Earth rather than the actual Return to Flight action. Its overall receipt remains failed under `world`, with its passed cases retained. The separate space-return run completed Earth readiness and surface-frame assertions, then failed a second incorrect driving-only expectation: a fresh space launch returns as a walker. The loaded Earth/walker screenshot was inspected. These overall failed receipts remain failed; their observed successful behaviors are recorded separately, without another city rerun. The driver now checks valid ground control and matching camera ownership.
+- Strengthened asynchronous road cancellation reproduced one retained late publication before the repair (`late-publication-before.tap`). After the fix, all 30 selected ownership, detailed-road and hot-path checks passed (`lifetime-final.tap`, overlapping earlier cases).
+- Actual title → Coral Shelf research vessel → deck actor passed on the final source (`marine-start/receipt.json`), without seeding runtime actor state. Screenshot inspected; no JavaScript exceptions or local asset failures. Local preview marine/reverse/weather endpoints returned 503 in these journeys. Their absence was displayed by the app and retained in receipts; live environmental/backend services were not validated.
+- The final road worker/contact/WebGL fixture completed three outward/return/release cycles, each retiring 46 regions. GPU geometry returned to the baseline of one terrain geometry and zero textures after every cycle; exact road contact returned at every visit. The moving region cap and single compile job held. Screenshot inspected. This controlled flat-terrain evidence is distinct from global-world or native timing acceptance.
+- Across the selected TAP runs, 70 distinct named cases passed; overlapping runs are not added together. `verification-summary.json` lists both executed checks and reviewed observations, including failed receipts.
+- An in-memory browser/worker bundling check resolved 1,074 inputs into 206 outputs, with one root context authority and no warnings. Nothing was emitted into `dist`; it is not a new tested hosting package. Context ownership and diff whitespace checks passed.
+- Owned browsers, local servers and disposable staging attestation were cleaned up. One failed runner required bounded cleanup after Chrome exited; ordinary Chrome and unrelated attestation records were preserved.
+
+No broad release sweep, production deployment or Godot client is part of this local checkpoint.
+
+## Bounded follow-up: transport publication handoff
+
+Starting from `d9159cc8`, this checkpoint audited the full road rebuild and its
+tunnel/support refresh during cancellation and world replacement. It stopped
+after reproducing and repairing the ownership gaps, checking their resource
+release, and saving a local commit. This is separate from the earlier moving
+region retirement repair.
+
+The prepared road worker was assigned to the shared context before mesh/contact
+staging succeeded. A staging failure could therefore leave a compiler and
+coverage texture owner alive. The commit also yielded after replacing the meshes
+and contacts but before recording their summary and attaching regional callbacks.
+A replacement world could intervene and have its state overwritten. Finally,
+the tunnel/support refresh assigned results after a worker await without checking
+the source world's identity.
+
+The road builder now owns preparation until the complete mesh/contact/summary/
+controller handoff. Its failure path disposes that preparation whether the worker
+promise is still pending or has already resolved. The commit has no asynchronous
+boundary. Generation checks reject obsolete work before it can start preparation
+or resume publication; explicit cancellation checks throw `AbortError` rather
+than returning as a successful empty build. Tunnel/support publication checks
+the load sequence, road source, ground release and caller generation before
+writing shared facts. Late tunnel results are rejected and the worker is
+terminated in its existing `finally`; synchronous message failure also clears
+its deadline timer.
+
+Evidence under ignored `output/research/transport-handoff-2026-10-19/`:
+
+- Four original road regressions failed before repair (`before.tap`). A fifth
+  reproduced obsolete structure refresh (`structure-before.tap`). Both retained.
+- Six new behavioral checks exercise the actual road publisher/compiler/contact
+  code with controlled scheduling and message delivery. Together with existing
+  transport, surface-failure and tunnel geometry checks, 40 distinct cases passed
+  (`focused.tap`). After completing cancellation propagation, the 11 affected
+  lifecycle/failure cases passed again (`cancellation-final.tap`); these overlap
+  the 40, not 11 additional cases.
+- Actual browser worker and full road publisher: initial publication/release,
+  cancellation during geometry staging, and replacement publication followed by
+  a distant region all passed. Road contact used the replacement terrain height
+  (8.1800003), with matching generation and one active worker. After release,
+  there were zero road workers, no retained staged geometry, and GPU resources
+  returned to one terrain geometry and zero textures. No page or console errors.
+- The prescribed web-game client also passed its short input/observation burst.
+  Both final screenshots were inspected. The fixture is deliberately controlled
+  terrain; it does not claim real-location graphics or frame-pacing acceptance.
+- The first passing browser receipt is retained under `browser-initial`; the
+  final source receipt is `browser/receipt.json`. Context ownership, syntax and
+  diff checks passed. Owned browsers and the temporary local server were closed.
+
+**Stopping point reached.** No full-city rerun, release matrix, backend test,
+hosting build, GitHub push or production deployment was performed. Tunnel
+worker cancellation rejects an obsolete result at its existing response/deadline
+boundary (at most the existing ten-second compilation budget); this does not add
+an immediate interrupt for that worker. Coordinated geographic residency,
+activation/spawn/return command ownership, visual policy and Godot remain the
+separate packages below. Do not reopen this checkpoint's passing checks unless
+their inputs change or new evidence identifies a regression.
+
+## Bounded follow-up: drone activation commands
+
+Starting from `cbad386d`, this checkpoint migrates one command group: explicit
+drone activation and pose restoration for activity starts, shared links and Earth
+session resume. Source inspection also found map teleportation, world/planetary
+initialization and other vehicle/interior returns; those remain separate work.
+
+The three migrated callers previously activated a mode and then wrote the drone
+pose directly. Shared links and activity starts could bypass launch clearance,
+and could alter the inactive drone after a refused transition. Their requested
+poses now go through `activateDroneAtWorldPose` in the existing travel owner. The
+command validates finite coordinates and optional orientation, returns whether
+it actually committed, and shares preparation and commitment with ordinary drone
+activation. It does not expose forced admission. Mode-only drone links also
+honor vessel-exit admission, without inventing a target position.
+
+Drone preparation resolves the complete pose and existing ground/roof clearance
+before retiring controls. A valid higher saved altitude and requested orientation
+survive; a lower altitude is raised to the existing launch minimum. Shared-link
+missing-altitude and activity height defaults are retained. Ordinary aircraft
+handoff preserves altitude and pitch, and an interior departure prepares from
+the saved exterior while retaining the interior owner's cleanup. The existing
+environment session rejects a world replacement during preparation. Earth resume
+retains its own asynchronous cancellation checks. No new store, scheduler or
+generic actor position setter was introduced. The three obsolete `drone` write
+permissions were removed; only the command export was registered.
+
+Evidence under ignored `output/research/drone-command-ownership-2026-10-19/`:
+
+- `before.tap`: four existing shared-link/activity behavior regressions failed
+  against the baseline. Six additional failures assert the then-missing command
+  contract; these are not six separately reproduced existing defects.
+- Fifteen command checks and eleven affected existing actor, vehicle-admission,
+  activity and session checks passed (`focused-final.tap`, 26 distinct cases).
+  They cover malformed requests, failed preparation, replacement during staging,
+  dedicated environments, blocked vessel exits, interior/aircraft departure,
+  actual caller paths, movement and superseded Earth resume.
+- The first after-run compared Three.js Euler callback internals rather than
+  camera values. The assertion was corrected to compare rotation values; its
+  failed receipt remains `first-after.tap`.
+- The controlled browser uses the actual travel command, walking retirement,
+  world-spawn helpers, share UI, activity runtime, Earth resume, drone physics,
+  engine input and HUD camera. All five cases passed (`browser/receipt.json`):
+  shared roof clearance, prescribed keyboard movement with matching camera,
+  activity start, saved flight restored without reloading the world, and refused
+  vessel exit without drone mutation. Screenshots were opened and inspected;
+  there were no page or console errors on the passing run.
+- `browser-attempt-1` and `browser-attempt-2` retain failed fixture setup:
+  missing click/boat-pose defaults, then the HUD marker collection. The first
+  four functional cases passed in both attempts, but neither overall receipt
+  is accepted as passing. The final fixture supplies the missing defaults.
+- Context ownership, touched-module syntax and diff checks passed. Source and
+  test hashes are recorded in `verification-summary.json`. Owned browsers and
+  the temporary server were closed; ordinary Chrome was preserved.
+
+**Stopping point reached.** This migration is complete locally, with controlled component
+integration, not a full-city performance measurement, ordinary full-world
+gameplay acceptance or live-service/release verification. No push, deployment,
+hosting build or Godot work is included. Exceptions after controller commitment
+still have the existing transition semantics; this does not claim general
+transactional recovery. The next separate command checkpoint is shared-link
+ground, boat and plane restoration through their existing owners.
+
+## October 20 bounded follow-up: shared-link surface restoration
+
+Starting from `946f20de`, this checkpoint removes the remaining actor writes
+from shared-link restoration: walking, driving, vessel and aircraft requests.
+The share UI now submits commands and consumes an applied/refused result. It no
+longer writes walkers, cars, vessels or meshes, calls the low-level vessel start,
+or forces an exit. Its four remaining actor/mesh write permissions were removed.
+The previous drone command remains in use.
+
+`restoreSurfaceTravelPose` belongs to the existing travel owner and accepts only
+the supported surface controllers. Ground requests stage through the existing
+safe-spawn resolver, retaining doorway restoration clearance, road identity,
+bridge height and the resolver's accepted heading. The existing spawn owner
+publishes actors, meshes and contact after controller retirement in the same
+synchronous transition. Mode-only/partial-coordinate links retain the current
+arrival, heading-only requests go through the owner, and camera-only links do not
+restart a vehicle. A refused travel request does not apply the requested camera
+mode. Unsupported or dedicated-world requests cannot write parked Earth actors.
+
+Aircraft still prepare their own visual/admission before releasing controls.
+Vessel starts use the existing candidate, hull/depth, obstacle and preparation
+authorities; active-vessel relocation uses `enterBoatAtWorldPoint`. A shared Y
+cannot override the vessel's water contact. Geographic vessel restoration cannot
+move a deck passenger or swimmer. Existing session captures now reject world
+replacement during vehicle/ground preparation and active-vessel clearance.
+
+Mapped-interior outdoor placement uses the interior cleanup owner. A mode-only
+walking link preserves the occupied interior. Authored/contained interiors have
+isolated collision queries, so geographic placement is refused until their normal
+exit rather than validating an outdoor position against indoor-only obstacles.
+This is an explicit admission boundary, not a new generic position setter or
+temporary mutation of collision context. No new store or scheduler was added.
+
+Evidence: ignored `output/research/shared-travel-command-2026-10-20/`.
+
+- `before.tap` retains baseline failures including bypassed vessel exit,
+  premature boat writes, unchecked boat altitude, retained interior ownership,
+  obsolete ground/aircraft publication, preparation exceptions and dedicated-world
+  actor writes. Its then-missing command assertion is not an additional existing
+  defect. The initial shallow-water fixture also lacked a qualified source ID;
+  the subsequent failure in `first-after.tap` was corrected by supplying test
+  evidence with a source, preserving the app's unknown-depth policy.
+- `contained-interior-before.tap` separately reproduces the authored-interior
+  admission gap identified during final source review.
+- Forty-seven distinct focused checks passed: 43 in `focused-complete.tap` plus
+  four affected existing vehicle-admission cases in `admission-complete.tap`.
+  Earlier overlapping runs are retained but not added to this total.
+- Seven browser cases passed on final source (`browser/receipt.json`), using
+  the actual complete walking controller, safe-spawn helpers, shared UI,
+  travel, aircraft and vessel owners, engine input and HUD camera. A bridge
+  walker kept height 23.7 through prescribed keyboard movement; the car kept
+  height 23.2 and the bridge identity. Aircraft restored at `(40,80,-120)` and
+  remained under its flight owner. Vessel start/relocation sampled water rather
+  than shared altitude, accepted real throttle input, and refused an offshore
+  walking request without changing the vessel, parked actor or camera mode.
+- All four final screenshots were opened and inspected; no page or console
+  errors. Earlier passing browser snapshots are retained in `browser-initial`
+  and `browser-before-contained-guard`. Owned browser cleanup completed, the
+  temporary server closed, and ordinary Chrome was not targeted.
+- Touched-module syntax, context ownership and diff checks passed. Source,
+  verification and evidence identities are recorded in `verification-summary.json`.
+
+**Stopping point reached.** This is controlled component integration, not a
+full-city performance result, ordinary full-world gameplay acceptance, backend
+or live-service verification. No hosting build, release sweep, push, deployment
+or Godot work was performed. Existing safe-spawn fallback rules and exceptions
+after controller commitment retain their existing semantics; this does not claim
+general transactional rollback. The next separate command checkpoint is the
+remaining walking/driving/vessel activity starts.
+
+## October 20 follow-up: activity start commands
+
+The owner has authorized continuing across local checkpoints without stopping
+for confirmation. Release, residency, visual and Godot work remain outside this
+command-ownership package.
+
+Starting from `5df435ed`, walking, driving and vessel activity starts now submit
+`activateSurfaceActivity` to the existing travel owner. The activity runtime no
+longer writes ground actors or forces transport admission; its remaining actor
+write permissions were removed. Refusal cannot publish activity progress or a
+route. Nearby-start guidance remains unchanged.
+
+Fresh ground entry stages through the existing safe-spawn resolver, retains the
+accepted bridge/road contact and heading, checks distance from the authored
+anchor, and requires verified support for elevated walking. Activities opt into
+strict candidate admission: the resolver's emergency fallback cannot represent
+a successfully admitted start. Save and arrival fallback behavior is unchanged.
+Verified roofs remain walkable; unsupported floating anchors are refused.
+Vessel activities require actual mapped water, hull/depth and obstacle admission,
+and a same-mode refused relocation cannot count as success. Offshore exits,
+dedicated frames, contained interiors and replacement worlds retain their
+existing ownership boundaries. No new store, scheduler or generic setter.
+
+Evidence: ignored `output/research/activity-command-ownership-2026-10-20/`.
+
+- `before.tap`: ten failures and one pass reproduced the old activity behavior.
+  `first-after.tap` retains the strict-candidate gap found during repair.
+- Thirty-nine distinct focused checks passed (`focused.tap`), covering the new
+  commands plus affected activity, navigation, shared restoration and walking
+  pose checks. Earlier overlapping runs are not added to that total.
+- Seven controlled browser cases passed (`browser/receipt.json`) using actual
+  activity, travel, spawn, complete walking and vessel owners, input and HUD.
+  Bridge walking retained eye height 23.7 under prescribed input; driving kept
+  height 23.2. A verified roof retained height 31.7 after walking physics. Floating
+  anchors, land vessel starts and offshore walking exits were refused. The real
+  vessel responded to throttle. No page or console errors; all three final
+  screenshots were opened and inspected.
+- `browser-attempt-1` retains a fixture failure: its walking building callbacks
+  returned permanently empty arrays despite a roof being added to the scene.
+  The fixture now supplies its current building collection to the full walking
+  module. No game repair was inferred from that setup failure.
+- Context ownership, touched-module syntax and diff checks passed. Source and
+  verification identities are recorded in `verification-summary.json`. Owned
+  browser and temporary server cleanup completed; ordinary Chrome was preserved.
+
+This is controlled component integration, not full-world gameplay, performance,
+live-service or release acceptance. Exceptions after controller commitment retain
+existing semantics. Continue with map travel through the active transport owner;
+world and interior returns require their own domain-specific review.
+
+## October 20 follow-up: map travel commands
+
+Starting from `dd769bbb`, both map context-menu paths now delegate geographic
+travel to `travelToWorldPoint` in the existing transport owner. Navigation no
+longer chooses from parked walking/driving state or directly writes the drone;
+its actor write permission and obsolete spawn injections were removed.
+
+The active controller determines admission. Ground arrivals resolve fresh safe
+support and preserve accepted bridge/contact/heading. Drones prepare destination
+roof clearance. Aircraft retain altitude, orientation, flight input settings and
+vehicle identity through their preparation owner, without relocating parked
+ground actors. Vessels retain actual hull/water/obstacle admission and refuse
+land destinations. Deck passengers and vessel swimmers cannot be moved through
+geographic helm commands. Contained interiors, loading/replaced worlds and
+dedicated environments refuse geographic requests. Ordinary mapped interiors
+leave through their cleanup owner before a ground arrival is published.
+
+Water preference uses actual mapped containment and destination support, rather
+than a departing roof height or a lake-bed terrain estimate. Qualified ocean
+surface domains retain their existing bounded synthetic-water authority;
+arbitrary caller flags cannot invent water on land. Cryosphere rules remain.
+This does not add worldwide transport streaming or another state/scheduler.
+
+Evidence: ignored `output/research/map-command-ownership-2026-10-20/`.
+
+- `before.tap`: eleven failures, two passes. The support-height example already
+  passed and is not claimed as a newly reproduced defect. `first-after.tap`
+  retains a fixture inconsistency: an allegedly active plane still had a walking
+  ground controller. The fixture now matches actual aircraft ownership.
+- Fifty-one distinct focused checks passed (`focused.tap`): map commands plus
+  affected shared/activity restoration, camera road and vehicle admission.
+- Eight controlled browser cases passed (`browser/receipt.json`), exercising
+  actual large-map/minimap DOM bindings with a controlled coordinate projection,
+  actual complete walking, aircraft, vessel and drone owners, physics, input
+  and HUD. Bridge height/contact, aircraft relocation, drone roof clearance and
+  movement, vessel start/relocation/throttle and refused land targets passed.
+  Four final screenshots were inspected; no page or console errors.
+- `browser-attempt-1` retains a test setup failure: the map stayed open and
+  correctly blocked movement input. The runner closes it before movement checks.
+  `browser-before-water-review` retains the earlier passing source receipt;
+  the final receipt includes the lake-bed/selected-support review.
+- Ownership guard passes with 219 writer files. Syntax/diff checks and source
+  fingerprints are in `verification-summary.json`. Owned browser and temporary
+  server cleanup completed; ordinary Chrome was preserved.
+
+This is controlled component integration, not cartography/full-world gameplay,
+performance, live-service or release acceptance. Existing post-commit exceptions
+retain their semantics. Continue with Earth-session restoration before the
+remaining recovery and domain-specific world/interior initialization commands.
+
+## October 20 follow-up: Earth-session transport restoration
+
+Starting from `533a7c2b`, Earth resume/reload now submits a saved transport command
+to the travel owner instead of publishing a ground pose first and forcing a
+mode afterward. All five supported surface modes report admission. Failed
+preparation cannot stamp/render a successful resume. The session coordinator
+captures the world generation before pose staging and rejects replacement before
+finalization; a superseded invocation cannot dismiss a newer loading cover.
+
+Ground snapshots now retain height and accepted road identity. Vessel snapshots
+read the helm's heading and preserve hull/entity/condition; aircraft snapshots
+also retain vehicle identity/condition alongside flight settings. Old ground
+snapshots without height retain safe-arrival compatibility. Ground returns use
+the existing spawn owner with safe-candidate and verified-roof admission. The
+redundant Moon-return car velocity writes were removed; accepted ground/vehicle
+owners reset their own dynamics. The existing drone command remains in use.
+
+Actual browser restoration exposed a genuine maritime reference gap: ordinary
+boat preparation correctly refuses an airborne boarding reference, but that
+reference belongs to the retiring controller during a saved-vessel Earth return.
+The boat entry owner now accepts a separate, checked Earth-session arrival. It
+requires the current published/usable world, matching origin, pending resume and
+current environment-session lease. It still runs hull/depth and obstacle
+admission; ordinary airborne boarding is unchanged. Qualified ocean domains keep
+their existing bounded water authority. No unrestricted setter, new state store
+or competing scheduler was added.
+
+Evidence: ignored `output/research/earth-return-command-2026-10-20/`.
+
+- Eleven baseline behavioral failures are retained in `before.tap`.
+  `first-after.tap` retains the older reload test's mock-boundary mismatch; its
+  successful-retry fixture now mocks the session command it is testing around.
+- Ninety-two distinct focused checks passed (`focused.tap`), covering Earth
+  command/return/session behavior, existing drone/shared/map commands, and the
+  affected ocean entry and maritime admission rules. Counts from earlier
+  overlapping runs are not added.
+- Seven controlled browser cases passed (`browser/receipt.json`): bridge and
+  roof walking returns with actual input/physics, aircraft identity/settings,
+  saved vessel entry and throttle, drone clearance, refused preparation without
+  ground mutation/success stamp, and replacement during staging. No forced world
+  reload occurred. All four screenshots were inspected; no page/console errors.
+- `browser-before-vessel-reference` retains the failing real-owner reproduction,
+  after its first three cases passed. This was not dismissed as a fixture issue.
+- Syntax, context ownership and diff checks passed. Source/verification hashes
+  are in `verification-summary.json`. Owned browser/server cleanup completed;
+  ordinary Chrome was preserved.
+
+The departure world and actor-asset callbacks are controlled in this browser
+fixture; this is not a complete Moon/Ocean journey, full-world gameplay,
+performance, live-service or release acceptance. Rejected restoration uses the
+existing caller error/retry path; general rollback after controller commitment
+is not claimed. Remaining recovery buttons and caller-driven spawns still need
+migration. Dedicated planetary initialization and contained-interior placement
+must retain their frame owners.
+
+## October 20 follow-up: explicit ground recovery and landmark clearance
+
+Starting from `1e5090f5`, Safe Ground, Random Respawn and the custody fallback
+submit `recoverSurfaceTravel` to the travel owner. Button bindings only send
+intent. The previous safe-ground handler cleared interiors and forced a mode
+before it had a spawn; random/custody paths could move inactive ground actors.
+`resolveRoadSpawn` now resolves a candidate without publishing. The existing
+world-publication `spawnOnRoad` wrapper retains its driving arrival behavior.
+
+Recovery stages safe candidates inside the existing transition/session capture,
+retains walking/driving ownership, and publishes accepted position, road contact,
+heading and meshes after flight retirement. Refused, malformed, throwing or
+obsolete preparation cannot retire controls. Offshore exit rules and isolated
+interior/planetary/dedicated frames remain enforced. Ordinary mapped-interior
+cleanup happens only after staging succeeds. Landmark publication clearance
+also submits to the active travel owner and reports actual applied/refused status
+rather than unconditionally counting a low-level spawn as success.
+
+Evidence: ignored `output/research/ground-recovery-command-2026-10-20/`.
+
+- Fifty-nine distinct focused checks passed (`focused.tap`): command/button
+  behavior, actual resolver/wrapper compatibility, landmark clearance, affected
+  interior/location/shared/Earth and landmark-lifetime cases. The earlier 55-case
+  run overlaps this set; it is not added to the total. No pre-change browser
+  reproduction was performed; the old caller behavior is source inspection.
+- Six controlled browser cases passed (`browser/receipt.json`), using actual
+  button bindings, travel/spawn owners, complete walking/aircraft/vessel
+  controllers, prescribed input and HUD. Drone/aircraft recovery retained bridge
+  support, driving retained contact, both buttons refused an offshore vessel
+  exit, and refused/replaced staging preserved the live aircraft and parked
+  actors. All three screenshots were inspected; no page or console errors.
+- Syntax, ownership and diff checks passed; fingerprints are in
+  `verification-summary.json`. Owned browser/server cleanup completed. No ordinary
+  Chrome, assets, dist, saves, backend or release state were changed.
+
+This is controlled component integration, not a complete custody journey,
+full-world gameplay/performance or live-service/release acceptance. The separate
+Journal and room callers still perform redundant low-level road spawns after a
+world loader has already published its final arrival; those are the last external
+`spawnOnRoad` callers to remove. Initial world/planetary and contained-interior
+placement remain domain-owned code, not permission for arbitrary geographic
+setters.
+
+## October 20 follow-up: published-world arrival acknowledgement
+
+Starting from `64328665`, Journal return and room synchronization no longer run a
+second road spawn after `loadRoads`. Source inspection confirms
+`finalizeLoadedWorld` already calls the world owner's final arrival, including
+custom-location bridge/land/vessel admission. The duplicate caller spawns could
+overwrite that accepted arrival. Low-level road-spawn calls are now confined to
+initial world publication and the spawn owner itself.
+
+Journal success now requires the exact ready publication, a current environment
+session and unchanged location intent. Selecting a preset alone is insufficient
+for an already-exploring result. Journal and room callers acknowledge loaded
+selection through the existing location owner only after publication succeeds.
+Raw world loading does not itself make that selection acknowledgement; tests
+cover the actual location-selection owner rather than assuming a previous stamp
+proves a new arrival.
+
+Earth room handoff now awaits the same return owner used by the Earth menu,
+including Ocean/Mars/space, then selects the room destination. Restoring the prior
+Earth session can no longer overwrite a room selection made prematurely. Existing
+room generations and exact publication identity reject superseded/failed loads;
+a newer location intent cannot be stamped as the old publication's destination.
+Moon/space room admission and marine Journal voyage authority remain distinct.
+
+Evidence: ignored `output/research/published-arrival-ownership-2026-10-20/`.
+Forty-five distinct focused checks passed (`focused.tap`), covering both callers,
+actual selection acknowledgement, refused/superseded handoff, preserved vessel
+arrival, affected room lifecycle, recovery, location and session behavior. Room
+cloud dependencies are controlled in the existing VM-test pattern. The first
+21-case run overlaps the final set and is not added. Syntax, ownership and diff
+checks passed; fingerprints are in `verification-summary.json`. No additional
+browser or live multiplayer/cloud run was performed for this asynchronous caller
+change; transport/controller browser evidence is recorded in the preceding
+packages. No new store, scheduler, reload-travel policy or generic setter.
+
+## Remaining architectural work
+
+Activity/shared/map commands, saved Earth restoration, explicit recovery and
+post-load arrivals now use the existing transport/session/publication owners.
+Remaining direct actor writes in world reset/initialization, planetary surfaces
+and contained-ship entry/return are domain-frame code and need a separate review
+against those owners' contracts. They must not be replaced with geographic
+setters or lose aircraft, maritime, walking or interior admission. This package
+does not claim those frame-specific commands or transactional rollback are
+finished.
+
+Regional scenery, detailed roads, structures, entrances and POIs still have distinct publication lifetimes. The next world-residency package must bind their identities and retirement explicitly, prove bridge/tunnel and landing continuity across neighboring cells, preserve edits and the location-based option, and measure retention on a repeat route. The road release repair here is a prerequisite, not completion of that package.
+
+The model/presentation boundary, common near/far visual policy and first Godot consumer remain later packages. No global rewrite, copied Open-Planet implementation or native-only renderer dependency was introduced.
+
+## October 20 continuous completion: frame owners and acceptance reuse
+
+The owner now requires completing browser packages 2–5 through a production-ready
+candidate without pausing at commits. The concrete endpoint is
+`2026-10-20-BROWSER-COMPLETION.md`. World-loading reset and planetary arrival now
+submit frame-specific travel commands. Planetary placement samples only the
+active accepted surface/body and actual obstacle authority. Moon completion and
+resume are session-scoped; unavailable surfaces retain the existing Earth-return
+owner. Ship entry/return uses walking frame commands. Late ship disposal retires
+its own scene without restoring old colliders, actor/camera or lighting into a
+replacement session. Existing intra-frame ship simulation remains ship-owned.
+
+Thirty-five focused boundary cases passed, including eight new frame cases;
+source identities and the failed incomplete vessel-cleanup test fixture are
+retained in output/research/frame-ownership-2026-10-20. Context ownership passes
+with 218 writer files. Real-world frame acceptance remains in the integrated
+journey, rather than another city load per boundary test.
+
+The new input-scoped acceptance runner hashes transitive runtime/worker inputs
+and evidence. It reuses completed passing cases whose relevant inputs still
+match; notes and unrelated case definitions do not invalidate them. Four cache
+invariant checks passed. The 35-case frame receipt was adopted and then reused,
+not executed again. Existing historical suites remain available; they are not
+the production-candidate execution queue.
+
+## October 20: geographic publication scopes, portable cells and presentation
+
+The owner requested continuing through a production-ready local candidate; the
+completion contract is in `2026-10-20-BROWSER-COMPLETION.md`. The previous frame
+commands and evidence reuse commit is `5e9050b5`. No release branch or deployment
+is changed.
+
+- Existing WorldSnapshotStore now begins a request lifetime before compilation,
+  owns accepted geographic leases through the existing lifecycle scope, rejects
+  obsolete publications, and retires regions on reset/title release. There is no
+  new scheduler or independent mutable world database. The regional window owns
+  terrain, buildings, water and road overview together. Moving road cells own
+  exact mesh/contact leases. Interactive building/structure coverage and its
+  entrance/POI identities stay pinned to the selected district; local/room edits
+  retain their existing separate durable owners. Old retirement cannot clear a
+  replacement catalog, window or road geometry.
+- Versioned WorldCellFacts and an explicit JSON/typed-buffer codec retain exact
+  published precision, geographic frame/units, terrain geometry/grid/portals and
+  provenance, building footprints/height semantics, transport source identities
+  and surfaces, entrances, POIs and land use. Exports include whole cross-cell
+  features. They describe accepted published data; regional inferred buildings
+  remain presentation only. Original provider bytes are not falsely claimed to
+  survive a compiler that already discarded them. No coarse resampled terrain
+  replaces original geometry. Browser road rendering/contact consumes the same
+  portable packet, and POI lifecycle compilation consumes canonical inputs.
+- Regional packing now carries every selected source building identity through
+  to instance batches and exact geometry ranges. It retains compact identity
+  tables and renderer buffers, without another expanded city object graph.
+- Near/regional facades share one presentation contract for glass, occupied
+  rooms, emission and metre-based detail fade. Existing catalogs, licensed
+  textures, night-light owner, geometry coverage and interior lighting remain
+  authoritative. No new lights/textures/scheduler are introduced.
+
+The one-world Baltimore baseline passed two finite-area road routes and returns,
+with 49,080 building colliders and 18,951 road records preserved. Returns settled
+to 2,489 GPU geometries and 251 textures in both cycles; bridge and tunnel contact
+matched the published surfaces. This is controlled local integration, not a new
+production or universal-performance pass.
+
+Focused case groups cover replacement/retirement, full-precision interchange,
+cross-cell IDs/contact, POI and overlay ownership, worker packing and the existing
+frame/admission boundaries. Shared shader fixture initially failed on a reserved
+GLSL parameter, then on a missing fragment uniform. Both failed receipts remain
+under output/research/browser-completion-2026-10-20. The corrected fixture passed
+with zero graphics errors; day/close/night images were inspected and retirement
+returned to its one-ground-geometry baseline. Final packaged integration and
+source/package/evidence delta review remain pending at this commit.
+
+The first production-package local run correctly hit the existing Firebase
+production-host guard. The harness initially misclassified its two expected
+initialization errors. Preserve candidate-initial-production-guard and its failed
+receipt. The harness now verifies the exact guard, ordinary local title assets
+and invitation behavior, while the assembled world uses explicit staging debug
+routing. This is not ordinary hosted candidate or live production verification.
+Selected-cell source metadata is retained explicitly for each layer and regional
+batch, alongside original transport source records.
+
+Tester invitation screenshots passed visual inspection at desktop and 390px
+mobile width. Keyboard dismissal worked, but reload exposed that engine-private
+storage helpers were not exposed to UI. The invitation now uses its own small
+dismissal preference through guarded localStorage access, retaining session
+dismissal if storage is unavailable. The failed title-only receipt and captures
+are retained in candidate-invitation-persistence-failure; no city was loaded.
+
+
+## October 20 completion evidence and tester signup
+
+The browser completion contract is now implemented locally. Final verification
+source is e0e411ef; final game content is identical to runtime commit 5958db63.
+The complete scope, current route/renderer measurements, failed harness receipts,
+reviewed metadata-only acceptance exception and rollout prerequisites are in
+`2026-10-20-BROWSER-COMPLETION.md` and ignored
+`output/release-evidence/browser-cleanup-2026-10-20/readiness.json`.
+
+Actual accepted cells, road/regional ownership, overlay preservation, near/far
+facade shaders, touch movement, authored ship walking, ship/flight/Earth return,
+Moon/Earth return and geographic release were checked. Selected district coverage
+remained 49,080 buildings / 18,951 roads; equal route returns were 2,489 GPU
+geometries / 251 textures. Surface controls and the original world publication
+were restored; final geographic leases and road/building meshes were zero.
+Earlier pending notes above describe their commit-time status, not unfinished
+work after this completion. Current scoped cache behavior has five passing cases.
+
+Merged-mid batches were the missing third consumer of shared facade emission;
+all four real shader adapters now compile. The small start-hub tester invitation
+uses the existing server Resend sender, explicit consent and one-hour email
+confirmation, with private verified interest records. It adds one Function and
+two temporary-record TTL policies; existing 80 Functions and access rules are
+unchanged. Six handler cases and controlled real UI checks passed. Read-only
+production Resend authentication/domain verification passed; no email/contact was
+sent during verification. Hosted delivery and rollout remain separate actions.
+
+No later browser package remains in this run. Future work is deployment under the
+existing protected release workflow and then a separately scoped Godot consumer
+of the reusable facts/rules. Transport still uses a finite selected-area source.

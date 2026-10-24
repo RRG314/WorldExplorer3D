@@ -1,3 +1,4 @@
+import {activeActorPose} from '../transport/actor-contract.js?v=6';
 import {earthCoordinateFrame} from '../earth-core/coordinate-frame.js?v=1';
 import {buildHarborWalk} from './harbor-walk.js';
 import { ctx as appCtx } from '../shared-context.js?v=55';
@@ -27,39 +28,7 @@ function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
 }
 
-function currentReferencePose() {
-  const mode = typeof appCtx.getCurrentTravelMode === 'function' ? appCtx.getCurrentTravelMode() : 'drive';
-  if (mode === 'boat') {
-    return {
-      mode,
-      x: finiteNumber(appCtx.boat?.x, 0),
-      y: finiteNumber(appCtx.boat?.y, 0),
-      z: finiteNumber(appCtx.boat?.z, 0)
-    };
-  }
-  if (mode === 'drone') {
-    return {
-      mode,
-      x: finiteNumber(appCtx.drone?.x, 0),
-      y: finiteNumber(appCtx.drone?.y, 12),
-      z: finiteNumber(appCtx.drone?.z, 0)
-    };
-  }
-  if (mode === 'walk' && appCtx.Walk?.state?.walker) {
-    return {
-      mode,
-      x: finiteNumber(appCtx.Walk.state.walker.x, 0),
-      y: finiteNumber(appCtx.Walk.state.walker.y, 1.7),
-      z: finiteNumber(appCtx.Walk.state.walker.z, 0)
-    };
-  }
-  return {
-    mode: 'drive',
-    x: finiteNumber(appCtx.car?.x, 0),
-    y: finiteNumber(appCtx.car?.y, 1.2),
-    z: finiteNumber(appCtx.car?.z, 0)
-  };
-}
+function currentReferencePose() { return activeActorPose(appCtx); }
 
 function worldToGeo(x, z) {
   return earthCoordinateFrame(appCtx.LOC, appCtx.SCALE).toGeographic(x, z);

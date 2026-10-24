@@ -45,3 +45,10 @@ test('research look is local to the deck and pauses with maps and gameplay',()=>
  assert.equal(f.api.look(1,1),false);assert.deepEqual(f.api.snapshot().pose,before);
  f.ctx.paused=false;f.ctx.showLargeMap=true;assert.equal(f.api.look(1,1),false);
 });
+
+test('deck boarding publishes the translated rider immediately, before the first simulation frame',()=>{
+ const f=fixture();f.mesh.position.set(1200,5,2400);f.mesh.rotation.y=.7;
+ assert.equal(f.api.enter(),true);const pose=f.api.snapshot().pose;
+ const expected=f.mesh.localToWorld(new THREE.Vector3(pose.x,pose.y+RESEARCH_EYE_HEIGHT,pose.z));
+ assert.deepEqual(f.api.navigationActor().position,{x:expected.x,y:expected.y,z:expected.z});f.api.dispose();
+});

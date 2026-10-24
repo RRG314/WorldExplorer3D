@@ -16,6 +16,13 @@ const earcut = triangulator.default || globalThis.earcut;
 const snap = n => Math.round(n * 1000) / 1000;
 const polygon = points => { const ring = points.map(([x,z]) => [snap(x),snap(z)]); return [ring.concat([ring[0]])]; };
 const union = parts => parts.length ? clip.union(parts[0], ...parts.slice(1)) : [];
+function sidewalkMaskUnion(item){
+  // Masks are complete before this plan is published. Every segment/cell of
+  // one road shares its plan-owned product; a new source plan gets a new one.
+  const product=item.sidewalkMaskProduct;
+  if(!product)return union(item.sidewalkMasks);
+  return product.union||(product.union=union(product.polygons));
+}
 const ringOf = item => item?.surfaceFootprint || item?.pts || item?.footprint || [];
 const box = points => ({ minX: Math.min(...points.map(p => p.x)), maxX: Math.max(...points.map(p => p.x)), minZ: Math.min(...points.map(p => p.z)), maxZ: Math.max(...points.map(p => p.z)) });
 const intersects = (a, b, pad = 0) => a.minX <= b.maxX + pad && a.maxX >= b.minX - pad && a.minZ <= b.maxZ + pad && a.maxZ >= b.minZ - pad;
@@ -92,6 +99,7 @@ function prepareStreetRegions({ roads = [], buildings = [], landuses = [], linea
   const frontageBarriers=createStreetCarriagewayBarriers(roads);
   const frontagePolicy = createStreetFrontagePolicy(buildings, metersPerWorldUnit);
   const sidewalkOwnership=createStreetSidewalkOwnership(roads,linearFeatures,frontagePolicy,metersPerWorldUnit);
+  const sidewalkMaskProducts=new Map([...sidewalkOwnership.masks].map(([road,polygons])=>[road,{polygons,union:null}]));
   const segments = [], paths = [], obstacles = [], mappedAreas = [], buildingEdges = [];
   const tiles = new Map();
   // Overview has no marking-only cells. Determine work keys before allocating
@@ -141,12 +149,13 @@ function prepareStreetRegions({ roads = [], buildings = [], landuses = [], linea
       const point=road.pts[i];
       if (coverageBounds && !intersects(box([point]),coverageBounds,20)) continue;
       const halfWidth=roadWidthAtSegment(road,i,0)/2;
-      insert('joins',{road,sidewalkMasks:sidewalkOwnership.masks.get(road),section:frontagePolicy.section(road,i),previous:road.pts[i-1],point,next:road.pts[i+1],halfWidth,offset},box([point]),halfWidth+Math.abs(offset)+32/metersPerWorldUnit);
+      insert('joins',{road,sidewalkMasks:sidewalkOwnership.masks.get(road),sidewalkMaskProduct:sidewalkMaskProducts.get(road),section:frontagePolicy.section(road,i),previous:road.pts[i-1],point,next:road.pts[i+1],halfWidth,offset},box([point]),halfWidth+Math.abs(offset)+32/metersPerWorldUnit);
     }
     for (const segment of streetRoadSegments(road)) {
       if(coverageBounds && !intersects(segment.bounds,coverageBounds,Math.max(segment.wa,segment.wb,20)))continue;
       segment.section=frontagePolicy.section(road,segment.index);
       segment.sidewalkMasks=sidewalkOwnership.masks.get(road);
+      segment.sidewalkMaskProduct=sidewalkMaskProducts.get(road);
       segments.push(segment);
       insert('segments',segment,segment.bounds,Math.max(segment.wa,segment.wb)/2+Math.abs(offset)+32/metersPerWorldUnit);
     }
@@ -301,7 +310,7 @@ export function compilePavementTile(tile, metersPerWorldUnit = 1.11, {includeMar
       // One outline per street side, including frontage steps. Unioning a stack
       // of touching slivers made Clipper's containment repair quadratic in cities.
       const inferred=polygon([[original.a.x,original.a.z],[original.b.x,original.b.z],...outerPoints.reverse()]);
-      pavementParts.push(...(original.sidewalkMasks?.length?clip.difference(inferred,union(original.sidewalkMasks)):[inferred]));
+      pavementParts.push(...(original.sidewalkMasks?.length?clip.difference(inferred,sidewalkMaskUnion(original)):[inferred]));
     }
   }
   for (const join of tile.joins || []) {
@@ -314,7 +323,7 @@ export function compilePavementTile(tile, metersPerWorldUnit = 1.11, {includeMar
     const rightExtra=section.left.presence==='present' ? section.left.widthMeters/metersPerWorldUnit : 0;
     if(leftExtra || rightExtra) {
       const inferred=roadTurnFootprint({...join,leftDistance:leftDistance+leftExtra,rightDistance:rightDistance+rightExtra});
-      pavementParts.push(...(join.sidewalkMasks?.length?clip.difference(inferred,union(join.sidewalkMasks)):inferred));
+      pavementParts.push(...(join.sidewalkMasks?.length?clip.difference(inferred,sidewalkMaskUnion(join)):inferred));
     }
   }
   const b = tile.bounds, boundary = polygon([[b.minX, b.minZ], [b.maxX, b.minZ], [b.maxX, b.maxZ], [b.minX, b.maxZ]]);

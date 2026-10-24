@@ -1,5 +1,11 @@
 # World Explorer architecture evaluation
 
+**October 19, 2026 current comparison:** [Browser foundation review against Open-Planet](2026-10-19-BROWSER-FOUNDATION-REVIEW.md) contains the fresh source inventory, completed navigation ownership repair, verification scope and the current bounded cleanup sequence before Godot work. It supersedes older implementation ordering for this request; older findings retain their original dates and evidence limits.
+
+The [local implementation ledger](2026-10-19-BROWSER-FOUNDATION-IMPLEMENTATION.md) records the actor/control consolidation, vehicle handoff and road-publication lifetime repairs, including current checks and unfinished broader migration work.
+
+Its bounded transport-handoff follow-up is complete locally: cancelled road and tunnel work cannot adopt the replacement world's publication, and prepared road resources are released on failure. The ledger records the stopping point and separates this from the remaining geographic-residency and Godot work.
+
 The measured runtime improvements from this investigation shipped September 28,
 2026, at source commit `2839df5d6bbed9f8dfa4b89e379ba2e026cab438`.
 Earlier documents describe the local investigation at their stated dates;
@@ -7,7 +13,7 @@ their no-deployment notes are historical. See the current
 [release status](../RELEASE_INTEGRATION_STATUS.md) for shipped scope and limits.
 
 
-**Local implementation:** start with [the implementation plan and checks](LOCAL_REFACTOR_PLAN.md). For the broader investigation, see [the current decision](FINAL_ARCHITECTURE_DECISION.md), which states both measured conclusions and remaining work. It is not an exhaustive-audit completion certificate.
+**Earlier local implementation:** [the implementation plan and checks](LOCAL_REFACTOR_PLAN.md). For the broader investigation, see [the current decision](FINAL_ARCHITECTURE_DECISION.md), which states both measured conclusions and remaining work. It is not an exhaustive-audit completion certificate.
 
 - [Measured hotspots and coverage](HOTSPOT_PROFILE.md)
 - [All context/Three source-access classifications](COUPLING_CLASSIFICATION.md)

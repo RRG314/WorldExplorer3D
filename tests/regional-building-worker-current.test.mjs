@@ -33,7 +33,7 @@ test('packed tile compilation preserves reference selection, every massing value
       for(let i=0;i<packed.length;i++){
         const got=packed.read(i,scratch),expected=reference.buildings[i];
         for(const key of ['centerLat','centerLon','widthMeters','depthMeters','areaMeters','rotationY','priority'])assert.equal(got[key],expected[key],`${i}:${key}`);
-        assert.deepEqual(got.ring,expected.ring);
+        assert.deepEqual(got.ring,expected.ring);assert.equal(got.identity,expected.identity);assert.ok(got.identity);
         const massing=resolveFarBuildingMassing(expected,null,expected.areaMeters*units*units,units);
         assert.equal(got.validMassing,Boolean(massing));
         if(massing){assert.equal(got.massing.heightMeters,massing.heightMeters);assert.deepEqual(got.massing.color,massing.color);assert.deepEqual(got.massing.facadeStyle,massing.facadeStyle);assert.equal(got.massing.roofFraction,massing.roofFraction);

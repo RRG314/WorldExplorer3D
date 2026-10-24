@@ -1,0 +1,66 @@
+<!doctype html><meta charset="utf-8"><title>Drone command ownership</title><link rel="icon" href="data:,">
+<style>body{margin:0;background:#9dc7db;font:15px system-ui}canvas{display:block}header{position:absolute;top:12px;left:12px;background:#ffffffed;padding:12px;border-radius:6px}button{margin:8px 8px 0 0}#status{margin-top:8px}</style>
+<header>Drone activation · controlled terrain and roof clearance<br><button id="shared">Shared flight</button><button id="activity">Activity start</button><button id="resume">Restore Earth visit</button><div id="status">Loading actual command and controller modules…</div></header>
+<script src="/app/vendor/three/build/three.min.js"></script>
+<script>addEventListener('error',e=>window.fixtureError=e.message);addEventListener('unhandledrejection',e=>window.fixtureError=String(e.reason));</script>
+<script type="module">
+import {ctx} from '/app/js/shared-context.js?v=55';
+import {setTravelMode,activateDroneAtWorldPose} from '/app/js/travel-mode.js';
+import {resolveTransportActor} from '/app/js/transport/actor-contract.js?v=6';
+import {resolveControlState} from '/app/js/transport/control-state.js';
+import {createWalkingRuntimeHelpers} from '/app/js/walking/runtime.js';
+import {initWorldSpawning,resolveSafeWorldSpawn,applyResolvedWorldSpawn} from '/app/js/world/spawn.js';
+import {updateDrone} from '/app/js/physics/drone-flight.js';
+import {updateCamera} from '/app/js/hud.js';
+import {keyboardControlActions} from '/app/js/controls/action-input.js';
+import {setupEngineInputHandlers} from '/app/js/engine/input-handlers.js';
+import {initShareUi} from '/app/js/ui/share-links.js';
+import {startActivity,stopActivity,getRuntimeSnapshot} from '/app/js/activity-discovery/runtime.js?v=9';
+import {resumeEarthWorldSession} from '/app/js/earth-session.js';
+import {commitEnvironment} from '/app/js/session-coordinator.js?v=2';
+commitEnvironment('EARTH');
+const renderer=new THREE.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});renderer.setSize(1000,700);document.body.append(renderer.domElement);
+const scene=new THREE.Scene();scene.background=new THREE.Color(0x9dc7db);scene.fog=new THREE.Fog(0x9dc7db,350,1000);
+scene.add(new THREE.HemisphereLight(0xd6f4ff,0x69804e,1.5));const sun=new THREE.DirectionalLight(0xffefd2,1.2);sun.position.set(-70,180,130);scene.add(sun);
+const camera=new THREE.PerspectiveCamera(65,1000/700,.1,1600);
+const ground=new THREE.Mesh(new THREE.PlaneGeometry(1800,1800),new THREE.MeshLambertMaterial({color:0x7f9c65}));ground.rotation.x=-Math.PI/2;scene.add(ground);
+const grid=new THREE.GridHelper(1600,40,0x53615c,0x7a866f);grid.position.y=.02;scene.add(grid);
+const buildings=[];
+for(const [x,z,w,h,d] of [[140,140,12,70,12],[30,20,30,28,24],[-80,-40,35,45,28],[100,-100,40,38,30],[-40,220,30,22,32]]){
+  const mesh=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),new THREE.MeshLambertMaterial({color:0xb8c5c8}));mesh.position.set(x,h/2,z);scene.add(mesh);
+  buildings.push({minX:x-w/2,maxX:x+w/2,minZ:z-d/2,maxZ:z+d/2,maxY:h});
+}
+const carMesh=new THREE.Mesh(new THREE.BoxGeometry(2,1.6,4),new THREE.MeshLambertMaterial({color:0xd28e4a}));scene.add(carMesh);
+const characterMesh=new THREE.Mesh(new THREE.CylinderGeometry(.35,.35,1.7),new THREE.MeshLambertMaterial({color:0x247180}));scene.add(characterMesh);
+const car={x:-40,y:1.2,z:120,angle:0};const state={mode:'walk',view:'third',walker:{x:-40,y:1.7,z:120,yaw:0,angle:0},characterMesh};
+Object.assign(ctx,{scene,renderer,camera,car,carMesh,drone:{x:0,y:12,z:0,yaw:0,pitch:-.4,roll:0,speed:24},droneMode:false,
+  boat:{x:-40,y:0,z:120,angle:0,speed:0},boatMode:{active:false},planeMode:{active:false},oceanMode:{active:false},spaceFlight:{active:false},
+  gameStarted:true,keys:{},terrainEnabled:true,buildings,roads:[],propMarkers:[],_worldLoadSequence:1,
+  SurfaceQuery:{walkAt:()=>({position:{y:0}}),terrainAt:()=>({position:{y:0}}),driveAt:()=>({position:{y:0}})},
+  terrainMeshHeightAt:()=>0,setCameraMode(mode){ctx.camMode=mode;},
+  resolveSafeWorldSpawn,applyResolvedWorldSpawn,setTravelMode,activateDroneAtWorldPose,
+  activeTransportActor:()=>resolveTransportActor(ctx),readControlActions:mode=>keyboardControlActions(ctx.keys,mode),
+  clearControlInputState(){ctx.keys={};},onKey(){},checkMoonClick:()=>false,checkStarClick:()=>false,updateCamera,canExitBoatMode:()=>false,
+  normalizeLocationSelection:()=> 'baltimore',restoreLoadedLocationSelection:()=> 'baltimore',
+  isLoadedLocationSelectionCurrent:()=>true,setPlanetaryVehicle:async()=>{},setPlanetaryCharacter:async()=>{},
+  showLoad(){},hideLoad(){},markLocationSelectionLoaded(){},prepareFirstWorldRender(){}});
+initWorldSpawning({buildingContainingPoint:()=>null,isInsideWaterArea:()=>false,findNearestRoad:()=>null,isVehicleRoad:()=>false,traversableFeaturesForMode:()=>[]});
+ctx.Walk={state,CFG:{eyeHeight:1.7},...createWalkingRuntimeHelpers({CFG:{eyeHeight:1.7},camera,car,carMesh,scene,state,
+  finiteOr:(v,f)=>Number.isFinite(v)?v:f,getSafeDriveY:()=>1.2,getWalkGroundY:()=>0,createCharacterMesh:()=>characterMesh,
+  syncCarFromWalker(){Object.assign(car,{x:state.walker.x,y:1.2,z:state.walker.z,angle:state.walker.yaw});},
+  syncWalkerFromCar(){Object.assign(state.walker,{x:car.x,y:1.7,z:car.z,angle:car.angle,yaw:car.angle});}})};
+const input=setupEngineInputHandlers(ctx);
+const share=initShareUi({bindTouchFriendlyPress(){},closeAllFloatMenus(){},getTitleLaunchMode:()=> 'earth'});
+const publication={sequence:1,requestId:'controlled-drone-world'};
+Object.assign(ctx,{worldPublication:publication,initialEarthWorldReady:true,
+  worldLoadRuntimeState:{sequence:1,publication,status:'ready',geometryReady:true,gameplayRuntimesReady:true,session:{state:'published',requestId:publication.requestId}}});
+function resetGround(){stopActivity();ctx.boatMode.active=false;ctx.droneMode=false;ctx.Walk.setModeWalk();}
+function draw(){if(ctx.droneMode)updateCamera();else{camera.position.set(-80,70,230);camera.lookAt(50,30,60);}renderer.render(scene,camera);document.getElementById('status').textContent=`${resolveControlState(ctx).mode} · ${ctx.drone.x.toFixed(1)}, ${ctx.drone.y.toFixed(1)}, ${ctx.drone.z.toFixed(1)}`;}
+document.getElementById('shared').onclick=()=>{resetGround();ctx.pendingExperienceState={travelMode:'drone',refX:120,refY:2,refZ:140,yaw:.2,pitch:-.45};share.applySharedRuntimeState();draw();};
+document.getElementById('activity').onclick=()=>{resetGround();window.activityStarted=startActivity({id:'fixture-drone-activity',title:'Drone route',traversalMode:'drone',requiresNearbyStart:false,
+  anchors:[{id:'start',typeId:'start',x:120,y:0,z:140,yaw:.2},{id:'finish',typeId:'finish',x:120,y:0,z:-200}]});draw();};
+document.getElementById('resume').onclick=async()=>{resetGround();ctx.earthSessionState={pose:{mode:'drone',x:120,z:140,angle:.2,droneY:90,dronePitch:-.45,droneRoll:0}};window.resumeResult=await resumeEarthWorldSession({transitionDurationMs:0});draw();};
+window.advanceTime=ms=>{for(let left=ms/1000;left>1e-8;left-=1/60)if(ctx.droneMode)updateDrone(Math.min(left,1/60));draw();};
+window.render_game_to_text=()=>JSON.stringify({coordinateSystem:'local surface: x east, y up, z south; controlled flat terrain y=0',actor:resolveTransportActor(ctx),control:resolveControlState(ctx),drone:ctx.drone,camera:{x:camera.position.x,y:camera.position.y,z:camera.position.z},activity:getRuntimeSnapshot(),resume:window.resumeResult});
+window.droneFixture={ctx,share,resetGround,draw,input};draw();window.fixtureReady=true;
+</script>

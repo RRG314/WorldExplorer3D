@@ -85,6 +85,8 @@ export function resetWorldForReload(options = {}) {
   const resetWorldFurnitureCaches = typeof options.resetWorldFurnitureCaches === 'function' ? options.resetWorldFurnitureCaches : () => {};
 
   appCtx._roadMeshGeneration=(appCtx._roadMeshGeneration||0)+1;
+  appCtx.worldSnapshotStore?.clear?.(options.reason || 'world_reload');
+  appCtx.worldPublication = null;
   appCtx._cancelTransportPreparation?.();
   appCtx._cancelTransportPreparation=null;
   appCtx.transportDetail?.dispose();
@@ -195,8 +197,6 @@ export function resetWorldForReload(options = {}) {
   appCtx.replaceWorldCollection('urbanSurfaceMeshes');
   invalidateTraversalNetworks('world_reload_reset');
   appCtx.clearNavigation?.();
-  appCtx.navigationRoutePoints = [];
-  appCtx.navigationRouteDistance = 0;
 
   disposeSceneMeshes(appCtx.buildingMeshes);
   appCtx.clearWorldCollections(['buildingMeshes', 'buildings', 'dynamicBuildingColliders']);

@@ -1,8 +1,21 @@
+import {isEarthWorldUsable} from '../earth-core/world-readiness.js';
+
 // A checked ocean handoff has already selected and committed its geographic
 // frame. The outgoing drone/plane/tunnel contact belongs to the previous frame.
 // Ordinary nearby boarding continues to use that active actor's reachability.
-export function resolveBoatEntryReference(current,options={},origin={}) {
- const arrival=options.surfaceArrival,candidate=options.candidate;
+export function resolveBoatEntryReference(current,options={},origin={},context={}) {
+ const candidate=options.candidate,restoration=options.earthSessionArrival;
+ if(restoration){
+  // A saved-vessel return belongs to a currently published Earth session. The
+  // retiring airborne actor cannot provide a nearby boarding reference. This
+  // reference only selects the arrival; hull/depth/obstacle admission still runs.
+  if(context.earthResumePending!==true||context.getEnv?.()!==context.ENV?.EARTH||
+    !isEarthWorldUsable(context)||restoration.publication!==context.worldPublication||
+    restoration.session?.isCurrent?.()!==true||restoration.lat!==origin.lat||restoration.lon!==origin.lon||
+    ![restoration.lat,restoration.lon,options.spawnX,options.spawnZ,candidate?.surfaceY].every(Number.isFinite))return null;
+  return {x:options.spawnX,y:candidate.surfaceY,z:options.spawnZ,angle:Number(options.yaw)||0,mode:'walk',structureTerrainMode:'at_grade'};
+ }
+ const arrival=options.surfaceArrival;
  if(!arrival)return current;
  if(arrival.lat!==origin.lat||arrival.lon!==origin.lon||
    ![arrival.lat,arrival.lon,options.spawnX,options.spawnZ,candidate?.surfaceY].every(Number.isFinite)||

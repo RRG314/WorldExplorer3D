@@ -466,7 +466,7 @@ service cloud.firestore {
     }
 
     function validRoomCore(roomId) {
-      return canConsumeRoomCreateQuota() &&
+      return !roomId.matches('^W[A-Z0-9]{5}$') && canConsumeRoomCreateQuota() &&
         request.resource.data.keys().hasOnly([
           'code',
           'createdAt',

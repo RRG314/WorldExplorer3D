@@ -39,3 +39,38 @@ test('duplicate joins are coalesced and an optional leaderboard error cannot und
   const a=f.api.handleJoinRoom('ABC123');await Promise.resolve();const b=f.api.handleJoinRoom('ABC123');await Promise.resolve();
   assert.equal(calls,1);finish({code:'ABC123'});await Promise.all([a,b]);assert.deepEqual(f.activations,['ABC123']);assert.equal(f.state.roomJoinBusy,false);
 });
+
+test('weekly guest admission coalesces clicks and restores retry after a full-room failure', async () => {
+  const state = { authUser: null }, renders = [], status = [];
+  let finish, requests = 0, activated;
+  const api = createUiRoomRoomActionsApi({
+    appCtx: {}, refs: {}, state,
+    helpers: { setInputCode() {} },
+    renderers: {
+      setStatus: text => status.push(text), closeRoomPanel() {},
+      renderFeaturedRooms: () => renders.push(state.roomJoinBusy)
+    },
+    callbacks: { setAuthUser: user => { state.authUser = user; } },
+    runtime: { refreshFeaturedRooms: async () => {} },
+    activateRoom: async room => { activated = room; return true; },
+    deps: {
+      joinWeeklyFeaturedRoom: () => { requests++; return new Promise((resolve, reject) => { finish = { resolve, reject }; }); },
+      getCurrentUser: () => ({ uid: 'guest', isAnonymous: true }),
+      bumpExplorerLeaderboard: async () => {}
+    }
+  });
+  const failed = api.handleJoinWeeklyFeaturedRoom();
+  await api.handleJoinWeeklyFeaturedRoom();
+  assert.equal(requests, 1);
+  finish.reject(Error('Room is full. Retry shortly.'));
+  assert.equal(await failed, null);
+  assert.equal(renders.at(-1), false);
+  assert.match(status.at(-1), /Room is full/);
+  const retry = api.handleJoinWeeklyFeaturedRoom();
+  const room = { code: 'WTEST2', name: 'Weekly City', maxPlayers: 32 };
+  finish.resolve(room);
+  assert.equal(await retry, room);
+  assert.equal(activated, room);
+  assert.equal(state.authUser.uid, 'guest');
+  assert.equal(renders.at(-1), false);
+});

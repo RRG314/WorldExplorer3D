@@ -1,6 +1,7 @@
 import {MATERIAL_VARIANTS,WINDOW_STYLES} from '../world/building-exterior-catalog.js?v=1';
 import {FACADE_OPENINGS_GLSL} from '../world/building-facade-layout.js?v=3';
 import {facadeNightUniform} from '../world/facade-lighting.js';
+import {FACADE_PRESENTATION,FACADE_PRESENTATION_GLSL} from '../world/facade-presentation.js';
 import {REGIONAL_MATERIAL_IDS,REGIONAL_WINDOW_IDS} from './regional-building-appearance.js';
 import {REGIONAL_SURFACE_IDS,sharedRegionalFacadeAtlas} from './regional-facade-atlas.js';
 const gl=n=>Number(n).toFixed(5);
@@ -34,11 +35,12 @@ vRegionalWall=1.0-step(0.2,abs(objectNormal.y));
  vRegionalWall=step(.01,regionalLayout.z);
 #endif`);
   shader.fragmentShader=`uniform sampler2D regionalSurfaces;
+uniform float regionalUnits;
 uniform float facadeNight;
 varying vec4 vRegionalStyle;
 varying vec4 vRegionalLayout;
 varying float vRegionalWall;
-${materials}\n${windows}\n${FACADE_OPENINGS_GLSL}
+${materials}\n${windows}\n${FACADE_OPENINGS_GLSL}\n${FACADE_PRESENTATION_GLSL}
 ${shader.fragmentShader}`.replace('#include <color_fragment>',`#include <color_fragment>
 vec4 surfaceProfile=regionalMaterial(vRegionalStyle.x);
 vec4 windowProfile=regionalWindow(vRegionalStyle.y);
@@ -49,7 +51,7 @@ vec4 wallLayout=vec4(vRegionalLayout.x/max(.01,vRegionalLayout.z)*bays,
  vRegionalLayout.y/max(2.0,(vRegionalLayout.w-.3)/max(1.0,floors)),vRegionalLayout.xy);
 vec4 openingStyle=vec4(windowProfile.zw,floors+.05,vRegionalStyle.z);
 float footprint=max(fwidth(wallLayout.x),fwidth(wallLayout.y));
-float nearDetail=1.0-smoothstep(400.0,900.0,length(vViewPosition));
+float nearDetail=facadeDetailWeight(length(vViewPosition)/regionalUnits);
 vec3 wall=diffuseColor.rgb;
 if(vRegionalWall>.5&&nearDetail>.001){
  vec2 tile=vec2(mod(surfaceProfile.x,4.0),floor(surfaceProfile.x/4.0));
@@ -58,7 +60,7 @@ if(vRegionalWall>.5&&nearDetail>.001){
  wall=mix(wall,facadeWallSurface(wall,grain),nearDetail*(1.0-smoothstep(.2,.6,footprint)));
 }
 vec4 facadeSurface=vec4(wall,0.0);
-float seed=dot(floor(diffuseColor.rgb*255.0),vec3(17.0,3.0,7.0));
+float seed=facadeBuildingSeed(diffuseColor.rgb);
 if(vRegionalWall>.5){
  if(nearDetail>.001&&footprint<.8){
   facadeSurface=facadeOpenings(wall,wallLayout,openingStyle,facadeViewRay(vViewPosition,vRegionalLayout.xy),seed);
@@ -84,14 +86,13 @@ if(vRegionalWall>.5){
 }
 diffuseColor.rgb=facadeSurface.rgb;`)
    .replace('#include <roughnessmap_fragment>',`#include <roughnessmap_fragment>
-roughnessFactor=mix(surfaceProfile.y,.28,facadeSurface.a*vRegionalWall);`)
+roughnessFactor=mix(surfaceProfile.y,${FACADE_PRESENTATION.glassRoughness},facadeSurface.a*vRegionalWall);`)
    .replace('#include <metalnessmap_fragment>',`#include <metalnessmap_fragment>
-metalnessFactor=mix(surfaceProfile.z,.12,facadeSurface.a*vRegionalWall);`)
+metalnessFactor=mix(surfaceProfile.z,${FACADE_PRESENTATION.glassMetalness},facadeSurface.a*vRegionalWall);`)
    .replace('#include <emissivemap_fragment>',`#include <emissivemap_fragment>
-float occupied=step(.62,facadeRoomSeed(wallLayout.xy,seed));
-totalEmissiveRadiance+=facadeSurface.rgb*vec3(2.8,2.15,1.35)*facadeSurface.a*occupied*facadeNight*vRegionalWall;`);
+totalEmissiveRadiance+=facadeRoomEmission(facadeSurface.rgb,wallLayout.xy,seed,vRegionalStyle.z,facadeNight)*facadeSurface.a*vRegionalWall;`);
  };
- material.customProgramCacheKey=()=> 'regional-building-shared-facades-v1';
- Object.assign(material.userData,{farBuildingFacadeDetail:'catalog-floor-bays-and-interiors',farBuildingFacadeOwner:'terrain/far-building-facade-material',farBuildingFacadeCoverage:'active-regional-window',farBuildingFacadeAtlas:'shared-licensed-surface-catalog',regionalSurfaceState:atlas.state});
+ material.customProgramCacheKey=()=> `regional-building-shared-facades-v2:${FACADE_PRESENTATION.version}`;
+ Object.assign(material.userData,{facadePresentationVersion:FACADE_PRESENTATION.version,farBuildingFacadeDetail:'catalog-floor-bays-and-interiors',farBuildingFacadeOwner:'terrain/far-building-facade-material',farBuildingFacadeCoverage:'active-regional-window',farBuildingFacadeAtlas:'shared-licensed-surface-catalog',regionalSurfaceState:atlas.state});
  return material;
 }

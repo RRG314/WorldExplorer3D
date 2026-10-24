@@ -1,0 +1,193 @@
+{
+  "schemaVersion": 1,
+  "purpose": "One owner per changed behavior; local deployment-candidate acceptance, not the historical release matrix.",
+  "cases": [
+    {
+      "id": "frame-owners",
+      "entries": [
+        "tests/frame-owner-commands-current.test.mjs",
+        "tests/world-load-lifecycle-current.test.mjs",
+        "tests/world-load-coverage-current.test.mjs",
+        "tests/ship-traversal-current.test.mjs",
+        "tests/planetary-surface-authority-current.test.mjs"
+      ],
+      "args": [
+        "--test",
+        "tests/frame-owner-commands-current.test.mjs",
+        "tests/world-load-lifecycle-current.test.mjs",
+        "tests/world-load-coverage-current.test.mjs",
+        "tests/ship-traversal-current.test.mjs",
+        "tests/planetary-surface-authority-current.test.mjs"
+      ],
+      "timeoutMs": 120000
+    },
+    {
+      "id": "acceptance-cache",
+      "entries": [
+        "tests/acceptance-inputs-current.test.mjs"
+      ],
+      "args": [
+        "--test",
+        "tests/acceptance-inputs-current.test.mjs"
+      ],
+      "timeoutMs": 120000
+    },
+    {
+      "id": "cell-residency-facts",
+      "entries": [
+        "tests/world-cell-residency-current.test.mjs",
+        "tests/region-build-current.test.mjs",
+        "tests/regional-building-lifetime-current.test.mjs",
+        "tests/regional-scenery-scheduler-current.test.mjs",
+        "tests/transport-ownership-current.test.mjs",
+        "tests/poi-lifecycle-current.test.mjs",
+        "tests/regional-building-worker-current.test.mjs",
+        "tests/regional-geometry-storage-current.test.mjs"
+      ],
+      "args": [
+        "--test",
+        "--test-concurrency=1",
+        "tests/world-cell-residency-current.test.mjs",
+        "tests/region-build-current.test.mjs",
+        "tests/regional-building-lifetime-current.test.mjs",
+        "tests/regional-scenery-scheduler-current.test.mjs",
+        "tests/transport-ownership-current.test.mjs",
+        "tests/poi-lifecycle-current.test.mjs",
+        "tests/regional-building-worker-current.test.mjs",
+        "tests/regional-geometry-storage-current.test.mjs"
+      ],
+      "timeoutMs": 120000
+    },
+    {
+      "id": "shared-presentation",
+      "entries": [
+        "tests/building-facade-layout-current.test.mjs",
+        "tests/facade-texture-sharing-current.test.mjs",
+        "tests/night-lighting-lifecycle-current.test.mjs"
+      ],
+      "args": [
+        "--test",
+        "--test-concurrency=1",
+        "tests/building-facade-layout-current.test.mjs",
+        "tests/facade-texture-sharing-current.test.mjs",
+        "tests/night-lighting-lifecycle-current.test.mjs"
+      ],
+      "timeoutMs": 120000
+    },
+    {
+      "id": "candidate-journey",
+      "entries": [
+        "scripts/verification/browser-completion-journey.mjs",
+        "app/index.html"
+      ],
+      "artifact": true,
+      "args": [
+        "scripts/verification/browser-completion-journey.mjs"
+      ],
+      "timeoutMs": 900000,
+      "evidence": [
+        "output/research/browser-completion-2026-10-20/candidate/receipt.json",
+        "output/research/browser-completion-2026-10-20/candidate/return-cycle-1.png",
+        "output/research/browser-completion-2026-10-20/candidate/return-cycle-2.png",
+        "output/research/browser-completion-2026-10-20/candidate/harbor-day.png",
+        "output/research/browser-completion-2026-10-20/candidate/harbor-night.png",
+        "output/research/browser-completion-2026-10-20/candidate/harbor-regional-night.png",
+        "output/research/browser-completion-2026-10-20/candidate/mobile-walking.png",
+        "output/research/browser-completion-2026-10-20/candidate/interior-day.png",
+        "output/research/browser-completion-2026-10-20/candidate/interior-night.png",
+        "output/research/browser-completion-2026-10-20/candidate/moon-arrival.png",
+        "output/research/browser-completion-2026-10-20/candidate/tester-invitation-desktop.png",
+        "output/research/browser-completion-2026-10-20/candidate/tester-invitation-mobile.png"
+      ]
+    },
+    {
+      "id": "facade-shaders",
+      "entries": [
+        "scripts/verification/regional-appearance-current.mjs",
+        "tests/fixtures/regional-appearance.html"
+      ],
+      "files": [
+        "app/assets/textures"
+      ],
+      "args": [
+        "scripts/verification/regional-appearance-current.mjs"
+      ],
+      "timeoutMs": 120000
+    },
+    {
+      "id": "tester-interest",
+      "entries": [
+        "tests/tester-interest-current.test.cjs"
+      ],
+      "args": [
+        "--test",
+        "tests/tester-interest-current.test.cjs"
+      ],
+      "timeoutMs": 120000
+    },
+    {
+      "id": "tester-ui",
+      "entries": [
+        "scripts/verification/tester-invitation-current.mjs",
+        "app/js/ui/tester-invitation.js",
+        "js/tester-confirmation.js"
+      ],
+      "files": [
+        "app/index.html",
+        "app/styles/start-hub.css",
+        "account/tester.html"
+      ],
+      "args": [
+        "scripts/verification/tester-invitation-current.mjs"
+      ],
+      "timeoutMs": 120000,
+      "evidence": [
+        "output/research/browser-completion-2026-10-20/tester-flow/receipt.json",
+        "output/research/browser-completion-2026-10-20/tester-flow/pending-mobile.png",
+        "output/research/browser-completion-2026-10-20/tester-flow/confirmed-mobile.png"
+      ]
+    },
+    {
+      "id": "candidate-remaining",
+      "entries": [
+        "scripts/verification/browser-completion-journey.mjs",
+        "app/index.html"
+      ],
+      "artifact": true,
+      "args": [
+        "scripts/verification/browser-completion-journey.mjs",
+        "--remaining"
+      ],
+      "timeoutMs": 900000,
+      "evidence": [
+        "output/research/browser-completion-2026-10-20/remaining/receipt.json",
+        "output/research/browser-completion-2026-10-20/remaining/harbor-day.png",
+        "output/research/browser-completion-2026-10-20/remaining/harbor-night.png",
+        "output/research/browser-completion-2026-10-20/remaining/harbor-regional-night.png",
+        "output/research/browser-completion-2026-10-20/remaining/mobile-walking.png",
+        "output/research/browser-completion-2026-10-20/remaining/interior-day.png",
+        "output/research/browser-completion-2026-10-20/remaining/interior-night.png",
+        "output/research/browser-completion-2026-10-20/remaining/moon-arrival.png"
+      ]
+    },
+    {
+      "id": "candidate-frames",
+      "entries": [
+        "scripts/verification/browser-completion-journey.mjs",
+        "app/index.html"
+      ],
+      "artifact": true,
+      "args": [
+        "scripts/verification/browser-completion-journey.mjs",
+        "--frames-only"
+      ],
+      "timeoutMs": 900000,
+      "evidence": [
+        "output/research/browser-completion-2026-10-20/frames/receipt.json",
+        "output/research/browser-completion-2026-10-20/frames/interior-day.png",
+        "output/research/browser-completion-2026-10-20/frames/interior-night.png",
+        "output/research/browser-completion-2026-10-20/frames/moon-arrival.png"
+      ]
+    }
+  ]
+}

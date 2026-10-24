@@ -883,55 +883,8 @@ async function createSolidWorld(pack) {
 }
 
 function positionPlayer(pack) {
-  const ground = pack.manifest.renderPlacement.y + sampleRenderedRelief(pack, pack.spawn.x, pack.spawn.z);
-  Object.assign(appCtx.car, {
-    x: pack.spawn.x,
-    z: pack.spawn.z,
-    y: ground + 1.2,
-    angle: pack.spawn.angle,
-    vx: 0,
-    vz: 0,
-    vy: 0,
-    vFwd: 0,
-    vLat: 0,
-    speed: 0,
-    isAirborne: false,
-    _lastSurfaceY: null
-  });
-  appCtx.carMesh?.position.set(pack.spawn.x, ground + 1.2, pack.spawn.z);
-  if (appCtx.carMesh) {
-    appCtx.carMesh.rotation.y = pack.spawn.angle;
-    appCtx.carMesh.visible = pack.arrivalMode !== 'walk';
-  }
-  if (pack.arrivalMode === 'walk' && appCtx.Walk?.state?.walker) {
-    Object.assign(appCtx.Walk.state.walker, {
-      x: pack.spawn.x,
-      z: pack.spawn.z,
-      y: ground + 1.7,
-      angle: pack.spawn.angle,
-      yaw: pack.spawn.angle,
-      lookYawOffset: 0,
-      pitch: 0,
-      vy: 0,
-      onGround: true
-    });
-  }
-  if (appCtx.drone) {
-    Object.assign(appCtx.drone, {
-      x: pack.spawn.x,
-      y: ground + 12,
-      z: pack.spawn.z,
-      yaw: pack.spawn.angle,
-      pitch: -0.2,
-      roll: 0,
-      vx: 0,
-      vy: 0,
-      vz: 0,
-      cameraYawOffset: 0,
-      cameraPitchOffset: 0,
-      cameraLookTimer: 0
-    });
-  }
+  if (appCtx.initializePlanetaryArrival?.(pack.bodyId,pack.spawn,{mode:pack.arrivalMode||'drive',source:`${pack.bodyId}_arrival`}) !== true) return false;
+  const ground = appCtx.car.y - 1.2;
   appCtx.camera?.position.set(pack.spawn.x + 18, ground + 10, pack.spawn.z + 22);
   appCtx.camera?.lookAt(pack.spawn.x, ground + 3, pack.spawn.z);
 }
@@ -1168,8 +1121,8 @@ async function arriveAtSolidWorld(bodyInput) {
   appCtx.ambientLight?.color?.setHex(0xffffff);
   if (appCtx.ambientLight) appCtx.ambientLight.intensity = pack.ambientIntensity*lightingGain;
   if (appCtx.fillLight) appCtx.fillLight.intensity = pack.fillIntensity*lightingGain;
-  appCtx.setTravelMode?.(pack.arrivalMode || 'drive', { source: `${bodyId}_arrival`, emitTutorial: false });
-  positionPlayer(pack);
+  if (!commitEnvironment(ENV.PLANETARY, { source: `${bodyId}_arrival` })) return false;
+  if (positionPlayer(pack) === false) throw new Error('The accepted planetary arrival is unavailable.');
   await appCtx.setPlanetaryVehicle?.(pack.vehicleBodyId || bodyId, { solidSurface: true });
   if (requestId !== transitionId) return false;
   appCtx.setPlanetaryCharacter?.(bodyId, { solidSurface: true });
@@ -1177,7 +1130,6 @@ async function arriveAtSolidWorld(bodyInput) {
     ? 0.94
     : Math.max(0.04, Math.min(0.55, 0.55 - Number(pack.fogDensity || 0) * 900));
   appCtx.setPlanetarySky?.(bodyId, new Date(), { starOpacity: surfaceStarOpacity });
-  if (!commitEnvironment(ENV.PLANETARY, { source: `${bodyId}_arrival` })) return false;
   await appCtx.ensureBlockBuilderReady?.();
   if (requestId !== transitionId) return false;
   appCtx.refreshBlockBuilderForCurrentLocation?.();

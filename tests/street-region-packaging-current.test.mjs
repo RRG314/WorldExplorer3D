@@ -2,10 +2,26 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {prepareStreetPavement,compilePavementTile,meshPavementTile} from '../app/js/world/compiler/street-pavement.js';
 import {streetPolygonKernel as clip} from '../app/js/world/compiler/street-polygon-kernel.js';
+import{serializeStreetPavementFingerprint}from'../app/js/world/compiler/street-pavement-fingerprint.js';
 const area=polys=>polys.reduce((sum,p)=>sum+p.reduce((total,r,i)=>total+(i?-1:1)*Math.abs(r.slice(1).reduce((s,b,j)=>s+r[j][0]*b[1]-b[0]*r[j][1],0))/2,0),0);
 const rectangle=(x,z,w,h)=>[{x,z},{x:x+w,z},{x:x+w,z:z+h},{x,z:z+h}];
 const source={metersPerWorldUnit:1,coverageBounds:{minX:0,maxX:128,minZ:0,maxZ:128},landuses:[{pts:rectangle(10,10,108,108),tags:{'area:highway':'pedestrian'}}]};
 function polygons(input){return prepareStreetPavement(input).tiles.flatMap(t=>compilePavementTile(t,1).polygons);}
+test('road mask products compile once across cells and a replacement source owns fresh products',()=>{
+ const road={width:8,type:'residential',pts:[{x:-160,z:0},{x:0,z:0},{x:160,z:0}],transportRecord:{sourceTags:{highway:'residential',sidewalk:'both'}}};
+ const input={metersPerWorldUnit:1,roads:[road],linearFeatures:[{kind:'footway',subtype:'sidewalk',width:2,pts:[{x:-150,z:6},{x:150,z:6}]}]};
+ const plan=prepareStreetPavement(input),reference=prepareStreetPavement(input),owners=new Set(plan.tiles.flatMap(t=>[...t.segments,...t.joins]).map(s=>s.sidewalkMaskProduct).filter(Boolean));
+ assert.equal(owners.size,1);const owner=[...owners][0];assert.equal(owner.union,null);
+ const fingerprints=plan.tiles.map(t=>serializeStreetPavementFingerprint(t,1));
+ for(const tile of reference.tiles)for(const item of [...tile.segments,...tile.joins])delete item.sidewalkMaskProduct;
+ let constructions=0;const original=clip.union;
+ clip.union=(...args)=>{if(args[0]===owner.polygons[0])constructions++;return original(...args);};
+ try{for(let i=0;i<plan.tiles.length;i++)assert.deepEqual(compilePavementTile(plan.tiles[i],1),compilePavementTile(reference.tiles[i],1));}finally{clip.union=original;}
+ assert.equal(constructions,1);assert.ok(owner.union);
+ assert.deepEqual(plan.tiles.map(t=>serializeStreetPavementFingerprint(t,1)),fingerprints,'memoized products cannot enter source identities');
+ const changed=structuredClone(input);changed.linearFeatures[0].width=3;const replacement=prepareStreetPavement(changed),next=replacement.tiles.flatMap(t=>t.segments).find(s=>s.sidewalkMaskProduct).sidewalkMaskProduct;
+ assert.notEqual(next,owner);assert.equal(next.union,null);
+});
 test('changing output chunks preserves the accepted pedestrian area and its hole',()=>{
   const input={...source,buildings:[{pts:rectangle(55,55,18,18)}]};
   const reference=polygons({...input,chunkSize:64});

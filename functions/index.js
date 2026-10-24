@@ -1768,6 +1768,7 @@ exports.joinRoom = functions.region('us-central1').runWith({ invoker: 'public' }
   if (!auth) return;
   try {
     const result = await admitRoomPlayer({ db, uid: auth.uid,
+      weekly: req.body?.weekly === true,
       roomCode: String(req.body?.roomCode || '').trim().toUpperCase(),
       displayName: req.body?.displayName || auth.name || 'Explorer' });
     res.status(200).json(result);
@@ -2789,3 +2790,11 @@ exports.sealRealityCaptureOriginal=functions.storage.object().onFinalize(async o
 
 // Free public weather and ocean models share bounded, authenticated cache authority.
 exports.getEnvironmentalData = require('./environment-data').buildEnvironmentDataExport({functions, db, setCors, verifyAppCheck});
+require('./tester-mail').initializeRuntimeProject();
+function testerProgramConfig(){
+  const projectId=require('./tester-mail').runtimeProject(),staging=projectId==='we3d-staging-20260712';
+  return {...contributionNotificationConfig(),projectId,webhookSecret:process.env.WE3D_TESTER_RESEND_WEBHOOK_SECRET||'',
+    inboundEnabled:projectId==='worldexplorer3d-d9b83',inboundTestSender:staging?(process.env.WE3D_TESTER_INBOUND_TEST_SENDER||''):'',
+    testRecipients:staging?(process.env.WE3D_TESTER_TEST_RECIPIENTS||'').split(',').map(v=>v.trim().toLowerCase()).filter(Boolean):[]};
+}
+Object.assign(exports, require('./tester-program').buildTesterProgramExports({functions, db, setCors, verifyAppCheck, requireModerator, config:testerProgramConfig}));

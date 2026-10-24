@@ -2,6 +2,7 @@
 <script src="/app/vendor/three/build/three.min.js"></script>
 <script>window.addEventListener('error',e=>window.fixtureError=e.message);window.addEventListener('unhandledrejection',e=>window.fixtureError=String(e.reason));</script>
 <script type="module">
+import {createRoadRegionLease} from '/app/js/terrain/road-region-lease.js';
 import {prepareTransportDetail} from '/app/js/terrain/transport-detail-runtime.js';
 import {createRegionalRoadContact} from '/app/js/terrain/regional-road-contact.js';
 import {createRoadContactIndex} from '/app/js/terrain/road-contact-index.js';
@@ -28,8 +29,8 @@ for(let cycle=0;cycle<3;cycle++){
  const contact=createRegionalRoadContact(createRoadContactIndex(initial));const resident=new Map();
  detail.attach((packet,{isCurrent})=>{
   check(isCurrent(),'Obsolete region reached publication');const meshes=makeMeshes(packet);
-  contact.add(packet.key,createRoadContactIndex(meshes));resident.set(packet.key,meshes);
- },()=>{},key=>{contact.remove(key);destroy(resident.get(key));resident.delete(key);});
+  contact.add(packet.key,createRoadContactIndex(meshes));resident.set(packet.key,createRoadRegionLease(meshes,contact,packet.key));
+ },()=>{},key=>{resident.get(key)?.dispose();resident.delete(key);});
  for(const x of [250,2500,4500,6500,8500,10500,6500,2500,-2500,-6500,-10500,250]){
   const point={x,z:0,source:'drive'};const start=performance.now();
   do{

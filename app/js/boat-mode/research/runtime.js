@@ -28,6 +28,11 @@ export function createResearchDeck({ctx,resetDynamics,updateVessel,onActivityCha
   return station?Math.hypot(pose.x-station.x,pose.z-station.z,(pose.y??RCRV_LAYOUT.floorY)-(station.y??RCRV_LAYOUT.floorY)):Infinity;
  };
  const stopped=()=>Math.hypot(ctx.boat.vx||0,ctx.boat.vz||0,ctx.boat.speed||0)*(ctx.METERS_PER_WORLD_UNIT||1)<=.5;
+ function syncWorldPose(){
+  host.position.set(pose.x,pose.y??RCRV_LAYOUT.floorY,pose.z);host.rotation.set(0,pose.yaw,0);
+  host.updateWorldMatrix(true,true);
+  const p=ctx.boatMode.mesh.localToWorld(new THREE.Vector3(pose.x,(pose.y??RCRV_LAYOUT.floorY)+RESEARCH_EYE_HEIGHT,pose.z));world={x:p.x,y:p.y,z:p.z};
+ }
  function enter(atLadder=false) {
   if(active)return true;
   if(!supported()||!ready()||!stopped()||!ctx.Walk?.state?.characterMesh)return false;
@@ -35,6 +40,7 @@ export function createResearchDeck({ctx,resetDynamics,updateVessel,onActivityCha
   host=ctx.Walk.state.characterMesh;parent=host.parent;ctx.boatMode.mesh.add(host);host.visible=true;
   pose={...(atLadder?stations().find(s=>s.id==='dive'):layout().spawn),yaw:0};origin=`${ctx.LOC?.lat}:${ctx.LOC?.lon}`;active=true;epoch++;wayfinding=createResearchWayfinding(navigation());routeAge=Infinity;
   motor=createResearchLocomotion(navigation(),pose);viewY=pose.y;closeCamera=false;clearCameraTime=0;viewDistance=3.5;jumpHeld=false;
+  syncWorldPose();
   ctx.clearControlInputState?.('research-deck-enter');ctx.updateControlsModeUI?.();onActivityChanged();return true;
  }
  function release(){
@@ -116,11 +122,11 @@ export function createResearchDeck({ctx,resetDynamics,updateVessel,onActivityCha
    jumpHeld=jump;
    const step=ctx.paused||ctx.showLargeMap||mapOpen?0:Math.min(.05,Math.max(0,dt));cameraStep=step;
    const motion=motor.update(step,actions);pose=motion.pose;viewY=researchCameraHeight(viewY,pose.y,step);
-   host.position.set(pose.x,pose.y??RCRV_LAYOUT.floorY,pose.z);host.rotation.set(0,pose.yaw,0);host.visible=true;
+   host.visible=true;
    updateCuratedCharacterAnimation(host,motion.grounded&&motion.moving,step,motion.running);
    ctx.boatMode.mesh.userData.researchInterior?.update(pose,ctx);
    routeAge+=dt;if(routeAge>=.65){route=wayfinding?.route(pose,targetId)||[];routeAge=0;}
-   host.updateWorldMatrix(true,true);const p=ctx.boatMode.mesh.localToWorld(new THREE.Vector3(pose.x,(pose.y??RCRV_LAYOUT.floorY)+RESEARCH_EYE_HEIGHT,pose.z));world={x:p.x,y:p.y,z:p.z};
+   syncWorldPose();
   }
   const target=stations().find(s=>s.id===targetId),distance=stationDistance(targetId);
   const next=route.find(p=>Math.hypot(p.x-pose.x,p.z-pose.z)>.65)||target;

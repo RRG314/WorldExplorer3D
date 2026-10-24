@@ -71,3 +71,10 @@ export function shouldLoadDetailedBuildings(data = {}, options = {}) {
     evidence: Object.freeze(evidence)
   });
 }
+
+// Before the biome is known, apply the existing most restrictive climate rule.
+// Positive settlement evidence still needs a road for the publication path.
+export function canPrefetchDetailedBuildings(data = {}) {
+  const policy=shouldLoadDetailedBuildings(data,{worldSurfaceProfile:{terrainModeHint:'snow'}});
+  return policy.shouldLoad&&policy.evidence.driveableRoads>0;
+}

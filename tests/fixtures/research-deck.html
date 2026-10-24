@@ -1,5 +1,6 @@
 <!doctype html><html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Research deck acceptance</title><link rel="icon" href="/favicon.svg"><style>body{margin:0;background:#234452;color:white;font:14px system-ui}header{position:absolute;padding:12px;background:#123844cc}canvas{display:block}</style><header>Research vessel · actual model, rig and deck controller<br>WASD walk · arrows turn · controlled waves and mapped water</header>
 <script src="/node_modules/three/build/three.min.js"></script><script src="/node_modules/three/examples/js/loaders/GLTFLoader.js"></script><script type="module">
+import {resolveTransportActor} from "/app/js/transport/actor-contract.js";
 import {keyboardControlActions} from '/app/js/controls/action-input.js';
 import {setupEngineInputHandlers} from '/app/js/engine/input-handlers.js';
 import {prepareSurfaceVoyage} from '/app/js/ocean/voyage.js';
@@ -35,7 +36,7 @@ Object.assign(ctx,{renderer,keys:{},gameStarted:true,onKey(){},checkMoonClick:()
 const inputScope=setupEngineInputHandlers(ctx);
 function step(dt){time+=dt;updateVessel();ctx.boatDeck.update(dt);if(!guideOpened&&new URLSearchParams(location.search).has('guide')){const guide=document.getElementById('coastalDeckChapter');if(guide){guide.open=true;guideOpened=true;}}ctx.boatSwimming.update(dt);if(state.mode==='walk'){const a=actions();waterRuntime.update(dt,{actions:a,forward:a.move||0,strafe:-(a.strafe||0),groundState:{effectiveGroundY:-30}});const w=state.walker;camera.position.set(w.x+4,w.y+2,w.z-4);camera.lookAt(w.x,w.y-.4,w.z);}else ctx.boatDeck.camera();}
 window.advanceTime=async ms=>{for(let left=ms/1000;left>1e-8;left-=1/60)step(Math.min(1/60,left));renderer.render(scene,camera)};
-window.render_game_to_text=()=>JSON.stringify({coordinateSystem:'ship local: x port, y up, z bow; working deck y=1.944',deck:ctx.boatDeck.snapshot(),swimming:ctx.boatSwimming.snapshot(),walker:state.walker,chartOpened,research:ctx.marineResearch?.snapshot(),vessel:mesh.userData.researchVesselState});
+window.render_game_to_text=()=>JSON.stringify({coordinateSystem:'ship local: x port, y up, z bow; working deck y=1.944',actor:resolveTransportActor(ctx),deck:ctx.boatDeck.snapshot(),swimming:ctx.boatSwimming.snapshot(),walker:state.walker,chartOpened,research:ctx.marineResearch?.snapshot(),vessel:mesh.userData.researchVesselState});
 window.researchTest={ctx,inputScope,setActions:value=>override=value,get chartOpened(){return chartOpened}};
 let last=performance.now();function frame(now){step(Math.min(.05,(now-last)/1000));last=now;renderer.render(scene,camera);requestAnimationFrame(frame)}requestAnimationFrame(frame);await mesh.userData.visualReady;window.ready=true;
 onresize=()=>{renderer.setSize(innerWidth,innerHeight);camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix()};

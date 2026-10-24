@@ -4,12 +4,13 @@ import {startActivity,stopActivity,updateActivityRuntime,getRuntimeSnapshot,getC
 import {createGameplayPluginRegistry} from '../app/js/gameplay/plugin-registry.js';
 const disk=new Map();globalThis.localStorage={getItem:k=>disk.get(k),setItem:(k,v)=>disk.set(k,v)};
 let mode='walk',environment='EARTH',records=[];
-Object.assign(ctx,{_worldLoadSequence:1,paused:false,worldLoading:false,getEnv:()=>environment,getCurrentTravelMode:()=>mode,setTravelMode:m=>{mode=m;return true},Walk:{state:{walker:{x:0,y:1.7,z:0}}},car:{x:0,y:1,z:0},recordExplorerEvent:async event=>{records.push(event);return {recorded:true,event}}});
+Object.assign(ctx,{_worldLoadSequence:1,paused:false,worldLoading:false,getEnv:()=>environment,getCurrentTravelMode:()=>mode,setTravelMode:m=>{mode=m;ctx.Walk.state.mode=m;return true},Walk:{state:{mode:'walk',walker:{x:0,y:1.7,z:0}}},car:{x:0,y:1,z:0},recordExplorerEvent:async event=>{records.push(event);return {recorded:true,event}}});
+ctx.activateSurfaceActivity=(m,start)=>{mode=m;ctx.Walk.state.mode=m;Object.assign(ctx.Walk.state.walker,{x:start.x,y:start.y+1.7,z:start.z});return true;};
 const route=id=>({id,title:id,traversalMode:'walk',requiresNearbyStart:false,anchors:[{id:'a',typeId:'start',x:0,y:0,z:0},{id:'b',typeId:'checkpoint',label:'View',x:0,y:0,z:50},{id:'c',typeId:'finish',label:'Finish',x:0,y:0,z:100}]});
 test('route mode, pause and world ownership prevent invalid completion; legitimate completion records once',async()=>{
  assert.equal(startActivity(route('lifecycle-route')),true);updateActivityRuntime(.05);const elapsed=getRuntimeSnapshot().elapsedMs;
- mode='drive';ctx.car.z=100;updateActivityRuntime(.05);assert.equal(getRuntimeSnapshot().targetIndex,1);assert.equal(getRuntimeSnapshot().elapsedMs,elapsed);
- mode='walk';ctx.paused=true;ctx.Walk.state.walker.z=50;updateActivityRuntime(.05);assert.equal(getRuntimeSnapshot().targetIndex,1);ctx.paused=false;
+ mode='drive';ctx.Walk.state.mode='drive';ctx.car.z=100;updateActivityRuntime(.05);assert.equal(getRuntimeSnapshot().targetIndex,1);assert.equal(getRuntimeSnapshot().elapsedMs,elapsed);
+ mode='walk';ctx.Walk.state.mode='walk';ctx.paused=true;ctx.Walk.state.walker.z=50;updateActivityRuntime(.05);assert.equal(getRuntimeSnapshot().targetIndex,1);ctx.paused=false;
  updateActivityRuntime(.05);assert.equal(getRuntimeSnapshot().targetIndex,2);ctx.Walk.state.walker.z=100;updateActivityRuntime(.05);updateActivityRuntime(.05);updateActivityRuntime(.05);await new Promise(r=>setTimeout(r,0));
  assert.equal(records.length,1);assert.equal(getCompletionState('lifecycle-route').count,1);assert.equal(getRuntimeSnapshot().active,false);
  startActivity(route('world-change'));environment='OCEAN';updateActivityRuntime(.05);assert.equal(getRuntimeSnapshot().active,false);assert.equal(records.length,1);environment='EARTH';

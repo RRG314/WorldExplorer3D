@@ -108,7 +108,7 @@ export function runLoggedStep(command, options = {}) {
     const forward = (stream, destination) => {
       stream?.on('data', (chunk) => {
         log.write(chunk);
-        destination.write(chunk);
+        if (options.quiet !== true) destination.write(chunk);
       });
     };
     forward(child.stdout, process.stdout);

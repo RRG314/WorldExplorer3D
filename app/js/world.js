@@ -22,10 +22,10 @@ import {
   applyResolvedWorldSpawn,
   applySpawnTarget,
   initWorldSpawning,
+  resolveRoadSpawn,
   resolveSafeWorldSpawn,
   spawnOnRoad,
-  terrainYAtWorld,
-  tryAutoEnterBoatAt
+  terrainYAtWorld
 } from "./world/spawn.js?v=41";
 import {
   buildWorldOverpassPlan,
@@ -378,11 +378,9 @@ initWorldOsmLoader({
   getPerfModeValue
 });
 initWorldNavigation({
-  applySpawnTarget,
   areRoadsConnected,
   isSuppressedBaseRoad,
-  sampleFeatureSurfaceY,
-  tryAutoEnterBoatAt
+  sampleFeatureSurfaceY
 });
 let editableWorldRuntimePromise = null;
 appCtx.ensureEditableWorldRuntime = () => {
@@ -463,6 +461,7 @@ Object.assign(appCtx, {
   refreshTransportStructureAssembliesForPublishedTerrain,
   refreshAuthoritativeMapData,
   releaseEarthWorldForTitle,
+  resolveRoadSpawn,
   resolveSafeWorldSpawn,
   sampleFeatureSurfaceY,
   syncLinearFeatureOverlayVisibility,
@@ -497,6 +496,7 @@ export {
   refreshStructureAwareFeatureProfilesCooperatively,
   refreshTransportStructureAssembliesForPublishedTerrain,
   refreshAuthoritativeMapData,
+  resolveRoadSpawn,
   resolveSafeWorldSpawn,
   sampleFeatureSurfaceY,
   syncLinearFeatureOverlayVisibility,

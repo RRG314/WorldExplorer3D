@@ -3,11 +3,9 @@ import { cameraRoadSurfaceHit } from './camera-road-surface.js';
 import { roadWidthAtProjection } from './road-cross-section-profile.js?v=1';
 
 const runtime = {
-  applySpawnTarget: () => null,
   areRoadsConnected: () => false,
   isSuppressedBaseRoad: () => false,
-  sampleFeatureSurfaceY: () => NaN,
-  tryAutoEnterBoatAt: () => null
+  sampleFeatureSurfaceY: () => NaN
 };
 
 const nearRoadResult = {
@@ -36,11 +34,9 @@ export function resetRoadSearchIndex() {
 }
 
 export function initWorldNavigation(deps = {}) {
-  if (typeof deps.applySpawnTarget === 'function') runtime.applySpawnTarget = deps.applySpawnTarget;
   if (typeof deps.areRoadsConnected === 'function') runtime.areRoadsConnected = deps.areRoadsConnected;
   if (typeof deps.isSuppressedBaseRoad === 'function') runtime.isSuppressedBaseRoad = deps.isSuppressedBaseRoad;
   if (typeof deps.sampleFeatureSurfaceY === 'function') runtime.sampleFeatureSurfaceY = deps.sampleFeatureSurfaceY;
-  if (typeof deps.tryAutoEnterBoatAt === 'function') runtime.tryAutoEnterBoatAt = deps.tryAutoEnterBoatAt;
 }
 
 function finiteNumberOr(value, fallback = 0) {
@@ -189,43 +185,7 @@ export function buildingContainingPoint(x, z, radius = 6, options = {}) {
 }
 
 export function teleportToLocation(worldX, worldZ, options = {}) {
-  const walkModeActive = !!(appCtx.Walk && appCtx.Walk.state && appCtx.Walk.state.mode === 'walk');
-  const mode = walkModeActive ? 'walk' : 'drive';
-  const currentAngle = walkModeActive ?
-    finiteNumberOr(appCtx.Walk?.state?.walker?.angle, appCtx.car?.angle) :
-    finiteNumberOr(appCtx.car?.angle, 0);
-  const currentFeetY = walkModeActive ?
-    finiteNumberOr(appCtx.Walk?.state?.walker?.y, 0) - 1.7 :
-    NaN;
-
-  const boatSpawn = runtime.tryAutoEnterBoatAt(worldX, worldZ, {
-    ...options,
-    mode,
-    source: options.source || 'teleport'
-  });
-  if (boatSpawn) {
-    if (appCtx.droneMode) {
-      appCtx.drone.x = boatSpawn.x;
-      appCtx.drone.z = boatSpawn.z;
-      appCtx.drone.yaw = boatSpawn.angle;
-    }
-    return boatSpawn;
-  }
-
-  const resolved = runtime.applySpawnTarget(worldX, worldZ, {
-    ...options,
-    mode,
-    angle: currentAngle,
-    feetY: currentFeetY,
-    source: options.source || 'teleport'
-  });
-
-  if (appCtx.droneMode && resolved) {
-    appCtx.drone.x = resolved.x;
-    appCtx.drone.z = resolved.z;
-    appCtx.drone.yaw = resolved.angle;
-  }
-  return resolved;
+  return appCtx.travelToWorldPoint?.(worldX, worldZ, options) || null;
 }
 
 function mapScreenToWorld(screenX, screenY, options = {}) {

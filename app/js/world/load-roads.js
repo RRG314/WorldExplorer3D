@@ -12,12 +12,12 @@ import {
   finishSupersededWorldLoadRuntimeSession,
   finishWorldLoadRuntimeSession
 } from "./load-runtime-session.js?v=125";
-import { loadBuildingDetailForPublication } from "./load-building-detail.js?v=27";
+import { loadBuildingDetailForPublication,createPreferredBuildingRequest } from "./load-building-detail.js?v=27";
 import { activateAcceptedGroundForWorldLoad } from "./accepted-ground-activation.js?v=7";
 import { createWorldLoadPlan } from "../earth-core/world-load-plan.js?v=1";
 import {createWorldLoadRequest} from '../earth-core/world-load-request.js?v=1';
 import { diagnoseDistrictGroundSource, prepareSelectedLocationSource } from "./compiler/selected-location-source-adapter.js?v=16";
-import { shouldLoadDetailedBuildings } from "./settlement-density-policy.js?v=1";
+import { shouldLoadDetailedBuildings,canPrefetchDetailedBuildings } from "./settlement-density-policy.js?v=1";
 import {
   waitForInitialTerrain,
   waitForTerrainSurfaceMaterials,
@@ -425,6 +425,15 @@ export function createWorldRoadLoader(deps = {}) {
         );
         const landuseGeometryGuards = buildLanduseGeometryGuards(geometryGuards);
         const waterGeometryGuards = buildWaterGeometryGuards(geometryGuards);
+        const buildingLocation={lat:appCtx.LOC.lat,lon:appCtx.LOC.lon};
+        const requestPreferredBuilding=createPreferredBuildingRequest({
+          isCurrent:isActiveLoadContext,
+          request:()=>runProviderWork('overture','building-detail',signal=>fetchGlobalBuildingData({
+            ...buildingLocation,radius:buildingPublicationCacheMeta.featureRadius,
+            bounds:buildingPublicationCacheMeta.bounds,
+            visibilityRadiusWorld:buildingPublicationCacheMeta.visibleRadiusWorld,signal
+          }))
+        });
         startLoadPhase('fetchFixedRegionalContext');
         const regionalRequest = beginFixedRegionalTransportLoad({
           fetchWorldData: fetchShortbreadWorldData,
@@ -461,7 +470,12 @@ export function createWorldRoadLoader(deps = {}) {
             ],
             signal
           })
-        ).then((facilityData) => ({ facilityData, error: null }))
+        ).then((facilityData) => {
+          // Download only: adoption still uses the final normalized policy and
+          // the original building publication path. Sparse scenes do not prefetch.
+          if(canPrefetchDetailedBuildings(facilityData))requestPreferredBuilding();
+          return {facilityData,error:null};
+        })
           .catch((error) => ({ facilityData: null, error }));
         startLoadPhase('fetchOverpass');
         let data;
@@ -795,16 +809,7 @@ export function createWorldRoadLoader(deps = {}) {
         // in loadBuildingDetailForPublication. Capture rejection immediately so a
         // superseded load cannot leave an unobserved prefetch rejection.
         const preferredBuildingRequest = buildingLoadPolicy.shouldLoad && normalizedSelection.roadWays.length > 0
-          ? runProviderWork('overture', 'building-detail', (signal) =>
-              fetchGlobalBuildingData({
-                lat: appCtx.LOC.lat,
-                lon: appCtx.LOC.lon,
-                radius: buildingPublicationCacheMeta.featureRadius,
-                bounds: buildingPublicationCacheMeta.bounds,
-                visibilityRadiusWorld: buildingPublicationCacheMeta.visibleRadiusWorld,
-                signal
-              })
-            ).then(data => ({ data }), error => ({ error }))
+          ? requestPreferredBuilding()
           : null;
         appCtx._worldLoadNodes = retainTreeRowNodes(normalizedSelection.nodes,appCtx.osmTreeRows);
         if (runtimeState) {

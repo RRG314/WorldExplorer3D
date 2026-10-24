@@ -51,7 +51,7 @@ const PHASES = Object.freeze({
   aviation: [80, 'Getting ready for your arrival'],
   maritime: [81, 'Getting ready for your arrival'],
   worldDiscovery: [82, 'Getting ready for your arrival'],
-  prepareLocationScenery: [83, 'Finishing the surrounding streets'],
+  prepareLocationScenery: [83, 'Preparing your starting streets'],
   prepareWorldPresentation: [99, 'Getting ready for your arrival']
 });
 const MODE_LABELS = Object.freeze({ earth: 'Preparing your location', ocean: 'Preparing your ocean outing', space: 'Preparing your space journey', moon: 'Preparing your Moon visit', mars: 'Preparing your Mars visit' });

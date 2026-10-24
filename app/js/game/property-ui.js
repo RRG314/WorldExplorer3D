@@ -8,7 +8,7 @@ import { createConnectedExplorerWallet } from '../economy/connected-wallet-autho
 import { getCurrentUser } from '../../../js/auth-ui.js?v=56';
 import { getCurrentRoom } from '../multiplayer/rooms.js?v=67';
 import { postActivity } from '../multiplayer/loop.js?v=56';
-import { createNavigationRoute, describeDestinationEntrySupport, getNavigationTargetForDestination } from './navigation-ui.js?v=2';
+import { createNavigationRoute, describeDestinationEntrySupport, getNavigationTargetForDestination, navigationDestinationLabel } from './navigation-ui.js?v=2';
 import { escapeHtml, sanitizeHttpUrl } from './ui-utils.js?v=1';
 import { isLikelyMarylandCoordinate } from '../gis/maryland-parcel-core.js?v=1';
 import { loadMarylandParcels, marylandParcelProviderSnapshot } from '../gis/maryland-parcel-provider.js?v=2';
@@ -173,8 +173,8 @@ export function routeToPersonalHome(home) {
   if (!home || home.locationId!==runtimeLocation().id) return false;
   const actor=actorPosition(),target=getNavigationTargetForDestination(home);
   if (!target.support?.enterable) return false;
-  appCtx.selectedProperty=home;appCtx.showNavigation=true;
-  createNavigationRoute(Number(actor.x||0),Number(actor.z||0),target.x,target.z,true);
+  appCtx.selectedProperty=home;
+  createNavigationRoute(Number(actor.x||0),Number(actor.z||0),target.x,target.z,true,{label:navigationDestinationLabel(home),owner:'property'});
   return true;
 }
 appCtx.marylandParcelRuntimeSnapshot = () => Object.freeze({ ...parcelRuntime, provider: marylandParcelProviderSnapshot() });
@@ -584,10 +584,9 @@ export function navigateToProperty(propertyId) {
     return false;
   }
   appCtx.selectedProperty = property;
-  appCtx.showNavigation = true;
   const actor = actorPosition();
   const target = getNavigationTargetForDestination(property);
-  createNavigationRoute(Number(actor.x || 0), Number(actor.z || 0), target.x, target.z, true);
+  createNavigationRoute(Number(actor.x || 0), Number(actor.z || 0), target.x, target.z, true, {label:navigationDestinationLabel(property),owner:'property'});
   setStatus(`Route set to ${property.label}.`, 'ok');
   closeModal(); updatePropertyPanel();
   return true;

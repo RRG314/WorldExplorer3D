@@ -15,7 +15,7 @@ export function writeBuildingDescriptor(data, index, building, massing) {
 }
 
 export class RegionalBuildingDescriptors {
-  constructor({ data, rings = [] }) {
+  constructor({ data, rings = [], identities = [] }) {
     if (!(data instanceof Float64Array) || data.length % DESCRIPTOR_STRIDE !== 0 ||
         data.length / DESCRIPTOR_STRIDE > 1200000 || rings.length > 9000) {
       throw new RangeError('Invalid regional building descriptor packet');
@@ -23,6 +23,9 @@ export class RegionalBuildingDescriptors {
     this.data = data;
     this.length = data.length / DESCRIPTOR_STRIDE;
     this.rings = new Map(rings);
+    if(identities.length && (identities.length!==this.length || identities.some(id=>typeof id!=='string'||!id)))
+      throw new TypeError('Invalid regional building identities');
+    this.identities = identities;
     this.disposed = false;
   }
   read(index, target) {
@@ -34,6 +37,7 @@ export class RegionalBuildingDescriptors {
     target.widthMeters = a[at + 2]; target.depthMeters = a[at + 3];
     target.areaMeters = a[at + 4]; target.rotationY = a[at + 5]; target.priority = a[at + 6];
     target.ring = this.rings.get(index) || null;
+    target.identity = this.identities[index] || null;
     const massing = target.massing;
     massing.heightMeters = a[at + 7]; massing.heightSource = HEIGHT_SOURCES[a[at + 8]];
     massing.color[0] = a[at + 9]; massing.color[1] = a[at + 10]; massing.color[2] = a[at + 11];
@@ -47,6 +51,6 @@ export class RegionalBuildingDescriptors {
     if (this.disposed) return;
     this.disposed = true;
     if (typeof this.data.buffer.transfer === 'function') this.data.buffer.transfer(0);
-    this.data = new Float64Array(0); this.rings.clear(); this.length = 0;
+    this.data = new Float64Array(0); this.rings.clear(); this.identities=[]; this.length = 0;
   }
 }

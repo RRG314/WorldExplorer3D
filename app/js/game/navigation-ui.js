@@ -1,8 +1,13 @@
+import {resolveControlState} from '../transport/control-state.js';
+import {activeActorPose} from '../transport/actor-contract.js?v=6';
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { escapeHtml, escapeJsString, formatPrice, toFiniteNumber } from "./ui-utils.js?v=1";
 
 import { disposeThreeObjectTree } from '../engine/webgl-lifecycle.js?v=2';
+import { createNavigationState } from './navigation-state.js';
 
+const navigation = createNavigationState();
+export const navigationDestinationSnapshot = () => navigation.current();
 let navigationFrame = null;
 function clearNavigationVisuals() {
   if (navigationFrame !== null) cancelAnimationFrame(navigationFrame);
@@ -243,14 +248,16 @@ export function closeMapInfo() {
   document.getElementById('mapInfoPanel').style.display = 'none';
 }
 
-export function navigateToPOI(x, z) {
+export function navigateToPOI(x, z, label = 'Destination') {
+  const actor = currentNavigationActor();
+  if (!actor || !Number.isFinite(x) || !Number.isFinite(z)) return false;
   appCtx.selectedProperty = null;
   appCtx.selectedHistoric = null;
-  appCtx.showNavigation = true;
-  createNavigationRoute(appCtx.car.x, appCtx.car.z, x, z);
+  return createNavigationRoute(actor.x, actor.z, x, z, true, {label, owner: 'poi'});
 }
 
-export function clearNavigation() {
+export function clearNavigation(owner = null) {
+  if (!navigation.clear(owner)) return false;
   appCtx.selectedProperty = null;
   appCtx.selectedHistoric = null;
   appCtx.showNavigation = false;
@@ -261,12 +268,13 @@ export function clearNavigation() {
   clearNavigationVisuals();
 
   document.getElementById('navigationHud').style.display = 'none';
+  return true;
 }
 
-function currentNavigationMode() {
-  if (appCtx.droneMode) return 'drone';
-  if (appCtx.Walk && appCtx.Walk.state.mode === 'walk') return 'walk';
-  return 'drive';
+function currentNavigationMode() { return resolveControlState(appCtx).locomotion; }
+function currentNavigationActor() {
+  const actor = activeActorPose(appCtx);
+  return actor.frame === 'surface' ? actor : null;
 }
 
 function navigationRouteNeedsRebuild(fromX, fromZ, toX, toZ, mode) {
@@ -292,13 +300,23 @@ function routePointsToWorldVectors(points, mode = 'drive') {
   });
 }
 
-export function createNavigationRoute(fromX, fromZ, toX, toZ, forceRebuild = false) {
+export function createNavigationRoute(fromX, fromZ, toX, toZ, forceRebuild = false, options = {}) {
+  if (![fromX, fromZ, toX, toZ].every(Number.isFinite)) return false;
+  navigation.select({x: toX, z: toZ, label: options.label}, {
+    owner: options.owner || 'manual', world: appCtx._worldLoadSequence || 0
+  });
+  appCtx.showNavigation = true;
+  rebuildNavigationRoute(fromX, fromZ, toX, toZ, forceRebuild);
+  return true;
+}
+
+function rebuildNavigationRoute(fromX, fromZ, toX, toZ, forceRebuild = false) {
   const navMode = currentNavigationMode();
   const shouldRebuild = forceRebuild || navigationRouteNeedsRebuild(fromX, fromZ, toX, toZ, navMode);
   if (!shouldRebuild) return;
 
   let routeData = null;
-  if (navMode !== 'drone' && typeof appCtx.findTraversalRoute === 'function') {
+  if (['walk', 'drive'].includes(navMode) && typeof appCtx.findTraversalRoute === 'function') {
     routeData = appCtx.findTraversalRoute(fromX, fromZ, toX, toZ, { mode: navMode });
   }
   if (!routeData || !Array.isArray(routeData.points) || routeData.points.length < 2) {
@@ -378,28 +396,21 @@ export function updateNavigationRoute() {
     return;
   }
 
-  const destination = appCtx.selectedProperty || appCtx.selectedHistoric;
-  if (!destination) return;
-
-  let currentX;
-  let currentZ;
-  let currentAngle;
-  if (appCtx.droneMode) {
-    currentX = appCtx.drone.x;
-    currentZ = appCtx.drone.z;
-    currentAngle = appCtx.drone.yaw;
-  } else if (appCtx.Walk && appCtx.Walk.state.mode === 'walk') {
-    currentX = appCtx.Walk.state.walker.x;
-    currentZ = appCtx.Walk.state.walker.z;
-    currentAngle = appCtx.Walk.state.walker.yaw;
-  } else {
-    currentX = appCtx.car.x;
-    currentZ = appCtx.car.z;
-    currentAngle = appCtx.car.angle;
+  const destination = navigation.current();
+  if (!destination || destination.world !== (appCtx._worldLoadSequence || 0)) {
+    clearNavigation();
+    return;
   }
+  const actor = currentNavigationActor();
+  if (!actor || !Number.isFinite(actor.x) || !Number.isFinite(actor.z)) {
+    navHud.style.display = 'none';
+    return;
+  }
+  const currentX = actor.x, currentZ = actor.z;
+  const currentAngle = actor.yaw ?? actor.angle ?? 0;
 
-  const target=getNavigationTargetForDestination(destination);
-  createNavigationRoute(currentX, currentZ, target.x, target.z);
+  const target = destination;
+  rebuildNavigationRoute(currentX, currentZ, target.x, target.z);
 
   const routePoints = Array.isArray(appCtx.navigationRoutePoints) ? appCtx.navigationRoutePoints : [];
   const guidancePoint = routePoints.length > 1 && typeof appCtx.pickNavigationTargetPoint === 'function'

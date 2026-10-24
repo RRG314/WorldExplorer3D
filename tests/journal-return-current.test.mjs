@@ -5,6 +5,10 @@ import {prepareSurfaceVoyage} from '../app/js/ocean/voyage.js';
 const earth={environment:'EARTH',regionLabel:'Saved coast',locationSnapshot:{lat:34,lon:-120,name:'Saved coast'}};
 const voyage=()=>prepareSurfaceVoyage({lat:34,lon:-120,name:'Offshore California'});
 
+function published(ctx,sequence=1){
+ const publication={sequence,requestId:`journal-${sequence}`};Object.assign(ctx,{initialEarthWorldReady:true,worldLoading:false,_worldLoadSequence:sequence,worldPublication:publication,isLoadedLocationSelectionCurrent:()=>true,worldLoadRuntimeState:{sequence,publication,status:'ready',geometryReady:true,gameplayRuntimesReady:true,session:{state:'published',requestId:publication.requestId}}});return {state:'published',...publication};
+}
+
 test('Journal routes by environment and validated traversal, never by coordinates alone',()=>{
  assert.equal(journalReturnDestination(earth).kind,'earth-coordinate');
  assert.equal(journalReturnDestination({...earth,locationKey:'coast'},{coast:{}}).kind,'earth-preset');
@@ -26,15 +30,24 @@ test('marine Journal return uses the same vessel and submarine authority without
 
 test('Earth return restores previous environment before selecting the Journal destination',async()=>{
  let environment='OCEAN';const calls=[];
- const ctx={getEnv:()=>environment,returnToEarthFromMenu:async()=>{calls.push('retire-ocean/restore-actor');environment='EARTH';return true;},setCustomLocation:p=>calls.push(p.name),loadRoads:async()=>calls.push('roads'),spawnOnRoad:()=>calls.push('spawn')};
- assert.equal(await returnToJournalRecord(ctx,earth),true);assert.deepEqual(calls,['retire-ocean/restore-actor','Saved coast','roads','spawn']);
+ const ctx={getEnv:()=>environment,returnToEarthFromMenu:async()=>{calls.push('retire-ocean/restore-actor');environment='EARTH';return true;},setCustomLocation:p=>calls.push(p.name),loadRoads:async()=>{calls.push('roads');return published(ctx);},spawnOnRoad:()=>assert.fail('Publication already owns the arrival')};
+ assert.equal(await returnToJournalRecord(ctx,earth),true);assert.deepEqual(calls,['retire-ocean/restore-actor','Saved coast','roads']);
  environment='MOON';calls.length=0;ctx.returnToEarthFromMenu=async()=>false;assert.equal(await returnToJournalRecord(ctx,earth),false);assert.deepEqual(calls,[]);
  delete ctx.returnToEarthFromMenu;assert.equal(await returnToJournalRecord(ctx,earth),false);
  environment='EARTH';ctx.loadRoads=async()=>false;assert.equal(await returnToJournalRecord(ctx,earth),false);assert.deepEqual(calls,['Saved coast']);
 });
 
 test('preset returns validate ownership and avoid rebuilding the already selected Earth location',async()=>{
- const calls=[],ctx={LOCS:{coast:{}},selLoc:'coast',getEnv:()=> 'EARTH',selectPresetLocation:key=>calls.push(key),loadRoads:async()=>calls.push('roads'),spawnOnRoad:()=>calls.push('spawn')};
- const event={...earth,locationKey:'coast'};assert.equal(await returnToJournalRecord(ctx,event),true);assert.deepEqual(calls,[]);
- ctx.selLoc='city';assert.equal(await returnToJournalRecord(ctx,event),true);assert.deepEqual(calls,['coast','roads','spawn']);
+ const calls=[],ctx={LOCS:{coast:{}},selLoc:'coast',getEnv:()=> 'EARTH',selectPresetLocation:key=>calls.push(key),loadRoads:async()=>{calls.push('roads');return published(ctx);},spawnOnRoad:()=>assert.fail('Publication already owns the arrival')};
+ published(ctx);const event={...earth,locationKey:'coast'};assert.equal(await returnToJournalRecord(ctx,event),true);assert.deepEqual(calls,[]);
+ ctx.selLoc='city';assert.equal(await returnToJournalRecord(ctx,event),true);assert.deepEqual(calls,['coast','roads']);
+});
+test('Journal cannot call an aborted or obsolete publication a successful return',async()=>{
+ const notices=[],ctx={getEnv:()=> 'EARTH',setCustomLocation(){},showToast:m=>notices.push(m),loadRoads:async()=>({state:'aborted'})};published(ctx);assert.equal(await returnToJournalRecord(ctx,earth),false);assert.deepEqual(notices,[]);
+ ctx.loadRoads=async()=>{const old=published(ctx,2);published(ctx,3);return old;};assert.equal(await returnToJournalRecord(ctx,earth),false);assert.deepEqual(notices,[]);
+ ctx.getLocationSelectionSignature=()=> 'before';ctx.loadRoads=async()=>{const result=published(ctx,4);ctx.getLocationSelectionSignature=()=> 'after';return result;};assert.equal(await returnToJournalRecord(ctx,earth),false);assert.deepEqual(notices,[]);
+});
+test('Journal preset selection alone does not prove that location is already playable',async()=>{
+ const calls=[],ctx={LOCS:{coast:{}},selLoc:'coast',getEnv:()=> 'EARTH',selectPresetLocation:key=>calls.push(key),loadRoads:async()=>{calls.push('roads');return published(ctx);}};
+ assert.equal(await returnToJournalRecord(ctx,{...earth,locationKey:'coast'}),true);assert.deepEqual(calls,['coast','roads']);
 });

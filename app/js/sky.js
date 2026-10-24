@@ -30,6 +30,7 @@ import {
 } from "./sky/moon-surface.js?v=3";
 import { suspendEarthModesForPlanetaryEntry } from "./planetary/entry.js?v=9";
 import {
+  captureEnvironmentSession,
   commitEnvironment,
   exitCurrentEnvironmentSync,
   registerEnvironmentLifecycle
@@ -248,20 +249,6 @@ function arriveAtMoon() {
   if (appCtx.carMesh) appCtx.carMesh.visible = false;
   appCtx.setPauseReason?.('planetary_transition', true);
 
-  // Reset to driving mode so everything starts clean at the landing site
-  if (appCtx.droneMode) {
-    appCtx.setDroneModeActive(false);
-    const droneBtn = document.getElementById('fDrone');
-    if (droneBtn) droneBtn.classList.remove('on');
-  }
-  if (appCtx.Walk && appCtx.Walk.state.mode === 'walk') {
-    appCtx.Walk.setModeDrive();
-  }
-  const drivingBtn = document.getElementById('fDriving');
-  if (drivingBtn) drivingBtn.classList.add('on');
-  const walkBtn = document.getElementById('fWalk');
-  if (walkBtn) walkBtn.classList.remove('on');
-
   // Travel menu visibility and copy are rendered by travel-mode.js after the
   // environment transition commits. Sky owns the world transition only.
   appCtx.syncTravelModeButtons?.();
@@ -291,9 +278,14 @@ function arriveAtMoon() {
     if (window._moonObjects) {
       window._moonObjects.forEach((obj) => {obj.visible = true;appCtx.scene.add(obj);});
     }
+    const moonSession=captureEnvironmentSession();
     const resumeMoon = () => {
-      if (!appCtx.onMoon) return;
-      positionCarOnMoon();
+      if (!appCtx.onMoon || !moonSession.isCurrent()) return;
+      if (!positionCarOnMoon()) {
+        appCtx.showToast?.('The lunar surface is unavailable. Returning to Earth.');
+        void appCtx.returnToEarthFromMenu?.();
+        return;
+      }
       activateLunarFieldwork(appCtx);
       appCtx.refreshBlockBuilderForCurrentLocation?.();
       if (appCtx.carMesh) appCtx.carMesh.visible = true;
@@ -410,12 +402,6 @@ async function arriveAtEarth(expectedSessionId = null) {
   // The Travel menu has one renderer. Publishing Earth is enough for it to
   // expose the Earth-only actions without a second DOM writer.
   appCtx.syncTravelModeButtons?.();
-
-  if (appCtx.car) {
-    appCtx.car.vx = 0;
-    appCtx.car.vz = 0;
-    appCtx.car.vy = 0;
-  }
 
   try {
     await resumeEarthWorldSession({

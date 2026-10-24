@@ -1,3 +1,5 @@
+import {isEarthWorldUsable} from '../earth-core/world-readiness.js';
+import {captureEnvironmentSession} from '../session-coordinator.js?v=2';
 import {validateOceanVoyage} from '../ocean/voyage-store.js';
 
 // Coordinates alone do not specify a travel mode or even an astronomical body.
@@ -20,7 +22,7 @@ export async function returnToJournalRecord(ctx,event) {
   if(!destination||ctx.sharedMarine?.active)return false;
   try {
     if(destination.kind==='ocean-voyage')return !!await ctx.oceanVoyage?.resume(destination.voyage);
-    if(typeof ctx.loadRoads!=='function'||typeof ctx.spawnOnRoad!=='function')return false;
+    if(typeof ctx.loadRoads!=='function')return false;
     if(destination.kind==='earth-preset'&&typeof ctx.selectPresetLocation!=='function')return false;
     if(destination.kind==='earth-coordinate'&&typeof ctx.setCustomLocation!=='function')return false;
     // Restore the actor and retire the previous environment through the same
@@ -30,12 +32,17 @@ export async function returnToJournalRecord(ctx,event) {
       if(typeof ctx.returnToEarthFromMenu!=='function'||!await ctx.returnToEarthFromMenu()||ctx.getEnv?.()!=='EARTH')return false;
     }
     if(destination.kind==='earth-preset'){
-      if(String(ctx.selLoc)===destination.key&&ctx.getEnv?.()==='EARTH'){ctx.showToast?.(`Already exploring ${event.regionLabel||'this location'}`);return true;}
+      if(String(ctx.selLoc)===destination.key&&ctx.getEnv?.()==='EARTH'&&isEarthWorldUsable(ctx)&&ctx.isLoadedLocationSelectionCurrent?.()===true){ctx.showToast?.(`Already exploring ${event.regionLabel||'this location'}`);return true;}
       ctx.selectPresetLocation(destination.key);
     }else{
       ctx.setCustomLocation(destination.location,{transient:false});
     }
-    const loaded=await ctx.loadRoads();if(loaded===false)return false;
-    ctx.spawnOnRoad();ctx.showToast?.(`Returned to ${event.regionLabel||destination.location?.name||'saved place'}`);return true;
+    const selectionSignature=ctx.getLocationSelectionSignature?.();
+    const session=captureEnvironmentSession({includeWorld:false});
+    const loaded=await ctx.loadRoads();
+    if(!session.isCurrent()||ctx.getEnv?.()!=='EARTH'||!loaded||!isEarthWorldUsable(ctx,loaded)||(selectionSignature!==undefined&&selectionSignature!==ctx.getLocationSelectionSignature?.()))return false;
+    ctx.markLocationSelectionLoaded?.();
+    // The accepted publication already owns its bridge, land or vessel arrival.
+    ctx.showToast?.(`Returned to ${event.regionLabel||destination.location?.name||'saved place'}`);return true;
   }catch{return false;}
 }

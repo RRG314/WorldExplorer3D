@@ -1,3 +1,4 @@
+import {publishResolvedSurfaceSpawn} from './spawn-publication.js';
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { featuredArrivalNear } from "./featured-arrivals.js?v=3";
 import { isRoadSurfaceReachable } from "../structure-semantics.js?v=63";
@@ -87,6 +88,7 @@ function evaluateWalkSpawnCandidate(x, z, options = {}) {
     return { valid: false, reason: "building_clearance", terrainY, buildingCheck };
   }
   if (options.preserveElevatedSurface === true && hasExplicitFeetY && actorFeetY > surfaceY + 1) {
+    if (options.requireVerifiedElevatedSurface === true && !standingOnRoof) return {valid:false,reason:'unsupported_elevated_surface',terrainY};
     surfaceY = actorFeetY;
   }
   if (walkBuildBlockCollision(x, z, terrainY)?.blocked) return { valid: false, reason: "build_block", terrainY };
@@ -494,6 +496,7 @@ function resolveSafeWorldSpawn(targetX, targetZ, options = {}) {
       restorePose: options.restorePose === true,
       feetY: options.feetY,
       preserveElevatedSurface: options.preserveElevatedSurface,
+      requireVerifiedElevatedSurface: options.requireVerifiedElevatedSurface,
       preferredRoad: options.preferredRoad || null,
       allowBuildingRoof: options.allowBuildingRoof,
       source: options.source || "direct"
@@ -520,6 +523,7 @@ function resolveSafeWorldSpawn(targetX, targetZ, options = {}) {
     });
     if (surfaceFallback) return surfaceFallback;
 
+    if (options.requireSafeCandidate === true) return {valid:false,reason:'no_safe_walk_spawn'};
     return fallbackResolvedSpawn("walk", { x, z, angle, source: "walk_fallback" });
   }
 
@@ -568,6 +572,7 @@ function resolveSafeWorldSpawn(targetX, targetZ, options = {}) {
     };
   }
 
+  if (options.requireSafeCandidate === true) return {valid:false,reason:'no_safe_drive_spawn'};
   return fallbackResolvedSpawn("drive", { x, z, angle, source: "drive_fallback" });
 }
 
@@ -582,62 +587,7 @@ function applyResolvedWorldSpawn(spawn, options = {}) {
     }) :
     spawn;
 
-  const syncCar = options.syncCar !== false;
-  const syncWalker = options.syncWalker !== false;
-
-  if (syncCar && appCtx.car) {
-    appCtx.car.x = resolved.x;
-    appCtx.car.z = resolved.z;
-    appCtx.car.angle = finiteNumberOr(resolved.angle, appCtx.car.angle);
-    appCtx.car.y = resolved.carY;
-    appCtx.car.speed = 0;
-    appCtx.car.vx = 0;
-    appCtx.car.vz = 0;
-    appCtx.car.vy = 0;
-    appCtx.car.vFwd = 0;
-    appCtx.car.vLat = 0;
-    appCtx.car.yawRate = 0;
-    appCtx.car.rearSlip = 0;
-    appCtx.car._lastSurfaceY = null;
-    appCtx.car._terrainAirTimer = 0;
-    appCtx.car.groundContact = null;
-    appCtx.car.isAirborne = false;
-    appCtx.car.onRoad = !!resolved.onRoad;
-    appCtx.car.road = resolved.road || null;
-    if (typeof appCtx.invalidateRoadCache === "function") appCtx.invalidateRoadCache();
-    // GroundHeight keeps its own walking-road cache. A world load first places
-    // the shared actors on a generic road and can then resolve a custom arrival
-    // on a different vertical layer (for example, the Jones Falls Expressway).
-    // Keeping the earlier cached feature makes the first walking physics frame
-    // sample the lower road/terrain and drop the actor through the bridge deck.
-    // Invalidate the surface selector at the same authoritative handoff where
-    // car.road changes so every consumer starts from the resolved feature.
-    appCtx.GroundHeight?.invalidate?.();
-    if (appCtx.carMesh) {
-      appCtx.carMesh.position.set(resolved.x, resolved.carY, resolved.z);
-      appCtx.carMesh.rotation.y = appCtx.car.angle;
-      appCtx.carMesh.updateMatrixWorld(true);
-    }
-  }
-
-  if (syncWalker && appCtx.Walk?.state?.walker) {
-    const walker = appCtx.Walk.state.walker;
-    walker._resolvedGroundState = null;
-    walker.x = resolved.x;
-    walker.z = resolved.z;
-    walker.y = resolved.walkY;
-    walker.vy = 0;
-    walker.angle = finiteNumberOr(resolved.angle, walker.angle);
-    walker.yaw = finiteNumberOr(resolved.angle, walker.yaw);
-    walker.speedMph = 0;
-    walker.onBuilding = false;
-    if (appCtx.Walk.state.characterMesh && appCtx.Walk.state.mode === "walk") {
-      appCtx.Walk.state.characterMesh.position.set(resolved.x, resolved.walkY - 1.7, resolved.z);
-      appCtx.Walk.state.characterMesh.rotation.y = walker.angle;
-    }
-  }
-
-  return resolved;
+  return publishResolvedSurfaceSpawn(appCtx, resolved, options);
 }
 
 function applySpawnTarget(worldX, worldZ, options = {}) {
@@ -686,43 +636,33 @@ function applyCustomLocationSpawn(mode = "walk", options = {}) {
   }, mode, options);
 }
 
-function spawnOnRoad(options = {}) {
-  const opts = options && typeof options === "object" ? options : {};
-
+// Resolve without publishing so recovery can admit the target before releasing
+// the currently controlled actor. Initial world publication retains its wrapper.
+function resolveRoadSpawn(options = {}) {
+  const opts = options && typeof options === 'object' ? options : {};
+  const mode = opts.mode === 'walk' ? 'walk' : 'drive';
+  const angle = Number.isFinite(opts.angle) ? opts.angle : appCtx.car?.angle;
   if (!appCtx.roads || appCtx.roads.length === 0) {
-    return applySpawnTarget(0, 0, {
-      mode: "drive",
-      source: "no_roads_fallback"
-    });
+    return resolveSafeWorldSpawn(0,0,{mode,angle,source:opts.source || 'no_roads_fallback',requireSafeCandidate:opts.requireSafeCandidate});
   }
-
   if (opts.random === true) {
-    const randomRoad = appCtx.roads[Math.floor(Math.random() * appCtx.roads.length)];
-    if (randomRoad?.pts?.length) {
-      const point = randomRoad.pts[Math.floor(Math.random() * randomRoad.pts.length)];
-      const randomSpawn = searchNearestSafeRoadSpawn(point.x, point.z, {
-        mode: "drive",
-        angle: appCtx.car?.angle,
-        maxDistance: 180
-      });
-      if (randomSpawn) return applyResolvedWorldSpawn(randomSpawn, { mode: "drive" });
+    const road = appCtx.roads[Math.floor(Math.random()*appCtx.roads.length)];
+    if (road?.pts?.length) {
+      const point = road.pts[Math.floor(Math.random()*road.pts.length)];
+      const randomSpawn = searchNearestSafeRoadSpawn(point.x,point.z,{mode,angle,maxDistance:180});
+      if (randomSpawn) return randomSpawn;
     }
   }
-
-  const originX = finiteNumberOr(opts.x, 0);
-  const originZ = finiteNumberOr(opts.z, 0);
-  const bestRoadSpawn = searchNearestSafeRoadSpawn(originX, originZ, {
-    mode: "drive",
-    angle: appCtx.car?.angle,
-    maxDistance: 320
-  });
-  if (bestRoadSpawn) return applyResolvedWorldSpawn(bestRoadSpawn, { mode: "drive" });
-
-  return applySpawnTarget(originX, originZ, {
-    mode: "drive",
-    source: "spawn_on_road_fallback"
-  });
+  const x = finiteNumberOr(opts.x,0), z = finiteNumberOr(opts.z,0);
+  const roadSpawn = searchNearestSafeRoadSpawn(x,z,{mode,angle,maxDistance:320});
+  if (roadSpawn) return roadSpawn;
+  return resolveSafeWorldSpawn(x,z,{mode,angle,source:opts.source || 'spawn_on_road_fallback',requireSafeCandidate:opts.requireSafeCandidate});
 }
+
+function spawnOnRoad(options = {}) {
+  return applyResolvedWorldSpawn(resolveRoadSpawn({...options,mode:'drive'}),{mode:'drive'});
+}
+
 export {
   applyCustomLocationSpawn,
   applyResolvedWorldSpawn,
@@ -730,6 +670,7 @@ export {
   initWorldSpawning,
   resolveSafeWorldSpawn,
   spawnOnRoad,
+  resolveRoadSpawn,
   terrainYAtWorld,
   tryAutoEnterBoatAt
 };

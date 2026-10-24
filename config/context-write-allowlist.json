@@ -10,15 +10,6 @@
       "textAlign",
       "textBaseline"
     ],
-    "app/js/activity-discovery/runtime.js": [
-      "Walk",
-      "car",
-      "drone",
-      "navigationRoute",
-      "navigationRouteDistance",
-      "navigationRoutePoints",
-      "showNavigation"
-    ],
     "app/js/activity-discovery/session.js": [
       "activityDiscoveryCatalog",
       "activityDiscoveryMapMarkers",
@@ -140,6 +131,7 @@
       "inspectBoatCandidate",
       "isPointInsideBoatCandidate",
       "isPointInsideWaterFootprint",
+      "prepareBoatMode",
       "recoverBoatSwimmer",
       "refreshBoatAvailability",
       "sampleDynamicWaterAt",
@@ -274,7 +266,6 @@
       "LOC"
     ],
     "app/js/earth-session.js": [
-      "drone",
       "earthResumeDiagnostics",
       "earthResumePending",
       "earthResumeRenderReady",
@@ -546,8 +537,7 @@
       "PropertyUI",
       "historicMode",
       "selectedHistoric",
-      "selectedProperty",
-      "showNavigation"
+      "selectedProperty"
     ],
     "app/js/game/modes.js": [
       "checkpoints",
@@ -614,7 +604,6 @@
       "realEstateMode",
       "selLoc",
       "selectedProperty",
-      "showNavigation",
       "worldEconomy"
     ],
     "app/js/ground.js": [
@@ -836,6 +825,7 @@
       "sharedSeedOverride"
     ],
     "app/js/multiplayer/ui-room.js": [
+      "prepareRoomWorldChange",
       "publishPaintTownClaim"
     ],
     "app/js/ocean.js": [
@@ -941,6 +931,7 @@
       "car",
       "getPlaneSnapshot",
       "planeMode",
+      "preparePlaneMode",
       "preparePlaneModeVisual",
       "startPlaneMode",
       "stopPlaneMode",
@@ -964,15 +955,12 @@
       "updatePlanetaryFieldMap"
     ],
     "app/js/planetary/mars-world.js": [
-      "Walk",
       "ambientLight",
       "arriveAtMars",
       "camera",
       "cancelPendingMarsTransition",
-      "car",
       "carMesh",
       "directTravelToMars",
-      "drone",
       "fillLight",
       "hemiLight",
       "marsObjects",
@@ -1026,9 +1014,7 @@
       "arriveAtSolidWorld",
       "camera",
       "canLandSolidWorld",
-      "car",
       "carMesh",
-      "drone",
       "fillLight",
       "getActivePlanetaryReturnPod",
       "getPlanetaryWorldCacheSnapshot",
@@ -1268,11 +1254,6 @@
       "sun",
       "sunSphere",
       "timeOfDay"
-    ],
-    "app/js/sky/moon-landing-ui.js": [
-      "Walk",
-      "car",
-      "drone"
     ],
     "app/js/sky/moon-surface.js": [
       "camera",
@@ -1675,6 +1656,14 @@
       "startMaritimeRuntime"
     ],
     "app/js/travel-mode.js": [
+      "initializePlanetaryArrival",
+      "initializeWorldLoadActors",
+      "recoverSurfaceTravel",
+      "restoreEarthTravelSession",
+      "travelToWorldPoint",
+      "activateSurfaceActivity",
+      "restoreSurfaceTravelPose",
+      "activateDroneAtWorldPose",
       "Walk",
       "camera",
       "car",
@@ -1754,11 +1743,6 @@
       "ssaoEnabled"
     ],
     "app/js/ui/share-links.js": [
-      "Walk",
-      "boat",
-      "car",
-      "carMesh",
-      "drone",
       "pendingExperienceState"
     ],
     "app/js/ui/title-screen.js": [
@@ -1870,6 +1854,7 @@
       "updateWeatherUi"
     ],
     "app/js/world.js": [
+      "resolveRoadSpawn",
       "applyCustomLocationSpawn",
       "applyResolvedWorldSpawn",
       "applySpawnTarget",
@@ -2035,8 +2020,6 @@
       "linearWalkContactIndex",
       "mappedLandmarkMetrics",
       "museumProgramPreparation",
-      "navigationRouteDistance",
-      "navigationRoutePoints",
       "osmTreeNodes",
       "osmTreeRows",
       "pendingPublishedTransportSurfaceControls",
@@ -2060,6 +2043,7 @@
       "tunnelSolidCompilation",
       "urbanSurfaceStats",
       "worldLoading",
+      "worldPublication",
       "worldSurfaceProfile",
       "worldTraversalRadiusWorld"
     ],
@@ -2072,7 +2056,6 @@
       "worldTraversalRadiusWorld"
     ],
     "app/js/world/load-runtime-session.js": [
-      "Walk",
       "_lastBuildingBatchStats",
       "_lastLanduseBatchStats",
       "_worldLoadSequence",
@@ -2080,8 +2063,6 @@
       "buildingProvenanceFeatureIds",
       "buildingProvenanceModel",
       "buildingProvenanceRecords",
-      "car",
-      "drone",
       "dynamicBudgetScale",
       "dynamicLodScale",
       "functionalPoiRecords",
@@ -2102,13 +2083,8 @@
       "worldSeed"
     ],
     "app/js/world/load-support.js": [
-      "navigationRouteDistance",
-      "navigationRoutePoints",
       "streetPavementError",
       "urbanSurfaceStats"
-    ],
-    "app/js/world/navigation.js": [
-      "drone"
     ],
     "app/js/world/release-location-models.js": [
       "*",
@@ -2117,10 +2093,7 @@
       "poiTenanciesByBuilding"
     ],
     "app/js/world/spawn.js": [
-      "Walk",
-      "_lastCustomStructureProbe",
-      "car",
-      "carMesh"
+      "_lastCustomStructureProbe"
     ],
     "app/js/world/street-pavement-runtime.js": [
       "_cancelStreetPavementBuild",
@@ -2214,6 +2187,21 @@
     "app/js/world/street-source-revision.js": [
       "_streetPavementDirty",
       "_streetSourceRevision"
+    ],
+    "app/js/world/world-cell-adapter.js": [
+      "activeFunctionalPois",
+      "buildingEntranceByBuilding",
+      "buildingEntranceCatalog",
+      "buildingFacadeEntrances",
+      "functionalPoiRecords",
+      "poiLifecycle",
+      "poiTenanciesByBuilding",
+      "refreshActiveFunctionalPois"
+    ],
+    "app/js/world/spawn-publication.js": [
+      "Walk",
+      "car",
+      "carMesh"
     ]
   }
 }

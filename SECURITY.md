@@ -39,6 +39,13 @@ General dependency version-update PRs are disabled; advisory-driven security
 updates remain enabled and require protected review/checks. Official JavaScript
 actions use their supported Node.js 24 runtime.
 
+Capture containers install the official Node 22.23.4 Linux binary only after
+verifying its SHA-256. Runtime refreshes start from the reviewed deployed image
+digest, verify existing worker/Meshroom file hashes and restore the original
+worker UID. Future runtime builds pin the refreshed image digest; full rebuilds
+also verify the reviewed Meshroom archive checksum. A container smoke check does
+not replace a separate end-to-end photogrammetry acceptance run.
+
 Local preview servers accept their configured local Host and Origin only. They
 deny hidden files, dependency directories, operational output and symlinks that
 escape the selected root or reach protected files. Error responses contain no

@@ -1,3 +1,4 @@
+import { roomPoseReady } from './room-world-policy.js';
 import { listenArtifacts } from "./artifacts.js?v=57";
 import {
   clearMySharedBlocks,
@@ -136,6 +137,19 @@ export function createUiRoomSession({ appCtx, refs, state, renderers, helpers, r
     renderHomeBase();
     updateToggleStates();
 
+    // Prepare once before the first room snapshot can request synchronization.
+    // Presence already owns the admission lease, but its pose provider withholds
+    // unfinished/wrong frames until this world is published.
+    startPresence(room.id,()=>{
+      const pose=helpers.readPoseSnapshot?.();
+      return roomPoseReady(state.currentRoom,pose,{playing:appCtx.gameStarted,loading:appCtx.worldLoading})?pose:null;
+    });
+    ensureGhostTicker();
+    const synced=await syncRoomWorldContext(room, false, true);
+    if (!isCurrent()) return false;
+    if(synced===false){await runtime.deactivateRoom(false);return false;}
+
+
     state.unsubRoom = listenRoom(room.id, async (nextRoom) => {
       if (!isCurrent()) return;
       if (!nextRoom) {
@@ -258,10 +272,6 @@ export function createUiRoomSession({ appCtx, refs, state, renderers, helpers, r
       onError: () => isCurrent() && setStatus("Paint Town is reconnecting; visible paint was kept.", true)
     });
 
-    startPresence(room.id, helpers.readPoseSnapshot);
-    ensureGhostTicker();
-    await syncRoomWorldContext(room, false, true);
-    if (!isCurrent()) return false;
 
     const invite = helpers.buildInviteLink(room.code);
     if (invite) {

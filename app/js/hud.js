@@ -1,3 +1,4 @@
+import {resolveControlState} from './transport/control-state.js';
 import { setDomText, setDomAttribute, setDomHidden, setDomClass } from './ui/dom-state.js?v=1';
 import { ctx as appCtx } from "./shared-context.js?v=55"; // ============================================================================
 import { updateNightLighting } from "./engine/night-lighting.js?v=8";
@@ -389,22 +390,26 @@ function updateSkyPositions() {
 }
 
 function updateCamera(dt = 1 / 60) {
+  const owner = resolveControlState(appCtx).camera;
+  if (owner === 'space' || owner === 'ocean') return;
   beginCameraFollowFrame(appCtx.camera);
-  if (appCtx.planeMode?.active || appCtx.boatMode?.active || appCtx.droneMode || appCtx.Walk?.state?.mode === 'walk') setCabinNearClip(appCtx.camera, false);
-  if (appCtx.planeMode?.active && appCtx.applyPlaneCamera?.(dt)) {
+  if (owner !== 'drive') setCabinNearClip(appCtx.camera, false);
+  if (owner === 'plane') {
+    appCtx.applyPlaneCamera?.(dt);
     updateBillboardMarkers();
     updateCameraLinkedEffects();
     return;
   }
-  if (appCtx.boatMode?.active) {
-    if(!appCtx.boatDeck?.camera())updateBoatCamera();
+  if (owner === 'boat' || owner === 'research-deck') {
+    if (owner === 'research-deck') appCtx.boatDeck.camera();
+    else updateBoatCamera();
     updateBillboardMarkers();
     updateCameraLinkedEffects();
     return;
   }
 
   // Drone camera mode
-  if (appCtx.droneMode) {
+  if (owner === 'drone') {
     const dronePose = appCtx.presentationPose?.mode === 'drone'
       ? appCtx.presentationPose.drone
       : appCtx.drone;
@@ -423,13 +428,14 @@ function updateCamera(dt = 1 / 60) {
   }
 
   // Walking module handles camera when in walk mode
-  if (appCtx.Walk) {
+  if (owner === 'walk') {
     const walkCameraApplied = appCtx.Walk.applyCameraIfWalking();
     if (walkCameraApplied) {
       updateBillboardMarkers();
       updateCameraLinkedEffects();
       return;
     }
+    return;
   }
 
   const carLook = appCtx.camera.userData.carLook || { yaw: 0, pitch: 0 };

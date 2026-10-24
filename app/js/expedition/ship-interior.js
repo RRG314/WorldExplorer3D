@@ -1,3 +1,4 @@
+import {captureEnvironmentSession} from '../session-coordinator.js?v=2';
 import { missionPodLaunchReady } from '../universe/mission-navigation.js';
 import {RESEARCH_BENCHES} from './research-workbench.js';
 import {podBayCycle} from './pod-bay-cycle.js';
@@ -1454,42 +1455,6 @@ function playExpeditionShipAction(details = {}) {
   return true;
 }
 
-function snapshotWalkingState() {
-  const walker = appCtx.Walk?.state?.walker;
-  return {
-    mode: appCtx.Walk?.state?.mode,
-    view: appCtx.Walk?.state?.view,
-    walker: walker ? {
-      x: walker.x, y: walker.y, z: walker.z, angle: walker.angle, yaw: walker.yaw,
-      pitch: walker.pitch, lookYawOffset: walker.lookYawOffset, vy: walker.vy
-    } : null,
-    car: appCtx.car ? { x: appCtx.car.x, y: appCtx.car.y, z: appCtx.car.z, angle: appCtx.car.angle } : null
-  };
-}
-
-function applyShipWalkingState() {
-  const walker = appCtx.Walk.state.walker;
-  Object.assign(walker, { x: 0, y: (appCtx.Walk.CFG.eyeHeight || 1.7) + 0.04, z: 21.8, angle: 0, yaw: 0, pitch: 0, lookYawOffset: 0, vy: 0, onGround: true });
-  appCtx.Walk.setModeWalk({ preserveResolvedSpawn: true, preserveResolvedSurface: true });
-  appCtx.Walk.state.view = 'first';
-  if (appCtx.Walk.state.characterMesh) appCtx.Walk.state.characterMesh.visible = false;
-  walker._resolvedGroundState = null;
-  walker.onBuilding = false;
-  if (appCtx.car) Object.assign(appCtx.car, { x: walker.x, y: 1.2, z: walker.z, angle: walker.angle });
-}
-
-function restoreWalkingState(saved) {
-  const walker = appCtx.Walk?.state?.walker;
-  if (walker && saved?.walker) Object.assign(walker, saved.walker, {_resolvedGroundState:null});
-  if (appCtx.car && saved?.car) Object.assign(appCtx.car, saved.car);
-  if (appCtx.Walk?.state) {
-    appCtx.Walk.state.mode = saved?.mode || 'drive';
-    appCtx.Walk.state.view = saved?.view || 'third';
-    if (appCtx.Walk.state.characterMesh) {
-      appCtx.Walk.state.characterMesh.visible = appCtx.Walk.state.mode === 'walk' && appCtx.Walk.state.view !== 'first';
-    }
-  }
-}
 
 function activeDeckState(session = activeSession) {
   return session?.sceneState?.deckStates?.get(session.activeDeckId) || null;
@@ -1585,6 +1550,7 @@ function updateActiveDeckContract(session = activeSession) {
   if (!session || !appCtx.activeInterior) return;
   const deck = getShipDeck(session.activeDeckId);
   appCtx.replaceWorldCollection('dynamicBuildingColliders', activeDeckColliders(session));
+  session.colliderPublication=appCtx.dynamicBuildingColliders;
   appCtx.activeInterior.interactions = activeDeckInteractions(session);
   appCtx.activeInterior.floorId = `solis-reach-${session.activeDeckId}`;
   appCtx.activeInterior.floorLabel = deck?.label || session.activeDeckId;
@@ -1913,7 +1879,7 @@ function ensureShipMaps(session) {
 }
 
 function enterSolisReachInterior(options = {}) {
-  if (activeSession || !appCtx.spaceFlight?.active || !appCtx.Walk || !appCtx.scene) return false;
+  if (activeSession || !appCtx.spaceFlight?.active || !appCtx.Walk?.captureFrameState || !appCtx.Walk?.enterShipFrame || !appCtx.scene) return false;
   const sceneState = buildSolisReachScene(options.expedition);
   const worldCanvas = getPrimaryWorldCanvas(appCtx);
   const session = {
@@ -1922,7 +1888,9 @@ function enterSolisReachInterior(options = {}) {
     onExit: typeof options.onExit === 'function' ? options.onExit : null,
     spaceWasActive: appCtx.spaceFlight.active === true,
     planetaryPauseWasActive: appCtx.hasPauseReason?.('planetary_transition') === true,
-    walking: snapshotWalkingState(),
+    frameLease:captureEnvironmentSession(),
+    camera:appCtx.camera,renderer:appCtx.renderer,scene:appCtx.scene,flight:appCtx.spaceFlight,
+    walking:appCtx.Walk.captureFrameState(),
     dynamicBuildingColliders: [...(appCtx.dynamicBuildingColliders || [])],
     sceneBackground: appCtx.scene.background,
     sceneFog: appCtx.scene.fog,
@@ -1979,6 +1947,7 @@ function enterSolisReachInterior(options = {}) {
   });
   appCtx.scene.add(sceneState.root);
   appCtx.replaceWorldCollection('dynamicBuildingColliders', activeDeckColliders(session));
+  session.colliderPublication=appCtx.dynamicBuildingColliders;
 
   appCtx.activeInterior = {
     key: 'expedition-ship:solis-reach',
@@ -2004,9 +1973,13 @@ function enterSolisReachInterior(options = {}) {
     lastValidPosition: { x: 0, y: (appCtx.Walk.CFG.eyeHeight || 1.7) + 0.04, z: 21.8, yaw: 0, angle: 0 },
     containmentNoticeUntil: 0
   };
+  session.interior=appCtx.activeInterior;
   appCtx.interiorHint = { state: 'inside', label: options.expedition?.ship?.name || STARSHIP_NAME, mode: 'authored-ship' };
   appCtx.setPauseReason?.('planetary_transition', false);
-  applyShipWalkingState();
+  if (!appCtx.Walk.enterShipFrame(session.interior,session.interior.entryPoint)) {
+    exitSolisReachInterior();
+    return false;
+  }
   // The Earth camera clips at 0.5 m, beyond the walking collision clearance.
   appCtx.camera.near = 0.05;
   appCtx.camera.updateProjectionMatrix();
@@ -2066,10 +2039,12 @@ function enterSolisReachInterior(options = {}) {
 function exitSolisReachInterior() {
   const session = activeSession;
   if (!session) return false;
+  const ownsFrame=appCtx.activeInterior===session.interior;
+  const restore=ownsFrame&&session.frameLease.isCurrent()&&appCtx.camera===session.camera&&appCtx.renderer===session.renderer&&appCtx.scene===session.scene&&appCtx.spaceFlight===session.flight&&appCtx.Walk?.state===session.walking?.state;
   if (globalThis.__WE3D_SHIP_INTERIOR_SUPPORT__ === session.diagnosticsSupport) {
     delete globalThis.__WE3D_SHIP_INTERIOR_SUPPORT__;
   }
-  if (session.podLaunch) appCtx.Walk.state.enabled = session.podLaunch.walkEnabled;
+  if (restore&&session.podLaunch) appCtx.Walk.state.enabled = session.podLaunch.walkEnabled;
   session.observation?.dispose();
   activeSession = null;
   document.getElementById('shipInteriorHud')?.classList.remove('show');
@@ -2080,11 +2055,12 @@ function exitSolisReachInterior() {
   document.getElementById('shipActionCue')?.classList.remove('show');
   document.getElementById('shipObjectiveCue')?.classList.remove('show');
   appCtx.toggleWorldDiscoveryJournal?.(false);
-  appCtx.activeInterior = null;
-  appCtx.interiorHint = null;
-  appCtx.activeShipInterior = false;
+  if (ownsFrame) {
+    appCtx.activeInterior = null;appCtx.interiorHint = null;appCtx.activeShipInterior = false;
+  }
   if (!session.bodyHadShipInteriorClass) document.body.classList.remove('expedition-ship-interior-open');
-  appCtx.replaceWorldCollection('dynamicBuildingColliders', session.dynamicBuildingColliders);
+  if (restore) appCtx.replaceWorldCollection('dynamicBuildingColliders',session.dynamicBuildingColliders);
+  else if (appCtx.dynamicBuildingColliders===session.colliderPublication) appCtx.replaceWorldCollection('dynamicBuildingColliders',[]);
   session.sceneState.root.parent?.remove?.(session.sceneState.root);
   session.sceneState.crewMeshes.forEach((mesh) => mesh.userData.disposeCuratedCharacter?.());
   // Detach asset instances before releasing scene-owned primitives. Their
@@ -2112,13 +2088,14 @@ function exitSolisReachInterior() {
   });
   try { session.ambientOscillator?.stop?.(); } catch {}
   void session.audioContext?.close?.();
-  restoreWalkingState(session.walking);
+  if (restore) {
+  appCtx.Walk.restoreFrameState(session.walking);
   appCtx.camera.near = session.cameraNear;
   appCtx.camera.updateProjectionMatrix();
   appCtx.scene.background = session.sceneBackground;
   appCtx.scene.fog = session.sceneFog;
   appCtx.scene.environment = appCtx.earthEnvironmentMap || session.sceneEnvironment;
-  session.indoorEnvironment?.dispose();
+
   appCtx.renderer.toneMappingExposure = session.toneMappingExposure;
   Object.entries(session.earthLightVisibility).forEach(([key, visible]) => {
     if (appCtx[key]) appCtx[key].visible = visible;
@@ -2143,8 +2120,10 @@ function exitSolisReachInterior() {
     appCtx.showSolarSystemUI?.();
     appCtx.showUniverseUI?.();
   }
+  }
+  session.indoorEnvironment?.dispose();
   appCtx.updateControlsModeUI?.();
-  session.onExit?.();
+  if (restore) session.onExit?.();
   return true;
 }
 

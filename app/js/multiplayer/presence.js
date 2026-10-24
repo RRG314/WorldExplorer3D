@@ -224,12 +224,16 @@ async function writePresence(force = false) {
   const now = Date.now();
   if (now - lastWriteAt < MIN_WRITE_INTERVAL_MS) return;
 
-  const normalized = enrichPoseVelocity(
-    normalizePosePayload(getPose() || {}),
-    now
-  );
+  const snapshot = getPose();
+  // Keep the admitted slot during world preparation without publishing a pose
+  // from the previous world or inferring motion across the loading boundary.
+  if (!snapshot) {
+    lastSamplePose = null;
+    lastSampleAt = 0;
+  }
+  const normalized = snapshot ? enrichPoseVelocity(normalizePosePayload(snapshot), now) : null;
   const intervalReached = now - lastWriteAt >= HEARTBEAT_INTERVAL_MS;
-  const movementReached = movedBeyondThreshold(lastSentPose?.pose, normalized.pose);
+  const movementReached = normalized && movedBeyondThreshold(lastSentPose?.pose, normalized.pose);
   if (!force && !intervalReached && !movementReached) return;
 
   const writingRoomId = activeRoomId;
@@ -256,16 +260,14 @@ async function writePresence(force = false) {
       displayName: getDisplayName(user),
       lastSeenAt: serverTimestamp(),
       expiresAt: Timestamp.fromMillis(now + PRESENCE_TTL_MS),
-      mode: normalized.mode,
-      frame: normalized.frame,
-      pose: normalized.pose,
+      ...(normalized ? { mode: normalized.mode, frame: normalized.frame, pose: normalized.pose } : {}),
       joinCode: writingRoomId
     }, { merge: true });
 
     if (isCurrent()) {
       lastWriteAt = Date.now();
       lastLeaseWriteAt = now;
-      lastSentPose = normalized;
+      if (normalized) lastSentPose = normalized;
     }
   } catch (err) {
     console.warn('[multiplayer][presence] write failed:', err);

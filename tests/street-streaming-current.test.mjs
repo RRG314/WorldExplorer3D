@@ -9,6 +9,9 @@ import {createPavementBaseSampler} from '../app/js/world/pavement-height-sampler
 import {indexPavementPositions} from '../app/js/world/pavement-indexed-mesh.js';
 import {createPavementBatch,createPavementBatchContacts} from '../app/js/world/pavement-batch-ownership.js';
 import {createRoadContactIndex} from '../app/js/terrain/road-contact-index.js?v=1';
+import{ctx as sessionContext}from'../app/js/shared-context.js?v=55';
+import{ENV,getEnv}from'../app/js/env.js?v=58';
+import{beginEnvironmentTransition,cancelEnvironmentTransition,commitEnvironment}from'../app/js/session-coordinator.js?v=2';
 
 test('batch leases retain geometry and walking contact together through cancellation and handover',()=>{
  const counts={geometry:0,contact:0,removed:0},material={},surfaceOwner={};
@@ -179,7 +182,7 @@ test('finished cache cells retain only one geometry representation within the sa
  cache.clear();assert.equal(cache.bytes,0);
 });
 
-function harness(t,{holdType,keys=['0:0','16:0']}={}){
+function harness(t,{holdType,keys=['0:0','16:0'],batch=false}={}){
  const oldThree=globalThis.THREE,oldWorker=globalThis.Worker,resources=[];
  class Texture{constructor(data,width,height){this.image={data,width,height};resources.push(this);}dispose(){this.disposed=true;}}
  class Vector4{constructor(...v){this.set(...v);}set(...v){this.values=v;}}
@@ -196,6 +199,7 @@ function harness(t,{holdType,keys=['0:0','16:0']}={}){
     if(this.terminated)return;
     if(data.type==='source-begin'||data.type==='source-chunk'){this.onmessage({data:{type:'source-ready'}});return;}
     if(data.type==='prepare'){this.keys=keys.filter(key=>!data.completedKeys?.includes(key));this.resumeKeys=data.completedKeys;this.onmessage({data:{type:'prepared',tiles:keys.length,keys,sourceCells:keys.length,excludedCells:0}});return;}
+    if(batch&&data.batchSize){const tiles=this.keys.splice(0,data.batchSize).map((key,i,all)=>({type:'tile',key,mask:new Uint8Array(data.resolution**2).fill(255),coveredSquareWorldUnits:4096,remaining:this.keys.length+all.length-i-1}));this.onmessage({data:{type:'tiles',tiles,remaining:this.keys.length,workMs:1}});return;}
     const key=this.keys.shift();
     this.onmessage({data:key===undefined?{type:'complete'}:{type:'tile',key,mask:new Uint8Array(data.resolution**2).fill(255),coveredSquareWorldUnits:4096,remaining:this.keys.length}});
    };
@@ -230,6 +234,36 @@ test('initial coverage accepts an empty plan without inventing cells',async t=>{
  assert.equal(await overview.prepareInitialCoverage({x:0,z:0}),true);
  assert.equal(overview.stats.totalCells,0);assert.equal(overview.stats.completedCells,0);assert.equal(bounds,null);
  overview.dispose();
+});
+
+test('nearby startup publishes an initial domain and completes the unchanged regional plan through frames',async t=>{
+ const h=harness(t);h.ctx.worldLoading=true;let callbacks=0;
+ const overview=createStreetOverview(h.ctx,{deferPresentation:true,onComplete:()=>{callbacks++;}});
+ assert.equal(await overview.prepareInitialCoverage({x:0,z:0},{requiredBounds:{minX:0,minZ:0,maxX:64,maxZ:64}}),true);
+ assert.equal(overview.stats.completedCells,1);assert.equal(overview.stats.totalCells,2);assert.equal(overview.stats.workerActive,true);assert.equal(callbacks,0);
+ assert.equal(await overview.publishPreparedCoverage(),false,'partial coverage cannot claim the full publication');
+ assert.equal(await overview.publishInitialCoverage(),true);assert.equal(overview.stats.initialReady,true);assert.equal(overview.completedBounds,null);assert.equal(overview.initialPreparationPending,false);
+ h.ctx.worldLoading=false;overview.step({x:1024,z:0});await overview.pause();
+ assert.equal(overview.stats.status,'complete');assert.equal(overview.stats.completedCells,2);assert.equal(overview.stats.coveredSquareWorldUnits,8192);assert.equal(callbacks,1);assert.equal(overview.stats.workerActive,false);assert.equal(overview.stats.uploads.cells,1,'post-startup cells resume incremental GPU uploads');overview.dispose();
+});
+
+test('suspending final path publication resumes that handoff without recompiling accepted cells',async t=>{
+ const h=harness(t);h.ctx.worldLoading=true;let finish,callbacks=0,ownership;
+ const overview=createStreetOverview(h.ctx,{deferPresentation:true,onComplete:async(_bounds,{current})=>{callbacks++;ownership=current;if(callbacks===1){await new Promise(resolve=>{finish=resolve;});if(!current())throw Error('Path construction superseded');}}});
+ await overview.prepareInitialCoverage({x:0,z:0},{requiredBounds:{minX:0,minZ:0,maxX:64,maxZ:64}});await overview.publishInitialCoverage();h.ctx.worldLoading=false;
+ overview.step({x:1024,z:0});const pending=overview.pause();for(let i=0;i<20&&!finish;i++)await new Promise(resolve=>setImmediate(resolve));
+ assert.equal(overview.stats.status,'finishing');await overview.suspendForDetail();assert.equal(ownership(),false);finish();await pending;
+ const calls=h.calls;assert.equal(overview.stats.status,'suspended');overview.step({x:0,z:0});await overview.pause();
+ assert.equal(overview.stats.status,'complete');assert.equal(callbacks,2);assert.equal(h.calls,calls,'only the cancelled final handoff is repeated');assert.equal(overview.stats.completedCells,2);overview.dispose();
+});
+
+test('environment requests retire unfinished Earth work before preparing another view',()=>{
+ commitEnvironment(ENV.EARTH,{source:'street_owner_setup'});
+ assert.equal(getEnv(),ENV.EARTH);let stopped=0,cancelled=0;
+ const names=['streetOverview','streetPavement','_cancelStreetPavementBuild','worldLoading'],saved=new Map(names.map(k=>[k,Object.getOwnPropertyDescriptor(sessionContext,k)]));
+ const accepted={};sessionContext.worldLoading=false;sessionContext.streetPavement=accepted;sessionContext.streetOverview={stats:{status:'building'},suspendForDetail(){stopped++;this.stats.status='suspended';return Promise.resolve();}};sessionContext._cancelStreetPavementBuild=()=>{cancelled++;};
+ try{const token=beginEnvironmentTransition(ENV.MOON,{source:'street_owner_test'});assert.equal(stopped,1);assert.equal(cancelled,1);assert.equal(sessionContext.streetPavement,accepted);cancelEnvironmentTransition(token,'test-complete');}
+ finally{for(const[k,d]of saved)if(d)Object.defineProperty(sessionContext,k,d);else delete sessionContext[k];}
 });
 
 test('cancelled initial coverage cannot advance a new loading screen or restart a retired worker',async t=>{
@@ -349,11 +383,18 @@ test('actual overview worker covers a multi-kilometre network beyond the old 144
  const stagedPlan=await request({type:'prepare'});
  assert.deepEqual(stagedPlan,plan,'staged worker transfer must preserve complete coverage');
  assert.ok(plan.tiles>144);
- let count=0,near=0,far=0;
+ let count=0,near=0,far=0;const expected=[];
  for(;;){const packet=await request({type:'next',focus:{x:0,z:0}});if(packet.type==='complete')break;assert.equal(packet.type,'tile');count++;
-  assert.ok(packet.mask instanceof Uint8Array);if(packet.mask.some(value=>value>0)){if(packet.bounds.minX<384&&packet.bounds.maxX>-384)near++;if(packet.bounds.maxX>1400||packet.bounds.minX<-1400)far++;}
+  expected.push(packet);assert.ok(packet.mask instanceof Uint8Array);if(packet.mask.some(value=>value>0)){if(packet.bounds.minX<384&&packet.bounds.maxX>-384)near++;if(packet.bounds.maxX>1400||packet.bounds.minX<-1400)far++;}
  }
  assert.equal(count,plan.tiles);assert.ok(near>0);assert.ok(far>0,'far pavement must exist, not only source inventory');
+ await request({type:'prepare',input:{roads,metersPerWorldUnit:1}});
+ const batched=[];let packets=0;
+ for(;;){const packet=await request({type:'next',focus:{x:0,z:0},batchSize:999});if(packet.type==='complete')break;
+  assert.equal(packet.type,'tiles');assert.ok(packet.tiles.length>0&&packet.tiles.length<=32);assert.ok(packet.workMs>=0);packets++;batched.push(...packet.tiles);
+ }
+ assert.deepEqual(batched,expected,'loading batches preserve every mask byte, nearest-first order and remaining count');
+ assert.ok(packets<count,'loading must avoid a round trip for every cell');
  const resumed=await request({type:'prepare',input:{roads,metersPerWorldUnit:1},completedKeys:plan.keys.slice(1)});
  assert.deepEqual(resumed,plan,'resumed plans retain the complete coverage inventory');
  const remaining=await request({type:'next',focus:{x:0,z:0}});
@@ -401,4 +442,40 @@ test('high flight outside the near terrain retains accepted pavement without sta
  updateStreetPavementFocus(ctx);assert.equal(ctx.streetPavement,accepted);assert.equal(ctx._streetPavementUpdating,undefined);assert.equal(overviewSteps,1);
  ctx.elevationWorldYAtWorldXZ=()=>NaN;updateStreetPavementFocus(ctx);
  assert.equal(ctx.streetPavement,accepted);assert.equal(ctx._streetPavementUpdating,undefined);assert.equal(overviewSteps,2);
+});
+
+test('early initial coverage coalesces its worker and keeps path publication behind the final handoff',async t=>{
+ const h=harness(t);h.ctx.worldLoading=true;let callbacks=0,finishPaths;
+ const overview=createStreetOverview(h.ctx,{deferPresentation:true,onComplete:()=>{callbacks++;return new Promise(resolve=>{finishPaths=resolve;});}});
+ const first=overview.prepareInitialCoverage({x:0,z:0}),second=overview.prepareInitialCoverage({x:0,z:0});
+ assert.equal(await first,true);assert.equal(await second,true);
+ assert.equal(overview.stats.status,'prepared');assert.equal(overview.stats.completedCells,overview.stats.totalCells);
+ assert.equal(callbacks,0);assert.equal(overview.completedBounds,null);assert.equal(h.worker.terminated,true);
+ const published=overview.publishPreparedCoverage();
+ assert.equal(callbacks,1);assert.equal(overview.stats.status,'finishing');
+ finishPaths();assert.equal(await published,true);assert.equal(overview.stats.status,'complete');
+ assert.equal(overview.initialPreparationPending,false);assert.equal(await overview.publishPreparedCoverage(),true);assert.equal(callbacks,1);
+ overview.dispose();
+});
+
+test('loading accepts a bounded mask batch atomically and discards it after world replacement',async t=>{
+ const h=harness(t,{holdType:'next',batch:true});h.ctx.worldLoading=true;
+ const overview=createStreetOverview(h.ctx,{deferPresentation:true});
+ const pending=overview.prepareInitialCoverage({x:0,z:0});
+ for(let i=0;i<20&&!h.worker?.held;i++)await new Promise(resolve=>setImmediate(resolve));
+ assert.equal(h.worker.held.data.batchSize,32);h.worker.held.deliver();await pending;
+ assert.equal(overview.stats.completedCells,2);assert.equal(overview.stats.workerPackets,1);assert.equal(overview.stats.status,'prepared');
+ assert.equal(overview.stats.coveredSquareWorldUnits,8192);overview.dispose();
+ const replacement=createStreetOverview(h.ctx,{deferPresentation:true});
+ const obsolete=replacement.prepareInitialCoverage({x:0,z:0});
+ for(let i=0;i<20&&!h.worker?.held;i++)await new Promise(resolve=>setImmediate(resolve));
+ h.ctx._worldLoadSequence++;h.worker.held.deliver();assert.equal(await obsolete,false);
+ assert.equal(replacement.stats.completedCells,0);replacement.dispose();
+});
+test('retired prepared coverage cannot publish mapped paths into a replacement world',async t=>{
+ const h=harness(t);h.ctx.worldLoading=true;let calls=0;
+ const overview=createStreetOverview(h.ctx,{deferPresentation:true,onComplete:()=>calls++});
+ await overview.prepareInitialCoverage({x:0,z:0});overview.dispose();
+ assert.equal(await overview.publishPreparedCoverage(),false);assert.equal(calls,0);
+ assert.equal(h.worker.terminated,true);assert.equal(overview.stats.workerActive,false);
 });

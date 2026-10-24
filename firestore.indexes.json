@@ -177,9 +177,49 @@
           "order": "DESCENDING"
         }
       ]
+    },
+    {
+      "collectionGroup": "appTesterInterests",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "updatedAtMs",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "appTesterMail",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "applicationId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "createdAtMs",
+          "order": "DESCENDING"
+        }
+      ]
     }
   ],
   "fieldOverrides": [
+    {
+      "collectionGroup": "appTesterConfirmations",
+      "fieldPath": "expiresAt",
+      "ttl": true,
+      "indexes": []
+    },
+    {
+      "collectionGroup": "appTesterRequestLimits",
+      "fieldPath": "expiresAt",
+      "ttl": true,
+      "indexes": []
+    },
     {
       "collectionGroup": "members",
       "fieldPath": "uid",
@@ -416,6 +456,30 @@
     {
       "collectionGroup": "environmentDataCache",
       "fieldPath": "payload",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "appTesterCapabilities",
+      "fieldPath": "expiresAt",
+      "ttl": true,
+      "indexes": []
+    },
+    {
+      "collectionGroup": "appTesterMail",
+      "fieldPath": "expiresAt",
+      "ttl": true,
+      "indexes": []
+    },
+    {
+      "collectionGroup": "appTesterMailReceipts",
+      "fieldPath": "expiresAt",
+      "ttl": true,
+      "indexes": []
+    },
+    {
+      "collectionGroup": "appTesterMailProvider",
+      "fieldPath": "expiresAt",
+      "ttl": true,
       "indexes": []
     }
   ]

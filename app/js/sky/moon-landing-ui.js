@@ -18,47 +18,7 @@ function createMoonLandingUiApi(context) {
   }
 
   function positionCarOnMoon() {
-    appCtx.car.x = playerSpawn.x;
-    appCtx.car.z = playerSpawn.z;
-    if (typeof appCtx.invalidateRoadCache === 'function') appCtx.invalidateRoadCache();
-
-    const sampledGround = planetarySurfaceYAtRenderXZ(appCtx, appCtx.car.x, appCtx.car.z, { bodyId: 'moon' });
-    let groundHeight;
-    if (Number.isFinite(sampledGround)) {
-      groundHeight = sampledGround;
-      appCtx.car.y = groundHeight + 1.2;
-    } else {
-      groundHeight = appCtx.moonSurface.position.y;
-      appCtx.car.y = groundHeight + 2;
-      console.warn('Spawn raycast failed, using fallback Y=' + appCtx.car.y);
-    }
-
-    appCtx.car.vx = 0;
-    appCtx.car.vz = 0;
-    appCtx.car.vy = 0;
-    appCtx.car.vFwd = 0;
-    appCtx.car.vLat = 0;
-    appCtx.car.speed = 0;
-    appCtx.car.driftAngle = 0;
-    appCtx.car.isAirborne = false;
-    appCtx.car._lastSurfaceY = null;
-    appCtx.car.angle = 0;
-
-    appCtx.drone.x = appCtx.car.x;
-    appCtx.drone.z = appCtx.car.z;
-    appCtx.drone.y = groundHeight + 10;
-    appCtx.drone.pitch = -0.2;
-    appCtx.drone.yaw = 0;
-    appCtx.drone.roll = 0;
-
-    if (appCtx.Walk && appCtx.Walk.state && appCtx.Walk.state.walker) {
-      appCtx.Walk.state.walker.x = appCtx.car.x;
-      appCtx.Walk.state.walker.z = appCtx.car.z;
-      appCtx.Walk.state.walker.y = groundHeight + 1.7;
-      appCtx.Walk.state.walker.vy = 0;
-      appCtx.Walk.state.walker.angle = 0;
-      appCtx.Walk.state.walker.yaw = 0;
-    }
+    return appCtx.initializePlanetaryArrival?.('moon',playerSpawn,{mode:'drive',source:'moon_arrival'}) === true;
   }
 
   function createApollo11LandingSite() {

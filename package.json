@@ -3,6 +3,9 @@
   "version": "5.6.1",
   "description": "Browser-based 3D geospatial exploration app using OpenStreetMap-derived data for Earth and destination-mode exploration.",
   "private": true,
+  "engines": {
+    "node": ">=22.23.4 <23"
+  },
   "type": "module",
   "main": "three.js",
   "scripts": {
@@ -33,6 +36,7 @@
     "verify:reality-capture:ui": "node scripts/verification/reality-capture-ui-current.mjs",
     "verify:reality-capture": "npm run verify:reality-capture:local && firebase emulators:exec --only firestore,storage --project we3d-staging-20260712 \"node --test tests/storage.rules.reality-capture.test.mjs\"",
     "verify:multiplayer": "firebase emulators:exec --only auth,firestore,functions --project we3d-staging-20260712 \"node scripts/verification/multiplayer.mjs\"",
+    "verify:multiplayer-readiness-rules": "node --test tests/multiplayer-readiness-emulator.test.mjs",
     "verify:interstellar-shared": "firebase emulators:exec --only auth,firestore,functions --project we3d-staging-20260712 \"node scripts/verification/interstellar-shared.mjs\"",
     "build:shared-expedition-engine": "node scripts/build-shared-expedition-engine.mjs",
     "verify:connected-property-multiplayer": "firebase emulators:exec --only auth,firestore,functions --project we3d-staging-20260712 \"node scripts/verification/connected-property-multiplayer-current.mjs\"",
@@ -178,7 +182,11 @@
     "preview:promote": "node scripts/firebase-hosting-promote.mjs",
     "verify:streets": "node scripts/verification/streets.mjs",
     "verify:ownership": "node scripts/verification/context-ownership.mjs",
-    "verify:runtime-diagnostics": "node scripts/verification/runtime-diagnostics-browser.mjs"
+    "verify:runtime-diagnostics": "node scripts/verification/runtime-diagnostics-browser.mjs",
+    "verify:browser-foundation": "node scripts/verification/browser-foundation-acceptance.mjs",
+    "qa:gameplay": "node scripts/verification/gameplay-qa.mjs",
+    "qa:gameplay:plan": "node scripts/verification/gameplay-qa.mjs --plan",
+    "qa:gameplay:report": "node scripts/verification/gameplay-qa/report.mjs"
   },
   "repository": {
     "type": "git",
@@ -218,6 +226,7 @@
     "geotiff": "^3.0.5",
     "manifold-3d": "3.5.3",
     "meshoptimizer": "^1.2.0",
+    "parse5": "8.0.1",
     "playwright": "^1.61.0",
     "sharp": "0.35.5",
     "three": "0.128.0",
@@ -228,8 +237,5 @@
   },
   "overrides": {
     "@grpc/grpc-js": "1.14.5"
-  },
-  "engines": {
-    "node": ">=22.23.4 <23"
   }
 }

@@ -46,9 +46,9 @@ function createStreetPublication({stats,focus,groundRevision,coverageBounds,mesh
   return publication;
 }
 
-async function refreshMappedPaths(appCtx,pavementBounds){
+async function refreshMappedPaths(appCtx,pavementBounds,ownerIsCurrent=()=>true){
   const meshes=[],sequence=appCtx._worldLoadSequence,features=appCtx.linearFeatures;
-  const current=()=>sequence===appCtx._worldLoadSequence&&features===appCtx.linearFeatures&&!appCtx.onMoon;
+  const current=()=>ownerIsCurrent()&&sequence===appCtx._worldLoadSequence&&features===appCtx.linearFeatures&&!appCtx.onMoon;
   let index=null,committed=false;
   const schedule={current,yieldWork:()=>appCtx.gameStarted&&!appCtx.worldLoading?yieldToWorldFrame():yieldToMainThread(),budgetMs:2};
   try {
@@ -72,7 +72,7 @@ export async function publishStreetPavement(appCtx, options = {}) {
   let partitionSurface = null;
   const profileCache=new Map();
   if (appCtx.onMoon || !appCtx.scene || !appCtx.terrainEnabled) return null;
-  if(appCtx.streetOverview){const sequence=appCtx._worldLoadSequence;await appCtx.streetOverview.suspendForDetail();if(sequence!==appCtx._worldLoadSequence)return null;}
+  if(appCtx.streetOverview&&!(appCtx.worldLoading&&appCtx.streetOverview.initialPreparationPending)){const sequence=appCtx._worldLoadSequence;await appCtx.streetOverview.suspendForDetail();if(sequence!==appCtx._worldLoadSequence)return null;}
   appCtx._cancelStreetPavementBuild?.();
   const startedAt = performance.now();
   const trace = (phase, detail={}) => { if(new URLSearchParams(location.search).has('streetDiagnostics')) console.info('[StreetPavement]', phase, JSON.stringify(detail)); };
@@ -497,7 +497,7 @@ export function updateStreetPavementFocus(appCtx) {
     // it. Keep the accepted publication and resume nearby detail on descent.
     cancelUnfinishedStreetDetail(appCtx);
     if (appCtx._streetPavementUpdating) return;
-    appCtx.streetOverview ||= createStreetOverview(appCtx,{onComplete:bounds=>refreshMappedPaths(appCtx,bounds)});
+    appCtx.streetOverview ||= createStreetOverview(appCtx,{onComplete:(bounds,{current}={})=>refreshMappedPaths(appCtx,bounds,current)});
     appCtx.streetOverview.step(p);return;
   }
   if (appCtx._streetPavementUpdating || performance.now() < (appCtx._streetPavementRetryAt || 0)) return;
@@ -508,7 +508,7 @@ export function updateStreetPavementFocus(appCtx) {
   const bounds=appCtx.streetPavement?.coverageBounds;
   const prefetch=streetPrefetch(p,appCtx._streetMotion,bounds,appCtx.streetPavement?.stats?.durationMs);
   if(!appCtx._streetPavementDirty && !prefetch.needsBuild){
-    if(appCtx.gameStarted){appCtx.streetOverview ||= createStreetOverview(appCtx,{onComplete:bounds=>refreshMappedPaths(appCtx,bounds)});appCtx.streetOverview.step(p);}
+    if(appCtx.gameStarted){appCtx.streetOverview ||= createStreetOverview(appCtx,{onComplete:(bounds,{current}={})=>refreshMappedPaths(appCtx,bounds,current)});appCtx.streetOverview.step(p);}
     return;
   }
   // Invalidation belongs to the accepted publication, not the pending job.
@@ -533,7 +533,20 @@ export function updateStreetOverviewFrame(appCtx) {
 export function prepareStreetOverviewMaterials(appCtx) {
   if(!appCtx.streetPavement||appCtx.onMoon||appCtx.onMars||appCtx.activePlanetaryBodyId||appCtx.activeShipInterior)return;
   if(appCtx.isEnv&&appCtx.ENV&&!appCtx.isEnv(appCtx.ENV.EARTH))return;
-  appCtx.streetOverview ||= createStreetOverview(appCtx,{onComplete:bounds=>refreshMappedPaths(appCtx,bounds)});
+  appCtx.streetOverview ||= createStreetOverview(appCtx,{onComplete:(bounds,{current}={})=>refreshMappedPaths(appCtx,bounds,current)});
+}
+
+// Building-constrained widths and structure classification are now final, but
+// vertical terrain/mesh construction can continue independently. The existing
+// overview owns its worker and mask; mapped-path contacts still wait for the
+// normal final loading handoff below.
+export function beginInitialStreetCoverage(appCtx,current) {
+  if(!current()||!appCtx.worldLoading||!appCtx.terrainEnabled||!appCtx.scene)return null;
+  if(appCtx.onMoon||appCtx.onMars||appCtx.activePlanetaryBodyId||appCtx.activeShipInterior)return null;
+  appCtx.streetOverview ||= createStreetOverview(appCtx,{deferPresentation:true,onComplete:(bounds,{current}={})=>refreshMappedPaths(appCtx,bounds,current)});
+  const pending=appCtx.streetOverview.prepareInitialCoverage(focusActor(appCtx),{current});
+  pending.catch(()=>{}); // Final preparation observes the owner's failed state.
+  return pending;
 }
 
 export async function ensureInitialStreetPavement(appCtx,current) {
@@ -541,17 +554,21 @@ export async function ensureInitialStreetPavement(appCtx,current) {
   if(!appCtx.terrainEnabled||!appCtx.scene||appCtx.onMoon||appCtx.onMars||appCtx.activePlanetaryBodyId||appCtx.activeShipInterior)return true;
   if(appCtx.isEnv&&appCtx.ENV&&!appCtx.isEnv(appCtx.ENV.EARTH))return true;
   if(!appCtx.worldLoading)throw new Error('Initial street preparation requires the loading cover');
+  const accepted=()=>{
+    const pavement=appCtx.streetPavement,b=pavement?.coverageBounds,p=focusActor(appCtx)||{x:0,z:0};
+    return pavement&&!appCtx._streetPavementDirty&&pavement.groundRevision===(appCtx._groundSurfaceRevision||0)&&
+      b&&p.x>=b.minX+128&&p.x<=b.maxX-128&&p.z>=b.minZ+128&&p.z<=b.maxZ-128;
+  };
   // Late accepted terrain can retire the first pavement job. A null result is
   // cancellation, not completion: settle it here rather than exposing an empty
   // first frame and launching the whole construction job during movement.
   for(let attempt=0;attempt<3;attempt++){
     if(!current())return false;
-    const pavement=appCtx.streetPavement;
-    if(pavement&&!appCtx._streetPavementDirty&&pavement.groundRevision===(appCtx._groundSurfaceRevision||0))return true;
+    if(accepted())return true;
     await publishStreetPavement(appCtx);
   }
   if(!current())return false;
-  if(appCtx.streetPavement&&!appCtx._streetPavementDirty&&appCtx.streetPavement.groundRevision===(appCtx._groundSurfaceRevision||0))return true;
+  if(accepted())return true;
   throw new Error('Initial street surfaces could not settle on the accepted terrain');
 }
 
@@ -560,12 +577,14 @@ export async function prepareInitialStreetCoverage(appCtx,current) {
   if(!await ensureInitialStreetPavement(appCtx,current))return false;
   prepareStreetOverviewMaterials(appCtx);
   if(!appCtx.streetOverview)return true;
+  const bounds=appCtx.streetPavement?.coverageBounds;
+  const requiredBounds=bounds?{minX:bounds.minX-64,maxX:bounds.maxX+64,minZ:bounds.minZ-64,maxZ:bounds.maxZ+64}:null;
   let reported=-1;
-  const complete=await appCtx.streetOverview.prepareInitialCoverage(focusActor(appCtx),{current,onProgress:({completed,total})=>{
+  const complete=await appCtx.streetOverview.prepareInitialCoverage(focusActor(appCtx),{current,requiredBounds,onProgress:({completed,total})=>{
     const percent=total>0?Math.floor(100*completed/total):0;
     if(percent===reported)return;
     reported=percent;
     appCtx.showLoad?.('',{phase:'prepareLocationScenery',completed,total});
   }});
-  return complete&&await ensureInitialStreetPavement(appCtx,current);
+  return complete&&await appCtx.streetOverview.publishInitialCoverage({current})&&await ensureInitialStreetPavement(appCtx,current);
 }

@@ -1,11 +1,14 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import { chromium } from 'playwright';
+import {closeOwnedBrowser} from './owned-browser.mjs';
 import { startStaticServer } from './static-server.mjs';
 import { installGpsSensorFixture } from './gps-sensor-fixture.mjs';
 
 const server = await startStaticServer({ rootDir: process.cwd(), ports: [4494, 4495] });
-const browser = await chromium.launch({ channel: 'chrome', headless: true });
+const owned=await chromium.launchServer({channel:'chrome',headless:true});
+const browser=await chromium.connect(owned.wsEndpoint());
+const out=process.env.WE3D_QA_OUTPUT||'output/verification/gps-sensor-fixture';
 try {
   const page = await browser.newPage();
   const fix = { latitude: 39.2904, longitude: -76.6122, accuracy: 6, speed: 0 };
@@ -35,7 +38,7 @@ try {
   await sensor.send('Emulation.setGeolocationOverride', fix);
   assert.equal(await page.evaluate(() => sensorEvents.length), interrupted.length);
   const report = { ok: true, scope: 'simulated browser sensor API only; not device GPS', checks: { continuousFixesWithoutArtificialErrors: true, realTimestampsAdvance: true, explicitFailureDelivered: true, poorAccuracyPreserved: true, clearWatchStopsDelivery: true } };
-  await fs.mkdir('output/verification/gps-sensor-fixture', { recursive: true });
-  await fs.writeFile('output/verification/gps-sensor-fixture/report.json', JSON.stringify(report, null, 2));
+  await fs.mkdir(out, { recursive: true });
+  await fs.writeFile(out+'/report.json', JSON.stringify(report, null, 2));
   console.log(JSON.stringify(report));
-} finally { await browser.close(); await server.close(); }
+} finally { try{await closeOwnedBrowser(owned);}finally{await server.close();} }

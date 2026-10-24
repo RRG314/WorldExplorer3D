@@ -31,7 +31,10 @@ import {
   renderLandingContentPreview
 } from './site-content.js?v=1';
 
+import {mountAdminTesters} from './admin-testers.js';
+let testerController=null;
 const VIEW_META = {
+  testers:{title:'Tester Applications',subtitle:'Approve volunteers, preview invitations, and track email delivery.'},
   overview: {
     title: 'Operations Overview',
     subtitle: 'Platform health, pending review workload, active rooms, and recent admin actions in one place.'
@@ -1531,6 +1534,11 @@ async function loadOverviewBundle() {
 }
 
 async function ensureViewLoaded(view) {
+  if(view==='testers'){
+    if(!adminAllowed()||!state.user?.uid)return;
+    testerController ||= mountAdminTesters(document.getElementById('adminTesterProgram'),{userId:state.user?.uid});
+    await testerController.refresh();return;
+  }
   if (view === 'overview') {
     await loadOverviewBundle();
     return;
@@ -1787,6 +1795,7 @@ async function handlePublishSiteContent() {
 }
 
 async function handleAuthUser(user) {
+  testerController?.dispose();testerController=null;
   state.user = user || null;
   state.accountOverview = null;
   state.dashboardOverview = null;

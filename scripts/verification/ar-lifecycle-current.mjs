@@ -1,11 +1,15 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import { chromium, devices } from 'playwright';
+import {startStaticServer} from './static-server.mjs';
+import {closeOwnedBrowser} from './owned-browser.mjs';
 
-const baseUrl = process.env.WE3D_VERIFY_BASE_URL || 'http://127.0.0.1:4195';
-const out = 'output/playwright/ar-lifecycle-current';
+const server=process.env.WE3D_VERIFY_BASE_URL?null:await startStaticServer({rootDir:process.cwd(),ports:[0]});
+const baseUrl=process.env.WE3D_VERIFY_BASE_URL||`http://127.0.0.1:${server.port}`;
+const out=process.env.WE3D_QA_OUTPUT||'output/playwright/ar-lifecycle-current';
 await fs.mkdir(out, { recursive: true });
-const browser = await chromium.launch({ headless: true, channel: 'chrome' });
+const owned=await chromium.launchServer({headless:true,channel:'chrome'});
+const browser=await chromium.connect(owned.wsEndpoint());
 const page = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, userAgent: devices['iPhone 13'].userAgent, hasTouch: true });
 const errors = [];
 page.on('pageerror', (error) => errors.push(String(error)));
@@ -94,4 +98,4 @@ try {
   await fs.writeFile(`${out}/report.json`, JSON.stringify(report, null, 2));
   console.log(JSON.stringify(report, null, 2));
   assert.deepEqual(errors, []);
-} finally { await browser.close(); }
+} finally { try{await closeOwnedBrowser(owned);}finally{await server?.close();} }

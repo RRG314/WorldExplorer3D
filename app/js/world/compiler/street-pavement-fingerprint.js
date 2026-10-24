@@ -8,6 +8,9 @@ import {roadMetersPerWorldUnit} from '../road-units.js';
 export function serializeStreetPavementFingerprint(tile, metersPerWorldUnit) {
   const indexes = new Map(), roads = [], maskIndexes=new Map(), masks=[];
   const serializedTile = JSON.stringify(tile, (key, value) => {
+    // Plan-owned memoized geometry is derived from sidewalkMasks below. Its
+    // construction order must never change a source/cache identity.
+    if(key==='sidewalkMaskProduct')return undefined;
     if(key==='sidewalkMasks'&&Array.isArray(value)){
       if(!maskIndexes.has(value)){maskIndexes.set(value,masks.length);masks.push(value);}
       return {maskIndex:maskIndexes.get(value)};

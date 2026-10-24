@@ -1,3 +1,4 @@
+import {activeActorPose} from '../transport/actor-contract.js?v=6';
 import {activityCompletions as completions} from './completion.js';
 import { ctx as appCtx } from '../shared-context.js?v=55';
 import { orderedRouteAnchors, sanitizeText } from './schema-core.js?v=1';
@@ -32,19 +33,7 @@ function cloneJson(value) {
   return value == null ? value : JSON.parse(JSON.stringify(value));
 }
 
-function currentPose() {
-  const mode = typeof appCtx.getCurrentTravelMode === 'function' ? appCtx.getCurrentTravelMode() : 'drive';
-  if (mode === 'boat') {
-    return { mode, x: finiteNumber(appCtx.boat?.x, 0), y: finiteNumber(appCtx.boat?.y, 0), z: finiteNumber(appCtx.boat?.z, 0) };
-  }
-  if (mode === 'drone') {
-    return { mode, x: finiteNumber(appCtx.drone?.x, 0), y: finiteNumber(appCtx.drone?.y, 12), z: finiteNumber(appCtx.drone?.z, 0) };
-  }
-  if (mode === 'walk' && appCtx.Walk?.state?.walker) {
-    return { mode, x: finiteNumber(appCtx.Walk.state.walker.x, 0), y: finiteNumber(appCtx.Walk.state.walker.y, 1.7), z: finiteNumber(appCtx.Walk.state.walker.z, 0) };
-  }
-  return { mode: 'drive', x: finiteNumber(appCtx.car?.x, 0), y: finiteNumber(appCtx.car?.y, 1.2), z: finiteNumber(appCtx.car?.z, 0) };
-}
+function currentPose() { return activeActorPose(appCtx); }
 
 function anchorCaptureDistance(anchor = {}) {
   if (anchor.typeId === 'trigger_zone') {
@@ -160,8 +149,7 @@ function navigateToActivityStart(activity = {}) {
   if (!start) return false;
   if (typeof appCtx.createNavigationRoute === 'function') {
     const pose = currentPose();
-    appCtx.showNavigation = true;
-    appCtx.createNavigationRoute(pose.x, pose.z, start.x, start.z, true);
+    appCtx.createNavigationRoute(pose.x, pose.z, start.x, start.z, true, {label: start.label || activity.title || 'Activity start', owner: 'activity'});
     return true;
   }
   return false;
@@ -171,80 +159,18 @@ function applySpawnForActivity(activity = {}) {
   const start = activity.startPoint || resolveSequence(activity)[0] || null;
   if (!start) return false;
   const mode = sanitizeText(activity.traversalMode || 'drive', 32).toLowerCase();
-  if (mode === 'boat') {
-    if (typeof appCtx.setTravelMode === 'function') {
-      const candidate = typeof appCtx.inspectBoatCandidate === 'function'
-        ? appCtx.inspectBoatCandidate(start.x, start.z, 420, { allowSynthetic: true, waterKind: 'coastal' })
-        : null;
-      appCtx.setTravelMode('boat', {
-        source: 'activity_runtime',
-        force: true,
-        spawnX: start.x,
-        spawnZ: start.z,
-        yaw: finiteNumber(start.yaw, 0),
-        candidate: candidate || undefined
-      });
-      return true;
-    }
-    return false;
-  }
   if (mode === 'drone') {
-    if (typeof appCtx.setTravelMode === 'function') {
-      appCtx.setTravelMode('drone', { source: 'activity_runtime', force: true });
-    }
-    if (appCtx.drone) {
-      appCtx.drone.x = start.x;
-      appCtx.drone.z = start.z;
-      appCtx.drone.y = Math.max(start.y + 12, finiteNumber(start.baseY, start.y) + 12);
-      appCtx.drone.yaw = finiteNumber(start.yaw, 0);
-      return true;
-    }
-    return false;
+    return appCtx.activateDroneAtWorldPose?.({
+      x: start.x, z: start.z,
+      y: Math.max(start.y + 12, finiteNumber(start.baseY, start.y) + 12),
+      yaw: finiteNumber(start.yaw, 0)
+    }, { source: 'activity_runtime' }) === true;
   }
-  if (mode === 'walk') {
-    if (typeof appCtx.setTravelMode === 'function') {
-      appCtx.setTravelMode('walk', { source: 'activity_runtime', force: true });
-    }
-    if (appCtx.Walk?.state?.walker) {
-      const walker = appCtx.Walk.state.walker;
-      walker.x = start.x;
-      walker.z = start.z;
-      walker.y = start.y + 1.7;
-      walker.yaw = finiteNumber(start.yaw, 0);
-      walker.angle = walker.yaw;
-      return true;
-    }
-    return false;
-  }
-  if (typeof appCtx.setTravelMode === 'function') {
-    appCtx.setTravelMode('drive', { source: 'activity_runtime', force: true });
-  }
-  if (typeof appCtx.resolveSafeWorldSpawn === 'function' && typeof appCtx.applyResolvedWorldSpawn === 'function') {
-    const resolved = appCtx.resolveSafeWorldSpawn(start.x, start.z, { mode: 'drive', angle: finiteNumber(start.yaw, 0), source: 'activity_runtime' });
-    if (resolved) {
-      appCtx.applyResolvedWorldSpawn(resolved, { mode: 'drive' });
-      return true;
-    }
-  }
-  if (appCtx.car) {
-    appCtx.car.x = start.x;
-    appCtx.car.z = start.z;
-    appCtx.car.y = start.y + 1.2;
-    appCtx.car.angle = finiteNumber(start.yaw, 0);
-    return true;
-  }
-  return false;
+  return appCtx.activateSurfaceActivity?.(mode, start, {maxDistance: anchorCaptureDistance(start)}) === true;
 }
 
 function clearRuntimeNavigation() {
-  if (typeof appCtx.clearNavigation === 'function') {
-    appCtx.clearNavigation();
-    return;
-  }
-  appCtx.showNavigation = false;
-  appCtx.navigationRoute = null;
-  appCtx.navigationRoutePoints = [];
-  appCtx.navigationRouteDistance = 0;
+  appCtx.clearNavigation?.('activity');
 }
 
 async function joinRoomActivity(activity = {}) {
@@ -281,8 +207,8 @@ function beginActivityRuntime(activity = {}) {
   clearRuntimeNavigation();
   if (sequence[initialTargetIndex] && typeof appCtx.createNavigationRoute === 'function') {
     const pose = state.lastPose || currentPose();
-    appCtx.showNavigation = true;
-    appCtx.createNavigationRoute(pose.x, pose.z, sequence[initialTargetIndex].x, sequence[initialTargetIndex].z, true);
+    const target = sequence[initialTargetIndex];
+    appCtx.createNavigationRoute(pose.x, pose.z, target.x, target.z, true, {label: target.label, owner: 'activity'});
   }
   return true;
 }
@@ -386,8 +312,7 @@ function updateActivityRuntime(dt = 1/60) {
     state.message = next ? `Checkpoint reached. Next: ${next.label}.` : 'Activity complete.';
     state.lastMessage = state.message;
     if (next && typeof appCtx.createNavigationRoute === 'function') {
-      appCtx.showNavigation = true;
-      appCtx.createNavigationRoute(pose.x, pose.z, next.x, next.z, true);
+      appCtx.createNavigationRoute(pose.x, pose.z, next.x, next.z, true, {label: next.label, owner: 'activity'});
     }
   }
   state.lastPose = pose;

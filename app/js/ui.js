@@ -12,6 +12,8 @@ import { bindSpaceActions } from "./ui/space-actions.js?v=17";
 import { initTitleScreenUi } from "./ui/title-screen.js?v=120";
 import { captureEnvironmentSession, exitCurrentEnvironmentSync } from './session-coordinator.js?v=2';
 import { createEarthReturnAction } from './travel/earth-return.js';
+import {bindSurfaceRecoveryControls} from './ui/recovery-controls.js';
+import {mountTesterInvitation} from './ui/tester-invitation.js';
 
 function emitTutorialEvent(eventName, payload = {}) {
   if (typeof appCtx.tutorialOnEvent === 'function') {
@@ -20,6 +22,7 @@ function emitTutorialEvent(eventName, payload = {}) {
 }
 
 function setupUI() {
+  mountTesterInvitation();
   mountCapabilityGuide();
   const LAST_LOCATION_STORAGE_KEY = 'worldExplorer3D.lastLocation.v1';
   const bindTouchFriendlyPress = (el, handler) => {
@@ -562,19 +565,7 @@ function setupUI() {
     }
     closeAllFloatMenus();
   });
-  document.getElementById('fRespawn').addEventListener('click', () => {
-    // Relocating inactive ground actors does not stop an active aircraft or boat.
-    // Release the current controller before applying the authoritative ground spawn.
-    const mode = appCtx.getCurrentTravelMode?.() === 'drive' ? 'drive' : 'walk';
-    appCtx.clearActiveInterior?.({ restorePlayer: false, preserveCache: true });
-    appCtx.setTravelMode(mode, { source: 'safe_ground_recovery', force: true });
-    appCtx.spawnOnRoad();
-    closeAllFloatMenus();
-  });
-  document.getElementById('fRespawnRand').addEventListener('click', () => {
-    if (typeof appCtx.spawnOnRoad === 'function') appCtx.spawnOnRoad({ random: true });
-    closeAllFloatMenus();
-  });
+  bindSurfaceRecoveryControls(appCtx,closeAllFloatMenus);
   document.getElementById('fTrack').addEventListener('click', () => {appCtx.toggleTrackRecording();closeAllFloatMenus();});
   document.getElementById('fEraseTrack').addEventListener('click', () => {appCtx.eraseTrack();closeAllFloatMenus();});
   document.getElementById('fClouds').addEventListener('click', () => {
@@ -676,7 +667,7 @@ function setupUI() {
     appCtx.setPauseReason?.('caught', false);
     document.getElementById('police').textContent = '💔 0/3';
     if (appCtx.handleUrbanCustodyContinue?.() === true) return;
-    appCtx.spawnOnRoad();
+    appCtx.recoverSurfaceTravel?.({source:'custody_ground_recovery'});
   });
   document.getElementById('againBtn').addEventListener('click', () => {appCtx.replayGameResult?.();});
   document.getElementById('freeBtn').addEventListener('click', () => {

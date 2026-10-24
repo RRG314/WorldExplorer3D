@@ -1,3 +1,4 @@
+import {resolveControlState} from '../transport/control-state.js';
 import { createTransportControllerRegistry } from '../transport/controller-registry.js?v=2';
 
 let controllerRegistry = null;
@@ -51,7 +52,7 @@ function createEarthTransportControllers(appCtx, options = {}) {
   registry.registerController({
     id: 'boat',
     priority: 10,
-    isActive: () => !!appCtx.boatMode?.active,
+    isActive: () => resolveControlState(appCtx).controller === 'boat',
     update(dt) {
       appCtx.updateBoatMode?.(dt);
     }
@@ -59,7 +60,7 @@ function createEarthTransportControllers(appCtx, options = {}) {
   registry.registerController({
     id: 'plane',
     priority: 20,
-    isActive: () => !!appCtx.planeMode?.active,
+    isActive: () => resolveControlState(appCtx).controller === 'plane',
     update(dt) {
       updatePlane(dt);
     }
@@ -67,7 +68,7 @@ function createEarthTransportControllers(appCtx, options = {}) {
   registry.registerController({
     id: 'drone',
     priority: 30,
-    isActive: () => !!appCtx.droneMode,
+    isActive: () => resolveControlState(appCtx).controller === 'drone',
     update(dt) {
       updateDrone(dt);
     }
@@ -75,7 +76,7 @@ function createEarthTransportControllers(appCtx, options = {}) {
   registry.registerController({
     id: 'walk',
     priority: 40,
-    isActive: () => appCtx.Walk?.state?.mode === 'walk',
+    isActive: () => resolveControlState(appCtx).controller === 'walk',
     update: (dt) => updateWalkController(appCtx, dt)
   });
   return registry;

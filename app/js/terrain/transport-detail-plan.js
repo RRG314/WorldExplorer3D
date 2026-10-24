@@ -18,7 +18,7 @@ export function transportRegionInWindow(bounds, focus, radius) {
     bounds.maxZ>focus.z-radius&&bounds.minZ<focus.z+radius;
 }
 export function actorRequestsRoadDetail(point,terrainY) {
-  if(point?.source==='boat'||point?.source==='interior')return false;
+  if(point?.source==='boat'||point?.source==='interior'||point?.occupancy==='water'||point?.occupancy==='vessel-deck')return false;
   // Begin landing preparation well before the existing 128-unit contact gate.
   if(['plane','drone'].includes(point?.source)&&Number.isFinite(point.y)&&Number.isFinite(terrainY)&&point.y-terrainY>384)return false;
   return true;
@@ -81,7 +81,7 @@ export function nearestTransportRegion(regions,focus) {
 }
 
 export function actorNeedsRoadDetail(point,terrainY) {
-  if(point?.source==='boat'||point?.source==='interior')return false;
+  if(point?.source==='boat'||point?.source==='interior'||point?.occupancy==='water'||point?.occupancy==='vessel-deck')return false;
   if(['plane','drone'].includes(point?.source)&&Number.isFinite(point.y)&&Number.isFinite(terrainY)&&point.y-terrainY>128)return false;
   return true;
 }

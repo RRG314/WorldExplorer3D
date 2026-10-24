@@ -8,8 +8,9 @@ export function frontageHit(point, nx, nz, edges, minimum, maximum) {
     const den = nx * dz - nz * dx;
     if (Math.abs(den) < 1e-8) continue;
     const ax = a.x - point.x, az = a.z - point.z;
-    const distance = (ax * dz - az * dx) / den;
     const t = (ax * nz - az * nx) / den;
+    if (!(t >= -1e-7 && t <= 1 + 1e-7)) continue;
+    const distance = (ax * dz - az * dx) / den;
     if (t >= -1e-7 && t <= 1 + 1e-7 && distance >= -1e-7 && (!best || distance < best.distance))
       best = { edge, distance:Math.max(0,distance), maximum: Math.max(maximum, minimum) };
   }

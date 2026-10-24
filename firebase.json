@@ -102,6 +102,12 @@
       }
     ],
     "rewrites": [
+      {"source":"/manageAppTesters","function":"manageAppTesters"},
+      {"source":"/appTesterEmailWebhook","function":"appTesterEmailWebhook"},
+      {
+        "source": "/registerAppTester",
+        "function": "registerAppTester"
+      },
       {"source":"/api/geospatial/weather","function":"getEnvironmentalData"},
       {"source":"/api/geospatial/marine","function":"getEnvironmentalData"},
       {"source":"/api/geospatial/search","function":"getPlaceLookup"},
@@ -411,7 +417,8 @@
   "functions": {
     "source": "functions",
     "predeploy": [
-      "npm run build:shared-expedition-engine"
+      "npm run build:shared-expedition-engine",
+      "node scripts/build-weekly-room-model.mjs"
     ]
   },
   "firestore": {

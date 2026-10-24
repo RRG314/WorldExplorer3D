@@ -12,5 +12,5 @@ export async function stagingCaptureAttestation() {
   const parent='/v1/projects/524178734996/apps/1:524178734996:web:f59acbc9014f0e26f51981/debugTokens';
   const token=randomUUID();
   const {body}=await client.post(parent,{displayName:'Disposable manual capture verification',token});
-  return {token,cleanup:()=>client.delete('/v1/'+body.name)};
+  return {token,name:body.name,cleanup:()=>client.delete('/v1/'+body.name)};
 }

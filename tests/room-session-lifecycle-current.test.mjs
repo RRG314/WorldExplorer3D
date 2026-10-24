@@ -6,16 +6,17 @@ const read = async name => (await readFile(new URL(`../app/js/multiplayer/${name
   .replace(/import[\s\S]*?from\s+["'][^"']+["'];\n/g, '').replaceAll('export function ', 'function ');
 const sessionSource = (await read('ui-room-session')).replace(/import\('[^']+'\)/g, 'Promise.resolve(editableModule)');
 const runtimeSource = await read('ui-room-runtime');
+const {leavesRoomForEarthLocation,roomPoseReady}=await import('../app/js/multiplayer/room-world-policy.js');
 const noop = () => {};
 const pending = () => { let resolve; const promise = new Promise(r => resolve = r); return { promise, resolve }; };
-function harness() {
+function harness({sync=async()=>true}={}) {
   const callbacks = [], events = [], timers = new Map();
   let nextTimer = 0;
   const state = { authUser: { uid: 'one' }, roomSessionGeneration: 0 };
   const renderers = new Proxy({}, { get: () => noop });
   const helpers = new Proxy({ readPoseSnapshot: () => ({}), buildInviteLink: () => null }, { get: (target, key) => target[key] || (v => v) });
   const appCtx = { ensureEditableWorldRuntime: async () => {} };
-  const context = vm.createContext({ console, Promise, URL, window: {setInterval: callback => {const id=++nextTimer;timers.set(id,callback);return id;},clearInterval:id=>timers.delete(id)}, state, appCtx, refs: {}, renderers, helpers,
+  const context = vm.createContext({ console, Promise, URL, leavesRoomForEarthLocation,roomPoseReady, window: {setInterval: callback => {const id=++nextTimer;timers.set(id,callback);return id;},clearInterval:id=>timers.delete(id)}, state, appCtx, refs: {}, renderers, helpers,
     editableModule: { resolveEditableRoomRole: () => 'member', editableRoomPermissions: () => ({}), roomWorldModificationIdentity: room => room.id,
       listenRoomWorldModifications: () => noop },
     startPresence: id => events.push(['presence', id]), recordRecentPlayers: async () => {},
@@ -28,7 +29,7 @@ function harness() {
   vm.runInContext(runtimeSource, context);
   const runtime = context.createUiRoomRuntime({ appCtx, refs: {}, state, renderers, helpers });
   // World loading is independently tested; isolate asynchronous session ownership.
-  const sessionRuntime = { ...runtime, syncRoomWorldContext: async () => {}, applyRoomPaintMultiplayerConfig: noop, installPaintClaimPublisher: noop };
+  const sessionRuntime = { ...runtime, syncRoomWorldContext: sync, applyRoomPaintMultiplayerConfig: noop, installPaintClaimPublisher: noop };
   vm.runInContext(sessionSource, context);
   const session = context.createUiRoomSession({ appCtx, refs: {}, state, renderers, helpers, runtime: sessionRuntime });
   return { context, state, appCtx, callbacks, events, timers, runtime, ...session };
@@ -141,4 +142,26 @@ test('remote-player updates exist only during an active room and restart once on
  await h.runtime.deactivateRoom();assert.equal(h.timers.size,0);
  await h.activateRoom({id:'BBBBBB',code:'BBBBBB'});assert.equal(h.timers.size,1);
  h.runtime.clearSubscriptions();assert.equal(h.timers.size,0);
+});
+
+test('travel detaches the captured room locally before slow network cleanup and preserves a newer join',async()=>{
+ const h=harness(),network=pending();h.context.stopPresence=()=>network.promise;
+ await h.activateRoom({id:'AAAAAA',code:'AAAAAA',world:{kind:'earth',lat:1,lon:2}});
+ assert.equal(h.runtime.prepareRoomWorldChange({lat:1,lon:2}),false);assert.equal(h.state.currentRoom.id,'AAAAAA');
+ const old=h.callbacks.find(row=>row.kind==='Chat');assert.equal(h.runtime.prepareRoomWorldChange({lat:3,lon:4}),true);assert.equal(h.state.currentRoom,null);assert.equal(h.timers.size,0);
+ h.state.currentRoom={id:'BBBBBB'};h.state.messages=['new'];old.callback(['obsolete']);assert.deepEqual(h.state.messages,['new']);network.resolve();await new Promise(resolve=>setImmediate(resolve));assert.equal(h.state.currentRoom.id,'BBBBBB');
+});
+
+test('world preparation settles before room listeners attach; failed preparation cannot announce a connection',async()=>{
+ const preparing=pending(),h=harness({sync:()=>preparing.promise});const joining=h.activateRoom({id:'AAAAAA',code:'AAAAAA'});await new Promise(resolve=>setImmediate(resolve));assert.equal(h.callbacks.length,0);preparing.resolve(true);assert.equal(await joining,true);assert.ok(h.callbacks.length>0);
+ const failed=harness({sync:async()=>false});assert.equal(await failed.activateRoom({id:'BBBBBB',code:'BBBBBB'}),false);assert.equal(failed.callbacks.length,0);assert.equal(failed.state.currentRoom,null);assert.equal(failed.timers.size,0);
+});
+test('room seed ownership transfers across room switches and restores the captured solo override on leave',async()=>{
+ const h=harness();let loads=0;h.context.document={getElementById:()=>null};h.context.isEarthWorldUsable=()=>true;h.context.deriveRoomDeterministicSeed=room=>room.code==='AAAAAA'?42:84;
+ Object.assign(h.appCtx,{gameStarted:true,sharedSeedOverride:123,loadRoads:async()=>{loads++;return{state:'published'}}});
+ const first={id:'AAAAAA',code:'AAAAAA',world:{kind:'earth',lat:1,lon:2,seed:'same'}},second={...first,id:'BBBBBB',code:'BBBBBB'};
+ h.state.currentRoom=first;await h.runtime.syncRoomWorldContext(first,true);assert.equal(h.appCtx.sharedSeedOverride,42);
+ h.state.currentRoom=second;await h.runtime.syncRoomWorldContext(second,false);assert.equal(h.appCtx.sharedSeedOverride,84);assert.equal(loads,2,'same city but different room seed requires its own publication');
+ await h.runtime.deactivateRoom(false);assert.equal(h.appCtx.sharedSeedOverride,123);
+ h.state.currentRoom=first;await h.runtime.syncRoomWorldContext(first,true);h.appCtx.sharedSeedOverride=99;await h.runtime.deactivateRoom(false);assert.equal(h.appCtx.sharedSeedOverride,99,'a newer seed owner is preserved');
 });

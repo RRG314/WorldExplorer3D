@@ -16,7 +16,7 @@ function harness({ rejected = false, writeImpl = async () => {} } = {}) {
     postProtectedFunction: async (...args) => { calls.push(['admit', ...args]); if (rejected) throw new Error('Room full'); }
   });
   vm.runInContext(source + "\nactiveRoomId='ROOM01';getPose=()=>({});lastWriteAt=Date.now();lastLeaseWriteAt=Date.now();", context);
-  return { calls, switchRoom: () => vm.runInContext("void stopPresence({releaseLease:false});activeRoomId='ROOM02';getPose=()=>({});lastWriteAt=Date.now();lastLeaseWriteAt=Date.now();", context), advance: ms => { now += ms; }, write: (force = false) => context.writePresence(force) };
+  return { calls, withhold: () => vm.runInContext('getPose=()=>null',context), switchRoom: () => vm.runInContext("void stopPresence({releaseLease:false});activeRoomId='ROOM02';getPose=()=>({});lastWriteAt=Date.now();lastLeaseWriteAt=Date.now();", context), advance: ms => { now += ms; }, write: (force = false) => context.writePresence(force) };
 }
 test('expired presence requests server admission instead of reviving its document', async () => {
   const h = harness(); h.advance(91_000); await h.write();
@@ -81,4 +81,19 @@ test('velocity inference never turns a location or interior change into motion',
   assert.equal(sample(2,2000).vx,2);
   assert.equal(sample(90,3000,{kind:'earth',locLat:40,locLon:-76}).vx,0);
   assert.equal(sample(0,4000,{kind:'earth',locLat:40,locLon:-76,interiorKey:'building:1'}).vx,0);
+});
+
+test('world preparation renews its admitted slot without a default or wrong-frame pose', async () => {
+  const h = harness(); h.withhold();
+  for (let step = 0; step < 40; step++) { h.advance(2500); await h.write(); }
+  assert.equal(h.calls.length, 40);
+  for (const call of h.calls) {
+    assert.equal(call[0], 'write');
+    for (const key of ['mode', 'frame', 'pose']) assert.equal(key in call[2], false);
+    assert.ok(call[2].expiresAt > 190000);
+  }
+});
+test('an expired loading slot still requires server admission', async () => {
+  const h = harness(); h.withhold(); h.advance(91000); await h.write();
+  assert.deepEqual(h.calls.map(call => call[0]), ['admit']);
 });

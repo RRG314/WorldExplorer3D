@@ -248,17 +248,7 @@ function initMultiplayerPlatform() {
   }
 
   function resolveWeeklyFeaturedWorld(selection) {
-    const cityKey = normalizeCityKey(selection?.cityKey || selection?.city || '');
-    const locations = Object.values(appCtx.LOCS || {});
-    const match = locations.find((loc) => normalizeCityKey(loc?.name || '') === cityKey) || null;
-    const lat = finiteNumber(match?.lat, finiteNumber(appCtx.LOC?.lat, 0));
-    const lon = finiteNumber(match?.lon, finiteNumber(appCtx.LOC?.lon, 0));
-    return {
-      kind: 'earth',
-      lat,
-      lon,
-      seed: `latlon:${lat.toFixed(5)},${lon.toFixed(5)}`
-    };
+    return {kind:'earth',lat:selection.lat,lon:selection.lon,seed:`latlon:${selection.lat.toFixed(5)},${selection.lon.toFixed(5)}`};
   }
 
   const callbacks = { setAuthUser: null };
@@ -340,6 +330,7 @@ function initMultiplayerPlatform() {
     applyEntitlementCopy,
     attemptPendingRoomJoin,
     deactivateRoom,
+    prepareRoomWorldChange,
     ensureGhostTicker,
     ensureGlobalSubscriptions,
     ensureInviteJoinAccess,
@@ -450,6 +441,8 @@ function initMultiplayerPlatform() {
   }
 
   callbacks.setAuthUser = setAuthUser;
+
+  appCtx.prepareRoomWorldChange = prepareRoomWorldChange;
 
   wireEvents();
   syncCreateOptionFields('title');

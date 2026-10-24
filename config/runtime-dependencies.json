@@ -363,7 +363,7 @@
   "locks": [
     {
       "path": "package-lock.json",
-      "sha256": "b24c8d9874a4ebe62415dfaae7160a8fd683e453c456325c379cca485a413d0a",
+      "sha256": "2be25738132c3c5e13a45f8fb9acdde27589dc9b39fc797350aaa1e7ec233f97",
       "direct": [
         {
           "package": "@babel/parser",
@@ -444,12 +444,17 @@
           "package": "sharp",
           "version": "0.35.5",
           "integrity": "sha512-Ywn4OnzGukp7CDMrp08RQ50YKmuwG47brZgIVPTvBaaAfQlRlygrRqSrxdCiL9M+LlzLBiJ68IR1QqvzHyjC7g=="
+        },
+        {
+          "package": "parse5",
+          "version": "8.0.1",
+          "integrity": "sha512-z1e/HMG90obSGeidlli3hj7cbocou0/wa5HacvI3ASx34PecNjNQeaHNo5WIZpWofN9kgkqV1q5YvXe3F0FoPw=="
         }
       ]
     },
     {
       "path": "functions/package-lock.json",
-      "sha256": "361e666b1a0f449fc19a9827749eb4a8ad35357e74719a5be4de2655f8176ab5",
+      "sha256": "098b469dcb15afee59edeeecd351ea7ca6a264da6fd5421bc656b5bbefb43cfc",
       "direct": [
         {
           "package": "firebase-admin",
@@ -475,6 +480,11 @@
           "package": "stripe",
           "version": "17.7.0",
           "integrity": "sha512-aT2BU9KkizY9SATf14WhhYVv2uOapBWX0OFWF4xvcj1mPaNotlSc2CsxpS4DS46ZueSppmCF5BX1sNYBtwBvfw=="
+        },
+        {
+          "package": "svix",
+          "version": "2.8.0",
+          "integrity": "sha512-3bvu4FoVP9szUn5WBXUXUs97lLVC+Jyr0+jm+Q+DVcPMLXmeoZepbmbCzJVqGDNf9i00P7WLAH6m0q9HrzH1+g=="
         }
       ]
     }
