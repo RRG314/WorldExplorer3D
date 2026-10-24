@@ -2,7 +2,7 @@
 if(new URL(location.href).searchParams.get('view')==='moderation'&&(!new URL(location.href).searchParams.get('queue')||new URL(location.href).searchParams.get('queue')==='reality')){const target=new URL('./',location.href);target.searchParams.set('section','review');const capture=new URL(location.href).searchParams.get('capture');if(capture)target.searchParams.set('capture',capture);location.replace(target.href);}
 import { hasFirebaseConfig } from './firebase-init.js?v=58';
 import { ensureSignedIn, observeAuth, signOutUser } from './auth-ui.js?v=56';
-import { enableAdminTester, getAccountOverview } from './billing.js?v=58';
+import { enableAdminTester, getAccountOverview } from './billing.js?v=59';
 import {
   getAdminDashboardOverview,
   getAdminOperationsSnapshot,
