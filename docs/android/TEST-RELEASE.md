@@ -91,26 +91,58 @@ Mac's mobile-layout measurements as phone performance.
 
 Operational evidence and failed attempts: `output/research/android-testing-2026-10-23/`.
 
-## October 23 observed status
+## October 24 observed status
 
-Protected PRs 118, 119 and 121 are merged. Native build/lint 40053369082 and
-official signed-package verification passed for code 2; it is awaiting upload.
-The earlier internal code 1 has no selected testers. Free pricing and the basic
-non-rating declarations were saved; this does not imply review acceptance.
+Version 2 has been uploaded, validated and published to the active internal
+track. Only a fresh owner-only World Explorer tester list is selected. The
+owner-eligible opt-in page is
+https://play.google.com/apps/internaltest/4701521177239633849 . Testers must use
+the Google account selected for that list. Google displays the temporary package
+name until app review; this is not public Play production approval. Code 1 is
+excluded. The native package has not changed or been rebuilt.
 
-Production install support is live at compiled source `dd51952e203c`, Hosting
-`b82e6df7154cb0dc`. Both official Digital Asset Links queries return linked=true.
-The canonical static file matches the authored declaration; staged and production
-packages differ only in their three environment config outputs. Existing game
-payload acceptance is retained by byte equivalence. Initial rewrite, hidden-file
-selector, comparison-expectation and propagation failures remain in the ledger.
+Free pricing and basic declarations are saved, including No advertising ID.
+The corrected IARC questionnaire is Completed: ESRB Teen, PEGI16, USK16,
+generic/Russia16+, Brazil14+, South Korea15+, TaiwanPG12, AustraliaPG and Saudi
+Arabia18. It accurately includes rare field medicine, human violence, interaction,
+location sharing and digital purchases. No unsupported war or user-blocking
+claim remains. Target audience is still unsubmitted, pending reviewer access.
 
-The Mac is currently locked. Owner unlock is needed for native file selection; keyboard
-Console navigation and text entry still work. Listing descriptions and the
-source-backed Data safety categories/security/deletion facts were saved as drafts.
-Data handling/purposes and final review remain incomplete. The explicit IARC terms checkbox also requires owner approval
-before proceeding; no age rating has been assigned or invented. Actual Android
-installation/gameplay remains a separate pending check, followed by complete
-closed-track forms and the real tester period before public production access.
-Use the newest CURRENT-STATE section and operational receipts to resume without
-repeating the completed native builds or browser gameplay checks.
+Store text, icon and feature graphic are saved as a draft. Required genuine app
+screenshots remain outstanding. Data safety retains its 16-category/security/
+account-deletion draft; per-type handling/purposes and provider/analytics sharing
+still require final review. Limited analytics is cookieless measurement, not a
+complete opt-out. No false No-data or independent-security-review badge was used.
+
+A dedicated empty, non-admin reviewer account with complimentary Pro access has
+passed normal password sign-in and its own-profile read. Credentials are private
+outside source/evidence and await the owner's explicit approval before sharing
+with Google. Prepared English instructions require no owner login, purchase,
+expiring trial or OTP. This is not Android UI or App Check qualification.
+
+Before wider distribution, resolve two source-confirmed policy gaps. Existing
+Stripe Pro checkout grants digital room/feature benefits, so it cannot be assumed
+to qualify as a pure tip. A consumption-only Android experience can retain web
+commerce and existing benefits; native billing/approved program enrollment is a
+separate alternative. Public chat has reporting/moderation but no user blocking.
+Implement effective blocking through existing social/session owners and verify
+pre-UGC terms acceptance for guest/public chat and uploads. Do not remove core
+features or label reporting as blocking. Reference current Google policies:
+https://support.google.com/googleplay/android-developer/answer/10281818?hl=en
+and https://support.google.com/googleplay/android-developer/answer/9876937?hl=en .
+
+PR123's two-page GPS disclosure is live on production at compiled source
+`e80d473f17b2`, Hosting `d41966c1156b4857`. It explains real-location visibility
+through multiplayer avatars in the existing consent panel and privacy page;
+pausing GPS does not erase a position already shared. No GPS/room control rule
+changed. All 773 other assets match the preceding qualified release and the
+staging/production pair differs only in the three Firebase config outputs.
+Desktop/mobile-layout consent/cancel checks and served-byte probes passed;
+local CAPTCHA errors were retained, not relabeled as new auth qualification.
+Required protected checks and post-merge workflows passed. No Android rebuild,
+repeated city tests, provider sweep or full release matrix was run.
+
+Actual Play-installed phone gameplay remains pending. The internal test is
+available now; public production still requires complete policy/forms/device
+qualification, the genuine closed-test period and Google's approval. Resume
+from current evidence without retaking ratings or rebuilding the same package.

@@ -1,85 +1,126 @@
 # Current development and release state
 
-Updated October 23, 2026 for Android internal-test setup. The live build manifest at
-https://worldexplorer3d.io/build-manifest.json and the GitHub release are the
-production identity authorities; check them before starting new release work.
-The owner has explicitly authorized production, protected stable, both active
-development branches and the release. Do not ask again.
+Updated October 24, 2026 for the active Android owner-only internal test. The
+live build manifest at https://worldexplorer3d.io/build-manifest.json and the
+GitHub release identify the web release. The owner has authorized necessary
+production/protected-source work; do not ask again for that existing scope.
 
-## October 23 Android internal-test setup — in progress
+## October 24 Android internal test — available; wider release incomplete
 
-This section supersedes older production identities below. The owner requested
-Google Play testing and confirmed a free download with accurate violence/age
-classification. The Android app uses the existing browser game through Google's
-Trusted Web Activity; the Godot port has not begun.
+The existing Google Play app (4972969608428854795), package
+`io.worldexplorer3d.app`, now has **version code 2 / 5.6.1-test.2 published on the
+active internal track** 4701521177239633849. Only the fresh World Explorer list
+with the signed-in owner account is selected; the unrelated RGE256 list remains
+unselected. Code 1 is excluded. The owner-eligible invitation was verified at
+https://play.google.com/apps/internaltest/4701521177239633849 . Accept invite was
+left to the owner. Google currently displays `io.worldexplorer3d.app (unreviewed)`.
+There is no public Android production rollout or broad tester mailing.
 
-Production now serves `5.6.1+dd51952e203c.05cc68649e170e60.production`, compiled
-source `dd51952e203ca5eafeb1f1158ea1b3b288a81597`, Hosting `b82e6df7154cb0dc`,
-asset manifest SHA-256 `4dc1591da727f9026e01c0e8872678f1f34278ef8f3a7d29d53cd4b2471450db`.
-Staging is `5.6.1+dd51952e203c.83f86edf7cd6aea7.staging`, Hosting
-`106adff9123eda53`. PR118, PR119 and PR121 were protected merges; PR121 merged
-as `9f960018ce38d9a886a0548783ecee2dd7dfe103`. Required checks and its merged
-runtime/package check passed. The compiled head and merge have identical trees.
+The signed AAB was rehashed against its signing receipt before actual Console
+upload and accepted: SHA-256
+`ce0cb18a6bf4e80a7ef59bca452e9fa29f19de127aec14bb2334a29511e15780`.
+Android 10/API29 minimum and API36 target remain unchanged. Build/lint
+40053369082 and official v3 signature verification remain valid; no native
+rebuild was performed for this continuation. Signed artifacts and durable-key
+instructions remain under `docs/android/TEST-RELEASE.md` and
+`output/research/android-testing-2026-10-23/build-65949abc/`. This is a Trusted
+Web Activity of the existing game, not the Godot version.
 
-Website changes add the install manifest/icons, scoped network-only recovery,
-Android privacy/account-deletion instructions and canonical certificate file.
-All 763 unchanged original production files retain their bytes; qualified
-staging/production differ only in the three expected Firebase config outputs.
-Five focused components and four actual owned-browser recovery checks passed;
-there was no broad city/gameplay replay. Both Google Digital Asset Links checks
-now return linked=true for the Play and local-upload certificates. Initial
-negative propagation and failed Firebase rewrite/hidden-directory selector
-attempts are retained. The static canonical file fixes Firebase AUTO precedence;
-automatic association mode and other Hosting configuration remain preserved.
-No Functions, rules, Auth, Resend or player-data change occurred in this task.
+The owner unlocked the Mac and approved the previously presented IARC terms.
+The initial owner questionnaire was retained and corrected against actual
+source. The new questionnaire was saved October 24 at 8:32 AM; Console shows
+IARC Completed. Ratings: ESRB Teen, PEGI16, USK16, generic/Russia16+, Brazil14+,
+South Korea15+, TaiwanPG12, AustraliaPG and Saudi Arabia18. No global all-ages
+claim. Human violence, rare medical-drug use/reference, digital purchases,
+interaction and location sharing are disclosed. Unsupported war setting and
+user-blocking answers were removed. Reporting/moderation and optional private
+invited rooms remain disclosed. These ratings do not mean Google app review
+has passed. The final target-audience form has not been submitted.
 
-Android package `io.worldexplorer3d.app`, code 2, `5.6.1-test.2`, requires Android
-10/API29 and targets API36. Runner build/lint 40053369082 succeeded at native
-source `65949abc2cefca5c7df470223e235272b44bde25`; signed AAB/APK and receipts are
-under `output/research/android-testing-2026-10-23/build-65949abc/`.
-The valid v3 signature passed the official verifier; an unsigned APK failed.
-Native source is unchanged by the later website fix: do not rebuild it solely
-for documentation or certificate-site publication.
+Free download, Game/Adventure, HTTPS public contact/privacy and No ads,
+government, health or financial features remain saved. Advertising ID is now
+saved as No, consistent with native manifest/dependencies. The store text,
+512x512 app icon and 1024x500 feature graphic are saved as a draft. Required
+real app screenshots remain outstanding; old browser proxies were not relabeled
+as physical-phone evidence. The 16-category Data safety/security/deletion draft
+is preserved; exact per-type handling/purposes and provider/analytics sharing
+review remain incomplete and unsubmitted. Cookieless limited measurement is
+not a complete analytics opt-out. Do not mark all analytics automatically optional.
 
-Existing Play app 4972969608428854795 has internal version 1 published with zero
-testers. Do not enable that superseded version. Version 2 is signed but NOT
-uploaded: the Mac is locked, blocking native file selection. Keyboard Console navigation and text entry work.
-Free pricing, Game/Adventure, HTTPS public contact/privacy, No ads/government/
-health/financial features were saved. Listing descriptions were saved as a Console draft; the icon/feature graphic
-are prepared but not uploaded. Data safety has saved security/account-deletion
-facts and 16 source-backed data categories; handling/purposes and final preview
-remain incomplete and have not been submitted for review. The IARC Game category and support contact are prepared,
-but its explicit legal agreement remains unchecked pending owner action-time
-approval. Do not infer approval from the general setup request. Combat includes
-human NPC/civilian/responder targets, lasers/sidearms/melee/grenades and hit/downed
-reactions; disclose violence, chat and user uploads. No regional rating or final
-target audience has been assigned. Do not select nonviolent/all-young-children.
+A dedicated empty reviewer account has been created with complimentary,
+non-expiring Pro access, normal user permissions and no Stripe customer/admin
+privileges. Normal email/password sign-in and own-profile read passed. This is
+live-service evidence, not Android UI or App Check qualification. Credentials
+are owner-only outside the repository and have NOT been shared with Google;
+a specific owner approval question remains pending. English reviewer instructions
+are prepared. Google blocks the audience questionnaire until reviewer access
+is completed; do not falsely declare all app features unrestricted.
 
-Next: resume the existing Console tabs after the owner unlocks the Mac; upload
-version 2, complete IARC after explicit terms approval, configure the first real
-tester and feedback/opt-in access, then finish accurate app-access, Data safety,
-audience and listing forms. Review existing web support checkout against Play
-payment policy before wider distribution. Physical Play-installed phone launch,
-controls/orientation, resume, auth/App Check, loading/performance, progress and
-rooms remain unqualified. Closed/public eligibility still requires the account's
-12 genuine continuous closed testers for 14 days and Google's review; internal
-testing does not bypass it. No public Android production rollout occurred.
+Concrete pre-closed/public work:
+- Resolve the existing Stripe checkout for digital Pro room/feature benefits
+  against Play payment policy. These benefits are not pure tips. A consumption-only
+  Android experience can preserve web commerce and existing account benefits;
+  Play billing/approved programs are alternatives, not implemented or presumed.
+- Add effective user blocking through existing social/session owners. Chat has
+  reports, profanity/contact restrictions and rate limits, but no player block.
+  Verify explicit pre-UGC terms acceptance across guest/public chat and other
+  uploads; capture permission/version records are not proof of global chat consent.
+- Finish accurate app-access/audience/Data safety forms and genuine screenshots.
+- Obtain actual Play-installed phone checks: fullscreen/cold launch, touch and
+  rotation, offline/retry, resume, auth/App Check, selected-place loading,
+  retained progress and personal/weekly rooms. No phone or emulator was tested.
+- Run the account's required 12 genuine continuously opted-in closed testers for
+  14 days, then apply for Google's production access. Internal testing does not
+  satisfy or bypass that requirement.
 
-Read `docs/android/TEST-RELEASE.md`. All operational/failed evidence is retained
-under `output/research/android-testing-2026-10-23/`. Four raw package slots remain;
-prior Android staging and failed unactivated production packages have verified
-basis/overlay recovery archives. Preserve the original final-production basis,
-multiplayer/security bases, dist, keys and rollback anchors. The failed prepared
-Hosting version `22076af685d820ba` is explicitly forbidden from activation.
+## October 24 Live GPS disclosure — released
 
-The canonical worktree remains the architecture-evaluation path below. Original
-shared Git index/metadata in Documents became iCloud-dataless and could not be
-read; do not reset, delete or rewrite it. Workfiles were verified clean against
-pushed source with a small metadata-only bare snapshot in the ignored Android
-evidence folder (no source copies). Commits/PRs used the existing authenticated
-GitHub API without force updates; the primary local HEAD remains 91bc5c37 until
-metadata hydrates and can be synchronized safely. The subsequent checkpoint-doc
-edits are intentional. No original .git pointer or history was replaced.
+Source inspection confirmed that GPS-follow moves the walker while rooms
+publish its world pose and geographic origin. The existing consent dialog now
+explains that this can reveal the player's real location and offers solo mode
+as the choice for avoiding room sharing. The privacy page also explains that
+pausing GPS does not erase a previously shared position. GPS/room behavior,
+ownership, assets and admission were not changed.
+
+Production is `5.6.1+e80d473f17b2.83fbf9c53fbab14e.production`, compiled source
+`e80d473f17b2e0026a6604fb2e08219a0b960bf4`, Hosting `d41966c1156b4857`, asset
+manifest SHA-256 `8dbb5aacd3fdd96dcb8313f8b3f163e25467ca99e8c9c90ab6c798f10f8ef86a`.
+Staging is `5.6.1+e80d473f17b2.e012705ec7c75a6f.staging`, Hosting
+`897f8b887a942370`. Protected PR123 merged as
+`537a0fa23520b254835f364b004286d109143ff5`; head/merge trees match. Required PR
+checks, CodeQL, secret scanning and all post-merge workflows passed.
+
+Only `app/index.html` and `legal/privacy.html` changed in the packaged assets;
+all other 773 assets retain their previous bytes. The staging/production pair
+differs only in the expected three Firebase configuration files. Two compiled
+consent/cancel checks at desktop and mobile-layout sizes passed, screenshots
+were inspected, both controls were reachable, Cancel left GPS off, and no
+world was loaded. Local App Check CAPTCHA errors were retained: this provides
+no new sign-in or physical-device qualification. Live HTTPS and exact served
+bytes were verified in both environments. No repeated city/gameplay sweep.
+Hosting configuration, Functions, rules, Auth configuration and existing player
+records were preserved; the one dedicated reviewer account/profile is the only
+new account record. Prior Digital Asset Links proof is retained and its
+association asset is byte-identical.
+
+Evidence and failed attempts: `output/research/android-testing-2026-10-23/`,
+including `2026-10-24-console/`, `2026-10-24-disclosure/`, `play-upload-v2.json`
+and the current `console-progress.json`. Previously released DD production and
+new tested staging have complete byte-verified basis/overlay recovery archives.
+Four raw package slots remain. Preserve the original final-production basis,
+multiplayer/security bases, current production, dist, signing keys and rollback
+anchors. The old failed version `22076af685d820ba` remains forbidden to activate.
+
+Use the canonical architecture-evaluation worktree below. Original shared Git
+metadata in Documents remains iCloud-dataless; do not reset/delete/replace it.
+The original local HEAD remains 91bc5c37. Source was committed via authenticated
+normal GitHub API and verified against the small metadata-only Git snapshot in
+the ignored Android evidence folder. No whole-project source copy, force update,
+original .git pointer change or history rewrite occurred. Subsequent documentation
+commits do not require new Android or website builds.
+
+The dated sections below retain earlier release/verification history; the
+October 24 sections above supersede their identities and setup status.
 
 ## October 23 coordinated production release — complete
 
