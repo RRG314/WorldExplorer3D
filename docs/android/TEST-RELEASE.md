@@ -25,6 +25,10 @@ world play.
 - Google Play signs distributed APKs with a separate app key. The canonical
   site's `/.well-known/assetlinks.json` must include that **Play app certificate**
   as well as the local APK/upload certificate. Never add a shared debug key.
+  The Hosting builder publishes a static canonical copy of `app/assetlinks.json`;
+  a rewrite cannot override Firebase's automatic association response. Other
+  hidden files remain excluded and Firebase's automatic association mode stays
+  intact for unrelated platform associations.
 - The installed wrapper adds Internet/network-state permissions. Location and
   camera continue through browser consent. There is no native advertising,
   billing, analytics or notification SDK and no JavaScript/native bridge.

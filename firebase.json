@@ -3,7 +3,12 @@
     "public": "dist",
     "ignore": [
       "firebase.json",
-      "**/.*",
+      ".!(well-known)",
+      ".!(well-known)/**",
+      "*/**/.*",
+      "*/**/.*/**",
+      ".well-known/!(assetlinks.json)",
+      ".well-known/!(assetlinks.json)/**",
       "**/node_modules/**"
     ],
     "headers": [
@@ -104,7 +109,6 @@
       }
     ],
     "rewrites": [
-      { "source": "/.well-known/assetlinks.json", "destination": "/app/assetlinks.json" },
       {"source":"/manageAppTesters","function":"manageAppTesters"},
       {"source":"/appTesterEmailWebhook","function":"appTesterEmailWebhook"},
       {

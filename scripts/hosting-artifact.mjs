@@ -118,6 +118,11 @@ async function copySources(sourceFiles) {
     await fs.mkdir(path.dirname(target), { recursive: true });
     await fs.copyFile(source, target);
   }
+  // Firebase's automatic association response outranks rewrites. Publish the
+  // canonical URL as static content from this one authored declaration.
+  const association = path.join(OUTPUT_DIR, '.well-known', 'assetlinks.json');
+  await fs.mkdir(path.dirname(association), {recursive:true});
+  await fs.copyFile(path.join(ROOT, 'app', 'assetlinks.json'), association);
 }
 
 async function copyGroundData(sourceFiles, releaseId) {
@@ -406,6 +411,10 @@ async function verifyArtifact() {
   const environment = String(buildManifest.firebaseEnvironment || '');
   const config = JSON.parse(await fs.readFile(firebaseConfigPath(environment), 'utf8'));
   const expectedFiles = assetManifest.files || {};
+  if (!expectedFiles['.well-known/assetlinks.json'] ||
+      expectedFiles['.well-known/assetlinks.json'] !== expectedFiles['app/assetlinks.json']) {
+    throw new Error('Canonical Android association must match its authored declaration.');
+  }
   const actualFiles = (await listFiles(OUTPUT_DIR)).filter((relative) =>
     relative !== ASSET_MANIFEST && relative !== BUILD_MANIFEST
   ).sort();
