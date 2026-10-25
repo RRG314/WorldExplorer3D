@@ -260,3 +260,30 @@ portal-entry-affected.tap, portal-entry-identity-fixed.tap and
 portal-entry-service-time-final.tap. No new Hosting/native deployment. Continue
 native widget clients/account integration, actual destination qualifications,
 remaining VR domains and coordinated release/platform acceptance.
+
+- Native Android widget implementation now uses RemoteViews within the existing
+  Java TWA package. It has compact and expanded layouts, independent per-widget
+  follow modes/Home choice, offline bundled/last-good catalog, native fact pages,
+  saved/investigated Trail, complete native investigations/sources and guarded
+  game/room/planetary links. Small tiles open native details; expanded widgets
+  support investigation directly. No new renderer, continuous GPS or connection.
+  Android JobScheduler owns network refresh; the daily widget request and user
+  actions trigger bounded work. Cancelled jobs cannot publish a late catalog.
+- Native public/bundled catalog copies are generated from the actual shared
+  content and full qualification policy. Offers retain time/device/version scope;
+  release qualifications remain empty. Two conformance cases pass. Java/native
+  XML/workflow compilation and actual emulator interaction are the next check;
+  source existence and syntax checks do not establish native acceptance.
+- Native account coordinator, signed-in sync, Apple containing app/WidgetKit,
+  preview imagery, broader destination qualification and distribution remain
+  unfinished. Android currently labels its native Trail as device-local. A
+  debug-only fresh-owned-emulator test host exercises actual widget binding,
+  RemoteViews/pending intents, persistence, investigation, native Trail and
+  compact layout; it refuses existing data/non-emulator devices. Production
+  packages do not contain that test host or instrumentation component.
+
+Implementation references: Android official Views app-widget advanced and
+configuration guides, AppWidgetProviderInfo updatePeriodMillis, and Apple
+WidgetKit/App Intents interactivity and timelines. Android retains its existing
+Java stack instead of introducing Compose just for this platform projection.
+No native build or device success is claimed until the targeted CI receipt.

@@ -14,6 +14,14 @@
         android:manageSpaceActivity="com.google.androidbrowserhelper.trusted.ManageDataLauncherActivity"
         android:theme="@android:style/Theme.Translucent.NoTitleBar">
         <meta-data android:name="asset_statements" android:resource="@string/asset_statements" />
+        <receiver android:name=".PortalWidgetProvider" android:exported="false" android:label="@string/portal_widget_label">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/portal_widget_info" />
+        </receiver>
+        <activity android:name=".PortalActivity" android:exported="true" android:theme="@style/PortalTheme" android:label="@string/portal_name">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" /></intent-filter>
+        </activity>
+        <service android:name=".PortalRefreshJob" android:permission="android.permission.BIND_JOB_SERVICE" android:exported="true" />
         <activity
             android:name=".GameLauncherActivity"
             android:exported="true">

@@ -1,0 +1,36 @@
+<resources>
+    <style name="PortalTheme" parent="android:style/Theme.Material.NoActionBar">
+        <item name="android:fontFamily">sans</item><item name="android:colorAccent">#57C9FA</item>
+        <item name="android:statusBarColor">#071423</item><item name="android:navigationBarColor">#071423</item>
+        <item name="android:windowLightStatusBar">false</item><item name="android:windowLightNavigationBar">false</item>
+        <item name="android:windowBackground">#071423</item>
+    </style>
+    <string name="portal_brand">WORLD EXPLORER 3D</string>
+    <string name="portal_name">The Living Portal</string>
+    <string name="portal_widget_label">World Explorer · Living Portal</string>
+    <string name="portal_widget_description">Discover real places, investigate their stories and keep your Exploration Trail.</string>
+    <string name="portal_settings">Portal settings</string><string name="portal_settings_icon">⋯</string>
+    <string name="portal_trail">Your Trail</string><string name="portal_save">Save place</string><string name="portal_saved">Saved</string>
+    <string name="portal_remove_saved">Remove from saved places</string>
+    <string name="portal_investigate">Investigate</string><string name="portal_investigated">Investigated</string><string name="portal_visited">Visited in 3D</string>
+    <string name="portal_close_fact">Close facts</string><string name="portal_next_fact">Next fact →</string><string name="portal_add_investigated">Add to Investigated</string>
+    <string name="portal_open_place">Open place</string><string name="portal_enter">Enter World</string><string name="portal_open_game">Open game</string>
+    <string name="portal_bundled">Offline-ready collection · refresh when connected</string><string name="portal_updated">Collection updated %1$s</string>
+    <string name="portal_together">Explore together</string><string name="portal_beyond">Beyond Earth</string><string name="portal_home">Your Home Portal</string>
+    <string name="portal_together_body">Join the shared weekly city, create your own room or join a friend. The game checks sign-in and current room availability.</string>
+    <string name="portal_beyond_body">Choose the Moon, Mars or a journey through space. Available worlds and vehicle controls open in the game.</string>
+    <string name="portal_home_body">Keep a favorite place close. Choose a destination in Portal settings.</string>
+    <string name="portal_follow_label">Your window into World Explorer</string><string name="portal_choose_place">Choose a place</string>
+    <string name="portal_open_multiplayer">Open Multiplayer</string><string name="portal_moon">Moon</string><string name="portal_mars">Mars</string><string name="portal_space">Space</string>
+    <string name="portal_trail_explanation">Saved, investigated and visited in 3D are different steps. This Trail keeps them separate from your game rewards and expeditions.</string>
+    <string name="portal_empty_trail">Your Trail starts with a place that catches your interest.</string>
+    <string name="portal_device_trail">Device Trail · your choices are kept on this device.</string>
+    <string name="portal_places_heading">Places to discover</string><string name="portal_sources">Read more</string>
+    <string name="portal_world_checks">3D entry is being checked for this destination. You can save it and investigate now.</string>
+    <string name="portal_add_widget_first">Add the Living Portal widget to your home screen to choose what it follows.</string>
+    <string name="portal_choose_follow">Choose your Portal experience</string><string name="portal_choose_home">Home destination</string>
+    <string name="portal_refresh_explanation">Your Portal keeps its last loaded collection offline. Android schedules an occasional refresh; the game does not run in the background.</string>
+    <string name="portal_done">Save Portal settings</string><string name="portal_cancel">Cancel</string><string name="portal_save_failed">Your choice could not be saved. Try again.</string>
+    <string name="portal_refresh">Refresh collection</string><string name="portal_refresh_scheduled">A refresh is scheduled when Android permits a network connection. Your current collection stays available.</string>
+    <string-array name="portal_modes"><item>Wander — somewhere new</item><item>Home — a favorite place</item><item>Nature — landscapes and geology</item><item>Together — multiplayer worlds</item><item>Beyond Earth — planets and space</item></string-array>
+</resources>

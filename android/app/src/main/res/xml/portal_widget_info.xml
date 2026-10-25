@@ -1,0 +1,6 @@
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:minWidth="170dp" android:minHeight="180dp" android:minResizeWidth="170dp" android:minResizeHeight="180dp"
+    android:targetCellWidth="2" android:targetCellHeight="3" android:updatePeriodMillis="86400000"
+    android:initialLayout="@layout/portal_widget" android:configure="io.worldexplorer3d.app.PortalActivity"
+    android:resizeMode="horizontal|vertical" android:widgetCategory="home_screen"
+    android:widgetFeatures="reconfigurable|configuration_optional" android:description="@string/portal_widget_description" />

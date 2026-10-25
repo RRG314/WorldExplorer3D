@@ -7,6 +7,10 @@ on:
         description: Verify native cold launch, offline recovery and retry
         type: boolean
         default: true
+      widget_check:
+        description: Verify the native Portal widget and Trail in an owned emulator
+        type: boolean
+        default: false
   push:
     branches: [steven/android-testing]
     paths: ['android/**', '.github/workflows/android-test.yml']
@@ -47,6 +51,22 @@ jobs:
           "$ANDROID_HOME/build-tools/36.0.0/aapt2" dump badging android-artifacts/app-release-unsigned.apk > android-artifacts/package-badging.txt
           git rev-parse HEAD > android-artifacts/source-commit.txt
           (cd android-artifacts && sha256sum * > SHA256SUMS)
+      - name: Build the native widget verification host
+        if: github.event_name == 'workflow_dispatch' && inputs.widget_check
+        working-directory: android
+        run: ./gradlew --no-daemon --max-workers=2 --dependency-verification strict :app:assembleDebug
+      - name: Verify native Portal widgets
+        if: github.event_name == 'workflow_dispatch' && inputs.widget_check
+        timeout-minutes: 12
+        run: bash scripts/verification/android-portal-widget.sh
+      - name: Preserve native widget evidence
+        if: always() && github.event_name == 'workflow_dispatch' && inputs.widget_check
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: android-widget-evidence
+          path: android-widget-evidence/
+          retention-days: 30
+          if-no-files-found: warn
       - name: Verify Android launch and connection recovery
         if: github.event_name != 'workflow_dispatch' || inputs.launch_check
         timeout-minutes: 12
