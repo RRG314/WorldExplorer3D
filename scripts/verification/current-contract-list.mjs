@@ -498,6 +498,7 @@ export const currentContractTests = [
   'tests/live-gps-field-session.test.mjs',
   'tests/mobile-touch-authority.test.mjs',
   'tests/vehicle-tilt-input-current.test.mjs',
+  'tests/request-parser-security-current.test.mjs',
   'tests/planetary-build-surface-current.test.mjs',
   'tests/planetary-physical-environment-current.test.mjs',
   'tests/planetary-surface-authority-current.test.mjs',

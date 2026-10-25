@@ -4,23 +4,55 @@ Updated October 25, 2026. Use the latest sections below for current identities;
 dated sections further down retain historical evidence. The owner has authorized
 necessary production/protected-source work; do not ask again for that scope.
 
-## October 25 mobile vehicle controls — candidate in verification
+## October 25 server request-parser security — candidate
 
-The owner reports successful Motorola startup after Play version 4, then difficult
-car steering. The candidate separates horizontal progressive steering from car
-pedals, reduces mobile steering authority at road speeds, and introduces explicit
-opt-in calibrated screen-relative tilt for cars, aircraft and spacecraft through
-the existing action reader. Optional car tilt speed uses service braking; flight
-keeps independent speed buttons. Motion stays on-device. Sensor freshness,
-permission cancellation and input-context lifecycle are owned; there is no new
-scheduler or position writer. Touch, keyboard and controller fallbacks remain.
-A guarded input-frame refresh now restores mobile controls after readiness and
-suspends them at blocking overlays. World/admission/save/native contracts stay intact.
+A newly surfaced availability advisory affects body-parser 1.20.6 in the Functions
+lockfile. An isolated owned HTTP process reproduces the old crash; the compatible
+1.20.9 patch survives it. Four focused cases pass and the production dependency
+audit reports zero findings. No malformed requests were sent to live services.
+Only that transitive package changes; game/Function code is unchanged. Cloud
+configuration, IAM and source recovery are being captured before staging/prod
+updates. The wildcard inventory returned 503; existing us-central1 lists all 84
+Functions ACTIVE. See `docs/verification/2026-10-25-REQUEST-PARSER-SECURITY.md`.
+Source protection and cloud deployment are still pending; the vehicle release
+below does not itself resolve this backend advisory.
 
-Focused control tests and actual source-browser car checks are recorded under
-`output/research/mobile-vehicle-controls-2026-10-25/`. Initial test-harness failures
-and local App Check errors are retained. These do not qualify a release, live
-backend or physical sensor feel; frozen/staging verification is still pending.
+## October 25 mobile vehicle controls — released
+
+Production serves `5.6.1+52d5f246f5ad.25a6fdc42a0cb4c1.production`, Hosting
+`ab107ddad5effe6a`. Staging serves `5.6.1+52d5f246f5ad.1f94b7fc123029fc.staging`,
+Hosting `d654414d6d60fe66`. Both compile `52d5f246f5add2c7eb6066fcb9bafc8d40105d61`.
+Protected PR131 merged normally as `358dfd3a673d541bd1fd6faaeba42470dd137a25`;
+all required checks passed and reviewed/merged trees match. Production's 15 changed
+files match served bytes. The pair differs only in the three Firebase environment
+files; all world assets and Hosting configuration remain intact.
+
+Cars have progressive horizontal steering and separate accelerate/brake-reverse
+pedals, with gentler mobile steering at road speeds. Explicit Controls → Enable
+tilt calibrates car steering, aircraft bank/pitch and spacecraft yaw/pitch through
+the existing action reader and lifecycle scope. Optional car tilt speed uses
+service braking; flight retains independent throttle buttons. Sensor freshness,
+permission cancellation, screen rotation and input-context suspension are owned.
+No new scheduler, position setter, native package, backend, admission or save
+change. Renderer-owned canvas bounds prevent tiny controls after rotation.
+
+50 focused controls/renderer cases and the source/module/ownership checks passed.
+Six compiled browser checks passed with zero page/console errors using a temporary
+registered staging test-attestation credential, now revoked. Screenshots were
+inspected; owned processes closed. Ordinary staging completed all six vehicle
+checks but its overall run failed on an external reCAPTCHA timeout; that failure
+is retained separately, not relabelled a pass. Physical phone sensor feel and
+performance remain owner checks. Play version 4 startup/update is owner-confirmed.
+
+See `docs/verification/2026-10-25-MOBILE-VEHICLE-CONTROLS.md` and
+`output/research/mobile-vehicle-controls-2026-10-25/` (qualification, live bytes,
+protected-release, parity and activation receipts). Previous packages and failed
+attempts have byte-verified recovery overlays; raw package count remains four.
+
+A newly surfaced body-parser advisory (GHSA-27r3-jxmh-p828) affects the Functions
+lockfile's 1.20.6. The current audit reports one high finding. This is a separate
+server dependency patch in progress under the owner's existing security scope;
+the vehicle release does not claim to resolve it or prove production exploitation.
 
 ## October 25 Android startup crash — version 4 internal test released
 
