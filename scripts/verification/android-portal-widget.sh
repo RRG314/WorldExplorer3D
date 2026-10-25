@@ -17,6 +17,8 @@ trap 'timeout 8 adb -s "$ANDROID_SERIAL" emu kill || true; kill "$WIDGET_EMULATO
 timeout 120 adb wait-for-device
 timeout 240 bash -c 'until [ "$(adb shell getprop sys.boot_completed | tr -d "\r")" = 1 ]; do sleep 2; done'
 adb shell input keyevent 82
+adb shell wm size 720x1600
+adb shell wm density 320
 adb shell settings put global window_animation_scale 0
 adb shell settings put global transition_animation_scale 0
 adb shell settings put global animator_duration_scale 0

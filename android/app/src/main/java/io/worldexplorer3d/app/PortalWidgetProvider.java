@@ -82,6 +82,7 @@ public final class PortalWidgetProvider extends AppWidgetProvider {
             views.setTextViewText(R.id.portal_open,context.getString(mode.equals("home")?R.string.portal_choose_place:R.string.portal_open_game));
             views.setOnClickPendingIntent(R.id.portal_open,open(context,widgetId,mode.equals("home")?"configure":mode,""));
         }
+        if(compact)views.setTextViewText(R.id.portal_body,"");
         return views;
     }
     private void localWork(Runnable work){

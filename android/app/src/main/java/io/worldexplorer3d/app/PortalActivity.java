@@ -6,7 +6,9 @@ import android.content.Intent;
 import android.graphics.Color;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Build;
 import android.view.View;
+import android.view.WindowInsets;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.LinearLayout;
@@ -32,19 +34,31 @@ public final class PortalActivity extends Activity {
     private boolean closed;
     private int widgetId;
     private String section,destination;
+    private String draftMode,draftHome;
+    private Spinner modeField,homeField;
+    private List<JSONObject> configurationPlaces;
     @Override public void onCreate(Bundle state){
         super.onCreate(state);store=new PortalStore(this);widgetId=getIntent().getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID,AppWidgetManager.INVALID_APPWIDGET_ID);
         section=state==null?getIntent().getStringExtra("section"):state.getString("section");destination=state==null?getIntent().getStringExtra("destination"):state.getString("destination");
+        if(state!=null){draftMode=state.getString("draftMode");draftHome=state.getString("draftHome");}
         if(AppWidgetManager.ACTION_APPWIDGET_CONFIGURE.equals(getIntent().getAction()))section="configure";
         if(section==null)section="trail";if(destination==null)destination="";
         setResult(RESULT_CANCELED);show();PortalRefreshJob.schedule(this);
     }
-    @Override protected void onSaveInstanceState(Bundle out){out.putString("section",section);out.putString("destination",destination);super.onSaveInstanceState(out);}
+    @Override protected void onSaveInstanceState(Bundle out){out.putString("section",section);out.putString("destination",destination);
+        if(modeField!=null&&homeField!=null&&configurationPlaces!=null){out.putString("draftMode",new String[]{"wander","home","nature","together","beyond"}[modeField.getSelectedItemPosition()]);out.putString("draftHome",configurationPlaces.get(homeField.getSelectedItemPosition()).optString("id"));}
+        super.onSaveInstanceState(out);}
     @Override protected void onDestroy(){closed=true;work.shutdownNow();super.onDestroy();}
     private int dp(int value){return Math.round(value*getResources().getDisplayMetrics().density);}
     private void shell(){
         ScrollView scroll=new ScrollView(this);scroll.setFillViewport(true);scroll.setBackgroundColor(Color.rgb(7,20,35));
         content=new LinearLayout(this);content.setOrientation(LinearLayout.VERTICAL);content.setPadding(dp(20),dp(24),dp(20),dp(24));scroll.addView(content);setContentView(scroll);
+        final LinearLayout currentContent=content;
+        scroll.setOnApplyWindowInsetsListener((view,insets)->{
+            if(Build.VERSION.SDK_INT>=30){android.graphics.Insets safe=insets.getInsets(WindowInsets.Type.systemBars()|WindowInsets.Type.displayCutout());currentContent.setPadding(dp(20)+safe.left,dp(24)+safe.top,dp(20)+safe.right,dp(24)+safe.bottom);}
+            else currentContent.setPadding(dp(20)+insets.getSystemWindowInsetLeft(),dp(24)+insets.getSystemWindowInsetTop(),dp(20)+insets.getSystemWindowInsetRight(),dp(24)+insets.getSystemWindowInsetBottom());
+            return insets;
+        });scroll.requestApplyInsets();
         text(getString(R.string.portal_brand),13,true);text(getString(R.string.portal_name),30,true);
         if(!section.equals("configure")){button(R.string.portal_trail,()->navigate("trail",""));button(R.string.portal_open_game,()->openGame("/app/"));}
     }
@@ -103,10 +117,10 @@ public final class PortalActivity extends Activity {
         if(!owned){text(getString(R.string.portal_add_widget_first),17,false);return;}
         text(getString(R.string.portal_choose_follow),21,true);
         final String[] modes={"wander","home","nature","together","beyond"};
-        Spinner mode=new Spinner(this);mode.setAdapter(new ArrayAdapter<>(this,android.R.layout.simple_spinner_dropdown_item,getResources().getStringArray(R.array.portal_modes)));mode.setSelection(Math.max(0,Arrays.asList(modes).indexOf(store.mode(widgetId))));content.addView(mode);
+        Spinner mode=new Spinner(this);modeField=mode;mode.setAdapter(new ArrayAdapter<>(this,android.R.layout.simple_spinner_dropdown_item,getResources().getStringArray(R.array.portal_modes)));mode.setSelection(Math.max(0,Arrays.asList(modes).indexOf(draftMode==null?store.mode(widgetId):draftMode)));content.addView(mode);
         text(getString(R.string.portal_choose_home),18,true);List<JSONObject> places=store.destinations();List<String> titles=new ArrayList<>();int selected=0;
-        for(int i=0;i<places.size();i++){titles.add(places.get(i).optString("title"));if(places.get(i).optString("id").equals(store.home(widgetId)))selected=i;}
-        Spinner home=new Spinner(this);home.setAdapter(new ArrayAdapter<>(this,android.R.layout.simple_spinner_dropdown_item,titles));home.setSelection(selected);content.addView(home);
+        configurationPlaces=places;for(int i=0;i<places.size();i++){titles.add(places.get(i).optString("title"));if(places.get(i).optString("id").equals(draftHome==null?store.home(widgetId):draftHome))selected=i;}
+        Spinner home=new Spinner(this);homeField=home;home.setAdapter(new ArrayAdapter<>(this,android.R.layout.simple_spinner_dropdown_item,titles));home.setSelection(selected);content.addView(home);
         text(getString(R.string.portal_refresh_explanation),15,false);
         button(R.string.portal_done,()->{String selectedMode=modes[mode.getSelectedItemPosition()],homeId=places.get(home.getSelectedItemPosition()).optString("id");
             work.execute(()->{store.configure(widgetId,selectedMode,homeId);PortalWidgetProvider.update(this,widgetId);if(!closed)runOnUiThread(()->{setResult(RESULT_OK,new Intent().putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID,widgetId));finish();});});});
