@@ -10,8 +10,12 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Bitmap;
+import android.graphics.Rect;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.SystemClock;
+import android.view.InputDevice;
+import android.view.MotionEvent;
 import android.view.View;
 import android.widget.TextView;
 import org.json.JSONObject;
@@ -25,12 +29,14 @@ import java.util.function.BooleanSupplier;
 public final class PortalWidgetContractInstrumentation extends Instrumentation {
     private Bundle arguments;
     private AppWidgetHostView view;
+    private Activity expectedWindow;
     @Override public void onCreate(Bundle args){arguments=args;start();}
     private static void check(boolean value,String message){if(!value)throw new AssertionError(message);}
     private void until(BooleanSupplier ready)throws Exception{long deadline=System.currentTimeMillis()+8000;while(!ready.getAsBoolean()){if(System.currentTimeMillis()>=deadline)throw new AssertionError("Native widget state did not settle.");Thread.sleep(50);}}
     private String text(int id){AtomicReference<String> value=new AtomicReference<>("");runOnMainSync(()->{TextView item=view.findViewById(id);if(item!=null)value.set(item.getText().toString());});return value.get();}
-    private void click(int id){runOnMainSync(()->{View item=view.findViewById(id);check(item!=null&&item.isShown(),"Widget control is unavailable: "+id);check(item.performClick(),"Widget click was not handled.");});}
-    private void screenshot(String name)throws Exception{waitForIdleSync();try{getUiAutomation().waitForIdle(150,1500);}catch(java.util.concurrent.TimeoutException ignored){}Bitmap pixels=getUiAutomation().takeScreenshot();check(pixels!=null,"Native screenshot unavailable.");File directory=new File(getTargetContext().getFilesDir(),"portal-evidence");check(directory.mkdirs()||directory.isDirectory(),"Evidence directory unavailable.");try(FileOutputStream output=new FileOutputStream(new File(directory,name))){check(pixels.compress(Bitmap.CompressFormat.PNG,100,output),"Screenshot could not be written.");}finally{pixels.recycle();}}
+    private boolean foreground(){AtomicReference<Boolean> focused=new AtomicReference<>(false);runOnMainSync(()->focused.set(expectedWindow!=null&&expectedWindow.hasWindowFocus()));android.view.accessibility.AccessibilityNodeInfo root=getUiAutomation().getRootInActiveWindow();return focused.get()&&root!=null&&root.getPackageName()!=null&&getTargetContext().getPackageName().contentEquals(root.getPackageName());}
+    private void click(int id)throws Exception{until(this::foreground);Rect bounds=new Rect();runOnMainSync(()->{View item=view.findViewById(id);check(item!=null&&item.isShown()&&item.getGlobalVisibleRect(bounds),"Widget control is unavailable: "+id);});long at=SystemClock.uptimeMillis();for(int action:new int[]{MotionEvent.ACTION_DOWN,MotionEvent.ACTION_UP}){MotionEvent event=MotionEvent.obtain(at,SystemClock.uptimeMillis(),action,bounds.exactCenterX(),bounds.exactCenterY(),0);event.setSource(InputDevice.SOURCE_TOUCHSCREEN);try{check(getUiAutomation().injectInputEvent(event,true),"Native screen tap was rejected.");}finally{event.recycle();}}}
+    private void screenshot(String name)throws Exception{until(this::foreground);waitForIdleSync();try{getUiAutomation().waitForIdle(150,1500);}catch(java.util.concurrent.TimeoutException ignored){}check(foreground(),"A system window covers the widget proof.");Bitmap pixels=getUiAutomation().takeScreenshot();check(pixels!=null,"Native screenshot unavailable.");File directory=new File(getTargetContext().getFilesDir(),"portal-evidence");check(directory.mkdirs()||directory.isDirectory(),"Evidence directory unavailable.");try(FileOutputStream output=new FileOutputStream(new File(directory,name))){check(pixels.compress(Bitmap.CompressFormat.PNG,100,output),"Screenshot could not be written.");}finally{pixels.recycle();}}
     @Override public void onStart(){
         Bundle result=new Bundle();int outcome=Activity.RESULT_CANCELED;AppWidgetHost host=null;PortalWidgetHarnessActivity activity=null;int widgetId=AppWidgetManager.INVALID_APPWIDGET_ID;SharedPreferences prefs=null;boolean owned=false;
         try{
@@ -50,6 +56,7 @@ public final class PortalWidgetContractInstrumentation extends Instrumentation {
             getUiAutomation().adoptShellPermissionIdentity("android.permission.BIND_APPWIDGET");
             try{check(manager.bindAppWidgetIdIfAllowed(widgetId,new ComponentName(context,PortalWidgetProvider.class),options),"System widget binding was denied.");}finally{getUiAutomation().dropShellPermissionIdentity();}
             activity=(PortalWidgetHarnessActivity)startActivitySync(new Intent(context,PortalWidgetHarnessActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+            expectedWindow=activity;
             final AppWidgetHost currentHost=host;final PortalWidgetHarnessActivity currentActivity=activity;final int currentId=widgetId;
             runOnMainSync(()->{currentHost.startListening();view=currentHost.createView(currentActivity,currentId,manager.getAppWidgetInfo(currentId));currentActivity.showWidget(view,300,440);});
             PortalWidgetProvider.update(context,widgetId);until(()->text(R.id.portal_title).contains("Baltimore"));
@@ -59,7 +66,7 @@ public final class PortalWidgetContractInstrumentation extends Instrumentation {
             int count=PortalStore.facts(place).size();for(int i=1;i<count;i++){click(R.id.portal_fact_next);final int index=i;until(()->store.fact(currentId)==index);until(()->text(R.id.portal_body).equals(PortalStore.facts(place).get(index)));}
             click(R.id.portal_fact_next);until(()->store.learning(currentId).isEmpty());check(store.trail(id).optLong("investigatedAt")>0,"The actual widget investigation did not persist.");check(store.trail(id).optLong("visitedAt")==0,"Investigation granted a game visit.");
             screenshot("widget-saved.png");result.putInt("host_interaction_checks",3);
-            ActivityMonitor monitor=addMonitor(PortalActivity.class.getName(),null,false);click(R.id.portal_trail);Activity trail=waitForMonitorWithTimeout(monitor,8000);removeMonitor(monitor);check(trail!=null,"Native Trail Activity did not open.");screenshot("native-trail.png");runOnMainSync(trail::finish);
+            ActivityMonitor monitor=addMonitor(PortalActivity.class.getName(),null,false);click(R.id.portal_trail);Activity trail=waitForMonitorWithTimeout(monitor,8000);removeMonitor(monitor);check(trail!=null,"Native Trail Activity did not open.");expectedWindow=trail;screenshot("native-trail.png");runOnMainSync(trail::finish);expectedWindow=activity;until(this::foreground);
             options.putInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH,180);options.putInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT,200);manager.updateAppWidgetOptions(widgetId,options);
             runOnMainSync(()->{android.view.ViewGroup parent=(android.view.ViewGroup)view.getParent();parent.removeView(view);currentActivity.showWidget(view,180,200);view.updateAppWidget(PortalWidgetProvider.views(context,currentId));});
             until(()->text(R.id.portal_title).contains("Baltimore"));screenshot("widget-compact.png");

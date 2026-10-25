@@ -9,8 +9,8 @@ export ANDROID_AVD_HOME="$ANDROID_USER_HOME/avd"
 export ANDROID_SERIAL=emulator-5566
 mkdir -p "$ANDROID_AVD_HOME"
 sudo chmod 666 /dev/kvm
-"$SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" "system-images;android-35;google_apis;x86_64" "emulator"
-printf 'no\n' | "$SDK_ROOT/cmdline-tools/latest/bin/avdmanager" create avd -n we3d-portal -k "system-images;android-35;google_apis;x86_64"
+"$SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" "system-images;android-35;default;x86_64" "emulator"
+printf 'no\n' | "$SDK_ROOT/cmdline-tools/latest/bin/avdmanager" create avd -n we3d-portal -k "system-images;android-35;default;x86_64"
 emulator -avd we3d-portal -port 5566 -no-window -no-audio -no-snapshot -gpu swiftshader_indirect -memory 2048 > android-widget-evidence/emulator.log 2>&1 &
 WIDGET_EMULATOR_PID=$!
 trap 'timeout 8 adb -s "$ANDROID_SERIAL" emu kill || true; kill "$WIDGET_EMULATOR_PID" 2>/dev/null || true' EXIT
