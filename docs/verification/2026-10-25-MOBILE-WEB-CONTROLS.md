@@ -88,3 +88,6 @@ from `8958c418a455bfe8d00682e7dee7b0d95b96f5d2`. Required source/security checks
 pass and reviewed/merged trees match. Production build manifest, game HTML and
 mobile-control CSS still match the already qualified release bytes. See
 `mobile-web-protected-release.json` and `mobile-web-live-identity.json`.
+
+All four automatic post-merge workflows also passed. The final combined receipt
+is `mobile-web-final-delivery.json`; original failed reports remain untouched.

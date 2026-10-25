@@ -8,7 +8,8 @@ necessary production/protected-source work; do not ask again for that scope.
 
 Protected PR133 merged as `9a529da79f319606627080ad5b896c6169c3ad20` from
 reviewed `8958c418a455bfe8d00682e7dee7b0d95b96f5d2`; required checks pass and
-reviewed/merged trees match. Production identity/HTML/mobile CSS still match the
+reviewed/merged trees match. All four automatic post-merge workflows also pass.
+Production identity/HTML/mobile CSS still match the
 previously qualified release bytes. No new game or native deployment is needed.
 
 The owner additionally requires phone-browser use outside the Play app. The
