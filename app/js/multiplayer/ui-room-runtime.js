@@ -78,6 +78,10 @@ export function createUiRoomRuntime({ appCtx, refs, state, renderers, helpers })
     state.unsubBlockedPlayers = null;
     state.blockedPlayers = [];
     state.blockedPlayersReady = false;
+    state.friends = [];
+    state.recentPlayers = [];
+    state.invites = [];
+    state.ownedRooms = [];
     if (typeof state.unsubFriends === "function") state.unsubFriends();
     if (typeof state.unsubRecentPlayers === "function") state.unsubRecentPlayers();
     if (typeof state.unsubInvites === "function") state.unsubInvites();

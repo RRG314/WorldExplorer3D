@@ -4,7 +4,7 @@ Updated October 24, 2026. Use the latest sections below for current identities;
 dated sections further down retain historical evidence. The owner has authorized
 necessary production/protected-source work; do not ask again for that scope.
 
-## October 24 selected-location defaults and community safety — candidate
+## October 24 selected-location defaults and community safety — released
 
 The owner's accepted foundation is implemented: selected-location Earth play is
 labelled as the default; new ocean voyages also default to the selected dive
@@ -39,13 +39,47 @@ no unrelated list was selected or invitations sent. Gameplay screenshot upload
 still requires the browser extension's file URL permission. No Google review,
 Android phone acceptance or genuine 12-person/14-day test period is claimed.
 
-This candidate requires protected source checks and coordinated activation of
-nine existing Functions, the reviewed rules and the additive blockedPlayers.uid
-collection-group index, followed by matching web artifacts. Index readiness must
-precede updated deleteAccount. All other Functions/configuration, Auth, IAM,
-Hosting configuration, source/rollback artifacts and player records are preserved.
+Protected PR127 merged as `2e32273f2d5e46cbf39f26559e0e1ecb7da42a3d`; required
+checks, security scans and all four post-merge workflows passed. Its head and
+merge trees match. Production serves
+`5.6.1+59d6712db577.c1507cbdad82b91e.production`, Hosting `3b6cffd49531a588`,
+asset manifest SHA-256 `3a7c24b45fbdd7e4c218ed00c7bac23c5564c4c5218f3fdbb51621e4936b2e3a`.
+Staging serves `5.6.1+59d6712db577.8d8d82cdc6d2dde4.staging`, Hosting `34c246395d413c68`.
+Both compile `59d6712db57791defd268fcb8cac0e2cc098a3a7`; the pair differs only
+in the expected three Firebase configuration files. All 43 changed production
+files matched served bytes; 738 preceding delivered files are unchanged.
+
+Nine existing Functions are updated in each project. Their configuration/IAM,
+the other 75 Functions, Auth, project IAM and Hosting configuration were preserved.
+The additive blockedPlayers.uid index was READY before updated deleteAccount.
+Two disposable staging guests passed actual HTTPS Auth/rules/admission, private
+block writes/read denial and normal account deletion, including incoming blocks,
+consent and membership cleanup. The weekly room/owner survived; both guest
+accounts and their temporary tokens were removed. No email journey was repeated.
+
+The final account-transition review reproduced retained private social rows
+before new-account snapshots. The existing global subscription cleanup now clears
+friends, recent players, invites and owned rooms with their account. A ninth
+focused test proves clearing before block readiness, rejection of late old-account
+callbacks and acceptance of the new account's rows. This frontend-only follow-up
+preserves the qualified backend/rule/native inputs; see the verification record
+for its delivery scope. The exact final frontend identity and activation status
+are recorded in `output/research/location-default-play-2026-10-24/account-production-web-activated.json`;
+that follow-up does not change the qualified Function, rule or native inputs.
+
+Google registered the existing package and public signing certificate. Closed
+Alpha uses only the one-owner World Explorer list, feedback mailbox and unchanged
+signed Android code 3, with 177 countries/regions selected. Store wording and all
+15 closed-release/declaration changes were submitted; Google shows Changes in review. The existing two
+accurate compiled UI screenshots are retained; eight prepared gameplay replacements
+still require extension file URL permission. This does not qualify a physical
+phone or complete Google's genuine 12-person/14-day closed-testing requirement.
+
 The dense-city San Francisco initial/retry failure recorded in the feasibility
-assessment remains separate and is not repaired by switching defaults.
+assessment remains separate and is not repaired by switching defaults. No claim
+of complete worldwide interactive streaming, device performance or Google policy
+approval is made. Original dist, rollback bases, uploads, assets, history and all
+failed evidence remain; superseded packages have byte-verified recovery overlays.
 
 ## October 24 world-mode feasibility assessment
 

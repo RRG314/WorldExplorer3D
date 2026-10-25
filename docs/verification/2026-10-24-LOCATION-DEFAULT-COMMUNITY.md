@@ -1,6 +1,6 @@
 # Selected-location defaults and Play community readiness
 
-October 24, 2026. Candidate follow-up to the current b48 released web game.
+October 24, 2026. Released follow-up to the b48 web game; dated identities below distinguish the final account cleanup.
 
 ## Behavior and ownership
 
@@ -38,7 +38,7 @@ additive blockedPlayers.uid group index must be ready before updated deletion.
 
 ## Executed acceptance
 
-- Eight focused runtime components cover defaults, denied storage, preference
+- Nine focused runtime components cover defaults, denied storage, preference
   ownership before lazy runtime, consent concurrency/cancel/auth races, accepted
   versions, block filtering/readiness and backend missing/stale/current consent.
 - Five real Firestore rule cases cover private/versioned consent, pre-consent
@@ -71,7 +71,7 @@ browser helper closed only the test browsers; ordinary Chrome was preserved.
 
 ## Reusable bounded checks
 
-`npm run verify:community-safety` runs the eight components.
+`npm run verify:community-safety` runs the nine components.
 `npm run verify:community-safety:browser` starts isolated demo emulators, executes
 rules, then browser flows sequentially. Append `-- --browser-only` after unchanged
 rules have passed when only presentation changed. The demo guard prevents cloud
@@ -89,8 +89,7 @@ sharing switch changed. App pricing confirms Free; no merchant account created.
 
 Closed Alpha uses the existing one-owner World Explorer list and feedback email.
 The prepared unedited gameplay screenshots still need extension file URL access;
-the prior saved listing assets have not been replaced on the service. No review
-submission, public production access, broad tester invitations, physical-phone
+the prior saved listing assets have not been replaced on the service. Public production access, broad tester invitations, physical-phone
 installation or 12 genuine opted-in testers/14-day period is claimed.
 
 Nine existing backend functions require source-only activation: joinRoom,
@@ -101,3 +100,69 @@ other functions, each configured value/IAM, Auth and existing data. Stage the
 additive index, consent/block rules and matching web before gating those commands;
 verify preservation and protected source checks before production. Android code 3
 is unchanged; avoid a duplicate native build for web-only inputs.
+
+
+## Released server and web acceptance
+
+Protected PR127: head `59d6712db57791defd268fcb8cac0e2cc098a3a7`, merge
+`2e32273f2d5e46cbf39f26559e0e1ecb7da42a3d`; identical trees, required checks,
+security scans and all four stable workflows passed. The first CI failed only
+because the new consumer of the existing pinned Firestore SDK was absent from
+its reviewed inventory; that one consumer was added. No SDK version changed.
+
+Production: `5.6.1+59d6712db577.c1507cbdad82b91e.production`, Hosting
+`3b6cffd49531a588`; staging: `5.6.1+59d6712db577.8d8d82cdc6d2dde4.staging`,
+Hosting `34c246395d413c68`. The pair differs only in three Firebase config files.
+All 43 changed production files matched exact served bytes; 738 preceding files
+are unchanged. Actual compiled globe/Settings/room/sign-in/account gates passed.
+A stale hidden-tab test locator was corrected to the visible navigation rail;
+the failed receipt is retained. Local CAPTCHA/Firestore errors remain separate
+from that compiled UI acceptance; no new browser protected-auth pass is claimed.
+
+All nine scoped Functions are ACTIVE in both projects; each configuration/IAM,
+the other 75 functions, Auth and project IAM matched before snapshots. Hosting
+configuration was preserved. The additive block index was READY before deletion
+activation. Staging/production Function archives contain 51 identical source
+files (ZIP headers differ). No replay of the unchanged backend suite in production.
+
+Actual staging HTTPS with two disposable guests passed missing-consent denial,
+client-rule consent writes, weekly admission, private block writes and cross-user
+read denial. Both accounts removed through the normal updated deleteAccount
+endpoint; own consent/blocks, incoming block references and membership were
+removed, while the existing weekly room and owner remained. Cleanup had no errors;
+temporary test tokens were deleted. No shared chat spam or real-player edits.
+
+A final targeted source review then reproduced private social arrays surviving a
+direct account change until new snapshots. Four array clears were added to the
+existing global subscription cleanup. The actual runtime-owner test fails before
+the repair and passes after it, including block-snapshot-first ordering, late
+old-account callbacks and new-account rows. One cross-realm harness comparison
+failure remains retained. Only that new local case was executed; the unchanged
+eight components/rules/live service journeys were not replayed. Backend, rules,
+world/physics/native inputs remain unchanged for this frontend-only follow-up.
+
+Google package/certificate registration completed. Closed Alpha reuses code 3,
+177 selected regions and only the World Explorer one-owner tester list. Free
+pricing, truthful listing wording, Data safety and existing IARC/audience settings
+are saved. Existing two accurate UI screenshots are kept for first review; the
+eight actual gameplay replacements need the extension's file URL permission.
+No unrelated tester list, merchant account or broad invitation was added.
+
+Approving a tester in the existing World Explorer admin portal does not add their
+Google account to Play's tester list. Add approved testers' Play email addresses
+to the selected World Explorer list before issuing its closed-test opt-in link.
+The one-owner internal-test link remains the owner's immediate installation path.
+Google review, real Play-installed phone checks and genuine continuous opted-in
+closed testing are distinct external requirements, not simulated test passes.
+
+
+Google now shows **Changes in review** for all 15 submitted changes, including
+closed Alpha code 3 and the completed listing/declarations. Package registration
+is Registered. This is submission evidence, not Google approval or production
+access. The final frontend-only account cleanup's exact source/build, protected
+checks, parity and activation are recorded under the operational evidence folder
+as `source-account-switch.json`, `protected-account-release.json`,
+`account-package-parity.json` and `account-production-web-activated.json`.
+The already qualified Functions/rules/native binaries are not redeployed or
+retested for that four-line owner cleanup. The final source check confirms those
+inputs are byte-identical. Prior production/staging packages remain recoverable.

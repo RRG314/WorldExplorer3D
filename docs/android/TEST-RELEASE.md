@@ -202,3 +202,28 @@ The gameplay pack is prepared but file upload is blocked by the extension's
 file-URL permission. The owner has not installed code 3 yet. Actual Android
 installation/auth/resume/touch/progress/room checks and Google's real closed-test
 period remain outstanding; browser component checks are not substitutes.
+
+
+The initial location-default/community release is live through protected PR127;
+CURRENT-STATE and its verification record contain exact web/server identities.
+The later four-line account social-state cleanup changes only frontend inputs.
+Google registered `io.worldexplorer3d.app` with its existing Play signing key.
+Closed Alpha reuses code 3; the World Explorer owner-only list, feedback mailbox
+and 177 regions are configured. Its first review uses the two already saved,
+accurate compiled UI images. The eight gameplay replacements still require the
+extension's file URL access. Do not claim they were uploaded.
+
+For real testers: approving an application in the World Explorer admin portal
+sends the existing consented mail workflow but does not automatically modify Play
+email lists. Add their Google Play account emails to the selected World Explorer
+list before sending the closed-test opt-in URL. The existing owner internal link
+is immediately usable. Preserve 24-hour confirmation links and the already
+verified production email flow; do not resend its test messages for this web edit.
+
+
+Google now shows **Changes in review** for the 15-change closed Alpha submission,
+including code 3, current listing, Data safety and content declarations. Package
+and signing-certificate registration is Registered. No review approval, public
+production access or physical Android acceptance is claimed. Final frontend
+cleanup delivery receipts are in the location-default operational folder; no
+new Android binary is required.
