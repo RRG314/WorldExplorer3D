@@ -211,7 +211,7 @@ function initMobileControls() {
     target: window,
     getContext: () => {
       const mode = detectControlsMode();
-      return { mode: mode === 'driving' ? 'drive' : mode, blocked: controlsBlocked(mode) };
+      return { mode: mode === 'driving' ? 'drive' : mode, blocked: controlsBlocked(mode)||appCtx.vrPresentation?.headTracking===true };
     },
     onChange: syncVehicleTiltUi
   });

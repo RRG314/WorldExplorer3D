@@ -3,6 +3,9 @@ import { oceanStreamingPreference, writeOceanStreamingPreference } from '../ocea
 import { prepareProviderCredentials, setProviderCredential } from '../real-estate/provider-credentials.js';
 
 export function setupSettingsUi(appCtx) {
+  document.getElementById('vrSettingsBtn')?.addEventListener('click',()=>{
+    void appCtx.openVrSettings?.().catch(error=>appCtx.showToast?.(error.message||'VR setup could not open.'));
+  });
   document.getElementById('copySupportReceiptBtn')?.addEventListener('click', async () => {
     const status=document.getElementById('supportReceiptStatus');
     const preview=document.getElementById('supportReceiptPreview');

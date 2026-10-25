@@ -13,8 +13,8 @@ local commits until the release criteria are satisfied or independent work is
 exhausted against a concrete external constraint. Do not mark hardware/store
 acceptance complete from mocks or source inspection.
 
-Owner hardware is a phone-insert viewer, with no tracked headset or Apple test
-device. The owner created an Apple developer account; the live account page on
+Owner plans a phone-insert viewer but does not have its setup/calibration yet,
+and has no tracked headset or Apple test device. The owner created an Apple developer account; the live account page on
 October 25 shows enrollment **Pending**, with membership purchase still required.
 The owner has the payment handoff; implementation can continue independently.
 Support both phone stereo/orientation and
@@ -66,11 +66,36 @@ permission, recenter, rotation/visibility handling and stale/late-grant rejectio
 Ten frame-owner cases, five optics cases and four sensing cases pass; 24 affected
 existing simulation/render-lifecycle cases also pass. Repeated receipts overlap.
 
-These adapters still need connection to game mounts, in-headset controls, guided
-and manual input and a calibrated entry UI. Tracked WebXR metre conversion is
-not yet implemented. Continue the product goal; these components are not a
-completed VR mode. Evidence: phone-stereo-final/, runtime-affected-final.tap,
-optics-final.tap and head-frame-final.tap in the current product evidence folder.
+Phone VR now connects to the actual main-world camera/render phases and authored
+walking, car cabin and aircraft mounts. Calibration UI requires measured screen
+and viewer optics, requests motion permission in the entry gesture and starts
+paused. Body-anchored gaze Start/Pause, Recenter and Exit plus viewer-trigger
+selection work without head rotation steering the actor. Tracking loss blocks
+the same simulation frame and requires explicit restart; world, mode, actor,
+viewport, focus and permission cancellation release only owned resources.
+Existing normal controls return on exit. Flat UI uses the existing screen-layout
+owner, initialized before VR; screenshot inspection caught the missing lazy
+initialization after the first behavioral pass, and the corrected journey passes.
+
+Actual Baltimore game browser verification passed with real WebGL/physics,
+synthetic orientation and illustrative optics: calibrated entry, paused stereo,
+gaze Start, prescribed driving input, gaze Exit, lifecycle cleanup and portrait
+return, with no page, console or resource errors. Stereo and return screenshots
+were inspected. This is not physical lens, comfort or phone performance evidence.
+Four phone-session cases and 23 affected core render cases pass (27 distinct;
+21 of those core cases predate this change). An initial core run caught a flat
+pause regression, fixed before browser verification. Browser failures from a
+transient tutorial and invalid test-form precision are retained.
+
+Tracked headset view conversion now has five math cases for physical translation,
+depth, repeated reads, parallel/canted-eye culling and invalid transforms. It is
+not connected to a WebXR session yet. Guided travel, separate space/ocean renderer
+handoffs, tracked session/input, native widgets and the remaining Portal product
+work are still required. Continue the active goal beyond this local commit.
+Evidence: phone-game-first/ (failed), phone-game-second/ (failed),
+phone-game-third/ (behavior pass with visual defect), phone-game-layer-final/,
+phone-integration-contracts.tap (failed), phone-integration-fixed.tap,
+xr-views-first.tap, plus the earlier component receipts in the same folder.
 
 ## October 25 Living Portal shared quality foundation
 

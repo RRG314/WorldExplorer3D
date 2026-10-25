@@ -103,9 +103,11 @@ const runtimeKernel = createRuntimeKernel({
   isSuspended: dedicatedRendererActive,
   isSimulationPaused: () => appCtx.paused || globalThis.document?.hidden === true,
   onSuspendedFrame: ({ timestamp }) => {
+    appCtx.vrPresentation?.guard?.();
     appCtx.lastTime = timestamp;
   },
   onSystemError: ({ error, system }) => {
+    appCtx.vrPresentation?.stop?.('runtime-error');
     console.error(`[runtime] System failed: ${system.id}`, error);
     globalThis.dispatchEvent?.(new CustomEvent('we3d:runtime-system-error', {
       detail: { system, message: error instanceof Error ? error.message : String(error) }

@@ -25,7 +25,8 @@ the work does not stop at another architecture checkpoint.
 
 ## Current external constraints
 
-Owner has a phone-insert viewer, no tracked headset and no Apple test device.
+Owner plans a phone-insert viewer but does not have its setup/calibration yet;
+there is no tracked headset or Apple test device.
 Owner created an Apple account during this work. Live developer account shows
 enrollment Pending and membership purchase required (October 25); owner payment
 handoff is open. Signing/store access is not yet confirmed. Mac has 8 GiB RAM,
@@ -108,7 +109,30 @@ acceptance. Continue implementation after the local commit.
   cleanup. Geometry, texture and lifecycle resources return to baseline.
   Inspected stereo image. Controlled scene is not gameplay, lens calibration,
   frame pacing or physical comfort acceptance. Adapters still need actual game
-  mounts/UI/actions/guidance and tracked WebXR conversion/session integration.
+  mounts/UI/actions/guidance and tracked WebXR conversion/session integration at
+  that commit; the connected phone slice is recorded below.
+
+- Connected phone VR: measured calibration/permission UI, main-world walking,
+  cabin and aircraft mounts, gaze Start/Pause/Recenter/Exit and trigger selection.
+  Main input/camera/render phases delegate while VR owns the view. Stale tracking
+  blocks the same simulation frame and requires explicit restart; mode, actor,
+  world, viewport and late-permission handoffs dispose their own resources.
+  Tilt steering is suspended while head tracking owns orientation. Existing
+  flat pause, vehicle physics, admission and portrait return are preserved.
+  Four session cases and 23 affected core cases pass. The first run caught a flat
+  pause regression, fixed; failed evidence is retained. Five tracked-view math
+  cases pass for metre conversion, repeated reads and canted-eye culling.
+- Actual selected-city browser journey: Baltimore WebGL/physics plus synthetic
+  orientation/illustrative optics passes entry, stationary stereo, gaze Start,
+  prescribed driving, gaze Exit, exact lifecycle cleanup and portrait return.
+  No page/console/resource errors. Inspected screenshots exposed flat UI covering
+  stereo despite a behavior pass: initialize the existing lazy screen-layout
+  service before VR, then require hidden controls in the corrected browser run.
+  Failed tutorial-click and form-precision fixtures were diagnosed, corrected
+  and retained. Final receipt: phone-game-layer-final/. This is desktop Chrome
+  touch emulation, not physical optics, comfort or phone/headset performance.
+  Tracked sessions/input, guidance, other renderer domains and native clients
+  remain active product work. Continue after committing this connected slice.
 
 Additional primary source evidence used in implementation:
 https://github.com/googlevr/cardboard/blob/master/proto/cardboard_device.proto,

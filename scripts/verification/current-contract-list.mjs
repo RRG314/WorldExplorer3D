@@ -65,6 +65,8 @@ export const currentContractTests = [
   'tests/runtime-frame-source-current.test.mjs',
   'tests/phone-optics-current.test.mjs',
   'tests/phone-head-tracking-current.test.mjs',
+  'tests/phone-vr-session-current.test.mjs',
+  'tests/xr-world-views-current.test.mjs',
   'tests/terrain-source-ownership-current.test.mjs',
   'tests/regional-source-recovery-current.test.mjs',
   'tests/regional-road-coverage-current.test.mjs',

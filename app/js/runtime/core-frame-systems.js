@@ -33,7 +33,8 @@ function createCoreFrameSystems(appCtx, hooks = {}) {
       owner: 'engine',
       phase: 'input',
       enabled: () => !!appCtx.gameStarted && !appCtx.worldLoading && !appCtx.titleLaunchPending,
-      update() {
+      update(frame) {
+        appCtx.vrPresentation?.beforeInput?.(frame);
         appCtx.updateControlInput?.();
       }
     },
@@ -111,7 +112,7 @@ function createCoreFrameSystems(appCtx, hooks = {}) {
       phase: 'camera',
       enabled: () => !!appCtx.gameStarted && !appCtx.worldLoading && !appCtx.titleLaunchPending,
       update(frame) {
-        appCtx.updateCamera(frame.dt);
+        if(!appCtx.vrPresentation?.active||appCtx.vrPresentation.updateCamera(frame)===false)appCtx.updateCamera(frame.dt);
         appCtx.updatePlanetarySky?.();
       }
     },
@@ -201,7 +202,8 @@ function createCoreRenderSystem(appCtx, shouldUseComposer) {
     graphicsEvidence?.begin();
     const restoreWaterPresentation=beginSwimmingRender(appCtx);
     try {
-      if (shouldUseComposer()) appCtx.composer.render();
+      if (appCtx.vrPresentation?.active) appCtx.vrPresentation.render();
+      else if (shouldUseComposer()) appCtx.composer.render();
       else appCtx.renderer.render(appCtx.scene, appCtx.camera);
       appCtx.recordPerfRendererInfo?.(appCtx.renderer);
     } finally {restoreWaterPresentation?.();graphicsEvidence?.end();}
@@ -248,7 +250,7 @@ function createCoreRenderSystem(appCtx, shouldUseComposer) {
     // partial city batches competes with compilation and uploads them early.
     // Manual pause retains the last frame beneath its dimmed dialog. Network
     // listeners and lease heartbeats remain alive without redrawing the city.
-    enabled: (frame) => frame?.manualRender !== false && activePresentationOwner(appCtx)==='main' && !appCtx.worldLoading && !appCtx.titleLaunchPending && !appCtx.hasPauseReason?.('manual_pause'),
+    enabled: (frame) => frame?.manualRender !== false && activePresentationOwner(appCtx)==='main' && !appCtx.worldLoading && !appCtx.titleLaunchPending && (!appCtx.hasPauseReason?.('manual_pause')||appCtx.vrPresentation?.active===true),
     update() {
       draw();
     }

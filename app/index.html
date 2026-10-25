@@ -21,6 +21,7 @@ if (location.protocol === 'file:') document.documentElement.classList.add('unsup
 </style>
 <link rel="icon" href="../favicon.svg" type="image/svg+xml">
 <link rel="manifest" href="manifest.webmanifest">
+<link rel="stylesheet" href="vr.css?v=1">
 <script defer src="install-support.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@400;500;600;700&family=Orbitron:wght@500;700;900&family=Righteous&display=swap" rel="stylesheet">
 <script src="../js/firebase-project-config.js"></script>
@@ -1612,6 +1613,7 @@ How Connected Data Is Used
 </aside>
 <div id="controlsTab" aria-hidden="true"><div id="ctrlHeader" aria-expanded="false" aria-controls="ctrlContent">⚙️ Driving Mode ▼</div><div id="ctrlContent" class="hidden" aria-hidden="true">
 <section id="mobileControlSettings" aria-label="Mobile control settings">
+<button id="vrSettingsBtn" type="button">Virtual reality · viewer setup</button>
 <div class="mobileControlSettingsHead"><strong>Mobile Controls</strong><button id="mobileControlsReset" type="button">Reset</button></div>
 <label><span>Layout</span><select id="mobileControlsHandedness"><option value="standard">Standard · move left</option><option value="southpaw">Southpaw · move right</option></select></label>
 <label><span>Move sensitivity</span><input id="mobileMoveSensitivity" type="range" min="45" max="150" step="5" value="100"><output id="mobileMoveSensitivityValue">100%</output></label>

@@ -145,6 +145,10 @@ function registerPlatformServices() {
             return mod;
         }
     });
+    platformServices.register({
+        id:'virtual-reality',category:'presentation',
+        load:async()=>{const mod=await import('./vr/platform.js');return mod.createVrPlatform(appCtx);}
+    });
 }
 
 function ensurePlatformService(id) {
@@ -358,6 +362,7 @@ function registerLazySubsystemEntrypoints() {
     appCtx.scheduleActivityDiscoveryWarmup = scheduleActivityDiscoveryWarmup;
     appCtx.ensurePlatformService = ensurePlatformService;
     appCtx.openArExperience = async (request = {}) => {
+        if(appCtx.vrPresentation?.active){appCtx.showToast?.('Exit VR before opening AR.');return false;}
         const mod = await ensurePlatformService('augmented-reality');
         const platform = mod.initArPlatform?.(appCtx);
         return platform?.open?.(request) ?? false;
@@ -370,6 +375,8 @@ function registerLazySubsystemEntrypoints() {
     appCtx.getArPlatformSnapshot = () => platformServices.peek('augmented-reality')?.getArPlatformSnapshot?.() || {
         type: 'ArPlatformSnapshot', phase: 'idle', active: false
     };
+    appCtx.openVrSettings=async()=>{const platform=await ensurePlatformService('virtual-reality');return platform.openSettings();};
+    appCtx.getVrSnapshot=()=>platformServices.peek('virtual-reality')?.snapshot()||{active:false,kind:null};
     appCtx.getPlatformServicesSnapshot = () => platformServices.snapshot();
     appCtx.getAccountUserId = () => {
         const user = platformServices.peek('account')?.getUser?.();
