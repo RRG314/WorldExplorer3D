@@ -76,3 +76,37 @@ A minimal installed-Chrome reproduction confirms `innerWidth`/scrollWidth stays
 existing auxiliary renderer owners now bound their own canvases to the viewport.
 The layout check requires the requested viewport width as well as hit targets.
 Original failed evidence is retained; no overall staging pass is claimed yet.
+
+## Final acceptance and delivery
+
+The corrected frozen candidate is source `52d5f246f5add2c7eb6066fcb9bafc8d40105d61`.
+39 focused control cases and 11 existing renderer/lifecycle cases passed. Source
+and ownership checks passed. Ordinary staging completed all six vehicle checks,
+but its overall run failed on an external `reCAPTCHA Timeout (o)`; keep that result.
+The supported registered staging App Check test provider then qualified the exact
+compiled artifact on loopback, with actual staging services, all six checks and
+zero page/console errors. The temporary credential was revoked and removed.
+These are synthetic sensor samples in desktop Chrome, not physical-phone feel.
+
+Actual car, aircraft and rendered spacecraft gameplay screenshots were inspected.
+The supplied skill's choreography used the existing owned renderer and frame hook.
+No source changes occurred while measuring. No original game-wide, native or
+historical city performance sequence was repeated.
+
+PR131 passed required checks and merged as `358dfd3a673d541bd1fd6faaeba42470dd137a25`;
+the reviewed and merged trees match. Production build is
+`5.6.1+52d5f246f5ad.25a6fdc42a0cb4c1.production`, Hosting `ab107ddad5effe6a`.
+Staging is `5.6.1+52d5f246f5ad.1f94b7fc123029fc.staging`, Hosting `d654414d6d60fe66`.
+The artifacts differ only in the three expected Firebase environment files.
+All 15 changed production files match served bytes; 766 preceding files,
+all world assets and Hosting configuration are preserved. Native version 4 needs
+no rebuild: close/reopen the installed app to fetch the hosted game update.
+
+`qualification.json`, `protected-release.json`, `parity.json`,
+`production-live-bytes.json` and the activation receipts in the evidence directory
+bind this acceptance. Original failed attempts remain. Superseded current/staging
+packages have full hash-verified recovery overlays, retaining all four existing
+basis/raw package slots. Source/dist/assets/history/player data are preserved.
+
+A new body-parser security advisory surfaced during source publication; it is
+tracked as a separate backend dependency repair, not resolved by this frontend.
