@@ -55,7 +55,8 @@ Evidence: `output/research/mobile-vehicle-controls-2026-10-25/`.
   other resource failure, console error or page exception still fails the run.
 - Actual car, portrait/landscape, permission, aircraft and space screenshots were
   opened and inspected. The prescribed game-client action choreography ran in
-  the same existing world. Owned browsers and servers were closed.
+  the same existing world. Owned browsers and servers were closed. A deliberate missing-engine check
+  also exits as failed and closes its owned server without loading a world.
 
 Acceptance combines the completed WebKit gameplay checks with the isolated
 routing/codec proofs and the clean Chrome run. It does not claim a clean full

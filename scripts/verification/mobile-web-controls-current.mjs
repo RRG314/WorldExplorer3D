@@ -19,10 +19,11 @@ assert.ok(process.env.WE3D_STAGING_APP_CHECK_FILE, 'Use a temporary registered s
 const server = await startStaticServer({ rootDir: path.resolve(process.env.WE3D_VERIFY_ROOT), ports: [4536], handleRequest: createStagingGatewayHandler() });
 const base = `http://127.0.0.1:${server.port}`;
 const engine = name === 'webkit' ? webkit : chromium;
-const owned = await engine.launchServer({ headless: true, ...(name === 'chromium' ? { channel: 'chrome', args: ['--js-flags=--max-old-space-size=1536'] } : {}) });
+let owned;
 const report = { passed: false, engine: name, scope: 'Regular mobile website without Play distribution; desktop browser engines with touch viewport and synthetic sensors, staging attestation. Not physical Android/iOS qualification.', checks: [], pageErrors: [], consoleErrors: [], resourceFailures: [] };
 let page;
 try {
+  owned = await engine.launchServer({ headless: true, ...(name === 'chromium' ? { channel: 'chrome', args: ['--js-flags=--max-old-space-size=1536'] } : {}) });
   const browser = await engine.connect(owned.wsEndpoint());
   const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 1 });
   page = await context.newPage(); page.setDefaultTimeout(15000);
@@ -182,6 +183,9 @@ try {
 } catch (error) {
   report.failure = error.stack; process.exitCode = 1; await page?.screenshot({ path: `${out}/failed.png` }).catch(() => {});
 } finally {
-  await closeOwnedBrowser(owned); await server.close(); report.ownedBrowserClosed = true;
-  await fs.writeFile(`${out}/report.json`, JSON.stringify(report, null, 2)); console.log(JSON.stringify(report));
+  try { if (owned) await closeOwnedBrowser(owned); report.ownedBrowserClosed = true; }
+  catch (error) { report.passed = false; report.cleanupFailure = error.message; process.exitCode = 1; }
+  finally { await server.close(); report.ownedServerClosed = true; }
+  await fs.writeFile(`${out}/report.json`, JSON.stringify(report, null, 2));
+  console.log(JSON.stringify({ passed: report.passed, engine: name, checks: report.checks.map(c => c.id), pageErrors: report.pageErrors, consoleErrors: report.consoleErrors, failure: report.failure?.split('\n')[0], report: `${out}/report.json` }));
 }

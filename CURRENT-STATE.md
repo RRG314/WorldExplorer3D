@@ -23,18 +23,30 @@ coverage does not qualify physical Android/iPhone sensor feel or every old OS.
 See `docs/verification/2026-10-25-MOBILE-WEB-CONTROLS.md`. The Play package and
 production game identity below remain unchanged.
 
-## October 25 server request-parser security — candidate
+## October 25 server request-parser security — released
 
-A newly surfaced availability advisory affects body-parser 1.20.6 in the Functions
-lockfile. An isolated owned HTTP process reproduces the old crash; the compatible
-1.20.9 patch survives it. Four focused cases pass and the production dependency
-audit reports zero findings. No malformed requests were sent to live services.
-Only that transitive package changes; game/Function code is unchanged. Cloud
-configuration, IAM and source recovery are being captured before staging/prod
-updates. The wildcard inventory returned 503; existing us-central1 lists all 84
-Functions ACTIVE. See `docs/verification/2026-10-25-REQUEST-PARSER-SECURITY.md`.
-Source protection and cloud deployment are still pending; the vehicle release
-below does not itself resolve this backend advisory.
+Protected PR132 merged as 249fa2b6655d640fbbb2820476246d564e487dbb from reviewed
+fa09fdb39981f29ed87c81b1f77addaf2e4f4c67; required checks passed and trees match.
+The compatible body-parser 1.20.6 → 1.20.9 patch resolves the identified
+GHSA-27r3-jxmh-p828 process-crash advisory. Four focused parser cases pass and the
+production dependency audit reports zero findings. GitHub marks the alert fixed.
+No malformed request was sent to live services.
+
+All 84 existing Functions in staging and production are updated and ACTIVE. Each
+existing source archive received only the reviewed lock entry; all other business
+files and dependencies stay byte-identical. Four staging and five production
+active source groups match downloaded archive hashes. Every Function's immutable
+configuration/IAM and Auth/project IAM/rules/Hosting are preserved. Source/config
+recovery stays private. Final production HTTP checks return expected 200/405/401.
+
+A queued production build hit a resource limit. Only that service was retried;
+its expired upload URL was refreshed from the identical qualified archive before
+the successful retry. The other 83 updates were retained. Initial inventory,
+ZIP, CI, premature staging audit and cloud-build failures remain recorded.
+See `docs/verification/2026-10-25-REQUEST-PARSER-SECURITY.md` and
+`output/research/request-parser-security-2026-10-25/` for exact preservation,
+protected-source, source-group and HTTP receipts. This server patch does not
+change the web game, Android package or player data.
 
 ## October 25 mobile vehicle controls — released
 

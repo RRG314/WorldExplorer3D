@@ -31,8 +31,8 @@ Evidence directory: `output/research/request-parser-security-2026-10-25/`.
   existing us-central1 region returns all 84 functions ACTIVE. Retain the failed
   request; regional source/configuration/IAM/rollback snapshots precede updates.
 
-Protected source review and staged/live deployment remain pending at this source
-checkpoint. A clean dependency audit is not an absolute security guarantee or a
+At the initial source checkpoint, protected review and staged/live deployment
+were pending; the completed delivery is recorded below. A clean dependency audit is not an absolute security guarantee or a
 claim to have tested every game or backend feature again.
 
 ## Review and deployment preparation follow-up
@@ -52,9 +52,58 @@ its existing root dependencies (including older versions without Svix), every
 other package and every other archived file are preserved. The existing qs
 6.16.0 satisfies the fixed parser requirement. This avoids promoting unrelated
 newer business code to functions deliberately left at older source versions.
-The first staging public-stats update completed; broader rollout is pending.
+The first staging public-stats update preceded the broader rollout recorded below.
 
 The owner additionally requires normal phone-browser control coverage. Add
 explicit mobile-web verification across browser engines and the Safari user-gesture
 permission path; keep physical-device claims separate. Game bytes remain the
 qualified source 52d5f24 unless a demonstrated browser defect requires a repair.
+
+## Completed delivery
+
+Protected PR132 passed all required checks and merged normally as
+`249fa2b6655d640fbbb2820476246d564e487dbb`, from head
+`fa09fdb39981f29ed87c81b1f77addaf2e4f4c67`. Reviewed and merged trees match.
+GitHub marks Dependabot alert 1 fixed. Source production-dependency audit has
+zero findings; this is an identified dependency repair, not a promise of
+absolute security.
+
+All 84 existing staging Functions and all 84 production Functions are updated
+and ACTIVE. Every immutable Function configuration and IAM policy is preserved;
+Auth, project IAM, Firestore rules and Hosting are unchanged. Every updated
+version ID changed. Downloads from representatives of all four staging and five
+production source groups match the exact reviewed patched-archive hashes.
+Each upload preserves all archived files other than package-lock.json, and only
+the body-parser package entry changes within that lockfile. Original source and
+configuration recovery remain private and owner-readable only.
+
+The staging audit started before the final operation finished and correctly
+rejected its unchanged version; the final audit after all operations finished
+passes. A queued production build for claimExplorerDiscovery was cancelled with
+resource-exhaustion code 8. Only that service was retried. Its first resubmission
+rejected the now-expired signed upload URL with code 3, before a build started.
+The exact previously qualified archive was rehashed and reuploaded under a fresh
+URL, then the single service completed. The other 83 successful updates were
+retained, and both failed operation records/logs are preserved. No whole rollout,
+world test matrix or game build was restarted.
+
+Production's final normal HTTP checks return public stats GET 200, stats POST
+405 and unauthenticated joinRoom 401. Staging's equivalent checks pass. These
+are normal reads/admission rejection; no account, player data, email or payment
+mutation is part of this verification. The isolated gzip reproducer never ran
+against either live project.
+
+Primary receipts in the evidence directory:
+
+- protected-release.json: reviewed head, merge, required checks and tree parity.
+- staging-preservation.json and production-preservation.json: final ownership,
+  configuration/IAM, version and representative live archive checks.
+- staging-prepared.json and production-prepared.json: exact archive/lock hashes
+  and preserved-file proofs, with no private source contents or signed URLs.
+- production-operations.json and production-retry*.json: original failures,
+  narrowly resumed update and final ownership trail.
+- staging-http-after.json and production-http-after.json: expected HTTP behavior.
+
+The separately released vehicle game bytes and native version 4 stay unchanged.
+Ordinary mobile-browser coverage is recorded in the mobile-web verification
+record; it does not require another Hosting or Play build.
