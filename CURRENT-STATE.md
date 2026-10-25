@@ -4,7 +4,25 @@ Updated October 25, 2026. Use the latest sections below for current identities;
 dated sections further down retain historical evidence. The owner has authorized
 necessary production/protected-source work; do not ask again for that scope.
 
-## October 25 Android startup crash — version 4 candidate verified
+## October 25 mobile vehicle controls — candidate in verification
+
+The owner reports successful Motorola startup after Play version 4, then difficult
+car steering. The candidate separates horizontal progressive steering from car
+pedals, reduces mobile steering authority at road speeds, and introduces explicit
+opt-in calibrated screen-relative tilt for cars, aircraft and spacecraft through
+the existing action reader. Optional car tilt speed uses service braking; flight
+keeps independent speed buttons. Motion stays on-device. Sensor freshness,
+permission cancellation and input-context lifecycle are owned; there is no new
+scheduler or position writer. Touch, keyboard and controller fallbacks remain.
+A guarded input-frame refresh now restores mobile controls after readiness and
+suspends them at blocking overlays. World/admission/save/native contracts stay intact.
+
+Focused control tests and actual source-browser car checks are recorded under
+`output/research/mobile-vehicle-controls-2026-10-25/`. Initial test-harness failures
+and local App Check errors are retained. These do not qualify a release, live
+backend or physical sensor feel; frozen/staging verification is still pending.
+
+## October 25 Android startup crash — version 4 internal test released
 
 The owner reported the Play-installed app repeatedly stopping on a Motorola g
 play (approximately 2026). The unchanged version 3 launcher reproduced a native
@@ -32,13 +50,32 @@ The initial PR inventory failure (missing registration) is retained too.
 Native candidate source is `1e644245ba11df70059954c2f6a92134a35128b7`, build
 40162826077. Signed AAB SHA-256 is
 `8f8595385fa25821449341ec83adfc4c2715fc258bf540ece8e4f1da2e203a55`.
-The version 4 Console upload/activation is still pending; do not call code 3 fixed
-or ask the owner to reinstall it. Browser-extension file URL access was previously
-disabled and has been requested for the concrete AAB upload. Do not bypass that
-capability restriction. Code 3 remains the internal-track release and closed Alpha
-is still under review unless a later operational receipt confirms replacement.
+The owner enabled the extension's file URL setting. The unchanged signed bundle
+was rehashed, uploaded, accepted and published October 25 at 9:09 AM Eastern to
+internal track `4701521177239633849`, release 4. Console confirms Active and
+Available to internal testers; code 3 is excluded, supported-device counts are
+unchanged, and the existing tester selection and opt-in link are preserved:
+https://play.google.com/apps/internaltest/4701521177239633849 . Google advises
+that the update usually appears within an hour, occasionally longer. Update to
+`5.6.1-test.4`; do not reinstall broken code 3 or use the upload-key APK as a Play
+update. The owner confirms October 25 that Play version 4 updated successfully and the game now opens on their Motorola. Their next report concerns difficult touch car steering; this confirms startup, not all-mode phone performance.
+
+Closed Alpha's code 3 pause became effective. The exact same code 4 bundle was
+added from the library, with code 3 excluded. Its rollout and track resumption
+were submitted together. Google now confirms Changes in review for four changes:
+code 4, resumption, the saved selected-location full description and eight actual
+gameplay phone screenshots. The prepared, hash-verified screenshot set replaces
+the two menu images and covers Monaco, Baltimore, Las Vegas, aircraft, driving,
+research vessel, submarine, spaceflight and Mars. Existing icon/feature-graphic
+AI labels are preserved; the real gameplay images are not labelled AI-generated.
+This is submitted closed testing, not Google approval or public Android release.
+PR130 passed all required checks and merged normally using the repository's
+required squash method as `8e33229d96dac0ebb1c119b93fb0eeda32c0cf92`; its tree
+equals the reviewed head. All four post-merge workflows also passed. No new native
+build or repeat game sweep was run for the upload or documentation updates.
 See [the focused repair record](docs/verification/2026-10-25-ANDROID-LAUNCH-CRASH.md)
-and `output/research/android-launch-crash-2026-10-25/` for all failed evidence.
+and `output/research/android-launch-crash-2026-10-25/play-version-4-delivery.json`
+for the latest receipt. Earlier failed and blocked evidence remains in that folder.
 No game-wide sweep, web/backend redeployment or new signing key is needed.
 
 ## October 24 selected-location defaults and community safety — released

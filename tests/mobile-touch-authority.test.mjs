@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
+  mobileDrivingSteeringGain,
   normalizeMobileStick,
   normalizeMobileTouchSettings,
   resolveMobileCameraRecenter,
@@ -36,10 +37,11 @@ test('walking uses a left movement stick and independent right camera stick', ()
   assert.ok(actions.lookPitch < 0, 'dragging up must raise the view');
 });
 
-test('driving maps the left stick to throttle and steering', () => {
+test('driving separates horizontal steering from independent pedals', () => {
   const actions = resolveMobileSemanticActions('drive', {
     enabled: true,
     move: { x: 0.8, y: -0.75, active: true },
+    pedals: { throttle: 1, reverse: 0 },
     look: { x: 0, y: 0, active: false }
   });
   assert.ok(actions.move > 0);
@@ -86,10 +88,32 @@ test('walking response curve preserves direction and lowers only partial magnitu
   assert.ok(Math.abs(shapeMobileStick(normalizeMobileStick(0, -1, 0.14), 1.45).magnitude - 1) < 1e-9);
 });
 
-test('vehicle response remains linear and separate from walking tuning', () => {
-  const vehicle = resolveMobileSemanticActions('drive', {
+test('boat response remains linear and separate from walking and driving tuning', () => {
+  const vehicle = resolveMobileSemanticActions('boat', {
     enabled: true,
     move: { x: 0, y: -0.4, active: true }
   });
   assert.ok(vehicle.move > 0.32 && vehicle.move < 0.34);
+});
+
+
+test('car steering is precise around center and retains full lock with either pedal', () => {
+  const drive = (x, y, pedals) => resolveMobileSemanticActions('drive', { move: { x, y, active: true }, pedals });
+  const small = drive(.3, -1, { throttle: 1 });
+  assert.ok(small.steer < -.08 && small.steer > -.13);
+  assert.equal(small.move, 1);
+  for (const y of [-1, 0, 1]) {
+    assert.equal(drive(1, y, { throttle: 1 }).steer, -1);
+    assert.equal(drive(-1, y, { reverse: 1 }).steer, 1);
+  }
+  assert.equal(drive(0, -1, {}).move, 0, 'steering pad cannot accidentally accelerate');
+});
+
+
+test('mobile driving retains parking lock and progressively reduces steering at road speeds', () => {
+  assert.equal(mobileDrivingSteeringGain(0), 1);
+  assert.equal(mobileDrivingSteeringGain(12), 1);
+  assert.ok(mobileDrivingSteeringGain(36) > .7 && mobileDrivingSteeringGain(36) < .75);
+  assert.ok(Math.abs(mobileDrivingSteeringGain(60) - .45) < 1e-9);
+  assert.equal(mobileDrivingSteeringGain(-36), mobileDrivingSteeringGain(36));
 });

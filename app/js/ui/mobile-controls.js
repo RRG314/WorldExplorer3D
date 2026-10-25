@@ -4,7 +4,7 @@ import { canUseEquippedItemOnMobile } from './equipment-action-policy.js?v=1';
 
 const MOBILE_CONTROL_PROFILES = {
   driving: {
-    moveLabel: 'Drive',
+    moveLabel: 'Steer',
     lookLabel: 'Look',
     move: {
       up: { channel: 'earth', key: 'ArrowUp' },
@@ -18,7 +18,7 @@ const MOBILE_CONTROL_PROFILES = {
       left: { channel: 'earth', key: 'KeyA' },
       right: { channel: 'earth', key: 'KeyD' }
     },
-    actions: [{ label: 'Brake', binding: { channel: 'earth', key: 'Space' } }]
+    actions: [{ label: 'Handbrake', binding: { channel: 'earth', key: 'Space' } }]
   },
   boat: {
     moveLabel: 'Throttle',
@@ -152,7 +152,7 @@ const MOBILE_CONTROL_PROFILES = {
 };
 
 const MOBILE_CONTROL_GUIDANCE = {
-  driving: ['Driving', 'Throttle · steer', 'Look', 'Brake'],
+  driving: ['Driving', 'Steer left · right', 'Look · pedals', 'Handbrake'],
   boat: ['Boat', 'Throttle · steer', 'Look', 'Brake'],
   walking: ['Walking', 'Move', 'Look', 'Jump · Run'],
   skydiving: ['Skydiving', 'Steer · flare', 'Look', 'Deploy parachute'],
@@ -197,6 +197,25 @@ function initMobileControls() {
   const mobileControlLeftSummary = document.getElementById('mobileControlLeftSummary');
   const mobileControlRightSummary = document.getElementById('mobileControlRightSummary');
   const mobileControlActionSummary = document.getElementById('mobileControlActionSummary');
+  const mobileDrivePedals = document.getElementById('mobileDrivePedals');
+  const mobileTiltEnable = document.getElementById('mobileTiltEnable');
+  const mobileTiltRecenter = document.getElementById('mobileTiltRecenter');
+  const mobileTiltQuickRecenter = document.getElementById('mobileTiltQuickRecenter');
+  const mobileTiltStatus = document.getElementById('mobileTiltStatus');
+  const mobileTiltSensitivity = document.getElementById('mobileTiltSensitivity');
+  const mobileTiltSensitivityValue = document.getElementById('mobileTiltSensitivityValue');
+  const mobileTiltSpeed = document.getElementById('mobileTiltSpeed');
+  let focused = true;
+  let previousInputContext = '';
+  const tiltInput = appCtx.initVehicleTiltInput?.({
+    target: window,
+    getContext: () => {
+      const mode = detectControlsMode();
+      return { mode: mode === 'driving' ? 'drive' : mode, blocked: controlsBlocked(mode) };
+    },
+    onChange: syncVehicleTiltUi
+  });
+  mobileControlScope.defer(() => tiltInput?.dispose());
   const mobileHoldButtons = [
     'mobileMoveUp',
     'mobileMoveLeft',
@@ -265,6 +284,8 @@ function initMobileControls() {
     mobileActivePointers.clear();
     analogPadPointers.clear();
     appCtx.clearMobileTouchInput?.('mobile-controls-cleared');
+    tiltInput?.suspend();
+    mobileDrivePedals?.querySelectorAll('button').forEach(button => { button.classList.remove('active'); button.dispatchEvent(new Event('mobile-input-reset')); });
     [mobileMovePad, mobileLookPad].forEach((pad) => {
       pad?.classList.remove('active');
       const knob = pad?.querySelector('.mobilePadLabel');
@@ -285,10 +306,11 @@ function initMobileControls() {
       const radius = Math.max(32, Math.min(bounds.width, bounds.height) * 0.48);
       const rawX = (event.clientX - activePointer.originX) / radius;
       const rawY = (event.clientY - activePointer.originY) / radius;
-      const length = Math.hypot(rawX, rawY) || 1;
+      const steeringOnly = kind === 'move' && detectControlsMode() === 'driving';
+      const length = (steeringOnly ? Math.abs(rawX) : Math.hypot(rawX, rawY)) || 1;
       const scale = length > 1 ? 1 / length : 1;
       const x = rawX * scale;
-      const y = rawY * scale;
+      const y = steeringOnly ? 0 : rawY * scale;
       appCtx.setMobileTouchPad?.(kind, x, y, true, performance.now());
       const knob = pad.querySelector('.mobilePadLabel');
       if (knob) knob.style.transform = `translate(${(x * radius * 0.52).toFixed(1)}px, ${(y * radius * 0.52).toFixed(1)}px)`;
@@ -382,6 +404,10 @@ function initMobileControls() {
     if (mobileLookSensitivity) mobileLookSensitivity.value = String(Math.round(settings.lookSensitivity * 100));
     if (mobileLookSensitivityValue) mobileLookSensitivityValue.value = `${Math.round(settings.lookSensitivity * 100)}%`;
     if (mobileCameraRecenter) mobileCameraRecenter.checked = settings.cameraRecenter !== false;
+    if (mobileTiltSensitivity) mobileTiltSensitivity.value = String(Math.round(settings.tiltSensitivity * 100));
+    if (mobileTiltSensitivityValue) mobileTiltSensitivityValue.value = `${Math.round(settings.tiltSensitivity * 100)}%`;
+    if (mobileTiltSpeed) mobileTiltSpeed.checked = settings.tiltSpeed === true;
+    syncVehicleTiltUi();
     if (mobileTouchControls) mobileTouchControls.dataset.handedness = settings.handedness;
   }
 
@@ -500,13 +526,67 @@ function initMobileControls() {
     return 'driving';
   }
 
-  function updateMobileTouchControls(mode = detectControlsMode()) {
-    if (!mobileTouchControls || !isTouchPreferredClient) return;
-    updateMobileControlGuidance(mode);
-    const titleVisible = !document.getElementById('titleScreen')?.classList.contains('hidden');
+  function controlsBlocked(mode) {
     const inSpaceFlight = mode === 'rocket';
-    const controlsExpanded = !!(ctrlContent && !ctrlContent.classList.contains('hidden'));
-    const blocked = titleVisible || !appCtx.gameStarted || (appCtx.paused && !inSpaceFlight) || (!inSpaceFlight && appCtx.showLargeMap) || (!inSpaceFlight && controlsExpanded);
+    return !focused || document.hidden || !appCtx.gameStarted || appCtx.worldLoading || appCtx.titleLaunchPending ||
+      !document.getElementById('titleScreen')?.classList.contains('hidden') ||
+      (appCtx.paused && !inSpaceFlight) || document.getElementById('pauseScreen')?.classList.contains('show') || (!inSpaceFlight && appCtx.showLargeMap) ||
+      !ctrlContent?.classList.contains('hidden') || document.body.classList.contains('game-panel-layer-open') ||
+      document.body.classList.contains('space-flight-hud-expanded') || appCtx.fishingGame?.open || appCtx.blockBuildMode;
+  }
+
+  function syncVehicleTiltUi() {
+    const tilt = tiltInput?.snapshot() || { enabled: false, status: 'off' };
+    const messages = {
+      off: 'Tilt is off. Touch controls always work.',
+      waiting: 'Hold your phone comfortably, then close controls to calibrate.',
+      active: 'Tilt is on. Tilt left/right to steer; pull back to raise the nose in flight.',
+      suspended: 'Tilt resumes centered when you return to a car, plane or spacecraft.',
+      denied: 'Motion access was declined. You can keep using touch controls or try again.',
+      unsupported: 'Motion controls are unavailable in this browser. Use touch controls.',
+      unavailable: 'No motion data received. Touch controls still work; check your browser’s motion access.'
+    };
+    if (mobileTiltEnable) {
+      mobileTiltEnable.textContent = tilt.enabled ? 'Turn tilt off' : 'Enable tilt';
+      mobileTiltEnable.setAttribute('aria-pressed', String(tilt.enabled));
+    }
+    if (mobileTiltRecenter) mobileTiltRecenter.disabled = !tilt.enabled;
+    if (mobileTiltStatus) mobileTiltStatus.textContent = messages[tilt.status] || messages.off;
+    const mode = detectControlsMode();
+    mobileTiltQuickRecenter?.classList.toggle('hidden', !tilt.enabled || !['driving', 'plane', 'rocket'].includes(mode));
+  }
+
+  function bindDrivePedal(button, pedal) {
+    if (!button) return;
+    let pointer = null;
+    const end = event => {
+      if (pointer !== event.pointerId) return;
+      pointer = null;
+      appCtx.setMobileTouchPedal?.(pedal, false);
+      button.classList.remove('active');
+    };
+    mobileControlScope.listen(button, 'pointerdown', event => {
+      if (pointer !== null) return;
+      event.preventDefault(); event.stopPropagation();
+      pointer = event.pointerId;
+      try { button.setPointerCapture(pointer); } catch (_) {}
+      appCtx.setMobileTouchPedal?.(pedal, true);
+      button.classList.add('active');
+    });
+    for (const name of ['pointerup', 'pointercancel', 'lostpointercapture']) mobileControlScope.listen(button, name, end);
+    mobileControlScope.defer(() => { pointer = null; appCtx.setMobileTouchPedal?.(pedal, false); });
+    // Clear local pointer ownership on mode/overlay transitions, too.
+    mobileControlScope.listen(button, 'mobile-input-reset', () => { pointer = null; });
+  }
+
+  function updateMobileTouchControls(mode = detectControlsMode(), { contextOnly = false } = {}) {
+    if (!mobileTouchControls || !isTouchPreferredClient) return;
+    const blocked = controlsBlocked(mode);
+    const inputContext = `${mode}:${!!blocked}`;
+    if (contextOnly && inputContext === previousInputContext) return;
+    previousInputContext = inputContext;
+    updateMobileControlGuidance(mode);
+    const inSpaceFlight = mode === 'rocket';
 
     if (blocked) {
       mobileTouchControls.classList.remove('show');
@@ -524,6 +604,8 @@ function initMobileControls() {
     mobileTouchControls.dataset.handedness = appCtx.getMobileTouchInputSnapshot?.().settings?.handedness || 'standard';
     mobileTouchControls.style.zIndex = inSpaceFlight ? '10002' : '106';
 
+    if (mobileDrivePedals) mobileDrivePedals.hidden = mode !== 'driving';
+    syncVehicleTiltUi();
     const profile = MOBILE_CONTROL_PROFILES[mode] || MOBILE_CONTROL_PROFILES.driving;
     let actions = profile.actions;
     if (mode === 'rocket' && appCtx.pirateInterceptionRuntime?.active === true) {
@@ -668,6 +750,17 @@ function initMobileControls() {
 
   if (mobileTouchControls && isTouchPreferredClient) {
     appCtx.setMobileTouchEnabled?.(true);
+    bindDrivePedal(document.getElementById('mobileDriveAccelerate'), 'throttle');
+    bindDrivePedal(document.getElementById('mobileDriveBrakeReverse'), 'reverse');
+    mobileControlScope.listen(mobileTiltEnable, 'click', () => {
+      if (tiltInput?.snapshot().enabled) tiltInput.disable();
+      else void tiltInput?.enable();
+    });
+    for (const button of [mobileTiltRecenter, mobileTiltQuickRecenter]) {
+      mobileControlScope.listen(button, 'click', () => tiltInput?.recenter());
+    }
+    mobileControlScope.listen(mobileTiltSensitivity, 'input', () => updateMobileSettings({ tiltSensitivity: Number(mobileTiltSensitivity.value) / 100 }));
+    mobileControlScope.listen(mobileTiltSpeed, 'change', () => { updateMobileSettings({ tiltSpeed: mobileTiltSpeed.checked }); tiltInput?.recenter(); });
     bindAnalogPad(mobileMovePad, 'move');
     bindAnalogPad(mobileLookPad, 'look');
     mobileHoldButtons.forEach((btn) => bindMobileHoldButton(btn));
@@ -681,8 +774,9 @@ function initMobileControls() {
     mobileControlScope.listen(mobileMoveSensitivity, 'input', () => updateMobileSettings({ moveSensitivity: Number(mobileMoveSensitivity.value) / 100 }));
     mobileControlScope.listen(mobileLookSensitivity, 'input', () => updateMobileSettings({ lookSensitivity: Number(mobileLookSensitivity.value) / 100 }));
     mobileControlScope.listen(mobileCameraRecenter, 'change', () => updateMobileSettings({ cameraRecenter: mobileCameraRecenter.checked }));
-    mobileControlScope.listen(mobileControlsReset, 'click', () => updateMobileSettings({ handedness: 'standard', moveSensitivity: 1, lookSensitivity: 0.82, cameraRecenter: true, cameraRecenterDelayMs: 650 }));
-    mobileControlScope.listen(window, 'blur', clearVirtualHeldInputs);
+    mobileControlScope.listen(mobileControlsReset, 'click', () => { tiltInput?.disable(); updateMobileSettings({ handedness: 'standard', moveSensitivity: 1, lookSensitivity: 0.82, cameraRecenter: true, cameraRecenterDelayMs: 650, tiltSensitivity: 1, tiltSpeed: false }); });
+    mobileControlScope.listen(window, 'blur', () => { focused = false; clearVirtualHeldInputs(); });
+    mobileControlScope.listen(window, 'focus', () => { focused = true; updateMobileTouchControls(); });
     mobileControlScope.listen(document, 'visibilitychange', () => {
       if (document.hidden) clearVirtualHeldInputs();
     });

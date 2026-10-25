@@ -83,6 +83,7 @@
     "verify:unified-fishing": "node scripts/verification/unified-fishing.mjs",
     "verify:underwater-fish": "node scripts/verification/underwater-fish.mjs",
     "verify:mobile-controls": "node scripts/verification/mobile-controls.mjs",
+    "verify:mobile-vehicle-controls": "node scripts/verification/mobile-vehicle-controls-current.mjs",
     "verify:mobile-load": "node scripts/verification/mobile-load.mjs",
     "verify:player-reported-blockers": "node scripts/verification/player-reported-blockers.mjs",
     "verify:accessibility-release": "node scripts/verification/expedition-mission-dom-current.mjs && node scripts/verification/hud-mutations-current.mjs && node scripts/verification/accessibility-mutations-current.mjs && node scripts/verification/accessibility-release.mjs",

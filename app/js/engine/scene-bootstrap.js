@@ -454,6 +454,9 @@ export function initEngineRuntime(ctx) {
     console.warn('Could not get GPU info:', error);
   }
 
+  // A previous landscape pixel width must not widen the mobile layout
+  // viewport before the resize handler can measure the new portrait width.
+  Object.assign(appCtx.renderer.domElement.style, { maxWidth: '100vw', maxHeight: '100vh' });
   appCtx.renderer.setSize(innerWidth, innerHeight);
   try {
     appCtx.renderer.info.autoReset = false;

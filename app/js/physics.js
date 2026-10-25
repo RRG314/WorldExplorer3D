@@ -18,7 +18,7 @@ import {
   arcadeSteeringYawTarget,
   earthDrivingSteeringProfile,
   resolveCarDriveCommand
-} from "./controls/traversal-control-policy.js?v=8";
+} from "./controls/traversal-control-policy.js?v=9";
 import {
   carSpeedToMph,
   carSpeedToWorldUnitsPerSecond,
@@ -151,7 +151,8 @@ function update(dt) {
     speed: appCtx.car.speed,
     throttle: throttleControl,
     reverse: reverseControl,
-    brake: brakeControl
+    brake: brakeControl,
+    serviceBrake: actions.serviceBrake
   });
   const gas = driveCommand.forward > 0.05;
   const reverse = driveCommand.reverse > 0.05;
@@ -294,7 +295,8 @@ function update(dt) {
     const stopRate = Math.max(6, Number(appCtx.CFG.brake) || 18) *
       (isPlanetarySurface() ? 1 : vehicleHandling.brakeScale * vehicleCondition.brakeScale) *
       characterVehicle.brakingScale * vehicleUpgrades.brakeScale;
-    const nextMagnitude = Math.max(0, Math.abs(appCtx.car.speed) - stopRate * dt);
+    const brakeStrength = driveCommand.changingDirection ? 1 : Math.min(1, Math.max(0, Number(actions.serviceBrake) || 0));
+    const nextMagnitude = Math.max(0, Math.abs(appCtx.car.speed) - stopRate * brakeStrength * dt);
     appCtx.car.speed = Math.sign(appCtx.car.speed) * nextMagnitude;
     if (nextMagnitude < 0.5) appCtx.car.speed = 0;
   }

@@ -2,7 +2,7 @@ import {publishResolvedSurfaceSpawn} from './world/spawn-publication.js';
 import {resolveControlState} from './transport/control-state.js';
 import {activeActorPose} from './transport/actor-contract.js?v=6';
 import { ctx as appCtx } from "./shared-context.js?v=55";
-import { nextPrimaryTravelMode } from "./controls/traversal-control-policy.js?v=8";
+import { nextPrimaryTravelMode } from "./controls/traversal-control-policy.js?v=9";
 import { planetarySurfaceYAtRenderXZ } from './planetary/runtime/surface-query.js?v=3';
 import {
   isPlanetarySurfaceActive,

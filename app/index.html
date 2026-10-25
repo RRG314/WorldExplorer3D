@@ -36,7 +36,7 @@ if (location.protocol === 'file:') document.documentElement.classList.add('unsup
 <link rel="stylesheet" href="styles/discovery.css?v=19">
 <link rel="stylesheet" href="styles/tutorial.css?v=15">
 <link rel="stylesheet" href="styles/ar.css?v=1">
-<link rel="stylesheet" href="styles/mobile-controls.css?v=3">
+<link rel="stylesheet" href="styles/mobile-controls.css?v=4">
 <link rel="stylesheet" href="styles/map-explorer.css?v=4">
 <link rel="stylesheet" href="styles/accessibility.css?v=3">
 <link rel="stylesheet" href="styles/reality-capture.css?v=2">
@@ -1616,7 +1616,12 @@ How Connected Data Is Used
 <label><span>Move sensitivity</span><input id="mobileMoveSensitivity" type="range" min="45" max="150" step="5" value="100"><output id="mobileMoveSensitivityValue">100%</output></label>
 <label><span>Camera sensitivity</span><input id="mobileLookSensitivity" type="range" min="35" max="150" step="5" value="80"><output id="mobileLookSensitivityValue">80%</output></label>
 <label class="mobileControlToggle"><input id="mobileCameraRecenter" type="checkbox" checked><span>Return camera behind player</span></label>
-<p id="mobileControlSettingsStatus">Left thumb moves. Right thumb looks and uses actions.</p>
+<p id="mobileControlSettingsStatus">Cars: steer with your left thumb and use the pedals on the right. Brake / reverse slows first, then reverses. Flight: use the flight pad and separate speed buttons.</p>
+<div class="mobileTiltActions"><button id="mobileTiltEnable" type="button" aria-pressed="false">Enable tilt</button><button id="mobileTiltRecenter" type="button" disabled>Recenter tilt</button></div>
+<label><span>Tilt sensitivity</span><input id="mobileTiltSensitivity" type="range" min="50" max="150" step="5" value="100"><output id="mobileTiltSensitivityValue">100%</output></label>
+<label class="mobileControlToggle"><input id="mobileTiltSpeed" type="checkbox"><span>Car speed by tilt: tip forward to accelerate, back to brake</span></label>
+<p id="mobileTiltStatus" role="status" aria-live="polite">Tilt is off. Touch controls always work.</p>
+<p class="mobileTiltHelp">Cars: tilt to steer. Planes: tilt to bank and pitch. Spacecraft: tilt to turn and pitch. Flight speed uses the throttle buttons. Hold the phone comfortably when enabling or recentering. Motion stays on your device.</p>
 <div id="mobileControlModeSummary" aria-live="polite">
 <strong id="mobileControlModeName">Walking</strong>
 <div><span><b>LEFT</b><i id="mobileControlLeftSummary">Move</i></span><span><b>RIGHT</b><i id="mobileControlRightSummary">Look</i></span><span><b>ACTIONS</b><i id="mobileControlActionSummary">Jump · Run</i></span></div>
@@ -1733,6 +1738,8 @@ How Connected Data Is Used
 <button id="mobileMoveDown" class="mobileNavBtn down" type="button" aria-label="Move down">▼</button>
 <div id="mobileMoveLabel" class="mobilePadLabel">Move</div>
 </div>
+<div id="mobileDrivePedals" aria-label="Driving pedals" hidden><button id="mobileDriveAccelerate" type="button">Accelerate</button><button id="mobileDriveBrakeReverse" type="button">Brake /<br>reverse</button></div>
+<button id="mobileTiltQuickRecenter" class="hidden" type="button" aria-label="Recenter phone tilt">Recenter tilt</button>
 <div id="mobileActionStack" aria-label="Mode actions">
 <button id="mobileActionPrimary" class="mobileActionBtn" type="button">Action 1</button>
 <button id="mobileActionSecondary" class="mobileActionBtn" type="button">Action 2</button>

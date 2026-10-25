@@ -25,6 +25,34 @@
 #mobileActionStack.has-equipment-action #mobileActionSecondary{grid-column:2;grid-row:2}
 #mobileActionStack.has-equipment-action .mobilePackAction{grid-column:1;grid-row:1}
 #mobileTouchControls #mobileActionStack.has-equipment-action #mobileEquipmentUse{grid-column:1;grid-row:2;min-width:58px;width:58px;padding:6px 4px}
+/* Driving separates steering travel from acceleration. Keep the existing
+   action buttons for handbrake, responder lights and mode-specific actions. */
+#mobileDrivePedals{position:absolute;right:var(--mobile-edge);bottom:var(--mobile-bottom);display:flex;gap:8px;pointer-events:none}
+#mobileDrivePedals[hidden]{display:none}
+#mobileDrivePedals button{width:76px;min-height:76px;padding:8px 5px;border:1px solid rgba(207,239,250,.58);border-radius:20px;background:rgba(5,25,36,.88);color:#f5fcff;font:700 10px/1.4 Orbitron,sans-serif;pointer-events:auto;touch-action:none;user-select:none;-webkit-user-select:none}
+#mobileDrivePedals button.active{background:rgba(11,103,134,.94);border-color:#7ee8ff}
+#mobileTouchControls.mode-driving #mobileMovePad{width:150px;height:94px;border-radius:48px}
+#mobileTouchControls.mode-driving #mobileLookPad{bottom:calc(var(--mobile-bottom) + 216px);width:98px;height:98px}
+#mobileTouchControls.mode-driving #mobileActionStack{bottom:calc(var(--mobile-bottom) + 88px)}
+#mobileTouchControls[data-handedness="southpaw"] #mobileDrivePedals{left:var(--mobile-edge);right:auto}
+#mobileTiltQuickRecenter{position:absolute;left:var(--mobile-edge);bottom:calc(var(--mobile-bottom) + 108px);min-height:40px;padding:8px 12px;border:1px solid rgba(126,205,234,.5);border-radius:20px;color:#eaf7fb;background:rgba(5,25,36,.88);font:600 10px Inter,sans-serif;pointer-events:auto;touch-action:manipulation}
+#mobileTiltQuickRecenter.hidden{display:none}
+#mobileTouchControls.mode-plane #mobileTiltQuickRecenter,#mobileTouchControls.mode-rocket #mobileTiltQuickRecenter{bottom:calc(var(--mobile-bottom) + 144px)}
+body:has(#mobileTouchControls.mode-driving #mobileTiltQuickRecenter:not(.hidden)) #controlsMenu{bottom:calc(max(92px,calc(76px + env(safe-area-inset-bottom))) + 156px)}
+body:has(#mobileTouchControls.mode-plane #mobileTiltQuickRecenter:not(.hidden)) #controlsMenu,body:has(#mobileTouchControls.mode-rocket #mobileTiltQuickRecenter:not(.hidden)) #controlsMenu{bottom:calc(max(92px,calc(76px + env(safe-area-inset-bottom))) + 196px)}
+#mobileTouchControls[data-handedness="southpaw"] #mobileTiltQuickRecenter{left:auto;right:var(--mobile-edge)}
+.mobileTiltActions{display:flex;flex-wrap:wrap;gap:8px}
+.mobileTiltActions button{min-height:44px;padding:8px 12px;border:1px solid rgba(166,213,230,.5);border-radius:8px;color:#eaf8fd;background:#102d3b;font:600 12px Inter,sans-serif}
+.mobileTiltActions button:disabled{opacity:.5}
+#mobileTiltStatus,.mobileTiltHelp{margin:0;color:#bed0d8;font:400 11px/1.5 Inter,sans-serif}
+@media(max-height:560px) and (orientation:landscape) and (pointer:coarse){
+  #mobileTouchControls.mode-driving #mobileLookPad{bottom:var(--mobile-bottom);right:calc(var(--mobile-edge) + 176px);width:94px;height:94px}
+  #mobileTouchControls.mode-driving[data-handedness="southpaw"] #mobileLookPad{right:auto;left:calc(var(--mobile-edge) + 176px)}
+  #mobileTouchControls.mode-driving #mobileActionStack{bottom:calc(var(--mobile-bottom) + 88px)}
+  #mobileTiltQuickRecenter,#mobileTouchControls.mode-plane #mobileTiltQuickRecenter,#mobileTouchControls.mode-rocket #mobileTiltQuickRecenter{left:calc(50% + 32px);right:auto;bottom:var(--mobile-bottom);max-width:108px}
+  #mobileTouchControls[data-handedness="southpaw"] #mobileTiltQuickRecenter{left:auto;right:calc(50% + 32px)}
+  body:has(#mobileTouchControls.show #mobileTiltQuickRecenter:not(.hidden)) #controlsMenu{bottom:max(78px,calc(64px + env(safe-area-inset-bottom)))}
+}
 }
 @media(max-width:390px){#mobileTouchControls{--mobile-edge:10px}#mobileTouchControls .mobilePad{width:122px;height:122px}#mobileTouchControls #mobileLookPad{width:108px;height:108px;bottom:calc(var(--mobile-bottom) + 128px)}#mobileTouchControls #mobileActionStack{width:108px}#mobileTouchControls .mobileActionBtn{min-width:108px}}
 @media(max-height:560px) and (orientation:landscape) and (pointer:coarse){#mobileTouchControls{--mobile-edge:12px;--mobile-bottom:max(78px,calc(64px + env(safe-area-inset-bottom)))}#mobileTouchControls .mobilePad{width:112px;height:112px}#mobileTouchControls #mobileLookPad{right:calc(var(--mobile-edge) + var(--mobile-action-width,108px) + 16px);bottom:var(--mobile-bottom);width:100px;height:100px}#mobileTouchControls #mobileActionStack{width:108px}#mobileTouchControls .mobileActionBtn{min-width:108px;min-height:46px}#mobileTouchControls[data-handedness="southpaw"] #mobileLookPad{left:calc(var(--mobile-edge) + var(--mobile-action-width,108px) + 16px);right:auto}}

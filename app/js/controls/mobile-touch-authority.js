@@ -5,6 +5,8 @@ const DEFAULT_MOBILE_TOUCH_SETTINGS = Object.freeze({
   moveSensitivity: 1,
   lookSensitivity: 0.82,
   cameraRecenter: true,
+  tiltSensitivity: 1,
+  tiltSpeed: false,
   cameraRecenterDelayMs: 650
 });
 
@@ -19,6 +21,8 @@ function normalizeMobileTouchSettings(value = {}) {
     moveSensitivity: clamp(value?.moveSensitivity ?? DEFAULT_MOBILE_TOUCH_SETTINGS.moveSensitivity, 0.45, 1.5),
     lookSensitivity: clamp(value?.lookSensitivity ?? DEFAULT_MOBILE_TOUCH_SETTINGS.lookSensitivity, 0.35, 1.5),
     cameraRecenter: value?.cameraRecenter !== false,
+    tiltSensitivity: clamp(value?.tiltSensitivity ?? 1, 0.5, 1.5),
+    tiltSpeed: value?.tiltSpeed === true,
     cameraRecenterDelayMs: Math.round(clamp(value?.cameraRecenterDelayMs ?? DEFAULT_MOBILE_TOUCH_SETTINGS.cameraRecenterDelayMs, 250, 1800))
   });
 }
@@ -58,12 +62,18 @@ function resolveMobileSemanticActions(mode = 'walk', state = {}) {
   // precision range. Vehicle modes retain their established response.
   const move = walking ? shapeMobileStick(normalizedMove, 1.45) : normalizedMove;
   const look = normalizeMobileStick(state.look?.x, state.look?.y, 0.045);
-  const moveX = clamp(move.x * settings.moveSensitivity);
+  const driving = mode === 'drive';
+  // Steering owns the entire horizontal travel. Throttle no longer consumes
+  // the circular stick's available steering range. Gentle center, full lock.
+  const steering = normalizeMobileStick(state.move?.x, 0, 0.06).x;
+  const moveX = driving
+    ? clamp(Math.sign(steering) * Math.pow(Math.abs(steering), 1.65) * settings.moveSensitivity)
+    : clamp(move.x * settings.moveSensitivity);
   const moveY = clamp(move.y * settings.moveSensitivity);
   const lookX = clamp(look.x * settings.lookSensitivity);
   const lookY = clamp(look.y * settings.lookSensitivity);
   return Object.freeze({
-    move: -moveY,
+    move: driving ? clamp((state.pedals?.throttle || 0) - (state.pedals?.reverse || 0)) : -moveY,
     turn: walking ? 0 : -moveX,
     steer: walking ? 0 : -moveX,
     strafe: walking ? moveX : 0,
@@ -76,6 +86,11 @@ function resolveMobileSemanticActions(mode = 'walk', state = {}) {
     enabled: state.enabled === true,
     settings
   });
+}
+
+function mobileDrivingSteeringGain(speedMph = 0) {
+  const blend = clamp((Math.abs(Number(speedMph) || 0) - 12) / 48, 0, 1);
+  return 1 - 0.55 * blend;
 }
 
 function wrapAngle(angle = 0) {
@@ -113,6 +128,7 @@ export {
   DEFAULT_MOBILE_TOUCH_SETTINGS,
   MOBILE_TOUCH_SETTINGS_KEY,
   loadMobileTouchSettings,
+  mobileDrivingSteeringGain,
   normalizeMobileStick,
   shapeMobileStick,
   normalizeMobileTouchSettings,

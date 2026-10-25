@@ -9,8 +9,8 @@ world play.
 
 ## Build and signing
 
-- Package: `io.worldexplorer3d.app`; published internal code `3`, name `5.6.1-test.3`.
-  Codes `1` and `2` remain in history and are excluded from the new release.
+- Package: `io.worldexplorer3d.app`; published internal code `4`, name `5.6.1-test.4`.
+  Codes `1`, `2` and `3` remain in history and are excluded from the new release.
   The first undistributed internal upload, code `1`, remains in Play's history.
 - Minimum Android API 29 (Android 10), matching current Chrome support;
   compile/target API 36, as currently required for new
@@ -237,11 +237,25 @@ cold-launch, offline, retry and relaunch checks on an owned API35 emulator.
 The browser phases stop at Chrome's first-run screen, so physical Play-installed
 and web gameplay acceptance remain distinct. The original upload key is reused.
 
-The signed version 4 AAB is ready; Console upload/activation still awaits the
-extension's file URL capability. Do not claim it is available to testers until
-an operational receipt confirms publication. See
+The owner enabled extension file URL access and the unchanged signed version 4
+AAB was uploaded and published to internal testing on October 25 at 9:09 AM
+Eastern. Console confirms Available to internal testers. Code 3 is excluded;
+device support, tester selection and the existing opt-in URL are preserved. Google
+says updates usually appear within one hour and occasionally take longer. See
 `docs/verification/2026-10-25-ANDROID-LAUNCH-CRASH.md` and the October 25 CURRENT-STATE
 section. The native check now runs by default in Android test-package dispatches,
 with bounded setup waits and screenshots/logs retained on failure. Its Node
 checker rejects the actual version 3 crash and silent home returns. Browser Helper
 and world/session/save authorities are preserved; no broad web sweep is needed.
+
+PR130 is merged as 8e33229d96dac0ebb1c119b93fb0eeda32c0cf92 with all required
+and four post-merge workflows passing. Closed Alpha's code 3 pause became effective.
+The same code 4 bundle, track resumption, selected-location description and eight
+prepared real gameplay screenshots are now submitted; Google shows Changes in
+review. No public Android release or phone acceptance is implied. Icon and feature
+graphic AI labels remain; the gameplay images are actual unedited browser-game
+captures. No duplicate native build, photo session or game sweep was run.
+The owner confirms October 25 that the Motorola installed the Play update and the game opens successfully. This is owner-reported startup acceptance; physical touch/sensor feel and all-mode performance remain separate checks. Update
+through Google Play; do not use the separately upload-key-signed APK as an update
+to Google's differently signed install. Latest operational receipt:
+`output/research/android-launch-crash-2026-10-25/play-version-4-delivery.json`.
