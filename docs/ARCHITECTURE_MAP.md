@@ -49,6 +49,12 @@ Destination choice → provider requests → normalized evidence → world compi
 
 Owners include `world/`, `terrain/`, `earth-core/`, `geospatial/`, `structure-semantics/` and `poi/`. Geospatial provider failures and generated fallbacks must retain honest provenance. Earth uses bounded locations rather than continuous planetary streaming.
 
+The Living Portal's development foundation is the read-only
+`earth-core/portal-destination-policy.js`. It separates scoped destination/device
+qualification from current publication readiness and reuses `isEarthWorldUsable`.
+It owns no world, actor, timer, Journal or rewards. Catalog and widget consumers
+are not yet connected. See the [cross-device design](architecture-evaluation/2026-10-25-LIVING-PORTAL-ARCHITECTURE.md).
+
 ### Building exterior presentation flow
 
 Mapped footprint/height/context → compiled building → generated exterior catalog/materials → optional reviewed photo representation. Appearance must not create a competing building identity, collision model or property record. Existing roads, terrain alignment, doors and POIs remain connected to the building authority.

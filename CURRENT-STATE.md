@@ -4,6 +4,38 @@ Updated October 25, 2026. Use the latest sections below for current identities;
 dated sections further down retain historical evidence. The owner has authorized
 necessary production/protected-source work; do not ask again for that scope.
 
+## October 25 Living Portal shared quality foundation
+
+The owner proposes a persistent Living Portal/Exploration Trail and requires
+Android, Apple and browser availability, with rich correctly rendered suggested
+destinations. The cross-device design and current-source findings are in
+`docs/architecture-evaluation/2026-10-25-LIVING-PORTAL-ARCHITECTURE.md`.
+
+Implemented `earth-core/portal-destination-policy.js`: read-only offer and
+publication-readiness checks, with scoped destination/content/render/device
+qualification, expiry, typed Earth arrivals, distinct city/nature/coast layer
+requirements and advertised experience evidence. It reuses the current world
+readiness owner and immutable publication; it cannot move an actor or award a
+visit. Twelve distinct focused component cases pass, including ready-but-sparse
+and wrong-location worlds, obsolete publications and antimeridian regions.
+The strengthened +180/-180 case failed before normalization was fixed; that
+receipt is retained. The test is registered in the existing contract list.
+
+This is a development foundation, not a released widget/catalog or proof of
+worldwide fidelity. No native widget, shared Trail API, Portal UI, live approved
+destination or launcher consumer is connected yet. A future source adapter must
+bind content versions to real published packages; qualification flags from a
+widget/URL/player are not trusted. Existing local Journal saves do not already
+provide full cross-device sync. Preserve saved/learned/virtually visited/activity
+receipts independently and keep widget interest separate from rewards.
+
+Next product slice is one qualified city and one landscape, responsive web
+Portal/Trail, non-reward Journal projection and session-owned resolved launch;
+then native Glance and WidgetKit clients against the same identity/data contract.
+Evidence: `output/research/living-portal-2026-10-25/`. No SDK/native build, browser
+world certification, store submission or deployment occurred. Released game,
+Play version 4, assets and player data remain unchanged by this work.
+
 ## October 25 VR foundation research and component experiment
 
 The owner requests researched optional headset VR, eventual guided and manual
