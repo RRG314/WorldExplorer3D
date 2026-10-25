@@ -51,6 +51,6 @@ export function readRegionalSceneryPreference(storage) {
   catch { return false; }
 }
 export function writeRegionalSceneryPreference(enabled, storage) {
-  try { (storage ?? globalThis.localStorage)?.setItem('we3d.regionalScenery', enabled ? 'on' : 'off'); }
-  catch {}
+  try { const target=storage??globalThis.localStorage;if(!target?.setItem)return false;target.setItem('we3d.regionalScenery',enabled?'on':'off');return true; }
+  catch { return false; }
 }

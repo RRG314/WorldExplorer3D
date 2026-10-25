@@ -12,6 +12,7 @@ import {
 } from "./rooms.js?v=67";
 import { listenPaintClaims, upsertPaintClaim } from "./painttown.js?v=56";
 import {
+  listenBlockedPlayers,
   listenFriends,
   listenIncomingInvites,
   listenRecentPlayers
@@ -73,6 +74,10 @@ export function createUiRoomRuntime({ appCtx, refs, state, renderers, helpers })
   }
 
   function clearGlobalSubscriptions() {
+    if (typeof state.unsubBlockedPlayers === 'function') state.unsubBlockedPlayers();
+    state.unsubBlockedPlayers = null;
+    state.blockedPlayers = [];
+    state.blockedPlayersReady = false;
     if (typeof state.unsubFriends === "function") state.unsubFriends();
     if (typeof state.unsubRecentPlayers === "function") state.unsubRecentPlayers();
     if (typeof state.unsubInvites === "function") state.unsubInvites();
@@ -428,6 +433,8 @@ export function createUiRoomRuntime({ appCtx, refs, state, renderers, helpers })
     if (state.globalSubscriptionUid !== uid) {
       clearGlobalSubscriptions();
       state.globalSubscriptionUid = uid;
+      renderChat(); renderFriends(); renderInvites(); renderRecentPlayers(); renderPlayerList();
+      renderers.renderBlockedPlayers();
     }
     if (!state.authUser) {
       clearGlobalSubscriptions();
@@ -442,6 +449,19 @@ export function createUiRoomRuntime({ appCtx, refs, state, renderers, helpers })
       ensureLeaderboardSubscription();
       renderFeaturedRooms();
       return;
+    }
+
+    if (!state.unsubBlockedPlayers) {
+      state.unsubBlockedPlayers = listenBlockedPlayers(rows => {
+        if (state.authUser?.uid !== uid) return;
+        state.blockedPlayers = rows;
+        state.blockedPlayersReady = true;
+        renderChat(); renderFriends(); renderInvites(); renderRecentPlayers(); renderPlayerList();
+        renderers.renderBlockedPlayers();
+      }, {onError: () => {
+        if (state.authUser?.uid !== uid) return;
+        setStatus('Blocked players could not be refreshed. Chat and invites wait for the first successful check.', true);
+      }});
     }
 
     if (!state.unsubFriends) {

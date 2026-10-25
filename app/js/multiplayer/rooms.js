@@ -1,4 +1,5 @@
 import { ensureRoomUserProfile } from './rooms-profile.js';
+import { ensureCommunityTerms } from '../../../js/community-consent.js?v=1';
 import { postProtectedFunction } from '../../../js/function-api.js?v=3';
 import {
   collection,
@@ -194,6 +195,8 @@ async function createRoom(options = {}) {
   const generation = ++roomRequestGeneration;
   const { db } = getServices();
   const user = requireSignedInUser();
+  await ensureCommunityTerms(user.uid);
+  assertCurrentRoomRequest(generation, user.uid);
   const displayName = resolveDisplayName(user, options.displayName);
   const world = normalizeWorld(options.world || {});
   const maxPlayers = normalizeMaxPlayers(options.maxPlayers);
@@ -387,6 +390,8 @@ async function joinRoomByCode(codeInput, options = {}) {
     user=await ensureGuestSession();
   }
   if(!user?.uid)throw new Error('Sign in is required before joining this room.');
+  assertCurrentRoomRequest(generation,user.uid);
+  await ensureCommunityTerms(user.uid);
   assertCurrentRoomRequest(generation,user.uid);
   const result=await postProtectedFunction('/joinRoom',{...(weekly?{weekly:true}:{roomCode:code}),displayName:resolveDisplayName(user,options.displayName)},{label:'Room admission'});
   assertCurrentRoomRequest(generation,user.uid);

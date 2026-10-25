@@ -240,6 +240,11 @@ function savedRoomDoc(roomCode, ownerUid, role = 'owner') {
 async function seedData(testEnv) {
   await testEnv.withSecurityRulesDisabled(async (ctx) => {
     const db = ctx.firestore();
+    // These established security fixtures represent players who accepted the
+    // current community rules. Missing/stale consent has its own focused gate.
+    for (const uid of [OWNER_UID,MEMBER_UID,ATTACKER_UID,INVITEE_UID,FRESH_UID,JOINER_UID]) {
+      await setDoc(doc(db,'users',uid,'consents','community'),{version:'community-2026-10-24',acceptedAt:Timestamp.now()});
+    }
 
     await setDoc(doc(db, 'users', OWNER_UID), userDoc(OWNER_UID, 'Owner'));
     await setDoc(doc(db, 'users', MEMBER_UID), userDoc(MEMBER_UID, 'Member'));

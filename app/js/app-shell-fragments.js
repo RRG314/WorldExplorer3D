@@ -77,6 +77,10 @@ const APP_SHELL_FRAGMENT_HTML = `
       <ul id="roomPanelPlayerList" class="mp-player-list">
         <li class="mpPlayerEmpty">No active room.</li>
       </ul>
+      <details class="mp-secondary-tools"><summary>Blocked players</summary>
+        <p class="mp-status">Blocks hide chat and stop new invites. Shared world changes remain visible. Leave the room to stop sharing it.</p>
+        <ul id="roomPanelBlockedPlayersList" class="mp-room-list"></ul>
+      </details>
       <div class="mp-subtitle">Room Settings</div>
       <div class="mp-row">
         <input id="roomPanelNameInput" class="mp-input" type="text" maxlength="80" placeholder="Room name (optional)">

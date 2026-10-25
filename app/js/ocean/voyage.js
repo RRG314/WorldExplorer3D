@@ -5,7 +5,7 @@ import {createInvestigationControls} from '../campaign/coastal-investigation-ui.
 import {ensureMarineResearch,REEF_SURVEY} from './research-outing.js';
 import {styleMarinePanel} from './interface.js';
 import {earthLocalToGeographic} from '../earth-core/location-origin.js?v=1';
-import {createOceanVoyageStore,validateOceanVoyage,oceanStreamingPreference,OCEAN_STREAM_PREFERENCE_KEY} from './voyage-store.js';
+import {createOceanVoyageStore,validateOceanVoyage} from './voyage-store.js';
 import {createCoastalDepartureControls} from '../campaign/coastal-departure-ui.js';
 const id=()=>globalThis.crypto?.randomUUID?.()||`voyage-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 // Preparing an aboard journey allocates data only; it must not create an
@@ -103,8 +103,6 @@ export function ensureOceanVoyage(ctx,{store=createOceanVoyageStore()}={}){
  function mount(){
   if(ui||typeof document==='undefined')return;
   const oceanButton=document.getElementById('globeSelectorOceanBtn');if(!oceanButton)return;
-  const streamToggle=document.getElementById('oceanContinuousToggle');
-  if(streamToggle){streamToggle.checked=oceanStreamingPreference();streamToggle.onchange=()=>{try{localStorage.setItem(OCEAN_STREAM_PREFERENCE_KEY,streamToggle.checked?'on':'off');}catch{ctx.showToast?.('This browser could not save the ocean preference.');}};}
   const resumeButton=document.createElement('button');resumeButton.id='oceanVoyageResume';resumeButton.type='button';resumeButton.className='globe-selector-action-btn';resumeButton.style.cssText='margin-top:8px;width:100%;min-height:44px;font:600 12px system-ui;background:#112b3a;color:#e8f6ff;border:1px solid #5689a3;border-radius:4px;padding:10px';resumeButton.onclick=()=>void resume();(document.getElementById('globeSelectorStartBtn')||oceanButton).after(resumeButton);
   const panel=document.createElement('section');panel.id='oceanVoyageControls';panel.setAttribute('aria-label','Ocean voyage');panel.style.cssText='position:fixed;top:245px;right:12px;width:250px;max-width:calc(100vw - 24px);padding:10px;box-sizing:border-box;border-radius:10px;background:#092a3bee;color:#eefaff;font:13px/1.4 system-ui;z-index:110';
   const title=document.createElement('strong');title.textContent='Research voyage';const distance=document.createElement('div'),statusElement=document.createElement('div');statusElement.setAttribute('role','status');

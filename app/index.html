@@ -340,6 +340,10 @@ Not case sensitive! Try: "Seattle" • "Tokyo" • "Paris, France" • "Austin, 
 <li class="mpRoomEmpty">No incoming invites.</li>
 </ul>
 
+<div class="mp-subtitle">Blocked players</div>
+<p class="mp-status">Blocking hides their chat and prevents new invites. Shared world changes and gameplay remain visible. Leave the room to stop sharing it. Guests keep blocks only while they keep the same guest account.</p>
+<ul id="mpBlockedPlayersList" class="mp-room-list"><li class="mpRoomEmpty">No blocked players.</li></ul>
+
 <div class="mp-subtitle">Community League · Global · All time</div>
 <ul id="mpLeaderboardList" class="mpFeedList">
 <li class="mpRoomEmpty">Loading public Community League results…</li>
@@ -375,21 +379,28 @@ High Quality Boost (stronger shadows + car paint)
 <input type="checkbox" id="ssaoToggle" style="width:16px;height:16px;cursor:pointer">
 High-only SSAO contact shadows
 </label>
-<label style="display:flex;align-items:center;gap:10px;font-size:12px;margin-bottom:6px;cursor:pointer">
-<input type="checkbox" id="regionalSceneryToggle" style="width:16px;height:16px;cursor:pointer">
-Extend scenery beyond this location
-</label>
-<p style="font-size:11px;margin:0 0 12px">Earth starts with a fixed location. This optional setting extends terrain and mapped buildings as you travel; it does not extend the detailed driving area or activities.</p>
-<label style="display:flex;align-items:center;gap:10px;font-size:12px;margin-bottom:6px;cursor:pointer">
-<input type="checkbox" id="oceanContinuousToggle" checked aria-describedby="oceanContinuousHelp" style="width:16px;height:16px;cursor:pointer">
-Continue exploring beyond an ocean dive site
-</label>
-<p id="oceanContinuousHelp" style="font-size:11px;margin:0 0 12px">New open-ocean voyages load nearby seabed as you travel. Turn off for a fixed dive area. Saved voyages and guided study sites keep their original setting.</p>
 <div id="perfSettingsStatus" style="font-size:11px;color:#64748b;min-height:16px">
 Graphics changes apply to the current session.
 </div>
 </div>
 </div>
+<section aria-labelledby="worldExplorationSettingsTitle" style="margin-bottom:24px">
+<h3 id="worldExplorationSettingsTitle" style="font-family:'Poppins',sans-serif;font-size:15px;font-weight:600;color:#667eea;margin:0 0 12px">World exploration</h3>
+<div style="background:#f8fafc;border:2px solid #e2e8f0;border-radius:8px;padding:14px;color:#334155;font-size:12px">
+<p style="margin:0 0 12px"><strong>Explore a selected location (default).</strong> Pick a place on the globe or use your location. Roads, buildings and activities load for that area. Personal rooms and the weekly community room share their selected place.</p>
+<label style="display:flex;align-items:center;gap:10px;margin-bottom:6px;cursor:pointer">
+<input type="checkbox" id="regionalSceneryToggle" aria-describedby="regionalSceneryHelp" style="width:16px;height:16px;cursor:pointer">
+Extend Earth scenery (experimental)
+</label>
+<p id="regionalSceneryHelp" style="font-size:11px;margin:0 0 12px">Optional: load terrain and mapped buildings beyond the selected location as you travel. Detailed driving, entrances and activities remain in the loaded area. This is not a continuous worldwide driving mode and uses more data.</p>
+<label style="display:flex;align-items:center;gap:10px;margin-bottom:6px;cursor:pointer">
+<input type="checkbox" id="oceanContinuousToggle" aria-describedby="oceanContinuousHelp" style="width:16px;height:16px;cursor:pointer">
+Continue ocean exploration beyond the dive site
+</label>
+<p id="oceanContinuousHelp" style="font-size:11px;margin:0">Optional: new open-ocean voyages load nearby seabed as you travel, using more data. Off by default. Saved voyages and guided study sites keep their original setting. Your explicit preferences are remembered on this device.</p>
+<p id="worldExplorationStatus" role="status" aria-live="polite" style="font-size:11px;margin:8px 0 0"></p>
+</div>
+</section>
 <div style="margin-bottom:24px">
 <div style="font-family:'Poppins',sans-serif;font-size:15px;font-weight:600;color:#667eea;margin-bottom:12px;display:flex;align-items:center;gap:8px">
 Optional Property Data

@@ -158,6 +158,9 @@ async function createPlayer(label) {
     }
     if (authUi.getCurrentUser()?.uid !== credential.user.uid) throw new Error('Application auth state did not adopt the emulator user.');
     const firestore = await import('https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js');
+    // This existing journey starts with an already-consenting emulator account.
+    // The dedicated community-safety browser gate exercises the actual dialog.
+    await firestore.setDoc(firestore.doc(services.db,'users',credential.user.uid,'consents','community'),{version:'community-2026-10-24',acceptedAt:firestore.serverTimestamp()});
     const firestoreDeadline = Date.now() + 15000;
     let firestoreReady = false;
     let lastFirestoreError = null;

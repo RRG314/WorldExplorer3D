@@ -1,4 +1,5 @@
 import { readRegionalSceneryPreference, writeRegionalSceneryPreference } from '../terrain/regional-scenery-scheduler.js';
+import { oceanStreamingPreference, writeOceanStreamingPreference } from '../ocean/voyage-store.js';
 import { prepareProviderCredentials, setProviderCredential } from '../real-estate/provider-credentials.js';
 
 export function setupSettingsUi(appCtx) {
@@ -23,12 +24,31 @@ export function setupSettingsUi(appCtx) {
   const attomKeyInput = document.getElementById('attomKeyInput');
   const estatedKeyInput = document.getElementById('estatedKeyInput');
   const saveApiKeyBtn = document.getElementById('saveApiKey');
+  const explorationStatus = document.getElementById('worldExplorationStatus');
   const regionalSceneryToggle = document.getElementById('regionalSceneryToggle');
   if (regionalSceneryToggle) {
     regionalSceneryToggle.checked = appCtx.getRegionalSceneryState?.().enabled ?? readRegionalSceneryPreference();
     regionalSceneryToggle.addEventListener('change', () => {
-      writeRegionalSceneryPreference(regionalSceneryToggle.checked);
+      if (!writeRegionalSceneryPreference(regionalSceneryToggle.checked)) {
+        regionalSceneryToggle.checked = appCtx.getRegionalSceneryState?.().enabled ?? readRegionalSceneryPreference();
+        if (explorationStatus) explorationStatus.textContent = 'This browser could not save the setting. Your previous mode is kept.';
+        return;
+      }
       appCtx.setRegionalSceneryEnabled?.(regionalSceneryToggle.checked);
+      if (explorationStatus) explorationStatus.textContent = regionalSceneryToggle.checked ? 'Extended Earth scenery enabled. Detailed gameplay stays in the loaded area.' : 'Selected-location Earth exploration enabled.';
+    });
+  }
+  // Settings owns this choice before the lazy ocean/voyage runtime exists.
+  const oceanContinuousToggle = document.getElementById('oceanContinuousToggle');
+  if (oceanContinuousToggle) {
+    oceanContinuousToggle.checked = oceanStreamingPreference();
+    oceanContinuousToggle.addEventListener('change', () => {
+      if (!writeOceanStreamingPreference(oceanContinuousToggle.checked)) {
+        oceanContinuousToggle.checked = oceanStreamingPreference();
+        if (explorationStatus) explorationStatus.textContent = 'This browser could not save the setting. Your previous mode is kept.';
+        return;
+      }
+      if (explorationStatus) explorationStatus.textContent = oceanContinuousToggle.checked ? 'Continuous exploration enabled for new ocean voyages. Saved voyages keep their mode.' : 'New ocean voyages stay at the selected dive site. Saved voyages keep their mode.';
     });
   }
   const renderQualitySelect = document.getElementById('renderQualitySelect');

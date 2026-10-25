@@ -1,0 +1,13 @@
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="icon" href="data:,"><title>World Explorer 3D · World settings check</title><style>body{margin:0;padding:16px;background:#fff;font:14px/1.5 system-ui;color:#1e293b}main{max-width:600px;margin:auto}input:focus-visible{outline:3px solid #667eea;outline-offset:3px}</style></head><body><main><h1>World exploration</h1><p>Current app settings · controlled component check</p><div id="settings"></div></main><script type="module">
+import {setupSettingsUi} from '/app/js/ui/settings.js';
+import {oceanStreamingPreference} from '/app/js/ocean/voyage-store.js';
+import {readRegionalSceneryPreference} from '/app/js/terrain/regional-scenery-scheduler.js';
+const source=await fetch('/app/index.html').then(response=>{if(!response.ok)throw Error('Settings source unavailable');return response.text();});
+const parsed=new DOMParser().parseFromString(source,'text/html');
+const section=parsed.getElementById('worldExplorationSettingsTitle')?.closest('section');
+if(!section)throw Error('Current world settings are missing');
+document.getElementById('settings').append(document.importNode(section,true));
+setupSettingsUi({apiConfig:{}});
+window.worldSettingsCheck={ready:true};
+window.render_game_to_text=()=>JSON.stringify({scope:'Settings only; no world runtime initialized',earth:readRegionalSceneryPreference(),ocean:oceanStreamingPreference(),status:document.getElementById('worldExplorationStatus').textContent});
+</script></body></html>

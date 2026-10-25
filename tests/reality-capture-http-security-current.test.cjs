@@ -19,6 +19,7 @@ const base = { ownerUid: 'owner', captureKind: 'exterior', status: 'approved',
 function harness(t, capture = base, extras = {}) {
   t.mock.method(console, 'error', () => {});
   const records = new Map(Object.entries(extras));
+  for (const uid of ['owner','visitor','moderator']) records.set(`users/${uid}/consents/community`, {version:'community-2026-10-24'});
   if (capture) records.set(`realityCaptures/${id}`, structuredClone(capture));
   const versions = new Map();
   const writes = [];
@@ -93,6 +94,14 @@ function harness(t, capture = base, extras = {}) {
   }
   return { call, bucket, records, reads, fileRequests, writes, mutate, hooks, authClaims };
 }
+
+test('capture creation, reservations, upload tickets and publication fail before side effects without explicit community acceptance', async t => {
+  const h=harness(t);h.records.delete('users/owner/consents/community');
+  for (const name of ['createRealityCaptureDraft','reserveRealityCapturePhoto','createRealityCaptureUploadUrl','submitRealityCaptureHybrid']) {
+    const response=await h.call(name,'owner');assert.equal(response.code,403);assert.match(response.body.error,/community rules/);
+  }
+  assert.deepEqual(h.writes,[]);assert.deepEqual(h.reads,[]);
+});
 
 test('continuing a contribution copies owned immutable photos and placements without changing the submitted version',async t=>{
   const {footprintSignature}=require('../functions/reality-capture-hybrid');

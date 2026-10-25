@@ -1,10 +1,12 @@
 import { postProtectedFunction } from './function-api.js?v=3';
+import { ensureCommunityTerms } from './community-consent.js?v=1';
 
 function sanitizeText(value, max = 180) {
   return String(value || '').replace(/\s+/g, ' ').trim().slice(0, max);
 }
 
 export async function saveOverlayFeatureDraft(input = {}) {
+  await ensureCommunityTerms();
   const payload = await postProtectedFunction(
     '/saveOverlayFeatureDraft',
     input,
@@ -14,6 +16,7 @@ export async function saveOverlayFeatureDraft(input = {}) {
 }
 
 export async function submitOverlayFeature(featureId) {
+  await ensureCommunityTerms();
   const payload = await postProtectedFunction(
     '/submitOverlayFeature',
     { featureId: sanitizeText(featureId || '', 180) },

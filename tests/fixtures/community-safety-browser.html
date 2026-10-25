@@ -1,0 +1,34 @@
+<!doctype html><html><head><link rel="icon" href="data:,"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/app/styles/runtime-shell.css"><style>body{margin:0;padding:16px;font:14px/1.5 system-ui;background:#f8fafc;color:#1e293b}main{max-width:600px;margin:auto}button,input{min-height:44px;max-width:100%;box-sizing:border-box}section{margin:16px 0;padding:14px;background:#0f172a;color:white;border-radius:12px}#roomChatMessages{min-height:90px}</style></head><body><main>
+<h1>Community controls check</h1><p>Component integration · disposable emulator accounts</p>
+<button id="join">Join room</button><button id="weekly">Join weekly room</button><p id="status" role="status"></p>
+<section><h2>Room chat</h2><div id="roomChatMessages"></div><input id="message" aria-label="Message"><button id="send">Send</button></section>
+<section><h2>Blocked players</h2><ul id="blocked"></ul></section>
+<section><h2>Invite a friend</h2><input id="target" aria-label="Player UID"><button id="invite">Add friend and invite</button><ul id="invites"></ul></section>
+</main><script type="module">
+import {initFirebase} from '/js/firebase-init.js?v=58';
+import {getCurrentUser,observeAuth} from '/js/auth-ui.js?v=56';
+import {joinRoomByCode,joinWeeklyFeaturedRoom,normalizeCode,normalizeCityKey} from '/app/js/multiplayer/rooms.js?v=67';
+import {sendMessage,listenChat} from '/app/js/multiplayer/chat.js?v=56';
+import {addFriend,sendInviteToFriend} from '/app/js/multiplayer/social.js?v=55';
+import {createUiRoomRenderers} from '/app/js/multiplayer/ui-room-renderers.js?v=3';
+import {createUiRoomRuntime} from '/app/js/multiplayer/ui-room-runtime.js?v=5';
+import {createUiRoomEventsApi} from '/app/js/multiplayer/ui-room-events.js?v=4';
+import * as support from '/app/js/multiplayer/ui-room-support.js?v=2';
+const helpers={...support,normalizeCode,normalizeCityKey};
+initFirebase();
+const state={authUser:null,entitlement:{plan:'free'},currentRoom:null,messages:[],players:[],friends:[],recentPlayers:[],invites:[],ownedRooms:[],featuredRooms:[],leaderboard:[],blockedPlayers:[],blockedPlayersReady:false};
+const refs={chatMessages:document.getElementById('roomChatMessages'),blockedPlayersList:document.getElementById('blocked'),titleInvitesList:document.getElementById('invites'),titleStatus:document.getElementById('status')};
+const appCtx={},ui=createUiRoomRenderers({appCtx,refs,state,helpers});
+const runtime=createUiRoomRuntime({appCtx,refs,state,renderers:ui,helpers});
+const handlers=new Proxy({...ui,...runtime},{get:(obj,key)=>obj[key]||(()=>{})});
+createUiRoomEventsApi({appCtx,refs,state,handlers,helpers,callbacks:{}}).wireEvents();
+observeAuth(user=>{state.authUser=user;runtime.ensureGlobalSubscriptions();});
+let detachChat=()=>{};
+async function action(fn){try{await fn();}catch(error){refs.titleStatus.textContent=error.message;}}
+async function join(weekly=false){const room=await (weekly?joinWeeklyFeaturedRoom():joinRoomByCode('ROOM01'));state.authUser=getCurrentUser();state.currentRoom=room;detachChat();detachChat=listenChat(room.id,messages=>{state.messages=messages;ui.renderChat();});refs.titleStatus.textContent='Joined '+room.code;}
+document.getElementById('join').onclick=()=>action(()=>join());
+document.getElementById('weekly').onclick=()=>action(()=>join(true));
+document.getElementById('send').onclick=()=>action(async()=>{await sendMessage(state.currentRoom.id,document.getElementById('message').value);refs.titleStatus.textContent='Message sent';});
+document.getElementById('invite').onclick=()=>action(async()=>{const target=document.getElementById('target').value;await addFriend(target,'Other explorer');await sendInviteToFriend(target,state.currentRoom.code,'Community check','Join us');refs.titleStatus.textContent='Invite sent';});
+window.communityCheck={state};window.render_game_to_text=()=>JSON.stringify({status:refs.titleStatus.textContent,room:state.currentRoom?.code,blocked:state.blockedPlayers.length,visibleMessages:refs.chatMessages.textContent});
+</script></body></html>

@@ -200,6 +200,7 @@ export const currentContractTests = [
   'tests/account-state-concurrency-current.test.mjs',
   'tests/room-session-lifecycle-current.test.mjs',
   'tests/room-chat-focus-current.test.mjs',
+  'tests/community-safety-current.test.mjs',
   'tests/parked-vehicle-identity-current.test.mjs',
   'tests/room-vehicle-reconciliation-current.test.mjs',
   'tests/place-search-lifecycle-current.test.mjs',
