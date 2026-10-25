@@ -33,6 +33,7 @@ jobs:
       - name: Install the targeted Android platform
         run: '"${ANDROID_HOME:?}/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "build-tools;36.0.0"'
       - name: Build and lint unsigned packages
+        if: ${{ !inputs.launch_check }}
         working-directory: android
         run: ./gradlew --no-daemon --max-workers=2 --dependency-verification strict :app:lintRelease :app:bundleRelease :app:assembleRelease
       - name: Build the same launcher for device diagnostics
@@ -52,6 +53,7 @@ jobs:
           retention-days: 30
           if-no-files-found: warn
       - name: Prepare package evidence and local signing tool
+        if: ${{ !inputs.launch_check }}
         run: |
           mkdir -p android-artifacts
           cp android/app/build/outputs/bundle/release/app-release.aab android-artifacts/
@@ -64,6 +66,7 @@ jobs:
           git rev-parse HEAD > android-artifacts/source-commit.txt
           (cd android-artifacts && sha256sum * > SHA256SUMS)
       - name: Retain the exact unsigned package and evidence
+        if: ${{ !inputs.launch_check }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: world-explorer-android-${{ github.sha }}

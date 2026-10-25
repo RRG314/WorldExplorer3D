@@ -3,13 +3,18 @@ set -euo pipefail
 mkdir -p android-launch-evidence
 SDK_ROOT="${ANDROID_HOME:?}"
 export PATH="$SDK_ROOT/platform-tools:$SDK_ROOT/emulator:$PATH"
+export ANDROID_USER_HOME="$RUNNER_TEMP/we3d-android"
+export ANDROID_AVD_HOME="$ANDROID_USER_HOME/avd"
+mkdir -p "$ANDROID_AVD_HOME"
 sudo chmod 666 /dev/kvm
 "$SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" "system-images;android-35;google_apis_playstore;x86_64" "emulator"
 printf 'no\n' | "$SDK_ROOT/cmdline-tools/latest/bin/avdmanager" create avd -n we3d-launch -k "system-images;android-35;google_apis_playstore;x86_64" --force
+test -f "$ANDROID_AVD_HOME/we3d-launch.ini"
+emulator -list-avds
 emulator -avd we3d-launch -no-window -no-audio -no-snapshot -gpu swiftshader_indirect -memory 2048 > android-launch-evidence/emulator.log 2>&1 &
 EMULATOR_PID=$!
-trap 'adb emu kill || true; wait "$EMULATOR_PID" || true' EXIT
-adb wait-for-device
+trap 'timeout 8 adb emu kill || true; kill "$EMULATOR_PID" 2>/dev/null || true' EXIT
+if ! timeout 120 adb wait-for-device; then cat android-launch-evidence/emulator.log; exit 1; fi
 timeout 240 bash -c 'until [ "$(adb shell getprop sys.boot_completed | tr -d "\r")" = 1 ]; do sleep 2; done'
 adb shell input keyevent 82
 adb shell getprop ro.build.version.release > android-launch-evidence/android-version.txt
