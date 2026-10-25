@@ -30,7 +30,7 @@ adb logcat -c
 adb shell am instrument -w -e ownedEmulator true io.worldexplorer3d.app/.PortalWidgetContractInstrumentation > android-widget-evidence/result.txt
 adb logcat -d > android-widget-evidence/logcat.txt
 adb shell dumpsys appwidget > android-widget-evidence/widget-ownership.txt
-for name in widget-investigation widget-saved native-trail widget-compact; do
+for name in widget-investigation widget-saved native-trail native-account widget-compact; do
     adb exec-out run-as io.worldexplorer3d.app cat "files/portal-evidence/$name.png" > "android-widget-evidence/$name.png" || true
 done
 git rev-parse HEAD > android-widget-evidence/source-commit.txt
