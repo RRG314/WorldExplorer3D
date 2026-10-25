@@ -216,6 +216,7 @@
       "getControlPromptLabel",
       "getKeyboardBindingsSnapshot",
       "getMobileTouchInputSnapshot",
+      "initVehicleTiltInput",
       "keyMatchesControlAction",
       "readControlActions",
       "registerPlaneTurnTap",
@@ -223,6 +224,7 @@
       "setKeyboardBinding",
       "setMobileTouchEnabled",
       "setMobileTouchPad",
+      "setMobileTouchPedal",
       "updateControlInput",
       "updateMobileTouchSettings"
     ],

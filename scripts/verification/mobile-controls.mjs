@@ -67,7 +67,7 @@ const pathTurnDegrees = (a, b, c) => {
   return Math.acos(cosine) * 180 / Math.PI;
 };
 
-async function touchDrag(selector, deltaX, deltaY, holdMs = 900) {
+async function touchDrag(selector, deltaX, deltaY, holdMs = 900, { accelerate = false } = {}) {
   const box = await page.locator(selector).boundingBox();
   assert.ok(box, `${selector} must be visible.`);
   const start = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
@@ -75,7 +75,10 @@ async function touchDrag(selector, deltaX, deltaY, holdMs = 900) {
   const point = (position) => ({ x: position.x, y: position.y, id: 0, radiusX: 5, radiusY: 5, force: 1 });
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [point(start)] });
   await page.waitForTimeout(80);
-  await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [point(end)] });
+  const pedal = accelerate ? await page.locator('#mobileDriveAccelerate').boundingBox() : null;
+  const heldPoints = [point(end), ...(pedal ? [{ id: 1, x: pedal.x + pedal.width / 2, y: pedal.y + pedal.height / 2, radiusX: 5, radiusY: 5, force: 1 }] : [])];
+  if (pedal) await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [point(start), heldPoints[1]] });
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: heldPoints });
   try {
     if (selector === '#largeMapCanvas') await page.waitForTimeout(holdMs);
     else {
@@ -334,7 +337,7 @@ try {
   await mode('drive', '#fDriving');
   const drivePackVisible = await page.locator('#urbanEquipmentToggle').isVisible();
   const driveBefore = await diagnostics();
-  await touchDrag('#mobileMovePad', 30, -48, 1_500);
+  await touchDrag('#mobileMovePad', 30, 0, 1_500, { accelerate: true });
   const driveMoved = await diagnostics();
   await touchDrag('#mobileLookPad', 43, 0, 900);
   const driveLooked = await diagnostics();

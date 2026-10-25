@@ -40,10 +40,10 @@ function resolveCarDriveCommand(options = {}) {
     requestedDirection,
     movingDirection,
     changingDirection,
-    serviceBrake: changingDirection,
+    serviceBrake: changingDirection || Number(options.serviceBrake) > 0.05,
     handbrake: brake > 0.05,
-    forward: requestedDirection === 1 && !changingDirection ? throttle : 0,
-    reverse: requestedDirection === -1 && !changingDirection ? reverse : 0
+    forward: requestedDirection === 1 && !changingDirection && !(Number(options.serviceBrake) > 0.05) ? throttle : 0,
+    reverse: requestedDirection === -1 && !changingDirection && !(Number(options.serviceBrake) > 0.05) ? reverse : 0
   });
 }
 

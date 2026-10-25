@@ -1,14 +1,14 @@
 import {activeActorPose} from './transport/actor-contract.js?v=6';
 import { cameraFollowHistory, smoothMovingCameraTarget } from './hud/moving-camera-target.js';
 import { ctx as appCtx } from './shared-context.js?v=55';
-import { aircraftBankTurnFactor, aircraftChaseOffset, aircraftForwardVector, integrateAerobaticAttitude } from './controls/traversal-control-policy.js?v=8';
+import { aircraftBankTurnFactor, aircraftChaseOffset, aircraftForwardVector, integrateAerobaticAttitude } from './controls/traversal-control-policy.js?v=9';
 import { aircraftGearSamplePoints } from './plane/roof-contact.js?v=2';
 import { applyAircraftHeadingTurn, classicAircraftBankTurnRate, integrateFixedWingFlight, resolveAircraftFlightTuning } from './plane/flight-dynamics.js?v=4';
 import { sampleSweptContact } from './physics/swept-contact.js?v=1';
 import { getAviationCatalogEntry } from './transport/aviation-catalog.js?v=5';
 import { aircraftGroundOffset, createAircraftVisual, updateAircraftVisual } from './transport/aircraft-visual-recipe.js?v=11';
 import { applyTransportDamage } from './transport/damage-model.js?v=1';
-import { resolveMobileCameraRecenter } from './controls/mobile-touch-authority.js?v=5';
+import { resolveMobileCameraRecenter } from './controls/mobile-touch-authority.js?v=6';
 
 const PLANE_MAX_SPEED_MPS = 84;
 

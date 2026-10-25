@@ -14,7 +14,7 @@ import { resolveTunnelCameraState } from "./hud/tunnel-camera-controller.js?v=6"
 import { resolveTunnelCameraBoom } from './hud/tunnel-camera-boom.js';
 import { createVehicleCameraBody, selectBodySafeCamera, vehicleCameraProbeRadius, vehicleRoofOrbitPoint, vehicleClearanceLookTarget } from './hud/vehicle-camera-body.js';
 import { applyDrivingCabinCamera, setCabinNearClip } from './hud/driving-cabin-camera.js';
-import { cameraSmoothingBlend } from "./controls/traversal-control-policy.js?v=8";
+import { cameraSmoothingBlend } from "./controls/traversal-control-policy.js?v=9";
 import { beginCameraFollowFrame, cameraFollowHistory, smoothMovingCameraTarget } from "./hud/moving-camera-target.js";
 import { planetarySurfaceYAtRenderXZ } from './planetary/runtime/surface-query.js?v=3';
 // hud.js - HUD updates, camera system, sky positioning

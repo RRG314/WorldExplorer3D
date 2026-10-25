@@ -1,9 +1,12 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
 import {
   loadMobileTouchSettings,
+  mobileDrivingSteeringGain,
   resolveMobileSemanticActions,
   saveMobileTouchSettings
-} from './mobile-touch-authority.js?v=5';
+} from './mobile-touch-authority.js?v=6';
+import { carSpeedToMph } from '../physics/vehicle-speed-units.js?v=2';
+import { createVehicleTiltInput } from './vehicle-tilt-input.js?v=1';
 import {
   keyMatchesKeyboardAction,
   keyboardActionPressed,
@@ -26,10 +29,12 @@ const mobileTouchState = {
   enabled: false,
   move: { x: 0, y: 0, active: false },
   look: { x: 0, y: 0, active: false },
+  pedals: { throttle: 0, reverse: 0 },
   lastMoveInputAt: 0,
   lastLookInputAt: 0,
   settings: loadMobileTouchSettings()
 };
+let vehicleTiltInput = null;
 const PLANE_DOUBLE_TAP_WINDOW_MS = 340;
 const HELD_CONTROL_CODES = Object.freeze([
   'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight',
@@ -110,6 +115,7 @@ function keyboardControlActions(keys = {}, mode = 'drive') {
     lookPitch,
     throttle: Math.max(0, move),
     reverse: Math.max(0, -move),
+    serviceBrake: 0,
     brake: (planeControls
       ? boostAction
       : keyboardActionPressed(keys, 'primary_action')) ? 1 : 0,
@@ -225,12 +231,50 @@ function mergeMobileTouch(actions) {
 
 function readControlActions(mode = 'drive') {
   const normalizedMode = normalizeMode(mode);
-  return mergeMobileTouch(mergeGamepad(keyboardActions(normalizedMode), inputState.gamepad || connectedGamepad()));
+  const hardware = mergeGamepad(keyboardActions(normalizedMode), inputState.gamepad || connectedGamepad());
+  const hardwareTurn = Math.abs(hardware.turn) > 0;
+  const hardwareMove = Math.abs(hardware.move) > 0;
+  const hardwareDriveSpeed = hardwareMove || hardware.throttle > 0 || hardware.reverse > 0 || hardware.brake > 0;
+  const actions = mergeMobileTouch(hardware);
+  const tilt = mobileTouchState.enabled ? vehicleTiltInput?.read(normalizedMode, mobileTouchState.settings) : null;
+  if (normalizedMode === 'drive' && !hardwareTurn && (mobileTouchState.move.active || tilt)) {
+    const gain = mobileDrivingSteeringGain(carSpeedToMph(appCtx.car?.speed));
+    if (mobileTouchState.move.active) { actions.turn *= gain; actions.steer = actions.turn; }
+    else if (tilt) tilt.turn *= gain;
+  }
+  if (!tilt) return actions;
+  actions.mobileTilt = true;
+  if (!hardwareTurn && !mobileTouchState.move.active) actions.turn = tilt.turn;
+  actions.steer = actions.turn;
+  if (normalizedMode === 'drive') {
+    if (tilt.speed && !hardwareDriveSpeed && !mobileTouchState.pedals.throttle && !mobileTouchState.pedals.reverse) {
+      actions.move = Math.max(0, tilt.move);
+      actions.throttle = actions.move;
+      // Tilting back is a service brake. It never engages reverse or drift.
+      actions.serviceBrake = Math.max(0, -tilt.move);
+    }
+  } else {
+    if (!hardwareMove && !mobileTouchState.move.active) actions.move = tilt.move;
+    if (normalizedMode === 'plane') { actions.pitch = -actions.move; actions.roll = actions.turn; }
+  }
+  return actions;
 }
+
+function initVehicleTiltInput(options) {
+  vehicleTiltInput?.dispose();
+  vehicleTiltInput = createVehicleTiltInput(options);
+  return vehicleTiltInput;
+}
+
+function setMobileTouchPedal(pedal, pressed) {
+  if (!Object.hasOwn(mobileTouchState.pedals, pedal)) return;
+  mobileTouchState.pedals[pedal] = pressed === true ? 1 : 0;
+}
+
 
 function setMobileTouchEnabled(enabled) {
   mobileTouchState.enabled = enabled === true;
-  if (!mobileTouchState.enabled) clearMobileTouchInput('disabled');
+  if (!mobileTouchState.enabled) { clearMobileTouchInput('disabled'); vehicleTiltInput?.suspend(); }
   return mobileTouchState.enabled;
 }
 
@@ -250,6 +294,7 @@ function setMobileTouchPad(pad, x = 0, y = 0, active = true, now = performance.n
 function clearMobileTouchInput(reason = 'runtime') {
   Object.assign(mobileTouchState.move, { x: 0, y: 0, active: false });
   Object.assign(mobileTouchState.look, { x: 0, y: 0, active: false });
+  Object.assign(mobileTouchState.pedals, { throttle: 0, reverse: 0 });
   return String(reason || 'runtime');
 }
 
@@ -263,6 +308,8 @@ function getMobileTouchInputSnapshot() {
     enabled: mobileTouchState.enabled,
     move: { ...mobileTouchState.move },
     look: { ...mobileTouchState.look },
+    pedals: { ...mobileTouchState.pedals },
+    tilt: vehicleTiltInput?.snapshot() || { enabled: false, status: 'off' },
     lastMoveInputAt: mobileTouchState.lastMoveInputAt,
     lastLookInputAt: mobileTouchState.lastLookInputAt,
     settings: { ...mobileTouchState.settings }
@@ -298,6 +345,9 @@ function controlPromptLabel(actionId) {
 }
 
 function updateControlInput() {
+  // Readiness/overlay changes must release and restore phone input even when
+  // they do not trigger a mode-menu refresh. The UI only changes on transition.
+  appCtx.updateMobileTouchControls?.(undefined, { contextOnly: true });
   const gamepad = connectedGamepad();
   inputState.gamepad = gamepad;
   inputState.updatedAt = typeof performance !== 'undefined' ? performance.now() : Date.now();
@@ -335,6 +385,7 @@ function clearControlInputState(reason = 'runtime') {
   inputState.lastPlaneTurnTapAt.ArrowRight = -Infinity;
   inputState.pendingPlaneBarrelRoll = 0;
   clearMobileTouchInput(reason);
+  vehicleTiltInput?.suspend();
   inputState.updatedAt = typeof performance !== 'undefined' ? performance.now() : Date.now();
   return String(reason || 'runtime');
 }
@@ -365,6 +416,8 @@ Object.assign(appCtx, {
   setKeyboardBinding,
   setMobileTouchEnabled,
   setMobileTouchPad,
+  setMobileTouchPedal,
+  initVehicleTiltInput,
   updateMobileTouchSettings,
   updateControlInput
 });
@@ -380,6 +433,8 @@ export {
   registerPlaneTurnTap,
   setMobileTouchEnabled,
   setMobileTouchPad,
+  setMobileTouchPedal,
+  initVehicleTiltInput,
   updateControlInput,
   updateMobileTouchSettings
 };
