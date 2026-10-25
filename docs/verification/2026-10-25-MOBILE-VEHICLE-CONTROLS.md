@@ -60,3 +60,19 @@ Frozen/staging verification, protected source review and production activation
 remain pending at this source checkpoint. Physical phone sensor feel/performance
 requires owner testing; desktop synthetic samples cannot establish it. Existing
 whole-game evidence is retained; no unrelated historical matrix is repeated.
+
+## Staging follow-up before production
+
+The first compiled staging journey passed car controls, tilt, two layout center
+hit checks and aircraft tilt/touch override, with no page errors. Its spacecraft
+assertion incorrectly read the Earth action's jump instead of the existing
+spacecraft key channel. The corrected check observes that channel and the actual
+space controller's thrust state, after launch readiness and a rendered frame.
+
+Screenshot inspection also rejected the apparent post-rotation layout pass:
+mobile shrink-to-fit retained an old 844px canvas width on a 360px portrait screen.
+A minimal installed-Chrome reproduction confirms `innerWidth`/scrollWidth stays
+844 without bounds and becomes exactly 360 with canvas max-width:100vw. Main and
+existing auxiliary renderer owners now bound their own canvases to the viewport.
+The layout check requires the requested viewport width as well as hit targets.
+Original failed evidence is retained; no overall staging pass is claimed yet.

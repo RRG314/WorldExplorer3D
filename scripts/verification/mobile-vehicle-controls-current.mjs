@@ -76,6 +76,7 @@ try {
   await page.locator('#ctrlHeader').click();
   for (const viewport of [{ width: 844, height: 390 }, { width: 360, height: 740 }]) {
     await page.setViewportSize(viewport);
+    await page.waitForFunction(width => innerWidth === width && document.documentElement.scrollWidth === width, viewport.width);
     const hitTargets = await page.evaluate(() => ['mobileMovePad', 'mobileDriveAccelerate', 'mobileDriveBrakeReverse', 'mobileActionPrimary', 'mobileLookPad'].map(id => {
       const e = document.getElementById(id), b = e.getBoundingClientRect(), hit = document.elementFromPoint(b.x + b.width / 2, b.y + b.height / 2);
       return { id, x: b.x, y: b.y, width: b.width, height: b.height, hit: hit === e || e.contains(hit), visible: b.x >= 0 && b.y >= 0 && b.right <= innerWidth && b.bottom <= innerHeight };
@@ -106,14 +107,16 @@ try {
   await page.screenshot({ path: `${out}/plane-tilt.png` });
   report.checks.push({ id: 'plane-tilt-and-touch-override', planeTilt, manualPlane });
   await page.locator('#travelBtn').click(); await page.locator('#fSpaceRocket').click();
-  await page.waitForFunction(() => vehicleQa.spaceFlight?.active && vehicleQa.spaceFlight?.rocket, null, { timeout: 90000 });
+  await page.waitForFunction(() => vehicleQa.spaceFlight?.active && !vehicleQa.paused && vehicleQa.spaceFlight?.renderer?.info.render.frame > 0, null, { timeout: 90000 });
   await page.locator('#mobileTouchControls.show.mode-rocket').waitFor({ state: 'visible' });
   await controls(); await orient(40, 0); await controls(); await orient(60, 25);
   await page.waitForTimeout(100); const spaceTilt = await controls();
   assert.ok(spaceTilt.move < 0); assert.ok(spaceTilt.turn < 0);
   const [tx, ty] = await center('#mobileActionPrimary');
-  await dispatch('touchStart', [[1, tx, ty]]); assert.ok((await controls()).jump > 0);
-  await dispatch('touchCancel', []); assert.equal((await controls()).jump, 0);
+  await dispatch('touchStart', [[1, tx, ty]]); assert.equal(await page.evaluate(() => vehicleQa.spaceFlight.keys[' ']), true);
+  await page.waitForFunction(() => vehicleQa.spaceFlight._isThrusting === true);
+  await dispatch('touchCancel', []); assert.equal(await page.evaluate(() => vehicleQa.spaceFlight.keys[' ']), false);
+  await page.waitForFunction(() => vehicleQa.spaceFlight._isThrusting === false);
   await page.screenshot({ path: `${out}/space-tilt.png` });
   report.checks.push({ id: 'space-tilt-and-thrust-release', spaceTilt });
   assert.deepEqual(report.pageErrors, []);

@@ -82,6 +82,7 @@ export function createAuxiliaryRenderer({
         ...(canvas ? { canvas } : {}),
         ...attempts[index]
       });
+      Object.assign(renderer.domElement.style, { maxWidth: '100vw', maxHeight: '100vh' });
       applyDisplayColorPolicy(renderer, THREE);
       if (size && Number.isFinite(size.width) && Number.isFinite(size.height)) {
         renderer.setSize(size.width, size.height, false);
