@@ -11,6 +11,10 @@ on:
         description: Verify the native Portal widget and Trail in an owned emulator
         type: boolean
         default: false
+      widget_only:
+        description: Check only debug widget interactions (does not verify a release package)
+        type: boolean
+        default: false
   push:
     branches: [steven/android-testing]
     paths: ['android/**', '.github/workflows/android-test.yml']
@@ -37,9 +41,11 @@ jobs:
       - name: Install the targeted Android platform
         run: '"${ANDROID_HOME:?}/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "build-tools;36.0.0"'
       - name: Build and lint unsigned packages
+        if: github.event_name != 'workflow_dispatch' || !inputs.widget_only
         working-directory: android
         run: ./gradlew --no-daemon --max-workers=2 --dependency-verification strict :app:lintRelease :app:bundleRelease :app:assembleRelease
       - name: Prepare package evidence and local signing tool
+        if: github.event_name != 'workflow_dispatch' || !inputs.widget_only
         run: |
           mkdir -p android-artifacts
           cp android/app/build/outputs/bundle/release/app-release.aab android-artifacts/
@@ -68,7 +74,7 @@ jobs:
           retention-days: 30
           if-no-files-found: warn
       - name: Verify Android launch and connection recovery
-        if: github.event_name != 'workflow_dispatch' || inputs.launch_check
+        if: github.event_name != 'workflow_dispatch' || (inputs.launch_check && !inputs.widget_only)
         timeout-minutes: 12
         run: bash scripts/verification/android-cold-launch.sh
       - name: Preserve Android launch evidence
@@ -80,6 +86,7 @@ jobs:
           retention-days: 30
           if-no-files-found: warn
       - name: Retain the exact unsigned package and evidence
+        if: always() && (github.event_name != 'workflow_dispatch' || !inputs.widget_only)
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: world-explorer-android-${{ github.sha }}

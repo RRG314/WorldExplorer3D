@@ -31,5 +31,6 @@ for name in widget-investigation widget-saved native-trail widget-compact; do
     adb exec-out run-as io.worldexplorer3d.app cat "files/portal-evidence/$name.png" > "android-widget-evidence/$name.png" || true
 done
 git rev-parse HEAD > android-widget-evidence/source-commit.txt
+git rev-parse HEAD:android/app/src/main > android-widget-evidence/native-main-source-tree.txt
 cat android-widget-evidence/result.txt
 grep -q 'INSTRUMENTATION_RESULT: passed=true' android-widget-evidence/result.txt

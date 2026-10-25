@@ -41,7 +41,7 @@ public final class PortalWidgetContractInstrumentation extends Instrumentation {
             store.act(id,"save");store.act(id,"investigate");store.act(id,"unsave");JSONObject state=new PortalStore(context).trail(id);
             check(!state.getBoolean("saved")&&state.getLong("investigatedAt")>0&&state.getLong("visitedAt")==0&&state.getJSONArray("expeditionIds").length()==0,"Native choices changed visit/reward semantics.");
             boolean denied=false;try{store.act(id,"visit");}catch(Exception expected){denied=true;}check(denied,"Widget accepted game visit verb.");
-            String invalid=store.catalog().toString().replace("/app/?portal=baltimore-harbor&pr=1","https://invalid.example/");denied=false;try{PortalStore.validateCatalog(invalid);}catch(Exception expected){denied=true;}check(denied,"Malformed game link was accepted.");
+            JSONObject invalid=store.catalog();invalid.getJSONArray("destinations").getJSONObject(0).put("gameLink","https://invalid.example/");denied=false;try{PortalStore.validateCatalog(invalid.toString());}catch(Exception expected){denied=true;}check(denied,"Malformed game link was accepted.");
             check(!store.gameAvailable(place,System.currentTimeMillis()),"Unqualified bundled destination offered a game entry.");
             result.putInt("persistence_contract_checks",4);
             AppWidgetManager manager=AppWidgetManager.getInstance(context);host=new AppWidgetHost(context,60252);widgetId=host.allocateAppWidgetId();
