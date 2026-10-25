@@ -6,6 +6,7 @@ import { startStaticServer } from './static-server.mjs';
 import { closeOwnedBrowser } from './owned-browser.mjs';
 import { configureStagingAppCheck } from './staging-app-check.mjs';
 import { runPrescribedGameActions } from './prescribed-game-actions.mjs';
+import { createStagingGatewayHandler } from './staging-proxy-delivery.mjs';
 
 // Frozen released web artifact, staging services, one selected world per engine.
 // Real browser engines; synthetic sensor samples are not physical phone tests.
@@ -14,7 +15,8 @@ assert.ok(['chromium', 'webkit'].includes(name));
 const out = process.env.WE3D_MOBILE_WEB_OUTPUT || `output/research/mobile-vehicle-controls-2026-10-25/mobile-web-${name}`;
 await fs.mkdir(out, { recursive: true });
 assert.ok(process.env.WE3D_VERIFY_ROOT, 'Use an explicitly frozen artifact.');
-const server = await startStaticServer({ rootDir: path.resolve(process.env.WE3D_VERIFY_ROOT), ports: [4536] });
+assert.ok(process.env.WE3D_STAGING_APP_CHECK_FILE, 'Use a temporary registered staging credential.');
+const server = await startStaticServer({ rootDir: path.resolve(process.env.WE3D_VERIFY_ROOT), ports: [4536], handleRequest: createStagingGatewayHandler() });
 const base = `http://127.0.0.1:${server.port}`;
 const engine = name === 'webkit' ? webkit : chromium;
 const owned = await engine.launchServer({ headless: true, ...(name === 'chromium' ? { channel: 'chrome', args: ['--js-flags=--max-old-space-size=1536'] } : {}) });
@@ -27,7 +29,9 @@ try {
   page.on('pageerror', e => report.pageErrors.push(e.message));
   page.on('console', m => { if (m.type() === 'error') report.consoleErrors.push(m.text().slice(0, 500)); });
   page.on('response', r => { if (r.status() >= 400) { const u = new URL(r.url()); report.resourceFailures.push({ status: r.status(), url: u.origin + u.pathname }); } });
-  report.attestation = await configureStagingAppCheck(page, base);
+  // API rewrites are served above, including requests controlled by the real
+  // offline worker. Only the local Firebase configuration needs a page route.
+  report.attestation = await configureStagingAppCheck(page, base, { proxyGeospatial: false });
   if (name === 'webkit') await page.addInitScript(() => {
     globalThis.__motionPermissionQa = { answer: 'denied', calls: [], clickTrusted: false };
     document.addEventListener('click', event => {
@@ -154,7 +158,26 @@ try {
     await page.waitForFunction(() => mobileWebQa.spaceFlight._isThrusting === false);
     await page.screenshot({ path: `${out}/space-mobile-web.png` }); report.checks.push({ id: 'webkit-space-tilt-thrust-release', spaceTilt });
   }
-  assert.deepEqual(report.pageErrors, []); assert.deepEqual(report.consoleErrors, []);
+  report.cdnCodecs = await page.evaluate(async () => {
+    const [{default: Pbf}, {VectorTile}, {PMTiles}] = await Promise.all([
+      import('https://cdn.jsdelivr.net/npm/pbf@3.2.1/+esm'),
+      import('https://cdn.jsdelivr.net/npm/@mapbox/vector-tile@1.3.1/+esm'),
+      import('https://cdn.jsdelivr.net/npm/pmtiles@4.4.1/+esm')
+    ]);
+    const writer = new Pbf(); writer.writeVarint(42);
+    return { pbfRoundTrip: new Pbf(writer.finish()).readVarint(), emptyTileLayers: Object.keys(new VectorTile(new Pbf(new Uint8Array())).layers), pmtilesConstructor: typeof PMTiles };
+  });
+  assert.deepEqual(report.cdnCodecs, { pbfRoundTrip: 42, emptyTileLayers: [], pmtilesConstructor: 'function' });
+  // Desktop WebKit emits extra origin-relative CDN dependency requests even
+  // when actual imports and decoding succeed. Retain the raw failures and permit
+  // only these diagnosed engine requests, with the real codecs checked above.
+  const knownWebKitPaths = new Set(['/npm/@mapbox/point-geometry@0.1.0/+esm', '/npm/ieee754@1.1.13/+esm', '/npm/fflate@0.8.2/+esm']);
+  report.browserEngineWarnings = report.resourceFailures.filter(r => name === 'webkit' && r.status === 404 && new URL(r.url).origin === base && knownWebKitPaths.has(new URL(r.url).pathname));
+  assert.deepEqual(report.resourceFailures.filter(r => !report.browserEngineWarnings.includes(r)), []);
+  const console404 = report.consoleErrors.filter(m => m === 'Failed to load resource: the server responded with a status of 404 (Not Found)');
+  assert.equal(console404.length, report.browserEngineWarnings.length);
+  assert.deepEqual(report.consoleErrors.filter(m => !console404.includes(m)), []);
+  assert.deepEqual(report.pageErrors, []);
   report.passed = true;
 } catch (error) {
   report.failure = error.stack; process.exitCode = 1; await page?.screenshot({ path: `${out}/failed.png` }).catch(() => {});

@@ -47,3 +47,43 @@ test('context closure may race the page closed flag without a second fulfillment
   }});
   assert.equal(attempts, 1);
 });
+
+// The browser verifier keeps its real offline worker; the owned server routes
+// these requests independently of Playwright's page interception.
+import {createStagingGatewayHandler} from '../scripts/verification/staging-proxy-delivery.mjs';
+function gatewayResponse() {
+  return {headers: {}, status: null, body: null,
+    setHeader(k,v) {this.headers[k] = v;},
+    writeHead(status) {this.status = status; return this;},
+    end(body) {this.body = body; return this;}};
+}
+test('owned staging gateway pins authority, forwards App Check only and preserves provider failure', async () => {
+  const calls = [], handler = createStagingGatewayHandler({fetchImpl: async (url, options) => {
+    calls.push({url: String(url), options}); return new Response('{"error":"busy"}', {status: 429, headers: {'retry-after': '60'}});
+  }}), response = gatewayResponse();
+  assert.equal(await handler({method: 'GET', headers: {'x-firebase-appcheck': 'test-token', cookie: 'private', authorization: 'private'}}, response,
+    new URL('http://127.0.0.1/api/geospatial/weather?kind=weather&latitude=39&longitude=-76&url=https://example.test')), true);
+  const target = new URL(calls[0].url);
+  assert.equal(target.origin, 'https://us-central1-we3d-staging-20260712.cloudfunctions.net');
+  assert.equal(target.pathname, '/getEnvironmentalData'); assert.equal(target.searchParams.get('latitude'), '39');
+  assert.deepEqual(calls[0].options.headers, {'X-Firebase-AppCheck': 'test-token'});
+  assert.equal(calls[0].options.redirect, 'error');
+  assert.equal(response.status, 429); assert.equal(String(response.body), '{"error":"busy"}'); assert.equal(response.headers['Retry-After'], '60');
+});
+test('owned staging gateway refuses writes and ignores unrelated paths without contacting upstream', async () => {
+  const handler = createStagingGatewayHandler({fetchImpl: () => {throw Error('Unexpected network access');}}), denied = gatewayResponse();
+  assert.equal(await handler({method: 'POST', headers: {}}, denied, new URL('http://127.0.0.1/api/geospatial/reverse')), true);
+  assert.equal(denied.status, 405);
+  const ignored = gatewayResponse();
+  assert.equal(await handler({method: 'GET', headers: {}}, ignored, new URL('http://127.0.0.1/private')), false); assert.equal(ignored.status, null);
+});
+test('owned staging gateway bounds upstream bodies and returns a safe failure', async () => {
+  for (const failure of ['network', 'oversized']) {
+    const handler = createStagingGatewayHandler({fetchImpl: async () => {
+      if (failure === 'network') throw Error('private upstream diagnostic');
+      return new Response(new Uint8Array(6000001));
+    }}), response = gatewayResponse();
+    await handler({method: 'GET', headers: {}}, response, new URL('http://127.0.0.1/api/geospatial/reverse'));
+    assert.equal(response.status, 502); assert.equal(String(response.body).includes('private'), false);
+  }
+});
