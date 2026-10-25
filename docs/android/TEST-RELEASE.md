@@ -227,3 +227,21 @@ and signing-certificate registration is Registered. No review approval, public
 production access or physical Android acceptance is claimed. Final frontend
 cleanup delivery receipts are in the location-default operational folder; no
 new Android binary is required.
+
+## October 25 startup repair
+
+Do not use internal code 3 as a working launch candidate: its missing Browser
+Helper settings activity causes a reproduced native startup crash. Code 4 /
+5.6.1-test.4 declares that private activity and passed focused release-bytecode
+cold-launch, offline, retry and relaunch checks on an owned API35 emulator.
+The browser phases stop at Chrome's first-run screen, so physical Play-installed
+and web gameplay acceptance remain distinct. The original upload key is reused.
+
+The signed version 4 AAB is ready; Console upload/activation still awaits the
+extension's file URL capability. Do not claim it is available to testers until
+an operational receipt confirms publication. See
+`docs/verification/2026-10-25-ANDROID-LAUNCH-CRASH.md` and the October 25 CURRENT-STATE
+section. The native check now runs by default in Android test-package dispatches,
+with bounded setup waits and screenshots/logs retained on failure. Its Node
+checker rejects the actual version 3 crash and silent home returns. Browser Helper
+and world/session/save authorities are preserved; no broad web sweep is needed.
