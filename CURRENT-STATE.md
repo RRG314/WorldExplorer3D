@@ -4,18 +4,49 @@ Updated October 25, 2026. Use the latest sections below for current identities;
 dated sections further down retain historical evidence. The owner has authorized
 necessary production/protected-source work; do not ask again for that scope.
 
-## October 25 server request-parser security — candidate
+## October 25 normal mobile website — controls accepted
 
-A newly surfaced availability advisory affects body-parser 1.20.6 in the Functions
-lockfile. An isolated owned HTTP process reproduces the old crash; the compatible
-1.20.9 patch survives it. Four focused cases pass and the production dependency
-audit reports zero findings. No malformed requests were sent to live services.
-Only that transitive package changes; game/Function code is unchanged. Cloud
-configuration, IAM and source recovery are being captured before staging/prod
-updates. The wildcard inventory returned 503; existing us-central1 lists all 84
-Functions ACTIVE. See `docs/verification/2026-10-25-REQUEST-PARSER-SECURITY.md`.
-Source protection and cloud deployment are still pending; the vehicle release
-below does not itself resolve this backend advisory.
+The owner additionally requires phone-browser use outside the Play app. The
+released source 52d5f24 is verified explicitly without the Play distribution
+flag: six real Chrome mobile-web checks pass with zero page/console errors.
+WebKit completes nine focused car, permission, fallback, layout, aircraft and
+rendered-spacecraft checks. Its full report remains failed on diagnosed network
+errors: worker-controlled requests bypassed the local Playwright gateway, and
+three extra origin-relative CDN requests returned 404 despite actual modules
+loading. Isolated browser proofs reproduce both issues, validate actual codecs,
+and prove real staging lookup returns 200 with the real offline worker after
+moving the verifier's gateway into the existing owned server. Seven proxy cases
+pass. No second WebKit world sweep or shipped game change is needed for tooling.
+Raw failed results remain unchanged. Screenshots were inspected; owned browsers
+closed and temporary staging attestation revoked. Desktop engine/synthetic sensor
+coverage does not qualify physical Android/iPhone sensor feel or every old OS.
+See `docs/verification/2026-10-25-MOBILE-WEB-CONTROLS.md`. The Play package and
+production game identity below remain unchanged.
+
+## October 25 server request-parser security — released
+
+Protected PR132 merged as 249fa2b6655d640fbbb2820476246d564e487dbb from reviewed
+fa09fdb39981f29ed87c81b1f77addaf2e4f4c67; required checks passed and trees match.
+The compatible body-parser 1.20.6 → 1.20.9 patch resolves the identified
+GHSA-27r3-jxmh-p828 process-crash advisory. Four focused parser cases pass and the
+production dependency audit reports zero findings. GitHub marks the alert fixed.
+No malformed request was sent to live services.
+
+All 84 existing Functions in staging and production are updated and ACTIVE. Each
+existing source archive received only the reviewed lock entry; all other business
+files and dependencies stay byte-identical. Four staging and five production
+active source groups match downloaded archive hashes. Every Function's immutable
+configuration/IAM and Auth/project IAM/rules/Hosting are preserved. Source/config
+recovery stays private. Final production HTTP checks return expected 200/405/401.
+
+A queued production build hit a resource limit. Only that service was retried;
+its expired upload URL was refreshed from the identical qualified archive before
+the successful retry. The other 83 updates were retained. Initial inventory,
+ZIP, CI, premature staging audit and cloud-build failures remain recorded.
+See `docs/verification/2026-10-25-REQUEST-PARSER-SECURITY.md` and
+`output/research/request-parser-security-2026-10-25/` for exact preservation,
+protected-source, source-group and HTTP receipts. This server patch does not
+change the web game, Android package or player data.
 
 ## October 25 mobile vehicle controls — released
 
@@ -49,10 +80,10 @@ See `docs/verification/2026-10-25-MOBILE-VEHICLE-CONTROLS.md` and
 protected-release, parity and activation receipts). Previous packages and failed
 attempts have byte-verified recovery overlays; raw package count remains four.
 
-A newly surfaced body-parser advisory (GHSA-27r3-jxmh-p828) affects the Functions
-lockfile's 1.20.6. The current audit reports one high finding. This is a separate
-server dependency patch in progress under the owner's existing security scope;
-the vehicle release does not claim to resolve it or prove production exploitation.
+At vehicle-release time the newly surfaced body-parser advisory
+GHSA-27r3-jxmh-p828 affected the Functions lockfile. Its separate server repair is
+recorded above; the vehicle release itself did not resolve that dependency or
+prove production exploitation.
 
 ## October 25 Android startup crash — version 4 internal test released
 

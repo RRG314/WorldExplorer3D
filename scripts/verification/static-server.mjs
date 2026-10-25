@@ -21,13 +21,14 @@ const MIME = Object.freeze({
   '.webp': 'image/webp'
 });
 
-async function listen(rootDir, host, port) {
+async function listen(rootDir, host, port, handleRequest) {
   const sockets = new Set();
   const server = http.createServer(async (request, response) => {
     try {
       assertPreviewRequest(request, server.address().port, host);
       response.setHeader('X-Content-Type-Options', 'nosniff');
       const requestUrl = new URL(request.url || '/', `http://${host}:${port}`);
+      if (await handleRequest?.(request, response, requestUrl)) return;
       if(await servePlaceLookupPreview(request,response,requestUrl))return;
       // Match the local preview's read-only backend route. A static 404 here
       // prevents real DeFlock journeys from exercising their production source.
@@ -91,10 +92,10 @@ async function listen(rootDir, host, port) {
   };
 }
 
-export async function startStaticServer({ rootDir, host = '127.0.0.1', ports = [] }) {
+export async function startStaticServer({ rootDir, host = '127.0.0.1', ports = [], handleRequest }) {
   for (const port of ports) {
     try {
-      return await listen(path.resolve(rootDir), host, port);
+      return await listen(path.resolve(rootDir), host, port, handleRequest);
     } catch {
       // Try the next bounded port; parallel local verification may own this one.
     }

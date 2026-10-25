@@ -4,7 +4,7 @@ import { fulfillStagingProxyRoute } from './staging-proxy-delivery.mjs';
 
 // Credentials stay outside the build and reports. This only configures the
 // documented Firebase debug provider in an explicitly local staging browser.
-export async function configureStagingAppCheck(page, baseUrl) {
+export async function configureStagingAppCheck(page, baseUrl, { proxyGeospatial = true } = {}) {
   const credentialPath = process.env.WE3D_STAGING_APP_CHECK_FILE;
   if (!credentialPath) return { provider: 'default' };
   const url = new URL(baseUrl);
@@ -32,7 +32,7 @@ export async function configureStagingAppCheck(page, baseUrl) {
   }, { token: credential.token, config });
   // Local immutable-artifact verification mirrors the Hosting rewrite against
   // the explicit staging authority. No production endpoint or free-provider bypass.
-  if (process.env.WE3D_VERIFY_HOSTED_PLACE_LOOKUP === '1') {
+  if (proxyGeospatial && process.env.WE3D_VERIFY_HOSTED_PLACE_LOOKUP === '1') {
     await page.route(candidate => candidate.origin === url.origin && ['/api/geospatial/search', '/api/geospatial/reverse', '/api/geospatial/weather', '/api/geospatial/marine', '/api/geospatial/aircraft'].includes(candidate.pathname), async route => {
       const request = new URL(route.request().url());
       const environmental = ['/api/geospatial/weather','/api/geospatial/marine'].includes(request.pathname);
