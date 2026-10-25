@@ -1005,6 +1005,9 @@ async function deleteUserData(uid) {
   } else {
     await deleteDocsByQuery(explorerProfileRef.collection('items'), 200, 'explorerProfiles/{uid}/items');
     await deleteDocsByQuery(explorerProfileRef.collection('claims'), 200, 'explorerProfiles/{uid}/claims');
+    for (const name of ['portalTrail','portalOperations','portalLimits']) {
+      await deleteDocsByQuery(explorerProfileRef.collection(name), 200, `explorerProfiles/{uid}/${name}`);
+    }
     await explorerProfileRef.delete();
   }
 }
@@ -2753,6 +2756,8 @@ Object.assign(exports, buildDiscoveryExports({
   db,
   admin
 }));
+
+Object.assign(exports, require('./portal').buildPortalExports({functions,db,setCors,verifyAuth,verifyAppCheck}));
 
 Object.assign(exports, buildCommunityRealityCaptureExports({
   db,

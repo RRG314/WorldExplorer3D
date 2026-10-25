@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#081425">
+  <title>The Living Portal · World Explorer 3D</title>
+  <link rel="icon" href="../favicon.svg" type="image/svg+xml">
+  <script src="../js/distribution-context.js?v=1"></script>
+  <script src="../js/firebase-project-config.js"></script>
+  <link rel="stylesheet" href="../styles/distribution.css?v=1">
+  <link rel="stylesheet" href="./portal.css">
+  <script type="module" src="../app/js/portal/page.js"></script>
+</head>
+<body>
+  <a class="skip" href="#discovery">Skip to discovery</a>
+  <div class="wrap">
+    <header><a class="brand" href="../app/">WORLD EXPLORER <span>3D</span></a><nav aria-label="Main"><a href="#trail">Your Trail</a><a href="../app/">Open game ↗</a><button id="accountBtn" type="button">Sign in</button></nav></header>
+    <main>
+      <section class="intro"><p class="eyebrow">A small window into a bigger world</p><h1>The Living Portal</h1><p>Discover a place. Follow your curiosity. Return when you have time to explore.</p></section>
+      <nav class="modes" aria-label="Portal experience">
+        <button type="button" data-mode="wander" aria-pressed="true">Wander</button>
+        <button type="button" data-mode="home" aria-pressed="false">Home</button>
+        <button type="button" data-mode="nature" aria-pressed="false">Nature</button>
+        <button type="button" data-mode="together" aria-pressed="false">Together</button>
+        <button type="button" data-mode="beyond" aria-pressed="false">Beyond Earth</button>
+      </nav>
+      <div class="layout"><section id="discovery" aria-label="Discovery"><p>Opening your Portal…</p></section>
+        <aside id="trail" class="panel" aria-labelledby="trailTitle"><p class="eyebrow">Your personal collection</p><h2 id="trailTitle">Exploration Trail</h2>
+          <p class="muted">Saved, learned about and visited are different steps. Each has its own record.</p>
+          <div id="trailCounts" class="counts"></div><p id="syncState" role="status" aria-live="polite">Saved on this device</p>
+          <div class="actions"><button id="syncBtn" type="button" hidden>Sync now</button><button id="copyBtn" type="button" hidden>Copy device choices to account</button></div>
+          <div id="trailList"></div><p class="small muted">Portal choices never grant game rewards or complete expeditions. Your existing Journal progress is kept.</p>
+        </aside></div>
+      <p id="notice" class="notice" role="status" aria-live="polite"></p>
+    </main>
+    <footer><a href="../legal/privacy.html">Privacy</a><a href="../account/">Account &amp; data</a><span>World Explorer 3D</span></footer>
+  </div>
+  <dialog id="learning" aria-label="Place investigation"><form method="dialog"><button class="close" aria-label="Close investigation">✕</button></form><div id="learningBody"></div><button id="completeBtn" class="primary" type="button">Add to Investigated</button><p class="small muted">Records learning about this place. A 3D visit is separate.</p></dialog>
+  <dialog id="account" aria-labelledby="accountTitle"><form method="dialog"><button class="close" aria-label="Close sign in">✕</button></form><h2 id="accountTitle">Your Explorer account</h2><p id="accountInfo">Sign in to keep your Portal Trail across devices. Device-only choices stay separate until you choose to copy them.</p>
+    <form id="signInForm"><label>Email <input name="email" type="email" autocomplete="username" required></label><label>Password <input name="password" type="password" autocomplete="current-password" required></label><button type="submit" class="primary">Sign in with email</button></form>
+    <button id="googleBtn" type="button">Sign in with Google</button><button id="signOutBtn" type="button" hidden>Sign out</button><p><a href="../account/">Create an account or reset your password ↗</a></p><p id="accountError" role="alert"></p>
+  </dialog>
+</body>
+</html>

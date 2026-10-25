@@ -13,8 +13,11 @@ local commits until the release criteria are satisfied or independent work is
 exhausted against a concrete external constraint. Do not mark hardware/store
 acceptance complete from mocks or source inspection.
 
-Owner hardware is a phone-insert viewer, with no tracked headset, Apple test
-device or Apple Developer membership. Support both phone stereo/orientation and
+Owner hardware is a phone-insert viewer, with no tracked headset or Apple test
+device. The owner created an Apple developer account; the live account page on
+October 25 shows enrollment **Pending**, with membership purchase still required.
+The owner has the payment handoff; implementation can continue independently.
+Support both phone stereo/orientation and
 WebXR; phone orientation is not positional tracking. This Mac has command-line
 tools but no full Xcode application; native CI/build/signing/device work remains.
 
@@ -28,9 +31,28 @@ Trail/model/memory-persistence cases and five affected receipt-outbox cases pass
 (18 distinct). Existing IndexedDB browser integration is still to be exercised
 with the complete Portal UI; this is not a widget or sync service completion.
 
-Evidence: `output/research/vr-portal-product-2026-10-25/`. Continue with Portal
-service/UI/game entry and actual VR presentation/input, then native clients and
-qualified release work. No new deployment has occurred.
+Portal learning/Trail UI now works in Chrome and WebKit with real IndexedDB,
+responsive layouts, keyboard/modal focus and persistent save/investigation
+choices. Chrome also reopens the Portal offline and saves another choice through
+the scoped static cache. Account service and sync commands are implemented with
+Auth/App Check, owner pinning, atomic idempotency, quota, catalog validation and
+account-deletion coordination; 12 distinct controlled service/sync cases pass.
+Seven affected existing routing/fingerprint cases pass. Controlled service
+doubles are not live Firestore/account acceptance. Browser fixtures use a
+temporary registered staging attestation, cleaned up after each run. An initial
+unattested browser failure is retained. No ordinary production attestation or
+physical device acceptance is inferred.
+
+Two sourced learning destinations (Baltimore and Monaco) are available locally.
+Their 3D launch remains gated pending real destination qualification; the catalog
+does not pretend they have passed. Journal links to Portal in a new tab, keeping
+the running game. Hosting packaging/routing inputs include the Portal; no new
+complete Hosting artifact has been built. Native widgets, live account sync,
+resolved game arrival and VR are still required product work.
+
+Evidence: `output/research/vr-portal-product-2026-10-25/`. Continue with game entry
+and actual VR presentation/input, native clients, live services and qualified
+release work. No new deployment has occurred; the product goal remains active.
 
 ## October 25 Living Portal shared quality foundation
 

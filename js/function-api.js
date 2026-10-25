@@ -7,7 +7,7 @@ const ROUTING_MISS_STATUS_CODES = new Set([404, 405, 501]);
 
 function normalizeBasePath(pathname = '/') {
   const path = String(pathname || '/');
-  const anchors = ['/app/', '/account/', '/legal/'];
+  const anchors = ['/app/', '/account/', '/legal/', '/portal/'];
   for (const anchor of anchors) {
     const idx = path.indexOf(anchor);
     if (idx >= 0) return path.slice(0, idx);

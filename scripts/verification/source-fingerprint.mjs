@@ -14,13 +14,13 @@ const git = (root, args) => execFileSync('git', ['-c','core.fsmonitor=false',
   '-c','core.untrackedCache=false','-c','core.ignoreStat=false','-c','core.trustctime=true',...args],
   { cwd: root, encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 });
 export const SHIPPED_SOURCE_ENTRIES = Object.freeze(['about.html', 'favicon.svg', 'index.html',
-  'about', 'account', 'app', 'assets', 'js', 'legal', 'styles']);
+  'about', 'account', 'app', 'assets', 'js', 'legal', 'portal', 'styles']);
 
 // Unknown inputs are runtime inputs. In particular, a README shipped inside
 // app/assets is NOT documentation-only. Symlinks cannot opt out of acceptance.
 export function fingerprintClass(file, mode = '100644') {
   if (mode === '120000') return 'runtime';
-  if (/^(about|account|app|assets|js|legal|styles|functions)\//.test(file) ||
+  if (/^(about|account|app|assets|js|legal|portal|styles|functions)\//.test(file) ||
       ['index.html', 'about.html', 'favicon.svg'].includes(file)) return 'runtime';
   if (/^(tests|scripts\/(verification|architecture-evaluation))\//.test(file)) return 'tests';
   if (/^(config|\.github)\//.test(file) || /^(firebase[^/]*\.json|firestore\.[^/]+|storage\.rules|\.firebaserc)$/.test(file)) return 'environment';

@@ -31,6 +31,7 @@ const GAME_RUNTIME_ENTRYPOINTS = Object.freeze({
   'app-entry': 'app/js/app-entry.js',
   'account-social': 'app/js/multiplayer/social.js',
   'account-contributions': 'account/contribution-workspace.js',
+  'living-portal': 'app/js/portal/page.js',
   'capture-phone': 'app/js/reality-capture/phone-entry.js',
   'capture-review': 'app/js/reality-capture/result-viewer.js',
   'multiplayer-rooms': 'app/js/multiplayer/rooms.js',
@@ -268,6 +269,14 @@ async function rewriteAccountHtml(runtime) {
   await fs.writeFile(htmlPath, html, 'utf8');
 }
 
+async function rewritePortalHtml(runtime) {
+  const htmlPath=path.join(OUTPUT_DIR,'portal','index.html');
+  const html=await fs.readFile(htmlPath,'utf8');
+  const source='../app/js/portal/page.js';
+  if(!html.includes(source))throw new Error('Portal HTML entry is missing.');
+  await fs.writeFile(htmlPath,html.replace(source,`../app/${runtime.entries['living-portal']}`));
+}
+
 function firebaseConfigPath(environment) {
   if (environment !== 'production' && environment !== 'staging') {
     throw new Error(`Unknown Firebase environment "${environment}". Expected production or staging.`);
@@ -345,6 +354,7 @@ async function buildArtifact(environment) {
   const runtimePackaging = await buildGameRuntime();
   await rewriteGameHtml(runtimePackaging, groundData);
   await rewriteAccountHtml(runtimePackaging);
+  await rewritePortalHtml(runtimePackaging);
   const captureHtmlPath = path.join(OUTPUT_DIR, 'app', 'capture.html');
   const captureHtml = await fs.readFile(captureHtmlPath, 'utf8');
   await fs.writeFile(captureHtmlPath, captureHtml.replace('js/reality-capture/phone-entry.js?v=1', runtimePackaging.entries['capture-phone']));
@@ -434,7 +444,7 @@ async function verifyArtifact() {
   const sourceReleases = await sourceReleaseFingerprint(sourceFiles);
   for (const [relative, source] of sourceFiles) {
     if (GENERATED_PATHS.has(relative)) continue;
-    if ((isGameRuntimeSource(relative) && relative !== GAME_SHARED_CONTEXT_MODULE) || relative === 'app/index.html' || relative === 'app/capture.html' || relative === 'account/index.html') continue;
+    if ((isGameRuntimeSource(relative) && relative !== GAME_SHARED_CONTEXT_MODULE) || relative === 'app/index.html' || relative === 'app/capture.html' || relative === 'account/index.html' || relative === 'portal/index.html') continue;
     const outputRelative = isGroundDataSource(relative)
       ? `location-data/ground/${sourceReleases.sha256.slice(0, 16)}/${relative.slice('app/assets/ground/'.length)}`
       : relative;
@@ -477,6 +487,7 @@ async function verifyArtifact() {
   }
   const gameHtml = await fs.readFile(path.join(OUTPUT_DIR, 'app', 'index.html'), 'utf8');
   const accountHtml = await fs.readFile(path.join(OUTPUT_DIR, 'account', 'index.html'), 'utf8');
+  const portalHtml = await fs.readFile(path.join(OUTPUT_DIR, 'portal', 'index.html'), 'utf8');
   const captureHtml = await fs.readFile(path.join(OUTPUT_DIR, 'app', 'capture.html'), 'utf8');
   const adminModule = await fs.readFile(path.join(OUTPUT_DIR, 'js', 'admin-dashboard.js'), 'utf8');
   for (const [name, entry] of Object.entries(runtimePackaging.entries || {})) {
@@ -484,6 +495,7 @@ async function verifyArtifact() {
       throw new Error(`Packaged runtime entry is missing: ${name} -> ${entry}`);
     }
     const referenced = (name === 'account-social'||name === 'account-contributions') ? accountHtml.includes(`../app/${entry}`)
+      : name === 'living-portal' ? portalHtml.includes(`../app/${entry}`)
       : name === 'capture-phone' ? captureHtml.includes(entry)
       : name === 'capture-review' ? adminModule.includes(`../app/${entry}`) : gameHtml.includes(entry);
     if (!referenced && !INDIRECT_RUNTIME_ENTRYPOINTS.has(name)) {

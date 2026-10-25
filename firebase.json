@@ -196,6 +196,14 @@
         "function": "listExplorerDiscoveries"
       },
       {
+        "source": "/mutatePortalTrail",
+        "function": "mutatePortalTrail"
+      },
+      {
+        "source": "/listPortalTrail",
+        "function": "listPortalTrail"
+      },
+      {
         "source": "/createDiscoveryTrade",
         "function": "createDiscoveryTrade"
       },

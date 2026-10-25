@@ -25,8 +25,11 @@ the work does not stop at another architecture checkpoint.
 
 ## Current external constraints
 
-Owner has a phone-insert viewer, no tracked headset, no Apple test device and no
-Apple Developer membership. Mac has 8 GiB RAM, 7.4 GiB free, command-line tools
+Owner has a phone-insert viewer, no tracked headset and no Apple test device.
+Owner created an Apple account during this work. Live developer account shows
+enrollment Pending and membership purchase required (October 25); owner payment
+handoff is open. Signing/store access is not yet confirmed. Mac has 8 GiB RAM,
+7.2 GiB free, command-line tools
 but no full Xcode application. Implement and exercise all independent paths;
 use repository automation for native compilation where possible. Hardware
 acceptance, Apple enrollment/signing and store decisions cannot be fabricated.
@@ -56,4 +59,32 @@ failures, reuse unaffected checks and run one heavyweight process at a time.
   memory adapter. Account-scoped pending actions, safe synchronization merge,
   pagination, legacy backup retention and rollback have 13 focused cases; five
   affected existing receipt cases also pass. Actual IndexedDB/browser UI and
-  protected sync service remain to be completed in the next connected slice.
+  protected sync service were the next connected slice, now implemented below.
+- Portal learning/Trail: responsive page, two sourced investigations, independent
+  saved/learned states, device Home preference, explicit copy into an account,
+  existing room/planetary menu handoffs and Journal link preserving the game tab.
+  Real IndexedDB Chrome/WebKit flows pass. Chrome offline reload plus another
+  save passes through a bounded /portal/ static-only service-worker cache.
+  Images/portrait/landscape/modal viewport screenshots were inspected. Keyboard
+  focus survives store refresh and investigation completion. Initial browser run
+  passed behavior but failed local CAPTCHA/favicons; retained, diagnosed and
+  corrected with existing temporary staging attestation and authored favicon.
+- Protected Trail services: same generated portable rules/catalog, revoked-token
+  auth and mandatory App Check; strict initiating owner, catalog/version checks,
+  server times/revisions, atomic operation receipts, bounded pagination and
+  action quota. Deleting accounts cannot create more Trail actions. Recursive
+  profile cleanup already covers records; legacy fallback now covers them too.
+  Six endpoint cases use actual handlers with transactional storage doubles;
+  six sync-owner cases cover retries, superseded choices and account replacement.
+  Seven affected routing/fingerprint cases also pass; repeat runs overlap.
+- Source packaging includes /portal/, a bundled Portal entry and the two API
+  routes. Final artifact, live services, signed-in browser/account acceptance,
+  qualified 3D destination arrival, native widgets and VR remain unfinished.
+  No qualification fixtures have been promoted to a released quality assessment.
+
+Evidence: output/research/vr-portal-product-2026-10-25/ service-sync-first.tap,
+affected-contracts-final.tap, portal-chromium/ (failed),
+portal-chromium-attested/, portal-webkit-attested/, portal-focus-final/.
+Temporary staging debug identities and owned browsers/servers were cleaned up.
+The browser service checks do not establish native, hardware or live backend
+acceptance. Continue implementation after the local commit.
