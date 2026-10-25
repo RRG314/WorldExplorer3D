@@ -180,6 +180,13 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   border-radius: 2px !important;
 }
 .mode-name, .mode-desc, .mp-title, .mp-subtitle, .mp-status { color: inherit; }
+.mp-secondary-tools {
+  color: var(--wx-text);
+  background: var(--wx-panel-soft);
+  border-color: var(--wx-line-soft);
+}
+.mp-secondary-tools > summary,
+.mp-secondary-tools[open] > summary { color: var(--wx-text); }
 .start-section {
   position: fixed;
   z-index: 5;
