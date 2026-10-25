@@ -116,8 +116,8 @@ Exit, restored flat frame ownership and portrait return. Inspected stereo/city
 screenshots. The compositor boundary and poses are controlled fixtures; these
 are not native runtime, physical lenses, comfort or phone/headset performance
 acceptance. No signed native widget, qualified Portal world entry or release is
-claimed. Guided travel, separate space/ocean handoffs and native clients remain
-active work; continue beyond this local commit.
+claimed. The connected local guided ride is now implemented below; separate
+space/ocean handoffs and native clients remain active work. Continue after commits.
 Evidence: phone-game-first/ (failed), phone-game-second/ (failed),
 phone-game-third/ (behavior pass with visual defect), phone-game-layer-final/,
 phone-integration-contracts.tap (failed), phone-integration-fixed.tap,
@@ -127,6 +127,49 @@ tracked-input-final.tap, tracked-world-release.tap, tracked-gaze-final.tap,
 tracked-session-input-final.tap, tracked-webgl-final/ and
 vr-connected-game-first/. Intermediate failed gaze diagnostics are retained;
 normalization fixed the observed miss, not the underlying world content.
+
+Guided road rides now reuse the living world's actual TrafficGraph lane records,
+including direction, driving side, source feature and grade. A bounded existing
+lane is checked for current source/access, width, physical contact, mild grade,
+obstructions and loaded road coverage; it ends before its junction. No display
+route fallback or inferred connector. Explicit preparation uses the existing
+surface-activity arrival owner, and in-headset Start drives through the normal
+action reader/car physics. Target speed is 4 mph; service braking stops the ride.
+Manual input cancels guidance. Lost coverage, wrong heading, airborne travel,
+obstacles and world/actor changes stop it. Actual route data remains finite to
+the selected area; an 80 m ride fits well within the existing retained window.
+
+Actual Baltimore integration completed the 78 m East Fayette Street ride with
+ordinary car physics and braking, then gaze Exit returned flat play and released
+route/VR resources. A second phone-specific run verified guided movement, stale
+orientation pause, fresh-data/nonautomatic restart, prescribed steering takeover,
+gaze Exit, portrait return and resource cleanup. Screenshots were inspected.
+No page, console or resource errors. Tracked run uses controlled compositor poses
+and timestamps; phone uses synthetic orientation/illustrative optics and real RAF
+plus prescribed short frame bursts. Neither is physical performance or comfort
+acceptance. The first phone receipt reused the tracked runner's broad scope
+string; scope-notes.md records the correction without editing the raw receipt.
+
+Six ride cases, two completed-ride/manual-resume session cases and two ordinary
+UI-handoff session cases pass. The affected transport publication case confirms
+the new read-only coverage query has no gameplay-notice side effect and retires
+with its owner. Wider session/input reruns overlap earlier cases. The ride label
+also passes real WebGL exact GPU/lifecycle return to baseline. An early braking
+boundary failure was corrected before the actual completed ride; retained.
+Closed sessions/route owners now drop borrowed world/actor/native references.
+The syntax ownership guard correctly distinguishes local alias rebinding from
+context property mutation, while retaining conservative later alias-write checks.
+Ordinary map, Backpack or activity UI ends VR instead of hiding a competing UI.
+
+Guided evidence: road-ride-game-first/, road-ride-phone-first/,
+ride-caption-webgl-final/, road-ride-first.tap (failed),
+road-ride-controller-final.tap, road-ride-connected-contracts.tap,
+road-ride-coverage.tap, road-ride-ownership-final.tap,
+road-ride-manual-resume.tap, vr-ui-owner-handoff.tap and
+road-ride-context-reviewed.tap in the current product folder. About 6.3 GiB free
+after this work. No new Hosting/native release or deployment. Continue the full
+product goal: Portal admitted entry/qualification/live sync, native widgets and
+remaining VR domains, then coordinated release/device acceptance.
 
 ## October 25 Living Portal shared quality foundation
 

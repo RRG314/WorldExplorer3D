@@ -16,11 +16,15 @@ export function createVrGazeControls({THREE,scene,worldUnitsPerMeter,onAction,do
     label(text);root.add(mesh);return {mesh,label};
   });
   const meshes=controls.map(row=>row.mesh);root.visible=false;reticle.visible=false;
+  const captionCanvas=documentRef.createElement('canvas');captionCanvas.width=1024;captionCanvas.height=128;
+  const captionTexture=new THREE.CanvasTexture(captionCanvas),captionMaterial=new THREE.MeshBasicMaterial({map:captionTexture,transparent:true,depthTest:false,depthWrite:false,toneMapped:false}),captionGeometry=new THREE.PlaneGeometry(1.3,.16),caption=new THREE.Mesh(captionGeometry,captionMaterial);
+  caption.position.set(0,-.13,-1.5);caption.renderOrder=10001;caption.visible=false;root.add(caption);let lastMessage='';
+  scope.defer(()=>captionTexture.dispose(),'texture');scope.defer(()=>captionMaterial.dispose(),'material');scope.defer(()=>captionGeometry.dispose(),'geometry');
   scene.add(root,reticle);scope.defer(()=>{scene.remove(root,reticle);root.clear();},'scene-objects');
   let hover=null,since=0,latched=false,disposed=false,lastLabel='Start';
   function reset(){hover=null;since=0;latched=false;reticle.material.color.setHex(0xeaf4ff);reticle.scale.setScalar(units);}
   return Object.freeze({
-    update({mountPosition,mountQuaternion,camera,timestamp,paused,tracking}){
+    update({mountPosition,mountQuaternion,camera,timestamp,paused,tracking,message=''}){
       if(disposed)return;root.visible=true;reticle.visible=true;root.position.copy(mountPosition);root.quaternion.copy(mountQuaternion);root.updateMatrixWorld(true);
       // Ray requires a normalized world direction. Matrix decomposition can
       // leave a quaternion a few ulps off unit length; an unnormalized ray can
@@ -30,6 +34,8 @@ export function createVrGazeControls({THREE,scene,worldUnitsPerMeter,onAction,do
       point.copy(hit?.point||origin).addScaledVector(direction,hit?-.002:1.5*units);
       reticle.position.copy(point);reticle.quaternion.copy(orientation);
       const label=!tracking?'Waiting for motion':paused?'Start':'Pause';if(label!==lastLabel){controls[0].label(label);lastLabel=label;}
+      caption.visible=!!message;
+      if(message!==lastMessage){lastMessage=message;const draw=captionCanvas.getContext('2d');draw.clearRect(0,0,1024,128);draw.fillStyle='#102b45';draw.fillRect(0,0,1024,128);draw.font='600 38px system-ui';draw.fillStyle='#eaf4ff';draw.textAlign='center';draw.textBaseline='middle';draw.fillText(String(message).slice(0,88),512,64,990);captionTexture.needsUpdate=true;}
       const next=tracking?hit?.object?.userData.action:null;
       if(next!==hover){reset();hover=next;since=timestamp;}
       if(!next)return;const progress=Math.max(0,Math.min(1,(timestamp-since)/1100));reticle.material.color.setHex(progress>=1?0x59d39c:0xffc857);reticle.scale.setScalar(units*(1+progress*.4));
@@ -44,6 +50,6 @@ export function createVrGazeControls({THREE,scene,worldUnitsPerMeter,onAction,do
       raycaster.ray.set(origin,direction);raycaster.ray.direction.normalize();const action=raycaster.intersectObjects(meshes,false)[0]?.object?.userData.action;
       if(!action)return false;reset();onAction(action);return true;
     },
-    dispose(){if(disposed)return;disposed=true;scope.dispose('VR controls ended');}
+    dispose(){if(disposed)return;disposed=true;scope.dispose('VR controls ended');scene=null;}
   });
 }

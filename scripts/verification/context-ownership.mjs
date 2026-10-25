@@ -28,7 +28,10 @@ export function contextWrites(source) {
    for(const spec of node.specifiers)if(spec.imported?.name==='ctx')roots.set(spec.local.name,'');
   }
   if(node.type==='VariableDeclarator'&&node.id.type==='Identifier'){const base=member(node.init);if(base!==null)roots.set(node.id.name,base);}
-  if(node.type==='AssignmentExpression'){const key=member(node.left);if(key)writes.add(key.split('.')[0]);}
+  // Rebinding a local alias (for example releasing a retained actor reference)
+  // does not mutate the context object. Keep its conservative alias mapping so
+  // any later property writes through that name are still reported.
+  if(node.type==='AssignmentExpression'&&node.left.type!=='Identifier'){const key=member(node.left);if(key)writes.add(key.split('.')[0]);}
   if(node.type==='UpdateExpression'||node.type==='UnaryExpression'&&node.operator==='delete'){const key=member(node.argument);if(key)writes.add(key.split('.')[0]);}
   if(node.type==='CallExpression'&&node.callee?.object?.name==='Object'){
    const method=node.callee.property?.name,base=member(node.arguments[0]);

@@ -9,7 +9,7 @@ import {getLifecycleRegistrySnapshot} from '../app/js/runtime/lifecycle-scope.js
 const sandbox=vm.createContext({console});vm.runInContext(await readFile(new URL('../app/vendor/three/build/three.min.js',import.meta.url),'utf8'),sandbox);const T=sandbox.THREE,units=1/1.11;
 const deferred=()=>{let resolve,reject;const promise=new Promise((a,b)=>{resolve=a;reject=b;});return {promise,resolve,reject};};
 function pose(x=0){const projection=new T.Matrix4().makePerspective(-.05,.05,.05,-.05,.05,100).toArray();return {transform:{matrix:new T.Matrix4().makeTranslation(x,1.6,0).toArray()},views:[-1,1].map(eye=>({eye,transform:{matrix:new T.Matrix4().makeTranslation(x+eye*.032,1.6,0).toArray()},projectionMatrix:projection}))};}
-function fixture({permission,compatibility,reference,delayedEnd=false,layerFailure=false}={}){
+function fixture({permission,compatibility,reference,delayedEnd=false,layerFailure=false,ride=null}={}){
   const target=new EventTarget(),abort=new AbortController(),native=new EventTarget(),ref=new EventTarget(),reasons=new Set(),events=[],frames=new Map();let next=0,flat=null,current=true,layerCount=0,draws=0,gaze,runEnd;
   target.document={hidden:false,getElementById:()=>null};target.isSecureContext=true;target.innerWidth=1280;target.innerHeight=720;
   native.visibilityState='visible';native.inputSources=[];native.renderState={};native.requestReferenceSpace=()=>reference?.promise||Promise.resolve(ref);
@@ -33,7 +33,7 @@ function fixture({permission,compatibility,reference,delayedEnd=false,layerFailu
   kernel.registerSystem({id:'camera',phase:'camera',update:frame=>ctx.vrPresentation?.updateCamera(frame)});
   kernel.registerSystem({id:'render',phase:'render',update:()=>ctx.vrPresentation?.render()});
   ctx.acquireRuntimeFrameSource=options=>source.acquire(options);ctx.getRuntimeKernelSnapshot=()=>kernel.snapshot();ctx.renderLoop=()=>source.start();source.start();
-  const session=createTrackedVrSession({ctx,THREE:T,target,captureSession:()=>({signal:abort.signal,isCurrent:()=>current}),
+  const session=createTrackedVrSession({ctx,THREE:T,target,ride,captureSession:()=>({signal:abort.signal,isCurrent:()=>current}),
     createControls:options=>{gaze=options.onAction;return {update(){},reset(){},select:()=>true,selectRay:()=>true,dispose:()=>events.push('controls-disposed')};}});
   return {ctx,target,native,ref,session,source,events,errors,reasons,abort,end,gaze:action=>gaze(action),flat:()=>!!flat,layers:()=>layerCount,draws:()=>draws,bound:()=>bound,
     setCurrent:value=>current=value,resolveEnd:()=>runEnd(),send:(value=pose(),time=0)=>{const [id,callback]=frames.entries().next().value;frames.delete(id);callback(time,{getViewerPose:()=>value});},
@@ -75,4 +75,14 @@ test('mode/world replacement revokes callbacks and waits for actual native end',
 test('permission rejection and layer failure settle their owned setup and restore the existing loop',async()=>{
   const permission=deferred(),denied=fixture({permission}),start=denied.session.start();permission.reject(Error('denied'));await assert.rejects(start,/denied/);assert.equal(denied.flat(),true);denied.source.dispose();
   const failed=fixture({layerFailure:true});await assert.rejects(failed.session.start(),/layer failed/);assert.equal(failed.flat(),true);assert.equal(failed.ctx.vrPresentation,null);failed.source.dispose();
+});
+test('a completed road ride stops simulation before presentation and can resume as manual driving',async()=>{
+  let status='ready';const ride={step:(_frame,enabled)=>{if(enabled&&status==='ready')status='complete';},snapshot:()=>({status,name:'Street',progress:0}),readActions:()=>null,takeManual:()=>status='manual',dispose(){}};
+  const f=fixture({ride});await f.session.start();f.send();f.gaze('toggle');f.send(pose(),20);assert.equal(f.session.snapshot().userPaused,true);assert.equal(f.events.some(event=>Array.isArray(event)&&event[0]==='simulation'),false);
+  f.gaze('toggle');f.send(pose(),40);assert.equal(status,'manual');assert.equal(f.session.snapshot().userPaused,false);assert.ok(f.events.some(event=>Array.isArray(event)&&event[0]==='simulation'&&event[1]>0));await f.cleanup();
+});
+test('ordinary map, Backpack and activity admission end tracked VR before adopting another UI layer',async()=>{
+  for(const change of [ctx=>ctx.showLargeMap=true,ctx=>ctx.fishingGame={open:true},ctx=>ctx.blockBuildMode=true,ctx=>ctx.gameStarted=false,ctx=>ctx.screenLayout.getPanelLayer=()=> 'backpack']){
+    const f=fixture();await f.session.start();change(f.ctx);f.send();await f.session.stop();assert.equal(f.ctx.vrPresentation,null);assert.equal(f.flat(),true);f.source.dispose();
+  }
 });

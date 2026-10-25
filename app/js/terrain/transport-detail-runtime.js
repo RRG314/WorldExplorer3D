@@ -137,13 +137,17 @@ export async function prepareTransportDetail(appCtx,roads,{isCurrent,focus={x:0,
         if(!actorNeedsRoadDetail(point,terrainY)){updateNotice(false);return true;}
         return controller.readyAt(point);
       },
+      hasReadyCoverageAt(point,margin=384){
+        if(disposed||!Number.isFinite(point?.x)||!Number.isFinite(point?.z)||!Number.isFinite(margin)||margin<0||margin>TRANSPORT_RETENTION_RADIUS||Math.abs(point.x)>Number.MAX_SAFE_INTEGER/2||Math.abs(point.z)>Number.MAX_SAFE_INTEGER/2)return false;
+        for(let ix=Math.floor((point.x-margin)/TRANSPORT_REGION_SIZE);ix<=Math.floor((point.x+margin)/TRANSPORT_REGION_SIZE);ix++)
+          for(let iz=Math.floor((point.z-margin)/TRANSPORT_REGION_SIZE);iz<=Math.floor((point.z+margin)/TRANSPORT_REGION_SIZE);iz++)
+            if(remaining.has(`${ix}:${iz}`))return false;
+        return true;
+      },
       readyAt(point,margin=384){
         if(disposed)return true;
         const x=Number(point?.x)||0,z=Number(point?.z)||0;
-        for(let ix=Math.floor((x-margin)/TRANSPORT_REGION_SIZE);ix<=Math.floor((x+margin)/TRANSPORT_REGION_SIZE);ix++)
-          for(let iz=Math.floor((z-margin)/TRANSPORT_REGION_SIZE);iz<=Math.floor((z+margin)/TRANSPORT_REGION_SIZE);iz++)
-            if(remaining.has(`${ix}:${iz}`)){updateNotice(true);return false;}
-        updateNotice(false);return true;
+        const ready=controller.hasReadyCoverageAt({x,z},margin);updateNotice(!ready);return ready;
       },
       step(point={x:0,z:0},terrainY=NaN){
         latestFocus.x=Number(point.x)||0;latestFocus.z=Number(point.z)||0;

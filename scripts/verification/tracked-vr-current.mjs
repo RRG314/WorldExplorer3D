@@ -12,7 +12,7 @@ let owned,page;const report={passed:false,scope:'Real shipped Three r128 WebGL, 
 try{
   owned=await chromium.launchServer({headless:true,channel:'chrome',args:['--js-flags=--max-old-space-size=1536']});const browser=await chromium.connect(owned.wsEndpoint());page=await browser.newPage({viewport:{width:1280,height:720},deviceScaleFactor:2});
   page.on('pageerror',error=>report.pageErrors.push(error.message));page.on('console',message=>{if(message.type()==='error')report.consoleErrors.push(message.text());});await page.goto(`http://127.0.0.1:${server.port}/__tracked-vr/`);
-  report.result=await page.evaluate(async()=>{
+  report.result=await page.evaluate(async({caption})=>{
     const {createTrackedVrSession}=await import('/app/js/vr/xr-session.js'),{installControlledXrRuntime}=await import('/scripts/verification/xr-runtime-fixture.js');
     const {createRuntimeKernel}=await import('/app/js/runtime/kernel.js'),{createRuntimeFrameSource}=await import('/app/js/runtime/frame-source.js'),{getLifecycleRegistrySnapshot}=await import('/app/js/runtime/lifecycle-scope.js?v=2');
     const units=1/1.11,renderer=new THREE.WebGLRenderer({antialias:false});renderer.setPixelRatio(2);renderer.setSize(1280,720);renderer.outputEncoding=THREE.sRGBEncoding;document.body.append(renderer.domElement);renderer.domElement.style.display='none';
@@ -23,11 +23,12 @@ try{
     const kernel=createRuntimeKernel({isSimulationPaused:()=>ctx.paused}),source=createRuntimeFrameSource(kernel),fixture=installControlledXrRuntime({THREE,renderer,cant:.2});
     kernel.registerSystem({id:'input',phase:'input',update:frame=>ctx.vrPresentation?.beforeInput(frame)});kernel.registerSystem({id:'camera',phase:'camera',update:frame=>ctx.vrPresentation?.updateCamera(frame)});kernel.registerSystem({id:'render',phase:'render',update:()=>ctx.vrPresentation?.render()});
     ctx.acquireRuntimeFrameSource=options=>source.acquire(options);ctx.getRuntimeKernelSnapshot=()=>kernel.snapshot();ctx.renderLoop=()=>source.start();source.start();
-    const session=createTrackedVrSession({ctx,THREE,captureSession:()=>({signal:new AbortController().signal,isCurrent:()=>true})});await session.start();fixture.step(0);const capture=fixture.capture();
+    const ride=caption?{snapshot:()=>({status:'ready',name:'Controlled road label',progress:0}),step(){},readActions:()=>null,dispose(){}}:null;
+    const session=createTrackedVrSession({ctx,THREE,ride,captureSession:()=>({signal:new AbortController().signal,isCurrent:()=>true})});await session.start();fixture.step(0);const capture=fixture.capture();
     const preview=document.createElement('img');preview.alt='Controlled tracked VR eye framebuffer';preview.src=capture.image;document.body.append(preview);await preview.decode();
     window.xrFixture={renderer,scene,camera,kernel,source,session,fixture,preview,baseline};
     return {baseline,counts:capture.counts,glError:capture.glError,snapshot:session.snapshot(),frameOwner:source.snapshot(),kernel:kernel.snapshot()};
-  });
+  },{caption:process.env.WE3D_TRACKED_VR_CAPTION==='1'});
   assert.ok(report.result.counts.every(count=>count>100));assert.equal(report.result.glError,0);assert.equal(report.result.frameOwner.owner,'webxr-vr');assert.equal(report.result.kernel.running,false);assert.ok(Math.abs(report.result.snapshot.eyeSeparationWorld-.064/1.11)<1e-8);
   await page.screenshot({path:path.join(out,'canted-eyes-dpr2.png')});
   report.interaction=await page.evaluate(async()=>{

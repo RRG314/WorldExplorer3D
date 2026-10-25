@@ -232,7 +232,8 @@ function mergeMobileTouch(actions) {
 
 function readControlActions(mode = 'drive') {
   const normalizedMode = normalizeMode(mode);
-  const hardware = mergeXrActions(mergeGamepad(keyboardActions(normalizedMode), inputState.gamepad || connectedGamepad()),appCtx.vrPresentation?.readActions?.(normalizedMode));
+  const hardware = mergeGamepad(keyboardActions(normalizedMode), inputState.gamepad || connectedGamepad());
+  mergeXrActions(hardware,appCtx.vrPresentation?.readActions?.(normalizedMode,hardware));
   const hardwareTurn = Math.abs(hardware.turn) > 0;
   const hardwareMove = Math.abs(hardware.move) > 0;
   const hardwareDriveSpeed = hardwareMove || hardware.throttle > 0 || hardware.reverse > 0 || hardware.brake > 0;

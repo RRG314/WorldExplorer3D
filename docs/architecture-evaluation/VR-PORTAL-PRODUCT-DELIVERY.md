@@ -180,3 +180,48 @@ The r128 union frustum assumes parallel eyes and mixes pose distance with
 projection depth. Tracked views need an explicit audited unit adapter, not just
 a scaled parent. Its XR manager exposes the compositor callback directly;
 the convenience renderer animation loop must not restart a parallel window RAF.
+
+- Guided road ride: reuses current immutable TrafficGraph directed lane facts,
+  source access, driving side and grade; no independent road graph, navigation
+  display line, inferred connection or extra geographic data. Up to 80 metres
+  on one loaded lane, with buffers before its junction. Checks current source,
+  width, three-point physical contact, gentle grade, buildings and coverage.
+  A read-only query on the existing detail owner avoids preview notices and
+  rejects retired coverage. This short corridor stays inside existing retention.
+- Explicit preparation uses the existing surface-activity ground-arrival owner;
+  no new pose writer or forced vessel/interior exit. In-view Start begins ordinary
+  car actions at a 4 mph target. Service braking stops before the end; small
+  manual steering/pedal input cancels guidance. Missing support, blocked path,
+  airborne travel, wrong heading or replaced ownership stops the ride. Stopped
+  rides can deliberately return to manual play. UI admits the move to the start
+  explicitly and shows the road, distance, progress and final/manual state.
+- Verification: six ride cases, two completion/manual-resume session cases, two
+  ordinary UI-handoff session cases and one affected transport publication case
+  pass. Wider focused session/input reruns overlap existing cases. First braking
+  boundary assertion failed; the stopping envelope/service-brake control was
+  corrected before the actual city run. Local alias-release rebinding is now
+  correctly excluded from state-property writes; later alias writes still count.
+  No actual context pose writer was granted a new allowlist entry.
+- Actual Baltimore integration: the 78 m East Fayette Street ride completes using
+  its real compiled lane, ground admission, car physics and service braking.
+  Gaze Exit releases route/headset/frame resources and returns flat play. Tracked
+  compositor and timestamps are controlled, so this is not physical runtime,
+  pacing or comfort acceptance. The phone-specific city run confirms guided
+  movement with real RAF, synthetic orientation and illustrative optics, then
+  stale-sensor pause, explicit restart, prescribed steering takeover, gaze Exit
+  and portrait/resource return. No page/console/resource errors. All new city and
+  caption screenshots inspected. Scope notes correct the phone runner's reused
+  top-level metadata string while preserving its raw receipt.
+- Caption WebGL check includes the new label texture/geometry and returns GPU
+  and lifecycle counts exactly to baseline. Closed route, phone and tracked
+  owners release borrowed actor/world/native references. Map, Backpack or other
+  activity admission exits VR so its ordinary UI can own presentation.
+
+Evidence: road-ride-game-first/, road-ride-phone-first/ (with scope-notes.md),
+ride-caption-webgl-final/, road-ride-first.tap (failed),
+road-ride-controller-final.tap, road-ride-connected-contracts.tap,
+road-ride-coverage.tap, road-ride-ownership-final.tap,
+road-ride-manual-resume.tap, vr-ui-owner-handoff.tap,
+road-ride-context-reviewed.tap in output/research/vr-portal-product-2026-10-25/.
+No new deployment or release. Continue Portal qualified entry/live services,
+native widgets, other renderer domains and physical/platform acceptance.

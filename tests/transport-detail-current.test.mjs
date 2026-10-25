@@ -120,12 +120,15 @@ test('regional readiness changes only after the publication callback commits and
  const detail=await prepareTransportDetail(ctx,[],{isCurrent:()=>true});
  let finish;const publication=new Promise(resolve=>finish=resolve);let called=false;
  detail.attach(async()=>{called=true;await publication;});
+ assert.equal(detail.hasReadyCoverageAt({x:2500,z:300},0),false);assert.equal(detail.stats.blocked,false,'Previewing readiness must not open a gameplay notice');
  assert.equal(detail.readyAt({x:2500,z:300},0),false);
  detail.step({x:2500,z:300});await new Promise(resolve=>setTimeout(resolve,0));
  assert.equal(called,true);assert.equal(detail.readyAt({x:2500,z:300},0),false);
  finish();await new Promise(resolve=>setTimeout(resolve,0));
  assert.equal(detail.readyAt({x:2500,z:300},0),true);
+ assert.equal(detail.hasReadyCoverageAt({x:2500,z:300},0),true);
  detail.dispose();assert.equal(worker.terminated,true);assert.equal(detail.stats.status,'disposed');
+ assert.equal(detail.hasReadyCoverageAt({x:2500,z:300},0),false,'A retired controller cannot qualify another ride');
  detail.step({x:2500,z:300});assert.equal(detail.stats.status,'disposed');
  // Reset while asynchronous main-thread publication is still outstanding.
  const cancelled=await prepareTransportDetail(ctx,[],{isCurrent:()=>true});

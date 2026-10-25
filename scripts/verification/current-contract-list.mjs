@@ -70,6 +70,7 @@ export const currentContractTests = [
   'tests/xr-input-current.test.mjs',
   'tests/tracked-vr-session-current.test.mjs',
   'tests/vr-gaze-current.test.mjs',
+  'tests/vr-road-ride-current.test.mjs',
   'tests/terrain-source-ownership-current.test.mjs',
   'tests/regional-source-recovery-current.test.mjs',
   'tests/regional-road-coverage-current.test.mjs',

@@ -72,6 +72,7 @@ function createScreenLayoutService(documentRef = globalThis.document) {
     type: 'ScreenLayoutService',
     setActivityLayer,
     setPanelLayer,
+    getPanelLayer: () => panelLayer,
     snapshot,
     subscribe(listener) {
       if (typeof listener !== 'function') return () => {};

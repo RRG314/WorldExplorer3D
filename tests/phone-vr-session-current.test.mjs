@@ -5,14 +5,14 @@ import {readFile} from 'node:fs/promises';
 import {createPhoneVrSession} from '../app/js/vr/phone-session.js';
 import {getLifecycleRegistrySnapshot} from '../app/js/runtime/lifecycle-scope.js?v=2';
 const sandbox=vm.createContext({console});vm.runInContext(await readFile(new URL('../app/vendor/three/build/three.min.js',import.meta.url),'utf8'),sandbox);const THREE=sandbox.THREE;
-function fixture(permission=async()=>true){
+function fixture(permission=async()=>true,{ride=null}={}){
   const target=new EventTarget();target.document=new EventTarget();target.document.hidden=false;target.document.getElementById=()=>null;target.screen={orientation:new EventTarget()};target.innerWidth=844;target.innerHeight=390;
   const reasons=new Set(['unrelated-pause']),events=[],controller=new AbortController(),classes=new Set();let current=true,tracking=true,gaze,disposals=0;
   const ctx={gameStarted:true,scene:new THREE.Scene(),camera:new THREE.PerspectiveCamera(),WORLD_UNITS_PER_METER:1/1.11,
     renderer:{domElement:{classList:{add:value=>classes.add(value),remove:value=>classes.delete(value)}}},carMesh:new THREE.Object3D(),car:{x:0,y:1,z:0,angle:0,speed:0},
     setPauseReason:(reason,active)=>active?reasons.add(reason):reasons.delete(reason),hasPauseReason:reason=>reasons.has(reason),clearControlInputState:reason=>events.push(reason),screenLayout:{setPanelLayer:(id,active)=>events.push([id,active])}};
   Object.defineProperty(ctx,'paused',{get:()=>reasons.size>0});
-  const session=createPhoneVrSession({ctx,THREE,target,optics:{},captureSession:()=>({signal:controller.signal,isCurrent:()=>current}),
+  const session=createPhoneVrSession({ctx,THREE,target,optics:{},ride,captureSession:()=>({signal:controller.signal,isCurrent:()=>current}),
     createStereo:()=>({render:()=>events.push('stereo-render'),dispose:()=>disposals++,snapshot:()=>({active:true})}),
     createTracking:()=>({enable:permission,dispose:()=>disposals++,recenter:()=>events.push('recenter'),snapshot:()=>({status:tracking?'active':'stale'}),read:out=>{out.identity();return tracking;}}),
     createControls:options=>{gaze=options.onAction;return {dispose:()=>disposals++,reset(){},select(){},update:()=>events.push('gaze-update')};}});
@@ -38,4 +38,14 @@ test('world, actor and viewport handoffs retire only this presentation and retur
 test('cancelled permission and environment abort cannot later adopt a prepared renderer',async()=>{
   let grant;const pending=new Promise(resolve=>grant=resolve),f=fixture(()=>pending);const start=f.session.start();f.session.stop('setup-closed');grant(true);assert.equal(await start,false);assert.equal(f.ctx.vrPresentation,undefined);assert.equal(f.disposals(),3);
   const live=fixture();await live.session.start();live.controller.abort();assert.equal(live.session.active,false);assert.equal(live.disposals(),3);
+});
+test('a completed road ride pauses the same frame and Start deliberately returns to manual control',async()=>{
+  let status='ready',disposed=false;const ride={step:(_frame,enabled)=>{if(enabled&&status==='ready')status='complete';},snapshot:()=>({status,name:'Street',progress:status==='complete'?1:0}),readActions:()=>null,takeManual:()=>status='manual',dispose:()=>disposed=true};
+  const f=fixture(undefined,{ride});f.reasons.delete('unrelated-pause');await f.session.start();f.session.beforeInput({flags:{}});f.gaze('toggle');const completed={flags:{}};f.session.beforeInput(completed);
+  assert.equal(f.session.snapshot().userPaused,true);assert.equal(completed.flags.simulationBlocked,true);f.gaze('toggle');const manual={flags:{}};f.session.beforeInput(manual);assert.equal(status,'manual');assert.equal(f.session.snapshot().userPaused,false);assert.equal(manual.flags.simulationBlocked,undefined);f.session.stop();assert.equal(disposed,true);
+});
+test('ordinary map, Backpack and activity admission returns phone VR to its normal UI owner',async()=>{
+  for(const change of [ctx=>ctx.showLargeMap=true,ctx=>ctx.fishingGame={open:true},ctx=>ctx.blockBuildMode=true,ctx=>ctx.gameStarted=false,ctx=>ctx.screenLayout.getPanelLayer=()=> 'backpack']){
+    const f=fixture();await f.session.start();change(f.ctx);assert.equal(f.session.guard(),false);assert.equal(f.ctx.vrPresentation,null);assert.equal(f.disposals(),3);
+  }
 });
