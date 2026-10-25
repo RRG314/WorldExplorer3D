@@ -156,6 +156,16 @@ service cloud.firestore {
       return isSignedIn();
     }
 
+    function hasCommunityConsent() {
+      return isSignedIn() &&
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)/consents/community) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)/consents/community).data.version == 'community-2026-10-24';
+    }
+
+    function hasPlayerBlock(ownerUid, otherUid) {
+      return exists(/databases/$(database)/documents/users/$(ownerUid)/blockedPlayers/$(otherUid));
+    }
+
     function roomExists(roomId) {
       return exists(/databases/$(database)/documents/rooms/$(roomId));
     }
@@ -1058,7 +1068,8 @@ service cloud.firestore {
     }
 
     function validIncomingInviteCreate(userId, inviteId) {
-      return isMultiplayerEntitled() &&
+      return isMultiplayerEntitled() && hasCommunityConsent() &&
+        !hasPlayerBlock(userId, request.auth.uid) && !hasPlayerBlock(request.auth.uid, userId) &&
         request.resource.data.keys().hasOnly([
           'fromUid',
           'fromDisplayName',
@@ -1163,7 +1174,7 @@ service cloud.firestore {
         request.resource.data.message is string &&
         request.resource.data.message.size() <= 120 &&
         request.resource.data.seen == false &&
-        request.resource.data.createdAt == resource.data.createdAt &&
+        (request.resource.data.createdAt == resource.data.createdAt || request.resource.data.createdAt == request.time) &&
         request.resource.data.updatedAt == request.time &&
         request.resource.data.expiresAt is timestamp &&
         request.resource.data.expiresAt > request.time &&
@@ -1806,9 +1817,27 @@ service cloud.firestore {
       allow update: if isSelf(userId) && validUserSelfUpdate(userId);
       allow delete: if false;
 
+      match /consents/{consentId} {
+        allow read, delete: if isSelf(userId) && consentId == 'community';
+        allow create, update: if isSelf(userId) && consentId == 'community' &&
+          request.resource.data.keys().hasOnly(['version', 'acceptedAt']) &&
+          request.resource.data.version == 'community-2026-10-24' &&
+          request.resource.data.acceptedAt == request.time;
+      }
+
+      match /blockedPlayers/{otherUid} {
+        allow read, delete: if isSelf(userId);
+        allow create, update: if isSelf(userId) && otherUid != userId && otherUid.size() <= 128 &&
+          request.resource.data.keys().hasOnly(['uid', 'displayName', 'updatedAt']) &&
+          request.resource.data.uid == otherUid &&
+          request.resource.data.displayName is string &&
+          request.resource.data.displayName.size() > 0 && request.resource.data.displayName.size() <= 48 &&
+          request.resource.data.updatedAt == request.time;
+      }
+
       match /friends/{friendUid} {
         allow read: if isSelf(userId);
-        allow create: if isSelf(userId) && validFriendData(friendUid);
+        allow create: if isSelf(userId) && !hasPlayerBlock(userId, friendUid) && validFriendData(friendUid);
         allow update: if isSelf(userId) &&
           validFriendData(friendUid) &&
           request.resource.data.uid == resource.data.uid &&
@@ -1833,7 +1862,8 @@ service cloud.firestore {
           request.auth.uid != userId &&
           validIncomingInviteCreate(userId, inviteId);
         allow update: if validIncomingInviteSeenUpdate(userId) ||
-          validIncomingInviteSenderUpdate(userId, inviteId);
+          (hasCommunityConsent() && !hasPlayerBlock(userId, request.auth.uid) &&
+            !hasPlayerBlock(request.auth.uid, userId) && validIncomingInviteSenderUpdate(userId, inviteId));
         allow delete: if isSelf(userId) || request.auth.uid == resource.data.fromUid;
       }
 
@@ -2072,8 +2102,8 @@ service cloud.firestore {
         resource.data.visibility == 'public' ||
         isRoomOwner(roomId)
       );
-      allow create: if isMultiplayerEntitled() && validRoomCore(roomId);
-      allow update: if isMultiplayerEntitled() && isRoomOwner(roomId) && validRoomUpdate(roomId);
+      allow create: if hasCommunityConsent() && isMultiplayerEntitled() && validRoomCore(roomId);
+      allow update: if hasCommunityConsent() && isMultiplayerEntitled() && isRoomOwner(roomId) && validRoomUpdate(roomId);
       allow delete: if isSignedIn() && isRoomOwner(roomId);
 
       match /players/{uid} {
@@ -2095,11 +2125,11 @@ service cloud.firestore {
 
       match /artifacts/{artifactId} {
         allow read: if isMultiplayerEntitled() && canReadRoom(roomId);
-        allow create: if isMultiplayerEntitled() &&
+        allow create: if hasCommunityConsent() && isMultiplayerEntitled() &&
           isRoomMember(roomId) &&
           request.resource.data.ownerUid == request.auth.uid &&
           validArtifactData();
-        allow update: if isMultiplayerEntitled() &&
+        allow update: if hasCommunityConsent() && isMultiplayerEntitled() &&
           isRoomMember(roomId) &&
           validArtifactUpdate() &&
           (request.auth.uid == resource.data.ownerUid || canManageRoom(roomId));
@@ -2110,10 +2140,10 @@ service cloud.firestore {
 
       match /activities/{activityId} {
         allow read: if canReadRoom(roomId);
-        allow create: if isMultiplayerEntitled() &&
+        allow create: if hasCommunityConsent() && isMultiplayerEntitled() &&
           canManageRoom(roomId) &&
           validRoomActivityCreate(roomId);
-        allow update: if isMultiplayerEntitled() &&
+        allow update: if hasCommunityConsent() && isMultiplayerEntitled() &&
           canManageRoom(roomId) &&
           validRoomActivityUpdate(roomId);
         allow delete: if isMultiplayerEntitled() &&
@@ -2122,7 +2152,7 @@ service cloud.firestore {
 
       match /activityState/{stateId} {
         allow read: if canReadRoom(roomId);
-        allow create: if isMultiplayerEntitled() &&
+        allow create: if hasCommunityConsent() && isMultiplayerEntitled() &&
           stateId == 'active' &&
           canManageRoom(roomId) &&
           request.resource.data.roomCode == roomId &&
@@ -2144,10 +2174,10 @@ service cloud.firestore {
 
       match /blocks/{blockId} {
         allow read: if isMultiplayerEntitled() && canReadRoom(roomId);
-        allow create: if isMultiplayerEntitled() &&
+        allow create: if hasCommunityConsent() && isMultiplayerEntitled() &&
           isRoomMember(roomId) &&
           validRoomBlockData(blockId);
-        allow update: if isMultiplayerEntitled() &&
+        allow update: if hasCommunityConsent() && isMultiplayerEntitled() &&
           isRoomMember(roomId) &&
           resource.data.createdBy == request.auth.uid &&
           validRoomBlockUpdate(blockId);
@@ -2158,13 +2188,13 @@ service cloud.firestore {
 
       match /worldModifications/{modificationId} {
         allow read: if isMultiplayerEntitled() && canReadRoom(roomId);
-        allow create: if isMultiplayerEntitled() &&
+        allow create: if hasCommunityConsent() && isMultiplayerEntitled() &&
           validRoomWorldModificationData(roomId, modificationId) &&
           request.resource.data.createdBy == request.auth.uid &&
           request.resource.data.revision == 1 &&
           request.resource.data.createdAt == request.time &&
           canCreateRoomWorldModification(roomId);
-        allow update: if isMultiplayerEntitled() &&
+        allow update: if hasCommunityConsent() && isMultiplayerEntitled() &&
           validRoomWorldModificationData(roomId, modificationId) &&
           request.resource.data.worldId == resource.data.worldId &&
           request.resource.data.worldSeed == resource.data.worldSeed &&
@@ -2183,10 +2213,10 @@ service cloud.firestore {
 
       match /paintClaims/{claimId} {
         allow read: if isMultiplayerEntitled() && canReadRoom(roomId);
-        allow create: if isMultiplayerEntitled() &&
+        allow create: if hasCommunityConsent() && isMultiplayerEntitled() &&
           isRoomMember(roomId) &&
           validPaintClaimData(claimId);
-        allow update: if isMultiplayerEntitled() &&
+        allow update: if hasCommunityConsent() && isMultiplayerEntitled() &&
           isRoomMember(roomId) &&
           request.auth.uid == resource.data.uid &&
           validPaintClaimUpdate(claimId);
@@ -2225,11 +2255,11 @@ service cloud.firestore {
 
       match /state/{stateId} {
         allow read: if isMultiplayerEntitled() && canReadRoom(roomId);
-        allow create: if isMultiplayerEntitled() &&
+        allow create: if hasCommunityConsent() && isMultiplayerEntitled() &&
           stateId == 'homeBase' &&
           canManageRoom(roomId) &&
           validHomeBaseData();
-        allow update: if isMultiplayerEntitled() &&
+        allow update: if hasCommunityConsent() && isMultiplayerEntitled() &&
           stateId == 'homeBase' &&
           canManageRoom(roomId) &&
           validHomeBaseUpdate();
@@ -2238,7 +2268,7 @@ service cloud.firestore {
 
       match /chat/{msgId} {
         allow read: if isMultiplayerEntitled() && isRoomMember(roomId) && roomAllowsChat(roomId);
-        allow create: if isMultiplayerEntitled() &&
+        allow create: if hasCommunityConsent() && isMultiplayerEntitled() &&
           isRoomMember(roomId) &&
           roomAllowsChat(roomId) &&
           validChatCreate(roomId);

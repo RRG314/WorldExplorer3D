@@ -180,3 +180,25 @@ rollback bases, assets, history, player data and all evidence remain preserved;
 identical bytes now share APFS copy-on-write storage with hash receipts. Do not
 repeat builds for documentation-only changes or relabel Mac evidence as phone
 performance. No public Android production rollout or broad tester mailing occurred.
+
+
+## October 24 location-default/community candidate follow-up
+
+The selected-location default, optional world exploration controls, pre-community
+terms acceptance and persistent chat/invitation blocking are implemented and
+focused local checks passed. See `docs/verification/2026-10-24-LOCATION-DEFAULT-COMMUNITY.md`
+and the latest CURRENT-STATE section for exact scope and activation status.
+No native source changed: signed Android code 3 remains the reusable internal/
+closed-test binary; the TWA consumes the coordinated hosted web update.
+
+Data safety handling/purposes are now saved for all 16 selected types. Independent
+provider sharing, required limited diagnostics/measurement, optional GPS, social
+and uploads are distinguished; no ad/independent-audit claim was added. Analytics
+Data Processing Terms were accepted with the owner's explicit authorization.
+Free pricing is confirmed by App pricing. Closed Alpha's existing World Explorer
+one-owner list and feedback mailbox are saved. No broad mailing or fake testers.
+
+The gameplay pack is prepared but file upload is blocked by the extension's
+file-URL permission. The owner has not installed code 3 yet. Actual Android
+installation/auth/resume/touch/progress/room checks and Google's real closed-test
+period remain outstanding; browser component checks are not substitutes.

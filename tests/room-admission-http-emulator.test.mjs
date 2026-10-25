@@ -24,6 +24,8 @@ test('HTTP admission verifies auth and uses token identity for membership', asyn
     });
     assert.equal(signup.status, 200);
     const { localId, idToken } = await signup.json(); uid = localId;
+    assert.equal((await endpoint({ roomCode: code }, idToken)).status,403,'Missing community acceptance must prevent admission');
+    await db.doc(`users/${uid}/consents/community`).set({version:'community-2026-10-24',acceptedAt:new Date()});
     await db.doc(`rooms/${code}`).set({ code, ownerUid: uid, maxPlayers: 2, visibility: 'private', world: { kind: 'earth', lat: 0, lon: 0 } });
     const joined = await endpoint({ roomCode: code, uid: 'forged-user', role: 'mod', displayName: 'HTTP Explorer' }, idToken);
     assert.equal(joined.status, 200, await joined.clone().text());
@@ -36,6 +38,7 @@ test('HTTP admission verifies auth and uses token identity for membership', asyn
   } finally {
     await db.recursiveDelete(db.doc(`rooms/${code}`));
     if (uid) await getAuth(app).deleteUser(uid);
+    if (uid) await db.recursiveDelete(db.doc(`users/${uid}`));
     await deleteApp(app);
   }
 });

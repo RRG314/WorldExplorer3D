@@ -524,7 +524,8 @@ body.creator-profile-open #tutorialHintCard{
 .room-meta-name{font-size:11px;color:#cbd5e1;margin-top:4px}
 .room-player-head{display:flex;align-items:center;justify-content:space-between;font-size:11px;color:#cbd5e1}
 .mp-player-list{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:6px;max-height:200px;overflow:auto}
-.mpPlayerItem{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 10px;background:rgba(15,23,42,0.66);border:1px solid rgba(148,163,184,0.28);border-radius:9px}
+.mpPlayerItem{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;padding:8px 10px;background:rgba(15,23,42,0.66);border:1px solid rgba(148,163,184,0.28);border-radius:9px}
+.mpSafetyBtn{min-width:44px;min-height:44px}
 .mpPlayerName{font-size:12px;color:#f8fafc;font-weight:600}
 .mpPlayerMeta{font-size:11px;color:#94a3b8}
 .mpPlayerEmpty{font-size:11px;color:#94a3b8;padding:10px;background:rgba(15,23,42,0.42);border:1px dashed rgba(148,163,184,0.3);border-radius:9px;text-align:center}
@@ -538,7 +539,7 @@ body.creator-profile-open #tutorialHintCard{
 .room-chat-messages{max-height:min(34vh,260px);overflow:auto;display:flex;flex-direction:column;gap:8px}
 .mpChatRow{padding:8px 9px;background:rgba(15,23,42,0.66);border:1px solid rgba(148,163,184,0.24);border-radius:8px}
 .mpChatRow.mine{border-color:rgba(34,197,94,0.55);background:rgba(20,83,45,0.44)}
-.mpChatHead{display:flex;align-items:center;justify-content:space-between;font-size:11px;color:#bfdbfe;margin-bottom:4px}
+.mpChatHead{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px;font-size:11px;color:#bfdbfe;margin-bottom:4px}
 .mpChatText{font-size:12px;color:#f8fafc;line-height:1.35;word-break:break-word}
 .mpChatReport{border:none;background:#dc2626;color:#fee2e2;border-radius:999px;padding:3px 8px;font-size:10px;cursor:pointer}
 .mpChatEmpty{font-size:11px;color:#94a3b8;background:rgba(15,23,42,0.38);border:1px dashed rgba(148,163,184,0.24);border-radius:8px;padding:10px;text-align:center}

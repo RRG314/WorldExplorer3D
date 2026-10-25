@@ -1,5 +1,6 @@
 import { postAppCheckedFunction, postProtectedFunction } from './function-api.js?v=3';
 import { initFirebase } from './firebase-init.js?v=58';
+import { ensureCommunityTerms } from './community-consent.js?v=1';
 
 
 const CLIENT_LIMITS = Object.freeze({
@@ -9,7 +10,8 @@ const CLIENT_LIMITS = Object.freeze({
   jpegQuality: 0.91
 });
 
-function endpoint(path, body = {}) {
+async function endpoint(path, body = {}) {
+  if (['/createRealityCaptureDraft', '/reserveRealityCapturePhoto', '/createRealityCaptureUploadUrl', '/submitRealityCaptureHybrid'].includes(path)) await ensureCommunityTerms();
   return postProtectedFunction(path, body, { label: 'Reality Capture' });
 }
 

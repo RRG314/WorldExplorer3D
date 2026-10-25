@@ -965,6 +965,7 @@ async function deleteUserData(uid) {
   await deleteDocsByQuery(db.collectionGroup('chatState').where('uid', '==', uid), 200, 'chatState(uid)');
   await deleteDocsByQuery(db.collectionGroup('friends').where('uid', '==', uid), 200, 'friends(uid)');
   await deleteDocsByQuery(db.collectionGroup('recentPlayers').where('uid', '==', uid), 200, 'recentPlayers(uid)');
+  await deleteDocsByQuery(db.collectionGroup('blockedPlayers').where('uid', '==', uid), 200, 'blockedPlayers(uid)');
   await deleteDocsByQuery(db.collectionGroup('incomingInvites').where('fromUid', '==', uid), 200, 'incomingInvites(fromUid)');
   await deleteDocsByQuery(db.collectionGroup('artifacts').where('ownerUid', '==', uid), 200, 'artifacts(ownerUid)');
   await deleteDocsByQuery(db.collectionGroup('blocks').where('createdBy', '==', uid), 200, 'blocks(createdBy)');
@@ -985,6 +986,8 @@ async function deleteUserData(uid) {
     await db.recursiveDelete(userRef);
   } else {
     await deleteDocsByQuery(userRef.collection('friends'), 200, 'users/{uid}/friends');
+    await deleteDocsByQuery(userRef.collection('blockedPlayers'), 200, 'users/{uid}/blockedPlayers');
+    await deleteDocsByQuery(userRef.collection('consents'), 200, 'users/{uid}/consents');
     await deleteDocsByQuery(userRef.collection('recentPlayers'), 200, 'users/{uid}/recentPlayers');
     await deleteDocsByQuery(userRef.collection('incomingInvites'), 200, 'users/{uid}/incomingInvites');
     await deleteDocsByQuery(userRef.collection('myRooms'), 200, 'users/{uid}/myRooms');
@@ -1767,6 +1770,7 @@ exports.joinRoom = functions.region('us-central1').runWith({ invoker: 'public' }
   const auth = await verifyAuth(req, res);
   if (!auth) return;
   try {
+    await require('./community-consent').requireCommunityConsent(db, auth.uid);
     const result = await admitRoomPlayer({ db, uid: auth.uid,
       weekly: req.body?.weekly === true,
       roomCode: String(req.body?.roomCode || '').trim().toUpperCase(),
@@ -2391,6 +2395,7 @@ exports.submitContribution = functions.region('us-central1').runWith({ invoker: 
   if (!auth) return;
 
   try {
+    await require('./community-consent').requireCommunityConsent(db, auth.uid);
     const authUser = await admin.auth().getUser(auth.uid);
     await ensureUserDoc(auth.uid, authUser.email || '', authUser.displayName || '');
 
@@ -2450,7 +2455,7 @@ exports.submitContribution = functions.region('us-central1').runWith({ invoker: 
     });
   } catch (err) {
     console.error('[submitContribution] failed:', err);
-    const publicError = err.status === 400 || err.status === 409;
+    const publicError = err.status === 400 || err.status === 403 || err.status === 409;
     res.status(publicError ? err.status : 500).json({ error: publicError ? err.message : 'Could not save this contribution right now.' });
   }
 });

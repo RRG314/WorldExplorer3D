@@ -14,6 +14,7 @@ import {
 import { getCurrentUser } from '../../../js/auth-ui.js?v=56';
 import { initFirebase } from '../../../js/firebase-init.js?v=58';
 import { normalizeCode } from './rooms.js?v=67';
+import { ensureCommunityTerms } from '../../../js/community-consent.js?v=1';
 
 const ROOM_COLLECTION = 'rooms';
 const CHAT_COLLECTION = 'chat';
@@ -175,6 +176,9 @@ async function sendMessage(roomId, text) {
   if (!normalizedRoomId) {
     throw new Error('Join a room before sending messages.');
   }
+
+  await ensureCommunityTerms(user.uid);
+  if (getCurrentUser()?.uid !== user.uid) throw new Error('Account changed. Please try again.');
 
   const clampedText = clampMessage(text);
   enforceChatSafetyPolicy(clampedText);

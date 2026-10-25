@@ -1,6 +1,8 @@
 import { distributionUrl } from '../../../js/distribution.js?v=1';
 import { CHAT_MAX_LENGTH, reportMessage } from './chat.js?v=56';
 import {
+  blockPlayer,
+  unblockPlayer,
   dismissInvite,
   markInviteSeen,
   removeFriend
@@ -69,6 +71,22 @@ function createUiRoomEventsApi(context) {
   }
 
   function wireEvents() {
+    document.addEventListener('click', async event => {
+      const button = event.target?.closest?.('button[data-block-player],button[data-unblock-player]');
+      if (!button || button.disabled || !state.authUser?.uid) return;
+      const accountUid = state.authUser.uid;
+      const targetUid = button.dataset.blockPlayer || button.dataset.unblockPlayer;
+      const name = button.dataset.playerName || 'Explorer';
+      button.disabled = true;
+      try {
+        if (button.dataset.unblockPlayer) await unblockPlayer(targetUid);
+        else await blockPlayer(targetUid, name);
+        if (state.authUser?.uid !== accountUid) return;
+        setStatus(button.dataset.unblockPlayer ? 'Player unblocked.' : 'Player blocked. Their chat is hidden and new invites are prevented. Manage blocks in Multiplayer.');
+      } catch (error) {
+        if (state.authUser?.uid === accountUid) setStatus(error?.message || 'Could not change this block. Please try again.', true);
+      } finally { if (button.isConnected) button.disabled = false; }
+    });
     globalThis.addEventListener('offline', () => {
       if (!state.currentRoom) return;
       appCtx.setSharedBuildConnectionState?.(false);

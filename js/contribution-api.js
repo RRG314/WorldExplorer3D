@@ -1,4 +1,5 @@
 import { postProtectedFunction } from './function-api.js?v=3';
+import { ensureCommunityTerms } from './community-consent.js?v=1';
 
 function sanitizeText(value, max = 120) {
   return String(value || '').replace(/\s+/g, ' ').trim().slice(0, max);
@@ -24,6 +25,7 @@ function normalizeSubmissionFilters(options = {}) {
 }
 
 export async function submitContribution(input = {}, options = {}) {
+  await ensureCommunityTerms();
   // A caller retrying an uncertain result must reuse error.requestId.
   const requestId = options.requestId || input.requestId || globalThis.crypto.randomUUID();
   try {

@@ -1,6 +1,18 @@
 import { createUiRoomMapApi } from "./ui-room-map.js?v=1";
 
 export function createUiRoomRenderers({ appCtx, refs, state, helpers }) {
+  const blocked = uid => state.blockedPlayers?.some(player => player.uid === uid) === true;
+  const visibleSocial = rows => state.blockedPlayersReady === false ? [] : rows.filter(row => !blocked(row.uid || row.fromUid));
+  const blockButton = (uid, name) => uid && uid !== state.authUser?.uid
+    ? `<button type="button" class="mp-btn secondary mpSmallBtn mpSafetyBtn" data-block-player="${helpers.escapeHtml(String(uid))}" data-player-name="${helpers.escapeHtml(String(name || 'Explorer'))}">${blocked(uid) ? 'Blocked' : 'Block'}</button>` : '';
+
+  function renderBlockedPlayers() {
+    const html = !state.authUser ? '<li class="mpRoomEmpty">Join a room or sign in to manage blocked players.</li>'
+      : !state.blockedPlayersReady ? '<li class="mpRoomEmpty">Checking blocked players…</li>'
+      : !state.blockedPlayers?.length ? '<li class="mpRoomEmpty">No blocked players.</li>'
+      : state.blockedPlayers.map(player => `<li class="mpRoomItem"><span class="mpRoomName">${helpers.safeHtml(player.displayName || 'Explorer', 48)}</span><button type="button" class="mp-btn secondary mpSmallBtn mpSafetyBtn" data-unblock-player="${helpers.escapeHtml(player.uid)}">Unblock</button></li>`).join('');
+    for (const list of [refs.blockedPlayersList,refs.roomPanelBlockedPlayersList]) if (list) list.innerHTML = html;
+  }
   const {
     applyPaintRulesToPanel,
     buildWeeklyFeaturedRoomCode,
@@ -141,12 +153,12 @@ export function createUiRoomRenderers({ appCtx, refs, state, helpers }) {
         '<li class="mpRoomEmpty">No friends yet. Add by UID above or from Recent Players.</li>';
       return;
     }
-    refs.titleFriendsList.innerHTML = state.friends
+    refs.titleFriendsList.innerHTML = visibleSocial(state.friends)
       .map((friend) => {
         const display = safeHtml(friend.displayName || "Explorer", 48);
         const source = safeHtml(friend.source || "manual", 12);
         const friendUid = escapeHtml(String(friend.uid || ""));
-        return `<li class="mpRoomItem"><div class="mpRoomInfo"><div class="mpRoomName">${display}</div><div class="mpRoomMeta">source: ${source}</div></div><div class="mp-row"><button class="mp-btn secondary mpSmallBtn" data-invite-friend="${friendUid}" type="button">Invite</button><button class="mp-btn secondary mpSmallBtn" data-remove-friend="${friendUid}" type="button">Remove</button></div></li>`;
+        return `<li class="mpRoomItem"><div class="mpRoomInfo"><div class="mpRoomName">${display}</div><div class="mpRoomMeta">source: ${source}</div></div><div class="mp-row"><button class="mp-btn secondary mpSmallBtn" data-invite-friend="${friendUid}" type="button">Invite</button><button class="mp-btn secondary mpSmallBtn" data-remove-friend="${friendUid}" type="button">Remove</button>${blockButton(friend.uid, friend.displayName)}</div></li>`;
       })
       .join("");
   }
@@ -162,7 +174,7 @@ export function createUiRoomRenderers({ appCtx, refs, state, helpers }) {
         '<li class="mpRoomEmpty">Play with others to populate recent players.</li>';
       return;
     }
-    refs.titleRecentPlayersList.innerHTML = state.recentPlayers
+    refs.titleRecentPlayersList.innerHTML = visibleSocial(state.recentPlayers)
       .map((player) => {
         const display = safeHtml(player.displayName || "Explorer", 48);
         const displayAttr = escapeHtml(sanitizeText(player.displayName || "Explorer", 48));
@@ -170,7 +182,7 @@ export function createUiRoomRenderers({ appCtx, refs, state, helpers }) {
         const roomLabel = safeHtml(player.roomName || roomCode || "", 80);
         const roomCodeSafe = escapeHtml(roomCode || "----");
         const sessions = Math.max(1, Number(player.sharedSessions || 1));
-        return `<li class="mpRoomItem"><div class="mpRoomInfo"><div class="mpRoomName">${display}</div><div class="mpRoomMeta">${roomLabel || "Recent room"} • ${roomCodeSafe} • sessions ${sessions}</div></div><div class="mp-row"><button class="mp-btn secondary mpSmallBtn" data-add-friend="${escapeHtml(String(player.uid || ""))}" data-player-name="${displayAttr}" type="button">Add Friend</button><button class="mp-btn secondary mpSmallBtn" data-join-recent="${escapeHtml(roomCode)}" type="button">Join</button></div></li>`;
+        return `<li class="mpRoomItem"><div class="mpRoomInfo"><div class="mpRoomName">${display}</div><div class="mpRoomMeta">${roomLabel || "Recent room"} • ${roomCodeSafe} • sessions ${sessions}</div></div><div class="mp-row"><button class="mp-btn secondary mpSmallBtn" data-add-friend="${escapeHtml(String(player.uid || ""))}" data-player-name="${displayAttr}" type="button">Add Friend</button><button class="mp-btn secondary mpSmallBtn" data-join-recent="${escapeHtml(roomCode)}" type="button">Join</button>${blockButton(player.uid, player.displayName)}</div></li>`;
       })
       .join("");
   }
@@ -185,14 +197,14 @@ export function createUiRoomRenderers({ appCtx, refs, state, helpers }) {
       refs.titleInvitesList.innerHTML = '<li class="mpRoomEmpty">No incoming invites.</li>';
       return;
     }
-    refs.titleInvitesList.innerHTML = state.invites
+    refs.titleInvitesList.innerHTML = visibleSocial(state.invites)
       .map((invite) => {
         const from = safeHtml(invite.fromDisplayName || "Explorer", 48);
         const roomCode = normalizeCode(invite.roomCode || "");
         const roomName = safeHtml(invite.roomName || roomCode || "Room", 80);
         const statusBadge = invite.seen ? '<span class="mp-pill">Seen</span>' : '<span class="mp-pill">New</span>';
         const message = invite.message ? `<div class="mpRoomMeta">${safeHtml(invite.message, 120)}</div>` : "";
-        return `<li class="mpRoomItem"><div class="mpRoomInfo"><div class="mpRoomName">${from} invited you ${statusBadge}</div><div class="mpRoomMeta">${roomName} • ${escapeHtml(roomCode)}</div>${message}</div><div class="mp-row"><button class="mp-btn secondary mpSmallBtn" data-accept-invite="${escapeHtml(String(invite.id || ""))}" data-room-code="${escapeHtml(roomCode)}" type="button">Join</button><button class="mp-btn secondary mpSmallBtn" data-dismiss-invite="${escapeHtml(String(invite.id || ""))}" type="button">Dismiss</button></div></li>`;
+        return `<li class="mpRoomItem"><div class="mpRoomInfo"><div class="mpRoomName">${from} invited you ${statusBadge}</div><div class="mpRoomMeta">${roomName} • ${escapeHtml(roomCode)}</div>${message}</div><div class="mp-row"><button class="mp-btn secondary mpSmallBtn" data-accept-invite="${escapeHtml(String(invite.id || ""))}" data-room-code="${escapeHtml(roomCode)}" type="button">Join</button><button class="mp-btn secondary mpSmallBtn" data-dismiss-invite="${escapeHtml(String(invite.id || ""))}" type="button">Dismiss</button>${blockButton(invite.fromUid, invite.fromDisplayName)}</div></li>`;
       })
       .join("");
   }
@@ -486,7 +498,7 @@ export function createUiRoomRenderers({ appCtx, refs, state, helpers }) {
         const displayName = safeHtml(player.displayName || "Explorer", 48);
         const mode = safeHtml(player.mode || "drive", 16);
         const selfTag = player.uid === state.authUser?.uid ? " (You)" : "";
-        return `<li class="mpPlayerItem"><span class="mpPlayerName">${displayName}${selfTag}</span><span class="mpPlayerMeta">${role} • ${mode}</span></li>`;
+        return `<li class="mpPlayerItem"><span class="mpPlayerName">${displayName}${selfTag}</span><span class="mpPlayerMeta">${role} • ${mode}</span>${blockButton(player.uid, player.displayName)}</li>`;
       })
       .join("");
 
@@ -502,12 +514,13 @@ export function createUiRoomRenderers({ appCtx, refs, state, helpers }) {
       return;
     }
 
-    if (!state.messages.length) {
-      refs.chatMessages.innerHTML = '<div class="mpChatEmpty">No messages yet.</div>';
+    const messages = visibleSocial(state.messages);
+    if (!messages.length) {
+      refs.chatMessages.innerHTML = state.blockedPlayersReady === false ? '<div class="mpChatEmpty">Checking blocked players…</div>' : '<div class="mpChatEmpty">No visible messages yet.</div>';
       return;
     }
 
-    refs.chatMessages.innerHTML = state.messages
+    refs.chatMessages.innerHTML = messages
       .map((msg) => {
         const userName = safeHtml(msg.displayName || "Explorer", 48);
         const text = safeHtml(msg.text || "", helpers.chatMaxLength);
@@ -516,7 +529,7 @@ export function createUiRoomRenderers({ appCtx, refs, state, helpers }) {
         const reportBtn = mine
           ? ""
           : `<button class="mpChatReport" data-msgid="${escapeHtml(String(msg.id || ""))}" type="button">Report</button>`;
-        return `<div class="${klass}"><div class="mpChatHead"><span>${userName}</span>${reportBtn}</div><div class="mpChatText">${text}</div></div>`;
+        return `<div class="${klass}"><div class="mpChatHead"><span>${userName}</span>${reportBtn}${blockButton(msg.uid, msg.displayName)}</div><div class="mpChatText">${text}</div></div>`;
       })
       .join("");
 
@@ -556,6 +569,7 @@ export function createUiRoomRenderers({ appCtx, refs, state, helpers }) {
     renderRecentPlayers,
     renderRoomActivities,
     renderRoomMeta,
+    renderBlockedPlayers,
     renderWeeklyFeaturedCallout,
     resolveWeeklyFeaturedWorld,
     refreshPlanLabel,

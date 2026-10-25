@@ -468,6 +468,7 @@ function buildOverlayExports(helpers = {}) {
       if (!auth) return;
 
       try {
+        await require('./community-consent').requireCommunityConsent(db, auth.uid);
         const authUser = await admin.auth().getUser(auth.uid);
         const featureId = sanitizeSmallText(req.body?.featureId || '', 180) || db.collection(OVERLAY_FEATURES_COLLECTION).doc().id;
         const ref = db.collection(OVERLAY_FEATURES_COLLECTION).doc(featureId);
@@ -515,7 +516,7 @@ function buildOverlayExports(helpers = {}) {
 
         res.status(200).json({ item: normalized });
       } catch (error) {
-        const status = overlayRequestErrorStatus(error);
+        const status = error.status === 403 ? 403 : overlayRequestErrorStatus(error);
         if (status === 500) console.error('[saveOverlayFeatureDraft] failed:', error);
         res.status(status).json({ error: error?.message || 'Could not save this overlay draft right now.' });
       }
@@ -530,6 +531,7 @@ function buildOverlayExports(helpers = {}) {
       const auth = await verifyAuth(req, res);
       if (!auth) return;
       try {
+        await require('./community-consent').requireCommunityConsent(db, auth.uid);
         const featureId = sanitizeSmallText(req.body?.featureId || '', 180);
         if (!featureId) {
           res.status(400).json({ error: 'Missing feature id.' });
@@ -559,7 +561,7 @@ function buildOverlayExports(helpers = {}) {
         }));
         res.status(200).json({ item: updated });
       } catch (error) {
-        const status = overlayRequestErrorStatus(error);
+        const status = error.status === 403 ? 403 : overlayRequestErrorStatus(error);
         if (status === 500) console.error('[submitOverlayFeature] failed:', error);
         res.status(status).json({ error: error?.message || 'Could not submit this overlay feature right now.' });
       }

@@ -49,6 +49,8 @@ function initMultiplayerPlatform() {
   if (singleton) return singleton;
 
   const refs = {
+    blockedPlayersList: document.getElementById('mpBlockedPlayersList'),
+    roomPanelBlockedPlayersList: document.getElementById('roomPanelBlockedPlayersList'),
     titleStatus: document.getElementById('mpTitleStatus'),
     titlePlanState: document.getElementById('mpPlanState'),
     titleCodeInput: document.getElementById('mpTitleCodeInput'),
@@ -148,6 +150,9 @@ function initMultiplayerPlatform() {
     browseRequestId: 0,
     featuredRooms: [],
     friends: [],
+    blockedPlayers: [],
+    blockedPlayersReady: false,
+    unsubBlockedPlayers: null,
     recentPlayers: [],
     invites: [],
     ownedRooms: [],

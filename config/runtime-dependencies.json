@@ -121,6 +121,7 @@
         "app/js/player/connected-player-state.js",
         "app/js/real-estate/connected-property-authority.js",
         "js/capture-activity.js",
+        "js/community-consent.js",
         "js/creator-profile-api.js",
         "js/entitlements.js",
         "js/firebase-init.js",

@@ -4,6 +4,72 @@ Updated October 24, 2026. Use the latest sections below for current identities;
 dated sections further down retain historical evidence. The owner has authorized
 necessary production/protected-source work; do not ask again for that scope.
 
+## October 24 selected-location defaults and community safety — candidate
+
+The owner's accepted foundation is implemented: selected-location Earth play is
+labelled as the default; new ocean voyages also default to the selected dive
+site. Extended Earth scenery and continuous ocean voyages are separate explicit
+Settings choices. Existing explicit preferences and v1/v2/v3 saved voyages retain
+their contracts. Settings owns the ocean preference before its lazy runtime loads;
+failed persistence keeps the previous mode. Ground transport remains finite to
+the selected source, and rooms share a selected origin.
+
+Community rules require explicit per-account acceptance before room admission,
+chat and capture/contribution/overlay publication. Existing Auth, App Check,
+room transactions and Firestore rules enforce the boundary. Persistent private
+player blocks use the existing social/session owner to filter old/new chat and
+invitations, with an accessible Unblock list. Shared physical world changes stay
+consistent. Invitations no longer try to read a recipient's private inbox.
+Account removal cleans up consent and incoming/outgoing block references.
+
+Eight focused components, five actual Firestore rule cases and the controlled
+real-browser consent/admission/chat/block/reload/unblock/invite/weekly journey
+passed. Desktop/mobile-layout Settings checks passed, including choosing ocean
+streaming before ocean initialization and retaining it after reload. Two targeted
+existing voyage save cases passed. The final browser run had zero page/console
+errors. Earlier failures remain retained. No repeated city or full release sweep,
+physical-phone, live authentication or higher-concurrency acceptance is implied.
+See [the implementation and verification record](docs/verification/2026-10-24-LOCATION-DEFAULT-COMMUNITY.md).
+
+Google saved the completed 16-type Data safety handling/purpose declarations.
+The owner explicitly authorized Analytics Data Processing Terms; the account UI
+confirms acceptance on October 24. Free pricing was verified. Closed Alpha uses
+only the existing one-owner World Explorer tester list and the feedback mailbox;
+no unrelated list was selected or invitations sent. Gameplay screenshot upload
+still requires the browser extension's file URL permission. No Google review,
+Android phone acceptance or genuine 12-person/14-day test period is claimed.
+
+This candidate requires protected source checks and coordinated activation of
+nine existing Functions, the reviewed rules and the additive blockedPlayers.uid
+collection-group index, followed by matching web artifacts. Index readiness must
+precede updated deleteAccount. All other Functions/configuration, Auth, IAM,
+Hosting configuration, source/rollback artifacts and player records are preserved.
+The dense-city San Francisco initial/retry failure recorded in the feasibility
+assessment remains separate and is not repaired by switching defaults.
+
+## October 24 world-mode feasibility assessment
+
+Current source supports selected-location Earth gameplay with optional moving
+scenery; physical transport still has a finite selected-area source. Personal
+and weekly rooms share one selected origin. Separate ocean streaming has its
+own bounded tile/frame/save contract. Preserve these modes and existing features;
+do not classify scenery extension as complete worldwide interactive Earth.
+
+The recommended browser foundation remains selected locations. Seven focused
+cross-module model scenarios passed; live manifests still identify b48. No game
+code/defaults, world data, services or deployment changed, and no full-city or
+historical release tests were repeated. The October 14 fallback followed a
+recorded road-contact/recovery failure; that repaired historical defect is not
+asserted current. The recent San Francisco initial/retry failures occurred in
+fresh sessions with optional Earth scenery off and remain a separate loading
+fault requiring diagnosis.
+
+See [the feasibility assessment](docs/architecture-evaluation/2026-10-24-WORLD-MODE-FEASIBILITY.md)
+for current source evidence and the finite three-area route/return, complete
+physical/interactive publication, origin/save/peer agreement and whole-resource
+acceptance needed before any wider ground-streaming claim. Keep the location
+option and current session/scheduling/actor/lease authorities.
+
 ## October 24 Play edition — web released; Android v3 internal test active
 
 The public name is **World Explorer 3D** in the saved Play listing, native label

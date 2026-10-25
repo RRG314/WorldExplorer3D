@@ -190,11 +190,15 @@ function buildCommunityRealityCaptureExports(helpers = {}) {
     const auth = await verifyAuth(req, res);
     if (!auth) return null;
     if(helpers.captureAccountIsDeleting&&await helpers.captureAccountIsDeleting(auth.uid)){res.status(409).json({error:'Account deletion is in progress. Capture changes are disabled.'});return null;}
+    if (options.community) {
+      try { await require('./community-consent').requireCommunityConsent(db, auth.uid); }
+      catch (error) { res.status(error.status || 503).json({error:error.status === 403 ? error.message : 'Community settings are unavailable. Please try again.'}); return null; }
+    }
     return auth;
   }
 
   const createRealityCaptureDraft = functions.runWith({ timeoutSeconds: 120, memory: '512MB', maxInstances: 2 }).region('us-central1').runWith({ invoker: 'public' }).https.onRequest(async (req, res) => {
-    const auth = await guard(req, res);
+    const auth = await guard(req, res, {community:true});
     if (!auth) return;
     try {
       const authUser = await (helpers.getAuthUser || (uid=>admin.auth().getUser(uid)))(auth.uid);
@@ -280,7 +284,7 @@ function buildCommunityRealityCaptureExports(helpers = {}) {
   });
 
   const reserveRealityCapturePhoto = functions.region('us-central1').runWith({ invoker: 'public' }).https.onRequest(async (req, res) => {
-    const auth = await guard(req, res);
+    const auth = await guard(req, res, {community:true});
     if (!auth) return;
     try {
       const captureId = clean(req.body?.captureId, 180);
@@ -308,7 +312,7 @@ function buildCommunityRealityCaptureExports(helpers = {}) {
   });
 
   const createRealityCaptureUploadUrl=functions.region('us-central1').runWith({ invoker: 'public' }).https.onRequest(async(req,res)=>{
-    const auth=await guard(req,res);if(!auth)return;
+    const auth=await guard(req,res,{community:true});if(!auth)return;
     try{
       const captureId=clean(req.body?.captureId,180),photoId=clean(req.body?.photoId,32),size=req.body?.size,sha256=req.body?.sha256;
       if(!/^[\w-]{1,180}$/.test(captureId)||!/^[a-f0-9]{32}$/.test(photoId))throw Error('invalid_photo_identity');
@@ -491,7 +495,7 @@ function buildCommunityRealityCaptureExports(helpers = {}) {
   });
 
   const submitRealityCaptureHybrid = functions.region('us-central1').runWith({memory:'1GB',timeoutSeconds:120,maxInstances:2}).runWith({ invoker: 'public' }).https.onRequest(async(req,res)=>{
-    const auth=await guard(req,res);if(!auth)return;
+    const auth=await guard(req,res,{community:true});if(!auth)return;
     try{
       const captureId=clean(req.body?.captureId,180);if(!/^[a-zA-Z0-9_-]{1,180}$/.test(captureId))throw Error('invalid_capture_id');
       const ref=db.collection(CAPTURES).doc(captureId),snap=await ref.get(),capture={...snap.data(),captureId};

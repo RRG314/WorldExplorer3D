@@ -45,7 +45,10 @@ async function boot(label, mobile) {
   const uid = await page.evaluate(async label => {
     const { auth } = WorldExplorerFirebase.initFirebase();
     const sdk = await import('https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js');
-    return (await sdk.createUserWithEmailAndPassword(auth, `${label}-${Date.now()}@example.test`, 'Emulator-Only-Test-93!')).user.uid;
+    const user=(await sdk.createUserWithEmailAndPassword(auth, `${label}-${Date.now()}@example.test`, 'Emulator-Only-Test-93!')).user;
+    const dbApi=await import('https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js');
+    await dbApi.setDoc(dbApi.doc(WorldExplorerFirebase.initFirebase().db,'users',user.uid,'consents','community'),{version:'community-2026-10-24',acceptedAt:dbApi.serverTimestamp()});
+    return user.uid;
   }, label);
   await page.locator('[data-globe-destination="multiplayer"]:visible').click();
   await page.waitForFunction(() => /Multiplayer ready/.test(document.getElementById('mpTitleStatus')?.textContent || ''), null, { timeout: 20000 });

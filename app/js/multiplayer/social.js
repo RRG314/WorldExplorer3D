@@ -28,6 +28,40 @@ const RECENT_WRITE_COOLDOWN_MS = 60 * 1000;
 const recentWriteGate = new Map();
 const inviteWriteGate = new Map();
 
+// This collection belongs to the existing per-account social subscriptions.
+function listenBlockedPlayers(callback, options = {}) {
+  const uid = getCurrentUser()?.uid;
+  if (!uid) { callback([]); return () => {}; }
+  const {db} = getServices();
+  return onSnapshot(userCollectionPath(db, uid, 'blockedPlayers'), {includeMetadataChanges:true}, snapshot => {
+    if (getCurrentUser()?.uid !== uid || snapshot.metadata?.fromCache) return;
+    callback(snapshot.docs.map(row => ({uid: row.id, displayName: sanitizeName(row.data().displayName)})));
+  }, error => { if (getCurrentUser()?.uid === uid) options.onError?.(error); });
+}
+
+async function blockPlayer(playerUid, displayName = 'Explorer') {
+  const user = requireUser();
+  const uid = String(playerUid || '').trim();
+  if (!uid || uid.includes('/') || uid.length > 128 || uid === user.uid) throw new Error('Choose another player to block.');
+  const {db} = getServices();
+  await setDoc(userDocPath(db, user.uid, 'blockedPlayers', uid), {uid, displayName: sanitizeName(displayName), updatedAt: serverTimestamp()});
+  return {uid, displayName: sanitizeName(displayName)};
+}
+
+async function unblockPlayer(playerUid) {
+  const user = requireUser();
+  const uid = String(playerUid || '').trim();
+  if (!uid || uid.includes('/') || uid.length > 128) throw new Error('Choose a blocked player.');
+  const {db} = getServices();
+  await deleteDoc(userDocPath(db, user.uid, 'blockedPlayers', uid));
+}
+
+async function assertPlayerNotBlocked(db, userUid, otherUid) {
+  const blocked = await getDoc(userDocPath(db, userUid, 'blockedPlayers', otherUid));
+  if (blocked.exists()) throw new Error('Unblock this player before adding or inviting them.');
+  if (getCurrentUser()?.uid !== userUid) throw new Error('Account changed. Please try again.');
+}
+
 function getServices() {
   const services = initFirebase();
   if (!services || !services.db) {
@@ -229,6 +263,7 @@ async function addFriend(friendUid, displayName = 'Explorer', source = 'manual')
   const safeSource = source === 'recent' ? 'recent' : 'manual';
   const { db } = getServices();
   const ref = userDocPath(db, user.uid, FRIENDS_COLLECTION, cleanedUid);
+  await assertPlayerNotBlocked(db, user.uid, cleanedUid);
   const existing = await getDoc(ref);
   await setDoc(ref, {
     uid: cleanedUid,
@@ -294,6 +329,7 @@ async function sendInviteToFriend(friendUid, roomCode, roomName = '', message = 
 
   const invite = normalizeInvite(roomCode, roomName, message);
   const { db } = getServices();
+  await assertPlayerNotBlocked(db, user.uid, targetUid);
   const friendshipRef = userDocPath(db, user.uid, FRIENDS_COLLECTION, targetUid);
   const friendship = await getDoc(friendshipRef);
   if (!friendship.exists()) {
@@ -309,14 +345,8 @@ async function sendInviteToFriend(friendUid, roomCode, roomName = '', message = 
   }
 
   const inviteRef = userDocPath(db, targetUid, INCOMING_INVITES_COLLECTION, inviteId);
-  const existingInvite = await getDoc(inviteRef);
-  if (existingInvite.exists()) {
-    const existingUpdatedAt = toMillis(existingInvite.data()?.updatedAt);
-    if (Number.isFinite(existingUpdatedAt) && now - existingUpdatedAt < INVITE_RESEND_COOLDOWN_MS) {
-      throw new Error('Invite cooldown active. Please wait before sending another invite.');
-    }
-  }
-
+  // Recipient inboxes are private. The sender writes one scoped invitation;
+  // server rules enforce its resend clock without granting inbox read access.
   await setDoc(inviteRef, {
     fromUid: user.uid,
     fromDisplayName: sanitizeName(user.displayName || 'Explorer'),
@@ -326,7 +356,7 @@ async function sendInviteToFriend(friendUid, roomCode, roomName = '', message = 
     inviteLink: invite.inviteLink,
     message: invite.message,
     seen: false,
-    createdAt: existingInvite.exists() ? existingInvite.data()?.createdAt || serverTimestamp() : serverTimestamp(),
+    createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
     expiresAt: Timestamp.fromMillis(now + INVITE_TTL_MS)
   });
@@ -355,6 +385,9 @@ async function dismissInvite(inviteId) {
 }
 
 export {
+  blockPlayer,
+  unblockPlayer,
+  listenBlockedPlayers,
   addFriend,
   dismissInvite,
   listenFriends,

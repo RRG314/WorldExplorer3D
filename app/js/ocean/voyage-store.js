@@ -6,7 +6,8 @@ export const OCEAN_VOYAGE_KEY='we3d.ocean.voyage.v1';
 export const OCEAN_NATIVE_VOYAGE_KEY='we3d.ocean.voyage.v2';
 export const OCEAN_STREAM_VOYAGE_KEY='we3d.ocean.voyage.v3';
 export const OCEAN_STREAM_PREFERENCE_KEY='we3d.ocean.continuous.v1';
-export function oceanStreamingPreference(){try{return globalThis.localStorage?.getItem(OCEAN_STREAM_PREFERENCE_KEY)!=='off';}catch{return true;}}
+export function oceanStreamingPreference(storage){try{return (storage??globalThis.localStorage)?.getItem(OCEAN_STREAM_PREFERENCE_KEY)==='on';}catch{return false;}}
+export function writeOceanStreamingPreference(enabled,storage){try{const target=storage??globalThis.localStorage;if(!target?.setItem)return false;target.setItem(OCEAN_STREAM_PREFERENCE_KEY,enabled?'on':'off');return true;}catch{return false;}}
 const text=(v,max=160)=>typeof v==='string'&&v.length>0&&v.length<=max;
 const point=p=>p&&Number.isFinite(p.lat)&&Math.abs(p.lat)<=90&&Number.isFinite(p.lon)&&Math.abs(p.lon)<=180;
 const wave=p=>p&&Number.isFinite(p.x)&&Number.isFinite(p.z)&&Math.abs(p.x)<1e12&&Math.abs(p.z)<1e12;
