@@ -117,3 +117,28 @@ test('the backend denies absent and stale consent while allowing the current ver
     else await assert.rejects(result,error=>error.status===403);
   }
 });
+
+test('switching accounts clears private social rows before new block or social snapshots can render',async()=>{
+  const state={authUser:{uid:'one'},blockedPlayers:[],blockedPlayersReady:false,friends:[],recentPlayers:[],invites:[],ownedRooms:[]};
+  const batches=[],rendered=[];
+  let callbacks={};
+  const subscribe=key=>callback=>{callbacks[key]=callback;return()=>{};};
+  const noop=()=>{},exports={
+    leavesRoomForEarthLocation:noop,ensureEntitlements:noop,isEarthWorldUsable:noop,createGhostManager:noop,
+    listenExplorerLeaderboard:()=>noop,stopPresence:noop,deriveRoomDeterministicSeed:noop,findFeaturedPublicRooms:noop,leaveRoom:noop,
+    listenMyRooms:subscribe('rooms'),listenPaintClaims:noop,upsertPaintClaim:noop,
+    listenBlockedPlayers:subscribe('blocked'),listenFriends:subscribe('friends'),listenIncomingInvites:subscribe('invites'),listenRecentPlayers:subscribe('recent')};
+  const context=vm.createContext({console});
+  const module=new vm.SourceTextModule(await readFile(new URL('../app/js/multiplayer/ui-room-runtime.js',import.meta.url),'utf8'),{context});
+  await module.link(()=>new vm.SyntheticModule(Object.keys(exports),function(){for(const [name,value]of Object.entries(exports))this.setExport(name,value);},{context}));await module.evaluate();
+  const renderers=new Proxy({},{get:(_target,name)=>name==='renderFriends'?()=>rendered.push(state.friends.map(row=>row.uid)):noop});
+  const runtime=module.namespace.createUiRoomRuntime({appCtx:{},refs:{},state,renderers,helpers:{}});
+  runtime.ensureGlobalSubscriptions();batches.push(callbacks);callbacks={};
+  batches[0].blocked([]);for(const key of ['friends','recent','invites','rooms'])batches[0][key]([{uid:'old-private-row'}]);
+  state.authUser={uid:'two'};runtime.ensureGlobalSubscriptions();batches.push(callbacks);
+  for(const key of ['friends','recentPlayers','invites','ownedRooms'])assert.equal(state[key].length,0,key+' must retire with its account');
+  batches[1].blocked([]);assert.equal(rendered.at(-1).length,0,'New block readiness must not reveal the previous account social rows');
+  for(const key of ['friends','recent','invites','rooms'])batches[0][key]([{uid:'late-old-row'}]);
+  for(const key of ['friends','recentPlayers','invites','ownedRooms'])assert.equal(state[key].length,0,'Late old-account snapshots stay rejected');
+  batches[1].friends([{uid:'new-account-friend'}]);assert.equal(state.friends[0].uid,'new-account-friend');
+});
