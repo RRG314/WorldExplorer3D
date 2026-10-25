@@ -60,6 +60,7 @@ export const currentContractTests = [
   'tests/world-load-consumers-current.test.mjs',
   'tests/portal-destination-policy-current.test.mjs',
   'tests/portal-trail-current.test.mjs',
+  'tests/portal-game-entry-current.test.mjs',
   'tests/portal-sync-current.test.mjs',
   'tests/portal-service-current.test.mjs',
   'tests/runtime-frame-source-current.test.mjs',

@@ -5,6 +5,7 @@ const id = value => typeof value === 'string' && /^[a-z0-9][a-z0-9._:-]{0,159}$/
 const time = value => Number.isSafeInteger(value) && value > 0;
 const copy = value => JSON.parse(JSON.stringify(value));
 const actionSlots = Object.freeze({save:'saved',unsave:'saved',investigate:'investigated',offered:'offered'});
+const commandSlot=action=>action.kind==='visit'?'visited':actionSlots[action.kind];
 const uidValid = value => typeof value === 'string' && /^[^\u0000-\u001f\u007f]{1,128}$/u.test(value);
 
 export function portalOwnerScope(uid = null) {
@@ -54,6 +55,26 @@ export function normalizePortalAction(input) {
     createdAt:input.createdAt,...(input.kind === 'investigate' ? {contentVersion:input.contentVersion} : {})};
 }
 
+// Only the admitted game-presentation owner emits this command. It is kept
+// outside the widget action vocabulary and grants no inventory, XP or activity.
+export function normalizePortalGameVisit(input){
+  if(input?.kind!=='visit'||!id(input.operationId)||!id(input.destinationId)||!time(input.createdAt)||
+    !['destinationRevision','contentVersion','qualificationId','deviceProfile','worldRequestId'].every(key=>id(input[key]))||
+    !['walk','drive'].includes(input.arrivalMode))throw new TypeError('Invalid Portal game visit.');
+  return Object.fromEntries(['operationId','destinationId','kind','createdAt','destinationRevision','contentVersion',
+    'qualificationId','deviceProfile','worldRequestId','arrivalMode'].map(key=>[key,input[key]]));
+}
+const normalizeCommand=input=>input?.kind==='visit'?normalizePortalGameVisit(input):normalizePortalAction(input);
+function applyCommand(state,input,now=input.createdAt){
+  if(input.kind!=='visit')return applyPortalAction(state,input,now);
+  const action=normalizePortalGameVisit(input),next=validatePortalTrailState(state,action.destinationId);
+  if(!time(now))throw new TypeError('Portal visits require a valid timestamp.');
+  next.firstOfferedAt=next.firstOfferedAt?Math.min(next.firstOfferedAt,now):now;
+  next.lastOfferedAt=Math.max(next.lastOfferedAt,now);next.visitedAt=Math.max(next.visitedAt,now);
+  return next;
+}
+export function applyPortalGameVisit(state,input,now=input?.createdAt){return applyCommand(state,normalizePortalGameVisit(input),now);}
+
 export function applyPortalAction(state, input, now = input?.createdAt) {
   const action = normalizePortalAction(input);
   const next = validatePortalTrailState(state,action.destinationId);
@@ -83,8 +104,8 @@ export function validatePortalTrailEntry(input) {
   const state = validatePortalTrailState(input.state,input.destinationId);
   const pending = {};
   for (const [slot,value] of Object.entries(input.pending)) {
-    const action = normalizePortalAction(value);
-    if (action.destinationId !== input.destinationId || actionSlots[action.kind] !== slot ||
+    const action = normalizeCommand(value);
+    if (action.destinationId !== input.destinationId || commandSlot(action) !== slot ||
         input.ownerScope === 'device-guest') throw new TypeError('Invalid pending Trail action.');
     pending[slot] = action;
   }
@@ -92,10 +113,14 @@ export function validatePortalTrailEntry(input) {
 }
 
 export function queuePortalAction(entry, input) {
-  const next = validatePortalTrailEntry(entry), action = normalizePortalAction(input);
+  return queueCommand(entry,normalizePortalAction(input));
+}
+export function queuePortalGameVisit(entry,input){return queueCommand(entry,normalizePortalGameVisit(input));}
+function queueCommand(entry, action) {
+  const next = validatePortalTrailEntry(entry);
   if (action.destinationId !== next.destinationId) throw new TypeError('Portal action changed destination.');
-  if (next.ownerScope === 'device-guest') next.state = applyPortalAction(next.state,action);
-  else next.pending[actionSlots[action.kind]] = action;
+  if (next.ownerScope === 'device-guest') next.state = applyCommand(next.state,action);
+  else next.pending[commandSlot(action)] = action;
   return next;
 }
 
@@ -103,7 +128,7 @@ export function portalTrailView(entry) {
   const next = validatePortalTrailEntry(entry);
   let state = next.state;
   for (const action of Object.values(next.pending).sort((a,b) => a.createdAt-b.createdAt || a.operationId.localeCompare(b.operationId))) {
-    state = applyPortalAction(state,action);
+    state = applyCommand(state,action);
   }
   return {...state,pending:Object.keys(next.pending).length > 0,ownerScope:next.ownerScope};
 }

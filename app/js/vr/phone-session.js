@@ -67,7 +67,7 @@ export function createPhoneVrSession({ctx,THREE,optics,captureSession,ride=null,
       if(body)body.visible=false;
       controls.update({mountPosition,mountQuaternion,camera,timestamp:frame.timestamp,paused:ctx.paused,tracking,message:roadRideMessage(ride,ctx.paused)});return true;
     },
-    render(){if(api.guard())stereo.render(presentation.scene,presentation.camera);},
+    render(){if(!api.guard())return false;stereo.render(presentation.scene,presentation.camera);return true;},
     async start(){
       if(!active)return false;if(started)return true;
       // Permission invocation is before the first await of this method.

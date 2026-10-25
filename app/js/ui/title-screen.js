@@ -1,4 +1,5 @@
 import { requestGuidedJourney, consumeGuidedJourney, readReturnPlace } from '../tutorial/entry-journey.js';
+import {createPortalGameEntry} from '../portal/game-entry.js';
 import { createLaunchMeasurement } from '../platform/launch-telemetry.js';
 import {validateOceanVoyage} from '../ocean/voyage-store.js';
 import { oceanEntryDecision } from '../ocean/entry-policy.js?v=1';
@@ -45,7 +46,19 @@ function initTitleScreenUi({
     space: spaceLaunchToggle,
     ocean: oceanLaunchToggle
   };
-  const sharedExperienceParams = readSharedExperienceParams();
+  const portalEntry=createPortalGameEntry(appCtx,{recordVisit:async(ownerScope,claim)=>{
+    const {createIndexedDbDiscoveryProfileStore}=await import('../discovery/profile-store.js?v=5');
+    const store=appCtx.discoveryProfileStore||createIndexedDbDiscoveryProfileStore();
+    await store.recordPortalGameVisit(ownerScope,claim);
+    const uid=ownerScope.startsWith('account:')?ownerScope.slice(8):null;
+    if(!uid||appCtx.getAccountUserId?.()!==uid||navigator.onLine===false)return;
+    const [{createPortalTrailController},{postProtectedFunction}]=await Promise.all([
+      import('../portal/trail-controller.js'),import('../../../js/function-api.js?v=3')]);
+    const sync=createPortalTrailController({store,request:postProtectedFunction});
+    try{await sync.changeOwner(uid);}finally{sync.dispose();}
+  }});
+  const sharedExperienceParams = portalEntry.intent?null:readSharedExperienceParams();
+  window.addEventListener('pagehide',event=>{if(!event.persisted)portalEntry.dispose();});
   let pendingOceanSelection = null;
   let pendingOceanResume = null;
   let titleLaunchMode = 'earth';
@@ -527,6 +540,20 @@ function initTitleScreenUi({
     if (raw) applyLastLocationSelection(JSON.parse(raw));
   } catch {}
 
+  if(portalEntry.intent){
+    const {place,decision}=portalEntry.intent;
+    if(decision.eligible){
+      const origin=place.destination.origin,preset=appCtx.LOCS?.[place.preset];
+      applyLastLocationSelection(preset?.lat===origin.lat&&preset?.lon===origin.lon
+        ?{selLoc:place.preset,launchMode:'earth'}
+        :{selLoc:'custom',customLoc:{...origin,name:place.title},launchMode:'earth'});
+      selectCurrentLocationMode();
+    }
+    const status=shareExperienceStatus||perfSettingsStatus;
+    if(status)status.textContent=decision.eligible?`${place.title} · Start Explore to enter this Portal.`:
+      'This Portal world is not ready for this device. Your saved place is kept; you can choose another location.';
+  }
+
   if (sharedExperienceParams) {
     const validGameModes = new Set(['free', 'trial', 'checkpoint', 'painttown', 'police', 'flower', 'deflock', 'livegps']);
     if (sharedExperienceParams.gameMode && validGameModes.has(sharedExperienceParams.gameMode)) {
@@ -614,6 +641,7 @@ function initTitleScreenUi({
     if (externalBypassCustomGate) appCtx.pendingCustomLaunchBypass = false;
     if (globeSelector?.isOpen?.()) globeSelector.close();
 
+    const portalTicket=portalEntry.begin(requestedLaunchMode);
     activeLaunchMode = requestedLaunchMode;
     launchMeasurement = createLaunchMeasurement(requestedLaunchMode);
     const pendingFlowerChallengeRequested = typeof appCtx.consumePendingFlowerChallengeStart === 'function' ? appCtx.consumePendingFlowerChallengeStart() : false;
@@ -752,6 +780,7 @@ function initTitleScreenUi({
     updateControlsModeUI?.();
     applySharedRuntimeState?.();
     if (typeof appCtx.startMode === 'function') appCtx.startMode();
+    if(portalTicket&&!portalEntry.arm(portalTicket,earthLoadResult))appCtx.showToast?.('The location is open, but its Portal arrival could not be verified. No visit was recorded.');
     emitTutorialEvent('spawned_in_world', {
       location: appCtx.selLoc === 'custom' ? appCtx.customLoc : appCtx.LOCS?.[appCtx.selLoc] || null,
       launchMode: requestedLaunchMode
@@ -793,6 +822,7 @@ function initTitleScreenUi({
         return result;
       })
       .catch((error) => {
+        portalEntry.cancel();
         launchMeasurement?.finish('failed');
         consumeGuidedJourney();
         console.error('[title] World launch failed:',error);

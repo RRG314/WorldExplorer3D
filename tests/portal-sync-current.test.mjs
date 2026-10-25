@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {createMemoryDiscoveryProfileStore} from '../app/js/discovery/profile-store.js';
 import {createPortalTrailController} from '../app/js/portal/trail-controller.js';
 import {emptyPortalTrailState,portalTrailView} from '../app/js/portal/trail-model.js';
+import {portalFixture} from './fixtures/portal-qualification.mjs';
 const deferred=()=>{let resolve;return {promise:new Promise(r=>resolve=r),resolve};};
 function fixture(request){const store=createMemoryDiscoveryProfileStore();let view,sequence=0;const controller=createPortalTrailController({store,request,onChange:value=>view=value,now:()=>1000+sequence,operationId:()=>`operation-${++sequence}`});return {store,controller,view:()=>view};}
 const remote=(uid='a',items=[])=>({ownerScope:`account:${uid}`,items,nextCursor:null});
@@ -43,4 +44,15 @@ test('wrong-account server payload is rejected and preserves the pending choice'
   const f=fixture(async(path,body)=>path==='listPortalTrail'?remote():{ownerScope:'account:intruder',operationId:body.action.operationId,state:emptyPortalTrailState('baltimore-harbor')});
   await f.controller.changeOwner('a');await f.controller.act('baltimore-harbor','save');await f.controller.sync();assert.equal(f.view().status,'pending');
   assert.equal(portalTrailView(await f.store.getPortalDestination('account:a','baltimore-harbor')).saved,true);f.controller.dispose();
+});
+test('durable game visit uses its separate endpoint and copying guest choices does not copy that visit',async()=>{
+  const p=portalFixture(),claim={kind:'visit',operationId:'game-visit:one',destinationId:p.place.id,createdAt:p.now,destinationRevision:'1',
+    contentVersion:p.place.destination.contentVersion,qualificationId:p.qualification.evidenceId,deviceProfile:'desktop',worldRequestId:'world:one',arrivalMode:'walk'};
+  const calls=[],f=fixture(async(path,body)=>{calls.push({path,body});return path==='listPortalTrail'?remote():{
+    ownerScope:'account:a',operationId:body.action.operationId,state:{...emptyPortalTrailState(p.place.id),revision:1,visitedAt:p.now}};});
+  await f.store.recordPortalGameVisit('device-guest',claim);await f.controller.changeOwner('a');await f.controller.copyDeviceChoices();
+  assert.equal(f.view().summary.visited,0);
+  await f.store.recordPortalGameVisit('account:a',claim);await f.controller.sync();
+  assert.equal(f.view().summary.visited,1);assert.equal(calls.filter(row=>row.path==='confirmPortalVisit').length,1);
+  assert.equal(calls.some(row=>row.path==='mutatePortalTrail'),false);assert.deepEqual((await f.store.getPortalDestination('account:a',p.place.id)).pending,{});f.controller.dispose();
 });

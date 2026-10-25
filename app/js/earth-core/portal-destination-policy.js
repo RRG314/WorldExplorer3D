@@ -17,6 +17,13 @@ const buildIdentity = value => typeof value === 'string' && value.length > 0 && 
 const timestamp = value => Number.isSafeInteger(value) && value > 0;
 const point = value => Number.isFinite(value?.lat) && Math.abs(value.lat) <= 90 &&
   Number.isFinite(value?.lon) && Math.abs(value.lon) <= 180;
+// Match the selection owner's canonical longitude operation on BOTH sides.
+// It preserves geographic identity despite floating-point wrapping, including
+// +180/-180. No travel-radius tolerance can admit a neighboring destination.
+export function portalLocationsMatch(left,right){
+  const longitude=value=>((value+180)%360+360)%360-180;
+  return point(left)&&point(right)&&left.lat===right.lat&&longitude(left.lon)===longitude(right.lon);
+}
 const bounds = value => value && [value.south, value.north, value.west, value.east].every(Number.isFinite) &&
   value.south < value.north && value.south >= -90 && value.north <= 90 &&
   Math.abs(value.west) <= 180 && Math.abs(value.east) <= 180 && value.west !== value.east &&
@@ -110,7 +117,7 @@ export function evaluatePortalWorldReadiness(appCtx, loadResult, destination, as
   }
   const publication = appCtx.worldPublication;
   if (publication?.type !== 'WorldSnapshot' || !Object.isFrozen(publication) ||
-      !sameFields(publication.location, destination.origin, ['lat', 'lon'])) reasons.push('published-location-mismatch');
+      !portalLocationsMatch(publication.location,destination.origin)) reasons.push('published-location-mismatch');
   for (const layer of offer.requiredLayers) {
     const product = publication.layers?.[layer];
     // Compiler products deliberately say partial when they have records. That

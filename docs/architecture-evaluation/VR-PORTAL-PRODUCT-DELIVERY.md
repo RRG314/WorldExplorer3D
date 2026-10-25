@@ -225,3 +225,38 @@ road-ride-manual-resume.tap, vr-ui-owner-handoff.tap,
 road-ride-context-reviewed.tap in output/research/vr-portal-product-2026-10-25/.
 No new deployment or release. Continue Portal qualified entry/live services,
 native widgets, other renderer domains and physical/platform acceptance.
+
+- Portal entry: opaque catalog ID/revision only, no composable raw poses,
+  coordinates, seeds, rooms or alternate environments. Trusted qualification
+  gates the Portal link and game. Title/location/load/session owners remain in
+  charge; existing surface travel admission refuses water, vessel, aircraft and
+  interior replacement. An observer on the same kernel waits for a successful
+  matching visible world draw before saving a virtual visit. Ownership changes
+  revoke it; it unregisters immediately after its one receipt. No new scheduler.
+- Independent visits use Journal Trail persistence/outbox and a separate
+  confirmPortalVisit endpoint with existing Auth/App Check, initiating owner,
+  idempotent transaction, quota, catalog scope and deletion checks. Offline
+  occurrence time is retained. The receipt explicitly says client-admitted
+  virtual presentation, not physical presence or trusted activity/rewards.
+  Widgets cannot submit visits through their action endpoint, and explicit
+  copying of guest saves/learning does not copy guest visits.
+- Ten new focused cases pass, plus affected persistence, policy, render, ownership
+  and routing contracts. Repeated receipts overlap. Actual browser save → admitted
+  Baltimore city render → prescribed normal walking → returned durable Trail
+  passes with inspected screenshots and no page/console/resource errors.
+  A browser-only qualification fixture establishes this wiring; catalog release
+  qualifications remain empty. Real destination/device approval is still required.
+- Failed browser evidence is retained: first stale diagnostics field, then a
+  real exact-coordinate rejection caused by longitude wrapping floating-point
+  drift. Shared canonical geographic comparison matches the existing selection
+  normalizer, including the antimeridian, without a nearby-place tolerance.
+  Installed Playwright's async-predicate polling can return a false result after
+  seeing a truthy Promise. The runner now awaits IndexedDB explicitly and asserts
+  the stored visit, so the earlier premature progress statement is not evidence.
+
+Evidence: portal-game-first/ (failed), portal-game-final/ (failed),
+portal-game-identity-fixed/ (pass), portal-entry-first.tap,
+portal-entry-affected.tap, portal-entry-identity-fixed.tap and
+portal-entry-service-time-final.tap. No new Hosting/native deployment. Continue
+native widget clients/account integration, actual destination qualifications,
+remaining VR domains and coordinated release/platform acceptance.

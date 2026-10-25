@@ -3,8 +3,9 @@ import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
 import {readFile} from 'node:fs/promises';
 import {buildSharedPortal} from '../scripts/build-shared-portal.mjs';
+import {portalFixture} from './fixtures/portal-qualification.mjs';
 const {buildPortalExports}=createRequire(import.meta.url)('../functions/portal.js');
-function fixture(){
+function fixture(catalog){
   const records=new Map(),writes=[];let at=1800000000000,auth={uid:'owner'},checked=true;
   function ref(path){return {path,id:path.split('/').at(-1),collection:name=>collection(`${path}/${name}`)};}
   function collection(path){return {doc:id=>ref(`${path}/${id}`),orderBy:()=>query(path)};}
@@ -15,9 +16,9 @@ function fixture(){
     for(const [path,value] of pending){records.set(path,structuredClone(value));writes.push(path);}return result;
   }};
   const functions={region:()=>({runWith(){return this;},https:{onRequest:handler=>handler}})};
-  const endpoints=buildPortalExports({functions,db,now:()=>at++,setCors:()=>false,verifyAuth:async(req,res)=>{if(!auth)res.status(401).json({error:'Auth required'});return auth;},verifyAppCheck:async(req,res)=>{if(!checked)res.status(401).json({error:'App Check required'});return checked;}});
+  const endpoints=buildPortalExports({functions,db,catalog,now:()=>at++,setCors:()=>false,verifyAuth:async(req,res)=>{if(!auth)res.status(401).json({error:'Auth required'});return auth;},verifyAppCheck:async(req,res)=>{if(!checked)res.status(401).json({error:'App Check required'});return checked;}});
   async function call(name,body,method='POST'){const res={code:200,status(code){this.code=code;return this;},set(){},json(body){this.body=body;return this;}};await endpoints[name]({method,body},res);return res;}
-  return {records,writes,call,setAuth:value=>auth=value,setCheck:value=>checked=value};
+  return {records,writes,call,setAuth:value=>auth=value,setCheck:value=>checked=value,setTime:value=>at=value};
 }
 const action=(kind='save',operationId='operation-1')=>({expectedOwnerUid:'owner',action:{operationId,destinationId:'baltimore-harbor',kind,createdAt:1000,...(kind==='investigate'?{contentVersion:'2026.10.25.1'}:{})}});
 
@@ -54,4 +55,26 @@ test('rate limit keeps pending choices retryable and never charges exact retries
   const f=fixture();await f.call('mutatePortalTrail',action());f.records.set('explorerProfiles/owner/portalLimits/actions',{windowAt:1800000000000,count:120});
   assert.equal((await f.call('mutatePortalTrail',action())).code,200);
   const before=f.writes.length;assert.equal((await f.call('mutatePortalTrail',action('unsave','later'))).code,429);assert.equal(f.writes.length,before);
+});
+test('game visit endpoint checks catalog scope separately, preserves offline visit time and never awards activity progress',async()=>{
+  const p=portalFixture(),f=fixture(p.catalog),body={expectedOwnerUid:'owner',action:{kind:'visit',operationId:'visit-1',destinationId:p.place.id,
+    createdAt:p.now,destinationRevision:'1',contentVersion:p.place.destination.contentVersion,qualificationId:p.qualification.evidenceId,
+    deviceProfile:'desktop',worldRequestId:'world-load:1:39.2904:-76.6122:baltimore',arrivalMode:'walk'}};
+  assert.equal((await f.call('mutatePortalTrail',body)).code,400);
+  for(const patch of [{deviceProfile:'mobile-touch'},{qualificationId:'invented'},{arrivalMode:'plane'},{destinationRevision:'2'},{contentVersion:'different'},
+    {createdAt:p.now+86400000},{createdAt:p.now-31*86400000}])assert.ok((await f.call('confirmPortalVisit',{...body,action:{...body.action,...patch}})).code>=400);
+  assert.equal(f.writes.length,0);f.setTime(p.now+86400000);
+  const accepted=await f.call('confirmPortalVisit',body);assert.equal(accepted.code,200);assert.equal(accepted.body.state.visitedAt,p.now);
+  assert.equal(accepted.body.state.saved,false);assert.equal(accepted.body.state.investigatedAt,0);assert.deepEqual(accepted.body.state.expeditionIds,[]);
+  const count=f.writes.length;f.setTime(p.now+32*86400000);assert.equal((await f.call('confirmPortalVisit',body)).code,200);assert.equal(f.writes.length,count);
+  assert.ok([...f.records.values()].some(row=>row.evidenceClass==='client-admitted-virtual-presentation'));
+  assert.ok(f.writes.every(path=>/\/portal(Trail|Operations|Limits)\//.test(path)));
+});
+test('the released catalog cannot accept an unqualified 3D visit and game visits retain Auth/App Check/account-deletion boundaries',async()=>{
+  const p=portalFixture(),body={expectedOwnerUid:'owner',action:{kind:'visit',operationId:'visit-1',destinationId:p.place.id,createdAt:p.now,
+    destinationRevision:'1',contentVersion:p.place.destination.contentVersion,qualificationId:p.qualification.evidenceId,deviceProfile:'desktop',worldRequestId:'world:1',arrivalMode:'walk'}};
+  assert.equal((await fixture().call('confirmPortalVisit',body)).code,409);
+  const f=fixture(p.catalog);f.setCheck(false);assert.equal((await f.call('confirmPortalVisit',body)).code,401);f.setCheck(true);
+  assert.equal((await f.call('confirmPortalVisit',{...body,expectedOwnerUid:'other'})).code,409);
+  f.records.set('captureAccountDeletions/owner',{started:true});assert.equal((await f.call('confirmPortalVisit',body)).code,409);assert.equal(f.writes.length,0);
 });

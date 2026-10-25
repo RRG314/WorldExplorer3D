@@ -22,13 +22,19 @@ var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: tru
 var stdin_exports = {};
 __export(stdin_exports, {
   PORTAL_CATALOG: () => PORTAL_CATALOG,
+  PORTAL_RENDER_CONTRACT: () => PORTAL_RENDER_CONTRACT,
   PORTAL_TRAIL_VERSION: () => PORTAL_TRAIL_VERSION,
   acceptPortalSync: () => acceptPortalSync,
   applyPortalAction: () => applyPortalAction,
+  applyPortalGameVisit: () => applyPortalGameVisit,
   createPortalTrailEntry: () => createPortalTrailEntry,
   emptyPortalTrailState: () => emptyPortalTrailState,
   normalizePortalAction: () => normalizePortalAction,
+  normalizePortalGameVisit: () => normalizePortalGameVisit,
   portalDestination: () => portalDestination,
+  portalDeviceProfile: () => portalDeviceProfile,
+  portalGameLink: () => portalGameLink,
+  portalOffer: () => portalOffer,
   portalOwnerScope: () => portalOwnerScope,
   portalSuggestions: () => portalSuggestions,
   portalTrailKey: () => portalTrailKey,
@@ -36,6 +42,8 @@ __export(stdin_exports, {
   portalTrailSummary: () => portalTrailSummary,
   portalTrailView: () => portalTrailView,
   queuePortalAction: () => queuePortalAction,
+  queuePortalGameVisit: () => queuePortalGameVisit,
+  resolvePortalGameIntent: () => resolvePortalGameIntent,
   validatePortalTrailEntry: () => validatePortalTrailEntry,
   validatePortalTrailState: () => validatePortalTrailState
 });
@@ -47,6 +55,7 @@ var id = (value) => typeof value === "string" && /^[a-z0-9][a-z0-9._:-]{0,159}$/
 var time = (value) => Number.isSafeInteger(value) && value > 0;
 var copy = (value) => JSON.parse(JSON.stringify(value));
 var actionSlots = Object.freeze({ save: "saved", unsave: "saved", investigate: "investigated", offered: "offered" });
+var commandSlot = (action) => action.kind === "visit" ? "visited" : actionSlots[action.kind];
 var uidValid = (value) => typeof value === "string" && /^[^\u0000-\u001f\u007f]{1,128}$/u.test(value);
 function portalOwnerScope(uid = null) {
   if (uid == null || uid === "") return "device-guest";
@@ -94,6 +103,34 @@ function normalizePortalAction(input) {
     ...input.kind === "investigate" ? { contentVersion: input.contentVersion } : {}
   };
 }
+function normalizePortalGameVisit(input) {
+  if (input?.kind !== "visit" || !id(input.operationId) || !id(input.destinationId) || !time(input.createdAt) || !["destinationRevision", "contentVersion", "qualificationId", "deviceProfile", "worldRequestId"].every((key) => id(input[key])) || !["walk", "drive"].includes(input.arrivalMode)) throw new TypeError("Invalid Portal game visit.");
+  return Object.fromEntries([
+    "operationId",
+    "destinationId",
+    "kind",
+    "createdAt",
+    "destinationRevision",
+    "contentVersion",
+    "qualificationId",
+    "deviceProfile",
+    "worldRequestId",
+    "arrivalMode"
+  ].map((key) => [key, input[key]]));
+}
+var normalizeCommand = (input) => input?.kind === "visit" ? normalizePortalGameVisit(input) : normalizePortalAction(input);
+function applyCommand(state, input, now = input.createdAt) {
+  if (input.kind !== "visit") return applyPortalAction(state, input, now);
+  const action = normalizePortalGameVisit(input), next = validatePortalTrailState(state, action.destinationId);
+  if (!time(now)) throw new TypeError("Portal visits require a valid timestamp.");
+  next.firstOfferedAt = next.firstOfferedAt ? Math.min(next.firstOfferedAt, now) : now;
+  next.lastOfferedAt = Math.max(next.lastOfferedAt, now);
+  next.visitedAt = Math.max(next.visitedAt, now);
+  return next;
+}
+function applyPortalGameVisit(state, input, now = input?.createdAt) {
+  return applyCommand(state, normalizePortalGameVisit(input), now);
+}
 function applyPortalAction(state, input, now = input?.createdAt) {
   const action = normalizePortalAction(input);
   const next = validatePortalTrailState(state, action.destinationId);
@@ -125,24 +162,30 @@ function validatePortalTrailEntry(input) {
   const state = validatePortalTrailState(input.state, input.destinationId);
   const pending = {};
   for (const [slot, value] of Object.entries(input.pending)) {
-    const action = normalizePortalAction(value);
-    if (action.destinationId !== input.destinationId || actionSlots[action.kind] !== slot || input.ownerScope === "device-guest") throw new TypeError("Invalid pending Trail action.");
+    const action = normalizeCommand(value);
+    if (action.destinationId !== input.destinationId || commandSlot(action) !== slot || input.ownerScope === "device-guest") throw new TypeError("Invalid pending Trail action.");
     pending[slot] = action;
   }
   return { ...createPortalTrailEntry(input.ownerScope, input.destinationId), state, pending };
 }
 function queuePortalAction(entry, input) {
-  const next = validatePortalTrailEntry(entry), action = normalizePortalAction(input);
+  return queueCommand(entry, normalizePortalAction(input));
+}
+function queuePortalGameVisit(entry, input) {
+  return queueCommand(entry, normalizePortalGameVisit(input));
+}
+function queueCommand(entry, action) {
+  const next = validatePortalTrailEntry(entry);
   if (action.destinationId !== next.destinationId) throw new TypeError("Portal action changed destination.");
-  if (next.ownerScope === "device-guest") next.state = applyPortalAction(next.state, action);
-  else next.pending[actionSlots[action.kind]] = action;
+  if (next.ownerScope === "device-guest") next.state = applyCommand(next.state, action);
+  else next.pending[commandSlot(action)] = action;
   return next;
 }
 function portalTrailView(entry) {
   const next = validatePortalTrailEntry(entry);
   let state = next.state;
   for (const action of Object.values(next.pending).sort((a, b) => a.createdAt - b.createdAt || a.operationId.localeCompare(b.operationId))) {
-    state = applyPortalAction(state, action);
+    state = applyCommand(state, action);
   }
   return { ...state, pending: Object.keys(next.pending).length > 0, ownerScope: next.ownerScope };
 }
@@ -257,16 +300,119 @@ function portalSuggestions({ mode = "wander", homeId = null, day = Math.floor(Da
   const offset = (day % rows.length + rows.length) % rows.length;
   return [...rows.slice(offset), ...rows.slice(0, offset)];
 }
+
+// app/js/earth-core/portal-destination-policy.js
+var PORTAL_QUALIFICATION_VERSION = 1;
+var PORTAL_QUALITY_CHECKS = Object.freeze([
+  "geographicIdentity",
+  "visualExperience",
+  "safeArrival",
+  "playableContent",
+  "devicePerformance"
+]);
+var profiles = Object.freeze({
+  city: Object.freeze(["terrain", "transport", "buildings", "places"]),
+  nature: Object.freeze(["terrain", "landuse", "places"]),
+  coast: Object.freeze(["terrain", "hydrology", "landuse", "places"])
+});
+var identifier = (value) => typeof value === "string" && /^[a-z0-9][a-z0-9._:-]{0,159}$/i.test(value);
+var buildIdentity = (value) => typeof value === "string" && value.length > 0 && value.length <= 200 && /^[a-z0-9.+_:-]+$/i.test(value);
+var timestamp = (value) => Number.isSafeInteger(value) && value > 0;
+var point = (value) => Number.isFinite(value?.lat) && Math.abs(value.lat) <= 90 && Number.isFinite(value?.lon) && Math.abs(value.lon) <= 180;
+var bounds = (value) => value && [value.south, value.north, value.west, value.east].every(Number.isFinite) && value.south < value.north && value.south >= -90 && value.north <= 90 && Math.abs(value.west) <= 180 && Math.abs(value.east) <= 180 && value.west !== value.east && !(value.west === 180 && value.east === -180);
+function contains(area, location) {
+  if (!bounds(area) || !point(location) || location.lat < area.south || location.lat > area.north) return false;
+  const longitude = location.lon === 180 ? -180 : location.lon;
+  return area.west <= area.east ? longitude >= area.west && longitude <= area.east || longitude === -180 && area.east === 180 : longitude >= area.west || longitude <= area.east;
+}
+var ids = (value) => Array.isArray(value) && value.length > 0 && value.length <= 32 && value.every(identifier) && new Set(value).size === value.length;
+var sameFields = (left, right, fields) => !!left && !!right && fields.every((key) => left[key] === right[key]);
+function portalDestinationRequirements(destination) {
+  const base = Object.hasOwn(profiles, destination?.kind) ? profiles[destination.kind] : null;
+  if (!base) return null;
+  return Object.freeze([.../* @__PURE__ */ new Set([...base, ...destination.arrival?.mode === "drive" ? ["transport"] : []])]);
+}
+function destinationValid(destination) {
+  return destination?.type === "PortalDestination" && destination.schemaVersion === 1 && identifier(destination.id) && identifier(destination.revision) && identifier(destination.contentVersion) && destination.environment === "EARTH" && portalDestinationRequirements(destination) !== null && point(destination.origin) && point(destination.arrival) && bounds(destination.bounds) && contains(destination.bounds, destination.origin) && contains(destination.bounds, destination.arrival) && ["walk", "drive"].includes(destination.arrival.mode) && ids(destination.experienceIds);
+}
+function decision(destination, requiredLayers, reasons) {
+  return Object.freeze({
+    destinationId: identifier(destination?.id) ? destination.id : null,
+    eligible: reasons.length === 0,
+    requiredLayers: requiredLayers || Object.freeze([]),
+    reasons: Object.freeze([...new Set(reasons)])
+  });
+}
+function evaluatePortalOffer(destination, assessment, context = {}) {
+  context ??= {};
+  const required = portalDestinationRequirements(destination);
+  const reasons = [];
+  if (!destinationValid(destination)) return decision(destination, required, ["invalid-destination"]);
+  if (!timestamp(context.now) || !identifier(context.deviceProfile) || !identifier(context.renderContractVersion) || !identifier(context.contentVersion)) {
+    reasons.push("missing-qualification-context");
+  }
+  if (assessment?.type !== "PortalQualification" || assessment.schemaVersion !== PORTAL_QUALIFICATION_VERSION || assessment.status !== "approved" || !identifier(assessment.evidenceId) || !buildIdentity(assessment.testedBuildId)) {
+    return decision(destination, required, [...reasons, "missing-approved-qualification"]);
+  }
+  if (assessment.destinationId !== destination.id || assessment.destinationRevision !== destination.revision || assessment.kind !== destination.kind || !sameFields(assessment.origin, destination.origin, ["lat", "lon"]) || !sameFields(assessment.bounds, destination.bounds, ["south", "north", "west", "east"]) || !sameFields(assessment.arrival, destination.arrival, ["lat", "lon", "mode"])) reasons.push("qualification-scope-mismatch");
+  if (assessment.contentVersion !== destination.contentVersion || assessment.contentVersion !== context.contentVersion || assessment.renderContractVersion !== context.renderContractVersion) reasons.push("qualification-version-mismatch");
+  if (assessment.deviceProfile !== context.deviceProfile) reasons.push("device-not-qualified");
+  if (!timestamp(assessment.checkedAt) || !timestamp(assessment.validUntil) || assessment.checkedAt > context.now || assessment.validUntil <= context.now || assessment.checkedAt >= assessment.validUntil) reasons.push("qualification-not-current");
+  for (const check of PORTAL_QUALITY_CHECKS) {
+    if (assessment.checks?.[check] !== "passed") reasons.push(`unverified-${check}`);
+  }
+  for (const layer of required) {
+    if (assessment.layers?.[layer] !== "verified") reasons.push(`unverified-layer:${layer}`);
+  }
+  if (!ids(assessment.experienceIds) || destination.experienceIds.some((id2) => !assessment.experienceIds.includes(id2))) {
+    reasons.push("unverified-experience");
+  }
+  return decision(destination, required, reasons);
+}
+
+// app/js/portal/game-intent.js
+var PORTAL_RENDER_CONTRACT = "earth-main:2026.10.25.1";
+function portalDeviceProfile(host = globalThis) {
+  return host.matchMedia?.("(pointer: coarse)").matches === true ? "mobile-touch" : "desktop";
+}
+function portalOffer(place, catalog, context = {}) {
+  const qualification = catalog?.qualifications?.find((row) => row.destinationId === place?.id && row.deviceProfile === context.deviceProfile && row.evidenceId === (context.evidenceId ?? row.evidenceId));
+  const decision2 = evaluatePortalOffer(place?.destination, qualification, {
+    ...context,
+    renderContractVersion: PORTAL_RENDER_CONTRACT,
+    contentVersion: place?.destination?.contentVersion
+  });
+  return { place, qualification, decision: decision2 };
+}
+function portalGameLink(place) {
+  return `/app/?portal=${encodeURIComponent(place.id)}&pr=${encodeURIComponent(place.destination.revision)}`;
+}
+function resolvePortalGameIntent(search, catalog, context) {
+  const params = new URLSearchParams(search);
+  if (!params.has("portal")) return null;
+  if (params.getAll("portal").length !== 1 || params.getAll("pr").length !== 1 || [...params.keys()].some((key) => !["portal", "pr", "distribution", "graphicsDiagnostics"].includes(key))) {
+    return { decision: { eligible: false, reasons: ["conflicting-portal-intent"] } };
+  }
+  const place = catalog.destinations.find((row) => row.id === params.get("portal"));
+  if (!place || place.destination.revision !== params.get("pr")) return { decision: { eligible: false, reasons: ["unknown-portal-revision"] } };
+  return portalOffer(place, catalog, context);
+}
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
   PORTAL_CATALOG,
+  PORTAL_RENDER_CONTRACT,
   PORTAL_TRAIL_VERSION,
   acceptPortalSync,
   applyPortalAction,
+  applyPortalGameVisit,
   createPortalTrailEntry,
   emptyPortalTrailState,
   normalizePortalAction,
+  normalizePortalGameVisit,
   portalDestination,
+  portalDeviceProfile,
+  portalGameLink,
+  portalOffer,
   portalOwnerScope,
   portalSuggestions,
   portalTrailKey,
@@ -274,6 +420,8 @@ function portalSuggestions({ mode = "wander", homeId = null, day = Math.floor(Da
   portalTrailSummary,
   portalTrailView,
   queuePortalAction,
+  queuePortalGameVisit,
+  resolvePortalGameIntent,
   validatePortalTrailEntry,
   validatePortalTrailState
 });

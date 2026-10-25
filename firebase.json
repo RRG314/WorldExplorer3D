@@ -200,6 +200,10 @@
         "function": "mutatePortalTrail"
       },
       {
+        "source": "/confirmPortalVisit",
+        "function": "confirmPortalVisit"
+      },
+      {
         "source": "/listPortalTrail",
         "function": "listPortalTrail"
       },

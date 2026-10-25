@@ -202,10 +202,12 @@ function createCoreRenderSystem(appCtx, shouldUseComposer) {
     graphicsEvidence?.begin();
     const restoreWaterPresentation=beginSwimmingRender(appCtx);
     try {
-      if (appCtx.vrPresentation?.active) appCtx.vrPresentation.render();
+      let presented=true;
+      if (appCtx.vrPresentation?.active) presented=appCtx.vrPresentation.render()!==false;
       else if (shouldUseComposer()) appCtx.composer.render();
       else appCtx.renderer.render(appCtx.scene, appCtx.camera);
       appCtx.recordPerfRendererInfo?.(appCtx.renderer);
+      return presented;
     } finally {restoreWaterPresentation?.();graphicsEvidence?.end();}
   };
   // The completed world must have produced its first frame before the loading
@@ -251,8 +253,9 @@ function createCoreRenderSystem(appCtx, shouldUseComposer) {
     // Manual pause retains the last frame beneath its dimmed dialog. Network
     // listeners and lease heartbeats remain alive without redrawing the city.
     enabled: (frame) => frame?.manualRender !== false && activePresentationOwner(appCtx)==='main' && !appCtx.worldLoading && !appCtx.titleLaunchPending && (!appCtx.hasPauseReason?.('manual_pause')||appCtx.vrPresentation?.active===true),
-    update() {
-      draw();
+    update(frame) {
+      const presented=draw();
+      if(presented&&frame?.flags)frame.flags.mainWorldPresented=appCtx.worldPublication;
     }
   };
 }

@@ -3,6 +3,15 @@ import assert from 'node:assert/strict';
 import { createRuntimeKernel } from '../app/js/runtime/kernel.js';
 import { createCoreFrameSystems, createCoreRenderSystem } from '../app/js/runtime/core-frame-systems.js';
 
+test('only a successful current-world draw exposes presentation evidence to later frame systems',()=>{
+  const publication=Object.freeze({requestId:'presented:one'}),app={gameStarted:true,worldPublication:publication,renderer:{render(){}}};
+  const render=createCoreRenderSystem(app,()=>false),frame=()=>({flags:{}});
+  let f=frame();render.update(f);assert.equal(f.flags.mainWorldPresented,publication);
+  app.renderer.render=()=>{throw Error('lost context');};f=frame();assert.throws(()=>render.update(f));assert.equal(f.flags.mainWorldPresented,undefined);
+  app.vrPresentation={active:true,render:()=>false};f=frame();render.update(f);assert.equal(f.flags.mainWorldPresented,undefined);
+  app.vrPresentation.render=()=>true;f=frame();render.update(f);assert.equal(f.flags.mainWorldPresented,publication);
+});
+
 test('VR retains head presentation during pause and delegates the camera without advancing a second renderer',()=>{
   let flatCamera=0,vrCamera=0,flatDraw=0,vrDraw=0;
   const app={gameStarted:true,hasPauseReason:()=>true,updateCamera:()=>flatCamera++,renderer:{render:()=>flatDraw++},

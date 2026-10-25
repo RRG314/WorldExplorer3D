@@ -173,6 +173,43 @@ remaining VR domains, then coordinated release/device acceptance.
 
 ## October 25 Living Portal shared quality foundation
 
+Portal game entry now resolves only opaque catalog ID/revision links. Mixed
+coordinate, vehicle, seed, room and environment commands are rejected. Trusted
+per-device qualification controls both the Portal link and game admission.
+Title launch keeps the existing location/load/session owners; ground arrival
+uses the existing travel owner and refuses vessel, swimming, aircraft and
+interior replacement. A one-shot system on the existing kernel records a visit
+only after a successful matching visible world render. Account, selection,
+actor, publication and session changes revoke an unpresented visit. No new clock
+or position writer. Gaze/tracked presenters explicitly report skipped draws.
+
+Game visits persist independently through the Journal Trail with a separate
+protected confirmPortalVisit command, exact idempotency, owner pinning, catalog
+scope and account-deletion checks. Server receipts label the evidence as a
+client-admitted virtual presentation; they are not physical-location proof or
+activity/reward authority. Offline visits keep their encounter time, and guest
+interest copying does not copy visits. Current catalog qualifications remain
+empty pending real content/device approval; no fixture was promoted.
+
+Actual browser Portal save → game launch → admitted Baltimore walking/render →
+prescribed walking input → returned Portal Trail passes, with no page, console
+or resource errors. Inspected destination, city and returned Trail screenshots.
+The browser injects a controlled qualification in its own network context;
+this verifies wiring, not Baltimore or a device's quality/performance approval.
+Ten new focused cases and affected policy/persistence/render/ownership/routing
+checks pass; focused reruns overlap. First browser failed a stale diagnostic
+field. The second exposed longitude wrapping drift; shared canonical geographic
+identity now matches selection normalization without a travel-radius tolerance.
+An async-predicate poll in the installed Playwright returns on a truthy Promise;
+the new runner now explicitly awaits IndexedDB and asserts the actual record.
+Both failed receipts are retained. Evidence: portal-game-first/ (failed),
+portal-game-final/ (failed), portal-game-identity-fixed/ (passed),
+portal-entry-first.tap, portal-entry-affected.tap,
+portal-entry-identity-fixed.tap and portal-entry-service-time-final.tap in the
+current product evidence folder. Owned browsers/servers and staging attestations
+were released. No new deployment. Continue native widgets and identity sync,
+content qualification, remaining VR domains and release/device acceptance.
+
 The owner proposes a persistent Living Portal/Exploration Trail and requires
 Android, Apple and browser availability, with rich correctly rendered suggested
 destinations. The cross-device design and current-source findings are in

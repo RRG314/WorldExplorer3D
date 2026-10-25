@@ -127,7 +127,7 @@ export function createTrackedVrSession({ctx,THREE,captureSession,ride=null,targe
       controls.update({mountPosition:mount.position,mountQuaternion:mount.quaternion,camera:presentation.camera,timestamp:frame.timestamp,paused:ctx.paused,tracking,message:roadRideMessage(ride,ctx.paused)});return true;
     },
     render(){
-      if(!api.guard()||!tracking)return;
+      if(!api.guard()||!tracking)return false;
       if(pose.views.length<1||pose.views.length>2)throw new Error('Unsupported headset view layout.');
       while(arrayCamera.cameras.length<pose.views.length){const eye=new THREE.PerspectiveCamera();eye.viewport=new THREE.Vector4();arrayCamera.cameras.push(eye);}
       arrayCamera.cameras.length=pose.views.length;arrayCamera.layers.mask=presentation.camera.layers.mask;
@@ -145,6 +145,7 @@ export function createTrackedVrSession({ctx,THREE,captureSession,ride=null,targe
       }finally{
         renderer.state.bindXRFramebuffer(null);renderer.setRenderTarget(previousTarget);renderer.setViewport(previousViewport);renderer.setScissor(previousScissor);renderer.setScissorTest(scissorTest);
       }
+      return true;
     },
     start(){
       if(startPromise)return startPromise;if(phase!=='prepared')return Promise.resolve(false);

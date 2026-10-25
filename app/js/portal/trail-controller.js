@@ -22,7 +22,7 @@ export function createPortalTrailController({store,request,onChange=()=>{},now=D
           for(const row of await entries(owner)){
             for(const action of Object.values(row.pending).sort((a,b)=>a.createdAt-b.createdAt||a.operationId.localeCompare(b.operationId))){
               if(!current(version,owner))return;
-              const response=await request('mutatePortalTrail',{expectedOwnerUid:owner,action},{expectedUserId:owner,signal});
+              const response=await request(action.kind==='visit'?'confirmPortalVisit':'mutatePortalTrail',{expectedOwnerUid:owner,action},{expectedUserId:owner,signal});
               if(!current(version,owner))return;
               await store.acceptPortalTrailSync(portalOwnerScope(owner),response);
             }

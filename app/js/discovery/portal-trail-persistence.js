@@ -1,6 +1,6 @@
 import {
   acceptPortalSync, createPortalTrailEntry, normalizePortalAction, portalTrailKey,
-  queuePortalAction, validatePortalTrailEntry
+  queuePortalAction, validatePortalTrailEntry, normalizePortalGameVisit, queuePortalGameVisit
 } from '../portal/trail-model.js';
 
 // These methods extend the existing Journal persistence owner. The adapters
@@ -15,6 +15,10 @@ export function createPortalTrailPersistence({read,update,page}) {
     async recordPortalAction(ownerScope,input) {
       const action=normalizePortalAction(input),key=portalTrailKey(ownerScope,action.destinationId);
       return update(key,existing=>queuePortalAction(existing||createPortalTrailEntry(ownerScope,action.destinationId),action));
+    },
+    async recordPortalGameVisit(ownerScope,input){
+      const visit=normalizePortalGameVisit(input),key=portalTrailKey(ownerScope,visit.destinationId);
+      return update(key,existing=>queuePortalGameVisit(existing||createPortalTrailEntry(ownerScope,visit.destinationId),visit));
     },
     async acceptPortalTrailSync(ownerScope,response) {
       const destinationId=response?.state?.destinationId,key=portalTrailKey(ownerScope,destinationId);
