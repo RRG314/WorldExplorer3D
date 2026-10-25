@@ -3,6 +3,10 @@ name: Android test package
 on:
   workflow_dispatch:
     inputs:
+      dependency_proposal:
+        description: Resolve proposed new SDK locks/checksums for review (not release verification)
+        type: boolean
+        default: false
       launch_check:
         description: Verify native cold launch, offline recovery and retry
         type: boolean
@@ -27,7 +31,36 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  dependency-proposal:
+    if: github.event_name == 'workflow_dispatch' && inputs.dependency_proposal
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Install the targeted Android platform
+        run: '"${ANDROID_HOME:?}/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "build-tools;36.0.0"'
+      - name: Resolve proposed dependency metadata and compile for review
+        working-directory: android
+        run: ./gradlew --no-daemon --max-workers=2 --write-verification-metadata sha256 --write-locks :app:lintRelease :app:assembleRelease :app:assembleDebug
+      - name: Retain dependency proposal and compile diagnostics
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: android-dependency-proposal
+          path: |
+            android/app/gradle.lockfile
+            android/gradle/verification-metadata.xml
+            android/app/build/reports/lint-results-release.*
+          retention-days: 30
+          if-no-files-found: error
   android:
+    if: github.event_name != 'workflow_dispatch' || !inputs.dependency_proposal
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     steps:
