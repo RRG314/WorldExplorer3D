@@ -219,3 +219,11 @@ email lists. Add their Google Play account emails to the selected World Explorer
 list before sending the closed-test opt-in URL. The existing owner internal link
 is immediately usable. Preserve 24-hour confirmation links and the already
 verified production email flow; do not resend its test messages for this web edit.
+
+
+Google now shows **Changes in review** for the 15-change closed Alpha submission,
+including code 3, current listing, Data safety and content declarations. Package
+and signing-certificate registration is Registered. No review approval, public
+production access or physical Android acceptance is claimed. Final frontend
+cleanup delivery receipts are in the location-default operational folder; no
+new Android binary is required.

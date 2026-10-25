@@ -89,8 +89,7 @@ sharing switch changed. App pricing confirms Free; no merchant account created.
 
 Closed Alpha uses the existing one-owner World Explorer list and feedback email.
 The prepared unedited gameplay screenshots still need extension file URL access;
-the prior saved listing assets have not been replaced on the service. No review
-submission, public production access, broad tester invitations, physical-phone
+the prior saved listing assets have not been replaced on the service. Public production access, broad tester invitations, physical-phone
 installation or 12 genuine opted-in testers/14-day period is claimed.
 
 Nine existing backend functions require source-only activation: joinRoom,
@@ -155,3 +154,15 @@ to the selected World Explorer list before issuing its closed-test opt-in link.
 The one-owner internal-test link remains the owner's immediate installation path.
 Google review, real Play-installed phone checks and genuine continuous opted-in
 closed testing are distinct external requirements, not simulated test passes.
+
+
+Google now shows **Changes in review** for all 15 submitted changes, including
+closed Alpha code 3 and the completed listing/declarations. Package registration
+is Registered. This is submission evidence, not Google approval or production
+access. The final frontend-only account cleanup's exact source/build, protected
+checks, parity and activation are recorded under the operational evidence folder
+as `source-account-switch.json`, `protected-account-release.json`,
+`account-package-parity.json` and `account-production-web-activated.json`.
+The already qualified Functions/rules/native binaries are not redeployed or
+retested for that four-line owner cleanup. The final source check confirms those
+inputs are byte-identical. Prior production/staging packages remain recoverable.

@@ -63,12 +63,14 @@ friends, recent players, invites and owned rooms with their account. A ninth
 focused test proves clearing before block readiness, rejection of late old-account
 callbacks and acceptance of the new account's rows. This frontend-only follow-up
 preserves the qualified backend/rule/native inputs; see the verification record
-for its final delivery identity.
+for its delivery scope. The exact final frontend identity and activation status
+are recorded in `output/research/location-default-play-2026-10-24/account-production-web-activated.json`;
+that follow-up does not change the qualified Function, rule or native inputs.
 
 Google registered the existing package and public signing certificate. Closed
 Alpha uses only the one-owner World Explorer list, feedback mailbox and unchanged
 signed Android code 3, with 177 countries/regions selected. Store wording and all
-15 closed-release/declaration changes are prepared for review. The existing two
+15 closed-release/declaration changes were submitted; Google shows Changes in review. The existing two
 accurate compiled UI screenshots are retained; eight prepared gameplay replacements
 still require extension file URL permission. This does not qualify a physical
 phone or complete Google's genuine 12-person/14-day closed-testing requirement.
