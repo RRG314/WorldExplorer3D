@@ -6,6 +6,11 @@ necessary production/protected-source work; do not ask again for that scope.
 
 ## October 25 normal mobile website — controls accepted
 
+Protected PR133 merged as `9a529da79f319606627080ad5b896c6169c3ad20` from
+reviewed `8958c418a455bfe8d00682e7dee7b0d95b96f5d2`; required checks pass and
+reviewed/merged trees match. Production identity/HTML/mobile CSS still match the
+previously qualified release bytes. No new game or native deployment is needed.
+
 The owner additionally requires phone-browser use outside the Play app. The
 released source 52d5f24 is verified explicitly without the Play distribution
 flag: six real Chrome mobile-web checks pass with zero page/console errors.

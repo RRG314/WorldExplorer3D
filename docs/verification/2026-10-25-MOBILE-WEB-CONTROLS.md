@@ -82,3 +82,9 @@ Remaining device acceptance is physical sensor feel, browser chrome/safe-area
 behavior and sustained performance on actual Android and iPhone hardware.
 Desktop engine tests do not establish every historical browser/OS/GPU version.
 The owner's Motorola startup/update acceptance predates these handling changes.
+
+Protected PR133 merged normally as `9a529da79f319606627080ad5b896c6169c3ad20`
+from `8958c418a455bfe8d00682e7dee7b0d95b96f5d2`. Required source/security checks
+pass and reviewed/merged trees match. Production build manifest, game HTML and
+mobile-control CSS still match the already qualified release bytes. See
+`mobile-web-protected-release.json` and `mobile-web-live-identity.json`.
