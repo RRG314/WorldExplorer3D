@@ -193,7 +193,8 @@
     "verify:play-distribution": "node --experimental-vm-modules --test tests/play-distribution-current.test.mjs",
     "verify:community-safety": "node --experimental-vm-modules --test --test-concurrency=1 tests/community-safety-current.test.mjs",
     "verify:community-safety:rules": "node --test --test-concurrency=1 tests/community-safety-rules.test.mjs",
-    "verify:community-safety:browser": "node scripts/verification/community-safety-emulators.mjs"
+    "verify:community-safety:browser": "node scripts/verification/community-safety-emulators.mjs",
+    "verify:mobile-web-controls": "node scripts/verification/mobile-web-controls-current.mjs"
   },
   "repository": {
     "type": "git",
