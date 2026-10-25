@@ -66,6 +66,9 @@ preserves the qualified backend/rule/native inputs; see the verification record
 for its delivery scope. The exact final frontend identity and activation status
 are recorded in `output/research/location-default-play-2026-10-24/account-production-web-activated.json`;
 that follow-up does not change the qualified Function, rule or native inputs.
+Its opened social panel also uses the existing interface theme variables for
+background, text and summary, correcting inherited light text on a light card.
+See the final source/UI-theme receipt for that small presentation follow-up.
 
 Google registered the existing package and public signing certificate. Closed
 Alpha uses only the one-owner World Explorer list, feedback mailbox and unchanged

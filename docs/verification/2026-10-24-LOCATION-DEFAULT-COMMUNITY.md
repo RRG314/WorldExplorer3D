@@ -166,3 +166,16 @@ as `source-account-switch.json`, `protected-account-release.json`,
 The already qualified Functions/rules/native binaries are not redeployed or
 retested for that four-line owner cleanup. The final source check confirms those
 inputs are byte-identical. Prior production/staging packages remain recoverable.
+
+
+Final screenshot review of the actual compiled app found the expanded social
+panel retained a pale runtime-shell card under interface-v4's inherited light
+text. The shared panel and summary now use existing wx theme variables, preserving
+light/dark context instead of adding a second palette. Its exact final source is
+`source-ui-theme.json`; `protected-community-final-release.json` and
+`account-production-web-activated.json` bind its final delivery. The earlier
+account cleanup's compiled Settings assertions passed, then its test waited on a
+collapsed detail; the continuation corrected a duplicate selector and opened the
+actual social summary with prescribed keyboard input. Both failed setup receipts
+remain failed. The screenshot exposed the real contrast defect; it was corrected
+before final publication. No city, email, backend or native journey was restarted.
