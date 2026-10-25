@@ -11,6 +11,7 @@
         android:usesCleartextTraffic="false"
         android:supportsRtl="true"
         android:appCategory="game"
+        android:manageSpaceActivity="com.google.androidbrowserhelper.trusted.ManageDataLauncherActivity"
         android:theme="@android:style/Theme.Translucent.NoTitleBar">
         <meta-data android:name="asset_statements" android:resource="@string/asset_statements" />
         <activity
@@ -37,6 +38,13 @@
             </intent-filter>
         </activity>
         <activity android:name="com.google.androidbrowserhelper.trusted.FocusActivity" android:exported="false" />
+        <!-- ABH configures this component on every connected launch, even when
+             the selected browser does not offer a Site Settings shortcut. -->
+        <activity android:name="com.google.androidbrowserhelper.trusted.ManageDataLauncherActivity"
+            android:exported="false">
+            <meta-data android:name="android.support.customtabs.trusted.MANAGE_SPACE_URL"
+                android:value="https://worldexplorer3d.io" />
+        </activity>
         <provider android:name="androidx.core.content.FileProvider"
             android:authorities="@string/provider_authority" android:exported="false" android:grantUriPermissions="true">
             <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/filepaths" />
