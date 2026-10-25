@@ -499,6 +499,18 @@
       "fieldPath": "expiresAt",
       "ttl": true,
       "indexes": []
+    },
+    {
+      "collectionGroup": "portalPairings",
+      "fieldPath": "deleteAfter",
+      "ttl": true,
+      "indexes": []
+    },
+    {
+      "collectionGroup": "portalPairingLimits",
+      "fieldPath": "deleteAfter",
+      "ttl": true,
+      "indexes": []
     }
   ]
 }

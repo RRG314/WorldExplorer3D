@@ -17,6 +17,15 @@
   <div class="wrap">
     <header><a class="brand" href="../app/">WORLD EXPLORER <span>3D</span></a><nav aria-label="Main"><a href="#trail">Your Trail</a><a href="../app/">Open game ↗</a><button id="accountBtn" type="button">Sign in</button></nav></header>
     <main>
+      <section id="nativeConnection" class="panel connection" hidden aria-labelledby="nativeDeviceLabel">
+        <p class="eyebrow">Your Explorer account · device connection</p><h2 id="nativeDeviceLabel">Connect your World Explorer app</h2>
+        <p id="nativeConnectionAccount" class="muted"></p><p id="nativeConnectionStatus" role="status" aria-live="polite"></p>
+        <p id="nativeConnectionCode" class="connection-code" aria-label="Device confirmation code" hidden></p>
+        <label id="nativeConfirmLabel" class="connection-confirm" hidden><input id="nativeConfirmCode" type="checkbox"> This code matches my app, and I started this connection.</label>
+        <div class="actions"><button id="nativeSignIn" type="button" class="primary">Sign in to connect</button><button id="nativeApprove" type="button" class="primary" hidden disabled>Approve this device</button>
+          <button id="nativeReturn" type="button" class="primary" hidden>Return to World Explorer 3D</button><button id="nativeRetry" type="button" hidden>Try again</button><button id="nativeCancel" type="button">Cancel connection</button></div>
+        <p class="small muted">Connect only an app you just opened yourself. Device-only saves stay separate until you choose to copy them into your account.</p>
+      </section>
       <section class="intro"><p class="eyebrow">A small window into a bigger world</p><h1>The Living Portal</h1><p>Discover a place. Follow your curiosity. Return when you have time to explore.</p></section>
       <nav class="modes" aria-label="Portal experience">
         <button type="button" data-mode="wander" aria-pressed="true">Wander</button>
@@ -39,7 +48,7 @@
   <dialog id="learning" aria-label="Place investigation"><form method="dialog"><button class="close" aria-label="Close investigation">✕</button></form><div id="learningBody"></div><button id="completeBtn" class="primary" type="button">Add to Investigated</button><p class="small muted">Records learning about this place. A 3D visit is separate.</p></dialog>
   <dialog id="account" aria-labelledby="accountTitle"><form method="dialog"><button class="close" aria-label="Close sign in">✕</button></form><h2 id="accountTitle">Your Explorer account</h2><p id="accountInfo">Sign in to keep your Portal Trail across devices. Device-only choices stay separate until you choose to copy them.</p>
     <form id="signInForm"><label>Email <input name="email" type="email" autocomplete="username" required></label><label>Password <input name="password" type="password" autocomplete="current-password" required></label><button type="submit" class="primary">Sign in with email</button></form>
-    <button id="googleBtn" type="button">Sign in with Google</button><button id="signOutBtn" type="button" hidden>Sign out</button><p><a href="../account/">Create an account or reset your password ↗</a></p><p id="accountError" role="alert"></p>
+    <button id="googleBtn" type="button">Sign in with Google</button><button id="signOutBtn" type="button" hidden>Sign out</button><p><a href="../account/" target="_blank" rel="noopener">Create an account or reset your password ↗</a></p><p id="accountError" role="alert"></p>
   </dialog>
 </body>
 </html>

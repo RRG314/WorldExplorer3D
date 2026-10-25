@@ -204,6 +204,30 @@
         "function": "confirmPortalVisit"
       },
       {
+        "source": "/startPortalPairing",
+        "function": "startPortalPairing"
+      },
+      {
+        "source": "/inspectPortalPairing",
+        "function": "inspectPortalPairing"
+      },
+      {
+        "source": "/approvePortalPairing",
+        "function": "approvePortalPairing"
+      },
+      {
+        "source": "/claimPortalPairing",
+        "function": "claimPortalPairing"
+      },
+      {
+        "source": "/cancelPortalPairing",
+        "function": "cancelPortalPairing"
+      },
+      {
+        "source": "/cancelPortalApproval",
+        "function": "cancelPortalApproval"
+      },
+      {
         "source": "/listPortalTrail",
         "function": "listPortalTrail"
       },

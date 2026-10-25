@@ -22,6 +22,7 @@ var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: tru
 var stdin_exports = {};
 __export(stdin_exports, {
   PORTAL_CATALOG: () => PORTAL_CATALOG,
+  PORTAL_NATIVE_CLIENTS: () => PORTAL_NATIVE_CLIENTS,
   PORTAL_RENDER_CONTRACT: () => PORTAL_RENDER_CONTRACT,
   PORTAL_TRAIL_VERSION: () => PORTAL_TRAIL_VERSION,
   acceptPortalSync: () => acceptPortalSync,
@@ -31,11 +32,13 @@ __export(stdin_exports, {
   emptyPortalTrailState: () => emptyPortalTrailState,
   normalizePortalAction: () => normalizePortalAction,
   normalizePortalGameVisit: () => normalizePortalGameVisit,
+  portalCallbackAllowed: () => portalCallbackAllowed,
   portalDestination: () => portalDestination,
   portalDeviceProfile: () => portalDeviceProfile,
   portalGameLink: () => portalGameLink,
   portalOffer: () => portalOffer,
   portalOwnerScope: () => portalOwnerScope,
+  portalPairingId: () => portalPairingId,
   portalSuggestions: () => portalSuggestions,
   portalTrailKey: () => portalTrailKey,
   portalTrailPrefix: () => portalTrailPrefix,
@@ -397,9 +400,26 @@ function resolvePortalGameIntent(search, catalog, context) {
   if (!place || place.destination.revision !== params.get("pr")) return { decision: { eligible: false, reasons: ["unknown-portal-revision"] } };
   return portalOffer(place, catalog, context);
 }
+
+// app/js/portal/native-contract.js
+var PORTAL_NATIVE_CLIENTS = Object.freeze({
+  "worldexplorer3d-d9b83": Object.freeze({
+    "1:469573887496:android:074e2769d10bcbdd42d3bd": Object.freeze({ platform: "android", label: "World Explorer 3D for Android", callback: "io.worldexplorer3d.app://portal-connect" }),
+    "1:469573887496:ios:e86ce3a7af39b6d842d3bd": Object.freeze({ platform: "ios", label: "World Explorer 3D for Apple", callback: "io.worldexplorer3d.app://portal-connect" })
+  }),
+  "we3d-staging-20260712": Object.freeze({
+    "1:524178734996:android:b6c8ac1247bbf6f3f51981": Object.freeze({ platform: "android", label: "World Explorer 3D for Android \xB7 test build", callback: "io.worldexplorer3d.app.staging://portal-connect" }),
+    "1:524178734996:ios:84e80cd71e77579cf51981": Object.freeze({ platform: "ios", label: "World Explorer 3D for Apple \xB7 test build", callback: "io.worldexplorer3d.app.staging://portal-connect" })
+  })
+});
+var portalPairingId = (value) => typeof value === "string" && /^[A-Za-z0-9_-]{43}$/.test(value);
+function portalCallbackAllowed(value, projectId) {
+  return Object.values(PORTAL_NATIVE_CLIENTS[projectId] || {}).some((client) => client.callback === value);
+}
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
   PORTAL_CATALOG,
+  PORTAL_NATIVE_CLIENTS,
   PORTAL_RENDER_CONTRACT,
   PORTAL_TRAIL_VERSION,
   acceptPortalSync,
@@ -409,11 +429,13 @@ function resolvePortalGameIntent(search, catalog, context) {
   emptyPortalTrailState,
   normalizePortalAction,
   normalizePortalGameVisit,
+  portalCallbackAllowed,
   portalDestination,
   portalDeviceProfile,
   portalGameLink,
   portalOffer,
   portalOwnerScope,
+  portalPairingId,
   portalSuggestions,
   portalTrailKey,
   portalTrailPrefix,

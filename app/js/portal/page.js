@@ -8,6 +8,10 @@ const scope=createLifecycleScope('living-portal-page'),byId=id=>document.getElem
 const escape=value=>String(value??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#39;');
 const link=href=>globalThis.WorldExplorerDistribution?.url(href)||href;
 let mode='wander',selectedId=null,learningId=null,homeId=null,auth=null,api=null,view={places:[],summary:{saved:0,investigated:0,visited:0},ownerScope:'device-guest',status:'device'};
+let nativeConnection=null,recentSignIn=false;
+const nativeRequested=new URLSearchParams(location.search).has('connect');
+if(nativeRequested){byId('nativeConnection').hidden=false;byId('nativeSignIn').hidden=true;byId('nativeConnectionStatus').textContent='Opening the account connection…';}
+scope.listen(byId('nativeCancel'),'click',()=>{if(!nativeConnection)byId('nativeConnection').hidden=true;});
 try{homeId=localStorage.getItem('we3d:portal-home');}catch{}
 const store=createIndexedDbDiscoveryProfileStore();
 const controller=createPortalTrailController({store,request:async(...args)=>{
@@ -75,12 +79,12 @@ scope.listen(document,'click',event=>{
   if(button.hasAttribute('data-next')){const rows=portalSuggestions({mode,homeId});selectedId=rows[(Math.max(0,rows.findIndex(row=>row.id===selectedId))+1)%rows.length]?.id;render();return;}
   if(button.id==='syncBtn')run(()=>controller.sync());
   if(button.id==='copyBtn')run(async()=>{await controller.copyDeviceChoices();notice('Device saves and investigations copied. Existing device records are kept.');});
-  if(button.id==='accountBtn'){byId('account').showModal();return;}
+  if(button.id==='accountBtn'){recentSignIn=false;byId('account').showModal();return;}
   if(button.id==='googleBtn')runAuth(()=>auth.signInWithGoogle());
   if(button.id==='signOutBtn')runAuth(()=>auth.signOutUser());
 });
 async function runAuth(work){byId('accountError').textContent='';if(!auth){byId('accountError').textContent='Sign-in is unavailable offline. Your device Trail still works.';return;}
-  try{await work();byId('account').close();}catch(error){byId('accountError').textContent=error.message||'Sign-in could not complete. Please try again.';}}
+  try{await work();recentSignIn=false;byId('signInForm').elements.namedItem('password').value='';byId('account').close();if(nativeConnection)run(()=>nativeConnection.changeUser(auth.getCurrentUser()));}catch(error){byId('accountError').textContent=error.message||'Sign-in could not complete. Please try again.';}}
 scope.listen(byId('signInForm'),'submit',event=>{event.preventDefault();const data=new FormData(event.currentTarget);void runAuth(()=>auth.signInWithEmailPassword(data.get('email'),data.get('password')));});
 scope.listen(window,'online',()=>{render();run(()=>controller.sync());});
 scope.listen(window,'offline',render);
@@ -96,12 +100,23 @@ if('serviceWorker' in navigator){
   void navigator.serviceWorker.register('/portal/sw.js',{scope:'/portal/'}).then(()=>navigator.serviceWorker.ready).then(cacheStatic).catch(()=>{});
 }
 // Local discovery/storage opens before network SDKs, preserving offline use.
-void Promise.all([import('../../../js/auth-ui.js?v=56'),import('../../../js/function-api.js?v=3')]).then(([authModule,apiModule])=>{
+void Promise.all([import('../../../js/auth-ui.js?v=56'),import('../../../js/function-api.js?v=3')]).then(async([authModule,apiModule])=>{
   if(!scope.isActive())return;auth=authModule;api=apiModule;
+  if(nativeRequested){
+    const [{mountPortalConnection},{readFirebaseConfig}]=await Promise.all([import('./connect-view.js'),import('../../../js/firebase-init.js?v=58')]);
+    if(!scope.isActive())return;
+    nativeConnection=mountPortalConnection({parentScope:scope,projectId:readFirebaseConfig()?.projectId,request:api.postProtectedFunction,onSignIn:({recent})=>{
+      recentSignIn=recent;const user=auth.getCurrentUser();byId('googleBtn').hidden=false;byId('signInForm').hidden=false;
+      if(user?.email)byId('signInForm').elements.namedItem('email').value=user.email;
+      if(recent)byId('accountInfo').textContent='Sign in again to confirm this device connection. Your account choices stay saved.';
+      byId('account').showModal();
+    }});
+  }
   scope.defer(auth.observeAuth(user=>{
     if(!scope.isActive())return;const registered=user&&!user.isAnonymous;
-    byId('signOutBtn').hidden=!registered;byId('googleBtn').hidden=!!registered;byId('signInForm').hidden=!!registered;
+    byId('signOutBtn').hidden=!registered;byId('googleBtn').hidden=!!registered&&!recentSignIn;byId('signInForm').hidden=!!registered&&!recentSignIn;
     byId('accountInfo').textContent=registered?`Signed in as ${user.email||user.displayName||'Explorer'}. Your account Trail stays separate from device-only choices.`:'Sign in to keep your Portal Trail across devices. Device-only choices stay separate until you choose to copy them.';
     run(()=>controller.changeOwner(registered?user.uid:null));
+    if(nativeConnection)run(()=>nativeConnection.changeUser(user));
   }));
-}).catch(()=>{byId('accountInfo').textContent='Sign-in is unavailable offline. You can still save places and investigate on this device.';});
+}).catch(()=>{byId('accountInfo').textContent='Sign-in is unavailable offline. You can still save places and investigate on this device.';if(nativeRequested)byId('nativeConnectionStatus').textContent='Account connection is unavailable. Check your connection and reopen it from the app. Your device-only choices stay saved.';});

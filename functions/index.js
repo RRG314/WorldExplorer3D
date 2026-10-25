@@ -981,6 +981,7 @@ async function deleteUserData(uid) {
   await releaseWorldPropertiesForUser(uid);
   await db.collection('propertyLeaderboard').doc(uid).delete();
   await deleteDiscoveryTradesForUser(uid);
+  await deleteDocsByQuery(db.collection('portalPairings').where('approvedUid','==',uid),200,'portalPairings(approvedUid)');
 
   if (db && typeof db.recursiveDelete === 'function') {
     await db.recursiveDelete(userRef);
@@ -2758,6 +2759,8 @@ Object.assign(exports, buildDiscoveryExports({
 }));
 
 Object.assign(exports, require('./portal').buildPortalExports({functions,db,setCors,verifyAuth,verifyAppCheck}));
+Object.assign(exports, require('./portal-pairing').buildPortalPairingExports({functions,db,setCors,verifyAuth,verifyAppCheck,
+  projectId:require('./tester-mail').runtimeProject(),getUser:uid=>admin.auth().getUser(uid),createCustomToken:uid=>admin.auth().createCustomToken(uid)}));
 
 Object.assign(exports, buildCommunityRealityCaptureExports({
   db,

@@ -1027,3 +1027,36 @@ city replay for the float assertion, email replay, push or production deployment
 Current readiness pointer remains `output/release-review/multiplayer-candidate.json`
 with the newer hash-bound staging decision. Production promotion is still the
 protected, coordinated release boundary, including the tester activation needs.
+
+## October 25 — native Android acceptance and browser account approval
+
+Native Android build/lint and the owned AOSP emulator's real widget taps, fact
+investigation, Trail and compact/expanded layouts pass at 4f676d1 (CI run
+40241590430). Inspected all final screenshots. Earlier fixture/binding failures,
+occluded screenshots and clipped layouts are retained separately; they are not
+accepted visual receipts. This is offline/emulator widget evidence, not physical
+phone, native authentication or live synchronization acceptance.
+
+Registered one Android and one Apple Firebase app in each existing project,
+using io.worldexplorer3d.app. No production provider, signing key, Hosting or
+Function was changed. Native SDKs are still to be connected.
+
+Added a browser-approved native connection protocol: registered native App Check,
+S256 verifier, recent existing Explorer authentication, visible matching code,
+explicit approval, single-use claim and native/browser cancellation. A callback
+contains a short-lived code, never an identity token. Account changes, late
+hash/approval results, expiry, deletion/revocation and signing/cancellation races
+fail closed. A dedicated least-privilege service account and TTL policies are
+declared but not provisioned/deployed. Existing account deletion removes owned
+pairing rows. Browser Portal approval uses its existing UI and authentication.
+
+Seventeen distinct new service/controller cases pass; twelve affected existing
+service/routing/ownership cases pass. Chromium and WebKit controlled approval UI
+runs pass with portrait/landscape screenshots inspected and no page/console
+errors. The runner exercises real Portal UI, WebCrypto and service handlers;
+Auth/App Check, signer and storage boundaries are controlled. It does not prove
+live Google/native SDK sign-in or native callback adoption. Evidence:
+native-connection-terminal-final.tap, native-connection-integration-final.tap,
+native-connect-chromium-final/, native-connect-webkit-final/ under the current
+product evidence folder. Native SDK ownership/sync, Apple app/widget, preview
+images, real destination qualification, other VR domains and releases continue.
