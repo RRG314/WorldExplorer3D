@@ -88,3 +88,35 @@ portal-chromium-attested/, portal-webkit-attested/, portal-focus-final/.
 Temporary staging debug identities and owned browsers/servers were cleaned up.
 The browser service checks do not establish native, hardware or live backend
 acceptance. Continue implementation after the local commit.
+
+- VR frame ownership: existing kernel now exposes one exclusive external frame
+  lease, with late callback rejection, error cancellation, timing reset and an
+  opt-out of immediate flat resume until XR framebuffer teardown completes.
+  The ordinary renderLoop and stopRuntimeKernel use this owner. Manual stepping
+  rejects concurrent external presentation. Ten focused lease cases and 24
+  affected existing simulation/render lifecycle cases pass.
+- Phone optics and head sensing: measured screen/lens geometry, bounded standard
+  Cardboard viewer URL/protobuf parsing, mirrored asymmetric projections and a
+  stereo render/warp pass using shipped Three r128. Five optics cases pass;
+  one first test incorrectly expected the physical FOV boundary to be outside,
+  corrected to test a corner beyond it; failed receipt is retained. Rotation-only
+  sensing has four focused cases for permission, calibration, rotation, stale
+  data, visibility and disposed/obsolete grants. No additional RAF or actor writes.
+- Real WebGL component receipt: two eyes rendered at DPR 2, 1920×1080 bounded
+  target, illustrative 64 mm spacing converted to .0576577 world units, no
+  console/page/GL errors, restored viewport/scissor/autoClear and interrupted-draw
+  cleanup. Geometry, texture and lifecycle resources return to baseline.
+  Inspected stereo image. Controlled scene is not gameplay, lens calibration,
+  frame pacing or physical comfort acceptance. Adapters still need actual game
+  mounts/UI/actions/guidance and tracked WebXR conversion/session integration.
+
+Additional primary source evidence used in implementation:
+https://github.com/googlevr/cardboard/blob/master/proto/cardboard_device.proto,
+https://github.com/googlevr/cardboard/blob/master/sdk/lens_distortion.cc,
+https://github.com/googlevr/cardboard/blob/master/sdk/distortion_mesh.cc,
+https://github.com/mrdoob/three.js/blob/r128/examples/jsm/controls/DeviceOrientationControls.js,
+https://github.com/mrdoob/three.js/blob/r128/src/renderers/webxr/WebXRManager.js.
+The r128 union frustum assumes parallel eyes and mixes pose distance with
+projection depth. Tracked views need an explicit audited unit adapter, not just
+a scaled parent. Its XR manager exposes the compositor callback directly;
+the convenience renderer animation loop must not restart a parallel window RAF.

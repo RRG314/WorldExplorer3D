@@ -54,6 +54,24 @@ Evidence: `output/research/vr-portal-product-2026-10-25/`. Continue with game en
 and actual VR presentation/input, native clients, live services and qualified
 release work. No new deployment has occurred; the product goal remains active.
 
+VR implementation now has an exclusive external-frame lease installed on the
+existing kernel, with cancellation, critical-error retirement, clock reset and
+deferred flat restart for framebuffer teardown. Phone stereo uses measured
+optics, bounded Cardboard-profile decoding, asymmetric per-eye projections,
+physical eye spacing, distortion correction and owned GPU cleanup. A real r128
+WebGL controlled scene passed at DPR 2 and returned geometry/texture/lifecycle
+counts to baseline, including interrupted drawing. This is not an actual game
+world or phone/headset qualification. Rotation-only head sensing has explicit
+permission, recenter, rotation/visibility handling and stale/late-grant rejection.
+Ten frame-owner cases, five optics cases and four sensing cases pass; 24 affected
+existing simulation/render-lifecycle cases also pass. Repeated receipts overlap.
+
+These adapters still need connection to game mounts, in-headset controls, guided
+and manual input and a calibrated entry UI. Tracked WebXR metre conversion is
+not yet implemented. Continue the product goal; these components are not a
+completed VR mode. Evidence: phone-stereo-final/, runtime-affected-final.tap,
+optics-final.tap and head-frame-final.tap in the current product evidence folder.
+
 ## October 25 Living Portal shared quality foundation
 
 The owner proposes a persistent Living Portal/Exploration Trail and requires

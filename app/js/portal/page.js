@@ -1,7 +1,7 @@
 import {PORTAL_CATALOG,portalDestination,portalSuggestions} from './catalog.js';
 import {createIndexedDbDiscoveryProfileStore} from '../discovery/profile-store.js?v=5';
 import {createPortalTrailController} from './trail-controller.js';
-import {createLifecycleScope} from '../runtime/lifecycle-scope.js';
+import {createLifecycleScope} from '../runtime/lifecycle-scope.js?v=2';
 
 const scope=createLifecycleScope('living-portal-page'),byId=id=>document.getElementById(id);
 const escape=value=>String(value??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#39;');

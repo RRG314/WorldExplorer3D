@@ -2,6 +2,7 @@ import { ctx as appCtx } from './shared-context.js?v=55';
 import { createCoreFrameSystems, createCoreRenderSystem } from './runtime/core-frame-systems.js?v=11';
 import { createDebugPresentationSystem } from './runtime/debug-presentation.js?v=3';
 import { createRuntimeKernel } from './runtime/kernel.js?v=3';
+import { createRuntimeFrameSource } from './runtime/frame-source.js';
 import { createLoadingPresentation } from './ui/loading-progress.js?v=1';
 import { dedicatedPresentationActive } from './runtime/renderer-owners.js';
 
@@ -111,6 +112,12 @@ const runtimeKernel = createRuntimeKernel({
     }));
   }
 });
+const runtimeFrameSource=createRuntimeFrameSource(runtimeKernel,{
+  onError:({owner,error})=>{
+    console.error(`[runtime] External frame source failed: ${owner}`,error);
+    appCtx.showToast?.('VR stopped after a rendering problem. Your progress is kept.');
+  }
+});
 
 function registerRuntimeSystems() {
   if (runtimeSystemsRegistered) return;
@@ -139,7 +146,7 @@ function registerRuntimeSystems() {
 
 function renderLoop() {
   registerRuntimeSystems();
-  return runtimeKernel.start();
+  return runtimeFrameSource.start();
 }
 
 function registerRuntimeSystem(definition) {
@@ -149,6 +156,7 @@ function registerRuntimeSystem(definition) {
 
 function advanceRuntimeTime(milliseconds = 0, options = {}) {
   registerRuntimeSystems();
+  if(runtimeFrameSource.snapshot().active)throw new Error('External presentation owns runtime frames. End VR before manually advancing simulation.');
   // Functional automation can coalesce draws while retaining every input,
   // simulation, world and UI update. Normal play/default stepping is unchanged.
   const context = { source: 'automation', renderIntermediateFrames: options.renderIntermediateFrames !== false };
@@ -217,13 +225,15 @@ window.addEventListener('resize', () => {
 Object.assign(appCtx, {
   advanceRuntimeTime,
   getRuntimeKernelSnapshot: () => runtimeKernel.snapshot(),
+  getRuntimeFrameSourceSnapshot: () => runtimeFrameSource.snapshot(),
+  acquireRuntimeFrameSource: (options) => {registerRuntimeSystems();return runtimeFrameSource.acquire(options);},
   hideLoad,
   positionTopOverlays,
   registerRuntimeSystem,
   renderLoop,
   showLoad,
   showTransitionLoad,
-  stopRuntimeKernel: (reason) => runtimeKernel.stop(reason),
+  stopRuntimeKernel: (reason) => runtimeFrameSource.stop(reason),
   unregisterRuntimeOwner: (owner) => runtimeKernel.unregisterOwner(owner),
   unregisterRuntimeSystem: (id) => runtimeKernel.unregisterSystem(id)
 });
