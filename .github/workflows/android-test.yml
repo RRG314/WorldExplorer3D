@@ -2,6 +2,11 @@ name: Android test package
 
 on:
   workflow_dispatch:
+    inputs:
+      launch_check:
+        description: Run the bounded Android cold-launch diagnostic
+        type: boolean
+        default: false
   push:
     branches: [steven/android-testing]
     paths: ['android/**', '.github/workflows/android-test.yml']
@@ -30,6 +35,22 @@ jobs:
       - name: Build and lint unsigned packages
         working-directory: android
         run: ./gradlew --no-daemon --max-workers=2 --dependency-verification strict :app:lintRelease :app:bundleRelease :app:assembleRelease
+      - name: Build the same launcher for device diagnostics
+        if: inputs.launch_check
+        working-directory: android
+        run: ./gradlew --no-daemon --max-workers=2 --dependency-verification strict :app:assembleDebug
+      - name: Diagnose Android cold launch
+        if: inputs.launch_check
+        timeout-minutes: 12
+        run: bash scripts/verification/android-cold-launch.sh
+      - name: Preserve Android launch evidence
+        if: always() && inputs.launch_check
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: android-launch-evidence
+          path: android-launch-evidence/
+          retention-days: 30
+          if-no-files-found: warn
       - name: Prepare package evidence and local signing tool
         run: |
           mkdir -p android-artifacts
