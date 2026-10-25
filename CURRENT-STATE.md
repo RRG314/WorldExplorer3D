@@ -4,6 +4,38 @@ Updated October 25, 2026. Use the latest sections below for current identities;
 dated sections further down retain historical evidence. The owner has authorized
 necessary production/protected-source work; do not ask again for that scope.
 
+## October 25 VR foundation research and component experiment
+
+The owner requests researched optional headset VR, eventual guided and manual
+driving/flying, phone portrait/landscape preservation and possible GPS use.
+Current-source findings and proposed contracts are saved in
+`docs/architecture-evaluation/2026-10-25-VR-FOUNDATION-RESEARCH.md`.
+The recommendation is a selected-location seated road tour built on the current
+actor/action/world owners, following a stationary cockpit foundation. It does
+not depend on worldwide streaming or start a Godot port. Headset choice remains
+open; the report compares vendor capabilities rather than claiming all headsets.
+
+One lightweight experiment against the unchanged kernel confirms externally
+supplied 72/90 Hz callback counts without a parallel flat callback, paused
+simulation with presentation, reset timing on flat return, and the adapter's
+responsibility for errors in external frames. Source constants and Three r128
+math confirm 1.11 metres per world unit and the need for physical-unit conversion.
+This is component evidence, not real frame timing or stereo validation. A scaled
+camera parent is not yet qualified for r128 frustum/projection behavior.
+
+Before tours, implement a generation-scoped XR session/frame handoff, audited
+metre-space presentation and essential selectable headset UI. Guidance must
+reject navigation's straight-line display fallback and use admitted physical
+roads via vehicle actions. GPS can choose a starting area; existing foreground
+GPS avatar movement cannot also drive a tracked headset camera. Phone tilt
+remains separate from headset pose. Preserve AR's existing admission rules.
+
+Evidence: `output/research/vr-foundation-2026-10-25/`. Research and the bounded
+component run complete this checkpoint; no VR game code, dependency, browser
+world run, headset/store qualification or deployment occurred. The released
+website, Play v4, assets and player data remain as recorded below. Next package
+and its focused acceptance gates are explicit in the research report.
+
 ## October 25 normal mobile website — controls accepted
 
 Protected PR133 merged as `9a529da79f319606627080ad5b896c6169c3ad20` from
