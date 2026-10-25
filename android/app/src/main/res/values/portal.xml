@@ -25,6 +25,15 @@
     <string name="portal_trail_explanation">Saved, investigated and visited in 3D are different steps. This Trail keeps them separate from your game rewards and expeditions.</string>
     <string name="portal_empty_trail">Your Trail starts with a place that catches your interest.</string>
     <string name="portal_device_trail">Device Trail · your choices are kept on this device.</string>
+    <string name="portal_account">Explorer account</string><string name="portal_connect">Connect your Explorer account</string>
+    <string name="portal_account_trail">Account Trail · offline choices sync when connected.</string>
+    <string name="portal_change_account">Connect a different account</string><string name="portal_match_code">Check that this code matches the browser before approving.</string>
+    <string name="portal_approve_browser">Approve in browser</string><string name="portal_cancel_connection">Cancel connection</string>
+    <string name="portal_connection_expired">This connection expired. Start again.</string><string name="portal_sync">Sync Trail now</string>
+    <string name="portal_copy_device">Copy device choices</string><string name="portal_copy_explanation">Copy saved places and current investigations from this device to your connected Explorer account? Visits and expeditions stay with their original Trail.</string>
+    <string name="portal_disconnect">Disconnect this device</string><string name="portal_disconnect_explanation">Your account Trail stays private and available when you reconnect. The widget returns to this device’s separate Trail. Other signed-in devices stay connected.</string>
+    <string name="portal_synced_at">Trail synced %1$s</string>
+    <string name="portal_account_explanation">Use your existing World Explorer account in the browser. The widget never asks for your password. Connecting keeps device choices separate; you can choose to copy saved places and investigations.</string>
     <string name="portal_places_heading">Places to discover</string><string name="portal_sources">Read more</string>
     <string name="portal_world_checks">3D entry is being checked for this destination. You can save it and investigate now.</string>
     <string name="portal_add_widget_first">Add the Living Portal widget to your home screen to choose what it follows.</string>

@@ -105,37 +105,58 @@ final class PortalStore {
     // deep link or widget extra never supplies the owner of a mutation.
     String owner(){return prefs.getString("owner","device-guest");}
     private String trailKey(String owner,String id){return "trail:"+Uri.encode(owner)+"|"+id;}
-    JSONObject trail(String id){return trail(owner(),id);}
-    List<JSONObject> trailEntries(){
-        synchronized(LOCK){List<JSONObject> rows=new ArrayList<>();String prefix="trail:"+Uri.encode(owner())+"|";
-            for(String key:prefs.getAll().keySet())if(key.startsWith(prefix))try{rows.add(new JSONObject(prefs.getString(key,"{}")));}catch(JSONException ignored){}
-            rows.sort((a,b)->Long.compare(Math.max(b.optLong("visitedAt"),Math.max(b.optLong("savedAt"),b.optLong("investigatedAt"))),Math.max(a.optLong("visitedAt"),Math.max(a.optLong("savedAt"),a.optLong("investigatedAt")))));return rows;}
+    boolean accountCommitPending(){return prefs.getBoolean("accountCommitPending",false);}
+    void beginAccountCommit(){synchronized(LOCK){if(!prefs.edit().putBoolean("accountCommitPending",true).commit())throw new IllegalStateException("The account connection could not be saved.");}}
+    void finishAccountRollback(){synchronized(LOCK){if(!prefs.edit().remove("accountCommitPending").commit())throw new IllegalStateException("The previous account could not be restored.");}}
+    void adoptOwner(String uid){
+        String next=uid==null?"device-guest":"account:"+uid;if(!PortalTrail.ownerValid(next))throw new IllegalArgumentException("Invalid Explorer account.");
+        synchronized(LOCK){if(!prefs.edit().putString("owner",next).remove("accountCommitPending").commit())throw new IllegalStateException("The account connection could not be saved.");}
     }
-    JSONObject trail(String owner,String id){
-        synchronized(LOCK){String value=prefs.getString(trailKey(owner,id),null);if(value!=null)try{return new JSONObject(value);}catch(JSONException ignored){}
-            try{return new JSONObject().put("destinationId",id).put("revision",0).put("firstOfferedAt",0).put("lastOfferedAt",0).put("saved",false).put("savedAt",0).put("investigatedAt",0).put("investigationVersion",JSONObject.NULL).put("visitedAt",0).put("expeditionIds",new JSONArray()).put("pending",new JSONObject());}
-            catch(JSONException impossible){throw new IllegalStateException(impossible);}}
+    JSONObject entry(String owner,String id)throws JSONException{
+        String value=prefs.getString(trailKey(owner,id),null);return PortalTrail.read(value==null?null:new JSONObject(value),owner,id);
+    }
+    JSONObject trail(String id){return trail(owner(),id);}
+    JSONObject trail(String owner,String id){synchronized(LOCK){try{return PortalTrail.view(entry(owner,id));}catch(JSONException error){throw new IllegalStateException("Your saved Trail could not open.",error);}}}
+    List<JSONObject> entries(String owner)throws JSONException{
+        synchronized(LOCK){List<JSONObject> rows=new ArrayList<>();String prefix="trail:"+Uri.encode(owner)+"|";
+            for(String key:prefs.getAll().keySet())if(key.startsWith(prefix))rows.add(entry(owner,key.substring(prefix.length())));
+            rows.sort((a,b)->a.optString("destinationId").compareTo(b.optString("destinationId")));return rows;}
+    }
+    List<JSONObject> trailEntries(){
+        synchronized(LOCK){try{List<JSONObject> rows=new ArrayList<>();for(JSONObject entry:entries(owner()))rows.add(PortalTrail.view(entry));
+            rows.sort((a,b)->Long.compare(Math.max(b.optLong("visitedAt"),Math.max(b.optLong("savedAt"),b.optLong("investigatedAt"))),Math.max(a.optLong("visitedAt"),Math.max(a.optLong("savedAt"),a.optLong("investigatedAt")))));return rows;}
+            catch(JSONException error){throw new IllegalStateException("Your saved Trail could not open.",error);}}
     }
     void act(String id,String kind)throws JSONException{act(id,kind,owner());}
     void act(String id,String kind,String expectedOwner)throws JSONException{
         synchronized(LOCK){
-            JSONObject place=place(id);if(place==null||!Arrays.asList("offered","save","unsave","investigate").contains(kind))throw new JSONException("Invalid widget action.");
+            JSONObject place=place(id);if(place==null)throw new JSONException("Invalid widget destination.");PortalTrail.slot(kind);
             String owner=owner();if(!owner.equals(expectedOwner))throw new JSONException("Explorer account changed.");
-            long now=System.currentTimeMillis();JSONObject state=trail(owner,id);
+            long now=System.currentTimeMillis();JSONObject entry=entry(owner,id),state=PortalTrail.view(entry);
             if(kind.equals("offered")&&state.optLong("lastOfferedAt")/86400000L==now/86400000L)return;
             JSONObject action=new JSONObject().put("operationId",UUID.randomUUID().toString()).put("destinationId",id).put("kind",kind).put("createdAt",now);
             if(kind.equals("investigate"))action.put("contentVersion",place.getJSONObject("learning").getString("version"));
-            apply(state,action,now);
-            if(!owner.equals("device-guest"))state.getJSONObject("pending").put(kind.equals("save")||kind.equals("unsave")?"saved":kind.equals("investigate")?"investigated":"offered",action);
-            if(!prefs.edit().putString(trailKey(owner,id),state.toString()).commit())throw new JSONException("Your Trail could not be saved.");
+            if(!prefs.edit().putString(trailKey(owner,id),PortalTrail.queue(entry,action).toString()).commit())throw new JSONException("Your Trail could not be saved.");
         }
     }
-    private static void apply(JSONObject state,JSONObject action,long now)throws JSONException{
-        state.put("firstOfferedAt",state.optLong("firstOfferedAt")==0?now:Math.min(now,state.getLong("firstOfferedAt"))).put("lastOfferedAt",Math.max(now,state.optLong("lastOfferedAt")));
-        String kind=action.getString("kind");
-        if(kind.equals("save")||kind.equals("unsave")){state.put("saved",kind.equals("save"));if(kind.equals("save"))state.put("savedAt",now);}
-        if(kind.equals("investigate"))state.put("investigatedAt",now).put("investigationVersion",action.getString("contentVersion"));
+    boolean accept(JSONObject response,String expectedOwner,BooleanSupplier current)throws JSONException{
+        synchronized(LOCK){if(!current.getAsBoolean()||!owner().equals(expectedOwner)||accountCommitPending())return false;
+            String id=response.getJSONObject("state").getString("destinationId");
+            JSONObject next=PortalTrail.accept(entry(expectedOwner,id),response,expectedOwner);
+            if(!prefs.edit().putString(trailKey(expectedOwner,id),next.toString()).commit())throw new JSONException("Your Trail could not be saved.");return true;}
     }
+    void copyGuestChoices(String expectedOwner)throws JSONException{
+        synchronized(LOCK){if(expectedOwner.equals("device-guest")||!owner().equals(expectedOwner))throw new JSONException("Sign in to copy device choices.");
+            // Explicit interest copy only. Never turn device visits/expeditions
+            // into an account visit or completed activity.
+            for(JSONObject guest:entries("device-guest")){JSONObject view=PortalTrail.view(guest);String id=view.getString("destinationId");JSONObject place=place(id);if(place==null)continue;
+                if(view.getBoolean("saved"))act(id,"save",expectedOwner);
+                if(view.getLong("investigatedAt")>0&&view.optString("investigationVersion").equals(place.getJSONObject("learning").getString("version")))act(id,"investigate",expectedOwner);
+            }
+        }
+    }
+    void markSynced(String expectedOwner,BooleanSupplier current){synchronized(LOCK){if(current.getAsBoolean()&&owner().equals(expectedOwner)&&!accountCommitPending())prefs.edit().putLong("synced:"+expectedOwner,System.currentTimeMillis()).commit();}}
+    long syncedAt(){return prefs.getLong("synced:"+owner(),0);}
     String learning(int widgetId){return prefs.getString("learning:"+widgetId,"");}
     String learningVersion(int widgetId){return prefs.getString("learningVersion:"+widgetId,"");}
     int fact(int widgetId){return prefs.getInt("fact:"+widgetId,0);}

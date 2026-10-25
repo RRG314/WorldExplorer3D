@@ -22,7 +22,11 @@ public final class PortalRefreshJob extends JobService {
     @Override public boolean onStartJob(JobParameters params){
         final int request; synchronized(PortalStore.LOCK){request=++generation;}
         final PortalStore store=new PortalStore(this);activeStore=store;
-        worker=new Thread(()->{store.refresh(()->generation==request);if(generation==request){PortalWidgetProvider.updateAll(this);jobFinished(params,false);}},"living-portal-refresh");worker.start();return true;
+        worker=new Thread(()->{store.refresh(()->generation==request);if(generation==request){
+            PortalWidgetProvider.updateAll(this);
+            if(store.owner().equals("device-guest"))jobFinished(params,false);
+            else PortalAccount.get(this).sync(()->generation==request,()->{if(generation==request){boolean retry=false;try{for(org.json.JSONObject row:store.entries(store.owner()))if(row.getJSONObject("pending").length()>0)retry=true;}catch(Exception ignored){retry=true;}jobFinished(params,retry);}});
+        }},"living-portal-refresh");worker.start();return true;
     }
     @Override public boolean onStopJob(JobParameters params){synchronized(PortalStore.LOCK){generation++;}if(activeStore!=null)activeStore.cancelRefresh();if(worker!=null)worker.interrupt();activeStore=null;worker=null;return false;}
 }

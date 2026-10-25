@@ -43,6 +43,7 @@ public final class PortalWidgetContractInstrumentation extends Instrumentation {
             check(arguments!=null&&"true".equals(arguments.getString("ownedEmulator"))&&(Build.HARDWARE.contains("ranchu")||Build.HARDWARE.contains("goldfish")),"Use a fresh owned Android emulator.");
             Context context=getTargetContext();prefs=context.getSharedPreferences("living-portal-v1",Context.MODE_PRIVATE);
             check(prefs.getAll().isEmpty()&&PortalWidgetProvider.ids(context).length==0,"Refusing to replace existing Portal data or widgets.");owned=true;
+            result.putInt("account_contract_checks",PortalAccountContracts.run(context));
             PortalStore store=new PortalStore(context);String id="baltimore-harbor";JSONObject place=store.place(id);check(place!=null,"Bundled destination unavailable offline.");
             final String modelId="monaco-coast";
             store.act(modelId,"save");store.act(modelId,"investigate");store.act(modelId,"unsave");JSONObject state=new PortalStore(context).trail(modelId);

@@ -114,7 +114,7 @@ public final class PortalWidgetProvider extends AppWidgetProvider {
                     if(index>=count-1){store.act(destination,"investigate",intent.getStringExtra("owner"));store.closeLearning(currentWidgetId);}else store.showFact(currentWidgetId,destination,index+1);
                 }
             }catch(Exception ignored){/* A failed commit cannot create a success state. */}
-            updateAll(context);
+            updateAll(context);PortalRefreshJob.schedule(context);
         });
     }
 }

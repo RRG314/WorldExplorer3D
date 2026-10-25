@@ -37,18 +37,20 @@ public final class PortalActivity extends Activity {
     private String draftMode,draftHome;
     private Spinner modeField,homeField;
     private List<JSONObject> configurationPlaces;
+    private PortalAccount account;
+    private final Runnable accountChanged=()->{if(!closed&&!"configure".equals(section))show();};
     @Override public void onCreate(Bundle state){
         super.onCreate(state);store=new PortalStore(this);widgetId=getIntent().getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID,AppWidgetManager.INVALID_APPWIDGET_ID);
         section=state==null?getIntent().getStringExtra("section"):state.getString("section");destination=state==null?getIntent().getStringExtra("destination"):state.getString("destination");
         if(state!=null){draftMode=state.getString("draftMode");draftHome=state.getString("draftHome");}
         if(AppWidgetManager.ACTION_APPWIDGET_CONFIGURE.equals(getIntent().getAction()))section="configure";
         if(section==null)section="trail";if(destination==null)destination="";
-        setResult(RESULT_CANCELED);show();PortalRefreshJob.schedule(this);
+        account=PortalAccount.get(this);setResult(RESULT_CANCELED);show();account.observe(accountChanged);PortalRefreshJob.schedule(this);
     }
     @Override protected void onSaveInstanceState(Bundle out){out.putString("section",section);out.putString("destination",destination);
         if(modeField!=null&&homeField!=null&&configurationPlaces!=null){out.putString("draftMode",new String[]{"wander","home","nature","together","beyond"}[modeField.getSelectedItemPosition()]);out.putString("draftHome",configurationPlaces.get(homeField.getSelectedItemPosition()).optString("id"));}
         super.onSaveInstanceState(out);}
-    @Override protected void onDestroy(){closed=true;work.shutdownNow();super.onDestroy();}
+    @Override protected void onDestroy(){closed=true;if(account!=null)account.unobserve(accountChanged);work.shutdownNow();super.onDestroy();}
     private int dp(int value){return Math.round(value*getResources().getDisplayMetrics().density);}
     private void shell(){
         ScrollView scroll=new ScrollView(this);scroll.setFillViewport(true);scroll.setBackgroundColor(Color.rgb(7,20,35));
@@ -60,7 +62,7 @@ public final class PortalActivity extends Activity {
             return insets;
         });scroll.requestApplyInsets();
         text(getString(R.string.portal_brand),13,true);text(getString(R.string.portal_name),30,true);
-        if(!section.equals("configure")){button(R.string.portal_trail,()->navigate("trail",""));button(R.string.portal_open_game,()->openGame("/app/"));}
+        if(!section.equals("configure")){button(R.string.portal_trail,()->navigate("trail",""));button(R.string.portal_open_game,()->openGame("/app/"));button(R.string.portal_account,()->navigate("account",""));}
     }
     private TextView text(String value,int size,boolean heading){
         TextView view=new TextView(this);view.setText(value);view.setTextSize(size);view.setTextColor(heading?Color.rgb(230,242,255):Color.rgb(183,203,223));view.setPadding(0,dp(8),0,dp(8));
@@ -73,7 +75,7 @@ public final class PortalActivity extends Activity {
     }
     private void navigate(String next,String id){section=next;destination=id;show();}
     private void perform(Runnable mutation){
-        work.execute(()->{try{mutation.run();PortalWidgetProvider.updateAll(this);if(!closed)runOnUiThread(this::show);}
+        work.execute(()->{try{mutation.run();PortalWidgetProvider.updateAll(this);PortalRefreshJob.schedule(this);if(!closed)runOnUiThread(this::show);}
             catch(Exception error){if(!closed)runOnUiThread(()->text(getString(R.string.portal_save_failed),16,false));}});
     }
     private void mutate(String id,String kind){String owner=store.owner();perform(()->{try{store.act(id,kind,owner);}catch(Exception error){throw new IllegalStateException(error);}});}
@@ -84,6 +86,7 @@ public final class PortalActivity extends Activity {
     private void show(){
         if(closed)return;shell();
         if(section.equals("configure")){configure();return;}
+        if(section.equals("account")){showAccount();return;}
         if(section.equals("together")){text(getString(R.string.portal_together_body),17,false);button(R.string.portal_open_multiplayer,()->openGame("/app/?tab=multiplayer"));return;}
         if(section.equals("beyond")){text(getString(R.string.portal_beyond_body),17,false);for(String body:Arrays.asList("moon","mars","space"))button(getString(body.equals("moon")?R.string.portal_moon:body.equals("mars")?R.string.portal_mars:R.string.portal_space),()->openGame("/app/?launch="+body+"&gm=free"));return;}
         JSONObject place=store.place(destination);if(section.equals("place")&&place!=null){showPlace(place);return;}
@@ -95,10 +98,31 @@ public final class PortalActivity extends Activity {
             text(android.text.TextUtils.join(" · ",labels),15,false);if(known!=null)button(R.string.portal_open_place,()->navigate("place",id));
         }
         if(count==0)text(getString(R.string.portal_empty_trail),17,false);
-        text(getString(R.string.portal_device_trail),14,false);
+        text(store.owner().equals("device-guest")?getString(R.string.portal_device_trail):getString(R.string.portal_account_trail),14,false);
         text(getString(R.string.portal_places_heading),23,true);for(JSONObject row:store.destinations())button(row.optString("title"),()->navigate("place",row.optString("id")));
         button(R.string.portal_refresh,()->{PortalRefreshJob.schedule(this);text(getString(R.string.portal_refresh_scheduled),14,false);});
         long loaded=store.loadedAt();text(loaded==0?getString(R.string.portal_bundled):getString(R.string.portal_updated,DateFormat.getDateTimeInstance().format(new Date(loaded))),13,false);
+    }
+    private void showAccount(){
+        text(getString(R.string.portal_account),24,true);String label=account.accountLabel();
+        text(label.isEmpty()?getString(R.string.portal_device_trail):label,17,false);
+        if(!account.message().isEmpty())text(account.message(),16,false);
+        String code=account.code();
+        if(!code.isEmpty()){
+            text(getString(R.string.portal_match_code),17,false);text(code.substring(0,4)+" "+code.substring(4),30,true);
+            button(R.string.portal_approve_browser,()->{Uri target=account.approval();if(target!=null)startActivity(new Intent(Intent.ACTION_VIEW,target));else text(getString(R.string.portal_connection_expired),16,false);});
+            button(R.string.portal_cancel_connection,account::cancel);
+        }else if(!account.status().equals("connecting"))button(label.isEmpty()?R.string.portal_connect:R.string.portal_change_account,account::start);
+        else button(R.string.portal_cancel_connection,account::cancel);
+        if(!store.owner().equals("device-guest")){
+            button(R.string.portal_sync,()->account.sync(()->true));
+            button(R.string.portal_copy_device,()->new android.app.AlertDialog.Builder(this).setTitle(R.string.portal_copy_device).setMessage(R.string.portal_copy_explanation)
+                .setNegativeButton(R.string.portal_cancel,null).setPositiveButton(R.string.portal_copy_device,(dialog,which)->account.copyDeviceChoices()).show());
+            button(R.string.portal_disconnect,()->new android.app.AlertDialog.Builder(this).setTitle(R.string.portal_disconnect).setMessage(R.string.portal_disconnect_explanation)
+                .setNegativeButton(R.string.portal_cancel,null).setPositiveButton(R.string.portal_disconnect,(dialog,which)->account.disconnect()).show());
+            long synced=store.syncedAt();if(synced>0)text(getString(R.string.portal_synced_at,DateFormat.getDateTimeInstance().format(new Date(synced))),14,false);
+        }
+        text(getString(R.string.portal_account_explanation),15,false);
     }
     private void showPlace(JSONObject place){
         String id=place.optString("id");JSONObject state=store.trail(id),learning=place.optJSONObject("learning");

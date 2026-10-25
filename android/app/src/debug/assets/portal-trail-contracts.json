@@ -1,0 +1,599 @@
+{
+  "scope": "Generated from the browser/server wire model. Debug-only native conformance fixture.",
+  "scenarios": [
+    {
+      "kind": "queue",
+      "before": {
+        "type": "PortalTrailEntry",
+        "schemaVersion": 1,
+        "id": "portal-trail:account%3Anative-fixture|baltimore-harbor",
+        "ownerScope": "account:native-fixture",
+        "destinationId": "baltimore-harbor",
+        "state": {
+          "destinationId": "baltimore-harbor",
+          "revision": 0,
+          "firstOfferedAt": 0,
+          "lastOfferedAt": 0,
+          "saved": false,
+          "savedAt": 0,
+          "investigatedAt": 0,
+          "investigationVersion": null,
+          "visitedAt": 0,
+          "expeditionIds": []
+        },
+        "pending": {}
+      },
+      "command": {
+        "operationId": "save-one",
+        "kind": "save",
+        "destinationId": "baltimore-harbor",
+        "createdAt": 1000
+      },
+      "expected": {
+        "type": "PortalTrailEntry",
+        "schemaVersion": 1,
+        "id": "portal-trail:account%3Anative-fixture|baltimore-harbor",
+        "ownerScope": "account:native-fixture",
+        "destinationId": "baltimore-harbor",
+        "state": {
+          "destinationId": "baltimore-harbor",
+          "revision": 0,
+          "firstOfferedAt": 0,
+          "lastOfferedAt": 0,
+          "saved": false,
+          "savedAt": 0,
+          "investigatedAt": 0,
+          "investigationVersion": null,
+          "visitedAt": 0,
+          "expeditionIds": []
+        },
+        "pending": {
+          "saved": {
+            "operationId": "save-one",
+            "destinationId": "baltimore-harbor",
+            "kind": "save",
+            "createdAt": 1000
+          }
+        }
+      },
+      "view": {
+        "destinationId": "baltimore-harbor",
+        "revision": 0,
+        "firstOfferedAt": 1000,
+        "lastOfferedAt": 1000,
+        "saved": true,
+        "savedAt": 1000,
+        "investigatedAt": 0,
+        "investigationVersion": null,
+        "visitedAt": 0,
+        "expeditionIds": [],
+        "pending": true,
+        "ownerScope": "account:native-fixture"
+      }
+    },
+    {
+      "kind": "queue",
+      "before": {
+        "type": "PortalTrailEntry",
+        "schemaVersion": 1,
+        "id": "portal-trail:account%3Anative-fixture|baltimore-harbor",
+        "ownerScope": "account:native-fixture",
+        "destinationId": "baltimore-harbor",
+        "state": {
+          "destinationId": "baltimore-harbor",
+          "revision": 0,
+          "firstOfferedAt": 0,
+          "lastOfferedAt": 0,
+          "saved": false,
+          "savedAt": 0,
+          "investigatedAt": 0,
+          "investigationVersion": null,
+          "visitedAt": 0,
+          "expeditionIds": []
+        },
+        "pending": {
+          "saved": {
+            "operationId": "save-one",
+            "destinationId": "baltimore-harbor",
+            "kind": "save",
+            "createdAt": 1000
+          }
+        }
+      },
+      "command": {
+        "operationId": "unsave-newer",
+        "kind": "unsave",
+        "destinationId": "baltimore-harbor",
+        "createdAt": 2000
+      },
+      "expected": {
+        "type": "PortalTrailEntry",
+        "schemaVersion": 1,
+        "id": "portal-trail:account%3Anative-fixture|baltimore-harbor",
+        "ownerScope": "account:native-fixture",
+        "destinationId": "baltimore-harbor",
+        "state": {
+          "destinationId": "baltimore-harbor",
+          "revision": 0,
+          "firstOfferedAt": 0,
+          "lastOfferedAt": 0,
+          "saved": false,
+          "savedAt": 0,
+          "investigatedAt": 0,
+          "investigationVersion": null,
+          "visitedAt": 0,
+          "expeditionIds": []
+        },
+        "pending": {
+          "saved": {
+            "operationId": "unsave-newer",
+            "destinationId": "baltimore-harbor",
+            "kind": "unsave",
+            "createdAt": 2000
+          }
+        }
+      },
+      "view": {
+        "destinationId": "baltimore-harbor",
+        "revision": 0,
+        "firstOfferedAt": 2000,
+        "lastOfferedAt": 2000,
+        "saved": false,
+        "savedAt": 0,
+        "investigatedAt": 0,
+        "investigationVersion": null,
+        "visitedAt": 0,
+        "expeditionIds": [],
+        "pending": true,
+        "ownerScope": "account:native-fixture"
+      }
+    },
+    {
+      "kind": "queue",
+      "before": {
+        "type": "PortalTrailEntry",
+        "schemaVersion": 1,
+        "id": "portal-trail:account%3Anative-fixture|baltimore-harbor",
+        "ownerScope": "account:native-fixture",
+        "destinationId": "baltimore-harbor",
+        "state": {
+          "destinationId": "baltimore-harbor",
+          "revision": 0,
+          "firstOfferedAt": 0,
+          "lastOfferedAt": 0,
+          "saved": false,
+          "savedAt": 0,
+          "investigatedAt": 0,
+          "investigationVersion": null,
+          "visitedAt": 0,
+          "expeditionIds": []
+        },
+        "pending": {
+          "saved": {
+            "operationId": "unsave-newer",
+            "destinationId": "baltimore-harbor",
+            "kind": "unsave",
+            "createdAt": 2000
+          }
+        }
+      },
+      "command": {
+        "operationId": "learn-one",
+        "kind": "investigate",
+        "destinationId": "baltimore-harbor",
+        "createdAt": 3000,
+        "contentVersion": "learning-v1"
+      },
+      "expected": {
+        "type": "PortalTrailEntry",
+        "schemaVersion": 1,
+        "id": "portal-trail:account%3Anative-fixture|baltimore-harbor",
+        "ownerScope": "account:native-fixture",
+        "destinationId": "baltimore-harbor",
+        "state": {
+          "destinationId": "baltimore-harbor",
+          "revision": 0,
+          "firstOfferedAt": 0,
+          "lastOfferedAt": 0,
+          "saved": false,
+          "savedAt": 0,
+          "investigatedAt": 0,
+          "investigationVersion": null,
+          "visitedAt": 0,
+          "expeditionIds": []
+        },
+        "pending": {
+          "saved": {
+            "operationId": "unsave-newer",
+            "destinationId": "baltimore-harbor",
+            "kind": "unsave",
+            "createdAt": 2000
+          },
+          "investigated": {
+            "operationId": "learn-one",
+            "destinationId": "baltimore-harbor",
+            "kind": "investigate",
+            "createdAt": 3000,
+            "contentVersion": "learning-v1"
+          }
+        }
+      },
+      "view": {
+        "destinationId": "baltimore-harbor",
+        "revision": 0,
+        "firstOfferedAt": 2000,
+        "lastOfferedAt": 3000,
+        "saved": false,
+        "savedAt": 0,
+        "investigatedAt": 3000,
+        "investigationVersion": "learning-v1",
+        "visitedAt": 0,
+        "expeditionIds": [],
+        "pending": true,
+        "ownerScope": "account:native-fixture"
+      }
+    },
+    {
+      "kind": "accept",
+      "before": {
+        "type": "PortalTrailEntry",
+        "schemaVersion": 1,
+        "id": "portal-trail:account%3Anative-fixture|baltimore-harbor",
+        "ownerScope": "account:native-fixture",
+        "destinationId": "baltimore-harbor",
+        "state": {
+          "destinationId": "baltimore-harbor",
+          "revision": 0,
+          "firstOfferedAt": 0,
+          "lastOfferedAt": 0,
+          "saved": false,
+          "savedAt": 0,
+          "investigatedAt": 0,
+          "investigationVersion": null,
+          "visitedAt": 0,
+          "expeditionIds": []
+        },
+        "pending": {
+          "saved": {
+            "operationId": "unsave-newer",
+            "destinationId": "baltimore-harbor",
+            "kind": "unsave",
+            "createdAt": 2000
+          },
+          "investigated": {
+            "operationId": "learn-one",
+            "destinationId": "baltimore-harbor",
+            "kind": "investigate",
+            "createdAt": 3000,
+            "contentVersion": "learning-v1"
+          }
+        }
+      },
+      "response": {
+        "ownerScope": "account:native-fixture",
+        "operationId": "save-one",
+        "state": {
+          "destinationId": "baltimore-harbor",
+          "revision": 3,
+          "firstOfferedAt": 500,
+          "lastOfferedAt": 900,
+          "saved": true,
+          "savedAt": 900,
+          "investigatedAt": 0,
+          "investigationVersion": null,
+          "visitedAt": 800,
+          "expeditionIds": [
+            "confirmed-game-expedition"
+          ]
+        }
+      },
+      "expected": {
+        "type": "PortalTrailEntry",
+        "schemaVersion": 1,
+        "id": "portal-trail:account%3Anative-fixture|baltimore-harbor",
+        "ownerScope": "account:native-fixture",
+        "destinationId": "baltimore-harbor",
+        "state": {
+          "destinationId": "baltimore-harbor",
+          "revision": 3,
+          "firstOfferedAt": 500,
+          "lastOfferedAt": 900,
+          "saved": true,
+          "savedAt": 900,
+          "investigatedAt": 0,
+          "investigationVersion": null,
+          "visitedAt": 800,
+          "expeditionIds": [
+            "confirmed-game-expedition"
+          ]
+        },
+        "pending": {
+          "saved": {
+            "operationId": "unsave-newer",
+            "destinationId": "baltimore-harbor",
+            "kind": "unsave",
+            "createdAt": 2000
+          },
+          "investigated": {
+            "operationId": "learn-one",
+            "destinationId": "baltimore-harbor",
+            "kind": "investigate",
+            "createdAt": 3000,
+            "contentVersion": "learning-v1"
+          }
+        }
+      },
+      "view": {
+        "destinationId": "baltimore-harbor",
+        "revision": 3,
+        "firstOfferedAt": 500,
+        "lastOfferedAt": 3000,
+        "saved": false,
+        "savedAt": 900,
+        "investigatedAt": 3000,
+        "investigationVersion": "learning-v1",
+        "visitedAt": 800,
+        "expeditionIds": [
+          "confirmed-game-expedition"
+        ],
+        "pending": true,
+        "ownerScope": "account:native-fixture"
+      }
+    },
+    {
+      "kind": "accept",
+      "before": {
+        "type": "PortalTrailEntry",
+        "schemaVersion": 1,
+        "id": "portal-trail:account%3Anative-fixture|baltimore-harbor",
+        "ownerScope": "account:native-fixture",
+        "destinationId": "baltimore-harbor",
+        "state": {
+          "destinationId": "baltimore-harbor",
+          "revision": 3,
+          "firstOfferedAt": 500,
+          "lastOfferedAt": 900,
+          "saved": true,
+          "savedAt": 900,
+          "investigatedAt": 0,
+          "investigationVersion": null,
+          "visitedAt": 800,
+          "expeditionIds": [
+            "confirmed-game-expedition"
+          ]
+        },
+        "pending": {
+          "saved": {
+            "operationId": "unsave-newer",
+            "destinationId": "baltimore-harbor",
+            "kind": "unsave",
+            "createdAt": 2000
+          },
+          "investigated": {
+            "operationId": "learn-one",
+            "destinationId": "baltimore-harbor",
+            "kind": "investigate",
+            "createdAt": 3000,
+            "contentVersion": "learning-v1"
+          }
+        }
+      },
+      "response": {
+        "ownerScope": "account:native-fixture",
+        "operationId": "unsave-newer",
+        "state": {
+          "destinationId": "baltimore-harbor",
+          "revision": 2,
+          "firstOfferedAt": 500,
+          "lastOfferedAt": 900,
+          "saved": true,
+          "savedAt": 900,
+          "investigatedAt": 0,
+          "investigationVersion": null,
+          "visitedAt": 800,
+          "expeditionIds": [
+            "confirmed-game-expedition"
+          ]
+        }
+      },
+      "expected": {
+        "type": "PortalTrailEntry",
+        "schemaVersion": 1,
+        "id": "portal-trail:account%3Anative-fixture|baltimore-harbor",
+        "ownerScope": "account:native-fixture",
+        "destinationId": "baltimore-harbor",
+        "state": {
+          "destinationId": "baltimore-harbor",
+          "revision": 3,
+          "firstOfferedAt": 500,
+          "lastOfferedAt": 900,
+          "saved": true,
+          "savedAt": 900,
+          "investigatedAt": 0,
+          "investigationVersion": null,
+          "visitedAt": 800,
+          "expeditionIds": [
+            "confirmed-game-expedition"
+          ]
+        },
+        "pending": {
+          "investigated": {
+            "operationId": "learn-one",
+            "destinationId": "baltimore-harbor",
+            "kind": "investigate",
+            "createdAt": 3000,
+            "contentVersion": "learning-v1"
+          }
+        }
+      },
+      "view": {
+        "destinationId": "baltimore-harbor",
+        "revision": 3,
+        "firstOfferedAt": 500,
+        "lastOfferedAt": 3000,
+        "saved": true,
+        "savedAt": 900,
+        "investigatedAt": 3000,
+        "investigationVersion": "learning-v1",
+        "visitedAt": 800,
+        "expeditionIds": [
+          "confirmed-game-expedition"
+        ],
+        "pending": true,
+        "ownerScope": "account:native-fixture"
+      }
+    },
+    {
+      "kind": "accept",
+      "before": {
+        "type": "PortalTrailEntry",
+        "schemaVersion": 1,
+        "id": "portal-trail:account%3Anative-fixture|baltimore-harbor",
+        "ownerScope": "account:native-fixture",
+        "destinationId": "baltimore-harbor",
+        "state": {
+          "destinationId": "baltimore-harbor",
+          "revision": 3,
+          "firstOfferedAt": 500,
+          "lastOfferedAt": 900,
+          "saved": true,
+          "savedAt": 900,
+          "investigatedAt": 0,
+          "investigationVersion": null,
+          "visitedAt": 800,
+          "expeditionIds": [
+            "confirmed-game-expedition"
+          ]
+        },
+        "pending": {
+          "investigated": {
+            "operationId": "learn-one",
+            "destinationId": "baltimore-harbor",
+            "kind": "investigate",
+            "createdAt": 3000,
+            "contentVersion": "learning-v1"
+          }
+        }
+      },
+      "response": {
+        "ownerScope": "account:native-fixture",
+        "operationId": "learn-one",
+        "state": {
+          "destinationId": "baltimore-harbor",
+          "revision": 4,
+          "firstOfferedAt": 500,
+          "lastOfferedAt": 900,
+          "saved": true,
+          "savedAt": 900,
+          "investigatedAt": 0,
+          "investigationVersion": null,
+          "visitedAt": 800,
+          "expeditionIds": [
+            "confirmed-game-expedition"
+          ]
+        }
+      },
+      "expected": {
+        "type": "PortalTrailEntry",
+        "schemaVersion": 1,
+        "id": "portal-trail:account%3Anative-fixture|baltimore-harbor",
+        "ownerScope": "account:native-fixture",
+        "destinationId": "baltimore-harbor",
+        "state": {
+          "destinationId": "baltimore-harbor",
+          "revision": 4,
+          "firstOfferedAt": 500,
+          "lastOfferedAt": 900,
+          "saved": true,
+          "savedAt": 900,
+          "investigatedAt": 0,
+          "investigationVersion": null,
+          "visitedAt": 800,
+          "expeditionIds": [
+            "confirmed-game-expedition"
+          ]
+        },
+        "pending": {}
+      },
+      "view": {
+        "destinationId": "baltimore-harbor",
+        "revision": 4,
+        "firstOfferedAt": 500,
+        "lastOfferedAt": 900,
+        "saved": true,
+        "savedAt": 900,
+        "investigatedAt": 0,
+        "investigationVersion": null,
+        "visitedAt": 800,
+        "expeditionIds": [
+          "confirmed-game-expedition"
+        ],
+        "pending": false,
+        "ownerScope": "account:native-fixture"
+      }
+    },
+    {
+      "kind": "queue",
+      "before": {
+        "type": "PortalTrailEntry",
+        "schemaVersion": 1,
+        "id": "portal-trail:device-guest|baltimore-harbor",
+        "ownerScope": "device-guest",
+        "destinationId": "baltimore-harbor",
+        "state": {
+          "destinationId": "baltimore-harbor",
+          "revision": 0,
+          "firstOfferedAt": 0,
+          "lastOfferedAt": 0,
+          "saved": false,
+          "savedAt": 0,
+          "investigatedAt": 0,
+          "investigationVersion": null,
+          "visitedAt": 0,
+          "expeditionIds": []
+        },
+        "pending": {}
+      },
+      "command": {
+        "operationId": "guest-save",
+        "kind": "save",
+        "destinationId": "baltimore-harbor",
+        "createdAt": 4000
+      },
+      "expected": {
+        "type": "PortalTrailEntry",
+        "schemaVersion": 1,
+        "id": "portal-trail:device-guest|baltimore-harbor",
+        "ownerScope": "device-guest",
+        "destinationId": "baltimore-harbor",
+        "state": {
+          "destinationId": "baltimore-harbor",
+          "revision": 0,
+          "firstOfferedAt": 4000,
+          "lastOfferedAt": 4000,
+          "saved": true,
+          "savedAt": 4000,
+          "investigatedAt": 0,
+          "investigationVersion": null,
+          "visitedAt": 0,
+          "expeditionIds": []
+        },
+        "pending": {}
+      },
+      "view": {
+        "destinationId": "baltimore-harbor",
+        "revision": 0,
+        "firstOfferedAt": 4000,
+        "lastOfferedAt": 4000,
+        "saved": true,
+        "savedAt": 4000,
+        "investigatedAt": 0,
+        "investigationVersion": null,
+        "visitedAt": 0,
+        "expeditionIds": [],
+        "pending": false,
+        "ownerScope": "device-guest"
+      }
+    }
+  ]
+}
