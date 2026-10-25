@@ -23,6 +23,7 @@ adb shell settings put global animator_duration_scale 0
 adb shell svc wifi disable
 adb shell svc data disable
 adb install android/app/build/outputs/apk/debug/app-debug.apk
+adb shell appwidget grantbind --package io.worldexplorer3d.app
 adb logcat -c
 adb shell am instrument -w -e ownedEmulator true io.worldexplorer3d.app/.PortalWidgetContractInstrumentation > android-widget-evidence/result.txt
 adb logcat -d > android-widget-evidence/logcat.txt

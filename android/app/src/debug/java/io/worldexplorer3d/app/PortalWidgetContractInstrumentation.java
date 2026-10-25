@@ -30,7 +30,7 @@ public final class PortalWidgetContractInstrumentation extends Instrumentation {
     private void until(BooleanSupplier ready)throws Exception{long deadline=System.currentTimeMillis()+8000;while(!ready.getAsBoolean()){if(System.currentTimeMillis()>=deadline)throw new AssertionError("Native widget state did not settle.");Thread.sleep(50);}}
     private String text(int id){AtomicReference<String> value=new AtomicReference<>("");runOnMainSync(()->{TextView item=view.findViewById(id);if(item!=null)value.set(item.getText().toString());});return value.get();}
     private void click(int id){runOnMainSync(()->{View item=view.findViewById(id);check(item!=null&&item.isShown(),"Widget control is unavailable: "+id);check(item.performClick(),"Widget click was not handled.");});}
-    private void screenshot(String name)throws Exception{Bitmap pixels=getUiAutomation().takeScreenshot();check(pixels!=null,"Native screenshot unavailable.");File directory=new File(getTargetContext().getFilesDir(),"portal-evidence");check(directory.mkdirs()||directory.isDirectory(),"Evidence directory unavailable.");try(FileOutputStream output=new FileOutputStream(new File(directory,name))){check(pixels.compress(Bitmap.CompressFormat.PNG,100,output),"Screenshot could not be written.");}finally{pixels.recycle();}}
+    private void screenshot(String name)throws Exception{waitForIdleSync();try{getUiAutomation().waitForIdle(150,1500);}catch(java.util.concurrent.TimeoutException ignored){}Bitmap pixels=getUiAutomation().takeScreenshot();check(pixels!=null,"Native screenshot unavailable.");File directory=new File(getTargetContext().getFilesDir(),"portal-evidence");check(directory.mkdirs()||directory.isDirectory(),"Evidence directory unavailable.");try(FileOutputStream output=new FileOutputStream(new File(directory,name))){check(pixels.compress(Bitmap.CompressFormat.PNG,100,output),"Screenshot could not be written.");}finally{pixels.recycle();}}
     @Override public void onStart(){
         Bundle result=new Bundle();int outcome=Activity.RESULT_CANCELED;AppWidgetHost host=null;PortalWidgetHarnessActivity activity=null;int widgetId=AppWidgetManager.INVALID_APPWIDGET_ID;SharedPreferences prefs=null;boolean owned=false;
         try{
@@ -38,7 +38,8 @@ public final class PortalWidgetContractInstrumentation extends Instrumentation {
             Context context=getTargetContext();prefs=context.getSharedPreferences("living-portal-v1",Context.MODE_PRIVATE);
             check(prefs.getAll().isEmpty()&&PortalWidgetProvider.ids(context).length==0,"Refusing to replace existing Portal data or widgets.");owned=true;
             PortalStore store=new PortalStore(context);String id="baltimore-harbor";JSONObject place=store.place(id);check(place!=null,"Bundled destination unavailable offline.");
-            store.act(id,"save");store.act(id,"investigate");store.act(id,"unsave");JSONObject state=new PortalStore(context).trail(id);
+            final String modelId="monaco-coast";
+            store.act(modelId,"save");store.act(modelId,"investigate");store.act(modelId,"unsave");JSONObject state=new PortalStore(context).trail(modelId);
             check(!state.getBoolean("saved")&&state.getLong("investigatedAt")>0&&state.getLong("visitedAt")==0&&state.getJSONArray("expeditionIds").length()==0,"Native choices changed visit/reward semantics.");
             boolean denied=false;try{store.act(id,"visit");}catch(Exception expected){denied=true;}check(denied,"Widget accepted game visit verb.");
             JSONObject invalid=store.catalog();invalid.getJSONArray("destinations").getJSONObject(0).put("gameLink","https://invalid.example/");denied=false;try{PortalStore.validateCatalog(invalid.toString());}catch(Exception expected){denied=true;}check(denied,"Malformed game link was accepted.");
@@ -56,7 +57,7 @@ public final class PortalWidgetContractInstrumentation extends Instrumentation {
             click(R.id.portal_investigate);until(()->store.learning(currentId).equals(id));until(()->text(R.id.portal_body).equals(PortalStore.facts(place).get(0)));
             screenshot("widget-investigation.png");
             int count=PortalStore.facts(place).size();for(int i=1;i<count;i++){click(R.id.portal_fact_next);final int index=i;until(()->store.fact(currentId)==index);until(()->text(R.id.portal_body).equals(PortalStore.facts(place).get(index)));}
-            click(R.id.portal_fact_next);until(()->store.learning(currentId).isEmpty());check(store.trail(id).optLong("visitedAt")==0,"Investigation granted a game visit.");
+            click(R.id.portal_fact_next);until(()->store.learning(currentId).isEmpty());check(store.trail(id).optLong("investigatedAt")>0,"The actual widget investigation did not persist.");check(store.trail(id).optLong("visitedAt")==0,"Investigation granted a game visit.");
             screenshot("widget-saved.png");result.putInt("host_interaction_checks",3);
             ActivityMonitor monitor=addMonitor(PortalActivity.class.getName(),null,false);click(R.id.portal_trail);Activity trail=waitForMonitorWithTimeout(monitor,8000);removeMonitor(monitor);check(trail!=null,"Native Trail Activity did not open.");screenshot("native-trail.png");runOnMainSync(trail::finish);
             options.putInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH,180);options.putInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT,200);manager.updateAppWidgetOptions(widgetId,options);
