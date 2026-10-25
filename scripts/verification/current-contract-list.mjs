@@ -519,5 +519,6 @@ export const currentContractTests = [
   'tests/earth-district-current.test.mjs',
   'tests/weapon-reticle-current.test.mjs',
   'tests/android-web-support.test.mjs',
+  'tests/android-launch-evidence.test.mjs',
   'tests/play-distribution-current.test.mjs'
 ];

@@ -1,8 +1,45 @@
 # Current development and release state
 
-Updated October 24, 2026. Use the latest sections below for current identities;
+Updated October 25, 2026. Use the latest sections below for current identities;
 dated sections further down retain historical evidence. The owner has authorized
 necessary production/protected-source work; do not ask again for that scope.
+
+## October 25 Android startup crash — version 4 candidate verified
+
+The owner reported the Play-installed app repeatedly stopping on a Motorola g
+play (approximately 2026). The unchanged version 3 launcher reproduced a native
+startup exception on an owned Android 15/API35 emulator: Browser Helper calls
+`ManageDataLauncherActivity.addSiteSettingsShortcut` on connected launch, but
+that component was missing from the manifest. Both enable/disable paths require
+the component. This happens before the game or browser origin validation.
+
+The repair declares that private activity and its canonical site-settings URL
+using the existing Browser Helper. Package ID, permissions, minimum/target SDK,
+browser security checks, upload key, web release and player data are preserved.
+Version code 4 / `5.6.1-test.4` is built and signed. Build/lint and four focused
+release-bytecode emulator phases passed: cold browser handoff, offline recovery,
+retry and relaunch. The browser phases reach Chrome's first-run screen; they do
+not qualify web gameplay, fullscreen association or the owner's physical phone.
+
+The initial diagnostic device setup failed because AVD directories differed.
+Its next attempt captured the real crash but incorrectly exited success because
+`rg` was unavailable inside a shell conditional. That result is explicitly not
+accepted as a pass. The replacement Node checker rejects the retained real crash
+and a silent return home, and requires phase-specific foreground/UI evidence.
+Three focused checker regressions are registered in the normal component suite.
+The initial PR inventory failure (missing registration) is retained too.
+
+Native candidate source is `1e644245ba11df70059954c2f6a92134a35128b7`, build
+40162826077. Signed AAB SHA-256 is
+`8f8595385fa25821449341ec83adfc4c2715fc258bf540ece8e4f1da2e203a55`.
+The version 4 Console upload/activation is still pending; do not call code 3 fixed
+or ask the owner to reinstall it. Browser-extension file URL access was previously
+disabled and has been requested for the concrete AAB upload. Do not bypass that
+capability restriction. Code 3 remains the internal-track release and closed Alpha
+is still under review unless a later operational receipt confirms replacement.
+See [the focused repair record](docs/verification/2026-10-25-ANDROID-LAUNCH-CRASH.md)
+and `output/research/android-launch-crash-2026-10-25/` for all failed evidence.
+No game-wide sweep, web/backend redeployment or new signing key is needed.
 
 ## October 24 selected-location defaults and community safety — released
 

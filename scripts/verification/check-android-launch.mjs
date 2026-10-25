@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import {fileURLToPath} from 'node:url';
 import assert from 'node:assert/strict';
 
 // adb's successful am-start response does not mean onCreate survived. Check
@@ -22,7 +23,7 @@ export function checkLaunch(log, activities, ui, phase) {
   }
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(new URL(import.meta.url).pathname)) {
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const [directory, phase] = process.argv.slice(2);
   assert.ok(directory && ['online', 'offline', 'retry', 'relaunch'].includes(phase));
   const read = name => fs.readFileSync(path.join(directory, `${phase}-${name}`), 'utf8');
