@@ -34,3 +34,27 @@ Evidence directory: `output/research/request-parser-security-2026-10-25/`.
 Protected source review and staged/live deployment remain pending at this source
 checkpoint. A clean dependency audit is not an absolute security guarantee or a
 claim to have tested every game or backend feature again.
+
+## Review and deployment preparation follow-up
+
+Initial protected checks rejected the missing dependency-inventory hash update
+and an unsafe echo in the test-only loopback fixture. The reviewed lock hash is
+updated, and the fixture now returns a fixed JSON boolean with explicit JSON
+content type and nosniff. No suppression or security-policy bypass was added.
+The source-package verification also caught reused mutable ZIP metadata before
+any upload/update; a copied ZipInfo preserves all original offsets. Original
+failed results and the failed generated private archive remain retained.
+
+All 84 existing Functions in each project have configuration/IAM/source recovery
+snapshots. Staging contains four active source versions and production five.
+Each existing source archive receives only the reviewed body-parser lock entry;
+its existing root dependencies (including older versions without Svix), every
+other package and every other archived file are preserved. The existing qs
+6.16.0 satisfies the fixed parser requirement. This avoids promoting unrelated
+newer business code to functions deliberately left at older source versions.
+The first staging public-stats update completed; broader rollout is pending.
+
+The owner additionally requires normal phone-browser control coverage. Add
+explicit mobile-web verification across browser engines and the Safari user-gesture
+permission path; keep physical-device claims separate. Game bytes remain the
+qualified source 52d5f24 unless a demonstrated browser defect requires a repair.

@@ -15,7 +15,9 @@ const server = http.createServer((req, res) => {
   if (req.method === 'GET') { res.end('healthy'); return; }
   parse(req, res, error => {
     res.statusCode = error?.status || 200;
-    res.end(error ? 'rejected' : JSON.stringify(req.body));
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.end(JSON.stringify(error ? { rejected: true } : { parsed: req.body?.probe === true }));
     // Hold the invalid suffix until parsing has completed. This models a
     // decoder error arriving after the valid compressed frame was consumed.
     if (tail.length) setImmediate(() => client.end(tail));

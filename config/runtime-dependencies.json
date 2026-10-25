@@ -455,7 +455,7 @@
     },
     {
       "path": "functions/package-lock.json",
-      "sha256": "098b469dcb15afee59edeeecd351ea7ca6a264da6fd5421bc656b5bbefb43cfc",
+      "sha256": "0cd7d8725b2a548657ef4f3053c8896106d67796a0a54346da25e8c7a2c060b5",
       "direct": [
         {
           "package": "firebase-admin",
