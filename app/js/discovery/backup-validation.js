@@ -5,6 +5,7 @@ import { THREE_VIEWS, validateThreeViewsBackup } from '../campaign/three-views.j
 import {HOME_ACHIEVEMENTS} from '../campaign/home-achievements.js';
 import { HARBOR_RUN, normalizeHarborRun, validateDeliveryRoute } from '../campaign/harbor-run.js';
 import { validHandling, deliveryDistinction } from '../campaign/delivery-handling.js';
+import {validatePortalTrailEntry} from '../portal/trail-model.js';
 // Validate the entire file before opening a destructive replacement transaction.
 // Older backups may omit optional collections, but malformed rows are never dropped.
 import { FIRST_BEARINGS, normalizeOpeningChapter, finishOpeningChapter } from '../campaign/first-bearings.js?v=1';
@@ -14,6 +15,14 @@ export function validateJournalBackup(input) {
   if (input.schemaVersion != null && (!Number.isInteger(input.schemaVersion) || input.schemaVersion < 1 || input.schemaVersion > 5)) fail();
   if (input.profile.id != null && input.profile.id !== 'local-explorer') fail();
   const data = JSON.parse(JSON.stringify(input));
+  if(Object.hasOwn(data,'portalTrail')) {
+    if(!Array.isArray(data.portalTrail))fail();
+    const ids=new Set();
+    for(const row of data.portalTrail){
+      try{validatePortalTrailEntry(row);}catch{fail();}
+      if(ids.has(row.id))fail();ids.add(row.id);
+    }
+  }
   for (const [name, key, required, catalog] of [['events','eventId',true,false],['fieldGuide','catalogId',true,false],['items','instanceId',false,true],['companions','instanceId',false,true]]) {
     if (data[name] == null && !required) data[name] = [];
     if (!Array.isArray(data[name])) fail();

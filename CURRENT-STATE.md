@@ -4,6 +4,34 @@ Updated October 25, 2026. Use the latest sections below for current identities;
 dated sections further down retain historical evidence. The owner has authorized
 necessary production/protected-source work; do not ask again for that scope.
 
+## October 25 VR and Living Portal complete product work — active
+
+The owner now explicitly authorizes finishing working VR and widget products,
+not stopping at scaffolding/checkpoints. The active goal and execution ledger
+are `docs/architecture-evaluation/VR-PORTAL-PRODUCT-DELIVERY.md`. Continue beyond
+local commits until the release criteria are satisfied or independent work is
+exhausted against a concrete external constraint. Do not mark hardware/store
+acceptance complete from mocks or source inspection.
+
+Owner hardware is a phone-insert viewer, with no tracked headset, Apple test
+device or Apple Developer membership. Support both phone stereo/orientation and
+WebXR; phone orientation is not positional tracking. This Mac has command-line
+tools but no full Xcode application; native CI/build/signing/device work remains.
+
+First implementation now adds durable independent Trail state through the
+existing Journal `profiles` object store, with scoped account/guest keys,
+coalesced pending actions, out-of-order sync protection and paginated reads.
+No new database or scheduler. Journal export/import includes Trail; older
+backups retain it and rollback restores it. Widget actions cannot grant visits,
+activity receipts, character/field-guide progress or inventory. Thirteen new
+Trail/model/memory-persistence cases and five affected receipt-outbox cases pass
+(18 distinct). Existing IndexedDB browser integration is still to be exercised
+with the complete Portal UI; this is not a widget or sync service completion.
+
+Evidence: `output/research/vr-portal-product-2026-10-25/`. Continue with Portal
+service/UI/game entry and actual VR presentation/input, then native clients and
+qualified release work. No new deployment has occurred.
+
 ## October 25 Living Portal shared quality foundation
 
 The owner proposes a persistent Living Portal/Exploration Trail and requires
