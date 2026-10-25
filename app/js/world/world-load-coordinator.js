@@ -10,8 +10,12 @@ export function createWorldLoadCoordinator(options = {}) {
     if (options.admitRequest?.() === false) {
       return {aborted: true, reason: 'invalid_location_selection'};
     }
-    if (retryPass > 0) return loadWorld(retryPass);
     const signature = getWorldLoadSignature();
+    if (retryPass > 0) {
+      await options.prepareLoad?.();
+      if(signature!==getWorldLoadSignature())return {aborted:true,reason:'superseded-before-preparation'};
+      return loadWorld(retryPass);
+    }
     if (activeWorldLoad) {
       if (activeWorldLoad.signature === signature) return activeWorldLoad.promise;
       if (activeWorldLoad.supersededBySignature !== signature) {
@@ -29,7 +33,14 @@ export function createWorldLoadCoordinator(options = {}) {
         .then(() => coordinatedLoad(0));
     }
 
-    const promise = Promise.resolve(loadWorld(0)).finally(() => {
+    const prepared = typeof options.prepareLoad === 'function' ? (async () => {
+      await options.prepareLoad();
+      // An asynchronous presentation release may outlive another selection.
+      // Let the queued request load its own destination without a duplicate reset.
+      if (signature !== getWorldLoadSignature()) return {aborted:true,reason:'superseded-before-preparation'};
+      return loadWorld(0);
+    })() : Promise.resolve(loadWorld(0));
+    const promise = prepared.finally(() => {
       if (activeWorldLoad?.promise === promise) activeWorldLoad = null;
     });
     activeWorldLoad = { signature, promise, supersededBySignature: '', terrainDrain: null };

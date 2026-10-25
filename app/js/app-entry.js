@@ -362,8 +362,9 @@ function registerLazySubsystemEntrypoints() {
     appCtx.scheduleActivityDiscoveryWarmup = scheduleActivityDiscoveryWarmup;
     appCtx.ensurePlatformService = ensurePlatformService;
     appCtx.openArExperience = async (request = {}) => {
-        if(appCtx.vrPresentation?.active){appCtx.showToast?.('Exit VR before opening AR.');return false;}
+        if(appCtx.getVrSnapshot?.().active){appCtx.showToast?.('Exit VR before opening AR.');return false;}
         const mod = await ensurePlatformService('augmented-reality');
+        if(appCtx.getVrSnapshot?.().active){appCtx.showToast?.('Exit VR before opening AR.');return false;}
         const platform = mod.initArPlatform?.(appCtx);
         return platform?.open?.(request) ?? false;
     };

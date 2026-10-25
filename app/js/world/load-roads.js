@@ -1167,6 +1167,7 @@ export function createWorldRoadLoader(deps = {}) {
 
   const { loadWorld: loadRoads } = createWorldLoadCoordinator({
     appCtx,
+    prepareLoad: () => appCtx.vrPresentation?.stop?.('world-loading'),
     admitRequest: () => {
       const accepted = !!createWorldLoadRequest(appCtx.resolveLocationSelection?.(), Number(appCtx._worldLoadSequence || 0) + 1);
       if (!accepted) appCtx.showToast?.('Choose a valid location. The current world has been kept.');

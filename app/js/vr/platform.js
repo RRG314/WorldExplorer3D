@@ -3,6 +3,7 @@ import {captureEnvironmentSession} from '../session-coordinator.js?v=2';
 import {createPhoneVrSession} from './phone-session.js';
 import {parseCardboardViewerUrl,validatePhoneOptics} from './phone-optics.js';
 import {getScreenLayoutService} from '../ui/screen-layout.js?v=2';
+import {createTrackedVrSession} from './xr-session.js';
 
 const STORAGE='we3d:vr-phone-optics:1';
 export function createVrPlatform(ctx,{target=window}={}){
@@ -11,8 +12,9 @@ export function createVrPlatform(ctx,{target=window}={}){
   let session=null,disposed=false;
   const dialog=doc.createElement('dialog');dialog.id='vrSetup';dialog.setAttribute('aria-labelledby','vrSetupTitle');
   dialog.innerHTML=`<form method="dialog"><button type="submit" class="vrClose" aria-label="Close VR setup">✕</button></form><p class="vrEyebrow">Optional · seated experience</p><h2 id="vrSetupTitle">Virtual reality</h2>
-    <p>Phone viewer mode provides stereo viewing and head rotation. It does not track your position. Your gamepad or keyboard controls the vehicle; looking around does not steer it.</p>
     <p>Stay seated in a clear space. Start with a stationary view. Look slightly down at the in-world Start, Recenter and Exit buttons for a moment to select them. You can also tap a viewer trigger while looking at a button.</p>
+    <section aria-labelledby="vrTrackedTitle"><h3 id="vrTrackedTitle">Tracked headset</h3><p>Use a headset browser with WebXR support. Head movement changes your view independently of the vehicle. You can select the in-world controls with a controller or pinch where supported.</p><p>With standard paired XR controllers: the left stick steers a car; the right trigger accelerates and the left trigger brakes. For aircraft, the left stick banks, the right stick pitches and the triggers change throttle. Release the controls before starting.</p><button id="vrStartTracked" type="button" disabled>Enter headset VR</button><p id="vrTrackedStatus" class="vrSmall" role="status">Checking headset support…</p></section>
+    <h3>Phone in a viewer</h3><p>Phone viewer mode provides stereo viewing and head rotation. It does not track your position. A gamepad or keyboard controls the vehicle; looking around does not steer it.</p>
     <button id="vrFullScreen" type="button">Use full screen before calibrating</button>
     <form id="vrCalibration"><h3>1. Measure your screen</h3><p>Turn the phone sideways. Adjust this line to match <b>50 mm on a ruler</b>, then use the measurement. Measure the active screen, not its outer case.</p>
       <div class="vrRuler"><div id="vrRulerLine" style="width:150px"></div></div><label>Calibration line width<input id="vrRulerWidth" type="range" min="60" max="320" value="150"></label><button id="vrMeasure" type="button">Use this measurement</button>
@@ -43,6 +45,25 @@ export function createVrPlatform(ctx,{target=window}={}){
   scope.listen(dialog,'close',()=>{if(session?.active&&!session.snapshot().started)session.stop('setup-closed');ctx.setPauseReason?.('vr-setup',false);ctx.screenLayout?.setPanelLayer?.('vr-setup',false);});
   const emergency=doc.createElement('button');emergency.id='vrEmergencyExit';emergency.type='button';emergency.textContent='Exit VR';emergency.hidden=true;doc.body.append(emergency);scope.defer(()=>emergency.remove());
   scope.listen(emergency,'click',()=>session?.stop('touch-exit'));
+  function exitHandler(initiated,reason){
+    if(disposed||session!==initiated)return;emergency.hidden=true;
+    if(!['user-exit','touch-exit','escape','session-ended'].includes(reason))ctx.showToast?.(reason==='motion-unavailable'?'Motion access is unavailable. Your normal controls are ready.':'VR ended because the view or travel mode changed. Your normal controls are ready.');
+  }
+  function begin(initiated,button,onAccepted){
+    session=initiated;button.disabled=true;
+    void initiated.start().then(accepted=>{
+      if(disposed||session!==initiated)return;
+      if(!accepted){status('VR was not started. You can try again or keep using normal controls.');return;}
+      onAccepted?.();emergency.hidden=false;dialog.close();
+    }).catch(error=>{initiated.stop('start-failed');if(!disposed&&session===initiated)status(error.message);}).finally(()=>{if(!disposed&&session===initiated)button.disabled=false;});
+  }
+  scope.listen(byId('vrStartTracked'),'click',()=>{
+    if(disposed||session?.active)return;
+    try{
+      let initiated;initiated=createTrackedVrSession({ctx,THREE:ctx.THREE||target.THREE,target,captureSession:captureEnvironmentSession,onExit:reason=>exitHandler(initiated,reason)});
+      begin(initiated,byId('vrStartTracked'));
+    }catch(error){status(error.message);}
+  });
   scope.listen(form,'submit',event=>{
     event.preventDefault();if(disposed)return;
     if(target.innerWidth<target.innerHeight){status('Turn your phone sideways, then measure and calibrate in that orientation.');return;}
@@ -56,17 +77,11 @@ export function createVrPlatform(ctx,{target=window}={}){
         lensDistance:number('lensDistance')/1000,lensSeparation:number('lensSeparation')/1000,lensY:number('lensY')/1000,
         fov:[0,1,2,3].map(index=>number('fov'+index)),distortion:[number('k1'),number('k2')]});
       const THREE=ctx.THREE||target.THREE;
-      session=createPhoneVrSession({ctx,THREE,optics,target,captureSession:captureEnvironmentSession,onExit:reason=>{
-        emergency.hidden=true;
-        if(reason!=='user-exit'&&reason!=='touch-exit'&&reason!=='escape')ctx.showToast?.(reason==='motion-unavailable'?'Motion access is unavailable. Your normal controls are ready.':'VR ended because the view or travel mode changed. Your normal controls are ready.');
-      }});
-      byId('vrStartPhone').disabled=true;
+      let initiated;initiated=createPhoneVrSession({ctx,THREE,optics,target,captureSession:captureEnvironmentSession,onExit:reason=>exitHandler(initiated,reason)});
       // start() requests permission synchronously in this click/submit gesture.
-      void session.start().then(accepted=>{
-        if(!accepted){status('Motion access was not enabled. You can try again or keep using normal controls.');return;}
+      begin(initiated,byId('vrStartPhone'),()=>{
         try{target.localStorage.setItem(STORAGE,JSON.stringify({optics,viewport:viewport()}));}catch{}
-        emergency.hidden=false;dialog.close();
-      }).catch(error=>{session?.stop('start-failed');status(error.message);}).finally(()=>byId('vrStartPhone').disabled=false);
+      });
     }catch(error){status(error.message);}
   });
   return Object.freeze({
@@ -74,7 +89,9 @@ export function createVrPlatform(ctx,{target=window}={}){
       if(disposed)return false;if(session?.active)return false;
       const layer=ctx.screenLayout?.snapshot?.().panelLayer;
       if(layer&&layer!=='vr-setup'){ctx.showToast?.('Close the current panel before opening VR setup.');return false;}
-      ctx.setPauseReason?.('vr-setup',true);ctx.screenLayout?.setPanelLayer?.('vr-setup',true);dialog.showModal();status(stored?'Check the saved calibration if your phone, viewer or orientation has changed.':'Measure your screen and match your viewer before entering.');return true;
+      ctx.setPauseReason?.('vr-setup',true);ctx.screenLayout?.setPanelLayer?.('vr-setup',true);dialog.showModal();status(stored?'Check the saved calibration if your phone, viewer or orientation has changed.':'Measure your screen and match your viewer before entering.');
+      const supported=target.isSecureContext&&target.navigator?.xr?.isSessionSupported?.('immersive-vr');
+      void Promise.resolve(supported).then(available=>{if(disposed)return;byId('vrStartTracked').disabled=!available;byId('vrTrackedStatus').textContent=available?'Headset VR is available. Your browser will ask before entering.':'No tracked headset is available in this browser. Phone viewer mode is separate.';}).catch(()=>{if(!disposed)byId('vrTrackedStatus').textContent='Headset support could not be checked. Normal play and phone viewer mode remain available.';});return true;
     },
     snapshot:()=>session?.snapshot()||{active:false,kind:null},
     dispose(){if(disposed)return;disposed=true;session?.stop('platform-disposed');ctx.setPauseReason?.('vr-setup',false);ctx.screenLayout?.setPanelLayer?.('vr-setup',false);scope.dispose('VR platform ended');}

@@ -87,15 +87,46 @@ Four phone-session cases and 23 affected core render cases pass (27 distinct;
 pause regression, fixed before browser verification. Browser failures from a
 transient tutorial and invalid test-form precision are retained.
 
-Tracked headset view conversion now has five math cases for physical translation,
-depth, repeated reads, parallel/canted-eye culling and invalid transforms. It is
-not connected to a WebXR session yet. Guided travel, separate space/ocean renderer
-handoffs, tracked session/input, native widgets and the remaining Portal product
-work are still required. Continue the active goal beyond this local commit.
+Tracked headset view conversion has five math cases for physical translation,
+depth, repeated reads, parallel/canted-eye culling and invalid transforms.
+Tracked WebXR now connects through the same main-world mounts and frame lease.
+It borrows r128 ArrayCamera/framebuffer interfaces explicitly rather than its
+metre/parallel-eye manager; the manager can complete async setup after native
+end. The adapter checks each compatibility/reference-space boundary, drains
+pending context compatibility before flat resume, and binds the compositor
+framebuffer only inside synchronous rendering with restoration in finally.
+No second simulation, pose writer or parallel flat callback. Existing quality
+selection bounds compositor resolution; physical headset pacing is unverified.
+
+Entry starts paused. Reference reset, lost pose/visibility, world/mode/actor
+replacement, cancellation, native end and late denied/granted permissions have
+seven session cases. Four input cases cover standard XR slots, neutral rearming,
+mode-specific actions, invalid/unknown input and merging into the existing action
+reader. Two gaze cases cover finite normalized world rays and the r128 triangle
+diagonal precision failure found in browser integration. Three world-load cases
+wait for presentation release, preserve invalid selections and reject a request
+superseded during that wait. Eleven existing load lifecycle cases and four
+existing standard-input/pause cases also pass. Focused reruns overlap.
+
+Controlled real WebGL canted-eye/DPR2 proof passes gaze Start, transient-pointer
+Exit, physical spacing, no GL/page/console errors and exact GPU/lifecycle return.
+The same actual Baltimore game journey now passes phone VR followed by tracked
+VR through its real UI, XR controller throttle through the normal reader, safe
+Exit, restored flat frame ownership and portrait return. Inspected stereo/city
+screenshots. The compositor boundary and poses are controlled fixtures; these
+are not native runtime, physical lenses, comfort or phone/headset performance
+acceptance. No signed native widget, qualified Portal world entry or release is
+claimed. Guided travel, separate space/ocean handoffs and native clients remain
+active work; continue beyond this local commit.
 Evidence: phone-game-first/ (failed), phone-game-second/ (failed),
 phone-game-third/ (behavior pass with visual defect), phone-game-layer-final/,
 phone-integration-contracts.tap (failed), phone-integration-fixed.tap,
 xr-views-first.tap, plus the earlier component receipts in the same folder.
+Tracked evidence: tracked-first.tap (two input boundary failures, corrected),
+tracked-input-final.tap, tracked-world-release.tap, tracked-gaze-final.tap,
+tracked-session-input-final.tap, tracked-webgl-final/ and
+vr-connected-game-first/. Intermediate failed gaze diagnostics are retained;
+normalization fixed the observed miss, not the underlying world content.
 
 ## October 25 Living Portal shared quality foundation
 

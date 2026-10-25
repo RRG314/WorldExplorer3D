@@ -61,6 +61,21 @@ test('invalid request cannot cancel an in-flight valid location or advance its g
   assert.equal((await owner.loadWorld()).aborted,true);assert.equal(cancelled,0);assert.equal(ctx._worldLoadSequence,5);
   release('published');assert.equal(await pending,'published');
 });
+test('presentation release finishes before reset and invalid admission never closes the current view',async()=>{
+  let release,prepares=0,loads=0,valid=true;
+  const barrier=new Promise(resolve=>release=resolve),owner=createWorldLoadCoordinator({appCtx:{},admitRequest:()=>valid,getWorldLoadSignature:()=> 'place',prepareLoad:()=>{prepares++;return barrier;},loadWorld:()=>++loads});
+  const pending=owner.loadWorld();assert.equal(prepares,1);assert.equal(loads,0);valid=false;assert.equal((await owner.loadWorld()).aborted,true);assert.equal(prepares,1);
+  valid=true;release();assert.equal(await pending,1);assert.equal(loads,1);
+});
+test('a replacement selected during presentation release loads only its own world once',async()=>{
+  let release,signature='first';const loads=[],barrier=new Promise(resolve=>release=resolve),ctx={_worldLoadSequence:1};
+  const owner=createWorldLoadCoordinator({appCtx:ctx,getWorldLoadSignature:()=>signature,prepareLoad:()=>barrier,loadWorld:()=>{loads.push(signature);return signature;}});
+  const first=owner.loadWorld();signature='second';const second=owner.loadWorld();release();assert.equal((await first).aborted,true);assert.equal(await second,'second');assert.deepEqual(loads,['second']);
+});
+test('failed presentation release leaves the world untouched and a later request can retry',async()=>{
+  let fail=true,loads=0;const owner=createWorldLoadCoordinator({appCtx:{},getWorldLoadSignature:()=> 'place',prepareLoad:async()=>{if(fail)throw Error('presentation not released');},loadWorld:()=>++loads});
+  await assert.rejects(owner.loadWorld(),/not released/);assert.equal(loads,0);fail=false;assert.equal(await owner.loadWorld(),1);
+});
 test('provider scope rejects admission after cancellation and joins delayed/rejected work',async()=>{
   const {deps}=setup();const session=createWorldLoadRuntimeSession(deps);let release,drained=false,started=0;
   const delayed=session.runProviderWork('slow','pending',()=>new Promise(r=>release=r));

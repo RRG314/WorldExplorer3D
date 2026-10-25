@@ -7,6 +7,7 @@ import {
 } from './mobile-touch-authority.js?v=6';
 import { carSpeedToMph } from '../physics/vehicle-speed-units.js?v=2';
 import { createVehicleTiltInput } from './vehicle-tilt-input.js?v=1';
+import {mergeXrActions} from '../vr/xr-input.js';
 import {
   keyMatchesKeyboardAction,
   keyboardActionPressed,
@@ -71,7 +72,7 @@ function normalizeMode(mode) {
 function connectedGamepad() {
   const pads = typeof navigator !== 'undefined' && navigator.getGamepads?.();
   if (!pads) return null;
-  return Array.from(pads).find((pad) => pad?.connected) || null;
+  return Array.from(pads).find((pad) => pad?.connected&&pad.mapping!=='xr-standard') || null;
 }
 
 function buttonValue(gamepad, index) {
@@ -231,7 +232,7 @@ function mergeMobileTouch(actions) {
 
 function readControlActions(mode = 'drive') {
   const normalizedMode = normalizeMode(mode);
-  const hardware = mergeGamepad(keyboardActions(normalizedMode), inputState.gamepad || connectedGamepad());
+  const hardware = mergeXrActions(mergeGamepad(keyboardActions(normalizedMode), inputState.gamepad || connectedGamepad()),appCtx.vrPresentation?.readActions?.(normalizedMode));
   const hardwareTurn = Math.abs(hardware.turn) > 0;
   const hardwareMove = Math.abs(hardware.move) > 0;
   const hardwareDriveSpeed = hardwareMove || hardware.throttle > 0 || hardware.reverse > 0 || hardware.brake > 0;

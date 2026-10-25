@@ -60,6 +60,43 @@ try{
   const after=await page.evaluate(async()=>({near:vrQa.camera.near,camMode:vrQa.camMode,vrScopes:(await import('/app/js/runtime/lifecycle-scope.js?v=2')).getLifecycleRegistrySnapshot().scopes.filter(row=>row.owner.startsWith('vr-phone-')||row.owner==='vr-gaze-controls')}));
   assert.equal(after.near,before.near);assert.equal(after.camMode,before.camMode);assert.deepEqual(after.vrScopes,[]);
   assert.equal(await page.locator('#controlsBarBtn').isVisible(),true,'Normal controls return after VR.');
+  if(process.env.WE3D_VERIFY_TRACKED==='1'){
+    await page.evaluate(async()=>{
+      const {installControlledXrRuntime}=await import('/scripts/verification/xr-runtime-fixture.js');
+      window.vrQaXr=installControlledXrRuntime({THREE:window.THREE,renderer:vrQa.renderer,width:1280,height:720,cant:.2});
+      await vrQa.openVrSettings();
+    });
+    await page.locator('#vrStartTracked:not([disabled])').waitFor();await page.locator('#vrStartTracked').click();
+    await page.waitForFunction(()=>vrQa.getVrSnapshot().kind==='tracked'&&vrQa.getVrSnapshot().started&&vrQa.screenLayout.snapshot().panelLayer==='vr');
+    report.tracked=await page.evaluate(async()=>{
+      const T=window.THREE,fixture=window.vrQaXr,start=performance.now();fixture.step(start);
+      const paused=vrQa.hasPauseReason('vr-user'),frameOwner=vrQa.getRuntimeFrameSourceSnapshot(),preview=document.createElement('img');preview.id='vrQaEyePreview';preview.className='vrMainCanvas';preview.style.cssText='position:fixed;inset:0;width:100%;height:100%;z-index:100000';preview.src=fixture.capture().image;document.body.append(preview);await preview.decode();
+      window.vrQaXrClock=start;return {paused,frameOwner,physicalScale:vrQa.getVrSnapshot().eyeSeparationWorld};
+    });
+    assert.equal(report.tracked.paused,true);assert.equal(report.tracked.frameOwner.owner,'webxr-vr');assert.ok(Math.abs(report.tracked.physicalScale-.064/1.11)<1e-8);
+    await page.screenshot({path:path.join(out,'city-tracked-paused.png')});
+    report.tracked.drive=await page.evaluate(async()=>{
+      const T=window.THREE,fixture=window.vrQaXr,look=x=>new T.Quaternion().setFromUnitVectors(new T.Vector3(0,0,-1),new T.Vector3(x,-.34,-1.5).normalize()).toArray();
+      for(let time=20;time<=1220;time+=20)fixture.step(vrQaXrClock+time,{quaternion:look(-.43)});
+      const started=!vrQa.hasPauseReason('vr-user'),before={x:vrQa.car.x,z:vrQa.car.z};
+      const source=handedness=>({handedness,targetRayMode:'tracked-pointer',gamepad:{mapping:'xr-standard',connected:true,axes:[0,0,0,0],buttons:[{value:0}]}});
+      fixture.session.inputSources=[source('left'),source('right')];fixture.step(vrQaXrClock+1240);fixture.session.inputSources[1].gamepad.buttons[0].value=.8;
+      for(let time=1260;time<=1460;time+=20)fixture.step(vrQaXrClock+time);
+      const actions=vrQa.readControlActions('drive'),distance=Math.hypot(vrQa.car.x-before.x,vrQa.car.z-before.z);fixture.session.inputSources[1].gamepad.buttons[0].value=0;
+      fixture.step(vrQaXrClock+1480);const preview=document.getElementById('vrQaEyePreview');preview.src=fixture.capture().image;await preview.decode();
+      return {started,distance,throttle:actions.throttle,steer:actions.steer,snapshot:vrQa.getVrSnapshot()};
+    });
+    assert.equal(report.tracked.drive.started,true);assert.equal(report.tracked.drive.throttle,.8);assert.equal(report.tracked.drive.steer,0);assert.ok(report.tracked.drive.distance>.001);
+    await page.screenshot({path:path.join(out,'city-tracked-driving.png')});
+    report.tracked.return=await page.evaluate(async()=>{
+      const T=window.THREE,fixture=window.vrQaXr,q=new T.Quaternion().setFromUnitVectors(new T.Vector3(0,0,-1),new T.Vector3(.43,-.34,-1.5).normalize()).toArray();
+      fixture.select({quaternion:q});await Promise.resolve();const active=vrQa.getVrSnapshot().active;await fixture.dispose();document.getElementById('vrQaEyePreview').remove();
+      const {getLifecycleRegistrySnapshot}=await import('/app/js/runtime/lifecycle-scope.js?v=2');
+      return {active,frameOwner:vrQa.getRuntimeFrameSourceSnapshot(),flatRunning:vrQa.getRuntimeKernelSnapshot().running,scopes:getLifecycleRegistrySnapshot().scopes.filter(row=>row.owner==='vr-tracked-session'||row.owner==='runtime-frame:webxr-vr'||row.owner==='vr-gaze-controls')};
+    });
+    assert.equal(report.tracked.return.active,false);assert.equal(report.tracked.return.frameOwner.active,false);assert.equal(report.tracked.return.flatRunning,true);assert.deepEqual(report.tracked.return.scopes,[]);
+    report.checks.push('The same city enters tracked VR through the actual UI with controlled compositor poses: canted eye views, gaze Start, XR controller throttle through the normal action reader, transient-pointer Exit and restored flat frame ownership. This is not a physical headset runtime.');
+  }
   await page.setViewportSize({width:390,height:844});await page.waitForTimeout(200);await page.screenshot({path:path.join(out,'flat-portrait-return.png')});
   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
   report.checks.push('Gaze exit releases phone VR resources and restores camera settings and a portrait game view.');

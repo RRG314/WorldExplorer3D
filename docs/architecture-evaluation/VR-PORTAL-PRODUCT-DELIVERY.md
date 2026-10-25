@@ -134,6 +134,42 @@ acceptance. Continue implementation after the local commit.
   Tracked sessions/input, guidance, other renderer domains and native clients
   remain active product work. Continue after committing this connected slice.
 
+- Tracked VR: actual WebXR permission and local reference-space entry, explicit
+  renderer ArrayCamera/framebuffer adapter, calibrated physical head movement,
+  native compositor frames through the existing kernel lease and no flat RAF
+  alongside it. Async context-compatibility work drains on cancellation before
+  flat resume; reference setup cannot adopt after native end. Standard paired
+  XR controller actions merge through the ordinary reader with neutral rearming.
+  Gaze, tracked-pointer and transient pinch-style selection share in-world UI.
+  No hand-joint feature permission is requested just for base select events.
+  Main world load waits for presentation release; superseded requests do not
+  perform duplicate resets. Existing quality choice controls layer scale.
+- Tracked verification: seven lifecycle, four input, two gaze and three async
+  world-preparation cases; 11 affected existing load and four standard-input/
+  pause cases pass. Earlier five view-math cases remain applicable. Real WebGL
+  canted views at DPR2 pass physical spacing, gaze Start, pointer Exit, exact
+  resource return and no GL/page/console errors. Initial input rounding failure
+  fixed by clamping. Browser gaze diagnostics traced an ulp-length quaternion
+  ray miss at a shared triangle diagonal; normalized world rays fix it, with a
+  focused regression. Failed evidence is preserved, including an initially
+  incorrect preview canvas that showed the flat buffer instead of XR pixels.
+- Connected city verification now covers phone followed by tracked VR in one
+  Baltimore load. Actual UI entry, gaze Start, native-source controller throttle
+  through the real car owner, transient-pointer Exit, no extra frame owner and
+  portrait return pass. Inspected both city eye views and return images; no
+  page/console/resource errors. The compositor/session boundary is a controlled
+  fixture and does not qualify a physical runtime or performance/comfort.
+  Evidence: tracked-webgl-final/, vr-connected-game-first/, tracked-first.tap,
+  tracked-input-final.tap, tracked-world-release.tap, tracked-gaze-final.tap,
+  tracked-session-input-final.tap. Native widgets, guided routes, safe qualified
+  Portal entry, space/ocean presentation and physical acceptance remain active.
+
+Tracked adapter primary sources:
+https://raw.githubusercontent.com/mrdoob/three.js/r128/src/renderers/WebGLRenderer.js,
+https://raw.githubusercontent.com/mrdoob/three.js/r128/src/renderers/webgl/WebGLState.js,
+https://immersive-web.github.io/webxr/#dom-xrsession-updaterenderstate,
+https://immersive-web.github.io/webxr-gamepads-module/#xr-standard-gamepad-mapping.
+
 Additional primary source evidence used in implementation:
 https://github.com/googlevr/cardboard/blob/master/proto/cardboard_device.proto,
 https://github.com/googlevr/cardboard/blob/master/sdk/lens_distortion.cc,
