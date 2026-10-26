@@ -64,17 +64,28 @@ printf '%s\n' "$APPLE_SIMULATOR" > apple-portal-evidence/owned-simulator.txt
 xcrun simctl boot "$APPLE_SIMULATOR"
 xcrun simctl bootstatus "$APPLE_SIMULATOR" -b > "$APPLE_PRIVATE/boot.log" 2>&1
 xcodebuild build-for-testing -project apple/WorldExplorerPortal.xcodeproj -scheme WorldExplorerPortal -configuration Debug -destination "id=$APPLE_SIMULATOR" -derivedDataPath "$RUNNER_TEMP/we3d-apple-derived" -clonedSourcePackagesDirPath "$RUNNER_TEMP/we3d-apple-packages" -disableAutomaticPackageResolution CODE_SIGN_IDENTITY=- > "$APPLE_PRIVATE/build.log" 2>&1
-xcodebuild test-without-building -project apple/WorldExplorerPortal.xcodeproj -scheme WorldExplorerPortal -configuration Debug -destination "id=$APPLE_SIMULATOR" -derivedDataPath "$RUNNER_TEMP/we3d-apple-derived" -resultBundlePath "$APPLE_PRIVATE/Portal.xcresult" -parallel-testing-enabled NO CODE_SIGN_IDENTITY=- > "$APPLE_PRIVATE/test.log" 2>&1
+APPLE_JOURNEY=()
+if test "${WE3D_PORTAL_APPLE_WIDGET_ONLY:-false}" = true; then APPLE_JOURNEY=(-only-testing:PortalUITests/PortalUITests/testHomeScreenWidget); fi
+APPLE_UI_STATUS=0
+xcodebuild test-without-building -project apple/WorldExplorerPortal.xcodeproj -scheme WorldExplorerPortal -configuration Debug -destination "id=$APPLE_SIMULATOR" -derivedDataPath "$RUNNER_TEMP/we3d-apple-derived" -resultBundlePath "$APPLE_PRIVATE/Portal.xcresult" -parallel-testing-enabled NO "${APPLE_JOURNEY[@]}" CODE_SIGN_IDENTITY=- > "$APPLE_PRIVATE/test.log" 2>&1 || APPLE_UI_STATUS=$?
 # Run only the added SDK journey when an owned short-lived identity is present.
 # Reuse this exact build and simulator; do not restart the offline UI sequence.
+APPLE_LIVE_STATUS=not-requested
 if test -n "${WE3D_PORTAL_APPLE_ACCEPTANCE:-}"; then
     xcrun simctl terminate "$APPLE_SIMULATOR" io.worldexplorer3d.app.staging >/dev/null 2>&1 || true
     APPLE_CONTAINER=$(xcrun simctl get_app_container "$APPLE_SIMULATOR" io.worldexplorer3d.app.staging data)
-    test -d "$APPLE_CONTAINER/Documents"
+    mkdir -p "$APPLE_CONTAINER/Documents"
     umask 077
     printf '%s' "$WE3D_PORTAL_APPLE_ACCEPTANCE" > "$APPLE_CONTAINER/Documents/native-acceptance.json"
     unset WE3D_PORTAL_APPLE_ACCEPTANCE
-    xcodebuild test-without-building -project apple/WorldExplorerPortal.xcodeproj -scheme WorldExplorerPortal -configuration Debug -destination "id=$APPLE_SIMULATOR" -derivedDataPath "$RUNNER_TEMP/we3d-apple-derived" -resultBundlePath "$APPLE_PRIVATE/NativeLive.xcresult" -parallel-testing-enabled NO -only-testing:PortalTests/PortalNativeLiveTests CODE_SIGN_IDENTITY=- > "$APPLE_PRIVATE/native-live.log" 2>&1
+    APPLE_LIVE_STATUS=0
+    xcodebuild test-without-building -project apple/WorldExplorerPortal.xcodeproj -scheme WorldExplorerPortal -configuration Debug -destination "id=$APPLE_SIMULATOR" -derivedDataPath "$RUNNER_TEMP/we3d-apple-derived" -resultBundlePath "$APPLE_PRIVATE/NativeLive.xcresult" -parallel-testing-enabled NO -only-testing:PortalTests/PortalNativeLiveTests CODE_SIGN_IDENTITY=- > "$APPLE_PRIVATE/native-live.log" 2>&1 || APPLE_LIVE_STATUS=$?
     rm "$APPLE_CONTAINER/Documents/native-acceptance.json"
 fi
-printf '%s\n' 'Native iOS simulator checks passed. This is not physical iPhone, App Attest, WidgetKit Home Screen, TestFlight or headset acceptance.' > apple-portal-evidence/scope.txt
+python3 - "$APPLE_UI_STATUS" "$APPLE_LIVE_STATUS" "${WE3D_PORTAL_APPLE_WIDGET_ONLY:-false}" <<'PY'
+import json,sys
+from pathlib import Path
+Path('apple-portal-evidence/journey-status.json').write_text(json.dumps({'uiExitCode':int(sys.argv[1]),'uiScope':'Home Screen widget only' if sys.argv[3]=='true' else 'Native app and Home Screen widget','nativeSDKExitCode':None if sys.argv[2]=='not-requested' else int(sys.argv[2]),'scope':'Owned iOS simulator. Controlled HTTP browser role and temporary debug attestation for requested SDK check. Not physical iPhone, App Attest, TestFlight or headset acceptance.'},indent=2)+'\n')
+PY
+test "$APPLE_UI_STATUS" = 0
+test "$APPLE_LIVE_STATUS" = not-requested || test "$APPLE_LIVE_STATUS" = 0

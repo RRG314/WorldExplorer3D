@@ -3,6 +3,10 @@ name: Apple Portal native acceptance
 on:
   workflow_dispatch:
     inputs:
+      widget_only:
+        description: Run the Home Screen widget journey and reuse accepted app checks
+        type: boolean
+        default: false
       native_live:
         description: Exercise native SDK ownership with the owned temporary staging identity
         type: boolean
@@ -36,6 +40,7 @@ jobs:
       - name: Build and exercise the native app in one owned simulator
         env:
           WE3D_PORTAL_APPLE_ACCEPTANCE: ${{ inputs.native_live && secrets.WE3D_PORTAL_APPLE_ACCEPTANCE || '' }}
+          WE3D_PORTAL_APPLE_WIDGET_ONLY: ${{ inputs.widget_only }}
         run: bash scripts/verification/apple-portal.sh
       - name: Retain bounded diagnostics, pins and native screenshots
         if: always()
