@@ -1,9 +1,10 @@
 import {execFileSync} from 'node:child_process';
+import {readFileSync} from 'node:fs';
 
 // The public source tree contains product code, source assets, licenses,
 // dependency locks, useful tests and contributor documentation. Operator notes
 // and generated diagnostic evidence belong in private/ignored storage.
-const privateRoots=['docs/architecture-evaluation/','docs/audits/','docs/product-audit/',
+const privateRoots=['docs/architecture-evaluation/','docs/audits/','docs/product-audit/','docs/aquarium-expansion/evidence/',
   'docs/system-review/','docs/verification/','docs/release-review/','docs/visual-quality/',
   'scripts/architecture-evaluation/'];
 const sourceExceptions=new Set([
@@ -14,6 +15,8 @@ const sourceExceptions=new Set([
   'scripts/architecture-evaluation/tooling/package-lock.json'
 ]);
 const localOnly=new Set(['AGENTS.md','CURRENT-STATE.md','progress.md',
+  ...['BASELINE','CHANGE-LEDGER','FINAL-REPORT','VERIFICATION'].map(name=>`docs/architecture-consolidation/${name}.md`),
+  'docs/aquarium-expansion/FINAL-REPORT.md','docs/aquarium-expansion/VERIFICATION.md',
   'docs/streets/baseline-probes.json','docs/streets/street-system-inventory.json',
   'scripts/verification/deploy-portal-staging.mjs',
   'scripts/verification/portal-native-ci-identity.mjs',
@@ -30,5 +33,11 @@ const rejected=files.filter(file=>{
     /\.(jks|keystore|p8|p12|pfx|mobileprovision|apk|aab|ipa|xcresult|heapsnapshot)$/i.test(file)||
     /(^|\/)\.env(?:\.[^/]*)?$/.test(file)&&!file.endsWith('/.env.example')&&file!=='.env.example';
 });
+// Public contributor/design documentation must be portable. A personal checkout
+// path is operator metadata, not a reference another contributor can use.
+for(const file of files){
+  if(rejected.includes(file)||!(/^(?:docs\/.*|README|CONTRIBUTING|ATTRIBUTION).*\.(?:md|json)$/.test(file)))continue;
+  if(/\/(?:Users|home)\/[^/\s`"']+\/(?:Documents|Developer|\.codex)\//.test(readFileSync(file,'utf8')))rejected.push(file);
+}
 if(rejected.length){console.error(JSON.stringify({passed:false,unpublishablePaths:rejected},null,2));process.exitCode=1;}
-else console.log(JSON.stringify({passed:true,trackedFiles:files.length,scope:'Tracked paths only. Content secrets are checked independently by Gitleaks.'}));
+else console.log(JSON.stringify({passed:true,trackedFiles:files.length,scope:'Tracked paths and public documentation portability. Content secrets are checked independently by Gitleaks.'}));

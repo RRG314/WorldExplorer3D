@@ -13,7 +13,7 @@ The acquired art remains a species illustration with the documented shark
 detail limitation. No artist file, source texture or animation was replaced in
 this continuation, and no aquarium building model was approved.
 
-[Fresh GitHub metadata](evidence/2026-10-13-source-refresh.json) confirms all five
+[Fresh GitHub metadata](SOURCE-PROVENANCE.json) confirms all five
 reviewed heads/push dates below are unchanged. Explicit repository license files
 were rechecked: jamisonhill's LICENSES.md states MIT, polyfish's LICENSE states
 MIT, and no root code-license grant was established for the other three.

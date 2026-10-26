@@ -1,0 +1,93 @@
+{
+  "schemaVersion": 1,
+  "reviewDate": "2026-10-13",
+  "scope": "Pinned public source and license references from the October 13 review; not current runtime or release verification.",
+  "attribution": "https://www.openstreetmap.org/copyright",
+  "repositories": [
+    {
+      "repository": "jamisonhill/aquarium",
+      "url": "https://github.com/jamisonhill/aquarium",
+      "head": "2a6e16ce5df82b858183c02624d2ac5e605faec5",
+      "pushedAt": "2026-07-26T04:48:37Z",
+      "metadataLicense": null,
+      "rootLicenseFiles": [
+        "LICENSES.md"
+      ]
+    },
+    {
+      "repository": "unclemattmakes/polyfish",
+      "url": "https://github.com/unclemattmakes/polyfish",
+      "head": "2223904b7c3935984f52570c2dc109cf98fc42f6",
+      "pushedAt": "2026-09-10T03:33:31Z",
+      "metadataLicense": "MIT",
+      "rootLicenseFiles": [
+        "LICENSE"
+      ]
+    },
+    {
+      "repository": "Nihdao/three-aquarium-challenge",
+      "url": "https://github.com/Nihdao/three-aquarium-challenge",
+      "head": "aafa3bf67421a267f743ea68e364d5ca8234bc28",
+      "pushedAt": "2025-09-09T11:12:17Z",
+      "metadataLicense": null,
+      "rootLicenseFiles": []
+    },
+    {
+      "repository": "KaleabBantayehu/threejs-virtual-aquarium",
+      "url": "https://github.com/KaleabBantayehu/threejs-virtual-aquarium",
+      "head": "7cdec73ff44f4dc0e2ae2acddfd34a0d7087b5cb",
+      "pushedAt": "2026-06-13T14:21:07Z",
+      "metadataLicense": null,
+      "rootLicenseFiles": []
+    },
+    {
+      "repository": "meghprkh/webgl-aquarium",
+      "url": "https://github.com/meghprkh/webgl-aquarium",
+      "head": "758b0b6742f10381e427b0e4adffd7a253e47941",
+      "pushedAt": "2020-11-23T21:10:58Z",
+      "metadataLicense": null,
+      "rootLicenseFiles": []
+    }
+  ],
+  "mapping": [
+    {
+      "url": "https://api.openstreetmap.org/api/0.6/relation/14162263.json",
+      "type": "relation",
+      "id": 14162263,
+      "version": 4,
+      "lat": null,
+      "lon": null,
+      "tags": {
+        "building": "yes",
+        "ele": "1",
+        "layer": "1",
+        "name": "National Aquarium",
+        "type": "multipolygon"
+      }
+    },
+    {
+      "url": "https://api.openstreetmap.org/api/0.6/relation/14162358.json",
+      "type": "relation",
+      "id": 14162358,
+      "version": 3,
+      "lat": null,
+      "lon": null,
+      "tags": {
+        "building": "yes",
+        "name": "Marine Mammal Pavilion",
+        "type": "multipolygon"
+      }
+    },
+    {
+      "url": "https://api.openstreetmap.org/api/0.6/node/4390760200.json",
+      "type": "node",
+      "id": 4390760200,
+      "version": 2,
+      "lat": 39.2854979,
+      "lon": -76.608518,
+      "tags": {
+        "entrance": "yes"
+      }
+    }
+  ]
+}

@@ -85,10 +85,9 @@ results. Choosing “need more evidence” can be correct and must not punish ho
 
 ## Reuse the existing Collision Lab
 
-Inspected project: `/Users/stevenreid/Documents/ChatGPT/lhc game`, package
-`collision-lab` **0.7.0**, Three.js **0.186.0**. All project files are currently
-untracked in that repository. Read-only inspection preserves them; do not move,
-clean, commit or overwrite that project as an integration shortcut.
+A separate local Collision Lab reference project uses package `collision-lab`
+**0.7.0** and Three.js **0.186.0**. Its source is maintained separately from this
+repository; importing it requires a reviewed integration.
 
 Reuse candidates verified in source:
 
