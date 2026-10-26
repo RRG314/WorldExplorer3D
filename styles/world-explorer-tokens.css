@@ -30,6 +30,7 @@
   --wx-text-scale: 1;
   --wx-type-body: calc(1rem * var(--wx-text-scale));
   --wx-type-control: calc(.875rem * var(--wx-text-scale));
+  --wx-type-navigation: calc(.8125rem * var(--wx-text-scale));
   --wx-type-meta: calc(.75rem * var(--wx-text-scale));
   --wx-space-1: 4px;
   --wx-space-2: 8px;

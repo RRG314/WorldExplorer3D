@@ -445,122 +445,6 @@ body:has(#propertyPanel.show) #worldQuickControls { display: none !important; }
 }
 #minimapZoomControls { left: 186px; bottom: 22px; }
 .minimapZoomBtn, #minimapZoomLevel { border-radius: 0; }
-.floatMenuContainer {
-  left: 260px;
-  right: 310px;
-  bottom: 14px;
-  width: auto;
-  max-width: 760px;
-  margin: 0 auto;
-  transform: none;
-  display: none;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 0;
-  background: var(--wx-panel);
-  border: 1px solid var(--wx-line);
-}
-.floatMenuContainer.show { display: grid; }
-.floatMenuRow { display: contents; }
-.floatMenu { min-width: 0; }
-.contextualMenuControl {
-  position: absolute;
-  right: -58px;
-  bottom: 0;
-  width: 50px;
-}
-.contextualMenuControl .floatBtn {
-  width: 50px;
-  min-width: 50px;
-  border: 1px solid var(--wx-line);
-  background: var(--wx-panel);
-}
-.contextualMenuControl .btnText { display: none; }
-.contextualMenuControl .floatBtn::after {
-  content: 'Controls';
-  display: block;
-  color: inherit;
-  font: 600 var(--wx-type-meta)/1.2 var(--wx-font-ui);
-  text-transform: uppercase;
-}
-.floatBtn {
-  height: 66px;
-  padding: 7px 4px;
-  flex-direction: column;
-  gap: 5px;
-  color: var(--wx-muted) !important;
-  background: transparent;
-  border: 0;
-  border-right: 1px solid var(--wx-line-soft);
-  border-bottom: 3px solid transparent;
-  border-radius: 0;
-  box-shadow: none;
-  font-size: 10px;
-}
-.floatBtn:hover, .floatBtn:focus-visible, .floatMenu.open .floatBtn { color: var(--wx-text) !important; background: rgb(238 201 107 / 0.1); border-bottom-color: var(--wx-blue); transform: none; box-shadow: none; }
-.floatBtn:focus-visible { outline: 1px solid rgba(126,181,255,.82); outline-offset: -2px; }
-body.deflock-active .floatMenuContainer {
-  left: 300px;
-  right: 300px;
-  max-width: 440px;
-}
-body.deflock-active .floatBtn { height: 46px; padding: 4px 3px; gap: 2px; }
-body.deflock-active .btnIcon { font-size: 17px; }
-body.deflock-active .btnText { display: none; }
-body.deflock-active .floatBtn::after {
-  content: attr(data-mobile-label);
-  display: block;
-  color: inherit;
-  font: 600 8px/1 Orbitron,sans-serif;
-  text-transform: uppercase;
-}
-.btnIcon { display: block; width: auto; height: auto; font-size: 23px; line-height: 1; color: inherit; filter: grayscale(1) brightness(2); }
-.btnText { display: block; color: inherit; font: 600 9px/1 var(--wx-font-ui); text-transform: uppercase; }
-.floatItems {
-  top: 88px;
-  right: 0;
-  bottom: 0;
-  width: 292px;
-  min-width: 292px;
-  max-width: 292px;
-  max-height: none;
-  padding: 58px 16px 16px;
-  gap: 0;
-  box-sizing: border-box;
-  background: var(--wx-panel);
-  border-left: 1px solid var(--wx-line-soft);
-  overflow-y: auto;
-}
-.floatItems::before { content: attr(data-menu-title); position: absolute; top: 20px; left: 16px; right: 16px; padding-bottom: 12px; color: var(--wx-blue); border-bottom: 1px solid var(--wx-line-soft); font: 600 10px/1 var(--wx-font-ui); }
-.floatItems:not([data-menu-title])::before { content: 'SYSTEM CONTROLS'; }
-.floatItem {
-  width: 100%;
-  min-height: 54px;
-  box-sizing: border-box;
-  display: flex;
-  align-items: center;
-  padding: 0 12px;
-  color: var(--wx-text);
-  background: transparent;
-  border: 0;
-  border-bottom: 1px solid var(--wx-line-soft);
-  border-radius: 0;
-  box-shadow: none;
-  font: 600 11px/1.3 var(--wx-font-ui);
-  text-align: left;
-  cursor: pointer;
-}
-.floatItem:hover, .floatItem.on { color: var(--wx-text); background: rgb(238 201 107 / 0.12); transform: none; box-shadow: inset 4px 0 var(--wx-blue); }
-.floatItemSection {
-  padding: 18px 12px 8px;
-  color: var(--wx-blue);
-  border-bottom: 1px solid var(--wx-line-soft);
-  font: 600 9px/1 var(--wx-font-ui);
-  letter-spacing: 0.1em;
-}
-#communityMenu .floatItems, #backpackMenu .floatItems, #exploreMenu .floatItems, #travelMenu .floatItems, #realEstateMenu .floatItems { padding-bottom: 18px; }
-#communityMenu .floatItemSection, #backpackMenu .floatItemSection, #exploreMenu .floatItemSection, #travelMenu .floatItemSection, #realEstateMenu .floatItemSection { padding-top: 16px; }
-#communityMenu .floatItemSection:first-of-type, #backpackMenu .floatItemSection:first-of-type, #exploreMenu .floatItemSection:first-of-type, #travelMenu .floatItemSection:first-of-type, #realEstateMenu .floatItemSection:first-of-type { padding-top: 4px; }
-#communityMenu .floatItem, #backpackMenu .floatItem, #exploreMenu .floatItem, #travelMenu .floatItem, #realEstateMenu .floatItem { min-height: 50px; }
 [hidden] { display: none !important; }
 .mainMenuBtn {
   top: 0;
@@ -583,7 +467,6 @@ body.deflock-active .floatBtn::after {
 #controlsTab.show { display: none; }
 #controlsTab.show.bar-open { display: block; }
 #ctrlHeader { display: none; color: var(--wx-blue); }
-#controlsBarBtn[aria-expanded="true"] { color: var(--wx-text) !important; background: rgb(238 201 107 / 0.1); box-shadow: inset 4px 0 var(--wx-blue); }
 
 /* Mobile play shell */
 @media (max-width: 760px), (pointer: coarse) {
@@ -652,66 +535,9 @@ body.deflock-active .floatBtn::after {
   #minimapZoomControls { display: none !important; }
   /* An expanded paint tool palette must remain reachable above the map. */
   #paintTownHud[data-paint-layout="expanded"] { top: calc(70px + env(safe-area-inset-top)) !important; z-index: 110 !important; max-height: calc(100dvh - 180px); overflow-y: auto; }
-  .floatMenuContainer {
-    left: 0;
-    right: 0;
-    bottom: 0;
-    width: 100%;
-    height: 78px;
-    transform: none;
-    max-width: none;
-    margin: 0;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
-    padding-bottom: env(safe-area-inset-bottom);
-    border-right: 0;
-    border-left: 0;
-  }
   #multiplayerMenu { position: relative; left: auto; bottom: auto; z-index: auto; }
-  .floatBtn { height: 78px; padding: 8px 2px 5px; }
-  .btnIcon { width: auto; height: auto; font-size: 23px; }
-  .btnText { display: none; }
-  .floatBtn::after { content: attr(data-mobile-label); display: block; color: inherit; font: 600 8px/1 var(--wx-font-ui); text-transform: uppercase; }
-  .floatItems {
-    top: auto;
-    left: 0;
-    right: 0;
-    bottom: calc(78px + env(safe-area-inset-bottom));
-    width: 100%;
-    min-width: 0;
-    max-width: none;
-    max-height: 46dvh;
-    padding: 48px 10px 10px;
-    grid-template-columns: 1fr 1fr;
-    transform: none;
-    border: 1px solid var(--wx-line);
-    border-radius: 0;
-  }
-  .floatMenu.open .floatItems { display: grid; }
-  .floatItem { min-height: 48px; padding: 8px; font-size: 9px; white-space: normal; }
-  .floatItemSection { grid-column: 1 / -1; padding: 10px 8px 6px; }
-  .floatItemSection:first-of-type { padding-top: 0; }
-  #communityMenu .floatItem, #backpackMenu .floatItem, #exploreMenu .floatItem, #travelMenu .floatItem, #realEstateMenu .floatItem { min-height: 48px; }
-  .contextualMenuControl {
-    right: 8px;
-    bottom: calc(86px + env(safe-area-inset-bottom));
-    width: 44px;
-    z-index: 4;
-  }
-  .contextualMenuControl .floatBtn {
-    width: 44px;
-    min-width: 44px;
-    height: 44px;
-    padding: 0;
-    border-radius: 50%;
-  }
-  .contextualMenuControl .btnIcon { font-size: 18px; }
-  .contextualMenuControl .btnText,
-  .contextualMenuControl .floatBtn::after { display: none; }
   #controlsTab, #memoryFlowerFloatBtn { display: none !important; }
   #controlsTab.bar-open { display: block !important; }
-  body.deflock-active .floatMenuContainer { left: 0; right: 0; height: 58px; max-width: none; }
-  body.deflock-active .floatBtn { height: 58px; padding: 5px 2px 3px; }
-  body.deflock-active .floatItems { bottom: calc(58px + env(safe-area-inset-bottom)); }
   body.deflock-active #minimap { width: min(145px,37vw); height: min(145px,37vw); }
   body.deflock-active #coords { top: calc(78px + min(145px,37vw) - 38px); width: min(145px,37vw); }
 }

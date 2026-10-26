@@ -33,7 +33,8 @@ export function setupEngineInputHandlers(appCtx) {
     const equipment = appCtx.urbanSandboxRuntime;
     const ownerEscape = e.code === 'Escape' && (
       appCtx.hasPauseReason?.('manual_pause') ||
-      (equipment?.equipmentOpen && equipment.equipmentUi?.root?.contains(e.target))
+      (equipment?.equipmentOpen && equipment.equipmentUi?.root?.contains(e.target)) ||
+      (appCtx.worldDiscoveryRuntime?.ui?.open && document.getElementById('discoveryPanel')?.contains(e.target))
     );
     if (isFormControl(e.target) && !ownerEscape) return;
     if (appCtx.hasPauseReason?.('reality_capture')) return;

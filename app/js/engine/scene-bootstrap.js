@@ -1,6 +1,6 @@
 import { installRenderLightUniformReuse } from './light-uniform-reuse.js';
 import { applyDisplayColorPolicy } from './display-color-policy.js';
-import { setupEngineInputHandlers } from "./input-handlers.js?v=16";
+import { setupEngineInputHandlers } from "./input-handlers.js?v=17";
 import { createVehicleHeadlightRig } from "./night-lighting.js?v=8";
 import { attachCuratedPlayerCar } from './curated-player-car.js?v=7';
 import { applyDirectionalShadowPolicy } from "./shadow-policy.js?v=2";

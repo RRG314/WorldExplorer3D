@@ -25,7 +25,7 @@ import './env.js?v=58';
 import './session-coordinator.js?v=2';
 import './planetary/scene-ownership.js?v=9';
 import './real-estate.js?v=55';
-import { init, tryEnablePostProcessing } from './engine.js?v=105';
+import { init, tryEnablePostProcessing } from './engine.js?v=106';
 import './physics.js?v=129';
 import './walking.js?v=98';
 import './travel-mode.js?v=29';
@@ -52,7 +52,7 @@ import './map.js?v=61';
 import { renderLoop } from './main.js?v=78';
 import './memory.js?v=55';
 import { setupUI } from './ui.js?v=174';
-import { initAccessibility } from './ui/accessibility.js?v=2';
+import { initAccessibility } from './ui/accessibility.js?v=3';
 
 let _booted = false;
 let _lastObservedAuthUser = null;

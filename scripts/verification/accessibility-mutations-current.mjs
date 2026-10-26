@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict';
 import { chromium } from 'playwright';
 import { startStaticServer } from './static-server.mjs';
+import {closeOwnedBrowser} from './owned-browser.mjs';
 const server = await startStaticServer({ rootDir: process.cwd(), ports: [4497, 4498] });
-const browser = await chromium.launch({ headless: true, channel: 'chrome' });
+const owned = await chromium.launchServer({ headless: true, channel: 'chrome' });
+const browser = await chromium.connect(owned.wsEndpoint());
 try {
   const page = await browser.newPage();
   await page.goto(`http://127.0.0.1:${server.port}/app/js/ui/accessibility.js`);
@@ -35,17 +37,23 @@ try {
     document.getElementById('last').focus();document.dispatchEvent(new KeyboardEvent('keydown',{key:'Tab',bubbles:true,cancelable:true}));
     const wrapped=document.activeElement.id;
     dialog.hidden=true;await tick();const restored=document.activeElement.id;
+    // A panel command normally hides its own menu before modal focus is read.
+    document.getElementById('controls').innerHTML='<div class="floatMenu"><button class="floatBtn" id="destinationButton">Backpack</button><div id="destinationChoices"><button id="journalCommand">Journal</button></div></div>';
+    await tick();document.getElementById('journalCommand').focus();
+    document.getElementById('destinationChoices').hidden=true;dialog.hidden=false;await tick();
+    dialog.hidden=true;await tick();const menuRestored=document.activeElement.id;
     // Ancestor visibility and a newly assigned dialog role both need handling.
     document.getElementById('dialogs').hidden=true;dialog.hidden=false;await tick();
     const hiddenAncestor=api.snapshot().activeModalId;
     document.getElementById('dialogs').hidden=false;await tick();const visibleAncestor=api.snapshot().activeModalId;
     dialog.remove();await tick();const removed=api.snapshot().activeModalId;
-    return {idle,semantics,opened,wrapped,restored,hiddenAncestor,visibleAncestor,removed};
+    return {idle,semantics,opened,wrapped,restored,menuRestored,hiddenAncestor,visibleAncestor,removed};
   });
   console.log(JSON.stringify(result));
   assert.deepEqual(result.idle,{layoutReads:0,documentScans:0},'HUD mutations must not rescan controls or measure unrelated dialogs');
   assert.deepEqual(result.semantics,{role:'button',tabIndex:0,pressed:'true',expanded:'true',clicks:1});
   assert.deepEqual(result.opened,{modal:'testDialog',focus:'first'});
   assert.equal(result.wrapped,'first');assert.equal(result.restored,'launch');
+  assert.equal(result.menuRestored,'destinationButton');
   assert.equal(result.hiddenAncestor,'');assert.equal(result.visibleAncestor,'testDialog');assert.equal(result.removed,'');
-} finally { await browser.close(); await server.close(); }
+} finally { await closeOwnedBrowser(owned); await server.close(); }

@@ -160,7 +160,13 @@ function initAccessibility() {
       activeModal = null;
       const target = restoreFocus;
       restoreFocus = null;
-      if (target instanceof HTMLElement && target.isConnected && visible(target)) target.focus({ preventScroll: true });
+      if (target instanceof HTMLElement && target.isConnected) {
+        // A destination command closes its menu before opening a panel. Return
+        // to that menu's visible button when the original command is hidden.
+        const menuButton = target.closest('.floatMenu')?.querySelector('.floatBtn');
+        const destination = [target, menuButton].find(visible);
+        destination?.focus({ preventScroll: true });
+      }
       return;
     }
     if (next) {

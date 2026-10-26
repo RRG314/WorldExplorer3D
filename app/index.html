@@ -27,20 +27,21 @@ if (location.protocol === 'file:') document.documentElement.classList.add('unsup
 <script src="../js/firebase-project-config.js"></script>
 <script type="module" src="../js/site-analytics.js?v=1"></script>
 <style>@layer legacy, interface;</style>
-<link rel="stylesheet" href="../styles/world-explorer-tokens.css?v=2">
+<link rel="stylesheet" href="../styles/world-explorer-tokens.css?v=3">
 <link rel="stylesheet" href="../styles/world-explorer-components.css?v=2">
-<link rel="stylesheet" href="styles/title-shell.css?v=95">
-<link rel="stylesheet" href="styles/runtime-shell.css?v=132">
+<link rel="stylesheet" href="styles/title-shell.css?v=96">
+<link rel="stylesheet" href="styles/runtime-shell.css?v=133">
 <link rel="stylesheet" href="styles/block-builder.css?v=9">
 <link rel="stylesheet" href="styles/universe.css?v=9">
 <link rel="stylesheet" href="styles/fishing-game.css?v=6">
-<link rel="stylesheet" href="styles/interface-v4.css?v=34">
+<link rel="stylesheet" href="styles/interface-v4.css?v=35">
 <link rel="stylesheet" href="styles/start-hub.css?v=22">
-<link rel="stylesheet" href="styles/discovery.css?v=20">
+<link rel="stylesheet" href="styles/navigation.css?v=1">
+<link rel="stylesheet" href="styles/discovery.css?v=21">
 <link rel="stylesheet" href="styles/backpack.css?v=1">
 <link rel="stylesheet" href="styles/tutorial.css?v=15">
 <link rel="stylesheet" href="styles/ar.css?v=1">
-<link rel="stylesheet" href="styles/mobile-controls.css?v=4">
+<link rel="stylesheet" href="styles/mobile-controls.css?v=5">
 <link rel="stylesheet" href="styles/map-explorer.css?v=4">
 <link rel="stylesheet" href="styles/accessibility.css?v=4">
 <link rel="stylesheet" href="styles/reality-capture.css?v=2">
@@ -828,9 +829,9 @@ How Connected Data Is Used
   <button id="currentJourneyAction" type="button">Open</button>
   <button id="currentJourneyDismiss" type="button" aria-label="Dismiss this notice" title="Dismiss">×</button>
 </aside>
-<aside id="discoveryPanel" aria-label="Explorer" aria-hidden="true">
+<aside id="discoveryPanel" role="dialog" aria-modal="true" aria-labelledby="discoveryPanelTitle" aria-hidden="true" tabindex="-1">
   <header class="discoveryHead">
-    <div class="discoveryIdentity"><span class="discoveryMark" aria-hidden="true">⌖</span><div><span class="discoveryEyebrow">WORLD EXPLORER</span><strong id="discoveryPanelTitle">Today</strong></div></div>
+    <div class="discoveryIdentity"><span class="discoveryMark" aria-hidden="true">⌖</span><div><span class="discoveryEyebrow">WORLD EXPLORER</span><h2 id="discoveryPanelTitle">Today</h2></div></div>
     <div class="discoveryHeadActions"><button id="discoveryProfileBtn" class="discoveryProfileBtn" type="button" aria-label="Open Explorer Profile" aria-pressed="false"><span id="discoveryProfileRank">Trailhead</span><b id="discoveryProfilePoints">0</b></button><button id="discoveryHelpBtn" type="button" aria-label="Show help for this section">?</button><button id="discoveryCloseBtn" type="button" aria-label="Minimize fieldwork" title="Minimize during play">—</button></div>
   </header>
   <div class="discoveryWorkspace">
@@ -1339,11 +1340,11 @@ How Connected Data Is Used
 <div id="poiCategory" style="font-size:11px;text-align:center;opacity:0.8;margin-bottom:8px">Education</div>
 <div id="poiDistance" style="font-size:12px;text-align:center;padding-top:8px;border-top:1px solid rgba(0,255,200,0.3)">50m ahead</div>
 </div>
-<div class="floatMenuContainer" id="floatMenuContainer">
+<nav class="floatMenuContainer" id="floatMenuContainer" aria-label="Game destinations">
 <!-- Stable player goals. Detailed controls stay inside their owning panels. -->
 <div class="floatMenu" id="exploreMenu">
-<button class="floatBtn explore" id="exploreBtn" type="button" aria-label="Open Explore" aria-expanded="false" data-mobile-label="Explore"><span class="btnIcon">⌖</span><span class="btnText">Explore</span></button>
-<div class="floatItems" data-menu-title="EXPLORE">
+<button class="floatBtn explore" id="exploreBtn" type="button" aria-label="Open Explore" aria-expanded="false" aria-controls="exploreChoices" data-mobile-label="Explore"><span class="btnIcon">⌖</span><span class="btnText">Explore</span></button>
+<div class="floatItems" id="exploreChoices" role="group" aria-label="Explore" data-menu-title="EXPLORE"><h2 class="floatMenuTitle">Explore</h2>
 <div class="floatItemSection" role="separator">FIELDWORK</div>
 <div class="floatItem" id="fWorldDiscovery">⌖ Today &amp; Nearby</div>
 <div class="floatItem" id="fLiveGps">📍 Explore with Live GPS</div>
@@ -1358,8 +1359,8 @@ How Connected Data Is Used
 </div>
 
 <div class="floatMenu" id="travelMenu">
-<button class="floatBtn travel" id="travelBtn" type="button" aria-label="Open Travel" aria-expanded="false" data-mobile-label="Travel"><span class="btnIcon">◈</span><span class="btnText">Travel</span></button>
-<div class="floatItems" data-menu-title="TRAVEL">
+<button class="floatBtn travel" id="travelBtn" type="button" aria-label="Open Travel" aria-expanded="false" aria-controls="travelChoices" data-mobile-label="Travel"><span class="btnIcon">◈</span><span class="btnText">Travel</span></button>
+<div class="floatItems" id="travelChoices" role="group" aria-label="Travel" data-menu-title="TRAVEL"><h2 class="floatMenuTitle">Travel</h2>
 <div class="floatItemSection" role="separator">MAP</div>
 <div class="floatItem" id="fWorldMap">🗺️ World Map &amp; Search</div>
 <div class="floatItemSection" role="separator">MOVE</div>
@@ -1382,8 +1383,8 @@ How Connected Data Is Used
 </div>
 
 <div class="floatMenu" id="backpackMenu">
-<button class="floatBtn backpack" id="backpackBtn" type="button" aria-label="Open Backpack" aria-expanded="false" data-mobile-label="Backpack"><span class="btnIcon">▣</span><span class="btnText">Backpack</span></button>
-<div class="floatItems" data-menu-title="BACKPACK">
+<button class="floatBtn backpack" id="backpackBtn" type="button" aria-label="Open Backpack" aria-expanded="false" aria-controls="backpackChoices" data-mobile-label="Backpack"><span class="btnIcon">▣</span><span class="btnText">Backpack</span></button>
+<div class="floatItems" id="backpackChoices" role="group" aria-label="Backpack" data-menu-title="BACKPACK"><h2 class="floatMenuTitle">Backpack</h2>
 <div class="floatItem" id="fBackpack">🎒 Items &amp; Quick Slots</div>
 <div class="floatItem" id="fExplorerJournal">≡ Journal</div>
 <div class="floatItem" id="fExplorerGuide">▤ Field Guide</div>
@@ -1392,8 +1393,8 @@ How Connected Data Is Used
 </div>
 
 <div class="floatMenu" id="communityMenu">
-<button class="floatBtn community" id="communityBtn" type="button" aria-label="Open Community" aria-expanded="false" data-mobile-label="Community"><span class="btnIcon">◎</span><span class="btnText">Community</span></button>
-<div class="floatItems" data-menu-title="COMMUNITY">
+<button class="floatBtn community" id="communityBtn" type="button" aria-label="Open Community" aria-expanded="false" aria-controls="communityChoices" data-mobile-label="Community"><span class="btnIcon">◎</span><span class="btnText">Community</span></button>
+<div class="floatItems" id="communityChoices" role="group" aria-label="Community" data-menu-title="COMMUNITY"><h2 class="floatMenuTitle">Community</h2>
 <div class="floatItem" id="fMultiplayer">👥 Multiplayer</div>
 <div class="floatItem" id="fCommunityBoard">◎ Rankings</div>
 <div class="floatItem" id="fMemoryFlower">🌸 Leave a Memory Marker</div>
@@ -1413,8 +1414,8 @@ How Connected Data Is Used
 </div>
 
 <div class="floatMenu" id="realEstateMenu">
-<button class="floatBtn realEstate" id="realEstateFloatBtn" type="button" aria-label="Open Build &amp; Home" aria-expanded="false" data-mobile-label="Build &amp; Home"><span class="btnIcon">⌂</span><span class="btnText">Build &amp; Home</span></button>
-<div class="floatItems" data-menu-title="BUILD &amp; HOME">
+<button class="floatBtn realEstate" id="realEstateFloatBtn" type="button" aria-label="Open Build &amp; Home" aria-expanded="false" aria-controls="realEstateChoices" data-mobile-label="Build &amp; Home"><span class="btnIcon">⌂</span><span class="btnText">Build &amp; Home</span></button>
+<div class="floatItems" id="realEstateChoices" role="group" aria-label="Build &amp; Home" data-menu-title="BUILD &amp; HOME"><h2 class="floatMenuTitle">Build &amp; Home</h2>
 <div class="floatItem" id="fQuickBuild">🧱 Build with Blocks</div>
 <div class="floatItem" id="fRealEstate">⌂ Homes &amp; Property</div>
 </div>
@@ -1438,7 +1439,7 @@ How Connected Data Is Used
 <div class="floatItem" id="fClouds">☁️ Clouds</div>
 <div class="floatItem" id="fConstellations">✨ Constellations</div>
 </div>
-</div>
+</nav>
 
 <div id="memoryComposer">
 <div class="memoryComposerTitle">Memory Marker</div>
@@ -1763,5 +1764,5 @@ How Connected Data Is Used
 <!-- Real Estate System -->
 <script type="module" data-startup-critical src="js/app-shell-fragments.js?v=91"></script>
 <script type="module" src="js/app-auth-shell.js?v=87"></script>
-<script type="module" data-startup-critical src="js/bootstrap.js?v=612"></script>
+<script type="module" data-startup-critical src="js/bootstrap.js?v=613"></script>
 </body></html>

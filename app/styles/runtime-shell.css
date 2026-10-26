@@ -130,7 +130,6 @@ body.live-gps-consent-open .analytics-consent-banner{visibility:hidden;pointer-e
 #liveGpsHud.show{display:block}.liveGpsHudTop{display:flex;align-items:center;justify-content:space-between;gap:8px;color:#70edf5}.liveGpsHudTop span{font-size:9px;color:#bddde1}#liveGpsStatus{margin:5px 0;color:#fff}.liveGpsMetrics{display:flex;justify-content:space-between;gap:8px;color:#acd2d8;font-size:9px}.liveGpsActions{display:flex;gap:5px;flex-wrap:wrap;margin-top:7px}.liveGpsActions button{flex:1 1 auto;padding:5px 7px;font-size:9px}
 #liveGpsHud[data-state="warning"]{border-color:#f4cb66}#liveGpsHud[data-state="recenter-ready"],#liveGpsHud[data-state="hard-pause"]{border-color:#ff9278}#liveGpsHud[data-state="recentering"]{border-color:#b89cff}
 body.deflock-active.live-gps-active #liveGpsHud{top:164px}
-.floatMenuContainer:has(.floatMenu.open),.floatMenu.open .floatItems{z-index:190}
 @media(max-width:760px){#liveGpsHud{top:var(--wx-live-gps-top,max(68px,calc(env(safe-area-inset-top) + 58px)));right:8px;width:min(180px,calc(100vw - 16px));padding:7px 8px;font-size:8.5px}.liveGpsMetrics{display:grid;gap:1px}.liveGpsActions{gap:4px}.liveGpsActions button{padding:6px 4px;font-size:7.5px}.liveGpsPermissionCard{padding:18px}.liveGpsPermissionActions{flex-direction:column-reverse}.liveGpsPermissionActions button{width:100%;min-height:42px}body.deflock-active.live-gps-active #liveGpsHud{top:max(158px,calc(env(safe-area-inset-top) + 150px))}}
 #loading{position:fixed;inset:0;background:#000 url('../../assets/landing/city.jpg') center center/cover no-repeat;display:none;align-items:flex-end;justify-content:center;z-index:20000;pointer-events:auto;padding:20px;padding-bottom:max(20px,env(safe-area-inset-bottom));overflow:auto;box-sizing:border-box;color:var(--wx-text);font-family:Inter,system-ui,sans-serif}
 #loading.show{display:flex}
@@ -460,8 +459,6 @@ body.creator-profile-open #tutorialHintCard{
 #proAccessStatus{min-height:16px;font-size:11px;color:#93c5fd}
 .pro-access-panel[hidden]{display:none!important}
 
-.floatItem.disabled{opacity:0.45;pointer-events:none}
-
 .mp-card{background:#f8fafc;border:2px solid #dbe5f5;border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:10px}
 .mp-title{font-family:'Poppins',sans-serif;font-size:14px;font-weight:700;color:#14532d}
 .mp-plan-state{font-size:12px;color:#334155;line-height:1.45}
@@ -555,14 +552,9 @@ body.creator-profile-open #tutorialHintCard{
 
 @media (pointer:coarse){
   #multiplayerMenu{position:relative;left:auto!important;bottom:auto!important;z-index:auto}
-  .floatBtn.multiplayer{width:100%;min-width:0;height:52px;border-radius:12px}
   #tutorialHintCard{right:max(6px,env(safe-area-inset-right))!important;bottom:max(330px,calc(env(safe-area-inset-bottom) + 322px))!important}
   body:has(.floatMenu.open) #tutorialHintCard{display:none!important}
   body:has(#interiorPrompt.show) #tutorialHintCard:not([data-tutorial-stage="move"]){display:none!important}
-  #multiplayerMenu.open .floatItems{
-    left:max(6px,env(safe-area-inset-left))!important;right:max(6px,env(safe-area-inset-right))!important;
-    bottom:max(78px,calc(env(safe-area-inset-bottom) + 78px))!important
-  }
 }
 
 .spaceFlightHud{position:fixed;top:max(70px,calc(env(safe-area-inset-top) + 58px));right:max(14px,env(safe-area-inset-right));z-index:10002;display:none;width:min(244px,calc(100vw - 28px));box-sizing:border-box;padding:12px;background:rgba(5,12,18,.94);border:1px solid rgba(157,174,186,.38);border-radius:3px;color:#f4f7f9;font-family:Inter,system-ui,sans-serif;font-size:11px;box-shadow:0 14px 38px rgba(0,0,0,.4);backdrop-filter:blur(10px)}
