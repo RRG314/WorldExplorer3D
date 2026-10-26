@@ -186,8 +186,8 @@ performance. No public Android production rollout or broad tester mailing occurr
 
 The selected-location default, optional world exploration controls, pre-community
 terms acceptance and persistent chat/invitation blocking are implemented and
-focused local checks passed. See `docs/verification/2026-10-24-LOCATION-DEFAULT-COMMUNITY.md`
-and the latest CURRENT-STATE section for exact scope and activation status.
+focused local checks passed. Exact run scope and activation status are retained
+in private operator records; source presence alone does not establish deployment.
 No native source changed: signed Android code 3 remains the reusable internal/
 closed-test binary; the TWA consumes the coordinated hosted web update.
 
@@ -241,9 +241,9 @@ The owner enabled extension file URL access and the unchanged signed version 4
 AAB was uploaded and published to internal testing on October 25 at 9:09 AM
 Eastern. Console confirms Available to internal testers. Code 3 is excluded;
 device support, tester selection and the existing opt-in URL are preserved. Google
-says updates usually appear within one hour and occasionally take longer. See
-`docs/verification/2026-10-25-ANDROID-LAUNCH-CRASH.md` and the October 25 CURRENT-STATE
-section. The native check now runs by default in Android test-package dispatches,
+says updates usually appear within one hour and occasionally take longer. The
+diagnostic record is retained privately. The native check runs by default in
+Android test-package dispatches,
 with bounded setup waits and screenshots/logs retained on failure. Its Node
 checker rejects the actual version 3 crash and silent home returns. Browser Helper
 and world/session/save authorities are preserved; no broad web sweep is needed.

@@ -193,6 +193,6 @@ Production promotion must use the verified staging game payload, changing only
 the three reviewed Firebase configuration assets. Commit identities, manifests,
 backend deployment evidence and the rollback plan must agree before promotion.
 
-[Current state](../CURRENT-STATE.md) ·
+[Verification policy](RELEASE_VALIDATION.md) ·
 [Release status](RELEASE_INTEGRATION_STATUS.md) ·
-[Candidate evidence](release-review/2026-10-14/READINESS.md)
+Candidate evidence (private operator record)

@@ -1,6 +1,6 @@
 # Contributing to World Explorer 3D
 
-Last reviewed: 2026-10-12
+Last reviewed: 2026-10-26
 
 Contribution workflow and minimum quality bars for this repository.
 
@@ -36,7 +36,7 @@ Canonical runtime source is `app/*`.
 Canonical landing/account sources are `index.html` and `account/index.html`. The separate `github-pages/` directory contains only the public project explainer.
 Firebase Hosting output is generated into ignored `dist/`; it is not a second source tree.
 
-Required before merge/deploy:
+Required before releasing runtime changes:
 
 ```bash
 npm run build:hosting -- --firebase-env staging
@@ -49,11 +49,13 @@ Do not retain superseded runtime modules: the reachability audit must report zer
 
 ## 4. Minimum Validation Before PR
 
-Required:
-
-1. `npm run release:verify` passes.
-2. Manual smoke for launch flows, geolocation path, and Earth/Ocean mode switching.
-3. No new blocking console/runtime errors in critical flows.
+Choose focused checks for the changed behavior. Use an actual browser journey
+when a runtime, input or UI change needs it; distinguish service doubles,
+emulation and physical devices. Retain a passing result while its source,
+configuration and environment remain applicable. Do not restart unrelated
+release sequences after a small repair. A complete release still needs its
+current package, affected services and representative gameplay checked together.
+Record failures and limitations honestly; a screenshot alone is not acceptance.
 
 If backend touched:
 
@@ -79,12 +81,34 @@ At minimum, review the affected public documents:
 Describe what changed, why it changed, how it was validated, and any remaining compatibility or deployment risk.
 
 Include screenshots for UI changes and logs for backend behavior changes.
+Share only reviewed, redacted evidence. Keep raw browser state and diagnostic
+logs outside the public Git tree.
 
 ## 7. Security and Secrets
 
 - never commit real secrets (`sk_live`, `whsec`, tokens)
 - use placeholders in docs/examples
 - keep billing/env values in runtime env, not source files
+- keep signing certificates with private keys, player records, raw evidence and
+  operator handoffs outside public Git; `.env.example` uses placeholders only
+- Firebase client IDs and client API keys are public app configuration, not
+  backend credentials; restrict them to their intended clients/services
+- run `node scripts/verification/public-repository-policy.mjs` before publishing
+  repository changes; CI checks this boundary as well as content secret scanning
+
+## Focused verification
+
+`npm run verify:boundary-types` uses TypeScript from the application toolchain
+when available, or the isolated pinned verification toolchain. To install the
+latter, copy `scripts/architecture-evaluation/tooling/package.json` and its lock
+to ignored `output/architecture-evaluation/tooling/`, then run
+`npm ci --prefix output/architecture-evaluation/tooling --no-audit --no-fund`.
+The lockfile is source; downloaded compilers and generated reports are not.
+
+Native Android and Apple projects keep source, public SDK configuration and
+dependency locks in Git. Their workflows build in owned emulators/simulators.
+Release signing material and temporary live-test identities stay outside Git;
+they must never enter screenshots, uploaded logs or build artifacts.
 
 ## 8. OSM-Facing Quality Bar
 

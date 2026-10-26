@@ -15,15 +15,15 @@
   "deferredAcceptanceClasses": {
     "physical-ios": {
       "reason": "No named iPhone memory, thermal and resume measurements were supplied; remains unverified.",
-      "ownerDecision": "docs/release-review/2026-10-08/OWNER-RELEASE-DECISION.md"
+      "ownerDecision": "docs/RELEASE_VALIDATION.md"
     },
     "physical-android": {
       "reason": "Owner reports the preview works on Android; named device and sustained memory, thermal and resume measurements remain unverified.",
-      "ownerDecision": "docs/release-review/2026-10-08/OWNER-RELEASE-DECISION.md"
+      "ownerDecision": "docs/RELEASE_VALIDATION.md"
     },
     "fresh-player": {
       "reason": "Owner reports testing; an independent uncoached new-player review remains unverified.",
-      "ownerDecision": "docs/release-review/2026-10-08/OWNER-RELEASE-DECISION.md"
+      "ownerDecision": "docs/RELEASE_VALIDATION.md"
     }
   },
   "executionGateRequirements": {

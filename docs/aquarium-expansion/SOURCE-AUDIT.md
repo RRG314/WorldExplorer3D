@@ -1,13 +1,13 @@
 # Aquarium integration audit
 
 Updated October 13, 2026. Current working source: `steven/visual-quality` in the
-architecture-evaluation worktree, confirmed by CURRENT-STATE.md. Initial museum checkpoint
+architecture-evaluation worktree, confirmed by local operator notes (not published). Initial museum checkpoint
 `f86c16513b95`. This is an implementation ledger, not a release certification.
 
 ## October 13 continuation
 
 The attached brief was read in a different, unrelated math checkout. Read-only
-discovery found older Documents and Developer checkouts; CURRENT-STATE.md in
+discovery found older Documents and Developer checkouts; local operator notes (not published) in
 the newer worktree explicitly resolves current repository/branch authority.
 No older checkout was edited. Existing uncommitted waterfront, exterior and
 transport repairs were preserved; they are separate work with their own ledger.

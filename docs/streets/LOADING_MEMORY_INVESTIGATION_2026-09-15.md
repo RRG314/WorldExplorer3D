@@ -24,7 +24,7 @@ These are saved browser measurements, re-examined against the current source. No
 
 Monaco includes the latest frontage-query pruning. The San Francisco recording predates that optimization; its 182-second load must not be presented as a measurement of the latest code. In that San Francisco session, a later flight snapshot reported 1.94 GB heap while scene geometry decreased to 302.0 MB. That is a reason to investigate retained objects and transient allocation, not proof of a geometry leak.
 
-Evidence: [Monaco startup](audit-2026-09-13/monaco-shared-grid-startup.json), [San Francisco startup](audit-2026-09-13/sf-bounded-support-startup.json), [San Francisco flight](audit-2026-09-13/sf-bounded-support-flight.json).
+Evidence: Monaco startup (private operator record), San Francisco startup (private operator record), San Francisco flight (private operator record).
 
 ## Why loading is slow
 
