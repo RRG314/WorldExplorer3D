@@ -46,7 +46,12 @@ final class PortalFirebase {
             // Firebase API-key Android restrictions require the actual package
             // certificate; the SDK supplies those headers to its own endpoints.
             byte[] bytes=body.toString().getBytes(StandardCharsets.UTF_8);http.setFixedLengthStreamingMode(bytes.length);try(OutputStream out=http.getOutputStream()){out.write(bytes);}
-            int status=http.getResponseCode();if(status!=200)throw new IllegalStateException(status==401||status==403?"The device could not verify its account. Reconnect when online.":status==409?"This connection or investigation changed. Reopen it and try again.":status==410?"This device connection expired. Start again.":"Sync is unavailable. Your choices are kept on this device.");
+            int status=http.getResponseCode();if(status!=200){
+                // Development diagnostics contain only the fixed API name and
+                // status, never response bodies, account IDs or credentials.
+                if(BuildConfig.DEBUG)android.util.Log.w("PortalService",endpoint+" returned HTTP "+status);
+                throw new IllegalStateException(status==401||status==403?"The device could not verify its account. Reconnect when online.":status==409?"This connection or investigation changed. Reopen it and try again.":status==410?"This device connection expired. Start again.":"Sync is unavailable. Your choices are kept on this device.");
+            }
             JSONObject result=new JSONObject(PortalStore.readBounded(http.getInputStream(),262144));if(!current.getAsBoolean())throw new InterruptedException("Device connection changed.");return result;
         }finally{http.disconnect();if(connection==http)connection=null;}
     }
