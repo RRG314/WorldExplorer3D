@@ -1,3 +1,4 @@
+import {updateControlInputFrame} from './controls/input-frame.js';
 import {createOceanStreamRuntime,oceanRenderFrame,oceanParentPosition,reprojectOceanPose} from './ocean/stream-runtime.js';
 import {normalizeOceanWaterContext,defaultOceanWaterContext} from './ocean/water-context.js';
 import {OCEAN_DEPTH_MODEL,normalizeOceanDepthProfile,oceanDepthProfileMatchesSite} from './ocean/depth-model.js';
@@ -636,6 +637,7 @@ function updateOceanStream(nowMs) {
 function animateOceanMode(nowMs = 0) {
   if (!oceanMode.active) return;
   oceanMode.animationId = oceanSessionScope?.animationFrame(animateOceanMode) ?? null;
+  updateControlInputFrame(appCtx, {timestamp: nowMs});
 
   if (!oceanMode.lastFrameMs) oceanMode.lastFrameMs = nowMs;
   const dt = appCtx.paused || globalThis.document?.hidden ? 0 : acceptedSimulationDelta((nowMs-oceanMode.lastFrameMs)/1000);

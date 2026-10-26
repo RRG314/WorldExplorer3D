@@ -1,5 +1,5 @@
 import { ctx as appCtx } from './shared-context.js?v=55';
-import { createCoreFrameSystems, createCoreRenderSystem, updateSuspendedFrameInput } from './runtime/core-frame-systems.js?v=12';
+import { createCoreFrameSystems, createCoreRenderSystem } from './runtime/core-frame-systems.js?v=13';
 import { createDebugPresentationSystem } from './runtime/debug-presentation.js?v=3';
 import { createRuntimeKernel } from './runtime/kernel.js?v=3';
 import { createRuntimeFrameSource } from './runtime/frame-source.js';
@@ -102,7 +102,10 @@ const runtimeKernel = createRuntimeKernel({
   }),
   isSuspended: dedicatedRendererActive,
   isSimulationPaused: () => appCtx.paused || globalThis.document?.hidden === true,
-  onSuspendedFrame: frame => updateSuspendedFrameInput(appCtx, frame),
+  onSuspendedFrame: ({ timestamp }) => {
+    appCtx.vrPresentation?.guard?.();
+    appCtx.lastTime = timestamp;
+  },
   onSystemError: ({ error, system }) => {
     appCtx.vrPresentation?.stop?.('runtime-error');
     console.error(`[runtime] System failed: ${system.id}`, error);

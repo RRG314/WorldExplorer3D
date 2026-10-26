@@ -1,26 +1,34 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import vm from 'node:vm';
+import {readFile} from 'node:fs/promises';
+import {parse} from '@babel/parser';
 import {createRuntimeKernel} from '../app/js/runtime/kernel.js?v=3';
-import {createCoreFrameSystems,updateSuspendedFrameInput} from '../app/js/runtime/core-frame-systems.js?v=12';
+import {createCoreFrameSystems} from '../app/js/runtime/core-frame-systems.js?v=13';
 import {dedicatedPresentationActive} from '../app/js/runtime/renderer-owners.js';
-function fixture(t){
- const calls=[];const ctx={gameStarted:true,spaceFlight:{active:false},oceanMode:{active:false},vrPresentation:{guard:()=>calls.push('guard'),beforeInput:()=>calls.push('before')},updateControlInput:()=>calls.push('input')};
- const kernel=createRuntimeKernel({now:()=>0,getContext:()=>({ctx}),isSuspended:()=>dedicatedPresentationActive(ctx),onSuspendedFrame:frame=>updateSuspendedFrameInput(ctx,frame)});
- kernel.registerSystem(createCoreFrameSystems(ctx).find(system=>system.id==='core.input'));
- kernel.registerSystem({id:'fixture-simulation',owner:'fixture',phase:'simulation',update:()=>calls.push('simulation')});
- t.after(()=>kernel.dispose());let timestamp=0;return {ctx,calls,kernel,step:()=>kernel.runFrame(timestamp+=20)};
-}
-test('one existing input frame continues across Earth, Space and Ocean without resuming suspended simulation',t=>{
- const {ctx,calls,step}=fixture(t);step();assert.equal(calls.filter(c=>c==='input').length,1);assert.ok(calls.includes('simulation'));calls.length=0;
- for(const mode of ['spaceFlight','oceanMode']){
-  ctx[mode].active=true;step();assert.deepEqual(calls,['guard','before','input']);assert.equal(ctx.lastTime,40+(mode==='oceanMode'?20:0));calls.length=0;ctx[mode].active=false;
- }
- step();assert.equal(calls.filter(c=>c==='input').length,1);assert.ok(calls.includes('simulation'));
+import {acceptedSimulationDelta} from '../app/js/runtime/simulation-clock.js';
+import {updateControlInputFrame} from '../app/js/controls/input-frame.js';
+function context(){const calls=[];const ctx={gameStarted:true,spaceFlight:{active:false},oceanMode:{active:false},vrPresentation:{beforeInput:()=>calls.push('before')},updateControlInput:()=>calls.push('input')};return {ctx,calls};}
+test('the existing Earth kernel polls once per active frame and yields input with dedicated presentation',t=>{
+ const {ctx,calls}=context();const kernel=createRuntimeKernel({now:()=>0,isSuspended:()=>dedicatedPresentationActive(ctx)});t.after(()=>kernel.dispose());kernel.registerSystem(createCoreFrameSystems(ctx).find(s=>s.id==='core.input'));
+ kernel.runFrame(0);assert.deepEqual(calls,['before','input']);calls.length=0;
+ for(const mode of ['spaceFlight','oceanMode']){ctx[mode].active=true;kernel.runFrame(20);assert.deepEqual(calls,[]);ctx[mode].active=false;}
+ kernel.runFrame(40);assert.deepEqual(calls,['before','input']);
 });
-test('dedicated presentation keeps readiness, AR and hidden-page boundaries, while a menu pause can refresh control visibility',t=>{
- const {ctx,calls,step}=fixture(t);ctx.spaceFlight.active=true;
- for(const field of ['worldLoading','titleLaunchPending','arSessionActive']){ctx[field]=true;step();assert.deepEqual(calls,['guard'],field);calls.length=0;ctx[field]=false;}
- ctx.gameStarted=false;step();assert.deepEqual(calls,['guard']);calls.length=0;ctx.gameStarted=true;
- ctx.paused=true;step();assert.deepEqual(calls,['guard','before','input']);calls.length=0;
- const saved=Object.getOwnPropertyDescriptor(globalThis,'document');try{globalThis.document={hidden:true};step();assert.deepEqual(calls,['guard']);}finally{if(saved)Object.defineProperty(globalThis,'document',saved);else delete globalThis.document;}
+test('the shared input boundary keeps readiness, AR and hidden-page guards while refreshing a menu pause',()=>{
+ const {ctx,calls}=context();for(const field of ['worldLoading','titleLaunchPending','arSessionActive']){ctx[field]=true;assert.equal(updateControlInputFrame(ctx,{}),false);ctx[field]=false;}
+ ctx.gameStarted=false;assert.equal(updateControlInputFrame(ctx,{}),false);ctx.gameStarted=true;assert.deepEqual(calls,[]);
+ ctx.paused=true;assert.equal(updateControlInputFrame(ctx,{}),true);assert.deepEqual(calls,['before','input']);calls.length=0;
+ const saved=Object.getOwnPropertyDescriptor(globalThis,'document');try{globalThis.document={hidden:true};assert.equal(updateControlInputFrame(ctx,{}),false);assert.deepEqual(calls,[]);}finally{if(saved)Object.defineProperty(globalThis,'document',saved);else delete globalThis.document;}
+});
+test('actual Space and Ocean callback prefixes poll once on fresh launch, through pause, without an Earth kernel',async()=>{
+ // Execute the real entry guards, scheduling and input statements in isolation.
+ // The remainder renders/advances its world and belongs to browser acceptance.
+ for(const [file,name,frame] of [['space/runtime.js','animateSpaceFlight','spaceFlight'],['ocean.js','animateOceanMode','oceanMode']]){
+  const source=await readFile(new URL('../app/js/'+file,import.meta.url),'utf8');const ast=parse(source,{sourceType:'module'});const fn=ast.program.body.map(n=>n.declaration||n).find(n=>n.type==='FunctionDeclaration'&&n.id.name===name);assert.ok(fn);
+  const statements=fn.body.body.filter(n=>n.type==='ExpressionStatement'&&n.expression.type==='CallExpression'&&n.expression.callee.name==='updateControlInputFrame');assert.equal(statements.length,1);const prefix=source.slice(fn.start,statements[0].end)+'\n}';
+  const {ctx,calls}=context();ctx[frame].active=true;ctx.paused=true;let scheduled=0;const schedule=()=>++scheduled;const bindings={acceptedSimulationDelta,appCtx:ctx,oceanMode:ctx.oceanMode,oceanSessionScope:{animationFrame:schedule},updateControlInputFrame,performance:{now:()=>1000},requestAnimationFrame:schedule};
+  vm.runInNewContext(prefix+`;${name}();`,bindings);assert.deepEqual(calls,['before','input'],file);assert.equal(scheduled,1,file+' uses its one existing callback');calls.length=0;ctx[frame].active=false;
+  vm.runInNewContext(prefix+`;${name}();`,bindings);assert.deepEqual(calls,[]);assert.equal(scheduled,1,'Inactive owner cannot schedule or poll');
+ }
 });

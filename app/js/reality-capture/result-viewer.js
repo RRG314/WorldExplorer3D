@@ -1,7 +1,7 @@
 import {prepareHomePhotoSurfaces} from './home-photo-surfaces.js';
 import { applyDisplayColorPolicy } from '../engine/display-color-policy.js';
 import { loadClassicScript } from '../modules/script-loader.js?v=57';
-import { vendorScriptsCritical } from '../modules/manifest.js?v=615';
+import { vendorScriptsCritical } from '../modules/manifest.js?v=616';
 import { applyCaptureAlignment } from './alignment.js?v=1';
 
 export async function createCaptureViewer(host, bytes, signal, options = {}) {

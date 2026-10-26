@@ -6,7 +6,7 @@ import {
   moduleEntrypoint,
   vendorScriptsCritical,
   vendorScriptsOptional
-} from './modules/manifest.js?v=615';
+} from './modules/manifest.js?v=616';
 import { loadScriptList, STARTUP_SCRIPT_TIMEOUT_MS } from './modules/script-loader.js?v=57';
 import {
   initStartupDiagnostics,

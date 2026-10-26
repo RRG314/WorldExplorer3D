@@ -1,3 +1,4 @@
+import {updateControlInputFrame} from '../controls/input-frame.js';
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import {acceptedSimulationDelta,frameDamping} from '../runtime/simulation-clock.js';
 import {
@@ -753,6 +754,7 @@ export function animateSpaceFlight(deps = {}) {
   const previousFrame = appCtx.spaceFlight._lastFrameMs || frameNow - (1000 / 60);
   appCtx.spaceFlight._frameScale = acceptedSimulationDelta((frameNow-previousFrame)/1000)*60;
   appCtx.spaceFlight._lastFrameMs = frameNow;
+  updateControlInputFrame(appCtx, {timestamp: frameNow});
   if(appCtx.paused||globalThis.document?.hidden)return;
 
   if (appCtx.spaceFlight.earth) appCtx.spaceFlight.earth.rotation.y += 0.0005 * appCtx.spaceFlight._frameScale;
