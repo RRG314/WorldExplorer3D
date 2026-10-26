@@ -8,6 +8,7 @@ import {configureStagingAppCheck} from './staging-app-check.mjs';
 import {createStagingGatewayHandler} from './staging-proxy-delivery.mjs';
 import {runPrescribedGameActions} from './prescribed-game-actions.mjs';
 import {sourceFingerprint, sameAcceptanceSource} from './source-fingerprint.mjs';
+import {collectBrowserGraphicsErrors} from './browser-graphics-errors.mjs';
 
 // One startup regression group and, when requested, one selected-city entry.
 // Cold network delay is controlled; world providers remain real staging/live
@@ -24,7 +25,7 @@ await mkdir(out, {recursive: true});
 const before = sourceFingerprint();
 const server = await startStaticServer({rootDir: root, ports: [4586], handleRequest: createStagingGatewayHandler()});
 const base = `http://127.0.0.1:${server.port}`;
-const report = {passed: false, engine: engineName, root, source: before, scope: 'Actual app startup/recovery in a desktop browser engine with a touch viewport; essential-file delay controlled. Optional single city uses real providers and registered staging debug attestation. Not physical-device performance or production-service acceptance.', checks: [], errors: [], resources: [], events: []};
+const report = {passed: false, engine: engineName, root, source: before, scope: 'Actual app startup/recovery in a desktop browser engine with a touch viewport; essential-file delay controlled. Optional single city uses real providers and registered staging debug attestation. Not physical-device performance or production-service acceptance.', checks: [], errors: [], graphicsErrors: [], expectedGraphicsErrors: [], resources: [], events: []};
 let owned, page, stage;
 const engine = engineName === 'webkit' ? webkit : chromium;
 const safe = value => String(value).replace(/AIza[\w-]+/g, '[public SDK key]').replace(/eyJ[\w-]+\.[\w-]+\.[\w-]+/g, '[private token]').slice(0, 1000);
@@ -35,6 +36,7 @@ async function newPage() {
     serviceWorkers: 'block'
   });
   const current = await context.newPage();
+  collectBrowserGraphicsErrors(current, report.graphicsErrors);
   current.on('pageerror', error => report.errors.push({stage, type: 'page', message: safe(error.message)}));
   current.on('console', message => {
     if (message.type() === 'error') report.errors.push({stage, type: 'console', message: safe(message.text())});
@@ -186,6 +188,35 @@ try {
       assert.equal(samples.at(-1).regional?.status, 'ready', 'Background regional publication did not finish.');
       assert.equal(settled.diagnostics.renderer.contextLost, false);
     }
+    if (process.env.WE3D_STARTUP_GRAPHICS_LOSS === '1') {
+      stage = 'controlled-graphics-loss';
+      const errorsBeforeLoss = report.graphicsErrors.length;
+      const publication = await page.evaluate(() => startupQa.worldPublication.requestId);
+      await page.evaluate(() => new Promise((resolve, reject) => {
+        const gl = startupQa.renderer.getContext(), extension = gl.getExtension('WEBGL_lose_context');
+        if (!extension) { reject(Error('Controlled context-loss extension unavailable.')); return; }
+        startupQa.renderer.domElement.addEventListener('webglcontextlost', () => resolve(), {once: true});
+        extension.loseContext();
+      }));
+      const lost = await page.evaluate(() => {
+        let readinessError;
+        try {startupQa.prepareFirstWorldRender();} catch (error) {readinessError = error.message;}
+        return {contextLost: startupQa.renderer.getContext().isContextLost(), readinessError};
+      });
+      assert.equal(lost.contextLost, true); assert.match(lost.readinessError, /3D view.*unavailable/);
+      await page.waitForTimeout(100);
+      await page.evaluate(() => startupQa.renderer.getContext().getExtension('WEBGL_lose_context').restoreContext());
+      await page.waitForFunction(() => !startupQa.renderer.getContext().isContextLost(), null, {timeout: 15000});
+      const frame = await page.evaluate(() => startupQa.renderer.info.render.frame);
+      await page.waitForFunction(before => startupQa.renderer.info.render.frame > before, frame, {timeout: 15000});
+      assert.equal(await page.evaluate(() => startupQa.worldPublication.requestId), publication);
+      for (let index = errorsBeforeLoss; index < report.graphicsErrors.length; index++) {
+        assert.match(report.graphicsErrors[index], /context (?:was )?lost|CONTEXT_LOST_WEBGL/i);
+        report.expectedGraphicsErrors.push(index);
+      }
+      report.checks.push({id: stage, deliberatelyLost: true, ...lost, restoredWithoutReload: true, publicationPreserved: true});
+      await page.screenshot({path: path.join(out, 'graphics-restored.png')});
+    }
     if (profiler) {
       const {profile} = await profiler.send('HeapProfiler.stopSampling');
       const allocations = new Map();
@@ -205,6 +236,7 @@ try {
   const unexpected = report.errors.filter(error => error.stage !== 'failed-file-and-explicit-reload');
   assert.equal(unexpected.length, 0, 'Unexpected browser errors: ' + JSON.stringify(unexpected));
   assert.equal(report.events.length, 0);
+  assert.equal(report.graphicsErrors.filter((_, index) => !report.expectedGraphicsErrors.includes(index)).length, 0, 'Unexpected graphics errors.');
   assert.ok(sameAcceptanceSource(before, sourceFingerprint()), 'Source changed while measuring it.');
   report.passed = true;
 } catch (error) {

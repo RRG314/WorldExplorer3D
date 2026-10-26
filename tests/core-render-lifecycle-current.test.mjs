@@ -3,6 +3,34 @@ import assert from 'node:assert/strict';
 import { createRuntimeKernel } from '../app/js/runtime/kernel.js';
 import { createCoreFrameSystems, createCoreRenderSystem } from '../app/js/runtime/core-frame-systems.js';
 
+test('a lost graphics context cannot publish current-world presentation evidence',()=>{
+ for(const owner of ['direct','composer','vr']) {
+  let lost=true,draws=0;
+  const publication=Object.freeze({requestId:'context-recovery:'+owner});
+  const draw=()=>{draws++;};
+  const app={gameStarted:true,worldPublication:publication,renderer:{getContext:()=>({isContextLost:()=>lost}),render:draw},composer:{render:draw}};
+  if(owner==='vr')app.vrPresentation={active:true,render:draw};
+  const render=createCoreRenderSystem(app,()=>owner==='composer');
+  const hidden={flags:{}};render.update(hidden);
+  assert.equal(hidden.flags.mainWorldPresented,undefined,owner);assert.equal(draws,0,owner);
+  lost=false;const restored={flags:{}};render.update(restored);
+  assert.equal(restored.flags.mainWorldPresented,publication,owner);assert.equal(draws,1,owner);
+  // Loss can occur during the renderer/composer call as well.
+  app.renderer.render=app.composer.render=()=>{lost=true;};
+  if(app.vrPresentation)app.vrPresentation.render=()=>{lost=true;};
+  const interrupted={flags:{}};render.update(interrupted);
+  assert.equal(interrupted.flags.mainWorldPresented,undefined,owner);
+ }
+});
+
+test('first-world readiness rejects a lost context before compiling resident resources',()=>{
+ let compiled=0,drawn=0;
+ const app={gameStarted:true,worldLoading:false,renderer:{getContext:()=>({isContextLost:()=>true}),getRenderTarget:()=>null,setRenderTarget(){},compile:()=>compiled++,render:()=>drawn++}};
+ createCoreRenderSystem(app,()=>false);
+ assert.throws(()=>app.prepareFirstWorldRender(),/3D view.*unavailable/);
+ assert.equal(compiled,0);assert.equal(drawn,0);
+});
+
 test('only a successful current-world draw exposes presentation evidence to later frame systems',()=>{
   const publication=Object.freeze({requestId:'presented:one'}),app={gameStarted:true,worldPublication:publication,renderer:{render(){}}};
   const render=createCoreRenderSystem(app,()=>false),frame=()=>({flags:{}});

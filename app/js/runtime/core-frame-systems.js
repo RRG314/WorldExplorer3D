@@ -199,6 +199,8 @@ function createCoreRenderSystem(appCtx, shouldUseComposer) {
     });
   };
   const draw = () => {
+    const gl = appCtx.renderer.getContext?.();
+    if (gl?.isContextLost?.()) return false;
     graphicsEvidence?.begin();
     const restoreWaterPresentation=beginSwimmingRender(appCtx);
     try {
@@ -207,13 +209,14 @@ function createCoreRenderSystem(appCtx, shouldUseComposer) {
       else if (shouldUseComposer()) appCtx.composer.render();
       else appCtx.renderer.render(appCtx.scene, appCtx.camera);
       appCtx.recordPerfRendererInfo?.(appCtx.renderer);
-      return presented;
+      return presented && !gl?.isContextLost?.();
     } finally {restoreWaterPresentation?.();graphicsEvidence?.end();}
   };
   // The completed world must have produced its first frame before the loading
   // cover is dismissed. Use the real render path, including postprocessing.
   appCtx.prepareFirstWorldRender = () => {
     if (!appCtx.gameStarted || appCtx.worldLoading) throw new Error('World is not ready for its first render');
+    if (appCtx.renderer.getContext?.()?.isContextLost?.()) throw new Error('The 3D view is temporarily unavailable. Wait for your browser to restore it, then retry this location.');
     const started=performance.now();
     appCtx.updateCamera?.(0);
     prepareStreetOverviewMaterials(appCtx);
@@ -237,7 +240,7 @@ function createCoreRenderSystem(appCtx, shouldUseComposer) {
       }
     }
     const residentPreparation = appCtx.prepareResidentPresentation(appCtx.scene, [appCtx.carMesh, appCtx.Walk?.state?.characterMesh]);
-    draw();
+    if (!draw()) throw new Error('The 3D view became unavailable before the world could be shown. Retry this location.');
     return {durationMs:performance.now()-started,programs:appCtx.renderer?.info?.programs?.length || 0,residentPreparation};
   };
   return {
