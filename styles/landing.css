@@ -47,8 +47,32 @@ body::before {
 
 img { display: block; max-width: 100%; }
 a { color: inherit; }
+[hidden] { display: none !important; }
 button, a { -webkit-tap-highlight-color: transparent; }
 button { font: inherit; }
+
+.install-card { display: flex; align-items: flex-start; gap: 24px; padding: 28px; border: 1px solid var(--line-strong); border-radius: 16px; background: var(--surface); }
+.install-card > img { flex: 0 0 96px; border-radius: 20px; }
+.install-section { scroll-margin-top: 90px; }
+.install-copy { min-width: 0; }
+.install-copy h3 { margin: 0; font-size: 24px; }
+.install-copy p { color: var(--muted); }
+.install-copy .install-status { color: var(--ink); }
+.install-note { font-size: 14px; max-width: 72ch; }
+.install-steps { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; margin-top: 20px; scroll-margin-top: 100px; }
+.install-steps details { border: 1px solid var(--line); border-radius: 12px; background: var(--surface); padding: 0 18px; }
+.install-steps summary { min-height: 48px; padding: 14px 0; font-weight: 600; cursor: pointer; }
+.install-steps li { margin-bottom: 12px; }
+.install-steps ol { padding-left: 22px; }
+.install-steps a { text-decoration: underline; text-underline-offset: 3px; }
+.install-steps p { color: var(--muted); }
+.install-section :focus-visible { outline: 3px solid var(--field); outline-offset: 4px; }
+.install-section .btn { min-height: 48px; white-space: normal; }
+@media (max-width: 700px) {
+  .install-card { display: block; padding: 20px; }
+  .install-card > img { width: 64px; height: 64px; margin-bottom: 16px; }
+  .install-steps { grid-template-columns: 1fr; }
+}
 
 .skip-link {
   position: fixed;

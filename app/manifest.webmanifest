@@ -5,10 +5,10 @@
   "description": "Explore real-world places on foot, by air and at sea. Internet connection required.",
   "start_url": "/app/",
   "scope": "/app/",
-  "display": "fullscreen",
+  "display": "standalone",
   "orientation": "any",
-  "background_color": "#1a1a2e",
-  "theme_color": "#1a1a2e",
+  "background_color": "#101818",
+  "theme_color": "#101818",
   "lang": "en-US",
   "categories": [
     "games",

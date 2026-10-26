@@ -51,3 +51,51 @@ test('install manifest icons exist and remain bounded to the game origin',async(
     assert.ok(!icon.src.includes('..'));assert.ok((await fs.stat(new URL('../app/'+icon.src,import.meta.url))).size>0);
   }
 });
+
+const installCode=await fs.readFile(new URL('../js/app-install.js',import.meta.url),'utf8');
+function installPage({secure=true,installed=false,ios=false,play=false}={}) {
+  const listeners=new Map(),clicks=new Map(),media={matches:installed,addEventListener(){}};
+  const instructions={open:false,addEventListener(){}},button={hidden:true,disabled:false,setAttribute(){}},
+    status={},steps={focused:false,querySelector:()=>instructions,focus(){this.focused=true;}};
+  const window={isSecureContext:secure,matchMedia:()=>media,WorldExplorerDistribution:{isGooglePlay:play},
+    addEventListener:(name,listener)=>listeners.set(name,listener)};
+  button.addEventListener=(name,listener)=>clicks.set(name,listener);
+  vm.runInNewContext(installCode,{window,navigator:{userAgent:ios?'iPhone':'Linux',platform:'',maxTouchPoints:0},
+    document:{getElementById:id=>({installAppBtn:button,installStatus:status,installSteps:steps})[id]}});
+  return {button,status,steps,instructions,fire:(type,event={})=>listeners.get(type)?.(event),click:()=>clicks.get('click')()};
+}
+test('install help stays usable without a browser install API; insecure origins cannot offer installation',async()=>{
+  const ui=installPage();await ui.click();assert.equal(ui.instructions.open,true);assert.equal(ui.steps.focused,true);
+  assert.equal(installPage({secure:false}).button.hidden,true);
+  for(const options of [{installed:true},{play:true}])assert.equal(installPage(options).button.hidden,true);
+});
+test('each install event is prompted only on a click and consumed once; cancellation remains recoverable',async()=>{
+  const ui=installPage();let calls=0,prevented=false;
+  ui.fire('beforeinstallprompt',{preventDefault(){prevented=true;},prompt:async()=>{calls++;return{outcome:'dismissed'};}});
+  assert.equal(prevented,true);assert.equal(calls,0);assert.equal(ui.button.textContent,'Install World Explorer 3D');
+  await ui.click();assert.equal(calls,1);assert.match(ui.status.textContent,/cancelled/);
+  await ui.click();assert.equal(calls,1);assert.equal(ui.instructions.open,true);
+});
+test('prompt acceptance is not completion; browser appinstalled is authoritative even during a pending prompt',async()=>{
+  const ui=installPage();ui.fire('beforeinstallprompt',{preventDefault(){},prompt:async()=>({outcome:'accepted'})});
+  await ui.click();assert.match(ui.status.textContent,/requested/);assert.equal(ui.button.hidden,false);
+  let resolve;ui.fire('beforeinstallprompt',{preventDefault(){},prompt:()=>new Promise(r=>{resolve=r;})});
+  const pending=ui.click();assert.equal(ui.button.disabled,true);await ui.click();
+  ui.fire('appinstalled');resolve({outcome:'accepted'});await pending;
+  assert.equal(ui.button.hidden,true);assert.match(ui.status.textContent,/Installation complete/);
+});
+test('failed single-use prompt restores manual steps and supports a later browser event',async()=>{
+  const ui=installPage();let calls=0;
+  ui.fire('beforeinstallprompt',{preventDefault(){},prompt:()=>{throw Error('expired');}});
+  await ui.click();assert.equal(ui.button.disabled,false);assert.equal(ui.instructions.open,true);assert.match(ui.status.textContent,/could not open/);
+  ui.fire('beforeinstallprompt',{preventDefault(){},prompt:async()=>{calls++;return{outcome:'accepted'};}});
+  await ui.click();assert.equal(calls,1);
+});
+test('landing and game advertise one stable app identity; installation keeps the private pages outside worker scope',async()=>{
+  const landing=await fs.readFile(new URL('../index.html',import.meta.url),'utf8'),game=await fs.readFile(new URL('../app/index.html',import.meta.url),'utf8');
+  assert.match(landing,/rel="manifest" href="\.\/app\/manifest\.webmanifest"/);
+  for(const html of [landing,game])assert.match(html,/rel="apple-touch-icon"/);
+  const manifest=JSON.parse(await fs.readFile(new URL('../app/manifest.webmanifest',import.meta.url),'utf8'));
+  assert.equal(manifest.id,'/app/');assert.equal(manifest.display,'standalone');
+  assert.equal(manifest.scope,'/app/');assert.equal(manifest.start_url,'/app/');
+});

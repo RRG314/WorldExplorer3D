@@ -9,6 +9,11 @@
   <title>World Explorer 3D | Explore Real Places in Your Browser</title>
   <meta name="description" content="Explore real places in a free 3D browser sandbox. Walk, drive and fly, record discoveries, and explore oceans and space. No download required.">
   <meta name="theme-color" content="#070b0e">
+  <meta name="apple-mobile-web-app-title" content="World Explorer 3D">
+  <link rel="manifest" href="./app/manifest.webmanifest">
+  <link rel="apple-touch-icon" href="./app/assets/icons/app-192-v1.png">
+  <script defer src="./app/install-support.js"></script>
+  <script defer src="./js/app-install.js?v=1"></script>
   <meta property="og:type" content="website">
   <meta property="og:title" content="World Explorer 3D">
   <meta property="og:description" content="Explore real places by land, sea, air and space. A world sandbox in your browser.">
@@ -20,7 +25,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Orbitron:wght@500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="./styles/landing.css?v=4">
+  <link rel="stylesheet" href="./styles/landing.css?v=5">
   <script src="./js/firebase-project-config.js"></script>
   <script type="module" src="./js/site-analytics.js?v=1"></script>
 </head>
@@ -36,6 +41,7 @@
       <a href="#expedition">The experience</a>
       <a href="#gameplay">Current gameplay</a>
       <a href="#world">The world</a>
+      <a href="#install">Get the app</a>
       <a href="#faq">FAQ</a>
     </nav>
     <div class="masthead-actions">
@@ -61,6 +67,7 @@
           <div class="cta-row">
             <a class="btn btn-primary" id="landingPrimaryCta" href="./app/">Start exploring — free</a>
             <button class="btn btn-secondary" id="landingSecondaryCta" type="button">Explore with friends</button>
+            <a class="btn btn-secondary" href="#install">Get the app</a>
           </div>
           <ul class="hero-notes" aria-label="Access details">
             <li>Runs in your browser</li>
@@ -94,6 +101,36 @@
       <div class="promise"><strong>A world that remembers</strong><span>Keep discoveries, companions, builds, contributions, and places worth returning to.</span></div>
       <div class="promise"><strong>Free core world</strong><span>The map, core exploration, and traversal modes are free.</span></div>
     </div>
+
+    <section class="section install-section" id="install" aria-labelledby="installTitle">
+      <div class="section-heading">
+        <div>
+          <span class="section-kicker">Take your world with you</span>
+          <h2 id="installTitle">World Explorer, on your device.</h2>
+        </div>
+        <p>Add the free web app to your phone, tablet or computer. Open it from your Home Screen or apps, with the same online world and controls.</p>
+      </div>
+      <div class="install-card">
+        <img src="./app/assets/icons/app-192-v1.png" width="96" height="96" alt="" loading="lazy">
+        <div class="install-copy">
+          <h3>World Explorer 3D</h3>
+          <p>Internet is required to explore. The latest game loads when you open it online; a connection screen helps you retry when offline.</p>
+          <div class="cta-row">
+            <button class="btn btn-primary" id="installAppBtn" type="button" hidden aria-controls="installSteps" aria-describedby="installStatus">Show install steps</button>
+            <a class="btn btn-secondary" href="./app/">Open the game</a>
+          </div>
+          <p id="installStatus" class="install-status" role="status" aria-live="polite">Choose your device below for installation steps.</p>
+          <p class="install-note">Use the same browser for your existing local saves. Some devices keep installed-app data separate. In the game, open Journal → Profile → Data and backup before switching browsers or installing.</p>
+        </div>
+      </div>
+      <div id="installSteps" class="install-steps" tabindex="-1" aria-label="Installation steps">
+        <details data-install-platform="android"><summary>Android phones and tablets</summary><ol><li>Open <a href="./app/">the game</a> in Chrome, Edge or another browser with app installation.</li><li>Open the browser menu and choose <strong>Install app</strong> or <strong>Add to Home screen</strong>.</li><li>Confirm, then open World Explorer 3D from its icon.</li></ol><p>If this page offers an Install button, you can use it directly. Menu labels vary by browser.</p></details>
+        <details data-install-platform="ios"><summary>iPhone and iPad</summary><ol><li>Open <a href="./app/">the game</a> in Safari.</li><li>Tap <strong>Share</strong>, then <strong>Add to Home Screen</strong>. You may need to scroll through the actions or choose Edit Actions.</li><li>If shown, turn on <strong>Open as Web App</strong>, then tap <strong>Add</strong>.</li></ol><p>Your device adds a World Explorer 3D icon. No App Store account is needed for the web app.</p></details>
+        <details data-install-platform="desktop"><summary>Windows, Mac, Linux and Chromebook</summary><ol><li>In Chrome or Edge, use this page’s Install button when available, or open <a href="./app/">the game</a> and use the install icon in the address bar or browser menu.</li><li>On a Mac with Safari 17 or later, open the game and choose <strong>File → Add to Dock</strong>.</li><li>Confirm the name, then open World Explorer 3D from your apps, Dock or launcher.</li></ol><p>If your browser has no install option, you can keep playing in it or use a supported browser.</p></details>
+        <details data-install-platform="other"><summary>Other devices and browsers</summary><p>Open <a href="./app/">the game</a> and look for Install app or Add to Home Screen in your browser menu. If neither is available, bookmark the game. Installation and 3D graphics support depend on your device and browser.</p></details>
+      </div>
+      <noscript><p>You can install using your browser menu. Follow the steps above for your device.</p></noscript>
+    </section>
 
     <section class="section" id="expedition">
       <div class="section-heading">
