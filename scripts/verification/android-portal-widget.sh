@@ -37,3 +37,27 @@ git rev-parse HEAD > android-widget-evidence/source-commit.txt
 git rev-parse HEAD:android/app/src/main > android-widget-evidence/native-main-source-tree.txt
 cat android-widget-evidence/result.txt
 grep -q 'INSTRUMENTATION_RESULT: passed=true' android-widget-evidence/result.txt
+if test -n "${WE3D_PORTAL_ANDROID_ACCEPTANCE:-}"; then
+    adb shell svc wifi enable
+    adb shell svc data enable
+    NATIVE_FIXTURE="$RUNNER_TEMP/we3d-native-acceptance.private.json"
+    umask 077
+    printf '%s' "$WE3D_PORTAL_ANDROID_ACCEPTANCE" > "$NATIVE_FIXTURE"
+    unset WE3D_PORTAL_ANDROID_ACCEPTANCE
+    adb shell -T "run-as io.worldexplorer3d.app.staging sh -c 'cat > files/native-acceptance.json'" < "$NATIVE_FIXTURE"
+    rm "$NATIVE_FIXTURE"
+    adb logcat -c
+    adb shell am instrument -w -e ownedEmulator true io.worldexplorer3d.app.staging/io.worldexplorer3d.app.PortalAccountLiveInstrumentation > android-widget-evidence/native-live-result.txt
+    # Only bounded redacted SDK diagnostics enter the uploaded evidence.
+    adb logcat -d > "$RUNNER_TEMP/we3d-native-logcat.private.txt"
+    python3 - "$RUNNER_TEMP/we3d-native-logcat.private.txt" <<'PY'
+import re,sys
+from pathlib import Path
+data=Path(sys.argv[1]).read_text(errors='replace')
+data=re.sub(r'(?im)^.*(?:Authorization|AppCheck.*token|refreshToken|customToken|idToken).*$','[private authentication diagnostic omitted]',data)
+data=re.sub(r'eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+','[private token omitted]',data)
+Path('android-widget-evidence/native-live-logcat.txt').write_text(data)
+PY
+    cat android-widget-evidence/native-live-result.txt
+    grep -q 'INSTRUMENTATION_RESULT: passed=true' android-widget-evidence/native-live-result.txt
+fi

@@ -3,6 +3,10 @@ name: Android test package
 on:
   workflow_dispatch:
     inputs:
+      native_live:
+        description: Verify native account SDK with the owned temporary staging identity
+        type: boolean
+        default: false
       dependency_proposal:
         description: Resolve proposed new SDK locks/checksums for review (not release verification)
         type: boolean
@@ -97,6 +101,8 @@ jobs:
       - name: Verify native Portal widgets
         if: github.event_name == 'workflow_dispatch' && inputs.widget_check
         timeout-minutes: 12
+        env:
+          WE3D_PORTAL_ANDROID_ACCEPTANCE: ${{ inputs.native_live && secrets.WE3D_PORTAL_ANDROID_ACCEPTANCE || '' }}
         run: bash scripts/verification/android-portal-widget.sh
       - name: Preserve native widget evidence
         if: always() && github.event_name == 'workflow_dispatch' && inputs.widget_check

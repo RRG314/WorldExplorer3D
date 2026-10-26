@@ -8,7 +8,6 @@ import com.google.firebase.FirebaseOptions;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.appcheck.FirebaseAppCheck;
-import com.google.firebase.appcheck.playintegrity.PlayIntegrityAppCheckProviderFactory;
 import org.json.JSONObject;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
@@ -29,7 +28,7 @@ final class PortalFirebase {
             .setGcmSenderId(context.getString(R.string.portal_firebase_sender)).build();
         FirebaseApp existing=null;for(FirebaseApp value:FirebaseApp.getApps(context))if(name.equals(value.getName()))existing=value;
         app=existing==null?FirebaseApp.initializeApp(context,options,name):existing;check=FirebaseAppCheck.getInstance(app);
-        check.installAppCheckProviderFactory(PlayIntegrityAppCheckProviderFactory.getInstance());
+        PortalAttestation.install(check);
         check.setTokenAutoRefreshEnabled(false);
         auth=FirebaseAuth.getInstance(app);
     }
