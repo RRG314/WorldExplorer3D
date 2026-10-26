@@ -60,9 +60,9 @@
   #accessibilitySettings input[type="checkbox"] { width: 20px; height: 20px; }
 
   :where(button, a, input, select, textarea, [tabindex]):focus-visible {
-    outline: 3px solid #ffdf5d !important;
+    outline: 3px solid var(--wx-focus) !important;
     outline-offset: 3px !important;
-    box-shadow: 0 0 0 2px #071821 !important;
+    box-shadow: 0 0 0 2px var(--wx-bg) !important;
   }
 
   html[data-we3d-text-scale="115"] :where(

@@ -1,0 +1,60 @@
+/* Roam: shared presentation values. Gameplay and saved preferences have no owner here. */
+:root {
+  --wx-bg: #101818;
+  --wx-panel: rgb(26 39 39 / 96%);
+  --wx-panel-solid: #1a2727;
+  --wx-panel-soft: #223232;
+  --wx-input: #121e1d;
+  --wx-line: #708179;
+  --wx-line-soft: rgb(177 192 185 / 28%);
+  --wx-text: #f5f6ed;
+  --wx-muted: #b1c0b9;
+  --wx-action: #eec96b;
+  --wx-action-hover: #f5d786;
+  --wx-action-text: #1a251f;
+  --wx-selected: #35413a;
+  --wx-focus: #ffe49a;
+  --wx-success: #a5d6a7;
+  --wx-warning: #eec96b;
+  --wx-danger: #ff9c94;
+  --wx-info: #aacde8;
+  /* Existing readers retain their variable contract during staged migration. */
+  --wx-blue: var(--wx-action);
+  --wx-green: var(--wx-success);
+  --wx-yellow: var(--wx-warning);
+  --wx-red: var(--wx-danger);
+  --wx-font-ui: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --wx-font-display: Impact, "Arial Narrow", "Arial Black", sans-serif;
+  --wx-font-instrument: ui-monospace, "SFMono-Regular", Consolas, monospace;
+  --wx-text-scale: 1;
+  --wx-type-body: calc(1rem * var(--wx-text-scale));
+  --wx-type-control: calc(.875rem * var(--wx-text-scale));
+  --wx-type-meta: calc(.75rem * var(--wx-text-scale));
+  --wx-space-1: 4px;
+  --wx-space-2: 8px;
+  --wx-space-3: 12px;
+  --wx-space-4: 16px;
+  --wx-space-6: 24px;
+  --wx-space-8: 32px;
+  --wx-radius: 4px;
+  --wx-control-height: 44px;
+  --wx-motion-fast: 120ms;
+  --wx-shadow-panel: 0 12px 32px rgb(0 0 0 / 24%);
+}
+
+html[data-we3d-text-scale="115"] { --wx-text-scale: 1.15; }
+html[data-we3d-text-scale="130"] { --wx-text-scale: 1.3; }
+html[data-we3d-text-scale="160"] { --wx-text-scale: 1.6; }
+html[data-we3d-text-scale="200"] { --wx-text-scale: 2; }
+
+html[data-we3d-contrast="more"] {
+  --wx-text: #fff;
+  --wx-muted: #edf4ee;
+  --wx-line: #d4e0d7;
+  --wx-line-soft: #9aaca1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root { --wx-motion-fast: 0ms; }
+}
+html[data-we3d-motion="reduce"] { --wx-motion-fast: 0ms; }

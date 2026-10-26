@@ -1,0 +1,66 @@
+@layer interface {
+  /* Opt-in components: do not restyle unreviewed gameplay/editor controls. */
+  .wx-panel {
+    box-sizing: border-box;
+    color: var(--wx-text);
+    background: var(--wx-panel-solid);
+    border: 1px solid var(--wx-line-soft);
+    border-radius: var(--wx-radius);
+  }
+
+  .wx-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--wx-space-2);
+    min-width: var(--wx-control-height);
+    min-height: var(--wx-control-height);
+    box-sizing: border-box;
+    padding: 10px 16px;
+    border: 1px solid var(--wx-line);
+    border-radius: var(--wx-radius);
+    color: var(--wx-text);
+    background: var(--wx-panel-soft);
+    font: 650 var(--wx-type-control)/1.4 var(--wx-font-ui);
+    text-align: center;
+    text-decoration: none;
+    overflow-wrap: anywhere;
+    cursor: pointer;
+    touch-action: manipulation;
+    transition: background-color var(--wx-motion-fast), border-color var(--wx-motion-fast);
+  }
+  .wx-button:hover { border-color: var(--wx-action); }
+  .wx-button--primary {
+    color: var(--wx-action-text);
+    background: var(--wx-action);
+    border-color: var(--wx-action);
+  }
+  .wx-button--primary:hover { background: var(--wx-action-hover); }
+  .wx-button--quiet { background: transparent; }
+  .wx-button:disabled, .wx-button[aria-disabled="true"] { opacity: .65; cursor: default; }
+  .wx-button:focus-visible, .wx-field:focus-visible {
+    outline: 3px solid var(--wx-focus);
+    outline-offset: 3px;
+  }
+  .wx-button[hidden], .wx-panel[hidden], .wx-field[hidden] { display: none; }
+
+  .wx-field {
+    min-width: 0;
+    min-height: var(--wx-control-height);
+    box-sizing: border-box;
+    padding: 10px 12px;
+    border: 1px solid var(--wx-line);
+    border-radius: var(--wx-radius);
+    color: var(--wx-text);
+    background: var(--wx-input);
+    font: 400 var(--wx-type-control)/1.5 var(--wx-font-ui);
+    accent-color: var(--wx-action);
+  }
+  .wx-field::placeholder { color: var(--wx-muted); opacity: 1; }
+  .wx-field[aria-invalid="true"] { border-color: var(--wx-danger); }
+
+  @media (forced-colors: active) {
+    .wx-panel, .wx-button, .wx-field { border-color: CanvasText; }
+    .wx-button:focus-visible, .wx-field:focus-visible { outline-color: Highlight; }
+  }
+}

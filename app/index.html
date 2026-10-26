@@ -7,7 +7,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="theme-color" content="#1a1a2e">
+<meta name="theme-color" content="#101818">
 <title>World Explorer 3D</title>
 <script>
 if (location.protocol === 'file:') document.documentElement.classList.add('unsupported-file-launch');
@@ -27,25 +27,27 @@ if (location.protocol === 'file:') document.documentElement.classList.add('unsup
 <script src="../js/firebase-project-config.js"></script>
 <script type="module" src="../js/site-analytics.js?v=1"></script>
 <style>@layer legacy, interface;</style>
+<link rel="stylesheet" href="../styles/world-explorer-tokens.css?v=1">
+<link rel="stylesheet" href="../styles/world-explorer-components.css?v=1">
 <link rel="stylesheet" href="styles/title-shell.css?v=95">
-<link rel="stylesheet" href="styles/runtime-shell.css?v=130">
+<link rel="stylesheet" href="styles/runtime-shell.css?v=131">
 <link rel="stylesheet" href="styles/block-builder.css?v=9">
 <link rel="stylesheet" href="styles/universe.css?v=9">
 <link rel="stylesheet" href="styles/fishing-game.css?v=6">
-<link rel="stylesheet" href="styles/interface-v4.css?v=33">
-<link rel="stylesheet" href="styles/start-hub.css?v=21">
+<link rel="stylesheet" href="styles/interface-v4.css?v=34">
+<link rel="stylesheet" href="styles/start-hub.css?v=22">
 <link rel="stylesheet" href="styles/discovery.css?v=19">
 <link rel="stylesheet" href="styles/tutorial.css?v=15">
 <link rel="stylesheet" href="styles/ar.css?v=1">
 <link rel="stylesheet" href="styles/mobile-controls.css?v=4">
 <link rel="stylesheet" href="styles/map-explorer.css?v=4">
-<link rel="stylesheet" href="styles/accessibility.css?v=3">
+<link rel="stylesheet" href="styles/accessibility.css?v=4">
 <link rel="stylesheet" href="styles/reality-capture.css?v=2">
 </head>
 <body>
 <!-- Initial loading and recovery are available before any game module. -->
 <div id="loading" class="show" data-state="starting" role="dialog" aria-modal="true" aria-busy="true" aria-labelledby="loadTitle" tabindex="-1">
-  <section class="loadingCard">
+  <section class="loadingCard wx-panel">
     <div class="loadingOverview">
       <div class="loadingBrand">WORLD EXPLORER 3D</div>
       <h1 id="loadTitle">Starting World Explorer</h1>
@@ -53,7 +55,7 @@ if (location.protocol === 'file:') document.documentElement.classList.add('unsup
       <div class="loadingStatus"><span id="loadText" role="status" aria-live="polite">Opening the game</span><span id="loadPercent" aria-hidden="true"></span></div>
       <progress id="loadProgress" max="100" aria-label="World loading progress" aria-describedby="loadText loadProgressNote"></progress>
       <p id="loadProgressNote">Progress follows loading steps. Some steps take longer than others.</p>
-      <a id="loadRetry" href="" hidden>Reload and try again</a>
+      <a id="loadRetry" href="" hidden class="wx-button wx-button--quiet">Reload and try again</a>
     </div>
     <noscript><p>JavaScript is required to start World Explorer. Enable it for this site, then reload.</p></noscript>
     <div id="loadTip" class="loadingTip" role="group" aria-label="Things to try in World Explorer">
@@ -62,9 +64,9 @@ if (location.protocol === 'file:') document.documentElement.classList.add('unsup
       <p id="loadTipText">Explore on foot, take a flight or set out on the water.</p>
       <div class="loadingTipControls">
         <span id="loadTipCount" aria-label="Tip number"></span>
-        <button id="loadTipPause" type="button" aria-pressed="false">Pause tips</button>
-        <button id="loadTipPrevious" type="button" aria-label="Previous tip">←</button>
-        <button id="loadTipNext" type="button" aria-label="Next tip">→</button>
+        <button id="loadTipPause" type="button" aria-pressed="false" class="wx-button wx-button--quiet">Pause tips</button>
+        <button id="loadTipPrevious" type="button" aria-label="Previous tip" class="wx-button wx-button--quiet">←</button>
+        <button id="loadTipNext" type="button" aria-label="Next tip" class="wx-button wx-button--quiet">→</button>
       </div>
     </div>
   </section>
