@@ -43,7 +43,7 @@ test('a superseded long mapped feature stops between paths without publishing pa
 });
 
 for(const city of ['monaco','sf'])test(`${city}: scheduled indexing preserves captured geometry and contact`,async()=>{
- const capture=JSON.parse(readFileSync(new URL(`../docs/streets/audit-2026-09-13/${city}-unioned-roads-surfaces.json`,import.meta.url)));
+ const capture=JSON.parse(readFileSync(new URL(`./fixtures/street-geometry/${city}-road-surfaces.json`,import.meta.url)));
  const triangles=capture.surfaces.filter(s=>s.family==='road').flatMap(s=>s.triangles);
  const input=triangles.flatMap(t=>t.flatMap(p=>[p.x,p.y,p.z]));
  let yields=0;const schedule={budgetMs:0,yieldWork:async()=>{yields++;}};

@@ -6,7 +6,7 @@ Updated September 10, 2026 · Version 5.2.0 · Source baseline `53452516c16eb93a
 
 This is the September 10 system inventory. It replaces the dated patch-note sequence formerly at the top of this document. Historical implementation records remain in Git and the linked specialist documents. A capability listed here exists in the inspected source; it is not automatically certified on every device or deployed to production.
 
-[Project description](PROJECT_DESCRIPTION.md) · [Architecture](ARCHITECTURE_MAP.md) · [Complete source reference](SYSTEM_INVENTORY_REFERENCE.md) · [Audit findings](audits/2026-09-10/README.md) · [Test evidence](audits/2026-09-10/tests-and-evidence.md) · [Repair plan](audits/2026-09-10/repair-plan.md)
+[Project description](PROJECT_DESCRIPTION.md) · [Architecture](ARCHITECTURE_MAP.md) · [Complete source reference](SYSTEM_INVENTORY_REFERENCE.md) · Audit findings (private operator record) · Test evidence (private operator record) · Repair plan (private operator record)
 
 ## Product model
 
@@ -134,10 +134,12 @@ Repository runtime: browser JavaScript modules and Three.js/WebGL; Firebase Auth
 
 ## Current limits
 
-The September 10 audit passed 234 selected contract tests and source checks. Full world/browser execution was interrupted; the security-emulator attempt did not execute tests because Java was unavailable on its PATH. Those results remain incomplete. Full test evidence and CI gaps are in [the evidence ledger](audits/2026-09-10/tests-and-evidence.md).
+The September 10 audit passed 234 selected contract tests and source checks. Full world/browser execution was interrupted; the security-emulator attempt did not execute tests because Java was unavailable on its PATH. Those results remain incomplete. Full test evidence and CI gaps are in the evidence ledger (private operator record).
 
-Highest-priority open findings: incomplete mandatory release coverage; ambiguous-response write retries; account deletion reporting success despite incomplete cleanup; loader retry hangs; multiplayer prejoin disclosure/capacity boundaries; production-default CLI risk; stale evidence and documentation. The [repair plan](audits/2026-09-10/repair-plan.md) gives acceptance criteria.
+Highest-priority open findings: incomplete mandatory release coverage; ambiguous-response write retries; account deletion reporting success despite incomplete cleanup; loader retry hangs; multiplayer prejoin disclosure/capacity boundaries; production-default CLI risk; stale evidence and documentation. The repair plan (private operator record) gives acceptance criteria.
 
 Cloud backups, restore drills, alerts, budgets and deployed permission settings were not fully inventoried live. Physical Android/iOS, assistive technology, long-session memory and every advertised environment still need suitable acceptance evidence. The source inventory must not be used as a claim that these passed.
 
-On the owner's 8 GiB Mac, follow root `AGENTS.md`: one task at a time, no automatic heavy browser/emulator matrix. The previous cleanup recovered approximately 17.5 GiB; it did not change game behavior. Future reports should identify their source commit and distinguish source presence, scoped verification and deployed availability.
+Follow `CONTRIBUTING.md` for proportionate checks. Reports should identify their
+source commit and distinguish source presence, scoped verification and deployed
+availability. Keep operator machine details and raw diagnostic reports private.

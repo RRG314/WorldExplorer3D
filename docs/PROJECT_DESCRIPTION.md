@@ -251,6 +251,6 @@ The immediate priority is reliability: make critical journeys mandatory release
 checks, prevent duplicate writes after uncertain network responses, make account
 deletion complete and recoverable, and make editing/review/publication easy to
 follow. Keep the existing working world and improve its shared foundations. The
-[repair plan](audits/2026-09-10/repair-plan.md) states the evidence required before
+repair plan (private operator record) states the evidence required before
 each repair can be called complete. No whole-app readiness claim follows merely
 from the number of systems or tests in the repository.

@@ -82,7 +82,7 @@ The first full source check caught a duplicate query-version model cache import;
 the shared import was corrected. The next inventory check caught the new tests
 outside the regular component list; both are now included. Their passing focused
 checks do not erase those earlier failed receipts. The final source-chain result
-is 2,417 passing tests; see CURRENT-STATE.md for the latest journey receipt.
+is 2,417 passing tests; see local operator notes (not published) for the latest journey receipt.
 
 Remaining marine work is explicit: licensed whales and deep squid, broader
 habitat/season evidence, surface-vessel encounters and a genuinely streamed ocean.

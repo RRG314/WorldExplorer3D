@@ -5,13 +5,13 @@ import {replayStreetLayout} from './street-layout-replay.mjs';
 // Reuse the captured source snapshots; no browser, provider requests or new
 // world copies. The scope is each entire saved resident extent, not a city.
 const cases=[
-  ['Baltimore','baltimore-geometric-corners-layout.json','7c576aa427adcfddda108f70fba7b5348cb341015f00cf64ff311c7c5f926a7d'],
-  ['Monaco','monaco-frontage-layout.json','34b392b7694f1218b2825142c92533f2b0c9eb3a098b0eab37055e1c0e5aceb7'],
-  ['San Francisco','sf-single-partition-layout.json','4ce3e9887c35c17029aaf0a9ed4dfc4ca2a4db531d40c8a18d9d1b9fbe9d1067']
+  ['Baltimore','baltimore-geometric-corners-layout.json','8ff6dfefa90356cbde9158fad070befe045d1c56d0c1d297b0f7e73482a26126'],
+  ['Monaco','monaco-frontage-layout.json','2006e3ba118f9f8c7cbddfed7ab0739eec12663efaac26fae38cbcfb68e647fe'],
+  ['San Francisco','sf-single-partition-layout.json','0bb49c30ca3dade04c2fa593cc7212bf82f6171391bab91f83a8574fab0543c3']
 ];
 const reports=[];
 for(const [name,file,expectedHash] of cases){
-  const source=await readFile(new URL(`../../docs/streets/audit-2026-09-13/${file}`,import.meta.url),'utf8');
+  const source=await readFile(new URL(`../../tests/fixtures/street-geometry/${file}`,import.meta.url),'utf8');
   const hash=createHash('sha256').update(source).digest('hex');
   if(hash!==expectedHash)throw new Error(`${name} source capture changed; review and deliberately update its pinned hash before using a new baseline`);
   const replay=replayStreetLayout(JSON.parse(source));

@@ -3,7 +3,7 @@ import { readFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { createCellCoverage } from '../../app/js/world/cell-coverage.js';
 
-const file = 'docs/streets/audit-2026-09-13/baltimore-geometric-corners-layout.json';
+const file = 'tests/fixtures/cell-coverage-roads.json';
 const bytes = await readFile(file);
 const { roads } = JSON.parse(bytes);
 const stamps = [];

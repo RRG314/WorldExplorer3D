@@ -15,6 +15,6 @@ out of scope. Existing contributions and exterior assets were preserved.
 - [x] Staging candidate and owner test instructions.
 
 Evidence, exact tested artifact, scripts and remaining physical-device/external
-limits are in [capture-redesign-20260910.md](verification/capture-redesign-20260910.md).
+limits are in capture-redesign-20260910.md (private operator record).
 A checked implementation item does not claim unperformed Android, real-image
 quality, historical data migration, email or push acceptance.

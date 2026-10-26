@@ -548,7 +548,7 @@
       "beforeMode": "100644",
       "after": "a9d50aec88adf727e19ab93316815fefad7ac1a6ab7afc26b3698acbefaa07be",
       "afterMode": "100644",
-      "review": "Reviewed verification policy only: 30FPS floor,35ms p95 scheduling allowance and existing50ms p99/individual-pause/hitch limits. Existing byte/request caps apply per cold load,bounded travel,each reload and finalization with complete cumulative accounting. This configuration is not shipped and changes no runtime/save/backend format. The explicit policy change and retained failed evidence are documented in docs/release-review/2026-10-19/VERIFICATION-MEASUREMENT-SCOPE.md."
+      "review": "Reviewed verification policy only: 30FPS floor,35ms p95 scheduling allowance and existing50ms p99/individual-pause/hitch limits. Existing byte/request caps apply per cold load,bounded travel,each reload and finalization with complete cumulative accounting. This configuration is not shipped and changes no runtime/save/backend format. The explicit policy change and retained failed evidence are documented in docs/RELEASE_VALIDATION.md."
     },
     "config/scene-resource-budgets.json": {
       "before": "1d8d58c8a40a1824b2f088d4821a888e2f8d7cd6a8b881746c780f5be7d43a4e",

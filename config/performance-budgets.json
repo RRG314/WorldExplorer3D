@@ -4,7 +4,7 @@
   "memoryMeasurement": {
     "protocol": "post-timing-occupied-retention-v1",
     "scope": "The 1 GiB limit applies to retained JavaScript data in each occupied mode after collection, separately from all natural live timing windows. Raw used heap remains reported and can exceed this value before collection; this is not a total browser/GPU memory ceiling.",
-    "review": "docs/release-review/2026-10-14/MEMORY-MEASUREMENT.md"
+    "review": "docs/RELEASE_VALIDATION.md"
   },
   "desktopTier": {
     "id": "apple-m1-8gb-mac-mini-chrome",
@@ -95,7 +95,7 @@
     "ten location replacements on the same physical devices"
   ],
   "framePacingPolicy": {
-    "review": "docs/release-review/2026-10-19/VERIFICATION-MEASUREMENT-SCOPE.md",
+    "review": "docs/RELEASE_VALIDATION.md",
     "minimumAverageFps": 30,
     "scope": "Current desktop 30 FPS floor with p95 at 35 ms (5% scheduling allowance around a 30 FPS interval), p99 at 50 ms, and unchanged individual-pause, hitch-frequency, coverage, memory and resource criteria. Historical fractional-ms snapshots remain references.",
     "ownerPriority": "Keep the accepted playable frame rate and fix visible jitter/stalling; do not reduce building coverage to chase a historical FPS value."
@@ -103,6 +103,6 @@
   "transferMeasurement": {
     "protocol": "bounded-operation-transfer-v1",
     "scope": "Apply existing byte/request limits independently to cold-world load, the complete bounded movement sequence, each reload and finalization. Account for every byte in the cumulative session; include healthy exact-map providers.",
-    "review": "docs/release-review/2026-10-19/VERIFICATION-MEASUREMENT-SCOPE.md"
+    "review": "docs/RELEASE_VALIDATION.md"
   }
 }

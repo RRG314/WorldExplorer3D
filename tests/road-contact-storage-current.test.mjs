@@ -17,7 +17,7 @@ test('packed contacts preserve stacked layers, reference height, batch ranges an
 });
 
 for(const city of ['sf','monaco'])test(`packed contacts agree with captured ${city} rendered triangle interiors`,()=>{
-  const capture=JSON.parse(readFileSync(new URL(`../docs/streets/audit-2026-09-13/${city}-unioned-roads-surfaces.json`,import.meta.url),'utf8'));
+  const capture=JSON.parse(readFileSync(new URL(`./fixtures/street-geometry/${city}-road-surfaces.json`,import.meta.url),'utf8'));
   const triangles=capture.surfaces.filter(s=>s.family==='road').flatMap(s=>s.triangles);
   const index=createRoadContactIndex([mesh(triangles.flatMap(t=>t.flatMap(p=>[p.x,p.y,p.z])),'at_grade')]);
   let checked=0;
