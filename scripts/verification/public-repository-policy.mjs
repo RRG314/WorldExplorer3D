@@ -24,7 +24,7 @@ const rejected=files.filter(file=>{
   if(sourceExceptions.has(file))return false;
   return localOnly.has(file)||privateRoots.some(root=>file.startsWith(root))||
     /^docs\/streets\/(audit|validation|evidence)[^/]*\//.test(file)||
-    /^(output|dist|test-results|coverage|node_modules|\.firebase|\.playwright-cli|\.local-candidates)\//.test(file)||
+    /^(output|dist|public|_site|test-results|coverage|node_modules|\.firebase|\.playwright-cli|\.local-candidates|android-artifacts|android-widget-evidence|android-launch-evidence|apple-portal-evidence)\//.test(file)||
     /(^|\/)node_modules\//.test(file)||/\.private\./i.test(file)||
     /\.(jks|keystore|p8|p12|pfx|mobileprovision|apk|aab|ipa|xcresult|heapsnapshot)$/i.test(file)||
     /(^|\/)\.env(?:\.[^/]*)?$/.test(file)&&!file.endsWith('/.env.example')&&file!=='.env.example';

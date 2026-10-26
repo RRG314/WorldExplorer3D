@@ -80,3 +80,8 @@ apple/DerivedData/
 *.ipa
 *.xcresult/
 *.heapsnapshot
+/_site/
+/android-artifacts/
+/android-widget-evidence/
+/android-launch-evidence/
+/apple-portal-evidence/
