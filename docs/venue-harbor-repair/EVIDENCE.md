@@ -122,7 +122,7 @@ locations; it is not a photographically exact reconstruction of every museum,
 aquarium or spaceport. Peale collection displays remain the existing interpretive
 museum experience, not its real collection. Aquarium interiors remain the
 Pavilion/Blacktip Reef visit. Their prior performance failures remain recorded in
-`docs/aquarium-expansion/VERIFICATION.md`. Exterior finishes, surrounding generic
+the private aquarium verification records. Exterior finishes, surrounding generic
 utility buildings and wider urban scenery can still look stylized.
 
 Live Overpass timeout/cooldown and a weather-provider 429 were observed in separate

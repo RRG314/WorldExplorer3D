@@ -36,7 +36,7 @@ using its **printed** page numbers. VM =
 VT = [official virtual-tour landing page](https://aqua.org/explore/virtual-tour);
 ordinary viewing is not asset extraction. R =
 [reef exhibit description](https://aqua.org/explore/exhibits/blacktip-reef).
-OSM = [fresh pinned mapping](evidence/2026-10-13-source-refresh.json).
+OSM = [fresh pinned mapping](SOURCE-PROVENANCE.json).
 Rights R0 means factual references only: no redistributed institutional plan,
 photo, tour imagery, prose, logo or model grant. Assets A0 means original
 construction with existing project CC0 surface materials; A1 additionally means

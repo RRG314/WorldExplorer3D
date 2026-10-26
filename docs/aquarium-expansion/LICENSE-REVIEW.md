@@ -21,7 +21,7 @@ The original architect, structural designer and glazing contractor pages are
 factual architectural references only; no image/model redistribution license
 was established. Their published component dimensions cannot license their
 photos or solve the rest of the building. OSM is separately licensed and fresh
-revisions are pinned in evidence/2026-10-13-source-refresh.json.
+revisions are pinned in SOURCE-PROVENANCE.json.
 
 The already imported shark/turtle files have independent CC BY 4.0 credits and
 transformation records. Current source uses them; historical statements about
