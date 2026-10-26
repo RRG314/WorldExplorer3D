@@ -352,50 +352,13 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .globe-destination-bar button:hover, .globe-destination-bar button.active { color: var(--wx-text); background: rgb(238 201 107 / 0.08); }
 .globe-selector-shortcut { position: static; width: auto; height: auto; box-shadow: none; }
 
-/* Runtime desktop HUD */
-#hud { top: 0; left: 0; }
-.hud-box {
-  width: 238px;
-  max-width: 238px;
-  box-sizing: border-box;
-  padding: 16px 16px 18px;
-  color: var(--wx-text);
-  background: var(--wx-panel);
-  border: 0;
-  border-right: 1px solid var(--wx-line-soft);
-  border-bottom: 1px solid var(--wx-line-soft);
-  border-radius: 0;
-  box-shadow: none;
-  backdrop-filter: none;
-}
-.hud-box::before { content: 'WORLD EXPLORER'; display: block; margin: 0 0 24px; padding-bottom: 9px; color: var(--wx-muted); border-bottom: 1px solid var(--wx-line-soft); font: 600 9px/1 var(--wx-font-ui); }
-.hud-box::after { content: attr(data-build-label); position: absolute; top: 39px; left: 16px; max-width: 190px; overflow: hidden; color: var(--wx-blue); font: 600 9px/1 var(--wx-font-ui); text-overflow: ellipsis; white-space: nowrap; }
-.hud-box:not([data-build-label])::after { content: 'SOURCE PREVIEW'; }
-.hud-box.compact { width: 72px; max-width: 72px; min-width: 0; min-height: 44px; padding: 8px; }
-.hud-box.compact::before, .hud-box.compact::after,
-.hud-box.compact #hudClockDisplay { display: none !important; }
-#hudToggleBtn { color: var(--wx-text); background: transparent; border: 1px solid var(--wx-line); border-radius: 50%; }
-#hudHeader { gap: 12px; padding-right: 0; }
-#hudSpeedBlock { flex: 0 0 92px; min-width: 0; }
-#weatherLine, #weatherMetaLine { overflow-wrap: anywhere; }
-#speed { color: var(--wx-text); font-family: var(--wx-font-ui); }
-.hud-label, #weatherMetaLine, #locationLine, .indicators { color: var(--wx-muted); }
-#weatherLine, #street, #hudClockDisplay { color: var(--wx-text); }
-#hudClockDisplay { position: static; width: 100%; margin-top: 8px; padding-top: 6px; transform: none; border-top: 1px solid var(--wx-line-soft); }
-#worldQuickControls {
-  position: fixed;
-  top: var(--wx-world-controls-top);
-  right: 16px;
-  z-index: 10019;
-  display: none;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 4px;
-  margin: 0;
-  pointer-events: auto;
-}
-#worldQuickControls.show { display: flex; }
-#worldQuickControls[hidden] { display: none !important; }
+body.space-flight-active #worldQuickControls,
+body.solid-world-active #worldQuickControls,
+body.activity-browser-open #worldQuickControls,
+body:has(#largeMap.show) #worldQuickControls,
+body:has(#roomPanelModal.show) #worldQuickControls,
+body:has(#propertyPanel.show) #worldQuickControls { display: none !important; }
+[hidden] { display: none !important; }
 body.space-flight-active #worldQuickControls,
 body.solid-world-active #worldQuickControls,
 body.activity-browser-open #worldQuickControls,
@@ -419,8 +382,6 @@ body:has(#propertyPanel.show) #worldQuickControls { display: none !important; }
 .worldQuickControl svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.65; stroke-linecap: round; stroke-linejoin: round; }
 .worldQuickControl span { display: none; }
 .worldQuickControl:hover,.worldQuickControl:focus-visible,.worldQuickControl[aria-pressed="true"] { color: var(--wx-text); background: rgb(238 201 107 / .13); border-color: rgba(90,151,255,.7); }
-#conditionBar { background: var(--wx-panel-soft); border-radius: 0; }
-#conditionFill { background: var(--wx-action); border-radius: 0; }
 #coords {
   left: 14px;
   bottom: 246px;
@@ -497,49 +458,14 @@ body:has(#propertyPanel.show) #worldQuickControls { display: none !important; }
   .globe-destination-bar button { font-size: 8px; }
   .globe-destination-bar button span { font-size: 21px; }
   .globe-selector-side { order: 3; flex: 0 0 auto; padding: 12px 12px 82px; overflow: visible; border-top: 1px solid var(--wx-line-soft); border-left: 0; }
-  #hud { top: 0; left: 0; right: 0; pointer-events: none; }
-  .hud-box {
-    width: 100%;
-    max-width: none;
-    height: 66px;
-    padding: 9px 62px 8px 12px;
-    display: grid;
-    grid-template-columns: 86px minmax(0, 1fr) 72px;
-    gap: 8px;
-    align-items: center;
-    border-right: 0;
-  }
-  .hud-box::before, .hud-box::after, #hudToggleBtn, #conditionBar, .indicators, #locationLine, #hudClockDisplay { display: none; }
-  .hud-box.compact { width: 100%; max-width: none; padding: 9px 62px 8px 12px; display: grid; }
-  .hud-box.compact #hudHeader, .hud-box.compact #hudDetails { display: contents; }
-  #hudHeader { display: contents; padding: 0; }
-  #hudSpeedBlock { min-width: 0; display: flex; align-items: baseline; gap: 5px; }
-  #speed { font-size: 21px; }
-  .hud-label { font-size: 8px; }
-  .hud-label span:not(#speedUnitLabel) { display: none; }
-  #weatherPanel { display: contents !important; }
-  #weatherLine,#weatherTimeLine,#weatherMetaLine { display: none !important; }
-  #worldQuickControls { position: fixed; top: var(--wx-world-controls-top); right: 8px; justify-content: flex-end; gap: 4px; margin: 0; padding: 0; border: 0; pointer-events: auto; }
-  .worldQuickControl { min-width: var(--wx-world-control-size); width: var(--wx-world-control-size); height: var(--wx-world-control-size); padding: 0; border-radius: 50%; }
-  .worldQuickControl svg { width: 15px; height: 15px; }
-  .worldQuickControl span { display: none; }
-  #weatherTimeLine, #weatherMetaLine { display: none; }
-  #hudDetails { display: contents; }
-  #street { grid-column: 2; grid-row: 1; overflow: hidden; font: 600 10px/1.2 var(--wx-font-ui); text-align: center; text-overflow: ellipsis; white-space: nowrap; }
   .mainMenuBtn { width: 58px; height: 66px; padding: 0; overflow: hidden; font-size: 0; pointer-events: auto; z-index: 10020; }
   .mainMenuBtn::before { content: '☰'; font: 28px/1 Inter, sans-serif; }
   #gameShareFloatBtn { top: var(--wx-world-controls-top); right: 88px; width: 46px; height: 46px; border-radius: 50%; }
-  #minimap { top: 78px; bottom: auto; left: 10px; width: min(190px, 48vw); height: min(190px, 48vw); border-radius: 8px; }
-  #coords { top: calc(78px + min(190px, 48vw) - 38px); bottom: auto !important; left: 10px !important; width: min(190px, 48vw); min-height: 38px; font-size: 9px; background: rgba(3, 9, 14, 0.86); border-radius: 0 0 8px 8px; }
-  #coords { z-index: 102; }
-  #minimapZoomControls { display: none !important; }
   /* An expanded paint tool palette must remain reachable above the map. */
   #paintTownHud[data-paint-layout="expanded"] { top: calc(70px + env(safe-area-inset-top)) !important; z-index: 110 !important; max-height: calc(100dvh - 180px); overflow-y: auto; }
   #multiplayerMenu { position: relative; left: auto; bottom: auto; z-index: auto; }
   #controlsTab, #memoryFlowerFloatBtn { display: none !important; }
   #controlsTab.bar-open { display: block !important; }
-  body.deflock-active #minimap { width: min(145px,37vw); height: min(145px,37vw); }
-  body.deflock-active #coords { top: calc(78px + min(145px,37vw) - 38px); width: min(145px,37vw); }
 }
 
 @media (max-width: 390px) {
@@ -564,9 +490,6 @@ body:has(#propertyPanel.show) #worldQuickControls { display: none !important; }
 }
 
 @media (max-height: 560px) and (orientation: landscape) {
-  #minimap { width: 148px; height: 148px; }
-  #coords { top: auto; bottom: 170px; width: 148px; }
-  .hud-box { width: 100%; max-width: none; padding-bottom: 8px; }
   #controlsTab { top: 66px; right: 12px; }
 }
 }

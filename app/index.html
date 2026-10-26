@@ -31,19 +31,20 @@ if (location.protocol === 'file:') document.documentElement.classList.add('unsup
 <style>@layer legacy, interface;</style>
 <link rel="stylesheet" href="../styles/world-explorer-tokens.css?v=3">
 <link rel="stylesheet" href="../styles/world-explorer-components.css?v=2">
-<link rel="stylesheet" href="styles/title-shell.css?v=96">
-<link rel="stylesheet" href="styles/runtime-shell.css?v=134">
+<link rel="stylesheet" href="styles/title-shell.css?v=97">
+<link rel="stylesheet" href="styles/runtime-shell.css?v=135">
 <link rel="stylesheet" href="styles/block-builder.css?v=9">
 <link rel="stylesheet" href="styles/universe.css?v=9">
 <link rel="stylesheet" href="styles/fishing-game.css?v=6">
-<link rel="stylesheet" href="styles/interface-v4.css?v=35">
+<link rel="stylesheet" href="styles/interface-v4.css?v=36">
 <link rel="stylesheet" href="styles/start-hub.css?v=22">
-<link rel="stylesheet" href="styles/navigation.css?v=2">
+<link rel="stylesheet" href="styles/navigation.css?v=3">
 <link rel="stylesheet" href="styles/discovery.css?v=21">
 <link rel="stylesheet" href="styles/backpack.css?v=1">
 <link rel="stylesheet" href="styles/tutorial.css?v=15">
 <link rel="stylesheet" href="styles/ar.css?v=1">
-<link rel="stylesheet" href="styles/mobile-controls.css?v=5">
+<link rel="stylesheet" href="styles/mobile-controls.css?v=6">
+<link rel="stylesheet" href="styles/hud.css?v=1">
 <link rel="stylesheet" href="styles/map-explorer.css?v=4">
 <link rel="stylesheet" href="styles/accessibility.css?v=4">
 <link rel="stylesheet" href="styles/reality-capture.css?v=2">
@@ -799,8 +800,8 @@ How Connected Data Is Used
 <button id="liveEarthReplayBtn" class="live-earth-local-btn primary" type="button">Replay Shake</button>
 </div>
 </div>
-<div id="hud"><div class="hud-box" id="hudBox">
-<button id="hudToggleBtn" type="button" aria-label="Collapse HUD" aria-expanded="true">-</button>
+<div id="hud" role="region" aria-label="Travel status"><div class="hud-box" id="hudBox">
+<button id="hudToggleBtn" type="button" aria-label="Collapse HUD" aria-expanded="true" aria-controls="hudHeader hudDetails hudClockDisplay">−</button>
 <div id="hudHeader">
 <div id="hudSpeedBlock">
 <div id="speed">0</div>
@@ -814,13 +815,40 @@ How Connected Data Is Used
 </div>
 <div id="hudClockDisplay"></div>
 <div id="hudDetails">
+<span id="conditionLabel">Explorer health · 100%</span>
 <div id="conditionBar" role="progressbar" aria-label="Explorer health" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100" title="Explorer health · 100%"><div id="conditionFill" data-state="healthy"></div></div>
 <div id="street">Loading...</div>
 <div id="locationLine"></div>
 <div class="indicators"><span class="ind" id="indBrake">BRK</span><span class="ind" id="indBoost">BOOST</span><span class="ind" id="indDrift">DRIFT</span></div>
 </div>
-</div></div>
+</div>
+<div id="hudMap" aria-label="Local map and coordinates">
+<div class="hudMapVisual">
+<canvas id="minimap" width="150" height="150"></canvas>
+<div id="minimapZoomControls" aria-label="Minimap zoom controls">
+  <button id="minimapZoomIn" class="minimapZoomBtn" type="button" aria-label="Zoom in on minimap">+</button>
+  <div id="minimapZoomLevel" aria-live="polite">Z 15</div>
+  <button id="minimapZoomOut" class="minimapZoomBtn" type="button" aria-label="Zoom out on minimap">−</button>
+</div>
+</div>
 <div id="coords"><span id="coordsText">--</span><a id="coordsOsmLink" data-osm-location-link href="https://www.openstreetmap.org" target="_blank" rel="noopener noreferrer" title="Edit this location in OpenStreetMap">OSM</a><a id="terrainImageryCredit" hidden href="https://www.esri.com/en-us/legal/terms/full-master-agreement" target="_blank" rel="noopener noreferrer" title="Imagery: Esri, Vantor, Earthstar Geographics, and the GIS User Community">© Esri</a></div>
+</div>
+<div id="hudUtilities">
+<div id="worldQuickControls" aria-label="Quick world controls">
+<button id="quickTimeOfDay" class="worldQuickControl" type="button" aria-label="Change time of day" title="Change time of day">
+<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.5"></circle><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M18.7 5.3l-2.1 2.1M7.4 16.6l-2.1 2.1"></path></svg>
+<span id="quickTimeOfDayState">Live</span>
+</button>
+<button id="quickWeatherMode" class="worldQuickControl" type="button" aria-label="Change weather" title="Change weather">
+<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7.2 18.2h10.3a3.6 3.6 0 0 0 .4-7.2 5.8 5.8 0 0 0-11-1.1 4.2 4.2 0 0 0 .3 8.3Z"></path></svg>
+<span id="quickWeatherModeState">Live</span>
+</button>
+</div>
+<div class="floatMenu contextualMenuControl" id="controlsMenu">
+<button class="floatBtn controls" id="controlsBarBtn" type="button" aria-label="Open current controls" aria-expanded="false" title="Current controls"><span class="btnIcon">⚙️</span><span class="btnText">Controls</span></button>
+</div>
+</div>
+</div>
 <div id="interiorPrompt" aria-live="polite"></div>
 <div id="boatPrompt" aria-live="polite"></div>
 <div id="discoveryContextPrompt" aria-live="polite"><span id="discoveryContextText">Explore what is possible here.</span><button id="discoveryContextOpenBtn" type="button">Explore</button></div>
@@ -1082,12 +1110,7 @@ How Connected Data Is Used
     <button id="liveGpsStopBtn" type="button">Stop</button>
   </div>
 </section>
-<canvas id="minimap" width="150" height="150"></canvas>
-<div id="minimapZoomControls" aria-label="Minimap zoom controls">
-  <button id="minimapZoomIn" class="minimapZoomBtn" type="button" aria-label="Zoom in on minimap">+</button>
-  <div id="minimapZoomLevel" aria-live="polite">Z 15</div>
-  <button id="minimapZoomOut" class="minimapZoomBtn" type="button" aria-label="Zoom out on minimap">−</button>
-</div>
+
 <div id="largeMap">
 <header id="mapExplorerHeader">
   <div><span>WORLD MAP</span><strong id="mapExplorerStatus">Following your position</strong></div>
@@ -1424,9 +1447,6 @@ How Connected Data Is Used
 </div>
 </div>
 
-<div class="floatMenu contextualMenuControl" id="controlsMenu">
-<button class="floatBtn controls" id="controlsBarBtn" type="button" aria-label="Open current controls" aria-expanded="false" title="Current controls"><span class="btnIcon">⚙️</span><span class="btnText">Controls</span></button>
-</div>
 <div class="floatItem" id="fHome" style="display:none">🏠 Menu</div>
 
 <!-- Map display settings live with the map; weather and time live in the top quick controls. -->
@@ -1543,16 +1563,6 @@ How Connected Data Is Used
 </div>
 
 <button class="mainMenuBtn" id="mainMenuBtn">🏠 Main Menu</button>
-<div id="worldQuickControls" aria-label="Quick world controls">
-<button id="quickTimeOfDay" class="worldQuickControl" type="button" aria-label="Change time of day" title="Change time of day">
-<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.5"></circle><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M18.7 5.3l-2.1 2.1M7.4 16.6l-2.1 2.1"></path></svg>
-<span id="quickTimeOfDayState">Live</span>
-</button>
-<button id="quickWeatherMode" class="worldQuickControl" type="button" aria-label="Change weather" title="Change weather">
-<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7.2 18.2h10.3a3.6 3.6 0 0 0 .4-7.2 5.8 5.8 0 0 0-11-1.1 4.2 4.2 0 0 0 .3 8.3Z"></path></svg>
-<span id="quickWeatherModeState">Live</span>
-</button>
-</div>
 <button id="memoryFlowerFloatBtn" title="Place Flower Memory">🌸</button>
 <div id="flowerActionMenu" aria-label="Flower Actions">
 <button id="flowerActionMemoryBtn" class="flowerActionOption" type="button">🌸 Place Memory Flower</button>
@@ -1767,5 +1777,5 @@ How Connected Data Is Used
 <!-- Real Estate System -->
 <script type="module" data-startup-critical src="js/app-shell-fragments.js?v=91"></script>
 <script type="module" src="js/app-auth-shell.js?v=87"></script>
-<script type="module" data-startup-critical src="js/bootstrap.js?v=614"></script>
+<script type="module" data-startup-critical src="js/bootstrap.js?v=615"></script>
 </body></html>

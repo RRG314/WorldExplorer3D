@@ -3,6 +3,7 @@ import {OCEAN_DEPTH_MODEL} from './depth-model.js';
 import { worldUnitsPerSecondToKnots } from '../physics/vehicle-speed-units.js?v=2';
 
 import { drawOceanNavigationMap } from './navigation-map.js?v=1';
+import {renderHudCondition} from '../hud/condition-view.js';
 
 export function updateOceanHud(appCtx, oceanMode, nowSeconds = 0, sampleSeabedEvidence = null) {
   const speedEl = document.getElementById('speed');
@@ -15,8 +16,6 @@ export function updateOceanHud(appCtx, oceanMode, nowSeconds = 0, sampleSeabedEv
   const indBrake = document.getElementById('indBrake');
   const indBoost = document.getElementById('indBoost');
   const indDrift = document.getElementById('indDrift');
-  const conditionBar = document.getElementById('conditionBar');
-  const conditionFill = document.getElementById('conditionFill');
   const nativeDepth=oceanMode.depthProfile?.model===OCEAN_DEPTH_MODEL.GEOGRAPHIC;
   const diving=!!oceanMode.diver?.active;
   const sub = diving?oceanMode.diver.navigationActor():oceanMode.submarine;
@@ -26,7 +25,6 @@ export function updateOceanHud(appCtx, oceanMode, nowSeconds = 0, sampleSeabedEv
   const depth = Math.max(0, Math.round(((oceanMode.waterSample?.surfaceY ?? .08)-sub.position.y) * metersPerUnit));
   const breathing=diving?oceanMode.diver.snapshot().swimming:null;
   const condition = diving?Math.max(0,Math.min(1,(breathing?.airSeconds??180)/(breathing?.airCapacity||180))):Math.max(0, Math.min(1, Number(oceanMode.condition ?? sub.condition ?? 1)));
-  const conditionPct = Math.round(condition * 100);
 
   if (speedUnitLabel) speedUnitLabel.textContent = 'KTS';
   if (limitLabel) limitLabel.textContent = nativeDepth?'DEPTH':'SIM DEPTH';
@@ -56,15 +54,7 @@ export function updateOceanHud(appCtx, oceanMode, nowSeconds = 0, sampleSeabedEv
   drawOceanNavigationMap(appCtx, oceanMode, sampleSeabedEvidence);
   if (limitEl) limitEl.title = nativeDepth?'Metre-scale depth below the game sea surface. Seabed uses the available geographic model; unknown areas are marked on the map.':'Authored study depth below the game sea surface. Seabed is compressed; geographic model depth is separate.';
 
-  if (conditionFill) {
-    conditionFill.style.width = `${conditionPct}%`;
-    conditionFill.dataset.state = condition <= .25 ? 'critical' : condition <= .6 ? 'injured' : 'healthy';
-  }
-  if (conditionBar) {
-    conditionBar.setAttribute('aria-label', diving?'Dive air':'Submarine health');
-    conditionBar.setAttribute('aria-valuenow', String(conditionPct));
-    conditionBar.title = `${diving?'Dive air':'Submarine health'} · ${conditionPct}%`;
-  }
+  renderHudCondition(document, condition, diving ? 'Dive air' : 'Submarine health');
   if (indBrake) {
     indBrake.textContent = 'ASC';
     indBrake.classList.toggle('on', !!(appCtx.keys.Space || appCtx.keys.KeyR));

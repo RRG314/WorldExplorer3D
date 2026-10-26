@@ -33,7 +33,7 @@ import {
 import { createOceanFishLifeApi } from "./ocean/fish-life.js?v=2";
 import { createFishPopulationContext } from './fishing/population-authority.js?v=2';
 import { createOceanBathymetryApi } from "./ocean/bathymetry.js?v=5";
-import { updateOceanHud as updateOceanHudView } from "./ocean/hud.js?v=5";
+import { updateOceanHud as updateOceanHudView } from "./ocean/hud.js?v=6";
 import {
   commitEnvironment,
   exitCurrentEnvironmentSync,

@@ -1,0 +1,135 @@
+/* One presentation owner for the shared travel readout. Controllers supply all
+   values; collapse remains owned by the existing settings event handler. */
+@layer interface {
+  #hud {
+    position: fixed;
+    top: max(12px, env(safe-area-inset-top));
+    left: max(12px, env(safe-area-inset-left));
+    right: max(12px, env(safe-area-inset-right));
+    z-index: 100;
+    display: none;
+    grid-template-columns: minmax(0, max-content) 1fr;
+    grid-template-rows: auto minmax(0, 1fr);
+    height: calc(100dvh - var(--wx-navigation-height,78px) - 40px);
+    align-items: start;
+    gap: 8px;
+    pointer-events: none;
+  }
+  #hud.show { display: grid; }
+  .hud-box {
+    grid-row: 1;
+    grid-column: 1;
+    position: relative;
+    width: min(calc(280px * var(--wx-text-scale)), calc(100vw - 24px));
+    max-height: calc(100dvh - var(--wx-navigation-height, 78px) - 48px);
+    padding: 16px;
+    overflow: auto;
+    overscroll-behavior: contain;
+    color: var(--wx-text);
+    background: var(--wx-panel);
+    border: 1px solid var(--wx-line-soft);
+    border-radius: var(--wx-radius);
+    font: 500 var(--wx-type-meta)/1.4 var(--wx-font-ui);
+    pointer-events: auto;
+  }
+  #hudToggleBtn {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    min-width: 44px;
+    min-height: 44px;
+    padding: 6px;
+    color: var(--wx-muted);
+    background: var(--wx-panel-soft);
+    border: 1px solid var(--wx-line-soft);
+    border-radius: var(--wx-radius);
+    font: 650 var(--wx-type-control)/1.2 var(--wx-font-ui);
+    cursor: pointer;
+  }
+  #hudToggleBtn:hover { color: var(--wx-text); border-color: var(--wx-action); }
+  #hudHeader { display: flex; align-items: start; flex-wrap: wrap; gap: 12px; padding-right: 44px; }
+  #hudSpeedBlock { min-width: 0; flex: 1 1 80px; }
+  #speed { font: 700 calc(2rem * var(--wx-text-scale))/1 var(--wx-font-instrument); color: var(--wx-text); }
+  #speed.fast { color: var(--wx-warning); }
+  .hud-label { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; color: var(--wx-muted); font-size: var(--wx-type-meta); }
+  #weatherPanel { display: none; flex: 1 1 112px; min-width: 0; }
+  #weatherLine, #weatherMetaLine { overflow-wrap: anywhere; line-height: 1.4; }
+  #weatherLine { color: var(--wx-text); }
+  #weatherMetaLine { margin-top: 4px; color: var(--wx-muted); }
+  #weatherTimeLine { display: none; }
+  #hudClockDisplay { display: none; position: static; margin-top: 12px; font-variant-numeric: tabular-nums; color: var(--wx-muted); }
+  #hudDetails { display: grid; gap: 5px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--wx-line-soft); }
+  #conditionLabel { color: var(--wx-muted); font-size: var(--wx-type-meta); overflow-wrap: anywhere; }
+  #conditionBar { width: 100%; height: 5px; margin: 0 0 7px; overflow: hidden; background: var(--wx-input); border-radius: 1px; }
+  #conditionFill { height: 100%; width: 100%; background: var(--wx-success); }
+  #conditionFill[data-state="injured"] { background: var(--wx-warning); }
+  #conditionFill[data-state="critical"] { background: var(--wx-danger); }
+  #street { color: var(--wx-text); font: 650 var(--wx-type-control)/1.4 var(--wx-font-ui); overflow-wrap: anywhere; }
+  #locationLine { color: var(--wx-muted); overflow-wrap: anywhere; }
+  .indicators { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+  .ind { color: var(--wx-muted); font: 600 var(--wx-type-meta)/1.4 var(--wx-font-instrument); }
+  .ind.on { color: var(--wx-action); }
+  .ind.warn { color: var(--wx-danger); }
+  .hud-box.compact { width: auto; min-width: 56px; padding: 5px; overflow: visible; }
+  .hud-box.compact #hudToggleBtn { position: static; }
+  .hud-box.compact #hudHeader, .hud-box.compact #hudDetails, .hud-box.compact #hudClockDisplay { display: none !important; }
+  #hudUtilities { grid-row: 1; grid-column: 2; justify-self: end; display: grid; justify-items: end; gap: 8px; margin-top: 54px; pointer-events: auto; }
+  #worldQuickControls { position: static; display: none; align-items: center; gap: 6px; }
+  #worldQuickControls.show { display: flex; }
+  #controlsMenu { position: static; width: auto; }
+  body:is(.game-panel-layer-open, .game-activity-layer-open) #hudUtilities { display: none; }
+  .worldQuickControl, .minimapZoomBtn { display: inline-flex; align-items: center; justify-content: center; width: 44px; min-width: 44px; height: 44px; min-height: 44px; padding: 0; color: var(--wx-text); background: var(--wx-panel-solid); border: 1px solid var(--wx-line-soft); border-radius: var(--wx-radius); font: 650 var(--wx-type-control)/1 var(--wx-font-ui); cursor: pointer; }
+  .worldQuickControl:hover, .worldQuickControl[aria-pressed="true"], .minimapZoomBtn:hover { color: var(--wx-action); border-color: var(--wx-action); }
+  .worldQuickControl svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.65; stroke-linecap: round; stroke-linejoin: round; }
+  .worldQuickControl span { display: none; }
+  #hudMap { position: relative; grid-row: 2; grid-column: 1; align-self: end; width: 222px; min-height: 0; max-height: 100%; max-width: calc(100vw - 28px); overflow: auto; overscroll-behavior: contain; pointer-events: auto; }
+  #coords { position: static; display: none; align-items: center; gap: 8px; width: 100%; padding: 8px; color: var(--wx-muted); background: var(--wx-panel-solid); border: 1px solid var(--wx-line-soft); font: 500 var(--wx-type-meta)/1.4 var(--wx-font-ui); overflow-wrap: anywhere; }
+  #coords.show { display: flex; }
+  #coordsText { flex: 1; min-width: 0; }
+  #coords a { display: inline-flex; flex: none; min-width: 44px; min-height: 44px; align-items: center; justify-content: center; color: var(--wx-action); }
+  .hudMapVisual { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px; align-items: start; }
+  #minimap { position: static; display: none; width: 100%; height: auto; aspect-ratio: 1; border: 1px solid var(--wx-line); border-radius: var(--wx-radius); background: var(--wx-panel-solid); cursor: pointer; }
+  #minimap.show { display: block; }
+  #minimapZoomControls { position: static; display: none; flex-direction: column; gap: 4px; align-items: center; }
+  #minimapZoomControls.show { display: flex; }
+  #minimapZoomLevel { padding: 2px 6px; color: var(--wx-text); background: var(--wx-panel-solid); font: 500 var(--wx-type-meta)/1.4 var(--wx-font-instrument); white-space: nowrap; }
+  .minimapZoomBtn:disabled { opacity: .5; cursor: default; }
+
+  @media (max-width: 760px), (pointer: coarse) {
+    #hud { top: max(8px, env(safe-area-inset-top)); left: max(8px, env(safe-area-inset-left)); right: max(8px, env(safe-area-inset-right)); height: auto; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto; }
+    .hud-box { width: calc(100% - 60px); max-height: min(35dvh, calc(100dvh - 140px)); padding: 8px 54px 8px 10px; }
+    #hudToggleBtn { top: 4px; right: 4px; }
+    #hudHeader { padding: 0; }
+    #hudSpeedBlock { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; }
+    #speed { font-size: calc(1.5rem * var(--wx-text-scale)); }
+    .hud-label { margin: 0; gap: 4px; }
+    #weatherPanel { display: none !important; }
+    #hudClockDisplay { display: none !important; }
+    #hudDetails { grid-template-columns: minmax(0, 1fr); gap: 2px; margin-top: 5px; padding-top: 5px; }
+    #conditionLabel { font-size: var(--wx-type-meta); }
+    #conditionBar { margin: 0 0 3px; height: 3px; }
+    #street { font-size: var(--wx-type-meta); }
+    #locationLine { display: none !important; }
+    .indicators { display: none; }
+    .hud-box.compact { width: max-content; }
+    #hudMap { position: relative; grid-row: 2; grid-column: 1; left: auto; bottom: auto; width: min(calc(150px * var(--wx-text-scale)), calc(100vw - 132px)); max-height: calc(65dvh - var(--wx-navigation-height,78px) - 180px); overflow: auto; overscroll-behavior: contain; }
+    .hudMapVisual { grid-template-columns: minmax(0, 1fr); }
+    #coords { padding: 4px; font-size: var(--wx-type-meta); }
+    #coords a { font-size: var(--wx-type-meta); }
+    #minimapZoomControls { display: none !important; }
+    #hudUtilities { grid-row: 2; grid-column: 1; margin-top: 0; }
+  }
+  @media (max-height: 560px) and (orientation: landscape) {
+    #hud { right: max(8px, env(safe-area-inset-right)); width: auto; }
+    .hud-box { width: min(340px, calc(100vw - 140px)); max-height: 130px; }
+    #hudDetails { grid-template-columns: minmax(0, 1fr); }
+    #hudMap { position: fixed; top: auto; bottom: calc(var(--wx-navigation-height,78px) + 66px); left: 50%; width: 96px; max-height: none; transform: translateX(-50%); }
+    #hudUtilities { grid-row: 1; grid-column: 1; margin-top: 66px; }
+    #coords { display: none !important; }
+  }
+  @media (forced-colors: active) {
+    .hud-box, #hudToggleBtn { border-color: CanvasText; }
+    #conditionBar { border: 1px solid CanvasText; }
+    #conditionFill { background: Highlight; }
+  }
+}

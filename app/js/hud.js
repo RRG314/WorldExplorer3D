@@ -1,4 +1,5 @@
 import {resolveControlState} from './transport/control-state.js';
+import {renderHudCondition} from './hud/condition-view.js';
 import { setDomText, setDomAttribute, setDomHidden, setDomClass } from './ui/dom-state.js?v=1';
 import { ctx as appCtx } from "./shared-context.js?v=55"; // ============================================================================
 import { updateNightLighting } from "./engine/night-lighting.js?v=8";
@@ -177,18 +178,7 @@ function setStreetAndLocation(roadLabel, locationLabel) {
 }
 
 function updateConditionBar(condition = 1, label = 'Explorer') {
-  const bar = document.getElementById('conditionBar');
-  const fill = document.getElementById('conditionFill');
-  if (!bar || !fill) return;
-  const value = clampValue(Number(condition), 0, 1);
-  const percent = Math.round(value * 100);
-  const state = value <= .25 ? 'critical' : value <= .6 ? 'injured' : 'healthy';
-  const width = `${percent}%`;
-  if (fill.style.width !== width) fill.style.width = width;
-  setDomAttribute(fill, 'data-state', state);
-  setDomAttribute(bar, 'aria-label', `${label} health`);
-  setDomAttribute(bar, 'aria-valuenow', percent);
-  setDomAttribute(bar, 'title', `${label} health · ${percent}%`);
+  renderHudCondition(document, condition, `${label} health`);
 }
 
 function explorerCondition() {

@@ -123,14 +123,12 @@
   .floatItem:hover, .floatItem.on { color: var(--wx-action); background: var(--wx-selected); box-shadow: inset 3px 0 var(--wx-action); }
   .floatItem.recording { color: var(--wx-danger); border-color: var(--wx-danger); }
   .floatItemSection { grid-column: 1 / -1; padding: 18px 12px 8px; color: var(--wx-muted); font: 650 var(--wx-type-meta)/1.5 var(--wx-font-ui); letter-spacing: .06em; }
-  .contextualMenuControl { position: absolute; right: -66px; bottom: 0; width: 58px; }
   .contextualMenuControl .floatBtn { min-height: 58px; padding: 8px 2px; border: 1px solid var(--wx-line); border-radius: var(--wx-radius); background: var(--wx-panel-solid); }
   .contextualMenuControl .btnText { display: none; }
   .contextualMenuControl .floatBtn::after { content: 'Controls'; font: 600 var(--wx-type-meta)/1.2 var(--wx-font-ui); }
 
   html:is([data-we3d-text-scale="160"], [data-we3d-text-scale="200"]) .floatMenuContainer { grid-template-columns: repeat(5, minmax(160px, 1fr)); overflow-x: auto; scrollbar-width: thin; }
   html:is([data-we3d-text-scale="160"], [data-we3d-text-scale="200"]) .floatMenu:not(.contextualMenuControl) .btnIcon { display: none; }
-  html:is([data-we3d-text-scale="160"], [data-we3d-text-scale="200"]) .contextualMenuControl { position: fixed; right: 16px; bottom: calc(var(--wx-navigation-height) + 24px); }
 
   @media (max-width: 1100px), (pointer: coarse) {
     :root { --wx-navigation-height: max(78px, calc(var(--wx-type-control) * 2.8 + 20px)); }
@@ -141,7 +139,6 @@
     .floatMenu.open .floatItems { display: grid; }
     .floatMenuTitle { padding: 14px 8px; }
     .floatItem { min-height: 50px; padding: 10px 8px; }
-    .contextualMenuControl { position: fixed; right: 8px; bottom: calc(var(--wx-navigation-height) + env(safe-area-inset-bottom) + 8px); width: 44px; }
     .contextualMenuControl .floatBtn { width: 44px; min-height: 44px; padding: 0; }
     .contextualMenuControl .floatBtn::after { display: none; }
     html:is([data-we3d-text-scale="160"], [data-we3d-text-scale="200"]) .floatItems { grid-template-columns: minmax(0, 1fr); }

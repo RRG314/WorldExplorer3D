@@ -48,8 +48,6 @@
 #gameShareStatus{font-size:10px;line-height:1.25;color:#475569;min-height:12px;margin-top:6px}
 #buildModeIndicator{position:fixed;left:20px;bottom:78px;background:rgba(17,24,39,0.88);border:1px solid rgba(251,146,60,0.7);border-radius:10px;padding:9px 12px;font-size:11px;color:#fdba74;z-index:101;display:none;max-width:280px;line-height:1.45;box-shadow:0 8px 20px rgba(0,0,0,0.25)}
 #buildModeIndicator.show{display:block}
-#coords{position:fixed;bottom:200px;left:20px;background:rgba(255,255,255,0.95);border:none;border-radius:10px;padding:10px 14px;font-size:11px;color:#475569;z-index:100;display:none;box-shadow:0 4px 12px rgba(0,0,0,0.1);cursor:pointer}
-#coords.show{display:block}
 #interiorPrompt{position:fixed;left:50%;bottom:116px;transform:translateX(-50%);display:none;max-width:min(78vw,420px);padding:10px 14px;border-radius:999px;background:rgba(15,23,42,0.9);border:1px solid rgba(148,163,184,0.35);color:#f8fafc;font-family:'Poppins',sans-serif;font-size:12px;font-weight:600;letter-spacing:0.2px;z-index:140;box-shadow:0 12px 28px rgba(15,23,42,0.3);backdrop-filter:blur(8px);pointer-events:none}
 #interiorPrompt.show{display:block}
 #interiorPrompt[data-variant="supported"],#interiorPrompt[data-variant="active"]{border-color:rgba(52,211,153,0.65);color:#dcfce7}

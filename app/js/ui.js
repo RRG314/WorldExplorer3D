@@ -14,6 +14,7 @@ import { captureEnvironmentSession, exitCurrentEnvironmentSync } from './session
 import { createEarthReturnAction } from './travel/earth-return.js';
 import {bindSurfaceRecoveryControls} from './ui/recovery-controls.js';
 import {mountTesterInvitation} from './ui/tester-invitation.js';
+import {bindWorldFocusControls} from './ui/world-focus.js';
 
 function emitTutorialEvent(eventName, payload = {}) {
   if (typeof appCtx.tutorialOnEvent === 'function') {
@@ -171,26 +172,7 @@ function setupUI() {
       if (menuEl && menuEl.classList.contains('open')) appCtx.toggleFlowerActionMenu();
     }
   }
-  // Menu focus remains useful after a dialog closes. Give keyboard players an
-  // explicit way back to movement, without allowing buttons to dispatch travel.
-  const returnKeyboardToWorld = () => {
-    if (!appCtx.gameStarted || appCtx.paused || appCtx.worldLoading ||
-        appCtx.titleLaunchPending || appCtx.earthResumePending ||
-        appCtx.screenLayout?.snapshot?.().panelLayer) return false;
-    const canvas = appCtx.renderer?.domElement;
-    if (!canvas?.isConnected) return false;
-    closeAllFloatMenus();
-    canvas.focus({preventScroll:true});
-    return document.activeElement === canvas;
-  };
-  document.getElementById('returnToWorldBtn')?.addEventListener('click', returnKeyboardToWorld);
-  document.getElementById('floatMenuContainer')?.addEventListener('keydown', event => {
-    if (event.key !== 'Escape' || event.target?.isContentEditable ||
-        ['INPUT','TEXTAREA','SELECT'].includes(event.target?.tagName)) return;
-    if (!returnKeyboardToWorld()) return;
-    event.preventDefault();
-    event.stopPropagation(); // This UI action must not also toggle manual pause.
-  });
+  bindWorldFocusControls(appCtx, closeAllFloatMenus);
   function goToMainMenu() {
     emitTutorialEvent('opened_main_menu', { source: 'main_menu_button' });
     appCtx.stopLiveGpsMode?.({ reason: 'main-menu' });
