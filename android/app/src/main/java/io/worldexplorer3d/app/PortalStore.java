@@ -20,7 +20,7 @@ import java.util.function.BooleanSupplier;
 /** Native projection of the shared catalog/Trail wire contract. No game engine,
  * location tracking, socket, reward authority or alternate Explorer identity. */
 final class PortalStore {
-    static final String ORIGIN="https://worldexplorer3d.io";
+    static final String ORIGIN=BuildConfig.PORTAL_ORIGIN;
     static final Object LOCK=new Object();
     private final Context context;
     private final SharedPreferences prefs;
@@ -157,7 +157,11 @@ final class PortalStore {
             }
         }
     }
-    void markSynced(String expectedOwner,BooleanSupplier current){synchronized(LOCK){if(current.getAsBoolean()&&owner().equals(expectedOwner)&&!accountCommitPending())prefs.edit().putLong("synced:"+expectedOwner,System.currentTimeMillis()).commit();}}
+    boolean markSynced(String expectedOwner,BooleanSupplier current)throws JSONException{
+        synchronized(LOCK){if(!current.getAsBoolean()||!owner().equals(expectedOwner)||accountCommitPending())return false;
+            for(JSONObject entry:entries(expectedOwner))if(entry.getJSONObject("pending").length()>0)return false;
+            if(!prefs.edit().putLong("synced:"+expectedOwner,System.currentTimeMillis()).commit())throw new JSONException("Your Trail status could not be saved.");return true;}
+    }
     long syncedAt(){return prefs.getLong("synced:"+owner(),0);}
     String learning(int widgetId){return prefs.getString("learning:"+widgetId,"");}
     String learningVersion(int widgetId){return prefs.getString("learningVersion:"+widgetId,"");}

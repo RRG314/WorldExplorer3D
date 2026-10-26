@@ -29,14 +29,14 @@
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="io.worldexplorer3d.app" android:host="portal-connect" />
+                <data android:scheme="${applicationId}" android:host="portal-connect" />
             </intent-filter>
         </activity>
         <service android:name=".PortalRefreshJob" android:permission="android.permission.BIND_JOB_SERVICE" android:exported="true" />
         <activity
             android:name=".GameLauncherActivity"
             android:exported="true">
-            <meta-data android:name="android.support.customtabs.trusted.DEFAULT_URL" android:value="https://worldexplorer3d.io/app/?distribution=google-play" />
+            <meta-data android:name="android.support.customtabs.trusted.DEFAULT_URL" android:value="${gameUrl}" />
             <meta-data android:name="android.support.customtabs.trusted.DISPLAY_MODE" android:value="immersive" />
             <meta-data android:name="android.support.customtabs.trusted.STATUS_BAR_COLOR" android:resource="@color/brand_background" />
             <meta-data android:name="android.support.customtabs.trusted.NAVIGATION_BAR_COLOR" android:resource="@color/brand_background" />
@@ -62,7 +62,7 @@
         <activity android:name="com.google.androidbrowserhelper.trusted.ManageDataLauncherActivity"
             android:exported="false">
             <meta-data android:name="android.support.customtabs.trusted.MANAGE_SPACE_URL"
-                android:value="https://worldexplorer3d.io" />
+                android:value="${gameOrigin}" />
         </activity>
         <provider android:name="androidx.core.content.FileProvider"
             android:authorities="@string/provider_authority" android:exported="false" android:grantUriPermissions="true">

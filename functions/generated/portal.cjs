@@ -408,11 +408,13 @@ var PORTAL_NATIVE_CLIENTS = Object.freeze({
     "1:469573887496:ios:e86ce3a7af39b6d842d3bd": Object.freeze({ platform: "ios", label: "World Explorer 3D for Apple", callback: "io.worldexplorer3d.app://portal-connect" })
   }),
   "we3d-staging-20260712": Object.freeze({
+    "1:524178734996:android:eededce4f644ea41f51981": Object.freeze({ platform: "android", label: "World Explorer 3D for Android \xB7 development", callback: "io.worldexplorer3d.app.staging://portal-connect" }),
+    "1:524178734996:ios:2d8e12cf5c57d2cef51981": Object.freeze({ platform: "ios", label: "World Explorer 3D for Apple \xB7 development", callback: "io.worldexplorer3d.app.staging://portal-connect" }),
     "1:524178734996:android:b6c8ac1247bbf6f3f51981": Object.freeze({ platform: "android", label: "World Explorer 3D for Android \xB7 test build", callback: "io.worldexplorer3d.app.staging://portal-connect" }),
     "1:524178734996:ios:84e80cd71e77579cf51981": Object.freeze({ platform: "ios", label: "World Explorer 3D for Apple \xB7 test build", callback: "io.worldexplorer3d.app.staging://portal-connect" })
   })
 });
-var portalPairingId = (value) => typeof value === "string" && /^[A-Za-z0-9_-]{43}$/.test(value);
+var portalPairingId = (value) => typeof value === "string" && value.length === 43 && /^[A-Za-z0-9_-]{43}$/.test(value);
 function portalCallbackAllowed(value, projectId) {
   return Object.values(PORTAL_NATIVE_CLIENTS[projectId] || {}).some((client) => client.callback === value);
 }

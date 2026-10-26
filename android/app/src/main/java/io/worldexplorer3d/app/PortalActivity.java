@@ -104,17 +104,16 @@ public final class PortalActivity extends Activity {
         long loaded=store.loadedAt();text(loaded==0?getString(R.string.portal_bundled):getString(R.string.portal_updated,DateFormat.getDateTimeInstance().format(new Date(loaded))),13,false);
     }
     private void showAccount(){
-        text(getString(R.string.portal_account),24,true);String label,displayedOwner;
-        synchronized(PortalStore.LOCK){label=account.accountLabel();displayedOwner=store.owner();}
+        text(getString(R.string.portal_account),24,true);String label,displayedOwner,code,detail,phase;Uri approval;long displayedVersion;
+        synchronized(PortalStore.LOCK){label=account.accountLabel();displayedOwner=store.owner();code=account.code();approval=account.approval();detail=account.message();phase=account.status();displayedVersion=account.version();}
         text(label.isEmpty()?getString(R.string.portal_device_trail):label,17,false);
-        if(!account.message().isEmpty())text(account.message(),16,false);
-        String code=account.code();
+        if(!detail.isEmpty())text(detail,16,false);
         if(!code.isEmpty()){
             text(getString(R.string.portal_match_code),17,false);text(code.substring(0,4)+" "+code.substring(4),30,true);
-            button(R.string.portal_approve_browser,()->{Uri target=account.approval();if(target!=null)startActivity(new Intent(Intent.ACTION_VIEW,target));else text(getString(R.string.portal_connection_expired),16,false);});
-            button(R.string.portal_cancel_connection,account::cancel);
-        }else if(!account.status().equals("connecting"))button(label.isEmpty()?R.string.portal_connect:R.string.portal_change_account,account::start);
-        else button(R.string.portal_cancel_connection,account::cancel);
+            button(R.string.portal_approve_browser,()->{if(approval!=null)startActivity(new Intent(Intent.ACTION_VIEW,approval));else text(getString(R.string.portal_connection_expired),16,false);});
+            button(R.string.portal_cancel_connection,()->account.cancel(displayedVersion));
+        }else if(!phase.equals("connecting"))button(label.isEmpty()?R.string.portal_connect:R.string.portal_change_account,account::start);
+        else button(R.string.portal_cancel_connection,()->account.cancel(displayedVersion));
         if(!store.owner().equals("device-guest")){
             button(R.string.portal_sync,()->account.sync(()->true));
             button(R.string.portal_copy_device,()->new android.app.AlertDialog.Builder(this).setTitle(R.string.portal_copy_device).setMessage(R.string.portal_copy_explanation)

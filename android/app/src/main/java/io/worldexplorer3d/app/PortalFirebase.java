@@ -25,10 +25,12 @@ final class PortalFirebase {
     private volatile HttpURLConnection connection;
     PortalFirebase(Context context,String name){
         FirebaseOptions options=new FirebaseOptions.Builder().setApplicationId(context.getString(R.string.portal_firebase_app_id))
-            .setApiKey(context.getString(R.string.portal_firebase_api_key)).setProjectId(context.getString(R.string.portal_firebase_project)).build();
+            .setApiKey(context.getString(R.string.portal_firebase_api_key)).setProjectId(context.getString(R.string.portal_firebase_project))
+            .setGcmSenderId(context.getString(R.string.portal_firebase_sender)).build();
         FirebaseApp existing=null;for(FirebaseApp value:FirebaseApp.getApps(context))if(name.equals(value.getName()))existing=value;
         app=existing==null?FirebaseApp.initializeApp(context,options,name):existing;check=FirebaseAppCheck.getInstance(app);
         check.installAppCheckProviderFactory(PlayIntegrityAppCheckProviderFactory.getInstance());
+        check.setTokenAutoRefreshEnabled(false);
         auth=FirebaseAuth.getInstance(app);
     }
     static void workerOnly(){if(Looper.getMainLooper().isCurrentThread())throw new IllegalStateException("Native account work cannot block the screen.");}
@@ -37,7 +39,7 @@ final class PortalFirebase {
         workerOnly();String attestation=Tasks.await(check.getAppCheckToken(false)).getToken();FirebaseUser user=auth.getCurrentUser();String token=null;
         if(expectedUid!=null){if(user==null||!expectedUid.equals(user.getUid()))throw new IllegalStateException("Explorer account changed. Reconnect this device.");token=Tasks.await(user.getIdToken(false)).getToken();}
         if(!current.getAsBoolean())throw new InterruptedException("Device connection changed.");
-        HttpURLConnection http=(HttpURLConnection)new URL(PortalStore.ORIGIN+"/"+endpoint).openConnection();connection=http;
+        HttpURLConnection http=(HttpURLConnection)new URL(BuildConfig.PORTAL_API_ORIGIN+"/"+endpoint).openConnection();connection=http;
         try{
             http.setInstanceFollowRedirects(false);http.setConnectTimeout(6000);http.setReadTimeout(10000);http.setRequestMethod("POST");http.setDoOutput(true);
             http.setRequestProperty("Content-Type","application/json");http.setRequestProperty("Accept","application/json");http.setRequestProperty("X-Firebase-AppCheck",attestation);

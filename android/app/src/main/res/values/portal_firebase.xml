@@ -3,4 +3,5 @@
     <string name="portal_firebase_app_id" translatable="false">1:469573887496:android:074e2769d10bcbdd42d3bd</string>
     <string name="portal_firebase_api_key" translatable="false">AIzaSyAXg4lDym08l6-dvKDSmo2Zju1VQeSyNsI</string>
     <string name="portal_firebase_project" translatable="false">worldexplorer3d-d9b83</string>
+    <string name="portal_firebase_sender" translatable="false">469573887496</string>
 </resources>

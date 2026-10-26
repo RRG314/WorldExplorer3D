@@ -4,7 +4,7 @@ const {PORTAL_NATIVE_CLIENTS,portalPairingId}=require('./generated/portal.cjs');
 const fail=(status,message)=>Object.assign(new Error(message),{status});
 const digest=value=>crypto.createHash('sha256').update(value).digest('base64url');
 const equals=(a,b)=>typeof a==='string'&&typeof b==='string'&&a.length===b.length&&crypto.timingSafeEqual(Buffer.from(a),Buffer.from(b));
-const verifier=value=>typeof value==='string'&&/^[A-Za-z0-9._~-]{43,128}$/.test(value);
+const verifier=value=>typeof value==='string'&&value.length>=43&&value.length<=128&&!/[^A-Za-z0-9._~-]/.test(value);
 
 // Exchange a PKCE-bound one-use approval for the EXISTING Firebase identity.
 // SDKs own the resulting auth session. No widget token, cookie copying, custom
@@ -58,7 +58,7 @@ function buildPortalPairingExports({functions,db,projectId,setCors,verifyAuth,ve
   });
   const approvePortalPairing=endpoint(false,async({body,auth})=>{
     accountActive(auth);
-    if(!portalPairingId(body.codeHash)||typeof body.approvalId!=='string'||!/^[A-Za-z0-9_-]{16,80}$/.test(body.approvalId))throw fail(400,'Invalid device approval.');
+    if(!portalPairingId(body.codeHash)||typeof body.approvalId!=='string'||body.approvalId.length<16||body.approvalId.length>80||/[^A-Za-z0-9_-]/.test(body.approvalId))throw fail(400,'Invalid device approval.');
     const ref=pairing(body.requestId),deletion=db.collection('captureAccountDeletions').doc(auth.uid);
     return db.runTransaction(async tx=>{
       const [stored,deleted]=await Promise.all([tx.get(ref),tx.get(deletion)]);if(deleted.exists)throw fail(409,'This account is being deleted.');

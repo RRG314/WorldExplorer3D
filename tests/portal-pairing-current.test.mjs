@@ -49,6 +49,17 @@ test('concurrent claims can return only one custom token',async()=>{
   const f=fixture(),p=await connection(f);await p.approve();const results=await Promise.all([f.call('claimPortalPairing',p.claim),f.call('claimPortalPairing',p.claim)]);
   assert.deepEqual(results.map(row=>row.code).sort(),[200,409]);assert.equal(results.filter(row=>row.body.customToken).length,1);
 });
+test('native connection identifiers reject trailing line terminators without creating or approving work',async()=>{
+  const f=fixture();
+  assert.equal((await f.call('startPortalPairing',{challenge:nonce()+'\n'})).code,400);assert.equal(f.writes.length,0);
+  const p=await connection(f),before=f.writes.length;
+  for(const change of [{codeHash:p.approval.codeHash+'\n'},{approvalId:p.approval.approvalId+'\n'},{requestId:p.requestId+'\n'}]){
+    assert.equal((await f.call('approvePortalPairing',{...p.approval,...change})).code,400);
+  }
+  assert.equal(f.writes.length,before);assert.equal((await p.approve()).code,200);
+  assert.equal((await f.call('claimPortalPairing',{...p.claim,code:p.code+'\n'})).code,403);
+  assert.equal(f.minted.length,0);
+});
 test('native cancellation during signing, account deletion, disablement and revoked browser approval cannot publish a token',async()=>{
   const f=fixture(),p=await connection(f);await p.approve();let resolve,started;const waiting=new Promise(r=>started=r);
   f.setMint(async()=>{started();return new Promise(r=>resolve=r);});const pending=f.call('claimPortalPairing',p.claim);await waiting;

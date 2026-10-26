@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="portal_firebase_app_id" translatable="false">1:524178734996:android:eededce4f644ea41f51981</string>
+    <string name="portal_firebase_api_key" translatable="false">AIzaSyCIidx3M0yCCfzW3p8NXyS2AaYDIB1QmdI</string>
+    <string name="portal_firebase_project" translatable="false">we3d-staging-20260712</string>
+    <string name="portal_firebase_sender" translatable="false">524178734996</string>
+</resources>

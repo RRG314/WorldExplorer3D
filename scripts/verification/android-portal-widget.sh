@@ -25,13 +25,13 @@ adb shell settings put global animator_duration_scale 0
 adb shell svc wifi disable
 adb shell svc data disable
 adb install android/app/build/outputs/apk/debug/app-debug.apk
-adb shell appwidget grantbind --package io.worldexplorer3d.app
+adb shell appwidget grantbind --package io.worldexplorer3d.app.staging
 adb logcat -c
-adb shell am instrument -w -e ownedEmulator true io.worldexplorer3d.app/.PortalWidgetContractInstrumentation > android-widget-evidence/result.txt
+adb shell am instrument -w -e ownedEmulator true io.worldexplorer3d.app.staging/io.worldexplorer3d.app.PortalWidgetContractInstrumentation > android-widget-evidence/result.txt
 adb logcat -d > android-widget-evidence/logcat.txt
 adb shell dumpsys appwidget > android-widget-evidence/widget-ownership.txt
 for name in widget-investigation widget-saved native-trail native-account widget-compact; do
-    adb exec-out run-as io.worldexplorer3d.app cat "files/portal-evidence/$name.png" > "android-widget-evidence/$name.png" || true
+    adb exec-out run-as io.worldexplorer3d.app.staging cat "files/portal-evidence/$name.png" > "android-widget-evidence/$name.png" || true
 done
 git rev-parse HEAD > android-widget-evidence/source-commit.txt
 git rev-parse HEAD:android/app/src/main > android-widget-evidence/native-main-source-tree.txt

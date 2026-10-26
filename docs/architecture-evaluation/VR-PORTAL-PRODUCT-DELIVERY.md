@@ -427,3 +427,23 @@ late acknowledgements, interrupted owners, content replacement, pending sync and
 apple-project-foundation-compile.log and apple-project-foundation-run.log.
 Continue actual platform checks, live native SDK adoption, browser identity
 handoff, qualified imagery/destinations, remaining VR domains and distribution.
+
+
+Android development is now a separate .staging package with its own Firebase
+client, callback and fixed API origin. Native services can be tested without
+requiring a Hosting release or touching installed production app data. The
+Play Integrity provider now receives the required Firebase project number;
+source inspection of its pinned provider exposed that missing option. SDK
+attestation remains on demand. Account commands suppress obsolete status/proof
+publication, stale displayed cancellation is ignored, and a reply leaving newer
+pending choices can no longer report complete synchronization. Focused native
+verification is next; no phone attestation success is inferred.
+
+The shared native registry now includes the separate Apple/Android development
+clients. Strict connection identifier validation rejects trailing line breaks;
+18 service/controller cases pass (17 retained plus one new boundary case).
+Apple API-key restriction operations are confirmed complete for the correct
+bundle IDs and four Firebase services; existing web keys remain distinct.
+The staging deployment helper can update only the six pairing endpoints,
+checks all other Function metadata, uses durable owner-only private evidence,
+and creates a new receipt instead of overwriting an earlier failed/passing run.
