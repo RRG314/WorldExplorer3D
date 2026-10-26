@@ -110,7 +110,7 @@ function createLocationTerrainApi(deps = {}) {
     appCtx.samplePolarCryosphereWorldYAt = null;
   }
 
-  function publishLocationTerrain() {
+  function publishLocationTerrain(options = {}) {
     if (!appCtx.terrainEnabled || appCtx.onMoon) return false;
 
     const polarCryosphere = appCtx.worldLoadRuntimeState?.groundMode === 'polar-cryosphere-local';
@@ -180,7 +180,8 @@ function createLocationTerrainApi(deps = {}) {
       appCtx.TERRAIN_ZOOM,
       centerTile.x,
       centerTile.y,
-      activeRing
+      activeRing,
+      options.regionalContextRadiusMeters
     ].join(':');
     if (publishedLocationKey === locationKey) return false;
 
@@ -231,7 +232,8 @@ function createLocationTerrainApi(deps = {}) {
       z: appCtx.TERRAIN_ZOOM,
       centerX: centerTile.x,
       centerY: centerTile.y,
-      ring: activeRing
+      ring: activeRing,
+      regionalContextRadiusMeters: options.regionalContextRadiusMeters
     });
     return true;
   }

@@ -66,9 +66,9 @@ import {
   toggleRoadDebugMode as toggleRoadDebugModeInternal,
   validateRoadTerrainConformance as validateRoadTerrainConformanceInternal
 } from "./terrain/debug-tools.js?v=17";
-import { createLocationTerrainApi } from "./terrain/location-world.js?v=4";
+import { createLocationTerrainApi } from "./terrain/location-world.js?v=5";
 import { buildPolarCryosphereSurface } from "./terrain/polar-cryosphere-surface.js?v=1";
-import { createFarFieldTerrainApi } from "./terrain/far-field.js?v=74";
+import { createFarFieldTerrainApi } from "./terrain/far-field.js?v=75";
 import { reconcileActorsAfterSurfaceRebuild } from "./terrain/actor-reprojection.js?v=2";
 import { waterTerrainBedY } from "./terrain/water-terrain-mask.js?v=1";
 import {engineeredWaterfrontFor} from './world/engineered-waterfront.js';

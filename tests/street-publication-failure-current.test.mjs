@@ -20,11 +20,12 @@ test('regional terrain failure cannot fall through to a larger map query',async(
 
 test('road compilation cannot begin against a failed near-terrain publication',async t=>{
  const saved={...ctx};t.after(()=>{for(const key of Object.keys(ctx))delete ctx[key];Object.assign(ctx,saved);});
- let compiled=false,spawned=false;
- Object.assign(ctx,{terrainEnabled:true,onMoon:false,roads:[{}],publishLocationTerrain:()=>true,
+ let compiled=false,spawned=false,terrainRequest;
+ Object.assign(ctx,{terrainEnabled:true,onMoon:false,roads:[{}],publishLocationTerrain:request=>{terrainRequest=request;return true;},
    waitForLocationTerrainPublication:async()=>{throw Error('missing near tile');},
    publishCompiledTransportMeshes:async()=>{compiled=true;}});
- await assert.rejects(finalizeLoadedWorld({spawnPlayer:()=>{spawned=true;}}),error=>isSurfacePublicationError(error)&&error.stage==='terrain');
+ await assert.rejects(finalizeLoadedWorld({loadProfile:{regionalContextRadiusMeters:6000},spawnPlayer:()=>{spawned=true;}}),error=>isSurfacePublicationError(error)&&error.stage==='terrain');
+ assert.deepEqual(terrainRequest,{regionalContextRadiusMeters:6000});
  assert.equal(compiled,false);assert.equal(spawned,false);
 });
 

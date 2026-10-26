@@ -273,6 +273,7 @@ export function createWorldRoadLoader(deps = {}) {
         earthSceneSuppressed,
         hideEarthSceneMeshes,
         loadMetrics,
+        loadProfile,
         markLoaded: () => {
           // A late title/session restoration must not replace the location
           // that this load actually published.

@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createLocationTerrainApi} from '../app/js/terrain/location-world.js';
 
-function harness(t,{fail=false,sourceTile=null,unavailable=false,waitForSource=null}={}) {
+function harness(t,{fail=false,sourceTile=null,unavailable=false,waitForSource=null,farRequests=null}={}) {
   const previous=globalThis.requestIdleCallback,queue=[];
   globalThis.requestIdleCallback=task=>queue.push(task);
   t.after(()=>{if(previous===undefined)delete globalThis.requestIdleCallback;else globalThis.requestIdleCallback=previous;});
@@ -11,6 +11,7 @@ function harness(t,{fail=false,sourceTile=null,unavailable=false,waitForSource=n
   const api=createLocationTerrainApi({appCtx:ctx,ensureTerrainGroup(){},worldToLatLon:()=>({lat:0,lon:0}),latLonToTileXY:()=>({x:10,y:20}),
     getOrLoadTerrainTile:()=>sourceTile,
     waitForTerrainTileReadyAtZoom:waitForSource,
+    updateFarTerrainClipmap:request=>farRequests?.push(request),
     terrainTileDeps:{usesAcceptedGround:!sourceTile,sampleAcceptedGroundAtLatLon:()=>({status:'available'})},
     buildTerrainTileMesh:(z,x,y)=>{if(fail)throw new Error('ground tile rejected');return unavailable ? {visible:false,userData:{pendingTerrainTile:true,groundUnavailableReason:'outside-artifact',terrainTileKey:key(z,x,y)},geometry:{dispose(){}}} : {userData:{terrainTileKey:key(z,x,y)}};},
     getTerrainMeshKey:m=>m.userData.terrainTileKey,terrainTileMeshKey:key,clearTerrainHeightCache(){}});
@@ -83,4 +84,17 @@ test('unavailable accepted tiles are excluded with reasons and cannot appear und
  assert.equal(ctx.locationTerrainPublication.status,'settled');
  assert.equal(ctx.locationTerrainPublication.excludedTiles.length,49);
  assert.ok(ctx.locationTerrainPublication.excludedTiles.every(tile=>tile.reason==='outside-artifact'));
+});
+
+
+test('terrain forwards the admitted radius and distinguishes a changed plan at the same location',t=>{
+ const farRequests=[],{api}=harness(t,{farRequests});
+ const plan={regionalContextRadiusMeters:6000};
+ assert.equal(api.publishLocationTerrain(plan),true);
+ plan.regionalContextRadiusMeters=14000;
+ assert.equal(farRequests[0].regionalContextRadiusMeters,6000);
+ assert.equal(api.publishLocationTerrain({regionalContextRadiusMeters:6000}),false);
+ assert.equal(api.publishLocationTerrain(plan),true);
+ assert.deepEqual(farRequests.map(r=>r.regionalContextRadiusMeters),[6000,14000]);
+ api.resetLocationTerrainPublication();
 });

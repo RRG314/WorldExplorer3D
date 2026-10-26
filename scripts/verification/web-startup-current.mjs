@@ -10,7 +10,7 @@ import {runPrescribedGameActions} from './prescribed-game-actions.mjs';
 import {sourceFingerprint, sameAcceptanceSource} from './source-fingerprint.mjs';
 import {collectBrowserGraphicsErrors} from './browser-graphics-errors.mjs';
 
-// One startup regression group and, when requested, one selected-city entry.
+// Startup regressions, or a selected-city load with an optional owned replacement.
 // Cold network delay is controlled; world providers remain real staging/live
 // providers. Desktop engines/touch emulation do not qualify physical phones.
 const engineName = process.env.WE3D_STARTUP_ENGINE || 'chromium';
@@ -18,6 +18,10 @@ assert.ok(['chromium', 'webkit'].includes(engineName));
 const withWorld = process.env.WE3D_STARTUP_WORLD === '1';
 const onlyWorld = process.env.WE3D_STARTUP_PHASE === 'world-only';
 assert.ok(!onlyWorld || withWorld, 'world-only requires the selected-city journey.');
+if (process.env.WE3D_STARTUP_LOAD_PLAN === '1') {
+  assert.ok(withWorld && process.env.WE3D_STARTUP_SETTLE === '1', 'Load-plan acceptance requires a settled city.');
+  assert.notEqual(process.env.WE3D_STARTUP_GRAPHICS_LOSS, '1', 'Run graphics recovery independently of world release.');
+}
 assert.ok(process.env.WE3D_STAGING_APP_CHECK_FILE, 'Run with the owned staging-attestation wrapper.');
 const root = path.resolve(process.env.WE3D_VERIFY_ROOT || process.cwd());
 const out = path.resolve(process.env.WE3D_STARTUP_OUTPUT || `output/research/web-release-2026-10-26/${engineName}`);
@@ -171,6 +175,8 @@ try {
       while (true) {
         const sample = await page.evaluate(() => ({
           regional: startupQa.farTerrainClipmapState,
+          loadProfile: startupQa.worldLoadRuntimeState?.loadProfile,
+          publication: startupQa.worldPublication,
           scenery: startupQa.getRegionalSceneryState?.(),
           memory: performance.memory ? {usedJSHeapSize: performance.memory.usedJSHeapSize, totalJSHeapSize: performance.memory.totalJSHeapSize} : null,
           contextLost: startupQa.renderer.getContext().isContextLost(),
@@ -187,6 +193,57 @@ try {
       await page.screenshot({path: path.join(out, 'regional-settled.png')});
       assert.equal(samples.at(-1).regional?.status, 'ready', 'Background regional publication did not finish.');
       assert.equal(settled.diagnostics.renderer.contextLost, false);
+    }
+    if (process.env.WE3D_STARTUP_LOAD_PLAN === '1') {
+      stage = 'admitted-mobile-context-plan';
+      const first = await page.evaluate(() => ({
+        publication: startupQa.worldPublication,
+        profile: startupQa.worldLoadRuntimeState.loadProfile,
+        regional: startupQa.farTerrainClipmapState,
+        unitsPerMeter: startupQa.WORLD_UNITS_PER_METER,
+        extended: startupQa.getRegionalSceneryState(),
+        diagnostics: getWorldExplorerRuntimeDiagnostics()
+      }));
+      assert.equal(first.profile.regionalContextRadiusMeters, 6000);
+      assert.equal(first.regional.regionalContextRadiusMeters, 6000);
+      assert.equal(first.regional.contextHalfExtentWorld, 6000 * first.unitsPerMeter);
+      assert.equal(first.regional.contextTilesLoaded, first.regional.contextTilesRequested);
+      assert.equal(first.regional.farBuildingSourceCoverageComplete, true);
+      assert.equal(first.extended.enabled, false);
+      report.checks.push({id: stage, ...first});
+      // A nearby accepted location exercises real replacement and ownership
+      // without introducing another city's unrelated provider requirements.
+      stage = 'location-replacement-with-admitted-plan';
+      await page.evaluate(() => {
+        startupQa.setCustomLocation({lat: 39.2914, lon: -76.6122, name: 'Baltimore north'}, {syncInputs: false});
+        void startupQa.loadRoads();
+      });
+      await page.waitForFunction(id => startupQa.worldPublication?.requestId !== id &&
+        startupQa.worldPublication && !startupQa.worldLoading &&
+        startupQa.worldLoadRuntimeState?.gameplayRuntimesReady && startupQa.farTerrainClipmapState?.status === 'ready',
+        first.publication.requestId, {timeout: 120000});
+      const replacement = await page.evaluate(() => ({publication: startupQa.worldPublication,
+        profile: startupQa.worldLoadRuntimeState.loadProfile,regional: startupQa.farTerrainClipmapState,
+        diagnostics: getWorldExplorerRuntimeDiagnostics(),resources: getWorldExplorerSceneResources()}));
+      assert.notEqual(replacement.publication.requestId, first.publication.requestId);
+      assert.equal(replacement.profile.regionalContextRadiusMeters, 6000);
+      assert.equal(replacement.regional.regionalContextRadiusMeters, 6000);
+      assert.equal(replacement.regional.contextHalfExtentWorld, first.regional.contextHalfExtentWorld);
+      assert.equal(replacement.regional.contextTilesLoaded, replacement.regional.contextTilesRequested);
+      assert.equal(replacement.regional.farBuildingSourceCoverageComplete, true);
+      assert.equal(replacement.diagnostics.renderer.contextLost, false);
+      report.checks.push({id: stage, ...replacement});
+      await page.screenshot({path: path.join(out, 'replacement-settled.png')});
+      stage = 'owned-world-release';
+      await page.evaluate(() => startupQa.releaseEarthWorldForTitle({reason: 'startup-verification-complete'}));
+      await page.waitForTimeout(1500);
+      const released = await page.evaluate(() => ({publication: startupQa.worldPublication,
+        regional: startupQa.farTerrainClipmapState,diagnostics: getWorldExplorerRuntimeDiagnostics()}));
+      assert.equal(released.publication, null);
+      assert.equal(released.regional, null);
+      assert.equal(released.diagnostics.worldCounts.roads, 0);
+      assert.equal(released.diagnostics.worldCounts.buildings, 0);
+      report.checks.push({id: stage, ...released});
     }
     if (process.env.WE3D_STARTUP_GRAPHICS_LOSS === '1') {
       stage = 'controlled-graphics-loss';

@@ -125,3 +125,11 @@ For map/data path changes:
 - keep OSM attribution visible and accurate
 - avoid exaggerated performance or coverage claims
 - document known tradeoffs/limitations explicitly
+
+For an admitted mobile context change, reuse accepted startup cases with
+`WE3D_STARTUP_WORLD=1 WE3D_STARTUP_PHASE=world-only WE3D_STARTUP_SETTLE=1
+WE3D_STARTUP_LOAD_PLAN=1` and the same attested wrapper. This runs one real
+Baltimore load, input, complete regional publication, nearby location replacement
+and owned world release. It checks the shared mobile context boundary; it does
+not qualify physical-phone performance. Do not combine this release flag with
+the independent graphics-loss journey, which needs an active world.

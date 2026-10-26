@@ -33,6 +33,7 @@ test('a slower desktop reload retains district edge buildings and the same near/
     }).ways.map(way=>way.id);
     assert.deepEqual(selected,[0,1,2],'quality adaptation must not delete the outer district');
     assert.equal(load.runtimeState.buildingVisibleRadiusWorld,2700);
+    assert.equal(load.loadProfile.regionalContextRadiusMeters,14000);
     assert.equal(ctx.dynamicLodScale,lodScale,'presentation still receives the adaptive quality setting');
     if(original) assert.deepEqual(load.loadProfile,original);
     original=load.loadProfile;
@@ -43,6 +44,7 @@ test('a slower desktop reload retains district edge buildings and the same near/
 test('the fixed mobile district and road safety cap remain unchanged',()=>{
   const load=loadWithQuality(context(),{deviceClass:'mobile',budgetScale:.28,lodScale:.68});
   assert.equal(load.runtimeState.buildingVisibleRadiusWorld,2040);
+  assert.equal(load.loadProfile.regionalContextRadiusMeters,6000);
   assert.equal(load.loadProfile.maxRoadWays,5600);
   assert.equal(load.loadProfile.maxTotalLoadMs,32000);
   load.abortProviderWork('test-complete');load.releaseWorldLoadCancellation();

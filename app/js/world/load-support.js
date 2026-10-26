@@ -60,7 +60,9 @@ export async function finalizeLoadedWorld(options = {}) {
   }
 
   if (appCtx.terrainEnabled && !appCtx.onMoon && typeof appCtx.publishLocationTerrain === 'function') {
-    runFinalStep('publishLocationTerrain', () => appCtx.publishLocationTerrain());
+    runFinalStep('publishLocationTerrain', () => appCtx.publishLocationTerrain({
+      regionalContextRadiusMeters: options.loadProfile?.regionalContextRadiusMeters
+    }));
     await yieldToMainThread();
     // Every world needs the published near surface before transport snapshots
     // or player spawn, including retries after an interrupted terrain source.
