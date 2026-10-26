@@ -1,6 +1,6 @@
 import {prepareHomePhotoSurfaces} from './home-photo-surfaces.js';
 import { applyDisplayColorPolicy } from '../engine/display-color-policy.js';
-import { loadClassicScript } from '../modules/script-loader.js?v=56';
+import { loadClassicScript } from '../modules/script-loader.js?v=57';
 import { vendorScriptsCritical } from '../modules/manifest.js?v=606';
 import { applyCaptureAlignment } from './alignment.js?v=1';
 

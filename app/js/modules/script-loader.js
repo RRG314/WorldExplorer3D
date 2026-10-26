@@ -1,4 +1,8 @@
 const DEFAULT_SCRIPT_TIMEOUT_MS = 12000;
+// Essential cold-start files can take longer than a feature opened in an
+// already running game. The startup cover reports a slow connection at 30s;
+// keep that same request alive while still bounding an unresponsive server.
+export const STARTUP_SCRIPT_TIMEOUT_MS = 90000;
 const inFlightClassicScripts = new Map();
 
 export function loadClassicScript(src, options = {}) {

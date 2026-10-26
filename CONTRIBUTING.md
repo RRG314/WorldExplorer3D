@@ -110,6 +110,14 @@ dependency locks in Git. Their workflows build in owned emulators/simulators.
 Release signing material and temporary live-test identities stay outside Git;
 they must never enter screenshots, uploaded logs or build artifacts.
 
+`scripts/verification/web-startup-current.mjs` checks a failed essential file,
+explicit reload and slow startup in one selected browser engine. Run it through
+`scripts/verification/attested-source-check.mjs` with authorized staging access.
+`WE3D_STARTUP_WORLD=1` adds one city entry; `WE3D_STARTUP_PHASE=world-only` reuses
+accepted startup checks when only a world journey needs investigation. Optional
+allocation profiling and regional settling are diagnostics, not phone performance
+acceptance. Keep their output private and reuse applicable successful results.
+
 ## 8. OSM-Facing Quality Bar
 
 For map/data path changes:
