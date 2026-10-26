@@ -60,7 +60,7 @@ final class PortalAccountContracts {
         store.act("monaco-coast","save");store.beginAccountCommit();CountDownLatch recovered=new CountDownLatch(1);PortalAccount account=PortalAccount.get(context);Runnable observer=recovered::countDown;account.observe(observer);
         check(recovered.await(10,java.util.concurrent.TimeUnit.SECONDS),"Native SDK recovery did not finish.");account.unobserve(observer);
         check(!store.accountCommitPending()&&store.owner().equals("device-guest")&&store.trail("monaco-coast").getBoolean("saved"),"Interrupted SDK adoption lost the guest Trail or remained active.");count++;
-        PortalFirebase sdk=new PortalFirebase(context,"portal-native");check(sdk.app.getOptions().getApplicationId().split(":")[1].equals(sdk.app.getOptions().getGcmSenderId()),"Play Integrity's required project number is missing or belongs to a different Firebase app.");count++;
+        PortalFirebase firebaseSdk=new PortalFirebase(context,"portal-native");check(firebaseSdk.app.getOptions().getApplicationId().split(":")[1].equals(firebaseSdk.app.getOptions().getGcmSenderId()),"Play Integrity's required project number is missing or belongs to a different Firebase app.");count++;
         context.getSharedPreferences("living-portal-v1",Context.MODE_PRIVATE).edit().clear().commit();return count;
     }
 }
