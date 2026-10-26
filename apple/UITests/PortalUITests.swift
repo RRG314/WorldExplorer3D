@@ -2,12 +2,6 @@ import XCTest
 
 @MainActor final class PortalUITests: XCTestCase {
     override func setUpWithError() throws { continueAfterFailure = false }
-    override func tearDownWithError() throws {
-        if (testRun?.failureCount ?? 0) > 0 {
-            capture("portal-widget-failed-screen")
-            print(String(XCUIApplication(bundleIdentifier: "com.apple.springboard").debugDescription.prefix(24_000)))
-        }
-    }
     private func capture(_ name: String) {
         let image = XCTAttachment(screenshot: XCUIScreen.main.screenshot()); image.name = name; image.lifetime = .keepAlways; add(image)
     }
@@ -40,6 +34,12 @@ import XCTest
         capture("portal-account-device")
     }
     func testHomeScreenWidget() throws {
+        defer {
+            if (testRun?.failureCount ?? 0) > 0 {
+                capture("portal-widget-failed-screen")
+                print(String(XCUIApplication(bundleIdentifier: "com.apple.springboard").debugDescription.prefix(24_000)))
+            }
+        }
         let app = XCUIApplication(); app.launch()
         XCTAssertTrue(app.staticTexts["The Living Portal"].waitForExistence(timeout: 15))
         XCUIDevice.shared.press(.home)
