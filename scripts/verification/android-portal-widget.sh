@@ -3,6 +3,9 @@ set -euo pipefail
 test "${GITHUB_ACTIONS:-}" = true
 mkdir -p android-widget-evidence
 SDK_ROOT="${ANDROID_HOME:?}"
+"$SDK_ROOT/build-tools/36.0.0/aapt2" dump badging android/app/build/outputs/apk/debug/app-debug.apk > android-widget-evidence/debug-package.txt
+"$SDK_ROOT/build-tools/36.0.0/aapt2" dump xmltree android/app/build/outputs/apk/debug/app-debug.apk --file AndroidManifest.xml > android-widget-evidence/debug-manifest.txt
+grep -q "package: name='io.worldexplorer3d.app.staging'" android-widget-evidence/debug-package.txt
 export PATH="$SDK_ROOT/platform-tools:$SDK_ROOT/emulator:$PATH"
 export ANDROID_USER_HOME="$RUNNER_TEMP/we3d-portal-android"
 export ANDROID_AVD_HOME="$ANDROID_USER_HOME/avd"
@@ -25,6 +28,8 @@ adb shell settings put global animator_duration_scale 0
 adb shell svc wifi disable
 adb shell svc data disable
 adb install android/app/build/outputs/apk/debug/app-debug.apk
+adb shell pm list instrumentation > android-widget-evidence/instrumentation-components.txt
+grep -Fq 'io.worldexplorer3d.app.staging/io.worldexplorer3d.app.PortalWidgetContractInstrumentation' android-widget-evidence/instrumentation-components.txt
 adb shell appwidget grantbind --package io.worldexplorer3d.app.staging
 adb logcat -c
 adb shell am instrument -w -e ownedEmulator true io.worldexplorer3d.app.staging/io.worldexplorer3d.app.PortalWidgetContractInstrumentation > android-widget-evidence/result.txt

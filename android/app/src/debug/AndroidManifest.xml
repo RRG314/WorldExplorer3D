@@ -1,5 +1,5 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <application><activity android:name=".PortalWidgetHarnessActivity" android:exported="false" android:theme="@style/PortalTheme" /></application>
-    <instrumentation android:name=".PortalWidgetContractInstrumentation" android:targetPackage="${applicationId}" android:label="Owned emulator Portal checks" />
-    <instrumentation android:name=".PortalAccountLiveInstrumentation" android:targetPackage="${applicationId}" android:label="Owned staging native account check" />
+    <application><activity android:name="io.worldexplorer3d.app.PortalWidgetHarnessActivity" android:exported="false" android:theme="@style/PortalTheme" /></application>
+    <instrumentation android:name="io.worldexplorer3d.app.PortalWidgetContractInstrumentation" android:targetPackage="${applicationId}" android:label="Owned emulator Portal checks" />
+    <instrumentation android:name="io.worldexplorer3d.app.PortalAccountLiveInstrumentation" android:targetPackage="${applicationId}" android:label="Owned staging native account check" />
 </manifest>

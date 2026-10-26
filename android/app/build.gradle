@@ -14,7 +14,7 @@ android {
         resValue 'string', 'provider_authority', 'io.worldexplorer3d.app.fileprovider'
         buildConfigField 'String', 'PORTAL_ORIGIN', '"https://worldexplorer3d.io"'
         buildConfigField 'String', 'PORTAL_API_ORIGIN', '"https://us-central1-worldexplorer3d-d9b83.cloudfunctions.net"'
-        manifestPlaceholders = [gameUrl: 'https://worldexplorer3d.io/app/?distribution=google-play', gameOrigin: 'https://worldexplorer3d.io']
+        manifestPlaceholders = [gameUrl: 'https://worldexplorer3d.io/app/?distribution=google-play', gameOrigin: 'https://worldexplorer3d.io', gameHost: 'worldexplorer3d.io']
     }
     buildTypes {
         debug {
@@ -23,7 +23,7 @@ android {
             resValue 'string', 'provider_authority', 'io.worldexplorer3d.app.staging.fileprovider'
             buildConfigField 'String', 'PORTAL_ORIGIN', '"https://we3d-staging-20260712.web.app"'
             buildConfigField 'String', 'PORTAL_API_ORIGIN', '"https://us-central1-we3d-staging-20260712.cloudfunctions.net"'
-            manifestPlaceholders = [gameUrl: 'https://we3d-staging-20260712.web.app/app/?distribution=google-play', gameOrigin: 'https://we3d-staging-20260712.web.app']
+            manifestPlaceholders = [gameUrl: 'https://we3d-staging-20260712.web.app/app/?distribution=google-play', gameOrigin: 'https://we3d-staging-20260712.web.app', gameHost: 'we3d-staging-20260712.web.app']
         }
         release {
             // Signing is deliberately local. CI never receives the upload key.
