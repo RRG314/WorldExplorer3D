@@ -1,4 +1,4 @@
-import { targetFromIntersection } from '../interaction/world-click-router.js?v=3';
+import { targetFromIntersection } from '../interaction/world-click-router.js?v=4';
 import { capturePresentation } from '../runtime/renderer-owners.js';
 import { earthCoordinateFrame } from '../earth-core/coordinate-frame.js?v=1';
 import { THREE_VIEWS, validateAlbumPhoto } from './three-views.js';

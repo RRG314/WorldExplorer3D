@@ -1,3 +1,5 @@
+import {bindHudLaneLayout} from './hud-layout.js';
+
 const SCREEN_LAYOUT_SCHEMA_VERSION = 1;
 let singleton = null;
 
@@ -6,6 +8,7 @@ function createScreenLayoutService(documentRef = globalThis.document) {
   let panelLayer = '';
   let revision = 0;
   const listeners = new Set();
+  let hudBinding = null;
 
   function publish(reason) {
     revision += 1;
@@ -70,6 +73,12 @@ function createScreenLayoutService(documentRef = globalThis.document) {
 
   return Object.freeze({
     type: 'ScreenLayoutService',
+    bindHudLayout() {
+      hudBinding?.dispose();
+      hudBinding = bindHudLaneLayout(documentRef);
+      return hudBinding;
+    },
+    refreshHudLayout: () => hudBinding?.refresh(),
     setActivityLayer,
     setPanelLayer,
     getPanelLayer: () => panelLayer,

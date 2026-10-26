@@ -73,7 +73,8 @@
   .hud-box.compact { width: auto; min-width: 56px; padding: 5px; overflow: visible; }
   .hud-box.compact #hudToggleBtn { position: static; }
   .hud-box.compact #hudHeader, .hud-box.compact #hudDetails, .hud-box.compact #hudClockDisplay { display: none !important; }
-  #hudUtilities { grid-row: 1; grid-column: 2; justify-self: end; display: grid; justify-items: end; gap: 8px; margin-top: 54px; pointer-events: auto; }
+  #hudUtilities { grid-row: 1 / span 2; grid-column: 2; justify-self: end; align-self: start; display: flex; flex-direction: column; gap: 8px; width: min(320px, 100%); max-height: var(--wx-hud-utility-height, calc(100dvh - 150px)); overflow: auto; overscroll-behavior: contain; scroll-padding-block: 8px var(--wx-hud-utility-footer,64px); margin-top: 54px; pointer-events: auto; }
+  .hudUtilityActions { position: sticky; bottom: 0; z-index: 1; display: flex; flex: none; justify-content: end; align-items: start; flex-wrap: wrap; gap: 8px; width: 100%; padding-top: 4px; background: var(--wx-panel-solid); }
   #worldQuickControls { position: static; display: none; align-items: center; gap: 6px; }
   #worldQuickControls.show { display: flex; }
   #controlsMenu { position: static; width: auto; }
@@ -82,7 +83,7 @@
   .worldQuickControl:hover, .worldQuickControl[aria-pressed="true"], .minimapZoomBtn:hover { color: var(--wx-action); border-color: var(--wx-action); }
   .worldQuickControl svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.65; stroke-linecap: round; stroke-linejoin: round; }
   .worldQuickControl span { display: none; }
-  #hudMap { position: relative; grid-row: 2; grid-column: 1; align-self: end; width: 222px; min-height: 0; max-height: 100%; max-width: calc(100vw - 28px); overflow: auto; overscroll-behavior: contain; pointer-events: auto; }
+  #hudMap { position: relative; grid-row: 2; grid-column: 1; align-self: start; width: 222px; min-height: 0; max-height: min(100%, var(--wx-hud-map-height, 100dvh)); max-width: calc(100vw - 28px); overflow: auto; overscroll-behavior: contain; pointer-events: auto; }
   #coords { position: static; display: none; align-items: center; gap: 8px; width: 100%; padding: 8px; color: var(--wx-muted); background: var(--wx-panel-solid); border: 1px solid var(--wx-line-soft); font: 500 var(--wx-type-meta)/1.4 var(--wx-font-ui); overflow-wrap: anywhere; }
   #coords.show { display: flex; }
   #coordsText { flex: 1; min-width: 0; }
@@ -94,10 +95,37 @@
   #minimapZoomControls.show { display: flex; }
   #minimapZoomLevel { padding: 2px 6px; color: var(--wx-text); background: var(--wx-panel-solid); font: 500 var(--wx-type-meta)/1.4 var(--wx-font-instrument); white-space: nowrap; }
   .minimapZoomBtn:disabled { opacity: .5; cursor: default; }
+  #liveGpsHud, #deFlockHud, #urbanCivicStatus, .world-selection-notice { position: static; display: none; flex: none; width: 100%; min-width: 0; padding: 12px; color: var(--wx-text); background: var(--wx-panel-solid); border: 1px solid var(--wx-line-soft); border-radius: var(--wx-radius); font: 500 var(--wx-type-meta)/1.5 var(--wx-font-ui); overflow-wrap: anywhere; }
+  #liveGpsHud.show, #deFlockHud.show, #urbanCivicStatus.show { display: block; }
+  .liveGpsHudTop, .deFlockHudHead { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; color: var(--wx-action); }
+  .liveGpsHudTop { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; }
+  .liveGpsHudTop span { grid-column: 1 / -1; }
+  .liveGpsHudTop span, .liveGpsMetrics, #urbanCivicStatusDetail { color: var(--wx-muted); }
+  #liveGpsStatus, #deFlockCounts { margin-top: 8px; }
+  .liveGpsMetrics, .deFlockHudMeta { display: grid; gap: 4px; margin-top: 8px; }
+  .liveGpsActions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+  .liveGpsActions button, #liveGpsStopBtn, #deFlockHelpOpen, .world-selection-notice button { min-width: 44px; min-height: 44px; padding: 8px; color: var(--wx-text); background: var(--wx-panel-soft); border: 1px solid var(--wx-line); border-radius: var(--wx-radius); font: 650 var(--wx-type-meta)/1.4 var(--wx-font-ui); cursor: pointer; overflow-wrap: anywhere; }
+  .liveGpsActions button { flex: 1 1 100px; }
+  .liveGpsActions button:disabled { opacity: .55; cursor: default; }
+  #deFlockTimer { font-family: var(--wx-font-instrument); font-variant-numeric: tabular-nums; }
+  #deFlockStatus[data-tone="success"] { color: var(--wx-success); }
+  #deFlockStatus[data-tone="alert"], #liveGpsHud:is([data-state="hard-pause"], [data-state="recenter-ready"]) { border-color: var(--wx-danger); }
+  #deFlockStatus[data-tone="alert"] { color: var(--wx-danger); }
+  #deFlockStatus[data-tone="empty"], #liveGpsHud[data-state="warning"] { border-color: var(--wx-warning); }
+  #deFlockStatus[data-tone="empty"] { color: var(--wx-warning); }
+  #urbanCivicStatusMeter { color: var(--wx-warning); letter-spacing: .12em; }
+  #urbanCivicStatus[data-level="3"] #urbanCivicStatusMeter { color: var(--wx-danger); }
+  #urbanCivicStatusTitle { margin: 6px 0; font-weight: 650; }
+  .world-selection-notice:not([hidden]) { display: grid; gap: 12px; }
+  .world-selection-notice div { display: grid; gap: 4px; min-width: 0; }
+  .world-selection-notice span { color: var(--wx-muted); }
+  .world-selection-notice .worldSelectionActions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: end; }
+  .world-selection-notice [data-world-selection-action] { flex: 1; }
+  .world-selection-notice[hidden], .world-selection-notice [hidden], body:has(.floatMenu.open) .world-selection-notice { display: none; }
 
   @media (max-width: 760px), (pointer: coarse) {
-    #hud { top: max(8px, env(safe-area-inset-top)); left: max(8px, env(safe-area-inset-left)); right: max(8px, env(safe-area-inset-right)); height: auto; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto; }
-    .hud-box { width: calc(100% - 60px); max-height: min(35dvh, calc(100dvh - 140px)); padding: 8px 54px 8px 10px; }
+    #hud { top: max(8px, env(safe-area-inset-top)); left: max(8px, env(safe-area-inset-left)); right: max(8px, env(safe-area-inset-right)); height: auto; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-rows: auto auto; }
+    .hud-box { grid-column: 1 / span 2; width: calc(100% - 60px); max-height: min(35dvh, calc(100dvh - 140px)); padding: 8px 54px 8px 10px; }
     #hudToggleBtn { top: 4px; right: 4px; }
     #hudHeader { padding: 0; }
     #hudSpeedBlock { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; }
@@ -112,19 +140,23 @@
     #locationLine { display: none !important; }
     .indicators { display: none; }
     .hud-box.compact { width: max-content; }
-    #hudMap { position: relative; grid-row: 2; grid-column: 1; left: auto; bottom: auto; width: min(calc(150px * var(--wx-text-scale)), calc(100vw - 132px)); max-height: calc(65dvh - var(--wx-navigation-height,78px) - 180px); overflow: auto; overscroll-behavior: contain; }
+    #hudMap { grid-row: 2; grid-column: 1; width: min(calc(150px * var(--wx-text-scale)), 100%); max-height: var(--wx-hud-map-height, calc(65dvh - var(--wx-navigation-height,78px) - 180px)); }
     .hudMapVisual { grid-template-columns: minmax(0, 1fr); }
-    #coords { padding: 4px; font-size: var(--wx-type-meta); }
+    #coords { flex-wrap: wrap; padding: 4px; font-size: var(--wx-type-meta); }
+    #coordsText { flex-basis: 100%; }
     #coords a { font-size: var(--wx-type-meta); }
     #minimapZoomControls { display: none !important; }
-    #hudUtilities { grid-row: 2; grid-column: 1; margin-top: 0; }
+    #hudUtilities { grid-row: 2; grid-column: 2; margin-top: 0; width: 100%; }
+    .hudUtilityActions { gap: 4px; }
+    .liveGpsActions button { flex-basis: 100%; }
+    #liveGpsHud, #deFlockHud, #urbanCivicStatus, .world-selection-notice { padding: 8px; }
   }
   @media (max-height: 560px) and (orientation: landscape) {
     #hud { right: max(8px, env(safe-area-inset-right)); width: auto; }
     .hud-box { width: min(340px, calc(100vw - 140px)); max-height: 130px; }
     #hudDetails { grid-template-columns: minmax(0, 1fr); }
     #hudMap { position: fixed; top: auto; bottom: calc(var(--wx-navigation-height,78px) + 66px); left: 50%; width: 96px; max-height: none; transform: translateX(-50%); }
-    #hudUtilities { grid-row: 1; grid-column: 1; margin-top: 66px; }
+    #hudUtilities { grid-row: 1 / span 2; grid-column: 2; margin-top: 66px; width: min(320px, 100%); }
     #coords { display: none !important; }
   }
   @media (forced-colors: active) {

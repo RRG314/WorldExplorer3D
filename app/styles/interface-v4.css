@@ -486,121 +486,13 @@ body:has(#propertyPanel.show) #worldQuickControls { display: none !important; }
 /* A central status panel leaves both landscape thumb-control zones free. */
 @media (max-height: 560px) and (orientation: landscape) and (pointer: coarse) {
   :root { --wx-live-gps-top: var(--wx-world-controls-top); }
-  #liveGpsHud { left: 50%; right: auto; width: min(320px, calc(100vw - 32px)); transform: translateX(-50%); }
 }
 
 @media (max-height: 560px) and (orientation: landscape) {
   #controlsTab { top: 66px; right: 12px; }
 }
 }
-.world-selection-notice {
-  box-sizing: border-box;
-  position: fixed;
-  right: max(18px, env(safe-area-inset-right));
-  bottom: max(86px, calc(env(safe-area-inset-bottom) + 78px));
-  z-index: 190;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 14px;
-  width: min(340px, calc(100vw - 36px));
-  padding: 13px 14px;
-  color: #edf8ff;
-  background: rgba(5, 16, 24, .94);
-  border: 1px solid rgba(112, 204, 255, .64);
-  border-left: 3px solid #58bdff;
-  box-shadow: 0 12px 34px rgba(0, 0, 0, .36);
-  font-family: 'Poppins', sans-serif;
-}
-
-.world-selection-notice[hidden] {
-  display: none;
-}
-
-/* Selected-place actions resume when the player closes the hotbar menu. */
-body:has(.floatMenu.open) .world-selection-notice {
-  display: none;
-}
-
-.world-selection-notice div {
-  display: grid;
-  gap: 4px;
-  min-width: 0;
-}
-
-.world-selection-notice strong {
-  font-family: 'Orbitron', sans-serif;
-  font-size: 12px;
-  letter-spacing: .03em;
-  text-transform: capitalize;
-}
-
-.world-selection-notice span {
-  color: #b9cedb;
-  font-size: 12px;
-  line-height: 1.35;
-}
-
-.world-selection-notice button {
-  margin-left: auto;
-  padding: 0;
-  color: #b9cedb;
-  background: transparent;
-  border: 0;
-  font: 20px/1 sans-serif;
-  cursor: pointer;
-}
-
-.world-selection-notice .worldSelectionActions {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  width: 100%;
-  justify-content: flex-end;
-}
-
 body:has(#worldSelectionNotice:not([hidden])) .tutorial-card { display: none !important; }
-.world-selection-notice [data-world-selection-dismiss] { min-width: 44px; min-height: 44px; margin-left: 0; }
-
-.world-selection-notice [data-world-selection-action] {
-  width: auto;
-  min-width: 126px;
-  min-height: 44px;
-  padding: 7px 10px;
-  border: 1px solid rgba(103, 232, 249, .6);
-  border-radius: 6px;
-  background: rgba(14, 116, 144, .72);
-  color: #ecfeff;
-  font: 700 10px/1.2 'Poppins', sans-serif;
-}
-
-.world-selection-notice [data-world-selection-action][hidden] { display: none; }
-
-@media (max-width: 700px), (pointer: coarse) {
-  .world-selection-notice {
-    right: 12px;
-    top: calc(var(--wx-world-controls-top) + var(--wx-world-controls-row-height) + 8px);
-    bottom: auto;
-    width: min(310px, calc(100vw - 24px));
-  }
-}
-
-@media (max-height: 560px) and (orientation: landscape) and (pointer: coarse) {
-  .world-selection-notice {
-    left: 50%;
-    right: auto;
-    top: max(70px, calc(env(safe-area-inset-top) + 66px));
-    transform: translateX(-50%);
-    width: min(600px, calc(100vw - 24px));
-    flex-direction: row;
-    align-items: center;
-    gap: 10px;
-    padding: 6px 10px;
-  }
-  .world-selection-notice .worldSelectionActions { flex: 0 0 auto; width: auto; }
-  .world-selection-notice strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .world-selection-notice span { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
-}
 
 /* The lobby is hosted on a dark panel; keep secondary guidance readable. */
 #globeHubPanelHost .mp-plan-state{color:#b6c5d7}

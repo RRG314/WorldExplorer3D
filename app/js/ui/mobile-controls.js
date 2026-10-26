@@ -1,6 +1,7 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { createLifecycleScope } from "../runtime/lifecycle-scope.js?v=2";
 import { canUseEquippedItemOnMobile } from './equipment-action-policy.js?v=1';
+import {getScreenLayoutService} from './screen-layout.js?v=3';
 
 const MOBILE_CONTROL_PROFILES = {
   driving: {
@@ -672,11 +673,13 @@ function initMobileControls() {
     mobileActionStack?.classList.toggle('has-pack-action', !!showPackAction);
     mobileActionStack?.classList.toggle('has-equipment-action', !!showEquipmentUse);
     mobileTouchControls.classList.add('show');
+    (appCtx.screenLayout || getScreenLayoutService()).refreshHudLayout();
   }
 
   function installMobileUiPointerShield() {
     if (!isTouchPreferredClient) return;
     const shieldTargets = document.querySelectorAll([
+      '#hud',
       '#floatMenuContainer',
       '#controlsTab',
       '#mainMenuBtn',

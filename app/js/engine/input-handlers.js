@@ -1,5 +1,5 @@
 import { createLifecycleScope } from '../runtime/lifecycle-scope.js?v=2';
-import { handleWorldCanvasClick } from '../interaction/world-click-router.js?v=3';
+import { handleWorldCanvasClick } from '../interaction/world-click-router.js?v=4';
 
 export function setupEngineInputHandlers(appCtx) {
   const inputScope = createLifecycleScope('engine-input');

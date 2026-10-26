@@ -58,7 +58,7 @@ function positionTopOverlays() {
   const debugVisible = !!debugOverlay && debugOverlay.style.display !== 'none';
   const perfVisible = !!perfPanel && perfPanel.style.display !== 'none';
   if (!debugVisible && !perfVisible) return;
-  const hudRect = isVisibleRect(document.getElementById('hud'));
+  const hudRect = isVisibleRect(document.getElementById('hudBox'));
   const menuRect = isVisibleRect(document.getElementById('mainMenuBtn'));
   if (!hudRect || !menuRect) return;
   const centerX = Math.round((hudRect.right + menuRect.left) * 0.5);

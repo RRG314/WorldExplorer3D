@@ -1,4 +1,4 @@
-import {getScreenLayoutService} from '../ui/screen-layout.js?v=2';
+import {getScreenLayoutService} from '../ui/screen-layout.js?v=3';
 import {roomRing} from '../../../functions/interior-layout.mjs';
 const node=(tag,text)=>{const e=document.createElement(tag);if(text!==undefined)e.textContent=text;return e;};
 const button=(label,action)=>{const b=node('button',label);b.type='button';b.dataset.venueAction=action;return b;};

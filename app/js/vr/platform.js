@@ -2,7 +2,7 @@ import {createLifecycleScope} from '../runtime/lifecycle-scope.js?v=2';
 import {captureEnvironmentSession} from '../session-coordinator.js?v=2';
 import {createPhoneVrSession} from './phone-session.js';
 import {parseCardboardViewerUrl,validatePhoneOptics} from './phone-optics.js';
-import {getScreenLayoutService} from '../ui/screen-layout.js?v=2';
+import {getScreenLayoutService} from '../ui/screen-layout.js?v=3';
 import {createTrackedVrSession} from './xr-session.js';
 import {inspectLocalRoadRide,createLocalRoadRide} from './road-ride.js';
 

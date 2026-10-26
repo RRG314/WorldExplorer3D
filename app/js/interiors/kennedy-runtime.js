@@ -1,6 +1,6 @@
 import {loadOwnedLandmarkModel,disposeLandmarkModel} from '../world/landmark-lifetime.js';
 import {acquireVenueLighting} from './venue-lighting.js';
-import {getScreenLayoutService} from '../ui/screen-layout.js?v=2';
+import {getScreenLayoutService} from '../ui/screen-layout.js?v=3';
 import {KENNEDY_CONTENT} from './kennedy-content.js';
 
 export function closeKennedyPanel(ctx,active){

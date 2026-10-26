@@ -5,7 +5,7 @@ import { ctx as appCtx } from "./shared-context.js?v=55"; // ===================
 import { captureEarthWorldSession, resumeEarthWorldSession } from "./earth-session.js?v=17";
 import { prepareTitleEnvironment } from "./planetary/entry.js?v=9";
 import { initMapInteractions } from "./ui/map-interactions.js?v=62";
-import { initMobileControls } from "./ui/mobile-controls.js?v=87";
+import { initMobileControls } from "./ui/mobile-controls.js?v=88";
 import { initShareUi } from "./ui/share-links.js?v=64";
 import { setupSettingsUi } from "./ui/settings.js?v=2";
 import { bindSpaceActions } from "./ui/space-actions.js?v=17";
@@ -15,6 +15,7 @@ import { createEarthReturnAction } from './travel/earth-return.js';
 import {bindSurfaceRecoveryControls} from './ui/recovery-controls.js';
 import {mountTesterInvitation} from './ui/tester-invitation.js';
 import {bindWorldFocusControls} from './ui/world-focus.js';
+import {getScreenLayoutService} from './ui/screen-layout.js?v=3';
 
 function emitTutorialEvent(eventName, payload = {}) {
   if (typeof appCtx.tutorialOnEvent === 'function') {
@@ -173,6 +174,7 @@ function setupUI() {
     }
   }
   bindWorldFocusControls(appCtx, closeAllFloatMenus);
+  (appCtx.screenLayout || getScreenLayoutService()).bindHudLayout();
   function goToMainMenu() {
     emitTutorialEvent('opened_main_menu', { source: 'main_menu_button' });
     appCtx.stopLiveGpsMode?.({ reason: 'main-menu' });

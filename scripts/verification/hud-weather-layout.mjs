@@ -10,17 +10,20 @@ import {vendorScriptsCritical} from '../../app/js/modules/manifest.js';
 
 export async function verifyHudWeatherLayout(){
   const out=process.env.WE3D_VERIFY_OUTPUT_DIR||'output/verification/hud-weather-layout';await mkdir(out,{recursive:true});
-  const wanted=['hud','mainMenuBtn','floatMenuContainer','mobileTouchControls'];
+  const wanted=['hud','mainMenuBtn','floatMenuContainer','mobileTouchControls','liveGpsHud','deFlockHud','urbanCivicStatus'];
   const source=parse5.parse(await readFile('app/index.html','utf8')),nodes={};
   function visit(n){const id=n.attrs?.find(a=>a.name==='id')?.value;if(wanted.includes(id))nodes[id]=n;if(n.tagName==='head')nodes.head=n;for(const child of n.childNodes||[])visit(child);}
   visit(source);for(const id of wanted)assert.ok(nodes[id],`Current product ${id} must exist`);
   nodes.head.childNodes=nodes.head.childNodes.filter(n=>n.tagName!=='script');
-  const html='<!doctype html><html><head><base href="/app/">'+parse5.serialize(nodes.head)+'</head><body>'+wanted.map(id=>parse5.serializeOuter(nodes[id])).join('')+`<script src="${vendorScriptsCritical[0]}"></script><script type="module">
+  const html='<!doctype html><html><head><base href="/app/">'+parse5.serialize(nodes.head)+'</head><body>'+wanted.filter(id=>{let parent=nodes[id].parentNode;while(parent){if(wanted.includes(parent.attrs?.find(a=>a.name==='id')?.value))return false;parent=parent.parentNode;}return true;}).map(id=>parse5.serializeOuter(nodes[id])).join('')+`<script src="${vendorScriptsCritical[0]}"></script><script type="module">
     import {ctx} from '/app/js/shared-context.js?v=55';
     import {updateHUD} from '/app/js/hud.js';
     import {updateOceanHud} from '/app/js/ocean/hud.js';
     import {setupSettingsUi} from '/app/js/ui/settings.js?v=2';
     import {bindWorldFocusControls} from '/app/js/ui/world-focus.js';
+    import {getScreenLayoutService} from '/app/js/ui/screen-layout.js?v=3';
+    import {showWorldSelectionNotice} from '/app/js/interaction/world-click-router.js?v=4';
+    window.showWorldSelectionNotice=showWorldSelectionNotice;
     Object.assign(ctx,{apiConfig:{},selLoc:'custom',customLoc:{name:'Baltimore, Maryland'},LOC:{lat:39.2904,lon:-76.6122},SCALE:100000,METERS_PER_WORLD_UNIT:1,keys:{},
       Walk:{state:{mode:'walk',walker:{x:0,z:0,angle:0,speedMph:2}}},car:{speed:0,x:0,z:0,angle:0,condition:1},playerConditionAuthority:{snapshot:()=>({condition:1})}});
     setupSettingsUi(ctx);
@@ -30,6 +33,7 @@ export async function verifyHudWeatherLayout(){
     for(const id of ['hud','coords','minimap','minimapZoomControls','worldQuickControls','floatMenuContainer','mainMenuBtn'])document.getElementById(id).classList.add('show');
     document.getElementById('mobileTouchControls').classList.add('show','mode-walking');
     window.hudProbe={ctx,updateHUD,updateOceanHud};updateHUD();
+    window.hudLayout=getScreenLayoutService();hudLayout.bindHudLayout();
     window.render_game_to_text=()=>JSON.stringify({scope:'Controlled current HUD component, no world',speed:document.getElementById('speed').textContent,condition:document.getElementById('conditionLabel').textContent,collapsed:document.getElementById('hudBox').classList.contains('compact')});
     window.ready=true;
   </script></body></html>`;
@@ -62,21 +66,41 @@ export async function verifyHudWeatherLayout(){
       {name:'phone',width:390,height:844,scale:'100'},
       {name:'narrow-phone-large-text',width:320,height:740,scale:'200'},
       {name:'landscape',width:844,height:390,scale:'100'},
-      {name:'landscape-large-text',width:844,height:390,scale:'200'}
+      {name:'landscape-large-text',width:844,height:390,scale:'200'},
+      {name:'gps-phone',width:390,height:844,scale:'100',status:['liveGpsHud']},
+      {name:'gps-phone-large',width:320,height:740,scale:'200',status:['liveGpsHud']},
+      {name:'gps-deflock-landscape',width:844,height:390,scale:'100',status:['liveGpsHud','deFlockHud']},
+      {name:'civic-desktop',width:1440,height:900,scale:'100',status:['urbanCivicStatus']},
+      {name:'selection-phone',width:390,height:844,scale:'100',selection:true},
+      {name:'gps-plane-phone',width:390,height:844,scale:'100',mode:'plane',status:['liveGpsHud']},
+      {name:'gps-car-southpaw-landscape',width:844,height:390,scale:'100',mode:'driving',southpaw:true,tilt:true,status:['liveGpsHud']}
     ].filter(row=>!process.env.WE3D_HUD_CASE||process.env.WE3D_HUD_CASE.split(',').includes(row.name));
     const cdp=await page.context().newCDPSession(page);
     for(const row of cases){
       await page.setViewportSize({width:row.width,height:row.height});
-      await cdp.send('Emulation.setTouchEmulationEnabled',{enabled:!row.name.startsWith('desktop')});
+      await cdp.send('Emulation.setTouchEmulationEnabled',{enabled:!row.name.startsWith('desktop')&&row.width<1100});
       await page.evaluate(row=>{
         document.documentElement.dataset.we3dTextScale=row.scale;
         const id=n=>document.getElementById(n);id('hudBox').classList.remove('compact');
+        for(const name of ['hudBox','hudMap','hudUtilities'])id(name).scrollTop=0;
         id('speed').textContent='12';id('speedUnitLabel').textContent='KTS';id('limitLabel').textContent='SIM DEPTH';id('limit').textContent='1000m';
         id('street').textContent='Ocean · Scuba explorer';id('conditionLabel').textContent='Dive air · 25%';
         id('weatherPanel').style.display='block';id('weatherLine').textContent=row.weather?.[0]||'Loading live weather';id('weatherMetaLine').textContent=row.weather?.[1]||'Fetching local conditions';
-        id('mobileTouchControls').classList.toggle('show',!row.name.startsWith('desktop'));
+        id('mobileTouchControls').classList.toggle('show',!row.name.startsWith('desktop')&&row.width<1100);
+        const touch=id('mobileTouchControls');touch.classList.remove('mode-walking','mode-driving','mode-plane');touch.classList.add('mode-'+(row.mode||'walking'));touch.dataset.handedness=row.southpaw?'southpaw':'standard';id('mobileDrivePedals').hidden=row.mode!=='driving';id('mobileTiltQuickRecenter').classList.toggle('hidden',!row.tilt);
+        for(const name of ['liveGpsHud','deFlockHud','urbanCivicStatus'])id(name).classList.toggle('show',!!row.status?.includes(name));
+        if(row.selection)showWorldSelectionNotice('Mapped waterfront building','Inspect the mapped identity before choosing an activity.',{label:'Inspect place',onClick:()=>window.selectedWorldAction=(window.selectedWorldAction||0)+1});else{const card=id('worldSelectionNotice');if(card)card.hidden=true;}
+        document.body.classList.toggle('live-gps-active',!!row.status?.includes('liveGpsHud'));document.body.classList.toggle('deflock-active',!!row.status?.includes('deFlockHud'));
       },row);
-      await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+      await page.evaluate(()=>{hudLayout.refreshHudLayout();return new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));});
+      // Viewport emulation, text reflow and ResizeObserver delivery can span
+      // different frames. Observe the settled result without driving the view.
+      await page.waitForFunction(()=>{
+        if(!matchMedia('(pointer:coarse)').matches)return true;
+        const r=id=>document.getElementById(id).getBoundingClientRect();
+        const overlaps=(a,b)=>a.left<b.right&&a.right>b.left&&a.top<b.bottom&&a.bottom>b.top;
+        return ['hudMap','hudUtilities'].every(id=>['mobileMovePad','mobileLookPad'].every(pad=>!overlaps(r(id),r(pad))));
+      },null,{timeout:1500});
       const result=await page.evaluate(()=>{
         const box=n=>{const r=n.getBoundingClientRect();return {x:r.x,y:r.y,right:r.right,bottom:r.bottom,width:r.width,height:r.height};};
         const hud=document.getElementById('hudBox'),bounds=box(hud),toggle=box(document.getElementById('hudToggleBtn')),clipped=[];
@@ -98,6 +122,18 @@ export async function verifyHudWeatherLayout(){
         assert.equal(overlaps(result.quickControls,pad),false,'Utilities keep the thumb controls clear');
       }
       for(const id of ['hudToggleBtn','controlsBarBtn','quickTimeOfDay','quickWeatherMode']){const b=await page.locator('#'+id).boundingBox();assert.ok(b?.width>=44&&b?.height>=44,id);}
+      for(const id of row.status||[]){
+        const status=await page.locator('#'+id).boundingBox();report.activeCase.status={id,...status};
+        const box={x:status.x,y:status.y,right:status.x+status.width,bottom:status.y+status.height};
+        assert.equal(await page.locator('#'+id).evaluate(e=>e.scrollWidth<=e.clientWidth+1),true,'Feature status has no horizontal clipping');
+      }
+      if(row.status?.includes('liveGpsHud')){
+        const stop=await page.locator('#liveGpsStopBtn').boundingBox(),toolbar=await page.locator('.hudUtilityActions').boundingBox();
+        assert.ok(stop.y>=result.quickControls.y&&stop.y+stop.height<=toolbar.y+1,'GPS Stop is visible before scrolling');
+        for(const id of ['liveGpsStopBtn','liveGpsFieldBtn','liveGpsPauseBtn','liveGpsLowPowerBtn']){await page.locator('#'+id).click({trial:true});const r=await page.locator('#'+id).boundingBox();assert.ok(r.width>=44&&r.height>=44);}
+        await page.locator('#liveGpsStopBtn').scrollIntoViewIfNeeded();
+      }
+      if(row.selection){await page.screenshot({path:`${out}/selection-phone-open.png`});await page.locator('[data-world-selection-action]').click();assert.equal(await page.evaluate(()=>selectedWorldAction),1);await page.locator('[data-world-selection-dismiss]').click();assert.equal(await page.locator('#worldSelectionNotice').isVisible(),false);}
       await page.locator('#conditionLabel').scrollIntoViewIfNeeded();assert.ok(await page.locator('#conditionLabel').isVisible());await page.screenshot({path:`${out}/${row.name}.png`});
       await page.locator('#hudToggleBtn').click();assert.equal(await page.locator('#hudToggleBtn').getAttribute('aria-expanded'),'false');assert.equal(await page.locator('#hudHeader').isVisible(),false);
       await page.locator('#hudToggleBtn').focus();await runPrescribedGameActions(page,out,[{buttons:['space'],frames:1},{buttons:[],frames:2}],'#minimap');
@@ -105,6 +141,8 @@ export async function verifyHudWeatherLayout(){
       await page.keyboard.press('Escape');assert.equal(await page.evaluate(()=>document.activeElement?.id),'worldCanvas');
       report.cases.push({...row,...result,collapseRestoredByKeyboard:true,textState:JSON.parse(await page.evaluate(()=>render_game_to_text()))});
     }
+    report.bindingRelease=await page.evaluate(()=>{const root=document.getElementById('hud'),binding=hudLayout.bindHudLayout();binding.dispose();return ['--wx-hud-map-height','--wx-hud-utility-height','--wx-hud-utility-footer'].every(name=>!root.style.getPropertyValue(name));});
+    assert.equal(report.bindingRelease,true);
     assert.deepEqual(report.errors,[]);report.passed=true;
   }catch(error){report.failure=String(error.stack||error);process.exitCode=1;await page?.screenshot({path:`${out}/failure.png`}).catch(()=>{});}
   finally{try{if(owned)await closeOwnedBrowser(owned);}finally{await server.close();await writeFile(`${out}/report.json`,JSON.stringify(report,null,2));}}
