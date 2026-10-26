@@ -1,0 +1,207 @@
+@layer interface {
+  /* This stylesheet owns Backpack composition; item/custody actions stay in the existing runtime. */
+  #urbanEquipment {
+    position: fixed;
+    top: max(24px, env(safe-area-inset-top));
+    left: 50%;
+    z-index: 10030;
+    display: none;
+    width: min(1060px, calc(100vw - 48px));
+    max-height: calc(100dvh - max(48px, env(safe-area-inset-top) + env(safe-area-inset-bottom)));
+    box-sizing: border-box;
+    overflow: auto;
+    overscroll-behavior: contain;
+    padding: var(--wx-space-6);
+    color: var(--wx-text);
+    background: var(--wx-panel-solid);
+    border: 1px solid var(--wx-line);
+    border-radius: var(--wx-radius);
+    box-shadow: var(--wx-shadow-panel);
+    transform: translateX(-50%);
+    font: 400 var(--wx-type-control)/1.5 var(--wx-font-ui);
+    pointer-events: auto;
+    scrollbar-gutter: stable;
+  }
+  #urbanEquipment.show {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(250px, .48fr);
+    grid-template-areas:
+      "heading heading"
+      "records wallet"
+      "note note"
+      "quick-label quick-label"
+      "quick quick"
+      "pack-label detail"
+      "filters detail"
+      "contents detail"
+      "status detail"
+      "condition detail";
+    gap: 12px 20px;
+    align-items: start;
+  }
+  .urbanEquipmentHead {
+    grid-area: heading;
+    position: sticky;
+    top: -24px;
+    z-index: 3;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin: -24px -24px 4px;
+    padding: 18px 24px;
+    border-bottom: 1px solid var(--wx-line-soft);
+    background: var(--wx-panel-solid);
+  }
+  .urbanEquipmentHead h2 {
+    margin: 0;
+    color: var(--wx-text);
+    font: 750 calc(1.5rem * var(--wx-text-scale))/1.15 var(--wx-font-ui);
+    letter-spacing: -.025em;
+  }
+  .urbanEquipmentHead > div { display: flex; align-items: center; gap: 12px; }
+  .urbanEquipmentHead small { color: var(--wx-muted); font-size: var(--wx-type-meta); }
+  #urbanEquipmentCloseBtn {
+    flex: none;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    border: 1px solid var(--wx-line);
+    border-radius: var(--wx-radius);
+    color: var(--wx-text);
+    background: var(--wx-panel-soft);
+    font: 600 24px/1 var(--wx-font-ui);
+    cursor: pointer;
+    touch-action: manipulation;
+  }
+  #urbanEquipment > .sandboxPathActions { grid-area: records; margin: 0; padding: 0; }
+  #urbanEquipment > .sandboxPathActions button {
+    min-height: 44px;
+    padding: 9px 12px;
+    border: 1px solid var(--wx-line);
+    border-radius: var(--wx-radius);
+    color: var(--wx-text);
+    background: transparent;
+    font: 600 var(--wx-type-control)/1.4 var(--wx-font-ui);
+  }
+  .urbanBackpackWallet {
+    grid-area: wallet;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    padding: 12px;
+    border: 1px solid var(--wx-line-soft);
+    border-radius: var(--wx-radius);
+    background: var(--wx-panel-soft);
+  }
+  .urbanBackpackWallet span { color: var(--wx-muted); font-size: var(--wx-type-meta); }
+  .urbanBackpackWallet strong { color: var(--wx-text); font-variant-numeric: tabular-nums; font-size: var(--wx-type-body); }
+  #urbanEquipment > .sandboxWalletNote { grid-area: note; margin: 0; color: var(--wx-muted); font-size: var(--wx-type-meta); }
+  .urbanBackpackLabel { margin: 0; color: var(--wx-muted); font: 650 var(--wx-type-meta)/1.4 var(--wx-font-ui); }
+  #urbanQuickAccessHeading { grid-area: quick-label; }
+  #urbanContentsHeading { grid-area: pack-label; }
+  .urbanEquipmentSlots {
+    grid-area: quick;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, calc(6rem * var(--wx-text-scale))), 1fr));
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+  .urbanBackpackFilters { grid-area: filters; display: flex; flex-wrap: wrap; gap: 8px; }
+  .urbanBackpackFilters button, .urbanBackpackDetailActions button, .urbanBackpackPages button {
+    min-width: 44px;
+    min-height: 44px;
+    padding: 9px 12px;
+    border: 1px solid var(--wx-line);
+    border-radius: var(--wx-radius);
+    color: var(--wx-text);
+    background: var(--wx-panel-soft);
+    font: 650 var(--wx-type-control)/1.4 var(--wx-font-ui);
+    cursor: pointer;
+  }
+  .urbanBackpackFilters button.active { border-color: var(--wx-action); color: var(--wx-action); background: var(--wx-selected); }
+  .urbanBackpackContents { grid-area: contents; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, calc(8rem * var(--wx-text-scale))), 1fr)); gap: 10px; }
+  .urbanEquipmentSlot, .urbanBackpackItem {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 6px;
+    min-width: 0;
+    min-height: 148px;
+    padding: 14px 10px;
+    border: 1px solid var(--wx-line-soft);
+    border-radius: var(--wx-radius);
+    color: var(--wx-text);
+    background: var(--wx-panel-soft);
+    text-align: center;
+    font: 500 var(--wx-type-control)/1.4 var(--wx-font-ui);
+    cursor: pointer;
+    transition: border-color var(--wx-motion-fast), background-color var(--wx-motion-fast);
+  }
+  .urbanEquipmentSlot:hover, .urbanBackpackItem:not(:disabled):hover { border-color: var(--wx-action); }
+  .urbanEquipmentSlot.equipped, .urbanBackpackItem.equipped { border-color: var(--wx-success); background: var(--wx-equipped-surface); }
+  .urbanEquipmentSlot.selected, .urbanBackpackItem.selected { outline: 2px solid var(--wx-action); outline-offset: 2px; }
+  .urbanEquipmentSlot.selected::after, .urbanBackpackItem.selected::after {
+    content: 'Selected';
+    position: static;
+    margin-top: auto;
+    padding: 2px 6px;
+    color: var(--wx-action-text);
+    background: var(--wx-action);
+    font: 650 var(--wx-type-meta)/1.3 var(--wx-font-ui);
+  }
+  #urbanEquipment .urbanItemVisual { display: grid; place-items: center; width: 56px; height: 56px; margin: 4px auto; color: var(--wx-text); background: transparent; }
+  #urbanEquipment .urbanItemVisual svg { width: 48px; height: 48px; fill: currentColor; filter: none; }
+  #urbanEquipment .urbanItemName { color: var(--wx-text); font: 650 var(--wx-type-control)/1.4 var(--wx-font-ui); white-space: normal; overflow-wrap: anywhere; }
+  #urbanEquipment .urbanItemCount { color: var(--wx-muted); font: 400 var(--wx-type-meta)/1.4 var(--wx-font-ui); white-space: normal; }
+  #urbanEquipment .urbanItemSlot { top: 8px; left: 8px; width: calc(1.5rem * var(--wx-text-scale)); height: calc(1.5rem * var(--wx-text-scale)); border-color: var(--wx-line); color: var(--wx-muted); background: var(--wx-input); font: 600 var(--wx-type-meta)/1 var(--wx-font-ui); }
+  #urbanEquipment .urbanItemQuantity { top: 8px; right: 8px; color: var(--wx-text); background: var(--wx-input); font: 650 var(--wx-type-meta)/1.3 var(--wx-font-ui); }
+  .urbanBackpackDetail {
+    grid-area: detail;
+    position: sticky;
+    top: 80px;
+    min-width: 0;
+    padding: 20px;
+    border: 1px solid var(--wx-line);
+    border-radius: var(--wx-radius);
+    color: var(--wx-muted);
+    background: var(--wx-panel-soft);
+    font-size: var(--wx-type-control);
+    overflow-wrap: anywhere;
+  }
+  .urbanBackpackDetail strong, .urbanBackpackDetail small { display: block; }
+  .urbanBackpackDetail strong { margin-bottom: 10px; color: var(--wx-text); font: 700 var(--wx-type-body)/1.4 var(--wx-font-ui); }
+  .urbanBackpackDetail small { font-size: var(--wx-type-control); }
+  .urbanBackpackUse { display: block; margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--wx-line-soft); }
+  .urbanBackpackUse b { display: block; margin-bottom: 6px; color: var(--wx-text); font-size: var(--wx-type-meta); }
+  .urbanBackpackDetailActions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+  .urbanBackpackDetailActions > button[data-backpack-action="equip"],
+  .urbanBackpackDetailActions > button[data-backpack-action="consume"] {
+    color: var(--wx-action-text); background: var(--wx-action); border-color: var(--wx-action);
+  }
+  .urbanBackpackSlotActions { flex-basis: 100%; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 8px; padding-top: 14px; border-top: 1px solid var(--wx-line-soft); }
+  .urbanBackpackSlotActions > span { grid-column: 1 / -1; margin-bottom: 4px; font-size: var(--wx-type-meta); }
+  .urbanBackpackSlotActions button { min-width: 0; padding-inline: 6px; }
+
+  .urbanBackpackEmpty { grid-column: 1 / -1; padding: 24px; border: 1px dashed var(--wx-line); color: var(--wx-muted); text-align: center; }
+  .urbanBackpackPages { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; color: var(--wx-muted); }
+  .urbanBackpackDetailActions button:disabled, .urbanBackpackPages button:disabled { opacity: .65; cursor: default; }
+  .urbanEquipmentStatus { grid-area: status; min-height: 20px; color: var(--wx-muted); font-size: var(--wx-type-meta); }
+  #urbanEquipment .urbanConditionDetails summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 44px; color: var(--wx-muted); font: 600 var(--wx-type-meta)/1.5 var(--wx-font-ui); }
+  #urbanEquipment .urbanConditionDetails summary span { float: none; }
+  #urbanEquipment .urbanPlayerCondition { background: var(--wx-panel-soft); border-color: var(--wx-line-soft); }
+  #urbanEquipment > .urbanConditionDetails { grid-area: condition; margin: 0; color: var(--wx-muted); font-size: var(--wx-type-meta); }
+
+  @media (max-width: 760px) {
+    #urbanEquipment { top: max(8px, env(safe-area-inset-top)); width: calc(100vw - 16px); max-height: calc(100dvh - max(16px, env(safe-area-inset-top) + env(safe-area-inset-bottom))); padding: 16px; }
+    #urbanEquipment.show { grid-template-columns: minmax(0, 1fr); grid-template-areas: "heading" "records" "wallet" "note" "quick-label" "quick" "pack-label" "filters" "contents" "detail" "status" "condition"; gap: 12px; }
+    .urbanEquipmentHead { top: -16px; margin: -16px -16px 4px; padding: 12px 16px; }
+    .urbanEquipmentHead small { display: none; }
+    .urbanEquipmentSlots, .urbanBackpackContents { gap: 8px; }
+    .urbanBackpackDetail { position: static; padding: 16px; }
+  }
+}

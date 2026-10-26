@@ -11,7 +11,7 @@ import { VEHICLE_CATALOG, VEHICLE_ROOT_TO_GROUND_METERS, vehicleMassKg } from '.
 import { applyTransportDamage } from '../transport/damage-model.js?v=1';
 import { createCivicResponseModel } from './civic-response-model.js?v=3';
 import { ensurePlayerBackpackInventory } from './equipment-model.js?v=10';
-import { createUrbanEquipmentRuntime } from './equipment-runtime.js?v=24';
+import { createUrbanEquipmentRuntime } from './equipment-runtime.js?v=25';
 import {urbanGroundPlayerPosition} from './player-position.js';
 import { createEquipmentVisuals } from './equipment-visuals.js?v=10';
 import {

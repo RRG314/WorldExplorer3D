@@ -63,4 +63,25 @@
     .wx-panel, .wx-button, .wx-field { border-color: CanvasText; }
     .wx-button:focus-visible, .wx-field:focus-visible { outline-color: Highlight; }
   }
+  /* Shared Explorer-record/path actions previously lived outside the discovery layer. */
+  .sandboxPathChoices, .sandboxPathActions { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; }
+  .sandboxPathChoices button, .sandboxPathActions button {
+    min-width: var(--wx-control-height);
+    min-height: var(--wx-control-height);
+    padding: 9px 12px;
+    border: 1px solid var(--wx-line);
+    border-radius: var(--wx-radius);
+    color: var(--wx-text);
+    background: var(--wx-panel-soft);
+    font: 600 var(--wx-type-control)/1.4 var(--wx-font-ui);
+    cursor: pointer;
+  }
+  .sandboxPathChoices button { flex: 1; }
+  .sandboxPathChoices button[aria-pressed="true"], #sandboxPathStart {
+    color: var(--wx-action-text); background: var(--wx-action); border-color: var(--wx-action);
+  }
+  .sandboxPathChoices button:focus-visible, .sandboxPathActions button:focus-visible {
+    outline: 3px solid var(--wx-focus); outline-offset: 3px;
+  }
+  .sandboxWalletNote { margin: 0; padding: 8px 14px; color: var(--wx-muted); font: 400 var(--wx-type-meta)/1.5 var(--wx-font-ui); }
 }

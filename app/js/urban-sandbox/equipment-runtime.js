@@ -107,7 +107,7 @@ function createUrbanEquipmentRuntime(options = {}) {
     if (item.verbs?.includes('inspect')) actions.push(`<button data-backpack-action="inspect" data-equipment-id="${escapeHtml(item.instanceId)}" type="button">Inspect</button>`);
     if (item.verbs?.includes('consume')) actions.unshift(`<button data-backpack-action="consume" data-equipment-id="${escapeHtml(item.instanceId)}" type="button">${escapeHtml(item.metadata?.consumeLabel || item.consumeLabel || 'Use')}</button>`);
     const slots = item.verbs?.includes('equip')
-      ? Array.from({ length: 6 }, (_, index) => `<button data-backpack-slot="${index + 1}" data-equipment-id="${escapeHtml(item.instanceId)}" type="button">Slot ${index + 1}</button>`).join('')
+      ? `<div class="urbanBackpackSlotActions" role="group" aria-label="Assign to quick access"><span>Assign to quick access</span>${Array.from({ length: 6 }, (_, index) => `<button data-backpack-slot="${index + 1}" data-equipment-id="${escapeHtml(item.instanceId)}" type="button">Slot ${index + 1}</button>`).join('')}</div>`
       : '';
     const description = item.metadata?.description || item.description || `${source}${acquired ? ` · added ${acquired}` : ''}`;
     const capabilities = Array.isArray(item.capabilities) && item.capabilities.length
@@ -139,14 +139,13 @@ function createUrbanEquipmentRuntime(options = {}) {
       ui.filters?.querySelectorAll?.('[data-backpack-filter]').forEach((button) => {
         button.classList.toggle('active', button.dataset.backpackFilter === (state.backpackFilter || 'all'));
       });
-      const hotbarItems = new Map(inventory.hotbar.filter(Boolean).map((item) => [item.hotbarSlot, item]));
       replaceMarkup(ui.slots, Array.from({ length: 6 }, (_, index) => {
         const slot = index + 1;
-        const item = hotbarItems.get(slot);
+        const item = inventory.hotbar[index] || null;
         if (!item) return `<button class="urbanEquipmentSlot empty" type="button" disabled aria-label="Quick slot ${slot} is empty"><b class="urbanItemSlot">${slot}</b><span class="urbanItemVisual">+</span><strong class="urbanItemName">Empty slot</strong><span class="urbanItemCount">Choose an item below</span></button>`;
         const count = item.magazine !== null ? `${item.magazine}/${item.reserve}` : Number(item.quantity || 0) > 1 ? `×${item.quantity}` : '';
         const selected = item.instanceId === state.backpackSelectedId;
-        return `<button class="urbanEquipmentSlot${item.equipped ? ' equipped' : ''}${selected ? ' selected' : ''}" type="button" data-equipment-id="${escapeHtml(item.instanceId)}" aria-pressed="${item.equipped}"${selected ? ' aria-current="true"' : ''} title="${escapeHtml(`${item.hotbarSlot}. ${item.label} · ${count}`)}"><b class="urbanItemSlot">${item.hotbarSlot}</b><span class="urbanItemVisual">${itemIconMarkup(item)}</span><strong class="urbanItemName">${escapeHtml(item.label)}</strong><span class="urbanItemCount">${escapeHtml(count)}</span></button>`;
+        return `<button class="urbanEquipmentSlot${item.equipped ? ' equipped' : ''}${selected ? ' selected' : ''}" type="button" data-equipment-id="${escapeHtml(item.instanceId)}" aria-pressed="${item.equipped}"${selected ? ' aria-current="true"' : ''} title="${escapeHtml(`${slot}. ${item.label} · ${count}`)}"><b class="urbanItemSlot">${slot}</b><span class="urbanItemVisual">${itemIconMarkup(item)}</span><strong class="urbanItemName">${escapeHtml(item.label)}</strong><span class="urbanItemCount">${escapeHtml(count)}</span></button>`;
       }).join(''));
       if (ui.contents) {
         let page = state.equipment.page({offset:backpackPageOffset,limit:backpackPageSize,filter:state.backpackFilter||'all'});

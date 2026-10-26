@@ -27,16 +27,17 @@ if (location.protocol === 'file:') document.documentElement.classList.add('unsup
 <script src="../js/firebase-project-config.js"></script>
 <script type="module" src="../js/site-analytics.js?v=1"></script>
 <style>@layer legacy, interface;</style>
-<link rel="stylesheet" href="../styles/world-explorer-tokens.css?v=1">
-<link rel="stylesheet" href="../styles/world-explorer-components.css?v=1">
+<link rel="stylesheet" href="../styles/world-explorer-tokens.css?v=2">
+<link rel="stylesheet" href="../styles/world-explorer-components.css?v=2">
 <link rel="stylesheet" href="styles/title-shell.css?v=95">
-<link rel="stylesheet" href="styles/runtime-shell.css?v=131">
+<link rel="stylesheet" href="styles/runtime-shell.css?v=132">
 <link rel="stylesheet" href="styles/block-builder.css?v=9">
 <link rel="stylesheet" href="styles/universe.css?v=9">
 <link rel="stylesheet" href="styles/fishing-game.css?v=6">
 <link rel="stylesheet" href="styles/interface-v4.css?v=34">
 <link rel="stylesheet" href="styles/start-hub.css?v=22">
-<link rel="stylesheet" href="styles/discovery.css?v=19">
+<link rel="stylesheet" href="styles/discovery.css?v=20">
+<link rel="stylesheet" href="styles/backpack.css?v=1">
 <link rel="stylesheet" href="styles/tutorial.css?v=15">
 <link rel="stylesheet" href="styles/ar.css?v=1">
 <link rel="stylesheet" href="styles/mobile-controls.css?v=4">
@@ -1010,15 +1011,15 @@ How Connected Data Is Used
   <button id="urbanVehiclePromptTakeButton" type="button" hidden>Take</button>
 </div>
 <aside id="urbanEquipment" aria-hidden="true" aria-label="Character Backpack">
-  <div class="urbanEquipmentHead"><span>Backpack</span><div><small>I to close · 1–6 quick equip</small><button id="urbanEquipmentCloseBtn" type="button" aria-label="Close Backpack">×</button></div></div>
+  <div class="urbanEquipmentHead"><h2 id="urbanEquipmentTitle">Backpack</h2><div><small>I to close · 1–6 quick equip</small><button id="urbanEquipmentCloseBtn" type="button" aria-label="Close Backpack">×</button></div></div>
   <nav class="sandboxPathActions" aria-label="Explorer records"><button data-pack-record="journal" type="button">Journal</button><button data-pack-record="guide" type="button">Field Guide</button><button data-pack-record="profile" type="button">Skills & companions</button></nav>
   <section class="urbanBackpackWallet" aria-label="Explorer wallet"><span>Explorer wallet</span><strong id="urbanBackpackWallet">$0</strong></section>
   <p class="sandboxWalletNote">Credits buy in-game goods and property. Exploring and basic building are free.</p>
-  <div class="urbanBackpackLabel">Quick access</div>
-  <div id="urbanEquipmentSlots" class="urbanEquipmentSlots"></div>
-  <div class="urbanBackpackLabel">Pack contents</div>
+  <h3 id="urbanQuickAccessHeading" class="urbanBackpackLabel">Quick access</h3>
+  <div id="urbanEquipmentSlots" class="urbanEquipmentSlots" role="group" aria-labelledby="urbanQuickAccessHeading"></div>
+  <h3 id="urbanContentsHeading" class="urbanBackpackLabel">Carried items</h3>
   <nav id="urbanBackpackFilters" class="urbanBackpackFilters" aria-label="Backpack categories"><button class="active" data-backpack-filter="all" type="button">All</button><button data-backpack-filter="field-tool" type="button">Tools</button><button data-backpack-filter="specimen" type="button">Finds</button><button data-backpack-filter="gear" type="button">Gear</button></nav>
-  <div id="urbanBackpackContents" class="urbanBackpackContents"></div>
+  <div id="urbanBackpackContents" class="urbanBackpackContents" role="group" aria-labelledby="urbanContentsHeading"></div>
   <div id="urbanBackpackDetail" class="urbanBackpackDetail" aria-live="polite"><span>Select an item to see its story and available actions.</span></div>
   <div id="urbanEquipmentStatus" class="urbanEquipmentStatus"></div>
   <details class="urbanConditionDetails"><summary>Character condition <span id="urbanPlayerConditionText">100%</span></summary><div id="urbanPlayerCondition" class="urbanPlayerCondition" role="status" aria-label="Character health"><i aria-hidden="true"><b id="urbanPlayerConditionFill"></b></i></div></details>
