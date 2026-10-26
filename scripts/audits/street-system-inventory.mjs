@@ -1,5 +1,5 @@
 // Lexical dependency evidence. Runtime ownership is reviewed in STREET_SYSTEM_AUDIT.md.
-import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve, relative, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
@@ -27,5 +27,7 @@ const entries = allFiles.map(file => {
 const result = { schemaVersion: 1, baseline: execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim(),
   method: 'All app/js JavaScript files scanned; entries retain lexical contract mentions and imports, including comments. Not a call graph or proof of live reachability.',
   scannedFiles: allFiles.length, contracts, entries: entries.filter(e => e.mentions.length) };
-writeFileSync(resolve(root, 'docs/streets/street-system-inventory.json'), JSON.stringify(result, null, 2) + '\n');
+const output=resolve(root,'output/research/street-audits');
+mkdirSync(output,{recursive:true});
+writeFileSync(resolve(output, 'street-system-inventory.json'), JSON.stringify(result, null, 2) + '\n');
 console.log(`${result.scannedFiles} modules scanned; ${result.entries.length} modules reference audited contracts.`);

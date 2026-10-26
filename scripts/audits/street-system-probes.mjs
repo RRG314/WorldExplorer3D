@@ -1,5 +1,5 @@
 // Read-only behavioral audit. Defects are observations, not passing release tests.
-import { writeFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { normalizeTransportSource } from '../../app/js/world/compiler/transport-source-normalizer.js';
 import { linearFeatureVisualSpec } from '../../app/js/world/load-style.js';
 import { normalizeLanduseSurfaceType } from '../../app/js/surface-rules.js';
@@ -34,5 +34,7 @@ const findings = [
     defectObserved: areaRoad === 'paved' && areaSidewalk === 'paved', explanation: 'Both enter the same paved presentation category. This is semantic flattening, not proof that the original provider omitted their geometry.' }
 ];
 const result = { schemaVersion: 1, purpose: 'Baseline defect reproduction; not release acceptance', findings };
-writeFileSync(new URL('../../docs/streets/baseline-probes.json', import.meta.url), JSON.stringify(result, null, 2) + '\n');
+const output=new URL('../../output/research/street-audits/',import.meta.url);
+mkdirSync(output,{recursive:true});
+writeFileSync(new URL('baseline-probes.json',output), JSON.stringify(result, null, 2) + '\n');
 console.log(JSON.stringify(result, null, 2));

@@ -14,6 +14,7 @@ const sourceExceptions=new Set([
   'scripts/architecture-evaluation/tooling/package-lock.json'
 ]);
 const localOnly=new Set(['AGENTS.md','CURRENT-STATE.md','progress.md',
+  'docs/streets/baseline-probes.json','docs/streets/street-system-inventory.json',
   'scripts/verification/deploy-portal-staging.mjs',
   'scripts/verification/portal-native-ci-identity.mjs',
   'scripts/verification/portal-native-live-staging.mjs',
@@ -25,7 +26,7 @@ const rejected=files.filter(file=>{
   return localOnly.has(file)||privateRoots.some(root=>file.startsWith(root))||
     /^docs\/streets\/(audit|validation|evidence)[^/]*\//.test(file)||
     /^(output|dist|public|_site|test-results|coverage|node_modules|\.firebase|\.playwright-cli|\.local-candidates|android-artifacts|android-widget-evidence|android-launch-evidence|apple-portal-evidence)\//.test(file)||
-    /(^|\/)node_modules\//.test(file)||/\.private\./i.test(file)||
+    /(^|\/)node_modules\//.test(file)||/\.private\./i.test(file)||/(^|\/)native-acceptance\.json$/.test(file)||
     /\.(jks|keystore|p8|p12|pfx|mobileprovision|apk|aab|ipa|xcresult|heapsnapshot)$/i.test(file)||
     /(^|\/)\.env(?:\.[^/]*)?$/.test(file)&&!file.endsWith('/.env.example')&&file!=='.env.example';
 });
