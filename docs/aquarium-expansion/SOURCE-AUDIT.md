@@ -29,7 +29,7 @@ compatible. The existing content record version advances while event IDs remain
 stable, preserving saved observations.
 
 Fresh public GitHub and OSM metadata is pinned in
-[source-refresh evidence](evidence/2026-10-13-source-refresh.json). All five
+[source-refresh evidence](SOURCE-PROVENANCE.json). All five
 candidate heads and the Pier 3/Pier 4 revisions match the earlier review. The
 entrance node still has only `entrance=yes`; no main/member/exit role is implied.
 No sufficiently licensed exact interior asset has been established.
@@ -47,7 +47,7 @@ cloud data, credentials or production package were changed by this continuation.
 
 The table and findings below document the original audit; missing capabilities
 there are superseded only by the implementation and current verification above
-and in [VERIFICATION](VERIFICATION.md).
+and in private verification records.
 
 ## Corrections to the supplied brief
 
