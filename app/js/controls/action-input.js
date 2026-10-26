@@ -357,7 +357,7 @@ function updateControlInput() {
     inputState.previousButtons = [];
     return false;
   }
-  if (appCtx.hasPauseReason?.('reality_capture')) {
+  if (appCtx.hasPauseReason?.('reality_capture') || appCtx.hasPauseReason?.('controls_settings')) {
     inputState.previousButtons = gamepad.buttons.map(button => button.value > 0.55);
     return false;
   }
@@ -381,6 +381,8 @@ function clearControlInputState(reason = 'runtime') {
   new Set([...HELD_CONTROL_CODES, ...configuredCodes]).forEach((code) => {
     keys[code] = false;
   });
+  // Dedicated flight UI retains its normalized keyboard channel separately.
+  for (const code of Object.keys(appCtx.spaceFlight?.keys || {})) appCtx.spaceFlight.keys[code] = false;
   inputState.gamepad = null;
   inputState.previousButtons = [];
   inputState.lastPlaneTurnTapAt.ArrowLeft = -Infinity;

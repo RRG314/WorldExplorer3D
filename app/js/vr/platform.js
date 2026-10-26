@@ -100,7 +100,7 @@ export function createVrPlatform(ctx,{target=window}={}){
     openSettings(){
       if(disposed)return false;if(session?.active)return false;
       const layer=ctx.screenLayout?.snapshot?.().panelLayer;
-      if(layer&&layer!=='vr-setup'){ctx.showToast?.('Close the current panel before opening VR setup.');return false;}
+      if(layer&&layer!=='vr-setup'&&layer!=='controls'){ctx.showToast?.('Close the current panel before opening VR setup.');return false;}
       ctx.setPauseReason?.('vr-setup',true);ctx.screenLayout?.setPanelLayer?.('vr-setup',true);dialog.showModal();status(stored?'Check the saved calibration if your phone, viewer or orientation has changed.':'Measure your screen and match your viewer before entering.');
       ride?.dispose();ride=null;previewRide=inspectLocalRoadRide(ctx);byId('vrPrepareRide').textContent='Prepare road ride';byId('vrPrepareRide').disabled=!previewRide;byId('vrRideStatus').textContent='';byId('vrRidePreview').textContent=previewRide?previewRide.name+' · about '+Math.round(previewRide.length*previewRide.metersPerWorldUnit)+' metres.':'A suitable road ride is not available here. Manual viewing and driving remain available.';
       const supported=target.isSecureContext&&target.navigator?.xr?.isSessionSupported?.('immersive-vr');

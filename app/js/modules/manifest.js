@@ -1,4 +1,4 @@
-const CACHE_BUST = 'v=749';
+const CACHE_BUST = 'v=750';
 
 export const vendorScriptsCritical = [
   '/app/vendor/three/build/three.min.js',

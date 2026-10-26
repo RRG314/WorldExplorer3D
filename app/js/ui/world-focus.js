@@ -18,6 +18,14 @@ export function bindWorldFocusControls(context, closeMenus, documentRef = global
     canvas.focus({preventScroll:true});
     return documentRef.activeElement === canvas;
   }
+  function requestWorldFocus() {
+    const revision = context.screenLayout?.snapshot?.().revision;
+    const presentation = capturePresentation(context);
+    queueMicrotask(() => {
+      if (context.screenLayout?.snapshot?.().revision !== revision || !presentation.isCurrent()) return;
+      focusWorld();
+    });
+  }
   scope.listen(documentRef.getElementById('returnToWorldBtn'), 'click', focusWorld);
   for (const id of ['floatMenuContainer', 'hud', 'minimapZoomControls', 'worldQuickControls']) {
     const element = documentRef.getElementById(id);
@@ -31,5 +39,5 @@ export function bindWorldFocusControls(context, closeMenus, documentRef = global
     });
   }
   scope.listen(globalThis, 'pagehide', event => { if (!event.persisted) scope.dispose('page closed'); });
-  return Object.freeze({focusWorld, dispose: () => scope.dispose('UI released')});
+  return Object.freeze({focusWorld, requestWorldFocus, dispose: () => scope.dispose('UI released')});
 }

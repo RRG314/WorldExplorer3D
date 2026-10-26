@@ -5,16 +5,17 @@ import { ctx as appCtx } from "./shared-context.js?v=55"; // ===================
 import { captureEarthWorldSession, resumeEarthWorldSession } from "./earth-session.js?v=17";
 import { prepareTitleEnvironment } from "./planetary/entry.js?v=9";
 import { initMapInteractions } from "./ui/map-interactions.js?v=62";
-import { initMobileControls } from "./ui/mobile-controls.js?v=88";
+import { initMobileControls } from "./ui/mobile-controls.js?v=89";
 import { initShareUi } from "./ui/share-links.js?v=64";
 import { setupSettingsUi } from "./ui/settings.js?v=3";
 import { bindSpaceActions } from "./ui/space-actions.js?v=17";
-import { initTitleScreenUi } from "./ui/title-screen.js?v=122";
+import { initTitleScreenUi } from "./ui/title-screen.js?v=123";
 import { captureEnvironmentSession, exitCurrentEnvironmentSync } from './session-coordinator.js?v=2';
 import { createEarthReturnAction } from './travel/earth-return.js';
 import {bindSurfaceRecoveryControls} from './ui/recovery-controls.js';
 import {mountTesterInvitation} from './ui/tester-invitation.js';
 import {bindWorldFocusControls} from './ui/world-focus.js';
+import {bindControlPanel} from './ui/control-panel.js';
 import {getScreenLayoutService} from './ui/screen-layout.js?v=3';
 
 function emitTutorialEvent(eventName, payload = {}) {
@@ -24,6 +25,7 @@ function emitTutorialEvent(eventName, payload = {}) {
 }
 
 function setupUI() {
+  appCtx.screenLayout ||= getScreenLayoutService();
   mountTesterInvitation();
   mountCapabilityGuide();
   const LAST_LOCATION_STORAGE_KEY = 'worldExplorer3D.lastLocation.v1';
@@ -133,9 +135,6 @@ function setupUI() {
 
   const {
     clearVirtualHeldInputs,
-    controlsTab,
-    ctrlContent,
-    ctrlHeader,
     isTouchPreferredClient,
     updateControlsModeUI
   } = initMobileControls();
@@ -173,9 +172,11 @@ function setupUI() {
       if (menuEl && menuEl.classList.contains('open')) appCtx.toggleFlowerActionMenu();
     }
   }
-  bindWorldFocusControls(appCtx, closeAllFloatMenus);
-  (appCtx.screenLayout || getScreenLayoutService()).bindHudLayout();
+  const worldFocus = bindWorldFocusControls(appCtx, closeAllFloatMenus);
+  bindControlPanel(appCtx, {updateMode: updateControlsModeUI, clearHeld: clearVirtualHeldInputs, requestWorldFocus: worldFocus.requestWorldFocus});
+  appCtx.screenLayout.bindHudLayout();
   function goToMainMenu() {
+    appCtx.closeControlsPanel?.();
     emitTutorialEvent('opened_main_menu', { source: 'main_menu_button' });
     appCtx.stopLiveGpsMode?.({ reason: 'main-menu' });
     appCtx.stopGameplayPlugin?.('main-menu', { resumeFree: false });
@@ -191,7 +192,7 @@ function setupUI() {
     document.getElementById('titleScreen').classList.remove('hidden');
     window.requestAnimationFrame(() => appCtx.openGlobeSelector?.());
     if (typeof appCtx.closeFlowerChallengeTitlePanel === 'function') appCtx.closeFlowerChallengeTitlePanel();
-    ['hud', 'minimap', 'minimapZoomControls', 'police', 'floatMenuContainer', 'mainMenuBtn', 'worldQuickControls', 'pauseScreen', 'resultScreen', 'caughtScreen', 'controlsTab', 'coords', 'flowerChallengeHud', 'paintTownHud', 'deFlockHud', 'deFlockPrompt', 'deFlockHelp', 'liveGpsHud', 'liveGpsPermissionPanel', 'realEstateBtn', 'historicBtn', 'memoryFlowerFloatBtn', 'gameShareFloatBtn', 'gameShareMenu', 'mobileTouchControls'].forEach((id) => {
+    ['hud', 'minimap', 'minimapZoomControls', 'police', 'floatMenuContainer', 'mainMenuBtn', 'worldQuickControls', 'pauseScreen', 'resultScreen', 'caughtScreen', 'coords', 'flowerChallengeHud', 'paintTownHud', 'deFlockHud', 'deFlockPrompt', 'deFlockHelp', 'liveGpsHud', 'liveGpsPermissionPanel', 'realEstateBtn', 'historicBtn', 'memoryFlowerFloatBtn', 'gameShareFloatBtn', 'gameShareMenu', 'mobileTouchControls'].forEach((id) => {
       const el = document.getElementById(id);
       if (el) el.classList.remove('show');
     });
@@ -199,7 +200,6 @@ function setupUI() {
     if (flowerActionMenu) flowerActionMenu.classList.remove('open');
     document.getElementById('boatPrompt')?.classList.remove('show');
     clearVirtualHeldInputs();
-    if (ctrlContent) ctrlContent.classList.add('hidden');
     if (typeof appCtx.closeMemoryComposer === 'function') appCtx.closeMemoryComposer();
     const memoryInfoPanel = document.getElementById('memoryInfoPanel');
     if (memoryInfoPanel) memoryInfoPanel.classList.remove('show');
@@ -585,38 +585,6 @@ function setupUI() {
     document.getElementById('fConstellations').classList.toggle('on', appCtx.constellationsVisible);
     closeAllFloatMenus();
   });
-  if (ctrlHeader && ctrlContent) {
-    ctrlHeader.addEventListener('click', (e) => {
-      e.stopPropagation();
-      ctrlContent.classList.toggle('hidden');
-      updateControlsModeUI();
-    });
-  }
-  const controlsBarBtn = document.getElementById('controlsBarBtn');
-  if (controlsBarBtn && ctrlContent) {
-    let lastTouchToggleAt = 0;
-    const toggleControlsPanel = (e) => {
-      e.stopPropagation();
-      document.querySelectorAll('.floatMenu').forEach((menu) => menu.classList.remove('open'));
-      ctrlContent.classList.toggle('hidden');
-      controlsTab?.classList.toggle('bar-open', !ctrlContent.classList.contains('hidden'));
-      updateControlsModeUI();
-    };
-    controlsBarBtn.addEventListener('touchend', (e) => {
-      e.preventDefault();
-      lastTouchToggleAt = performance.now();
-      toggleControlsPanel(e);
-    }, { passive: false });
-    controlsBarBtn.addEventListener('click', (e) => {
-      if (performance.now() - lastTouchToggleAt < 700) {
-        e.preventDefault();
-        e.stopPropagation();
-        return;
-      }
-      toggleControlsPanel(e);
-    });
-  }
-
   // Main Menu Button
   document.getElementById('mainMenuBtn').addEventListener('click', () => {
     goToMainMenu();
@@ -655,11 +623,7 @@ function setupUI() {
     {
       closeAllFloatMenus();
     }
-    if (controlsTab && !controlsTab.contains(e.target) && !controlsBarBtn?.contains(e.target) && ctrlContent) {
-      ctrlContent.classList.add('hidden');
-      controlsTab.classList.remove('bar-open');
-      updateControlsModeUI();
-    }
+
   });
 
   document.getElementById('resumeBtn').addEventListener('click', () => {appCtx.setPauseReason?.('manual_pause', false);document.getElementById('pauseScreen').classList.remove('show');});

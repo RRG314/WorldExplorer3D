@@ -242,6 +242,14 @@ function setupGlobeHub({
     if (challengePanel && overlay) overlay.appendChild(challengePanel);
   }
 
+  // These are the same live controls borrowed by the in-world Controls dialog.
+  const mobileSettings = document.getElementById('mobileControlSettings');
+  const quickStart = document.getElementById('tab-controls');
+  if (mobileSettings && quickStart) quickStart.prepend(mobileSettings);
+  const accessibilitySettings = document.getElementById('accessibilitySettings');
+  const settings = document.getElementById('tab-settings');
+  if (accessibilitySettings && settings) settings.prepend(accessibilitySettings);
+
   const selectLibraryPlace = (event, activate = false) => {
     const button = event.target instanceof Element
       ? event.target.closest('[data-library-lat][data-library-lon]')

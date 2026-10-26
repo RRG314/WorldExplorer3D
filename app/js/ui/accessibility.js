@@ -70,7 +70,7 @@ function initAccessibility() {
     if (element.getAttribute(name) !== value) element.setAttribute(name, value);
   };
   const upgradeSemantics = (scope = document) => {
-    within(scope, '.floatItem, .mode, .loc, #ctrlHeader').forEach((element) => {
+    within(scope, '.floatItem, .mode, .loc').forEach((element) => {
       if (!(element instanceof HTMLElement) || element.dataset.we3dKeyboardButton === 'true') return;
       element.dataset.we3dKeyboardButton = 'true';
       element.setAttribute('role', 'button');
@@ -84,12 +84,6 @@ function initAccessibility() {
     within(scope, '.floatItem, .mode, .loc').forEach((element) => {
       setAttributeIfChanged(element, 'aria-pressed', String(element.classList.contains('on') || element.classList.contains('sel')));
     });
-    const controlsHeader = document.getElementById('ctrlHeader');
-    const controlsContent = document.getElementById('ctrlContent');
-    if (controlsHeader && controlsContent && (scope === document || scope.contains(controlsHeader) || scope.contains(controlsContent))) {
-      setAttributeIfChanged(controlsHeader, 'aria-controls', 'ctrlContent');
-      setAttributeIfChanged(controlsHeader, 'aria-expanded', String(!controlsContent.classList.contains('hidden')));
-    }
     // New HUD nodes must not rewrite status roles in unrelated closed dialogs:
     // even setting the same role triggers our modal visibility observer.
     within(scope, '#locationSearchStatus, #perfSettingsStatus, #urbanEquipmentStatus, #gameShareStatus, #roomPanelStatus').forEach((element) => {
@@ -154,7 +148,9 @@ function initAccessibility() {
   }).sort((a, b) => a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1);
 
   const syncModal = () => {
-    const next = modalCandidates().at(-1) || null;
+    const candidates = modalCandidates();
+    const next = candidates.find(element => element.matches('dialog:modal') && element.contains(document.activeElement)) ||
+      candidates.filter(element => element.matches('dialog:modal')).at(-1) || candidates.at(-1) || null;
     if (next === activeModal) return;
     if (!next && activeModal) {
       activeModal = null;
@@ -222,12 +218,9 @@ function initAccessibility() {
       } else {
         // Class changes need only update the affected toggle, not every
         // control in the application (HUD text/classes change every frame).
-        if (target.matches('.floatItem, .mode, .loc, #ctrlHeader') && target.dataset.we3dKeyboardButton !== 'true') upgradeSemantics(target);
+        if (target.matches('.floatItem, .mode, .loc') && target.dataset.we3dKeyboardButton !== 'true') upgradeSemantics(target);
         if (target.matches('.floatItem, .mode, .loc')) {
           target.setAttribute('aria-pressed', String(target.classList.contains('on') || target.classList.contains('sel')));
-        }
-        if (target.id === 'ctrlContent') {
-          document.getElementById('ctrlHeader')?.setAttribute('aria-expanded', String(!target.classList.contains('hidden')));
         }
         if (target.matches(modalSelector)) {
           modalElements.add(target);

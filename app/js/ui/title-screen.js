@@ -13,7 +13,7 @@ import { readSharedExperienceParams } from "./share-links.js?v=64";
 import { prepareTitleEnvironment } from "../planetary/entry.js?v=9";
 import { markFirstPlayReady, scheduleAfterFirstPlay } from '../runtime/workload-policy.js?v=1';
 import {isEarthWorldUsable} from '../earth-core/world-readiness.js';
-import { setupGlobeHub } from './title-screen/globe-hub.js?v=7';
+import { setupGlobeHub } from './title-screen/globe-hub.js?v=8';
 import {
   clampDetectedCoords,
   geolocationErrorMessage,
@@ -672,10 +672,6 @@ function initTitleScreenUi({
     document.getElementById('floatMenuContainer')?.classList.add('show');
     document.getElementById('mainMenuBtn')?.classList.add('show');
     document.getElementById('worldQuickControls')?.classList.add('show');
-    document.getElementById('controlsTab')?.classList.add('show');
-    const accessibilitySettings = document.getElementById('accessibilitySettings');
-    const mobileControlSettings = document.getElementById('mobileControlSettings');
-    if (accessibilitySettings && mobileControlSettings?.parentElement) mobileControlSettings.after(accessibilitySettings);
     document.getElementById('coords')?.classList.add('show');
     document.getElementById('historicBtn')?.classList.add('show');
     document.getElementById('memoryFlowerFloatBtn')?.classList.add('show');

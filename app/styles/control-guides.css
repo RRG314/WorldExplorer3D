@@ -1,4 +1,27 @@
 @layer interface {
+  #controlsTab { position: fixed; inset: 0; margin: auto; padding: 0; width: min(880px,calc(100% - 32px)); max-width: none; max-height: calc(100dvh - 32px - env(safe-area-inset-top) - env(safe-area-inset-bottom)); overflow: hidden; color: var(--wx-text); background: var(--wx-panel-solid); border: 1px solid var(--wx-line); border-radius: var(--wx-radius); font: 500 var(--wx-type-control)/1.6 var(--wx-font-ui); }
+  #controlsTab[open] { display: flex; flex-direction: column; }
+  #controlsTab::backdrop { background: rgb(2 8 12 / 78%); }
+  .controls-panel-header { flex: 0 0 auto; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px; padding: 16px 20px; border-bottom: 1px solid var(--wx-line-soft); }
+  .controls-panel-header > div { min-width: 0; flex: 1 1 160px; }
+  .controls-panel-header h2 { margin: 0; font: 700 calc(var(--wx-type-body) * 1.25)/1.3 var(--wx-font-ui); overflow-wrap: anywhere; }
+  .controls-panel-header .wx-button { flex: 0 0 auto; }
+  .controls-panel-eyebrow { margin: 0 0 4px; color: var(--wx-action); font: 600 var(--wx-type-meta)/1.4 var(--wx-font-instrument); }
+  #ctrlContent { min-height: 0; padding: 20px; overflow: auto; overscroll-behavior: contain; }
+  #ctrlContent.hidden { display: none; }
+  .controls-panel-intro { margin: 0 0 20px; color: var(--wx-muted); }
+  #controlsSharedSettings { display: grid; gap: 16px; min-width: 0; }
+  #controlsSharedSettings > :is(#accessibilitySettings,.keyboard-binding-settings) { margin: 0; }
+  .controls-keyboard-guide { margin-top: 16px; padding: 16px; border: 1px solid var(--wx-line-soft); border-radius: var(--wx-radius); }
+  .controls-keyboard-guide > summary { min-height: 44px; align-content: center; cursor: pointer; overflow-wrap: anywhere; }
+  .controls-keyboard-guide[open] > summary { margin-bottom: 16px; }
+  .controls-panel-footer { display: flex; flex-wrap: wrap; gap: 12px; padding-top: 20px; }
+  #controlsTab :is(button,summary,input,select):focus-visible { outline: 3px solid var(--wx-focus); outline-offset: 3px; }
+  @media (max-width: 480px) {
+    #controlsTab { width: calc(100% - 16px); max-height: calc(100dvh - 16px - env(safe-area-inset-top) - env(safe-area-inset-bottom)); }
+    .controls-panel-header, #ctrlContent { padding: 12px; }
+    .controls-keyboard-guide { padding: 12px; }
+  }
   .ctrl-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 16px; }
   .control-guide-section, .keyboard-binding-settings { min-width: 0; padding: 16px; color: var(--wx-text); background: var(--wx-panel-solid); border: 1px solid var(--wx-line-soft); border-radius: var(--wx-radius); font: 500 var(--wx-type-control)/1.6 var(--wx-font-ui); }
   .ctrl-section, .control-mode-guide h3 { margin: 0 0 12px; color: var(--wx-text); font: 700 var(--wx-type-control)/1.5 var(--wx-font-ui); }

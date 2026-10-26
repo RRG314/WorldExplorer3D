@@ -77,6 +77,7 @@ export function initSpaceFlightUI(attemptLanding, lifecycleScope = null) {
     <button id="sfAssistBtn" class="spaceFlightAction primary" type="button">
       ENGAGE FLIGHT ASSIST
     </button>
+    <button id="sfControlsBtn" class="spaceFlightAction" type="button">CONTROLS</button>
     <button id="sfExpeditionBtn" class="spaceFlightAction" type="button">
       SHIP &amp; EXPEDITION
     </button>
@@ -118,6 +119,7 @@ function setupSpaceFlightControls(attemptLanding, lifecycleScope = null) {
     target.addEventListener(eventName, listener, options);
   });
   listen(document.getElementById('sfLandBtn'), 'click', attemptLanding);
+  listen(document.getElementById('sfControlsBtn'), 'click', () => appCtx.openControlsPanel?.());
   listen(document.getElementById('sfExpeditionBtn'), 'click', async () => {
     const runtime = await import('../expedition/runtime.js?v=52');
     runtime.openExpeditionPlanner(appCtx);
@@ -177,6 +179,7 @@ function setupSpaceFlightControls(attemptLanding, lifecycleScope = null) {
 }
 
 export function hideGameUI() {
+  appCtx.closeControlsPanel?.();
   document.body.classList.add('space-flight-active');
   const elementsToHide = [
     'hud',
@@ -184,7 +187,6 @@ export function hideGameUI() {
     'minimapZoomControls',
     'coords',
     'floatMenuContainer',
-    'controlsTab',
     'police',
     'navigationHud',
     'interiorPrompt',
@@ -207,7 +209,6 @@ export function showGameUI() {
     'minimapZoomControls',
     'coords',
     'floatMenuContainer',
-    'controlsTab',
     'interiorPrompt',
     'boatPrompt',
     'boatWaveDock',

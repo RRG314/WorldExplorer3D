@@ -10,7 +10,7 @@ const doc=parse5.parse(await readFile('app/index.html','utf8')),nodes={};functio
 const html='<!doctype html><html><head><base href="/app/">'+parse5.serialize(nodes.head)+'</head><body>'+['globeHubOverlay','tab-controls','tab-settings','controlsTab'].map(id=>parse5.serializeOuter(nodes[id])).join('')+`<canvas id="componentCanvas" width="1" height="1"></canvas><script type="module">
 import{initKeyboardBindingUi}from'/app/js/controls/keyboard-binding-ui.js';
 import{KEYBOARD_BINDING_ACTIONS,keyboardBindingCode,keyboardBindingsSnapshot,resetKeyboardBindings,setKeyboardBinding}from'/app/js/controls/keyboard-bindings.js?v=3';
-import{keyboardControlActions}from'/app/js/controls/action-input.js?v=14';
+import{keyboardControlActions}from'/app/js/controls/action-input.js?v=15';
 import{getLifecycleRegistrySnapshot}from'/app/js/runtime/lifecycle-scope.js?v=2';
 import{setupGlobeHub}from'/app/js/ui/title-screen/globe-hub.js';
 import{initAccessibility}from'/app/js/ui/accessibility.js';

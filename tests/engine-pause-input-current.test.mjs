@@ -105,3 +105,10 @@ test('world return keeps typing, active panels, transitions, pause and immersive
 test('disposing the world-return view removes its events and prevents late refocus',t=>{
   const f=focusFixture(t);f.action.dispose();assert.equal(f.key('hud'),false);assert.equal(f.action.focusWorld(),false);assert.equal(f.document.activeElement,null);
 });
+test('deferred world return follows the same presentation and layout revision only',async t=>{
+  const f=focusFixture(t);let revision=1;f.context.screenLayout.snapshot=()=>({revision});
+  f.action.requestWorldFocus();await Promise.resolve();assert.equal(f.document.activeElement,f.main);
+  f.document.activeElement=null;f.action.requestWorldFocus();revision++;await Promise.resolve();assert.equal(f.document.activeElement,null,'A newer panel transition retains focus even if it already closed');
+  f.action.requestWorldFocus();f.context.renderer={domElement:f.main};await Promise.resolve();assert.equal(f.document.activeElement,null,'A replaced renderer cannot inherit a predecessor focus request');
+  f.action.requestWorldFocus();f.action.dispose();await Promise.resolve();assert.equal(f.document.activeElement,null);
+});

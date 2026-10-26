@@ -417,10 +417,6 @@ body:has(#propertyPanel.show) #worldQuickControls { display: none !important; }
 .mainMenuBtn:hover { color: #fff; background: #101921; border-color: var(--wx-line-soft); transform: none; box-shadow: none; }
 #gameShareFloatBtn { top: 0; right: 132px; bottom: auto; left: auto; width: 58px; height: 58px; border-radius: 0; background: var(--wx-panel); border-color: var(--wx-line-soft); }
 #memoryFlowerFloatBtn { display: none !important; }
-#controlsTab { top: auto; right: 310px; bottom: 88px; left: auto; transform: none; color: var(--wx-text); background: var(--wx-panel); border: 1px solid var(--wx-line-soft); border-radius: 0; box-shadow: none; }
-#controlsTab.show { display: none; }
-#controlsTab.show.bar-open { display: block; }
-#ctrlHeader { display: none; color: var(--wx-blue); }
 
 /* Mobile play shell */
 @media (max-width: 760px), (pointer: coarse) {
@@ -456,9 +452,7 @@ body:has(#propertyPanel.show) #worldQuickControls { display: none !important; }
   #gameShareFloatBtn { top: var(--wx-world-controls-top); right: 88px; width: 46px; height: 46px; border-radius: 50%; }
   /* An expanded paint tool palette must remain reachable above the map. */
   #paintTownHud[data-paint-layout="expanded"] { top: calc(70px + env(safe-area-inset-top)) !important; z-index: 110 !important; max-height: calc(100dvh - 180px); overflow-y: auto; }
-  #multiplayerMenu { position: relative; left: auto; bottom: auto; z-index: auto; }
-  #controlsTab, #memoryFlowerFloatBtn { display: none !important; }
-  #controlsTab.bar-open { display: block !important; }
+  #multiplayerMenu { position: relative; left: auto; bottom: auto; z-index: auto; } #memoryFlowerFloatBtn { display: none !important; }
 }
 
 @media (max-width: 390px) {
@@ -479,10 +473,6 @@ body:has(#propertyPanel.show) #worldQuickControls { display: none !important; }
 /* A central status panel leaves both landscape thumb-control zones free. */
 @media (max-height: 560px) and (orientation: landscape) and (pointer: coarse) {
   :root { --wx-live-gps-top: var(--wx-world-controls-top); }
-}
-
-@media (max-height: 560px) and (orientation: landscape) {
-  #controlsTab { top: 66px; right: 12px; }
 }
 }
 body:has(#worldSelectionNotice:not([hidden])) .tutorial-card { display: none !important; }

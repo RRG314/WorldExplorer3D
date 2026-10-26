@@ -238,6 +238,9 @@ function initMobileControls() {
     }
   })();
 
+  const mobileSettings = document.getElementById('mobileControlSettings');
+  if (mobileSettings) mobileSettings.hidden = !isTouchPreferredClient;
+
   if (isTouchPreferredClient && mobileActionStack && urbanEquipmentToggle) {
     urbanEquipmentToggle.classList.add('mobilePackAction');
     mobileActionStack.append(urbanEquipmentToggle);
@@ -532,7 +535,7 @@ function initMobileControls() {
     return !focused || document.hidden || !appCtx.gameStarted || appCtx.worldLoading || appCtx.titleLaunchPending ||
       !document.getElementById('titleScreen')?.classList.contains('hidden') ||
       (appCtx.paused && !inSpaceFlight) || document.getElementById('pauseScreen')?.classList.contains('show') || (!inSpaceFlight && appCtx.showLargeMap) ||
-      !ctrlContent?.classList.contains('hidden') || document.body.classList.contains('game-panel-layer-open') ||
+      !!appCtx.screenLayout?.snapshot?.().panelLayer || document.body.classList.contains('game-panel-layer-open') ||
       document.body.classList.contains('space-flight-hud-expanded') || appCtx.fishingGame?.open || appCtx.blockBuildMode;
   }
 
@@ -540,7 +543,7 @@ function initMobileControls() {
     const tilt = tiltInput?.snapshot() || { enabled: false, status: 'off' };
     const messages = {
       off: 'Tilt is off. Touch controls always work.',
-      waiting: 'Hold your phone comfortably, then close controls to calibrate.',
+      waiting: 'Hold your phone comfortably. Tilt calibrates when you return to driving or flight.',
       active: 'Tilt is on. Tilt left/right to steer; pull back to raise the nose in flight.',
       suspended: 'Tilt resumes centered when you return to a car, plane or spacecraft.',
       denied: 'Motion access was declined. You can keep using touch controls or try again.',
@@ -721,33 +724,11 @@ function initMobileControls() {
     if (planeControls) planeControls.style.display = mode === 'plane' ? 'block' : 'none';
     if (rocketControls) rocketControls.style.display = mode === 'rocket' ? 'block' : 'none';
     if (oceanControls) oceanControls.style.display = mode === 'ocean' ? 'block' : 'none';
-    if (controlsTab && ctrlContent) {
-      controlsTab.classList.toggle('compact', isTouchPreferredClient && ctrlContent.classList.contains('hidden'));
-    }
-    if (ctrlHeader) {
-      const modeLabel =
-        mode === 'boat' ? 'Boat Mode' :
-        mode === 'walking' ? 'Walking Mode' :
-        mode === 'skydiving' ? 'Skydiving' :
-        mode === 'drone' ? 'Drone Mode' :
-        mode === 'plane' ? 'Personal Plane' :
-        mode === 'rocket' ? 'Rocket Mode' :
-        mode === 'ocean' ? 'Submarine Mode' :
-        'Driving Mode';
-      const arrow = ctrlContent?.classList.contains('hidden') ? '▼' : '▲';
-      const controlsOpen = !ctrlContent?.classList.contains('hidden');
-      ctrlContent?.setAttribute('aria-hidden', String(!controlsOpen));
-      ctrlHeader.textContent = isTouchPreferredClient && controlsOpen
-        ? 'Close controls ×'
-        : `⚙️ ${modeLabel} ${arrow}`;
-      ctrlHeader.setAttribute('aria-expanded', String(controlsOpen));
-      const controlsBarBtn = document.getElementById('controlsBarBtn');
-      const controlsBarLabel = controlsBarBtn?.querySelector('.btnText');
-      if (controlsBarLabel) controlsBarLabel.textContent = `⚙️ ${modeLabel} Controls`;
-      controlsBarBtn?.setAttribute('aria-expanded', String(controlsOpen));
-      controlsTab?.classList.toggle('bar-open', controlsOpen);
-      controlsTab?.setAttribute('aria-hidden', String(!controlsOpen));
-    }
+    const modeLabel = {boat: 'Boat', walking: 'Walking', skydiving: 'Skydiving', drone: 'Drone', plane: 'Personal plane', rocket: 'Spacecraft', ocean: 'Submarine', driving: 'Driving'}[mode];
+    const heading = document.getElementById('controlsPanelTitle');
+    if (heading) heading.textContent = modeLabel + ' controls';
+    const controlsBarLabel = document.querySelector('#controlsBarBtn .btnText');
+    if (controlsBarLabel) controlsBarLabel.textContent = modeLabel + ' controls';
     updateMobileTouchControls(mode);
   }
 

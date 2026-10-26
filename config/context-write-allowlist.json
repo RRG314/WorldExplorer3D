@@ -227,6 +227,7 @@
       "setMobileTouchEnabled",
       "setMobileTouchPad",
       "setMobileTouchPedal",
+      "spaceFlight",
       "updateControlInput",
       "updateMobileTouchSettings"
     ],
@@ -1718,6 +1719,7 @@
       "realEstateMode",
       "returnToEarthFromMenu",
       "satelliteView",
+      "screenLayout",
       "setupUI",
       "showPathOverlays",
       "showRoads"
@@ -2217,6 +2219,11 @@
     ],
     "app/js/vr/xr-session.js": [
       "vrPresentation"
+    ],
+    "app/js/ui/control-panel.js": [
+      "closeControlsPanel",
+      "disposeControlsPanel",
+      "openControlsPanel"
     ]
   }
 }

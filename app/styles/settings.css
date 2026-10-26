@@ -1,5 +1,35 @@
 /* Settings use existing preference, graphics and credential owners. */
 @layer interface {
+  #mobileControlSettings { min-width: 0; display: grid; gap: 16px; margin: 0 0 16px; padding: 16px; color: var(--wx-text); background: var(--wx-panel-solid); border: 1px solid var(--wx-line-soft); border-radius: var(--wx-radius); font: 500 var(--wx-type-control)/1.6 var(--wx-font-ui); }
+  #mobileControlSettings[hidden] { display: none; }
+  #mobileControlSettings h3 { margin: 0; font: 700 var(--wx-type-control)/1.5 var(--wx-font-ui); }
+  .mobileControlSettingsHead { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
+  .mobileControlSettingsHead button { flex: 0 0 auto; }
+  #mobileControlSettings summary { min-height: 44px; align-content: center; cursor: pointer; }
+  #mobileControlSettings details { min-width: 0; border-top: 1px solid var(--wx-line-soft); padding-top: 12px; }
+  #mobileControlSettings details[open] > :not(summary) { margin-top: 16px; }
+  #mobileControlSettings label { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr) auto; gap: 12px; align-items: center; min-height: 44px; }
+  #mobileControlSettings select { grid-column: 2/4; min-width: 0; width: 100%; }
+  #mobileControlSettings input[type="range"] { width: 100%; min-width: 0; min-height: 44px; accent-color: var(--wx-action); }
+  #mobileControlSettings output { color: var(--wx-action); font: 600 var(--wx-type-meta)/1.6 var(--wx-font-instrument); }
+  #mobileControlSettings .mobileControlToggle { display: flex; align-items: center; gap: 12px; cursor: pointer; }
+  #mobileControlSettings input[type="checkbox"] { flex: 0 0 20px; width: 20px; height: 20px; accent-color: var(--wx-action); }
+  #mobileControlSettings :is(p,span,i,summary) { overflow-wrap: anywhere; }
+  #mobileControlSettings p { margin: 0; color: var(--wx-muted); font-size: var(--wx-type-meta); }
+  #mobileControlSettings #mobileTiltStatus { color: var(--wx-info); }
+  .mobileTiltActions { display: flex; flex-wrap: wrap; gap: 12px; }
+  #mobileControlModeSummary { display: grid; gap: 12px; }
+  #mobileControlModeSummary > div { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 12px; }
+  #mobileControlModeSummary span { display: grid; gap: 8px; min-width: 0; padding: 12px; border: 1px solid var(--wx-line-soft); border-radius: var(--wx-radius); }
+  #mobileControlModeSummary b { color: var(--wx-action); font: 600 var(--wx-type-meta)/1.5 var(--wx-font-instrument); }
+  #mobileControlModeSummary i { font-style: normal; }
+  @media (max-width: 700px) {
+    #mobileControlSettings { padding: 12px; }
+    #mobileControlSettings label { grid-template-columns: minmax(0,1fr) auto; }
+    #mobileControlSettings label > span { grid-column: 1/-1; }
+    #mobileControlSettings select { grid-column: 1/-1; }
+  }
+  @media (max-width: 480px) { #mobileControlModeSummary > div { grid-template-columns: minmax(0,1fr); } }
   .settings-page { color: var(--wx-text); font: 500 var(--wx-type-control)/1.6 var(--wx-font-ui); }
   .settings-intro, .settings-section > p { margin: 0; color: var(--wx-muted); font-size: var(--wx-type-control); line-height: 1.6; }
   .settings-intro { margin-bottom: 16px; }

@@ -1226,6 +1226,7 @@ function getWorldExplorerRuntimeDiagnostics() {
     modelAssets: modelAssetCacheSnapshot(),
     rendererOwners,
     accessibility: globalThis.getWorldExplorerAccessibilitySnapshot?.() || null,
+    screenLayout: appCtx.screenLayout?.snapshot?.() || null,
     lastEarthWorldRelease: appCtx.lastEarthWorldRelease || null,
     composer: composerSnapshot(),
     worldComposition: worldCompositionSnapshot(),
