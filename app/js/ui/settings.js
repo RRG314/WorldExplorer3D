@@ -98,19 +98,10 @@ export function setupSettingsUi(appCtx) {
         if (input && setProviderCredential(appCtx.apiConfig, provider, input.value)) savedCount++;
       }
 
-      // Show feedback
-      if (savedCount > 0) {
-        saveApiKeyBtn.textContent = `✓ ${savedCount} Key${savedCount > 1 ? 's' : ''} Ready for This Visit`;
-        saveApiKeyBtn.style.background = '#10b981';
-      } else {
-        saveApiKeyBtn.textContent = '✓ All Keys Cleared!';
-        saveApiKeyBtn.style.background = '#64748b';
-      }
-
-      setTimeout(() => {
-        saveApiKeyBtn.textContent = 'Use Keys for This Visit';
-        saveApiKeyBtn.style.background = '#667eea';
-      }, 2000);
+      const status = document.getElementById('providerKeysStatus');
+      if (status) status.textContent = savedCount > 0
+        ? `${savedCount} provider key${savedCount > 1 ? 's' : ''} ready for this visit.`
+        : 'All optional provider keys cleared.';
     });
   }
 

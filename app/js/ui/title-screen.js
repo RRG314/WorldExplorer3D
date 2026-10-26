@@ -13,7 +13,7 @@ import { readSharedExperienceParams } from "./share-links.js?v=64";
 import { prepareTitleEnvironment } from "../planetary/entry.js?v=9";
 import { markFirstPlayReady, scheduleAfterFirstPlay } from '../runtime/workload-policy.js?v=1';
 import {isEarthWorldUsable} from '../earth-core/world-readiness.js';
-import { setupGlobeHub } from './title-screen/globe-hub.js?v=5';
+import { setupGlobeHub } from './title-screen/globe-hub.js?v=6';
 import {
   clampDetectedCoords,
   geolocationErrorMessage,

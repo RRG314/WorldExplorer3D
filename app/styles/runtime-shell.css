@@ -539,9 +539,3 @@ body.space-destination-details-open #spaceFlightHUD{visibility:hidden}
 
 /* Activities share the same minimum touch target as other game controls. */
 .activityDiscoveryHeaderActions button,.activityDiscoveryDetailActions button,.activityDiscoveryPromptActions button,.activityRunHud button,.activityDiscoveryChipRow button{min-height:44px;min-width:44px;box-sizing:border-box}
-
-.support-receipt-card{padding:14px;margin:8px 0 24px;background:#f8fafc;border:2px solid #e2e8f0;border-radius:8px;color:#334155}
-.support-receipt-card h3{margin:0 0 8px;font-size:15px;color:#1e293b}
-.support-receipt-card p{font-size:12px;line-height:1.5}
-.support-receipt-card button{min-height:44px;padding:8px 14px;border:1px solid #475569;border-radius:6px;background:#fff;color:#1e293b;font:inherit;cursor:pointer}
-.support-receipt-card textarea{box-sizing:border-box;width:100%;height:140px;margin-top:8px;font:11px monospace;color:#172554;background:#fff}

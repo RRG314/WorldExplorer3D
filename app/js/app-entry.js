@@ -51,7 +51,7 @@ import './hud.js?v=106';
 import './map.js?v=61';
 import { renderLoop } from './main.js?v=79';
 import './memory.js?v=55';
-import { setupUI } from './ui.js?v=177';
+import { setupUI } from './ui.js?v=178';
 import { initAccessibility } from './ui/accessibility.js?v=3';
 
 let _booted = false;

@@ -203,9 +203,11 @@ function setupGlobeHub({
     const target = HUB_PANELS[destination];
     const panel = target ? document.getElementById(`tab-${target.tab}`) : null;
     if (!target || !panel || !overlay || !panelHost) return false;
-    if (destination === 'controls') {
+    if (destination === 'controls' || destination === 'settings') {
       const accessibilitySettings = document.getElementById('accessibilitySettings');
       if (accessibilitySettings && accessibilitySettings.parentElement !== panel) panel.prepend(accessibilitySettings);
+    }
+    if (destination === 'controls') {
       const capabilities = panel.querySelector('#capabilityGuide');
       if (capabilities) panel.prepend(capabilities);
     }

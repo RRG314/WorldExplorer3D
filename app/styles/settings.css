@@ -1,0 +1,34 @@
+/* Settings use existing preference, graphics and credential owners. */
+@layer interface {
+  .settings-page { color: var(--wx-text); font: 500 var(--wx-type-control)/1.6 var(--wx-font-ui); }
+  .settings-intro, .settings-section > p { margin: 0; color: var(--wx-muted); font-size: var(--wx-type-control); line-height: 1.6; }
+  .settings-intro { margin-bottom: 16px; }
+  .settings-section, #accessibilitySettings { min-width: 0; margin: 0 0 16px; padding: 16px; color: var(--wx-text); background: var(--wx-panel-solid); border: 1px solid var(--wx-line-soft); border-radius: var(--wx-radius); }
+  .settings-section:not(details), #accessibilitySettings { display: grid; gap: 16px; }
+  .settings-section h3, .accessibilitySettingsHead strong { margin: 0; color: var(--wx-text); font: 700 var(--wx-type-control)/1.5 var(--wx-font-ui); }
+  .settings-stack, .settings-field { display: grid; gap: 10px; min-width: 0; }
+  .settings-field { color: var(--wx-muted); font-size: var(--wx-type-control); }
+  .settings-check, #accessibilitySettings label { display: flex; align-items: center; gap: 12px; min-height: 44px; min-width: 0; font-size: var(--wx-type-control); cursor: pointer; }
+  .settings-check input, #accessibilitySettings input[type="checkbox"] { flex: 0 0 20px; width: 20px; height: 20px; margin: 0; accent-color: var(--wx-action); }
+  .settings-key-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 20px; }
+  .settings-section :is(input,select,textarea) { width: 100%; }
+  .settings-section input[type="checkbox"] { width: 20px; }
+  .settings-section p, .settings-section a, #accessibilitySettings label { overflow-wrap: anywhere; }
+  .settings-section a { color: var(--wx-action); font-size: var(--wx-type-control); text-underline-offset: 3px; }
+  .settings-section :is(button,a):focus-visible { outline: 3px solid var(--wx-focus); outline-offset: 3px; }
+  .settings-section .settings-status, #accessibilitySettingsStatus { margin: 0; color: var(--wx-info); font: 500 var(--wx-type-meta)/1.6 var(--wx-font-ui); }
+  .settings-status:empty { display: none; }
+  .settings-section > summary { min-height: 44px; align-content: center; color: var(--wx-text); font: 700 var(--wx-type-control)/1.5 var(--wx-font-ui); cursor: pointer; }
+  .settings-section[open] > :not(summary) { margin-top: 16px; }
+  .settings-section textarea { min-height: 180px; resize: vertical; font-family: var(--wx-font-instrument); }
+  .settings-section .wx-button { justify-self: start; }
+  .accessibilitySettingsHead { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px; }
+  .accessibilitySettingsHead .wx-button { flex: 0 0 auto; white-space: nowrap; }
+  .accessibilitySettingsIntro { margin: 0; color: var(--wx-muted); font: 500 var(--wx-type-control)/1.6 var(--wx-font-ui); }
+  #accessibilitySettings label:has(select) { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); }
+  #accessibilitySettings select { width: 100%; min-width: 0; }
+  @media (max-width: 700px) {
+    .settings-section, #accessibilitySettings { padding: 12px; }
+    .settings-key-grid, #accessibilitySettings label:has(select) { grid-template-columns: minmax(0,1fr); }
+  }
+}

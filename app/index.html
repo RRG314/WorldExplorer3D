@@ -32,12 +32,12 @@ if (location.protocol === 'file:') document.documentElement.classList.add('unsup
 <link rel="stylesheet" href="../styles/world-explorer-tokens.css?v=3">
 <link rel="stylesheet" href="../styles/world-explorer-components.css?v=2">
 <link rel="stylesheet" href="styles/title-shell.css?v=97">
-<link rel="stylesheet" href="styles/runtime-shell.css?v=137">
+<link rel="stylesheet" href="styles/runtime-shell.css?v=138">
 <link rel="stylesheet" href="styles/block-builder.css?v=9">
 <link rel="stylesheet" href="styles/universe.css?v=9">
 <link rel="stylesheet" href="styles/fishing-game.css?v=6">
 <link rel="stylesheet" href="styles/interface-v4.css?v=38">
-<link rel="stylesheet" href="styles/start-hub.css?v=23">
+<link rel="stylesheet" href="styles/start-hub.css?v=24">
 <link rel="stylesheet" href="styles/navigation.css?v=3">
 <link rel="stylesheet" href="styles/discovery.css?v=21">
 <link rel="stylesheet" href="styles/backpack.css?v=1">
@@ -46,8 +46,9 @@ if (location.protocol === 'file:') document.documentElement.classList.add('unsup
 <link rel="stylesheet" href="styles/mobile-controls.css?v=6">
 <link rel="stylesheet" href="styles/hud.css?v=2">
 <link rel="stylesheet" href="styles/multiplayer.css?v=1">
+<link rel="stylesheet" href="styles/settings.css?v=1">
 <link rel="stylesheet" href="styles/map-explorer.css?v=4">
-<link rel="stylesheet" href="styles/accessibility.css?v=4">
+<link rel="stylesheet" href="styles/accessibility.css?v=5">
 <link rel="stylesheet" href="styles/reality-capture.css?v=2">
 </head>
 <body>
@@ -364,92 +365,62 @@ Not case sensitive! Try: "Seattle" • "Tokyo" • "Paris, France" • "Austin, 
 </details>
 </div>
 </div>
-<div class="tab-content" id="tab-settings">
-<section class="support-receipt-card" aria-labelledby="supportReceiptTitle">
-<h3 id="supportReceiptTitle">Help with a problem</h3>
-<p>Copy a report of the game version and recent errors to share with support. Coordinates, account details and personal media are excluded.</p>
-<button id="copySupportReceiptBtn" type="button">Copy support report</button>
-<p id="supportReceiptStatus" role="status" aria-live="polite"></p>
-<textarea id="supportReceiptPreview" readonly hidden aria-label="Support report for copying" spellcheck="false"></textarea>
-</section>
-<div style="padding:8px 0">
-<div style="margin-bottom:24px">
-<div style="font-family:'Poppins',sans-serif;font-size:15px;font-weight:600;color:#667eea;margin-bottom:12px;display:flex;align-items:center;gap:8px">
-Graphics
-</div>
-<div style="background:#f8fafc;border:2px solid #e2e8f0;border-radius:8px;padding:14px">
-<label style="display:block;font-size:12px;font-weight:600;color:#1e293b;margin-bottom:6px">Render Quality</label>
-<select id="renderQualitySelect" style="width:100%;background:#ffffff;border:2px solid #e2e8f0;border-radius:8px;padding:10px;font-size:13px;color:#1e293b;margin-bottom:10px">
+<div class="tab-content settings-page" id="tab-settings">
+<p class="settings-intro">Adjust this device’s view and exploration preferences. Accessibility options are also available in Quick Start.</p>
+<section class="settings-section" aria-labelledby="graphicsSettingsTitle">
+<h3 id="graphicsSettingsTitle">Graphics</h3>
+<label class="settings-field" for="renderQualitySelect"><span>Render quality</span>
+<select id="renderQualitySelect" class="wx-field">
 <option value="low">Low (mobile/performance)</option>
 <option value="med">Medium (balanced)</option>
 <option value="high">High (best visuals)</option>
-</select>
-<label style="display:flex;align-items:center;gap:10px;font-size:12px;color:#334155;margin-bottom:12px;cursor:pointer">
-<input type="checkbox" id="highQualityToggle" style="width:16px;height:16px;cursor:pointer">
-High Quality Boost (stronger shadows + car paint)
-</label>
-<label style="display:flex;align-items:center;gap:10px;font-size:12px;color:#334155;margin-bottom:12px;cursor:pointer">
-<input type="checkbox" id="ssaoToggle" style="width:16px;height:16px;cursor:pointer">
-High-only SSAO contact shadows
-</label>
-<div id="perfSettingsStatus" style="font-size:11px;color:#64748b;min-height:16px">
-Graphics changes apply to the current session.
-</div>
-</div>
-</div>
-<section aria-labelledby="worldExplorationSettingsTitle" style="margin-bottom:24px">
-<h3 id="worldExplorationSettingsTitle" style="font-family:'Poppins',sans-serif;font-size:15px;font-weight:600;color:#667eea;margin:0 0 12px">World exploration</h3>
-<div style="background:#f8fafc;border:2px solid #e2e8f0;border-radius:8px;padding:14px;color:#334155;font-size:12px">
-<p style="margin:0 0 12px"><strong>Explore a selected location (default).</strong> Pick a place on the globe or use your location. Roads, buildings and activities load for that area. Personal rooms and the weekly community room share their selected place.</p>
-<label style="display:flex;align-items:center;gap:10px;margin-bottom:6px;cursor:pointer">
-<input type="checkbox" id="regionalSceneryToggle" aria-describedby="regionalSceneryHelp" style="width:16px;height:16px;cursor:pointer">
+</select></label>
+<label class="settings-check"><input type="checkbox" id="highQualityToggle"><span>High Quality Boost (stronger shadows + car paint)</span></label>
+<label class="settings-check"><input type="checkbox" id="ssaoToggle"><span>High-only SSAO contact shadows</span></label>
+<p id="perfSettingsStatus" class="settings-status" role="status" aria-live="polite">Graphics changes apply to the current session.</p>
+</section>
+<section class="settings-section" aria-labelledby="worldExplorationSettingsTitle">
+<h3 id="worldExplorationSettingsTitle">World exploration</h3>
+<div class="settings-stack">
+<p><strong>Explore a selected location (default).</strong> Pick a place on the globe or use your location. Roads, buildings and activities load for that area. Personal rooms and the weekly community room share their selected place.</p>
+<label class="settings-check">
+<input type="checkbox" id="regionalSceneryToggle" aria-describedby="regionalSceneryHelp">
 Extend Earth scenery (experimental)
 </label>
-<p id="regionalSceneryHelp" style="font-size:11px;margin:0 0 12px">Optional: load terrain and mapped buildings beyond the selected location as you travel. Detailed driving, entrances and activities remain in the loaded area. This is not a continuous worldwide driving mode and uses more data.</p>
-<label style="display:flex;align-items:center;gap:10px;margin-bottom:6px;cursor:pointer">
-<input type="checkbox" id="oceanContinuousToggle" aria-describedby="oceanContinuousHelp" style="width:16px;height:16px;cursor:pointer">
+<p id="regionalSceneryHelp">Optional: load terrain and mapped buildings beyond the selected location as you travel. Detailed driving, entrances and activities remain in the loaded area. This is not a continuous worldwide driving mode and uses more data.</p>
+<label class="settings-check">
+<input type="checkbox" id="oceanContinuousToggle" aria-describedby="oceanContinuousHelp">
 Continue ocean exploration beyond the dive site
 </label>
-<p id="oceanContinuousHelp" style="font-size:11px;margin:0">Optional: new open-ocean voyages load nearby seabed as you travel, using more data. Off by default. Saved voyages and guided study sites keep their original setting. Your explicit preferences are remembered on this device.</p>
-<p id="worldExplorationStatus" role="status" aria-live="polite" style="font-size:11px;margin:8px 0 0"></p>
+<p id="oceanContinuousHelp">Optional: new open-ocean voyages load nearby seabed as you travel, using more data. Off by default. Saved voyages and guided study sites keep their original setting. Your explicit preferences are remembered on this device.</p>
+<p id="worldExplorationStatus" role="status" aria-live="polite"></p>
 </div>
 </section>
-<div style="margin-bottom:24px">
-<div style="font-family:'Poppins',sans-serif;font-size:15px;font-weight:600;color:#667eea;margin-bottom:12px;display:flex;align-items:center;gap:8px">
-Optional Property Data
+
+<details class="settings-section settings-optional">
+<summary>Optional property data</summary>
+<h3 id="propertyDataSettingsTitle">Connect your provider account</h3>
+<p>These services are optional reference records. The mapped world and game homes work without them.</p>
+<p>Private provider keys last for this visit. Re-enter them after reloading or closing the page.</p>
+<div hidden><input type="password" id="estatedKeyInput" autocomplete="off" aria-label="Legacy property provider key"></div>
+<div class="settings-key-grid">
+<div class="settings-stack"><label class="settings-field" for="attomKeyInput"><span>ATTOM API key</span><input type="password" id="attomKeyInput" class="wx-field" autocomplete="off" spellcheck="false" placeholder="Your ATTOM key"></label>
+<a href="https://api.developer.attomdata.com/docs" target="_blank" rel="noopener noreferrer">ATTOM documentation</a></div>
+<div class="settings-stack"><label class="settings-field" for="rentcastKeyInput"><span>RentCast API key</span><input type="password" id="rentcastKeyInput" class="wx-field" autocomplete="off" spellcheck="false" placeholder="Your RentCast key"></label>
+<a href="https://developers.rentcast.io/reference/search-queries" target="_blank" rel="noopener noreferrer">RentCast documentation</a></div>
 </div>
-<div style="background:#f8fafc;border:2px solid #e2e8f0;border-radius:12px;padding:16px">
-<div hidden><input type="password" id="estatedKeyInput" autocomplete="off"></div>
-<div style="margin-bottom:16px">
-<label style="display:block;font-size:12px;font-weight:600;color:#1e293b;margin-bottom:6px">ATTOM API Key</label>
-<input type="password" id="attomKeyInput" autocomplete="off" placeholder="Enter your ATTOM API key" style="width:100%;background:#ffffff;border:2px solid #e2e8f0;border-radius:8px;padding:10px;font-size:13px;font-family:'Inter',sans-serif;color:#1e293b;margin-bottom:4px">
-<div style="font-size:10px;color:#64748b;margin-bottom:8px">
-Property records from your ATTOM account. <a href="https://api.developer.attomdata.com/docs" target="_blank" rel="noopener noreferrer" style="color:#667eea">ATTOM documentation</a>
-</div>
-</div>
-<div style="margin-bottom:12px">
-<label style="display:block;font-size:12px;font-weight:600;color:#1e293b;margin-bottom:6px">RentCast API Key</label>
-<input type="password" id="rentcastKeyInput" autocomplete="off" placeholder="Enter your RentCast API key" style="width:100%;background:#ffffff;border:2px solid #e2e8f0;border-radius:8px;padding:10px;font-size:13px;font-family:'Inter',sans-serif;color:#1e293b;margin-bottom:4px">
-<div style="font-size:10px;color:#64748b;margin-bottom:8px">
-Sale and rental listings from your RentCast account. <a href="https://developers.rentcast.io/reference/search-queries" target="_blank" rel="noopener noreferrer" style="color:#667eea">RentCast documentation</a>
-</div>
-</div>
-<button id="saveApiKey" style="background:#667eea;border:none;border-radius:8px;padding:10px 20px;color:#ffffff;font-family:'Poppins',sans-serif;font-weight:600;cursor:pointer;font-size:13px;transition:all 0.2s;width:100%">
-Use Keys for This Visit
-</button>
-</div>
-</div>
-<div>
-<div style="font-family:'Poppins',sans-serif;font-size:15px;font-weight:600;color:#667eea;margin-bottom:12px;display:flex;align-items:center;gap:8px">
-How Connected Data Is Used
-</div>
-<div style="background:#f0f4ff;border:2px solid #c7d2fe;border-radius:12px;padding:16px;font-size:12px;color:#475569;line-height:1.6">
-<p style="margin:0 0 8px 0">Connected records appear under <strong>Home &amp; Property → Property Data</strong> as optional reference information.</p>
-<p style="margin:0 0 8px 0">Provider terms, coverage, and request limits depend on your own account. Private provider keys last for this visit. Re-enter them after reloading or closing the page.</p>
-<p style="margin:0">Outside data never creates game buildings, changes in-game home prices, or grants ownership.</p>
-</div>
-</div>
-</div>
+<button id="saveApiKey" class="wx-button wx-button--primary" type="button">Use Keys for This Visit</button>
+<p id="providerKeysStatus" class="settings-status" role="status" aria-live="polite"></p>
+<p>Connected records appear under <strong>Home &amp; Property → Property Data</strong>. Provider terms, coverage and request limits depend on your account.</p>
+<p>Outside data never creates game buildings, changes in-game home prices or grants ownership.</p>
+</details>
+<section class="settings-section support-receipt-card" aria-labelledby="supportReceiptTitle">
+<h3 id="supportReceiptTitle">Help with a problem</h3>
+<p>Copy a report of the game version and recent errors to share with support. Coordinates, account details and personal media are excluded.</p>
+<button id="copySupportReceiptBtn" class="wx-button" type="button">Copy support report</button>
+<p id="supportReceiptStatus" class="settings-status" role="status" aria-live="polite"></p>
+<textarea id="supportReceiptPreview" class="wx-field" readonly hidden aria-label="Support report for copying" spellcheck="false"></textarea>
+</section>
 </div>
 <div class="tab-content" id="tab-controls">
 <div class="ctrl-grid">
@@ -1658,11 +1629,11 @@ How Connected Data Is Used
 </div>
 </section>
 <section id="accessibilitySettings" aria-label="Accessibility settings">
-<div class="accessibilitySettingsHead"><strong>Accessibility</strong><button id="accessibilityReset" type="button">Reset</button></div>
+<div class="accessibilitySettingsHead"><strong>Accessibility</strong><button id="accessibilityReset" class="wx-button" type="button">Reset</button></div>
 <p class="accessibilitySettingsIntro">Readable controls, calmer effects, and guidance that stays long enough for you.</p>
-<label><span>Text size</span><select id="accessibilityTextScale"><option value="100">Standard · 100%</option><option value="115">Large · 115%</option><option value="130">Extra large · 130%</option><option value="160">Very large · 160%</option><option value="200">Maximum · 200%</option></select></label>
-<label><span>Nearby notice time</span><select id="accessibilityNoticeDuration"><option value="standard">Standard · 7 seconds</option><option value="long">Longer · 15 seconds</option><option value="persistent">Until dismissed</option></select></label>
-<label><span>Aim reticle</span><select id="accessibilityReticleSize"><option value="standard">Standard</option><option value="large">Large</option></select></label>
+<label><span>Text size</span><select id="accessibilityTextScale" class="wx-field"><option value="100">Standard · 100%</option><option value="115">Large · 115%</option><option value="130">Extra large · 130%</option><option value="160">Very large · 160%</option><option value="200">Maximum · 200%</option></select></label>
+<label><span>Nearby notice time</span><select id="accessibilityNoticeDuration" class="wx-field"><option value="standard">Standard · 7 seconds</option><option value="long">Longer · 15 seconds</option><option value="persistent">Until dismissed</option></select></label>
+<label><span>Aim reticle</span><select id="accessibilityReticleSize" class="wx-field"><option value="standard">Standard</option><option value="large">Large</option></select></label>
 <label><input id="accessibilityReducedMotion" type="checkbox"><span>Reduce interface motion</span></label>
 <label><input id="accessibilityReducedEffects" type="checkbox"><span>Reduce flashes and screen pulses</span></label>
 <label><input id="accessibilityHighContrast" type="checkbox"><span>Increase interface contrast</span></label>
@@ -1787,5 +1758,5 @@ How Connected Data Is Used
 <!-- Real Estate System -->
 <script type="module" data-startup-critical src="js/app-shell-fragments.js?v=93"></script>
 <script type="module" src="js/app-auth-shell.js?v=87"></script>
-<script type="module" data-startup-critical src="js/bootstrap.js?v=618"></script>
+<script type="module" data-startup-critical src="js/bootstrap.js?v=619"></script>
 </body></html>
