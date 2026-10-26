@@ -397,3 +397,33 @@ staging-portal-cli-quota-diagnosis.json; portal-native-live-staging.json (failed
 and portal-native-live-staging-identity-fixed.json (pass), in the current product
 folder. Continue native SDK live acceptance, Apple app/WidgetKit, preview imagery,
 actual destination qualification, remaining VR domains and coordinated releases.
+
+
+## October 26 — Apple native implementation and first platform check
+
+The containing SwiftUI app and interactive WidgetKit client share a bounded,
+atomically replaced App Group document with a stable interprocess file lock.
+Offline learning/saving, per-widget modes, independent visits, scoped copying,
+exact outbox acknowledgement and owner/content guards use the shared wire model.
+Private connection proof lives only in Keychain; Firebase owns refresh tokens.
+One serialized account coordinator drains SDK adoption, rolls back cancellation
+and uses a durable interrupted-commit marker. Apple SDK source inspection found
+that updateCurrentUser retains the candidate User's weak Auth association; the
+primary therefore signs in independently before candidate teardown. Native SDK
+forced-refresh acceptance is still required, not inferred from this inspection.
+
+Debug and Release select separate bundle IDs, app groups, callback schemes and
+Firebase clients. Widget App Intents compile in both containing app and extension.
+WidgetKit and BGTaskScheduler own refresh timing. No renderer, background GPS or
+socket is created. The project pins Firebase Apple SDK 13.1.1 and XcodeGen 2.46.0;
+CI will compile and exercise one fresh, owned simulator, preserving sanitized
+logs and explicit screenshot attachments. It does not assert physical iPhone,
+App Attest, TestFlight or actual Home Screen widget success before those run.
+
+Local 16-case Foundation verification passes, including shared JS fixtures,
+late acknowledgements, interrupted owners, content replacement, pending sync and
+40 concurrent store writers. This overlaps earlier Apple model checks; it is not
+16 additional cases. XML resources and shell syntax also parse. Evidence:
+apple-project-foundation-compile.log and apple-project-foundation-run.log.
+Continue actual platform checks, live native SDK adoption, browser identity
+handoff, qualified imagery/destinations, remaining VR domains and distribution.

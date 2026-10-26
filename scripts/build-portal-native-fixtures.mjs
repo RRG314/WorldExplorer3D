@@ -14,3 +14,5 @@ const guest=createPortalTrailEntry('device-guest',id),command=action('guest-save
 scenarios.push({kind:'queue',before:guest,command,expected:next,view:portalTrailView(next)});
 const directory=new URL('../android/app/src/debug/assets/',import.meta.url);mkdirSync(directory,{recursive:true});
 writeFileSync(new URL('portal-trail-contracts.json',directory),JSON.stringify({scope:'Generated from the browser/server wire model. Debug-only native conformance fixture.',scenarios},null,2)+'\n');
+const apple=new URL('../apple/Tests/Resources/',import.meta.url);mkdirSync(apple,{recursive:true});
+writeFileSync(new URL('portal-trail-contracts.json',apple),JSON.stringify({scope:'Generated from the browser/server wire model. Test-only native conformance fixture.',scenarios},null,2)+'\n');

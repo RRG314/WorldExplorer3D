@@ -1,0 +1,118 @@
+name: WorldExplorerPortal
+options:
+  minimumXcodeGenVersion: 2.46.0
+  xcodeVersion: '26.6'
+  deploymentTarget:
+    iOS: '17.0'
+settings:
+  base:
+    SWIFT_VERSION: '6.0'
+    SWIFT_STRICT_CONCURRENCY: complete
+    TARGETED_DEVICE_FAMILY: '1,2'
+    CURRENT_PROJECT_VERSION: '1'
+    MARKETING_VERSION: '5.6.1'
+    CODE_SIGN_STYLE: Automatic
+    ENABLE_USER_SCRIPT_SANDBOXING: YES
+  configs:
+    Debug:
+      SWIFT_ACTIVE_COMPILATION_CONDITIONS: '$(inherited) DEBUG WE3D_STAGING'
+      PORTAL_BUNDLE_ID: io.worldexplorer3d.app.staging
+      PORTAL_APP_GROUP: group.io.worldexplorer3d.portal.staging
+      PORTAL_ATTEST_ENVIRONMENT: development
+    Release:
+      PORTAL_BUNDLE_ID: io.worldexplorer3d.app
+      PORTAL_APP_GROUP: group.io.worldexplorer3d.portal
+      PORTAL_ATTEST_ENVIRONMENT: production
+packages:
+  Firebase:
+    url: https://github.com/firebase/firebase-ios-sdk.git
+    exactVersion: 13.1.1
+targets:
+  WorldExplorerPortal:
+    type: application
+    platform: iOS
+    sources: [App, Shared]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: '$(PORTAL_BUNDLE_ID)'
+        CODE_SIGN_ENTITLEMENTS: App/PortalApp.entitlements
+    info:
+      path: App/Info.plist
+      properties:
+        CFBundleDisplayName: World Explorer 3D
+        CFBundleURLTypes:
+          - CFBundleURLName: Living Portal
+            CFBundleURLSchemes: ['$(PORTAL_BUNDLE_ID)']
+        UILaunchScreen: {}
+        UIApplicationSupportsIndirectInputEvents: true
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait, UIInterfaceOrientationLandscapeLeft, UIInterfaceOrientationLandscapeRight]
+        UISupportedInterfaceOrientations~ipad: [UIInterfaceOrientationPortrait, UIInterfaceOrientationPortraitUpsideDown, UIInterfaceOrientationLandscapeLeft, UIInterfaceOrientationLandscapeRight]
+        UIBackgroundModes: [fetch]
+        BGTaskSchedulerPermittedIdentifiers: ['$(PORTAL_BUNDLE_ID).portal-refresh']
+        FirebaseDataCollectionDefaultEnabled: false
+        FirebaseAppCheckTokenAutoRefreshEnabled: false
+        FirebaseAppDelegateProxyEnabled: false
+        NSAppTransportSecurity:
+          NSAllowsArbitraryLoads: false
+    dependencies:
+      - target: LivingPortalWidget
+      - package: Firebase
+        product: FirebaseCore
+      - package: Firebase
+        product: FirebaseAuth
+      - package: Firebase
+        product: FirebaseAppCheck
+  LivingPortalWidget:
+    type: app-extension
+    platform: iOS
+    sources: [Widget, Shared]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: '$(PORTAL_BUNDLE_ID).portalWidget'
+        CODE_SIGN_ENTITLEMENTS: Widget/PortalWidget.entitlements
+        APPLICATION_EXTENSION_API_ONLY: YES
+        SKIP_INSTALL: YES
+    info:
+      path: Widget/Info.plist
+      properties:
+        CFBundleDisplayName: Living Portal
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+  PortalTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: Tests
+        excludes: [PortalContractRunner.swift]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: '$(PORTAL_BUNDLE_ID).tests'
+        GENERATE_INFOPLIST_FILE: YES
+    dependencies:
+      - target: WorldExplorerPortal
+  PortalUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources: [UITests]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: '$(PORTAL_BUNDLE_ID).uitests'
+        GENERATE_INFOPLIST_FILE: YES
+    dependencies:
+      - target: WorldExplorerPortal
+schemes:
+  WorldExplorerPortal:
+    build:
+      targets:
+        WorldExplorerPortal: all
+    test:
+      config: Debug
+      targets:
+        - name: PortalTests
+          parallelizable: false
+        - name: PortalUITests
+          parallelizable: false
+      commandLineArguments:
+        '-FIRDebugDisabled': true
+    archive:
+      config: Release

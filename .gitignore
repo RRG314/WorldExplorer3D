@@ -43,3 +43,8 @@ WorldExplorer3D-rdt-engine/
 _style_reference_worldexplorer3d/
 world-explorer-esm/
 three.js
+
+# Xcode projects are generated from the reviewed spec; native data stays outside Git.
+apple/WorldExplorerPortal.xcodeproj/
+apple/build/
+apple/DerivedData/

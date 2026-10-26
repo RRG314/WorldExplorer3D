@@ -6,6 +6,22 @@ necessary production/protected-source work; do not ask again for that scope.
 
 ## October 25 VR and Living Portal complete product work — active
 
+Latest native work: Android debug widget CI 40248159666 at 98e6896 passes 19
+account/wire cases plus the retained persistence/widget/layout journey; all five
+screenshots were inspected. The later sender-ID, command-generation and sync
+completion refinements remain to receive their focused native receipt.
+
+Apple now has a containing SwiftUI app, interactive WidgetKit source, App Group
+file ownership, private Keychain approval proof, serialized Firebase account
+commands, offline Trail and system-owned background refresh. Sixteen Foundation
+wire/storage cases pass locally, including concurrent file access and stale
+responses. This is not iOS compilation, entitlements, native authentication or
+Home Screen widget acceptance. The pinned XcodeGen/Firebase project and owned
+simulator CI are the next actual native check. Debug Apple identities use the
+separate .staging namespace; production distribution still requires the owner's
+pending Apple membership/signing setup. Native-to-browser account reconciliation
+is required before qualifying any 3D destination link.
+
 The owner now explicitly authorizes finishing working VR and widget products,
 not stopping at scaffolding/checkpoints. The active goal and execution ledger
 are `docs/architecture-evaluation/VR-PORTAL-PRODUCT-DELIVERY.md`. Continue beyond

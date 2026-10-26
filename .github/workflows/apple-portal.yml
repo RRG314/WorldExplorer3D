@@ -1,0 +1,37 @@
+name: Apple Portal native acceptance
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [steven/living-portal-vr]
+    paths: ['apple/**', 'scripts/verification/apple-portal.sh', '.github/workflows/apple-portal.yml']
+
+permissions:
+  contents: read
+concurrency:
+  group: apple-portal-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  native:
+    runs-on: macos-26
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Verify the pinned project generator
+        run: |
+          curl --fail --location --silent --show-error https://github.com/yonaskolb/XcodeGen/releases/download/2.46.0/xcodegen.zip -o "$RUNNER_TEMP/xcodegen.zip"
+          printf '%s  %s\n' '4d9e34b62172d645eed6457cac13fc222569974098ef4ee9c3368bedf0196806' "$RUNNER_TEMP/xcodegen.zip" | shasum -a 256 -c -
+          unzip -q "$RUNNER_TEMP/xcodegen.zip" -d "$RUNNER_TEMP/xcodegen"
+          "$RUNNER_TEMP/xcodegen/xcodegen/bin/xcodegen" generate --spec apple/project.yml
+      - name: Build and exercise the native app in one owned simulator
+        run: bash scripts/verification/apple-portal.sh
+      - name: Retain bounded diagnostics, pins and native screenshots
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: apple-portal-evidence
+          path: apple-portal-evidence/
+          retention-days: 30
+          if-no-files-found: warn
