@@ -44,7 +44,9 @@ jobs:
           key: apple-sdk-${{ runner.os }}-${{ runner.arch }}-xcode26.6-v1-${{ hashFiles('apple/Package.resolved', 'apple/project.yml') }}
           path: |
             ${{ runner.temp }}/we3d-apple-packages
-            ${{ runner.temp }}/we3d-apple-derived
+            ${{ runner.temp }}/we3d-apple-derived/Build
+            ${{ runner.temp }}/we3d-apple-derived/ModuleCache.noindex
+            ${{ runner.temp }}/we3d-apple-derived/SDKStatCaches.noindex
       - name: Build and exercise the native app in one owned simulator
         id: native
         env:
@@ -52,13 +54,15 @@ jobs:
           WE3D_PORTAL_APPLE_WIDGET_ONLY: ${{ inputs.widget_only }}
         run: bash scripts/verification/apple-portal.sh
       - name: Retain compiled SDKs after a completed build
-        if: always() && steps.native.outputs.sdk_built == 'true' && steps.apple_sdk_cache.outputs.cache-hit != 'true'
+        if: always() && steps.native.outputs.sdk_built == 'true' && steps.apple_sdk_cache.outputs.cache-hit != 'true' && !inputs.native_live
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           key: ${{ steps.apple_sdk_cache.outputs.cache-primary-key }}
           path: |
             ${{ runner.temp }}/we3d-apple-packages
-            ${{ runner.temp }}/we3d-apple-derived
+            ${{ runner.temp }}/we3d-apple-derived/Build
+            ${{ runner.temp }}/we3d-apple-derived/ModuleCache.noindex
+            ${{ runner.temp }}/we3d-apple-derived/SDKStatCaches.noindex
       - name: Retain bounded diagnostics, pins and native screenshots
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
