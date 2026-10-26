@@ -1,5 +1,5 @@
 import {resolveControlState} from '../transport/control-state.js';
-import {activeActorPose} from '../transport/actor-contract.js';
+import {activeActorPose} from '../transport/actor-contract.js?v=6';
 import {applyDrivingCabinCamera} from '../hud/driving-cabin-camera.js';
 import {getAviationCatalogEntry} from '../transport/aviation-catalog.js?v=5';
 import {aircraftForwardVector} from '../controls/traversal-control-policy.js?v=9';

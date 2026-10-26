@@ -1,6 +1,6 @@
 import {createLifecycleScope} from '../runtime/lifecycle-scope.js?v=2';
 import {resolveControlState} from '../transport/control-state.js';
-import {activeActorPose} from '../transport/actor-contract.js';
+import {activeActorPose} from '../transport/actor-contract.js?v=6';
 import {isEarthWorldUsable} from '../earth-core/world-readiness.js';
 import {roadWidthAtSegment} from '../world/road-cross-section-profile.js?v=1';
 import {carSpeedToMph,carSpeedToWorldUnitsPerSecond,mphToCarSpeed} from '../physics/vehicle-speed-units.js?v=2';
