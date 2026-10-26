@@ -4,14 +4,13 @@ import Vision
 
 @MainActor final class PortalUITests: XCTestCase {
     override func setUpWithError() throws { continueAfterFailure = false }
-    override func tearDownWithError() throws {
+    @MainActor override func tearDown() async throws {
         // XCTest records some thrown failures after the test method unwinds.
         // Observe them here, rather than in that method's defer block.
         if name.contains("testHomeScreenWidget"), (testRun?.failureCount ?? 0) > 0 {
             capture("portal-widget-failed-screen")
             print(String(XCUIApplication(bundleIdentifier: "com.apple.springboard").debugDescription.prefix(24_000)))
         }
-        try super.tearDownWithError()
     }
     private func capture(_ name: String) {
         let image = XCTAttachment(screenshot: XCUIScreen.main.screenshot()); image.name = name; image.lifetime = .keepAlways; add(image)
