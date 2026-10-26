@@ -47,6 +47,7 @@ PY
 trap finish EXIT
 mkdir -p apple/WorldExplorerPortal.xcodeproj/project.xcworkspace/xcshareddata/swiftpm
 cp apple/Package.resolved apple/WorldExplorerPortal.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved
+printf '%s\n' 'Apple phase: resolve the pinned SDKs'
 xcodebuild -resolvePackageDependencies -onlyUsePackageVersionsFromResolvedFile -project apple/WorldExplorerPortal.xcodeproj -scheme WorldExplorerPortal -clonedSourcePackagesDirPath "$RUNNER_TEMP/we3d-apple-packages" > "$APPLE_PRIVATE/resolve.log" 2>&1
 cp apple/WorldExplorerPortal.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved apple-portal-evidence/Package.resolved
 cmp apple/Package.resolved apple-portal-evidence/Package.resolved
@@ -65,20 +66,23 @@ PY
 )
 APPLE_SIMULATOR=$(xcrun simctl create "WorldExplorer-Owned-$GITHUB_RUN_ID" "$APPLE_DEVICE_TYPE" "$APPLE_RUNTIME")
 printf '%s\n' "$APPLE_SIMULATOR" > apple-portal-evidence/owned-simulator.txt
-xcrun simctl boot "$APPLE_SIMULATOR"
-xcrun simctl bootstatus "$APPLE_SIMULATOR" -b > "$APPLE_PRIVATE/boot.log" 2>&1
 # Reuse only pinned dependency compilation. Rebuild every first-party app,
 # extension and test target so a restored bundle cannot retain deleted files.
 rm -rf -- "$RUNNER_TEMP/we3d-apple-derived/Build/Intermediates.noindex/WorldExplorerPortal.build"
 for APPLE_PRODUCT in WorldExplorerPortal.app PortalUITests-Runner.app PortalTests.xctest LivingPortalWidget.appex; do
   rm -rf -- "$RUNNER_TEMP/we3d-apple-derived/Build/Products/Debug-iphonesimulator/$APPLE_PRODUCT"
 done
+printf '%s\n' 'Apple phase: compile current app, widget and tests before explicit simulator boot'
 xcodebuild build-for-testing -project apple/WorldExplorerPortal.xcodeproj -scheme WorldExplorerPortal -configuration Debug -destination "id=$APPLE_SIMULATOR" -derivedDataPath "$RUNNER_TEMP/we3d-apple-derived" -clonedSourcePackagesDirPath "$RUNNER_TEMP/we3d-apple-packages" -disableAutomaticPackageResolution CODE_SIGN_IDENTITY=- > "$APPLE_PRIVATE/build.log" 2>&1
 printf '%s\n' 'sdk_built=true' >> "$GITHUB_OUTPUT"
+printf '%s\n' 'Apple phase: boot the owned simulator after compilation'
+xcrun simctl boot "$APPLE_SIMULATOR"
+xcrun simctl bootstatus "$APPLE_SIMULATOR" -b > "$APPLE_PRIVATE/boot.log" 2>&1
 # Keep the array nonempty: macOS Bash 3.2 treats an empty array as unset under -u.
 APPLE_JOURNEY=(-parallel-testing-enabled NO)
 if test "${WE3D_PORTAL_APPLE_WIDGET_ONLY:-false}" = true; then APPLE_JOURNEY+=(-only-testing:PortalUITests/PortalUITests/testHomeScreenWidget); fi
 APPLE_UI_STATUS=0
+printf '%s\n' 'Apple phase: run only the requested current native UI journey'
 xcodebuild test-without-building -project apple/WorldExplorerPortal.xcodeproj -scheme WorldExplorerPortal -configuration Debug -destination "id=$APPLE_SIMULATOR" -derivedDataPath "$RUNNER_TEMP/we3d-apple-derived" -resultBundlePath "$APPLE_PRIVATE/Portal.xcresult" "${APPLE_JOURNEY[@]}" CODE_SIGN_IDENTITY=- > "$APPLE_PRIVATE/test.log" 2>&1 || APPLE_UI_STATUS=$?
 # Run only the added SDK journey when an owned short-lived identity is present.
 # Reuse this exact build and simulator; do not restart the offline UI sequence.

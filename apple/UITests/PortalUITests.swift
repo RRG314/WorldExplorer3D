@@ -28,14 +28,7 @@ import Vision
             request.recognitionLanguages = ["en-US"]
             request.usesLanguageCorrection = false
             try VNImageRequestHandler(cgImage: image, options: [:]).perform([request])
-            let matches = (request.results ?? []).compactMap { observation -> CGRect? in
-                guard let candidate = observation.topCandidates(1).first, candidate.confidence >= 0.6 else { return nil }
-                let value = candidate.string.trimmingCharacters(in: .whitespacesAndNewlines)
-                let exact = value.caseInsensitiveCompare(text) == .orderedSame
-                let plusLabel = text == "Add Widget" && value.hasSuffix(text) && value.count <= text.count + 3
-                guard exact || plusLabel, !lowerPart || observation.boundingBox.midY < 0.35 else { return nil }
-                return observation.boundingBox
-            }
+            let matches = try visibleSystemControlBounds(text, observations: request.results ?? [], lowerPart: lowerPart)
             XCTAssertLessThanOrEqual(matches.count, 1, "The visible control must be unambiguous: \(text)")
             if matches.count == 1 { return matches[0] }
             Thread.sleep(forTimeInterval: 0.4)
