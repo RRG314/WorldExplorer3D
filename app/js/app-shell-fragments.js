@@ -75,7 +75,7 @@ const APP_SHELL_FRAGMENT_HTML = `
       </div>
       <div class="mpMeta">Join an existing room above, or create a new room at your current location below.</div>
       <div class="mp-row">
-        <label class="mp-field" for="roomPanelVisibilitySelect"><span>Who can find your room</span><select id="roomPanelVisibilitySelect" class="mp-select" aria-label="Room visibility">
+        <label class="mp-field" for="roomPanelVisibilitySelect"><span>Who can find your room</span><select id="roomPanelVisibilitySelect" class="mp-select">
           <option value="private" selected>Private Room</option>
           <option value="public">Public Room</option>
         </select></label>
@@ -96,7 +96,7 @@ const APP_SHELL_FRAGMENT_HTML = `
       </div>
       <div class="mp-row">
         <label class="mp-field" for="roomPanelPaintTimeInput"><span>Paint round length (seconds)</span><input id="roomPanelPaintTimeInput" class="mp-input" type="number" min="30" max="1800" step="15" value="120" placeholder="Paint round time (seconds)"></label>
-        <label class="mp-field" for="roomPanelPaintTouchModeSelect"><span>Touch paint rule</span><select id="roomPanelPaintTouchModeSelect" class="mp-select" aria-label="Paint touch mode">
+        <label class="mp-field" for="roomPanelPaintTouchModeSelect"><span>Touch paint rule</span><select id="roomPanelPaintTouchModeSelect" class="mp-select">
           <option value="off">Touch Paint Off</option>
           <option value="roof">Touch Roof Only</option>
           <option value="any" selected>Touch Anywhere</option>
@@ -144,7 +144,7 @@ const APP_SHELL_FRAGMENT_HTML = `
 
       <details class="mp-secondary-tools"><summary>Shared Artifacts</summary>
       <div class="mp-row">
-        <label class="mp-field" for="roomArtifactTypeSelect"><span>Artifact type</span><select id="roomArtifactTypeSelect" class="mp-select" aria-label="Artifact type">
+        <label class="mp-field" for="roomArtifactTypeSelect"><span>Artifact type</span><select id="roomArtifactTypeSelect" class="mp-select">
           <option value="pin">Pin</option>
           <option value="landmark">Landmark</option>
           <option value="build-area">Build Area</option>

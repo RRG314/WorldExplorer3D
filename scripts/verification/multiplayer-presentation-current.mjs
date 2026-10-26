@@ -59,7 +59,7 @@ try{
  await page.evaluate(()=>{mpProbe.state.roomJoinBusy=true;mpProbe.ui.renderWeeklyFeaturedCallout();});assert.equal(await page.locator('#mpFeaturedWeeklyBtn').isDisabled(),true);
  await page.evaluate(()=>{mpProbe.state.roomJoinBusy=false;mpProbe.ui.renderWeeklyFeaturedCallout();});assert.equal(await page.locator('#mpFeaturedWeeklyBtn').isEnabled(),true);
  await page.locator('#mpTitleCodeInput').fill('abc123');await press('#mpTitleCodeInput');assert.equal(await page.evaluate(()=>mpProbe.calls.at(-1)[0]),'handleJoinRoom');
- await page.locator('#mpCreateRoomDetails > summary').click();await page.locator('#mpTitleRoomNameInput').fill('Phone exploration');await page.locator('#mpTitleVisibilitySelect').selectOption('public');await page.locator('#mpTitleLocationTagInput').fill('Baltimore');await page.locator('#mpTitleCreateBtn').click();assert.equal(await page.evaluate(()=>mpProbe.calls.at(-1)[0]),'handleCreateRoom');
+ await page.locator('#mpCreateRoomDetails > summary').click();assert.equal(await page.locator('#tab-multiplayer').getByRole('combobox',{name:'Who can find your room',exact:true}).count(),1);await page.locator('#mpTitleRoomNameInput').fill('Phone exploration');await page.locator('#mpTitleVisibilitySelect').selectOption('public');await page.locator('#mpTitleLocationTagInput').fill('Baltimore');await page.locator('#mpTitleCreateBtn').click();assert.equal(await page.evaluate(()=>mpProbe.calls.at(-1)[0]),'handleCreateRoom');
  report.checks.push('Weekly/code/create UI reaches existing command callbacks; busy weekly button disables and recovers');
  for(const phase of ['loading','error','ready']){
   await page.evaluate(phase=>{mpProbe.state.browseRooms=[];mpProbe.state.browsePhase=phase;mpProbe.ui.renderBrowseRooms();},phase);
@@ -72,7 +72,9 @@ try{
  await page.evaluate(()=>{mpProbe.state.authUser={uid:'one'};mpProbe.state.currentRoom=mpProbe.room;mpProbe.state.browseRooms=[mpProbe.room];mpProbe.render();mpProbe.ui.setStatus('Room is full. Try another room or retry shortly.',true);mpProbe.ui.setBrowseStatus('Directory unavailable. Try Browse again.',true);});
  assert.equal(await page.locator('#mpTitleStatus').getAttribute('role'),'status');assert.equal(await page.locator('#mpTitleStatus').getAttribute('data-tone'),'warning');assert.equal(await page.locator('#mpTitleStatus').evaluate(e=>e.style.color),'');
  report.checks.push('Errors retain visible text and polite live status with theme-owned color');
- for(const size of sizes){
+ const selection=process.env.WE3D_MP_LAYOUTS;const names=selection&&selection!=='none'?selection.split(','):null;
+ if(names)for(const name of names)assert.ok(sizes.some(s=>s.name===name),'Unknown layout: '+name);
+ for(const size of sizes.filter(s=>selection!=='none'&&(!names||names.includes(s.name)))){
   await page.setViewportSize({width:size.width,height:size.height});await page.evaluate(scale=>{document.documentElement.dataset.we3dTextScale=scale;document.getElementById('globeHubOverlay').hidden=false;document.getElementById('globeHubPanelHost').scrollTop=0;document.getElementById('floatMenuContainer').classList.remove('show');document.getElementById('mobileTouchControls').classList.remove('show');document.querySelectorAll('#tab-multiplayer details').forEach(d=>d.open=true);},size.scale);await page.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))));
   assert.equal(await page.locator('#tab-multiplayer').evaluate(e=>e.scrollWidth<=e.clientWidth+1),true,'Lobby horizontal overflow '+size.name);
   for(const id of ['mpFeaturedWeeklyBtn','mpTitleJoinBtn','mpTitleCreateBtn','mpTitlePanelBtn','mpTitleInviteBtn','mpTitleLeaveBtn','mpBrowseBtn','mpTitleTrialBtn','mpAddFriendBtn']){
