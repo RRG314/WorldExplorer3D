@@ -28,6 +28,17 @@ public final class PortalAccountLiveInstrumentation extends Instrumentation {
     @Override public void onCreate(Bundle args){arguments=args;start();}
     private static void check(boolean value,String message){if(!value)throw new AssertionError(message);}
     private static void until(BooleanSupplier condition,String message)throws Exception{long deadline=System.currentTimeMillis()+90000;while(!condition.getAsBoolean()){if(System.currentTimeMillis()>deadline)throw new AssertionError(message);Thread.sleep(100);}}
+    private void freshBrowserIdentity(JSONObject fixture)throws Exception{
+        check(fixture.getString("browserEmail").matches("qa-native-[a-f0-9-]+@example\\.invalid"),"Use only the disposable verification account.");
+        HttpURLConnection connection=(HttpURLConnection)new URL("https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key="+Uri.encode(fixture.getString("browserApiKey"))).openConnection();
+        try{
+            connection.setInstanceFollowRedirects(false);connection.setConnectTimeout(6000);connection.setReadTimeout(15000);connection.setRequestMethod("POST");connection.setDoOutput(true);connection.setRequestProperty("Content-Type","application/json");
+            byte[] bytes=new JSONObject().put("email",fixture.getString("browserEmail")).put("password",fixture.getString("browserPassword")).put("returnSecureToken",true).toString().getBytes(StandardCharsets.UTF_8);
+            connection.setFixedLengthStreamingMode(bytes.length);try(OutputStream out=connection.getOutputStream()){out.write(bytes);}
+            check(connection.getResponseCode()==200,"The disposable browser account could not sign in.");
+            JSONObject signed=new JSONObject(PortalStore.readBounded(connection.getInputStream(),16384));check(signed.getString("localId").equals(fixture.getString("uid")),"The disposable browser identity changed.");fixture.put("webIdentity",signed.getString("idToken"));
+        }finally{connection.disconnect();}
+    }
     private JSONObject approve(String name,JSONObject body,JSONObject fixture)throws Exception{
         HttpURLConnection connection=(HttpURLConnection)new URL(BuildConfig.PORTAL_API_ORIGIN+"/"+name).openConnection();
         try{
@@ -49,6 +60,7 @@ public final class PortalAccountLiveInstrumentation extends Instrumentation {
             check(opened.await(20,TimeUnit.SECONDS),"Native SDK bootstrap did not finish.");account.unobserve(observer);
             account.start();final PortalAccount current=account;
             until(()->current.approval()!=null,"Native connection did not reach approval.");Uri approval=account.approval();String requestId=approval.getQueryParameter("connect");
+            freshBrowserIdentity(fixture);
             JSONObject metadata=approve("inspectPortalPairing",new JSONObject().put("requestId",requestId),fixture);
             check(metadata.getString("verificationCode").equals(account.code()),"Displayed native/browser codes differ.");
             byte[] random=new byte[32];new SecureRandom().nextBytes(random);String code=Base64.encodeToString(random,Base64.URL_SAFE|Base64.NO_WRAP|Base64.NO_PADDING);

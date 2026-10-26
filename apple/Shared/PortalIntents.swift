@@ -67,4 +67,3 @@ struct InvestigatePortalPlace: AppIntent {
         WidgetCenter.shared.reloadTimelines(ofKind: "LivingPortal"); return .result(dialog: "Your Portal investigation is updated.")
     }
 }
-

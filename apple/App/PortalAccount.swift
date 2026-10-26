@@ -38,7 +38,7 @@ private final class PortalAttestFactory: NSObject, AppCheckProviderFactory {
         return user.email ?? "Explorer account"
     }
     var version: UInt64 { generation.capture() }
-    private func enqueue(_ action: @escaping @MainActor () async -> Void) -> Task<Void, Never> {
+    @discardableResult private func enqueue(_ action: @escaping @MainActor () async -> Void) -> Task<Void, Never> {
         let previous = commands
         let next = Task { @MainActor in await previous?.value; await action() }
         commands = next; return next
@@ -48,7 +48,9 @@ private final class PortalAttestFactory: NSObject, AppCheckProviderFactory {
     }
     private func sdk(_ name: String) throws -> FirebaseApp {
         if let app = FirebaseApp.app(name: name) { return app }
-        #if DEBUG && WE3D_STAGING
+        #if DEBUG && WE3D_STAGING && targetEnvironment(simulator)
+        AppCheck.setAppCheckProviderFactory(try PortalDebugAttestation.factory() ?? AppCheckDebugProviderFactory())
+        #elseif DEBUG && WE3D_STAGING
         AppCheck.setAppCheckProviderFactory(AppCheckDebugProviderFactory())
         #else
         AppCheck.setAppCheckProviderFactory(PortalAttestFactory())
@@ -62,7 +64,8 @@ private final class PortalAttestFactory: NSObject, AppCheckProviderFactory {
         FirebaseApp.configure(name: name, options: options)
         guard let app = FirebaseApp.app(name: name) else { throw PortalError.invalid("The account service could not open.") }
         app.isDataCollectionDefaultEnabled = false
-        AppCheck.appCheck(app: app).isTokenAutoRefreshEnabled = false
+        guard let attestation = AppCheck.appCheck(app: app) else { throw PortalError.invalid("This device's secure connection could not open.") }
+        attestation.isTokenAutoRefreshEnabled = false
         return app
     }
     private func open() async throws {

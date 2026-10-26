@@ -35,8 +35,18 @@ adb logcat -c
 adb shell am instrument -w -e ownedEmulator true io.worldexplorer3d.app.staging/io.worldexplorer3d.app.PortalWidgetContractInstrumentation > android-widget-evidence/result.txt
 adb logcat -d > android-widget-evidence/logcat.txt
 adb shell dumpsys appwidget > android-widget-evidence/widget-ownership.txt
-for name in widget-investigation widget-saved native-trail native-account widget-compact; do
-    adb exec-out run-as io.worldexplorer3d.app.staging cat "files/portal-evidence/$name.png" > "android-widget-evidence/$name.png" || true
+for name in widget-investigation widget-saved native-trail native-account widget-compact widget-failure; do
+    CAPTURE="$RUNNER_TEMP/we3d-$name.capture"
+    if adb exec-out run-as io.worldexplorer3d.app.staging cat "files/portal-evidence/$name.png" > "$CAPTURE" 2>/dev/null; then
+        python3 - "$CAPTURE" "android-widget-evidence/$name.png" <<'PY'
+from pathlib import Path
+import sys
+source=Path(sys.argv[1]); data=source.read_bytes()
+if data.startswith(b'\x89PNG\r\n\x1a\n'):Path(sys.argv[2]).write_bytes(data)
+else:print('No valid PNG was captured for '+Path(sys.argv[2]).stem)
+PY
+    fi
+    rm -f "$CAPTURE"
 done
 git rev-parse HEAD > android-widget-evidence/source-commit.txt
 git rev-parse HEAD:android/app/src/main > android-widget-evidence/native-main-source-tree.txt

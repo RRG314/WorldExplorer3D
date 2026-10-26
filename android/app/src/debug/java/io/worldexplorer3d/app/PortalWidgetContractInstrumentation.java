@@ -30,6 +30,7 @@ public final class PortalWidgetContractInstrumentation extends Instrumentation {
     private Bundle arguments;
     private AppWidgetHostView view;
     private Activity expectedWindow;
+    private String step="fresh emulator preflight";
     @Override public void onCreate(Bundle args){arguments=args;start();}
     private static void check(boolean value,String message){if(!value)throw new AssertionError(message);}
     private void until(BooleanSupplier ready)throws Exception{long deadline=System.currentTimeMillis()+8000;while(!ready.getAsBoolean()){if(System.currentTimeMillis()>=deadline)throw new AssertionError("Native widget state did not settle.");Thread.sleep(50);}}
@@ -61,13 +62,15 @@ public final class PortalWidgetContractInstrumentation extends Instrumentation {
             final AppWidgetHost currentHost=host;final PortalWidgetHarnessActivity currentActivity=activity;final int currentId=widgetId;
             runOnMainSync(()->{currentHost.startListening();view=currentHost.createView(currentActivity,currentId,manager.getAppWidgetInfo(currentId));currentActivity.showWidget(view,300,440);});
             PortalWidgetProvider.update(context,widgetId);until(()->text(R.id.portal_title).contains("Baltimore"));
-            click(R.id.portal_save);until(()->store.trail(id).optBoolean("saved"));until(()->text(R.id.portal_save).equals(context.getString(R.string.portal_saved)));
+            step="save from actual widget";click(R.id.portal_save);until(()->store.trail(id).optBoolean("saved"));until(()->text(R.id.portal_save).equals(context.getString(R.string.portal_saved)));
+            step="reveal first fact";
             click(R.id.portal_investigate);until(()->store.learning(currentId).equals(id));until(()->text(R.id.portal_body).equals(PortalStore.facts(place).get(0)));
             screenshot("widget-investigation.png");
-            int count=PortalStore.facts(place).size();for(int i=1;i<count;i++){click(R.id.portal_fact_next);final int index=i;until(()->store.fact(currentId)==index);until(()->text(R.id.portal_body).equals(PortalStore.facts(place).get(index)));}
+            int count=PortalStore.facts(place).size();for(int i=1;i<count;i++){step="tap fact "+i+" of "+count;click(R.id.portal_fact_next);final int index=i;step="persist fact "+i+" of "+count;until(()->store.fact(currentId)==index);step="render fact "+i+" of "+count;until(()->text(R.id.portal_body).equals(PortalStore.facts(place).get(index)));}
+            step="complete investigation from last fact";
             click(R.id.portal_fact_next);until(()->store.learning(currentId).isEmpty());check(store.trail(id).optLong("investigatedAt")>0,"The actual widget investigation did not persist.");check(store.trail(id).optLong("visitedAt")==0,"Investigation granted a game visit.");
             screenshot("widget-saved.png");result.putInt("host_interaction_checks",3);
-            ActivityMonitor monitor=addMonitor(PortalActivity.class.getName(),null,false);click(R.id.portal_trail);Activity trail=waitForMonitorWithTimeout(monitor,8000);removeMonitor(monitor);check(trail!=null,"Native Trail Activity did not open.");expectedWindow=trail;screenshot("native-trail.png");runOnMainSync(trail::finish);expectedWindow=activity;until(this::foreground);
+            step="open containing Trail";ActivityMonitor monitor=addMonitor(PortalActivity.class.getName(),null,false);click(R.id.portal_trail);Activity trail=waitForMonitorWithTimeout(monitor,8000);removeMonitor(monitor);check(trail!=null,"Native Trail Activity did not open.");expectedWindow=trail;screenshot("native-trail.png");runOnMainSync(trail::finish);expectedWindow=activity;until(this::foreground);
             Activity account=startActivitySync(new Intent(context,PortalActivity.class).putExtra("section","account").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));expectedWindow=account;screenshot("native-account.png");runOnMainSync(account::finish);expectedWindow=activity;until(this::foreground);
             options.putInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH,180);options.putInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT,200);manager.updateAppWidgetOptions(widgetId,options);
             runOnMainSync(()->{android.view.ViewGroup parent=(android.view.ViewGroup)view.getParent();parent.removeView(view);currentActivity.showWidget(view,180,200);view.updateAppWidget(PortalWidgetProvider.views(context,currentId));});
@@ -76,7 +79,11 @@ public final class PortalWidgetContractInstrumentation extends Instrumentation {
             store.configure(widgetId,"beyond",id);check(store.suggestion(widgetId,System.currentTimeMillis())==null,"Beyond Earth fabricated an Earth visit.");
             result.putInt("handoff_layout_checks",3);result.putString("scope","Actual Android emulator widget host and pending-intent interaction. Offline bundled content; no physical phone, account sync, native VR or live catalog acceptance.");
             result.putString("passed","true");outcome=Activity.RESULT_OK;
-        }catch(Throwable error){result.putString("passed","false");result.putString("failure",error.toString());}
+        }catch(Throwable error){
+            result.putString("passed","false");result.putString("failure",error.toString());result.putString("failed_step",step);
+            if(owned&&widgetId!=AppWidgetManager.INVALID_APPWIDGET_ID){PortalStore state=new PortalStore(getTargetContext());result.putInt("displayed_fact_index",state.fact(widgetId));result.putBoolean("learning_open",!state.learning(widgetId).isEmpty());result.putString("visible_fact",text(R.id.portal_body));}
+            try{if(foreground())screenshot("widget-failure.png");}catch(Exception ignored){}
+        }
         finally{
             if(host!=null){host.stopListening();if(widgetId!=AppWidgetManager.INVALID_APPWIDGET_ID)host.deleteAppWidgetId(widgetId);}
             if(activity!=null){final Activity closing=activity;runOnMainSync(closing::finish);}

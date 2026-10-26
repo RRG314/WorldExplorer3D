@@ -2,6 +2,11 @@ name: Apple Portal native acceptance
 
 on:
   workflow_dispatch:
+    inputs:
+      native_live:
+        description: Exercise native SDK ownership with the owned temporary staging identity
+        type: boolean
+        default: false
   push:
     branches: [steven/living-portal-vr]
     paths: ['apple/**', 'scripts/verification/apple-portal.sh', '.github/workflows/apple-portal.yml']
@@ -13,6 +18,9 @@ concurrency:
   cancel-in-progress: false
 jobs:
   native:
+    # The push trigger registers this feature-branch workflow. Native acceptance
+    # itself is dispatched deliberately so each committed change is tested once.
+    if: github.event_name == 'workflow_dispatch'
     runs-on: macos-26
     timeout-minutes: 35
     steps:
@@ -26,6 +34,8 @@ jobs:
           unzip -q "$RUNNER_TEMP/xcodegen.zip" -d "$RUNNER_TEMP/xcodegen"
           "$RUNNER_TEMP/xcodegen/xcodegen/bin/xcodegen" generate --spec apple/project.yml
       - name: Build and exercise the native app in one owned simulator
+        env:
+          WE3D_PORTAL_APPLE_ACCEPTANCE: ${{ inputs.native_live && secrets.WE3D_PORTAL_APPLE_ACCEPTANCE || '' }}
         run: bash scripts/verification/apple-portal.sh
       - name: Retain bounded diagnostics, pins and native screenshots
         if: always()
