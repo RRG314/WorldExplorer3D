@@ -64,6 +64,9 @@ if test -n "${WE3D_PORTAL_ANDROID_ACCEPTANCE:-}"; then
     umask 077
     printf '%s' "$WE3D_PORTAL_ANDROID_ACCEPTANCE" > "$NATIVE_FIXTURE"
     unset WE3D_PORTAL_ANDROID_ACCEPTANCE
+    # A native-only run has not launched the app and cannot depend on the UI
+    # journey having created Context.filesDir first.
+    adb shell run-as io.worldexplorer3d.app.staging mkdir -p files
     adb shell -T "run-as io.worldexplorer3d.app.staging sh -c 'cat > files/native-acceptance.json'" < "$NATIVE_FIXTURE"
     rm "$NATIVE_FIXTURE"
     adb logcat -c
