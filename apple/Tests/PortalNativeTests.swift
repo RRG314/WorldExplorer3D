@@ -9,7 +9,7 @@ final class PortalNativeTests: XCTestCase {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent("we3d-owned-tests-" + UUID().uuidString)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: directory) }
-        XCTAssertEqual(try PortalContractChecks.run(fixtures: fixtures, catalog: catalog, directory: directory), 16)
+        XCTAssertEqual(try PortalContractChecks.run(fixtures: fixtures, catalog: catalog, directory: directory), 17)
     }
 
     func testPrivateConnectionProofAndStaleGeneration() throws {

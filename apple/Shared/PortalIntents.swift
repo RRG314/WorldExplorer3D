@@ -56,13 +56,13 @@ struct InvestigatePortalPlace: AppIntent {
     @Parameter(title: "Explorer") var owner: String
     @Parameter(title: "Investigation") var version: String
     @Parameter(title: "Portal") var portal: String
-    @Parameter(title: "Next", default: false) var next: Bool
+    @Parameter(title: "Shown fact", default: -1) var shownPage: Int
     init() {}
-    init(destination: String, owner: String, version: String, portal: String, next: Bool) {
-        self.destination = destination; self.owner = owner; self.version = version; self.portal = portal; self.next = next
+    init(destination: String, owner: String, version: String, portal: String, shownPage: Int) {
+        self.destination = destination; self.owner = owner; self.version = version; self.portal = portal; self.shownPage = shownPage
     }
     func perform() async throws -> some IntentResult & ProvidesDialog {
-        do { try PortalStore().investigate(key: portal, destination: destination, expectedOwner: owner, version: version, next: next) }
+        do { try PortalStore().investigate(key: portal, destination: destination, expectedOwner: owner, version: version, shownPage: shownPage) }
         catch { WidgetCenter.shared.reloadTimelines(ofKind: "LivingPortal"); return .result(dialog: "This account or investigation changed. Reopen the Portal before marking it complete.") }
         WidgetCenter.shared.reloadTimelines(ofKind: "LivingPortal"); return .result(dialog: "Your Portal investigation is updated.")
     }

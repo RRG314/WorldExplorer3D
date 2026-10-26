@@ -143,14 +143,16 @@ final class PortalStore: @unchecked Sendable {
             }
         }
     }
-    func investigate(key: String, destination: String, expectedOwner: String, version: String, next: Bool) throws {
+    func investigate(key: String, destination: String, expectedOwner: String, version: String, shownPage: Int) throws {
         try change { document in
             guard document.ownerScope == expectedOwner, let place = try catalog(in: document).place(destination), version == place.learning.version else { throw PortalError.invalid("This account or investigation changed. Reopen the widget.") }
             let previous = document.learning[key]
-            if !next || previous?.destinationId != destination || previous?.contentVersion != version {
+            if shownPage == -1 {
                 document.learning[key] = PortalLearningPage(destinationId: destination, contentVersion: version, index: 0); return
             }
-            let index = max(0, previous?.index ?? 0)
+            guard shownPage >= 0, previous?.destinationId == destination, previous?.contentVersion == version,
+                  previous?.index == shownPage else { throw PortalError.invalid("This fact page changed. Wait for the widget to refresh.") }
+            let index = shownPage
             if index < place.facts.count - 1 { document.learning[key]?.index = index + 1; return }
             let trailKey = try PortalContract.key(owner: expectedOwner, destination: destination)
             var entry = try document.entries[trailKey] ?? PortalTrailEntry(owner: expectedOwner, destination: destination)

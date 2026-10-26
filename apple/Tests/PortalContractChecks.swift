@@ -59,9 +59,14 @@ enum PortalContractChecks {
         do { try store.act(destination: id, kind: .investigate, expectedOwner: PortalContract.guest, learningVersion: "old-version") } catch { denied = true }
         try check(denied, "Outdated facts marked new content as investigated."); count += 1
         let pageKey = "wander:default"
-        try store.investigate(key: pageKey, destination: "monaco-coast", expectedOwner: PortalContract.guest, version: places.place("monaco-coast")!.learning.version, next: false)
-        for _ in places.place("monaco-coast")!.facts {
-            try store.investigate(key: pageKey, destination: "monaco-coast", expectedOwner: PortalContract.guest, version: places.place("monaco-coast")!.learning.version, next: true)
+        let monaco = places.place("monaco-coast")!
+        try store.investigate(key: pageKey, destination: monaco.id, expectedOwner: PortalContract.guest, version: monaco.learning.version, shownPage: -1)
+        try store.investigate(key: pageKey, destination: monaco.id, expectedOwner: PortalContract.guest, version: monaco.learning.version, shownPage: 0)
+        denied = false
+        do { try store.investigate(key: pageKey, destination: monaco.id, expectedOwner: PortalContract.guest, version: monaco.learning.version, shownPage: 0) } catch { denied = true }
+        try check(denied && store.snapshot().learning[pageKey]?.index == 1, "An old widget command advanced a fact that had not been shown."); count += 1
+        for index in 1..<monaco.facts.count {
+            try store.investigate(key: pageKey, destination: monaco.id, expectedOwner: PortalContract.guest, version: monaco.learning.version, shownPage: index)
         }
         let monacoKey = try PortalContract.key(owner: PortalContract.guest, destination: "monaco-coast")
         let learned = try store.snapshot().entries[monacoKey]!.view()

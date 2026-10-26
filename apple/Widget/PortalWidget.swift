@@ -84,7 +84,7 @@ struct PortalWidgetView: View {
                         Label(entry.state?.saved == true ? "Saved" : "Save", systemImage: entry.state?.saved == true ? "bookmark.fill" : "bookmark")
                     }.privacySensitive().invalidatableContent()
                     if family != .systemSmall {
-                        Button(intent: InvestigatePortalPlace(destination: place.id, owner: entry.owner, version: place.learning.version, portal: entry.configuration.learningKey, next: entry.page != nil)) {
+                        Button(intent: InvestigatePortalPlace(destination: place.id, owner: entry.owner, version: place.learning.version, portal: entry.configuration.learningKey, shownPage: entry.page?.index ?? -1)) {
                             Text(entry.page == nil ? "Investigate" : entry.page!.index >= place.facts.count - 1 ? "Add to Trail" : "Next fact")
                         }.invalidatableContent()
                     }
