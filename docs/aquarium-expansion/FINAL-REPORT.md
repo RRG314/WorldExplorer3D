@@ -23,7 +23,7 @@ was established. Restricted areas and protected institutional imagery are exclud
 ## Work delivered in this continuation
 
 - Audited the existing implementation rather than duplicating it. Resolved the
-  authoritative worktree through CURRENT-STATE.md and preserved other ongoing edits.
+  authoritative worktree through local operator notes (not published) and preserved other ongoing edits.
 - Refreshed public GitHub/OSM metadata and corrected stale report statements;
   added a full area-by-area evidence/rights/dimension/difficulty table.
 - Added a reusable habitat record carrying species scientific identity, building,

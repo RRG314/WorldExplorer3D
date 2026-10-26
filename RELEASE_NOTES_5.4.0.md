@@ -41,8 +41,8 @@ of every historical site.
 
 Regional data and landmark reconstructions retain their documented limits.
 Physical-phone responsiveness remains unverified. See
-[known limitations](KNOWN_ISSUES.md) and the
-[verification record](docs/visual-quality/EVIDENCE.md).
+[known limitations](KNOWN_ISSUES.md). Historical verification records are retained
+outside the public source tree.
 
 The update targets 5.4 rather than 6.0 because its intended changes preserve
 existing saves, room interfaces and supported links. Compatibility checks passed for the released build.

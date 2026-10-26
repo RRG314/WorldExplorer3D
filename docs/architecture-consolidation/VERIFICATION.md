@@ -31,7 +31,7 @@ The source suite includes server/revision/permission components; no new Firestor
 
 ## C1–C3 next work at that checkpoint (subsequently advanced below)
 
-1. Start with `BASELINE.md` and `REFACTOR-PLAN.md`; inspect `git status --short` and `CURRENT-STATE.md`. Do not touch the older Documents checkout or production dist.
+1. Start with `BASELINE.md` and `REFACTOR-PLAN.md`; inspect `git status --short` and local operator notes (not published). Do not touch the older Documents checkout or production dist.
 2. `node scripts/verification/account-request-lifetime-current.mjs` reproduces this slice's controlled browser acceptance. The regression tests are part of `npm run verify:pr`.
 3. Configure a valid existing staging/hosted test context under its normal rules, then rerun the driving adapter and connected-property journey; retain the failed local receipt separately. No repeated unconfigured cold-world run.
 4. Use the retained `rdt-building-index.matches` and regional graphics profile leads for one measured performance repair. Preserve in-place capture edits, old complete scenery, cancellation and unchanged map coverage.

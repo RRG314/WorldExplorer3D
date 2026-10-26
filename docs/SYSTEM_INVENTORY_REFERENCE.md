@@ -1045,7 +1045,8 @@ Source page paths; hosting may redirect, alias or bundle them. See `firebase.jso
 
 ## Package command catalog
 
-Commands are inventory only, not instructions to run all checks locally. Browser/emulator/release commands may be heavy; follow root AGENTS.md.
+Commands are inventory only, not instructions to run all checks locally. Follow
+`CONTRIBUTING.md` when choosing browser, emulator and release checks.
 
 | Name | Command |
 |---|---|

@@ -6,7 +6,7 @@ ordinary gameplay and release checks are distinct.
 
 ## October 13 request continuation
 
-Working branch resolved from CURRENT-STATE.md: architecture-evaluation worktree,
+Working branch resolved from local operator notes (not published): architecture-evaluation worktree,
 `steven/visual-quality`; initial HEAD `283646e04e2cd654a25a700b659700ba79427be3`.
 Existing exterior/waterfront/transport edits are separate work and are not
 attributed to this continuation. No production artifact was rebuilt/deployed.

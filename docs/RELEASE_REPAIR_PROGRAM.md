@@ -1,6 +1,6 @@
 # Professional release repair program
 
-Started September 10, 2026. This is the active execution record for the [repair plan](audits/2026-09-10/repair-plan.md). The September 10 audit is a historical baseline; this document tracks subsequent repairs. **Release decision: blocked pending integration, security, device and operational evidence.**
+Started September 10, 2026. This is the active execution record for the repair plan (private operator record). The September 10 audit is a historical baseline; this document tracks subsequent repairs. **Release decision: blocked pending integration, security, device and operational evidence.**
 
 ## How a professional team would structure this
 
@@ -69,4 +69,6 @@ Rollback must cover more than hosting files: keep the previous compatible backen
 
 ## Workstation policy
 
-The owner's Mac has 8 GiB RAM. Run one bounded task at a time. Small source/contract checks are suitable locally; do not automatically launch the world browser suite, emulators or full release matrix. Root `AGENTS.md` requires explicit authorization before heavy local checks. CI can provide the appropriate machine for those checks; workflow changes alone do not mean CI has executed.
+Run checks proportionate to the actual change and available resources, following
+`CONTRIBUTING.md`. CI can provide an appropriate machine for native acceptance;
+workflow source alone does not establish that a check has executed.

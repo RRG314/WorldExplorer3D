@@ -4,7 +4,7 @@ Owner request, October 5, 2026: restore at least 90% of available valid building
 
 ## Latest checkpoint: location preservation, October 6
 
-Runtime 86fdc6e3 is published only to the existing staging preview as `5.4.0+86fdc6e3e6a2.febba16c0a5e3daa.staging` (611 files, 187 runtime bundles, 84 accepted-ground files). Hosted manifests byte-match local `dist`; production remains 1532bdfb. See [CURRENT-STATE.md](../../CURRENT-STATE.md) for immutable identities and [TEST-BUILD.md](TEST-BUILD.md) for the review journey. Earlier sections below are chronological evidence, not current release acceptance.
+Runtime 86fdc6e3 is published only to the existing staging preview as `5.4.0+86fdc6e3e6a2.febba16c0a5e3daa.staging` (611 files, 187 runtime bundles, 84 accepted-ground files). Hosted manifests byte-match local `dist`; production remains 1532bdfb. See local operator notes (not published) (private operator record) for immutable identities and [TEST-BUILD.md](TEST-BUILD.md) for the review journey. Earlier sections below are chronological evidence, not current release acceptance.
 
 The owner requires preserving location-based play and making continuous travel optional. That requirement is recorded in [WORLDWIDE-READINESS.md](WORLDWIDE-READINESS.md); no worldwide scheduler or functional mode toggle exists yet. Do not reinterpret presets, favorites, saved local positions or shared-room records to simulate global movement.
 

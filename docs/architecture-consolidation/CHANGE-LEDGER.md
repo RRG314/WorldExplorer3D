@@ -35,7 +35,7 @@ Before boundary/structure characterization passed. After **42/42** focused tests
 - `scripts/architecture-evaluation/system-review.mjs`: reuse existing inventory with explicit output destination and optional tooling root; include account support modules/untracked new source, event/subscription and persistence-call sites. Historical audit output is preserved. Static data-flow signals are not a leak/dead-code proof.
 - `scripts/verification/current-contract-list.mjs`: register the two new regression files in the existing maintained suite.
 - `scripts/verification/account-request-lifetime-current.mjs`: bounded native Chrome fixture, actual ESM imports, controlled SDK/HTTP, disposable state, owned cleanup, stored failures and explicit evidence tier.
-- Ten files under `docs/architecture-consolidation/`: first-pass system/feature/authority inventory, ordered work and honest evidence. `CURRENT-STATE.md` and `progress.md` record the local checkpoint; three older system/architecture indexes now identify their historical scope and link the current review.
+- Ten files under `docs/architecture-consolidation/`: first-pass system/feature/authority inventory, ordered work and honest evidence. local operator notes (not published) and `progress.md` record the local checkpoint; three older system/architecture indexes now identify their historical scope and link the current review.
 
 ## C1–C3 checkpoint risk (historical; follow-ups below)
 

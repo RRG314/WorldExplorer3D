@@ -4,7 +4,7 @@ This is an implementation audit of the existing product, not a new release or a 
 
 ## Identity and preservation
 
-Authoritative checkout: `/Users/stevenreid/.codex/worktrees/architecture-evaluation/WorldExplorer3D-live-deployed-20260320`, branch `steven/visual-quality`, initial clean commit `64bab7769e6ae0fc97bb395bc22fedb35f973e51`. `CURRENT-STATE.md` resolves the stale checkout instruction in `AGENTS.md`. Other Documents/Developer worktrees are preserved.
+Authoritative checkout: `/Users/stevenreid/.codex/worktrees/architecture-evaluation/WorldExplorer3D-live-deployed-20260320`, branch `steven/visual-quality`, initial clean commit `64bab7769e6ae0fc97bb395bc22fedb35f973e51`. local operator notes (not published) resolves the stale checkout instruction in local operator guidance. Other Documents/Developer worktrees are preserved.
 
 GitHub default `stable` is `437e06cb`; both active development branches have the same tree (`025f88bd`). Stable code/package, secret scan and Pages deployment passed before this task. Source version is 5.6.0; the public app remains 5.5.0 (`d8775a392c42`). The 5.6 release remains a draft. No production deployment, rule change, push, asset purchase or data migration is part of this assignment.
 

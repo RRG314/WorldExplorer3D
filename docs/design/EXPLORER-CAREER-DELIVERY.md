@@ -366,7 +366,7 @@ Executed acceptance for the personal-home delivery:
   The current source-world run precedes only the player-car cancellation/error
   lease repair; its explicit failure-path test and final source chain follow it.
 
-The final source-chain result is recorded in CURRENT-STATE.md and
+The final source-chain result is recorded in local operator notes (not published) and
 `output/career-finish-20261010/verify-pr-release-checkpoint.log`.
 
 ## October 10 — Harbor distinction and licensed research vessel, local

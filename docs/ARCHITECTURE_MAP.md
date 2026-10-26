@@ -120,7 +120,7 @@ Canonical source → environment-selected hosting artifact → manifest/content 
 
 The backend targets Node 22; hosting uses esbuild and static assets. Node contract tests, browser tests and Firebase emulators serve different roles. Browser CDN dependencies need an inventory in addition to npm advisory checks. CI dependency setup and the production-default CLI shortcut require repair.
 
-No build, browser, emulator or deployment was run for this documentation update. Root `AGENTS.md` limits this 8 GiB workstation to one task at a time and requires explicit authorization before heavy checks. Saved candidates are bounded by the local tooling safeguard added during cleanup.
+No build, browser, emulator or deployment was run for this documentation update. Choose proportionate verification using CONTRIBUTING.md; saved candidates are bounded by local tooling safeguards.
 
 Cloud alerting, backups, restore tests and physical-device performance remain operational verification items, not inferred guarantees. Use [the repair plan](audits/2026-09-10/repair-plan.md) for completion criteria and [the evidence ledger](audits/2026-09-10/tests-and-evidence.md) for actual results.
 
