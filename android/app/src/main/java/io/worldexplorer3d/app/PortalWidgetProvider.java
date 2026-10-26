@@ -22,13 +22,19 @@ public final class PortalWidgetProvider extends AppWidgetProvider {
     private static final String ACTION="io.worldexplorer3d.app.PORTAL_ACTION";
     static int[] ids(Context context){return AppWidgetManager.getInstance(context).getAppWidgetIds(new ComponentName(context,PortalWidgetProvider.class));}
     static void updateAll(Context context){for(int id:ids(context))update(context,id);}
-    private static PendingIntent action(Context context,int widgetId,String verb,String destination){
-        PortalStore store=new PortalStore(context);JSONObject place=store.place(destination);
+    static PendingIntent action(Context context,int widgetId,String verb,String destination){
+        synchronized(PortalStore.LOCK){
+        PortalStore store=new PortalStore(context);JSONObject place=store.place(destination);String owner=store.owner(),version=place==null?"":place.optJSONObject("learning").optString("version");int fact=store.fact(widgetId);
+        // Extras do not distinguish PendingIntents. Bind the actual command
+        // identity too, or UPDATE_CURRENT can retarget a still-visible button
+        // to another account or a later fact page before the host redraws.
         Intent intent=new Intent(context,PortalWidgetProvider.class).setAction(ACTION)
-            .setData(new Uri.Builder().scheme("we3d-widget").authority("action").appendPath(Integer.toString(widgetId)).appendPath(verb).appendPath(destination).build())
-            .putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID,widgetId).putExtra("verb",verb).putExtra("destination",destination).putExtra("owner",store.owner())
-            .putExtra("learningVersion",place==null?"":place.optJSONObject("learning").optString("version"));
+            .setData(new Uri.Builder().scheme("we3d-widget").authority("action").appendPath(Integer.toString(widgetId)).appendPath(verb).appendPath(destination)
+                .appendQueryParameter("owner",owner).appendQueryParameter("version",version).appendQueryParameter("fact",Integer.toString(fact)).build())
+            .putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID,widgetId).putExtra("verb",verb).putExtra("destination",destination).putExtra("owner",owner)
+            .putExtra("learningVersion",version).putExtra("fact",fact);
         return PendingIntent.getBroadcast(context,0,intent,PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);
+        }
     }
     private static PendingIntent open(Context context,int widgetId,String section,String destination){
         Intent intent=new Intent(context,PortalActivity.class).setData(new Uri.Builder().scheme("we3d-widget").authority("open").appendPath(Integer.toString(widgetId)).appendPath(section).appendPath(destination).build())
@@ -42,6 +48,9 @@ public final class PortalWidgetProvider extends AppWidgetProvider {
         AppWidgetManager.getInstance(context).updateAppWidget(widgetId,views(context,widgetId));
     }
     static RemoteViews views(Context context,int widgetId){
+        synchronized(PortalStore.LOCK){return viewsLocked(context,widgetId);}
+    }
+    private static RemoteViews viewsLocked(Context context,int widgetId){
         PortalStore store=new PortalStore(context);JSONObject place=store.suggestion(widgetId,System.currentTimeMillis());
         String mode=store.mode(widgetId),id=place==null?"":place.optString("id"),learningId=store.learning(widgetId);
         // A revealed investigation remains the displayed place across midnight.
@@ -60,7 +69,7 @@ public final class PortalWidgetProvider extends AppWidgetProvider {
             views.setTextViewText(R.id.portal_title,place.optString("title"));
             views.setTextViewText(R.id.portal_region,place.optString("region"));
             views.setTextViewText(R.id.portal_save,context.getString(saved?R.string.portal_saved:R.string.portal_save));
-            views.setOnClickPendingIntent(R.id.portal_save,action(context,widgetId,"save",id));
+            views.setOnClickPendingIntent(R.id.portal_save,action(context,widgetId,saved?"unsave":"save",id));
             views.setOnClickPendingIntent(R.id.portal_investigate,compact?open(context,widgetId,"place",id):action(context,widgetId,revealed?"close":"investigate",id));
             views.setTextViewText(R.id.portal_investigate,context.getString(revealed?R.string.portal_close_fact:R.string.portal_investigate));
             boolean ready=store.gameAvailable(place,System.currentTimeMillis());
@@ -100,20 +109,23 @@ public final class PortalWidgetProvider extends AppWidgetProvider {
         for(int id:ids(context))if(id==widgetId)owned=true;if(!owned)return;
         final int currentWidgetId=widgetId;
         localWork(()->{
+            synchronized(PortalStore.LOCK){
             PortalStore store=new PortalStore(context);String destination=intent.getStringExtra("destination"),verb=intent.getStringExtra("verb");
             JSONObject shown=store.suggestion(currentWidgetId,System.currentTimeMillis());String learning=store.learning(currentWidgetId);
             if(destination==null||!store.owner().equals(intent.getStringExtra("owner"))||!(destination.equals(learning)||shown!=null&&destination.equals(shown.optString("id")))){update(context,currentWidgetId);return;}
             try{
                 JSONObject place=store.place(destination);if(place==null)return;
-                if("save".equals(verb))store.act(destination,store.trail(destination).optBoolean("saved")?"unsave":"save",intent.getStringExtra("owner"));
+                if("save".equals(verb)||"unsave".equals(verb))store.act(destination,verb,intent.getStringExtra("owner"));
                 else if("investigate".equals(verb))store.showFact(currentWidgetId,destination,0);
                 else if("close".equals(verb))store.closeLearning(currentWidgetId);
                 else if("next".equals(verb)&&destination.equals(learning)){
                     if(!place.getJSONObject("learning").getString("version").equals(intent.getStringExtra("learningVersion"))){store.showFact(currentWidgetId,destination,0);updateAll(context);return;}
                     int index=store.fact(currentWidgetId),count=PortalStore.facts(place).size();
+                    if(intent.getIntExtra("fact",-1)!=index){update(context,currentWidgetId);return;}
                     if(index>=count-1){store.act(destination,"investigate",intent.getStringExtra("owner"),intent.getStringExtra("learningVersion"));store.closeLearning(currentWidgetId);}else store.showFact(currentWidgetId,destination,index+1);
                 }
             }catch(Exception ignored){/* A failed commit cannot create a success state. */}
+            }
             updateAll(context);PortalRefreshJob.schedule(context);
         });
     }

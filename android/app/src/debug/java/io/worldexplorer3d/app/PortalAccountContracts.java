@@ -39,6 +39,15 @@ final class PortalAccountContracts {
         check(store.trail("device-guest","monaco-coast").getLong("visitedAt")==400,"Copy moved or removed device history.");store.adoptOwner(null);count++;
         boolean staleDenied=false;try{store.act("baltimore-harbor","investigate","device-guest","old-learning-version");}catch(Exception expected){staleDenied=true;}
         check(staleDenied&&store.trail("baltimore-harbor").getLong("investigatedAt")==0,"Replaced learning content was marked read from an old screen.");count++;
+        // Exercise Android's real PendingIntent identity/cache rather than a
+        // model of intent extras. These owned invalid widget IDs cannot send
+        // a mutation; every created handle is explicitly retired below.
+        int commandWidget=-60252;store.adoptOwner("first-command-fixture");android.app.PendingIntent first=PortalWidgetProvider.action(context,commandWidget,"save","baltimore-harbor");
+        store.adoptOwner("second-command-fixture");android.app.PendingIntent second=PortalWidgetProvider.action(context,commandWidget,"save","baltimore-harbor");
+        try{check(!first.equals(second),"A displayed widget command was rebound to a different Explorer account.");}finally{first.cancel();second.cancel();}count++;
+        store.showFact(commandWidget,"baltimore-harbor",0);first=PortalWidgetProvider.action(context,commandWidget,"next","baltimore-harbor");
+        store.showFact(commandWidget,"baltimore-harbor",1);second=PortalWidgetProvider.action(context,commandWidget,"next","baltimore-harbor");
+        try{check(!first.equals(second),"An old fact button was rebound to a later investigation page.");}finally{first.cancel();second.cancel();store.removeWidget(commandWidget);store.adoptOwner(null);}count++;
         boolean denied=false;try{PortalTrail.queue(PortalTrail.entry(owner,"baltimore-harbor"),new JSONObject().put("operationId","visit-forged").put("destinationId","baltimore-harbor").put("kind","visit").put("createdAt",100));}catch(Exception expected){denied=true;}check(denied,"Native widget acquired a visit writer.");count++;
         String proof="A".repeat(43);check(PortalAccount.callback(Uri.parse(BuildConfig.APPLICATION_ID+"://portal-connect?requestId="+proof+"&code="+proof))!=null,"Valid native callback rejected.");
         for(String bad:new String[]{"https://portal-connect?requestId="+proof+"&code="+proof,BuildConfig.APPLICATION_ID+"://portal-connect/else?requestId="+proof+"&code="+proof,BuildConfig.APPLICATION_ID+"://portal-connect?requestId="+proof+"&code="+proof+"&code="+proof,BuildConfig.APPLICATION_ID+"://portal-connect?requestId="+proof+"&code="+proof+"#fragment"})check(PortalAccount.callback(Uri.parse(bad))==null,"Native callback accepted a mixed command.");count++;

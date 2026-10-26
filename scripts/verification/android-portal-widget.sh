@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 test "${GITHUB_ACTIONS:-}" = true
+if test "${WE3D_PORTAL_NATIVE_ONLY:-false}" = true; then
+    test -n "${WE3D_PORTAL_ANDROID_ACCEPTANCE:-}"
+fi
 mkdir -p android-widget-evidence
 SDK_ROOT="${ANDROID_HOME:?}"
 "$SDK_ROOT/build-tools/36.0.0/aapt2" dump badging android/app/build/outputs/apk/debug/app-debug.apk > android-widget-evidence/debug-package.txt
@@ -30,6 +33,7 @@ adb shell svc data disable
 adb install android/app/build/outputs/apk/debug/app-debug.apk
 adb shell pm list instrumentation > android-widget-evidence/instrumentation-components.txt
 grep -Fq 'io.worldexplorer3d.app.staging/io.worldexplorer3d.app.PortalWidgetContractInstrumentation' android-widget-evidence/instrumentation-components.txt
+if test "${WE3D_PORTAL_NATIVE_ONLY:-false}" != true; then
 adb shell appwidget grantbind --package io.worldexplorer3d.app.staging
 adb logcat -c
 adb shell am instrument -w -e ownedEmulator true io.worldexplorer3d.app.staging/io.worldexplorer3d.app.PortalWidgetContractInstrumentation > android-widget-evidence/result.txt
@@ -48,10 +52,11 @@ PY
     fi
     rm -f "$CAPTURE"
 done
-git rev-parse HEAD > android-widget-evidence/source-commit.txt
-git rev-parse HEAD:android/app/src/main > android-widget-evidence/native-main-source-tree.txt
 cat android-widget-evidence/result.txt
 grep -q 'INSTRUMENTATION_RESULT: passed=true' android-widget-evidence/result.txt
+fi
+git rev-parse HEAD > android-widget-evidence/source-commit.txt
+git rev-parse HEAD:android/app/src/main > android-widget-evidence/native-main-source-tree.txt
 if test -n "${WE3D_PORTAL_ANDROID_ACCEPTANCE:-}"; then
     adb shell svc wifi enable
     adb shell svc data enable

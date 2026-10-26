@@ -81,7 +81,7 @@ public final class PortalWidgetContractInstrumentation extends Instrumentation {
             result.putString("passed","true");outcome=Activity.RESULT_OK;
         }catch(Throwable error){
             result.putString("passed","false");result.putString("failure",error.toString());result.putString("failed_step",step);
-            if(owned&&widgetId!=AppWidgetManager.INVALID_APPWIDGET_ID){PortalStore state=new PortalStore(getTargetContext());result.putInt("displayed_fact_index",state.fact(widgetId));result.putBoolean("learning_open",!state.learning(widgetId).isEmpty());result.putString("visible_fact",text(R.id.portal_body));}
+            if(owned&&view!=null&&widgetId!=AppWidgetManager.INVALID_APPWIDGET_ID){PortalStore state=new PortalStore(getTargetContext());result.putInt("displayed_fact_index",state.fact(widgetId));result.putBoolean("learning_open",!state.learning(widgetId).isEmpty());result.putString("visible_fact",text(R.id.portal_body));}
             try{if(foreground())screenshot("widget-failure.png");}catch(Exception ignored){}
         }
         finally{

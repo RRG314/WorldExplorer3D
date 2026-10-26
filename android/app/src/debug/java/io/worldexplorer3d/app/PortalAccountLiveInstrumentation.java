@@ -5,6 +5,8 @@ import android.app.Instrumentation;
 import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
+import android.net.ConnectivityManager;
+import android.net.NetworkCapabilities;
 import android.os.Build;
 import android.os.Bundle;
 import android.util.Base64;
@@ -56,6 +58,8 @@ public final class PortalAccountLiveInstrumentation extends Instrumentation {
             JSONObject fixture=new JSONObject(PortalStore.readBounded(context.openFileInput("native-acceptance.json"),16384));
             check(fixture.getString("appId").equals(context.getString(R.string.portal_firebase_app_id))&&fixture.getString("project").equals("we3d-staging-20260712"),"Wrong native verification client.");
             PortalAttestation.prepare(fixture.getString("nativeCheck"),fixture.getLong("expiresAt"));
+            ConnectivityManager network=context.getSystemService(ConnectivityManager.class);
+            until(()->{NetworkCapabilities capabilities=network.getNetworkCapabilities(network.getActiveNetwork());return capabilities!=null&&capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED);},"The owned emulator's Internet connection did not become ready.");
             PortalStore store=new PortalStore(context);account=PortalAccount.get(context);CountDownLatch opened=new CountDownLatch(1);Runnable observer=opened::countDown;account.observe(observer);
             check(opened.await(20,TimeUnit.SECONDS),"Native SDK bootstrap did not finish.");account.unobserve(observer);
             account.start();final PortalAccount current=account;
@@ -80,7 +84,7 @@ public final class PortalAccountLiveInstrumentation extends Instrumentation {
             JSONObject listed=approve("listPortalTrail",new JSONObject().put("after",JSONObject.NULL).put("limit",100),fixture);
             check(listed.getString("ownerScope").equals(owner)&&listed.getJSONArray("items").length()==1&&listed.getJSONArray("items").getJSONObject(0).getBoolean("saved")&&listed.getJSONArray("items").getJSONObject(0).getLong("visitedAt")==0,"Native save did not reach the browser account Trail or falsely granted a visit.");
             result.putString("passed","true");result.putString("scope","Real Android OS callback, native Firebase candidate/primary adoption, candidate teardown, forced SDK token refresh and live staging Trail save/read. Controlled browser HTTP approval and temporary Google-signed debug attestation; not Google OAuth, physical Play Integrity or a production phone.");outcome=Activity.RESULT_OK;
-        }catch(Throwable error){result.putString("passed","false");result.putString("failure",error.getClass().getSimpleName()+": "+error.getMessage());}
+        }catch(Throwable error){result.putString("passed","false");result.putString("failure",error.getClass().getSimpleName()+": "+error.getMessage());if(account!=null){result.putString("native_phase",account.status());result.putString("native_notice",account.message());}}
         finally{if(account!=null&&owner!=null)account.disconnect(owner);getTargetContext().deleteFile("native-acceptance.json");}
         finish(outcome,result);
     }
