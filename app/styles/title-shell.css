@@ -215,14 +215,6 @@ input,textarea{-webkit-user-select:text;user-select:text}
 .mode-check{width:20px;height:20px;border:2px solid #cbd5e1;border-radius:50%;margin-left:auto;display:flex;align-items:center;justify-content:center;font-size:12px;color:transparent;transition:all 0.2s}
 .mode.sel .mode-check{border-color:#667eea;background:#667eea;color:#ffffff}
 
-/* Controls Tab */
-.ctrl-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px 20px}
-.ctrl-section{grid-column:1/-1;font-family:'Poppins',sans-serif;font-size:11px;font-weight:600;color:#667eea;text-transform:uppercase;letter-spacing:0.5px;margin-top:12px;padding-bottom:6px;border-bottom:2px solid #e8eef5}
-.ctrl-section:first-child{margin-top:0}
-.ctrl-row{display:flex;align-items:center;gap:10px;padding:6px 0}
-.ctrl-key{background:#f0f4ff;border:2px solid #c7d2fe;border-radius:6px;padding:4px 10px;font-family:'Inter',sans-serif;font-size:11px;font-weight:600;color:#667eea}
-.ctrl-action{font-size:12px;color:#475569}
-
 /* Start Button */
 .start-section{padding:16px 24px;border-top:2px solid #e8eef5;flex-shrink:0;background:rgba(248,250,252,0.8);backdrop-filter:blur(10px)}
 .startBtn{width:100%;background:linear-gradient(135deg,#0f3460 0%,#533483 100%);border:2px solid rgba(255,255,255,0.2);border-radius:12px;padding:18px;font-family:'Orbitron',sans-serif;font-size:16px;font-weight:700;color:#ffffff;cursor:pointer;letter-spacing:2px;transition:all 0.3s;text-transform:uppercase;box-shadow:0 4px 20px rgba(83,52,131,0.4)}
@@ -477,12 +469,6 @@ input,textarea{-webkit-user-select:text;user-select:text}
     --debug-overlay-top:8px;
     --perf-panel-top:8px;
   }
-}
-
-@media (pointer:coarse) {
-}
-
-@media (max-height:500px) and (orientation:landscape) and (pointer:coarse) {
 }
 }
 

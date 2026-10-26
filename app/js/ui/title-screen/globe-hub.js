@@ -153,7 +153,13 @@ function setupGlobeHub({
     });
   };
 
+  const releaseOverlayFocus = () => {
+    const focused = overlay?.ownerDocument.activeElement;
+    if (focused instanceof HTMLElement && overlay.contains(focused)) focused.blur();
+  };
+
   const closePanel = () => {
+    releaseOverlayFocus();
     if (liveEarthPanel && liveEarthHome && liveEarthPanel.parentElement === panelHost) {
       liveEarthHome.insertBefore(liveEarthPanel, liveEarthNextSibling);
       liveEarthPanel.classList.remove('hub-center-panel');
@@ -171,6 +177,7 @@ function setupGlobeHub({
 
   const openPanel = (destination) => {
     if (destination === 'library' && overlay && panelHost) {
+      releaseOverlayFocus();
       panelHost.querySelectorAll('.tab-content, .hub-center-panel').forEach((node) => node.classList.remove('active'));
       renderLibraryPanel();
       libraryPanel.hidden = false;
@@ -203,6 +210,7 @@ function setupGlobeHub({
     const target = HUB_PANELS[destination];
     const panel = target ? document.getElementById(`tab-${target.tab}`) : null;
     if (!target || !panel || !overlay || !panelHost) return false;
+    releaseOverlayFocus();
     if (destination === 'controls' || destination === 'settings') {
       const accessibilitySettings = document.getElementById('accessibilitySettings');
       if (accessibilitySettings && accessibilitySettings.parentElement !== panel) panel.prepend(accessibilitySettings);

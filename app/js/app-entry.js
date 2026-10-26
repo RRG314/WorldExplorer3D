@@ -15,7 +15,7 @@ import './camera-mode.js?v=1';
 import './pause-state.js?v=1';
 import './location-session.js?v=7';
 import './controls/action-input.js?v=14';
-import './controls/keyboard-binding-ui.js?v=2';
+import './controls/keyboard-binding-ui.js?v=3';
 import './interaction/context-router.js?v=5';
 import './transport/actor-contract.js?v=6';
 import './world/collection-registry.js?v=1';
@@ -51,7 +51,7 @@ import './hud.js?v=106';
 import './map.js?v=61';
 import { renderLoop } from './main.js?v=79';
 import './memory.js?v=55';
-import { setupUI } from './ui.js?v=178';
+import { setupUI } from './ui.js?v=179';
 import { initAccessibility } from './ui/accessibility.js?v=3';
 
 let _booted = false;

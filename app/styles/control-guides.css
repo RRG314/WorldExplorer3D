@@ -1,0 +1,32 @@
+@layer interface {
+  .ctrl-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 16px; }
+  .control-guide-section, .keyboard-binding-settings { min-width: 0; padding: 16px; color: var(--wx-text); background: var(--wx-panel-solid); border: 1px solid var(--wx-line-soft); border-radius: var(--wx-radius); font: 500 var(--wx-type-control)/1.6 var(--wx-font-ui); }
+  .ctrl-section, .control-mode-guide h3 { margin: 0 0 12px; color: var(--wx-text); font: 700 var(--wx-type-control)/1.5 var(--wx-font-ui); }
+  .ctrl-row { display: grid; grid-template-columns: minmax(0,.8fr) minmax(0,1.2fr); align-items: start; gap: 12px; padding: 12px 0; border-top: 1px solid var(--wx-line-soft); }
+  .ctrl-key { min-width: 0; color: var(--wx-action); font: 600 var(--wx-type-meta)/1.6 var(--wx-font-instrument); overflow-wrap: anywhere; }
+  .ctrl-action { min-width: 0; color: var(--wx-muted); overflow-wrap: anywhere; }
+  .keyboard-binding-settings { grid-column: 1/-1; }
+  .keyboard-binding-settings summary { min-height: 44px; align-content: center; cursor: pointer; }
+  .keyboard-binding-settings summary span { display: inline-grid; gap: 4px; vertical-align: middle; }
+  .keyboard-binding-settings summary b { color: var(--wx-text); font: 700 var(--wx-type-control)/1.5 var(--wx-font-ui); }
+  .keyboard-binding-settings summary small, .keyboard-binding-settings p { color: var(--wx-muted); font-size: var(--wx-type-meta); }
+  .keyboard-binding-list { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 16px; margin-top: 16px; }
+  .keyboard-binding-row { display: grid; grid-template-columns: minmax(0,1fr) auto; align-items: center; gap: 8px; min-width: 0; padding: 12px; background: var(--wx-input); border: 1px solid var(--wx-line-soft); border-radius: var(--wx-radius); }
+  .keyboard-binding-row > span { grid-column: 1/-1; color: var(--wx-text); overflow-wrap: anywhere; }
+  .keyboard-binding-row kbd, .control-mode-guide kbd { color: var(--wx-action); font: 600 var(--wx-type-meta)/1.6 var(--wx-font-instrument); overflow-wrap: anywhere; }
+  .keyboard-binding-row .wx-button { min-width: 0; }
+  .keyboard-binding-row .listening { color: var(--wx-action-text); background: var(--wx-action); }
+  .keyboard-binding-settings footer { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; margin-top: 16px; }
+  #keyboardBindingStatus { color: var(--wx-info); font-size: var(--wx-type-meta); overflow-wrap: anywhere; }
+  .keyboard-binding-settings :is(button,summary):focus-visible { outline: 3px solid var(--wx-focus); outline-offset: 3px; }
+  .control-mode-guide { color: var(--wx-text); font: 500 var(--wx-type-control)/1.6 var(--wx-font-ui); }
+  .control-mode-guide ul { margin: 0; padding-left: 20px; }
+  .control-mode-guide li { margin: 0 0 12px; overflow-wrap: anywhere; }
+  @media (max-width: 900px) { .ctrl-grid, .keyboard-binding-list { grid-template-columns: minmax(0,1fr); } }
+  @media (max-width: 480px) {
+    .control-guide-section, .keyboard-binding-settings { padding: 12px; }
+    .ctrl-row { grid-template-columns: minmax(0,1fr); gap: 6px; }
+    .keyboard-binding-row { grid-template-columns: minmax(0,1fr); }
+    .keyboard-binding-row .wx-button { justify-self: start; }
+  }
+}
