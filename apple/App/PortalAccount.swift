@@ -74,14 +74,17 @@ private final class PortalAttestFactory: NSObject, AppCheckProviderFactory {
         firebase = app; auth = identity; check = AppCheck.appCheck(app: app)
         // The first listener fires after the SDK has loaded its private user.
         // Do not mistake a not-yet-loaded keychain session for a signed-out user.
-        let user: User? = await withCheckedContinuation { continuation in
-            initialListener = identity.addStateDidChangeListener { [weak self] _, user in
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            initialListener = identity.addStateDidChangeListener { [weak self] _, _ in
                 Task { @MainActor in
                     guard let self, let listener = self.initialListener else { return }
-                    identity.removeStateDidChangeListener(listener); self.initialListener = nil; continuation.resume(returning: user)
+                    identity.removeStateDidChangeListener(listener); self.initialListener = nil; continuation.resume()
                 }
             }
         }
+        // Wait for SDK restoration without sending its shared User object
+        // through a continuation. Account state is read on this owner's actor.
+        let user = identity.currentUser
         let document = try store.snapshot(), expected = user.map { "account:" + $0.uid } ?? PortalContract.guest
         if document.accountCommitPending || document.ownerScope != expected {
             try identity.signOut(); try store.adoptOwner(nil); message = "Reconnect your Explorer account. Your saved Trails are kept."
