@@ -4,6 +4,15 @@ import Vision
 
 @MainActor final class PortalUITests: XCTestCase {
     override func setUpWithError() throws { continueAfterFailure = false }
+    override func tearDownWithError() throws {
+        // XCTest records some thrown failures after the test method unwinds.
+        // Observe them here, rather than in that method's defer block.
+        if name.contains("testHomeScreenWidget"), (testRun?.failureCount ?? 0) > 0 {
+            capture("portal-widget-failed-screen")
+            print(String(XCUIApplication(bundleIdentifier: "com.apple.springboard").debugDescription.prefix(24_000)))
+        }
+        try super.tearDownWithError()
+    }
     private func capture(_ name: String) {
         let image = XCTAttachment(screenshot: XCUIScreen.main.screenshot()); image.name = name; image.lifetime = .keepAlways; add(image)
     }
@@ -69,12 +78,6 @@ import Vision
         capture("portal-account-device")
     }
     func testHomeScreenWidget() throws {
-        defer {
-            if (testRun?.failureCount ?? 0) > 0 {
-                capture("portal-widget-failed-screen")
-                print(String(XCUIApplication(bundleIdentifier: "com.apple.springboard").debugDescription.prefix(24_000)))
-            }
-        }
         let app = XCUIApplication(); app.launch()
         XCTAssertTrue(app.staticTexts["The Living Portal"].waitForExistence(timeout: 15))
         XCUIDevice.shared.press(.home)
@@ -108,6 +111,7 @@ import Vision
         try tapVisibleText("Add Widget", in: home, lowerPart: true)
         let done = home.buttons["Done"]
         XCTAssertTrue(done.waitForExistence(timeout: 5)); done.tap()
+        capture("portal-widget-home-after-add")
         let wasSaved = try visibleText("Saved", timeout: 2) != nil
         if wasSaved { try tapVisibleText("Saved", in: home) }
         try tapVisibleText("Save", in: home)
