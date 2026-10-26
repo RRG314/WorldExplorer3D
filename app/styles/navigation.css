@@ -21,6 +21,8 @@
     transform: none;
   }
   .floatMenuContainer.show { display: grid; }
+  .gameFocusReturn { position: fixed; top: 12px; left: 12px; z-index: 240; max-width: calc(100vw - 24px); min-height: 44px; padding: 12px 18px; transform: translateY(-160%); color: var(--wx-text); background: var(--wx-panel-solid); border: 2px solid var(--wx-action); border-radius: var(--wx-radius); font: 650 var(--wx-type-control)/1.4 var(--wx-font-ui); pointer-events: none; }
+  .gameFocusReturn:focus { transform: none; pointer-events: auto; outline: 3px solid var(--wx-focus); outline-offset: 3px; }
   .floatMenuContainer:has(.floatMenu.open) { z-index: 190; }
   .floatMenuRow { display: contents; }
   .floatMenu { position: relative; display: flex; flex-direction: column; min-width: 0; pointer-events: auto; }

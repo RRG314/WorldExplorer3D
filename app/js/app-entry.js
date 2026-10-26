@@ -25,7 +25,7 @@ import './env.js?v=58';
 import './session-coordinator.js?v=2';
 import './planetary/scene-ownership.js?v=9';
 import './real-estate.js?v=55';
-import { init, tryEnablePostProcessing } from './engine.js?v=106';
+import { init, tryEnablePostProcessing } from './engine.js?v=107';
 import './physics.js?v=129';
 import './walking.js?v=98';
 import './travel-mode.js?v=29';
@@ -51,7 +51,7 @@ import './hud.js?v=105';
 import './map.js?v=61';
 import { renderLoop } from './main.js?v=78';
 import './memory.js?v=55';
-import { setupUI } from './ui.js?v=174';
+import { setupUI } from './ui.js?v=175';
 import { initAccessibility } from './ui/accessibility.js?v=3';
 
 let _booted = false;
@@ -131,7 +131,7 @@ function registerPlatformServices() {
     platformServices.register({
         id: 'multiplayer', category: 'social',
         load: async () => {
-            const { initMultiplayerPlatform } = await import('./multiplayer/ui-room.js?v=86');
+            const { initMultiplayerPlatform } = await import('./multiplayer/ui-room.js?v=87');
             const api = initMultiplayerPlatform({ getScene: () => appCtx.scene });
             api?.setAuthUser?.(_lastObservedAuthUser || getCurrentUser() || null);
             return api;

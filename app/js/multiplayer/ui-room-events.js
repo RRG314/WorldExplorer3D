@@ -87,6 +87,19 @@ function createUiRoomEventsApi(context) {
         if (state.authUser?.uid === accountUid) setStatus(error?.message || 'Could not change this block. Please try again.', true);
       } finally { if (button.isConnected) button.disabled = false; }
     });
+    globalThis.addEventListener('we3d-screen-layout-change', event => {
+      const owner = event.detail?.panelLayer;
+      if (state.chatOpen && owner !== 'room-chat') setChatOpen(false);
+      if (owner !== 'multiplayer' && refs.roomPanelModal?.classList.contains('show')) closeRoomPanel();
+    });
+    for (const [element, close] of [[refs.chatDrawer, () => setChatOpen(false)], [refs.roomPanelModal, closeRoomPanel]]) {
+      element?.addEventListener('keydown', event => {
+        if (event.key !== 'Escape') return;
+        event.preventDefault();
+        event.stopPropagation();
+        close();
+      });
+    }
     globalThis.addEventListener('offline', () => {
       if (!state.currentRoom) return;
       appCtx.setSharedBuildConnectionState?.(false);

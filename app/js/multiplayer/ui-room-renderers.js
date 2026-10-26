@@ -41,10 +41,16 @@ export function createUiRoomRenderers({ appCtx, refs, state, helpers }) {
   function closeRoomPanel() {
     if (!refs.roomPanelModal) return;
     refs.roomPanelModal.classList.remove("show");
+    refs.roomPanelModal.setAttribute('aria-hidden', 'true');
+    appCtx.screenLayout?.setPanelLayer?.('multiplayer', false);
   }
 
   function openRoomPanel() {
     if (!refs.roomPanelModal) return;
+    setChatOpen(false);
+    appCtx.clearControlInputState?.('room-panel-open');
+    appCtx.screenLayout?.setPanelLayer?.('multiplayer', true);
+    refs.roomPanelModal.setAttribute('aria-hidden', 'false');
     refs.roomPanelModal.classList.add("show");
     emitTutorialEvent("opened_rooms_menu", { source: "room_panel" });
   }
@@ -537,6 +543,7 @@ export function createUiRoomRenderers({ appCtx, refs, state, helpers }) {
   }
 
   function setChatOpen(open) {
+    if (open && !state.chatOpen) appCtx.clearControlInputState?.('room-chat-open');
     state.chatOpen = !!open;
     if (refs.chatDrawer) {
       const focused = refs.chatDrawer.ownerDocument?.activeElement;
@@ -548,6 +555,7 @@ export function createUiRoomRenderers({ appCtx, refs, state, helpers }) {
       refs.chatDrawer.setAttribute("aria-hidden", String(!state.chatOpen));
       refs.chatDrawer.classList.toggle("open", state.chatOpen);
     }
+    appCtx.screenLayout?.setPanelLayer?.('room-chat', state.chatOpen);
     updateToggleStates();
   }
 

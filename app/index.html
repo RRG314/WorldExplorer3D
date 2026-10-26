@@ -32,13 +32,13 @@ if (location.protocol === 'file:') document.documentElement.classList.add('unsup
 <link rel="stylesheet" href="../styles/world-explorer-tokens.css?v=3">
 <link rel="stylesheet" href="../styles/world-explorer-components.css?v=2">
 <link rel="stylesheet" href="styles/title-shell.css?v=96">
-<link rel="stylesheet" href="styles/runtime-shell.css?v=133">
+<link rel="stylesheet" href="styles/runtime-shell.css?v=134">
 <link rel="stylesheet" href="styles/block-builder.css?v=9">
 <link rel="stylesheet" href="styles/universe.css?v=9">
 <link rel="stylesheet" href="styles/fishing-game.css?v=6">
 <link rel="stylesheet" href="styles/interface-v4.css?v=35">
 <link rel="stylesheet" href="styles/start-hub.css?v=22">
-<link rel="stylesheet" href="styles/navigation.css?v=1">
+<link rel="stylesheet" href="styles/navigation.css?v=2">
 <link rel="stylesheet" href="styles/discovery.css?v=21">
 <link rel="stylesheet" href="styles/backpack.css?v=1">
 <link rel="stylesheet" href="styles/tutorial.css?v=15">
@@ -1343,6 +1343,7 @@ How Connected Data Is Used
 <div id="poiDistance" style="font-size:12px;text-align:center;padding-top:8px;border-top:1px solid rgba(0,255,200,0.3)">50m ahead</div>
 </div>
 <nav class="floatMenuContainer" id="floatMenuContainer" aria-label="Game destinations">
+<button id="returnToWorldBtn" class="gameFocusReturn" type="button">Return to world controls · Escape</button>
 <!-- Stable player goals. Detailed controls stay inside their owning panels. -->
 <div class="floatMenu" id="exploreMenu">
 <button class="floatBtn explore" id="exploreBtn" type="button" aria-label="Open Explore" aria-expanded="false" aria-controls="exploreChoices" data-mobile-label="Explore"><span class="btnIcon">⌖</span><span class="btnText">Explore</span></button>
@@ -1766,5 +1767,5 @@ How Connected Data Is Used
 <!-- Real Estate System -->
 <script type="module" data-startup-critical src="js/app-shell-fragments.js?v=91"></script>
 <script type="module" src="js/app-auth-shell.js?v=87"></script>
-<script type="module" data-startup-critical src="js/bootstrap.js?v=613"></script>
+<script type="module" data-startup-critical src="js/bootstrap.js?v=614"></script>
 </body></html>

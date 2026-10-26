@@ -190,6 +190,7 @@
     "qa:gameplay:report": "node scripts/verification/gameplay-qa/report.mjs",
     "verify:android-web-support": "node --test tests/android-web-support.test.mjs",
     "verify:android-install-browser": "node scripts/verification/android-install-support.mjs",
+    "verify:room-panels": "node scripts/verification/room-panel-ownership-current.mjs",
     "verify:play-distribution": "node --experimental-vm-modules --test tests/play-distribution-current.test.mjs",
     "verify:community-safety": "node --experimental-vm-modules --test --test-concurrency=1 tests/community-safety-current.test.mjs",
     "verify:community-safety:rules": "node --test --test-concurrency=1 tests/community-safety-rules.test.mjs",
