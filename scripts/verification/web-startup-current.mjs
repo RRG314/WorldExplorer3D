@@ -195,6 +195,7 @@ try {
       await page.evaluate(() => new Promise((resolve, reject) => {
         const gl = startupQa.renderer.getContext(), extension = gl.getExtension('WEBGL_lose_context');
         if (!extension) { reject(Error('Controlled context-loss extension unavailable.')); return; }
+        globalThis.__startupLossExtension = extension;
         startupQa.renderer.domElement.addEventListener('webglcontextlost', () => resolve(), {once: true});
         extension.loseContext();
       }));
@@ -205,7 +206,7 @@ try {
       });
       assert.equal(lost.contextLost, true); assert.match(lost.readinessError, /3D view.*unavailable/);
       await page.waitForTimeout(100);
-      await page.evaluate(() => startupQa.renderer.getContext().getExtension('WEBGL_lose_context').restoreContext());
+      await page.evaluate(() => {__startupLossExtension.restoreContext(); delete globalThis.__startupLossExtension;});
       await page.waitForFunction(() => !startupQa.renderer.getContext().isContextLost(), null, {timeout: 15000});
       const frame = await page.evaluate(() => startupQa.renderer.info.render.frame);
       await page.waitForFunction(before => startupQa.renderer.info.render.frame > before, frame, {timeout: 15000});
