@@ -58,7 +58,7 @@ export function createUiRoomRenderers({ appCtx, refs, state, helpers }) {
   function setChatStatus(message, warn = false) {
     if (!refs.chatStatus) return;
     refs.chatStatus.textContent = message || "";
-    refs.chatStatus.style.color = warn ? "#fca5a5" : "#93c5fd";
+    refs.chatStatus.dataset.tone = warn ? "warning" : "info";
   }
 
   function setStatus(message, warn = false) {
@@ -66,18 +66,18 @@ export function createUiRoomRenderers({ appCtx, refs, state, helpers }) {
     state.lastActionStatusWarn = warn === true;
     if (refs.titleStatus) {
       refs.titleStatus.textContent = message || "";
-      refs.titleStatus.style.color = warn ? "#ef4444" : "#64748b";
+      refs.titleStatus.dataset.tone = warn ? "warning" : "info";
     }
     if (refs.roomPanelStatus) {
       refs.roomPanelStatus.textContent = message || "";
-      refs.roomPanelStatus.style.color = warn ? "#fca5a5" : "#93c5fd";
+      refs.roomPanelStatus.dataset.tone = warn ? "warning" : "info";
     }
   }
 
   function setBrowseStatus(message, warn = false) {
     if (!refs.titleBrowseStatus) return;
     refs.titleBrowseStatus.textContent = message || "";
-    refs.titleBrowseStatus.style.color = warn ? "#b91c1c" : "#64748b";
+    refs.titleBrowseStatus.dataset.tone = warn ? "warning" : "info";
   }
 
   function renderBrowseRooms() {
@@ -122,7 +122,6 @@ export function createUiRoomRenderers({ appCtx, refs, state, helpers }) {
 
     if (refs.titleFeaturedWeeklyMeta) {
       refs.titleFeaturedWeeklyMeta.textContent = `Week ${weekly.week}: ${weekly.city}. Open to everyone, including guests. Up to 32 players; resets to a new room each Monday (UTC).`;
-      refs.titleFeaturedWeeklyMeta.style.color = "#64748b";
     }
   }
 
@@ -221,7 +220,6 @@ export function createUiRoomRenderers({ appCtx, refs, state, helpers }) {
       refs.titleOwnedRoomsList.innerHTML = '<li class="mpRoomEmpty">Sign in to manage rooms you created.</li>';
       if (refs.titleOwnedRoomsStatus) {
         refs.titleOwnedRoomsStatus.textContent = "Sign in to access your saved rooms.";
-        refs.titleOwnedRoomsStatus.style.color = "#64748b";
       }
       publishMapRoomsToContext();
       return;
@@ -231,7 +229,6 @@ export function createUiRoomRenderers({ appCtx, refs, state, helpers }) {
       refs.titleOwnedRoomsList.innerHTML = '<li class="mpRoomEmpty">No saved rooms yet.</li>';
       if (refs.titleOwnedRoomsStatus) {
         refs.titleOwnedRoomsStatus.textContent = "Create or join a room to save it here for quick return.";
-        refs.titleOwnedRoomsStatus.style.color = "#64748b";
       }
       publishMapRoomsToContext();
       return;
@@ -247,15 +244,14 @@ export function createUiRoomRenderers({ appCtx, refs, state, helpers }) {
         const locationMeta = location ? ` • ${location}` : "";
         const canDelete = String(room.ownerUid || "") === String(state.authUser?.uid || "");
         const deleteBtn = canDelete
-          ? `<button class="mp-btn secondary mpSmallBtn" data-delete-owned-room="${escapeHtml(code)}" type="button">Delete</button>`
+          ? `<button class="mp-btn secondary mpSmallBtn" data-delete-owned-room="${escapeHtml(code)}" aria-label="Delete room ${escapeHtml(code)}" type="button">Delete</button>`
           : "";
-        return `<li class="mpRoomItem" data-owned-room-code="${escapeHtml(code)}" tabindex="0" role="button" aria-label="Open room ${escapeHtml(code)}"><div class="mpRoomInfo"><div class="mpRoomName">${name}</div><div class="mpRoomMeta">${escapeHtml(code)} • ${visibility} • ${role}${locationMeta}</div></div><div class="mp-row"><button class="mp-btn secondary mpSmallBtn" data-open-owned-room="${escapeHtml(code)}" type="button">Open</button>${deleteBtn}</div></li>`;
+        return `<li class="mpRoomItem" data-owned-room-code="${escapeHtml(code)}"><div class="mpRoomInfo"><div class="mpRoomName">${name}</div><div class="mpRoomMeta">${escapeHtml(code)} • ${visibility} • ${role}${locationMeta}</div></div><div class="mp-row"><button class="mp-btn secondary mpSmallBtn" data-open-owned-room="${escapeHtml(code)}" aria-label="Open room ${escapeHtml(code)}" type="button">Open</button>${deleteBtn}</div></li>`;
       })
       .join("");
 
     if (refs.titleOwnedRoomsStatus) {
       refs.titleOwnedRoomsStatus.textContent = `${state.ownedRooms.length} saved room${state.ownedRooms.length === 1 ? "" : "s"}. Use Open to return anytime.`;
-      refs.titleOwnedRoomsStatus.style.color = "#64748b";
     }
     publishMapRoomsToContext();
   }

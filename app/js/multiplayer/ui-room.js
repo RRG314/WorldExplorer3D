@@ -12,8 +12,8 @@ import {
 } from './painttown.js?v=56';
 import {
   createUiRoomEventsApi
-} from './ui-room-events.js?v=5';
-import { createUiRoomRenderers } from './ui-room-renderers.js?v=4';
+} from './ui-room-events.js?v=6';
+import { createUiRoomRenderers } from './ui-room-renderers.js?v=5';
 import { createUiRoomActions } from './ui-room-actions.js?v=10';
 import {
   emitTutorialEvent,

@@ -662,7 +662,6 @@ body.start-hub-open #authFloatPanel { z-index: 10006; top: 64px; }
 .globe-hub-panel-host .loc-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .globe-hub-panel-host .loc,
 .globe-hub-panel-host .mode,
-.globe-hub-panel-host .mp-card,
 .globe-hub-panel-host #customPanel,
 .globe-hub-panel-host [style*="background:#f8fafc"],
 .globe-hub-panel-host [style*="background: #f8fafc"] {
@@ -692,8 +691,6 @@ body.start-hub-open #authFloatPanel { z-index: 10006; top: 64px; }
 #tab-settings [style*="color: #475569"] { color: var(--hub-muted) !important; }
 #tab-settings input,
 #tab-settings select { color: var(--hub-text) !important; background: var(--hub-input) !important; border-color: var(--hub-line) !important; }
-#tab-multiplayer .mpRoomEmpty { color: var(--hub-muted); background: var(--hub-panel-2); border-color: var(--hub-line); }
-#tab-multiplayer .mp-btn.warn { color: #fff; background: var(--hub-blue); }
 .globe-hub-footer-host .title-footer {
   position: static;
   width: 100%;

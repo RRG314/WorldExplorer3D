@@ -161,20 +161,13 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .loc:hover, .loc.sel { background: var(--wx-selected); border-color: var(--wx-blue); transform: none; }
 .loc-name { color: var(--wx-text); }
 .loc-region { color: var(--wx-muted); }
-.mode, .mp-card, #titleScreen [style*="background:#f8fafc"], #titleScreen [style*="background: #f8fafc"] {
+.mode, #titleScreen [style*="background:#f8fafc"], #titleScreen [style*="background: #f8fafc"] {
   color: var(--wx-text) !important;
   background: var(--wx-input) !important;
   border-color: var(--wx-line-soft) !important;
   border-radius: 2px !important;
 }
-.mode-name, .mode-desc, .mp-title, .mp-subtitle, .mp-status { color: inherit; }
-.mp-secondary-tools {
-  color: var(--wx-text);
-  background: var(--wx-panel-soft);
-  border-color: var(--wx-line-soft);
-}
-.mp-secondary-tools > summary,
-.mp-secondary-tools[open] > summary { color: var(--wx-text); }
+.mode-name, .mode-desc{ color: inherit; }
 .start-section {
   position: fixed;
   z-index: 5;
@@ -493,10 +486,4 @@ body:has(#propertyPanel.show) #worldQuickControls { display: none !important; }
 }
 }
 body:has(#worldSelectionNotice:not([hidden])) .tutorial-card { display: none !important; }
-
-/* The lobby is hosted on a dark panel; keep secondary guidance readable. */
-#globeHubPanelHost .mp-plan-state{color:#b6c5d7}
-#globeHubPanelHost .mp-plan-state.warn{color:#fca5a5}
-#mpCreateRoomDetails{margin:14px 0;padding:10px 0;border-block:1px solid rgba(148,163,184,.25)}
-#mpCreateRoomDetails>summary{cursor:pointer;min-height:32px;line-height:32px}
 #terrainImageryCredit { color: #b7d8e8; font-size: 9px; white-space: nowrap; }

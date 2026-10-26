@@ -1,12 +1,12 @@
 // ES module bootstrap: modular loader + legacy app compatibility.
 // The runtime binds shell controls, so wait for that module before booting.
-import './app-shell-fragments.js?v=91';
+import './app-shell-fragments.js?v=92';
 import {
   classicScripts,
   moduleEntrypoint,
   vendorScriptsCritical,
   vendorScriptsOptional
-} from './modules/manifest.js?v=610';
+} from './modules/manifest.js?v=611';
 import { loadScriptList, STARTUP_SCRIPT_TIMEOUT_MS } from './modules/script-loader.js?v=57';
 import {
   initStartupDiagnostics,

@@ -403,18 +403,6 @@ function createUiRoomEventsApi(context) {
       }
     });
 
-    refs.titleOwnedRoomsList?.addEventListener('keydown', async (event) => {
-      if (event.key !== 'Enter' && event.key !== ' ') return;
-      const target = eventElementTarget(event);
-      if (!target) return;
-      const roomRow = target.closest('li[data-owned-room-code]');
-      if (!(roomRow instanceof HTMLElement)) return;
-      const roomCode = normalizeCode(roomRow.dataset.ownedRoomCode || '');
-      if (!roomCode) return;
-      event.preventDefault();
-      await handleOpenOwnedRoom(roomCode);
-    });
-
     refs.roomArtifactList?.addEventListener('click', (event) => {
       const target = event.target;
       if (!(target instanceof HTMLElement)) return;

@@ -42,7 +42,7 @@ const APP_SHELL_FRAGMENT_HTML = `
 <div id="roomPanelModal" class="room-panel-modal" aria-hidden="true">
   <section class="room-panel" role="dialog" aria-modal="true" aria-label="Multiplayer room panel" tabindex="-1">
     <div class="room-panel-head">
-      <div class="room-panel-title">MULTIPLAYER ROOM</div>
+      <div class="room-panel-title">Your room</div>
       <button id="roomPanelCloseBtn" class="room-panel-close" type="button">Close</button>
     </div>
     <div class="room-panel-body">
@@ -50,21 +50,8 @@ const APP_SHELL_FRAGMENT_HTML = `
         <div id="roomPanelRoomCode" class="room-meta-code">Not in a room</div>
         <div id="roomPanelRoomName" class="room-meta-name">Create or join to start multiplayer.</div>
       </div>
+      <div id="roomPanelStatus" class="mp-status" role="status" aria-live="polite"></div>
       <div class="mp-row">
-        <input id="roomPanelCodeInput" class="mp-input" type="text" maxlength="8" placeholder="Room code (AB12CD)">
-        <button id="roomPanelJoinBtn" class="mp-btn primary" type="button">Join Room</button>
-      </div>
-      <div class="mpMeta">Join an existing room above, or create a new room at your current location below.</div>
-      <div class="mp-row">
-        <select id="roomPanelVisibilitySelect" class="mp-select" aria-label="Room visibility">
-          <option value="private" selected>Private Room</option>
-          <option value="public">Public Room</option>
-        </select>
-        <input id="roomPanelCreateNameInput" class="mp-input" type="text" maxlength="80" placeholder="Room name (optional)">
-        <input id="roomPanelLocationTagInput" class="mp-input" type="text" maxlength="80" placeholder="Optional location tag (Tokyo, Paris, Moon Base)">
-      </div>
-      <div class="mp-row">
-        <button id="roomPanelCreateBtn" class="mp-btn primary" type="button">Create Room Here</button>
         <button id="roomChatToggleBtn" class="mp-btn secondary" type="button" disabled>Room Chat</button>
         <button id="roomPanelInviteBtn" class="mp-btn secondary" type="button">Invite Link</button>
         <button id="roomPanelLeaveBtn" class="mp-btn secondary" type="button">Leave Room</button>
@@ -81,17 +68,39 @@ const APP_SHELL_FRAGMENT_HTML = `
         <p class="mp-status">Blocks hide chat and stop new invites. Shared world changes remain visible. Leave the room to stop sharing it.</p>
         <ul id="roomPanelBlockedPlayersList" class="mp-room-list"></ul>
       </details>
-      <div class="mp-subtitle">Room Settings</div>
+      <details class="mp-secondary-tools"><summary>Join or create another room</summary>
       <div class="mp-row">
-        <input id="roomPanelNameInput" class="mp-input" type="text" maxlength="80" placeholder="Room name (optional)">
+        <label class="mp-field" for="roomPanelCodeInput"><span>Room code</span><input id="roomPanelCodeInput" class="mp-input" type="text" maxlength="8" placeholder="Room code (AB12CD)" autocomplete="off" autocapitalize="characters" spellcheck="false"></label>
+        <button id="roomPanelJoinBtn" class="mp-btn primary" type="button">Join Room</button>
+      </div>
+      <div class="mpMeta">Join an existing room above, or create a new room at your current location below.</div>
+      <div class="mp-row">
+        <label class="mp-field" for="roomPanelVisibilitySelect"><span>Who can find your room</span><select id="roomPanelVisibilitySelect" class="mp-select" aria-label="Room visibility">
+          <option value="private" selected>Private Room</option>
+          <option value="public">Public Room</option>
+        </select></label>
+        <label class="mp-field" for="roomPanelCreateNameInput"><span>New room name (optional)</span><input id="roomPanelCreateNameInput" class="mp-input" type="text" maxlength="80" placeholder="Room name (optional)"></label>
+        <label class="mp-field" for="roomPanelLocationTagInput"><span>City label (required for public rooms)</span><input id="roomPanelLocationTagInput" class="mp-input" type="text" maxlength="80" placeholder="e.g. Tokyo, Paris, Moon Base"></label>
       </div>
       <div class="mp-row">
-        <input id="roomPanelPaintTimeInput" class="mp-input" type="number" min="30" max="1800" step="15" value="120" placeholder="Paint round time (seconds)">
-        <select id="roomPanelPaintTouchModeSelect" class="mp-select" aria-label="Paint touch mode">
+        <button id="roomPanelCreateBtn" class="mp-btn primary" type="button">Create Room Here</button>
+
+
+
+
+      </div>
+      </details>
+      <details class="mp-secondary-tools"><summary>Room Settings</summary>
+      <div class="mp-row">
+        <label class="mp-field" for="roomPanelNameInput"><span>Room name</span><input id="roomPanelNameInput" class="mp-input" type="text" maxlength="80" placeholder="Room name (optional)"></label>
+      </div>
+      <div class="mp-row">
+        <label class="mp-field" for="roomPanelPaintTimeInput"><span>Paint round length (seconds)</span><input id="roomPanelPaintTimeInput" class="mp-input" type="number" min="30" max="1800" step="15" value="120" placeholder="Paint round time (seconds)"></label>
+        <label class="mp-field" for="roomPanelPaintTouchModeSelect"><span>Touch paint rule</span><select id="roomPanelPaintTouchModeSelect" class="mp-select" aria-label="Paint touch mode">
           <option value="off">Touch Paint Off</option>
           <option value="roof">Touch Roof Only</option>
           <option value="any" selected>Touch Anywhere</option>
-        </select>
+        </select></label>
       </div>
       <div class="mp-row">
         <label class="mp-check" for="roomPanelPaintAllowGunToggle">
@@ -111,19 +120,21 @@ const APP_SHELL_FRAGMENT_HTML = `
         <button id="roomPanelSaveSettingsBtn" class="mp-btn secondary mpSmallBtn" type="button">Save Room</button>
       </div>
 
-      <div class="mp-subtitle">Home Base</div>
+      </details>
+      <details class="mp-secondary-tools"><summary>Home Base</summary>
       <div class="mp-row">
-        <input id="roomHomeBaseNameInput" class="mp-input" type="text" maxlength="80" placeholder="Home base name (Moon Base Alpha)">
+        <label class="mp-field" for="roomHomeBaseNameInput"><span>Home base name</span><input id="roomHomeBaseNameInput" class="mp-input" type="text" maxlength="80" placeholder="Home base name (Moon Base Alpha)"></label>
       </div>
       <div class="mp-row">
-        <input id="roomHomeBaseDescInput" class="mp-input" type="text" maxlength="240" placeholder="Short description">
+        <label class="mp-field" for="roomHomeBaseDescInput"><span>Home base description</span><input id="roomHomeBaseDescInput" class="mp-input" type="text" maxlength="240" placeholder="Short description"></label>
       </div>
       <div class="mp-row">
         <button id="roomHomeBaseSaveBtn" class="mp-btn secondary mpSmallBtn" type="button">Save Home Base Here</button>
       </div>
       <div id="roomHomeBaseCurrent" class="mpMeta">No home base set.</div>
 
-      <div class="mp-subtitle">Room Games</div>
+      </details>
+      <h3 class="mp-subtitle">Room Games</h3>
       <div class="mp-row">
         <button id="roomActivityOpenBtn" class="mp-btn secondary mpSmallBtn" type="button">Browse / Create Room Games</button>
       </div>
@@ -131,18 +142,18 @@ const APP_SHELL_FRAGMENT_HTML = `
         <li class="mpRoomEmpty">Join a room to browse room games.</li>
       </ul>
 
-      <div class="mp-subtitle">Shared Artifacts</div>
+      <details class="mp-secondary-tools"><summary>Shared Artifacts</summary>
       <div class="mp-row">
-        <select id="roomArtifactTypeSelect" class="mp-select" aria-label="Artifact type">
+        <label class="mp-field" for="roomArtifactTypeSelect"><span>Artifact type</span><select id="roomArtifactTypeSelect" class="mp-select" aria-label="Artifact type">
           <option value="pin">Pin</option>
           <option value="landmark">Landmark</option>
           <option value="build-area">Build Area</option>
           <option value="memory-board">Memory Board</option>
-        </select>
-        <input id="roomArtifactTitleInput" class="mp-input" type="text" maxlength="80" placeholder="Artifact title">
+        </select></label>
+        <label class="mp-field" for="roomArtifactTitleInput"><span>Artifact title</span><input id="roomArtifactTitleInput" class="mp-input" type="text" maxlength="80" placeholder="Artifact title"></label>
       </div>
       <div class="mp-row">
-        <input id="roomArtifactTextInput" class="mp-input" type="text" maxlength="280" placeholder="Short note (optional)">
+        <label class="mp-field" for="roomArtifactTextInput"><span>Note (optional)</span><input id="roomArtifactTextInput" class="mp-input" type="text" maxlength="280" placeholder="Short note (optional)"></label>
       </div>
       <div class="mp-row">
         <button id="roomArtifactCreateBtn" class="mp-btn secondary mpSmallBtn" type="button">Drop Artifact At Current Position</button>
@@ -150,7 +161,8 @@ const APP_SHELL_FRAGMENT_HTML = `
       <ul id="roomArtifactList" class="mp-room-list mpArtifactList">
         <li class="mpRoomEmpty">No shared artifacts yet.</li>
       </ul>
-      <div id="roomPanelStatus"></div>
+
+      </details>
     </div>
   </section>
 </div>
@@ -164,11 +176,11 @@ const APP_SHELL_FRAGMENT_HTML = `
       <div class="mpChatEmpty">Join a room to enable chat.</div>
     </div>
     <div class="room-chat-compose">
-      <input id="roomChatInput" class="mp-input" type="text" maxlength="500" placeholder="Send message (max 500 chars)">
+      <input id="roomChatInput" class="mp-input" type="text" maxlength="500" placeholder="Send message (max 500 chars)" aria-label="Room message">
       <button id="roomChatSendBtn" class="mp-btn primary" type="button">Send</button>
     </div>
     <div class="mpChatPolicy">Safety rules: no links, no personal contact info, and no harassment. Use Report on abusive messages.</div>
-    <div id="roomChatStatus"></div>
+    <div id="roomChatStatus" role="status" aria-live="polite"></div>
   </div>
 </aside>
 
