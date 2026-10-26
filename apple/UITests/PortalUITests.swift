@@ -83,33 +83,22 @@ import Vision
         let home = XCUIApplication(bundleIdentifier: "com.apple.springboard")
         let icon = home.icons["World Explorer 3D"]
         XCTAssertTrue(icon.waitForExistence(timeout: 10)); icon.press(forDuration: 1.5)
-        let editHome = home.buttons["Edit Home Screen"]
-        XCTAssertTrue(editHome.waitForExistence(timeout: 5)); editHome.tap()
-        let edit = home.buttons["Edit"]
-        XCTAssertTrue(edit.waitForExistence(timeout: 5)); edit.tap()
-        let add = home.buttons["Add Widget"]
-        XCTAssertTrue(add.waitForExistence(timeout: 5)); add.tap()
+        // SpringBoard's remote menus can expose stale accessibility hit points
+        // even when tap() reports success. Resolve each system action from its
+        // actual visible state; the next required control proves the transition.
+        try tapVisibleText("Edit Home Screen", in: home)
+        try tapVisibleText("Edit", in: home)
+        try tapVisibleText("Add Widget", in: home)
         let search = home.searchFields.firstMatch
-        XCTAssertTrue(search.waitForExistence(timeout: 5)); search.tap(); search.typeText("World Explorer"); search.typeText("\n")
+        XCTAssertTrue(search.waitForExistence(timeout: 5))
+        try tapVisibleText("Search Widgets", in: home)
+        search.typeText("World Explorer"); search.typeText("\n")
         capture("portal-widget-gallery-search")
-        let collection = home.staticTexts["World Explorer 3D"].firstMatch
-        XCTAssertTrue(collection.waitForExistence(timeout: 5))
-        if collection.isHittable { collection.tap() }
-        else {
-            // iOS 26's remote gallery exposes this visible row but its text
-            // reports no accessibility hit point. Use its verified on-screen
-            // bounds, then require the actual gallery to open below.
-            let bounds = collection.frame, keyboard = home.keyboards.firstMatch
-            XCTAssertEqual(search.value as? String, "World Explorer")
-            XCTAssertTrue(home.frame.contains(bounds)); XCTAssertGreaterThan(bounds.width, 40)
-            XCTAssertGreaterThan(bounds.minY, search.frame.maxY)
-            if keyboard.exists, keyboard.frame.height > 0, home.frame.intersects(keyboard.frame) { XCTAssertLessThan(bounds.maxY, keyboard.frame.minY) }
-            home.coordinate(withNormalizedOffset: CGVector(dx: 0, dy: 0)).withOffset(CGVector(dx: bounds.midX, dy: bounds.midY)).tap()
-        }
+        XCTAssertEqual(search.value as? String, "World Explorer")
+        try tapVisibleText("World Explorer 3D", in: home)
         capture("portal-widget-gallery")
         try tapVisibleText("Add Widget", in: home, lowerPart: true)
-        let done = home.buttons["Done"]
-        XCTAssertTrue(done.waitForExistence(timeout: 5)); done.tap()
+        try tapVisibleText("Done", in: home)
         capture("portal-widget-home-after-add")
         let wasSaved = try visibleText("Saved", timeout: 2) != nil
         if wasSaved { try tapVisibleText("Saved", in: home) }
