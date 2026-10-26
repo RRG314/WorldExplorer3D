@@ -3,6 +3,24 @@ import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import {RegionalGeometryBuffer,createRegionalGeometryStorage} from '../app/js/terrain/regional-geometry-storage.js';
 import {appendRegionalBuildingFootprint} from '../app/js/terrain/regional-building-geometry.js';
+import {FAR_CONTEXT_MAX_BUILDINGS} from '../app/js/terrain/far-building-selection.js';
+
+test('a metropolitan source does not reserve exact vertex streams for instanced buildings',()=>{
+ const district=createRegionalGeometryStorage(FAR_CONTEXT_MAX_BUILDINGS);
+ const metro=createRegionalGeometryStorage(386624);
+ try {
+  const bytes=storage=>Object.values(storage).reduce((sum,buffer)=>sum+(buffer?.data?.byteLength||0),0);
+  assert.equal(bytes(metro),bytes(district));
+  assert.ok(bytes(metro)<12*1024*1024,'The exact-footprint arena must fit its own budget');
+  // This is capacity, not an output limit. Keep exact bytes when a footprint
+  // requires more data than the initial reservation.
+  const originalCapacity=metro.positions.data.length;
+  for(let i=0;i<=originalCapacity;i++)metro.positions.push(i*.125);
+  const result=metro.positions.finish();
+  assert.equal(result.length,originalCapacity+1);
+  for(let i=0;i<result.length;i++)assert.equal(result[i],Math.fround(i*.125));
+ } finally {district.dispose();metro.dispose();}
+});
 
 test('regional typed construction preserves concave roofs, independent facade bays and the former geometry bytes',()=>{
  const reference={positions:[],colors:[],styles:[],layouts:[],indices:[]},storage=createRegionalGeometryStorage(0);

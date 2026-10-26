@@ -1,3 +1,5 @@
+import {FAR_CONTEXT_MAX_BUILDINGS} from './far-building-selection.js';
+
 // Exclusive construction buffers. No boxed-number arrays or second typed copy
 // are retained alongside a completed regional building mesh.
 export class RegionalGeometryBuffer {
@@ -35,7 +37,11 @@ export class RegionalGeometryBuffer {
 }
 
 export function createRegionalGeometryStorage(buildingCount=0) {
-  const vertices=Math.min(1000000,Math.max(0,buildingCount)*22);
+  // The source count includes instanced boxes. Only the separately budgeted
+  // exact footprints use these vertex streams. Dense metropolitan sources must
+  // not reserve a second full-city vertex arena for the instanced buildings.
+  // Unusual footprints still grow through RegionalGeometryBuffer.push().
+  const vertices=Math.min(1000000,Math.min(FAR_CONTEXT_MAX_BUILDINGS,Math.max(0,buildingCount))*22);
   const storage={
     positions:new RegionalGeometryBuffer(Float32Array,vertices*3),
     colors:new RegionalGeometryBuffer(Uint8Array,vertices*3,true),
