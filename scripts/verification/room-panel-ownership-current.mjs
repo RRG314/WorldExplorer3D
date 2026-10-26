@@ -48,6 +48,7 @@ try{
     assert.equal(await page.locator('#roomPanelModal').getAttribute('aria-hidden'),'true');
     assert.equal(await visible('floatMenuContainer'),true);
     await page.evaluate(()=>roomUiProbe.ui.setChatOpen(true));await page.waitForTimeout(250);
+    assert.equal(await page.evaluate(()=>document.activeElement?.id),'roomChatInput');
     assert.equal(await visible('mobileTouchControls'),false);assert.equal(await visible('floatMenuContainer'),false);
     const rect=await page.locator('#roomChatDrawer').boundingBox();assert.ok(rect.x>=0&&rect.y>=0&&rect.x+rect.width<=size.width+1&&rect.y+rect.height<=size.height+1);
     assert.equal(await page.locator('#roomChatDrawer').evaluate(e=>e.scrollWidth<=e.clientWidth+1),true);

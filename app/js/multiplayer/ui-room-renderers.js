@@ -543,7 +543,8 @@ export function createUiRoomRenderers({ appCtx, refs, state, helpers }) {
   }
 
   function setChatOpen(open) {
-    if (open && !state.chatOpen) appCtx.clearControlInputState?.('room-chat-open');
+    const opening = !!open && !state.chatOpen;
+    if (opening) appCtx.clearControlInputState?.('room-chat-open');
     state.chatOpen = !!open;
     if (refs.chatDrawer) {
       const focused = refs.chatDrawer.ownerDocument?.activeElement;
@@ -557,6 +558,11 @@ export function createUiRoomRenderers({ appCtx, refs, state, helpers }) {
     }
     appCtx.screenLayout?.setPanelLayer?.('room-chat', state.chatOpen);
     updateToggleStates();
+    if (opening) queueMicrotask(() => {
+      const owner = appCtx.screenLayout?.snapshot?.().panelLayer;
+      if (!state.chatOpen || refs.chatDrawer?.inert || (owner && owner !== 'room-chat')) return;
+      refs.chatInput?.focus();
+    });
   }
 
   return {

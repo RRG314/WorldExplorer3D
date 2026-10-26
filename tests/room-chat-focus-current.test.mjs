@@ -6,7 +6,7 @@ import { createScreenLayoutService } from '../app/js/ui/screen-layout.js';
 function harness() {
   const document = { activeElement: null };
   const attributes = {};
-  const control = { blur() { document.activeElement = null; } };
+  const control = { blur() { document.activeElement = null; },focus(){document.activeElement=this;} };
   const drawer = {
     ownerDocument: document, inert: true,
     contains: element => element === control,
@@ -20,7 +20,7 @@ function harness() {
   const layout=createScreenLayoutService(document),cleared=[];
   const modalAttributes={},classes=new Set();
   const modal={classList:{add:v=>classes.add(v),remove:v=>classes.delete(v)},setAttribute:(k,v)=>modalAttributes[k]=v};
-  const ui = createUiRoomRenderers({ appCtx: {screenLayout:layout,clearControlInputState:reason=>cleared.push(reason)}, refs: { chatDrawer: drawer,roomPanelModal:modal }, state, helpers: {emitTutorialEvent(){}} });
+  const ui = createUiRoomRenderers({ appCtx: {screenLayout:layout,clearControlInputState:reason=>cleared.push(reason)}, refs: { chatDrawer: drawer,chatInput:control,roomPanelModal:modal }, state, helpers: {emitTutorialEvent(){}} });
   return { ui, drawer, document, control, attributes,layout,cleared,modalAttributes,classes };
 }
 
@@ -61,4 +61,10 @@ test('room and chat opening use the existing panel owner and release held contro
 test('a late chat close cannot clear a newer Backpack panel',()=>{
   const h=harness();h.ui.setChatOpen(true);h.layout.setPanelLayer('backpack',true);h.ui.setChatOpen(false);
   assert.equal(h.layout.snapshot().panelLayer,'backpack');assert.equal(h.drawer.inert,true);
+});
+
+test('opening chat focuses composition after modal close; an obsolete focus callback cannot steal a newer panel',async()=>{
+  const h=harness();h.ui.setChatOpen(true);await Promise.resolve();assert.equal(h.document.activeElement,h.control);
+  h.ui.setChatOpen(false);h.ui.setChatOpen(true);h.layout.setPanelLayer('backpack',true);
+  const outside={};h.document.activeElement=outside;await Promise.resolve();assert.equal(h.document.activeElement,outside);
 });
