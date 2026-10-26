@@ -36,6 +36,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: '$(PORTAL_BUNDLE_ID)'
         CODE_SIGN_ENTITLEMENTS: App/PortalApp.entitlements
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
     info:
       path: App/Info.plist
       properties:

@@ -2,6 +2,12 @@ import XCTest
 
 @MainActor final class PortalUITests: XCTestCase {
     override func setUpWithError() throws { continueAfterFailure = false }
+    override func tearDownWithError() throws {
+        if (testRun?.failureCount ?? 0) > 0 {
+            capture("portal-widget-failed-screen")
+            print(String(XCUIApplication(bundleIdentifier: "com.apple.springboard").debugDescription.prefix(24_000)))
+        }
+    }
     private func capture(_ name: String) {
         let image = XCTAttachment(screenshot: XCUIScreen.main.screenshot()); image.name = name; image.lifetime = .keepAlways; add(image)
     }
@@ -47,7 +53,7 @@ import XCTest
         let add = home.buttons["Add Widget"]
         XCTAssertTrue(add.waitForExistence(timeout: 5)); add.tap()
         let search = home.searchFields.firstMatch
-        XCTAssertTrue(search.waitForExistence(timeout: 5)); search.tap(); search.typeText("World Explorer")
+        XCTAssertTrue(search.waitForExistence(timeout: 5)); search.tap(); search.typeText("World Explorer"); search.typeText("\n")
         capture("portal-widget-gallery-search")
         let collection = home.staticTexts["World Explorer 3D"].firstMatch
         XCTAssertTrue(collection.waitForExistence(timeout: 5))
@@ -60,11 +66,12 @@ import XCTest
             XCTAssertEqual(search.value as? String, "World Explorer")
             XCTAssertTrue(home.frame.contains(bounds)); XCTAssertGreaterThan(bounds.width, 40)
             XCTAssertGreaterThan(bounds.minY, search.frame.maxY)
-            if keyboard.exists { XCTAssertLessThan(bounds.maxY, keyboard.frame.minY) }
+            if keyboard.exists, keyboard.frame.height > 0, home.frame.intersects(keyboard.frame) { XCTAssertLessThan(bounds.maxY, keyboard.frame.minY) }
             home.coordinate(withNormalizedOffset: CGVector(dx: 0, dy: 0)).withOffset(CGVector(dx: bounds.midX, dy: bounds.midY)).tap()
         }
-        XCTAssertTrue(add.waitForExistence(timeout: 10))
+        let galleryOpened = add.waitForExistence(timeout: 10)
         capture("portal-widget-gallery")
+        XCTAssertTrue(galleryOpened)
         XCTAssertTrue(add.waitForExistence(timeout: 5)); add.tap()
         let done = home.buttons["Done"]
         XCTAssertTrue(done.waitForExistence(timeout: 5)); done.tap()

@@ -22,6 +22,10 @@ Path(sys.argv[2]).write_text(data)
 PY
 }
 finish() {
+  if test -n "${APPLE_SIMULATOR:-}"; then
+    xcrun simctl spawn "$APPLE_SIMULATOR" log show --style compact --info --debug --last 20m --predicate 'process == "LivingPortalWidget" OR (eventMessage CONTAINS[c] "worldexplorer" AND (subsystem BEGINSWITH[c] "com.apple.widgetkit" OR process == "runningboardd" OR process == "SpringBoard"))' > "$APPLE_PRIVATE/widget-system.log" 2>&1 || true
+    sanitize "$APPLE_PRIVATE/widget-system.log" "apple-portal-evidence/widget-system.log"
+  fi
   for step in resolve build test native-live; do
     if test -f "$APPLE_PRIVATE/$step.log"; then sanitize "$APPLE_PRIVATE/$step.log" "apple-portal-evidence/$step.log"; fi
   done
@@ -64,10 +68,11 @@ printf '%s\n' "$APPLE_SIMULATOR" > apple-portal-evidence/owned-simulator.txt
 xcrun simctl boot "$APPLE_SIMULATOR"
 xcrun simctl bootstatus "$APPLE_SIMULATOR" -b > "$APPLE_PRIVATE/boot.log" 2>&1
 xcodebuild build-for-testing -project apple/WorldExplorerPortal.xcodeproj -scheme WorldExplorerPortal -configuration Debug -destination "id=$APPLE_SIMULATOR" -derivedDataPath "$RUNNER_TEMP/we3d-apple-derived" -clonedSourcePackagesDirPath "$RUNNER_TEMP/we3d-apple-packages" -disableAutomaticPackageResolution CODE_SIGN_IDENTITY=- > "$APPLE_PRIVATE/build.log" 2>&1
-APPLE_JOURNEY=()
-if test "${WE3D_PORTAL_APPLE_WIDGET_ONLY:-false}" = true; then APPLE_JOURNEY=(-only-testing:PortalUITests/PortalUITests/testHomeScreenWidget); fi
+# Keep the array nonempty: macOS Bash 3.2 treats an empty array as unset under -u.
+APPLE_JOURNEY=(-parallel-testing-enabled NO)
+if test "${WE3D_PORTAL_APPLE_WIDGET_ONLY:-false}" = true; then APPLE_JOURNEY+=(-only-testing:PortalUITests/PortalUITests/testHomeScreenWidget); fi
 APPLE_UI_STATUS=0
-xcodebuild test-without-building -project apple/WorldExplorerPortal.xcodeproj -scheme WorldExplorerPortal -configuration Debug -destination "id=$APPLE_SIMULATOR" -derivedDataPath "$RUNNER_TEMP/we3d-apple-derived" -resultBundlePath "$APPLE_PRIVATE/Portal.xcresult" -parallel-testing-enabled NO "${APPLE_JOURNEY[@]}" CODE_SIGN_IDENTITY=- > "$APPLE_PRIVATE/test.log" 2>&1 || APPLE_UI_STATUS=$?
+xcodebuild test-without-building -project apple/WorldExplorerPortal.xcodeproj -scheme WorldExplorerPortal -configuration Debug -destination "id=$APPLE_SIMULATOR" -derivedDataPath "$RUNNER_TEMP/we3d-apple-derived" -resultBundlePath "$APPLE_PRIVATE/Portal.xcresult" "${APPLE_JOURNEY[@]}" CODE_SIGN_IDENTITY=- > "$APPLE_PRIVATE/test.log" 2>&1 || APPLE_UI_STATUS=$?
 # Run only the added SDK journey when an owned short-lived identity is present.
 # Reuse this exact build and simulator; do not restart the offline UI sequence.
 APPLE_LIVE_STATUS=not-requested
@@ -80,7 +85,13 @@ if test -n "${WE3D_PORTAL_APPLE_ACCEPTANCE:-}"; then
     unset WE3D_PORTAL_APPLE_ACCEPTANCE
     APPLE_LIVE_STATUS=0
     xcodebuild test-without-building -project apple/WorldExplorerPortal.xcodeproj -scheme WorldExplorerPortal -configuration Debug -destination "id=$APPLE_SIMULATOR" -derivedDataPath "$RUNNER_TEMP/we3d-apple-derived" -resultBundlePath "$APPLE_PRIVATE/NativeLive.xcresult" -parallel-testing-enabled NO -only-testing:PortalTests/PortalNativeLiveTests CODE_SIGN_IDENTITY=- > "$APPLE_PRIVATE/native-live.log" 2>&1 || APPLE_LIVE_STATUS=$?
-    rm "$APPLE_CONTAINER/Documents/native-acceptance.json"
+    # XCTest can replace the host's data-container directory during installation.
+    # Clean the captured and current owned locations without failing on a file
+    # the simulator has already removed.
+    rm -f "$APPLE_CONTAINER/Documents/native-acceptance.json"
+    if APPLE_CURRENT_CONTAINER=$(xcrun simctl get_app_container "$APPLE_SIMULATOR" io.worldexplorer3d.app.staging data 2>/dev/null); then
+      rm -f "$APPLE_CURRENT_CONTAINER/Documents/native-acceptance.json"
+    fi
 fi
 python3 - "$APPLE_UI_STATUS" "$APPLE_LIVE_STATUS" "${WE3D_PORTAL_APPLE_WIDGET_ONLY:-false}" <<'PY'
 import json,sys
