@@ -62,7 +62,7 @@ export function bindControlPanel(ctx, {updateMode, clearHeld, requestWorldFocus,
 
   function open() {
     if (!scope.isActive() || !dialog?.isConnected || typeof dialog.showModal !== 'function' ||
-        !ctx.gameStarted || ctx.worldLoading || ctx.titleLaunchPending || ctx.vrPresentation?.active ||
+        !ctx.gameStarted || ctx.worldLoading || ctx.titleLaunchPending || ctx.showLargeMap || ctx.vrPresentation?.active ||
         layout.snapshot().activityLayer || layout.snapshot().panelLayer === 'vr-setup') return false;
     layout.setPanelLayer('controls', true);
     return isOpen();

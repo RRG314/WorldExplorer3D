@@ -5,6 +5,22 @@ import {activePresentationOwner} from './renderer-owners.js';
 import { updateStreetPavementFocus, updateStreetOverviewFrame, prepareStreetOverviewMaterials } from '../world/street-pavement-runtime.js';
 import { suspendStreetPreparationForInterior } from '../world/street-interior-suspension.js';
 import { prepareResidentPresentation } from './resident-presentation-preparation.js';
+function updateControlInputFrame(appCtx, frame) {
+  if (!appCtx.gameStarted || appCtx.worldLoading || appCtx.titleLaunchPending || globalThis.document?.hidden) return false;
+  appCtx.vrPresentation?.beforeInput?.(frame);
+  appCtx.updateControlInput?.();
+  return true;
+}
+
+function updateSuspendedFrameInput(appCtx, frame) {
+  appCtx.vrPresentation?.guard?.();
+  const owner = activePresentationOwner(appCtx);
+  // The existing kernel still owns input polling while a dedicated renderer
+  // owns presentation. Its simulation and world systems remain suspended.
+  if (!appCtx.arSessionActive && (owner === 'space' || owner === 'ocean')) updateControlInputFrame(appCtx, frame);
+  appCtx.lastTime = frame.timestamp;
+}
+
 function createCoreFrameSystems(appCtx, hooks = {}) {
   appCtx.presentationPose = null;
   let hudTimer = 0;
@@ -34,8 +50,7 @@ function createCoreFrameSystems(appCtx, hooks = {}) {
       phase: 'input',
       enabled: () => !!appCtx.gameStarted && !appCtx.worldLoading && !appCtx.titleLaunchPending,
       update(frame) {
-        appCtx.vrPresentation?.beforeInput?.(frame);
-        appCtx.updateControlInput?.();
+        updateControlInputFrame(appCtx, frame);
       }
     },
     {
@@ -263,4 +278,4 @@ function createCoreRenderSystem(appCtx, shouldUseComposer) {
   };
 }
 
-export { createCoreFrameSystems, createCoreRenderSystem };
+export { createCoreFrameSystems, createCoreRenderSystem, updateSuspendedFrameInput };

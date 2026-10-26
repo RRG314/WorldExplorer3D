@@ -9,7 +9,7 @@ const out=process.env.WE3D_VERIFY_OUTPUT_DIR||'output/verification/control-panel
 const doc=parse5.parse(await readFile('app/index.html','utf8')),nodes={};
 const ids=['globeHubOverlay','tab-controls','tab-settings','controlsTab','mobileTouchControls'];
 function visit(n){const id=n.attrs?.find(a=>a.name==='id')?.value;if(ids.includes(id))nodes[id]=n;if(n.tagName==='head')nodes.head=n;for(const c of n.childNodes||[])visit(c);}visit(doc);nodes.head.childNodes=nodes.head.childNodes.filter(n=>n.tagName!=='script');
-const html='<!doctype html><html><head><base href="/app/">'+parse5.serialize(nodes.head)+'</head><body>'+ids.map(id=>parse5.serializeOuter(nodes[id])).join('')+`<div id="titleScreen" class="hidden"></div><button id="controlsBarBtn" class="wx-button" type="button" aria-expanded="false" aria-controls="controlsTab"><span class="btnText">Controls</span></button><button id="outside" class="wx-button">Outside</button><canvas id="componentCanvas" width="1" height="1"></canvas><div id="pauseScreen"><button>Resume</button></div><script type="module">
+const html='<!doctype html><html><head><base href="/app/">'+parse5.serialize(nodes.head)+'</head><body>'+ids.map(id=>parse5.serializeOuter(nodes[id])).join('')+`<div id="titleScreen" class="hidden"></div><div id="largeMap"></div><button id="controlsBarBtn" class="wx-button" type="button" aria-expanded="false" aria-controls="controlsTab"><span class="btnText">Controls</span></button><button id="outside" class="wx-button">Outside</button><canvas id="componentCanvas" width="1" height="1"></canvas><div id="pauseScreen"><button>Resume</button></div><script type="module">
 import {ctx} from '/app/js/shared-context.js?v=55';
 import '/app/js/pause-state.js';
 import '/app/js/controls/action-input.js?v=15';
@@ -69,6 +69,8 @@ try{
  report.checks.push('Actual VR setup admits a deliberate Controls handoff without dropping its pause; top-layer Controls keeps focus over a visible pause dialog; backdrop dismisses');
  }
  if(process.env.WE3D_CONTROLS_PHASE!=='core'){
+  await page.evaluate(()=>{probe.ctx.showLargeMap=true;window.mapAdmission=probe.view.open();probe.ctx.showLargeMap=false;probe.view.open();document.getElementById('largeMap').classList.add('show');});assert.equal(await page.evaluate(()=>mapAdmission),false);assert.equal(await page.locator('#controlsTab').isVisible(),true,'Late map presentation must not hide an inert native modal');await page.locator('#ctrlHeader').click();await page.evaluate(()=>document.getElementById('largeMap').classList.remove('show'));
+
   await page.evaluate(()=>{
    probe.ctx.screenLayout.setActivityLayer('fishing',true);window.blockedActivity=probe.view.open();probe.ctx.screenLayout.setActivityLayer('fishing',false);
    probe.ctx.screenLayout.setPanelLayer('vr-setup',true);window.blockedVr=probe.view.open();probe.ctx.screenLayout.setPanelLayer('vr-setup',false);
