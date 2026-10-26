@@ -78,7 +78,7 @@ public final class PortalActivity extends Activity {
         work.execute(()->{try{mutation.run();PortalWidgetProvider.updateAll(this);PortalRefreshJob.schedule(this);if(!closed)runOnUiThread(this::show);}
             catch(Exception error){if(!closed)runOnUiThread(()->text(getString(R.string.portal_save_failed),16,false));}});
     }
-    private void mutate(String id,String kind){String owner=store.owner();perform(()->{try{store.act(id,kind,owner);}catch(Exception error){throw new IllegalStateException(error);}});}
+    private void mutate(String id,String kind,String displayedOwner,String learningVersion){perform(()->{try{store.act(id,kind,displayedOwner,learningVersion);}catch(Exception error){throw new IllegalStateException(error);}});}
     private void openGame(String path){
         Uri uri=Uri.parse(PortalStore.ORIGIN+path);if(!PortalStore.ORIGIN.equals(uri.getScheme()+"://"+uri.getHost())||!uri.getPath().startsWith("/app/"))return;
         startActivity(new Intent(this,GameLauncherActivity.class).setAction(Intent.ACTION_VIEW).setData(uri));
@@ -104,7 +104,8 @@ public final class PortalActivity extends Activity {
         long loaded=store.loadedAt();text(loaded==0?getString(R.string.portal_bundled):getString(R.string.portal_updated,DateFormat.getDateTimeInstance().format(new Date(loaded))),13,false);
     }
     private void showAccount(){
-        text(getString(R.string.portal_account),24,true);String label=account.accountLabel();
+        text(getString(R.string.portal_account),24,true);String label,displayedOwner;
+        synchronized(PortalStore.LOCK){label=account.accountLabel();displayedOwner=store.owner();}
         text(label.isEmpty()?getString(R.string.portal_device_trail):label,17,false);
         if(!account.message().isEmpty())text(account.message(),16,false);
         String code=account.code();
@@ -117,24 +118,25 @@ public final class PortalActivity extends Activity {
         if(!store.owner().equals("device-guest")){
             button(R.string.portal_sync,()->account.sync(()->true));
             button(R.string.portal_copy_device,()->new android.app.AlertDialog.Builder(this).setTitle(R.string.portal_copy_device).setMessage(R.string.portal_copy_explanation)
-                .setNegativeButton(R.string.portal_cancel,null).setPositiveButton(R.string.portal_copy_device,(dialog,which)->account.copyDeviceChoices()).show());
+                .setNegativeButton(R.string.portal_cancel,null).setPositiveButton(R.string.portal_copy_device,(dialog,which)->account.copyDeviceChoices(displayedOwner)).show());
             button(R.string.portal_disconnect,()->new android.app.AlertDialog.Builder(this).setTitle(R.string.portal_disconnect).setMessage(R.string.portal_disconnect_explanation)
-                .setNegativeButton(R.string.portal_cancel,null).setPositiveButton(R.string.portal_disconnect,(dialog,which)->account.disconnect()).show());
+                .setNegativeButton(R.string.portal_cancel,null).setPositiveButton(R.string.portal_disconnect,(dialog,which)->account.disconnect(displayedOwner)).show());
             long synced=store.syncedAt();if(synced>0)text(getString(R.string.portal_synced_at,DateFormat.getDateTimeInstance().format(new Date(synced))),14,false);
         }
         text(getString(R.string.portal_account_explanation),15,false);
     }
     private void showPlace(JSONObject place){
-        String id=place.optString("id");JSONObject state=store.trail(id),learning=place.optJSONObject("learning");
+        String id=place.optString("id"),displayedOwner;JSONObject state,learning=place.optJSONObject("learning");
+        synchronized(PortalStore.LOCK){displayedOwner=store.owner();state=store.trail(displayedOwner,id);}
         text(place.optString("title"),24,true);text(place.optString("region"),15,false);text(place.optString("summary"),17,false);
-        button(state.optBoolean("saved")?R.string.portal_remove_saved:R.string.portal_save,()->mutate(id,state.optBoolean("saved")?"unsave":"save"));
+        button(state.optBoolean("saved")?R.string.portal_remove_saved:R.string.portal_save,()->mutate(id,state.optBoolean("saved")?"unsave":"save",displayedOwner,null));
         if(store.gameAvailable(place,System.currentTimeMillis()))button(R.string.portal_enter,()->openGame(place.optString("gameLink")));
         else text(getString(R.string.portal_world_checks),14,false);
         text(learning.optString("title"),21,true);JSONArray paragraphs=learning.optJSONArray("paragraphs");for(int i=0;i<paragraphs.length();i++)text(paragraphs.optString(i),17,false);
         text(getString(R.string.portal_sources),18,true);JSONArray sources=learning.optJSONArray("sources");for(int i=0;i<sources.length();i++){
             JSONObject source=sources.optJSONObject(i);button(source.optString("title"),()->startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse(source.optString("url")))));
         }
-        button(state.optString("investigationVersion").equals(learning.optString("version"))?R.string.portal_investigated:R.string.portal_add_investigated,()->mutate(id,"investigate"));
+        button(state.optString("investigationVersion").equals(learning.optString("version"))?R.string.portal_investigated:R.string.portal_add_investigated,()->mutate(id,"investigate",displayedOwner,learning.optString("version")));
     }
     private void configure(){
         boolean owned=false;for(int id:PortalWidgetProvider.ids(this))if(id==widgetId)owned=true;

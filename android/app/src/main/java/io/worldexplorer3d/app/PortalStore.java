@@ -128,10 +128,12 @@ final class PortalStore {
             catch(JSONException error){throw new IllegalStateException("Your saved Trail could not open.",error);}}
     }
     void act(String id,String kind)throws JSONException{act(id,kind,owner());}
-    void act(String id,String kind,String expectedOwner)throws JSONException{
+    void act(String id,String kind,String expectedOwner)throws JSONException{act(id,kind,expectedOwner,null);}
+    void act(String id,String kind,String expectedOwner,String expectedLearningVersion)throws JSONException{
         synchronized(LOCK){
             JSONObject place=place(id);if(place==null)throw new JSONException("Invalid widget destination.");PortalTrail.slot(kind);
             String owner=owner();if(!owner.equals(expectedOwner))throw new JSONException("Explorer account changed.");
+            if(kind.equals("investigate")&&expectedLearningVersion!=null&&!expectedLearningVersion.equals(place.getJSONObject("learning").getString("version")))throw new JSONException("This investigation changed. Reopen it before marking it complete.");
             long now=System.currentTimeMillis();JSONObject entry=entry(owner,id),state=PortalTrail.view(entry);
             if(kind.equals("offered")&&state.optLong("lastOfferedAt")/86400000L==now/86400000L)return;
             JSONObject action=new JSONObject().put("operationId",UUID.randomUUID().toString()).put("destinationId",id).put("kind",kind).put("createdAt",now);

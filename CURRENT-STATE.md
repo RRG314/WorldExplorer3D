@@ -1060,3 +1060,80 @@ native-connection-terminal-final.tap, native-connection-integration-final.tap,
 native-connect-chromium-final/, native-connect-webkit-final/ under the current
 product evidence folder. Native SDK ownership/sync, Apple app/widget, preview
 images, real destination qualification, other VR domains and releases continue.
+
+## October 25/26 — native identity, durable sync and live staging service
+
+Android now uses named Firebase Auth/App Check SDK instances, initialized only
+for Portal account work. Its existing TWA launcher avoids Firebase auto-start.
+Browser approval uses an encrypted short-lived verifier in Android Keystore;
+SDKs own authentication credentials. Candidate sign-in stays separate from the
+active account. Adoption is serialized, drained and rolled back on cancellation;
+a durable marker rejects interrupted adoption after process death. Native buttons
+and confirmations pin the displayed account; investigation completion pins the
+content version actually displayed. Device choice copying is explicit and never
+copies visits or expeditions. JobScheduler still owns bounded background work.
+
+The native Trail now separates accepted state from pending choices using the
+shared wire envelope. It migrates existing flattened guest records, retains
+remote visits, acknowledges exact operations and rejects stale owner replies.
+Seven fixtures generated from the actual JS model check cross-language behavior.
+CI run 40246325021 at 2ea23de passes strict dependency verification, release
+build/lint, debug build and actual owned AOSP widget interactions. Eighteen new
+native contract cases include data migration, delayed replies, owner replacement,
+explicit copy, mixed callbacks, Keystore persistence, cancelled SDK adoption,
+identity mismatch and real SDK initialization/recovery. Existing 4 persistence,
+3 widget and 3 layout/handoff checks pass. All five screenshots inspected.
+This is emulator/offline acceptance, not native live authentication or a phone.
+Later displayed-owner/content-version refinements add one case and require the
+focused debug receipt; the full product release build remains separate.
+
+SDKs are pinned to Firebase Android BoM 35.1.0. All 93 new artifact hashes match
+Google Maven/Maven Central, with existing checksums retained. Strict builds
+exposed Kotlin's redirected common module missing from generated lock state;
+it is explicitly locked only for runtime consumers. Failed compile/lock receipts
+remain; no permissive dependency-verification setting was adopted.
+
+Staging now has the nine additive Portal connection/Trail Functions. All existing
+84 Functions have identical canonical metadata hashes. Pairing uses a dedicated
+service account: datastore.user and firebaseauth.viewer at project scope, token
+creation only on itself, no service-account key. Two scoped TTL policies are
+active. New endpoints contain no copied mail/commerce secrets. Hosting and the
+existing deleteAccount Function are unchanged; coordinated release must include
+its reviewed immediate pairing-row cleanup (expiry/deletion admission already
+blocks new claims).
+
+The first deploy lacked unrelated shared-entrypoint parameters; explicit empty
+values for the new APIs resolved that without copying secrets. The next CLI
+failure was a shared OAuth consumer's Cloud Billing read quota (429). The
+supported GOOGLE_CLOUD_QUOTA_PROJECT setting and this existing staging project's
+Cloud Billing metadata API fixed it, preserving the actual billing check. No
+billing relationship/payment change. Raw map serialization had also made a
+noncanonical inventory hash comparison misleading; unchanged versions/timestamps
+and the subsequent canonical before/after comparison establish preservation.
+Private raw snapshots/logs stay outside the repository.
+
+Live staging HTTP verification passes real email Auth, registered native/web
+App Check debug attestations, recent approval, dedicated signing, single-use
+claim, same-UID Auth lookup, protected save/idempotent receipt/browser-role read,
+browser cancellation API and account-deletion tombstone rejection. All temporary
+identities, approval rows and debug registrations were removed. This uses Auth
+REST clients, not native SDK UI or Google OAuth. The first runner expected a
+localId field absent from custom-token REST responses; it now verifies identity
+through Auth lookup. Both receipts remain. A scope note clarifies that receipt
+labels refer to HTTP client roles, not actual browser UI in this live run.
+
+Production's new Android Firebase client now has its actual Play signing SHA-1
+and SHA-256 registered, and its dedicated auto-created Android key is restricted
+to that package/certificate and the four required Firebase APIs. Existing web
+keys are distinct and unchanged. Play Integrity provider defaults are retained;
+linking the existing Play project awaits specific approval of Google's separate
+API terms. Apple membership still visibly Pending with purchase required.
+No production Functions, Hosting or new native release was deployed.
+
+Evidence: android-account-dependency-*/; android-account-strict-first.log and
+second.log (failed); android-account-native-first/; staging-pairing-provision*.json;
+native-infrastructure-status.json; staging-portal-deployment-scoped.json;
+staging-portal-cli-quota-diagnosis.json; portal-native-live-staging.json (failed)
+and portal-native-live-staging-identity-fixed.json (pass), in the current product
+folder. Continue native SDK live acceptance, Apple app/WidgetKit, preview imagery,
+actual destination qualification, remaining VR domains and coordinated releases.

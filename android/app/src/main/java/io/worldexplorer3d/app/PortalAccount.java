@@ -48,7 +48,7 @@ final class PortalAccount {
         if(opened)return;PortalFirebase.workerOnly();firebase=new PortalFirebase(context,"portal-native");
         FirebaseUser user=firebase.auth.getCurrentUser();String expected=user==null?"device-guest":"account:"+user.getUid();
         if(store.accountCommitPending()||!expected.equals(store.owner())){
-            firebase.auth.signOut();store.adoptOwner(null);message="Reconnect your Explorer account. Your private Trail caches are kept.";
+            firebase.auth.signOut();store.adoptOwner(null);message="Reconnect your Explorer account. Your saved Trails are kept.";
         }
         // A candidate never becomes the active identity merely because its SDK
         // task persisted before a process death. Only explicit adoption commits.
@@ -75,13 +75,15 @@ final class PortalAccount {
     }
     private void cancelNetwork(){PortalFirebase sdk=firebase;if(sdk!=null)sdk.cancelNetwork();}
     private void cancelRemote(JSONObject row){try{firebase.request("cancelPortalPairing",new JSONObject().put("requestId",row.getString("requestId")).put("verifier",row.getString("verifier")),null,()->true);}catch(Exception ignored){/* Short-lived proof is already retired locally; server approval expires. */}}
+    private JSONObject retirePendingLocked(){generation++;JSONObject old=pending;pending=null;status="device";message="Device connection cancelled.";try{proof.clear();}catch(Exception error){message="Connection cancelled. The saved connection could not be cleared; it will expire shortly.";}return old;}
     void cancel(){
-        final JSONObject old;synchronized(PortalStore.LOCK){generation++;old=pending;pending=null;proof.clear();status="device";message="Device connection cancelled.";}cancelNetwork();publish();
+        final JSONObject old;synchronized(PortalStore.LOCK){old=retirePendingLocked();}cancelNetwork();publish();
         commands.execute(()->{if(old!=null&&firebase!=null)cancelRemote(old);});
     }
-    void disconnect(){
-        cancel();synchronized(PortalStore.LOCK){store.adoptOwner(null);}PortalWidgetProvider.updateAll(context);
-        commands.execute(()->{try{open();firebase.auth.signOut();store.adoptOwner(null);status="device";message="Disconnected on this device. Your account Trail is kept.";publish();}catch(Exception error){fail(error);}});
+    void disconnect(String displayedOwner){
+        final JSONObject old;synchronized(PortalStore.LOCK){if(!displayedOwner.equals(store.owner())){message="Explorer account changed. Reopen the account screen.";publish();return;}old=retirePendingLocked();store.adoptOwner(null);}
+        cancelNetwork();publish();PortalWidgetProvider.updateAll(context);
+        commands.execute(()->{try{open();if(old!=null)cancelRemote(old);firebase.auth.signOut();store.adoptOwner(null);status="device";message="Disconnected on this device. Your account Trail is kept.";publish();}catch(Exception error){fail(error);}});
     }
     static String[] callback(Uri uri){
         if(uri==null||!"io.worldexplorer3d.app".equals(uri.getScheme())||!"portal-connect".equals(uri.getHost())||uri.getUserInfo()!=null||uri.getPort()!=-1||uri.getFragment()!=null||uri.getPath()!=null&&!uri.getPath().isEmpty()||uri.getQueryParameterNames().size()!=2)return null;
@@ -110,8 +112,9 @@ final class PortalAccount {
         }catch(Exception error){if(current(version))fail(error);}finally{if(candidate!=null)candidate.deleteCandidate();}});
     }
     void sync(BooleanSupplier allowed){sync(allowed,()->{});}
-    void sync(BooleanSupplier allowed,Runnable complete){final long version=generation;commands.execute(()->{try{open();syncNow(()->current(version)&&allowed.getAsBoolean());}catch(Exception error){if(current(version)&&allowed.getAsBoolean())fail(error);}finally{complete.run();}});}
-    void copyDeviceChoices(){final long version=generation;final String owner=store.owner();commands.execute(()->{try{open();synchronized(PortalStore.LOCK){if(!current(version)||!owner.equals(store.owner()))return;store.copyGuestChoices(owner);}PortalWidgetProvider.updateAll(context);syncNow(()->current(version));}catch(Exception error){if(current(version))fail(error);}});}
+    void sync(BooleanSupplier allowed,Runnable complete){final long version=generation;commands.execute(()->{try{open();syncNow(()->current(version)&&allowed.getAsBoolean());}catch(Exception error){if(current(version)&&allowed.getAsBoolean())fail(error);}finally{
+        if(current(version)&&!allowed.getAsBoolean()&&status.equals("syncing")){status="pending";message="Your choices are saved. Sync will continue when connected.";publish();}complete.run();}});}
+    void copyDeviceChoices(String displayedOwner){final long version=generation;commands.execute(()->{try{open();synchronized(PortalStore.LOCK){if(!current(version)||!displayedOwner.equals(store.owner()))throw new IllegalStateException("Explorer account changed. Reopen the account screen.");store.copyGuestChoices(displayedOwner);}PortalWidgetProvider.updateAll(context);syncNow(()->current(version));}catch(Exception error){if(current(version))fail(error);}});}
     private void syncNow(BooleanSupplier allowed)throws Exception{
         String owner=store.owner();if(owner.equals("device-guest")||store.accountCommitPending()||!allowed.getAsBoolean())return;
         String uid=owner.substring(8);BooleanSupplier active=()->allowed.getAsBoolean()&&owner.equals(store.owner())&&!store.accountCommitPending();

@@ -111,7 +111,7 @@ public final class PortalWidgetProvider extends AppWidgetProvider {
                 else if("next".equals(verb)&&destination.equals(learning)){
                     if(!place.getJSONObject("learning").getString("version").equals(intent.getStringExtra("learningVersion"))){store.showFact(currentWidgetId,destination,0);updateAll(context);return;}
                     int index=store.fact(currentWidgetId),count=PortalStore.facts(place).size();
-                    if(index>=count-1){store.act(destination,"investigate",intent.getStringExtra("owner"));store.closeLearning(currentWidgetId);}else store.showFact(currentWidgetId,destination,index+1);
+                    if(index>=count-1){store.act(destination,"investigate",intent.getStringExtra("owner"),intent.getStringExtra("learningVersion"));store.closeLearning(currentWidgetId);}else store.showFact(currentWidgetId,destination,index+1);
                 }
             }catch(Exception ignored){/* A failed commit cannot create a success state. */}
             updateAll(context);PortalRefreshJob.schedule(context);
