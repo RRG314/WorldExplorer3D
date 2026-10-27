@@ -1,4 +1,4 @@
 <shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
-    <solid android:color="#0C2338" /><corners android:radius="20dp" />
-    <stroke android:width="1dp" android:color="#31546E" />
+    <solid android:color="@color/portal_roam_card" /><corners android:radius="20dp" />
+    <stroke android:width="1dp" android:color="@color/portal_roam_line" />
 </shape>

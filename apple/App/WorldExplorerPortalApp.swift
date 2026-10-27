@@ -58,12 +58,6 @@ import UIKit
     }
 }
 
-private enum PortalStyle {
-    static let background = Color(red: 0.027, green: 0.078, blue: 0.137)
-    static let card = Color(red: 0.055, green: 0.14, blue: 0.21)
-    static let accent = Color(red: 0.34, green: 0.79, blue: 0.98)
-    static let muted = Color(red: 0.72, green: 0.80, blue: 0.87)
-}
 
 struct PortalRootView: View {
     @ObservedObject var model: PortalAppModel
@@ -86,7 +80,7 @@ struct PortalRootView: View {
                     else { discover }
                 }.padding(20).frame(maxWidth: 820, alignment: .leading).frame(maxWidth: .infinity)
             }
-            .background(PortalStyle.background).foregroundStyle(.white).tint(PortalStyle.accent)
+            .background(PortalStyle.background).foregroundStyle(PortalStyle.text).tint(PortalStyle.accent)
             .navigationDestination(for: String.self) { id in PortalPlaceView(model: model, id: id) }
             .sheet(item: Binding(get: { model.openedDestination.map { PortalOpenedPlace(id: $0) } }, set: { model.openedDestination = $0?.id })) { item in
                 NavigationStack { PortalPlaceView(model: model, id: item.id).toolbar { ToolbarItem(placement: .cancellationAction) { Button("Close") { model.openedDestination = nil } } } }
@@ -111,7 +105,7 @@ struct PortalRootView: View {
                     VStack(alignment: .leading, spacing: 8) {
                         Text(place.title).font(.headline); Text(place.region).font(.caption).foregroundStyle(PortalStyle.accent)
                         Text(place.summary).foregroundStyle(PortalStyle.muted)
-                    }.padding(18).frame(maxWidth: .infinity, alignment: .leading).background(PortalStyle.card, in: RoundedRectangle(cornerRadius: 18))
+                    }.padding(18).frame(maxWidth: .infinity, alignment: .leading).background(PortalStyle.card, in: RoundedRectangle(cornerRadius: PortalStyle.cardRadius))
                 }.buttonStyle(.plain)
             }
             Button("Explore together") { model.section = "together" }; Button("Beyond Earth") { model.section = "beyond" }
@@ -129,7 +123,7 @@ struct PortalRootView: View {
                     Text(model.collection?.place(state.destinationId)?.title ?? state.destinationId).font(.headline)
                     Text([state.saved ? "Saved" : nil, state.investigatedAt > 0 ? "Investigated" : nil, state.visitedAt > 0 ? "Visited in 3D" : nil].compactMap { $0 }.joined(separator: " · ")).foregroundStyle(PortalStyle.muted)
                     if model.collection?.place(state.destinationId) != nil { NavigationLink("Open place", value: state.destinationId) }
-                }.padding(18).frame(maxWidth: .infinity, alignment: .leading).background(PortalStyle.card, in: RoundedRectangle(cornerRadius: 18))
+                }.padding(18).frame(maxWidth: .infinity, alignment: .leading).background(PortalStyle.card, in: RoundedRectangle(cornerRadius: PortalStyle.cardRadius))
             }
             Text(model.document.ownerScope == PortalContract.guest ? "Portal's device Trail · connect your Explorer account to share saved places and investigations with the game's Journal." : "Account Trail · offline choices sync when connected.").font(.footnote).foregroundStyle(PortalStyle.muted)
         }
@@ -173,7 +167,7 @@ struct PortalPlaceView: View {
                     if !model.message.isEmpty { Text(model.message).foregroundStyle(PortalStyle.muted) }
                 }.padding(20).frame(maxWidth: 820, alignment: .leading).frame(maxWidth: .infinity)
             }
-        }.background(PortalStyle.background).foregroundStyle(.white).tint(PortalStyle.accent).preferredColorScheme(.dark)
+        }.background(PortalStyle.background).foregroundStyle(PortalStyle.text).tint(PortalStyle.accent).preferredColorScheme(.dark)
     }
 }
 

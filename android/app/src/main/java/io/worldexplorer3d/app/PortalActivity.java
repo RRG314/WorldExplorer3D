@@ -3,7 +3,6 @@ package io.worldexplorer3d.app;
 import android.app.Activity;
 import android.appwidget.AppWidgetManager;
 import android.content.Intent;
-import android.graphics.Color;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Build;
@@ -53,7 +52,7 @@ public final class PortalActivity extends Activity {
     @Override protected void onDestroy(){closed=true;if(account!=null)account.unobserve(accountChanged);work.shutdownNow();super.onDestroy();}
     private int dp(int value){return Math.round(value*getResources().getDisplayMetrics().density);}
     private void shell(){
-        ScrollView scroll=new ScrollView(this);scroll.setFillViewport(true);scroll.setBackgroundColor(Color.rgb(7,20,35));
+        ScrollView scroll=new ScrollView(this);scroll.setFillViewport(true);scroll.setBackgroundColor(getColor(R.color.portal_roam_background));
         content=new LinearLayout(this);content.setOrientation(LinearLayout.VERTICAL);content.setPadding(dp(20),dp(24),dp(20),dp(24));scroll.addView(content);setContentView(scroll);
         final LinearLayout currentContent=content;
         scroll.setOnApplyWindowInsetsListener((view,insets)->{
@@ -65,12 +64,12 @@ public final class PortalActivity extends Activity {
         if(!section.equals("configure")){button(R.string.portal_trail,()->navigate("trail",""));button(R.string.portal_open_game,()->openGame("/app/"));button(R.string.portal_account,()->navigate("account",""));}
     }
     private TextView text(String value,int size,boolean heading){
-        TextView view=new TextView(this);view.setText(value);view.setTextSize(size);view.setTextColor(heading?Color.rgb(230,242,255):Color.rgb(183,203,223));view.setPadding(0,dp(8),0,dp(8));
+        TextView view=new TextView(this);view.setText(value);view.setTextSize(size);view.setTextColor(heading?getColor(R.color.portal_roam_text):getColor(R.color.portal_roam_muted));view.setPadding(0,dp(8),0,dp(8));
         view.setAccessibilityHeading(heading);if(heading)view.setTypeface(null,android.graphics.Typeface.BOLD);content.addView(view,new LinearLayout.LayoutParams(-1,-2));return view;
     }
     private void button(int label,Runnable action){button(getString(label),action);}
     private void button(String label,Runnable action){
-        Button view=new Button(this);view.setText(label);view.setAllCaps(false);view.setTextColor(Color.rgb(230,242,255));view.setBackgroundTintList(android.content.res.ColorStateList.valueOf(Color.rgb(24,53,76)));
+        Button view=new Button(this);view.setText(label);view.setAllCaps(false);view.setTextColor(getColor(R.color.portal_roam_text));view.setBackgroundTintList(android.content.res.ColorStateList.valueOf(getColor(R.color.portal_roam_surface)));
         LinearLayout.LayoutParams params=new LinearLayout.LayoutParams(-1,-2);params.setMargins(0,dp(4),0,dp(4));view.setMinHeight(dp(48));content.addView(view,params);view.setOnClickListener(v->action.run());
     }
     private void navigate(String next,String id){section=next;destination=id;show();}

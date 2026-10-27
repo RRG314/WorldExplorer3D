@@ -1,0 +1,28 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="match_parent"
+    android:orientation="vertical" android:padding="12dp" android:background="@drawable/portal_background">
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:minHeight="48dp" android:gravity="center_vertical">
+        <TextView android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content"
+            android:text="@string/portal_brand" android:textColor="@color/portal_roam_accent" android:textSize="11sp" android:textStyle="bold" android:maxLines="2" />
+        <Button android:id="@+id/portal_settings" android:layout_width="48dp" android:layout_height="48dp"
+            android:contentDescription="@string/portal_settings" android:text="@string/portal_settings_icon" android:textColor="@color/portal_roam_text" android:backgroundTint="@color/portal_roam_surface" />
+    </LinearLayout>
+    <TextView android:id="@+id/portal_title" android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:textColor="@color/portal_roam_text" android:textStyle="bold" android:textSize="18sp" android:maxLines="1" android:ellipsize="end" />
+    <TextView android:id="@+id/portal_region" android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:textColor="@color/portal_roam_muted" android:textSize="12sp" android:maxLines="1" android:ellipsize="end" />
+    <TextView android:id="@+id/portal_body" android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1"
+        android:paddingTop="6dp" android:textColor="@color/portal_roam_muted" android:textSize="14sp" android:maxLines="3" android:ellipsize="end" />
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:minHeight="48dp">
+        <Button android:id="@+id/portal_save" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:minHeight="48dp"
+            android:textColor="@color/portal_roam_text" android:backgroundTint="@color/portal_roam_surface" android:textSize="12sp" />
+        <Button android:id="@+id/portal_investigate" android:layout_width="0dp" android:layout_weight="1.4" android:layout_height="wrap_content" android:minHeight="48dp"
+            android:textColor="@color/portal_roam_text" android:backgroundTint="@color/portal_roam_surface" android:textSize="12sp" />
+        <Button android:id="@+id/portal_open" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:minHeight="48dp"
+            android:textColor="@color/portal_roam_action_text" android:backgroundTint="@color/portal_roam_accent" android:textSize="12sp" />
+    </LinearLayout>
+    <Button android:id="@+id/portal_fact_next" android:layout_width="1dp" android:layout_height="1dp" android:visibility="gone" />
+    <Button android:id="@+id/portal_trail" android:layout_width="1dp" android:layout_height="1dp" android:visibility="gone" />
+    <TextView android:id="@+id/portal_status" android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:textColor="@color/portal_roam_muted" android:textSize="10sp" android:maxLines="1" android:ellipsize="end" />
+</LinearLayout>

@@ -81,6 +81,8 @@ jobs:
           java-version: '21'
       - name: Install the targeted Android platform
         run: '"${ANDROID_HOME:?}/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "build-tools;36.0.0"'
+      - name: Verify shared native presentation tokens
+        run: node scripts/build-native-roam-theme.mjs --check
       - name: Build and lint unsigned packages
         if: github.event_name != 'workflow_dispatch' || !inputs.widget_only
         working-directory: android
