@@ -284,6 +284,7 @@ export const currentContractTests = [
   'tests/scene-object-lifecycle-current.test.mjs',
   'tests/interstellar-expedition-current.test.mjs',
   'tests/living-world-demand-current.test.mjs',
+  'tests/initial-graphics-profile-current.test.mjs',
   'tests/living-world-population-distribution-current.test.mjs',
   'tests/location-model-release-current.test.mjs',
   'tests/mapped-ground-evidence-current.test.mjs',
