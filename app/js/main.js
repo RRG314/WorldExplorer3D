@@ -4,7 +4,7 @@ import { createDebugPresentationSystem } from './runtime/debug-presentation.js?v
 import { createRuntimeKernel } from './runtime/kernel.js?v=3';
 import { createRuntimeFrameSource } from './runtime/frame-source.js';
 import { createLoadingPresentation } from './ui/loading-progress.js?v=1';
-import { dedicatedPresentationActive } from './runtime/renderer-owners.js';
+import { dedicatedPresentationActive,presentationFrameVisible } from './runtime/renderer-owners.js';
 
 let loadingPresentation = null;
 
@@ -101,7 +101,7 @@ const runtimeKernel = createRuntimeKernel({
     gameStarted: !!appCtx.gameStarted
   }),
   isSuspended: dedicatedRendererActive,
-  isSimulationPaused: () => appCtx.paused || globalThis.document?.hidden === true,
+  isSimulationPaused: frame => appCtx.paused || !presentationFrameVisible(appCtx,frame),
   onSuspendedFrame: ({ timestamp }) => {
     appCtx.vrPresentation?.guard?.();
     appCtx.lastTime = timestamp;

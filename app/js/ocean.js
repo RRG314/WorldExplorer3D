@@ -1,4 +1,6 @@
 import {updateControlInputFrame} from './controls/input-frame.js';
+import {captureSessionFrameDriver} from './runtime/frame-source.js';
+import {presentationFrameVisible} from './runtime/renderer-owners.js';
 import {createOceanStreamRuntime,oceanRenderFrame,oceanParentPosition,reprojectOceanPose} from './ocean/stream-runtime.js';
 import {normalizeOceanWaterContext,defaultOceanWaterContext} from './ocean/water-context.js';
 import {OCEAN_DEPTH_MODEL,normalizeOceanDepthProfile,oceanDepthProfileMatchesSite} from './ocean/depth-model.js';
@@ -579,19 +581,24 @@ function updateSubmarine(dt,time) {
     }
   }
 
+  updateSubmarineCamera(dt,false,time);
+}
+
+function updateSubmarineCamera(dt,snap=false,time=performance.now()*.001) {
+  const sub=oceanMode.submarine,sinYaw=Math.sin(sub.yaw),cosYaw=Math.cos(sub.yaw);
   _tmpVecB.set(
     sub.position.x - sinYaw * OCEAN_CONSTANTS.FOLLOW_DISTANCE,
     sub.position.y + OCEAN_CONSTANTS.FOLLOW_HEIGHT,
     sub.position.z - cosYaw * OCEAN_CONSTANTS.FOLLOW_DISTANCE
   );
-  oceanMode.camera.position.lerp(_tmpVecB, expApproachFactor(OCEAN_CONSTANTS.FOLLOW_LERP, dt));
+  oceanMode.camera.position.lerp(_tmpVecB, snap?1:expApproachFactor(OCEAN_CONSTANTS.FOLLOW_LERP, dt));
 
   _tmpVecC.set(
     sub.position.x + sinYaw * OCEAN_CONSTANTS.LOOK_AHEAD,
     sub.position.y + OCEAN_CONSTANTS.LOOK_HEIGHT,
     sub.position.z + cosYaw * OCEAN_CONSTANTS.LOOK_AHEAD
   );
-  oceanMode.cameraLookTarget.lerp(_tmpVecC, expApproachFactor(OCEAN_CONSTANTS.LOOK_LERP, dt));
+  oceanMode.cameraLookTarget.lerp(_tmpVecC, snap?1:expApproachFactor(OCEAN_CONSTANTS.LOOK_LERP, dt));
   const cameraWater=oceanMode.waterSurface.sample(oceanMode.camera.position.x,oceanMode.camera.position.z,{time});
   oceanMode.camera.position.y=Math.min(oceanMode.camera.position.y,cameraWater.surfaceY-.2);
   const parentShip=appCtx.oceanVoyage?.current?.ship;
@@ -637,10 +644,16 @@ function updateOceanStream(nowMs) {
 function animateOceanMode(nowMs = 0) {
   if (!oceanMode.active) return;
   oceanMode.animationId = oceanSessionScope?.animationFrame(animateOceanMode) ?? null;
-  updateControlInputFrame(appCtx, {timestamp: nowMs});
+  stepOceanMode(nowMs);
+}
+
+function stepOceanMode(nowMs,frameContext={}) {
+  if (!oceanMode.active) return;
+  const frame={...frameContext,timestamp:nowMs,flags:{}};
+  updateControlInputFrame(appCtx, frame);
 
   if (!oceanMode.lastFrameMs) oceanMode.lastFrameMs = nowMs;
-  const dt = appCtx.paused || globalThis.document?.hidden ? 0 : acceptedSimulationDelta((nowMs-oceanMode.lastFrameMs)/1000);
+  const dt = appCtx.paused || frame.flags.simulationBlocked || !presentationFrameVisible(appCtx,frame) ? 0 : acceptedSimulationDelta((nowMs-oceanMode.lastFrameMs)/1000);
   oceanMode.lastFrameMs = nowMs;
 
   appCtx.sharedMarine?.tick(dt);
@@ -667,8 +680,23 @@ function animateOceanMode(nowMs = 0) {
 
   appCtx.oceanVoyage?.tick(dt);
   updateOceanHud(nowMs * 0.001);
-  oceanMode.renderer.render(oceanMode.scene, oceanMode.camera);
+  if(appCtx.vrPresentation?.active){appCtx.vrPresentation.updateCamera(frame);appCtx.vrPresentation?.render();}
+  else oceanMode.renderer.render(oceanMode.scene, oceanMode.camera);
 }
+
+oceanMode.captureFrameDriver=()=>{
+  const scope=oceanSessionScope;
+  return captureSessionFrameDriver({scope,isCurrent:()=>oceanSessionScope===scope&&oceanMode.active,
+    getHandle:()=>oceanMode.animationId,setHandle:value=>oceanMode.animationId=value,
+    resetClock:()=>{oceanMode.lastFrameMs=0;},callback:animateOceanMode,step:stepOceanMode});
+};
+
+oceanMode.restorePresentationCamera=()=>{
+  if(!oceanMode.active||!oceanMode.camera)return false;
+  if(oceanMode.diver?.active)oceanMode.diver.restorePresentationCamera();
+  else updateSubmarineCamera(0,true);
+  return true;
+};
 
 async function startOceanMode(options = {}) {
   if(options.isTransferCurrent?.()===false)return false;

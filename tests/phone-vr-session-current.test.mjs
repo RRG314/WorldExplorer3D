@@ -5,13 +5,14 @@ import {readFile} from 'node:fs/promises';
 import {createPhoneVrSession} from '../app/js/vr/phone-session.js';
 import {getLifecycleRegistrySnapshot} from '../app/js/runtime/lifecycle-scope.js?v=2';
 const sandbox=vm.createContext({console});vm.runInContext(await readFile(new URL('../app/vendor/three/build/three.min.js',import.meta.url),'utf8'),sandbox);const THREE=sandbox.THREE;
-function fixture(permission=async()=>true,{ride=null}={}){
+function fixture(permission=async()=>true,{ride=null,configure=()=>{}}={}){
   const target=new EventTarget();target.document=new EventTarget();target.document.hidden=false;target.document.getElementById=()=>null;target.screen={orientation:new EventTarget()};target.innerWidth=844;target.innerHeight=390;
   const reasons=new Set(['unrelated-pause']),events=[],controller=new AbortController(),classes=new Set();let current=true,tracking=true,gaze,disposals=0;
   const ctx={gameStarted:true,scene:new THREE.Scene(),camera:new THREE.PerspectiveCamera(),WORLD_UNITS_PER_METER:1/1.11,
     renderer:{domElement:{classList:{add:value=>classes.add(value),remove:value=>classes.delete(value)}}},carMesh:new THREE.Object3D(),car:{x:0,y:1,z:0,angle:0,speed:0},
     setPauseReason:(reason,active)=>active?reasons.add(reason):reasons.delete(reason),hasPauseReason:reason=>reasons.has(reason),clearControlInputState:reason=>events.push(reason),screenLayout:{setPanelLayer:(id,active)=>events.push([id,active])}};
   Object.defineProperty(ctx,'paused',{get:()=>reasons.size>0});
+  configure(ctx);
   const session=createPhoneVrSession({ctx,THREE,target,optics:{},ride,captureSession:()=>({signal:controller.signal,isCurrent:()=>current}),
     createStereo:()=>({render:()=>events.push('stereo-render'),dispose:()=>disposals++,snapshot:()=>({active:true})}),
     createTracking:()=>({enable:permission,dispose:()=>disposals++,recenter:()=>events.push('recenter'),snapshot:()=>({status:tracking?'active':'stale'}),read:out=>{out.identity();return tracking;}}),
@@ -23,6 +24,25 @@ test('phone VR takes presentation only after permission and starts paused with i
   assert.equal(f.ctx.vrPresentation,f.session);assert.equal(f.reasons.has('vr-user'),true);f.session.beforeInput();assert.equal(f.reasons.has('vr-tracking'),false);f.session.updateCamera({timestamp:0});f.session.render();
   assert.ok(f.events.includes('stereo-render'));assert.equal(JSON.stringify(f.ctx.car),before);f.gaze('toggle');assert.equal(f.reasons.has('vr-user'),false);f.gaze('recenter');assert.ok(f.events.includes('recenter'));
   f.gaze('exit');assert.equal(f.ctx.vrPresentation,null);assert.equal(f.classes.size,0);assert.equal(f.reasons.has('unrelated-pause'),true);assert.equal(f.disposals(),3);
+});
+test('Ocean and free-flight spacecraft use their active renderer, scale and stable actor identity',async()=>{
+  for(const domain of ['submarine','diver','rocket']){
+    const f=fixture(undefined,{configure:ctx=>{
+      const renderer=ctx.renderer,scene=new THREE.Scene(),camera=new THREE.PerspectiveCamera();
+      if(domain==='rocket'){
+        const rocket=new THREE.Group();rocket.position.set(10,20,30);rocket.scale.setScalar(.62);rocket.userData.spaceCraftId='pathfinder-pod';
+        ctx.spaceFlight={active:true,mode:'flying',renderer,scene,camera,rocket};
+      }else{
+        const diver={active:domain==='diver',presentationBody:new THREE.Group(),navigationActor:()=>({position:{x:1,y:-3,z:2},yaw:.2})};
+        ctx.oceanMode={active:true,renderer,scene,camera,diver,submarine:{position:new THREE.Vector3(0,-20,0),yaw:0,mesh:new THREE.Group()}};
+      }
+    }});
+    const source=f.ctx.spaceFlight||f.ctx.oceanMode,body=domain==='rocket'?source.rocket:domain==='diver'?source.diver.presentationBody:source.submarine.mesh;
+    await f.session.start();f.session.beforeInput({flags:{}});f.session.updateCamera({timestamp:0});f.session.render();assert.equal(body.visible,false);
+    assert.equal(f.session.snapshot().worldUnitsPerMeter,domain==='rocket'?.62:1/1.11);assert.ok(source.camera.position.length()>0);assert.ok(f.events.includes('stereo-render'));
+    if(domain==='rocket')source.rocket=new THREE.Group();else if(domain==='diver')source.diver={...source.diver};else source.submarine={...source.submarine};
+    assert.equal(f.session.guard(),false);assert.equal(body.visible,true);assert.equal(f.disposals(),3);
+  }
 });
 test('stale tracking pauses gameplay while retaining the presentation until an explicit restart',async()=>{
   const f=fixture();await f.session.start();f.session.beforeInput();f.gaze('toggle');f.setTracking(false);const frame={flags:{}};f.session.beforeInput(frame);assert.equal(f.reasons.has('vr-tracking'),true);assert.equal(f.session.active,true);assert.equal(frame.flags.simulationBlocked,true);

@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createRuntimeKernel} from '../app/js/runtime/kernel.js';
-import {createRuntimeFrameSource} from '../app/js/runtime/frame-source.js';
-import {getLifecycleRegistrySnapshot} from '../app/js/runtime/lifecycle-scope.js?v=2';
+import {createRuntimeFrameSource,captureSessionFrameDriver} from '../app/js/runtime/frame-source.js';
+import {getLifecycleRegistrySnapshot,createLifecycleScope} from '../app/js/runtime/lifecycle-scope.js?v=2';
 function fixture(){
   let pending=null,frame=null,stops=0,paused=false,sequence=0;
   const frames=[],errors=[];
@@ -52,4 +52,20 @@ test('an obsolete grant is rejected before starting a renderer or disturbing fla
 test('a framebuffer owner can defer flat restart until its asynchronous session has ended',()=>{
   const f=fixture();f.source.start();const lease=f.acquire({resumeOnRelease:false});lease.release('session ending');assert.equal(f.hasFlat(),false);
   f.source.start();assert.equal(f.hasFlat(),true);f.source.dispose();
+});
+test('a dedicated session driver cancels its owned callback, advances once and cannot restart a replacement',()=>{
+  const previousRequest=globalThis.requestAnimationFrame,previousCancel=globalThis.cancelAnimationFrame;
+  const pending=new Map();let sequence=0,handle=null,current=true,resets=0,steps=0;const baseline=getLifecycleRegistrySnapshot().resourceCount;
+  globalThis.requestAnimationFrame=callback=>{pending.set(++sequence,callback);return sequence;};globalThis.cancelAnimationFrame=id=>pending.delete(id);
+  const scope=createLifecycleScope('test-dedicated-world'),f=fixture();
+  try{
+    const driver=captureSessionFrameDriver({scope,isCurrent:()=>current,getHandle:()=>handle,setHandle:value=>handle=value,resetClock:()=>resets++,callback:()=>{},step:()=>steps++});
+    assert.equal(driver.start(),true);assert.equal(pending.size,1);assert.equal(scope.snapshot().resourceCount,1);
+    f.source.start();const lease=f.acquire({driver});assert.equal(pending.size,0);assert.equal(scope.snapshot().resourceCount,0);assert.equal(f.hasFlat(),false);
+    f.send(10);assert.equal(steps,1);assert.equal(f.frames.length,0,'The Earth kernel is not the dedicated simulation');
+    lease.release();assert.equal(pending.size,1);assert.equal(f.hasFlat(),true);assert.equal(driver.start(),false);
+    driver.stop();assert.equal(pending.size,0);assert.ok(resets>=3);current=false;assert.equal(driver.start(),false);assert.equal(driver.runFrame(20),false);assert.equal(steps,1);
+    assert.equal(scope.cancelAnimationFrame(987),false,'An unrelated callback is never cancelled');
+  }finally{scope.dispose();f.source.dispose();if(previousRequest)globalThis.requestAnimationFrame=previousRequest;else delete globalThis.requestAnimationFrame;if(previousCancel)globalThis.cancelAnimationFrame=previousCancel;else delete globalThis.cancelAnimationFrame;}
+  assert.equal(getLifecycleRegistrySnapshot().resourceCount,baseline);
 });

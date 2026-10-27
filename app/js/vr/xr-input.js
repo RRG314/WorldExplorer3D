@@ -35,6 +35,8 @@ export function createXrActionInput(){
       if(mode==='drive')return {turn,steer:turn,move,throttle:Math.max(throttle,move),reverse:Math.max(0,-move),serviceBrake:brake};
       if(mode==='plane')return {turn,steer:turn,roll:turn,pitch,throttleAdjust:throttle-brake};
       if(mode==='walk')return {move,strafe:-turn,sprint:0};
+      if(mode==='ocean')return {turn,move,vertical:-pitch};
+      if(mode==='rocket')return {turn,move:-pitch,jump:throttle,sprint:brake};
       return null;
     },
     snapshot:()=>({armed,sampled:!!sample})
@@ -43,9 +45,9 @@ export function createXrActionInput(){
 
 export function mergeXrActions(actions,immersive){
   if(!immersive)return actions;
-  for(const key of ['move','turn','steer','strafe','roll','pitch','throttleAdjust']){
+  for(const key of ['move','turn','steer','strafe','roll','pitch','throttleAdjust','vertical']){
     const value=clamp(immersive[key]);if(Math.abs(value)>Math.abs(actions[key]||0))actions[key]=value;
   }
-  for(const key of ['throttle','reverse','serviceBrake'])actions[key]=Math.max(actions[key]||0,Math.max(0,clamp(immersive[key])));
+  for(const key of ['throttle','reverse','serviceBrake','jump','sprint'])actions[key]=Math.max(actions[key]||0,Math.max(0,clamp(immersive[key])));
   return actions;
 }

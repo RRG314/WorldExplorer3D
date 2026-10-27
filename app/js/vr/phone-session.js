@@ -11,20 +11,19 @@ export function createPhoneVrSession({ctx,THREE,optics,captureSession,ride=null,
   if(!ctx.gameStarted||ctx.worldLoading||ctx.titleLaunchPending||ctx.arSessionActive||ctx.fishingGame?.open||ctx.blockBuildMode)throw new Error('Close the current activity and finish loading a world before entering VR.');
   if(ctx.getLiveGpsSnapshot?.().active)throw new Error('Stop live GPS movement before entering a seated VR view.');
   const admission=vrMountEligibility(ctx);if(!admission.eligible)throw new Error(admission.reason);
-  let presentation=capturePresentation(ctx);if(presentation.owner!=='main'||!presentation.renderer||!presentation.scene||!presentation.camera)throw new Error('The current renderer cannot enter this phone view.');
-  const world=captureSession(),scope=createLifecycleScope('vr-phone-session'),units=ctx.WORLD_UNITS_PER_METER;
+  let presentation=capturePresentation(ctx);if(!presentation.renderer||!presentation.scene||!presentation.camera)throw new Error('The current renderer cannot enter this phone view.');
+  const world=captureSession(),scope=createLifecycleScope('vr-phone-session'),units=admission.worldUnitsPerMeter;
   scope.defer(()=>ride?.dispose());
   const mount=new THREE.PerspectiveCamera(),head=new THREE.Quaternion(),mountPosition=new THREE.Vector3(),mountQuaternion=new THREE.Quaternion();
   let active=true,started=false,tracking=false,userPaused=true;
-  const oldCamera={up:presentation.camera.up.clone(),near:presentation.camera.near};let body=ctx.planeMode?.active?ctx.planeMode.mesh:null;const oldVisible=body?.visible;
+  const oldCamera={up:presentation.camera.up.clone(),near:presentation.camera.near};let body=admission.hiddenBody;const oldVisible=body?.visible;
   const viewport={width:target.innerWidth,height:target.innerHeight};
-  const mountBody=()=>admission.control.mode==='drive'?ctx.carMesh:admission.control.mode==='walk'?ctx.Walk?.state?.walker:ctx.planeMode;
-  let originalBody=mountBody();
+  let originalBody=admission.body;
   const current=()=>{
     const next=vrMountEligibility(ctx),layer=ctx.screenLayout?.getPanelLayer?.();
     return active&&ctx.gameStarted&&world.isCurrent()&&presentation.isCurrent()&&!ctx.worldLoading&&!ctx.titleLaunchPending&&!ctx.arSessionActive&&!ctx.getLiveGpsSnapshot?.().active&&!ctx.showLargeMap&&!ctx.fishingGame?.open&&!ctx.blockBuildMode&&
       (!started||layer===undefined||layer==='vr')&&
-      next.eligible&&next.control.mode===admission.control.mode&&next.control.occupancy===admission.control.occupancy&&next.control.frame===admission.control.frame&&mountBody()===originalBody;
+      next.eligible&&next.control.mode===admission.control.mode&&next.control.occupancy===admission.control.occupancy&&next.control.frame===admission.control.frame&&next.body===originalBody&&next.hiddenBody===body&&next.worldUnitsPerMeter===units;
   };
   const stop=(reason='user-exit')=>{
     if(!active)return false;active=false;scope.dispose(reason);
@@ -32,7 +31,7 @@ export function createPhoneVrSession({ctx,THREE,optics,captureSession,ride=null,
     ctx.setPauseReason?.('vr-tracking',false);ctx.setPauseReason?.('vr-user',false);ctx.clearControlInputState?.('vr-exit');
     ctx.screenLayout?.setPanelLayer?.('vr',false);
     presentation.camera.up.copy(oldCamera.up);presentation.camera.near=oldCamera.near;presentation.camera.updateProjectionMatrix();
-    if(body)body.visible=oldVisible;presentation=body=originalBody=null;onExit(reason);return true;
+    if(body)body.visible=oldVisible;presentation.restoreCamera();presentation=body=originalBody=null;onExit(reason);return true;
   };
   const tracker=createTracking({THREE,target,isCurrent:current});scope.defer(()=>tracker.dispose());
   let stereo,controls;
@@ -78,7 +77,7 @@ export function createPhoneVrSession({ctx,THREE,optics,captureSession,ride=null,
       presentation.renderer.domElement.classList.add('vrMainCanvas');scope.defer(()=>presentation.renderer.domElement.classList.remove('vrMainCanvas'));
       return true;
     },
-    snapshot:()=>({active,started,tracking,userPaused,kind:'phone',stereo:stereo.snapshot(),sensor:tracker.snapshot(),ride:ride?.snapshot()||null})
+    snapshot:()=>({active,started,tracking,userPaused,kind:'phone',frame:admission.control.frame,worldUnitsPerMeter:units,stereo:stereo.snapshot(),sensor:tracker.snapshot(),ride:ride?.snapshot()||null})
   };
   scope.listen(world.signal,'abort',()=>stop('environment-changed'));
   scope.listen(target,'keydown',event=>{if(started&&event.code==='Escape'){event.preventDefault();event.stopImmediatePropagation();stop('escape');}},{capture:true});

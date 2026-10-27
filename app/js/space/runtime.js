@@ -1,4 +1,5 @@
 import {updateControlInputFrame} from '../controls/input-frame.js';
+import {presentationFrameVisible} from '../runtime/renderer-owners.js';
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import {acceptedSimulationDelta,frameDamping} from '../runtime/simulation-clock.js';
 import {
@@ -477,12 +478,17 @@ export function updateSpaceFlightPhysics() {
   }));
   appCtx.spaceFlight.characterHandling = characterFlight;
 
-  // Read the axes the player is looking through before applying either turn.
-  // These remain continuous with the chase view and have no world-axis pole.
+  // A head-tracked view cannot steer by looking. Use the craft's transported
+  // seat axes in VR; ordinary play keeps its existing chase-view convention.
   _sfForward.set(0, 1, 0).applyQuaternion(rocket.quaternion).normalize();
-  _sfControlRight.set(1, 0, 0).applyQuaternion(appCtx.spaceFlight.camera.quaternion);
+  if(appCtx.vrPresentation?.headTracking){
+    _sfControlRight.set(-1,0,0).applyQuaternion(rocket.quaternion);
+    _sfControlUp.set(0,0,-1).applyQuaternion(rocket.quaternion);
+  }else{
+    _sfControlRight.set(1,0,0).applyQuaternion(appCtx.spaceFlight.camera.quaternion);
+    _sfControlUp.set(0,1,0).applyQuaternion(appCtx.spaceFlight.camera.quaternion);
+  }
   _sfControlRight.addScaledVector(_sfForward, -_sfControlRight.dot(_sfForward)).normalize();
-  _sfControlUp.set(0, 1, 0).applyQuaternion(appCtx.spaceFlight.camera.quaternion);
   _sfControlUp.addScaledVector(_sfForward, -_sfControlUp.dot(_sfForward)).normalize();
   _sfControlYawAxis.crossVectors(_sfForward, _sfControlRight).normalize();
   _sfControlPitchAxis.crossVectors(_sfForward, _sfControlUp).normalize();
@@ -744,18 +750,26 @@ export function updateSpaceFlightCamera(dt = (appCtx.spaceFlight._frameScale ?? 
   appCtx.spaceFlight._snapCameraToCraft = false;
 }
 
-export function animateSpaceFlight(deps = {}) {
+export function animateSpaceFlight(deps = {}, timestamp) {
   if (!appCtx.spaceFlight.active) return;
 
   const requestFrame = deps.requestFrame || globalThis.requestAnimationFrame;
-  appCtx.spaceFlight.animationId = requestFrame(() => animateSpaceFlight(deps));
+  appCtx.spaceFlight.animationId = requestFrame(timestamp => animateSpaceFlight(deps, timestamp));
+  stepSpaceFlight(deps, timestamp);
+}
 
-  const frameNow = performance.now();
+export function stepSpaceFlight(deps = {}, frameNow = performance.now(), frameContext = {}) {
+  if (!appCtx.spaceFlight.active) return;
   const previousFrame = appCtx.spaceFlight._lastFrameMs || frameNow - (1000 / 60);
   appCtx.spaceFlight._frameScale = acceptedSimulationDelta((frameNow-previousFrame)/1000)*60;
   appCtx.spaceFlight._lastFrameMs = frameNow;
-  updateControlInputFrame(appCtx, {timestamp: frameNow});
-  if(appCtx.paused||globalThis.document?.hidden)return;
+  const frame={...frameContext,timestamp:frameNow,flags:{}};
+  updateControlInputFrame(appCtx, frame);
+  // Pausing locomotion must not freeze head tracking, gaze or Exit.
+  if(appCtx.paused||frame.flags.simulationBlocked||!presentationFrameVisible(appCtx,frame)){
+    if(appCtx.vrPresentation?.active&&presentationFrameVisible(appCtx,frame)){appCtx.vrPresentation.updateCamera(frame);appCtx.vrPresentation?.render();}
+    return;
+  }
 
   if (appCtx.spaceFlight.earth) appCtx.spaceFlight.earth.rotation.y += 0.0005 * appCtx.spaceFlight._frameScale;
   if (appCtx.spaceFlight.moon) appCtx.spaceFlight.moon.rotation.y += 0.0002 * appCtx.spaceFlight._frameScale;
@@ -790,11 +804,12 @@ export function animateSpaceFlight(deps = {}) {
   updateSpaceFlightPhysics();
   appCtx.updatePirateInterception?.(appCtx.spaceFlight._frameScale / 60);
   if (!hostileInterceptionActive) deps.updateSpaceFlightHUD?.(findLandableBodyByName);
-  updateSpaceFlightCamera();
+  if(!appCtx.vrPresentation?.active||appCtx.vrPresentation.updateCamera(frame)===false)updateSpaceFlightCamera();
   appCtx.updateExpeditionPodFlightPresentation?.(appCtx.spaceFlight._frameScale / 60);
 
   if (appCtx.spaceFlight.renderer && appCtx.spaceFlight.scene && appCtx.spaceFlight.camera) {
-    appCtx.spaceFlight.renderer.render(appCtx.spaceFlight.scene, appCtx.spaceFlight.camera);
+    if(!appCtx.vrPresentation?.active)appCtx.spaceFlight.renderer.render(appCtx.spaceFlight.scene, appCtx.spaceFlight.camera);
+    else appCtx.vrPresentation.render();
   }
 }
 

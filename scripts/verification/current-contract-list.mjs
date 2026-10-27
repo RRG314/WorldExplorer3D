@@ -71,6 +71,7 @@ export const currentContractTests = [
   'tests/phone-optics-current.test.mjs',
   'tests/phone-head-tracking-current.test.mjs',
   'tests/phone-vr-session-current.test.mjs',
+  'tests/vr-domain-mounts-current.test.mjs',
   'tests/xr-world-views-current.test.mjs',
   'tests/xr-input-current.test.mjs',
   'tests/tracked-vr-session-current.test.mjs',

@@ -4,7 +4,8 @@ import { ctx as appCtx } from "./shared-context.js?v=55";
 import { getPrimaryWorldCanvas } from "./engine/webgl-lifecycle.js?v=2";
 import { captureEarthWorldSession } from "./earth-session.js?v=17";
 import { suspendEarthModesForPlanetaryEntry } from "./planetary/entry.js?v=9";
-import { animateSpaceFlight as animateSpaceFlightRuntime, attemptLanding as attemptLandingRuntime, configureSpaceRuntimeDependencies, forceSpaceFlightLanding as forceSpaceFlightLandingRuntime, setSpaceFlightLandingTarget as setSpaceFlightLandingTargetRuntime, updateSpaceFlightPhysics } from "./space/runtime.js?v=35";
+import { animateSpaceFlight as animateSpaceFlightRuntime, stepSpaceFlight, updateSpaceFlightCamera, attemptLanding as attemptLandingRuntime, configureSpaceRuntimeDependencies, forceSpaceFlightLanding as forceSpaceFlightLandingRuntime, setSpaceFlightLandingTarget as setSpaceFlightLandingTargetRuntime, updateSpaceFlightPhysics } from "./space/runtime.js?v=35";
+import {captureSessionFrameDriver} from './runtime/frame-source.js';
 import { createSpaceFlightScene, destroySpaceFlightScene, ensureSolisReachDockTarget, ensureExtendedSpaceScene, getSolisReachDockTarget, orientActiveCraftForAtmosphere, orientActiveCraftTowardSolisReach, positionSpacecraftAtSolisReachDock, resetSpaceFlightForEarth, resetSpaceFlightForMars, resetSpaceFlightForMoon, setExpeditionPodFlightPresentation, setSolisReachFlightPresentation, updateExpeditionPodFlightPresentation } from "./space/scene.js?v=54";
 import { hideGameUI, initSpaceFlightUI, prepareSpaceFlightHudForEntry, setSpaceFlightHudCollapsed, showFlightMessage, showGameUI, updateSpaceFlightHUD } from "./space/ui.js?v=53";
 import { createLifecycleScope } from './runtime/lifecycle-scope.js?v=2';
@@ -203,6 +204,18 @@ const animationDeps = {
   completeLanding,
   requestFrame: requestSessionFrame,
   updateSpaceFlightHUD
+};
+
+appCtx.spaceFlight.captureFrameDriver=()=>{
+  const scope=spaceSessionScope,sessionId=appCtx.spaceFlight._sessionId;
+  return captureSessionFrameDriver({scope,isCurrent:()=>spaceSessionScope===scope&&isCurrentSpaceFlightSession(sessionId),
+    getHandle:()=>appCtx.spaceFlight.animationId,setHandle:value=>appCtx.spaceFlight.animationId=value,
+    resetClock:()=>{appCtx.spaceFlight._lastFrameMs=0;},callback:timestamp=>animateSpaceFlightRuntime(animationDeps,timestamp),
+    step:(timestamp,frame)=>stepSpaceFlight(animationDeps,timestamp,frame)});
+};
+appCtx.spaceFlight.restorePresentationCamera=()=>{
+  if(!appCtx.spaceFlight.active||!appCtx.spaceFlight.rocket||!appCtx.spaceFlight.camera)return false;
+  appCtx.spaceFlight._snapCameraToCraft=true;updateSpaceFlightCamera(0);return true;
 };
 
 function startSpaceFlightToMoon(options = {}) {

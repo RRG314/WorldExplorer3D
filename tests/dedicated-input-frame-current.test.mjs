@@ -26,7 +26,8 @@ test('actual Space and Ocean callback prefixes poll once on fresh launch, throug
  // The remainder renders/advances its world and belongs to browser acceptance.
  for(const [file,name,frame] of [['space/runtime.js','animateSpaceFlight','spaceFlight'],['ocean.js','animateOceanMode','oceanMode']]){
   const source=await readFile(new URL('../app/js/'+file,import.meta.url),'utf8');const ast=parse(source,{sourceType:'module'});const fn=ast.program.body.map(n=>n.declaration||n).find(n=>n.type==='FunctionDeclaration'&&n.id.name===name);assert.ok(fn);
-  const statements=fn.body.body.filter(n=>n.type==='ExpressionStatement'&&n.expression.type==='CallExpression'&&n.expression.callee.name==='updateControlInputFrame');assert.equal(statements.length,1);const prefix=source.slice(fn.start,statements[0].end)+'\n}';
+  const step=ast.program.body.map(n=>n.declaration||n).find(n=>n.type==='FunctionDeclaration'&&n.id.name===(frame==='spaceFlight'?'stepSpaceFlight':'stepOceanMode'));assert.ok(step);
+  const statements=step.body.body.filter(n=>n.type==='ExpressionStatement'&&n.expression.type==='CallExpression'&&n.expression.callee.name==='updateControlInputFrame');assert.equal(statements.length,1);const prefix=source.slice(fn.start,fn.end)+'\n'+source.slice(step.start,statements[0].end)+'\n}';
   const {ctx,calls}=context();ctx[frame].active=true;ctx.paused=true;let scheduled=0;const schedule=()=>++scheduled;const bindings={acceptedSimulationDelta,appCtx:ctx,oceanMode:ctx.oceanMode,oceanSessionScope:{animationFrame:schedule},updateControlInputFrame,performance:{now:()=>1000},requestAnimationFrame:schedule};
   vm.runInNewContext(prefix+`;${name}();`,bindings);assert.deepEqual(calls,['before','input'],file);assert.equal(scheduled,1,file+' uses its one existing callback');calls.length=0;ctx[frame].active=false;
   vm.runInNewContext(prefix+`;${name}();`,bindings);assert.deepEqual(calls,[]);assert.equal(scheduled,1,'Inactive owner cannot schedule or poll');

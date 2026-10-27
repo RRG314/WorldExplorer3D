@@ -47,7 +47,16 @@ function createLifecycleScope(owner = 'runtime') {
       if (active) callback(timestamp);
     });
     record = track('animation-frame', () => globalThis.cancelAnimationFrame?.(handle));
+    if (record) record.handle = handle;
     return handle;
+  }
+
+  function cancelAnimationFrame(handle) {
+    const record = [...records].find(item => item.type === 'animation-frame' && item.handle === handle);
+    if (!record) return false;
+    record.cancel();
+    release(record);
+    return true;
   }
 
   function listen(target, eventName, listener, options) {
@@ -107,6 +116,7 @@ function createLifecycleScope(owner = 'runtime') {
 
   const scope = Object.freeze({
     animationFrame,
+    cancelAnimationFrame,
     defer,
     dispose,
     guard,

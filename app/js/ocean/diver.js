@@ -132,7 +132,12 @@ export function createOceanDiver(ctx,mode,{sampleSeabedHeight,worldRadius=1200})
     }
     if(!falling)controller.update(dt,{actions,forward:Number(actions.move)||0,strafe:0,groundState:{effectiveGroundY:sampleSeabedHeight(w.x,w.z)}});
     if(!falling&&!state.walker.swimming){board(true);return false;}
-    const yaw=w.yaw+w.lookYawOffset,water=mode.waterSurface.sample(w.x,w.z,{time});
+    updateCamera(dt,false,time);
+    button.textContent=`${returnTarget==='vessel'?'Board vessel':'Board submarine'} · ${Math.round(boardingDistance())} m`;button.disabled=falling||boardingDistance()>8;
+    return true;
+  }
+  function updateCamera(dt,snap=false,time=performance.now()*.001){
+    const w=state.walker,yaw=w.yaw+w.lookYawOffset,water=mode.waterSurface.sample(w.x,w.z,{time});
     mode.waterSample=water.volume;
     const followDistance=5*Math.max(1,Math.min(1.45,1/(mode.camera.aspect||1)));
     cameraTarget.set(w.x-Math.sin(yaw)*followDistance,w.y+1.2-Math.sin(w.pitch)*2,w.z-Math.cos(yaw)*followDistance);
@@ -141,17 +146,15 @@ export function createOceanDiver(ctx,mode,{sampleSeabedHeight,worldRadius=1200})
     lookTarget.set(w.x,w.y-.4,w.z);
     const safeTarget=resolveOceanDiverCameraPose({anchor:lookTarget,target:cameraTarget,submarinePosition:mode.submarine.position,checkBuildingCollision:allHullCollisionAt});
     cameraTarget.set(safeTarget.x,safeTarget.y,safeTarget.z);
-    mode.camera.position.lerp(cameraTarget,1-Math.exp(-dt*7));
+    mode.camera.position.lerp(cameraTarget,snap?1:1-Math.exp(-dt*7));
     const cameraPose=resolveOceanDiverCameraPose({anchor:lookTarget,target:mode.camera.position,submarinePosition:mode.submarine.position,checkBuildingCollision:allHullCollisionAt});
     mode.camera.position.set(cameraPose.x,cameraPose.y,cameraPose.z);
     // On a portrait display, keep the explorer left of the compact right HUD.
     // Collision stays anchored to the actual body; only optical framing shifts.
     frameOceanDiverLookTarget(lookTarget,mode.camera);
     mode.camera.lookAt(lookTarget);
-    button.textContent=`${returnTarget==='vessel'?'Board vessel':'Board submarine'} · ${Math.round(boardingDistance())} m`;button.disabled=falling||boardingDistance()>8;
-    return true;
   }
-  return {rebase(oldFrame,newFrame){const p=reprojectOceanPose(state.walker,oldFrame,newFrame);Object.assign(state.walker,p);host.position.x=p.x;host.position.z=p.z;mode.submarine.mesh.updateMatrixWorld(true);box.setFromObject(mode.submarine.mesh);},get active(){return active},start,stop,board,update,
+  return {get presentationBody(){return host;},restorePresentationCamera:()=>{if(active)updateCamera(0,true);},rebase(oldFrame,newFrame){const p=reprojectOceanPose(state.walker,oldFrame,newFrame);Object.assign(state.walker,p);host.position.x=p.x;host.position.z=p.z;mode.submarine.mesh.updateMatrixWorld(true);box.setFromObject(mode.submarine.mesh);},get active(){return active},start,stop,board,update,
     navigationActor:()=>({position:{x:state.walker.x,y:state.walker.y,z:state.walker.z},yaw:state.walker.yaw,vx:state.walker.vx||0,vy:state.walker.vy||0,vz:state.walker.vz||0,speed:Math.hypot(state.walker.vx||0,state.walker.vz||0)}),
     snapshot:()=>({active,pending,ready,returnTarget,falling,position:{x:state.walker.x,y:state.walker.y,z:state.walker.z},swimming:state.walker.swimming||null,distanceToSubMeters:active?separation()*units:null}),
     dispose(){if(disposed)return;disposed=true;stop();panel.remove();disposeCuratedCharacter(host);host.parent?.remove(host);}

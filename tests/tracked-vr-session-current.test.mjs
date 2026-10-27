@@ -6,10 +6,12 @@ import {createTrackedVrSession} from '../app/js/vr/xr-session.js';
 import {createRuntimeKernel} from '../app/js/runtime/kernel.js';
 import {createRuntimeFrameSource} from '../app/js/runtime/frame-source.js';
 import {getLifecycleRegistrySnapshot} from '../app/js/runtime/lifecycle-scope.js?v=2';
+import {updateControlInputFrame} from '../app/js/controls/input-frame.js';
+import {presentationFrameVisible} from '../app/js/runtime/renderer-owners.js';
 const sandbox=vm.createContext({console});vm.runInContext(await readFile(new URL('../app/vendor/three/build/three.min.js',import.meta.url),'utf8'),sandbox);const T=sandbox.THREE,units=1/1.11;
 const deferred=()=>{let resolve,reject;const promise=new Promise((a,b)=>{resolve=a;reject=b;});return {promise,resolve,reject};};
 function pose(x=0){const projection=new T.Matrix4().makePerspective(-.05,.05,.05,-.05,.05,100).toArray();return {transform:{matrix:new T.Matrix4().makeTranslation(x,1.6,0).toArray()},views:[-1,1].map(eye=>({eye,transform:{matrix:new T.Matrix4().makeTranslation(x+eye*.032,1.6,0).toArray()},projectionMatrix:projection}))};}
-function fixture({permission,compatibility,reference,delayedEnd=false,layerFailure=false,ride=null}={}){
+function fixture({permission,compatibility,reference,delayedEnd=false,layerFailure=false,ride=null,configure=()=>{}}={}){
   const target=new EventTarget(),abort=new AbortController(),native=new EventTarget(),ref=new EventTarget(),reasons=new Set(),events=[],frames=new Map();let next=0,flat=null,current=true,layerCount=0,draws=0,gaze,runEnd;
   target.document={hidden:false,getElementById:()=>null};target.isSecureContext=true;target.innerWidth=1280;target.innerHeight=720;
   native.visibilityState='visible';native.inputSources=[];native.renderState={};native.requestReferenceSpace=()=>reference?.promise||Promise.resolve(ref);
@@ -26,17 +28,18 @@ function fixture({permission,compatibility,reference,delayedEnd=false,layerFailu
   const ctx={gameStarted:true,scene:new T.Scene(),camera:new T.PerspectiveCamera(60,1,.1,100*units),renderer,WORLD_UNITS_PER_METER:units,carMesh:new T.Object3D(),car:{x:0,y:0,z:0,angle:0,speed:0},
     setPauseReason:(key,active)=>active?reasons.add(key):reasons.delete(key),hasPauseReason:key=>reasons.has(key),clearControlInputState:()=>{},screenLayout:{setPanelLayer:()=>{}}};
   Object.defineProperty(ctx,'paused',{get:()=>reasons.size>0});
-  const kernel=createRuntimeKernel({getContext:()=>({appCtx:ctx}),isSimulationPaused:()=>ctx.paused,requestFrame:callback=>{assert.equal(flat,null);flat=callback;return 1;},cancelFrame:()=>flat=null});
+  const kernel=createRuntimeKernel({getContext:()=>({appCtx:ctx}),isSimulationPaused:frame=>ctx.paused||!presentationFrameVisible(ctx,frame),requestFrame:callback=>{assert.equal(flat,null);flat=callback;return 1;},cancelFrame:()=>flat=null});
   const errors=[],source=createRuntimeFrameSource(kernel,{onError:row=>errors.push(row)});
-  kernel.registerSystem({id:'input',phase:'input',update:frame=>ctx.vrPresentation?.beforeInput(frame)});
+  kernel.registerSystem({id:'input',phase:'input',update:frame=>updateControlInputFrame(ctx,frame)});
   kernel.registerSystem({id:'simulation',phase:'simulation',update:frame=>{if(!frame.flags.simulationBlocked)events.push(['simulation',frame.dt]);}});
   kernel.registerSystem({id:'camera',phase:'camera',update:frame=>ctx.vrPresentation?.updateCamera(frame)});
   kernel.registerSystem({id:'render',phase:'render',update:()=>ctx.vrPresentation?.render()});
   ctx.acquireRuntimeFrameSource=options=>source.acquire(options);ctx.getRuntimeKernelSnapshot=()=>kernel.snapshot();ctx.renderLoop=()=>source.start();source.start();
+  configure(ctx,kernel);
   const session=createTrackedVrSession({ctx,THREE:T,target,ride,captureSession:()=>({signal:abort.signal,isCurrent:()=>current}),
     createControls:options=>{gaze=options.onAction;return {update(){},reset(){},select:()=>true,selectRay:()=>true,dispose:()=>events.push('controls-disposed')};}});
   return {ctx,target,native,ref,session,source,events,errors,reasons,abort,end,gaze:action=>gaze(action),flat:()=>!!flat,layers:()=>layerCount,draws:()=>draws,bound:()=>bound,
-    setCurrent:value=>current=value,resolveEnd:()=>runEnd(),send:(value=pose(),time=0)=>{const [id,callback]=frames.entries().next().value;frames.delete(id);callback(time,{getViewerPose:()=>value});},
+    setCurrent:value=>current=value,resolveEnd:()=>runEnd(),send:(value=pose(),time=0)=>{const [id,callback]=frames.entries().next().value;frames.delete(id);const frame={getViewerPose:()=>value};callback(time,frame);return frame;},
     cleanup:async()=>{await session.stop();source.dispose();}};
 }
 test('real kernel receives only compositor frames, physical views stay scaled and cleanup restores flat ownership',async()=>{
@@ -46,6 +49,30 @@ test('real kernel receives only compositor frames, physical views stay scaled an
   const first=f.ctx.camera.position.clone();f.send(pose(.1),20);assert.ok(Math.abs(f.ctx.camera.position.distanceTo(first)-.1*units)<1e-10);
   assert.ok(Math.abs(f.session.snapshot().eyeSeparationWorld-.064*units)<1e-10);f.gaze('toggle');f.send(pose(.1),40);assert.equal(f.session.snapshot().userPaused,false);
   await f.session.stop();assert.equal(f.flat(),true);assert.equal(f.ctx.vrPresentation,null);assert.equal(getLifecycleRegistrySnapshot().resourceCount,baseline);f.source.dispose();
+});
+test('tracked Ocean and spacecraft borrow their dedicated driver and restore it only after native end',async()=>{
+  for(const domain of ['ocean','space']){
+    let running=true,starts=0,frames=0;
+    const f=fixture({delayedEnd:true,configure:(ctx,kernel)=>{
+      const driver={start(){running=true;starts++;},stop(){running=false;},snapshot:()=>({running}),runFrame:(timestamp,frame)=>{frames++;kernel.runFrame(timestamp,frame);}};
+      const view={active:true,renderer:ctx.renderer,scene:new T.Scene(),camera:new T.PerspectiveCamera(60,1,.05,100),captureFrameDriver:()=>driver};
+      if(domain==='ocean'){ctx.oceanMode={...view,submarine:{position:new T.Vector3(0,-20,0),yaw:0,mesh:new T.Group()}};}
+      else{const rocket=new T.Group();rocket.scale.setScalar(.62);rocket.userData.spaceCraftId='pathfinder-pod';ctx.spaceFlight={...view,rocket,mode:'flying'};}
+    }});
+    await f.session.start();assert.equal(running,false);assert.equal(f.flat(),false);f.send();assert.equal(frames,1);assert.equal(f.draws(),1);
+    assert.ok(Math.abs(f.session.snapshot().eyeSeparationWorld-.064*(domain==='space'?.62:units))<1e-10);
+    const ending=f.session.stop();assert.equal(running,false);assert.equal(starts,0);f.resolveEnd();await ending;assert.equal(running,true);assert.equal(starts,1);assert.equal(f.flat(),true);f.source.dispose();
+  }
+});
+test('only the executing visible compositor frame can use input while the HTML document is hidden',async()=>{
+  const saved=Object.getOwnPropertyDescriptor(globalThis,'document'),f=fixture();
+  try{
+    globalThis.document={hidden:true};await f.session.start();const nativeFrame=f.send();assert.equal(f.session.snapshot().tracking,true);assert.equal(f.draws(),1);
+    assert.equal(f.session.isFrameVisible({source:'webxr-vr',xrFrame:nativeFrame}),false,'A retained native frame is obsolete outside its callback');
+    assert.equal(updateControlInputFrame(f.ctx,{source:'window'}),false);assert.equal(updateControlInputFrame(f.ctx,{source:'webxr-vr',xrFrame:{}}),false);
+    f.gaze('toggle');f.send(pose(),20);assert.ok(f.events.some(event=>Array.isArray(event)&&event[0]==='simulation'&&event[1]>0));
+    f.native.visibilityState='visible-blurred';f.native.dispatchEvent(new Event('visibilitychange'));f.send(pose(),40);assert.equal(f.session.snapshot().userPaused,true);
+  }finally{await f.cleanup();if(saved)Object.defineProperty(globalThis,'document',saved);else delete globalThis.document;}
 });
 test('missing pose and blurred visibility block movement and require deliberate restart after tracking returns',async()=>{
   const f=fixture();await f.session.start();f.send();f.gaze('toggle');f.send(pose(),20);

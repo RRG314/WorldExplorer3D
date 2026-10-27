@@ -14,7 +14,9 @@ test('standard controller slots produce distinct car, aircraft and walking actio
   input.update([source('left',[0,0,-1,0],.4),source('right',[0,0,0,-1],.8)],true);
   assert.deepEqual(input.read('drive'),{turn:1,steer:1,move:-0,throttle:.8,reverse:0,serviceBrake:.4});
   const plane=input.read('plane');assert.equal(plane.roll,1);assert.equal(plane.pitch,-1);assert.equal(plane.throttleAdjust,.4);
-  assert.deepEqual(input.read('walk'),{move:-0,strafe:-1,sprint:0});assert.equal(input.read('ocean'),null);
+  assert.deepEqual(input.read('walk'),{move:-0,strafe:-1,sprint:0});
+  assert.deepEqual(input.read('ocean'),{turn:1,move:-0,vertical:1});
+  assert.deepEqual(input.read('rocket'),{turn:1,move:1,jump:.8,sprint:.4});assert.equal(input.read('unknown'),null);
 });
 test('unknown mappings, absent sources, invalid values and untouched pads cannot create movement',()=>{
   const input=createXrActionInput();input.update([],true);
@@ -26,4 +28,5 @@ test('the action reader merge preserves stronger existing controls and rejects n
   const actions={mode:'drive',turn:1,steer:1,throttle:.8,reverse:0};
   assert.equal(mergeXrActions(actions,{turn:-.5,steer:-.5,throttle:.3,serviceBrake:.7,move:NaN}),actions);
   assert.equal(actions.turn,1);assert.equal(actions.throttle,.8);assert.equal(actions.serviceBrake,.7);assert.equal(actions.move,undefined);
+  mergeXrActions(actions,{vertical:-.7,jump:.8,sprint:.4});assert.equal(actions.vertical,-.7);assert.equal(actions.jump,.8);assert.equal(actions.sprint,.4);
 });
