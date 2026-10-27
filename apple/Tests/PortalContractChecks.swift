@@ -85,7 +85,15 @@ enum PortalContractChecks {
             catch { failures.mark() }
         }
         try check(!failures.value() && store.snapshot().syncedAt["contention"] == 40, "Shared file lock lost concurrent updates."); count += 1
-        try check(!places.gameAvailable(places.place(id)!, now: PortalContract.milliseconds()), "Unqualified collection offered a game visit."); count += 1
+        guard let offer = places.offers.first(where: { $0.destinationId == id && $0.deviceProfile == "mobile-touch" }) else {
+            throw PortalError.invalid("The reviewed mobile destination offer is missing.")
+        }
+        try check(places.gameAvailable(places.place(id)!, now: offer.checkedAt), "The reviewed world is unavailable during its assessed interval."); count += 1
+        try check(!places.gameAvailable(places.place(id)!, now: offer.checkedAt - 1) && !places.gameAvailable(places.place(id)!, now: offer.validUntil), "Native availability ignored its time bounds."); count += 1
+        try check(!places.gameAvailable(monaco, now: offer.checkedAt), "An unqualified learning destination offered entry."); count += 1
+        var replaced = places
+        replaced.renderContractVersion += ":replaced"
+        try check(!replaced.gameAvailable(places.place(id)!, now: offer.checkedAt), "A replacement renderer reused obsolete approval."); count += 1
         return count
     }
 }

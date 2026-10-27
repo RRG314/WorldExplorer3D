@@ -74,6 +74,24 @@ public final class PortalWidgetContractInstrumentation extends Instrumentation {
         try(java.io.InputStream output=new android.os.ParcelFileDescriptor.AutoCloseInputStream(getUiAutomation().executeShellCommand("settings put system font_scale "+Float.toString(scale)))){output.readAllBytes();}
         until(()->Math.abs(getTargetContext().getResources().getConfiguration().fontScale-scale)<.01f);
     }
+    private void openDestination(PortalStore store,JSONObject place,Activity returnTo,String capture)throws Exception{
+        boolean ready=store.gameAvailable(place,System.currentTimeMillis());
+        String target=(ready?GameLauncherActivity.class:PortalActivity.class).getName();
+        ActivityMonitor monitor=addMonitor(target,null,false);Activity opened;
+        try{click(R.id.portal_open);opened=waitForMonitorWithTimeout(monitor,8000);}finally{removeMonitor(monitor);}
+        check(opened!=null,"Widget Open did not reach its admitted destination.");
+        try{
+            expectedWindow=opened;
+            if(ready){
+                check((PortalStore.ORIGIN+place.getString("gameLink")).equals(opened.getIntent().getDataString()),"Widget changed the reviewed game intent.");
+                // This owned emulator is offline. Prove handoff and recovery,
+                // not a networked 3D visit; the browser verifies that separately.
+                until(()->opened.findViewById(R.id.retry_connection)!=null);
+                check(store.trail(place.getString("id")).optLong("visitedAt")==0,"Opening the launcher fabricated a game visit.");
+            }
+            screenshot(capture);
+        }finally{runOnMainSync(opened::finish);expectedWindow=returnTo;until(this::foreground);}
+    }
     @Override public void onStart(){
         Bundle result=new Bundle();int outcome=Activity.RESULT_CANCELED;AppWidgetHost host=null;PortalWidgetHarnessActivity activity=null;int widgetId=AppWidgetManager.INVALID_APPWIDGET_ID;SharedPreferences prefs=null;boolean owned=false,fontChanged=false;float originalFontScale=1;
         try{
@@ -89,9 +107,15 @@ public final class PortalWidgetContractInstrumentation extends Instrumentation {
             check(!state.getBoolean("saved")&&state.getLong("investigatedAt")>0&&state.getLong("visitedAt")==0&&state.getJSONArray("expeditionIds").length()==0,"Native choices changed visit/reward semantics.");
             boolean denied=false;try{store.act(id,"visit");}catch(Exception expected){denied=true;}check(denied,"Widget accepted game visit verb.");
             JSONObject invalid=store.catalog();invalid.getJSONArray("destinations").getJSONObject(0).put("gameLink","https://invalid.example/");denied=false;try{PortalStore.validateCatalog(invalid.toString());}catch(Exception expected){denied=true;}check(denied,"Malformed game link was accepted.");
-            check(!store.gameAvailable(place,System.currentTimeMillis()),"Unqualified bundled destination offered a game entry.");
-            result.putInt("persistence_contract_checks",4);
+            result.putInt("persistence_contract_checks",3);
             }
+            JSONObject offer=null;org.json.JSONArray offers=store.catalog().getJSONArray("offers");
+            for(int i=0;i<offers.length();i++){JSONObject row=offers.getJSONObject(i);if(id.equals(row.optString("destinationId"))&&"mobile-touch".equals(row.optString("deviceProfile")))offer=row;}
+            check(offer!=null,"The reviewed mobile destination offer is missing.");long checkedAt=offer.getLong("checkedAt"),expiresAt=offer.getLong("validUntil");
+            check(store.gameAvailable(place,checkedAt),"The reviewed bundled destination was unavailable during its assessed interval.");
+            check(!store.gameAvailable(place,checkedAt-1)&&!store.gameAvailable(place,expiresAt),"The native offer ignored its time bounds.");
+            check(!store.gameAvailable(store.place("monaco-coast"),checkedAt),"An unqualified learning destination offered entry.");
+            result.putInt("native_qualification_checks",3);
             AppWidgetManager manager=AppWidgetManager.getInstance(context);host=new AppWidgetHost(context,60252);widgetId=host.allocateAppWidgetId();
             store.configure(widgetId,"home",id);Bundle options=new Bundle();options.putInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH,300);options.putInt(AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH,300);options.putInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT,440);options.putInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT,440);
             getUiAutomation().adoptShellPermissionIdentity("android.permission.BIND_APPWIDGET");
@@ -107,7 +131,7 @@ public final class PortalWidgetContractInstrumentation extends Instrumentation {
                 runOnMainSync(activity::finish);fontChanged=true;fontScale(2f);
                 activity=(PortalWidgetHarnessActivity)startActivitySync(new Intent(context,PortalWidgetHarnessActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));expectedWindow=activity;
                 step="compact current card with large system text";attachWidget(activity,host,widgetId,170,180);visibleControls(R.id.portal_save,R.id.portal_open,R.id.portal_settings);completeText(R.id.portal_title);completeText(R.id.portal_save);singleLineControl(R.id.portal_save);screenshot("widget-compact-minimum-system-text.png");
-                ActivityMonitor opening=addMonitor(PortalActivity.class.getName(),null,false);click(R.id.portal_open);Activity opened=waitForMonitorWithTimeout(opening,8000);removeMonitor(opening);check(opened!=null,"The compact Open icon did not reach its native place.");expectedWindow=opened;screenshot("native-compact-open-place.png");runOnMainSync(opened::finish);expectedWindow=activity;until(this::foreground);
+                openDestination(store,place,activity,"native-compact-open-destination.png");
                 result.putInt("presentation_layouts",2);result.putInt("compact_interaction_checks",3);result.putString("scope","Compact-only current Android widget layouts at minimum170x180dp, normal and2x system font. Reuses accepted larger layouts/account/investigation checks.");
             }else{
             if(!layoutOnly){
@@ -137,7 +161,7 @@ public final class PortalWidgetContractInstrumentation extends Instrumentation {
             }
             visibleControls(R.id.portal_save,R.id.portal_open);completeText(R.id.portal_title);check(!shown(R.id.portal_investigate),"Large system text should open the full native investigation.");check(text(R.id.portal_fact_next).isEmpty(),"Large text offered inline completion without full fact space.");screenshot("widget-large-system-text.png");
             step="medium system text";attachWidget(activity,host,widgetId,320,280);visibleControls(R.id.portal_save,R.id.portal_open);completeText(R.id.portal_title);screenshot("widget-medium-system-text.png");
-            ActivityMonitor largeReading=addMonitor(PortalActivity.class.getName(),null,false);click(R.id.portal_open);Activity fullPage=waitForMonitorWithTimeout(largeReading,8000);removeMonitor(largeReading);check(fullPage!=null,"Large-text Open did not reach the full native place.");expectedWindow=fullPage;screenshot("native-system-text-place.png");runOnMainSync(fullPage::finish);expectedWindow=activity;until(this::foreground);
+            openDestination(store,place,activity,"native-system-text-destination.png");
             step="compact system text";attachWidget(activity,host,widgetId,180,200);visibleControls(R.id.portal_save,R.id.portal_open);completeText(R.id.portal_title);screenshot("widget-compact-system-text.png");
             store.configure(widgetId,"together",id);check(store.suggestion(widgetId,System.currentTimeMillis())==null,"Together fabricated a daily destination.");
             store.configure(widgetId,"beyond",id);check(store.suggestion(widgetId,System.currentTimeMillis())==null,"Beyond Earth fabricated an Earth visit.");
