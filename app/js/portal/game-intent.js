@@ -1,7 +1,7 @@
 import {evaluatePortalOffer} from '../earth-core/portal-destination-policy.js';
 
 // Versioned with affected Earth presentation/content contracts, not URL input.
-export const PORTAL_RENDER_CONTRACT='earth-main:2026.10.25.1';
+export const PORTAL_RENDER_CONTRACT='earth-main:2026.10.27.1';
 export function portalDeviceProfile(host=globalThis){
   return host.matchMedia?.('(pointer: coarse)').matches===true?'mobile-touch':'desktop';
 }

@@ -246,6 +246,7 @@ var entries = [
       kind: "city",
       origin: { lat: 39.2904, lon: -76.6122 },
       bounds: { south: 39.26, north: 39.32, west: -76.65, east: -76.57 },
+      // This is self-guided exploration, not a registered mission or an expedition award.
       arrival: { lat: 39.2904, lon: -76.6122, mode: "walk" },
       experienceIds: ["waterfront-exploration"]
     }
@@ -292,7 +293,100 @@ function freeze(value) {
   }
   return value;
 }
-var PORTAL_CATALOG = freeze({ schemaVersion: 1, version: "2026.10.25.1", destinations: entries, qualifications: [] });
+var PORTAL_CATALOG = freeze({ schemaVersion: 1, version: "2026.10.27.1", destinations: entries, qualifications: [
+  {
+    "type": "PortalQualification",
+    "schemaVersion": 1,
+    "status": "approved",
+    "destinationId": "baltimore-harbor",
+    "destinationRevision": "1",
+    "kind": "city",
+    "contentVersion": "baltimore-portal-1",
+    "renderContractVersion": "earth-main:2026.10.27.1",
+    "origin": {
+      "lat": 39.2904,
+      "lon": -76.6122
+    },
+    "bounds": {
+      "south": 39.26,
+      "north": 39.32,
+      "west": -76.65,
+      "east": -76.57
+    },
+    "arrival": {
+      "lat": 39.2904,
+      "lon": -76.6122,
+      "mode": "walk"
+    },
+    "deviceProfile": "desktop",
+    "testedBuildId": "5.6.1+2d9ad8ad913d.cdf024cda84cd6e4.staging",
+    "checkedAt": 1793142629766,
+    "validUntil": 1800918629766,
+    "evidenceId": "portal:baltimore:desktop:2026.10.27",
+    "checks": {
+      "geographicIdentity": "passed",
+      "visualExperience": "passed",
+      "safeArrival": "passed",
+      "playableContent": "passed",
+      "devicePerformance": "passed"
+    },
+    "layers": {
+      "terrain": "verified",
+      "transport": "verified",
+      "buildings": "verified",
+      "places": "verified"
+    },
+    "experienceIds": [
+      "waterfront-exploration"
+    ]
+  },
+  {
+    "type": "PortalQualification",
+    "schemaVersion": 1,
+    "status": "approved",
+    "destinationId": "baltimore-harbor",
+    "destinationRevision": "1",
+    "kind": "city",
+    "contentVersion": "baltimore-portal-1",
+    "renderContractVersion": "earth-main:2026.10.27.1",
+    "origin": {
+      "lat": 39.2904,
+      "lon": -76.6122
+    },
+    "bounds": {
+      "south": 39.26,
+      "north": 39.32,
+      "west": -76.65,
+      "east": -76.57
+    },
+    "arrival": {
+      "lat": 39.2904,
+      "lon": -76.6122,
+      "mode": "walk"
+    },
+    "deviceProfile": "mobile-touch",
+    "testedBuildId": "5.6.1+2d9ad8ad913d.cdf024cda84cd6e4.staging",
+    "checkedAt": 1793142629766,
+    "validUntil": 1800918629766,
+    "evidenceId": "portal:baltimore:mobile-touch:2026.10.27",
+    "checks": {
+      "geographicIdentity": "passed",
+      "visualExperience": "passed",
+      "safeArrival": "passed",
+      "playableContent": "passed",
+      "devicePerformance": "passed"
+    },
+    "layers": {
+      "terrain": "verified",
+      "transport": "verified",
+      "buildings": "verified",
+      "places": "verified"
+    },
+    "experienceIds": [
+      "waterfront-exploration"
+    ]
+  }
+] });
 function portalDestination(id2) {
   return PORTAL_CATALOG.destinations.find((row) => row.id === id2) || null;
 }
@@ -374,7 +468,7 @@ function evaluatePortalOffer(destination, assessment, context = {}) {
 }
 
 // app/js/portal/game-intent.js
-var PORTAL_RENDER_CONTRACT = "earth-main:2026.10.25.1";
+var PORTAL_RENDER_CONTRACT = "earth-main:2026.10.27.1";
 function portalDeviceProfile(host = globalThis) {
   return host.matchMedia?.("(pointer: coarse)").matches === true ? "mobile-touch" : "desktop";
 }
