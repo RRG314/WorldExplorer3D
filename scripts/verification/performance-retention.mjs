@@ -177,7 +177,7 @@ async function launchWorld(client) {
   });
   milestones.documentLoadedMs = Date.now() - startedAt;
   await client.page.waitForFunction(() => globalThis.__WE3D_RUNTIME_READY__ === true, null, { timeout: 120_000 });
-  await client.page.evaluate(async()=>{globalThis.__WE3D_PERF_CONTEXT__=(await import('/app/js/shared-context.js?v=55')).ctx;});
+  await client.page.evaluate(async()=>{globalThis.__WE3D_PERF_CONTEXT__=(await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55')).ctx;});
   milestones.runtimeReadyMs = Date.now() - startedAt;
   const titleHeapBytes = await heapUsedBytes(client.cdp);
   await client.page.waitForSelector('#globeSelectorScreen.show', { timeout: 60_000 });
@@ -188,7 +188,7 @@ async function launchWorld(client) {
   milestones.worldRequestedMs = Date.now() - startedAt;
   await waitForPlayable(client.page);
   milestones.playableMs = Date.now() - startedAt;
-  await client.page.evaluate(async()=>{globalThis.__WE3D_PERF_CONTEXT__=(await import('/app/js/shared-context.js?v=55')).ctx;});
+  await client.page.evaluate(async()=>{globalThis.__WE3D_PERF_CONTEXT__=(await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55')).ctx;});
   const diagnostics = await client.page.evaluate(performanceLaunchSummary);
   return { firstPlayableMs: milestones.playableMs, titleHeapBytes, milestones, diagnostics };
 }
@@ -434,12 +434,12 @@ async function runDesktop() {
     // performance evidence. Do not teleport, disable collisions, or inject speed.
     // Release the menu's keyboard focus without selecting a sky object.
     await client.page.locator('#travelBtn').blur();
-    const flightBefore = await client.page.evaluate(async () => (await import('/app/js/shared-context.js?v=55')).ctx.getPlaneSnapshot());
+    const flightBefore = await client.page.evaluate(async () => (await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55')).ctx.getPlaneSnapshot());
     await client.page.keyboard.down('Space');
     await client.page.keyboard.down('s');
     try { await client.page.waitForTimeout(2_000); }
     finally { await client.page.keyboard.up('s'); await client.page.keyboard.up('Space'); }
-    const flightAfter = await client.page.evaluate(async () => (await import('/app/js/shared-context.js?v=55')).ctx.getPlaneSnapshot());
+    const flightAfter = await client.page.evaluate(async () => (await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55')).ctx.getPlaneSnapshot());
     assert.ok(flightAfter.pitch > .05 && flightAfter.y > flightBefore.y && flightAfter.throttle > flightBefore.throttle,
       'Real pitch/throttle input must establish a climb before sustained flight');
     const plane = { ...(await measureMode(client, 'plane', auditOnly && !process.env.WE3D_PERF_TRACE_MODE && !process.argv.includes('--flight-window') ? 1_500 : 90_000, 'Space')), activationMs: planeActivationMs,

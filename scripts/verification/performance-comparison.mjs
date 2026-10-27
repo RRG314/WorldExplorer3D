@@ -74,7 +74,7 @@ async function measure(page, mode) {
   await page.waitForFunction(mode => globalThis.getWorldExplorerRuntimeDiagnostics?.().activeActor?.mode === mode, mode);
   await page.mouse.click(720,400);
   await page.evaluate(async mode=>{
-    const {ctx}=await import('/app/js/shared-context.js?v=55');
+    const {ctx}=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
     const actor=mode==='walk'?ctx.Walk.state.walker:ctx.car;
     const x=mode==='walk'?-10:-3, z=mode==='walk'?-4:-2;
     Object.assign(actor,{x,z,angle:Math.atan2(1,.25),yaw:Math.atan2(1,.25),speed:0,vFwd:0,vLat:0,vx:0,vy:0,vz:0,yawRate:0,lookYawOffset:0,pitch:0});
@@ -100,7 +100,7 @@ async function measureTravel(page, label, round, state) {
   const cdp=profileMode && profileMode!=='gpu' ? await page.context().newCDPSession(page) : null;
   if(cdp)await cdp.send('Performance.enable');
   const ctxKey='__WE3D_TRAVEL_CONTEXT__',actorKey='__WE3D_TRAVEL_ACTOR__';
-  await page.evaluate(async key=>{globalThis[key]=(await import('/app/js/shared-context.js?v=55')).ctx;},ctxKey);
+  await page.evaluate(async key=>{globalThis[key]=(await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55')).ctx;},ctxKey);
   if(process.env.WE3D_TRAVEL_LIGHT_UNIFORMS==='1')await page.evaluate('globalThis.__lightUniformExperiment=('+installLightUniformExperiment.toString()+')(globalThis.'+ctxKey+')');
   if(process.env.WE3D_TRAVEL_INACTIVE_LIGHTS==='1')await page.evaluate('globalThis.__inactiveLightExperiment=('+installInactiveLightExperiment.toString()+')(globalThis.'+ctxKey+');globalThis.__inactiveLightExperiment.setEnabled(true)');
   if(process.env.WE3D_TRAVEL_TERRAIN_WEIGHTS==='1')await page.evaluate('globalThis.__terrainWeightExperiment=('+installTerrainWeightExperiment.toString()+')(globalThis.'+ctxKey+');globalThis.__terrainWeightExperiment.setEnabled(true)');
@@ -433,7 +433,7 @@ async function trial(label, round) {
       });
       requireHardwareGraphics(graphics);
       await page.waitForFunction(()=>globalThis.__WE3D_RUNTIME_READY__===true,null,{timeout:120000,polling:500});
-      await page.evaluate(async()=>{globalThis.__WE3D_READY_CONTEXT__=(await import('/app/js/shared-context.js?v=55')).ctx;});
+      await page.evaluate(async()=>{globalThis.__WE3D_READY_CONTEXT__=(await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55')).ctx;});
       if(await page.locator('#analyticsConsentDenyBtn').isVisible())await page.locator('#analyticsConsentDenyBtn').click();
       const loadCdp=process.env.WE3D_PROFILE_LOAD?await context.newCDPSession(page):null;
       if(loadCdp)await loadCdp.send('HeapProfiler.startSampling',{samplingInterval:131072,includeObjectsCollectedByMajorGC:process.env.WE3D_PROFILE_LOAD!=='surviving',includeObjectsCollectedByMinorGC:process.env.WE3D_PROFILE_LOAD!=='surviving'});
@@ -443,7 +443,7 @@ async function trial(label, round) {
       if(process.env.WE3D_CAPTURE_PROFILE_HASH==='1'){
         assert.equal(process.env.WE3D_COMPARISON_LOAD_ONLY,'1','Profile fingerprinting is excluded from timing runs');
         const profiles=await page.evaluate(async()=>{
-          const {ctx}=await import('/app/js/shared-context.js?v=55');
+          const {ctx}=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
           const features=[...ctx.roads,...ctx.linearFeatures].sort((a,b)=>String(a.sourceFeatureId||'').localeCompare(String(b.sourceFeatureId||'')));
           const blocks=[];
           for(let i=0;i<features.length;i+=128){
@@ -461,7 +461,7 @@ async function trial(label, round) {
       if(loadCdp){await writeFile(path.join(output,`${label}-${round}-load-allocation.json`),JSON.stringify(await loadCdp.send('HeapProfiler.stopSampling')));await loadCdp.detach();}
       console.log(JSON.stringify({label,round,state,stage:'playable',playableMs,misses:misses.length}));
       const scene = await page.evaluate(async()=>{
-        const {ctx}=await import('/app/js/shared-context.js?v=55');
+        const {ctx}=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
         ctx.setTimeOfDay?.('day');
         ctx.setWeatherMode?.('clear');
         const worldCounts={buildings:ctx.buildings.length,buildingMeshes:ctx.buildingMeshes.length,landuseMeshes:ctx.landuseMeshes.length,roadMeshes:ctx.roadMeshes.length,roads:ctx.roads.length,terrainTiles:ctx.terrainTileCache.size};

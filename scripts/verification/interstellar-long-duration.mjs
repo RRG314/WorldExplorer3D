@@ -36,7 +36,7 @@ async function selectPlan(page, shipId, propulsionId) {
 
 async function moveToStation(page, stationId) {
   const station = await page.evaluate(async (id) => {
-    const [{ ctx }, layout] = await Promise.all([import('/app/js/shared-context.js?v=55'), import('/app/js/expedition/ship-layout.js?v=4')]);
+    const [{ ctx }, layout] = await Promise.all([import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55'), import('/app/js/expedition/ship-layout.js?v=4')]);
     const target = layout.SHIP_STATIONS.find((entry) => entry.id === id);
     if (!target) return null;
     if (ctx.getShipInteriorSnapshot()?.deckId !== target.deckId) ctx.switchSurveyorDeck(target.deckId);
@@ -88,7 +88,7 @@ async function run(viewport, name) {
     await page.waitForTimeout(120);
     await page.screenshot({ path: path.join(outputDir, `${name}-cryogenic-wake.png`), fullPage: true });
 
-    await page.evaluate(async () => { const { ctx } = await import('/app/js/shared-context.js?v=55'); ctx.exitExpeditionShipInterior(); });
+    await page.evaluate(async () => { const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55'); ctx.exitExpeditionShipInterior(); });
     await openPlanner(page);
     state = await selectPlan(page, 'generation-ship', 'fusion-pulse-interstellar');
     assert.notEqual(state.interstellarExpedition.readiness.status, 'insufficient');

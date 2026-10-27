@@ -17,7 +17,7 @@ try {
  await page.waitForFunction(()=>window.__WE3D_RUNTIME_READY__,null,{timeout:45000});
  await page.locator('#globeSelectorStartBtn').click();
  await page.waitForFunction(afterWorldLoad(()=>{const s=window.getWorldExplorerRuntimeDiagnostics?.();return s?.gameStarted&&!s.worldLoading&&!document.querySelector('#loading')?.classList.contains('show');}),null,{timeout:120000});
- await page.evaluate(async()=>{window.cameraCtx=(await import('/app/js/shared-context.js?v=55')).ctx;if(cameraCtx.Walk.state.mode!=='drive')throw Error('Not driving: invalid test setup');await cameraCtx.ensureCuratedPlayerCar();cameraCtx.setTimeOfDay('day');cameraCtx.setCameraMode(0);});
+ await page.evaluate(async()=>{window.cameraCtx=(await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55')).ctx;if(cameraCtx.Walk.state.mode!=='drive')throw Error('Not driving: invalid test setup');await cameraCtx.ensureCuratedPlayerCar();cameraCtx.setTimeOfDay('day');cameraCtx.setCameraMode(0);});
  for(const name of ['chase','cabin','overhead','return-chase']) {
   await page.waitForTimeout(700);
   report.views.push(await page.evaluate(name=>{const c=cameraCtx;return {name,mode:c.camMode,clearance:c.camera.userData.vehicleClearanceMode,visible:c.carMesh.visible,position:c.camera.position,car:c.carMesh.position,look:c.camera.userData.carLook,near:c.camera.near};},name));

@@ -35,7 +35,7 @@ try {
     document.body.replaceChildren(document.importNode(menu,true));
     document.body.style.cssText='margin:0;padding:16px;display:grid;place-items:start center;overflow:auto;min-height:100vh';
     document.querySelector('.menu-container').style.cssText='max-height:none;width:100%;max-width:600px;margin:0';
-    const {ctx}=await import('/app/js/shared-context.js?v=55');
+    const {ctx}=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
     const {apiConfig,PropertyAPI}=await import('/app/js/real-estate.js');
     const {setupSettingsUi}=await import('/app/js/ui/settings.js');
     setupSettingsUi(ctx);

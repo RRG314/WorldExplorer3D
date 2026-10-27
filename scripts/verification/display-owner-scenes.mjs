@@ -14,7 +14,7 @@ try{
  await page.route('**/display-scene-fixture',route=>route.fulfill({contentType:'text/html',body:'<!doctype html><title>Space display owner calibration</title><link rel="icon" href="/favicon.svg"><style>body{margin:0;background:black}canvas{display:block}</style><canvas></canvas><script src="/app/vendor/three/build/three.min.js"></script>'}));
  await page.goto(`http://127.0.0.1:${server.port}/display-scene-fixture`);
  await page.evaluate(async()=>{
-  const {ctx}=await import('/app/js/shared-context.js?v=55');
+  const {ctx}=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
   const {createSpaceFlightScene}=await import('/app/js/space/scene.js');
   ctx.spaceFlight={canvas:document.querySelector('canvas'),velocity:new THREE.Vector3()};
   createSpaceFlightScene({includeExtendedSpace:false});

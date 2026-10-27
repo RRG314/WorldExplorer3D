@@ -53,24 +53,24 @@ try{
   report.loadedHeap=await heapReader.send('Runtime.getHeapUsage');
   await heapReader.detach();
  }
- report.programFailures=await page.evaluate(async()=>{const {ctx}=await import('/app/js/shared-context.js?v=55');return (ctx.renderer.info.programs||[]).filter(p=>p.diagnostics?.runnable===false).map(p=>({name:p.name,diagnostics:p.diagnostics}));});
+ report.programFailures=await page.evaluate(async()=>{const {ctx}=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');return (ctx.renderer.info.programs||[]).filter(p=>p.diagnostics?.runnable===false).map(p=>({name:p.name,diagnostics:p.diagnostics}));});
  if(report.shaderErrors.length||report.programFailures.length)throw new Error('Terrain/WebGL shader compilation failed; see shaderErrors/programFailures');
- report.terrainCache=await page.evaluate(async()=>{const {ctx}=await import('/app/js/shared-context.js?v=55');return ctx.terrainTileCacheSnapshot();});
+ report.terrainCache=await page.evaluate(async()=>{const {ctx}=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');return ctx.terrainTileCacheSnapshot();});
  assert.ok(report.terrainCache.entries<=report.terrainCache.limit,'Published terrain sources must return to their steady cache budget');
  report.before=await page.evaluate(()=>{const s=globalThis.getWorldExplorerRuntimeDiagnostics();return {counts:s.worldCounts,far:s.farTerrainClipmap,roads:s.worldLoad?.regionalTransportSelection,buildings:s.worldDetail?.buildings,landmarks:s.mappedTallBuildingVisuals,transport:s.transportDetail,resources:s.resources};});
  if(process.env.WE3D_COVERAGE_INSPECT_LANDUSE==='1') {
   report.landcover=await page.evaluate(async()=>{
-   const {ctx}=await import('/app/js/shared-context.js?v=55');
+   const {ctx}=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
    const countBy=(items,key)=>items.reduce((r,p)=>{const k=String(p[key]||'unknown');r[k]=(r[k]||0)+1;return r;},{});
    const plants=ctx.vegetationFeatures||[],areas=ctx.landuses||[];
    return {landUses:countBy(areas,'type'),plants:plants.length,plantTypes:countBy(plants,'landuseType'),
     plantSources:countBy(plants,'source'),models:ctx.vegetationModelStatus||{}};
   });
   assert.ok(report.landcover.plants>0,'The requested vegetated location has no published plants');
-  await page.evaluate(async()=>{const {ctx}=await import('/app/js/shared-context.js?v=55');ctx.setTimeOfDay('day');});
+  await page.evaluate(async()=>{const {ctx}=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');ctx.setTimeOfDay('day');});
   await page.waitForTimeout(500);
   const data=await page.evaluate(async()=>{
-   const {ctx}=await import('/app/js/shared-context.js?v=55');
+   const {ctx}=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
    const plants=ctx.vegetationFeatures||[],forest=plants.filter(p=>p.source==='polygon'&&p.landuseType==='forest');
    const point=forest.reduce((best,p)=>!best||Math.hypot(p.x,p.z)<Math.hypot(best.x,best.z)?p:best,null)||plants.find(p=>p.source==='polygon')||plants[0];
    if(!point)return null;
@@ -82,10 +82,10 @@ try{
  }
  console.log(JSON.stringify({stage:'loaded',loadMs:report.loadMs,counts:report.before.counts,far:{available:report.before.far.farBuildingsAvailable,rendered:report.before.far.farBuildings,coverage:report.before.far.farBuildingPublishedCoverage},roads:report.before.roads}));
  for(const time of ['day','night']){
-  await page.evaluate(async time=>{const {ctx}=await import('/app/js/shared-context.js?v=55');ctx.setTimeOfDay(time);},time);
+  await page.evaluate(async time=>{const {ctx}=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');ctx.setTimeOfDay(time);},time);
   await page.waitForTimeout(500);
   const captures=await page.evaluate(async time=>{
-   const {ctx}=await import('/app/js/shared-context.js?v=55');
+   const {ctx}=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
    ctx.setTimeOfDay(time);
    const make=(x,y,z,tx,tz)=>{const camera=ctx.camera.clone();camera.position.set(x,y,z);camera.lookAt(tx,0,tz);camera.updateMatrixWorld(true);ctx.renderer.render(ctx.scene,camera);return ctx.renderer.domElement.toDataURL('image/png');};
    const images={regional:make(4200,1700,4200,1000,0),near:make(500,380,500,0,0)};
@@ -93,16 +93,16 @@ try{
   },time);
   for(const [view,data]of Object.entries(captures))await fs.writeFile(`${out}/${time}-${view}.png`,Buffer.from(data.split(',')[1],'base64'));
  }
- await page.evaluate(async()=>{const {ctx}=await import('/app/js/shared-context.js?v=55');ctx.setTimeOfDay('day');});
+ await page.evaluate(async()=>{const {ctx}=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');ctx.setTimeOfDay('day');});
  await page.keyboard.down('ArrowUp');await page.waitForTimeout(2000);await page.keyboard.up('ArrowUp');
  await page.screenshot({path:`${out}/drive.png`});
  await page.locator('#travelBtn').click();await page.locator('#fPlane').click();
  await page.waitForFunction(()=>globalThis.getWorldExplorerRuntimeDiagnostics?.().activeActor?.mode==='plane');
- await page.evaluate(async()=>{const {ctx}=await import('/app/js/shared-context.js?v=55');Object.assign(ctx.planeMode,{x:3000,z:3000,y:700,yaw:0,pitch:0,roll:0,pitchRate:0,rollRate:0,yawRate:0,lookYawOffset:0,cameraYaw:0,cameraPitch:0,speed:100,horizontalSpeed:100,vx:0,vy:0,vz:100,throttle:1,airborne:true,stalled:false,flightPathAngle:0,climbRate:0,turnRate:0,angleOfAttack:0,barrelRollActive:false});});
+ await page.evaluate(async()=>{const {ctx}=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');Object.assign(ctx.planeMode,{x:3000,z:3000,y:700,yaw:0,pitch:0,roll:0,pitchRate:0,rollRate:0,yawRate:0,lookYawOffset:0,cameraYaw:0,cameraPitch:0,speed:100,horizontalSpeed:100,vx:0,vy:0,vz:100,throttle:1,airborne:true,stalled:false,flightPathAngle:0,climbRate:0,turnRate:0,angleOfAttack:0,barrelRollActive:false});});
  await page.keyboard.down('Space');await page.waitForTimeout(2500);await page.keyboard.up('Space');await page.waitForTimeout(1000);
  await page.screenshot({path:`${out}/flight.png`});
  if(flightSeconds){
-  await page.evaluate(async()=>{const {ctx}=await import('/app/js/shared-context.js?v=55');globalThis.__WE3D_TRAVEL_ACTOR__=ctx.planeMode;const a=ctx.planeMode;Object.assign(a,{x:3500,z:0,y:700,yaw:0,pitch:0,roll:0,pitchRate:0,rollRate:0,turnRate:0,climbRate:0,speed:95,airborne:true});});
+  await page.evaluate(async()=>{const {ctx}=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');globalThis.__WE3D_TRAVEL_ACTOR__=ctx.planeMode;const a=ctx.planeMode;Object.assign(a,{x:3500,z:0,y:700,yaw:0,pitch:0,roll:0,pitchRate:0,rollRate:0,turnRate:0,climbRate:0,speed:95,airborne:true});});
   const signal={stopped:false};let flightError=null;
   const profiler=profileFlight?await page.context().newCDPSession(page):null;
   let clock;const events=[];

@@ -38,7 +38,7 @@ try{
   return checks;
  });
  async function mountBuilder(lazy=false){await page.evaluate(async lazy=>{
-  const {ctx}=await import('/app/js/shared-context.js?v=55');window.creativeCtx=ctx;ctx.LOC={lat:39.3,lon:-76.6};
+  const {ctx}=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');window.creativeCtx=ctx;ctx.LOC={lat:39.3,lon:-76.6};
   ctx.SCALE=111320;ctx.getEnv=()=> 'EARTH';ctx.gameStarted=true;ctx.car={x:0,y:0,z:0};ctx.scene=new THREE.Scene();
   ctx.initialEarthWorldReady=true;ctx.worldLoading=false;
   ctx.scene.add(new THREE.AmbientLight(0xffffff,1));ctx.camera=new THREE.PerspectiveCamera(45,900/600,.1,100);ctx.camera.position.set(10,7,14);ctx.camera.lookAt(4,0,6);

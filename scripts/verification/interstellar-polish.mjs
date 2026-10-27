@@ -56,7 +56,7 @@ async function runViewport(name, viewport) {
 
     await enterPlannedShip(page);
     const signEvidence = await page.evaluate(async () => {
-      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
       const signs = [];
       ctx.activeInterior?.group?.traverse?.((child) => {
         if (child.name?.startsWith('room-sign:')) signs.push({ name: child.name, side: child.material?.side });
@@ -66,7 +66,7 @@ async function runViewport(name, viewport) {
     assert.equal(signEvidence.length, 50);
     assert.ok(signEvidence.every((entry) => entry.side === 0));
     await page.evaluate(async () => {
-      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
       Object.assign(ctx.Walk.state.walker, { x: 0, z: 22.2, angle: 0, yaw: 0, lookYawOffset: 0, pitch: 0 });
     });
     await page.waitForTimeout(350);
@@ -95,7 +95,7 @@ async function runViewport(name, viewport) {
     assert.equal(state.expeditionShipInterior.selectedRoomId, eventBefore.roomId);
     assert.equal(await page.locator('#shipObjectiveCue').isVisible(), true);
     const incidentObjects = await page.evaluate(async () => {
-      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
       const names = [];
       ctx.activeInterior?.group?.traverse?.((child) => {
         if (child.name?.startsWith('ship-incident:') || child.name?.startsWith('incident-action-node:') || child.name === 'incident-floor-beacon' || child.name === 'incident-guidance-column') names.push(child.name);
@@ -107,13 +107,13 @@ async function runViewport(name, viewport) {
     assert.ok(incidentObjects.includes('incident-guidance-column'));
     assert.equal(incidentObjects.filter((nameValue) => nameValue.startsWith('incident-action-node:')).length, 3);
     await page.evaluate(async () => {
-      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
       Object.assign(ctx.Walk.state.walker, { x: 7, z: 27, angle: 0, yaw: 0, lookYawOffset: 0, pitch: -0.08 });
     });
     await page.waitForTimeout(350);
     await page.screenshot({ path: path.join(outputDir, `${name}-incident-in-world.png`), fullPage: true });
     await page.evaluate(async () => {
-      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
       Object.assign(ctx.Walk.state.walker, { x: 7, z: 31, angle: Math.PI, yaw: Math.PI, lookYawOffset: 0, pitch: 0 });
     });
     await page.waitForTimeout(180);
@@ -124,13 +124,13 @@ async function runViewport(name, viewport) {
     await page.waitForFunction(() => JSON.parse(globalThis.render_game_to_text?.() || '{}').expeditionShipInterior?.incidentProcedure?.stepIndex === 0);
     for (let stepIndex = 0; stepIndex < 3; stepIndex += 1) {
       const procedureTarget = await page.evaluate(async () => {
-        const { ctx } = await import('/app/js/shared-context.js?v=55');
+        const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
         const snapshot = ctx.getShipInteriorSnapshot?.();
         return ctx.activeInterior?.interactions?.find((entry) => entry.id === snapshot?.incidentProcedure?.currentInteractionId) || null;
       });
       assert.ok(procedureTarget, `missing physical incident action ${stepIndex + 1}`);
       await page.evaluate(async ({ x, z }) => {
-        const { ctx } = await import('/app/js/shared-context.js?v=55');
+        const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
         const walker = ctx.Walk?.state?.walker;
         if (walker) Object.assign(walker, { x, z: z - 1.75, angle: 0, yaw: 0, lookYawOffset: 0, pitch: 0.18 });
       }, procedureTarget);

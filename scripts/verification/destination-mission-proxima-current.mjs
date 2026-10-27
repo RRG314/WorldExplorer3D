@@ -46,7 +46,7 @@ async function seedExpedition(page) {
 
 async function enterProximaFrame(page) {
   await page.evaluate(async () => {
-    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
     ctx.travelToUniverseDestination('proxima-centauri', { kind: 'verification-arrival', routeLabel: 'Verified Expedition arrival' });
   });
   await page.waitForFunction(() => {
@@ -82,7 +82,7 @@ async function desktopJourney() {
     await page.waitForFunction(() => JSON.parse(globalThis.render_game_to_text?.() || '{}').destinationMission?.phase === 'fieldwork', null, { timeout: 8_000 });
     assert.equal((await state(page)).destinationMission.phase, 'fieldwork');
     await page.evaluate(async () => {
-      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
       ctx.openDestinationMission('proxima-centauri');
     });
     await page.locator('[data-mission-field]').click();
@@ -91,7 +91,7 @@ async function desktopJourney() {
     await page.locator('[data-mission-close]').click();
     await page.waitForTimeout(260);
     const scanEvidence = await page.evaluate(async () => {
-      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
       let count = 0;
       const matchingNames = [];
       ctx.spaceFlight.scene.traverse((child) => { if (child.name === 'destination-mission-scan:proxima-centauri' && child.visible !== false) count += 1; });
@@ -113,7 +113,7 @@ async function desktopJourney() {
     await page.locator('#expeditionEnterShip').click();
     await page.waitForFunction(() => JSON.parse(globalThis.render_game_to_text?.() || '{}').expeditionShipInterior?.active === true);
     await page.evaluate(async () => {
-      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
       Object.assign(ctx.Walk.state.walker, { x: -5.1, z: -14.5, angle: Math.PI / 2, yaw: Math.PI / 2, lookYawOffset: 0, pitch: 0, vy: 0, onGround: true });
     });
     await page.waitForTimeout(220);

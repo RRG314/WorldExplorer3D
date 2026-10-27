@@ -15,7 +15,7 @@ try{const page=await browser.newPage({viewport:{width:1100,height:800}});const e
  if(process.env.WE3D_ENTRY_MODEL)await page.route('**/fixture-home.glb*',r=>r.fulfill({contentType:'model/gltf-binary',path:process.env.WE3D_ENTRY_MODEL}));
  await page.goto(`http://127.0.0.1:${server.port}/entry-fixture`);await page.addScriptTag({url:'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js'});await page.addScriptTag({url:'https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js'});
  await page.evaluate(async({building,layout,model})=>{
- const {ctx}=await import('/app/js/shared-context.js?v=55');window.testCtx=ctx;
+ const {ctx}=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');window.testCtx=ctx;
  const a=building.pts[0],b=building.pts[1],x=(a.x+b.x)/2,z=(a.z+b.z)/2;window.outside={x,z,y:1.7};
  window.exteriorObstacle={id:"fixture-street-furniture",minX:100,maxX:101,minZ:100,maxZ:101};
  Object.assign(ctx,{dynamicBuildingColliders:[exteriorObstacle],buildings:[building],gameStarted:true,LOC:{lat:39.6573,lon:-76.8876},scene:new THREE.Scene(),camera:new THREE.PerspectiveCamera(65,1100/700,.1,1000),Walk:{CFG:{eyeHeight:1.7},state:{mode:'walk',view:'third',walker:{...outside,yaw:0,angle:0}}},buildingEntranceByBuilding:new Map([[building.sourceBuildingId,{x:x+40,z:z+40,approachX:x+40,approachZ:z+40}]]),communityRealityCaptureEntryBuildings:new Set(),replaceWorldCollection:(key,values=[])=>ctx[key]=values,elevationWorldYAtWorldXZ:()=>0,sampleFeatureSurfaceY:()=>0});

@@ -110,7 +110,7 @@ async function waitForPlayable(page, requireLiveGps = false) {
   await page.waitForTimeout(1_000);
   if (measureLoadTime) {
     const renderer = await page.evaluate(async () => {
-      const {ctx} = await import('/app/js/shared-context.js?v=55');
+      const {ctx} = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
       const gl = ctx.renderer?.getContext?.();
       const info = gl?.getExtension('WEBGL_debug_renderer_info');
       return gl ? gl.getParameter(info ? info.UNMASKED_RENDERER_WEBGL : gl.RENDERER) : null;

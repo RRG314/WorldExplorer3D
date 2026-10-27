@@ -18,7 +18,7 @@ try{
  await page.selectOption('#spaceDestinationSelect','mars');
  await page.waitForFunction(()=>JSON.parse(window.render_game_to_text()).currentJourney?.title==='Mars',null,{timeout:15000});
  report.selected=JSON.parse(await page.evaluate(()=>window.render_game_to_text())).currentJourney;
- await page.evaluate(async()=>{const {ctx}=await import('/app/js/shared-context.js?v=55');ctx.getInterstellarExpeditionSnapshot=()=>({state:'completed',campaignResult:{totalPoints:0}});ctx.tutorialUpdate(1);});
+ await page.evaluate(async()=>{const {ctx}=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');ctx.getInterstellarExpeditionSnapshot=()=>({state:'completed',campaignResult:{totalPoints:0}});ctx.tutorialUpdate(1);});
  assert.equal(await page.locator('#currentJourneyTitle').innerText(),'Mars');
  await page.locator('#currentJourneyCard').waitFor({state:'visible'});
  await page.screenshot({path:`${dir}/objective-mars.png`});

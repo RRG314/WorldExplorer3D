@@ -42,7 +42,7 @@ async function launchSpace() {
   }, null, { timeout: 180_000 });
   await page.waitForTimeout(1_000);
   return page.evaluate(async () => {
-    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
     let sceneObjects = 0;
     ctx.spaceFlight.scene?.traverse?.(() => { sceneObjects += 1; });
     return {
@@ -67,7 +67,7 @@ async function returnToTitle() {
   }, null, { timeout: 30_000 });
   await page.waitForTimeout(750);
   const released = await page.evaluate(async () => {
-    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
     return {
       active: Boolean(ctx.spaceFlight.active),
       animationActive: ctx.spaceFlight.animationId != null,

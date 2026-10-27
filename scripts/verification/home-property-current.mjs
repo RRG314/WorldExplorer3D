@@ -37,7 +37,7 @@ try {
   await page.locator('#globeSelectorStartBtn').click();
   await page.waitForTimeout(800);
   await waitForAsyncCondition(page, async () => {
-    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
     return Array.isArray(ctx.buildings) && ctx.buildings.length > 0;
   }, null, { timeout: 180_000 });
   await page.waitForFunction(() => {
@@ -56,7 +56,7 @@ try {
   await page.locator('[data-property-view="nearby"]').first().click();
   await page.waitForTimeout(1200);
   const propertyDebug = await page.evaluate(async () => {
-    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
     return {
       buildingCount: Array.isArray(ctx.buildings) ? ctx.buildings.length : null,
       propertyCount: Array.isArray(ctx.properties) ? ctx.properties.length : null,
@@ -82,7 +82,7 @@ try {
 
   await page.locator('.propertyHomeCard.candidate [data-property-action="navigate"]').first().click();
   await waitForAsyncCondition(page, async () => {
-    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
     return ctx.showNavigation === true && !!ctx.selectedProperty;
   }, null, { timeout: 20_000 });
 

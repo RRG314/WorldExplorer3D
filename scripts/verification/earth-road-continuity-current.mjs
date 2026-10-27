@@ -37,7 +37,7 @@ try{
   await page.locator('#globeSelectorStartBtn').click();
   await page.waitForFunction(afterWorldLoad(()=>{const d=getWorldExplorerRuntimeDiagnostics();return d.gameStarted&&!d.worldLoading&&d.transportDetail?.pinnedRegions>0&&!document.getElementById('loading')?.classList.contains('show');}),null,{timeout:300000});
   const skip=page.getByRole('button',{name:'Skip guide',exact:true});if(await skip.isVisible())await skip.click();
-  await page.evaluate(async()=>{globalThis.roadCtx=(await import('/app/js/shared-context.js?v=55')).ctx;roadCtx.setTimeOfDay('day');});
+  await page.evaluate(async()=>{globalThis.roadCtx=(await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55')).ctx;roadCtx.setTimeOfDay('day');});
   report.origin=await page.evaluate(()=>({sequence:roadCtx._worldLoadSequence,roads:roadCtx.roads.length,buildings:roadCtx.buildings.length,stats:{...roadCtx.transportDetail?.stats}}));
   console.log('[continuity] World ready '+report.build.buildId);
   for(const x of [2500,4500,6500,8500,10500,6500,2500,-2500,-6500,-10500,0]){

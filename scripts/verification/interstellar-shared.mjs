@@ -36,7 +36,7 @@ async function createPlayer(label, viewport) {
     const auth = await import('https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js');
     const credential = await auth.createUserWithEmailAndPassword(services.auth, email, 'WorldExplorer3D-Test-Only-93!');
     await auth.updateProfile(credential.user, { displayName: label });
-    const authUi = await import('/js/auth-ui.js?v=56');
+    const authUi = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/js/auth-ui.js?v=56');
     const deadline = Date.now() + 12_000;
     while (authUi.getCurrentUser()?.uid !== credential.user.uid && Date.now() < deadline) {
       await new Promise((resolve) => setTimeout(resolve, 50));
@@ -108,7 +108,7 @@ try {
   const roomCode = String(await owner.page.locator('#roomPanelRoomCode').textContent()).match(/\b[A-Z2-9]{6}\b/)?.[0] || '';
   assert.match(roomCode, /^[A-Z2-9]{6}$/);
   const roomWorld = await owner.page.evaluate(async () => {
-    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
     return { world: ctx.getCurrentMultiplayerRoom?.()?.world,
       selected: ctx.loadingScreenMode, gameStarted: ctx.gameStarted,
       spaceActive: ctx.spaceFlight?.active, worldLoading: ctx.worldLoading };
@@ -122,7 +122,7 @@ try {
   await member.page.waitForFunction((code) => String(document.getElementById('roomPanelRoomCode')?.textContent || '').includes(code), roomCode, { timeout: 30_000 });
 
   const created = await owner.page.evaluate(async (roomCode) => {
-    const api = await import('/js/expedition-api.js?v=2');
+    const api = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/js/expedition-api.js?v=2');
     return api.mutateSharedExpedition({
       roomCode,
       action: 'create',
@@ -139,20 +139,20 @@ try {
   assert.equal(created.state.revision, 1);
 
   const joined = await member.page.evaluate(async (roomCode) => {
-    const api = await import('/js/expedition-api.js?v=2');
+    const api = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/js/expedition-api.js?v=2');
     return api.mutateSharedExpedition({ roomCode, action: 'join', role: 'engineering' });
   }, roomCode);
   assert.equal(joined.state.participants[member.identity.uid].role, 'engineering');
 
   const started = await owner.page.evaluate(async ({ roomCode, state }) => {
-    const api = await import('/js/expedition-api.js?v=2');
+    const api = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/js/expedition-api.js?v=2');
     return api.mutateSharedExpedition({ roomCode, action: 'commit', command: { type: 'start' }, expectedRevision: state.revision });
   }, { roomCode, state: joined.state });
   assert.equal(started.state.revision, 2);
 
   await Promise.all([
-    owner.page.evaluate(async (roomCode) => (await import('/js/expedition-api.js?v=2')).mutateSharedExpedition({ roomCode, action: 'ready' }), roomCode),
-    member.page.evaluate(async (roomCode) => (await import('/js/expedition-api.js?v=2')).mutateSharedExpedition({ roomCode, action: 'ready' }), roomCode)
+    owner.page.evaluate(async (roomCode) => (await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/js/expedition-api.js?v=2')).mutateSharedExpedition({ roomCode, action: 'ready' }), roomCode),
+    member.page.evaluate(async (roomCode) => (await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/js/expedition-api.js?v=2')).mutateSharedExpedition({ roomCode, action: 'ready' }), roomCode)
   ]);
 
   const beforeAdvance = await owner.page.evaluate(async (roomCode) => {
@@ -163,21 +163,21 @@ try {
   assert.equal(Object.values(beforeAdvance.participants).filter((entry) => entry.readyForRevision === 2).length, 2);
 
   const advanced = await owner.page.evaluate(async ({ roomCode, state }) => {
-    const api = await import('/js/expedition-api.js?v=2');
+    const api = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/js/expedition-api.js?v=2');
     return api.mutateSharedExpedition({ roomCode, action: 'commit', command: { type: 'advance' }, expectedRevision: state.revision });
   }, { roomCode, state: beforeAdvance });
   assert.equal(advanced.state.revision, 3);
   assert.ok(advanced.state.expedition.strategicElapsedS > 0);
 
-  await member.page.evaluate(async (roomCode) => (await import('/js/expedition-api.js?v=2')).mutateSharedExpedition({ roomCode, action: 'connection', connected: false }), roomCode);
-  const rejoined = await member.page.evaluate(async (roomCode) => (await import('/js/expedition-api.js?v=2')).mutateSharedExpedition({ roomCode, action: 'join' }), roomCode);
+  await member.page.evaluate(async (roomCode) => (await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/js/expedition-api.js?v=2')).mutateSharedExpedition({ roomCode, action: 'connection', connected: false }), roomCode);
+  const rejoined = await member.page.evaluate(async (roomCode) => (await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/js/expedition-api.js?v=2')).mutateSharedExpedition({ roomCode, action: 'join' }), roomCode);
   assert.equal(rejoined.state.participants[member.identity.uid].role, 'engineering');
   assert.equal(rejoined.state.participants[member.identity.uid].connected, true);
 
   const choiceId = advanced.state.expedition.pendingEvent?.choices?.[0];
   assert.ok(choiceId, 'the first server-calculated watch should produce a crew response');
   const responded = await owner.page.evaluate(async ({ roomCode, revision, choiceId }) => (
-    await import('/js/expedition-api.js?v=2')
+    await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/js/expedition-api.js?v=2')
   ).mutateSharedExpedition({
     roomCode,
     action: 'commit',
@@ -242,7 +242,7 @@ try {
   } finally {await fixtureAdmin.delete();}
   let researchState=finalShared;
   const researchCommand=async(player,benchId,researchAction,sampleId,revision=researchState.revision)=>player.page.evaluate(async args=>{
-    const api=await import('/js/expedition-api.js?v=2');
+    const api=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/js/expedition-api.js?v=2');
     return api.mutateSharedExpedition(args);
   },{roomCode,action:'commit',expectedRevision:revision,command:{type:'research',benchId,researchAction,sampleId}});
   for(const bench of ['science-bench','analysis-bench','fabrication-bench']){

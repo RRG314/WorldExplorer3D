@@ -7,7 +7,7 @@ export async function verifyTransportResidency(page,out){
  await page.locator('#travelBtn').click();await page.locator('#fDriving').click();
  await page.waitForFunction(()=>globalThis.getWorldExplorerRuntimeDiagnostics?.().activeActor?.mode==='drive');
  const setup=await page.evaluate(async()=>{
-  const {ctx}=await import('/app/js/shared-context.js?v=55');
+  const {ctx}=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
   const targets=[[3500,0],[7000,0],[-3500,0],[-7000,0],[3500,0]];
   const samples=targets.map(([x,z])=>{
    let best=null,score=Infinity;
@@ -25,7 +25,7 @@ export async function verifyTransportResidency(page,out){
  const visits=[];
  for(const [i,point] of setup.samples.entries()){
   await page.evaluate(async point=>{
-   const {ctx}=await import('/app/js/shared-context.js?v=55');
+   const {ctx}=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
    const road=ctx.roads.find(road=>String(road.sourceFeatureId||road.id||'')===point.sourceId);
    ctx.applyResolvedWorldSpawn({...point,valid:true,mode:'drive',carY:ctx.GroundHeight.carCenterY(point.x,point.z),
     angle:0,onRoad:true,road},{syncWalker:false});
@@ -40,7 +40,7 @@ export async function verifyTransportResidency(page,out){
   // a render/contact commit alone is not a rendered car-on-road assertion.
   await page.waitForTimeout(2000);
   const sample=await page.evaluate(async point=>{
-   const {ctx}=await import('/app/js/shared-context.js?v=55');
+   const {ctx}=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
    return {point,stats:{...ctx.transportDetail.stats},contact:ctx.roadContactIndex.sampleAt(point.x,point.z,NaN,'at_grade'),
     worldLoadSequence:ctx._worldLoadSequence,buildings:ctx.buildings.length,roads:ctx.roads.length,
     roadMeshes:ctx.roadMeshes.length,contactIndex:ctx.roadContactIndex.stats(),gpu:{...ctx.renderer.info.memory},

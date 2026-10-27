@@ -154,7 +154,7 @@ try {
       await page.waitForTimeout(3000);
 
       const snapshot = await page.evaluate(async () => {
-        const {ctx}=await import('/app/js/shared-context.js?v=55');
+        const {ctx}=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
         const roadPublication=ctx.transportSurfacePublication;
         const roadCounts={
           published:{meshes:roadPublication?.meshCount,vertices:roadPublication?.vertices,triangles:roadPublication?.triangles},

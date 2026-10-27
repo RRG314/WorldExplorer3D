@@ -47,7 +47,7 @@ async function openEarth(page, label) {
 
 async function curatedPresentation(page) {
   return page.evaluate(async () => {
-    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
     return (ctx.urbanSandboxRuntime?.vehicles || []).filter((vehicle) => vehicle.visual?.root?.userData?.curatedTrafficAssetId).map((vehicle) => {
       const root = vehicle.visual.root;
       let fallbackMeshCount = 0;
@@ -84,7 +84,7 @@ async function curatedPresentation(page) {
 
 async function frameVehicle(page, vehicleId) {
   await page.evaluate(async (id) => {
-    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
     const vehicle = ctx.urbanSandboxRuntime?.vehicles?.find((entry) => entry.id === id);
     const walker = ctx.Walk?.state?.walker;
     if (!vehicle || !walker) return;
@@ -118,7 +118,7 @@ async function activeJourney(viewport, label) {
   try {
     await openEarth(page, label);
     const populationContract = await page.evaluate(async () => {
-      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
       const snapshot = ctx.livingWorldRuntimeSnapshot();
       return {
         vehiclePresentation: snapshot.population.vehiclePresentation,
@@ -132,7 +132,7 @@ async function activeJourney(viewport, label) {
     assert.ok(populationContract.curatedVehicleHosts >= 4);
     assert.equal(populationContract.simulationHz, 30);
     await page.evaluate(async () => {
-      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
       const first = ctx.livingWorldRuntime?.population?.vehicleSnapshots?.()[0];
       const walker = ctx.Walk?.state?.walker;
       if (!first || !walker) return;
@@ -162,7 +162,7 @@ async function activeJourney(viewport, label) {
 
     const damageTarget = presentation[1] || presentation[0];
     const damageResult = damageTarget ? await page.evaluate(async (id) => {
-      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
       const vehicle = ctx.urbanSandboxRuntime.vehicles.find((entry) => entry.id === id);
       vehicle.visual.setCondition(.72);
       let visibleFallbackMeshCount = 0;
@@ -184,7 +184,7 @@ async function activeJourney(viewport, label) {
     }
 
     const enterResult = await page.evaluate(async (id) => {
-      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
       const vehicle = ctx.urbanSandboxRuntime.vehicles.find((entry) => entry.id === id);
       const snapshot = ctx.urbanSandboxRuntimeSnapshot();
       const entry = snapshot.vehicles.find((candidate) => candidate.id === id);
@@ -225,7 +225,7 @@ async function activeJourney(viewport, label) {
     assert.equal(enterResult.carVariantId, presentation[0].variantId);
 
     const exitResult = await page.evaluate(async () => {
-      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
       ctx.car.speed = 0;
       const accepted = ctx.exitUrbanVehicleForSupport();
       await globalThis.advanceTime?.(900);
@@ -235,7 +235,7 @@ async function activeJourney(viewport, label) {
     assert.deepEqual(exitResult, { accepted: true, phase: 'walking', activeVehicleId: '' });
 
     const teardown = await page.evaluate(async () => {
-      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
       const refs = ctx.urbanSandboxRuntime.vehicles.map((vehicle) => vehicle.visual.root);
       ctx.disposeUrbanSandboxRuntime('curated-traffic-family-test');
       return {
@@ -264,7 +264,7 @@ async function fallbackJourney() {
     await openEarth(page, 'blocked-mobile');
     await page.waitForTimeout(1_500);
     const result = await page.evaluate(async () => {
-      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
       return {
         curatedCount: ctx.urbanSandboxRuntime.vehicles.filter((vehicle) => vehicle.visual.root.userData.curatedTrafficAssetId).length,
         vehicles: ctx.urbanSandboxRuntime.vehicles.map((vehicle) => {

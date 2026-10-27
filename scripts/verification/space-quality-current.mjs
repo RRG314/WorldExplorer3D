@@ -23,7 +23,7 @@ try {
  await page.waitForFunction(()=>document.getElementById('startBtn')?.disabled===false,null,{timeout:120000});
  await page.evaluate(()=>{document.getElementById('spaceLaunchToggle')?.click();document.getElementById('startBtn')?.click();});
  await page.waitForFunction(()=>JSON.parse(window.render_game_to_text?.()||'{}').modes?.space===true,null,{timeout:180000});
- await page.evaluate(async()=>{window.__spaceQualityContext=(await import('/app/js/shared-context.js?v=55')).ctx;});
+ await page.evaluate(async()=>{window.__spaceQualityContext=(await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55')).ctx;});
  await page.waitForFunction(()=>window.__spaceQualityContext.spaceFlight?.mode==='flying',null,{timeout:30000});
  if(!shipOnly&&!atmosphereOnly){
  await page.waitForFunction(()=>window.__spaceQualityContext.spaceFlight?.celestialCatalog?.starEntries?.length>=700);
@@ -34,7 +34,7 @@ try {
  checks.push({name:'constellation-overlay-toggle',figures:88});
  // Explicit scene fixtures isolate selection and geometry; they are not a full travel journey.
  const selected=await page.evaluate(async()=>{
-  const {ctx}=await import('/app/js/shared-context.js?v=55');
+  const {ctx}=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
   ctx.restoreUniverseLocalFrame('proxima-centauri');
   cancelAnimationFrame(ctx.spaceFlight.animationId);
   const meshes=ctx.universeRuntime.frameGroup.userData.destinationMeshes;
@@ -51,7 +51,7 @@ try {
  await page.screenshot({path:`${out}/01-exoplanet-selection.png`});
  await page.locator('#ssInfoClose').click();
  const sky=await page.evaluate(async()=>{
-  const {ctx}=await import('/app/js/shared-context.js?v=55');
+  const {ctx}=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
   const catalog=ctx.spaceFlight.celestialCatalog;
   ctx.updateSpaceCatalogObserver({x:0,y:0,z:0},ctx.spaceFlight.camera.position);
   const before=catalog.points.geometry.attributes.position.array.slice();
@@ -97,7 +97,7 @@ try {
  }
  if(!atmosphereOnly){
  await page.evaluate(async()=>{
-  const {ctx}=await import('/app/js/shared-context.js?v=55');ctx.returnUniverseToSolImmediate();
+  const {ctx}=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');ctx.returnUniverseToSolImmediate();
   const action=document.getElementById('fBoardSolisReach');
   if(!action)throw Error('Missing ship boarding action');
   action.click();
@@ -107,7 +107,7 @@ try {
   return crew?.length===7 && crew.every(member=>member.curatedAssetId && member.visibleFallbackMeshCount===0);
  },null,{timeout:60000});
  const interior=await page.evaluate(async()=>{
-  const {ctx}=await import('/app/js/shared-context.js?v=55');const pending=[];
+  const {ctx}=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');const pending=[];
   ctx.activeInterior.group.traverse(o=>{if(o.userData.furnishingReady)pending.push(o.userData.furnishingReady);});
   const loaded=await Promise.all(pending);const crew=ctx.getShipInteriorSnapshot().crewPresentation.length;return {crew,furnishings:loaded.length,loaded:loaded.filter(Boolean).length,near:ctx.camera.near};
  });
@@ -144,7 +144,7 @@ try {
 
   await page.screenshot({path:`${out}/ship-player-${expected}.png`});
  }
- const exited=await page.evaluate(async()=>{const {ctx}=await import('/app/js/shared-context.js?v=55');ctx.exitExpeditionShipInterior();return {near:ctx.camera.near,active:ctx.spaceFlight.active};});
+ const exited=await page.evaluate(async()=>{const {ctx}=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');ctx.exitExpeditionShipInterior();return {near:ctx.camera.near,active:ctx.spaceFlight.active};});
  assert.equal(exited.near,.5);assert.equal(exited.active,true);checks.push({name:'interior-exit-restores-camera',...exited});
  const retention=[];
  for(let cycle=0;cycle<2;cycle++) {

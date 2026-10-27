@@ -138,7 +138,7 @@ async function createExplorer(label, viewport = { width: 1280, height: 720 }, in
     const authApi = await import('https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js');
     const credential = await authApi.createUserWithEmailAndPassword(services.auth, email, accountPassword);
     await authApi.updateProfile(credential.user, { displayName });
-    const authUi = await import('/js/auth-ui.js?v=56');
+    const authUi = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/js/auth-ui.js?v=56');
     const deadline = Date.now() + 15_000;
     while (authUi.getCurrentUser()?.uid !== credential.user.uid && Date.now() < deadline) {
       await new Promise((resolve) => setTimeout(resolve, 50));
@@ -262,7 +262,7 @@ async function exposedCanvasPoint(page, avoidPoint = null) {
 
 async function projectedBlockPoint(page) {
   const readPoint = () => page.evaluate(async () => {
-      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
       const group = ctx.scene?.getObjectByName?.('buildBlocksGroup');
       const canvas = ctx.renderer?.domElement;
       const meshes = (group?.children || []).filter((entry) => entry?.userData?.isBuildBlock === true);
@@ -325,7 +325,7 @@ async function waitForBlockCount(page, count, shared = null) {
     }, { expectedCount: count, expectedShared: shared }, { timeout: 30_000 });
   } catch (error) {
     const evidence = await page.evaluate(async () => {
-      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
       const room = ctx.getCurrentMultiplayerRoom?.() || null;
       return {
         blockBuilder: globalThis.getWorldExplorerRuntimeDiagnostics?.().blockBuilder || null,
@@ -341,7 +341,7 @@ async function waitForBlockCount(page, count, shared = null) {
 
 async function inspectFirstBlockCollision(page) {
   return page.evaluate(async () => {
-    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
     const group = ctx.scene?.getObjectByName?.('buildBlocksGroup');
     const mesh = group?.children?.find((entry) => entry?.userData?.isBuildBlock === true);
     if (!mesh) return null;
@@ -362,7 +362,7 @@ async function inspectFirstBlockCollision(page) {
 
 async function runWalkingCollisionJourney(page, bypassBlockCollision = false) {
   const setup = await page.evaluate(async (bypass) => {
-    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
     const group = ctx.scene?.getObjectByName?.('buildBlocksGroup');
     const mesh = group?.children?.find((entry) => entry?.userData?.isBuildBlock === true);
     const walker = ctx.Walk?.state?.walker;
@@ -390,7 +390,7 @@ async function runWalkingCollisionJourney(page, bypassBlockCollision = false) {
   for (let index = 0; index < 80; index += 1) {
     await page.waitForTimeout(25);
     samples.push(await page.evaluate(async () => {
-      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
       const walker = ctx.Walk?.state?.walker;
       return walker ? { x: Number(walker.x), z: Number(walker.z) } : null;
     }));
@@ -410,7 +410,7 @@ async function runWalkingCollisionJourney(page, bypassBlockCollision = false) {
 
 async function restoreWalkingCollisionAuthority(page) {
   await page.evaluate(async () => {
-    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
     if (globalThis.__WE3D_ORIGINAL_BLOCK_COLLISION__) {
       ctx.getBuildCollisionAtWorldXZ = globalThis.__WE3D_ORIGINAL_BLOCK_COLLISION__;
     }
@@ -451,7 +451,7 @@ async function switchToDrivingThroughVisibleUi(page) {
 
 async function runVehicleBlockJourney(page, shape, bypassBlockAuthority = false) {
   const setup = await page.evaluate(async ({ expectedShape, bypass }) => {
-    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
     const group = ctx.scene?.getObjectByName?.('buildBlocksGroup');
     const mesh = group?.children?.find((entry) => entry?.userData?.isBuildBlock === true && entry.userData.shape === expectedShape);
     if (!mesh || !ctx.car) return null;
@@ -505,7 +505,7 @@ async function runVehicleBlockJourney(page, shape, bypassBlockAuthority = false)
   for (let index = 0; index < 80; index += 1) {
     await page.waitForTimeout(25);
     samples.push(await page.evaluate(async () => {
-      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
       return { x: Number(ctx.car?.x), y: Number(ctx.car?.y), z: Number(ctx.car?.z), speed: Number(ctx.car?.speed) };
     }));
   }
@@ -533,7 +533,7 @@ async function runVehicleBlockJourney(page, shape, bypassBlockAuthority = false)
 
 async function restoreVehicleBlockAuthority(page) {
   await page.evaluate(async () => {
-    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
     if (globalThis.__WE3D_ORIGINAL_VEHICLE_BLOCK_CONTACT__) {
       ctx.getBuildVehicleContact = globalThis.__WE3D_ORIGINAL_VEHICLE_BLOCK_CONTACT__;
       ctx.getBuildVehicleSurfaceAtWorldXZ = globalThis.__WE3D_ORIGINAL_VEHICLE_BLOCK_SURFACE__;
@@ -543,7 +543,7 @@ async function restoreVehicleBlockAuthority(page) {
 
 async function resetWalkerFacingFirstBlock(page) {
   const reset = await page.evaluate(async () => {
-    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
     const group = ctx.scene?.getObjectByName?.('buildBlocksGroup');
     const mesh = group?.children?.find((entry) => entry?.userData?.isBuildBlock === true);
     const walker = ctx.Walk?.state?.walker;
@@ -626,7 +626,7 @@ async function corruptLocalCopies(page, target) {
 
 async function readLocalPersistence(page) {
   return page.evaluate(async () => {
-    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
     return {
       persistence: ctx.getBuildPersistenceStatus?.() || null,
       status: document.getElementById('blockBuilderStatus')?.textContent || ''
@@ -648,7 +648,7 @@ async function openVisibleMultiplayerTab(page) {
 
 async function readCurrentRoom(page) {
   return page.evaluate(async () => {
-    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
     const room = ctx.getCurrentMultiplayerRoom?.() || null;
     return room ? {
       id: String(room.id || room.code || ''),
@@ -689,7 +689,7 @@ async function joinRoomThroughVisibleTitleUi(page, roomCode) {
 
 async function readRenderedBlocks(page) {
   return page.evaluate(async () => {
-    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
     const group = ctx.scene?.getObjectByName?.('buildBlocksGroup');
     return (group?.children || []).filter((entry) => entry?.userData?.isBuildBlock === true).map((mesh) => ({
       id: `${mesh.userData.gx}_${mesh.userData.gy}_${mesh.userData.gz}`,
@@ -705,7 +705,7 @@ async function readRenderedBlocks(page) {
 
 async function readRoomBlockDocumentCount(page, roomCode) {
   return page.evaluate(async (code) => {
-    const { initFirebase } = await import('/js/firebase-init.js?v=58');
+    const { initFirebase } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/js/firebase-init.js?v=58');
     const firestore = await import('https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js');
     const { db } = initFirebase();
     const snapshot = await firestore.getDocs(firestore.collection(db, 'rooms', code, 'blocks'));
@@ -876,7 +876,7 @@ try {
     ]);
 
     await roomOwner.page.evaluate(async () => {
-      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
       globalThis.__sandboxRoomContext = ctx;
       ctx.restartTutorial();
       ctx.openWorldDiscoverySection('today');

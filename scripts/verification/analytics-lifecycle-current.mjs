@@ -250,7 +250,7 @@ async function verifyDefaultStoredFirstEntry() {
     assert.ok(defaultAnalyticsCookies.length > 0, 'Default analytics must create a stable first-party analytics identifier');
 
     await page.evaluate(async () => {
-      const consent = await import('/js/analytics-consent.js?v=3');
+      const consent = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/js/analytics-consent.js?v=3');
       consent.writeAnalyticsConsent('denied');
     });
     await page.waitForFunction(() => globalThis.getWorldExplorerAnalyticsSnapshot?.().deliveryState === 'cookieless_denied');
@@ -260,7 +260,7 @@ async function verifyDefaultStoredFirstEntry() {
     assert.equal(deniedAnalyticsCookies.length, 0, 'Limited analytics must remove first-party analytics cookies');
 
     await page.evaluate(async () => {
-      const consent = await import('/js/analytics-consent.js?v=3');
+      const consent = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/js/analytics-consent.js?v=3');
       consent.writeAnalyticsConsent('granted');
     });
     await page.waitForFunction(() => {
@@ -321,7 +321,7 @@ async function verifyStorageBlockedConsent() {
     await page.waitForSelector('#analyticsConsentAllowBtn', { state: 'visible', timeout: 30_000 });
     await page.locator('#analyticsConsentAllowBtn').click();
     const evidence = await page.evaluate(async () => {
-      const consent = await import('/js/analytics-consent.js?v=3');
+      const consent = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/js/analytics-consent.js?v=3');
       return {
         readValue: consent.readAnalyticsConsent(),
         memoryValue: globalThis.__WE3D_ANALYTICS_CONSENT__ || null

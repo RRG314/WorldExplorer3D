@@ -63,7 +63,7 @@ try {
   await page.locator('#emailSignIn button').click();
   await page.locator('#phoneCaptures').waitFor({ state: 'visible' });
   const admitted = resumeId ? { capture: { captureId: resumeId } } : await page.evaluate(async () => {
-    const api = await import('/js/community-reality-capture-api.js?v=4');
+    const api = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/js/community-reality-capture-api.js?v=4');
     return api.createRealityCaptureDraft({ captureKind: 'exterior', publicContributionRequested: false,
       building: { sourceBuildingId: 'osm:way:424242', worldId: 'capture-benchmark-only', sourceAuthority: 'osm',
         label: 'Private photogrammetry benchmark — not a mapped house', lat: 0, lon: 0 } });
@@ -73,7 +73,7 @@ try {
   await page.goto(origin + '/app/capture.html#capture=' + id);
   await page.locator('#realityCapturePanel.show').waitFor();
   if (resumeId) {
-    const current = await page.evaluate(async id => (await import('/js/community-reality-capture-api.js?v=4')).getMyRealityCapture(id), id);
+    const current = await page.evaluate(async id => (await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/js/community-reality-capture-api.js?v=4')).getMyRealityCapture(id), id);
     if (current.capture.status === 'processing_failed' && process.argv.includes('--retry')) {
       const acknowledged = page.waitForResponse(response => new URL(response.url()).pathname === '/retryRealityCapture' && response.request().method() === 'POST');
       await page.locator('[data-capture-retry]').click();
@@ -112,7 +112,7 @@ try {
   const deadline = Date.now() + 35 * 60_000;
   let previous = '';
   while (Date.now() < deadline) {
-    const state = await page.evaluate(async id => (await import('/js/community-reality-capture-api.js?v=4')).getMyRealityCapture(id), id);
+    const state = await page.evaluate(async id => (await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/js/community-reality-capture-api.js?v=4')).getMyRealityCapture(id), id);
     if (state.capture.status !== previous) {
       previous = state.capture.status;
       console.log(JSON.stringify({ phase: previous, failure: state.capture.failure || null }));

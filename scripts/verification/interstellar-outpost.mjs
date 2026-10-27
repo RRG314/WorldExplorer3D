@@ -91,7 +91,7 @@ async function run(viewport, name) {
     await page.locator('#expeditionSetSurveyCourse').click();
     await page.waitForFunction((bodyId) => JSON.parse(globalThis.render_game_to_text?.() || '{}').universeNavigation?.courseDestinationId === bodyId, `${contact.id}-i`);
     await page.evaluate(async () => {
-      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
       const target = ctx.getUniverseHudTarget();
       ctx.spaceFlight.rocket.position.set(target.position.x, target.position.y, target.position.z + target.radius + Math.max(12, target.radius * 2));
       ctx.spaceFlight.velocity.set(0, 0, 0);
@@ -104,7 +104,7 @@ async function run(viewport, name) {
     await page.waitForFunction(() => document.getElementById('solidWorldPanel')?.textContent?.includes('Field Station'));
 
     const visual = await page.evaluate(async () => {
-      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
       const expedition = ctx.getInterstellarExpeditionSnapshot();
       const outpost = expedition.outposts[0];
       const meshes = [];

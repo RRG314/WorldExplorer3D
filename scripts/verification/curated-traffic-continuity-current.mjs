@@ -35,7 +35,7 @@ async function launchEarth() {
 try {
   await launchEarth();
   const tracked = await page.evaluate(async () => {
-    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
     // Time-of-day demand intentionally virtualizes part of the fixed pool.
     // Track an actor that is currently published, not an arbitrary inactive
     // pool member whose activity affinity may be outside the current band.
@@ -50,7 +50,7 @@ try {
   for (let index = 0; index < 120; index += 1) {
     await page.waitForTimeout(100);
     samples.push(await page.evaluate(async (id) => {
-      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
       const vehicle = ctx.livingWorldRuntime.population.vehicleSnapshots().find((entry) => entry.id === id);
       return vehicle ? {
         id: vehicle.id,

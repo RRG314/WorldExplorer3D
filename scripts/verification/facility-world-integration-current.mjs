@@ -28,7 +28,7 @@ try {
   const base=`http://127.0.0.1:${server.port}`;
   await page.goto(`${base}/app/?launch=earth&gm=free&loc=custom&lat=${location.lat}&lon=${location.lon}&lname=Facility%20verification&mode=walking&diagnostics=1`);
   await page.waitForFunction(()=>globalThis.__WE3D_RUNTIME_READY__,null,{timeout:90000});
-  await page.evaluate(async()=>{window.facilityCtx=(await import('/app/js/shared-context.js?v=55')).ctx;});
+  await page.evaluate(async()=>{window.facilityCtx=(await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55')).ctx;});
   if(await page.locator('#analyticsConsentDenyBtn').isVisible())await page.locator('#analyticsConsentDenyBtn').click();
   await page.getByRole('button',{name:'Explore',exact:true}).click();
   await page.waitForFunction(()=>facilityCtx.gameStarted&&!facilityCtx.worldLoading&&facilityCtx.transportFacilityVisual?.perimeter?.snapshot().status==='ready',null,{timeout:150000});

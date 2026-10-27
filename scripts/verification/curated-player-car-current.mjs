@@ -38,7 +38,7 @@ try {
   let earthReady = false;
   for (let attempt = 0; attempt < 720 && !earthReady; attempt += 1) {
     earthReady = await page.evaluate(async () => {
-      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
       return !!(ctx.gameStarted && ctx.initialEarthWorldReady && !ctx.worldLoading && ctx.carMesh?.parent);
     });
     if (!earthReady) await page.waitForTimeout(250);
@@ -54,7 +54,7 @@ try {
   let curatedReady = false;
   for (let attempt = 0; attempt < 120 && !curatedReady; attempt += 1) {
     curatedReady = await page.evaluate(async () => {
-      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
       return ctx.carMesh?.userData?.curatedVehicleAssetId === 'vehicle-bmw-525i-e34';
     });
     if (!curatedReady) await page.waitForTimeout(250);
@@ -63,7 +63,7 @@ try {
   assert.equal(bundledAssetRequests.length, 1, 'Drive mode should request the bundled car exactly once.');
 
   const before = await page.evaluate(async () => {
-    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
     const visual = ctx.carMesh.userData.curatedVehicleVisual;
     const bounds = new THREE.Box3().setFromObject(visual);
     const size = bounds.getSize(new THREE.Vector3());
@@ -100,7 +100,7 @@ try {
   await page.keyboard.up('ArrowUp');
   await page.waitForTimeout(450);
   const after = await page.evaluate(async () => {
-    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
     return {
       car: { x: ctx.car.x, y: ctx.car.y, z: ctx.car.z },
       assetId: ctx.carMesh?.userData?.curatedVehicleAssetId || '',

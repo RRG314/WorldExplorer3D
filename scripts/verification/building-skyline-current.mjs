@@ -23,7 +23,7 @@ try {
  await page.locator('#globeSelectorStartBtn').click();
  await page.waitForFunction(afterWorldLoad(()=>{const s=globalThis.getWorldExplorerRuntimeDiagnostics?.();return s?.gameStarted&&!s.worldLoading&&!document.getElementById('loading')?.classList.contains('show');}),null,{timeout:90000});
  const result = await page.evaluate(async()=>{
-  const {ctx}=await import('/app/js/shared-context.js?v=55');
+  const {ctx}=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
   ctx.setTimeOfDay?.('day');
   const camera=ctx.camera.clone();
   camera.position.set(0,200,400);camera.lookAt(0,60,-400);camera.updateMatrixWorld(true);
@@ -33,7 +33,7 @@ try {
  await writeFile(`${out}/skyline.png`,Buffer.from(result.image.split(',')[1],'base64'));
  delete result.image;
  for (const [direction,yaw] of [['north',Math.PI/2],['east',0],['south',-Math.PI/2],['west',Math.PI]]) {
-  await page.evaluate(async(yaw)=>{const {ctx}=await import('/app/js/shared-context.js?v=55');ctx.setTravelMode('plane');Object.assign(ctx.planeMode,{x:0,y:180,z:0,yaw,speed:2,throttle:0});},yaw);
+  await page.evaluate(async(yaw)=>{const {ctx}=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');ctx.setTravelMode('plane');Object.assign(ctx.planeMode,{x:0,y:180,z:0,yaw,speed:2,throttle:0});},yaw);
   await page.waitForTimeout(400);
   await page.screenshot({path:`${out}/flight-${direction}.png`});
  }

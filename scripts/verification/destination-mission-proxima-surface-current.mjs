@@ -52,7 +52,7 @@ async function beginProximaBMission(page) {
   await page.locator('[data-mission-course]').click();
   await page.waitForFunction(() => JSON.parse(globalThis.render_game_to_text?.() || '{}').universeNavigation?.courseDestinationId === 'proxima-centauri-b');
   const planetApproachReady = await page.evaluate(async () => {
-    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
     const target = ctx.getUniverseHudTarget?.();
     if (!target?.position || !ctx.spaceFlight?.rocket) return false;
     ctx.spaceFlight.rocket.position.set(
@@ -81,14 +81,14 @@ async function enterPodBay(page) {
   await page.waitForFunction(() => JSON.parse(globalThis.render_game_to_text?.() || '{}').expeditionShipInterior?.active === true);
   }
   await page.evaluate(async station => {
-    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
     ctx.switchSolisReachDeck(station.deckId);
     Object.assign(ctx.Walk.state.walker, { x: station.x, z: station.z, y:1.74, angle: 0, yaw: 0, lookYawOffset: 0, pitch: 0, vy: 0, onGround: true });
   },SHIP_STATIONS.find(entry=>entry.id==='craft-bay-status'));
   await page.waitForTimeout(220);
   await page.keyboard.press('KeyE');
   await page.locator('[data-pod-mission]').waitFor({ state: 'visible', timeout:10000 }).catch(async error => {
-    const state = await page.evaluate(async()=>{const {ctx}=await import('/app/js/shared-context.js?v=55');return {mission:ctx.getDestinationMissionSnapshot(),pod:ctx.getInterstellarExpeditionSnapshot()?.podJourney,frame:ctx.universeRuntime?.current?.id,course:ctx.universeRuntime?.course?.destination?.id,ship:ctx.getShipInteriorSnapshot()?.deckId,panel:document.getElementById('shipStationPanel')?.textContent};});
+    const state = await page.evaluate(async()=>{const {ctx}=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');return {mission:ctx.getDestinationMissionSnapshot(),pod:ctx.getInterstellarExpeditionSnapshot()?.podJourney,frame:ctx.universeRuntime?.current?.id,course:ctx.universeRuntime?.course?.destination?.id,ship:ctx.getShipInteriorSnapshot()?.deckId,panel:document.getElementById('shipStationPanel')?.textContent};});
     throw Error(JSON.stringify(state));
   });
 }
@@ -107,22 +107,22 @@ async function recordSurfaceActivity(page, activityId, failFirstSave = false) {
     };
   });
   await page.evaluate(async (id) => {
-    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
     const activity = ctx.planetaryFieldActivitySnapshot().activities.find((entry) => entry.activityId === id);
     Object.assign(ctx.Walk.state.walker, { x: activity.x + 2.2, z: activity.z + 0.8, y: activity.y + 1.2, vy: 0, onGround: true });
   }, activityId);
   await page.waitForTimeout(180);
   for (let step = 0; step < 3; step += 1) {
     assert.equal(await page.evaluate(async () => {
-      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
       return ctx.handlePrimaryContextInteraction();
     }), !(failFirstSave && step === 2));
     await page.waitForTimeout(120);
   }
   if(failFirstSave){
-    const failure=await page.evaluate(async()=>{const {ctx}=await import('/app/js/shared-context.js?v=55');return {evidence:ctx.getDestinationMissionSnapshot().evidence,procedure:ctx.planetaryFieldActivitySnapshot().activities.find(entry=>entry.activityId==='photograph').procedure};});
+    const failure=await page.evaluate(async()=>{const {ctx}=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');return {evidence:ctx.getDestinationMissionSnapshot().evidence,procedure:ctx.planetaryFieldActivitySnapshot().activities.find(entry=>entry.activityId==='photograph').procedure};});
     assert.equal(failure.evidence.includes('photograph'),false);assert.equal(failure.procedure.complete,false);
-    assert.equal(await page.evaluate(async()=>{const {ctx}=await import('/app/js/shared-context.js?v=55');return ctx.handlePrimaryContextInteraction();}),true);
+    assert.equal(await page.evaluate(async()=>{const {ctx}=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');return ctx.handlePrimaryContextInteraction();}),true);
     await page.waitForTimeout(200);
   }
 
@@ -130,14 +130,14 @@ async function recordSurfaceActivity(page, activityId, failFirstSave = false) {
 
 async function returnSurfaceToShip(page) {
     const pod = await page.evaluate(async () => {
-      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
       let result = null;
       ctx.scene.traverse((child) => { if (child.name === 'expedition-return-pod:proxima-centauri-b') result = child; });
       return result ? { x: result.position.x, y: result.position.y, z: result.position.z, rotationY: result.rotation.y } : null;
     });
     assert.ok(pod);
     await page.evaluate(async (pose) => {
-      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
       Object.assign(ctx.Walk.state.walker, {
         x: pose.x - Math.sin(pose.rotationY) * 2.7,
         z: pose.z - Math.cos(pose.rotationY) * 2.7,
@@ -151,7 +151,7 @@ async function returnSurfaceToShip(page) {
       });
     }, pod);
     assert.equal(await page.evaluate(async () => {
-      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
       return ctx.handlePrimaryContextInteraction();
     }), true);
     await page.waitForFunction(() => {
@@ -169,16 +169,16 @@ async function returnSurfaceToShip(page) {
         && state.universeNavigation?.transitionDestinationId == null;
     }, null, { timeout: 35_000 });
     assert.equal(await page.evaluate(async () => {
-      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
       return ctx.starField?.userData?.planetarySurfaceOcclusion === false;
     }), true);
     await waitForAsyncCondition(page, async () => {
-      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
       return ctx.getExpeditionPodDockingTarget?.()?.position != null;
     });
     await page.waitForTimeout(1000);
     assert.equal(await page.evaluate(async () => {
-      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
       const target = ctx.getExpeditionPodDockingTarget?.();
       if (!target?.position) return false;
       ctx.spaceFlight.rocket.position.set(target.position.x, target.position.y, target.position.z + Math.max(2, target.radius * 0.25));
@@ -200,7 +200,7 @@ async function deployPodAndLand(page) {
     await page.locator('[data-pod-mission]').click();
     await page.waitForFunction(() => JSON.parse(globalThis.render_game_to_text?.() || '{}').interstellarExpedition?.podJourney?.phase === 'local_flight');
     const landingTargetReady = await page.evaluate(async () => {
-      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
       const target = ctx.getUniverseHudTarget();
       if (!target?.landable) return false;
       const approachOffset = target.radius + Math.max(9, target.radius * 1.5);
@@ -317,7 +317,7 @@ async function run() {
     await page.screenshot({ path: path.join(outputDir, 'desktop-proxima-b-pod-route.png'), fullPage: true });
     await deployPodAndLand(page);
     const worldProfile = await page.evaluate(async () => {
-      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
       const positions = ctx.activeSolidWorldSurface.geometry.attributes.position;
       let minElevation = Infinity;
       let maxElevation = -Infinity;
@@ -340,7 +340,7 @@ async function run() {
     assert.equal(worldProfile.atmosphereEvidence, 'unconfirmed');
     assert.equal(worldProfile.weatherModelId, 'none');
     const surfaceSky = await page.evaluate(async () => {
-      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
       const layers = [];
       ctx.starField?.traverse((object) => {
         if (!(object.isPoints || object.isLine || object.isLineSegments) || object.userData?.skyHitbox || !object.material) return;
@@ -382,7 +382,7 @@ async function run() {
     await page.screenshot({ path: path.join(outputDir, 'desktop-proxima-b-surface-complete.png'), fullPage: true });
     await returnSurfaceToShip(page);
     await page.evaluate(async station => {
-      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
       ctx.switchSolisReachDeck(station.deckId);
       Object.assign(ctx.Walk.state.walker, { x: station.x, z: station.z, y:1.74, angle: 0, yaw: 0, lookYawOffset: 0, pitch: 0, vy: 0, onGround: true });
     },SHIP_STATIONS.find(entry=>entry.id==='analysis-review'));
@@ -416,7 +416,7 @@ async function run() {
     await page.screenshot({ path: path.join(outputDir, 'desktop-first-light-mission-success.png'), fullPage: true });
     await page.locator('#expeditionClose').click();
     const fictionalWorldProfile = await page.evaluate(async () => {
-      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
       const destinationId='andromeda-explorer-a-b';
       if(!ctx.prepareDestinationMissionSurface(destinationId))throw Error('Mission surface could not be prepared');
       const arrived=await ctx.arriveAtSolidWorld(destinationId);
@@ -442,7 +442,7 @@ async function run() {
     assert.notEqual(fictionalWorldProfile.weatherModelId, 'none');
     assert.ok(fictionalWorldProfile.pressurePa > 0, JSON.stringify(fictionalWorldProfile));
     const nextWorldEquipment = await page.evaluate(async () => {
-      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
       const restored = ctx.getPlanetarySurveyEquipment();
       const photo = ctx.planetaryFieldActivitySnapshot().activities.find(entry => entry.activityId === 'photograph');
       Object.assign(ctx.Walk.state.walker, { x:photo.x+24, z:photo.z, y:photo.y+1.7, vy:0, onGround:true });
@@ -455,14 +455,14 @@ async function run() {
     // Survey reach uses 3D distance; the actor above is also 1.7 m above the target.
     assert.ok(Math.abs(nextWorldEquipment.distance-Math.hypot(24,1.7))<1e-6);
     for(let step=0;step<3;step++) {
-      assert.equal(await page.evaluate(async()=>{const {ctx}=await import('/app/js/shared-context.js?v=55');return ctx.handlePrimaryContextInteraction();}),true);
+      assert.equal(await page.evaluate(async()=>{const {ctx}=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');return ctx.handlePrimaryContextInteraction();}),true);
       await page.waitForTimeout(180);
     }
     await page.waitForTimeout(300);
     await page.screenshot({ path: path.join(outputDir, 'desktop-andromeda-copper-dawn-weather.png'), fullPage: true });
     await openSpace(page);
     const restoredMission=await page.evaluate(async()=>{
-      const {ctx}=await import('/app/js/shared-context.js?v=55');
+      const {ctx}=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
       const event=await new Promise((resolve,reject)=>{const request=indexedDB.open('world-explorer-discovery');request.onerror=()=>reject(request.error);request.onsuccess=()=>{const db=request.result;const tx=db.transaction('events','readonly');const read=tx.objectStore('events').get('event:destination-mission:proxima-centauri-b');read.onsuccess=()=>resolve(read.result);read.onerror=()=>reject(read.error);tx.oncomplete=()=>db.close();};});
       const events=event?[event]:[];
       return {phase:ctx.getDestinationMissionSnapshot()?.phase,equipment:ctx.getPlanetarySurveyEquipment?.(),reportCount:events.length};

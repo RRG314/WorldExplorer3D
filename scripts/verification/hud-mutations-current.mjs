@@ -10,7 +10,7 @@ try{
  await page.setContent(ids.map(id=>`<div id="${id}"></div>`).join('')+'<a data-osm-location-link>Edit</a>');
  await page.addScriptTag({url:`http://127.0.0.1:${server.port}/node_modules/three/build/three.min.js`});
  const result=await page.evaluate(async()=>{
-  const {ctx}=await import('/app/js/shared-context.js?v=55');
+  const {ctx}=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
   const {updateHUD}=await import('/app/js/hud.js');
   Object.assign(ctx,{selLoc:'custom',customLoc:{name:'Test City'},LOC:{lat:39.29,lon:-76.61},SCALE:100000,METERS_PER_WORLD_UNIT:1,keys:{},Walk:{state:{mode:'walk',walker:{x:0,z:0,angle:0,speedMph:2}}},car:{speed:0,x:0,z:0,angle:0,condition:1},playerConditionAuthority:{snapshot:()=>({condition:1})}});
   const tick=()=>new Promise(resolve=>setTimeout(resolve,0));

@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
+import {verifyRuntimeGenerations} from '../lib/hosting-runtime-generation.mjs';
 import { currentArtifactIdentity, currentBaseline, sameArtifactIdentity, sameAcceptanceSource } from './execution-evidence.mjs';
 
 export const PROMOTION_RECEIPT = 'output/release-evidence/current/production-promotion.json';
@@ -33,6 +34,24 @@ export function validatePromotion({ receipt, baseline, productionIdentity, produ
   assert.equal(productionBuild.firebaseEnvironment, 'production');
   assert.equal(productionBuild.firebaseProjectId, productionConfig.projectId);
   assert.notEqual(stagingConfig.projectId, productionConfig.projectId);
+  const environmentAssets = new Set(ENVIRONMENT_ASSETS);
+  const retainedOnly = build => {
+    const packaging = build.runtimePackaging;
+    if (!packaging?.generation) return new Set();
+    const assets = build === stagingBuild ? stagingAssets.files : productionAssets.files;
+    verifyRuntimeGenerations(packaging, assets);
+    const current = new Set([...packaging.bundlePaths, ...Object.keys(packaging.generation.files)]);
+    return new Set(packaging.compatibility.flatMap(previous => Object.keys(previous.files)).filter(file => !current.has(file)));
+  };
+  if (stagingBuild.runtimePackaging?.generation || productionBuild.runtimePackaging?.generation) {
+    assert.equal(productionBuild.runtimePackaging?.generation?.id, stagingBuild.runtimePackaging?.generation?.id, 'Runtime generation changed during promotion');
+    assert.deepEqual(productionBuild.runtimePackaging?.bundlePaths, stagingBuild.runtimePackaging?.bundlePaths, 'Current bundle graph changed during promotion');
+    const configPath = `${stagingBuild.runtimePackaging.generation.prefix.slice(1)}/js/firebase-project-config.js`;
+    environmentAssets.add(configPath);
+    assert.equal(stagingAssets.files[configPath], hash(generatedFirebaseFiles('staging', stagingConfig)['js/firebase-project-config.js']));
+    assert.equal(productionAssets.files[configPath], hash(generatedFirebaseFiles('production', productionConfig)['js/firebase-project-config.js']));
+  }
+  const stagingRetained = retainedOnly(stagingBuild), productionRetained = retainedOnly(productionBuild);
   assert.equal(stagingBuild.sourceDirty, false);
   assert.equal(productionBuild.sourceDirty, false);
   if (stagingBuild.sourceInputFingerprint || productionBuild.sourceInputFingerprint) {
@@ -52,12 +71,12 @@ export function validatePromotion({ receipt, baseline, productionIdentity, produ
       assert.equal(assets.files?.[file], hash(contents), `Wrong ${environment} configuration asset: ${file}`);
     }
   }
-  const names = Object.keys(stagingAssets.files || {}).sort();
+  const names = Object.keys(stagingAssets.files || {}).filter(file => !stagingRetained.has(file)).sort();
   assert.ok(names.length > ENVIRONMENT_ASSETS.length);
-  assert.deepEqual(Object.keys(productionAssets.files || {}).sort(), names, 'Artifact file set changed');
+  assert.deepEqual(Object.keys(productionAssets.files || {}).filter(file => !productionRetained.has(file)).sort(), names, 'Current artifact file set changed');
   for (const file of ENVIRONMENT_ASSETS) assert.ok(names.includes(file), `Missing environment asset ${file}`);
   for (const file of names) {
-    if (!ENVIRONMENT_ASSETS.includes(file)) {
+    if (!environmentAssets.has(file)) {
       assert.equal(productionAssets.files[file], stagingAssets.files[file], `Untested asset changed: ${file}`);
     }
   }

@@ -37,7 +37,7 @@ try {
  await page.waitForFunction(() => window.__WE3D_RUNTIME_READY__ === true, null, { timeout: 90000 });
  await page.waitForSelector('#globeSelectorScreen.show');
  if (await page.locator('#analyticsConsentDenyBtn').isVisible()) await page.locator('#analyticsConsentDenyBtn').click();
- await page.evaluate(async()=>{window.marineCtx=(await import('/app/js/shared-context.js?v=55')).ctx;});
+ await page.evaluate(async()=>{window.marineCtx=(await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55')).ctx;});
  await page.locator('#coralResearchStart').click();
  await page.waitForFunction(()=>marineCtx.boatDeck?.active,null,{timeout:90000});
  report.cases.push({id:'new-player-research-shortcut-arrives-on-deck',passed:true});
@@ -95,7 +95,7 @@ try {
  const scan=async()=>{await page.locator('#marineResearchScan').click();await page.waitForFunction(()=>!marineCtx.marineResearch.snapshot().busy);};
  await approach();await scan();assert.equal(await page.evaluate(()=>marineCtx.marineResearch.snapshot().scans.length),1);await page.screenshot({path:`${dir}/first-scan.png`});
  await page.evaluate(()=>marineCtx.oceanVoyage.checkpoint());await page.reload();if(await page.locator('#landingPrimaryCta').isVisible())await page.locator('#landingPrimaryCta').click();await page.waitForFunction(()=>window.__WE3D_RUNTIME_READY__===true,null,{timeout:90000});
- await page.evaluate(async()=>{window.marineCtx=(await import('/app/js/shared-context.js?v=55')).ctx;});await page.locator('#oceanVoyageResume').click();await page.waitForFunction(()=>marineCtx.oceanMode.active&&marineCtx.marineResearch?.snapshot().ready,null,{timeout:90000});
+ await page.evaluate(async()=>{window.marineCtx=(await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55')).ctx;});await page.locator('#oceanVoyageResume').click();await page.waitForFunction(()=>marineCtx.oceanMode.active&&marineCtx.marineResearch?.snapshot().ready,null,{timeout:90000});
  assert.equal(await page.evaluate(()=>marineCtx.marineResearch.snapshot().scans.length),1);if(coastal){await page.waitForFunction(()=>marineCtx.marineResearch.coastal.snapshot().ready);assert.equal(await page.evaluate(()=>marineCtx.marineResearch.coastal.snapshot().completed),true);report.cases.push({id:'coastal-journal-completion-survives-real-reload',passed:true});}report.cases.push({id:'first-scan-survives-real-reload-and-voyage-resume',passed:true});
  await page.locator('#oceanVoyageRecover').click();await page.waitForFunction(()=>marineCtx.boatMode.active&&!marineCtx.oceanMode.active&&marineCtx.boatDeck.active,null,{timeout:30000});await lab();assert.equal(await page.evaluate(()=>marineCtx.marineResearch.snapshot().stage),'survey');
  await deploy();report.cases.push({id:'partial-outing-recovery-review-and-redeployment-retain-findings',passed:true});
@@ -147,7 +147,7 @@ try {
  await page.setViewportSize({width:1440,height:900});await goDeck('galley');await page.locator('#researchDeckAction').click();await page.getByLabel('Carried galley provisions').waitFor();await labPhoto('galley-room');
  report.cases.push({id:'actual-galley-opens-carried-provisions',passed:true});
  await page.reload();if(await page.locator('#landingPrimaryCta').isVisible())await page.locator('#landingPrimaryCta').click();await page.waitForFunction(()=>window.__WE3D_RUNTIME_READY__===true,null,{timeout:90000});
- await page.evaluate(async()=>{window.marineCtx=(await import('/app/js/shared-context.js?v=55')).ctx;});await page.locator('#oceanVoyageResume').click();await page.waitForFunction(()=>marineCtx.boatDeck?.active,null,{timeout:90000});
+ await page.evaluate(async()=>{window.marineCtx=(await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55')).ctx;});await page.locator('#oceanVoyageResume').click();await page.waitForFunction(()=>marineCtx.boatDeck?.active,null,{timeout:90000});
  assert.equal(await page.evaluate(()=>marineCtx.oceanVoyage.current.ship.transportEntityId),voyage.shipId);
  await goDeck('helm');await page.locator('#researchDeckAction').click();await page.waitForFunction(()=>!marineCtx.boatDeck.active&&marineCtx.boatMode.active);
  report.cases.push({id:'surface-checkpoint-reload-restores-vessel-and-walked-bridge-releases-to-helm',passed:true});

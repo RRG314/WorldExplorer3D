@@ -36,7 +36,7 @@ try{
   const enter=page.getByRole('link',{name:'Enter World ↗',exact:true});assert.equal(await enter.getAttribute('href'),`${base}/app/?portal=baltimore-harbor&pr=1`);
   await page.screenshot({path:path.join(out,'qualified-fixture-portal.png'),fullPage:true});await enter.click();
   await page.waitForFunction(()=>window.__WE3D_RUNTIME_READY__===true,null,{timeout:90000});
-  await page.evaluate(async()=>{window.portalQa=(await import('/app/js/shared-context.js?v=55')).ctx;portalQa.renderer.domElement.setAttribute('data-portal-main','true');});
+  await page.evaluate(async()=>{window.portalQa=(await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55')).ctx;portalQa.renderer.domElement.setAttribute('data-portal-main','true');});
   for(const id of ['analyticsConsentDenyBtn','testerInvitationClose'])if(await page.locator('#'+id).isVisible())await page.locator('#'+id).click();
   const before=await page.evaluate(async()=>{const {createIndexedDbDiscoveryProfileStore}=await import('/app/js/discovery/profile-store.js?v=5');return (await createIndexedDbDiscoveryProfileStore().getPortalDestination('device-guest','baltimore-harbor')).state;});
   assert.equal(before.visitedAt,0);assert.equal(before.saved,true);report.checks.push('Portal save survives game navigation; link selection alone does not award a visit.');

@@ -103,7 +103,7 @@ async function startEarth(page, suffix) {
   }
   await page.locator('#loading.show').waitFor({ state: 'hidden', timeout: 180_000 });
   await waitForAsyncCondition(page, async () => {
-    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
     return !!(ctx.gameStarted && ctx.initialEarthWorldReady && !ctx.worldLoading && ctx.worldDiscoveryRuntime && ctx.urbanSandboxRuntime);
   }, null, { timeout: 180_000 });
 }
@@ -146,20 +146,20 @@ async function verifyEarthActions(page) {
   await page.waitForFunction(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().deflock?.active === true, null, { timeout: 30_000 });
   assert.equal(await page.locator('body').evaluate((body) => body.classList.contains('deflock-active')), true);
   await page.evaluate(async () => {
-    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
     ctx.stopGameplayPlugin?.('hotbar-verification');
   });
   mark('Explore · DeFlock Hunt', 'gameplay authority active');
 
   await clickMenuItem(page, 'exploreBtn', 'exploreMenu', 'fFlowerChallenge');
   await waitForAsyncCondition(page, async () => {
-    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
     return ctx.getFlowerChallengeBackendStatus?.().challengeActive === true;
   }, null, { timeout: 20_000 });
   await page.locator('#flowerChallengeHud.show').waitFor({ state: 'visible', timeout: 10_000 });
   assert.match(await page.locator('#flowerChallengeHudStatus').textContent(), /flower/i);
   await page.evaluate(async () => {
-    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
     ctx.stopFlowerChallenge?.();
   });
   mark('Explore · Find Red Flower', 'challenge and marker active');
@@ -186,7 +186,7 @@ async function verifyEarthActions(page) {
 
   await clickMenuItem(page, 'exploreBtn', 'exploreMenu', 'fPOI');
   const poi = await page.evaluate(async () => {
-    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
     return { active: ctx.poiMode === true, count: ctx.poiMeshes?.length || 0, visible: ctx.poiMeshes?.filter((mesh) => mesh?.visible).length || 0 };
   });
   assert.equal(poi.active, true);
@@ -218,7 +218,7 @@ async function verifyEarthActions(page) {
     if (document.getElementById('loading')?.classList.contains('show')) return false;
     // Read only publication ownership. Full diagnostics rebuild several world
     // inventories and must not run every half second during world loading.
-    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
     return ctx.worldLoading === false
       && Number(ctx.livingWorldRuntime?.publication?.sequence || 0) > priorSequence;
   }, worldSequenceBeforeSearch, { timeout: 180_000, polling: 500 });
@@ -229,7 +229,7 @@ async function verifyEarthActions(page) {
   }
   await page.locator('#loading.show').waitFor({ state: 'hidden', timeout: 180_000 });
   const searchedLocation = await page.evaluate(async () => {
-    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
     return { lat: Number(ctx.customLoc?.lat), lon: Number(ctx.customLoc?.lon), name: String(ctx.customLoc?.name || '') };
   });
   assert.ok(Math.abs(searchedLocation.lat - 39.2904) < 0.00001, JSON.stringify(searchedLocation));
@@ -257,7 +257,7 @@ async function verifyEarthActions(page) {
   await openMenu(page, 'travelBtn', 'travelMenu');
   const boatVisible = await page.locator('#fBoat').isVisible();
   const boatAvailability = await page.evaluate(async () => {
-    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
     return !!(ctx.boatMode?.active || ctx.boatMode?.available || ctx.oceanMode?.active);
   });
   assert.equal(boatVisible, boatAvailability, 'Boat hotbar visibility did not match the boat authority.');
@@ -265,7 +265,7 @@ async function verifyEarthActions(page) {
     await page.locator('#fBoat').click();
     await page.waitForFunction(() => JSON.parse(globalThis.render_game_to_text?.() || '{}').modes?.boat === true, null, { timeout: 10_000 });
     await page.evaluate(async () => {
-      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
       ctx.setTravelMode?.('walk', { source: 'hotbar-verification', force: true });
     });
     mark('Travel · Pilot Boat', 'nearby vessel entered');
@@ -275,13 +275,13 @@ async function verifyEarthActions(page) {
   }
 
   await page.evaluate(async () => {
-    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
     const walker = ctx.Walk?.state?.walker;
     if (walker) { walker.y = -500; walker.vy = -10; walker.onGround = false; }
   });
   await clickMenuItem(page, 'travelBtn', 'travelMenu', 'fRespawn');
   await waitForAsyncCondition(page, async () => {
-    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
     return ctx.getCurrentTravelMode?.() === 'walk' &&
       !ctx.planeMode?.active && !ctx.droneMode?.active && !ctx.boatMode?.active &&
       Number(ctx.Walk?.state?.walker?.y) > -100 && ctx.Walk?.state?.walker?.onGround === true;
@@ -322,7 +322,7 @@ async function verifyEarthActions(page) {
   await page.locator('#flowerChallengePanel.open').waitFor({ state: 'visible', timeout: 20_000 });
   assert.equal(await page.locator('#leaderboardTabExplorer').evaluate((el) => el.classList.contains('active')), true);
   await page.evaluate(async () => {
-    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
     ctx.closeFlowerChallengeTitlePanel?.();
   });
   mark('Community · Community Board');
@@ -353,7 +353,7 @@ async function verifyEarthActions(page) {
   assert.equal(await page.locator('.propertyHubTabs [data-property-view="home"]').getAttribute('aria-selected'), 'true');
   await page.locator('#closePropertyPanelBtn').click();
   await page.evaluate(async () => {
-    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
     // Reproduce a late parcel/ownership refresh after dismissal. It may update
     // data, but must not reopen Real Estate over the next gameplay action.
     ctx.updatePropertyPanel?.();
@@ -390,7 +390,7 @@ async function verifyEnvironmentAndSpaceActions(page) {
   }, null, { timeout: 120_000 });
   await page.locator('#loading.show').waitFor({ state: 'hidden', timeout: 120_000 });
   await waitForAsyncCondition(page, async () => {
-    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
     return ctx.initialEarthWorldReady && !ctx.worldLoading;
   }, null, { timeout: 120_000 });
   mark('Travel · Return to Earth', 'Earth session resumed');
@@ -436,7 +436,7 @@ async function verifyMobileAccess(page) {
   await clickMenuItem(page, 'communityBtn', 'communityMenu', 'fCommunityBoard');
   await page.locator('#flowerChallengePanel.open').waitFor({ state: 'visible', timeout: 20_000 });
   await page.evaluate(async () => {
-    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
     ctx.closeFlowerChallengeTitlePanel?.();
   });
   await clickMenuItem(page, 'realEstateFloatBtn', 'realEstateMenu', 'fRealEstate');

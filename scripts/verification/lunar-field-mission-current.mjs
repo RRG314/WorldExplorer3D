@@ -74,7 +74,7 @@ try{
  await page.locator('#sfExpeditionBtn').click();await page.locator('#expeditionPlan').click();
  await page.waitForFunction(()=>document.querySelector('.expeditionSummary .is-ready')?.textContent?.includes('READY'));
  await page.locator('#expeditionEnterShip').click();
- await page.evaluate(async()=>{window.lunarCtx=(await import('/app/js/shared-context.js?v=55')).ctx;});
+ await page.evaluate(async()=>{window.lunarCtx=(await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55')).ctx;});
  await page.waitForFunction(()=>lunarCtx.getShipInteriorSnapshot?.()?.active===true,null,{timeout:30000});
  const original=(await state()).expedition;await station('navigation-course');await page.locator('[data-lunar-brief]').click();await page.locator('[data-mission-begin]').click();await page.locator('[data-mission-close]').click();
  assert.equal((await state()).mission.phase,'approach');cases.push('physical-navigation-station-begins-local-moon-mission');

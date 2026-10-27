@@ -40,7 +40,7 @@ async function prepareEncounter(page) {
       import('/app/js/expedition/hostile-interception.js?v=1'),
       import('/app/js/expedition/store.js?v=12'),
       import('/app/js/expedition/runtime.js?v=52'),
-      import('/app/js/shared-context.js?v=55')
+      import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55')
     ]);
     const plan = model.createExpeditionPlan({
       destinationId: 'proxima-centauri',
@@ -73,7 +73,7 @@ async function destroyEnemyWithRealFire(page, enemyId) {
     const aligned = await page.evaluate((id) => {
       const runtime = globalThis.getWorldExplorerRuntimeDiagnostics?.()?.pirateInterception;
       void runtime;
-      return globalThis.__pirateVerificationResult = null, import('/app/js/shared-context.js?v=55').then(({ ctx }) => {
+      return globalThis.__pirateVerificationResult = null, import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55').then(({ ctx }) => {
         const didAlign = ctx.pirateInterceptionRuntime?.verification?.alignEnemy(id, 78) === true;
         const didFire = ctx.pirateInterceptionRuntime?.fire?.() === true;
         return didAlign && didFire;
@@ -122,7 +122,7 @@ async function desktopJourney() {
 
   const boarding = combat.pirateInterception.enemies.find((enemy) => enemy.role === 'boarding-craft');
   const defenders = combat.pirateInterception.enemies.filter((enemy) => enemy.role !== 'boarding-craft').slice(0, 2);
-  assert.equal(await page.evaluate((id) => import('/app/js/shared-context.js?v=55').then(({ ctx }) => {
+  assert.equal(await page.evaluate((id) => import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55').then(({ ctx }) => {
     const aligned = ctx.pirateInterceptionRuntime?.verification?.alignEnemy(id, 160) === true;
     const fired = ctx.pirateInterceptionRuntime?.fire?.() === true;
     return aligned && fired;
@@ -153,7 +153,7 @@ async function desktopJourney() {
   assert.equal(resumed.interstellarExpedition.voyagePhase, 'long-watch-recovery');
   assert.equal(resumed.interstellarExpedition.encounterHistory.length, 1);
   assert.match(resumed.interstellarExpedition.log.at(-1).message, /resumed its original course/i);
-  assert.deepEqual(await page.evaluate(() => import('/app/js/shared-context.js?v=55').then(({ ctx }) => ({
+  assert.deepEqual(await page.evaluate(() => import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55').then(({ ctx }) => ({
     combatGroupPresent: ctx.spaceFlight.scene?.getObjectByName?.('Pirate Boarding Interception') != null,
     solarSystemRestored: ctx.spaceFlight.scene?.getObjectByName?.('solarSystemGroup')?.visible === true,
     combatHudHidden: document.getElementById('pirateCombatHUD')?.hidden === true

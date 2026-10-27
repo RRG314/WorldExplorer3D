@@ -47,7 +47,7 @@ try {
     return diagnostics.environment === 'OCEAN' && diagnostics.modes?.ocean === true &&
       ocean.active === true && ocean.underwaterSchoolCount > 0 && ocean.underwaterFishCount > 0;
   }, null, { timeout: 180_000 });
-  const fishPose=()=>page.evaluate(async()=>{const {ctx}=await import('/app/js/shared-context.js?v=55');return {paused:ctx.paused,hidden:document.hidden,lastFrameMs:ctx.oceanMode.lastFrameMs,now:performance.now(),fish:ctx.oceanMode.fishEntities.map(f=>({id:f.mesh.uuid,x:f.mesh.position.x,y:f.mesh.position.y,z:f.mesh.position.z,visible:f.mesh.visible,visualState:f.visualState,water:ctx.oceanMode.waterSurface?.sample(f.mesh.position.x,f.mesh.position.z)?.volume,tail:f.tail?.rotation.y??null}))};});
+  const fishPose=()=>page.evaluate(async()=>{const {ctx}=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');return {paused:ctx.paused,hidden:document.hidden,lastFrameMs:ctx.oceanMode.lastFrameMs,now:performance.now(),fish:ctx.oceanMode.fishEntities.map(f=>({id:f.mesh.uuid,x:f.mesh.position.x,y:f.mesh.position.y,z:f.mesh.position.z,visible:f.mesh.visible,visualState:f.visualState,water:ctx.oceanMode.waterSurface?.sample(f.mesh.position.x,f.mesh.position.z)?.volume,tail:f.tail?.rotation.y??null}))};});
   let fishBefore=await fishPose(),fishAfter,commonFish=[];
   const fishSampling=[];
   // Arrival can replace the entire population when a more accurate depth

@@ -43,7 +43,7 @@ try {
   await page.waitForFunction(() => typeof globalThis.render_game_to_text === 'function' && typeof globalThis.document.getElementById('currentJourneyCard') !== 'undefined');
   await page.waitForTimeout(7_000);
   const runtimeState = await page.evaluate(async () => {
-    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
     return {
       gameStarted: ctx.gameStarted,
       spaceActive: ctx.spaceFlight?.active,
@@ -64,7 +64,7 @@ try {
   await page.screenshot({ path: path.join(evidenceDir, '01-space-flight-journey.png') });
 
   const preCoursePosition = await page.evaluate(async () => {
-    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
     return ctx.spaceFlight.rocket.position.toArray();
   });
   await page.selectOption('#spaceDestinationSelect', 'mars');
@@ -75,7 +75,7 @@ try {
       && document.getElementById('sfAssistBtn')?.disabled === false;
   });
   const solarCourse = await page.evaluate(async () => {
-    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
     return {
       journeyId: ctx.spaceJourney?.journeyId,
       destinationBodyId: ctx.spaceJourney?.destinationBodyId,
@@ -108,18 +108,18 @@ try {
   await page.screenshot({ path: path.join(evidenceDir, '02-solar-course-set.png') });
   await page.locator('#sfAssistBtn').click();
   await waitForAsyncCondition(page, async () => {
-    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
     return ctx.spaceJourneyAssistState?.active === true;
   });
   const assistedJourneyId = await page.evaluate(async () => {
-    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
     return ctx.spaceJourney?.journeyId;
   });
   await page.keyboard.down('ArrowLeft');
   await page.waitForTimeout(120);
   await page.keyboard.up('ArrowLeft');
   const manualTakeover = await page.evaluate(async () => {
-    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
     return {
       journeyId: ctx.spaceJourney?.journeyId,
       spacecraftStatePresent: Boolean(ctx.spacecraftState),
@@ -159,7 +159,7 @@ try {
   await page.screenshot({ path: path.join(evidenceDir, '04-space-journey-mobile.png') });
 
   const cleanup = await page.evaluate(async () => {
-    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
     ctx.exitSpaceFlight?.('space-lifecycle-verification');
     return {
       active: ctx.spaceFlight?.active === true,

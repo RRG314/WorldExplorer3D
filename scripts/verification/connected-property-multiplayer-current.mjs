@@ -85,7 +85,7 @@ async function createPlayer(label, viewport) {
     // token refresh alone retains auth_time and cannot repair that boundary.
     const signedIn = await auth.signInWithEmailAndPassword(services.auth, email, 'WorldExplorer3D-Test-Only-93!');
     if (signedIn.user.uid !== credential.user.uid) throw new Error('Emulator sign-in changed the fixture account.');
-    const authUi = await import('/js/auth-ui.js?v=56');
+    const authUi = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/js/auth-ui.js?v=56');
     const deadline = Date.now() + 12_000;
     while (authUi.getCurrentUser()?.uid !== credential.user.uid && Date.now() < deadline) {
       await new Promise((resolve) => setTimeout(resolve, 50));
@@ -153,7 +153,7 @@ async function stageAtSameMappedProperty(player, roomCode, sourceBuildingId = ''
     // Set up the declared map fixture through the actual property owner. The
     // production module can load before diagnostics; a test-only global is not
     // a prerequisite for players opening and using the Property panel.
-    const {ctx}=await import('/app/js/shared-context.js?v=55');
+    const {ctx}=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
     ctx.selLoc='baltimore';
     ctx.LOC={lat:39.2904,lon:-76.6122,name:'Baltimore'};
     ctx.LOCS={...ctx.LOCS,baltimore:ctx.LOC};

@@ -70,7 +70,7 @@ try{
   await configureStagingAppCheck(page,server.url||`http://127.0.0.1:${server.port}`);
   await page.goto(`http://127.0.0.1:${server.port}/app/?launch=earth&gm=free&loc=custom&lat=39.29184&lon=-76.61036&lname=The%20Peale&mode=walking`,{waitUntil:'domcontentloaded'});
   await page.waitForFunction(()=>globalThis.__WE3D_RUNTIME_READY__,null,{timeout:120000});
-  await page.evaluate(async()=>{globalThis.museumCtx=(await import('/app/js/shared-context.js?v=55')).ctx;});
+  await page.evaluate(async()=>{globalThis.museumCtx=(await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55')).ctx;});
   if(await page.locator('#analyticsConsentDenyBtn').isVisible())await page.locator('#analyticsConsentDenyBtn').click();
   if(await page.locator('#globeSelectorStartBtn').isVisible())await page.locator('#globeSelectorStartBtn').click();
   await page.waitForFunction(()=>museumCtx.gameStarted&&!museumCtx.worldLoading&&!document.getElementById('loading')?.classList.contains('show'),null,{timeout:300000});
@@ -167,7 +167,7 @@ try{
   if(process.argv.includes('--reload')){
     await page.reload({waitUntil:'domcontentloaded'});
     await page.waitForFunction(()=>globalThis.__WE3D_RUNTIME_READY__,null,{timeout:120000});
-    await page.evaluate(async()=>{globalThis.museumCtx=(await import('/app/js/shared-context.js?v=55')).ctx;});
+    await page.evaluate(async()=>{globalThis.museumCtx=(await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55')).ctx;});
     if(await page.locator('#globeSelectorStartBtn').isVisible())await page.locator('#globeSelectorStartBtn').click();
     await page.waitForFunction(()=>museumCtx.gameStarted&&!museumCtx.worldLoading&&!document.getElementById('loading')?.classList.contains('show'),null,{timeout:300000});
     const {approach}=await mappedTarget();

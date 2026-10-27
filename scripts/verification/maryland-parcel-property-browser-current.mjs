@@ -85,7 +85,7 @@ try {
   assert.ok((await parcelShape.getAttribute('points') || '').split(' ').length >= 3);
   await page.screenshot({ path: path.join(evidenceDir, '02-desktop-parcel-details.png'), fullPage: false });
   await page.locator('[data-property-action="boundary"]').click();
-  const boundary = await page.evaluate(() => import('/app/js/shared-context.js?v=55').then(({ ctx }) => ({
+  const boundary = await page.evaluate(() => import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55').then(({ ctx }) => ({
     present: ctx.scene?.children?.some((child) => String(child.name || '').startsWith('parcel-boundary:')) === true,
     permission: ctx.canPlaceQuickBuildAt?.({ x: Number(ctx.car?.x || 0), z: Number(ctx.car?.z || 0) }) || null
   })));
@@ -96,7 +96,7 @@ try {
   await page.screenshot({ path: path.join(evidenceDir, '03-desktop-terrain-boundary.png'), fullPage: false });
 
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.evaluate(() => import('/app/js/shared-context.js?v=55').then(({ ctx }) => ctx.toggleRealEstate?.(true)));
+  await page.evaluate(() => import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55').then(({ ctx }) => ctx.toggleRealEstate?.(true)));
   await page.locator('.propertyHubTabs [data-property-view="nearby"]').click();
   await page.locator('.propertyParcelNotice').waitFor({ state: 'visible' });
   assert.equal(await page.locator('#propertyPanel').evaluate((element) => {

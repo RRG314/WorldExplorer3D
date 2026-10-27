@@ -23,7 +23,7 @@ try {
   await page.locator('#marsReturnEarthBtn').click();
   await page.waitForFunction(() => JSON.parse(globalThis.render_game_to_text?.() || '{}').surfacePodLaunch?.phase === 'ready');
   const grounded = await page.evaluate(async () => {
-    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
     const pod = ctx.scene.getObjectByName('expedition-surface-launch-pod:mars');
     return {
       environment: ctx.getEnv?.(),
@@ -49,7 +49,7 @@ try {
       && state.spaceFlight?.vehiclePresentation === 'pathfinder-pod';
   }, null, { timeout: 120_000 });
   const rendezvous = await page.evaluate(async () => {
-    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
     const target = ctx.getSolisReachDockTarget?.();
     const activeCraftRoots = ctx.spaceFlight.scene.children.filter((child) => child.userData?.spaceCraftId);
     return {

@@ -272,7 +272,7 @@ async function acceptLead(page, lead) {
   assert.equal(await page.locator('#discoveryEncounterLeadBtn').evaluate(button => button.hidden), true,
     'The persistent invitation must hide after its lead is accepted.');
   return page.evaluate(async () => {
-    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
     const discovery = globalThis.getWorldExplorerRuntimeDiagnostics?.().worldDiscovery;
     const quick = document.getElementById('discoveryQuickToolBtn');
     const direct = document.getElementById('urbanVehiclePrompt');

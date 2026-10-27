@@ -28,7 +28,7 @@ try {
   await page.waitForFunction(()=>window.__WE3D_RUNTIME_READY__===true,null,{timeout:90000});
   if(await page.locator('#analyticsConsentDenyBtn').isVisible())await page.locator('#analyticsConsentDenyBtn').click();
   await page.locator('#globeSelectorStartBtn').click();
-  await page.evaluate(async()=>{window.swimCtx=(await import('/app/js/shared-context.js?v=55')).ctx;});
+  await page.evaluate(async()=>{window.swimCtx=(await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55')).ctx;});
   // This source fixture verifies swimming after a complete world load. Use the
   // bounded loading window from the packaged functional journeys; the separate
   // packaged performance gate still enforces the actual first-playable budget.

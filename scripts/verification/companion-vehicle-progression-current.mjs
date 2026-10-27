@@ -73,7 +73,7 @@ async function openCompanions(page) {
 
 async function moveWalker(page, x, z) {
   await page.evaluate(async ({ x, z }) => {
-    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
     ctx.Walk.state.walker.x = x;
     ctx.Walk.state.walker.z = z;
     if (ctx.Walk.state.characterMesh) {
@@ -85,7 +85,7 @@ async function moveWalker(page, x, z) {
 
 async function clickContextAction(page, expectedLabel, holdPosition = null) {
   const result = await page.evaluate(async ({ expectedLabel, holdPosition }) => {
-    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
     if (holdPosition && ctx.Walk?.state?.walker) {
       const walker = ctx.Walk.state.walker;
       walker.x = holdPosition.x;
@@ -156,7 +156,7 @@ async function exercise(page, label) {
 
   await page.getByRole('button', { name: 'Practice Recall', exact: true }).click();
   const start = await page.evaluate(async () => {
-    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
     return { x: ctx.Walk.state.walker.x, z: ctx.Walk.state.walker.z };
   });
   await moveWalker(page, start.x + 7.5, start.z);
@@ -229,7 +229,7 @@ async function exerciseProgressionAndRecall(page, label) {
   assert.match(before, /Level 2/);
   await page.getByRole('button', { name: 'Practice Recall', exact: true }).click();
   const start = await page.evaluate(async () => {
-    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
     return { x: ctx.Walk.state.walker.x, z: ctx.Walk.state.walker.z };
   });
   await moveWalker(page, start.x + 7.5, start.z);

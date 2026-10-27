@@ -36,7 +36,7 @@ async function respondToIncidentAboardShip(page, name, capture = false) {
   await page.locator('#expeditionEnterShip').click();
   await page.waitForFunction(() => JSON.parse(globalThis.render_game_to_text?.() || '{}').expeditionShipInterior?.incidentPresentation != null);
   await page.evaluate(async (targetRoomId) => {
-    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
     const { getShipDeckForRoom, SHIP_STATIONS } = await import('/app/js/expedition/ship-layout.js?v=6');
     const { handleShipInteriorInteraction, switchSolisReachDeck } = await import('/app/js/expedition/ship-interior.js?v=28');
     const deckId = getShipDeckForRoom(targetRoomId);
@@ -54,7 +54,7 @@ async function respondToIncidentAboardShip(page, name, capture = false) {
   await page.waitForFunction(() => JSON.parse(globalThis.render_game_to_text?.() || '{}').expeditionShipInterior?.incidentProcedure?.stepIndex === 0);
   for (let stepIndex = 0; stepIndex < 3; stepIndex += 1) {
     const completed = await page.evaluate(async () => {
-      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
       const { handleShipInteriorInteraction } = await import('/app/js/expedition/ship-interior.js?v=28');
       const snapshot = ctx.getShipInteriorSnapshot?.();
       const target = ctx.activeInterior?.interactions?.find((entry) => entry.id === snapshot?.incidentProcedure?.currentInteractionId);
@@ -147,7 +147,7 @@ async function runJourney(viewport, name) {
     assert.equal(await page.locator('#spaceFlightCanvas').isVisible(), false);
     assert.equal(await page.locator('#tutorialHintCard').isVisible(), false);
     await page.evaluate(async () => {
-      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
       Object.assign(ctx.Walk.state.walker, { x: 0, z: 26.5, angle: 0, yaw: 0, lookYawOffset: 0, pitch: 0 });
     });
     await page.waitForTimeout(250);
@@ -161,7 +161,7 @@ async function runJourney(viewport, name) {
     await page.screenshot({ path: path.join(outputDir, `${name}-ship-map.png`), fullPage: true });
     await page.locator('#shipMapOverlay [data-close-map]').click();
     await page.evaluate(async () => {
-      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
       Object.assign(ctx.Walk.state.walker, { x: 0, z: 0.6 });
     });
     await page.waitForTimeout(120);
@@ -171,13 +171,13 @@ async function runJourney(viewport, name) {
     state = await diagnostics(page);
     assert.equal(state.expeditionShipInterior.deckId, 'habitat');
     await page.evaluate(async () => {
-      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
       Object.assign(ctx.Walk.state.walker, { x: 10, z: 26.1, angle: -Math.PI / 2, yaw: -Math.PI / 2, lookYawOffset: 0, pitch: 0 });
     });
     await page.waitForTimeout(250);
     await page.screenshot({ path: path.join(outputDir, `${name}-surveyor-habitat-visual.png`), fullPage: true });
     await page.evaluate(async () => {
-      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
       Object.assign(ctx.Walk.state.walker, { x: 0, z: 0.6 });
     });
     await page.waitForTimeout(120);
@@ -187,13 +187,13 @@ async function runJourney(viewport, name) {
     state = await diagnostics(page);
     assert.equal(state.expeditionShipInterior.deckId, 'engineering');
     await page.evaluate(async () => {
-      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
       Object.assign(ctx.Walk.state.walker, { x: 10, z: 27, angle: -Math.PI / 2, yaw: -Math.PI / 2, lookYawOffset: 0, pitch: 0 });
     });
     await page.waitForTimeout(250);
     await page.screenshot({ path: path.join(outputDir, `${name}-surveyor-engineering-visual.png`), fullPage: true });
     await page.evaluate(async () => {
-      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
       Object.assign(ctx.Walk.state.walker, { x: 0, z: 0.6 });
     });
     await page.waitForTimeout(120);
@@ -203,7 +203,7 @@ async function runJourney(viewport, name) {
     state = await diagnostics(page);
     assert.equal(state.expeditionShipInterior.deckId, 'habitat');
     await page.evaluate(async () => {
-      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
       Object.assign(ctx.Walk.state.walker, { x: -1.45, z: 0.5 });
     });
     await page.waitForTimeout(120);
@@ -214,7 +214,7 @@ async function runJourney(viewport, name) {
     assert.equal(state.expeditionShipInterior.openDoorCount, 1);
     await page.screenshot({ path: path.join(outputDir, `${name}-surveyor-habitat.png`), fullPage: true });
     await page.evaluate(async () => {
-      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
       Object.assign(ctx.Walk.state.walker, { x: 0, z: 0.6 });
     });
     await page.waitForTimeout(120);
@@ -224,7 +224,7 @@ async function runJourney(viewport, name) {
     state = await diagnostics(page);
     assert.equal(state.expeditionShipInterior.deckId, 'command');
     await page.evaluate(async () => {
-      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
       Object.assign(ctx.Walk.state.walker, { x: -5.1, z: 15.5 });
     });
     await page.waitForTimeout(120);
@@ -268,11 +268,11 @@ async function runJourney(viewport, name) {
     }, null, { timeout: 10000 });
     assert.equal(await page.locator('#spaceFlightCanvas').isVisible(), true);
     await page.evaluate(async () => {
-      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
       globalThis.__we3dVerificationContext = ctx;
     });
     const starshipPresentation = await page.evaluate(async () => {
-      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
       let originalHullVisible = false;
       ctx.spaceFlight.rocket?.traverse?.((object) => {
         if (object?.userData?.defaultStarshipFallback === true && object.visible !== false) originalHullVisible = true;

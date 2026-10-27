@@ -81,6 +81,14 @@
         ]
       },
       {
+        "source": "/runtime/**",
+        "headers": [{"key":"Cache-Control","value":"public, max-age=31536000, immutable"}]
+      },
+      {
+        "source": "/app/js/bundles/**",
+        "headers": [{"key":"Cache-Control","value":"public, max-age=31536000, immutable"}]
+      },
+      {
         "source": "**/*.@(jpg|jpeg|png|webp|svg|ico|woff|woff2|ttf|map|glb|gltf)",
         "headers": [
           {

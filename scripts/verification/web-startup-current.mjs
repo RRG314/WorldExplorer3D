@@ -131,7 +131,7 @@ try {
       }
     });
     await page.evaluate(async () => {
-      globalThis.startupQa = (await import('/app/js/shared-context.js?v=55')).ctx;
+      globalThis.startupQa = (await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55')).ctx;
       startupQa.renderer.domElement.setAttribute('data-startup-world', 'true');
     });
     const start = Date.now();

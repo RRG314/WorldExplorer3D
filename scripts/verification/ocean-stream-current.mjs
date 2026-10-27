@@ -78,7 +78,7 @@ try{
  await page.reload({waitUntil:'load'});await page.waitForFunction(()=>window.__WE3D_RUNTIME_READY__,null,{timeout:90000});
  await page.locator('#oceanVoyageResume').waitFor({state:'visible',timeout:30000});await page.locator('#oceanVoyageResume').click();
  await page.waitForFunction(()=>window.getOceanModeDebugState?.()?.active&&window.getOceanModeDebugState?.().streaming?.ready===9,null,{timeout:90000});
- await page.evaluate(async()=>{globalThis.__marineEntryContext=(await import('/app/js/shared-context.js?v=55')).ctx;});
+ await page.evaluate(async()=>{globalThis.__marineEntryContext=(await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55')).ctx;});
  const resumed=await page.evaluate(()=>({state:getOceanModeDebugState(),voyage:__marineEntryContext.oceanVoyage.current}));assert.equal(resumed.voyage.subId,identity.sub);assert.deepEqual(resumed.state.streaming.frameOrigin,saved.frameOrigin);
  report.cases.push('Reload resumes the remote geographic frame and original vessel/sub identities');
  await page.locator('#oceanDiverToggle').click();await page.waitForFunction(()=>getOceanModeDebugState().diver?.active,null,{timeout:30000});
@@ -98,7 +98,7 @@ try{
    await beforeResume();
    await page.locator('#oceanVoyageResume').waitFor({state:'visible',timeout:30000});await page.locator('#oceanVoyageResume').click();
    await page.waitForFunction(()=>window.getOceanModeDebugState?.()?.active,null,{timeout:90000});
-   await page.evaluate(async()=>{globalThis.__marineEntryContext=(await import('/app/js/shared-context.js?v=55')).ctx;});
+   await page.evaluate(async()=>{globalThis.__marineEntryContext=(await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55')).ctx;});
   }
   await reopen(fallback,async()=>{
    const departedRaw=await page.evaluate(()=>localStorage.getItem('we3d.ocean.voyage.v3'));

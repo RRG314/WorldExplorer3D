@@ -60,7 +60,7 @@ async function enterPodBay(page, contactId) {
   await page.locator('#expeditionEnterShip').click();
   await page.waitForFunction(() => JSON.parse(globalThis.render_game_to_text?.() || '{}').expeditionShipInterior?.active === true);
   const crewInteraction = await page.evaluate(async () => {
-    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
     const interaction = ctx.activeInterior?.interactions.find((entry) => entry.kind === 'ship-crew');
     if (!interaction) return null;
     Object.assign(ctx.Walk.state.walker, { x: interaction.x, z: interaction.z, angle: 0, yaw: 0, lookYawOffset: 0, pitch: 0, vy: 0, onGround: true });
@@ -77,14 +77,14 @@ async function enterPodBay(page, contactId) {
   assert.ok((await snapshot(page)).expeditionShipInterior?.selectedRoomId, 'Crew advice did not select a physical ship-map destination.');
   await page.locator('#shipMapOverlay [data-close-map]').click();
   await page.evaluate(async () => {
-    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
     Object.assign(ctx.Walk.state.walker, { x: 0, z: 0.6, angle: 0, yaw: 0, lookYawOffset: 0, pitch: 0 });
   });
   await page.keyboard.press('KeyE');
   await page.locator('#shipDeckPicker').waitFor({ state: 'visible' });
   await page.locator('#shipDeckPicker [data-deck="engineering"]').click();
   await page.evaluate(async () => {
-    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
     Object.assign(ctx.Walk.state.walker, { x: 4.8, z: -28.4, angle: Math.PI / 2, yaw: Math.PI / 2, lookYawOffset: 0, pitch: 0, vy: 0, onGround: true });
   });
   await page.waitForTimeout(250);
@@ -96,7 +96,7 @@ async function enterPodBay(page, contactId) {
 
 async function switchShipDeck(page, deckId) {
   await page.evaluate(async () => {
-    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
     Object.assign(ctx.Walk.state.walker, { x: 0, z: 0.6, angle: 0, yaw: 0, lookYawOffset: 0, pitch: 0, vy: 0, onGround: true });
   });
   await page.waitForTimeout(120);
@@ -107,7 +107,7 @@ async function switchShipDeck(page, deckId) {
 
 async function useShipStation(page, station, actionId) {
   await page.evaluate(async (pose) => {
-    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
     Object.assign(ctx.Walk.state.walker, { ...pose, angle: 0, yaw: 0, lookYawOffset: 0, pitch: 0, vy: 0, onGround: true });
   }, station);
   await page.waitForTimeout(180);
@@ -134,7 +134,7 @@ async function sellReturnedSampleOnEarth(page, expectedCatalogId) {
     return state.gameStarted && !state.worldLoading && state.urbanSandbox?.active;
   }, null, { timeout: 120_000 });
   const hardwareStores = await page.evaluate(async () => {
-    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
     return (ctx.urbanSandboxRuntimeSnapshot?.().commerce?.stores || [])
       .filter((place) => place.kind === 'hardware')
       .map((place) => ({
@@ -147,7 +147,7 @@ async function sellReturnedSampleOnEarth(page, expectedCatalogId) {
   });
   assert.ok(hardwareStores.length > 0, 'The loaded Earth world did not publish an eligible mapped hardware business.');
   const openedStoreId = await page.evaluate(async (stores) => {
-    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
     ctx.setTravelMode?.('walk', { source: 'sample-return-verification', emitTutorial: false });
     await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
     for (const store of stores) {
@@ -168,7 +168,7 @@ async function sellReturnedSampleOnEarth(page, expectedCatalogId) {
   await sellButton.click();
   await page.waitForFunction((credits) => Number((document.getElementById('urbanStoreCredits')?.textContent || '').replace(/[^\d]/g, '') || 0) > credits, beforeCredits);
   const sale = await page.evaluate(async (catalogId) => {
-    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
     return {
       credits: Number((document.getElementById('urbanStoreCredits')?.textContent || '').replace(/[^\d]/g, '') || 0),
       status: document.getElementById('urbanStoreStatus')?.textContent || '',
@@ -201,13 +201,13 @@ async function run() {
     await enterPodBay(page, contact.id);
     await page.locator('[data-close-station]').click();
     await page.evaluate(async () => {
-      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
       Object.assign(ctx.Walk.state.walker, { x: 10, z: -26.5, angle: -Math.PI / 2, yaw: -Math.PI / 2, lookYawOffset: 0, pitch: -0.03 });
     });
     await page.waitForTimeout(250);
     await page.screenshot({ path: path.join(outputDir, 'desktop-pod-launch-bay.png'), fullPage: true });
     await page.evaluate(async () => {
-      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
       Object.assign(ctx.Walk.state.walker, { x: 4.8, z: -28.4, angle: Math.PI / 2, yaw: Math.PI / 2, lookYawOffset: 0, pitch: 0 });
     });
     await page.keyboard.press('KeyE');
@@ -231,11 +231,11 @@ async function run() {
         && document.getElementById('sfFlightTitle')?.textContent === 'PATHFINDER POD';
     });
     await waitForAsyncCondition(page, async () => {
-      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
       return ctx.spaceFlight.rocket?.userData?.curatedPodAssetId === 'space-pathfinder-transfer-pod-v2';
     }, null, { timeout: 15_000 });
     const outboundPodPresentation = await page.evaluate(async () => {
-      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
       const pod = ctx.spaceFlight.rocket?.userData?.spaceCraftId === 'pathfinder-pod'
         ? ctx.spaceFlight.rocket
         : null;
@@ -268,7 +268,7 @@ async function run() {
     });
 
     await page.evaluate(async () => {
-      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
       const target = ctx.getUniverseHudTarget();
       const approachOffset = target.radius + Math.max(9, target.radius * 1.5);
       ctx.spaceFlight.rocket.position.set(target.position.x, target.position.y, target.position.z + approachOffset);
@@ -277,7 +277,7 @@ async function run() {
     });
     await page.waitForTimeout(500);
     const approachState = await page.evaluate(async () => {
-      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
       const target = ctx.getUniverseHudTarget?.();
       return {
         buttonDisabled: document.getElementById('sfLandBtn')?.disabled,
@@ -302,7 +302,7 @@ async function run() {
       return saved?.podJourney?.phase;
     }), 'surface');
     const surfacePod = await page.evaluate(async () => {
-      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
       let pod = null;
       ctx.scene.traverse((child) => { if (child.name === `expedition-return-pod:${ctx.activePlanetaryBodyId}`) pod = child; });
       return pod ? { x: pod.position.x, y: pod.position.y, z: pod.position.z, rotationY: pod.rotation.y, visible: pod.visible !== false } : null;
@@ -310,7 +310,7 @@ async function run() {
     assert.ok(surfacePod?.visible);
 
     const podCollisionStart = await page.evaluate(async (pose) => {
-      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
       const x = pose.x + 3.1;
       const z = pose.z;
       const heading = Math.atan2(pose.x - x, pose.z - z);
@@ -321,14 +321,14 @@ async function run() {
     await page.waitForTimeout(900);
     await page.keyboard.up('ArrowUp');
     const podCollisionEnd = await page.evaluate(async (pose) => {
-      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
       return Math.hypot(Number(ctx.Walk.state.walker.x) - pose.x, Number(ctx.Walk.state.walker.z) - pose.z);
     }, surfacePod);
     assert.ok(podCollisionEnd < podCollisionStart, JSON.stringify({ podCollisionStart, podCollisionEnd }));
     assert.ok(podCollisionEnd >= 1.85, JSON.stringify({ podCollisionStart, podCollisionEnd }));
 
     await page.evaluate(async () => {
-      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
       const activity = ctx.planetaryFieldActivitySnapshot().activities.find((entry) => entry.activityId === 'geology-inspect');
       const x = activity.x + 6;
       const z = activity.z + 8;
@@ -338,14 +338,14 @@ async function run() {
     await page.waitForTimeout(350);
     await page.screenshot({ path: path.join(outputDir, 'desktop-geology-field-site.png'), fullPage: true });
     await page.evaluate(async () => {
-      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
       const activity = ctx.planetaryFieldActivitySnapshot().activities.find((entry) => entry.activityId === 'geology-inspect');
       Object.assign(ctx.Walk.state.walker, { x: activity.x + 3, z: activity.z + 1, y: activity.y + 1.2, vy: 0, onGround: true });
     });
     await page.waitForTimeout(180);
     for (let step = 0; step < 3; step += 1) {
       assert.equal(await page.evaluate(async () => {
-        const { ctx } = await import('/app/js/shared-context.js?v=55');
+        const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
         return ctx.handlePrimaryContextInteraction();
       }), true);
       await page.waitForTimeout(120);
@@ -353,7 +353,7 @@ async function run() {
     await page.waitForFunction(() => JSON.parse(globalThis.render_game_to_text?.() || '{}').interstellarExpedition?.localOperation?.state === 'surface-sampled');
 
     const podCandidate = await page.evaluate(async (pose) => {
-      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
       const rampDistance = 2.7;
       Object.assign(ctx.Walk.state.walker, {
         x: pose.x - Math.sin(pose.rotationY) * rampDistance,
@@ -371,7 +371,7 @@ async function run() {
     assert.equal(podCandidate.id, 'expedition-return-pod');
     await page.screenshot({ path: path.join(outputDir, 'desktop-surface-return-pod.png'), fullPage: true });
     assert.equal(await page.evaluate(async () => {
-      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
       return ctx.handlePrimaryContextInteraction();
     }), true);
     await page.waitForFunction(() => {
@@ -388,7 +388,7 @@ async function run() {
     await page.screenshot({ path: path.join(outputDir, 'desktop-surface-pod-liftoff.png'), fullPage: true });
     await page.waitForFunction(() => JSON.parse(globalThis.render_game_to_text?.() || '{}').modes?.space === true, null, { timeout: 15_000 });
     assert.equal(await page.evaluate(async () => {
-      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
       const pod = ctx.spaceFlight.rocket?.userData?.spaceCraftId === 'pathfinder-pod'
         ? ctx.spaceFlight.rocket
         : null;
@@ -404,7 +404,7 @@ async function run() {
         && state.universeNavigation?.transitionDestinationId == null;
     }, null, { timeout: 35_000 });
     await waitForAsyncCondition(page, async () => {
-      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
       const state = JSON.parse(globalThis.render_game_to_text?.() || '{}');
       const target = ctx.getExpeditionPodDockingTarget?.();
       if (
@@ -418,7 +418,7 @@ async function run() {
     // beginning the player's manual docking approach.
     await page.waitForTimeout(1000);
     const dockingApproach = await page.evaluate(async () => {
-      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
       const target = ctx.getExpeditionPodDockingTarget?.();
       if (!target?.position) return null;
       ctx.spaceFlight.rocket.position.set(target.position.x, target.position.y, target.position.z + Math.max(2, target.radius * 0.25));
@@ -430,7 +430,7 @@ async function run() {
     assert.ok(dockingApproach, 'The Solis Reach docking target disappeared after the return-frame handoff.');
     await page.waitForTimeout(500);
     const dockingState = await page.evaluate(async () => {
-      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
       const target = ctx.getExpeditionPodDockingTarget?.();
       return {
         buttonDisabled: document.getElementById('sfLandBtn')?.disabled,
@@ -462,7 +462,7 @@ async function run() {
     assert.equal(final.interstellarExpedition.scienceSamples[0].processed, false);
     assert.equal(final.interstellarExpedition.resources.scienceCargoKg >= 4, true);
     assert.equal(await page.evaluate(async () => {
-      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
       return ctx.spaceFlight.rocket?.userData?.spaceCraftId === 'solis-reach'
         && ctx.spaceFlight.rocket?.children.some((child) => child.visible !== false) === true;
     }), true, 'Pathfinder recovery did not restore the Solis Reach flight presentation.');
@@ -484,7 +484,7 @@ async function run() {
     await useShipStation(page, { x: 4.3, z: 0.5 }, 'transfer-approved-sample');
     await page.waitForFunction(() => JSON.parse(globalThis.render_game_to_text?.() || '{}').interstellarExpedition?.scienceSamples?.[0]?.exported === true);
     const exported = await page.evaluate(async () => {
-      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
       const state = JSON.parse(globalThis.render_game_to_text?.() || '{}');
       const sample = state.interstellarExpedition.scienceSamples[0];
       const item = ctx.playerBackpackInventory.snapshot().items.find((entry) => entry.catalogId === sample.exportedCatalogId);

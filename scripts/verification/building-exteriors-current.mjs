@@ -63,7 +63,7 @@ async function launchPilot(pilot) {
       skip?.click();
     });
     await page.evaluate(async () => {
-      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
       ctx.setTimeOfDay?.('day');
     });
     await page.waitForTimeout(2_000);
@@ -78,7 +78,7 @@ async function launchPilot(pilot) {
     }
 
     const closeFacade = await page.evaluate(async ({ preferredFamilies, targetBuildingId }) => {
-      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
       const entrances = [...(ctx.buildingEntranceByBuilding?.values?.() || [])];
       const valid = entrances.filter((entry) => Number.isFinite(entry?.x) && Number.isFinite(entry?.z));
       const exact = targetBuildingId
@@ -119,7 +119,7 @@ async function launchPilot(pilot) {
     await page.screenshot({ path: path.join(outputDir, `${pilot.id}-facade.png`) });
 
     const snapshot = await page.evaluate(async () => {
-      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
       const diagnostics = globalThis.getWorldExplorerRuntimeDiagnostics?.() || {};
       return {
         location: { lat: ctx.LOC?.lat, lon: ctx.LOC?.lon, name: ctx.LOC?.name },

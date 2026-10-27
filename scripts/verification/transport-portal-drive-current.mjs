@@ -21,7 +21,7 @@ try{
  await page.route('**/listApprovedExteriorRepresentations',r=>r.fulfill({status:200,contentType:'application/json',headers:{'Access-Control-Allow-Origin':'*'},body:'{"representations":[]}'}));
  await page.goto(`http://127.0.0.1:${server.port}/app/?loc=custom&lat=43.7384&lon=7.4246&lname=Monaco&launch=earth&gm=free&mode=driving`);
  await page.waitForFunction(()=>window.__WE3D_RUNTIME_READY__,null,{timeout:60000});
- await page.evaluate(async()=>{window.driveCtx=(await import('/app/js/shared-context.js?v=55')).ctx});
+ await page.evaluate(async()=>{window.driveCtx=(await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55')).ctx});
  if(await page.locator('#analyticsConsentDenyBtn').isVisible())await page.locator('#analyticsConsentDenyBtn').click();
  await page.getByRole('button',{name:'Explore',exact:true}).click();
  await page.waitForFunction(()=>!driveCtx.worldLoading&&driveCtx.worldLoadRuntimeState?.status==='ready',null,{timeout:240000});

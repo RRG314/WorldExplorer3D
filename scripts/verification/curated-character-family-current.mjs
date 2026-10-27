@@ -60,7 +60,7 @@ async function earthJourney(viewport, label) {
     }, nearbyFamilyAssetIds, { timeout: 120_000 });
 
     const beforeIncident = await page.evaluate(async () => {
-      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
       const player = ctx.Walk?.state?.characterMesh;
       const npcs = ctx.urbanSandboxRuntime?.npcs || [];
       const actor = ctx.Walk?.state?.walker;
@@ -102,7 +102,7 @@ async function earthJourney(viewport, label) {
     assert.equal(officer.curatedEquipmentAssetId, 'equipment-explorer-pulse-sidearm-v1');
 
     await page.evaluate(async (officerPose) => {
-      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
       const walker = ctx.Walk?.state?.walker;
       if (!walker) return;
       const yaw = Math.atan2(Number(officerPose.x) - Number(walker.x), Number(officerPose.z) - Number(walker.z));
@@ -151,7 +151,7 @@ async function shipJourney(viewport, label) {
     await openShip(page);
     await page.waitForTimeout(800);
     const presentation = await page.evaluate(async () => {
-      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
       const crewLayer = ctx.scene?.getObjectByName?.('solis-reach-crew-layer');
       const roots = crewLayer?.children || [];
       globalThis.__WE3D_CREW_TEARDOWN_REFS__ = [...roots];
@@ -187,7 +187,7 @@ async function shipJourney(viewport, label) {
     assert.ok(presentation.members.every((member) => Number(member.actions.idle || 0) + Number(member.actions.walk || 0) > 0.99));
 
     await page.evaluate(async () => {
-      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
       const crewLayer = ctx.scene?.getObjectByName?.('solis-reach-crew-layer');
       const target = crewLayer?.children?.find((root) => root.visible !== false);
       const walker = ctx.Walk?.state?.walker;
@@ -206,7 +206,7 @@ async function shipJourney(viewport, label) {
     await page.waitForTimeout(350);
     await page.screenshot({ path: path.join(evidenceDir, `${label}-ship-crew.png`), fullPage: false });
     const deckResult = await page.evaluate(async () => {
-      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
       const before = ctx.getShipInteriorSnapshot?.();
       ctx.switchSolisReachDeck?.('habitat');
       const habitat = ctx.getShipInteriorSnapshot?.();
@@ -224,7 +224,7 @@ async function shipJourney(viewport, label) {
     assert.ok([deckResult.before, deckResult.habitat, deckResult.engineering].every((deck) => deck.visibleCrewCount > 0));
 
     const teardown = await page.evaluate(async () => {
-      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
       const exited = ctx.exitExpeditionShipInterior?.() === true;
       const refs = globalThis.__WE3D_CREW_TEARDOWN_REFS__ || [];
       const result = {

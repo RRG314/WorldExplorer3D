@@ -27,7 +27,7 @@ try {
   await page.waitForFunction(()=>window.__WE3D_RUNTIME_READY__===true,null,{timeout:90000});
   if(await page.locator('#analyticsConsentDenyBtn').isVisible())await page.locator('#analyticsConsentDenyBtn').click();
   await page.locator('#globeSelectorStartBtn').click();
-  await page.evaluate(async()=>{window.backupUiCtx=(await import('/app/js/shared-context.js?v=55')).ctx;});
+  await page.evaluate(async()=>{window.backupUiCtx=(await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55')).ctx;});
   try {await page.waitForFunction(()=>typeof backupUiCtx.openWorldDiscoverySection==='function' || backupUiCtx.worldLoadRuntimeState?.status==='failed',null,{timeout:45000});}
   catch(error){
    report.startup=await page.evaluate(()=>({gameStarted:backupUiCtx.gameStarted,worldLoading:backupUiCtx.worldLoading,ready:backupUiCtx.initialEarthWorldReady,environment:backupUiCtx.getEnv?.(),publication:!!backupUiCtx.worldPublication,loadingText:document.getElementById('loading')?.innerText}));

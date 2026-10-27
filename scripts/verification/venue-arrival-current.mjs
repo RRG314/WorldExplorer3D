@@ -52,7 +52,7 @@ if(!process.env.FIREBASE_AUTH_EMULATOR_HOST){
     if(await page.locator('#globeSelectorStartBtn').isVisible())await page.locator('#globeSelectorStartBtn').click();
     await page.waitForFunction(afterWorldLoad(()=>{const d=getWorldExplorerRuntimeDiagnostics();return d.gameStarted&&!d.worldLoading&&!document.getElementById('loading')?.classList.contains('show');}),null,{timeout:300000});
     const skip=page.getByRole('button',{name:'Skip guide',exact:true});if(await skip.isVisible())await skip.click();
-    await page.evaluate(async()=>{globalThis.venueCtx=(await import('/app/js/shared-context.js?v=55')).ctx;});
+    await page.evaluate(async()=>{globalThis.venueCtx=(await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55')).ctx;});
     console.log('[venue] World ready; inspecting published doors');
     await page.evaluate(()=>venueCtx.setTimeOfDay?.('day'));
     if(venue==='launchpad'){report.pad=await verifyLaunchPad(page,out);report.checks.push('Mapped launch pad publishes, south approach is continuously walkable');await runPrescribedGameActions(page,out,[{buttons:['up'],frames:12},{buttons:[],frames:4}], 'body > canvas:not(#minimap)');assert.deepEqual(report.errors,[]);assert.deepEqual(report.failedLocalAssets,[]);report.ok=true;}else{

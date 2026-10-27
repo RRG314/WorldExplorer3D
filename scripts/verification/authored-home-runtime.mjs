@@ -13,7 +13,7 @@ try{
   if(await page.locator('#globeSelectorStartBtn').isVisible())await page.locator('#globeSelectorStartBtn').click();
   await page.waitForFunction(afterWorldLoad(()=>{const d=globalThis.getWorldExplorerRuntimeDiagnostics?.();return d?.gameStarted&&!d.worldLoading&&d.modes?.walking&&!document.getElementById('loading')?.classList.contains('show');}),null,{timeout:120000});
   const entry=await page.evaluate(async()=>{
-    const {ctx}=await import('/app/js/shared-context.js?v=55'),core=await import('/app/js/interiors/core.js?v=4'),runtime=await import('/app/js/interiors/runtime.js?v=20'),{buildInteriorScene}=await import('/app/js/interiors/scene-builder.js?v=13'),{makeStarterLayout}=await import('/functions/interior-layout.mjs');
+    const {ctx}=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55'),core=await import('/app/js/interiors/core.js?v=4'),runtime=await import('/app/js/interiors/runtime.js?v=20'),{buildInteriorScene}=await import('/app/js/interiors/scene-builder.js?v=13'),{makeStarterLayout}=await import('/functions/interior-layout.mjs');
     const x=ctx.Walk.state.walker.x,z=ctx.Walk.state.walker.z;
     const outline=[{x:-5,z:-6},{x:5,z:-6},{x:5,z:6},{x:-5,z:6}],layout=makeStarterLayout({footprint:outline,heightMeters:6},{floorCount:2});
     const building={pts:outline.map(p=>({x:p.x+x,z:p.z+z})),centerX:x,centerZ:z,bodyHeightMeters:6,height:6,baseY:ctx.Walk.state.walker.y-1.7};

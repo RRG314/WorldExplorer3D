@@ -18,7 +18,7 @@ try{
  if(await page.locator('#analyticsConsentDenyBtn').isVisible())await page.locator('#analyticsConsentDenyBtn').click();
  await page.locator('#globeSelectorStartBtn').click();
  await page.waitForFunction(afterWorldLoad(()=>{const d=getWorldExplorerRuntimeDiagnostics();return d.gameStarted&&!d.worldLoading&&d.worldDiscovery?.active&&!document.getElementById('loading')?.classList.contains('show');}),null,{timeout:180000});
- await page.evaluate(async()=>{globalThis.__mapContext=(await import('/app/js/shared-context.js?v=55')).ctx;});
+ await page.evaluate(async()=>{globalThis.__mapContext=(await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55')).ctx;});
  const mini=await page.locator('#minimapZoomLevel').textContent();await page.locator('#minimapZoomIn').click();assert.notEqual(await page.locator('#minimapZoomLevel').textContent(),mini);await page.locator('#minimapZoomOut').click();
  for(const [id,viewport] of [['desktop',{width:1440,height:900}],['phone',{width:390,height:844}]]){
   await page.setViewportSize(viewport);await page.locator('#minimap').click();await page.locator('#largeMap.show').waitFor({state:'visible'});

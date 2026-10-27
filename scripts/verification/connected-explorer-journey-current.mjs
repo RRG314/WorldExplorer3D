@@ -94,7 +94,7 @@ async function approachNearbyAction() {
         // Read-only navigation over real building footprints. Keep this route
         // until its waypoints are reached; replanning a differently aligned
         // grid every step can reverse direction on opposite sides of a wall.
-        const { ctx } = await import('/app/js/shared-context.js?v=55');
+        const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
         const origin = actor.position;
         const spacing = 2;
         const nearby = targetId ? [target] : targets.filter(candidate => distance(candidate) < 90);
@@ -293,7 +293,7 @@ try {
   const state = await page.evaluate(async () => {
     let tutorialRuntime;
     try {
-      const {ctx} = await import('/app/js/shared-context.js?v=55');
+      const {ctx} = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
       tutorialRuntime = {snapshot:ctx.getTutorialSnapshot?.(), updateType:typeof ctx.tutorialUpdate, gameStarted:ctx.gameStarted, walkMode:ctx.Walk?.state?.mode, walker:ctx.Walk?.state?.walker ? {x:ctx.Walk.state.walker.x,y:ctx.Walk.state.walker.y,z:ctx.Walk.state.walker.z} : null};
     } catch (error) {tutorialRuntime={error:String(error?.stack||error)};}
     return ({

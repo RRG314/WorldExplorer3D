@@ -14,7 +14,7 @@ try {
  await page.locator('#globeSelectorStartBtn').click();
  await page.waitForFunction(afterWorldLoad(()=>{const s=window.getWorldExplorerRuntimeDiagnostics?.();return s?.gameStarted&&!s.worldLoading&&s.environmentEvidence?.vegetationCount>0;}),null,{timeout:90000});
  report.tree=await page.evaluate(async()=>{
-  const {ctx}=await import('/app/js/shared-context.js?v=55');
+  const {ctx}=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
   const focus=ctx.activeTransportActor().position;
   const tree=[...ctx.vegetationFeatures].filter(t=>t.trunkRadius>0 && Math.abs(ctx.terrainMeshHeightAt(t.x,t.z-10)-t.baseY)<.8).sort((a,b)=>Math.hypot(a.x-focus.x,a.z-focus.z)-Math.hypot(b.x-focus.x,b.z-focus.z))[0];
   if(!tree)throw new Error('No actual tree with a safe level approach loaded');
@@ -26,7 +26,7 @@ try {
  });
  async function snapshot(label){
   const state=await page.evaluate(async()=>{
-   const {ctx}=await import('/app/js/shared-context.js?v=55');
+   const {ctx}=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
    const walk=ctx.Walk.state.mode==='walk',actor=walk?ctx.Walk.state.walker:ctx.car,t=window.testVegetationTree;
    return {mode:walk?'walk':'drive',x:actor.x,z:actor.z,y:actor.y,speed:actor.speed,relativeZ:actor.z-t.z,distance:Math.hypot(actor.x-t.x,actor.z-t.z),impact:ctx.car.lastWorldImpact,health:ctx.car.health};
   });
@@ -44,7 +44,7 @@ try {
  await page.keyboard.down('s');await page.waitForTimeout(2500);await page.keyboard.up('s');
  const reverse=await snapshot('drive-reverse');report.checks.vehicleCanBackAway=reverse.z<hit.z-.3 && reverse.speed<0;
  await page.evaluate(async()=>{
-  const {ctx}=await import('/app/js/shared-context.js?v=55');const t=window.testVegetationTree;
+  const {ctx}=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');const t=window.testVegetationTree;
   ctx.setTravelMode('walk');Object.assign(ctx.Walk.state.walker,{x:t.x,z:t.z-4,y:t.baseY+1.7,angle:0,yaw:0,vy:0,grounded:true});
  });
  await page.waitForTimeout(300);await page.keyboard.down('w');await page.waitForTimeout(2000);await page.keyboard.up('w');

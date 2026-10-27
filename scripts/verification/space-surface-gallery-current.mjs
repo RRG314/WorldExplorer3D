@@ -11,7 +11,7 @@ try{
  await page.waitForFunction(()=>document.querySelector('#startBtn')?.disabled===false);
  await page.evaluate(()=>{document.querySelector('#spaceLaunchToggle')?.click();document.querySelector('#startBtn').click()});
  await page.waitForFunction(()=>JSON.parse(render_game_to_text()).modes?.space,null,{timeout:90000});
- await page.evaluate(async()=>{window.c=(await import('/app/js/shared-context.js?v=55')).ctx;});
+ await page.evaluate(async()=>{window.c=(await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55')).ctx;});
  if(!destinationsOnly)for(const body of ['mercury','venus','io','europa','titan','enceladus','triton','ceres','vesta','pluto']){
   const started=Date.now();await page.evaluate(id=>c.arriveAtSolidWorld(id),body);await page.waitForTimeout(700);
   const before=requests;await page.keyboard.down('w');

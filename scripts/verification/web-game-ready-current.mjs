@@ -35,7 +35,7 @@ if(process.env.WE3D_ACTION_NOAA_FIXTURE_DIR){
  await page.goto(args.url, { waitUntil: "domcontentloaded" });`);
 }
 if(process.env.WE3D_ACTION_ROAD_START==='1') source=source.replace('await doChoreography(page, canvas, steps);', `if(i===0)await page.evaluate(async()=>{
- const {ctx}=await import('/app/js/shared-context.js?v=55');
+ const {ctx}=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
  const route=(${planRoadRoute.toString()})(ctx.roads),a=route.points[0],b=route.points[1],car=ctx.car;
  Object.assign(car,{x:a.x,z:a.z,y:ctx.GroundHeight.carCenterY(a.x,a.z),angle:Math.atan2(b.x-a.x,b.z-a.z),speed:0,vFwd:0,vLat:0,vx:0,vy:0,vz:0,onGround:true,isAirborne:false});
 });
@@ -111,7 +111,7 @@ if(i===0){
  if(!(resumed>paused))throw new Error('Rendering did not resume after the pause dialog');
  fs.writeFileSync(path.join(args.screenshotDir,'pause.json'),JSON.stringify({ok:true,before,paused,resumed},null,2));
 }`);
-if(process.env.WE3D_TEST_DAY==='1') source=source.replace('await doChoreography(page, canvas, steps);', `await page.evaluate(async()=>{const {ctx}=await import('/app/js/shared-context.js?v=55');ctx.setTimeOfDay?.('day');ctx.setWeatherMode?.('clear');});\nawait doChoreography(page, canvas, steps);`);
+if(process.env.WE3D_TEST_DAY==='1') source=source.replace('await doChoreography(page, canvas, steps);', `await page.evaluate(async()=>{const {ctx}=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');ctx.setTimeOfDay?.('day');ctx.setWeatherMode?.('clear');});\nawait doChoreography(page, canvas, steps);`);
 if(process.env.WE3D_TEST_MOBILE==='1') source=source.replace('const page = await browser.newPage();','const page = await browser.newPage({viewport:{width:412,height:915},isMobile:true,hasTouch:true,deviceScaleFactor:1,userAgent:"Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Mobile Safari/537.36"});');
 if(process.env.WE3D_REAL_GPU==='1') source=source.replace('args: ["--use-gl=angle", "--use-angle=swiftshader"],','channel:"chrome",');
 if(process.env.WE3D_ACTION_MODE==='plane') source=source.replace('await doChoreography(page, canvas, steps);', `if(i===0){
@@ -126,7 +126,7 @@ if(process.env.WE3D_TEST_BOAT==='1') source=source.replace('await doChoreography
 await doChoreography(page, canvas, steps);`);
 if(process.env.WE3D_TEST_BOAT==='1') source=source.replace('await page.screenshot({path:shotPath, type:"png"});', `await page.screenshot({path:shotPath, type:"png"});
 const water = await page.evaluate(async()=>{
- const {ctx}=await import('/app/js/shared-context.js?v=55');
+ const {ctx}=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
  const meshes=[]; ctx.scene.updateMatrixWorld(true);
  ctx.scene.traverse(mesh=>{if(mesh.isMesh && mesh.visible && mesh.material?.userData?.weWaterWaveConfig)meshes.push(mesh);});
  const base=ctx.sampleDynamicWaterAt(ctx.boat.x,ctx.boat.z,ctx.boatMode.currentWater).baseY;
@@ -141,7 +141,7 @@ if(water.glError!==0 || !water.rays[0].hits.length || water.rays.some(ray=>ray.h
 if(process.env.WE3D_TEST_BOAT==='1') source=source.replace('await browser.close();', `await page.locator('#travelBtn').click(); await page.locator('#fBoat').click();
 await page.waitForFunction(()=>window.getWorldExplorerRuntimeDiagnostics?.().modes?.boat===false,null,{timeout:10000});
 const exitState=await page.evaluate(async()=>{
- const {ctx}=await import('/app/js/shared-context.js?v=55');
+ const {ctx}=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
  return {mode:ctx.Walk.state.mode,patchVisible:ctx.boatMode.waterPatch?.visible,boatVisible:ctx.boatMode.mesh?.visible};
 });
 fs.writeFileSync(path.join(args.screenshotDir,'exit.json'),JSON.stringify(exitState,null,2));
@@ -150,7 +150,7 @@ if(exitState.mode!=='walk' || exitState.patchVisible || exitState.boatVisible)th
 await browser.close();`);
 if(process.env.WE3D_GROUND_EVIDENCE==='1') source=source.replace('await page.screenshot({path:shotPath, type:"png"});', `await page.screenshot({path:shotPath, type:"png"});
 fs.writeFileSync(path.join(args.screenshotDir,'ground.json'),JSON.stringify(await page.evaluate(async()=>{
- const {ctx}=await import('/app/js/shared-context.js?v=55');
+ const {ctx}=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
  const counts={}; for(const f of ctx.landuses||[])counts[f.type]=(counts[f.type]||0)+1;
  return {location:ctx.LOC,counts,localSamples:(ctx.landuses||[]).slice(0,8).map(f=>({type:f.type,tags:f.tags,source:f.geometrySource})),
  meshes:(ctx.terrainGroup?.children||[]).filter(m=>m.userData?.isTerrainMesh).slice(0,8).map(m=>({
@@ -160,14 +160,14 @@ fs.writeFileSync(path.join(args.screenshotDir,'ground.json'),JSON.stringify(awai
 }),null,2));`);
 if(process.env.WE3D_BUILDING_PARITY==='1') source=source.replace('await page.screenshot({path:shotPath, type:"png"});', `await page.screenshot({path:shotPath, type:"png"});
 fs.writeFileSync(path.join(args.screenshotDir,'buildings.json'),JSON.stringify(await page.evaluate(async()=>{
- const {ctx}=await import('/app/js/shared-context.js?v=55');
+ const {ctx}=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
  return {location:ctx.LOC,device:ctx.isLikelyMobileDevice?.(),detail:ctx.worldDetailState?.buildings,
   buildings:(ctx.buildings||[]).filter(b=>Math.hypot(b.centerX,b.centerZ)<250).map(b=>({id:b.sourceBuildingId,x:b.centerX,z:b.centerZ,pts:b.pts,height:b.bodyHeightMeters,baseY:b.baseY,levels:b.levels})),
   provenance:ctx.buildingProvenanceRecords?.filter(r=>r.identity?.featureId==='overture:ba77061a-6e09-416a-aaf8-3057532ee880')};
 }),null,2));`);
 if(process.env.WE3D_TERRAIN_SAMPLES==='1') source=source.replace('await page.screenshot({path:shotPath, type:"png"});', `await page.screenshot({path:shotPath, type:"png"});
 fs.writeFileSync(path.join(args.screenshotDir,'terrain-samples.json'),JSON.stringify(await page.evaluate(async()=>{
- const {ctx}=await import('/app/js/shared-context.js?v=55');
+ const {ctx}=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
  const actor=ctx.activeTransportActor().position;
  const meshes=ctx.terrainGroup.children.filter(m=>m.userData?.isTerrainMesh&&!m.userData?.isFarTerrainClipmap).sort((a,b)=>Math.hypot(a.position.x-actor.x,a.position.z-actor.z)-Math.hypot(b.position.x-actor.x,b.position.z-actor.z)).slice(0,4);
  const lines=[];
@@ -176,7 +176,7 @@ fs.writeFileSync(path.join(args.screenshotDir,'terrain-samples.json'),JSON.strin
 }),null,2));`);
 if(process.env.WE3D_TERRAIN_SEAMS==='1') source=source.replace('await page.screenshot({path:shotPath, type:"png"});', `await page.screenshot({path:shotPath, type:"png"});
 fs.writeFileSync(path.join(args.screenshotDir,'seams.json'),JSON.stringify(await page.evaluate(async()=>{
- const {ctx}=await import('/app/js/shared-context.js?v=55');const samples=[];
+ const {ctx}=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');const samples=[];
  for(const mesh of ctx.terrainGroup.children) {
   if(mesh.userData?.isTerrainMesh!==true || mesh.userData?.isFarTerrainClipmap || !mesh.userData?.terrainTile || mesh.userData?.pendingTerrainTile)continue;
   const p=mesh.geometry?.attributes?.position,n=Math.round(Math.sqrt(p?.count||0));
@@ -196,7 +196,7 @@ fs.writeFileSync(path.join(args.screenshotDir,'seams.json'),JSON.stringify(await
 }),null,2));`);
 if(process.env.WE3D_TREE_CLOSEUP==='1') source=source.replace('await page.screenshot({path:shotPath, type:"png"});', `await page.screenshot({path:shotPath, type:"png"});
 const treeImage=await page.evaluate(async()=>{
- const {ctx}=await import('/app/js/shared-context.js?v=55');
+ const {ctx}=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
  const tree=[...(ctx.vegetationFeatures||[])].filter(p=>p.trunkRadius>0).sort((a,b)=>Math.hypot(a.x,a.z)-Math.hypot(b.x,b.z))[0];
  if(!tree)return null;
  const camera=ctx.camera.clone();camera.position.set(tree.x+10,tree.baseY+5,tree.z+12);camera.lookAt(tree.x,tree.baseY+4,tree.z);camera.updateMatrixWorld(true);

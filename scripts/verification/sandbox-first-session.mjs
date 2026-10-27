@@ -60,10 +60,10 @@ try {
    await page.locator(entry).click();
   } else if(await page.locator('#globeSelectorStartBtn').isVisible())await page.locator('#globeSelectorStartBtn').click();
   await page.waitForFunction(afterWorldLoad(()=>{const d=globalThis.getWorldExplorerRuntimeDiagnostics?.();return d?.gameStarted&&!d.worldLoading&&d.worldDiscovery?.active&&!document.getElementById('loading')?.classList.contains('show');}),null,{timeout:180000});
-  await page.evaluate(async()=>{globalThis.__sandboxTestContext=(await import('/app/js/shared-context.js?v=55')).ctx;});
+  await page.evaluate(async()=>{globalThis.__sandboxTestContext=(await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55')).ctx;});
  };
  await page.goto(url,{waitUntil:'domcontentloaded'});await ready();
- await page.evaluate(async()=>{const{ctx}=await import('/app/js/shared-context.js?v=55');ctx.setTimeOfDay?.('day');ctx.setWeatherMode?.('clear');});
+ await page.evaluate(async()=>{const{ctx}=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');ctx.setTimeOfDay?.('day');ctx.setWeatherMode?.('clear');});
  if(process.env.WE3D_SANDBOX_RELOAD_ONLY === '1') {
   await page.reload({waitUntil:'domcontentloaded'});await ready();report.checks.entryAndReturnReload=true;
  }
@@ -111,7 +111,7 @@ try {
   assert.equal(selected,process.env.WE3D_SANDBOX_RESEARCH);
   await page.screenshot({path:`${out}/research-started.png`});
  } else {
-  await page.evaluate(async()=>{const{ctx}=await import('/app/js/shared-context.js?v=55');ctx.openWorldDiscoverySection('today');});
+  await page.evaluate(async()=>{const{ctx}=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');ctx.openWorldDiscoverySection('today');});
   await page.locator('.discoveryTodayRoute summary').click();
   objective=await page.locator('[data-field-objective]:not([disabled])').first().getAttribute('data-field-objective');
   await page.locator(`[data-field-objective="${objective}"]`).click();
@@ -119,7 +119,7 @@ try {
  assert.ok(objective,'World must supply a valid field opportunity');
  if(process.env.WE3D_SANDBOX_RESEARCH) report.checks.researchChoiceAndTarget=true;
  const setup=await page.evaluate(async id=>{
-  const{ctx}=await import('/app/js/shared-context.js?v=55');const state=ctx.worldDiscoveryRuntime;
+  const{ctx}=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');const state=ctx.worldDiscoveryRuntime;
   const slot=state.publication.fieldActivities.slots.find(s=>s.id===id);
   if(ctx.Walk?.state?.mode!=='walk')ctx.toggleWalkDriveMode?.();
   const actor=ctx.Walk?.state?.walker; if(!actor)throw Error('Walking actor unavailable');
@@ -129,7 +129,7 @@ try {
  report.setup=setup;
  if(process.env.WE3D_SANDBOX_HARBOR==='1'){report.visualAudit=await captureVisualSceneAudit(page);await writeFile(`${out}/visual-audit.json`,JSON.stringify(report.visualAudit,null,2));}
  await page.waitForFunction(()=>globalThis.getWorldExplorerRuntimeDiagnostics?.().worldDiscovery?.interaction?.phase==='revealed',null,{timeout:45000});
- await page.evaluate(async()=>{const{ctx}=await import('/app/js/shared-context.js?v=55');ctx.openWorldDiscoverySection('today');});
+ await page.evaluate(async()=>{const{ctx}=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');ctx.openWorldDiscoverySection('today');});
  report.discoveryDomStability=await verifyDiscoveryDomStability(page);
  await page.locator('#discoveryPrimaryBtn').scrollIntoViewIfNeeded();
  const primaryBox=await page.locator('#discoveryPrimaryBtn').boundingBox();
@@ -144,8 +144,8 @@ try {
   mouse_y:primaryBox.y+primaryBox.height/2-canvasBox.y},{buttons:[],frames:3}],
   'body > canvas:not([id])');
  await page.waitForFunction(()=>globalThis.__sandboxTestContext.getTutorialSnapshot()?.stage==='review',null,{timeout:20000});
- const result=await page.evaluate(async()=>{const{ctx}=await import('/app/js/shared-context.js?v=55');return ctx.getTutorialSnapshot().result;});
- report.tutorial=await page.evaluate(async()=>{const{ctx}=await import('/app/js/shared-context.js?v=55');return {snapshot:ctx.getTutorialSnapshot(),saved:JSON.parse(localStorage.getItem('worldExplorer3D.tutorialState.v6')||'null'),resultText:document.getElementById('discoveryResultCard')?.textContent};});
+ const result=await page.evaluate(async()=>{const{ctx}=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');return ctx.getTutorialSnapshot().result;});
+ report.tutorial=await page.evaluate(async()=>{const{ctx}=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');return {snapshot:ctx.getTutorialSnapshot(),saved:JSON.parse(localStorage.getItem('worldExplorer3D.tutorialState.v6')||'null'),resultText:document.getElementById('discoveryResultCard')?.textContent};});
  assert.ok(result?.eventId,JSON.stringify(report.tutorial));report.result=result;
  assert.match(await page.locator('#discoveryResultCard').innerText(),/Journal saved in this browser on this device/);
  await page.screenshot({path:`${out}/desktop-result.png`});
@@ -250,7 +250,7 @@ try {
 
 
  await page.reload({waitUntil:'domcontentloaded'});await ready();
- const restored=await page.evaluate(async id=>{const{ctx}=await import('/app/js/shared-context.js?v=55');return {completed:ctx.getTutorialSnapshot().completed,hasRecord:(await ctx.discoveryProfileStore.listEvents()).some(e=>e.eventId===id)};},result.eventId);
+ const restored=await page.evaluate(async id=>{const{ctx}=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');return {completed:ctx.getTutorialSnapshot().completed,hasRecord:(await ctx.discoveryProfileStore.listEvents()).some(e=>e.eventId===id)};},result.eventId);
  assert.equal(await page.evaluate(()=>globalThis.__sandboxTestContext.getTutorialSnapshot().selectedPath),'together');
  await page.evaluate(async()=>{await globalThis.__sandboxTestContext.ensureBlockBuilderReady();});
  assert.equal(await page.evaluate(()=>globalThis.__sandboxTestContext.getBlockBuilderSnapshot().count),1,'Solo block survives reload');

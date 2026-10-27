@@ -132,7 +132,7 @@ try {
 
   const ready = await snapshot();
   const migratedStorage = await page.evaluate(async () => {
-    const {ctx}=await import('/app/js/shared-context.js?v=55');
+    const {ctx}=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
     return {current:ctx.playerBackpackStore.load(),backup:JSON.parse(localStorage.getItem(ctx.playerBackpackStore.backupKey)||'null')};
   });
   const readyItems = ready.equipment?.items || [];

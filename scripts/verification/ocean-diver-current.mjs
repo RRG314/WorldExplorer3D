@@ -41,7 +41,7 @@ try {
  elevation=-80;await select(-18.2861,147.7);await click();await deployResearchSubmarineFromDeck(page);
  await page.waitForFunction(()=>window.getOceanModeDebugState?.().active===true,null,{timeout:90000});
  const submarine=await page.evaluate(async()=>{
-  const {ctx}=await import('/app/js/shared-context.js?v=55');
+  const {ctx}=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
   const mesh=ctx.oceanMode.submarine.mesh;
   return {asset:mesh.userData.curatedMarineAssetId,loaded:mesh.userData.visualLoaded,position:{...getOceanModeDebugState().position}};
  });
@@ -64,33 +64,33 @@ try {
  // night. This exercises the real diver scene rather than a light-only mock.
  report.lighting=[];
  for(const phase of ['night','day']){
-  const lighting=await page.evaluate(async phase=>{const {ctx}=await import('/app/js/shared-context.js?v=55');ctx.setTimeOfDay(phase);return {phase:ctx.skyState.phase,daylight:ctx.skyState.sun.daylightFactor,exposure:ctx.oceanMode.renderer.toneMappingExposure,ambient:ctx.oceanMode.ambientLight.intensity,hemisphere:ctx.oceanMode.hemiLight.intensity};},phase);
+  const lighting=await page.evaluate(async phase=>{const {ctx}=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');ctx.setTimeOfDay(phase);return {phase:ctx.skyState.phase,daylight:ctx.skyState.sun.daylightFactor,exposure:ctx.oceanMode.renderer.toneMappingExposure,ambient:ctx.oceanMode.ambientLight.intensity,hemisphere:ctx.oceanMode.hemiLight.intensity};},phase);
   assert.equal(lighting.phase,phase);assert.equal(lighting.daylight,phase==='night'?0:1);
   assert.ok(lighting.exposure>=.9);assert.ok(lighting.ambient>=.28);
   report.lighting.push(lighting);await page.waitForTimeout(250);await page.screenshot({path:`${dir}/diver-${phase}.png`});
  }
  report.cases.push({id:'manual-day-night-updates-active-ocean-and-keeps-diver-fill',passed:true});
- const paused=await page.evaluate(async()=>{const {ctx}=await import('/app/js/shared-context.js?v=55');ctx.setPauseReason('verification_pause',true);return getOceanModeDebugState().diver});
+ const paused=await page.evaluate(async()=>{const {ctx}=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');ctx.setPauseReason('verification_pause',true);return getOceanModeDebugState().diver});
  await page.waitForTimeout(500);const stillPaused=await page.evaluate(()=>getOceanModeDebugState().diver);assert.deepEqual(stillPaused.position,paused.position);assert.equal(stillPaused.swimming.airSeconds,paused.swimming.airSeconds);
- await page.evaluate(async()=>{const {ctx}=await import('/app/js/shared-context.js?v=55');ctx.setPauseReason('verification_pause',false)});report.cases.push({id:'pause-preserves-diver-position-and-air',passed:true});
+ await page.evaluate(async()=>{const {ctx}=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');ctx.setPauseReason('verification_pause',false)});report.cases.push({id:'pause-preserves-diver-position-and-air',passed:true});
  const initial=await page.evaluate(()=>getOceanModeDebugState());
  assert.equal(initial.diver.ready,true);assert.equal(initial.diver.swimming.equipment,'scuba');
  await page.keyboard.down('w');
  try{
   await page.waitForFunction(position=>{const d=getOceanModeDebugState().diver;return Math.hypot(d.position.x-position.x,d.position.z-position.z)>.6},initial.diver.position,{timeout:12000});
-  report.swimPose=await page.evaluate(async()=>{const {ctx}=await import('/app/js/shared-context.js?v=55');const actor=ctx.oceanMode.scene.getObjectByName('Player Character');return {pitch:actor.rotation.x,animation:actor.userData.characterAnimation.snapshot()};});
+  report.swimPose=await page.evaluate(async()=>{const {ctx}=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');const actor=ctx.oceanMode.scene.getObjectByName('Player Character');return {pitch:actor.rotation.x,animation:actor.userData.characterAnimation.snapshot()};});
   assert.ok(report.swimPose.pitch>.5,'Forward swimming retains an upright standing pose');
   assert.ok(Object.entries(report.swimPose.animation.weights).some(([name,weight])=>name.startsWith('Explorer_Swim:')&&weight>.5),'Forward motion has no swimming stroke');
   await page.screenshot({path:`${dir}/diver-swimming.png`});
   report.cases.push({id:'forward-swimming-pose-and-stroke',passed:true});
- }catch(error){report.motionFailure=await page.evaluate(async()=>{const {ctx}=await import('/app/js/shared-context.js?v=55');return {state:getOceanModeDebugState(),actions:ctx.readControlActions('ocean'),focus:document.activeElement?.id}});throw error}finally{await page.keyboard.up('w')}
+ }catch(error){report.motionFailure=await page.evaluate(async()=>{const {ctx}=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');return {state:getOceanModeDebugState(),actions:ctx.readControlActions('ocean'),focus:document.activeElement?.id}});throw error}finally{await page.keyboard.up('w')}
 
  const moved=await page.evaluate(()=>getOceanModeDebugState());
  assert.ok(Math.hypot(moved.diver.position.x-initial.diver.position.x,moved.diver.position.z-initial.diver.position.z)>.5);
  assert.deepEqual(moved.position,initial.position);report.cases.push({id:'diver-owns-motion-sub-stays-parked',passed:true});
  assert.doesNotMatch(await page.locator('#boatPrompt').innerText(),/Surface boat available/);
  await page.screenshot({path:`${dir}/diver-outside-sub.png`});
- assert.equal(await page.evaluate(async()=>{const {ctx}=await import('/app/js/shared-context.js?v=55');return ctx.transferSubmarineToBoat()}),false);
+ assert.equal(await page.evaluate(async()=>{const {ctx}=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');return ctx.transferSubmarineToBoat()}),false);
  assert.equal(await page.evaluate(()=>getOceanModeDebugState().diver.active),true);report.cases.push({id:'surface-transfer-cannot-abandon-diver',passed:true});
  await page.setViewportSize({width:390,height:844});
  const layout=await page.locator('#oceanDiverControls').boundingBox();assert.ok(layout.x>=0&&layout.x+layout.width<=391);
@@ -111,7 +111,7 @@ try {
  await page.locator('#oceanDiverToggle').click();await page.waitForFunction(()=>getOceanModeDebugState().diver.active===true);
  await page.locator('#oceanSwimmingHud').getByRole('button',{name:'Recover',exact:true}).click();
  await page.waitForFunction(()=>getOceanModeDebugState().diver.active===false);report.cases.push({id:'explicit-recovery-returns-aboard',passed:true});
- await page.evaluate(async()=>{const {ctx}=await import('/app/js/shared-context.js?v=55');window.diverCtx=ctx;ctx.oceanMode.submarine.position.y=-40});
+ await page.evaluate(async()=>{const {ctx}=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');window.diverCtx=ctx;ctx.oceanMode.submarine.position.y=-40});
  await page.waitForFunction(()=>document.querySelector('#oceanDiverToggle').disabled===true);assert.match(await page.locator('#oceanDiverControls').innerText(),/1–38/);report.cases.push({id:'deep-sub-exit-is-blocked-with-instructions',passed:true});
  const parentId=await page.evaluate(()=>diverCtx.oceanVoyage.current.ship.transportEntityId);
  await page.locator('#oceanVoyageRecover').click();await page.waitForFunction(()=>diverCtx.boatDeck?.active&&!diverCtx.oceanMode.active,null,{timeout:30000});

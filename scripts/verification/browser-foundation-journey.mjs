@@ -32,7 +32,7 @@ try {
  await page.goto(`${base}/app/?loc=custom&lat=39.2904&lon=-76.6122&lname=Baltimore&launch=earth&gm=free&mode=driving`,{waitUntil:'domcontentloaded'});
  await page.waitForFunction(()=>globalThis.__WE3D_RUNTIME_READY__,null,{timeout:120000});
  if(await page.locator('#analyticsConsentDenyBtn').isVisible())await page.locator('#analyticsConsentDenyBtn').click();
- await page.evaluate(async()=>{window.foundationContext=(await import('/app/js/shared-context.js?v=55')).ctx;window.foundationControl=(await import('/app/js/transport/control-state.js')).resolveControlState;});
+ await page.evaluate(async()=>{window.foundationContext=(await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55')).ctx;window.foundationControl=(await import('/app/js/transport/control-state.js')).resolveControlState;});
  if(spaceReturnOnly)await page.locator('#globeSelectorSpaceBtn').click();
  else if(!marineOnly&&await page.locator('#globeSelectorStartBtn').isVisible())await page.locator('#globeSelectorStartBtn').click();
  const ready=()=>page.waitForFunction(()=>{const c=window.foundationContext;return c?.gameStarted&&!c.worldLoading&&!c.titleLaunchPending&&!document.querySelector('#loading.show')&&c.buildings?.length>0&&c.roads?.length>0&&c.worldDiscoveryRuntime&&!c.worldDiscoveryRuntime.disposed;},null,{timeout:210000,polling:1000});

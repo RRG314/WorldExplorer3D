@@ -32,7 +32,7 @@ try{
  if(await page.locator('#globeSelectorStartBtn').isVisible())await page.locator('#globeSelectorStartBtn').click();
  await page.waitForFunction(afterWorldLoad(()=>{const d=globalThis.getWorldExplorerRuntimeDiagnostics?.();return d?.gameStarted&&!d.worldLoading&&!document.getElementById('loading')?.classList.contains('show');}),null,{timeout:180000});
  await page.evaluate(async()=>{
-  window.streetCtx=(await import('/app/js/shared-context.js?v=55')).ctx;const c=streetCtx;
+  window.streetCtx=(await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55')).ctx;const c=streetCtx;
   window.initialStreetArrival={focus:c.streetPavement?.focus,position:{x:c.Walk.state.walker.x,z:c.Walk.state.walker.z},coverageBounds:c.streetPavement?.coverageBounds,phases:c.streetPavement?.stats?.phaseDurationsMs};
   c.setTimeOfDay?.('day');c.setWeatherMode?.('clear');await c.setTravelMode('walk',{force:true,emitTutorial:false});
   const frame=(await import('/app/js/earth-core/coordinate-frame.js?v=1')).earthCoordinateFrame(c.LOC,c.SCALE);

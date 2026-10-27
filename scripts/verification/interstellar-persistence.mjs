@@ -150,7 +150,7 @@ async function run(viewport, name) {
     await setWayfinderCourse(page, bodyId);
     await page.waitForFunction((id) => JSON.parse(globalThis.render_game_to_text?.() || '{}').universeNavigation?.courseDestinationId === id, bodyId);
     await page.evaluate(async () => {
-      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
       const target = ctx.getUniverseHudTarget();
       ctx.spaceFlight.rocket.position.set(target.position.x, target.position.y, target.position.z + target.radius + Math.max(12, target.radius * 2));
       ctx.spaceFlight.velocity.set(0, 0, 0);
@@ -164,7 +164,7 @@ async function run(viewport, name) {
     await page.waitForFunction(() => document.body.classList.contains('solid-world-active'), null, { timeout: 30_000 });
     await page.waitForFunction(() => document.getElementById('solidWorldPanel')?.textContent?.includes('Field Station'));
     const surface = await page.evaluate(async () => {
-      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
       const stationBlocks = [];
       ctx.scene.traverse((object) => { if (object.userData?.buildAuthority === 'expedition-outpost') stationBlocks.push(object); });
       const first = stationBlocks[0];

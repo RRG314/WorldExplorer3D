@@ -192,14 +192,24 @@ const APP_SHELL_FRAGMENT_HTML = `
 `;
 
 async function publishImmutableBuildIdentity() {
+  const loaded = globalThis.__WORLD_EXPLORER_PRODUCTION__;
+  const hudBox = document.querySelector('.hud-box');
+  if (loaded?.sourceVersion && loaded?.sourceCommit && hudBox) {
+    hudBox.dataset.buildLabel = `V${loaded.sourceVersion} · ${loaded.sourceCommit.slice(0, 7)}`;
+  }
   try {
     const response = await fetch('/build-manifest.json', { cache: 'no-store' });
     if (!response.ok) return;
     const manifest = await response.json();
     const candidateId = String(manifest?.candidateId || '');
     if (!candidateId || candidateId !== String(manifest?.buildId || '')) return;
+    if (loaded?.runtimeReleaseId && (loaded.runtimeReleaseId !== manifest.runtimePackaging?.generation?.id || loaded.sourceCommit !== manifest.commit)) {
+      // The channel changed after this page loaded. Do not label this session
+      // with a different build or automatically interrupt its active world.
+      if (hudBox) hudBox.title = 'An update is available. Reopen the game when you are ready to use the latest version.';
+      return;
+    }
     globalThis.__WORLD_EXPLORER_BUILD__ = Object.freeze(manifest);
-    const hudBox = document.querySelector('.hud-box');
     if (hudBox) {
       hudBox.dataset.buildLabel = `V${manifest.version} · ${String(manifest.commit || '').slice(0, 7)}`;
       hudBox.title = candidateId;

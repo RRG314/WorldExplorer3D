@@ -57,7 +57,7 @@ await page.route(/https:\/\/[^/]*overpass[^/]*\/.*interpreter/i, route => route.
 async function snapshot(label) {
   await page.screenshot({ path: `${output}/${label}.png` });
   const state = await page.evaluate(async () => {
-    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
     const { resolveTunnelSpace, projectPointToFeature, createVehicleCameraBody, vehicleCameraProbeRadius } = await import('/__verification/transport-inspection.mjs');
     const walker = ctx.Walk.state.walker;
     const walk = ctx.Walk.state.mode === 'walk';
@@ -90,7 +90,7 @@ try {
     return d?.gameStarted && !d.worldLoading && d.worldCounts.roads > 0;
   }), null, { timeout: 240_000 });
   await page.evaluate(async () => {
-    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
     window.testTunnel = ctx.roads.find(r => r.name === 'Fort McHenry Tunnel (Bore 2)' && r.tunnelSystemModel?.shellRanges.length);
     if (!window.testTunnel) throw new Error('Mapped test tunnel did not load');
     window.placeOnTestTunnel = (distance, normal = false) => {
@@ -145,7 +145,7 @@ try {
   const walk = await snapshot('walking');
   report.checks.walkModePreservesTunnel = walk.mode === 'walk' && walk.y < 0;
   await page.evaluate(async () => {
-    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
     ctx.Walk.state.walker.angle += Math.PI / 2;
     ctx.Walk.state.walker.yaw = ctx.Walk.state.walker.angle;
   });
@@ -164,7 +164,7 @@ try {
   report.checks.mobileCameraInside = mobile.cameraInside;
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.evaluate(async () => {
-    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
     ctx.setTravelMode('drive');
   });
   await page.waitForTimeout(300);

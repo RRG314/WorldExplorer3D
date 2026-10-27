@@ -59,8 +59,8 @@ established that difference.
 2. `node scripts/prepare-production-artifact.mjs` requires the complete current
    readiness and public-claim checks before replacing that artifact. It builds
    the production configuration and validates that every other packaged asset
-   is byte-identical to the tested staging package. Only the three generated
-   Firebase configuration assets may differ, and their contents must match the
+   is byte-identical to the tested staging package. Only the generated
+   Firebase configuration assets (including the pinned runtime copy) may differ, and their contents must match the
    respective checked-in configuration. The receipt retains both manifest
    identities and source identity.
 3. Finalization rechecks actual production asset bytes, clean source, the
@@ -79,6 +79,47 @@ past a gate. A subset of passing gates does not replace a complete matrix.
 Requesting a backend gate under candidate scope is now an error, not a silently
 omitted check. Human phone acceptance and sustained device performance remain
 separate from component and remote browser evidence.
+
+## Code continuity across Hosting updates
+
+An open page can load an on-demand module hours after startup. Keeping old
+Hosting releases available for rollback does not serve their missing files at
+the current site's URLs. The packager therefore pins the shared JavaScript
+authorities to `/runtime/<generation>/`, keeps one instance per page, and can
+carry two explicitly selected predecessor code graphs into the next package:
+
+```sh
+node scripts/hosting-artifact.mjs build --firebase-env staging \
+  --retain-runtime-from <verified-previous-staging-package> \
+  --output-dir output/hosting-validation/<new-candidate>
+```
+
+Repeat `--retain-runtime-from` for a second predecessor when needed. Selection
+does not recursively retain the predecessor's older history. Environment,
+project, manifest identity, ordinary-file paths and individual code hashes
+must match before any predecessor is copied. Legacy packages are eligible
+only while their shared root authorities remain byte-identical. Changed or
+revoked security code must not be retained merely for compatibility.
+
+For production preparation, set `WE3D_PREVIOUS_PRODUCTION_ARTIFACT` to the
+verified previous production package; staging history cannot be adopted on
+the production origin. Promotion compares the complete current graph and
+validates environment-specific generated configuration; separately recorded
+predecessor code is verified through its own bounded manifest. This does not
+waive current-code, world-data, gameplay, security or device acceptance.
+
+`node scripts/verification/runtime-update-current.mjs` checks delayed ESM loading
+across a real local HTTP deployment using tiny esbuild graphs, then verifies
+that a fresh navigation gets the new graph. It is packaging integration, not
+a city, account, multiplayer-service or performance test. Existing browser
+checkers resolve shared modules through the current package's
+`sharedModulePrefix`, with the source-preview path as their fallback.
+
+No game or API cache, background download, new scheduler, player-data rewrite
+or forced gameplay reload is introduced. The supported continuity window is
+the explicitly retained code generations; older sessions are not an unlimited
+compatibility guarantee. World assets and geographic data retain their own
+release and coverage contracts.
 
 ## Performance authority and remote execution
 

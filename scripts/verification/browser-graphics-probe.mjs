@@ -29,7 +29,7 @@ export async function installBrowserGraphicsProbe(page, outputPath, phase = () =
     // Capture promptly, while the failing context still exists. Do not call
     // getError(), clear errors, restore contexts, or alter shader compilation.
     page.evaluate(async () => {
-      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
       const renderer = ctx.renderer;
       const gl = renderer?.getContext?.();
       const lost = gl?.isContextLost?.();

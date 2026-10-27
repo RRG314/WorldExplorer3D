@@ -54,7 +54,7 @@ try {
   await page.waitForFunction(() => JSON.parse(globalThis.render_game_to_text?.() || '{}').spaceFlight?.assist?.active === true);
 
   const approach = await page.evaluate(async () => {
-    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
     let minimumForwardDot = 1;
     for (let frame = 0; frame < 2_000 && ctx.spaceJourney?.phase !== 'approach'; frame += 1) {
       const prior = ctx.spaceFlight.rocket.position.clone();
@@ -84,7 +84,7 @@ try {
   }, returnControlSelector, { timeout: 120_000 });
   const surface = await page.evaluate(async ({ target, returnSelector }) => {
     const [{ ctx }, { planetarySurfaceYAtRenderXZ }] = await Promise.all([
-      import('/app/js/shared-context.js?v=55'),
+      import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55'),
       import('/app/js/planetary/runtime/surface-query.js?v=3')
     ]);
     const position = ctx.Walk?.state?.mode === 'walk'
@@ -123,7 +123,7 @@ try {
     return state.modes?.space === true && state.spaceFlight?.travelSession?.phase === 'rendezvous';
   }, null, { timeout: 120_000 });
   const rendezvous = await page.evaluate(async () => {
-    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
     const target = ctx.getSolisReachDockTarget?.();
     const craft = ctx.spaceFlight?.rocket;
     const camera = ctx.spaceFlight?.camera;

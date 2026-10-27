@@ -66,7 +66,7 @@ try {
   // Hold the real runtime loader at its import boundary. A title launch must
   // not tick/render the default Baltimore world while Manchester is pending.
   await page.evaluate(async () => {
-    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
     const original = ctx.ensureEarthRuntimeReady;
     const gate = new Promise(resolve => { window.__releaseTitleImport = resolve; });
     ctx.ensureEarthRuntimeReady = async (...args) => {
@@ -79,7 +79,7 @@ try {
   await page.locator('#globeSelectorStartBtn').click();
   await page.waitForFunction(() => window.__titleImportHeld === true);
   const launchSnapshot = () => page.evaluate(async () => {
-    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
     const phases = window.getWorldExplorerRuntimeDiagnostics().runtimeKernel.phases;
     return { pending: ctx.titleLaunchPending, worldLoading: !!ctx.worldLoading,
       presentation: phases.presentation.find(row => row.id === 'core.presentation').updates,
@@ -102,7 +102,7 @@ try {
   }, null, { timeout: 360_000, polling: 500 });
 
   const samples = await page.evaluate(async () => {
-    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
     return [2980, 3000, 3020, 3040, 3060, 3100].map((z) => {
       const x = 716;
       const rendered = Number(ctx.terrainMeshHeightAt?.(x, z));
@@ -123,7 +123,7 @@ try {
   assert.ok(samples.every((sample) => Math.abs(sample.driveMinusRendered) <= 0.01), JSON.stringify(samples));
 
   await page.evaluate(async () => {
-    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
     const x = 716;
     const z = 3040;
     const groundY = Number(ctx.terrainMeshHeightAt?.(x, z));

@@ -145,7 +145,7 @@ try {
   // retirement boundary. Do not ignore unrelated aborts or HTTP failures.
   await page.exposeFunction('__we3dAuditProviderWillFail', () => markSupersededLocationRequests('injected-failure-retirement'));
   await page.evaluate(async () => {
-    const {ctx} = await import('/app/js/shared-context.js?v=55');
+    const {ctx} = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
     await ctx.ensureEarthRuntimeReady();
     globalThis.__WE3D_LIFECYCLE_CONTEXT__ = ctx;
     const prepare = ctx.prepareAcceptedGroundFromCatalog;
@@ -164,7 +164,7 @@ try {
       document.getElementById('globeSelectorScreen')?.classList.contains('show');
   }, null, {timeout: 60000});
   failedLoad = await page.evaluate(async () => {
-    const {ctx} = await import('/app/js/shared-context.js?v=55');
+    const {ctx} = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
     return {started:ctx.gameStarted, ready:ctx.initialEarthWorldReady, publication:!!ctx.worldPublication,
       loading:ctx.worldLoading, buildings:ctx.buildings.length, roads:ctx.roads.length,
       providers:ctx.worldLoadRuntimeState.session.outstandingProviderWork,
@@ -189,7 +189,7 @@ try {
   const baseline = await runtimeSnapshot('custom-baltimore');
   snapshots.push(baseline);
   invalidAdmission = await page.evaluate(async () => {
-    const {ctx} = await import('/app/js/shared-context.js?v=55');
+    const {ctx} = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
     const snapshot = () => ({sequence:ctx._worldLoadSequence,publication:ctx.worldPublication?.requestId,
       buildings:ctx.buildings.length,roads:ctx.roads.length,ready:ctx.initialEarthWorldReady,
       loading:ctx.worldLoading,started:ctx.gameStarted,x:ctx.car.x,z:ctx.car.z});
@@ -214,7 +214,7 @@ try {
     await page.locator('#mainMenuBtn').click();
     await page.waitForSelector('#globeSelectorScreen.show');
     await page.evaluate(async () => {
-      const {ctx} = await import('/app/js/shared-context.js?v=55');
+      const {ctx} = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
       ctx.setPerfAutoQualityEnabled(true, {persist:false});
       ctx.setPerfAutoQualityTier(ctx.PERF_QUALITY_TIER_PERFORMANCE, {reason:'coverage-regression-check'});
     });
@@ -268,7 +268,7 @@ try {
     logStep('returning to Baltimore through the same location loader as the city control');
     markSupersededLocationRequests();
     await page.evaluate(async () => {
-      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
       ctx.selectPresetLocation('baltimore');
       await ctx.loadRoads();
     });

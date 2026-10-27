@@ -47,7 +47,7 @@ try {
   await page.locator('#sfAssistBtn').click();
   await page.waitForFunction(() => JSON.parse(globalThis.render_game_to_text?.() || '{}').spaceFlight?.assist?.active === true);
   const approach = await page.evaluate(async () => {
-    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
     for (let frame = 0; frame < 3_000 && ctx.spaceJourney?.phase !== 'approach'; frame += 1) {
       ctx.updateRenderedSpaceJourney?.({ realDtS: 0.1 });
     }
@@ -70,7 +70,7 @@ try {
   await capture('02-mars-surface-arrival.png');
 
   const surfaceAudit = await page.evaluate(async () => {
-    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
     const { planetarySurfaceYAtRenderXZ } = await import('/app/js/planetary/runtime/surface-query.js?v=3');
     const raycaster = new THREE.Raycaster();
     const down = new THREE.Vector3(0, -1, 0);
@@ -121,7 +121,7 @@ try {
   await capture('05-pathfinder-rendezvous.png');
 
   const dockingSetup = await page.evaluate(async () => {
-    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
     ctx.positionSpacecraftAtSolisReachDock?.(0);
     ctx.spaceFlight.velocity?.set?.(0, 0, 0);
     ctx.spaceFlight.speed = 0;
@@ -155,7 +155,7 @@ try {
   await page.waitForTimeout(200);
   const interiorAfterMove = await state();
   const interiorVisual = await page.evaluate(async () => {
-    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
     const snapshot = ctx.getShipInteriorSnapshot?.() || null;
     const root = ctx.scene.getObjectByName('expedition-ship:solis-reach');
     let visibleMeshes = 0;

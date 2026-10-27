@@ -20,7 +20,7 @@ try{
  await page.goto(`http://127.0.0.1:${server.port}/app/?launch=earth&loc=custom&lat=-18.2861&lon=147.7&lname=Coral%20Shelf&diagnostics=1`);
  await page.waitForFunction(()=>globalThis.__WE3D_RUNTIME_READY__,null,{timeout:90000});
  await page.waitForSelector('#globeSelectorScreen.show',{timeout:30000});
- await page.evaluate(async()=>{globalThis.marineCtx=(await import('/app/js/shared-context.js?v=55')).ctx;});
+ await page.evaluate(async()=>{globalThis.marineCtx=(await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55')).ctx;});
  await page.evaluate(()=>{globalThis.marineOceanStarts=0;const start=marineCtx.startOceanMode;marineCtx.startOceanMode=(...args)=>{marineOceanStarts++;return start(...args);};});
  if(await page.locator('#analyticsConsentDenyBtn').isVisible())await page.locator('#analyticsConsentDenyBtn').click();
  await page.locator('#globeSelectorOceanBtn').click();

@@ -52,7 +52,7 @@ async function arriveAtProxima(page) {
 
 async function setThermalAngle(page, zone) {
   return page.evaluate(async (requestedZone) => {
-    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
     const target = ctx.getUniverseHudTarget();
     const star = ctx.universeRuntime.frameGroup.userData.destinationMeshes.get('proxima-centauri');
     const starPosition = new THREE.Vector3();
@@ -78,7 +78,7 @@ async function setThermalAngle(page, zone) {
 async function runThermalPass(page, zone, capture = false) {
   assert.equal(await setThermalAngle(page, zone), 'proxima-centauri-d');
   await page.evaluate(async () => {
-    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
     ctx.openDestinationMission('proxima-centauri-d');
   });
   const action = page.locator('[data-mission-field]');
@@ -122,7 +122,7 @@ async function run() {
     if (await courseAction.isVisible()) await courseAction.click();
     await page.waitForFunction(() => JSON.parse(globalThis.render_game_to_text?.() || '{}').universeNavigation?.courseDestinationId === 'proxima-centauri-d');
     assert.equal(await page.evaluate(async () => {
-      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
       const target = ctx.getUniverseHudTarget?.();
       if (!target?.position || !ctx.spaceFlight?.rocket) return false;
       ctx.spaceFlight.rocket.position.set(target.position.x, target.position.y, target.position.z + Math.max(90, Number(target.radius || 6) * 12));
@@ -136,7 +136,7 @@ async function run() {
       return state.universeNavigation?.courseDestinationId === 'proxima-centauri-d' && state.destinationMission?.phase === 'fieldwork';
     }, null, { timeout: 30_000 });
     await setThermalAngle(page,'dayside');
-    await page.evaluate(async()=>{window.scanCtx=(await import('/app/js/shared-context.js?v=55')).ctx;scanCtx.openDestinationMission('proxima-centauri-d');});
+    await page.evaluate(async()=>{window.scanCtx=(await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55')).ctx;scanCtx.openDestinationMission('proxima-centauri-d');});
     await page.locator('[data-mission-field]').click();
     await page.evaluate(()=>scanCtx.setPauseReason('scan-verification',true));
     await page.waitForTimeout(1650);
@@ -170,7 +170,7 @@ async function run() {
     await page.locator('#expeditionEnterShip').click();
     await page.waitForFunction(() => JSON.parse(globalThis.render_game_to_text?.() || '{}').expeditionShipInterior?.active === true);
     await page.evaluate(async station => {
-      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
       ctx.switchSolisReachDeck(station.deckId);
       Object.assign(ctx.Walk.state.walker, { x: station.x, z: station.z,y:1.74, angle: Math.PI / 2, yaw: Math.PI / 2, lookYawOffset: 0, pitch: 0, vy: 0, onGround: true });
     },SHIP_STATIONS.find(station=>station.id==='analysis-review'));

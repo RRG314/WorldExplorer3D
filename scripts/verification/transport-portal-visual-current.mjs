@@ -25,7 +25,7 @@ try{
   await page.waitForFunction(afterWorldLoad(()=>{const d=window.getWorldExplorerRuntimeDiagnostics?.();return d?.gameStarted&&!d.worldLoading&&d.worldCounts.roads>0;}),null,{timeout:240000});
   console.log('Monaco loaded');
   const inventory=await page.evaluate(async()=>{
-    const {ctx}=await import('/app/js/shared-context.js?v=55');
+    const {ctx}=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
     ctx.setTimeOfDay?.('day');ctx.setTravelMode('drive');
     // Regional fallback roads extend well beyond active terrain. Their array
     // order depends on tile completion; never teleport to the first tile's road.
@@ -58,7 +58,7 @@ try{
   report.targets=targets;
   for(const target of targets){
     const placement=await page.evaluate(async target=>{
-      const {ctx}=await import('/app/js/shared-context.js?v=55');
+      const {ctx}=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
       const r=window.portalVisualRoads[target.index];
       const distance=Math.max(0,target.portals[0]-8);
       let left=distance,point;
@@ -80,7 +80,7 @@ try{
     const filename=`portal-${target.index}.png`;
     await page.screenshot({path:path.join(out,filename)});
     const state=await page.evaluate(async()=>{
-      const {ctx}=await import('/app/js/shared-context.js?v=55');
+      const {ctx}=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
       const d=window.getWorldExplorerRuntimeDiagnostics();
       const ray=new THREE.Raycaster();ray.setFromCamera(new THREE.Vector2(0,0),ctx.camera);
       const hits=ray.intersectObjects(ctx.scene.children,true).filter(h=>h.object.visible).slice(0,5).map(h=>({distance:h.distance,point:h.point.toArray(),name:h.object.name,type:h.object.userData.structureVisualType,terrain:h.object.userData.isTerrainMesh,keys:Object.keys(h.object.userData)}));

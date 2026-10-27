@@ -34,7 +34,7 @@ try{
  await page.waitForFunction(()=>window.__WE3D_RUNTIME_READY__===true,null,{timeout:90000});
  if(await page.locator('#analyticsConsentDenyBtn').isVisible())await page.locator('#analyticsConsentDenyBtn').click();
  await page.locator('#globeSelectorStartBtn').click();
- await page.evaluate(async()=>{window.referenceCtx=(await import('/app/js/shared-context.js?v=55')).ctx;});
+ await page.evaluate(async()=>{window.referenceCtx=(await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55')).ctx;});
  await page.waitForFunction(()=>referenceCtx.initialEarthWorldReady===true&&getComputedStyle(document.getElementById('loading')).display==='none',null,{timeout:150000});
  await page.evaluate(()=>{referenceCtx.closeWorldDiscovery?.();referenceCtx.setTimeOfDay('day');referenceCtx.setWeatherMode('clear');});
  await page.waitForTimeout(4000);

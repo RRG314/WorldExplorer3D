@@ -25,7 +25,7 @@ try {
   page.on('console', message => { if (message.type() === 'error') report.consoleErrors.push(message.text().slice(0, 500)); });
   await page.goto(`${base}/app/?loc=custom&lat=39.2904&lon=-76.6122&lname=Baltimore&launch=earth&gm=free&mode=driving&distribution=google-play`, { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => globalThis.__WE3D_RUNTIME_READY__ === true, null, { timeout: 90000 });
-  await page.evaluate(async () => { globalThis.vehicleQa = (await import('/app/js/shared-context.js?v=55')).ctx; vehicleQa.renderer.domElement.setAttribute('data-vehicle-controls-main', 'true'); });
+  await page.evaluate(async () => { globalThis.vehicleQa = (await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55')).ctx; vehicleQa.renderer.domElement.setAttribute('data-vehicle-controls-main', 'true'); });
   for (const selector of ['#analyticsConsentDenyBtn', '#testerInvitationClose']) if (await page.locator(selector).isVisible()) await page.locator(selector).click();
   if (await page.locator('#globeSelectorStartBtn').isVisible()) await page.locator('#globeSelectorStartBtn').click();
   await page.waitForFunction(() => vehicleQa.gameStarted && !vehicleQa.worldLoading && !vehicleQa.titleLaunchPending && vehicleQa.worldLoadRuntimeState?.gameplayRuntimesReady, null, { timeout: 180000, polling: 500 });

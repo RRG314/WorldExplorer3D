@@ -60,7 +60,7 @@ async function waitForDetailedFamily(page) {
 
 async function inspectCharacters(page) {
   return page.evaluate(async ({ allowed, femaleIds, maleIds }) => {
-    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
     const player = ctx.Walk?.state?.characterMesh;
     const npcs = ctx.urbanSandboxRuntime?.npcs || [];
     const inspectRoot = (root) => {
@@ -132,7 +132,7 @@ async function selectCharacter(page, gender, label) {
 
 async function positionFamilyForEvidence(page) {
   await page.evaluate(async () => {
-    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
     ctx.toggleUrbanEquipment?.(false);
     const walker = ctx.Walk?.state?.walker;
     const npcs = (ctx.urbanSandboxRuntime?.npcs || []).slice(0, 4);
@@ -214,7 +214,7 @@ async function blockedWomanFallbackJourney() {
     await openEarth(page, 'blocked-woman');
     await page.waitForFunction(() => globalThis.Walk?.state?.characterMesh?.userData?.curatedCharacterAssetId === 'character-field-explorer-v1', null, { timeout: 120_000 });
     await page.evaluate(() => {
-      void import('/app/js/shared-context.js?v=55').then(({ ctx }) => ctx.setPlayerCharacterGender?.('woman'));
+      void import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55').then(({ ctx }) => ctx.setPlayerCharacterGender?.('woman'));
     });
     await page.waitForFunction(() => {
       const root = globalThis.Walk?.state?.characterMesh;

@@ -8,6 +8,7 @@ import { canonicalBundledModule, rewritePackagedModuleReference } from './lib/ru
 import { readReleaseSourceIdentity, assertCompatibleReleaseSourceIdentity } from './lib/release-source-identity.mjs';
 import { sourceFingerprint as inputFingerprint, SHIPPED_SOURCE_ENTRIES } from './verification/source-fingerprint.mjs';
 import { build as buildJavaScript } from 'esbuild';
+import {runtimeGeneration, generationModulePath, pinHtmlRootModules, snapshotRootModules, retainRuntimeGenerations, verifyRuntimeGenerations} from './lib/hosting-runtime-generation.mjs';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
@@ -73,6 +74,18 @@ function readFlag(name, fallback = '') {
   if (exact) return exact.slice(name.length + 1);
   const index = process.argv.indexOf(name);
   return index >= 0 && index + 1 < process.argv.length ? process.argv[index + 1] : fallback;
+}
+
+function readRepeatedFlag(name) {
+  const result = [];
+  for (let i = 0; i < process.argv.length; i++) {
+    if (process.argv[i].startsWith(`${name}=`)) result.push(process.argv[i].slice(name.length + 1));
+    else if (process.argv[i] === name) {
+      if (!process.argv[i + 1] || process.argv[i + 1].startsWith('--')) throw Error(`Missing value for ${name}`);
+      result.push(process.argv[++i]);
+    }
+  }
+  return result;
 }
 
 async function listFiles(directory, base = '') {
@@ -157,7 +170,7 @@ function bundleOutputForEntry(metafile, sourceEntry) {
   return normalizePath(path.relative(path.join(OUTPUT_DIR, 'app'), path.resolve(ROOT, match[0])));
 }
 
-async function buildGameRuntime() {
+async function buildGameRuntime(generation) {
   const externalRootModules = new Set();
   const rootSharedModulePlugin = {
     name: 'one-root-shared-module-authority',
@@ -170,7 +183,7 @@ async function buildGameRuntime() {
         if (resolved === path.join(ROOT, GAME_SHARED_CONTEXT_MODULE)) {
           const externalPath = `/app/js/shared-context.js${query}`;
           externalRootModules.add(externalPath);
-          return { path: externalPath, external: true };
+          return { path: generationModulePath(generation, externalPath), external: true };
         }
         const relative = path.relative(ROOT_SHARED_MODULE_DIR, resolved);
         if (relative.startsWith('..') || path.isAbsolute(relative)) {
@@ -179,7 +192,7 @@ async function buildGameRuntime() {
         }
         const externalPath = `/js/${normalizePath(relative)}${query}`;
         externalRootModules.add(externalPath);
-        return { path: externalPath, external: true };
+        return { path: generationModulePath(generation, externalPath), external: true };
       });
     }
   };
@@ -218,16 +231,17 @@ async function buildGameRuntime() {
   }
   return Object.freeze({
     strategy: 'esbuild-esm-code-splitting',
-    sharedModuleAuthority: 'one-root-hosted-esm-instance',
+    sharedModuleAuthority: 'one-generation-hosted-esm-instance',
     externalRootModules: Object.freeze(sharedModules),
     entries: Object.freeze(entries),
+    bundlePaths: Object.freeze(outputFiles.map(([file]) => normalizePath(path.relative(OUTPUT_DIR, path.resolve(ROOT, file)))).sort()),
     fileCount: outputFiles.length,
     entryFileCount: Object.keys(entries).length,
     bytes: outputFiles.reduce((sum, [, details]) => sum + Number(details.bytes || 0), 0)
   });
 }
 
-async function rewriteGameHtml(runtime, groundData) {
+async function rewriteGameHtml(runtime, groundData, generation, sourceIdentity, version) {
   const htmlPath = path.join(OUTPUT_DIR, 'app', 'index.html');
   let html = await fs.readFile(htmlPath, 'utf8');
   const productionConfig = canonicalJson({
@@ -239,7 +253,11 @@ async function rewriteGameHtml(runtime, groundData) {
     regionalBuildingWorkerUrl: `/app/${runtime.entries['regional-building-worker']}`,
     canvasRedMaskWorkerUrl: `/app/${runtime.entries['canvas-red-mask-worker']}`,
     groundCatalogUrl: groundData.catalogUrl,
-    groundReleaseId: groundData.releaseId
+    groundReleaseId: groundData.releaseId,
+    runtimeReleaseId: generation.id,
+    sharedModulePrefix: generation.prefix,
+    sourceCommit: sourceIdentity.commit,
+    sourceVersion: version
   }).trim();
   const replacement = [
     `<script>globalThis.__WORLD_EXPLORER_PRODUCTION__ = Object.freeze(${productionConfig});</script>`,
@@ -347,24 +365,35 @@ async function buildArtifact(environment) {
   if (sourceIdentity.sourceDirty || inputBefore.dirty) throw new Error('Commit all shipped source inputs before replacing a release artifact.');
   const sourceFiles = await collectSourceFiles();
   const config = JSON.parse(await fs.readFile(firebaseConfigPath(environment), 'utf8'));
+  const packageJson = await readPackage();
   const sourceReleases = await sourceReleaseFingerprint(sourceFiles);
   const groundReleaseId = sourceReleases.sha256.slice(0, 16);
   await copySources(sourceFiles);
   const groundData = await copyGroundData(sourceFiles, groundReleaseId);
-  const runtimePackaging = await buildGameRuntime();
-  await rewriteGameHtml(runtimePackaging, groundData);
-  await rewriteAccountHtml(runtimePackaging);
-  await rewritePortalHtml(runtimePackaging);
+  const generation = runtimeGeneration(inputBefore.acceptanceFingerprint, environment);
+  const runtime = await buildGameRuntime(generation);
+  await rewriteGameHtml(runtime, groundData, generation, sourceIdentity, packageJson.version);
+  await rewriteAccountHtml(runtime);
+  await rewritePortalHtml(runtime);
   const captureHtmlPath = path.join(OUTPUT_DIR, 'app', 'capture.html');
   const captureHtml = await fs.readFile(captureHtmlPath, 'utf8');
-  await fs.writeFile(captureHtmlPath, captureHtml.replace('js/reality-capture/phone-entry.js?v=1', runtimePackaging.entries['capture-phone']));
+  await fs.writeFile(captureHtmlPath, captureHtml.replace('js/reality-capture/phone-entry.js?v=1', runtime.entries['capture-phone']));
   const adminModulePath = path.join(OUTPUT_DIR, 'js', 'admin-dashboard.js');
   const adminModule = await fs.readFile(adminModulePath, 'utf8');
-  await fs.writeFile(adminModulePath, rewritePackagedModuleReference(adminModule, '../app/js/reality-capture/result-viewer.js', `../app/${runtimePackaging.entries['capture-review']}`));
+  await fs.writeFile(adminModulePath, rewritePackagedModuleReference(adminModule, '../app/js/reality-capture/result-viewer.js', `../app/${runtime.entries['capture-review']}`));
   await writeGeneratedFirebaseFiles(environment, config);
+  const snapshot = await snapshotRootModules(OUTPUT_DIR, [...sourceFiles.keys()], generation, runtime.entries['capture-review']);
+  const rootModules = new Set([...sourceFiles.keys()].filter(relative => relative.startsWith('js/') && relative.endsWith('.js')));
+  for (const relative of await listFiles(OUTPUT_DIR)) {
+    if (!relative.endsWith('.html')) continue;
+    const absolute = path.join(OUTPUT_DIR, relative), html = await fs.readFile(absolute, 'utf8');
+    await fs.writeFile(absolute, pinHtmlRootModules(html, relative, generation, rootModules));
+  }
+  const compatibility = await retainRuntimeGenerations({output: OUTPUT_DIR, predecessors: readRepeatedFlag('--retain-runtime-from'), environment, projectId: config.projectId});
+  const runtimePackaging = {...runtime, generation: snapshot, compatibility,
+    retainedBundlePaths: [...new Set(compatibility.flatMap(previous => Object.keys(previous.files).filter(relative => relative.startsWith('app/js/bundles/'))))].sort()};
 
   const files = await hashOutputFiles();
-  const packageJson = await readPackage();
   const { commit, commitTime, sourceDirty: dirty } = sourceIdentity;
   const shortCommit = commit.slice(0, 12);
   const contentHash = sha256(canonicalJson(files));
@@ -442,6 +471,8 @@ async function verifyArtifact() {
 
   const sourceFiles = await collectSourceFiles();
   const sourceReleases = await sourceReleaseFingerprint(sourceFiles);
+  const generation = buildManifest.runtimePackaging?.generation;
+  const rootModules = new Set([...sourceFiles.keys()].filter(relative => relative.startsWith('js/') && relative.endsWith('.js')));
   for (const [relative, source] of sourceFiles) {
     if (GENERATED_PATHS.has(relative)) continue;
     if ((isGameRuntimeSource(relative) && relative !== GAME_SHARED_CONTEXT_MODULE) || relative === 'app/index.html' || relative === 'app/capture.html' || relative === 'account/index.html' || relative === 'portal/index.html') continue;
@@ -451,6 +482,7 @@ async function verifyArtifact() {
     const outputHash = expectedFiles[outputRelative];
     const sourceHash = relative === 'js/admin-dashboard.js'
       ? sha256(rewritePackagedModuleReference(await fs.readFile(source, 'utf8'), '../app/js/reality-capture/result-viewer.js', `../app/${buildManifest.runtimePackaging?.entries?.['capture-review']}`))
+      : relative.endsWith('.html') ? sha256(pinHtmlRootModules(await fs.readFile(source, 'utf8'), relative, generation, rootModules))
       : await hashFile(source);
     if (!outputHash || outputHash !== sourceHash) {
       throw new Error(`Hosting artifact differs from canonical source: ${relative} -> ${outputRelative}`);
@@ -458,15 +490,25 @@ async function verifyArtifact() {
   }
 
   const runtimePackaging = buildManifest.runtimePackaging || {};
+  const retainedBundles = verifyRuntimeGenerations(runtimePackaging, expectedFiles);
+  const snapshotNames = [...rootModules, GAME_SHARED_CONTEXT_MODULE].map(relative => `${generation.prefix.slice(1)}/${relative}`).sort();
+  if (JSON.stringify(snapshotNames) !== JSON.stringify(Object.keys(generation.files).sort())) throw Error('Current shared runtime snapshot is incomplete');
+  for (const [relative, digest] of Object.entries(generation.files)) {
+    const rootPath = relative.slice(generation.prefix.length);
+    let bytes = await fs.readFile(path.join(OUTPUT_DIR, rootPath));
+    if (rootPath === 'js/admin-dashboard.js') bytes = Buffer.from(bytes.toString().replace(`../app/${runtimePackaging.entries['capture-review']}`, `/app/${runtimePackaging.entries['capture-review']}`));
+    if (sha256(bytes) !== digest) throw Error(`Runtime shared module differs from the current source: ${rootPath}`);
+  }
   const runtimeFiles = expectedNames.filter((relative) => relative.startsWith('app/js/bundles/'));
   if (
     runtimePackaging.strategy !== 'esbuild-esm-code-splitting' ||
-    runtimePackaging.sharedModuleAuthority !== 'one-root-hosted-esm-instance' ||
+    runtimePackaging.sharedModuleAuthority !== 'one-generation-hosted-esm-instance' ||
     !REQUIRED_EXTERNAL_ROOT_MODULES.every((modulePath) =>
       runtimePackaging.externalRootModules?.includes(modulePath)
     ) ||
     runtimePackaging.entryFileCount !== Object.keys(GAME_RUNTIME_ENTRYPOINTS).length ||
-    runtimePackaging.fileCount !== runtimeFiles.length ||
+    runtimePackaging.fileCount !== runtimePackaging.bundlePaths?.length ||
+    JSON.stringify([...new Set([...(runtimePackaging.bundlePaths || []), ...retainedBundles])].sort()) !== JSON.stringify(runtimeFiles.sort()) ||
     expectedNames.some((relative) => relative.startsWith('app/js/') &&
       !relative.startsWith('app/js/bundles/') && relative !== GAME_SHARED_CONTEXT_MODULE)
   ) {
@@ -509,6 +551,7 @@ async function verifyArtifact() {
   if (
     configuredAppEntrypoint === './' ||
     !gameHtml.includes(configuredAppEntrypoint) ||
+    !gameHtml.includes(`"sharedModulePrefix": "${generation.prefix}"`) ||
     !gameHtml.includes(groundData.catalogUrl || '__missing_ground_catalog__')
   ) {
     throw new Error('Game HTML does not publish the bundled app or immutable ground release.');
@@ -554,6 +597,8 @@ async function verifyArtifact() {
     sourceReleaseManifestSha256: sourceReleases.sha256,
     sourceReleaseManifestCount: sourceReleases.manifestCount,
     runtimeBundleFileCount: runtimeFiles.length,
+    runtimeReleaseId: generation.id,
+    retainedRuntimeGenerations: runtimePackaging.compatibility.length,
     groundReleaseId: expectedGroundReleaseId,
     groundFileCount: groundFiles.length,
     assetManifestSha256,

@@ -22,7 +22,7 @@ try{
   page.on('response',response=>{if(response.status()>=400)report.resourceFailures.push({url:response.url(),status:response.status()});});
   await page.goto(`${base}/app/?loc=baltimore&launch=earth&gm=free&mode=driving`,{waitUntil:'domcontentloaded'});
   await page.waitForFunction(()=>window.__WE3D_RUNTIME_READY__===true,null,{timeout:90000});
-  await page.evaluate(async()=>{window.vrQa=(await import('/app/js/shared-context.js?v=55')).ctx;vrQa.renderer.domElement.setAttribute('data-vr-main','true');});
+  await page.evaluate(async()=>{window.vrQa=(await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55')).ctx;vrQa.renderer.domElement.setAttribute('data-vr-main','true');});
   for(const id of ['analyticsConsentDenyBtn','testerInvitationClose'])if(await page.locator('#'+id).isVisible())await page.locator('#'+id).click();
   if(await page.locator('#globeSelectorStartBtn').isVisible())await page.locator('#globeSelectorStartBtn').click();
   await page.waitForFunction(()=>vrQa.gameStarted&&!vrQa.worldLoading&&!vrQa.titleLaunchPending&&vrQa.worldLoadRuntimeState?.gameplayRuntimesReady,null,{timeout:180000,polling:500});console.log('phone-vr: world ready');

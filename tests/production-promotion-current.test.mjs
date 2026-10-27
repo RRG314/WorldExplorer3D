@@ -45,6 +45,29 @@ function fixture() {
 test('configuration-only promotion preserves the original staging evidence identity', () => {
   const f = fixture(); assert.deepEqual(validatePromotion(f), f.receipt.stagingIdentity);
 });
+test('promotion preserves the pinned current graph and validates its generated configuration independently of retained history', () => {
+  const f = fixture(), id='1'.repeat(24), prefix=`/runtime/${id}`, bundle='app/js/bundles/current-ABC123.js';
+  const install = (build, assets, environment) => {
+    assets.files[bundle] = hash('tested current code');
+    const files = {[`${prefix.slice(1)}/app/js/shared-context.js`]:hash('one context'),
+      [`${prefix.slice(1)}/js/firebase-project-config.js`]:hash(generatedFirebaseFiles(environment, environment==='staging'?f.stagingConfig:f.productionConfig)['js/firebase-project-config.js'])};
+    Object.assign(assets.files,files);
+    const previous = `app/js/bundles/previous-${environment}.js`, digest=hash(`verified ${environment} predecessor`);
+    assets.files[previous]=digest;
+    build.runtimePackaging={generation:{id,prefix,files},bundlePaths:[bundle],compatibility:[{buildId:`previous-${environment}`,generationId:null,files:{[previous]:digest}}],retainedBundlePaths:[previous]};
+  };
+  const stagingBuild=JSON.parse(f.receipt.stagingBuildJson), stagingAssets=JSON.parse(f.receipt.stagingAssetsJson);
+  install(stagingBuild,stagingAssets,'staging'); install(f.productionBuild,f.productionAssets,'production');
+  f.receipt.stagingBuildJson=JSON.stringify(stagingBuild); f.receipt.stagingAssetsJson=JSON.stringify(stagingAssets);
+  f.receipt.stagingIdentity.buildManifestSha256=hash(f.receipt.stagingBuildJson); f.receipt.stagingIdentity.assetManifestSha256=hash(f.receipt.stagingAssetsJson);
+  assert.deepEqual(validatePromotion(f),f.receipt.stagingIdentity);
+  f.productionAssets.files[bundle]=hash('untested current code');
+  assert.throws(()=>validatePromotion(f),/Untested asset changed/);
+  f.productionAssets.files[bundle]=hash('tested current code');
+  const config=`${prefix.slice(1)}/js/firebase-project-config.js`;
+  f.productionAssets.files[config]=hash('wrong environment'); f.productionBuild.runtimePackaging.generation.files[config]=f.productionAssets.files[config];
+  assert.throws(()=>validatePromotion(f));
+});
 test('new promotion receipts preserve build provenance across documentation-only commits and still reject changed inputs', () => {
   const f = fixture(), fingerprint = hash('accepted-inputs');
   Object.assign(f.baseline, { contract: 'world-explorer-source-fingerprint-v2', acceptanceFingerprint: fingerprint, headCommit: 'new-doc-commit' });
