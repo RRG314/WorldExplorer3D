@@ -71,7 +71,7 @@ async function deployEarthPathfinder(page) {
 
 async function approachAndBoardEarthPathfinder(page) {
   await page.evaluate(async () => {
-    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
+    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/app/js/shared-context.js?v=55');
     const pod = ctx.earthSceneRoot?.getObjectByName('expedition-surface-launch-pod:earth');
     if (!pod) throw new Error('Staged Earth Pathfinder is missing from the active Earth scene.');
     ctx.Walk.setModeWalk({ preserveResolvedSpawn: true, deferWorldSync: true });
@@ -89,7 +89,7 @@ async function approachAndBoardEarthPathfinder(page) {
   });
   await page.waitForFunction(() => JSON.parse(globalThis.render_game_to_text?.() || '{}').stagedEarthPathfinder?.distance < 4);
   const interaction = await page.evaluate(async () => {
-    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
+    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/app/js/shared-context.js?v=55');
     const before = ctx.contextInteractionSnapshot?.() || null;
     const handled = await ctx.handlePrimaryContextInteraction?.();
     return { before, handled };
@@ -105,7 +105,7 @@ async function approachAndBoardEarthPathfinder(page) {
 
 async function placeAtDockingRange(page) {
   return page.evaluate(async () => {
-    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
+    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/app/js/shared-context.js?v=55');
     const target = ctx.getSolisReachDockTarget();
     const approachDirection = target.approachDirection.clone().normalize();
     ctx.spaceFlight.rocket.position.copy(target.position).addScaledVector(approachDirection, target.radius + 8);
@@ -130,13 +130,13 @@ async function dockWithSurveyor(page) {
 
 async function enterPodBay(page) {
   await page.evaluate(async () => {
-    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
+    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/app/js/shared-context.js?v=55');
     Object.assign(ctx.Walk.state.walker, { x: 0, z: 0.6, angle: 0, yaw: 0, lookYawOffset: 0, pitch: 0, vy: 0, onGround: true });
   });
   await page.keyboard.press('KeyE');
   await page.locator('#shipDeckPicker [data-deck="engineering"]').click();
   await page.evaluate(async () => {
-    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
+    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/app/js/shared-context.js?v=55');
     Object.assign(ctx.Walk.state.walker, { x: 4.8, z: -28.4, angle: Math.PI / 2, yaw: Math.PI / 2, lookYawOffset: 0, pitch: 0, vy: 0, onGround: true });
   });
   await page.waitForTimeout(220);
@@ -146,7 +146,7 @@ async function enterPodBay(page) {
 
 async function approachEarthAndLand(page) {
   await page.evaluate(async () => {
-    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
+    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/app/js/shared-context.js?v=55');
     const earth = ctx.spaceFlight.earth;
     const outward = new THREE.Vector3(0.62, 0.48, 0.62).normalize();
     ctx.spaceFlight.rocket.position.copy(earth.position).addScaledVector(outward, 130);
@@ -179,7 +179,7 @@ async function run() {
     await startEarth(page);
     const earthBefore = await snapshot(page);
     const earthLocationBefore = await page.evaluate(async () => {
-      const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
+      const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/app/js/shared-context.js?v=55');
       return { selLoc: String(ctx.selLoc || ''), name: String(ctx.customLoc?.name || ctx.LOCS?.[ctx.selLoc]?.name || '') };
     });
     const expedition = await seedIncompleteExpedition(page);
@@ -215,7 +215,7 @@ async function run() {
     assert.equal(landed.interstellarExpedition.podJourney.phase, 'surface');
     assert.equal(landed.environment, 'EARTH');
     const earthLocationAfter = await page.evaluate(async () => {
-      const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
+      const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/app/js/shared-context.js?v=55');
       return { selLoc: String(ctx.selLoc || ''), name: String(ctx.customLoc?.name || ctx.LOCS?.[ctx.selLoc]?.name || '') };
     });
     assert.deepEqual(earthLocationAfter, earthLocationBefore);
@@ -254,19 +254,19 @@ async function run() {
     await page.waitForFunction(() => JSON.parse(globalThis.render_game_to_text?.() || '{}').interstellarExpedition?.podJourney?.phase === 'rendezvous', null, { timeout: 120_000 });
     assert.equal((await snapshot(page)).interstellarExpedition.podJourney.id, returnJourneyId);
     assert.equal(await page.evaluate(async () => {
-      const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
+      const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/app/js/shared-context.js?v=55');
       return ctx.spaceFlight.rocket?.userData?.spaceCraftId === 'pathfinder-pod'
         && ctx.getSolisReachDockTarget()?.mesh?.visible === true;
     }), true);
     const beforeThrust = await page.evaluate(async () => {
-      const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
+      const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/app/js/shared-context.js?v=55');
       return ctx.spaceFlight.rocket.position.toArray();
     });
     await page.keyboard.down('Space');
     await page.waitForTimeout(450);
     await page.keyboard.up('Space');
     const afterThrust = await page.evaluate(async () => {
-      const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
+      const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/app/js/shared-context.js?v=55');
       return ctx.spaceFlight.rocket.position.toArray();
     });
     assert.notDeepEqual(afterThrust, beforeThrust, 'Manual pod throttle did not move Pathfinder.');
@@ -276,7 +276,7 @@ async function run() {
     assert.equal(final.expeditionShipInterior.active, true);
     assert.equal(final.interstellarExpedition.ship.name, 'Solis Reach');
     const recoveredPresentation = await page.evaluate(async () => {
-      const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
+      const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/app/js/shared-context.js?v=55');
       return {
         starshipActive: ctx.spaceFlight.rocket?.userData?.spaceCraftId === 'solis-reach',
         starshipScale: Number(ctx.spaceFlight.rocket?.scale?.x || 0),

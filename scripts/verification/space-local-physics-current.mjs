@@ -22,7 +22,7 @@ try {
   await page.waitForFunction(() => JSON.parse(globalThis.render_game_to_text?.() || '{}').modes?.space === true, null, { timeout: 180_000 });
 
   const result = await page.evaluate(async () => {
-    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
+    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/app/js/shared-context.js?v=55');
     if (typeof ctx.updateSpaceFlightPhysics !== 'function' || typeof ctx.updateBlackHoleEncounter !== 'function') {
       throw new Error('The bundled space runtime did not publish its active physics authorities.');
     }

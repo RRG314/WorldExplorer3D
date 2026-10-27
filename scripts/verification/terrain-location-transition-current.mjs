@@ -19,7 +19,7 @@ try {
  const ready=()=>{const s=window.getWorldExplorerRuntimeDiagnostics?.();return s?.gameStarted&&!s.worldLoading&&!document.getElementById('loading')?.classList.contains('show');};
  await page.waitForFunction(afterWorldLoad(ready),null,{timeout:90000});
  report.before=await page.evaluate(async()=>{
-  const {ctx}=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');window.transitionContext=ctx;
+  const {ctx}=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/app/js/shared-context.js?v=55');window.transitionContext=ctx;
   const value={location:ctx.LOC,roads:ctx.roads.length,cuts:ctx.structureTerrainCuts?.length,sequence:ctx._worldLoadSequence};
   return value;
  });

@@ -12,7 +12,7 @@ try {
   await page.route(`http://127.0.0.1:${server.port}/controller-fixture`,route=>route.fulfill({contentType:'text/html',body:'<!doctype html><body><div id="loading" class="show"></div><div id="ctrlContent"></div><div id="tab-settings"></div></body>'}));
   await page.goto(`http://127.0.0.1:${server.port}/controller-fixture`);
   const result=await page.evaluate(async mobile=>{
-   const {ctx}=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
+   const {ctx}=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/app/js/shared-context.js?v=55');
    const controller=await import('/app/js/tutorial/tutorial.js?v=15');
    Object.assign(ctx,{gameStarted:true,worldLoading:true,isLikelyMobileDevice:()=>mobile,Walk:{state:{mode:'walk',walker:{x:0,z:0}}},resolvePrimaryContextInteraction:()=>null});
    controller.initTutorial();controller.tutorialUpdate(.1);

@@ -17,7 +17,7 @@ try {
     const {createEquipmentInventory}=await import('/app/js/urban-sandbox/equipment-model.js');
     const {createUrbanEquipmentRuntime}=await import('/app/js/urban-sandbox/equipment-runtime.js');
     const {createLocalBackpackStore,BACKPACK_STORAGE_KEY,BACKPACK_CONTROLS_KEY}=await import('/app/js/player/backpack-store.js?v=2');
-    const {ctx}=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
+    const {ctx}=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/app/js/shared-context.js?v=55');
     const inventory=createEquipmentInventory();
     const store=createLocalBackpackStore();
     if(!await store.ready)throw Error('Disposable Backpack writer unavailable');

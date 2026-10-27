@@ -38,13 +38,13 @@ async function launchEarth() {
 try {
   await launchEarth();
   await page.evaluate(async () => {
-    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
+    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/app/js/shared-context.js?v=55');
     ctx.setTimeOfDay?.('day');
   });
   await page.waitForTimeout(1_500);
 
   const baseline = await page.evaluate(async () => {
-    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
+    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/app/js/shared-context.js?v=55');
     const living = ctx.livingWorldRuntimeSnapshot();
     const controls = (ctx.trafficControlPlacements || []).map((control) => ({
       id: control.id,
@@ -73,7 +73,7 @@ try {
     .every((control) => Number(control.centerToFixture) > 1));
 
   const tracked = await page.evaluate(async () => {
-    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
+    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/app/js/shared-context.js?v=55');
     return ctx.livingWorldRuntime.population.vehicleSnapshots()
       .filter((vehicle) => vehicle.visible)
       .slice(0, 6)
@@ -87,7 +87,7 @@ try {
   for (let index = 0; index < 40; index += 1) {
     await page.waitForTimeout(100);
     const samples = await page.evaluate(async (ids) => {
-      const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
+      const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/app/js/shared-context.js?v=55');
       const wanted = new Set(ids);
       return ctx.livingWorldRuntime.population.vehicleSnapshots()
         .filter((vehicle) => wanted.has(vehicle.id))
@@ -108,7 +108,7 @@ try {
   assert.ok(maximumStep < 5, `maximum traffic step ${maximumStep.toFixed(3)}m ${JSON.stringify(maximumStepSample)}`);
 
   const selection = await page.evaluate(async () => {
-    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
+    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/app/js/shared-context.js?v=55');
     const { performWorldClickTarget } = await import('/app/js/interaction/world-click-router.js?v=3');
     const pedestrian = ctx.livingWorldRuntime.population.pedestrianSnapshots().find((entry) => entry.visible);
     if (!pedestrian) throw new Error('No visible pedestrian available for selection');

@@ -151,7 +151,7 @@ async function createPlayer(label) {
     // token refresh alone retains auth_time and cannot repair that boundary.
     const signedIn = await authApi.signInWithEmailAndPassword(services.auth, email, 'WorldExplorer3D-Test-Only-93!');
     if (signedIn.user.uid !== credential.user.uid) throw new Error('Emulator sign-in changed the fixture account.');
-    const authUi = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/js/auth-ui.js?v=56');
+    const authUi = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/js/auth-ui.js?v=56');
     const deadline = Date.now() + 10000;
     while (authUi.getCurrentUser()?.uid !== credential.user.uid && Date.now() < deadline) {
       await new Promise((resolve) => setTimeout(resolve, 50));
@@ -501,7 +501,7 @@ try {
   const memberInitialVehicleIds = await member.page.evaluate(() =>
     (globalThis.getWorldExplorerRuntimeDiagnostics?.().urbanSandbox?.vehicles || []).map(vehicle => vehicle.id));
   const parkingSource = await owner.page.evaluate(async () => {
-    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
+    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/app/js/shared-context.js?v=55');
     const actor = ctx.activeEarthActorPosition?.() || ctx.Walk?.state?.walker || ctx.car || {};
     return (ctx.livingWorldRuntime?.publication?.trafficGraph?.edges || [])
       .filter(edge => Math.hypot((edge.p1.x + edge.p2.x) / 2 - actor.x, (edge.p1.z + edge.p2.z) / 2 - actor.z) <= 80)

@@ -322,7 +322,7 @@ async function equip(page, id) {
   await equipAction.waitFor({ state: 'visible', timeout: 5_000 });
   await equipAction.click();
   await waitForAsyncCondition(page, async (catalogId) => {
-    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
+    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/app/js/shared-context.js?v=55');
     return ctx.urbanSandboxRuntimeSnapshot?.().equipment?.equippedId === catalogId;
   }, id, { timeout: process.env.CI ? 20_000 : 5_000, polling: 250 });
   await page.keyboard.press('Escape');

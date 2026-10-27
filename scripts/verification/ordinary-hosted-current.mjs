@@ -57,7 +57,7 @@ async function attach(page) {
 async function ready(page) {
   await page.waitForFunction(() => globalThis.__WE3D_RUNTIME_READY__, null, { timeout: 120000 });
   if (await page.locator('#analyticsConsentDenyBtn').isVisible()) await page.locator('#analyticsConsentDenyBtn').click();
-  await page.evaluate(async () => { globalThis.marineCtx = (await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55')).ctx; });
+  await page.evaluate(async () => { globalThis.marineCtx = (await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/app/js/shared-context.js?v=55')).ctx; });
   assert.equal(await page.evaluate(() => globalThis.FIREBASE_APPCHECK_DEBUG_TOKEN || false), false);
   assert.equal(await page.evaluate(() => fetch('/build-manifest.json').then(r => r.json()).then(b => b.buildId)), manifest.buildId);
 }

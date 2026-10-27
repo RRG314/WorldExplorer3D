@@ -21,7 +21,7 @@ try{
  await page.waitForFunction(()=>document.getElementById('startBtn')?.disabled===false,null,{timeout:120000});
  await page.evaluate(()=>{document.getElementById('spaceLaunchToggle')?.click();document.getElementById('startBtn')?.click();});
  await page.waitForFunction(()=>JSON.parse(window.render_game_to_text?.()||'{}').modes?.space===true,null,{timeout:180000});
- await page.evaluate(async()=>{window.__shipCheck=(await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55')).ctx;});
+ await page.evaluate(async()=>{window.__shipCheck=(await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/app/js/shared-context.js?v=55')).ctx;});
  await page.locator('#sfExpeditionBtn').click();
  await page.locator('#expeditionEnterShip').click();
  await page.waitForFunction(()=>window.__shipCheck.getShipInteriorSnapshot?.()?.active===true,null,{timeout:60000});

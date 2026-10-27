@@ -24,7 +24,7 @@ try {
   let fallbackReady = false;
   for (let attempt = 0; attempt < 120 && !fallbackReady; attempt += 1) {
     fallbackReady = await page.evaluate(async () => {
-      const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
+      const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/app/js/shared-context.js?v=55');
       return !!ctx.carMesh && ctx.carMesh.userData.curatedVehicleLoadStarted === false;
     });
     if (!fallbackReady) await page.waitForTimeout(250);
@@ -32,7 +32,7 @@ try {
   assert.equal(fallbackReady, true, 'The built-in car did not recover after the curated asset failed.');
 
   const result = await page.evaluate(async () => {
-    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
+    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/app/js/shared-context.js?v=55');
     const fallback = ctx.carMesh.children.filter((child) =>
       child.userData?.defaultPlayerVehicleFallback === true
     );

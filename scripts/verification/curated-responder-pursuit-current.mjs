@@ -36,7 +36,7 @@ async function launchEarth() {
 try {
   await launchEarth();
   await page.evaluate(async () => {
-    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
+    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/app/js/shared-context.js?v=55');
     const walker = ctx.Walk.state.walker;
     ctx.setPauseReason?.('responder-verification', true);
     // This focused browser journey exercises the local responder runtime. Room
@@ -62,7 +62,7 @@ try {
   }, null, { timeout: 20_000 });
 
   const candidate = await page.evaluate(async () => {
-    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
+    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/app/js/shared-context.js?v=55');
     const walker = ctx.Walk.state.walker;
     const radii = [24, 32, 40, 48];
     for (const radius of radii) {
@@ -89,7 +89,7 @@ try {
   const trace = [];
   for (let index = 0; index < 24; index += 1) {
     trace.push(await page.evaluate(async () => {
-      const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
+      const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/app/js/shared-context.js?v=55');
       const runtime = ctx.urbanSandboxRuntime;
       const walker = ctx.Walk?.state?.walker;
       if (walker) walker.vx = 2;
@@ -115,14 +115,14 @@ try {
   const minimumDistance = Math.min(...samples.map((sample) => Number(sample.distanceToActor)));
   assert.ok(minimumDistance < firstDistance - 2, JSON.stringify({ firstDistance, minimumDistance, candidate, trace: samples.slice(-8) }));
   await waitForAsyncCondition(page, async () => {
-    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
+    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/app/js/shared-context.js?v=55');
     const root = ctx.urbanSandboxRuntime?.responders?.targets?.().find((entry) => entry.kind === 'responder_officer')?.ref?.visual?.root;
     const equipment = root?.children?.find((child) => child?.userData?.equipmentPresentation);
     return root?.userData?.curatedCharacterAssetId === 'character-civic-responder-v1' &&
       equipment?.userData?.curatedEquipmentAssetId === 'equipment-explorer-pulse-sidearm-v1';
   }, null, { timeout: 35_000 });
   const officerPresentation = await page.evaluate(async () => {
-    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
+    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/app/js/shared-context.js?v=55');
     const runtime = ctx.urbanSandboxRuntime;
     const walker = ctx.Walk?.state?.walker;
     if (walker) walker.vx = 2;
@@ -135,7 +135,7 @@ try {
   assert.equal(Number(officerPresentation?.proceduralCharacterMeshes || 0), 0);
   assert.equal(Number(officerPresentation?.proceduralEquipmentMeshes || 0), 0);
   await page.evaluate(async () => {
-    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
+    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/app/js/shared-context.js?v=55');
     const officer = ctx.urbanSandboxRuntime?.responders?.targets?.().find((entry) => entry.kind === 'responder_officer')?.ref;
     if (!officer || !ctx.camera) return;
     ctx.camera.position.set(Number(officer.x) + 3.5, Number(officer.y) + 1.65, Number(officer.z) + 4.5);
@@ -145,7 +145,7 @@ try {
   await page.screenshot({ path: path.join(evidenceDir, 'curated-officer-and-pursuit.png'), fullPage: false });
 
   await page.evaluate(async () => {
-    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
+    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/app/js/shared-context.js?v=55');
     const walker = ctx.Walk?.state?.walker;
     if (!walker) return;
     ctx.Walk.state.mode = 'walk';

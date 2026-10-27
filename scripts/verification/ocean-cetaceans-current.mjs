@@ -31,7 +31,7 @@ try{
  await page.route('https://wms.gebco.net/**',route=>route.fulfill({status:200,contentType:'text/plain',body:"value_list = '-180'"}));
  await page.goto(`${base}/app/?launch=earth&loc=custom&lat=34&lon=-120&lname=Offshore%20California&diagnostics=1`);
  await page.waitForFunction(()=>globalThis.__WE3D_RUNTIME_READY__,null,{timeout:90000});
- await page.evaluate(async()=>{window.marineCtx=(await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55')).ctx;});
+ await page.evaluate(async()=>{window.marineCtx=(await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/app/js/shared-context.js?v=55')).ctx;});
  if(await page.locator('#analyticsConsentDenyBtn').isVisible())await page.locator('#analyticsConsentDenyBtn').click();
  await page.locator('#globeSelectorOceanBtn').click();await deployResearchSubmarineFromDeck(page);
  await page.evaluate(async()=>{await marineCtx.oceanMode.fishVisualsReady;marineCtx.setTimeOfDay('day');});

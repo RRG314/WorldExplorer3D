@@ -22,7 +22,7 @@ try {
  await page.locator('#globeSelectorStartBtn').click();
  await page.waitForFunction(afterWorldLoad(()=>{const s=window.getWorldExplorerRuntimeDiagnostics?.();return s?.gameStarted&&!s.worldLoading&&!document.querySelector('#loading')?.classList.contains('show');}),null,{timeout:100000});
  const result=await page.evaluate(async()=>{
-  const {ctx}=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
+  const {ctx}=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/app/js/shared-context.js?v=55');
   ctx.setTimeOfDay('day');
   const id='overture:ba77061a-6e09-416a-aaf8-3057532ee880';
   const runtime=await import('/app/js/reality-capture/runtime.js?v=1');

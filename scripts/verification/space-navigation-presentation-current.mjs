@@ -15,7 +15,7 @@ try {
   await page.evaluate(()=>{document.getElementById('spaceLaunchToggle').click();document.getElementById('startBtn').click();});
   await page.waitForFunction(()=>JSON.parse(globalThis.render_game_to_text?.()||'{}').modes?.space===true&&!document.getElementById('loading')?.classList.contains('show'),null,{timeout:180000});
   await page.evaluate(async()=>{
-    const {ctx}=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
+    const {ctx}=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/app/js/shared-context.js?v=55');
     cancelAnimationFrame(ctx.spaceFlight.animationId);ctx.spaceFlight.animationId=null;
     // Boundary scenarios deliberately freeze the real scene; they do not impersonate flown journeys.
     ctx.clearRenderedSpaceJourney?.();ctx.spaceFlight.mode='flying';
@@ -26,7 +26,7 @@ try {
   });
   async function scenario(kind) {
     return page.evaluate(async(kind)=>{
-      const {ctx}=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
+      const {ctx}=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/app/js/shared-context.js?v=55');
       const {updateSpaceFlightHUD}=await import('/app/js/space/ui.js?v=52');
       const {findLandableBodyByName,attemptLanding}=await import('/app/js/space/runtime.js?v=34');
       const {createBodyEphemerisState,createSpacecraftState}=await import('/app/js/space/spacecraft-authority.js?v=4');

@@ -113,7 +113,7 @@ try {
     await page.waitForFunction(discoveryWorldReady, null, { timeout: 180000, polling: 500 });
     assert.equal(await page.evaluate(() => fetch('/build-manifest.json', { cache: 'no-store' }).then(r => r.json()).then(m => m.buildId)), manifest.buildId);
     const result = await page.evaluate(async ({ seed, label, expectedMagazine, writeMagazine, previous, extended }) => {
-      const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
+      const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/app/js/shared-context.js?v=55');
       const check = (value, message) => { if (!value) throw Error(message); };
       const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
       const store = ctx.discoveryProfileStore, backpack = ctx.playerBackpackStore;

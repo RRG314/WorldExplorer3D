@@ -52,7 +52,7 @@ try {
   await page.waitForFunction(() => JSON.parse(globalThis.render_game_to_text?.() || '{}').spaceFlight?.assist?.active === true);
 
   const advanced = await page.evaluate(async () => {
-    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
+    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/app/js/shared-context.js?v=55');
     let minimumForwardDot = 1;
     for (let frame = 0; frame < 2_000 && ctx.spaceJourney?.phase !== 'approach'; frame += 1) {
       const before = ctx.spaceFlight.rocket.position.clone();
@@ -81,7 +81,7 @@ try {
       button.textContent?.trim().toUpperCase() === `ENTER ${label.toUpperCase()} ATMOSPHERE`;
   }, destinationLabel, { timeout: 10_000 });
   const before = await page.evaluate(async () => {
-    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
+    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/app/js/shared-context.js?v=55');
     return {
       journeyId: ctx.spaceJourney?.journeyId,
       phase: ctx.spaceJourney?.phase,
@@ -110,7 +110,7 @@ try {
   await page.keyboard.up('ArrowRight');
   await page.keyboard.up('Space');
   const after = await page.evaluate(async () => {
-    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
+    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/app/js/shared-context.js?v=55');
     return {
       journeyId: ctx.spaceJourney?.journeyId,
       phase: ctx.spaceJourney?.phase,
@@ -168,7 +168,7 @@ try {
   await page.waitForFunction(() => JSON.parse(globalThis.render_game_to_text?.() || '{}').spaceFlight?.phase === 'ascent');
   await page.waitForTimeout(250);
   const departure = await page.evaluate(async () => {
-    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
+    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/app/js/shared-context.js?v=55');
     return {
       phase: ctx.spaceJourney?.phase || null,
       atmosphereReleased: !ctx.spaceFlight?.atmosphericPresentation,

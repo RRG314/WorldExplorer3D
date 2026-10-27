@@ -62,7 +62,7 @@ try {
  delay = 0; elevation = -30;
  await context.route('**/api/geospatial/reverse?**',route=>route.fulfill({status:503,json:{error:'Controlled naming outage'}}));
  await select(25.51, -80.31); await click();
- await page.evaluate(async()=>{window.oceanEntryCtx=(await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55')).ctx;});
+ await page.evaluate(async()=>{window.oceanEntryCtx=(await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/app/js/shared-context.js?v=55')).ctx;});
  await page.waitForFunction(()=>oceanEntryCtx.boatDeck?.active&&!oceanEntryCtx.titleLaunchPending,null,{timeout:90000});
  report.cases.push({id:'fresh-ocean-entry-starts-on-research-deck',passed:true});
  await deployResearchSubmarineFromDeck(page);
@@ -97,7 +97,7 @@ try {
  assert.equal(await page.locator('#largeMap').evaluate(el => el.classList.contains('show')), false);
  report.cases.push({ id: 'sampled-map-zoom-heading-depth-labels', passed: true });
  const guard = await page.evaluate(async () => {
-   const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
+   const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/app/js/shared-context.js?v=55');
    const before = ctx.oceanMode.launchSite;
    const result = await ctx.startOceanMode({ launchSite: { lat: 39.2898, lon: -76.6122 } });
    return { rejected: result === false, retained: ctx.oceanMode.launchSite === before && ctx.oceanMode.active };
@@ -137,7 +137,7 @@ try {
  // requests fail. This uses the real runtime and provider request path.
  elevation = null;
  const outage = await page.evaluate(async () => {
-   const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
+   const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/app/js/shared-context.js?v=55');
    const site = { lat: 25.51, lon: -80.31, name: 'Admitted coastal outage fixture', region: 'Florida' };
    const started = await ctx.startOceanMode({ launchSite: site, entry: {
      ...site, source: 'gebco-elevation-sample', kind: 'modeled-ocean', elevationMeters: -80,
@@ -164,7 +164,7 @@ try {
  await page.screenshot({ path: `${dir}/outage-playable.png` });
  report.cases.push({ id: 'provider-outage-retains-origin-depth-with-unknown-survey-evidence', passed: true });
  // Exercise the actual upper-water boundary, not only deep-water travel.
- await page.evaluate(async()=>{const {ctx}=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');ctx.oceanMode.submarine.position.y=-.1;});
+ await page.evaluate(async()=>{const {ctx}=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/app/js/shared-context.js?v=55');ctx.oceanMode.submarine.position.y=-.1;});
  await page.keyboard.down('Space');await page.waitForTimeout(400);await page.keyboard.up('Space');
  report.surfaceBoundary=await page.evaluate(()=>{
    const d=window.getOceanModeDebugState();return {water:d.water,position:d.position,depthText:document.querySelector('#limit').textContent};
@@ -175,7 +175,7 @@ try {
  await page.screenshot({path:`${dir}/underwater-wave-boundary.png`});
  report.cases.push({id:'underwater-wave-boundary-and-qualified-depth',passed:true});
  const surfaced = await page.evaluate(async () => {
-   const {ctx}=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
+   const {ctx}=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/app/js/shared-context.js?v=55');
    window.expectedSurfaceOrigin={...ctx.oceanMode.launchSite};
    const sub=ctx.oceanMode.submarine;
    window.expectedWaveOffset={...ctx.oceanVoyage.current.waveOffset};
@@ -183,7 +183,7 @@ try {
  });
  report.surfaceTransfer={surfaced,warnings:report.boatWarnings||[],snapshot:await page.evaluate(()=>window.getWorldExplorerRuntimeDiagnostics?.().modes)};
  assert.equal(surfaced,true,JSON.stringify(report.surfaceTransfer));
- await page.evaluate(async()=>{window.waterCheckContext=(await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55')).ctx;});
+ await page.evaluate(async()=>{window.waterCheckContext=(await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/app/js/shared-context.js?v=55')).ctx;});
  await page.waitForFunction(()=>{
    const ctx=window.waterCheckContext;
    const shader=ctx.boatMode?.waterPatch?.material?.userData?.weWaterWaveShader;
@@ -258,7 +258,7 @@ try {
  await page.reload({waitUntil:'load'});if(await page.locator('#landingPrimaryCta').isVisible())await page.locator('#landingPrimaryCta').click();await page.waitForFunction(()=>window.__WE3D_RUNTIME_READY__===true,null,{timeout:90000});
  await page.locator('#oceanVoyageResume').waitFor({state:'visible'});await page.screenshot({path:`${dir}/saved-voyage-menu.png`});await page.locator('#oceanVoyageResume').click();
  await page.waitForFunction(()=>window.getWorldExplorerRuntimeDiagnostics?.().modes?.ocean===true,null,{timeout:90000});
- await page.evaluate(async()=>{window.waterCheckContext=(await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55')).ctx;});
+ await page.evaluate(async()=>{window.waterCheckContext=(await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/app/js/shared-context.js?v=55')).ctx;});
  const resumed=await page.evaluate(()=>({voyage:waterCheckContext.oceanVoyage.current,subId:waterCheckContext.oceanMode.submarine.transportEntityId,gameStarted:waterCheckContext.gameStarted,hud:document.querySelector('#hud').classList.contains('show'),parent:waterCheckContext.oceanMode.parentVessel.root.userData.transportEntityId}));
  assert.equal(resumed.subId,voyageBefore.subId);assert.equal(resumed.parent,voyageBefore.ship.transportEntityId);assert.equal(resumed.gameStarted,true);assert.equal(resumed.hud,true);assert.ok(Math.abs(resumed.voyage.sub.x-voyageBefore.sub.x)<1);assert.ok(Math.abs(resumed.voyage.sub.z-voyageBefore.sub.z)<1);
  await page.screenshot({path:`${dir}/resumed-voyage.png`});report.cases.push({id:'actual-menu-reload-resumes-same-sub-and-parent-vessel',passed:true});
@@ -268,11 +268,11 @@ try {
  report.cases.push({id:'explicit-recovery-returns-to-original-parent-anchor',passed:true});
  await page.reload({waitUntil:'load'});if(await page.locator('#landingPrimaryCta').isVisible())await page.locator('#landingPrimaryCta').click();await page.waitForFunction(()=>window.__WE3D_RUNTIME_READY__===true,null,{timeout:90000});await page.locator('#oceanVoyageResume').click();
  await page.waitForFunction(()=>window.getWorldExplorerRuntimeDiagnostics?.().modes?.boat===true,null,{timeout:90000});
- await page.evaluate(async()=>{window.waterCheckContext=(await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55')).ctx;});
+ await page.evaluate(async()=>{window.waterCheckContext=(await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/app/js/shared-context.js?v=55')).ctx;});
  await page.waitForFunction(()=>waterCheckContext.boatDeck?.active&&waterCheckContext.oceanVoyage.current?.stage==='aboard'&&!waterCheckContext.titleLaunchPending,null,{timeout:90000});
- const shipResume=await page.evaluate(async()=>{const {ctx}=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');return {id:ctx.boatMode.transportEntityId,stage:ctx.oceanVoyage.current.stage,subId:ctx.oceanVoyage.current.subId}});
+ const shipResume=await page.evaluate(async()=>{const {ctx}=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/app/js/shared-context.js?v=55');return {id:ctx.boatMode.transportEntityId,stage:ctx.oceanVoyage.current.stage,subId:ctx.oceanVoyage.current.subId}});
  assert.equal(shipResume.id,voyageBefore.ship.transportEntityId);assert.equal(shipResume.subId,voyageBefore.subId);assert.equal(shipResume.stage,'aboard');report.cases.push({id:'reload-after-recovery-restores-same-ship-and-docked-sub',passed:true});
- await page.evaluate(async()=>{window.waterCheckContext=(await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55')).ctx;});
+ await page.evaluate(async()=>{window.waterCheckContext=(await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/app/js/shared-context.js?v=55')).ctx;});
  await page.waitForFunction(()=>waterCheckContext.boatDeck?.active,null,{timeout:30000});
  const reachedCradle=await page.evaluate(()=>{const ctx=waterCheckContext,read=ctx.readControlActions;try{for(let i=0;i<200;i++){const p=ctx.boatDeck.snapshot().pose,dx=-1.8-p.x,dz=-31.5-p.z;if(Math.hypot(dx,dz)<.25)return true;ctx.readControlActions=()=>Math.abs(dx)>.15?{strafe:-Math.sign(dx)}:{move:Math.sign(dz)};ctx.boatDeck.update(.05);}return false;}finally{ctx.readControlActions=read;}});assert.equal(reachedCradle,true);
  await page.getByLabel('Deck destination').selectOption('sub');await page.screenshot({path:`${dir}/research-submarine-cradle.png`});await page.locator('#researchDeckAction').click();await page.waitForFunction(()=>waterCheckContext.oceanMode.active,null,{timeout:30000});

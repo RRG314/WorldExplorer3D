@@ -38,7 +38,7 @@ try {
   }), null, { timeout: 180000 });
   for (const [index, bodyId] of ['mercury', 'venus', 'io', 'europa', 'titan', 'enceladus', 'triton', 'ceres', 'vesta', 'pluto', 'mercury'].entries()) {
     const state = await page.evaluate(async bodyId => {
-      const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
+      const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/app/js/shared-context.js?v=55');
       const arrived = await ctx.arriveAtSolidWorld(bodyId);
       await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
       return { arrived, bodyId: ctx.activePlanetaryBodyId, cache: ctx.getPlanetaryWorldCacheSnapshot(),
@@ -59,7 +59,7 @@ try {
     await page.screenshot({ path: `${output}/${index}-${bodyId}.png` });
     // Additional aerial fixture is explicitly separate from player-input evidence.
     const aerial = await page.evaluate(async () => {
-      const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
+      const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/app/js/shared-context.js?v=55');
       const camera = ctx.camera;
       const prior = { position: camera.position.clone(), quaternion: camera.quaternion.clone() };
       const center = ctx.activeSolidWorldSurface.position;

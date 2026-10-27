@@ -27,7 +27,7 @@ await installBrowserGraphicsProbe(page, 'output/verification/mobile-controls/gra
 async function recordGraphicsPhase(phase) {
   graphicsPhase = phase;
   const snapshot = await page.evaluate(async () => {
-    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
+    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/app/js/shared-context.js?v=55');
     return { memory: ctx.renderer?.info?.memory, programs: ctx.renderer?.info?.programs?.length,
       contextLost: ctx.renderer?.getContext?.()?.isContextLost?.(),
       heap: performance.memory?.usedJSHeapSize, canvasCount: document.querySelectorAll('canvas').length };
@@ -84,7 +84,7 @@ async function touchDrag(selector, deltaX, deltaY, holdMs = 900, { accelerate = 
     else {
       const startedAt = Date.now();
       const receipt = await advanceGameplay(page, holdMs);
-      const held=await page.evaluate(async()=>{const {ctx}=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');return {actor:globalThis.getWorldExplorerRuntimeDiagnostics?.().activeActor,camera:globalThis.getWorldExplorerRuntimeDiagnostics?.().cameraFollow,carLook:ctx.camera?.userData?.carLook,cameraMode:ctx.camMode,clearanceMode:ctx.camera?.userData?.vehicleClearanceMode,cameraPosition:{...ctx.camera?.position},car:{x:ctx.car?.x,y:ctx.car?.y,z:ctx.car?.z,angle:ctx.car?.angle},controls:ctx.readControlActions?.('drive')};});
+      const held=await page.evaluate(async()=>{const {ctx}=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/app/js/shared-context.js?v=55');return {actor:globalThis.getWorldExplorerRuntimeDiagnostics?.().activeActor,camera:globalThis.getWorldExplorerRuntimeDiagnostics?.().cameraFollow,carLook:ctx.camera?.userData?.carLook,cameraMode:ctx.camMode,clearanceMode:ctx.camera?.userData?.vehicleClearanceMode,cameraPosition:{...ctx.camera?.position},car:{x:ctx.car?.x,y:ctx.car?.y,z:ctx.car?.z,angle:ctx.car?.angle},controls:ctx.readControlActions?.('drive')};});
       touchTimingReceipts.push({ selector, holdMs, receipt, held, wallElapsedMs: Date.now() - startedAt });
     }
   } finally {

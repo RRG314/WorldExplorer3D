@@ -23,12 +23,12 @@ try {
  if(process.env.WE3D_FORCE_TRANSPORT_FALLBACK==='1')await page.route(/https:\/\/[^/]*overpass[^/]*\/.*interpreter/i,r=>r.abort());
  await page.goto(`http://127.0.0.1:${server.port}/app/?launch=earth&gm=free&loc=custom&lat=39.2867&lon=-76.6121&lname=Baltimore&mode=driving&streetDiagnostics=1`,{waitUntil:'domcontentloaded'});
  await page.waitForFunction(()=>globalThis.__WE3D_RUNTIME_READY__,null,{timeout:60000});
- await page.evaluate(async()=>{globalThis.__sidewalkCtx=(await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55')).ctx;});
+ await page.evaluate(async()=>{globalThis.__sidewalkCtx=(await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/app/js/shared-context.js?v=55')).ctx;});
  await page.locator('#globeSelectorStartBtn').click();
  await page.waitForFunction(()=>{const ctx=globalThis.__sidewalkCtx;return ctx.gameStarted&&!ctx.worldLoading&&ctx.roads?.length>0&&ctx.streetPavement?.stats?.tiles>0;},null,{timeout:300000,polling:1000});
  console.log('Actual Light Street world loaded');
  const capture=await page.evaluate(async()=>{
-  const {ctx}=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
+  const {ctx}=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/app/js/shared-context.js?v=55');
   const {streetSourceInput}=await import('/__verification/sidewalk-source-inspection.mjs');
   ctx.setTimeOfDay('day');
   const center=ctx.geoToWorld(39.2867,-76.6121),radius=220;

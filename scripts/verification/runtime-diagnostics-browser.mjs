@@ -97,7 +97,7 @@ try{
  await measure('earth','main');
  if(process.argv.includes('--lifecycle')){
   const inspectEarth=()=>page.evaluate(async()=>{
-   const {ctx:c}=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');globalThis.__residencyContext=c;
+   const {ctx:c}=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/app/js/shared-context.js?v=55');globalThis.__residencyContext=c;
    return {buildings:c.buildings.length,roads:c.roads.length,terrainTiles:c.terrainTileCache?.size||0,location:{lat:c.LOC.lat,lon:c.LOC.lon},pose:c.earthSessionState?.pose,release:c.lastEarthWorldRelease,submerged:!!c.oceanMode.active};
   });
   const before=await inspectEarth();
@@ -136,10 +136,10 @@ try{
   await deployResearchSubmarineFromDeck(page);
  await page.waitForFunction(()=>globalThis.getOceanModeDebugState?.().active===true,null,{timeout:90000});
  await page.locator('#oceanDiverToggle').waitFor({state:'visible'});
- await page.evaluate(async()=>{const {ctx}=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');await ctx.oceanMode.fishVisualsReady;});
+ await page.evaluate(async()=>{const {ctx}=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/app/js/shared-context.js?v=55');await ctx.oceanMode.fishVisualsReady;});
  await measure('ocean','ocean');
  report.oceanInventory=await page.evaluate(async()=>{
-  const {ctx}=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
+  const {ctx}=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/app/js/shared-context.js?v=55');
   const o=ctx.oceanMode,geometries=new Map(),textures=new Map();
   o.scene.traverse(mesh=>{
    const ancestry=[];for(let p=mesh;p&&p!==o.scene;p=p.parent)if(p.name)ancestry.push(p.name);const owner=ancestry.reverse().join(' / ');

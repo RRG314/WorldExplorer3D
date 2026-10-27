@@ -49,7 +49,7 @@ try {
   await page.waitForFunction(() => globalThis.__WE3D_RUNTIME_READY__ === true, null, { timeout: 90000 });
   assert.equal(await page.evaluate(() => WorldExplorerDistribution.isGooglePlay), false);
   assert.equal(await page.evaluate(() => document.documentElement.dataset.distribution), 'web');
-  await page.evaluate(async () => { globalThis.mobileWebQa = (await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55')).ctx; mobileWebQa.renderer.domElement.setAttribute('data-mobile-web-main', 'true'); });
+  await page.evaluate(async () => { globalThis.mobileWebQa = (await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/app/js/shared-context.js?v=55')).ctx; mobileWebQa.renderer.domElement.setAttribute('data-mobile-web-main', 'true'); });
   for (const selector of ['#analyticsConsentDenyBtn', '#testerInvitationClose']) if (await page.locator(selector).isVisible()) await page.locator(selector).tap();
   if (await page.locator('#globeSelectorStartBtn').isVisible()) await page.locator('#globeSelectorStartBtn').tap();
   await page.waitForFunction(() => mobileWebQa.gameStarted && !mobileWebQa.worldLoading && !mobileWebQa.titleLaunchPending && mobileWebQa.worldLoadRuntimeState?.gameplayRuntimesReady, null, { timeout: 180000, polling: 500 });

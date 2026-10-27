@@ -23,7 +23,7 @@ try {
   let fallbackReady = false;
   for (let attempt = 0; attempt < 120 && !fallbackReady; attempt += 1) {
     fallbackReady = await page.evaluate(async () => {
-      const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
+      const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/app/js/shared-context.js?v=55');
       const character = ctx.Walk?.state?.characterMesh;
       const npcs = ctx.urbanSandboxRuntime?.npcs || [];
       return !!character && character.userData.curatedCharacterLoadStarted === false &&
@@ -34,7 +34,7 @@ try {
   assert.equal(fallbackReady, true, 'Character asset failure states did not settle.');
 
   const result = await page.evaluate(async () => {
-    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
+    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/app/js/shared-context.js?v=55');
     const character = ctx.Walk.state.characterMesh;
     const npcRoots = (ctx.urbanSandboxRuntime?.npcs || []).map((npc) => npc.visual.root);
     const inspectFallback = (root) => {
@@ -63,7 +63,7 @@ try {
   assert.equal(result.curatedNpcCount, 0);
 
   const incidentAccepted = await page.evaluate(async () => {
-    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
+    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/app/js/shared-context.js?v=55');
     const actor = ctx.Walk?.state?.walker;
     return ctx.urbanSandboxRuntime?.reportCivicEvent?.({
       kind: 'vehicle_collision',
@@ -78,7 +78,7 @@ try {
   let responderFallback = null;
   for (let attempt = 0; attempt < 220; attempt += 1) {
     responderFallback = await page.evaluate(async () => {
-      const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
+      const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/app/js/shared-context.js?v=55');
       const officer = ctx.urbanSandboxRuntime?.responders?.snapshot?.()?.responders?.find((entry) => entry.officer)?.officer;
       if (!officer) return null;
       const root = ctx.urbanSandboxRuntime.responders.targets().find((entry) => entry.kind === 'responder_officer')?.ref?.visual?.root;
@@ -118,12 +118,12 @@ try {
   await page.locator('#expeditionEnterShip').click();
   await page.waitForFunction(() => JSON.parse(globalThis.render_game_to_text?.() || '{}').expeditionShipInterior?.active === true);
   await waitForAsyncCondition(page, async () => {
-    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
+    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/app/js/shared-context.js?v=55');
     const layer = ctx.scene?.getObjectByName?.('solis-reach-crew-layer');
     return layer?.children?.length === 7 && layer.children.every((root) => root.userData.curatedCharacterLoadStarted === false);
   }, null, { timeout: 60_000 });
   const crewFallback = await page.evaluate(async () => {
-    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
+    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/app/js/shared-context.js?v=55');
     const roots = ctx.scene?.getObjectByName?.('solis-reach-crew-layer')?.children || [];
     return roots.map((root) => {
       const parts = [];

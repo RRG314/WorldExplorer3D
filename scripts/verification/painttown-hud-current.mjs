@@ -11,7 +11,7 @@ try {
   const errors = []; page.on('pageerror', error => errors.push(String(error)));
   await page.goto(`http://127.0.0.1:${server.port}/404.html`);
   const result = await page.evaluate(async () => {
-    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
+    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/app/js/shared-context.js?v=55');
     const { ensurePaintTownState, updatePaintTownHud, setPaintTownPlayerColor } = await import('/app/js/game/paint-town/core.js?v=1');
     document.body.replaceChildren(); document.body.style.background = '#152d3a';
     const state = ensurePaintTownState();

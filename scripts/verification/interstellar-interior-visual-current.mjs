@@ -35,7 +35,7 @@ async function openShip(page) {
 
 async function placeCamera(page, { x, z, yaw = 0, pitch = 0 }) {
   await page.evaluate(async (pose) => {
-    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
+    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/app/js/shared-context.js?v=55');
     Object.assign(ctx.Walk.state.walker, {
       x: pose.x,
       z: pose.z,
@@ -71,7 +71,7 @@ async function openDoor(page, pose) {
     await page.waitForFunction((expected) => JSON.parse(globalThis.render_game_to_text?.() || '{}').expeditionShipInterior?.openDoorCount === expected, before + 1, { timeout: 3_000 });
   } catch (error) {
     const diagnostics = await page.evaluate(async () => {
-      const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
+      const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/app/js/shared-context.js?v=55');
       const walker = ctx.Walk?.state?.walker;
       return {
         activeDeckId: ctx.getShipInteriorSnapshot?.()?.deckId || null,
@@ -98,12 +98,12 @@ async function runViewport(name, viewport) {
   try {
     await openShip(page);
     await page.evaluate(async () => {
-      const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
+      const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/app/js/shared-context.js?v=55');
       globalThis.__we3dVerificationContext = ctx;
     });
     await page.waitForFunction(() => globalThis.__we3dVerificationContext?.scene?.getObjectByName('expedition-landing-pod')?.userData?.curatedPodAssetId === 'space-pathfinder-transfer-pod-v2', null, { timeout: 15000 });
     const dockedPod = await page.evaluate(async () => {
-      const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
+      const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/app/js/shared-context.js?v=55');
       const pod = ctx.scene?.getObjectByName('expedition-landing-pod');
       let fallbackVisible = false;
       pod?.traverse?.((object) => {
@@ -123,7 +123,7 @@ async function runViewport(name, viewport) {
     assert.ok(contract.equipmentGroupCount >= 25);
 
     const sceneEvidence = await page.evaluate(async () => {
-      const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
+      const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/app/js/shared-context.js?v=55');
       const evidence = { roots: 0, textured: [], displayLabels: [], surfaceNames: [] };
       ctx.scene?.traverse?.((child) => {
         if (child.name === 'expedition-ship:solis-reach') evidence.roots += 1;

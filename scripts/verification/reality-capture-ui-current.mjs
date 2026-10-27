@@ -347,7 +347,7 @@ try {
   if(await phone.locator('#googleSignIn').isVisible())await phone.click('#googleSignIn');
   await phone.locator('#realityCapturePanel.show').waitFor();
   assert.equal(await phone.locator('[data-capture-count]').textContent(),videoCount);
-  await phone.evaluate(async () => (await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/js/auth-ui.js?v=56')).setUser('other'));
+  await phone.evaluate(async () => (await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/js/auth-ui.js?v=56')).setUser('other'));
   assert.equal(await phone.locator('#realityCapturePanel.show').count(), 0);
   await phone.waitForFunction(() => document.getElementById('phoneStatus').textContent.includes('unavailable for this account'));
   // Exercise the actual shared Three.js review renderer. This deliberately

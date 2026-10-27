@@ -35,10 +35,10 @@ try {
   if(await page.locator('#analyticsConsentDenyBtn').isVisible())await page.locator('#analyticsConsentDenyBtn').click();
   if(await page.locator('#globeSelectorStartBtn').isVisible())await page.locator('#globeSelectorStartBtn').click();
   await page.waitForFunction(afterWorldLoad(()=>{const d=globalThis.getWorldExplorerRuntimeDiagnostics?.();return d?.gameStarted&&!d.worldLoading&&d.worldDiscovery?.active&&!document.getElementById('loading')?.classList.contains('show');}),null,{timeout:180000});
-  await page.evaluate(async()=>{globalThis.__sandboxTestContext=(await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55')).ctx;});
+  await page.evaluate(async()=>{globalThis.__sandboxTestContext=(await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/app/js/shared-context.js?v=55')).ctx;});
  };
  await page.goto(url,{waitUntil:'domcontentloaded'});await ready();
- await page.evaluate(async()=>{const{ctx}=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');ctx.setTimeOfDay?.('day');ctx.setWeatherMode?.('clear');});
+ await page.evaluate(async()=>{const{ctx}=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/app/js/shared-context.js?v=55');ctx.setTimeOfDay?.('day');ctx.setWeatherMode?.('clear');});
 
  await page.evaluate(()=>{globalThis.__shipInputEvents=[];addEventListener('keydown',e=>globalThis.__shipInputEvents.push({code:e.code,target:e.target?.tagName,id:e.target?.id,html:e.target?.outerHTML?.slice(0,240),active:document.activeElement?.id}),true);});
  report.earth=await page.evaluate(()=>{const c=globalThis.__sandboxTestContext;return{buildings:c.buildings?.length,roads:c.roads?.length};});

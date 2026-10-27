@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import {fitFishToWater} from '../../app/js/ocean/fish-water-envelope.js';
 export async function verifyOceanEcology({page,dir,report}){
  const observed=await page.evaluate(async()=>{
-  const {ctx}=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55'),mode=ctx.oceanMode;
+  const {ctx}=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/app/js/shared-context.js?v=55'),mode=ctx.oceanMode;
   const ids=mode.fishEntities.map(f=>f.mesh.uuid),before=mode.fishEntities.map(f=>f.mesh.position.clone());
   const failures=[],envelopes=[],seen=new Set();let samples=0,maxStep=0,last=mode.lastFrameMs;
   let previous=before.map(p=>p.clone());
@@ -34,22 +34,22 @@ export async function verifyOceanEcology({page,dir,report}){
  // Controlled asset-review camera in the actual running world, after the
  // ordinary diver journey reaches this habitat. Restore it before continuing.
  const prior=await page.evaluate(async()=>{
-  const {ctx}=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55'),m=ctx.oceanMode;
+  const {ctx}=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/app/js/shared-context.js?v=55'),m=ctx.oceanMode;
   ctx.setPauseReason('ecology-asset-review',true);
   const f=m.fishEntities.find(f=>f.mesh.visible),p=f.mesh.position;
   const prior={position:m.camera.position.toArray(),quaternion:m.camera.quaternion.toArray()};
   m.camera.position.set(p.x+3,p.y+1,p.z+3);m.camera.lookAt(p);m.renderer.render(m.scene,m.camera);return prior;
  });
  try{await page.screenshot({path:`${dir}/reef-fish-asset-review.png`});}
- finally{await page.evaluate(async prior=>{const {ctx}=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55'),m=ctx.oceanMode;m.camera.position.fromArray(prior.position);m.camera.quaternion.fromArray(prior.quaternion);ctx.setPauseReason('ecology-asset-review',false);},prior);}
+ finally{await page.evaluate(async prior=>{const {ctx}=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/app/js/shared-context.js?v=55'),m=ctx.oceanMode;m.camera.position.fromArray(prior.position);m.camera.quaternion.fromArray(prior.quaternion);ctx.setPauseReason('ecology-asset-review',false);},prior);}
 }
 
 export async function verifyOceanEcologySwitch({page,dir,report}){
  const samples=[];
  for(const site of [{lat:25.5,lon:-80.2,name:'Florida shelf'},{lat:25.5,lon:128,name:'Ryukyu shelf'},{lat:25.5,lon:-80.2,name:'Florida return'},{lat:25.5,lon:128,name:'Ryukyu return'}]){
-  const before=await page.evaluate(async()=>{const {ctx}=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');return ctx.oceanMode.fishEntities.map(f=>f.mesh.uuid)});
-  assert.equal(await page.evaluate(async site=>{const {ctx}=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');return ctx.startOceanMode({launchSite:{...site,region:'Controlled geographic fixture'},entry:{...site,source:'gebco-elevation-sample',kind:'modeled-ocean',elevationMeters:-30}})},site),true);
-  await page.evaluate(async()=>{window.ecologyCtx=(await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55')).ctx;});
+  const before=await page.evaluate(async()=>{const {ctx}=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/app/js/shared-context.js?v=55');return ctx.oceanMode.fishEntities.map(f=>f.mesh.uuid)});
+  assert.equal(await page.evaluate(async site=>{const {ctx}=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/app/js/shared-context.js?v=55');return ctx.startOceanMode({launchSite:{...site,region:'Controlled geographic fixture'},entry:{...site,source:'gebco-elevation-sample',kind:'modeled-ocean',elevationMeters:-30}})},site),true);
+  await page.evaluate(async()=>{window.ecologyCtx=(await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/app/js/shared-context.js?v=55')).ctx;});
   // Geographic outings now use streamed depth tiles; their readiness does not
   // set the retained fixed-area grid flag. Wait for the active owner and its
   // current habitat before comparing regional life and retained geometry.
@@ -62,7 +62,7 @@ export async function verifyOceanEcologySwitch({page,dir,report}){
   await page.evaluate(()=>ecologyCtx.oceanMode.fishVisualsReady);
   await page.waitForTimeout(700);
   const sample=await page.evaluate(async()=>{
-   const {ctx}=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55'),m=ctx.oceanMode;
+   const {ctx}=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/app/js/shared-context.js?v=55'),m=ctx.oceanMode;
    return {site:m.launchSite,continuous:m.continuous,species:m.underwaterSchoolPlan.schools.map(s=>s.speciesId),ids:m.fishEntities.map(f=>f.mesh.uuid),
      geometry:m.renderer.info.memory.geometries,texture:m.renderer.info.memory.textures,count:m.fishEntities.length,
      sceneFish:m.scene.children.filter(o=>o.name.startsWith('Ocean fish')).length};

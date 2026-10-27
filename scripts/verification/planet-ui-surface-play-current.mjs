@@ -19,7 +19,7 @@ async function openMarsDetails() {
     const panel = document.getElementById('solarSystemInfo');
     const mars = SOLAR_SYSTEM_PLANETS.find((planet) => planet.bodyId === 'mars');
     showPlanetInfo({
-      appCtx: (await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55')).ctx,
+      appCtx: (await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/app/js/shared-context.js?v=55')).ctx,
       solarSystem: { infoPanel: panel, selectedPlanet: null, selectedBodyId: null, planetMeshes: [] },
       getEarthHelioPos: () => ({ x: 0, y: 0, z: 0 }),
       distanceAU: (a, b) => Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z)
@@ -81,7 +81,7 @@ try {
 
   await page.setViewportSize({ width: 1440, height: 900 });
   const mercuryArrival = await page.evaluate(async () => {
-    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
+    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/app/js/shared-context.js?v=55');
     return ctx.arriveAtSolidWorld?.('mercury');
   });
   assert.equal(mercuryArrival, true);
@@ -91,7 +91,7 @@ try {
   }, null, { timeout: 120_000 });
   await page.waitForTimeout(800);
   const mercurySurface = await page.evaluate(async () => {
-    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
+    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/app/js/shared-context.js?v=55');
     const { planetarySurfaceYAtRenderXZ } = await import('/app/js/planetary/runtime/surface-query.js?v=3');
     const surface = ctx.activeSolidWorldSurface;
     surface.updateMatrixWorld(true);
@@ -117,7 +117,7 @@ try {
   await page.keyboard.up('ArrowUp');
   await page.waitForTimeout(250);
   const mercuryAfterDrive = await page.evaluate(async () => {
-    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
+    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/app/js/shared-context.js?v=55');
     const raycaster = new THREE.Raycaster(new THREE.Vector3(ctx.car.x, 2_000, ctx.car.z), new THREE.Vector3(0, -1, 0));
     const hit = raycaster.intersectObject(ctx.activeSolidWorldSurface, false)[0];
     return { car: { x: ctx.car.x, y: ctx.car.y, z: ctx.car.z }, renderedY: hit?.point?.y ?? null, clearance: hit ? ctx.car.y - 1.2 - hit.point.y : null };

@@ -29,7 +29,7 @@ try{
  await page.waitForFunction(()=>document.querySelector('.expeditionSummary .is-ready')?.textContent?.includes('READY'));
  await page.locator('#expeditionEnterShip').click();
  await page.waitForFunction(()=>JSON.parse(globalThis.render_game_to_text?.()||'{}').expeditionShipInterior?.active);
- await page.evaluate(async()=>{globalThis.__shipTestCtx=(await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55')).ctx;});
+ await page.evaluate(async()=>{globalThis.__shipTestCtx=(await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/app/js/shared-context.js?v=55')).ctx;});
  await page.waitForTimeout(1500);
  const pose=()=>page.evaluate(()=>{const c=globalThis.__shipTestCtx,w=c.Walk.state.walker;return{x:w.x,y:w.y,z:w.z,ground:w.onGround,focus:{id:document.activeElement?.id,tag:document.activeElement?.tagName},interior:c.getShipInteriorSnapshot?.()};});
  report.entry=await pose();

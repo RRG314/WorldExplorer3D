@@ -25,16 +25,16 @@ try{
   }
   await page.goto(origin+'/app/capture.html');await page.locator('#googleSignIn').waitFor({state:'visible'});
   config=await page.evaluate(()=>globalThis.WORLD_EXPLORER_FIREBASE);assert.equal(config.projectId,production?'worldexplorer3d-d9b83':'we3d-staging-20260712');
-  assert.equal(await page.evaluate(async()=>!!(await(await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/js/firebase-init.js?v=58')).getFirebaseAppCheckToken())),true,'Registered staging automation identity must obtain an App Check token before creating test records');
+  assert.equal(await page.evaluate(async()=>!!(await(await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/js/firebase-init.js?v=58')).getFirebaseAppCheckToken())),true,'Registered staging automation identity must obtain an App Check token before creating test records');
   const email=`hybrid-smoke-${Date.now()}@example.test`,password=randomBytes(24).toString('base64url');
   const response=await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${config.apiKey}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,password,returnSecureToken:true})});account=await response.json();assert.ok(response.ok,account.error?.message);
   await page.locator('[name=email]').fill(email);await page.locator('[name=password]').fill(password);await page.locator('#emailSignIn button').click();await page.locator('#phoneCaptures').waitFor({state:'visible'});
   const admitted=await page.evaluate(async home=>{
-    const api=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/js/community-reality-capture-api.js?v=4');
+    const api=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/js/community-reality-capture-api.js?v=4');
     return api.createRealityCaptureDraft({captureKind:home?'interior_room':'exterior',permissionConfirmed:home,room:home?{label:'Home test',widthMeters:20,lengthMeters:10,heightMeters:2.7}:undefined,publicContributionRequested:false,building:{sourceBuildingId:'osm:way:hybrid-fixture',worldId:'capture-benchmark-only',sourceAuthority:'osm',label:'Private hybrid API fixture — not a mapped house',lat:0,lon:0,spatialContext:{schemaVersion:1,frame:'building-local-x-east-y-up-z-south',height:{meters:6,evidence:'user-test'},wallHeightMeters:6,footprint:[{x:-10,z:-5},{x:10,z:-5},{x:10,z:5},{x:-10,z:5}]}}});
   },home);captureId=admitted.capture.captureId;
   const result=await page.evaluate(async ({id,homeLayout})=>{
-    const api=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/js/community-reality-capture-api.js?v=4'),original=await api.getMyRealityCapture(id);
+    const api=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/js/community-reality-capture-api.js?v=4'),original=await api.getMyRealityCapture(id);
     const preview={baseRevision:0,footprintSignature:original.capture.footprintSignature,...(homeLayout?{layout:homeLayout,roomPhotos:[]}:{heightMeters:6,roofShape:'gabled',roofRiseMeters:2,patches:[]})};
     const saved=await api.saveRealityCaptureHybridPreview(id,preview);
     let conflict=false;try{await api.saveRealityCaptureHybridPreview(id,preview);}catch{conflict=true;}
@@ -65,10 +65,10 @@ try{
     await page.locator('.homeLayoutEditor [data-close]').click();
   }
   await page.locator('[data-capture-close]').click();
-  const afterReload=await page.evaluate(async id=>(await(await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/js/community-reality-capture-api.js?v=4')).getMyRealityCapture(id)).capture.hybridPreview.revision,captureId);assert.equal(afterReload,1);
+  const afterReload=await page.evaluate(async id=>(await(await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/js/community-reality-capture-api.js?v=4')).getMyRealityCapture(id)).capture.hybridPreview.revision,captureId);assert.equal(afterReload,1);
   const surface=home?layoutRoomDescriptor(homeLayout,homeLayout.floors[0].rooms[0].id).surfaceIds:null;
   const manual=await page.evaluate(async ({id,home,surface})=>{
-    const api=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/js/community-reality-capture-api.js?v=4');
+    const api=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/js/community-reality-capture-api.js?v=4');
     const c=document.createElement('canvas');c.width=1280;c.height=720;
     const ctx=c.getContext('2d');ctx.fillStyle='#9e7153';ctx.fillRect(0,0,c.width,c.height);
     const photo=await api.normalizeCapturePhoto(await new Promise(resolve=>c.toBlob(resolve,'image/jpeg')));
@@ -93,7 +93,7 @@ try{
   },{id:captureId,home,surface});
   assert.deepEqual(manual,{uploadStatus:'uploaded',photoCount:home?3:2,revision:2,submissionStatus:'review_required',paidDenied:true,roomDenied:true});
   await page.locator('.captureActivity').getByText('Your improvement is awaiting review',{exact:true}).waitFor({timeout:60000});
-  if(home){const resolved=await page.evaluate(async id=>{const api=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/js/community-reality-capture-api.js?v=4'),capture=(await api.getMyRealityCapture(id)).capture;const value=await api.resolveBuildingInteriorRepresentation(capture.building.sourceBuildingId,capture.building.worldId,'');return {authorized:value.authorized,available:value.available,kind:value.representationKind,floors:value.layout?.floors?.length,publicRequested:capture.publicContributionRequested,model:!!value.model?.url};},captureId);assert.equal(resolved.authorized,true);assert.equal(resolved.kind,'home-layout');assert.equal(resolved.floors,2);assert.equal(resolved.publicRequested,false);assert.equal(resolved.model,true);}
+  if(home){const resolved=await page.evaluate(async id=>{const api=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/js/community-reality-capture-api.js?v=4'),capture=(await api.getMyRealityCapture(id)).capture;const value=await api.resolveBuildingInteriorRepresentation(capture.building.sourceBuildingId,capture.building.worldId,'');return {authorized:value.authorized,available:value.available,kind:value.representationKind,floors:value.layout?.floors?.length,publicRequested:capture.publicContributionRequested,model:!!value.model?.url};},captureId);assert.equal(resolved.authorized,true);assert.equal(resolved.kind,'home-layout');assert.equal(resolved.floors,2);assert.equal(resolved.publicRequested,false);assert.equal(resolved.model,true);}
   if(home){
     // Reopen through the visible account action: assigning the same hash after
     // closing a dialog does not emit hashchange and is not a real user action.
@@ -113,22 +113,22 @@ try{
     await page.locator('.homeLayoutEditor [data-close]').click();await page.locator('[data-capture-close]').click();
   }
   const continued=await page.evaluate(async id=>{
-    const api=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/js/community-reality-capture-api.js?v=4'),source=await api.getMyRealityCapture(id);
+    const api=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/js/community-reality-capture-api.js?v=4'),source=await api.getMyRealityCapture(id);
     const c=source.capture,result=await api.createRealityCaptureDraft({sourceCaptureId:id,captureKind:c.captureKind,building:c.building,room:c.room,permissionConfirmed:c.permissionConfirmed});
     const next=await api.getMyRealityCapture(result.capture.captureId),again=await api.createRealityCaptureDraft({sourceCaptureId:id,captureKind:c.captureKind,building:c.building,room:c.room,permissionConfirmed:c.permissionConfirmed});
     const library=await api.listMyRealityCaptures({worldId:c.building.worldId,sourceBuildingId:c.building.sourceBuildingId});
     return {id:next.capture.captureId,ready:next.capture.continuationReady,photoCount:next.photos.length,hasLayout:!!next.capture.hybridPreview?.layout,placements:next.capture.hybridPreview?.layout?next.capture.hybridPreview.roomPhotos.reduce((n,r)=>n+r.patches.length,0):next.capture.hybridPreview.patches.length,sameRetry:again.capture.captureId===next.capture.captureId,libraryCount:library.captures.length,submission:next.capture.hybridSubmission};
   },captureId);continuedId=continued.id;
   assert.equal(continued.ready,true);assert.equal(continued.photoCount,home?3:2);assert.equal(continued.placements,home?3:1);assert.equal(continued.hasLayout,home);assert.equal(continued.sameRetry,true);assert.equal(continued.libraryCount,2);assert.equal(continued.submission,null);
-  await page.evaluate(async id=>(await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/js/community-reality-capture-api.js?v=4')).deleteRealityCapture(id),continuedId);continuedId=null;
-  await page.evaluate(async id=>(await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/js/community-reality-capture-api.js?v=4')).deleteRealityCapture(id),captureId);deleted=true;
+  await page.evaluate(async id=>(await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/js/community-reality-capture-api.js?v=4')).deleteRealityCapture(id),continuedId);continuedId=null;
+  await page.evaluate(async id=>(await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/js/community-reality-capture-api.js?v=4')).deleteRealityCapture(id),captureId);deleted=true;
   report={passed:false,origin,home,...result,afterReload,manual,fixtureDeleted:true,automationAttestation:!!attestation,limitations:'Synthetic photo with real upload/validation/CPU submission. No physical phone, public approval or world acceptance.'};
 }finally{
   const cleanupErrors=[];
   const attempt=async(label,action)=>{try{await action();}catch(error){cleanupErrors.push({label,error:String(error.message||error)});}};
-  if(continuedId)await attempt('continued capture',()=>page.evaluate(async id=>(await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/js/community-reality-capture-api.js?v=4')).deleteRealityCapture(id),continuedId));
-  if(captureId&&!deleted)await attempt('original capture',()=>page.evaluate(async id=>(await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/js/community-reality-capture-api.js?v=4')).deleteRealityCapture(id),captureId));
-  if(account?.idToken&&config)await attempt(`disposable account ${account.localId}`,()=>page.evaluate(async()=>(await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/js/function-api.js?v=1')).postProtectedFunction('/deleteAccount',{confirmation:'DELETE'})));
+  if(continuedId)await attempt('continued capture',()=>page.evaluate(async id=>(await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/js/community-reality-capture-api.js?v=4')).deleteRealityCapture(id),continuedId));
+  if(captureId&&!deleted)await attempt('original capture',()=>page.evaluate(async id=>(await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/js/community-reality-capture-api.js?v=4')).deleteRealityCapture(id),captureId));
+  if(account?.idToken&&config)await attempt(`disposable account ${account.localId}`,()=>page.evaluate(async()=>(await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/js/function-api.js?v=1')).postProtectedFunction('/deleteAccount',{confirmation:'DELETE'})));
   await attempt('browser',()=>browser.close());
   await attempt('staging attestation',()=>attestation?.cleanup());
   report={...report,passed:!!report&&!cleanupErrors.length,cleanupErrors,completedAt:new Date().toISOString()};

@@ -111,7 +111,7 @@ async function desktopJourney() {
     const scout = await adoptAndWait(page, 'trail-hound', 'Scout');
     const beforePosition = scout.presentation.position;
     await page.evaluate(async () => {
-      const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
+      const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/app/js/shared-context.js?v=55');
       const walker = ctx.Walk.state.walker;
       walker.x += 7;
       walker.vx = 0;
@@ -151,7 +151,7 @@ async function desktopJourney() {
     ), null, { timeout: 15_000 });
     const inVehicle = await page.evaluate(() => globalThis.__WE3D_COMPANION_SUPPORT__.snapshot());
     const exitStarted = await page.evaluate(async () => {
-      const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
+      const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/app/js/shared-context.js?v=55');
       return ctx.exitUrbanVehicleForSupport?.() === true;
     });
     assert.equal(exitStarted, true, 'The completed vehicle entry did not permit a companion-aware exit.');

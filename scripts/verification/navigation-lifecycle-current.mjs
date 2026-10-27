@@ -20,7 +20,7 @@ try {
     '<!doctype html><title>Navigation lifecycle</title><link rel="icon" href="/favicon.svg"><style>body{margin:0}</style><div id="navigationHud" hidden></div><script src="/node_modules/three/build/three.min.js"></script>' }));
   await page.goto(`http://127.0.0.1:${server.port}/navigation-fixture`);
   const state = await page.evaluate(async () => {
-    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
+    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/app/js/shared-context.js?v=55');
     const { createNavigationRoute, clearNavigation } = await import('/app/js/game/navigation-ui.js?v=2');
     const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
     renderer.setSize(480, 320); document.body.append(renderer.domElement);

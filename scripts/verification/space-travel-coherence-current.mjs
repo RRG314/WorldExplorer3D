@@ -74,7 +74,7 @@ async function verifyPathfinderAndInterior(page) {
   assert.equal(staged.interstellarExpedition?.readiness?.status, 'insufficient');
   assert.equal(staged.stagedEarthPathfinder?.active, true);
   const stagedPresentation = await page.evaluate(async () => {
-    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
+    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/app/js/shared-context.js?v=55');
     const pod = ctx.earthSceneRoot?.getObjectByName('expedition-surface-launch-pod:earth');
     if (!pod) return null;
     pod.updateMatrixWorld(true);
@@ -113,7 +113,7 @@ async function verifyPathfinderAndInterior(page) {
   assert.ok(interior.expeditionShipInterior?.crewActors?.length >= 5, JSON.stringify(interior.expeditionShipInterior));
   const presentation = await page.evaluate(async () => {
     const [{ ctx }, { SHIP_DOORS }] = await Promise.all([
-      import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55'),
+      import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/app/js/shared-context.js?v=55'),
       import('/app/js/expedition/ship-layout.js?v=6')
     ]);
     const actors = ctx.getShipInteriorSnapshot?.()?.crewActors || [];
@@ -136,7 +136,7 @@ async function verifyPathfinderAndInterior(page) {
   assert.equal(presentation.pathfinderNestedInsideStarship, false);
   assert.deepEqual(presentation.stationaryAtDoor, []);
   const cameraEvidence = await page.evaluate(async () => {
-    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
+    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/app/js/shared-context.js?v=55');
     const candidates = [];
     for (let z = 25.5; z <= 32.5; z += 0.5) {
       for (let x = -1.5; x <= 1.5; x += 0.5) candidates.push({ x, z });
@@ -163,7 +163,7 @@ async function verifyPathfinderAndInterior(page) {
   assert.equal(cameraEvidence, true);
   await page.waitForTimeout(900);
   const collisionEvidence = await page.evaluate(async () => {
-    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
+    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/app/js/shared-context.js?v=55');
     const camera = ctx.camera;
     const collision = ctx.checkBuildingCollision?.(camera.position.x, camera.position.z, 0.18, {
       actorBaseY: camera.position.y - 0.24,
@@ -189,7 +189,7 @@ async function verifyFreeFlight(page) {
     return state.modes?.space === true && state.spaceFlight?.controlMode === 'flying';
   }, null, { timeout: 120_000 });
   const before = await page.evaluate(async () => {
-    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
+    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/app/js/shared-context.js?v=55');
     return {
       position: ctx.spaceFlight.rocket.position.toArray(),
       journey: ctx.spaceJourney || null,
@@ -201,7 +201,7 @@ async function verifyFreeFlight(page) {
   await page.waitForTimeout(600);
   await page.keyboard.up('Space');
   const afterThrottle = await page.evaluate(async () => {
-    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
+    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/app/js/shared-context.js?v=55');
     return {
       position: ctx.spaceFlight.rocket.position.toArray(),
       quaternion: ctx.spaceFlight.rocket.quaternion.toArray()
@@ -214,7 +214,7 @@ async function verifyFreeFlight(page) {
   await page.keyboard.up('ArrowLeft');
   await page.waitForTimeout(350);
   const afterTurn = await page.evaluate(async () => {
-    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
+    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/app/js/shared-context.js?v=55');
     const forward = new THREE.Vector3(0, 1, 0).applyQuaternion(ctx.spaceFlight.rocket.quaternion).normalize();
     const localUp = new THREE.Vector3(0, 0, -1).applyQuaternion(ctx.spaceFlight.rocket.quaternion).normalize();
     const velocity = ctx.spaceFlight.velocity.clone().normalize();

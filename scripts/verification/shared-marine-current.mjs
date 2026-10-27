@@ -31,7 +31,7 @@ async function openClient(user){
  if(await page.locator('#landingPrimaryCta').isVisible())await page.locator('#landingPrimaryCta').click();
  await page.waitForFunction(()=>window.__WE3D_RUNTIME_READY__===true,null,{timeout:90000});
  if(await page.locator('#analyticsConsentDenyBtn').isVisible())await page.locator('#analyticsConsentDenyBtn').click();
- await page.evaluate(async()=>{window.marineCtx=(await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55')).ctx});
+ await page.evaluate(async()=>{window.marineCtx=(await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/app/js/shared-context.js?v=55')).ctx});
  await page.locator('#coralResearchStart').click();try{await page.waitForFunction(()=>marineCtx.boatDeck?.active,null,{timeout:45000});}catch(error){await page.screenshot({path:`${dir}/${user.name}-entry-failure.png`});report.entryFailure=await page.evaluate(()=>({status:document.querySelector('#globeLocationSearchStatus')?.textContent,boat:marineCtx.boatMode?.active,ocean:marineCtx.oceanMode?.active,deck:marineCtx.boatDeck?.snapshot(),environment:marineCtx.getEnv?.(),text:document.body.innerText.slice(-5000)}));throw error;}
  user.personal=await personalRecords(page);
  const saved=createOceanVoyageStore({storage:{getItem:key=>user.personal[key]??null}}).read();
@@ -41,7 +41,7 @@ async function openClient(user){
   const {signInWithEmailAndPassword}=await import('https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js');
   const services=globalThis.WorldExplorerFirebase.initFirebase();
   const credential=await signInWithEmailAndPassword(services.auth,email,'Local-test-only-934!');
-  const {getCurrentUser}=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/js/auth-ui.js?v=56');
+  const {getCurrentUser}=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/js/auth-ui.js?v=56');
   const until=Date.now()+15000;while(getCurrentUser()?.uid!==credential.user.uid&&Date.now()<until)await new Promise(r=>setTimeout(r,50));
   if(getCurrentUser()?.uid!==credential.user.uid)throw Error('Application sign-in did not settle');
   const manifest=await fetch('/build-manifest.json').then(r=>r.json());

@@ -16,7 +16,7 @@ try{
   await configureStagingAppCheck(page,base);await page.addInitScript(()=>localStorage.setItem('worldExplorer3D.tutorialState.v6',JSON.stringify({version:6,enabled:false,skipped:true})));
   page.on('pageerror',error=>report.pageErrors.push(error.message));page.on('console',message=>{if(message.type()==='error')report.consoleErrors.push(message.text().slice(0,1000));});page.on('response',response=>{if(response.status()>=400)report.resourceFailures.push({url:response.url(),status:response.status()});});
   await page.goto(`${base}/app/?loc=baltimore&launch=earth&gm=free&mode=driving`,{waitUntil:'domcontentloaded'});await page.waitForFunction(()=>window.__WE3D_RUNTIME_READY__===true,null,{timeout:90000});
-  await page.evaluate(async()=>window.rideQa=(await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55')).ctx);
+  await page.evaluate(async()=>window.rideQa=(await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/app/js/shared-context.js?v=55')).ctx);
   for(const id of ['analyticsConsentDenyBtn','testerInvitationClose'])if(await page.locator('#'+id).isVisible())await page.locator('#'+id).click();
   if(await page.locator('#globeSelectorStartBtn').isVisible())await page.locator('#globeSelectorStartBtn').click();
   await page.waitForFunction(()=>rideQa.gameStarted&&!rideQa.worldLoading&&!rideQa.titleLaunchPending&&rideQa.worldLoadRuntimeState?.gameplayRuntimesReady,null,{timeout:180000,polling:500});await page.locator('#loading.show').waitFor({state:'hidden',timeout:60000});console.log('road-ride: world ready');

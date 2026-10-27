@@ -60,7 +60,7 @@ try {
     timeout: 120_000
   });
   console.log('[bridge-endpoints] runtime ready');
-  await page.evaluate(async()=>{globalThis.bridgeCtx=(await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55')).ctx;});
+  await page.evaluate(async()=>{globalThis.bridgeCtx=(await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/app/js/shared-context.js?v=55')).ctx;});
   const consent = page.locator('#analyticsConsentDenyBtn');
   if (await consent.isVisible()) await consent.click();
   await page.getByRole('button', { name: 'Explore', exact: true }).click();

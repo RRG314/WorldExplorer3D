@@ -26,7 +26,7 @@ try{
  const params=new URLSearchParams({...sites[city],loc:'custom',lname:city,launch:'earth',gm:'free',mode:'walking'});
  await page.goto(`http://127.0.0.1:${server.port}/app/?${params}`);
  await page.waitForFunction(()=>window.__WE3D_RUNTIME_READY__,null,{timeout:60000});
- await page.evaluate(async()=>{window.fixtureCtx=(await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55')).ctx});
+ await page.evaluate(async()=>{window.fixtureCtx=(await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/app/js/shared-context.js?v=55')).ctx});
  if(await page.locator('#analyticsConsentDenyBtn').isVisible())await page.locator('#analyticsConsentDenyBtn').click();
  await page.getByRole('button',{name:'Explore',exact:true}).click();
  await page.waitForFunction(()=>!fixtureCtx.worldLoading&&fixtureCtx.worldLoadRuntimeState?.status==='ready'&&fixtureCtx.roads.length>0,null,{timeout:240000});

@@ -333,7 +333,7 @@ async function walkToPoint(target, options = {}) {
 
 async function interiorOwnershipSnapshot(targetKey) {
   return page.evaluate(async (key) => {
-    const {ctx}=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
+    const {ctx}=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/app/js/shared-context.js?v=55');
     const diagnostics = globalThis.getWorldExplorerRuntimeDiagnostics?.() || {};
     const active = diagnostics.interior || { active: false };
     const actor = diagnostics.activeActor || {};

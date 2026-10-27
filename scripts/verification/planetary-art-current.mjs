@@ -9,7 +9,7 @@ try{
  await page.waitForFunction(()=>document.querySelector('#startBtn')?.disabled===false,null,{timeout:90000});
  await page.evaluate(()=>{document.querySelector('#spaceLaunchToggle').click();document.querySelector('#startBtn').click()});
  await page.waitForFunction(()=>JSON.parse(render_game_to_text()).modes?.space,null,{timeout:90000});
- await page.evaluate(async()=>{window.c=(await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55')).ctx;window.__beforeSurfaceEnvironment=c.scene.environment;});
+ await page.evaluate(async()=>{window.c=(await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/app/js/shared-context.js?v=55')).ctx;window.__beforeSurfaceEnvironment=c.scene.environment;});
  for(const body of ['moon','mars','andromeda-explorer-a-b']){
   await page.evaluate(async id=>{if(id==='moon')c.arriveAtMoon();else if(id==='mars'){await import('/app/js/planetary/mars-world.js');await c.arriveAtMars();}else{c.prepareDestinationMissionSurface(id);await c.arriveAtSolidWorld(id);}},body);
   await page.waitForFunction(id=>id==='moon'?c.moonSurface?.userData?.ready:id==='mars'?c.onMars:c.activePlanetaryBodyId===id,body,{timeout:90000});

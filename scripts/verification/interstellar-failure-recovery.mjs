@@ -51,7 +51,7 @@ async function seedEmergency(page) {
 async function moveToStation(page, stationId) {
   return page.evaluate(async (id) => {
     const [{ ctx }, layout] = await Promise.all([
-      import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55'),
+      import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/app/js/shared-context.js?v=55'),
       import('/app/js/expedition/ship-layout.js?v=4')
     ]);
     const station = layout.SHIP_STATIONS.find((entry) => entry.id === id);
@@ -114,7 +114,7 @@ async function run(viewport, name) {
 
     await page.evaluate(async () => {
       const [{ ctx }, simulation, { createExpeditionStore }] = await Promise.all([
-        import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55'),
+        import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/app/js/shared-context.js?v=55'),
         import('/app/js/expedition/simulation.js?v=5'),
         import('/app/js/expedition/store.js?v=6')
       ]);

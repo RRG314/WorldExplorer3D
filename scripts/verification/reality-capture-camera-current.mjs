@@ -61,7 +61,7 @@ try {
   assert.equal(await page.evaluate(() => inputProbe.calls), 1);
   await page.evaluate(async () => {
     inputProbeScope.dispose();
-    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
+    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/app/js/shared-context.js?v=55');
     const { updateControlInput } = await import('/app/js/controls/action-input.js');
     let focused = true, calls = 0;
     const pad = { connected: true, mapping: 'standard', axes: [0, 0, 0, 0], buttons: Array.from({ length: 16 }, () => ({ value: 0 })) };

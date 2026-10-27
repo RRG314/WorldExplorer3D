@@ -25,11 +25,12 @@ export function generationModulePath(generation, modulePath) {
 // Only script/module references are changed. Navigation, assets, API URLs and
 // Firebase's app identity still belong to the page's ordinary origin and path.
 export function pinHtmlRootModules(html, htmlPath, generation, modules) {
-  return html.replace(/(["'])([^"'<>\s]+\.js(?:\?[^"'<>\s]*)?)\1/g, (match, quote, reference) => {
+  const pinned = html.replace(/(["'])([^"'<>\s]+\.js(?:\?[^"'<>\s]*)?)\1/g, (match, quote, reference) => {
     const url = new URL(reference, `https://artifact.invalid/${htmlPath}`);
     if (url.origin !== 'https://artifact.invalid' || !modules.has(url.pathname.slice(1))) return match;
     return `${quote}${generation.prefix}${url.pathname}${url.search}${url.hash}${quote}`;
   });
+  return pinned.replace(/<html\b([^>]*)>/i, (_, attributes) => `<html${attributes} data-runtime-module-prefix="${generation.prefix}">`);
 }
 
 export async function snapshotRootModules(output, sourcePaths, generation, captureEntry) {

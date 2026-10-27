@@ -100,22 +100,22 @@ async function startRegionalFieldLead(page, journey) {
   // Hold the real tool-selection refresh to reproduce a fast Begin during an
   // asynchronous profile update. Input must remain gated until the owner settles.
   await page.evaluate(async()=>{
-    const {ctx}=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');const state=ctx.worldDiscoveryRuntime;
+    const {ctx}=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/app/js/shared-context.js?v=55');const state=ctx.worldDiscoveryRuntime;
     const original=state.equipTool;const held=new Promise(resolve=>window.releaseFieldSelection=resolve);
     let first=true;state.equipTool=async(...args)=>{const delay=first;first=false;const result=await original(...args);if(delay)await held;return result;};
     window.restoreFieldSelection=()=>{state.equipTool=original;releaseFieldSelection();};
   });
   await action.click();
   assert.equal(await page.locator('#discoveryPrimaryBtn').isDisabled(),true,'Begin waits for the selected tool');
-  assert.equal(await page.evaluate(async()=>{const {ctx}=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');return ctx.worldDiscoveryRuntime.handlePrimary();}),false,'Early input cannot begin a session that the pending selection will reset');
-  await page.evaluate(async()=>{const {ctx}=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');await ctx.worldDiscoveryRuntime.selectActivity('inspect',{tutorial:false});restoreFieldSelection();});
+  assert.equal(await page.evaluate(async()=>{const {ctx}=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/app/js/shared-context.js?v=55');return ctx.worldDiscoveryRuntime.handlePrimary();}),false,'Early input cannot begin a session that the pending selection will reset');
+  await page.evaluate(async()=>{const {ctx}=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/app/js/shared-context.js?v=55');await ctx.worldDiscoveryRuntime.selectActivity('inspect',{tutorial:false});restoreFieldSelection();});
   await page.waitForTimeout(80);
-  assert.equal(await page.evaluate(async()=>{const {ctx}=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');return ctx.worldDiscoveryRuntime.activeActivityId;}),'inspect','Older selection cannot overwrite the latest selected tool');
-  await page.evaluate(async()=>{const {ctx}=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');const state=ctx.worldDiscoveryRuntime,original=state.equipTool;window.restoreRefreshFailure=()=>state.equipTool=original;state.equipTool=async(...args)=>{await original(...args);throw Error('Injected Journal refresh failure after equipment applied');};});
+  assert.equal(await page.evaluate(async()=>{const {ctx}=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/app/js/shared-context.js?v=55');return ctx.worldDiscoveryRuntime.activeActivityId;}),'inspect','Older selection cannot overwrite the latest selected tool');
+  await page.evaluate(async()=>{const {ctx}=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/app/js/shared-context.js?v=55');const state=ctx.worldDiscoveryRuntime,original=state.equipTool;window.restoreRefreshFailure=()=>state.equipTool=original;state.equipTool=async(...args)=>{await original(...args);throw Error('Injected Journal refresh failure after equipment applied');};});
   await action.click();
   await page.waitForFunction(()=>!document.getElementById('discoveryPrimaryBtn').disabled);
   await page.evaluate(()=>restoreRefreshFailure());
-  assert.equal(await page.evaluate(async()=>{const {ctx}=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');return ctx.worldDiscoveryRuntime.activeActivityId;}),regionalActivityId,'A completed tool change survives a later Journal refresh failure');
+  assert.equal(await page.evaluate(async()=>{const {ctx}=await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/app/js/shared-context.js?v=55');return ctx.worldDiscoveryRuntime.activeActivityId;}),regionalActivityId,'A completed tool change survives a later Journal refresh failure');
   const activityTutorial = page.locator('#discoveryTutorial:not([hidden])');
   if (await activityTutorial.isVisible()) await page.locator('#discoveryTutorialDoneBtn').click();
   await page.locator('#discoveryPrimaryBtn').click();

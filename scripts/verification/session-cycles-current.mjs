@@ -16,7 +16,7 @@ try {
  await page.locator('#coralResearchStart').click();
  await page.waitForFunction(()=>window.getWorldExplorerRuntimeDiagnostics?.().modes?.boat,null,{timeout:60000});
  if(await page.locator('#researchDeckHelm').isVisible())await page.locator('#researchDeckHelm').click();
- await page.evaluate(async()=>{window.cycleContext=(await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55')).ctx;});
+ await page.evaluate(async()=>{window.cycleContext=(await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/app/js/shared-context.js?v=55')).ctx;});
  for(let i=0;i<10;i++){
   const result=await page.evaluate(async()=>{
    const c=cycleContext,id=c.boatMode.transportEntityId;

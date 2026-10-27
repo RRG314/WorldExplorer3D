@@ -21,7 +21,7 @@ page.on('response', (response) => {
 
 async function flightEvidence() {
   return page.evaluate(async () => {
-    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55');
+    const { ctx } = await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/app/js/shared-context.js?v=55');
     return {
       journeyId: ctx.spaceJourney?.journeyId || null,
       phase: ctx.spaceJourney?.phase || null,

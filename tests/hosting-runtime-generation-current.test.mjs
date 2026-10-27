@@ -4,6 +4,7 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import {createHash} from 'node:crypto';
+import vm from 'node:vm';
 import {runtimeGeneration, generationModulePath, pinHtmlRootModules, snapshotRootModules, retainRuntimeGenerations, verifyRuntimeGenerations} from '../scripts/lib/hosting-runtime-generation.mjs';
 
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
@@ -44,6 +45,23 @@ test('shared modules and HTML use one generation without changing app links, ass
   assert.ok(result.includes(`src="${g.prefix}/js/config.js"`));
   assert.ok(result.includes(`import '${g.prefix}/js/auth.js?v=3'`));
   assert.ok(result.includes('href="/app/"')); assert.ok(result.includes('https://sdk.invalid/js/auth.js')); assert.ok(result.includes('../assets/photo.jpg'));
+});
+
+test('other packaged pages expose their immutable module prefix without creating another app context', () => {
+  const g=runtimeGeneration('a'.repeat(64),'staging');
+  const html=pinHtmlRootModules('<!doctype html><html lang="en"><head><script src="../js/config.js"></script></head></html>','portal/index.html',g,new Set(['js/config.js']));
+  assert.ok(html.includes(`<html lang="en" data-runtime-module-prefix="${g.prefix}">`));
+  assert.ok(html.includes(`src="${g.prefix}/js/config.js"`));
+  assert.ok(!html.includes('__WORLD_EXPLORER_PRODUCTION__'),'Metadata does not install a new runtime or state owner');
+});
+
+test('Portal offline static policy admits pinned public code and excludes account, API, private and foreign resources', async () => {
+  const source=await fs.readFile(new URL('../portal/sw.js',import.meta.url),'utf8');
+  const start=source.indexOf('function staticUrl('),end=source.indexOf('\nasync function remember',start);
+  const staticUrl=vm.runInNewContext(`${source.slice(start,end)};staticUrl`,{URL,self:{location:new URL('https://fixture.invalid/portal/sw.js')}});
+  const prefix='/runtime/'+'a'.repeat(24);
+  for(const file of [`${prefix}/js/firebase-init.js?v=58`,`${prefix}/app/js/shared-context.js?v=55`,'/app/js/bundles/chunk-ABC123.js','/portal/'])assert.ok(staticUrl(file),file);
+  for(const file of ['/account/','/api/private','/registerAppTester',`${prefix}/js/user.json`,`${prefix}/account/profile.js`,'/runtime/unknown/js/auth.js','https://other.invalid/js/auth.js'])assert.equal(staticUrl(file),null,file);
 });
 
 test('verified predecessors are bounded, preserve exact code bytes and never recursively adopt older sets', async t => {

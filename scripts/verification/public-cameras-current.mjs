@@ -7,7 +7,7 @@ page.on('pageerror',e=>errors.push(String(e)));let mediaRequests=0;page.on('requ
 try{
  await page.goto((process.env.WE3D_VERIFY_BASE_URL||'http://127.0.0.1:4398')+'/app/');
  await page.waitForFunction(()=>document.querySelector('#startBtn')?.disabled===false,null,{timeout:90000});
- await page.evaluate(async()=>{window.c=(await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||'')+'/app/js/shared-context.js?v=55')).ctx;await c.ensureLiveEarthReady();await c.openLiveEarthSelector('public-cameras');});
+ await page.evaluate(async()=>{window.c=(await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/app/js/shared-context.js?v=55')).ctx;await c.ensureLiveEarthReady();await c.openLiveEarthSelector('public-cameras');});
  await page.waitForSelector('[data-live-earth-action="camera-select"]',{timeout:45000});
  const catalogue=await page.evaluate(()=>c.getLiveEarthSummary().publicCameras);assert.ok(catalogue.indexed>100);
  await page.locator('#publicCameraSearch').fill('zz-no-such-camera');await page.locator('[data-camera-search] button').click();
