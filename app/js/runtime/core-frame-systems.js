@@ -195,6 +195,7 @@ function createCoreRenderSystem(appCtx, shouldUseComposer) {
     return prepareResidentPresentation(appCtx, globalThis.THREE, {
       root: root || appCtx.scene,
       visibleRoots,
+      residentRoots: root && root !== appCtx.scene ? [] : appCtx.livingWorldRuntime?.residentPresentationRoots?.() || [],
       target: shouldUseComposer() ? appCtx.composer.readBuffer : null
     });
   };

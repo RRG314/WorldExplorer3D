@@ -768,11 +768,18 @@ export function createLivingWorldPopulation(options = {}) {
   };
 
   const refreshVehiclePresentation = () => updateCuratedVehicleHosts(POPULATION_STEP_SECONDS);
+  // These existing hosts own their model leases, including while detached for
+  // bone-update savings. Initial presentation must include their loaded visuals,
+  // rather than compiling new variants when an agent first becomes visible.
   updateCuratedPedestrianHosts(.1);
   refreshVehiclePresentation();
 
   return Object.freeze({
     group,
+    residentPresentationRoots() {
+      return disposed ? [] : [...pedestrianHosts, ...vehicleHosts].filter(host =>
+        host.userData.curatedCharacterAttachment || host.userData.curatedTrafficVehicleAttachment);
+    },
     diagnostics: Object.freeze({
       tier,
       pedestrians: pedestrians.length,
