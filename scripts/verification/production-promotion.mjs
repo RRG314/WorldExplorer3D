@@ -41,7 +41,7 @@ export function validatePromotion({ receipt, baseline, productionIdentity, produ
     const assets = build === stagingBuild ? stagingAssets.files : productionAssets.files;
     verifyRuntimeGenerations(packaging, assets);
     const current = new Set([...packaging.bundlePaths, ...Object.keys(packaging.generation.files)]);
-    return new Set(packaging.compatibility.flatMap(previous => Object.keys(previous.files)).filter(file => !current.has(file)));
+    return new Set([...Object.keys(packaging.rootModuleAliases||{}),...packaging.compatibility.flatMap(previous => Object.keys(previous.files))].filter(file => !current.has(file)));
   };
   if (stagingBuild.runtimePackaging?.generation || productionBuild.runtimePackaging?.generation) {
     assert.equal(productionBuild.runtimePackaging?.generation?.id, stagingBuild.runtimePackaging?.generation?.id, 'Runtime generation changed during promotion');
@@ -74,7 +74,7 @@ export function validatePromotion({ receipt, baseline, productionIdentity, produ
   const names = Object.keys(stagingAssets.files || {}).filter(file => !stagingRetained.has(file)).sort();
   assert.ok(names.length > ENVIRONMENT_ASSETS.length);
   assert.deepEqual(Object.keys(productionAssets.files || {}).filter(file => !productionRetained.has(file)).sort(), names, 'Current artifact file set changed');
-  for (const file of ENVIRONMENT_ASSETS) assert.ok(names.includes(file), `Missing environment asset ${file}`);
+  for (const file of ENVIRONMENT_ASSETS) assert.ok(stagingAssets.files[file]&&productionAssets.files[file], `Missing environment asset ${file}`);
   for (const file of names) {
     if (!environmentAssets.has(file)) {
       assert.equal(productionAssets.files[file], stagingAssets.files[file], `Untested asset changed: ${file}`);

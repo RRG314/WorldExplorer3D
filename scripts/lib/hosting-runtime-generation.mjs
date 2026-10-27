@@ -30,7 +30,11 @@ export function pinHtmlRootModules(html, htmlPath, generation, modules) {
     if (url.origin !== 'https://artifact.invalid' || !modules.has(url.pathname.slice(1))) return match;
     return `${quote}${generation.prefix}${url.pathname}${url.search}${url.hash}${quote}`;
   });
-  return pinned.replace(/<html\b([^>]*)>/i, (_, attributes) => `<html${attributes} data-runtime-module-prefix="${generation.prefix}">`);
+  return pinned.replace(/<html\b([^>]*)>/i, (tag, attributes) => {
+    const existing=/\bdata-runtime-module-prefix=["']([^"']*)["']/.exec(attributes);
+    if(existing){if(existing[1]!==generation.prefix)throw Error('HTML references another runtime generation');return tag;}
+    return `<html${attributes} data-runtime-module-prefix="${generation.prefix}">`;
+  });
 }
 
 export async function snapshotRootModules(output, sourcePaths, generation, captureEntry) {
@@ -75,7 +79,7 @@ async function regularFile(root, relative) {
 // Each predecessor is explicit and independently verified. Do not recursively
 // carry its older compatibility set: a release must not grow without bound.
 // Security releases can deliberately omit a revoked predecessor.
-export async function retainRuntimeGenerations({ output, predecessors, environment, projectId }) {
+export async function retainRuntimeGenerations({ output, predecessors, environment, projectId, currentGeneration=null }) {
   if (predecessors.length > 2 || new Set(predecessors.map(p => path.resolve(p))).size !== predecessors.length) throw Error('Select at most two distinct predecessor artifacts');
   const retained = [];
   const staged = new Map();
@@ -93,29 +97,41 @@ export async function retainRuntimeGenerations({ output, predecessors, environme
     if (generation && (generation.prefix !== `/runtime/${generation.id}` || !/^[a-f0-9]{24}$/.test(generation.id))) throw Error('Invalid predecessor generation');
     if (retained.some(previous => previous.buildId === build.buildId)) throw Error('Duplicate predecessor identity');
     const files = {};
+    let legacyRootPaths=[];
     const names = generation
       ? [...(build.runtimePackaging?.bundlePaths || []), ...Object.keys(generation.files || {})]
       : Object.keys(assets).filter(bundlePath);
     if (new Set(names).size !== names.length || names.some(relative => !retainedPath(relative, generation))) throw Error('Invalid predecessor runtime inventory');
     if (!names.some(bundlePath) || Object.values(build.runtimePackaging?.entries || {}).some(entry => !names.includes(`app/${entry}`))) throw Error('Predecessor runtime entry is missing');
     if (!generation) {
-      // One transition from legacy packages: their root authorities must be
-      // byte-identical. Never combine old chunks with changed auth/state code.
-      for (const relative of [sharedContext, ...Object.keys(assets).filter(relative => rootModulePath(relative) && relative !== 'js/admin-dashboard.js')]) {
-        const current = await fs.readFile(path.join(output, relative));
-        if (hash(current) !== assets[relative]) throw Error(`Legacy predecessor has a changed root module: ${relative}`);
+      const roots=[sharedContext,...Object.keys(assets).filter(rootModulePath)];
+      if(currentGeneration){
+        // New pages must already have a complete pinned authority before the
+        // canonical URLs can remain aliases for an older document's graph.
+        for(const relative of roots){
+          const pinned=generationModulePath(currentGeneration,'/'+relative).slice(1);
+          if(hash(await regularFile(output,pinned))!==currentGeneration.files?.[pinned])throw Error(`Current authority is not pinned: ${relative}`);
+          if(relative==='js/firebase-project-config.js'&&hash(await regularFile(output,relative))!==assets[relative])throw Error('Legacy Firebase configuration changed; do not revive a revoked configuration');
+        }
+        legacyRootPaths=roots.sort();names.push(...legacyRootPaths);
+      }else{
+        // Older packager callers cannot adopt changed root code unless the
+        // current page has its own independently verified immutable graph.
+        for (const relative of roots.filter(p=>p!=='js/admin-dashboard.js')) {
+          if (hash(await regularFile(output,relative)) !== assets[relative]) throw Error(`Legacy predecessor has a changed root module: ${relative}`);
+        }
       }
     }
     for (const relative of names.sort()) {
       const bytes = await regularFile(root, relative);
       if (hash(bytes) !== assets[relative] || (generation?.files?.[relative] && generation.files[relative] !== assets[relative])) throw Error(`Predecessor runtime hash mismatch: ${relative}`);
-      const existing = staged.get(relative) || await fs.readFile(path.join(output, relative)).catch(error => { if (error.code !== 'ENOENT') throw error; });
+      const existing = staged.get(relative) || (!legacyRootPaths.includes(relative)&&await fs.readFile(path.join(output, relative)).catch(error => { if (error.code !== 'ENOENT') throw error; }));
       if (existing && !existing.equals(bytes)) throw Error(`Runtime URL collision: ${relative}`);
       staged.set(relative, bytes);
       files[relative] = assets[relative];
     }
     if (generation && (!Object.hasOwn(generation.files || {}, `${generation.prefix.slice(1)}/${sharedContext}`) || Object.entries(generation.files).some(([relative, digest]) => files[relative] !== digest))) throw Error('Predecessor root module snapshot is incomplete');
-    retained.push({ buildId: build.buildId, generationId: generation?.id || null, files });
+    retained.push({ buildId: build.buildId, generationId: generation?.id || null, files, ...(legacyRootPaths.length?{legacyRootPaths}:{}) });
   }
   // Validate every input before writing; a rejected predecessor cannot partially
   // adopt an old generation into the new artifact.
@@ -137,15 +153,27 @@ export function verifyRuntimeGenerations(packaging, assets) {
   const retainedBundles = new Set();
   for (const predecessor of retained) {
     const previous = predecessor.generationId ? { id: predecessor.generationId } : null;
+    const aliases=predecessor.legacyRootPaths||[];
+    if(!Array.isArray(aliases)||new Set(aliases).size!==aliases.length||aliases.length&&
+      (previous||!aliases.includes(sharedContext)||aliases.some(p=>(!rootModulePath(p)&&p!==sharedContext)||!Object.hasOwn(predecessor.files||{},p))))throw Error('Invalid legacy root aliases');
     for (const [relative, digest] of Object.entries(predecessor.files || {})) {
-      if (!retainedPath(relative, previous)) throw Error('Unexpected retained runtime path');
+      if (!retainedPath(relative, previous)&&!aliases.includes(relative)) throw Error('Unexpected retained runtime path');
       if (allowed.has(relative) && allowed.get(relative) !== digest) throw Error('Conflicting retained runtime digest');
       allowed.set(relative, digest);
       if (bundlePath(relative)) retainedBundles.add(relative);
     }
   }
+  if(packaging.rootModuleAliases){
+    const roots=Object.keys(assets).filter(p=>rootModulePath(p)||p===sharedContext).sort();
+    if(JSON.stringify(roots)!==JSON.stringify(Object.keys(packaging.rootModuleAliases).sort()))throw Error('Root alias inventory does not match');
+    for(const relative of roots)if(!/^[a-f0-9]{64}$/.test(packaging.rootModuleAliases[relative])||packaging.rootModuleAliases[relative]!==assets[relative])throw Error('Root alias hash does not match');
+  }else if(retained.some(p=>p.legacyRootPaths?.length))throw Error('Missing root alias inventory');
   for (const [relative, digest] of allowed) if (!/^[a-f0-9]{64}$/.test(digest) || assets[relative] !== digest) throw Error(`Runtime manifest mismatch: ${relative}`);
   for (const relative of Object.keys(assets)) if (relative.startsWith('runtime/') && !allowed.has(relative)) throw Error('Unowned runtime generation in artifact');
   if (JSON.stringify([...retainedBundles].sort()) !== JSON.stringify([...(packaging.retainedBundlePaths || [])].sort())) throw Error('Retained bundle inventory does not match');
   return retainedBundles;
+}
+
+export function retainedLegacyRootFiles(packaging){
+  return new Map((packaging.compatibility||[]).flatMap(previous=>(previous.legacyRootPaths||[]).map(relative=>[relative,previous.files[relative]])));
 }

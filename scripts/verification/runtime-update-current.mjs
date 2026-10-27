@@ -13,6 +13,7 @@ import {runPrescribedGameActions} from './prescribed-game-actions.mjs';
 // Small real ESM graphs exercise deployment skew without a city, account,
 // remote service or second game renderer. This is packaging integration.
 const out = process.env.WE3D_VERIFY_OUTPUT_DIR || 'output/research/runtime-update-current';
+const legacy=process.env.WE3D_UPDATE_PHASE==='legacy';
 await fs.mkdir(out,{recursive:true});
 const temporary = await fs.mkdtemp(path.join(await fs.realpath(os.tmpdir()),'we3d-update-'));
 const digest = bytes => createHash('sha256').update(bytes).digest('hex'), json = value => `${JSON.stringify(value,null,2)}\n`;
@@ -25,15 +26,16 @@ async function generation(number) {
   const g = runtimeGeneration(number.repeat(64),'staging');
   await fs.writeFile(path.join(output,'js/shared.js'),`globalThis.authorityStarts=(globalThis.authorityStarts||0)+1; export const authority={generation:'${number}',value:0};`);
   await fs.writeFile(path.join(output,'app/js/shared-context.js'),'export const ctx={};');
-  await fs.writeFile(path.join(source,'feature.js'),`import {authority} from '/js/shared.js';export const read=()=>({generation:authority.generation,value:++authority.value,starts:globalThis.authorityStarts});`);
+  await fs.writeFile(path.join(output,'js/delayed.js'),`export const generation='${number}';`);
+  await fs.writeFile(path.join(source,'feature.js'),`import {authority} from '/js/shared.js';import {generation as delayedGeneration} from '/js/delayed.js';export const read=()=>({generation:authority.generation,delayedGeneration,value:++authority.value,starts:globalThis.authorityStarts});`);
   await fs.writeFile(path.join(source,'entry.js'),`import {authority} from '/js/shared.js'; globalThis.initialAuthority=authority; document.querySelector('button').onclick=async()=>{const feature=await import('./feature.js');globalThis.updateResult=feature.read();document.querySelector('output').textContent=JSON.stringify(updateResult);};`);
-  const result=await build({entryPoints:{entry:path.join(source,'entry.js')},outdir:path.join(output,'app/js/bundles'),bundle:true,splitting:true,format:'esm',entryNames:'[name]-[hash]',chunkNames:'chunk-[hash]',metafile:true,plugins:[{name:'pin-real-shared-module',setup(builder){builder.onResolve({filter:/^\/js\//},args=>({path:generationModulePath(g,args.path),external:true}));}}]});
+  const result=await build({entryPoints:{entry:path.join(source,'entry.js')},outdir:path.join(output,'app/js/bundles'),bundle:true,splitting:true,format:'esm',entryNames:'[name]-[hash]',chunkNames:'chunk-[hash]',metafile:true,plugins:[{name:'pin-real-shared-module',setup(builder){builder.onResolve({filter:/^\/js\//},args=>({path:legacy&&number==='1'?args.path:generationModulePath(g,args.path),external:true}));}}]});
   const bundles=Object.keys(result.metafile.outputs).map(p=>path.relative(output,path.resolve(p))), entry=bundles.find(p=>p.includes('/entry-'));
-  const snapshot=await snapshotRootModules(output,['js/shared.js'],g,'unused');
+  const snapshot=legacy&&number==='1'?null:await snapshotRootModules(output,['js/shared.js','js/delayed.js'],g,'unused');
   const html=`<!doctype html><meta charset="utf-8"><title>Runtime update integration fixture</title><style>body{background:#15251e;color:#fff4df;font:18px system-ui;padding:24px}button{padding:16px}output{display:block;margin:24px}canvas{display:block}</style><h1>Controlled update integration</h1><p>Packaging fixture. This is not World Explorer gameplay.</p><button>Load delayed feature</button><output>Waiting</output><canvas width="20" height="20"></canvas><script type="module" src="/${entry}"></script>`;
   await fs.writeFile(path.join(output,'index.html'),pinHtmlRootModules(html,'index.html',g,new Set(['js/shared.js'])));
   const files={};
-  for(const file of [...bundles,...Object.keys(snapshot.files),'js/shared.js','app/js/shared-context.js','index.html'])files[file]=digest(await fs.readFile(path.join(output,file)));
+  for(const file of [...bundles,...Object.keys(snapshot?.files||{}),'js/shared.js','js/delayed.js','app/js/shared-context.js','index.html'])files[file]=digest(await fs.readFile(path.join(output,file)));
   const assets={schemaVersion:1,files}, contentHash=digest(json(files));
   const manifest={version:'1.0',commit:number.repeat(40),sourceDirty:false,firebaseEnvironment:'staging',firebaseProjectId:'fixture-staging',contentHash,assetManifestSha256:digest(json(assets)),fileCount:Object.keys(files).length,
     buildId:`1.0+${number.repeat(12)}.${contentHash.slice(0,16)}.staging`,runtimePackaging:{entries:{'app-entry':entry.slice(4)},generation:snapshot,bundlePaths:bundles,fileCount:bundles.length}};
@@ -42,7 +44,8 @@ async function generation(number) {
 }
 try {
   const previous=await generation('1'), next=await generation('2');
-  await retainRuntimeGenerations({output:next,predecessors:[previous],environment:'staging',projectId:'fixture-staging'});
+  const current=JSON.parse(await fs.readFile(path.join(next,'build-manifest.json'),'utf8')).runtimePackaging.generation;
+  await retainRuntimeGenerations({output:next,predecessors:[previous],environment:'staging',projectId:'fixture-staging',currentGeneration:current});
   activeRoot=previous;
   server=createServer(async(request,response)=>{
     try {
@@ -64,11 +67,11 @@ try {
   await page.getByRole('button',{name:'Load delayed feature'}).focus();
   await runPrescribedGameActions(page,out,[{buttons:['enter'],frames:1}],'canvas');
   await page.waitForFunction(()=>globalThis.updateResult?.generation==='1');
-  assert.deepEqual(await page.evaluate(()=>globalThis.updateResult),{generation:'1',value:1,starts:1});
-  report.checks.push('Already-open generation loads its delayed feature after the new deployment, retaining one original shared authority');
+  assert.deepEqual(await page.evaluate(()=>globalThis.updateResult),{generation:'1',delayedGeneration:'1',value:1,starts:1});
+  report.checks.push(legacy?'Legacy page loads its delayed feature and previously unloaded root API from the original generation after deployment':'Already-open generation loads its delayed feature after the new deployment, retaining one original shared authority');
   await page.reload(); await page.waitForFunction(()=>globalThis.initialAuthority?.generation==='2');
   await page.getByRole('button',{name:'Load delayed feature'}).click();await page.waitForFunction(()=>globalThis.updateResult?.generation==='2');
-  assert.deepEqual(await page.evaluate(()=>globalThis.updateResult),{generation:'2',value:1,starts:1});
+  assert.deepEqual(await page.evaluate(()=>globalThis.updateResult),{generation:'2',delayedGeneration:'2',value:1,starts:1});
   report.checks.push('Fresh navigation uses only the new generation and a single shared authority');
   assert.deepEqual(report.errors,[]);assert.ok(report.requests.every(r=>r.status===200));
   await page.screenshot({path:path.join(out,'update-integration.png')});report.passed=true;

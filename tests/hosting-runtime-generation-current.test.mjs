@@ -15,11 +15,12 @@ async function fixture(t) {
   const put = async (file, contents) => { await fs.mkdir(path.dirname(path.join(root, file)), {recursive:true}); await fs.writeFile(path.join(root, file), contents); };
   return {root, put};
 }
-async function predecessor(t, {number='1', environment='staging', legacy=false}={}) {
+async function predecessor(t, {number='1', environment='staging', legacy=false, configuration=null}={}) {
   const f = await fixture(t), generation = runtimeGeneration(number.repeat(64), environment);
   const paths = ['js/shared.js', 'app/js/shared-context.js'];
   await f.put(paths[0], `export const generation = '${number}';`);
   await f.put(paths[1], 'export const ctx = {};');
+  if(configuration!==null){paths.push('js/firebase-project-config.js');await f.put(paths[2],configuration);}
   const entry = `app/js/bundles/app-${number}.js`;
   await f.put(entry, `export const number = '${number}';`);
   const snapshot = legacy ? null : await snapshotRootModules(f.root, paths, generation, 'unused');
@@ -95,6 +96,33 @@ test('legacy predecessor is admitted only with unchanged shared authorities', as
   assert.equal((await retain(out.root,[a.root])).length,1);
   await out.put('js/shared.js', 'changed authority');
   await assert.rejects(retain(out.root,[a.root]), /changed root module/);
+});
+
+test('legacy pages keep their original root authorities while a new page uses independently pinned current source',async t=>{
+  const old=await predecessor(t,{legacy:true,configuration:'same staging configuration'}),next=await predecessor(t,{number:'2',configuration:'same staging configuration'});
+  const current=next.build.runtimePackaging.generation;
+  const compatibility=await retainRuntimeGenerations({output:next.root,predecessors:[old.root],environment:'staging',projectId:'fixture-staging',currentGeneration:current});
+  assert.equal(await fs.readFile(path.join(next.root,'js/shared.js'),'utf8'),"export const generation = '1';");
+  assert.equal(await fs.readFile(path.join(next.root,current.prefix,'js/shared.js'),'utf8'),"export const generation = '2';");
+  const assets={...next.assets.files,...compatibility[0].files};
+  const rootModuleAliases=Object.fromEntries(Object.entries(assets).filter(([p])=>p.startsWith('js/')||p==='app/js/shared-context.js'));
+  const packaging={...next.build.runtimePackaging,compatibility,rootModuleAliases,retainedBundlePaths:Object.keys(compatibility[0].files).filter(p=>p.startsWith('app/js/bundles/'))};
+  assert.equal(verifyRuntimeGenerations(packaging,assets).size,1);
+  assert.throws(()=>verifyRuntimeGenerations({...packaging,rootModuleAliases:{}},assets),/alias inventory/);
+  const html=`<html lang="en"><script src="../js/shared.js"></script></html>`;
+  const pinned=pinHtmlRootModules(html,'account/index.html',current,new Set(['js/shared.js']));
+  assert.equal(pinHtmlRootModules(pinned,'account/index.html',current,new Set(['js/shared.js'])),pinned,'Current pages are completely sealed and metadata is idempotent');
+});
+
+test('legacy root adoption requires complete current proofs and cannot revive changed configuration or mix two legacy authorities',async t=>{
+  const old=await predecessor(t,{legacy:true,configuration:'old configuration'}),next=await predecessor(t,{number:'2',configuration:'rotated configuration'});
+  await assert.rejects(retainRuntimeGenerations({output:next.root,predecessors:[old.root],environment:'staging',projectId:'fixture-staging',currentGeneration:next.build.runtimePackaging.generation}),/revoked configuration/);
+  assert.ok(!await fs.stat(path.join(next.root,'app/js/bundles/app-1.js')).catch(()=>null));
+  const a=await predecessor(t,{legacy:true}),b=await predecessor(t,{legacy:true,number:'3'}),current=await predecessor(t,{number:'2'});
+  const proof=structuredClone(current.build.runtimePackaging.generation);delete proof.files[`${proof.prefix.slice(1)}/js/shared.js`];
+  await assert.rejects(retainRuntimeGenerations({output:current.root,predecessors:[a.root],environment:'staging',projectId:'fixture-staging',currentGeneration:proof}),/not pinned/);
+  await assert.rejects(retainRuntimeGenerations({output:current.root,predecessors:[a.root,b.root],environment:'staging',projectId:'fixture-staging',currentGeneration:current.build.runtimePackaging.generation}),/collision/);
+  assert.equal(await fs.readFile(path.join(current.root,'js/shared.js'),'utf8'),"export const generation = '2';",'Rejected predecessors cannot partially override current code');
 });
 
 test('current artifact verifies finite owned snapshots and rejects unexpected generations or changed hashes', async t => {

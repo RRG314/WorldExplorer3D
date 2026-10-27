@@ -97,15 +97,21 @@ node scripts/hosting-artifact.mjs build --firebase-env staging \
 Repeat `--retain-runtime-from` for a second predecessor when needed. Selection
 does not recursively retain the predecessor's older history. Environment,
 project, manifest identity, ordinary-file paths and individual code hashes
-must match before any predecessor is copied. Legacy packages are eligible
-only while their shared root authorities remain byte-identical. Changed or
-revoked security code must not be retained merely for compatibility.
+must match before any predecessor is copied. During the first transition from
+legacy URLs, new pages use the verified immutable namespace while canonical root
+URLs retain the selected legacy package's exact public code. The manifest records
+these aliases separately. Current pages and bundle imports must remain sealed to
+their current namespace, and that namespace must still match current source bytes.
+Two conflicting legacy root sets or changed Firebase configuration are rejected.
+Changed or revoked security code must not be retained merely for compatibility.
 
 For production preparation, set `WE3D_PREVIOUS_PRODUCTION_ARTIFACT` to the
 verified previous production package; staging history cannot be adopted on
 the production origin. Promotion compares the complete current graph and
 validates environment-specific generated configuration; separately recorded
-predecessor code is verified through its own bounded manifest. This does not
+predecessor code and legacy URL aliases are verified through their own bounded
+manifests. Canonical root aliases are excluded from the current graph comparison
+only after namespace isolation and their explicit alias inventory are checked. This does not
 waive current-code, world-data, gameplay, security or device acceptance.
 
 `node scripts/verification/runtime-update-current.mjs` checks delayed ESM loading

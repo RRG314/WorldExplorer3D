@@ -50,11 +50,13 @@ test('promotion preserves the pinned current graph and validates its generated c
   const install = (build, assets, environment) => {
     assets.files[bundle] = hash('tested current code');
     const files = {[`${prefix.slice(1)}/app/js/shared-context.js`]:hash('one context'),
+      [`${prefix.slice(1)}/js/function-api.js`]:hash('tested current API'),
       [`${prefix.slice(1)}/js/firebase-project-config.js`]:hash(generatedFirebaseFiles(environment, environment==='staging'?f.stagingConfig:f.productionConfig)['js/firebase-project-config.js'])};
     Object.assign(assets.files,files);
     const previous = `app/js/bundles/previous-${environment}.js`, digest=hash(`verified ${environment} predecessor`);
     assets.files[previous]=digest;
-    build.runtimePackaging={generation:{id,prefix,files},bundlePaths:[bundle],compatibility:[{buildId:`previous-${environment}`,generationId:null,files:{[previous]:digest}}],retainedBundlePaths:[previous]};
+    const legacy={'js/function-api.js':hash(`old ${environment} API`),'app/js/shared-context.js':hash('old context')};Object.assign(assets.files,legacy);
+    build.runtimePackaging={generation:{id,prefix,files},bundlePaths:[bundle],compatibility:[{buildId:`previous-${environment}`,generationId:null,files:{[previous]:digest,...legacy},legacyRootPaths:Object.keys(legacy)}],retainedBundlePaths:[previous],rootModuleAliases:{...legacy,'js/firebase-project-config.js':assets.files['js/firebase-project-config.js']}};
   };
   const stagingBuild=JSON.parse(f.receipt.stagingBuildJson), stagingAssets=JSON.parse(f.receipt.stagingAssetsJson);
   install(stagingBuild,stagingAssets,'staging'); install(f.productionBuild,f.productionAssets,'production');
@@ -64,6 +66,10 @@ test('promotion preserves the pinned current graph and validates its generated c
   f.productionAssets.files[bundle]=hash('untested current code');
   assert.throws(()=>validatePromotion(f),/Untested asset changed/);
   f.productionAssets.files[bundle]=hash('tested current code');
+  const currentApi=`${prefix.slice(1)}/js/function-api.js`;
+  f.productionAssets.files[currentApi]=hash('untested current API');f.productionBuild.runtimePackaging.generation.files[currentApi]=f.productionAssets.files[currentApi];
+  assert.throws(()=>validatePromotion(f),/Untested asset changed/);
+  f.productionAssets.files[currentApi]=hash('tested current API');f.productionBuild.runtimePackaging.generation.files[currentApi]=f.productionAssets.files[currentApi];
   const config=`${prefix.slice(1)}/js/firebase-project-config.js`;
   f.productionAssets.files[config]=hash('wrong environment'); f.productionBuild.runtimePackaging.generation.files[config]=f.productionAssets.files[config];
   assert.throws(()=>validatePromotion(f));
