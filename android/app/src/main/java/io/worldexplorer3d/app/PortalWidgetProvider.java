@@ -111,7 +111,7 @@ public final class PortalWidgetProvider extends AppWidgetProvider {
             views.setTextViewText(R.id.portal_investigate,context.getString(revealed?R.string.portal_close_fact:R.string.portal_investigate));
             boolean ready=store.gameAvailable(place,now);
             views.setOnClickPendingIntent(R.id.portal_open,ready?game(context,place.optString("gameLink")):open(context,widgetId,"place",id));
-            views.setTextViewText(R.id.portal_open,context.getString(inlineLearning?(ready?R.string.portal_enter:R.string.portal_open_place):(ready?R.string.portal_enter_short:R.string.portal_open_short)));
+            if(!compact)views.setTextViewText(R.id.portal_open,context.getString(inlineLearning?(ready?R.string.portal_enter:R.string.portal_open_place):(ready?R.string.portal_enter_short:R.string.portal_open_short)));
             views.setContentDescription(R.id.portal_open,context.getString(ready?R.string.portal_enter:R.string.portal_open_place));
             views.setViewVisibility(R.id.portal_fact_next,revealed?View.VISIBLE:View.GONE);
             if(revealed){
@@ -127,11 +127,10 @@ public final class PortalWidgetProvider extends AppWidgetProvider {
             views.setTextViewText(R.id.portal_title,context.getString(title));views.setTextViewText(R.id.portal_body,context.getString(body));
             views.setContentDescription(R.id.portal_open,context.getString(mode.equals("home")?R.string.portal_choose_place:R.string.portal_open_game));
             views.setTextViewText(R.id.portal_region,context.getString(R.string.portal_follow_label));views.setViewVisibility(R.id.portal_fact_next,View.GONE);
-            views.setTextViewText(R.id.portal_open,context.getString(mode.equals("home")?R.string.portal_choose_place:R.string.portal_open_game));
+            if(!compact)views.setTextViewText(R.id.portal_open,context.getString(mode.equals("home")?R.string.portal_choose_place:R.string.portal_open_game));
             views.setOnClickPendingIntent(R.id.portal_open,open(context,widgetId,mode.equals("home")?"configure":mode,""));
         }
         if(compact){
-            views.setTextViewText(R.id.portal_open,"↗");
             views.setTextViewText(R.id.portal_body,"");
             if(context.getResources().getConfiguration().fontScale>1.3f){views.setViewVisibility(R.id.portal_region,View.GONE);views.setViewVisibility(R.id.portal_status,View.GONE);}
         }

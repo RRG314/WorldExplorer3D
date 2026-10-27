@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       widget_only:
-        description: Run the Home Screen widget journey and reuse accepted app checks
+        description: Run widget layouts and Home Screen journey; reuse accepted app checks
         type: boolean
         default: false
       native_live:

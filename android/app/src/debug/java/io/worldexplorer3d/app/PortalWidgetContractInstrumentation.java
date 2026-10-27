@@ -107,7 +107,8 @@ public final class PortalWidgetContractInstrumentation extends Instrumentation {
                 runOnMainSync(activity::finish);fontChanged=true;fontScale(2f);
                 activity=(PortalWidgetHarnessActivity)startActivitySync(new Intent(context,PortalWidgetHarnessActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));expectedWindow=activity;
                 step="compact current card with large system text";attachWidget(activity,host,widgetId,170,180);visibleControls(R.id.portal_save,R.id.portal_open,R.id.portal_settings);completeText(R.id.portal_title);completeText(R.id.portal_save);singleLineControl(R.id.portal_save);screenshot("widget-compact-minimum-system-text.png");
-                result.putInt("presentation_layouts",2);result.putInt("compact_interaction_checks",2);result.putString("scope","Compact-only current Android widget layouts at minimum170x180dp, normal and2x system font. Reuses accepted larger layouts/account/investigation checks.");
+                ActivityMonitor opening=addMonitor(PortalActivity.class.getName(),null,false);click(R.id.portal_open);Activity opened=waitForMonitorWithTimeout(opening,8000);removeMonitor(opening);check(opened!=null,"The compact Open icon did not reach its native place.");expectedWindow=opened;screenshot("native-compact-open-place.png");runOnMainSync(opened::finish);expectedWindow=activity;until(this::foreground);
+                result.putInt("presentation_layouts",2);result.putInt("compact_interaction_checks",3);result.putString("scope","Compact-only current Android widget layouts at minimum170x180dp, normal and2x system font. Reuses accepted larger layouts/account/investigation checks.");
             }else{
             if(!layoutOnly){
             step="save from actual widget";click(R.id.portal_save);until(()->store.trail(id).optBoolean("saved"));until(()->text(R.id.portal_save).equals(context.getString(R.string.portal_saved)));

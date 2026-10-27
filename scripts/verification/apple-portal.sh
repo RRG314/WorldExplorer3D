@@ -80,7 +80,7 @@ xcrun simctl boot "$APPLE_SIMULATOR"
 xcrun simctl bootstatus "$APPLE_SIMULATOR" -b > "$APPLE_PRIVATE/boot.log" 2>&1
 # Keep the array nonempty: macOS Bash 3.2 treats an empty array as unset under -u.
 APPLE_JOURNEY=(-parallel-testing-enabled NO)
-if test "${WE3D_PORTAL_APPLE_WIDGET_ONLY:-false}" = true; then APPLE_JOURNEY+=(-only-testing:PortalUITests/PortalUITests/testHomeScreenWidget); fi
+if test "${WE3D_PORTAL_APPLE_WIDGET_ONLY:-false}" = true; then APPLE_JOURNEY+=(-only-testing:PortalTests/PortalWidgetLayoutTests -only-testing:PortalUITests/PortalUITests/testHomeScreenWidget); fi
 APPLE_UI_STATUS=0
 printf '%s\n' 'Apple phase: run only the requested current native UI journey'
 xcodebuild test-without-building -project apple/WorldExplorerPortal.xcodeproj -scheme WorldExplorerPortal -configuration Debug -destination "id=$APPLE_SIMULATOR" -derivedDataPath "$RUNNER_TEMP/we3d-apple-derived" -resultBundlePath "$APPLE_PRIVATE/Portal.xcresult" "${APPLE_JOURNEY[@]}" CODE_SIGN_IDENTITY=- > "$APPLE_PRIVATE/test.log" 2>&1 || APPLE_UI_STATUS=$?

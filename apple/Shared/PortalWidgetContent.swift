@@ -4,6 +4,18 @@ import SwiftUI
 import WidgetKit
 import AppIntents
 
+private struct PortalWidgetButtonStyle: ButtonStyle {
+    var primary = false
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label.padding(.horizontal, 8).frame(minWidth: 44, minHeight: 44)
+            .foregroundStyle(primary || configuration.isPressed ? PortalStyle.actionText : PortalStyle.text)
+            .background(configuration.isPressed ? PortalStyle.focus : primary ? PortalStyle.accent : PortalStyle.surface,
+                        in: RoundedRectangle(cornerRadius: PortalStyle.cardRadius))
+            .overlay(RoundedRectangle(cornerRadius: PortalStyle.cardRadius).stroke(PortalStyle.line, lineWidth: 1))
+            .contentShape(RoundedRectangle(cornerRadius: PortalStyle.cardRadius))
+    }
+}
+
 struct PortalWidgetEntry: TimelineEntry {
     var date: Date
     var configuration: PortalConfiguration
@@ -22,6 +34,7 @@ struct PortalWidgetView: View {
 struct PortalWidgetComposition: View {
     let entry: PortalWidgetEntry
     let family: WidgetFamily
+    @Environment(\.dynamicTypeSize) private var textSize
     private func open(_ section: String, id: String = "") -> URL {
         var url = URLComponents(); url.scheme = PortalContract.callbackScheme; url.host = "portal-open"; url.path = "/" + section
         if !id.isEmpty { url.queryItems = [URLQueryItem(name: "destination", value: id)] }; return url.url!
@@ -35,20 +48,20 @@ struct PortalWidgetComposition: View {
     private func save(_ place: PortalCatalog.Destination) -> some View {
         Button(intent: SavePortalPlace(destination: place.id, owner: entry.owner, remove: entry.state?.saved == true)) {
             Text(entry.state?.saved == true ? "Saved" : "Save").frame(maxWidth: .infinity, minHeight: 44)
-        }.privacySensitive().invalidatableContent().buttonStyle(.bordered)
+        }.privacySensitive().invalidatableContent().buttonStyle(PortalWidgetButtonStyle())
     }
     private func openPlace(_ place: PortalCatalog.Destination) -> some View {
         Link(destination: open("place", id: place.id)) {
             Text(family == .systemSmall ? "Open" : "Open place").frame(maxWidth: .infinity, minHeight: 44)
-        }.accessibilityLabel("Open place").buttonStyle(.borderedProminent).foregroundStyle(PortalStyle.actionText)
+        }.accessibilityLabel("Open place").buttonStyle(PortalWidgetButtonStyle(primary: true))
     }
-    private func small(_ place: PortalCatalog.Destination, details: Bool) -> some View {
+    private func small(_ place: PortalCatalog.Destination, details: Bool, saveAction: Bool = true) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             if details { brand }
             Text(shortTitle(place)).font(.headline).lineLimit(2).fixedSize(horizontal: false, vertical: true).accessibilityLabel(place.title)
             if details { Text(place.region).font(.caption2).foregroundStyle(PortalStyle.muted).lineLimit(1) }
             Spacer(minLength: 0)
-            HStack(spacing: 6) { save(place); openPlace(place) }.font(.caption2)
+            HStack(spacing: 6) { if saveAction { save(place) }; openPlace(place) }.font(.caption2)
         }
     }
     private func medium(_ place: PortalCatalog.Destination, details: Bool) -> some View {
@@ -62,7 +75,7 @@ struct PortalWidgetComposition: View {
                 }.frame(maxWidth: .infinity, alignment: .leading)
                 VStack(spacing: 4) {
                     save(place)
-                    Link(destination: open("place", id: place.id)) { Text("Investigate").frame(minHeight: 44) }.buttonStyle(.bordered)
+                    Link(destination: open("place", id: place.id)) { Text("Investigate").frame(minHeight: 44) }.buttonStyle(PortalWidgetButtonStyle())
                 }.font(.caption2).fixedSize(horizontal: true, vertical: true)
             }
         }
@@ -70,7 +83,7 @@ struct PortalWidgetComposition: View {
     private func large(_ place: PortalCatalog.Destination, inlineFacts: Bool) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             brand
-            Text(place.title).font(.headline).lineLimit(2).fixedSize(horizontal: false, vertical: true)
+            Text(inlineFacts ? place.title : shortTitle(place)).font(.headline).lineLimit(2).fixedSize(horizontal: false, vertical: true)
             Text(place.region).font(.caption).foregroundStyle(PortalStyle.muted).lineLimit(1)
             if inlineFacts, let page = entry.page {
                 // Never offer Next/Add to Trail for a fact which the allocated
@@ -80,7 +93,7 @@ struct PortalWidgetComposition: View {
                 Spacer(minLength: 0)
             } else {
                 Text(entry.page.map { place.facts[min(max(0, $0.index), place.facts.count - 1)] } ?? place.summary)
-                    .font(.callout).foregroundStyle(PortalStyle.muted).lineLimit(3)
+                    .font(.callout).foregroundStyle(PortalStyle.muted).lineLimit(inlineFacts ? 3 : 2)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading).layoutPriority(-1)
             }
             HStack(spacing: 8) {
@@ -88,9 +101,9 @@ struct PortalWidgetComposition: View {
                 if inlineFacts {
                     Button(intent: InvestigatePortalPlace(destination: place.id, owner: entry.owner, version: place.learning.version, portal: entry.configuration.learningKey, shownPage: entry.page?.index ?? -1)) {
                         Text(entry.page == nil ? "Investigate" : entry.page!.index >= place.facts.count - 1 ? "Add to Trail" : "Next fact").frame(maxWidth: .infinity, minHeight: 44)
-                    }.buttonStyle(.bordered).invalidatableContent()
+                    }.buttonStyle(PortalWidgetButtonStyle()).invalidatableContent()
                 } else {
-                    Link(destination: open("place", id: place.id)) { Text(entry.page == nil ? "Investigate" : "Read full fact").frame(maxWidth: .infinity, minHeight: 44) }.buttonStyle(.bordered)
+                    Link(destination: open("place", id: place.id)) { Text(entry.page == nil ? "Investigate" : "Read full fact").frame(maxWidth: .infinity, minHeight: 44) }.buttonStyle(PortalWidgetButtonStyle())
                 }
             }.font(.caption)
             openPlace(place).font(.caption.bold())
@@ -102,7 +115,7 @@ struct PortalWidgetComposition: View {
             Text(title).font(.headline).lineLimit(2)
             Text(message).font(.caption).foregroundStyle(PortalStyle.muted).lineLimit(family == .systemSmall ? 2 : 4).layoutPriority(-1)
             Spacer(minLength: 0)
-            Link(destination: open(section)) { Text("Open Portal").frame(maxWidth: .infinity, minHeight: 44) }.font(.caption.bold()).buttonStyle(.borderedProminent).foregroundStyle(PortalStyle.actionText)
+            Link(destination: open(section)) { Text("Open Portal").frame(maxWidth: .infinity, minHeight: 44) }.font(.caption.bold()).buttonStyle(PortalWidgetButtonStyle(primary: true))
         }
     }
     var body: some View {
@@ -111,7 +124,10 @@ struct PortalWidgetComposition: View {
                 status(title: "Your Living Portal", message: "Open World Explorer to reconnect your Portal.", section: "trail")
             } else if let place = entry.place {
                 Group {
-                    if family == .systemSmall { ViewThatFits(in: .vertical) { small(place, details: true); small(place, details: false); openPlace(place).font(.caption) } }
+                    if family == .systemSmall {
+                        if textSize.isAccessibilitySize { ViewThatFits(in: .vertical) { small(place, details: false, saveAction: false); openPlace(place).font(.caption) } }
+                        else { ViewThatFits(in: .vertical) { small(place, details: true); small(place, details: false); openPlace(place).font(.caption) } }
+                    }
                     else if family == .systemMedium { ViewThatFits(in: .vertical) { medium(place, details: true); medium(place, details: false); small(place, details: false); openPlace(place).font(.caption) } }
                     else { ViewThatFits(in: .vertical) { large(place, inlineFacts: true); large(place, inlineFacts: false); small(place, details: false); openPlace(place).font(.caption) } }
                 }.widgetURL(open("place", id: place.id))
