@@ -374,6 +374,7 @@ export const currentContractTests = [
   'tests/world-click-router-current.test.mjs',
   'tests/world-explorer-polish-current.test.mjs',
   'tests/worldcover-categorical-current.test.mjs',
+  'tests/android-widget-evidence-current.test.mjs',
   'tests/worldcover-recovery-current.test.mjs',
 
   'tests/boat-wake-shader-current.test.mjs',

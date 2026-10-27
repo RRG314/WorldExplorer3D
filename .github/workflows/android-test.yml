@@ -23,6 +23,10 @@ on:
         description: Verify the native Portal widget and Trail in an owned emulator
         type: boolean
         default: false
+      layout_only:
+        description: Collect widget layouts only; reuses separately accepted functional checks
+        type: boolean
+        default: false
       widget_only:
         description: Check only debug widget interactions (does not verify a release package)
         type: boolean
@@ -81,6 +85,11 @@ jobs:
           java-version: '21'
       - name: Install the targeted Android platform
         run: '"${ANDROID_HOME:?}/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "build-tools;36.0.0"'
+      - name: Validate diagnostic layout selection
+        if: github.event_name == 'workflow_dispatch' && inputs.layout_only
+        env:
+          VALID_LAYOUT_SELECTION: ${{ inputs.widget_only && inputs.widget_check && !inputs.launch_check && !inputs.native_live && !inputs.native_only }}
+        run: test "$VALID_LAYOUT_SELECTION" = true
       - name: Verify shared native presentation tokens
         run: node scripts/build-native-roam-theme.mjs --check
       - name: Build and lint unsigned packages
@@ -110,6 +119,7 @@ jobs:
         env:
           WE3D_PORTAL_ANDROID_ACCEPTANCE: ${{ inputs.native_live && secrets.WE3D_PORTAL_ANDROID_ACCEPTANCE || '' }}
           WE3D_PORTAL_NATIVE_ONLY: ${{ inputs.native_only }}
+          WE3D_PORTAL_LAYOUT_ONLY: ${{ inputs.layout_only }}
         run: bash scripts/verification/android-portal-widget.sh
       - name: Preserve native widget evidence
         if: always() && github.event_name == 'workflow_dispatch' && inputs.widget_check

@@ -17,6 +17,11 @@ struct PortalWidgetEntry: TimelineEntry {
 struct PortalWidgetView: View {
     let entry: PortalWidgetEntry
     @Environment(\.widgetFamily) private var family
+    var body: some View { PortalWidgetComposition(entry: entry, family: family) }
+}
+struct PortalWidgetComposition: View {
+    let entry: PortalWidgetEntry
+    let family: WidgetFamily
     private func open(_ section: String, id: String = "") -> URL {
         var url = URLComponents(); url.scheme = PortalContract.callbackScheme; url.host = "portal-open"; url.path = "/" + section
         if !id.isEmpty { url.queryItems = [URLQueryItem(name: "destination", value: id)] }; return url.url!

@@ -33,7 +33,7 @@ import UIKit
     }
     private func capture(_ entry: PortalWidgetEntry, family: WidgetFamily, scale: DynamicTypeSize,
                          width: CGFloat, height: CGFloat, scene: UIWindowScene, name: String) async throws {
-        let root = PortalWidgetView(entry: entry).environment(\.widgetFamily, family).environment(\.dynamicTypeSize, scale)
+        let root = PortalWidgetComposition(entry: entry, family: family).environment(\.dynamicTypeSize, scale)
             .padding(16).frame(width: width, height: height).background(PortalStyle.card).environment(\.colorScheme, .dark)
         let controller = UIHostingController(rootView: root); controller.safeAreaRegions = []
         let container = UIViewController(), window = UIWindow(windowScene: scene)

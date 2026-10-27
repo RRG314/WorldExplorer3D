@@ -36,22 +36,11 @@ grep -Fq 'io.worldexplorer3d.app.staging/io.worldexplorer3d.app.PortalWidgetCont
 if test "${WE3D_PORTAL_NATIVE_ONLY:-false}" != true; then
 adb shell appwidget grantbind --package io.worldexplorer3d.app.staging
 adb logcat -c
-adb shell am instrument -w -e ownedEmulator true io.worldexplorer3d.app.staging/io.worldexplorer3d.app.PortalWidgetContractInstrumentation > android-widget-evidence/result.txt
+adb shell am instrument -w -e ownedEmulator true -e layoutOnly "${WE3D_PORTAL_LAYOUT_ONLY:-false}" io.worldexplorer3d.app.staging/io.worldexplorer3d.app.PortalWidgetContractInstrumentation > android-widget-evidence/result.txt
 adb logcat -d > android-widget-evidence/logcat.txt
 adb shell dumpsys appwidget > android-widget-evidence/widget-ownership.txt
-for name in widget-investigation widget-saved native-trail native-account widget-compact widget-failure; do
-    CAPTURE="$RUNNER_TEMP/we3d-$name.capture"
-    if adb exec-out run-as io.worldexplorer3d.app.staging cat "files/portal-evidence/$name.png" > "$CAPTURE" 2>/dev/null; then
-        python3 - "$CAPTURE" "android-widget-evidence/$name.png" <<'PY'
-from pathlib import Path
-import sys
-source=Path(sys.argv[1]); data=source.read_bytes()
-if data.startswith(b'\x89PNG\r\n\x1a\n'):Path(sys.argv[2]).write_bytes(data)
-else:print('No valid PNG was captured for '+Path(sys.argv[2]).stem)
-PY
-    fi
-    rm -f "$CAPTURE"
-done
+node scripts/verification/android-widget-evidence.mjs
+
 cat android-widget-evidence/result.txt
 grep -q 'INSTRUMENTATION_RESULT: passed=true' android-widget-evidence/result.txt
 fi
