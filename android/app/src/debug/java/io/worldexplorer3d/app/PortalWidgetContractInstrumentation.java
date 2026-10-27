@@ -14,6 +14,8 @@ import android.graphics.Rect;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.SystemClock;
+import android.net.ConnectivityManager;
+import android.net.NetworkCapabilities;
 import android.view.InputDevice;
 import android.view.MotionEvent;
 import android.view.View;
@@ -75,21 +77,28 @@ public final class PortalWidgetContractInstrumentation extends Instrumentation {
         until(()->Math.abs(getTargetContext().getResources().getConfiguration().fontScale-scale)<.01f);
     }
     private void openDestination(PortalStore store,JSONObject place,Activity returnTo,String capture)throws Exception{
-        boolean ready=store.gameAvailable(place,System.currentTimeMillis());
-        check(ready,"The current collection does not offer the reviewed game entry; do not accept a fallback page as the qualified launcher journey.");
-        String target=(ready?GameLauncherActivity.class:PortalActivity.class).getName();
-        ActivityMonitor monitor=addMonitor(target,null,false);Activity opened;
+        step="reviewed widget to actual game launcher";
+        check(store.gameAvailable(place,System.currentTimeMillis()),"The current collection does not offer the reviewed game entry; do not accept a fallback page as the qualified launcher journey.");
+        ActivityMonitor monitor=addMonitor(GameLauncherActivity.class.getName(),null,false);Activity opened;
         try{click(R.id.portal_open);opened=waitForMonitorWithTimeout(monitor,8000);}finally{removeMonitor(monitor);}
         check(opened!=null,"Widget Open did not reach its admitted destination.");
         try{
             expectedWindow=opened;
-            if(ready){
-                check((PortalStore.ORIGIN+place.getString("gameLink")).equals(opened.getIntent().getDataString()),"Widget changed the reviewed game intent.");
-                // This owned emulator is offline. Prove handoff and recovery,
-                // not a networked 3D visit; the browser verifies that separately.
-                until(()->opened.findViewById(R.id.retry_connection)!=null);
-                check(store.trail(place.getString("id")).optLong("visitedAt")==0,"Opening the launcher fabricated a game visit.");
+            check((PortalStore.ORIGIN+place.getString("gameLink")).equals(opened.getIntent().getDataString()),"Widget changed the reviewed game intent.");
+            step="verified offline launch recovery";
+            until(()->opened.findViewById(R.id.retry_connection)!=null);
+            until(this::foreground);waitForIdleSync();
+            // At large system text the recovery screen scrolls. Exercise the
+            // visible real button, including a retry that remains offline.
+            runOnMainSync(()->{View retry=opened.findViewById(R.id.retry_connection);retry.requestRectangleOnScreen(new Rect(0,0,retry.getWidth(),retry.getHeight()),true);});
+            until(this::foreground);waitForIdleSync();Rect bounds=new Rect();
+            runOnMainSync(()->{View retry=opened.findViewById(R.id.retry_connection);check(retry.getGlobalVisibleRect(bounds)&&bounds.height()==retry.getHeight()&&bounds.height()>=48*retry.getResources().getDisplayMetrics().density,"Offline retry is clipped or undersized.");});
+            long at=SystemClock.uptimeMillis();for(int action:new int[]{MotionEvent.ACTION_DOWN,MotionEvent.ACTION_UP}){
+                MotionEvent event=MotionEvent.obtain(at,SystemClock.uptimeMillis(),action,bounds.exactCenterX(),bounds.exactCenterY(),0);event.setSource(InputDevice.SOURCE_TOUCHSCREEN);
+                try{check(getUiAutomation().injectInputEvent(event,true),"Offline retry tap was rejected.");}finally{event.recycle();}
             }
+            until(()->foreground()&&opened.findViewById(R.id.retry_connection)!=null);
+            check(store.trail(place.getString("id")).optLong("visitedAt")==0,"Opening or retrying the launcher fabricated a game visit.");
             screenshot(capture);
         }finally{runOnMainSync(opened::finish);expectedWindow=returnTo;until(this::foreground);}
     }
@@ -97,7 +106,11 @@ public final class PortalWidgetContractInstrumentation extends Instrumentation {
         Bundle result=new Bundle();int outcome=Activity.RESULT_CANCELED;AppWidgetHost host=null;PortalWidgetHarnessActivity activity=null;int widgetId=AppWidgetManager.INVALID_APPWIDGET_ID;SharedPreferences prefs=null;boolean owned=false,fontChanged=false;float originalFontScale=1;
         try{
             check(arguments!=null&&"true".equals(arguments.getString("ownedEmulator"))&&(Build.HARDWARE.contains("ranchu")||Build.HARDWARE.contains("goldfish")),"Use a fresh owned Android emulator.");
-            Context context=getTargetContext();originalFontScale=context.getResources().getConfiguration().fontScale;prefs=context.getSharedPreferences("living-portal-v1",Context.MODE_PRIVATE);
+            Context context=getTargetContext();
+            ConnectivityManager network=context.getSystemService(ConnectivityManager.class);
+            until(()->{NetworkCapabilities capabilities=network.getNetworkCapabilities(network.getActiveNetwork());return capabilities==null||!capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET);});
+            result.putBoolean("offline_connectivity_verified",true);
+            originalFontScale=context.getResources().getConfiguration().fontScale;prefs=context.getSharedPreferences("living-portal-v1",Context.MODE_PRIVATE);
             check(prefs.getAll().isEmpty()&&PortalWidgetProvider.ids(context).length==0,"Refusing to replace existing Portal data or widgets.");owned=true;
             boolean layoutOnly="true".equals(arguments.getString("layoutOnly"));
             PortalStore store=new PortalStore(context);String id="baltimore-harbor";JSONObject place=store.place(id);check(place!=null,"Bundled destination unavailable offline.");
@@ -133,6 +146,7 @@ public final class PortalWidgetContractInstrumentation extends Instrumentation {
                 activity=(PortalWidgetHarnessActivity)startActivitySync(new Intent(context,PortalWidgetHarnessActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));expectedWindow=activity;
                 step="compact current card with large system text";attachWidget(activity,host,widgetId,170,180);visibleControls(R.id.portal_save,R.id.portal_open,R.id.portal_settings);completeText(R.id.portal_title);completeText(R.id.portal_save);singleLineControl(R.id.portal_save);screenshot("widget-compact-minimum-system-text.png");
                 openDestination(store,place,activity,"native-compact-open-destination.png");
+                result.putBoolean("qualified_game_launcher_and_offline_retry",true);
                 result.putInt("presentation_layouts",2);result.putInt("compact_interaction_checks",3);result.putString("scope","Compact-only current Android widget layouts at minimum170x180dp, normal and2x system font. Reuses accepted larger layouts/account/investigation checks.");
             }else{
             if(!layoutOnly){

@@ -30,6 +30,17 @@ adb shell settings put global transition_animation_scale 0
 adb shell settings put global animator_duration_scale 0
 adb shell svc wifi disable
 adb shell svc data disable
+if test "${WE3D_PORTAL_NATIVE_ONLY:-false}" != true; then
+    # This fresh default-system emulator also has an Ethernet internet route.
+    # Radio toggles alone never prove offline behavior. Only this owned AVD is
+    # changed; instrumentation checks the app's actual connectivity afterward.
+    test "$(adb shell getprop ro.kernel.qemu | tr -d '\r')" = 1
+    adb root > android-widget-evidence/owned-adb-root.txt
+    timeout 30 adb wait-for-device
+    test "$(adb shell id -u | tr -d '\r')" = 0
+    adb shell ip link show eth0 > android-widget-evidence/owned-ethernet-before.txt
+    adb shell ip link set eth0 down
+fi
 adb install android/app/build/outputs/apk/debug/app-debug.apk
 adb shell pm list instrumentation > android-widget-evidence/instrumentation-components.txt
 grep -Fq 'io.worldexplorer3d.app.staging/io.worldexplorer3d.app.PortalWidgetContractInstrumentation' android-widget-evidence/instrumentation-components.txt
@@ -47,6 +58,7 @@ fi
 git rev-parse HEAD > android-widget-evidence/source-commit.txt
 git rev-parse HEAD:android/app/src/main > android-widget-evidence/native-main-source-tree.txt
 if test -n "${WE3D_PORTAL_ANDROID_ACCEPTANCE:-}"; then
+    if test "${WE3D_PORTAL_NATIVE_ONLY:-false}" != true; then adb shell ip link set eth0 up; fi
     adb shell svc wifi enable
     adb shell svc data enable
     NATIVE_FIXTURE="$RUNNER_TEMP/we3d-native-acceptance.private.json"
