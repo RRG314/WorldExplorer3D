@@ -39,8 +39,8 @@ struct PortalWidgetComposition: View {
     }
     private func openPlace(_ place: PortalCatalog.Destination) -> some View {
         Link(destination: open("place", id: place.id)) {
-            Text("Open place").frame(maxWidth: .infinity, minHeight: 44)
-        }.buttonStyle(.borderedProminent).foregroundStyle(PortalStyle.actionText)
+            Text(family == .systemSmall ? "Open" : "Open place").frame(maxWidth: .infinity, minHeight: 44)
+        }.accessibilityLabel("Open place").buttonStyle(.borderedProminent).foregroundStyle(PortalStyle.actionText)
     }
     private func small(_ place: PortalCatalog.Destination, details: Bool) -> some View {
         VStack(alignment: .leading, spacing: 6) {

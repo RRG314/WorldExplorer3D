@@ -97,7 +97,7 @@ import Vision
         if wasSaved { try tapVisibleText("Saved", in: home) }
         try tapVisibleText("Save", in: home)
         XCTAssertNotNil(try visibleText("Saved")); capture("portal-widget-home-saved")
-        try tapVisibleText("Open place", in: home)
+        try tapVisibleText("Open", in: home)
         XCTAssertTrue(app.buttons["Remove from saved places"].waitForExistence(timeout: 10))
         capture("portal-widget-open-native-place")
         // Keep this journey independent of the learning/rotation test's order.
