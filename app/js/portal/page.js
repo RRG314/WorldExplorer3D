@@ -3,6 +3,9 @@ import {portalOffer,portalGameLink,portalDeviceProfile} from './game-intent.js';
 import {createIndexedDbDiscoveryProfileStore} from '../discovery/profile-store.js?v=5';
 import {createPortalTrailController} from './trail-controller.js';
 import {createLifecycleScope} from '../runtime/lifecycle-scope.js?v=2';
+import {createPortalRoomsView} from './rooms-view.js';
+import {weeklyRoomDescriptor} from '../multiplayer/featured-city-model.js?v=1';
+import {readAccessibilityPreferences,applyAccessibilityPreferences} from '../ui/accessibility.js?v=4';
 
 const scope=createLifecycleScope('living-portal-page'),byId=id=>document.getElementById(id);
 const escape=value=>String(value??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#39;');
@@ -10,6 +13,14 @@ const link=href=>globalThis.WorldExplorerDistribution?.url(href)||href;
 let mode='wander',selectedId=null,learningId=null,homeId=null,auth=null,api=null,view={places:[],summary:{saved:0,investigated:0,visited:0},ownerScope:'device-guest',status:'device'};
 let nativeConnection=null,recentSignIn=false;
 const nativeRequested=new URLSearchParams(location.search).has('connect');
+const applyPreferences=()=>applyAccessibilityPreferences(readAccessibilityPreferences());
+applyPreferences();
+scope.listen(window,'storage',event=>{if(event.key===null||event.key==='worldExplorer3D.accessibility.v1')applyPreferences();});
+const roomsView=createPortalRoomsView({scope,readRooms:async()=>{
+  const directory=await import('../multiplayer/rooms.js?v=67');
+  if(!scope.isActive()||mode!=='together'||document.hidden)return null;
+  return directory.findPublicRoomsByCity('',{resultLimit:20});
+},onChange:()=>{if(mode==='together')render();}});
 if(nativeRequested){byId('nativeConnection').hidden=false;byId('nativeSignIn').hidden=true;byId('nativeConnectionStatus').textContent='Opening the account connection…';}
 scope.listen(byId('nativeCancel'),'click',()=>{if(!nativeConnection)byId('nativeConnection').hidden=true;});
 try{homeId=localStorage.getItem('we3d:portal-home');}catch{}
@@ -34,6 +45,7 @@ function run(work){Promise.resolve().then(work).catch(error=>notice(error.messag
 function placeState(id){return view.places.find(row=>row.destinationId===id)||{};}
 function render(){
   observer.disconnect();
+  roomsView.setVisible(mode==='together'&&!document.hidden);
   const focused=document.activeElement;
   const focusKey=focused?.matches('button')?[...focused.attributes].find(attribute=>attribute.name.startsWith('data-')):null;
   const restoreFocus=()=>{if(focusKey&&!focused.isConnected&&!document.querySelector('dialog[open]'))document.querySelector(`button[${focusKey.name}="${CSS.escape(focusKey.value)}"]`)?.focus({preventScroll:true});};
@@ -49,7 +61,8 @@ function render(){
   document.querySelectorAll('[data-mode]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.mode===mode)));
   const section=byId('discovery');
   if(mode==='together'){
-    section.innerHTML=`<div class="panel"><p class="eyebrow">Explore with others</p><h2>Find your fellow explorers</h2><p>Open Multiplayer to join the shared weekly city, create a room, or use a friend’s room code.</p><a class="button primary" href="${escape(link('../app/?tab=multiplayer'))}">Open Multiplayer ↗</a><p class="small muted">Sign-in and room availability are checked in the game. This Portal keeps no background room connection.</p></div>`;return;
+    const weekly=weeklyRoomDescriptor(),rooms=roomsView.snapshot(),checked=rooms.checkedAt?new Date(rooms.checkedAt):null;
+    section.innerHTML=`<section class="panel together" aria-labelledby="togetherTitle"><p class="eyebrow">Explore with others</p><h2 id="togetherTitle">A world to share</h2><article class="room-card weekly"><p class="eyebrow">This week’s shared city</p><h3>${escape(weekly.city)}</h3><p>Open to everyone, including guests. The game checks consent and available space when you join.</p><a class="button primary" href="${escape(link('../app/?tab=multiplayer'))}">Open weekly city ↗</a></article><div class="room-list-heading"><h3>Other public rooms</h3><button type="button" data-refresh-rooms aria-disabled="${rooms.status==='loading'}">Refresh rooms</button></div><p class="small muted" role="status">${escape(rooms.error||(rooms.status==='loading'?'Checking available destinations…':rooms.rooms.length?'Choose a room to join in the game.':'No other public rooms are listed right now. You can create one in Multiplayer.'))}</p>${checked?`<p class="small muted">List checked <time datetime="${checked.toISOString()}">${escape(checked.toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}))}</time>${rooms.status==='error'||rooms.status==='offline'?' · showing the last available list':''}</p>`:''}<ul class="portal-room-list">${rooms.rooms.map(room=>`<li class="room-card"><h4>${escape(room.name)}</h4><p>${escape(room.city||({earth:'Earth',moon:'Moon',space:'Space'}[room.kind]))}</p><a class="button" href="${escape(link('../app/?tab=multiplayer&room='+encodeURIComponent(room.code)))}">Join room ${escape(room.code)} ↗</a></li>`).join('')}</ul><p class="small muted">Rooms can fill or close. Player counts are shown after joining. Your Portal uses one directory request when needed; it keeps no background presence connection.</p><a href="${escape(link('../app/?tab=multiplayer'))}">Create a room or use an invitation ↗</a></section>`;restoreFocus();return;
   }
   if(mode==='beyond'){
     section.innerHTML=`<div class="panel"><p class="eyebrow">Look beyond Earth</p><h2>Choose your next horizon</h2><p>Visit the Moon or Mars, or start a journey in space. Your game’s destination menu includes the available worlds and controls.</p><div class="actions"><a class="button primary" href="${escape(link('../app/?launch=moon&gm=free'))}">Moon ↗</a><a class="button" href="${escape(link('../app/?launch=mars&gm=free'))}">Mars ↗</a><a class="button" href="${escape(link('../app/?launch=space&gm=free'))}">Space ↗</a></div></div>`;return;
@@ -65,6 +78,7 @@ function render(){
 scope.listen(document,'click',event=>{
   const button=event.target.closest('button');if(!button)return;
   if(button.dataset.mode){mode=button.dataset.mode;selectedId=null;render();return;}
+  if(button.hasAttribute('data-refresh-rooms')){void roomsView.refresh();return;}
   if(button.hasAttribute('data-wander')){mode='wander';selectedId=null;render();return;}
   if(button.dataset.reopen){mode='wander';selectedId=button.dataset.reopen;render();byId('discovery').scrollIntoView({behavior:'instant'});return;}
   if(button.dataset.save){const id=button.dataset.save;run(()=>controller.act(id,placeState(id).saved?'unsave':'save'));return;}
@@ -86,9 +100,9 @@ scope.listen(document,'click',event=>{
 async function runAuth(work){byId('accountError').textContent='';if(!auth){byId('accountError').textContent='Sign-in is unavailable offline. Your device Trail still works.';return;}
   try{await work();recentSignIn=false;byId('signInForm').elements.namedItem('password').value='';byId('account').close();if(nativeConnection)run(()=>nativeConnection.changeUser(auth.getCurrentUser()));}catch(error){byId('accountError').textContent=error.message||'Sign-in could not complete. Please try again.';}}
 scope.listen(byId('signInForm'),'submit',event=>{event.preventDefault();const data=new FormData(event.currentTarget);void runAuth(()=>auth.signInWithEmailPassword(data.get('email'),data.get('password')));});
-scope.listen(window,'online',()=>{render();run(()=>controller.sync());});
+scope.listen(window,'online',()=>{render();if(mode==='together')void roomsView.refresh();run(()=>controller.sync());});
 scope.listen(window,'offline',render);
-scope.listen(document,'visibilitychange',()=>{if(!document.hidden)run(()=>controller.sync());});
+scope.listen(document,'visibilitychange',()=>{roomsView.setVisible(mode==='together'&&!document.hidden);if(!document.hidden){render();run(()=>controller.sync());}});
 scope.listen(window,'pagehide',event=>{if(!event.persisted)scope.dispose('page closed');});
 render();run(()=>controller.changeOwner(null));
 if('serviceWorker' in navigator){

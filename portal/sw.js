@@ -4,6 +4,7 @@ function staticUrl(input){
   const url=new URL(input,self.location.href);
   return url.origin===self.location.origin&&(
     /^\/portal\/(?:index\.html|portal\.css)?$/.test(url.pathname)||
+    /^\/styles\/(?:world-explorer-tokens|distribution)\.css$/.test(url.pathname)||
     /^\/(?:app\/js|js)\/[a-z0-9_./-]+\.js$/i.test(url.pathname)||
     /^\/runtime\/[a-f0-9]{24}\/(?:js\/[a-z0-9_./-]+\.js|app\/js\/shared-context\.js)$/i.test(url.pathname)||
     /^\/assets\/landing\/current\/[a-z0-9_.-]+\.(?:webp|png|jpg)$/i.test(url.pathname))?url:null;
@@ -19,7 +20,7 @@ function cacheKey(request){
   return url.href;
 }
 self.addEventListener('install',event=>event.waitUntil((async()=>{
-  const cache=await caches.open(CACHE);await cache.addAll(['./','./portal.css']);await self.skipWaiting();
+  const cache=await caches.open(CACHE);await cache.addAll(['./','./portal.css','../styles/world-explorer-tokens.css?v=3','../styles/distribution.css?v=1']);await self.skipWaiting();
 })()));
 self.addEventListener('activate',event=>event.waitUntil((async()=>{
   for(const name of await caches.keys())if(name.startsWith('we3d-living-portal-')&&name!==CACHE)await caches.delete(name);

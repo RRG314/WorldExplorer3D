@@ -46,6 +46,17 @@ function saveSettings(settings) {
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(settings)); } catch {}
 }
 
+// Standalone Explorer pages read the same preferences without mounting the
+// game's modal observer, input handlers or a second settings authority.
+function applyAccessibilityPreferences(settings, root = document.documentElement) {
+  root.dataset.we3dTextScale = settings.textScale;
+  root.dataset.we3dMotion = settings.reducedMotion ? 'reduce' : 'system';
+  root.dataset.we3dEffects = settings.reducedEffects ? 'reduce' : 'standard';
+  root.dataset.we3dContrast = settings.highContrast ? 'more' : 'standard';
+  root.dataset.we3dReticle = settings.reticleSize;
+  root.dataset.we3dActionDetails = settings.alwaysShowActionDetails ? 'always' : 'familiar';
+}
+
 function initAccessibility() {
   const root = document.documentElement;
   const announceRegion = document.getElementById('accessibilityAnnouncements');
@@ -98,12 +109,7 @@ function initAccessibility() {
   };
 
   const apply = ({ persist = true, announce = true } = {}) => {
-    root.dataset.we3dTextScale = settings.textScale;
-    root.dataset.we3dMotion = settings.reducedMotion ? 'reduce' : 'system';
-    root.dataset.we3dEffects = settings.reducedEffects ? 'reduce' : 'standard';
-    root.dataset.we3dContrast = settings.highContrast ? 'more' : 'standard';
-    root.dataset.we3dReticle = settings.reticleSize;
-    root.dataset.we3dActionDetails = settings.alwaysShowActionDetails ? 'always' : 'familiar';
+    applyAccessibilityPreferences(settings, root);
     if (textScale) textScale.value = settings.textScale;
     if (noticeDuration) noticeDuration.value = settings.noticeDuration;
     if (reticleSize) reticleSize.value = settings.reticleSize;
@@ -267,4 +273,4 @@ function initAccessibility() {
   return { snapshot, update, announce(message) { if (announceRegion) announceRegion.textContent = String(message || ''); } };
 }
 
-export { initAccessibility };
+export { initAccessibility, loadSettings as readAccessibilityPreferences, applyAccessibilityPreferences };
