@@ -1,9 +1,9 @@
 <resources>
     <style name="PortalTheme" parent="android:style/Theme.Material.NoActionBar">
-        <item name="android:fontFamily">sans</item><item name="android:colorAccent">#57C9FA</item>
-        <item name="android:statusBarColor">#071423</item><item name="android:navigationBarColor">#071423</item>
+        <item name="android:fontFamily">sans</item><item name="android:colorAccent">@color/portal_roam_accent</item>
+        <item name="android:statusBarColor">@color/portal_roam_background</item><item name="android:navigationBarColor">@color/portal_roam_background</item>
         <item name="android:windowLightStatusBar">false</item><item name="android:windowLightNavigationBar">false</item>
-        <item name="android:windowBackground">#071423</item>
+        <item name="android:windowBackground">@color/portal_roam_background</item>
     </style>
     <string name="portal_brand">WORLD EXPLORER 3D</string>
     <string name="portal_name">The Living Portal</string>

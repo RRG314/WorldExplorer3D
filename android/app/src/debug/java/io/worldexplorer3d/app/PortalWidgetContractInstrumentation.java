@@ -76,6 +76,7 @@ public final class PortalWidgetContractInstrumentation extends Instrumentation {
     }
     private void openDestination(PortalStore store,JSONObject place,Activity returnTo,String capture)throws Exception{
         boolean ready=store.gameAvailable(place,System.currentTimeMillis());
+        check(ready,"The current collection does not offer the reviewed game entry; do not accept a fallback page as the qualified launcher journey.");
         String target=(ready?GameLauncherActivity.class:PortalActivity.class).getName();
         ActivityMonitor monitor=addMonitor(target,null,false);Activity opened;
         try{click(R.id.portal_open);opened=waitForMonitorWithTimeout(monitor,8000);}finally{removeMonitor(monitor);}
