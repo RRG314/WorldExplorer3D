@@ -3,6 +3,10 @@ name: Apple Portal native acceptance
 on:
   workflow_dispatch:
     inputs:
+      app_only:
+        description: Run changed native app views; reuse accepted widget checks
+        type: boolean
+        default: false
       widget_only:
         description: Run widget layouts and Home Screen journey; reuse accepted app checks
         type: boolean
@@ -53,6 +57,7 @@ jobs:
         env:
           WE3D_PORTAL_APPLE_ACCEPTANCE: ${{ inputs.native_live && secrets.WE3D_PORTAL_APPLE_ACCEPTANCE || '' }}
           WE3D_PORTAL_APPLE_WIDGET_ONLY: ${{ inputs.widget_only }}
+          WE3D_PORTAL_APPLE_APP_ONLY: ${{ inputs.app_only }}
         run: bash scripts/verification/apple-portal.sh
       - name: Retain compiled SDKs after a completed build
         if: always() && steps.native.outputs.sdk_built == 'true' && steps.apple_sdk_cache.outputs.cache-hit != 'true' && !inputs.native_live
