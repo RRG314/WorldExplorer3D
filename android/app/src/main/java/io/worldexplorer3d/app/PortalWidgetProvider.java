@@ -125,11 +125,13 @@ public final class PortalWidgetProvider extends AppWidgetProvider {
             int title=mode.equals("together")?R.string.portal_together:mode.equals("beyond")?R.string.portal_beyond:R.string.portal_home;
             int body=mode.equals("together")?R.string.portal_together_body:mode.equals("beyond")?R.string.portal_beyond_body:R.string.portal_home_body;
             views.setTextViewText(R.id.portal_title,context.getString(title));views.setTextViewText(R.id.portal_body,context.getString(body));
+            views.setContentDescription(R.id.portal_open,context.getString(mode.equals("home")?R.string.portal_choose_place:R.string.portal_open_game));
             views.setTextViewText(R.id.portal_region,context.getString(R.string.portal_follow_label));views.setViewVisibility(R.id.portal_fact_next,View.GONE);
             views.setTextViewText(R.id.portal_open,context.getString(mode.equals("home")?R.string.portal_choose_place:R.string.portal_open_game));
             views.setOnClickPendingIntent(R.id.portal_open,open(context,widgetId,mode.equals("home")?"configure":mode,""));
         }
         if(compact){
+            views.setTextViewText(R.id.portal_open,"↗");
             views.setTextViewText(R.id.portal_body,"");
             if(context.getResources().getConfiguration().fontScale>1.3f){views.setViewVisibility(R.id.portal_region,View.GONE);views.setViewVisibility(R.id.portal_status,View.GONE);}
         }

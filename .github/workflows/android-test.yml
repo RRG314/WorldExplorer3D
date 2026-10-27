@@ -23,6 +23,11 @@ on:
         description: Verify the native Portal widget and Trail in an owned emulator
         type: boolean
         default: false
+      layout_stage:
+        description: Current layout checkpoint to collect
+        type: choice
+        options: [all, compact]
+        default: all
       layout_only:
         description: Collect widget layouts only; reuses separately accepted functional checks
         type: boolean
@@ -120,6 +125,7 @@ jobs:
           WE3D_PORTAL_ANDROID_ACCEPTANCE: ${{ inputs.native_live && secrets.WE3D_PORTAL_ANDROID_ACCEPTANCE || '' }}
           WE3D_PORTAL_NATIVE_ONLY: ${{ inputs.native_only }}
           WE3D_PORTAL_LAYOUT_ONLY: ${{ inputs.layout_only }}
+          WE3D_PORTAL_LAYOUT_STAGE: ${{ inputs.layout_stage }}
         run: bash scripts/verification/android-portal-widget.sh
       - name: Preserve native widget evidence
         if: always() && github.event_name == 'workflow_dispatch' && inputs.widget_check

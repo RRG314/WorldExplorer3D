@@ -62,6 +62,7 @@ public final class PortalWidgetContractInstrumentation extends Instrumentation {
         });check(failure.get()==null,failure.get());
     }
     private boolean shown(int id){AtomicReference<Boolean> visible=new AtomicReference<>(false);runOnMainSync(()->{View item=view.findViewById(id);visible.set(item!=null&&item.isShown());});return visible.get();}
+    private void singleLineControl(int id){AtomicReference<Integer> lines=new AtomicReference<>(0);runOnMainSync(()->{TextView text=view.findViewById(id);if(text.getLayout()!=null)lines.set(text.getLayout().getLineCount());});check(lines.get()==1,"The compact action must stay on one readable line.");}
     private void completeText(int id){
         AtomicReference<String> failure=new AtomicReference<>();runOnMainSync(()->{TextView text=view.findViewById(id);android.text.Layout layout=text.getLayout();
             if(layout==null||layout.getLineCount()==0){failure.set("Missing widget text layout.");return;}
@@ -100,6 +101,14 @@ public final class PortalWidgetContractInstrumentation extends Instrumentation {
             final AppWidgetHost currentHost=host;final PortalWidgetHarnessActivity currentActivity=activity;final int currentId=widgetId;
             runOnMainSync(()->{currentHost.startListening();view=currentHost.createView(currentActivity,currentId,manager.getAppWidgetInfo(currentId));currentActivity.showWidget(view,300,440);});
             PortalWidgetProvider.update(context,widgetId);until(()->text(R.id.portal_title).contains("Baltimore"));
+            if(layoutOnly&&"compact".equals(arguments.getString("layoutStage"))){
+                step="compact current card";store.act(id,"save");attachWidget(activity,host,widgetId,170,180);visibleControls(R.id.portal_save,R.id.portal_open,R.id.portal_settings);completeText(R.id.portal_title);completeText(R.id.portal_save);singleLineControl(R.id.portal_save);screenshot("widget-compact-minimum.png");
+                click(R.id.portal_save);until(()->!store.trail(id).optBoolean("saved"));until(()->text(R.id.portal_save).equals(context.getString(R.string.portal_save_short)));click(R.id.portal_save);until(()->store.trail(id).optBoolean("saved"));until(()->text(R.id.portal_save).equals(context.getString(R.string.portal_saved)));
+                runOnMainSync(activity::finish);fontChanged=true;fontScale(2f);
+                activity=(PortalWidgetHarnessActivity)startActivitySync(new Intent(context,PortalWidgetHarnessActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));expectedWindow=activity;
+                step="compact current card with large system text";attachWidget(activity,host,widgetId,170,180);visibleControls(R.id.portal_save,R.id.portal_open,R.id.portal_settings);completeText(R.id.portal_title);completeText(R.id.portal_save);singleLineControl(R.id.portal_save);screenshot("widget-compact-minimum-system-text.png");
+                result.putInt("presentation_layouts",2);result.putInt("compact_interaction_checks",2);result.putString("scope","Compact-only current Android widget layouts at minimum170x180dp, normal and2x system font. Reuses accepted larger layouts/account/investigation checks.");
+            }else{
             if(!layoutOnly){
             step="save from actual widget";click(R.id.portal_save);until(()->store.trail(id).optBoolean("saved"));until(()->text(R.id.portal_save).equals(context.getString(R.string.portal_saved)));
             step="reveal first fact";
@@ -132,6 +141,7 @@ public final class PortalWidgetContractInstrumentation extends Instrumentation {
             store.configure(widgetId,"together",id);check(store.suggestion(widgetId,System.currentTimeMillis())==null,"Together fabricated a daily destination.");
             store.configure(widgetId,"beyond",id);check(store.suggestion(widgetId,System.currentTimeMillis())==null,"Beyond Earth fabricated an Earth visit.");
             if(!layoutOnly)result.putInt("handoff_layout_checks",8);result.putInt("presentation_layouts",6);result.putString("scope",layoutOnly?"Layout-only Android widget host evidence. Reuse prior functional acceptance; account and investigation checks not repeated.":"Actual Android emulator widget host and pending-intent interaction. Offline bundled content; no physical phone, account sync, native VR or live catalog acceptance.");
+            }
             result.putString("passed","true");outcome=Activity.RESULT_OK;
         }catch(Throwable error){
             result.putString("passed","false");result.putString("failure",error.toString());result.putString("failed_step",step);

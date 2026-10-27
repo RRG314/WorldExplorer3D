@@ -36,7 +36,7 @@ grep -Fq 'io.worldexplorer3d.app.staging/io.worldexplorer3d.app.PortalWidgetCont
 if test "${WE3D_PORTAL_NATIVE_ONLY:-false}" != true; then
 adb shell appwidget grantbind --package io.worldexplorer3d.app.staging
 adb logcat -c
-adb shell am instrument -w -e ownedEmulator true -e layoutOnly "${WE3D_PORTAL_LAYOUT_ONLY:-false}" io.worldexplorer3d.app.staging/io.worldexplorer3d.app.PortalWidgetContractInstrumentation > android-widget-evidence/result.txt
+adb shell am instrument -w -e ownedEmulator true -e layoutOnly "${WE3D_PORTAL_LAYOUT_ONLY:-false}" -e layoutStage "${WE3D_PORTAL_LAYOUT_STAGE:-all}" io.worldexplorer3d.app.staging/io.worldexplorer3d.app.PortalWidgetContractInstrumentation > android-widget-evidence/result.txt
 adb logcat -d > android-widget-evidence/logcat.txt
 adb shell dumpsys appwidget > android-widget-evidence/widget-ownership.txt
 node scripts/verification/android-widget-evidence.mjs
