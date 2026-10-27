@@ -59,7 +59,7 @@ const MOBILE_CONTROL_PROFILES = {
     ]
   },
   skydiving: {
-    moveLabel: 'Canopy',
+    moveLabel: 'Steer',
     lookLabel: 'Look',
     move: {
       up: { channel: 'earth', key: 'ArrowUp' },

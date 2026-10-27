@@ -1,51 +1,147 @@
 @layer interface {
-#mobileTouchControls{position:fixed;inset:0;z-index:106;display:none;pointer-events:none;--mobile-edge:16px;--mobile-bottom:max(92px,calc(var(--wx-navigation-height,78px) + 14px + env(safe-area-inset-bottom)))}
+/* The existing mobile-input owner controls visibility, mode and pointer state.
+   These dimensions reserve separate movement, camera and action footprints. */
+#mobileTouchControls {
+  position:fixed;inset:0;z-index:106;display:none;pointer-events:none;
+  --mobile-edge:16px;
+  --mobile-bottom:max(92px,calc(var(--wx-navigation-height,78px) + 14px + env(safe-area-inset-bottom)));
+  --mobile-action-row:max(52px,calc(42px * var(--wx-text-scale)));
+  --mobile-action-label-width:max(108px,calc(66px * var(--wx-text-scale)));
+  --mobile-small-action-width:max(58px,calc(36px * var(--wx-text-scale)));
+  --mobile-action-width:var(--mobile-action-label-width);
+  --mobile-stack-height:calc(2 * var(--mobile-action-row) + 9px);
+  --mobile-pedal-height:max(76px,calc(44px * var(--wx-text-scale)));
+  --mobile-pedal-width:max(76px,calc(56px * var(--wx-text-scale)));
+  --mobile-pedal-stack-height:var(--mobile-pedal-height);
+}
 #mobileTouchControls.show{display:block}
-#mobileTouchControls .mobilePad{position:absolute;bottom:var(--mobile-bottom);display:block;width:132px;height:132px;transform:none;border:1px solid rgba(187,225,240,.48);border-radius:50%;background:radial-gradient(circle,rgba(25,63,78,.32),rgba(3,13,20,.5));box-shadow:inset 0 0 0 12px rgba(255,255,255,.025),0 10px 30px rgba(0,0,0,.24);pointer-events:auto;touch-action:none;user-select:none;-webkit-user-select:none}
-#mobileTouchControls #mobileMovePad{left:var(--mobile-edge);right:auto}
-#mobileTouchControls #mobileLookPad{right:var(--mobile-edge);left:auto;bottom:calc(var(--mobile-bottom) + 134px);width:118px;height:118px}
+#mobileTouchControls .mobilePad {
+  --mobile-pad-size:132px;--mobile-pad-height:var(--mobile-pad-size);
+  position:absolute;bottom:var(--mobile-bottom);display:block;
+  width:var(--mobile-pad-size);height:var(--mobile-pad-height);transform:none;
+  border:1px solid var(--wx-line);border-radius:50%;background:var(--wx-panel);
+  box-shadow:inset 0 0 0 10px var(--wx-line-soft),var(--wx-shadow-panel);
+  pointer-events:auto;touch-action:none;user-select:none;-webkit-user-select:none;
+}
+#mobileTouchControls #mobileMovePad{left:max(var(--mobile-edge),env(safe-area-inset-left));right:auto}
+#mobileTouchControls #mobileLookPad {
+  --mobile-pad-size:118px;right:max(var(--mobile-edge),env(safe-area-inset-right));left:auto;
+  bottom:calc(var(--mobile-bottom) + var(--mobile-stack-height) + 16px);
+}
 #mobileTouchControls .mobileNavBtn{display:none!important;pointer-events:none!important}
-#mobileTouchControls .mobilePadLabel{position:absolute;left:50%;top:50%;display:flex;width:58px;height:58px;align-items:center;justify-content:center;margin:-29px 0 0 -29px;border:1px solid rgba(226,247,255,.66);border-radius:50%;color:#effcff;background:rgba(12,47,62,.88);box-shadow:0 6px 18px rgba(0,0,0,.3);font:700 9px/1 Orbitron,sans-serif;letter-spacing:.08em;text-transform:uppercase;transition:transform 70ms linear,background .12s,border-color .12s;pointer-events:none}
-#mobileTouchControls .mobilePad.active .mobilePadLabel{border-color:#7ee8ff;background:rgba(11,103,134,.92);transition:none}
-#mobileTouchControls #mobileActionStack{position:absolute;right:var(--mobile-edge);left:auto;bottom:var(--mobile-bottom);top:auto;display:flex;width:118px;transform:none;flex-direction:column;gap:9px;pointer-events:none}
-#mobileTouchControls .mobileActionBtn{min-width:118px;min-height:52px;padding:9px 12px;border:1px solid rgba(207,239,250,.58);border-radius:28px;color:#f5fcff;background:rgba(5,25,36,.82);box-shadow:0 8px 24px rgba(0,0,0,.28);font:700 10px/1.15 Orbitron,sans-serif;letter-spacing:.04em;pointer-events:auto;touch-action:none}
-#mobileTouchControls .mobileActionBtn.active{border-color:#7ee8ff;background:rgba(11,103,134,.94);transform:scale(.97)}
+#mobileTouchControls .mobilePadLabel {
+  --mobile-knob-size:min(calc(58px * var(--wx-text-scale)),calc(var(--mobile-pad-height) - 16px));
+  position:absolute;left:50%;top:50%;display:flex;box-sizing:border-box;
+  width:var(--mobile-knob-size);height:var(--mobile-knob-size);
+  align-items:center;justify-content:center;margin:calc(var(--mobile-knob-size) / -2);padding:4px;
+  border:1px solid var(--wx-line);border-radius:50%;color:var(--wx-text);background:var(--wx-panel-solid);
+  box-shadow:var(--wx-shadow-panel);font:700 var(--wx-type-meta)/1.15 var(--wx-font-ui);
+  text-align:center;overflow-wrap:normal;pointer-events:none;
+  transition:background var(--wx-motion-fast),border-color var(--wx-motion-fast);
+}
+#mobileTouchControls .mobilePad.active .mobilePadLabel{border-color:var(--wx-action);color:var(--wx-action-text);background:var(--wx-action);transition:none}
+#mobileTouchControls #mobileActionStack {
+  position:absolute;right:max(var(--mobile-edge),env(safe-area-inset-right));left:auto;
+  bottom:var(--mobile-bottom);top:auto;display:flex;width:var(--mobile-action-label-width);
+  transform:none;flex-direction:column;gap:9px;pointer-events:none;
+}
+#mobileTouchControls .mobileActionBtn,#mobileTouchControls .mobilePackAction,
+#mobileDrivePedals button,#mobileTiltQuickRecenter {
+  box-sizing:border-box;min-width:44px;min-height:44px;border:1px solid var(--wx-line);
+  border-radius:var(--wx-radius);color:var(--wx-text);background:var(--wx-panel);
+  box-shadow:var(--wx-shadow-panel);font:700 var(--wx-type-meta)/1.2 var(--wx-font-ui);
+  overflow-wrap:normal;word-break:normal;text-align:center;pointer-events:auto;touch-action:none;
+  user-select:none;-webkit-user-select:none;
+}
+#mobileTouchControls .mobileActionBtn{min-width:0;min-height:var(--mobile-action-row);padding:8px}
+#mobileTouchControls .mobileActionBtn.active,#mobileDrivePedals button.active {
+  border-color:var(--wx-action);color:var(--wx-action-text);background:var(--wx-action);
+}
+#mobileTouchControls button:focus-visible{outline:3px solid var(--wx-focus);outline-offset:3px}
 #mobileTouchControls .mobilePad.hidden,#mobileTouchControls .mobileActionBtn.hidden{display:none!important}
-#mobileTouchControls[data-handedness="southpaw"] #mobileMovePad{right:var(--mobile-edge);left:auto}
-#mobileTouchControls[data-handedness="southpaw"] #mobileLookPad{left:var(--mobile-edge);right:auto}
-#mobileTouchControls[data-handedness="southpaw"] #mobileActionStack{left:var(--mobile-edge);right:auto}
-@media(max-width:760px),(pointer:coarse){#mobileActionStack.has-pack-action{display:grid!important;grid-template-columns:58px 108px;grid-template-rows:52px 52px;width:175px!important;gap:9px;align-items:stretch}#mobileActionStack.has-pack-action #mobileActionPrimary{grid-column:2;grid-row:1}#mobileActionStack.has-pack-action #mobileActionSecondary{grid-column:2;grid-row:2}#mobileActionStack .mobilePackAction{position:static!important;grid-column:1;grid-row:1/3;display:flex!important;width:58px!important;height:auto!important;min-height:100%!important;flex-direction:column;gap:6px;align-items:center;justify-content:center;padding:0 8px!important;border:1px solid rgba(207,239,250,.46)!important;border-radius:28px!important;color:#d9edf5!important;background:rgba(5,25,36,.76)!important;font:700 8px/1.2 Orbitron,sans-serif!important;letter-spacing:.05em;box-shadow:0 8px 24px rgba(0,0,0,.24)!important}#mobileActionStack .mobilePackAction svg{width:21px;height:21px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}#mobileActionStack .mobilePackAction.mobile-mode-hidden{display:none!important}}
-/* Keep equipped-item use inside the existing two-row action footprint. */
-@media(max-width:760px),(pointer:coarse){
-#mobileTouchControls:has(#mobileActionStack.has-pack-action),#mobileTouchControls:has(#mobileActionStack.has-equipment-action){--mobile-action-width:175px}
-#mobileActionStack.has-equipment-action{display:grid!important;grid-template-columns:58px 108px;grid-template-rows:52px 52px;width:175px!important;gap:9px;align-items:stretch}
-#mobileActionStack.has-equipment-action #mobileActionPrimary{grid-column:2;grid-row:1}
-#mobileActionStack.has-equipment-action #mobileActionSecondary{grid-column:2;grid-row:2}
-#mobileActionStack.has-equipment-action .mobilePackAction{grid-column:1;grid-row:1}
-#mobileTouchControls #mobileActionStack.has-equipment-action #mobileEquipmentUse{grid-column:1;grid-row:2;min-width:58px;width:58px;padding:6px 4px}
-/* Driving separates steering travel from acceleration. Keep the existing
-   action buttons for handbrake, responder lights and mode-specific actions. */
-#mobileDrivePedals{position:absolute;right:var(--mobile-edge);bottom:var(--mobile-bottom);display:flex;gap:8px;pointer-events:none}
+#mobileTouchControls[data-handedness="southpaw"] #mobileMovePad{right:max(var(--mobile-edge),env(safe-area-inset-right));left:auto}
+#mobileTouchControls[data-handedness="southpaw"] #mobileLookPad{left:max(var(--mobile-edge),env(safe-area-inset-left));right:auto}
+#mobileTouchControls[data-handedness="southpaw"] #mobileActionStack{left:max(var(--mobile-edge),env(safe-area-inset-left));right:auto}
+
+#mobileTouchControls:has(#mobileActionStack.has-pack-action),
+#mobileTouchControls:has(#mobileActionStack.has-equipment-action){--mobile-action-width:calc(var(--mobile-small-action-width) + 117px)}
+#mobileTouchControls #mobileActionStack.has-pack-action,#mobileTouchControls #mobileActionStack.has-equipment-action {
+  display:grid;grid-template-columns:var(--mobile-small-action-width) minmax(0,1fr);
+  grid-template-rows:repeat(2,var(--mobile-action-row));width:var(--mobile-action-width);align-items:stretch;
+}
+#mobileActionStack.has-pack-action #mobileActionPrimary,#mobileActionStack.has-equipment-action #mobileActionPrimary{grid-column:2;grid-row:1}
+#mobileActionStack.has-pack-action #mobileActionSecondary,#mobileActionStack.has-equipment-action #mobileActionSecondary{grid-column:2;grid-row:2}
+#mobileTouchControls #mobileActionStack .mobilePackAction {
+  position:static;grid-column:1;grid-row:1/3;display:flex;width:var(--mobile-small-action-width);height:auto;
+  min-height:100%;flex-direction:column;gap:6px;align-items:center;justify-content:center;padding:4px;
+}
+#mobileActionStack .mobilePackAction svg{flex-shrink:0;width:21px;height:21px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+#mobileTouchControls #mobileActionStack .mobilePackAction.mobile-mode-hidden{display:none!important}
+#mobileTouchControls #mobileActionStack.has-equipment-action .mobilePackAction{grid-row:1}
+#mobileTouchControls #mobileActionStack.has-equipment-action #mobileEquipmentUse{grid-column:1;grid-row:2;min-width:0;width:var(--mobile-small-action-width);padding:4px}
+
+/* Separate steering and pedals remain separate commands, including reverse. */
+#mobileDrivePedals{position:absolute;right:max(var(--mobile-edge),env(safe-area-inset-right));bottom:var(--mobile-bottom);display:flex;gap:8px;pointer-events:none}
 #mobileDrivePedals[hidden]{display:none}
-#mobileDrivePedals button{width:76px;min-height:76px;padding:8px 5px;border:1px solid rgba(207,239,250,.58);border-radius:20px;background:rgba(5,25,36,.88);color:#f5fcff;font:700 10px/1.4 Orbitron,sans-serif;pointer-events:auto;touch-action:none;user-select:none;-webkit-user-select:none}
-#mobileDrivePedals button.active{background:rgba(11,103,134,.94);border-color:#7ee8ff}
-#mobileTouchControls.mode-driving #mobileMovePad{width:150px;height:94px;border-radius:48px}
-#mobileTouchControls.mode-driving #mobileLookPad{bottom:calc(var(--mobile-bottom) + 216px);width:98px;height:98px}
-#mobileTouchControls.mode-driving #mobileActionStack{bottom:calc(var(--mobile-bottom) + 88px)}
-#mobileTouchControls[data-handedness="southpaw"] #mobileDrivePedals{left:var(--mobile-edge);right:auto}
-#mobileTiltQuickRecenter{position:absolute;left:var(--mobile-edge);bottom:calc(var(--mobile-bottom) + 108px);min-height:40px;padding:8px 12px;border:1px solid rgba(126,205,234,.5);border-radius:20px;color:#eaf7fb;background:rgba(5,25,36,.88);font:600 10px Inter,sans-serif;pointer-events:auto;touch-action:manipulation}
+#mobileDrivePedals button{width:var(--mobile-pedal-width);min-height:var(--mobile-pedal-height);padding:8px 5px}
+#mobileTouchControls.mode-driving #mobileMovePad{--mobile-pad-size:max(122px,calc(178px - 28px * var(--wx-text-scale)));--mobile-pad-height:94px;border-radius:48px}
+#mobileTouchControls.mode-driving #mobileLookPad {
+  --mobile-pad-size:98px;
+  bottom:calc(var(--mobile-bottom) + var(--mobile-pedal-stack-height) + var(--mobile-stack-height) + 28px);
+}
+#mobileTouchControls.mode-driving #mobileActionStack{bottom:calc(var(--mobile-bottom) + var(--mobile-pedal-stack-height) + 12px)}
+#mobileTouchControls[data-handedness="southpaw"] #mobileDrivePedals{left:max(var(--mobile-edge),env(safe-area-inset-left));right:auto}
+#mobileTiltQuickRecenter{position:absolute;left:max(var(--mobile-edge),env(safe-area-inset-left));bottom:calc(var(--mobile-bottom) + 108px);max-width:150px;padding:8px 12px;touch-action:manipulation}
 #mobileTiltQuickRecenter.hidden{display:none}
 #mobileTouchControls.mode-plane #mobileTiltQuickRecenter,#mobileTouchControls.mode-rocket #mobileTiltQuickRecenter{bottom:calc(var(--mobile-bottom) + 144px)}
-#mobileTouchControls[data-handedness="southpaw"] #mobileTiltQuickRecenter{left:auto;right:var(--mobile-edge)}
-@media(max-height:560px) and (orientation:landscape) and (pointer:coarse){
-  #mobileTouchControls.mode-driving #mobileLookPad{bottom:var(--mobile-bottom);right:calc(var(--mobile-edge) + 176px);width:94px;height:94px}
-  #mobileTouchControls.mode-driving[data-handedness="southpaw"] #mobileLookPad{right:auto;left:calc(var(--mobile-edge) + 176px)}
-  #mobileTouchControls.mode-driving #mobileActionStack{bottom:calc(var(--mobile-bottom) + 88px)}
-  #mobileTiltQuickRecenter,#mobileTouchControls.mode-plane #mobileTiltQuickRecenter,#mobileTouchControls.mode-rocket #mobileTiltQuickRecenter{left:calc(50% + 32px);right:auto;bottom:var(--mobile-bottom);max-width:108px}
-  #mobileTouchControls[data-handedness="southpaw"] #mobileTiltQuickRecenter{left:auto;right:calc(50% + 32px)}
-}
-}
-@media(max-width:390px){#mobileTouchControls{--mobile-edge:10px}#mobileTouchControls .mobilePad{width:122px;height:122px}#mobileTouchControls #mobileLookPad{width:108px;height:108px;bottom:calc(var(--mobile-bottom) + 128px)}#mobileTouchControls #mobileActionStack{width:108px}#mobileTouchControls .mobileActionBtn{min-width:108px}}
-@media(max-height:560px) and (orientation:landscape) and (pointer:coarse){#mobileTouchControls{--mobile-edge:12px;--mobile-bottom:max(78px,calc(var(--wx-navigation-height,78px) + env(safe-area-inset-bottom)))}#mobileTouchControls .mobilePad{width:112px;height:112px}#mobileTouchControls #mobileLookPad{right:calc(var(--mobile-edge) + var(--mobile-action-width,108px) + 16px);bottom:var(--mobile-bottom);width:100px;height:100px}#mobileTouchControls #mobileActionStack{width:108px}#mobileTouchControls .mobileActionBtn{min-width:108px;min-height:46px}#mobileTouchControls[data-handedness="southpaw"] #mobileLookPad{left:calc(var(--mobile-edge) + var(--mobile-action-width,108px) + 16px);right:auto}}
+#mobileTouchControls[data-handedness="southpaw"] #mobileTiltQuickRecenter{left:auto;right:max(var(--mobile-edge),env(safe-area-inset-right))}
 
+@media(max-width:390px){
+  #mobileTouchControls{--mobile-edge:10px}
+  #mobileTouchControls .mobilePad{--mobile-pad-size:122px}
+  #mobileTouchControls #mobileLookPad{--mobile-pad-size:108px}
+}
+@media(max-width:360px){
+  #mobileTouchControls.mode-driving #mobileMovePad{--mobile-pad-size:132px}
+}
+/* Large text gets a two-column action deck rather than broken words in small
+   slots. It is the same controls and bindings, above the two thumb pads. */
+@media(max-width:480px){
+  html:is([data-we3d-text-scale="160"],[data-we3d-text-scale="200"]) #mobileTouchControls #mobileActionStack.has-pack-action,
+  html:is([data-we3d-text-scale="160"],[data-we3d-text-scale="200"]) #mobileTouchControls #mobileActionStack.has-equipment-action{
+    left:var(--mobile-edge);right:var(--mobile-edge);width:auto;grid-template-columns:repeat(2,minmax(0,1fr));
+    bottom:calc(var(--mobile-bottom) + 150px);
+  }
+  html:is([data-we3d-text-scale="160"],[data-we3d-text-scale="200"]) #mobileTouchControls #mobileActionStack .mobilePackAction,
+  html:is([data-we3d-text-scale="160"],[data-we3d-text-scale="200"]) #mobileTouchControls #mobileActionStack #mobileEquipmentUse{width:100%}
+  html:is([data-we3d-text-scale="160"],[data-we3d-text-scale="200"]) #mobileTouchControls.mode-walking #mobileLookPad{bottom:var(--mobile-bottom)}
+  html:is([data-we3d-text-scale="160"],[data-we3d-text-scale="200"]) #mobileTouchControls.mode-driving #mobileActionStack{
+    left:var(--mobile-edge);right:var(--mobile-edge);width:auto;flex-direction:row;
+    bottom:calc(var(--mobile-bottom) + var(--mobile-pedal-stack-height) + 16px);
+  }
+  html:is([data-we3d-text-scale="160"],[data-we3d-text-scale="200"]) #mobileTouchControls.mode-driving .mobileActionBtn{flex:1}
+  html:is([data-we3d-text-scale="160"],[data-we3d-text-scale="200"]) #mobileTouchControls.mode-driving #mobileLookPad,
+  html:is([data-we3d-text-scale="160"],[data-we3d-text-scale="200"]) #mobileTouchControls.mode-driving #mobileTiltQuickRecenter{
+    bottom:calc(var(--mobile-bottom) + var(--mobile-pedal-stack-height) + var(--mobile-action-row) + 32px);
+  }
+}
+@media(max-width:360px){
+  html:is([data-we3d-text-scale="160"],[data-we3d-text-scale="200"]) #mobileTouchControls{--mobile-pedal-stack-height:calc(2 * var(--mobile-pedal-height) + 8px)}
+  html:is([data-we3d-text-scale="160"],[data-we3d-text-scale="200"]) #mobileDrivePedals{flex-direction:column}
+}
+@media(max-height:560px) and (orientation:landscape) and (pointer:coarse){
+  #mobileTouchControls{--mobile-edge:12px;--mobile-bottom:max(78px,calc(var(--wx-navigation-height,78px) + env(safe-area-inset-bottom)))}
+  #mobileTouchControls .mobilePad{--mobile-pad-size:112px}
+  #mobileTouchControls #mobileLookPad{--mobile-pad-size:100px;right:calc(var(--mobile-edge) + var(--mobile-action-width,108px) + 16px);bottom:var(--mobile-bottom)}
+  #mobileTouchControls[data-handedness="southpaw"] #mobileLookPad{left:calc(var(--mobile-edge) + var(--mobile-action-width,108px) + 16px);right:auto}
+  #mobileTouchControls.mode-driving #mobileLookPad{--mobile-pad-size:94px;right:calc(var(--mobile-edge) + 2 * var(--mobile-pedal-width) + 24px);bottom:var(--mobile-bottom)}
+  #mobileTouchControls.mode-driving[data-handedness="southpaw"] #mobileLookPad{right:auto;left:calc(var(--mobile-edge) + 2 * var(--mobile-pedal-width) + 24px)}
+  #mobileTouchControls.mode-driving #mobileActionStack{width:calc(2 * max(108px,calc(76px * var(--wx-text-scale))) + 9px);flex-direction:row;justify-content:flex-end}
+  #mobileTouchControls.mode-driving .mobileActionBtn{width:max(108px,calc(76px * var(--wx-text-scale)))}
+  #mobileTiltQuickRecenter,#mobileTouchControls.mode-plane #mobileTiltQuickRecenter,#mobileTouchControls.mode-rocket #mobileTiltQuickRecenter{left:calc(50% - 96px);right:auto;bottom:var(--mobile-bottom);max-width:150px}
+  #mobileTouchControls[data-handedness="southpaw"] #mobileTiltQuickRecenter{left:auto;right:calc(50% - 96px)}
+}
+@media(forced-colors:active){
+  #mobileTouchControls .mobilePad.active .mobilePadLabel,#mobileTouchControls .mobileActionBtn.active,#mobileDrivePedals button.active{outline:3px solid Highlight;outline-offset:-4px}
+}
 }
