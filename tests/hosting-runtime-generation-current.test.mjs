@@ -135,4 +135,8 @@ test('current artifact verifies finite owned snapshots and rejects unexpected ge
   assert.throws(() => verifyRuntimeGenerations(packaging,{...files,[oldPath]:'0'.repeat(64)}), /mismatch/);
   assert.throws(() => verifyRuntimeGenerations(packaging,{...files,'runtime/unknown/js/key.js':'0'.repeat(64)}), /Unowned/);
   assert.throws(() => verifyRuntimeGenerations({...packaging,retainedBundlePaths:[]},files), /inventory/);
+  const standalone={...b.build.runtimePackaging,compatibility:[],retainedBundlePaths:[],rootModuleAliases:Object.fromEntries(Object.entries(b.assets.files).filter(([p])=>p.startsWith('js/')||p==='app/js/shared-context.js'))};
+  assert.doesNotThrow(()=>verifyRuntimeGenerations(standalone,b.assets.files));
+  const forged=structuredClone(standalone),changed={...b.assets.files,'js/shared.js':hash('unverified root code')};forged.rootModuleAliases['js/shared.js']=changed['js/shared.js'];
+  assert.throws(()=>verifyRuntimeGenerations(forged,changed),/verified authority/,'Self-consistent alias metadata cannot replace the actual current immutable source');
 });

@@ -387,6 +387,7 @@ async function buildArtifact(environment) {
   await writeGeneratedFirebaseFiles(environment, config);
   const snapshot = await snapshotRootModules(OUTPUT_DIR, [...sourceFiles.keys()], generation, runtime.entries['capture-review']);
   const rootModules = new Set([...sourceFiles.keys()].filter(relative => relative.startsWith('js/') && relative.endsWith('.js')));
+  for(const relative of [...rootModules,GAME_SHARED_CONTEXT_MODULE])await fs.copyFile(path.join(OUTPUT_DIR,generation.prefix.slice(1),relative),path.join(OUTPUT_DIR,relative));
   for (const relative of await listFiles(OUTPUT_DIR)) {
     if (!relative.endsWith('.html')) continue;
     const absolute = path.join(OUTPUT_DIR, relative), html = await fs.readFile(absolute, 'utf8');
@@ -489,7 +490,7 @@ async function verifyArtifact() {
       : relative;
     const outputHash = expectedFiles[outputRelative];
     const sourceHash = relative === 'js/admin-dashboard.js'
-      ? sha256(rewritePackagedModuleReference(await fs.readFile(source, 'utf8'), '../app/js/reality-capture/result-viewer.js', `../app/${buildManifest.runtimePackaging?.entries?.['capture-review']}`))
+      ? sha256(rewritePackagedModuleReference(await fs.readFile(source, 'utf8'), '../app/js/reality-capture/result-viewer.js', `/app/${buildManifest.runtimePackaging?.entries?.['capture-review']}`))
       : relative.endsWith('.html') ? sha256(pinHtmlRootModules(await fs.readFile(source, 'utf8'), relative, generation, rootModules))
       : await hashFile(source);
     if(legacyRoots.has(relative)){

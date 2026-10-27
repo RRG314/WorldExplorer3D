@@ -166,7 +166,11 @@ export function verifyRuntimeGenerations(packaging, assets) {
   if(packaging.rootModuleAliases){
     const roots=Object.keys(assets).filter(p=>rootModulePath(p)||p===sharedContext).sort();
     if(JSON.stringify(roots)!==JSON.stringify(Object.keys(packaging.rootModuleAliases).sort()))throw Error('Root alias inventory does not match');
-    for(const relative of roots)if(!/^[a-f0-9]{64}$/.test(packaging.rootModuleAliases[relative])||packaging.rootModuleAliases[relative]!==assets[relative])throw Error('Root alias hash does not match');
+    const legacy=retainedLegacyRootFiles(packaging);
+    for(const relative of roots){
+      const expected=legacy.get(relative)||current[`${generation.prefix.slice(1)}/${relative}`];
+      if(!/^[a-f0-9]{64}$/.test(expected||'')||packaging.rootModuleAliases[relative]!==expected||expected!==assets[relative])throw Error('Root alias hash does not match its verified authority');
+    }
   }else if(retained.some(p=>p.legacyRootPaths?.length))throw Error('Missing root alias inventory');
   for (const [relative, digest] of allowed) if (!/^[a-f0-9]{64}$/.test(digest) || assets[relative] !== digest) throw Error(`Runtime manifest mismatch: ${relative}`);
   for (const relative of Object.keys(assets)) if (relative.startsWith('runtime/') && !allowed.has(relative)) throw Error('Unowned runtime generation in artifact');
