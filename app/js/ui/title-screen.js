@@ -11,7 +11,7 @@ import { commitEnvironment } from '../session-coordinator.js?v=2';
 import { createGlobeSelector } from "./globe-selector.js?v=94";
 import { readSharedExperienceParams } from "./share-links.js?v=64";
 import { prepareTitleEnvironment } from "../planetary/entry.js?v=9";
-import { markFirstPlayReady, scheduleAfterFirstPlay } from '../runtime/workload-policy.js?v=1';
+import { markFirstPlayReady } from '../runtime/workload-policy.js?v=1';
 import {isEarthWorldUsable} from '../earth-core/world-readiness.js';
 import { setupGlobeHub } from './title-screen/globe-hub.js?v=8';
 import {
@@ -738,6 +738,10 @@ function initTitleScreenUi({
 
     await ensureEarthWorldRuntime();
     appCtx.ensureEnginePbrTextures?.();
+    // Start the local catalog while location data/geometry is loading. Starting
+    // it only after control release introduces its geometry and shader variants
+    // into the first playable seconds. The existing sky owner caches this load.
+    void appCtx.ensureStarCatalogLoaded?.();
     commitEnvironment(ENV.EARTH, { source: 'title_earth_start' });
     resetTitleEarthTravelMode('title_earth_start');
     const earthLoadResult = await appCtx.loadRoads();
@@ -748,9 +752,6 @@ function initTitleScreenUi({
       globeSelector.open();
       return false;
     }
-    scheduleAfterFirstPlay('earth-star-catalog', () => appCtx.ensureStarCatalogLoaded?.(), {
-      timeout: 1800
-    });
     const startedOnWater = appCtx.boatMode?.active === true;
     if (!startedOnWater) resetTitleEarthTravelMode('title_earth_ready');
     if (!startedOnWater && appCtx.Walk) {
