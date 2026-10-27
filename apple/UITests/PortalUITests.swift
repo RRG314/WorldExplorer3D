@@ -19,7 +19,7 @@ import Vision
     // accessibility tree omits. Locate their actual visible text, then require
     // the resulting Home Screen/native app state. Never invent a widget host
     // or tap a guessed screen coordinate when the control is absent.
-    private func visibleText(_ text: String, lowerPart: Bool = false, timeout: TimeInterval = 10) throws -> CGRect? {
+    private func visibleText(_ text: String, lowerPart: Bool = false, exactLine: Bool = false, timeout: TimeInterval = 10) throws -> CGRect? {
         let deadline = Date().addingTimeInterval(timeout)
         repeat {
             let image = try XCTUnwrap(XCUIScreen.main.screenshot().image.cgImage)
@@ -28,15 +28,15 @@ import Vision
             request.recognitionLanguages = ["en-US"]
             request.usesLanguageCorrection = false
             try VNImageRequestHandler(cgImage: image, options: [:]).perform([request])
-            let matches = try visibleSystemControlBounds(text, observations: request.results ?? [], lowerPart: lowerPart)
+            let matches = try visibleSystemControlBounds(text, observations: request.results ?? [], lowerPart: lowerPart, exactLine: exactLine)
             XCTAssertLessThanOrEqual(matches.count, 1, "The visible control must be unambiguous: \(text)")
             if matches.count == 1 { return matches[0] }
             Thread.sleep(forTimeInterval: 0.4)
         } while Date() < deadline
         return nil
     }
-    private func tapVisibleText(_ text: String, in application: XCUIApplication, lowerPart: Bool = false) throws {
-        let bounds = try XCTUnwrap(visibleText(text, lowerPart: lowerPart), "Visible control missing: \(text)")
+    private func tapVisibleText(_ text: String, in application: XCUIApplication, lowerPart: Bool = false, exactLine: Bool = false) throws {
+        let bounds = try XCTUnwrap(visibleText(text, lowerPart: lowerPart, exactLine: exactLine), "Visible control missing: \(text)")
         let point = CGPoint(x: bounds.midX, y: 1 - bounds.midY)
         XCTAssertTrue(CGRect(x: 0, y: 0, width: 1, height: 1).contains(point))
         application.coordinate(withNormalizedOffset: CGVector(dx: point.x, dy: point.y)).tap()
@@ -80,7 +80,7 @@ import Vision
         // even when tap() reports success. Resolve each system action from its
         // actual visible state; the next required control proves the transition.
         try tapVisibleText("Edit Home Screen", in: home)
-        try tapVisibleText("Edit", in: home)
+        try tapVisibleText("Edit", in: home, exactLine: true)
         try tapVisibleText("Add Widget", in: home)
         let search = home.searchFields.firstMatch
         XCTAssertTrue(search.waitForExistence(timeout: 5))
