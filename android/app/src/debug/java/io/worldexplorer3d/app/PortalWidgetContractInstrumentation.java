@@ -49,15 +49,19 @@ public final class PortalWidgetContractInstrumentation extends Instrumentation {
         java.util.ArrayList<android.util.SizeF> sizes=new java.util.ArrayList<>();sizes.add(new android.util.SizeF(width,height));options.putParcelableArrayList(AppWidgetManager.OPTION_APPWIDGET_SIZES,sizes);
         manager.updateAppWidgetOptions(widgetId,options);
         runOnMainSync(()->{if(view!=null&&view.getParent()!=null)((android.view.ViewGroup)view.getParent()).removeView(view);view=host.createView(activity,widgetId,manager.getAppWidgetInfo(widgetId));activity.showWidget(view,width,height);view.updateAppWidget(PortalWidgetProvider.views(getTargetContext(),widgetId));});
-        until(()->text(R.id.portal_title).equals("Baltimore"));waitForIdleSync();
+        until(()->text(R.id.portal_title).equals("Baltimore"));
+        java.util.concurrent.CountDownLatch drawn=new java.util.concurrent.CountDownLatch(1);
+        runOnMainSync(()->{final AppWidgetHostView attached=view;attached.getViewTreeObserver().addOnPreDrawListener(new android.view.ViewTreeObserver.OnPreDrawListener(){public boolean onPreDraw(){attached.getViewTreeObserver().removeOnPreDrawListener(this);drawn.countDown();return true;}});attached.invalidate();});
+        check(drawn.await(3,java.util.concurrent.TimeUnit.SECONDS),"The resized widget did not reach its first actual layout/draw.");waitForIdleSync();
     }
     private void visibleControls(int...ids){
         AtomicReference<String> failure=new AtomicReference<>();
         runOnMainSync(()->{Rect outer=new Rect();if(!view.getGlobalVisibleRect(outer)){failure.set("The widget is not visible.");return;}
             float density=view.getResources().getDisplayMetrics().density;
-            for(int id:ids){View control=view.findViewById(id);Rect rect=new Rect();if(control==null||!control.isShown()||!control.getGlobalVisibleRect(rect)||rect.height()!=control.getHeight()||!outer.contains(rect)||rect.width()<44*density||rect.height()<48*density){failure.set("Clipped or undersized widget control: "+id);return;}}
+            for(int id:ids){View control=view.findViewById(id);Rect rect=new Rect();if(control==null||!control.isShown()||!control.getGlobalVisibleRect(rect)||rect.height()!=control.getHeight()||!outer.contains(rect)||rect.width()<44*density||rect.height()<48*density){failure.set("Clipped or undersized widget control: "+view.getResources().getResourceName(id)+" visible="+rect+" raw="+(control==null?"missing":control.getWidth()+"x"+control.getHeight())+" outer="+outer);return;}}
         });check(failure.get()==null,failure.get());
     }
+    private boolean shown(int id){AtomicReference<Boolean> visible=new AtomicReference<>(false);runOnMainSync(()->{View item=view.findViewById(id);visible.set(item!=null&&item.isShown());});return visible.get();}
     private void completeText(int id){
         AtomicReference<String> failure=new AtomicReference<>();runOnMainSync(()->{TextView text=view.findViewById(id);android.text.Layout layout=text.getLayout();
             if(layout==null||layout.getLineCount()==0){failure.set("Missing widget text layout.");return;}
@@ -112,6 +116,7 @@ public final class PortalWidgetContractInstrumentation extends Instrumentation {
             step="medium responsive composition";attachWidget(activity,host,widgetId,320,280);visibleControls(R.id.portal_save,R.id.portal_investigate,R.id.portal_open);completeText(R.id.portal_title);screenshot("widget-medium.png");
             ActivityMonitor readingMonitor=addMonitor(PortalActivity.class.getName(),null,false);click(R.id.portal_investigate);Activity reading=waitForMonitorWithTimeout(readingMonitor,8000);removeMonitor(readingMonitor);check(reading!=null,"Medium Investigate did not open the complete native page.");expectedWindow=reading;screenshot("native-medium-investigation.png");runOnMainSync(reading::finish);expectedWindow=activity;until(this::foreground);
             step="compact responsive composition";attachWidget(activity,host,widgetId,180,200);visibleControls(R.id.portal_save,R.id.portal_open);completeText(R.id.portal_title);screenshot("widget-compact.png");
+            if(layoutOnly)store.act(id,"save");
             store.showFact(widgetId,id,0);android.app.PendingIntent previousNext=PortalWidgetProvider.action(context,widgetId,"next",id,300,440);
             runOnMainSync(activity::finish);fontChanged=true;fontScale(2f);
             activity=(PortalWidgetHarnessActivity)startActivitySync(new Intent(context,PortalWidgetHarnessActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));expectedWindow=activity;
@@ -120,8 +125,9 @@ public final class PortalWidgetContractInstrumentation extends Instrumentation {
                 java.util.concurrent.CountDownLatch completed=new java.util.concurrent.CountDownLatch(1);previousNext.send(context,0,null,(pending,intent,code,data,extras)->completed.countDown(),null);
                 check(completed.await(8,java.util.concurrent.TimeUnit.SECONDS),"The old reading command did not finish.");check(store.fact(widgetId)==0,"A clipped stale fact command advanced investigation.");
             }
-            visibleControls(R.id.portal_save,R.id.portal_investigate,R.id.portal_open);completeText(R.id.portal_title);check(text(R.id.portal_fact_next).isEmpty(),"Large text offered inline completion without full fact space.");screenshot("widget-large-system-text.png");
-            step="medium system text";attachWidget(activity,host,widgetId,320,280);visibleControls(R.id.portal_save,R.id.portal_investigate,R.id.portal_open);completeText(R.id.portal_title);screenshot("widget-medium-system-text.png");
+            visibleControls(R.id.portal_save,R.id.portal_open);completeText(R.id.portal_title);check(!shown(R.id.portal_investigate),"Large system text should open the full native investigation.");check(text(R.id.portal_fact_next).isEmpty(),"Large text offered inline completion without full fact space.");screenshot("widget-large-system-text.png");
+            step="medium system text";attachWidget(activity,host,widgetId,320,280);visibleControls(R.id.portal_save,R.id.portal_open);completeText(R.id.portal_title);screenshot("widget-medium-system-text.png");
+            ActivityMonitor largeReading=addMonitor(PortalActivity.class.getName(),null,false);click(R.id.portal_open);Activity fullPage=waitForMonitorWithTimeout(largeReading,8000);removeMonitor(largeReading);check(fullPage!=null,"Large-text Open did not reach the full native place.");expectedWindow=fullPage;screenshot("native-system-text-place.png");runOnMainSync(fullPage::finish);expectedWindow=activity;until(this::foreground);
             step="compact system text";attachWidget(activity,host,widgetId,180,200);visibleControls(R.id.portal_save,R.id.portal_open);completeText(R.id.portal_title);screenshot("widget-compact-system-text.png");
             store.configure(widgetId,"together",id);check(store.suggestion(widgetId,System.currentTimeMillis())==null,"Together fabricated a daily destination.");
             store.configure(widgetId,"beyond",id);check(store.suggestion(widgetId,System.currentTimeMillis())==null,"Beyond Earth fabricated an Earth visit.");

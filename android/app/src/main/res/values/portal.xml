@@ -15,7 +15,7 @@
     <string name="portal_investigate">Investigate</string><string name="portal_investigated">Investigated</string><string name="portal_visited">Visited in 3D</string>
     <string name="portal_close_fact">Close facts</string><string name="portal_next_fact">Next fact →</string><string name="portal_add_investigated">Add to Investigated</string>
     <string name="portal_open_place">Open place</string><string name="portal_enter">Enter World</string><string name="portal_open_game">Open game</string>
-    <string name="portal_open_short">Open</string><string name="portal_enter_short">Enter</string>
+    <string name="portal_save_short">Save</string><string name="portal_open_short">Open</string><string name="portal_enter_short">Enter</string>
     <string name="portal_bundled">Offline-ready collection · refresh when connected</string><string name="portal_updated">Collection updated %1$s</string>
     <string name="portal_together">Explore together</string><string name="portal_beyond">Beyond Earth</string><string name="portal_home">Your Home Portal</string>
     <string name="portal_together_body">Join the shared weekly city, create your own room or join a friend. The game checks sign-in and current room availability.</string>

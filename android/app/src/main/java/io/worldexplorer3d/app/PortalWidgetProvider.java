@@ -95,7 +95,7 @@ public final class PortalWidgetProvider extends AppWidgetProvider {
         views.setOnClickPendingIntent(R.id.portal_settings,open(context,widgetId,"configure",id));
         views.setOnClickPendingIntent(R.id.portal_trail,open(context,widgetId,"trail",id));
         views.setViewVisibility(R.id.portal_save,place==null?View.GONE:View.VISIBLE);
-        views.setViewVisibility(R.id.portal_investigate,place==null||compact?View.GONE:View.VISIBLE);
+        views.setViewVisibility(R.id.portal_investigate,place==null||compact||!inlineLearning&&context.getResources().getConfiguration().fontScale>1.3f?View.GONE:View.VISIBLE);
         long loaded=store.loadedAt();views.setTextViewText(R.id.portal_status,loaded==0?context.getString(R.string.portal_bundled):context.getString(R.string.portal_updated,DateFormat.getDateTimeInstance(DateFormat.SHORT,DateFormat.SHORT).format(new Date(loaded))));
         if(place!=null){
             JSONObject state=store.trail(id),learning=place.optJSONObject("learning");boolean revealed=inlineLearning&&id.equals(learningId),saved=state.optBoolean("saved");
@@ -104,7 +104,8 @@ public final class PortalWidgetProvider extends AppWidgetProvider {
             views.setTextViewText(R.id.portal_title,inlineLearning?title:title.split(" · ",2)[0]);
             views.setContentDescription(R.id.portal_title,title);
             views.setTextViewText(R.id.portal_region,place.optString("region"));
-            views.setTextViewText(R.id.portal_save,context.getString(saved?R.string.portal_saved:R.string.portal_save));
+            views.setTextViewText(R.id.portal_save,context.getString(saved?R.string.portal_saved:inlineLearning?R.string.portal_save:R.string.portal_save_short));
+            views.setContentDescription(R.id.portal_save,context.getString(saved?R.string.portal_saved:R.string.portal_save));
             views.setOnClickPendingIntent(R.id.portal_save,action(context,widgetId,saved?"unsave":"save",id,width,height));
             views.setOnClickPendingIntent(R.id.portal_investigate,!inlineLearning?open(context,widgetId,"place",id):action(context,widgetId,revealed?"close":"investigate",id,width,height));
             views.setTextViewText(R.id.portal_investigate,context.getString(revealed?R.string.portal_close_fact:R.string.portal_investigate));
