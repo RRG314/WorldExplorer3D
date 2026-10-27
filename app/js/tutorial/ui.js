@@ -18,6 +18,7 @@ export function createTutorialUi(options = {}) {
     if (!runtime.card) return;
     const open = expanded === true;
     runtime.card.classList.toggle('compact', !open);
+    if (!open) runtime.card.scrollTop = 0;
     runtime.detailsBtn?.setAttribute('aria-expanded', String(open));
     if (runtime.detailsBtn) runtime.detailsBtn.textContent = open ? 'Less' : 'Details';
   }

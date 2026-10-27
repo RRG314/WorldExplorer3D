@@ -1,39 +1,110 @@
-#tutorialHintCard[hidden]{display:none!important}
-#currentJourneyCard[hidden]{display:none!important}
-#currentJourneyCard{position:fixed;right:16px;bottom:88px;z-index:138;display:flex;align-items:center;gap:9px;width:min(340px,calc(100vw - 30px));box-sizing:border-box;padding:8px 32px 8px 10px;border:1px solid rgba(91,132,163,.48);border-left:3px solid #5ca7e8;border-radius:3px;background:linear-gradient(110deg,rgba(9,21,30,.97),rgba(5,12,18,.94));box-shadow:0 12px 28px rgba(0,0,0,.32);color:#edf5fb;backdrop-filter:blur(12px)}
-.space-flight-active #currentJourneyCard{right:260px;bottom:18px;z-index:10002}
-.currentJourneyMark{display:none}.currentJourneyMark svg{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:1.55;stroke-linecap:round;stroke-linejoin:round}
-.currentJourneyCopy{min-width:0;flex:1}.currentJourneyCopy span,.currentJourneyCopy strong,.currentJourneyCopy small{display:block}.currentJourneyCopy span{color:#75b8f1;font:700 7px/1.2 Orbitron,sans-serif;letter-spacing:.13em}.currentJourneyCopy strong{margin-top:4px;overflow:hidden;color:#f3f8fb;font:700 11px/1.25 Orbitron,sans-serif;text-overflow:ellipsis;white-space:nowrap}.currentJourneyCopy small{margin-top:3px;overflow:hidden;color:#a8b8c2;font:500 9px/1.35 Inter,sans-serif;white-space:normal;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2}#currentJourneyAction{position:relative;flex:0 0 auto;min-height:34px;border:1px solid #4f91ca;border-radius:2px;padding:0 22px 0 10px;background:#153f63;color:#f4f9ff;font:700 8px/1 Orbitron,sans-serif;cursor:pointer}#currentJourneyAction::after{content:'›';position:absolute;right:8px;top:50%;transform:translateY(-52%);font:500 15px/1 Inter,sans-serif}#currentJourneyAction:hover,#currentJourneyAction:focus-visible{border-color:#83c2f8;background:#1b527f;outline:none}
-#currentJourneyDismiss{position:absolute;top:3px;right:3px;width:24px;height:24px;border:0;background:transparent;color:#8fa4b3;font:500 17px/1 Inter,sans-serif;cursor:pointer}#currentJourneyDismiss:hover,#currentJourneyDismiss:focus-visible{color:#fff;outline:1px solid rgba(131,194,248,.7)}
-.tutorial-card{position:fixed;right:16px;bottom:88px;z-index:250;width:min(344px,calc(100vw - 30px));padding:13px;border:1px solid var(--wx-line-soft);border-left:2px solid var(--wx-blue);border-radius:3px;background:rgba(5,12,18,.96);color:var(--wx-text);box-shadow:0 18px 44px rgba(0,0,0,.46);font:500 12px/1.45 Inter,sans-serif;backdrop-filter:blur(12px);pointer-events:none;transition:width .16s ease,padding .16s ease}
-.tutorial-card button{pointer-events:auto}
-.tutorial-card.compact{width:min(292px,calc(100vw - 24px));padding:10px 11px}
-.tutorial-card-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
-.tutorial-card-head>div:first-child{min-width:0}
-.tutorial-eyebrow,.tutorial-settings-eyebrow{display:block;color:var(--wx-blue);font:600 8px/1.2 Orbitron,sans-serif;letter-spacing:.13em;text-transform:uppercase}
-.tutorial-title{display:block;margin-top:5px;overflow:hidden;color:var(--wx-text);font:700 13px/1.25 Orbitron,sans-serif;text-overflow:ellipsis;text-transform:uppercase;white-space:nowrap}
-.tutorial-card:not(.compact) .tutorial-title{white-space:normal}
-.tutorial-head-actions{display:flex;flex:0 0 auto;gap:5px}
-.tutorial-details-btn,.tutorial-icon-btn{height:27px;border:1px solid var(--wx-line-soft);border-radius:2px;background:#101921;color:var(--wx-muted);font:600 9px/1 Inter,sans-serif;cursor:pointer}
-.tutorial-details-btn{padding:0 8px}
-.tutorial-icon-btn{width:27px;font-size:16px}
-.tutorial-body{margin:11px 0;color:var(--wx-muted);white-space:pre-line}
-.tutorial-progress-track{height:2px;background:#1b2730;overflow:hidden}
-.tutorial-progress-track span{display:block;width:10%;height:100%;background:var(--wx-blue);transition:width .25s ease}
-.tutorial-actions{display:flex;align-items:center;gap:7px;margin-top:11px}
-.tutorial-actions button{min-height:31px;border-radius:2px;padding:7px 10px;font:600 10px/1 Inter,sans-serif;cursor:pointer}
-.tutorial-primary{border:1px solid var(--wx-blue);background:var(--wx-blue);color:#fff}
-.tutorial-secondary{border:1px solid var(--wx-line-soft);background:#101921;color:var(--wx-text)}
-.tutorial-text-btn{margin-left:auto;border:0;background:transparent;color:var(--wx-muted)}
-.tutorial-card.compact .tutorial-body,.tutorial-card.compact .tutorial-progress-track,.tutorial-card.compact .tutorial-actions{display:none}
-.tutorial-settings-card{margin-top:18px;padding:14px;border:1px solid rgba(157,174,186,.28);border-radius:2px;background:#071018;color:#f4f7f9;font:500 12px/1.45 Inter,sans-serif}
-.tutorial-settings-card h3{margin:6px 0 8px;font:700 14px/1.2 Orbitron,sans-serif;text-transform:uppercase}
-.tutorial-settings-card p{margin:0 0 12px;color:#9aa8b2}
-.tutorial-settings-card label{display:flex;align-items:center;gap:8px;color:#f4f7f9}
-.tutorial-settings-card input{accent-color:#2d7dff}
-.tutorial-settings-actions{margin-top:12px}
-.tutorial-settings-actions button{border:1px solid rgba(157,174,186,.28);border-radius:2px;padding:8px 11px;background:#101921;color:#f4f7f9;font:600 10px Inter,sans-serif;cursor:pointer}
-#tutorialSettingsStatus{min-height:16px;margin-top:9px;color:#9aa8b2;font-size:10px}
+/* First Journey and the contextual journey card share the Roam presentation.
+   Tutorial, activity and screen-layout owners still decide what is shown. */
+#tutorialHintCard[hidden], #currentJourneyCard[hidden] { display: none !important; }
+.tutorial-card, #currentJourneyCard, .tutorial-settings-card {
+  box-sizing: border-box;
+  border: 1px solid var(--wx-line-soft);
+  border-radius: var(--wx-radius);
+  background: var(--wx-panel-solid);
+  color: var(--wx-text);
+  font: 500 var(--wx-type-control)/1.5 var(--wx-font-ui);
+  box-shadow: var(--wx-shadow-panel);
+}
+.tutorial-card, #currentJourneyCard {
+  position: fixed;
+  right: max(16px, env(safe-area-inset-right));
+  bottom: max(88px, calc(env(safe-area-inset-bottom) + 80px));
+  width: min(420px, calc(100vw - 32px));
+  max-height: calc(100dvh - 112px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+  border-left: 3px solid var(--wx-action);
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+#currentJourneyCard {
+  z-index: 138;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: center;
+  gap: var(--wx-space-3);
+  padding: var(--wx-space-4) 52px var(--wx-space-4) var(--wx-space-4);
+}
+.space-flight-active #currentJourneyCard { right: 260px; bottom: 18px; z-index: 10002; }
+.currentJourneyMark { display: none; }
+.currentJourneyCopy { min-width: 0; }
+.currentJourneyCopy :is(span, strong, small) { display: block; overflow-wrap: anywhere; }
+.currentJourneyCopy span, .tutorial-eyebrow, .tutorial-settings-eyebrow {
+  color: var(--wx-action);
+  font: 700 var(--wx-type-meta)/1.4 var(--wx-font-ui);
+}
+.currentJourneyCopy strong { margin-top: 4px; font-size: var(--wx-type-control); line-height: 1.4; }
+.currentJourneyCopy small { margin-top: 4px; color: var(--wx-muted); font-size: var(--wx-type-meta); }
+#currentJourneyAction, .tutorial-card button, .tutorial-settings-actions button {
+  box-sizing: border-box;
+  min-height: var(--wx-control-height);
+  min-width: var(--wx-control-height);
+  border: 1px solid var(--wx-line);
+  border-radius: var(--wx-radius);
+  padding: 8px 12px;
+  background: var(--wx-panel-soft);
+  color: var(--wx-text);
+  font: 600 var(--wx-type-meta)/1.35 var(--wx-font-ui);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+#currentJourneyAction { justify-self: start; }
+#currentJourneyAction, .tutorial-card .tutorial-primary {
+  border-color: var(--wx-action);
+  background: var(--wx-action);
+  color: var(--wx-action-text);
+}
+#currentJourneyAction:hover, .tutorial-card .tutorial-primary:hover { background: var(--wx-action-hover); }
+#currentJourneyDismiss {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--wx-radius);
+  background: transparent;
+  color: var(--wx-muted);
+  font: 24px/1 var(--wx-font-ui);
+  cursor: pointer;
+}
+.tutorial-card { z-index: 250; padding: var(--wx-space-3); pointer-events: auto; touch-action: pan-y; }
+.tutorial-card.compact { pointer-events: none; }
+.tutorial-card button { pointer-events: auto; }
+.tutorial-card-head { display: flex; flex-wrap: wrap; align-items: flex-start; gap: var(--wx-space-2); }
+.tutorial-card-head > div:first-child { flex: 1 1 140px; min-width: 0; }
+.tutorial-head-actions { display: flex; flex: 0 1 auto; gap: var(--wx-space-1); margin-left: auto; }
+.tutorial-title { display: block; margin-top: 4px; color: var(--wx-text); font: 700 var(--wx-type-control)/1.4 var(--wx-font-ui); overflow-wrap: anywhere; }
+.tutorial-card .tutorial-icon-btn { width: 44px; padding: 0; font-size: 24px; }
+.tutorial-body { margin: var(--wx-space-3) 0; color: var(--wx-muted); white-space: pre-line; overflow-wrap: anywhere; }
+.tutorial-progress-track { height: 4px; overflow: hidden; background: var(--wx-selected); }
+.tutorial-progress-track span { display: block; width: 10%; height: 100%; background: var(--wx-action); transition: width var(--wx-motion-fast) ease; }
+.tutorial-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--wx-space-2); margin-top: var(--wx-space-3); }
+.tutorial-card .tutorial-text-btn { margin-left: auto; border-color: transparent; background: transparent; color: var(--wx-muted); }
+.tutorial-card.compact :is(.tutorial-body, .tutorial-progress-track, .tutorial-actions) { display: none; }
+.tutorial-settings-card { margin-top: 18px; padding: var(--wx-space-4); box-shadow: none; }
+.tutorial-settings-card h3 { margin: 8px 0; font: 700 var(--wx-type-body)/1.4 var(--wx-font-ui); }
+.tutorial-settings-card p { margin: 0 0 12px; color: var(--wx-muted); }
+.tutorial-settings-card label { display: flex; align-items: center; gap: 8px; min-height: 44px; cursor: pointer; }
+.tutorial-settings-card input { flex: 0 0 24px; width: 24px; height: 24px; accent-color: var(--wx-action); }
+.tutorial-settings-actions { margin-top: 12px; }
+#tutorialSettingsStatus { min-height: 1.5em; margin-top: 8px; color: var(--wx-muted); font-size: var(--wx-type-meta); }
+:is(.tutorial-card, .tutorial-settings-card, #currentJourneyCard) :focus-visible { outline: 2px solid var(--wx-focus); outline-offset: 2px; }
+@media (max-width: 700px), (pointer: coarse) {
+  .tutorial-card { right: max(8px, env(safe-area-inset-right)); bottom: max(330px, calc(env(safe-area-inset-bottom) + 322px)); width: min(420px, calc(100vw - 16px)); max-height: calc(100dvh - 350px - env(safe-area-inset-top)); }
+  body:not(.space-flight-active) #currentJourneyCard { right: max(8px, env(safe-area-inset-right)); bottom: max(82px, calc(env(safe-area-inset-bottom) + 74px)); width: min(360px, calc(100vw - 16px)); grid-template-columns: minmax(0, 1fr); }
+  body:not(.space-flight-active) #currentJourneyAction { justify-self: start; }
+  .space-flight-active #currentJourneyCard { display: none !important; }
+}
+@media (max-height: 520px) and (orientation: landscape) {
+  .tutorial-card { top: max(8px, env(safe-area-inset-top)); bottom: auto; right: max(8px, env(safe-area-inset-right)); max-height: calc(100dvh - 160px - env(safe-area-inset-top) - env(safe-area-inset-bottom)); }
+  body:not(.space-flight-active) #currentJourneyCard { top: max(8px, env(safe-area-inset-top)); bottom: auto; max-height: calc(100dvh - 160px - env(safe-area-inset-top) - env(safe-area-inset-bottom)); }
+}
+
 body:has(.floatMenu.open) #tutorialHintCard,
 body:has(#discoveryPanel.show) #tutorialHintCard,
 body:has(#urbanEquipment[aria-hidden="false"]) #tutorialHintCard{display:none!important}
@@ -61,10 +132,3 @@ body:has(#tutorialHintCard[data-tutorial-stage="move"]:not([hidden])) #interiorP
 body:has(#tutorialHintCard[data-tutorial-stage="move"]:not([hidden])) #boatPrompt,
 body:has(#tutorialHintCard[data-tutorial-stage="move"]:not([hidden])) #discoveryContextPrompt{display:none!important}
 body:has(#controlsTab.bar-open) #tutorialHintCard{display:none!important}
-@media(max-width:700px){
-  .tutorial-card{top:auto;right:max(9px,env(safe-area-inset-right));bottom:max(330px,calc(env(safe-area-inset-bottom) + 322px));width:min(330px,calc(100vw - 18px));max-height:calc(100dvh - 360px);overflow:auto;padding:11px}
-  .tutorial-card.compact{width:min(286px,calc(100vw - 18px));padding:9px 10px}
-  .tutorial-body{margin:8px 0}.tutorial-actions{margin-top:9px;flex-wrap:wrap}.tutorial-text-btn{margin-left:auto}
-  body:not(.space-flight-active) #currentJourneyCard{right:max(8px,env(safe-area-inset-right));bottom:max(82px,calc(env(safe-area-inset-bottom) + 74px));width:min(270px,calc(100vw - 18px));min-height:0;display:flex;flex-direction:column;align-items:stretch;justify-content:space-between;gap:7px;padding:9px 32px 9px 9px}body:not(.space-flight-active) .currentJourneyCopy strong{white-space:normal;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2}body:not(.space-flight-active) .currentJourneyCopy small{display:none}body:not(.space-flight-active) #currentJourneyAction{width:100%;min-height:31px;padding-left:8px;text-align:left}
-  .space-flight-active #currentJourneyCard{display:none!important}
-}

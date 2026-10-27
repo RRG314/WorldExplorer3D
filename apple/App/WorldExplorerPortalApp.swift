@@ -132,13 +132,13 @@ struct PortalRootView: View {
         VStack(alignment: .leading, spacing: 18) {
             Text("Explore together").font(.title2.bold())
             Text("Enter the shared weekly city, create a room or join a friend. The game checks your sign-in and current room availability.").foregroundStyle(PortalStyle.muted)
-            Button("Open Multiplayer") { model.openGame("/app/?tab=multiplayer") }.buttonStyle(.borderedProminent)
+            Button("Open Multiplayer") { model.openGame("/app/?tab=multiplayer") }.buttonStyle(.borderedProminent).foregroundStyle(PortalStyle.actionText)
         }
     }
     private var beyond: some View {
         VStack(alignment: .leading, spacing: 18) {
             Text("Beyond Earth").font(.title2.bold()); Text("Choose the Moon, Mars or a journey through space.").foregroundStyle(PortalStyle.muted)
-            ForEach(["moon", "mars", "space"], id: \.self) { body in Button(body.capitalized) { model.openGame("/app/?launch=" + body + "&gm=free") }.buttonStyle(.borderedProminent) }
+            ForEach(["moon", "mars", "space"], id: \.self) { body in Button(body.capitalized) { model.openGame("/app/?launch=" + body + "&gm=free") }.buttonStyle(.borderedProminent).foregroundStyle(PortalStyle.actionText) }
         }
     }
 }
@@ -155,7 +155,7 @@ struct PortalPlaceView: View {
                 VStack(alignment: .leading, spacing: 20) {
                     Text(place.title).font(.largeTitle.bold()); Text(place.region).foregroundStyle(PortalStyle.accent)
                     Text(place.summary).foregroundStyle(PortalStyle.muted)
-                    Button(state?.saved == true ? "Remove from saved places" : "Save place") { model.act(id, kind: state?.saved == true ? .unsave : .save, owner: owner) }.buttonStyle(.borderedProminent)
+                    Button(state?.saved == true ? "Remove from saved places" : "Save place") { model.act(id, kind: state?.saved == true ? .unsave : .save, owner: owner) }.buttonStyle(.borderedProminent).foregroundStyle(PortalStyle.actionText)
                     if model.collection?.gameAvailable(place, now: PortalContract.milliseconds()) == true {
                         Button("Enter World") { model.openGame(place.gameLink) }.buttonStyle(.bordered)
                     } else { Text("3D entry is being checked for this destination. You can save it and investigate now.").font(.footnote).foregroundStyle(PortalStyle.muted) }
@@ -163,7 +163,7 @@ struct PortalPlaceView: View {
                     ForEach(Array(place.learning.paragraphs.enumerated()), id: \.offset) { _, paragraph in Text(paragraph) }
                     Text("Read more").font(.headline)
                     ForEach(Array(place.learning.sources.enumerated()), id: \.offset) { _, source in Link(source.title, destination: source.url) }
-                    Button(state?.investigationVersion == place.learning.version ? "Investigated" : "Add to Investigated") { model.act(id, kind: .investigate, owner: owner, version: place.learning.version) }.buttonStyle(.borderedProminent)
+                    Button(state?.investigationVersion == place.learning.version ? "Investigated" : "Add to Investigated") { model.act(id, kind: .investigate, owner: owner, version: place.learning.version) }.buttonStyle(.borderedProminent).foregroundStyle(PortalStyle.actionText)
                     if !model.message.isEmpty { Text(model.message).foregroundStyle(PortalStyle.muted) }
                 }.padding(20).frame(maxWidth: 820, alignment: .leading).frame(maxWidth: .infinity)
             }
@@ -186,10 +186,10 @@ struct PortalAccountView: View {
             if !account.verificationCode.isEmpty, let url = account.approvalURL {
                 Text("Check that this code matches your browser before approving.").foregroundStyle(PortalStyle.muted)
                 Text(account.verificationCode).font(.largeTitle.monospaced().bold()).textSelection(.enabled)
-                Link("Approve in browser", destination: url).buttonStyle(.borderedProminent)
+                Link("Approve in browser", destination: url).buttonStyle(.borderedProminent).foregroundStyle(PortalStyle.actionText)
                 Button("Cancel connection") { account.cancel(displayedVersion: version) }.buttonStyle(.bordered)
             } else if account.phase == "connecting" { ProgressView("Connecting…"); Button("Cancel connection") { account.cancel(displayedVersion: version) } }
-            else { Button(account.accountLabel.isEmpty ? "Connect your Explorer account" : "Connect a different account") { account.begin() }.buttonStyle(.borderedProminent) }
+            else { Button(account.accountLabel.isEmpty ? "Connect your Explorer account" : "Connect a different account") { account.begin() }.buttonStyle(.borderedProminent).foregroundStyle(PortalStyle.actionText) }
             if owner != PortalContract.guest {
                 Button("Sync Trail now") { Task { await account.synchronize(); model.reload() } }
                 Button("Copy device choices") { copyOwner = owner }
