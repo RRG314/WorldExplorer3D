@@ -1,4 +1,7 @@
-const DATA_API = 'https://planetarycomputer.microsoft.com/api/data/v1/item/bbox/';
+const DATA_API = 'https://planetarycomputer.microsoft.com/api/data/v1/item/tiles/WebMercatorQuad/';
+const TILE_SIZE = 256;
+const MAX_TILE_BYTES = TILE_SIZE * TILE_SIZE + 4096 + 12;
+const MERCATOR_LATITUDE = 85.0511287798066;
 export const WORLD_COVER_CLASS_MIME = 'application/vnd.we3d.worldcover-classes';
 
 export function worldCoverSourceTile(latitude, longitude) {
@@ -7,10 +10,15 @@ export function worldCoverSourceTile(latitude, longitude) {
   return {lat,lon,id,url:`https://esa-worldcover.s3.eu-central-1.amazonaws.com/v200/2021/map/ESA_WorldCover_10m_2021_v200_${id}_Map.tif`};
 }
 
-export function worldCoverWindows(bounds, size) {
+function validateGrid(bounds,size) {
   if (!Number.isInteger(size) || size < 1 || size > 128) throw new Error('Unsupported WorldCover raster size');
   const {latS,latN,lonW,lonE} = bounds;
   if (![latS,latN,lonW,lonE].every(Number.isFinite) || latS < -90 || latN > 90 || lonW < -180 || lonE > 180 || latN <= latS || lonE <= lonW || latN-latS>3 || lonE-lonW>3) throw new Error('Unsupported WorldCover bounds');
+}
+
+export function worldCoverWindows(bounds, size) {
+  validateGrid(bounds,size);
+  const {latS,latN,lonW,lonE} = bounds;
   const groups = new Map();
   for(let y=0;y<size;y++) for(let x=0;x<size;x++) {
     const tile=worldCoverSourceTile(latN-(y+.5)/size*(latN-latS),lonW+(x+.5)/size*(lonE-lonW));
@@ -39,22 +47,51 @@ export function decodeWorldCoverNpy(buffer, width, height) {
   return result;
 }
 
+// Target cells retain their geographic centres. The supported raw numeric tile
+// endpoint supplies nearest-neighbour class bytes; no display colour is data.
+// Pick a level whose longest edge spans at most one 256-pixel tile. Misalignment
+// can cross two tiles per axis and four source COGs: at most 16 bounded requests.
+export function worldCoverTilePlan(bounds,size) {
+  validateGrid(bounds,size);
+  const {latS,latN,lonW,lonE}=bounds;
+  if(latS < -MERCATOR_LATITUDE || latN > MERCATOR_LATITUDE)throw new Error('Unsupported WorldCover tile latitude');
+  const mercatorY=latitude=>(1-Math.asinh(Math.tan(latitude*Math.PI/180))/Math.PI)/2;
+  const span=Math.max((lonE-lonW)/360,mercatorY(latS)-mercatorY(latN));
+  const zoom=Math.max(0,Math.min(18,Math.ceil(Math.log2(size/(TILE_SIZE*span))))),tiles=2**zoom,pixels=TILE_SIZE*tiles,groups=new Map();
+  for(let y=0;y<size;y++)for(let x=0;x<size;x++){
+    const lat=latN-(y+.5)/size*(latN-latS),lon=lonW+(x+.5)/size*(lonE-lonW);
+    const px=Math.max(0,Math.min(pixels-1,Math.floor((lon+180)/360*pixels))),py=Math.max(0,Math.min(pixels-1,Math.floor(mercatorY(lat)*pixels)));
+    // An output pixel can straddle a 3-degree source-file edge. Read the COG
+    // containing the chosen native pixel centre, not a masked adjacent file.
+    const source=worldCoverSourceTile(Math.atan(Math.sinh(Math.PI*(1-2*(py+.5)/pixels)))*180/Math.PI,(px+.5)/pixels*360-180);
+    const tileX=Math.floor(px/TILE_SIZE),tileY=Math.floor(py/TILE_SIZE),key=`${source.id}:${zoom}:${tileX}:${tileY}`;
+    let group=groups.get(key);if(!group){group={source,zoom,x:tileX,y:tileY,samples:[]};groups.set(key,group);}
+    group.samples.push(y*size+x,(py%TILE_SIZE)*TILE_SIZE+px%TILE_SIZE);
+  }
+  if(groups.size>16)throw new Error('WorldCover request budget exceeded');
+  return [...groups.values()];
+}
+
 export async function fetchWorldCoverClasses(bounds,size,signal,fetchImpl=globalThis.fetch) {
-  const windows=worldCoverWindows(bounds,size);
+  const plan=worldCoverTilePlan(bounds,size);
   const result=new Uint8Array(size*size);
-  for(const g of windows) {
+  for(const g of plan) {
     signal?.throwIfAborted();
-    const query=new URLSearchParams({collection:'esa-worldcover',item:`ESA_WorldCover_10m_2021_v200_${g.tile.id}`,assets:'map',resampling:'nearest',reproject:'nearest',return_mask:'false'});
-    const response=await fetchImpl(`${DATA_API}${g.bbox.join(',')}/${g.width}x${g.height}.npy?${query}`,{signal,credentials:'omit'});
-    if(!response.ok) throw Object.assign(new Error(`WorldCover numeric HTTP ${response.status}`),{status:response.status});
-    const reader=response.body.getReader();
+    const query=new URLSearchParams({collection:'esa-worldcover',item:`ESA_WorldCover_10m_2021_v200_${g.source.id}`,assets:'map',resampling:'nearest',reproject:'nearest',return_mask:'false'});
+    const response=await fetchImpl(`${DATA_API}${g.zoom}/${g.x}/${g.y}.npy?${query}`,{signal,credentials:'omit'});
+    const reader=response.body?.getReader();
     const chunks=[];let length=0;
     try {
-      for(;;){const part=await reader.read();if(part.done)break;length+=part.value.length;if(length>32768){await reader.cancel();throw new Error('Class raster exceeds bounded payload');}chunks.push(part.value);}
-    } finally {reader.releaseLock();}
+      signal?.throwIfAborted();
+      if(!response.ok) throw Object.assign(new Error(`WorldCover numeric HTTP ${response.status}`),{status:response.status});
+      if(!reader)throw new Error('Missing WorldCover numeric response');
+      for(;;){signal?.throwIfAborted();const part=await reader.read();if(part.done)break;length+=part.value.length;if(length>MAX_TILE_BYTES)throw new Error('Class raster exceeds bounded payload');chunks.push(part.value);}
+    } catch(error) {await reader?.cancel(error).catch(()=>{});throw error;
+    } finally {reader?.releaseLock();}
     const bytes=new Uint8Array(length);let offset=0;for(const chunk of chunks){bytes.set(chunk,offset);offset+=chunk.length;}
-    const data=decodeWorldCoverNpy(bytes.buffer,g.width,g.height);
-    for(let y=0;y<g.height;y++) result.set(data.subarray(y*g.width,(y+1)*g.width),(g.minY+y)*size+g.minX);
+    const data=decodeWorldCoverNpy(bytes.buffer,TILE_SIZE,TILE_SIZE);
+    for(let i=0;i<g.samples.length;i+=2)result[g.samples[i]]=data[g.samples[i+1]];
   }
+  signal?.throwIfAborted();
   return result;
 }

@@ -486,7 +486,7 @@ async function createSemanticTexture(blob, size, bounds = null) {
 export async function loadWorldCoverBaseline(bounds, options = {}) {
   if (!worldCoverSupportsBounds(bounds) || typeof document === 'undefined') return null;
   const size = Math.max(32, Math.min(128, Math.round(Number(options.size) || DEFAULT_TEXTURE_SIZE)));
-  const key = `categorical-v200-v1:${size}:${String(options.key || worldCoverTileKey(bounds, size))}`;
+  const key = `categorical-v200-v2:${size}:${String(options.key || worldCoverTileKey(bounds, size))}`;
   const loaded = await fetchWorldCoverBlob(
     bounds,
     size,
