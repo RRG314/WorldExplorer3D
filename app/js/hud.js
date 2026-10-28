@@ -18,6 +18,7 @@ import { applyDrivingCabinCamera, setCabinNearClip } from './hud/driving-cabin-c
 import { cameraSmoothingBlend } from "./controls/traversal-control-policy.js?v=9";
 import { beginCameraFollowFrame, cameraFollowHistory, smoothMovingCameraTarget } from "./hud/moving-camera-target.js";
 import { planetarySurfaceYAtRenderXZ } from './planetary/runtime/surface-query.js?v=3';
+import {isPlanetarySurfaceActive} from './planetary/traversal-capabilities.js?v=1';
 // hud.js - HUD updates, camera system, sky positioning
 // ============================================================================
 
@@ -794,7 +795,8 @@ function updateHUD() {
   setDomText(document.getElementById('limit'), limit);
   const planetarySurfaceLabel = appCtx.onMars ? 'Martian Surface' : appCtx.onMoon ? 'Lunar Surface' : null;
   setStreetAndLocation(planetarySurfaceLabel || appCtx.car.road?.name || 'Exploring', locName);
-  updateConditionBar(appCtx.car.condition ?? 1, appCtx.car.durabilityPolicy === 'exploration_unlimited' ? 'BMW' : 'Vehicle');
+  updateConditionBar(appCtx.car.condition ?? 1, isPlanetarySurfaceActive(appCtx)
+    ? 'Rover' : appCtx.car.durabilityPolicy === 'exploration_unlimited' ? 'BMW' : 'Vehicle');
   setDomClass(document.getElementById('indBrake'), 'on', appCtx.keys.Space);
   setDomClass(document.getElementById('indBoost'), 'on', appCtx.car.boost);
   const isDrifting = appCtx.car.isDrifting === true && Math.abs(appCtx.car.driftAngle) > 0.08;

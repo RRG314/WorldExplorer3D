@@ -1,4 +1,5 @@
 import { lunarFieldPlan } from './lunar-survey.js';
+import {mountHudPanel} from '../ui/hud-panel.js';
 import { APOLLO11_SURFACE_REGION } from './runtime/surface-authority.js?v=5';
 import { planetarySurfaceYAtRenderXZ } from './runtime/surface-query.js?v=3';
 import { stageSurfacePod, getStagedSurfacePod, releaseStagedEarthPod, consumeStagedEarthPod, playSurfacePodLaunch } from './surface-pod-launch.js?v=11';
@@ -9,7 +10,7 @@ let narrowScreen = null;
 function showLunarPanel(ctx) {
   let panel = document.getElementById('solidWorldPanel');
   if (!panel) { panel = document.createElement('aside'); panel.id = 'solidWorldPanel'; document.body.appendChild(panel); }
-  panel.style.cssText = 'position:fixed;top:76px;right:18px;left:auto;z-index:999;background:rgba(10,20,27,.9);border:1px solid #526773;padding:10px;color:#fff;font:12px Inter,sans-serif;width:220px;max-width:calc(100vw - 40px);line-height:1.4;display:block';
+  mountHudPanel(panel);
   panel.dataset.fieldBody = 'moon';
   panel.innerHTML = '<details open><summary style="cursor:pointer;font-weight:700">Lunar Field Book</summary><p>Compare Site A and Site B. Use E at each instrument. Return to Pathfinder whenever you need to; saved records stay in your Journal.</p><small id="lunarFieldPower" style="display:block;margin-bottom:6px"></small><button id="lunarPowerRetry" class="floatItem" type="button" hidden>Retry battery save</button><canvas id="planetaryFieldMap" width="220" height="105" style="display:block;width:100%;height:105px" aria-label="Lunar stations and return pod"></canvas><small id="planetaryFieldHint" style="display:block;margin-top:6px"></small><button id="planetaryJournalBtn" class="floatItem" type="button">Open Journal</button><small style="display:block;margin-top:6px;color:#b4c4ce">Simulated samples · NASA/ASU lunar terrain</small></details>';
   panel.querySelector('#lunarPowerRetry').addEventListener('click', () => ctx.retryLunarFieldPower?.());
@@ -20,12 +21,11 @@ function showLunarPanel(ctx) {
     narrowScreen.addEventListener('change', event => {
       const current = document.getElementById('solidWorldPanel');
       if (current?.dataset.fieldBody === 'moon') {
-        current.style.width = event.matches ? 'min(180px, calc(100vw - 220px))' : '220px';
         if (event.matches) current.querySelector('details')?.removeAttribute('open');
       }
     });
   }
-  if (narrowScreen?.matches || globalThis.innerWidth < 600) { panel.querySelector('details').open = false; panel.style.width = 'min(180px, calc(100vw - 220px))'; }
+  if (narrowScreen?.matches || globalThis.innerWidth < 600) panel.querySelector('details').open = false;
 }
 
 export function activateLunarFieldwork(ctx) {

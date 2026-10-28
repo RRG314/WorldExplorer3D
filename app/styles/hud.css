@@ -183,15 +183,15 @@
 @layer interface {
   /* Session-owned panels borrow the one ScreenLayout lane and its scrolling.
      The controls footer stays last; these panels have no floating coordinates. */
-  #hudUtilities .marine-panel{position:static;flex:none;width:100%;max-width:none;max-height:none;min-width:0;box-sizing:border-box;margin:0;padding:12px;overflow:visible;transform:none;border:1px solid var(--wx-line-soft);border-radius:var(--wx-radius);background:var(--wx-panel);color:var(--wx-text);font:500 var(--wx-type-meta)/1.5 var(--wx-font-ui)}
-  .marine-panel strong{display:block;font-size:var(--wx-type-control);font-weight:700}
-  .marine-panel button,.marine-panel select{box-sizing:border-box;width:100%;min-height:44px;margin-top:8px;padding:8px;border:1px solid var(--wx-line);border-radius:var(--wx-radius);background:var(--wx-panel-soft);color:var(--wx-text);font:650 var(--wx-type-meta)/1.4 var(--wx-font-ui);white-space:normal}
-  .marine-panel button:disabled{opacity:.55;cursor:default}
-  .marine-panel button:not(:disabled):hover{border-color:var(--wx-action)}
-  .marine-panel :is(button,select,summary):focus-visible{outline:3px solid var(--wx-focus);outline-offset:2px}
-  .marine-panel summary{cursor:pointer;min-height:44px;display:flex;align-items:center;color:var(--wx-muted)}
-  .marine-panel details{margin-top:8px;border-top:1px solid var(--wx-line-soft);padding-top:4px}
-  .marine-panel [role=status]{color:var(--wx-muted);margin-top:6px}
+  #hudUtilities .session-hud-panel{position:static;flex:none;width:100%;max-width:none;max-height:none;min-width:0;box-sizing:border-box;margin:0;padding:12px;overflow:visible;transform:none;border:1px solid var(--wx-line-soft);border-radius:var(--wx-radius);background:var(--wx-panel);color:var(--wx-text);font:500 var(--wx-type-meta)/1.5 var(--wx-font-ui)}
+  .session-hud-panel strong{display:block;font-size:var(--wx-type-control);font-weight:700}
+  .session-hud-panel button,.session-hud-panel select{box-sizing:border-box;width:100%;min-height:44px;margin-top:8px;padding:8px;border:1px solid var(--wx-line);border-radius:var(--wx-radius);background:var(--wx-panel-soft);color:var(--wx-text);font:650 var(--wx-type-meta)/1.4 var(--wx-font-ui);white-space:normal}
+  .session-hud-panel button:disabled{opacity:.55;cursor:default}
+  .session-hud-panel button:not(:disabled):hover{border-color:var(--wx-action)}
+  .session-hud-panel :is(button,select,summary):focus-visible{outline:3px solid var(--wx-focus);outline-offset:2px}
+  .session-hud-panel summary{cursor:pointer;min-height:44px;display:flex;align-items:center;color:var(--wx-muted)}
+  .session-hud-panel details{margin-top:8px;border-top:1px solid var(--wx-line-soft);padding-top:4px}
+  .session-hud-panel [role=status]{color:var(--wx-muted);margin-top:6px}
   .marine-panel-header{display:flex;align-items:center;justify-content:space-between;gap:8px}
   .marine-panel .marine-panel-header button{width:auto;min-width:44px;margin-top:0;flex:none}
   .marine-swim-inline{position:static;transform:none;max-width:none;width:100%;max-height:none;border:0;border-radius:0;padding:8px 0 0;background:none;box-shadow:none;font:inherit}

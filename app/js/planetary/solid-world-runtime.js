@@ -1,3 +1,4 @@
+import {mountHudPanel} from '../ui/hud-panel.js';
 import { createSurfaceDressing } from './surface-dressing.js';
 import { surfaceLightingGain } from './surface-lighting.js';
 import { parentSkyPlacement } from './parent-sky-placement.js';
@@ -894,13 +895,8 @@ function showWorldPanel(pack, environment) {
   if (!panel) {
     panel = document.createElement('aside');
     panel.id = 'solidWorldPanel';
-    panel.style.cssText = 'position:fixed;top:76px;left:18px;z-index:999;background:rgba(10,12,18,.88);border:1px solid rgba(255,255,255,.22);border-radius:10px;padding:12px 14px;color:#fff;font:12px Inter,sans-serif;max-width:260px;line-height:1.45;';
-    document.body.appendChild(panel);
   }
-  const compact = globalThis.innerWidth <= 600;
-  panel.style.left = compact ? '10px' : '18px';
-  panel.style.right = compact ? '10px' : 'auto';
-  panel.style.maxWidth = compact ? 'none' : '260px';
+  mountHudPanel(panel);
   const temperatureC = Math.round(environment.temperatureK - 273.15);
   const pressure = environment.pressurePa >= 1000
     ? `${(environment.pressurePa / 1000).toFixed(1)} kPa`
