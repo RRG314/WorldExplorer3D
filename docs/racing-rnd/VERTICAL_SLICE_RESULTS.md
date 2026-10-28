@@ -97,3 +97,12 @@ was not yet committed. No verification gate was bypassed.
 This is not the complete racing release: verified online sessions, the racing
 leaderboard writer, durable server results, creator publication/moderation and the
 selected rivals/crews progression remain required.
+
+Actual80a6bcc Monaco hub opened with full city coverage and no page errors but
+produced no event. This remains a failed gameplay entry, not acceptance. Source
+review found a long-single-edge assumption incompatible with surveyed road
+segmentation. Grids now follow connected supported segments over a sufficiently
+straight clear run without replacing source geometry. Recommendations consider
+short spans too; a graph remains editable even when recommendations fail.
+15 selected geometry/owner/qualification tests passed, including a dense surveyed
+circuit. Actual Monaco qualification and playable racing remain to be verified.

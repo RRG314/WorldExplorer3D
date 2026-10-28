@@ -17,3 +17,13 @@ test('a replacement publication cancels qualification without publishing a stale
  const h=setup();let reads=0;h.context.sampleFeatureSurfaceY=()=>{if(++reads===5)h.context.worldPublication={requestId:'two'};return 0;};
  await assert.rejects(collectRaceDistrict(h.context,{locationId:'fixture',yieldWork:async()=>{}}),/changed|superseded/);
 });
+test('recommended races accept densely surveyed real-road topology, not only long fixture edges',()=>{
+ const points=[{x:0,y:0,z:0},{x:0,y:0,z:120},{x:120,y:0,z:120},{x:120,y:0,z:0}],roads=[];
+ for(let side=0;side<4;side++)for(let i=0;i<12;i++){
+  const from=points[side],to=points[(side+1)%4],at=t=>({x:from.x+(to.x-from.x)*t,y:0,z:from.z+(to.z-from.z)*t});
+  roads.push({sourceId:`survey:${side}:${i}`,a:at(i/12),b:at((i+1)/12),widthMeters:8,driveable:true,supported:true});
+ }
+ const result=recommendRaceCourses({roads,metersPerUnit:1,locationId:'survey',locationLabel:'Survey district',anchor:{lat:43,lon:7}});
+ assert.ok(result.events.some(e=>e.discipline==='circuit'));assert.ok(result.events.some(e=>e.discipline==='sprint'));
+ assert.ok(result.events.every(e=>e.points.length>15),'segmented source geometry is retained');
+});

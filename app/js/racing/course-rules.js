@@ -44,6 +44,12 @@ export function buildRaceRoadGraph(roads,{metersPerUnit=1,minimumWidth=6,maximum
   function add(a,b,reverse){
    const heights=road.heightSamples;
    if(heights&&(!Array.isArray(heights)||heights.length<2||heights.length>250||heights.some((s,i)=>!Number.isFinite(s.t)||!Number.isFinite(s.y)||s.t<0||s.t>1||i>0&&s.t<=heights[i-1].t)||heights[0].t!==0||heights.at(-1).t!==1))throw Error('invalid_race_road_heights');
+   if(heights){
+    const span=Number(road.heightSampleSpanMeters??1.2);
+    if(!(span>=.2&&span<=4)||Math.abs(heights[0].y-road.a.y)>.001||Math.abs(heights.at(-1).y-road.b.y)>.001||heights.some((s,i)=>
+      i>0&&Math.abs(s.y-heights[i-1].y)*metersPerUnit/((s.t-heights[i-1].t)*length)>maximumGrade ||
+      (s.leftY!==undefined||s.rightY!==undefined)&&(!Number.isFinite(s.leftY)||!Number.isFinite(s.rightY)||Math.max(Math.abs(s.leftY-s.y),Math.abs(s.rightY-s.y))*metersPerUnit/span>.15)))throw Error('invalid_race_road_heights');
+   }
    const id=`${String(road.sourceId).slice(0,180)}:${reverse?'reverse':'forward'}`,edge={id,from:a,to:b,length,widthMeters:width,
     sourceId:String(road.sourceId).slice(0,180),structure:road.structure||'surface',clearanceMeters:Number(road.clearanceMeters)||0};
    if(heights){edge.heightSamples=reverse?heights.map(s=>({...s,t:1-s.t,leftY:s.rightY,rightY:s.leftY})).reverse():heights.map(s=>({...s}));edge.heightSampleSpanMeters=Number(road.heightSampleSpanMeters)||1.2;}
@@ -110,7 +116,12 @@ export function createRaceCourse(graph,path,settings={}){
  }
  const participants=Math.max(1,Math.min(4,Math.floor(Number(settings.participants)||1)));
  const gridLength=(Math.ceil(participants/2)-1)*8+12;
- if(segments[0].lengthMeters<gridLength||segments[0].widthMeters<6)throw Error('race_grid_has_no_clearance');
+ let gridRun=0;
+ for(const segment of segments){
+  if(angle(segments[0].forward,segment.forward)>.12||segment.widthMeters<6)break;
+  gridRun+=segment.lengthMeters;if(gridRun>=gridLength)break;
+ }
+ if(gridRun<gridLength)throw Error('race_grid_has_no_clearance');
  const course={version:RACE_COURSE_VERSION,sourcePath:[...path],startOffsetMeters:closed?Number(settings.startOffsetMeters??edges[0].length*.5):null,name:clean(settings.name)||'Mapped road run',description:String(settings.description||'').trim().slice(0,400),
   locationId:clean(settings.locationId),locationLabel:clean(settings.locationLabel),anchor:settings.anchor?{lat:Number(settings.anchor.lat),lon:Number(settings.anchor.lon)}:null,
   discipline,laps,participants,metersPerUnit:graph.metersPerUnit,vehicleClass:settings.vehicleClass||'road',traffic:'closed-course',collision:'ghost',
@@ -150,7 +161,9 @@ export function projectRacePosition(course,pose,{minimumMeters=-Infinity,maximum
 
 export function raceGridPose(course,index=0){
  if(!Number.isInteger(index)||index<0||index>=course.participants)throw Error('invalid_race_grid_slot');
- const s=course.segments[0],forward=s.forward,along=(2+(Math.ceil(course.participants/2)-1-Math.floor(index/2))*8)/course.metersPerUnit;
+ const distanceMeters=2+(Math.ceil(course.participants/2)-1-Math.floor(index/2))*8;
+ const s=course.segments.find(segment=>segment.startMeters+segment.lengthMeters>=distanceMeters)||course.segments.at(-1);
+ const forward=s.forward,along=(distanceMeters-s.startMeters)/course.metersPerUnit;
  const lateral=(course.participants===1?0:index%2===0?-1.4:1.4)/course.metersPerUnit;
  return {x:s.a.x+forward.x*along+forward.z*lateral,y:sampleRaceSegmentY(s,along*course.metersPerUnit/s.lengthMeters,lateral*course.metersPerUnit),
   z:s.a.z+forward.z*along-forward.x*lateral,yaw:Math.atan2(forward.x,forward.z)};

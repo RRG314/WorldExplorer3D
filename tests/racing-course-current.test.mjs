@@ -52,3 +52,9 @@ test('qualified nonlinear elevations and road banking survive direction reversal
  for(let i=0;i<300;i++)stepRaceVehicle(forward,car,{throttle:.5},1/60,profile);
  assert.ok(car.y>2);assert.ok(Math.abs(car.terrainRoll)>.01);assert.ok(car.maximumWheelPenetration<1e-6);
 });
+test('a starting grid may span connected survey segments without replacing their geography',()=>{
+ const roads=Array.from({length:30},(_,i)=>({sourceId:'survey-'+i,a:{x:0,y:i*.2,z:i*10},b:{x:0,y:(i+1)*.2,z:(i+1)*10},widthMeters:8,driveable:true,supported:true}));
+ const graph=buildRaceRoadGraph(roads,{metersPerUnit:1}),course=createRaceCourse(graph,roads.map(r=>r.sourceId+':forward'),{locationId:'survey',anchor:{lat:43,lon:7},participants:4});
+ assert.equal(course.segments.length,30);assert.equal(course.points.length,31);
+ const front=raceGridPose(course,0),back=raceGridPose(course,2);assert.equal(front.z,10);assert.equal(back.z,2);assert.ok(front.y>back.y);
+});

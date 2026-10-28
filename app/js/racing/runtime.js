@@ -22,6 +22,7 @@ const messages={no_qualified_racing_roads:'No supported racing district is ready
  race_world_changed:'The location changed. Open Racing again in the current world.',activity_library_save_failed:'This device could not save the route. Free some storage and retry.'};
 const message=error=>messages[error?.message]||'This race could not complete. Your garage and exploration progress are safe. Try again.';
 export function createRacingRuntime(c,{closeMenus=()=>{},requestWorldFocus=()=>{},chooseDestination=()=>{}}={}) {
+ let routeDiagnostics=null;
  let dialog=null,hud=null,loadScope=null,loadPublication=null,raceScope=null,controller=null,presentation=null,district=null,graph=null,fingerprint='',events=[],selected=0;
  let recordOwner='',records=null;
  let creatorPath=[],creatorNodes=[],customCourse=null,returnFocus=null,busy=false,recordId='',lastUiAt=-Infinity,saving=false,lastResult=null;
@@ -90,10 +91,10 @@ export function createRacingRuntime(c,{closeMenus=()=>{},requestWorldFocus=()=>{
   try {
    if(!c.gameStarted||resolveControlState(c).frame!=='surface')throw Error('race_world_changed');
    const facts=await collectRaceDistrict(c,{current});const derived=recommendRaceCourses(facts),hash=await raceDistrictFingerprint(facts);
-   if(!current())throw Error('race_world_changed');district=facts;graph=derived.graph;events=derived.events;fingerprint=hash;selected=0;
+   if(!current())throw Error('race_world_changed');district=facts;graph=derived.graph;events=derived.events;routeDiagnostics=derived.diagnostics;fingerprint=hash;selected=0;
    for(const saved of listStoredActivities().filter(a=>a.raceRoute&&a.locationLabel===facts.locationLabel))try{events.push(restoreRaceCourse(saved.raceRoute,district,graph,hash));}catch{/* Kept in the library for explicit recovery; never silently remap it. */}
    const nodeSelect=el('[data-race-node]');nodeSelect.replaceChildren(...graph.nodes.map(n=>new Option(`Junction ${n.id+1}`,String(n.id))));
-   status(`${facts.roads.length} road spans qualified. Choose an event or create your own route.`);
+   status(derived.events.length?`${facts.roads.length} road spans qualified. Choose an event or create your own route.`:'The mapped roads are ready. Create a route using the qualified junctions below, or choose another destination.');
    // Store the identity on the local scope projection, not the world owner.
    loadPublication=publication;
   } catch(error){if(current())status(message(error));}
@@ -205,5 +206,5 @@ export function createRacingRuntime(c,{closeMenus=()=>{},requestWorldFocus=()=>{
   stop(reason);loadScope?.dispose(reason);loadScope=null;loadPublication=null;district=null;graph=null;
   busy=false;dialog?.close();c.setPauseReason?.('racing-menu',false);
  }
- return {open,update,stop:stopAll,snapshot:()=>controller?.snapshot()||{phase:'idle'}};
+ return {open,update,stop:stopAll,snapshot:()=>controller?.snapshot()||{phase:'idle',qualification:district?.diagnostics||null,routes:routeDiagnostics,roadLengths:district?.roads.map(r=>Math.hypot(r.b.x-r.a.x,r.b.z-r.a.z)*district.metersPerUnit).sort((a,b)=>b-a).slice(0,12)||[],events:events.map(e=>({name:e.name,discipline:e.discipline,lengthMeters:e.lengthMeters})),fingerprint}};
 }

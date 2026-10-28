@@ -77,8 +77,9 @@ export async function collectRaceDistrict(context,{locationId,locationLabel,radi
 }
 
 export function recommendRaceCourses(district){
- const graph=buildRaceRoadGraph(district.roads,{metersPerUnit:district.metersPerUnit}),events=[],signatures=new Set();
- const starts=graph.edges.filter(e=>e.length>=44).sort((a,b)=>Math.hypot(graph.nodes[a.from].x,graph.nodes[a.from].z)-Math.hypot(graph.nodes[b.from].x,graph.nodes[b.from].z)).slice(0,30);
+ const graph=buildRaceRoadGraph(district.roads,{metersPerUnit:district.metersPerUnit}),events=[],signatures=new Set(),failures={};
+ const rejected=error=>{failures[error.message]=(failures[error.message]||0)+1;};
+ const starts=graph.edges.filter(e=>e.length>=2).sort((a,b)=>Math.hypot(graph.nodes[a.from].x,graph.nodes[a.from].z)-Math.hypot(graph.nodes[b.from].x,graph.nodes[b.from].z)).slice(0,30);
  const settings={locationId:district.locationId,locationLabel:district.locationLabel,anchor:district.anchor,participants:4};
  for(const first of starts){
   if(events.length>=4)break;
@@ -90,7 +91,7 @@ export function recommendRaceCourses(district){
     const course=createRaceCourse(graph,[first.id,...back],{...settings,discipline:'circuit',laps:2,name:`${district.locationLabel} · Circuit ${events.filter(e=>e.discipline==='circuit').length+1}`});
     signatures.add(signature);events.push(course);
    }
-  }catch(error){if(!/race_|disconnected/.test(error.message))throw error;}
+  }catch(error){if(!/race_|disconnected/.test(error.message))throw error;rejected(error);}
  }
  for(const first of starts.slice(0,12)){
   if(events.some(e=>e.discipline==='sprint'))break;
@@ -99,8 +100,7 @@ export function recommendRaceCourses(district){
    const path=[first.id,...shortestRacePath(graph,first.to,target.id,{excludedEdges:new Set([first.id.replace(/:(forward|reverse)$/,first.id.endsWith(':forward')?':reverse':':forward')])})];
    const sprint=createRaceCourse(graph,path,{...settings,discipline:'sprint',name:`${district.locationLabel} · District sprint`});events.push(sprint);
    const trial=createRaceCourse(graph,path,{...settings,participants:1,discipline:'time-trial',name:`${district.locationLabel} · Time trial`});events.push(trial);break;
-  }catch(error){if(!/race_|disconnected/.test(error.message))throw error;}
+  }catch(error){if(!/race_|disconnected/.test(error.message))throw error;rejected(error);}
  }
- if(!events.length)throw Error('no_qualified_race_route');
- return {graph,events};
+ return {graph,events,diagnostics:{attemptFailures:failures,starts:starts.length,nodes:graph.nodes.length,edges:graph.edges.length}};
 }
