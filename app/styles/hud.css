@@ -180,9 +180,9 @@
   .marine-panel [role=status]{color:var(--wx-muted);margin-top:6px}
   .marine-panel-header{display:flex;align-items:center;justify-content:space-between;gap:8px}
   .marine-panel .marine-panel-header button{width:auto;min-width:44px;margin-top:0;flex:none}
-  .marine-swim-inline{position:static!important;transform:none!important;max-width:none!important;width:100%!important;max-height:none!important;border:0!important;border-radius:0!important;padding:8px 0 0!important;background:none!important;box-shadow:none!important;font:inherit!important}
-  .marine-swim-inline>div:last-child{display:flex;gap:4px}
-  .marine-swim-inline button{width:auto;min-width:44px;flex:1;padding:6px 4px}
+  .marine-swim-inline{position:static;transform:none;max-width:none;width:100%;max-height:none;border:0;border-radius:0;padding:8px 0 0;background:none;box-shadow:none;font:inherit}
+  .marine-swim-inline>div:last-child{display:flex;flex-wrap:wrap;gap:4px;margin-top:8px}
+  .marine-swim-inline button{width:auto;min-width:44px;flex:1 1 64px;margin-top:0;padding:6px 4px}
   body:has(#researchDeckControls[data-active=true]) #boatPrompt{display:none}
 
   #urbanVehiclePrompt{position:fixed;right:max(16px,env(safe-area-inset-right));left:auto;bottom:calc(var(--wx-navigation-height,78px) + 16px);z-index:138;display:none;align-items:center;gap:10px;width:min(380px,calc(100vw - 32px));box-sizing:border-box;padding:12px;color:var(--wx-text);background:var(--wx-panel);border:1px solid var(--wx-line);border-radius:var(--wx-radius);font:500 var(--wx-type-meta)/1.4 var(--wx-font-ui);transform:none;pointer-events:none}
