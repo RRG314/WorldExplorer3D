@@ -1,6 +1,7 @@
 import {detachSceneObject} from '../engine/scene-object-lifecycle.js';
 import { loadModelAsset } from '../assets/model-asset-runtime.js?v=16';
 import { VEHICLE_ROOT_TO_GROUND_METERS } from '../engine/vehicle-catalog.js?v=6';
+import {vehicleWheelRig} from '../transport/vehicle-wheel-motion.js';
 
 const CURATED_TRAFFIC_ASSET_BY_VARIANT = Object.freeze({
   compact: 'traffic-compact-hatchback-v1',
@@ -11,7 +12,12 @@ const CURATED_TRAFFIC_ASSET_BY_VARIANT = Object.freeze({
   delivery_van: 'traffic-city-van-v1',
   taxi: 'traffic-city-taxi-v1',
   box_truck: 'traffic-service-truck-v1',
-  city_bus: 'traffic-city-bus-v1'
+  city_bus: 'traffic-city-bus-v1',
+  delorean: 'road-delorean-dmc12',
+  cadillac_coupe: 'road-cadillac-coupe-deville',
+  cadillac_fleetwood: 'road-cadillac-fleetwood-brougham',
+  golf_ii: 'road-volkswagen-golf-ii',
+  datsun_280z: 'road-datsun-280z'
 });
 
 const CURATED_RESPONDER_ASSET_ID = 'traffic-police-response-v1';
@@ -85,6 +91,7 @@ function prepareTrafficVisual(THREE, instance, options = {}) {
     });
   });
   visual.userData.curatedTrafficAssetId = record.id;
+  visual.userData.wheels = vehicleWheelRig(source);
   visual.userData.collisionPolicy = record.collisionPolicy;
   visual.userData.performanceProfile = Object.freeze({
     style: 'licensed-curated-world-traffic',
@@ -115,8 +122,9 @@ async function attachCuratedTrafficVehicle(THREE, host, options = {}) {
     : CURATED_TRAFFIC_ASSET_BY_VARIANT[String(options.variantId || '')]);
   if (!assetId) return false;
   host.userData.curatedTrafficVehicleLoadStarted = true;
+  let instance;
   try {
-    const instance = await loadModelAsset(THREE, assetId, { signal: options.signal });
+    instance = await loadModelAsset(THREE, assetId, { signal: options.signal });
     if (options.isCurrent && !options.isCurrent()) {
       instance.dispose();
       host.userData.curatedTrafficVehicleLoadStarted = false;
@@ -131,6 +139,8 @@ async function attachCuratedTrafficVehicle(THREE, host, options = {}) {
     syncCuratedVehicleGroundPivot(host);
     return true;
   } catch (error) {
+    disposeCuratedTrafficVehicle(host);
+    instance?.dispose();
     host.userData.curatedTrafficVehicleLoadStarted = false;
     host.userData.curatedTrafficVehicleLoadFailed = error?.name !== 'AbortError';
     if (error?.name !== 'AbortError') console.warn('Curated traffic vehicle unavailable; vehicle remains hidden.', error);

@@ -1,4 +1,5 @@
 import {consumePlayerProvision} from '../player/provisions.js';
+import {updateVehicleWheels} from '../transport/vehicle-wheel-motion.js';
 import {detachSceneObject} from '../engine/scene-object-lifecycle.js';
 import {urbanTargetOverlapsHeight} from './vertical-contact.js';
 import { bindPlayerConditionAuthority } from './player-condition-binding.js';
@@ -134,6 +135,13 @@ function vehiclePose(vehicle) {
 }
 
 function syncVehiclePose(vehicle, pose) {
+  if (!vehicle.attachedToPlayer && Number.isFinite(vehicle.x) && Number.isFinite(vehicle.z)) {
+    const dx=Number(pose.x)-vehicle.x,dz=Number(pose.z)-vehicle.z;
+    const distance=dx*Math.sin(Number(pose.yaw)||0)+dz*Math.cos(Number(pose.yaw)||0);
+    const turn=Math.atan2(Math.sin(Number(pose.yaw)-Number(vehicle.yaw)),Math.cos(Number(pose.yaw)-Number(vehicle.yaw)));
+    // Reconciliation/recovery jumps reposition the car; they are not wheel travel.
+    if(Math.hypot(dx,dz)<8)updateVehicleWheels(vehicle.visual?.wheels,distance*(Number(appCtx.METERS_PER_WORLD_UNIT)||1),Math.abs(distance)>.01?Math.atan(turn*Number(vehicle.variant?.length||4.4)*.58/distance):0);
+  }
   vehicle.x = Number(pose.x || 0);
   vehicle.y = Number(pose.y || 0);
   vehicle.z = Number(pose.z || 0);
@@ -1300,6 +1308,8 @@ function attachCuratedTrafficDetail(state, vehicle) {
     color: vehicle.color,
     dimensionsMeters: vehicle.variant,
     isCurrent: () => activeWorldMatches(state) && state.vehicles.includes(vehicle)
+  }).then(attached => {
+    if (attached && activeWorldMatches(state) && vehicle.attachedToPlayer && root.parent === appCtx.carMesh) appCtx.wheelMeshes = vehicle.visual.wheels;
   });
   return true;
 }

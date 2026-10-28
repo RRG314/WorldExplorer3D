@@ -38,8 +38,9 @@ test('personal and airport-fleet aviation classes use the shared playable transp
     assert.equal(entry.playable, true);
     assert.equal(entry.enterable, true);
     assert.equal(entry.interaction.companionAboard, true);
-    assert.equal(entry.rights.kind, 'original-generic-design');
-    assert.equal(entry.rights.brand, 'unbranded');
+    const licensed=['expedition-prop','business-jet'].includes(entry.id);
+    assert.equal(entry.rights.kind, licensed?'licensed-model':'original-generic-design');
+    assert.equal(entry.rights.brand, licensed?entry.label:'unbranded');
     assert.match(entry.visual.referenceEvidence, /aviation-fleet-and-damage-2026-08-29\.png$/);
     assert.ok(entry.dimensions.length > 0);
     assert.ok(entry.performance.topSpeed > 0);

@@ -28,12 +28,20 @@ export function reconcilePublishedRoomVehicles(state, options) {
     state.roomTrafficOwnership.delete(id);
   }
   for (const entity of state.remoteEntities.values()) {
-    if (!publishedRoomVehicleDefinition(entity, state.driveOnLeft)) continue;
+    const published = publishedRoomVehicleDefinition(entity, state.driveOnLeft);
+    if (!published) continue;
     if (!state.roomTrafficOwnership.has(entity.entityId)) {
       const agentId = options.claimTrafficAgent?.(entity.entityId);
       if (agentId) state.roomTrafficOwnership.set(entity.entityId, agentId);
     }
     const local = state.vehicles.find(vehicle => vehicle.id === entity.entityId && vehicle.ambientTraffic);
+    if (local?.variant?.id && local.variant.id !== published.variant.id && !protectedVehicle(local)) {
+      // Fleet additions can change a local traffic seed. The published room
+      // identity keeps its actual model; recreate through the existing owner.
+      options.disposeVehicle(local);
+      state.vehicles.splice(state.vehicles.indexOf(local),1);
+      continue;
+    }
     if (local) {
       local.ambientTraffic = false;
       local.roomPublished = true;

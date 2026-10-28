@@ -1,6 +1,7 @@
 import {detachSceneObject} from '../engine/scene-object-lifecycle.js';
 import { roadVehicleVisualRecipe } from '../transport/road-vehicle-visual-recipe.js?v=1';
 import { transportDamagePresentation } from '../transport/damage-model.js?v=1';
+const EMPTY_WHEELS=Object.freeze([]);
 
 function vehicleMaterials(root) {
   const materials = new Set();
@@ -75,7 +76,7 @@ function createUrbanVehicleVisual(THREE, definition = {}, serviceLighting = null
 
   const api = {
     root,
-    wheels: Object.freeze([]),
+    get wheels() { return root.userData.curatedTrafficVehicleAttachment?.visual?.userData?.wheels || EMPTY_WHEELS; },
     doors: Object.freeze(doors),
     serviceLights: Object.freeze([serviceRed, serviceBlue].filter(Boolean)),
     materials: Object.freeze([]),

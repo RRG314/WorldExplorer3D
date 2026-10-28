@@ -26,7 +26,7 @@ function loadTemplate(THREE, record) {
           return;
         }
         try {
-          if (record.roles.includes('road-vehicle-presentation')) {
+          if (record.roles.includes('road-vehicle-presentation') && record.rigPolicy !== 'preserve-parts') {
             root.userData.staticModelBatching = batchStaticModelTemplate(THREE, root, gltf?.animations || []);
           }
           if (record.roles.some(role => /character$/.test(role))) {

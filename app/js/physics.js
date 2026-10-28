@@ -1,4 +1,5 @@
 import { resolvePlanetaryVehicleObstacle } from './physics/planetary-obstacle-response.js';
+import {updateVehicleWheels} from './transport/vehicle-wheel-motion.js';
 import { shouldRefreshRoadQuery } from './physics/road-query-policy.js';
 import { ctx as appCtx } from "./shared-context.js?v=55";
 import { constrainTunnelActorCeiling } from './world/compiler/tunnel-space-query.js';
@@ -699,6 +700,7 @@ function update(dt) {
       z: appCtx.car.z,
       angle: appCtx.car.angle,
       currentY,
+      ...(vehicleHandling.assetId?{halfWheelBase:vehicleHandling.wheelBase*.5,halfTrack:vehicleHandling.halfTrack}:{}),
       preferRoad: !!appCtx.car.onRoad,
       nearestRoad: appCtx.car.onRoad ? nr : null
     }, dt, Number.isFinite(appCtx.lastTime) ? appCtx.lastTime : undefined);
@@ -807,7 +809,8 @@ function update(dt) {
     ? appCtx.car.speed
     : carSpeedToWorldUnitsPerSecond(appCtx.car.speed, appCtx.METERS_PER_WORLD_UNIT);
   const wheelRot = wheelSpeed * dt * 0.5;
-  appCtx.wheelMeshes.forEach((w) => w.rotation.x += wheelRot);
+  appCtx.wheelMeshes.forEach((w) => { if (!w.userData?.radiusMeters) w.rotation.x += wheelRot; });
+  updateVehicleWheels(appCtx.wheelMeshes, wheelSpeed * dt, steerAngle);
 
   appCtx.updateTrack();
   appCtx.updatePolice(dt);

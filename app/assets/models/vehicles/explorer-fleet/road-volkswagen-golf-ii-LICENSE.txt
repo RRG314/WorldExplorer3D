@@ -1,0 +1,11 @@
+Model Information:
+* title:	Volkswagen Golf II
+* source:	https://sketchfab.com/3d-models/volkswagen-golf-ii-740500f10bc94e7a91c2290e445fcb39
+* author:	ARDmation (https://sketchfab.com/ardmation)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Volkswagen Golf II" (https://sketchfab.com/3d-models/volkswagen-golf-ii-740500f10bc94e7a91c2290e445fcb39) by ARDmation (https://sketchfab.com/ardmation) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)

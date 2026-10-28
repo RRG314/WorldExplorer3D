@@ -47,7 +47,7 @@ The upstream Cars Pack is published by Quaternius under CC0 1.0. Its `License.tx
 - License: Creative Commons Zero v1.0 Universal (CC0 1.0).
 - Bundled SHA-256 values: `e5f5fa41c4434383b20287725c0e9d757cbd0f059eedc342ec265d32a195fe39`, `bf00f2f0386a25aa310abc0424d22586e46a59ee6c737e6b375c97c9f01bd462`, `1a9ce2bba813dca5005abab09715b01b8b5f4a9c48d7260463afdfeb876aa8b6`, and `14b2f982f8a501565702ecb56f917c82e9abae914fa3f76d2f622a8670598af1`, respectively.
 - Processing: converted from OBJ to extension-free, texture-free GLB with `obj2gltf`; original geometry and named materials were retained.
-- Notes: Used across near, mid, and far ambient traffic. Existing routes, motion, collisions, entry, and damage rules remain authoritative. Curated assets fail closed; no retired procedural road-vehicle mesh is loaded or revealed as fallback. The BMW E34 remains the sole player-car model.
+- Notes: Used across near, mid, and far ambient traffic. Existing routes, motion, collisions, entry, and damage rules remain authoritative. Curated assets fail closed; no retired procedural road-vehicle mesh is loaded or revealed as fallback. The BMW E34 remains the default personal car; enterable world cars retain their own models.
 
 Additional Traffic and Response Vehicles
 
@@ -314,3 +314,17 @@ the browser. Original bones, topology and swimming clips are retained. These
 illustrate species; they are not scans of named animals or an endorsement by the
 artists or National Aquarium. Source/output hashes and exact changes are in
 `interiors/aquarium/PROVENANCE.json`.
+
+## Explorer real-car and aircraft fleet
+
+All seven models below are adapted under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Original author notices accompany each GLB. Changes: offline scale/orientation normalization, bounded mesh simplification, resized/compressed embedded textures, adjusted paint and trim response, and road-wheel or Cessna propeller pivots. Existing World Explorer controllers provide gameplay movement; no manufacturer physics or endorsement is claimed.
+
+- [DeLorean DMC-12](https://sketchfab.com/3d-models/delorean-dmc-12-7001f739fe594314b5a3081163577139) — JandroS (https://sketchfab.com/JandroS). File: `vehicles/explorer-fleet/road-delorean-dmc12.glb`.
+- [Cadillac Coupe deVille](https://sketchfab.com/3d-models/cadillac-coupe-deville-2adc47898c3145078f0b3bc51995cfe9) — its.anjaney (https://sketchfab.com/rajanjaney). File: `vehicles/explorer-fleet/road-cadillac-coupe-deville.glb`.
+- [Cadillac Fleetwood Brougham · early 1980s](https://sketchfab.com/3d-models/1980s-cadillac-e0bbaf9283b2413a8dae9b991fe121ff) — scorpion81 (https://sketchfab.com/scorpion81). File: `vehicles/explorer-fleet/road-cadillac-fleetwood-brougham.glb`.
+- [Volkswagen Golf II](https://sketchfab.com/3d-models/volkswagen-golf-ii-740500f10bc94e7a91c2290e445fcb39) — ARDmation (https://sketchfab.com/ardmation). File: `vehicles/explorer-fleet/road-volkswagen-golf-ii.glb`.
+- [Datsun 280Z](https://sketchfab.com/3d-models/free-datsun-280z-0789ab2ece9442de94b3c41595e0ecbd) — Martin Trafas (https://sketchfab.com/Bexxie). File: `vehicles/explorer-fleet/road-datsun-280z.glb`.
+- [Cessna 172](https://sketchfab.com/3d-models/cessna-172-64cddaee5aff470682659a8c08525046) — e737 (https://sketchfab.com/e0057537). File: `vehicles/explorer-fleet/aircraft-cessna-172.glb`.
+- [Dassault Falcon 10](https://sketchfab.com/3d-models/falcon10-0d5a676f75da403b8419154b102d55a7) — manilov.ap (https://sketchfab.com/manilov.ap). File: `vehicles/explorer-fleet/aircraft-falcon-10.glb`.
+
+The coupe author does not specify an exact model year. The long Fleetwood Brougham depicts the early 1980s. The source and derived checksums, measured budgets and transformations are recorded in `vehicles/explorer-fleet/asset-manifest.json`.

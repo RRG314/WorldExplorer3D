@@ -22,10 +22,14 @@ function hashText(value = '') {
 function stableVehicleDefinition(worldIdentity, anchorKey, slot = 0, catalog = URBAN_VEHICLE_CATALOG) {
   if (!catalog.length) return null;
   const seed = hashText(`${worldIdentity}:${anchorKey}:${slot}`);
-  const variant = catalog[seed % catalog.length];
+  // New fleet choices get distinct identities. Existing generic parked-car
+  // identities must never silently become a different model with old upgrades.
+  const licensed=catalog.filter(entry=>entry.assetId),legacy=catalog.filter(entry=>!entry.assetId);
+  const choices=licensed.length&&(!legacy.length||(seed>>>16)%3!==0)?licensed:legacy;
+  const variant = choices[seed % choices.length];
   const palette = [variant.color, 0x2f3d4a, 0x9b9a8d, 0x6f3e39, 0x426255, 0x6b587b];
   return Object.freeze({
-    id: `urban-vehicle:${hashText(`${worldIdentity}:${anchorKey}:${slot}:vehicle`).toString(16)}`,
+    id: `urban-vehicle:${hashText(`${worldIdentity}:${anchorKey}:${slot}:vehicle${variant.assetId?`:${variant.assetId}`:''}`).toString(16)}`,
     variant,
     color: palette[(seed >>> 5) % palette.length],
     condition: 1,

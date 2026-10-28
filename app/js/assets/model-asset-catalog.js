@@ -1,6 +1,9 @@
 const MODEL_ASSET_SCHEMA_VERSION = 1;
 
+import {EXPLORER_FLEET_ASSETS} from './explorer-fleet-assets.js';
+
 const MODEL_ASSET_CATALOG = Object.freeze([
+  ...EXPLORER_FLEET_ASSETS,
   ...[
   {
     "schemaVersion": 1,

@@ -49,14 +49,15 @@ test('local curated models cover every road-traffic variant and the response fle
   const assets = modelAssetsForRole('road-vehicle-presentation');
   const coveredVariants = [...new Set(assets.flatMap((asset) => asset.vehicleVariantIds || []))].sort();
   assert.deepEqual(coveredVariants, [
-    'box_truck', 'city_bus', 'compact', 'delivery_van', 'pickup', 'responder', 'sedan', 'suv', 'taxi', 'van'
-  ]);
+    'box_truck', 'city_bus', 'compact', 'delivery_van', 'pickup', 'responder', 'sedan', 'suv', 'taxi', 'van',
+    'delorean', 'cadillac_coupe', 'cadillac_fleetwood', 'golf_ii', 'datsun_280z'
+  ].sort());
   assert.equal(modelAssetsForRole('responder-road-vehicle').length, 1);
   for (const asset of assets) {
     assert.ok(['existing-road-vehicle-envelope', 'existing-responder-vehicle-envelope'].includes(asset.collisionPolicy));
     assert.deepEqual(asset.instancePolicy, { geometry: 'shared', materials: 'clone' });
     assert.ok(asset.budgets.maxInstances >= 8);
-    assert.match(asset.url, /^\/app\/assets\/models\/vehicles\/traffic\//);
+    assert.match(asset.url, /^\/app\/assets\/models\/vehicles\/(traffic|explorer-fleet)\//);
     const file = path.join(root, asset.url.replace(/^\/app\//, 'app/'));
     const { bytes, json } = readGlbAssetMetadata(file);
     assert.ok(bytes.length <= asset.budgets.bytes);

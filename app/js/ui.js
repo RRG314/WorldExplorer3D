@@ -487,7 +487,9 @@ function setupUI() {
   });
 
   document.getElementById('fPlane')?.addEventListener('click', () => {
-    appCtx.setTravelMode?.('plane', { source: 'ui_button' });
+    const selected=document.getElementById('travelAircraftSelect')?.value;
+    const transportCatalogId=['expedition-prop','business-jet'].includes(selected)?selected:'personal-prop';
+    appCtx.setTravelMode?.('plane', { source: 'ui_button', transportCatalogId });
     updateControlsModeUI();
     closeAllFloatMenus();
   });

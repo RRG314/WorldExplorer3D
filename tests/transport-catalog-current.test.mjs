@@ -16,9 +16,10 @@ import { roadVehicleVisualRecipe } from '../app/js/transport/road-vehicle-visual
 const source = async (path) => readFile(new URL(path, import.meta.url), 'utf8');
 
 test('every current road family uses the shared playable transport contract', () => {
-  assert.equal(VEHICLE_CATALOG.length, 9);
+  assert.equal(VEHICLE_CATALOG.length, 14);
   assert.deepEqual(VEHICLE_CATALOG.map(({ id }) => id), [
-    'compact', 'sedan', 'suv', 'pickup', 'van', 'delivery_van', 'taxi', 'box_truck', 'city_bus'
+    'compact', 'sedan', 'suv', 'pickup', 'van', 'delivery_van', 'taxi', 'box_truck', 'city_bus',
+    'delorean', 'cadillac_coupe', 'cadillac_fleetwood', 'golf_ii', 'datsun_280z'
   ]);
   for (const vehicle of VEHICLE_CATALOG) {
     assert.equal(vehicle.schemaVersion, TRANSPORT_CATALOG_SCHEMA_VERSION, vehicle.id);
@@ -29,8 +30,8 @@ test('every current road family uses the shared playable transport contract', ()
     assert.ok(vehicle.damage.resistance > 0, vehicle.id);
     assert.ok(vehicle.damage.zones.includes('running-gear'), vehicle.id);
     assert.equal(vehicle.visual.referenceEvidence, ROAD_FLEET_REFERENCE, vehicle.id);
-    assert.equal(vehicle.rights.kind, 'original-generic-design', vehicle.id);
-    assert.equal(vehicle.rights.brand, 'unbranded', vehicle.id);
+    assert.equal(vehicle.rights.kind, vehicle.assetId?'licensed-model':'original-generic-design', vehicle.id);
+    assert.equal(vehicle.rights.brand, vehicle.assetId?vehicle.label:'unbranded', vehicle.id);
   }
 });
 

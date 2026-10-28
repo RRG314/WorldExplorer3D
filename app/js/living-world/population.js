@@ -1,4 +1,5 @@
 import {detachSceneObject} from '../engine/scene-object-lifecycle.js';
+import {updateVehicleWheels} from '../transport/vehicle-wheel-motion.js';
 import { nearbyPedestrianSnapshots } from './nearby-pedestrians.js';
 import { nearbyVehicleSnapshots } from './nearby-vehicles.js';
 import {setPopulationHostVisible} from './presentation-attachment.js';
@@ -758,6 +759,14 @@ export function createLivingWorldPopulation(options = {}) {
       agent.renderedGroundY = Number(pose.y || 0);
       agent.wheelContact = vehicleContactSnapshot(pose);
       const scale = Math.max(.001, agent.visibility);
+      const dx = pose.x - host.position.x, dz = pose.z - host.position.z;
+      const signedDistance = dx * Math.sin(pose.yaw) + dz * Math.cos(pose.yaw);
+      const turn = Math.atan2(Math.sin(pose.yaw - host.rotation.y), Math.cos(pose.yaw - host.rotation.y));
+      if (Math.hypot(dx, dz) < 8) updateVehicleWheels(
+        host.userData.curatedTrafficVehicleAttachment?.visual?.userData?.wheels,
+        signedDistance,
+        Math.abs(signedDistance) > .01 ? Math.atan(turn * agent.variant.length * .58 / signedDistance) : 0
+      );
       host.position.set(pose.x, pose.y + VEHICLE_ROOT_TO_GROUND_METERS * scale, pose.z);
       host.rotation.order = 'YXZ';
       host.rotation.set(Number(pose.pitch || 0), pose.yaw, Number(pose.roll || 0));
