@@ -5,7 +5,7 @@ import {capturePresentation} from '../runtime/renderer-owners.js';
 export function createRaceLocationPreview(context,{isCurrent=()=>true,onImage=()=>{},onUnavailable=()=>{}}={}) {
  const publication=context.worldPublication,presentation=capturePresentation(context);
  let disposed=false,reading=false,url=null,unregister=null;
- const current=()=>!disposed&&isCurrent()&&context.worldPublication===publication&&presentation.owner==='main'&&presentation.isCurrent()&&!context.worldLoading;
+ const current=()=>!disposed&&isCurrent()&&context.worldPublication===publication&&presentation.owner==='main'&&!!presentation.renderer?.domElement&&presentation.isCurrent()&&!context.worldLoading;
  const releaseSystem=()=>{const release=unregister;unregister=null;release?.();};
  const unavailable=()=>{releaseSystem();if(current())onUnavailable();};
  function read() {

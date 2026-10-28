@@ -47,14 +47,14 @@ export function createRacingRuntime(c,{closeMenus=()=>{},requestWorldFocus=()=>{
  function ensure() {
   if(dialog)return;dialog=document.createElement('dialog');dialog.id='racingHub';dialog.className='racing-hub';dialog.setAttribute('aria-labelledby','racingHeading');
   dialog.innerHTML=`<header><div><p class="racing-eyebrow">WORLD EXPLORER 3D</p><h2 id="racingHeading" data-race-heading>Racing</h2></div><button type="button" data-race-close aria-label="Close racing">Close</button></header>
-   <p data-race-location></p><div class="racing-toolbar"><button type="button" data-race-destination>Change location</button><button type="button" data-race-garage>My garage</button><button type="button" data-race-refresh aria-label="Update routes" title="Update routes"><span aria-hidden="true">↻</span></button></div>
+   <p data-race-location></p><div class="racing-toolbar"><button type="button" data-race-destination>Change location</button><button type="button" data-race-garage>Garage</button><button type="button" data-race-refresh aria-label="Update routes" title="Update routes"><span aria-hidden="true">↻</span></button></div>
    <p role="status" aria-live="polite" data-race-status></p>
-   <div class="racing-layout"><nav aria-label="Road events" data-race-events></nav><section class="racing-event-detail">
-   <div class="racing-view-switch" role="group" aria-label="Course preview"><button type="button" data-race-preview="scene" aria-pressed="true">Location view</button><button type="button" data-race-preview="map" aria-pressed="false">Route map</button></div>
-   <div class="racing-course-view"><figure class="racing-location-view" data-race-scene><img data-race-image hidden alt=""><p data-race-image-empty>Loading location view…</p><figcaption data-race-image-caption></figcaption></figure><div class="racing-map" data-race-map hidden></div></div>
-   <h3 data-race-name>Loading routes…</h3><dl class="racing-course-facts" data-race-facts></dl><p data-race-detail></p><p data-race-record></p>
+   <div class="racing-layout"><aside class="racing-setup"><nav aria-label="Road events" data-race-events></nav><div class="racing-setup-controls"><p data-race-detail></p><p data-race-record></p>
    <div class="racing-options"><label>AI drivers<select data-race-rivals><option value="2">2 drivers</option><option value="1">1 driver</option><option value="0">None</option></select></label>
-   <label>Difficulty<select data-race-difficulty><option value=".45">Explorer</option><option value=".65" selected>Club</option><option value=".85">Expert</option></select></label></div>
+   <label>Difficulty<select data-race-difficulty><option value=".45">Explorer</option><option value=".65" selected>Club</option><option value=".85">Expert</option></select></label></div></div></aside>
+   <section class="racing-event-detail"><div class="racing-summary"><h3 data-race-name>Loading routes…</h3><dl class="racing-course-facts" data-race-facts></dl></div><div class="racing-preview-panel">
+   <div class="racing-view-switch" role="group" aria-label="Course preview"><button type="button" data-race-preview="scene" aria-pressed="true">Location view</button><button type="button" data-race-preview="map" aria-pressed="false">Route map</button></div>
+   <div class="racing-course-view"><figure class="racing-location-view" data-race-scene><img data-race-image hidden alt=""><p data-race-image-empty>Loading location view…</p><figcaption data-race-image-credit hidden><span data-race-image-caption></span><a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap contributors</a></figcaption></figure><div class="racing-map" data-race-map hidden></div></div></div><div class="racing-extra">
    <details data-race-creator><summary>Create a route</summary><p>Pick a start junction on the map, then add junctions along your route.</p>
    <label>Junction<select data-race-node aria-label="Route junction"></select></label><button type="button" data-race-add>Add junction</button><button type="button" data-race-undo>Undo last</button><button type="button" data-race-reset>Clear route</button>
    <p data-race-waypoints></p><label>Route name<input data-race-route-name maxlength="100" placeholder="My city run"></label>
@@ -62,7 +62,7 @@ export function createRacingRuntime(c,{closeMenus=()=>{},requestWorldFocus=()=>{
    <button type="button" data-race-test>Test this route</button><button type="button" data-race-save>Save route</button><p data-race-saved></p></details>
    <details data-race-driver><summary>Your cars &amp; driving skill</summary><p data-race-collection></p><p data-race-skill></p>
    <p>Manage cars and upgrades in My garage. Finish routes to build Ground Vehicles skill; repeated runs earn less XP. Skill rank does not change race handling.</p></details>
-   <details><summary>Practice rules</summary><p>AI cars can pass through you. Boosts are off. Results save to your Journal; practice does not pay Credits or enter online rankings.</p></details>
+   <details><summary>Practice rules</summary><p>AI cars can pass through you. Boosts are off. Results save to your Journal; practice does not pay Credits or enter online rankings.</p></details></div>
    </section></div><footer class="racing-start-bar"><button class="racing-primary" type="button" data-race-start disabled>Start practice</button>
    <p class="racing-note">Private practice · results saved in your Journal</p></footer><section data-race-results hidden aria-labelledby="racingResultHeading"><h3 id="racingResultHeading" tabindex="-1">Race results</h3><ol data-race-order></ol><p data-race-save-state role="status"></p>
    <p data-race-feedback></p></section><footer class="racing-result-actions" data-race-result-actions hidden><button type="button" data-race-retry-save hidden>Retry Journal save</button><button type="button" data-race-again>Race again</button><button type="button" data-race-explore>Return to exploration</button></footer>`;
@@ -129,6 +129,7 @@ export function createRacingRuntime(c,{closeMenus=()=>{},requestWorldFocus=()=>{
   previewRevision++;locationPreview?.dispose();locationPreview=null;
   if(!dialog)return;
   const image=el('[data-race-image]');image.hidden=true;image.removeAttribute('src');
+  el('[data-race-image-credit]').hidden=true;
   el('[data-race-image-caption]').textContent='';el('[data-race-image-empty]').hidden=false;
   el('[data-race-image-empty]').textContent='Location view unavailable. Use the route map.';
  }
@@ -137,7 +138,7 @@ export function createRacingRuntime(c,{closeMenus=()=>{},requestWorldFocus=()=>{
   el('[data-race-image-empty]').textContent='Loading location view…';showPreview('scene');
   locationPreview=createRaceLocationPreview(c,{isCurrent:()=>revision===previewRevision&&dialog.open,
    onImage:url=>{const image=el('[data-race-image]');image.src=url;image.alt=`Current in-game view of ${district?.locationLabel||'this location'}`;image.hidden=false;
-    el('[data-race-image-empty]').hidden=true;el('[data-race-image-caption]').textContent=`Current view · ${district?.locationLabel||'this location'}`;},
+    el('[data-race-image-empty]').hidden=true;el('[data-race-image-credit]').hidden=false;el('[data-race-image-caption]').textContent=`Current view · ${district?.locationLabel||'this location'}`;},
    onUnavailable:()=>{if(c.worldPublication===publication){el('[data-race-image-empty]').textContent='Location view unavailable. Use the route map.';showPreview('map');}}
   });
  }

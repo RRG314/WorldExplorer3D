@@ -3,7 +3,9 @@
 The menu uses one event list and one preview, with the shared Roam typography,
 colours and controls. Route names, distance, laps, car and personal best appear
 beside the setup controls. Start and result actions stay outside the scrolling
-content. Small screens use a horizontal event list and the same full-size controls.
+content. Desktop car/opponent settings sit under the event list, with distance and
+laps above the image. Small screens place the settings after the preview, using
+a horizontal event list and the same full-size controls.
 
 Location view is a temporary image of the player's current game camera. It is
 labelled as a current view, not a photograph of an entire course. Route map shows
