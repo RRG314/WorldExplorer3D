@@ -90,3 +90,10 @@ test('late ship scene disposal retires only its own resources, preserving replac
  const source=await readFile(new URL('../app/js/expedition/ship-interior.js',import.meta.url),'utf8');const ast=parse(source,{sourceType:'module'});const node=ast.program.body.find(n=>n.type==='FunctionDeclaration'&&n.id.name==='exitSolisReachInterior');const root=new THREE.Group(),geometry=new THREE.BoxGeometry(),material=new THREE.MeshStandardMaterial();root.add(new THREE.Mesh(geometry,material));let releases=0;geometry.addEventListener('dispose',()=>releases++);const replacement={key:'new'},colliders=[{id:'new'}],background={id:'new'},context={activeInterior:replacement,activeShipInterior:false,dynamicBuildingColliders:colliders,camera:{},renderer:{},scene:{background},replaceWorldCollection:()=>assert.fail('old collider write'),Walk:{restoreFrameState:()=>assert.fail('old pose write')}};
  const session={interior:{key:'old'},frameLease:{isCurrent:()=>false},sceneState:{root,crewMeshes:[]},dynamicBuildingColliders:[],earthLightVisibility:{},bodyHadShipInteriorClass:true};const document={getElementById:()=>null};vm.runInNewContext('let activeSession=session;'+source.slice(node.start,node.end)+';exitSolisReachInterior();',{appCtx:context,session,document,globalThis:{}});assert.equal(releases,1);assert.equal(context.activeInterior,replacement);assert.equal(context.dynamicBuildingColliders,colliders);assert.equal(context.scene.background,background);
 });
+
+test('ship arrival orientation is admitted with the owned interior pose and rejects malformed headings', t=>{
+ setup(t);const interior=ship();ctx.activeInterior=interior;ctx.activeShipInterior=true;
+ const before=bodies();assert.equal(ctx.Walk.enterShipFrame(interior,{x:0,y:1.74,z:21.8,yaw:NaN}),false);assert.deepEqual(bodies(),before);
+ assert.equal(ctx.Walk.enterShipFrame(interior,{x:0,y:1.74,z:21.8,yaw:Math.PI}),true);
+ assert.equal(ctx.Walk.state.walker.yaw,Math.PI);assert.equal(ctx.Walk.state.walker.angle,Math.PI);assert.equal(ctx.car.angle,Math.PI);assert.equal(ctx.Walk.state.view,'first');
+});

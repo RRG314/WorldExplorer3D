@@ -1,4 +1,5 @@
 import {captureEnvironmentSession} from '../session-coordinator.js?v=2';
+import {setSpaceFlightHudCollapsed, prepareSpaceFlightHudForEntry} from '../space/ui.js?v=53';
 import { missionPodLaunchReady } from '../universe/mission-navigation.js';
 import {RESEARCH_BENCHES} from './research-workbench.js';
 import {podBayCycle} from './pod-bay-cycle.js';
@@ -1934,6 +1935,8 @@ function enterSolisReachInterior(options = {}) {
   appCtx.activeShipInterior = true;
   if (appCtx.spaceFlight.canvas) appCtx.spaceFlight.canvas.style.display = 'none';
   if (appCtx.spaceFlight.hud) appCtx.spaceFlight.hud.style.display = 'none';
+  // The hidden flight instruments no longer own touch-input admission.
+  setSpaceFlightHudCollapsed(true);
   appCtx.hideSolarSystemUI?.();
   appCtx.hideUniverseUI?.();
   ['mainMenuBtn', 'gameShareFloatBtn', 'tutorialHintCard'].forEach((id) => {
@@ -1969,8 +1972,8 @@ function enterSolisReachInterior(options = {}) {
     connector: null,
     stairs: [],
     interactions: activeDeckInteractions(session),
-    entryPoint: { x: 0, y: (appCtx.Walk.CFG.eyeHeight || 1.7) + 0.04, z: 21.8 },
-    lastValidPosition: { x: 0, y: (appCtx.Walk.CFG.eyeHeight || 1.7) + 0.04, z: 21.8, yaw: 0, angle: 0 },
+    entryPoint: { x: 0, y: (appCtx.Walk.CFG.eyeHeight || 1.7) + 0.04, z: 21.8, yaw: Math.PI },
+    lastValidPosition: { x: 0, y: (appCtx.Walk.CFG.eyeHeight || 1.7) + 0.04, z: 21.8, yaw: Math.PI, angle: Math.PI },
     containmentNoticeUntil: 0
   };
   session.interior=appCtx.activeInterior;
@@ -2116,6 +2119,7 @@ function exitSolisReachInterior() {
     appCtx.spaceFlight.active = true;
     if (appCtx.spaceFlight.canvas) appCtx.spaceFlight.canvas.style.display = 'block';
     if (appCtx.spaceFlight.hud) appCtx.spaceFlight.hud.style.display = 'block';
+    prepareSpaceFlightHudForEntry();
     appCtx.animateSpaceFlight?.();
     appCtx.showSolarSystemUI?.();
     appCtx.showUniverseUI?.();
