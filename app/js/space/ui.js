@@ -110,7 +110,7 @@ export function setSpaceFlightHudCollapsed(collapsed) {
 
 export function prepareSpaceFlightHudForEntry() {
   const hud = document.getElementById('spaceFlightHUD');
-  const mobile = globalThis.matchMedia?.('(max-width: 768px)').matches === true;
+  const mobile = globalThis.matchMedia?.('(max-width: 768px), (pointer: coarse)').matches === true;
   return setSpaceFlightHudCollapsed(mobile || hud?.classList.contains('collapsed'));
 }
 

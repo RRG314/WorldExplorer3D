@@ -20,6 +20,7 @@ export function bindHudLaneLayout(documentRef, host = globalThis) {
   const nodes = Object.fromEntries(ids.map(id => [id, documentRef?.getElementById(id)]));
   const toolbar = root?.querySelector?.('.hudUtilityActions');
   const previous = new Map(), written = new Map();
+  let resizeFrame = null;
   function visible(element) {
     if (!element || element.hidden) return null;
     const style = host.getComputedStyle(element);
@@ -51,12 +52,19 @@ export function bindHudLaneLayout(documentRef, host = globalThis) {
     const toolbarRect = visible(toolbar);
     if (toolbarRect) set('--wx-hud-utility-footer', Math.ceil(toolbarRect.height + 8));
   }
+  // ResizeObserver runs during layout. Apply its dependent CSS limits on the
+  // next owned UI frame, instead of resizing an observed ancestor mid-delivery.
+  function scheduleRefresh() {
+    if (!scope.isActive() || resizeFrame !== null) return;
+    resizeFrame = scope.animationFrame(() => { resizeFrame = null; refresh(); });
+    if (resizeFrame === null) refresh();
+  }
   if (root && typeof host.ResizeObserver === 'function') {
-    const observer = new host.ResizeObserver(refresh);
+    const observer = new host.ResizeObserver(scheduleRefresh);
     for (const node of [root,toolbar,...Object.values(nodes)].filter(Boolean)) observer.observe(node);
     scope.defer(() => observer.disconnect());
   }
-  scope.listen(host, 'resize', refresh, {passive:true});
+  scope.listen(host, 'resize', scheduleRefresh, {passive:true});
   scope.listen(host, 'pagehide', event => { if (!event.persisted) scope.dispose('page closed'); });
   scope.defer(() => {
     for (const [name, value] of previous) if (root.style.getPropertyValue(name) === written.get(name)) {

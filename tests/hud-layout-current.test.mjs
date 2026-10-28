@@ -31,3 +31,29 @@ test('owned HUD geometry recovers a zero-height lane, avoids repeated writes and
   values.set('--wx-hud-utility-height','37px');binding.dispose();assert.equal(disconnected,true);assert.equal(values.get('--wx-hud-map-height'),'999px');assert.equal(values.get('--wx-hud-utility-height'),'37px');
   const stoppedWrites=writes;callback();assert.equal(writes,stoppedWrites);assert.equal(getLifecycleRegistrySnapshot().resourceCount,baseline);
 });
+
+test('resize delivery coalesces one owned frame and cancels it when the HUD is released',()=>{
+  const oldFrame=globalThis.requestAnimationFrame,oldCancel=globalThis.cancelAnimationFrame;
+  const frames=new Map(),values=new Map();let sequence=0,callback;
+  globalThis.requestAnimationFrame=fn=>{frames.set(++sequence,fn);return sequence;};
+  globalThis.cancelAnimationFrame=id=>frames.delete(id);
+  const geometry=rect(200,113,182,0),root={style:{getPropertyValue:k=>values.get(k)||'',setProperty:(k,v)=>values.set(k,v),removeProperty:k=>values.delete(k)}};
+  const utility={getBoundingClientRect:()=>geometry},nodes={hud:root,hudUtilities:utility};root.getBoundingClientRect=()=>rect(8,8,374,740);
+  const host=new EventTarget();host.innerHeight=844;host.getComputedStyle=()=>({display:'block',visibility:'visible'});
+  host.ResizeObserver=class{constructor(fn){callback=fn;}observe(){}disconnect(){}};
+  let binding;
+  try {
+    binding=bindHudLaneLayout({getElementById:id=>nodes[id]},host);
+    assert.equal(values.get('--wx-hud-utility-height'),'723px');
+    callback();callback();assert.equal(frames.size,1);
+    geometry.top=200;assert.equal(values.get('--wx-hud-utility-height'),'723px');
+    const [id,frame]=frames.entries().next().value;frames.delete(id);frame(0);
+    assert.equal(values.get('--wx-hud-utility-height'),'636px');
+    callback();assert.equal(frames.size,1);binding.dispose();assert.equal(frames.size,0);
+    callback();assert.equal(frames.size,0);
+  } finally {
+    binding?.dispose();
+    if(oldFrame===undefined)delete globalThis.requestAnimationFrame;else globalThis.requestAnimationFrame=oldFrame;
+    if(oldCancel===undefined)delete globalThis.cancelAnimationFrame;else globalThis.cancelAnimationFrame=oldCancel;
+  }
+});
