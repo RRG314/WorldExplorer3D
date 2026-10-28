@@ -61,7 +61,7 @@ export async function verifyHudWeatherLayout(){
     assert.deepEqual(report.reader.changed,{speed:'4',condition:'Explorer health · 40%',value:'40'});assert.deepEqual(report.reader.drive,{street:'Pratt Street',limit:'30'});
     assert.equal(report.reader.submarine,'Submarine health · 70%');assert.equal(report.reader.dive,'Dive air · 25%');
     const cases=[
-      {name:'desktop-short-window',width:1280,height:450,scale:'100',weather:['☀️ Clear · 57°F','77% humidity · Wind 4 mph NE'],readableMap:true},
+      {name:'desktop-short-window',width:1280,height:450,scale:'100',weather:['☀️ Clear • 57°F','77% humidity • Wind 6 mph NE'],readableMap:true,imagery:true},
       {name:'desktop-weather',width:1440,height:900,scale:'100',weather:['🌧 Heavy rain · 69°F','46% humidity · Wind 10 mph NW']},
       {name:'desktop-unavailable',width:1024,height:768,scale:'200',weather:['Weather unavailable','No current model coverage']},
       {name:'phone',width:390,height:844,scale:'100'},
@@ -87,6 +87,7 @@ export async function verifyHudWeatherLayout(){
         id('speed').textContent='12';id('speedUnitLabel').textContent='KTS';id('limitLabel').textContent='SIM DEPTH';id('limit').textContent='1000m';
         id('street').textContent='Ocean · Scuba explorer';id('conditionLabel').textContent='Dive air · 25%';
         id('weatherPanel').style.display='block';id('weatherLine').textContent=row.weather?.[0]||'Loading live weather';id('weatherMetaLine').textContent=row.weather?.[1]||'Fetching local conditions';
+        id('coordsText').textContent='39.2904, -76.6122 | S 180°';id('terrainImageryCredit').hidden=!row.imagery;
         id('mobileTouchControls').classList.toggle('show',!row.name.startsWith('desktop')&&row.width<1100);
         const touch=id('mobileTouchControls');touch.classList.remove('mode-walking','mode-driving','mode-plane');touch.classList.add('mode-'+(row.mode||'walking'));touch.dataset.handedness=row.southpaw?'southpaw':'standard';id('mobileDrivePedals').hidden=row.mode!=='driving';id('mobileTiltQuickRecenter').classList.toggle('hidden',!row.tilt);
         for(const name of ['liveGpsHud','deFlockHud','urbanCivicStatus'])id(name).classList.toggle('show',!!row.status?.includes(name));

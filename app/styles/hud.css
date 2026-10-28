@@ -170,7 +170,8 @@
     #hudDetails { gap: 3px; margin-top: 6px; padding-top: 6px; }
     #conditionBar { margin-bottom: 3px; }
     #hudMap { display: flex; flex-direction: column; gap: 4px; width: 192px; }
-    #coords { order: -1; padding: 4px; gap: 4px; }
+    #coords { order: -1; padding: 4px; gap: 4px; font-size: 11px; line-height: 1.3; }
+    #coords a { min-width: 28px; min-height: 28px; font-size: 10px; }
   }
   @media (forced-colors: active) {
     .hud-box, #hudToggleBtn { border-color: CanvasText; }
