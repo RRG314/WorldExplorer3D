@@ -88,6 +88,7 @@ function vehicleHandlingProfile(variantOrId = 'sedan', options = {}) {
     id: responder ? `response-${variant.id}` : variant.id,
     label: responder ? 'Response-tuned' : String(variant.handlingLabel || 'Balanced'),
     assetId: String(variant.assetId || ''),
+    width: Number(variant.width||1.8), height: Number(variant.height||1.5), length: Number(variant.length||4.45),
     halfTrack: Number(variant.halfTrack || Number(variant.width || 1.8)*.43),
     topSpeedMph: responder ? 120 : Math.max(40, Math.min(120, Number(variant.topSpeedMph) || 120)),
     accelerationScale: Math.max(.35, Number(variant.accelerationScale) || 1) * (responder ? 1.18 : 1),
@@ -139,6 +140,7 @@ function vehicleWheelContactLayout(variant = {}) {
   const width = Math.max(0.8, Number(variant.width) || 1.8);
   const length = Math.max(1.8, Number(variant.length) || 4.4);
   const style = String(variant.bodyStyle || variant.id || 'sedan');
+  if (variant.wheelBase && variant.halfTrack) return Object.freeze({halfTrack:variant.halfTrack,halfWheelbase:variant.wheelBase*.5,wheelRadius:variant.wheelRadius});
   const axleFactor = style === 'bus' ? 0.37 : style === 'box-truck' ? 0.35 : style === 'compact' ? 0.3 : 0.32;
   return Object.freeze({
     halfTrack: width * 0.43,

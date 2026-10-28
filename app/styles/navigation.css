@@ -146,3 +146,20 @@
     html:is([data-we3d-text-scale="160"], [data-we3d-text-scale="200"]) .floatItems { grid-template-columns: minmax(0, 1fr); }
   }
 }
+
+.vehicle-garage { color:var(--wx-text); background:var(--wx-panel-solid); border:1px solid var(--wx-line); border-radius:var(--wx-radius); width:min(900px,calc(100vw - 24px)); max-height:calc(100dvh - 24px); padding:24px; font-family:var(--wx-font-ui); }
+.vehicle-garage::backdrop { background:rgba(0,0,0,.72); }
+.vehicle-garage header { display:flex; justify-content:space-between; align-items:start; gap:16px; }
+.vehicle-garage header p { color:var(--wx-muted); letter-spacing:.08em; font-size:12px; }
+.vehicle-garage h2,.vehicle-garage h3 { margin:8px 0 16px; }
+.vehicle-garage-layout { display:grid; grid-template-columns:minmax(220px,1fr) minmax(220px,1fr); gap:24px; }
+.vehicle-garage nav { max-height:55dvh; overflow:auto; display:flex; flex-direction:column; gap:8px; }
+.vehicle-garage button,.vehicle-garage select { min-height:44px; border:1px solid var(--wx-line); border-radius:var(--wx-radius); padding:10px 12px; background:var(--wx-panel-solid); color:var(--wx-text); font:inherit; }
+.vehicle-garage button:focus-visible,.vehicle-garage select:focus-visible { outline:3px solid var(--wx-action); outline-offset:2px; }
+.vehicle-garage button[aria-pressed="true"],.vehicle-garage [data-garage-drive] { border-color:var(--wx-action); }
+.vehicle-garage-row { display:flex; flex-direction:column; text-align:left; gap:4px; }
+.vehicle-garage-row span,.vehicle-garage section p { font-size:14px; color:var(--wx-muted); line-height:1.6; }
+.vehicle-garage select { width:100%; margin:8px 0; }
+.vehicle-garage-actions { display:flex; flex-wrap:wrap; gap:8px; margin-top:20px; }
+.vehicle-garage button:disabled { opacity:.55; }
+@media(max-width:600px){.vehicle-garage{padding:16px}.vehicle-garage-layout{grid-template-columns:1fr;gap:16px}.vehicle-garage nav{max-height:30dvh}.vehicle-garage-actions button{flex:1}}

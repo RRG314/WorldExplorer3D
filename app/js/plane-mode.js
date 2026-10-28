@@ -292,6 +292,14 @@ function preparePlaneMode(options = {}) {
       throttle: state.throttle, airborne: true }
     : null;
   const catalog = getAviationCatalogEntry(options.transportCatalogId);
+  const water=appCtx.SurfaceQuery?.waterAt?.(reference.x,reference.z);
+  const ground=appCtx.SurfaceQuery?.driveAt?.(reference.x,reference.z,{preferRoad:true,currentY:reference.y});
+  const waterY=water?.position?.y;
+  if(water?.feature&&Number.isFinite(waterY)&&Number(ground?.position?.y??-Infinity)<waterY-.25&&
+    !flightContinuation&&(!Number.isFinite(options.y)||options.y<waterY+aircraftGroundOffset(catalog)+1)){
+    appCtx.showToast?.('Move to land or an airfield before starting this aircraft.');
+    return false;
+  }
   const mesh = ensurePlaneMesh(catalog);
   if (!mesh) return false;
   return {catalog, mesh, reference, flightContinuation};

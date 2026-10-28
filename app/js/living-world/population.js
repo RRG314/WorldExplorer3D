@@ -1,3 +1,4 @@
+import {createVehicleSpacing, vehicleFollowingGap} from './vehicle-spacing.js';
 import {detachSceneObject} from '../engine/scene-object-lifecycle.js';
 import {updateVehicleWheels} from '../transport/vehicle-wheel-motion.js';
 import { nearbyPedestrianSnapshots } from './nearby-pedestrians.js';
@@ -151,11 +152,11 @@ function spawnCandidate(graph, random, kind, reference) {
   const progress = (.06 + random() * .88) * edge.length;
   const pathOffset = kind === 'pedestrian' ? pedestrianPathOffset(edge, random) : 0;
   const point = edgePoint(edge, progress, pathOffset);
-  return { edgeIndex, progress, pathOffset, x: point.x, z: point.z, corridorKey: physicalEdgeKey(edge) };
+  return { edgeIndex, progress, pathOffset, x: point.x, y: Number(edge.p1.y||0)+(Number(edge.p2.y||0)-Number(edge.p1.y||0))*progress/Math.max(.01,edge.length), z: point.z, corridorKey: physicalEdgeKey(edge) };
 }
 
 function spawnCandidateScore(candidate, placements, graph, kind) {
-  if (kind !== 'pedestrian') return 0;
+  if (kind === 'vehicle') return placements.reduce((penalty,other)=>Math.max(penalty,Math.abs((candidate.y||0)-(other.y||0))<3?Math.max(0,12-Math.hypot(candidate.x-other.x,candidate.z-other.z)):0),0);
   const sameCorridor = placements.filter((entry) => entry.corridorKey === candidate.corridorKey).length;
   const nearest = placements.reduce((distance, entry) => (
     Math.min(distance, Math.hypot(candidate.x - entry.x, candidate.z - entry.z))
@@ -172,7 +173,7 @@ function spawnCandidateScore(candidate, placements, graph, kind) {
 function planAgentSpawns(count, graph, random, kind, reference = null) {
   if (!graph?.edges?.length) return [];
   const placements = [];
-  const attempts = kind === 'pedestrian' ? Math.min(28, Math.max(12, graph.edges.length * 2)) : 1;
+  const attempts = kind === 'pedestrian' ? Math.min(28, Math.max(12, graph.edges.length * 2)) : 24;
   for (let index = 0; index < count; index += 1) {
     let best = null;
     let bestScore = Infinity;
@@ -185,7 +186,7 @@ function planAgentSpawns(count, graph, random, kind, reference = null) {
       }
       if (kind === 'pedestrian' && score < .01) break;
     }
-    if (best && (kind !== 'pedestrian' || placements.every(other => Math.hypot(best.x - other.x, best.z - other.z) >= 1.1))) placements.push(best);
+    if (best && (kind !== 'vehicle' || bestScore < .011) && (kind !== 'pedestrian' || placements.every(other => Math.hypot(best.x - other.x, best.z - other.z) >= 1.1))) placements.push(best);
   }
   return placements;
 }
@@ -370,10 +371,12 @@ export function yieldToOpposingPedestrian(agent, agents, graph) {
 }
 
 function advanceAgents(agents, graph, outgoing, random, dt, kind, behavior = {}) {
-  const spacing = kind === 'pedestrian' ? createPedestrianSpacing(agents, agent => agentPose(agent, graph)) : null;
+  const spacing = kind === 'pedestrian' ? createPedestrianSpacing(agents, agent => agentPose(agent, graph))
+    : createVehicleSpacing(agents, agent => agentPose(agent, graph), behavior.obstacles);
   const occupancy = new Map();
   if (kind === 'vehicle') {
     agents.forEach((agent) => {
+      if(agent.promoted&&!agent.detailPromoted)return;
       const list = occupancy.get(agent.edgeIndex) || [];
       list.push(agent);
       occupancy.set(agent.edgeIndex, list);
@@ -433,10 +436,10 @@ function advanceAgents(agents, graph, outgoing, random, dt, kind, behavior = {})
       const sameEdge = occupancy.get(agent.edgeIndex) || [];
       const rank = sameEdge.indexOf(agent);
       const leader = rank > 0 ? sameEdge[rank - 1] : null;
-      const followingGap = 3.2 + Math.max(0, Number(agent.currentSpeed ?? speed)) * .82;
+      const followingGap = vehicleFollowingGap(agent, leader, Number(agent.currentSpeed ?? speed));
       if (leader && leader.progress - agent.progress < followingGap) {
-        const availableGap = Math.max(0, leader.progress - agent.progress - 2.8);
-        speed *= Math.max(0, Math.min(1, availableGap / Math.max(1, followingGap - 2.8)));
+        const availableGap = Math.max(0, leader.progress - agent.progress - (agent.variant.length + leader.variant.length)*.5 - 1.1);
+        speed *= Math.max(0, Math.min(1, availableGap / Math.max(1, followingGap - (agent.variant.length + leader.variant.length)*.5 - 1.1)));
         agent.waitReason = 'traffic_queue';
       } else {
         agent.waitReason = '';
@@ -469,6 +472,9 @@ function advanceAgents(agents, graph, outgoing, random, dt, kind, behavior = {})
         agent.waitReason = `signal_${signal.aspect}`;
       }
       speed *= Math.max(.12, Number(behavior.speedScale) || 1);
+      const run=Math.max(.01,Math.hypot(edge.p2.x-edge.p1.x,edge.p2.z-edge.p1.z));
+      const clear=spacing.limit(agent,(edge.p2.x-edge.p1.x)/run*speed*dt,(edge.p2.z-edge.p1.z)/run*speed*dt);
+      speed*=clear; if(clear<1)agent.waitReason='vehicle_clearance';
     } else {
       if (agent.reactionRemaining > 0) {
         agent.reactionRemaining = Math.max(0, agent.reactionRemaining - dt * stride);
@@ -980,6 +986,7 @@ export function createLivingWorldPopulation(options = {}) {
           reference,
           tick,
           sampleVehicleSurface,
+          obstacles: options.getVehicleObstacles?.() || [],
           speedScale: demand.vehicleSpeedScale,
           signalDirective: (edgeIndex, progress, speed) => trafficControls.directive(edgeIndex, progress, speed, elapsedSeconds)
         });

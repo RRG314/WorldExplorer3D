@@ -175,12 +175,20 @@ async function settleCommerceOutcome(options = {}) {
         levels[upgrade[1]] = Math.max(Number(levels[upgrade[1]] || 0), Number(upgrade[2]));
         vehicles[receipt.targetId] = levels;
         transaction.set(playerProgressRef, {
+          ...current,
           authority: 'explorer-player-state-v1',
           schemaVersion: 1,
           vehicles,
           revision: Math.max(0, Number(current.revision || 0)) + 1,
           updatedAt: timestampFromMs(nowMs)
         }, { merge: false });
+      }
+      if(playerProgressRef&&receipt.catalogId==='vehicle-full-repair'&&receipt.targetId){
+        const current=snapshotData(progressSnapshot)||{};
+        const {normalizeVehicleGarage,personalVehicleIdentity}=require('./generated/vehicle-garage-rules.cjs');
+        const garage=normalizeVehicleGarage(current.garage);
+        const row=Object.values(garage.vehicles).find(v=>personalVehicleIdentity(v.id)===receipt.targetId);
+        if(row){row.condition=1;garage.revision++;transaction.set(playerProgressRef,{...current,garage,updatedAt:timestampFromMs(nowMs)},{merge:false});}
       }
       return Object.freeze(settled);
     }
@@ -216,3 +224,29 @@ module.exports = {
   settleCommerceTransaction,
   walletData
 };
+
+// Owned vehicles share the existing wallet and player-upgrade transaction.
+// No client-supplied price, balance, entitlement or property ownership is used.
+async function settleVehicleGarageAction({runTransaction,walletRef,progressRef,receiptRef,propertyRef,
+  uid,input={},nowMs=Date.now(),timestampFromMs}) {
+  const {normalizeVehicleGarage,prepareVehicleGarageChange}=require('./generated/vehicle-garage-rules.cjs');
+  if(!uid||!input.requestId||!['initialize','buy','select','park','home'].includes(input.action))throw Error('invalid_vehicle_action');
+  const fingerprint=JSON.stringify([input.action,input.vehicleId||'',input.homeId||'',input.condition??null,input.expectedRevision??null]);
+  return runTransaction(async tx=>{
+    const [saved,balance,receipt,property]=await Promise.all([tx.get(progressRef),tx.get(walletRef),tx.get(receiptRef),propertyRef?tx.get(propertyRef):null]);
+    const prior=snapshotData(receipt);
+    if(prior){if(prior.fingerprint!==fingerprint)throw Error('vehicle_request_conflict');return {...prior.result,duplicate:true};}
+    const progress=snapshotData(saved)||{},wallet=walletData(snapshotData(balance)||{});
+    const change=input.action==='initialize'?{garage:normalizeVehicleGarage(progress.garage),cost:0}:
+      prepareVehicleGarageChange(progress.garage,input,{now:nowMs,ownsHome:id=>id===input.homeId&&snapshotData(property)?.ownerUid===uid});
+    if(change.cost>wallet.credits)throw Error('not_enough_credits');
+    if(change.cost)tx.set(walletRef,{...wallet,credits:wallet.credits-change.cost,lifetimeSpent:wallet.lifetimeSpent+change.cost,
+      revision:wallet.revision+1,updatedAt:timestampFromMs(nowMs)},{merge:false});
+    const result={ok:true,garage:change.garage,credits:wallet.credits-change.cost};
+    tx.set(progressRef,{...progress,authority:'explorer-player-state-v1',schemaVersion:1,garage:change.garage,
+      revision:Number(progress.revision||0)+1,updatedAt:timestampFromMs(nowMs)},{merge:false});
+    tx.set(receiptRef,{fingerprint,result,createdAt:timestampFromMs(nowMs)},{merge:false});
+    return result;
+  });
+}
+module.exports.settleVehicleGarageAction=settleVehicleGarageAction;

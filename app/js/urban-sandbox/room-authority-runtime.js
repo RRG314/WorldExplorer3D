@@ -273,6 +273,24 @@ function createUrbanRoomAuthorityRuntime(options = {}) {
     return state.authority.resolveCivicOutcome();
   }
 
+  async function claimPreparedVehicle(vehicle) {
+    if(!active())return {accepted:false,reason:'world_changed'};
+    if(!currentRoom())return {accepted:true};
+    if(!state.authority)return {accepted:false,reason:'authority_connecting'};
+    const authority=state.authority,generation=syncGeneration;
+    const result=await authority.claimVehicle(vehicle,options.vehiclePose(vehicle));
+    if(!active()||generation!==syncGeneration||authority!==state.authority){
+      if(result?.accepted)void authority.releaseVehicle(vehicle,options.vehiclePose(vehicle)).catch(()=>{});
+      return {accepted:false,reason:'world_changed'};
+    }
+    return result;
+  }
+  function releasePreparedVehicle(vehicle){
+    if(leasedVehicle()===vehicle)heartbeat.stop();
+    if(state.authority&&!revokedVehicles.has(vehicle))void state.authority.releaseVehicle(vehicle,options.vehiclePose(vehicle)).catch(()=>{});
+  }
+  function adoptPreparedVehicle(){if(state.authority)heartbeat.start();}
+
   function dispose() {
     if (disposed) return false;
     heartbeat.stop();
@@ -293,7 +311,7 @@ function createUrbanRoomAuthorityRuntime(options = {}) {
 
   globalThis.addEventListener('we3d-room-changed', sync);
   sync();
-  return Object.freeze({ civicSnapshot, dispose, reportCivicEvent, requestVehicleEntry, resolveCivicOutcome, snapshot, sync, update,
+  return Object.freeze({ claimPreparedVehicle,releasePreparedVehicle,adoptPreparedVehicle,civicSnapshot, dispose, reportCivicEvent, requestVehicleEntry, resolveCivicOutcome, snapshot, sync, update,
     hasRevokedLease: vehicle => revokedVehicles.has(vehicle) });
 }
 

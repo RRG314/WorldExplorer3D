@@ -994,6 +994,7 @@ async function deleteUserData(uid) {
     await deleteDocsByQuery(userRef.collection('myRooms'), 200, 'users/{uid}/myRooms');
     await deleteDocsByQuery(userRef.collection('economy'), 200, 'users/{uid}/economy');
     await deleteDocsByQuery(userRef.collection('commerceReceipts'), 200, 'users/{uid}/commerceReceipts');
+    await deleteDocsByQuery(userRef.collection('vehicleReceipts'), 200, 'users/{uid}/vehicleReceipts');
     await deleteDocsByQuery(userRef.collection('commerceItems'), 200, 'users/{uid}/commerceItems');
     await deleteDocsByQuery(userRef.collection('commerceStock'), 200, 'users/{uid}/commerceStock');
     await deleteDocsByQuery(userRef.collection('gameplay'), 200, 'users/{uid}/gameplay');
@@ -1939,6 +1940,7 @@ exports.claimUrbanVehicle = functions.region('us-central1').runWith({ invoker: '
     const result = await claimUrbanVehicleLease({
       runTransaction: (callback) => db.runTransaction(callback),
       entityRef: context.roomRef.collection('urbanEntities').doc(documentId),
+      personalGarageRef:entityId.startsWith('personal:')?db.collection('users').doc(auth.uid).collection('gameplay').doc('vehicleUpgrades'):null,
       uid: auth.uid,
       nowMs: context.nowMs,
       timestampFromMs: urbanTimestampFromMs,
@@ -2162,6 +2164,30 @@ exports.settleExplorerCommerceOutcome = functions.region('us-central1').runWith(
     }
     console.error('[settleExplorerCommerceOutcome] failed:', error);
     res.status(500).json({ error: 'The Explorer Wallet could not settle this service.' });
+  }
+});
+
+exports.commitExplorerVehicleAction = functions.region('us-central1').runWith({ invoker: 'public' }).https.onRequest(async (req,res)=>{
+  if(setCors(req,res))return;
+  if(req.method!=='POST')return res.status(405).json({error:'Method not allowed.'});
+  const auth=await verifyAuth(req,res);if(!auth)return;
+  const input=req.body||{};
+  if(!/^[A-Za-z0-9:._-]{12,120}$/.test(input.requestId||'')||String(input.homeId||'').length>420)
+    return res.status(400).json({error:'A valid vehicle command is required.'});
+  const user=db.collection('users').doc(auth.uid),homeId=String(input.homeId||'');
+  try {
+    const result=await require('./economy-authority').settleVehicleGarageAction({
+      runTransaction:fn=>db.runTransaction(fn),walletRef:user.collection('economy').doc('wallet'),
+      progressRef:user.collection('gameplay').doc('vehicleUpgrades'),
+      receiptRef:user.collection('vehicleReceipts').doc(input.requestId),
+      propertyRef:homeId?db.collection('worldProperties').doc(propertyDocumentId(homeId)):null,
+      uid:auth.uid,input,nowMs:Date.now(),timestampFromMs:urbanTimestampFromMs});
+    return res.status(200).json(result);
+  }catch(error){
+    const reason=String(error.message||'');
+    if(/^(vehicle_|invalid_vehicle_|not_enough_credits)/.test(reason))return res.status(reason==='vehicle_garage_changed'?409:422).json({error:reason,reason});
+    console.error('[commitExplorerVehicleAction] failed:',error);
+    return res.status(500).json({error:'Your garage could not be saved. Please try again.'});
   }
 });
 

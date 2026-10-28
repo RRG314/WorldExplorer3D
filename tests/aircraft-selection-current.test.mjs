@@ -52,3 +52,13 @@ test('dedicated environment admission still rejects an aircraft choice before to
     assert.equal(h.appCtx.planeMode.y,180);assert.equal(h.appCtx.planeMode.speed,65);
   }
 });
+
+test('grounded aircraft starts reject mapped water above the drive surface without blocking valid flight or dry land',()=>{
+ const h=flight();vm.runInContext('state.active=false;state.airborne=false;',h.context);
+ h.appCtx.SurfaceQuery={waterAt:()=>({feature:{type:'water'},position:{y:0}}),driveAt:()=>({position:{y:-30}})};
+ assert.equal(h.prepare({transportCatalogId:'business-jet'}),false);
+ h.appCtx.SurfaceQuery.driveAt=()=>({position:{y:1}});
+ assert.ok(h.prepare({transportCatalogId:'business-jet'}));
+ h.appCtx.SurfaceQuery.driveAt=()=>({position:{y:-30}});
+ assert.ok(h.prepare({transportCatalogId:'business-jet',x:100,y:180,z:200}));
+});

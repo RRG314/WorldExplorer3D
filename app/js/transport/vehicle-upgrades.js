@@ -1,3 +1,4 @@
+import {normalizeVehicleGarage} from './vehicle-garage-rules.js';
 const VEHICLE_UPGRADE_STORAGE_KEY = 'world-explorer:vehicle-upgrades:v1';
 const VEHICLE_UPGRADE_SCHEMA_VERSION = 1;
 
@@ -41,10 +42,14 @@ const VEHICLE_UPGRADE_SERVICES = Object.freeze(VEHICLE_UPGRADE_DEFINITIONS.flatM
 
 function createVehicleUpgradeStore(options = {}) {
   const storage = options.storage || globalThis.localStorage;
+  const ownerUid=String(options.ownerUid||'');
+  const storageKey=ownerUid?`${VEHICLE_UPGRADE_STORAGE_KEY}:account:${ownerUid}`:VEHICLE_UPGRADE_STORAGE_KEY;
+  let garage=normalizeVehicleGarage();
+  let garageLoaded=!ownerUid;
   let vehicles = {};
   const listeners = new Set();
   try {
-    const saved = JSON.parse(storage?.getItem?.(VEHICLE_UPGRADE_STORAGE_KEY) || 'null');
+    const saved = JSON.parse(storage?.getItem?.(storageKey) || 'null');
     if (saved?.schemaVersion === VEHICLE_UPGRADE_SCHEMA_VERSION && saved.vehicles && typeof saved.vehicles === 'object') {
       vehicles = { ...saved.vehicles };
     }
@@ -53,7 +58,7 @@ function createVehicleUpgradeStore(options = {}) {
   function save() {
     try {
       if (!storage?.setItem) return false;
-      storage?.setItem?.(VEHICLE_UPGRADE_STORAGE_KEY, JSON.stringify({ schemaVersion: VEHICLE_UPGRADE_SCHEMA_VERSION, vehicles }));
+      storage?.setItem?.(storageKey, JSON.stringify({ schemaVersion: VEHICLE_UPGRADE_SCHEMA_VERSION, vehicles }));
       return true;
     } catch (_) {return false;}
   }
@@ -106,6 +111,10 @@ function createVehicleUpgradeStore(options = {}) {
   }
 
   return Object.freeze({
+    ownerUid,
+    get garageLoaded(){return garageLoaded;},
+    garageSnapshot:()=>structuredClone(garage),
+    hydrateGarage:raw=>{garage=normalizeVehicleGarage(raw);garageLoaded=true;},
     apply,
     canApply,
     exportState,
@@ -135,7 +144,9 @@ function vehicleUpgradeDynamics(levels = {}) {
 }
 
 function ensureVehicleUpgradeStore(appContext = {}, options = {}) {
-  if (!appContext.vehicleUpgradeStore?.snapshot) appContext.vehicleUpgradeStore = createVehicleUpgradeStore(options);
+  if (!appContext.vehicleUpgradeStore?.snapshot ||
+    (Object.hasOwn(options,'ownerUid')&&appContext.vehicleUpgradeStore.ownerUid!==String(options.ownerUid||'')))
+    appContext.vehicleUpgradeStore = createVehicleUpgradeStore(options);
   return appContext.vehicleUpgradeStore;
 }
 

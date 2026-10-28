@@ -214,13 +214,21 @@ async function resolveUrbanCivicOutcome(options = {}) {
 }
 
 async function claimUrbanVehicleLease(options = {}) {
-  const { runTransaction, entityRef, uid, input, nowMs, timestampFromMs } = options;
+  const { runTransaction, entityRef, personalGarageRef, uid, input, nowMs, timestampFromMs } = options;
   if (typeof runTransaction !== 'function' || !entityRef || !uid || !input) throw new TypeError('Vehicle claim transaction inputs are required.');
   const entityId = normalizeUrbanEntityId(input.entityId);
   if (!entityId) throw new Error('invalid_entity');
   return runTransaction(async (transaction) => {
     const snapshot = await transaction.get(entityRef);
     const current = snapshotData(snapshot);
+    let personal=null;
+    if(entityId.startsWith('personal:')){
+      const [,ownerUid,vehicleId]=entityId.split(':');
+      const definition=require('./generated/vehicle-garage-rules.cjs').personalVehicleById(vehicleId);
+      if(ownerUid!==uid||!definition||!personalGarageRef)return {accepted:false,reason:'vehicle_not_owned'};
+      personal=snapshotData(await transaction.get(personalGarageRef))?.garage?.vehicles?.[vehicleId];
+      if(!personal||input.label!==definition.label||input.style!==definition.category)return {accepted:false,reason:'vehicle_not_owned'};
+    }
     const leaseExpiresMs = timestampMillis(current?.leaseExpiresAt, 0);
     if (current && current.kind !== 'vehicle') throw new Error('entity_kind_conflict');
     if (current && current.worldSeed !== input.worldSeed) throw new Error('world_conflict');
@@ -245,7 +253,7 @@ async function claimUrbanVehicleLease(options = {}) {
       style: String(input.style || 'sedan').slice(0, 40),
       color: Math.max(0, Math.min(0xffffff, Math.floor(finiteNumber(input.color, 0x51667a)))),
       pose,
-      condition: clamp(current?.condition ?? 1, 0, 1),
+      condition: clamp(personal?.condition ?? current?.condition ?? 1, 0, 1),
       resistance: TARGET_RESISTANCE.vehicle,
       leaseOwnerUid: uid,
       leaseExpiresAt,

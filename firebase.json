@@ -251,6 +251,7 @@
         "source": "/cancelDiscoveryTrade",
         "function": "cancelDiscoveryTrade"
       },
+      { "source": "/commitExplorerVehicleAction", "function": "commitExplorerVehicleAction" },
       {
         "source": "/commitExplorerCommerceAction",
         "function": "commitExplorerCommerceAction"

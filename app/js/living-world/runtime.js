@@ -210,6 +210,7 @@ export function startLivingWorldRuntime(appCtx, options = {}) {
       const projected=new THREE.Vector3(point.x,Number(point.y||0)+1,point.z).project(camera);
       return projected.z < -1 || projected.z > 1 || Math.abs(projected.x)>1.3 || Math.abs(projected.y)>1.3;
     },
+    getVehicleObstacles: () => appCtx.urbanSandboxRuntime?.trafficObstacles?.() || [],
     getTimePhase: () => appCtx.timeOfDay,
     getTrafficFlow: () => appCtx.currentTrafficFlowProfile || null,
     trafficControls: appCtx.trafficControlPlacements,

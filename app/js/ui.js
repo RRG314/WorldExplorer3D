@@ -1,3 +1,4 @@
+import {bindVehicleGarage,vehicleGarageMessage} from './ui/vehicle-garage.js';
 import { mountCapabilityGuide } from './product/capability-guide.js?v=1';
 import { ctx as appCtx } from "./shared-context.js?v=55"; // ============================================================================
 // ui.js - UI setup, event binding, button handlers
@@ -27,6 +28,7 @@ function emitTutorialEvent(eventName, payload = {}) {
 function setupUI() {
   appCtx.screenLayout ||= getScreenLayoutService();
   mountTesterInvitation();
+  bindVehicleGarage();
   mountCapabilityGuide();
   const LAST_LOCATION_STORAGE_KEY = 'worldExplorer3D.lastLocation.v1';
   const bindTouchFriendlyPress = (el, handler) => {
@@ -456,9 +458,11 @@ function setupUI() {
     });
   }
   // Travel mode switchers - mutually exclusive
-  document.getElementById('fDriving').addEventListener('click', () => {
+  document.getElementById('fDriving').addEventListener('click', async () => {
     if (typeof appCtx.setTravelMode === 'function') {
-      appCtx.setTravelMode('drive', { source: 'ui_button' });
+      const selected=document.getElementById('travelVehicleSelect')?.value||'bmw_e34';
+      const result=await appCtx.selectPersonalVehicle?.(selected);
+      if(!result?.ok)appCtx.showToast?.(vehicleGarageMessage(result));
     } else {
       console.error('Travel mode controller is unavailable.');
     }

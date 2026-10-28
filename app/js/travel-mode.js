@@ -299,6 +299,7 @@ function transitionTravelMode(mode, options = {}, dronePose = null, restoration 
   // Dedicated environments own their controllers until their explicit exit.
   if (resolveControlState(appCtx).frame !== 'surface') return rejected();
   const session = captureEnvironmentSession();
+  if(targetMode!=='drive'&&appCtx.canReleaseUrbanVehicle?.()===false)return rejected();
   if (targetMode === 'boat' && appCtx.boatSwimming?.active) {
     appCtx.startBoatMode?.(options);
     return {mode: syncTravelModeButtons(), applied: getCurrentTravelMode() === targetMode};
@@ -372,6 +373,8 @@ function transitionTravelMode(mode, options = {}, dronePose = null, restoration 
     }
   }
   if (!session.isCurrent() || (targetMode === 'drone' && !droneEntry)) return rejected();
+
+  if(targetMode!=='drive'&&appCtx.releaseUrbanVehicleForTravel?.(targetMode)===false)return rejected();
 
   if ((targetMode !== 'walk' || groundSpawn) && appCtx.activeInterior && typeof appCtx.clearActiveInterior === 'function') {
     appCtx.clearActiveInterior({ restorePlayer: true, preserveCache: true });

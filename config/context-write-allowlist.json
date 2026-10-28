@@ -1805,14 +1805,19 @@
     ],
     "app/js/urban-sandbox/runtime.js": [
       "boatMode",
+      "canReleaseUrbanVehicle",
+      "cancelPersonalVehicleSelection",
       "car",
       "carMesh",
+      "changeVehicleGarage",
       "connectedExplorerPlayerState",
       "connectedExplorerWallet",
       "disposeUrbanSandboxRuntime",
       "enterUrbanVehicleByIdForSupport",
       "equipUrbanEquipmentSlot",
       "exitUrbanVehicleForSupport",
+      "getVehicleGarage",
+      "getVehicleGarageHomes",
       "handleMechanicInteraction",
       "handleUrbanCustodyContinue",
       "handleUrbanEquipmentUse",
@@ -1821,7 +1826,9 @@
       "localConvenienceStoreCommerce",
       "onUrbanParachuteLanded",
       "prepareAirborneParachute",
+      "releaseUrbanVehicleForTravel",
       "resolveUrbanActorCollision",
+      "selectPersonalVehicle",
       "startUrbanSandboxRuntime",
       "toggleUrbanEquipment",
       "toggleUrbanResponderEquipment",
@@ -2224,6 +2231,9 @@
       "closeControlsPanel",
       "disposeControlsPanel",
       "openControlsPanel"
+    ],
+    "app/js/ui/vehicle-garage.js": [
+      "openVehicleGarage"
     ]
   }
 }

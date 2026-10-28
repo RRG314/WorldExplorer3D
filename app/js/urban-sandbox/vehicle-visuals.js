@@ -1,3 +1,4 @@
+import {createVehicleDamageVisual} from '../transport/vehicle-damage-visual.js';
 import {detachSceneObject} from '../engine/scene-object-lifecycle.js';
 import { roadVehicleVisualRecipe } from '../transport/road-vehicle-visual-recipe.js?v=1';
 import { transportDamagePresentation } from '../transport/damage-model.js?v=1';
@@ -53,24 +54,16 @@ function createUrbanVehicleVisual(THREE, definition = {}, serviceLighting = null
     root.add(serviceRed, serviceBlue);
   }
 
-  let condition = Math.max(0, Math.min(1, Number(definition.condition ?? 1)));
-  const setCondition = (nextCondition = 1) => {
-    condition = Math.max(0, Math.min(1, Number(nextCondition) || 0));
-    const damage = transportDamagePresentation(condition);
-    root.userData.condition = condition;
-    root.userData.damageState = damage;
-    const attachmentRoot = root.userData.curatedTrafficVehicleAttachment?.visual;
-    vehicleMaterials(attachmentRoot).forEach((material) => {
-      if (!material.color) return;
-      if (!material.userData.curatedFleetBaseColor) {
-        material.userData.curatedFleetBaseColor = `#${material.color.getHexString()}`;
-      }
-      material.color.set(material.userData.curatedFleetBaseColor).multiplyScalar(1 - damage.dirt * .34);
-      material.needsUpdate = true;
-    });
-    // Ground attitude belongs to the pose controller; damage must not reset it.
-    const model = attachmentRoot?.children?.[0];
-    if (model) model.rotation.z = damage.band === 'disabled' ? .035 : 0;
+  const damageVisual=createVehicleDamageVisual(THREE,root,variant);
+  let condition=Math.max(0,Math.min(1,Number(definition.condition??1)));
+  let appliedCondition=null;
+  const setCondition=(nextCondition=1)=>{
+    condition=Math.max(0,Math.min(1,Number(nextCondition)||0));
+    if(appliedCondition===condition)return root.userData.damageState;
+    appliedCondition=condition;
+    const damage=transportDamagePresentation(condition);
+    root.userData.condition=condition;root.userData.damageState=damage;
+    damageVisual.condition(condition,damage);
     return damage;
   };
 
@@ -78,10 +71,10 @@ function createUrbanVehicleVisual(THREE, definition = {}, serviceLighting = null
     root,
     get wheels() { return root.userData.curatedTrafficVehicleAttachment?.visual?.userData?.wheels || EMPTY_WHEELS; },
     doors: Object.freeze(doors),
+    updateDamageVisual:time=>damageVisual.update(time),
     serviceLights: Object.freeze([serviceRed, serviceBlue].filter(Boolean)),
     materials: Object.freeze([]),
     setCondition,
-    updateDamageVisual() {},
     setServiceLights(elapsed = 0, active = true) {
       if (!serviceRed || !serviceBlue) return;
       const redActive = active && Math.sin(Number(elapsed || 0) * 11) >= 0;
@@ -95,6 +88,7 @@ function createUrbanVehicleVisual(THREE, definition = {}, serviceLighting = null
       });
     },
     dispose() {
+      damageVisual.dispose();
       root.userData.disposeCuratedTrafficVehicle?.();
       detachSceneObject(root);
       serviceLighting?.release(serviceRed);
@@ -103,7 +97,7 @@ function createUrbanVehicleVisual(THREE, definition = {}, serviceLighting = null
       serviceBlue?.dispose?.();
     }
   };
-  root.userData.onCuratedTrafficAttached = () => setCondition(condition);
+  root.userData.onCuratedTrafficAttached = () => {appliedCondition=null;setCondition(condition);};
   setCondition(condition);
   return Object.freeze(api);
 }

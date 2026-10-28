@@ -9,3 +9,8 @@ async function saveExplorerPlayerCondition(input = {}) {
 }
 
 export { saveExplorerPlayerCondition };
+
+export function commitExplorerVehicleAction(input={}) {
+  const {expectedUserId,...command}=input;
+  return postProtectedFunction('/commitExplorerVehicleAction',command,{label:'Vehicle garage',forceRefreshToken:false,expectedUserId});
+}
