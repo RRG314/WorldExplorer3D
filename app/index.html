@@ -32,7 +32,7 @@ if (location.protocol === 'file:') document.documentElement.classList.add('unsup
 <link rel="stylesheet" href="../styles/world-explorer-tokens.css?v=3">
 <link rel="stylesheet" href="../styles/world-explorer-components.css?v=2">
 <link rel="stylesheet" href="styles/title-shell.css?v=98">
-<link rel="stylesheet" href="styles/runtime-shell.css?v=140">
+<link rel="stylesheet" href="styles/runtime-shell.css?v=141">
 <link rel="stylesheet" href="styles/block-builder.css?v=9">
 <link rel="stylesheet" href="styles/universe.css?v=10">
 <link rel="stylesheet" href="styles/fishing-game.css?v=6">
@@ -824,6 +824,7 @@ Continue ocean exploration beyond the dive site
 <div id="coords"><span id="coordsText">--</span><a id="coordsOsmLink" data-osm-location-link href="https://www.openstreetmap.org" target="_blank" rel="noopener noreferrer" title="Edit this location in OpenStreetMap">OSM</a><a id="terrainImageryCredit" hidden href="https://www.esri.com/en-us/legal/terms/full-master-agreement" target="_blank" rel="noopener noreferrer" title="Imagery: Esri, Vantor, Earthstar Geographics, and the GIS User Community">© Esri</a></div>
 </div>
 <div id="hudUtilities">
+<div id="boatPrompt" aria-live="polite"></div>
 <section id="liveGpsHud" aria-label="Live GPS status">
   <div class="liveGpsHudTop"><strong aria-label="Live GPS">GPS</strong><button id="liveGpsStopBtn" type="button">Stop</button><span id="liveGpsMotion">stationary · 0.0 m/s</span></div>
   <div id="liveGpsStatus" aria-live="polite">Waiting for GPS…</div>
@@ -866,7 +867,6 @@ Continue ocean exploration beyond the dive site
 </div>
 </div>
 <div id="interiorPrompt" aria-live="polite"></div>
-<div id="boatPrompt" aria-live="polite"></div>
 <div id="discoveryContextPrompt" aria-live="polite"><span id="discoveryContextText">Explore what is possible here.</span><button id="discoveryContextOpenBtn" type="button">Explore</button></div>
 <button id="discoveryQuickToolBtn" type="button" aria-controls="discoveryPanel" aria-expanded="false"><span>⌁</span><strong>Resume Field Activity</strong><span id="discoveryQuickSignal">Ready</span></button>
 <aside id="currentJourneyCard" role="status" aria-label="Current journey" aria-live="polite" aria-atomic="true" hidden>

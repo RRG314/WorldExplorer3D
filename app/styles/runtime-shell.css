@@ -34,7 +34,7 @@
 #interiorPrompt[data-variant="notice"]{border-color:rgba(248,113,113,0.65);color:#fee2e2}
 #interiorPrompt[data-variant="familiar"]{padding:7px 11px;background:rgba(15,23,42,.82);border-color:rgba(96,165,250,.48);color:#e0f2fe}
 @media(hover:none),(pointer:coarse){#interiorPrompt{top:max(112px,calc(env(safe-area-inset-top) + 102px));bottom:auto}#interiorPrompt.show{pointer-events:auto;cursor:pointer;min-height:40px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;touch-action:manipulation}}
-#boatPrompt{position:fixed;left:50%;bottom:76px;transform:translateX(-50%);display:none;max-width:min(82vw,480px);padding:10px 14px;border-radius:999px;background:rgba(8,47,73,0.92);border:1px solid rgba(125,211,252,0.5);color:#e0f2fe;font-family:'Poppins',sans-serif;font-size:12px;font-weight:600;letter-spacing:0.2px;z-index:141;box-shadow:0 12px 28px rgba(8,47,73,0.28);backdrop-filter:blur(8px);pointer-events:none}
+#boatPrompt{position:static;display:none;flex:none;width:100%;box-sizing:border-box;padding:10px 12px;border-radius:var(--wx-radius);background:var(--wx-panel);border:1px solid var(--wx-line);color:var(--wx-text);font:600 var(--wx-type-meta)/1.5 var(--wx-font-ui);overflow-wrap:anywhere;pointer-events:none}
 #boatPrompt.show{display:block}
 body:has(#urbanVehiclePrompt.show) #boatPrompt{display:none!important}
 body.game-panel-layer-open #urbanVehiclePrompt,
@@ -64,8 +64,8 @@ body.game-activity-layer-open .tutorial-card,
 body.game-activity-layer-open #appSignInBtn,
 body.game-activity-layer-open #authFloatPanel,
 body.game-activity-layer-open #proAccessPanel{display:none!important}
-#boatPrompt[data-variant="supported"],#boatPrompt[data-variant="active"]{border-color:rgba(56,189,248,0.78);color:#e0f2fe}
-#boatPrompt[data-variant="notice"]{border-color:rgba(248,113,113,0.65);color:#fee2e2}
+#boatPrompt[data-variant="supported"],#boatPrompt[data-variant="active"]{border-color:var(--wx-line);color:var(--wx-text)}
+#boatPrompt[data-variant="notice"]{border-color:var(--wx-warning);color:var(--wx-warning)}
 #boatWaveDock{position:fixed;left:50%;bottom:96px;transform:translateX(-50%);display:none;align-items:center;gap:12px;min-width:min(88vw,380px);padding:10px 14px;border-radius:999px;background:rgba(6,24,40,0.9);border:1px solid rgba(125,211,252,0.36);color:#e0f2fe;font-family:'Poppins',sans-serif;z-index:142;box-shadow:0 14px 34px rgba(2,12,27,0.34);backdrop-filter:blur(10px)}
 #boatWaveDock.show{display:flex}
 .boatWaveMeta{display:flex;flex-direction:column;gap:2px;min-width:90px}
@@ -442,7 +442,6 @@ body.creator-profile-open #tutorialHintCard{
 
 @media (max-width: 768px){
   #boatWaveDock{display:none!important}
-  #boatPrompt{bottom:max(90px,calc(env(safe-area-inset-bottom) + 88px));max-width:calc(100vw - 20px);box-sizing:border-box}
   #memoryComposer{left:10px;right:10px;bottom:12px;width:auto}
   #memoryInfoPanel{left:10px;right:10px;top:72px;width:auto}
   .auth-float-toggle{top:max(8px,calc(env(safe-area-inset-top) + 6px));left:10px;padding:8px 11px;font-size:11px}
@@ -487,13 +486,11 @@ body.space-destination-details-open #spaceFlightHUD{visibility:hidden}
 @media (max-width:768px){body.space-flight-hud-expanded #mobileTouchControls.mode-rocket{visibility:hidden}}
 
 @media(min-width:761px){
-  body:has(#floatMenuContainer.show) #boatPrompt{bottom:94px}
-  #interiorPrompt,#boatPrompt{left:auto;right:16px;bottom:88px;transform:none;max-width:min(380px,calc(100vw - 32px));border-radius:3px}
+  #interiorPrompt{left:auto;right:16px;bottom:88px;transform:none;max-width:min(380px,calc(100vw - 32px));border-radius:3px}
 }
 
 @media(max-width:760px),(hover:none) and (pointer:coarse){
   #interiorPrompt{left:max(10px,env(safe-area-inset-left));right:max(10px,env(safe-area-inset-right));transform:none;max-width:none;border-radius:3px;text-align:center}
-  #boatPrompt{left:auto;right:max(10px,env(safe-area-inset-right));transform:none;border-radius:3px}
 }
 }
 
