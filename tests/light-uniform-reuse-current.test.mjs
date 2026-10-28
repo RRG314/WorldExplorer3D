@@ -44,3 +44,14 @@ test('installation is idempotent and renderer disposal restores owned hooks',()=
  assert.equal(renderer.render,render);assert.equal(renderer.dispose,dispose);assert.equal(uniform.setValue,set);
  assert.deepEqual(calls,['dispose']);control.dispose();
 });
+
+test('single numeric caches retain exact doubles across enable/disable and disposal without changing dynamic arrays',()=>{
+ const values=[1/3,-0,1+Number.EPSILON],uniform={cache:[],setValue(_gl,value){for(let i=0;i<value.length;i++)this.cache[i]=value[i];}};
+ const array={cache:[],size:3,setValue:uniform.setValue},original=uniform.cache;
+ const renderer={info:{programs:[{getUniforms:()=>({map:{diffuse:uniform,weights:array}})}]},render(){uniform.setValue(null,values);array.setValue(null,values);}};
+ const control=installLightUniformExperiment({renderer});renderer.render({},{});
+ assert.ok(uniform.cache instanceof Float64Array);assert.deepEqual([...uniform.cache],values);assert.ok(Array.isArray(array.cache));
+ const buffer=uniform.cache;renderer.render({},{});assert.equal(uniform.cache,buffer);
+ control.setEnabled(false);assert.equal(uniform.cache,original);renderer.render({},{});assert.deepEqual(uniform.cache,values);
+ control.setEnabled(true);assert.equal(uniform.cache,buffer);control.dispose();assert.equal(uniform.cache,original);assert.deepEqual(uniform.cache,values);
+});

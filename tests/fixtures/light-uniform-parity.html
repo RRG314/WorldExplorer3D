@@ -1,5 +1,5 @@
 <!doctype html><meta charset="utf-8"><link rel="icon" href="data:,"><style>body{margin:0;background:#111}canvas{display:block}</style>
-<script src="/node_modules/three/build/three.min.js"></script><script type="module">
+<script src="/app/vendor/three/build/three.min.js"></script><script type="module">
 import {installLightUniformExperiment} from '/scripts/verification/light-uniform-experiment.mjs';
 const renderer=new THREE.WebGLRenderer({preserveDrawingBuffer:true,antialias:false});renderer.setSize(640,400);document.body.append(renderer.domElement);
 const scene=new THREE.Scene();scene.background=new THREE.Color(0x223344);
@@ -18,5 +18,6 @@ point.intensity=0;spot.intensity=0;rows.push(compare('day inactive pools'));
 point.intensity=4;point.position.set(3,2,-2);spot.intensity=6;spot.target.position.set(-3,0,1);directional.color.setHex(0x4455ff);rows.push(compare('night and moved lights'));
 camera.position.set(-9,4,8);camera.lookAt(0,0,0);rows.push(compare('changed camera'));
 const left=camera.clone(),right=camera.clone();left.aspect=right.aspect=.8;left.updateProjectionMatrix();right.updateProjectionMatrix();left.viewport=new THREE.Vector4(0,0,320,400);right.viewport=new THREE.Vector4(320,0,320,400);right.position.x+=3;right.lookAt(0,0,0);const array=new THREE.ArrayCamera([left,right]);rows.push(compare('array camera'));
+if(!experiment.snapshot().numericConverted)throw Error("Numeric cache path was not exercised");
 window.result={rows,uniforms:experiment.snapshot()};capture(camera);window.ready=true;
 </script>
