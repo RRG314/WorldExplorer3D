@@ -61,3 +61,16 @@ paths. Actual DeLorean/Fleetwood deformation,smoke/fire,garage landscape scrolli
 Drive-to-world focus and Escape were exercised in an isolated component. Images
 inspected; effect textures returned tozero and both model leases tozero; idle
 templates retained within the existing64MiB budget. This is not city gameplay.
+
+## Calibration and source intake update
+
+Shared automatic transmission/traction calibration and a cooperative published-
+road qualification adapter are implemented locally. A61-case focused source run
+passed after the change; this overlaps earlier cases. AI braking now forecasts
+its actual grip/brake envelope rather than retaining the old deceleration
+assumption. BMW sprint25.329s and wet pickup two-lap circuit80.378s finished
+without barrier contacts. These remain source fixtures.
+
+No authenticated low-latency service,production course catalog,racing hub/editor,
+leaderboard persistence or rivals/crew career is accepted yet. The16-step end
+point remains outstanding. Do not describe the source kernel as a complete game.

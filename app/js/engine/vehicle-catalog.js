@@ -89,6 +89,7 @@ function vehicleHandlingProfile(variantOrId = 'sedan', options = {}) {
     label: responder ? 'Response-tuned' : String(variant.handlingLabel || 'Balanced'),
     assetId: String(variant.assetId || ''),
     width: Number(variant.width||1.8), height: Number(variant.height||1.5), length: Number(variant.length||4.45),
+    wheelRadius:Number(variant.wheelRadius)||.35,
     halfTrack: Number(variant.halfTrack || Number(variant.width || 1.8)*.43),
     topSpeedMph: responder ? 120 : Math.max(40, Math.min(120, Number(variant.topSpeedMph) || 120)),
     accelerationScale: Math.max(.35, Number(variant.accelerationScale) || 1) * (responder ? 1.18 : 1),

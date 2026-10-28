@@ -26,3 +26,22 @@ test('a low speed collision is forgiving while severe impacts still disable and 
  assert.ok(result.moverDamageForce<3);assert.ok(result.targetDamageForce<3);
  assert.ok(Math.abs(result.moverVelocity.z+result.targetVelocity.z-4.5)<1e-6);
 });
+
+test('a long chassis cannot rotate through a parked car at a junction',()=>{
+ const a=car('a',0,0),b=car('parked',3.7,0);b.speed=0;
+ const spacing=createVehicleSpacing([a],v=>v,[b]);
+ assert.equal(spacing.limit(a,0,.1),1,'straight approach remains clear');
+ assert.equal(spacing.allowsPose(a,{...a,yaw:Math.PI/2}),false);
+ b.x=8;const open=createVehicleSpacing([a],v=>v,[b]);
+ assert.equal(open.allowsPose(a,{...a,yaw:Math.PI/2}),true);
+});
+test('intersection priority lets both cars complete instead of parking inside each other',()=>{
+ const a=car('a',0,-18),b=car('b',-18,0,Math.PI/2);const cars=[a,b];
+ for(let frame=0;frame<240;frame++){
+  const spacing=createVehicleSpacing(cars,v=>v);
+  for(const car of cars){const dx=Math.sin(car.yaw)*8/30,dz=Math.cos(car.yaw)*8/30;
+   const fraction=spacing.limit(car,dx,dz);car.x+=dx*fraction;car.z+=dz*fraction;spacing.update(car,car);}
+  assert.ok(Math.abs(a.x-b.x)>2.03 || Math.abs(a.z-b.z)>5.7,'visible bodies never overlap');
+ }
+ assert.ok(a.z>20&&b.x>10,'both approach paths eventually clear');
+});

@@ -3,12 +3,13 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
 import {normalizeVehicleGarage,personalVehicleById,personalVehicleIdentity} from '../app/js/transport/vehicle-garage-rules.js';
+import {resolveControlState}from'../app/js/transport/control-state.js';
 
 function harness(){
  const events=[],world=new AbortController();let uid='',current=true,stagedResolve,saveResolve;
  let garage=normalizeVehicleGarage({schemaVersion:1,revision:0,vehicles:{delorean:{condition:.64},bmw_e34:{condition:.43}}});
  const position={x:5,y:2,z:7},car={speed:0,condition:.64},actor={locomotion:'walk',position};
- const context={car,activeTransportActor:()=>actor,resolveSafeWorldSpawn:()=>({valid:true,x:5,z:7,carY:1.2,angle:0}),
+ const context={car,Walk:{state:{mode:'walk'}},activeTransportActor:()=>actor,resolveSafeWorldSpawn:()=>({valid:true,x:5,z:7,carY:1.2,angle:0}),
   setTravelMode:()=>{events.push('mode');return 'drive';},applyResolvedWorldSpawn:()=>events.push('spawn')};
  const state={worldIdentity:'test',activeVehicle:null,commerce:{vehicleGarage:()=>garage,changeVehicleGarage:request=>{
    if(request.action==='park'){events.push(['park',request.vehicleId,request.condition]);return {ok:true};}
@@ -26,7 +27,7 @@ function harness(){
  const scope={isActive:()=>true,defer(){},dispose(){current=false;}};
  const sandbox={AbortController,Math,Number,Object,String,crypto:globalThis.crypto,getCurrentUser:()=>uid?{uid}:null,
   createLifecycleScope:()=>scope,captureEnvironmentSession:()=>({signal:world.signal,isCurrent:()=>!world.signal.aborted}),
-  resolveControlState:()=>({frame:'surface',locomotion:actor.locomotion}),personalVehicleById,personalVehicleIdentity,normalizeVehicleGarage,
+  resolveControlState,personalVehicleById,personalVehicleIdentity,normalizeVehicleGarage,
   commitExplorerVehicleAction:async()=>({ok:true,garage})};
  vm.createContext(sandbox);vm.runInContext(source,sandbox);const runtime=sandbox.createPersonalVehicleRuntime(options);
  return {runtime,context,state,events,actor,car,world,resolve:()=>stagedResolve({personalVehicleId:'delorean'}),uid:value=>uid=value,
@@ -67,4 +68,10 @@ test('connected car commands wait for the account projection instead of using a 
  assert.equal((await h.runtime.selectAndDrive('bmw_e34')).reason,'garage_loading');
  assert.equal((await h.runtime.change({action:'select',vehicleId:'bmw_e34'})).reason,'garage_loading');
  assert.deepEqual(h.events,[]);
+});
+
+test('personal car delivery cannot bypass maritime, interior, aircraft or space admission',async()=>{
+ for(const patch of [{boatMode:{active:true},boatDeck:{active:true}},{boatMode:{active:true}},{activeInterior:{}},{planeMode:{active:true}},{spaceFlight:{active:true}},{oceanMode:{active:true}}]){
+  const h=harness();Object.assign(h.context,patch);const result=await h.runtime.selectAndDrive('bmw_e34');assert.equal(result.ok,false);assert.equal(result.reason,'leave_current_vehicle_or_interior');assert.deepEqual(h.events,[]);
+ }
 });

@@ -1,3 +1,4 @@
+import {PLANETARY_ROVER_CONFIG} from './physics/vehicle-config.js';
 import { resolvePlanetaryVehicleObstacle } from './physics/planetary-obstacle-response.js';
 import {updateVehicleWheels} from './transport/vehicle-wheel-motion.js';
 import { shouldRefreshRoadQuery } from './physics/road-query-policy.js';
@@ -180,8 +181,8 @@ function update(dt) {
     appCtx.car.onRoad = false;
     appCtx.car.road = null;
 
-    const planetaryBaseAccel = appCtx.CFG.accel * planetaryDriveProfile.accel;
-    const planetaryBoostAccel = appCtx.CFG.boostAccel * planetaryDriveProfile.boostAccel;
+    const planetaryBaseAccel = PLANETARY_ROVER_CONFIG.accel * planetaryDriveProfile.accel;
+    const planetaryBoostAccel = PLANETARY_ROVER_CONFIG.boostAccel * planetaryDriveProfile.boostAccel;
 
     maxSpd = appCtx.car.boost ? planetaryDriveProfile.boost : planetaryDriveProfile.normal;
     planetaryNormalMaxSpd = planetaryDriveProfile.normal;
@@ -219,6 +220,7 @@ function update(dt) {
   }
 
   const surfaceDynamics = updateVehicleSurface(appCtx, dt);
+  const collisionStartYaw=appCtx.car.angle;
   const {wheelBase,steerAngle,isDrifting,spdAbs}=stepVehiclePlanarDrive(appCtx.car,dt,driveFrame,{
     config:appCtx.CFG,planetary:isPlanetarySurface(),metersPerWorldUnit:appCtx.METERS_PER_WORLD_UNIT,
     surfaceDynamics,vehicleHandling,vehicleCondition,vehicleUpgrades,characterVehicle,
@@ -259,8 +261,10 @@ function update(dt) {
         {
           mode: 'drive',
           actorBaseY: appCtx.car.y-1.2,
-          actorHeight: 1.8,
-          radius: .92,
+          actorHeight: vehicleHandling.height || 1.8,
+          fromYaw: collisionStartYaw,
+          yaw: appCtx.car.angle,
+          radius: (vehicleHandling.width || 1.84)*.5,
           speedMph: carSpeedToMph(appCtx.car.speed),
           velocityX: appCtx.car.vx,
           velocityZ: appCtx.car.vz
@@ -268,6 +272,7 @@ function update(dt) {
       );
       nx = actorCollision.x;
       nz = actorCollision.z;
+      if(Number.isFinite(actorCollision.yaw))appCtx.car.angle=actorCollision.yaw;
       if (actorCollision.collision && !actorCollision.responseApplied) {
         appCtx.car.speed *= .18;
         appCtx.car.vFwd *= .18;

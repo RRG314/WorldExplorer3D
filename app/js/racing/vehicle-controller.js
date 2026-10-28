@@ -1,7 +1,8 @@
 import {prepareVehicleDriveFrame,stepVehiclePlanarDrive,integrateVehiclePlanarPosition}from'../physics/vehicle-planar-dynamics.js';
 import {ROAD_CAR_CONFIG}from'../physics/vehicle-config.js';
 import {carSpeedToMph,mphToCarSpeed,carSpeedToWorldUnitsPerSecond}from'../physics/vehicle-speed-units.js';
-import {vehicleHandlingProfile,vehicleConditionDynamics,VEHICLE_ROOT_TO_GROUND_METERS}from'../engine/vehicle-catalog.js?v=6';
+import {VEHICLE_CATALOG,vehicleHandlingProfile,vehicleConditionDynamics,VEHICLE_ROOT_TO_GROUND_METERS}from'../engine/vehicle-catalog.js?v=6';
+import {resolveVehicleRoadContactPose}from'../engine/vehicle-road-attitude.js?v=3';
 import {vehicleUpgradeDynamics}from'../transport/vehicle-upgrades.js?v=1';
 import {personalVehicleById}from'../transport/vehicle-garage-rules.js';
 import {projectRacePosition}from'./course-rules.js';
@@ -10,7 +11,7 @@ export function createRaceVehicleProfile(vehicleId,{condition=1,levels={},grip=1
  const definition=personalVehicleById(vehicleId);if(!definition)throw Error('race_vehicle_unknown');
  if(!Number.isFinite(condition)||condition<.3||condition>1)throw Error('race_vehicle_needs_repair');
  const handling=vehicleHandlingProfile(definition.variantId);
- return Object.freeze({vehicleId,conditionValue:condition,handling,condition:vehicleConditionDynamics(condition),upgrades:vehicleUpgradeDynamics(levels),
+ return Object.freeze({vehicleId,variant:VEHICLE_CATALOG.find(v=>v.id===definition.variantId),conditionValue:condition,handling,condition:vehicleConditionDynamics(condition),upgrades:vehicleUpgradeDynamics(levels),
   config:ROAD_CAR_CONFIG,character:Object.freeze({accelerationScale:1,brakingScale:1,steeringResponseScale:1,steeringAngleScale:1,recoveryScale:1}),
   surface:Object.freeze({topSpeed:1,rolling:1,accel:1,grip:Math.max(.55,Math.min(1,Number(grip)||1)),drift:1})});
 }
@@ -39,10 +40,13 @@ export function stepRaceVehicle(course,car,actions,dt,profile){
   x=support.x+(x-support.x)*scale;z=support.z+(z-support.z)*scale;
   car.speed*=.35;car.vFwd*=.35;car.vLat*=.2;car.barrierContacts++;
  }
- car.x=x;car.z=z;car.y=support.y+VEHICLE_ROOT_TO_GROUND_METERS;
- car.terrainPitch=Math.atan2(course.segments[support.index].b.y-course.segments[support.index].a.y,
-  course.segments[support.index].lengthMeters/course.metersPerUnit);
- car.terrainRoll=0;
+ const segment=course.segments[support.index];
+ const contact=resolveVehicleRoadContactPose({x,z,y:support.y,yaw:car.angle,variant:profile.variant,
+  pitch:car.terrainPitch||0,roll:car.terrainRoll||0,
+  sampleSurface:(px,pz)=>projectRacePosition(course,{x:px,z:pz,y:support.y},{minimumMeters:Math.max(0,segment.startMeters-12),maximumMeters:Math.min(course.lengthMeters,segment.startMeters+segment.lengthMeters+12)})?.y});
+ car.x=x;car.z=z;car.y=contact.y+VEHICLE_ROOT_TO_GROUND_METERS;
+ car.terrainPitch=contact.pitch;car.terrainRoll=contact.roll;
+ car.maximumWheelPenetration=contact.maximumWheelPenetration;car.maximumWheelGap=contact.maximumWheelGap;
  return driving;
 }
 export function raceVehicleSpeedMetersPerSecond(car){return carSpeedToMph(car.speed)*.44704;}

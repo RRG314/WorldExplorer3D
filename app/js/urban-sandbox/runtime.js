@@ -228,7 +228,7 @@ function urbanCollisionTargets(state, reference, radius = 5) {
     ...(state.population?.nearbyPedestrians?.(reference, radius) || [])
       .filter((npc) => !promotedNpcIds.has(npc.id))
       .map((npc) => ({ kind: 'ambient_npc', ref: npc, radius: .42, ...npc })),
-    ...state.vehicles.filter((vehicle) => !vehicle.attachedToPlayer && Number(vehicle.condition ?? 1) > .05).map((vehicle) => ({
+    ...state.vehicles.filter((vehicle) => !vehicle.attachedToPlayer).map((vehicle) => ({
       kind: 'vehicle', ref: vehicle, radius: Math.max(.78, Number(vehicle.variant?.width || 1.8) * .5), ...vehiclePose(vehicle)
     })),
     ...(state.population?.nearbyVehicles?.(reference, radius) || [])
@@ -567,8 +567,9 @@ function resolveUrbanActorCollision(from = {}, to = {}, options = {}) {
   if (!activeWorldMatches(state)) return Object.freeze({ x: Number(to.x) || 0, z: Number(to.z) || 0, collision: false });
   const mode = options.mode === 'drive' ? 'drive' : 'walk';
   const actorRadius = mode === 'drive' ? Math.max(.78, Number(options.radius) || .9) : Math.max(.2, Number(options.radius) || .3);
-  const source = { x: Number(from.x) || 0, z: Number(from.z) || 0 };
-  const destination = { x: Number(to.x) || 0, z: Number(to.z) || 0 };
+  const source = { x: Number(from.x) || 0, z: Number(from.z) || 0, yaw:Number(options.fromYaw??appCtx.car?.angle??0) };
+  const destination = { x: Number(to.x) || 0, z: Number(to.z) || 0, yaw:Number(options.yaw??appCtx.car?.angle??0) };
+  const actorProfile=mode==='drive'?appCtx.car?.handlingProfile:null;
   const travelDistance = Math.hypot(destination.x - source.x, destination.z - source.z);
   const actorBaseY=Number.isFinite(options.actorBaseY)?options.actorBaseY:mode==='drive'?appCtx.car?.y-1.2:appCtx.Walk?.state?.walker?.y;
   const actorHeight=Number.isFinite(options.actorHeight)?options.actorHeight:1.8;
@@ -579,7 +580,7 @@ function resolveUrbanActorCollision(from = {}, to = {}, options = {}) {
     const dz = end.z - start.z;
     const lengthSquared = dx * dx + dz * dz;
     return targets.map((target) => {
-      const footprint = sweptVehicleFootprintContact(start, end, target, actorRadius);
+      const footprint = sweptVehicleFootprintContact(start, end, target, actorRadius, actorProfile);
       if (footprint !== undefined) return footprint;
       const targetX = Number(target.x || 0);
       const targetZ = Number(target.z || 0);
@@ -660,9 +661,15 @@ function resolveUrbanActorCollision(from = {}, to = {}, options = {}) {
     }
   }
 
+  const responseApplied = direct.responseSuppressed === true || direct.crashResponse?.applied === true && direct.crashResponse?.severity !== 'contact';
+  if(mode==='drive' && direct.footprint) {
+    const t=Math.max(0,direct.t-.001);
+    return Object.freeze({x:source.x+(destination.x-source.x)*t,z:source.z+(destination.z-source.z)*t,
+      yaw:source.yaw+Math.atan2(Math.sin(destination.yaw-source.yaw),Math.cos(destination.yaw-source.yaw))*t,
+      collision:true,responseApplied,targetKind:direct.target.kind});
+  }
   const slideX = blockerAlong(source, { x: destination.x, z: source.z });
   const slideZ = blockerAlong(source, { x: source.x, z: destination.z });
-  const responseApplied = direct.responseSuppressed === true || direct.crashResponse?.applied === true && direct.crashResponse?.severity !== 'contact';
   if (!slideX) return Object.freeze({ x: destination.x, z: source.z, collision: true, responseApplied, targetKind: direct.target.kind });
   if (!slideZ) return Object.freeze({ x: source.x, z: destination.z, collision: true, responseApplied, targetKind: direct.target.kind });
   return Object.freeze({ x: source.x, z: source.z, collision: true, responseApplied, targetKind: direct.target.kind });

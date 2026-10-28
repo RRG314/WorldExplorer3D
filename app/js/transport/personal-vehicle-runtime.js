@@ -39,7 +39,7 @@ export function createPersonalVehicleRuntime(options) {
     if(uid&&state.vehicleUpgradeStore.garageLoaded===false)return {ok:false,reason:'garage_loading'};
     const definition=personalVehicleById(id),record=snapshot().vehicles[id],control=resolveControlState(c);
     if(!definition||!record)return {ok:false,reason:'vehicle_not_owned'};
-    if(control.frame!=='surface'||!['walk','drive'].includes(control.locomotion)||control.occupancy==='interior'||c.onMoon||c.onMars||c.worldLoading)
+    if(control.frame!=='surface'||!['walk','drive'].includes(control.locomotion)||!['ground','driver'].includes(control.occupancy)||c.onMoon||c.onMars||c.worldLoading)
       return {ok:false,reason:'leave_current_vehicle_or_interior'};
     if(state.transition||Math.abs(Number(c.car.speed||0))>4)return {ok:false,reason:'stop_before_switching'};
     if(state.activeVehicle?.personalVehicleId===id)return {ok:true,vehicleId:id};

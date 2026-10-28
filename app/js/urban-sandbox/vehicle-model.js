@@ -1,3 +1,4 @@
+import {sweptChassisContact} from '../engine/vehicle-footprint.js';
 import { PARKED_VEHICLE_CATALOG, VEHICLE_CATALOG, VEHICLE_ROOT_TO_GROUND_METERS } from '../engine/vehicle-catalog.js?v=6';
 import { directedSurfacePitch, resolveVehicleRoadContactPose } from '../engine/vehicle-road-attitude.js?v=3';
 
@@ -178,10 +179,14 @@ export {
 // Sweep the actor against the vehicle's full oriented footprint. Expanding
 // the box by the actor radius is conservative at corners and prevents both
 // tunnelling and walking through the front/rear overhangs of long vehicles.
-export function sweptVehicleFootprintContact(from, to, target, actorRadius = .3) {
+export function sweptVehicleFootprintContact(from, to, target, actorRadius = .3, actorProfile = null) {
   const variant = target?.ref?.variant;
   if (!['vehicle', 'ambient_vehicle'].includes(target?.kind) ||
       !(Number(variant?.width) > 0 && Number(variant?.length) > 0)) return undefined;
+  if(actorProfile) {
+    const t=sweptChassisContact(from,to,actorProfile,{...target,y:from.y},variant,.03);
+    return t<1?{target,t,distance:0,footprint:'swept-chassis'}:null;
+  }
   const yaw = Number(target.yaw || 0), c = Math.cos(yaw), s = Math.sin(yaw);
   const local = point => ({ x: (point.x - target.x) * c - (point.z - target.z) * s,
     z: (point.x - target.x) * s + (point.z - target.z) * c });

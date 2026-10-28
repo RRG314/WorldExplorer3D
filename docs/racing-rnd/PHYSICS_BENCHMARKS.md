@@ -9,3 +9,19 @@ One Node run,600steps per case on this Mac: current road-support + swept-spacing
 The first candidate used the opposite axle sign and travelled in negativeZ; it is retained as an axis-integration failure. Corrected trial moves in World Explorer's positiveZ direction. Native controller forward-speed sign still differs and would need an explicit adapter.
 
 Benchmarks required before adopting a new force model:0–50km/h,50–0braking, steady-circle radius, slalom, step-steer settling, wet/offroad grip, loaded van/truck versus coupe, ramp/crest, elevated bridge/tunnel entry, collision impulse, damaged handling and fixed/variable frame schedules. Freeze geometry/seed/quality and compare equivalent commands. These full equivalent-controller measurements are pending, not silently passed by the isolated trial.
+
+## Comparable existing-controller motion benchmark
+
+Run `node scripts/verification/vehicle-motion-benchmark.mjs <private-output.json>`
+for six real current vehicle profiles,dry/wet acceleration and60mph stops through
+the shared controller at120Hz. This is distinct from the earlier different-workload
+Rapier CPU trial. Before/after evidence is retained privately. Results in
+DRIVING_PHYSICS_RESEARCH show the corrected calibration. No browser FPS or
+physical-device performance conclusion follows from these source measurements.
+
+Five exact trajectory cases first established that extraction preserved the old
+controller in commitfbbea67. Subsequent deliberate Earth calibration supersedes
+the old ground trajectories: current tests compare surge reduction,finite motion,
+shifts/reverse,grip/stopping and actual upgrade effects. Moon/airborne preservation
+cases remain numerical regressions. This is an intentional behavior change with
+measured acceptance ranges; the earlier extraction proof remains in history.

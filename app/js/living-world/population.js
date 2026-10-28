@@ -404,6 +404,16 @@ function advanceAgents(agents, graph, outgoing, random, dt, kind, behavior = {})
       }
       continue;
     }
+    const priorMotion = kind === 'vehicle' ? {edgeIndex:agent.edgeIndex,progress:agent.progress,
+      bridge:agent.bridge?{...agent.bridge}:null,motionTime:agent.motionTime} : null;
+    const publishMotion = () => {
+      let pose=agentPose(agent,graph);
+      if(priorMotion && !spacing.allowsPose(agent,pose)) {
+        Object.assign(agent,priorMotion);agent.currentSpeed=0;agent.waiting=true;agent.waitReason='turn_clearance';
+        pose=agentPose(agent,graph);
+      }
+      spacing.update(agent,pose);
+    };
     if (agent.bridge) {
       let bridgeSpeed = agent.speed * .72;
       if (spacing) {
@@ -419,7 +429,7 @@ function advanceAgents(agents, graph, outgoing, random, dt, kind, behavior = {})
         agent.progress = overflow;
         agent.bridge = null;
       }
-      spacing?.update(agent, agentPose(agent, graph));
+      publishMotion();
       continue;
     }
     const edge = graph.edges[agent.edgeIndex];
@@ -545,7 +555,7 @@ function advanceAgents(agents, graph, outgoing, random, dt, kind, behavior = {})
       transitionEdge = nextEdge;
       if (!nextEdge || agent.progress < nextEdge.length) break;
     }
-    spacing?.update(agent, agentPose(agent, graph));
+    publishMotion();
   }
 }
 

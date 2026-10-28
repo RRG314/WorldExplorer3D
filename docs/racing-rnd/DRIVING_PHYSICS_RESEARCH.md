@@ -14,3 +14,32 @@ Evidence date: October 28, 2026. Baseline `7da846f`; current working-source impr
 | Rust/Wasm custom force kernel | Same equations and controller owner | Potential numeric throughput | Copy/boundary costs; determinism does not follow automatically |
 
 Recommendation: retain current authority while proving improvements against actual journeys. Add one coherent tyre-force budget only after braking/turning telemetry is characterized; engine torque/gear tuning depends on that decision. Do not present inactive ABS, differential or camber sliders. Existing arcade touch assists remain defaults; assists must be included in future event/record keys.
+
+## Measured calibration, October28
+
+The extracted original controller reached60mph in1.367s for the starter BMW,
+1.708s for Fleetwood and2.992s for a city bus. BMW60-to-zero was13.37m and
+identical under the tested wet-grip factor. This supplied evidence for a shared
+calibration change rather than another vehicle-health workaround.
+
+`physics/automatic-powertrain.js` now uses wheel speed,actual asset wheel radius,
+a game torque map,forward/reverse ratios,shift hysteresis and a brief torque
+interruption. Its RPM/gear values affect thrust. Longitudinal tyre capacity and
+steering yaw use grip limits; wet grip affects stopping. Deliberate handbrake
+drift begins at18mph,not the old7.5mph raw-unit threshold. Reverse is bounded
+to18mph. This remains an accessible arcade chassis,not a factory-calibrated
+manufacturer model or a professional tyre simulator.
+
+The design principle of a speed/torque map and ratio/shift-point transmission is
+supported by [Project Chrono's powertrain documentation](https://api.chrono.projectchrono.org/vehicle_powertrain.html).
+No Chrono code,example parameters or vehicle asset is copied into this model.
+The existing road-car configuration/profile/upgrade authorities own calibration.
+Existing planetary acceleration/braking constants are explicit in the same
+configuration module; mode-specific rover multipliers and Ocean/aircraft/Space
+controllers remain with their existing owners.
+
+Current source benchmark: BMW0–60mph7.392s,60–0in45.35m dry/57.59m atgrip.7;
+Fleetwood10.283s/47.12m;pickup7.708s/47.59m;van9.833s/48.54m;bus43.767s/55.96m.
+These are game calibration measurements,not manufacturer performance claims.
+Engine,brake and tyre upgrades have measured effects within grip limits.
+Actual in-game feel and sustained timing remain required on the final candidate.

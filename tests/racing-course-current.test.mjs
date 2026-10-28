@@ -40,3 +40,15 @@ test('a diagonal shortcut between two legal roads is rejected along its swept pa
  assert.throws(()=>advanceRaceProgress(course,p,{x:20,z:120,y:0},1000,{startedAtMs:0}),/outside/);
  assert.throws(()=>advanceRaceProgress(course,p,{x:0,z:101,y:0},100),/clock/);
 });
+
+test('qualified nonlinear elevations and road banking survive direction reversal and timing-line placement',async()=>{
+ const {sampleRaceSegmentY}=await import('../app/js/racing/course-rules.js');
+ const graph=buildRaceRoadGraph([road('hill',{x:0,z:0},{x:0,z:250},{heightSampleSpanMeters:1.2,heightSamples:[{t:0,y:0,leftY:.1,rightY:-.1},{t:.5,y:8,leftY:8.1,rightY:7.9},{t:1,y:0,leftY:.1,rightY:-.1}]})]);
+ const settings=setup().settings,forward=createRaceCourse(graph,['hill:forward'],settings),reverse=createRaceCourse(graph,['hill:reverse'],settings);
+ assert.equal(sampleRaceSegmentY(forward.segments[0],.5),8);assert.equal(sampleRaceSegmentY(forward.segments[0],.5,-1.2),8.1);
+ assert.equal(sampleRaceSegmentY(reverse.segments[0],.5,1.2),8.1);
+ const {createRaceVehicleProfile,createRaceVehicleState,stepRaceVehicle}=await import('../app/js/racing/vehicle-controller.js');
+ const profile=createRaceVehicleProfile('cadillac_fleetwood'),car=createRaceVehicleState(raceGridPose(forward,0),profile);
+ for(let i=0;i<300;i++)stepRaceVehicle(forward,car,{throttle:.5},1/60,profile);
+ assert.ok(car.y>2);assert.ok(Math.abs(car.terrainRoll)>.01);assert.ok(car.maximumWheelPenetration<1e-6);
+});

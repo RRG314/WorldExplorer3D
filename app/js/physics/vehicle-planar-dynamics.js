@@ -1,6 +1,7 @@
 import {arcadeSteeringYawTarget,earthDrivingSteeringProfile,resolveCarDriveCommand} from '../controls/traversal-control-policy.js?v=9';
 import {carSpeedToMph,carSpeedToWorldUnitsPerSecond,mphToCarSpeed} from './vehicle-speed-units.js?v=2';
-import {ROAD_CAR_CONFIG} from './vehicle-config.js';
+import {ROAD_CAR_CONFIG,PLANETARY_ROVER_CONFIG} from './vehicle-config.js';
+import {stepAutomaticPowertrain} from './automatic-powertrain.js';
 
 // One planar driving calculation for player vehicles and controller-driven race
 // actors. Callers retain surface/collision/pose ownership and their existing
@@ -82,13 +83,19 @@ export function stepVehiclePlanarDrive(car,dt,frame,environment){
   const spd = Math.abs(car.speed);
   const hasGroundControl = !car.isAirborne;
   const canAccelerate = hasGroundControl && (planetary || vehicleCondition.operable);
-  const driftBrakeSpeed = 10;
+  const driftBrakeSpeed = mphToCarSpeed(16);
   const earthDriftBrakeIntent = !planetary && braking && (left || right) && spd > driftBrakeSpeed;
 
+  const tyreGrip=Math.max(.2,Math.min(1.35,Number(config.gripRoad||.96)*surfaceDynamics.grip*vehicleHandling.gripScale*vehicleCondition.gripScale*vehicleUpgrades.gripScale));
+  const gripAcceleration=tyreGrip*9.81/.22352;
+  const lateralAcceleration=Math.min(gripAcceleration*.9,Math.abs((car.yawRate||0)*carSpeedToMph(car.speed)*.44704)/.22352);
+  const availableLongitudinal=Math.sqrt(Math.max(0,gripAcceleration*gripAcceleration-lateralAcceleration*lateralAcceleration));
+  const transmission=planetary?1:stepAutomaticPowertrain(car,frame,dt,vehicleHandling);
   if (driveCommand.serviceBrake && hasGroundControl) {
-    const stopRate = Math.max(6, Number(config.brake) || 18) *
+    const configuredStopRate = Math.max(6, Number(planetary?PLANETARY_ROVER_CONFIG.brake:config.brake) || 18) *
       (planetary ? 1 : vehicleHandling.brakeScale * vehicleCondition.brakeScale) *
       characterVehicle.brakingScale * vehicleUpgrades.brakeScale;
+    const stopRate=planetary?configuredStopRate:Math.min(configuredStopRate,availableLongitudinal);
     const brakeStrength = driveCommand.changingDirection ? 1 : Math.min(1, Math.max(0, Number(serviceBrakeControl) || 0));
     const nextMagnitude = Math.max(0, Math.abs(car.speed) - stopRate * brakeStrength * dt);
     car.speed = Math.sign(car.speed) * nextMagnitude;
@@ -96,7 +103,7 @@ export function stepVehiclePlanarDrive(car,dt,frame,environment){
   }
 
   if (gas && !braking && !driveCommand.serviceBrake && canAccelerate) {
-    let throttleAccel = accel;
+    let throttleAccel = planetary?accel:Math.min(accel*transmission,availableLongitudinal);
     if (planetary) {
       const lowSpeedBoost = Math.max(0, 1 - spd / 14);
       throttleAccel *= 1 + lowSpeedBoost * 0.75;
@@ -117,7 +124,7 @@ export function stepVehiclePlanarDrive(car,dt,frame,environment){
 
   if (reverse && !braking && !driveCommand.serviceBrake && canAccelerate) {
     const reverseAccelScale = planetary ? 0.65 : 0.5;
-    car.speed -= accel * reverseAccelScale * driveCommand.reverse * dt;
+    car.speed -= (planetary?accel:Math.min(accel*transmission,availableLongitudinal)) * reverseAccelScale * driveCommand.reverse * dt;
   }
 
   // Natural friction when coasting
@@ -126,7 +133,8 @@ export function stepVehiclePlanarDrive(car,dt,frame,environment){
     if (Math.abs(car.speed) < 0.5) car.speed = 0;
   }
 
-  car.speed = Math.max(-maxSpd * 0.3, Math.min(maxSpd, car.speed));
+  const reverseLimit=planetary?maxSpd*.3:Math.min(maxSpd*.3,mphToCarSpeed(18));
+  car.speed = Math.max(-reverseLimit, Math.min(maxSpd, car.speed));
 
   if (boostDecayFactor > 0 && !car.boost) {
     const normalMaxSpd = planetary
@@ -178,7 +186,7 @@ export function stepVehiclePlanarDrive(car,dt,frame,environment){
 
   const clamp01 = (n) => Math.max(0, Math.min(1, n));
   const steerMag = Math.abs(car.steerSm);
-  const speedNorm = clamp01((spdAbs - 8) / 70);
+  const speedNorm = planetary?clamp01((spdAbs-8)/70):clamp01((carSpeedToMph(spdAbs)-10)/60);
   const parkingTurnBlend = clamp01(1 - spdAbs / 14);
   const reverseTurnBlend = car.speed < -1 ? clamp01((Math.abs(car.speed) - 1) / 12) : 0;
   const lowSpeedTurnBoost = Math.max(parkingTurnBlend, reverseTurnBlend);
@@ -192,8 +200,8 @@ export function stepVehiclePlanarDrive(car,dt,frame,environment){
   );
   const driftStartSteer = 0.12;
   const driftHoldSteer = 0.05;
-  const driftStartSpeed = 15;
-  const driftHoldSpeed = 10;
+  const driftStartSpeed = mphToCarSpeed(18);
+  const driftHoldSpeed = mphToCarSpeed(14);
   const driftStartIntent = !planetary && braking && steerMag >= driftStartSteer && spdAbs >= driftStartSpeed;
 
   if (planetary) {
@@ -268,9 +276,10 @@ export function stepVehiclePlanarDrive(car,dt,frame,environment){
     steerAuthority *= 1.22;
   }
   const radiusAuthority = Math.max(.76, Math.min(1.22, 5.2 / vehicleHandling.turningRadius));
+  const tyreYawLimit=tyreGrip*9.81/Math.max(2,Math.abs(carSpeedToMph(car.speed))*.44704)*(isDrifting?1.35:1);
   const maxYawRate = planetary
     ? Infinity
-    : earthSteering.maxYawRate * vehicleHandling.steeringScale * radiusAuthority * characterVehicle.steeringAngleScale;
+    : Math.min(tyreYawLimit,earthSteering.maxYawRate * vehicleHandling.steeringScale * radiusAuthority * characterVehicle.steeringAngleScale);
   const yawRateTarget = arcadeSteeringYawTarget(
     v,
     steerAngle * steerAuthority,
@@ -347,6 +356,7 @@ export function stepVehiclePlanarDrive(car,dt,frame,environment){
     const yawKick = car.steerSm * 1.28 * (0.35 + 0.65 * speedNorm);
     car.yawRate += yawKick * dt * 4.6;
   }
+  if(!planetary)car.yawRate=Math.max(-tyreYawLimit,Math.min(tyreYawLimit,car.yawRate));
   car.isDrifting = isDrifting;
 
   return {wheelBase,steerAngle,isDrifting,spdAbs};
