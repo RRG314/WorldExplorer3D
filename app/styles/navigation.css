@@ -164,37 +164,67 @@
 .vehicle-garage button:disabled { opacity:.55; }
 @media(max-width:600px){.vehicle-garage{padding:16px}.vehicle-garage-layout{grid-template-columns:1fr;gap:16px}.vehicle-garage nav{max-height:30dvh}.vehicle-garage-actions button{flex:1}}
 
-/* Concept B: compact racing surfaces, ordinary exploration HUD retained. */
-.racing-hub { --race-accent:#b7f568; background:#111e26; color:#ecf1f4; border:1px solid #4a5b65; border-radius:18px; padding:24px; margin:auto; width:min(1000px,94vw); max-height:90dvh; overflow:auto; box-shadow:0 20px 80px #0009; }
-.racing-hub::backdrop {background:#071016b8;}
-.racing-hub header {display:flex;align-items:center;justify-content:space-between;gap:12px;}
-.racing-hub h2 {font-size:clamp(24px,4vw,36px);margin:4px 0 10px;}
-.racing-hub h3 {font-size:20px;margin:14px 0 8px;}
-.racing-eyebrow {font-size:11px;letter-spacing:.13em;color:var(--race-accent);}
-.racing-hub p {line-height:1.55;margin:8px 0;color:#bdcbd4;}
-.racing-toolbar {display:flex;flex-wrap:wrap;gap:8px;margin:14px 0;}
-.racing-hub button,.racing-hub select,.racing-hub input {font:inherit;color:inherit;background:#20323e;border:1px solid #526773;border-radius:9px;min-height:44px;padding:10px 14px;}
+/* Racing uses the shared Roam tokens: an event list and one preview. */
+.racing-hub { --race-accent:var(--wx-action); color-scheme:dark; background:var(--wx-bg); color:var(--wx-text); font-family:var(--wx-font-ui); border:1px solid var(--wx-line-soft); border-radius:var(--wx-radius); padding:24px; margin:auto; width:min(1080px,94vw); max-height:90dvh; box-shadow:0 20px 80px #0009; }
+.racing-hub[open] {display:flex;flex-direction:column;height:min(880px,92dvh);overflow:hidden;}
+.racing-hub::backdrop {background:#07100fba;}
+.racing-hub header {display:flex;align-items:center;justify-content:space-between;gap:12px;flex:none;}
+.racing-hub header h2 {font-family:var(--wx-font-display);font-size:38px;letter-spacing:.02em;font-weight:400;margin:2px 0 0;}
+.racing-hub h3 {font-size:24px;font-weight:650;margin:18px 0 12px;}
+.racing-hub .racing-eyebrow {font-size:11px;letter-spacing:.13em;color:var(--wx-muted);margin:0;}
+.racing-hub p {line-height:1.5;margin:8px 0;color:var(--wx-muted);}
+.racing-hub > p,.racing-toolbar,.racing-start-bar {flex:none;}
+.racing-hub [data-race-location] {font-size:16px;margin:0;color:var(--wx-text);}
+.racing-toolbar {display:flex;flex-wrap:wrap;gap:8px;margin:16px 0 4px;}
+.racing-hub [data-race-refresh] {width:44px;padding:6px;font-size:24px;line-height:1;}
+.racing-hub button,.racing-hub select,.racing-hub input {font:inherit;color:inherit;background:var(--wx-panel-solid);border:1px solid var(--wx-line-soft);border-radius:var(--wx-radius);min-height:44px;padding:10px 14px;}
 .racing-hub button {cursor:pointer;}
-.racing-hub button:hover {background:#2d4350;}
-.racing-hub :focus-visible,.road-race-hud :focus-visible {outline:3px solid #b7f568;outline-offset:3px;}
-.racing-hub button:disabled {opacity:.45;cursor:wait;}
+.racing-hub button:hover {background:var(--wx-panel-soft);}
+.racing-hub :focus-visible,.road-race-hud :focus-visible {outline:3px solid var(--wx-focus);outline-offset:3px;}
+.racing-hub button:disabled {opacity:.5;cursor:default;}
 .racing-hub label {display:block;font-size:13px;margin:12px 0;}
 .racing-hub select,.racing-hub input {display:block;width:100%;margin-top:6px;}
-.racing-layout {display:grid;grid-template-columns:minmax(190px,1fr) minmax(0,2fr);gap:24px;}
-.racing-layout nav {display:flex;flex-direction:column;gap:8px;max-height:65dvh;overflow:auto;}
-.racing-layout nav button {text-align:left;flex-shrink:0;}
-.racing-layout nav button[aria-pressed=true] {border-color:var(--race-accent);box-shadow:inset 3px 0 var(--race-accent);}
-.racing-layout nav span {display:block;font-size:12px;margin-top:6px;color:#b0c1ce;}
-.racing-hub .racing-primary {width:100%;background:var(--race-accent);color:#142212;font-weight:700;margin:14px 0 4px;}
-.racing-hub .racing-note {font-size:12px;}
-.racing-map {background:#0b151c;border:1px solid #354955;border-radius:12px;overflow:hidden;min-height:180px;}
-.racing-map svg {display:block;width:100%;height:230px;touch-action:manipulation;}
-.racing-map-credit {display:block;padding:4px 8px;color:#b8cbd7;font-size:11px;text-align:right;}
-.racing-hub details {border-top:1px solid #40535e;margin-top:22px;padding-top:16px;}
-.racing-hub summary {cursor:pointer;min-height:44px;font-weight:600;}
-.racing-hub [data-race-status] {min-height:24px;color:#d5e9bb;}
-.racing-hub [data-race-results] {border-top:1px solid #40535e;padding-top:16px;}
+.racing-layout {display:grid;grid-template-columns:minmax(180px,1fr) minmax(0,2.7fr);align-items:start;gap:28px;flex:1;min-height:0;overflow:auto;padding:4px 5px 16px 2px;}
+.racing-layout nav {display:flex;flex-direction:column;gap:0;max-height:65dvh;overflow:auto;border-top:1px solid var(--wx-line-soft);}
+.racing-layout nav button {text-align:left;flex-shrink:0;border:0;border-bottom:1px solid var(--wx-line-soft);border-radius:0;background:transparent;padding:16px 12px 16px 16px;min-height:78px;}
+.racing-layout nav button[aria-pressed=true] {background:var(--wx-selected);box-shadow:inset 3px 0 var(--wx-action);}
+.racing-layout nav strong {font-size:15px;font-weight:600;}
+.racing-layout nav span {display:block;font-size:12px;margin-top:7px;color:var(--wx-muted);font-variant-numeric:tabular-nums;}
+.racing-event-detail {min-width:0;}
+.racing-view-switch {display:flex;gap:0;margin-bottom:10px;border-bottom:1px solid var(--wx-line-soft);}
+.racing-view-switch button {border:0;border-bottom:2px solid transparent;border-radius:0;background:transparent;padding:10px 12px;color:var(--wx-muted);}
+.racing-view-switch button[aria-pressed=true] {border-color:var(--wx-action);color:var(--wx-text);}
+.racing-course-view {min-height:220px;}
+.racing-location-view {position:relative;margin:0;background:var(--wx-panel-solid);height:clamp(220px,30vw,320px);overflow:hidden;}
+.racing-location-view img {display:block;width:100%;height:100%;object-fit:cover;}
+.racing-location-view figcaption {position:absolute;bottom:0;left:0;right:0;padding:24px 12px 10px;background:linear-gradient(transparent,#000b);color:#fff;font-size:12px;}
+.racing-location-view figcaption:empty {display:none;}
+.racing-location-view > p {padding:32px;}
+.racing-map {background:var(--wx-input);overflow:hidden;min-height:220px;}
+.racing-map svg {display:block;width:100%;height:clamp(196px,calc(30vw - 24px),296px);touch-action:manipulation;}
+.racing-map-credit {display:block;padding:4px 8px;color:var(--wx-muted);font-size:11px;text-align:right;}
+.racing-hub :is(.racing-map,.racing-location-view,.racing-location-view img,.racing-location-view p)[hidden] {display:none;}
+.racing-course-facts {display:flex;flex-wrap:wrap;gap:12px 28px;margin:0 0 12px;}
+.racing-course-facts div {display:flex;flex-direction:column;gap:4px;}
+.racing-course-facts dt {font-size:12px;color:var(--wx-muted);}
+.racing-course-facts dd {margin:0;font-size:17px;font-weight:600;font-variant-numeric:tabular-nums;}
+.racing-hub [data-race-detail],.racing-hub [data-race-record] {font-size:13px;}
+.racing-options {display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.racing-options label {margin:12px 0;}
+.racing-hub details {border-top:1px solid var(--wx-line-soft);margin-top:12px;padding-top:8px;}
+.racing-hub summary {cursor:pointer;min-height:44px;padding:12px 0;font-size:14px;font-weight:600;}
+.racing-hub [data-race-status] {min-height:24px;font-size:12px;margin:4px 0 10px;}
+.racing-start-bar {padding-top:12px;border-top:1px solid var(--wx-line-soft);}
+.racing-hub .racing-primary {width:100%;background:var(--wx-action);color:var(--wx-action-text);font-weight:700;margin:0;}
+.racing-hub .racing-primary:hover {background:var(--wx-action-hover);}
+.racing-start-bar .racing-note {font-size:11px;margin:6px 0 0;}
+.racing-hub[data-race-view="results"] {height:auto;max-height:90dvh;}
+.racing-hub[data-race-view="results"] :is(.racing-layout,.racing-toolbar,.racing-start-bar,[data-race-status]) {display:none;}
+.racing-hub [data-race-results] {border-top:1px solid var(--wx-line-soft);padding-top:16px;overflow:auto;min-height:0;}
 .racing-hub ol {padding-left:24px;line-height:2;}
+.racing-result-actions {display:flex;flex-wrap:wrap;gap:8px;flex:none;border-top:1px solid var(--wx-line-soft);padding-top:10px;}
+.racing-result-actions[hidden] {display:none;}
+.racing-hub #racingResultHeading {outline:none;}
 .road-race-hud {position:fixed;top:calc(env(safe-area-inset-top,0px) + 86px);left:50%;transform:translateX(-50%);z-index:120;display:grid;grid-template-columns:auto auto;gap:4px 18px;min-width:210px;padding:12px 16px;border-radius:12px;background:#101e29e8;border:1px solid #7b9b6a;color:#f2f5ef;pointer-events:auto;}
 .road-race-hud[hidden] {display:none;}
 .road-race-hud p {font-size:12px;color:#b7f568;margin:0;}
@@ -205,28 +235,35 @@
 body.activity-racing-open :is(#hudBox,#hudMap,#hudUtilities,#floatMenuContainer,#urbanVehiclePrompt,#discoveryContextPrompt,#discoveryQuickToolBtn) {display:none!important;}
 .road-race-hud {max-width:calc(100vw - 32px);}
 .road-race-hud [data-race-speed] {font-variant-numeric:tabular-nums;}
-@media(max-width:650px) {.racing-hub {padding:16px;max-height:calc(100dvh - 24px);}.racing-layout {grid-template-columns:1fr;gap:14px;}.racing-layout nav {flex-direction:row;max-height:none;}.racing-layout nav button {width:210px;}.racing-map svg {height:190px;}.road-race-hud {top:calc(env(safe-area-inset-top,0px) + 68px);padding:8px 12px;}}
-@media(orientation:landscape) and (max-height:500px) {.road-race-hud {top:calc(env(safe-area-inset-top,0px) + 10px);}.racing-hub {max-height:94dvh;}.racing-layout {grid-template-columns:190px minmax(0,1fr);}.racing-layout nav {flex-direction:column;max-height:55dvh;}.racing-layout nav button {width:auto;}}
 
-.racing-hub[open] {display:flex;flex-direction:column;height:min(840px,90dvh);overflow:hidden;}
-.racing-hub header,.racing-hub > p,.racing-toolbar,.racing-start-bar {flex:none;}
-.racing-hub header h2 {font-size:30px;margin:2px 0 4px;}
-.racing-hub .racing-eyebrow {margin:0;}
-.racing-layout {flex:1;min-height:0;overflow:auto;padding:2px 5px 4px 2px;}
-.racing-map svg {height:190px;}
-.racing-options {display:grid;grid-template-columns:1fr 1fr;gap:12px;}
-.racing-options label {margin:8px 0;}
-.racing-start-bar {padding-top:10px;border-top:1px solid #40535e;}
-.racing-start-bar .racing-primary {margin:0;}
-.racing-start-bar .racing-note {font-size:11px;margin:6px 0 0;}
-.racing-hub[data-race-view="results"] {height:auto;max-height:90dvh;}
-.racing-hub[data-race-view="results"] .racing-layout,
-.racing-hub[data-race-view="results"] .racing-toolbar,
-.racing-hub[data-race-view="results"] .racing-start-bar,
-.racing-hub[data-race-view="results"] [data-race-status] {display:none;}
-.racing-hub [data-race-results] {overflow:auto;min-height:0;}
-.racing-result-actions {display:flex;flex-wrap:wrap;gap:8px;flex:none;border-top:1px solid #40535e;padding-top:10px;}
-.racing-result-actions[hidden] {display:none;}
-.racing-hub #racingResultHeading {outline:none;}
-@media(max-width:650px) {.racing-hub[open] {height:calc(100dvh - 24px);}.racing-map svg {height:150px;}.racing-map {min-height:150px;}.racing-hub header h2 {font-size:25px;}.racing-layout nav {min-height:106px;}.racing-layout nav button {width:190px;}.racing-hub[data-race-view="results"] {height:auto;}}
-@media(orientation:landscape) and (max-height:500px) {.racing-hub[open] {height:94dvh;padding:12px 18px;}.racing-hub header h2 {font-size:22px;margin:0;}.racing-hub .racing-eyebrow {display:none;}.racing-hub > p {margin:3px 0;font-size:12px;}.racing-toolbar {margin:5px 0;}.racing-hub [data-race-status] {font-size:12px;min-height:18px;}.racing-start-bar .racing-note {display:none;}.racing-start-bar {padding-top:6px;}.racing-hub[data-race-view="results"] {height:auto;}}
+@media(max-width:650px) {
+ .racing-hub {padding:16px;max-height:calc(100dvh - 24px);}
+ .racing-hub[open] {height:calc(100dvh - 24px);}
+ .racing-hub header h2 {font-size:30px;}
+ .racing-layout {grid-template-columns:1fr;gap:12px;}
+ .racing-layout nav {flex-direction:row;max-height:none;min-height:82px;}
+ .racing-layout nav button {width:178px;min-height:78px;}
+ .racing-layout nav button[aria-pressed=true] {box-shadow:inset 0 -3px var(--wx-action);}
+ .racing-course-view,.racing-map {min-height:190px;}
+ .racing-location-view {height:210px;}
+ .racing-map svg {height:186px;}
+ .racing-course-facts {gap:10px 24px;}
+ .racing-hub h3 {font-size:22px;}
+ .racing-hub[data-race-view="results"] {height:auto;}
+ .road-race-hud {top:calc(env(safe-area-inset-top,0px) + 68px);padding:8px 12px;}
+}
+@media(orientation:landscape) and (max-height:500px) {
+ .racing-hub[open] {height:94dvh;padding:12px 18px;}
+ .racing-hub header h2 {font-size:24px;}
+ .racing-hub .racing-eyebrow {display:none;}
+ .racing-hub > p {margin:3px 0;font-size:12px;}
+ .racing-toolbar {margin:5px 0;}
+ .racing-hub [data-race-status] {font-size:12px;min-height:18px;margin:2px 0;}
+ .racing-layout {grid-template-columns:180px minmax(0,1fr);gap:16px;}
+ .racing-layout nav {flex-direction:column;max-height:55dvh;}
+ .racing-layout nav button {width:auto;}
+ .racing-start-bar .racing-note {display:none;}
+ .racing-start-bar {padding-top:6px;}
+ .racing-hub[data-race-view="results"] {height:auto;}
+ .road-race-hud {top:calc(env(safe-area-inset-top,0px) + 10px);}
+}
