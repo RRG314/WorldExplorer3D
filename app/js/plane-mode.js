@@ -292,8 +292,10 @@ function preparePlaneMode(options = {}) {
       throttle: state.throttle, airborne: true }
     : null;
   const catalog = getAviationCatalogEntry(options.transportCatalogId);
-  const water=appCtx.SurfaceQuery?.waterAt?.(reference.x,reference.z);
-  const ground=appCtx.SurfaceQuery?.driveAt?.(reference.x,reference.z,{preferRoad:true,currentY:reference.y});
+  const arrival={x:Number.isFinite(options.x)?options.x:reference.x,z:Number.isFinite(options.z)?options.z:reference.z,
+    y:Number.isFinite(options.y)?options.y:reference.y};
+  const water=appCtx.SurfaceQuery?.waterAt?.(arrival.x,arrival.z);
+  const ground=appCtx.SurfaceQuery?.driveAt?.(arrival.x,arrival.z,{preferRoad:true,currentY:arrival.y});
   const waterY=water?.position?.y;
   if(water?.feature&&Number.isFinite(waterY)&&Number(ground?.position?.y??-Infinity)<waterY-.25&&
     !flightContinuation&&(!Number.isFinite(options.y)||options.y<waterY+aircraftGroundOffset(catalog)+1)){

@@ -62,3 +62,10 @@ test('grounded aircraft starts reject mapped water above the drive surface witho
  h.appCtx.SurfaceQuery.driveAt=()=>({position:{y:-30}});
  assert.ok(h.prepare({transportCatalogId:'business-jet',x:100,y:180,z:200}));
 });
+
+test('explicit dry airport arrivals query the destination even when the departure is over water',()=>{
+ const h=flight();vm.runInContext('state.active=false;state.airborne=false;',h.context);
+ const queried=[];h.appCtx.SurfaceQuery={waterAt:(x,z)=>{queried.push([x,z]);return x===1?null:{feature:{},position:{y:0}};},driveAt:()=>({position:{y:8}})};
+ assert.ok(h.prepare({transportCatalogId:'business-jet',x:1,y:8,z:2,anchorFacilityId:'dry-airport'}));
+ assert.deepEqual(queried,[[1,2]]);
+});

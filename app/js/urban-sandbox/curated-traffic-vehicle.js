@@ -83,7 +83,8 @@ function prepareTrafficVisual(THREE, instance, options = {}) {
       } else if (/Headlights/i.test(name)) {
         material.emissive?.setHex?.(0xffd784);
         material.emissiveIntensity = .5;
-      } else if (/TailLights/i.test(name)) {
+      } else if (/TailLights|BrakeLight/i.test(name)) {
+        material.color?.setHex?.(0xa52c27);
         material.emissive?.setHex?.(0x7c1118);
         material.emissiveIntensity = .62;
       }
