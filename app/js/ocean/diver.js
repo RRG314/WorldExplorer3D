@@ -4,7 +4,7 @@ import {createInvestigationControls} from '../campaign/coastal-investigation-ui.
 import {parentHullCollision} from './parent-vessel.js';
 import {getMaritimeCatalogEntry} from '../transport/maritime-catalog.js?v=1';
 import {RCRV_LAYOUT,RESEARCH_EYE_HEIGHT} from '../boat-mode/research/layout.js';
-import {styleMarinePanel} from './interface.js';
+import {mountMarinePanel} from './interface.js';
 import {createWildlifeObservationControls} from './wildlife-observation.js';
 import {getPlayerCharacterGender} from '../../../js/player-character-preference.js?v=1';
 import {createWalkingWaterRuntime} from '../walking/water/runtime.js';
@@ -50,10 +50,10 @@ export function createOceanDiver(ctx,mode,{sampleSeabedHeight,worldRadius=1200})
   let active=false,pending=false,disposed=false,controller=null,ready=false,returnTarget='submarine',falling=false,fallVelocity=0,entryEpoch=0,lastAdmission='';
   const state={walker:{x:0,y:0,z:0,yaw:0,angle:0,lookYawOffset:0,pitch:0,vy:0},characterMesh:host};
   const panel=document.createElement('section');panel.id='oceanDiverControls';panel.setAttribute('aria-label','Ocean explorer');
-  const button=document.createElement('button'),status=document.createElement('div');button.id='oceanDiverToggle';button.type='button';button.textContent='Explore outside submarine';status.setAttribute('role','status');panel.append(button,status);document.body.append(panel);
+  const button=document.createElement('button'),status=document.createElement('div');button.id='oceanDiverToggle';button.type='button';button.textContent='Explore outside submarine';status.setAttribute('role','status');panel.append(button,status);
   const optionsDetails=document.createElement('details'),optionsSummary=document.createElement('summary');optionsSummary.textContent='Dive controls & sound';optionsDetails.id='oceanDiverOptions';optionsDetails.append(optionsSummary);panel.append(optionsDetails);
   const help=document.createElement('div');help.textContent='W/S swim · A/D turn · Space/Shift rise/dive. Recover returns you aboard.';optionsDetails.append(help);
-  styleMarinePanel(panel,'diver');
+  mountMarinePanel(panel,'diver');
   const investigation=createInvestigationControls({api:()=>ctx.marineResearch?.investigation,prefix:'coastalDiver'});panel.append(investigation.node);
   const wildlife=createWildlifeObservationControls(()=>ctx.marineResearch?.wildlife);panel.append(wildlife.node);
   const box=new THREE.Box3(),cameraTarget=new THREE.Vector3(),lookTarget=new THREE.Vector3();

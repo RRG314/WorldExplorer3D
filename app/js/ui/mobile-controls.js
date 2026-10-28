@@ -126,8 +126,8 @@ const MOBILE_CONTROL_PROFILES = {
     },
     look: null,
     actions: [
-      { label: 'Accelerate', binding: { channel: 'space', key: ' ' } },
-      { label: 'Decelerate', binding: { channel: 'space', key: 'shift' } }
+      { label: 'Speed +', binding: { channel: 'space', key: ' ' } },
+      { label: 'Speed −', binding: { channel: 'space', key: 'shift' } }
     ]
   },
   ocean: {
