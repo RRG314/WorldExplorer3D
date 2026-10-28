@@ -171,3 +171,35 @@ UI proof observed pause before the queued native dialog close event and requeste
 an absent favicon; driver now waits for close and embeds an empty favicon.
 Rendered release failure remains retained in the prior report. No broad historic
 release sweep or production deployment occurred.
+
+## Frozen85519af actual city and scoped HUD follow-up
+
+The frozen85519af staging-config package passed full artifact verification. One
+actual Monaco load reached first playable in49.193s with10,097buildings and11,533
+roads. Actual keyboard steering/throttle/braking completed all22gates in55.314s;
+two AI rivals finished45.58/45.68s. The digital pilot touched course barriers275
+simulation frames, so the result correctly did not claim a clean finish. This
+proves the changed integrated flow, not manual driving feel or FPS acceptance.
+Journal accepted the original Monaco coordinate/vehicle/build metadata and
+existing14GroundVehicles/20PilotingXP. Returning to ordinary driving removed the
+race root and its3owned geometries; ordinary walking then moved with real input.
+No pageerrors. One HTTP502console message remains unclassified; weather showed
+its unavailable/retrying recovery state. Do not label the run console-clean or
+claim a provider attribution that was not captured. Owned cleanup had no errors.
+
+The actual short-landscape HUD overlapped the ordinary status panel, and three
+standings could push return/retry buttons below the result viewport. After the
+frozen gameplay portion, a clearly labelled controlled CSS/UI composition reused
+the same city through the existing ScreenLayout owner; it reserved racing's
+compact status, kept Main Menu clear in portrait/landscape and restored the normal
+layout. No second city load or repeat race was needed for that UI comparison.
+
+The following source integrates that activity layer under the race lifecycle,
+restoring it only while still owned by racing, adds current speed/condition, and
+keeps result actions outside the scrolling standings. Controlled current-source
+UI/session/IndexedDB browser integration with two actual-model AI rivals passes:
+three viewport sizes, three-row landscape results, always-visible retry/return,
+and disposal that preserves a replacement activity layer. Screenshots inspected.
+These final HUD changes have controlled composition/component evidence, not a
+second immutable full-city acceptance run. Performance and online/venue blockers
+in RELEASE_READINESS remain unchanged.

@@ -9,3 +9,13 @@ Planned entries: main menu Racing and in-world activity entry. Hub: nearby quali
 Race HUD should prioritize next turn,laps/time,position and recovery. Preserve navigation,readable speed and unobscured road. Do not add a tachometer or gear display until those quantities exist in the controller. Portrait uses thumb-reachable controls and collapsed supporting panels;landscape avoids piling event UI onto both steering and throttle. Native dialog semantics,44px controls,focus return,Escape and reduced effects apply to garage and race panels.
 
 Validation: a new player must find Racing,choose a non-sports starter,enter an event,understand a blocked course,change builds legally,finish,inspect evidence scope and return to exploration. Attractive mockups alone do not pass that journey.
+
+Current practice uses the existing ScreenLayout activity owner for its compact
+race HUD, scoped to the race lifecycle. It shows time, position, ordered gate/lap,
+speed and condition; it keeps touch controls and Main Menu available and restores
+the ordinary exploration HUD on exit. A replacement activity layer cannot be
+cleared by late race teardown. The native result dialog scrolls standings and
+feedback while keeping retry/race/return actions visible. This was refined from
+actual city landscape overlap and checked in a controlled same-city composition
+and current-source three-participant browser integration. Major-venue references
+in the separate design preview remain explicitly unbuilt, not working game UI.
