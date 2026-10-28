@@ -12,8 +12,9 @@ test('known mobile, software and integrated renderer profiles retain distinct ha
   assert.equal(classifyGraphicsTier('NVIDIA GeForce RTX 4070'),'high');
   assert.equal(classifyGraphicsTier('NVIDIA GeForce RTX 4070',390*844),'low');
 });
-test('first-run defaults choose the existing performance setting on constrained graphics',()=>{
-  for(const gpuTier of ['low','mid'])assert.equal(initialRenderQuality({gpuTier}),'low');
+test('first-run defaults retain production balanced desktop quality and conservative mobile graphics',()=>{
+  assert.equal(initialRenderQuality({gpuTier:'low'}),'low');
+  assert.equal(initialRenderQuality({gpuTier:'mid'}),'med');
   assert.equal(initialRenderQuality({gpuTier:'high',mobile:true}),'low');
   assert.equal(initialRenderQuality({gpuTier:'high'}),'med');
 });

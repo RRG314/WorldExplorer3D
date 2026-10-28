@@ -9,8 +9,8 @@
     z-index: 100;
     display: none;
     grid-template-columns: minmax(0, max-content) 1fr;
-    grid-template-rows: auto minmax(0, 1fr);
-    height: calc(100dvh - var(--wx-navigation-height,78px) - 40px);
+    grid-template-rows: auto auto;
+    height: auto;
     align-items: start;
     gap: 8px;
     pointer-events: none;
@@ -151,13 +151,26 @@
     .liveGpsActions button { flex-basis: 100%; }
     #liveGpsHud, #deFlockHud, #urbanCivicStatus, .world-selection-notice { padding: 8px; }
   }
-  @media (max-height: 560px) and (orientation: landscape) {
+  @media (max-height: 560px) and (orientation: landscape) and (pointer: coarse),
+         (max-height: 560px) and (orientation: landscape) and (max-width: 760px) {
     #hud { right: max(8px, env(safe-area-inset-right)); width: auto; }
     .hud-box { width: min(340px, calc(100vw - 140px)); max-height: 130px; }
     #hudDetails { grid-template-columns: minmax(0, 1fr); }
-    #hudMap { position: relative; top: auto; bottom: auto; left: auto; width: 96px; max-height: var(--wx-hud-map-height,96px); transform: none; }
+    #hudMap { position: relative; top: auto; bottom: auto; left: auto; width: min(96px, var(--wx-hud-map-height,96px)); max-height: var(--wx-hud-map-height,96px); transform: none; }
     #hudUtilities { grid-row: 1 / span 2; grid-column: 2; margin-top: 66px; width: min(320px, 100%); }
     #coords { display: none !important; }
+  }
+  @media (min-width: 761px) and (max-height: 560px) and (pointer: fine) {
+    /* Desktop windows keep a readable map and all travel readouts. The phone
+       landscape layout must not crop desktop status to a 130px scroll box. */
+    .hud-box { padding: 10px 12px; }
+    #hudHeader { display: grid; grid-template-columns: 76px minmax(0, 1fr); gap: 8px; padding-right: 0; }
+    #weatherPanel { padding-right: 40px; }
+    #hudClockDisplay { margin-top: 6px; }
+    #hudDetails { gap: 3px; margin-top: 6px; padding-top: 6px; }
+    #conditionBar { margin-bottom: 3px; }
+    #hudMap { display: flex; flex-direction: column; gap: 4px; width: 192px; }
+    #coords { order: -1; padding: 4px; gap: 4px; }
   }
   @media (forced-colors: active) {
     .hud-box, #hudToggleBtn { border-color: CanvasText; }
@@ -201,7 +214,8 @@
     #urbanVehiclePrompt kbd{display:none}
     #urbanVehiclePrompt button{display:inline-flex;align-items:center;justify-content:center;white-space:normal}
   }
-  @media(max-height:560px) and (orientation:landscape){
+  @media(max-height:560px) and (orientation:landscape) and (pointer:coarse),
+        (max-height:560px) and (orientation:landscape) and (max-width:760px){
     #urbanVehiclePrompt{left:50%;right:auto;bottom:calc(var(--wx-navigation-height,78px) + 12px);transform:translateX(-50%);width:min(340px,40vw);max-height:36dvh;flex-direction:row;align-items:center}
   }
 }

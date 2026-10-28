@@ -61,6 +61,7 @@ export async function verifyHudWeatherLayout(){
     assert.deepEqual(report.reader.changed,{speed:'4',condition:'Explorer health · 40%',value:'40'});assert.deepEqual(report.reader.drive,{street:'Pratt Street',limit:'30'});
     assert.equal(report.reader.submarine,'Submarine health · 70%');assert.equal(report.reader.dive,'Dive air · 25%');
     const cases=[
+      {name:'desktop-short-window',width:1280,height:450,scale:'100',weather:['☀️ Clear · 57°F','77% humidity · Wind 4 mph NE'],readableMap:true},
       {name:'desktop-weather',width:1440,height:900,scale:'100',weather:['🌧 Heavy rain · 69°F','46% humidity · Wind 10 mph NW']},
       {name:'desktop-unavailable',width:1024,height:768,scale:'200',weather:['Weather unavailable','No current model coverage']},
       {name:'phone',width:390,height:844,scale:'100'},
@@ -116,6 +117,12 @@ export async function verifyHudWeatherLayout(){
       assert.equal(overlaps(result.bounds,result.map),false,'Map must follow the expanded HUD');
       assert.equal(overlaps(result.bounds,result.quickControls),false,'Weather/time actions must follow the expanded HUD');
       assert.equal(overlaps(result.map,result.quickControls),false,'Map and world actions have separate space');
+      if(row.readableMap){
+        const map=await page.locator('#minimap').boundingBox();
+        assert.ok(map.width>=140&&map.height>=140,'Short desktop windows retain a readable production-sized map');
+        assert.equal(await page.locator('#hudBox').evaluate(e=>e.scrollHeight<=e.clientHeight+1),true,'Normal desktop status is visible without scrolling');
+        assert.equal(await page.locator('#hudMap').evaluate(e=>e.scrollHeight<=e.clientHeight+1),true,'The map and coordinates must both fit the short desktop window');
+      }
       assert.equal(overlaps(result.bounds,result.menu),false,'HUD keeps the main-menu control clear');
       if(result.coarse)for(const pad of [result.move,result.look]){
         assert.equal(overlaps(result.map,pad),false,'Map keeps the thumb controls clear');

@@ -11,5 +11,5 @@ export function classifyGraphicsTier(rendererName = '', viewportPixels = Infinit
 
 export function initialRenderQuality({savedQuality, mobile = false, gpuTier = 'high'} = {}) {
   if (['low', 'med', 'high'].includes(savedQuality)) return savedQuality;
-  return mobile || gpuTier === 'low' || gpuTier === 'mid' ? 'low' : 'med';
+  return mobile || gpuTier === 'low' ? 'low' : 'med';
 }
