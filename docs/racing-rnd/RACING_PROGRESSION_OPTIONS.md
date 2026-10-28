@@ -15,3 +15,12 @@ All three preserve non-racing exploration,property,Ocean/Space and ordinary tran
 **Owner decision, October28,2026: Open rivals and racing crews is selected as the primary direction.** Preserve everyday ownership and optional collection/learning; regional clubs are not the primary career. The other proposals remain alternatives for reference.
 
 The owner selected the career explicitly; its implementation follows the shared vehicle and integrated-slice acceptance requirements.
+
+Owner expansion: add collector and skill depth cleanly alongside the selected
+rivals/crews direction. Initial implementation reads owned classics/everyday/
+utility counts and home assignments from the existing garage, displays existing
+Ground Vehicles rank/XP, and records actual finished practice through the Journal
+character transaction. No separate racing character, collection wallet or XP
+store. Clean/consistent driving feedback does not claim a server-verified licence.
+The social career remains blocked on the actual authenticated service/result
+integration; it is not replaced by the collector alternative.

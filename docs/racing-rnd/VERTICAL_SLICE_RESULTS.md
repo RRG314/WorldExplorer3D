@@ -123,3 +123,51 @@ browser acceptance. Both failures are retained privately. New source fixtures
 cover coordinate-only origins, stale selection labels, sparse timing gates on
 hills, class/grid clearance and rejected-preparation cleanup. Oversized buses
 remain usable in ordinary exploration; this car/van grid does not admit them.
+
+## Actual city practice accepted; later UI/progression/presentation integration
+
+Frozen83d76d5 actual Monaco:136 qualified spans from41,685 traversal spans,
+149nodes/270directed edges,705.99m sprint/trial. Both actual model AI rivals
+finished45.695/45.783s. Real player keyboard input finished83.360s (included
+initial idle waiting, not a competitive benchmark), all22gates. Results saved;
+ordinary car/braking/walking returned. Actual UI creator saved a214.88m route,
+real keyboard finished20.667s/all6gates, and title-only reload retained route
+references plus both practice histories. No repeated full-city load was needed
+for persistence. No wallet payout or garage-condition refill. No app pageerrors;
+external Esri globe CORS failures and private driver mistakes retained separately.
+
+The initial results/Start layout had scroll problems and stale preparation copy.
+The new dedicated results view/fixed Start passed a small component browser
+check. A further portrait diagnostic found the event navigation grid row had
+collapsed to zero height; it now reserves visible touch height. Actual screenshots
+of desktop/portrait/landscape and results were inspected.
+
+Current controlled UI integration runs the real racing/session/controller/UI and
+real IndexedDB Journal, with explicitly fixture roads/admission. One finish
+commits existing Ground Vehicles14XP/Piloting20XP under existing character rules;
+retry after controller release and a different-account rejection preserve one
+receipt. World replacement before retry retains the original course coordinates.
+Reload retained the event/character state. These are not live service or physical
+phone claims. Other saved character/tool/progression fields remain intact.
+
+Practice record keys now include vehicle, upgrades, condition, grip and physics
+version. Source checks distinguish five configurations and changed source geometry;
+repetition rewards remain grouped by original course across builds. Collector
+summary reads actual garage ownership/home state, including both Cadillacs.
+
+Original grid/finish paint follows nonlinear surveyed heights/crossfall and uses
+one vertex-colour mesh, without another support surface/collider. Longest-class
+rear grid row now stays inside qualified start support. Rendered component shows
+actual DeLorean/Fleetwood identities and sloped paint. A r128 unsupported detach
+call was exposed by the visual release proof, repaired through the existing
+scene lifecycle helper and covered by a once-only resource-disposal test. Both
+model leases return0; idle cache templates remain bounded, not falsely reported
+as destroyed. Two detailed real-model rivals plus fixture road/paint/gates render
+79draw calls/171,736triangles in that diagnostic; not a full-city cost estimate.
+
+Failures retained: old source grid-position assertion expected the former chassis
+center instead of full support; updated to physical support/gap assertions. First
+UI proof observed pause before the queued native dialog close event and requested
+an absent favicon; driver now waits for close and embeds an empty favicon.
+Rendered release failure remains retained in the prior report. No broad historic
+release sweep or production deployment occurred.

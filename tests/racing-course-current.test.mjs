@@ -56,5 +56,6 @@ test('a starting grid may span connected survey segments without replacing their
  const roads=Array.from({length:30},(_,i)=>({sourceId:'survey-'+i,a:{x:0,y:i*.2,z:i*10},b:{x:0,y:(i+1)*.2,z:(i+1)*10},widthMeters:8,driveable:true,supported:true}));
  const graph=buildRaceRoadGraph(roads,{metersPerUnit:1}),course=createRaceCourse(graph,roads.map(r=>r.sourceId+':forward'),{locationId:'survey',anchor:{lat:43,lon:7},participants:4});
  assert.equal(course.segments.length,30);assert.equal(course.points.length,31);
- const front=raceGridPose(course,0),back=raceGridPose(course,2);assert.equal(front.z,10);assert.equal(back.z,2);assert.ok(front.y>back.y);
+ const front=raceGridPose(course,0),back=raceGridPose(course,2);assert.equal(front.z-back.z,8);
+ assert.ok(back.z-course.vehicleEnvelope.lengthMeters/2>=1,'even the longest rear-row chassis remains inside qualified support');assert.ok(front.y>back.y);
 });

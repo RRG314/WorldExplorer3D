@@ -1,13 +1,25 @@
-# Release readiness
+# Racing release readiness
 
-Evidence date: October 28, 2026. Baseline `7da846f`; current working-source improvements are distinguished from unimplemented racing. No production deployment or purchase.
+Updated October 28, 2026. **Full racing is not release-ready.** No production deployment or purchase is authorised by this package. Production remains the previously released web build; local racing commits are separate.
 
-Production deployment is not authorized by this package. No purchase has been made. Existing release thresholds remain intact.
+## Implemented and evidenced
 
-Shared vehicle source now includes garage/economy/room custody and controller/presentation repairs. Focused source/transaction evidence is distinct from real browser input and from live services. Backend routes must be deployed together with the corresponding browser build only after matching emulator/account/security checks;the local build alone does not activate a new cloud endpoint.
+- Shared vehicle selection, condition, upgrades and home assignment use existing garage/economy owners. Matching models prepare before adoption. Account/receipt tests and isolated authenticated garage API checks passed; the new garage endpoint has not been deployed.
+- Player and AI use the same calibrated road controller, with existing transport/session/frame owners. Source covers four-wheel grade/crossfall support, full chassis spacing, ordered gates, countdown, stale controls and cancellation.
+- The actual frozen `83d76d5` Monaco browser journey qualified 136 published road spans, ran the 705.99 m sprint with two real-model AI rivals, finished through actual keyboard input, saved a practice result, returned to ordinary driving/walking, created and finished a 214.88 m custom route, and retained both results and the route after a title-only reload. This is local practice, not an authenticated multiplayer race or a professional Monaco circuit.
+- Subsequent controlled browser UI/Journal integration verifies desktop/portrait/landscape selection and persistent Start/results, failed-save retry after controller release, rejection under a different account, original location retained across world replacement, real IndexedDB persistence and the existing Ground Vehicles XP transaction. These checks use fixture roads/admission, and are not another full-city acceptance run.
+- New practice bests separate course, car, upgrades, condition, grip and physics version. Existing older records remain retained. Existing character repetition limits span changed vehicle builds. Practice does not pay Credits or submit verified competitive results.
+- Original one-buffer grid/finish paint follows surveyed grades/crossfall. Real DeLorean/Fleetwood component rendering was inspected. The bundled-renderer disposal check caught an unsupported scene-detach call; it now uses the existing scene-object lifecycle helper. Owned presentation resources dispose once and both actual model leases return to zero; idle templates remain within the existing cache budget.
+- The balanced twelve-layout register and exact venue requirements are documented in `RACE_VENUE_COVERAGE.md`. It explicitly lists **zero playable major-venue packs**; it is research input rather than a selectable fake track list.
 
-Outstanding competitive blockers: no race-grade course publication/validation,no authoritative realtime racing session,no accepted AI opponent,no creator publishing,no verified racing boards/rewards,noactualtwo-player race,no sustained physical-phone acceptance. Career selection is also pending. Racing is NOT release-ready and is not being hidden behind a menu button.
+## Remaining release blockers
 
-The shared vehicle package additionally needs its exact frozen browser visual/input/persistence proof and the outstanding pacing investigation before production release. Account switching must not leak prior garage projections;receipts must prevent duplicate debit,upgrade erasure and unauthorized home custody;room users cannot claim someone else's owned car. A safe spawn must use canonical surface/layer rules and an exact matching staged model.
+1. Low-latency authenticated race service integrated with existing room admission, Firebase Auth/App Check, consent, blocking, personal-car custody, scoped world cancellation and reconnect behaviour. The current casual room presence channel is not race-grade networking.
+2. Durable server result/award transaction and existing leaderboard integration. Two distinct authenticated players must finish an actual synchronized race, with replay/disconnect/host-leave checks. A portable two-input source simulation does not satisfy this.
+3. Creator test-drive/publication/moderation workflow. Current drafts and route tests work locally; a saved draft is not a certified public competition.
+4. Selected Open rivals and racing crews progression: real invitations, persistent optional crew series, verified reputation and challenge rewards. Existing collector/character skill integration is now functional; this does not mean the social career is complete.
+5. Rights-cleared, geographically complete major-venue packs and correct circuit/oval/rally handling/rules/presentation. The current short city-road practice adapter cannot certify long Nordschleife laps, high-banked ovals or narrow loose-surface jumping stages merely by raising limits.
+6. Performance acceptance. The last actual same-city foreground minute averaged 30.5157 FPS, p95 35.4 ms, p99 50 ms, worst 51.9 ms, zero frames over 100 ms. The hitch check passed but desktop frame rate is unaccepted. Existing CPU profile is diagnostic evidence, not proof of the cause or a claimed fix. Physical-phone sustained/thermal acceptance remains outstanding.
+7. Exact final coordinated browser/backend build verification, affected ordinary-vehicle/world-return regressions and device/input claims. Do not repeat unaffected historic release sweeps for each local change, and do not deploy all existing cloud functions as a shortcut.
 
-Track remaining checks by affected journey;do not rerun the historical entire-app gate sequence after every local edit. Retain failures and annotate driver errors separately from game defects. Physical gamepad,wheel,phone andVR tests are required for any claims about those devices.
+Retain failed runs. Source tests, controlled integrations, real city input and live-service evidence are separate levels. Physical gamepad, wheel, phone and VR claims require corresponding physical-device evidence.

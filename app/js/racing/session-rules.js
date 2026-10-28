@@ -89,7 +89,7 @@ export function createRaceSession({id,course,creatorUid,createdAtMs,maximumDurat
    serverAtMs:lastNow,simulationAtMs:startAtMs===null?null:startAtMs+tick*STEP_MS,completedAtMs,
    players:ordered.map((p,index)=>({uid:p.uid,label:p.label,ai:p.ai,vehicleId:p.profile.vehicleId,slot:p.slot,ready:p.ready,
     disconnected:p.disconnectedAt!==null,dnf:p.dnf,position:index+1,lastInputSequence:p.lastSequence,pose:p.car?raceVehicleGroundPose(p.car):null,
-    speed:p.car?.speed||0,condition:p.car?.condition??p.profile.conditionValue,
+    speed:p.car?.speed||0,condition:p.car?.condition??p.profile.conditionValue,barrierContacts:p.car?.barrierContacts??0,
     vehicleState:snapshotRaceVehicle(p.car),
     progress:p.progress?{nextGate:p.progress.nextGate,lap:p.progress.lap,finished:p.progress.finished,elapsedMs:p.progress.elapsedMs??null,
      bestLapMs:p.progress.bestLapMs,lapTimes:[...p.progress.lapTimes],penaltyMs:p.progress.penaltyMs}:null}))};

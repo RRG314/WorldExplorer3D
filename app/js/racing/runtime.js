@@ -12,6 +12,8 @@ import {createActivityCompletionStore} from '../activity-discovery/completion.js
 import {personalVehicleById,personalVehicleIdentity} from '../transport/vehicle-garage-rules.js';
 import {getCurrentUser} from '../../../js/auth-ui.js?v=56';
 import {getCurrentRoom} from '../multiplayer/rooms.js?v=67';
+import {racePracticeRecordKey,RACE_PHYSICS_VERSION} from './record-rules.js';
+import {racingCollectionSummary,racePracticeFeedback,racePracticeMetadata} from './driver-progress.js';
 const formatTime=ms=>Number.isFinite(ms)?`${Math.floor(ms/60000)}:${((ms%60000)/1000).toFixed(2).padStart(5,'0')}`:'—';
 const messages={no_qualified_racing_roads:'No supported racing district is ready here. Continue loading nearby roads or choose another destination.',
  no_qualified_race_route:'These roads do not yet form a safe race route. Choose another location or create a route on the map.',race_route_length:'Use a connected route between 200 m and 8 km.',
@@ -24,7 +26,7 @@ const message=error=>messages[error?.message]||'This race could not complete. Yo
 export function createRacingRuntime(c,{closeMenus=()=>{},requestWorldFocus=()=>{},chooseDestination=()=>{}}={}) {
  let routeDiagnostics=null;
  let dialog=null,hud=null,loadScope=null,loadPublication=null,raceScope=null,controller=null,presentation=null,district=null,graph=null,fingerprint='',events=[],selected=0;
- let recordOwner='',records=null;
+ let recordOwner='',records=null,driverReadRevision=0;
  let creatorPath=[],creatorNodes=[],customCourse=null,returnFocus=null,busy=false,recordId='',lastUiAt=-Infinity,saving=false,lastResult=null,lastResultCourse=null,lastResultOwner='',resultSaved=false;
  function currentRecords() {
   const uid=getCurrentUser()?.uid||'';if(records&&recordOwner===uid)return records;
@@ -32,7 +34,10 @@ export function createRacingRuntime(c,{closeMenus=()=>{},requestWorldFocus=()=>{
   const owner=uid,namespace=uid?`:account:${uid}`:':guest-racing';
   records=createActivityCompletionStore({storage:()=>({getItem:key=>localStorage.getItem(key+namespace),setItem:(key,value)=>localStorage.setItem(key+namespace,value)}),
    recordEvent:event=>{if((getCurrentUser()?.uid||'')!==owner)throw Error('race_account_changed');return c.recordExplorerEvent?.(event);},
-   lookupEvents:ids=>c.getExplorerEventsById?.(ids),context:()=>({environment:'EARTH',locationSnapshot:{...(c.worldPublication?.location||c.LOC||{}),name:district?.locationLabel||''},regionLabel:district?.locationLabel||'Earth road race'})});
+   lookupEvents:ids=>c.getExplorerEventsById?.(ids),context:()=>({environment:'EARTH',
+    locationSnapshot:{...(lastResultCourse?.anchor||district?.anchor||c.worldPublication?.location||c.LOC||{}),name:lastResultCourse?.locationLabel||district?.locationLabel||''},
+    regionId:lastResultCourse?.locationId||district?.locationId||'earth-road-racing',worldIdentity:lastResultCourse?.locationId||district?.locationId||'earth-road-racing',
+    regionLabel:lastResultCourse?.locationLabel||district?.locationLabel||'Earth road race'})});
   return records;
  }
  const el=(selector)=>dialog.querySelector(selector),status=text=>{el('[data-race-status]').textContent=text;};
@@ -50,9 +55,11 @@ export function createRacingRuntime(c,{closeMenus=()=>{},requestWorldFocus=()=>{
    <p data-race-waypoints></p><label>Route name<input data-race-route-name maxlength="100" placeholder="My city run"></label>
    <label>Discipline<select data-race-discipline><option value="sprint">Sprint</option><option value="circuit">Circuit · 2 laps</option><option value="time-trial">Time trial</option></select></label>
    <button type="button" data-race-test>Test this route</button><button type="button" data-race-save>Save route</button><p data-race-saved></p></details>
+   <details data-race-driver><summary>Your cars &amp; driving skill</summary><p data-race-collection></p><p data-race-skill></p>
+   <p>Keep cars, upgrades and home assignments in My garage. Finishing a route contributes to your existing Ground Vehicles skill, with reduced gains for repeated practice. Racing uses standard character handling so skill rank does not give a hidden speed advantage.</p></details>
    </section></div><footer class="racing-start-bar"><button class="racing-primary" type="button" data-race-start disabled>Start practice</button>
    <p class="racing-note">Closed course · ghost competitors · standard road class, boosts off. Practice records are kept in your Journal.</p></footer><section data-race-results hidden aria-labelledby="racingResultHeading"><h3 id="racingResultHeading" tabindex="-1">Race results</h3><ol data-race-order></ol><p data-race-save-state role="status"></p>
-   <button type="button" data-race-retry-save hidden>Retry Journal save</button><button type="button" data-race-again>Race again</button><button type="button" data-race-explore>Return to exploration</button></section>`;
+   <p data-race-feedback></p><button type="button" data-race-retry-save hidden>Retry Journal save</button><button type="button" data-race-again>Race again</button><button type="button" data-race-explore>Return to exploration</button></section>`;
   document.body.append(dialog);
   hud=document.createElement('section');hud.id='roadRaceHud';hud.className='road-race-hud';hud.hidden=true;hud.setAttribute('aria-label','Race progress');
   hud.innerHTML='<p data-race-phase aria-live="polite"></p><strong data-race-clock></strong><span data-race-progress></span><button type="button" data-race-leave>Leave race</button>';document.body.append(hud);
@@ -76,6 +83,7 @@ export function createRacingRuntime(c,{closeMenus=()=>{},requestWorldFocus=()=>{
  async function open() {
   ensure();if(!controller&&resultSaved){lastResult=null;lastResultCourse=null;}returnFocus=document.activeElement;closeMenus();c.clearControlInputState?.('racing-menu');
   c.setPauseReason?.('racing-menu',true);if(!dialog.open)dialog.showModal();
+  void refreshDriver();
   if(lastResult){renderResults();return;}
   if(controller){render();return;}
   if(district&&loadScope?.isActive()&&c.worldPublication===loadPublication){render();return;}
@@ -117,6 +125,23 @@ export function createRacingRuntime(c,{closeMenus=()=>{},requestWorldFocus=()=>{
   for(const [i,id]of creatorNodes.entries()){const point=graph.nodes[id],circle=document.createElementNS(ns,'circle');circle.setAttribute('cx',point.x);circle.setAttribute('cy',point.z);circle.setAttribute('r',5);circle.setAttribute('fill',i?'#79c8ef':'#fff');svg.append(circle);}
   svg.addEventListener('click',event=>{if(!el('[data-race-creator]').open||busy)return;const p=svg.createSVGPoint();p.x=event.clientX;p.y=event.clientY;const at=p.matrixTransform(svg.getScreenCTM().inverse());
    const node=graph.nodes.reduce((best,n)=>Math.hypot(n.x-at.x,n.z-at.y)<Math.hypot(best.x-at.x,best.z-at.y)?n:best);addJunction(node.id);});host.append(svg);
+  const credit=document.createElement('a');credit.href='https://www.openstreetmap.org/copyright';credit.textContent='© OpenStreetMap contributors · ODbL';credit.target='_blank';credit.rel='noopener';credit.className='racing-map-credit';host.append(credit);
+ }
+ function currentVehicleProfile() {
+  const vehicleId=c.car?.personalVehicleId||'bmw_e34',garage=c.getVehicleGarage?.();
+  const levels=c.vehicleUpgradeStore?.levels({vehicleIdentity:personalVehicleIdentity(vehicleId)})||{};
+  return createRaceVehicleProfile(vehicleId,{condition:c.car?.condition??garage?.vehicles?.[vehicleId]?.condition??1,levels});
+ }
+ async function refreshDriver() {
+  const revision=++driverReadRevision,owner=getCurrentUser()?.uid||'';
+  const renderDriver=profile=>{
+   if(revision!==driverReadRevision||(getCurrentUser()?.uid||'')!==owner)return;
+   const summary=racingCollectionSummary(c.getVehicleGarage?.(),profile);
+   el('[data-race-collection]').textContent=`${summary.owned} of ${summary.available} cars owned · ${summary.families.classics} classics · ${summary.families.everyday} everyday · ${summary.families.utility} utility. ${summary.homed} assigned to a home.`;
+   el('[data-race-skill]').textContent=summary.skill?`Ground Vehicles · ${summary.skill.label} · ${summary.skill.xp} XP${summary.skill.nextXp?` · next rank at ${summary.skill.nextXp} XP`:''}`:'Your driving skill is shown when the Journal is available. Saved progress is kept.';
+  };
+  renderDriver(null);
+  try{renderDriver(await c.discoveryProfileStore?.getProfile?.());}catch{/* Leave the garage usable and retain the unavailable-skill message. */}
  }
  function render() {
   if(!dialog)return;dialog.dataset.raceView='events';el('[data-race-heading]').textContent='Road racing';el('[data-race-location]').textContent=district?district.locationLabel:'Current selected location';
@@ -126,7 +151,12 @@ export function createRacingRuntime(c,{closeMenus=()=>{},requestWorldFocus=()=>{
   const vehicle=personalVehicleById(c.car?.personalVehicleId||'bmw_e34');el('[data-race-detail]').textContent=course?`${course.discipline} · ${(course.lengthMeters/1000).toFixed(2)} km · ${course.laps} lap${course.laps===1?'':'s'} · ${vehicle?.label||'Personal vehicle'}`:'';
   el('[data-race-start]').disabled=busy||!course;el('[data-race-rivals]').disabled=course?.discipline==='time-trial';map(course);
   el('[data-race-results]').hidden=!lastResult;el('[data-race-creator]').hidden=!graph;
-  if(course)void raceCourseKey(course).then(id=>{if((customCourse||events[selected])!==course)return;const record=currentRecords().get(id);el('[data-race-record]').textContent=record?.bestTimeMs?`Practice personal best · ${formatTime(record.bestTimeMs)}`:'Set your first practice record.';});
+  el('[data-race-record]').textContent='';
+  if(course){const owner=getCurrentUser()?.uid||'';try{void racePracticeRecordKey(course,currentVehicleProfile()).then(id=>{
+   if((customCourse||events[selected])!==course||(getCurrentUser()?.uid||'')!==owner)return;
+   const record=currentRecords().get(id);el('[data-race-record]').textContent=record?.bestTimeMs?`Practice best · ${formatTime(record.bestTimeMs)} · same car, upgrades and condition`:'Set a practice record for this car and build.';
+  }).catch(()=>{if((customCourse||events[selected])===course)el('[data-race-record]').textContent='Practice records could not be read. Your saved results are kept.';});}
+  catch{el('[data-race-record]').textContent='Repair your car before racing.';}}
  }
  function addJunction(id) {try{if(!graph?.nodes[id]||creatorNodes.at(-1)===id)return;if(creatorNodes.length>=30)throw Error('invalid_race_route');creatorNodes.push(id);rebuildCreator(true);}catch(error){creatorNodes.pop();status(message(error));}}
  function rebuildCreator(throwFailure=false) {
@@ -164,7 +194,7 @@ export function createRacingRuntime(c,{closeMenus=()=>{},requestWorldFocus=()=>{
    const count=course.discipline==='time-trial'?0:Math.min(course.participants-1,Number(el('[data-race-rivals]').value));
    const rivals=Array.from({length:count},(_,i)=>({label:['Mara · Coastline Crew','Jules · City Current','Rin · Night Survey'][i],
     difficulty:Number(el('[data-race-difficulty]').value),profile:createRaceVehicleProfile(['golf_ii','datsun_280z','delorean'][i])}));
-   recordId=await raceCourseKey(course);if(!currentRecords().canStart(recordId))throw Error('race_previous_result_unsaved');
+   recordId=await racePracticeRecordKey(course,profile);if(!currentRecords().canStart(recordId))throw Error('race_previous_result_unsaved');
    const prepared=await prepareRacePresentation(THREE,c,course,rivals,{signal:request.signal,current});scope.defer(()=>prepared.dispose(),'race-visuals');
    if(!current())throw Error('race_world_changed');
    const run=createPracticeRaceController({context:c,course,profile,rivals,label:'You',uid,onComplete:result=>complete(result),isAdmitted:current});
@@ -181,6 +211,8 @@ export function createRacingRuntime(c,{closeMenus=()=>{},requestWorldFocus=()=>{
  function renderResults() {
   if(!lastResult)return;dialog.dataset.raceView='results';el('[data-race-heading]').textContent='Race results';el('#racingResultHeading').textContent=lastResult.courseName;el('[data-race-results]').hidden=false;const list=el('[data-race-order]');list.replaceChildren();
   for(const player of lastResult.players){const li=document.createElement('li');li.textContent=`${player.label} · ${player.dnf?'Did not finish':formatTime(player.progress?.elapsedMs)}${player.ai?' · AI rival':''}`;list.append(li);}
+  const player=lastResult.players.find(p=>!p.ai),feedback=racePracticeFeedback(player);
+  el('[data-race-feedback]').textContent=feedback.finished?`${personalVehicleById(player.vehicleId)?.label||'Your car'} · ${feedback.clean?'Clean finish: no course barrier contacts or timing penalties.':'Finish recorded. Aim to avoid course barriers on your next run.'}${feedback.consistent?' Three or more laps within 5%: consistent driving.':''}`:'Finish the complete route to record a driving practice result.';
   el('[data-race-save-state]').textContent=resultSaved?'Practice record saved in your Journal.':'Device practice result. Your Journal save needs to finish.';el('[data-race-retry-save]').hidden=resultSaved||saving;
  }
  async function persistResult() {
@@ -189,10 +221,14 @@ export function createRacingRuntime(c,{closeMenus=()=>{},requestWorldFocus=()=>{
   saving=true;const result=lastResult,player=result.players.find(p=>!p.ai),id=recordId,course=lastResultCourse;
   el('[data-race-save-state]').textContent='Saving your practice record in the Journal…';el('[data-race-retry-save]').hidden=true;
   try {if(!player?.progress?.finished){resultSaved=true;el('[data-race-save-state]').textContent='Run ended without a finishing time. Your exploration progress is preserved.';return;}
+   const metadata=racePracticeMetadata(result,player,{courseId:await raceCourseKey(course),recordKey:id,physicsVersion:RACE_PHYSICS_VERSION});
+   if(lastResult!==result)return;
+   if((getCurrentUser()?.uid||'')!==lastResultOwner)throw Error('race_account_changed');
    const saved=await currentRecords().complete({id,title:course.name,sourceType:'creator'},player.progress.elapsedMs,player.pose,
-    {pointsFirst:0,detail:`Practice road race · ${course.locationLabel} · ${formatTime(player.progress.elapsedMs)}`,metadata:{resultOwner:'game-result',raceVerified:false,discipline:course.discipline,position:player.position}});
-   if(lastResult!==result)return;resultSaved=saved;el('[data-race-save-state]').textContent=saved?'Practice record saved in your Journal.':'The result needs a Journal save. Retry before starting another run.';el('[data-race-retry-save]').hidden=saved;
-  }finally{saving=false;}
+    {pointsFirst:0,detail:`Practice road race · ${course.locationLabel} · ${formatTime(player.progress.elapsedMs)} · ${personalVehicleById(player.vehicleId)?.label||'Personal car'}${metadata.cleanFinish?' · Clean finish':''}`,metadata});
+   if(lastResult!==result)return;resultSaved=saved;el('[data-race-save-state]').textContent=saved?'Practice record saved in your Journal.':'The result needs a Journal save. Retry before starting another run.';el('[data-race-retry-save]').hidden=saved;if(saved)void refreshDriver();
+  }catch(error){if(lastResult===result){el('[data-race-save-state]').textContent=error.message==='race_account_changed'?'Sign back into the account that ran this race to save its result.':'The result needs a Journal save. Retry before starting another run.';el('[data-race-retry-save]').hidden=false;}}
+  finally{saving=false;}
  }
  function update(dt) {
   if(!controller)return;if(!controller.isCurrent()){stop('race_vehicle_or_world_changed');return;}

@@ -2,6 +2,8 @@ import {createUrbanVehicleVisual} from '../urban-sandbox/vehicle-visuals.js?v=12
 import {attachCuratedTrafficVehicle,syncCuratedVehicleGroundPivot} from '../urban-sandbox/curated-traffic-vehicle.js?v=5';
 import {updateVehicleWheels} from '../transport/vehicle-wheel-motion.js';
 import {carSpeedToWorldUnitsPerSecond} from '../physics/vehicle-speed-units.js?v=2';
+import {buildRacePaint,raceCourseSurfacePoint} from './course-markings.js';
+import {detachSceneObject} from '../engine/scene-object-lifecycle.js';
 export async function prepareRacePresentation(THREE,context,course,rivals,{signal,current}) {
  const root=new THREE.Group();root.name='Scoped mapped road race';const visuals=[];let disposed=false;
  const material=new THREE.MeshBasicMaterial({color:0xb7f568,transparent:true,opacity:.8,depthWrite:false});
@@ -12,7 +14,10 @@ export async function prepareRacePresentation(THREE,context,course,rivals,{signa
  }
  const lineGeometry=new THREE.BufferGeometry().setFromPoints(course.points.map(p=>new THREE.Vector3(p.x,p.y+.08,p.z)));
  const lineMaterial=new THREE.LineBasicMaterial({color:0xb7f568,transparent:true,opacity:.45});root.add(new THREE.Line(lineGeometry,lineMaterial));
- const dispose=()=>{if(disposed)return;disposed=true;for(const visual of visuals)visual.dispose();root.removeFromParent();pole.dispose();material.dispose();lineGeometry.dispose();lineMaterial.dispose();};
+ const paint=buildRacePaint(course),paintGeometry=new THREE.BufferGeometry();paintGeometry.setAttribute('position',new THREE.BufferAttribute(paint.positions,3));paintGeometry.setAttribute('color',new THREE.BufferAttribute(paint.colors,3));
+ const paintMaterial=new THREE.MeshBasicMaterial({vertexColors:true,side:THREE.DoubleSide,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-1,polygonOffsetUnits:-1});
+ const painted=new THREE.Mesh(paintGeometry,paintMaterial);painted.name='Surveyed finish and full-chassis grid paint';root.add(painted);
+ const dispose=()=>{if(disposed)return;disposed=true;for(const visual of visuals)visual.dispose();detachSceneObject(root);pole.dispose();material.dispose();lineGeometry.dispose();lineMaterial.dispose();paintGeometry.dispose();paintMaterial.dispose();};
  try {
   for(let i=0;i<rivals.length;i++) {
    if(!current()||signal.aborted)throw Error('race_world_changed');
@@ -29,7 +34,8 @@ export async function prepareRacePresentation(THREE,context,course,rivals,{signa
     for(let i=0;i<gates.length;i++) {
      const gate=course.gates[next+i],host=gates[i];host.visible=!!gate&&!player?.progress?.finished;
      if(!gate)continue;host.position.set(gate.x,gate.y+.08,gate.z);host.rotation.y=Math.atan2(gate.forward.x,gate.forward.z);
-     for(const mesh of host.children)mesh.position.x=mesh.userData.side*(gate.halfWidthMeters/course.metersPerUnit-.2);
+     for(const mesh of host.children){const lateral=mesh.userData.side*(gate.halfWidthMeters-.2);mesh.position.x=lateral/course.metersPerUnit;
+      mesh.position.y=1.4+raceCourseSurfacePoint(course,gate.distanceMeters,lateral).y-gate.y;}
     }
     for(const p of snapshot.players)if(p.ai&&p.pose) {
      const visual=visuals[p.slot-1];if(!visual)continue;const state=p.vehicleState;

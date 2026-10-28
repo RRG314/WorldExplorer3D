@@ -161,7 +161,7 @@ export function projectRacePosition(course,pose,{minimumMeters=-Infinity,maximum
 
 export function raceGridPose(course,index=0){
  if(!Number.isInteger(index)||index<0||index>=course.participants)throw Error('invalid_race_grid_slot');
- const distanceMeters=2+(Math.ceil(course.participants/2)-1-Math.floor(index/2))*8;
+ const distanceMeters=course.vehicleEnvelope.lengthMeters/2+1+(Math.ceil(course.participants/2)-1-Math.floor(index/2))*8;
  const s=course.segments.find(segment=>segment.startMeters+segment.lengthMeters>=distanceMeters)||course.segments.at(-1);
  const forward=s.forward,along=(distanceMeters-s.startMeters)/course.metersPerUnit;
  const lateral=(course.participants===1?0:index%2===0?-1.4:1.4)/course.metersPerUnit;
