@@ -65,3 +65,21 @@ test('matrix uploads reuse their Float32 storage while preserving exact cache pr
  matrix.elements[12]=1234.123456789;renderer.render({},{});assert.equal(uploads.length,2);assert.equal(uploads[0].data,uploads[1].data);assert.deepEqual(uploads[1].values,[...Float32Array.from(matrix.elements)]);assert.equal(uploads[1].transpose,false);
  control.dispose();assert.equal(uniform.setValue,originalSetter);assert.deepEqual(uniform.cache,matrix.elements);
 });
+
+test('render scratch retains exact doubles, releases offscreen objects and restores only owned buffers',()=>{
+ const object=()=>({modelViewMatrix:{elements:Array.from({length:16},(_,i)=>i/7)},normalMatrix:{elements:Array.from({length:9},(_,i)=>i/11)}});
+ const a=object(),b=object(),originalA=a.modelViewMatrix.elements,originalB=b.modelViewMatrix.elements;
+ const direct=function(){},renderer={info:{programs:[]},renderBufferDirect:direct,render(scene){for(const object of scene.objects)this.renderBufferDirect(null,scene,null,null,object,null);}};
+ const control=installLightUniformExperiment({renderer});renderer.render({objects:[a]},{});assert.ok(a.modelViewMatrix.elements instanceof Float64Array);assert.deepEqual([...a.modelViewMatrix.elements],originalA);
+ renderer.render({objects:[b]},{});assert.equal(a.modelViewMatrix.elements,originalA);assert.ok(b.modelViewMatrix.elements instanceof Float64Array);
+ const replacement=Float64Array.from(b.modelViewMatrix.elements);b.modelViewMatrix.elements=replacement;control.dispose();assert.equal(renderer.renderBufferDirect,direct);assert.equal(b.modelViewMatrix.elements,replacement);assert.equal(a.modelViewMatrix.elements,originalA);
+ assert.notEqual(replacement,originalB);
+});
+
+test('a preparation failure releases the prior view scratch and cannot poison the next render depth',()=>{
+ const object=()=>({modelViewMatrix:{elements:Array(16).fill(1/7)},normalMatrix:{elements:Array(9).fill(1/11)}}),a=object(),b=object(),original=a.modelViewMatrix.elements;
+ const renderer={info:{programs:[]},renderBufferDirect(){},render(scene){this.renderBufferDirect(null,scene,null,null,scene.object,null);}};
+ const control=installLightUniformExperiment({renderer});renderer.render({object:a},{});renderer.info.programs=[{getUniforms(){throw Error('program unavailable');}}];
+ assert.throws(()=>renderer.render({object:b},{}),/program unavailable/);assert.equal(a.modelViewMatrix.elements,original);
+ renderer.info.programs=[];renderer.render({object:b},{});assert.ok(b.modelViewMatrix.elements instanceof Float64Array);control.dispose();assert.ok(Array.isArray(b.modelViewMatrix.elements));
+});

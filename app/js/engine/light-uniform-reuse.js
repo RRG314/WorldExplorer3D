@@ -5,7 +5,7 @@
 export function installRenderLightUniformReuse(ctx) {
   const renderer=ctx.renderer,marker=Symbol.for('WorldExplorer.renderLightUniformReuse');
   if(renderer[marker])return renderer[marker];
-  const original=renderer.render,originalDispose=renderer.dispose,seen=new WeakSet(),setters=new WeakMap(),used=[];
+  const original=renderer.render,originalDraw=renderer.renderBufferDirect,originalDispose=renderer.dispose,seen=new WeakSet(),setters=new WeakMap(),used=[];
   const names=['directionalLights','pointLights','spotLights','hemisphereLights','rectAreaLights'];
   let epoch=0,enabled=true,allowed=false,calls=0,skipped=0,wrapped=0,numericConverted=0;
   const numericStates=new WeakMap();
@@ -67,6 +67,38 @@ export function installRenderLightUniformReuse(ctx) {
     if(active){state.valid=false;state.cache.fill(NaN);}
     if(dispose)uniform.setValue=state.originalSetter;
   }
+  // Object3D's model-view and normal matrices are renderer scratch, distinct
+  // from actor/world transforms. Retain their exact doubles in fixed buffers.
+  // Frame lists contain WeakRefs so a hidden/loading renderer cannot retain a
+  // retired city's parent graph. Offscreen/disposed views restore owned arrays.
+  const scratchStates=new WeakMap();let previousScratch=[],currentScratch=[],renderDepth=0,scratchEpoch=0,scratchConverted=0;
+  function restoreScratch(state){
+    for(const entry of state.entries)if(entry.matrix.elements===entry.typed){
+      for(let i=0;i<entry.typed.length;i++)entry.original[i]=entry.typed[i];entry.matrix.elements=entry.original;
+    }
+  }
+  function scratch(object){
+    if(!enabled||!object||typeof WeakRef!=='function')return;
+    let state=scratchStates.get(object);
+    if(!state){
+      const entries=[];
+      for(const key of ['modelViewMatrix','normalMatrix']){
+        const matrix=object[key],original=matrix?.elements;
+        if(Array.isArray(original))entries.push({matrix,original,typed:Float64Array.from(original)});
+      }
+      if(!entries.length)return;
+      state={entries,ref:new WeakRef(object),epoch:-1};scratchStates.set(object,state);scratchConverted++;
+    }
+    for(const entry of state.entries)if(entry.matrix.elements===entry.original){entry.typed.set(entry.original);entry.matrix.elements=entry.typed;}
+    if(state.epoch!==scratchEpoch){state.epoch=scratchEpoch;currentScratch.push(state.ref);}
+  }
+  const draw=function(camera,scene,geometry,material,object,group){
+    if(renderDepth>0)scratch(object);return originalDraw.call(this,camera,scene,geometry,material,object,group);
+  };
+  if(typeof originalDraw==='function')renderer.renderBufferDirect=draw;
+  function clearScratch(){
+    for(const refs of [previousScratch,currentScratch])for(const ref of refs){const object=ref.deref(),state=object&&scratchStates.get(object);if(state)restoreScratch(state);}
+  }
   function prepare(){
     for(const program of renderer.info.programs){
       if(seen.has(program))continue;seen.add(program);
@@ -90,12 +122,17 @@ export function installRenderLightUniformReuse(ctx) {
     }
   }
   const render=function(scene,camera){
-    const priorAllowed=allowed;
+    const priorAllowed=allowed,outer=renderDepth++===0;
+    if(outer){scratchEpoch++;currentScratch.length=0;}
     // ArrayCamera renders several views within one render invocation.
-    allowed=!camera?.isArrayCamera;epoch++;prepare();
-    try{return original.call(this,scene,camera);}
+    allowed=!camera?.isArrayCamera;epoch++;
+    try{prepare();return original.call(this,scene,camera);}
     finally{
-      epoch++;allowed=priorAllowed;
+      epoch++;allowed=priorAllowed;renderDepth--;
+      if(outer){
+        for(const ref of previousScratch){const object=ref.deref(),state=object&&scratchStates.get(object);if(state&&state.epoch!==scratchEpoch)restoreScratch(state);}
+        const recycled=previousScratch;previousScratch=currentScratch;currentScratch=recycled;currentScratch.length=0;
+      }
       for(const state of used)state.value=null;
       used.length=0;
     }
@@ -103,10 +140,12 @@ export function installRenderLightUniformReuse(ctx) {
   renderer.render=render;
   let disposed=false;
   const control={
-    setEnabled(value){if(!disposed){enabled=!!value;epoch++;for(const program of renderer.info.programs)leaves(program.getUniforms(),uniform=>toggleNumeric(uniform,enabled));}},
-    snapshot(){return {calls,skipped,wrapped,numericConverted};},
+    setEnabled(value){if(!disposed){enabled=!!value;epoch++;if(!enabled)clearScratch();for(const program of renderer.info.programs)leaves(program.getUniforms(),uniform=>toggleNumeric(uniform,enabled));}},
+    snapshot(){return {calls,skipped,wrapped,numericConverted,scratchConverted};},
     dispose(){
       if(disposed)return;disposed=true;enabled=false;allowed=false;epoch++;
+      clearScratch();previousScratch.length=currentScratch.length=0;
+      if(renderer.renderBufferDirect===draw)renderer.renderBufferDirect=originalDraw;
       for(const state of used)state.value=null;used.length=0;
       for(const program of renderer.info.programs){
         if(!seen.has(program))continue;
